@@ -56,21 +56,6 @@
     <value>true</value>
   </property>
 
-
-  <property>
-    <name>hdds.heartbeat.interval</name>
-    <value>1s</value>
-  </property>
-  <property>
-    <name>ozone.scm.heartbeat.thread.interval</name>
-    <value>100ms</value>
-  </property>
-
-  <property>
-    <name>ozone.scm.ratis.pipeline.limit</name>
-    <value>3</value>
-  </property>
-
   <property>
     <name>ozone.scm.close.container.wait.duration</name>
     <value>1s</value>

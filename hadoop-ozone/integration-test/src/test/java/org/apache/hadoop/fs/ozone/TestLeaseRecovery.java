@@ -43,7 +43,6 @@ import java.io.OutputStream;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeoutException;
 
-import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_RATIS_PIPELINE_LIMIT;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_OFS_URI_SCHEME;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_ROOT;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
@@ -93,8 +92,6 @@ public class TestLeaseRecovery {
     conf.setBoolean(OZONE_OM_RATIS_ENABLE_KEY, false);
     conf.setBoolean(OzoneConfigKeys.OZONE_FS_HSYNC_ENABLED, true);
     conf.set(OZONE_DEFAULT_BUCKET_LAYOUT, layout.name());
-    conf.setInt(OZONE_SCM_RATIS_PIPELINE_LIMIT, 10);
-
     ClientConfigForTesting.newBuilder(StorageUnit.BYTES)
         .setBlockSize(blockSize)
         .setChunkSize(chunkSize)
@@ -107,6 +104,7 @@ public class TestLeaseRecovery {
 
     cluster = MiniOzoneCluster.newBuilder(conf)
       .setNumDatanodes(5)
+      .setTotalPipelineNumLimit(10)
       .build();
     cluster.waitForClusterToBeReady();
     client = cluster.newClient();

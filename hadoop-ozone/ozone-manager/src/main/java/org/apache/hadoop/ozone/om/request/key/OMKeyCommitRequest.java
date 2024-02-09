@@ -270,10 +270,8 @@ public class OMKeyCommitRequest extends OMKeyRequest {
             keyToDelete, trxnLogIndex, ozoneManager.isRatisEnabled());
         checkBucketQuotaInBytes(omMetadataManager, omBucketInfo,
             correctedSpace);
-        // using pseudoObjId as objectId can be same in case of overwrite key
-        long pseudoObjId = ozoneManager.getObjectIdFromTxId(trxnLogIndex);
         String delKeyName = omMetadataManager.getOzoneDeletePathKey(
-            pseudoObjId, dbOzoneKey);
+            keyToDelete.getObjectID(), dbOzoneKey);
         if (null == oldKeyVersionsToDeleteMap) {
           oldKeyVersionsToDeleteMap = new HashMap<>();
         }
@@ -305,8 +303,8 @@ public class OMKeyCommitRequest extends OMKeyRequest {
         if (null == oldKeyVersionsToDeleteMap) {
           oldKeyVersionsToDeleteMap = new HashMap<>();
         }
-        oldKeyVersionsToDeleteMap.computeIfAbsent(delKeyName,
-            key -> new RepeatedOmKeyInfo()).addOmKeyInfo(pseudoKeyInfo);
+        oldKeyVersionsToDeleteMap.put(delKeyName,
+            new RepeatedOmKeyInfo(pseudoKeyInfo));
       }
 
       // Add to cache of open key table and key table.

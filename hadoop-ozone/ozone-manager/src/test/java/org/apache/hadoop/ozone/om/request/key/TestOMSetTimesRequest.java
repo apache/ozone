@@ -100,7 +100,7 @@ public class TestOMSetTimesRequest extends TestOMKeyRequest {
 
   protected String addKeyToTable() throws Exception {
     OMRequestTestUtils.addKeyToTable(false, false, volumeName, bucketName,
-        keyName, clientID, replicationConfig, 1L,
+        keyName, clientID, replicationType, replicationFactor, 1L,
         omMetadataManager);
 
     return omMetadataManager.getOzoneKey(volumeName, bucketName,

@@ -18,14 +18,13 @@
 
 package org.apache.hadoop.ozone.om.request.key;
 
-import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.ONE;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import org.apache.hadoop.hdds.client.RatisReplicationConfig;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.ozone.om.OzonePrefixPathImpl;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
@@ -34,6 +33,7 @@ import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.security.acl.OzonePrefixPath;
+import org.apache.hadoop.util.Time;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
@@ -72,11 +72,11 @@ public class TestOMKeyDeleteRequestWithFSO extends TestOMKeyDeleteRequest {
             bucketName, PARENT_DIR, omMetadataManager);
 
     OmKeyInfo omKeyInfo =
-        OMRequestTestUtils.createOmKeyInfo(volumeName, bucketName, FILE_KEY, RatisReplicationConfig.getInstance(ONE))
-            .setObjectID(parentId + 1L)
-            .setParentObjectID(parentId)
-            .setUpdateID(100L)
-            .build();
+            OMRequestTestUtils.createOmKeyInfo(volumeName, bucketName, FILE_KEY,
+                    HddsProtos.ReplicationType.RATIS,
+                    HddsProtos.ReplicationFactor.ONE,
+                    parentId + 1,
+                    parentId, 100, Time.now());
     omKeyInfo.setKeyName(FILE_NAME);
     OMRequestTestUtils.addFileToKeyTable(false, false,
         FILE_NAME, omKeyInfo, -1, 50, omMetadataManager);
@@ -96,11 +96,11 @@ public class TestOMKeyDeleteRequestWithFSO extends TestOMKeyDeleteRequest {
         bucketName, key, omMetadataManager);
 
     OmKeyInfo omKeyInfo =
-        OMRequestTestUtils.createOmKeyInfo(volumeName, bucketName, key, RatisReplicationConfig.getInstance(ONE))
-            .setObjectID(parentId + 1L)
-            .setParentObjectID(parentId)
-            .setUpdateID(100L)
-            .build();
+        OMRequestTestUtils.createOmKeyInfo(volumeName, bucketName, key,
+            HddsProtos.ReplicationType.RATIS,
+            HddsProtos.ReplicationFactor.ONE,
+            parentId + 1,
+            parentId, 100, Time.now());
     omKeyInfo.setKeyName(key);
     return omKeyInfo.getPath();
   }

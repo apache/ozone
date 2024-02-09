@@ -27,7 +27,7 @@ import java.util.UUID;
 import java.util.stream.Collectors;
 
 import org.apache.commons.lang3.RandomStringUtils;
-import org.apache.hadoop.hdds.client.RatisReplicationConfig;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.om.ResolvedBucket;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
@@ -60,7 +60,6 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CreateD
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyArgs;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 
-import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.ONE;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
@@ -298,7 +297,8 @@ public class TestOMDirectoryCreateRequest {
         omMetadataManager);
 
     OMRequestTestUtils.addKeyToTable(false, volumeName, bucketName,
-        keyName.substring(0, 12), 1L, RatisReplicationConfig.getInstance(ONE), omMetadataManager);
+        keyName.substring(0, 12), 1L, HddsProtos.ReplicationType.RATIS,
+        HddsProtos.ReplicationFactor.ONE, omMetadataManager);
     OMRequest omRequest = createDirectoryRequest(volumeName, bucketName,
         keyName);
     OMDirectoryCreateRequest omDirectoryCreateRequest =
@@ -340,7 +340,7 @@ public class TestOMDirectoryCreateRequest {
 
     OMRequestTestUtils.addKeyToTable(false, volumeName, bucketName,
         OzoneFSUtils.addTrailingSlashIfNeeded(keyName), 1L,
-        RatisReplicationConfig.getInstance(ONE),
+        HddsProtos.ReplicationType.RATIS, HddsProtos.ReplicationFactor.ONE,
         omMetadataManager);
     OMRequest omRequest = createDirectoryRequest(volumeName, bucketName,
         keyName);
@@ -383,7 +383,8 @@ public class TestOMDirectoryCreateRequest {
         omMetadataManager);
     // Add a key with first two levels.
     OMRequestTestUtils.addKeyToTable(false, volumeName, bucketName,
-        keyName.substring(0, 11), 1L, RatisReplicationConfig.getInstance(ONE), omMetadataManager);
+        keyName.substring(0, 11), 1L, HddsProtos.ReplicationType.RATIS,
+        HddsProtos.ReplicationFactor.ONE, omMetadataManager);
     OMRequest omRequest = createDirectoryRequest(volumeName, bucketName,
         keyName);
     OMDirectoryCreateRequest omDirectoryCreateRequest =

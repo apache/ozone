@@ -34,7 +34,6 @@ import org.junit.jupiter.api.Timeout;
 import picocli.CommandLine;
 import java.util.concurrent.TimeUnit;
 
-import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HEARTBEAT_PROCESS_INTERVAL;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
@@ -55,8 +54,9 @@ public class TestFreonWithDatanodeFastRestart {
   @BeforeAll
   public static void init() throws Exception {
     conf = new OzoneConfiguration();
-    conf.setTimeDuration(OZONE_SCM_HEARTBEAT_PROCESS_INTERVAL, 1000, TimeUnit.MILLISECONDS);
     cluster = MiniOzoneCluster.newBuilder(conf)
+      .setHbProcessorInterval(1000)
+      .setHbInterval(1000)
       .setNumDatanodes(3)
       .build();
     cluster.waitForClusterToBeReady();

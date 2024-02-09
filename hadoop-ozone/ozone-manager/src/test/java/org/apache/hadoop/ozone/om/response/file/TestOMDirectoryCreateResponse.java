@@ -20,8 +20,6 @@ package org.apache.hadoop.ozone.om.response.file;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
-
-import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.utils.db.Table;
@@ -84,7 +82,7 @@ public class TestOMDirectoryCreateResponse {
 
     OmKeyInfo omKeyInfo = OMRequestTestUtils.createOmKeyInfo(volumeName,
         bucketName, OzoneFSUtils.addTrailingSlashIfNeeded(keyName),
-        RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.ONE)).build();
+        HddsProtos.ReplicationType.RATIS, HddsProtos.ReplicationFactor.ONE);
 
     ThreadLocalRandom random = ThreadLocalRandom.current();
     long usedNamespace = Math.abs(random.nextLong(Long.MAX_VALUE));

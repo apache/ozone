@@ -23,7 +23,6 @@ import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
-import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
 import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.ozone.om.request.key.TestOMKeyRequest;
@@ -36,6 +35,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
     .RecoverLeaseRequest;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
+import org.apache.hadoop.util.Time;
 import jakarta.annotation.Nonnull;
 import org.junit.jupiter.api.Test;
 
@@ -272,9 +272,8 @@ public class TestOMRecoverLeaseRequest extends TestOMKeyRequest {
   String addToOpenFileTable(List<OmKeyLocationInfo> locationList)
       throws Exception {
     OmKeyInfo omKeyInfo = OMRequestTestUtils.createOmKeyInfo(volumeName,
-            bucketName, keyName, replicationConfig, new OmKeyLocationInfoGroup(version, new ArrayList<>(), false))
-        .setParentObjectID(parentId)
-        .build();
+        bucketName, keyName, replicationType, replicationFactor, 0, parentId,
+        0, Time.now(), version);
     omKeyInfo.appendNewBlocks(locationList, false);
     omKeyInfo.getMetadata().put(OzoneConsts.HSYNC_CLIENT_ID,
         String.valueOf(clientID));
@@ -295,9 +294,8 @@ public class TestOMRecoverLeaseRequest extends TestOMKeyRequest {
   String addToFileTable(List<OmKeyLocationInfo> locationList)
       throws Exception {
     OmKeyInfo omKeyInfo = OMRequestTestUtils.createOmKeyInfo(volumeName,
-            bucketName, keyName, replicationConfig, new OmKeyLocationInfoGroup(version, new ArrayList<>(), false))
-        .setParentObjectID(parentId)
-        .build();
+        bucketName, keyName, replicationType, replicationFactor, 0, parentId,
+        0, Time.now(), version);
     omKeyInfo.appendNewBlocks(locationList, false);
 
     OMRequestTestUtils.addFileToKeyTable(

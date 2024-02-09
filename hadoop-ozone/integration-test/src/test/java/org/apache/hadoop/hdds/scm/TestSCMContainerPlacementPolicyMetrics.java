@@ -85,9 +85,9 @@ public class TestSCMContainerPlacementPolicyMetrics {
     StaticMapping.addNodeToRack(NetUtils.normalizeHostNames(
         Collections.singleton(HddsUtils.getHostName(conf))).get(0),
         "/rack1");
-    conf.setInt(ScmConfigKeys.OZONE_SCM_RATIS_PIPELINE_LIMIT, 10);
     cluster = MiniOzoneCluster.newBuilder(conf)
         .setNumDatanodes(4)
+        .setTotalPipelineNumLimit(10)
         .build();
     cluster.waitForClusterToBeReady();
     metrics = getMetrics(SCMContainerPlacementMetrics.class.getSimpleName());

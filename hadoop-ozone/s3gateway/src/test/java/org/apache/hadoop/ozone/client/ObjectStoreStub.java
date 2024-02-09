@@ -20,6 +20,7 @@
 package org.apache.hadoop.ozone.client;
 
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
@@ -61,7 +62,7 @@ public class ObjectStoreStub extends ObjectStore {
             .setAdmin("root")
             .setOwner("root")
             .setQuotaInBytes(Integer.MAX_VALUE)
-            .build());
+            .setAcls(new ArrayList<>()).build());
   }
 
   @Override

@@ -18,7 +18,7 @@
 
 package org.apache.hadoop.ozone.om.request.key;
 
-import org.apache.hadoop.hdds.client.RatisReplicationConfig;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
@@ -31,7 +31,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
-import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.THREE;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status.PARTIAL_DELETE;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type.DeleteKeys;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -146,7 +145,8 @@ public class TestOMKeysDeleteRequest extends TestOMKeyRequest {
     for (int i = 0; i < count; i++) {
       key = parentDir.concat("/key" + i);
       OMRequestTestUtils.addKeyToTableCache(volumeName, bucketName,
-          parentDir.concat("/key" + i), RatisReplicationConfig.getInstance(THREE), omMetadataManager);
+          parentDir.concat("/key" + i), HddsProtos.ReplicationType.RATIS,
+          HddsProtos.ReplicationFactor.THREE, omMetadataManager);
       deleteKeyArgs.addKeys(key);
       deleteKeyList.add(key);
     }

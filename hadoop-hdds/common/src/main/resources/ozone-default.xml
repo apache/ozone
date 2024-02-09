@@ -2227,14 +2227,6 @@
     <description>The OzoneManager service principal. Ex om/_HOST@REALM.COM</description>
   </property>
   <property>
-    <name>ozone.om.kerberos.principal.pattern</name>
-    <value>*</value>
-    <description>
-      A client-side RegEx that can be configured to control
-      allowed realms to authenticate with (useful in cross-realm env.)
-    </description>
-  </property>
-  <property>
     <name>ozone.om.http.auth.kerberos.principal</name>
     <value>HTTP/_HOST@REALM</value>
     <tag>OZONE, SECURITY, KERBEROS</tag>

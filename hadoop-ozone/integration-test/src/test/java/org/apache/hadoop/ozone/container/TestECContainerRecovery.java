@@ -140,7 +140,6 @@ public class TestECContainerRecovery {
         TimeUnit.MILLISECONDS);
     conf.setTimeDuration(HddsConfigKeys.HDDS_CONTAINER_REPORT_INTERVAL, 1,
         TimeUnit.SECONDS);
-    conf.setInt(ScmConfigKeys.OZONE_SCM_RATIS_PIPELINE_LIMIT, 10);
 
     ClientConfigForTesting.newBuilder(StorageUnit.BYTES)
         .setBlockSize(blockSize)
@@ -149,8 +148,8 @@ public class TestECContainerRecovery {
         .setStreamBufferMaxSize(maxFlushSize)
         .applyTo(conf);
 
-    cluster = MiniOzoneCluster.newBuilder(conf)
-        .setNumDatanodes(10)
+    cluster = MiniOzoneCluster.newBuilder(conf).setNumDatanodes(10)
+        .setTotalPipelineNumLimit(10)
         .build();
     cluster.waitForClusterToBeReady();
     client = OzoneClientFactory.getRpcClient(conf);

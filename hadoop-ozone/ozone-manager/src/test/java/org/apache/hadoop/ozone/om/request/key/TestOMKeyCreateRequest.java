@@ -31,7 +31,6 @@ import java.util.Map;
 import java.util.HashMap;
 
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
-import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.OzoneAcl;
@@ -547,8 +546,7 @@ public class TestOMKeyCreateRequest extends TestOMKeyRequest {
     KeyArgs.Builder keyArgs = KeyArgs.newBuilder()
         .setVolumeName(volumeName).setBucketName(bucketName)
         .setKeyName(keyName).setIsMultipartKey(isMultipartKey)
-        .setFactor(((RatisReplicationConfig) replicationConfig).getReplicationFactor())
-        .setType(replicationConfig.getReplicationType())
+        .setFactor(replicationFactor).setType(replicationType)
         .setLatestVersionLocation(true);
 
     if (isMultipartKey) {
@@ -795,7 +793,7 @@ public class TestOMKeyCreateRequest extends TestOMKeyRequest {
 
   protected void addToKeyTable(String keyName) throws Exception {
     OMRequestTestUtils.addKeyToTable(false, volumeName, bucketName,
-        keyName.substring(1), 0L, RatisReplicationConfig.getInstance(THREE), omMetadataManager);
+        keyName.substring(1), 0L, RATIS, THREE, omMetadataManager);
   }
 
 

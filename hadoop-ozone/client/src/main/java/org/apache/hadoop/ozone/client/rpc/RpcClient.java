@@ -430,9 +430,8 @@ public class RpcClient implements ClientProtocol {
     userGroups.stream().forEach((group) -> listOfAcls.add(
         new OzoneAcl(ACLIdentityType.GROUP, group, groupRights, ACCESS)));
     //ACLs from VolumeArgs
-    List<OzoneAcl> volumeAcls = volArgs.getAcls();
-    if (volumeAcls != null) {
-      listOfAcls.addAll(volumeAcls);
+    if (volArgs.getAcls() != null) {
+      listOfAcls.addAll(volArgs.getAcls());
     }
 
     OmVolumeArgs.Builder builder = OmVolumeArgs.newBuilder();

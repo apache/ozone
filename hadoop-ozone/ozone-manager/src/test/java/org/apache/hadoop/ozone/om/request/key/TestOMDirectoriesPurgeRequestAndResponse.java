@@ -68,7 +68,7 @@ public class TestOMDirectoriesPurgeRequestAndResponse extends TestOMKeyRequest {
     for (int i = 1; i <= numKeys; i++) {
       String key = keyName + "-" + i;
       OMRequestTestUtils.addKeyToTable(false, false, volumeName, bucket,
-          key, clientID, replicationConfig, trxnIndex++,
+          key, clientID, replicationType, replicationFactor, trxnIndex++,
           omMetadataManager);
       String ozoneKey = omMetadataManager.getOzoneKey(
           volumeName, bucket, key);

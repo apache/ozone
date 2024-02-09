@@ -203,10 +203,8 @@ public class OMKeyCommitRequestWithFSO extends OMKeyCommitRequest {
             correctedSpace);
         String delKeyName = omMetadataManager
             .getOzoneKey(volumeName, bucketName, fileName);
-        // using pseudoObjId as objectId can be same in case of overwrite key
-        long pseudoObjId = ozoneManager.getObjectIdFromTxId(trxnLogIndex);
         delKeyName = omMetadataManager.getOzoneDeletePathKey(
-            pseudoObjId, delKeyName);
+            keyToDelete.getObjectID(), delKeyName);
         if (null == oldKeyVersionsToDeleteMap) {
           oldKeyVersionsToDeleteMap = new HashMap<>();
         }
@@ -240,8 +238,8 @@ public class OMKeyCommitRequestWithFSO extends OMKeyCommitRequest {
         if (null == oldKeyVersionsToDeleteMap) {
           oldKeyVersionsToDeleteMap = new HashMap<>();
         }
-        oldKeyVersionsToDeleteMap.computeIfAbsent(delKeyName,
-            key -> new RepeatedOmKeyInfo()).addOmKeyInfo(pseudoKeyInfo);
+        oldKeyVersionsToDeleteMap.put(delKeyName,
+            new RepeatedOmKeyInfo(pseudoKeyInfo));
       }
 
       // Add to cache of open key table and key table.

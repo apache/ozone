@@ -56,6 +56,8 @@ import java.util.function.Function;
 
 import static java.util.Collections.singletonList;
 import static org.apache.hadoop.hdds.HddsConfigKeys.OZONE_METADATA_DIRS;
+import static org.apache.hadoop.hdds.scm.ScmConfig.ConfigStrings.HDDS_SCM_INIT_DEFAULT_LAYOUT_VERSION;
+import static org.apache.hadoop.ozone.om.OmUpgradeConfig.ConfigStrings.OZONE_OM_INIT_DEFAULT_LAYOUT_VERSION;
 import static org.apache.ozone.test.GenericTestUtils.PortAllocator.getFreePort;
 import static org.apache.ozone.test.GenericTestUtils.PortAllocator.localhostWithFreePort;
 
@@ -485,6 +487,11 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
             String metaDirPath = path + "/" + nodeId;
             config.set(OZONE_METADATA_DIRS, metaDirPath);
 
+            // Set non standard layout version if needed.
+            omLayoutVersion.ifPresent(integer ->
+                config.set(OZONE_OM_INIT_DEFAULT_LAYOUT_VERSION,
+                    String.valueOf(integer)));
+
             OzoneManager.omInit(config);
             OzoneManager om = OzoneManager.createOm(config);
             if (certClient != null) {
@@ -547,6 +554,10 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
             scmConfig.set(OZONE_METADATA_DIRS, metaDirPath);
             scmConfig.set(ScmConfigKeys.OZONE_SCM_NODE_ID_KEY, nodeId);
             scmConfig.setBoolean(ScmConfigKeys.OZONE_SCM_HA_ENABLE_KEY, true);
+
+            scmLayoutVersion.ifPresent(integer ->
+                scmConfig.set(HDDS_SCM_INIT_DEFAULT_LAYOUT_VERSION,
+                    String.valueOf(integer)));
 
             configureSCM();
             if (i == 1) {

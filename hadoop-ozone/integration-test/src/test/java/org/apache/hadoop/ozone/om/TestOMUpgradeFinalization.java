@@ -20,7 +20,6 @@ package org.apache.hadoop.ozone.om;
 import static org.apache.hadoop.ozone.OzoneConsts.LAYOUT_VERSION_KEY;
 import static org.apache.hadoop.ozone.om.OMUpgradeTestUtils.assertClusterPrepared;
 import static org.apache.hadoop.ozone.om.OMUpgradeTestUtils.waitForFinalization;
-import static org.apache.hadoop.ozone.om.OmUpgradeConfig.ConfigStrings.OZONE_OM_INIT_DEFAULT_LAYOUT_VERSION;
 import static org.apache.hadoop.ozone.om.upgrade.OMLayoutFeature.INITIAL_VERSION;
 import static org.apache.hadoop.ozone.om.upgrade.OMLayoutVersionManager.maxLayoutVersion;
 import static org.apache.ozone.test.GenericTestUtils.waitFor;
@@ -104,11 +103,11 @@ class TestOMUpgradeFinalization {
 
   private static MiniOzoneHAClusterImpl newCluster(OzoneConfiguration conf)
       throws IOException {
-    conf.setInt(OZONE_OM_INIT_DEFAULT_LAYOUT_VERSION, INITIAL_VERSION.layoutVersion());
     return (MiniOzoneHAClusterImpl) MiniOzoneCluster.newOMHABuilder(conf)
         .setOMServiceId(UUID.randomUUID().toString())
         .setNumOfOzoneManagers(3)
         .setNumDatanodes(1)
+        .setOmLayoutVersion(INITIAL_VERSION.layoutVersion())
         .build();
   }
 
