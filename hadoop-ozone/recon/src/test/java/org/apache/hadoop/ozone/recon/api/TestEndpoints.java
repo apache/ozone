@@ -288,8 +288,9 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
         utilizationSchemaDefinition);
     fileSizeCountTask =
         new FileSizeCountTask(fileCountBySizeDao, utilizationSchemaDefinition);
-    omTableInsightTask = new OmTableInsightTask(
-        globalStatsDao, sqlConfiguration, reconOMMetadataManager);
+    omTableInsightTask =
+        new OmTableInsightTask(globalStatsDao, sqlConfiguration,
+            reconOMMetadataManager);
     containerHealthSchemaManager =
         reconTestInjector.getInstance(ContainerHealthSchemaManager.class);
     clusterStateEndpoint =
@@ -515,11 +516,11 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
 
     // Populate the deletedDirectories table in OM DB
     writeDeletedDirToOm(reconOMMetadataManager, "Bucket1", "Volume1", "dir1",
-        3L, 2L, 1L);
+        3L, 2L, 1L, 23L);
     writeDeletedDirToOm(reconOMMetadataManager, "Bucket2", "Volume2", "dir2",
-        6L, 5L, 4L);
+        6L, 5L, 4L, 22L);
     writeDeletedDirToOm(reconOMMetadataManager, "Bucket3", "Volume3", "dir3",
-        9L, 8L, 7L);
+        9L, 8L, 7L, 21L);
 
     // Truncate global stats table before running each test
     dslContext.truncate(GLOBAL_STATS);
@@ -594,7 +595,7 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
           (DatanodesResponse) response1.getEntity();
       DatanodeMetadata datanodeMetadata1 =
           datanodesResponse1.getDatanodes().stream().filter(datanodeMetadata ->
-              datanodeMetadata.getHostname().equals("host1.datanode"))
+                  datanodeMetadata.getHostname().equals("host1.datanode"))
               .findFirst().orElse(null);
       return (datanodeMetadata1 != null &&
           datanodeMetadata1.getContainers() == 1 &&
@@ -699,7 +700,7 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
     byte[] fileBytes = FileUtils.readFileToByteArray(
         new File(classLoader.getResource(PROMETHEUS_TEST_RESPONSE_FILE)
             .getFile())
-        );
+    );
     verify(outputStreamMock).write(fileBytes, 0, fileBytes.length);
   }
 
