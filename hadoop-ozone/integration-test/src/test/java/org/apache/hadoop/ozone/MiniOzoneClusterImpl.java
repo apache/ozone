@@ -115,6 +115,8 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
   private static final Logger LOG =
       LoggerFactory.getLogger(MiniOzoneClusterImpl.class);
 
+  private static final String[] NO_ARGS = new String[0];
+
   static {
     CodecBuffer.enableLeakDetection();
   }
@@ -369,8 +371,7 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
       // wait for node to be removed from SCM healthy node list.
       waitForHddsDatanodeToStop(datanodeService.getDatanodeDetails());
     }
-    String[] args = new String[] {};
-    HddsDatanodeService service = new HddsDatanodeService(args);
+    HddsDatanodeService service = new HddsDatanodeService(NO_ARGS);
     service.setConfiguration(config);
     hddsDatanodes.add(i, service);
     startHddsDatanode(service);
@@ -455,7 +456,7 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
   @Override
   public void startRecon() {
     reconServer = new ReconServer();
-    reconServer.execute(new String[]{});
+    reconServer.execute(NO_ARGS);
   }
 
   @Override
@@ -722,7 +723,7 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
       if (includeRecon) {
         configureRecon();
         reconServer = new ReconServer();
-        reconServer.execute(new String[] {});
+        reconServer.execute(NO_ARGS);
 
         OzoneStorageContainerManager reconScm =
             reconServer.getReconStorageContainerManager();
@@ -740,7 +741,6 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
      */
     protected List<HddsDatanodeService> createHddsDatanodes()
         throws IOException {
-      String[] args = new String[] {};
       List<HddsDatanodeService> hddsDatanodes = new ArrayList<>();
       for (int i = 0; i < numOfDatanodes; i++) {
         OzoneConfiguration dnConf = new OzoneConfiguration(conf);
@@ -772,7 +772,7 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
         dnConf.set(OzoneConfigKeys.DFS_CONTAINER_RATIS_DATANODE_STORAGE_DIR,
             ratisDir.toString());
 
-        HddsDatanodeService datanode = new HddsDatanodeService(args);
+        HddsDatanodeService datanode = new HddsDatanodeService(NO_ARGS);
         datanode.setConfiguration(dnConf);
         hddsDatanodes.add(datanode);
       }
