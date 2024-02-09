@@ -30,7 +30,6 @@ import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.common.BlockGroup;
-import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.ListKeysResult;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmDBAccessIdInfo;
@@ -612,14 +611,4 @@ public interface OMMetadataManager extends DBStoreHAManager {
    */
   boolean containsIncompleteMPUs(String volume, String bucket)
       throws IOException;
-
-  /**
-   * validates if bucket is valid.
-   *
-   * @param volumeName
-   * @param bucketName
-   * @return valid OmBucketInfo object
-   * @throws OMException
-   */
-  OmBucketInfo validateBucket(String volumeName, String bucketName) throws IOException;
 }
