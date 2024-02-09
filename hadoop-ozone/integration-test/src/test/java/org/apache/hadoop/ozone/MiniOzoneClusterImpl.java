@@ -182,18 +182,6 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
     this.conf = newConf;
   }
 
-  @Override
-  public String getOMServiceId() {
-    // Non-HA cluster doesn't have OM Service Id.
-    return null;
-  }
-
-  @Override
-  public String getSCMServiceId() {
-    // Non-HA cluster doesn't have OM Service Id.
-    return null;
-  }
-
   public void waitForSCMToBeReady() throws TimeoutException,
       InterruptedException {
     if (SCMHAUtils.isSCMHAEnabled(conf)) {

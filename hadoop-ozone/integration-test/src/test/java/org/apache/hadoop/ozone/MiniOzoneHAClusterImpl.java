@@ -99,16 +99,6 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
     this.clusterMetaPath = clusterPath;
   }
 
-  @Override
-  public String getOMServiceId() {
-    return omhaService.getServiceId();
-  }
-
-  @Override
-  public String getSCMServiceId() {
-    return scmhaService.getServiceId();
-  }
-
   /**
    * Returns the first OzoneManager from the list.
    * @return
@@ -713,7 +703,7 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
 
     while (true) {
       try {
-        OzoneConfiguration newConf = addNewOMToConfig(getOMServiceId(),
+        OzoneConfiguration newConf = addNewOMToConfig(omhaService.getServiceId(),
             omNodeId);
 
         if (updateConfigs) {

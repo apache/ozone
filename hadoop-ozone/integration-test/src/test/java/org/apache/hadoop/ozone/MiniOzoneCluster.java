@@ -122,21 +122,6 @@ public interface MiniOzoneCluster extends AutoCloseable {
   void waitTobeOutOfSafeMode() throws TimeoutException, InterruptedException;
 
   /**
-   * Returns OzoneManager Service ID.
-   *
-   * @return Service ID String
-   */
-  String getOMServiceId();
-
-
-  /**
-   * Returns StorageContainerManager Service ID.
-   *
-   * @return Service ID String
-   */
-  String getSCMServiceId();
-
-  /**
    * Returns {@link StorageContainerManager} associated with this
    * {@link MiniOzoneCluster} instance.
    *
