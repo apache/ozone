@@ -37,7 +37,7 @@ import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.ozone.om.response.key.OMKeyCommitResponse;
 import org.apache.hadoop.util.Time;
-import org.jetbrains.annotations.NotNull;
+import jakarta.annotation.Nonnull;
 import org.junit.jupiter.api.Test;
 
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
@@ -717,13 +717,13 @@ public class TestOMKeyCommitRequest extends TestOMKeyRequest {
     return parentDir;
   }
 
-  @NotNull
+  @Nonnull
   protected String getOzonePathKey() throws IOException {
     return omMetadataManager.getOzoneKey(volumeName, bucketName,
             keyName);
   }
 
-  @NotNull
+  @Nonnull
   protected String addKeyToOpenKeyTable(List<OmKeyLocationInfo> locationList)
       throws Exception {
     OMRequestTestUtils.addKeyToTable(true, volumeName, bucketName, keyName,
@@ -734,7 +734,7 @@ public class TestOMKeyCommitRequest extends TestOMKeyRequest {
               keyName, clientID);
   }
 
-  @NotNull
+  @Nonnull
   protected OMKeyCommitRequest getOmKeyCommitRequest(OMRequest omRequest) {
     return new OMKeyCommitRequest(omRequest, BucketLayout.DEFAULT);
   }

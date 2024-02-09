@@ -23,8 +23,8 @@ import static org.apache.hadoop.ozone.recon.ReconUtils.createTarFile;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyBoolean;
+import static org.mockito.Mockito.any;
+import static org.mockito.Mockito.anyBoolean;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -41,8 +41,8 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.net.URL;
-import java.util.Random;
 
+import org.apache.commons.lang3.RandomUtils;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -206,9 +206,8 @@ public class TestReconUtils {
       assertNextClosestPowerIndexOfTwo(n - 1);
     }
 
-    final Random random = new Random();
     for (int i = 0; i < 10; i++) {
-      assertNextClosestPowerIndexOfTwo(random.nextLong());
+      assertNextClosestPowerIndexOfTwo(RandomUtils.nextLong());
     }
   }
 

@@ -18,8 +18,6 @@
 
 package org.apache.hadoop.hdds.scm.pipeline;
 
-import org.apache.hadoop.fs.FileUtil;
-import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -39,10 +37,10 @@ import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.utils.db.DBStoreBuilder;
 import org.apache.hadoop.ozone.ClientVersion;
 import org.apache.hadoop.ozone.container.common.SCMTestUtils;
-import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
 import java.io.File;
 import java.io.IOException;
@@ -50,13 +48,11 @@ import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
-import java.util.UUID;
 import java.util.concurrent.TimeoutException;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.junit.jupiter.api.Assertions.fail;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
@@ -65,15 +61,13 @@ import static org.assertj.core.api.Assertions.assertThat;
 public class TestPipelineStateManagerImpl {
 
   private PipelineStateManager stateManager;
+  @TempDir
   private File testDir;
   private DBStore dbStore;
 
   @BeforeEach
   public void init() throws Exception {
-    final OzoneConfiguration conf = SCMTestUtils.getConf();
-    testDir = GenericTestUtils.getTestDir(
-        TestPipelineStateManagerImpl.class.getSimpleName() + UUID.randomUUID());
-    conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, testDir.getAbsolutePath());
+    final OzoneConfiguration conf = SCMTestUtils.getConf(testDir);
     dbStore = DBStoreBuilder.createDBStore(
         conf, new SCMDBDefinition());
 
@@ -93,8 +87,6 @@ public class TestPipelineStateManagerImpl {
     if (dbStore != null) {
       dbStore.close();
     }
-
-    FileUtil.fullyDelete(testDir);
   }
 
   private Pipeline createDummyPipeline(int numNodes) {
@@ -323,14 +315,13 @@ public class TestPipelineStateManagerImpl {
 
     finalizePipeline(pipelineProto);
     removePipeline(pipelineProto);
-    try {
-      stateManager.addContainerToPipeline(pipeline.getId(),
-          ContainerID.valueOf(++containerID));
-      fail("Container should not have been added");
-    } catch (IOException e) {
-      // Can not add a container to removed pipeline
-      assertThat(e.getMessage()).contains("not found");
-    }
+    Pipeline finalPipeline = pipeline;
+    ContainerID cid = ContainerID.valueOf(++containerID);
+    IOException e =
+        assertThrows(IOException.class,
+            () -> stateManager.addContainerToPipeline(finalPipeline.getId(), cid));
+    // Can not add a container to removed pipeline
+    assertThat(e.getMessage()).contains("not found");
   }
 
   @Test
@@ -344,13 +335,9 @@ public class TestPipelineStateManagerImpl {
     stateManager
         .addContainerToPipeline(pipeline.getId(), ContainerID.valueOf(1));
 
-    try {
-      removePipeline(pipelineProto);
-      fail("Pipeline should not have been removed");
-    } catch (IOException e) {
-      // can not remove a pipeline which already has containers
-      assertThat(e.getMessage()).contains("not yet closed");
-    }
+    IOException e = assertThrows(IOException.class, () -> removePipeline(pipelineProto));
+    // can not remove a pipeline which already has containers
+    assertThat(e.getMessage()).contains("not yet closed");
 
     // close the pipeline
     finalizePipeline(pipelineProto);

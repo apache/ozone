@@ -79,6 +79,12 @@ for i in $(seq 1 ${ITERATIONS}); do
   fi
 
   if [[ ${ITERATIONS} -gt 1 ]]; then
+    if ! grep -q "Tests run: [^0]" "${REPORT_DIR}/output.log"; then
+      echo "No tests were run" >> "${REPORT_DIR}/summary.txt"
+      irc=1
+      FAIL_FAST=true
+    fi
+
     REPORT_DIR="${original_report_dir}"
     echo "Iteration ${i} exit code: ${irc}" | tee -a "${REPORT_FILE}"
   fi

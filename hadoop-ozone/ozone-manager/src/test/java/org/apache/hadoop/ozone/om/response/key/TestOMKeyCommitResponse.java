@@ -29,7 +29,7 @@ import java.util.Map;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
-import org.jetbrains.annotations.NotNull;
+import jakarta.annotation.Nonnull;
 import org.junit.jupiter.api.Test;
 
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
@@ -132,20 +132,20 @@ public class TestOMKeyCommitResponse extends TestOMKeyResponse {
 
   }
 
-  @NotNull
+  @Nonnull
   protected void addKeyToOpenKeyTable() throws Exception {
     OMRequestTestUtils.addKeyToTable(true, volumeName, bucketName, keyName,
             clientID, replicationType, replicationFactor, omMetadataManager);
   }
 
-  @NotNull
+  @Nonnull
   protected String getOzoneKey() throws IOException {
     assertNotNull(omBucketInfo);
     return omMetadataManager.getOzoneKey(volumeName,
             omBucketInfo.getBucketName(), keyName);
   }
 
-  @NotNull
+  @Nonnull
   protected OMKeyCommitResponse getOmKeyCommitResponse(OmKeyInfo omKeyInfo,
           OzoneManagerProtocolProtos.OMResponse omResponse, String openKey,
           String ozoneKey, RepeatedOmKeyInfo deleteKeys, Boolean isHSync, OmKeyInfo newOpenKeyInfo)

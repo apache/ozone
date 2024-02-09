@@ -45,7 +45,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Allocat
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyArgs;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
-import org.jetbrains.annotations.NotNull;
+import jakarta.annotation.Nonnull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -222,7 +222,7 @@ public class OMAllocateBlockRequestWithFSO extends OMAllocateBlockRequest {
             openKeyInfo, fileName, trxnLogIndex);
   }
 
-  @NotNull
+  @Nonnull
   private OMClientResponse getOmClientResponse(long clientID,
       OMResponse.Builder omResponse, OmKeyInfo openKeyInfo,
       OmBucketInfo omBucketInfo, long volumeId) {

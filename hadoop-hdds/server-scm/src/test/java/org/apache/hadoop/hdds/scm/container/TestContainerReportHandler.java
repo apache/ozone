@@ -16,8 +16,6 @@
  */
 package org.apache.hadoop.hdds.scm.container;
 
-import org.apache.hadoop.fs.FileUtil;
-import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -48,10 +46,10 @@ import org.apache.hadoop.hdds.utils.db.DBStoreBuilder;
 import org.apache.hadoop.ozone.common.statemachine.InvalidStateTransitionException;
 import org.apache.hadoop.ozone.container.common.SCMTestUtils;
 import org.apache.hadoop.ozone.protocol.commands.CommandForDatanode;
-import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
 import java.io.File;
 import java.io.IOException;
@@ -63,7 +61,6 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.UUID;
 import java.util.concurrent.TimeoutException;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -89,20 +86,17 @@ public class TestContainerReportHandler {
   private ContainerManager containerManager;
   private ContainerStateManager containerStateManager;
   private EventPublisher publisher;
+  @TempDir
   private File testDir;
   private DBStore dbStore;
   private SCMHAManager scmhaManager;
   private PipelineManager pipelineManager;
 
   @BeforeEach
-  public void setup() throws IOException, InvalidStateTransitionException,
-      TimeoutException {
-    final OzoneConfiguration conf = SCMTestUtils.getConf();
+  void setup() throws IOException, InvalidStateTransitionException {
+    final OzoneConfiguration conf = SCMTestUtils.getConf(testDir);
     nodeManager = new MockNodeManager(true, 10);
     containerManager = mock(ContainerManager.class);
-    testDir = GenericTestUtils.getTestDir(
-        TestContainerReportHandler.class.getSimpleName() + UUID.randomUUID());
-    conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, testDir.getAbsolutePath());
     dbStore = DBStoreBuilder.createDBStore(
         conf, new SCMDBDefinition());
     scmhaManager = SCMHAManagerStub.getInstance(true);
@@ -165,8 +159,6 @@ public class TestContainerReportHandler {
     if (dbStore != null) {
       dbStore.close();
     }
-
-    FileUtil.fullyDelete(testDir);
   }
 
   private void testReplicaIndexUpdate(ContainerInfo container,

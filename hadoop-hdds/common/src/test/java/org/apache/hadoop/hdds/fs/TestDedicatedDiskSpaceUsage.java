@@ -17,45 +17,30 @@
  */
 package org.apache.hadoop.hdds.fs;
 
-import org.apache.hadoop.fs.FileUtil;
-import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
 import java.io.File;
 import java.io.IOException;
 
 import static org.apache.hadoop.hdds.fs.TestDU.createFile;
-import static org.apache.ozone.test.GenericTestUtils.getTestDir;
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Tests for {@link DedicatedDiskSpaceUsage}.
  */
 class TestDedicatedDiskSpaceUsage {
 
-  private static final File DIR =
-      getTestDir(TestDedicatedDiskSpaceUsage.class.getSimpleName());
+  @TempDir
+  private File dir;
 
   private static final int FILE_SIZE = 1024;
 
-  @BeforeEach
-  void setUp() {
-    FileUtil.fullyDelete(DIR);
-    assertTrue(DIR.mkdirs());
-  }
-
-  @AfterEach
-  void tearDown() {
-    FileUtil.fullyDelete(DIR);
-  }
-
   @Test
   void testGetUsed() throws IOException {
-    File file = new File(DIR, "data");
+    File file = new File(dir, "data");
     createFile(file, FILE_SIZE);
-    SpaceUsageSource subject = new DedicatedDiskSpaceUsage(DIR);
+    SpaceUsageSource subject = new DedicatedDiskSpaceUsage(dir);
 
     // condition comes from TestDFCachingGetSpaceUsed in Hadoop Common
     assertThat(subject.getUsedSpace()).isGreaterThanOrEqualTo(FILE_SIZE - 20);

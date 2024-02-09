@@ -46,7 +46,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CommitK
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.AllocateBlockRequest;
 import org.apache.hadoop.util.Time;
-import org.jetbrains.annotations.NotNull;
+import jakarta.annotation.Nonnull;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
@@ -61,7 +61,6 @@ import static org.apache.hadoop.ozone.om.protocolPB.OzoneManagerProtocolClientSi
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
-
 
 /**
  * Tests OMRecoverLeaseRequest.
@@ -436,7 +435,7 @@ public class TestOMRecoverLeaseRequest extends TestOMKeyRequest {
           .setAllocateBlockRequest(allocateBlockRequest).build();
   }
 
-  @NotNull
+  @Nonnull
   protected OMRequest createRecoverLeaseRequest(
       String volumeName, String bucketName, String keyName, boolean force) {
     RecoverLeaseRequest.Builder rb = RecoverLeaseRequest.newBuilder();
@@ -460,7 +459,7 @@ public class TestOMRecoverLeaseRequest extends TestOMKeyRequest {
     return omClientResponse;
   }
 
-  @NotNull
+  @Nonnull
   protected OMRequest createKeyCommitRequest(KeyArgs keyArgs, boolean newClientID, boolean recovery) {
     CommitKeyRequest.Builder rb =
         CommitKeyRequest.newBuilder().setKeyArgs(keyArgs).setRecovery(recovery);

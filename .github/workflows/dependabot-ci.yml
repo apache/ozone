@@ -49,7 +49,7 @@ jobs:
           #Delete the lockfile created by dependabot
           rm -rf hadoop-ozone/recon/src/main/resources/webapps/recon/ozone-recon-web/pnpm-lock.yaml
       - name: Install NodeJS v${{ env.NODE_VERSION }}
-        uses: actions/setup-node@v3
+        uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
       - name: Install pnpm v${{ env.PNPM_VERSION }} and recreate lockfile

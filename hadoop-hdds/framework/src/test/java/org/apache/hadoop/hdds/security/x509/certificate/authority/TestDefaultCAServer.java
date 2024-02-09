@@ -78,7 +78,6 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.junit.jupiter.api.Assertions.fail;
 
 /**
  * Tests the Default CA Server.
@@ -124,15 +123,11 @@ public class TestDefaultCAServer {
         ((DefaultCAServer) testCA).processVerificationStatus(
             DefaultCAServer.VerificationStatus.MISSING_CERTIFICATE,
             CAType.ROOT);
-    try {
-
-      caInitializer.accept(securityConfig);
-      fail("code should not reach here, exception should have been thrown.");
-    } catch (IllegalStateException e) {
-      // This also is a runtime exception. Hence not caught by junit expected
-      // exception.
-      assertThat(e.toString()).contains("Missing Root Certs");
-    }
+    IllegalStateException e =
+        assertThrows(IllegalStateException.class, () -> caInitializer.accept(securityConfig));
+    // This also is a runtime exception. Hence not caught by junit expected
+    // exception.
+    assertThat(e.toString()).contains("Missing Root Certs");
   }
 
   @Test
@@ -145,15 +140,11 @@ public class TestDefaultCAServer {
     Consumer<SecurityConfig> caInitializer =
         ((DefaultCAServer) testCA).processVerificationStatus(
             DefaultCAServer.VerificationStatus.MISSING_KEYS, CAType.ROOT);
-    try {
-
-      caInitializer.accept(securityConfig);
-      fail("code should not reach here, exception should have been thrown.");
-    } catch (IllegalStateException e) {
-      // This also is a runtime exception. Hence not caught by junit expected
-      // exception.
-      assertThat(e.toString()).contains("Missing Keys");
-    }
+    IllegalStateException e =
+        assertThrows(IllegalStateException.class, () -> caInitializer.accept(securityConfig));
+    // This also is a runtime exception. Hence not caught by junit expected
+    // exception.
+    assertThat(e.toString()).contains("Missing Keys");
   }
 
   /**
@@ -457,7 +448,7 @@ public class TestDefaultCAServer {
   }
 
   @Test
-  public void testIntermediaryCA() throws Exception {
+  void testIntermediaryCA() throws Exception {
 
     conf.set(HddsConfigKeys.HDDS_X509_MAX_DURATION, "P3650D");
     securityConfig = new SecurityConfig(conf);
@@ -527,11 +518,8 @@ public class TestDefaultCAServer {
           clusterId, scmId, caStore, new DefaultProfile(),
           scmCertificateClient.getComponentName());
 
-      try {
-        scmCA.init(securityConfig, CAType.SUBORDINATE);
-      } catch (Exception e) {
-        fail("testIntermediaryCA failed during init");
-      }
+
+      scmCA.init(securityConfig, CAType.SUBORDINATE);
     }
   }
 

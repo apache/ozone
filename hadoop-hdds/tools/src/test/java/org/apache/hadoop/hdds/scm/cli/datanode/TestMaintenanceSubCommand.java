@@ -23,6 +23,7 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
+import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.PrintStream;
@@ -34,8 +35,8 @@ import java.util.regex.Pattern;
 
 import picocli.CommandLine;
 
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.junit.jupiter.api.Assertions.fail;
 import static org.mockito.Mockito.anyInt;
 import static org.mockito.Mockito.anyList;
 import static org.mockito.Mockito.mock;
@@ -48,6 +49,7 @@ import static org.mockito.Mockito.when;
 public class TestMaintenanceSubCommand {
 
   private MaintenanceSubCommand cmd;
+  private ScmClient scmClient;
   private final ByteArrayOutputStream outContent = new ByteArrayOutputStream();
   private final ByteArrayOutputStream errContent = new ByteArrayOutputStream();
   private final PrintStream originalOut = System.out;
@@ -57,6 +59,7 @@ public class TestMaintenanceSubCommand {
   @BeforeEach
   public void setup() throws UnsupportedEncodingException {
     cmd = new MaintenanceSubCommand();
+    scmClient = mock(ScmClient.class);
     System.setOut(new PrintStream(outContent, false, DEFAULT_ENCODING));
     System.setErr(new PrintStream(errContent, false, DEFAULT_ENCODING));
   }
@@ -68,8 +71,36 @@ public class TestMaintenanceSubCommand {
   }
 
   @Test
+  public void testMultipleHostnamesCanBeReadFromStdin() throws Exception {
+    when(scmClient.decommissionNodes(anyList()))
+            .thenAnswer(invocation -> new ArrayList<DatanodeAdminError>());
+
+    String input = "host1\nhost2\nhost3\n";
+    System.setIn(new ByteArrayInputStream(input.getBytes(DEFAULT_ENCODING)));
+    CommandLine c = new CommandLine(cmd);
+    c.parseArgs("-");
+    cmd.execute(scmClient);
+
+    Pattern p = Pattern.compile(
+            "^Entering\\smaintenance\\smode\\son\\sdatanode\\(s\\)", Pattern.MULTILINE);
+    Matcher m = p.matcher(outContent.toString(DEFAULT_ENCODING));
+    assertTrue(m.find());
+
+    p = Pattern.compile("^host1$", Pattern.MULTILINE);
+    m = p.matcher(outContent.toString(DEFAULT_ENCODING));
+    assertTrue(m.find());
+
+    p = Pattern.compile("^host2$", Pattern.MULTILINE);
+    m = p.matcher(outContent.toString(DEFAULT_ENCODING));
+    assertTrue(m.find());
+
+    p = Pattern.compile("^host3$", Pattern.MULTILINE);
+    m = p.matcher(outContent.toString(DEFAULT_ENCODING));
+    assertTrue(m.find());
+  }
+
+  @Test
   public void testNoErrorsWhenEnteringMaintenance() throws IOException  {
-    ScmClient scmClient = mock(ScmClient.class);
     when(scmClient.startMaintenanceNodes(anyList(), anyInt()))
         .thenAnswer(invocation -> new ArrayList<DatanodeAdminError>());
 
@@ -94,7 +125,6 @@ public class TestMaintenanceSubCommand {
 
   @Test
   public void testErrorsReportedWhenEnteringMaintenance() throws IOException  {
-    ScmClient scmClient = mock(ScmClient.class);
     when(scmClient.startMaintenanceNodes(anyList(), anyInt()))
         .thenAnswer(invocation -> {
           ArrayList<DatanodeAdminError> e = new ArrayList<>();
@@ -104,12 +134,7 @@ public class TestMaintenanceSubCommand {
 
     CommandLine c = new CommandLine(cmd);
     c.parseArgs("host1", "host2");
-    try {
-      cmd.execute(scmClient);
-      fail("Should not succeed without an exception");
-    } catch (IOException e) {
-      // Expected
-    }
+    assertThrows(IOException.class, () -> cmd.execute(scmClient));
 
     Pattern p = Pattern.compile(
         "^Entering\\smaintenance\\smode\\son\\sdatanode\\(s\\)",

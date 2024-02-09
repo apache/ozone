@@ -180,8 +180,8 @@ import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.any;
+import static org.mockito.Mockito.anyString;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 import static org.slf4j.event.Level.INFO;
@@ -624,15 +624,11 @@ final class TestSecureOzoneCluster {
         new OzoneManagerProtocolClientSideTranslatorPB(
             OmTransportFactory.create(conf, ugi, null),
             ClientId.randomId().toString());
-    try {
-      secureClient.createVolume(
-          new OmVolumeArgs.Builder().setVolume("vol1")
-              .setOwnerName("owner1")
-              .setAdminName("admin")
-              .build());
-    } catch (IOException ex) {
-      fail("Secure client should be able to create volume.");
-    }
+    secureClient.createVolume(
+        new OmVolumeArgs.Builder().setVolume("vol1")
+            .setOwnerName("owner1")
+            .setAdminName("admin")
+            .build());
 
     ugi = UserGroupInformation.createUserForTesting(
         "testuser1", new String[] {"test"});

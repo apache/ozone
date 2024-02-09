@@ -82,6 +82,7 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.HDDS_DATANODE_PLUGINS_KEY;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_SERVICE_WORKERS;
 import static org.apache.hadoop.ozone.conf.OzoneServiceConfig.DEFAULT_SHUTDOWN_HOOK_PRIORITY;
 import static org.apache.hadoop.ozone.common.Storage.StorageState.INITIALIZED;
+import static org.apache.hadoop.ozone.container.replication.ReplicationServer.ReplicationConfig.REPLICATION_STREAMS_LIMIT_KEY;
 import static org.apache.hadoop.security.UserGroupInformation.getCurrentUser;
 import static org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration.HDDS_DATANODE_BLOCK_DELETE_THREAD_MAX;
 import static org.apache.hadoop.util.ExitUtil.terminate;
@@ -290,7 +291,9 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
               .register(HDDS_DATANODE_BLOCK_DELETE_THREAD_MAX,
                   this::reconfigBlockDeleteThreadMax)
               .register(OZONE_BLOCK_DELETING_SERVICE_WORKERS,
-                  this::reconfigDeletingServiceWorkers);
+                  this::reconfigDeletingServiceWorkers)
+              .register(REPLICATION_STREAMS_LIMIT_KEY,
+                  this::reconfigReplicationStreamsLimit);
 
       datanodeStateMachine = new DatanodeStateMachine(datanodeDetails, conf,
           dnCertClient, secretKeyClient, this::terminateDatanode, dnCRLStore,
@@ -664,6 +667,14 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
     getConf().set(OZONE_BLOCK_DELETING_SERVICE_WORKERS, value);
 
     getDatanodeStateMachine().getContainer().getBlockDeletingService()
+        .setPoolSize(Integer.parseInt(value));
+    return value;
+  }
+
+  private String reconfigReplicationStreamsLimit(String value) {
+    getConf().set(REPLICATION_STREAMS_LIMIT_KEY, value);
+
+    getDatanodeStateMachine().getContainer().getReplicationServer()
         .setPoolSize(Integer.parseInt(value));
     return value;
   }

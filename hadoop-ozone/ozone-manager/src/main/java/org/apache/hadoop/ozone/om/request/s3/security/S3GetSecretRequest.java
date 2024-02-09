@@ -150,21 +150,16 @@ public class S3GetSecretRequest extends OMClientRequest {
     try {
       omClientResponse = ozoneManager.getS3SecretManager()
           .doUnderLock(accessId, s3SecretManager -> {
-            S3SecretValue assignS3SecretValue;
-            S3SecretValue s3SecretValue =
-                s3SecretManager.getSecret(accessId);
+            final S3SecretValue assignS3SecretValue;
+            S3SecretValue s3SecretValue = s3SecretManager.getSecret(accessId);
 
             if (s3SecretValue == null) {
               // Not found in S3SecretTable.
               if (createIfNotExist) {
                 // Add new entry in this case
-                assignS3SecretValue =
-                    new S3SecretValue(accessId, awsSecret.get());
-                // Set the transactionLogIndex to be used for updating.
-                assignS3SecretValue.setTransactionLogIndex(termIndex.getIndex());
+                assignS3SecretValue = S3SecretValue.of(accessId, awsSecret.get(), termIndex.getIndex());
                 // Add cache entry first.
-                s3SecretManager.updateCache(accessId,
-                    assignS3SecretValue);
+                s3SecretManager.updateCache(accessId, assignS3SecretValue);
               } else {
                 assignS3SecretValue = null;
               }

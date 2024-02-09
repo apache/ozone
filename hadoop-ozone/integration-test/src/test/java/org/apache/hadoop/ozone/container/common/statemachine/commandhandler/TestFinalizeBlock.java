@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.ozone.container.common.statemachine.commandhandler;
 
+import jakarta.annotation.Nonnull;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
@@ -47,7 +48,6 @@ import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
 import org.apache.ozone.test.GenericTestUtils;
-import org.jetbrains.annotations.NotNull;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -273,7 +273,7 @@ public class TestFinalizeBlock {
     }
   }
 
-  @NotNull
+  @Nonnull
   private ContainerProtos.ContainerCommandRequestProto getFinalizeBlockRequest(
       List<OmKeyLocationInfoGroup> omKeyLocationInfoGroupList,
       ContainerInfo container) {

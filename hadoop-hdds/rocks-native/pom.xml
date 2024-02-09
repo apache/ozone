@@ -52,10 +52,11 @@
     </dependency>
   </dependencies>
   <properties>
-    <allow.junit4>false</allow.junit4>
 
     <maven.compiler.source>8</maven.compiler.source>
     <maven.compiler.target>8</maven.compiler.target>
+    <bzip2.url>https://sourceware.org/pub/bzip2/bzip2-${bzip2.version}.tar.gz</bzip2.url>
+    <zlib.url>https://zlib.net/fossils/zlib-${zlib.version}.tar.gz</zlib.url>
   </properties>
 
   <build>
@@ -134,7 +135,7 @@
                   <goal>wget</goal>
                 </goals>
                 <configuration>
-                  <url>https://zlib.net/fossils/zlib-${zlib.version}.tar.gz</url>
+                  <url>${zlib.url}</url>
                   <outputFileName>zlib-${zlib.version}.tar.gz</outputFileName>
                   <outputDirectory>${project.build.directory}/zlib</outputDirectory>
                 </configuration>
@@ -146,7 +147,7 @@
                   <goal>wget</goal>
                 </goals>
                 <configuration>
-                  <url>https://sourceware.org/pub/bzip2/bzip2-${bzip2.version}.tar.gz</url>
+                  <url>${bzip2.url}</url>
                   <outputFileName>bzip2-v${bzip2.version}.tar.gz</outputFileName>
                   <outputDirectory>${project.build.directory}/bzip2</outputDirectory>
                 </configuration>
@@ -220,6 +221,7 @@
                     <untar src="${project.build.directory}/rocksdb/rocksdb-v${rocksdb.version}.tar.gz" compression="gzip" dest="${project.build.directory}/rocksdb/" />
                     <untar src="${project.build.directory}/zlib/zlib-${zlib.version}.tar.gz" compression="gzip" dest="${project.build.directory}/zlib/" />
                     <untar src="${project.build.directory}/bzip2/bzip2-v${bzip2.version}.tar.gz" compression="gzip" dest="${project.build.directory}/bzip2/" />
+                    <move file="${project.build.directory}/bzip2/bzip2-bzip2-${bzip2.version}" tofile="${project.build.directory}/bzip2/bzip2-${bzip2.version}" failonerror="false" />
                     <untar src="${project.build.directory}/lz4/lz4-v${lz4.version}.tar.gz" compression="gzip" dest="${project.build.directory}/lz4/" />
                     <untar src="${project.build.directory}/snappy/snappy-v${snappy.version}.tar.gz" compression="gzip" dest="${project.build.directory}/snappy/" />
                     <untar src="${project.build.directory}/zstd/zstd-v${zstd.version}.tar.gz" compression="gzip" dest="${project.build.directory}/zstd/" />

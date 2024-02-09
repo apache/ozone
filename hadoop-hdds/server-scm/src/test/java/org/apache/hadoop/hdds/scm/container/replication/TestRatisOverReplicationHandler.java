@@ -59,10 +59,10 @@ import static org.apache.hadoop.hdds.scm.container.replication.ReplicationTestUt
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
-import static org.junit.jupiter.api.Assertions.fail;
-import static org.mockito.ArgumentMatchers.anyBoolean;
-import static org.mockito.ArgumentMatchers.anyInt;
-import static org.mockito.ArgumentMatchers.eq;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.Mockito.anyBoolean;
+import static org.mockito.Mockito.anyInt;
+import static org.mockito.Mockito.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 import static org.mockito.Mockito.argThat;
@@ -441,13 +441,9 @@ public class TestRatisOverReplicationHandler {
     RatisOverReplicationHandler handler =
         new RatisOverReplicationHandler(policy, replicationManager);
 
-    try {
-      handler.processAndSendCommands(replicas, Collections.emptyList(),
-          getOverReplicatedHealthResult(), 2);
-      fail("Expected CommandTargetOverloadedException");
-    } catch (CommandTargetOverloadedException e) {
-      // Expected
-    }
+    assertThrows(CommandTargetOverloadedException.class,
+        () -> handler.processAndSendCommands(replicas, Collections.emptyList(),
+            getOverReplicatedHealthResult(), 2));
     assertEquals(1, commandsSent.size());
     Pair<DatanodeDetails, SCMCommand<?>> cmd = commandsSent.iterator().next();
     assertNotEquals(quasiClosedReplica.getDatanodeDetails(),

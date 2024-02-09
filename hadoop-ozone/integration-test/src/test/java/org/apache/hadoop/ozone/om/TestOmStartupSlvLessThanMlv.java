@@ -20,7 +20,6 @@ import java.io.File;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.UUID;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
@@ -66,10 +65,7 @@ public class TestOmStartupSlvLessThanMlv {
     // Create version file with MLV > SLV, which should fail the cluster build.
     UpgradeTestUtils.createVersionFile(omSubdir, HddsProtos.NodeType.OM, mlv);
 
-    MiniOzoneCluster.Builder clusterBuilder = MiniOzoneCluster.newBuilder(conf)
-        .setClusterId(UUID.randomUUID().toString())
-        .setScmId(UUID.randomUUID().toString())
-        .setOmId(UUID.randomUUID().toString());
+    MiniOzoneCluster.Builder clusterBuilder = MiniOzoneCluster.newBuilder(conf);
 
     OMException omException = assertThrows(OMException.class,
         clusterBuilder::build);
