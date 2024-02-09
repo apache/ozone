@@ -2261,7 +2261,7 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
         return handleError(submitRequest(omRequest));
       } catch (OMException e) {
         if (e.getResult().equals(SCM_IN_SAFE_MODE) && retryCount > 0) {
-          System.err.println("SCM is in safe mode, request will be retried after " +
+          System.err.println("SCM is in safe mode. Will retry in " +
               BLOCK_ALLOCATION_RETRY_WAIT_TIME_MS + "ms");
           retryCount--;
           try {
