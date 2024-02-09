@@ -592,12 +592,7 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
         scm = createAndStartSingleSCM();
 
         om = createOM();
-        if (certClient != null) {
-          om.setCertClient(certClient);
-        }
-        if (secretKeyClient != null) {
-          om.setSecretKeyClient(secretKeyClient);
-        }
+        setClients(om);
         om.start();
 
         reconServer = createRecon();
@@ -632,6 +627,15 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
           throw (RuntimeException) ex;
         }
         throw new IOException("Unable to build MiniOzoneCluster. ", ex);
+      }
+    }
+
+    protected void setClients(OzoneManager om) throws IOException {
+      if (certClient != null) {
+        om.setCertClient(certClient);
+      }
+      if (secretKeyClient != null) {
+        om.setSecretKeyClient(secretKeyClient);
       }
     }
 

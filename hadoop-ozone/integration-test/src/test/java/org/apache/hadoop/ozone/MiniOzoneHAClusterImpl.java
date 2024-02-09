@@ -454,6 +454,7 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
         AuthenticationException {
       if (omServiceId == null) {
         OzoneManager om = createOM();
+        setClients(om);
         om.start();
         return new OMHAService(singletonList(om), null, null);
       }
@@ -482,9 +483,7 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
 
             OzoneManager.omInit(config);
             OzoneManager om = OzoneManager.createOm(config);
-            if (certClient != null) {
-              om.setCertClient(certClient);
-            }
+            setClients(om);
             omList.add(om);
 
             if (i <= numOfActiveOMs) {
