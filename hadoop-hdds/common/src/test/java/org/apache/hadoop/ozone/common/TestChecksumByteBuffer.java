@@ -22,7 +22,7 @@ import org.apache.hadoop.util.PureJavaCrc32C;
 import org.junit.jupiter.api.Test;
 
 import java.nio.charset.StandardCharsets;
-import java.util.Random;
+import org.apache.commons.lang3.RandomUtils;
 import java.util.zip.Checksum;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -59,11 +59,9 @@ public class TestChecksumByteBuffer {
 
       checkBytes("hello world!".getBytes(StandardCharsets.UTF_8));
 
-      final Random random = new Random();
-      final byte[] bytes = new byte[1 << 10];
+      final int len = 1 << 10;
       for (int i = 0; i < 1000; i++) {
-        random.nextBytes(bytes);
-        checkBytes(bytes, random.nextInt(bytes.length));
+        checkBytes(RandomUtils.nextBytes(len), RandomUtils.nextInt(0, len));
       }
     }
 

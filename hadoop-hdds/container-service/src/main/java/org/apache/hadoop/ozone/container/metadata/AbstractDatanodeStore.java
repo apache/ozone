@@ -32,14 +32,12 @@ import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedColumnFamilyOptions;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedDBOptions;
-import org.apache.hadoop.hdds.utils.db.managed.ManagedStatistics;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.helpers.ChunkInfoList;
 import org.apache.hadoop.ozone.container.common.interfaces.BlockIterator;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
 import org.apache.hadoop.ozone.container.common.utils.db.DatanodeDBProfile;
 import org.rocksdb.InfoLogLevel;
-import org.rocksdb.StatsLevel;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -49,9 +47,6 @@ import java.util.NoSuchElementException;
 
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DB_PROFILE;
 import static org.apache.hadoop.hdds.utils.db.DBStoreBuilder.HDDS_DEFAULT_DB_PROFILE;
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_METADATA_STORE_ROCKSDB_STATISTICS;
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_METADATA_STORE_ROCKSDB_STATISTICS_DEFAULT;
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_METADATA_STORE_ROCKSDB_STATISTICS_OFF;
 
 /**
  * Implementation of the {@link DatanodeStore} interface that contains
@@ -63,9 +58,15 @@ public abstract class AbstractDatanodeStore implements DatanodeStore {
 
   private Table<String, BlockData> blockDataTable;
 
+  private Table<String, BlockData> lastChunkInfoTable;
+
   private Table<String, BlockData> blockDataTableWithIterator;
 
   private Table<String, ChunkInfoList> deletedBlocksTable;
+
+  private Table<String, Long> finalizeBlocksTable;
+
+  private Table<String, Long> finalizeBlocksTableWithIterator;
 
   static final Logger LOG =
       LoggerFactory.getLogger(AbstractDatanodeStore.class);
@@ -111,16 +112,6 @@ public abstract class AbstractDatanodeStore implements DatanodeStore {
           this.dbDef instanceof DatanodeSchemaTwoDBDefinition) {
         long maxWalSize = DBProfile.toLong(StorageUnit.MB.toBytes(2));
         options.setMaxTotalWalSize(maxWalSize);
-      }
-
-      String rocksDbStat = config.getTrimmed(
-          OZONE_METADATA_STORE_ROCKSDB_STATISTICS,
-          OZONE_METADATA_STORE_ROCKSDB_STATISTICS_DEFAULT);
-
-      if (!rocksDbStat.equals(OZONE_METADATA_STORE_ROCKSDB_STATISTICS_OFF)) {
-        ManagedStatistics statistics = new ManagedStatistics();
-        statistics.setStatsLevel(StatsLevel.valueOf(rocksDbStat));
-        options.setStatistics(statistics);
       }
 
       DatanodeConfiguration dc =
@@ -173,6 +164,21 @@ public abstract class AbstractDatanodeStore implements DatanodeStore {
       deletedBlocksTable = new DatanodeTable<>(
               dbDef.getDeletedBlocksColumnFamily().getTable(this.store));
       checkTableStatus(deletedBlocksTable, deletedBlocksTable.getName());
+
+      if (dbDef.getFinalizeBlocksColumnFamily() != null) {
+        finalizeBlocksTableWithIterator =
+            dbDef.getFinalizeBlocksColumnFamily().getTable(this.store);
+
+        finalizeBlocksTable = new DatanodeTable<>(
+            finalizeBlocksTableWithIterator);
+        checkTableStatus(finalizeBlocksTable, finalizeBlocksTable.getName());
+      }
+
+      if (dbDef.getLastChunkInfoColumnFamily() != null) {
+        lastChunkInfoTable = new DatanodeTable<>(
+            dbDef.getLastChunkInfoColumnFamily().getTable(this.store));
+        checkTableStatus(lastChunkInfoTable, lastChunkInfoTable.getName());
+      }
     }
   }
 
@@ -205,22 +211,39 @@ public abstract class AbstractDatanodeStore implements DatanodeStore {
   }
 
   @Override
+  public Table<String, BlockData> getLastChunkInfoTable() {
+    return lastChunkInfoTable;
+  }
+
+  @Override
   public Table<String, ChunkInfoList> getDeletedBlocksTable() {
     return deletedBlocksTable;
+  }
+
+  @Override
+  public Table<String, Long> getFinalizeBlocksTable() {
+    return finalizeBlocksTable;
   }
 
   @Override
   public BlockIterator<BlockData> getBlockIterator(long containerID)
       throws IOException {
     return new KeyValueBlockIterator(containerID,
-            blockDataTableWithIterator.iterator());
+        blockDataTableWithIterator.iterator());
   }
 
   @Override
   public BlockIterator<BlockData> getBlockIterator(long containerID,
       KeyPrefixFilter filter) throws IOException {
     return new KeyValueBlockIterator(containerID,
-            blockDataTableWithIterator.iterator(), filter);
+        blockDataTableWithIterator.iterator(), filter);
+  }
+
+  @Override
+  public BlockIterator<Long> getFinalizeBlockIterator(long containerID,
+      KeyPrefixFilter filter) throws IOException {
+    return new KeyValueBlockLocalIdIterator(containerID,
+        finalizeBlocksTableWithIterator.iterator(), filter);
   }
 
   @Override
@@ -263,6 +286,10 @@ public abstract class AbstractDatanodeStore implements DatanodeStore {
 
   protected Table<String, BlockData> getBlockDataTableWithIterator() {
     return this.blockDataTableWithIterator;
+  }
+
+  protected Table<String, Long> getFinalizeBlocksTableWithIterator() {
+    return this.finalizeBlocksTableWithIterator;
   }
 
   private static void checkTableStatus(Table<?, ?> table, String name)
@@ -378,6 +405,96 @@ public abstract class AbstractDatanodeStore implements DatanodeStore {
     @Override
     public void close() throws IOException {
       blockIterator.close();
+    }
+  }
+
+  /**
+   * Block localId Iterator for KeyValue Container.
+   * This Block localId iterator returns localIds
+   * which match with the {@link MetadataKeyFilters.KeyPrefixFilter}. If no
+   * filter is specified, then default filter used is
+   * {@link MetadataKeyFilters#getUnprefixedKeyFilter()}
+   */
+  @InterfaceAudience.Public
+  public static class KeyValueBlockLocalIdIterator implements
+      BlockIterator<Long>, Closeable {
+
+    private static final Logger LOG = LoggerFactory.getLogger(
+        KeyValueBlockLocalIdIterator.class);
+
+    private final TableIterator<String, ? extends Table.KeyValue<String,
+        Long>> blockLocalIdIterator;
+    private final KeyPrefixFilter localIdFilter;
+    private Long nextLocalId;
+    private final long containerID;
+
+    /**
+     * KeyValueBlockLocalIdIterator to iterate block localIds in a container.
+     * @param iterator - The iterator to apply the blockLocalId filter to.
+     * @param filter - BlockLocalId filter to be applied for block localIds.
+     */
+    KeyValueBlockLocalIdIterator(long containerID,
+        TableIterator<String, ? extends Table.KeyValue<String, Long>>
+        iterator, KeyPrefixFilter filter) {
+      this.containerID = containerID;
+      this.blockLocalIdIterator = iterator;
+      this.localIdFilter = filter;
+    }
+
+    /**
+     * This method returns blocks matching with the filter.
+     * @return next block local Id or null if no more block localIds
+     * @throws IOException
+     */
+    @Override
+    public Long nextBlock() throws IOException, NoSuchElementException {
+      if (nextLocalId != null) {
+        Long currentLocalId = nextLocalId;
+        nextLocalId = null;
+        return currentLocalId;
+      }
+      if (hasNext()) {
+        return nextBlock();
+      }
+      throw new NoSuchElementException("Block Local ID Iterator " +
+          "reached end for ContainerID " + containerID);
+    }
+
+    @Override
+    public boolean hasNext() throws IOException {
+      if (nextLocalId != null) {
+        return true;
+      }
+      while (blockLocalIdIterator.hasNext()) {
+        Table.KeyValue<String, Long> keyValue = blockLocalIdIterator.next();
+        byte[] keyBytes = StringUtils.string2Bytes(keyValue.getKey());
+        if (localIdFilter.filterKey(null, keyBytes, null)) {
+          nextLocalId = keyValue.getValue();
+          if (LOG.isTraceEnabled()) {
+            LOG.trace("Block matching with filter found: LocalID is : " +
+                "{} for containerID {}", nextLocalId, containerID);
+          }
+          return true;
+        }
+      }
+      return false;
+    }
+
+    @Override
+    public void seekToFirst() {
+      nextLocalId = null;
+      blockLocalIdIterator.seekToFirst();
+    }
+
+    @Override
+    public void seekToLast() {
+      nextLocalId = null;
+      blockLocalIdIterator.seekToLast();
+    }
+
+    @Override
+    public void close() throws IOException {
+      blockLocalIdIterator.close();
     }
   }
 }

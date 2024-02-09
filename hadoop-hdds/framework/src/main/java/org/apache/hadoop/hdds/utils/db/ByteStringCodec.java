@@ -20,7 +20,7 @@ package org.apache.hadoop.hdds.utils.db;
 
 import com.google.protobuf.ByteString;
 
-import javax.annotation.Nonnull;
+import jakarta.annotation.Nonnull;
 
 /**
  * Codec to serialize/deserialize a {@link ByteString}.

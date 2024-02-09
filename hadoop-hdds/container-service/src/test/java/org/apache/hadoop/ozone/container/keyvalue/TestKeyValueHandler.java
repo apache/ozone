@@ -62,7 +62,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.any;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -244,6 +244,14 @@ public class TestKeyValueHandler {
     KeyValueHandler
         .dispatchRequest(handler, getSmallFileRequest, container, null);
     verify(handler, times(1)).handleGetSmallFile(
+        any(ContainerCommandRequestProto.class), any());
+
+    // Test Finalize Block Request handling
+    ContainerCommandRequestProto finalizeBlock =
+        getDummyCommandRequestProto(ContainerProtos.Type.FinalizeBlock);
+    KeyValueHandler
+        .dispatchRequest(handler, finalizeBlock, container, null);
+    verify(handler, times(1)).handleFinalizeBlock(
         any(ContainerCommandRequestProto.class), any());
   }
 

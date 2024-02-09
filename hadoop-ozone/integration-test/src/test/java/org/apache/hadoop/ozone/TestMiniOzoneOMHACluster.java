@@ -22,19 +22,19 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.ozone.test.GenericTestUtils;
 
-import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicReference;
 
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ACL_ENABLED;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ADMINISTRATORS_WILDCARD;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
-import org.junit.jupiter.api.Assertions;
 
 /**
  * This class tests MiniOzoneHAClusterImpl.
@@ -44,28 +44,22 @@ public class TestMiniOzoneOMHACluster {
 
   private MiniOzoneHAClusterImpl cluster = null;
   private OzoneConfiguration conf;
-  private String clusterId;
-  private String scmId;
   private String omServiceId;
   private int numOfOMs = 3;
 
   /**
    * Create a MiniOzoneHAClusterImpl for testing.
    *
-   * @throws IOException
+   * @throws Exception
    */
   @BeforeEach
   public void init() throws Exception {
     conf = new OzoneConfiguration();
-    clusterId = UUID.randomUUID().toString();
-    scmId = UUID.randomUUID().toString();
     omServiceId = "omServiceId1";
     conf.setBoolean(OZONE_ACL_ENABLED, true);
     conf.set(OzoneConfigKeys.OZONE_ADMINISTRATORS,
         OZONE_ADMINISTRATORS_WILDCARD);
     cluster = (MiniOzoneHAClusterImpl) MiniOzoneCluster.newOMHABuilder(conf)
-        .setClusterId(clusterId)
-        .setScmId(scmId)
         .setOMServiceId(omServiceId)
         .setNumOfOzoneManagers(numOfOMs)
         .build();
@@ -91,9 +85,8 @@ public class TestMiniOzoneOMHACluster {
       ozoneManager.set(om);
       return om != null;
     }, 100, 120000);
-    Assertions.assertNotNull(ozoneManager, "Timed out waiting OM leader election to finish: "
+    assertNotNull(ozoneManager, "Timed out waiting OM leader election to finish: "
             + "no leader or more than one leader.");
-    Assertions.assertTrue(ozoneManager.get().isLeaderReady(),
-            "Should have gotten the leader!");
+    assertTrue(ozoneManager.get().isLeaderReady(), "Should have gotten the leader!");
   }
 }

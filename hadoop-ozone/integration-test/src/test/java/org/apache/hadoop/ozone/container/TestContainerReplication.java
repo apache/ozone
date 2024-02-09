@@ -28,7 +28,7 @@ import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_STALENODE_INTER
 import static org.apache.hadoop.ozone.container.TestHelper.waitForContainerClose;
 import static org.apache.hadoop.ozone.container.TestHelper.waitForReplicaCount;
 import static org.apache.ozone.test.GenericTestUtils.setLogLevel;
-import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 import java.io.IOException;
@@ -108,7 +108,7 @@ class TestContainerReplication {
         createTestData(client);
 
         List<OmKeyLocationInfo> keyLocations = lookupKey(cluster);
-        assertFalse(keyLocations.isEmpty());
+        assertThat(keyLocations).isNotEmpty();
 
         OmKeyLocationInfo keyLocation = keyLocations.get(0);
         long containerID = keyLocation.getContainerID();

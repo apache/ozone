@@ -23,8 +23,6 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto
-    .StorageContainerDatanodeProtocolProtos;
-import org.apache.hadoop.hdds.protocol.proto
     .StorageContainerDatanodeProtocolProtos.StorageReportProto;
 import org.apache.hadoop.hdds.protocol.proto
     .StorageContainerDatanodeProtocolProtos.NodeReportProto;
@@ -40,7 +38,6 @@ import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
 import org.apache.hadoop.hdds.server.events.EventQueue;
 import org.apache.hadoop.ozone.container.common.SCMTestUtils;
-import org.apache.hadoop.ozone.upgrade.LayoutVersionManager;
 import org.apache.hadoop.security.authentication.client.AuthenticationException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -122,19 +119,13 @@ public class TestStatisticsUpdate {
 
     //TODO: Support logic to mark a node as dead in NodeManager.
 
-    LayoutVersionManager versionManager = nodeManager.getLayoutVersionManager();
-    StorageContainerDatanodeProtocolProtos.LayoutVersionProto layoutInfo =
-        StorageContainerDatanodeProtocolProtos.LayoutVersionProto.newBuilder()
-        .setSoftwareLayoutVersion(versionManager.getSoftwareLayoutVersion())
-        .setMetadataLayoutVersion(versionManager.getMetadataLayoutVersion())
-        .build();
-    nodeManager.processHeartbeat(datanode2, layoutInfo);
+    nodeManager.processHeartbeat(datanode2);
     Thread.sleep(1000);
-    nodeManager.processHeartbeat(datanode2, layoutInfo);
+    nodeManager.processHeartbeat(datanode2);
     Thread.sleep(1000);
-    nodeManager.processHeartbeat(datanode2, layoutInfo);
+    nodeManager.processHeartbeat(datanode2);
     Thread.sleep(1000);
-    nodeManager.processHeartbeat(datanode2, layoutInfo);
+    nodeManager.processHeartbeat(datanode2);
     //THEN statistics in SCM should changed.
     stat = nodeManager.getStats();
     assertEquals(200L, stat.getCapacity().get());

@@ -25,9 +25,9 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.response.CleanupTableInfo;
 import org.apache.hadoop.ozone.om.response.key.OmKeyResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
-        .OMResponse;
+    .OMResponse;
 
-import javax.annotation.Nonnull;
+import jakarta.annotation.Nonnull;
 import java.io.IOException;
 
 import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.FILE_TABLE;
@@ -39,16 +39,14 @@ import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.OPEN_FILE_TABLE;
 @CleanupTableInfo(cleanupTables = {FILE_TABLE, OPEN_FILE_TABLE})
 public class OMRecoverLeaseResponse extends OmKeyResponse {
 
-  private OmKeyInfo keyInfo;
-  private String dbFileKey;
+  private OmKeyInfo openKeyInfo;
   private String openKeyName;
+
   public OMRecoverLeaseResponse(@Nonnull OMResponse omResponse,
-      BucketLayout bucketLayout, OmKeyInfo keyInfo, String dbFileKey,
-      String openKeyName) {
+      BucketLayout bucketLayout, String openKeyName, OmKeyInfo openKeyInfo) {
     super(omResponse, bucketLayout);
-    this.keyInfo = keyInfo;
-    this.dbFileKey = dbFileKey;
     this.openKeyName = openKeyName;
+    this.openKeyInfo = openKeyInfo;
   }
 
   /**
@@ -64,12 +62,11 @@ public class OMRecoverLeaseResponse extends OmKeyResponse {
   @Override
   protected void addToDBBatch(OMMetadataManager omMetadataManager,
       BatchOperation batchOperation) throws IOException {
-    // Delete from OpenKey table
+    // Update OpenKey table
     if (openKeyName != null) {
-      omMetadataManager.getOpenKeyTable(getBucketLayout()).deleteWithBatch(
-          batchOperation, openKeyName);
-      omMetadataManager.getKeyTable(getBucketLayout())
-          .putWithBatch(batchOperation, dbFileKey, keyInfo);
+      // In INIT stage, update the keyInfo in openKeyTable
+      omMetadataManager.getOpenKeyTable(getBucketLayout()).putWithBatch(
+          batchOperation, openKeyName, openKeyInfo);
     }
   }
 

@@ -30,7 +30,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRespo
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
 
 import java.io.IOException;
-import javax.annotation.Nonnull;
+import jakarta.annotation.Nonnull;
 
 import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.BUCKET_TABLE;
 import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.DELETED_TABLE;
@@ -49,15 +49,17 @@ public class OMKeyCommitResponse extends OmKeyResponse {
   private String openKeyName;
   private OmBucketInfo omBucketInfo;
   private Map<String, RepeatedOmKeyInfo> keyToDeleteMap;
-
   private boolean isHSync;
+  private OmKeyInfo newOpenKeyInfo;
 
+  @SuppressWarnings("checkstyle:ParameterNumber")
   public OMKeyCommitResponse(
       @Nonnull OMResponse omResponse,
       @Nonnull OmKeyInfo omKeyInfo, String ozoneKeyName, String openKeyName,
       @Nonnull OmBucketInfo omBucketInfo,
       Map<String, RepeatedOmKeyInfo> keyToDeleteMap,
-      boolean isHSync) {
+      boolean isHSync,
+      OmKeyInfo newOpenKeyInfo) {
     super(omResponse, omBucketInfo.getBucketLayout());
     this.omKeyInfo = omKeyInfo;
     this.ozoneKeyName = ozoneKeyName;
@@ -65,6 +67,7 @@ public class OMKeyCommitResponse extends OmKeyResponse {
     this.omBucketInfo = omBucketInfo;
     this.keyToDeleteMap = keyToDeleteMap;
     this.isHSync = isHSync;
+    this.newOpenKeyInfo = newOpenKeyInfo;
   }
 
   /**
@@ -84,7 +87,10 @@ public class OMKeyCommitResponse extends OmKeyResponse {
     // Delete from OpenKey table
     if (!isHSync()) {
       omMetadataManager.getOpenKeyTable(getBucketLayout())
-              .deleteWithBatch(batchOperation, openKeyName);
+          .deleteWithBatch(batchOperation, openKeyName);
+    } else if (newOpenKeyInfo != null) {
+      omMetadataManager.getOpenKeyTable(getBucketLayout()).putWithBatch(
+          batchOperation, openKeyName, newOpenKeyInfo);
     }
 
     omMetadataManager.getKeyTable(getBucketLayout())
@@ -132,5 +138,9 @@ public class OMKeyCommitResponse extends OmKeyResponse {
 
   protected boolean isHSync() {
     return isHSync;
+  }
+
+  public OmKeyInfo getNewOpenKeyInfo() {
+    return newOpenKeyInfo;
   }
 }

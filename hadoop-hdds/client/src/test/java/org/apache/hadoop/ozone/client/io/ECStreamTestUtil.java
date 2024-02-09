@@ -281,7 +281,6 @@ public final class ECStreamTestUtil {
   public static class TestBlockInputStream extends BlockExtendedInputStream {
 
     private ByteBuffer data;
-    private boolean closed = false;
     private BlockID blockID;
     private long length;
     private boolean shouldError = false;
@@ -302,10 +301,6 @@ public final class ECStreamTestUtil {
       this.data = data;
       this.ecReplicaIndex = replicaIndex;
       data.position(0);
-    }
-
-    public boolean isClosed() {
-      return closed;
     }
 
     public void setShouldErrorOnSeek(boolean val) {
@@ -377,9 +372,7 @@ public final class ECStreamTestUtil {
     }
 
     @Override
-    public void close() {
-      closed = true;
-    }
+    public void close() { }
 
     @Override
     public void unbuffer() {

@@ -29,7 +29,7 @@ import java.util.Map;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
-import org.jetbrains.annotations.NotNull;
+import jakarta.annotation.Nonnull;
 import org.junit.jupiter.api.Test;
 
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
@@ -65,7 +65,7 @@ public class TestOMKeyCommitResponse extends TestOMKeyResponse {
 
     String ozoneKey = getOzoneKey();
     OMKeyCommitResponse omKeyCommitResponse = getOmKeyCommitResponse(
-            omKeyInfo, omResponse, openKey, ozoneKey, keysToDelete, false);
+            omKeyInfo, omResponse, openKey, ozoneKey, keysToDelete, false, null);
 
     omKeyCommitResponse.addToDBBatch(omMetadataManager, batchOperation);
 
@@ -94,7 +94,7 @@ public class TestOMKeyCommitResponse extends TestOMKeyResponse {
     String ozoneKey = getOzoneKey();
 
     OMKeyCommitResponse omKeyCommitResponse = getOmKeyCommitResponse(
-            omKeyInfo, omResponse, openKey, ozoneKey, null, false);
+            omKeyInfo, omResponse, openKey, ozoneKey, null, false, null);
 
     // As during commit Key, entry will be already there in openKeyTable.
     // Adding it here.
@@ -132,23 +132,23 @@ public class TestOMKeyCommitResponse extends TestOMKeyResponse {
 
   }
 
-  @NotNull
+  @Nonnull
   protected void addKeyToOpenKeyTable() throws Exception {
     OMRequestTestUtils.addKeyToTable(true, volumeName, bucketName, keyName,
             clientID, replicationType, replicationFactor, omMetadataManager);
   }
 
-  @NotNull
+  @Nonnull
   protected String getOzoneKey() throws IOException {
     assertNotNull(omBucketInfo);
     return omMetadataManager.getOzoneKey(volumeName,
             omBucketInfo.getBucketName(), keyName);
   }
 
-  @NotNull
+  @Nonnull
   protected OMKeyCommitResponse getOmKeyCommitResponse(OmKeyInfo omKeyInfo,
           OzoneManagerProtocolProtos.OMResponse omResponse, String openKey,
-          String ozoneKey, RepeatedOmKeyInfo deleteKeys, Boolean isHSync)
+          String ozoneKey, RepeatedOmKeyInfo deleteKeys, Boolean isHSync, OmKeyInfo newOpenKeyInfo)
           throws IOException {
     assertNotNull(omBucketInfo);
     Map<String, RepeatedOmKeyInfo> deleteKeyMap = new HashMap<>();
@@ -158,6 +158,6 @@ public class TestOMKeyCommitResponse extends TestOMKeyResponse {
           new RepeatedOmKeyInfo(e)));
     }
     return new OMKeyCommitResponse(omResponse, omKeyInfo, ozoneKey, openKey,
-            omBucketInfo, deleteKeyMap, isHSync);
+        omBucketInfo, deleteKeyMap, isHSync, newOpenKeyInfo);
   }
 }

@@ -35,8 +35,10 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.LambdaTestUtils.VoidCallable;
 import org.apache.ratis.util.function.CheckedConsumer;
-import org.junit.jupiter.api.Assertions;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 /**
  * Helper class for Tests.
@@ -92,7 +94,7 @@ public final class OzoneTestUtils {
             .updateContainerState(ContainerID.valueOf(blockID.getContainerID()),
                 HddsProtos.LifeCycleEvent.CLOSE);
       }
-      Assertions.assertFalse(scm.getContainerManager()
+      assertFalse(scm.getContainerManager()
           .getContainer(ContainerID.valueOf(blockID.getContainerID()))
           .isOpen());
     }, omKeyLocationInfoGroups);
@@ -140,14 +142,10 @@ public final class OzoneTestUtils {
 
   public static <E extends Throwable> void expectOmException(
       OMException.ResultCodes code,
-      VoidCallable eval)
-      throws Exception {
-    try {
-      eval.call();
-      Assertions.fail("OMException is expected");
-    } catch (OMException ex) {
-      Assertions.assertEquals(code, ex.getResult());
-    }
+      VoidCallable eval) {
+
+    OMException ex = assertThrows(OMException.class, () -> eval.call(), "OMException is expected");
+    assertEquals(code, ex.getResult());
   }
 
   /**
@@ -158,7 +156,7 @@ public final class OzoneTestUtils {
       throws IOException, TimeoutException, InterruptedException {
     Pipeline pipeline = scm.getPipelineManager()
         .getPipeline(container.getPipelineID());
-    scm.getPipelineManager().closePipeline(pipeline, false);
+    scm.getPipelineManager().closePipeline(pipeline, true);
     GenericTestUtils.waitFor(() ->
             container.getState() == HddsProtos.LifeCycleState.CLOSED,
         200, 30000);

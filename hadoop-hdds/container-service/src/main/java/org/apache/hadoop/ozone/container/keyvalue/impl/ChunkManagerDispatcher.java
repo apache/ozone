@@ -38,7 +38,7 @@ import org.apache.ratis.statemachine.StateMachine;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import javax.annotation.Nonnull;
+import jakarta.annotation.Nonnull;
 import java.io.IOException;
 import java.util.EnumMap;
 import java.util.Map;
@@ -95,6 +95,12 @@ public class ChunkManagerDispatcher implements ChunkManager {
 
     selectHandler(kvContainer)
         .finishWriteChunks(kvContainer, blockData);
+  }
+
+  @Override
+  public void finalizeWriteChunk(KeyValueContainer kvContainer,
+      BlockID blockId) throws IOException {
+    selectHandler(kvContainer).finalizeWriteChunk(kvContainer, blockId);
   }
 
   @Override

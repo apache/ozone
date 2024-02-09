@@ -29,7 +29,7 @@ import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.util.Time;
-import org.jetbrains.annotations.NotNull;
+import jakarta.annotation.Nonnull;
 
 import java.io.IOException;
 
@@ -38,11 +38,11 @@ import java.io.IOException;
  */
 public class TestOMKeyCommitResponseWithFSO extends TestOMKeyCommitResponse {
 
-  @NotNull
+  @Nonnull
   @Override
   protected OMKeyCommitResponse getOmKeyCommitResponse(OmKeyInfo omKeyInfo,
       OzoneManagerProtocolProtos.OMResponse omResponse, String openKey,
-      String ozoneKey, RepeatedOmKeyInfo deleteKeys, Boolean isHSync)
+      String ozoneKey, RepeatedOmKeyInfo deleteKeys, Boolean isHSync, OmKeyInfo newOpenKeyInfo)
           throws IOException {
     assertNotNull(omBucketInfo);
     long volumeId = omMetadataManager.getVolumeId(omKeyInfo.getVolumeName());
@@ -55,10 +55,10 @@ public class TestOMKeyCommitResponseWithFSO extends TestOMKeyCommitResponse {
           new RepeatedOmKeyInfo(e)));
     }
     return new OMKeyCommitResponseWithFSO(omResponse, omKeyInfo, ozoneKey,
-        openKey, omBucketInfo, deleteKeyMap, volumeId, isHSync);
+        openKey, omBucketInfo, deleteKeyMap, volumeId, isHSync, newOpenKeyInfo);
   }
 
-  @NotNull
+  @Nonnull
   @Override
   protected OmKeyInfo getOmKeyInfo() {
     assertNotNull(omBucketInfo);
@@ -69,7 +69,7 @@ public class TestOMKeyCommitResponseWithFSO extends TestOMKeyCommitResponse {
             omBucketInfo.getObjectID(), 100, Time.now());
   }
 
-  @NotNull
+  @Nonnull
   @Override
   protected void addKeyToOpenKeyTable() throws Exception {
     assertNotNull(omBucketInfo);
@@ -87,7 +87,7 @@ public class TestOMKeyCommitResponseWithFSO extends TestOMKeyCommitResponse {
             fileName, omKeyInfoFSO, clientID, txnLogId, omMetadataManager);
   }
 
-  @NotNull
+  @Nonnull
   @Override
   protected String getOpenKeyName() throws IOException  {
     assertNotNull(omBucketInfo);
@@ -98,7 +98,7 @@ public class TestOMKeyCommitResponseWithFSO extends TestOMKeyCommitResponse {
             omBucketInfo.getObjectID(), keyName, clientID);
   }
 
-  @NotNull
+  @Nonnull
   @Override
   protected String getOzoneKey()  throws IOException {
     assertNotNull(omBucketInfo);

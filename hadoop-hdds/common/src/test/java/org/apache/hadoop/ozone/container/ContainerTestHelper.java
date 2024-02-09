@@ -442,11 +442,9 @@ public final class ContainerTestHelper {
   /**
    * Verify the response against the request.
    *
-   * @param request - Request
    * @param response - Response
    */
-  public static void verifyGetBlock(ContainerCommandRequestProto request,
-      ContainerCommandResponseProto response, int expectedChunksCount) {
+  public static void verifyGetBlock(ContainerCommandResponseProto response, int expectedChunksCount) {
     assertEquals(ContainerProtos.Result.SUCCESS, response.getResult());
     assertEquals(expectedChunksCount,
         response.getGetBlock().getBlockData().getChunksCount());
@@ -495,23 +493,6 @@ public final class ContainerTestHelper {
       Pipeline pipeline, long containerID) throws IOException {
     return getCloseContainer(pipeline, containerID, null);
   }
-  /**
-   * Returns a simple request without traceId.
-   * @param pipeline - pipeline
-   * @param containerID - ID of the container.
-   * @return ContainerCommandRequestProto without traceId.
-   */
-  public static ContainerCommandRequestProto getRequestWithoutTraceId(
-      Pipeline pipeline, long containerID) throws IOException {
-    Preconditions.checkNotNull(pipeline);
-    return ContainerCommandRequestProto.newBuilder()
-        .setCmdType(ContainerProtos.Type.CloseContainer)
-        .setContainerID(containerID)
-        .setCloseContainer(
-            ContainerProtos.CloseContainerRequestProto.getDefaultInstance())
-        .setDatanodeUuid(pipeline.getFirstNode().getUuidString())
-        .build();
-  }
 
   /**
    * Returns a delete container request.
@@ -533,14 +514,6 @@ public final class ContainerTestHelper {
         .setDeleteContainer(deleteRequest)
         .setDatanodeUuid(pipeline.getFirstNode().getUuidString())
         .build();
-  }
-
-  private static void sleep(long milliseconds) {
-    try {
-      Thread.sleep(milliseconds);
-    } catch (InterruptedException e) {
-      Thread.currentThread().interrupt();
-    }
   }
 
   public static BlockID getTestBlockID(long containerID) {
@@ -625,6 +598,12 @@ public final class ContainerTestHelper {
                   .setBlockID(fakeBlockId)
                   .build())
               .build());
+      break;
+    case FinalizeBlock:
+      builder
+          .setFinalizeBlock(ContainerProtos
+            .FinalizeBlockRequestProto.newBuilder()
+            .setBlockID(fakeBlockId).build());
       break;
 
     default:

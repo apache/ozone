@@ -29,7 +29,7 @@ import org.apache.hadoop.ozone.om.request.file.OMFileRequest;
 import org.apache.hadoop.ozone.om.response.CleanupTableInfo;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 
-import javax.annotation.Nonnull;
+import jakarta.annotation.Nonnull;
 
 import java.io.IOException;
 
@@ -47,16 +47,17 @@ public class OMKeyCommitResponseWithFSO extends OMKeyCommitResponse {
 
   private long volumeId;
 
-  @SuppressWarnings("parameternumber")
+  @SuppressWarnings("checkstyle:ParameterNumber")
   public OMKeyCommitResponseWithFSO(
       @Nonnull OMResponse omResponse,
       @Nonnull OmKeyInfo omKeyInfo,
       String ozoneKeyName, String openKeyName,
       @Nonnull OmBucketInfo omBucketInfo,
       Map<String, RepeatedOmKeyInfo> deleteKeyMap, long volumeId,
-      boolean isHSync) {
+      boolean isHSync,
+      OmKeyInfo newOpenKeyInfo) {
     super(omResponse, omKeyInfo, ozoneKeyName, openKeyName,
-            omBucketInfo, deleteKeyMap, isHSync);
+            omBucketInfo, deleteKeyMap, isHSync, newOpenKeyInfo);
     this.volumeId = volumeId;
   }
 
@@ -77,18 +78,21 @@ public class OMKeyCommitResponseWithFSO extends OMKeyCommitResponse {
     // Delete from OpenKey table if commit
     if (!this.isHSync()) {
       omMetadataManager.getOpenKeyTable(getBucketLayout())
-              .deleteWithBatch(batchOperation, getOpenKeyName());
+          .deleteWithBatch(batchOperation, getOpenKeyName());
+    } else if (getNewOpenKeyInfo() != null) {
+      omMetadataManager.getOpenKeyTable(getBucketLayout()).putWithBatch(
+          batchOperation, getOpenKeyName(), getNewOpenKeyInfo());
     }
 
     OMFileRequest.addToFileTable(omMetadataManager, batchOperation,
-            getOmKeyInfo(), volumeId, getOmBucketInfo().getObjectID());
+        getOmKeyInfo(), volumeId, getOmBucketInfo().getObjectID());
 
     updateDeletedTable(omMetadataManager, batchOperation);
 
     // update bucket usedBytes.
     omMetadataManager.getBucketTable().putWithBatch(batchOperation,
-            omMetadataManager.getBucketKey(getOmBucketInfo().getVolumeName(),
-                    getOmBucketInfo().getBucketName()), getOmBucketInfo());
+        omMetadataManager.getBucketKey(getOmBucketInfo().getVolumeName(),
+            getOmBucketInfo().getBucketName()), getOmBucketInfo());
   }
 
   @Override

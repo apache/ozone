@@ -72,7 +72,7 @@ import org.apache.ratis.thirdparty.io.grpc.Status;
 import org.apache.ratis.thirdparty.io.grpc.StatusException;
 import org.apache.ratis.thirdparty.io.grpc.StatusRuntimeException;
 import org.apache.ratis.util.ExitUtils;
-import org.jetbrains.annotations.NotNull;
+import jakarta.annotation.Nonnull;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
@@ -102,12 +102,12 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_KEY_PREALLOCATION_BL
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyBoolean;
-import static org.mockito.ArgumentMatchers.anyInt;
-import static org.mockito.ArgumentMatchers.anyLong;
-import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.ArgumentMatchers.argThat;
+import static org.mockito.Mockito.any;
+import static org.mockito.Mockito.anyBoolean;
+import static org.mockito.Mockito.anyInt;
+import static org.mockito.Mockito.anyLong;
+import static org.mockito.Mockito.anyString;
+import static org.mockito.Mockito.argThat;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.reset;
@@ -169,7 +169,7 @@ public class TestOmContainerLocationCache {
     metadataManager = omTestManagers.getMetadataManager();
 
     rpcClient = new RpcClient(conf, null) {
-      @NotNull
+      @Nonnull
       @Override
       protected XceiverClientFactory createXceiverClientFactory(
           ServiceInfoEx serviceInfo) throws IOException {
@@ -588,7 +588,7 @@ public class TestOmContainerLocationCache {
         .sendCommandAsync(argThat(matchCmd(Type.PutBlock)));
   }
 
-  @NotNull
+  @Nonnull
   private ContainerProtos.DatanodeBlockID createBlockId(long containerId,
                                                         long localId) {
     return ContainerProtos.DatanodeBlockID.newBuilder()
@@ -696,7 +696,7 @@ public class TestOmContainerLocationCache {
         .sendCommandAsync(argThat(matchCmd(Type.GetBlock)), any());
   }
 
-  @NotNull
+  @Nonnull
   private ChunkInfo createChunkInfo(byte[] data) throws Exception {
     Checksum checksum = new Checksum(ChecksumType.CRC32, 4);
     return ChunkInfo.newBuilder()

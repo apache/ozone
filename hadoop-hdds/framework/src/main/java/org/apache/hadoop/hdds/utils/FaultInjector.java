@@ -40,4 +40,13 @@ public abstract class FaultInjector {
   @VisibleForTesting
   public void reset() throws IOException {
   }
+
+  @VisibleForTesting
+  public void setException(Throwable e) {
+  }
+
+  @VisibleForTesting
+  public Throwable getException() {
+    return null;
+  }
 }

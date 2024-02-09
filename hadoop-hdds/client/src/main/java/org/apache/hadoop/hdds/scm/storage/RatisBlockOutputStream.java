@@ -30,8 +30,6 @@ import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.ozone.common.ChunkBuffer;
 import org.apache.hadoop.security.token.Token;
 import org.apache.hadoop.security.token.TokenIdentifier;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.io.OutputStream;
@@ -58,8 +56,6 @@ import java.util.concurrent.ExecutionException;
  */
 public class RatisBlockOutputStream extends BlockOutputStream
     implements Syncable {
-  public static final Logger LOG = LoggerFactory.getLogger(
-      RatisBlockOutputStream.class);
 
   // This object will maintain the commitIndexes and byteBufferList in order
   // Also, corresponding to the logIndex, the corresponding list of buffers will

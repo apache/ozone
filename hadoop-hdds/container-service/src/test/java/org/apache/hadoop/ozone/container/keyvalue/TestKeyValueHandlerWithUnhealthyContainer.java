@@ -41,6 +41,7 @@ import java.io.IOException;
 import java.util.UUID;
 
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.CONTAINER_INTERNAL_ERROR;
+import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.CONTAINER_UNHEALTHY;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.SUCCESS;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.UNKNOWN_BCSID;
 import static org.apache.hadoop.ozone.container.ContainerTestHelper.DATANODE_UUID;
@@ -49,7 +50,7 @@ import static org.apache.hadoop.ozone.container.ContainerTestHelper.getPutBlockR
 import static org.apache.hadoop.ozone.container.ContainerTestHelper.getTestBlockID;
 import static org.apache.hadoop.ozone.container.ContainerTestHelper.getWriteChunkRequest;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.atMostOnce;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -119,6 +120,19 @@ public class TestKeyValueHandlerWithUnhealthyContainer {
                 ContainerProtos.Type.ReadChunk),
             container, null);
     assertEquals(UNKNOWN_BCSID, response.getResult());
+  }
+
+  @Test
+  public void testFinalizeBlock() {
+    KeyValueContainer container = getMockUnhealthyContainer();
+    KeyValueHandler handler = getDummyHandler();
+
+    ContainerProtos.ContainerCommandResponseProto response =
+        handler.handleFinalizeBlock(
+            getDummyCommandRequestProto(
+                ContainerProtos.Type.FinalizeBlock),
+            container);
+    assertEquals(CONTAINER_UNHEALTHY, response.getResult());
   }
 
   @Test

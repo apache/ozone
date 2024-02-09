@@ -53,8 +53,8 @@ import org.apache.ozone.test.GenericTestUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 
 import static org.apache.ratis.rpc.SupportedRpcType.GRPC;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import org.apache.ratis.protocol.RaftGroupId;
 import org.apache.ratis.util.ExitUtils;
@@ -66,7 +66,6 @@ import java.util.function.BiConsumer;
 import org.apache.ratis.util.function.CheckedBiFunction;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.Assertions;
 
 /**
  * This class tests the metrics of ContainerStateMachine.
@@ -142,7 +141,7 @@ public class TestCSMMetrics {
               pipeline, blockID, 1024);
       ContainerCommandResponseProto response =
           client.sendCommand(writeChunkRequest);
-      Assertions.assertEquals(ContainerProtos.Result.SUCCESS,
+      assertEquals(ContainerProtos.Result.SUCCESS,
           response.getResult());
 
       metric = getMetrics(CSMMetrics.SOURCE_NAME +
@@ -160,7 +159,7 @@ public class TestCSMMetrics {
           ContainerTestHelper.getReadChunkRequest(pipeline, writeChunkRequest
               .getWriteChunk());
       response = client.sendCommand(readChunkRequest);
-      Assertions.assertEquals(ContainerProtos.Result.SUCCESS,
+      assertEquals(ContainerProtos.Result.SUCCESS,
           response.getResult());
 
       metric = getMetrics(CSMMetrics.SOURCE_NAME +
@@ -169,10 +168,10 @@ public class TestCSMMetrics {
       assertCounter("NumApplyTransactionOps", 1L, metric);
       applyTransactionLatency = getDoubleGauge(
           "ApplyTransactionNsAvgTime", metric);
-      assertTrue(applyTransactionLatency > 0.0);
+      assertThat(applyTransactionLatency).isGreaterThan(0.0);
       writeStateMachineLatency = getDoubleGauge(
           "WriteStateMachineDataNsAvgTime", metric);
-      assertTrue(writeStateMachineLatency > 0.0);
+      assertThat(writeStateMachineLatency).isGreaterThan(0.0);
 
     } finally {
       if (client != null) {

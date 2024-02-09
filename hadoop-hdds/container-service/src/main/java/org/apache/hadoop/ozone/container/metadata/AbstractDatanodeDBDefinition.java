@@ -73,4 +73,11 @@ public abstract class AbstractDatanodeDBDefinition implements DBDefinition {
 
   public abstract DBColumnFamilyDefinition<String, ChunkInfoList>
       getDeletedBlocksColumnFamily();
+
+  public DBColumnFamilyDefinition<String, Long> getFinalizeBlocksColumnFamily() {
+    return null;
+  }
+
+  public abstract DBColumnFamilyDefinition<String, BlockData>
+      getLastChunkInfoColumnFamily();
 }

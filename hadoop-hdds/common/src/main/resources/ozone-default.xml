@@ -856,6 +856,17 @@
     </description>
   </property>
   <property>
+    <name>ozone.chunk.list.incremental</name>
+    <value>false</value>
+    <tag>OZONE, CLIENT, DATANODE, PERFORMANCE</tag>
+    <description>
+      By default, a writer client sends full chunk list of a block when it
+      sends PutBlock requests. Changing this configuration to true will send
+      only incremental chunk list which reduces metadata overhead and improves
+      hsync performance.
+    </description>
+  </property>
+  <property>
     <name>ozone.scm.container.layout</name>
     <value>FILE_PER_BLOCK</value>
     <tag>OZONE, SCM, CONTAINER, PERFORMANCE</tag>
@@ -1287,15 +1298,6 @@
       see ozone.scm.heartbeat.thread.interval before changing this value.
     </description>
   </property>
-  <property>
-    <name>ozone.trace.enabled</name>
-    <value>false</value>
-    <tag>OZONE, DEBUG</tag>
-    <description>
-      Setting this flag to true dumps the HTTP request/ response in
-      the logs. Very useful when debugging REST protocol.
-    </description>
-  </property>
 
   <property>
     <name>ozone.key.preallocation.max.blocks</name>
@@ -1424,6 +1426,17 @@
     <description>
       Controls how long an open key operation is considered active. Specifically, if a key
       has been open longer than the value of this config entry, that open key is considered as
+      expired (e.g. due to client crash). Unit could be defined with postfix (ns,ms,s,m,h,d)
+    </description>
+  </property>
+
+  <property>
+    <name>ozone.om.lease.hard.limit</name>
+    <value>7d</value>
+    <tag>OZONE, OM, PERFORMANCE</tag>
+    <description>
+      Controls how long an open hsync key is considered as active. Specifically, if a hsync key
+      has been open longer than the value of this config entry, that open hsync key is considered as
       expired (e.g. due to client crash). Unit could be defined with postfix (ns,ms,s,m,h,d)
     </description>
   </property>
@@ -3419,6 +3432,14 @@
     </description>
   </property>
   <property>
+    <name>hdds.datanode.slow.op.warning.threshold</name>
+    <tag>OZONE, DATANODE, PERFORMANCE</tag>
+    <value>500ms</value>
+    <description>
+      Thresholds for printing slow-operation audit logs.
+    </description>
+  </property>
+  <property>
     <name>ozone.om.keyname.character.check.enabled</name>
     <tag>OZONE, OM</tag>
     <value>false</value>
@@ -4099,6 +4120,14 @@
     <tag>OZONE, CLIENT</tag>
     <description>
       Enable hsync/hflush. By default they are disabled.
+    </description>
+  </property>
+  <property>
+    <name>ozone.om.lease.soft.limit</name>
+    <value>60s</value>
+    <tag>OZONE, OM</tag>
+    <description>
+      Hsync soft limit lease period.
     </description>
   </property>
 

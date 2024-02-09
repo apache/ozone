@@ -148,17 +148,6 @@ public final class OzoneConsts {
 
   public static final String MULTIPART_FORM_DATA_BOUNDARY = "---XXX";
 
-  /**
-   * Supports Bucket Versioning.
-   */
-  public enum Versioning {
-    NOT_DEFINED, ENABLED, DISABLED;
-
-    public static Versioning getVersioning(boolean versioning) {
-      return versioning ? ENABLED : DISABLED;
-    }
-  }
-
   // Block ID prefixes used in datanode containers.
   public static final String DELETING_KEY_PREFIX = "#deleting#";
 
@@ -397,6 +386,8 @@ public final class OzoneConsts {
 
   /** Metadata stored in OmKeyInfo. */
   public static final String HSYNC_CLIENT_ID = "hsyncClientId";
+  public static final String LEASE_RECOVERY = "leaseRecovery";
+  public static final String FORCE_LEASE_RECOVERY_ENV = "OZONE.CLIENT.RECOVER.LEASE.FORCE";
 
   //GDPR
   public static final String GDPR_FLAG = "gdprEnabled";

@@ -23,13 +23,14 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.utils.db.Codec;
 import org.apache.hadoop.hdds.utils.db.Proto2CodecTestBase;
 import org.apache.hadoop.util.Time;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
 import java.util.UUID;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 /**
  * Test {@link OmMultipartKeyInfo#getCodec()}.
@@ -58,7 +59,7 @@ public class TestOmMultipartKeyInfoCodec
     } catch (java.io.IOException e) {
       e.printStackTrace();
     }
-    Assertions.assertNotNull(data);
+    assertNotNull(data);
 
     OmMultipartKeyInfo multipartKeyInfo = null;
     try {
@@ -66,7 +67,7 @@ public class TestOmMultipartKeyInfoCodec
     } catch (java.io.IOException e) {
       e.printStackTrace();
     }
-    Assertions.assertEquals(omMultipartKeyInfo, multipartKeyInfo);
+    assertEquals(omMultipartKeyInfo, multipartKeyInfo);
 
     // When random byte data passed returns null.
     try {

@@ -50,6 +50,7 @@ import org.apache.hadoop.ozone.om.helpers.ListKeysLightResult;
 import org.apache.hadoop.ozone.om.helpers.ListKeysResult;
 import org.apache.hadoop.ozone.om.helpers.DBUpdates;
 import org.apache.hadoop.ozone.om.helpers.KeyInfoWithVolumeContext;
+import org.apache.hadoop.ozone.om.helpers.ListOpenFilesResult;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
@@ -57,6 +58,7 @@ import org.apache.hadoop.ozone.om.helpers.OmMultipartUploadList;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartUploadListParts;
 import org.apache.hadoop.ozone.om.helpers.OmPartInfo;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
+import org.apache.hadoop.ozone.om.helpers.OpenKeySession;
 import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
 import org.apache.hadoop.ozone.om.helpers.OzoneFileStatusLight;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
@@ -80,6 +82,8 @@ import org.apache.hadoop.ozone.om.upgrade.DisallowedUntilLayoutVersion;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CancelSnapshotDiffRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CancelSnapshotDiffResponse;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ListOpenFilesRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ListOpenFilesResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ListSnapshotDiffJobRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ListSnapshotDiffJobResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CheckVolumeAccessRequest;
@@ -249,6 +253,11 @@ public class OzoneManagerRequestHandler implements RequestHandler {
             listMultipartUploads(request.getListMultipartUploadsRequest());
         responseBuilder.setListMultipartUploadsResponse(response);
         break;
+      case ListOpenFiles:
+        ListOpenFilesResponse listOpenFilesResponse = listOpenFiles(
+            request.getListOpenFilesRequest(), request.getVersion());
+        responseBuilder.setListOpenFilesResponse(listOpenFilesResponse);
+        break;
       case ServiceList:
         ServiceListResponse serviceListResponse = getServiceList(
             request.getServiceListRequest());
@@ -397,7 +406,7 @@ public class OzoneManagerRequestHandler implements RequestHandler {
     OMClientRequest omClientRequest =
         OzoneManagerRatisUtils.createClientRequest(omRequest, impl);
     return captureLatencyNs(
-        impl.getPerfMetrics().getValidateAndUpdateCacneLatencyNs(),
+        impl.getPerfMetrics().getValidateAndUpdateCacheLatencyNs(),
         () -> {
           OMClientResponse omClientResponse =
               omClientRequest.validateAndUpdateCache(getOzoneManager(), termIndex);
@@ -919,6 +928,31 @@ public class OzoneManagerRequestHandler implements RequestHandler {
       }
     }
     return resp;
+  }
+
+  private ListOpenFilesResponse listOpenFiles(ListOpenFilesRequest req,
+                                              int clientVersion)
+      throws IOException {
+    ListOpenFilesResponse.Builder resp = ListOpenFilesResponse.newBuilder();
+
+    ListOpenFilesResult res =
+        impl.listOpenFiles(req.getPath(), req.getCount(), req.getToken());
+    // TODO: Is there a clean way to avoid ser-de for responses:
+    //  OM does: ListOpenFilesResult -> ListOpenFilesResponse
+    //  Client : ListOpenFilesResponse -> ListOpenFilesResult
+
+    resp.setTotalOpenKeyCount(res.getTotalOpenKeyCount());
+    resp.setHasMore(res.hasMore());
+    if (res.getContinuationToken() != null) {
+      resp.setContinuationToken(res.getContinuationToken());
+    }
+
+    for (OpenKeySession e : res.getOpenKeys()) {
+      resp.addClientID(e.getId());
+      resp.addKeyInfo(e.getKeyInfo().getProtobuf(clientVersion));
+    }
+
+    return resp.build();
   }
 
   private ServiceListResponse getServiceList(ServiceListRequest request)

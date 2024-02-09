@@ -80,6 +80,7 @@ public class OMMetrics implements OmMetadataReaderMetrics {
   private @Metric MutableCounterLong numCreateFile;
   private @Metric MutableCounterLong numLookupFile;
   private @Metric MutableCounterLong numListStatus;
+  private @Metric MutableCounterLong numListOpenFiles;
 
   private @Metric MutableCounterLong numOpenKeyDeleteRequests;
   private @Metric MutableCounterLong numOpenKeysSubmittedForDeletion;
@@ -176,6 +177,7 @@ public class OMMetrics implements OmMetadataReaderMetrics {
   private @Metric MutableCounterLong numCreateFileFails;
   private @Metric MutableCounterLong numLookupFileFails;
   private @Metric MutableCounterLong numListStatusFails;
+  private @Metric MutableCounterLong numListOpenFilesFails;
   private @Metric MutableCounterLong getNumGetKeyInfoFails;
 
   private @Metric MutableCounterLong numRecoverLeaseFails;
@@ -428,8 +430,16 @@ public class OMMetrics implements OmMetadataReaderMetrics {
   }
 
   public void incNumListS3BucketsFails() {
-    numBucketOps.incr();
     numBucketS3ListFails.incr();
+  }
+
+  public void incNumListOpenFiles() {
+    numKeyOps.incr();
+    numListOpenFiles.incr();
+  }
+
+  public void incNumListOpenFilesFails() {
+    numListOpenFilesFails.incr();
   }
 
   public void incNumInitiateMultipartUploads() {
@@ -1088,6 +1098,11 @@ public class OMMetrics implements OmMetadataReaderMetrics {
   @VisibleForTesting
   public long getNumKeyHSyncs() {
     return numKeyHSyncs.value();
+  }
+
+  @VisibleForTesting
+  public void resetNumKeyHSyncs() {
+    numKeyHSyncs.incr(-numKeyHSyncs.value());
   }
 
   @VisibleForTesting

@@ -144,17 +144,6 @@ public final class ContainerCommandResponseBuilders {
         .build();
   }
 
-  /**
-   * Returns successful blockResponse.
-   * @param msg - Request.
-   * @return Response.
-   */
-  public static ContainerCommandResponseProto getBlockResponseSuccess(
-      ContainerCommandRequestProto msg) {
-
-    return getSuccessResponse(msg);
-  }
-
   public static ContainerCommandResponseProto getBlockDataResponse(
       ContainerCommandRequestProto msg, BlockData data) {
 
@@ -315,6 +304,18 @@ public final class ContainerCommandResponseBuilders {
 
     return getSuccessResponseBuilder(request)
         .setReadChunk(response)
+        .build();
+  }
+
+  public static ContainerCommandResponseProto getFinalizeBlockResponse(
+      ContainerCommandRequestProto msg, BlockData data) {
+
+    ContainerProtos.FinalizeBlockResponseProto.Builder blockData =
+        ContainerProtos.FinalizeBlockResponseProto.newBuilder()
+        .setBlockData(data);
+
+    return getSuccessResponseBuilder(msg)
+        .setFinalizeBlock(blockData)
         .build();
   }
 
