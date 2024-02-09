@@ -111,10 +111,6 @@ public abstract class OMKeyRequest extends OMClientRequest {
 
   private BucketLayout bucketLayout = BucketLayout.DEFAULT;
 
-  public static final int BLOCK_ALLOCATION_RETRY_COUNT = 5;
-
-  public static final int BLOCK_ALLOCATION_RETRY_WAIT_TIME_MS = 3000;
-
   public OMKeyRequest(OMRequest omRequest) {
     super(omRequest);
   }
@@ -203,30 +199,18 @@ public abstract class OMKeyRequest extends OMClientRequest {
     List<OmKeyLocationInfo> locationInfos = new ArrayList<>(numBlocks);
     String remoteUser = getRemoteUser().getShortUserName();
     List<AllocatedBlock> allocatedBlocks;
-    int retryCount = BLOCK_ALLOCATION_RETRY_COUNT;
-    while (true) {
-      try {
-        allocatedBlocks = scmClient.getBlockClient()
-            .allocateBlock(scmBlockSize, numBlocks, replicationConfig, serviceID,
-                excludeList, clientMachine);
-      } catch (SCMException ex) {
-        omMetrics.incNumBlockAllocateCallFails();
-        if (ex.getResult().equals(SCMException.ResultCodes.SAFE_MODE_EXCEPTION) && retryCount > 0) {
-          LOG.debug("Allocate block failed as SCM is in safe mode, number of retries remaining: {}", retryCount);
-          retryCount--;
-          // SCM is in safe mode, retry again
-          try {
-            Thread.sleep(BLOCK_ALLOCATION_RETRY_WAIT_TIME_MS);
-            continue;
-          } catch (InterruptedException e) {
-            throw new OMException(ex.getMessage(), OMException.ResultCodes.SCM_IN_SAFE_MODE);
-          }
-        } else if (ex.getResult().equals(SCMException.ResultCodes.SAFE_MODE_EXCEPTION) && retryCount == 0) {
-          throw new OMException(ex.getMessage(), OMException.ResultCodes.SCM_IN_SAFE_MODE);
-        }
-        throw ex;
+    try {
+      allocatedBlocks = scmClient.getBlockClient()
+          .allocateBlock(scmBlockSize, numBlocks, replicationConfig, serviceID,
+              excludeList, clientMachine);
+    } catch (SCMException ex) {
+      omMetrics.incNumBlockAllocateCallFails();
+      if (ex.getResult()
+          .equals(SCMException.ResultCodes.SAFE_MODE_EXCEPTION)) {
+        throw new OMException(ex.getMessage(),
+            OMException.ResultCodes.SCM_IN_SAFE_MODE);
       }
-      break;
+      throw ex;
     }
     for (AllocatedBlock allocatedBlock : allocatedBlocks) {
       BlockID blockID = new BlockID(allocatedBlock.getBlockID());
