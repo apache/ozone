@@ -397,15 +397,11 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
       initOMRatisConf();
       SCMHAService scmService;
       OMHAService omService;
-      ReconServer reconServer = null;
+      ReconServer reconServer;
       try {
         scmService = createSCMService();
         omService = createOMService();
-        if (includeRecon) {
-          configureRecon();
-          reconServer = new ReconServer();
-          reconServer.execute(new String[] {});
-        }
+        reconServer = createRecon();
       } catch (AuthenticationException ex) {
         throw new IOException("Unable to build MiniOzoneCluster. ", ex);
       }

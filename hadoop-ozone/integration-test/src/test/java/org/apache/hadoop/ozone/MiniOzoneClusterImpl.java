@@ -598,11 +598,7 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
         }
         om.start();
 
-        if (includeRecon) {
-          configureRecon();
-          reconServer = new ReconServer();
-          reconServer.execute(new String[] {});
-        }
+        reconServer = createRecon();
 
         hddsDatanodes = createHddsDatanodes(
             Collections.singletonList(scm), reconServer);
@@ -753,6 +749,16 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
       return stringBuilder.toString();
     }
 
+    protected ReconServer createRecon() {
+      ReconServer reconServer = null;
+      if (includeRecon) {
+        configureRecon();
+        reconServer = new ReconServer();
+        reconServer.execute(new String[] {});
+      }
+      return reconServer;
+    }
+
     /**
      * Creates HddsDatanodeService(s) instance.
      *
@@ -859,7 +865,7 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
       conf.setFromObject(new ReplicationConfig().setPort(getFreePort()));
     }
 
-    protected void configureRecon() throws IOException {
+    protected void configureRecon() {
       ConfigurationProvider.resetConfiguration();
 
       File tempNewFolder = new File(path, "recon");
