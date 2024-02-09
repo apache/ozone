@@ -80,11 +80,6 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
   private static final int RATIS_RPC_TIMEOUT = 1000; // 1 second
   public static final int NODE_FAILURE_TIMEOUT = 2000; // 2 seconds
 
-  /**
-   * Creates a new MiniOzoneCluster.
-   *
-   * @throws IOException if there is an I/O error
-   */
   public MiniOzoneHAClusterImpl(
       OzoneConfiguration conf,
       SCMConfigurator scmConfigurator,
@@ -101,7 +96,6 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
 
   /**
    * Returns the first OzoneManager from the list.
-   * @return
    */
   @Override
   public OzoneManager getOzoneManager() {

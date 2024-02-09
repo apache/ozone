@@ -93,7 +93,7 @@ public interface MiniOzoneCluster extends AutoCloseable {
   void waitForClusterToBeReady() throws TimeoutException, InterruptedException;
 
   /**
-   * Waits for atleast one RATIS pipeline of given factor to be reported in open
+   * Waits for at least one RATIS pipeline of given factor to be reported in open
    * state.
    *
    * @param factor replication factor
@@ -165,20 +165,12 @@ public interface MiniOzoneCluster extends AutoCloseable {
   /**
    * Returns StorageContainerLocationClient to communicate with
    * {@link StorageContainerManager} associated with the MiniOzoneCluster.
-   *
-   * @return StorageContainerLocation Client
-   * @throws IOException
    */
   StorageContainerLocationProtocolClientSideTranslatorPB
       getStorageContainerLocationClient() throws IOException;
 
   /**
    * Restarts StorageContainerManager instance.
-   *
-   * @param waitForDatanode
-   * @throws IOException
-   * @throws TimeoutException
-   * @throws InterruptedException
    */
   void restartStorageContainerManager(boolean waitForDatanode)
       throws InterruptedException, TimeoutException, IOException,
@@ -186,8 +178,6 @@ public interface MiniOzoneCluster extends AutoCloseable {
 
   /**
    * Restarts OzoneManager instance.
-   *
-   * @throws IOException
    */
   void restartOzoneManager() throws IOException;
 
@@ -358,13 +348,6 @@ public interface MiniOzoneCluster extends AutoCloseable {
       return this;
     }
 
-    /**
-     * Sets the certificate client.
-     *
-     * @param client
-     *
-     * @return MiniOzoneCluster.Builder
-     */
     public Builder setCertificateClient(CertificateClient client) {
       this.certClient = client;
       return this;
@@ -462,8 +445,6 @@ public interface MiniOzoneCluster extends AutoCloseable {
      * Constructs and returns MiniOzoneCluster.
      *
      * @return {@link MiniOzoneCluster}
-     *
-     * @throws IOException
      */
     public abstract MiniOzoneCluster build() throws IOException;
   }

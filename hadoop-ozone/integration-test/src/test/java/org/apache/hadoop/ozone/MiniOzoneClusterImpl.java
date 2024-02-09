@@ -134,8 +134,6 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
 
   /**
    * Creates a new MiniOzoneCluster with Recon.
-   *
-   * @throws IOException if there is an I/O error
    */
   MiniOzoneClusterImpl(OzoneConfiguration conf,
                        SCMConfigurator scmConfigurator,
@@ -156,9 +154,6 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
    * StorageContainerManager. This is used by
    * {@link MiniOzoneHAClusterImpl} for starting multiple
    * OzoneManagers and StorageContainerManagers.
-   *
-   * @param conf
-   * @param hddsDatanodes
    */
   MiniOzoneClusterImpl(OzoneConfiguration conf, SCMConfigurator scmConfigurator,
       List<HddsDatanodeService> hddsDatanodes, ReconServer reconServer) {
@@ -194,9 +189,6 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
     return scm;
   }
 
-  /**
-   * Waits for the Ozone cluster to be ready for processing requests.
-   */
   @Override
   public void waitForClusterToBeReady()
       throws TimeoutException, InterruptedException {
@@ -220,10 +212,6 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
     }, 1000, waitForClusterToBeReadyTimeout);
   }
 
-  /**
-   * Waits for atleast one RATIS pipeline of given factor to be reported in open
-   * state.
-   */
   @Override
   public void waitForPipelineTobeReady(HddsProtos.ReplicationFactor factor,
                                        int timeoutInMs) throws
@@ -236,24 +224,11 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
     }, 1000, timeoutInMs);
   }
 
-  /**
-   * Sets the timeout value after which
-   * {@link MiniOzoneClusterImpl#waitForClusterToBeReady} times out.
-   *
-   * @param timeoutInMs timeout value in milliseconds
-   */
   @Override
   public void setWaitForClusterToBeReadyTimeout(int timeoutInMs) {
     waitForClusterToBeReadyTimeout = timeoutInMs;
   }
 
-  /**
-   * Waits for SCM to be out of Safe Mode. Many tests can be run iff we are out
-   * of Safe mode.
-   *
-   * @throws TimeoutException
-   * @throws InterruptedException
-   */
   @Override
   public void waitTobeOutOfSafeMode()
       throws TimeoutException, InterruptedException {
@@ -469,9 +444,6 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
     datanode.start();
   }
 
-  /**
-   * Start DataNodes.
-   */
   @Override
   public void startHddsDatanodes() {
     hddsDatanodes.forEach(this::startHddsDatanode);
@@ -624,8 +596,6 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
 
     /**
      * Initializes the configuration required for starting MiniOzoneCluster.
-     *
-     * @throws IOException
      */
     protected void initializeConfiguration() throws IOException {
       Path metaDir = Paths.get(path, "ozone-meta");
@@ -661,7 +631,6 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
      * Creates a new StorageContainerManager instance.
      *
      * @return {@link StorageContainerManager}
-     * @throws IOException
      */
     protected StorageContainerManager createSCM()
         throws IOException, AuthenticationException {
@@ -680,6 +649,7 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
       }
       return scm;
     }
+
     protected void initializeScmStorage(SCMStorageConfig scmStore)
         throws IOException {
       if (scmStore.getState() == StorageState.INITIALIZED) {
@@ -726,7 +696,6 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
      * Creates a new OzoneManager instance.
      *
      * @return {@link OzoneManager}
-     * @throws IOException
      */
     protected OzoneManager createOM()
         throws IOException, AuthenticationException {
@@ -776,7 +745,6 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
      * Creates HddsDatanodeService(s) instance.
      *
      * @return List of HddsDatanodeService
-     * @throws IOException
      */
     protected List<HddsDatanodeService> createHddsDatanodes()
         throws IOException {
