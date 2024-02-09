@@ -179,19 +179,15 @@ public class SstFilteringService extends BackgroundService
                 getColumnFamilyToKeyPrefixMap(ozoneManager.getMetadataManager(),
                     snapshotInfo.getVolumeName(),
                     snapshotInfo.getBucketName());
-
-            try (
-                ReferenceCounted<OmSnapshot> snapshotMetadataReader =
-                    snapshotManager.get().getActiveSnapshot(
-                        snapshotInfo.getVolumeName(),
-                        snapshotInfo.getBucketName(),
-                        snapshotInfo.getName())) {
+            try (ReferenceCounted<OmSnapshot> snapshotMetadataReader = snapshotManager.get()
+                .getActiveSnapshot(snapshotInfo.getVolumeName(),
+                    snapshotInfo.getBucketName(),
+                    snapshotInfo.getName())) {
               OmSnapshot omSnapshot = snapshotMetadataReader.get();
               RDBStore rdbStore = (RDBStore) omSnapshot.getMetadataManager()
                   .getStore();
               RocksDatabase db = rdbStore.getDb();
-              try (BootstrapStateHandler.Lock lock = getBootstrapStateLock()
-                  .lock()) {
+              try (BootstrapStateHandler.Lock lock = getBootstrapStateLock().lock()) {
                 db.deleteFilesNotMatchingPrefix(columnFamilyNameToPrefixMap);
               }
             } catch (OMException ome) {

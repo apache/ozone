@@ -135,8 +135,7 @@ import static org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse.JobStatus.RE
  * Class to generate snapshot diff.
  */
 public class SnapshotDiffManager implements AutoCloseable {
-  private static final Logger LOG =
-          LoggerFactory.getLogger(SnapshotDiffManager.class);
+  private static final Logger LOG = LoggerFactory.getLogger(SnapshotDiffManager.class);
   private static final String FROM_SNAP_TABLE_SUFFIX = "-from-snap";
   private static final String TO_SNAP_TABLE_SUFFIX = "-to-snap";
   private static final String UNIQUE_IDS_TABLE_SUFFIX = "-unique-ids";
@@ -836,11 +835,9 @@ public class SnapshotDiffManager implements AutoCloseable {
         return;
       }
 
-      rcFromSnapshot =
-          ozoneManager.getOmSnapshotManager()
+      rcFromSnapshot = ozoneManager.getOmSnapshotManager()
               .getActiveSnapshot(volumeName, bucketName, fromSnapshotName);
-      rcToSnapshot =
-          ozoneManager.getOmSnapshotManager()
+      rcToSnapshot = ozoneManager.getOmSnapshotManager()
               .getActiveSnapshot(volumeName, bucketName, toSnapshotName);
 
       OmSnapshot fromSnapshot = rcFromSnapshot.get();
