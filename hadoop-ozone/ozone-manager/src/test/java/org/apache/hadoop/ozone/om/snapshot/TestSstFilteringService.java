@@ -26,7 +26,6 @@ import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
 import org.apache.hadoop.hdds.utils.db.DBProfile;
 import org.apache.hadoop.hdds.utils.db.RDBStore;
 import org.apache.hadoop.ozone.lock.BootstrapStateHandler;
-import org.apache.hadoop.ozone.om.IOmMetadataReader;
 import org.apache.hadoop.ozone.om.KeyManager;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
@@ -468,11 +467,12 @@ public class TestSstFilteringService {
                                           String snapshot) throws IOException {
     SnapshotInfo snapshotInfo = om.getMetadataManager().getSnapshotInfoTable()
         .get(SnapshotInfo.getTableKey(volume, bucket, snapshot));
-    try (ReferenceCounted<IOmMetadataReader, SnapshotCache>
-             snapshotMetadataReader = om.getOmSnapshotManager()
-        .getSnapshotCache()
-        .get(snapshotInfo.getTableKey())) {
-      OmSnapshot omSnapshot = (OmSnapshot) snapshotMetadataReader.get();
+    try (ReferenceCounted<OmSnapshot> snapshotMetadataReader =
+             om.getOmSnapshotManager().getActiveSnapshot(
+                 snapshotInfo.getVolumeName(),
+                 snapshotInfo.getBucketName(),
+                 snapshotInfo.getName())) {
+      OmSnapshot omSnapshot = snapshotMetadataReader.get();
       return getKeysFromDb(omSnapshot.getMetadataManager(), volume, bucket);
     }
   }

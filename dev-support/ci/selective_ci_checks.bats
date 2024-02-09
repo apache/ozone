@@ -57,6 +57,18 @@ load bats-assert/load.bash
   assert_output -p needs-kubernetes-tests=false
 }
 
+@test "dashboard only" {
+  run dev-support/ci/selective_ci_checks.sh 039dea9
+
+  assert_output -p 'basic-checks=["rat"]'
+  assert_output -p needs-build=false
+  assert_output -p needs-compile=false
+  assert_output -p needs-compose-tests=false
+  assert_output -p needs-dependency-check=false
+  assert_output -p needs-integration-tests=false
+  assert_output -p needs-kubernetes-tests=false
+}
+
 @test "compose and robot" {
   run dev-support/ci/selective_ci_checks.sh b83039eef
 

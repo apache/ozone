@@ -630,7 +630,7 @@ public class TestOzoneManagerSnapshotAcl {
   private void createVolume() throws IOException {
     final String volumePrefix = "volume-";
     volumeName = volumePrefix + RandomStringUtils.randomNumeric(32);
-    final VolumeArgs volumeArgs = new VolumeArgs.Builder()
+    final VolumeArgs volumeArgs = VolumeArgs.newBuilder()
         .setAdmin(ADMIN)
         .setOwner(ADMIN)
         .build();

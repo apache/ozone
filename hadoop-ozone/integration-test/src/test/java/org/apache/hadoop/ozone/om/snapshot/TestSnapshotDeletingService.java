@@ -32,7 +32,6 @@ import org.apache.hadoop.ozone.TestDataUtil;
 import org.apache.hadoop.ozone.client.BucketArgs;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
-import org.apache.hadoop.ozone.om.IOmMetadataReader;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
@@ -62,7 +61,6 @@ import java.util.concurrent.TimeoutException;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CHUNK_SIZE_KEY;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ACL_ENABLED;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_SERVICE_INTERVAL;
-import static org.apache.hadoop.ozone.om.OmSnapshotManager.getSnapshotPrefix;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SNAPSHOT_DELETING_SERVICE_INTERVAL;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SNAPSHOT_DELETING_SERVICE_TIMEOUT;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -137,9 +135,8 @@ public class TestSnapshotDeletingService {
     GenericTestUtils.waitFor(() -> snapshotDeletingService
             .getSuccessfulRunCount() >= 1, 1000, 10000);
 
-    OmSnapshot bucket1snap3 = (OmSnapshot) om.getOmSnapshotManager()
-        .checkForSnapshot(VOLUME_NAME, BUCKET_NAME_ONE,
-            getSnapshotPrefix("bucket1snap3"), true).get();
+    OmSnapshot bucket1snap3 = om.getOmSnapshotManager()
+        .getSnapshot(VOLUME_NAME, BUCKET_NAME_ONE, "bucket1snap3").get();
 
     // Check bucket1key1 added to next non deleted snapshot db.
     List<? extends Table.KeyValue<String, RepeatedOmKeyInfo>> omKeyInfos =
@@ -194,8 +191,7 @@ public class TestSnapshotDeletingService {
 
     // verify the cache of purged snapshot
     // /vol1/bucket2/bucket2snap1 has been cleaned up from cache map
-    SnapshotCache snapshotCache = om.getOmSnapshotManager().getSnapshotCache();
-    assertEquals(2, snapshotCache.size());
+    assertEquals(2, om.getOmSnapshotManager().getSnapshotCacheSize());
   }
 
   @SuppressWarnings("checkstyle:MethodLength")
@@ -363,9 +359,8 @@ public class TestSnapshotDeletingService {
     assertTableRowCount(om.getMetadataManager().getSnapshotInfoTable(), 2);
 
     verifySnapshotChain(deletedSnap, "/vol1/bucket2/snap3");
-    OmSnapshot snap3 = (OmSnapshot) om.getOmSnapshotManager()
-        .checkForSnapshot(VOLUME_NAME, BUCKET_NAME_TWO,
-            getSnapshotPrefix("snap3"), true).get();
+    OmSnapshot snap3 = om.getOmSnapshotManager()
+        .getSnapshot(VOLUME_NAME, BUCKET_NAME_TWO, "snap3").get();
 
     Table<String, OmKeyInfo> snapDeletedDirTable =
         snap3.getMetadataManager().getDeletedDirTable();
@@ -392,10 +387,10 @@ public class TestSnapshotDeletingService {
     assertTableRowCount(renamedTable, 4);
     assertTableRowCount(deletedDirTable, 3);
 
-    ReferenceCounted<IOmMetadataReader, SnapshotCache> rcSnap1 =
-        om.getOmSnapshotManager().checkForSnapshot(
-            VOLUME_NAME, BUCKET_NAME_TWO, getSnapshotPrefix("snap1"), true);
-    OmSnapshot snap1 = (OmSnapshot) rcSnap1.get();
+    ReferenceCounted<OmSnapshot> rcSnap1 =
+        om.getOmSnapshotManager().getSnapshot(
+            VOLUME_NAME, BUCKET_NAME_TWO, "snap1");
+    OmSnapshot snap1 = rcSnap1.get();
     Table<String, OmKeyInfo> snap1KeyTable =
         snap1.getMetadataManager().getFileTable();
     try (TableIterator<String, ? extends Table.KeyValue<String,

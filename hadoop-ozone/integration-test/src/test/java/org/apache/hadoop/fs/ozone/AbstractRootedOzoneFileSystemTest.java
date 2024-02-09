@@ -1185,18 +1185,14 @@ abstract class AbstractRootedOzoneFileSystemTest {
     BitSet aclRights = new BitSet();
     aclRights.set(READ.ordinal());
     aclRights.set(WRITE.ordinal());
-    List<OzoneAcl> objectAcls = new ArrayList<>();
-    objectAcls.add(new OzoneAcl(ACLIdentityType.WORLD, "",
-        aclRights, ACCESS));
-    objectAcls.add(new OzoneAcl(ACLIdentityType.USER, "admin", userRights,
-        ACCESS));
     // volume acls have all access to admin and read+write access to world
 
     // Construct VolumeArgs
-    VolumeArgs volumeArgs = new VolumeArgs.Builder()
+    VolumeArgs volumeArgs = VolumeArgs.newBuilder()
         .setAdmin("admin")
         .setOwner("admin")
-        .setAcls(Collections.unmodifiableList(objectAcls))
+        .addAcl(new OzoneAcl(ACLIdentityType.WORLD, "", aclRights, ACCESS))
+        .addAcl(new OzoneAcl(ACLIdentityType.USER, "admin", userRights, ACCESS))
         .setQuotaInNamespace(1000)
         .setQuotaInBytes(Long.MAX_VALUE).build();
     // Sanity check
@@ -1227,7 +1223,7 @@ abstract class AbstractRootedOzoneFileSystemTest {
     }
 
     // set acls for shared tmp mount under the tmp volume
-    objectAcls.clear();
+    List<OzoneAcl> objectAcls = new ArrayList<>();
     objectAcls.add(new OzoneAcl(ACLIdentityType.USER, "admin", userRights,
         ACCESS));
     aclRights.clear(DELETE.ordinal());
@@ -1302,8 +1298,8 @@ abstract class AbstractRootedOzoneFileSystemTest {
     OzoneAcl aclWorldAccess = new OzoneAcl(ACLIdentityType.WORLD, "",
         userRights, ACCESS);
     // Construct VolumeArgs
-    VolumeArgs volumeArgs = new VolumeArgs.Builder()
-        .setAcls(Collections.singletonList(aclWorldAccess))
+    VolumeArgs volumeArgs = VolumeArgs.newBuilder()
+        .addAcl(aclWorldAccess)
         .setQuotaInNamespace(1000).build();
     // Sanity check
     assertNull(volumeArgs.getOwner());
@@ -2303,8 +2299,8 @@ abstract class AbstractRootedOzoneFileSystemTest {
     OzoneAcl aclWorldAccess = new OzoneAcl(ACLIdentityType.WORLD, "",
         userRights, ACCESS);
     // Construct VolumeArgs, set ACL to world access
-    VolumeArgs volumeArgs = new VolumeArgs.Builder()
-        .setAcls(Collections.singletonList(aclWorldAccess))
+    VolumeArgs volumeArgs = VolumeArgs.newBuilder()
+        .addAcl(aclWorldAccess)
         .build();
     proxy.createVolume(volume, volumeArgs);
 

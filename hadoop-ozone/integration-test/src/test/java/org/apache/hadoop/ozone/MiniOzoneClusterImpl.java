@@ -81,19 +81,16 @@ import org.apache.hadoop.security.authentication.client.AuthenticationException;
 import org.apache.ozone.test.GenericTestUtils;
 
 import org.apache.commons.io.FileUtils;
-import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_HEARTBEAT_INTERVAL;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState.HEALTHY;
 import static org.apache.hadoop.hdds.recon.ReconConfigKeys.OZONE_RECON_ADDRESS_KEY;
 import static org.apache.hadoop.hdds.recon.ReconConfigKeys.OZONE_RECON_DATANODE_ADDRESS_KEY;
 import static org.apache.hadoop.hdds.recon.ReconConfigKeys.OZONE_RECON_HTTP_ADDRESS_KEY;
 import static org.apache.hadoop.hdds.recon.ReconConfigKeys.OZONE_RECON_TASK_SAFEMODE_WAIT_THRESHOLD;
-import static org.apache.hadoop.hdds.scm.ScmConfig.ConfigStrings.HDDS_SCM_INIT_DEFAULT_LAYOUT_VERSION;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.DFS_CONTAINER_IPC_PORT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.DFS_CONTAINER_RATIS_ADMIN_PORT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.DFS_CONTAINER_RATIS_DATASTREAM_PORT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.DFS_CONTAINER_RATIS_IPC_PORT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.DFS_CONTAINER_RATIS_SERVER_PORT;
-import static org.apache.hadoop.ozone.om.OmUpgradeConfig.ConfigStrings.OZONE_OM_INIT_DEFAULT_LAYOUT_VERSION;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_DB_DIR;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_OM_SNAPSHOT_DB_DIR;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_SCM_DB_DIR;
@@ -652,10 +649,6 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
       conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, metaDir.toString());
       // conf.setBoolean(ScmConfigKeys.OZONE_SCM_HA_ENABLE_KEY, true);
 
-      // MiniOzoneCluster should have global pipeline upper limit.
-      conf.setInt(ScmConfigKeys.OZONE_SCM_RATIS_PIPELINE_LIMIT,
-          pipelineNumLimit >= DEFAULT_PIPELINE_LIMIT ?
-              pipelineNumLimit : DEFAULT_PIPELINE_LIMIT);
       conf.setTimeDuration(OMConfigKeys.OZONE_OM_RATIS_MINIMUM_TIMEOUT_KEY,
           DEFAULT_RATIS_RPC_TIMEOUT_SEC, TimeUnit.SECONDS);
       SCMClientConfig scmClientConfig = conf.getObject(SCMClientConfig.class);
@@ -681,14 +674,8 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
     protected StorageContainerManager createSCM()
         throws IOException, AuthenticationException {
       configureSCM();
-      SCMStorageConfig scmStore;
 
-      // Set non standard layout version if needed.
-      scmLayoutVersion.ifPresent(integer ->
-          conf.set(HDDS_SCM_INIT_DEFAULT_LAYOUT_VERSION,
-              String.valueOf(integer)));
-
-      scmStore = new SCMStorageConfig(conf);
+      SCMStorageConfig scmStore = new SCMStorageConfig(conf);
       initializeScmStorage(scmStore);
       StorageContainerManager scm = HddsTestUtils.getScmSimple(conf,
           scmConfigurator);
@@ -745,9 +732,6 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
     protected OzoneManager createOM()
         throws IOException, AuthenticationException {
       configureOM();
-      omLayoutVersion.ifPresent(integer ->
-          conf.set(OZONE_OM_INIT_DEFAULT_LAYOUT_VERSION,
-              String.valueOf(integer)));
       OMStorage omStore = new OMStorage(conf);
       initializeOmStorage(omStore);
       return OzoneManager.createOm(conf);
@@ -850,30 +834,6 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
           localhostWithFreePort());
       conf.set(HddsConfigKeys.HDDS_SCM_WAIT_TIME_AFTER_SAFE_MODE_EXIT,
           "3s");
-      configureSCMheartbeat();
-    }
-
-    private void configureSCMheartbeat() {
-      if (hbInterval.isPresent()) {
-        conf.setTimeDuration(HDDS_HEARTBEAT_INTERVAL,
-            hbInterval.get(), TimeUnit.MILLISECONDS);
-      } else {
-        conf.setTimeDuration(HDDS_HEARTBEAT_INTERVAL,
-            DEFAULT_HB_INTERVAL_MS,
-            TimeUnit.MILLISECONDS);
-      }
-
-      if (hbProcessorInterval.isPresent()) {
-        conf.setTimeDuration(
-            ScmConfigKeys.OZONE_SCM_HEARTBEAT_PROCESS_INTERVAL,
-            hbProcessorInterval.get(),
-            TimeUnit.MILLISECONDS);
-      } else {
-        conf.setTimeDuration(
-            ScmConfigKeys.OZONE_SCM_HEARTBEAT_PROCESS_INTERVAL,
-            DEFAULT_HB_PROCESSOR_INTERVAL_MS,
-            TimeUnit.MILLISECONDS);
-      }
     }
 
     private void configureOM() {

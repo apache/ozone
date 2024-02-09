@@ -297,11 +297,8 @@ public interface MiniOzoneCluster extends AutoCloseable {
   @SuppressWarnings("visibilitymodifier")
   abstract class Builder {
 
-    protected static final int DEFAULT_HB_INTERVAL_MS = 1000;
-    protected static final int DEFAULT_HB_PROCESSOR_INTERVAL_MS = 100;
     protected static final int ACTIVE_OMS_NOT_SET = -1;
     protected static final int ACTIVE_SCMS_NOT_SET = -1;
-    protected static final int DEFAULT_PIPELINE_LIMIT = 3;
     protected static final int DEFAULT_RATIS_RPC_TIMEOUT_SEC = 1;
 
     protected OzoneConfiguration conf;
@@ -317,17 +314,12 @@ public interface MiniOzoneCluster extends AutoCloseable {
     protected int numOfActiveSCMs = ACTIVE_SCMS_NOT_SET;
     protected SCMConfigurator scmConfigurator;
 
-    protected Optional<Integer> hbInterval = Optional.empty();
-    protected Optional<Integer> hbProcessorInterval = Optional.empty();
     protected String scmId = UUID.randomUUID().toString();
     protected String omId = UUID.randomUUID().toString();
     
     protected Optional<String> datanodeReservedSpace = Optional.empty();
     protected boolean includeRecon = false;
 
-
-    protected Optional<Integer> omLayoutVersion = Optional.empty();
-    protected Optional<Integer> scmLayoutVersion = Optional.empty();
     protected Optional<Integer> dnLayoutVersion = Optional.empty();
 
     protected int numOfDatanodes = 3;
@@ -335,7 +327,6 @@ public interface MiniOzoneCluster extends AutoCloseable {
     protected boolean  startDataNodes = true;
     protected CertificateClient certClient;
     protected SecretKeyClient secretKeyClient;
-    protected int pipelineNumLimit = DEFAULT_PIPELINE_LIMIT;
 
     protected Builder(OzoneConfiguration conf) {
       this.conf = conf;
@@ -425,42 +416,6 @@ public interface MiniOzoneCluster extends AutoCloseable {
     }
 
     /**
-     * Sets the total number of pipelines to create.
-     * @param val number of pipelines
-     * @return MiniOzoneCluster.Builder
-     */
-    public Builder setTotalPipelineNumLimit(int val) {
-      pipelineNumLimit = val;
-      return this;
-    }
-
-    /**
-     * Sets the number of HeartBeat Interval of Datanodes, the value should be
-     * in MilliSeconds.
-     *
-     * @param val HeartBeat interval in milliseconds
-     *
-     * @return MiniOzoneCluster.Builder
-     */
-    public Builder setHbInterval(int val) {
-      hbInterval = Optional.of(val);
-      return this;
-    }
-
-    /**
-     * Sets the number of HeartBeat Processor Interval of Datanodes,
-     * the value should be in MilliSeconds.
-     *
-     * @param val HeartBeat Processor interval in milliseconds
-     *
-     * @return MiniOzoneCluster.Builder
-     */
-    public Builder setHbProcessorInterval(int val) {
-      hbProcessorInterval = Optional.of(val);
-      return this;
-    }
-
-    /**
      * Sets the reserved space
      * {@link org.apache.hadoop.hdds.scm.ScmConfigKeys}
      * HDDS_DATANODE_DIR_DU_RESERVED
@@ -510,16 +465,6 @@ public interface MiniOzoneCluster extends AutoCloseable {
 
     public Builder setSCMServiceId(String serviceId) {
       this.scmServiceId = serviceId;
-      return this;
-    }
-
-    public Builder setScmLayoutVersion(int layoutVersion) {
-      scmLayoutVersion = Optional.of(layoutVersion);
-      return this;
-    }
-
-    public Builder setOmLayoutVersion(int layoutVersion) {
-      omLayoutVersion = Optional.of(layoutVersion);
       return this;
     }
 
