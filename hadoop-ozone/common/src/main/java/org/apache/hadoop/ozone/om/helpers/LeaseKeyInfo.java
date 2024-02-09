@@ -18,12 +18,14 @@
 package org.apache.hadoop.ozone.om.helpers;
 
 /**
- * This class represents LeaseKeyInfo
- * isKeyInfo represents whether key is from openKeyTable or keyTable
- * true corresponds to keyInfo is from keyTable.
+ * This class represents LeaseKeyInfo.
  */
 public class LeaseKeyInfo {
   private final OmKeyInfo keyInfo;
+  /**
+   * isKeyInfo = true indicates keyInfo is from keyTable.
+   * isKeyInfo = false indicates keyInfo is from openKeyTable.
+   */
   private boolean isKeyInfo;
 
   public LeaseKeyInfo(OmKeyInfo info, boolean isKeyInfo) {
