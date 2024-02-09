@@ -745,7 +745,7 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
       for (int i = 0; i < numOfDatanodes; i++) {
         OzoneConfiguration dnConf = new OzoneConfiguration(conf);
         configureDatanodePorts(dnConf);
-        String datanodeBaseDir = path + "/datanode-" + Integer.toString(i);
+        String datanodeBaseDir = path + "/datanode-" + i;
         Path metaDir = Paths.get(datanodeBaseDir, "meta");
         List<String> dataDirs = new ArrayList<>();
         List<String> reservedSpaceList = new ArrayList<>();
