@@ -291,7 +291,6 @@ public class TestStorageContainerManager {
         numKeys);
 
     MiniOzoneCluster cluster = MiniOzoneCluster.newBuilder(conf)
-        .setHbInterval(50)
         .build();
     cluster.waitForClusterToBeReady();
 
@@ -371,10 +370,11 @@ public class TestStorageContainerManager {
   @Test
   public void testOldDNRegistersToReInitialisedSCM() throws Exception {
     OzoneConfiguration conf = new OzoneConfiguration();
-    MiniOzoneCluster cluster =
-        MiniOzoneCluster.newBuilder(conf).setHbInterval(1000)
-            .setHbProcessorInterval(3000).setNumDatanodes(1)
-            .build();
+    conf.setTimeDuration(HDDS_HEARTBEAT_INTERVAL, 1000, TimeUnit.MILLISECONDS);
+    conf.setTimeDuration(ScmConfigKeys.OZONE_SCM_HEARTBEAT_PROCESS_INTERVAL, 3000, TimeUnit.MILLISECONDS);
+    MiniOzoneCluster cluster = MiniOzoneCluster.newBuilder(conf)
+        .setNumDatanodes(1)
+        .build();
     cluster.waitForClusterToBeReady();
 
     try {
@@ -462,10 +462,10 @@ public class TestStorageContainerManager {
     conf.setInt(ScmConfigKeys.OZONE_SCM_PIPELINE_OWNER_CONTAINER_COUNT,
         numKeys);
     conf.setBoolean(HDDS_SCM_SAFEMODE_PIPELINE_CREATION, false);
+    conf.setTimeDuration(HDDS_HEARTBEAT_INTERVAL, 1000, TimeUnit.MILLISECONDS);
+    conf.setTimeDuration(ScmConfigKeys.OZONE_SCM_HEARTBEAT_PROCESS_INTERVAL, 3000, TimeUnit.MILLISECONDS);
 
     MiniOzoneCluster cluster = MiniOzoneCluster.newBuilder(conf)
-        .setHbInterval(1000)
-        .setHbProcessorInterval(3000)
         .setNumDatanodes(1)
         .build();
     cluster.waitForClusterToBeReady();
@@ -826,10 +826,10 @@ public class TestStorageContainerManager {
     conf.setInt(ScmConfigKeys.OZONE_SCM_PIPELINE_OWNER_CONTAINER_COUNT,
         numKeys);
     conf.setBoolean(HDDS_SCM_SAFEMODE_PIPELINE_CREATION, false);
+    conf.setTimeDuration(HDDS_HEARTBEAT_INTERVAL, 1000, TimeUnit.MILLISECONDS);
+    conf.setTimeDuration(ScmConfigKeys.OZONE_SCM_HEARTBEAT_PROCESS_INTERVAL, 3000, TimeUnit.MILLISECONDS);
 
     MiniOzoneCluster cluster = MiniOzoneCluster.newBuilder(conf)
-        .setHbInterval(1000)
-        .setHbProcessorInterval(3000)
         .setNumDatanodes(1)
         .build();
     cluster.waitForClusterToBeReady();

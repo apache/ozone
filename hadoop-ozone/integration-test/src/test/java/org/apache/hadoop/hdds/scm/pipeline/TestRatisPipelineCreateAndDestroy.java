@@ -38,8 +38,10 @@ import java.util.List;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_HEARTBEAT_INTERVAL;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_PIPELINE_AUTO_CREATE_FACTOR_ONE;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_DATANODE_PIPELINE_LIMIT;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_RATIS_PIPELINE_LIMIT;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_STALENODE_INTERVAL;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -55,14 +57,14 @@ public class TestRatisPipelineCreateAndDestroy {
 
   public void init(int numDatanodes) throws Exception {
     conf.setInt(OZONE_DATANODE_PIPELINE_LIMIT, 2);
+    conf.setInt(OZONE_SCM_RATIS_PIPELINE_LIMIT, numDatanodes + numDatanodes / 3);
+    conf.setTimeDuration(HDDS_HEARTBEAT_INTERVAL, 2000, TimeUnit.MILLISECONDS);
+    conf.setTimeDuration(ScmConfigKeys.OZONE_SCM_HEARTBEAT_PROCESS_INTERVAL, 1000, TimeUnit.MILLISECONDS);
     conf.setTimeDuration(
         ScmConfigKeys.OZONE_SCM_PIPELINE_CREATION_INTERVAL, 500,
         TimeUnit.MILLISECONDS);
     cluster = MiniOzoneCluster.newBuilder(conf)
             .setNumDatanodes(numDatanodes)
-            .setTotalPipelineNumLimit(numDatanodes + numDatanodes / 3)
-            .setHbInterval(2000)
-            .setHbProcessorInterval(1000)
             .build();
     cluster.waitForClusterToBeReady();
     StorageContainerManager scm = cluster.getStorageContainerManager();
