@@ -336,11 +336,11 @@ public final class OmSnapshotManager implements AutoCloseable {
             .getSnapshotChainManager()
             .getTableKey(snapshotId);
 
+        // SnapshotChain maintains in-memory reverse mapping of snapshotId to snapshotName based on snapshotInfoTable.
+        // So it should not happen ideally.
+        // If it happens, then either snapshot has been purged in between or SnapshotChain is corrupted
+        // and missing some entries which needs investigation.
         if (snapshotTableKey == null) {
-          // SnapshotChain is basically in-memory reverse mapping of snapshotId to snapshotName based on
-          // snapshotInfoTable. So it should not happen ideally.
-          // If it happens, then either snapshot has been purged in between or SnapshotChain is corrupted
-          // and missing some entries which needs investigation.
           throw new IOException("No snapshot exist with snapshotId: " + snapshotId);
         }
 
