@@ -754,7 +754,7 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
   /**
    * Update the configurations of the given list of OMs.
    */
-  public void updateOMConfigs(OzoneConfiguration newConf) {
+  private void updateOMConfigs(OzoneConfiguration newConf) {
     for (OzoneManager om : omhaService.getActiveServices()) {
       om.setConfiguration(newConf);
     }

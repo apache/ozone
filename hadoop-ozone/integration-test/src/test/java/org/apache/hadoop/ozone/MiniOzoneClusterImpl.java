@@ -137,12 +137,12 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
   /**
    * Creates a new MiniOzoneCluster with Recon.
    */
-  MiniOzoneClusterImpl(OzoneConfiguration conf,
-                       SCMConfigurator scmConfigurator,
-                       OzoneManager ozoneManager,
-                       StorageContainerManager scm,
-                       List<HddsDatanodeService> hddsDatanodes,
-                       ReconServer reconServer) {
+  private MiniOzoneClusterImpl(OzoneConfiguration conf,
+      SCMConfigurator scmConfigurator,
+      OzoneManager ozoneManager,
+      StorageContainerManager scm,
+      List<HddsDatanodeService> hddsDatanodes,
+      ReconServer reconServer) {
     this.conf = conf;
     this.ozoneManager = ozoneManager;
     this.scm = scm;
@@ -427,7 +427,7 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
     stopRecon(reconServer);
   }
 
-  public void startHddsDatanode(HddsDatanodeService datanode) {
+  private void startHddsDatanode(HddsDatanodeService datanode) {
     try {
       datanode.setCertificateClient(getCAClient());
     } catch (IOException e) {
@@ -698,7 +698,7 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
       return OzoneManager.createOm(conf);
     }
 
-    protected String getSCMAddresses(List<StorageContainerManager> scms) {
+    private String getSCMAddresses(List<StorageContainerManager> scms) {
       StringBuilder stringBuilder = new StringBuilder();
       Iterator<StorageContainerManager> iter = scms.iterator();
 
