@@ -18,7 +18,6 @@
 package org.apache.hadoop.hdds.scm.storage;
 
 import com.google.common.annotations.VisibleForTesting;
-import org.apache.hadoop.fs.Syncable;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandResponseProto;
 import org.apache.hadoop.hdds.scm.ContainerClientMetrics;
@@ -36,7 +35,6 @@ import java.io.OutputStream;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ExecutionException;
 
 /**
  * An {@link OutputStream} used by the REST service in combination with the
@@ -55,7 +53,7 @@ import java.util.concurrent.ExecutionException;
  * through to the container.
  */
 public class RatisBlockOutputStream extends BlockOutputStream
-    implements Syncable {
+    implements NonBlockingSyncable {
 
   // This object will maintain the commitIndexes and byteBufferList in order
   // Also, corresponding to the logIndex, the corresponding list of buffers will
@@ -116,10 +114,10 @@ public class RatisBlockOutputStream extends BlockOutputStream
   }
 
   @Override
-  void waitOnFlushFutures() throws InterruptedException, ExecutionException {
-    // wait for all the transactions to complete
-    CompletableFuture.allOf(commitWatcher.getFutureMap().values().toArray(
-        new CompletableFuture[0])).get();
+  CompletableFuture<Void> waitOnFlushFutures() {
+    // TODO: Rename method to getFlushFutures
+    // return future directly, don't wait here
+    return CompletableFuture.allOf(commitWatcher.getFutureMap().values().toArray(new CompletableFuture[0]));
   }
 
   @Override
@@ -128,17 +126,19 @@ public class RatisBlockOutputStream extends BlockOutputStream
   }
 
   @Override
-  public void hflush() throws IOException {
-    hsync();
+  public CompletableFuture<Void> hflush() throws IOException {
+    return hsync();
   }
 
   @Override
-  public void hsync() throws IOException {
+  public CompletableFuture<Void> hsync() throws IOException {
     if (!isClosed()) {
       if (getBufferPool() != null && getBufferPool().getSize() > 0) {
         handleFlush(false);
       }
-      waitForFlushAndCommit(false);
+      return waitForFlushAndCommit(false);
+    } else {
+      return null;
     }
   }
 }

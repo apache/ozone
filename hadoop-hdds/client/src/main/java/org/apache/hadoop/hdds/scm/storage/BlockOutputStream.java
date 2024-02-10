@@ -376,17 +376,13 @@ public class BlockOutputStream extends OutputStream {
     waitForFlushAndCommit(true);
   }
 
-  void waitForFlushAndCommit(boolean bufferFull) throws IOException {
-    try {
-      checkOpen();
-      waitOnFlushFutures();
-    } catch (ExecutionException e) {
-      handleExecutionException(e);
-    } catch (InterruptedException ex) {
-      Thread.currentThread().interrupt();
-      handleInterruptedException(ex, true);
-    }
+  CompletableFuture<Void> waitForFlushAndCommit(boolean bufferFull) throws IOException {
+    checkOpen();
+    CompletableFuture<Void> future = waitOnFlushFutures();
+    // TODO: This call can be removed?
     watchForCommit(bufferFull);
+
+    return future;
   }
 
   void releaseBuffersOnException() {
@@ -605,7 +601,8 @@ public class BlockOutputStream extends OutputStream {
     }
   }
 
-  void waitOnFlushFutures() throws InterruptedException, ExecutionException {
+  CompletableFuture<Void> waitOnFlushFutures() {
+    return null;
   }
 
   void validateResponse(
@@ -752,6 +749,7 @@ public class BlockOutputStream extends OutputStream {
 
   /**
    * Handles InterruptedExecution.
+   * TODO: Move this to StreamUtil.
    *
    * @param ex
    * @param processExecutionException is optional, if passed as TRUE, then
@@ -771,6 +769,8 @@ public class BlockOutputStream extends OutputStream {
 
   /**
    * Handles ExecutionException by adjusting buffers.
+   * TODO: Move this to StreamUtil.
+   *
    * @param ex
    * @throws IOException
    */

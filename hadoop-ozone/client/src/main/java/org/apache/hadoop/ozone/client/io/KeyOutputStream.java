@@ -24,6 +24,8 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutionException;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -56,6 +58,8 @@ import org.apache.ratis.protocol.exceptions.AlreadyClosedException;
 import org.apache.ratis.protocol.exceptions.RaftRetryFailureException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import static org.apache.hadoop.ozone.client.io.StreamUtil.EXCEPTION_MSG;
 
 /**
  * Maintaining a list of BlockInputStream. Write based on offset.
@@ -194,13 +198,13 @@ public class KeyOutputStream extends OutputStream
    * @param openVersion the version corresponding to the pre-allocation.
    * @throws IOException
    */
-  public synchronized void addPreallocateBlocks(OmKeyLocationInfoGroup version,
+  public void addPreallocateBlocks(OmKeyLocationInfoGroup version,
       long openVersion) throws IOException {
     blockOutputStreamEntryPool.addPreallocateBlocks(version, openVersion);
   }
 
   @Override
-  public synchronized void write(int b) throws IOException {
+  public void write(int b) throws IOException {
     byte[] buf = new byte[1];
     buf[0] = (byte) b;
     write(buf, 0, 1);
@@ -219,7 +223,7 @@ public class KeyOutputStream extends OutputStream
    * @throws IOException
    */
   @Override
-  public synchronized void write(byte[] b, int off, int len)
+  public void write(byte[] b, int off, int len)
       throws IOException {
     checkNotClosed();
     if (b == null) {
@@ -232,6 +236,7 @@ public class KeyOutputStream extends OutputStream
     if (len == 0) {
       return;
     }
+    // TODO: Return future?
     handleWrite(b, off, len, false);
     writeOffset += len;
   }
@@ -459,7 +464,7 @@ public class KeyOutputStream extends OutputStream
   }
 
   @Override
-  public synchronized void flush() throws IOException {
+  public void flush() throws IOException {
     checkNotClosed();
     handleFlushOrClose(StreamAction.FLUSH);
   }
@@ -470,7 +475,7 @@ public class KeyOutputStream extends OutputStream
   }
 
   @Override
-  public synchronized void hsync() throws IOException {
+  public void hsync() throws IOException {
     if (replication.getReplicationType() != ReplicationType.RATIS) {
       throw new UnsupportedOperationException(
           "Replication type is not " + ReplicationType.RATIS);
@@ -481,10 +486,62 @@ public class KeyOutputStream extends OutputStream
     }
     checkNotClosed();
     final long hsyncPos = writeOffset;
-    handleFlushOrClose(StreamAction.HSYNC);
+
+    CompletableFuture<Void> future = null;
+    synchronized (this) {
+      future = handleFlushOrClose(StreamAction.HSYNC);
+    }
+    // TODO: Error handling?
+    try {
+      future.get();
+    } catch (ExecutionException e) {
+      handleExecutionException(e);
+    } catch (InterruptedException ex) {
+      Thread.currentThread().interrupt();
+      handleInterruptedException(ex, true);
+    }
+
     Preconditions.checkState(offset >= hsyncPos,
         "offset = %s < hsyncPos = %s", offset, hsyncPos);
     blockOutputStreamEntryPool.hsyncKey(hsyncPos);
+  }
+
+  /**
+   * Handles InterruptedExecution.
+   * TODO: Move this to StreamUtil.
+   *
+   * @param ex
+   * @param processExecutionException is optional, if passed as TRUE, then
+   * handle ExecutionException else skip it.
+   * @throws IOException
+   */
+  void handleInterruptedException(Exception ex, boolean processExecutionException)
+      throws IOException {
+    LOG.error("Command execution was interrupted.");
+    if (processExecutionException) {
+      handleExecutionException(ex);
+    } else {
+      throw new IOException(EXCEPTION_MSG + ex.toString(), ex);
+    }
+  }
+
+  /**
+   * Handles ExecutionException by adjusting buffers.
+   * TODO: Move this to StreamUtil.
+   *
+   * @param ex
+   * @throws IOException
+   */
+  private void handleExecutionException(Exception ex) throws IOException {
+    // TODO: Incomplete. See {@link BlockOutputStream#handleExecutionException}
+    //  This was originally handled 6-layers deep in BlockOutputStream.
+    //  Find another way to properly handle this. Either:
+    //   1. Add new interface methods
+    //   2. Reduce layers of abstraction
+//    setIoException(ex);
+//    adjustBuffersOnException();
+//    throw getIoException();
+    throw new IOException(ex);
   }
 
   /**
@@ -503,7 +560,8 @@ public class KeyOutputStream extends OutputStream
    * @throws IOException In case, flush or close fails with exception.
    */
   @SuppressWarnings("squid:S1141")
-  private void handleFlushOrClose(StreamAction op) throws IOException {
+  private CompletableFuture<Void> handleFlushOrClose(StreamAction op) throws IOException {
+    CompletableFuture<Void> future = null;
     if (!blockOutputStreamEntryPool.isEmpty()) {
       while (true) {
         try {
@@ -511,23 +569,22 @@ public class KeyOutputStream extends OutputStream
               blockOutputStreamEntryPool.getCurrentStreamEntry();
           if (entry != null) {
             try {
-              handleStreamAction(entry, op);
+              future = handleStreamAction(entry, op);
             } catch (IOException ioe) {
               handleException(entry, ioe);
               continue;
             }
           }
-          return;
         } catch (Exception e) {
           markStreamClosed();
           throw e;
         }
       }
     }
+    return future;
   }
 
-  private void handleStreamAction(BlockOutputStreamEntry entry,
-                                  StreamAction op) throws IOException {
+  private CompletableFuture<Void> handleStreamAction(BlockOutputStreamEntry entry, StreamAction op) throws IOException {
     Collection<DatanodeDetails> failedServers = entry.getFailedServers();
     // failed servers can be null in case there is no data written in
     // the stream
@@ -535,6 +592,7 @@ public class KeyOutputStream extends OutputStream
       blockOutputStreamEntryPool.getExcludeList().addDatanodes(
           failedServers);
     }
+    CompletableFuture<Void> future = null;
     switch (op) {
     case CLOSE:
       entry.close();
@@ -548,11 +606,12 @@ public class KeyOutputStream extends OutputStream
       entry.flush();
       break;
     case HSYNC:
-      entry.hsync();
+      future = entry.hsync();
       break;
     default:
       throw new IOException("Invalid Operation");
     }
+    return future;
   }
 
   /**
@@ -561,7 +620,7 @@ public class KeyOutputStream extends OutputStream
    * @throws IOException
    */
   @Override
-  public synchronized void close() throws IOException {
+  public void close() throws IOException {
     if (closed) {
       return;
     }
@@ -583,8 +642,7 @@ public class KeyOutputStream extends OutputStream
     }
   }
 
-  public synchronized OmMultipartCommitUploadPartInfo
-      getCommitUploadPartInfo() {
+  public OmMultipartCommitUploadPartInfo getCommitUploadPartInfo() {
     return blockOutputStreamEntryPool.getCommitUploadPartInfo();
   }
 

@@ -21,6 +21,7 @@ import java.io.IOException;
 import java.io.OutputStream;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.concurrent.CompletableFuture;
 
 import org.apache.hadoop.fs.Syncable;
 import org.apache.hadoop.hdds.client.BlockID;
@@ -32,6 +33,7 @@ import org.apache.hadoop.hdds.scm.XceiverClientFactory;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.storage.BlockOutputStream;
 import org.apache.hadoop.hdds.scm.storage.BufferPool;
+import org.apache.hadoop.hdds.scm.storage.NonBlockingSyncable;
 import org.apache.hadoop.hdds.scm.storage.RatisBlockOutputStream;
 import org.apache.hadoop.hdds.security.token.OzoneBlockTokenIdentifier;
 import org.apache.hadoop.security.token.Token;
@@ -147,7 +149,7 @@ public class BlockOutputStreamEntry extends OutputStream {
     }
   }
 
-  void hsync() throws IOException {
+  CompletableFuture<Void> hsync() throws IOException {
     if (isInitialized()) {
       final OutputStream out = getOutputStream();
       if (!(out instanceof Syncable)) {
@@ -155,7 +157,9 @@ public class BlockOutputStreamEntry extends OutputStream {
             out.getClass() + " is not " + Syncable.class.getSimpleName());
       }
 
-      ((Syncable)out).hsync();
+      return ((NonBlockingSyncable) out).hsync();
+    } else {
+      return null;
     }
   }
 
