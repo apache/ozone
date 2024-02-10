@@ -30,9 +30,10 @@ import org.apache.hadoop.crypto.key.KeyProvider;
 import org.apache.hadoop.crypto.key.KeyProviderTokenIssuer;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.StorageStatistics;
+import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
+import org.apache.hadoop.ozone.om.helpers.LeaseKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
-import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.security.token.DelegationTokenIssuer;
 
@@ -41,6 +42,8 @@ import java.io.InputStream;
 import java.net.URI;
 import java.util.List;
 
+import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.CONTAINER_NOT_FOUND;
+import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.NO_SUCH_BLOCK;
 import static org.apache.hadoop.ozone.OzoneConsts.FORCE_LEASE_RECOVERY_ENV;
 
 /**
@@ -139,9 +142,9 @@ public class RootedOzoneFileSystem extends BasicRootedOzoneFileSystem
     LOG.trace("recoverLease() path:{}", f);
     Path qualifiedPath = makeQualified(f);
     String key = pathToKey(qualifiedPath);
-    OmKeyInfo keyInfo = null;
+    LeaseKeyInfo leaseKeyInfo;
     try {
-      keyInfo = getAdapter().recoverFilePrepare(key, forceRecovery);
+      leaseKeyInfo = getAdapter().recoverFilePrepare(key, forceRecovery);
     } catch (OMException e) {
       if (e.getResult() == OMException.ResultCodes.KEY_ALREADY_CLOSED) {
         // key is already closed, let's just return success
@@ -151,26 +154,42 @@ public class RootedOzoneFileSystem extends BasicRootedOzoneFileSystem
     }
 
     // finalize the final block and get block length
-    List<OmKeyLocationInfo> keyLocationInfoList = keyInfo.getLatestVersionLocations().getLocationList();
-    if (!keyLocationInfoList.isEmpty()) {
-      OmKeyLocationInfo block = keyLocationInfoList.get(keyLocationInfoList.size() - 1);
+    List<OmKeyLocationInfo> locationInfoList = leaseKeyInfo.getKeyInfo().getLatestVersionLocations().getLocationList();
+    if (!locationInfoList.isEmpty()) {
+      OmKeyLocationInfo block = locationInfoList.get(locationInfoList.size() - 1);
       try {
         block.setLength(getAdapter().finalizeBlock(block));
       } catch (Throwable e) {
-        if (!forceRecovery) {
+        if (e instanceof StorageContainerException && (((StorageContainerException) e).getResult().equals(NO_SUCH_BLOCK)
+            || ((StorageContainerException) e).getResult().equals(CONTAINER_NOT_FOUND))
+            && !leaseKeyInfo.getIsKeyInfo() && locationInfoList.size() > 1) {
+          locationInfoList = leaseKeyInfo.getKeyInfo().getLatestVersionLocations().getLocationList().subList(0,
+              locationInfoList.size() - 1);
+          block = locationInfoList.get(locationInfoList.size() - 1);
+          try {
+            block.setLength(getAdapter().finalizeBlock(block));
+          } catch (Throwable exp) {
+            if (!forceRecovery) {
+              throw exp;
+            }
+            LOG.warn("Failed to finalize block. Continue to recover the file since {} is enabled.",
+                FORCE_LEASE_RECOVERY_ENV, exp);
+          }
+        } else if (!forceRecovery) {
           throw e;
+        } else {
+          LOG.warn("Failed to finalize block. Continue to recover the file since {} is enabled.",
+              FORCE_LEASE_RECOVERY_ENV, e);
         }
-        LOG.warn("Failed to finalize block. Continue to recover the file since {} is enabled.",
-            FORCE_LEASE_RECOVERY_ENV, e);
       }
     }
 
     // recover and commit file
-    long keyLength = keyLocationInfoList.stream().mapToLong(OmKeyLocationInfo::getLength).sum();
-    OmKeyArgs keyArgs = new OmKeyArgs.Builder().setVolumeName(keyInfo.getVolumeName())
-        .setBucketName(keyInfo.getBucketName()).setKeyName(keyInfo.getKeyName())
-        .setReplicationConfig(keyInfo.getReplicationConfig()).setDataSize(keyLength)
-        .setLocationInfoList(keyLocationInfoList)
+    long keyLength = locationInfoList.stream().mapToLong(OmKeyLocationInfo::getLength).sum();
+    OmKeyArgs keyArgs = new OmKeyArgs.Builder().setVolumeName(leaseKeyInfo.getKeyInfo().getVolumeName())
+        .setBucketName(leaseKeyInfo.getKeyInfo().getBucketName()).setKeyName(leaseKeyInfo.getKeyInfo().getKeyName())
+        .setReplicationConfig(leaseKeyInfo.getKeyInfo().getReplicationConfig()).setDataSize(keyLength)
+        .setLocationInfoList(locationInfoList)
         .build();
     getAdapter().recoverFile(keyArgs);
     return true;

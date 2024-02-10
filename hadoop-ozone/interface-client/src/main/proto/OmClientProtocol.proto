@@ -2117,6 +2117,7 @@ message RecoverLeaseRequest {
 message RecoverLeaseResponse {
   optional bool response = 1 [deprecated=true];
   optional KeyInfo keyInfo = 2;
+  optional bool isKeyInfo = 3 [default = true];
 }
 
 message SetTimesRequest {

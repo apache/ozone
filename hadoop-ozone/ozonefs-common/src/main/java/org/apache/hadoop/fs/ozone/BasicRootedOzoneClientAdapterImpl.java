@@ -79,6 +79,7 @@ import org.apache.hadoop.ozone.client.rpc.RpcClient;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
+import org.apache.hadoop.ozone.om.helpers.LeaseKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
@@ -1364,7 +1365,7 @@ public class BasicRootedOzoneClientAdapterImpl
   }
 
   @Override
-  public OmKeyInfo recoverFilePrepare(final String pathStr, boolean force) throws IOException {
+  public LeaseKeyInfo recoverFilePrepare(final String pathStr, boolean force) throws IOException {
     incrementCounter(Statistic.INVOCATION_RECOVER_FILE_PREPARE, 1);
     OFSPath ofsPath = new OFSPath(pathStr, config);
 

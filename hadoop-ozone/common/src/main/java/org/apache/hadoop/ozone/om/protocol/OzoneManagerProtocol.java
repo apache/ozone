@@ -33,6 +33,7 @@ import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.DBUpdates;
 import org.apache.hadoop.ozone.om.helpers.DeleteTenantState;
 import org.apache.hadoop.ozone.om.helpers.KeyInfoWithVolumeContext;
+import org.apache.hadoop.ozone.om.helpers.LeaseKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.ListOpenFilesResult;
 import org.apache.hadoop.ozone.om.helpers.OmBucketArgs;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
@@ -1112,10 +1113,10 @@ public interface OzoneManagerProtocol
    * @param bucketName - The bucket name.
    * @param keyName - The key user want to recover.
    * @param force - force recover the file.
-   * @return OmKeyInfo KeyInfo of file under recovery
+   * @return LeaseKeyInfo KeyInfo of file under recovery
    * @throws IOException if an error occurs
    */
-  OmKeyInfo recoverLease(String volumeName, String bucketName, String keyName, boolean force) throws IOException;
+  LeaseKeyInfo recoverLease(String volumeName, String bucketName, String keyName, boolean force) throws IOException;
 
   /**
    * Update modification time and access time of a file.
