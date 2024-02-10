@@ -166,9 +166,16 @@ class TestOmSnapshotManager {
 
     SnapshotInfo first = createSnapshotInfo(volumeName, bucketName);
     SnapshotInfo second = createSnapshotInfo(volumeName, bucketName);
+    first.setGlobalPreviousSnapshotId(null);
+    first.setPathPreviousSnapshotId(null);
+    second.setGlobalPreviousSnapshotId(first.getSnapshotId());
+    second.setPathPreviousSnapshotId(first.getSnapshotId());
+
     when(snapshotInfoTable.get(first.getTableKey())).thenReturn(first);
     when(snapshotInfoTable.get(second.getTableKey())).thenReturn(second);
 
+    ((OmMetadataManagerImpl) om.getMetadataManager()).getSnapshotChainManager().addSnapshot(first);
+    ((OmMetadataManagerImpl) om.getMetadataManager()).getSnapshotChainManager().addSnapshot(second);
     // create the first snapshot checkpoint
     OmSnapshotManager.createOmSnapshotCheckpoint(om.getMetadataManager(),
         first);
