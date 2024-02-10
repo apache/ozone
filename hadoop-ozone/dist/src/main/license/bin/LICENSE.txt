@@ -283,7 +283,6 @@ Apache License 2.0
    com.github.stephenc.jcip:jcip-annotations
    com.google.android:annotations
    com.google.api.grpc:proto-google-common-protos
-   com.google.code.findbugs:jsr305
    com.google.code.gson:gson
    com.google.errorprone:error_prone_annotations
    com.google.guava:failureaccess
