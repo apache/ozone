@@ -35,6 +35,7 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
+import java.util.UUID;
 
 import com.google.common.cache.RemovalListener;
 import org.apache.hadoop.hdds.StringUtils;
@@ -244,7 +245,7 @@ public final class OmSnapshotManager implements AutoCloseable {
         OZONE_OM_SNAPSHOT_CACHE_MAX_SIZE,
         OZONE_OM_SNAPSHOT_CACHE_MAX_SIZE_DEFAULT);
 
-    CacheLoader<String, OmSnapshot> loader = createCacheLoader();
+    CacheLoader<UUID, OmSnapshot> loader = createCacheLoader();
 
     // TODO: [SNAPSHOT] Remove this if not going to make SnapshotCache impl
     //  pluggable.
@@ -325,19 +326,25 @@ public final class OmSnapshotManager implements AutoCloseable {
     return isSnapshotInfoTableEmpty;
   }
 
-  private CacheLoader<String, OmSnapshot> createCacheLoader() {
-    return new CacheLoader<String, OmSnapshot>() {
+  private CacheLoader<UUID, OmSnapshot> createCacheLoader() {
+    return new CacheLoader<UUID, OmSnapshot>() {
 
       @Nonnull
       @Override
-      public OmSnapshot load(@Nonnull String snapshotTableKey)
-          throws IOException {
-        // Check if the snapshot exists
-        final SnapshotInfo snapshotInfo = getSnapshotInfo(snapshotTableKey);
+      public OmSnapshot load(@Nonnull UUID snapshotId) throws IOException {
+        String snapshotTableKey = ((OmMetadataManagerImpl) ozoneManager.getMetadataManager())
+            .getSnapshotChainManager()
+            .getTableKey(snapshotId);
 
-        // Block snapshot from loading when it is no longer active e.g. DELETED,
-        // unless this is called from SnapshotDeletingService.
-        checkSnapshotActive(snapshotInfo, true);
+        // SnapshotChain maintains in-memory reverse mapping of snapshotId to snapshotName based on snapshotInfoTable.
+        // So it should not happen ideally.
+        // If it happens, then either snapshot has been purged in between or SnapshotChain is corrupted
+        // and missing some entries which needs investigation.
+        if (snapshotTableKey == null) {
+          throw new IOException("No snapshot exist with snapshotId: " + snapshotId);
+        }
+
+        final SnapshotInfo snapshotInfo = getSnapshotInfo(snapshotTableKey);
 
         CacheValue<SnapshotInfo> cacheValue = ozoneManager.getMetadataManager()
             .getSnapshotInfoTable()
@@ -417,9 +424,9 @@ public final class OmSnapshotManager implements AutoCloseable {
   /**
    * Immediately invalidate an entry.
    *
-   * @param key DB snapshot table key
+   * @param key SnapshotId.
    */
-  public void invalidateCacheEntry(String key) throws IOException {
+  public void invalidateCacheEntry(UUID key) throws IOException {
     if (snapshotCache != null) {
       snapshotCache.invalidate(key);
     }
@@ -663,17 +670,16 @@ public final class OmSnapshotManager implements AutoCloseable {
     return getSnapshot(snapshotTableKey, skipActiveCheck);
   }
 
-  private ReferenceCounted<OmSnapshot> getSnapshot(
-      String snapshotTableKey,
-      boolean skipActiveCheck) throws IOException {
-
+  private ReferenceCounted<OmSnapshot> getSnapshot(String snapshotTableKey, boolean skipActiveCheck)
+      throws IOException {
+    SnapshotInfo snapshotInfo = SnapshotUtils.getSnapshotInfo(ozoneManager, snapshotTableKey);
     // Block FS API reads when snapshot is not active.
     if (!skipActiveCheck) {
-      checkSnapshotActive(ozoneManager, snapshotTableKey);
+      checkSnapshotActive(snapshotInfo, false);
     }
 
     // retrieve the snapshot from the cache
-    return snapshotCache.get(snapshotTableKey);
+    return snapshotCache.get(snapshotInfo.getSnapshotId());
   }
 
   /**
