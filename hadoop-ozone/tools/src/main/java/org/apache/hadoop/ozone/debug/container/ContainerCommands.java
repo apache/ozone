@@ -79,7 +79,8 @@ import java.util.stream.Stream;
         ListSubcommand.class,
         InfoSubcommand.class,
         ExportSubcommand.class,
-        InspectSubcommand.class
+        InspectSubcommand.class,
+        FindContainerKeys.class
     })
 @MetaInfServices(SubcommandWithParent.class)
 public class ContainerCommands implements Callable<Void>, SubcommandWithParent {

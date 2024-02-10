@@ -25,6 +25,9 @@ import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.utils.db.DBStoreBuilder;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.ClientVersion;
+import org.apache.hadoop.ozone.debug.container.ContainerKeyInfo;
+import org.apache.hadoop.ozone.debug.container.ContainerKeyInfoResponse;
+import org.apache.hadoop.ozone.debug.container.FindContainerKeys;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
@@ -56,7 +59,7 @@ import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.KEY_TABLE;
  * This class tests `ozone debug ckscanner` CLI that reads from RocksDB
  * and gets keys for container ids.
  */
-public class TestContainerKeyScanner {
+public class TestFindContainerKeys {
   private DBStore dbStore;
   @TempDir
   private File tempDir;
@@ -104,7 +107,7 @@ public class TestContainerKeyScanner {
     pstderr = new PrintWriter(stderr);
 
     cmd = new CommandLine(new OzoneDebug())
-        .addSubcommand(new ContainerKeyScanner())
+        .addSubcommand(new FindContainerKeys())
         .setOut(pstdout)
         .setErr(pstderr);
 

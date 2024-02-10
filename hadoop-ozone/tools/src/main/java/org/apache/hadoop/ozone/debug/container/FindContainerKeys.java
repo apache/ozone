@@ -16,7 +16,7 @@
  *  limitations under the License.
  */
 
-package org.apache.hadoop.ozone.debug;
+package org.apache.hadoop.ozone.debug.container;
 
 import com.google.common.collect.Sets;
 import com.google.gson.GsonBuilder;
@@ -25,6 +25,7 @@ import org.apache.hadoop.hdds.cli.SubcommandWithParent;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
+import org.apache.hadoop.ozone.debug.OzoneDebug;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
@@ -58,18 +59,18 @@ import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 import static org.apache.hadoop.ozone.OzoneConsts.ROOT_PATH;
 
 /**
- * Parser for a list of container IDs, to scan for keys.
+ * Finds keys that reference a container/s.
  */
 @CommandLine.Command(
-    name = "ckscanner",
+    name = "find-keys",
     description = "Find keys that reference a container"
 )
 @MetaInfServices(SubcommandWithParent.class)
-public class ContainerKeyScanner
+public class FindContainerKeys
     implements Callable<Void>, SubcommandWithParent {
 
   public static final Logger LOG =
-      LoggerFactory.getLogger(ContainerKeyScanner.class);
+      LoggerFactory.getLogger(FindContainerKeys.class);
   @CommandLine.Spec
   private static CommandLine.Model.CommandSpec spec;
   @CommandLine.Option(names = {"--om-db"},
@@ -78,10 +79,10 @@ public class ContainerKeyScanner
       description = "Path to OM DB.")
   private String dbPath;
   @CommandLine.Option(names = {"--container-ids"},
-      split = " ",
+      split = ",",
       paramLabel = "<container ID>",
       required = true,
-      description = "One or more container IDs separated by spaces.")
+      description = "One or more container IDs separated by comma.")
   private Set<Long> containerIds;
   private static Map<String, OmDirectoryInfo> directoryTable;
   private static boolean isDirTableLoaded = false;

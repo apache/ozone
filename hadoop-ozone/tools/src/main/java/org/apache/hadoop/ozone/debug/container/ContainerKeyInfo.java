@@ -15,7 +15,7 @@
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
  */
-package org.apache.hadoop.ozone.debug;
+package org.apache.hadoop.ozone.debug.container;
 
 import java.util.Objects;
 
