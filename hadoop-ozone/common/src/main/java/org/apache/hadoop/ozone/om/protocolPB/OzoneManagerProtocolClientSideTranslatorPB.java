@@ -228,6 +228,7 @@ import org.apache.hadoop.util.ProtobufUtils;
 
 import static org.apache.hadoop.ozone.OzoneConsts.OM_S3_CALLER_CONTEXT_PREFIX;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes;
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.SCM_IN_SAFE_MODE;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.TOKEN_ERROR_OTHER;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CancelPrepareRequest;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CancelPrepareResponse;
@@ -256,6 +257,10 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
   private ThreadLocal<S3Auth> threadLocalS3Auth
       = new ThreadLocal<>();
   private boolean s3AuthCheck;
+
+  public static final int BLOCK_ALLOCATION_RETRY_COUNT = 5;
+  public static final int BLOCK_ALLOCATION_RETRY_WAIT_TIME_MS = 3000;
+
   public OzoneManagerProtocolClientSideTranslatorPB(OmTransport omTransport,
       String clientId) {
     this.clientID = clientId;
@@ -726,8 +731,7 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
         .setCreateKeyRequest(req)
         .build();
 
-    CreateKeyResponse keyResponse =
-        handleError(submitRequest(omRequest)).getCreateKeyResponse();
+    CreateKeyResponse keyResponse = handleSubmitRequestAndSCMSafeModeRetry(omRequest).getCreateKeyResponse();
     return new OpenKeySession(keyResponse.getID(),
         OmKeyInfo.getFromProtobuf(keyResponse.getKeyInfo()),
         keyResponse.getOpenVersion());
@@ -772,8 +776,7 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
         .setAllocateBlockRequest(req)
         .build();
 
-    AllocateBlockResponse resp = handleError(submitRequest(omRequest))
-        .getAllocateBlockResponse();
+    AllocateBlockResponse resp = handleSubmitRequestAndSCMSafeModeRetry(omRequest).getAllocateBlockResponse();
     return OmKeyLocationInfo.getFromProtobuf(resp.getKeyLocation());
   }
 
@@ -2230,10 +2233,36 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
     OMRequest omRequest = createOMRequest(Type.CreateFile)
         .setCreateFileRequest(createFileRequest)
         .build();
-    CreateFileResponse resp =
-        handleError(submitRequest(omRequest)).getCreateFileResponse();
+    CreateFileResponse resp = handleSubmitRequestAndSCMSafeModeRetry(omRequest).getCreateFileResponse();
+
     return new OpenKeySession(resp.getID(),
         OmKeyInfo.getFromProtobuf(resp.getKeyInfo()), resp.getOpenVersion());
+  }
+
+
+  @Nonnull
+  private OMResponse handleSubmitRequestAndSCMSafeModeRetry(OMRequest omRequest) throws IOException {
+    int retryCount = BLOCK_ALLOCATION_RETRY_COUNT;
+    while (true) {
+      try {
+        return handleError(submitRequest(omRequest));
+      } catch (OMException e) {
+        if (e.getResult().equals(SCM_IN_SAFE_MODE) && retryCount > 0) {
+          System.err.println("SCM is in safe mode. Will retry in " +
+              BLOCK_ALLOCATION_RETRY_WAIT_TIME_MS + "ms");
+          retryCount--;
+          try {
+            Thread.sleep(BLOCK_ALLOCATION_RETRY_WAIT_TIME_MS);
+            continue;
+          } catch (InterruptedException ex) {
+            throw new OMException(ex.getMessage(), ResultCodes.SCM_IN_SAFE_MODE);
+          }
+        } else if (e.getResult().equals(SCM_IN_SAFE_MODE) && retryCount == 0) {
+          throw new OMException(e.getMessage(), ResultCodes.SCM_IN_SAFE_MODE);
+        }
+        throw e;
+      }
+    }
   }
 
   @Override
