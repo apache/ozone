@@ -27,23 +27,22 @@ import java.util.Objects;
  * Class for response for container key scanner.
  */
 @JsonInclude(JsonInclude.Include.NON_NULL)
-public class ContainerKeyInfoResponse {
+public final class ContainerKeyInfoResponse {
 
   private final long keysProcessed;
-  private final Map<Long, List<ContainerKeyInfo>> containerKeys;
+  private final Map<Long, List<ContainerKeyInfo>> containerIdToKeyInfos;
 
-  public ContainerKeyInfoResponse(
-      long keysProcessed, Map<Long, List<ContainerKeyInfo>> containerKeys) {
+  public ContainerKeyInfoResponse(long keysProcessed, Map<Long, List<ContainerKeyInfo>> containerIdToKeyInfos) {
     this.keysProcessed = keysProcessed;
-    this.containerKeys = containerKeys;
+    this.containerIdToKeyInfos = containerIdToKeyInfos;
   }
 
   public long getKeysProcessed() {
     return keysProcessed;
   }
 
-  public Map<Long, List<ContainerKeyInfo>> getContainerKeys() {
-    return containerKeys;
+  public Map<Long, List<ContainerKeyInfo>> getContainerIdToKeyInfos() {
+    return containerIdToKeyInfos;
   }
 
   @Override
@@ -51,16 +50,15 @@ public class ContainerKeyInfoResponse {
     if (this == o) {
       return true;
     }
-    if (o == null || getClass() != o.getClass()) {
+    if (!(o instanceof ContainerKeyInfoResponse)) {
       return false;
     }
     ContainerKeyInfoResponse that = (ContainerKeyInfoResponse) o;
-    return keysProcessed == that.keysProcessed &&
-        Objects.equals(containerKeys, that.containerKeys);
+    return keysProcessed == that.keysProcessed && Objects.equals(containerIdToKeyInfos, that.containerIdToKeyInfos);
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(keysProcessed, containerKeys);
+    return Objects.hash(keysProcessed, containerIdToKeyInfos);
   }
 }

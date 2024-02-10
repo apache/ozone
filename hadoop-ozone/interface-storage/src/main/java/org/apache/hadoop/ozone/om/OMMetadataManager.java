@@ -510,7 +510,7 @@ public interface OMMetadataManager extends DBStoreHAManager {
   }
 
   /**
-   * Given ozone path key, component id, return the corresponding 
+   * Given ozone path key, component id, return the corresponding
    * DB path key for delete table.
    *
    * @param objectId - object Id
@@ -611,4 +611,26 @@ public interface OMMetadataManager extends DBStoreHAManager {
    */
   boolean containsIncompleteMPUs(String volume, String bucket)
       throws IOException;
+
+  /**
+   * Helper method to generate /volumeId/bucketId/ DB key prefix from given
+   * volume name and bucket name as a prefix for FSO buckets.
+   *
+   * @param volumeName volume name
+   * @param bucketName bucket name
+   * @return /volumeId/bucketId/
+   *    e.g. /-9223372036854772480/-9223372036854771968/
+   */
+  String getOzonePathKeyForFso(String volumeName, String bucketName)
+      throws IOException;
+
+  /**
+   * Helper method to generate /volumeId/bucketId DB key prefix from given
+   * volume id and bucket id as a prefix for FSO buckets.
+   * @param volumeId volume id
+   * @param bucketId bucket id
+   * @return /volumeId/bucketId
+   *    e.g. /-9223372036854772480/-9223372036854771968/
+   */
+  String getOzonePathKeyForFso(long volumeId, long bucketId);
 }

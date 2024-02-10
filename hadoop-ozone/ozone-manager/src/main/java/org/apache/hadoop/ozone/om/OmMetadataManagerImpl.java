@@ -2185,4 +2185,17 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
       }
     }
   }
+
+  @Override
+  public String getOzonePathKeyForFso(String volumeName, String bucketName)
+      throws IOException {
+    final long volumeId = getVolumeId(volumeName);
+    final long bucketId = getBucketId(volumeName, bucketName);
+    return getOzonePathKeyForFso(volumeId, bucketId);
+  }
+
+  @Override
+  public String getOzonePathKeyForFso(long volumeId, long bucketId) {
+    return OM_KEY_PREFIX + volumeId + OM_KEY_PREFIX + bucketId + OM_KEY_PREFIX;
+  }
 }

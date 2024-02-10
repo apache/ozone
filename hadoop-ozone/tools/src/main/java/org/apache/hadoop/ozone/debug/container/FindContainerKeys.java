@@ -26,6 +26,7 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.ozone.debug.OzoneDebug;
+import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
@@ -79,10 +80,10 @@ public class FindContainerKeys
       description = "Path to OM DB.")
   private String dbPath;
   @CommandLine.Option(names = {"--container-ids"},
-      split = ",",
+      split = " ",
       paramLabel = "<container ID>",
       required = true,
-      description = "One or more container IDs separated by comma.")
+      description = "One or more container IDs separated by space.")
   private Set<Long> containerIds;
   private static Map<String, OmDirectoryInfo> directoryTable;
   private static boolean isDirTableLoaded = false;
@@ -98,9 +99,12 @@ public class FindContainerKeys
     ContainerKeyInfoResponse containerKeyInfoResponse =
         scanDBForContainerKeys(omMetadataManager);
 
-    printOutput(containerKeyInfoResponse);
-
-    closeStdChannels();
+    try {
+      printOutput(containerKeyInfoResponse);
+    } finally {
+      closeStdChannels();
+      omMetadataManager.stop();
+    }
 
     return null;
   }
@@ -218,7 +222,7 @@ public class FindContainerKeys
           continue;
         }
 
-        processKeyData(containerKeyInfos, next.getKey(), next.getValue());
+        processKeyData(containerKeyInfos, next.getValue());
       }
     }
 
@@ -261,7 +265,7 @@ public class FindContainerKeys
 
   private void processKeyData(
       Map<Long, List<ContainerKeyInfo>> containerKeyInfos,
-      String key, OmKeyInfo keyInfo) {
+      OmKeyInfo keyInfo) {
     long volumeId = 0L;
     long bucketId = 0L;
 
@@ -270,19 +274,22 @@ public class FindContainerKeys
       for (List<OmKeyLocationInfo> locationInfos :
           locationInfoGroup.getLocationVersionMap().values()) {
         for (OmKeyLocationInfo locationInfo : locationInfos) {
-          if (containerIds.contains(locationInfo.getContainerID())) {
-
-            containerKeyInfos.merge(locationInfo.getContainerID(),
-                new ArrayList<>(Collections.singletonList(
-                    new ContainerKeyInfo(locationInfo.getContainerID(),
-                        keyInfo.getVolumeName(), volumeId,
-                        keyInfo.getBucketName(), bucketId, keyInfo.getKeyName(),
-                        keyInfo.getParentObjectID()))),
-                (existingList, newList) -> {
-                  existingList.addAll(newList);
-                  return existingList;
-                });
+          if (!containerIds.contains(locationInfo.getContainerID())) {
+            continue;
           }
+
+          List<ContainerKeyInfo> containerKeyInfoList = new ArrayList<>();
+          containerKeyInfoList.add(
+              new ContainerKeyInfo(locationInfo.getContainerID(),
+                  keyInfo.getVolumeName(), volumeId, keyInfo.getBucketName(),
+                  bucketId, keyInfo.getKeyName(), keyInfo.getParentObjectID()));
+
+          containerKeyInfos.merge(locationInfo.getContainerID(),
+              containerKeyInfoList,
+              (existingList, newList) -> {
+                existingList.addAll(newList);
+                return existingList;
+              });
         }
       }
     }
@@ -302,29 +309,31 @@ public class FindContainerKeys
       for (List<OmKeyLocationInfo> locationInfos :
           locationInfoGroup.getLocationVersionMap().values()) {
         for (OmKeyLocationInfo locationInfo : locationInfos) {
-          if (containerIds.contains(locationInfo.getContainerID())) {
-            StringBuilder keyName = new StringBuilder();
-            if (!isDirTableLoaded) {
-              long start = System.currentTimeMillis();
-              directoryTable = getDirectoryTableData(omMetadataManager);
-              long end = System.currentTimeMillis();
-              LOG.info("directoryTable loaded in " + (end - start) + " ms.");
-              isDirTableLoaded = true;
-            }
-            keyName.append(getFsoKeyPrefix(volumeId, bucketId, keyInfo));
-            keyName.append(keyInfo.getKeyName());
-
-            containerKeyInfos.merge(locationInfo.getContainerID(),
-                new ArrayList<>(Collections.singletonList(
-                    new ContainerKeyInfo(locationInfo.getContainerID(),
-                        keyInfo.getVolumeName(), volumeId,
-                        keyInfo.getBucketName(), bucketId, keyName.toString(),
-                        keyInfo.getParentObjectID()))),
-                (existingList, newList) -> {
-                  existingList.addAll(newList);
-                  return existingList;
-                });
+          if (!containerIds.contains(locationInfo.getContainerID())) {
+            continue;
           }
+
+          if (!isDirTableLoaded) {
+            long start = System.currentTimeMillis();
+            directoryTable = getDirectoryTableData(omMetadataManager);
+            long end = System.currentTimeMillis();
+            LOG.info("directoryTable loaded in " + (end - start) + " ms.");
+            isDirTableLoaded = true;
+          }
+
+          String keyName = getFsoKeyWithPrefix(volumeId, bucketId, keyInfo,
+              omMetadataManager);
+
+          containerKeyInfos.merge(locationInfo.getContainerID(),
+              new ArrayList<>(Collections.singletonList(
+                  new ContainerKeyInfo(locationInfo.getContainerID(),
+                      keyInfo.getVolumeName(), volumeId,
+                      keyInfo.getBucketName(), bucketId, keyName,
+                      keyInfo.getParentObjectID()))),
+              (existingList, newList) -> {
+                existingList.addAll(newList);
+                return existingList;
+              });
         }
       }
     }
@@ -338,11 +347,10 @@ public class FindContainerKeys
     return path;
   }
 
-  private String getFsoKeyPrefix(long volumeId, long bucketId,
-                                 OmKeyInfo value) {
-    String prefix =
-        OM_KEY_PREFIX + volumeId + OM_KEY_PREFIX + bucketId +
-            OM_KEY_PREFIX;
+  private String getFsoKeyWithPrefix(long volumeId, long bucketId,
+                                     OmKeyInfo value,
+                                     OMMetadataManager omMetadataManager) {
+    String prefix = omMetadataManager.getOzonePathKeyForFso(volumeId, bucketId);
     Set<Long> dirObjIds = new HashSet<>();
     dirObjIds.add(value.getParentObjectID());
     Map<Long, Path> absolutePaths =
@@ -355,11 +363,11 @@ public class FindContainerKeys
       keyPath = path + OM_KEY_PREFIX;
     }
 
-    return removeBeginningSlash(keyPath);
+    return removeBeginningSlash(keyPath + value.getKeyName());
   }
 
   private void printOutput(ContainerKeyInfoResponse containerKeyInfoResponse) {
-    if (containerKeyInfoResponse.getContainerKeys().isEmpty()) {
+    if (containerKeyInfoResponse.getContainerIdToKeyInfos().isEmpty()) {
       err().println("No keys were found for container IDs: " + containerIds);
       err().println(
           "Keys processed: " + containerKeyInfoResponse.getKeysProcessed());

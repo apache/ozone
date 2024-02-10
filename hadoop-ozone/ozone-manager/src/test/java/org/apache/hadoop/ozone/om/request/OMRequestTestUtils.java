@@ -28,6 +28,7 @@ import java.util.UUID;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.client.BlockID;
+import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfigValidator;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
@@ -557,6 +558,23 @@ public final class OMRequestTestUtils {
       String keyName, ReplicationConfig replicationConfig) {
     return createOmKeyInfo(volumeName, bucketName, keyName, replicationConfig,
         new OmKeyLocationInfoGroup(0L, new ArrayList<>(), false));
+  }
+
+  public static OmKeyInfo.Builder createOmKeyInfo(String volumeName, String bucketName, String keyName,
+                                                  RatisReplicationConfig replicationConfig, long objectId,
+                                                  long parentId, OmKeyLocationInfoGroup omKeyLocationInfoGroup) {
+    return new OmKeyInfo.Builder()
+        .setVolumeName(volumeName)
+        .setBucketName(bucketName)
+        .setKeyName(keyName)
+        .setFileName(OzoneFSUtils.getFileName(keyName))
+        .setReplicationConfig(replicationConfig)
+        .setParentObjectID(parentId)
+        .setObjectID(objectId)
+        .setUpdateID(0L)
+        .setCreationTime(Time.now())
+        .addOmKeyLocationInfoGroup(omKeyLocationInfoGroup)
+        .setDataSize(1000L);
   }
 
   /**

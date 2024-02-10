@@ -22,7 +22,7 @@ import java.util.Objects;
 /**
  * Class that holds basic key data in relation to container it is in.
  */
-public class ContainerKeyInfo {
+public final class ContainerKeyInfo {
 
   private final long containerID;
   private final String volumeName;
@@ -69,16 +69,13 @@ public class ContainerKeyInfo {
       return false;
     }
     ContainerKeyInfo that = (ContainerKeyInfo) o;
-    return containerID == that.containerID && volumeId == that.volumeId &&
-        bucketId == that.bucketId && parentId == that.parentId &&
-        Objects.equals(volumeName, that.volumeName) &&
-        Objects.equals(bucketName, that.bucketName) &&
-        Objects.equals(keyName, that.keyName);
+    return containerID == that.containerID && volumeId == that.volumeId && bucketId == that.bucketId &&
+        parentId == that.parentId && Objects.equals(volumeName, that.volumeName) &&
+        Objects.equals(bucketName, that.bucketName) && Objects.equals(keyName, that.keyName);
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(containerID, volumeName, volumeId, bucketName, bucketId,
-        keyName, parentId);
+    return Objects.hash(containerID, volumeName, volumeId, bucketName, bucketId, keyName, parentId);
   }
 }
