@@ -49,6 +49,7 @@ import org.apache.hadoop.ozone.container.common.statemachine
 import org.apache.hadoop.ozone.container.common.statemachine
     .EndpointStateMachine.EndPointStates;
 import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
+import org.apache.hadoop.ozone.container.diskbalancer.DiskBalancerInfo;
 import org.apache.hadoop.ozone.protocol.commands.CloseContainerCommand;
 import org.apache.hadoop.ozone.protocol.commands.ClosePipelineCommand;
 import org.apache.hadoop.ozone.protocol.commands.CreatePipelineCommand;
@@ -178,6 +179,7 @@ public class HeartbeatEndpointTask
       addContainerActions(requestBuilder);
       addPipelineActions(requestBuilder);
       addQueuedCommandCounts(requestBuilder);
+      addDiskBalancerReport(requestBuilder);
       SCMHeartbeatRequestProto request = requestBuilder.build();
       LOG.debug("Sending heartbeat message : {}", request);
       SCMHeartbeatResponseProto response = rpcEndpoint.getEndPoint()
@@ -286,6 +288,11 @@ public class HeartbeatEndpointTask
           .addCount(entry.getValue());
     }
     requestBuilder.setCommandQueueReport(reportProto.build());
+  }
+
+  private void addDiskBalancerReport(SCMHeartbeatRequestProto.Builder requestBuilder) {
+    DiskBalancerInfo info = context.getParent().getContainer().getDiskBalancerInfo();
+    requestBuilder.setDiskBalancerReport(info.toDiskBalancerReportProto());
   }
 
   /**
