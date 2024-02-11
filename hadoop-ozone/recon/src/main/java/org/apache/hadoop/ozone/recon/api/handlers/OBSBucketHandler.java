@@ -90,7 +90,7 @@ public class OBSBucketHandler extends BucketHandler {
   /**
    * This method handles disk usage of direct keys.
    *
-   * @param parentId       parent OBS bucket
+   * @param parentId       The identifier for the parent bucket.
    * @param withReplica    if withReplica is enabled, set sizeWithReplica
    *                       for each direct key's DU
    * @param listFile       if listFile is enabled, append key DU as a children
@@ -163,15 +163,51 @@ public class OBSBucketHandler extends BucketHandler {
   }
 
   /**
-   * Object stores do not support directories.
+   * Calculates the total disk usage (DU) for an Object Store Bucket (OBS) by
+   * summing the sizes of all keys contained within the bucket.
+   * Since OBS buckets operate on a flat hierarchy, this method iterates through
+   * all the keys in the bucket without the need to traverse directories.
    *
-   * @throws UnsupportedOperationException
+   * @param parentId The identifier for the parent bucket.
+   * @return The total disk usage of all keys within the specified OBS bucket.
+   * @throws IOException
    */
   @Override
-  public long calculateDUUnderObject(long parentId)
-      throws IOException {
-    throw new UnsupportedOperationException(
-        "Object stores do not support directories.");
+  public long calculateDUUnderObject(long parentId) throws IOException {
+    // Initialize the total disk usage variable.
+    long totalDU = 0L;
+
+    // Access the key table for the bucket.
+    Table<String, OmKeyInfo> keyTable = getKeyTable();
+
+    try (
+        TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>>
+            iterator = keyTable.iterator()) {
+      // Construct the seek prefix to filter keys under this bucket.
+      String seekPrefix =
+          OM_KEY_PREFIX + vol + OM_KEY_PREFIX + bucket + OM_KEY_PREFIX;
+      iterator.seek(seekPrefix);
+
+      // Iterate over keys in the bucket.
+      while (iterator.hasNext()) {
+        Table.KeyValue<String, OmKeyInfo> kv = iterator.next();
+        String keyName = kv.getKey();
+
+        // Break the loop if the current key does not start with the seekPrefix.
+        if (!keyName.startsWith(seekPrefix)) {
+          break;
+        }
+
+        // Sum the size of each key to the total disk usage.
+        OmKeyInfo keyInfo = kv.getValue();
+        if (keyInfo != null) {
+          totalDU += keyInfo.getDataSize();
+        }
+      }
+    }
+
+    // Return the total disk usage of all keys in the bucket.
+    return totalDU;
   }
 
   /**
