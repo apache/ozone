@@ -55,7 +55,8 @@ import java.util.UUID;
       .HDDS_SCM_KERBEROS_PRINCIPAL_KEY)
 public interface StorageContainerLocationProtocol extends Closeable {
 
-  @SuppressWarnings("checkstyle:ConstantName")
+  // Accessed and checked via reflection in Hadoop RPC - changing it is incompatible
+  @SuppressWarnings({"checkstyle:ConstantName", "unused"})
   /**
    * Version 1: Initial version.
    */

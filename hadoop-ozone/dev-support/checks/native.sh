@@ -25,7 +25,14 @@ if [[ -z "${zlib_version}" ]]; then
   exit 1
 fi
 
+bzip2_version=$(mvn -N help:evaluate -Dexpression=bzip2.version -q -DforceStdout)
+if [[ -z "${bzip2_version}" ]]; then
+  echo "ERROR bzip2.version not defined in pom.xml"
+  exit 1
+fi
+
 source "${DIR}/junit.sh" -Pnative -Drocks_tools_native \
+  -Dbzip2.url="https://github.com/libarchive/bzip2/archive/refs/tags/bzip2-${bzip2_version}.tar.gz" \
   -Dzlib.url="https://github.com/madler/zlib/releases/download/v${zlib_version}/zlib-${zlib_version}.tar.gz" \
   -DexcludedGroups="unhealthy" \
   "$@"

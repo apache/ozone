@@ -30,10 +30,10 @@ import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.stream.Collectors;
 
 import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Optional;
 import com.google.common.base.Preconditions;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.client.ContainerBlockID;
@@ -284,7 +284,7 @@ public abstract class OMKeyRequest extends OMClientRequest {
 
   protected static Optional<FileEncryptionInfo> getFileEncryptionInfo(
       OzoneManager ozoneManager, OmBucketInfo bucketInfo) throws IOException {
-    Optional<FileEncryptionInfo> encInfo = Optional.absent();
+    Optional<FileEncryptionInfo> encInfo = Optional.empty();
     BucketEncryptionKeyInfo ezInfo = bucketInfo.getEncryptionKeyInfo();
     if (ezInfo != null) {
       final String ezKeyName = ezInfo.getKeyName();

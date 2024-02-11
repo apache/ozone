@@ -21,10 +21,8 @@ package org.apache.hadoop.hdds.security.x509.certificate.client;
 
 import org.apache.hadoop.hdds.security.exception.OzoneSecurityException;
 import org.apache.hadoop.hdds.security.ssl.KeyStoresFactory;
-import org.apache.hadoop.hdds.security.x509.certificate.authority.CAType;
 import org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateSignRequest;
 import org.apache.hadoop.hdds.security.x509.exception.CertificateException;
-import org.bouncycastle.pkcs.PKCS10CertificationRequest;
 
 import java.io.Closeable;
 import java.io.IOException;
@@ -139,32 +137,11 @@ public interface CertificateClient extends Closeable {
   List<String> getCAList();
 
   /**
-   * Return the pem encoded  CA certificate list.
-   *
-   * If list is null, fetch the list from SCM and returns the list.
-   * If list is not null, return the pem encoded  CA certificate list.
-   *
-   * @return list of pem encoded  CA certificates.
-   * @throws IOException
-   */
-  List<String> listCA() throws IOException;
-
-  /**
    * Update and returns the pem encoded CA certificate list.
    * @return list of pem encoded  CA certificates.
    * @throws IOException
    */
   List<String> updateCAList() throws IOException;
-
-  /**
-   * Creates digital signature over the data stream using the components private
-   * key.
-   *
-   * @param data data to be signed
-   * @return byte array - containing the signature
-   * @throws CertificateException - on Error
-   */
-  byte[] signData(byte[] data) throws CertificateException;
 
   /**
    * Verifies a digital Signature, given the signature and the certificate of
@@ -184,26 +161,6 @@ public interface CertificateClient extends Closeable {
    * @return CertificateSignRequest.Builder
    */
   CertificateSignRequest.Builder getCSRBuilder()
-      throws CertificateException;
-
-  /**
-   * Send request to SCM to sign the certificate and save certificates returned
-   * by SCM to PEM files on disk.
-   *
-   * @return the serial ID of the new certificate
-   */
-  String signAndStoreCertificate(PKCS10CertificationRequest request)
-      throws CertificateException;
-
-  /**
-   * Stores the Certificate  for this client. Don't use this api to add
-   * trusted certificates of others.
-   *
-   * @param pemEncodedCert - pem encoded X509 Certificate
-   * @param caType         - Is CA certificate.
-   * @throws CertificateException - on Error.
-   */
-  void storeCertificate(String pemEncodedCert, CAType caType)
       throws CertificateException;
 
   default void assertValidKeysAndCertificate() throws OzoneSecurityException {

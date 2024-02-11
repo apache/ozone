@@ -136,10 +136,4 @@ public final class BufferUtils {
     }
     return Math.toIntExact(n);
   }
-
-  public static void clearBuffers(ByteBuffer[] byteBuffers) {
-    for (ByteBuffer buffer : byteBuffers) {
-      buffer.clear();
-    }
-  }
 }

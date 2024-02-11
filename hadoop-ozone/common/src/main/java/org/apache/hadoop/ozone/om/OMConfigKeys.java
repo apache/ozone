@@ -289,6 +289,8 @@ public final class OMConfigKeys {
       + "kerberos.keytab.file";
   public static final String OZONE_OM_KERBEROS_PRINCIPAL_KEY = "ozone.om"
       + ".kerberos.principal";
+  public static final String OZONE_OM_KERBEROS_PRINCIPAL_PATTERN_KEY =
+      "ozone.om.kerberos.principal.pattern";
   public static final String OZONE_OM_HTTP_KERBEROS_KEYTAB_FILE =
       "ozone.om.http.auth.kerberos.keytab";
   public static final String OZONE_OM_HTTP_KERBEROS_PRINCIPAL_KEY
@@ -389,6 +391,18 @@ public final class OMConfigKeys {
       "ozone.directory.deleting.service.interval";
   public static final String OZONE_DIR_DELETING_SERVICE_INTERVAL_DEFAULT
       = "60s";
+
+  /**
+   * Configuration properties for Snapshot Directory Service.
+   */
+  public static final String OZONE_SNAPSHOT_DIRECTORY_SERVICE_INTERVAL =
+      "ozone.snapshot.directory.service.interval";
+  public static final String OZONE_SNAPSHOT_DIRECTORY_SERVICE_INTERVAL_DEFAULT
+      = "24h";
+  public static final String OZONE_SNAPSHOT_DIRECTORY_SERVICE_TIMEOUT =
+      "ozone.snapshot.directory.service.timeout";
+  public static final String
+      OZONE_SNAPSHOT_DIRECTORY_SERVICE_TIMEOUT_DEFAULT = "300s";
 
   public static final String OZONE_PATH_DELETING_LIMIT_PER_TASK =
       "ozone.path.deleting.limit.per.task";

@@ -70,7 +70,6 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.junit.jupiter.api.Assertions.fail;
 import static org.junit.jupiter.api.Assumptions.assumeTrue;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -456,14 +455,12 @@ public class TestSCMContainerPlacementRackScatter {
   public void testNoInfiniteLoop(int datanodeCount) {
     setup(datanodeCount);
     int nodeNum = 1;
-
-    try {
-      // request storage space larger than node capability
-      policy.chooseDatanodes(null, null, nodeNum, STORAGE_CAPACITY + 0, 15);
-      fail("Storage requested exceeds capacity, this call should fail");
-    } catch (Exception e) {
-      assertEquals("SCMException", e.getClass().getSimpleName());
-    }
+    // request storage space larger than node capability
+    Exception e =
+        assertThrows(Exception.class,
+            () -> policy.chooseDatanodes(null, null, nodeNum, STORAGE_CAPACITY + 0, 15),
+            "Storage requested exceeds capacity, this call should fail");
+    assertEquals("SCMException", e.getClass().getSimpleName());
 
     // get metrics
     long totalRequest = metrics.getDatanodeRequestCount();

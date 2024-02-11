@@ -112,7 +112,6 @@ public class TestMultiBlockWritesWithDnFailures {
     conf.setQuietMode(false);
     cluster = MiniOzoneCluster.newBuilder(conf)
         .setNumDatanodes(datanodes)
-        .setTotalPipelineNumLimit(0)
         .build();
     cluster.waitForClusterToBeReady();
     //the easiest way to create an open container is creating a key

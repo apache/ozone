@@ -188,8 +188,6 @@ public class OMSnapshotRenameRequest extends OMClientRequest {
 
       omMetadataManager.getSnapshotChainManager().updateSnapshot(snapshotOldInfo);
 
-      ozoneManager.getOmSnapshotManager().getSnapshotCache().invalidate(snapshotOldTableKey);
-
       omResponse.setRenameSnapshotResponse(
           OzoneManagerProtocolProtos.RenameSnapshotResponse.newBuilder()
               .setSnapshotInfo(snapshotOldInfo.getProtobuf()));

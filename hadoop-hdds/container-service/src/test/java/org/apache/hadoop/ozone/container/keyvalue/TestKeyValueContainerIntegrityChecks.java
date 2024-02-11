@@ -18,7 +18,6 @@
 package org.apache.hadoop.ozone.container.keyvalue;
 
 import org.apache.commons.lang3.RandomStringUtils;
-import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
@@ -34,8 +33,8 @@ import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
 import org.apache.hadoop.ozone.container.common.volume.RoundRobinVolumeChoosingPolicy;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.BlockUtils;
 import org.apache.hadoop.ozone.container.keyvalue.interfaces.ChunkManager;
-import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.io.TempDir;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -63,6 +62,7 @@ public class TestKeyValueContainerIntegrityChecks {
   private ContainerLayoutTestInfo containerLayoutTestInfo;
   private MutableVolumeSet volumeSet;
   private OzoneConfiguration conf;
+  @TempDir
   private File testRoot;
   private ChunkManager chunkManager;
   private String clusterID = UUID.randomUUID().toString();
@@ -87,7 +87,6 @@ public class TestKeyValueContainerIntegrityChecks {
 
   private void setup() throws Exception {
     LOG.info("Testing  layout:{}", containerLayoutTestInfo.getLayout());
-    this.testRoot = GenericTestUtils.getRandomizedTestDir();
     conf.set(HDDS_DATANODE_DIR_KEY, testRoot.getAbsolutePath());
     conf.set(OzoneConfigKeys.OZONE_METADATA_DIRS, testRoot.getAbsolutePath());
     containerLayoutTestInfo.updateConfig(conf);
@@ -101,7 +100,6 @@ public class TestKeyValueContainerIntegrityChecks {
   public void teardown() {
     BlockUtils.shutdownCache(conf);
     volumeSet.shutdown();
-    FileUtil.fullyDelete(testRoot);
   }
 
   protected ContainerLayoutVersion getChunkLayout() {
