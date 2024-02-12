@@ -192,13 +192,13 @@ const COLUMNS = [
     key: 'pipelines',
     isVisible: true,
     render: (pipelines: IPipeline[], record: IDatanode) => {
-      let firstThreePipeLineIDs = [];
+      let firstThreePipelinesIDs = [];
       let remainingPipelinesIDs: any[] = [];
-      firstThreePipeLineIDs = pipelines && pipelines.filter((element, index) => index < 3);
+      firstThreePipelinesIDs = pipelines && pipelines.filter((element, index) => index < 3);
       remainingPipelinesIDs = pipelines && pipelines.slice(3, pipelines.length);
 
-      const RenderPipelineIds = ({ pipeLinesIds }) => {
-        return pipeLinesIds && pipeLinesIds.map((pipeline: any, index: any) => (
+      const RenderPipelineIds = ({ pipelinesIds }) => {
+        return pipelinesIds && pipelinesIds.map((pipeline: any, index: any) => (
           <div key={index} className='pipeline-container'>
             <ReplicationIcon
               replicationFactor={pipeline.replicationFactor}
@@ -213,11 +213,11 @@ const COLUMNS = [
       return (
         <>
           {
-            <RenderPipelineIds pipeLinesIds={firstThreePipeLineIDs} />
+            <RenderPipelineIds pipelinesIds={firstThreePipelinesIDs} />
           }
           {
             remainingPipelinesIDs.length > 1 &&
-            <Popover content={<RenderPipelineIds pipeLinesIds={remainingPipelinesIDs} />} title="Remaining Pieplines" placement="rightTop" trigger="hover">
+            <Popover content={<RenderPipelineIds pipelinesIds={remainingPipelinesIDs} />} title="Remaining Pieplines" placement="rightTop" trigger="hover">
               {`... and ${remainingPipelinesIDs.length} more pipelines`}
             </Popover>
           }
