@@ -402,6 +402,7 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
   }
 
   private static void overrideDatanodeVersions(int dnInitialVersion, int dnCurrentVersion) {
+    // FUTURE_VERSION (-1) is not a valid version for a datanode, using it as a marker when version is not overridden
     if (dnInitialVersion != DatanodeVersion.FUTURE_VERSION.toProtoValue()) {
       mockDNStatic.when(HddsDatanodeService::getDefaultInitialVersion).thenReturn(dnInitialVersion);
     }
