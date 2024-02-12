@@ -237,6 +237,7 @@ public class NodeImpl implements Node {
             .setName(name)
             .setLocation(location)
             .setCost(cost)
+            .setLevel(level)
             .build();
 
     ScmBlockLocationProtocolProtos.NodeType nodeType =
@@ -247,12 +248,13 @@ public class NodeImpl implements Node {
   }
 
   public static ScmBlockLocationProtocolProtos.NodeImpl toProtobuf(String name,
-      String location, int cost) {
+      String location, int level, int cost) {
 
     ScmBlockLocationProtocolProtos.NodeImpl.Builder nodeImplBuilder =
         ScmBlockLocationProtocolProtos.NodeImpl.newBuilder()
             .setName(name)
             .setLocation(location)
+            .setLevel(level)
             .setCost(cost);
 
     ScmBlockLocationProtocolProtos.NodeImpl nodeImpl = nodeImplBuilder.build();
@@ -268,8 +270,8 @@ public class NodeImpl implements Node {
 
   public static NodeImpl fromProtobuf(
       ScmBlockLocationProtocolProtos.NodeImpl nodeImpl) {
-    return new NodeImpl(nodeImpl.getName(), nodeImpl.getLocation(),
-        nodeImpl.getCost());
+    return new NodeImpl(nodeImpl.getName(), nodeImpl.getLocation(), null,
+        nodeImpl.getLevel(), nodeImpl.getCost());
   }
 
   @Override

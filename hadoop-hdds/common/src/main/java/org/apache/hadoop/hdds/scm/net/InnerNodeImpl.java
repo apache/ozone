@@ -67,9 +67,14 @@ public class InnerNodeImpl extends NodeImpl implements InnerNode {
     super(name, location, parent, level, cost);
   }
 
-  protected InnerNodeImpl(String name, String location, int cost,
+  /**
+   * Construct an InnerNode from its name, network location, level, cost,
+   * childrenMap and number of leaves. This constructor is used as part of
+   * protobuf deserialization.
+   */
+  protected InnerNodeImpl(String name, String location, int level, int cost,
                           HashMap<String, Node> childrenMap, int numOfLeaves) {
-    super(name, location, cost);
+    super(name, location, null, level, cost);
     this.childrenMap = childrenMap;
     this.numOfLeaves = numOfLeaves;
   }
@@ -82,6 +87,7 @@ public class InnerNodeImpl extends NodeImpl implements InnerNode {
     private String name;
     private String location;
     private int cost;
+    private int level;
     private HashMap<String, Node> childrenMap = new LinkedHashMap<>();
     private int numOfLeaves;
 
@@ -100,6 +106,11 @@ public class InnerNodeImpl extends NodeImpl implements InnerNode {
       return this;
     }
 
+    public Builder setLevel(int level) {
+      this.level = level;
+      return this;
+    }
+
     public Builder setChildrenMap(HashMap<String, Node> childrenMap) {
       this.childrenMap = childrenMap;
       return this;
@@ -107,7 +118,7 @@ public class InnerNodeImpl extends NodeImpl implements InnerNode {
 
     public Builder setChildrenMap(
         List<ScmBlockLocationProtocolProtos.ChildrenMap> childrenMapList) {
-      HashMap<String, Node> newChildrenMap = new HashMap<>();
+      HashMap<String, Node> newChildrenMap = new LinkedHashMap<>();
       for (ScmBlockLocationProtocolProtos.ChildrenMap childrenMapProto :
           childrenMapList) {
         String networkName = childrenMapProto.getNetworkName();
@@ -126,7 +137,8 @@ public class InnerNodeImpl extends NodeImpl implements InnerNode {
     }
 
     public InnerNodeImpl build() {
-      return new InnerNodeImpl(name, location, cost, childrenMap, numOfLeaves);
+      return new InnerNodeImpl(name, location, level, cost, childrenMap,
+          numOfLeaves);
     }
   }
 
@@ -139,6 +151,11 @@ public class InnerNodeImpl extends NodeImpl implements InnerNode {
   @Override
   public int getNumOfLeaves() {
     return numOfLeaves;
+  }
+
+  /** @return a map of node's network name to Node. */
+  public HashMap<String, Node> getChildrenMap() {
+    return childrenMap;
   }
 
   /**
@@ -461,7 +478,7 @@ public class InnerNodeImpl extends NodeImpl implements InnerNode {
             .setNumOfLeaves(numOfLeaves)
             .setNodeImpl(
                 NodeImpl.toProtobuf(getNetworkName(), getNetworkLocation(),
-                    getCost()));
+                    getLevel(), getCost()));
 
     if (childrenMap != null && !childrenMap.isEmpty()) {
       for (Map.Entry<String, Node> entry : childrenMap.entrySet()) {
@@ -499,6 +516,7 @@ public class InnerNodeImpl extends NodeImpl implements InnerNode {
         .setName(nodeImpl.getName())
         .setLocation(nodeImpl.getLocation())
         .setCost(nodeImpl.getCost())
+        .setLevel(nodeImpl.getLevel())
         .setChildrenMap(innerNode.getChildrenMapList())
         .setNumOfLeaves(innerNode.getNumOfLeaves());
 
@@ -507,14 +525,21 @@ public class InnerNodeImpl extends NodeImpl implements InnerNode {
   }
 
   @Override
-  public boolean equals(Object to) {
-    if (to == null) {
-      return false;
-    }
-    if (this == to) {
+  public boolean equals(Object o) {
+    if (this == o) {
       return true;
     }
-    return this.toString().equals(to.toString());
+    if (o == null || getClass() != o.getClass()) {
+      return false;
+    }
+    InnerNodeImpl innerNode = (InnerNodeImpl) o;
+    return this.getNetworkName().equals(innerNode.getNetworkName()) &&
+        this.getNetworkLocation().equals(innerNode.getNetworkLocation()) &&
+        this.getLevel() == innerNode.getLevel() &&
+        this.getCost() == innerNode.getCost() &&
+        this.numOfLeaves == innerNode.numOfLeaves &&
+        this.childrenMap.size() == innerNode.childrenMap.size() &&
+        this.childrenMap.equals(innerNode.childrenMap);
   }
 
   @Override

@@ -18,7 +18,6 @@
 package org.apache.hadoop.ozone;
 
 import org.apache.hadoop.hdds.scm.net.InnerNode;
-import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.protocolPB.ScmBlockLocationProtocolClientSideTranslatorPB;
 import org.apache.hadoop.hdds.scm.proxy.SCMBlockLocationFailoverProxyProvider;
 import org.junit.jupiter.api.BeforeAll;
@@ -49,9 +48,6 @@ public class TestGetClusterTreeInformation {
   private static MiniOzoneCluster cluster;
   private static OzoneConfiguration conf;
   private static StorageContainerManager scm;
-  private static NodeManager nodeManager;
-  private static ClassLoader classLoader =
-      Thread.currentThread().getContextClassLoader();
 
   @BeforeAll
   public static void init() throws IOException, TimeoutException,

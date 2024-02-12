@@ -47,6 +47,7 @@ message DatanodeDetailsProto {
     optional int64 persistedOpStateExpiry = 9; // The seconds after the epoch when the OpState should expire
     // TODO(runzhiwang): when uuid is gone, specify 1 as the index of uuid128 and mark as required
     optional UUID uuid128 = 100; // UUID with 128 bits assigned to the Datanode.
+    optional uint32 level = 101;
 }
 
 /**

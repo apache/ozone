@@ -1834,7 +1834,8 @@ public class KeyManagerImpl implements KeyManager {
               LOG.warn("No datanodes in pipeline {}", pipeline.getId());
               continue;
             }
-            sortedNodes = sortDatanodes(clientMachine, nodes);
+            sortedNodes = sortDatanodes(clientMachine, nodes, keyInfo,
+                uuidList);
             if (sortedNodes != null) {
               sortedPipelines.put(uuidSet, sortedNodes);
             }
@@ -1849,12 +1850,27 @@ public class KeyManagerImpl implements KeyManager {
   }
 
   public List<DatanodeDetails> sortDatanodes(String clientMachine,
-                                             List<DatanodeDetails> nodes) {
+      List<DatanodeDetails> nodes, OmKeyInfo keyInfo, List<String> nodeList) {
     DatanodeDetails client = null;
     List<DatanodeDetails> possibleClients =
         getClientNodesByAddress(clientMachine, nodes);
     if (possibleClients.size() > 0) {
       client = possibleClients.get(0);
+    } else {
+      /**
+       * In case of read from a non-datanode host, return
+       * {@link ScmBlockLocationProtocol#sortDatanodes(List<String>, String)}.
+       */
+      try {
+        return scmClient.getBlockClient()
+            .sortDatanodes(nodeList, clientMachine);
+      } catch (IOException e) {
+        LOG.warn("Unable to sort datanodes based on distance to client, "
+                + " volume={}, bucket={}, key={}, client={}, datanodes={}, "
+                + " exception={}",
+            keyInfo.getVolumeName(), keyInfo.getBucketName(),
+            keyInfo.getKeyName(), clientMachine, nodeList, e.getMessage());
+      }
     }
     List<? extends Node> sortedNodeList = ozoneManager.getClusterMap()
         .sortByDistanceCost(client, nodes, nodes.size());
