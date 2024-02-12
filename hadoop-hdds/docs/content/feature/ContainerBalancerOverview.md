@@ -35,7 +35,3 @@ Container balancer has a command line interface for administrators. You can run 
 Container balancer supports only closed Ratis containers. Erasure Coded containers are not supported yet.
 ```
 ## Container balancer CLI commands({{< ref "feature/ContainerBalancer-cli.md" >}})
-
-## Configuring container balancer service({{< ref "feature/ContainerBalancer-cfg.md" >}})
-
-## Activating container balancer using Cloudera Manager({{< ref "feature/ContainerBalancer-cm.md" >}})
