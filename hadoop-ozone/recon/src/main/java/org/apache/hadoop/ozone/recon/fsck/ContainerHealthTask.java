@@ -217,6 +217,8 @@ public class ContainerHealthTask extends ReconScmTask {
         UnHealthyContainerStates.OVER_REPLICATED, new HashMap<>());
     unhealthyContainerStateStatsMap.put(
         UnHealthyContainerStates.MIS_REPLICATED, new HashMap<>());
+    unhealthyContainerStateStatsMap.put(
+        UnHealthyContainerStates.NEGATIVE_SIZE, new HashMap<>());
   }
 
   private ContainerHealthStatus setCurrentContainer(long recordId)
@@ -496,6 +498,19 @@ public class ContainerHealthTask extends ReconScmTask {
             container, UnHealthyContainerStates.MIS_REPLICATED, time));
         populateContainerStats(container,
             UnHealthyContainerStates.MIS_REPLICATED,
+            unhealthyContainerStateStatsMap);
+      }
+
+      ContainerInfo containerInfo = container.getContainer();
+      if (containerInfo.getUsedBytes() < 0) {
+        LOG.error("Container {} has negative size. Please visit Recon's " +
+            "missing container page for a list of keys (and their metadata) " +
+            "mapped to this container.", containerInfo.getContainerID());
+        records.add(
+            recordForState(container, UnHealthyContainerStates.NEGATIVE_SIZE,
+                time));
+        populateContainerStats(container,
+            UnHealthyContainerStates.NEGATIVE_SIZE,
             unhealthyContainerStateStatsMap);
       }
 

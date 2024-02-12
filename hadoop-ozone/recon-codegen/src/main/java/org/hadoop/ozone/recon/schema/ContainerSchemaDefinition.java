@@ -51,8 +51,9 @@ public class ContainerSchemaDefinition implements ReconSchemaDefinition {
     UNDER_REPLICATED,
     OVER_REPLICATED,
     MIS_REPLICATED,
-    ALL_REPLICAS_UNHEALTHY
-  }
+    ALL_REPLICAS_UNHEALTHY,
+    NEGATIVE_SIZE // Added new state to track containers with negative sizes
+    }
 
   private static final String CONTAINER_ID = "container_id";
   private static final String CONTAINER_STATE = "container_state";
