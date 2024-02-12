@@ -168,8 +168,9 @@ public class ContainerSizeCountTask extends ReconScmTask {
     try {
       final Map<ContainerSizeCountKey, Long> containerSizeCountMap
           = new HashMap<>();
-      final Map<ContainerID, Long> deletedContainers =
-          new HashMap<>(processedContainers);
+      final Map<ContainerID, Long> deletedContainers
+          = new HashMap<>(processedContainers);
+
       // Loop to handle container create and size-update operations
       for (ContainerInfo container : containers) {
         if (container.getState().equals(DELETED)) {
@@ -328,7 +329,7 @@ public class ContainerSizeCountTask extends ReconScmTask {
       Map<ContainerSizeCountKey, Long> containerSizeCountMap) {
     ContainerSizeCountKey key = getContainerSizeCountKey(containerSize);
     containerSizeCountMap.compute(key,
-        (k, previous) -> previous != null ? previous + delta : 0);
+        (k, previous) -> previous != null ? previous + delta : delta);
   }
 
   /**
