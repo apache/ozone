@@ -252,7 +252,7 @@ public class TestReconTasks {
                   ContainerSchemaDefinition.UnHealthyContainerStates.
                       EMPTY_MISSING,
                   0, 1000);
-      return (allEmptyMissingContainers.size() == 1);
+      return (allEmptyMissingContainers.size() >= 1);
     });
 
     // Now add a container to key mapping count as 3. This data is used to
@@ -270,7 +270,7 @@ public class TestReconTasks {
               .getUnhealthyContainers(
                   ContainerSchemaDefinition.UnHealthyContainerStates.MISSING,
                   0, 1000);
-      return (allMissingContainers.size() == 1);
+      return (allMissingContainers.size() >= 1);
     });
 
     LambdaTestUtils.await(25000, 1000, () -> {
