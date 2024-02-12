@@ -27,7 +27,7 @@ import java.util.List;
 import java.util.Map;
 
 import com.google.common.base.Preconditions;
-import org.apache.hadoop.hdds.protocol.proto.ScmBlockLocationProtocolProtos;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -117,12 +117,12 @@ public class InnerNodeImpl extends NodeImpl implements InnerNode {
     }
 
     public Builder setChildrenMap(
-        List<ScmBlockLocationProtocolProtos.ChildrenMap> childrenMapList) {
+        List<HddsProtos.ChildrenMap> childrenMapList) {
       HashMap<String, Node> newChildrenMap = new LinkedHashMap<>();
-      for (ScmBlockLocationProtocolProtos.ChildrenMap childrenMapProto :
+      for (HddsProtos.ChildrenMap childrenMapProto :
           childrenMapList) {
         String networkName = childrenMapProto.getNetworkName();
-        ScmBlockLocationProtocolProtos.NodeType nodeType =
+        HddsProtos.NodeInterface nodeType =
             childrenMapProto.getNodeType();
         Node node = Node.fromProtobuf(nodeType);
         newChildrenMap.put(networkName, node);
@@ -471,10 +471,11 @@ public class InnerNodeImpl extends NodeImpl implements InnerNode {
   }
 
   @Override
-  public ScmBlockLocationProtocolProtos.NodeType toProtobuf(int clientVersion) {
+  public HddsProtos.NodeInterface toProtobuf(
+      int clientVersion) {
 
-    ScmBlockLocationProtocolProtos.InnerNode.Builder innerNode =
-        ScmBlockLocationProtocolProtos.InnerNode.newBuilder()
+    HddsProtos.InnerNode.Builder innerNode =
+        HddsProtos.InnerNode.newBuilder()
             .setNumOfLeaves(numOfLeaves)
             .setNodeImpl(
                 NodeImpl.toProtobuf(getNetworkName(), getNetworkLocation(),
@@ -483,8 +484,8 @@ public class InnerNodeImpl extends NodeImpl implements InnerNode {
     if (childrenMap != null && !childrenMap.isEmpty()) {
       for (Map.Entry<String, Node> entry : childrenMap.entrySet()) {
         if (entry.getValue() != null) {
-          ScmBlockLocationProtocolProtos.ChildrenMap childrenMapProto =
-              ScmBlockLocationProtocolProtos.ChildrenMap.newBuilder()
+          HddsProtos.ChildrenMap childrenMapProto =
+              HddsProtos.ChildrenMap.newBuilder()
                   .setNetworkName(entry.getKey())
                   .setNodeType(entry.getValue().toProtobuf(clientVersion))
                   .build();
@@ -494,24 +495,25 @@ public class InnerNodeImpl extends NodeImpl implements InnerNode {
     }
     innerNode.build();
 
-    ScmBlockLocationProtocolProtos.NodeType nodeType =
-        ScmBlockLocationProtocolProtos.NodeType.newBuilder()
+    HddsProtos.NodeInterface nodeType =
+        HddsProtos.NodeInterface.newBuilder()
             .setInnerNode(innerNode).build();
 
     return nodeType;
   }
 
   public static Node fromProtobuf(
-      ScmBlockLocationProtocolProtos.NodeType nodeType) {
+      HddsProtos.NodeInterface nodeType) {
     return nodeType.hasInnerNode()
         ? InnerNodeImpl.fromProtobuf(nodeType.getInnerNode())
         : null;
   }
 
   public static InnerNode fromProtobuf(
-      ScmBlockLocationProtocolProtos.InnerNode innerNode) {
+      HddsProtos.InnerNode innerNode) {
 
-    ScmBlockLocationProtocolProtos.NodeImpl nodeImpl = innerNode.getNodeImpl();
+    HddsProtos.NodeImpl nodeImpl =
+        innerNode.getNodeImpl();
     InnerNodeImpl.Builder builder = new InnerNodeImpl.Builder()
         .setName(nodeImpl.getName())
         .setLocation(nodeImpl.getLocation())

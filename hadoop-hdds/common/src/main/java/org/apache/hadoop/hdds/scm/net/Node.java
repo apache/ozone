@@ -18,7 +18,7 @@
 package org.apache.hadoop.hdds.scm.net;
 
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
-import org.apache.hadoop.hdds.protocol.proto.ScmBlockLocationProtocolProtos;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 
 /**
  * The interface defines a node in a network topology.
@@ -130,16 +130,16 @@ public interface Node {
    */
   boolean isDescendant(String nodePath);
 
-  ScmBlockLocationProtocolProtos.NodeType toProtobuf(int clientVersion);
+  default HddsProtos.NodeInterface toProtobuf(
+      int clientVersion) {
+    return null;
+  }
 
   static Node fromProtobuf(
-      ScmBlockLocationProtocolProtos.NodeType nodeTypeProto) {
-
+      HddsProtos.NodeInterface nodeTypeProto) {
     if (nodeTypeProto.hasDatanodeDetails()) {
       return DatanodeDetails.getFromProtoBuf(
           nodeTypeProto.getDatanodeDetails());
-    } else if (nodeTypeProto.hasNodeImpl()) {
-      return NodeImpl.fromProtobuf(nodeTypeProto.getNodeImpl());
     } else if (nodeTypeProto.hasInnerNode()) {
       return InnerNode.fromProtobuf(nodeTypeProto.getInnerNode());
     } else {

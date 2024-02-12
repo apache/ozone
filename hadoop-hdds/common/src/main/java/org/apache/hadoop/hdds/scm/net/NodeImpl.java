@@ -18,7 +18,7 @@
 package org.apache.hadoop.hdds.scm.net;
 
 import com.google.common.base.Preconditions;
-import org.apache.hadoop.hdds.protocol.proto.ScmBlockLocationProtocolProtos;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 
 import static org.apache.hadoop.hdds.scm.net.NetConstants.ROOT;
 import static org.apache.hadoop.hdds.scm.net.NetConstants.PATH_SEPARATOR_STR;
@@ -230,46 +230,23 @@ public class NodeImpl implements Node {
         NetUtils.addSuffix(nodePath));
   }
 
-  @Override
-  public ScmBlockLocationProtocolProtos.NodeType toProtobuf(int clientVersion) {
-    ScmBlockLocationProtocolProtos.NodeImpl nodeImpl =
-        ScmBlockLocationProtocolProtos.NodeImpl.newBuilder()
-            .setName(name)
-            .setLocation(location)
-            .setCost(cost)
-            .setLevel(level)
-            .build();
+  public static HddsProtos.NodeImpl toProtobuf(
+      String name, String location, int level, int cost) {
 
-    ScmBlockLocationProtocolProtos.NodeType nodeType =
-        ScmBlockLocationProtocolProtos.NodeType.newBuilder()
-            .setNodeImpl(nodeImpl).build();
-
-    return nodeType;
-  }
-
-  public static ScmBlockLocationProtocolProtos.NodeImpl toProtobuf(String name,
-      String location, int level, int cost) {
-
-    ScmBlockLocationProtocolProtos.NodeImpl.Builder nodeImplBuilder =
-        ScmBlockLocationProtocolProtos.NodeImpl.newBuilder()
+    HddsProtos.NodeImpl.Builder nodeImplBuilder =
+        HddsProtos.NodeImpl.newBuilder()
             .setName(name)
             .setLocation(location)
             .setLevel(level)
             .setCost(cost);
 
-    ScmBlockLocationProtocolProtos.NodeImpl nodeImpl = nodeImplBuilder.build();
+    HddsProtos.NodeImpl nodeImpl =
+        nodeImplBuilder.build();
     return nodeImpl;
   }
 
-  public static Node fromProtobuf(
-      ScmBlockLocationProtocolProtos.NodeType nodeType) {
-    return nodeType.hasNodeImpl()
-        ? InnerNodeImpl.fromProtobuf(nodeType.getNodeImpl())
-        : null;
-  }
-
   public static NodeImpl fromProtobuf(
-      ScmBlockLocationProtocolProtos.NodeImpl nodeImpl) {
+      HddsProtos.NodeImpl nodeImpl) {
     return new NodeImpl(nodeImpl.getName(), nodeImpl.getLocation(), null,
         nodeImpl.getLevel(), nodeImpl.getCost());
   }

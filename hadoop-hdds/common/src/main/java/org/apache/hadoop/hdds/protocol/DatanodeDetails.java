@@ -34,7 +34,6 @@ import org.apache.hadoop.hdds.annotation.InterfaceStability;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails.Port.Name;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ExtendedDatanodeDetailsProto;
-import org.apache.hadoop.hdds.protocol.proto.ScmBlockLocationProtocolProtos;
 import org.apache.hadoop.hdds.scm.net.NetConstants;
 import org.apache.hadoop.hdds.scm.net.Node;
 import org.apache.hadoop.hdds.scm.net.NodeImpl;
@@ -1039,15 +1038,17 @@ public class DatanodeDetails extends NodeImpl implements
     this.buildDate = date;
   }
 
-  public ScmBlockLocationProtocolProtos.NodeType toProtobuf(int clientVersion) {
-    ScmBlockLocationProtocolProtos.NodeType nodeType =
-        ScmBlockLocationProtocolProtos.NodeType.newBuilder()
+  @Override
+  public HddsProtos.NodeInterface toProtobuf(
+      int clientVersion) {
+    HddsProtos.NodeInterface nodeType =
+        HddsProtos.NodeInterface.newBuilder()
             .setDatanodeDetails(toProtoBuilder(clientVersion).build()).build();
     return nodeType;
   }
 
   public static Node fromProtobuf(
-      ScmBlockLocationProtocolProtos.NodeType nodeType) {
+      HddsProtos.NodeInterface nodeType) {
     return nodeType.hasDatanodeDetails()
         ? DatanodeDetails.getFromProtoBuf(nodeType.getDatanodeDetails())
         : null;

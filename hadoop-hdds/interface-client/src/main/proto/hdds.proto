@@ -498,3 +498,26 @@ message CompactionLogEntryProto {
     repeated CompactionFileInfoProto outputFileIntoList = 4;
     optional string compactionReason = 5;
 }
+
+message NodeImpl {
+    required string name = 1;
+    required string location = 2;
+    required uint32 cost = 3;
+    required uint32 level = 4;
+}
+
+message NodeInterface {
+    optional DatanodeDetailsProto datanodeDetails = 1;
+    optional InnerNode innerNode = 3;
+}
+
+message ChildrenMap {
+    required string networkName = 1;
+    required NodeInterface nodeType = 2;
+}
+
+message InnerNode {
+    required NodeImpl nodeImpl = 1;
+    required uint32 numOfLeaves = 2;
+    repeated ChildrenMap childrenMap = 3;
+}

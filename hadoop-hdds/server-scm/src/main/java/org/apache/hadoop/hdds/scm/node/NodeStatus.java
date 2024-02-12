@@ -20,7 +20,6 @@ package org.apache.hadoop.hdds.scm.node;
 
 import com.google.common.collect.ImmutableSet;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
-import org.apache.hadoop.hdds.protocol.proto.ScmBlockLocationProtocolProtos;
 
 import java.util.EnumSet;
 import java.util.Objects;
@@ -261,21 +260,5 @@ public class NodeStatus implements Comparable<NodeStatus> {
       order = operationalState.compareTo(o.operationalState);
     }
     return order;
-  }
-
-  public ScmBlockLocationProtocolProtos.NodeStatus toProtobuf() {
-    ScmBlockLocationProtocolProtos.NodeStatus.Builder nodeStatus =
-        ScmBlockLocationProtocolProtos.NodeStatus.newBuilder()
-            .setOperationalState(operationalState)
-            .setHealth(health)
-            .setOpStateExpiryEpochSeconds(opStateExpiryEpochSeconds);
-
-    return nodeStatus.build();
-  }
-
-  public static NodeStatus fromProtobuf(
-      ScmBlockLocationProtocolProtos.NodeStatus nodeStatus) {
-    return new NodeStatus(nodeStatus.getOperationalState(),
-        nodeStatus.getHealth(), nodeStatus.getOpStateExpiryEpochSeconds());
   }
 }
