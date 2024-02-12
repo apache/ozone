@@ -17,17 +17,17 @@
  */
 package org.apache.hadoop.ozone.om.request.key;
 
+import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.junit.jupiter.api.Test;
 
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.ozone.om.request.file.OMFileRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
-import org.apache.hadoop.util.Time;
 
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.ONE;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -115,10 +115,13 @@ public class TestOMSetTimesRequestWithFSO extends TestOMSetTimesRequest {
         .addParentsToDirTable(volumeName, bucketName, PARENT_DIR,
             omMetadataManager);
 
-    OmKeyInfo omKeyInfo = OMRequestTestUtils
-        .createOmKeyInfo(volumeName, bucketName, FILE_NAME,
-            HddsProtos.ReplicationType.RATIS, HddsProtos.ReplicationFactor.ONE,
-            parentId + 1, parentId, 100, Time.now());
+    OmKeyInfo omKeyInfo =
+        OMRequestTestUtils.createOmKeyInfo(volumeName, bucketName, FILE_NAME,
+                RatisReplicationConfig.getInstance(ONE))
+            .setObjectID(parentId + 1L)
+            .setParentObjectID(parentId)
+            .setUpdateID(100L)
+            .build();
     OMRequestTestUtils
         .addFileToKeyTable(false, false, FILE_NAME, omKeyInfo, -1, 50,
             omMetadataManager);

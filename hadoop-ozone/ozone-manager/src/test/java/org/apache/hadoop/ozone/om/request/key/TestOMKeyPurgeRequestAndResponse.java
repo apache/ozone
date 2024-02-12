@@ -76,7 +76,7 @@ public class TestOMKeyPurgeRequestAndResponse extends TestOMKeyRequest {
     for (int i = 1; i <= numKeys; i++) {
       String key = keyName + "-" + i;
       OMRequestTestUtils.addKeyToTable(false, false, volumeName, bucket,
-          key, clientID, replicationType, replicationFactor, trxnIndex++,
+          key, clientID, replicationConfig, trxnIndex++,
           omMetadataManager);
       ozoneKeyNames.add(omMetadataManager.getOzoneKey(
           volumeName, bucket, key));

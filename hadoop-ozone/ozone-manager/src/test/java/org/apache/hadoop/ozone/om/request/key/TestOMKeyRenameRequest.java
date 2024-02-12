@@ -240,7 +240,7 @@ public class TestOMKeyRenameRequest extends TestOMKeyRequest {
 
   protected OmKeyInfo getOmKeyInfo(String keyName) {
     return OMRequestTestUtils.createOmKeyInfo(volumeName, bucketName, keyName,
-        replicationType, replicationFactor, 0L);
+        replicationConfig).build();
   }
 
   protected String addKeyToTable(OmKeyInfo keyInfo) throws Exception {

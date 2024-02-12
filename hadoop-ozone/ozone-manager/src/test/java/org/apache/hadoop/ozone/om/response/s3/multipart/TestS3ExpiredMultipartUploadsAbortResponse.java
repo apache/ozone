@@ -19,15 +19,19 @@
 
 package org.apache.hadoop.ozone.om.response.s3.multipart;
 
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.ONE;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+
+import org.apache.hadoop.hdds.client.RatisReplicationConfig;
+import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType;
 import org.apache.hadoop.hdds.utils.UniqueId;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartAbortInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
@@ -277,10 +281,10 @@ public class TestS3ExpiredMultipartUploadsAbortResponse
       OmBucketInfo omBucketInfo = OMRequestTestUtils.addBucketToDB(volume,
           bucket, omMetadataManager, getBucketLayout());
 
-      final OmKeyInfo omKeyInfo = OMRequestTestUtils.createOmKeyInfo(volume,
-          bucket, keyName,
-          HddsProtos.ReplicationType.RATIS, HddsProtos.ReplicationFactor.ONE,
-          0L, Time.now(), true);
+      ReplicationConfig replicationConfig = RatisReplicationConfig.getInstance(ONE);
+      final OmKeyInfo omKeyInfo = OMRequestTestUtils.createOmKeyInfo(volume, bucket, keyName, replicationConfig,
+              new OmKeyLocationInfoGroup(0L, new ArrayList<>(), true))
+          .build();
 
       if (getBucketLayout().equals(BucketLayout.FILE_SYSTEM_OPTIMIZED)) {
         omKeyInfo.setParentObjectID(omBucketInfo.getObjectID());

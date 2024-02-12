@@ -22,7 +22,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import org.apache.hadoop.hdds.client.BlockID;
-import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.utils.db.Table;
@@ -89,8 +88,7 @@ public class TestOMKeyDeleteResponse extends TestOMKeyResponse {
     Pipeline pipeline = Pipeline.newBuilder()
         .setState(Pipeline.PipelineState.OPEN)
         .setId(PipelineID.randomId())
-        .setReplicationConfig(RatisReplicationConfig
-            .getInstance(replicationFactor))
+        .setReplicationConfig(replicationConfig)
         .setNodes(new ArrayList<>())
         .build();
 
@@ -167,7 +165,7 @@ public class TestOMKeyDeleteResponse extends TestOMKeyResponse {
             keyName);
 
     OMRequestTestUtils.addKeyToTable(false, volumeName, bucketName, keyName,
-            clientID, replicationType, replicationFactor, omMetadataManager);
+        clientID, replicationConfig, omMetadataManager);
     return ozoneKey;
   }
 

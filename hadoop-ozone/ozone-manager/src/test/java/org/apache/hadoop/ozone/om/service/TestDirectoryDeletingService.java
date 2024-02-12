@@ -23,9 +23,10 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.util.concurrent.TimeUnit;
+
+import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.server.ServerUtils;
 import org.apache.hadoop.hdds.utils.db.DBConfigFromFile;
 import org.apache.hadoop.ozone.om.KeyManager;
@@ -47,6 +48,7 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.ONE;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_DIR_DELETING_SERVICE_INTERVAL;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -129,10 +131,11 @@ public class TestDirectoryDeletingService {
     for (int i = 0; i < 2000; ++i) {
       String keyName = "key" + longName + i;
       OmKeyInfo omKeyInfo =
-          OMRequestTestUtils.createOmKeyInfo(volumeName, bucketName,
-              keyName, HddsProtos.ReplicationType.RATIS,
-              HddsProtos.ReplicationFactor.ONE, dir1.getObjectID() + 1 + i,
-              dir1.getObjectID(), 100, Time.now());
+          OMRequestTestUtils.createOmKeyInfo(volumeName, bucketName, keyName, RatisReplicationConfig.getInstance(ONE))
+              .setObjectID(dir1.getObjectID() + 1 + i)
+              .setParentObjectID(dir1.getObjectID())
+              .setUpdateID(100L)
+              .build();
       OMRequestTestUtils.addFileToKeyTable(false, true, keyName,
           omKeyInfo, 1234L, i + 1, om.getMetadataManager());
     }
@@ -143,7 +146,7 @@ public class TestDirectoryDeletingService {
         .setBucketName(bucketName)
         .setKeyName("dir" + longName)
         .setReplicationConfig(StandaloneReplicationConfig.getInstance(
-            HddsProtos.ReplicationFactor.ONE))
+            ONE))
         .setDataSize(0).setRecursive(true)
         .build();
     writeClient.deleteKey(delArgs);

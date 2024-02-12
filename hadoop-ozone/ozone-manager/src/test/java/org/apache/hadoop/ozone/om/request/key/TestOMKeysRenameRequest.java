@@ -18,12 +18,14 @@
 
 package org.apache.hadoop.ozone.om.request.key;
 
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.THREE;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+
+import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
@@ -127,8 +129,7 @@ public class TestOMKeysRenameRequest extends TestOMKeyRequest {
       String key = parentDir.concat("/key" + i);
       String toKey = parentDir.concat("/newKey" + i);
       OMRequestTestUtils.addKeyToTableCache(volumeName, bucketName,
-          parentDir.concat("/key" + i), HddsProtos.ReplicationType.RATIS,
-          HddsProtos.ReplicationFactor.THREE, omMetadataManager);
+          parentDir.concat("/key" + i), RatisReplicationConfig.getInstance(THREE), omMetadataManager);
 
       RenameKeysMap.Builder renameKey = RenameKeysMap.newBuilder()
           .setFromKeyName(key)

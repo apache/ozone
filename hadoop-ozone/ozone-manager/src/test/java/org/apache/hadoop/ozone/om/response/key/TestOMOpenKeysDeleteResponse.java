@@ -208,7 +208,7 @@ public class TestOMOpenKeysDeleteResponse extends TestOMKeyResponse {
       long parentID = random.nextLong();
 
       OmKeyInfo omKeyInfo = OMRequestTestUtils.createOmKeyInfo(volume,
-          bucket, key, replicationType, replicationFactor);
+          bucket, key, replicationConfig).build();
 
       if (keyLength > 0) {
         OMRequestTestUtils.addKeyLocationInfo(omKeyInfo, 0, keyLength);

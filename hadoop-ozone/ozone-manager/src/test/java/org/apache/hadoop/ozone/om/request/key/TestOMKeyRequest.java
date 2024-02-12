@@ -25,6 +25,7 @@ import java.util.Random;
 import java.util.UUID;
 
 import org.apache.commons.lang3.tuple.Pair;
+import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
@@ -55,7 +56,6 @@ import org.junit.jupiter.api.io.TempDir;
 import org.apache.hadoop.hdds.client.ContainerBlockID;
 import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.scm.container.common.helpers.AllocatedBlock;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
@@ -110,8 +110,7 @@ public class TestOMKeyRequest {
   protected String volumeName;
   protected String bucketName;
   protected String keyName;
-  protected HddsProtos.ReplicationType replicationType;
-  protected HddsProtos.ReplicationFactor replicationFactor;
+  protected ReplicationConfig replicationConfig;
   protected long clientID;
   protected long scmBlockSize = 1000L;
   protected long dataSize;
@@ -209,8 +208,7 @@ public class TestOMKeyRequest {
     volumeName = UUID.randomUUID().toString();
     bucketName = UUID.randomUUID().toString();
     keyName = UUID.randomUUID().toString();
-    replicationFactor = HddsProtos.ReplicationFactor.ONE;
-    replicationType = HddsProtos.ReplicationType.RATIS;
+    replicationConfig = RatisReplicationConfig.getInstance(ReplicationFactor.ONE);
     clientID = Time.now();
     dataSize = 1000L;
     random = new Random();
