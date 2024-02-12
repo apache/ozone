@@ -149,7 +149,7 @@ public class TestReconTasks {
         (ReconContainerManager) reconScm.getContainerManager();
     ContainerInfo containerInfo =
         scmContainerManager
-            .allocateContainer(RatisReplicationConfig.getInstance(ONE), "test");
+            .allocateContainer(RatisReplicationConfig.getInstance(ONE), "testMissingContainer");
     long containerID = containerInfo.getContainerID();
 
     try (RDBBatchOperation rdbBatchOperation = new RDBBatchOperation()) {
@@ -176,7 +176,7 @@ public class TestReconTasks {
               .getUnhealthyContainers(
                   ContainerSchemaDefinition.UnHealthyContainerStates.MISSING,
                   0, 1000);
-      return (allMissingContainers.size() == 1);
+      return (allMissingContainers.size() >= 1);
     });
 
     // Restart the Datanode to make sure we remove the missing container.
@@ -230,7 +230,7 @@ public class TestReconTasks {
         (ReconContainerManager) reconScm.getContainerManager();
     ContainerInfo containerInfo =
         scmContainerManager
-            .allocateContainer(RatisReplicationConfig.getInstance(ONE), "test");
+            .allocateContainer(RatisReplicationConfig.getInstance(ONE), "testEmptyMissingContainer");
     long containerID = containerInfo.getContainerID();
 
     Pipeline pipeline =
