@@ -661,12 +661,10 @@ public abstract class TestOzoneRpcClientAbstract {
     String bucketName = UUID.randomUUID().toString();
     OzoneAcl userAcl = new OzoneAcl(USER, "test",
         READ, ACCESS);
-    List<OzoneAcl> acls = new ArrayList<>();
-    acls.add(userAcl);
     store.createVolume(volumeName);
     OzoneVolume volume = store.getVolume(volumeName);
-    BucketArgs.Builder builder = BucketArgs.newBuilder();
-    builder.setAcls(acls);
+    BucketArgs.Builder builder = BucketArgs.newBuilder()
+        .addAcl(userAcl);
     volume.createBucket(bucketName, builder.build());
     OzoneBucket bucket = volume.getBucket(bucketName);
     assertEquals(bucketName, bucket.getName());
@@ -697,15 +695,13 @@ public abstract class TestOzoneRpcClientAbstract {
     String bucketName = UUID.randomUUID().toString();
     OzoneAcl userAcl = new OzoneAcl(USER, "test",
         ACLType.ALL, ACCESS);
-    List<OzoneAcl> acls = new ArrayList<>();
-    acls.add(userAcl);
     ReplicationConfig repConfig = new ECReplicationConfig(3, 2);
     store.createVolume(volumeName);
     OzoneVolume volume = store.getVolume(volumeName);
     BucketArgs.Builder builder = BucketArgs.newBuilder();
     builder.setVersioning(true)
         .setStorageType(StorageType.SSD)
-        .setAcls(acls)
+        .addAcl(userAcl)
         .setDefaultReplicationConfig(new DefaultReplicationConfig(repConfig));
     volume.createBucket(bucketName, builder.build());
     OzoneBucket bucket = volume.getBucket(bucketName);
@@ -754,20 +750,16 @@ public abstract class TestOzoneRpcClientAbstract {
     String bucketName = UUID.randomUUID().toString();
     OzoneAcl userAcl = new OzoneAcl(USER, "test",
         ACLType.ALL, ACCESS);
-    List<OzoneAcl> acls = new ArrayList<>();
-    acls.add(userAcl);
     store.createVolume(volumeName);
     OzoneVolume volume = store.getVolume(volumeName);
-    BucketArgs.Builder builder = BucketArgs.newBuilder();
-    builder.setAcls(acls);
+    BucketArgs.Builder builder = BucketArgs.newBuilder()
+        .addAcl(userAcl);
     volume.createBucket(bucketName, builder.build());
     OzoneBucket bucket = volume.getBucket(bucketName);
-    for (OzoneAcl acl : acls) {
-      assertTrue(bucket.removeAcl(acl));
-    }
+    assertTrue(bucket.removeAcl(userAcl));
     OzoneBucket newBucket = volume.getBucket(bucketName);
     assertEquals(bucketName, newBucket.getName());
-    assertThat(bucket.getAcls()).doesNotContain(acls.get(0));
+    assertThat(newBucket.getAcls()).doesNotContain(userAcl);
   }
 
   @Test
@@ -777,14 +769,13 @@ public abstract class TestOzoneRpcClientAbstract {
     String bucketName = UUID.randomUUID().toString();
     OzoneAcl userAcl = new OzoneAcl(USER, "test",
         ACLType.ALL, ACCESS);
-    List<OzoneAcl> acls = new ArrayList<>();
-    acls.add(userAcl);
-    acls.add(new OzoneAcl(USER, "test1",
-        ACLType.ALL, ACCESS));
+    OzoneAcl acl2 = new OzoneAcl(USER, "test1",
+        ACLType.ALL, ACCESS);
     store.createVolume(volumeName);
     OzoneVolume volume = store.getVolume(volumeName);
-    BucketArgs.Builder builder = BucketArgs.newBuilder();
-    builder.setAcls(acls);
+    BucketArgs.Builder builder = BucketArgs.newBuilder()
+        .addAcl(userAcl)
+        .addAcl(acl2);
     volume.createBucket(bucketName, builder.build());
     OzoneObj ozoneObj = OzoneObjInfo.Builder.newBuilder()
         .setBucketName(bucketName)
@@ -793,13 +784,11 @@ public abstract class TestOzoneRpcClientAbstract {
         .setResType(OzoneObj.ResourceType.BUCKET).build();
 
     // Remove the 2nd acl added to the list.
-    boolean remove = store.removeAcl(ozoneObj, acls.get(1));
-    assertTrue(remove);
-    assertThat(store.getAcl(ozoneObj)).doesNotContain(acls.get(1));
+    assertTrue(store.removeAcl(ozoneObj, acl2));
+    assertThat(store.getAcl(ozoneObj)).doesNotContain(acl2);
 
-    remove = store.removeAcl(ozoneObj, acls.get(0));
-    assertTrue(remove);
-    assertThat(store.getAcl(ozoneObj)).doesNotContain(acls.get(0));
+    assertTrue(store.removeAcl(ozoneObj, userAcl));
+    assertThat(store.getAcl(ozoneObj)).doesNotContain(userAcl);
   }
 
   @Test
