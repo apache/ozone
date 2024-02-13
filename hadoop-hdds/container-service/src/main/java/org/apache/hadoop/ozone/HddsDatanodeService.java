@@ -423,18 +423,19 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
     String idFilePath = HddsServerUtil.getDatanodeIdFilePath(conf);
     Preconditions.checkNotNull(idFilePath);
     File idFile = new File(idFilePath);
+    DatanodeDetails details;
     if (idFile.exists()) {
-      DatanodeDetails details = ContainerUtils.readDatanodeDetailsFrom(idFile);
-      details.setCurrentVersion(DatanodeVersion.CURRENT_VERSION);
-      return details;
+      details = ContainerUtils.readDatanodeDetailsFrom(idFile);
+      // Current version is always overridden to the latest
+      details.setCurrentVersion(getDefaultCurrentVersion());
     } else {
       // There is no datanode.id file, this might be the first time datanode
       // is started.
-      DatanodeDetails details = DatanodeDetails.newBuilder().setUuid(UUID.randomUUID()).build();
+      details = DatanodeDetails.newBuilder().setUuid(UUID.randomUUID()).build();
       details.setInitialVersion(getDefaultInitialVersion());
       details.setCurrentVersion(getDefaultCurrentVersion());
-      return details;
     }
+    return details;
   }
 
   /**

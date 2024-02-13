@@ -42,9 +42,7 @@ import org.junit.jupiter.api.Timeout;
 
 import java.util.List;
 import java.util.UUID;
-import java.util.concurrent.TimeUnit;
 
-import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_STALENODE_INTERVAL;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 /**
@@ -79,7 +77,6 @@ public class TestDatanodeVersion {
     OzoneClientConfig clientConfig = conf.getObject(OzoneClientConfig.class);
     conf.setFromObject(clientConfig);
 
-    conf.setTimeDuration(OZONE_SCM_STALENODE_INTERVAL, 3, TimeUnit.SECONDS);
     conf.setQuietMode(false);
     conf.setStorageSize(OzoneConfigKeys.OZONE_SCM_BLOCK_SIZE, 4, StorageUnit.MB);
 
@@ -96,7 +93,6 @@ public class TestDatanodeVersion {
     cluster = MiniOzoneCluster.newBuilder(conf)
         .setNumDatanodes(3)
         .setDatanodeCurrentVersion(DN_OLD_VERSION)
-        .setTotalPipelineNumLimit(3)
         .build();
     cluster.waitForClusterToBeReady();
     //the easiest way to create an open container is creating a key
@@ -119,10 +115,8 @@ public class TestDatanodeVersion {
     }
   }
 
-  static OzoneDataStreamOutput createKey(String keyName, ReplicationType type,
-                                         long size) throws Exception {
-    return TestHelper.createStreamKey(
-        keyName, type, size, objectStore, volumeName, bucketName);
+  static OzoneDataStreamOutput createKey(String keyName, ReplicationType type, long size) throws Exception {
+    return TestHelper.createStreamKey(keyName, type, size, objectStore, volumeName, bucketName);
   }
 
   @Test
