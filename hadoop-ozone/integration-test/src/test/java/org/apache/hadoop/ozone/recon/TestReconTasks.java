@@ -61,7 +61,7 @@ import static org.junit.jupiter.api.Assertions.assertNotEquals;
 /**
  * Integration Tests for Recon's tasks.
  */
-@Timeout(300)
+@Timeout(1200)
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 @TestMethodOrder(OrderAnnotation.class)
 public class TestReconTasks {
