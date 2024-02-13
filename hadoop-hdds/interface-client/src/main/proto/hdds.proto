@@ -506,14 +506,14 @@ message NodeImpl {
     required uint32 level = 4;
 }
 
-message NodeInterface {
+message NetworkNode {
     optional DatanodeDetailsProto datanodeDetails = 1;
     optional InnerNode innerNode = 3;
 }
 
 message ChildrenMap {
     required string networkName = 1;
-    required NodeInterface nodeType = 2;
+    required NetworkNode networkNode = 2;
 }
 
 message InnerNode {

@@ -93,7 +93,7 @@ public interface InnerNode extends Node {
       Collection<Node> excludedNodes, int ancestorGen);
 
   @Override
-  HddsProtos.NodeInterface toProtobuf(int clientVersion);
+  HddsProtos.NetworkNode toProtobuf(int clientVersion);
 
   boolean equals(Object o);
 

@@ -1865,7 +1865,7 @@ public class KeyManagerImpl implements KeyManager {
         return scmClient.getBlockClient()
             .sortDatanodes(nodeList, clientMachine);
       } catch (IOException e) {
-        LOG.warn("Unable to sort datanodes based on distance to client, "
+        LOG.debug("Unable to sort datanodes based on distance to client, "
                 + " volume={}, bucket={}, key={}, client={}, datanodes={}, "
                 + " exception={}",
             keyInfo.getVolumeName(), keyInfo.getBucketName(),

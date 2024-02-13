@@ -122,9 +122,9 @@ public class InnerNodeImpl extends NodeImpl implements InnerNode {
       for (HddsProtos.ChildrenMap childrenMapProto :
           childrenMapList) {
         String networkName = childrenMapProto.getNetworkName();
-        HddsProtos.NodeInterface nodeType =
-            childrenMapProto.getNodeType();
-        Node node = Node.fromProtobuf(nodeType);
+        HddsProtos.NetworkNode networkNode =
+            childrenMapProto.getNetworkNode();
+        Node node = Node.fromProtobuf(networkNode);
         newChildrenMap.put(networkName, node);
       }
       this.childrenMap = newChildrenMap;
@@ -471,7 +471,7 @@ public class InnerNodeImpl extends NodeImpl implements InnerNode {
   }
 
   @Override
-  public HddsProtos.NodeInterface toProtobuf(
+  public HddsProtos.NetworkNode toProtobuf(
       int clientVersion) {
 
     HddsProtos.InnerNode.Builder innerNode =
@@ -487,7 +487,7 @@ public class InnerNodeImpl extends NodeImpl implements InnerNode {
           HddsProtos.ChildrenMap childrenMapProto =
               HddsProtos.ChildrenMap.newBuilder()
                   .setNetworkName(entry.getKey())
-                  .setNodeType(entry.getValue().toProtobuf(clientVersion))
+                  .setNetworkNode(entry.getValue().toProtobuf(clientVersion))
                   .build();
           innerNode.addChildrenMap(childrenMapProto);
         }
@@ -495,17 +495,17 @@ public class InnerNodeImpl extends NodeImpl implements InnerNode {
     }
     innerNode.build();
 
-    HddsProtos.NodeInterface nodeType =
-        HddsProtos.NodeInterface.newBuilder()
+    HddsProtos.NetworkNode networkNode =
+        HddsProtos.NetworkNode.newBuilder()
             .setInnerNode(innerNode).build();
 
-    return nodeType;
+    return networkNode;
   }
 
   public static Node fromProtobuf(
-      HddsProtos.NodeInterface nodeType) {
-    return nodeType.hasInnerNode()
-        ? InnerNodeImpl.fromProtobuf(nodeType.getInnerNode())
+      HddsProtos.NetworkNode networkNode) {
+    return networkNode.hasInnerNode()
+        ? InnerNodeImpl.fromProtobuf(networkNode.getInnerNode())
         : null;
   }
 

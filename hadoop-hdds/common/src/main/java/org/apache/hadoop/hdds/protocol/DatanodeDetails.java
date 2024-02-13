@@ -1039,18 +1039,18 @@ public class DatanodeDetails extends NodeImpl implements
   }
 
   @Override
-  public HddsProtos.NodeInterface toProtobuf(
+  public HddsProtos.NetworkNode toProtobuf(
       int clientVersion) {
-    HddsProtos.NodeInterface nodeType =
-        HddsProtos.NodeInterface.newBuilder()
+    HddsProtos.NetworkNode networkNode =
+        HddsProtos.NetworkNode.newBuilder()
             .setDatanodeDetails(toProtoBuilder(clientVersion).build()).build();
-    return nodeType;
+    return networkNode;
   }
 
   public static Node fromProtobuf(
-      HddsProtos.NodeInterface nodeType) {
-    return nodeType.hasDatanodeDetails()
-        ? DatanodeDetails.getFromProtoBuf(nodeType.getDatanodeDetails())
+      HddsProtos.NetworkNode networkNode) {
+    return networkNode.hasDatanodeDetails()
+        ? DatanodeDetails.getFromProtoBuf(networkNode.getDatanodeDetails())
         : null;
   }
 }

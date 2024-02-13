@@ -130,18 +130,18 @@ public interface Node {
    */
   boolean isDescendant(String nodePath);
 
-  default HddsProtos.NodeInterface toProtobuf(
+  default HddsProtos.NetworkNode toProtobuf(
       int clientVersion) {
     return null;
   }
 
   static Node fromProtobuf(
-      HddsProtos.NodeInterface nodeTypeProto) {
-    if (nodeTypeProto.hasDatanodeDetails()) {
+      HddsProtos.NetworkNode networkNode) {
+    if (networkNode.hasDatanodeDetails()) {
       return DatanodeDetails.getFromProtoBuf(
-          nodeTypeProto.getDatanodeDetails());
-    } else if (nodeTypeProto.hasInnerNode()) {
-      return InnerNode.fromProtobuf(nodeTypeProto.getInnerNode());
+          networkNode.getDatanodeDetails());
+    } else if (networkNode.hasInnerNode()) {
+      return InnerNode.fromProtobuf(networkNode.getInnerNode());
     } else {
       return null;
     }
