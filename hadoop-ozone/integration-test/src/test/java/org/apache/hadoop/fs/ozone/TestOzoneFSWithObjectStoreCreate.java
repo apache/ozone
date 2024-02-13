@@ -194,7 +194,7 @@ public class TestOzoneFSWithObjectStoreCreate {
 
     // check
     for (int i = 1; i <= 3; i++) {
-      String fileName = parentDir.concat("/file" + i + "/");
+      String fileName = parentDir.concat("/file" + i);
       Path p = new Path(fileName);
       assertTrue(o3fs.getFileStatus(p).isFile());
       checkAncestors(p);
@@ -202,7 +202,7 @@ public class TestOzoneFSWithObjectStoreCreate {
 
     // Delete keys with object store api delete
     for (int i = 1; i <= 3; i++) {
-      String fileName = parentDir.concat("/file" + i + "/");
+      String fileName = parentDir.concat("/file" + i);
       ozoneBucket.deleteKey(fileName);
     }
 
