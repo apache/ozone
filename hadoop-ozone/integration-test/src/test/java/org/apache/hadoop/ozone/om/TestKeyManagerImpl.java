@@ -122,6 +122,7 @@ import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
+import org.junit.jupiter.params.provider.ValueSource;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -762,8 +763,10 @@ public class TestKeyManagerImpl {
     return createBuilder().setKeyName(toKeyName).build();
   }
 
-  @Test
-  public void testLookupKeyWithLocation() throws IOException {
+  @ParameterizedTest
+  @ValueSource(booleans = {true, false})
+  public void testLookupKeyWithLocation(boolean enablePath) throws IOException {
+    conf.setBoolean(OMConfigKeys.OZONE_OM_ENABLE_FILESYSTEM_PATHS, enablePath);
     String keyName = RandomStringUtils.randomAlphabetic(5);
     OmKeyArgs keyArgs = createBuilder()
         .setKeyName(keyName)
@@ -1009,8 +1012,10 @@ public class TestKeyManagerImpl {
     }
   }
 
-  @Test
-  public void testListStatusWithTableCacheRecursive() throws Exception {
+  @ParameterizedTest
+  @ValueSource(booleans = {true, false})
+  public void testListStatusWithTableCacheRecursive(boolean enablePath) throws Exception {
+    conf.setBoolean(OMConfigKeys.OZONE_OM_ENABLE_FILESYSTEM_PATHS, enablePath);
     String keyNameDir1 = "dir1";
     OmKeyArgs keyArgsDir1 =
         createBuilder().setKeyName(keyNameDir1).build();
@@ -1194,8 +1199,10 @@ public class TestKeyManagerImpl {
     assertTrue(existKeySet.isEmpty());
   }
 
-  @Test
-  public void testListStatus() throws IOException {
+  @ParameterizedTest
+  @ValueSource(booleans = {true, false})
+  public void testListStatus(boolean enablePath) throws IOException {
+    conf.setBoolean(OMConfigKeys.OZONE_OM_ENABLE_FILESYSTEM_PATHS, enablePath);
     String superDir = RandomStringUtils.randomAlphabetic(5);
 
     int numDirectories = 5;
@@ -1292,8 +1299,10 @@ public class TestKeyManagerImpl {
     assertEquals(keyName, ozoneFileStatus.getKeyInfo().getFileName());
   }
 
-  @Test
-  public void testGetFileStatusWithFakeDir() throws IOException {
+  @ParameterizedTest
+  @ValueSource(booleans = {true, false})
+  public void testGetFileStatusWithFakeDir(boolean enablePath) throws IOException {
+    conf.setBoolean(OMConfigKeys.OZONE_OM_ENABLE_FILESYSTEM_PATHS, enablePath);
     String parentDir = "dir1";
     String fileName = "file1";
     String keyName1 = parentDir + OZONE_URI_DELIMITER + fileName;
