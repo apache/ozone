@@ -44,7 +44,6 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.ArrayList;
 import java.util.Optional;
-import java.util.UUID;
 
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_CLIENT_LIST_CACHE_SIZE;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_FS_ITERATE_BATCH_SIZE;
@@ -59,9 +58,6 @@ public class TestListKeysWithFSO {
 
   private static MiniOzoneCluster cluster = null;
   private static OzoneConfiguration conf;
-  private static String clusterId;
-  private static String scmId;
-  private static String omId;
 
   private static OzoneBucket legacyOzoneBucket;
   private static OzoneBucket fsoOzoneBucket;
@@ -80,14 +76,10 @@ public class TestListKeysWithFSO {
     conf = new OzoneConfiguration();
     conf.setBoolean(OMConfigKeys.OZONE_OM_ENABLE_FILESYSTEM_PATHS,
         true);
-    clusterId = UUID.randomUUID().toString();
-    scmId = UUID.randomUUID().toString();
-    omId = UUID.randomUUID().toString();
     // Set the number of keys to be processed during batch operate.
     conf.setInt(OZONE_FS_ITERATE_BATCH_SIZE, 3);
     conf.setInt(OZONE_CLIENT_LIST_CACHE_SIZE, 3);
-    cluster = MiniOzoneCluster.newBuilder(conf).setClusterId(clusterId)
-        .setScmId(scmId).setOmId(omId).build();
+    cluster = MiniOzoneCluster.newBuilder(conf).build();
     cluster.waitForClusterToBeReady();
     client = cluster.newClient();
 
@@ -417,6 +409,11 @@ public class TestListKeysWithFSO {
 
     expectedKeys = getExpectedKeyList("a", "a1", legacyOzoneBucket2);
     checkKeyList("a", "a1", expectedKeys, fsoOzoneBucket2);
+
+    // test when the keyPrefix = existing key
+    expectedKeys =
+        getExpectedKeyList("x/y/z/z1.tx", "", legacyOzoneBucket2);
+    checkKeyList("x/y/z/z1.tx", "", expectedKeys, fsoOzoneBucket2);
   }
 
   @Test
@@ -549,6 +546,7 @@ public class TestListKeysWithFSO {
     keys.add("/a3/b1/c1/c1.tx");
 
     keys.add("/x/y/z/z1.tx");
+    keys.add("/x/y/z/z1.txdir/z2.tx");
 
     keys.add("/dir1/dir2/dir3/d11.tx");
 

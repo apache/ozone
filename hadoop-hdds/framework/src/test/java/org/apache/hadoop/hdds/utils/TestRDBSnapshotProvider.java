@@ -81,8 +81,8 @@ public class TestRDBSnapshotProvider {
   private Set<TableConfig> configSet;
   private RDBSnapshotProvider rdbSnapshotProvider;
   private File testDir;
-  private final int numUsedCF = 3;
-  private final String leaderId = "leaderNode-1";
+  private static final int NUM_USED_CF = 3;
+  private static final String LEADER_ID = "leaderNode-1";
   private final AtomicReference<DBCheckpoint> latestCK =
       new AtomicReference<>(null);
 
@@ -109,7 +109,7 @@ public class TestRDBSnapshotProvider {
       public void downloadSnapshot(String leaderNodeID, File targetFile)
           throws IOException {
         for (int i = 0; i < 10; i++) {
-          insertDataToDB(numUsedCF);
+          insertDataToDB(NUM_USED_CF);
         }
         DBCheckpoint dbCheckpoint = rdbStore.getCheckpoint(true);
         latestCK.set(dbCheckpoint);
@@ -151,30 +151,30 @@ public class TestRDBSnapshotProvider {
     assertEquals(0, before);
 
     // Get first snapshot
-    checkpoint = rdbSnapshotProvider.downloadDBSnapshotFromLeader(leaderId);
+    checkpoint = rdbSnapshotProvider.downloadDBSnapshotFromLeader(LEADER_ID);
     File checkpointDir = checkpoint.getCheckpointLocation().toFile();
     assertEquals(candidateDir, checkpointDir);
     int first = HAUtils.getExistingSstFiles(
         rdbSnapshotProvider.getCandidateDir()).size();
 
     // Get second snapshot
-    checkpoint = rdbSnapshotProvider.downloadDBSnapshotFromLeader(leaderId);
+    checkpoint = rdbSnapshotProvider.downloadDBSnapshotFromLeader(LEADER_ID);
     int second = HAUtils.getExistingSstFiles(
         rdbSnapshotProvider.getCandidateDir()).size();
     assertThat(second).withFailMessage("The second snapshot should have more SST files")
         .isGreaterThan(first);
     DBCheckpoint latestCheckpoint = latestCK.get();
     compareDB(latestCheckpoint.getCheckpointLocation().toFile(),
-        checkpoint.getCheckpointLocation().toFile(), numUsedCF);
+        checkpoint.getCheckpointLocation().toFile(), NUM_USED_CF);
 
     // Get third snapshot
-    checkpoint = rdbSnapshotProvider.downloadDBSnapshotFromLeader(leaderId);
+    checkpoint = rdbSnapshotProvider.downloadDBSnapshotFromLeader(LEADER_ID);
     int third = HAUtils.getExistingSstFiles(
         rdbSnapshotProvider.getCandidateDir()).size();
     assertThat(third).withFailMessage("The third snapshot should have more SST files")
         .isGreaterThan(second);
     compareDB(latestCK.get().getCheckpointLocation().toFile(),
-        checkpoint.getCheckpointLocation().toFile(), numUsedCF);
+        checkpoint.getCheckpointLocation().toFile(), NUM_USED_CF);
 
     // Test cleanup candidateDB
     rdbSnapshotProvider.init();

@@ -28,7 +28,6 @@ import java.io.File;
 import java.io.IOException;
 import java.util.Iterator;
 
-import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState;
@@ -76,10 +75,9 @@ public class TestUnknownContainerReport {
 
   @BeforeEach
   public void setup() throws IOException {
-    final OzoneConfiguration conf = SCMTestUtils.getConf();
+    final OzoneConfiguration conf = SCMTestUtils.getConf(testDir);
     this.nodeManager = new MockNodeManager(true, 10);
     this.containerManager = mock(ContainerManager.class);
-    conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, testDir.getAbsolutePath());
     dbStore = DBStoreBuilder.createDBStore(
         conf, new SCMDBDefinition());
     scmhaManager = SCMHAManagerStub.getInstance(true);

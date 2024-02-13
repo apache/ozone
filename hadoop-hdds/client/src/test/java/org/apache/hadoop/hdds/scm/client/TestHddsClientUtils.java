@@ -50,7 +50,6 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.junit.jupiter.api.Assertions.fail;
 
 /**
  * This test class verifies the parsing of SCM endpoint config settings. The
@@ -228,17 +227,13 @@ public class TestHddsClientUtils {
     invalidNames.add(tooShort);
 
     for (String name : invalidNames) {
-      try {
-        HddsClientUtils.verifyResourceName(name);
-        fail("Did not reject invalid string [" + name + "] as a name");
-      } catch (IllegalArgumentException e) {
-        // throwing up on an invalid name. we're good
-      }
+      assertThrows(IllegalArgumentException.class, () -> HddsClientUtils.verifyResourceName(name),
+          "Did not reject invalid string [" + name + "] as a name");
     }
   }
 
   @Test
-  public void testVerifyKeyName() {
+  void testVerifyKeyName() throws IllegalArgumentException {
     List<String> invalidNames = new ArrayList<>();
     invalidNames.add("#");
     invalidNames.add("ab^cd");
@@ -257,12 +252,8 @@ public class TestHddsClientUtils {
 
 
     for (String name : invalidNames) {
-      try {
-        HddsClientUtils.verifyKeyName(name);
-        fail("Did not reject invalid string [" + name + "] as a name");
-      } catch (IllegalArgumentException e) {
-        // throwing up on an invalid name. it's working.
-      }
+      assertThrows(IllegalArgumentException.class, () -> HddsClientUtils.verifyKeyName(name),
+          "Did not reject invalid string [" + name + "] as a name");
     }
 
     List<String> validNames = new ArrayList<>();
@@ -284,13 +275,7 @@ public class TestHddsClientUtils {
     validNames.add("dollar$");
 
     for (String name : validNames) {
-      try {
-        HddsClientUtils.verifyKeyName(name);
-        // not throwing up on a valid name. it's working.
-      } catch (IllegalArgumentException e) {
-        // throwing up on an valid name. it's not working.
-        fail("Rejected valid string [" + name + "] as a name");
-      }
+      HddsClientUtils.verifyKeyName(name);
     }
   }
 

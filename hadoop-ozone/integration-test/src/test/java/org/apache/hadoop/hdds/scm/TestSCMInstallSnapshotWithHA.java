@@ -22,7 +22,6 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
-import java.util.UUID;
 import java.util.concurrent.TimeoutException;
 
 import org.apache.commons.io.FileUtils;
@@ -71,8 +70,6 @@ public class TestSCMInstallSnapshotWithHA {
 
   private MiniOzoneHAClusterImpl cluster = null;
   private OzoneConfiguration conf;
-  private String clusterId;
-  private String scmId;
   private String omServiceId;
   private String scmServiceId;
   private int numOfOMs = 1;
@@ -89,8 +86,6 @@ public class TestSCMInstallSnapshotWithHA {
   @BeforeEach
   public void init() throws Exception {
     conf = new OzoneConfiguration();
-    clusterId = UUID.randomUUID().toString();
-    scmId = UUID.randomUUID().toString();
     omServiceId = "om-service-test1";
     scmServiceId = "scm-service-test1";
 
@@ -100,8 +95,6 @@ public class TestSCMInstallSnapshotWithHA {
             SNAPSHOT_THRESHOLD);
 
     cluster = (MiniOzoneHAClusterImpl) MiniOzoneCluster.newHABuilder(conf)
-        .setClusterId(clusterId)
-        .setScmId(scmId)
         .setOMServiceId(omServiceId)
         .setSCMServiceId(scmServiceId)
         .setNumOfOzoneManagers(numOfOMs)

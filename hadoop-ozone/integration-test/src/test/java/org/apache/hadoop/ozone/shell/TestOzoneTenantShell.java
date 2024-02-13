@@ -57,7 +57,6 @@ import java.io.UnsupportedEncodingException;
 import java.security.PrivilegedExceptionAction;
 import java.util.Arrays;
 import java.util.List;
-import java.util.UUID;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_MULTITENANCY_ENABLED;
@@ -68,7 +67,7 @@ import static org.apache.hadoop.ozone.om.OMMultiTenantManagerImpl.OZONE_OM_TENAN
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
-import static org.junit.jupiter.api.Assertions.fail;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 /**
  * Integration test for Ozone tenant shell command. HA enabled.
@@ -108,8 +107,6 @@ public class TestOzoneTenantShell {
   private static final PrintStream OLD_ERR = System.err;
 
   private static String omServiceId;
-  private static String clusterId;
-  private static String scmId;
   private static int numOfOMs;
 
   private static final boolean USE_ACTUAL_RANGER = false;
@@ -156,11 +153,7 @@ public class TestOzoneTenantShell {
     // Init cluster
     omServiceId = "om-service-test1";
     numOfOMs = 3;
-    clusterId = UUID.randomUUID().toString();
-    scmId = UUID.randomUUID().toString();
     cluster = MiniOzoneCluster.newOMHABuilder(conf)
-        .setClusterId(clusterId)
-        .setScmId(scmId)
         .setOMServiceId(omServiceId)
         .setNumOfOzoneManagers(numOfOMs)
         .withoutDatanodes()  // Remove this once we are actually writing data
@@ -254,17 +247,13 @@ public class TestOzoneTenantShell {
     if (Strings.isNullOrEmpty(expectedError)) {
       execute(shell, args);
     } else {
-      try {
-        execute(shell, args);
-        fail("Exception is expected from command execution " + Arrays.asList(args));
-      } catch (Exception ex) {
-        if (!Strings.isNullOrEmpty(expectedError)) {
-          Throwable exceptionToCheck = ex;
-          if (exceptionToCheck.getCause() != null) {
-            exceptionToCheck = exceptionToCheck.getCause();
-          }
-          assertThat(exceptionToCheck.getMessage()).contains(expectedError);
+      Exception ex = assertThrows(Exception.class, () -> execute(shell, args));
+      if (!Strings.isNullOrEmpty(expectedError)) {
+        Throwable exceptionToCheck = ex;
+        if (exceptionToCheck.getCause() != null) {
+          exceptionToCheck = exceptionToCheck.getCause();
         }
+        assertThat(exceptionToCheck.getMessage()).contains(expectedError);
       }
     }
   }

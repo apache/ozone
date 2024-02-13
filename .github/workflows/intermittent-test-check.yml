@@ -34,7 +34,7 @@ on:
         required: true
       splits:
         description: Number of splits
-        default: 2
+        default: 10
         required: true
       fail-fast:
         description: Stop after first failure
@@ -52,34 +52,16 @@ jobs:
     runs-on: ubuntu-20.04
     outputs:
       matrix: ${{steps.generate.outputs.matrix}}
-      test_type: ${{steps.check-test-existence.outputs.test_type}}
     steps:
       - uses: actions/checkout@v4
         with:
           ref: ${{ github.event.inputs.ref }}
-      - name: Check for Test File
-        id: check-test-existence
-        run: |
-          filename="$TEST_CLASS.java"
-          found_file=$(find . -name "$filename" -type f -print -quit)
-          test_type=unit
-          if [ -n "$found_file" ]; then
-              echo "File path : $found_file"
-              if [[ "$found_file" == *"integration-test"* ]]; then
-                  test_type=integration
-              fi 
-              echo "Test file $filename found. Continuing.."
-          else
-              echo "Test file $filename not found.Stopping!"
-              exit 1
-          fi
-          echo "test_type=$test_type" >> $GITHUB_OUTPUT
       - id: generate
         name: Generate test matrix
         run: |
           splits=()
           for ((i = 1; i <= ${{ github.event.inputs.splits }}; i++)); do
-              splits+=("$i")
+            splits+=("$i")
           done
           printf -v x "%s," "${splits[@]}"
           split_matrix="[${x%,}]"
@@ -157,31 +139,28 @@ jobs:
             export OZONE_REPO_CACHED=true
           fi
 
-          test_type=${{ needs.prepare-job.outputs.test_type }}
-          args="-DexcludedGroups=unhealthy"
-          if [ "$test_type" = "integration" ]; then
-              args="$args -pl :ozone-integration-test,:mini-chaos-tests"
-          fi
+          args="-DexcludedGroups=native|slow|unhealthy"
           if [ "$TEST_METHOD" = "ALL" ]; then
-              echo "Running all tests from $TEST_CLASS"
-              hadoop-ozone/dev-support/checks/junit.sh $args -Dtest=$TEST_CLASS
+            echo "Running all tests from $TEST_CLASS"
+            set -x
+            hadoop-ozone/dev-support/checks/junit.sh $args -Dtest="$TEST_CLASS,Abstract*Test*\$*"
           else
-              echo "Running test: $TEST_METHOD from $TEST_CLASS"
-              hadoop-ozone/dev-support/checks/junit.sh $args -Dtest=$TEST_CLASS#$TEST_METHOD
+            echo "Running test: $TEST_METHOD from $TEST_CLASS"
+            set -x
+            hadoop-ozone/dev-support/checks/junit.sh $args -Dtest="$TEST_CLASS#$TEST_METHOD,Abstract*Test*\$*"
           fi
         continue-on-error: true
         env:
-          CHECK: ${{ needs.prepare-job.outputs.test_type }}
           GRADLE_ENTERPRISE_ACCESS_KEY: ${{ secrets.GE_ACCESS_TOKEN }}
       - name: Summary of failures
-        run: hadoop-ozone/dev-support/checks/_summary.sh target/${{ needs.prepare-job.outputs.test_type }}/summary.txt
+        run: hadoop-ozone/dev-support/checks/_summary.sh target/unit/summary.txt
         if: ${{ !cancelled() }}
       - name: Archive build results
         uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: result-${{ env.TEST_CLASS }}-split-${{ matrix.split }}
-          path: target/${{ needs.prepare-job.outputs.test_type }}
+          name: result-${{ github.run_id }}-${{ github.run_number }}-${{ matrix.split }}
+          path: target/unit
   count-failures:
     if: ${{ always() }}
     needs: run-test

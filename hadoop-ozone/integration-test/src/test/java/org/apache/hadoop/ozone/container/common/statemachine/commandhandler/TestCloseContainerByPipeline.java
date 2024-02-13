@@ -85,10 +85,10 @@ public class TestCloseContainerByPipeline {
     conf = new OzoneConfiguration();
     conf.set(ScmConfigKeys.OZONE_SCM_PIPELINE_OWNER_CONTAINER_COUNT, "1");
     conf.setInt(OZONE_DATANODE_PIPELINE_LIMIT, 2);
+    conf.setInt(ScmConfigKeys.OZONE_SCM_RATIS_PIPELINE_LIMIT, 15);
 
     cluster = MiniOzoneCluster.newBuilder(conf)
         .setNumDatanodes(10)
-        .setTotalPipelineNumLimit(15)
         .build();
     cluster.waitForClusterToBeReady();
     //the easiest way to create an open container is creating a key

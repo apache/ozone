@@ -119,6 +119,7 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ENABLE_FILESYSTEM
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_DIFF_DISABLE_NATIVE_LIBS;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_FORCE_FULL_DIFF;
 import static org.apache.hadoop.ozone.om.OmSnapshotManager.DELIMITER;
+import static org.apache.hadoop.ozone.om.OmUpgradeConfig.ConfigStrings.OZONE_OM_INIT_DEFAULT_LAYOUT_VERSION;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.BUCKET_NOT_FOUND;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.CONTAINS_SNAPSHOT;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.KEY_NOT_FOUND;
@@ -196,8 +197,6 @@ public abstract class TestOmSnapshot {
    */
   private void init() throws Exception {
     OzoneConfiguration conf = new OzoneConfiguration();
-    String clusterId = UUID.randomUUID().toString();
-    String scmId = UUID.randomUUID().toString();
     conf.setBoolean(OZONE_OM_ENABLE_FILESYSTEM_PATHS, enabledFileSystemPaths);
     conf.set(OZONE_DEFAULT_BUCKET_LAYOUT, bucketLayout.name());
     conf.setBoolean(OZONE_OM_SNAPSHOT_FORCE_FULL_DIFF, forceFullSnapshotDiff);
@@ -209,14 +208,10 @@ public abstract class TestOmSnapshot {
     conf.setEnum(HDDS_DB_PROFILE, DBProfile.TEST);
     // Enable filesystem snapshot feature for the test regardless of the default
     conf.setBoolean(OMConfigKeys.OZONE_FILESYSTEM_SNAPSHOT_ENABLED_KEY, true);
+    conf.setInt(OZONE_OM_INIT_DEFAULT_LAYOUT_VERSION, OMLayoutFeature.BUCKET_LAYOUT_SUPPORT.layoutVersion());
 
     cluster = MiniOzoneCluster.newBuilder(conf)
-        .setClusterId(clusterId)
-        .setScmId(scmId)
         .setNumOfOzoneManagers(3)
-        .setOmLayoutVersion(OMLayoutFeature.
-          BUCKET_LAYOUT_SUPPORT.layoutVersion())
-        .setOmId(UUID.randomUUID().toString())
         .build();
 
     cluster.waitForClusterToBeReady();
@@ -278,7 +273,7 @@ public abstract class TestOmSnapshot {
    * Trigger OM upgrade finalization from the client and block until completion
    * (status FINALIZATION_DONE).
    */
-  private void finalizeOMUpgrade() throws IOException {
+  private void finalizeOMUpgrade() throws Exception {
     // Trigger OM upgrade finalization. Ref: FinalizeUpgradeSubCommand#call
     final OzoneManagerProtocol omClient = client.getObjectStore()
         .getClientProxy().getOzoneManagerClient();
@@ -290,17 +285,12 @@ public abstract class TestOmSnapshot {
     assertTrue(isStarting(finalizationResponse.status()));
     // Wait for the finalization to be marked as done.
     // 10s timeout should be plenty.
-    try {
-      await(POLL_MAX_WAIT_MILLIS, POLL_INTERVAL_MILLIS, () -> {
-        final UpgradeFinalizer.StatusAndMessages progress =
-            omClient.queryUpgradeFinalizationProgress(
-                upgradeClientID, false, false);
-        return isDone(progress.status());
-      });
-    } catch (Exception e) {
-      fail("Unexpected exception while waiting for "
-          + "the OM upgrade to finalize: " + e.getMessage());
-    }
+    await(POLL_MAX_WAIT_MILLIS, POLL_INTERVAL_MILLIS, () -> {
+      final UpgradeFinalizer.StatusAndMessages progress =
+          omClient.queryUpgradeFinalizationProgress(
+              upgradeClientID, false, false);
+      return isDone(progress.status());
+    });
   }
 
   @AfterAll
@@ -2041,7 +2031,7 @@ public abstract class TestOmSnapshot {
     String snapPrefix = createSnapshot(volumeName, bucketName);
     try (RDBStore snapshotDBStore = (RDBStore)
         ((OmSnapshot) cluster.getOzoneManager().getOmSnapshotManager()
-            .checkForSnapshot(volumeName, bucketName, snapPrefix, false).get())
+            .getActiveFsMetadataOrSnapshot(volumeName, bucketName, snapPrefix).get())
             .getMetadataManager().getStore()) {
       for (String table : snapshotDBStore.getTableNames().values()) {
         assertTrue(snapshotDBStore.getDb().getColumnFamily(table)
@@ -2171,7 +2161,7 @@ public abstract class TestOmSnapshot {
 
     OmSnapshot omSnapshot = (OmSnapshot) cluster.getOzoneManager()
         .getOmSnapshotManager()
-        .checkForSnapshot(volumeName, bucketName, snapshotName, false).get();
+        .getActiveFsMetadataOrSnapshot(volumeName, bucketName, snapshotName).get();
 
     RDBStore snapshotDbStore =
         (RDBStore) omSnapshot.getMetadataManager().getStore();

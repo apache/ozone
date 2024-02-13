@@ -25,7 +25,7 @@ import org.junit.jupiter.api.Test;
 import static org.apache.hadoop.ozone.om.request.OMClientRequest.validateAndNormalizeKey;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.fail;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 /**
  * Class to test normalize paths.
@@ -75,12 +75,11 @@ public class TestNormalizePaths {
   }
 
   private void checkInvalidPath(String keyName) {
-    try {
-      validateAndNormalizeKey(true, keyName);
-      fail("checkInvalidPath failed for path " + keyName);
-    } catch (OMException ex) {
-      assertThat(ex.getMessage()).contains("Invalid KeyPath");
-    }
+    OMException ex =
+        assertThrows(OMException.class,
+            () -> validateAndNormalizeKey(true, keyName),
+            "checkInvalidPath failed for path " + keyName);
+    assertThat(ex.getMessage()).contains("Invalid KeyPath");
   }
 
 

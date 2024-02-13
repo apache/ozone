@@ -44,8 +44,8 @@ import org.junit.jupiter.api.Timeout;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.junit.jupiter.api.Assertions.fail;
 
 /**
  * This class tests container operations (TODO currently only supports create)
@@ -94,13 +94,9 @@ public class TestContainerOperations {
    */
   @Test
   public void testGetPipeline() throws Exception {
-    try {
-      storageClient.getPipeline(PipelineID.randomId().getProtobuf());
-      fail("Get Pipeline should fail");
-    } catch (Exception e) {
-      assertInstanceOf(PipelineNotFoundException.class, SCMHAUtils.unwrapException(e));
-    }
-
+    Exception e =
+        assertThrows(Exception.class, () -> storageClient.getPipeline(PipelineID.randomId().getProtobuf()));
+    assertInstanceOf(PipelineNotFoundException.class, SCMHAUtils.unwrapException(e));
     assertThat(storageClient.listPipelines()).isNotEmpty();
   }
 
