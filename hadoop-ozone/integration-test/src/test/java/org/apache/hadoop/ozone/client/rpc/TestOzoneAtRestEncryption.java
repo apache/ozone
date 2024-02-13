@@ -22,6 +22,7 @@ import java.io.IOException;
 import java.net.URI;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -35,6 +36,7 @@ import java.util.UUID;
 
 import com.google.common.cache.Cache;
 import org.apache.hadoop.conf.StorageUnit;
+import javax.xml.bind.DatatypeConverter;
 import org.apache.hadoop.crypto.key.KeyProvider;
 import org.apache.hadoop.crypto.key.kms.KMSClientProvider;
 import org.apache.hadoop.crypto.key.kms.server.MiniKMS;
@@ -117,6 +119,7 @@ class TestOzoneAtRestEncryption {
   private static final int DEFAULT_CRYPTO_BUFFER_SIZE = 8 * 1024; // 8KB
   // (this is the default Crypto Buffer size as determined by the config
   // hadoop.security.crypto.buffer.size)
+  private static MessageDigest eTagProvider;
 
   @BeforeAll
   static void init() throws Exception {
@@ -166,6 +169,7 @@ class TestOzoneAtRestEncryption {
 
     // create test key
     createKey(TEST_KEY, cluster.getOzoneManager().getKmsProvider(), conf);
+    eTagProvider = MessageDigest.getInstance(OzoneConsts.MD5_HASH);
   }
 
   @AfterAll
@@ -647,14 +651,17 @@ class TestOzoneAtRestEncryption {
 
     ByteBuffer dataBuffer = ByteBuffer.wrap(data);
     multipartStreamKey.write(dataBuffer, 0, length);
+    multipartStreamKey.getMetadata().put(OzoneConsts.ETAG,
+        DatatypeConverter.printHexBinary(eTagProvider.digest(data))
+            .toLowerCase());
     multipartStreamKey.close();
 
     OmMultipartCommitUploadPartInfo omMultipartCommitUploadPartInfo =
         multipartStreamKey.getCommitUploadPartInfo();
 
     assertNotNull(omMultipartCommitUploadPartInfo);
-    assertNotNull(omMultipartCommitUploadPartInfo.getPartName());
-    return omMultipartCommitUploadPartInfo.getPartName();
+    assertNotNull(omMultipartCommitUploadPartInfo.getETag());
+    return omMultipartCommitUploadPartInfo.getETag();
   }
 
   private String uploadPart(OzoneBucket bucket, String keyName,
@@ -662,14 +669,17 @@ class TestOzoneAtRestEncryption {
     OzoneOutputStream ozoneOutputStream = bucket.createMultipartKey(keyName,
         data.length, partNumber, uploadID);
     ozoneOutputStream.write(data, 0, data.length);
+    ozoneOutputStream.getMetadata().put(OzoneConsts.ETAG,
+        DatatypeConverter.printHexBinary(eTagProvider.digest(data))
+            .toLowerCase());
     ozoneOutputStream.close();
 
     OmMultipartCommitUploadPartInfo omMultipartCommitUploadPartInfo =
         ozoneOutputStream.getCommitUploadPartInfo();
 
     assertNotNull(omMultipartCommitUploadPartInfo);
-    assertNotNull(omMultipartCommitUploadPartInfo.getPartName());
-    return omMultipartCommitUploadPartInfo.getPartName();
+    assertNotNull(omMultipartCommitUploadPartInfo.getETag());
+    return omMultipartCommitUploadPartInfo.getETag();
   }
 
   private void completeMultipartUpload(OzoneBucket bucket, String keyName,

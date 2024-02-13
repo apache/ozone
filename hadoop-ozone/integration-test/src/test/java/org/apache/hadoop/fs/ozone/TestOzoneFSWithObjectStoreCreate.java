@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.fs.ozone;
 
+import javax.xml.bind.DatatypeConverter;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.fs.FileAlreadyExistsException;
@@ -49,6 +50,7 @@ import org.junit.jupiter.api.Timeout;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.net.URI;
+import java.security.MessageDigest;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -58,6 +60,8 @@ import java.util.List;
 import java.util.Map;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
+import static org.apache.hadoop.ozone.OzoneConsts.ETAG;
+import static org.apache.hadoop.ozone.OzoneConsts.MD5_HASH;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_SCHEME;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.NOT_A_FILE;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -302,10 +306,13 @@ public class TestOzoneFSWithObjectStoreCreate {
 
     // This should succeed, as we check during creation of part or during
     // complete MPU.
+    ozoneOutputStream.getMetadata().put(ETAG,
+        DatatypeConverter.printHexBinary(MessageDigest.getInstance(MD5_HASH)
+            .digest(b)).toLowerCase());
     ozoneOutputStream.close();
 
     Map<Integer, String> partsMap = new HashMap<>();
-    partsMap.put(1, ozoneOutputStream.getCommitUploadPartInfo().getPartName());
+    partsMap.put(1, ozoneOutputStream.getCommitUploadPartInfo().getETag());
 
     // Should fail, as we have directory with same name.
     try {

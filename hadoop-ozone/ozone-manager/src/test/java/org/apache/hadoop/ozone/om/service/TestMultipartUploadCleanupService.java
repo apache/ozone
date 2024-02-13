@@ -19,11 +19,13 @@
 
 package org.apache.hadoop.ozone.om.service;
 
+import org.apache.commons.codec.digest.DigestUtils;
 import org.apache.commons.lang3.RandomUtils;
 import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.server.ServerUtils;
 import org.apache.hadoop.hdds.utils.db.DBConfigFromFile;
+import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.om.KeyManager;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OmTestManagers;
@@ -248,6 +250,8 @@ public class TestMultipartUploadCleanupService {
               .setMultipartUploadID(omMultipartInfo.getUploadID())
               .setMultipartUploadPartNumber(i)
               .setAcls(Collections.emptyList())
+              .addMetadata(OzoneConsts.ETAG,
+                  DigestUtils.md5Hex(UUID.randomUUID().toString()))
               .setReplicationConfig(
                   StandaloneReplicationConfig.getInstance(ONE))
               .setLocationInfoList(Collections.emptyList())

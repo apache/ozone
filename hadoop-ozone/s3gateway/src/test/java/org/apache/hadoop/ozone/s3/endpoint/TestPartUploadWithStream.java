@@ -22,6 +22,7 @@ package org.apache.hadoop.ozone.s3.endpoint;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
+import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientStub;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
@@ -95,7 +96,7 @@ public class TestPartUploadWithStream {
     response = REST.put(S3BUCKET, S3KEY,
         content.length(), 1, uploadID, body);
 
-    assertNotNull(response.getHeaderString("ETag"));
+    assertNotNull(response.getHeaderString(OzoneConsts.ETAG));
 
   }
 
@@ -116,16 +117,16 @@ public class TestPartUploadWithStream {
     response = REST.put(S3BUCKET, S3KEY,
         content.length(), 1, uploadID, body);
 
-    assertNotNull(response.getHeaderString("ETag"));
+    assertNotNull(response.getHeaderString(OzoneConsts.ETAG));
 
-    String eTag = response.getHeaderString("ETag");
+    String eTag = response.getHeaderString(OzoneConsts.ETAG);
 
     // Upload part again with same part Number, the ETag should be changed.
     content = "Multipart Upload Changed";
     response = REST.put(S3BUCKET, S3KEY,
         content.length(), 1, uploadID, body);
-    assertNotNull(response.getHeaderString("ETag"));
-    assertNotEquals(eTag, response.getHeaderString("ETag"));
+    assertNotNull(response.getHeaderString(OzoneConsts.ETAG));
+    assertNotEquals(eTag, response.getHeaderString(OzoneConsts.ETAG));
 
   }
 
