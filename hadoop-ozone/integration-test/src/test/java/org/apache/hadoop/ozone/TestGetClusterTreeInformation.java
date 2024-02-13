@@ -80,6 +80,6 @@ public class TestGetClusterTreeInformation {
 
     InnerNode expectedInnerNode = (InnerNode) scm.getClusterMap().getNode(ROOT);
     InnerNode actualInnerNode = scmBlockLocationClient.getNetworkTopology();
-    assertEq uals(expectedInnerNode, actualInnerNode);
+    assertEquals(expectedInnerNode, actualInnerNode);
   }
 }
