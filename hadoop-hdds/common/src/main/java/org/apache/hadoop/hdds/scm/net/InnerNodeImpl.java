@@ -111,20 +111,15 @@ public class InnerNodeImpl extends NodeImpl implements InnerNode {
       return this;
     }
 
-    public Builder setChildrenMap(HashMap<String, Node> childrenMap) {
-      this.childrenMap = childrenMap;
-      return this;
-    }
-
     public Builder setChildrenMap(
         List<HddsProtos.ChildrenMap> childrenMapList) {
       HashMap<String, Node> newChildrenMap = new LinkedHashMap<>();
       for (HddsProtos.ChildrenMap childrenMapProto :
           childrenMapList) {
-        String networkName = childrenMapProto.getNetworkName();
-        HddsProtos.NetworkNode networkNode =
-            childrenMapProto.getNetworkNode();
-        Node node = Node.fromProtobuf(networkNode);
+        String networkName = childrenMapProto.hasNetworkName() ?
+            childrenMapProto.getNetworkName() : null;
+        Node node = childrenMapProto.hasNetworkNode() ?
+            Node.fromProtobuf(childrenMapProto.getNetworkNode()) : null;
         newChildrenMap.put(networkName, node);
       }
       this.childrenMap = newChildrenMap;
@@ -502,28 +497,34 @@ public class InnerNodeImpl extends NodeImpl implements InnerNode {
     return networkNode;
   }
 
-  public static Node fromProtobuf(
-      HddsProtos.NetworkNode networkNode) {
-    return networkNode.hasInnerNode()
-        ? InnerNodeImpl.fromProtobuf(networkNode.getInnerNode())
-        : null;
-  }
+  public static InnerNode fromProtobuf(HddsProtos.InnerNode innerNode) {
+    InnerNodeImpl.Builder builder = new InnerNodeImpl.Builder();
 
-  public static InnerNode fromProtobuf(
-      HddsProtos.InnerNode innerNode) {
+    if (innerNode.hasNodeTopology()) {
+      HddsProtos.NodeTopology nodeTopology = innerNode.getNodeTopology();
 
-    HddsProtos.NodeTopology nodeTopology =
-        innerNode.getNodeTopology();
-    InnerNodeImpl.Builder builder = new InnerNodeImpl.Builder()
-        .setName(nodeTopology.getName())
-        .setLocation(nodeTopology.getLocation())
-        .setCost(nodeTopology.getCost())
-        .setLevel(nodeTopology.getLevel())
-        .setChildrenMap(innerNode.getChildrenMapList())
-        .setNumOfLeaves(innerNode.getNumOfLeaves());
+      if (nodeTopology.hasName()) {
+        builder.setName(nodeTopology.getName());
+      }
+      if (nodeTopology.hasLocation()) {
+        builder.setLocation(nodeTopology.getLocation());
+      }
+      if (nodeTopology.hasLevel()) {
+        builder.setLevel(nodeTopology.getLevel());
+      }
+      if (nodeTopology.hasCost()) {
+        builder.setCost(nodeTopology.getCost());
+      }
+    }
 
-    InnerNode res = builder.build();
-    return res;
+    if (!innerNode.getChildrenMapList().isEmpty()) {
+      builder.setChildrenMap(innerNode.getChildrenMapList());
+    }
+    if (innerNode.hasNumOfLeaves()) {
+      builder.setNumOfLeaves(innerNode.getNumOfLeaves());
+    }
+
+    return builder.build();
   }
 
   @Override

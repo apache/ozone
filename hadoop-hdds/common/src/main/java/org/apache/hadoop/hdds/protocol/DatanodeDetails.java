@@ -35,7 +35,6 @@ import org.apache.hadoop.hdds.protocol.DatanodeDetails.Port.Name;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ExtendedDatanodeDetailsProto;
 import org.apache.hadoop.hdds.scm.net.NetConstants;
-import org.apache.hadoop.hdds.scm.net.Node;
 import org.apache.hadoop.hdds.scm.net.NodeImpl;
 
 import com.google.common.base.Preconditions;
@@ -1045,12 +1044,5 @@ public class DatanodeDetails extends NodeImpl implements
         HddsProtos.NetworkNode.newBuilder()
             .setDatanodeDetails(toProtoBuilder(clientVersion).build()).build();
     return networkNode;
-  }
-
-  public static Node fromProtobuf(
-      HddsProtos.NetworkNode networkNode) {
-    return networkNode.hasDatanodeDetails()
-        ? DatanodeDetails.getFromProtoBuf(networkNode.getDatanodeDetails())
-        : null;
   }
 }

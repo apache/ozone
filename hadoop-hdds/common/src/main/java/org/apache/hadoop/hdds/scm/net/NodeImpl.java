@@ -230,8 +230,8 @@ public class NodeImpl implements Node {
         NetUtils.addSuffix(nodePath));
   }
 
-  public static HddsProtos.NodeTopology toProtobuf(
-      String name, String location, int level, int cost) {
+  public static HddsProtos.NodeTopology toProtobuf(String name, String location,
+      int level, int cost) {
 
     HddsProtos.NodeTopology.Builder nodeTopologyBuilder =
         HddsProtos.NodeTopology.newBuilder()
@@ -240,15 +240,8 @@ public class NodeImpl implements Node {
             .setLevel(level)
             .setCost(cost);
 
-    HddsProtos.NodeTopology nodeTopology =
-        nodeTopologyBuilder.build();
+    HddsProtos.NodeTopology nodeTopology = nodeTopologyBuilder.build();
     return nodeTopology;
-  }
-
-  public static NodeImpl fromProtobuf(
-      HddsProtos.NodeTopology nodeTopology) {
-    return new NodeImpl(nodeTopology.getName(), nodeTopology.getLocation(),
-        null, nodeTopology.getLevel(), nodeTopology.getCost());
   }
 
   @Override
