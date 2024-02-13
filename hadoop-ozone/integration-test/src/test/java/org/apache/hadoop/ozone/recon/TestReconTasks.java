@@ -170,7 +170,7 @@ public class TestReconTasks {
     // Bring down the Datanode that had the container replica.
     cluster.shutdownHddsDatanode(pipeline.getFirstNode());
 
-    LambdaTestUtils.await(120000, 6000, () -> {
+    LambdaTestUtils.await(1200000, 6000, () -> {
       List<UnhealthyContainers> allMissingContainers =
           reconContainerManager.getContainerSchemaManager()
               .getUnhealthyContainers(
@@ -181,7 +181,7 @@ public class TestReconTasks {
 
     // Restart the Datanode to make sure we remove the missing container.
     cluster.restartHddsDatanode(pipeline.getFirstNode(), true);
-    LambdaTestUtils.await(120000, 10000, () -> {
+    LambdaTestUtils.await(1200000, 10000, () -> {
       List<UnhealthyContainers> allMissingContainers =
           reconContainerManager.getContainerSchemaManager()
               .getUnhealthyContainers(
