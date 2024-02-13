@@ -477,7 +477,7 @@ public class InnerNodeImpl extends NodeImpl implements InnerNode {
     HddsProtos.InnerNode.Builder innerNode =
         HddsProtos.InnerNode.newBuilder()
             .setNumOfLeaves(numOfLeaves)
-            .setNodeImpl(
+            .setNodeTopology(
                 NodeImpl.toProtobuf(getNetworkName(), getNetworkLocation(),
                     getLevel(), getCost()));
 
@@ -512,13 +512,13 @@ public class InnerNodeImpl extends NodeImpl implements InnerNode {
   public static InnerNode fromProtobuf(
       HddsProtos.InnerNode innerNode) {
 
-    HddsProtos.NodeImpl nodeImpl =
-        innerNode.getNodeImpl();
+    HddsProtos.NodeTopology nodeTopology =
+        innerNode.getNodeTopology();
     InnerNodeImpl.Builder builder = new InnerNodeImpl.Builder()
-        .setName(nodeImpl.getName())
-        .setLocation(nodeImpl.getLocation())
-        .setCost(nodeImpl.getCost())
-        .setLevel(nodeImpl.getLevel())
+        .setName(nodeTopology.getName())
+        .setLocation(nodeTopology.getLocation())
+        .setCost(nodeTopology.getCost())
+        .setLevel(nodeTopology.getLevel())
         .setChildrenMap(innerNode.getChildrenMapList())
         .setNumOfLeaves(innerNode.getNumOfLeaves());
 
