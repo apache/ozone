@@ -79,6 +79,7 @@ public class OmMultipartUploadListParts {
   public void addProtoPartList(List<PartInfo> partInfos) {
     partInfos.forEach(partInfo -> partInfoList.add(new OmPartInfo(
         partInfo.getPartNumber(), partInfo.getPartName(),
-        partInfo.getModificationTime(), partInfo.getSize())));
+        partInfo.getModificationTime(), partInfo.getSize(),
+        partInfo.getETag())));
   }
 }

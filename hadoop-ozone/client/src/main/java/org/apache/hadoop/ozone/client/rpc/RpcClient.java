@@ -1952,7 +1952,8 @@ public class RpcClient implements ClientProtocol {
       ozoneMultipartUploadPartListParts.addPart(
           new OzoneMultipartUploadPartListParts.PartInfo(
               omPartInfo.getPartNumber(), omPartInfo.getPartName(),
-              omPartInfo.getModificationTime(), omPartInfo.getSize()));
+              omPartInfo.getModificationTime(), omPartInfo.getSize(),
+              omPartInfo.getETag()));
     }
     return ozoneMultipartUploadPartListParts;
 
