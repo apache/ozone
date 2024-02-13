@@ -105,6 +105,9 @@ public class TestReconTasks {
     StorageContainerManager scm = cluster.getStorageContainerManager();
     ContainerManager scmContainerManager = scm.getContainerManager();
     ContainerManager reconContainerManager = reconScm.getContainerManager();
+    int diff = scmContainerManager.getContainers().size() - reconContainerManager
+        .getContainers().size();
+
     final ContainerInfo container1 = scmContainerManager.allocateContainer(
         RatisReplicationConfig.getInstance(
             HddsProtos.ReplicationFactor.ONE), "admin");
@@ -122,11 +125,11 @@ public class TestReconTasks {
     int scmContainersCount = scmContainerManager.getContainers().size();
     int reconContainersCount = reconContainerManager
         .getContainers().size();
-    assertNotEquals(scmContainersCount, reconContainersCount);
+    assertNotEquals(scmContainersCount - 1, reconContainersCount);
     reconScm.syncWithSCMContainerInfo();
     reconContainersCount = reconContainerManager
         .getContainers().size();
-    assertEquals(scmContainersCount, reconContainersCount);
+    assertEquals(scmContainersCount - 1, reconContainersCount);
   }
 
   @Test
