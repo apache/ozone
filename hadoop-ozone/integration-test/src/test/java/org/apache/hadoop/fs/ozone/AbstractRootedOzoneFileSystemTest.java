@@ -90,7 +90,6 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.BitSet;
 import java.util.Collection;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.LinkedList;
@@ -122,7 +121,6 @@ import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.PERM
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.VOLUME_NOT_FOUND;
 import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType.READ;
 import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType.WRITE;
-import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType.DELETE;
 import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType.LIST;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
@@ -1223,20 +1221,11 @@ abstract class AbstractRootedOzoneFileSystemTest {
     }
 
     // set acls for shared tmp mount under the tmp volume
-    List<OzoneAcl> objectAcls = new ArrayList<>();
-    objectAcls.add(new OzoneAcl(ACLIdentityType.USER, "admin", userRights,
-        ACCESS));
-    aclRights.clear(DELETE.ordinal());
-    aclRights.set(LIST.ordinal());
-    objectAcls.add(new OzoneAcl(ACLIdentityType.WORLD, "",
-        aclRights, ACCESS));
-    objectAcls.add(new OzoneAcl(ACLIdentityType.USER, "admin", userRights,
-        ACCESS));
     // bucket acls have all access to admin and read+write+list access to world
-
     BucketArgs bucketArgs = new BucketArgs.Builder()
         .setOwner("admin")
-        .setAcls(Collections.unmodifiableList(objectAcls))
+        .addAcl(new OzoneAcl(ACLIdentityType.WORLD, "", ACCESS, READ, WRITE, LIST))
+        .addAcl(new OzoneAcl(ACLIdentityType.USER, "admin", userRights, ACCESS))
         .setQuotaInNamespace(1000)
         .setQuotaInBytes(Long.MAX_VALUE).build();
 

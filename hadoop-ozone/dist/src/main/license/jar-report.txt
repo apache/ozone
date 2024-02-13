@@ -157,7 +157,6 @@ share/ozone/lib/jooq-meta.jar
 share/ozone/lib/jsch.jar
 share/ozone/lib/json-simple.jar
 share/ozone/lib/jsp-api.jar
-share/ozone/lib/jsr305.jar
 share/ozone/lib/jsr311-api.jar
 share/ozone/lib/kerb-core.jar
 share/ozone/lib/kerby-asn1.jar
