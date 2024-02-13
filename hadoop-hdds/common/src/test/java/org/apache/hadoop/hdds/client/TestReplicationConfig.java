@@ -43,7 +43,6 @@ import static org.junit.jupiter.params.provider.Arguments.arguments;
 public class TestReplicationConfig {
 
   private static final int MB = 1024 * 1024;
-  private static final int KB = 1024;
 
   //NOTE: if a new chunkSize is used/added in the parameters other than KB or MB
   // please revisit the method createECDescriptor, to handle the new chunkSize.

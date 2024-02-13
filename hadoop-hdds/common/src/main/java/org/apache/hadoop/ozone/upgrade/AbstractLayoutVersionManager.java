@@ -221,6 +221,7 @@ public abstract class AbstractLayoutVersionManager<T extends LayoutFeature>
     }
   }
 
+  @Override
   public void close() {
     if (mBean != null) {
       MBeans.unregister(mBean);

@@ -18,6 +18,7 @@
 package org.apache.hadoop.ozone.recon.persistence;
 
 import static org.hadoop.ozone.recon.codegen.SqlDbUtils.DERBY_DRIVER_CLASS;
+import static org.junit.jupiter.api.Assertions.fail;
 
 import java.io.File;
 import java.io.IOException;
@@ -38,7 +39,6 @@ import org.jooq.DSLContext;
 import org.jooq.SQLDialect;
 import org.jooq.impl.DSL;
 import org.jooq.impl.DefaultConfiguration;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 
 import com.google.inject.AbstractModule;
@@ -46,27 +46,34 @@ import com.google.inject.Guice;
 import com.google.inject.Injector;
 import com.google.inject.Module;
 import com.google.inject.Provider;
+import org.junit.jupiter.api.io.TempDir;
+import org.springframework.util.FileSystemUtils;
 
 /**
  * Class that provides a Recon SQL DB with all the tables created, and APIs
  * to access the DAOs easily.
  */
 public class AbstractReconSqlDBTest {
-  private Path temporaryFolder;
-
   private Injector injector;
   private DSLContext dslContext;
   private Provider<DataSourceConfiguration> configurationProvider;
 
   public AbstractReconSqlDBTest() {
+  }
+
+  public void init(Path temporaryFolder) {
     try {
-      temporaryFolder = Files.createTempDirectory("JunitConfig");
+      FileSystemUtils.deleteRecursively(temporaryFolder.resolve("Config"));
       configurationProvider =
           new DerbyDataSourceConfigurationProvider(Files.createDirectory(
               temporaryFolder.resolve("Config")).toFile());
     } catch (IOException e) {
-      Assertions.fail();
+      fail();
     }
+  }
+
+  public AbstractReconSqlDBTest(Path temporaryFolder) {
+    init(temporaryFolder);
   }
 
   protected AbstractReconSqlDBTest(Provider<DataSourceConfiguration> provider) {
@@ -74,7 +81,8 @@ public class AbstractReconSqlDBTest {
   }
 
   @BeforeEach
-  public void createReconSchemaForTest() throws IOException {
+  public void createReconSchemaForTest(@TempDir Path temporaryFolder) throws IOException {
+    init(temporaryFolder);
     injector = Guice.createInjector(getReconSqlDBModules());
     dslContext = DSL.using(new DefaultConfiguration().set(
         injector.getInstance(DataSource.class)));

@@ -18,7 +18,6 @@
 
 package org.apache.hadoop.hdds.scm.storage;
 
-import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
@@ -131,10 +130,11 @@ public class BlockDataStreamOutput implements ByteBufferStreamOutput {
   //number of buffers used before doing a flush/putBlock.
   private int flushPeriod;
   private final Token<? extends TokenIdentifier> token;
+  private final String tokenString;
   private final DataStreamOutput out;
   private CompletableFuture<DataStreamReply> dataStreamCloseReply;
   private List<CompletableFuture<DataStreamReply>> futures = new ArrayList<>();
-  private final long syncSize = 0; // TODO: disk sync is disabled for now
+  private static final long SYNC_SIZE = 0; // TODO: disk sync is disabled for now
   private long syncPosition = 0;
   private StreamBuffer currentBuffer;
   private XceiverClientMetrics metrics;
@@ -168,6 +168,8 @@ public class BlockDataStreamOutput implements ByteBufferStreamOutput {
     this.xceiverClient =
         (XceiverClientRatis)xceiverClientManager.acquireClient(pipeline, true);
     this.token = token;
+    this.tokenString = (this.token == null) ? null :
+        this.token.encodeToUrlString();
     // Alternatively, stream setup can be delayed till the first chunk write.
     this.out = setupStream(pipeline);
     this.bufferList = bufferList;
@@ -207,8 +209,8 @@ public class BlockDataStreamOutput implements ByteBufferStreamOutput {
             .setContainerID(blockID.get().getContainerID())
             .setDatanodeUuid(id).setWriteChunk(writeChunkRequest);
 
-    if (token != null) {
-      builder.setEncodedToken(token.encodeToUrlString());
+    if (tokenString != null) {
+      builder.setEncodedToken(tokenString);
     }
 
     ContainerCommandRequestMessage message =
@@ -234,11 +236,6 @@ public class BlockDataStreamOutput implements ByteBufferStreamOutput {
 
   public List<DatanodeDetails> getFailedServers() {
     return failedServers;
-  }
-
-  @VisibleForTesting
-  public XceiverClientRatis getXceiverClient() {
-    return xceiverClient;
   }
 
   public IOException getIoException() {
@@ -328,10 +325,6 @@ public class BlockDataStreamOutput implements ByteBufferStreamOutput {
     totalDataFlushedLength = writtenDataLength;
   }
 
-  @VisibleForTesting
-  public long getTotalDataFlushedLength() {
-    return totalDataFlushedLength;
-  }
   /**
    * Will be called on the retryPath in case closedContainerException/
    * TimeoutException.
@@ -374,7 +367,7 @@ public class BlockDataStreamOutput implements ByteBufferStreamOutput {
    * @return minimum commit index replicated to all nodes
    * @throws IOException IOException in case watch gets timed out
    */
-  private void watchForCommit(boolean bufferFull) throws IOException {
+  public void watchForCommit(boolean bufferFull) throws IOException {
     checkOpen();
     try {
       XceiverClientReply reply = bufferFull ?
@@ -402,7 +395,7 @@ public class BlockDataStreamOutput implements ByteBufferStreamOutput {
    * @param force true if no data was written since most recent putBlock and
    *            stream is being closed
    */
-  private void executePutBlock(boolean close,
+  public void executePutBlock(boolean close,
       boolean force) throws IOException {
     checkOpen();
     long flushPos = totalDataFlushedLength;
@@ -420,7 +413,7 @@ public class BlockDataStreamOutput implements ByteBufferStreamOutput {
     if (close) {
       final ContainerCommandRequestProto putBlockRequest
           = ContainerProtocolCalls.getPutBlockRequest(
-              xceiverClient.getPipeline(), blockData, true, token);
+              xceiverClient.getPipeline(), blockData, true, tokenString);
       dataStreamCloseReply = executePutBlockClose(putBlockRequest,
           PUT_BLOCK_REQUEST_LENGTH_MAX, out);
       dataStreamCloseReply.whenComplete((reply, e) -> {
@@ -437,7 +430,7 @@ public class BlockDataStreamOutput implements ByteBufferStreamOutput {
 
     try {
       XceiverClientReply asyncReply =
-          putBlockAsync(xceiverClient, blockData, close, token);
+          putBlockAsync(xceiverClient, blockData, close, tokenString);
       final CompletableFuture<ContainerCommandResponseProto> flushFuture
           = asyncReply.getResponse().thenApplyAsync(e -> {
             try {
@@ -637,9 +630,9 @@ public class BlockDataStreamOutput implements ByteBufferStreamOutput {
   }
 
   private boolean needSync(long position) {
-    if (syncSize > 0) {
+    if (SYNC_SIZE > 0) {
       // TODO: or position >= fileLength
-      if (position - syncPosition >= syncSize) {
+      if (position - syncPosition >= SYNC_SIZE) {
         syncPosition = position;
         return true;
       }
@@ -698,11 +691,6 @@ public class BlockDataStreamOutput implements ByteBufferStreamOutput {
 
     futures.add(future);
     containerBlockData.addChunks(chunkInfo);
-  }
-
-  @VisibleForTesting
-  public void setXceiverClient(XceiverClientRatis xceiverClient) {
-    this.xceiverClient = xceiverClient;
   }
 
   /**

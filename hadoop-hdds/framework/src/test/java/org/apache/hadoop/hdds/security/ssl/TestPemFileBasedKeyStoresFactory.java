@@ -40,7 +40,6 @@ import org.apache.ratis.thirdparty.io.grpc.netty.NettyServerBuilder;
 import org.apache.ratis.thirdparty.io.grpc.stub.StreamObserver;
 import org.apache.ratis.thirdparty.io.netty.handler.ssl.ClientAuth;
 import org.apache.ratis.thirdparty.io.netty.handler.ssl.SslContextBuilder;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -53,6 +52,8 @@ import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.SUCCESS;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
 /**
  * Test PemFileBasedKeyStoresFactory.
@@ -73,23 +74,20 @@ public class TestPemFileBasedKeyStoresFactory {
   @ParameterizedTest
   public void testInit(boolean clientAuth) throws Exception {
     KeyStoresFactory keyStoresFactory = new PemFileBasedKeyStoresFactory(
-        secConf, caClient);
+        caClient);
     try {
       keyStoresFactory.init(KeyStoresFactory.Mode.CLIENT, clientAuth);
-      Assertions.assertEquals(clientAuth, keyStoresFactory.getKeyManagers()[0]
+      assertEquals(clientAuth, keyStoresFactory.getKeyManagers()[0]
           instanceof ReloadingX509KeyManager);
-      Assertions.assertTrue(keyStoresFactory.getTrustManagers()[0]
-          instanceof ReloadingX509TrustManager);
+      assertInstanceOf(ReloadingX509TrustManager.class, keyStoresFactory.getTrustManagers()[0]);
     } finally {
       keyStoresFactory.destroy();
     }
 
     try {
       keyStoresFactory.init(KeyStoresFactory.Mode.SERVER, clientAuth);
-      Assertions.assertTrue(keyStoresFactory.getKeyManagers()[0]
-          instanceof ReloadingX509KeyManager);
-      Assertions.assertTrue(keyStoresFactory.getTrustManagers()[0]
-          instanceof ReloadingX509TrustManager);
+      assertInstanceOf(ReloadingX509KeyManager.class, keyStoresFactory.getKeyManagers()[0]);
+      assertInstanceOf(ReloadingX509TrustManager.class, keyStoresFactory.getTrustManagers()[0]);
     } finally {
       keyStoresFactory.destroy();
     }
@@ -103,13 +101,13 @@ public class TestPemFileBasedKeyStoresFactory {
     ManagedChannel channel = null;
     try {
       // create server
-      serverFactory = new PemFileBasedKeyStoresFactory(secConf, caClient);
+      serverFactory = new PemFileBasedKeyStoresFactory(caClient);
       serverFactory.init(KeyStoresFactory.Mode.SERVER, true);
       server = setupServer(serverFactory);
       server.start();
 
       // create client
-      clientFactory = new PemFileBasedKeyStoresFactory(secConf, caClient);
+      clientFactory = new PemFileBasedKeyStoresFactory(caClient);
       clientFactory.init(KeyStoresFactory.Mode.CLIENT, true);
       channel = setupClient(clientFactory, server.getPort());
       XceiverClientProtocolServiceStub asyncStub =
@@ -117,7 +115,7 @@ public class TestPemFileBasedKeyStoresFactory {
 
       // send command
       ContainerCommandResponseProto responseProto = sendRequest(asyncStub);
-      Assertions.assertEquals(SUCCESS, responseProto.getResult());
+      assertEquals(SUCCESS, responseProto.getResult());
 
       // Renew certificate
       caClient.renewKey();
@@ -125,7 +123,7 @@ public class TestPemFileBasedKeyStoresFactory {
 
       // send command again
       responseProto = sendRequest(asyncStub);
-      Assertions.assertEquals(SUCCESS, responseProto.getResult());
+      assertEquals(SUCCESS, responseProto.getResult());
     } finally {
       if (channel != null) {
         channel.shutdownNow();

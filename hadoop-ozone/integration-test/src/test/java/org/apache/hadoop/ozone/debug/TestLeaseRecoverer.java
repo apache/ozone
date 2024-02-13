@@ -19,16 +19,13 @@ package org.apache.hadoop.ozone.debug;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.io.StringWriter;
-import java.util.UUID;
 import java.util.concurrent.ThreadLocalRandom;
+import java.util.concurrent.TimeUnit;
 
-import org.junit.AfterClass;
-import org.junit.BeforeClass;
-import org.junit.Rule;
-import org.junit.Test;
-import org.junit.rules.TestRule;
-import org.junit.rules.Timeout;
-import org.apache.ozone.test.JUnit5AwareTimeout;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
 import picocli.CommandLine;
 
 import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
@@ -49,20 +46,18 @@ import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_OFS_URI_SCHEME;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ADDRESS_KEY;
-import static org.junit.Assert.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 /**
  * Test cases for LeaseRecoverer.
  */
+@Timeout(value = 120000, unit = TimeUnit.MILLISECONDS)
 public class TestLeaseRecoverer {
   private static MiniOzoneCluster cluster = null;
   private static OzoneConfiguration conf;
   private static OzoneBucket fsoOzoneBucket;
   private static OzoneClient client;
-
-  @Rule
-  public TestRule timeout = new JUnit5AwareTimeout(new Timeout(120000));
 
   /**
    * Create a MiniDFSCluster for testing.
@@ -70,16 +65,12 @@ public class TestLeaseRecoverer {
    *
    * @throws IOException
    */
-  @BeforeClass
+  @BeforeAll
   public static void init() throws Exception {
     conf = new OzoneConfiguration();
     conf.setBoolean(OzoneConfigKeys.OZONE_FS_HSYNC_ENABLED, true);
-    String clusterId = UUID.randomUUID().toString();
-    String scmId = UUID.randomUUID().toString();
-    String omId = UUID.randomUUID().toString();
     // Set the number of keys to be processed during batch operate.
-    cluster = MiniOzoneCluster.newBuilder(conf).setClusterId(clusterId)
-        .setScmId(scmId).setOmId(omId).build();
+    cluster = MiniOzoneCluster.newBuilder(conf).build();
     cluster.waitForClusterToBeReady();
     client = cluster.newClient();
 
@@ -88,7 +79,7 @@ public class TestLeaseRecoverer {
         .createVolumeAndBucket(client, BucketLayout.FILE_SYSTEM_OPTIMIZED);
   }
 
-  @AfterClass
+  @AfterAll
   public static void teardownClass() {
     IOUtils.closeQuietly(client);
     if (cluster != null) {

@@ -137,9 +137,6 @@ public final class OzoneConfigKeys {
       "dfs.container.ratis.ipc.random.port";
   public static final boolean DFS_CONTAINER_RATIS_IPC_RANDOM_PORT_DEFAULT =
       false;
-  public static final String OZONE_TRACE_ENABLED_KEY =
-      "ozone.trace.enabled";
-  public static final boolean OZONE_TRACE_ENABLED_DEFAULT = false;
 
   public static final String OZONE_METADATA_STORE_ROCKSDB_STATISTICS =
       "ozone.metastore.rocksdb.statistics";
@@ -667,6 +664,14 @@ public final class OzoneConfigKeys {
       TimeDuration.valueOf(150, TimeUnit.SECONDS);
   public static final String OZONE_SCM_CLOSE_CONTAINER_WAIT_DURATION =
       "ozone.scm.close.container.wait.duration";
+
+  public static final String HDDS_SCM_CLIENT_RPC_TIME_OUT =
+      "hdds.scmclient.rpc.timeout";
+  public static final String HDDS_SCM_CLIENT_MAX_RETRY_TIMEOUT =
+      "hdds.scmclient.max.retry.timeout";
+  public static final String HDDS_SCM_CLIENT_FAILOVER_MAX_RETRY =
+      "hdds.scmclient.failover.max.retry";
+
 
   /**
    * There is no need to instantiate this class.

@@ -36,16 +36,15 @@ import org.apache.hadoop.ozone.protocolPB.OzoneManagerProtocolServerSideTranslat
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.api.io.TempDir;
-import org.mockito.Mockito;
 
 import java.io.IOException;
-import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status.INVALID_REQUEST;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 /**
@@ -63,9 +62,9 @@ public class TestOzoneManagerRatisRequest {
 
   @Test
   public void testRequestWithNonExistentBucket() throws Exception {
-    ozoneManager = Mockito.mock(OzoneManager.class);
+    ozoneManager = mock(OzoneManager.class);
     ozoneConfiguration.set(OMConfigKeys.OZONE_OM_DB_DIRS,
-        Files.createTempDirectory(folder, "om").toString());
+        folder.resolve("om").toAbsolutePath().toString());
     omMetadataManager = new OmMetadataManagerImpl(ozoneConfiguration,
         ozoneManager);
     when(ozoneManager.getMetadataManager()).thenReturn(omMetadataManager);
@@ -104,18 +103,17 @@ public class TestOzoneManagerRatisRequest {
             .setClientId("test-client-id")
             .build();
 
-    ozoneManager = Mockito.mock(OzoneManager.class);
+    ozoneManager = mock(OzoneManager.class);
     ozoneConfiguration.set(OMConfigKeys.OZONE_OM_DB_DIRS,
-        Files.createTempDirectory(folder, "om").toString());
+        folder.resolve("om").toAbsolutePath().toString());
     omMetadataManager = new OmMetadataManagerImpl(ozoneConfiguration,
         ozoneManager);
     when(ozoneManager.getMetadataManager()).thenReturn(omMetadataManager);
     when(ozoneManager.getConfiguration()).thenReturn(ozoneConfiguration);
 
-    OzoneManagerRatisServer ratisServer =
-        Mockito.mock(OzoneManagerRatisServer.class);
+    OzoneManagerRatisServer ratisServer = mock(OzoneManagerRatisServer.class);
     ProtocolMessageMetrics<ProtocolMessageEnum> protocolMessageMetrics =
-        Mockito.mock(ProtocolMessageMetrics.class);
+        mock(ProtocolMessageMetrics.class);
     long lastTransactionIndexForNonRatis = 100L;
 
     OzoneManagerProtocolProtos.OMResponse expectedResponse =

@@ -31,10 +31,8 @@ import org.apache.hadoop.ozone.om.OmSnapshotManager;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
-import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
-import org.apache.hadoop.ozone.om.snapshot.SnapshotCache;
 import org.apache.hadoop.ozone.om.upgrade.OMLayoutVersionManager;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
@@ -46,7 +44,6 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
-import org.mockito.Mockito;
 
 import java.io.File;
 import java.util.UUID;
@@ -57,13 +54,16 @@ import static org.apache.hadoop.ozone.om.request.OMRequestTestUtils.createSnapsh
 import static org.apache.hadoop.ozone.om.request.OMRequestTestUtils.deleteSnapshotRequest;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status.OK;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type.DeleteSnapshot;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.any;
+import static org.mockito.Mockito.anyString;
+import static org.mockito.Mockito.doNothing;
+import static org.mockito.Mockito.framework;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -83,10 +83,6 @@ public class TestOMSnapshotDeleteRequest {
   private String volumeName;
   private String bucketName;
   private String snapshotName;
-
-  // Just setting ozoneManagerDoubleBuffer which does nothing.
-  private final OzoneManagerDoubleBufferHelper ozoneManagerDoubleBufferHelper =
-      ((response, transactionIndex) -> null);
 
   @BeforeEach
   public void setup() throws Exception {
@@ -110,11 +106,9 @@ public class TestOMSnapshotDeleteRequest {
     when(ozoneManager.getVersionManager()).thenReturn(lvm);
     AuditLogger auditLogger = mock(AuditLogger.class);
     when(ozoneManager.getAuditLogger()).thenReturn(auditLogger);
-    Mockito.doNothing().when(auditLogger).logWrite(any(AuditMessage.class));
+    doNothing().when(auditLogger).logWrite(any(AuditMessage.class));
 
     OmSnapshotManager omSnapshotManager = mock(OmSnapshotManager.class);
-    when(omSnapshotManager.getSnapshotCache())
-        .thenReturn(mock(SnapshotCache.class));
     when(ozoneManager.getOmSnapshotManager()).thenReturn(omSnapshotManager);
 
     volumeName = UUID.randomUUID().toString();
@@ -128,7 +122,7 @@ public class TestOMSnapshotDeleteRequest {
   @AfterEach
   public void stop() {
     omMetrics.unRegister();
-    Mockito.framework().clearInlineMocks();
+    framework().clearInlineMocks();
   }
 
 
@@ -203,8 +197,7 @@ public class TestOMSnapshotDeleteRequest {
 
     // Trigger validateAndUpdateCache
     OMClientResponse omClientResponse =
-        omSnapshotDeleteRequest.validateAndUpdateCache(ozoneManager, 2L,
-            ozoneManagerDoubleBufferHelper);
+        omSnapshotDeleteRequest.validateAndUpdateCache(ozoneManager, 2L);
 
     OMResponse omResponse = omClientResponse.getOMResponse();
     assertNotNull(omResponse);
@@ -240,8 +233,7 @@ public class TestOMSnapshotDeleteRequest {
 
     // Trigger delete snapshot validateAndUpdateCache
     OMClientResponse omClientResponse =
-        omSnapshotDeleteRequest.validateAndUpdateCache(ozoneManager, 1L,
-            ozoneManagerDoubleBufferHelper);
+        omSnapshotDeleteRequest.validateAndUpdateCache(ozoneManager, 1L);
 
     OMResponse omResponse = omClientResponse.getOMResponse();
     assertNotNull(omResponse.getDeleteSnapshotResponse());
@@ -268,8 +260,7 @@ public class TestOMSnapshotDeleteRequest {
     assertNull(omMetadataManager.getSnapshotInfoTable().get(key));
 
     // Create snapshot entry
-    omSnapshotCreateRequest.validateAndUpdateCache(ozoneManager, 1L,
-        ozoneManagerDoubleBufferHelper);
+    omSnapshotCreateRequest.validateAndUpdateCache(ozoneManager, 1L);
     SnapshotInfo snapshotInfo =
         omMetadataManager.getSnapshotInfoTable().get(key);
     assertNotNull(snapshotInfo);
@@ -282,8 +273,7 @@ public class TestOMSnapshotDeleteRequest {
 
     // Delete snapshot entry
     OMClientResponse omClientResponse =
-        omSnapshotDeleteRequest.validateAndUpdateCache(ozoneManager, 2L,
-            ozoneManagerDoubleBufferHelper);
+        omSnapshotDeleteRequest.validateAndUpdateCache(ozoneManager, 2L);
     // Response should be successful
     OMResponse omResponse = omClientResponse.getOMResponse();
     assertNotNull(omResponse);
@@ -295,15 +285,14 @@ public class TestOMSnapshotDeleteRequest {
     // but marked as DELETED.
     assertNotNull(snapshotInfo);
     assertEquals(SNAPSHOT_DELETED, snapshotInfo.getSnapshotStatus());
-    assertTrue(snapshotInfo.getDeletionTime() > 0L);
+    assertThat(snapshotInfo.getDeletionTime()).isGreaterThan(0L);
     assertEquals(0, omMetrics.getNumSnapshotActive());
 
     // Now delete snapshot entry again, expect error.
     omRequest2 = deleteSnapshotRequest(volumeName, bucketName, snapshotName);
     omSnapshotDeleteRequest = doPreExecute(omRequest2);
     omClientResponse =
-        omSnapshotDeleteRequest.validateAndUpdateCache(ozoneManager, 3L,
-            ozoneManagerDoubleBufferHelper);
+        omSnapshotDeleteRequest.validateAndUpdateCache(ozoneManager, 3L);
 
     omResponse = omClientResponse.getOMResponse();
     assertNotNull(omResponse);

@@ -18,8 +18,8 @@
 
 package org.apache.hadoop.ozone.om.request.key;
 
+import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
@@ -31,8 +31,6 @@ import org.apache.hadoop.ozone.om.lock.OzoneLockProvider;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
-import org.apache.hadoop.util.Time;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
 
@@ -43,7 +41,11 @@ import java.util.Iterator;
 import java.util.Arrays;
 import java.util.Collection;
 
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.ONE;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_SNAPSHOT_INDICATOR;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.when;
 /**
  * Tests OMCreateKeyRequestWithFSO class.
@@ -82,10 +84,9 @@ public class TestOMKeyCreateRequestWithFSO extends TestOMKeyCreateRequest {
       omKeyCreateRequest = getOMKeyCreateRequest(modifiedOmRequest);
 
       OMClientResponse omKeyCreateResponse =
-          omKeyCreateRequest.validateAndUpdateCache(ozoneManager, 100L,
-              ozoneManagerDoubleBufferHelper);
-      Assertions.assertTrue(omKeyCreateResponse.getOMResponse().getSuccess());
-      Assertions.assertEquals(keyName,
+          omKeyCreateRequest.validateAndUpdateCache(ozoneManager, 100L);
+      assertTrue(omKeyCreateResponse.getOMResponse().getSuccess());
+      assertEquals(keyName,
           omKeyCreateResponse.getOMResponse()
                 .getCreateKeyResponse().getKeyInfo().getKeyName(),
           "Incorrect keyName");
@@ -106,12 +107,13 @@ public class TestOMKeyCreateRequestWithFSO extends TestOMKeyCreateRequest {
     Path keyPath = Paths.get(keyName);
     long parentId = checkIntermediatePaths(keyPath);
     String fileName = OzoneFSUtils.getFileName(keyName);
-    OmKeyInfo omKeyInfo = OMRequestTestUtils.createOmKeyInfo(volumeName,
-        bucketName, fileName, HddsProtos.ReplicationType.RATIS,
-        HddsProtos.ReplicationFactor.ONE,  parentId + 1, parentId, 100,
-        Time.now());
-    OMRequestTestUtils.addFileToKeyTable(false, false,
-            fileName, omKeyInfo, -1, 50, omMetadataManager);
+    OmKeyInfo omKeyInfo = OMRequestTestUtils.createOmKeyInfo(volumeName, bucketName, fileName,
+            RatisReplicationConfig.getInstance(ONE))
+        .setObjectID(parentId + 1L)
+        .setParentObjectID(parentId)
+        .setUpdateID(100L)
+        .build();
+    OMRequestTestUtils.addFileToKeyTable(false, false, fileName, omKeyInfo, -1, 50, omMetadataManager);
   }
 
   @Override
@@ -129,14 +131,14 @@ public class TestOMKeyCreateRequestWithFSO extends TestOMKeyCreateRequest {
 
     // Check open key entry
     Path keyPathFileName = keyPath.getFileName();
-    Assertions.assertNotNull(keyPathFileName, "Failed to find fileName");
+    assertNotNull(keyPathFileName, "Failed to find fileName");
     String fileName = keyPathFileName.toString();
     String openKey = omMetadataManager.getOpenFileName(volumeId, bucketId,
         parentID, fileName, omRequest.getCreateKeyRequest().getClientID());
     OmKeyInfo omKeyInfo =
         omMetadataManager.getOpenKeyTable(omKeyCreateRequest.getBucketLayout())
             .get(openKey);
-    Assertions.assertNotNull(omKeyInfo);
+    assertNotNull(omKeyInfo);
   }
 
   @Override
@@ -146,7 +148,7 @@ public class TestOMKeyCreateRequestWithFSO extends TestOMKeyCreateRequest {
     String bucketKey = omMetadataManager.getBucketKey(volumeName, bucketName);
     OmBucketInfo omBucketInfo =
         omMetadataManager.getBucketTable().get(bucketKey);
-    Assertions.assertNotNull(omBucketInfo, "Bucket not found!");
+    assertNotNull(omBucketInfo, "Bucket not found!");
     long lastKnownParentId = omBucketInfo.getObjectID();
     final long volumeId = omMetadataManager.getVolumeId(volumeName);
 
@@ -161,7 +163,7 @@ public class TestOMKeyCreateRequestWithFSO extends TestOMKeyCreateRequest {
       OmDirectoryInfo omDirInfo = omMetadataManager.getDirectoryTable().
           get(dbNodeName);
 
-      Assertions.assertNotNull(omDirInfo, "Parent key path:" + fullKeyPath +
+      assertNotNull(omDirInfo, "Parent key path:" + fullKeyPath +
           " doesn't exist");
       lastKnownParentId = omDirInfo.getObjectID();
     }

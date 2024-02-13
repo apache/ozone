@@ -31,13 +31,13 @@ import org.apache.hadoop.hdds.security.symmetric.SecretKeyVerifierClient;
 import org.apache.hadoop.hdds.security.symmetric.SecretKeyTestUtil;
 import org.apache.hadoop.hdds.security.SecurityConfig;
 import org.apache.hadoop.security.token.Token;
-import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.mockito.Mockito;
+import org.junit.jupiter.api.io.TempDir;
 
 import java.io.ByteArrayInputStream;
 import java.io.DataInputStream;
+import java.io.File;
 import java.security.NoSuchAlgorithmException;
 import java.util.EnumSet;
 import java.util.UUID;
@@ -49,12 +49,12 @@ import static org.apache.hadoop.ozone.container.ContainerTestHelper.getBlockRequ
 import static org.apache.hadoop.ozone.container.ContainerTestHelper.getReadChunkRequest;
 import static org.apache.hadoop.ozone.container.ContainerTestHelper.newPutBlockRequestBuilder;
 import static org.apache.hadoop.ozone.container.ContainerTestHelper.newWriteChunkRequestBuilder;
-import static org.hamcrest.CoreMatchers.containsString;
-import static org.hamcrest.MatcherAssert.assertThat;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.any;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 /**
@@ -62,8 +62,8 @@ import static org.mockito.Mockito.when;
  */
 public class TestOzoneBlockTokenSecretManager {
 
-  private static final String BASEDIR = GenericTestUtils
-      .getTempPath(TestOzoneBlockTokenSecretManager.class.getSimpleName());
+  @TempDir
+  private File baseDir;
   private static final String ALGORITHM = "HmacSHA256";
 
   private OzoneBlockTokenSecretManager secretManager;
@@ -78,16 +78,16 @@ public class TestOzoneBlockTokenSecretManager {
     pipeline = MockPipeline.createPipeline(3);
 
     OzoneConfiguration conf = new OzoneConfiguration();
-    conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, BASEDIR);
+    conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, baseDir.getPath());
     conf.setBoolean(HddsConfigKeys.HDDS_BLOCK_TOKEN_ENABLED, true);
     SecurityConfig securityConfig = new SecurityConfig(conf);
 
     secretKey = generateValidSecretKey();
     secretKeyId = secretKey.getId();
 
-    secretKeyClient = Mockito.mock(SecretKeyVerifierClient.class);
+    secretKeyClient = mock(SecretKeyVerifierClient.class);
     SecretKeySignerClient secretKeySignerClient =
-        Mockito.mock(SecretKeySignerClient.class);
+        mock(SecretKeySignerClient.class);
     when(secretKeySignerClient.getCurrentSecretKey()).thenReturn(secretKey);
     when(secretKeyClient.getSecretKey(secretKeyId)).thenReturn(secretKey);
 
@@ -174,10 +174,10 @@ public class TestOzoneBlockTokenSecretManager {
     BlockTokenException e = assertThrows(BlockTokenException.class,
         () -> tokenVerifier.verify("testUser", token, writeChunkRequest));
 
-    assertThat(e.getMessage(), containsString("Token for ID: " +
+    assertThat(e.getMessage()).contains("Token for ID: " +
         OzoneBlockTokenIdentifier.getTokenService(blockID) +
         " can't be used to access: " +
-        OzoneBlockTokenIdentifier.getTokenService(otherBlockID)));
+        OzoneBlockTokenIdentifier.getTokenService(otherBlockID));
   }
 
   @Test
@@ -202,8 +202,8 @@ public class TestOzoneBlockTokenSecretManager {
     BlockTokenException e = assertThrows(BlockTokenException.class,
         () -> tokenVerifier.verify(testUser1, token, putBlockCommand));
 
-    assertThat(e.getMessage(),
-        containsString("doesn't have WRITE permission"));
+    assertThat(e.getMessage())
+        .contains("doesn't have WRITE permission");
 
     tokenVerifier.verify(testUser1, token, getBlockCommand);
   }
@@ -227,8 +227,8 @@ public class TestOzoneBlockTokenSecretManager {
 
     BlockTokenException e = assertThrows(BlockTokenException.class,
         () -> tokenVerifier.verify(testUser2, token, readChunkRequest));
-    assertThat(e.getMessage(),
-        containsString("doesn't have READ permission"));
+    assertThat(e.getMessage())
+        .contains("doesn't have READ permission");
   }
 
   @Test
@@ -251,8 +251,8 @@ public class TestOzoneBlockTokenSecretManager {
 
     BlockTokenException e = assertThrows(BlockTokenException.class,
         () -> tokenVerifier.verify(user, token, writeChunkRequest));
-    assertThat(e.getMessage(),
-        containsString("Token can't be verified due to expired secret key"));
+    assertThat(e.getMessage())
+        .contains("Token can't be verified due to expired secret key");
   }
 
   private ManagedSecretKey generateValidSecretKey()

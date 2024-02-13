@@ -22,10 +22,8 @@ import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.conf.StorageSize;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
-import org.mockito.Mockito;
 
 import java.io.IOException;
 import java.util.Arrays;
@@ -35,7 +33,14 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SCM_BLOCK_SIZE;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SCM_BLOCK_SIZE_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_SNAPSHOT_INDICATOR;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.mockito.Matchers.any;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.fail;
+import static org.mockito.Mockito.any;
+import static org.mockito.Mockito.doReturn;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.spy;
+import static org.mockito.Mockito.when;
 
 /**
  * Unit test for Basic*OzoneFileSystem.
@@ -74,11 +79,11 @@ public class TestBasicOzoneFileSystems {
   @MethodSource("data")
   public void testFileSystemPosixSymlinkSupport(FileSystem subject) {
     if (subject instanceof BasicRootedOzoneFileSystem) {
-      Assertions.assertTrue(subject.supportsSymlinks());
+      assertTrue(subject.supportsSymlinks());
     } else if (subject instanceof BasicOzoneFileSystem) {
-      Assertions.assertFalse(subject.supportsSymlinks());
+      assertFalse(subject.supportsSymlinks());
     } else {
-      Assertions.fail("Test case not implemented for FileSystem: " +
+      fail("Test case not implemented for FileSystem: " +
           subject.getClass().getSimpleName());
     }
   }
@@ -91,12 +96,12 @@ public class TestBasicOzoneFileSystems {
 
     if (subject instanceof BasicRootedOzoneFileSystem) {
       BasicRootedOzoneClientAdapterImpl adapter =
-          Mockito.mock(BasicRootedOzoneClientAdapterImpl.class);
-      Mockito.doReturn(snapshotName).when(adapter).createSnapshot(any(), any());
+          mock(BasicRootedOzoneClientAdapterImpl.class);
+      doReturn(snapshotName).when(adapter).createSnapshot(any(), any());
 
       BasicRootedOzoneFileSystem ofs =
-          Mockito.spy((BasicRootedOzoneFileSystem) subject);
-      Mockito.when(ofs.getAdapter()).thenReturn(adapter);
+          spy((BasicRootedOzoneFileSystem) subject);
+      when(ofs.getAdapter()).thenReturn(adapter);
 
       Path ofsBucketStr = new Path("ofs://om/vol1/buck1/");
       Path ofsDir1 = new Path(ofsBucketStr, "dir1");
@@ -107,14 +112,14 @@ public class TestBasicOzoneFileSystems {
 
       // Return value path should be "ofs://om/vol1/buck1/.snapshot/snap1"
       // without the subdirectory "dir1" in the Path.
-      Assertions.assertEquals(expectedSnapshotPath, res);
+      assertEquals(expectedSnapshotPath, res);
     } else if (subject instanceof BasicOzoneFileSystem) {
       BasicOzoneClientAdapterImpl adapter =
-          Mockito.mock(BasicOzoneClientAdapterImpl.class);
-      Mockito.doReturn(snapshotName).when(adapter).createSnapshot(any(), any());
+          mock(BasicOzoneClientAdapterImpl.class);
+      doReturn(snapshotName).when(adapter).createSnapshot(any(), any());
 
-      BasicOzoneFileSystem o3fs = Mockito.spy((BasicOzoneFileSystem) subject);
-      Mockito.when(o3fs.getAdapter()).thenReturn(adapter);
+      BasicOzoneFileSystem o3fs = spy((BasicOzoneFileSystem) subject);
+      when(o3fs.getAdapter()).thenReturn(adapter);
 
       Path o3fsBucketStr = new Path("o3fs://buck1.vol1.om/");
       Path o3fsDir1 = new Path(o3fsBucketStr, "dir1");
@@ -126,9 +131,9 @@ public class TestBasicOzoneFileSystems {
 
       // Return value path should be "o3fs://buck1.vol1.om/.snapshot/snap1"
       // without the subdirectory "dir1" in the Path.
-      Assertions.assertEquals(expectedSnapshotPath, res);
+      assertEquals(expectedSnapshotPath, res);
     } else {
-      Assertions.fail("Test case not implemented for FileSystem: " +
+      fail("Test case not implemented for FileSystem: " +
           subject.getClass().getSimpleName());
     }
   }

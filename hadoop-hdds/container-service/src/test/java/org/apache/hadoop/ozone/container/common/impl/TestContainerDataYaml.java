@@ -23,18 +23,14 @@ import org.apache.hadoop.conf.StorageUnit;
 import org.apache.hadoop.fs.FileSystemTestHelper;
 import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.hdds.HddsConfigKeys;
+import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerUtils;
 import org.apache.hadoop.ozone.container.keyvalue.ContainerLayoutTestInfo;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
-import org.junit.Assert;
 import org.apache.hadoop.ozone.container.upgrade.VersionedDatanodeFeatures;
-import org.apache.ozone.test.GenericTestUtils;
-import org.junit.Test;
-import org.junit.runner.RunWith;
-import org.junit.runners.Parameterized;
 
 import java.io.File;
 import java.io.IOException;
@@ -43,15 +39,14 @@ import java.time.Instant;
 import java.util.UUID;
 
 import static org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion.FILE_PER_CHUNK;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertTrue;
-import static org.junit.Assert.fail;
-
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * This class tests create/read .container files.
  */
-@RunWith(Parameterized.class)
 public class TestContainerDataYaml {
 
   private long testContainerID = 1234;
@@ -64,16 +59,11 @@ public class TestContainerDataYaml {
   private static final String VOLUME_OWNER = "hdfs";
   private static final String CONTAINER_DB_TYPE = "RocksDB";
 
-  private final ContainerLayoutVersion layout;
+  private ContainerLayoutVersion layoutVersion;
   private OzoneConfiguration conf = new OzoneConfiguration();
-    
-  public TestContainerDataYaml(ContainerLayoutVersion layout) {
-    this.layout = layout;
-  }
 
-  @Parameterized.Parameters
-  public static Iterable<Object[]> parameters() {
-    return ContainerLayoutTestInfo.containerLayoutParameters();
+  private void setLayoutVersion(ContainerLayoutVersion layoutVersion) {
+    this.layoutVersion = layoutVersion;
   }
 
   /**
@@ -87,7 +77,7 @@ public class TestContainerDataYaml {
     String containerPath = containerID + ".container";
 
     KeyValueContainerData keyValueContainerData = new KeyValueContainerData(
-        containerID, layout, MAXSIZE,
+        containerID, layoutVersion, MAXSIZE,
         UUID.randomUUID().toString(),
         UUID.randomUUID().toString());
     keyValueContainerData.setContainerDBType(CONTAINER_DB_TYPE);
@@ -114,8 +104,10 @@ public class TestContainerDataYaml {
     FileUtil.fullyDelete(new File(testRoot));
   }
 
-  @Test
-  public void testCreateContainerFile() throws IOException {
+  @ContainerLayoutTestInfo.ContainerTest
+  public void testCreateContainerFile(ContainerLayoutVersion layout)
+      throws IOException {
+    setLayoutVersion(layout);
     long containerID = testContainerID++;
 
     File containerFile = createContainerFile(containerID, 7);
@@ -174,13 +166,15 @@ public class TestContainerDataYaml {
     assertEquals(MAXSIZE, kvData.getMaxSize());
     assertTrue(kvData.lastDataScanTime().isPresent());
     assertEquals(SCAN_TIME.toEpochMilli(),
-                 kvData.lastDataScanTime().get().toEpochMilli());
+        kvData.lastDataScanTime().get().toEpochMilli());
     assertEquals(SCAN_TIME.toEpochMilli(),
-                 kvData.getDataScanTimestamp().longValue());
+        kvData.getDataScanTimestamp().longValue());
   }
 
-  @Test
-  public void testCreateContainerFileWithoutReplicaIndex() throws IOException {
+  @ContainerLayoutTestInfo.ContainerTest
+  public void testCreateContainerFileWithoutReplicaIndex(
+      ContainerLayoutVersion layout) throws IOException {
+    setLayoutVersion(layout);
     long containerID = testContainerID++;
 
     File containerFile = createContainerFile(containerID, 0);
@@ -188,87 +182,83 @@ public class TestContainerDataYaml {
     final String content =
         FileUtils.readFileToString(containerFile, Charset.defaultCharset());
 
-    Assert.assertFalse("ReplicaIndex shouldn't be persisted if zero",
-        content.contains("replicaIndex"));
+    assertThat(content)
+        .withFailMessage("ReplicaIndex shouldn't be persisted if zero")
+        .doesNotContain("replicaIndex");
     cleanup();
   }
 
+  @ContainerLayoutTestInfo.ContainerTest
+  public void testIncorrectContainerFile(ContainerLayoutVersion layout) {
+    setLayoutVersion(layout);
+    String containerFile = "incorrect.container";
 
-  @Test
-  public void testIncorrectContainerFile() throws IOException {
-    try {
-      String containerFile = "incorrect.container";
-      //Get file from resources folder
-      ClassLoader classLoader = getClass().getClassLoader();
-      File file = new File(classLoader.getResource(containerFile).getFile());
-      KeyValueContainerData kvData = (KeyValueContainerData) ContainerDataYaml
-          .readContainerFile(file);
-      fail("testIncorrectContainerFile failed");
-    } catch (IllegalArgumentException ex) {
-      GenericTestUtils.assertExceptionContains("No enum constant", ex);
-    }
+    // Get file from resource folder
+    ClassLoader classLoader = getClass().getClassLoader();
+    File file = new File(classLoader.getResource(containerFile).getFile());
+    IllegalArgumentException exception = assertThrows(IllegalArgumentException.class,
+        () -> ContainerDataYaml.readContainerFile(file));
+
+    assertThat(exception).hasMessageContaining("No enum constant");
   }
 
 
-  @Test
-  public void testCheckBackWardCompatibilityOfContainerFile() throws
-      IOException {
+  @ContainerLayoutTestInfo.ContainerTest
+  void testCheckBackWardCompatibilityOfContainerFile(
+      ContainerLayoutVersion layout) throws Exception {
+    setLayoutVersion(layout);
     // This test is for if we upgrade, and then .container files added by new
     // server will have new fields added to .container file, after a while we
     // decided to rollback. Then older ozone can read .container files
     // created or not.
 
-    try {
-      String containerFile = "additionalfields.container";
-      //Get file from resources folder
-      ClassLoader classLoader = getClass().getClassLoader();
-      File file = new File(classLoader.getResource(containerFile).getFile());
-      KeyValueContainerData kvData = (KeyValueContainerData) ContainerDataYaml
-          .readContainerFile(file);
-      ContainerUtils.verifyChecksum(kvData, conf);
+    String containerFile = "additionalfields.container";
+    //Get file from resources folder
+    ClassLoader classLoader = getClass().getClassLoader();
+    File file = new File(classLoader.getResource(containerFile).getFile());
+    KeyValueContainerData kvData = (KeyValueContainerData) ContainerDataYaml
+        .readContainerFile(file);
+    ContainerUtils.verifyChecksum(kvData, conf);
 
-      //Checking the Container file data is consistent or not
-      assertEquals(ContainerProtos.ContainerDataProto.State.CLOSED, kvData
-          .getState());
-      assertEquals(CONTAINER_DB_TYPE, kvData.getContainerDBType());
-      assertEquals(ContainerProtos.ContainerType.KeyValueContainer, kvData
-          .getContainerType());
-      assertEquals(9223372036854775807L, kvData.getContainerID());
-      assertEquals("/hdds/current/aed-fg4-hji-jkl/containerDir0/1", kvData
-          .getChunksPath());
-      assertEquals("/hdds/current/aed-fg4-hji-jkl/containerDir0/1", kvData
-          .getMetadataPath());
-      assertEquals(FILE_PER_CHUNK, kvData.getLayoutVersion());
-      assertEquals(2, kvData.getMetadata().size());
-
-    } catch (Exception ex) {
-      ex.printStackTrace();
-      fail("testCheckBackWardCompatibilityOfContainerFile failed");
-    }
+    //Checking the Container file data is consistent or not
+    assertEquals(ContainerProtos.ContainerDataProto.State.CLOSED, kvData
+        .getState());
+    assertEquals(CONTAINER_DB_TYPE, kvData.getContainerDBType());
+    assertEquals(ContainerProtos.ContainerType.KeyValueContainer, kvData
+        .getContainerType());
+    assertEquals(9223372036854775807L, kvData.getContainerID());
+    assertEquals("/hdds/current/aed-fg4-hji-jkl/containerDir0/1", kvData
+        .getChunksPath());
+    assertEquals("/hdds/current/aed-fg4-hji-jkl/containerDir0/1", kvData
+        .getMetadataPath());
+    assertEquals(FILE_PER_CHUNK, kvData.getLayoutVersion());
+    assertEquals(2, kvData.getMetadata().size());
   }
 
   /**
-   * Test to verify {@link ContainerUtils#verifyChecksum(ContainerData)}.
+   * Test to verify {@link ContainerUtils#verifyChecksum(ContainerData,ConfigurationSource)}.
    */
-  @Test
-  public void testChecksumInContainerFile() throws IOException {
+  @ContainerLayoutTestInfo.ContainerTest
+  public void testChecksumInContainerFile(ContainerLayoutVersion layout) throws IOException {
+    setLayoutVersion(layout);
     long containerID = testContainerID++;
 
     File containerFile = createContainerFile(containerID, 0);
 
     // Read from .container file, and verify data.
-    KeyValueContainerData kvData = (KeyValueContainerData) ContainerDataYaml
-        .readContainerFile(containerFile);
+    KeyValueContainerData kvData = (KeyValueContainerData) ContainerDataYaml.readContainerFile(containerFile);
     ContainerUtils.verifyChecksum(kvData, conf);
 
     cleanup();
   }
 
   /**
-   * Test to verify {@link ContainerUtils#verifyChecksum(ContainerData)}.
+   * Test to verify {@link ContainerUtils#verifyChecksum(ContainerData,ConfigurationSource)}.
    */
-  @Test
-  public void testChecksumInContainerFileWithReplicaIndex() throws IOException {
+  @ContainerLayoutTestInfo.ContainerTest
+  public void testChecksumInContainerFileWithReplicaIndex(
+      ContainerLayoutVersion layout) throws IOException {
+    setLayoutVersion(layout);
     long containerID = testContainerID++;
 
     File containerFile = createContainerFile(containerID, 10);
@@ -292,26 +282,27 @@ public class TestContainerDataYaml {
   /**
    * Test to verify incorrect checksum is detected.
    */
-  @Test
-  public void testIncorrectChecksum() {
-    try {
+  @ContainerLayoutTestInfo.ContainerTest
+  public void testIncorrectChecksum(ContainerLayoutVersion layout) {
+    setLayoutVersion(layout);
+    Exception ex = assertThrows(Exception.class, () -> {
       KeyValueContainerData kvData = getKeyValueContainerData();
       ContainerUtils.verifyChecksum(kvData, conf);
-      fail("testIncorrectChecksum failed");
-    } catch (Exception ex) {
-      GenericTestUtils.assertExceptionContains("Container checksum error for " +
-          "ContainerID:", ex);
-    }
+    });
+
+    assertThat(ex).hasMessageStartingWith("Container checksum error for ContainerID:");
   }
 
   /**
    * Test to verify disabled checksum with incorrect checksum.
    */
-  @Test
-  public void testDisabledChecksum() throws IOException {
+  @ContainerLayoutTestInfo.ContainerTest
+  public void testDisabledChecksum(ContainerLayoutVersion layout)
+      throws IOException {
+    setLayoutVersion(layout);
     KeyValueContainerData kvData = getKeyValueContainerData();
     conf.setBoolean(HddsConfigKeys.
-                    HDDS_CONTAINER_CHECKSUM_VERIFICATION_ENABLED, false);
+        HDDS_CONTAINER_CHECKSUM_VERIFICATION_ENABLED, false);
     ContainerUtils.verifyChecksum(kvData, conf);
   }
 }

@@ -1097,8 +1097,42 @@
 
       Set a value that is appropriate for the cluster size. Generally, HDFS
       recommends RPC handler count is set to 20 * log2(Cluster Size) with an
-      upper limit of 200. However, SCM will not have the same amount of
-      traffic as Namenode, so a value much smaller than that will work well too.
+      upper limit of 200. However, Ozone SCM will not have the same amount of
+      traffic as HDFS Namenode, so a value much smaller than that will work well too.
+
+      To specify handlers for individual RPC servers,
+      set the following configuration properties instead:
+      ---- RPC type ----       : ---- Configuration properties ----
+      SCMClientProtocolServer  : 'ozone.scm.client.handler.count.key'
+      SCMBlockProtocolServer   : 'ozone.scm.block.handler.count.key'
+      SCMDatanodeProtocolServer: 'ozone.scm.datanode.handler.count.key'
+    </description>
+  </property>
+  <property>
+    <name>ozone.scm.client.handler.count.key</name>
+    <value>100</value>
+    <tag>OZONE, MANAGEMENT, PERFORMANCE</tag>
+    <description>
+      Used to set the number of RPC handlers used by Client to access SCM.
+      The default value is 100.
+    </description>
+  </property>
+  <property>
+    <name>ozone.scm.block.handler.count.key</name>
+    <value>100</value>
+    <tag>OZONE, MANAGEMENT, PERFORMANCE</tag>
+    <description>
+      Used to set the number of RPC handlers when accessing blocks.
+      The default value is 100.
+    </description>
+  </property>
+  <property>
+    <name>ozone.scm.datanode.handler.count.key</name>
+    <value>100</value>
+    <tag>OZONE, MANAGEMENT, PERFORMANCE</tag>
+    <description>
+      Used to set the number of RPC handlers used by DataNode to access SCM.
+      The default value is 100.
     </description>
   </property>
   <property>
@@ -1251,15 +1285,6 @@
     <description>
       The interval for stale node flagging. Please
       see ozone.scm.heartbeat.thread.interval before changing this value.
-    </description>
-  </property>
-  <property>
-    <name>ozone.trace.enabled</name>
-    <value>false</value>
-    <tag>OZONE, DEBUG</tag>
-    <description>
-      Setting this flag to true dumps the HTTP request/ response in
-      the logs. Very useful when debugging REST protocol.
     </description>
   </property>
 
@@ -1876,6 +1901,14 @@
       will be used for http authentication.
     </description>
   </property>
+  <property>
+    <name>ozone.s3g.metrics.percentiles.intervals.seconds</name>
+    <value>60</value>
+    <tag>S3GATEWAY, PERFORMANCE</tag>
+    <description>Specifies the interval in seconds for the rollover of MutableQuantiles metrics.
+      Setting this interval equal to the metrics sampling time ensures more detailed metrics.
+    </description>
+  </property>
 
   <property>
     <name>ozone.om.save.metrics.interval</name>
@@ -2192,6 +2225,14 @@
     <value>OM/_HOST@REALM</value>
     <tag>OZONE, SECURITY, KERBEROS</tag>
     <description>The OzoneManager service principal. Ex om/_HOST@REALM.COM</description>
+  </property>
+  <property>
+    <name>ozone.om.kerberos.principal.pattern</name>
+    <value>*</value>
+    <description>
+      A client-side RegEx that can be configured to control
+      allowed realms to authenticate with (useful in cross-realm env.)
+    </description>
   </property>
   <property>
     <name>ozone.om.http.auth.kerberos.principal</name>
@@ -3119,6 +3160,32 @@
     </description>
   </property>
   <property>
+    <name>ozone.recon.scmclient.rpc.timeout</name>
+    <value>1m</value>
+    <tag>OZONE, RECON, SCM</tag>
+    <description>
+      RpcClient timeout on waiting for the response from SCM when Recon connects to SCM.
+    </description>
+  </property>
+  <property>
+    <name>ozone.recon.scmclient.max.retry.timeout</name>
+    <value>6s</value>
+    <tag>OZONE, RECON, SCM</tag>
+    <description>
+      Max retry timeout for SCM Client when Recon connects to SCM. This config is used to
+      dynamically compute the max retry count for SCM Client when failover happens. Check the
+      SCMClientConfig class getRetryCount method.
+    </description>
+  </property>
+  <property>
+    <name>ozone.recon.scmclient.failover.max.retry</name>
+    <value>3</value>
+    <tag>OZONE, RECON, SCM</tag>
+    <description>
+      Max retry count for SCM Client when failover happens.
+    </description>
+  </property>
+  <property>
     <name>ozone.recon.om.socket.timeout</name>
     <value>5s</value>
     <tag>OZONE, RECON, OM</tag>
@@ -3351,6 +3418,14 @@
     </description>
   </property>
   <property>
+    <name>hdds.datanode.slow.op.warning.threshold</name>
+    <tag>OZONE, DATANODE, PERFORMANCE</tag>
+    <value>500ms</value>
+    <description>
+      Thresholds for printing slow-operation audit logs.
+    </description>
+  </property>
+  <property>
     <name>ozone.om.keyname.character.check.enabled</name>
     <tag>OZONE, OM</tag>
     <value>false</value>
@@ -3528,6 +3603,25 @@
     <tag>OZONE, PERFORMANCE, OM</tag>
     <description>
       The time interval between successive SnapshotDeletingService
+      thread run.
+    </description>
+  </property>
+
+  <property>
+    <name>ozone.snapshot.directory.service.timeout</name>
+    <value>300s</value>
+    <tag>OZONE, PERFORMANCE, OM</tag>
+    <description>
+      Timeout value for SnapshotDirectoryCleaningService.
+    </description>
+  </property>
+
+  <property>
+    <name>ozone.snapshot.directory.service.interval</name>
+    <value>24h</value>
+    <tag>OZONE, PERFORMANCE, OM</tag>
+    <description>
+      The time interval between successive SnapshotDirectoryCleaningService
       thread run.
     </description>
   </property>
@@ -4185,6 +4279,15 @@
     <tag>OZONE, OM</tag>
     <description>
       Threadpool size for SST Dumptool which would be used for computing snapdiff when native library is enabled.
+    </description>
+  </property>
+
+  <property>
+    <name>ozone.om.snapshot.load.native.lib</name>
+    <value>true</value>
+    <tag>OZONE, OM</tag>
+    <description>
+      Load native library for performing optimized snapshot diff.
     </description>
   </property>
 

@@ -23,7 +23,6 @@ import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.scm.cli.ScmSubcommand;
 import org.apache.hadoop.hdds.scm.client.ScmClient;
 
-import static org.apache.hadoop.hdds.scm.cli.container.ContainerCommands.checkContainerExists;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Parameters;
 
@@ -42,7 +41,6 @@ public class CloseSubcommand extends ScmSubcommand {
 
   @Override
   public void execute(ScmClient scmClient) throws IOException {
-    checkContainerExists(scmClient, containerId);
     scmClient.closeContainer(containerId);
   }
 

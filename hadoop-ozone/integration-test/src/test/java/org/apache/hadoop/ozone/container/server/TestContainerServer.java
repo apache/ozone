@@ -62,23 +62,19 @@ import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
 import org.apache.hadoop.ozone.container.common.volume.VolumeSet;
 import org.apache.hadoop.ozone.container.ozoneimpl.ContainerController;
 import org.apache.ozone.test.GenericTestUtils;
-
 import com.google.common.collect.Maps;
-
-import static org.apache.hadoop.hdds.HddsConfigKeys.OZONE_METADATA_DIRS;
-import static org.apache.hadoop.hdds.protocol.MockDatanodeDetails.randomDatanodeDetails;
-
 import org.apache.ratis.rpc.RpcType;
-
-import static org.apache.hadoop.hdds.scm.ScmConfigKeys.HDDS_DATANODE_DIR_KEY;
-import static org.apache.ratis.rpc.SupportedRpcType.GRPC;
 import org.apache.ratis.util.function.CheckedBiConsumer;
 import org.apache.ratis.util.function.CheckedBiFunction;
-import org.junit.Assert;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
+import static org.apache.hadoop.hdds.HddsConfigKeys.OZONE_METADATA_DIRS;
+import static org.apache.hadoop.hdds.protocol.MockDatanodeDetails.randomDatanodeDetails;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.HDDS_DATANODE_DIR_KEY;
+import static org.apache.ratis.rpc.SupportedRpcType.GRPC;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 /**
  * Test Containers.
@@ -93,6 +89,7 @@ public class TestContainerServer {
   public static void setup() {
     DefaultMetricsSystem.setMiniClusterMode(true);
     CONF.set(HddsConfigKeys.HDDS_METADATA_DIR_NAME, TEST_DIR);
+    CONF.setBoolean(OzoneConfigKeys.DFS_CONTAINER_RATIS_DATASTREAM_ENABLED, false);
     DatanodeDetails dn = MockDatanodeDetails.randomDatanodeDetails();
     caClient = new DNCertificateClient(new SecurityConfig(CONF), null,
         dn, null, null, null);
@@ -174,7 +171,7 @@ public class TestContainerServer {
           ContainerTestHelper
               .getCreateContainerRequest(
                   ContainerTestHelper.getTestContainerID(), pipeline);
-      Assert.assertNotNull(request.getTraceID());
+      assertNotNull(request.getTraceID());
 
       client.sendCommand(request);
     } finally {

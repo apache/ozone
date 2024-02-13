@@ -25,6 +25,7 @@ import java.util.Random;
 import java.util.UUID;
 
 import org.apache.commons.lang3.tuple.Pair;
+import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
@@ -39,26 +40,21 @@ import org.apache.hadoop.ozone.om.KeyManagerImpl;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
-import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
 import org.apache.hadoop.ozone.om.request.OMClientRequest;
 import org.apache.hadoop.ozone.om.snapshot.ReferenceCounted;
-import org.apache.hadoop.ozone.om.snapshot.SnapshotCache;
 import org.apache.hadoop.ozone.om.upgrade.OMLayoutVersionManager;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyArgs;
 import org.apache.hadoop.ozone.security.acl.OzoneNativeAuthorizer;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.ozone.test.GenericTestUtils;
-import org.jetbrains.annotations.NotNull;
+import jakarta.annotation.Nonnull;
 import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.io.TempDir;
-import org.mockito.Mockito;
 
 import org.apache.hadoop.hdds.client.ContainerBlockID;
 import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.scm.container.common.helpers.AllocatedBlock;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
@@ -77,10 +73,13 @@ import org.apache.hadoop.util.Time;
 import org.slf4j.event.Level;
 
 import static org.apache.hadoop.ozone.om.request.OMRequestTestUtils.setupReplicationConfigValidation;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyInt;
-import static org.mockito.ArgumentMatchers.anyLong;
-import static org.mockito.ArgumentMatchers.anyString;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.mockito.Mockito.any;
+import static org.mockito.Mockito.anyInt;
+import static org.mockito.Mockito.anyLong;
+import static org.mockito.Mockito.anyString;
+import static org.mockito.Mockito.doNothing;
+import static org.mockito.Mockito.framework;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -110,8 +109,7 @@ public class TestOMKeyRequest {
   protected String volumeName;
   protected String bucketName;
   protected String keyName;
-  protected HddsProtos.ReplicationType replicationType;
-  protected HddsProtos.ReplicationFactor replicationFactor;
+  protected ReplicationConfig replicationConfig;
   protected long clientID;
   protected long scmBlockSize = 1000L;
   protected long dataSize;
@@ -119,16 +117,9 @@ public class TestOMKeyRequest {
   protected long txnLogId = 100000L;
   protected long version = 0L;
 
-  // Just setting ozoneManagerDoubleBuffer which does nothing.
-  protected OzoneManagerDoubleBufferHelper ozoneManagerDoubleBufferHelper =
-      ((response, transactionIndex) -> {
-        return null;
-      });
-
-
   @BeforeEach
   public void setup() throws Exception {
-    ozoneManager = Mockito.mock(OzoneManager.class);
+    ozoneManager = mock(OzoneManager.class);
     omMetrics = OMMetrics.create();
     OzoneConfiguration ozoneConfiguration = getOzoneConfiguration();
     ozoneConfiguration.set(OMConfigKeys.OZONE_OM_DB_DIRS,
@@ -146,21 +137,20 @@ public class TestOMKeyRequest {
     when(ozoneManager.getVersionManager()).thenReturn(lvm);
     when(ozoneManager.isRatisEnabled()).thenReturn(true);
     when(ozoneManager.isFilesystemSnapshotEnabled()).thenReturn(true);
-    auditLogger = Mockito.mock(AuditLogger.class);
+    auditLogger = mock(AuditLogger.class);
     when(ozoneManager.getAuditLogger()).thenReturn(auditLogger);
     when(ozoneManager.isAdmin(any(UserGroupInformation.class)))
         .thenReturn(true);
     when(ozoneManager.getBucketInfo(anyString(), anyString())).thenReturn(
         new OmBucketInfo.Builder().setVolumeName("").setBucketName("").build());
-    Mockito.doNothing().when(auditLogger).logWrite(any(AuditMessage.class));
+    doNothing().when(auditLogger).logWrite(any(AuditMessage.class));
 
     setupReplicationConfigValidation(ozoneManager, ozoneConfiguration);
 
-    scmClient = Mockito.mock(ScmClient.class);
-    ozoneBlockTokenSecretManager =
-        Mockito.mock(OzoneBlockTokenSecretManager.class);
-    scmBlockLocationProtocol = Mockito.mock(ScmBlockLocationProtocol.class);
-    metrics = Mockito.mock(OMPerformanceMetrics.class);
+    scmClient = mock(ScmClient.class);
+    ozoneBlockTokenSecretManager = mock(OzoneBlockTokenSecretManager.class);
+    scmBlockLocationProtocol = mock(ScmBlockLocationProtocol.class);
+    metrics = mock(OMPerformanceMetrics.class);
     keyManager = new KeyManagerImpl(ozoneManager, scmClient, ozoneConfiguration,
         metrics);
     when(ozoneManager.getScmClient()).thenReturn(scmClient);
@@ -177,7 +167,7 @@ public class TestOMKeyRequest {
     when(ozoneManager.getAccessAuthorizer())
         .thenReturn(new OzoneNativeAuthorizer());
 
-    ReferenceCounted<IOmMetadataReader, SnapshotCache> rcOmMetadataReader =
+    ReferenceCounted<IOmMetadataReader> rcOmMetadataReader =
         mock(ReferenceCounted.class);
     when(ozoneManager.getOmMetadataReader()).thenReturn(rcOmMetadataReader);
     // Init OmMetadataReader to let the test pass
@@ -217,8 +207,7 @@ public class TestOMKeyRequest {
     volumeName = UUID.randomUUID().toString();
     bucketName = UUID.randomUUID().toString();
     keyName = UUID.randomUUID().toString();
-    replicationFactor = HddsProtos.ReplicationFactor.ONE;
-    replicationType = HddsProtos.ReplicationType.RATIS;
+    replicationConfig = RatisReplicationConfig.getInstance(ReplicationFactor.ONE);
     clientID = Time.now();
     dataSize = 1000L;
     random = new Random();
@@ -244,7 +233,7 @@ public class TestOMKeyRequest {
     GenericTestUtils.setLogLevel(OMKeyCommitRequestWithFSO.LOG, Level.DEBUG);
   }
 
-  @NotNull
+  @Nonnull
   protected OzoneConfiguration getOzoneConfiguration() {
     return new OzoneConfiguration();
   }
@@ -268,7 +257,7 @@ public class TestOMKeyRequest {
     OmKeyInfo omKeyInfo =
         omMetadataManager.getOpenKeyTable(getBucketLayout()).get(openKey);
     if (doAssert) {
-      Assertions.assertNotNull(omKeyInfo, "Failed to find key in OpenKeyTable");
+      assertNotNull(omKeyInfo, "Failed to find key in OpenKeyTable");
     }
     return omKeyInfo;
   }
@@ -280,6 +269,6 @@ public class TestOMKeyRequest {
   @AfterEach
   public void stop() {
     omMetrics.unRegister();
-    Mockito.framework().clearInlineMocks();
+    framework().clearInlineMocks();
   }
 }

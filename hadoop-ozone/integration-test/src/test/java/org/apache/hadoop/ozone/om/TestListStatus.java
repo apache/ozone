@@ -33,10 +33,9 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 
 import java.io.IOException;
-import java.util.UUID;
 import java.util.List;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.
     OZONE_FS_ITERATE_BATCH_SIZE;
 
@@ -48,9 +47,6 @@ public class TestListStatus {
 
   private static MiniOzoneCluster cluster = null;
   private static OzoneConfiguration conf;
-  private static String clusterId;
-  private static String scmId;
-  private static String omId;
   private static OzoneBucket fsoOzoneBucket;
   private static OzoneClient client;
 
@@ -65,11 +61,7 @@ public class TestListStatus {
     conf = new OzoneConfiguration();
     conf.setBoolean(OMConfigKeys.OZONE_OM_ENABLE_FILESYSTEM_PATHS,
         true);
-    clusterId = UUID.randomUUID().toString();
-    scmId = UUID.randomUUID().toString();
-    omId = UUID.randomUUID().toString();
-    cluster = MiniOzoneCluster.newBuilder(conf).setClusterId(clusterId)
-        .setScmId(scmId).setOmId(omId).build();
+    cluster = MiniOzoneCluster.newBuilder(conf).build();
     cluster.waitForClusterToBeReady();
     client = cluster.newClient();
 
@@ -198,7 +190,7 @@ public class TestListStatus {
       OzoneFileStatus stNext = statuses.get(i + 1);
 
       System.out.println("status:"  + stCurr);
-      assertTrue(stCurr.getPath().compareTo(stNext.getPath()) < 0);
+      assertThat(stCurr.getPath().compareTo(stNext.getPath())).isLessThan(0);
     }
 
     if (!statuses.isEmpty()) {

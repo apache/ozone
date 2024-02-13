@@ -41,7 +41,7 @@ import org.apache.hadoop.ozone.container.upgrade.VersionedDatanodeFeatures.Schem
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import javax.annotation.Nullable;
+import jakarta.annotation.Nullable;
 
 import static org.apache.hadoop.ozone.OzoneConsts.CONTAINER_DB_NAME;
 import static org.apache.hadoop.ozone.container.common.utils.HddsVolumeUtil.initPerDiskDBStore;
@@ -79,7 +79,7 @@ public class HddsVolume extends StorageVolume {
   private final VolumeIOStats volumeIOStats;
   private final VolumeInfoMetrics volumeInfoMetrics;
 
-  private final AtomicLong committedBytes; // till Open containers become full
+  private final AtomicLong committedBytes = new AtomicLong(); // till Open containers become full
 
   // Mentions the type of volume
   private final VolumeType type = VolumeType.DATA_VOLUME;
@@ -121,7 +121,6 @@ public class HddsVolume extends StorageVolume {
           this.getStorageDir().toString());
       this.volumeInfoMetrics =
           new VolumeInfoMetrics(b.getVolumeRootStr(), this);
-      this.committedBytes = new AtomicLong(0);
 
       LOG.info("Creating HddsVolume: {} of storage type : {} capacity : {}",
           getStorageDir(), b.getStorageType(),
@@ -134,7 +133,6 @@ public class HddsVolume extends StorageVolume {
       this.setState(VolumeState.FAILED);
       volumeIOStats = null;
       volumeInfoMetrics = new VolumeInfoMetrics(b.getVolumeRootStr(), this);
-      committedBytes = null;
     }
 
   }

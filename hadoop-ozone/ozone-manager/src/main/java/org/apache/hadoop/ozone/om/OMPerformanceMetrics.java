@@ -108,11 +108,16 @@ public class OMPerformanceMetrics {
   private MutableRate createRatisRequestLatencyNs;
 
   @Metric(about = "Convert ratis response to om response nano seconds")
-  private MutableRate createOmResoonseLatencyNs;
+  private MutableRate createOmResponseLatencyNs;
 
   @Metric(about = "Ratis local command execution latency in nano seconds")
-  private MutableRate validateAndUpdateCacneLatencyNs;
+  private MutableRate validateAndUpdateCacheLatencyNs;
 
+  @Metric(about = "ACLs check latency in listKeys")
+  private MutableRate listKeysAclCheckLatencyNs;
+
+  @Metric(about = "resolveBucketLink latency in listKeys")
+  private MutableRate listKeysResolveBucketLatencyNs;
 
   public void addLookupLatency(long latencyInNs) {
     lookupLatencyNs.add(latencyInNs);
@@ -204,10 +209,18 @@ public class OMPerformanceMetrics {
   }
 
   public MutableRate getCreateOmResponseLatencyNs() {
-    return createOmResoonseLatencyNs;
+    return createOmResponseLatencyNs;
   }
 
-  public MutableRate getValidateAndUpdateCacneLatencyNs() {
-    return validateAndUpdateCacneLatencyNs;
+  public MutableRate getValidateAndUpdateCacheLatencyNs() {
+    return validateAndUpdateCacheLatencyNs;
+  }
+
+  public MutableRate getListKeysAclCheckLatencyNs() {
+    return listKeysAclCheckLatencyNs;
+  }
+
+  public MutableRate getListKeysResolveBucketLatencyNs() {
+    return listKeysResolveBucketLatencyNs;
   }
 }

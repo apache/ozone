@@ -56,10 +56,8 @@ import java.util.function.Function;
 
 import static java.util.Collections.singletonList;
 import static org.apache.hadoop.hdds.HddsConfigKeys.OZONE_METADATA_DIRS;
-import static org.apache.hadoop.hdds.scm.ScmConfig.ConfigStrings.HDDS_SCM_INIT_DEFAULT_LAYOUT_VERSION;
-import static org.apache.hadoop.ozone.MiniOzoneCluster.PortAllocator.getFreePort;
-import static org.apache.hadoop.ozone.MiniOzoneCluster.PortAllocator.localhostWithFreePort;
-import static org.apache.hadoop.ozone.om.OmUpgradeConfig.ConfigStrings.OZONE_OM_INIT_DEFAULT_LAYOUT_VERSION;
+import static org.apache.ozone.test.GenericTestUtils.PortAllocator.getFreePort;
+import static org.apache.ozone.test.GenericTestUtils.PortAllocator.localhostWithFreePort;
 
 /**
  * MiniOzoneHAClusterImpl creates a complete in-process Ozone cluster
@@ -170,18 +168,14 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
         .findFirst().orElse(null);
   }
 
-  private OzoneManager getOMLeader(boolean waitForLeaderElection)
+  public OzoneManager waitForLeaderOM()
       throws TimeoutException, InterruptedException {
-    if (waitForLeaderElection) {
-      final OzoneManager[] om = new OzoneManager[1];
-      GenericTestUtils.waitFor(() -> {
-        om[0] = getOMLeader();
-        return om[0] != null;
-      }, 200, waitForClusterToBeReadyTimeout);
-      return om[0];
-    } else {
-      return getOMLeader();
-    }
+    final OzoneManager[] om = new OzoneManager[1];
+    GenericTestUtils.waitFor(() -> {
+      om[0] = getOMLeader();
+      return om[0] != null;
+    }, 200, waitForClusterToBeReadyTimeout);
+    return om[0];
   }
 
   /**
@@ -221,8 +215,12 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
 
   @Override
   public void restartOzoneManager() throws IOException {
-    for (OzoneManager ozoneManager : omhaService.getActiveServices()) {
-      stopOM(ozoneManager);
+    for (OzoneManager ozoneManager : omhaService.getServices()) {
+      try {
+        stopOM(ozoneManager);
+      } catch (Exception e) {
+        LOG.warn("Failed to stop OM: {}", ozoneManager.getOMServiceId());
+      }
     }
     omhaService.inactiveServices().forEachRemaining(omhaService::activate);
     for (OzoneManager ozoneManager : omhaService.getServices()) {
@@ -427,7 +425,6 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
 
     protected void initOMRatisConf() {
       conf.setBoolean(OMConfigKeys.OZONE_OM_RATIS_ENABLE_KEY, true);
-      conf.setInt(OMConfigKeys.OZONE_OM_HANDLER_COUNT_KEY, numOfOmHandlers);
 
       // If test change the following config values we will respect,
       // otherwise we will set lower timeout values.
@@ -487,11 +484,6 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
             // Set metadata/DB dir base path
             String metaDirPath = path + "/" + nodeId;
             config.set(OZONE_METADATA_DIRS, metaDirPath);
-
-            // Set non standard layout version if needed.
-            omLayoutVersion.ifPresent(integer ->
-                config.set(OZONE_OM_INIT_DEFAULT_LAYOUT_VERSION,
-                    String.valueOf(integer)));
 
             OzoneManager.omInit(config);
             OzoneManager om = OzoneManager.createOm(config);
@@ -555,10 +547,6 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
             scmConfig.set(OZONE_METADATA_DIRS, metaDirPath);
             scmConfig.set(ScmConfigKeys.OZONE_SCM_NODE_ID_KEY, nodeId);
             scmConfig.setBoolean(ScmConfigKeys.OZONE_SCM_HA_ENABLE_KEY, true);
-
-            scmLayoutVersion.ifPresent(integer ->
-                scmConfig.set(HDDS_SCM_INIT_DEFAULT_LAYOUT_VERSION,
-                    String.valueOf(integer)));
 
             configureSCM();
             if (i == 1) {
@@ -727,7 +715,7 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
     int retryCount = 0;
     OzoneManager om = null;
 
-    OzoneManager omLeader = getOMLeader(true);
+    OzoneManager omLeader = waitForLeaderOM();
     long leaderSnapshotIndex = omLeader.getRatisSnapshotIndex();
 
     while (true) {

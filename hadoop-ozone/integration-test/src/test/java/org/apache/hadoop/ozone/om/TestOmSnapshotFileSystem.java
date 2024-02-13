@@ -82,6 +82,7 @@ import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_SCHEME;
 import static org.apache.hadoop.ozone.om.OmSnapshotManager.getSnapshotPath;
 import static org.apache.hadoop.ozone.om.helpers.BucketLayout.FILE_SYSTEM_OPTIMIZED;
 import static org.apache.hadoop.ozone.om.helpers.BucketLayout.LEGACY;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -123,12 +124,8 @@ public abstract class TestOmSnapshotFileSystem {
   @BeforeAll
   public static void init() throws Exception {
     conf = new OzoneConfiguration();
-    String clusterId = UUID.randomUUID().toString();
-    String scmId = UUID.randomUUID().toString();
-    String omId = UUID.randomUUID().toString();
     conf.setBoolean(OMConfigKeys.OZONE_OM_ENABLE_FILESYSTEM_PATHS, true);
-    cluster = MiniOzoneCluster.newBuilder(conf).setClusterId(clusterId)
-        .setScmId(scmId).setOmId(omId).build();
+    cluster = MiniOzoneCluster.newBuilder(conf).build();
     cluster.waitForClusterToBeReady();
     client = cluster.newClient();
 
@@ -424,10 +421,10 @@ public abstract class TestOmSnapshotFileSystem {
     final String errorMsg1 = "no longer active";
     FileNotFoundException exception = assertThrows(FileNotFoundException.class,
         () -> o3fs.listStatus(snapshotRoot));
-    assertTrue(exception.getMessage().contains(errorMsg1));
+    assertThat(exception.getMessage()).contains(errorMsg1);
     exception = assertThrows(FileNotFoundException.class,
         () -> o3fs.listStatus(snapshotParent));
-    assertTrue(exception.getMessage().contains(errorMsg1));
+    assertThat(exception.getMessage()).contains(errorMsg1);
 
     // Note: Different error message due to inconsistent FNFE client-side
     //  handling in BasicOzoneClientAdapterImpl#getFileStatus
@@ -435,10 +432,10 @@ public abstract class TestOmSnapshotFileSystem {
     final String errorMsg2 = "No such file or directory";
     exception = assertThrows(FileNotFoundException.class,
         () -> o3fs.getFileStatus(snapshotKey1));
-    assertTrue(exception.getMessage().contains(errorMsg2));
+    assertThat(exception.getMessage()).contains(errorMsg2);
     exception = assertThrows(FileNotFoundException.class,
         () -> o3fs.getFileStatus(snapshotKey2));
-    assertTrue(exception.getMessage().contains(errorMsg2));
+    assertThat(exception.getMessage()).contains(errorMsg2);
   }
 
   @Test
@@ -581,7 +578,7 @@ public abstract class TestOmSnapshotFileSystem {
   }
 
   @Test
-  public void testReadFileFromSnapshot() throws Exception {
+  void testReadFileFromSnapshot() throws Exception {
     String keyName = "dir/file";
     byte[] strBytes = "Sample text".getBytes(StandardCharsets.UTF_8);
     Path parent = new Path("/");
@@ -611,8 +608,6 @@ public abstract class TestOmSnapshotFileSystem {
       byte[] readBytes = new byte[strBytes.length];
       System.arraycopy(buffer.array(), 0, readBytes, 0, strBytes.length);
       assertArrayEquals(strBytes, readBytes);
-    } catch (Exception e) {
-      fail("Failed to read file, Exception : " + e);
     }
 
     deleteSnapshot(snapshotName);
@@ -718,7 +713,7 @@ public abstract class TestOmSnapshotFileSystem {
         "Total directories listed do not match the existing directories");
 
     for (int i = 0; i < numDirs; i++) {
-      assertTrue(paths.contains(fileStatuses[i].getPath().getName()));
+      assertThat(paths).contains(fileStatuses[i].getPath().getName());
     }
 
     deleteSnapshot(snapshotName);

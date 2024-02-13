@@ -54,12 +54,14 @@ import org.apache.hadoop.hdds.scm.container.replication.health.OpenContainerHand
 import org.apache.hadoop.hdds.scm.container.replication.health.QuasiClosedContainerHandler;
 import org.apache.hadoop.hdds.scm.container.replication.health.RatisReplicationCheckHandler;
 import org.apache.hadoop.hdds.scm.container.replication.health.RatisUnhealthyReplicationCheckHandler;
+import org.apache.hadoop.hdds.scm.container.replication.health.VulnerableUnhealthyReplicasHandler;
 import org.apache.hadoop.hdds.scm.events.SCMEvents;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.ha.SCMService;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.node.NodeStatus;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
+import org.apache.hadoop.hdds.scm.pipeline.PipelineNotFoundException;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
 import org.apache.hadoop.ozone.common.statemachine.InvalidStateTransitionException;
@@ -279,7 +281,8 @@ public class ReplicationManager implements SCMService {
         .addNext(ratisReplicationCheckHandler)
         .addNext(new ClosedWithUnhealthyReplicasHandler(this))
         .addNext(ecMisReplicationCheckHandler)
-        .addNext(new RatisUnhealthyReplicationCheckHandler());
+        .addNext(new RatisUnhealthyReplicationCheckHandler())
+        .addNext(new VulnerableUnhealthyReplicasHandler(this));
     start();
   }
 
@@ -1542,6 +1545,15 @@ public class ReplicationManager implements SCMService {
 
   private static boolean isEC(ReplicationConfig replicationConfig) {
     return replicationConfig.getReplicationType() == EC;
+  }
+
+  public boolean hasHealthyPipeline(ContainerInfo container) {
+    try {
+      return scmContext.getScm().getPipelineManager()
+          .getPipeline(container.getPipelineID()) != null;
+    } catch (PipelineNotFoundException e) {
+      return false;
+    }
   }
 }
 

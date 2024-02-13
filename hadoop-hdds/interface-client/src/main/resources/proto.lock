@@ -78,6 +78,14 @@
               {
                 "name": "GetCommittedBlockLength",
                 "integer": 18
+              },
+              {
+                "name": "StreamInit",
+                "integer": 19
+              },
+              {
+                "name": "StreamWrite",
+                "integer": 20
               }
             ]
           },
@@ -346,6 +354,31 @@
               {
                 "name": "V1",
                 "integer": 1
+              }
+            ]
+          },
+          {
+            "name": "CopyContainerCompressProto",
+            "enum_fields": [
+              {
+                "name": "NO_COMPRESSION",
+                "integer": 1
+              },
+              {
+                "name": "GZIP",
+                "integer": 2
+              },
+              {
+                "name": "LZ4",
+                "integer": 3
+              },
+              {
+                "name": "SNAPPY",
+                "integer": 4
+              },
+              {
+                "name": "ZSTD",
+                "integer": 5
               }
             ]
           }
@@ -1100,6 +1133,12 @@
                 "name": "checksumData",
                 "type": "ChecksumData",
                 "required": true
+              },
+              {
+                "id": 6,
+                "name": "stripeChecksum",
+                "type": "bytes",
+                "optional": true
               }
             ]
           },
@@ -1150,7 +1189,7 @@
                 "id": 2,
                 "name": "chunkData",
                 "type": "ChunkInfo",
-                "required": true
+                "optional": true
               },
               {
                 "id": 3,
@@ -1204,12 +1243,14 @@
               {
                 "id": 3,
                 "name": "data",
-                "type": "bytes"
+                "type": "bytes",
+                "oneof_parent": "responseData"
               },
               {
                 "id": 4,
                 "name": "dataBuffers",
-                "type": "DataBuffers"
+                "type": "DataBuffers",
+                "oneof_parent": "responseData"
               }
             ]
           },
@@ -1366,6 +1407,12 @@
                 "name": "version",
                 "type": "uint32",
                 "optional": true
+              },
+              {
+                "id": 5,
+                "name": "compression",
+                "type": "CopyContainerCompressProto",
+                "optional": true
               }
             ]
           },
@@ -1409,6 +1456,44 @@
                 "optional": true
               }
             ]
+          },
+          {
+            "name": "SendContainerRequest",
+            "fields": [
+              {
+                "id": 1,
+                "name": "containerID",
+                "type": "int64",
+                "required": true
+              },
+              {
+                "id": 2,
+                "name": "offset",
+                "type": "uint64",
+                "required": true
+              },
+              {
+                "id": 3,
+                "name": "data",
+                "type": "bytes",
+                "required": true
+              },
+              {
+                "id": 4,
+                "name": "checksum",
+                "type": "int64",
+                "optional": true
+              },
+              {
+                "id": 5,
+                "name": "compression",
+                "type": "CopyContainerCompressProto",
+                "optional": true
+              }
+            ]
+          },
+          {
+            "name": "SendContainerResponse"
           }
         ],
         "services": [
@@ -1432,6 +1517,12 @@
                 "in_type": "CopyContainerRequestProto",
                 "out_type": "CopyContainerResponseProto",
                 "out_streamed": true
+              },
+              {
+                "name": "upload",
+                "in_type": "SendContainerRequest",
+                "out_type": "SendContainerResponse",
+                "in_streamed": true
               }
             ]
           }
@@ -1447,6 +1538,150 @@
           {
             "name": "java_outer_classname",
             "value": "ContainerProtos"
+          },
+          {
+            "name": "java_generate_equals_and_hash",
+            "value": "true"
+          }
+        ]
+      }
+    },
+    {
+      "protopath": "ReconfigureProtocol.proto",
+      "def": {
+        "messages": [
+          {
+            "name": "GetServerNameRequestProto"
+          },
+          {
+            "name": "GetServerNameResponseProto",
+            "fields": [
+              {
+                "id": 1,
+                "name": "name",
+                "type": "string",
+                "required": true
+              }
+            ]
+          },
+          {
+            "name": "StartReconfigureRequestProto"
+          },
+          {
+            "name": "StartReconfigureResponseProto"
+          },
+          {
+            "name": "GetReconfigureStatusRequestProto"
+          },
+          {
+            "name": "GetConfigurationChangeProto",
+            "fields": [
+              {
+                "id": 1,
+                "name": "name",
+                "type": "string",
+                "required": true
+              },
+              {
+                "id": 2,
+                "name": "oldValue",
+                "type": "string",
+                "required": true
+              },
+              {
+                "id": 3,
+                "name": "newValue",
+                "type": "string",
+                "optional": true
+              },
+              {
+                "id": 4,
+                "name": "errorMessage",
+                "type": "string",
+                "optional": true
+              }
+            ]
+          },
+          {
+            "name": "GetReconfigureStatusResponseProto",
+            "fields": [
+              {
+                "id": 1,
+                "name": "startTime",
+                "type": "int64",
+                "required": true
+              },
+              {
+                "id": 2,
+                "name": "endTime",
+                "type": "int64",
+                "optional": true
+              },
+              {
+                "id": 3,
+                "name": "changes",
+                "type": "GetConfigurationChangeProto",
+                "is_repeated": true
+              }
+            ]
+          },
+          {
+            "name": "ListReconfigurePropertiesRequestProto"
+          },
+          {
+            "name": "ListReconfigurePropertiesResponseProto",
+            "fields": [
+              {
+                "id": 1,
+                "name": "name",
+                "type": "string",
+                "is_repeated": true
+              }
+            ]
+          }
+        ],
+        "services": [
+          {
+            "name": "ReconfigureProtocolService",
+            "rpcs": [
+              {
+                "name": "getServerName",
+                "in_type": "GetServerNameRequestProto",
+                "out_type": "GetServerNameResponseProto"
+              },
+              {
+                "name": "getReconfigureStatus",
+                "in_type": "GetReconfigureStatusRequestProto",
+                "out_type": "GetReconfigureStatusResponseProto"
+              },
+              {
+                "name": "startReconfigure",
+                "in_type": "StartReconfigureRequestProto",
+                "out_type": "StartReconfigureResponseProto"
+              },
+              {
+                "name": "listReconfigureProperties",
+                "in_type": "ListReconfigurePropertiesRequestProto",
+                "out_type": "ListReconfigurePropertiesResponseProto"
+              }
+            ]
+          }
+        ],
+        "package": {
+          "name": "hadoop.hdds"
+        },
+        "options": [
+          {
+            "name": "java_package",
+            "value": "org.apache.hadoop.hdds.protocol.proto"
+          },
+          {
+            "name": "java_outer_classname",
+            "value": "ReconfigureProtocolProtos"
+          },
+          {
+            "name": "java_generic_services",
+            "value": "true"
           },
           {
             "name": "java_generate_equals_and_hash",
@@ -2192,6 +2427,12 @@
                 "name": "node",
                 "type": "DatanodeDetailsProto",
                 "optional": true
+              },
+              {
+                "id": 5,
+                "name": "containerCount",
+                "type": "int64",
+                "optional": true
               }
             ]
           },
@@ -2348,6 +2589,46 @@
           },
           {
             "name": "AddScmResponseProto",
+            "fields": [
+              {
+                "id": 1,
+                "name": "success",
+                "type": "bool",
+                "required": true
+              },
+              {
+                "id": 2,
+                "name": "scmId",
+                "type": "string",
+                "optional": true
+              }
+            ]
+          },
+          {
+            "name": "RemoveScmRequestProto",
+            "fields": [
+              {
+                "id": 1,
+                "name": "clusterId",
+                "type": "string",
+                "required": true
+              },
+              {
+                "id": 2,
+                "name": "scmId",
+                "type": "string",
+                "required": true
+              },
+              {
+                "id": 3,
+                "name": "ratisAddr",
+                "type": "string",
+                "required": true
+              }
+            ]
+          },
+          {
+            "name": "RemoveScmResponseProto",
             "fields": [
               {
                 "id": 1,
@@ -2538,7 +2819,13 @@
                 "id": 4,
                 "name": "omCertSerialId",
                 "type": "string",
-                "required": true
+                "optional": true,
+                "options": [
+                  {
+                    "name": "deprecated",
+                    "value": "true"
+                  }
+                ]
               },
               {
                 "id": 5,
@@ -2551,6 +2838,12 @@
                 "name": "maxLength",
                 "type": "uint64",
                 "required": true
+              },
+              {
+                "id": 7,
+                "name": "secretKeyId",
+                "type": "UUID",
+                "optional": true
               }
             ]
           },
@@ -2671,6 +2964,12 @@
                 "name": "bcsId",
                 "type": "int64",
                 "required": true
+              },
+              {
+                "id": 5,
+                "name": "state",
+                "type": "string",
+                "optional": true
               }
             ]
           },
@@ -2875,6 +3174,119 @@
                 "id": 19,
                 "name": "nextIterationIndex",
                 "type": "int32",
+                "optional": true
+              },
+              {
+                "id": 20,
+                "name": "moveReplicationTimeout",
+                "type": "int64",
+                "optional": true
+              }
+            ]
+          },
+          {
+            "name": "TransferLeadershipRequestProto",
+            "fields": [
+              {
+                "id": 1,
+                "name": "newLeaderId",
+                "type": "string",
+                "required": true
+              }
+            ]
+          },
+          {
+            "name": "TransferLeadershipResponseProto"
+          },
+          {
+            "name": "DeletedBlocksTransactionInfo",
+            "fields": [
+              {
+                "id": 1,
+                "name": "txID",
+                "type": "int64",
+                "optional": true
+              },
+              {
+                "id": 2,
+                "name": "containerID",
+                "type": "int64",
+                "optional": true
+              },
+              {
+                "id": 3,
+                "name": "localID",
+                "type": "int64",
+                "is_repeated": true
+              },
+              {
+                "id": 4,
+                "name": "count",
+                "type": "int32",
+                "optional": true
+              }
+            ]
+          },
+          {
+            "name": "CompactionFileInfoProto",
+            "fields": [
+              {
+                "id": 1,
+                "name": "fileName",
+                "type": "string",
+                "optional": true
+              },
+              {
+                "id": 2,
+                "name": "startKey",
+                "type": "string",
+                "optional": true
+              },
+              {
+                "id": 3,
+                "name": "endKey",
+                "type": "string",
+                "optional": true
+              },
+              {
+                "id": 4,
+                "name": "columnFamily",
+                "type": "string",
+                "optional": true
+              }
+            ]
+          },
+          {
+            "name": "CompactionLogEntryProto",
+            "fields": [
+              {
+                "id": 1,
+                "name": "dbSequenceNumber",
+                "type": "uint64",
+                "optional": true
+              },
+              {
+                "id": 2,
+                "name": "compactionTime",
+                "type": "uint64",
+                "optional": true
+              },
+              {
+                "id": 3,
+                "name": "inputFileIntoList",
+                "type": "CompactionFileInfoProto",
+                "is_repeated": true
+              },
+              {
+                "id": 4,
+                "name": "outputFileIntoList",
+                "type": "CompactionFileInfoProto",
+                "is_repeated": true
+              },
+              {
+                "id": 5,
+                "name": "compactionReason",
+                "type": "string",
                 "optional": true
               }
             ]

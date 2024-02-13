@@ -46,13 +46,10 @@ import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ratis.protocol.RaftGroupId;
 import org.junit.jupiter.api.AfterEach;
-import org.junit.Assert;
 import org.junit.jupiter.api.BeforeEach;
-import org.apache.ozone.test.tag.Flaky;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 import org.mockito.ArgumentCaptor;
-import org.mockito.Mockito;
 
 import java.io.IOException;
 import java.util.List;
@@ -61,7 +58,14 @@ import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.Mockito.any;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.timeout;
+import static org.mockito.Mockito.verify;
 
 /**
  * Tests for Pipeline Closing.
@@ -126,8 +130,8 @@ public class TestPipelineClose {
         .getContainersInPipeline(ratisContainer.getPipeline().getId());
 
     ContainerID cId = ratisContainer.getContainerInfo().containerID();
-    Assert.assertEquals(1, set.size());
-    set.forEach(containerID -> Assert.assertEquals(containerID, cId));
+    assertEquals(1, set.size());
+    set.forEach(containerID -> assertEquals(containerID, cId));
 
     // Now close the container and it should not show up while fetching
     // containers by pipeline
@@ -138,14 +142,14 @@ public class TestPipelineClose {
 
     Set<ContainerID> setClosed = pipelineManager
         .getContainersInPipeline(ratisContainer.getPipeline().getId());
-    Assert.assertEquals(0, setClosed.size());
+    assertEquals(0, setClosed.size());
 
     pipelineManager.closePipeline(ratisContainer.getPipeline().getId());
     pipelineManager.deletePipeline(ratisContainer.getPipeline().getId());
     for (DatanodeDetails dn : ratisContainer.getPipeline().getNodes()) {
       // Assert that the pipeline has been removed from Node2PipelineMap as well
-      Assert.assertFalse(scm.getScmNodeManager().getPipelines(dn)
-          .contains(ratisContainer.getPipeline().getId()));
+      assertThat(scm.getScmNodeManager().getPipelines(dn))
+          .doesNotContain(ratisContainer.getPipeline().getId());
     }
   }
 
@@ -154,7 +158,7 @@ public class TestPipelineClose {
       throws IOException, TimeoutException, InterruptedException {
     Set<ContainerID> setOpen = pipelineManager.getContainersInPipeline(
         ratisContainer.getPipeline().getId());
-    Assert.assertEquals(1, setOpen.size());
+    assertEquals(1, setOpen.size());
 
     pipelineManager
         .closePipeline(ratisContainer.getPipeline(), false);
@@ -207,13 +211,11 @@ public class TestPipelineClose {
   }
 
   @Test
-  @Flaky("HDDS-5604")
-  public void testPipelineCloseWithLogFailure()
+  void testPipelineCloseWithLogFailure()
       throws IOException, TimeoutException {
-
     EventQueue eventQ = (EventQueue) scm.getEventQueue();
     PipelineActionHandler pipelineActionTest =
-        Mockito.mock(PipelineActionHandler.class);
+        mock(PipelineActionHandler.class);
     eventQ.addHandler(SCMEvents.PIPELINE_ACTIONS, pipelineActionTest);
     ArgumentCaptor<PipelineActionsFromDatanode> actionCaptor =
         ArgumentCaptor.forClass(PipelineActionsFromDatanode.class);
@@ -227,11 +229,7 @@ public class TestPipelineClose {
     Pipeline openPipeline = containerWithPipeline.getPipeline();
     RaftGroupId groupId = RaftGroupId.valueOf(openPipeline.getId().getId());
 
-    try {
-      pipelineManager.getPipeline(openPipeline.getId());
-    } catch (PipelineNotFoundException e) {
-      Assert.assertTrue("pipeline should exist", false);
-    }
+    pipelineManager.getPipeline(openPipeline.getId());
 
     DatanodeDetails datanodeDetails = openPipeline.getNodes().get(0);
     int index = cluster.getHddsDatanodeIndex(datanodeDetails);
@@ -245,12 +243,10 @@ public class TestPipelineClose {
      * This is expected to trigger an immediate pipeline actions report to SCM
      */
     xceiverRatis.handleNodeLogFailure(groupId, null);
-
-    // verify SCM receives a pipeline action report "immediately"
-    Mockito.verify(pipelineActionTest, Mockito.timeout(100))
+    verify(pipelineActionTest, timeout(1500).atLeastOnce())
         .onMessage(
             actionCaptor.capture(),
-            Mockito.any(EventPublisher.class));
+            any(EventPublisher.class));
 
     PipelineActionsFromDatanode actionsFromDatanode =
         actionCaptor.getValue();
@@ -277,8 +273,7 @@ public class TestPipelineClose {
       }
     }
 
-    Assert.assertTrue("SCM did not receive a Close action for the Pipeline",
-        found);
-    return found;
+    assertTrue(found, "SCM did not receive a Close action for the Pipeline");
+    return true;
   }
 }

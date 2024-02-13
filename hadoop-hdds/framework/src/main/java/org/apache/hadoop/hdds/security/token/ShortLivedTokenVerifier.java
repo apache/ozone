@@ -26,8 +26,6 @@ import org.apache.hadoop.hdds.security.symmetric.SecretKeyVerifierClient;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.token.Token;
 
-import java.io.ByteArrayInputStream;
-import java.io.DataInputStream;
 import java.io.IOException;
 import java.time.Instant;
 import java.util.Objects;
@@ -75,8 +73,7 @@ public abstract class
 
     T tokenId = createTokenIdentifier();
     try {
-      tokenId.readFields(new DataInputStream(new ByteArrayInputStream(
-          token.getIdentifier())));
+      tokenId.readFromByteArray(token.getIdentifier());
     } catch (IOException ex) {
       throw new BlockTokenException("Failed to decode token : " + token);
     }

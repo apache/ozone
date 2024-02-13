@@ -20,12 +20,9 @@ package org.apache.hadoop.ozone;
 import java.io.IOException;
 import java.util.List;
 import java.util.Optional;
-import java.util.OptionalInt;
 import java.util.UUID;
 import java.util.concurrent.TimeoutException;
-import java.util.concurrent.atomic.AtomicInteger;
 
-import org.apache.hadoop.conf.StorageUnit;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
@@ -300,11 +297,8 @@ public interface MiniOzoneCluster extends AutoCloseable {
   @SuppressWarnings("visibilitymodifier")
   abstract class Builder {
 
-    protected static final int DEFAULT_HB_INTERVAL_MS = 1000;
-    protected static final int DEFAULT_HB_PROCESSOR_INTERVAL_MS = 100;
     protected static final int ACTIVE_OMS_NOT_SET = -1;
     protected static final int ACTIVE_SCMS_NOT_SET = -1;
-    protected static final int DEFAULT_PIPELINE_LIMIT = 3;
     protected static final int DEFAULT_RATIS_RPC_TIMEOUT_SEC = 1;
 
     protected OzoneConfiguration conf;
@@ -320,39 +314,19 @@ public interface MiniOzoneCluster extends AutoCloseable {
     protected int numOfActiveSCMs = ACTIVE_SCMS_NOT_SET;
     protected SCMConfigurator scmConfigurator;
 
-    protected Optional<Boolean> enableTrace = Optional.of(false);
-    protected Optional<Integer> hbInterval = Optional.empty();
-    protected Optional<Integer> hbProcessorInterval = Optional.empty();
-    protected Optional<String> scmId = Optional.empty();
-    protected Optional<String> omId = Optional.empty();
+    protected String scmId = UUID.randomUUID().toString();
+    protected String omId = UUID.randomUUID().toString();
     
-    protected Boolean enableContainerDatastream = true;
     protected Optional<String> datanodeReservedSpace = Optional.empty();
-    protected Optional<Integer> chunkSize = Optional.empty();
-    protected OptionalInt streamBufferSize = OptionalInt.empty();
-    protected Optional<Long> streamBufferFlushSize = Optional.empty();
-    protected Optional<Long> dataStreamBufferFlushSize = Optional.empty();
-    protected Optional<Long> datastreamWindowSize = Optional.empty();
-    protected Optional<Long> streamBufferMaxSize = Optional.empty();
-    protected OptionalInt dataStreamMinPacketSize = OptionalInt.empty();
-    protected Optional<Long> blockSize = Optional.empty();
-    protected Optional<StorageUnit> streamBufferSizeUnit = Optional.empty();
     protected boolean includeRecon = false;
 
-
-    protected Optional<Integer> omLayoutVersion = Optional.empty();
-    protected Optional<Integer> scmLayoutVersion = Optional.empty();
     protected Optional<Integer> dnLayoutVersion = Optional.empty();
 
-    // Use relative smaller number of handlers for testing
-    protected int numOfOmHandlers = 20;
-    protected int numOfScmHandlers = 20;
     protected int numOfDatanodes = 3;
     protected int numDataVolumes = 1;
     protected boolean  startDataNodes = true;
     protected CertificateClient certClient;
     protected SecretKeyClient secretKeyClient;
-    protected int pipelineNumLimit = DEFAULT_PIPELINE_LIMIT;
 
     protected Builder(OzoneConfiguration conf) {
       this.conf = conf;
@@ -376,14 +350,11 @@ public interface MiniOzoneCluster extends AutoCloseable {
      * Sets the cluster Id.
      *
      * @param id cluster Id
-     *
-     * @return MiniOzoneCluster.Builder
      */
-    public Builder setClusterId(String id) {
+    void setClusterId(String id) {
       clusterId = id;
       path = GenericTestUtils.getTempPath(
           MiniOzoneClusterImpl.class.getSimpleName() + "-" + clusterId);
-      return this;
     }
 
     /**
@@ -420,30 +391,6 @@ public interface MiniOzoneCluster extends AutoCloseable {
     }
 
     /**
-     * Sets the SCM id.
-     *
-     * @param id SCM Id
-     *
-     * @return MiniOzoneCluster.Builder
-     */
-    public Builder setScmId(String id) {
-      scmId = Optional.of(id);
-      return this;
-    }
-
-    /**
-     * Sets the OM id.
-     *
-     * @param id OM Id
-     *
-     * @return MiniOzoneCluster.Builder
-     */
-    public Builder setOmId(String id) {
-      omId = Optional.of(id);
-      return this;
-    }
-
-    /**
      * Sets the number of HddsDatanodes to be started as part of
      * MiniOzoneCluster.
      *
@@ -469,54 +416,6 @@ public interface MiniOzoneCluster extends AutoCloseable {
     }
 
     /**
-     * Sets the total number of pipelines to create.
-     * @param val number of pipelines
-     * @return MiniOzoneCluster.Builder
-     */
-    public Builder setTotalPipelineNumLimit(int val) {
-      pipelineNumLimit = val;
-      return this;
-    }
-
-    /**
-     * Sets the number of HeartBeat Interval of Datanodes, the value should be
-     * in MilliSeconds.
-     *
-     * @param val HeartBeat interval in milliseconds
-     *
-     * @return MiniOzoneCluster.Builder
-     */
-    public Builder setHbInterval(int val) {
-      hbInterval = Optional.of(val);
-      return this;
-    }
-
-    /**
-     * Sets the number of HeartBeat Processor Interval of Datanodes,
-     * the value should be in MilliSeconds.
-     *
-     * @param val HeartBeat Processor interval in milliseconds
-     *
-     * @return MiniOzoneCluster.Builder
-     */
-    public Builder setHbProcessorInterval(int val) {
-      hbProcessorInterval = Optional.of(val);
-      return this;
-    }
-
-    /**
-     * When set to true, enables trace level logging.
-     *
-     * @param trace true or false
-     *
-     * @return MiniOzoneCluster.Builder
-     */
-    public Builder setTrace(Boolean trace) {
-      enableTrace = Optional.of(trace);
-      return this;
-    }
-
-    /**
      * Sets the reserved space
      * {@link org.apache.hadoop.hdds.scm.ScmConfigKeys}
      * HDDS_DATANODE_DIR_DU_RESERVED
@@ -534,66 +433,6 @@ public interface MiniOzoneCluster extends AutoCloseable {
       return this;
     }
 
-    /**
-     * Sets the chunk size.
-     *
-     * @return MiniOzoneCluster.Builder
-     */
-    public Builder setChunkSize(int size) {
-      chunkSize = Optional.of(size);
-      return this;
-    }
-
-    public Builder setStreamBufferSize(int size) {
-      streamBufferSize = OptionalInt.of(size);
-      return this;
-    }
-
-    /**
-     * Sets the flush size for stream buffer.
-     *
-     * @return MiniOzoneCluster.Builder
-     */
-    public Builder setStreamBufferFlushSize(long size) {
-      streamBufferFlushSize = Optional.of(size);
-      return this;
-    }
-
-    /**
-     * Sets the max size for stream buffer.
-     *
-     * @return MiniOzoneCluster.Builder
-     */
-    public Builder setStreamBufferMaxSize(long size) {
-      streamBufferMaxSize = Optional.of(size);
-      return this;
-    }
-
-    public Builder setDataStreamBufferFlushize(long size) {
-      dataStreamBufferFlushSize = Optional.of(size);
-      return this;
-    }
-
-    public Builder setDataStreamMinPacketSize(int size) {
-      dataStreamMinPacketSize = OptionalInt.of(size);
-      return this;
-    }
-
-    public Builder setDataStreamStreamWindowSize(long size) {
-      datastreamWindowSize = Optional.of(size);
-      return this;
-    }
-
-    /**
-     * Sets the block size for stream buffer.
-     *
-     * @return MiniOzoneCluster.Builder
-     */
-    public Builder setBlockSize(long size) {
-      blockSize = Optional.of(size);
-      return this;
-    }
-
     public Builder setNumOfOzoneManagers(int numOMs) {
       this.numOfOMs = numOMs;
       return this;
@@ -601,11 +440,6 @@ public interface MiniOzoneCluster extends AutoCloseable {
 
     public Builder setNumOfActiveOMs(int numActiveOMs) {
       this.numOfActiveOMs = numActiveOMs;
-      return this;
-    }
-
-    public Builder setStreamBufferSizeUnit(StorageUnit unit) {
-      this.streamBufferSizeUnit = Optional.of(unit);
       return this;
     }
 
@@ -634,16 +468,6 @@ public interface MiniOzoneCluster extends AutoCloseable {
       return this;
     }
 
-    public Builder setScmLayoutVersion(int layoutVersion) {
-      scmLayoutVersion = Optional.of(layoutVersion);
-      return this;
-    }
-
-    public Builder setOmLayoutVersion(int layoutVersion) {
-      omLayoutVersion = Optional.of(layoutVersion);
-      return this;
-    }
-
     public Builder setDnLayoutVersion(int layoutVersion) {
       dnLayoutVersion = Optional.of(layoutVersion);
       return this;
@@ -657,36 +481,5 @@ public interface MiniOzoneCluster extends AutoCloseable {
      * @throws IOException
      */
     public abstract MiniOzoneCluster build() throws IOException;
-  }
-
-  /**
-   * Helper class to get free port avoiding randomness.
-   */
-  class PortAllocator {
-
-    private static final int MIN_PORT = 15000;
-    private static final int MAX_PORT = 32000;
-    private static final AtomicInteger NEXT_PORT = new AtomicInteger(MIN_PORT);
-
-    private PortAllocator() {
-      // no instances
-    }
-
-    static synchronized int getFreePort() {
-      int port = NEXT_PORT.getAndIncrement();
-      if (port > MAX_PORT) {
-        NEXT_PORT.set(MIN_PORT);
-        port = NEXT_PORT.getAndIncrement();
-      }
-      return port;
-    }
-
-    static String localhostWithFreePort() {
-      return "127.0.0.1:" + getFreePort();
-    }
-
-    static String anyHostWithFreePort() {
-      return "0.0.0.0:" + getFreePort();
-    }
   }
 }

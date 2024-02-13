@@ -35,31 +35,23 @@ import org.apache.hadoop.ozone.HddsDatanodeService;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.ozone.test.GenericTestUtils.SystemOutCapturer;
-import org.junit.AfterClass;
-import org.junit.Assert;
-import org.junit.BeforeClass;
-import org.junit.Rule;
-import org.junit.Test;
-import org.junit.rules.TestRule;
-import org.junit.rules.Timeout;
-import org.apache.ozone.test.JUnit5AwareTimeout;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
 
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.DECOMMISSIONED;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.IN_SERVICE;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
 /**
  * * Integration test for {@code ozone admin reconfig} command. HA enabled.
  */
+@Timeout(300)
 public class TestReconfigShell {
 
   private static final int DATANODE_COUNT = 3;
-
-  /**
-   * Set a timeout for each test.
-   */
-  @Rule
-  public TestRule timeout = new JUnit5AwareTimeout(Timeout.seconds(300));
-
   private static MiniOzoneCluster cluster;
   private static List<HddsDatanodeService> datanodeServices;
   private static OzoneAdmin ozoneAdmin;
@@ -71,13 +63,11 @@ public class TestReconfigShell {
   /**
    * Create a Mini Cluster for testing.
    */
-  @BeforeClass
+  @BeforeAll
   public static void setup() throws Exception {
     OzoneConfiguration conf = new OzoneConfiguration();
     String omServiceId = UUID.randomUUID().toString();
     cluster = MiniOzoneCluster.newOMHABuilder(conf)
-        .setClusterId(UUID.randomUUID().toString())
-        .setScmId(UUID.randomUUID().toString())
         .setOMServiceId(omServiceId)
         .setNumOfOzoneManagers(1)
         .setNumOfStorageContainerManagers(1)
@@ -91,7 +81,7 @@ public class TestReconfigShell {
     nm = storageContainerManager.getScmNodeManager();
   }
 
-  @AfterClass
+  @AfterAll
   public static void shutdown() {
     if (cluster != null) {
       cluster.shutdown();
@@ -146,9 +136,7 @@ public class TestReconfigShell {
     List<String> outs =
         Arrays.asList(output.split(System.getProperty("line.separator")));
     for (String property : except) {
-      Assert.assertTrue(
-          String.format("Not found %s in output: %s", property, output),
-          outs.contains(property));
+      assertThat(outs).contains(property);
     }
   }
 
@@ -156,7 +144,7 @@ public class TestReconfigShell {
   public void testDatanodeBulkReconfig() throws Exception {
     // All Dn are normal, So All the Dn will be reconfig
     List<HddsDatanodeService> dns = cluster.getHddsDatanodes();
-    Assert.assertEquals(DATANODE_COUNT, dns.size());
+    assertEquals(DATANODE_COUNT, dns.size());
     executeAndAssertBulkReconfigCount(DATANODE_COUNT);
 
     // Shutdown a Dn, it will not be reconfig,
@@ -186,10 +174,7 @@ public class TestReconfigShell {
           "reconfig",  "--in-service-datanodes", "properties"});
       String output = capture.getOutput();
 
-      Assert.assertTrue(String.format(
-          "Excepted successfully %d. output: %s%n", except, output),
-          capture.getOutput().contains(
-              String.format("successfully %d", except)));
+      assertThat(capture.getOutput()).contains(String.format("successfully %d", except));
     }
   }
 }

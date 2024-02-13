@@ -23,14 +23,13 @@ import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandResponseProto;
 import org.apache.hadoop.hdds.scm.ContainerClientMetrics;
 import org.apache.hadoop.hdds.scm.OzoneClientConfig;
+import org.apache.hadoop.hdds.scm.StreamBufferArgs;
 import org.apache.hadoop.hdds.scm.XceiverClientFactory;
 import org.apache.hadoop.hdds.scm.XceiverClientReply;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.ozone.common.ChunkBuffer;
 import org.apache.hadoop.security.token.Token;
 import org.apache.hadoop.security.token.TokenIdentifier;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.io.OutputStream;
@@ -57,8 +56,6 @@ import java.util.concurrent.ExecutionException;
  */
 public class RatisBlockOutputStream extends BlockOutputStream
     implements Syncable {
-  public static final Logger LOG = LoggerFactory.getLogger(
-      RatisBlockOutputStream.class);
 
   // This object will maintain the commitIndexes and byteBufferList in order
   // Also, corresponding to the logIndex, the corresponding list of buffers will
@@ -71,6 +68,7 @@ public class RatisBlockOutputStream extends BlockOutputStream
    * @param blockID              block ID
    * @param bufferPool           pool of buffers
    */
+  @SuppressWarnings("checkstyle:ParameterNumber")
   public RatisBlockOutputStream(
       BlockID blockID,
       XceiverClientFactory xceiverClientManager,
@@ -78,10 +76,10 @@ public class RatisBlockOutputStream extends BlockOutputStream
       BufferPool bufferPool,
       OzoneClientConfig config,
       Token<? extends TokenIdentifier> token,
-      ContainerClientMetrics clientMetrics
+      ContainerClientMetrics clientMetrics, StreamBufferArgs streamBufferArgs
   ) throws IOException {
     super(blockID, xceiverClientManager, pipeline,
-        bufferPool, config, token, clientMetrics);
+        bufferPool, config, token, clientMetrics, streamBufferArgs);
     this.commitWatcher = new CommitWatcher(bufferPool, getXceiverClient());
   }
 

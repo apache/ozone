@@ -26,7 +26,6 @@ import org.apache.hadoop.hdds.security.x509.keys.HDDSKeyGenerator;
 import org.bouncycastle.asn1.x509.Extension;
 import org.bouncycastle.cert.X509CertificateHolder;
 import org.bouncycastle.cert.jcajce.JcaX509CertificateConverter;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -44,6 +43,13 @@ import java.util.Date;
 import java.util.UUID;
 
 import static org.apache.hadoop.hdds.HddsConfigKeys.OZONE_METADATA_DIRS;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.fail;
 
 /**
  * Test Class for Root Certificate generation.
@@ -82,35 +88,30 @@ public class TestRootCertificate {
     X509CertificateHolder certificateHolder = builder.build();
 
     //Assert that we indeed have a self signed certificate.
-    Assertions.assertEquals(certificateHolder.getIssuer(),
+    assertEquals(certificateHolder.getIssuer(),
         certificateHolder.getSubject());
 
 
     // Make sure that NotBefore is before the current Date
     Date invalidDate = Date.from(
         notBefore.minusDays(1).atZone(ZoneId.systemDefault()).toInstant());
-    Assertions.assertFalse(
-        certificateHolder.getNotBefore()
-            .before(invalidDate));
+    assertFalse(certificateHolder.getNotBefore().before(invalidDate));
 
     //Make sure the end date is honored.
     invalidDate = Date.from(
         notAfter.plusDays(1).atZone(ZoneId.systemDefault()).toInstant());
-    Assertions.assertFalse(
-        certificateHolder.getNotAfter()
-            .after(invalidDate));
+    assertFalse(certificateHolder.getNotAfter().after(invalidDate));
 
     // Check the Subject Name and Issuer Name is in the expected format.
     String dnName = String.format(SelfSignedCertificate.getNameFormat(),
         subject, scmID, clusterID, certificateHolder.getSerialNumber());
-    Assertions.assertEquals(dnName, certificateHolder.getIssuer().toString());
-    Assertions.assertEquals(dnName, certificateHolder.getSubject().toString());
+    assertEquals(dnName, certificateHolder.getIssuer().toString());
+    assertEquals(dnName, certificateHolder.getSubject().toString());
 
     // We did not ask for this Certificate to be a CertificateServer
     // certificate, hence that
     // extension should be null.
-    Assertions.assertNull(
-        certificateHolder.getExtension(Extension.basicConstraints));
+    assertNull(certificateHolder.getExtension(Extension.basicConstraints));
 
     // Extract the Certificate and verify that certificate matches the public
     // key.
@@ -149,13 +150,12 @@ public class TestRootCertificate {
     Extension basicExt =
         certificateHolder.getExtension(Extension.basicConstraints);
 
-    Assertions.assertNotNull(basicExt);
-    Assertions.assertTrue(basicExt.isCritical());
+    assertNotNull(basicExt);
+    assertTrue(basicExt.isCritical());
 
     // Since this code assigns ONE for the root certificate, we check if the
     // serial number is the expected number.
-    Assertions.assertEquals(BigInteger.ONE,
-        certificateHolder.getSerialNumber());
+    assertEquals(BigInteger.ONE, certificateHolder.getSerialNumber());
 
     CertificateCodec codec = new CertificateCodec(securityConfig, "scm");
     String pemString = CertificateCodec.getPEMEncodedString(certificateHolder);
@@ -165,8 +165,8 @@ public class TestRootCertificate {
 
     X509CertificateHolder loadedCert =
         codec.getTargetCertHolder(basePath, "pemcertificate.crt");
-    Assertions.assertNotNull(loadedCert);
-    Assertions.assertEquals(certificateHolder.getSerialNumber(),
+    assertNotNull(loadedCert);
+    assertEquals(certificateHolder.getSerialNumber(),
         loadedCert.getSerialNumber());
   }
 
@@ -194,51 +194,41 @@ public class TestRootCertificate {
     try {
       builder.setKey(null);
       builder.build();
-      Assertions.fail("Null Key should have failed.");
+      fail("Null Key should have failed.");
     } catch (NullPointerException | IllegalArgumentException e) {
       builder.setKey(keyPair);
     }
 
     // Now try with Blank Subject.
-    try {
+    assertThrows(IllegalArgumentException.class, () -> {
       builder.setSubject("");
       builder.build();
-      Assertions.fail("Null/Blank Subject should have thrown.");
-    } catch (IllegalArgumentException e) {
-      builder.setSubject(subject);
-    }
+    });
+    builder.setSubject(subject);
 
     // Now try with blank/null SCM ID
-    try {
+    assertThrows(IllegalArgumentException.class, () -> {
       builder.setScmID(null);
       builder.build();
-      Assertions.fail("Null/Blank SCM ID should have thrown.");
-    } catch (IllegalArgumentException e) {
-      builder.setScmID(scmID);
-    }
-
+    });
+    builder.setScmID(scmID);
 
     // Now try with blank/null SCM ID
-    try {
+    assertThrows(IllegalArgumentException.class, () -> {
       builder.setClusterID(null);
       builder.build();
-      Assertions.fail("Null/Blank Cluster ID should have thrown.");
-    } catch (IllegalArgumentException e) {
-      builder.setClusterID(clusterID);
-    }
-
+    });
+    builder.setClusterID(clusterID);
 
     // Swap the Begin and End Date and verify that we cannot create a
     // certificate like that.
-    try {
+    assertThrows(IllegalArgumentException.class, () -> {
       builder.setBeginDate(notAfter);
       builder.setEndDate(notBefore);
       builder.build();
-      Assertions.fail("Illegal dates should have thrown.");
-    } catch (IllegalArgumentException e) {
-      builder.setBeginDate(notBefore);
-      builder.setEndDate(notAfter);
-    }
+    });
+    builder.setBeginDate(notBefore);
+    builder.setEndDate(notAfter);
 
     try {
       KeyPair newKey = keyGen.generateKey();
@@ -248,12 +238,12 @@ public class TestRootCertificate {
       X509Certificate cert =
           new JcaX509CertificateConverter().getCertificate(certificateHolder);
       cert.verify(wrongKey.getPublic());
-      Assertions.fail("Invalid Key, should have thrown.");
+      fail("Invalid Key, should have thrown.");
     } catch (SCMSecurityException | CertificateException
         | SignatureException | InvalidKeyException e) {
       builder.setKey(keyPair);
     }
     // Assert that we can create a certificate with all sane params.
-    Assertions.assertNotNull(builder.build());
+    assertNotNull(builder.build());
   }
 }

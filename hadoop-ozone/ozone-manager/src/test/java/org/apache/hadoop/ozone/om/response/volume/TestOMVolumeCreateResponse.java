@@ -33,16 +33,14 @@ import org.apache.hadoop.ozone.storage.proto.
 import org.apache.hadoop.util.Time;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
-import java.io.IOException;
 import java.nio.file.Path;
 import java.util.UUID;
 
-import static org.junit.jupiter.api.Assertions.fail;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
 /**
  * This class tests OMVolumeCreateResponse.
@@ -99,18 +97,18 @@ public class TestOMVolumeCreateResponse {
     omMetadataManager.getStore().commitBatchOperation(batchOperation);
 
 
-    Assertions.assertEquals(1,
+    assertEquals(1,
         omMetadataManager.countRowsInTable(omMetadataManager.getVolumeTable()));
-    Assertions.assertEquals(omVolumeArgs,
+    assertEquals(omVolumeArgs,
         omMetadataManager.getVolumeTable().iterator().next().getValue());
 
-    Assertions.assertEquals(volumeList,
+    assertEquals(volumeList,
         omMetadataManager.getUserTable().get(
             omMetadataManager.getUserKey(userName)));
   }
 
   @Test
-  public void testAddToDBBatchNoOp() throws Exception {
+  void testAddToDBBatchNoOp() throws Exception {
 
     OMResponse omResponse = OMResponse.newBuilder()
         .setCmdType(OzoneManagerProtocolProtos.Type.CreateVolume)
@@ -122,15 +120,10 @@ public class TestOMVolumeCreateResponse {
     OMVolumeCreateResponse omVolumeCreateResponse =
         new OMVolumeCreateResponse(omResponse);
 
-    try {
-      omVolumeCreateResponse.checkAndUpdateDB(omMetadataManager,
-          batchOperation);
-      Assertions.assertEquals(0, omMetadataManager.countRowsInTable(
-          omMetadataManager.getVolumeTable()));
-    } catch (IOException ex) {
-      fail("testAddToDBBatchFailure failed");
-    }
-
+    omVolumeCreateResponse.checkAndUpdateDB(omMetadataManager,
+        batchOperation);
+    assertEquals(0, omMetadataManager.countRowsInTable(
+        omMetadataManager.getVolumeTable()));
   }
 
 

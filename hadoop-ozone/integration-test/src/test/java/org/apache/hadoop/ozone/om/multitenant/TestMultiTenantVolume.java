@@ -49,6 +49,8 @@ import java.util.concurrent.TimeoutException;
 import static org.apache.hadoop.ozone.admin.scm.FinalizeUpgradeCommandUtil.isDone;
 import static org.apache.hadoop.ozone.admin.scm.FinalizeUpgradeCommandUtil.isStarting;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_MULTITENANCY_ENABLED;
+import static org.apache.hadoop.ozone.om.OmUpgradeConfig.ConfigStrings.OZONE_OM_INIT_DEFAULT_LAYOUT_VERSION;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -75,9 +77,9 @@ public class TestMultiTenantVolume {
     conf.setBoolean(
         OMMultiTenantManagerImpl.OZONE_OM_TENANT_DEV_SKIP_RANGER, true);
     conf.setBoolean(OZONE_OM_MULTITENANCY_ENABLED, true);
+    conf.setInt(OZONE_OM_INIT_DEFAULT_LAYOUT_VERSION, OMLayoutFeature.INITIAL_VERSION.layoutVersion());
     MiniOzoneCluster.Builder builder = MiniOzoneCluster.newBuilder(conf)
-        .withoutDatanodes()
-        .setOmLayoutVersion(OMLayoutFeature.INITIAL_VERSION.layoutVersion());
+        .withoutDatanodes();
     cluster = builder.build();
     client = cluster.newClient();
     s3VolumeName = HddsClientUtils.getDefaultS3VolumeName(conf);
@@ -94,8 +96,8 @@ public class TestMultiTenantVolume {
 
   private static void expectFailurePreFinalization(VoidCallable eval) {
     OMException omException = assertThrows(OMException.class, eval::call);
-    assertTrue(omException.getMessage()
-        .contains("cannot be invoked before finalization"));
+    assertThat(omException.getMessage())
+        .contains("cannot be invoked before finalization");
   }
 
   /**
@@ -310,7 +312,7 @@ public class TestMultiTenantVolume {
           OMException.class,
           () -> store.createTenant(tenantId));
 
-      assertTrue(e.getMessage().contains("Invalid volume name: " + tenantId));
+      assertThat(e.getMessage()).contains("Invalid volume name: " + tenantId);
     }
   }
 }

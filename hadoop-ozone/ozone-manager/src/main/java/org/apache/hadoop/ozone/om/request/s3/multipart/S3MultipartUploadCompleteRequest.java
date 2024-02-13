@@ -29,6 +29,7 @@ import java.util.List;
 import java.util.Map;
 
 import org.apache.hadoop.hdds.client.ReplicationConfig;
+import org.apache.ratis.server.protocol.TermIndex;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.OzoneConsts;
@@ -44,7 +45,6 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
-import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
 import org.apache.hadoop.ozone.om.request.key.OMKeyRequest;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
 import org.apache.hadoop.ozone.om.request.validation.RequestFeatureValidator;
@@ -62,13 +62,12 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMReque
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PartKeyInfo;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
-import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
-import org.apache.hadoop.ozone.security.acl.OzoneObj;
+import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType;
 import org.apache.hadoop.util.Time;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import javax.annotation.Nullable;
+import jakarta.annotation.Nullable;
 
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.NOT_A_FILE;
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.BUCKET_LOCK;
@@ -89,23 +88,27 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
   @Override
   public OMRequest preExecute(OzoneManager ozoneManager) throws IOException {
     MultipartUploadCompleteRequest multipartUploadCompleteRequest =
-        getOmRequest().getCompleteMultiPartUploadRequest();
+        super.preExecute(ozoneManager).getCompleteMultiPartUploadRequest();
 
     KeyArgs keyArgs = multipartUploadCompleteRequest.getKeyArgs();
     String keyPath = keyArgs.getKeyName();
     keyPath = validateAndNormalizeKey(ozoneManager.getEnableFileSystemPaths(),
         keyPath, getBucketLayout());
 
+    KeyArgs newKeyArgs = keyArgs.toBuilder().setModificationTime(Time.now())
+            .setKeyName(keyPath).build();
+    KeyArgs resolvedArgs = resolveBucketAndCheckKeyAcls(newKeyArgs,
+        ozoneManager, ACLType.WRITE);
+
     return getOmRequest().toBuilder().setCompleteMultiPartUploadRequest(
         multipartUploadCompleteRequest.toBuilder().setKeyArgs(
-            keyArgs.toBuilder().setModificationTime(Time.now())
-                .setKeyName(keyPath))).setUserInfo(getUserInfo()).build();
+            resolvedArgs)).setUserInfo(getUserInfo()).build();
   }
 
   @Override
   @SuppressWarnings("methodlength")
-  public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager,
-      long trxnLogIndex, OzoneManagerDoubleBufferHelper omDoubleBufferHelper) {
+  public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager, TermIndex termIndex) {
+    final long trxnLogIndex = termIndex.getIndex();
     MultipartUploadCompleteRequest multipartUploadCompleteRequest =
         getOmRequest().getCompleteMultiPartUploadRequest();
 
@@ -134,16 +137,8 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
     Exception exception = null;
     Result result = null;
     try {
-      keyArgs = resolveBucketLink(ozoneManager, keyArgs, auditMap);
-      volumeName = keyArgs.getVolumeName();
-      bucketName = keyArgs.getBucketName();
-
       multipartKey = omMetadataManager.getMultipartKey(volumeName,
           bucketName, keyName, uploadID);
-
-      // check Acl
-      checkKeyAcls(ozoneManager, volumeName, bucketName, keyName,
-          IAccessAuthorizer.ACLType.WRITE, OzoneObj.ResourceType.KEY);
 
       mergeOmLockDetails(omMetadataManager.getLock()
           .acquireWriteLock(BUCKET_LOCK, volumeName, bucketName));
@@ -276,8 +271,6 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
       exception = ex;
       omClientResponse = getOmClientResponse(omResponse, exception);
     } finally {
-      addResponseToDoubleBuffer(trxnLogIndex, omClientResponse,
-          omDoubleBufferHelper);
       if (acquiredLock) {
         mergeOmLockDetails(omMetadataManager.getLock()
             .releaseWriteLock(BUCKET_LOCK, volumeName, bucketName));

@@ -233,6 +233,7 @@ function get_count_compose_files() {
     local ignore_array=(
         "^hadoop-ozone/dist/src/main/k8s"
         "^hadoop-ozone/dist/src/main/license"
+        "^hadoop-ozone/dist/src/main/compose/common/grafana/dashboards"
         "\.md$"
     )
     filter_changed_files true
@@ -487,12 +488,14 @@ function get_count_misc_files() {
         "^.github"
         "^hadoop-hdds/dev-support/checkstyle"
         "^hadoop-ozone/dev-support/checks"
+        "^hadoop-ozone/dev-support/intellij"
         "^hadoop-ozone/dist/src/main/license"
         "\.bats$"
         "\.txt$"
         "\.md$"
         "findbugsExcludeFile.xml"
         "/NOTICE$"
+        "^hadoop-ozone/dist/src/main/compose/common/grafana/dashboards"
     )
     local ignore_array=(
         "^.github/workflows/post-commit.yml"
