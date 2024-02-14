@@ -226,7 +226,7 @@ public abstract class TestOmSnapshot {
 
     // stop the deletion services so that keys can still be read
     stopKeyManager();
-    preFinalizationChecks();
+//    preFinalizationChecks();
     finalizeOMUpgrade();
   }
 

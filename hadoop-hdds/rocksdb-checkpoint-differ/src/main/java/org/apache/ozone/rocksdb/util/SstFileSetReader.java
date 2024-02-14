@@ -20,12 +20,12 @@ package org.apache.ozone.rocksdb.util;
 
 import org.apache.hadoop.hdds.StringUtils;
 import org.apache.hadoop.hdds.utils.IOUtils;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedRawSSTFileReader;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedRawSSTFileReaderIterator;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedSlice;
 import org.apache.hadoop.util.ClosableIterator;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedOptions;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedReadOptions;
-import org.apache.hadoop.hdds.utils.db.managed.ManagedSSTDumpIterator;
-import org.apache.hadoop.hdds.utils.db.managed.ManagedSSTDumpTool;
 import org.rocksdb.ReadOptions;
 import org.rocksdb.RocksDBException;
 import org.rocksdb.SstFileReader;
@@ -37,9 +37,9 @@ import java.util.Collection;
 import java.util.Iterator;
 import java.util.NoSuchElementException;
 import java.util.Objects;
-import java.util.Optional;
 import java.util.Spliterator;
 import java.util.Spliterators;
+import java.util.function.Function;
 import java.util.stream.Stream;
 import java.util.stream.StreamSupport;
 
@@ -142,8 +142,7 @@ public class SstFileSetReader {
     return getStreamFromIterator(itr);
   }
 
-  public Stream<String> getKeyStreamWithTombstone(
-      ManagedSSTDumpTool sstDumpTool, String lowerBound,
+  public Stream<String> getKeyStreamWithTombstone(String lowerBound,
       String upperBound) throws RocksDBException {
     final MultipleSstFileIterator<String> itr =
         new MultipleSstFileIterator<String>(sstFiles) {
@@ -166,16 +165,11 @@ public class SstFileSetReader {
           }
 
           @Override
-          protected ClosableIterator<String> getKeyIteratorForFile(String file)
-              throws IOException {
-            return new ManagedSSTDumpIterator<String>(sstDumpTool, file,
-                options, lowerBoundSlice, upperBoundSlice) {
-              @Override
-              protected String getTransformedValue(Optional<KeyValue> value) {
-                return value.map(v -> StringUtils.bytes2String(v.getKey()))
-                    .orElse(null);
-              }
-            };
+          protected ClosableIterator<String> getKeyIteratorForFile(
+              String file) {
+            return new ManagedRawSstFileIterator(file,
+                options, lowerBoundSlice, upperBoundSlice,
+                keyValue -> StringUtils.bytes2String(keyValue.getKey()));
           }
 
           @Override
@@ -220,6 +214,38 @@ public class SstFileSetReader {
       String value = getIteratorValue(fileReaderIterator);
       fileReaderIterator.next();
       return value;
+    }
+  }
+
+  private static class ManagedRawSstFileIterator implements
+      ClosableIterator<String> {
+    private ManagedRawSSTFileReader<String> fileReader;
+    private ManagedRawSSTFileReaderIterator<String> fileReaderIterator;
+
+    ManagedRawSstFileIterator(String path, ManagedOptions options,
+                              ManagedSlice lowerBound, ManagedSlice upperBound,
+                              Function<ManagedRawSSTFileReaderIterator.KeyValue,
+                                  String> keyValueFunction) {
+      this.fileReader = new ManagedRawSSTFileReader<>(options, path,
+          2 * 1024 * 1024);
+      this.fileReaderIterator = fileReader.newIterator(keyValueFunction,
+          lowerBound, upperBound);
+    }
+
+    @Override
+    public void close() {
+      this.fileReaderIterator.close();
+      this.fileReader.close();
+    }
+
+    @Override
+    public boolean hasNext() {
+      return fileReaderIterator.hasNext();
+    }
+
+    @Override
+    public String next() {
+      return fileReaderIterator.next();
     }
   }
 

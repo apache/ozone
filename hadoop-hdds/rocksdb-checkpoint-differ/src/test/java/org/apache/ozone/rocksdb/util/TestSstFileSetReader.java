@@ -21,11 +21,9 @@ import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.StringUtils;
 import org.apache.hadoop.hdds.utils.NativeLibraryLoader;
-import org.apache.hadoop.hdds.utils.NativeLibraryNotLoadedException;
 import org.apache.hadoop.hdds.utils.TestUtils;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedEnvOptions;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedOptions;
-import org.apache.hadoop.hdds.utils.db.managed.ManagedSSTDumpTool;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedSstFileWriter;
 import org.apache.ozone.test.tag.Native;
 import org.apache.ozone.test.tag.Unhealthy;
@@ -166,7 +164,7 @@ class TestSstFileSetReader {
   @ValueSource(ints = {0, 1, 2, 3, 7, 10})
   @Unhealthy("HDDS-9274")
   public void testGetKeyStreamWithTombstone(int numberOfFiles)
-      throws RocksDBException, IOException, NativeLibraryNotLoadedException {
+      throws RocksDBException, IOException {
     assumeTrue(NativeLibraryLoader.getInstance()
         .loadLibrary(ROCKS_TOOLS_NATIVE_LIBRARY_NAME));
     Pair<SortedMap<String, Integer>, List<String>> data =
@@ -178,8 +176,6 @@ class TestSstFileSetReader {
         new SynchronousQueue<>(), new ThreadFactoryBuilder()
         .setNameFormat("snapshot-diff-manager-sst-dump-tool-TID-%d")
         .build(), new ThreadPoolExecutor.DiscardPolicy());
-    ManagedSSTDumpTool sstDumpTool =
-        new ManagedSSTDumpTool(executorService, 256);
     // Getting every possible combination of 2 elements from the sampled keys.
     // Reading the sst file lying within the given bounds and
     // validating the keys read from the sst file.
@@ -197,7 +193,7 @@ class TestSstFileSetReader {
                   .collect(Collectors.toMap(Map.Entry::getKey,
                       Map.Entry::getValue));
           try (Stream<String> keyStream = new SstFileSetReader(files)
-              .getKeyStreamWithTombstone(sstDumpTool, lowerBound.orElse(null),
+              .getKeyStreamWithTombstone(lowerBound.orElse(null),
                   upperBound.orElse(null))) {
             keyStream.forEach(
                 key -> {
