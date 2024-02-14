@@ -124,11 +124,11 @@ public class TestReconTasks {
     int scmContainersCount = scmContainerManager.getContainers().size();
     int reconContainersCount = reconContainerManager
         .getContainers().size();
-    assertNotEquals(scmContainersCount - 1, reconContainersCount);
+    assertNotEquals(scmContainersCount - diff, reconContainersCount);
     reconScm.syncWithSCMContainerInfo();
     reconContainersCount = reconContainerManager
         .getContainers().size();
-    assertEquals(scmContainersCount - 1, reconContainersCount);
+    assertEquals(scmContainersCount - diff, reconContainersCount);
   }
 
 //  @Test
@@ -303,7 +303,7 @@ public class TestReconTasks {
     ContainerInfo containerInfo2 =
         scmContainerManager
             .allocateContainer(RatisReplicationConfig.getInstance(ONE), "testEmptyMissingContainer");
-    long containerID2 = containerInfo.getContainerID();
+//    long containerID2 = containerInfo.getContainerID();
     Pipeline pipeline2 =
         scmPipelineManager.getPipeline(containerInfo2.getPipelineID());
     XceiverClientGrpc client2 = new XceiverClientGrpc(pipeline2, conf);
