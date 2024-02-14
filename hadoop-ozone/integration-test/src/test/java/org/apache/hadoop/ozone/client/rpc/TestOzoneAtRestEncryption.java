@@ -69,6 +69,7 @@ import org.apache.hadoop.ozone.client.io.OzoneDataStreamOutput;
 import org.apache.hadoop.ozone.client.SecretKeyTestClient;
 import org.apache.hadoop.ozone.client.io.OzoneInputStream;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
+import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
@@ -88,6 +89,8 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_REPLICATION;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_OFS_URI_SCHEME;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_ROOT;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
+import static org.apache.hadoop.ozone.container.common.statemachine.container.ClusterContainersUtil.getContainerByID;
+import static org.apache.hadoop.ozone.container.common.statemachine.container.ClusterContainersUtil.verifyOnDiskData;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ADDRESS_KEY;
 import static org.apache.ozone.test.GenericTestUtils.getTestStartTime;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -98,11 +101,13 @@ import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.verify;
 
 import org.apache.ozone.test.tag.Flaky;
+import org.apache.ratis.io.CorruptedFileException;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -291,7 +296,6 @@ class TestOzoneAtRestEncryption {
       }
     }
     verifyKeyData(bucket, keyName, value, testStartTime);
-
   }
 
   static void verifyKeyData(OzoneBucket bucket, String keyName, String value,
@@ -320,6 +324,13 @@ class TestOzoneAtRestEncryption {
     assertEquals(value, new String(fileContent, StandardCharsets.UTF_8));
     assertFalse(key.getCreationTime().isBefore(testStartTime));
     assertFalse(key.getModificationTime().isBefore(testStartTime));
+
+    long containerID = key.getOzoneKeyLocations().get(0)
+        .getContainerID();
+    Container container = getContainerByID(cluster, containerID);
+    // the data stored on disk should not be the same as the input.
+    assertThrows(CorruptedFileException.class,
+        () -> verifyOnDiskData(cluster, container, key, value));
   }
 
   private OzoneBucket createVolumeAndBucket(String volumeName,

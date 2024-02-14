@@ -17,7 +17,6 @@
 
 package org.apache.hadoop.ozone.client.rpc;
 
-import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.security.MessageDigest;
@@ -96,7 +95,6 @@ import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.apache.hadoop.ozone.container.common.interfaces.DBHandle;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.BlockUtils;
-import org.apache.hadoop.ozone.container.keyvalue.helpers.KeyValueContainerLocationUtil;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OmFailoverProxyUtil;
@@ -127,7 +125,7 @@ import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.tag.Flaky;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
-import org.apache.commons.io.FileUtils;
+
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.commons.lang3.RandomUtils;
 import static org.apache.hadoop.hdds.StringUtils.string2Bytes;
@@ -145,6 +143,8 @@ import static org.apache.hadoop.ozone.OzoneConsts.DEFAULT_OM_UPDATE_ID;
 import static org.apache.hadoop.ozone.OzoneConsts.ETAG;
 import static org.apache.hadoop.ozone.OzoneConsts.GB;
 import static org.apache.hadoop.ozone.OzoneConsts.MD5_HASH;
+import static org.apache.hadoop.ozone.container.common.statemachine.container.ClusterContainersUtil.corruptData;
+import static org.apache.hadoop.ozone.container.common.statemachine.container.ClusterContainersUtil.getContainerByID;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.KEY_NOT_FOUND;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.NO_SUCH_MULTIPART_UPLOAD_ERROR;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.PARTIAL_RENAME;
@@ -1722,16 +1722,9 @@ public abstract class TestOzoneRpcClientAbstract {
 
     // Get the container by traversing the datanodes. Atleast one of the
     // datanode must have this container.
-    Container container = null;
-    for (HddsDatanodeService hddsDatanode : cluster.getHddsDatanodes()) {
-      container = hddsDatanode.getDatanodeStateMachine().getContainer()
-          .getContainerSet().getContainer(containerID);
-      if (container != null) {
-        break;
-      }
-    }
+    Container container = getContainerByID(cluster, containerID);
     assertNotNull(container, "Container not found");
-    corruptData(container, key);
+    corruptData(cluster, container, key);
   }
 
 
@@ -1894,7 +1887,7 @@ public abstract class TestOzoneRpcClientAbstract {
       }
     }
     assertNotNull(container, "Container not found");
-    corruptData(container, key);
+    corruptData(cluster, container, key);
 
     // Try reading the key. Since the chunk file is corrupted, it should
     // throw a checksum mismatch exception.
@@ -2049,7 +2042,7 @@ public abstract class TestOzoneRpcClientAbstract {
       }
     }
     assertThat(containerList).withFailMessage("Container not found").isNotEmpty();
-    corruptData(containerList.get(0), key);
+    corruptData(cluster, containerList.get(0), key);
     // Try reading the key. Read will fail on the first node and will eventually
     // failover to next replica
     try (OzoneInputStream is = bucket.readKey(keyName)) {
@@ -2057,7 +2050,7 @@ public abstract class TestOzoneRpcClientAbstract {
       is.read(b);
       assertArrayEquals(b, data);
     }
-    corruptData(containerList.get(1), key);
+    corruptData(cluster, containerList.get(1), key);
     // Try reading the key. Read will fail on the first node and will eventually
     // failover to next replica
     try (OzoneInputStream is = bucket.readKey(keyName)) {
@@ -2065,7 +2058,7 @@ public abstract class TestOzoneRpcClientAbstract {
       is.read(b);
       assertArrayEquals(b, data);
     }
-    corruptData(containerList.get(2), key);
+    corruptData(cluster, containerList.get(2), key);
     // Try reading the key. Read will fail here as all the replicas are corrupt
 
     IOException ioException = assertThrows(IOException.class, () -> {
@@ -2075,43 +2068,6 @@ public abstract class TestOzoneRpcClientAbstract {
       }
     });
     assertThat(ioException).hasMessageContaining("Checksum mismatch");
-  }
-
-  private void corruptData(Container container, OzoneKey key)
-      throws IOException {
-    long containerID = ((OzoneKeyDetails) key).getOzoneKeyLocations().get(0)
-        .getContainerID();
-    long localID = ((OzoneKeyDetails) key).getOzoneKeyLocations().get(0)
-        .getLocalID();
-    // From the containerData, get the block iterator for all the blocks in
-    // the container.
-    KeyValueContainerData containerData =
-        (KeyValueContainerData) container.getContainerData();
-    try (DBHandle db = BlockUtils.getDB(containerData, cluster.getConf());
-         BlockIterator<BlockData> keyValueBlockIterator =
-                 db.getStore().getBlockIterator(containerID)) {
-      // Find the block corresponding to the key we put. We use the localID of
-      // the BlockData to identify out key.
-      BlockData blockData = null;
-      while (keyValueBlockIterator.hasNext()) {
-        blockData = keyValueBlockIterator.nextBlock();
-        if (blockData.getBlockID().getLocalID() == localID) {
-          break;
-        }
-      }
-      assertNotNull(blockData, "Block not found");
-
-      // Get the location of the chunk file
-      String containreBaseDir =
-          container.getContainerData().getVolume().getHddsRootDir().getPath();
-      File chunksLocationPath = KeyValueContainerLocationUtil
-          .getChunksLocationPath(containreBaseDir, cluster.getClusterId(), containerID);
-      byte[] corruptData = "corrupted data".getBytes(UTF_8);
-      // Corrupt the contents of chunk files
-      for (File file : FileUtils.listFiles(chunksLocationPath, null, false)) {
-        FileUtils.writeByteArrayToFile(file, corruptData);
-      }
-    }
   }
 
   @Test
