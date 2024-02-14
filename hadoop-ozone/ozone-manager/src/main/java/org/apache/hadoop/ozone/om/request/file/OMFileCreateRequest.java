@@ -68,11 +68,13 @@ import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
 import org.apache.hadoop.util.Time;
 import org.apache.hadoop.hdds.utils.UniqueId;
 
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INTERNAL_ERROR;
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.BUCKET_LOCK;
 import static org.apache.hadoop.ozone.om.request.file.OMFileRequest.OMDirectoryResult.DIRECTORY_EXISTS;
 import static org.apache.hadoop.ozone.om.request.file.OMFileRequest.OMDirectoryResult.FILE_EXISTS_IN_GIVENPATH;
 import static org.apache.hadoop.ozone.om.request.file.OMFileRequest.OMDirectoryResult.FILE_EXISTS;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type.CreateFile;
+import static org.apache.ratis.util.Preconditions.assertTrue;
 
 /**
  * Handles create file request.
@@ -154,13 +156,18 @@ public class OMFileCreateRequest extends OMKeyRequest {
         .map(info -> info.getProtobuf(getOmRequest().getVersion()))
         .collect(Collectors.toList()));
 
+    generateRequiredEncryptionInfo(keyArgs, newKeyArgs, ozoneManager);
+
+    assertTrue(newKeyArgs.hasFileEncryptionInfo());
+
     KeyArgs resolvedArgs = resolveBucketAndCheckKeyAcls(newKeyArgs.build(),
         ozoneManager, IAccessAuthorizer.ACLType.CREATE);
-
-    generateRequiredEncryptionInfo(keyArgs, newKeyArgs, ozoneManager);
     CreateFileRequest.Builder newCreateFileRequest =
         createFileRequest.toBuilder().setKeyArgs(resolvedArgs)
             .setClientID(UniqueId.next());
+
+    assertTrue(newCreateFileRequest.getKeyArgs().hasFileEncryptionInfo());
+
 
     return getOmRequest().toBuilder()
         .setCreateFileRequest(newCreateFileRequest).setUserInfo(userInfo)
@@ -249,6 +256,12 @@ public class OMFileCreateRequest extends OMKeyRequest {
               keyArgs.getFactor(), keyArgs.getEcReplicationConfig(),
               omBucketInfo.getDefaultReplicationConfig(),
               ozoneManager);
+
+      if (omBucketInfo.getEncryptionKeyInfo() != null &&
+          !keyArgs.hasFileEncryptionInfo()) {
+        throw new OMException("Attempting to create unencrypted file " +
+            keyName + " in encrypted bucket " + bucketName, INTERNAL_ERROR);
+      }
 
       omKeyInfo = prepareKeyInfo(omMetadataManager, keyArgs, dbKeyInfo,
           keyArgs.getDataSize(), locations, getFileEncryptionInfo(keyArgs),
