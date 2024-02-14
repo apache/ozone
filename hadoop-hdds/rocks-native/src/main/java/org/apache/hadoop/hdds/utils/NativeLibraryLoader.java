@@ -126,6 +126,7 @@ public class NativeLibraryLoader {
       LOG.warn("Unable to load library: {}", libraryName, e);
     }
     this.librariesLoaded.put(libraryName, loaded);
+    LOG.info("Loaded Library {}", libraryName);
     return isLibraryLoaded(libraryName);
   }
 
