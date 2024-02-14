@@ -236,6 +236,7 @@
                     </exec>
                     <exec executable="make" dir="${project.build.directory}/rocksdb/rocksdb-${rocksdb.version}" failonerror="true">
                       <arg line="DEBUG_LEVEL=0"/>
+                      <arg line="EXTRA_CXXFLAGS='-fPIC'"/>
                       <arg line="-j${system.numCores}"/>
                       <arg line="tools"/>
                     </exec>
