@@ -264,9 +264,7 @@
                       <arg line="-DROCKSDB_TOOLS_LIB=${project.build.directory}/rocksdb/rocksdb-${rocksdb.version}"/>
                       <arg line="-DROCKSDB_LIB=${project.build.directory}/rocksdbjni/${rocksdbLibName}"/>
                     </exec>
-                    <exec executable="make" dir="${project.build.directory}/native/rocksdb" failonerror="true">
-                      <arg line="-d"/>
-                    </exec>
+                    <exec executable="make" dir="${project.build.directory}/native/rocksdb" failonerror="true"/>
                     <delete dir="${project.build.directory}/rocksdb/rocksdb-${rocksdb.version}"
                             includeemptydirs="true"/>
                   </target>
