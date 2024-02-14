@@ -421,7 +421,7 @@ index 000000000..1693bd1e6
 +#endif  // ROCKSDB_LITE
 diff --git a/tools/raw_sst_file_reader_iterator.cc b/tools/raw_sst_file_reader_iterator.cc
 new file mode 100644
-index 000000000..b31596c4a
+index 000000000..463c484ed
 --- /dev/null
 +++ b/tools/raw_sst_file_reader_iterator.cc
 @@ -0,0 +1,94 @@
@@ -472,8 +472,8 @@ index 000000000..b31596c4a
 +                             bool has_to, Slice* to_key)
 +    : iter_(iterator),
 +      ikey(new ParsedInternalKey()),
-+      has_to(has_to),
-+      to_key(to_key) {
++      has_to_(has_to),
++      to_key_(to_key) {
 +  if (has_from) {
 +    InternalKey k;
 +    k.SetMinPossibleForUserKey(*from_key);
@@ -521,7 +521,7 @@ index 000000000..b31596c4a
 +#endif  // ROCKSDB_LITE
 diff --git a/tools/raw_sst_file_reader_iterator.h b/tools/raw_sst_file_reader_iterator.h
 new file mode 100644
-index 000000000..8c3c4acf2
+index 000000000..79313264f
 --- /dev/null
 +++ b/tools/raw_sst_file_reader_iterator.h
 @@ -0,0 +1,45 @@
@@ -563,8 +563,8 @@ index 000000000..8c3c4acf2
 +  void initKey();
 +  InternalIterator* iter_;
 +  ParsedInternalKey* ikey;
-+  bool has_to;
-+  Slice* to_key;
++  bool has_to_;
++  Slice* to_key_;
 +};
 +
 +}  // namespace ROCKSDB_NAMESPACE
