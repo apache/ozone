@@ -43,12 +43,12 @@ import org.hadoop.ozone.recon.schema.ContainerSchemaDefinition;
 import org.hadoop.ozone.recon.schema.tables.pojos.UnhealthyContainers;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
-import org.junit.jupiter.api.Order;
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.TestInstance;
-import org.junit.jupiter.api.TestMethodOrder;
-import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.api.MethodOrderer.OrderAnnotation;
+import org.junit.jupiter.api.Order;
+import org.junit.jupiter.api.TestMethodOrder;
+import org.junit.jupiter.api.TestInstance;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
 import org.slf4j.event.Level;
 
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_CONTAINER_REPORT_INTERVAL;
@@ -104,9 +104,6 @@ public class TestReconTasks {
     StorageContainerManager scm = cluster.getStorageContainerManager();
     ContainerManager scmContainerManager = scm.getContainerManager();
     ContainerManager reconContainerManager = reconScm.getContainerManager();
-    int diff = scmContainerManager.getContainers().size() - reconContainerManager
-        .getContainers().size();
-
     final ContainerInfo container1 = scmContainerManager.allocateContainer(
         RatisReplicationConfig.getInstance(
             HddsProtos.ReplicationFactor.ONE), "admin");
@@ -124,78 +121,77 @@ public class TestReconTasks {
     int scmContainersCount = scmContainerManager.getContainers().size();
     int reconContainersCount = reconContainerManager
         .getContainers().size();
-    assertNotEquals(scmContainersCount - diff, reconContainersCount);
+    assertNotEquals(scmContainersCount, reconContainersCount);
     reconScm.syncWithSCMContainerInfo();
     reconContainersCount = reconContainerManager
         .getContainers().size();
-    assertEquals(scmContainersCount - diff, reconContainersCount);
+    assertEquals(scmContainersCount, reconContainersCount);
   }
 
-//  @Test
-//  @Order(3)
-//  @Disabled
-//  public void testMissingContainerDownNode() throws Exception {
-//    ReconStorageContainerManagerFacade reconScm =
-//        (ReconStorageContainerManagerFacade)
-//            cluster.getReconServer().getReconStorageContainerManager();
-//    ReconContainerMetadataManager reconContainerMetadataManager =
-//        cluster.getReconServer().getReconContainerMetadataManager();
-//
-//    StorageContainerManager scm = cluster.getStorageContainerManager();
-//    PipelineManager reconPipelineManager = reconScm.getPipelineManager();
-//    PipelineManager scmPipelineManager = scm.getPipelineManager();
-//
-//    // Make sure Recon's pipeline state is initialized.
-//    LambdaTestUtils.await(60000, 5000,
-//        () -> (reconPipelineManager.getPipelines().size() >= 1));
-//
-//    ContainerManager scmContainerManager = scm.getContainerManager();
-//    ReconContainerManager reconContainerManager =
-//        (ReconContainerManager) reconScm.getContainerManager();
-//    ContainerInfo containerInfo =
-//        scmContainerManager
-//            .allocateContainer(RatisReplicationConfig.getInstance(ONE), "testMissingContainer");
-//    long containerID = containerInfo.getContainerID();
-//
-//    try (RDBBatchOperation rdbBatchOperation = new RDBBatchOperation()) {
-//      reconContainerMetadataManager
-//          .batchStoreContainerKeyCounts(rdbBatchOperation, containerID, 2L);
-//      reconContainerMetadataManager.commitBatchOperation(rdbBatchOperation);
-//    }
-//
-//    Pipeline pipeline =
-//        scmPipelineManager.getPipeline(containerInfo.getPipelineID());
-//    XceiverClientGrpc client = new XceiverClientGrpc(pipeline, conf);
-//    runTestOzoneContainerViaDataNode(containerID, client);
-//
-//    // Make sure Recon got the container report with new container.
-//    assertArrayEquals(scmContainerManager.getContainers().toArray(),
-//        reconContainerManager.getContainers().toArray());
-//
-//    // Bring down the Datanode that had the container replica.
-//    cluster.shutdownHddsDatanode(pipeline.getFirstNode());
-//
-//    LambdaTestUtils.await(120000, 6000, () -> {
-//      List<UnhealthyContainers> allMissingContainers =
-//          reconContainerManager.getContainerSchemaManager()
-//              .getUnhealthyContainers(
-//                  ContainerSchemaDefinition.UnHealthyContainerStates.MISSING,
-//                  0, 1000);
-//      return (allMissingContainers.size() >= 1);
-//    });
-//
-//    // Restart the Datanode to make sure we remove the missing container.
-//    cluster.restartHddsDatanode(pipeline.getFirstNode(), true);
-//    LambdaTestUtils.await(120000, 10000, () -> {
-//      List<UnhealthyContainers> allMissingContainers =
-//          reconContainerManager.getContainerSchemaManager()
-//              .getUnhealthyContainers(
-//                  ContainerSchemaDefinition.UnHealthyContainerStates.MISSING,
-//                  0, 1000);
-//      return (allMissingContainers.isEmpty());
-//    });
-//    IOUtils.closeQuietly(client);
-//  }
+  @Test
+  @Order(3)
+  public void testMissingContainerDownNode() throws Exception {
+    ReconStorageContainerManagerFacade reconScm =
+        (ReconStorageContainerManagerFacade)
+            cluster.getReconServer().getReconStorageContainerManager();
+    ReconContainerMetadataManager reconContainerMetadataManager =
+        cluster.getReconServer().getReconContainerMetadataManager();
+
+    StorageContainerManager scm = cluster.getStorageContainerManager();
+    PipelineManager reconPipelineManager = reconScm.getPipelineManager();
+    PipelineManager scmPipelineManager = scm.getPipelineManager();
+
+    // Make sure Recon's pipeline state is initialized.
+    LambdaTestUtils.await(60000, 5000,
+        () -> (reconPipelineManager.getPipelines().size() >= 1));
+
+    ContainerManager scmContainerManager = scm.getContainerManager();
+    ReconContainerManager reconContainerManager =
+        (ReconContainerManager) reconScm.getContainerManager();
+    ContainerInfo containerInfo =
+        scmContainerManager
+            .allocateContainer(RatisReplicationConfig.getInstance(ONE), "testMissingContainer");
+    long containerID = containerInfo.getContainerID();
+
+    try (RDBBatchOperation rdbBatchOperation = new RDBBatchOperation()) {
+      reconContainerMetadataManager
+          .batchStoreContainerKeyCounts(rdbBatchOperation, containerID, 2L);
+      reconContainerMetadataManager.commitBatchOperation(rdbBatchOperation);
+    }
+
+    Pipeline pipeline =
+        scmPipelineManager.getPipeline(containerInfo.getPipelineID());
+    XceiverClientGrpc client = new XceiverClientGrpc(pipeline, conf);
+    runTestOzoneContainerViaDataNode(containerID, client);
+
+    // Make sure Recon got the container report with new container.
+    assertArrayEquals(scmContainerManager.getContainers().toArray(),
+        reconContainerManager.getContainers().toArray());
+
+    // Bring down the Datanode that had the container replica.
+    cluster.shutdownHddsDatanode(pipeline.getFirstNode());
+
+    LambdaTestUtils.await(120000, 6000, () -> {
+      List<UnhealthyContainers> allMissingContainers =
+          reconContainerManager.getContainerSchemaManager()
+              .getUnhealthyContainers(
+                  ContainerSchemaDefinition.UnHealthyContainerStates.MISSING,
+                  0, 1000);
+      return (allMissingContainers.size() >= 1);
+    });
+
+    // Restart the Datanode to make sure we remove the missing container.
+    cluster.restartHddsDatanode(pipeline.getFirstNode(), true);
+    LambdaTestUtils.await(120000, 10000, () -> {
+      List<UnhealthyContainers> allMissingContainers =
+          reconContainerManager.getContainerSchemaManager()
+              .getUnhealthyContainers(
+                  ContainerSchemaDefinition.UnHealthyContainerStates.MISSING,
+                  0, 1000);
+      return (allMissingContainers.isEmpty());
+    });
+    IOUtils.closeQuietly(client);
+  }
 
   /**
    * This test verifies the count of MISSING and EMPTY_MISSING containers.
@@ -299,39 +295,6 @@ public class TestReconTasks {
       return (allMissingContainers.isEmpty());
     });
 
-    //RRR
-    ContainerInfo containerInfo2 =
-        scmContainerManager
-            .allocateContainer(RatisReplicationConfig.getInstance(ONE), "testEmptyMissingContainer");
-//    long containerID2 = containerInfo.getContainerID();
-    Pipeline pipeline2 =
-        scmPipelineManager.getPipeline(containerInfo2.getPipelineID());
-    XceiverClientGrpc client2 = new XceiverClientGrpc(pipeline2, conf);
-//    runTestOzoneContainerViaDataNode(containerID2, client2);
-
-    // Bring down the Datanode that had the container replica.
-    cluster.shutdownHddsDatanode(pipeline2.getFirstNode());
-
-    LambdaTestUtils.await(120000, 6000, () -> {
-      List<UnhealthyContainers> allMissingContainers =
-          reconContainerManager.getContainerSchemaManager()
-              .getUnhealthyContainers(
-                  ContainerSchemaDefinition.UnHealthyContainerStates.MISSING,
-                  0, 1000);
-      return (allMissingContainers.size() >= 1);
-    });
-
-    // Restart the Datanode to make sure we remove the missing container.
-    cluster.restartHddsDatanode(pipeline.getFirstNode(), true);
-    LambdaTestUtils.await(120000, 10000, () -> {
-      List<UnhealthyContainers> allMissingContainers =
-          reconContainerManager.getContainerSchemaManager()
-              .getUnhealthyContainers(
-                  ContainerSchemaDefinition.UnHealthyContainerStates.MISSING,
-                  0, 1000);
-      return (allMissingContainers.isEmpty());
-    });
-    //RRR
-    IOUtils.closeQuietly(client, client2);
+    IOUtils.closeQuietly(client);
   }
 }
