@@ -18,6 +18,7 @@
 package org.apache.hadoop.hdds.utils;
 
 
+import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksObjectUtils;
 import org.apache.ozone.test.tag.Native;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -58,6 +59,7 @@ public class TestNativeLibraryLoader {
   @MethodSource("nativeLibraryDirectoryLocations")
   public void testNativeLibraryLoader(
       String nativeLibraryDirectoryLocation) {
+    ManagedRocksObjectUtils.loadRocksDBLibrary();
     Map<String, Boolean> libraryLoadedMap = new HashMap<>();
     NativeLibraryLoader loader = new NativeLibraryLoader(libraryLoadedMap);
     try (MockedStatic<NativeLibraryLoader> mockedNativeLibraryLoader =
@@ -68,6 +70,7 @@ public class TestNativeLibraryLoader {
           .thenReturn(nativeLibraryDirectoryLocation);
       mockedNativeLibraryLoader.when(() -> NativeLibraryLoader.getInstance())
           .thenReturn(loader);
+
       assertTrue(NativeLibraryLoader.getInstance()
           .loadLibrary(ROCKS_TOOLS_NATIVE_LIBRARY_NAME));
       assertTrue(NativeLibraryLoader
