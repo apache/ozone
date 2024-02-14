@@ -23,6 +23,7 @@ import java.nio.file.InvalidPathException;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
+import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.ratis.server.protocol.TermIndex;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
@@ -63,9 +64,10 @@ public class OMKeySetTimesRequest extends OMKeyRequest {
     OMRequest request = super.preExecute(ozoneManager);
     SetTimesRequest setTimesRequest = request.getSetTimesRequest();
     String keyPath = setTimesRequest.getKeyArgs().getKeyName();
+    OmBucketInfo bucketInfo = ozoneManager.getBucketInfo(volumeName, bucketName);
     String normalizedKeyPath =
         validateAndNormalizeKey(ozoneManager.getEnableFileSystemPaths(),
-            keyPath, getBucketLayout());
+            keyPath, bucketInfo.getBucketLayout());
 
     OzoneManagerProtocolProtos.KeyArgs keyArgs =
         OzoneManagerProtocolProtos.KeyArgs.newBuilder()
@@ -74,10 +76,12 @@ public class OMKeySetTimesRequest extends OMKeyRequest {
             .setKeyName(normalizedKeyPath)
             .build();
 
+    OzoneManagerProtocolProtos.KeyArgs newKeyArgs = resolveBucketLink(ozoneManager, keyArgs);
+
     return request.toBuilder()
         .setSetTimesRequest(
             setTimesRequest.toBuilder()
-                .setKeyArgs(keyArgs)
+                .setKeyArgs(newKeyArgs)
                 .setMtime(getModificationTime()))
         .build();
   }
