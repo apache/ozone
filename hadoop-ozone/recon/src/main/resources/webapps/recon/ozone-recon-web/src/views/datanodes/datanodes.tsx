@@ -216,7 +216,7 @@ const COLUMNS = [
             <RenderPipelineIds pipelinesIds={firstThreePipelinesIDs} />
           }
           {
-            remainingPipelinesIDs.length > 1 &&
+            remainingPipelinesIDs.length > 0 &&
             <Popover content={<RenderPipelineIds pipelinesIds={remainingPipelinesIDs} />} title="Remaining pipelines" placement="rightTop" trigger="hover">
               {`... and ${remainingPipelinesIDs.length} more pipelines`}
             </Popover>
