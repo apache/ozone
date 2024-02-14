@@ -181,6 +181,11 @@ class TestOzoneAtRestEncryption {
     // create test key
     createKey(TEST_KEY, cluster.getOzoneManager().getKmsProvider(), conf);
     eTagProvider = MessageDigest.getInstance(OzoneConsts.MD5_HASH);
+
+    final String rootPath = String.format("%s://%s/",
+        OZONE_OFS_URI_SCHEME, conf.get(OZONE_OM_ADDRESS_KEY));
+    conf.set(CommonConfigurationKeysPublic.FS_DEFAULT_NAME_KEY, rootPath);
+    conf.setInt(OZONE_REPLICATION, 1);
   }
 
   @AfterAll
@@ -276,17 +281,12 @@ class TestOzoneAtRestEncryption {
     Instant testStartTime = getTestStartTime();
     String keyName = UUID.randomUUID().toString();
     String value = "sample value";
-    final String rootPath = String.format("%s://%s/",
-        OZONE_OFS_URI_SCHEME, conf.get(OZONE_OM_ADDRESS_KEY));
-    conf.set(CommonConfigurationKeysPublic.FS_DEFAULT_NAME_KEY, rootPath);
-    conf.setInt(OZONE_REPLICATION, 1);
 
     final String dir = OZONE_ROOT + bucket.getVolumeName()
         + OZONE_URI_DELIMITER + bucket.getName();
     final Path file = new Path(dir, keyName);
     try (FileSystem fs = FileSystem.get(conf)) {
-      try (FSDataOutputStream out =
-               fs.create(file, true)) {
+      try (FSDataOutputStream out = fs.create(file, true)) {
         out.write(value.getBytes(StandardCharsets.UTF_8));
       }
     }

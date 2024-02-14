@@ -210,13 +210,12 @@ public class TestOMFileCreateRequest extends TestOMKeyRequest {
   }
 
   @Test
-  public void testValidateAndUpdateEncryption()
-      throws Exception {
-    KeyProviderCryptoExtension.EncryptedKeyVersion mockEncryptedKeyVersion =
+  public void testValidateAndUpdateEncryption() throws Exception {
+    KeyProviderCryptoExtension.EncryptedKeyVersion eKV =
         KeyProviderCryptoExtension.EncryptedKeyVersion.createForDecryption(
             "key1", "v1", new byte[0], new byte[0]);
     KeyProviderCryptoExtension mockKeyProvider = mock(KeyProviderCryptoExtension.class);
-    when(mockKeyProvider.generateEncryptedKey(any())).thenReturn(mockEncryptedKeyVersion);
+    when(mockKeyProvider.generateEncryptedKey(any())).thenReturn(eKV);
 
     when(ozoneManager.getKmsProvider()).thenReturn(mockKeyProvider);
     keyName = "test/" + keyName;
