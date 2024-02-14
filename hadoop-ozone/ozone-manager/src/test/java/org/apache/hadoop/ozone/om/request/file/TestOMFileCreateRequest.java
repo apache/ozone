@@ -26,7 +26,6 @@ import java.util.stream.Collectors;
 
 import org.apache.hadoop.crypto.CipherSuite;
 import org.apache.hadoop.crypto.CryptoProtocolVersion;
-import org.apache.hadoop.crypto.key.KeyProvider;
 import org.apache.hadoop.crypto.key.KeyProviderCryptoExtension;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
@@ -214,7 +213,8 @@ public class TestOMFileCreateRequest extends TestOMKeyRequest {
   public void testValidateAndUpdateEncryption()
       throws Exception {
     KeyProviderCryptoExtension.EncryptedKeyVersion mockEncryptedKeyVersion =
-        KeyProviderCryptoExtension.EncryptedKeyVersion.createForDecryption("key1", "v1",new byte[0], new byte[0]);
+        KeyProviderCryptoExtension.EncryptedKeyVersion.createForDecryption(
+            "key1", "v1", new byte[0], new byte[0]);
     KeyProviderCryptoExtension mockKeyProvider = mock(KeyProviderCryptoExtension.class);
     when(mockKeyProvider.generateEncryptedKey(any())).thenReturn(mockEncryptedKeyVersion);
 

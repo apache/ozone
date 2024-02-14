@@ -40,6 +40,9 @@ import org.apache.hadoop.crypto.key.KeyProvider;
 import org.apache.hadoop.crypto.key.kms.KMSClientProvider;
 import org.apache.hadoop.crypto.key.kms.server.MiniKMS;
 import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
+import org.apache.hadoop.fs.FSDataOutputStream;
+import org.apache.hadoop.fs.FileSystem;
+import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
@@ -81,6 +84,11 @@ import org.apache.ozone.test.GenericTestUtils;
 import static org.apache.hadoop.hdds.HddsConfigKeys.OZONE_METADATA_DIRS;
 import static org.apache.hadoop.hdds.client.ReplicationFactor.ONE;
 import static org.apache.hadoop.hdds.client.ReplicationType.RATIS;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_REPLICATION;
+import static org.apache.hadoop.ozone.OzoneConsts.OZONE_OFS_URI_SCHEME;
+import static org.apache.hadoop.ozone.OzoneConsts.OZONE_ROOT;
+import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ADDRESS_KEY;
 import static org.apache.ozone.test.GenericTestUtils.getTestStartTime;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
@@ -210,6 +218,7 @@ class TestOzoneAtRestEncryption {
 
     createAndVerifyKeyData(bucket);
     createAndVerifyStreamKeyData(bucket);
+    createAndVerifyFileSystemData(bucket);
   }
 
   @ParameterizedTest
@@ -256,6 +265,33 @@ class TestOzoneAtRestEncryption {
       out.write(value.getBytes(StandardCharsets.UTF_8));
     }
     verifyKeyData(bucket, keyName, value, testStartTime);
+  }
+
+  static void createAndVerifyFileSystemData(
+      OzoneBucket bucket) throws Exception {
+    // OBS does not support file system semantics.
+    if (bucket.getBucketLayout() == BucketLayout.OBJECT_STORE) {
+      return;
+    }
+    Instant testStartTime = getTestStartTime();
+    String keyName = UUID.randomUUID().toString();
+    String value = "sample value";
+    final String rootPath = String.format("%s://%s/",
+        OZONE_OFS_URI_SCHEME, conf.get(OZONE_OM_ADDRESS_KEY));
+    conf.set(CommonConfigurationKeysPublic.FS_DEFAULT_NAME_KEY, rootPath);
+    conf.setInt(OZONE_REPLICATION, 1);
+
+    final String dir = OZONE_ROOT + bucket.getVolumeName()
+        + OZONE_URI_DELIMITER + bucket.getName();
+    final Path file = new Path(dir, keyName);
+    try (FileSystem fs = FileSystem.get(conf)) {
+      try (FSDataOutputStream out =
+               fs.create(file, true)) {
+        out.write(value.getBytes(StandardCharsets.UTF_8));
+      }
+    }
+    verifyKeyData(bucket, keyName, value, testStartTime);
+
   }
 
   static void verifyKeyData(OzoneBucket bucket, String keyName, String value,
