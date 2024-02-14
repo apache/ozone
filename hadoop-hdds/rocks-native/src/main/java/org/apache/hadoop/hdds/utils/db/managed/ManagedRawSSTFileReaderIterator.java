@@ -21,6 +21,7 @@ import com.google.common.primitives.UnsignedLong;
 import org.apache.hadoop.hdds.StringUtils;
 import org.apache.hadoop.util.ClosableIterator;
 
+import java.util.Arrays;
 import java.util.function.Function;
 
 /**
@@ -88,9 +89,8 @@ public class ManagedRawSSTFileReaderIterator<T>
       this.value = value;
     }
 
-    @SuppressWarnings("M V EI")
     public byte[] getKey() {
-      return key;
+      return Arrays.copyOf(key, key.length);
     }
 
     public UnsignedLong getSequence() {
@@ -101,9 +101,8 @@ public class ManagedRawSSTFileReaderIterator<T>
       return type;
     }
 
-    @SuppressWarnings("M V EI")
     public byte[] getValue() {
-      return value;
+      return Arrays.copyOf(value, value.length);
     }
 
     @Override
