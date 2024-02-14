@@ -19,8 +19,14 @@ package org.apache.hadoop.hdds.utils.db.managed;
 
 import org.rocksdb.util.Environment;
 
+import java.io.FileOutputStream;
 import java.io.FileWriter;
 import java.io.IOException;
+import java.io.OutputStreamWriter;
+import java.io.Writer;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Paths;
 
 /**
  * Class to write the rocksdb lib name to a file.
@@ -33,7 +39,8 @@ public final class JniLibNamePropertyWriter {
 
   public static void main(String[] args) {
     String filePath = args[0];
-    try (FileWriter writer = new FileWriter(filePath)) {
+    try (Writer writer = new OutputStreamWriter(
+        Files.newOutputStream(Paths.get(filePath)), StandardCharsets.UTF_8)) {
       writer.write("rocksdbLibName=" +
           Environment.getJniLibraryFileName("rocksdb"));
     } catch (IOException e) {

@@ -88,6 +88,7 @@ public class ManagedRawSSTFileReaderIterator<T>
       this.value = value;
     }
 
+    @SuppressWarnings("M V EI")
     public byte[] getKey() {
       return key;
     }
@@ -100,6 +101,7 @@ public class ManagedRawSSTFileReaderIterator<T>
       return type;
     }
 
+    @SuppressWarnings("M V EI")
     public byte[] getValue() {
       return value;
     }
