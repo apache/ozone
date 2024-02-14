@@ -158,16 +158,11 @@ public class OMFileCreateRequest extends OMKeyRequest {
 
     generateRequiredEncryptionInfo(keyArgs, newKeyArgs, ozoneManager);
 
-    assertTrue(newKeyArgs.hasFileEncryptionInfo());
-
     KeyArgs resolvedArgs = resolveBucketAndCheckKeyAcls(newKeyArgs.build(),
         ozoneManager, IAccessAuthorizer.ACLType.CREATE);
     CreateFileRequest.Builder newCreateFileRequest =
         createFileRequest.toBuilder().setKeyArgs(resolvedArgs)
             .setClientID(UniqueId.next());
-
-    assertTrue(newCreateFileRequest.getKeyArgs().hasFileEncryptionInfo());
-
 
     return getOmRequest().toBuilder()
         .setCreateFileRequest(newCreateFileRequest).setUserInfo(userInfo)
