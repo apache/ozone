@@ -244,7 +244,6 @@ public class RatisPipelineProvider
                     getPipelineStateManager(), d)))
         .filter(d ->
             (d.getPipelines() >= getNodeManager().pipelineLimit(d.getDn())))
-        .sorted(Comparator.comparingInt(DnWithPipelines::getPipelines))
         .map(d -> d.getDn())
         .collect(Collectors.toList());
     return excluded;
