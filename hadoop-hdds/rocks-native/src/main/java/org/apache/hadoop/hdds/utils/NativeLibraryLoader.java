@@ -113,8 +113,7 @@ public class NativeLibraryLoader {
         System.loadLibrary(libraryName);
         loaded = true;
       } catch (Throwable e) {
-        LOG.warn("Unable to load library from java.library.path: {}",
-            libraryName, e);
+
       }
       if (!loaded) {
         Optional<File> file = copyResourceFromJarToTemp(libraryName);
