@@ -81,7 +81,7 @@ public class OzoneOutputStreamStub extends OzoneOutputStream {
     ReplicationConfig replicationConfig =
         ReplicationConfig.getDefault(conf);
     OzoneClientConfig ozoneClientConfig = conf.getObject(OzoneClientConfig.class);
-    return new KeyOutputStream(replicationConfig, null, ozoneClientConfig) {
+    return new KeyOutputStream(replicationConfig, null) {
       @Override
       public synchronized OmMultipartCommitUploadPartInfo
           getCommitUploadPartInfo() {

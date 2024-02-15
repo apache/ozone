@@ -116,20 +116,6 @@ public class BlockOutputStreamEntryPool implements KeyMetadataAware {
         Clock.system(ZoneOffset.UTC));
   }
 
-  BlockOutputStreamEntryPool(ContainerClientMetrics clientMetrics, OzoneClientConfig clientConfig) {
-    omClient = null;
-    keyArgs = null;
-    xceiverClientFactory = null;
-    config = clientConfig;
-    int chunkSize = 0;
-    bufferPool = new BufferPool(chunkSize, 1);
-
-    openID = -1;
-    excludeList = createExcludeList();
-    this.clientMetrics = clientMetrics;
-    this.streamBufferArgs = null;
-  }
-
   /**
    * When a key is opened, it is possible that there are some blocks already
    * allocated to it for this open session. In this case, to make use of these
