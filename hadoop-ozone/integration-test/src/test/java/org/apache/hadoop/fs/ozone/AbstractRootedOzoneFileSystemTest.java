@@ -2461,4 +2461,39 @@ abstract class AbstractRootedOzoneFileSystemTest {
     assertEquals(mtime, fileStatus.getModificationTime());
   }
 
+  @Test
+  public void testSetTimesForLinkedBucketPath() throws Exception {
+    // Create a file
+    OzoneBucket sourceBucket =
+        TestDataUtil.createVolumeAndBucket(client, bucketLayout);
+    Path volumePath1 =
+        new Path(OZONE_URI_DELIMITER, sourceBucket.getVolumeName());
+    Path sourceBucketPath = new Path(volumePath1, sourceBucket.getName());
+    Path path = new Path(sourceBucketPath, "key1");
+    try (FSDataOutputStream stream = fs.create(path)) {
+      stream.write(1);
+    }
+    OzoneVolume sourceVol = client.getObjectStore().getVolume(sourceBucket.getVolumeName());
+    String linkBucketName = UUID.randomUUID().toString();
+    createLinkBucket(sourceVol.getName(), linkBucketName,
+        sourceVol.getName(), sourceBucket.getName());
+
+    Path linkedBucketPath = new Path(volumePath1, linkBucketName);
+    Path keyInLinkedBucket = new Path(linkedBucketPath, "key1");
+
+    // test setTimes in linked bucket path
+    long mtime = 1000;
+    fs.setTimes(keyInLinkedBucket, mtime, 2000);
+
+    FileStatus fileStatus = fs.getFileStatus(path);
+    // verify that mtime is updated as expected.
+    assertEquals(mtime, fileStatus.getModificationTime());
+
+    long mtimeDontUpdate = -1;
+    fs.setTimes(keyInLinkedBucket, mtimeDontUpdate, 2000);
+
+    fileStatus = fs.getFileStatus(keyInLinkedBucket);
+    // verify that mtime is NOT updated as expected.
+    assertEquals(mtime, fileStatus.getModificationTime());
+  }
 }
