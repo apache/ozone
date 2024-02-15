@@ -90,7 +90,7 @@ public class TestPartUpload {
     response = REST.put(OzoneConsts.S3_BUCKET, OzoneConsts.KEY,
         content.length(), 1, uploadID, body);
 
-    assertNotNull(response.getHeaderString("ETag"));
+    assertNotNull(response.getHeaderString(OzoneConsts.ETAG));
 
   }
 
@@ -112,16 +112,16 @@ public class TestPartUpload {
     response = REST.put(OzoneConsts.S3_BUCKET, OzoneConsts.KEY,
         content.length(), 1, uploadID, body);
 
-    assertNotNull(response.getHeaderString("ETag"));
+    assertNotNull(response.getHeaderString(OzoneConsts.ETAG));
 
-    String eTag = response.getHeaderString("ETag");
+    String eTag = response.getHeaderString(OzoneConsts.ETAG);
 
     // Upload part again with same part Number, the ETag should be changed.
     content = "Multipart Upload Changed";
     response = REST.put(OzoneConsts.S3_BUCKET, OzoneConsts.KEY,
         content.length(), 1, uploadID, body);
-    assertNotNull(response.getHeaderString("ETag"));
-    assertNotEquals(eTag, response.getHeaderString("ETag"));
+    assertNotNull(response.getHeaderString(OzoneConsts.ETAG));
+    assertNotEquals(eTag, response.getHeaderString(OzoneConsts.ETAG));
 
   }
 

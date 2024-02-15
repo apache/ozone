@@ -44,6 +44,7 @@ import org.junit.jupiter.api.Timeout;
 
 import java.io.IOException;
 import static java.nio.charset.StandardCharsets.UTF_8;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_RATIS_PIPELINE_LIMIT;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -73,8 +74,9 @@ public class TestHybridPipelineOnDatanode {
   @BeforeAll
   public static void init() throws Exception {
     conf = new OzoneConfiguration();
+    conf.setInt(OZONE_SCM_RATIS_PIPELINE_LIMIT, 5);
     cluster = MiniOzoneCluster.newBuilder(conf).setNumDatanodes(3)
-        .setTotalPipelineNumLimit(5).build();
+        .build();
     cluster.waitForClusterToBeReady();
     //the easiest way to create an open container is creating a key
     client = OzoneClientFactory.getRpcClient(conf);

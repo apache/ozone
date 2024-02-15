@@ -277,6 +277,8 @@ public final class OMConfigKeys {
       + "kerberos.keytab.file";
   public static final String OZONE_OM_KERBEROS_PRINCIPAL_KEY = "ozone.om"
       + ".kerberos.principal";
+  public static final String OZONE_OM_KERBEROS_PRINCIPAL_PATTERN_KEY =
+      "ozone.om.kerberos.principal.pattern";
   public static final String OZONE_OM_HTTP_KERBEROS_KEYTAB_FILE =
       "ozone.om.http.auth.kerberos.keytab";
   public static final String OZONE_OM_HTTP_KERBEROS_PRINCIPAL_KEY

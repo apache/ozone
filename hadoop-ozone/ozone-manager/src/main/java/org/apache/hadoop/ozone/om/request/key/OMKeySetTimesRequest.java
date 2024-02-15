@@ -74,10 +74,12 @@ public class OMKeySetTimesRequest extends OMKeyRequest {
             .setKeyName(normalizedKeyPath)
             .build();
 
+    OzoneManagerProtocolProtos.KeyArgs newKeyArgs = resolveBucketLink(ozoneManager, keyArgs);
+
     return request.toBuilder()
         .setSetTimesRequest(
             setTimesRequest.toBuilder()
-                .setKeyArgs(keyArgs)
+                .setKeyArgs(newKeyArgs)
                 .setMtime(getModificationTime()))
         .build();
   }
