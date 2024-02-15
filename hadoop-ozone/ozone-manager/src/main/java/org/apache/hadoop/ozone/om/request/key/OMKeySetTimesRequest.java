@@ -64,10 +64,9 @@ public class OMKeySetTimesRequest extends OMKeyRequest {
     OMRequest request = super.preExecute(ozoneManager);
     SetTimesRequest setTimesRequest = request.getSetTimesRequest();
     String keyPath = setTimesRequest.getKeyArgs().getKeyName();
-    OmBucketInfo bucketInfo = ozoneManager.getBucketInfo(volumeName, bucketName);
     String normalizedKeyPath =
         validateAndNormalizeKey(ozoneManager.getEnableFileSystemPaths(),
-            keyPath, bucketInfo.getBucketLayout());
+            keyPath, getBucketLayout());
 
     OzoneManagerProtocolProtos.KeyArgs keyArgs =
         OzoneManagerProtocolProtos.KeyArgs.newBuilder()
