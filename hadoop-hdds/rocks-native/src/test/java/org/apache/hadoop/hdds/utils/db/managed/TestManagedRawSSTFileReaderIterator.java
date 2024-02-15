@@ -20,7 +20,6 @@ package org.apache.hadoop.hdds.utils.db.managed;
 
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.StringUtils;
-import org.apache.hadoop.hdds.utils.NativeLibraryLoader;
 import org.apache.hadoop.hdds.utils.TestUtils;
 import org.apache.ozone.test.tag.Native;
 import org.junit.jupiter.api.Named;
@@ -45,7 +44,6 @@ import java.util.stream.Stream;
 import static org.apache.hadoop.hdds.utils.NativeConstants.ROCKS_TOOLS_NATIVE_LIBRARY_NAME;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
 /**
  * Test for ManagedRawSSTFileReaderIterator.
@@ -123,7 +121,6 @@ class TestManagedRawSSTFileReaderIterator {
                                                String valueFormat)
       throws Exception {
     ManagedRocksObjectUtils.loadRocksDBLibrary();
-    assumeTrue(NativeLibraryLoader.getInstance().loadLibrary(ROCKS_TOOLS_NATIVE_LIBRARY_NAME));
 
     TreeMap<Pair<String, Integer>, String> keys =
         IntStream.range(0, 100).boxed().collect(
