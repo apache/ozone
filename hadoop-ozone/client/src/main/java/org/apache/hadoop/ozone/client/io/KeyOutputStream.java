@@ -32,7 +32,6 @@ import org.apache.hadoop.fs.Syncable;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType;
-import org.apache.hadoop.hdds.scm.ContainerClientMetrics;
 import org.apache.hadoop.hdds.scm.OzoneClientConfig;
 import org.apache.hadoop.hdds.scm.StreamBufferArgs;
 import org.apache.hadoop.hdds.scm.XceiverClientFactory;
@@ -106,8 +105,8 @@ public class KeyOutputStream extends OutputStream
   private boolean atomicKeyCreation;
 
   public KeyOutputStream(ReplicationConfig replicationConfig,
-      ContainerClientMetrics clientMetrics, OzoneClientConfig clientConfig,
-      StreamBufferArgs streamBufferArgs) {
+      StreamBufferArgs streamBufferArgs, OzoneClientConfig clientConfig,
+      BlockOutputStreamResourceProvider blockOutputStreamResourceProvider) {
     this.replication = replicationConfig;
     this.config = clientConfig;
     closed = false;
@@ -117,8 +116,8 @@ public class KeyOutputStream extends OutputStream
             e -> RetryPolicies.TRY_ONCE_THEN_FAIL));
     retryCount = 0;
     offset = 0;
-    blockOutputStreamEntryPool =
-        new BlockOutputStreamEntryPool(clientMetrics, clientConfig, streamBufferArgs);
+    blockOutputStreamEntryPool = new BlockOutputStreamEntryPool(
+        streamBufferArgs, clientConfig, blockOutputStreamResourceProvider);
   }
 
   @VisibleForTesting
@@ -155,9 +154,9 @@ public class KeyOutputStream extends OutputStream
       String requestId, ReplicationConfig replicationConfig,
       String uploadID, int partNumber, boolean isMultipart,
       boolean unsafeByteBufferConversion,
-      ContainerClientMetrics clientMetrics,
-      boolean atomicKeyCreation, StreamBufferArgs streamBufferArgs
-  ) {
+      boolean atomicKeyCreation,
+      StreamBufferArgs streamBufferArgs,
+      BlockOutputStreamResourceProvider blockOutputStreamResourceProvider) {
     this.config = config;
     this.replication = replicationConfig;
     blockOutputStreamEntryPool =
@@ -170,7 +169,9 @@ public class KeyOutputStream extends OutputStream
             unsafeByteBufferConversion,
             xceiverClientManager,
             handler.getId(),
-            clientMetrics, streamBufferArgs);
+            streamBufferArgs,
+            blockOutputStreamResourceProvider
+        );
     this.retryPolicyMap = HddsClientUtils.getRetryPolicyByException(
         config.getMaxRetryCount(), config.getRetryInterval());
     this.retryCount = 0;
@@ -612,9 +613,9 @@ public class KeyOutputStream extends OutputStream
     private boolean unsafeByteBufferConversion;
     private OzoneClientConfig clientConfig;
     private ReplicationConfig replicationConfig;
-    private ContainerClientMetrics clientMetrics;
     private boolean atomicKeyCreation = false;
     private StreamBufferArgs streamBufferArgs;
+    private BlockOutputStreamResourceProvider blockOutputStreamResourceProvider;
 
     public String getMultipartUploadID() {
       return multipartUploadID;
@@ -715,13 +716,14 @@ public class KeyOutputStream extends OutputStream
       return this;
     }
 
-    public Builder setClientMetrics(ContainerClientMetrics clientMetrics) {
-      this.clientMetrics = clientMetrics;
+    public Builder setblockOutputStreamResourceProvider(
+        BlockOutputStreamResourceProvider provider) {
+      this.blockOutputStreamResourceProvider = provider;
       return this;
     }
 
-    public ContainerClientMetrics getClientMetrics() {
-      return clientMetrics;
+    public BlockOutputStreamResourceProvider getblockOutputStreamResourceProvider() {
+      return blockOutputStreamResourceProvider;
     }
 
     public boolean getAtomicKeyCreation() {
@@ -740,9 +742,10 @@ public class KeyOutputStream extends OutputStream
           multipartNumber,
           isMultipartKey,
           unsafeByteBufferConversion,
-          clientMetrics,
           atomicKeyCreation,
-          streamBufferArgs);
+          streamBufferArgs,
+          blockOutputStreamResourceProvider
+      );
     }
 
   }

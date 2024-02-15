@@ -21,12 +21,12 @@ import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.fs.Syncable;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandResponseProto;
-import org.apache.hadoop.hdds.scm.ContainerClientMetrics;
 import org.apache.hadoop.hdds.scm.OzoneClientConfig;
 import org.apache.hadoop.hdds.scm.StreamBufferArgs;
 import org.apache.hadoop.hdds.scm.XceiverClientFactory;
 import org.apache.hadoop.hdds.scm.XceiverClientReply;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
+import org.apache.hadoop.ozone.client.io.BlockOutputStreamResourceProvider;
 import org.apache.hadoop.ozone.common.ChunkBuffer;
 import org.apache.hadoop.security.token.Token;
 import org.apache.hadoop.security.token.TokenIdentifier;
@@ -65,8 +65,8 @@ public class RatisBlockOutputStream extends BlockOutputStream
   /**
    * Creates a new BlockOutputStream.
    *
-   * @param blockID              block ID
-   * @param bufferPool           pool of buffers
+   * @param blockID    block ID
+   * @param bufferPool pool of buffers
    */
   @SuppressWarnings("checkstyle:ParameterNumber")
   public RatisBlockOutputStream(
@@ -76,10 +76,13 @@ public class RatisBlockOutputStream extends BlockOutputStream
       BufferPool bufferPool,
       OzoneClientConfig config,
       Token<? extends TokenIdentifier> token,
-      ContainerClientMetrics clientMetrics, StreamBufferArgs streamBufferArgs
+      StreamBufferArgs streamBufferArgs,
+      BlockOutputStreamResourceProvider blockOutputStreamResourceProvider
   ) throws IOException {
     super(blockID, xceiverClientManager, pipeline,
-        bufferPool, config, token, clientMetrics, streamBufferArgs);
+        bufferPool, config, token, streamBufferArgs,
+        blockOutputStreamResourceProvider
+    );
     this.commitWatcher = new CommitWatcher(bufferPool, getXceiverClient());
   }
 

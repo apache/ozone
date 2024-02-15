@@ -23,7 +23,6 @@ import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
-import org.apache.hadoop.hdds.scm.ContainerClientMetrics;
 import org.apache.hadoop.hdds.scm.OzoneClientConfig;
 import org.apache.hadoop.hdds.scm.StreamBufferArgs;
 import org.apache.hadoop.hdds.scm.XceiverClientFactory;
@@ -79,10 +78,10 @@ public class ECBlockOutputStreamEntry extends BlockOutputStreamEntry {
   ECBlockOutputStreamEntry(BlockID blockID, String key,
       XceiverClientFactory xceiverClientManager, Pipeline pipeline, long length,
       BufferPool bufferPool, Token<OzoneBlockTokenIdentifier> token,
-      OzoneClientConfig config, ContainerClientMetrics clientMetrics,
-      StreamBufferArgs streamBufferArgs) {
+      OzoneClientConfig config, StreamBufferArgs streamBufferArgs,
+      BlockOutputStreamResourceProvider provider) {
     super(blockID, key, xceiverClientManager, pipeline, length, bufferPool,
-        token, config, clientMetrics, streamBufferArgs);
+        token, config, streamBufferArgs, provider);
     assertInstanceOf(
         pipeline.getReplicationConfig(), ECReplicationConfig.class);
     this.replicationConfig =
@@ -101,7 +100,8 @@ public class ECBlockOutputStreamEntry extends BlockOutputStreamEntry {
         streams[i] =
             new ECBlockOutputStream(getBlockID(), getXceiverClientManager(),
                 createSingleECBlockPipeline(getPipeline(), nodes.get(i), i + 1),
-                getBufferPool(), getConf(), getToken(), getClientMetrics(), getStreamBufferArgs());
+                getBufferPool(), getConf(), getToken(), getStreamBufferArgs(),
+                getblockOutputStreamResourceProvider());
       }
       blockOutputStreams = streams;
     }
@@ -442,8 +442,8 @@ public class ECBlockOutputStreamEntry extends BlockOutputStreamEntry {
     private BufferPool bufferPool;
     private Token<OzoneBlockTokenIdentifier> token;
     private OzoneClientConfig config;
-    private ContainerClientMetrics clientMetrics;
     private StreamBufferArgs streamBufferArgs;
+    private BlockOutputStreamResourceProvider blockOutputStreamResourceProvider;
 
     public ECBlockOutputStreamEntry.Builder setBlockID(BlockID bID) {
       this.blockID = bID;
@@ -488,10 +488,9 @@ public class ECBlockOutputStreamEntry extends BlockOutputStreamEntry {
       this.token = bToken;
       return this;
     }
-
-    public ECBlockOutputStreamEntry.Builder setClientMetrics(
-        ContainerClientMetrics containerClientMetrics) {
-      this.clientMetrics = containerClientMetrics;
+    public ECBlockOutputStreamEntry.Builder setblockOutputStreamResourceProvider(
+        BlockOutputStreamResourceProvider provider) {
+      this.blockOutputStreamResourceProvider = provider;
       return this;
     }
 
@@ -508,7 +507,9 @@ public class ECBlockOutputStreamEntry extends BlockOutputStreamEntry {
           pipeline,
           length,
           bufferPool,
-          token, config, clientMetrics, streamBufferArgs);
+          token, config, streamBufferArgs,
+          blockOutputStreamResourceProvider
+      );
     }
   }
 }

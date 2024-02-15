@@ -23,13 +23,13 @@ import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ChunkInfo;
-import org.apache.hadoop.hdds.scm.ContainerClientMetrics;
 import org.apache.hadoop.hdds.scm.OzoneClientConfig;
 import org.apache.hadoop.hdds.scm.StreamBufferArgs;
 import org.apache.hadoop.hdds.scm.XceiverClientFactory;
 import org.apache.hadoop.hdds.scm.XceiverClientReply;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.client.io.BlockOutputStreamResourceProvider;
 import org.apache.hadoop.ozone.common.ChunkBuffer;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.security.token.Token;
@@ -75,10 +75,13 @@ public class ECBlockOutputStream extends BlockOutputStream {
       BufferPool bufferPool,
       OzoneClientConfig config,
       Token<? extends TokenIdentifier> token,
-      ContainerClientMetrics clientMetrics, StreamBufferArgs streamBufferArgs
+      StreamBufferArgs streamBufferArgs,
+      BlockOutputStreamResourceProvider blockOutputStreamResourceProvider
   ) throws IOException {
     super(blockID, xceiverClientManager,
-        pipeline, bufferPool, config, token, clientMetrics, streamBufferArgs);
+        pipeline, bufferPool, config, token, streamBufferArgs,
+        blockOutputStreamResourceProvider
+    );
     // In EC stream, there will be only one node in pipeline.
     this.datanodeDetails = pipeline.getClosestNode();
   }

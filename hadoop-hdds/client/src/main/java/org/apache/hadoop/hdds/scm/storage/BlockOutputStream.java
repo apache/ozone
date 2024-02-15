@@ -44,6 +44,7 @@ import org.apache.hadoop.hdds.scm.XceiverClientReply;
 import org.apache.hadoop.hdds.scm.XceiverClientSpi;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
+import org.apache.hadoop.ozone.client.io.BlockOutputStreamResourceProvider;
 import org.apache.hadoop.ozone.common.Checksum;
 import org.apache.hadoop.ozone.common.ChecksumData;
 import org.apache.hadoop.ozone.common.ChunkBuffer;
@@ -145,7 +146,8 @@ public class BlockOutputStream extends OutputStream {
       BufferPool bufferPool,
       OzoneClientConfig config,
       Token<? extends TokenIdentifier> token,
-      ContainerClientMetrics clientMetrics, StreamBufferArgs streamBufferArgs
+      StreamBufferArgs streamBufferArgs,
+      BlockOutputStreamResourceProvider blockOutputStreamResourceProvider
   ) throws IOException {
     this.xceiverClientFactory = xceiverClientManager;
     this.config = config;
@@ -189,7 +191,7 @@ public class BlockOutputStream extends OutputStream {
     ioException = new AtomicReference<>(null);
     checksum = new Checksum(config.getChecksumType(),
         config.getBytesPerChecksum());
-    this.clientMetrics = clientMetrics;
+    this.clientMetrics = blockOutputStreamResourceProvider.getClientMetrics();
     this.pipeline = pipeline;
     this.streamBufferArgs = streamBufferArgs;
   }

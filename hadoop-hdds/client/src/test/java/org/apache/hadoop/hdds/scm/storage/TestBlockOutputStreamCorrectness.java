@@ -43,10 +43,12 @@ import org.apache.hadoop.hdds.scm.XceiverClientSpi;
 import org.apache.hadoop.hdds.scm.pipeline.MockPipeline;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.client.io.BlockOutputStreamResourceProvider;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 
+import static java.util.concurrent.Executors.newFixedThreadPool;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.mock;
@@ -108,7 +110,9 @@ class TestBlockOutputStreamCorrectness {
         bufferPool,
         config,
         null,
-        ContainerClientMetrics.acquire(), streamBufferArgs);
+        streamBufferArgs,
+        BlockOutputStreamResourceProvider.create(() -> newFixedThreadPool(10),
+            ContainerClientMetrics.acquire()));
   }
 
   /**

@@ -128,8 +128,8 @@ public final class ECKeyOutputStream extends KeyOutputStream
   }
 
   private ECKeyOutputStream(Builder builder) {
-    super(builder.getReplicationConfig(), builder.getClientMetrics(),
-        builder.getClientConfig(), builder.getStreamBufferArgs());
+    super(builder.getReplicationConfig(), builder.getStreamBufferArgs(),
+        builder.getClientConfig(), builder.getblockOutputStreamResourceProvider());
     this.config = builder.getClientConfig();
     this.bufferPool = builder.getByteBufferPool();
     // For EC, cell/chunk size and buffer size can be same for now.
@@ -149,7 +149,8 @@ public final class ECKeyOutputStream extends KeyOutputStream
             builder.isMultipartKey(),
             info, builder.isUnsafeByteBufferConversionEnabled(),
             builder.getXceiverManager(), builder.getOpenHandler().getId(),
-            builder.getClientMetrics(), builder.getStreamBufferArgs());
+            builder.getStreamBufferArgs(),
+            builder.getblockOutputStreamResourceProvider());
 
     this.writeOffset = 0;
     this.encoder = CodecUtil.createRawEncoderWithFallback(

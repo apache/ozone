@@ -45,6 +45,7 @@ import org.apache.hadoop.io.ElasticByteBufferPool;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.client.io.BlockInputStreamFactory;
 import org.apache.hadoop.ozone.client.io.BlockInputStreamFactoryImpl;
+import org.apache.hadoop.ozone.client.io.BlockOutputStreamResourceProvider;
 import org.apache.hadoop.ozone.client.io.ECBlockInputStreamProxy;
 import org.apache.hadoop.ozone.client.io.ECBlockReconstructedStripeInputStream;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
@@ -73,6 +74,7 @@ import java.util.concurrent.SynchronousQueue;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 import static org.apache.hadoop.ozone.container.ec.reconstruction.TokenHelper.encode;
@@ -101,18 +103,22 @@ public class ECReconstructionCoordinator implements Closeable {
 
   private static final int EC_RECONSTRUCT_STRIPE_READ_POOL_MIN_SIZE = 3;
 
+  // TODO: Adjusts to the appropriate value when the ec-reconstruct-writer thread pool is used.
+  private static final int EC_RECONSTRUCT_STRIPE_WRITE_POOL_MIN_SIZE = 0;
+
   private final ECContainerOperationClient containerOperationClient;
 
   private final ByteBufferPool byteBufferPool;
 
-  private final ExecutorService ecReconstructExecutor;
-
+  private final ExecutorService ecReconstructReadExecutor;
+  private volatile ExecutorService ecReconstructWriteExecutor;
   private final BlockInputStreamFactory blockInputStreamFactory;
   private final TokenHelper tokenHelper;
-  private final ContainerClientMetrics clientMetrics;
   private final ECReconstructionMetrics metrics;
   private final StateContext context;
   private final OzoneClientConfig ozoneClientConfig;
+  private final BlockOutputStreamResourceProvider
+      blockOutputStreamResourceProvider;
 
   public ECReconstructionCoordinator(
       ConfigurationSource conf, CertificateClient certificateClient,
@@ -123,22 +129,33 @@ public class ECReconstructionCoordinator implements Closeable {
     this.containerOperationClient = new ECContainerOperationClient(conf,
         certificateClient);
     this.byteBufferPool = new ElasticByteBufferPool();
-    ThreadFactory threadFactory = new ThreadFactoryBuilder()
-        .setNameFormat(threadNamePrefix + "ec-reconstruct-reader-TID-%d")
+    Function<String, ThreadFactory> threadFactoryCreator = name ->
+        new ThreadFactoryBuilder()
+        .setNameFormat(threadNamePrefix + name)
         .build();
     ozoneClientConfig = conf.getObject(OzoneClientConfig.class);
-    this.ecReconstructExecutor =
+    this.ecReconstructReadExecutor =
         new ThreadPoolExecutor(EC_RECONSTRUCT_STRIPE_READ_POOL_MIN_SIZE,
             ozoneClientConfig.getEcReconstructStripeReadPoolLimit(),
             60,
             TimeUnit.SECONDS,
             new SynchronousQueue<>(),
-            threadFactory,
+            threadFactoryCreator.apply("ec-reconstruct-reader-TID-%d"),
+            new ThreadPoolExecutor.CallerRunsPolicy());
+    this.ecReconstructWriteExecutor =
+        new ThreadPoolExecutor(EC_RECONSTRUCT_STRIPE_WRITE_POOL_MIN_SIZE,
+            conf.getObject(OzoneClientConfig.class)
+                .getEcReconstructStripeWritePoolLimit(),
+            60,
+            TimeUnit.SECONDS,
+            new SynchronousQueue<>(),
+            threadFactoryCreator.apply("ec-reconstruct-writer-TID-%d"),
             new ThreadPoolExecutor.CallerRunsPolicy());
     this.blockInputStreamFactory = BlockInputStreamFactoryImpl
-        .getInstance(byteBufferPool, () -> ecReconstructExecutor);
+        .getInstance(byteBufferPool, () -> ecReconstructReadExecutor);
+    blockOutputStreamResourceProvider = BlockOutputStreamResourceProvider.create(
+        () -> ecReconstructWriteExecutor, ContainerClientMetrics.acquire());
     tokenHelper = new TokenHelper(new SecurityConfig(conf), secretKeyClient);
-    this.clientMetrics = ContainerClientMetrics.acquire();
     this.metrics = metrics;
   }
 
@@ -232,7 +249,9 @@ public class ECReconstructionCoordinator implements Closeable {
         containerOperationClient.singleNodePipeline(datanodeDetails,
             repConfig, replicaIndex),
         BufferPool.empty(), ozoneClientConfig,
-        blockLocationInfo.getToken(), clientMetrics, streamBufferArgs);
+        blockLocationInfo.getToken(), streamBufferArgs,
+        blockOutputStreamResourceProvider
+    );
   }
 
   @VisibleForTesting
@@ -272,7 +291,7 @@ public class ECReconstructionCoordinator implements Closeable {
         repConfig, blockLocationInfo, true,
         this.containerOperationClient.getXceiverClientManager(), null,
         this.blockInputStreamFactory, byteBufferPool,
-        this.ecReconstructExecutor)) {
+        this.ecReconstructReadExecutor)) {
 
       ECBlockOutputStream[] targetBlockStreams =
           new ECBlockOutputStream[toReconstructIndexes.size()];
@@ -456,6 +475,10 @@ public class ECReconstructionCoordinator implements Closeable {
   public void close() throws IOException {
     if (containerOperationClient != null) {
       containerOperationClient.close();
+    }
+    if (ecReconstructWriteExecutor != null) {
+      ecReconstructWriteExecutor.shutdownNow();
+      ecReconstructWriteExecutor = null;
     }
   }
 

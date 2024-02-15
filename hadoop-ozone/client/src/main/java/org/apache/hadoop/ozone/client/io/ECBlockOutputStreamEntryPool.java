@@ -19,7 +19,6 @@ package org.apache.hadoop.ozone.client.io;
 
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
-import org.apache.hadoop.hdds.scm.ContainerClientMetrics;
 import org.apache.hadoop.hdds.scm.OzoneClientConfig;
 import org.apache.hadoop.hdds.scm.StreamBufferArgs;
 import org.apache.hadoop.hdds.scm.XceiverClientFactory;
@@ -57,10 +56,11 @@ public class ECBlockOutputStreamEntryPool extends BlockOutputStreamEntryPool {
       boolean unsafeByteBufferConversion,
       XceiverClientFactory xceiverClientFactory,
       long openID,
-      ContainerClientMetrics clientMetrics, StreamBufferArgs streamBufferArgs) {
+      StreamBufferArgs streamBufferArgs,
+      BlockOutputStreamResourceProvider blockOutputStreamResourceProvider) {
     super(config, omClient, requestId, replicationConfig, uploadID, partNumber,
         isMultipart, info, unsafeByteBufferConversion, xceiverClientFactory,
-        openID, clientMetrics, streamBufferArgs);
+        openID, streamBufferArgs, blockOutputStreamResourceProvider);
     assert replicationConfig instanceof ECReplicationConfig;
   }
 
@@ -82,8 +82,8 @@ public class ECBlockOutputStreamEntryPool extends BlockOutputStreamEntryPool {
             .setLength(subKeyInfo.getLength())
             .setBufferPool(getBufferPool())
             .setToken(subKeyInfo.getToken())
-            .setClientMetrics(getClientMetrics())
             .setStreamBufferArgs(getStreamBufferArgs())
+            .setblockOutputStreamResourceProvider(getblockOutputStreamResourceProvider())
             .build();
   }
 

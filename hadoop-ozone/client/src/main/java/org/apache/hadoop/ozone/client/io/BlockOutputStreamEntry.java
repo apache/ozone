@@ -25,7 +25,6 @@ import java.util.Collections;
 import org.apache.hadoop.fs.Syncable;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
-import org.apache.hadoop.hdds.scm.ContainerClientMetrics;
 import org.apache.hadoop.hdds.scm.OzoneClientConfig;
 import org.apache.hadoop.hdds.scm.StreamBufferArgs;
 import org.apache.hadoop.hdds.scm.XceiverClientFactory;
@@ -61,8 +60,8 @@ public class BlockOutputStreamEntry extends OutputStream {
   private final Token<OzoneBlockTokenIdentifier> token;
 
   private BufferPool bufferPool;
-  private ContainerClientMetrics clientMetrics;
   private StreamBufferArgs streamBufferArgs;
+  private BlockOutputStreamResourceProvider blockOutputStreamResourceProvider;
 
   @SuppressWarnings({"parameternumber", "squid:S00107"})
   BlockOutputStreamEntry(
@@ -73,7 +72,8 @@ public class BlockOutputStreamEntry extends OutputStream {
       BufferPool bufferPool,
       Token<OzoneBlockTokenIdentifier> token,
       OzoneClientConfig config,
-      ContainerClientMetrics clientMetrics, StreamBufferArgs streamBufferArgs
+      StreamBufferArgs streamBufferArgs,
+      BlockOutputStreamResourceProvider blockOutputStreamResourceProvider
   ) {
     this.config = config;
     this.outputStream = null;
@@ -85,8 +85,8 @@ public class BlockOutputStreamEntry extends OutputStream {
     this.length = length;
     this.currentPosition = 0;
     this.bufferPool = bufferPool;
-    this.clientMetrics = clientMetrics;
     this.streamBufferArgs = streamBufferArgs;
+    this.blockOutputStreamResourceProvider = blockOutputStreamResourceProvider;
   }
 
   /**
@@ -108,11 +108,13 @@ public class BlockOutputStreamEntry extends OutputStream {
    */
   void createOutputStream() throws IOException {
     outputStream = new RatisBlockOutputStream(blockID, xceiverClientManager,
-        pipeline, bufferPool, config, token, clientMetrics, streamBufferArgs);
+        pipeline, bufferPool, config, token, streamBufferArgs,
+        blockOutputStreamResourceProvider
+    );
   }
 
-  ContainerClientMetrics getClientMetrics() {
-    return clientMetrics;
+  BlockOutputStreamResourceProvider getblockOutputStreamResourceProvider() {
+    return blockOutputStreamResourceProvider;
   }
 
   StreamBufferArgs getStreamBufferArgs() {
@@ -359,8 +361,8 @@ public class BlockOutputStreamEntry extends OutputStream {
     private BufferPool bufferPool;
     private Token<OzoneBlockTokenIdentifier> token;
     private OzoneClientConfig config;
-    private ContainerClientMetrics clientMetrics;
     private StreamBufferArgs streamBufferArgs;
+    private BlockOutputStreamResourceProvider blockOutputStreamResourceProvider;
 
     public Builder setBlockID(BlockID bID) {
       this.blockID = bID;
@@ -402,8 +404,10 @@ public class BlockOutputStreamEntry extends OutputStream {
       this.token = bToken;
       return this;
     }
-    public Builder setClientMetrics(ContainerClientMetrics clientMetrics) {
-      this.clientMetrics = clientMetrics;
+
+    public Builder setblockOutputStreamResourceProvider(
+        BlockOutputStreamResourceProvider provider) {
+      this.blockOutputStreamResourceProvider = provider;
       return this;
     }
     public Builder setStreamBufferArgs(StreamBufferArgs streamBufferArgs) {
@@ -418,7 +422,9 @@ public class BlockOutputStreamEntry extends OutputStream {
           pipeline,
           length,
           bufferPool,
-          token, config, clientMetrics, streamBufferArgs);
+          token, config, streamBufferArgs,
+          blockOutputStreamResourceProvider
+      );
     }
   }
 }
