@@ -65,7 +65,6 @@ import org.apache.ozone.rocksdb.util.RdbUtil;
 import org.apache.ozone.rocksdiff.DifferSnapshotInfo;
 import org.apache.ozone.rocksdiff.RocksDBCheckpointDiffer;
 import org.apache.ozone.rocksdiff.RocksDiffUtils;
-import org.apache.ozone.test.tag.Unhealthy;
 import org.apache.ratis.util.ExitUtils;
 import org.apache.ratis.util.TimeDuration;
 import jakarta.annotation.Nonnull;
@@ -376,6 +375,7 @@ public class TestSnapshotDiffManager {
         };
 
     omSnapshotManager = mock(OmSnapshotManager.class);
+    when(ozoneManager.getOmSnapshotManager()).thenReturn(omSnapshotManager);
     when(omSnapshotManager.isSnapshotStatus(
         any(), any())).thenReturn(true);
     snapshotCache = new SnapshotCache(omSnapshotManager, loader, 10);
@@ -383,6 +383,7 @@ public class TestSnapshotDiffManager {
     snapshotDiffManager = new SnapshotDiffManager(db, differ, ozoneManager,
         snapshotCache, snapDiffJobTable, snapDiffReportTable,
         columnFamilyOptions, codecRegistry);
+    when(omSnapshotManager.getDiffCleanupServiceInterval()).thenReturn(0L);
   }
 
   @AfterEach
@@ -1546,14 +1547,12 @@ public class TestSnapshotDiffManager {
    * Tests that only QUEUED jobs are submitted to the executor and rest are
    * short-circuited based on previous one.
    */
-  @Unhealthy
   @Test
   public void testGetSnapshotDiffReportJob() throws Exception {
     for (int i = 0; i < jobStatuses.size(); i++) {
       uploadSnapshotDiffJobToDb(snapshotInfo, snapshotInfoList.get(i),
           snapDiffJobs.get(i));
     }
-
     SnapshotDiffManager spy = spy(snapshotDiffManager);
 
     doAnswer(invocation -> {
