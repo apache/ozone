@@ -533,19 +533,6 @@ public abstract class OMClientRequest implements RequestAuditor {
     return isValidKeyPath(normalizedKeyName);
   }
 
-  public static String normalizeKeyPath(boolean enableFileSystemPaths,
-                                        String keyPath, BucketLayout bucketLayout) {
-    LOG.debug("Bucket Layout: {}", bucketLayout);
-    if (bucketLayout.shouldNormalizePaths(enableFileSystemPaths)) {
-      if (bucketLayout.isLegacy()) {
-        keyPath = OmUtils.normalizeKey(keyPath, true);
-      } else {
-        keyPath = OmUtils.normalizeKey(keyPath, false);
-      }
-    }
-    return keyPath;
-  }
-
   /**
    * Whether the pathname is valid.  Check key names which contain a
    * ":", ".", "..", "//", "". If it has any of these characters throws
