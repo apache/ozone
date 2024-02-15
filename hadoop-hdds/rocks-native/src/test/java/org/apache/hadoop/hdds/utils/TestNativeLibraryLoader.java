@@ -70,7 +70,6 @@ public class TestNativeLibraryLoader {
           .thenReturn(nativeLibraryDirectoryLocation);
       mockedNativeLibraryLoader.when(() -> NativeLibraryLoader.getInstance())
           .thenReturn(loader);
-
       assertTrue(NativeLibraryLoader.getInstance()
           .loadLibrary(ROCKS_TOOLS_NATIVE_LIBRARY_NAME));
       assertTrue(NativeLibraryLoader
