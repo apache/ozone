@@ -254,7 +254,7 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
   private OmTransport transport;
   private ThreadLocal<S3Auth> threadLocalS3Auth
       = new ThreadLocal<>();
-    
+
   private boolean s3AuthCheck;
 
   public static final int BLOCK_ALLOCATION_RETRY_COUNT = 5;
@@ -1033,7 +1033,7 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
     reqBuilder.setBucketName(bucketName);
     reqBuilder.setCount(maxKeys);
 
-    if (StringUtils.isNotEmpty(startKey)) {
+    if (startKey != null) {
       reqBuilder.setStartKey(startKey);
     }
 
@@ -2261,8 +2261,11 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
         ListStatusRequest.newBuilder()
             .setKeyArgs(keyArgs)
             .setRecursive(recursive)
-            .setStartKey(startKey)
             .setNumEntries(numEntries);
+
+    if (startKey != null) {
+      listStatusRequestBuilder.setStartKey(startKey);
+    }
 
     if (allowPartialPrefixes) {
       listStatusRequestBuilder.setAllowPartialPrefix(allowPartialPrefixes);
@@ -2297,8 +2300,11 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
         ListStatusRequest.newBuilder()
             .setKeyArgs(keyArgs)
             .setRecursive(recursive)
-            .setStartKey(startKey)
             .setNumEntries(numEntries);
+
+    if (startKey != null) {
+      listStatusRequestBuilder.setStartKey(startKey);
+    }
 
     if (allowPartialPrefixes) {
       listStatusRequestBuilder.setAllowPartialPrefix(allowPartialPrefixes);
