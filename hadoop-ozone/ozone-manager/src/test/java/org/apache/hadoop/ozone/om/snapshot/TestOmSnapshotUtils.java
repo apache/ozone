@@ -66,7 +66,7 @@ public class TestOmSnapshotUtils {
     assertFalse(tree2.exists());
     assertFalse(f1Link.exists());
 
-    OmSnapshotUtils.linkFiles(tree1, tree2);
+    OmSnapshotUtils.linkFilesOrCopy(tree1, tree2);
 
     // Expected files/links should exist now.
     assertTrue(tree2.exists());

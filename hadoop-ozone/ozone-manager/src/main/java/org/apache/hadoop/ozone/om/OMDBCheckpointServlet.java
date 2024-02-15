@@ -248,7 +248,7 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
       differ.incrementTarballRequestCount();
       FileUtils.copyDirectory(compactionLogDir.getOriginalDir(),
           compactionLogDir.getTmpDir());
-      OmSnapshotUtils.linkFiles(sstBackupDir.getOriginalDir(),
+      OmSnapshotUtils.linkFilesOrCopy(sstBackupDir.getOriginalDir(),
           sstBackupDir.getTmpDir());
       checkpoint = getDbStore().getCheckpoint(flush);
     } finally {

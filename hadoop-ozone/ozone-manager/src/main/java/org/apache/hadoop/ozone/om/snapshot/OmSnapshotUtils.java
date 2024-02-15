@@ -24,9 +24,11 @@ import org.apache.hadoop.ozone.om.OmSnapshotManager;
 import java.io.File;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.FileStore;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.nio.file.StandardCopyOption;
 import java.nio.file.attribute.BasicFileAttributes;
 import java.util.List;
 import java.util.Map;
@@ -128,7 +130,12 @@ public final class OmSnapshotUtils {
                   "Failed to create directory: " + parent.toString());
             }
           }
-          Files.createLink(fullToPath, fullFromPath);
+
+          if (isSamePartition(fullFromPath, fullToPath)) {
+            Files.createLink(fullToPath, fullFromPath);
+          } else {
+            Files.move(fullFromPath, fullToPath, StandardCopyOption.REPLACE_EXISTING);
+          }
         }
         if (!hardLinkFile.delete()) {
           throw new IOException("Failed to delete: " + hardLinkFile);
@@ -137,13 +144,24 @@ public final class OmSnapshotUtils {
     }
   }
 
+  private static boolean isSamePartition(Path fromPath, Path toPath) throws IOException {
+    try {
+      FileStore fromPathStore = Files.getFileStore(fromPath.getParent());
+      FileStore toPathStore = Files.getFileStore(toPath.getParent());
+      return fromPathStore.equals(toPathStore);
+    } catch (IOException ex) {
+      throw new IOException("Failed to get the stores, fromPath: " + fromPath + " toPath: " + toPath, ex);
+    }
+  }
+
   /**
-   * Link each of the files in oldDir to newDir.
+   * Link each of the files in oldDir to newDir if they are in the same partition
+   * else copy the files in oldDir to newDir.
    *
    * @param oldDir The dir to create links from.
    * @param newDir The dir to create links to.
    */
-  public static void linkFiles(File oldDir, File newDir) throws IOException {
+  public static void linkFilesOrCopy(File oldDir, File newDir) throws IOException {
     int truncateLength = oldDir.toString().length() + 1;
     List<String> oldDirList;
     try (Stream<Path> files = Files.walk(oldDir.toPath())) {
@@ -168,8 +186,10 @@ public final class OmSnapshotUtils {
         if (!newFile.mkdirs()) {
           throw new IOException("Directory create fails: " + newFile);
         }
-      } else {
+      } else if (isSamePartition(newFile.toPath(), oldFile.toPath())) {
         Files.createLink(newFile.toPath(), oldFile.toPath());
+      } else {
+        Files.move(oldFile.toPath(), newFile.toPath(), StandardCopyOption.REPLACE_EXISTING);
       }
     }
   }
