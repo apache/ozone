@@ -120,7 +120,7 @@ class TestManagedRawSSTFileReaderIterator {
   public void testSSTDumpIteratorWithKeyFormat(String keyFormat,
                                                String valueFormat)
       throws Exception {
-    ManagedRocksObjectUtils.loadRocksDBLibrary();
+    ManagedRawSSTFileReader.loadLibrary();
 
     TreeMap<Pair<String, Integer>, String> keys =
         IntStream.range(0, 100).boxed().collect(
