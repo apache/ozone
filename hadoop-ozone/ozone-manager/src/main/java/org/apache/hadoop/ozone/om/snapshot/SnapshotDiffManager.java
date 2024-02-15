@@ -1071,7 +1071,7 @@ public class SnapshotDiffManager implements AutoCloseable {
       sstFileReaderUpperBound = String.valueOf(upperBoundCharArray);
     }
     try (Stream<String> keysToCheck =
-             nativeRocksToolsLoaded && isNativeLibsLoaded
+             nativeRocksToolsLoaded
                  ? sstFileReader.getKeyStreamWithTombstone(
                      sstFileReaderLowerBound, sstFileReaderUpperBound)
                  : sstFileReader.getKeyStream(sstFileReaderLowerBound,
