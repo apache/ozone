@@ -17,6 +17,7 @@
  */
 package org.apache.hadoop.ozone.container.common.statemachine.container;
 
+import com.google.common.base.Preconditions;
 import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.ozone.HddsDatanodeService;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
@@ -56,6 +57,7 @@ public final class ClusterContainersUtil {
    */
   public static File getChunksLocationPath(MiniOzoneCluster cluster, Container container, OzoneKey key)
       throws IOException {
+    Preconditions.checkArgument(key instanceof OzoneKeyDetails);
     long containerID = ((OzoneKeyDetails) key).getOzoneKeyLocations().get(0)
         .getContainerID();
     long localID = ((OzoneKeyDetails) key).getOzoneKeyLocations().get(0)
