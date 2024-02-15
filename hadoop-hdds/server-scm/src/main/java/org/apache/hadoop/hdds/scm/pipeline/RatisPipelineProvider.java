@@ -20,7 +20,6 @@ package org.apache.hadoop.hdds.scm.pipeline;
 
 import java.io.IOException;
 import java.util.Collections;
-import java.util.Comparator;
 import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
