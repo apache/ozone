@@ -38,6 +38,7 @@ import org.apache.hadoop.ozone.protocol.commands.ReplicateContainerCommand;
 import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
 import org.apache.ratis.protocol.exceptions.NotLeaderException;
 
+import java.io.File;
 import java.io.IOException;
 import java.util.HashSet;
 import java.util.List;
@@ -78,10 +79,10 @@ public abstract class TestMisReplicationHandler {
       new AtomicBoolean(false);
   private ReplicationManagerMetrics metrics;
 
-  protected void setup(ReplicationConfig repConfig)
+  protected void setup(ReplicationConfig repConfig, File testDir)
       throws NodeNotFoundException, CommandTargetOverloadedException,
       NotLeaderException {
-    conf = SCMTestUtils.getConf();
+    conf = SCMTestUtils.getConf(testDir);
 
     replicationManager = mock(ReplicationManager.class);
     when(replicationManager.getNodeStatus(any(DatanodeDetails.class)))

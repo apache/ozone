@@ -60,7 +60,6 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.junit.jupiter.api.Assertions.fail;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -296,7 +295,7 @@ class TestBucketManagerImpl extends OzoneTestBase {
   }
 
   @Test
-  public void testDeleteBucket() throws Exception {
+  void testDeleteBucket() throws Exception {
     String volume = volumeName();
     createSampleVol(volume);
 
@@ -313,13 +312,9 @@ class TestBucketManagerImpl extends OzoneTestBase {
           bucketManager.getBucketInfo(
               volume, "bucket-" + i).getBucketName());
     }
-    try {
-      writeClient.deleteBucket(volume, "bucket-1");
-      assertNotNull(bucketManager.getBucketInfo(
-          volume, "bucket-2"));
-    } catch (IOException ex) {
-      fail(ex.getMessage());
-    }
+    writeClient.deleteBucket(volume, "bucket-1");
+    assertNotNull(bucketManager.getBucketInfo(volume, "bucket-2"));
+
     OMException omEx = assertThrows(OMException.class, () -> {
       bucketManager.getBucketInfo(volume, "bucket-1");
     });

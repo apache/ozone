@@ -46,6 +46,10 @@ http://maven.apache.org/xsd/maven-4.0.0.xsd">
           <groupId>com.google.j2objc</groupId>
           <artifactId>j2objc-annotations</artifactId>
         </exclusion>
+        <exclusion>
+          <groupId>com.google.code.findbugs</groupId>
+          <artifactId>jsr305</artifactId>
+        </exclusion>
       </exclusions>
     </dependency>
     <dependency>
@@ -61,6 +65,12 @@ http://maven.apache.org/xsd/maven-4.0.0.xsd">
           <artifactId>hadoop-hdfs</artifactId>
         </exclusion>
       </exclusions>
+    </dependency>
+    <dependency>
+      <groupId>com.google.code.findbugs</groupId>
+      <artifactId>jsr305</artifactId>
+      <version>3.0.2</version>
+      <scope>provided</scope>
     </dependency>
     <dependency>
       <groupId>com.google.guava</groupId>
@@ -108,6 +118,10 @@ http://maven.apache.org/xsd/maven-4.0.0.xsd">
         <exclusion>
           <groupId>com.google.protobuf</groupId>
           <artifactId>protobuf-java</artifactId>
+        </exclusion>
+        <exclusion>
+          <groupId>com.google.code.findbugs</groupId>
+          <artifactId>jsr305</artifactId>
         </exclusion>
       </exclusions>
     </dependency>

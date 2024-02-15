@@ -430,8 +430,9 @@ public class RpcClient implements ClientProtocol {
     userGroups.stream().forEach((group) -> listOfAcls.add(
         new OzoneAcl(ACLIdentityType.GROUP, group, groupRights, ACCESS)));
     //ACLs from VolumeArgs
-    if (volArgs.getAcls() != null) {
-      listOfAcls.addAll(volArgs.getAcls());
+    List<OzoneAcl> volumeAcls = volArgs.getAcls();
+    if (volumeAcls != null) {
+      listOfAcls.addAll(volumeAcls);
     }
 
     OmVolumeArgs.Builder builder = OmVolumeArgs.newBuilder();
@@ -626,8 +627,7 @@ public class RpcClient implements ClientProtocol {
           getRealUserInfo().getShortUserName() : bucketArgs.getOwner();
     }
 
-    Boolean isVersionEnabled = bucketArgs.getVersioning() == null ?
-        Boolean.FALSE : bucketArgs.getVersioning();
+    boolean isVersionEnabled = bucketArgs.getVersioning();
     StorageType storageType = bucketArgs.getStorageType() == null ?
         StorageType.DEFAULT : bucketArgs.getStorageType();
     BucketLayout bucketLayout = bucketArgs.getBucketLayout();
@@ -1972,7 +1972,8 @@ public class RpcClient implements ClientProtocol {
       ozoneMultipartUploadPartListParts.addPart(
           new OzoneMultipartUploadPartListParts.PartInfo(
               omPartInfo.getPartNumber(), omPartInfo.getPartName(),
-              omPartInfo.getModificationTime(), omPartInfo.getSize()));
+              omPartInfo.getModificationTime(), omPartInfo.getSize(),
+              omPartInfo.getETag()));
     }
     return ozoneMultipartUploadPartListParts;
 

@@ -1287,15 +1287,6 @@
       see ozone.scm.heartbeat.thread.interval before changing this value.
     </description>
   </property>
-  <property>
-    <name>ozone.trace.enabled</name>
-    <value>false</value>
-    <tag>OZONE, DEBUG</tag>
-    <description>
-      Setting this flag to true dumps the HTTP request/ response in
-      the logs. Very useful when debugging REST protocol.
-    </description>
-  </property>
 
   <property>
     <name>ozone.key.preallocation.max.blocks</name>
@@ -2234,6 +2225,14 @@
     <value>OM/_HOST@REALM</value>
     <tag>OZONE, SECURITY, KERBEROS</tag>
     <description>The OzoneManager service principal. Ex om/_HOST@REALM.COM</description>
+  </property>
+  <property>
+    <name>ozone.om.kerberos.principal.pattern</name>
+    <value>*</value>
+    <description>
+      A client-side RegEx that can be configured to control
+      allowed realms to authenticate with (useful in cross-realm env.)
+    </description>
   </property>
   <property>
     <name>ozone.om.http.auth.kerberos.principal</name>

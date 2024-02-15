@@ -18,7 +18,7 @@
 
 package org.apache.hadoop.ozone.om.response.key;
 
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
@@ -33,13 +33,13 @@ import org.apache.hadoop.ozone.om.response.bucket.OMBucketDeleteResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.DeleteKeysResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
-import org.apache.hadoop.util.Time;
 import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.ONE;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status.OK;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type.DeleteKeys;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -93,10 +93,11 @@ public class TestOMKeysDeleteResponseWithFSO
       keyName = keyPrefix + i;
 
       OmKeyInfo omKeyInfo =
-          OMRequestTestUtils.createOmKeyInfo(volumeName, bucketName, keyName,
-              HddsProtos.ReplicationType.RATIS,
-              HddsProtos.ReplicationFactor.ONE, dirId + 1, buckId,
-              dirId + 1, Time.now());
+          OMRequestTestUtils.createOmKeyInfo(volumeName, bucketName, keyName, RatisReplicationConfig.getInstance(ONE))
+              .setObjectID(dirId + 1)
+              .setParentObjectID(buckId)
+              .setUpdateID(dirId + 1)
+              .build();
       ozoneDBKey = OMRequestTestUtils.addFileToKeyTable(false, false,
           keyName, omKeyInfo, -1, 50, omMetadataManager);
 

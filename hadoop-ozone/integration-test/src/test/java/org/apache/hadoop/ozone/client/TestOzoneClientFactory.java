@@ -16,6 +16,7 @@
  */
 package org.apache.hadoop.ozone.client;
 
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_RATIS_PIPELINE_LIMIT;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -26,26 +27,20 @@ import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
 import java.security.PrivilegedExceptionAction;
-import java.util.UUID;
 
 /**
  * Test implementation for OzoneClientFactory.
  */
 public class TestOzoneClientFactory {
 
-  private static String scmId = UUID.randomUUID().toString();
-  private static String clusterId = UUID.randomUUID().toString();
-
   @Test
   public void testRemoteException() {
 
     OzoneConfiguration conf = new OzoneConfiguration();
+    conf.setInt(OZONE_SCM_RATIS_PIPELINE_LIMIT, 10);
     Exception e = assertThrows(Exception.class, () -> {
       MiniOzoneCluster cluster = MiniOzoneCluster.newBuilder(conf)
           .setNumDatanodes(3)
-          .setTotalPipelineNumLimit(10)
-          .setScmId(scmId)
-          .setClusterId(clusterId)
           .build();
 
       String omPort = cluster.getOzoneManager().getRpcPort();

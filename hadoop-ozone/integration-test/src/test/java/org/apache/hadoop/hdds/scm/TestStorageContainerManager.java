@@ -291,7 +291,6 @@ public class TestStorageContainerManager {
         numKeys);
 
     MiniOzoneCluster cluster = MiniOzoneCluster.newBuilder(conf)
-        .setHbInterval(50)
         .build();
     cluster.waitForClusterToBeReady();
 
@@ -371,10 +370,11 @@ public class TestStorageContainerManager {
   @Test
   public void testOldDNRegistersToReInitialisedSCM() throws Exception {
     OzoneConfiguration conf = new OzoneConfiguration();
-    MiniOzoneCluster cluster =
-        MiniOzoneCluster.newBuilder(conf).setHbInterval(1000)
-            .setHbProcessorInterval(3000).setNumDatanodes(1)
-            .setClusterId(UUID.randomUUID().toString()).build();
+    conf.setTimeDuration(HDDS_HEARTBEAT_INTERVAL, 1000, TimeUnit.MILLISECONDS);
+    conf.setTimeDuration(ScmConfigKeys.OZONE_SCM_HEARTBEAT_PROCESS_INTERVAL, 3000, TimeUnit.MILLISECONDS);
+    MiniOzoneCluster cluster = MiniOzoneCluster.newBuilder(conf)
+        .setNumDatanodes(1)
+        .build();
     cluster.waitForClusterToBeReady();
 
     try {
@@ -462,10 +462,10 @@ public class TestStorageContainerManager {
     conf.setInt(ScmConfigKeys.OZONE_SCM_PIPELINE_OWNER_CONTAINER_COUNT,
         numKeys);
     conf.setBoolean(HDDS_SCM_SAFEMODE_PIPELINE_CREATION, false);
+    conf.setTimeDuration(HDDS_HEARTBEAT_INTERVAL, 1000, TimeUnit.MILLISECONDS);
+    conf.setTimeDuration(ScmConfigKeys.OZONE_SCM_HEARTBEAT_PROCESS_INTERVAL, 3000, TimeUnit.MILLISECONDS);
 
     MiniOzoneCluster cluster = MiniOzoneCluster.newBuilder(conf)
-        .setHbInterval(1000)
-        .setHbProcessorInterval(3000)
         .setNumDatanodes(1)
         .build();
     cluster.waitForClusterToBeReady();
@@ -776,7 +776,6 @@ public class TestStorageContainerManager {
   @Test
   public void testScmProcessDatanodeHeartbeat() throws Exception {
     OzoneConfiguration conf = new OzoneConfiguration();
-    String scmId = UUID.randomUUID().toString();
     conf.setClass(NET_TOPOLOGY_NODE_SWITCH_MAPPING_IMPL_KEY,
         StaticMapping.class, DNSToSwitchMapping.class);
     StaticMapping.addNodeToRack(NetUtils.normalizeHostNames(
@@ -786,7 +785,6 @@ public class TestStorageContainerManager {
     final int datanodeNum = 3;
     MiniOzoneCluster cluster = MiniOzoneCluster.newBuilder(conf)
         .setNumDatanodes(datanodeNum)
-        .setScmId(scmId)
         .build();
     cluster.waitForClusterToBeReady();
     StorageContainerManager scm = cluster.getStorageContainerManager();
@@ -828,11 +826,10 @@ public class TestStorageContainerManager {
     conf.setInt(ScmConfigKeys.OZONE_SCM_PIPELINE_OWNER_CONTAINER_COUNT,
         numKeys);
     conf.setBoolean(HDDS_SCM_SAFEMODE_PIPELINE_CREATION, false);
+    conf.setTimeDuration(HDDS_HEARTBEAT_INTERVAL, 1000, TimeUnit.MILLISECONDS);
+    conf.setTimeDuration(ScmConfigKeys.OZONE_SCM_HEARTBEAT_PROCESS_INTERVAL, 3000, TimeUnit.MILLISECONDS);
 
     MiniOzoneCluster cluster = MiniOzoneCluster.newBuilder(conf)
-        .setHbInterval(1000)
-        .setHbProcessorInterval(3000)
-        .setTrace(false)
         .setNumDatanodes(1)
         .build();
     cluster.waitForClusterToBeReady();
@@ -1062,10 +1059,7 @@ public class TestStorageContainerManager {
       throws IOException, AuthenticationException, InterruptedException,
       TimeoutException {
     final OzoneConfiguration conf = new OzoneConfiguration();
-    final String clusterID = UUID.randomUUID().toString();
     try (MiniOzoneCluster cluster = MiniOzoneCluster.newBuilder(conf)
-        .setClusterId(clusterID)
-        .setScmId(UUID.randomUUID().toString())
         .setNumDatanodes(3)
         .build()) {
       final StorageContainerManager nonRatisSCM = cluster
@@ -1077,7 +1071,7 @@ public class TestStorageContainerManager {
 
       DefaultConfigManager.clearDefaultConfigs();
       conf.setBoolean(ScmConfigKeys.OZONE_SCM_HA_ENABLE_KEY, true);
-      StorageContainerManager.scmInit(conf, clusterID);
+      StorageContainerManager.scmInit(conf, cluster.getClusterId());
       cluster.restartStorageContainerManager(false);
 
       final StorageContainerManager ratisSCM = cluster

@@ -121,6 +121,7 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SNAPSHOT_DELETING_SE
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SNAPSHOT_DELETING_SERVICE_TIMEOUT_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SNAPSHOT_SST_FILTERING_SERVICE_TIMEOUT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SNAPSHOT_SST_FILTERING_SERVICE_TIMEOUT_DEFAULT;
+import static org.apache.hadoop.ozone.OzoneConsts.ETAG;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_DIR_DELETING_SERVICE_INTERVAL;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_DIR_DELETING_SERVICE_INTERVAL_DEFAULT;
@@ -609,13 +610,17 @@ public class KeyManagerImpl implements KeyManager {
       int maxKeys) throws IOException {
     Preconditions.checkNotNull(volumeName);
     Preconditions.checkNotNull(bucketName);
-
+    OmBucketInfo omBucketInfo = getBucketInfo(volumeName, bucketName);
+    if (omBucketInfo == null) {
+      throw new OMException("Bucket " + bucketName + " not found.",
+          ResultCodes.BUCKET_NOT_FOUND);
+    }
+    BucketLayout bucketLayout = omBucketInfo.getBucketLayout();
     // We don't take a lock in this path, since we walk the
     // underlying table using an iterator. That automatically creates a
     // snapshot of the data, so we don't need these locks at a higher level
     // when we iterate.
-
-    if (enableFileSystemPaths) {
+    if (bucketLayout.shouldNormalizePaths(enableFileSystemPaths)) {
       startKey = OmUtils.normalizeKey(startKey, true);
       keyPrefix = OmUtils.normalizeKey(keyPrefix, true);
     }
@@ -820,7 +825,10 @@ public class KeyManagerImpl implements KeyManager {
             OmPartInfo omPartInfo = new OmPartInfo(partKeyInfo.getPartNumber(),
                 partName,
                 partKeyInfo.getPartKeyInfo().getModificationTime(),
-                partKeyInfo.getPartKeyInfo().getDataSize());
+                partKeyInfo.getPartKeyInfo().getDataSize(),
+                partKeyInfo.getPartKeyInfo().getMetadataList().stream()
+                    .filter(keyValue -> keyValue.getKey().equals(ETAG))
+                    .findFirst().get().getValue());
             omPartInfoList.add(omPartInfo);
 
             //if there are parts, use replication type from one of the parts

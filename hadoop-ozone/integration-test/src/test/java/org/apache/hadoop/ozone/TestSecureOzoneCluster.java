@@ -624,15 +624,11 @@ final class TestSecureOzoneCluster {
         new OzoneManagerProtocolClientSideTranslatorPB(
             OmTransportFactory.create(conf, ugi, null),
             ClientId.randomId().toString());
-    try {
-      secureClient.createVolume(
-          new OmVolumeArgs.Builder().setVolume("vol1")
-              .setOwnerName("owner1")
-              .setAdminName("admin")
-              .build());
-    } catch (IOException ex) {
-      fail("Secure client should be able to create volume.");
-    }
+    secureClient.createVolume(
+        new OmVolumeArgs.Builder().setVolume("vol1")
+            .setOwnerName("owner1")
+            .setAdminName("admin")
+            .build());
 
     ugi = UserGroupInformation.createUserForTesting(
         "testuser1", new String[] {"test"});

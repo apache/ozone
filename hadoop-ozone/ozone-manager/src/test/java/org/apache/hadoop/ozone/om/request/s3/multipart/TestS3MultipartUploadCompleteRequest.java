@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.ozone.om.request.s3.multipart;
 
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.ONE;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -28,16 +29,17 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
+import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
+import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.junit.jupiter.api.Test;
 
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
@@ -132,9 +134,14 @@ public class TestS3MultipartUploadCompleteRequest
 
     List<Part> partList = new ArrayList<>();
 
-    String partName = getPartName(volumeName, bucketName, keyName,
-        multipartUploadID, 1);
-    partList.add(Part.newBuilder().setPartName(partName).setPartNumber(1)
+    String eTag = s3MultipartUploadCommitPartRequest.getOmRequest()
+        .getCommitMultiPartUploadRequest()
+        .getKeyArgs()
+        .getMetadataList()
+        .stream()
+        .filter(keyValue -> keyValue.getKey().equals(OzoneConsts.ETAG))
+        .findFirst().get().getValue();
+    partList.add(Part.newBuilder().setETag(eTag).setPartName(eTag).setPartNumber(1)
         .build());
 
     OMRequest completeMultipartRequest = doPreExecuteCompleteMPU(volumeName,
@@ -222,10 +229,10 @@ public class TestS3MultipartUploadCompleteRequest
     String partName = getPartName(volumeName, bucketName, keyName,
         multipartUploadID, 23);
 
-    partList.add(Part.newBuilder().setPartName(partName).setPartNumber(23).build());
+    partList.add(Part.newBuilder().setETag(partName).setPartName(partName).setPartNumber(23).build());
 
     partName = getPartName(volumeName, bucketName, keyName, multipartUploadID, 1);
-    partList.add(Part.newBuilder().setPartName(partName).setPartNumber(1).build());
+    partList.add(Part.newBuilder().setETag(partName).setPartName(partName).setPartNumber(1).build());
 
     OMRequest completeMultipartRequest = doPreExecuteCompleteMPU(volumeName,
         bucketName, keyName, multipartUploadID, partList);
@@ -315,8 +322,7 @@ public class TestS3MultipartUploadCompleteRequest
   protected void addKeyToTable(String volumeName, String bucketName,
                              String keyName, long clientID) throws Exception {
     OMRequestTestUtils.addKeyToTable(true, true, volumeName, bucketName,
-            keyName, clientID, HddsProtos.ReplicationType.RATIS,
-            HddsProtos.ReplicationFactor.ONE, omMetadataManager);
+        keyName, clientID, RatisReplicationConfig.getInstance(ONE), omMetadataManager);
   }
 
   protected String getMultipartKey(String volumeName, String bucketName,

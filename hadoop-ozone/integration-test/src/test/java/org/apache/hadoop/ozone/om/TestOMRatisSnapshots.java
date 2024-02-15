@@ -78,7 +78,6 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
-import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -109,8 +108,6 @@ public class TestOMRatisSnapshots {
   private MiniOzoneHAClusterImpl cluster = null;
   private ObjectStore objectStore;
   private OzoneConfiguration conf;
-  private String clusterId;
-  private String scmId;
   private String omServiceId;
   private int numOfOMs = 3;
   private OzoneBucket ozoneBucket;
@@ -136,8 +133,6 @@ public class TestOMRatisSnapshots {
   @BeforeEach
   public void init(TestInfo testInfo) throws Exception {
     conf = new OzoneConfiguration();
-    clusterId = UUID.randomUUID().toString();
-    scmId = UUID.randomUUID().toString();
     omServiceId = "om-service-test1";
     conf.setInt(OMConfigKeys.OZONE_OM_RATIS_LOG_PURGE_GAP, LOG_PURGE_GAP);
     conf.setStorageSize(OMConfigKeys.OZONE_OM_RATIS_SEGMENT_SIZE_KEY, 16,
@@ -161,8 +156,6 @@ public class TestOMRatisSnapshots {
     conf.setFromObject(omRatisConf);
 
     cluster = (MiniOzoneHAClusterImpl) MiniOzoneCluster.newOMHABuilder(conf)
-        .setClusterId(clusterId)
-        .setScmId(scmId)
         .setOMServiceId("om-service-test1")
         .setNumOfOzoneManagers(numOfOMs)
         .setNumOfActiveOMs(2)

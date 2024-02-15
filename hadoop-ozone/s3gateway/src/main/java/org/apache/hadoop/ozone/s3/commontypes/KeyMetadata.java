@@ -23,6 +23,8 @@ import javax.xml.bind.annotation.XmlAccessType;
 import javax.xml.bind.annotation.XmlAccessorType;
 import javax.xml.bind.annotation.XmlElement;
 import javax.xml.bind.annotation.adapters.XmlJavaTypeAdapter;
+import org.apache.hadoop.ozone.OzoneConsts;
+
 import java.time.Instant;
 
 /**
@@ -42,7 +44,7 @@ public class KeyMetadata {
   @XmlElement(name = "LastModified")
   private Instant lastModified;
 
-  @XmlElement(name = "ETag")
+  @XmlElement(name = OzoneConsts.ETAG)
   private String eTag;
 
   @XmlElement(name = "Size")

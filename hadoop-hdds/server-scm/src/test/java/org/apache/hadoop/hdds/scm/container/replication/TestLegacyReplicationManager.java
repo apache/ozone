@@ -77,10 +77,12 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
 import org.junit.jupiter.params.provider.ValueSource;
 
+import java.io.File;
 import java.io.IOException;
 import java.time.Clock;
 import java.time.Instant;
@@ -155,15 +157,18 @@ public class TestLegacyReplicationManager {
   private DBStore dbStore;
   private ContainerReplicaPendingOps containerReplicaPendingOps;
 
+  @TempDir
+  private File tempDir;
+
   int getInflightCount(InflightType type) {
     return replicationManager.getLegacyReplicationManager()
         .getInflightCount(type);
   }
 
   @BeforeEach
-  void setup() throws IOException, InterruptedException,
+  void setup(@TempDir File testDir) throws IOException, InterruptedException,
       NodeNotFoundException, InvalidStateTransitionException {
-    OzoneConfiguration conf = SCMTestUtils.getConf();
+    OzoneConfiguration conf = SCMTestUtils.getConf(testDir);
     conf.setTimeDuration(
         HddsConfigKeys.HDDS_SCM_WAIT_TIME_AFTER_SAFE_MODE_EXIT,
         0, TimeUnit.SECONDS);
@@ -260,10 +265,10 @@ public class TestLegacyReplicationManager {
     createReplicationManager(rmConf, null);
   }
 
-  void createReplicationManager(ReplicationManagerConfiguration rmConf,
+  private void createReplicationManager(ReplicationManagerConfiguration rmConf,
       LegacyReplicationManagerConfiguration lrmConf)
       throws InterruptedException, IOException {
-    OzoneConfiguration config = SCMTestUtils.getConf();
+    OzoneConfiguration config = SCMTestUtils.getConf(tempDir);
     config.setTimeDuration(
         HddsConfigKeys.HDDS_SCM_WAIT_TIME_AFTER_SAFE_MODE_EXIT,
         0, TimeUnit.SECONDS);
