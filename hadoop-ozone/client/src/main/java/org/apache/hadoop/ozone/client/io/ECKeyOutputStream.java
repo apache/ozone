@@ -45,9 +45,7 @@ import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.storage.ECBlockOutputStream;
 import org.apache.hadoop.io.ByteBufferPool;
-import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
-import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartCommitUploadPartInfo;
 
 import com.google.common.annotations.VisibleForTesting;
@@ -108,11 +106,6 @@ public final class ECKeyOutputStream extends KeyOutputStream
   }
 
   @VisibleForTesting
-  public XceiverClientFactory getXceiverClientFactory() {
-    return blockOutputStreamEntryPool.getXceiverClientFactory();
-  }
-
-  @VisibleForTesting
   public List<OmKeyLocationInfo> getLocationInfoList() {
     return blockOutputStreamEntryPool.getLocationInfoList();
   }
@@ -128,8 +121,7 @@ public final class ECKeyOutputStream extends KeyOutputStream
   }
 
   private ECKeyOutputStream(Builder builder) {
-    super(builder.getReplicationConfig(), builder.getClientMetrics(),
-        builder.getClientConfig(), builder.getStreamBufferArgs());
+    super(builder.getReplicationConfig(), builder.getClientMetrics(), builder.getClientConfig());
     this.config = builder.getClientConfig();
     this.bufferPool = builder.getByteBufferPool();
     // For EC, cell/chunk size and buffer size can be same for now.
@@ -140,16 +132,7 @@ public final class ECKeyOutputStream extends KeyOutputStream
         ecChunkSize, numDataBlks, numParityBlks, bufferPool);
     chunkIndex = 0;
     ecStripeQueue = new ArrayBlockingQueue<>(config.getEcStripeQueueSize());
-    OmKeyInfo info = builder.getOpenHandler().getKeyInfo();
-    blockOutputStreamEntryPool =
-        new ECBlockOutputStreamEntryPool(config,
-            builder.getOmClient(), builder.getRequestID(),
-            builder.getReplicationConfig(),
-            builder.getMultipartUploadID(), builder.getMultipartNumber(),
-            builder.isMultipartKey(),
-            info, builder.isUnsafeByteBufferConversionEnabled(),
-            builder.getXceiverManager(), builder.getOpenHandler().getId(),
-            builder.getClientMetrics(), builder.getStreamBufferArgs());
+    blockOutputStreamEntryPool = new ECBlockOutputStreamEntryPool(builder);
 
     this.writeOffset = 0;
     this.encoder = CodecUtil.createRawEncoderWithFallback(
@@ -162,24 +145,6 @@ public final class ECKeyOutputStream extends KeyOutputStream
     this.flushFuture = this.flushExecutor.submit(this::flushStripeFromQueue);
     this.flushCheckpoint = new AtomicLong(0);
     this.atomicKeyCreation = builder.getAtomicKeyCreation();
-  }
-
-  /**
-   * When a key is opened, it is possible that there are some blocks already
-   * allocated to it for this open session. In this case, to make use of these
-   * blocks, we need to add these blocks to stream entries. But, a key's version
-   * also includes blocks from previous versions, we need to avoid adding these
-   * old blocks to stream entries, because these old blocks should not be picked
-   * for write. To do this, the following method checks that, only those
-   * blocks created in this particular open version are added to stream entries.
-   *
-   * @param version     the set of blocks that are pre-allocated.
-   * @param openVersion the version corresponding to the pre-allocation.
-   * @throws IOException
-   */
-  public void addPreallocateBlocks(OmKeyLocationInfoGroup version,
-      long openVersion) throws IOException {
-    blockOutputStreamEntryPool.addPreallocateBlocks(version, openVersion);
   }
 
   /**
