@@ -23,6 +23,7 @@ import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.TimeoutException;
 
+import org.apache.hadoop.hdds.DatanodeVersion;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
@@ -321,15 +322,20 @@ public interface MiniOzoneCluster extends AutoCloseable {
     protected Optional<Integer> hbProcessorInterval = Optional.empty();
     protected String scmId = UUID.randomUUID().toString();
     protected String omId = UUID.randomUUID().toString();
-    
+
     protected Optional<String> datanodeReservedSpace = Optional.empty();
     protected boolean includeRecon = false;
-
 
     protected Optional<Integer> omLayoutVersion = Optional.empty();
     protected Optional<Integer> scmLayoutVersion = Optional.empty();
     protected Optional<Integer> dnLayoutVersion = Optional.empty();
 
+    protected int dnInitialVersion = DatanodeVersion.FUTURE_VERSION.toProtoValue();
+    protected int dnCurrentVersion = DatanodeVersion.FUTURE_VERSION.toProtoValue();
+
+    // Use relative smaller number of handlers for testing
+    protected int numOfOmHandlers = 20;
+    protected int numOfScmHandlers = 20;
     protected int numOfDatanodes = 3;
     protected int numDataVolumes = 1;
     protected boolean  startDataNodes = true;
@@ -409,6 +415,30 @@ public interface MiniOzoneCluster extends AutoCloseable {
      */
     public Builder setNumDatanodes(int val) {
       numOfDatanodes = val;
+      return this;
+    }
+
+    /**
+     * Set the initialVersion for all datanodes.
+     *
+     * @param val initialVersion value to be set for all datanodes.
+     *
+     * @return MiniOzoneCluster.Builder
+     */
+    public Builder setDatanodeInitialVersion(int val) {
+      dnInitialVersion = val;
+      return this;
+    }
+
+    /**
+     * Set the currentVersion for all datanodes.
+     *
+     * @param val currentVersion value to be set for all datanodes.
+     *
+     * @return MiniOzoneCluster.Builder
+     */
+    public Builder setDatanodeCurrentVersion(int val) {
+      dnCurrentVersion = val;
       return this;
     }
 

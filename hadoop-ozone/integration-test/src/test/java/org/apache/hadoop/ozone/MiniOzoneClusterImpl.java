@@ -35,6 +35,7 @@ import java.util.concurrent.TimeoutException;
 
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hdds.DFSConfigKeysLegacy;
+import org.apache.hadoop.hdds.DatanodeVersion;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
@@ -102,6 +103,8 @@ import static org.apache.ozone.test.GenericTestUtils.PortAllocator.getFreePort;
 import static org.apache.ozone.test.GenericTestUtils.PortAllocator.localhostWithFreePort;
 
 import org.hadoop.ozone.recon.codegen.ReconSqlDbConfig;
+import org.mockito.MockedStatic;
+import org.mockito.Mockito;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -132,12 +135,14 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
   private CertificateClient caClient;
   private final Set<AutoCloseable> clients = ConcurrentHashMap.newKeySet();
   private SecretKeyClient secretKeyClient;
+  private static MockedStatic mockDNStatic = Mockito.mockStatic(HddsDatanodeService.class);
 
   /**
    * Creates a new MiniOzoneCluster with Recon.
    *
    * @throws IOException if there is an I/O error
    */
+  @SuppressWarnings("checkstyle:ParameterNumber")
   MiniOzoneClusterImpl(OzoneConfiguration conf,
                        SCMConfigurator scmConfigurator,
                        OzoneManager ozoneManager,
@@ -394,6 +399,16 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
         return true;
       }
     }, 1000, waitForClusterToBeReadyTimeout);
+  }
+
+  private static void overrideDatanodeVersions(int dnInitialVersion, int dnCurrentVersion) {
+    // FUTURE_VERSION (-1) is not a valid version for a datanode, using it as a marker when version is not overridden
+    if (dnInitialVersion != DatanodeVersion.FUTURE_VERSION.toProtoValue()) {
+      mockDNStatic.when(HddsDatanodeService::getDefaultInitialVersion).thenReturn(dnInitialVersion);
+    }
+    if (dnCurrentVersion != DatanodeVersion.FUTURE_VERSION.toProtoValue()) {
+      mockDNStatic.when(HddsDatanodeService::getDefaultCurrentVersion).thenReturn(dnCurrentVersion);
+    }
   }
 
   @Override
@@ -782,10 +797,14 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
       String[] args = new String[] {};
       conf.setStrings(ScmConfigKeys.OZONE_SCM_NAMES, scmAddress);
       List<HddsDatanodeService> hddsDatanodes = new ArrayList<>();
+
+      // Override default datanode initial and current version if necessary
+      overrideDatanodeVersions(dnInitialVersion, dnCurrentVersion);
+
       for (int i = 0; i < numOfDatanodes; i++) {
         OzoneConfiguration dnConf = new OzoneConfiguration(conf);
         configureDatanodePorts(dnConf);
-        String datanodeBaseDir = path + "/datanode-" + Integer.toString(i);
+        String datanodeBaseDir = path + "/datanode-" + i;
         Path metaDir = Paths.get(datanodeBaseDir, "meta");
         List<String> dataDirs = new ArrayList<>();
         List<String> reservedSpaceList = new ArrayList<>();

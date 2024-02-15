@@ -371,6 +371,9 @@ public class DatanodeDetails extends NodeImpl implements
       builder.setPersistedOpStateExpiry(
           datanodeDetailsProto.getPersistedOpStateExpiry());
     }
+    if (datanodeDetailsProto.hasCurrentVersion()) {
+      builder.setCurrentVersion(datanodeDetailsProto.getCurrentVersion());
+    }
     return builder;
   }
 
@@ -475,6 +478,8 @@ public class DatanodeDetails extends NodeImpl implements
       }
     }
 
+    builder.setCurrentVersion(currentVersion);
+
     return builder;
   }
 
@@ -505,6 +510,7 @@ public class DatanodeDetails extends NodeImpl implements
   }
 
   /**
+   * Note: Datanode initial version is not passed to the client due to no use case. See HDDS-9884
    * @return the version this datanode was initially created with
    */
   public int getInitialVersion() {
