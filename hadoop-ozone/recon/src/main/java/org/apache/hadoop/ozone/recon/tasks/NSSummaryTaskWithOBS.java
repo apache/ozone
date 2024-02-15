@@ -85,7 +85,7 @@ public class NSSummaryTaskWithOBS extends NSSummaryTaskDbEventHandler {
           OmBucketInfo omBucketInfo = omMetadataManager
               .getBucketTable().getSkipCache(bucketDBKey);
 
-          if (omBucketInfo.getBucketLayout() != BucketLayout.OBJECT_STORE) {
+          if (omBucketInfo.getBucketLayout() != BUCKET_LAYOUT) {
             continue;
           }
 
@@ -152,7 +152,7 @@ public class NSSummaryTaskWithOBS extends NSSummaryTaskDbEventHandler {
         OmBucketInfo omBucketInfo = getReconOMMetadataManager().getBucketTable()
             .getSkipCache(bucketDBKey);
 
-        if (omBucketInfo.getBucketLayout() != BucketLayout.OBJECT_STORE) {
+        if (omBucketInfo.getBucketLayout() != BUCKET_LAYOUT) {
           continue;
         }
 
@@ -224,7 +224,7 @@ public class NSSummaryTaskWithOBS extends NSSummaryTaskDbEventHandler {
       keyInfo.setParentObjectID(parentBucketInfo.getObjectID());
     } else {
       throw new IOException("ParentKeyInfo for " +
-          "NSSummaryTaskWithLegacy is null");
+          "NSSummaryTaskWithOBS is null");
     }
   }
 

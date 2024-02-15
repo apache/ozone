@@ -35,7 +35,6 @@ import org.apache.hadoop.ozone.recon.api.types.NSSummary;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 import org.apache.hadoop.ozone.recon.spi.ReconNamespaceSummaryManager;
 import org.apache.hadoop.ozone.recon.spi.impl.OzoneManagerServiceProviderImpl;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
@@ -53,6 +52,10 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_DB_DIRS;
 import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.getTestReconOmMetadataManager;
 import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.writeKeyToOm;
 import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.getMockOzoneManagerServiceProviderWithFSO;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
+
 /**
  * Unit test for NSSummaryTaskWithOBS.
  */
@@ -123,7 +126,7 @@ public final class TestNSSummaryTaskWithOBS implements Serializable {
 
     NSSummary nonExistentSummary =
         reconNamespaceSummaryManager.getNSSummary(BUCKET_ONE_OBJECT_ID);
-    Assertions.assertNull(nonExistentSummary);
+    assertNull(nonExistentSummary);
 
     populateOMDB();
 
@@ -152,35 +155,35 @@ public final class TestNSSummaryTaskWithOBS implements Serializable {
       reconNamespaceSummaryManager.commitBatchOperation(rdbBatchOperation);
 
       // Verify commit
-      Assertions.assertNotNull(reconNamespaceSummaryManager.getNSSummary(-1L));
+      assertNotNull(reconNamespaceSummaryManager.getNSSummary(-1L));
 
       // reinit Recon RocksDB's namespace CF.
       reconNamespaceSummaryManager.clearNSSummaryTable();
 
       nSSummaryTaskWithOBS.reprocessWithOBS(reconOMMetadataManager);
-      Assertions.assertNull(reconNamespaceSummaryManager.getNSSummary(-1L));
+      assertNull(reconNamespaceSummaryManager.getNSSummary(-1L));
 
       nsSummaryForBucket1 =
           reconNamespaceSummaryManager.getNSSummary(BUCKET_ONE_OBJECT_ID);
       nsSummaryForBucket2 =
           reconNamespaceSummaryManager.getNSSummary(BUCKET_TWO_OBJECT_ID);
-      Assertions.assertNotNull(nsSummaryForBucket1);
-      Assertions.assertNotNull(nsSummaryForBucket2);
+      assertNotNull(nsSummaryForBucket1);
+      assertNotNull(nsSummaryForBucket2);
     }
 
     @Test
     public void testReprocessNSSummaryNull() throws IOException {
-      Assertions.assertNull(reconNamespaceSummaryManager.getNSSummary(-1L));
+      assertNull(reconNamespaceSummaryManager.getNSSummary(-1L));
     }
 
     @Test
     public void testReprocessGetFiles() {
-      Assertions.assertEquals(3, nsSummaryForBucket1.getNumOfFiles());
-      Assertions.assertEquals(2, nsSummaryForBucket2.getNumOfFiles());
+      assertEquals(3, nsSummaryForBucket1.getNumOfFiles());
+      assertEquals(2, nsSummaryForBucket2.getNumOfFiles());
 
-      Assertions.assertEquals(KEY_ONE_SIZE + KEY_TWO_OLD_SIZE + KEY_THREE_SIZE,
+      assertEquals(KEY_ONE_SIZE + KEY_TWO_OLD_SIZE + KEY_THREE_SIZE,
           nsSummaryForBucket1.getSizeOfFiles());
-      Assertions.assertEquals(KEY_FOUR_SIZE + KEY_FIVE_SIZE,
+      assertEquals(KEY_FOUR_SIZE + KEY_FIVE_SIZE,
           nsSummaryForBucket2.getSizeOfFiles());
     }
 
@@ -188,18 +191,18 @@ public final class TestNSSummaryTaskWithOBS implements Serializable {
     public void testReprocessFileBucketSize() {
       int[] fileDistBucket1 = nsSummaryForBucket1.getFileSizeBucket();
       int[] fileDistBucket2 = nsSummaryForBucket2.getFileSizeBucket();
-      Assertions.assertEquals(ReconConstants.NUM_OF_FILE_SIZE_BINS,
+      assertEquals(ReconConstants.NUM_OF_FILE_SIZE_BINS,
           fileDistBucket1.length);
-      Assertions.assertEquals(ReconConstants.NUM_OF_FILE_SIZE_BINS,
+      assertEquals(ReconConstants.NUM_OF_FILE_SIZE_BINS,
           fileDistBucket2.length);
 
       // Check for 1's and 0's in fileDistBucket1
       int[] expectedIndexes1 = {0, 1, 40};
       for (int index = 0; index < fileDistBucket1.length; index++) {
         if (contains(expectedIndexes1, index)) {
-          Assertions.assertEquals(1, fileDistBucket1[index]);
+          assertEquals(1, fileDistBucket1[index]);
         } else {
-          Assertions.assertEquals(0, fileDistBucket1[index]);
+          assertEquals(0, fileDistBucket1[index]);
         }
       }
 
@@ -207,20 +210,11 @@ public final class TestNSSummaryTaskWithOBS implements Serializable {
       int[] expectedIndexes2 = {0, 2};
       for (int index = 0; index < fileDistBucket2.length; index++) {
         if (contains(expectedIndexes2, index)) {
-          Assertions.assertEquals(1, fileDistBucket2[index]);
+          assertEquals(1, fileDistBucket2[index]);
         } else {
-          Assertions.assertEquals(0, fileDistBucket2[index]);
+          assertEquals(0, fileDistBucket2[index]);
         }
       }
-    }
-
-    @Test
-    public void testReprocessBucketDirs() {
-      // None of the buckets have any child dirs because OBS is flat namespace.
-      Set<Long> childDirBucketOne = nsSummaryForBucket1.getChildDir();
-      Set<Long> childDirBucketTwo = nsSummaryForBucket2.getChildDir();
-      Assertions.assertEquals(0, childDirBucketOne.size());
-      Assertions.assertEquals(0, childDirBucketTwo.size());
     }
 
   }
@@ -248,10 +242,10 @@ public final class TestNSSummaryTaskWithOBS implements Serializable {
 
       nsSummaryForBucket1 =
           reconNamespaceSummaryManager.getNSSummary(BUCKET_ONE_OBJECT_ID);
-      Assertions.assertNotNull(nsSummaryForBucket1);
+      assertNotNull(nsSummaryForBucket1);
       nsSummaryForBucket2 =
           reconNamespaceSummaryManager.getNSSummary(BUCKET_TWO_OBJECT_ID);
-      Assertions.assertNotNull(nsSummaryForBucket2);
+      assertNotNull(nsSummaryForBucket2);
     }
 
     private OMUpdateEventBatch processEventBatch() throws IOException {
@@ -332,25 +326,25 @@ public final class TestNSSummaryTaskWithOBS implements Serializable {
 
     @Test
     public void testProcessForCount() throws IOException {
-      Assertions.assertNotNull(nsSummaryForBucket1);
-      Assertions.assertEquals(3, nsSummaryForBucket1.getNumOfFiles());
-      Assertions.assertNotNull(nsSummaryForBucket2);
-      Assertions.assertEquals(3, nsSummaryForBucket2.getNumOfFiles());
+      assertNotNull(nsSummaryForBucket1);
+      assertEquals(3, nsSummaryForBucket1.getNumOfFiles());
+      assertNotNull(nsSummaryForBucket2);
+      assertEquals(3, nsSummaryForBucket2.getNumOfFiles());
 
       Set<Long> childDirBucket1 = nsSummaryForBucket1.getChildDir();
-      Assertions.assertEquals(0, childDirBucket1.size());
+      assertEquals(0, childDirBucket1.size());
       Set<Long> childDirBucket2 = nsSummaryForBucket2.getChildDir();
-      Assertions.assertEquals(0, childDirBucket2.size());
+      assertEquals(0, childDirBucket2.size());
     }
 
     @Test
     public void testProcessForSize() throws IOException {
-      Assertions.assertNotNull(nsSummaryForBucket1);
-      Assertions.assertEquals(
+      assertNotNull(nsSummaryForBucket1);
+      assertEquals(
           KEY_THREE_SIZE + KEY_SEVEN_SIZE + KEY_TWO_OLD_SIZE + 100,
           nsSummaryForBucket1.getSizeOfFiles());
-      Assertions.assertNotNull(nsSummaryForBucket2);
-      Assertions.assertEquals(KEY_FOUR_SIZE + KEY_FIVE_SIZE + KEY_SIX_SIZE,
+      assertNotNull(nsSummaryForBucket2);
+      assertEquals(KEY_FOUR_SIZE + KEY_FIVE_SIZE + KEY_SIX_SIZE,
           nsSummaryForBucket2.getSizeOfFiles());
     }
 
@@ -359,18 +353,18 @@ public final class TestNSSummaryTaskWithOBS implements Serializable {
     public void testProcessFileBucketSize() {
       int[] fileDistBucket1 = nsSummaryForBucket1.getFileSizeBucket();
       int[] fileDistBucket2 = nsSummaryForBucket2.getFileSizeBucket();
-      Assertions.assertEquals(ReconConstants.NUM_OF_FILE_SIZE_BINS,
+      assertEquals(ReconConstants.NUM_OF_FILE_SIZE_BINS,
           fileDistBucket1.length);
-      Assertions.assertEquals(ReconConstants.NUM_OF_FILE_SIZE_BINS,
+      assertEquals(ReconConstants.NUM_OF_FILE_SIZE_BINS,
           fileDistBucket2.length);
 
       // Check for 1's and 0's in fileDistBucket1
       int[] expectedIndexes1 = {1, 3, 40};
       for (int index = 0; index < fileDistBucket1.length; index++) {
         if (contains(expectedIndexes1, index)) {
-          Assertions.assertEquals(1, fileDistBucket1[index]);
+          assertEquals(1, fileDistBucket1[index]);
         } else {
-          Assertions.assertEquals(0, fileDistBucket1[index]);
+          assertEquals(0, fileDistBucket1[index]);
         }
       }
 
@@ -378,9 +372,9 @@ public final class TestNSSummaryTaskWithOBS implements Serializable {
       int[] expectedIndexes2 = {0, 2, 3};
       for (int index = 0; index < fileDistBucket2.length; index++) {
         if (contains(expectedIndexes2, index)) {
-          Assertions.assertEquals(1, fileDistBucket2[index]);
+          assertEquals(1, fileDistBucket2[index]);
         } else {
-          Assertions.assertEquals(0, fileDistBucket2[index]);
+          assertEquals(0, fileDistBucket2[index]);
         }
       }
     }

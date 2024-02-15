@@ -1127,7 +1127,7 @@ public class TestNSSummaryEndpointWithOBS {
 
   private static SCMNodeStat getMockSCMRootStat() {
     return new SCMNodeStat(ROOT_QUOTA, ROOT_DATA_SIZE,
-        ROOT_QUOTA - ROOT_DATA_SIZE);
+        ROOT_QUOTA - ROOT_DATA_SIZE,0L,0L);
   }
 
 }
