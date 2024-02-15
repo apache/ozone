@@ -255,6 +255,8 @@ jobs:
         with:
           distribution: 'temurin'
           java-version: 8
+      - name: Setup upterm session
+        uses: lhotari/action-upterm@v1
       - name: Execute tests
         run: hadoop-ozone/dev-support/checks/${{ matrix.check }}.sh
         continue-on-error: true
