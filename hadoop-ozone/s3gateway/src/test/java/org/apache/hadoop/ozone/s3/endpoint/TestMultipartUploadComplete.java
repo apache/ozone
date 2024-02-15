@@ -93,9 +93,9 @@ public class TestMultipartUploadComplete {
     Response response = REST.put(OzoneConsts.S3_BUCKET, key, content.length(),
         partNumber, uploadID, body);
     assertEquals(200, response.getStatus());
-    assertNotNull(response.getHeaderString("ETag"));
+    assertNotNull(response.getHeaderString(OzoneConsts.ETAG));
     Part part = new Part();
-    part.seteTag(response.getHeaderString("ETag"));
+    part.setETag(response.getHeaderString(OzoneConsts.ETAG));
     part.setPartNumber(partNumber);
 
     return part;
@@ -202,7 +202,7 @@ public class TestMultipartUploadComplete {
 
     Part part1 = uploadPart(key, uploadID, partNumber, content);
     // Change part name.
-    part1.seteTag("random");
+    part1.setETag("random");
     partsList.add(part1);
 
     content = "Multipart Upload 2";

@@ -108,6 +108,7 @@ share/ozone/lib/jakarta.activation.jar
 share/ozone/lib/jakarta.activation-api.jar
 share/ozone/lib/jakarta.annotation-api.jar
 share/ozone/lib/jakarta.inject.jar
+share/ozone/lib/jakarta.inject-api.jar
 share/ozone/lib/jakarta.validation-api.jar
 share/ozone/lib/jakarta.ws.rs-api.jar
 share/ozone/lib/jakarta.xml.bind-api.jar
@@ -157,7 +158,6 @@ share/ozone/lib/jooq-meta.jar
 share/ozone/lib/jsch.jar
 share/ozone/lib/json-simple.jar
 share/ozone/lib/jsp-api.jar
-share/ozone/lib/jsr305.jar
 share/ozone/lib/jsr311-api.jar
 share/ozone/lib/kerb-core.jar
 share/ozone/lib/kerby-asn1.jar

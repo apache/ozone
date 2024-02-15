@@ -141,11 +141,11 @@ public class TestMultipartObjectGet {
     Response response = REST.put(BUCKET, KEY, content.length(),
         partNumber, uploadID, body);
     assertEquals(200, response.getStatus());
-    assertNotNull(response.getHeaderString("ETag"));
+    assertNotNull(response.getHeaderString(OzoneConsts.ETAG));
 
     CompleteMultipartUploadRequest.Part
         part = new CompleteMultipartUploadRequest.Part();
-    part.seteTag(response.getHeaderString("ETag"));
+    part.setETag(response.getHeaderString(OzoneConsts.ETAG));
     part.setPartNumber(partNumber);
     return part;
   }

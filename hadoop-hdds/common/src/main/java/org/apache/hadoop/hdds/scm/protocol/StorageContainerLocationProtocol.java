@@ -474,4 +474,6 @@ public interface StorageContainerLocationProtocol extends Closeable {
 
   DecommissionScmResponseProto decommissionScm(
       String scmId) throws IOException;
+
+  String getMetrics(String query) throws IOException;
 }
