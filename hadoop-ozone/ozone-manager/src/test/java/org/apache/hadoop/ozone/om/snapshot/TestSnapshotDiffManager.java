@@ -828,7 +828,7 @@ public class TestSnapshotDiffManager {
         when(keyInfo.getKeyName()).thenReturn(i.getArgument(0));
         when(keyInfo.isKeyInfoSame(any(OmKeyInfo.class),
             eq(false), eq(false),
-            eq(false), eq(false)))
+            eq(false), eq(false), eq(false)))
             .thenAnswer(k -> {
               int keyVal = Integer.parseInt(((String)i.getArgument(0))
                   .substring(3));

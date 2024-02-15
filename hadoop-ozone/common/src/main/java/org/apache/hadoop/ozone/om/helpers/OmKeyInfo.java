@@ -785,7 +785,8 @@ public final class OmKeyInfo extends WithParentObjectId
   public boolean isKeyInfoSame(OmKeyInfo omKeyInfo, boolean checkPath,
                                boolean checkKeyLocationVersions,
                                boolean checkModificationTime,
-                               boolean checkUpdateID) {
+                               boolean checkUpdateID,
+                               boolean checkOwnerName) {
     boolean isEqual = dataSize == omKeyInfo.dataSize &&
         creationTime == omKeyInfo.creationTime &&
         volumeName.equals(omKeyInfo.volumeName) &&
@@ -793,7 +794,6 @@ public final class OmKeyInfo extends WithParentObjectId
         replicationConfig.equals(omKeyInfo.replicationConfig) &&
         Objects.equals(metadata, omKeyInfo.metadata) &&
         Objects.equals(acls, omKeyInfo.acls) &&
-        Objects.equals(ownerName, omKeyInfo.ownerName) &&
         objectID == omKeyInfo.objectID;
 
     if (isEqual && checkUpdateID) {
@@ -814,6 +814,11 @@ public final class OmKeyInfo extends WithParentObjectId
           .equals(keyLocationVersions, omKeyInfo.keyLocationVersions);
     }
 
+    if (isEqual && checkOwnerName) {
+      isEqual = Objects
+          .equals(ownerName, omKeyInfo.ownerName);
+    }
+
     return isEqual;
   }
 
@@ -825,7 +830,7 @@ public final class OmKeyInfo extends WithParentObjectId
     if (o == null || getClass() != o.getClass()) {
       return false;
     }
-    return isKeyInfoSame((OmKeyInfo) o, true, true, true, true);
+    return isKeyInfoSame((OmKeyInfo) o, true, true, true, true, true);
   }
 
   @Override
