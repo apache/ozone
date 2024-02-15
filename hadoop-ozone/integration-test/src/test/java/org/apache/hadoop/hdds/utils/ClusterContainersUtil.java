@@ -15,7 +15,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.hadoop.ozone.container.common.statemachine.container;
+package org.apache.hadoop.hdds.utils;
 
 import com.google.common.base.Preconditions;
 import org.apache.commons.io.FileUtils;
@@ -111,24 +111,26 @@ public final class ClusterContainersUtil {
    * @param cluster a mini ozone cluster object.
    * @param container a container object.
    * @param key an OzoneKey object.
+   * @return true if the same; false if does not match.
    * @throws IOException
    */
-  public static void verifyOnDiskData(MiniOzoneCluster cluster, Container container, OzoneKey key, String data)
+  public static boolean verifyOnDiskData(MiniOzoneCluster cluster, Container container, OzoneKey key, String data)
       throws IOException {
     File chunksLocationPath = getChunksLocationPath(cluster, container, key);
     for (File file : FileUtils.listFiles(chunksLocationPath, null, false)) {
       String chunkOnDisk = FileUtils.readFileToString(file, Charset.defaultCharset());
       if (!data.equals(chunkOnDisk)) {
-        throw new CorruptedFileException(file, " does not match the source.");
+        return false;
       }
     }
+    return true;
   }
 
   /**
    * Return the first container object in a mini cluster specified by its ID.
    * @param cluster a mini ozone cluster object.
    * @param containerID a long variable representing cluater ID.
-   * @return
+   * @return the container object; null if not found.
    */
   public static Container getContainerByID(MiniOzoneCluster cluster, long containerID) {
     // Get the container by traversing the datanodes. Atleast one of the

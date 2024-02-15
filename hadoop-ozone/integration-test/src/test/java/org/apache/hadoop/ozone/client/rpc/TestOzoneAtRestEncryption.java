@@ -89,8 +89,8 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_REPLICATION;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_OFS_URI_SCHEME;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_ROOT;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
-import static org.apache.hadoop.ozone.container.common.statemachine.container.ClusterContainersUtil.getContainerByID;
-import static org.apache.hadoop.ozone.container.common.statemachine.container.ClusterContainersUtil.verifyOnDiskData;
+import static org.apache.hadoop.hdds.utils.ClusterContainersUtil.getContainerByID;
+import static org.apache.hadoop.hdds.utils.ClusterContainersUtil.verifyOnDiskData;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ADDRESS_KEY;
 import static org.apache.ozone.test.GenericTestUtils.getTestStartTime;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -329,8 +329,8 @@ class TestOzoneAtRestEncryption {
         .getContainerID();
     Container container = getContainerByID(cluster, containerID);
     // the data stored on disk should not be the same as the input.
-    assertThrows(CorruptedFileException.class,
-        () -> verifyOnDiskData(cluster, container, key, value));
+    assertFalse(verifyOnDiskData(cluster, container, key, value),
+        "On disk block is written in clear text!");
   }
 
   private OzoneBucket createVolumeAndBucket(String volumeName,

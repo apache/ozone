@@ -251,11 +251,7 @@ public class OMFileCreateRequest extends OMKeyRequest {
               omBucketInfo.getDefaultReplicationConfig(),
               ozoneManager);
 
-      if (omBucketInfo.getEncryptionKeyInfo() != null &&
-          !keyArgs.hasFileEncryptionInfo()) {
-        throw new OMException("Attempting to create unencrypted file " +
-            keyName + " in encrypted bucket " + bucketName, INTERNAL_ERROR);
-      }
+      validateEncryptionKeyInfo(omBucketInfo, keyArgs);
 
       omKeyInfo = prepareKeyInfo(omMetadataManager, keyArgs, dbKeyInfo,
           keyArgs.getDataSize(), locations, getFileEncryptionInfo(keyArgs),

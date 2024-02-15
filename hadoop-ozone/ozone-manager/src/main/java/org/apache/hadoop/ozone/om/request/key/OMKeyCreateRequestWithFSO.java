@@ -135,6 +135,7 @@ public class OMKeyCreateRequestWithFSO extends OMKeyCreateRequest {
       // do open key
       OmBucketInfo bucketInfo = omMetadataManager.getBucketTable().get(
               omMetadataManager.getBucketKey(volumeName, bucketName));
+      validateEncryptionKeyInfo(bucketInfo, keyArgs);
 
       // add all missing parents to dir table
       missingParentInfos =

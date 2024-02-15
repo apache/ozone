@@ -51,6 +51,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INTERNAL_ERROR;
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.BUCKET_LOCK;
 
 /**
@@ -151,6 +152,7 @@ public class OMFileCreateRequestWithFSO extends OMFileCreateRequest {
       // do open key
       OmBucketInfo bucketInfo = omMetadataManager.getBucketTable().get(
           omMetadataManager.getBucketKey(volumeName, bucketName));
+      validateEncryptionKeyInfo(bucketInfo, keyArgs);
       // add all missing parents to dir table
 
       missingParentInfos =
