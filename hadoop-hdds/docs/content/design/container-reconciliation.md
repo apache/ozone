@@ -185,6 +185,7 @@ The following APIs would be added to datanodes to support container reconciliati
 ## Reconciliation Process
 
 SCM: Storage Container Manager
+
 DN: Datanode
 
 SCM sets up the reconciliation process as follows:
@@ -193,34 +194,34 @@ SCM sets up the reconciliation process as follows:
 
 Datanodes set up the reconciliation process as follows:
 
-1. DN 1 Calculates the Merkle Tree if it is not already present and report it to SCM. SCM can then compare the container replica hashes and schedule reconciliation if they are different.
-2. If DN 1 already has the Merkle Tree, it will compare it with the Merkle Trees of the other replicas and schedule reconciliation if they are different. Example: 
+1. DN 1 schedules the Merkle Tree to be calculated if it is not already present and report it to SCM. 
+   1. SCM can then compare the container replica hashes and schedule reconciliation if they are different.
+2. If DN 1 already has the Merkle Tree locally, it will compare it with the Merkle Trees of the other container replicas and schedule reconciliation if they are different. Example: 
    1. DN 1 -> getContainerHashes(Container #12) -> DN 2 // Datanode 1 gets the merkle tree of container 12 from Datanode 2.
    2. DN 1 -> getContainerHashes(Container #12) -> DN 3 // Datanode 1 gets the merkle tree of container 12 from Datanode 3.
    3. ... // Continue for all replicas.
 
-Reconcile Loop once the merkle trees are obtained from all/most replicas:
+Reconcile loop once the merkle trees are obtained from all/most replicas:
 
 1. DN 1 checks if any blocks are missing. For each missing Block:
-    1. Make a **union** of all chunks and which DNs has the chunk. It is possible that certain chunks are missing in one of the container replicas.
+    1. Make a **union** of all chunks and which DNs has the chunk. It is possible that certain chunks are missing in other container replicas. The **union** of chunks represents all the chunks that are present in any of the replicas.
     2. Read the remote chunks and store them locally and create the local block. Example: 
-       1. DN 1 -> readChunk(Container #12, Block #3, Chunk #1)  -> DN 2 // Read the chunk from DN 2
-       2. DN 1 -> readChunk(Container #12, Block #3, Chunk #2)  -> DN 3 // Read the chunk from DN 3
+       1. `DN 1 -> readChunk(Container #12, Block #3, Chunk #1)  -> DN 2` // Read the chunk from DN 2
+       2. `DN 1 -> readChunk(Container #12, Block #3, Chunk #2)  -> DN 3` // Read the chunk from DN 3
        3. ... // Continue for all chunks that are in the union of chunks.
-       4. Datanode will validate the checksum of the chunk read from the peer Datanode and if it is corrupted. This is already performed by the existing client code.
+       4. Datanode will validate the checksum of the chunk read from the peer Datanode before using it to reconcile. This is already performed by the existing client code. Thus, no silent data corruption will be introduced.
 2. DN 1 checks if any blocks are corrupted. For each corrupted Block: 
-    1. Make a union of all chunks and which DN has the chunks. It is possible that certain chunks are corrupted in one of the container replicas.
+    1. Make a union of all chunks and which DN has the chunks. It is possible that certain chunks are corrupted in one of the container replicas. The **union** of chunks represents all the chunks that are present in any of the replicas.
     2. Read the remote chunks and store them locally. Example: 
-       1. DN 1 -> readChunk(Container #12, Block #20, Chunk #13)  -> DN 2
-       2. DN 1 -> readChunk(Container #12, Block #20, Chunk #21)  -> DN 3
+       1. `DN 1 -> readChunk(Container #12, Block #20, Chunk #13)  -> DN 2`
+       2. `DN 1 -> readChunk(Container #12, Block #20, Chunk #21)  -> DN 3`
        3. ... // Continue for all chunks that are in the union of chunks.
-       4. Datanode will validate the checksum of the chunk read from the peer Datanode and if it is corrupted. This is already performed by the existing client code.
+       4. Datanode will validate the checksum of the chunk read from the peer Datanode before using it to reconcile. This is already performed by the existing client code. Thus, no silent data corruption will be introduced.
 3. DN 1 deletes any blocks that are marked as deleted.
     1. The block continues to be in the tree with the updated checksum to avoid redundant Merkle tree updates.
 4. DN 1 recomputes Merkle tree and sends it to SCM via ICR (Incremental Container Report).
 
 Note: This document does not cover the case where the checksums recorded at the time of write match the chunks locally within a Datanode but differ across replicas. We assume that the replication code path is correct and that the checksums are correct. If this is not the case, the system is already in a failed state and the reconciliation protocol will not be able to recover it. Chunks once written are not updated, thus this scenario is not expected to occur.
-
 
 #### `getContainerHashes`
 
@@ -228,20 +229,23 @@ When a datanode receives a request to get container hashes. The following steps 
 
 1. If the Merkle Tree is present, return it.
 2. If the Merkle Tree is not present, the call `getContainerHashes` will return and error. 
-   1. It will be scheduled to be calculated and then reported to SCM.
+   1. Datanode missing the Merkle Tree will be schedule the scanner to calculate the Merkle Tree and then report to SCM.
 3. If container not closed, return error.
 4. If container not found, return error.
 5. The merkle tree returned by this call will represent the status of the data on disk (post scanner scrub).
 
 ## Sample scenarios
+
 1. **Container is missing blocks**
    1. DN 1 has 10 blocks, DN 2 has 11 blocks, DN 3 has 12 blocks.
    2. DN 1 will read the missing block from DN 2 and DN 3 and store it locally.
    3. DN 1 will recompute the merkle tree and send it to SCM.
+
 2. **Container has corrupted chunks**
    1. DN 1 has block 20: chunk 13, DN 2 has block 12: chunk 13
    2. DN 1 will read the corrupted block from DN 2 and store it locally.
    3. DN 1 will recompute the merkle tree and send it to SCM.
+
 3. Closed container has a chunk that is corrupted
    1. Scanner will detect the corruption and mark the container as unhealthy and reported an updated Merkle tree to SCM.
       1. The Merkle tree will be updated to reflect the current contents of the disk and the hash will be updated to reflect the current contents of the disk.
