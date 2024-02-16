@@ -190,13 +190,14 @@ DN: Datanode
 
 ### SCM sets up the reconciliation process as follows:
 
-1. `SCM -> reconcileContainer(Container #12, DN2, DN3) -> DN 1` // SCM triggers a reconciliation on DN 1 for container 12 with replicas on DN 2 and DN 3.
+1. SCM triggers a reconciliation on `DN 1` for container 12 with replicas on `DN 2` and `DN 3`.
+   1. `SCM -> reconcileContainer(Container #12, DN2, DN3) -> DN 1` 
 
 ### Datanodes set up the reconciliation process as follows:
 
-1. DN 1 schedules the Merkle Tree to be calculated if it is not already present and report it to SCM. 
+1. `DN 1` schedules the Merkle Tree to be calculated if it is not already present and report it to SCM. 
    1. SCM can then compare the container replica hashes and schedule reconciliation if they are different.
-2. If DN 1 already has the Merkle Tree locally, it will compare it with the Merkle Trees of the other container replicas and schedule reconciliation if they are different. Example: 
+2. If `DN 1` already has the Merkle Tree locally, it will compare it with the Merkle Trees of the other container replicas and schedule reconciliation if they are different. Example: 
    1. `DN 1 -> getContainerHashes(Container #12) -> DN 2` // Datanode 1 gets the merkle tree of container 12 from Datanode 2.
    2. `DN 1 -> getContainerHashes(Container #12) -> DN 3` // Datanode 1 gets the merkle tree of container 12 from Datanode 3.
    3. ... // Continue for all replicas.
@@ -237,14 +238,14 @@ When a datanode receives a request to get container hashes. The following steps 
 ## Sample scenarios
 
 1. **Container is missing blocks**
-   1. DN 1 has 10 blocks, DN 2 has 11 blocks, DN 3 has 12 blocks.
-   2. DN 1 will read the missing block from DN 2 and DN 3 and store it locally.
-   3. DN 1 will recompute the merkle tree and send it to SCM.
+   1. `DN 1` has 10 blocks, `DN 2` has 11 blocks, `DN 3` has 12 blocks.
+   2. `DN 1` will read the missing block from `DN 2` and `DN 3` and store it locally.
+   3. `DN 1` will recompute the merkle tree and send it to SCM.
 
 2. **Container has corrupted chunks**
-   1. DN 1 has block 20: chunk 13, DN 2 has block 12: chunk 13
-   2. DN 1 will read the corrupted block from DN 2 and store it locally.
-   3. DN 1 will recompute the merkle tree and send it to SCM.
+   1. `DN 1` has block 20: chunk 13, `DN 2` has block 12: chunk 13
+   2. `DN 1` will read the corrupted block from `DN 2` and store it locally.
+   3. `DN 1` will recompute the merkle tree and send it to SCM.
 
 3. Closed container has a chunk that is corrupted
    1. Scanner will detect the corruption and mark the container as unhealthy and reported an updated Merkle tree to SCM.
