@@ -131,10 +131,10 @@ public final class OmSnapshotUtils {
             }
           }
 
-          if (isSamePartition(fullFromPath, fullToPath)) {
+          if (isSamePartition(fullFromPath.getParent(), fullToPath.getParent())) {
             Files.createLink(fullToPath, fullFromPath);
           } else {
-            Files.move(fullFromPath, fullToPath, StandardCopyOption.REPLACE_EXISTING);
+            Files.copy(fullFromPath, fullToPath, StandardCopyOption.REPLACE_EXISTING);
           }
         }
         if (!hardLinkFile.delete()) {
@@ -144,13 +144,17 @@ public final class OmSnapshotUtils {
     }
   }
 
-  private static boolean isSamePartition(Path fromPath, Path toPath) throws IOException {
+  private static boolean isSamePartition(Path fromPathParent, Path toPathParent) throws IOException {
     try {
-      FileStore fromPathStore = Files.getFileStore(fromPath.getParent());
-      FileStore toPathStore = Files.getFileStore(toPath.getParent());
+      if (fromPathParent == null || toPathParent == null) {
+        throw new IOException("From path: " + fromPathParent + " or To path: " + toPathParent + " is null");
+      }
+
+      FileStore fromPathStore = Files.getFileStore(fromPathParent);
+      FileStore toPathStore = Files.getFileStore(toPathParent);
       return fromPathStore.equals(toPathStore);
     } catch (IOException ex) {
-      throw new IOException("Failed to get the stores, fromPath: " + fromPath + " toPath: " + toPath, ex);
+      throw new IOException("Failed to get the stores, fromPath: " + fromPathParent + " toPath: " + toPathParent, ex);
     }
   }
 
@@ -186,10 +190,10 @@ public final class OmSnapshotUtils {
         if (!newFile.mkdirs()) {
           throw new IOException("Directory create fails: " + newFile);
         }
-      } else if (isSamePartition(newFile.toPath(), oldFile.toPath())) {
+      } else if (isSamePartition(newFile.toPath().getParent(), oldFile.toPath().getParent())) {
         Files.createLink(newFile.toPath(), oldFile.toPath());
       } else {
-        Files.move(oldFile.toPath(), newFile.toPath(), StandardCopyOption.REPLACE_EXISTING);
+        Files.copy(oldFile.toPath(), newFile.toPath(), StandardCopyOption.REPLACE_EXISTING);
       }
     }
   }
