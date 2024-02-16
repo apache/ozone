@@ -24,58 +24,76 @@ status: draft
 
 This document outlines the proposed recovery protocol for containers where one or more replicas are not cleanly closed or have potential data inconsistencies. It aims to provide an overview of the planned changes and their implications, focusing on the overall flow and key design decisions.
 
+## Nomenclature
+1. Container: A container is a logical unit of storage management in Ozone. It is a collection of blocks that are used to store data.
+2. Container Replica/Instance: A container replica is a copy of a container that is stored on a Datanode or a shard of an Erasure Coded Container.
+3. Block: A block is a collection of chunks that are used to store data. An Ozone object consists of one or more blocks.
+4. Chunk: A chunk is a collection of bytes that are used to store data. A chunk is the smallest unit of read and write in Ozone.
+
 ## Background
 
-Ideally, a healthy Ozone cluster would contain only open and closed containers. However, container replicas commonly end up with a mix of states including quasi-closed and unhealthy that the current system is not able to resolve to cleanly closed replicas. The cause of these states is often bugs or broad failure handling on the write path. While we should fix these causes, they raise the problem that Ozone is not able to reconcile these mismatched container states on its own, regardless of their cause. This has lead to significant complexity in the replication manager for how to handle cases where only quasi-closed and unhealthy replicas are availalbe, especially in the case of decommissioning.
+This proposal is motivated by the need to reconcile mismatched container replica states and contents among container replicas.
+This covers
+1. Containers replicas that are not cleanly closed.
+2. Containers replicas that have potential data inconsistencies due to bugs or broad failure handling on the write path.
+3. Silent data corruption that may occur in the system.
+4. The need to verify the equality and integrity of all closed containers replicas.
+5. Deleted blocks within a container that still exists in some container replicas.
+6. The need to simplify the replication manager for how to handle cases where only quasi-closed and unhealthy container replicas are available.
 
-Even when all replicas are closed, the system assumes that these closed container replicas are equal with no way to verify this. Checksumming is done for individual chunks within each container, but if two container replicas somehow end up with chunks that differ in length or content despite being marked closed with local checksums matching, the system has no way to detect or resolve this anomaly.
+Ideally, a healthy Ozone cluster would contain only open and closed container replicas. However, container replicas commonly end up with a mix of states including quasi-closed and unhealthy that the current system is not able to resolve to cleanly closed replicas. The cause of these states is often bugs or broad failure handling on the write path. While we should fix these causes, they raise the problem that Ozone is not able to reconcile these mismatched container replica states on its own, regardless of their cause. This has lead to significant complexity in the replication manager for how to handle cases where only quasi-closed and unhealthy replicas are available, especially in the case of decommissioning.
+
+Even when all container replicas are closed, the system assumes that these closed container replicas are equal with no way to verify this. During writes a client provides a checksum for the chunk that is written. 
+The scanner validates periodically that the checksums of the chunks on disk match the checksums provided by the client. It is possible that the checksum of a chunk on disk does not match the client provided checksum recorded at the time of write. Additionally, during container replica copying the consistency of the data is not validated, opening the possibility of silent data corruption propagating through the system.
 
 This document proposes a container reconciliation protocol to solve these problems. After implementing the proposal:
 1. It should be possible for a cluster to progress to a state where it has only properly replicated closed and open containers.
 2. We can verify the equality and integrity of all closed containers.
 
+Note: This document does not cover the case where the checksums recorded at the time of write match the chunks locally within a Datanode but differ across replicas. We assume that the replication code path is correct and that the checksums are correct. If this is not the case, the system is already in a failed state and the reconciliation protocol will not be able to recover it. Chunks once written are not updated, thus this scenario is not expected to occur.
 ## Guiding Principles
 
 1. **User Focus**: Users prioritize data durability and availability above all else.
    - From the user perspective, containers labelled quasi-closed and unhealthy represent compromised durability and availability, regardless of the container's actual contents.
 
 2. **Focus on Recovery Paths**: Focusing on the path to a failed state is secondary to focusing on the path out of failed states.
-    - For example, we should not focus on whether it is possible for two replicated closed containers with locally matching chunk checksums to have differing content, only on whether the system could detect and recover from this case if it were to happen.
+    - For example, we should not focus on whether it is possible for two replicated closed containers to have differing content, only on whether the system could detect and recover from this case if it were to happen.
 
-3. **System Safety**:  If a decision made by software will make data more durable a single trigger is sufficient. If a decision can potentially reduce durability of data or execute an unsafe operation (unlink, trim, delete) then the confidence level has to be high, the clarity of the decision precise and clear and preferably the decision is made within services that have a wider view of the cluster (SCM/Recon).
+3. **System Safety**: If a decision made by software will make data more durable a single trigger is sufficient. If a decision can potentially reduce durability of data or execute an unsafe operation (unlink, trim, delete) then the confidence level has to be high, the clarity of the decision precise and clear and preferably the decision is made within services that have a wider view of the cluster (SCM/Recon).
 
 4. **Datanode Simplicity**: Datanodes should only be responsible for safe decisions and eager to make safe choices, avoiding unsafe autonomy.
 
 ## Assumptions
 
-- A closed container will not accept new blocks from clients.
-
-- Empty containers are excluded in this proposal. Empty containers create unnecessary noise and overhead in the system but are not relevant to the durability of existing data.
-
-- The longest block is always the correct block to preserve at the Datanode level based on the limited information a single Datanode has about the higher level business logic that is storing data.
-
-    - The longest block may contain uncommitted chunks, but the datanodes have no way to verify this and must be defensive about preserving their data.
+1. A closed container will not accept new blocks from clients.
+2. Empty containers are excluded in this proposal. Empty containers create unnecessary noise and overhead in the system but are not relevant to the durability of existing data.
+3. If checksums of chunks match locally they should match across replicas.
+4. The longest block is always the correct block to preserve at the Datanode level based on the limited information a single Datanode has. Whether the data within a block is ever accessed by the client depends on the consistency between Datanode and Ozone Manager which is not transactional and can vary. The safe decision is to preserve the longest block and let an external entity that process cluster wide usage of blocks decide if the block can be trimmed or deleted. The longest block may contain uncommitted chunks, but the datanodes have no way to verify this and must be defensive about preserving their data.
 
 ## Solution Proposal
 
 The proposed solution involves defining a container level checksum that can be used to quickly tell if two containers replicas match or not based on their data. This container checksum can be defined as a three level Merkle tree:
 
-- Level 1 (leaves): The existing chunk level checksums (written by the client and verified by the existing datanode container scanner).
-- Level 2: A block level checksum created by hashing all the chunk checksums within the block.
-- Level 3 (root): A container level checksum created by hashing all the block checksums within the container.
-    - This top level container hash is what is reported to SCM to detect diverged replicas. SCM does not need block or chunk level hashes.
+1. Level 1 (leaves): The existing chunk level checksums (written by the client and verified by the existing datanode container scanner).
+2. Level 2: A block level checksum created by hashing all the chunk checksums within the block.
+3. Level 3 (root): A container level checksum created by hashing all the block checksums within the container.
+   1. This top level container hash is what is reported to SCM to detect diverged replicas. SCM does not need block or chunk level hashes.
 
 When SCM sees that replicas of a non-open container have diverged container checksums, it can trigger a reconciliation process on all datanode replicas. SCM does not need to know which container hash is correct (if any of them are correct), only that all containers match. Datanodes will use their merkle tree and those of the other replicas to identify issues with their container. Next, datanodes can read the missing data from existing replicas and use it to repair their container replica.
 
+Since the container hash is generated leveraging the checksum recorded at the time of writing, the container hash represents consistency of the data from a client perspective.
+
 ### Phase I (outlined in this document)
 
-- Add container level checksums that datanodes can compute and store.
+1. Add container level checksums that datanodes can compute and store.
 
-- Add a mechanism for datanodes to reconcile their replica of a container with another datanode's replica so that both replicas can be verified to be equal at the end of the process.
+2. Add a mechanism for datanodes to reconcile their replica of a container with another datanode's replica so that both replicas can be verified to be equal at the end of the process.
 
-- Add a mechanism for SCM to trigger this reconciliation as part of the existing heartbeat command protocol SCM uses to communicate with datanodes.
+3. Add a mechanism for SCM to trigger this reconciliation as part of the existing heartbeat command protocol SCM uses to communicate with datanodes.
 
-- Add an `ozone admin container reconcile <container-id>` CLI that can be used to manually resolve diverged container states among non-open container replicas.
+4. an `ozone admin container reconcile <container-id>` CLI that can be used to manually resolve diverged container states among non-open container replicas.
+
+5. Delete blocks that a Container Replica has not yet deleted.
 
 ### Phase II (out of scope for this document)
 
@@ -89,89 +107,154 @@ When SCM sees that replicas of a non-open container have diverged container chec
     - EC container replicas do not have the same data and are not expected to have matching container checksums.
     - EC containers already use offline recovery as a reconciliation mechanism.
 
+
 ## Solution Implementation
 
-### Storage
+### Container Hash Tree / Merkle Tree
 
 The only extra information we will need to store is the container merkle tree on each datanode container replica. The current proposal is store this separately as a proto file on disk so that it can be copied over the network exactly as stored. The structure would look something like this (not finalized, for illustrative purposes only):
 
+```diff
+diff --git a/hadoop-hdds/interface-client/src/main/proto/DatanodeClientProtocol.proto b/hadoop-hdds/interface-client/src/main/proto/DatanodeClientProtocol.proto
+index 718e2a108c7..d8d508af356 100644
+--- a/hadoop-hdds/interface-client/src/main/proto/DatanodeClientProtocol.proto
++++ b/hadoop-hdds/interface-client/src/main/proto/DatanodeClientProtocol.proto
+@@ -382,6 +382,7 @@ message ChunkInfo {
+   repeated KeyValue metadata = 4;
+   required ChecksumData checksumData =5;
+   optional bytes stripeChecksum = 6;
++  optional bool healthy = 7; // If all the chunks on disk match the expected checksums provided by the client during write
+ }
+ 
+ message ChunkInfoList {
+@@ -525,3 +526,38 @@ service IntraDatanodeProtocolService {
+   rpc download (CopyContainerRequestProto) returns (stream CopyContainerResponseProto);
+   rpc upload (stream SendContainerRequest) returns (SendContainerResponse);
+ }
++
++/*
++BlockMerkle tree stores the checksums of the chunks in a block.
++The Block checksum is derived from the checksums of the chunks in case of replicated blocks and derived from the
++metadata of the chunks in case of erasure coding.
++Two Blocks across container instances on two nodes have the same checksum if they have the same set of chunks.
++A Block upon deletion will be marked as deleted but will preserve the rest of the metadata.
++*/
++message BlockMerkleTree {
++  optional BlockData blockData = 1; // The chunks in this should be sorted by the order of chunks written.
++  optional ChecksumData checksumData = 2; // Checksum of the checksums of the chunks.
++  optional bool deleted = 3; // If the block is deleted.
++  optional int64 length = 4; // Length of the block.
++  optional int64 chunkCount = 5; // Number of chunks in the block.
++}
++
++/*
++ContainerMerkleTree stores the checksums of the blocks in a container.
++The Container checksum is derived from the checksums of the blocks.
++Two containers across container instances on two nodes have the same checksum if they have the same set of blocks.
++If a block is deleted within the container, the checksum of the container will remain unchanged.
++ */
++message ContainerMerkleTree {
++  enum FailureCause {
++    NO_HEALTHY_CHUNK_FOUND_WITH_PEERS = 1; // No healthy chunk found with peers.
++    NO_PEER_FOUND = 2; // No peer found.
++  }
++  optional int64 containerID = 1; // The container ID.
++  repeated BlockMerkleTree blockMerkleTrees = 2; // The blocks in this should be sorted by the order of blocks written.
++  optional ChecksumData checksumData = 3; // Checksum of the checksums of the blocks.
++  optional int64 length = 5; // Length of the container.
++  optional int64 blockCount = 6; // Number of blocks in the container.
++  optional FailureCause failureCause = 7; // The cause of the failure.
++  optional int64 reconciliationCount = 8; // The reconciliation count.
++}
+
+
 ```
-ContainerChecksum: {
-  algorithm: CRC32
-  checksum: 12345
-  repeated BlockChecksum
-}
-BlockChecksum: {
-  algorithm: CRC32
-  checksum: 12345
-  length: 5
-  deleted: false
-  healthy: true
-  repeated ChunkChecksum
-}
-ChunkChecksum: {
-  algorithm: CRC32
-  checksum: 12345
-  length: 5
-  offset: 5
-  healthy: true
-}
-```
-
-- The `deleted` flag in the block proto allows it to serve as a tombstone entry so that block deletion does not affect the container level hash.
-
-- The `algorithm` field is the algorithm used to aggregate hashes from the layer below which results in that object's current hash.
-    - We can define an order of chunks and blocks based on their IDs so that the hash does not need to be commutative (order independent).
-
-- The `healthy` field in the chunk checksum being true indicates that the computed chunk checksum used to fill in the merkle tree matches the chunk checksum stored in RocksDB.
-
-- The `healthy` field in the block checksum being true indicates that all chunks within the block are marked as `healthy = true`.
-
-- We may be able to re-use the `ChunkInfo` and `ChecksumData` messages in `DatanodeClientProtocol.proto` for chunk information and checksums. Other structures in the merkle tree storage will require new objects to be defined.
+This is written as a file to avoid bloating the RocksDB instance which is in the IO path.
 
 ## APIs
 
 The following APIs would be added to datanodes to support container reconciliation. The actions performed when calling them is defined in [Events](#events).
 
 - `reconcileContainer(containerID, List<Replica>)`
-    - Instructs a datanode to reconcile its copy of the specified container with the provided list of replica's containers.
-    - Datanodes will call `getContainerHashes` for each replica to identify repairs needed, and use existing chunk read/write APIs to do repairs necessary.
+    - Instructs a datanode to reconcile its copy of the specified container with the provided list of other container replicas.
+    - Datanodes will call `getContainerHashes` for each container replica to identify repairs needed, and use existing chunk read/write APIs to do repairs necessary.
     - This would likely be a new command as part of the SCM heartbeat protocol, not actually a new API.
 - `getContainerHashes(containerID)`
-    - A datanode API that returns the merkle tree for a given container. The proto structure would be similar to that outlined in [Storage](#storage)
+    - A datanode API that returns the merkle tree for a given container. The proto structure would be similar to that outlined in [Merkle Tree](#Container-Hash-Tree-/-Merkle-Tree).
 
+## Reconciliation Process
+SCM: Storage Container Manager
+DN: Datanode
+
+SCM setup the reconciliation process as follows:
+
+1. SCM -> reconcileContainer(Container #12, DN2, DN3) -> DN 1 // SCM triggers a reconciliation on DN 1 for container 12 with replicas on DN 2 and DN 3.
+2. DN 1 -> getContainerHashes(Container #12) -> DN 2 // Datanode 1 gets the merkle tree of container 12 from Datanode 2.
+3. DN 1 -> getContainerHashes(Container #12) -> DN 3 // Datanode 1 gets the merkle tree of container 12 from Datanode 3.
+
+Reconcile Loop once the merkle trees are obtained from all replicas:
+
+1. DN 1 checks if any blocks are missing
+    1. Make a **union** of all chunks and which DNs has the chunk. It is possible that certain chunks are missing in one of the container replicas.
+    2. Read the remote chunks and store them locally and create the local block.
+       1. DN 1 -> readChunk(Container #12, Block #3, Chunk #1)  -> DN 2 // Read the chunk from DN 2
+       2. DN 1 -> readChunk(Container #12, Block #3, Chunk #2)  -> DN 3 // Read the chunk from DN 3
+       3. ... // Continue for all chunks that are in the union of chunks.
+2. DN 1 checks if any blocks are corrupted
+    1. Make a union of all chunks and which DN has the chunks. It is possible that certain chunks are corrupted in one of the container replicas.
+    2. Read the remote chunks and store them locally
+       1. DN 1 -> readChunk(Container #12, Block #20, Chunk #13)  -> DN 2
+       2. DN 1 -> readChunk(Container #12, Block #20, Chunk #21)  -> DN 3
+       3. ... // Continue for all chunks that are in the union of chunks.
+3. DN 1 deletes any blocks that are marked as deleted.
+    1. The block continues to be in the tree with the updated checksum to avoid redundant Merkle tree updates.
+4. DN 1 recomputes Merkle tree and sends it to SCM via ICR.
+
+## Sample scenarios
+1. **Container is missing blocks**
+    - DN 1 has 10 blocks, DN 2 has 11 blocks, DN 3 has 12 blocks.
+    - DN 1 will read the missing block from DN 2 and DN 3 and store it locally.
+    - DN 1 will recompute the merkle tree and send it to SCM.
+2. **Container has corrupted chunks**
+    - DN 1 has block 20: chunk 13, DN 2 has block 12: chunk 13
+    - DN 1 will read the corrupted block from DN 2 and store it locally.
+    - DN 1 will recompute the merkle tree and send it to SCM.
 ## Events
-
+A Datanode is still accepting writes and reads while the reconciliation process is ongoing. The reconciliation process is a background process that does not affect the normal operation of the Datanode.
 This section defines how container reconciliation will function as events occur in the system.
 
-### Reconiliation Events
+### Reconciliation Events
 
  These events occur as part of container reconciliation in the happy path case.
 
 #### On Data Write
 
 - No change to existing datanode operations. Existing chunk checksums passed and validated from the client will be persisted to RocksDB.
+- Reconciliation is only performed on containers that are not open. 
+- Merkle tree is updated on container close.
 
 #### On Container Close
 
-- Container checksum is calculated synchonously from existing checksums. This calculation must finish before the close is acked back to SCM.
-    - **Invariant**: All closed containers have a checksum even in the the case of restarts and failures because SCM will retry the close command if it does not receive an ack.
+- Container checksum is calculated asynchronously using the checksums recorded at the time of write and recorded in RocksDB. This calculation must finish before the close is acked back to SCM.
+    - **Invariant**: All closed containers have a checksum even in the case of restarts and failures because SCM will retry the close command if it does not receive an ack.
       - Null handling should still be in place for containers created before this feature, and to guard against bugs.
 
 #### On Container Scan
 
-1. Scanner reads chunks and checks checksums in RocksDB.
+1. Scanner reads chunks and compares it to the checksums in RocksDB.
 2. Scanner updates Merkle tree to match the current contents of the disk. It does not update RocksDB.
-    - Update Merkle tree checksums in a rolling fashion per chunk and block as scanning progresses.
-    -  Do not let the scanner overwrite the RocksDB value, otherwise we cannot locally detect corruption anymore.
-        - This is not a deal breaker since SCM would see it on the next full container report, but it may slow down bitrot detection.
-3. If scanner detects local corruption (RocksDB hash does not match hash calculated from disk), marks container unhealthy and sends an incrmeental container report to SCM with its calculated container hash.
+   - Update Merkle tree checksums in a rolling fashion per chunk and block as scanning progresses.
+   - Note: The checksums recorded in the RocksDB are immutable and cannot be updated at any point in time.
+3. If scanner detects local corruption (RocksDB hash does not match hash calculated from disk), marks container unhealthy and sends an incremental container report to SCM with its calculated container hash.
     - The Merkle Tree is still updated to reflect the current contents of the disk in this case.
 
 #### On Container import
 
+In multiple scenarios it is safer to immediately create a container replica and not wait for reconciliation. 
+Example: The cluster has only one single closed container replica for the container.
+
 - Schedule on-demand scan after the container import completes.
-    - There may be cases where we need to import a slightly corrupt container since it is our best option. Therefore, do not do a synchronous scan of container and fail the import if corruption is detected.
+    - There may be cases where we need to import a container without verifying the contents.
     - Instead, schedule the imported container for on-demand scanning to be sure SCM knows of corruption if it does not already.
     - **Optimization**: Clear last scanned timestamp on container import to make the background scanner get to it faster if datanode restarts before the on-demand scan completes.
 
@@ -181,8 +264,7 @@ This section defines how container reconciliation will function as events occur 
     - The tree will be calculated from existing chunk checksums if it is not present. However, this should not happen in the majority of cases since it will be calculated on container close.
 - If container not closed, return error.
 - If container not found, return error.
-
-- The merkle tree returned by this call will always be consistent.
+- The merkle tree returned by this call will represent the status of the data on disk (post scanner scrub).
     - The hash of each node in the tree will always accurately represent a hash of its children.
 - The merkle tree returned by this call may not always match the current state of the container.
     - The container can be repaired or corrupted any time between the scan that generated the tree and the call to read the container's tree.
@@ -190,7 +272,7 @@ This section defines how container reconciliation will function as events occur 
 
 #### On `reconcileContainer`
 
-- Use existing merkle tree, unless its not there, then compute it.
+- Use existing merkle tree, unless it's not there, then compute it.
     - The tree will be calculated from existing chunk checksums if it is not present. However, this should not happen in the majority of cases since it will be calculated on container close.
 1. For each replica:
     1. Datanode calls `getContainerHashes`
@@ -224,21 +306,19 @@ This read could be an end client or another datanode asking for data to repair i
 
 - Allow replication to proceed with best effort, possibly with a warning log.
 
-There may be cases where a container is critically under-replicated and we need a good copy of the data as soon as possible. Meanwhile reconciliation could remained blocked for an unrelated reason. We can provide a way to pause/unpause reconciliation between chunk writes to do reasonably consistent container exports.
+There may be cases where a container is critically under-replicated and we need a good copy of the data as soon as possible. Meanwhile, reconciliation could remain blocked for an unrelated reason. We can provide a way to pause/unpause reconciliation between chunk writes to do reasonably consistent container exports.
 
 #### On block delete
 
 - When SCM sends block delete commands to datanodes, update the merkle tree when the datanode block deleting service runs and processes that block.
 
-    - Merkle tree update should be done before RocksDB update to make sure it is persisted in case of a failure during the delete.
+    - Merkle tree update should be done before RocksDB update to make sure it is persisted in case of a failure during delete.
 
-    - Callers of `getContainerHashes` will ignore blocks that either they marked for deletion or the peer has marked for deletion.
-
-    - Merkle tree update should not be done when datanodes first receive the block delete command from SCM, because this command only adds the delete block proto to the container. It does not iterate the blocks to be deleted so we should not add that additional step here.
+    - Merkle tree update should not be done when datanodes first receives the block delete command from SCM, because this command only adds the delete block proto to the container. It does not iterate the blocks to be deleted so we should not add that additional step here.
 
 #### On Container delete for container being reconciled
 
-- Provide a way to interrupt reconciliation and allow container delete to proceed.
+- Provide a way to interrupt reconciliation and allow container delete to proceed. 
 
 ## Backwards Compatibility
 
