@@ -131,7 +131,7 @@ public class OMDBInsightSearchEndpoint {
           // Add it to the list of matched keys.
           matchedKeys.add(omKeyInfo);
         }
-      } catch (Exception e) {
+      } catch (NullPointerException e) {
         return noMatchedKeysResponse(searchPrefix);
       }
     }
