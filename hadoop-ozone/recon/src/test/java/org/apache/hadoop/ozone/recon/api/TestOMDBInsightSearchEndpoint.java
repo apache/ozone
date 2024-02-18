@@ -59,7 +59,6 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
-import static org.mockito.MockitoAnnotations.openMocks;
 
 /**
  * Test for OMDBInsightSearchEndpoint.
@@ -67,15 +66,10 @@ import static org.mockito.MockitoAnnotations.openMocks;
 public class TestOMDBInsightSearchEndpoint extends AbstractReconSqlDBTest {
   @TempDir
   private Path temporaryFolder;
-  private OzoneStorageContainerManager ozoneStorageContainerManager;
-  private ReconContainerMetadataManager reconContainerMetadataManager;
   private OMMetadataManager omMetadataManager;
-  private ReconPipelineManager reconPipelineManager;
   private ReconOMMetadataManager reconOMMetadataManager;
   private OMDBInsightSearchEndpoint omdbInsightSearchEndpoint;
-  private Pipeline pipeline;
   private Random random = new Random();
-  private OzoneConfiguration ozoneConfiguration;
   private Set<Long> generatedIds = new HashSet<>();
   public TestOMDBInsightSearchEndpoint() {
     super();
@@ -112,18 +106,8 @@ public class TestOMDBInsightSearchEndpoint extends AbstractReconSqlDBTest {
             .addBinding(OMDBInsightEndpoint.class)
             .addBinding(ContainerHealthSchemaManager.class)
             .build();
-    reconContainerMetadataManager =
-        reconTestInjector.getInstance(ReconContainerMetadataManager.class);
     omdbInsightSearchEndpoint = reconTestInjector.getInstance(
         OMDBInsightSearchEndpoint.class);
-    ozoneStorageContainerManager =
-        reconTestInjector.getInstance(OzoneStorageContainerManager.class);
-    reconPipelineManager = (ReconPipelineManager)
-        ozoneStorageContainerManager.getPipelineManager();
-    pipeline = getRandomPipeline();
-    reconPipelineManager.addPipeline(pipeline);
-    ozoneConfiguration = new OzoneConfiguration();
-    openMocks(this);
   }
 
   @Test
