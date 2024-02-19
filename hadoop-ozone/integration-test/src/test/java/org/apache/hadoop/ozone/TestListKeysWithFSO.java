@@ -14,7 +14,7 @@
  * License for the specific language governing permissions and limitations under
  * the License.
  */
-package org.apache.hadoop.ozone.om;
+package org.apache.hadoop.ozone;
 
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.utils.IOUtils;
@@ -30,6 +30,7 @@ import org.apache.hadoop.ozone.client.OzoneKey;
 import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.client.io.OzoneInputStream;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
+import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
@@ -63,6 +64,8 @@ public class TestListKeysWithFSO {
   private static OzoneBucket fsoOzoneBucket;
   private static OzoneBucket legacyOzoneBucket2;
   private static OzoneBucket fsoOzoneBucket2;
+  private static OzoneBucket emptyLegacyOzoneBucket;
+  private static OzoneBucket emptyFsoOzoneBucket;
   private static OzoneClient client;
 
   /**
@@ -105,6 +108,10 @@ public class TestListKeysWithFSO {
     ozoneVolume.createBucket(fsoBucketName, omBucketArgs);
     fsoOzoneBucket2 = ozoneVolume.getBucket(fsoBucketName);
 
+    fsoBucketName = "bucket" + RandomStringUtils.randomNumeric(5);
+    ozoneVolume.createBucket(fsoBucketName, omBucketArgs);
+    emptyFsoOzoneBucket = ozoneVolume.getBucket(fsoBucketName);
+
     builder = BucketArgs.newBuilder();
     builder.setStorageType(StorageType.DISK);
     builder.setBucketLayout(BucketLayout.LEGACY);
@@ -112,6 +119,10 @@ public class TestListKeysWithFSO {
     String legacyBucketName = "bucket" + RandomStringUtils.randomNumeric(5);
     ozoneVolume.createBucket(legacyBucketName, omBucketArgs);
     legacyOzoneBucket2 = ozoneVolume.getBucket(legacyBucketName);
+
+    legacyBucketName = "bucket" + RandomStringUtils.randomNumeric(5);
+    ozoneVolume.createBucket(legacyBucketName, omBucketArgs);
+    emptyLegacyOzoneBucket = ozoneVolume.getBucket(legacyBucketName);
 
     initFSNameSpace();
   }
@@ -473,6 +484,24 @@ public class TestListKeysWithFSO {
 
     // case-6: keyPrefix corresponds to multiple existing keys and
     // startKey reaches last key
+    keyPrefix = "a1/b1/c12";
+    startKey = "a1/b1/c12/c3.tx";
+    // a1/b1/c1222.tx
+    expectedKeys =
+        getExpectedKeyShallowList(keyPrefix, startKey, legacyOzoneBucket);
+    checkKeyShallowList(keyPrefix, startKey, expectedKeys, fsoOzoneBucket);
+
+    // case-7: keyPrefix corresponds to multiple existing keys and
+    // startKey is null in empty bucket
+    keyPrefix = "a1/b1/c12";
+    startKey = null;
+    // a1/b1/c1222.tx
+    expectedKeys =
+        getExpectedKeyShallowList(keyPrefix, startKey, emptyLegacyOzoneBucket);
+    checkKeyShallowList(keyPrefix, startKey, expectedKeys, emptyFsoOzoneBucket);
+
+    // case-8: keyPrefix corresponds to multiple existing keys and
+    // startKey is null
     keyPrefix = "a1/b1/c12";
     startKey = "a1/b1/c12/c3.tx";
     // a1/b1/c1222.tx
