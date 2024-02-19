@@ -17,10 +17,6 @@
 
 package org.apache.hadoop.ozone.debug;
 
-import com.google.gson.Gson;
-import com.google.gson.GsonBuilder;
-import com.google.gson.JsonArray;
-import com.google.gson.JsonObject;
 import org.apache.hadoop.hdds.cli.SubcommandWithParent;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -36,6 +32,9 @@ import org.apache.hadoop.ozone.common.OzoneChecksumException;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.shell.OzoneAddress;
 import org.apache.hadoop.ozone.shell.keys.KeyHandler;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ArrayNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import jakarta.annotation.Nonnull;
 import org.kohsuke.MetaInfServices;
 import picocli.CommandLine;
@@ -129,18 +128,20 @@ public class ReadReplicas extends KeyHandler implements SubcommandWithParent {
           replicasWithoutChecksum = noChecksumClient
           .getKeysEveryReplicas(volumeName, bucketName, keyName);
 
-      JsonObject result = new JsonObject();
-      result.addProperty(JSON_PROPERTY_FILE_NAME,
+      ObjectMapper objectMapper = new ObjectMapper(); // Jackson's ObjectMapper
+      ObjectNode result = objectMapper.createObjectNode();
+      result.put(JSON_PROPERTY_FILE_NAME,
           volumeName + "/" + bucketName + "/" + keyName);
-      result.addProperty(JSON_PROPERTY_FILE_SIZE, keyInfoDetails.getDataSize());
+      result.put(JSON_PROPERTY_FILE_SIZE, keyInfoDetails.getDataSize());
 
-      JsonArray blocks = new JsonArray();
+      ArrayNode blocks = objectMapper.createArrayNode();
       downloadReplicasAndCreateManifest(keyName, replicas,
           replicasWithoutChecksum, dir, blocks);
-      result.add(JSON_PROPERTY_FILE_BLOCKS, blocks);
+      result.set(JSON_PROPERTY_FILE_BLOCKS, blocks);
 
-      Gson gson = new GsonBuilder().setPrettyPrinting().create();
-      String prettyJson = gson.toJson(result);
+      // For pretty printing JSON output with Jackson
+      String prettyJson = objectMapper.writerWithDefaultPrettyPrinter()
+          .writeValueAsString(result);
 
       String manifestFileName = keyName + "_manifest";
       System.out.println("Writing manifest file : " + manifestFileName);
@@ -158,25 +159,23 @@ public class ReadReplicas extends KeyHandler implements SubcommandWithParent {
       Map<OmKeyLocationInfo, Map<DatanodeDetails, OzoneInputStream>> replicas,
       Map<OmKeyLocationInfo, Map<DatanodeDetails, OzoneInputStream>>
           replicasWithoutChecksum,
-      File dir, JsonArray blocks) throws IOException {
+      File dir, ArrayNode blocks) throws IOException {
     int blockIndex = 0;
+    ObjectMapper objectMapper = new ObjectMapper();
 
     for (Map.Entry<OmKeyLocationInfo, Map<DatanodeDetails, OzoneInputStream>>
         block : replicas.entrySet()) {
-      JsonObject blockJson = new JsonObject();
-      JsonArray replicasJson = new JsonArray();
+      ObjectNode blockJson = objectMapper.createObjectNode();
+      ArrayNode replicasJson = objectMapper.createArrayNode();
 
       blockIndex += 1;
-      blockJson.addProperty(JSON_PROPERTY_BLOCK_INDEX, blockIndex);
+      blockJson.put(JSON_PROPERTY_BLOCK_INDEX, blockIndex);
       OmKeyLocationInfo locationInfo = block.getKey();
-      blockJson.addProperty(JSON_PROPERTY_BLOCK_CONTAINERID,
+      blockJson.put(JSON_PROPERTY_BLOCK_CONTAINERID,
           locationInfo.getContainerID());
-      blockJson.addProperty(JSON_PROPERTY_BLOCK_LOCALID,
-          locationInfo.getLocalID());
-      blockJson.addProperty(JSON_PROPERTY_BLOCK_LENGTH,
-          locationInfo.getLength());
-      blockJson.addProperty(JSON_PROPERTY_BLOCK_OFFSET,
-          locationInfo.getOffset());
+      blockJson.put(JSON_PROPERTY_BLOCK_LOCALID, locationInfo.getLocalID());
+      blockJson.put(JSON_PROPERTY_BLOCK_LENGTH, locationInfo.getLength());
+      blockJson.put(JSON_PROPERTY_BLOCK_OFFSET, locationInfo.getOffset());
 
       BlockID blockID = locationInfo.getBlockID();
       Map<DatanodeDetails, OzoneInputStream> blockReplicasWithoutChecksum =
@@ -186,12 +185,10 @@ public class ReadReplicas extends KeyHandler implements SubcommandWithParent {
           replica : block.getValue().entrySet()) {
         DatanodeDetails datanode = replica.getKey();
 
-        JsonObject replicaJson = new JsonObject();
+        ObjectNode replicaJson = objectMapper.createObjectNode();
 
-        replicaJson.addProperty(JSON_PROPERTY_REPLICA_HOSTNAME,
-            datanode.getHostName());
-        replicaJson.addProperty(JSON_PROPERTY_REPLICA_UUID,
-            datanode.getUuidString());
+        replicaJson.put(JSON_PROPERTY_REPLICA_HOSTNAME, datanode.getHostName());
+        replicaJson.put(JSON_PROPERTY_REPLICA_UUID, datanode.getUuidString());
 
         String fileName = keyName + "_block" + blockIndex + "_" +
             datanode.getHostName();
@@ -202,8 +199,7 @@ public class ReadReplicas extends KeyHandler implements SubcommandWithParent {
           Files.copy(is, path, StandardCopyOption.REPLACE_EXISTING);
         } catch (IOException e) {
           Throwable cause = e.getCause();
-          replicaJson.addProperty(JSON_PROPERTY_REPLICA_EXCEPTION,
-              e.getMessage());
+          replicaJson.put(JSON_PROPERTY_REPLICA_EXCEPTION, e.getMessage());
           if (cause instanceof OzoneChecksumException) {
             try (InputStream is = getReplica(
                 blockReplicasWithoutChecksum, datanode)) {
@@ -213,7 +209,7 @@ public class ReadReplicas extends KeyHandler implements SubcommandWithParent {
         }
         replicasJson.add(replicaJson);
       }
-      blockJson.add(JSON_PROPERTY_BLOCK_REPLICAS, replicasJson);
+      blockJson.set(JSON_PROPERTY_BLOCK_REPLICAS, replicasJson);
       blocks.add(blockJson);
 
       blockReplicasWithoutChecksum.values()

@@ -28,13 +28,13 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Properties;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.base.Strings;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.annotation.InterfaceStability;
 import org.apache.hadoop.hdds.server.http.HttpServer2;
 
 import com.google.common.annotations.VisibleForTesting;
-import com.google.gson.Gson;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -145,12 +145,12 @@ public class HddsConfServlet extends HttpServlet {
 
   private void processConfigTagRequest(HttpServletRequest request, String cmd,
       Writer out) throws IOException {
-    Gson gson = new Gson();
+    ObjectMapper objectMapper = new ObjectMapper();
     OzoneConfiguration config = getOzoneConfig();
 
     switch (cmd) {
     case "getOzoneTags":
-      out.write(gson.toJson(OzoneConfiguration.TAGS));
+      out.write(objectMapper.writeValueAsString(OzoneConfiguration.TAGS));
       break;
     case "getPropertyByTag":
       String tags = request.getParameter("tags");
@@ -170,7 +170,7 @@ public class HddsConfServlet extends HttpServlet {
           }
         }
       }
-      out.write(gson.toJsonTree(propMap).toString());
+      out.write(objectMapper.writeValueAsString(propMap));
       break;
     default:
       throw new IllegalArgumentException(cmd + " is not a valid command.");

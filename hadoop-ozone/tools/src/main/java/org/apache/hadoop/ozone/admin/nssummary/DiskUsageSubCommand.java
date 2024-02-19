@@ -17,7 +17,7 @@
  */
 package org.apache.hadoop.ozone.admin.nssummary;
 
-import com.google.gson.internal.LinkedTreeMap;
+import com.fasterxml.jackson.core.type.TypeReference;
 import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.ozone.shell.ListOptions;
@@ -25,7 +25,10 @@ import picocli.CommandLine;
 
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.concurrent.Callable;
+import com.fasterxml.jackson.databind.ObjectMapper;
 
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 import static org.apache.hadoop.ozone.admin.nssummary.NSSummaryCLIUtils.getResponseMap;
@@ -101,7 +104,8 @@ public class DiskUsageSubCommand implements Callable {
       return null;
     }
 
-    HashMap<String, Object> duResponse = getResponseMap(response);
+    ObjectMapper objectMapper = new ObjectMapper();
+    Map<String, Object> duResponse = objectMapper.readValue(response, new TypeReference<Map<String, Object>>() {});
 
     if (duResponse.get("status").equals("PATH_NOT_FOUND")) {
       printPathNotFound();
@@ -156,24 +160,20 @@ public class DiskUsageSubCommand implements Callable {
         printDUHeader();
         int limit = listOptions.getLimit();
         String seekStr = listOptions.getPrefix();
-        if (seekStr == null) {
-          seekStr = "";
-        }
+        seekStr = seekStr == null ? "" : seekStr;
 
-        ArrayList duData = (ArrayList)duResponse.get("subPaths");
+        List<Map<String, Object>> duData = (List<Map<String, Object>>) duResponse.get("subPaths");
         int cnt = 0;
-        for (int i = 0; i < duData.size(); ++i) {
+        for (Map<String, Object> subPathDU : duData) {
           if (cnt >= limit) {
             break;
           }
-          LinkedTreeMap subPathDU = (LinkedTreeMap) duData.get(i);
-          String subPath = subPathDU.get("path").toString();
-          // differentiate key from other types
-          if (!(boolean)subPathDU.get("isKey")) {
+          String subPath = (String) subPathDU.get("path");
+          if (!(Boolean) subPathDU.get("isKey")) {
             subPath += OM_KEY_PREFIX;
           }
-          long size = (long)(double)subPathDU.get("size");
-          long sizeWithReplica = (long)(double)subPathDU.get("sizeWithReplica");
+          long size = ((Number) subPathDU.get("size")).longValue();
+          long sizeWithReplica = ((Number) subPathDU.get("sizeWithReplica")).longValue();
           if (subPath.startsWith(seekStr)) {
             printDURow(subPath, size, sizeWithReplica);
             ++cnt;

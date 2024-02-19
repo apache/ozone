@@ -24,11 +24,10 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.HashSet;
-import com.google.gson.GsonBuilder;
-import com.google.gson.Gson;
-import com.google.gson.JsonObject;
-import com.google.gson.JsonArray;
-import com.google.gson.JsonElement;
+
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ArrayNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import org.apache.hadoop.hdds.cli.SubcommandWithParent;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
@@ -43,8 +42,6 @@ import org.apache.hadoop.hdds.scm.storage.ContainerProtocolCalls;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientException;
-import org.apache.hadoop.ozone.container.common.helpers.ChunkInfo;
-import org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
@@ -81,13 +78,12 @@ public class ChunkKeyHandler extends KeyHandler implements
         XceiverClientManager xceiverClientManager = containerOperationClient.getXceiverClientManager()) {
       OzoneManagerProtocol ozoneManagerClient = client.getObjectStore().getClientProxy().getOzoneManagerClient();
       address.ensureKeyAddress();
-      JsonElement element;
-      JsonObject result = new JsonObject();
+      ObjectMapper objectMapper = new ObjectMapper();
+      ObjectNode result = objectMapper.createObjectNode();
       String volumeName = address.getVolumeName();
       String bucketName = address.getBucketName();
       String keyName = address.getKeyName();
       List<ContainerProtos.ChunkInfo> tempchunks = null;
-      List<ChunkDetails> chunkDetailsList = new ArrayList<ChunkDetails>();
       HashSet<String> chunkPaths = new HashSet<>();
       OmKeyArgs keyArgs = new OmKeyArgs.Builder().setVolumeName(volumeName)
           .setBucketName(bucketName).setKeyName(keyName).build();
@@ -101,12 +97,8 @@ public class ChunkKeyHandler extends KeyHandler implements
         System.out.println("No Key Locations Found");
         return;
       }
-      ContainerLayoutVersion containerLayoutVersion = ContainerLayoutVersion
-          .getConfiguredVersion(getConf());
-      JsonArray responseArrayList = new JsonArray();
+      ArrayNode responseArrayList = objectMapper.createArrayNode();
       for (OmKeyLocationInfo keyLocation : locationInfos) {
-        ContainerChunkInfo containerChunkInfoVerbose = new ContainerChunkInfo();
-        ContainerChunkInfo containerChunkInfo = new ContainerChunkInfo();
         long containerId = keyLocation.getContainerID();
         chunkPaths.clear();
         Pipeline keyPipeline = keyLocation.getPipeline();
@@ -129,78 +121,39 @@ public class ChunkKeyHandler extends KeyHandler implements
               keyLocation.getBlockID().getDatanodeBlockIDProtobuf();
           // doing a getBlock on all nodes
           Map<DatanodeDetails, ContainerProtos.GetBlockResponseProto>
-              responses = null;
-          Map<DatanodeDetails, ContainerProtos.ReadContainerResponseProto>
-              readContainerResponses = null;
-          try {
-            responses = ContainerProtocolCalls.getBlockFromAllNodes(xceiverClient,
-                datanodeBlockID, keyLocation.getToken());
-            readContainerResponses =
-                containerOperationClient.readContainerFromAllNodes(
-                    keyLocation.getContainerID(), pipeline);
-          } catch (InterruptedException e) {
-            LOG.error("Execution interrupted due to " + e);
-            Thread.currentThread().interrupt();
-          }
-          JsonArray responseFromAllNodes = new JsonArray();
-          for (Map.Entry<DatanodeDetails, ContainerProtos.GetBlockResponseProto>
-              entry : responses.entrySet()) {
+              responses =
+              ContainerProtocolCalls.getBlockFromAllNodes(xceiverClient,
+                  datanodeBlockID, keyLocation.getToken());
+          ArrayNode responseFromAllNodes = objectMapper.createArrayNode();
+          for (Map.Entry<DatanodeDetails, ContainerProtos.GetBlockResponseProto> entry : responses.entrySet()) {
             chunkPaths.clear();
-            JsonObject jsonObj = new JsonObject();
-            if (entry.getValue() == null) {
-              LOG.error("Cant execute getBlock on this node");
-              continue;
-            }
+            ObjectNode jsonObj = objectMapper.createObjectNode();
             tempchunks = entry.getValue().getBlockData().getChunksList();
-            ContainerProtos.ContainerDataProto containerData =
-                readContainerResponses.get(entry.getKey()).getContainerData();
             for (ContainerProtos.ChunkInfo chunkInfo : tempchunks) {
-              String fileName = containerLayoutVersion.getChunkFile(new File(
-                      getChunkLocationPath(containerData.getContainerPath())),
-                  keyLocation.getBlockID(),
-                  ChunkInfo.getFromProtoBuf(chunkInfo)).toString();
+              String fileName =
+                  getChunkLocationPath("containerDataPath") + File.separator +
+                      chunkInfo.getChunkName();
               chunkPaths.add(fileName);
-              ChunkDetails chunkDetails = new ChunkDetails();
-              chunkDetails.setChunkName(fileName);
-              chunkDetails.setChunkOffset(chunkInfo.getOffset());
-              chunkDetailsList.add(chunkDetails);
             }
-            containerChunkInfoVerbose.setContainerPath(containerData
-                .getContainerPath());
-            containerChunkInfoVerbose.setPipeline(keyPipeline);
-            containerChunkInfoVerbose.setChunkInfos(chunkDetailsList);
-            containerChunkInfo.setFiles(chunkPaths);
-            containerChunkInfo.setPipelineID(keyPipeline.getId().getId());
-            if (isECKey) {
-              ChunkType blockChunksType =
-                  isECParityBlock(keyPipeline, entry.getKey()) ?
-                      ChunkType.PARITY : ChunkType.DATA;
-              containerChunkInfoVerbose.setChunkType(blockChunksType);
-              containerChunkInfo.setChunkType(blockChunksType);
-            }
-            Gson gson = new GsonBuilder().create();
-            if (isVerbose()) {
-              element = gson.toJsonTree(containerChunkInfoVerbose);
-            } else {
-              element = gson.toJsonTree(containerChunkInfo);
-            }
-            jsonObj.addProperty("Datanode-HostName", entry.getKey()
-                .getHostName());
-            jsonObj.addProperty("Datanode-IP", entry.getKey()
-                .getIpAddress());
-            jsonObj.addProperty("Container-ID", containerId);
-            jsonObj.addProperty("Block-ID", keyLocation.getLocalID());
-            jsonObj.add("Locations", element);
+            jsonObj.put("Datanode-HostName", entry.getKey().getHostName());
+            jsonObj.put("Datanode-IP", entry.getKey().getIpAddress());
+            jsonObj.put("Container-ID", containerId);
+            jsonObj.put("Block-ID", keyLocation.getLocalID());
+            ArrayNode filesNode = objectMapper.createArrayNode();
+            chunkPaths.forEach(filesNode::add);
+            jsonObj.set("Files", filesNode);
             responseFromAllNodes.add(jsonObj);
           }
           responseArrayList.add(responseFromAllNodes);
+        } catch (InterruptedException e) {
+          throw new RuntimeException(e);
         } finally {
           xceiverClientManager.releaseClientForReadData(xceiverClient, false);
         }
       }
-      result.add("KeyLocations", responseArrayList);
-      Gson gson2 = new GsonBuilder().setPrettyPrinting().create();
-      String prettyJson = gson2.toJson(result);
+      result.set("KeyLocations", responseArrayList);
+      String prettyJson = objectMapper.writerWithDefaultPrettyPrinter()
+          .writeValueAsString(result);
       System.out.println(prettyJson);
     }
   }
