@@ -17,7 +17,7 @@
  */
 package org.apache.hadoop.ozone.admin.nssummary;
 
-import com.fasterxml.jackson.core.type.TypeReference;
+import com.google.gson.internal.LinkedTreeMap;
 import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.ozone.shell.ListOptions;
@@ -25,10 +25,7 @@ import picocli.CommandLine;
 
 import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
 import java.util.concurrent.Callable;
-import com.fasterxml.jackson.databind.ObjectMapper;
 
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 import static org.apache.hadoop.ozone.admin.nssummary.NSSummaryCLIUtils.getResponseMap;
@@ -104,8 +101,7 @@ public class DiskUsageSubCommand implements Callable {
       return null;
     }
 
-    ObjectMapper objectMapper = new ObjectMapper();
-    Map<String, Object> duResponse = objectMapper.readValue(response, new TypeReference<Map<String, Object>>() {});
+    HashMap<String, Object> duResponse = getResponseMap(response);
 
     if (duResponse.get("status").equals("PATH_NOT_FOUND")) {
       printPathNotFound();
@@ -114,7 +110,7 @@ public class DiskUsageSubCommand implements Callable {
         printBucketReminder();
       }
 
-      long totalSize = (long)(double)duResponse.get("size");
+      long totalSize = ((Number) duResponse.get("size")).longValue();
 
       if (!noHeader) {
         printWithUnderline("Path", false);
@@ -128,11 +124,12 @@ public class DiskUsageSubCommand implements Callable {
         if (withReplica) {
           printWithUnderline("Total Disk Usage", false);
           printKVSeparator();
-          long du = (long)(double)duResponse.get("sizeWithReplica");
+          long du = ((Number) duResponse.get("sizeWithReplica")).longValue();
           System.out.println(FileUtils.byteCountToDisplaySize(du));
         }
 
-        long sizeDirectKey = (long)(double)duResponse.get("sizeDirectKey");
+        long sizeDirectKey =
+            ((Number) duResponse.get("sizeDirectKey")).longValue();
         if (!listFiles && sizeDirectKey != -1) {
           printWithUnderline("Size of Direct Keys", false);
           printKVSeparator();
@@ -141,7 +138,7 @@ public class DiskUsageSubCommand implements Callable {
         printNewLines(1);
       }
 
-      if ((double)duResponse.get("subPathCount") == 0) {
+      if (((Number) duResponse.get("subPathCount")).doubleValue() == 0) {
         if (totalSize == 0) {
           // the object is empty
           System.out.println("The object is empty.\n" +
@@ -160,20 +157,24 @@ public class DiskUsageSubCommand implements Callable {
         printDUHeader();
         int limit = listOptions.getLimit();
         String seekStr = listOptions.getPrefix();
-        seekStr = seekStr == null ? "" : seekStr;
+        if (seekStr == null) {
+          seekStr = "";
+        }
 
-        List<Map<String, Object>> duData = (List<Map<String, Object>>) duResponse.get("subPaths");
+        ArrayList<?> duData = (ArrayList<?>) duResponse.get("subPaths");
         int cnt = 0;
-        for (Map<String, Object> subPathDU : duData) {
+        for (Object o : duData) {
           if (cnt >= limit) {
             break;
           }
+          LinkedTreeMap<?, ?> subPathDU = (LinkedTreeMap<?, ?>) o;
           String subPath = (String) subPathDU.get("path");
           if (!(Boolean) subPathDU.get("isKey")) {
             subPath += OM_KEY_PREFIX;
           }
           long size = ((Number) subPathDU.get("size")).longValue();
-          long sizeWithReplica = ((Number) subPathDU.get("sizeWithReplica")).longValue();
+          long sizeWithReplica =
+              ((Number) subPathDU.get("sizeWithReplica")).longValue();
           if (subPath.startsWith(seekStr)) {
             printDURow(subPath, size, sizeWithReplica);
             ++cnt;

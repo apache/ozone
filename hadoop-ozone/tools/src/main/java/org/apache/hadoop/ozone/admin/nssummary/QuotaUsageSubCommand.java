@@ -85,8 +85,11 @@ public class QuotaUsageSubCommand implements Callable {
       }
 
       printWithUnderline("Quota", true);
-      long quotaAllowed = (long)(double)quotaResponse.get("allowed");
-      long quotaUsed = (long)(double)quotaResponse.get("used");
+
+      // Safe conversion using Number interface
+      long quotaAllowed = ((Number) quotaResponse.get("allowed")).longValue();
+      long quotaUsed = ((Number) quotaResponse.get("used")).longValue();
+
       printSpaces(2);
       System.out.print("Allowed");
       printKVSeparator();

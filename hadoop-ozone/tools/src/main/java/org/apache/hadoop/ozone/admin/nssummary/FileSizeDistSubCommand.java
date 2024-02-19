@@ -85,11 +85,11 @@ public class FileSizeDistSubCommand implements Callable {
       }
 
       printWithUnderline("File Size Distribution", true);
-      ArrayList fileSizeDist = (ArrayList) distResponse.get("dist");
+      ArrayList<?> fileSizeDist = (ArrayList<?>) distResponse.get("dist");
       double sum = 0;
 
-      for (int i = 0; i < fileSizeDist.size(); ++i) {
-        sum += (double) fileSizeDist.get(i);
+      for (Object obj : fileSizeDist) {
+        sum += ((Number) obj).doubleValue();
       }
       if (sum == 0) {
         printSpaces(2);
@@ -100,11 +100,12 @@ public class FileSizeDistSubCommand implements Callable {
       }
 
       for (int i = 0; i < fileSizeDist.size(); ++i) {
-        if ((double)fileSizeDist.get(i) == 0) {
+        double count = ((Number) fileSizeDist.get(i)).doubleValue();
+        if (count == 0) {
           continue;
         }
         String label = convertBinIndexToReadableRange(i);
-        printDistRow(label, (double) fileSizeDist.get(i), sum);
+        printDistRow(label, count, sum);
       }
     }
     printNewLines(1);
