@@ -665,13 +665,36 @@ public final class OzoneConfigKeys {
   public static final String OZONE_SCM_CLOSE_CONTAINER_WAIT_DURATION =
       "ozone.scm.close.container.wait.duration";
 
+  public static final String OZONE_CLIENT_CACHE_VOLUME_BUCKET_ENABLE =
+      "ozone.client.cache.volume.bucket.enable";
+
+  public static final boolean OZONE_CLIENT_CACHE_VOLUME_BUCKET_ENABLE_DEFAULT =
+      true;
+
+  public static final String OZONE_CLIENT_EXPIRES_AFTER_WRITE_SECONDS =
+      "ozone.client.expires.after.write.seconds";
+
+  public static final int OZONE_CLIENT_EXPIRES_AFTER_WRITE_SECONDS_DEFAULT =
+      60;
+
+  public static final String OZONE_CLIENT_REFRESH_AFTER_WRITE_SECONDS =
+      "ozone.client.refresh.after.write.seconds";
+
+  public static final int OZONE_CLIENT_REFRESH_AFTER_WRITE_SECONDS_DEFAULT =
+      30;
+
+  public static final String OZONE_CLIENT_CACHE_VOLUME_BUCKET_MAXIMUM_SIZE =
+      "ozone.client.cache.volume.bucket.maximum.size";
+
+  public static final int OZONE_CLIENT_CACHE_VOLUME_BUCKET_MAXIMUM_SIZE_DEFAULT =
+      10;
+
   public static final String HDDS_SCM_CLIENT_RPC_TIME_OUT =
       "hdds.scmclient.rpc.timeout";
   public static final String HDDS_SCM_CLIENT_MAX_RETRY_TIMEOUT =
       "hdds.scmclient.max.retry.timeout";
   public static final String HDDS_SCM_CLIENT_FAILOVER_MAX_RETRY =
       "hdds.scmclient.failover.max.retry";
-
 
   /**
    * There is no need to instantiate this class.
