@@ -503,7 +503,6 @@ public class TestListKeysWithFSO {
     // case-8: keyPrefix corresponds to multiple existing keys and
     // startKey is null
     keyPrefix = "a1/b1/c12";
-    startKey = "a1/b1/c12/c3.tx";
     // a1/b1/c1222.tx
     expectedKeys =
         getExpectedKeyShallowList(keyPrefix, startKey, legacyOzoneBucket);
