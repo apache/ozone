@@ -313,8 +313,7 @@ public class MiniOzoneChaosCluster extends MiniOzoneHAClusterImpl {
         throw new IOException("Unable to build MiniOzoneCluster. ", ex);
       }
 
-      final List<HddsDatanodeService> hddsDatanodes = createHddsDatanodes(
-          scmService.getActiveServices(), null);
+      final List<HddsDatanodeService> hddsDatanodes = createHddsDatanodes();
 
       MiniOzoneChaosCluster cluster =
           new MiniOzoneChaosCluster(conf, omService, scmService, hddsDatanodes,
