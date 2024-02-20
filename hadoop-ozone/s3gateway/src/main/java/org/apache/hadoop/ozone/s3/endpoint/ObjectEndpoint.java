@@ -1069,7 +1069,10 @@ public class ObjectEndpoint extends EndpointBase {
       ozoneMultipartUploadPartListParts.getPartInfoList().forEach(partInfo -> {
         ListPartsResponse.Part part = new ListPartsResponse.Part();
         part.setPartNumber(partInfo.getPartNumber());
-        part.setETag(partInfo.getETag());
+        // If the ETag field does not exist, use MPU part name for backward
+        // compatibility
+        part.setETag(partInfo.getETag() != null ?
+            partInfo.getETag() : partInfo.getPartName());
         part.setSize(partInfo.getSize());
         part.setLastModified(Instant.ofEpochMilli(
             partInfo.getModificationTime()));
