@@ -281,19 +281,6 @@ public class MiniOzoneChaosCluster extends MiniOzoneHAClusterImpl {
           OZONE_OM_RATIS_SNAPSHOT_AUTO_TRIGGER_THRESHOLD_KEY, 100);
     }
 
-    /**
-     * Sets the number of data volumes per datanode.
-     *
-     * @param val number of volumes per datanode.
-     *
-     * @return MiniOzoneCluster.Builder
-     */
-    @Override
-    public Builder setNumDataVolumes(int val) {
-      numDataVolumes = val;
-      return this;
-    }
-
     @Override
     public MiniOzoneChaosCluster build() throws IOException {
       DefaultMetricsSystem.setMiniClusterMode(true);
