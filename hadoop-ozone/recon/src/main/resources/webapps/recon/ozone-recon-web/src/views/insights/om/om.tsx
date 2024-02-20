@@ -163,7 +163,7 @@ const MISMATCH_TAB_COLUMNS = [
 
 const OPEN_KEY_TAB_COLUMNS = [
   {
-    title: 'Key',
+    title: 'Key Name',
     dataIndex: 'path',
     key: 'path',
     isSearchable: true
@@ -683,7 +683,7 @@ export class Om extends React.Component<Record<string, object>, IOmdbInsightsSta
       mismatchMissingState: 'SCM',
       includeFso: true,
       includeNonFso: false,
-
+      selectedLimit: INITIAL_LIMIT_OPTION
     }, () => {
       if (activeKey === '2') {
         this.fetchOpenKeys(this.state.includeFso, this.state.includeNonFso);
