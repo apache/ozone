@@ -154,7 +154,7 @@ public class OzoneBucket extends WithMetadata {
   private String owner;
 
   protected OzoneBucket(Builder builder) {
-    this.metadata = builder.metadata;
+    setMetadata(builder.metadata);
     this.proxy = builder.proxy;
     this.volumeName = builder.volumeName;
     this.name = builder.name;  // bucket name
