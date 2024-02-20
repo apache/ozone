@@ -38,11 +38,8 @@ import org.apache.hadoop.ozone.om.snapshot.ReferenceCounted;
 import org.apache.ratis.util.ExitUtils;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
-import org.junit.jupiter.api.Order;
-import org.junit.jupiter.api.TestMethodOrder;
 import org.junit.jupiter.api.TestInstance;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.MethodOrderer.OrderAnnotation;
 import org.junit.jupiter.api.io.TempDir;
 import org.rocksdb.LiveFileMetaData;
 
@@ -219,8 +216,7 @@ public class TestSstFilteringService {
 
     for (LiveFileMetaData file : allFiles) {
       //Skipping the previous files from this check.
-      if(listPreviousFiles.contains(file.fileName())) { //isContains(file, previousFiles)) {
-        System.out.println("Skipped file check for "+file.fileName());
+      if (listPreviousFiles.contains(file.fileName())) {
         continue;
       }
       File sstFile =
