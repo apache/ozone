@@ -60,8 +60,14 @@ public final class OmPartInfo {
   }
 
   public PartInfo getProto() {
-    return PartInfo.newBuilder().setPartNumber(partNumber).setPartName(partName)
-       .setModificationTime(modificationTime)
-       .setSize(size).setETag(eTag).build();
+    PartInfo.Builder builder = PartInfo.newBuilder()
+        .setPartNumber(partNumber)
+        .setPartName(partName)
+        .setModificationTime(modificationTime)
+        .setSize(size);
+    if (eTag != null) {
+      builder.setETag(eTag);
+    }
+    return builder.build();
   }
 }
