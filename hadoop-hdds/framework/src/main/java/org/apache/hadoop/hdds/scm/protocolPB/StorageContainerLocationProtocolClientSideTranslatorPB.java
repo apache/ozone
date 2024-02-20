@@ -902,7 +902,13 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
       Optional<Integer> maxDatanodesPercentageToInvolvePerIteration,
       Optional<Long> maxSizeToMovePerIterationInGB,
       Optional<Long> maxSizeEnteringTargetInGB,
-      Optional<Long> maxSizeLeavingSourceInGB) throws IOException {
+      Optional<Long> maxSizeLeavingSourceInGB,
+      Optional<Long> balancingInterval,
+      Optional<Long> moveTimeout,
+      Optional<Long> moveReplicationTimeout,
+      Optional<Boolean> networkTopologyEnable,
+      Optional<String> includeNodes,
+      Optional<String> excludeNodes) throws IOException {
     StartContainerBalancerRequestProto.Builder builder =
         StartContainerBalancerRequestProto.newBuilder();
     builder.setTraceID(TracingUtil.exportCurrentSpan());
@@ -950,6 +956,48 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
       Preconditions.checkState(msls > 0,
           "maxSizeLeavingSourceInGB must be positive.");
       builder.setMaxSizeLeavingSourceInGB(msls);
+    }
+
+    if (balancingInterval.isPresent()) {
+      long bi = balancingInterval.get();
+      Preconditions.checkState(bi > 0,
+              "balancingInterval must be greater than zero.");
+      builder.setBalancingInterval(bi);
+    }
+
+    if (moveTimeout.isPresent()) {
+      long mt = moveTimeout.get();
+      Preconditions.checkState(mt > 0,
+              "moveTimeout must be greater than zero.");
+      builder.setMoveTimeout(mt);
+    }
+
+    if (moveReplicationTimeout.isPresent()) {
+      long mrt = moveReplicationTimeout.get();
+      Preconditions.checkState(mrt > 0,
+              "moveTimeout must be greater than zero.");
+      builder.setMoveReplicationTimeout(mrt);
+    }
+
+    if (networkTopologyEnable.isPresent()) {
+      Boolean nt = networkTopologyEnable.get();
+      Preconditions.checkState(nt != null,
+              "networkTopologyEnable must be either true or false");
+      builder.setNetworkTopologyEnable(nt);
+    }
+
+    if (includeNodes.isPresent()) {
+      String in = includeNodes.get();
+      Preconditions.checkState(in != null,
+              "includeNodes must contain comma separated hostnames or ip addresses");
+      builder.setIncludeNodes(in);
+    }
+
+    if (excludeNodes.isPresent()) {
+      String ex = excludeNodes.get();
+      Preconditions.checkState(ex != null,
+              "excludeNodes must contain comma separated hostnames or ip addresses");
+      builder.setExcludeNodes(ex);
     }
 
     StartContainerBalancerRequestProto request = builder.build();

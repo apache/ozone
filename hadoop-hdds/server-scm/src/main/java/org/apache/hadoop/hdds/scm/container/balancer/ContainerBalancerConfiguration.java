@@ -330,16 +330,16 @@ public final class ContainerBalancerConfiguration {
     this.moveTimeout = duration.toMillis();
   }
 
-  public void setMoveTimeout(long millis) {
-    this.moveTimeout = millis;
+  public void setMoveTimeout(long minutes) {
+    this.moveTimeout = minutes * 60 * 1000;
   }
 
   public Duration getMoveReplicationTimeout() {
     return Duration.ofMillis(moveReplicationTimeout);
   }
 
-  public void setMoveReplicationTimeout(long millis) {
-    this.moveReplicationTimeout = millis;
+  public void setMoveReplicationTimeout(long minutes) {
+    this.moveReplicationTimeout = minutes * 60 * 1000;
   }
 
   public Duration getBalancingInterval() {
@@ -350,8 +350,8 @@ public final class ContainerBalancerConfiguration {
     this.balancingInterval = balancingInterval.toMillis();
   }
 
-  public void setBalancingInterval(long millis) {
-    this.balancingInterval = millis;
+  public void setBalancingInterval(long minutes) {
+    this.balancingInterval = minutes * 60 * 1000;
   }
 
   /**

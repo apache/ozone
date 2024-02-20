@@ -1047,7 +1047,13 @@ public class SCMClientProtocolServer implements
       Optional<Integer> maxDatanodesPercentageToInvolvePerIteration,
       Optional<Long> maxSizeToMovePerIterationInGB,
       Optional<Long> maxSizeEnteringTarget,
-      Optional<Long> maxSizeLeavingSource) throws IOException {
+      Optional<Long> maxSizeLeavingSource,
+      Optional<Long> balancingInterval,
+      Optional<Long> moveTimeout,
+      Optional<Long> moveReplicationTimeout,
+      Optional<Boolean> networkTopologyEnable,
+      Optional<String> includeNodes,
+      Optional<String> excludeNodes) throws IOException {
     getScm().checkAdminAccess(getRemoteUser(), false);
     ContainerBalancerConfiguration cbc =
         scm.getConfiguration().getObject(ContainerBalancerConfiguration.class);
@@ -1103,6 +1109,54 @@ public class SCMClientProtocolServer implements
           "maxSizeLeavingSource must be " +
               "greater than zero.");
       cbc.setMaxSizeLeavingSource(msls * OzoneConsts.GB);
+    }
+
+    if (balancingInterval.isPresent()) {
+      long bi = balancingInterval.get();
+      auditMap.put("balancingInterval",String.valueOf(bi));
+      Preconditions.checkState(bi > 0,
+              "balancingInterval must be greater than zero.");
+      cbc.setBalancingInterval(bi);
+    }
+
+    if (moveTimeout.isPresent()) {
+      long mt = moveTimeout.get();
+      auditMap.put("moveTimeout", String.valueOf(mt));
+      Preconditions.checkState(mt > 0,
+              "moveTimeout must be greater than zero.");
+      cbc.setMoveTimeout(mt);
+    }
+
+    if (moveReplicationTimeout.isPresent()) {
+      long mrt = moveReplicationTimeout.get();
+      auditMap.put("moveReplicationTimeout", String.valueOf(mrt));
+      Preconditions.checkState(mrt > 0,
+              "moveTimeout must be greater than zero.");
+      cbc.setMoveReplicationTimeout(mrt);
+    }
+
+    if (networkTopologyEnable.isPresent()) {
+      Boolean nt = networkTopologyEnable.get();
+      auditMap.put("networkTopologyEnable", String.valueOf(nt));
+      Preconditions.checkState(nt != null,
+              "networkTopologyEnable must be either true or false");
+      cbc.setNetworkTopologyEnable(nt);
+    }
+
+    if (includeNodes.isPresent()) {
+      String in = includeNodes.get();
+      auditMap.put("includeNodes", (in));
+      Preconditions.checkState(in != null,
+              "includeNodes must contain comma separated hostnames or ip addresses");
+      cbc.setIncludeNodes(in);
+    }
+
+    if (excludeNodes.isPresent()) {
+      String ex = excludeNodes.get();
+      auditMap.put("excludeNodes", (ex));
+      Preconditions.checkState(ex != null,
+              "includeNodes must contain comma separated hostnames or ip addresses");
+      cbc.setExcludeNodes(ex);
     }
 
     ContainerBalancer containerBalancer = scm.getContainerBalancer();

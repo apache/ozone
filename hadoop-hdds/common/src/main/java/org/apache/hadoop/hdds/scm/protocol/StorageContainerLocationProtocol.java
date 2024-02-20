@@ -408,7 +408,13 @@ public interface StorageContainerLocationProtocol extends Closeable {
       Optional<Integer> maxDatanodesPercentageToInvolvePerIteration,
       Optional<Long> maxSizeToMovePerIterationInGB,
       Optional<Long> maxSizeEnteringTargetInGB,
-      Optional<Long> maxSizeLeavingSourceInGB) throws IOException;
+      Optional<Long> maxSizeLeavingSourceInGB,
+      Optional<Long> balancingInterval,
+      Optional<Long> moveTimeout,
+      Optional<Long> moveReplicationTimeout,
+      Optional<Boolean> networkTopologyEnable,
+      Optional<String> includeNodes,
+      Optional<String> excludeNodes) throws IOException;
 
   /**
    * Stop ContainerBalancer.

@@ -83,11 +83,18 @@ public class TestContainerBalancerOperations {
     Optional<Long> maxSizeToMovePerIterationInGB = Optional.of(1L);
     Optional<Long> maxSizeEnteringTargetInGB = Optional.of(1L);
     Optional<Long> maxSizeLeavingSourceInGB = Optional.of(1L);
-
+    Optional<Long> balancingInterval = Optional.of(1L);
+    Optional<Long> moveTimeout = Optional.of(1L);
+    Optional<Long> moveReplicationTimeout = Optional.of(1L);
+    Optional<Boolean> networkTopologyEnable = Optional.of(false);
+    Optional<String> includeNodes = Optional.of("");
+    Optional<String> excludeNodes = Optional.of("");
     containerBalancerClient.startContainerBalancer(threshold, iterations,
         maxDatanodesPercentageToInvolvePerIteration,
         maxSizeToMovePerIterationInGB, maxSizeEnteringTargetInGB,
-        maxSizeLeavingSourceInGB);
+        maxSizeLeavingSourceInGB, balancingInterval, moveTimeout,
+        moveReplicationTimeout, networkTopologyEnable, includeNodes,
+        excludeNodes);
     running = containerBalancerClient.getContainerBalancerStatus();
     assertTrue(running);
 
@@ -105,7 +112,9 @@ public class TestContainerBalancerOperations {
     containerBalancerClient.startContainerBalancer(threshold, iterations,
         maxDatanodesPercentageToInvolvePerIteration,
         maxSizeToMovePerIterationInGB, maxSizeEnteringTargetInGB,
-        maxSizeLeavingSourceInGB);
+        maxSizeLeavingSourceInGB, balancingInterval, moveTimeout,
+        moveReplicationTimeout, networkTopologyEnable, includeNodes,
+        excludeNodes);
     running = containerBalancerClient.getContainerBalancerStatus();
     assertTrue(running);
 
