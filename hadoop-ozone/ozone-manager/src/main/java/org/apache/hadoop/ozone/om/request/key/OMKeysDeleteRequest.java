@@ -19,12 +19,13 @@
 package org.apache.hadoop.ozone.om.request.key;
 
 import org.apache.commons.lang3.tuple.Pair;
-import org.apache.ratis.server.protocol.TermIndex;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
+import org.apache.hadoop.util.Time;
 import org.apache.hadoop.ozone.audit.AuditLogger;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OMMetrics;
+import org.apache.hadoop.ozone.om.OMPerformanceMetrics;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.ResolvedBucket;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
@@ -49,6 +50,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRespo
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
 import jakarta.annotation.Nonnull;
+import org.apache.ratis.server.protocol.TermIndex;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -96,6 +98,7 @@ public class OMKeysDeleteRequest extends OMKeyRequest {
 
     OMMetrics omMetrics = ozoneManager.getMetrics();
     omMetrics.incNumKeyDeletes();
+    OMPerformanceMetrics perfMetrics = ozoneManager.getPerfMetrics();
     String volumeName = deleteKeyArgs.getVolumeName();
     String bucketName = deleteKeyArgs.getBucketName();
     Map<String, String> auditMap = new LinkedHashMap<>();
@@ -121,6 +124,7 @@ public class OMKeysDeleteRequest extends OMKeyRequest {
             .setVolumeName(volumeName).setBucketName(bucketName);
 
     boolean deleteStatus = true;
+    long startNanos = Time.monotonicNowNanos();
     try {
       ResolvedBucket bucket =
           ozoneManager.resolveBucketLink(Pair.of(volumeName, bucketName), this);
@@ -215,13 +219,14 @@ public class OMKeysDeleteRequest extends OMKeyRequest {
     }
 
     addDeletedKeys(auditMap, deleteKeys, unDeletedKeys.getKeysList());
-
+    long endNanos = Time.monotonicNowNanos();
     auditLog(auditLogger,
         buildAuditMessage(DELETE_KEYS, auditMap, exception, userInfo));
 
     switch (result) {
     case SUCCESS:
       omMetrics.decNumKeys(deleteKeys.size());
+      perfMetrics.setDeleteKeySuccessLatencyNs(endNanos - startNanos);
       if (LOG.isDebugEnabled()) {
         LOG.debug("Keys delete success. Volume:{}, Bucket:{}, Keys:{}",
             volumeName, bucketName, auditMap.get(DELETED_KEYS_LIST));
@@ -229,6 +234,7 @@ public class OMKeysDeleteRequest extends OMKeyRequest {
       break;
     case FAILURE:
       omMetrics.incNumKeyDeleteFails();
+      perfMetrics.setDeleteKeyFailureLatencyNs(endNanos - startNanos);
       if (LOG.isDebugEnabled()) {
         LOG.debug("Keys delete failed. Volume:{}, Bucket:{}, DeletedKeys:{}, "
                 + "UnDeletedKeys:{}", volumeName, bucketName,

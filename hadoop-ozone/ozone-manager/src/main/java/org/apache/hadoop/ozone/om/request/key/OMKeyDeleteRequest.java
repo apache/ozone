@@ -22,6 +22,7 @@ import java.io.IOException;
 import java.nio.file.InvalidPathException;
 import java.util.Map;
 
+import org.apache.hadoop.ozone.om.OMPerformanceMetrics;
 import org.apache.ratis.server.protocol.TermIndex;
 import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
@@ -115,7 +116,7 @@ public class OMKeyDeleteRequest extends OMKeyRequest {
 
     OMMetrics omMetrics = ozoneManager.getMetrics();
     omMetrics.incNumKeyDeletes();
-
+    OMPerformanceMetrics perfMetrics = ozoneManager.getPerfMetrics();
     AuditLogger auditLogger = ozoneManager.getAuditLogger();
     OzoneManagerProtocolProtos.UserInfo userInfo = getOmRequest().getUserInfo();
 
@@ -126,7 +127,7 @@ public class OMKeyDeleteRequest extends OMKeyRequest {
     boolean acquiredLock = false;
     OMClientResponse omClientResponse = null;
     Result result = null;
-
+    long startNanos = Time.monotonicNowNanos();
     try {
       String objectKey =
           omMetadataManager.getOzoneKey(volumeName, bucketName, keyName);
@@ -186,18 +187,20 @@ public class OMKeyDeleteRequest extends OMKeyRequest {
         omClientResponse.setOmLockDetails(getOmLockDetails());
       }
     }
-
+    long endNanos = Time.monotonicNowNanos();
     // Performing audit logging outside of the lock.
     auditLog(auditLogger,
         buildAuditMessage(OMAction.DELETE_KEY, auditMap, exception, userInfo));
 
     switch (result) {
     case SUCCESS:
+      perfMetrics.setDeleteKeySuccessLatencyNs(endNanos - startNanos);
       omMetrics.decNumKeys();
       LOG.debug("Key deleted. Volume:{}, Bucket:{}, Key:{}", volumeName,
           bucketName, keyName);
       break;
     case FAILURE:
+      perfMetrics.setDeleteKeyFailureLatencyNs(endNanos - startNanos);
       omMetrics.incNumKeyDeleteFails();
       LOG.error("Key delete failed. Volume:{}, Bucket:{}, Key:{}.", volumeName,
           bucketName, keyName, exception);

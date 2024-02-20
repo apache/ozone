@@ -119,6 +119,13 @@ public class OMPerformanceMetrics {
   @Metric(about = "resolveBucketLink latency in listKeys")
   private MutableRate listKeysResolveBucketLatencyNs;
 
+  @Metric(about = "deleteKeyFailure latency in nano seconds")
+  private MutableRate deleteKeyFailureLatencyNs;
+
+  @Metric(about = "deleteKeySuccess latency in nano seconds")
+  private MutableRate deleteKeySuccessLatencyNs;
+
+
   public void addLookupLatency(long latencyInNs) {
     lookupLatencyNs.add(latencyInNs);
   }
@@ -222,5 +229,13 @@ public class OMPerformanceMetrics {
 
   public MutableRate getListKeysResolveBucketLatencyNs() {
     return listKeysResolveBucketLatencyNs;
+  }
+
+  public void setDeleteKeyFailureLatencyNs(long latencyInNs) {
+    deleteKeyFailureLatencyNs.add(latencyInNs);
+  }
+
+  public void setDeleteKeySuccessLatencyNs(long latencyInNs) {
+    deleteKeySuccessLatencyNs.add(latencyInNs);
   }
 }
