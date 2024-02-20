@@ -58,6 +58,7 @@ import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.OPEN_FILE_TABLE;
 import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.OPEN_KEY_TABLE;
 import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.DELETED_TABLE;
+import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.DELETED_DIR_TABLE;
 import static org.apache.hadoop.ozone.recon.ReconConstants.DEFAULT_FETCH_COUNT;
 import static org.apache.hadoop.ozone.recon.ReconConstants.RECON_QUERY_LIMIT;
 import static org.apache.hadoop.ozone.recon.ReconConstants.RECON_QUERY_PREVKEY;
@@ -650,6 +651,36 @@ public class OMDBInsightEndpoint {
     getPendingForDeletionDirInfo(limit, prevKey,
         deletedDirInsightInfo);
     return Response.ok(deletedDirInsightInfo).build();
+  }
+
+  /**
+   * Retrieves the summary of deleted directories.
+   *
+   * This method calculates and returns a summary of deleted directories.
+   * @return The HTTP  response body includes a map with the following entries:
+   * - "totalDeletedDirectories": the total number of deleted directories
+   *
+   * Example response:
+   *   {
+   *    "totalDeletedDirectories": 8,
+   *   }
+   */
+  @GET
+  @Path("/deletePending/dirs/summary")
+  public Response getDeletedDirectorySummary() {
+    Map<String, Long> dirSummary = new HashMap<>();
+    // Create a keys summary for deleted directories
+    createSummaryForDeletedDirectories(dirSummary);
+    return Response.ok(dirSummary).build();
+  }
+
+  private void createSummaryForDeletedDirectories(
+      Map<String, Long> dirSummary) {
+    // Fetch the necessary metrics for deleted directories.
+    Long deletedDirCount = getValueFromId(globalStatsDao.findById(
+        OmTableInsightTask.getTableCountKeyFromTable(DELETED_DIR_TABLE)));
+    // Calculate the total number of deleted directories
+    dirSummary.put("totalDeletedDirectories", deletedDirCount);
   }
 
   private void updateReplicatedAndUnReplicatedTotal(

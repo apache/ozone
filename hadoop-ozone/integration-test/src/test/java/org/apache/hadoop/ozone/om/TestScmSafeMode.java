@@ -17,6 +17,12 @@
  */
 package org.apache.hadoop.ozone.om;
 
+import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
+import org.apache.hadoop.fs.FSDataOutputStream;
+import org.apache.hadoop.fs.FileSystem;
+import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.fs.SafeMode;
+import org.apache.hadoop.fs.SafeModeAction;
 import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.hdds.HddsConfigKeys;
@@ -55,11 +61,17 @@ import java.io.IOException;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.TimeoutException;
 
+import static java.util.concurrent.TimeUnit.MILLISECONDS;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_HEARTBEAT_INTERVAL;
 import static org.apache.hadoop.hdds.client.ReplicationType.RATIS;
 import static org.apache.hadoop.hdds.client.ReplicationFactor.ONE;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_DEADNODE_INTERVAL;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HEARTBEAT_PROCESS_INTERVAL;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_STALENODE_INTERVAL;
+import static org.apache.hadoop.ozone.OzoneConsts.OZONE_OFS_URI_SCHEME;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ADDRESS_KEY;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -97,9 +109,9 @@ public class TestScmSafeMode {
     conf = new OzoneConfiguration();
     conf.set(OZONE_SCM_STALENODE_INTERVAL, "10s");
     conf.set(OZONE_SCM_DEADNODE_INTERVAL, "25s");
+    conf.setTimeDuration(HDDS_HEARTBEAT_INTERVAL, 1000, MILLISECONDS);
+    conf.setTimeDuration(OZONE_SCM_HEARTBEAT_PROCESS_INTERVAL, 500, MILLISECONDS);
     builder = MiniOzoneCluster.newBuilder(conf)
-        .setHbInterval(1000)
-        .setHbProcessorInterval(500)
         .setStartDataNodes(false);
     cluster = builder.build();
     cluster.startHddsDatanodes();
@@ -323,8 +335,6 @@ public class TestScmSafeMode {
     conf.setBoolean(HddsConfigKeys.HDDS_SCM_SAFEMODE_ENABLED, false);
     conf.setInt(HddsConfigKeys.HDDS_SCM_SAFEMODE_MIN_DATANODE, 3);
     builder = MiniOzoneCluster.newBuilder(conf)
-        .setHbInterval(1000)
-        .setHbProcessorInterval(500)
         .setNumDatanodes(3);
     cluster = builder.build();
     StorageContainerManager scm = cluster.getStorageContainerManager();
@@ -333,5 +343,50 @@ public class TestScmSafeMode {
     // Even on SCM restart, cluster should be out of safe mode immediately.
     cluster.restartStorageContainerManager(true);
     assertFalse(scm.isInSafeMode());
+  }
+
+  @Test
+  public void testCreateRetryWhileSCMSafeMode() throws Exception {
+    // Test1: Test safe mode  when there are no containers in system.
+    cluster.stop();
+
+    try {
+      cluster = builder.build();
+    } catch (IOException e) {
+      fail("Cluster startup failed.");
+    }
+
+    final String rootPath = String.format("%s://%s/",
+        OZONE_OFS_URI_SCHEME, conf.get(OZONE_OM_ADDRESS_KEY));
+    conf.set(CommonConfigurationKeysPublic.FS_DEFAULT_NAME_KEY, rootPath);
+    OMMetrics omMetrics = cluster.getOzoneManager().getMetrics();
+    long allocateBlockReqCount = omMetrics.getNumBlockAllocateFails();
+
+    try (FileSystem fs = FileSystem.get(conf)) {
+      assertTrue(((SafeMode)fs).setSafeMode(SafeModeAction.GET));
+
+      Thread t = new Thread(() -> {
+        try {
+          LOG.info("Wait for allocate block fails at least once");
+          GenericTestUtils.waitFor(() -> omMetrics.getNumBlockAllocateFails() > allocateBlockReqCount,
+              100, 10000);
+
+          cluster.startHddsDatanodes();
+          cluster.waitForClusterToBeReady();
+          cluster.waitTobeOutOfSafeMode();
+        } catch (InterruptedException | TimeoutException e) {
+          throw new RuntimeException(e);
+        }
+      });
+      t.start();
+
+      final Path file = new Path("file");
+      try (FSDataOutputStream outputStream = fs.create(file, true)) {
+        LOG.info("Successfully created a file");
+      }
+      t.join();
+    }
+
+    assertFalse(cluster.getStorageContainerManager().isInSafeMode());
   }
 }

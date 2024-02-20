@@ -38,5 +38,7 @@ updates:
     directory: "/"
     schedule:
       interval: "weekly"
+      day: "saturday"
+      time: "07:00" # UTC
     pull-request-branch-name:
       separator: "-"
