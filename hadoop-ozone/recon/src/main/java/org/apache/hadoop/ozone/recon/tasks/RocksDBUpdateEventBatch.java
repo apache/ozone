@@ -26,9 +26,9 @@ import java.util.List;
  */
 public class OMUpdateEventBatch {
 
-  private final List<OMDBUpdateEvent> events;
+  private final List<RocksDBUpdateEvent> events;
 
-  public OMUpdateEventBatch(List<OMDBUpdateEvent> e) {
+  public OMUpdateEventBatch(List<RocksDBUpdateEvent> e) {
     events = e;
   }
 
@@ -48,7 +48,7 @@ public class OMUpdateEventBatch {
    * Return iterator to Event batch.
    * @return iterator
    */
-  public Iterator<OMDBUpdateEvent> getIterator() {
+  public Iterator<RocksDBUpdateEvent> getIterator() {
     return events.iterator();
   }
 
