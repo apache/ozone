@@ -144,27 +144,27 @@ public class FileSizeCountTask implements ReconOmTask {
    * @return Pair
    */
   @Override
-  public Pair<String, Boolean> process(OMUpdateEventBatch events) {
-    Iterator<OMDBUpdateEvent> eventIterator = events.getIterator();
+  public Pair<String, Boolean> process(RocksDBUpdateEventBatch events) {
+    Iterator<RocksDBUpdateEvent> eventIterator = events.getIterator();
     Map<FileSizeCountKey, Long> fileSizeCountMap = new HashMap<>();
     final Collection<String> taskTables = getTaskTables();
 
     while (eventIterator.hasNext()) {
-      OMDBUpdateEvent<String, Object> omdbUpdateEvent = eventIterator.next();
+      RocksDBUpdateEvent<String, Object> rocksDBUpdateEvent = eventIterator.next();
       // Filter event inside process method to avoid duping
-      if (!taskTables.contains(omdbUpdateEvent.getTable())) {
+      if (!taskTables.contains(rocksDBUpdateEvent.getTable())) {
         continue;
       }
-      String updatedKey = omdbUpdateEvent.getKey();
-      Object value = omdbUpdateEvent.getValue();
-      Object oldValue = omdbUpdateEvent.getOldValue();
+      String updatedKey = rocksDBUpdateEvent.getKey();
+      Object value = rocksDBUpdateEvent.getValue();
+      Object oldValue = rocksDBUpdateEvent.getOldValue();
 
       if (value instanceof OmKeyInfo) {
         OmKeyInfo omKeyInfo = (OmKeyInfo) value;
         OmKeyInfo omKeyInfoOld = (OmKeyInfo) oldValue;
 
         try {
-          switch (omdbUpdateEvent.getAction()) {
+          switch (rocksDBUpdateEvent.getAction()) {
           case PUT:
             handlePutKeyEvent(omKeyInfo, fileSizeCountMap);
             break;
@@ -185,7 +185,7 @@ public class FileSizeCountTask implements ReconOmTask {
 
           default:
             LOG.trace("Skipping DB update event : {}",
-                omdbUpdateEvent.getAction());
+                rocksDBUpdateEvent.getAction());
           }
         } catch (Exception e) {
           LOG.error("Unexpected exception while processing key {}.",

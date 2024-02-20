@@ -24,6 +24,7 @@ import com.google.inject.Singleton;
 import com.google.inject.multibindings.Multibinder;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.scm.metadata.SCMMetadataStore;
 import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocol;
 import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
@@ -37,6 +38,9 @@ import org.apache.hadoop.ozone.recon.persistence.DataSourceConfiguration;
 import org.apache.hadoop.ozone.recon.persistence.JooqPersistenceModule;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 import org.apache.hadoop.ozone.recon.recovery.ReconOmMetadataManagerImpl;
+import org.apache.hadoop.ozone.recon.scm.ReconSCMMetadataProcessingTask;
+import org.apache.hadoop.ozone.recon.scm.ReconScmMetadataManager;
+import org.apache.hadoop.ozone.recon.scm.ReconScmMetadataManagerImpl;
 import org.apache.hadoop.ozone.recon.scm.ReconStorageConfig;
 import org.apache.hadoop.ozone.recon.scm.ReconStorageContainerManagerFacade;
 import org.apache.hadoop.ozone.recon.spi.OzoneManagerServiceProvider;
@@ -49,6 +53,7 @@ import org.apache.hadoop.ozone.recon.spi.impl.ReconDBProvider;
 import org.apache.hadoop.ozone.recon.spi.impl.ReconNamespaceSummaryManagerImpl;
 import org.apache.hadoop.ozone.recon.spi.impl.StorageContainerServiceProviderImpl;
 import org.apache.hadoop.ozone.recon.tasks.ContainerKeyMapperTask;
+import org.apache.hadoop.ozone.recon.tasks.ContainerStatsTask;
 import org.apache.hadoop.ozone.recon.tasks.FileSizeCountTask;
 import org.apache.hadoop.ozone.recon.tasks.NSSummaryTask;
 import org.apache.hadoop.ozone.recon.tasks.ReconOmTask;
@@ -87,6 +92,7 @@ public class ReconControllerModule extends AbstractModule {
 
   @Override
   protected void configure() {
+    bind(ReconUtils.class).in(Singleton.class);
     bind(OzoneConfiguration.class).toProvider(ConfigurationProvider.class);
     bind(ReconHttpServer.class).in(Singleton.class);
     bind(ReconStorageConfig.class).in(Singleton.class);
@@ -94,6 +100,9 @@ public class ReconControllerModule extends AbstractModule {
     bind(ReconOMMetadataManager.class)
         .to(ReconOmMetadataManagerImpl.class);
     bind(OMMetadataManager.class).to(ReconOmMetadataManagerImpl.class);
+    bind(ReconScmMetadataManager.class)
+        .to(ReconScmMetadataManagerImpl.class);
+    bind(SCMMetadataStore.class).to(ReconScmMetadataManagerImpl.class);
 
     bind(ContainerHealthSchemaManager.class).in(Singleton.class);
     bind(ReconContainerMetadataManager.class)
@@ -102,12 +111,13 @@ public class ReconControllerModule extends AbstractModule {
         .to(ReconNamespaceSummaryManagerImpl.class).in(Singleton.class);
     bind(OzoneManagerServiceProvider.class)
         .to(OzoneManagerServiceProviderImpl.class).in(Singleton.class);
-    bind(ReconUtils.class).in(Singleton.class);
+
     // Persistence - inject configuration provider
     install(new JooqPersistenceModule(
         getProvider(DataSourceConfiguration.class)));
 
     install(new ReconOmTaskBindingModule());
+    install(new ReconSCMMetadataTaskBindingModule());
     install(new ReconDaoBindingModule());
 
     bind(ReconTaskController.class)
@@ -132,6 +142,16 @@ public class ReconControllerModule extends AbstractModule {
       taskBinder.addBinding().to(NSSummaryTask.class);
     }
   }
+
+  static class ReconSCMMetadataTaskBindingModule extends AbstractModule {
+    @Override
+    protected void configure() {
+      Multibinder<ReconSCMMetadataProcessingTask> taskBinder =
+          Multibinder.newSetBinder(binder(), ReconSCMMetadataProcessingTask.class);
+      taskBinder.addBinding().to(ContainerStatsTask.class);
+    }
+  }
+
 
   /**
    * Class that has all the DAO bindings in Recon.

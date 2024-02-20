@@ -23,6 +23,7 @@ import java.util.Map;
 import java.util.UUID;
 
 import org.apache.hadoop.hdds.annotation.InterfaceStability;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.hdds.utils.db.RDBBatchOperation;
 import org.apache.hadoop.hdds.utils.db.Table;
@@ -260,4 +261,28 @@ public interface ReconContainerMetadataManager {
    */
   Map<KeyPrefixContainer, Integer> getContainerForKeyPrefixes(
       String prevKeyPrefix, long keyVersion) throws IOException;
+
+  /**
+   * Store the total count of deleted containers into the sql DB GlobalStats table.
+   *
+   * @param containerCountMap count of the various container states to be
+   *                          inserted/updated in GlobalStats table.
+   * @return return true if insert/update operation is successful else false.
+   */
+  boolean storeContainerStatesStats(Map<HddsProtos.LifeCycleState, Long> containerCountMap);
+
+  /**
+   * Get the total count of containers for a give state present in the global stats table.
+   *
+   * @return total count of containers.
+   * @throws IOException
+   */
+  long getCountForContainers(HddsProtos.LifeCycleState state) throws IOException;
+
+  /**
+   * Removes existing stats related to container states of all containers.
+   *
+   * @return return true if clear stats operation is successful else false.
+   */
+  boolean clearContainerStats();
 }

@@ -17,6 +17,7 @@
 package org.apache.hadoop.hdds.scm.protocolPB;
 
 import com.google.common.base.Preconditions;
+import com.google.protobuf.ByteString;
 import com.google.protobuf.RpcController;
 import com.google.protobuf.ServiceException;
 import org.apache.commons.lang3.tuple.Pair;
@@ -117,6 +118,7 @@ import org.apache.hadoop.ipc.ProtobufHelper;
 import org.apache.hadoop.ipc.ProtocolTranslator;
 import org.apache.hadoop.ipc.RPC;
 import org.apache.hadoop.ozone.ClientVersion;
+import org.apache.hadoop.ozone.common.DBUpdates;
 import org.apache.hadoop.ozone.upgrade.UpgradeFinalizer;
 import org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.StatusAndMessages;
 import org.apache.hadoop.security.token.Token;
@@ -1142,5 +1144,32 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
             builder -> builder.setDecommissionScmRequest(request))
                 .getDecommissionScmResponse();
     return response;
+  }
+
+  /**
+   * Get DB updates since a specific sequence number.
+   *
+   * @param dbUpdatesRequest request that encapsulates a sequence number.
+   * @return Wrapper containing the updates.
+   */
+  @Override
+  public DBUpdates getDBUpdates(StorageContainerLocationProtocolProtos.DBUpdatesRequestProto dbUpdatesRequest)
+      throws IOException {
+
+    StorageContainerLocationProtocolProtos.DBUpdatesResponseProto dbUpdatesResponse =
+        submitRequest(Type.DBUpdates,
+            builder -> builder.setDbUpdatesRequest(dbUpdatesRequest))
+            .getDbUpdatesResponse();
+
+    DBUpdates dbUpdatesWrapper = new DBUpdates();
+    for (ByteString byteString : dbUpdatesResponse.getDataList()) {
+      dbUpdatesWrapper.addWriteBatch(byteString.toByteArray(), 0L);
+    }
+    dbUpdatesWrapper.setCurrentSequenceNumber(
+        dbUpdatesResponse.getSequenceNumber());
+    dbUpdatesWrapper.setLatestSequenceNumber(
+        dbUpdatesResponse.getLatestSequenceNumber());
+    dbUpdatesWrapper.setDBUpdateSuccess(dbUpdatesResponse.getDbUpdateSuccess());
+    return dbUpdatesWrapper;
   }
 }

@@ -75,6 +75,7 @@ import org.apache.hadoop.hdds.scm.protocolPB.StorageContainerLocationProtocolPB;
 import org.apache.hadoop.hdds.security.SecurityConfig;
 import org.apache.hadoop.hdds.utils.HddsServerUtil;
 import org.apache.hadoop.hdds.utils.ProtocolMessageMetrics;
+import org.apache.hadoop.hdds.utils.db.DBUpdatesWrapper;
 import org.apache.hadoop.io.IOUtils;
 import org.apache.hadoop.ipc.ProtobufRpcEngine;
 import org.apache.hadoop.ipc.RPC;
@@ -87,6 +88,7 @@ import org.apache.hadoop.ozone.audit.AuditLoggerType;
 import org.apache.hadoop.ozone.audit.AuditMessage;
 import org.apache.hadoop.ozone.audit.Auditor;
 import org.apache.hadoop.ozone.audit.SCMAction;
+import org.apache.hadoop.ozone.common.DBUpdates;
 import org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.StatusAndMessages;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.token.Token;
@@ -1372,5 +1374,28 @@ public class SCMClientProtocolServer implements
           .setErrorMsg(ex.getMessage());
     }
     return decommissionScmResponseBuilder.build();
+  }
+
+  /**
+   * Get DB updates since a specific sequence number.
+   *
+   * @param dbUpdatesRequest request that encapsulates a sequence number.
+   * @return Wrapper containing the updates.
+   */
+  @Override
+  public DBUpdates getDBUpdates(
+      StorageContainerLocationProtocolProtos.DBUpdatesRequestProto dbUpdatesRequest)
+      throws IOException {
+    long limitCount = Long.MAX_VALUE;
+    if (dbUpdatesRequest.hasLimitCount()) {
+      limitCount = dbUpdatesRequest.getLimitCount();
+    }
+    DBUpdatesWrapper updatesSince = scm.getScmMetadataStore().getStore()
+        .getUpdatesSince(dbUpdatesRequest.getSequenceNumber(), limitCount);
+    DBUpdates dbUpdates = new DBUpdates(updatesSince.getData());
+    dbUpdates.setCurrentSequenceNumber(updatesSince.getCurrentSequenceNumber());
+    dbUpdates.setLatestSequenceNumber(updatesSince.getLatestSequenceNumber());
+    dbUpdates.setDBUpdateSuccess(updatesSince.isDBUpdateSuccess());
+    return dbUpdates;
   }
 }

@@ -63,10 +63,14 @@ import org.apache.ratis.util.ExitUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import javax.inject.Inject;
+import javax.inject.Singleton;
+
 /**
  * A RocksDB based implementation of SCM Metadata Store.
  *
  */
+@Singleton
 public class SCMMetadataStoreImpl implements SCMMetadataStore {
 
   private Table<Long, DeletedBlocksTransaction> deletedBlocksTable;
@@ -110,10 +114,15 @@ public class SCMMetadataStoreImpl implements SCMMetadataStore {
    * @param config - Ozone Configuration.
    * @throws IOException - on Failure.
    */
+  @Inject
   public SCMMetadataStoreImpl(OzoneConfiguration config)
       throws IOException {
     this.configuration = config;
     start(this.configuration);
+  }
+
+  public SCMMetadataStoreImpl() {
+    this.configuration = new OzoneConfiguration();
   }
 
   @Override
@@ -139,64 +148,73 @@ public class SCMMetadataStoreImpl implements SCMMetadataStore {
 
       this.store = DBStoreBuilder.createDBStore(config, scmdbDefinition);
 
-      deletedBlocksTable =
-          DELETED_BLOCKS.getTable(this.store);
-
-      checkAndPopulateTable(deletedBlocksTable, DELETED_BLOCKS.getName());
-
-      validCertsTable = VALID_CERTS.getTable(store);
-
-      checkAndPopulateTable(validCertsTable, VALID_CERTS.getName());
-
-      validSCMCertsTable = VALID_SCM_CERTS.getTable(store);
-
-      checkAndPopulateTable(validSCMCertsTable, VALID_SCM_CERTS.getName());
-
-      revokedCertsTable = REVOKED_CERTS.getTable(store);
-
-      checkAndPopulateTable(revokedCertsTable, REVOKED_CERTS.getName());
-
-      revokedCertsV2Table = REVOKED_CERTS_V2.getTable(store);
-
-      checkAndPopulateTable(revokedCertsV2Table, REVOKED_CERTS_V2.getName());
-
-      pipelineTable = PIPELINES.getTable(store);
-
-      checkAndPopulateTable(pipelineTable, PIPELINES.getName());
-
-      containerTable = CONTAINERS.getTable(store);
-
-      checkAndPopulateTable(containerTable, CONTAINERS.getName());
-
-      transactionInfoTable = TRANSACTIONINFO.getTable(store);
-
-      checkAndPopulateTable(transactionInfoTable, TRANSACTIONINFO.getName());
-
-      crlInfoTable = CRLS.getTable(store);
-
-      checkAndPopulateTable(crlInfoTable, CRLS.getName());
-
-      crlSequenceIdTable = CRL_SEQUENCE_ID.getTable(store);
-
-      checkAndPopulateTable(crlInfoTable, CRL_SEQUENCE_ID.getName());
-
-      sequenceIdTable = SEQUENCE_ID.getTable(store);
-
-      checkAndPopulateTable(sequenceIdTable, SEQUENCE_ID.getName());
-
-      moveTable = MOVE.getTable(store);
-
-      checkAndPopulateTable(moveTable, MOVE.getName());
-
-      metaTable = META.getTable(store);
-
-      checkAndPopulateTable(metaTable, META.getName());
-
-      statefulServiceConfigTable = STATEFUL_SERVICE_CONFIG.getTable(store);
-
-      checkAndPopulateTable(statefulServiceConfigTable,
-          STATEFUL_SERVICE_CONFIG.getName());
+      initializeScmTables();
     }
+  }
+
+  /**
+   * Initialize SCM metadata rocksDB Tables.
+   *
+   * @throws IOException
+   */
+  protected void initializeScmTables() throws IOException {
+    deletedBlocksTable =
+        DELETED_BLOCKS.getTable(this.store);
+
+    checkAndPopulateTable(deletedBlocksTable, DELETED_BLOCKS.getName());
+
+    validCertsTable = VALID_CERTS.getTable(store);
+
+    checkAndPopulateTable(validCertsTable, VALID_CERTS.getName());
+
+    validSCMCertsTable = VALID_SCM_CERTS.getTable(store);
+
+    checkAndPopulateTable(validSCMCertsTable, VALID_SCM_CERTS.getName());
+
+    revokedCertsTable = REVOKED_CERTS.getTable(store);
+
+    checkAndPopulateTable(revokedCertsTable, REVOKED_CERTS.getName());
+
+    revokedCertsV2Table = REVOKED_CERTS_V2.getTable(store);
+
+    checkAndPopulateTable(revokedCertsV2Table, REVOKED_CERTS_V2.getName());
+
+    pipelineTable = PIPELINES.getTable(store);
+
+    checkAndPopulateTable(pipelineTable, PIPELINES.getName());
+
+    containerTable = CONTAINERS.getTable(store);
+
+    checkAndPopulateTable(containerTable, CONTAINERS.getName());
+
+    transactionInfoTable = TRANSACTIONINFO.getTable(store);
+
+    checkAndPopulateTable(transactionInfoTable, TRANSACTIONINFO.getName());
+
+    crlInfoTable = CRLS.getTable(store);
+
+    checkAndPopulateTable(crlInfoTable, CRLS.getName());
+
+    crlSequenceIdTable = CRL_SEQUENCE_ID.getTable(store);
+
+    checkAndPopulateTable(crlInfoTable, CRL_SEQUENCE_ID.getName());
+
+    sequenceIdTable = SEQUENCE_ID.getTable(store);
+
+    checkAndPopulateTable(sequenceIdTable, SEQUENCE_ID.getName());
+
+    moveTable = MOVE.getTable(store);
+
+    checkAndPopulateTable(moveTable, MOVE.getName());
+
+    metaTable = META.getTable(store);
+
+    checkAndPopulateTable(metaTable, META.getName());
+
+    statefulServiceConfigTable = STATEFUL_SERVICE_CONFIG.getTable(store);
+
+    checkAndPopulateTable(statefulServiceConfigTable,
+        STATEFUL_SERVICE_CONFIG.getName());
   }
 
   @Override
@@ -210,6 +228,15 @@ public class SCMMetadataStoreImpl implements SCMMetadataStore {
   @Override
   public DBStore getStore() {
     return this.store;
+  }
+
+  /**
+   * Update store used by subclass.
+   *
+   * @param store DB store.
+   */
+  protected void setStore(DBStore store) {
+    this.store = store;
   }
 
   @Override
@@ -324,7 +351,7 @@ public class SCMMetadataStoreImpl implements SCMMetadataStore {
     tableMap.put(name, table);
   }
 
-  Map<String, Table<?, ?>> getTableMap() {
+  public Map<String, Table<?, ?>> getTableMap() {
     return tableMap;
   }
 }

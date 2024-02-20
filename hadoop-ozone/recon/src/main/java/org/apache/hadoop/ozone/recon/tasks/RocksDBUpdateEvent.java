@@ -21,26 +21,26 @@ package org.apache.hadoop.ozone.recon.tasks;
 import java.util.Objects;
 
 /**
- * A class used to encapsulate a single OM DB update event.
+ * A class used to encapsulate a single OM and SCM DB update event.
  * Currently PUT, DELETE and UPDATE are supported.
  * @param <KEY> Type of Key.
  * @param <VALUE> Type of Value.
  */
-public final class OMDBUpdateEvent<KEY, VALUE> {
+public final class RocksDBUpdateEvent<KEY, VALUE> {
 
-  private final OMDBUpdateAction action;
+  private final RocksDBUpdateAction action;
   private final String table;
   private final KEY updatedKey;
   private final VALUE updatedValue;
   private final VALUE oldValue;
   private final long sequenceNumber;
 
-  private OMDBUpdateEvent(OMDBUpdateAction action,
-                          String table,
-                          KEY updatedKey,
-                          VALUE updatedValue,
-                          VALUE oldValue,
-                          long sequenceNumber) {
+  private RocksDBUpdateEvent(RocksDBUpdateAction action,
+                             String table,
+                             KEY updatedKey,
+                             VALUE updatedValue,
+                             VALUE oldValue,
+                             long sequenceNumber) {
     this.action = action;
     this.table = table;
     this.updatedKey = updatedKey;
@@ -49,7 +49,7 @@ public final class OMDBUpdateEvent<KEY, VALUE> {
     this.sequenceNumber = sequenceNumber;
   }
 
-  public OMDBUpdateAction getAction() {
+  public RocksDBUpdateAction getAction() {
     return action;
   }
 
@@ -81,7 +81,7 @@ public final class OMDBUpdateEvent<KEY, VALUE> {
     if (o == null || getClass() != o.getClass()) {
       return false;
     }
-    OMDBUpdateEvent that = (OMDBUpdateEvent) o;
+    RocksDBUpdateEvent that = (RocksDBUpdateEvent) o;
     return this.updatedKey.equals(that.updatedKey) &&
         this.table.equals(that.table) &&
         this.action.equals(that.action);
@@ -93,45 +93,45 @@ public final class OMDBUpdateEvent<KEY, VALUE> {
   }
 
   /**
-   * Builder used to construct an OM DB Update event.
+   * Builder used to construct an OM and SCM DB Update event.
    * @param <KEY> Key type.
    * @param <VALUE> Value type.
    */
-  public static class OMUpdateEventBuilder<KEY, VALUE> {
+  public static class RocksDBUpdateEventBuilder<KEY, VALUE> {
 
-    private OMDBUpdateAction action;
+    private RocksDBUpdateAction action;
     private String table;
     private KEY updatedKey;
     private VALUE oldValue;
     private VALUE updatedValue;
     private long lastSequenceNumber;
 
-    OMUpdateEventBuilder setAction(OMDBUpdateAction omdbUpdateAction) {
-      this.action = omdbUpdateAction;
+    public RocksDBUpdateEventBuilder setAction(RocksDBUpdateAction rocksDBUpdateAction) {
+      this.action = rocksDBUpdateAction;
       return this;
     }
 
-    OMUpdateEventBuilder setTable(String tableName) {
+    public RocksDBUpdateEventBuilder setTable(String tableName) {
       this.table = tableName;
       return this;
     }
 
-    OMUpdateEventBuilder setKey(KEY key) {
+    public RocksDBUpdateEventBuilder setKey(KEY key) {
       this.updatedKey = key;
       return this;
     }
 
-    OMUpdateEventBuilder setValue(VALUE value) {
+    public RocksDBUpdateEventBuilder setValue(VALUE value) {
       this.updatedValue = value;
       return this;
     }
 
-    OMUpdateEventBuilder setOldValue(VALUE value) {
+    public RocksDBUpdateEventBuilder setOldValue(VALUE value) {
       this.oldValue = value;
       return this;
     }
 
-    OMUpdateEventBuilder setSequenceNumber(long sequenceNumber) {
+    public RocksDBUpdateEventBuilder setSequenceNumber(long sequenceNumber) {
       this.lastSequenceNumber = sequenceNumber;
       return this;
     }
@@ -140,8 +140,8 @@ public final class OMDBUpdateEvent<KEY, VALUE> {
      * Build an OM update event.
      * @return OMDBUpdateEvent
      */
-    public OMDBUpdateEvent build() {
-      return new OMDBUpdateEvent<KEY, VALUE>(
+    public RocksDBUpdateEvent build() {
+      return new RocksDBUpdateEvent<KEY, VALUE>(
           action,
           table,
           updatedKey,
@@ -154,7 +154,7 @@ public final class OMDBUpdateEvent<KEY, VALUE> {
   /**
    * Supported Actions - PUT, DELETE.
    */
-  public enum OMDBUpdateAction {
+  public enum RocksDBUpdateAction {
     PUT, DELETE, UPDATE
   }
 }

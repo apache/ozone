@@ -98,10 +98,18 @@ public final class  ReconServerConfigKeys {
 
   public static final String RECON_OM_DELTA_UPDATE_LIMIT =
       "recon.om.delta.update.limit";
-  public static final long RECON_OM_DELTA_UPDATE_LIMIT_DEFUALT = 2000;
+  public static final long RECON_OM_DELTA_UPDATE_LIMIT_DEFAULT = 2000;
   public static final String RECON_OM_DELTA_UPDATE_LOOP_LIMIT =
       "recon.om.delta.update.loop.limit";
-  public static final int RECON_OM_DELTA_UPDATE_LOOP_LIMIT_DEFUALT = 10;
+  public static final int RECON_OM_DELTA_UPDATE_LOOP_LIMIT_DEFAULT = 10;
+
+  // Recon SCM DB sync configs
+  public static final String RECON_SCM_DELTA_UPDATE_LIMIT =
+      "recon.scm.delta.update.limit";
+  public static final long RECON_SCM_DELTA_UPDATE_LIMIT_DEFAULT = 2000;
+  public static final String RECON_SCM_DELTA_UPDATE_LOOP_LIMIT =
+      "recon.scm.delta.update.loop.limit";
+  public static final int RECON_SCM_DELTA_UPDATE_LOOP_LIMIT_DEFAULT = 10;
 
   public static final String OZONE_RECON_TASK_THREAD_COUNT_KEY =
       "ozone.recon.task.thread.count";
@@ -157,17 +165,29 @@ public final class  ReconServerConfigKeys {
   public static final long
       OZONE_RECON_CONTAINER_KEY_FLUSH_TO_DB_MAX_THRESHOLD_DEFAULT = 150 * 1000L;
 
+  public static final String OZONE_RECON_SCM_CONTAINER_INFO_SYNC_TASK_INTERVAL_DELAY =
+      "ozone.recon.scm.container.info.sync.task.interval.delay";
+
+  public static final String OZONE_RECON_SCM_CONTAINER_INFO_SYNC_TASK_INTERVAL_DEFAULT
+      = "24h";
+
+  public static final String OZONE_RECON_SCM_CONTAINER_INFO_SYNC_TASK_INITIAL_DELAY =
+      "ozone.recon.scm.snapshot.task.initial.delay";
+
+  public static final String
+      OZONE_RECON_SCM_CONTAINER_INFO_SYNC_TASK_INITIAL_DELAY_DEFAULT = "5m";
+
   public static final String OZONE_RECON_SCM_SNAPSHOT_TASK_INTERVAL_DELAY =
       "ozone.recon.scm.snapshot.task.interval.delay";
 
   public static final String OZONE_RECON_SCM_SNAPSHOT_TASK_INTERVAL_DEFAULT
-      = "24h";
+      = "15m";
 
   public static final String OZONE_RECON_SCM_SNAPSHOT_TASK_INITIAL_DELAY =
       "ozone.recon.scm.snapshot.task.initial.delay";
 
   public static final String
-      OZONE_RECON_SCM_SNAPSHOT_TASK_INITIAL_DELAY_DEFAULT = "1m";
+      OZONE_RECON_SCM_SNAPSHOT_TASK_INITIAL_DELAY_DEFAULT = "2m";
 
   public static final String OZONE_RECON_SCM_CLIENT_RPC_TIME_OUT_KEY =
       "ozone.recon.scmclient.rpc.timeout";

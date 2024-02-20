@@ -89,6 +89,11 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
         </exclusion>
       </exclusions>
     </dependency>
+    <dependency>
+      <groupId>org.glassfish.hk2.external</groupId>
+      <artifactId>jakarta.inject</artifactId>
+      <version>${jakarta.inject.version}</version>
+    </dependency>
 
     <!-- Test dependencies -->
     <dependency>

@@ -42,7 +42,7 @@ public class OpenKeysInsightHandler implements OmTableHandler {
    * been open in the backend.
    */
   @Override
-  public void handlePutEvent(OMDBUpdateEvent<String, Object> event,
+  public void handlePutEvent(RocksDBUpdateEvent<String, Object> event,
                              String tableName,
                              HashMap<String, Long> objectCountMap,
                              HashMap<String, Long> unReplicatedSizeMap,
@@ -70,7 +70,7 @@ public class OpenKeysInsightHandler implements OmTableHandler {
    * no longer closed in the backend.
    */
   @Override
-  public void handleDeleteEvent(OMDBUpdateEvent<String, Object> event,
+  public void handleDeleteEvent(RocksDBUpdateEvent<String, Object> event,
                                 String tableName,
                                 HashMap<String, Long> objectCountMap,
                                 HashMap<String, Long> unReplicatedSizeMap,
@@ -101,7 +101,7 @@ public class OpenKeysInsightHandler implements OmTableHandler {
    * have been updated in the backend.
    */
   @Override
-  public void handleUpdateEvent(OMDBUpdateEvent<String, Object> event,
+  public void handleUpdateEvent(RocksDBUpdateEvent<String, Object> event,
                                 String tableName,
                                 HashMap<String, Long> objectCountMap,
                                 HashMap<String, Long> unReplicatedSizeMap,

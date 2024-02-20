@@ -63,30 +63,30 @@ public class NSSummaryTaskWithFSO extends NSSummaryTaskDbEventHandler {
     return Arrays.asList(FILE_TABLE, DIRECTORY_TABLE);
   }
 
-  public boolean processWithFSO(OMUpdateEventBatch events) {
-    Iterator<OMDBUpdateEvent> eventIterator = events.getIterator();
+  public boolean processWithFSO(RocksDBUpdateEventBatch events) {
+    Iterator<RocksDBUpdateEvent> eventIterator = events.getIterator();
     final Collection<String> taskTables = getTaskTables();
     Map<Long, NSSummary> nsSummaryMap = new HashMap<>();
 
     while (eventIterator.hasNext()) {
-      OMDBUpdateEvent<String, ? extends
-              WithParentObjectId> omdbUpdateEvent = eventIterator.next();
-      OMDBUpdateEvent.OMDBUpdateAction action = omdbUpdateEvent.getAction();
+      RocksDBUpdateEvent<String, ? extends
+                    WithParentObjectId> rocksDBUpdateEvent = eventIterator.next();
+      RocksDBUpdateEvent.RocksDBUpdateAction action = rocksDBUpdateEvent.getAction();
 
       // we only process updates on OM's FileTable and Dirtable
-      String table = omdbUpdateEvent.getTable();
+      String table = rocksDBUpdateEvent.getTable();
       boolean updateOnFileTable = table.equals(FILE_TABLE);
       if (!taskTables.contains(table)) {
         continue;
       }
 
-      String updatedKey = omdbUpdateEvent.getKey();
+      String updatedKey = rocksDBUpdateEvent.getKey();
 
       try {
         if (updateOnFileTable) {
           // key update on fileTable
-          OMDBUpdateEvent<String, OmKeyInfo> keyTableUpdateEvent =
-                  (OMDBUpdateEvent<String, OmKeyInfo>) omdbUpdateEvent;
+          RocksDBUpdateEvent<String, OmKeyInfo> keyTableUpdateEvent =
+                  (RocksDBUpdateEvent<String, OmKeyInfo>) rocksDBUpdateEvent;
           OmKeyInfo updatedKeyInfo = keyTableUpdateEvent.getValue();
           OmKeyInfo oldKeyInfo = keyTableUpdateEvent.getOldValue();
 
@@ -112,13 +112,13 @@ public class NSSummaryTaskWithFSO extends NSSummaryTaskDbEventHandler {
 
           default:
             LOG.debug("Skipping DB update event : {}",
-                    omdbUpdateEvent.getAction());
+                    rocksDBUpdateEvent.getAction());
           }
 
         } else {
           // directory update on DirTable
-          OMDBUpdateEvent<String, OmDirectoryInfo> dirTableUpdateEvent =
-                  (OMDBUpdateEvent<String, OmDirectoryInfo>) omdbUpdateEvent;
+          RocksDBUpdateEvent<String, OmDirectoryInfo> dirTableUpdateEvent =
+                  (RocksDBUpdateEvent<String, OmDirectoryInfo>) rocksDBUpdateEvent;
           OmDirectoryInfo updatedDirectoryInfo = dirTableUpdateEvent.getValue();
           OmDirectoryInfo oldDirectoryInfo = dirTableUpdateEvent.getOldValue();
 
@@ -144,7 +144,7 @@ public class NSSummaryTaskWithFSO extends NSSummaryTaskDbEventHandler {
 
           default:
             LOG.debug("Skipping DB update event : {}",
-                    omdbUpdateEvent.getAction());
+                    rocksDBUpdateEvent.getAction());
           }
         }
       } catch (IOException ioEx) {

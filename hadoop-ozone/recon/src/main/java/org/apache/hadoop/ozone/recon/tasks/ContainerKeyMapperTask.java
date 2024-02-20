@@ -192,8 +192,8 @@ public class ContainerKeyMapperTask implements ReconOmTask {
   }
 
   @Override
-  public Pair<String, Boolean> process(OMUpdateEventBatch events) {
-    Iterator<OMDBUpdateEvent> eventIterator = events.getIterator();
+  public Pair<String, Boolean> process(RocksDBUpdateEventBatch events) {
+    Iterator<RocksDBUpdateEvent> eventIterator = events.getIterator();
     int eventCount = 0;
     final Collection<String> taskTables = getTaskTables();
 
@@ -210,15 +210,15 @@ public class ContainerKeyMapperTask implements ReconOmTask {
     List<ContainerKeyPrefix> deletedKeyCountList = new ArrayList<>();
 
     while (eventIterator.hasNext()) {
-      OMDBUpdateEvent<String, OmKeyInfo> omdbUpdateEvent = eventIterator.next();
+      RocksDBUpdateEvent<String, OmKeyInfo> rocksDBUpdateEvent = eventIterator.next();
       // Filter event inside process method to avoid duping
-      if (!taskTables.contains(omdbUpdateEvent.getTable())) {
+      if (!taskTables.contains(rocksDBUpdateEvent.getTable())) {
         continue;
       }
-      String updatedKey = omdbUpdateEvent.getKey();
-      OmKeyInfo updatedKeyValue = omdbUpdateEvent.getValue();
+      String updatedKey = rocksDBUpdateEvent.getKey();
+      OmKeyInfo updatedKeyValue = rocksDBUpdateEvent.getValue();
       try {
-        switch (omdbUpdateEvent.getAction()) {
+        switch (rocksDBUpdateEvent.getAction()) {
         case PUT:
           handlePutOMKeyEvent(updatedKey, updatedKeyValue, containerKeyMap,
               containerKeyCountMap, deletedKeyCountList);
@@ -230,9 +230,9 @@ public class ContainerKeyMapperTask implements ReconOmTask {
           break;
 
         case UPDATE:
-          if (omdbUpdateEvent.getOldValue() != null) {
+          if (rocksDBUpdateEvent.getOldValue() != null) {
             handleDeleteOMKeyEvent(
-                omdbUpdateEvent.getOldValue().getKeyName(), containerKeyMap,
+                rocksDBUpdateEvent.getOldValue().getKeyName(), containerKeyMap,
                 containerKeyCountMap, deletedKeyCountList);
           } else {
             LOG.warn("Update event does not have the old Key Info for {}.",
@@ -243,7 +243,7 @@ public class ContainerKeyMapperTask implements ReconOmTask {
           break;
 
         default: LOG.debug("Skipping DB update event : {}",
-            omdbUpdateEvent.getAction());
+            rocksDBUpdateEvent.getAction());
         }
         eventCount++;
       } catch (IOException e) {

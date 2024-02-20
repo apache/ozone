@@ -22,13 +22,13 @@ import java.util.Iterator;
 import java.util.List;
 
 /**
- * Wrapper class to hold multiple OM DB update events.
+ * Wrapper class to hold multiple RocksDB update events.
  */
-public class OMUpdateEventBatch {
+public class RocksDBUpdateEventBatch {
 
   private final List<RocksDBUpdateEvent> events;
 
-  public OMUpdateEventBatch(List<RocksDBUpdateEvent> e) {
+  public RocksDBUpdateEventBatch(List<RocksDBUpdateEvent> e) {
     events = e;
   }
 

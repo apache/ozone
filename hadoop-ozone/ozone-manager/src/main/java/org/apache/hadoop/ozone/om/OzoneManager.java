@@ -149,7 +149,7 @@ import org.apache.hadoop.ozone.om.exceptions.OMLeaderNotReadyException;
 import org.apache.hadoop.ozone.om.exceptions.OMNotLeaderException;
 import org.apache.hadoop.ozone.om.ha.OMHANodeDetails;
 import org.apache.hadoop.ozone.om.helpers.OMNodeDetails;
-import org.apache.hadoop.ozone.om.helpers.DBUpdates;
+import org.apache.hadoop.ozone.common.DBUpdates;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmDBAccessIdInfo;
 import org.apache.hadoop.ozone.om.helpers.OmDBUserPrincipalInfo;

@@ -32,6 +32,7 @@ import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -45,6 +46,7 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.conf.ReconfigurationHandler;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos;
 import org.apache.hadoop.hdds.scm.PlacementPolicy;
 import org.apache.hadoop.hdds.scm.ScmUtils;
 import org.apache.hadoop.hdds.scm.block.BlockManager;
@@ -82,13 +84,18 @@ import org.apache.hadoop.hdds.server.events.EventQueue;
 import org.apache.hadoop.hdds.server.events.FixedThreadPoolWithAffinityExecutor;
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager;
 import org.apache.hadoop.hdds.utils.IOUtils;
-import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
 import org.apache.hadoop.hdds.utils.db.DBColumnFamilyDefinition;
 import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.utils.db.DBStoreBuilder;
+import org.apache.hadoop.hdds.utils.db.RDBBatchOperation;
+import org.apache.hadoop.hdds.utils.db.RDBStore;
+import org.apache.hadoop.hdds.utils.db.RocksDatabase;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.Table.KeyValue;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedWriteBatch;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedWriteOptions;
+import org.apache.hadoop.ozone.common.DBUpdates;
 import org.apache.hadoop.ozone.recon.ReconServerConfigKeys;
 import org.apache.hadoop.ozone.recon.ReconUtils;
 import org.apache.hadoop.ozone.recon.fsck.ContainerHealthTask;
@@ -96,6 +103,8 @@ import org.apache.hadoop.ozone.recon.fsck.ReconSafeModeMgrTask;
 import org.apache.hadoop.ozone.recon.persistence.ContainerHealthSchemaManager;
 import org.apache.hadoop.ozone.recon.spi.ReconContainerMetadataManager;
 import org.apache.hadoop.ozone.recon.spi.StorageContainerServiceProvider;
+import org.apache.hadoop.ozone.recon.spi.impl.OzoneManagerServiceProviderImpl;
+import org.apache.hadoop.ozone.recon.spi.impl.StorageContainerServiceProviderImpl;
 import org.apache.hadoop.ozone.recon.tasks.ContainerSizeCountTask;
 import org.apache.hadoop.ozone.recon.tasks.ReconTaskConfig;
 import com.google.inject.Inject;
@@ -114,19 +123,31 @@ import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_SC
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_SCM_CLIENT_MAX_RETRY_TIMEOUT_KEY;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_SCM_CLIENT_RPC_TIME_OUT_DEFAULT;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_SCM_CLIENT_RPC_TIME_OUT_KEY;
+import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_SCM_CONTAINER_INFO_SYNC_TASK_INITIAL_DELAY;
+import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_SCM_CONTAINER_INFO_SYNC_TASK_INITIAL_DELAY_DEFAULT;
+import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_SCM_CONTAINER_INFO_SYNC_TASK_INTERVAL_DEFAULT;
+import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_SCM_CONTAINER_INFO_SYNC_TASK_INTERVAL_DELAY;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_SCM_SNAPSHOT_TASK_INITIAL_DELAY;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_SCM_SNAPSHOT_TASK_INITIAL_DELAY_DEFAULT;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_SCM_SNAPSHOT_TASK_INTERVAL_DEFAULT;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_SCM_SNAPSHOT_TASK_INTERVAL_DELAY;
+import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.RECON_SCM_DELTA_UPDATE_LIMIT;
+import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.RECON_SCM_DELTA_UPDATE_LIMIT_DEFAULT;
+import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.RECON_SCM_DELTA_UPDATE_LOOP_LIMIT;
+import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.RECON_SCM_DELTA_UPDATE_LOOP_LIMIT_DEFAULT;
 
 import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher.ContainerReport;
 import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher.ContainerReportFromDatanode;
 import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher.IncrementalContainerReportFromDatanode;
 
+import org.apache.hadoop.ozone.recon.tasks.ReconTaskController;
+import org.apache.hadoop.ozone.recon.tasks.RocksDBUpdateEventBatch;
 import org.apache.ratis.util.ExitUtils;
 import org.hadoop.ozone.recon.schema.UtilizationSchemaDefinition;
 import org.hadoop.ozone.recon.schema.tables.daos.ContainerCountBySizeDao;
 import org.hadoop.ozone.recon.schema.tables.daos.ReconTaskStatusDao;
+import org.hadoop.ozone.recon.schema.tables.pojos.ReconTaskStatus;
+import org.rocksdb.RocksDBException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -167,9 +188,16 @@ public class ReconStorageContainerManagerFacade
   private ContainerSizeCountTask containerSizeCountTask;
   private ContainerCountBySizeDao containerCountBySizeDao;
   private ScheduledExecutorService scheduler;
+  private ScheduledExecutorService reconSCMSyncScheduler;
+  private ReconTaskController reconTaskController;
+  private ReconTaskStatusDao reconTaskStatusDao;
+  private ReconScmMetadataManager scmMetadataManager;
 
+  private long deltaUpdateLimit;
+  private int deltaUpdateLoopLimit;
   private AtomicBoolean isSyncDataFromSCMRunning;
   private final String threadNamePrefix;
+  private ThreadFactory threadFactory;
 
   // To Do :- Refactor the constructor in a separate JIRA
   @Inject
@@ -181,8 +209,13 @@ public class ReconStorageContainerManagerFacade
       UtilizationSchemaDefinition utilizationSchemaDefinition,
       ContainerHealthSchemaManager containerHealthSchemaManager,
       ReconContainerMetadataManager reconContainerMetadataManager,
-      ReconUtils reconUtils,
-      ReconSafeModeManager safeModeManager) throws IOException {
+      ReconUtils reconUtils, ReconTaskController reconTaskController,
+      ReconSafeModeManager safeModeManager,
+      ReconScmMetadataManager scmMetadataManager) throws IOException {
+    this.reconTaskController = reconTaskController;
+    this.reconTaskStatusDao = reconTaskController.getReconTaskStatusDao();
+    this.scmMetadataManager = scmMetadataManager;
+
     reconNodeDetails = reconUtils.getReconNodeDetails(conf);
     this.threadNamePrefix = reconNodeDetails.threadNamePrefix();
     this.eventQueue = new EventQueue(threadNamePrefix);
@@ -208,6 +241,13 @@ public class ReconStorageContainerManagerFacade
     conf.setLong(HDDS_SCM_CLIENT_MAX_RETRY_TIMEOUT, scmClientMaxRetryTimeOut);
     conf.setLong(HDDS_SCM_CLIENT_FAILOVER_MAX_RETRY,
         scmClientFailOverMaxRetryCount);
+
+    long deltaUpdateLimits = ozoneConfiguration.getLong(RECON_SCM_DELTA_UPDATE_LIMIT,
+        RECON_SCM_DELTA_UPDATE_LIMIT_DEFAULT);
+    int deltaUpdateLoopLimits = ozoneConfiguration.getInt(RECON_SCM_DELTA_UPDATE_LOOP_LIMIT,
+        RECON_SCM_DELTA_UPDATE_LOOP_LIMIT_DEFAULT);
+    this.deltaUpdateLimit = deltaUpdateLimits;
+    this.deltaUpdateLoopLimit = deltaUpdateLoopLimits;
 
     this.scmStorageConfig = new ReconStorageConfig(conf, reconUtils);
     this.clusterMap = new NetworkTopologyImpl(conf);
@@ -356,6 +396,9 @@ public class ReconStorageContainerManagerFacade
     reconSafeModeMgrTask = new ReconSafeModeMgrTask(
         containerManager, nodeManager, safeModeManager,
         reconTaskConfig, ozoneConfiguration);
+    this.threadFactory =
+        new ThreadFactoryBuilder().setNameFormat(threadNamePrefix + "ReconSyncSCM-%d")
+            .build();
   }
 
   /**
@@ -389,11 +432,30 @@ public class ReconStorageContainerManagerFacade
           "Recon ScmDatanodeProtocol RPC server",
           getDatanodeProtocolServer().getDatanodeRpcAddress()));
     }
+    reconSCMSyncScheduler = Executors.newScheduledThreadPool(1, threadFactory);
+    registerSCMDBTasks();
+    try {
+      scmMetadataManager.start(ozoneConfiguration);
+    } catch (IOException ioEx) {
+      LOG.error("Error staring Recon SCM Metadata Manager.", ioEx);
+    }
+    reconTaskController.start();
+    long initialDelay = ozoneConfiguration.getTimeDuration(
+        OZONE_RECON_SCM_SNAPSHOT_TASK_INITIAL_DELAY,
+        ozoneConfiguration.get(
+            ReconServerConfigKeys.RECON_OM_SNAPSHOT_TASK_INITIAL_DELAY,
+            OZONE_RECON_SCM_SNAPSHOT_TASK_INITIAL_DELAY_DEFAULT),
+        TimeUnit.MILLISECONDS);
+
+    // This schedules a periodic task to sync Recon's copy of SCM metadata
+    // with SCM metadata rocks DB. Gets full snapshot or delta updates.
+    startSyncDataFromSCM(initialDelay);
+
     scheduler = Executors.newScheduledThreadPool(1,
         new ThreadFactoryBuilder().setNameFormat(threadNamePrefix +
                 "SyncSCMContainerInfo-%d")
             .build());
-    boolean isSCMSnapshotEnabled = ozoneConfiguration.getBoolean(
+/*    boolean isSCMSnapshotEnabled = ozoneConfiguration.getBoolean(
         ReconServerConfigKeys.OZONE_RECON_SCM_SNAPSHOT_ENABLED,
         ReconServerConfigKeys.OZONE_RECON_SCM_SNAPSHOT_ENABLED_DEFAULT);
     if (isSCMSnapshotEnabled) {
@@ -401,14 +463,17 @@ public class ReconStorageContainerManagerFacade
       LOG.info("SCM DB initialized");
     } else {
       initializePipelinesFromScm();
+    }*/
+    initializePipelinesFromScm();
+    if (LOG.isDebugEnabled()) {
+      LOG.debug("Started the SCM Container Info sync scheduler.");
     }
-    LOG.debug("Started the SCM Container Info sync scheduler.");
     long interval = ozoneConfiguration.getTimeDuration(
-        OZONE_RECON_SCM_SNAPSHOT_TASK_INTERVAL_DELAY,
-        OZONE_RECON_SCM_SNAPSHOT_TASK_INTERVAL_DEFAULT, TimeUnit.MILLISECONDS);
-    long initialDelay = ozoneConfiguration.getTimeDuration(
-        OZONE_RECON_SCM_SNAPSHOT_TASK_INITIAL_DELAY,
-        OZONE_RECON_SCM_SNAPSHOT_TASK_INITIAL_DELAY_DEFAULT,
+        OZONE_RECON_SCM_CONTAINER_INFO_SYNC_TASK_INTERVAL_DELAY,
+        OZONE_RECON_SCM_CONTAINER_INFO_SYNC_TASK_INTERVAL_DEFAULT, TimeUnit.MILLISECONDS);
+    initialDelay = ozoneConfiguration.getTimeDuration(
+        OZONE_RECON_SCM_CONTAINER_INFO_SYNC_TASK_INITIAL_DELAY,
+        OZONE_RECON_SCM_CONTAINER_INFO_SYNC_TASK_INITIAL_DELAY_DEFAULT,
         TimeUnit.MILLISECONDS);
     // This periodic sync with SCM container cache is needed because during
     // the window when recon will be down and any container being added
@@ -438,6 +503,210 @@ public class ReconStorageContainerManagerFacade
     }
   }
 
+  public void registerSCMDBTasks() {
+    String scmDeltaRequest = StorageContainerServiceProviderImpl.SCMSnapshotTaskName.SCMDeltaRequest.name();
+    ReconTaskStatus reconTaskStatusRecord = new ReconTaskStatus(scmDeltaRequest,
+        System.currentTimeMillis(), getCurrentSCMDBSequenceNumber());
+    if (!reconTaskStatusDao.existsById(scmDeltaRequest)) {
+      reconTaskStatusDao.insert(reconTaskStatusRecord);
+      LOG.info("Registered {} task ", scmDeltaRequest);
+    }
+
+    String scmSnapshotRequest = StorageContainerServiceProviderImpl.SCMSnapshotTaskName.SCMSnapshotRequest.name();
+    reconTaskStatusRecord = new ReconTaskStatus(scmSnapshotRequest,
+        System.currentTimeMillis(), getCurrentSCMDBSequenceNumber());
+    if (!reconTaskStatusDao.existsById(scmSnapshotRequest)) {
+      reconTaskStatusDao.insert(reconTaskStatusRecord);
+      LOG.info("Registered {} task ", scmSnapshotRequest);
+    }
+  }
+
+  private void startSyncDataFromSCM(long initialDelay) {
+    long interval = ozoneConfiguration.getTimeDuration(OZONE_RECON_SCM_SNAPSHOT_TASK_INTERVAL_DELAY,
+        ozoneConfiguration.get(OZONE_RECON_SCM_SNAPSHOT_TASK_INTERVAL_DELAY,
+            OZONE_RECON_SCM_SNAPSHOT_TASK_INTERVAL_DEFAULT),
+        TimeUnit.MILLISECONDS);
+    if (LOG.isDebugEnabled()) {
+      LOG.debug("Started the Recon SCM DB sync scheduler.");
+    }
+    reconSCMSyncScheduler.scheduleWithFixedDelay(() -> {
+      try {
+        boolean isSuccess = syncDataFromSCM();
+        if (!isSuccess) {
+          LOG.debug("Recon SCM DB sync is already running.");
+        }
+      } catch (Throwable t) {
+        LOG.error("Unexpected exception while syncing data from SCM.", t);
+      }
+    },
+        initialDelay,
+        interval,
+        TimeUnit.MILLISECONDS);
+  }
+
+  private void stopSyncDataFromSCMThread() {
+    reconSCMSyncScheduler.shutdownNow();
+    LOG.debug("Shutdown the Recon SCM DB sync scheduler.");
+  }
+
+  /**
+   * Get Delta updates from SCM through RPC call and apply to local SCM DB as
+   * well as accumulate in a buffer.
+   * @param fromSequenceNumber from sequence number to request from.
+   * @param scmdbUpdatesHandler SCM DB updates handler to buffer updates.
+   * @throws IOException when SCM RPC request fails.
+   * @throws RocksDBException when writing to RocksDB fails.
+   */
+  @VisibleForTesting
+  void getAndApplyDeltaUpdatesFromSCM(
+      long fromSequenceNumber, SCMDBUpdatesHandler scmdbUpdatesHandler)
+      throws IOException, RocksDBException {
+    int loopCount = 0;
+    LOG.info("OriginalFromSequenceNumber : {} ", fromSequenceNumber);
+    long deltaUpdateCnt = Long.MAX_VALUE;
+    long inLoopStartSequenceNumber = fromSequenceNumber;
+    long inLoopLatestSequenceNumber;
+    while (loopCount < deltaUpdateLoopLimit &&
+        deltaUpdateCnt >= deltaUpdateLimit) {
+      if (!innerGetAndApplyDeltaUpdatesFromSCM(
+          inLoopStartSequenceNumber, scmdbUpdatesHandler)) {
+        LOG.error(
+            "Retrieve SCM DB delta update failed for sequence number : {}, " +
+                "so falling back to full snapshot.", inLoopStartSequenceNumber);
+        throw new RocksDBException(
+            "Unable to get delta updates since sequenceNumber - " +
+                inLoopStartSequenceNumber);
+      }
+      inLoopLatestSequenceNumber = getCurrentSCMDBSequenceNumber();
+      deltaUpdateCnt = inLoopLatestSequenceNumber - inLoopStartSequenceNumber;
+      inLoopStartSequenceNumber = inLoopLatestSequenceNumber;
+      loopCount++;
+    }
+    LOG.info("Delta updates received from SCM : {} loops, {} records", loopCount,
+        getCurrentSCMDBSequenceNumber() - fromSequenceNumber
+    );
+  }
+
+  /**
+   * Get Delta updates from SCM through RPC call and apply to local SCM DB as
+   * well as accumulate in a buffer.
+   * @param fromSequenceNumber from sequence number to request from.
+   * @param scmdbUpdatesHandler SCM DB updates handler to buffer updates.
+   * @throws IOException when SCM RPC request fails.
+   * @throws RocksDBException when writing to RocksDB fails.
+   */
+  @VisibleForTesting
+  boolean innerGetAndApplyDeltaUpdatesFromSCM(long fromSequenceNumber,
+                                              SCMDBUpdatesHandler scmdbUpdatesHandler)
+      throws IOException, RocksDBException {
+    StorageContainerLocationProtocolProtos.DBUpdatesRequestProto dbUpdatesRequest =
+        StorageContainerLocationProtocolProtos.DBUpdatesRequestProto.newBuilder()
+            .setSequenceNumber(fromSequenceNumber)
+            .setLimitCount(deltaUpdateLimit)
+            .build();
+    DBUpdates dbUpdates = scmServiceProvider.getDBUpdates(dbUpdatesRequest);
+    int numUpdates = 0;
+    long latestSequenceNumberOfOM = -1L;
+    if (null != dbUpdates && dbUpdates.getCurrentSequenceNumber() != -1) {
+      latestSequenceNumberOfOM = dbUpdates.getLatestSequenceNumber();
+      RDBStore rocksDBStore = (RDBStore) scmMetadataManager.getStore();
+      final RocksDatabase rocksDB = rocksDBStore.getDb();
+      numUpdates = dbUpdates.getData().size();
+      for (byte[] data : dbUpdates.getData()) {
+        try (ManagedWriteBatch writeBatch = new ManagedWriteBatch(data)) {
+          writeBatch.iterate(scmdbUpdatesHandler);
+          try (RDBBatchOperation rdbBatchOperation =
+                   new RDBBatchOperation(writeBatch)) {
+            try (ManagedWriteOptions wOpts = new ManagedWriteOptions()) {
+              rdbBatchOperation.commit(rocksDB, wOpts);
+            }
+          }
+        }
+      }
+    }
+    long lag = latestSequenceNumberOfOM == -1 ? 0 :
+        latestSequenceNumberOfOM - getCurrentSCMDBSequenceNumber();
+    LOG.info("Number of updates received from SCM : {}, " +
+            "SequenceNumber diff: {}, SequenceNumber Lag from SCM {}, " +
+            "isDBUpdateSuccess: {}", numUpdates, getCurrentSCMDBSequenceNumber()
+            - fromSequenceNumber, lag,
+        null != dbUpdates && dbUpdates.isDBUpdateSuccess());
+    return null != dbUpdates && dbUpdates.isDBUpdateSuccess();
+  }
+
+  /**
+   * Based on current state of Recon's SCM DB, we either get delta updates or
+   * full snapshot from SCM.
+   */
+  @VisibleForTesting
+  public boolean syncDataFromSCM() {
+    if (isSyncDataFromSCMRunning.compareAndSet(false, true)) {
+      try {
+        LOG.info("Syncing data from SCM.");
+        long currentSequenceNumber = getCurrentSCMDBSequenceNumber();
+        LOG.debug("Seq number of Recon's SCM DB : {}", currentSequenceNumber);
+        boolean fullSnapshot = false;
+
+        if (currentSequenceNumber <= 0) {
+          fullSnapshot = true;
+        } else {
+          try (SCMDBUpdatesHandler scmdbUpdatesHandler =
+                   new SCMDBUpdatesHandler(scmMetadataManager)) {
+            LOG.info("Obtaining delta updates from SCM");
+            // Get updates from SCM and apply to local Recon SCM DB.
+            getAndApplyDeltaUpdatesFromSCM(currentSequenceNumber, scmdbUpdatesHandler);
+            // Update timestamp of successful delta updates query.
+            ReconTaskStatus reconTaskStatusRecord = new ReconTaskStatus(
+                StorageContainerServiceProviderImpl.SCMSnapshotTaskName.SCMDeltaRequest.name(),
+                System.currentTimeMillis(), getCurrentSCMDBSequenceNumber());
+            reconTaskStatusDao.update(reconTaskStatusRecord);
+
+            // Pass on DB update events to tasks that are listening.
+            reconTaskController.consumeSCMEvents(new RocksDBUpdateEventBatch(
+                scmdbUpdatesHandler.getEvents()), scmMetadataManager);
+          } catch (InterruptedException intEx) {
+            Thread.currentThread().interrupt();
+          } catch (Exception e) {
+            LOG.warn("Unable to get and apply delta updates from SCM.",
+                e.getMessage());
+            fullSnapshot = true;
+          }
+        }
+
+        if (fullSnapshot) {
+          try {
+            LOG.info("Obtaining full snapshot from SCM");
+            // Update local Recon SCM DB to new snapshot.
+            boolean success = scmServiceProvider.updateReconSCMDBWithNewSnapshot();
+            // Update timestamp of successful delta updates query.
+            if (success) {
+              ReconTaskStatus reconTaskStatusRecord =
+                  new ReconTaskStatus(
+                      OzoneManagerServiceProviderImpl.OmSnapshotTaskName.OmSnapshotRequest.name(),
+                      System.currentTimeMillis(),
+                      getCurrentSCMDBSequenceNumber());
+              reconTaskStatusDao.update(reconTaskStatusRecord);
+
+              // Reinitialize tasks that are listening.
+              LOG.info("Calling reprocess on Recon SCM tasks.");
+              reconTaskController.reInitializeSCMTasks(scmMetadataManager);
+            }
+          } catch (InterruptedException intEx) {
+            Thread.currentThread().interrupt();
+          } catch (Exception e) {
+            LOG.error("Unable to update Recon's metadata with new SCM DB. ", e);
+          }
+        }
+      } finally {
+        isSyncDataFromSCMRunning.set(false);
+      }
+    } else {
+      LOG.debug("SCM DB sync is already running.");
+      return false;
+    }
+    return true;
+  }
+
   /**
    * Wait until service has completed shutdown.
    */
@@ -464,6 +733,14 @@ public class ReconStorageContainerManagerFacade
     } catch (Exception ex) {
       LOG.error("SCM Event Queue stop failed", ex);
     }
+    reconTaskController.stop();
+    try {
+      scmMetadataManager.stop();
+    } catch (Exception ex) {
+      LOG.error("ReconScmMetaDataManager stop failed", ex);
+    }
+    scheduler.shutdownNow();
+    stopSyncDataFromSCMThread();
     IOUtils.cleanupWithLogger(LOG, nodeManager);
     IOUtils.cleanupWithLogger(LOG, containerManager);
     IOUtils.cleanupWithLogger(LOG, pipelineManager);
@@ -504,7 +781,7 @@ public class ReconStorageContainerManagerFacade
       if (Math.abs(scmContainersCount - reconContainerCount) > threshold) {
         LOG.info("Recon Container Count: {}, SCM Container Count: {}",
             reconContainerCount, scmContainersCount);
-        updateReconSCMDBWithNewSnapshot();
+        scmServiceProvider.updateReconSCMDBWithNewSnapshot();
         LOG.info("Updated Recon DB with SCM DB");
       } else {
         initializePipelinesFromScm();
@@ -516,24 +793,7 @@ public class ReconStorageContainerManagerFacade
     }
   }
 
-  public void updateReconSCMDBWithNewSnapshot() throws IOException {
-    if (isSyncDataFromSCMRunning.compareAndSet(false, true)) {
-      DBCheckpoint dbSnapshot = scmServiceProvider.getSCMDBSnapshot();
-      if (dbSnapshot != null && dbSnapshot.getCheckpointLocation() != null) {
-        LOG.info("Got new checkpoint from SCM : " +
-            dbSnapshot.getCheckpointLocation());
-        try {
-          initializeNewRdbStore(dbSnapshot.getCheckpointLocation().toFile());
-        } catch (IOException e) {
-          LOG.error("Unable to refresh Recon SCM DB Snapshot. ", e);
-        }
-      } else {
-        LOG.error("Null snapshot location got from SCM.");
-      }
-    } else {
-      LOG.warn("SCM DB sync is already running.");
-    }
-  }
+
 
   public boolean syncWithSCMContainerInfo()
       throws IOException {
@@ -737,5 +997,13 @@ public class ReconStorageContainerManagerFacade
   @VisibleForTesting
   public ContainerCountBySizeDao getContainerCountBySizeDao() {
     return containerCountBySizeDao;
+  }
+
+  /**
+   * Get SCM metadata RocksDB's latest sequence number.
+   * @return latest sequence number.
+   */
+  private long getCurrentSCMDBSequenceNumber() {
+    return scmMetadataManager.getLastSequenceNumberFromDB();
   }
 }

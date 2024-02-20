@@ -37,7 +37,7 @@ import java.nio.file.Path;
 import java.util.List;
 
 import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.initializeNewOmMetadataManager;
-import static org.apache.hadoop.ozone.recon.tasks.OMDBUpdateEvent.OMDBUpdateAction.PUT;
+import static org.apache.hadoop.ozone.recon.tasks.RocksDBUpdateEvent.RocksDBUpdateAction.PUT;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -52,7 +52,7 @@ import static org.mockito.Mockito.times;
  */
 public class TestOmUpdateEventValidator {
 
-  private OmUpdateEventValidator eventValidator;
+  private RocksDBDBUpdateEventValidator eventValidator;
   private OMDBDefinition omdbDefinition;
   private OMMetadataManager omMetadataManager;
   private Logger logger;
@@ -64,7 +64,7 @@ public class TestOmUpdateEventValidator {
     omMetadataManager = initializeNewOmMetadataManager(
         temporaryFolder.toFile());
     omdbDefinition = new OMDBDefinition();
-    eventValidator = new OmUpdateEventValidator(omdbDefinition);
+    eventValidator = new RocksDBDBUpdateEventValidator(omdbDefinition);
     // Create a mock logger
     logger = mock(Logger.class);
     eventValidator.setLogger(logger);

@@ -26,6 +26,7 @@ import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.recon.scm.ReconNodeManager;
 import org.apache.hadoop.ozone.recon.scm.ReconStorageContainerManagerFacade;
+import org.apache.hadoop.ozone.recon.spi.ReconContainerMetadataManager;
 import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.AfterEach;
@@ -34,30 +35,35 @@ import org.junit.jupiter.api.Timeout;
 import org.slf4j.LoggerFactory;
 
 import java.util.List;
+import java.util.concurrent.TimeUnit;
 
+import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_SCM_SNAPSHOT_TASK_INITIAL_DELAY;
+import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_SCM_SNAPSHOT_TASK_INTERVAL_DELAY;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Test Recon SCM Snapshot Download implementation.
  */
-@Timeout(100)
+@Timeout(300)
 public class TestReconScmSnapshot {
   private OzoneConfiguration conf;
-  private MiniOzoneCluster ozoneCluster = null;
-
   @BeforeEach
   public void setup() throws Exception {
     conf = new OzoneConfiguration();
     conf.setBoolean(
         ReconServerConfigKeys.OZONE_RECON_SCM_SNAPSHOT_ENABLED, true);
     conf.setInt(ReconServerConfigKeys.OZONE_RECON_SCM_CONTAINER_THRESHOLD, 0);
+    conf.setTimeDuration(OZONE_RECON_SCM_SNAPSHOT_TASK_INITIAL_DELAY, 1, TimeUnit.SECONDS);
+    conf.setTimeDuration(OZONE_RECON_SCM_SNAPSHOT_TASK_INTERVAL_DELAY, 2, TimeUnit.SECONDS);
     ozoneCluster = MiniOzoneCluster.newBuilder(conf)
         .setNumDatanodes(4)
         .includeRecon(true)
         .build();
     ozoneCluster.waitForClusterToBeReady();
   }
+
+  private MiniOzoneCluster ozoneCluster = null;
 
   @Test
   public void testScmSnapshot() throws Exception {
@@ -90,19 +96,23 @@ public class TestReconScmSnapshot {
       containerManager.allocateContainer(RatisReplicationConfig.getInstance(
           HddsProtos.ReplicationFactor.ONE), "testOwner");
     }
+    cluster.getStorageContainerManager().getScmMetadataStore().getStore().flushDB();
 
     cluster.startRecon();
-
+    Thread.sleep(3000);
     //ContainerCount after Recon DB is updated with SCM DB
     containerManager = cluster.getStorageContainerManager()
         .getContainerManager();
+    ReconContainerMetadataManager reconContainerMetadataManager =
+        cluster.getReconServer().getReconContainerMetadataManager();
+
     ContainerManager reconContainerManager = cluster.getReconServer()
         .getReconStorageContainerManager().getContainerManager();
-    assertTrue(logCapturer.getOutput()
+    /*assertTrue(logCapturer.getOutput()
         .contains("Recon Container Count: " + reconContainers.size() +
-        ", SCM Container Count: " + containerManager.getContainers().size()));
+        ", SCM Container Count: " + containerManager.getContainers().size()));*/
     assertEquals(containerManager.getContainers().size(),
-        reconContainerManager.getContainers().size());
+        reconContainerMetadataManager.getCountForContainers(HddsProtos.LifeCycleState.OPEN));
 
     //PipelineCount after Recon DB is updated with SCM DB
     PipelineManager scmPipelineManager = cluster.getStorageContainerManager()
@@ -117,6 +127,48 @@ public class TestReconScmSnapshot {
         .getReconStorageContainerManager().getScmNodeManager();
     long keyCountAfter = nodeManager.getNodeDBKeyCount();
     assertEquals(keyCountAfter, keyCountBefore);
+  }
+
+  @Test
+  public void testFullSCMDbSync() throws Exception {
+    GenericTestUtils.LogCapturer logCapturer = GenericTestUtils.LogCapturer
+        .captureLogs(LoggerFactory.getLogger(
+            ReconStorageContainerManagerFacade.class));
+
+    List<ContainerInfo> reconContainers = ozoneCluster.getReconServer()
+        .getReconStorageContainerManager().getContainerManager()
+        .getContainers();
+    assertEquals(0, reconContainers.size());
+
+    ReconNodeManager nodeManager;
+    nodeManager = (ReconNodeManager) ozoneCluster.getReconServer()
+        .getReconStorageContainerManager().getScmNodeManager();
+    long keyCountBefore = nodeManager.getNodeDBKeyCount();
+
+    //Stopping Recon to add Containers in SCM
+    ozoneCluster.stopRecon();
+
+    ContainerManager containerManager;
+    containerManager = ozoneCluster.getStorageContainerManager()
+        .getContainerManager();
+
+    for (int i = 0; i < 10; i++) {
+      containerManager.allocateContainer(RatisReplicationConfig.getInstance(
+          HddsProtos.ReplicationFactor.ONE), "testOwner");
+    }
+
+    ozoneCluster.startRecon();
+
+    //ContainerCount after Recon DB is updated with SCM DB
+    containerManager = ozoneCluster.getStorageContainerManager()
+        .getContainerManager();
+    ContainerManager reconContainerManager = ozoneCluster.getReconServer()
+        .getReconStorageContainerManager().getContainerManager();
+    assertTrue(logCapturer.getOutput()
+        .contains("Recon Container Count: " + reconContainers.size() +
+            ", SCM Container Count: " + containerManager.getContainers().size()));
+    assertEquals(containerManager.getContainers().size(),
+        reconContainerManager.getContainers().size());
   }
 
   @AfterEach

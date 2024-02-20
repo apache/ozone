@@ -21,10 +21,13 @@ import java.io.IOException;
 import java.util.List;
 
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
+import org.apache.hadoop.ozone.common.DBUpdates;
+import org.apache.hadoop.ozone.recon.scm.ReconScmMetadataManager;
 
 /**
  * Interface to access SCM endpoints.
@@ -99,4 +102,29 @@ public interface StorageContainerServiceProvider {
    * @return Total number of containers in SCM.
    */
   long getContainerCount(HddsProtos.LifeCycleState state) throws IOException;
+
+  /**
+   * Return instance of Recon SCM Metadata manager.
+   *
+   * @return Recon SCM metadata manager instance.
+   */
+  ReconScmMetadataManager getReconScmMetadataManagerInstance();
+
+  /**
+   * Update Recon's Local SCM DB with new SCM DB snapshot.
+   *
+   * @return return true if updates successfully else false.
+   * @throws IOException
+   */
+  boolean updateReconSCMDBWithNewSnapshot() throws IOException;
+
+  /**
+   * Get DB updates since a specific sequence number.
+   *
+   * @param dbUpdatesRequest request that encapsulates a sequence number.
+   * @return DBUpdates in a wrapper object containing the updates.
+   * @throws IOException
+   */
+  DBUpdates getDBUpdates(StorageContainerLocationProtocolProtos.DBUpdatesRequestProto dbUpdatesRequest)
+      throws IOException;
 }

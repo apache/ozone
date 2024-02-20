@@ -42,6 +42,7 @@ import javax.inject.Inject;
 import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos;
 import org.apache.hadoop.hdds.protocolPB.SCMSecurityProtocolClientSideTranslatorPB;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
@@ -57,11 +58,14 @@ import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
 import org.apache.hadoop.hdds.utils.db.RocksDBCheckpoint;
 import org.apache.hadoop.hdfs.web.URLConnectionFactory;
 import org.apache.hadoop.ozone.ClientVersion;
+import org.apache.hadoop.ozone.common.DBUpdates;
 import org.apache.hadoop.ozone.recon.ReconUtils;
+import org.apache.hadoop.ozone.recon.scm.ReconScmMetadataManager;
 import org.apache.hadoop.ozone.recon.scm.ReconStorageConfig;
 import org.apache.hadoop.ozone.recon.security.ReconCertificateClient;
 import org.apache.hadoop.ozone.recon.spi.StorageContainerServiceProvider;
 import org.apache.hadoop.security.SecurityUtil;
+import org.apache.hadoop.util.Time;
 import org.apache.ratis.proto.RaftProtos;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -82,13 +86,23 @@ public class StorageContainerServiceProviderImpl
   private URLConnectionFactory connectionFactory;
   private ReconUtils reconUtils;
   private ReconStorageConfig reconStorage;
+  private ReconScmMetadataManager scmMetadataManager;
+
+  /**
+   * SCM Snapshot related task names.
+   */
+  public enum SCMSnapshotTaskName {
+    SCMSnapshotRequest,
+    SCMDeltaRequest
+  }
 
   @Inject
   public StorageContainerServiceProviderImpl(
       StorageContainerLocationProtocol scmClient,
       ReconUtils reconUtils,
       OzoneConfiguration configuration,
-      ReconStorageConfig reconStorage) {
+      ReconStorageConfig reconStorage,
+      ReconScmMetadataManager scmMetadataManager) {
 
     int connectionTimeout = (int) configuration.getTimeDuration(
         OZONE_RECON_SCM_CONNECTION_TIMEOUT,
@@ -123,6 +137,7 @@ public class StorageContainerServiceProviderImpl
     this.scmClient = scmClient;
     this.configuration = configuration;
     this.reconStorage = reconStorage;
+    this.scmMetadataManager = scmMetadataManager;
   }
 
   @Override
@@ -174,12 +189,33 @@ public class StorageContainerServiceProviderImpl
         .equals("kerberos");
   }
 
+  @Override
+  public boolean updateReconSCMDBWithNewSnapshot() throws IOException {
+    // Obtain the current DB snapshot from SCM and
+    // update the in house SCM metadata managed DB instance.
+    long startTime = Time.monotonicNow();
+    DBCheckpoint dbSnapshot = getSCMDBSnapshot();
+    if (dbSnapshot != null && dbSnapshot.getCheckpointLocation() != null) {
+      LOG.info("Got new checkpoint from SCM : " +
+          dbSnapshot.getCheckpointLocation());
+      try {
+        scmMetadataManager.updateScmDB(
+            dbSnapshot.getCheckpointLocation().toFile());
+        return true;
+      } catch (IOException e) {
+        LOG.error("Unable to refresh Recon SCM DB Snapshot. ", e);
+      }
+    } else {
+      LOG.error("Null snapshot location got from SCM.");
+    }
+    return false;
+  }
+
   public DBCheckpoint getSCMDBSnapshot() {
     String snapshotFileName = RECON_SCM_SNAPSHOT_DB + "_" +
         System.currentTimeMillis();
     File targetFile = new File(scmSnapshotDBParentDir, snapshotFileName +
             ".tar");
-
     try {
       if (!SCMHAUtils.isSCMHAEnabled(configuration)) {
         SecurityUtil.doAsLoginUser(() -> {
@@ -238,4 +274,26 @@ public class StorageContainerServiceProviderImpl
     return scmClient.getListOfContainers(startContainerID, count, state);
   }
 
+  /**
+   * Return instance of Recon SCM Metadata manager.
+   *
+   * @return Recon SCM metadata manager instance.
+   */
+  @Override
+  public ReconScmMetadataManager getReconScmMetadataManagerInstance() {
+    return null;
+  }
+
+  /**
+   * Get DB updates since a specific sequence number.
+   *
+   * @param dbUpdatesRequest request that encapsulates a sequence number.
+   * @return DBUpdates in a wrapper object containing the updates.
+   * @throws IOException
+   */
+  @Override
+  public DBUpdates getDBUpdates(StorageContainerLocationProtocolProtos.DBUpdatesRequestProto dbUpdatesRequest)
+      throws IOException {
+    return scmClient.getDBUpdates(dbUpdatesRequest);
+  }
 }

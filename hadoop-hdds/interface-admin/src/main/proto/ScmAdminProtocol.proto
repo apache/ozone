@@ -83,6 +83,7 @@ message ScmContainerLocationRequest {
   optional DecommissionScmRequestProto decommissionScmRequest = 44;
   optional SingleNodeQueryRequestProto singleNodeQueryRequest = 45;
   optional GetContainersOnDecomNodeRequestProto getContainersOnDecomNodeRequest = 46;
+  optional DBUpdatesRequestProto dbUpdatesRequest = 47;
 }
 
 message ScmContainerLocationResponse {
@@ -137,6 +138,7 @@ message ScmContainerLocationResponse {
   optional DecommissionScmResponseProto decommissionScmResponse = 44;
   optional SingleNodeQueryResponseProto singleNodeQueryResponse = 45;
   optional GetContainersOnDecomNodeResponseProto getContainersOnDecomNodeResponse = 46;
+  optional DBUpdatesResponseProto dbUpdatesResponse = 47;
 
   enum Status {
     OK = 1;
@@ -190,6 +192,7 @@ enum Type {
   DecommissionScm = 40;
   SingleNodeQuery = 41;
   GetContainersOnDecomNode = 42;
+  DBUpdates = 43;
 }
 
 /**
@@ -624,4 +627,16 @@ message GetContainersOnDecomNodeResponseProto {
  */
 service StorageContainerLocationProtocolService {
   rpc submitRequest (ScmContainerLocationRequest) returns (ScmContainerLocationResponse);
+}
+
+message DBUpdatesRequestProto {
+  required uint64 sequenceNumber = 1;
+  optional uint64 limitCount = 2;
+}
+
+message DBUpdatesResponseProto {
+  required uint64 sequenceNumber = 1;
+  repeated bytes data = 2;
+  optional uint64 latestSequenceNumber = 3;
+  optional bool dbUpdateSuccess = 4;
 }

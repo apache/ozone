@@ -19,24 +19,24 @@
 package org.apache.hadoop.ozone.recon.tasks;
 
 import com.google.common.annotations.VisibleForTesting;
-import org.apache.hadoop.ozone.om.codec.OMDBDefinition;
+import org.apache.hadoop.hdds.utils.db.DBDefinition;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 
 /**
- * OmUpdateEventValidator is a utility class for validating OMDBUpdateEvents
+ * RocksDBDBUpdateEventValidator is a utility class for validating OM and SCM DBUpdateEvents
  * It can be further extended to different types of validations.
  */
-public class OmUpdateEventValidator {
+public class RocksDBDBUpdateEventValidator {
 
   private static Logger log =
-      LoggerFactory.getLogger(OmUpdateEventValidator.class);
-  private OMDBDefinition omdbDefinition;
+      LoggerFactory.getLogger(RocksDBDBUpdateEventValidator.class);
+  private DBDefinition dbDefinition;
 
-  public OmUpdateEventValidator(OMDBDefinition omdbDefinition) {
-    this.omdbDefinition = omdbDefinition;
+  public RocksDBDBUpdateEventValidator(DBDefinition dbDefinition) {
+    this.dbDefinition = dbDefinition;
   }
 
   /**
@@ -53,10 +53,10 @@ public class OmUpdateEventValidator {
   public boolean isValidEvent(String tableName,
                               Object actualValueType,
                               Object keyType,
-                              OMDBUpdateEvent.OMDBUpdateAction action) {
+                              RocksDBUpdateEvent.RocksDBUpdateAction action) {
 
     String expectedValueTypeString =
-        omdbDefinition.getColumnFamily(tableName).getValueType().getName();
+        dbDefinition.getColumnFamily(tableName).getValueType().getName();
     String actualValueTypeString = actualValueType.getClass().getName();
 
     // Check if both objects are of the same type
@@ -86,7 +86,7 @@ public class OmUpdateEventValidator {
 
   @VisibleForTesting
   public static void setLogger(Logger logger) {
-    OmUpdateEventValidator.log = logger;
+    RocksDBDBUpdateEventValidator.log = logger;
   }
 
 }

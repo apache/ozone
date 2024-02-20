@@ -39,6 +39,8 @@ import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
+import org.apache.hadoop.ozone.recon.scm.ReconSCMMetadataProcessingTask;
+import org.apache.hadoop.ozone.recon.scm.ReconScmMetadataManager;
 import org.hadoop.ozone.recon.schema.tables.daos.ReconTaskStatusDao;
 import org.hadoop.ozone.recon.schema.tables.pojos.ReconTaskStatus;
 import org.slf4j.Logger;
@@ -55,6 +57,7 @@ public class ReconTaskControllerImpl implements ReconTaskController {
       LoggerFactory.getLogger(ReconTaskControllerImpl.class);
 
   private Map<String, ReconOmTask> reconOmTasks;
+  private Map<String, ReconSCMMetadataProcessingTask> reconSCMMetadataProcessingTasks;
   private ExecutorService executorService;
   private final int threadCount;
   private Map<String, AtomicInteger> taskFailureCounter = new HashMap<>();
@@ -62,25 +65,50 @@ public class ReconTaskControllerImpl implements ReconTaskController {
   private ReconTaskStatusDao reconTaskStatusDao;
 
   @Inject
-  public ReconTaskControllerImpl(OzoneConfiguration configuration,
-                                 ReconTaskStatusDao reconTaskStatusDao,
-                                 Set<ReconOmTask> tasks) {
+  public ReconTaskControllerImpl(OzoneConfiguration configuration, ReconTaskStatusDao reconTaskStatusDao,
+                                 Set<ReconOmTask> tasks, Set<ReconSCMMetadataProcessingTask> reconSCMTasks) {
     reconOmTasks = new HashMap<>();
+    reconSCMMetadataProcessingTasks = new HashMap<>();
     threadCount = configuration.getInt(OZONE_RECON_TASK_THREAD_COUNT_KEY,
         OZONE_RECON_TASK_THREAD_COUNT_DEFAULT);
     this.reconTaskStatusDao = reconTaskStatusDao;
     for (ReconOmTask task : tasks) {
       registerTask(task);
     }
+    for (ReconSCMMetadataProcessingTask task : reconSCMTasks) {
+      registerSCMTask(task);
+    }
   }
 
   @Override
   public void registerTask(ReconOmTask task) {
     String taskName = task.getTaskName();
-    LOG.info("Registered task {} with controller.", taskName);
+    LOG.info("Registered OM task {} with controller.", taskName);
 
-    // Store task in Task Map.
+    // Store OM task in Task Map.
     reconOmTasks.put(taskName, task);
+    // Store Task in Task failure tracker.
+    taskFailureCounter.put(taskName, new AtomicInteger(0));
+    // Create DB record for the task.
+    ReconTaskStatus reconTaskStatusRecord = new ReconTaskStatus(taskName,
+        0L, 0L);
+    if (!reconTaskStatusDao.existsById(taskName)) {
+      reconTaskStatusDao.insert(reconTaskStatusRecord);
+    }
+  }
+
+  /**
+   * Register API used by SCM tasks to register themselves.
+   *
+   * @param task task instance
+   */
+  @Override
+  public void registerSCMTask(ReconSCMMetadataProcessingTask task) {
+    String taskName = task.getTaskName();
+    LOG.info("Registered SCM task {} with controller.", taskName);
+
+    // Store SCM task in Task Map.
+    reconSCMMetadataProcessingTasks.put(taskName, task);
     // Store Task in Task failure tracker.
     taskFailureCounter.put(taskName, new AtomicInteger(0));
     // Create DB record for the task.
@@ -100,8 +128,8 @@ public class ReconTaskControllerImpl implements ReconTaskController {
    * @throws InterruptedException
    */
   @Override
-  public synchronized void consumeOMEvents(OMUpdateEventBatch events,
-                              OMMetadataManager omMetadataManager)
+  public synchronized void consumeOMEvents(RocksDBUpdateEventBatch events,
+                                           OMMetadataManager omMetadataManager)
       throws InterruptedException {
 
     try {
@@ -166,7 +194,7 @@ public class ReconTaskControllerImpl implements ReconTaskController {
   }
 
   @Override
-  public synchronized void reInitializeTasks(
+  public synchronized void reInitializeOMTasks(
       ReconOMMetadataManager omMetadataManager) throws InterruptedException {
     try {
       Collection<Callable<Pair<String, Boolean>>> tasks = new ArrayList<>();
@@ -175,22 +203,46 @@ public class ReconTaskControllerImpl implements ReconTaskController {
         ReconOmTask task = taskEntry.getValue();
         tasks.add(() -> task.reprocess(omMetadataManager));
       }
-      List<Future<Pair<String, Boolean>>> results =
-          executorService.invokeAll(tasks);
-      for (Future<Pair<String, Boolean>> f : results) {
-        String taskName = f.get().getLeft();
-        if (!f.get().getRight()) {
-          LOG.info("Init failed for task {}.", taskName);
-        } else {
-          //store the timestamp for the task
-          ReconTaskStatus reconTaskStatusRecord = new ReconTaskStatus(taskName,
-              System.currentTimeMillis(),
-              omMetadataManager.getLastSequenceNumberFromDB());
-          reconTaskStatusDao.update(reconTaskStatusRecord);
-        }
-      }
+      invokeTasks(omMetadataManager.getLastSequenceNumberFromDB(), tasks);
     } catch (ExecutionException e) {
-      LOG.error("Unexpected error : ", e);
+      LOG.error("Unexpected error while reinitializing OM tasks:: ", e);
+    }
+  }
+
+  private void invokeTasks(long lastSequenceNumberFromDB, Collection<Callable<Pair<String, Boolean>>> tasks)
+      throws InterruptedException, ExecutionException {
+    List<Future<Pair<String, Boolean>>> results =
+        executorService.invokeAll(tasks);
+    for (Future<Pair<String, Boolean>> f : results) {
+      String taskName = f.get().getLeft();
+      if (!f.get().getRight()) {
+        LOG.info("Init failed for task {}.", taskName);
+      } else {
+        //store the timestamp for the task
+        ReconTaskStatus reconTaskStatusRecord =
+            new ReconTaskStatus(taskName, System.currentTimeMillis(), lastSequenceNumberFromDB);
+        reconTaskStatusDao.update(reconTaskStatusRecord);
+      }
+    }
+  }
+
+  /**
+   * Pass on the handle to a new SCM DB instance to the registered tasks.
+   *
+   * @param reconScmMetadataManager Recon SCM Metadata Manager instance
+   */
+  @Override
+  public void reInitializeSCMTasks(ReconScmMetadataManager reconScmMetadataManager) throws InterruptedException {
+    try {
+      Collection<Callable<Pair<String, Boolean>>> tasks = new ArrayList<>();
+      for (Map.Entry<String, ReconSCMMetadataProcessingTask> taskEntry :
+          reconSCMMetadataProcessingTasks.entrySet()) {
+        ReconSCMMetadataProcessingTask task = taskEntry.getValue();
+        tasks.add(() -> task.reprocess(reconScmMetadataManager));
+      }
+      invokeTasks(reconScmMetadataManager.getLastSequenceNumberFromDB(), tasks);
+    } catch (ExecutionException e) {
+      LOG.error("Unexpected error while reinitializing SCM tasks: ", e);
     }
   }
 
@@ -243,7 +295,7 @@ public class ReconTaskControllerImpl implements ReconTaskController {
    */
   private List<String> processTaskResults(List<Future<Pair<String, Boolean>>>
                                               results,
-                                          OMUpdateEventBatch events)
+                                          RocksDBUpdateEventBatch events)
       throws ExecutionException, InterruptedException {
     List<String> failedTasks = new ArrayList<>();
     for (Future<Pair<String, Boolean>> f : results) {
@@ -257,5 +309,60 @@ public class ReconTaskControllerImpl implements ReconTaskController {
       }
     }
     return failedTasks;
+  }
+
+  /**
+   * Pass on a set of SCM DB update events to the registered tasks.
+   *
+   * @param events             set of events
+   * @param scmMetadataManager
+   * @throws InterruptedException InterruptedException
+   */
+  @Override
+  public void consumeSCMEvents(RocksDBUpdateEventBatch events, ReconScmMetadataManager scmMetadataManager)
+      throws InterruptedException {
+    try {
+      if (!events.isEmpty()) {
+        Collection<Callable<Pair<String, Boolean>>> tasks = new ArrayList<>();
+        for (Map.Entry<String, ReconSCMMetadataProcessingTask> taskEntry :
+            reconSCMMetadataProcessingTasks.entrySet()) {
+          ReconSCMMetadataProcessingTask task = taskEntry.getValue();
+          // events passed to process method is no longer filtered
+          tasks.add(() -> task.process(events));
+        }
+
+        List<Future<Pair<String, Boolean>>> results =
+            executorService.invokeAll(tasks);
+        List<String> failedTasks = processTaskResults(results, events);
+
+        // Retry
+        List<String> retryFailedTasks = new ArrayList<>();
+        if (!failedTasks.isEmpty()) {
+          tasks.clear();
+          for (String taskName : failedTasks) {
+            ReconSCMMetadataProcessingTask task = reconSCMMetadataProcessingTasks.get(taskName);
+            // events passed to process method is no longer filtered
+            tasks.add(() -> task.process(events));
+          }
+          results = executorService.invokeAll(tasks);
+          retryFailedTasks = processTaskResults(results, events);
+        }
+
+        // Reprocess the failed tasks.
+        if (!retryFailedTasks.isEmpty()) {
+          tasks.clear();
+          for (String taskName : failedTasks) {
+            ReconSCMMetadataProcessingTask task = reconSCMMetadataProcessingTasks.get(taskName);
+            tasks.add(() -> task.reprocess(scmMetadataManager));
+          }
+          results = executorService.invokeAll(tasks);
+          List<String> reprocessFailedTasks =
+              processTaskResults(results, events);
+          ignoreFailedTasks(reprocessFailedTasks);
+        }
+      }
+    } catch (ExecutionException e) {
+      LOG.error("Unexpected error : ", e);
+    }
   }
 }

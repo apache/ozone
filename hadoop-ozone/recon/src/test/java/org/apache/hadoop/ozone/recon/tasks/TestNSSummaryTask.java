@@ -217,8 +217,8 @@ public final class TestNSSummaryTask {
     private NSSummary nsSummaryForBucket2;
     private NSSummary nsSummaryForBucket3;
 
-    private OMDBUpdateEvent keyEvent1;
-    private OMDBUpdateEvent keyEvent2;
+    private RocksDBUpdateEvent keyEvent1;
+    private RocksDBUpdateEvent keyEvent2;
 
     @BeforeEach
     public void setUp() throws IOException {
@@ -236,7 +236,7 @@ public final class TestNSSummaryTask {
       assertNull(nsSummaryForBucket3);
     }
 
-    private OMUpdateEventBatch processEventBatch() throws IOException {
+    private RocksDBUpdateEventBatch processEventBatch() throws IOException {
       // put file5 under bucket 2
       String omPutKey =
           OM_KEY_PREFIX + VOL +
@@ -244,13 +244,12 @@ public final class TestNSSummaryTask {
               OM_KEY_PREFIX + FILE_FIVE;
       OmKeyInfo omPutKeyInfo = buildOmKeyInfo(VOL, BUCKET_TWO, KEY_FIVE,
           FILE_FIVE, KEY_FIVE_OBJECT_ID, BUCKET_TWO_OBJECT_ID, KEY_FIVE_SIZE);
-      keyEvent1 = new OMDBUpdateEvent.
-          OMUpdateEventBuilder<String, OmKeyInfo>()
+      keyEvent1 = new RocksDBUpdateEvent.RocksDBUpdateEventBuilder<String, OmKeyInfo>()
           .setKey(omPutKey)
           .setValue(omPutKeyInfo)
           .setTable(omMetadataManager.getKeyTable(getLegacyBucketLayout())
               .getName())
-          .setAction(OMDBUpdateEvent.OMDBUpdateAction.PUT)
+          .setAction(RocksDBUpdateEvent.RocksDBUpdateAction.PUT)
           .build();
 
       // delete file 1 under bucket 1
@@ -258,16 +257,15 @@ public final class TestNSSummaryTask {
       OmKeyInfo omDeleteInfo = buildOmKeyInfo(
           VOL, BUCKET_ONE, KEY_ONE, FILE_ONE,
           KEY_ONE_OBJECT_ID, BUCKET_ONE_OBJECT_ID);
-      keyEvent2 = new OMDBUpdateEvent.
-          OMUpdateEventBuilder<String, OmKeyInfo>()
+      keyEvent2 = new RocksDBUpdateEvent.RocksDBUpdateEventBuilder<String, OmKeyInfo>()
           .setKey(omDeleteKey)
           .setValue(omDeleteInfo)
           .setTable(omMetadataManager.getKeyTable(getFSOBucketLayout())
               .getName())
-          .setAction(OMDBUpdateEvent.OMDBUpdateAction.DELETE)
+          .setAction(RocksDBUpdateEvent.RocksDBUpdateAction.DELETE)
           .build();
 
-      return new OMUpdateEventBatch(Arrays.asList(keyEvent1, keyEvent2));
+      return new RocksDBUpdateEventBatch(Arrays.asList(keyEvent1, keyEvent2));
     }
 
     @Test

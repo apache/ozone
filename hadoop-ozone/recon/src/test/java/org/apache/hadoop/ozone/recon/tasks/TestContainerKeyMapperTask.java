@@ -276,12 +276,11 @@ public class TestContainerKeyMapperTask {
     OmKeyInfo omKeyInfo = buildOmKeyInfo(volume, bucket, key,
         omKeyLocationInfoGroup);
 
-    OMDBUpdateEvent keyEvent1 = new OMDBUpdateEvent.
-        OMUpdateEventBuilder<String, OmKeyInfo>()
+    RocksDBUpdateEvent keyEvent1 = new RocksDBUpdateEvent.RocksDBUpdateEventBuilder<String, OmKeyInfo>()
         .setKey(omKey)
         .setValue(omKeyInfo)
         .setTable(omMetadataManager.getKeyTable(getBucketLayout()).getName())
-        .setAction(OMDBUpdateEvent.OMDBUpdateAction.PUT)
+        .setAction(RocksDBUpdateEvent.RocksDBUpdateAction.PUT)
         .build();
 
     BlockID blockID3 = new BlockID(1, 2);
@@ -303,16 +302,15 @@ public class TestContainerKeyMapperTask {
         .singletonList(omKeyLocationInfoGroup));
 
     omKey = omMetadataManager.getOzoneKey(volume, bucket, key2);
-    OMDBUpdateEvent keyEvent2 = new OMDBUpdateEvent.
-        OMUpdateEventBuilder<String, OmKeyInfo>()
+    RocksDBUpdateEvent keyEvent2 = new RocksDBUpdateEvent.RocksDBUpdateEventBuilder<String, OmKeyInfo>()
         .setKey(omKey)
-        .setAction(OMDBUpdateEvent.OMDBUpdateAction.DELETE)
+        .setAction(RocksDBUpdateEvent.RocksDBUpdateAction.DELETE)
         .setValue(omKeyInfo)
         .setTable(omMetadataManager.getKeyTable(getBucketLayout()).getName())
         .build();
 
-    OMUpdateEventBatch omUpdateEventBatch = new OMUpdateEventBatch(new
-        ArrayList<OMDBUpdateEvent>() {{
+    RocksDBUpdateEventBatch omUpdateEventBatch = new RocksDBUpdateEventBatch(new
+        ArrayList<RocksDBUpdateEvent>() {{
           add(keyEvent1);
           add(keyEvent2);
         }});
@@ -398,31 +396,29 @@ public class TestContainerKeyMapperTask {
     OmKeyInfo omKeyInfo = buildOmKeyInfo(volume, bucket, key,
         omKeyLocationInfoGroup);
 
-    OMDBUpdateEvent keyEvent1 = new OMDBUpdateEvent.
-        OMUpdateEventBuilder<String, OmKeyInfo>()
+    RocksDBUpdateEvent keyEvent1 = new RocksDBUpdateEvent.RocksDBUpdateEventBuilder<String, OmKeyInfo>()
         .setKey(omKey)
         .setValue(omKeyInfo)
         .setTable(
             omMetadataManager.getKeyTable(BucketLayout.FILE_SYSTEM_OPTIMIZED)
                 .getName())
-        .setAction(OMDBUpdateEvent.OMDBUpdateAction.PUT)
+        .setAction(RocksDBUpdateEvent.RocksDBUpdateAction.PUT)
         .build();
 
     String key2 = DELETED_KEY;
 
     omKey = omMetadataManager.getOzoneKey(volume, bucket, key2);
-    OMDBUpdateEvent keyEvent2 = new OMDBUpdateEvent.
-        OMUpdateEventBuilder<String, OmKeyInfo>()
+    RocksDBUpdateEvent keyEvent2 = new RocksDBUpdateEvent.RocksDBUpdateEventBuilder<String, OmKeyInfo>()
         .setKey(omKey)
         .setValue(omKeyInfo)
-        .setAction(OMDBUpdateEvent.OMDBUpdateAction.PUT)
+        .setAction(RocksDBUpdateEvent.RocksDBUpdateAction.PUT)
         .setTable(
             omMetadataManager.getKeyTable(BucketLayout.FILE_SYSTEM_OPTIMIZED)
                 .getName())
         .build();
 
-    OMUpdateEventBatch omUpdateEventBatch =
-        new OMUpdateEventBatch(new ArrayList<OMDBUpdateEvent>() {
+    RocksDBUpdateEventBatch omUpdateEventBatch =
+        new RocksDBUpdateEventBatch(new ArrayList<RocksDBUpdateEvent>() {
           {
             add(keyEvent1);
             add(keyEvent2);
@@ -446,17 +442,16 @@ public class TestContainerKeyMapperTask {
         secondKeyPrefix.getKeyPrefix());
 
     omKey = omMetadataManager.getOzoneKey(volume, bucket, key2);
-    OMDBUpdateEvent keyEvent3 = new OMDBUpdateEvent.
-        OMUpdateEventBuilder<String, OmKeyInfo>()
+    RocksDBUpdateEvent keyEvent3 = new RocksDBUpdateEvent.RocksDBUpdateEventBuilder<String, OmKeyInfo>()
         .setKey(omKey)
-        .setAction(OMDBUpdateEvent.OMDBUpdateAction.DELETE)
+        .setAction(RocksDBUpdateEvent.RocksDBUpdateAction.DELETE)
         .setValue(omKeyInfo)
         .setTable(
             omMetadataManager.getKeyTable(BucketLayout.FILE_SYSTEM_OPTIMIZED)
                 .getName())
         .build();
-    OMUpdateEventBatch omUpdateEventBatch2 =
-        new OMUpdateEventBatch(new ArrayList<OMDBUpdateEvent>() {
+    RocksDBUpdateEventBatch omUpdateEventBatch2 =
+        new RocksDBUpdateEventBatch(new ArrayList<RocksDBUpdateEvent>() {
           {
             add(keyEvent3);
           }
