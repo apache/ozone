@@ -33,10 +33,12 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicLong;
 
+import org.apache.commons.codec.digest.DigestUtils;
 import org.apache.commons.lang3.RandomUtils;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
+import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
@@ -65,6 +67,7 @@ import org.apache.hadoop.ozone.om.helpers.OmMultipartUpload;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartUploadList;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartUploadListParts;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
+import org.apache.hadoop.ozone.om.helpers.OpenKeySession;
 import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
 import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
@@ -86,6 +89,7 @@ import static java.util.Collections.emptyList;
 import static java.util.Collections.singletonList;
 import static java.util.Comparator.comparing;
 import static java.util.stream.Collectors.toList;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.ONE;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -159,6 +163,60 @@ class TestKeyManagerUnit extends OzoneTestBase {
 
     assertEquals(0,
         omMultipartUploadListParts.getPartInfoList().size());
+  }
+
+  @Test
+  public void listMultipartUploadPartsWithoutEtagField() throws IOException {
+    // For backward compatibility reasons
+    final String volume = volumeName();
+    final String bucket = "bucketForEtag";
+    final String key = "dir/key1";
+    createBucket(metadataManager, volume, bucket);
+    OmMultipartInfo omMultipartInfo =
+        initMultipartUpload(writeClient, volume, bucket, key);
+
+
+    // Commit some MPU parts without eTag field
+    for (int i = 1; i <= 5; i++) {
+      OmKeyArgs partKeyArgs =
+          new OmKeyArgs.Builder()
+              .setVolumeName(volume)
+              .setBucketName(bucket)
+              .setKeyName(key)
+              .setIsMultipartKey(true)
+              .setMultipartUploadID(omMultipartInfo.getUploadID())
+              .setMultipartUploadPartNumber(i)
+              .setAcls(Collections.emptyList())
+              .setReplicationConfig(
+                  RatisReplicationConfig.getInstance(ReplicationFactor.THREE))
+              .build();
+
+      OpenKeySession openKey = writeClient.openKey(partKeyArgs);
+
+      OmKeyArgs commitPartKeyArgs =
+          new OmKeyArgs.Builder()
+              .setVolumeName(volume)
+              .setBucketName(bucket)
+              .setKeyName(key)
+              .setIsMultipartKey(true)
+              .setMultipartUploadID(omMultipartInfo.getUploadID())
+              .setMultipartUploadPartNumber(i)
+              .setAcls(Collections.emptyList())
+              .setReplicationConfig(
+                  RatisReplicationConfig.getInstance(ReplicationFactor.THREE))
+              .setLocationInfoList(Collections.emptyList())
+              .build();
+
+      writeClient.commitMultipartUploadPart(commitPartKeyArgs, openKey.getId());
+    }
+
+
+    OmMultipartUploadListParts omMultipartUploadListParts = keyManager
+        .listParts(volume, bucket, key, omMultipartInfo.getUploadID(),
+            0, 10);
+    assertEquals(5,
+        omMultipartUploadListParts.getPartInfoList().size());
+
   }
 
   private String volumeName() {
