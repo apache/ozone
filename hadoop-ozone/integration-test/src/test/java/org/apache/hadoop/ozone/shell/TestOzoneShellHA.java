@@ -177,7 +177,6 @@ public class TestOzoneShellHA {
     final int numDNs = 5;
     conf.set(CommonConfigurationKeysPublic.HADOOP_SECURITY_KEY_PROVIDER_PATH,
         getKeyProviderURI(miniKMS));
-    conf.setBoolean(OMConfigKeys.OZONE_OM_ENABLE_FILESYSTEM_PATHS, true);
     cluster = MiniOzoneCluster.newOMHABuilder(conf)
         .setOMServiceId(omServiceId)
         .setNumOfOzoneManagers(numOfOMs)
