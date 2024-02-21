@@ -55,6 +55,8 @@ import java.util.concurrent.Future;
 import java.util.stream.Stream;
 
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto.State.CLOSED;
+import static org.apache.hadoop.hdds.scm.ScmConfig.ConfigStrings.HDDS_SCM_INIT_DEFAULT_LAYOUT_VERSION;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
@@ -86,11 +88,12 @@ public class TestScmHAFinalization {
     SCMConfigurator configurator = new SCMConfigurator();
     configurator.setUpgradeFinalizationExecutor(executor);
 
+    conf.setInt(HDDS_SCM_INIT_DEFAULT_LAYOUT_VERSION, HDDSLayoutFeature.INITIAL_VERSION.layoutVersion());
+
     MiniOzoneCluster.Builder clusterBuilder =
         new MiniOzoneHAClusterImpl.Builder(conf)
         .setNumOfStorageContainerManagers(NUM_SCMS)
         .setNumOfActiveSCMs(NUM_SCMS - numInactiveSCMs)
-        .setScmLayoutVersion(HDDSLayoutFeature.INITIAL_VERSION.layoutVersion())
         .setSCMServiceId("scmservice")
         .setSCMConfigurator(configurator)
         .setNumOfOzoneManagers(1)
@@ -292,8 +295,8 @@ public class TestScmHAFinalization {
         inactiveScm, 0, NUM_DATANODES);
 
     // Use log to verify a snapshot was installed.
-    assertTrue(logCapture.getOutput().contains("New SCM snapshot " +
-        "received with metadata layout version"));
+    assertThat(logCapture.getOutput()).contains("New SCM snapshot " +
+        "received with metadata layout version");
   }
 
   private void waitForScmsToFinalize(Collection<StorageContainerManager> scms)

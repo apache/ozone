@@ -23,7 +23,7 @@ import java.io.IOException;
 import java.util.List;
 import java.util.UUID;
 
-import javax.annotation.Nonnull;
+import jakarta.annotation.Nonnull;
 import org.apache.hadoop.fs.SafeModeAction;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
 import org.apache.hadoop.ozone.OzoneAcl;
@@ -679,6 +679,21 @@ public interface OzoneManagerProtocol
       String bucketName, String snapshotName) throws IOException {
     throw new UnsupportedOperationException("OzoneManager does not require " +
         "this to be implemented");
+  }
+
+  /**
+   * Rename snapshot.
+   * @param volumeName vol to be used
+   * @param bucketName bucket to be used
+   * @param snapshotOldName Old name of the snapshot
+   * @param snapshotNewName New name of the snapshot
+   *
+   * @throws IOException
+   */
+  default void renameSnapshot(String volumeName,
+      String bucketName, String snapshotOldName, String snapshotNewName) throws IOException {
+    throw new UnsupportedOperationException("OzoneManager does not require " +
+         "this to be implemented");
   }
 
   /**

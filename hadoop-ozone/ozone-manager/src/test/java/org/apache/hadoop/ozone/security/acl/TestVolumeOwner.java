@@ -18,7 +18,6 @@
 
 package org.apache.hadoop.ozone.security.acl;
 
-import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
@@ -37,11 +36,9 @@ import org.apache.hadoop.ozone.om.helpers.OzoneAclUtil;
 import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.security.UserGroupInformation;
-import org.apache.hadoop.security.authentication.client.AuthenticationException;
-import org.apache.ozone.test.GenericTestUtils;
-import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
 import java.io.File;
 import java.io.IOException;
@@ -74,14 +71,14 @@ public class TestVolumeOwner {
   private static OMMetadataManager metadataManager;
   private static UserGroupInformation testUgi;
   private static OzoneManagerProtocol writeClient;
+  @TempDir
   private static File testDir;
 
   @BeforeAll
-  public static void setup() throws IOException, AuthenticationException {
+  static void setup() throws Exception {
     ozoneConfig = new OzoneConfiguration();
     ozoneConfig.set(OZONE_ACL_AUTHORIZER_CLASS,
         OZONE_ACL_AUTHORIZER_CLASS_NATIVE);
-    testDir = GenericTestUtils.getRandomizedTestDir();
     ozoneConfig.set(OZONE_METADATA_DIRS, testDir.toString());
 
     OmTestManagers omTestManagers =
@@ -102,11 +99,6 @@ public class TestVolumeOwner {
     prepareTestVols();
     prepareTestBuckets();
     prepareTestKeys();
-  }
-
-  @AfterAll
-  public static void cleanup() throws IOException {
-    FileUtils.deleteDirectory(testDir);
   }
 
   // create 2 volumes

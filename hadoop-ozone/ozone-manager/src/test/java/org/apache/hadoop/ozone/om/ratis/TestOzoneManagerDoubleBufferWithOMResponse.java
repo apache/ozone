@@ -68,7 +68,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.fail;
-import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -107,9 +107,9 @@ public class TestOzoneManagerDoubleBufferWithOMResponse {
     auditLogger = mock(AuditLogger.class);
     when(ozoneManager.getAuditLogger()).thenReturn(auditLogger);
     doNothing().when(auditLogger).logWrite(any(AuditMessage.class));
-    doubleBuffer = new OzoneManagerDoubleBuffer.Builder()
+    doubleBuffer = OzoneManagerDoubleBuffer.newBuilder()
         .setOmMetadataManager(omMetadataManager)
-        .setmaxUnFlushedTransactionCount(100000)
+        .setMaxUnFlushedTransactionCount(100000)
         .enableRatis(true)
         .build();
   }

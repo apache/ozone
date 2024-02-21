@@ -19,7 +19,7 @@ package org.apache.hadoop.ozone.om;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.hdds.scm.storage.BlockInputStream;
 import org.apache.hadoop.ozone.client.io.KeyInputStream;
-import org.jetbrains.annotations.NotNull;
+import jakarta.annotation.Nonnull;
 import org.junit.jupiter.api.Test;
 
 import java.io.ByteArrayInputStream;
@@ -76,7 +76,7 @@ public class TestChunkStreams {
     }
   }
 
-  @NotNull
+  @Nonnull
   private List<BlockInputStream> createInputStreams(String dataString) {
     byte[] buf = dataString.getBytes(UTF_8);
     List<BlockInputStream> streams = new ArrayList<>();

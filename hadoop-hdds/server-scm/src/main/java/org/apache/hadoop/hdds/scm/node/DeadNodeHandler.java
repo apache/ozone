@@ -42,7 +42,7 @@ import org.slf4j.LoggerFactory;
 
 import com.google.common.base.Preconditions;
 
-import javax.annotation.Nullable;
+import jakarta.annotation.Nullable;
 
 import static org.apache.hadoop.hdds.scm.events.SCMEvents.CLOSE_CONTAINER;
 

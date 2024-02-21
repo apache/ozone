@@ -26,7 +26,6 @@ import java.util.List;
 import java.util.ListIterator;
 import java.util.Map;
 
-import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.scm.ByteStringConversion;
 import org.apache.hadoop.hdds.scm.ContainerClientMetrics;
 import org.apache.hadoop.hdds.scm.OzoneClientConfig;
@@ -62,7 +61,7 @@ public class BlockOutputStreamEntryPool implements KeyMetadataAware {
   /**
    * List of stream entries that are used to write a block of data.
    */
-  private final List<BlockOutputStreamEntry> streamEntries;
+  private final List<BlockOutputStreamEntry> streamEntries = new ArrayList<>();
   private final OzoneClientConfig config;
   /**
    * The actual stream entry we are writing into. Note that a stream entry is
@@ -73,7 +72,6 @@ public class BlockOutputStreamEntryPool implements KeyMetadataAware {
   private final OzoneManagerProtocol omClient;
   private final OmKeyArgs keyArgs;
   private final XceiverClientFactory xceiverClientFactory;
-  private final String requestID;
   /**
    * A {@link BufferPool} shared between all
    * {@link org.apache.hadoop.hdds.scm.storage.BlockOutputStream}s managed by
@@ -86,63 +84,36 @@ public class BlockOutputStreamEntryPool implements KeyMetadataAware {
   private final ContainerClientMetrics clientMetrics;
   private final StreamBufferArgs streamBufferArgs;
 
-  @SuppressWarnings({"parameternumber", "squid:S00107"})
-  public BlockOutputStreamEntryPool(
-      OzoneClientConfig config,
-      OzoneManagerProtocol omClient,
-      String requestId, ReplicationConfig replicationConfig,
-      String uploadID, int partNumber,
-      boolean isMultipart, OmKeyInfo info,
-      boolean unsafeByteBufferConversion,
-      XceiverClientFactory xceiverClientFactory, long openID,
-      ContainerClientMetrics clientMetrics, StreamBufferArgs streamBufferArgs
-  ) {
-    this.config = config;
-    this.xceiverClientFactory = xceiverClientFactory;
-    streamEntries = new ArrayList<>();
+  public BlockOutputStreamEntryPool(KeyOutputStream.Builder b) {
+    this.config = b.getClientConfig();
+    this.xceiverClientFactory = b.getXceiverManager();
     currentStreamIndex = 0;
-    this.omClient = omClient;
+    this.omClient = b.getOmClient();
+    final OmKeyInfo info = b.getOpenHandler().getKeyInfo();
     this.keyArgs = new OmKeyArgs.Builder().setVolumeName(info.getVolumeName())
         .setBucketName(info.getBucketName()).setKeyName(info.getKeyName())
-        .setReplicationConfig(replicationConfig).setDataSize(info.getDataSize())
-        .setIsMultipartKey(isMultipart).setMultipartUploadID(uploadID)
-        .setMultipartUploadPartNumber(partNumber).build();
-    this.requestID = requestId;
-    this.openID = openID;
+        .setReplicationConfig(b.getReplicationConfig())
+        .setDataSize(info.getDataSize())
+        .setIsMultipartKey(b.isMultipartKey())
+        .setMultipartUploadID(b.getMultipartUploadID())
+        .setMultipartUploadPartNumber(b.getMultipartNumber())
+        .build();
+    this.openID = b.getOpenHandler().getId();
     this.excludeList = createExcludeList();
 
+    this.streamBufferArgs = b.getStreamBufferArgs();
     this.bufferPool =
         new BufferPool(streamBufferArgs.getStreamBufferSize(),
             (int) (streamBufferArgs.getStreamBufferMaxSize() / streamBufferArgs
                 .getStreamBufferSize()),
             ByteStringConversion
-                .createByteBufferConversion(unsafeByteBufferConversion));
-    this.clientMetrics = clientMetrics;
-    this.streamBufferArgs = streamBufferArgs;
+                .createByteBufferConversion(b.isUnsafeByteBufferConversionEnabled()));
+    this.clientMetrics = b.getClientMetrics();
   }
 
   ExcludeList createExcludeList() {
     return new ExcludeList(getConfig().getExcludeNodesExpiryTime(),
         Clock.system(ZoneOffset.UTC));
-  }
-
-  BlockOutputStreamEntryPool(ContainerClientMetrics clientMetrics,
-      OzoneClientConfig clientConfig, StreamBufferArgs streamBufferArgs) {
-    streamEntries = new ArrayList<>();
-    omClient = null;
-    keyArgs = null;
-    xceiverClientFactory = null;
-    config = clientConfig;
-    streamBufferArgs.setStreamBufferFlushDelay(false);
-    requestID = null;
-    int chunkSize = 0;
-    bufferPool = new BufferPool(chunkSize, 1);
-
-    currentStreamIndex = 0;
-    openID = -1;
-    excludeList = createExcludeList();
-    this.clientMetrics = clientMetrics;
-    this.streamBufferArgs = null;
   }
 
   /**
@@ -156,10 +127,8 @@ public class BlockOutputStreamEntryPool implements KeyMetadataAware {
    *
    * @param version the set of blocks that are pre-allocated.
    * @param openVersion the version corresponding to the pre-allocation.
-   * @throws IOException
    */
-  public void addPreallocateBlocks(OmKeyLocationInfoGroup version,
-      long openVersion) throws IOException {
+  public void addPreallocateBlocks(OmKeyLocationInfoGroup version, long openVersion) {
     // server may return any number of blocks, (0 to any)
     // only the blocks allocated in this open session (block createVersion
     // equals to open session version)

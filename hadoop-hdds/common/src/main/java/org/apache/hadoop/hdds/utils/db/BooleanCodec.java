@@ -17,7 +17,7 @@
  */
 package org.apache.hadoop.hdds.utils.db;
 
-import javax.annotation.Nonnull;
+import jakarta.annotation.Nonnull;
 
 /**
  * Codec to serialize/deserialize {@link Boolean}.

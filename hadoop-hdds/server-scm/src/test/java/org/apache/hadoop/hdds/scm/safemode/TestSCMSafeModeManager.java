@@ -19,7 +19,6 @@ package org.apache.hadoop.hdds.scm.safemode;
 
 import java.io.File;
 import java.io.IOException;
-import java.nio.file.Path;
 import java.time.Clock;
 import java.time.ZoneOffset;
 import java.util.ArrayList;
@@ -27,12 +26,10 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.UUID;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import org.apache.commons.lang3.tuple.Pair;
-import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -88,9 +85,11 @@ public class TestSCMSafeModeManager {
   private List<ContainerInfo> containers = Collections.emptyList();
 
   private SCMMetadataStore scmMetadataStore;
+  @TempDir
+  private File tempDir;
 
   @BeforeEach
-  public void setUp(@TempDir Path tempDir) throws IOException {
+  public void setUp() throws IOException {
     queue = new EventQueue();
     scmContext = SCMContext.emptyContext();
     serviceManager = new SCMServiceManager();
@@ -98,7 +97,7 @@ public class TestSCMSafeModeManager {
     config.setBoolean(HddsConfigKeys.HDDS_SCM_SAFEMODE_PIPELINE_CREATION,
         false);
     config.set(HddsConfigKeys.OZONE_METADATA_DIRS,
-        tempDir.toAbsolutePath().toString());
+        tempDir.getAbsolutePath().toString());
     scmMetadataStore = new SCMMetadataStoreImpl(config);
   }
 
@@ -397,7 +396,7 @@ public class TestSCMSafeModeManager {
       if (entry.getKey().equals(safeModeRule)) {
         Pair<Boolean, String> value = entry.getValue();
         assertEquals(false, value.getLeft());
-        assertTrue(value.getRight().contains(stringToMatch));
+        assertThat(value.getRight()).contains(stringToMatch);
       }
     }
   }
@@ -556,11 +555,8 @@ public class TestSCMSafeModeManager {
   public void testSafeModePipelineExitRule() throws Exception {
     containers = new ArrayList<>();
     containers.addAll(HddsTestUtils.getContainerInfo(25 * 4));
-    String storageDir = GenericTestUtils.getTempPath(
-        TestSCMSafeModeManager.class.getName() + UUID.randomUUID());
     try {
       MockNodeManager nodeManager = new MockNodeManager(true, 3);
-      config.set(HddsConfigKeys.OZONE_METADATA_DIRS, storageDir);
       // enable pipeline check
       config.setBoolean(
           HddsConfigKeys.HDDS_SCM_SAFEMODE_PIPELINE_AVAILABILITY_CHECK, true);
@@ -606,13 +602,11 @@ public class TestSCMSafeModeManager {
       config.setBoolean(
           HddsConfigKeys.HDDS_SCM_SAFEMODE_PIPELINE_AVAILABILITY_CHECK,
           false);
-      FileUtil.fullyDelete(new File(storageDir));
     }
   }
 
   @Test
-  public void testPipelinesNotCreatedUntilPreCheckPasses()
-      throws Exception {
+  public void testPipelinesNotCreatedUntilPreCheckPasses() throws Exception {
     int numOfDns = 5;
     // enable pipeline check
     config.setBoolean(
@@ -622,12 +616,6 @@ public class TestSCMSafeModeManager {
         true);
 
     MockNodeManager nodeManager = new MockNodeManager(true, numOfDns);
-    String storageDir = GenericTestUtils.getTempPath(
-        TestSCMSafeModeManager.class.getName() + UUID.randomUUID());
-    config.set(HddsConfigKeys.OZONE_METADATA_DIRS, storageDir);
-    // enable pipeline check
-    config.setBoolean(
-        HddsConfigKeys.HDDS_SCM_SAFEMODE_PIPELINE_AVAILABILITY_CHECK, true);
 
     PipelineManagerImpl pipelineManager =
         PipelineManagerImpl.newPipelineManager(

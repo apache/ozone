@@ -33,10 +33,9 @@ import static org.mockito.Mockito.when;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.util.List;
+import java.util.Optional;
 import java.util.concurrent.TimeUnit;
 
-
-import com.google.common.base.Optional;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.OmDBAccessIdInfo;

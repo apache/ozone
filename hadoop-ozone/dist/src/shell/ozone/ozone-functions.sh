@@ -1428,12 +1428,13 @@ function ozone_set_module_access_args
 
   # populate JVM args based on java version
   if [[ "${JAVA_MAJOR_VERSION}" -ge 17 ]]; then
-    OZONE_MODULE_ACCESS_ARGS="--add-opens java.base/java.lang=ALL-UNNAMED"
     OZONE_MODULE_ACCESS_ARGS="${OZONE_MODULE_ACCESS_ARGS} --add-opens java.management/com.sun.jmx.mbeanserver=ALL-UNNAMED"
     OZONE_MODULE_ACCESS_ARGS="${OZONE_MODULE_ACCESS_ARGS} --add-exports java.management/com.sun.jmx.mbeanserver=ALL-UNNAMED"
   fi
   if [[ "${JAVA_MAJOR_VERSION}" -ge 9 ]]; then
     OZONE_MODULE_ACCESS_ARGS="${OZONE_MODULE_ACCESS_ARGS} --add-opens java.base/java.nio=ALL-UNNAMED"
+    OZONE_MODULE_ACCESS_ARGS="${OZONE_MODULE_ACCESS_ARGS} --add-opens java.base/java.lang=ALL-UNNAMED"
+    OZONE_MODULE_ACCESS_ARGS="${OZONE_MODULE_ACCESS_ARGS} --add-opens java.base/java.lang.reflect=ALL-UNNAMED"
   fi
 }
 

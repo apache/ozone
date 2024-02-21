@@ -22,6 +22,7 @@ import com.fasterxml.jackson.databind.ObjectWriter;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.StringUtils;
 import org.apache.hadoop.hdds.client.BlockID;
+import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.utils.db.DBStore;
@@ -36,7 +37,7 @@ import org.apache.hadoop.ozone.container.keyvalue.helpers.BlockUtils;
 import org.apache.hadoop.ozone.container.metadata.DatanodeSchemaThreeDBDefinition;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
-import org.jetbrains.annotations.NotNull;
+import jakarta.annotation.Nonnull;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Named;
@@ -61,8 +62,9 @@ import java.util.TreeMap;
 import java.util.stream.Stream;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType.STAND_ALONE;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * This class tests `ozone debug ldb` CLI that reads from a RocksDB directory.
@@ -198,8 +200,8 @@ public class TestLDBCli {
   @ParameterizedTest
   @MethodSource("scanTestCases")
   void testLDBScan(
-      @NotNull Pair<String, Boolean> tableAndOption,
-      @NotNull Pair<Integer, String> expectedExitCodeStderrPair,
+      @Nonnull Pair<String, Boolean> tableAndOption,
+      @Nonnull Pair<Integer, String> expectedExitCodeStderrPair,
       List<String> scanArgs,
       Pair<String, String> dbMapRange) throws IOException {
 
@@ -236,7 +238,7 @@ public class TestLDBCli {
 
     // Check stderr
     final String stderrShouldContain = expectedExitCodeStderrPair.getRight();
-    assertTrue(stderr.toString().contains(stderrShouldContain));
+    assertThat(stderr.toString()).contains(stderrShouldContain);
   }
 
   @Test
@@ -295,8 +297,7 @@ public class TestLDBCli {
       for (int i = 1; i <= 5; i++) {
         String key = "key" + i;
         OmKeyInfo value = OMRequestTestUtils.createOmKeyInfo("vol1", "buck1",
-            key, HddsProtos.ReplicationType.STAND_ALONE,
-            HddsProtos.ReplicationFactor.ONE);
+            key, ReplicationConfig.fromProtoTypeAndFactor(STAND_ALONE, HddsProtos.ReplicationFactor.ONE)).build();
         keyTable.put(key.getBytes(UTF_8),
             value.getProtobuf(ClientVersion.CURRENT_VERSION).toByteArray());
 

@@ -207,3 +207,9 @@ Verify Multipart Upload
     ${tmp} =    Catenate    @{files}
     Execute    cat ${tmp} > /tmp/original${random}
     Compare files    /tmp/original${random}    /tmp/verify${random}
+
+Revoke S3 secrets
+    Execute and Ignore Error             ozone s3 revokesecret -y
+    Execute and Ignore Error             ozone s3 revokesecret -y -u testuser
+    Execute and Ignore Error             ozone s3 revokesecret -y -u testuser2
+

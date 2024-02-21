@@ -22,7 +22,6 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
-import java.util.UUID;
 import java.util.concurrent.TimeoutException;
 
 import org.apache.commons.io.FileUtils;
@@ -47,6 +46,7 @@ import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.tag.Flaky;
 import org.apache.ratis.server.protocol.TermIndex;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
@@ -70,8 +70,6 @@ public class TestSCMInstallSnapshotWithHA {
 
   private MiniOzoneHAClusterImpl cluster = null;
   private OzoneConfiguration conf;
-  private String clusterId;
-  private String scmId;
   private String omServiceId;
   private String scmServiceId;
   private int numOfOMs = 1;
@@ -88,8 +86,6 @@ public class TestSCMInstallSnapshotWithHA {
   @BeforeEach
   public void init() throws Exception {
     conf = new OzoneConfiguration();
-    clusterId = UUID.randomUUID().toString();
-    scmId = UUID.randomUUID().toString();
     omServiceId = "om-service-test1";
     scmServiceId = "scm-service-test1";
 
@@ -99,8 +95,6 @@ public class TestSCMInstallSnapshotWithHA {
             SNAPSHOT_THRESHOLD);
 
     cluster = (MiniOzoneHAClusterImpl) MiniOzoneCluster.newHABuilder(conf)
-        .setClusterId(clusterId)
-        .setScmId(scmId)
         .setOMServiceId(omServiceId)
         .setSCMServiceId(scmServiceId)
         .setNumOfOzoneManagers(numOfOMs)
@@ -149,7 +143,7 @@ public class TestSCMInstallSnapshotWithHA {
     }, 100, 3000);
     long followerLastAppliedIndex =
         followerSM.getLastAppliedTermIndex().getIndex();
-    assertTrue(followerLastAppliedIndex >= 200);
+    assertThat(followerLastAppliedIndex).isGreaterThanOrEqualTo(200);
     assertFalse(followerSM.getLifeCycleState().isPausingOrPaused());
 
     // Verify that the follower 's DB contains the transactions which were
@@ -206,7 +200,7 @@ public class TestSCMInstallSnapshotWithHA {
     }
 
     String errorMsg = "Reloading old state of SCM";
-    assertTrue(logCapture.getOutput().contains(errorMsg));
+    assertThat(logCapture.getOutput()).contains(errorMsg);
     assertNull(newTermIndex, " installed checkpoint even though checkpoint " +
         "logIndex is less than it's lastAppliedIndex");
     assertEquals(followerTermIndex, followerSM.getLastAppliedTermIndex());
@@ -271,8 +265,8 @@ public class TestSCMInstallSnapshotWithHA {
     scmhaManager.installCheckpoint(leaderCheckpointLocation,
         leaderCheckpointTrxnInfo);
 
-    assertTrue(logCapture.getOutput()
-        .contains("Failed to reload SCM state and instantiate services."));
+    assertThat(logCapture.getOutput())
+        .contains("Failed to reload SCM state and instantiate services.");
     final LifeCycle.State s = followerSM.getLifeCycleState();
     assertTrue(s == LifeCycle.State.NEW || s.isPausingOrPaused(), "Unexpected lifeCycle state: " + s);
 

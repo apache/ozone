@@ -17,9 +17,9 @@
 
 package org.apache.hadoop.ozone.client.rpc;
 
-import org.apache.hadoop.conf.StorageUnit;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.scm.OzoneClientConfig;
 import org.apache.hadoop.hdds.scm.XceiverClientManager;
@@ -27,6 +27,7 @@ import org.apache.hadoop.hdds.scm.XceiverClientMetrics;
 import org.apache.hadoop.hdds.scm.storage.BlockDataStreamOutput;
 import org.apache.hadoop.hdds.scm.storage.ByteBufferStreamOutput;
 import org.apache.hadoop.hdds.utils.IOUtils;
+import org.apache.hadoop.ozone.ClientConfigForTesting;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.client.ObjectStore;
@@ -92,17 +93,18 @@ public class TestBlockDataStreamOutput {
     conf.setStorageSize(OzoneConfigKeys.OZONE_SCM_BLOCK_SIZE, 4,
         StorageUnit.MB);
 
-    cluster = MiniOzoneCluster.newBuilder(conf)
-        .setNumDatanodes(5)
-        .setTotalPipelineNumLimit(3)
+    ClientConfigForTesting.newBuilder(StorageUnit.BYTES)
         .setBlockSize(blockSize)
         .setChunkSize(chunkSize)
         .setStreamBufferFlushSize(flushSize)
         .setStreamBufferMaxSize(maxFlushSize)
-        .setDataStreamBufferFlushize(maxFlushSize)
-        .setStreamBufferSizeUnit(StorageUnit.BYTES)
+        .setDataStreamBufferFlushSize(maxFlushSize)
         .setDataStreamMinPacketSize(chunkSize)
-        .setDataStreamStreamWindowSize(5 * chunkSize)
+        .setDataStreamWindowSize(5 * chunkSize)
+        .applyTo(conf);
+
+    cluster = MiniOzoneCluster.newBuilder(conf)
+        .setNumDatanodes(5)
         .build();
     cluster.waitForClusterToBeReady();
     //the easiest way to create an open container is creating a key

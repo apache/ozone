@@ -201,7 +201,7 @@ public class SCMDeletedBlockTransactionStatusManager {
     }
 
     protected void onDatanodeDead(UUID dnId) {
-      LOG.info("Clean SCMCommand record for DN: {}", dnId);
+      LOG.info("Clean SCMCommand record for Datanode: {}", dnId);
       scmCmdStatusRecord.remove(dnId);
     }
 
@@ -252,12 +252,14 @@ public class SCMDeletedBlockTransactionStatusManager {
         CommandStatus.Status newStatus) {
       Map<Long, CmdStatusData> recordForDn = scmCmdStatusRecord.get(dnId);
       if (recordForDn == null) {
-        LOG.warn("Unknown Datanode: {} scmCmdId {} newStatus {}",
+        LOG.warn("Unknown Datanode: {} Scm Command ID: {} report status {}",
             dnId, scmCmdId, newStatus);
         return;
       }
       if (recordForDn.get(scmCmdId) == null) {
-        LOG.warn("Unknown SCM Command: {} Datanode {} newStatus {}",
+        // Because of the delay in the DN report, the DN sometimes report obsolete
+        // Command status that are cleared by the SCM.
+        LOG.debug("Unknown SCM Command ID: {} Datanode: {} report status {}",
             scmCmdId, dnId, newStatus);
         return;
       }
@@ -293,22 +295,23 @@ public class SCMDeletedBlockTransactionStatusManager {
           // which should not normally occur.
           LOG.error("Received {} status for a command marked TO_BE_SENT. " +
                   "This indicates a potential issue in command handling. " +
-                  "SCM Command ID: {}, Datanode ID: {}, Current Status: {}",
+                  "SCM Command ID: {}, Datanode: {}, Current status: {}",
               newStatus, scmCmdId, dnId, oldStatus);
           removeScmCommand(dnId, scmCmdId);
           changed = true;
         }
         break;
       default:
-        LOG.error("Can not update to Unknown new Status: {}", newStatus);
+        LOG.error("Unexpected status from Datanode: {}. SCM Command ID: {} with status: {}.",
+            dnId, scmCmdId, newStatus);
         break;
       }
       if (!changed) {
-        LOG.warn("Cannot update illegal status for DN: {} ScmCommandId {} " +
-            "Status From {} to {}", dnId, scmCmdId, oldStatus, newStatus);
+        LOG.warn("Cannot update illegal status for Datanode: {} SCM Command ID: {} " +
+            "status {} by DN report status {}", dnId, scmCmdId, oldStatus, newStatus);
       } else {
-        LOG.debug("Successful update DN: {} ScmCommandId {} Status From {} to" +
-            " {}", dnId, scmCmdId, oldStatus, newStatus);
+        LOG.debug("Successful update Datanode: {} SCM Command ID: {} status From {} to" +
+            " {}, DN report status {}", dnId, scmCmdId, oldStatus, statusData.getStatus(), newStatus);
       }
     }
 
@@ -320,11 +323,8 @@ public class SCMDeletedBlockTransactionStatusManager {
         if (updateTime != null &&
             Duration.between(updateTime, now).toMillis() > timeoutMs) {
           CmdStatusData state = removeScmCommand(dnId, scmCmdId);
-          LOG.warn("Remove Timeout SCM BlockDeletionCommand {} for DN {} " +
-              "after without update {}ms}", state, dnId, timeoutMs);
-        } else {
-          LOG.warn("Timeout SCM scmCmdIds {} for DN {} " +
-              "after without update {}ms}", scmCmdIds, dnId, timeoutMs);
+          LOG.warn("SCM BlockDeletionCommand {} for Datanode: {} was removed after {}ms without update",
+              state, dnId, timeoutMs);
         }
       }
     }
@@ -335,7 +335,7 @@ public class SCMDeletedBlockTransactionStatusManager {
         return null;
       }
       CmdStatusData statusData = record.remove(scmCmdId);
-      LOG.debug("Remove ScmCommand {} for DN: {} ", statusData, dnId);
+      LOG.debug("Remove ScmCommand {} for Datanode: {} ", statusData, dnId);
       return statusData;
     }
 
@@ -483,7 +483,7 @@ public class SCMDeletedBlockTransactionStatusManager {
           // Mostly likely it's a retried delete command response.
           if (LOG.isDebugEnabled()) {
             LOG.debug(
-                "Transaction txId={} commit by dnId={} for containerID={}"
+                "Transaction txId: {} commit by Datanode: {} for ContainerId: {}"
                     + " failed. Corresponding entry not found.", txID, dnId,
                 containerId);
           }
@@ -508,13 +508,13 @@ public class SCMDeletedBlockTransactionStatusManager {
             transactionToDNsCommitMap.remove(txID);
             transactionToRetryCountMap.remove(txID);
             if (LOG.isDebugEnabled()) {
-              LOG.debug("Purging txId={} from block deletion log", txID);
+              LOG.debug("Purging txId: {} from block deletion log", txID);
             }
             txIDsToBeDeleted.add(txID);
           }
         }
         if (LOG.isDebugEnabled()) {
-          LOG.debug("Datanode txId={} containerId={} committed by dnId={}",
+          LOG.debug("Datanode txId: {} ContainerId: {} committed by Datanode: {}",
               txID, containerId, dnId);
         }
       } catch (IOException e) {
@@ -557,7 +557,7 @@ public class SCMDeletedBlockTransactionStatusManager {
       lastStatus.put(cmdStatus.getCmdId(), cmdStatus);
       summary.put(cmdStatus.getCmdId(), cmdStatus.getStatus());
     });
-    LOG.debug("CommandStatus {} from Datanode {} ", summary, dnID);
+    LOG.debug("CommandStatus {} from Datanode: {} ", summary, dnID);
     for (Map.Entry<Long, CommandStatus> entry : lastStatus.entrySet()) {
       CommandStatus.Status status = entry.getValue().getStatus();
       scmDeleteBlocksCommandStatusManager.updateStatusByDNCommandStatus(
@@ -568,11 +568,11 @@ public class SCMDeletedBlockTransactionStatusManager {
   private boolean isTransactionFailed(DeleteBlockTransactionResult result) {
     if (LOG.isDebugEnabled()) {
       LOG.debug(
-          "Got block deletion ACK from datanode, TXIDs={}, " + "success={}",
+          "Got block deletion ACK from datanode, TXIDs {}, " + "success {}",
           result.getTxID(), result.getSuccess());
     }
     if (!result.getSuccess()) {
-      LOG.warn("Got failed ACK for TXID={}, prepare to resend the "
+      LOG.warn("Got failed ACK for TXID {}, prepare to resend the "
           + "TX in next interval", result.getTxID());
       return true;
     }

@@ -392,11 +392,11 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
   public synchronized void pause() {
     LOG.info("OzoneManagerStateMachine is pausing");
     statePausedCount.incrementAndGet();
-    if (getLifeCycleState() == LifeCycle.State.PAUSED) {
+    final LifeCycle.State state = getLifeCycleState();
+    if (state == LifeCycle.State.PAUSED) {
       return;
     }
-    final LifeCycle lc = getLifeCycle();
-    if (lc.getCurrentState() != LifeCycle.State.NEW) {
+    if (state != LifeCycle.State.NEW) {
       getLifeCycle().transition(LifeCycle.State.PAUSING);
       getLifeCycle().transition(LifeCycle.State.PAUSED);
     }
@@ -423,13 +423,13 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
   }
 
   public OzoneManagerDoubleBuffer buildDoubleBufferForRatis() {
-    int maxUnflushedTransactionSize = ozoneManager.getConfiguration()
+    final int maxUnFlushedTransactionCount = ozoneManager.getConfiguration()
         .getInt(OMConfigKeys.OZONE_OM_UNFLUSHED_TRANSACTION_MAX_COUNT,
             OMConfigKeys.OZONE_OM_UNFLUSHED_TRANSACTION_MAX_COUNT_DEFAULT);
-    return new OzoneManagerDoubleBuffer.Builder()
+    return OzoneManagerDoubleBuffer.newBuilder()
         .setOmMetadataManager(ozoneManager.getMetadataManager())
         .setUpdateLastAppliedIndex(this::updateLastAppliedTermIndex)
-        .setmaxUnFlushedTransactionCount(maxUnflushedTransactionSize)
+        .setMaxUnFlushedTransactionCount(maxUnFlushedTransactionCount)
         .setThreadPrefix(threadPrefix)
         .setS3SecretManager(ozoneManager.getS3SecretManager())
         .enableRatis(true)

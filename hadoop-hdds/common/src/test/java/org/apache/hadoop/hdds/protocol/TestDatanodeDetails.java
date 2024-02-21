@@ -29,7 +29,6 @@ import static org.apache.hadoop.ozone.ClientVersion.DEFAULT_VERSION;
 import static org.apache.hadoop.ozone.ClientVersion.VERSION_HANDLES_UNKNOWN_DN_PORTS;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.fail;
 
 /**
  * Test for {@link DatanodeDetails}.
@@ -50,14 +49,10 @@ public class TestDatanodeDetails {
   }
 
   public static void assertPorts(HddsProtos.DatanodeDetailsProto dn,
-      Set<Port.Name> expectedPorts) {
+      Set<Port.Name> expectedPorts) throws IllegalArgumentException {
     assertEquals(expectedPorts.size(), dn.getPortsCount());
     for (HddsProtos.Port port : dn.getPortsList()) {
-      try {
-        assertThat(expectedPorts).contains(Port.Name.valueOf(port.getName()));
-      } catch (IllegalArgumentException e) {
-        fail("Unknown port: " + port.getName());
-      }
+      assertThat(expectedPorts).contains(Port.Name.valueOf(port.getName()));
     }
   }
 

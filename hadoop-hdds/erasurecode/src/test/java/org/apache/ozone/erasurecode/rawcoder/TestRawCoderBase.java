@@ -24,9 +24,9 @@ import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 
 /**
@@ -93,13 +93,9 @@ public abstract class TestRawCoderBase extends TestCoderBase {
   protected void testCodingWithBadInput(boolean usingDirectBuffer) {
     this.usingDirectBuffer = usingDirectBuffer;
     prepareCoders(true);
-
-    try {
-      performTestCoding(baseChunkSize, false, true, false);
-      fail("Encoding test with bad input should fail");
-    } catch (Exception e) {
-      // Expected
-    }
+    assertThrows(Exception.class,
+        () -> performTestCoding(baseChunkSize, false, true, false),
+        "Encoding test with bad input should fail");
   }
 
   /**
@@ -109,13 +105,9 @@ public abstract class TestRawCoderBase extends TestCoderBase {
   protected void testCodingWithBadOutput(boolean usingDirectBuffer) {
     this.usingDirectBuffer = usingDirectBuffer;
     prepareCoders(true);
-
-    try {
-      performTestCoding(baseChunkSize, false, false, true);
-      fail("Decoding test with bad output should fail");
-    } catch (Exception e) {
-      // Expected
-    }
+    assertThrows(Exception.class,
+        () -> performTestCoding(baseChunkSize, false, false, true),
+        "Decoding test with bad output should fail");
   }
 
   /**
@@ -132,30 +124,19 @@ public abstract class TestRawCoderBase extends TestCoderBase {
     final ECChunk[] parity = prepareParityChunksForEncoding();
     IOException ioException = assertThrows(IOException.class,
         () -> encoder.encode(data, parity));
-    assertTrue(ioException.getMessage().contains("closed"));
+    assertThat(ioException.getMessage()).contains("closed");
     decoder.release();
     final ECChunk[] in = prepareInputChunksForDecoding(data, parity);
     final ECChunk[] out = prepareOutputChunksForDecoding();
     ioException = assertThrows(IOException.class,
         () -> decoder.decode(in, getErasedIndexesForDecoding(), out));
-    assertTrue(ioException.getMessage().contains("closed"));
+    assertThat(ioException.getMessage()).contains("closed");
   }
 
   @Test
   public void testCodingWithErasingTooMany() {
-    try {
-      testCoding(true);
-      fail("Decoding test erasing too many should fail");
-    } catch (Exception e) {
-      // Expected
-    }
-
-    try {
-      testCoding(false);
-      fail("Decoding test erasing too many should fail");
-    } catch (Exception e) {
-      // Expected
-    }
+    assertThrows(Exception.class, () -> testCoding(true), "Decoding test erasing too many should fail");
+    assertThrows(Exception.class, () -> testCoding(false), "Decoding test erasing too many should fail");
   }
 
   @Test

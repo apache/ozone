@@ -30,12 +30,13 @@ import org.apache.hadoop.ozone.segmentparser.DatanodeRatisLogParser;
 
 import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_RATIS_PIPELINE_LIMIT;
+import static org.assertj.core.api.Assertions.assertThat;
 
 /**
  * Test Datanode Ratis log parser.
@@ -50,8 +51,9 @@ public class TestDnRatisLogParser {
   @BeforeEach
   public void setup() throws Exception {
     OzoneConfiguration conf = new OzoneConfiguration();
+    conf.setInt(OZONE_SCM_RATIS_PIPELINE_LIMIT, 2);
     cluster = MiniOzoneCluster.newBuilder(conf)
-        .setNumDatanodes(1).setTotalPipelineNumLimit(2).build();
+        .setNumDatanodes(1).build();
     cluster.waitForClusterToBeReady();
     System.setOut(new PrintStream(out, false, UTF_8.name()));
     System.setErr(new PrintStream(err, false, UTF_8.name()));
@@ -78,14 +80,14 @@ public class TestDnRatisLogParser {
     File currentDir = new File(pipelineDir, "current");
     File logFile = new File(currentDir, "log_inprogress_0");
     GenericTestUtils.waitFor(logFile::exists, 100, 15000);
-    Assertions.assertTrue(logFile.isFile());
+    assertThat(logFile).isFile();
 
     DatanodeRatisLogParser datanodeRatisLogParser =
         new DatanodeRatisLogParser();
     datanodeRatisLogParser.setSegmentFile(logFile);
     datanodeRatisLogParser.parseRatisLogs(
         DatanodeRatisLogParser::smToContainerLogString);
-    Assertions.assertTrue(out.toString(StandardCharsets.UTF_8.name())
-        .contains("Num Total Entries:"));
+    assertThat(out.toString(StandardCharsets.UTF_8.name()))
+        .contains("Num Total Entries:");
   }
 }

@@ -47,8 +47,8 @@ import static org.apache.hadoop.ozone.om.OMMultiTenantManager.OZONE_TENANT_RANGE
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.junit.jupiter.api.Assertions.fail;
 
 /**
  * To test MultiTenantAccessController with Ranger Client.
@@ -166,12 +166,7 @@ public class TestMultiTenantAccessController {
     assertEquals(prevPolicyVersion + 2L, currPolicyVersion);
 
     // get to check it is deleted.
-    try {
-      controller.getPolicy(policyName);
-      fail("Expected exception for missing policy.");
-    } catch (Exception ex) {
-       // Expected since policy is not there.
-    }
+    assertThrows(Exception.class, () -> controller.getPolicy(policyName));
   }
 
   @Test
@@ -194,12 +189,7 @@ public class TestMultiTenantAccessController {
             .setName(policyName)
             .addVolume(volumeName + "2")
             .build();
-    try {
-      controller.createPolicy(sameNamePolicy);
-      fail("Expected exception for duplicate policy.");
-    } catch (Exception ex) {
-      // Expected since a policy with the same name should not be allowed.
-    }
+    assertThrows(Exception.class, () -> controller.createPolicy(sameNamePolicy));
 
     // Create a policy with different name but same resource.
     // Check for error.
@@ -208,12 +198,7 @@ public class TestMultiTenantAccessController {
             .setName(policyName + "2")
             .addVolume(volumeName)
             .build();
-    try {
-      controller.createPolicy(sameResourcePolicy);
-      fail("Expected exception for duplicate policy.");
-    } catch (Exception ex) {
-      // Expected since a policy with the same resource should not be allowed.
-    }
+    assertThrows(Exception.class, () -> controller.createPolicy(sameResourcePolicy));
 
     // delete policy.
     controller.deletePolicy(policyName);
@@ -369,12 +354,7 @@ public class TestMultiTenantAccessController {
     // delete role.
     controller.deleteRole(roleName);
     // get to check it is deleted.
-    try {
-      controller.getRole(roleName);
-      fail("Expected exception for missing role.");
-    } catch (Exception ex) {
-      // Expected since policy is not there.
-    }
+    assertThrows(Exception.class, () -> controller.getRole(roleName));
   }
 
   @Test
@@ -393,13 +373,7 @@ public class TestMultiTenantAccessController {
             .setName(roleName)
             .setDescription(OZONE_TENANT_RANGER_ROLE_DESCRIPTION)
             .build();
-    try {
-      controller.createRole(sameNameRole);
-      fail("Expected exception for duplicate role.");
-    } catch (Exception ex) {
-      // Expected since a policy with the same name should not be allowed.
-    }
-
+    assertThrows(Exception.class, () -> controller.createRole(sameNameRole));
     // delete role.
     controller.deleteRole(roleName);
   }

@@ -42,12 +42,12 @@ import java.util.UUID;
 
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_METADATA_DIR_NAME;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SECURITY_ENABLED_KEY;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
 
 /**
@@ -174,7 +174,7 @@ public class TestXceiverClientManager {
       Throwable t = assertThrows(IOException.class,
           () -> ContainerProtocolCalls.createContainer(client1,
               container1.getContainerInfo().getContainerID(), null));
-      assertTrue(t.getMessage().contains("This channel is not connected"));
+      assertThat(t.getMessage()).contains("This channel is not connected");
 
       clientManager.releaseClient(client2, false);
     }
@@ -225,7 +225,7 @@ public class TestXceiverClientManager {
       Throwable t = assertThrows(IOException.class,
           () -> ContainerProtocolCalls.createContainer(client1,
               container1.getContainerInfo().getContainerID(), null));
-      assertTrue(t.getMessage().contains("This channel is not connected"));
+      assertThat(t.getMessage()).contains("This channel is not connected");
 
       clientManager.releaseClient(client2, false);
     }

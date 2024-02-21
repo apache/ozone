@@ -79,6 +79,7 @@ import org.apache.hadoop.ozone.om.request.snapshot.OMSnapshotCreateRequest;
 import org.apache.hadoop.ozone.om.request.snapshot.OMSnapshotDeleteRequest;
 import org.apache.hadoop.ozone.om.request.snapshot.OMSnapshotMoveDeletedKeysRequest;
 import org.apache.hadoop.ozone.om.request.snapshot.OMSnapshotPurgeRequest;
+import org.apache.hadoop.ozone.om.request.snapshot.OMSnapshotRenameRequest;
 import org.apache.hadoop.ozone.om.request.snapshot.OMSnapshotSetPropertyRequest;
 import org.apache.hadoop.ozone.om.request.upgrade.OMCancelPrepareRequest;
 import org.apache.hadoop.ozone.om.request.upgrade.OMFinalizeUpgradeRequest;
@@ -224,6 +225,8 @@ public final class OzoneManagerRatisUtils {
       return new OMSnapshotCreateRequest(omRequest);
     case DeleteSnapshot:
       return new OMSnapshotDeleteRequest(omRequest);
+    case RenameSnapshot:
+      return new OMSnapshotRenameRequest(omRequest);
     case SnapshotMoveDeletedKeys:
       return new OMSnapshotMoveDeletedKeysRequest(omRequest);
     case SnapshotPurge:

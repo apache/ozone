@@ -63,7 +63,7 @@ import org.apache.hadoop.ozone.recon.scm.ReconContainerReportQueue;
 import org.apache.hadoop.security.authentication.client.AuthenticationException;
 import org.hadoop.ozone.recon.schema.tables.daos.GlobalStatsDao;
 import org.hadoop.ozone.recon.schema.tables.pojos.GlobalStats;
-import org.jetbrains.annotations.NotNull;
+import jakarta.annotation.Nonnull;
 import org.jooq.Configuration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -86,7 +86,7 @@ public class ReconUtils {
     return new ReconUtils().getReconDbDir(conf, OZONE_RECON_SCM_DB_DIR);
   }
 
-  @NotNull
+  @Nonnull
   public static List<BlockingQueue<SCMDatanodeHeartbeatDispatcher
       .ContainerReport>> initContainerReportQueue(
       OzoneConfiguration configuration) {
