@@ -136,7 +136,7 @@ public class TestSstFilteringService {
         keyManager.getSnapshotSstFilteringService();
 
     final int keyCount = 100;
-    String volumeName = "vol1";
+    String volumeName = "volz";
     String bucketName1 = "buck1";
     createVolume(volumeName);
     addBucketToVolume(volumeName, bucketName1);
@@ -215,7 +215,7 @@ public class TestSstFilteringService {
         OmSnapshotManager.getSnapshotPath(conf, snapshotInfo);
 
     for (LiveFileMetaData file : allFiles) {
-      //Skipping the previous files from this check.
+      //Skipping the previous files from this check even those also works.
       if (listPreviousFiles.contains(file.fileName())) {
         continue;
       }
@@ -388,7 +388,7 @@ public class TestSstFilteringService {
   @Test
   public void testSstFilteringService() throws Exception {
     RDBStore activeDbStore = (RDBStore) om.getMetadataManager().getStore();
-    String volumeName = "vol0";
+    String volumeName = "volume";
     List<String> bucketNames = Arrays.asList("bucket", "bucket1", "bucket2");
 
     createVolume(volumeName);
