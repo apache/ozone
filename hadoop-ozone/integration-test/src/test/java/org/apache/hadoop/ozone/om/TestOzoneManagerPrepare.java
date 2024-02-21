@@ -24,6 +24,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
+import static org.apache.hadoop.ozone.OzoneConsts.TRANSACTION_INFO_KEY;
 
 import java.io.File;
 import java.io.IOException;
@@ -42,6 +43,7 @@ import java.util.concurrent.Future;
 
 import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
+import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.hadoop.ozone.MiniOzoneHAClusterImpl;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneVolume;
@@ -336,6 +338,19 @@ public class TestOzoneManagerPrepare extends TestOzoneManagerHA {
     submitCancelPrepareRequest();
     assertClusterNotPrepared();
     assertKeysWritten(volumeNameNew, writtenKeys);
+  }
+
+  @Test
+  public void testPrepare() throws Exception {
+    long prepareIndex = submitPrepareRequest();
+
+    // Make sure all OMs are prepared.
+    assertClusterPrepared(prepareIndex);
+    assertRatisLogsCleared();
+    TransactionInfo txnInfo =
+        cluster.getOzoneManager().getMetadataManager().getTransactionInfoTable()
+            .getSkipCache(TRANSACTION_INFO_KEY);
+    assertTrue(txnInfo.getTransactionIndex() >= prepareIndex);
   }
 
   private boolean logFilesPresentInRatisPeer(OzoneManager om) {

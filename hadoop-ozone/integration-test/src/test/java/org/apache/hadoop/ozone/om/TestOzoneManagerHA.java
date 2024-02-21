@@ -84,7 +84,7 @@ public abstract class TestOzoneManagerHA {
   /* Reduce max number of retries to speed up unit test. */
   private static final int OZONE_CLIENT_FAILOVER_MAX_ATTEMPTS = 5;
   private static final int IPC_CLIENT_CONNECT_MAX_RETRIES = 4;
-  private static final long SNAPSHOT_THRESHOLD = 50;
+  private static final long SNAPSHOT_THRESHOLD = 1;
   private static final Duration RETRY_CACHE_DURATION = Duration.ofSeconds(30);
   private static OzoneClient client;
 
