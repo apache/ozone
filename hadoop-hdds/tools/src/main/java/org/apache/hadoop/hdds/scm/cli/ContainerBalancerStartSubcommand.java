@@ -84,7 +84,7 @@ public class ContainerBalancerStartSubcommand extends ScmSubcommand {
           "from source to target (for example, '65' for 65m).")
   private Optional<Long> moveTimeout;
 
-  @Option(names ={"-mrt", "--move-replication-timeout"},
+  @Option(names = {"-mrt", "--move-replication-timeout"},
       description = "The " +
           "amount of time to allow a single container's replication from source " +
           "to target as part of container move. For example, if \"hdds.container" +
@@ -115,13 +115,9 @@ public class ContainerBalancerStartSubcommand extends ScmSubcommand {
 
   @Override
   public void execute(ScmClient scmClient) throws IOException {
+    ContainerBalancerStartRequest start = new ContainerBalancerStartRequest();
     StartContainerBalancerResponseProto response = scmClient.
-        startContainerBalancer(threshold, iterations,
-        maxDatanodesPercentageToInvolvePerIteration,
-        maxSizeToMovePerIterationInGB, maxSizeEnteringTargetInGB,
-        maxSizeLeavingSourceInGB, balancingInterval, moveTimeout,
-        moveReplicationTimeout, networkTopologyEnable, includeNodes,
-        excludeNodes);
+            startContainerBalancer(start);
     if (response.getStart()) {
       System.out.println("Container Balancer started successfully.");
     } else {

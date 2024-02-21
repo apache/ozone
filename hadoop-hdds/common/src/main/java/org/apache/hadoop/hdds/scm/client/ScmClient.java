@@ -356,6 +356,7 @@ public interface ScmClient extends Closeable {
   /**
    * Start ContainerBalancer.
    */
+  @SuppressWarnings("checkstyle:parameternumber")
   StartContainerBalancerResponseProto startContainerBalancer(
       Optional<Double> threshold,
       Optional<Integer> iterations,

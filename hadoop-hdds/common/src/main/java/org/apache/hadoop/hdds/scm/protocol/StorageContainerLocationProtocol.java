@@ -402,6 +402,7 @@ public interface StorageContainerLocationProtocol extends Closeable {
    * @return {@link StartContainerBalancerResponseProto} that contains the
    * start status and an optional message.
    */
+  @SuppressWarnings("checkstyle:parameternumber")
   StartContainerBalancerResponseProto startContainerBalancer(
       Optional<Double> threshold,
       Optional<Integer> iterations,

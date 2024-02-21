@@ -1113,7 +1113,7 @@ public class SCMClientProtocolServer implements
 
     if (balancingInterval.isPresent()) {
       long bi = balancingInterval.get();
-      auditMap.put("balancingInterval",String.valueOf(bi));
+      auditMap.put("balancingInterval", String.valueOf(bi));
       Preconditions.checkState(bi > 0,
               "balancingInterval must be greater than zero.");
       cbc.setBalancingInterval(bi);
