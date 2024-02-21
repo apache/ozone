@@ -1002,7 +1002,7 @@ public class ObjectEndpoint extends EndpointBase {
       // If the OmMultipartCommitUploadPartInfo does not contain eTag,
       // fall back to MPU part name for compatibility in case the (old) OM
       // does not return the eTag field
-      if (eTag == null) {
+      if (StringUtils.isEmpty(eTag)) {
         eTag = omMultipartCommitUploadPartInfo.getPartName();
       }
 
