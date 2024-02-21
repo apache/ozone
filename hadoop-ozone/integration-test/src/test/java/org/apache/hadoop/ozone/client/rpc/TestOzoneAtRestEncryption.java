@@ -72,6 +72,7 @@ import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OzoneManager;
+import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
@@ -92,6 +93,7 @@ import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
 import static org.apache.hadoop.hdds.utils.ClusterContainersUtil.getContainerByID;
 import static org.apache.hadoop.hdds.utils.ClusterContainersUtil.verifyOnDiskData;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ADDRESS_KEY;
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.NO_SUCH_MULTIPART_UPLOAD_ERROR;
 import static org.apache.ozone.test.GenericTestUtils.getTestStartTime;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
@@ -101,6 +103,7 @@ import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.verify;
@@ -490,6 +493,18 @@ class TestOzoneAtRestEncryption {
 
   @ParameterizedTest
   @EnumSource
+  void mpuOnePartInvalidUploadID(BucketLayout bucketLayout) throws Exception {
+    String volumeName = UUID.randomUUID().toString();
+    String bucketName = UUID.randomUUID().toString();
+    OMException e = assertThrows(OMException.class, () ->
+        testMultipartUploadWithEncryption(
+        createVolumeAndBucket(volumeName, bucketName, bucketLayout), 1, false, true)
+    );
+    assertEquals(NO_SUCH_MULTIPART_UPLOAD_ERROR, e.getResult());
+  }
+
+  @ParameterizedTest
+  @EnumSource
   void mpuTwoParts(BucketLayout bucketLayout) throws Exception {
     String volumeName = UUID.randomUUID().toString();
     String bucketName = UUID.randomUUID().toString();
@@ -565,11 +580,20 @@ class TestOzoneAtRestEncryption {
 
   private void testMultipartUploadWithEncryption(OzoneBucket bucket,
       int numParts, boolean isStream) throws Exception {
+    testMultipartUploadWithEncryption(bucket, numParts, false, false);
+  }
+
+  private void testMultipartUploadWithEncryption(OzoneBucket bucket,
+      int numParts, boolean isStream, boolean invalidUploadID) throws Exception {
     String keyName = "mpu_test_key_" + numParts;
 
     // Initiate multipart upload
     String uploadID = initiateMultipartUpload(bucket, keyName,
         ReplicationConfig.fromTypeAndFactor(RATIS, ONE));
+
+    if (invalidUploadID) {
+      uploadID += "random1234";
+    }
 
     // Upload Parts
     Map<Integer, String> partsMap = new TreeMap<>();
