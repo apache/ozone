@@ -115,9 +115,13 @@ public class ContainerBalancerStartSubcommand extends ScmSubcommand {
 
   @Override
   public void execute(ScmClient scmClient) throws IOException {
-    ContainerBalancerStartRequest start = new ContainerBalancerStartRequest();
     StartContainerBalancerResponseProto response = scmClient.
-            startContainerBalancer(start);
+            startContainerBalancer(threshold, iterations,
+            maxDatanodesPercentageToInvolvePerIteration,
+            maxSizeToMovePerIterationInGB, maxSizeEnteringTargetInGB,
+            maxSizeLeavingSourceInGB, balancingInterval, moveTimeout,
+            moveReplicationTimeout, networkTopologyEnable, includeNodes,
+            excludeNodes);
     if (response.getStart()) {
       System.out.println("Container Balancer started successfully.");
     } else {
