@@ -125,12 +125,17 @@ public class ContainerSizeCountTask extends ReconScmTask {
   private void process(ContainerInfo container,
       Map<ContainerSizeCountKey, Long> map) {
     final ContainerID id = container.containerID();
-    final long currentSize = container.getUsedBytes();
-    if (currentSize < 0) {
-      LOG.error("Negative container size: {} for container: {}", currentSize,
-          id);
-      return;
+    final long usedBytes = container.getUsedBytes();
+    final long currentSize;
+
+    if (usedBytes < 0) {
+      LOG.warn("Negative usedBytes ({}) for container {}, treating it as 0",
+          usedBytes, id);
+      currentSize = 0;
+    } else {
+      currentSize = usedBytes;
     }
+
     final Long previousSize = processedContainers.put(id, currentSize);
     if (previousSize != null) {
       decrementContainerSizeCount(previousSize, map);
