@@ -28,11 +28,8 @@ import org.apache.hadoop.hdds.scm.StreamBufferArgs;
 import org.apache.hadoop.hdds.scm.XceiverClientFactory;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.storage.BlockOutputStream;
-import org.apache.hadoop.hdds.scm.storage.BufferPool;
 import org.apache.hadoop.hdds.scm.storage.ECBlockOutputStream;
-import org.apache.hadoop.hdds.security.token.OzoneBlockTokenIdentifier;
 import org.apache.hadoop.hdds.utils.IOUtils;
-import org.apache.hadoop.security.token.Token;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -74,19 +71,10 @@ public class ECBlockOutputStreamEntry extends BlockOutputStreamEntry {
   private int currentStreamIdx = 0;
   private long successfulBlkGrpAckedLen;
 
-  @SuppressWarnings({"parameternumber", "squid:S00107"})
-  ECBlockOutputStreamEntry(BlockID blockID, String key,
-      XceiverClientFactory xceiverClientManager, Pipeline pipeline, long length,
-      BufferPool bufferPool, Token<OzoneBlockTokenIdentifier> token,
-      OzoneClientConfig config, StreamBufferArgs streamBufferArgs,
-      BlockOutputStreamResourceProvider provider) {
-    super(blockID, key, xceiverClientManager, pipeline, length, bufferPool,
-        token, config, streamBufferArgs, provider);
-    assertInstanceOf(
-        pipeline.getReplicationConfig(), ECReplicationConfig.class);
-    this.replicationConfig =
-        (ECReplicationConfig) pipeline.getReplicationConfig();
-    this.length = replicationConfig.getData() * length;
+  ECBlockOutputStreamEntry(Builder b) {
+    super(b);
+    this.replicationConfig = assertInstanceOf(b.getPipeline().getReplicationConfig(), ECReplicationConfig.class);
+    this.length = replicationConfig.getData() * b.getLength();
   }
 
   @Override
@@ -433,83 +421,9 @@ public class ECBlockOutputStreamEntry extends BlockOutputStreamEntry {
   /**
    * Builder class for ChunkGroupOutputStreamEntry.
    * */
-  public static class Builder {
-    private BlockID blockID;
-    private String key;
-    private XceiverClientFactory xceiverClientManager;
-    private Pipeline pipeline;
-    private long length;
-    private BufferPool bufferPool;
-    private Token<OzoneBlockTokenIdentifier> token;
-    private OzoneClientConfig config;
-    private StreamBufferArgs streamBufferArgs;
-    private BlockOutputStreamResourceProvider blockOutputStreamResourceProvider;
-
-    public ECBlockOutputStreamEntry.Builder setBlockID(BlockID bID) {
-      this.blockID = bID;
-      return this;
-    }
-
-    public ECBlockOutputStreamEntry.Builder setKey(String keys) {
-      this.key = keys;
-      return this;
-    }
-
-    public ECBlockOutputStreamEntry.Builder setXceiverClientManager(
-        XceiverClientFactory
-            xClientManager) {
-      this.xceiverClientManager = xClientManager;
-      return this;
-    }
-
-    public ECBlockOutputStreamEntry.Builder setPipeline(Pipeline ppln) {
-      this.pipeline = ppln;
-      return this;
-    }
-
-    public ECBlockOutputStreamEntry.Builder setLength(long len) {
-      this.length = len;
-      return this;
-    }
-
-    public ECBlockOutputStreamEntry.Builder setBufferPool(BufferPool pool) {
-      this.bufferPool = pool;
-      return this;
-    }
-
-    public ECBlockOutputStreamEntry.Builder setConfig(
-        OzoneClientConfig clientConfig) {
-      this.config = clientConfig;
-      return this;
-    }
-
-    public ECBlockOutputStreamEntry.Builder setToken(
-        Token<OzoneBlockTokenIdentifier> bToken) {
-      this.token = bToken;
-      return this;
-    }
-    public ECBlockOutputStreamEntry.Builder setblockOutputStreamResourceProvider(
-        BlockOutputStreamResourceProvider provider) {
-      this.blockOutputStreamResourceProvider = provider;
-      return this;
-    }
-
-    public ECBlockOutputStreamEntry.Builder setStreamBufferArgs(
-        StreamBufferArgs args) {
-      this.streamBufferArgs = args;
-      return this;
-    }
-
+  public static class Builder extends BlockOutputStreamEntry.Builder {
     public ECBlockOutputStreamEntry build() {
-      return new ECBlockOutputStreamEntry(blockID,
-          key,
-          xceiverClientManager,
-          pipeline,
-          length,
-          bufferPool,
-          token, config, streamBufferArgs,
-          blockOutputStreamResourceProvider
-      );
+      return new ECBlockOutputStreamEntry(this);
     }
   }
 }
