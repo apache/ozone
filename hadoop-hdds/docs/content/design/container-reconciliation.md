@@ -91,7 +91,8 @@ Since the container hash is generated leveraging the checksum recorded at the ti
 
 3. Add a mechanism for SCM to trigger this reconciliation as part of the existing heartbeat command protocol SCM uses to communicate with datanodes.
 
-4. an `ozone admin container reconcile <container-id>` CLI that can be used to manually resolve diverged container states among non-open container replicas.
+4. An `ozone admin container reconcile <container-id>` CLI that can be used to manually resolve diverged container states among non-open container replicas.
+    - When SCM gets this command, it would trigger one reconcile command for each replica. The CLI would be asynchronous so progress could be checked using container level checksum info added to `ozone admin container info` output.
 
 5. Delete blocks that a Container Replica has not yet deleted.
 
@@ -271,7 +272,7 @@ This section defines how container reconciliation will function as events occur 
 
 #### On Container Close
 
-- Container checksum is calculated asynchronously using the checksums recorded at the time of write and recorded in RocksDB. This calculation must finish before the close is acked back to SCM.
+- Container checksum is calculated using the checksums that were recorded in RocksDB at the time of write. This calculation must finish before the close is acked back to SCM.
     - **Invariant**: All closed containers have a checksum even in the case of restarts and failures because SCM will retry the close command if it does not receive an ack.
       - Null handling should still be in place for containers created before this feature, and to guard against bugs.
 
@@ -280,7 +281,7 @@ This section defines how container reconciliation will function as events occur 
 1. Scanner reads chunks and compares it to the checksums in RocksDB.
 2. Scanner updates Merkle tree to match the current contents of the disk. It does not update RocksDB.
    - Update Merkle tree checksums in a rolling fashion per chunk and block as scanning progresses.
-   - Note: The checksums recorded in the RocksDB are immutable and cannot be updated at any point in time.
+   - **Note**: The checksums recorded in RocksDB are immutable and cannot be updated at any point in time. Only new chunks and their checksums can be added as part of reconciliation.
 3. If scanner detects local corruption (RocksDB hash does not match hash calculated from disk), marks container unhealthy and sends an incremental container report to SCM with its calculated container hash.
     - The Merkle Tree is still updated to reflect the current contents of the disk in this case.
 
@@ -326,3 +327,18 @@ There may be cases where a container is critically under-replicated and we need 
 
 Since the scanner can generate the container merkle trees in the background, existing containers created before this feature will still be eligible for reconciliation. These old containers may not have all of their block deletes present in the merkle tree, however, which could cause some false positives about missing blocks on upgrade if one node had already deleted blocks from a container before the upgrade, and another datanode has not yet processed the delete of those blocks.
 
+This can be mitigated by:
+1. Having datanodes delete blocks from their container replica on reconciliation that another replica has marked as deleted.
+2. Having SCM periodically ask datanodes to reconcile otherwise matching containers when there are no other mismatched containers in the cluster.
+
+The sequence of events would look like this. Assume software v1 does not have container reconciliation, but v2 does.
+1. Datanode 1 in v1 deletes block 1 in container 1. This does not leave a tombstone entry because v1 does not have container reconciliation.
+2. Cluster is upgraded to v2.
+3. Reconciliation is triggered between datanodes 1 and 2 for container 1. Datanode 2 has not yet deleted block 1.
+4. Datanode 1 will add block 1 to its container when reconciling with datanode 2.
+    - If we stop here, then block 1 will remain orphaned on datanode 1.
+5. Datanode 2 deletes block 1 and adds a tombstone entry for it since the cluster is running software v2 which has container reconciliation.
+6. Since container checksums disregard deleted blocks, container 1 will be seen as matching from SCM's point of view. However, periodic reconciliation requests for closed containers will still eventually ask these two replicas to reconcile.
+7. Datanode 1 learns that block 1 was deleted from datanode 2, so it moves the block metadata to the deleted table in RocksDB
+    - A delete transaction entry with an ID key would need to be created to do this. Currently these are only received from SCM and not created by the datanode.
+8. Datanode block deleting service deletes this block as usual.
