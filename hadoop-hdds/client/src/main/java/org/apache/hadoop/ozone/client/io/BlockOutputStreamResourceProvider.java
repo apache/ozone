@@ -20,7 +20,6 @@ package org.apache.hadoop.ozone.client.io;
 
 import java.util.concurrent.ExecutorService;
 import java.util.function.Supplier;
-import org.apache.hadoop.hdds.scm.ContainerClientMetrics;
 
 /**
  * Provides resources for BlockOutputStream, including executor service,
@@ -28,20 +27,16 @@ import org.apache.hadoop.hdds.scm.ContainerClientMetrics;
  */
 public final class BlockOutputStreamResourceProvider {
   private final Supplier<ExecutorService> executorServiceSupplier;
-  private final ContainerClientMetrics clientMetrics;
-
   /**
    * Creates an instance of blockOutputStreamResourceProvider.
    */
   public static BlockOutputStreamResourceProvider create(
-      Supplier<ExecutorService> executorServiceSupplier, ContainerClientMetrics clientMetrics) {
-    return new BlockOutputStreamResourceProvider(executorServiceSupplier, clientMetrics);
+      Supplier<ExecutorService> executorServiceSupplier) {
+    return new BlockOutputStreamResourceProvider(executorServiceSupplier);
   }
 
-  private BlockOutputStreamResourceProvider(Supplier<ExecutorService> executorServiceSupplier,
-      ContainerClientMetrics clientMetrics) {
+  private BlockOutputStreamResourceProvider(Supplier<ExecutorService> executorServiceSupplier) {
     this.executorServiceSupplier = executorServiceSupplier;
-    this.clientMetrics = clientMetrics;
   }
 
   /**
@@ -49,12 +44,5 @@ public final class BlockOutputStreamResourceProvider {
    */
   public ExecutorService getExecutorService() {
     return executorServiceSupplier.get();
-  }
-
-  /**
-   * Returns the ContainerClientMetrics instance.
-   */
-  public ContainerClientMetrics getClientMetrics() {
-    return clientMetrics;
   }
 }

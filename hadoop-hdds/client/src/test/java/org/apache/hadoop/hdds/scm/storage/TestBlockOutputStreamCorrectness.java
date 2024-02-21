@@ -110,9 +110,9 @@ class TestBlockOutputStreamCorrectness {
         bufferPool,
         config,
         null,
+        ContainerClientMetrics.acquire(),
         streamBufferArgs,
-        BlockOutputStreamResourceProvider.create(() -> newFixedThreadPool(10),
-            ContainerClientMetrics.acquire()));
+        BlockOutputStreamResourceProvider.create(() -> newFixedThreadPool(10)));
   }
 
   /**

@@ -218,6 +218,7 @@ public class RpcClient implements ClientProtocol {
   private final BlockInputStreamFactory blockInputStreamFactory;
   private final OzoneManagerVersion omVersion;
   private volatile ExecutorService ecReconstructExecutor;
+  private final ContainerClientMetrics clientMetrics;
   private volatile ExecutorService writeExecutor;
   private final AtomicBoolean isS3GRequest = new AtomicBoolean(false);
   private final BlockOutputStreamResourceProvider
@@ -318,8 +319,9 @@ public class RpcClient implements ClientProtocol {
     this.byteBufferPool = new ElasticByteBufferPool();
     this.blockInputStreamFactory = BlockInputStreamFactoryImpl
         .getInstance(byteBufferPool, this::getECReconstructExecutor);
+    this.clientMetrics = ContainerClientMetrics.acquire();
     this.blockOutputStreamResourceProvider = BlockOutputStreamResourceProvider
-        .create(this::getWriteThreadPool, ContainerClientMetrics.acquire());
+        .create(this::getWriteThreadPool);
   }
 
   public XceiverClientFactory getXceiverClientManager() {
@@ -2410,6 +2412,7 @@ public class RpcClient implements ClientProtocol {
         .enableUnsafeByteBufferConversion(unsafeByteBufferConversion)
         .setConfig(clientConfig)
         .setAtomicKeyCreation(isS3GRequest.get())
+        .setClientMetrics(clientMetrics)
         .setblockOutputStreamResourceProvider(blockOutputStreamResourceProvider)
         .setStreamBufferArgs(streamBufferArgs);
   }

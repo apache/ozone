@@ -27,6 +27,7 @@ import java.util.ListIterator;
 import java.util.Map;
 
 import org.apache.hadoop.hdds.scm.ByteStringConversion;
+import org.apache.hadoop.hdds.scm.ContainerClientMetrics;
 import org.apache.hadoop.hdds.scm.OzoneClientConfig;
 import org.apache.hadoop.hdds.scm.StreamBufferArgs;
 import org.apache.hadoop.hdds.scm.XceiverClientFactory;
@@ -80,6 +81,7 @@ public class BlockOutputStreamEntryPool implements KeyMetadataAware {
   private OmMultipartCommitUploadPartInfo commitUploadPartInfo;
   private final long openID;
   private final ExcludeList excludeList;
+  private final ContainerClientMetrics clientMetrics;
   private final StreamBufferArgs streamBufferArgs;
   private final BlockOutputStreamResourceProvider blockOutputStreamResourceProvider;
 
@@ -108,7 +110,7 @@ public class BlockOutputStreamEntryPool implements KeyMetadataAware {
             ByteStringConversion
                 .createByteBufferConversion(b.isUnsafeByteBufferConversionEnabled()));
     this.clientMetrics = b.getClientMetrics();
-    this.blockOutputStreamResourceProvider = blockOutputStreamResourceProvider;
+    this.blockOutputStreamResourceProvider = b.getblockOutputStreamResourceProvider();
   }
 
   ExcludeList createExcludeList() {
@@ -157,6 +159,7 @@ public class BlockOutputStreamEntryPool implements KeyMetadataAware {
             .setLength(subKeyInfo.getLength())
             .setBufferPool(bufferPool)
             .setToken(subKeyInfo.getToken())
+            .setClientMetrics(clientMetrics)
             .setStreamBufferArgs(streamBufferArgs)
             .setblockOutputStreamResourceProvider(blockOutputStreamResourceProvider)
             .build();
@@ -221,12 +224,16 @@ public class BlockOutputStreamEntryPool implements KeyMetadataAware {
     return config;
   }
 
-  BlockOutputStreamResourceProvider getblockOutputStreamResourceProvider() {
-    return blockOutputStreamResourceProvider;
+  ContainerClientMetrics getClientMetrics() {
+    return clientMetrics;
   }
 
   StreamBufferArgs getStreamBufferArgs() {
     return streamBufferArgs;
+  }
+
+  BlockOutputStreamResourceProvider getblockOutputStreamResourceProvider() {
+    return blockOutputStreamResourceProvider;
   }
 
   /**

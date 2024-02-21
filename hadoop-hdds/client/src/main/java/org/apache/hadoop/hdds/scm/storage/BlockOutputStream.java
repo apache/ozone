@@ -146,7 +146,7 @@ public class BlockOutputStream extends OutputStream {
       BufferPool bufferPool,
       OzoneClientConfig config,
       Token<? extends TokenIdentifier> token,
-      StreamBufferArgs streamBufferArgs,
+      ContainerClientMetrics clientMetrics, StreamBufferArgs streamBufferArgs,
       BlockOutputStreamResourceProvider blockOutputStreamResourceProvider
   ) throws IOException {
     this.xceiverClientFactory = xceiverClientManager;
@@ -191,7 +191,7 @@ public class BlockOutputStream extends OutputStream {
     ioException = new AtomicReference<>(null);
     checksum = new Checksum(config.getChecksumType(),
         config.getBytesPerChecksum());
-    this.clientMetrics = blockOutputStreamResourceProvider.getClientMetrics();
+    this.clientMetrics = clientMetrics;
     this.pipeline = pipeline;
     this.streamBufferArgs = streamBufferArgs;
   }

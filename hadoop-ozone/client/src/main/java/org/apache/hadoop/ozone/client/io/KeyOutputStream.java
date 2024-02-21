@@ -32,6 +32,7 @@ import org.apache.hadoop.fs.Syncable;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType;
+import org.apache.hadoop.hdds.scm.ContainerClientMetrics;
 import org.apache.hadoop.hdds.scm.OzoneClientConfig;
 import org.apache.hadoop.hdds.scm.StreamBufferArgs;
 import org.apache.hadoop.hdds.scm.XceiverClientFactory;
@@ -582,6 +583,7 @@ public class KeyOutputStream extends OutputStream
     private boolean unsafeByteBufferConversion;
     private OzoneClientConfig clientConfig;
     private ReplicationConfig replicationConfig;
+    private ContainerClientMetrics clientMetrics;
     private boolean atomicKeyCreation = false;
     private StreamBufferArgs streamBufferArgs;
     private BlockOutputStreamResourceProvider blockOutputStreamResourceProvider;
@@ -685,6 +687,19 @@ public class KeyOutputStream extends OutputStream
       return this;
     }
 
+    public Builder setClientMetrics(ContainerClientMetrics clientMetrics) {
+      this.clientMetrics = clientMetrics;
+      return this;
+    }
+
+    public ContainerClientMetrics getClientMetrics() {
+      return clientMetrics;
+    }
+
+    public boolean getAtomicKeyCreation() {
+      return atomicKeyCreation;
+    }
+
     public Builder setblockOutputStreamResourceProvider(
         BlockOutputStreamResourceProvider provider) {
       this.blockOutputStreamResourceProvider = provider;
@@ -693,10 +708,6 @@ public class KeyOutputStream extends OutputStream
 
     public BlockOutputStreamResourceProvider getblockOutputStreamResourceProvider() {
       return blockOutputStreamResourceProvider;
-    }
-
-    public boolean getAtomicKeyCreation() {
-      return atomicKeyCreation;
     }
 
     public KeyOutputStream build() {

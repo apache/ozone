@@ -25,6 +25,7 @@ import java.util.Collections;
 import org.apache.hadoop.fs.Syncable;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.scm.ContainerClientMetrics;
 import org.apache.hadoop.hdds.scm.OzoneClientConfig;
 import org.apache.hadoop.hdds.scm.StreamBufferArgs;
 import org.apache.hadoop.hdds.scm.XceiverClientFactory;
@@ -105,9 +106,12 @@ public class BlockOutputStreamEntry extends OutputStream {
    */
   void createOutputStream() throws IOException {
     outputStream = new RatisBlockOutputStream(blockID, xceiverClientManager,
-        pipeline, bufferPool, config, token, streamBufferArgs,
-        blockOutputStreamResourceProvider
-    );
+        pipeline, bufferPool, config, token, clientMetrics, streamBufferArgs,
+        blockOutputStreamResourceProvider);
+  }
+
+  ContainerClientMetrics getClientMetrics() {
+    return clientMetrics;
   }
 
   BlockOutputStreamResourceProvider getblockOutputStreamResourceProvider() {
@@ -358,6 +362,7 @@ public class BlockOutputStreamEntry extends OutputStream {
     private BufferPool bufferPool;
     private Token<OzoneBlockTokenIdentifier> token;
     private OzoneClientConfig config;
+    private ContainerClientMetrics clientMetrics;
     private StreamBufferArgs streamBufferArgs;
     private BlockOutputStreamResourceProvider blockOutputStreamResourceProvider;
 
@@ -410,13 +415,19 @@ public class BlockOutputStreamEntry extends OutputStream {
       return this;
     }
 
+    public Builder setClientMetrics(ContainerClientMetrics clientMetrics) {
+      this.clientMetrics = clientMetrics;
+      return this;
+    }
+
+    public Builder setStreamBufferArgs(StreamBufferArgs streamBufferArgs) {
+      this.streamBufferArgs = streamBufferArgs;
+      return this;
+    }
+
     public Builder setblockOutputStreamResourceProvider(
         BlockOutputStreamResourceProvider provider) {
       this.blockOutputStreamResourceProvider = provider;
-      return this;
-    }
-    public Builder setStreamBufferArgs(StreamBufferArgs streamBufferArgs) {
-      this.streamBufferArgs = streamBufferArgs;
       return this;
     }
 
