@@ -141,7 +141,7 @@ public class TestInfoSubCommand {
 
   private void validateMultiOutput() throws UnsupportedEncodingException {
     // Ensure we have a log line for each containerID
-    List<String> replica = Arrays.stream(outContent.toString().split("\n"))
+    List<String> replica = Arrays.stream(outContent.toString(DEFAULT_ENCODING).split("\n"))
         .filter(m -> m.matches("(?s)^Container id: (1|123|456|789).*"))
         .collect(Collectors.toList());
     assertEquals(4, replica.size());
@@ -180,7 +180,7 @@ public class TestInfoSubCommand {
 
   private void validateJsonMultiOutput() throws UnsupportedEncodingException {
     // Ensure we have a log line for each containerID
-    List<String> replica = Arrays.stream(outContent.toString().split("\n"))
+    List<String> replica = Arrays.stream(outContent.toString(DEFAULT_ENCODING).split("\n"))
         .filter(m -> m.matches("(?s)^.*\"containerInfo\".*"))
         .collect(Collectors.toList());
     assertEquals(4, replica.size());
@@ -200,7 +200,7 @@ public class TestInfoSubCommand {
     cmd.execute(scmClient);
 
     // Ensure we have a line for Replicas:
-    String output = outContent.toString();
+    String output = outContent.toString(DEFAULT_ENCODING);
     Pattern pattern = Pattern.compile("Replicas: \\[.*\\]", Pattern.DOTALL);
     Matcher matcher = pattern.matcher(output);
     assertTrue(matcher.find());
@@ -239,7 +239,7 @@ public class TestInfoSubCommand {
     cmd.execute(scmClient);
 
     // Ensure we have no lines for Replicas:
-    List<String> replica = Arrays.stream(outContent.toString().split("\n"))
+    List<String> replica = Arrays.stream(outContent.toString(DEFAULT_ENCODING).split("\n"))
         .filter(m -> m.matches("(?s)^Replicas:.*"))
         .collect(Collectors.toList());
     assertEquals(0, replica.size());
@@ -259,7 +259,7 @@ public class TestInfoSubCommand {
     c.parseArgs("1", "--json");
     cmd.execute(scmClient);
 
-    String json = outContent.toString();
+    String json = outContent.toString(DEFAULT_ENCODING);
 
     assertFalse(json.matches("(?s).*replicas.*"));
   }
@@ -294,7 +294,7 @@ public class TestInfoSubCommand {
     cmd.execute(scmClient);
 
     // Ensure each DN UUID is mentioned in the message after replicas:
-    String json = outContent.toString();
+    String json = outContent.toString(DEFAULT_ENCODING);
     assertTrue(json.matches("(?s).*replicas.*"));
     for (DatanodeDetails dn : datanodes) {
       Pattern pattern = Pattern.compile(
