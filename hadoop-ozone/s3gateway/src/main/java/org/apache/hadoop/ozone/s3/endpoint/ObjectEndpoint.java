@@ -999,6 +999,12 @@ public class ObjectEndpoint extends EndpointBase {
       OmMultipartCommitUploadPartInfo omMultipartCommitUploadPartInfo =
           keyOutputStream.getCommitUploadPartInfo();
       String eTag = omMultipartCommitUploadPartInfo.getETag();
+      // If the OmMultipartCommitUploadPartInfo does not contain eTag,
+      // fall back to MPU part name for compatibility in case the (old) OM
+      // does not return the eTag field
+      if (eTag == null) {
+        eTag = omMultipartCommitUploadPartInfo.getPartName();
+      }
 
       if (copyHeader != null) {
         getMetrics().updateCopyObjectSuccessStats(startNanos);
@@ -1071,7 +1077,7 @@ public class ObjectEndpoint extends EndpointBase {
         part.setPartNumber(partInfo.getPartNumber());
         // If the ETag field does not exist, use MPU part name for backward
         // compatibility
-        part.setETag(partInfo.getETag() != null ?
+        part.setETag(StringUtils.isNotEmpty(partInfo.getETag()) ?
             partInfo.getETag() : partInfo.getPartName());
         part.setSize(partInfo.getSize());
         part.setLastModified(Instant.ofEpochMilli(
