@@ -596,8 +596,6 @@ public abstract class OMKeyRequest extends OMClientRequest {
           if (omKeyInfo.getFileEncryptionInfo() != null) {
             newKeyArgs.setFileEncryptionInfo(
                 OMPBHelper.convert(omKeyInfo.getFileEncryptionInfo()));
-          } else {
-            throw new OMException("omKeyInfo " + omKeyInfo + " does not have encryption info ", INTERNAL_ERROR);
           }
         } else {
           LOG.warn("omKeyInfo not found. Key: " + dbMultipartOpenKey +
