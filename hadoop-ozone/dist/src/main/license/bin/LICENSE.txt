@@ -446,7 +446,6 @@ Apache License 2.0
    org.xerial.snappy:snappy-java
    org.xerial:sqlite-jdbc
    org.yaml:snakeyaml
-   software.amazon.ion:ion-java
    org.awaitility:awaitility
 
 MIT
