@@ -190,18 +190,6 @@ public class SnapshotCache implements ReferenceCountedCallback, AutoCloseable {
       throw new OMException("SnapshotId: '" + key + "' not found, or the snapshot is no longer active.",
           OMException.ResultCodes.FILE_NOT_FOUND);
     }
-
-    // If the snapshot is already loaded in cache, the check inside the loader
-    // above is ignored. But we would still want to reject all get()s except
-    // when called from SDT (and some) if the snapshot is not active anymore.
-    if (!skipActiveCheck && !omSnapshotManager.isSnapshotStatus(key, SNAPSHOT_ACTIVE)) {
-      // Ref count was incremented. Need to decrement on exception here.
-      rcOmSnapshot.close();
-      throw new OMException("Unable to load snapshot. " +
-          "Snapshot with table key '" + key + "' is no longer active",
-          FILE_NOT_FOUND);
-    }
-
     return rcOmSnapshot;
   }
 
@@ -238,7 +226,7 @@ public class SnapshotCache implements ReferenceCountedCallback, AutoCloseable {
     if (referenceCounted.getTotalRefCount() == 0L) {
       // Reference count reaches zero, add to pendingEvictionList
       pendingEvictionQueue.add(((OmSnapshot) referenceCounted.get())
-          .getSnapshotTableKey());
+          .getSnapshotID());
     }
   }
 

@@ -389,7 +389,8 @@ public final class OmSnapshotManager implements AutoCloseable {
           return new OmSnapshot(km, pm, ozoneManager,
               snapshotInfo.getVolumeName(),
               snapshotInfo.getBucketName(),
-              snapshotInfo.getName());
+              snapshotInfo.getName(),
+              snapshotInfo.getSnapshotId());
         } catch (Exception e) {
           // Close RocksDB if there is any failure.
           if (!snapshotMetadataManager.getStore().isClosed()) {

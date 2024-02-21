@@ -51,10 +51,10 @@ public class ReferenceCounted<T>
   /**
    * Parent instance whose callback will be triggered upon this RC closure.
    */
-  private final Object parentWithCallback;
+  private final ReferenceCountedCallback parentWithCallback;
 
   public ReferenceCounted(T obj, boolean disableCounter,
-      Object parentWithCallback) {
+      ReferenceCountedCallback parentWithCallback) {
     // A param to allow disabling ref counting to reduce active DB
     //  access penalties due to AtomicLong operations.
     this.obj = obj;
