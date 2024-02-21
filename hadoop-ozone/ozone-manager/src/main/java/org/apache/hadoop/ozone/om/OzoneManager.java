@@ -3711,7 +3711,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     TermIndex termIndex = null;
     try {
       // Install hard links.
-      OmSnapshotUtils.createHardLinks(omDBCheckpoint.getCheckpointLocation());
+      OmSnapshotUtils.createHardLinksOrCopyFromHardlinkFile(omDBCheckpoint.getCheckpointLocation());
       termIndex = installCheckpoint(leaderId, omDBCheckpoint);
     } catch (Exception ex) {
       LOG.error("Failed to install snapshot from Leader OM.", ex);

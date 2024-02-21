@@ -32,6 +32,7 @@ import java.nio.file.StandardCopyOption;
 import java.nio.file.attribute.BasicFileAttributes;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -108,7 +109,7 @@ public final class OmSnapshotUtils {
    *
    * @param dbPath Path to db to have links created.
    */
-  public static void createHardLinks(Path dbPath) throws IOException {
+  public static void createHardLinksOrCopyFromHardlinkFile(Path dbPath) throws IOException {
     File hardLinkFile =
         new File(dbPath.toString(), OmSnapshotManager.OM_HARDLINK_FILE);
     if (hardLinkFile.exists()) {
@@ -130,12 +131,7 @@ public final class OmSnapshotUtils {
                   "Failed to create directory: " + parent.toString());
             }
           }
-
-          if (isSamePartition(fullFromPath.getParent(), fullToPath.getParent())) {
-            Files.createLink(fullToPath, fullFromPath);
-          } else {
-            Files.copy(fullFromPath, fullToPath, StandardCopyOption.REPLACE_EXISTING);
-          }
+          createHardLinksOrCopy(fullFromPath, fullToPath);
         }
         if (!hardLinkFile.delete()) {
           throw new IOException("Failed to delete: " + hardLinkFile);
@@ -144,18 +140,20 @@ public final class OmSnapshotUtils {
     }
   }
 
-  private static boolean isSamePartition(Path fromPathParent, Path toPathParent) throws IOException {
-    try {
-      if (fromPathParent == null || toPathParent == null) {
-        throw new IOException("From path: " + fromPathParent + " or To path: " + toPathParent + " is null");
-      }
-
-      FileStore fromPathStore = Files.getFileStore(fromPathParent);
-      FileStore toPathStore = Files.getFileStore(toPathParent);
-      return fromPathStore.equals(toPathStore);
-    } catch (IOException ex) {
-      throw new IOException("Failed to get the stores, fromPath: " + fromPathParent + " toPath: " + toPathParent, ex);
+  private static void createHardLinksOrCopy(Path fullFromPath, Path fullToPath) throws IOException {
+    if (isSamePartition(fullFromPath.getParent(), fullToPath.getParent())) {
+      Files.createLink(fullToPath, fullFromPath);
+    } else {
+      Files.copy(fullFromPath, fullToPath, StandardCopyOption.REPLACE_EXISTING);
     }
+  }
+
+  private static boolean isSamePartition(Path fromPathParent, Path toPathParent) throws IOException {
+    Objects.requireNonNull(fromPathParent, "From path is null");
+    Objects.requireNonNull(toPathParent, "To path is null");
+    FileStore fromPathStore = Files.getFileStore(fromPathParent);
+    FileStore toPathStore = Files.getFileStore(toPathParent);
+    return fromPathStore.equals(toPathStore);
   }
 
   /**
@@ -190,10 +188,8 @@ public final class OmSnapshotUtils {
         if (!newFile.mkdirs()) {
           throw new IOException("Directory create fails: " + newFile);
         }
-      } else if (isSamePartition(newFile.toPath().getParent(), oldFile.toPath().getParent())) {
-        Files.createLink(newFile.toPath(), oldFile.toPath());
       } else {
-        Files.copy(oldFile.toPath(), newFile.toPath(), StandardCopyOption.REPLACE_EXISTING);
+        createHardLinksOrCopy(oldFile.toPath(), newFile.toPath());
       }
     }
   }
