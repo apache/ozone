@@ -61,10 +61,6 @@ public class ScmTopologyClient {
         "ScmBlockLocationClient must have been initialized already.");
   }
 
-  public void refetchClusterTree() {
-    checkAndRefresh();
-  }
-
   public void start(ConfigurationSource conf) throws IOException {
     final InnerNode initialTopology =
         scmBlockLocationProtocol.getNetworkTopology();

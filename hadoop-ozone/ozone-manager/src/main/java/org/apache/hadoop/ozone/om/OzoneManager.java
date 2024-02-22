@@ -1099,11 +1099,6 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     return secretKeyClient.getCurrentSecretKey().getId();
   }
 
-  public InnerNode refetchClusterTree() {
-    scmTopologyClient.refetchClusterTree();
-    return scmTopologyClient.getClusterTree();
-  }
-
   @VisibleForTesting
   public void startSecretManager() {
     try {
@@ -1160,16 +1155,10 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   public NetworkTopology getClusterMap() {
 
     InnerNode currentTree = scmTopologyClient.getClusterTree();
-    InnerNode refetchedTree = refetchClusterTree();
-
-    if (!currentTree.equals(refetchedTree)) {
-      return new NetworkTopologyImpl(configuration.get(
-          ScmConfigKeys.OZONE_SCM_NETWORK_TOPOLOGY_SCHEMA_FILE,
-          ScmConfigKeys.OZONE_SCM_NETWORK_TOPOLOGY_SCHEMA_FILE_DEFAULT),
-          refetchedTree);
-    } else {
-      return clusterMap;
-    }
+    return new NetworkTopologyImpl(configuration.get(
+        ScmConfigKeys.OZONE_SCM_NETWORK_TOPOLOGY_SCHEMA_FILE,
+        ScmConfigKeys.OZONE_SCM_NETWORK_TOPOLOGY_SCHEMA_FILE_DEFAULT),
+        currentTree);
   }
 
   /**
