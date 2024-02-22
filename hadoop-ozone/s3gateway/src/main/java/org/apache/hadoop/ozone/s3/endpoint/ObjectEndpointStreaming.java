@@ -124,14 +124,13 @@ final class ObjectEndpointStreaming {
       Map<String, String> keyMetadata,
       DigestInputStream body, PerformanceStringBuilder perf, long startNanos)
       throws IOException {
-    long writeLen = 0;
-    String eTag;
+    long writeLen;
     try (OzoneDataStreamOutput streamOutput = bucket.createStreamKey(keyPath,
         length, replicationConfig, keyMetadata)) {
       long metadataLatencyNs =
           METRICS.updateCopyKeyMetadataStats(startNanos);
       writeLen = writeToStreamOutput(streamOutput, body, bufferSize, length);
-      eTag = DatatypeConverter.printHexBinary(body.getMessageDigest().digest())
+      String eTag = DatatypeConverter.printHexBinary(body.getMessageDigest().digest())
           .toLowerCase();
       perf.appendMetaLatencyNanos(metadataLatencyNs);
       ((KeyMetadataAware)streamOutput).getMetadata().put(OzoneConsts.ETAG, eTag);
