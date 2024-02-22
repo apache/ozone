@@ -116,11 +116,11 @@ public final class OmKeyInfo extends WithParentObjectId
     this.creationTime = creationTime;
     this.modificationTime = modificationTime;
     this.replicationConfig = replicationConfig;
-    this.metadata = metadata;
+    setMetadata(metadata);
     this.encInfo = encInfo;
     this.acls = acls;
-    this.objectID = objectID;
-    this.updateID = updateID;
+    setObjectID(objectID);
+    setUpdateID(updateID);
     this.fileChecksum = fileChecksum;
   }
 
@@ -137,7 +137,7 @@ public final class OmKeyInfo extends WithParentObjectId
             creationTime, modificationTime, replicationConfig, metadata,
             encInfo, acls, objectID, updateID, fileChecksum);
     this.fileName = fileName;
-    this.parentObjectID = parentObjectID;
+    setParentObjectID(parentObjectID);
     this.isFile = isFile;
   }
 
@@ -181,11 +181,6 @@ public final class OmKeyInfo extends WithParentObjectId
     return fileName;
   }
 
-  public long getParentObjectID() {
-    return parentObjectID;
-  }
-
-
   public synchronized OmKeyLocationInfoGroup getLatestVersionLocations() {
     return keyLocationVersions.size() == 0 ? null :
         keyLocationVersions.get(keyLocationVersions.size() - 1);
@@ -213,7 +208,7 @@ public final class OmKeyInfo extends WithParentObjectId
   }
 
   public boolean isHsync() {
-    return metadata.containsKey(OzoneConsts.HSYNC_CLIENT_ID);
+    return getMetadata().containsKey(OzoneConsts.HSYNC_CLIENT_ID);
   }
 
   /**
@@ -411,10 +406,6 @@ public final class OmKeyInfo extends WithParentObjectId
 
   public boolean setAcls(List<OzoneAcl> newAcls) {
     return OzoneAclUtil.setAcl(acls, newAcls);
-  }
-
-  public void setParentObjectID(long parentObjectID) {
-    this.parentObjectID = parentObjectID;
   }
 
   public void setReplicationConfig(ReplicationConfig repConfig) {
@@ -674,11 +665,11 @@ public final class OmKeyInfo extends WithParentObjectId
         .addAllKeyLocationList(keyLocations)
         .setCreationTime(creationTime)
         .setModificationTime(modificationTime)
-        .addAllMetadata(KeyValueUtil.toProtobuf(metadata))
+        .addAllMetadata(KeyValueUtil.toProtobuf(getMetadata()))
         .addAllAcls(OzoneAclUtil.toProtobuf(acls))
-        .setObjectID(objectID)
-        .setUpdateID(updateID)
-        .setParentID(parentObjectID);
+        .setObjectID(getObjectID())
+        .setUpdateID(getUpdateID())
+        .setParentID(getParentObjectID());
 
     FileChecksumProto fileChecksumProto = OMPBHelper.convert(fileChecksum);
     if (fileChecksumProto != null) {
@@ -753,8 +744,8 @@ public final class OmKeyInfo extends WithParentObjectId
         ", key='" + keyName + '\'' +
         ", dataSize='" + dataSize + '\'' +
         ", creationTime='" + creationTime + '\'' +
-        ", objectID='" + objectID + '\'' +
-        ", parentID='" + parentObjectID + '\'' +
+        ", objectID='" + getObjectID() + '\'' +
+        ", parentID='" + getParentObjectID() + '\'' +
         ", replication='" + replicationConfig + '\'' +
         ", fileChecksum='" + fileChecksum +
         '}';
@@ -770,12 +761,12 @@ public final class OmKeyInfo extends WithParentObjectId
         volumeName.equals(omKeyInfo.volumeName) &&
         bucketName.equals(omKeyInfo.bucketName) &&
         replicationConfig.equals(omKeyInfo.replicationConfig) &&
-        Objects.equals(metadata, omKeyInfo.metadata) &&
+        Objects.equals(getMetadata(), omKeyInfo.getMetadata()) &&
         Objects.equals(acls, omKeyInfo.acls) &&
-        objectID == omKeyInfo.objectID;
+        getObjectID() == omKeyInfo.getObjectID();
 
     if (isEqual && checkUpdateID) {
-      isEqual = updateID == omKeyInfo.updateID;
+      isEqual = getUpdateID() == omKeyInfo.getUpdateID();
     }
 
     if (isEqual && checkModificationTime) {
@@ -783,7 +774,7 @@ public final class OmKeyInfo extends WithParentObjectId
     }
 
     if (isEqual && checkPath) {
-      isEqual = parentObjectID == omKeyInfo.parentObjectID &&
+      isEqual = getParentObjectID() == omKeyInfo.getParentObjectID() &&
           keyName.equals(omKeyInfo.keyName);
     }
 
@@ -808,7 +799,7 @@ public final class OmKeyInfo extends WithParentObjectId
 
   @Override
   public int hashCode() {
-    return Objects.hash(volumeName, bucketName, keyName, parentObjectID);
+    return Objects.hash(volumeName, bucketName, keyName, getParentObjectID());
   }
 
   /**
@@ -825,9 +816,9 @@ public final class OmKeyInfo extends WithParentObjectId
         .setDataSize(dataSize)
         .setReplicationConfig(replicationConfig)
         .setFileEncryptionInfo(encInfo)
-        .setObjectID(objectID)
-        .setUpdateID(updateID)
-        .setParentObjectID(parentObjectID)
+        .setObjectID(getObjectID())
+        .setUpdateID(getUpdateID())
+        .setParentObjectID(getParentObjectID())
         .setFileName(fileName)
         .setFile(isFile);
 
@@ -841,8 +832,8 @@ public final class OmKeyInfo extends WithParentObjectId
             acl.getName(), (BitSet) acl.getAclBitSet().clone(),
         acl.getAclScope())));
 
-    if (metadata != null) {
-      metadata.forEach((k, v) -> builder.addMetadata(k, v));
+    if (getMetadata() != null) {
+      getMetadata().forEach((k, v) -> builder.addMetadata(k, v));
     }
 
     if (fileChecksum != null) {
