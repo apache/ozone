@@ -158,7 +158,7 @@ public class ChunkKeyHandler extends KeyHandler implements
               String fileName = containerLayoutVersion.getChunkFile(new File(
                       getChunkLocationPath(containerData.getContainerPath())),
                   keyLocation.getBlockID(),
-                  ChunkInfo.getFromProtoBuf(chunkInfo)).toString();
+                  chunkInfo.getChunkName()).toString();
               chunkPaths.add(fileName);
               ChunkDetails chunkDetails = new ChunkDetails();
               chunkDetails.setChunkName(fileName);
