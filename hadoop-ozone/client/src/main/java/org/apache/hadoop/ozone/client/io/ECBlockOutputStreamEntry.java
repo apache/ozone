@@ -85,7 +85,8 @@ public class ECBlockOutputStreamEntry extends BlockOutputStreamEntry {
         streams[i] =
             new ECBlockOutputStream(getBlockID(), getXceiverClientManager(),
                 createSingleECBlockPipeline(getPipeline(), nodes.get(i), i + 1),
-                getBufferPool(), getConf(), getToken(), getClientMetrics(), getStreamBufferArgs());
+                getBufferPool(), getConf(), getToken(), getClientMetrics(), getStreamBufferArgs(),
+                getExecutorServiceSupplier());
       }
       blockOutputStreams = streams;
     }

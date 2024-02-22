@@ -24,7 +24,9 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.ExecutorService;
 import java.util.function.Function;
+import java.util.function.Supplier;
 import java.util.stream.Collectors;
 
 import org.apache.hadoop.fs.FSExceptionMessages;
@@ -586,6 +588,7 @@ public class KeyOutputStream extends OutputStream
     private ContainerClientMetrics clientMetrics;
     private boolean atomicKeyCreation = false;
     private StreamBufferArgs streamBufferArgs;
+    private Supplier<ExecutorService> executorServiceSupplier;
 
     public String getMultipartUploadID() {
       return multipartUploadID;
@@ -697,6 +700,15 @@ public class KeyOutputStream extends OutputStream
 
     public boolean getAtomicKeyCreation() {
       return atomicKeyCreation;
+    }
+
+    public Builder setExecutorServiceSupplier(Supplier<ExecutorService> executorServiceSupplier) {
+      this.executorServiceSupplier = executorServiceSupplier;
+      return this;
+    }
+
+    public Supplier<ExecutorService> getExecutorServiceSupplier() {
+      return executorServiceSupplier;
     }
 
     public KeyOutputStream build() {

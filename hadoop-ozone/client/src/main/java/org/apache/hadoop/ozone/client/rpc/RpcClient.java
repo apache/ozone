@@ -145,6 +145,7 @@ import org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.token.Token;
 import org.apache.ratis.protocol.ClientId;
+import org.apache.ratis.util.MemoizedSupplier;
 import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -196,6 +197,9 @@ public class RpcClient implements ClientProtocol {
   // for reconstruction.
   private static final int EC_RECONSTRUCT_STRIPE_READ_POOL_MIN_SIZE = 3;
 
+  // TODO: Adjusts to the appropriate value when the writeThreadPool is used.
+  private static final int WRITE_POOL_MIN_SIZE = 0;
+
   private final ConfigurationSource conf;
   private final OzoneManagerClientProtocol ozoneManagerClient;
   private final XceiverClientFactory xceiverClientManager;
@@ -214,8 +218,9 @@ public class RpcClient implements ClientProtocol {
   private final ByteBufferPool byteBufferPool;
   private final BlockInputStreamFactory blockInputStreamFactory;
   private final OzoneManagerVersion omVersion;
-  private volatile ExecutorService ecReconstructExecutor;
+  private final MemoizedSupplier<ExecutorService> ecReconstructExecutor;
   private final ContainerClientMetrics clientMetrics;
+  private final MemoizedSupplier<ExecutorService> writeExecutor;
   private final AtomicBoolean isS3GRequest = new AtomicBoolean(false);
 
   /**
@@ -238,6 +243,11 @@ public class RpcClient implements ClientProtocol {
     this.groupRights = aclConfig.getGroupDefaultRights();
 
     this.clientConfig = conf.getObject(OzoneClientConfig.class);
+    this.ecReconstructExecutor = MemoizedSupplier.valueOf(() -> createThreadPoolExecutor(
+        EC_RECONSTRUCT_STRIPE_READ_POOL_MIN_SIZE, clientConfig.getEcReconstructStripeReadPoolLimit(),
+        "ec-reconstruct-reader-TID-%d"));
+    this.writeExecutor = MemoizedSupplier.valueOf(() -> createThreadPoolExecutor(
+        WRITE_POOL_MIN_SIZE, Integer.MAX_VALUE, "client-write-TID-%d"));
 
     OmTransport omTransport = createOmTransport(omServiceId);
     OzoneManagerProtocolClientSideTranslatorPB
@@ -312,7 +322,7 @@ public class RpcClient implements ClientProtocol {
         }).build();
     this.byteBufferPool = new ElasticByteBufferPool();
     this.blockInputStreamFactory = BlockInputStreamFactoryImpl
-        .getInstance(byteBufferPool, this::getECReconstructExecutor);
+        .getInstance(byteBufferPool, ecReconstructExecutor);
     this.clientMetrics = ContainerClientMetrics.acquire();
   }
 
@@ -1737,9 +1747,11 @@ public class RpcClient implements ClientProtocol {
 
   @Override
   public void close() throws IOException {
-    if (ecReconstructExecutor != null) {
-      ecReconstructExecutor.shutdownNow();
-      ecReconstructExecutor = null;
+    if (ecReconstructExecutor.isInitialized()) {
+      ecReconstructExecutor.get().shutdownNow();
+    }
+    if (writeExecutor.isInitialized()) {
+      writeExecutor.get().shutdownNow();
     }
     IOUtils.cleanupWithLogger(LOG, ozoneManagerClient, xceiverClientManager);
     keyProviderCache.invalidateAll();
@@ -2359,6 +2371,7 @@ public class RpcClient implements ClientProtocol {
         .setConfig(clientConfig)
         .setAtomicKeyCreation(isS3GRequest.get())
         .setClientMetrics(clientMetrics)
+        .setExecutorServiceSupplier(writeExecutor)
         .setStreamBufferArgs(streamBufferArgs);
   }
 
@@ -2480,26 +2493,11 @@ public class RpcClient implements ClientProtocol {
     ozoneManagerClient.setTimes(builder.build(), mtime, atime);
   }
 
-  public ExecutorService getECReconstructExecutor() {
-    // local ref to a volatile to ensure access
-    // to a completed initialized object
-    ExecutorService executor = ecReconstructExecutor;
-    if (executor == null) {
-      synchronized (this) {
-        executor = ecReconstructExecutor;
-        if (executor == null) {
-          ecReconstructExecutor = new ThreadPoolExecutor(
-              EC_RECONSTRUCT_STRIPE_READ_POOL_MIN_SIZE,
-              clientConfig.getEcReconstructStripeReadPoolLimit(),
-              60, TimeUnit.SECONDS, new SynchronousQueue<>(),
-              new ThreadFactoryBuilder()
-                  .setNameFormat("ec-reconstruct-reader-TID-%d")
-                  .build(),
-              new ThreadPoolExecutor.CallerRunsPolicy());
-          executor = ecReconstructExecutor;
-        }
-      }
-    }
-    return executor;
+  private static ExecutorService createThreadPoolExecutor(
+       int corePoolSize, int maximumPoolSize, String threadNameFormat) {
+    return new ThreadPoolExecutor(corePoolSize, maximumPoolSize,
+            60, TimeUnit.SECONDS, new SynchronousQueue<>(),
+               new ThreadFactoryBuilder().setNameFormat(threadNameFormat).build(),
+               new ThreadPoolExecutor.CallerRunsPolicy());
   }
 }
