@@ -211,7 +211,7 @@ public class ContainerHealthTask extends ReconScmTask {
     unhealthyContainerStateStatsMap.put(
         UnHealthyContainerStates.MISSING, new HashMap<>());
     unhealthyContainerStateStatsMap.put(
-        EMPTY_MISSING, new HashMap<>());
+        UnHealthyContainerStates.EMPTY_MISSING, new HashMap<>());
     unhealthyContainerStateStatsMap.put(
         UnHealthyContainerStates.UNDER_REPLICATED, new HashMap<>());
     unhealthyContainerStateStatsMap.put(
