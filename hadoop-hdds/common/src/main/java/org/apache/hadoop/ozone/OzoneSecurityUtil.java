@@ -148,15 +148,11 @@ public final class OzoneSecurityUtil {
   }
 
   public static void updateKerberosInfo(Class clz, String serverPrincipal) {
-    final String ANNOTATIONS = "annotations";
-    final String ANNOTATION_METHOD = "annotationData";
-    final Class<? extends Annotation> ANNOTATION_TO_ALTER = KerberosInfo.class;
-
     // new KerberosInfo
     Annotation newValue = new KerberosInfo() {
       @Override
       public Class<? extends Annotation> annotationType() {
-        return ANNOTATION_TO_ALTER;
+        return KerberosInfo.class;
       }
       @Override
       public String serverPrincipal() {
@@ -169,16 +165,16 @@ public final class OzoneSecurityUtil {
     };
 
     try {
-      Method method = clz.getClass().getDeclaredMethod(ANNOTATION_METHOD, null);
+      Method method = clz.getClass().getDeclaredMethod("annotationData", null);
       method.setAccessible(true);
 
       Object annotationData = method.invoke(clz);
-      Field annotations = annotationData.getClass().getDeclaredField(ANNOTATIONS);
+      Field annotations = annotationData.getClass().getDeclaredField("annotations");
       annotations.setAccessible(true);
 
       Map<Class<? extends Annotation>, Annotation> map =
           (Map<Class<? extends Annotation>, Annotation>) annotations.get(annotationData);
-      map.put(ANNOTATION_TO_ALTER, newValue);
+      map.put(KerberosInfo.class, newValue);
       LOG.debug("Class {} is updated with new server principal {}", clz, serverPrincipal);
     } catch (Exception e) {
       LOG.error("Failed to update Kerberos Info for new serverPrincipal {}. ", serverPrincipal, e);
