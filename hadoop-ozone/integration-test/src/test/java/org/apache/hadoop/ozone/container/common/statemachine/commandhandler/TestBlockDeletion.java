@@ -100,6 +100,7 @@ import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_EXPIRED_CONTAIN
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_PIPELINE_OWNER_CONTAINER_COUNT;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_STALENODE_INTERVAL;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_SERVICE_INTERVAL;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -179,7 +180,6 @@ public class TestBlockDeletion {
     conf.setFromObject(replicationConf);
     cluster = MiniOzoneCluster.newBuilder(conf)
         .setNumDatanodes(3)
-        .setHbInterval(50)
         .build();
     cluster.waitForClusterToBeReady();
     client = cluster.newClient();
@@ -250,7 +250,7 @@ public class TestBlockDeletion {
       }
     }, 1000, 10000);
     // No containers with deleted blocks
-    assertTrue(containerIdsWithDeletedBlocks.isEmpty());
+    assertThat(containerIdsWithDeletedBlocks).isEmpty();
     // Delete transactionIds for the containers should be 0.
     // NOTE: this test assumes that all the container is KetValueContainer. If
     // other container types is going to be added, this test should be checked.
@@ -295,7 +295,7 @@ public class TestBlockDeletion {
     }, 2000, 30000);
 
     // Few containers with deleted blocks
-    assertFalse(containerIdsWithDeletedBlocks.isEmpty());
+    assertThat(containerIdsWithDeletedBlocks).isNotEmpty();
     // Containers in the DN and SCM should have same delete transactionIds
     matchContainerTransactionIds();
 
@@ -318,11 +318,11 @@ public class TestBlockDeletion {
 
     assertEquals(metrics.getNumBlockDeletionTransactionCreated(),
         metrics.getNumBlockDeletionTransactionCompleted());
-    assertTrue(metrics.getNumBlockDeletionCommandSent() >=
-        metrics.getNumBlockDeletionCommandSuccess() +
+    assertThat(metrics.getNumBlockDeletionCommandSent())
+        .isGreaterThanOrEqualTo(metrics.getNumBlockDeletionCommandSuccess() +
             metrics.getBNumBlockDeletionCommandFailure());
-    assertTrue(metrics.getNumBlockDeletionTransactionSent() >=
-        metrics.getNumBlockDeletionTransactionFailure() +
+    assertThat(metrics.getNumBlockDeletionTransactionSent())
+        .isGreaterThanOrEqualTo(metrics.getNumBlockDeletionTransactionFailure() +
             metrics.getNumBlockDeletionTransactionSuccess());
     LOG.info(metrics.toString());
 
@@ -330,8 +330,8 @@ public class TestBlockDeletion {
     for (int i = 5; i >= 0; i--) {
       if (logCapturer.getOutput().contains("1(" + i + ")")) {
         for (int j = 0; j <= i; j++) {
-          assertTrue(logCapturer.getOutput()
-              .contains("1(" + i + ")"));
+          assertThat(logCapturer.getOutput())
+              .contains("1(" + i + ")");
         }
         break;
       }
@@ -720,8 +720,8 @@ public class TestBlockDeletion {
       for (ContainerData containerData : containerDataList) {
         long containerId = containerData.getContainerID();
         if (containerIdsWithDeletedBlocks.contains(containerId)) {
-          assertTrue(
-              scm.getContainerInfo(containerId).getDeleteTransactionId() > 0);
+          assertThat(scm.getContainerInfo(containerId).getDeleteTransactionId())
+              .isGreaterThan(0);
           maxTransactionId = max(maxTransactionId,
               scm.getContainerInfo(containerId).getDeleteTransactionId());
         } else {

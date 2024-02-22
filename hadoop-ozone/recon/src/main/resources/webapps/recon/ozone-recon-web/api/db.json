@@ -44,6 +44,42 @@
             "replicationType": "RATIS",
             "replicationFactor": 1,
             "leaderNode": "localhost1.storage.enterprise.com"
+          },
+          {
+            "pipelineID": "02e3d908-ff01-4ce6-ad75-f3ec79bcc710",
+            "replicationType": "RATIS",
+            "replicationFactor": 3,
+            "leaderNode": "localhost1.storage.enterprise.com"
+          },
+          {
+            "pipelineID": "09d3a478-ff01-4ce6-ad75-f3ec79bcc711",
+            "replicationType": "RATIS",
+            "replicationFactor": 1,
+            "leaderNode": "localhost1.storage.enterprise.com"
+          },
+          {
+            "pipelineID": "02e3d908-ff01-4ce6-ad75-f3ec79bcc712",
+            "replicationType": "RATIS",
+            "replicationFactor": 3,
+            "leaderNode": "localhost1.storage.enterprise.com"
+          },
+          {
+            "pipelineID": "09d3a478-ff01-4ce6-ad75-f3ec79bcc713",
+            "replicationType": "RATIS",
+            "replicationFactor": 1,
+            "leaderNode": "localhost1.storage.enterprise.com"
+          },
+          {
+            "pipelineID": "02e3d908-ff01-4ce6-ad75-f3ec79bcc714",
+            "replicationType": "RATIS",
+            "replicationFactor": 3,
+            "leaderNode": "localhost1.storage.enterprise.com"
+          },
+          {
+            "pipelineID": "09d3a478-ff01-4ce6-ad75-f3ec79bcc715",
+            "replicationType": "RATIS",
+            "replicationFactor": 1,
+            "leaderNode": "localhost1.storage.enterprise.com"
           }
         ],
         "containers": 80,

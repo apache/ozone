@@ -31,6 +31,7 @@ import java.util.Map;
 import java.util.HashMap;
 
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
+import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.OzoneAcl;
@@ -69,14 +70,12 @@ import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status.OK;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.junit.jupiter.api.Assertions.fail;
 import static org.mockito.Mockito.when;
 
 /**
@@ -548,7 +547,8 @@ public class TestOMKeyCreateRequest extends TestOMKeyRequest {
     KeyArgs.Builder keyArgs = KeyArgs.newBuilder()
         .setVolumeName(volumeName).setBucketName(bucketName)
         .setKeyName(keyName).setIsMultipartKey(isMultipartKey)
-        .setFactor(replicationFactor).setType(replicationType)
+        .setFactor(((RatisReplicationConfig) replicationConfig).getReplicationFactor())
+        .setType(replicationConfig.getReplicationType())
         .setLatestVersionLocation(true);
 
     if (isMultipartKey) {
@@ -795,25 +795,20 @@ public class TestOMKeyCreateRequest extends TestOMKeyRequest {
 
   protected void addToKeyTable(String keyName) throws Exception {
     OMRequestTestUtils.addKeyToTable(false, volumeName, bucketName,
-        keyName.substring(1), 0L, RATIS, THREE, omMetadataManager);
+        keyName.substring(1), 0L, RatisReplicationConfig.getInstance(THREE), omMetadataManager);
   }
 
 
   private void checkNotAValidPath(String keyName) {
     OMRequest omRequest = createKeyRequest(false, 0, keyName);
     OMKeyCreateRequest omKeyCreateRequest = getOMKeyCreateRequest(omRequest);
-
-    try {
-      omKeyCreateRequest.preExecute(ozoneManager);
-      fail("checkNotAValidPath failed for path" + keyName);
-    } catch (IOException ex) {
-      OMException omException = assertInstanceOf(OMException.class, ex);
-      assertEquals(OMException.ResultCodes.INVALID_KEY_NAME,
-          omException.getResult());
-    }
-
-
+    OMException ex =
+        assertThrows(OMException.class, () -> omKeyCreateRequest.preExecute(ozoneManager),
+            "checkNotAValidPath failed for path" + keyName);
+    assertEquals(OMException.ResultCodes.INVALID_KEY_NAME,
+        ex.getResult());
   }
+
   private void checkNotAFile(String keyName) throws Exception {
     OMRequest omRequest = createKeyRequest(false, 0, keyName);
 

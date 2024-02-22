@@ -32,7 +32,6 @@ import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.helpers.OpenKeySession;
 import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
-import org.apache.hadoop.security.authentication.client.AuthenticationException;
 import org.apache.ratis.util.ExitUtils;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -66,7 +65,7 @@ public class TestTrashService {
   private String bucketName;
 
   @BeforeEach
-  public void setup() throws IOException, AuthenticationException {
+  void setup() throws Exception {
     ExitUtils.disableSystemExit();
     OzoneConfiguration configuration = new OzoneConfiguration();
 

@@ -24,7 +24,7 @@ import org.apache.hadoop.hdds.annotation.InterfaceStability;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import javax.annotation.Nullable;
+import jakarta.annotation.Nullable;
 import java.time.Duration;
 import java.util.OptionalLong;
 import java.util.concurrent.Executors;

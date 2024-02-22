@@ -262,15 +262,6 @@ public final class SelfSignedCertificate {
       return this;
     }
 
-    public Builder addServiceName(
-        String serviceName) {
-      Preconditions.checkNotNull(
-          serviceName, "Service Name cannot be null");
-
-      this.addAltName(GeneralName.otherName, serviceName);
-      return this;
-    }
-
     private Builder addAltName(int tag, String name) {
       if (altNames == null) {
         altNames = new ArrayList<>();

@@ -319,6 +319,7 @@ public final class OmUtils {
     case SetRangerServiceVersion:
     case CreateSnapshot:
     case DeleteSnapshot:
+    case RenameSnapshot:
     case SnapshotMoveDeletedKeys:
     case SnapshotPurge:
     case RecoverLease:

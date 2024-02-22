@@ -21,7 +21,9 @@ import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
+import java.util.HashSet;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Semaphore;
 
@@ -41,8 +43,10 @@ import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainer;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
+import org.apache.hadoop.ozone.container.keyvalue.TarContainerPacker;
 import org.apache.hadoop.ozone.container.ozoneimpl.ContainerController;
 import org.apache.ozone.test.GenericTestUtils;
+import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -52,7 +56,10 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doNothing;
+import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.when;
 
 /**
@@ -136,6 +143,42 @@ class TestContainerImporter {
         ex.getResult());
     assertThat(ex.getMessage()).contains("import in progress");
     semaphore.release();
+  }
+
+  @Test
+  public void testInconsistentChecksumContainerShouldThrowError() throws Exception {
+    // create container
+    long containerId = 1;
+    KeyValueContainerData containerData = spy(new KeyValueContainerData(containerId,
+        ContainerLayoutVersion.FILE_PER_BLOCK, 100, "test", "test"));
+    // mock to return different checksum
+    when(containerData.getChecksum()).thenReturn("checksum1", "checksum2");
+    doNothing().when(containerData).setChecksumTo0ByteArray();
+    // create containerImporter object
+    ContainerController controllerMock = mock(ContainerController.class);
+    ContainerSet containerSet = new ContainerSet(0);
+    MutableVolumeSet volumeSet = new MutableVolumeSet("test", conf, null,
+        StorageVolume.VolumeType.DATA_VOLUME, null);
+    ContainerImporter containerImporter = spy(new ContainerImporter(conf,
+        containerSet, controllerMock, volumeSet));
+
+    TarContainerPacker packer = mock(TarContainerPacker.class);
+    when(packer.unpackContainerDescriptor(any())).thenReturn("test".getBytes(
+        StandardCharsets.UTF_8));
+    when(containerImporter.getPacker(any())).thenReturn(packer);
+
+    doReturn(containerData).when(containerImporter).getKeyValueContainerData(any(byte[].class));
+    when(containerImporter.getImportContainerProgress()).thenReturn(new HashSet<>());
+
+    File tarFile = File.createTempFile("temp_" + System
+        .currentTimeMillis(), ".tar");
+
+    StorageContainerException scException =
+        assertThrows(StorageContainerException.class,
+            () -> containerImporter.importContainer(containerId,
+                tarFile.toPath(), null, NO_COMPRESSION));
+    Assertions.assertTrue(scException.getMessage().
+        contains("Container checksum error"));
   }
 
   private File containerTarFile(

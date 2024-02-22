@@ -21,6 +21,7 @@
 package org.apache.hadoop.ozone.client;
 
 import org.apache.hadoop.hdds.scm.storage.ByteBufferStreamOutput;
+import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.client.io.OzoneDataStreamOutput;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartCommitUploadPartInfo;
 
@@ -65,6 +66,7 @@ public class OzoneDataStreamOutputStub extends OzoneDataStreamOutput {
 
   @Override
   public OmMultipartCommitUploadPartInfo getCommitUploadPartInfo() {
-    return closed ? new OmMultipartCommitUploadPartInfo(partName) : null;
+    return closed ? new OmMultipartCommitUploadPartInfo(partName,
+        getMetadata().get(OzoneConsts.ETAG)) : null;
   }
 }

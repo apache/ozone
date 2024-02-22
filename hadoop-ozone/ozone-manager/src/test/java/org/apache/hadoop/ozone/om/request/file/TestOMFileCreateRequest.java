@@ -24,12 +24,13 @@ import java.util.List;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
+import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
-import org.jetbrains.annotations.NotNull;
+import jakarta.annotation.Nonnull;
 import org.junit.jupiter.api.Test;
 
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
@@ -190,7 +191,7 @@ public class TestOMFileCreateRequest extends TestOMKeyRequest {
             .setBucketName(bucketName)
             .setBucketLayout(getBucketLayout())
             .setQuotaInNamespace(1));
-    
+
     OMFileCreateRequest omFileCreateRequest = getOMFileCreateRequest(omRequest);
     OMRequest modifiedOmRequest = omFileCreateRequest.preExecute(ozoneManager);
 
@@ -243,19 +244,17 @@ public class TestOMFileCreateRequest extends TestOMKeyRequest {
     testNonRecursivePath(UUID.randomUUID().toString(), false, false, false);
     testNonRecursivePath("a/b", false, false, true);
 
+    ReplicationConfig replicationConfig = ReplicationConfig.fromProtoTypeAndFactor(HddsProtos.ReplicationType.RATIS,
+        HddsProtos.ReplicationFactor.ONE);
     // Create some child keys for the path
     OMRequestTestUtils.addKeyToTable(false, volumeName, bucketName,
-        "a/b/c/d", 0L,  HddsProtos.ReplicationType.RATIS,
-        HddsProtos.ReplicationFactor.ONE, omMetadataManager);
+        "a/b/c/d", 0L, replicationConfig, omMetadataManager);
     OMRequestTestUtils.addKeyToTable(false, volumeName, bucketName,
-        "a/b/c/", 0L,  HddsProtos.ReplicationType.RATIS,
-        HddsProtos.ReplicationFactor.ONE, omMetadataManager);
+        "a/b/c/", 0L, replicationConfig, omMetadataManager);
     OMRequestTestUtils.addKeyToTable(false, volumeName, bucketName,
-        "a/b/", 0L,  HddsProtos.ReplicationType.RATIS,
-        HddsProtos.ReplicationFactor.ONE, omMetadataManager);
+        "a/b/", 0L, replicationConfig, omMetadataManager);
     OMRequestTestUtils.addKeyToTable(false, volumeName, bucketName,
-        "a/", 0L,  HddsProtos.ReplicationType.RATIS,
-        HddsProtos.ReplicationFactor.ONE, omMetadataManager);
+        "a/", 0L, replicationConfig, omMetadataManager);
 
     // cannot create file if directory of same name exists
     testNonRecursivePath("a/b/c", false, false, true);
@@ -275,14 +274,14 @@ public class TestOMFileCreateRequest extends TestOMKeyRequest {
     // Should be able to create file even if parent directories does not
     // exist and key already exist, as this is with overwrite enabled.
     testNonRecursivePath(UUID.randomUUID().toString(), false, false, false);
+    ReplicationConfig replicationConfig = ReplicationConfig.fromProtoTypeAndFactor(HddsProtos.ReplicationType.RATIS,
+        HddsProtos.ReplicationFactor.ONE);
     OMRequestTestUtils.addKeyToTable(false, volumeName, bucketName,
-        "c/d/e/f", 0L,  HddsProtos.ReplicationType.RATIS,
-        HddsProtos.ReplicationFactor.ONE, omMetadataManager);
+        "c/d/e/f", 0L, replicationConfig, omMetadataManager);
     testNonRecursivePath("c/d/e/f", true, true, false);
     // Create some child keys for the path
     OMRequestTestUtils.addKeyToTable(false, volumeName, bucketName,
-        "a/b/c/d", 0L,  HddsProtos.ReplicationType.RATIS,
-        HddsProtos.ReplicationFactor.ONE, omMetadataManager);
+        "a/b/c/d", 0L, replicationConfig, omMetadataManager);
     testNonRecursivePath("a/b/c", false, true, false);
   }
 
@@ -293,16 +292,17 @@ public class TestOMFileCreateRequest extends TestOMKeyRequest {
     String key = "c/d/e/f";
     // Should be able to create file even if parent directories does not exist
     testNonRecursivePath(key, false, true, false);
-    
+
     // 3 parent directory created c/d/e
     assertEquals(omMetadataManager.getBucketTable().get(
             omMetadataManager.getBucketKey(volumeName, bucketName))
         .getUsedNamespace(), 3);
-    
+
     // Add the key to key table
+    ReplicationConfig replicationConfig = ReplicationConfig.fromProtoTypeAndFactor(HddsProtos.ReplicationType.RATIS,
+        HddsProtos.ReplicationFactor.ONE);
     OMRequestTestUtils.addKeyToTable(false, volumeName, bucketName,
-        key, 0L,  HddsProtos.ReplicationType.RATIS,
-        HddsProtos.ReplicationFactor.ONE, omMetadataManager);
+        key, 0L, replicationConfig, omMetadataManager);
 
     // Even if key exists, should be able to create file as overwrite is set
     // to true
@@ -315,23 +315,21 @@ public class TestOMFileCreateRequest extends TestOMKeyRequest {
       throws Exception {
 
     String key = "c/d/e/f";
+    ReplicationConfig replicationConfig = ReplicationConfig.fromProtoTypeAndFactor(HddsProtos.ReplicationType.RATIS,
+        HddsProtos.ReplicationFactor.ONE);
     // Need to add the path which starts with "c/d/e" to keyTable as this is
     // non-recursive parent should exist.
     OMRequestTestUtils.addKeyToTable(false, volumeName, bucketName,
-        "c/", 0L,  HddsProtos.ReplicationType.RATIS,
-        HddsProtos.ReplicationFactor.ONE, omMetadataManager);
+        "c/", 0L, replicationConfig, omMetadataManager);
     OMRequestTestUtils.addKeyToTable(false, volumeName, bucketName,
-        "c/d/", 0L,  HddsProtos.ReplicationType.RATIS,
-        HddsProtos.ReplicationFactor.ONE, omMetadataManager);
+        "c/d/", 0L, replicationConfig, omMetadataManager);
     OMRequestTestUtils.addKeyToTable(false, volumeName, bucketName,
-        "c/d/e/", 0L,  HddsProtos.ReplicationType.RATIS,
-        HddsProtos.ReplicationFactor.ONE, omMetadataManager);
+        "c/d/e/", 0L, replicationConfig, omMetadataManager);
     testNonRecursivePath(key, false, false, false);
 
     // Add the key to key table
     OMRequestTestUtils.addKeyToTable(false, volumeName, bucketName,
-        key, 0L,  HddsProtos.ReplicationType.RATIS,
-        HddsProtos.ReplicationFactor.ONE, omMetadataManager);
+        key, 0L, replicationConfig, omMetadataManager);
 
     // Even if key exists, should be able to create file as overwrite is set
     // to true
@@ -570,7 +568,7 @@ public class TestOMFileCreateRequest extends TestOMKeyRequest {
    * @param replicationType
    * @return OMRequest
    */
-  @NotNull
+  @Nonnull
   protected OMRequest createFileRequest(
       String volumeName, String bucketName, String keyName,
       HddsProtos.ReplicationFactor replicationFactor,
@@ -600,7 +598,7 @@ public class TestOMFileCreateRequest extends TestOMKeyRequest {
    * @param omRequest om request
    * @return OMFileCreateRequest reference
    */
-  @NotNull
+  @Nonnull
   protected OMFileCreateRequest getOMFileCreateRequest(OMRequest omRequest) {
     return new OMFileCreateRequest(omRequest, getBucketLayout());
   }

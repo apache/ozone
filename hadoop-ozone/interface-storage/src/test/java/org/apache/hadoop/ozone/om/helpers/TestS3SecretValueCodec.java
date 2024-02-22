@@ -43,7 +43,7 @@ public class TestS3SecretValueCodec
     final Codec<S3SecretValue> codec = getCodec();
 
     S3SecretValue s3SecretValue =
-        new S3SecretValue(UUID.randomUUID().toString(),
+        S3SecretValue.of(UUID.randomUUID().toString(),
             UUID.randomUUID().toString());
 
     byte[] data = codec.toPersistedFormat(s3SecretValue);

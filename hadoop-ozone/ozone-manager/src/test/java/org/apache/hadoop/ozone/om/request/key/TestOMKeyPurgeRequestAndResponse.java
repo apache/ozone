@@ -23,7 +23,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
-import org.apache.hadoop.ozone.om.IOmMetadataReader;
 import org.apache.hadoop.ozone.om.OmSnapshot;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
@@ -31,7 +30,6 @@ import org.apache.hadoop.ozone.om.request.snapshot.OMSnapshotCreateRequest;
 import org.apache.hadoop.ozone.om.request.snapshot.TestOMSnapshotCreateRequest;
 import org.apache.hadoop.ozone.om.response.snapshot.OMSnapshotCreateResponse;
 import org.apache.hadoop.ozone.om.snapshot.ReferenceCounted;
-import org.apache.hadoop.ozone.om.snapshot.SnapshotCache;
 import org.junit.jupiter.api.Test;
 
 import org.apache.hadoop.ozone.om.response.key.OMKeyPurgeResponse;
@@ -44,12 +42,11 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
 
-import static org.apache.hadoop.ozone.om.OmSnapshotManager.getSnapshotPrefix;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.when;
 
 /**
@@ -76,7 +73,7 @@ public class TestOMKeyPurgeRequestAndResponse extends TestOMKeyRequest {
     for (int i = 1; i <= numKeys; i++) {
       String key = keyName + "-" + i;
       OMRequestTestUtils.addKeyToTable(false, false, volumeName, bucket,
-          key, clientID, replicationType, replicationFactor, trxnIndex++,
+          key, clientID, replicationConfig, trxnIndex++,
           omMetadataManager);
       ozoneKeyNames.add(omMetadataManager.getOzoneKey(
           volumeName, bucket, key));
@@ -219,13 +216,12 @@ public class TestOMKeyPurgeRequestAndResponse extends TestOMKeyRequest {
         .setName("snap1")
         .build();
 
-    ReferenceCounted<IOmMetadataReader, SnapshotCache> rcOmSnapshot =
-        ozoneManager.getOmSnapshotManager().checkForSnapshot(
+    ReferenceCounted<OmSnapshot> rcOmSnapshot =
+        ozoneManager.getOmSnapshotManager().getSnapshot(
             fromSnapshotInfo.getVolumeName(),
             fromSnapshotInfo.getBucketName(),
-            getSnapshotPrefix(fromSnapshotInfo.getName()),
-            true);
-    OmSnapshot omSnapshot = (OmSnapshot) rcOmSnapshot.get();
+            fromSnapshotInfo.getName());
+    OmSnapshot omSnapshot = rcOmSnapshot.get();
 
     // The keys should be present in the snapshot's deletedTable
     for (String deletedKey : deletedKeyNames) {

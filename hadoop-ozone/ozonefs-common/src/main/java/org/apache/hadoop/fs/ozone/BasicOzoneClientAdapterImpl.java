@@ -605,6 +605,16 @@ public class BasicOzoneClientAdapterImpl implements OzoneClientAdapter {
   }
 
   @Override
+  public void renameSnapshot(String pathStr, String snapshotOldName, String snapshotNewName)
+      throws IOException {
+    OFSPath ofsPath = new OFSPath(pathStr, config);
+    objectStore.renameSnapshot(ofsPath.getVolumeName(),
+        ofsPath.getBucketName(),
+        snapshotOldName,
+        snapshotNewName);
+  }
+
+  @Override
   public void deleteSnapshot(String pathStr, String snapshotName)
       throws IOException {
     OFSPath ofsPath = new OFSPath(pathStr, config);

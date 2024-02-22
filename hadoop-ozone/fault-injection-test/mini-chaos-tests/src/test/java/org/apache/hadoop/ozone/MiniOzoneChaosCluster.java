@@ -63,7 +63,7 @@ public class MiniOzoneChaosCluster extends MiniOzoneHAClusterImpl {
 
   private final FailureManager failureManager;
 
-  private final int waitForClusterToBeReadyTimeout = 120000; // 2 min
+  private static final int WAIT_FOR_CLUSTER_TO_BE_READY_TIMEOUT = 120000; // 2 min
 
   private final Set<OzoneManager> failedOmSet;
   private final Set<StorageContainerManager> failedScmSet;
@@ -158,7 +158,7 @@ public class MiniOzoneChaosCluster extends MiniOzoneHAClusterImpl {
         }
       }
       return true;
-    }, 1000, waitForClusterToBeReadyTimeout);
+    }, 1000, WAIT_FOR_CLUSTER_TO_BE_READY_TIMEOUT);
   }
 
   /**
@@ -232,7 +232,7 @@ public class MiniOzoneChaosCluster extends MiniOzoneHAClusterImpl {
     protected void initializeConfiguration() throws IOException {
       super.initializeConfiguration();
 
-      OzoneClientConfig clientConfig = new OzoneClientConfig();
+      OzoneClientConfig clientConfig = conf.getObject(OzoneClientConfig.class);
       clientConfig.setStreamBufferFlushSize(8 * 1024 * 1024);
       clientConfig.setStreamBufferMaxSize(16 * 1024 * 1024);
       clientConfig.setStreamBufferSize(4 * 1024);
@@ -313,8 +313,7 @@ public class MiniOzoneChaosCluster extends MiniOzoneHAClusterImpl {
         throw new IOException("Unable to build MiniOzoneCluster. ", ex);
       }
 
-      final List<HddsDatanodeService> hddsDatanodes = createHddsDatanodes(
-          scmService.getActiveServices(), null);
+      final List<HddsDatanodeService> hddsDatanodes = createHddsDatanodes();
 
       MiniOzoneChaosCluster cluster =
           new MiniOzoneChaosCluster(conf, omService, scmService, hddsDatanodes,

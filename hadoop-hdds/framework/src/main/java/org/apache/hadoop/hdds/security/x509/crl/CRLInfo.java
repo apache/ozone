@@ -24,7 +24,7 @@ import org.apache.hadoop.hdds.security.exception.SCMSecurityException;
 import org.apache.hadoop.hdds.utils.db.Codec;
 import org.apache.hadoop.hdds.utils.db.DelegatedCodec;
 import org.apache.hadoop.hdds.utils.db.Proto2Codec;
-import org.jetbrains.annotations.NotNull;
+import jakarta.annotation.Nonnull;
 
 import java.security.cert.CRLException;
 import java.security.cert.X509CRL;
@@ -139,7 +139,7 @@ public final class CRLInfo implements Comparator<CRLInfo>,
    *                              from being compared to this object.
    */
   @Override
-  public int compareTo(@NotNull CRLInfo o) {
+  public int compareTo(@Nonnull CRLInfo o) {
     return this.compare(this, o);
   }
 

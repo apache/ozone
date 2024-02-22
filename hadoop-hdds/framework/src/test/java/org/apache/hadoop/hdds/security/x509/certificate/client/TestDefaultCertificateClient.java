@@ -45,7 +45,6 @@ import java.security.Signature;
 import java.security.cert.X509Certificate;
 import java.time.Duration;
 import java.util.Arrays;
-import java.util.UUID;
 import java.util.function.Predicate;
 
 import org.apache.commons.io.FileUtils;
@@ -74,8 +73,8 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.any;
+import static org.mockito.Mockito.anyString;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -88,6 +87,7 @@ public class TestDefaultCertificateClient {
   private X509Certificate x509Certificate;
   private DNCertificateClient dnCertClient;
   private HDDSKeyGenerator keyGenerator;
+  @TempDir
   private Path dnMetaDirPath;
   private SecurityConfig dnSecurityConfig;
   private SCMSecurityProtocolClientSideTranslatorPB scmSecurityClient;
@@ -99,10 +99,7 @@ public class TestDefaultCertificateClient {
     OzoneConfiguration config = new OzoneConfiguration();
     config.setStrings(OZONE_SCM_NAMES, "localhost");
     config.setInt(IPC_CLIENT_CONNECT_MAX_RETRIES_KEY, 2);
-    final String dnPath = GenericTestUtils
-        .getTempPath(UUID.randomUUID().toString());
 
-    dnMetaDirPath = Paths.get(dnPath, "test");
     config.set(HDDS_METADATA_DIR_NAME, dnMetaDirPath.toString());
     dnSecurityConfig = new SecurityConfig(config);
 
@@ -130,7 +127,6 @@ public class TestDefaultCertificateClient {
   public void tearDown() throws IOException {
     dnCertClient.close();
     dnCertClient = null;
-    FileUtils.deleteQuietly(dnMetaDirPath.toFile());
   }
 
   /**
