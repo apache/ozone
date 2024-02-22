@@ -21,6 +21,8 @@ import java.io.IOException;
 import java.io.OutputStream;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.concurrent.ExecutorService;
+import java.util.function.Supplier;
 
 import org.apache.hadoop.fs.Syncable;
 import org.apache.hadoop.hdds.client.BlockID;
@@ -64,7 +66,7 @@ public class BlockOutputStreamEntry extends OutputStream {
   private final BufferPool bufferPool;
   private final ContainerClientMetrics clientMetrics;
   private final StreamBufferArgs streamBufferArgs;
-  private BlockOutputStreamResourceProvider blockOutputStreamResourceProvider;
+  private final Supplier<ExecutorService> executorServiceSupplier;
 
   BlockOutputStreamEntry(Builder b) {
     this.config = b.config;
@@ -79,7 +81,7 @@ public class BlockOutputStreamEntry extends OutputStream {
     this.bufferPool = b.bufferPool;
     this.clientMetrics = b.clientMetrics;
     this.streamBufferArgs = b.streamBufferArgs;
-    this.blockOutputStreamResourceProvider = b.blockOutputStreamResourceProvider;
+    this.executorServiceSupplier = b.executorServiceSupplier;
   }
 
   @Override
@@ -106,16 +108,16 @@ public class BlockOutputStreamEntry extends OutputStream {
    */
   void createOutputStream() throws IOException {
     outputStream = new RatisBlockOutputStream(blockID, xceiverClientManager,
-        pipeline, bufferPool, config, token, clientMetrics, streamBufferArgs,
-        blockOutputStreamResourceProvider);
+        pipeline, bufferPool, config, token, clientMetrics, streamBufferArgs
+    );
   }
 
   ContainerClientMetrics getClientMetrics() {
     return clientMetrics;
   }
 
-  BlockOutputStreamResourceProvider getblockOutputStreamResourceProvider() {
-    return blockOutputStreamResourceProvider;
+  Supplier<ExecutorService> getExecutorServiceSupplier() {
+    return executorServiceSupplier;
   }
 
   StreamBufferArgs getStreamBufferArgs() {
@@ -364,7 +366,7 @@ public class BlockOutputStreamEntry extends OutputStream {
     private OzoneClientConfig config;
     private ContainerClientMetrics clientMetrics;
     private StreamBufferArgs streamBufferArgs;
-    private BlockOutputStreamResourceProvider blockOutputStreamResourceProvider;
+    private Supplier<ExecutorService> executorServiceSupplier;
 
     public Pipeline getPipeline() {
       return pipeline;
@@ -425,9 +427,8 @@ public class BlockOutputStreamEntry extends OutputStream {
       return this;
     }
 
-    public Builder setblockOutputStreamResourceProvider(
-        BlockOutputStreamResourceProvider provider) {
-      this.blockOutputStreamResourceProvider = provider;
+    public Builder setExecutorServiceSupplier(Supplier<ExecutorService> executorServiceSupplier) {
+      this.executorServiceSupplier = executorServiceSupplier;
       return this;
     }
 

@@ -35,8 +35,8 @@ import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.scm.storage.BlockLocationInfo;
 import org.apache.hadoop.hdds.scm.storage.BufferPool;
 import org.apache.hadoop.hdds.scm.storage.ECBlockOutputStream;
-import org.apache.hadoop.hdds.security.symmetric.SecretKeySignerClient;
 import org.apache.hadoop.hdds.security.SecurityConfig;
+import org.apache.hadoop.hdds.security.symmetric.SecretKeySignerClient;
 import org.apache.hadoop.hdds.security.token.ContainerTokenIdentifier;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
 import org.apache.hadoop.hdds.utils.IOUtils;
@@ -45,7 +45,6 @@ import org.apache.hadoop.io.ElasticByteBufferPool;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.client.io.BlockInputStreamFactory;
 import org.apache.hadoop.ozone.client.io.BlockInputStreamFactoryImpl;
-import org.apache.hadoop.ozone.client.io.BlockOutputStreamResourceProvider;
 import org.apache.hadoop.ozone.client.io.ECBlockInputStreamProxy;
 import org.apache.hadoop.ozone.client.io.ECBlockReconstructedStripeInputStream;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
@@ -118,8 +117,6 @@ public class ECReconstructionCoordinator implements Closeable {
   private final ECReconstructionMetrics metrics;
   private final StateContext context;
   private final OzoneClientConfig ozoneClientConfig;
-  private final BlockOutputStreamResourceProvider
-      blockOutputStreamResourceProvider;
 
   public ECReconstructionCoordinator(
       ConfigurationSource conf, CertificateClient certificateClient,
@@ -154,7 +151,6 @@ public class ECReconstructionCoordinator implements Closeable {
             new ThreadPoolExecutor.CallerRunsPolicy());
     this.blockInputStreamFactory = BlockInputStreamFactoryImpl
         .getInstance(byteBufferPool, () -> ecReconstructReadExecutor);
-    blockOutputStreamResourceProvider = BlockOutputStreamResourceProvider.create(() -> ecReconstructWriteExecutor);
     tokenHelper = new TokenHelper(new SecurityConfig(conf), secretKeyClient);
     this.clientMetrics = ContainerClientMetrics.acquire();
     this.metrics = metrics;

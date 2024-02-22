@@ -25,6 +25,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.ListIterator;
 import java.util.Map;
+import java.util.concurrent.ExecutorService;
+import java.util.function.Supplier;
 
 import org.apache.hadoop.hdds.scm.ByteStringConversion;
 import org.apache.hadoop.hdds.scm.ContainerClientMetrics;
@@ -83,7 +85,7 @@ public class BlockOutputStreamEntryPool implements KeyMetadataAware {
   private final ExcludeList excludeList;
   private final ContainerClientMetrics clientMetrics;
   private final StreamBufferArgs streamBufferArgs;
-  private final BlockOutputStreamResourceProvider blockOutputStreamResourceProvider;
+  private final Supplier<ExecutorService> executorServiceSupplier;
 
   public BlockOutputStreamEntryPool(KeyOutputStream.Builder b) {
     this.config = b.getClientConfig();
@@ -110,7 +112,7 @@ public class BlockOutputStreamEntryPool implements KeyMetadataAware {
             ByteStringConversion
                 .createByteBufferConversion(b.isUnsafeByteBufferConversionEnabled()));
     this.clientMetrics = b.getClientMetrics();
-    this.blockOutputStreamResourceProvider = b.getblockOutputStreamResourceProvider();
+    this.executorServiceSupplier = b.getExecutorServiceSupplier();
   }
 
   ExcludeList createExcludeList() {
@@ -161,7 +163,7 @@ public class BlockOutputStreamEntryPool implements KeyMetadataAware {
             .setToken(subKeyInfo.getToken())
             .setClientMetrics(clientMetrics)
             .setStreamBufferArgs(streamBufferArgs)
-            .setblockOutputStreamResourceProvider(blockOutputStreamResourceProvider)
+            .setExecutorServiceSupplier(executorServiceSupplier)
             .build();
   }
 
@@ -232,8 +234,8 @@ public class BlockOutputStreamEntryPool implements KeyMetadataAware {
     return streamBufferArgs;
   }
 
-  BlockOutputStreamResourceProvider getblockOutputStreamResourceProvider() {
-    return blockOutputStreamResourceProvider;
+  public Supplier<ExecutorService> getExecutorServiceSupplier() {
+    return executorServiceSupplier;
   }
 
   /**

@@ -80,7 +80,6 @@ import org.apache.hadoop.ozone.client.TenantArgs;
 import org.apache.hadoop.ozone.client.VolumeArgs;
 import org.apache.hadoop.ozone.client.io.BlockInputStreamFactory;
 import org.apache.hadoop.ozone.client.io.BlockInputStreamFactoryImpl;
-import org.apache.hadoop.ozone.client.io.BlockOutputStreamResourceProvider;
 import org.apache.hadoop.ozone.client.io.CipherOutputStreamOzone;
 import org.apache.hadoop.ozone.client.io.ECKeyOutputStream;
 import org.apache.hadoop.ozone.client.io.KeyDataStreamOutput;
@@ -222,8 +221,6 @@ public class RpcClient implements ClientProtocol {
   private final ContainerClientMetrics clientMetrics;
   private final MemoizedSupplier<ExecutorService> writeExecutor;
   private final AtomicBoolean isS3GRequest = new AtomicBoolean(false);
-  private final BlockOutputStreamResourceProvider
-      blockOutputStreamResourceProvider;
 
   /**
    * Creates RpcClient instance with the given configuration.
@@ -326,8 +323,6 @@ public class RpcClient implements ClientProtocol {
     this.blockInputStreamFactory = BlockInputStreamFactoryImpl
         .getInstance(byteBufferPool, ecReconstructExecutor);
     this.clientMetrics = ContainerClientMetrics.acquire();
-    this.blockOutputStreamResourceProvider = BlockOutputStreamResourceProvider
-        .create(writeExecutor);
   }
 
   public XceiverClientFactory getXceiverClientManager() {
@@ -2417,7 +2412,7 @@ public class RpcClient implements ClientProtocol {
         .setConfig(clientConfig)
         .setAtomicKeyCreation(isS3GRequest.get())
         .setClientMetrics(clientMetrics)
-        .setblockOutputStreamResourceProvider(blockOutputStreamResourceProvider)
+        .setExecutorServiceSupplier(writeExecutor)
         .setStreamBufferArgs(streamBufferArgs);
   }
 
