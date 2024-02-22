@@ -268,10 +268,10 @@ index 000000000..58e34b260
 +#endif  // ROCKSDB_LITE
 diff --git a/tools/raw_sst_file_reader.cc b/tools/raw_sst_file_reader.cc
 new file mode 100644
-index 000000000..0b1b55274
+index 000000000..5ba8a82ee
 --- /dev/null
 +++ b/tools/raw_sst_file_reader.cc
-@@ -0,0 +1,274 @@
+@@ -0,0 +1,272 @@
 +//  Copyright (c) 2011-present, Facebook, Inc.  All rights reserved.
 +//  This source code is licensed under both the GPLv2 (found in the
 +//  COPYING file in the root directory) and Apache 2.0 License
@@ -414,11 +414,6 @@ index 000000000..0b1b55274
 +        /* memory_allocator= */ nullptr, (magic_number == kBlockBasedTableMagicNumber)
 +                                             ? &prefetch_buffer
 +                                             : nullptr);
-+    if (!s.ok()) {
-+      if (!silent_) {
-+        fprintf(stderr, "Not able to read table properties\n");
-+      }
-+    }
 +    // For old sst format, ReadTableProperties might fail but file can be read
 +    if (s.ok()) {
 +      s = SetTableOptionsByMagicNumber(magic_number);
@@ -436,6 +431,9 @@ index 000000000..0b1b55274
 +        }
 +      }
 +    } else {
++      if (!silent_) {
++        fprintf(stderr, "Not able to read table properties\n");
++      }
 +      s = SetOldTableOptions();
 +    }
 +    options_.comparator = rep_->internal_comparator_.user_comparator();
