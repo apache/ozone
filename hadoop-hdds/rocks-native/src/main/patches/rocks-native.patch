@@ -18,7 +18,7 @@
 
 diff --git a/include/rocksdb/raw_iterator.h b/include/rocksdb/raw_iterator.h
 new file mode 100644
-index 000000000..1bf9b7d15
+index 000000000..21242ed15
 --- /dev/null
 +++ b/include/rocksdb/raw_iterator.h
 @@ -0,0 +1,25 @@
@@ -36,12 +36,12 @@ index 000000000..1bf9b7d15
 +class RawIterator {
 + public:
 +  virtual ~RawIterator() {}
-+  virtual bool has_next() const = 0;
-+  virtual Slice getKey() const = 0;
-+  virtual Slice getValue() const = 0;
-+  virtual uint64_t getSequenceNumber() const = 0;
-+  virtual uint32_t getType() const = 0;
-+  virtual void next() = 0;
++  virtual bool Valid() const = 0;
++  virtual Slice key() const = 0;
++  virtual Slice value() const = 0;
++  virtual uint64_t sequenceNumber() const = 0;
++  virtual uint32_t type() const = 0;
++  virtual void Next() = 0;
 +};
 +
 +}  // namespace ROCKSDB_NAMESPACE
@@ -135,7 +135,7 @@ index b94bc43ca..c13e5cde6 100644
    tools/block_cache_analyzer/block_cache_trace_analyzer.cc      \
 diff --git a/tools/raw_sst_file_iterator.cc b/tools/raw_sst_file_iterator.cc
 new file mode 100644
-index 000000000..5527b84a4
+index 000000000..3051637a3
 --- /dev/null
 +++ b/tools/raw_sst_file_iterator.cc
 @@ -0,0 +1,76 @@
@@ -180,10 +180,10 @@ index 000000000..5527b84a4
 +  initKey();
 +}
 +
-+bool RawSstFileIterator::has_next() const {
++bool RawSstFileIterator::Valid() const {
 +  return iter_->Valid() && (!has_to_ ||
 +                            BytewiseComparator()->Compare(
-+                                getKey(), *to_key_) < 0);
++                                key(), *to_key_) < 0);
 +}
 +
 +void RawSstFileIterator::initKey() {
@@ -191,25 +191,25 @@ index 000000000..5527b84a4
 +    ParseInternalKey(iter_->key(), ikey, true /* log_err_key */);
 +  }
 +}
-+void RawSstFileIterator::next() {
++void RawSstFileIterator::Next() {
 +  iter_->Next();
 +  initKey();
 +
 +}
 +
-+Slice RawSstFileIterator::getKey() const {
++Slice RawSstFileIterator::key() const {
 +  return ikey->user_key;
 +}
 +
-+uint64_t RawSstFileIterator::getSequenceNumber() const {
++uint64_t RawSstFileIterator::sequenceNumber() const {
 +    return ikey->sequence;
 +}
 +
-+uint32_t RawSstFileIterator::getType() const {
++uint32_t RawSstFileIterator::type() const {
 +    return static_cast<int>(ikey->type);
 +}
 +
-+Slice RawSstFileIterator::getValue() const {
++Slice RawSstFileIterator::value() const {
 +    return iter_->value();
 +}
 +}  // namespace ROCKSDB_NAMESPACE
@@ -217,7 +217,7 @@ index 000000000..5527b84a4
 +#endif  // ROCKSDB_LITE
 diff --git a/tools/raw_sst_file_iterator.h b/tools/raw_sst_file_iterator.h
 new file mode 100644
-index 000000000..622d7d75e
+index 000000000..58e34b260
 --- /dev/null
 +++ b/tools/raw_sst_file_iterator.h
 @@ -0,0 +1,45 @@
@@ -244,12 +244,12 @@ index 000000000..622d7d75e
 +                                    bool has_to,
 +                                    Slice* to_key);
 +
-+  bool has_next() const override;
-+  Slice getKey() const override;
-+  Slice getValue() const override;
-+  uint64_t getSequenceNumber() const override;
-+  uint32_t getType() const override;
-+  void next() final override;
++  bool Valid() const override;
++  Slice key() const override;
++  Slice value() const override;
++  uint64_t sequenceNumber() const override;
++  uint32_t type() const override;
++  void Next() final override;
 +
 +  ~RawSstFileIterator(){
 +    delete iter_;
@@ -268,10 +268,10 @@ index 000000000..622d7d75e
 +#endif  // ROCKSDB_LITE
 diff --git a/tools/raw_sst_file_reader.cc b/tools/raw_sst_file_reader.cc
 new file mode 100644
-index 000000000..220c814d0
+index 000000000..0b1b55274
 --- /dev/null
 +++ b/tools/raw_sst_file_reader.cc
-@@ -0,0 +1,285 @@
+@@ -0,0 +1,274 @@
 +//  Copyright (c) 2011-present, Facebook, Inc.  All rights reserved.
 +//  This source code is licensed under both the GPLv2 (found in the
 +//  COPYING file in the root directory) and Apache 2.0 License
@@ -283,20 +283,14 @@ index 000000000..220c814d0
 +
 +#include <chrono>
 +#include <cinttypes>
-+#include <iostream>
 +#include <map>
 +#include <memory>
-+#include <sstream>
-+#include <vector>
 +
-+#include "db/blob/blob_index.h"
++
 +#include "db/memtable.h"
 +#include "db/write_batch_internal.h"
 +#include "options/cf_options.h"
-+#include "port/port.h"
-+#include "rocksdb/db.h"
 +#include "rocksdb/env.h"
-+#include "rocksdb/iterator.h"
 +#include "rocksdb/slice_transform.h"
 +#include "rocksdb/status.h"
 +#include "rocksdb/table_properties.h"
@@ -304,17 +298,12 @@ index 000000000..220c814d0
 +#include "table/block_based/block.h"
 +#include "table/block_based/block_based_table_builder.h"
 +#include "table/block_based/block_based_table_factory.h"
-+#include "table/block_based/block_builder.h"
 +#include "table/format.h"
 +#include "table/meta_blocks.h"
 +#include "table/plain/plain_table_factory.h"
 +#include "table/table_reader.h"
 +#include "tools/raw_sst_file_iterator.h"
-+#include "util/compression.h"
-+#include "util/random.h"
 +#include "db/dbformat.h"
-+#include "file/writable_file_writer.h"
-+#include "options/cf_options.h"
 +
 +namespace ROCKSDB_NAMESPACE {
 +

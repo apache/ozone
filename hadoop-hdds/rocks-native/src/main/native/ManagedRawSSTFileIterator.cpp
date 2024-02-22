@@ -25,18 +25,18 @@
 
 jboolean Java_org_apache_hadoop_hdds_utils_db_managed_ManagedRawSSTFileIterator_hasNext(JNIEnv *env, jobject obj,
                                                                                            jlong native_handle) {
-    return static_cast<jboolean>(reinterpret_cast<ROCKSDB_NAMESPACE::RawIterator*>(native_handle)->has_next());
+    return static_cast<jboolean>(reinterpret_cast<ROCKSDB_NAMESPACE::RawIterator*>(native_handle)->Valid());
 }
 
 void Java_org_apache_hadoop_hdds_utils_db_managed_ManagedRawSSTFileIterator_next(JNIEnv *env, jobject obj,
                                                                                        jlong native_handle) {
-    reinterpret_cast<ROCKSDB_NAMESPACE::RawIterator*>(native_handle)->next();
+    reinterpret_cast<ROCKSDB_NAMESPACE::RawIterator*>(native_handle)->Next();
 }
 
 jbyteArray Java_org_apache_hadoop_hdds_utils_db_managed_ManagedRawSSTFileIterator_getKey(JNIEnv *env,
                                                                                                jobject obj,
                                                                                                jlong native_handle) {
-    ROCKSDB_NAMESPACE::Slice slice = reinterpret_cast<ROCKSDB_NAMESPACE::RawIterator*>(native_handle)->getKey();
+    ROCKSDB_NAMESPACE::Slice slice = reinterpret_cast<ROCKSDB_NAMESPACE::RawIterator*>(native_handle)->key();
     jbyteArray jkey = env->NewByteArray(static_cast<jsize>(slice.size()));
     if (jkey == nullptr) {
         // exception thrown: OutOfMemoryError
@@ -52,7 +52,7 @@ jbyteArray Java_org_apache_hadoop_hdds_utils_db_managed_ManagedRawSSTFileIterato
 jbyteArray Java_org_apache_hadoop_hdds_utils_db_managed_ManagedRawSSTFileIterator_getValue(JNIEnv *env,
                                                                                                jobject obj,
                                                                                                jlong native_handle) {
-    ROCKSDB_NAMESPACE::Slice slice = reinterpret_cast<ROCKSDB_NAMESPACE::RawIterator*>(native_handle)->getValue();
+    ROCKSDB_NAMESPACE::Slice slice = reinterpret_cast<ROCKSDB_NAMESPACE::RawIterator*>(native_handle)->value();
     jbyteArray jkey = env->NewByteArray(static_cast<jsize>(slice.size()));
     if (jkey == nullptr) {
         // exception thrown: OutOfMemoryError
@@ -68,7 +68,7 @@ jlong Java_org_apache_hadoop_hdds_utils_db_managed_ManagedRawSSTFileIterator_get
                                                                                                      jobject obj,
                                                                                                      jlong native_handle) {
     uint64_t sequence_number =
-            reinterpret_cast<ROCKSDB_NAMESPACE::RawIterator*>(native_handle)->getSequenceNumber();
+            reinterpret_cast<ROCKSDB_NAMESPACE::RawIterator*>(native_handle)->sequenceNumber();
     jlong result;
     std::memcpy(&result, &sequence_number, sizeof(jlong));
     return result;
@@ -78,7 +78,7 @@ jlong Java_org_apache_hadoop_hdds_utils_db_managed_ManagedRawSSTFileIterator_get
 jint Java_org_apache_hadoop_hdds_utils_db_managed_ManagedRawSSTFileIterator_getType(JNIEnv *env,
                                                                                           jobject obj,
                                                                                           jlong native_handle) {
-    uint32_t type = reinterpret_cast<ROCKSDB_NAMESPACE::RawIterator*>(native_handle)->getType();
+    uint32_t type = reinterpret_cast<ROCKSDB_NAMESPACE::RawIterator*>(native_handle)->type();
     return static_cast<jint>(type);
 }
 
