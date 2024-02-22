@@ -238,7 +238,7 @@
                       <arg line="DEBUG_LEVEL=0"/>
                       <arg line="EXTRA_CXXFLAGS='-fPIC -D_GLIBCXX_USE_CXX11_ABI=0'"/>
                       <arg line="-j${system.numCores}"/>
-                      <arg line="tools"/>
+                      <arg line="tools_lib"/>
                     </exec>
                   </target>
                 </configuration>

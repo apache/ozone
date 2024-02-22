@@ -116,10 +116,10 @@ index 000000000..09e748208
 +
 +#endif  // ROCKSDB_LITE
 diff --git a/src.mk b/src.mk
-index b94bc43ca..83f4fc90b 100644
+index b94bc43ca..c13e5cde6 100644
 --- a/src.mk
 +++ b/src.mk
-@@ -338,11 +338,9 @@ RANGE_TREE_SOURCES =\
+@@ -338,11 +338,8 @@ RANGE_TREE_SOURCES =\
    utilities/transactions/lock/range/range_tree/range_tree_lock_tracker.cc
 
  TOOL_LIB_SOURCES =                                              \
@@ -127,32 +127,12 @@ index b94bc43ca..83f4fc90b 100644
 -  tools/ldb_cmd.cc                                              \
 -  tools/ldb_tool.cc                                             \
 -  tools/sst_dump_tool.cc                                        \
-   utilities/blob_db/blob_dump_tool.cc                           \
+-  utilities/blob_db/blob_dump_tool.cc                           \
 +  tools/raw_sst_file_reader.cc                                  \
 +  tools/raw_sst_file_iterator.cc                                \
 
  ANALYZER_LIB_SOURCES =                                          \
    tools/block_cache_analyzer/block_cache_trace_analyzer.cc      \
-@@ -393,19 +391,7 @@ FOLLY_SOURCES =                                                 \
-   $(FOLLY_DIR)/folly/synchronization/ParkingLot.cpp             \
-
- TOOLS_MAIN_SOURCES =                                                    \
--  db_stress_tool/db_stress.cc                                           \
-   tools/blob_dump.cc                                                    \
--  tools/block_cache_analyzer/block_cache_trace_analyzer_tool.cc         \
--  tools/db_repl_stress.cc                                               \
--  tools/db_sanity_test.cc                                               \
--  tools/ldb.cc                                                          \
--  tools/io_tracer_parser.cc                                             \
--  tools/sst_dump.cc                                                     \
--  tools/write_stress.cc                                                 \
--  tools/dump/rocksdb_dump.cc                                            \
--  tools/dump/rocksdb_undump.cc                                          \
--  tools/trace_analyzer.cc                                               \
--  tools/io_tracer_parser_tool.cc                                        \
-
- BENCH_MAIN_SOURCES =                                                    \
-   cache/cache_bench.cc                                                  \
 diff --git a/tools/raw_sst_file_iterator.cc b/tools/raw_sst_file_iterator.cc
 new file mode 100644
 index 000000000..5527b84a4
