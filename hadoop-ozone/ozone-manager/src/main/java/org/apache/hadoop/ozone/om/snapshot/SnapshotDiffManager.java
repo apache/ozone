@@ -284,7 +284,7 @@ public class SnapshotDiffManager implements AutoCloseable {
       try {
         return ManagedRawSSTFileReader.loadLibrary();
       } catch (NativeLibraryNotLoadedException e) {
-        LOG.info("Native Library for raw sst file reading loading failed.", e);
+        LOG.error("Native Library for raw sst file reading loading failed.", e);
         return false;
       }
     }
