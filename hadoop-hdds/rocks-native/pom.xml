@@ -135,7 +135,7 @@
             <executions>
               <execution>
                 <id>read-property-from-file</id>
-                <phase>initialize</phase> <!-- Choose the appropriate phase -->
+                <phase>initialize</phase>
                 <goals>
                   <goal>read-project-properties</goal>
                 </goals>
@@ -153,7 +153,7 @@
             <executions>
               <execution>
                 <id>unpack-dependency</id>
-                <phase>initialize</phase> <!-- Choose the appropriate phase -->
+                <phase>initialize</phase>
                 <goals>
                   <goal>unpack</goal>
                 </goals>
@@ -337,7 +337,7 @@
                   <javahPath>${env.JAVA_HOME}/bin/javah</javahPath>
                   <javahClassNames>
                     <javahClassName>org.apache.hadoop.hdds.utils.db.managed.ManagedRawSSTFileReader</javahClassName>
-                    <javahClassName>org.apache.hadoop.hdds.utils.db.managed.ManagedRawSSTFileReaderIterator</javahClassName>
+                    <javahClassName>org.apache.hadoop.hdds.utils.db.managed.ManagedRawSSTFileIterator</javahClassName>
                   </javahClassNames>
                   <javahOutputDirectory>${project.build.directory}/native/javah</javahOutputDirectory>
                 </configuration>

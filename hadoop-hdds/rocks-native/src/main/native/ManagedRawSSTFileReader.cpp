@@ -25,37 +25,37 @@
 #include <iostream>
 
 jlong Java_org_apache_hadoop_hdds_utils_db_managed_ManagedRawSSTFileReader_newRawSSTFileReader(JNIEnv *env, jobject obj,
-                                                                                              jlong optionsHandle,
-                                                                                              jstring jfilename,
-                                                                                              jint readahead_size) {
-    ROCKSDB_NAMESPACE::Options *options = reinterpret_cast<ROCKSDB_NAMESPACE::Options *>(optionsHandle);
+                                                                                               jlong options_handle,
+                                                                                               jstring jfilename,
+                                                                                               jint readahead_size) {
+    ROCKSDB_NAMESPACE::Options *options = reinterpret_cast<ROCKSDB_NAMESPACE::Options *>(options_handle);
     const char *file_path = env->GetStringUTFChars(jfilename, nullptr);
-    size_t readAheadSizeValue = static_cast<size_t>(readahead_size);
-    ROCKSDB_NAMESPACE::RawSstFileReader* rawSstFileReader =
-            new ROCKSDB_NAMESPACE::RawSstFileReader(*options, file_path, readAheadSizeValue, true, true);
+    size_t read_ahead_size_value = static_cast<size_t>(readahead_size);
+    ROCKSDB_NAMESPACE::RawSstFileReader* raw_sst_file_reader =
+            new ROCKSDB_NAMESPACE::RawSstFileReader(*options, file_path, read_ahead_size_value, true, true);
     env->ReleaseStringUTFChars(jfilename, file_path);
-    return GET_CPLUSPLUS_POINTER(rawSstFileReader);
+    return GET_CPLUSPLUS_POINTER(raw_sst_file_reader);
 }
 
 jlong Java_org_apache_hadoop_hdds_utils_db_managed_ManagedRawSSTFileReader_newIterator(JNIEnv *env, jobject obj,
                                                                                        jlong native_handle,
                                                                                        jboolean jhas_from,
-                                                                                       jlong fromSliceHandle,
+                                                                                       jlong from_slice_handle,
                                                                                        jboolean jhas_to,
-                                                                                       jlong toSliceHandle) {
-    ROCKSDB_NAMESPACE::Slice* fromSlice = nullptr;
-    ROCKSDB_NAMESPACE::Slice* toSlice = nullptr;
-    ROCKSDB_NAMESPACE::RawSstFileReader* rawSstFileReader =
+                                                                                       jlong to_slice_handle) {
+    ROCKSDB_NAMESPACE::Slice* from_slice = nullptr;
+    ROCKSDB_NAMESPACE::Slice* to_slice = nullptr;
+    ROCKSDB_NAMESPACE::RawSstFileReader* raw_sst_file_reader =
             reinterpret_cast<ROCKSDB_NAMESPACE::RawSstFileReader*>(native_handle);
     bool has_from = static_cast<bool>(jhas_from);
     bool has_to = static_cast<bool>(jhas_to);
     if (has_from) {
-        fromSlice = reinterpret_cast<ROCKSDB_NAMESPACE::Slice*>(fromSliceHandle);
+        from_slice = reinterpret_cast<ROCKSDB_NAMESPACE::Slice*>(from_slice_handle);
     }
     if (has_to) {
-        toSlice = reinterpret_cast<ROCKSDB_NAMESPACE::Slice*>(toSliceHandle);
+        to_slice = reinterpret_cast<ROCKSDB_NAMESPACE::Slice*>(to_slice_handle);
     }
-    ROCKSDB_NAMESPACE::RawIterator* iterator = rawSstFileReader->newIterator(has_from, fromSlice, has_to, toSlice);
+    ROCKSDB_NAMESPACE::RawIterator* iterator = raw_sst_file_reader->newIterator(has_from, from_slice, has_to, to_slice);
     return GET_CPLUSPLUS_POINTER(iterator);
 }
 

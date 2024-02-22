@@ -22,18 +22,18 @@ import org.apache.hadoop.hdds.StringUtils;
 import org.apache.hadoop.util.ClosableIterator;
 
 import java.util.Arrays;
+import java.util.NoSuchElementException;
 import java.util.function.Function;
 
 /**
  * Iterator for SSTFileReader which would read all entries including tombstones.
  */
-public class ManagedRawSSTFileReaderIterator<T>
-    implements ClosableIterator<T> {
+public class ManagedRawSSTFileIterator<T> implements ClosableIterator<T> {
+  // Native address of pointer to the object.
   private final long nativeHandle;
   private final Function<KeyValue, T> transformer;
 
-  ManagedRawSSTFileReaderIterator(long nativeHandle,
-                                  Function<KeyValue, T> transformer) {
+  ManagedRawSSTFileIterator(long nativeHandle, Function<KeyValue, T> transformer) {
     this.nativeHandle = nativeHandle;
     this.transformer = transformer;
   }
@@ -53,7 +53,7 @@ public class ManagedRawSSTFileReaderIterator<T>
   @Override
   public T next() {
     if (!hasNext()) {
-      return null;
+      throw new NoSuchElementException();
     }
 
     KeyValue keyValue = new KeyValue(this.getKey(nativeHandle),

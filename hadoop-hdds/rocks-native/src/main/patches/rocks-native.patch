@@ -116,7 +116,7 @@ index 000000000..266a0c1c8
 +
 +#endif  // ROCKSDB_LITE
 diff --git a/src.mk b/src.mk
-index b94bc43ca..95bfff274 100644
+index b94bc43ca..39080b2cf 100644
 --- a/src.mk
 +++ b/src.mk
 @@ -343,6 +343,8 @@ TOOL_LIB_SOURCES =                                              \
@@ -124,13 +124,146 @@ index b94bc43ca..95bfff274 100644
    tools/sst_dump_tool.cc                                        \
    utilities/blob_db/blob_dump_tool.cc                           \
 +  tools/raw_sst_file_reader.cc                                  \
-+  tools/raw_sst_file_reader_iterator.cc                         \
++  tools/raw_sst_file_iterator.cc                                \
 
  ANALYZER_LIB_SOURCES =                                          \
    tools/block_cache_analyzer/block_cache_trace_analyzer.cc      \
+diff --git a/tools/raw_sst_file_iterator.cc b/tools/raw_sst_file_iterator.cc
+new file mode 100644
+index 000000000..5527b84a4
+--- /dev/null
++++ b/tools/raw_sst_file_iterator.cc
+@@ -0,0 +1,76 @@
++//  Copyright (c) 2011-present, Facebook, Inc.  All rights reserved.
++//  This source code is licensed under both the GPLv2 (found in the
++//  COPYING file in the root directory) and Apache 2.0 License
++//  (found in the LICENSE.Apache file in the root directory).
++//
++#ifndef ROCKSDB_LITE
++
++
++#include <cinttypes>
++#include <memory>
++
++#include "db/memtable.h"
++#include "db/write_batch_internal.h"
++#include "rocksdb/status.h"
++#include "rocksdb/utilities/ldb_cmd.h"
++#include "table/block_based/block.h"
++#include "table/block_based/block_based_table_builder.h"
++#include "table/block_based/block_based_table_factory.h"
++#include "table/meta_blocks.h"
++#include "table/plain/plain_table_factory.h"
++#include "tools/raw_sst_file_iterator.h"
++
++namespace ROCKSDB_NAMESPACE {
++
++RawSstFileIterator::RawSstFileIterator(InternalIterator* iterator,
++                             bool has_from, Slice* from_key,
++                             bool has_to, Slice* to_key)
++    : iter_(iterator),
++      ikey(new ParsedInternalKey()),
++      has_to_(has_to),
++      to_key_(to_key) {
++  if (has_from) {
++    InternalKey k;
++    k.SetMinPossibleForUserKey(*from_key);
++    iter_->Seek(k.Encode());
++  } else {
++    iter_->SeekToFirst();
++  }
++  initKey();
++}
++
++bool RawSstFileIterator::has_next() const {
++  return iter_->Valid() && (!has_to_ ||
++                            BytewiseComparator()->Compare(
++                                getKey(), *to_key_) < 0);
++}
++
++void RawSstFileIterator::initKey() {
++  if (iter_->Valid()) {
++    ParseInternalKey(iter_->key(), ikey, true /* log_err_key */);
++  }
++}
++void RawSstFileIterator::next() {
++  iter_->Next();
++  initKey();
++
++}
++
++Slice RawSstFileIterator::getKey() const {
++  return ikey->user_key;
++}
++
++uint64_t RawSstFileIterator::getSequenceNumber() const {
++    return ikey->sequence;
++}
++
++uint32_t RawSstFileIterator::getType() const {
++    return static_cast<int>(ikey->type);
++}
++
++Slice RawSstFileIterator::getValue() const {
++    return iter_->value();
++}
++}  // namespace ROCKSDB_NAMESPACE
++
++#endif  // ROCKSDB_LITE
+diff --git a/tools/raw_sst_file_iterator.h b/tools/raw_sst_file_iterator.h
+new file mode 100644
+index 000000000..ea7de6763
+--- /dev/null
++++ b/tools/raw_sst_file_iterator.h
+@@ -0,0 +1,45 @@
++// Copyright (c) 2011-present, Facebook, Inc.  All rights reserved.
++//  This source code is licensed under both the GPLv2 (found in the
++//  COPYING file in the root directory) and Apache 2.0 License
++//  (found in the LICENSE.Apache file in the root directory).
++#pragma once
++#ifndef ROCKSDB_LITE
++
++#include <memory>
++#include <string>
++#include "file/writable_file_writer.h"
++#include "rocksdb/advanced_options.h"
++#include "rocksdb/raw_iterator.h"
++
++namespace ROCKSDB_NAMESPACE {
++
++class RawSstFileIterator : public RawIterator {
++ public:
++  explicit RawSstFileIterator(InternalIterator* iterator,
++                                    bool has_from,
++                                    Slice* from_key,
++                                    bool has_to,
++                                    Slice* to_key);
++
++  bool has_next() const override;
++  Slice getKey() const override;
++  Slice getValue() const override;
++  uint64_t getSequenceNumber() const override;
++  uint32_t getType() const override;
++  void next() final override;
++
++  ~RawSstFileIterator(){
++    delete iter_;
++  }
++
++ private:
++  void initKey();
++  InternalIterator* iter_;
++  ParsedInternalKey* ikey;
++  bool has_to_;
++  Slice* to_key_;
++};
++
++}  // namespace ROCKSDB_NAMESPACE
++
++#endif  // ROCKSDB_LITE
 diff --git a/tools/raw_sst_file_reader.cc b/tools/raw_sst_file_reader.cc
 new file mode 100644
-index 000000000..1693bd1e6
+index 000000000..220c814d0
 --- /dev/null
 +++ b/tools/raw_sst_file_reader.cc
 @@ -0,0 +1,285 @@
@@ -171,7 +304,7 @@ index 000000000..1693bd1e6
 +#include "table/meta_blocks.h"
 +#include "table/plain/plain_table_factory.h"
 +#include "table/table_reader.h"
-+#include "tools/raw_sst_file_reader_iterator.h"
++#include "tools/raw_sst_file_iterator.h"
 +#include "util/compression.h"
 +#include "util/random.h"
 +#include "db/dbformat.h"
@@ -413,160 +546,9 @@ index 000000000..1693bd1e6
 +      rep_->read_options_, rep_->moptions_.prefix_extractor.get(),
 +      /*arena=*/nullptr, /*skip_filters=*/false,
 +      TableReaderCaller::kSSTDumpTool);
-+  return new RawSstFileReaderIterator(iter, has_from, from, has_to, to);
++  return new RawSstFileIterator(iter, has_from, from, has_to, to);
 +
 +}
-+}  // namespace ROCKSDB_NAMESPACE
-+
-+#endif  // ROCKSDB_LITE
-diff --git a/tools/raw_sst_file_reader_iterator.cc b/tools/raw_sst_file_reader_iterator.cc
-new file mode 100644
-index 000000000..39a2b84be
---- /dev/null
-+++ b/tools/raw_sst_file_reader_iterator.cc
-@@ -0,0 +1,94 @@
-+//  Copyright (c) 2011-present, Facebook, Inc.  All rights reserved.
-+//  This source code is licensed under both the GPLv2 (found in the
-+//  COPYING file in the root directory) and Apache 2.0 License
-+//  (found in the LICENSE.Apache file in the root directory).
-+//
-+#ifndef ROCKSDB_LITE
-+
-+#include "tools/raw_sst_file_reader_iterator.h"
-+
-+#include <chrono>
-+#include <cinttypes>
-+#include <iostream>
-+#include <map>
-+#include <memory>
-+#include <sstream>
-+#include <vector>
-+
-+#include "db/blob/blob_index.h"
-+#include "db/memtable.h"
-+#include "db/write_batch_internal.h"
-+#include "options/cf_options.h"
-+#include "port/port.h"
-+#include "rocksdb/db.h"
-+#include "rocksdb/env.h"
-+#include "rocksdb/iterator.h"
-+#include "rocksdb/slice_transform.h"
-+#include "rocksdb/status.h"
-+#include "rocksdb/table_properties.h"
-+#include "rocksdb/utilities/ldb_cmd.h"
-+#include "table/block_based/block.h"
-+#include "table/block_based/block_based_table_builder.h"
-+#include "table/block_based/block_based_table_factory.h"
-+#include "table/block_based/block_builder.h"
-+#include "table/format.h"
-+#include "table/meta_blocks.h"
-+#include "table/plain/plain_table_factory.h"
-+#include "table/table_reader.h"
-+#include "util/compression.h"
-+#include "util/random.h"
-+
-+namespace ROCKSDB_NAMESPACE {
-+
-+RawSstFileReaderIterator::RawSstFileReaderIterator(InternalIterator* iterator,
-+                             bool has_from, Slice* from_key,
-+                             bool has_to, Slice* to_key)
-+    : iter_(iterator),
-+      ikey(new ParsedInternalKey()),
-+      has_to_(has_to),
-+      to_key_(to_key) {
-+  if (has_from) {
-+    InternalKey k;
-+    k.SetMinPossibleForUserKey(*from_key);
-+    iter_->Seek(k.Encode());
-+  } else {
-+    iter_->SeekToFirst();
-+  }
-+  initKey();
-+}
-+
-+bool RawSstFileReaderIterator::has_next() const {
-+  return iter_->Valid() && (!has_to_ ||
-+                            BytewiseComparator()->Compare(
-+                                getKey(), *to_key_) < 0);
-+}
-+
-+void RawSstFileReaderIterator::initKey() {
-+  if (iter_->Valid()) {
-+    ParseInternalKey(iter_->key(), ikey, true /* log_err_key */);
-+  }
-+}
-+void RawSstFileReaderIterator::next() {
-+  iter_->Next();
-+  initKey();
-+
-+}
-+
-+Slice RawSstFileReaderIterator::getKey() const {
-+  return ikey->user_key;
-+}
-+
-+uint64_t RawSstFileReaderIterator::getSequenceNumber() const {
-+    return ikey->sequence;
-+}
-+
-+uint32_t RawSstFileReaderIterator::getType() const {
-+    return static_cast<int>(ikey->type);
-+}
-+
-+Slice RawSstFileReaderIterator::getValue() const {
-+    return iter_->value();
-+}
-+}  // namespace ROCKSDB_NAMESPACE
-+
-+#endif  // ROCKSDB_LITE
-diff --git a/tools/raw_sst_file_reader_iterator.h b/tools/raw_sst_file_reader_iterator.h
-new file mode 100644
-index 000000000..79313264f
---- /dev/null
-+++ b/tools/raw_sst_file_reader_iterator.h
-@@ -0,0 +1,45 @@
-+// Copyright (c) 2011-present, Facebook, Inc.  All rights reserved.
-+//  This source code is licensed under both the GPLv2 (found in the
-+//  COPYING file in the root directory) and Apache 2.0 License
-+//  (found in the LICENSE.Apache file in the root directory).
-+#pragma once
-+#ifndef ROCKSDB_LITE
-+
-+#include <memory>
-+#include <string>
-+#include "file/writable_file_writer.h"
-+#include "rocksdb/advanced_options.h"
-+#include "rocksdb/raw_iterator.h"
-+
-+namespace ROCKSDB_NAMESPACE {
-+
-+class RawSstFileReaderIterator : public RawIterator {
-+ public:
-+  explicit RawSstFileReaderIterator(InternalIterator* iterator,
-+                                    bool has_from,
-+                                    Slice* from_key,
-+                                    bool has_to,
-+                                    Slice* to_key);
-+
-+  bool has_next() const override;
-+  Slice getKey() const override;
-+  Slice getValue() const override;
-+  uint64_t getSequenceNumber() const override;
-+  uint32_t getType() const override;
-+  void next() final override;
-+
-+  ~RawSstFileReaderIterator(){
-+    delete iter_;
-+  }
-+
-+ private:
-+  void initKey();
-+  InternalIterator* iter_;
-+  ParsedInternalKey* ikey;
-+  bool has_to_;
-+  Slice* to_key_;
-+};
-+
 +}  // namespace ROCKSDB_NAMESPACE
 +
 +#endif  // ROCKSDB_LITE

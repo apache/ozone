@@ -35,7 +35,6 @@ import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksDB;
 import org.apache.hadoop.hdfs.protocol.SnapshotDiffReport.DiffReportEntry;
 import org.apache.hadoop.ozone.OFSPath;
 import org.apache.hadoop.ozone.OzoneConsts;
-import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
 import org.apache.hadoop.ozone.om.OmSnapshot;
@@ -109,6 +108,8 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_FORCE_FU
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_FORCE_FULL_DIFF_DEFAULT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_DIFF_DISABLE_NATIVE_LIBS;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_DIFF_DISABLE_NATIVE_LIBS_DEFAULT;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_LOAD_NATIVE_LIB;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_LOAD_NATIVE_LIB_DEFAULT;
 import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.DIRECTORY_TABLE;
 import static org.apache.hadoop.ozone.om.OmSnapshotManager.DELIMITER;
 import static org.apache.hadoop.ozone.om.snapshot.SnapshotUtils.checkSnapshotActive;
@@ -255,7 +256,7 @@ public class SnapshotDiffManager implements AutoCloseable {
     createEmptySnapDiffDir(path);
     this.sstBackupDirForSnapDiffJobs = path.toString();
 
-    this.isNativeLibsLoaded = initSSTDumpTool(ozoneManager.getConfiguration());
+    this.isNativeLibsLoaded = initNativeLibraryForEfficientDiff(ozoneManager.getConfiguration());
 
     // Ideally, loadJobsOnStartUp should run only on OM node, since SnapDiff
     // is not HA currently and running this on all the nodes would be
@@ -278,13 +279,12 @@ public class SnapshotDiffManager implements AutoCloseable {
     return snapDiffJobTable;
   }
 
-  private boolean initSSTDumpTool(
-      final OzoneConfiguration conf) {
-    if (conf.getBoolean(OMConfigKeys.OZONE_OM_SNAPSHOT_LOAD_NATIVE_LIB,
-        OMConfigKeys.OZONE_OM_SNAPSHOT_LOAD_NATIVE_LIB_DEFAULT)) {
+  private boolean initNativeLibraryForEfficientDiff(final OzoneConfiguration conf) {
+    if (conf.getBoolean(OZONE_OM_SNAPSHOT_LOAD_NATIVE_LIB, OZONE_OM_SNAPSHOT_LOAD_NATIVE_LIB_DEFAULT)) {
       try {
         return ManagedRawSSTFileReader.loadLibrary();
       } catch (NativeLibraryNotLoadedException e) {
+        LOG.info("Native Library for raw sst file reading loading failed.", e);
         return false;
       }
     }
@@ -1066,12 +1066,9 @@ public class SnapshotDiffManager implements AutoCloseable {
       upperBoundCharArray[upperBoundCharArray.length - 1] += 1;
       sstFileReaderUpperBound = String.valueOf(upperBoundCharArray);
     }
-    try (Stream<String> keysToCheck =
-             nativeRocksToolsLoaded
-                 ? sstFileReader.getKeyStreamWithTombstone(
-                     sstFileReaderLowerBound, sstFileReaderUpperBound)
-                 : sstFileReader.getKeyStream(sstFileReaderLowerBound,
-                 sstFileReaderUpperBound)) {
+    try (Stream<String> keysToCheck = nativeRocksToolsLoaded ?
+        sstFileReader.getKeyStreamWithTombstone(sstFileReaderLowerBound, sstFileReaderUpperBound)
+        : sstFileReader.getKeyStream(sstFileReaderLowerBound, sstFileReaderUpperBound)) {
       keysToCheck.forEach(key -> {
         try {
           final WithParentObjectId fromObjectId = fsTable.get(key);

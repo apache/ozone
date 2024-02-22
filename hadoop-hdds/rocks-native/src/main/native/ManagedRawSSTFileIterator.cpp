@@ -16,24 +16,24 @@
  * limitations under the License.
  */
 
-#include "org_apache_hadoop_hdds_utils_db_managed_ManagedRawSSTFileReaderIterator.h"
+#include "org_apache_hadoop_hdds_utils_db_managed_ManagedRawSSTFileIterator.h"
 #include "rocksdb/options.h"
 #include "rocksdb/raw_iterator.h"
 #include <string>
 #include "cplusplus_to_java_convert.h"
 #include <iostream>
 
-jboolean Java_org_apache_hadoop_hdds_utils_db_managed_ManagedRawSSTFileReaderIterator_hasNext(JNIEnv *env, jobject obj,
+jboolean Java_org_apache_hadoop_hdds_utils_db_managed_ManagedRawSSTFileIterator_hasNext(JNIEnv *env, jobject obj,
                                                                                            jlong native_handle) {
     return static_cast<jboolean>(reinterpret_cast<ROCKSDB_NAMESPACE::RawIterator*>(native_handle)->has_next());
 }
 
-void Java_org_apache_hadoop_hdds_utils_db_managed_ManagedRawSSTFileReaderIterator_next(JNIEnv *env, jobject obj,
+void Java_org_apache_hadoop_hdds_utils_db_managed_ManagedRawSSTFileIterator_next(JNIEnv *env, jobject obj,
                                                                                        jlong native_handle) {
     reinterpret_cast<ROCKSDB_NAMESPACE::RawIterator*>(native_handle)->next();
 }
 
-jbyteArray Java_org_apache_hadoop_hdds_utils_db_managed_ManagedRawSSTFileReaderIterator_getKey(JNIEnv *env,
+jbyteArray Java_org_apache_hadoop_hdds_utils_db_managed_ManagedRawSSTFileIterator_getKey(JNIEnv *env,
                                                                                                jobject obj,
                                                                                                jlong native_handle) {
     ROCKSDB_NAMESPACE::Slice slice = reinterpret_cast<ROCKSDB_NAMESPACE::RawIterator*>(native_handle)->getKey();
@@ -49,7 +49,7 @@ jbyteArray Java_org_apache_hadoop_hdds_utils_db_managed_ManagedRawSSTFileReaderI
 }
 
 
-jbyteArray Java_org_apache_hadoop_hdds_utils_db_managed_ManagedRawSSTFileReaderIterator_getValue(JNIEnv *env,
+jbyteArray Java_org_apache_hadoop_hdds_utils_db_managed_ManagedRawSSTFileIterator_getValue(JNIEnv *env,
                                                                                                jobject obj,
                                                                                                jlong native_handle) {
     ROCKSDB_NAMESPACE::Slice slice = reinterpret_cast<ROCKSDB_NAMESPACE::RawIterator*>(native_handle)->getValue();
@@ -64,7 +64,7 @@ jbyteArray Java_org_apache_hadoop_hdds_utils_db_managed_ManagedRawSSTFileReaderI
     return jkey;
 }
 
-jlong Java_org_apache_hadoop_hdds_utils_db_managed_ManagedRawSSTFileReaderIterator_getSequenceNumber(JNIEnv *env,
+jlong Java_org_apache_hadoop_hdds_utils_db_managed_ManagedRawSSTFileIterator_getSequenceNumber(JNIEnv *env,
                                                                                                      jobject obj,
                                                                                                      jlong native_handle) {
     uint64_t sequence_number =
@@ -75,7 +75,7 @@ jlong Java_org_apache_hadoop_hdds_utils_db_managed_ManagedRawSSTFileReaderIterat
 }
 
 
-jint Java_org_apache_hadoop_hdds_utils_db_managed_ManagedRawSSTFileReaderIterator_getType(JNIEnv *env,
+jint Java_org_apache_hadoop_hdds_utils_db_managed_ManagedRawSSTFileIterator_getType(JNIEnv *env,
                                                                                           jobject obj,
                                                                                           jlong native_handle) {
     uint32_t type = reinterpret_cast<ROCKSDB_NAMESPACE::RawIterator*>(native_handle)->getType();
@@ -83,7 +83,7 @@ jint Java_org_apache_hadoop_hdds_utils_db_managed_ManagedRawSSTFileReaderIterato
 }
 
 
-void Java_org_apache_hadoop_hdds_utils_db_managed_ManagedRawSSTFileReaderIterator_closeInternal(JNIEnv *env,
+void Java_org_apache_hadoop_hdds_utils_db_managed_ManagedRawSSTFileIterator_closeInternal(JNIEnv *env,
                                                                                                 jobject obj,
                                                                                                 jlong native_handle) {
     delete reinterpret_cast<ROCKSDB_NAMESPACE::RawIterator*>(native_handle);

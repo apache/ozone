@@ -34,53 +34,39 @@ public class ManagedRawSSTFileReader<T> implements Closeable {
 
   public static boolean loadLibrary() throws NativeLibraryNotLoadedException {
     ManagedRocksObjectUtils.loadRocksDBLibrary();
-    if (!NativeLibraryLoader.getInstance()
-        .loadLibrary(ROCKS_TOOLS_NATIVE_LIBRARY_NAME)) {
-      throw new NativeLibraryNotLoadedException(
-          ROCKS_TOOLS_NATIVE_LIBRARY_NAME);
+    if (!NativeLibraryLoader.getInstance().loadLibrary(ROCKS_TOOLS_NATIVE_LIBRARY_NAME)) {
+      throw new NativeLibraryNotLoadedException(ROCKS_TOOLS_NATIVE_LIBRARY_NAME);
     }
     return true;
   }
 
-  private final ManagedOptions options;
   private final String fileName;
-  private final int readAheadSize;
+  // Native address of pointer to the object.
   private final long nativeHandle;
-  private static final Logger LOG =
-      LoggerFactory.getLogger(ManagedRawSSTFileReader.class);
+  private static final Logger LOG = LoggerFactory.getLogger(ManagedRawSSTFileReader.class);
 
-  public ManagedRawSSTFileReader(final ManagedOptions options,
-                                 final String fileName,
-                                 final int readAheadSize) {
-    this.options = options;
+  public ManagedRawSSTFileReader(final ManagedOptions options, final String fileName, final int readAheadSize) {
     this.fileName = fileName;
-    this.readAheadSize = readAheadSize;
-    this.nativeHandle = this.newRawSSTFileReader(options.getNativeHandle(),
-        fileName, readAheadSize);
+    this.nativeHandle = this.newRawSSTFileReader(options.getNativeHandle(), fileName, readAheadSize);
   }
 
-  public ManagedRawSSTFileReaderIterator<T> newIterator(
-      Function<ManagedRawSSTFileReaderIterator.KeyValue, T> transformerFunction,
+  public ManagedRawSSTFileIterator<T> newIterator(
+      Function<ManagedRawSSTFileIterator.KeyValue, T> transformerFunction,
       ManagedSlice fromSlice, ManagedSlice toSlice) {
     long fromNativeHandle = fromSlice == null ? 0 : fromSlice.getNativeHandle();
     long toNativeHandle = toSlice == null ? 0 : toSlice.getNativeHandle();
     LOG.info("Iterating SST file: {} with native lib. " +
             "LowerBound: {}, UpperBound: {}", fileName, fromSlice, toSlice);
-    return new ManagedRawSSTFileReaderIterator<>(
+    return new ManagedRawSSTFileIterator<>(
         newIterator(this.nativeHandle, fromSlice != null,
             fromNativeHandle, toSlice != null, toNativeHandle),
         transformerFunction);
   }
 
-  private native long newRawSSTFileReader(long optionsHandle,
-                                          String filePath,
-                                          int readSize);
+  private native long newRawSSTFileReader(long optionsHandle, String filePath, int readSize);
 
 
-  private native long newIterator(long handle,
-                                  boolean hasFrom,
-                                  long fromSliceHandle,
-                                  boolean hasTo,
+  private native long newIterator(long handle, boolean hasFrom, long fromSliceHandle, boolean hasTo,
                                   long toSliceHandle);
 
   private native void disposeInternal(long handle);
