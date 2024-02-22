@@ -113,8 +113,8 @@ public class TestContainerSizeCountTask extends AbstractReconSqlDBTest {
 
     task.process(containers);
 
-    // Verify 2 containers are in correct bins.
-    assertEquals(2, containerCountBySizeDao.count());
+    // Verify 3 containers are in correct bins.
+    assertEquals(3, containerCountBySizeDao.count());
 
     // container size upper bound for
     // 1500000000L (1.5GB) is 2147483648L = 2^31 = 2GB (next highest power of 2)
@@ -146,7 +146,7 @@ public class TestContainerSizeCountTask extends AbstractReconSqlDBTest {
     task.process(containers);
 
     // Total size groups added to the database
-    assertEquals(4, containerCountBySizeDao.count());
+    assertEquals(5, containerCountBySizeDao.count());
 
     // Check whether container size upper bound for
     // 50000L is 536870912L = 2^29 = 512MB (next highest power of 2)
@@ -206,7 +206,7 @@ public class TestContainerSizeCountTask extends AbstractReconSqlDBTest {
     given(negativeSizeDeletedContainer.getUsedBytes()).willReturn(-1L);
     given(negativeSizeDeletedContainer.getState()).willReturn(DELETED);
 
-    // Create a container with valid size
+    // Create a mock container with id 1 and updated size of 1GB from 1.5GB
     final ContainerInfo validSizeContainer = mock(ContainerInfo.class);
     given(validSizeContainer.containerID()).willReturn(new ContainerID(1));
     given(validSizeContainer.getUsedBytes()).willReturn(1000000000L); // 1GB
@@ -225,7 +225,7 @@ public class TestContainerSizeCountTask extends AbstractReconSqlDBTest {
     task.process(containers);
 
     // Verify that only the valid containers are counted
-    assertEquals(2, containerCountBySizeDao.count());
+    assertEquals(3, containerCountBySizeDao.count());
   }
 
 }

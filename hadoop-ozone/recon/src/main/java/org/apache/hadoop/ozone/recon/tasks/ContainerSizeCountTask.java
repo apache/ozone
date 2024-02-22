@@ -338,19 +338,26 @@ public class ContainerSizeCountTask extends ReconScmTask {
   }
 
   /**
-   *
    * The purpose of this function is to categorize containers into different
    * size ranges, or "bins," based on their size.
    * The ContainerSizeCountKey object is used to store the upper bound value
    * for each size range, and is later used to lookup the count of containers
    * in that size range within a Map.
    *
-   * Used by decrementContainerSizeCount() and incrementContainerSizeCount()
+   * If the container size is 0, the method sets the size of
+   * ContainerSizeCountKey as zero without calculating the upper bound. Used by
+   * decrementContainerSizeCount() and incrementContainerSizeCount()
    *
    * @param containerSize to calculate the upperSizeBound
    */
   private static ContainerSizeCountKey getContainerSizeCountKey(
       long containerSize) {
+    // If containerSize is 0, return a ContainerSizeCountKey with size 0
+    if (containerSize == 0) {
+      return new ContainerSizeCountKey(0L);
+    }
+
+    // Otherwise, calculate the upperSizeBound
     return new ContainerSizeCountKey(
         ReconUtils.getContainerSizeUpperBound(containerSize));
   }
