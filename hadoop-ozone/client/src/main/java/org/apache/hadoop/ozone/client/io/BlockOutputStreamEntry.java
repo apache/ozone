@@ -108,8 +108,8 @@ public class BlockOutputStreamEntry extends OutputStream {
    */
   void createOutputStream() throws IOException {
     outputStream = new RatisBlockOutputStream(blockID, xceiverClientManager,
-        pipeline, bufferPool, config, token, clientMetrics, streamBufferArgs
-    );
+        pipeline, bufferPool, config, token, clientMetrics, streamBufferArgs,
+        executorServiceSupplier);
   }
 
   ContainerClientMetrics getClientMetrics() {
