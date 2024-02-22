@@ -273,7 +273,7 @@ Test Multipart Upload Put With Copy
     Run Keyword         Create Random file      5
     ${result} =         Execute AWSS3APICli     put-object --bucket ${BUCKET} --key ${PREFIX}/copytest/source --body /tmp/part1
 
-
+    ${part1Md5Sum} =    Execute                  md5sum /tmp/part1 | awk '{print $1}'
     ${result} =         Execute AWSS3APICli     create-multipart-upload --bucket ${BUCKET} --key ${PREFIX}/copytest/destination
 
     ${uploadID} =       Execute and checkrc      echo '${result}' | jq -r '.UploadId'    0
@@ -284,7 +284,7 @@ Test Multipart Upload Put With Copy
                         Should contain           ${result}    ETag
                         Should contain           ${result}    LastModified
     ${eTag1} =          Execute and checkrc      echo '${result}' | jq -r '.CopyPartResult.ETag'   0
-
+                        Should Be Equal          ${eTag1}     ${part1Md5Sum}
 
                         Execute AWSS3APICli     complete-multipart-upload --upload-id ${uploadID} --bucket ${BUCKET} --key ${PREFIX}/copytest/destination --multipart-upload 'Parts=[{ETag=${eTag1},PartNumber=1}]'
                         Execute AWSS3APICli     get-object --bucket ${BUCKET} --key ${PREFIX}/copytest/destination /tmp/part-result
@@ -302,15 +302,19 @@ Test Multipart Upload Put With Copy and range
                         Should contain           ${result}    ${BUCKET}
                         Should contain           ${result}    UploadId
 
+    ${part1Md5Sum} =    Execute                  dd if=/tmp/part1 ibs=1 skip=0 count=10485757 | md5sum | awk '{print $1}'
     ${result} =         Execute AWSS3APICli      upload-part-copy --bucket ${BUCKET} --key ${PREFIX}/copyrange/destination --upload-id ${uploadID} --part-number 1 --copy-source ${BUCKET}/${PREFIX}/copyrange/source --copy-source-range bytes=0-10485757
                         Should contain           ${result}    ETag
                         Should contain           ${result}    LastModified
     ${eTag1} =          Execute and checkrc      echo '${result}' | jq -r '.CopyPartResult.ETag'   0
+                        Should Be Equal          ${eTag1}     ${part1Md5Sum}
 
+    ${part2Md5Sum} =    Execute                  dd if=/tmp/part1 ibs=1 skip=10485758 count=1 | md5sum | awk '{print $1}'
     ${result} =         Execute AWSS3APICli      upload-part-copy --bucket ${BUCKET} --key ${PREFIX}/copyrange/destination --upload-id ${uploadID} --part-number 2 --copy-source ${BUCKET}/${PREFIX}/copyrange/source --copy-source-range bytes=10485758-10485759
                         Should contain           ${result}    ETag
                         Should contain           ${result}    LastModified
     ${eTag2} =          Execute and checkrc      echo '${result}' | jq -r '.CopyPartResult.ETag'   0
+                        Should Be Equal          ${eTag2}     ${part2Md5Sum}
 
 
                         Execute AWSS3APICli     complete-multipart-upload --upload-id ${uploadID} --bucket ${BUCKET} --key ${PREFIX}/copyrange/destination --multipart-upload 'Parts=[{ETag=${eTag1},PartNumber=1},{ETag=${eTag2},PartNumber=2}]'
