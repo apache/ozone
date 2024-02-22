@@ -772,7 +772,8 @@ public class ObjectEndpoint extends EndpointBase {
   private ReplicationConfig getReplicationConfig(OzoneBucket ozoneBucket,
       String storageType) throws OS3Exception {
     if (StringUtils.isEmpty(storageType)) {
-      storageType = S3StorageType.getDefault(ozoneConfiguration).toString();
+      S3StorageType defaultStorageType = S3StorageType.getDefault(ozoneConfiguration);
+      storageType = (defaultStorageType != null ? defaultStorageType.toString() : null);
     }
 
     ReplicationConfig clientConfiguredReplicationConfig = null;
