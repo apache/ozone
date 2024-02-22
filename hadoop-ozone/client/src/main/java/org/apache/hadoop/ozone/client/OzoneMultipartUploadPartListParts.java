@@ -98,13 +98,13 @@ public class OzoneMultipartUploadPartListParts {
   /**
    * Class that represents each Part information of a multipart upload part.
    */
-  public static class PartInfo {
+  public static final class PartInfo {
 
-    private int partNumber;
-    private String partName;
-    private long modificationTime;
-    private long size;
-    private String eTag;
+    private final int partNumber;
+    private final String partName;
+    private final long modificationTime;
+    private final long size;
+    private final String eTag;
 
     public PartInfo(int number, String name, long time, long size,
                     String eTag) {
