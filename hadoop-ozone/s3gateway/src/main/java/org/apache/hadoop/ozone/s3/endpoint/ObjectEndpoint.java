@@ -1110,7 +1110,6 @@ public class ObjectEndpoint extends EndpointBase {
       throws IOException {
     long copyLength;
     src = new DigestInputStream(src, E_TAG_PROVIDER.get());
-    String eTag;
     if (datastreamEnabled && !(replication != null &&
         replication.getReplicationType() == EC) &&
         srcKeyLen > datastreamMinLength) {
@@ -1126,7 +1125,7 @@ public class ObjectEndpoint extends EndpointBase {
             getMetrics().updateCopyKeyMetadataStats(startNanos);
         perf.appendMetaLatencyNanos(metadataLatencyNs);
         copyLength = IOUtils.copyLarge(src, dest);
-        eTag = DatatypeConverter.printHexBinary(
+        String eTag = DatatypeConverter.printHexBinary(
                 ((DigestInputStream) src).getMessageDigest().digest())
             .toLowerCase();
         dest.getMetadata().put(ETAG, eTag);
