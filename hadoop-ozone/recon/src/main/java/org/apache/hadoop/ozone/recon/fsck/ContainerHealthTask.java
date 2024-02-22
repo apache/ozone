@@ -57,6 +57,7 @@ import static org.apache.hadoop.ozone.recon.ReconConstants.CONTAINER_COUNT;
 import static org.apache.hadoop.ozone.recon.ReconConstants.DEFAULT_FETCH_COUNT;
 import static org.apache.hadoop.ozone.recon.ReconConstants.TOTAL_KEYS;
 import static org.apache.hadoop.ozone.recon.ReconConstants.TOTAL_USED_BYTES;
+import static org.hadoop.ozone.recon.schema.ContainerSchemaDefinition.UnHealthyContainerStates.EMPTY_MISSING;
 
 
 /**
@@ -210,7 +211,7 @@ public class ContainerHealthTask extends ReconScmTask {
     unhealthyContainerStateStatsMap.put(
         UnHealthyContainerStates.MISSING, new HashMap<>());
     unhealthyContainerStateStatsMap.put(
-        UnHealthyContainerStates.EMPTY_MISSING, new HashMap<>());
+        EMPTY_MISSING, new HashMap<>());
     unhealthyContainerStateStatsMap.put(
         UnHealthyContainerStates.UNDER_REPLICATED, new HashMap<>());
     unhealthyContainerStateStatsMap.put(
@@ -288,11 +289,16 @@ public class ContainerHealthTask extends ReconScmTask {
                 containerDeletedInSCM(currentContainer.getContainer())) {
               rec.delete();
             }
+            if (currentContainer.isEmpty()) {
+              rec.setContainerState(EMPTY_MISSING.toString());
+            }
             existingRecords.add(rec.getContainerState());
             if (rec.changed()) {
               rec.update();
             }
           } else {
+            LOG.info("DELETED existing unhealthy container record...for Container: {}",
+                currentContainer.getContainerID());
             rec.delete();
           }
         } catch (ContainerNotFoundException cnf) {
@@ -459,10 +465,10 @@ public class ContainerHealthTask extends ReconScmTask {
                 "starting with **Container State Stats:**");
           }
           records.add(
-              recordForState(container, UnHealthyContainerStates.EMPTY_MISSING,
+              recordForState(container, EMPTY_MISSING,
                   time));
           populateContainerStats(container,
-              UnHealthyContainerStates.EMPTY_MISSING,
+              EMPTY_MISSING,
               unhealthyContainerStateStatsMap);
         }
         // A container cannot have any other records if it is missing so return
