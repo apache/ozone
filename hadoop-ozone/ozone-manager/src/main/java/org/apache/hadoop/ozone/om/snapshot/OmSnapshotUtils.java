@@ -141,8 +141,6 @@ public final class OmSnapshotUtils {
   }
 
   private static void createHardLinksOrCopy(Path fullFromPath, Path fullToPath) throws IOException {
-    Objects.requireNonNull(fullFromPath, "From path is null");
-    Objects.requireNonNull(fullToPath, "To path is null");
     if (isSamePartition(fullFromPath.getParent(), fullToPath.getParent())) {
       Files.createLink(fullToPath, fullFromPath);
     } else {
@@ -151,8 +149,9 @@ public final class OmSnapshotUtils {
   }
 
   private static boolean isSamePartition(Path fromPathParent, Path toPathParent) throws IOException {
-    Objects.requireNonNull(fromPathParent, "From parent path is null");
-    Objects.requireNonNull(toPathParent, "To parent path is null");
+    if (fromPathParent == null || toPathParent == null) {
+      throw new IOException("From path: " + fromPathParent + " or To path: " + toPathParent + " is null");
+    }
     FileStore fromPathStore = Files.getFileStore(fromPathParent);
     FileStore toPathStore = Files.getFileStore(toPathParent);
     return fromPathStore.equals(toPathStore);
