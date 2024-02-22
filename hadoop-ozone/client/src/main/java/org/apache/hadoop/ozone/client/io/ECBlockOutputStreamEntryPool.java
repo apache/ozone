@@ -48,7 +48,8 @@ public class ECBlockOutputStreamEntryPool extends BlockOutputStreamEntryPool {
             .setBufferPool(getBufferPool())
             .setToken(subKeyInfo.getToken())
             .setClientMetrics(getClientMetrics())
-            .setStreamBufferArgs(getStreamBufferArgs());
+            .setStreamBufferArgs(getStreamBufferArgs())
+            .setExecutorServiceSupplier(getExecutorServiceSupplier());
     return b.build();
   }
 
