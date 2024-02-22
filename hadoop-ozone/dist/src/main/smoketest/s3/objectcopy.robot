@@ -40,16 +40,13 @@ Copy Object Happy Scenario
     ${file_checksum} =  Execute                    md5sum /tmp/copyfile | awk '{print $1}'
 
     ${result} =         Execute AWSS3ApiCli        put-object --bucket ${BUCKET} --key ${PREFIX}/copyobject/key=value/f1 --body /tmp/copyfile
-    Log                 Put object result is ${result}
     ${eTag} =           Execute and checkrc        echo '${result}' | jq -r '.ETag'  0
                         Should Be Equal            ${eTag}           \"${file_checksum}\"
 
     ${result} =         Execute AWSS3ApiCli        list-objects --bucket ${BUCKET} --prefix ${PREFIX}/copyobject/key=value/
-    Log                 List object result is ${result}
                         Should contain             ${result}         f1
 
     ${result} =         Execute AWSS3ApiCli        copy-object --bucket ${DESTBUCKET} --key ${PREFIX}/copyobject/key=value/f1 --copy-source ${BUCKET}/${PREFIX}/copyobject/key=value/f1
-    Log                 Copy object result is ${result}
     ${eTag} =           Execute and checkrc        echo '${result}' | jq -r '.CopyObjectResult.ETag'  0
                         Should Be Equal            ${eTag}           \"${file_checksum}\"
 
@@ -57,7 +54,7 @@ Copy Object Happy Scenario
                         Should contain             ${result}         f1
     #copying again will not throw error
     ${result} =         Execute AWSS3ApiCli        copy-object --bucket ${DESTBUCKET} --key ${PREFIX}/copyobject/key=value/f1 --copy-source ${BUCKET}/${PREFIX}/copyobject/key=value/f1
-    ${eTag} =           Execute and checkrc        echo '${result}' | jq -r '.ETag'  0
+    ${eTag} =           Execute and checkrc        echo '${result}' | jq -r '.CopyObjectResult.ETag'  0
                         Should Be Equal            ${eTag}           \"${file_checksum}\"
 
     ${result} =         Execute AWSS3ApiCli        list-objects --bucket ${DESTBUCKET} --prefix ${PREFIX}/copyobject/key=value/
@@ -73,8 +70,7 @@ Copy Object Where both source and dest are same with change to storageclass
      ${file_checksum} =  Execute                    md5sum /tmp/copyfile | awk '{print $1}'
      ${result} =         Execute AWSS3APICli        copy-object --storage-class REDUCED_REDUNDANCY --bucket ${DESTBUCKET} --key ${PREFIX}/copyobject/key=value/f1 --copy-source ${DESTBUCKET}/${PREFIX}/copyobject/key=value/f1
                          Should contain             ${result}        ETag
-     Log                 Copy object result is ${result}
-     ${eTag} =           Execute and checkrc        echo '${result}' | jq -r '.ETag'  0
+     ${eTag} =           Execute and checkrc        echo '${result}' | jq -r '.CopyObjectResult.ETag'  0
                          Should Be Equal            ${eTag}           \"${file_checksum}\"
 
 Copy Object Where Key not available
