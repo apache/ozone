@@ -211,6 +211,8 @@ public class ContainerHealthTask extends ReconScmTask {
         UnHealthyContainerStates.OVER_REPLICATED, new HashMap<>());
     unhealthyContainerStateStatsMap.put(
         UnHealthyContainerStates.MIS_REPLICATED, new HashMap<>());
+    unhealthyContainerStateStatsMap.put(
+        UnHealthyContainerStates.NEGATIVE_SIZE, new HashMap<>());
   }
 
   private ContainerHealthStatus setCurrentContainer(long recordId)
@@ -307,12 +309,20 @@ public class ContainerHealthTask extends ReconScmTask {
   private void processContainer(ContainerInfo container, long currentTime,
                                 Map<UnHealthyContainerStates,
                                     Map<String, Long>>
-                                      unhealthyContainerStateStatsMap) {
+                                    unhealthyContainerStateStatsMap) {
     try {
       Set<ContainerReplica> containerReplicas =
           containerManager.getContainerReplicas(container.containerID());
       ContainerHealthStatus h = new ContainerHealthStatus(container,
           containerReplicas, placementPolicy, reconContainerMetadataManager);
+
+      // Handle negative sized containers separately
+      if (h.getContainer().getUsedBytes() < 0) {
+        handleNegativeSizedContainers(h, currentTime,
+            unhealthyContainerStateStatsMap);
+        return;
+      }
+
       if (h.isHealthy() || h.isDeleted()) {
         return;
       }
@@ -356,6 +366,32 @@ public class ContainerHealthTask extends ReconScmTask {
           " Container Health task", e);
     }
     return false;
+  }
+
+  /**
+   * This method is used to handle containers with negative sizes. It logs an
+   * error message and inserts a record into the UNHEALTHY_CONTAINERS table.
+   * @param containerHealthStatus
+   * @param currentTime
+   * @param unhealthyContainerStateStatsMap
+   */
+  private void handleNegativeSizedContainers(
+      ContainerHealthStatus containerHealthStatus, long currentTime,
+      Map<UnHealthyContainerStates, Map<String, Long>>
+          unhealthyContainerStateStatsMap) {
+    ContainerInfo container = containerHealthStatus.getContainer();
+    LOG.error(
+        "Container {} has negative size. Please visit Recon's unhealthy " +
+            "container endpoint for more details.",
+        container.getContainerID());
+    UnhealthyContainers record =
+        ContainerHealthRecords.recordForState(containerHealthStatus,
+            UnHealthyContainerStates.NEGATIVE_SIZE, currentTime);
+    List<UnhealthyContainers> records = Collections.singletonList(record);
+    populateContainerStats(containerHealthStatus,
+        UnHealthyContainerStates.NEGATIVE_SIZE,
+        unhealthyContainerStateStatsMap);
+    containerHealthSchemaManager.insertUnhealthyContainerRecords(records);
   }
 
   /**

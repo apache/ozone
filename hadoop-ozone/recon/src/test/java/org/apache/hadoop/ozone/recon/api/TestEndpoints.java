@@ -855,10 +855,12 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
     ContainerInfo omContainerInfo1 = mock(ContainerInfo.class);
     given(omContainerInfo1.containerID()).willReturn(new ContainerID(1));
     given(omContainerInfo1.getUsedBytes()).willReturn(1500000000L); // 1.5GB
+    given(omContainerInfo1.getState()).willReturn(LifeCycleState.OPEN);
 
     ContainerInfo omContainerInfo2 = mock(ContainerInfo.class);
     given(omContainerInfo2.containerID()).willReturn(new ContainerID(2));
     given(omContainerInfo2.getUsedBytes()).willReturn(2500000000L); // 2.5GB
+    given(omContainerInfo2.getState()).willReturn(LifeCycleState.OPEN);
 
     // Create a list of container info objects
     List<ContainerInfo> containers = new ArrayList<>();
