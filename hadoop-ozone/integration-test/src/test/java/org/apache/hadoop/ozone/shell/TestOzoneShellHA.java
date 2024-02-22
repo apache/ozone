@@ -2012,11 +2012,6 @@ public class TestOzoneShellHA {
     execute(ozoneShell, args);
 
     // Check number of keys
-    args = new String[] {"key", "list", "o3://" + omServiceId + OZONE_URI_DELIMITER +
-          volumeName + OZONE_URI_DELIMITER + bucketName};
-    out.reset();
-    execute(ozoneShell, args);
-
     OzoneVolume volume = client.getObjectStore().getVolume(volumeName);
     OzoneBucket bucket = volume.getBucket(bucketName);
     List<OzoneFileStatus> files = bucket.listStatus("", true, "", 5);
