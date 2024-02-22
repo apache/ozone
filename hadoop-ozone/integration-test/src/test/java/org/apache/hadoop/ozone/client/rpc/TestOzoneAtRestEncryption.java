@@ -580,7 +580,7 @@ class TestOzoneAtRestEncryption {
 
   private void testMultipartUploadWithEncryption(OzoneBucket bucket,
       int numParts, boolean isStream) throws Exception {
-    testMultipartUploadWithEncryption(bucket, numParts, false, false);
+    testMultipartUploadWithEncryption(bucket, numParts, isStream, false);
   }
 
   private void testMultipartUploadWithEncryption(OzoneBucket bucket,
