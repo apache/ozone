@@ -47,6 +47,7 @@ import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 
+import static java.util.concurrent.Executors.newFixedThreadPool;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 /**
@@ -114,7 +115,9 @@ public class TestBlockOutputStreamCorrectness {
         bufferPool,
         config,
         null,
-        ContainerClientMetrics.acquire(), streamBufferArgs);
+        ContainerClientMetrics.acquire(),
+        streamBufferArgs,
+        () -> newFixedThreadPool(10));
   }
 
   /**
