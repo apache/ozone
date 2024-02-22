@@ -1239,6 +1239,8 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
 
     ReconfigureProtocolServerSideTranslatorPB reconfigureServerProtocol
         = new ReconfigureProtocolServerSideTranslatorPB(reconfigurationHandler);
+    OzoneSecurityUtil.updateKerberosInfo(ReconfigureProtocolPB.class,
+        OMConfigKeys.OZONE_OM_KERBEROS_PRINCIPAL_KEY);
     BlockingService reconfigureService =
         ReconfigureProtocolService.newReflectiveBlockingService(
             reconfigureServerProtocol);

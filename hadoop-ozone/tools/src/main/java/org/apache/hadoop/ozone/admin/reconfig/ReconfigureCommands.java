@@ -21,6 +21,7 @@ import org.apache.hadoop.hdds.cli.GenericCli;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.cli.OzoneAdmin;
 import org.apache.hadoop.hdds.cli.SubcommandWithParent;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.cli.ContainerOperationClient;
 import org.apache.hadoop.hdds.scm.client.ScmClient;
 import org.kohsuke.MetaInfServices;
@@ -56,6 +57,11 @@ public class ReconfigureCommands implements Callable<Void>,
   @Spec
   private CommandSpec spec;
 
+  @CommandLine.Option(names = {"--service"},
+      description = "service: OM, SCM, DATANODE.",
+      required = true)
+  private String service;
+
   @CommandLine.Option(names = {"--address"},
       description = "node address: <ip:port> or <hostname:port>.",
       required = false)
@@ -75,6 +81,10 @@ public class ReconfigureCommands implements Callable<Void>,
 
   public String getAddress() {
     return address;
+  }
+
+  public HddsProtos.NodeType getService() {
+    return HddsProtos.NodeType.valueOf(service);
   }
 
   @Override

@@ -20,6 +20,8 @@ package org.apache.hadoop.ozone;
 
 import com.google.protobuf.BlockingService;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.CommonConfigurationKeys;
+import org.apache.hadoop.hdds.DFSConfigKeysLegacy;
 import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.conf.ReconfigurationHandler;
@@ -66,6 +68,10 @@ public class HddsDatanodeClientProtocolServer extends ServiceRuntimeInfoImpl {
         HDDS_DATANODE_CLIENT_ADDRESS_KEY,
         HddsUtils.getDatanodeRpcAddress(conf), rpcServer);
     datanodeDetails.setPort(CLIENT_RPC, clientRpcAddress.getPort());
+    if (conf.getBoolean(CommonConfigurationKeys.HADOOP_SECURITY_AUTHORIZATION,
+        false)) {
+      rpcServer.refreshServiceAcl(conf, HddsPolicyProvider.getInstance());
+    }
   }
 
   public void start() {
@@ -103,6 +109,8 @@ public class HddsDatanodeClientProtocolServer extends ServiceRuntimeInfoImpl {
         HDDS_DATANODE_HANDLER_COUNT_DEFAULT);
     ReconfigureProtocolServerSideTranslatorPB reconfigureServerProtocol
         = new ReconfigureProtocolServerSideTranslatorPB(reconfigurationHandler);
+    OzoneSecurityUtil.updateKerberosInfo(ReconfigureProtocolPB.class,
+        DFSConfigKeysLegacy.DFS_DATANODE_KERBEROS_PRINCIPAL_KEY);
     BlockingService reconfigureService = ReconfigureProtocolProtos
         .ReconfigureProtocolService.newReflectiveBlockingService(
             reconfigureServerProtocol);

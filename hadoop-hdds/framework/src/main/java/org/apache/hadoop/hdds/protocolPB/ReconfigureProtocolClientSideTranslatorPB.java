@@ -23,10 +23,12 @@ import com.google.protobuf.ServiceException;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.conf.ReconfigurationTaskStatus;
 import org.apache.hadoop.conf.ReconfigurationUtil.PropertyChange;
+import org.apache.hadoop.hdds.DFSConfigKeysLegacy;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.annotation.InterfaceStability;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.ReconfigureProtocol;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.ReconfigureProtocolProtos.GetServerNameRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.ReconfigureProtocolProtos.GetServerNameResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.ReconfigureProtocolProtos.GetConfigurationChangeProto;
@@ -43,6 +45,7 @@ import org.apache.hadoop.ipc.ProtocolTranslator;
 import org.apache.hadoop.ipc.RPC;
 import org.apache.hadoop.ipc.RpcClientUtil;
 import org.apache.hadoop.net.NetUtils;
+import org.apache.hadoop.ozone.OzoneSecurityUtil;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -82,16 +85,22 @@ public class ReconfigureProtocolClientSideTranslatorPB implements
 
   private final ReconfigureProtocolPB rpcProxy;
 
-  public ReconfigureProtocolClientSideTranslatorPB(InetSocketAddress addr,
+  public ReconfigureProtocolClientSideTranslatorPB(HddsProtos.NodeType nodeType, InetSocketAddress addr,
       UserGroupInformation ugi, OzoneConfiguration conf)
       throws IOException {
-    rpcProxy = createReconfigureProtocolProxy(addr, ugi, conf);
+    rpcProxy = createReconfigureProtocolProxy(nodeType, addr, ugi, conf);
   }
 
-  static ReconfigureProtocolPB createReconfigureProtocolProxy(
+  static ReconfigureProtocolPB createReconfigureProtocolProxy(HddsProtos.NodeType nodeType,
       InetSocketAddress addr, UserGroupInformation ugi,
       OzoneConfiguration conf) throws IOException {
-
+    if (nodeType == HddsProtos.NodeType.OM) {
+      // TODO: currently OMConfigKeys.OZONE_OM_KERBEROS_PRINCIPAL_KEY cannot be referenced in this module
+      OzoneSecurityUtil.updateKerberosInfo(ReconfigureProtocolPB.class, "ozone.om.kerberos.principal");
+    } else if (nodeType == HddsProtos.NodeType.DATANODE) {
+      OzoneSecurityUtil.updateKerberosInfo(ReconfigureProtocolPB.class,
+          DFSConfigKeysLegacy.DFS_DATANODE_KERBEROS_PRINCIPAL_KEY);
+    }
     RPC.setProtocolEngine(OzoneConfiguration.of(conf),
         ReconfigureProtocolPB.class, ProtobufRpcEngine.class);
     Configuration hadoopConf = LegacyHadoopConfigurationSource
