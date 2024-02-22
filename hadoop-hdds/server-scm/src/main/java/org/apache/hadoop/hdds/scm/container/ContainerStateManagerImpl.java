@@ -244,21 +244,7 @@ public final class ContainerStateManagerImpl
 
       while (iterator.hasNext()) {
         final ContainerInfo container = iterator.next().getValue();
-        Preconditions.checkNotNull(container);
-        containers.addContainer(container);
-        if (container.getState() == LifeCycleState.OPEN) {
-          try {
-            pipelineManager.addContainerToPipelineSCMStart(
-                container.getPipelineID(), container.containerID());
-          } catch (PipelineNotFoundException ex) {
-            // We are ignoring this here. The container will be moved to
-            // CLOSING state by ReplicationManager's OpenContainerHandler
-            // For more info: HDDS-10231
-            LOG.warn("Found container {} which is in OPEN state with " +
-                "pipeline {} that does not exist.",
-                container, container.getPipelineID());
-          }
-        }
+        initialize(container);
       }
     }
   }
@@ -591,6 +577,30 @@ public final class ContainerStateManagerImpl
           SCMHAInvocationHandler.class.getClassLoader(),
           new Class<?>[]{ContainerStateManager.class}, invocationHandler);
     }
+  }
 
+  /**
+   * Initializes the ContainerStateManager with new container object.
+   *
+   * @param container
+   * @throws IOException
+   */
+  @Override
+  public void initialize(ContainerInfo container) throws IOException {
+    Preconditions.checkNotNull(container);
+    containers.addContainer(container);
+    if (container.getState() == LifeCycleState.OPEN) {
+      try {
+        pipelineManager.addContainerToPipelineSCMStart(
+            container.getPipelineID(), container.containerID());
+      } catch (PipelineNotFoundException ex) {
+        // We are ignoring this here. The container will be moved to
+        // CLOSING state by ReplicationManager's OpenContainerHandler
+        // For more info: HDDS-10231
+        LOG.warn("Found container {} which is in OPEN state with " +
+                "pipeline {} that does not exist.",
+            container, container.getPipelineID());
+      }
+    }
   }
 }

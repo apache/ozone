@@ -18,28 +18,18 @@
 
 package org.apache.hadoop.ozone.recon.scm;
 
-import com.google.protobuf.ByteString;
 import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos;
-import org.apache.hadoop.hdds.scm.container.ContainerID;
-import org.apache.hadoop.hdds.scm.container.ContainerInfo;
-import org.apache.hadoop.hdds.scm.container.common.helpers.MoveDataNodePair;
-import org.apache.hadoop.hdds.scm.metadata.BigIntegerCodec;
+import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.scm.ha.SequenceIdGenerator;
 import org.apache.hadoop.hdds.scm.metadata.SCMMetadataStoreImpl;
-import org.apache.hadoop.hdds.scm.metadata.X509CertificateCodec;
-import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
-import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
-import org.apache.hadoop.hdds.security.x509.certificate.CertInfo;
-import org.apache.hadoop.hdds.security.x509.crl.CRLInfo;
-import org.apache.hadoop.hdds.utils.TransactionInfo;
-import org.apache.hadoop.hdds.utils.db.ByteStringCodec;
+import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
+import org.apache.hadoop.hdds.utils.db.DBColumnFamilyDefinition;
 import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.utils.db.DBStoreBuilder;
-import org.apache.hadoop.hdds.utils.db.LongCodec;
 import org.apache.hadoop.hdds.utils.db.RDBStore;
-import org.apache.hadoop.hdds.utils.db.StringCodec;
 import org.apache.hadoop.hdds.utils.db.Table;
+import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.ozone.recon.ReconUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -48,23 +38,9 @@ import javax.inject.Inject;
 import javax.inject.Singleton;
 import java.io.File;
 import java.io.IOException;
-import java.math.BigInteger;
-import java.security.cert.X509Certificate;
+import java.util.UUID;
 
-import static org.apache.hadoop.hdds.scm.metadata.SCMDBDefinition.CONTAINERS;
-import static org.apache.hadoop.hdds.scm.metadata.SCMDBDefinition.CRLS;
-import static org.apache.hadoop.hdds.scm.metadata.SCMDBDefinition.CRL_SEQUENCE_ID;
-import static org.apache.hadoop.hdds.scm.metadata.SCMDBDefinition.DELETED_BLOCKS;
-import static org.apache.hadoop.hdds.scm.metadata.SCMDBDefinition.META;
-import static org.apache.hadoop.hdds.scm.metadata.SCMDBDefinition.MOVE;
-import static org.apache.hadoop.hdds.scm.metadata.SCMDBDefinition.PIPELINES;
-import static org.apache.hadoop.hdds.scm.metadata.SCMDBDefinition.REVOKED_CERTS;
-import static org.apache.hadoop.hdds.scm.metadata.SCMDBDefinition.REVOKED_CERTS_V2;
-import static org.apache.hadoop.hdds.scm.metadata.SCMDBDefinition.SEQUENCE_ID;
-import static org.apache.hadoop.hdds.scm.metadata.SCMDBDefinition.STATEFUL_SERVICE_CONFIG;
-import static org.apache.hadoop.hdds.scm.metadata.SCMDBDefinition.TRANSACTIONINFO;
-import static org.apache.hadoop.hdds.scm.metadata.SCMDBDefinition.VALID_CERTS;
-import static org.apache.hadoop.hdds.scm.metadata.SCMDBDefinition.VALID_SCM_CERTS;
+import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
 import static org.apache.hadoop.ozone.recon.ReconConstants.RECON_SCM_SNAPSHOT_DB;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_SCM_DB_DIR;
 
@@ -82,11 +58,13 @@ public class ReconScmMetadataManagerImpl extends SCMMetadataStoreImpl
 
   private OzoneConfiguration ozoneConfiguration;
   private ReconUtils reconUtils;
-  private boolean scmTablesInitialized = false;
+  private OzoneStorageContainerManager ozoneStorageContainerManager;
+  private SequenceIdGenerator sequenceIdGen;
+  private ReconNodeManager nodeManager;
 
   @Inject
   public ReconScmMetadataManagerImpl(OzoneConfiguration configuration,
-                                     ReconUtils reconUtils) throws IOException {
+                                     ReconUtils reconUtils) {
     this.reconUtils = reconUtils;
     this.ozoneConfiguration = configuration;
   }
@@ -99,10 +77,25 @@ public class ReconScmMetadataManagerImpl extends SCMMetadataStoreImpl
     File lastKnownSCMSnapshot =
         reconUtils.getLastKnownDB(reconDbDir, RECON_SCM_SNAPSHOT_DB);
     if (lastKnownSCMSnapshot != null) {
-      LOG.info("Last known snapshot for SCM : {}",
-          lastKnownSCMSnapshot.getAbsolutePath());
-      initializeNewRdbStore(lastKnownSCMSnapshot);
+      LOG.info("Last known snapshot for SCM : {}", lastKnownSCMSnapshot.getAbsolutePath());
     }
+  }
+
+  private DBStore createDBAndAddSCMTablesAndCodecs(File dbFile,
+                                                   ReconSCMDBDefinition definition) throws IOException {
+    DBStoreBuilder dbStoreBuilder =
+        DBStoreBuilder.newBuilder(ozoneConfiguration)
+            .setName(dbFile.getName())
+            .setPath(dbFile.toPath().getParent());
+    for (DBColumnFamilyDefinition columnFamily :
+        definition.getColumnFamilies()) {
+      dbStoreBuilder.addTable(columnFamily.getName());
+      dbStoreBuilder.addCodec(columnFamily.getKeyType(),
+          columnFamily.getKeyCodec());
+      dbStoreBuilder.addCodec(columnFamily.getValueType(),
+          columnFamily.getValueCodec());
+    }
+    return dbStoreBuilder.build();
   }
 
   /**
@@ -110,41 +103,70 @@ public class ReconScmMetadataManagerImpl extends SCMMetadataStoreImpl
    *
    * @param dbFile new DB file location.
    */
-  private void initializeNewRdbStore(File dbFile) throws IOException {
+  private void initializeRdbStoreWithFile(File dbFile)
+      throws IOException {
     try {
-      DBStoreBuilder dbStoreBuilder =
-          DBStoreBuilder.newBuilder(ozoneConfiguration)
-          .setName(dbFile.getName())
-          .setPath(dbFile.toPath().getParent());
-      addScmTablesAndCodecs(dbStoreBuilder);
-      setStore(dbStoreBuilder.build());
-      LOG.info("Created SCM DB handle from snapshot at {}.",
-          dbFile.getAbsolutePath());
+      DBStore newStore = createDBAndAddSCMTablesAndCodecs(
+          dbFile, new ReconSCMDBDefinition());
+      Table<UUID, DatanodeDetails> newNodeTable =
+          ReconSCMDBDefinition.NODES.getTable(newStore);
+      Table<UUID, DatanodeDetails> nodeTable =
+          ReconSCMDBDefinition.NODES.getTable(ozoneStorageContainerManager.getStore());
+      try (TableIterator<UUID, ? extends Table.KeyValue<UUID,
+          DatanodeDetails>> iterator = nodeTable.iterator()) {
+        while (iterator.hasNext()) {
+          Table.KeyValue<UUID, DatanodeDetails> keyValue = iterator.next();
+          newNodeTable.put(keyValue.getKey(), keyValue.getValue());
+        }
+      }
+      sequenceIdGen.reinitialize(
+          ReconSCMDBDefinition.SEQUENCE_ID.getTable(newStore));
+      ozoneStorageContainerManager.getPipelineManager().reinitialize(
+          ReconSCMDBDefinition.PIPELINES.getTable(newStore));
+      ozoneStorageContainerManager.getContainerManager().reinitialize(
+          ReconSCMDBDefinition.CONTAINERS.getTable(newStore));
+      nodeManager.reinitialize(
+          ReconSCMDBDefinition.NODES.getTable(newStore));
+
+      setStore(newStore);
+      ozoneStorageContainerManager.setStore(newStore);
+      File newDb = new File(dbFile.getParent() +
+          OZONE_URI_DELIMITER + ReconSCMDBDefinition.RECON_SCM_DB_NAME);
+      boolean success = dbFile.renameTo(newDb);
+      if (success) {
+        LOG.info("SCM snapshot linked to Recon DB.");
+      }
+      LOG.info("Created SCM DB handle from snapshot at {}.", dbFile.getAbsolutePath());
     } catch (IOException ioEx) {
       LOG.error("Unable to initialize Recon SCM DB snapshot store.", ioEx);
     }
     if (getStore() != null) {
       initializeScmTables();
-      scmTablesInitialized = true;
     }
   }
 
+  /**
+   * Refresh the DB instance to point to a new location. Get rid of the old
+   * DB instance.
+   *
+   * @param newDbLocation New location of the SCM Snapshot DB.
+   */
   @Override
   public void updateScmDB(File newDbLocation) throws IOException {
-    if (getStore() != null) {
-      File oldDBLocation = getStore().getDbLocation();
+    DBStore current = ozoneStorageContainerManager.getStore();
+    if (null != current) {
+      File oldDBLocation = current.getDbLocation();
       if (oldDBLocation.exists()) {
         LOG.info("Cleaning up old SCM snapshot db at {}.",
             oldDBLocation.getAbsolutePath());
         FileUtils.deleteDirectory(oldDBLocation);
       }
     }
-    DBStore current = getStore();
     try {
-      initializeNewRdbStore(newDbLocation);
+      initializeRdbStoreWithFile(newDbLocation);
     } finally {
       // Always close DBStore if it's replaced.
-      if (current != null && current != getStore()) {
+      if (current != null && current != ozoneStorageContainerManager.getStore()) {
         current.close();
       }
     }
@@ -169,47 +191,6 @@ public class ReconScmMetadataManagerImpl extends SCMMetadataStoreImpl
   }
 
   /**
-   * Check if SCM tables are initialized.
-   * @return true if SCM Tables are initialized, otherwise false.
-   */
-  @Override
-  public boolean isScmTablesInitialized() {
-    return scmTablesInitialized;
-  }
-
-  public DBStoreBuilder addScmTablesAndCodecs(DBStoreBuilder builder) throws IOException {
-
-    return builder.addTable(DELETED_BLOCKS.getName())
-        .addTable(VALID_CERTS.getName())
-        .addTable(VALID_SCM_CERTS.getName())
-        .addTable(REVOKED_CERTS.getName())
-        .addTable(REVOKED_CERTS_V2.getName())
-        .addTable(CONTAINERS.getName())
-        .addTable(PIPELINES.getName())
-        .addTable(TRANSACTIONINFO.getName())
-        .addTable(CRLS.getName())
-        .addTable(CRL_SEQUENCE_ID.getName())
-        .addTable(SEQUENCE_ID.getName())
-        .addTable(MOVE.getName())
-        .addTable(META.getName())
-        .addTable(STATEFUL_SERVICE_CONFIG.getName())
-        .addCodec(Long.class, LongCodec.get())
-        .addCodec(CRLInfo.class, CRLInfo.getCodec())
-        .addProto2Codec(StorageContainerDatanodeProtocolProtos.DeletedBlocksTransaction.getDefaultInstance())
-        .addCodec(BigInteger.class, BigIntegerCodec.get())
-        .addCodec(X509Certificate.class, X509CertificateCodec.get())
-        .addCodec(CertInfo.class, CertInfo.getCodec())
-        .addCodec(PipelineID.class, PipelineID.getCodec())
-        .addCodec(Pipeline.class, Pipeline.getCodec())
-        .addCodec(ContainerID.class, ContainerID.getCodec())
-        .addCodec(MoveDataNodePair.class, MoveDataNodePair.getCodec())
-        .addCodec(ContainerInfo.class, ContainerInfo.getCodec())
-        .addCodec(String.class, StringCodec.get())
-        .addCodec(ByteString.class, ByteStringCodec.get())
-        .addCodec(TransactionInfo.class, TransactionInfo.getCodec());
-  }
-
-  /**
    * Return table mapped to the specified table name.
    *
    * @param tableName
@@ -222,5 +203,36 @@ public class ReconScmMetadataManagerImpl extends SCMMetadataStoreImpl
       throw  new IllegalArgumentException("Unknown table " + tableName);
     }
     return table;
+  }
+
+  @Override
+  public void setOzoneStorageContainerManager(
+      OzoneStorageContainerManager ozoneStorageContainerManager) {
+    this.ozoneStorageContainerManager = ozoneStorageContainerManager;
+  }
+
+  @Override
+  public void setSequenceIdGen(SequenceIdGenerator sequenceIdGen) {
+    this.sequenceIdGen = sequenceIdGen;
+  }
+
+  @Override
+  public void setNodeManager(ReconNodeManager nodeManager) {
+    this.nodeManager = nodeManager;
+  }
+
+  @Override
+  public OzoneStorageContainerManager getOzoneStorageContainerManager() {
+    return ozoneStorageContainerManager;
+  }
+
+  @Override
+  public SequenceIdGenerator getSequenceIdGen() {
+    return sequenceIdGen;
+  }
+
+  @Override
+  public ReconNodeManager getNodeManager() {
+    return nodeManager;
   }
 }

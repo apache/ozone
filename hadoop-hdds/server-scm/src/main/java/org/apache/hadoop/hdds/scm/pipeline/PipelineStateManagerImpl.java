@@ -327,7 +327,9 @@ public class PipelineStateManagerImpl implements PipelineStateManager {
       throws IOException {
     lock.writeLock().lock();
     try {
-      pipelineStore.close();
+      if (pipelineStore != null) {
+        pipelineStore.close();
+      }
       this.pipelineStateMap = new PipelineStateMap();
       this.pipelineStore = store;
       initialize();

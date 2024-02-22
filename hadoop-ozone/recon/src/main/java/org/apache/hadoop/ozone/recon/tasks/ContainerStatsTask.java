@@ -141,44 +141,46 @@ public class ContainerStatsTask implements ReconSCMMetadataProcessingTask {
     Iterator<RocksDBUpdateEvent> eventIterator = events.getIterator();
     int eventCount = 0;
     Collection<String> taskTables = Collections.EMPTY_SET;
+    Map<HddsProtos.LifeCycleState, Long> containerCountMap = new HashMap<>();
     try {
       taskTables = getTaskTables();
-    } catch (IOException ioe) {
-      LOG.error("IOException while getting ContainerStats task tables - {}", ioe);
-    }
-    Map<HddsProtos.LifeCycleState, Long> containerCountMap = new HashMap<>();
-    while (eventIterator.hasNext()) {
-      RocksDBUpdateEvent<ContainerID, ContainerInfo> rocksDBUpdateEvent = eventIterator.next();
-      if (!taskTables.contains(rocksDBUpdateEvent.getTable())) {
-        continue;
-      }
-      ContainerID containerId = rocksDBUpdateEvent.getKey();
-      ContainerInfo containerInfo = rocksDBUpdateEvent.getValue();
 
-      switch (rocksDBUpdateEvent.getAction()) {
-      case PUT:
-        handlePutContainerEvent(containerInfo, containerCountMap);
-        break;
 
-      case DELETE:
-        handleDeleteContainerEvent(containerInfo, containerCountMap);
-        break;
-
-      case UPDATE:
-        if (rocksDBUpdateEvent.getOldValue() != null) {
-          handleDeleteContainerEvent(rocksDBUpdateEvent.getOldValue(), containerCountMap);
-        } else {
-          LOG.warn("Update event does not have the old container info for {}.",
-              containerId);
+      while (eventIterator.hasNext()) {
+        RocksDBUpdateEvent<ContainerID, ContainerInfo> rocksDBUpdateEvent = eventIterator.next();
+        if (!taskTables.contains(rocksDBUpdateEvent.getTable())) {
+          continue;
         }
-        handlePutContainerEvent(containerInfo, containerCountMap);
-        break;
+        ContainerID containerId = rocksDBUpdateEvent.getKey();
+        ContainerInfo containerInfo = rocksDBUpdateEvent.getValue();
 
-      default:
-        LOG.debug("Skipping DB update event : {}",
-            rocksDBUpdateEvent.getAction());
+        switch (rocksDBUpdateEvent.getAction()) {
+        case PUT:
+          handlePutContainerEvent(containerInfo, containerCountMap);
+          break;
+
+        case DELETE:
+          handleDeleteContainerEvent(containerInfo, containerCountMap);
+          break;
+
+        case UPDATE:
+          if (rocksDBUpdateEvent.getOldValue() != null) {
+            handleDeleteContainerEvent(rocksDBUpdateEvent.getOldValue(), containerCountMap);
+          } else {
+            LOG.warn("Update event does not have the old container info for {}.",
+                containerId);
+          }
+          handlePutContainerEvent(containerInfo, containerCountMap);
+          break;
+
+        default:
+          LOG.debug("Skipping DB update event : {}",
+              rocksDBUpdateEvent.getAction());
+        }
+        eventCount++;
       }
-      eventCount++;
+    } catch (IOException ioe) {
+      LOG.error("Unexpected exception while processing processing container data from SCM - {}", ioe);
     }
     writeToTheDB(containerCountMap);
     LOG.info("{} successfully processed {} OM DB update event(s).",
@@ -196,7 +198,10 @@ public class ContainerStatsTask implements ReconSCMMetadataProcessingTask {
   }
 
   private void handlePutContainerEvent(ContainerInfo containerInfo,
-                                       Map<HddsProtos.LifeCycleState, Long> containerCountMap) {
+                                       Map<HddsProtos.LifeCycleState, Long> containerCountMap) throws IOException {
     containerCountMap.compute(containerInfo.getState(), (k, v) -> (v != null ? v : 0L) + 1);
+    scmMetadataManager.getOzoneStorageContainerManager().getContainerManager().initialize(containerInfo);
+
+    // TODO: Initialize other managers also (sequenceIdGen, NodeManager, PipelineManager)
   }
 }

@@ -184,4 +184,13 @@ public interface ContainerStateManager {
    *
    */
   void close() throws IOException;
+
+  /**
+   * Initializes the ContainerStateManager with new container object.
+   *
+   * @throws IOException
+   */
+  default void initialize(ContainerInfo containerInfo) throws IOException {
+
+  }
 }

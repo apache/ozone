@@ -18,7 +18,9 @@
 
 package org.apache.hadoop.ozone.recon.scm;
 
+import org.apache.hadoop.hdds.scm.ha.SequenceIdGenerator;
 import org.apache.hadoop.hdds.scm.metadata.SCMMetadataStore;
+import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
 import org.apache.hadoop.hdds.utils.db.Table;
 
 import java.io.File;
@@ -33,7 +35,8 @@ public interface ReconScmMetadataManager extends SCMMetadataStore {
   /**
    * Refresh the DB instance to point to a new location. Get rid of the old
    * DB instance.
-   * @param dbLocation New location of the SCM Snapshot DB.
+   *
+   * @param dbLocation  New location of the SCM Snapshot DB.
    */
   void updateScmDB(File dbLocation) throws IOException;
 
@@ -43,16 +46,21 @@ public interface ReconScmMetadataManager extends SCMMetadataStore {
   long getLastSequenceNumberFromDB();
 
   /**
-   * Check if SCM tables are initialized.
-   * @return true if SCM Tables are initialized, otherwise false.
-   */
-  boolean isScmTablesInitialized();
-
-  /**
    * Return table mapped to the specified table name.
    * @param tableName
    * @return Table
    */
   Table getTable(String tableName);
 
+  void setOzoneStorageContainerManager(OzoneStorageContainerManager ozoneStorageContainerManager);
+
+  void setSequenceIdGen(SequenceIdGenerator sequenceIdGen);
+
+  void setNodeManager(ReconNodeManager nodeManager);
+
+  OzoneStorageContainerManager getOzoneStorageContainerManager();
+
+  SequenceIdGenerator getSequenceIdGen();
+
+  ReconNodeManager getNodeManager();
 }

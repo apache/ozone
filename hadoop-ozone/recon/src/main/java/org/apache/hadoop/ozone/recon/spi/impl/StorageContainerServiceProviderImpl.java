@@ -55,6 +55,7 @@ import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocol;
 import org.apache.hadoop.hdds.security.SecurityConfig;
 import org.apache.hadoop.hdds.server.http.HttpConfig;
 import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
+import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.utils.db.RocksDBCheckpoint;
 import org.apache.hadoop.hdfs.web.URLConnectionFactory;
 import org.apache.hadoop.ozone.ClientVersion;
@@ -189,18 +190,23 @@ public class StorageContainerServiceProviderImpl
         .equals("kerberos");
   }
 
+  /**
+   * Update Recon's Local SCM DB with new SCM DB snapshot as well as
+   * initializes the Recon and SCM managers.
+   *
+   * @return return true if updates successfully else false.
+   */
   @Override
-  public boolean updateReconSCMDBWithNewSnapshot() throws IOException {
+  public boolean updateReconSCMDBWithNewSnapshot() {
     // Obtain the current DB snapshot from SCM and
     // update the in house SCM metadata managed DB instance.
     long startTime = Time.monotonicNow();
     DBCheckpoint dbSnapshot = getSCMDBSnapshot();
     if (dbSnapshot != null && dbSnapshot.getCheckpointLocation() != null) {
-      LOG.info("Got new checkpoint from SCM : " +
-          dbSnapshot.getCheckpointLocation());
+      LOG.info("Got new checkpoint from SCM : {}", dbSnapshot.getCheckpointLocation());
       try {
-        scmMetadataManager.updateScmDB(
-            dbSnapshot.getCheckpointLocation().toFile());
+        scmMetadataManager.updateScmDB(dbSnapshot.getCheckpointLocation().toFile());
+        LOG.info("Time taken to update Recon SCM DB with new snapshot: {}", (Time.monotonicNow() - startTime));
         return true;
       } catch (IOException e) {
         LOG.error("Unable to refresh Recon SCM DB Snapshot. ", e);
@@ -275,16 +281,6 @@ public class StorageContainerServiceProviderImpl
   }
 
   /**
-   * Return instance of Recon SCM Metadata manager.
-   *
-   * @return Recon SCM metadata manager instance.
-   */
-  @Override
-  public ReconScmMetadataManager getReconScmMetadataManagerInstance() {
-    return null;
-  }
-
-  /**
    * Get DB updates since a specific sequence number.
    *
    * @param dbUpdatesRequest request that encapsulates a sequence number.
@@ -295,5 +291,15 @@ public class StorageContainerServiceProviderImpl
   public DBUpdates getDBUpdates(StorageContainerLocationProtocolProtos.DBUpdatesRequestProto dbUpdatesRequest)
       throws IOException {
     return scmClient.getDBUpdates(dbUpdatesRequest);
+  }
+
+  /**
+   * Returns new SCM db store.
+   *
+   * @return
+   */
+  @Override
+  public DBStore getStore() {
+    return scmMetadataManager.getStore();
   }
 }

@@ -29,6 +29,7 @@ import org.apache.hadoop.hdds.scm.container.balancer.ContainerBalancer;
 import org.apache.hadoop.hdds.scm.ha.SCMNodeDetails;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
+import org.apache.hadoop.hdds.utils.db.DBStore;
 
 /**
  * Interface for the SCM Facade class that can be used by a passive SCM like
@@ -61,4 +62,12 @@ public interface OzoneStorageContainerManager {
   SCMNodeDetails getScmNodeDetails();
 
   ReconfigurationHandler getReconfigurationHandler();
+
+  default void setStore(DBStore store) {
+
+  }
+
+  default DBStore getStore() {
+    return null;
+  }
 }
