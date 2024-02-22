@@ -18,7 +18,7 @@
 
 diff --git a/include/rocksdb/raw_iterator.h b/include/rocksdb/raw_iterator.h
 new file mode 100644
-index 000000000..ec3c05d6d
+index 000000000..1bf9b7d15
 --- /dev/null
 +++ b/include/rocksdb/raw_iterator.h
 @@ -0,0 +1,25 @@
@@ -49,7 +49,7 @@ index 000000000..ec3c05d6d
 +#endif  // ROCKSDB_LITE
 diff --git a/include/rocksdb/raw_sst_file_reader.h b/include/rocksdb/raw_sst_file_reader.h
 new file mode 100644
-index 000000000..266a0c1c8
+index 000000000..09e748208
 --- /dev/null
 +++ b/include/rocksdb/raw_sst_file_reader.h
 @@ -0,0 +1,62 @@
@@ -116,18 +116,43 @@ index 000000000..266a0c1c8
 +
 +#endif  // ROCKSDB_LITE
 diff --git a/src.mk b/src.mk
-index b94bc43ca..39080b2cf 100644
+index b94bc43ca..83f4fc90b 100644
 --- a/src.mk
 +++ b/src.mk
-@@ -343,6 +343,8 @@ TOOL_LIB_SOURCES =                                              \
-   tools/ldb_tool.cc                                             \
-   tools/sst_dump_tool.cc                                        \
+@@ -338,11 +338,9 @@ RANGE_TREE_SOURCES =\
+   utilities/transactions/lock/range/range_tree/range_tree_lock_tracker.cc
+
+ TOOL_LIB_SOURCES =                                              \
+-  tools/io_tracer_parser_tool.cc                                \
+-  tools/ldb_cmd.cc                                              \
+-  tools/ldb_tool.cc                                             \
+-  tools/sst_dump_tool.cc                                        \
    utilities/blob_db/blob_dump_tool.cc                           \
 +  tools/raw_sst_file_reader.cc                                  \
 +  tools/raw_sst_file_iterator.cc                                \
 
  ANALYZER_LIB_SOURCES =                                          \
    tools/block_cache_analyzer/block_cache_trace_analyzer.cc      \
+@@ -393,19 +391,7 @@ FOLLY_SOURCES =                                                 \
+   $(FOLLY_DIR)/folly/synchronization/ParkingLot.cpp             \
+
+ TOOLS_MAIN_SOURCES =                                                    \
+-  db_stress_tool/db_stress.cc                                           \
+   tools/blob_dump.cc                                                    \
+-  tools/block_cache_analyzer/block_cache_trace_analyzer_tool.cc         \
+-  tools/db_repl_stress.cc                                               \
+-  tools/db_sanity_test.cc                                               \
+-  tools/ldb.cc                                                          \
+-  tools/io_tracer_parser.cc                                             \
+-  tools/sst_dump.cc                                                     \
+-  tools/write_stress.cc                                                 \
+-  tools/dump/rocksdb_dump.cc                                            \
+-  tools/dump/rocksdb_undump.cc                                          \
+-  tools/trace_analyzer.cc                                               \
+-  tools/io_tracer_parser_tool.cc                                        \
+
+ BENCH_MAIN_SOURCES =                                                    \
+   cache/cache_bench.cc                                                  \
 diff --git a/tools/raw_sst_file_iterator.cc b/tools/raw_sst_file_iterator.cc
 new file mode 100644
 index 000000000..5527b84a4
@@ -212,7 +237,7 @@ index 000000000..5527b84a4
 +#endif  // ROCKSDB_LITE
 diff --git a/tools/raw_sst_file_iterator.h b/tools/raw_sst_file_iterator.h
 new file mode 100644
-index 000000000..ea7de6763
+index 000000000..622d7d75e
 --- /dev/null
 +++ b/tools/raw_sst_file_iterator.h
 @@ -0,0 +1,45 @@
