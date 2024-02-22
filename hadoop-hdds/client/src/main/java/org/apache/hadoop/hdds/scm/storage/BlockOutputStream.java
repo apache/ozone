@@ -855,7 +855,12 @@ public class BlockOutputStream extends OutputStream {
         try {
           LOG.debug("put into last chunk buffer start = {} len = {}",
               copyStart, copyLen);
-          lastChunkBuffer.put(bb.array(), copyStart, copyLen);
+          int origPos = bb.position();
+          int origLimit = bb.limit();
+          bb.position(copyStart).limit(copyStart + copyLen);
+          lastChunkBuffer.put(bb);
+          bb.position(origPos).limit(origLimit);
+          //lastChunkBuffer.put(bb.array(), copyStart, copyLen);
         } catch (BufferOverflowException e) {
           LOG.error("appending from " + copyStart + " for len=" + copyLen +
               ". lastChunkBuffer remaining=" + lastChunkBuffer.remaining() +
