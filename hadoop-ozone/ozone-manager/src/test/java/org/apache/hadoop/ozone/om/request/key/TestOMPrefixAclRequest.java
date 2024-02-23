@@ -50,7 +50,7 @@ public class TestOMPrefixAclRequest extends TestOMKeyRequest {
 
   @Test
   public void testAddAclRequest() throws Exception {
-    PrefixManagerImpl prefixManager = new PrefixManagerImpl(
+    PrefixManagerImpl prefixManager = new PrefixManagerImpl(ozoneManager,
         ozoneManager.getMetadataManager(), true);
     when(ozoneManager.getPrefixManager()).thenReturn(prefixManager);
     String prefixName = UUID.randomUUID() + OZONE_URI_DELIMITER;
@@ -116,7 +116,7 @@ public class TestOMPrefixAclRequest extends TestOMKeyRequest {
 
   @Test
   public void testValidationFailure() {
-    PrefixManagerImpl prefixManager = new PrefixManagerImpl(
+    PrefixManagerImpl prefixManager = new PrefixManagerImpl(ozoneManager,
         ozoneManager.getMetadataManager(), true);
     when(ozoneManager.getPrefixManager()).thenReturn(prefixManager);
 
@@ -143,7 +143,7 @@ public class TestOMPrefixAclRequest extends TestOMKeyRequest {
 
   @Test
   public void testRemoveAclRequest() throws Exception {
-    PrefixManagerImpl prefixManager = new PrefixManagerImpl(
+    PrefixManagerImpl prefixManager = new PrefixManagerImpl(ozoneManager,
         ozoneManager.getMetadataManager(), true);
     when(ozoneManager.getPrefixManager()).thenReturn(prefixManager);
     String prefixName = UUID.randomUUID() + OZONE_URI_DELIMITER;
@@ -223,7 +223,7 @@ public class TestOMPrefixAclRequest extends TestOMKeyRequest {
 
   @Test
   public void testSetAclRequest() throws Exception {
-    PrefixManagerImpl prefixManager = new PrefixManagerImpl(
+    PrefixManagerImpl prefixManager = new PrefixManagerImpl(ozoneManager,
         ozoneManager.getMetadataManager(), true);
     when(ozoneManager.getPrefixManager()).thenReturn(prefixManager);
     String prefixName = UUID.randomUUID() + OZONE_URI_DELIMITER;

@@ -186,6 +186,16 @@ public final class OzoneObjInfo extends OzoneObj {
           .setResType(ResourceType.KEY);
     }
 
+    public static Builder fromOzoneObj(OzoneObj obj) {
+      return new Builder()
+          .setVolumeName(obj.getVolumeName())
+          .setBucketName(obj.getBucketName())
+          .setKeyName(obj.getKeyName())
+          .setResType(obj.getResourceType())
+          .setStoreType(obj.getStoreType())
+          .setOzonePrefixPath(obj.getOzonePrefixPathViewer());
+    }
+
     public Builder setResType(OzoneObj.ResourceType res) {
       this.resType = res;
       return this;

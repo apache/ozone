@@ -839,7 +839,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       delegationTokenMgr = createDelegationTokenSecretManager(configuration);
     }
 
-    prefixManager = new PrefixManagerImpl(metadataManager, isRatisEnabled);
+    prefixManager = new PrefixManagerImpl(this, metadataManager, isRatisEnabled);
     keyManager = new KeyManagerImpl(this, scmClient, configuration,
         perfMetrics);
     accessAuthorizer = OzoneAuthorizerFactory.forOM(this);
