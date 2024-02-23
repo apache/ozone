@@ -21,13 +21,12 @@ package org.apache.hadoop.ozone;
 import com.google.protobuf.BlockingService;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.CommonConfigurationKeys;
-import org.apache.hadoop.hdds.DFSConfigKeysLegacy;
 import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.conf.ReconfigurationHandler;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.ReconfigureProtocolProtos;
-import org.apache.hadoop.hdds.protocolPB.ReconfigureProtocolPB;
+import org.apache.hadoop.hdds.protocolPB.ReconfigureProtocolDatanodePB;
 import org.apache.hadoop.hdds.protocolPB.ReconfigureProtocolServerSideTranslatorPB;
 import org.apache.hadoop.hdds.server.ServerUtils;
 import org.apache.hadoop.hdds.server.ServiceRuntimeInfoImpl;
@@ -103,20 +102,18 @@ public class HddsDatanodeClientProtocolServer extends ServiceRuntimeInfoImpl {
     InetSocketAddress rpcAddress = HddsUtils.getDatanodeRpcAddress(conf);
     // Add reconfigureProtocolService.
     RPC.setProtocolEngine(
-        configuration, ReconfigureProtocolPB.class, ProtobufRpcEngine.class);
+        configuration, ReconfigureProtocolDatanodePB.class, ProtobufRpcEngine.class);
 
     final int handlerCount = conf.getInt(HDDS_DATANODE_HANDLER_COUNT_KEY,
         HDDS_DATANODE_HANDLER_COUNT_DEFAULT);
     ReconfigureProtocolServerSideTranslatorPB reconfigureServerProtocol
         = new ReconfigureProtocolServerSideTranslatorPB(reconfigurationHandler);
-    OzoneSecurityUtil.updateKerberosInfo(ReconfigureProtocolPB.class,
-        DFSConfigKeysLegacy.DFS_DATANODE_KERBEROS_PRINCIPAL_KEY);
     BlockingService reconfigureService = ReconfigureProtocolProtos
         .ReconfigureProtocolService.newReflectiveBlockingService(
             reconfigureServerProtocol);
 
     return preserveThreadName(() -> startRpcServer(configuration, rpcAddress,
-        ReconfigureProtocolPB.class, reconfigureService, handlerCount));
+        ReconfigureProtocolDatanodePB.class, reconfigureService, handlerCount));
   }
 
   /**

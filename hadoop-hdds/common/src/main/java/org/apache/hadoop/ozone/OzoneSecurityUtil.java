@@ -20,9 +20,6 @@ package org.apache.hadoop.ozone;
 
 import java.io.File;
 import java.io.IOException;
-import java.lang.annotation.Annotation;
-import java.lang.reflect.Field;
-import java.lang.reflect.Method;
 import java.net.InetAddress;
 import java.net.NetworkInterface;
 import java.nio.file.Path;
@@ -32,7 +29,6 @@ import java.util.Arrays;
 import java.util.Enumeration;
 import java.util.HashSet;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
 
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
@@ -47,7 +43,6 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SECURITY_ENABLED_DEF
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SECURITY_ENABLED_KEY;
 
 import org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateCodec;
-import org.apache.hadoop.security.KerberosInfo;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -145,40 +140,5 @@ public final class OzoneSecurityUtil {
           cert, CertificateCodec::toIOException));
     }
     return x509Certificates;
-  }
-
-  public static void updateKerberosInfo(Class clz, String serverPrincipal) {
-    // new KerberosInfo
-    Annotation newValue = new KerberosInfo() {
-      @Override
-      public Class<? extends Annotation> annotationType() {
-        return KerberosInfo.class;
-      }
-      @Override
-      public String serverPrincipal() {
-        return serverPrincipal;
-      }
-      @Override
-      public String clientPrincipal() {
-        return null;
-      }
-    };
-
-    try {
-      Method method = clz.getClass().getDeclaredMethod("annotationData", null);
-      method.setAccessible(true);
-
-      Object annotationData = method.invoke(clz);
-      Field annotations = annotationData.getClass().getDeclaredField("annotations");
-      annotations.setAccessible(true);
-
-      Map<Class<? extends Annotation>, Annotation> map =
-          (Map<Class<? extends Annotation>, Annotation>) annotations.get(annotationData);
-      map.put(KerberosInfo.class, newValue);
-      LOG.debug("Class {} is updated with new server principal {}", clz, serverPrincipal);
-    } catch (Exception e) {
-      LOG.error("Failed to update Kerberos Info for new serverPrincipal {}. ", serverPrincipal, e);
-      throw new RuntimeException("Failed to update Kerberos Info for new serverPrincipal " + serverPrincipal);
-    }
   }
 }
