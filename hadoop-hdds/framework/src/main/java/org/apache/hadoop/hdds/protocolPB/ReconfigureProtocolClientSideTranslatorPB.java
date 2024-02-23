@@ -27,6 +27,7 @@ import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.annotation.InterfaceStability;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.ReconfigureProtocol;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.ReconfigureProtocolProtos.GetServerNameRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.ReconfigureProtocolProtos.GetServerNameResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.ReconfigureProtocolProtos.GetConfigurationChangeProto;
@@ -82,26 +83,45 @@ public class ReconfigureProtocolClientSideTranslatorPB implements
 
   private final ReconfigureProtocolPB rpcProxy;
 
-  public ReconfigureProtocolClientSideTranslatorPB(InetSocketAddress addr,
+  public ReconfigureProtocolClientSideTranslatorPB(HddsProtos.NodeType nodeType, InetSocketAddress addr,
       UserGroupInformation ugi, OzoneConfiguration conf)
       throws IOException {
-    rpcProxy = createReconfigureProtocolProxy(addr, ugi, conf);
+    rpcProxy = createReconfigureProtocolProxy(nodeType, addr, ugi, conf);
   }
 
-  static ReconfigureProtocolPB createReconfigureProtocolProxy(
+  static ReconfigureProtocolPB createReconfigureProtocolProxy(HddsProtos.NodeType nodeType,
       InetSocketAddress addr, UserGroupInformation ugi,
       OzoneConfiguration conf) throws IOException {
-
-    RPC.setProtocolEngine(OzoneConfiguration.of(conf),
-        ReconfigureProtocolPB.class, ProtobufRpcEngine.class);
     Configuration hadoopConf = LegacyHadoopConfigurationSource
         .asHadoopConfiguration(conf);
-    return RPC.getProtocolProxy(
-            ReconfigureProtocolPB.class,
-            RPC.getProtocolVersion(ReconfigureProtocolPB.class),
-            addr, ugi, hadoopConf,
-            NetUtils.getDefaultSocketFactory(hadoopConf))
-        .getProxy();
+    if (nodeType == HddsProtos.NodeType.OM) {
+      RPC.setProtocolEngine(OzoneConfiguration.of(conf),
+          ReconfigureProtocolOmPB.class, ProtobufRpcEngine.class);
+      return RPC.getProtocolProxy(
+              ReconfigureProtocolOmPB.class,
+              RPC.getProtocolVersion(ReconfigureProtocolOmPB.class),
+              addr, ugi, hadoopConf,
+              NetUtils.getDefaultSocketFactory(hadoopConf))
+          .getProxy();
+    } else if (nodeType == HddsProtos.NodeType.DATANODE) {
+      RPC.setProtocolEngine(OzoneConfiguration.of(conf),
+          ReconfigureProtocolDatanodePB.class, ProtobufRpcEngine.class);
+      return RPC.getProtocolProxy(
+              ReconfigureProtocolDatanodePB.class,
+              RPC.getProtocolVersion(ReconfigureProtocolDatanodePB.class),
+              addr, ugi, hadoopConf,
+              NetUtils.getDefaultSocketFactory(hadoopConf))
+          .getProxy();
+    } else {
+      RPC.setProtocolEngine(OzoneConfiguration.of(conf),
+          ReconfigureProtocolPB.class, ProtobufRpcEngine.class);
+      return RPC.getProtocolProxy(
+              ReconfigureProtocolPB.class,
+              RPC.getProtocolVersion(ReconfigureProtocolPB.class),
+              addr, ugi, hadoopConf,
+              NetUtils.getDefaultSocketFactory(hadoopConf))
+          .getProxy();
+    }
   }
 
   @Override

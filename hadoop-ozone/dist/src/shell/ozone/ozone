@@ -230,6 +230,7 @@ function ozonecmd_case
     ;;
     admin)
       OZONE_CLASSNAME=org.apache.hadoop.hdds.cli.OzoneAdmin
+      OZONE_ADMIN_OPTS="${OZONE_ADMIN_OPTS} ${OZONE_MODULE_ACCESS_ARGS}"
       OZONE_RUN_ARTIFACT_NAME="ozone-tools"
     ;;
     debug)

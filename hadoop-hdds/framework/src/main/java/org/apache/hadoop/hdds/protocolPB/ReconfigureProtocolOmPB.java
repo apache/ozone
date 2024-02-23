@@ -17,20 +17,17 @@
  */
 package org.apache.hadoop.hdds.protocolPB;
 
-import org.apache.hadoop.hdds.protocol.proto.ReconfigureProtocolProtos.ReconfigureProtocolService;
-import org.apache.hadoop.hdds.scm.ScmConfig;
 import org.apache.hadoop.ipc.ProtocolInfo;
 import org.apache.hadoop.security.KerberosInfo;
 
 /**
- * Protocol that clients use to communicate with the SCM to do
+ * Protocol that clients use to communicate with the OM to do
  * reconfiguration on the fly.
  */
 @ProtocolInfo(
     protocolName = "org.apache.hadoop.hdds.protocol.ReconfigureProtocol",
     protocolVersion = 1)
-@KerberosInfo(serverPrincipal = ScmConfig.ConfigStrings
-    .HDDS_SCM_KERBEROS_PRINCIPAL_KEY)
-public interface ReconfigureProtocolPB extends
-    ReconfigureProtocolService.BlockingInterface {
+// TODO: move OMConfigKeys.OZONE_OM_KERBEROS_PRINCIPAL_KEY to hdds-common.
+@KerberosInfo(serverPrincipal = "ozone.om.kerberos.principal")
+public interface ReconfigureProtocolOmPB extends ReconfigureProtocolPB {
 }

@@ -21,6 +21,7 @@ import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience.Private;
 import org.apache.hadoop.hdds.annotation.InterfaceStability;
 import org.apache.hadoop.hdds.annotation.InterfaceStability.Unstable;
+import org.apache.hadoop.hdds.protocol.ReconfigureProtocol;
 import org.apache.hadoop.hdds.protocol.SecretKeyProtocolDatanode;
 import org.apache.hadoop.hdds.protocol.SecretKeyProtocolOm;
 import org.apache.hadoop.hdds.protocol.SCMSecurityProtocol;
@@ -43,6 +44,7 @@ import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_SECURITY_CLIENT_SCM_CON
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_SECURITY_CLIENT_SCM_SECRET_KEY_DATANODE_PROTOCOL_ACL;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_SECURITY_CLIENT_SCM_SECRET_KEY_OM_PROTOCOL_ACL;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_SECURITY_CLIENT_SCM_SECRET_KEY_SCM_PROTOCOL_ACL;
+import static org.apache.hadoop.hdds.HddsConfigKeys.OZONE_SECURITY_RECONFIGURE_PROTOCOL_ACL;
 
 /**
  * {@link PolicyProvider} for SCM protocols.
@@ -85,7 +87,10 @@ public final class SCMPolicyProvider extends PolicyProvider {
               SecretKeyProtocolScm.class),
           new Service(
               HDDS_SECURITY_CLIENT_SCM_SECRET_KEY_DATANODE_PROTOCOL_ACL,
-              SecretKeyProtocolDatanode.class)
+              SecretKeyProtocolDatanode.class),
+          new Service(
+              OZONE_SECURITY_RECONFIGURE_PROTOCOL_ACL,
+              ReconfigureProtocol.class)
       );
 
   @Override

@@ -2755,6 +2755,14 @@
       manager admin protocol.
     </description>
   </property>
+  <property>
+    <name>ozone.security.reconfigure.protocol.acl</name>
+    <value>*</value>
+    <tag>SECURITY</tag>
+    <description>
+      Comma separated list of users and groups allowed to access reconfigure protocol.
+    </description>
+  </property>
 
   <property>
     <name>hdds.datanode.http.auth.kerberos.principal</name>
