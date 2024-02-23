@@ -77,7 +77,7 @@ class TestGrpcReplicationService {
   private OzoneConfiguration conf;
   private ContainerController containerController;
   private DatanodeDetails datanode;
-  private final long replicationContainerId = 123456L;
+  private static final long replicationContainerId = 123456L;
   private final AtomicLong pushContainerId = new AtomicLong();
 
   @BeforeEach
