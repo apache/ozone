@@ -44,13 +44,7 @@ public class S3InMemoryCache implements S3SecretCache {
 
   @Override
   public void invalidate(String id) {
-    S3SecretValue secret = cache.getIfPresent(id);
-    if (secret == null) {
-      return;
-    }
-    secret.setDeleted(true);
-    secret.setAwsSecret(null);
-    cache.put(id, secret);
+    cache.asMap().computeIfPresent(id, (k, secret) -> secret.deleted());
   }
 
   /**

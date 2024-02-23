@@ -245,8 +245,11 @@ public abstract class DefaultCertificateClient implements CertificateClient {
       updateCachedData(fileName, CAType.SUBORDINATE, this::updateCachedSubCAId);
       updateCachedData(fileName, CAType.ROOT, this::updateCachedRootCAId);
 
-      getLogger().info("Added certificate {} from file: {}.", cert,
+      getLogger().info("Added certificate {} from file: {}.", readCertSerialId,
           filePath.toAbsolutePath());
+      if (getLogger().isDebugEnabled()) {
+        getLogger().debug("Certificate: {}", cert);
+      }
     } catch (java.security.cert.CertificateException
              | IOException | IndexOutOfBoundsException e) {
       getLogger().error("Error reading certificate from file: {}.",
@@ -487,7 +490,6 @@ public abstract class DefaultCertificateClient implements CertificateClient {
    * @param data - Data to sign.
    * @throws CertificateException - on Error.
    */
-  @Override
   public byte[] signData(byte[] data) throws CertificateException {
     try {
       Signature sign = Signature.getInstance(securityConfig.getSignatureAlgo(),
@@ -582,7 +584,6 @@ public abstract class DefaultCertificateClient implements CertificateClient {
    * @param caType         - Is CA certificate.
    * @throws CertificateException - on Error.
    */
-  @Override
   public void storeCertificate(String pemEncodedCert,
       CAType caType) throws CertificateException {
     CertificateCodec certificateCodec = new CertificateCodec(securityConfig,
@@ -992,7 +993,6 @@ public abstract class DefaultCertificateClient implements CertificateClient {
     }
   }
 
-  @Override
   public List<String> listCA() throws IOException {
     pemEncodedCACertsLock.lock();
     try {
@@ -1024,8 +1024,7 @@ public abstract class DefaultCertificateClient implements CertificateClient {
   public synchronized KeyStoresFactory getServerKeyStoresFactory()
       throws CertificateException {
     if (serverKeyStoresFactory == null) {
-      serverKeyStoresFactory = SecurityUtil.getServerKeyStoresFactory(
-          securityConfig, this, true);
+      serverKeyStoresFactory = SecurityUtil.getServerKeyStoresFactory(this, true);
     }
     return serverKeyStoresFactory;
   }
@@ -1034,8 +1033,7 @@ public abstract class DefaultCertificateClient implements CertificateClient {
   public KeyStoresFactory getClientKeyStoresFactory()
       throws CertificateException {
     if (clientKeyStoresFactory == null) {
-      clientKeyStoresFactory = SecurityUtil.getClientKeyStoresFactory(
-          securityConfig, this, true);
+      clientKeyStoresFactory = SecurityUtil.getClientKeyStoresFactory(this, true);
     }
     return clientKeyStoresFactory;
   }

@@ -109,8 +109,8 @@ public class TestMiniOzoneCluster {
   }
 
   @Test
-  public void testContainerRandomPort() throws IOException {
-    OzoneConfiguration ozoneConf = SCMTestUtils.getConf();
+  void testContainerRandomPort(@TempDir File tempDir) throws IOException {
+    OzoneConfiguration ozoneConf = SCMTestUtils.getConf(tempDir);
 
     // Each instance of SM will create an ozone container
     // that bounds to a random port.
@@ -233,7 +233,6 @@ public class TestMiniOzoneCluster {
             EndpointStateMachine.EndPointStates.GETVERSION,
             endpoint.getState());
       }
-      Thread.sleep(1000);
     }
 
     // DN should successfully register with the SCM after SCM is restarted.
@@ -259,8 +258,10 @@ public class TestMiniOzoneCluster {
     String reservedSpace = "1B";
     cluster = MiniOzoneCluster.newBuilder(conf)
         .setNumDatanodes(1)
-        .setNumDataVolumes(3)
-        .setDatanodeReservedSpace(reservedSpace)
+        .setDatanodeFactory(UniformDatanodesFactory.newBuilder()
+            .setNumDataVolumes(3)
+            .setReservedSpace(reservedSpace)
+            .build())
         .build();
     cluster.waitForClusterToBeReady();
 

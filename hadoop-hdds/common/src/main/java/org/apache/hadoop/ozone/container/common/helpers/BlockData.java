@@ -146,22 +146,6 @@ public class BlockData {
     return Collections.unmodifiableMap(this.metadata);
   }
 
-  /**
-   * Returns value of a key.
-   */
-  public synchronized String getValue(String key) {
-    return metadata.get(key);
-  }
-
-  /**
-   * Deletes a metadata entry from the map.
-   *
-   * @param key - Key
-   */
-  public synchronized void deleteKey(String key) {
-    metadata.remove(key);
-  }
-
   @SuppressWarnings("unchecked")
   private List<ContainerProtos.ChunkInfo> castChunkList() {
     return (List<ContainerProtos.ChunkInfo>)chunkList;

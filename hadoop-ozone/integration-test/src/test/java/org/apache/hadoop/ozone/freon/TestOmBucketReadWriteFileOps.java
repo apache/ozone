@@ -34,7 +34,6 @@ import org.apache.hadoop.ozone.om.lock.OMLockMetrics;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ratis.server.RaftServer;
 import org.apache.ratis.server.raftlog.RaftLog;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.slf4j.Logger;
@@ -45,6 +44,9 @@ import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.net.URI;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
 /**
  * Test for OmBucketReadWriteFileOps.
@@ -207,7 +209,7 @@ public class TestOmBucketReadWriteFileOps {
         }
       }
     }
-    Assertions.assertEquals(expectedCount, actual, "Mismatch Count!");
+    assertEquals(expectedCount, actual, "Mismatch Count!");
   }
 
   private void verifyOMLockMetrics(OMLockMetrics omLockMetrics) {
@@ -218,7 +220,7 @@ public class TestOmBucketReadWriteFileOps {
         omLockMetrics.getLongestReadLockWaitingTimeMs());
     int readWaitingSamples =
         Integer.parseInt(readLockWaitingTimeMsStat.split(" ")[2]);
-    Assertions.assertTrue(readWaitingSamples > 0, "Read Lock Waiting Samples should be positive");
+    assertThat(readWaitingSamples).isPositive();
 
     String readLockHeldTimeMsStat = omLockMetrics.getReadLockHeldTimeMsStat();
     LOG.info("Read Lock Held Time Stat: " + readLockHeldTimeMsStat);
@@ -226,7 +228,7 @@ public class TestOmBucketReadWriteFileOps {
         omLockMetrics.getLongestReadLockHeldTimeMs());
     int readHeldSamples =
         Integer.parseInt(readLockHeldTimeMsStat.split(" ")[2]);
-    Assertions.assertTrue(readHeldSamples > 0, "Read Lock Held Samples should be positive");
+    assertThat(readHeldSamples).isPositive();
 
     String writeLockWaitingTimeMsStat =
         omLockMetrics.getWriteLockWaitingTimeMsStat();
@@ -235,7 +237,7 @@ public class TestOmBucketReadWriteFileOps {
         omLockMetrics.getLongestWriteLockWaitingTimeMs());
     int writeWaitingSamples =
         Integer.parseInt(writeLockWaitingTimeMsStat.split(" ")[2]);
-    Assertions.assertTrue(writeWaitingSamples > 0, "Write Lock Waiting Samples should be positive");
+    assertThat(writeWaitingSamples).isPositive();
 
     String writeLockHeldTimeMsStat = omLockMetrics.getWriteLockHeldTimeMsStat();
     LOG.info("Write Lock Held Time Stat: " + writeLockHeldTimeMsStat);
@@ -243,7 +245,7 @@ public class TestOmBucketReadWriteFileOps {
         omLockMetrics.getLongestWriteLockHeldTimeMs());
     int writeHeldSamples =
         Integer.parseInt(writeLockHeldTimeMsStat.split(" ")[2]);
-    Assertions.assertTrue(writeHeldSamples > 0, "Write Lock Held Samples should be positive");
+    assertThat(writeHeldSamples).isPositive();
   }
 
   private static class ParameterBuilder {

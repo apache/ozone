@@ -287,7 +287,7 @@ public class TestS3MultipartResponse {
             .setStatus(status).setSuccess(true)
             .setCommitMultiPartUploadResponse(
                     OzoneManagerProtocolProtos.MultipartCommitUploadPartResponse
-                            .newBuilder().setPartName(volumeName)).build();
+                            .newBuilder().setETag(volumeName).setPartName(volumeName)).build();
 
     return new S3MultipartUploadCommitPartResponseWithFSO(omResponse,
         multipartKey, openKey, multipartKeyInfo, oldPartKeyInfo,

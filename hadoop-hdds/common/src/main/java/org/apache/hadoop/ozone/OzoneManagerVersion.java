@@ -44,7 +44,6 @@ public enum OzoneManagerVersion implements ComponentVersion {
       + " newer and an unknown server version has arrived to the client.");
 
   public static final OzoneManagerVersion CURRENT = latest();
-  public static final int CURRENT_VERSION = CURRENT.version;
 
   private static final Map<Integer, OzoneManagerVersion> BY_PROTO_VALUE =
       Arrays.stream(values())

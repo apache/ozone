@@ -36,7 +36,6 @@ import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType.REA
 import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType.WRITE;
 import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType.WRITE_ACL;
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.junit.jupiter.api.Assertions.fail;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -122,14 +121,7 @@ class TestOzoneAcls {
       if (entry.getValue()) {
         OzoneAcl.parseAcl(entry.getKey());
       } else {
-        try {
-          OzoneAcl.parseAcl(entry.getKey());
-          // should never get here since parseAcl will throw
-          fail("An exception was expected but did not happen. Key: " +
-              entry.getKey());
-        } catch (IllegalArgumentException e) {
-          // nothing to do
-        }
+        assertThrows(IllegalArgumentException.class, () -> OzoneAcl.parseAcl(entry.getKey()));
       }
     }
   }

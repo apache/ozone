@@ -17,9 +17,13 @@
  */
 package org.apache.hadoop.ozone.common;
 
+import org.apache.hadoop.hdds.JavaUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.lang.invoke.MethodHandle;
+import java.lang.invoke.MethodHandles;
+import java.lang.invoke.MethodType;
 import java.lang.reflect.Field;
 import java.nio.ByteBuffer;
 import java.util.zip.Checksum;
@@ -35,6 +39,8 @@ public class ChecksumByteBufferImpl implements ChecksumByteBuffer {
   private final Checksum checksum;
 
   private static final Field IS_READY_ONLY_FIELD;
+  // To access Checksum.update(ByteBuffer) API from Java 9+.
+  private static final MethodHandle BYTE_BUFFER_UPDATE;
 
   static {
     Field f = null;
@@ -46,6 +52,18 @@ public class ChecksumByteBufferImpl implements ChecksumByteBuffer {
       LOG.error("No isReadOnly field in ByteBuffer", e);
     }
     IS_READY_ONLY_FIELD = f;
+
+    MethodHandle byteBufferUpdate = null;
+    if (JavaUtils.isJavaVersionAtLeast(9)) {
+      try {
+        byteBufferUpdate = MethodHandles.publicLookup().findVirtual(Checksum.class, "update",
+            MethodType.methodType(void.class, ByteBuffer.class));
+      } catch (Throwable t) {
+        throw new IllegalStateException("Failed to lookup Checksum.update(ByteBuffer).");
+      }
+    }
+    BYTE_BUFFER_UPDATE = byteBufferUpdate;
+
   }
 
   public ChecksumByteBufferImpl(Checksum impl) {
@@ -57,6 +75,17 @@ public class ChecksumByteBufferImpl implements ChecksumByteBuffer {
   //        should be refactored to simply call checksum.update(buffer), as the
   //        Checksum interface has been enhanced to allow this since Java 9.
   public void update(ByteBuffer buffer) {
+    // Prefer JDK9+ implementation that allows ByteBuffer. This allows DirectByteBuffer to be checksum directly in
+    // native memory.
+    if (BYTE_BUFFER_UPDATE != null) {
+      try {
+        BYTE_BUFFER_UPDATE.invokeExact(checksum, buffer);
+        return;
+      } catch (Throwable e) {
+        throw new IllegalStateException("Error invoking " + BYTE_BUFFER_UPDATE,  e);
+      }
+    }
+
     // this is a hack to not do memory copy.
     if (IS_READY_ONLY_FIELD != null) {
       try {

@@ -28,6 +28,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Supplier;
 
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
@@ -145,7 +146,8 @@ public class BlockOutputStream extends OutputStream {
       BufferPool bufferPool,
       OzoneClientConfig config,
       Token<? extends TokenIdentifier> token,
-      ContainerClientMetrics clientMetrics, StreamBufferArgs streamBufferArgs
+      ContainerClientMetrics clientMetrics, StreamBufferArgs streamBufferArgs,
+      Supplier<ExecutorService> blockOutputStreamResourceProvider
   ) throws IOException {
     this.xceiverClientFactory = xceiverClientManager;
     this.config = config;
@@ -235,10 +237,6 @@ public class BlockOutputStream extends OutputStream {
     return ioException.get();
   }
 
-  XceiverClientSpi getXceiverClientSpi() {
-    return this.xceiverClient;
-  }
-
   public BlockData.Builder getContainerBlockData() {
     return this.containerBlockData;
   }
@@ -325,10 +323,6 @@ public class BlockOutputStream extends OutputStream {
 
   private void updateFlushLength() {
     totalDataFlushedLength = writtenDataLength;
-  }
-
-  private boolean isBufferPoolFull() {
-    return bufferPool.computeBufferData() == streamBufferArgs.getStreamBufferMaxSize();
   }
 
   /**
@@ -756,11 +750,6 @@ public class BlockOutputStream extends OutputStream {
       handleInterruptedException(ex, false);
     }
     return null;
-  }
-
-  @VisibleForTesting
-  public void setXceiverClient(XceiverClientSpi xceiverClient) {
-    this.xceiverClient = xceiverClient;
   }
 
   /**

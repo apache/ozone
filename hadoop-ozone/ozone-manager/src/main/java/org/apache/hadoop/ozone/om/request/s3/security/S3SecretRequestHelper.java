@@ -17,7 +17,6 @@
  */
 package org.apache.hadoop.ozone.om.request.s3.security;
 
-import com.google.common.base.Optional;
 import org.apache.hadoop.ipc.ProtobufRpcEngine;
 import org.apache.hadoop.ozone.om.OMMultiTenantManager;
 import org.apache.hadoop.ozone.om.OzoneManager;
@@ -29,6 +28,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.util.Optional;
 
 import static org.apache.hadoop.security.SaslRpcServer.AuthMethod.KERBEROS;
 

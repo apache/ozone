@@ -100,6 +100,10 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
           <artifactId>jersey-json</artifactId>
         </exclusion>
         <exclusion>
+          <groupId>com.google.code.findbugs</groupId>
+          <artifactId>jsr305</artifactId>
+        </exclusion>
+        <exclusion>
           <groupId>com.sun.jersey</groupId>
           <artifactId>jersey-core</artifactId>
         </exclusion>

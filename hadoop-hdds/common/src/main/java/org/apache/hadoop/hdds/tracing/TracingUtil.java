@@ -150,16 +150,6 @@ public final class TracingUtil {
   }
 
   /**
-   * Execute a function inside an activated new span.
-   */
-  public static <E extends Exception> void executeInNewSpan(String spanName,
-      CheckedRunnable<E> runnable) throws E {
-    Span span = GlobalTracer.get()
-        .buildSpan(spanName).start();
-    executeInSpan(span, runnable);
-  }
-
-  /**
    * Execute {@code supplier} in the given {@code span}.
    * @return the value returned by {@code supplier}
    */
@@ -188,15 +178,6 @@ public final class TracingUtil {
     } finally {
       span.finish();
     }
-  }
-
-  /**
-   * Execute a new function as a child span of the parent.
-   */
-  public static <R, E extends Exception> R executeAsChildSpan(String spanName,
-      String parentName, CheckedSupplier<R, E> supplier) throws E {
-    Span span = TracingUtil.importAndCreateSpan(spanName, parentName);
-    return executeInSpan(span, supplier);
   }
 
   /**

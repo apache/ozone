@@ -1287,15 +1287,6 @@
       see ozone.scm.heartbeat.thread.interval before changing this value.
     </description>
   </property>
-  <property>
-    <name>ozone.trace.enabled</name>
-    <value>false</value>
-    <tag>OZONE, DEBUG</tag>
-    <description>
-      Setting this flag to true dumps the HTTP request/ response in
-      the logs. Very useful when debugging REST protocol.
-    </description>
-  </property>
 
   <property>
     <name>ozone.key.preallocation.max.blocks</name>
@@ -2234,6 +2225,14 @@
     <value>OM/_HOST@REALM</value>
     <tag>OZONE, SECURITY, KERBEROS</tag>
     <description>The OzoneManager service principal. Ex om/_HOST@REALM.COM</description>
+  </property>
+  <property>
+    <name>ozone.om.kerberos.principal.pattern</name>
+    <value>*</value>
+    <description>
+      A client-side RegEx that can be configured to control
+      allowed realms to authenticate with (useful in cross-realm env.)
+    </description>
   </property>
   <property>
     <name>ozone.om.http.auth.kerberos.principal</name>
@@ -3419,6 +3418,14 @@
     </description>
   </property>
   <property>
+    <name>hdds.datanode.slow.op.warning.threshold</name>
+    <tag>OZONE, DATANODE, PERFORMANCE</tag>
+    <value>500ms</value>
+    <description>
+      Thresholds for printing slow-operation audit logs.
+    </description>
+  </property>
+  <property>
     <name>ozone.om.keyname.character.check.enabled</name>
     <tag>OZONE, OM</tag>
     <value>false</value>
@@ -4267,29 +4274,11 @@
   </property>
 
   <property>
-    <name>ozone.om.snapshot.sst_dumptool.pool.size</name>
-    <value>1</value>
-    <tag>OZONE, OM</tag>
-    <description>
-      Threadpool size for SST Dumptool which would be used for computing snapdiff when native library is enabled.
-    </description>
-  </property>
-
-  <property>
     <name>ozone.om.snapshot.load.native.lib</name>
     <value>true</value>
     <tag>OZONE, OM</tag>
     <description>
       Load native library for performing optimized snapshot diff.
-    </description>
-  </property>
-
-  <property>
-    <name>ozone.om.snapshot.sst_dumptool.buffer.size</name>
-    <value>8KB</value>
-    <tag>OZONE, OM</tag>
-    <description>
-      Buffer size for SST Dumptool Pipe which would be used for computing snapdiff when native library is enabled.
     </description>
   </property>
 

@@ -46,9 +46,9 @@ import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.container.replication.ContainerHealthResult;
 import org.apache.hadoop.hdds.scm.container.replication.ReplicationManager;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
-import org.apache.hadoop.hdds.scm.ha.SCMRatisServer;
 import org.apache.hadoop.hdds.scm.ha.SequenceIdGenerator;
 import org.apache.hadoop.hdds.scm.metadata.DBTransactionBuffer;
+import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.server.events.EventHandler;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
 import org.apache.hadoop.hdds.utils.db.Table;
@@ -95,14 +95,10 @@ public class DeletedBlockLogImpl
 
   private static final int LIST_ALL_FAILED_TRANSACTIONS = -1;
 
-  @SuppressWarnings("parameternumber")
   public DeletedBlockLogImpl(ConfigurationSource conf,
+      StorageContainerManager scm,
       ContainerManager containerManager,
-      SCMRatisServer ratisServer,
-      Table<Long, DeletedBlocksTransaction> deletedBlocksTXTable,
       DBTransactionBuffer dbTxBuffer,
-      SCMContext scmContext,
-      SequenceIdGenerator sequenceIdGen,
       ScmBlockDeletingServiceMetrics metrics) {
     maxRetry = conf.getInt(OZONE_SCM_BLOCK_DELETION_MAX_RETRY,
         OZONE_SCM_BLOCK_DELETION_MAX_RETRY_DEFAULT);
@@ -112,17 +108,17 @@ public class DeletedBlockLogImpl
     this.deletedBlockLogStateManager = DeletedBlockLogStateManagerImpl
         .newBuilder()
         .setConfiguration(conf)
-        .setDeletedBlocksTable(deletedBlocksTXTable)
+        .setDeletedBlocksTable(scm.getScmMetadataStore().getDeletedBlocksTXTable())
         .setContainerManager(containerManager)
-        .setRatisServer(ratisServer)
+        .setRatisServer(scm.getScmHAManager().getRatisServer())
         .setSCMDBTransactionBuffer(dbTxBuffer)
         .build();
-    this.scmContext = scmContext;
-    this.sequenceIdGen = sequenceIdGen;
+    this.scmContext = scm.getScmContext();
+    this.sequenceIdGen = scm.getSequenceIdGen();
     this.metrics = metrics;
     this.transactionStatusManager =
         new SCMDeletedBlockTransactionStatusManager(deletedBlockLogStateManager,
-            containerManager, scmContext, metrics, scmCommandTimeoutMs);
+            containerManager, this.scmContext, metrics, scmCommandTimeoutMs);
   }
 
   @Override

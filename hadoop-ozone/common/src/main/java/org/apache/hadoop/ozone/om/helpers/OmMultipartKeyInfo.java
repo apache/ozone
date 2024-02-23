@@ -170,8 +170,8 @@ public final class OmMultipartKeyInfo extends WithObjectID {
     this.creationTime = creationTime;
     this.replicationConfig = replicationConfig;
     this.partKeyInfoMap = sortedMap;
-    this.objectID = objectID;
-    this.updateID = updateID;
+    setObjectID(objectID);
+    setUpdateID(updateID);
     this.parentID = parentObjId;
   }
 
@@ -323,8 +323,8 @@ public final class OmMultipartKeyInfo extends WithObjectID {
         .setUploadID(uploadID)
         .setCreationTime(creationTime)
         .setType(replicationConfig.getReplicationType())
-        .setObjectID(objectID)
-        .setUpdateID(updateID)
+        .setObjectID(getObjectID())
+        .setUpdateID(getUpdateID())
         .setParentID(parentID);
 
     if (replicationConfig instanceof ECReplicationConfig) {
@@ -362,7 +362,7 @@ public final class OmMultipartKeyInfo extends WithObjectID {
     // is added, it returns a new shallow copy of the PartKeyInfoMap Object
     // so here we can directly pass in partKeyInfoMap
     return new OmMultipartKeyInfo(uploadID, creationTime, replicationConfig,
-        partKeyInfoMap, objectID, updateID, parentID);
+        partKeyInfoMap, getObjectID(), getUpdateID(), parentID);
   }
 
 }

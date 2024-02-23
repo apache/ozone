@@ -23,17 +23,20 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PartInf
 /**
  * Class that defines information about each part of a multipart upload key.
  */
-public class OmPartInfo {
-  private int partNumber;
-  private String partName;
-  private long modificationTime;
-  private long size;
+public final class OmPartInfo {
+  private final int partNumber;
+  private final String partName;
+  private final long modificationTime;
+  private final long size;
+  private final String eTag;
 
-  public OmPartInfo(int number, String name, long time, long size) {
+  public OmPartInfo(int number, String name, long time, long size,
+                    String eTag) {
     this.partNumber = number;
     this.partName = name;
     this.modificationTime = time;
     this.size = size;
+    this.eTag = eTag;
   }
 
   public int getPartNumber() {
@@ -52,9 +55,19 @@ public class OmPartInfo {
     return size;
   }
 
+  public String getETag() {
+    return eTag;
+  }
+
   public PartInfo getProto() {
-    return PartInfo.newBuilder().setPartNumber(partNumber).setPartName(partName)
-       .setModificationTime(modificationTime)
-       .setSize(size).build();
+    PartInfo.Builder builder = PartInfo.newBuilder()
+        .setPartNumber(partNumber)
+        .setPartName(partName)
+        .setModificationTime(modificationTime)
+        .setSize(size);
+    if (eTag != null) {
+      builder.setETag(eTag);
+    }
+    return builder.build();
   }
 }

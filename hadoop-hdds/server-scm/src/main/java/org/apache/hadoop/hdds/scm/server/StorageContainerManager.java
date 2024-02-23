@@ -450,7 +450,6 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     moveManager = new MoveManager(replicationManager, containerManager);
     containerReplicaPendingOps.registerSubscriber(moveManager);
     containerBalancer = new ContainerBalancer(this);
-    LOG.info(containerBalancer.toString());
 
     // Emit initial safe mode status, as now handlers are registered.
     scmSafeModeManager.emitSafeModeStatus();
@@ -804,9 +803,9 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
 
     ScmConfig scmConfig = conf.getObject(ScmConfig.class);
     pipelineChoosePolicy = PipelineChoosePolicyFactory
-        .getPolicy(scmConfig, false);
+        .getPolicy(scmNodeManager, scmConfig, false);
     ecPipelineChoosePolicy = PipelineChoosePolicyFactory
-        .getPolicy(scmConfig, true);
+        .getPolicy(scmNodeManager, scmConfig, true);
     if (configurator.getWritableContainerFactory() != null) {
       writableContainerFactory = configurator.getWritableContainerFactory();
     } else {
