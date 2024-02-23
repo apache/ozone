@@ -289,9 +289,6 @@ public class ContainerHealthTask extends ReconScmTask {
                 containerDeletedInSCM(currentContainer.getContainer())) {
               rec.delete();
             }
-            if (currentContainer.isEmpty()) {
-              rec.setContainerState(EMPTY_MISSING.toString());
-            }
             existingRecords.add(rec.getContainerState());
             if (rec.changed()) {
               rec.update();
@@ -400,7 +397,7 @@ public class ContainerHealthTask extends ReconScmTask {
       boolean returnValue = false;
       switch (UnHealthyContainerStates.valueOf(rec.getContainerState())) {
       case MISSING:
-        returnValue = container.isMissing();
+        returnValue = container.isMissing() && !container.isEmpty();
         break;
       case MIS_REPLICATED:
         returnValue = keepMisReplicatedRecord(container, rec);
