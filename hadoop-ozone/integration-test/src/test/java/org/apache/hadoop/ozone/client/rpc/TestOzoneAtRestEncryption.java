@@ -213,6 +213,14 @@ class TestOzoneAtRestEncryption {
     }
   }
 
+  static void reInitClient() throws IOException {
+    ozClient = OzoneClientFactory.getRpcClient(conf);
+    store = ozClient.getObjectStore();
+    TestOzoneRpcClient.setOzClient(ozClient);
+    TestOzoneRpcClient.setStore(store);
+  }
+
+
   @ParameterizedTest
   @EnumSource
   void testPutKeyWithEncryption(BucketLayout bucketLayout) throws Exception {
@@ -770,9 +778,7 @@ class TestOzoneAtRestEncryption {
 
     KeyProvider kp3 = ozClient.getObjectStore().getKeyProvider();
     assertNotEquals(kp3, kpSpy);
-    // Restore ozClient and store
-    TestOzoneRpcClient.setOzClient(OzoneClientFactory.getRpcClient(conf));
-    TestOzoneRpcClient.setStore(ozClient.getObjectStore());
+    reInitClient();
   }
 
   private static RepeatedOmKeyInfo getMatchedKeyInfo(
