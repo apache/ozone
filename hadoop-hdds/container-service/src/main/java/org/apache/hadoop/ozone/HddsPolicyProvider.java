@@ -14,16 +14,12 @@
  * License for the specific language governing permissions and limitations under
  * the License.
  */
-package org.apache.hadoop.ozone.om;
+package org.apache.hadoop.ozone;
 
-import org.apache.hadoop.hdds.annotation.InterfaceAudience;
+
 import org.apache.hadoop.hdds.annotation.InterfaceAudience.Private;
-import org.apache.hadoop.hdds.annotation.InterfaceStability;
 import org.apache.hadoop.hdds.annotation.InterfaceStability.Unstable;
 import org.apache.hadoop.hdds.protocol.ReconfigureProtocol;
-import org.apache.hadoop.ozone.om.protocol.OMInterServiceProtocol;
-import org.apache.hadoop.ozone.om.protocol.OMAdminProtocol;
-import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
 import org.apache.hadoop.security.authorize.PolicyProvider;
 import org.apache.hadoop.security.authorize.Service;
 import org.apache.ratis.util.MemoizedSupplier;
@@ -33,44 +29,35 @@ import java.util.List;
 import java.util.function.Supplier;
 
 import static org.apache.hadoop.hdds.HddsConfigKeys.OZONE_SECURITY_RECONFIGURE_PROTOCOL_ACL;
-import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SECURITY_ADMIN_PROTOCOL_ACL;
-import static org.apache.hadoop.ozone.om.OMConfigKeys
-    .OZONE_OM_SECURITY_CLIENT_PROTOCOL_ACL;
 
 /**
- * {@link PolicyProvider} for OM protocols.
+ * {@link PolicyProvider} for Datanode protocols.
  */
-@InterfaceAudience.Private
-@InterfaceStability.Unstable
-public final class OMPolicyProvider extends PolicyProvider {
+@Private
+@Unstable
+public final class HddsPolicyProvider extends PolicyProvider {
 
-  private static final Supplier<OMPolicyProvider> SUPPLIER =
-      MemoizedSupplier.valueOf(OMPolicyProvider::new);
+  private static final Supplier<HddsPolicyProvider> SUPPLIER =
+      MemoizedSupplier.valueOf(HddsPolicyProvider::new);
 
-  private OMPolicyProvider() {
+  private HddsPolicyProvider() {
   }
 
   @Private
   @Unstable
-  public static OMPolicyProvider getInstance() {
+  public static HddsPolicyProvider getInstance() {
     return SUPPLIER.get();
   }
 
-  private static final List<Service> OM_SERVICES =
+  private static final List<Service> DN_SERVICES =
       Arrays.asList(
-          new Service(OZONE_OM_SECURITY_CLIENT_PROTOCOL_ACL,
-              OzoneManagerProtocol.class),
-          new Service(OZONE_OM_SECURITY_ADMIN_PROTOCOL_ACL,
-              OMInterServiceProtocol.class),
-          new Service(OZONE_OM_SECURITY_ADMIN_PROTOCOL_ACL,
-              OMAdminProtocol.class),
-          new Service(OZONE_SECURITY_RECONFIGURE_PROTOCOL_ACL,
+          new Service(
+              OZONE_SECURITY_RECONFIGURE_PROTOCOL_ACL,
               ReconfigureProtocol.class)
       );
 
   @Override
   public Service[] getServices() {
-    return OM_SERVICES.toArray(new Service[0]);
+    return DN_SERVICES.toArray(new Service[0]);
   }
-
 }
