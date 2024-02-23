@@ -77,7 +77,7 @@ class TestGrpcReplicationService {
   private OzoneConfiguration conf;
   private ContainerController containerController;
   private DatanodeDetails datanode;
-  private static final long replicationContainerId = 123456L;
+  private static final long CONTAINER_ID = 123456L;
   private final AtomicLong pushContainerId = new AtomicLong();
 
   @BeforeEach
@@ -139,7 +139,7 @@ class TestGrpcReplicationService {
             ContainerProtos.ContainerType.KeyValueContainer, containerHandler));
 
     KeyValueContainerData data = new KeyValueContainerData(
-        replicationContainerId,
+        CONTAINER_ID,
         ContainerLayoutVersion.FILE_PER_BLOCK, GB, UUID.randomUUID().toString(),
         datanode.getUuidString());
     KeyValueContainer container = new KeyValueContainer(data, conf);
@@ -154,7 +154,7 @@ class TestGrpcReplicationService {
       return null;
     }).when(importer).importContainer(anyLong(), any(), any(), any());
     doReturn(true).when(importer).isAllowedContainerImport(eq(
-        replicationContainerId));
+        CONTAINER_ID));
     when(importer.chooseNextVolume()).thenReturn(new HddsVolume.Builder(
         Files.createDirectory(tempDir.resolve("ImporterDir")).toString()).conf(
         conf).build());
@@ -176,7 +176,7 @@ class TestGrpcReplicationService {
         new SimpleContainerDownloader(conf, null);
     Path downloadDir = Files.createDirectory(tempDir.resolve("DownloadDir"));
     Path result = downloader.getContainerDataFromReplicas(
-        replicationContainerId,
+        CONTAINER_ID,
         Collections.singletonList(datanode), downloadDir,
         CopyContainerCompression.NO_COMPRESSION);
 
@@ -188,7 +188,7 @@ class TestGrpcReplicationService {
     assertEquals(files.length, 1);
 
     assertTrue(files[0].getName().startsWith("container-" +
-        replicationContainerId + "-"));
+        CONTAINER_ID + "-"));
 
     downloader.close();
   }
@@ -203,11 +203,11 @@ class TestGrpcReplicationService {
     PushReplicator pushReplicator = new PushReplicator(conf, source, uploader);
 
     ReplicationTask task =
-        new ReplicationTask(toTarget(replicationContainerId, datanode), pushReplicator);
+        new ReplicationTask(toTarget(CONTAINER_ID, datanode), pushReplicator);
 
     pushReplicator.replicate(task);
 
-    assertEquals(pushContainerId.get(), replicationContainerId);
+    assertEquals(pushContainerId.get(), CONTAINER_ID);
   }
 
   @Test
