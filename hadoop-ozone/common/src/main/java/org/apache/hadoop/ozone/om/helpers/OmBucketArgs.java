@@ -17,6 +17,7 @@
  */
 package org.apache.hadoop.ozone.om.helpers;
 
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
@@ -197,7 +198,7 @@ public final class OmBucketArgs extends WithMetadata implements Auditable {
     private String bucketName;
     private Boolean isVersionEnabled;
     private StorageType storageType;
-    private Map<String, String> metadata;
+    private final Map<String, String> metadata = new HashMap<>();
     private boolean quotaInBytesSet = false;
     private long quotaInBytes;
     private boolean quotaInNamespaceSet = false;
@@ -233,11 +234,6 @@ public final class OmBucketArgs extends WithMetadata implements Auditable {
       if (info == null || info.getKeyName() != null) {
         this.bekInfo = info;
       }
-      return this;
-    }
-
-    public Builder addMetadata(Map<String, String> metadataMap) {
-      this.metadata = metadataMap;
       return this;
     }
 
