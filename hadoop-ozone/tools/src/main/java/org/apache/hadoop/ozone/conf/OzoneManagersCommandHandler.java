@@ -33,7 +33,7 @@ import static org.apache.hadoop.ozone.OmUtils.getOmHAAddressesById;
  */
 @Command(name = "ozonemanagers",
     aliases = {"-ozonemanagers"},
-    description = "gets list of Ozone ozone-manager nodes in the cluster",
+    description = "gets list of Ozone Manager nodes in the cluster",
     mixinStandardHelpOptions = true,
     versionProvider = HddsVersionProvider.class)
 public class OzoneManagersCommandHandler implements Callable<Void> {
