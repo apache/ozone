@@ -63,7 +63,6 @@ import org.apache.ratis.util.ExitUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import javax.inject.Inject;
 import javax.inject.Singleton;
 
 /**
@@ -114,7 +113,6 @@ public class SCMMetadataStoreImpl implements SCMMetadataStore {
    * @param config - Ozone Configuration.
    * @throws IOException - on Failure.
    */
-  @Inject
   public SCMMetadataStoreImpl(OzoneConfiguration config)
       throws IOException {
     this.configuration = config;

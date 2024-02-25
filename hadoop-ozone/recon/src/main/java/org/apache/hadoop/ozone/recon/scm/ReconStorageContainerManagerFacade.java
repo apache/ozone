@@ -245,7 +245,8 @@ public class ReconStorageContainerManagerFacade
     this.scmStorageConfig = new ReconStorageConfig(conf, reconUtils);
     this.clusterMap = new NetworkTopologyImpl(conf);
 
-    this.dbStore = checkAndInitializeSCMDBSnapshot(reconUtils);
+    this.dbStore = DBStoreBuilder.createDBStore(ozoneConfiguration, new ReconSCMDBDefinition());
+    //checkAndInitializeSCMDBSnapshot(reconUtils);
 
     this.scmLayoutVersionManager =
         new HDDSLayoutVersionManager(scmStorageConfig.getLayoutVersion());

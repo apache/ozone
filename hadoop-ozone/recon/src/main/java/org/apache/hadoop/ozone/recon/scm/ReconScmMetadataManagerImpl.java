@@ -40,9 +40,8 @@ import java.io.File;
 import java.io.IOException;
 import java.util.UUID;
 
-import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
-import static org.apache.hadoop.ozone.recon.ReconConstants.RECON_SCM_SNAPSHOT_DB;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_SCM_DB_DIR;
+import static org.apache.hadoop.ozone.recon.scm.ReconSCMDBDefinition.RECON_SCM_DB_NAME;
 
 /**
  * Recon's implementation of the SCM Metadata manager. By extending and
@@ -75,7 +74,7 @@ public class ReconScmMetadataManagerImpl extends SCMMetadataStoreImpl
     File reconDbDir =
         reconUtils.getReconDbDir(configuration, OZONE_RECON_SCM_DB_DIR);
     File lastKnownSCMSnapshot =
-        reconUtils.getLastKnownDB(reconDbDir, RECON_SCM_SNAPSHOT_DB);
+        reconUtils.getLastKnownDB(reconDbDir, RECON_SCM_DB_NAME);
     if (lastKnownSCMSnapshot != null) {
       LOG.info("Last known snapshot for SCM : {}", lastKnownSCMSnapshot.getAbsolutePath());
     }
@@ -130,12 +129,12 @@ public class ReconScmMetadataManagerImpl extends SCMMetadataStoreImpl
 
       setStore(newStore);
       ozoneStorageContainerManager.setStore(newStore);
-      File newDb = new File(dbFile.getParent() +
-          OZONE_URI_DELIMITER + ReconSCMDBDefinition.RECON_SCM_DB_NAME);
+      /*File newDb = new File(dbFile.getParent() +
+          OZONE_URI_DELIMITER + RECON_SCM_DB_NAME);
       boolean success = dbFile.renameTo(newDb);
       if (success) {
         LOG.info("SCM snapshot linked to Recon DB.");
-      }
+      }*/
       LOG.info("Created SCM DB handle from snapshot at {}.", dbFile.getAbsolutePath());
     } catch (IOException ioEx) {
       LOG.error("Unable to initialize Recon SCM DB snapshot store.", ioEx);
