@@ -1253,7 +1253,7 @@ public class OzoneBucket extends WithMetadata {
           proxy.listStatusLight(volumeName, name, delimiterKeyPrefix, false,
               startKey, listCacheSize, false);
 
-      if (addedKeyPrefix) {
+      if (addedKeyPrefix && statuses.size() > 0) {
         // previous round already include the startKey, so remove it
         statuses.remove(0);
       } else {
