@@ -70,7 +70,7 @@ import static org.junit.jupiter.api.Assertions.fail;
  * Test Snapshot Deleting Service.
  */
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
-@TestMethodOrder(OrderAnnotation.class)
+//@TestMethodOrder(OrderAnnotation.class)
 public class TestSnapshotDeletingService {
 
   private static final Logger LOG =
@@ -125,14 +125,14 @@ public class TestSnapshotDeletingService {
   }
 
   @Test
-  @Order(2)
+  @Order(3)
   public void testSnapshotSplitAndMove() throws Exception {
     SnapshotDeletingService snapshotDeletingService =
         om.getKeyManager().getSnapshotDeletingService();
     Table<String, SnapshotInfo> snapshotInfoTable =
         om.getMetadataManager().getSnapshotInfoTable();
 
-    createSnapshotDataForBucket1();
+//    createSnapshotDataForBucket1();
 
     assertTableRowCount(snapshotInfoTable, 2);
     GenericTestUtils.waitFor(() -> snapshotDeletingService
@@ -150,7 +150,7 @@ public class TestSnapshotDeletingService {
   }
 
   @Test
-  @Order(3)
+  @Order(2)
   public void testMultipleSnapshotKeyReclaim() throws Exception {
 
     Table<String, RepeatedOmKeyInfo> deletedTable =
@@ -158,7 +158,7 @@ public class TestSnapshotDeletingService {
     Table<String, SnapshotInfo> snapshotInfoTable =
         om.getMetadataManager().getSnapshotInfoTable();
 
-//    createSnapshotDataForBucket1();
+    createSnapshotDataForBucket1();
 
     BucketArgs bucketArgs = new BucketArgs.Builder()
         .setBucketLayout(BucketLayout.LEGACY)
