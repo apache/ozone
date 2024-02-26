@@ -230,7 +230,7 @@ public class OzoneClientConfig {
           "list rather than full chunk list to optimize performance. " +
           "Critical to HBase.",
       tags = ConfigTag.CLIENT)
-  private boolean incrementalChunkList = false;
+  private boolean incrementalChunkList = true;
 
   @PostConstruct
   private void validate() {
