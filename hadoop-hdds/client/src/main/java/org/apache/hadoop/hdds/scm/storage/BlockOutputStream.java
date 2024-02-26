@@ -860,7 +860,6 @@ public class BlockOutputStream extends OutputStream {
           bb.position(copyStart).limit(copyStart + copyLen);
           lastChunkBuffer.put(bb);
           bb.position(origPos).limit(origLimit);
-          //lastChunkBuffer.put(bb.array(), copyStart, copyLen);
         } catch (BufferOverflowException e) {
           LOG.error("appending from " + copyStart + " for len=" + copyLen +
               ". lastChunkBuffer remaining=" + lastChunkBuffer.remaining() +
