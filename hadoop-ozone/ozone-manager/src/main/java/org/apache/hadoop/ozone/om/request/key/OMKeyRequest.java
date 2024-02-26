@@ -23,14 +23,7 @@ import jakarta.annotation.Nullable;
 import java.io.IOException;
 import java.security.GeneralSecurityException;
 import java.security.PrivilegedExceptionAction;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.EnumSet;
-import java.util.HashSet;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
+import java.util.*;
 import java.util.stream.Collectors;
 
 import com.google.common.annotations.VisibleForTesting;
@@ -39,6 +32,7 @@ import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.client.ContainerBlockID;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.OmUtils;
@@ -68,6 +62,7 @@ import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.KeyValue;
 
 import org.apache.hadoop.crypto.key.KeyProviderCryptoExtension
     .EncryptedKeyVersion;
@@ -775,6 +770,16 @@ public abstract class OMKeyRequest extends OMClientRequest {
       dbKeyInfo.setModificationTime(keyArgs.getModificationTime());
       dbKeyInfo.setUpdateID(transactionLogIndex, isRatisEnabled);
       dbKeyInfo.setReplicationConfig(replicationConfig);
+
+      // Construct new metadata map from KeyArgs
+      List<KeyValue> keyValueList = keyArgs.getMetadataList();
+      Map<String, String> newMetadata = new HashMap<>();
+      for (KeyValue keyValue : keyValueList) {
+        newMetadata.put(keyValue.getKey(), keyValue.getValue());
+      }
+
+      updateMetadata(dbKeyInfo, newMetadata);
+
       return dbKeyInfo;
     }
 
@@ -951,6 +956,27 @@ public abstract class OMKeyRequest extends OMClientRequest {
     uncommittedGroups.add(new OmKeyLocationInfoGroup(0, uncommitted));
     pseudoKeyInfo.setKeyLocationVersions(uncommittedGroups);
     return pseudoKeyInfo;
+  }
+
+  /**
+   * Updates the metadata of an OmKeyInfo object with new metadata.
+   *
+   * @param dbKeyInfo   The existing OmKeyInfo object whose metadata is to be updated.
+   * @param newMetadata The new metadata map to update the existing metadata with.
+   */
+  protected void updateMetadata(OmKeyInfo dbKeyInfo,
+                                Map<String, String> newMetadata) {
+    if (dbKeyInfo == null || newMetadata == null || newMetadata.isEmpty()) {
+      return;
+    }
+    Map<String, String> existingMetadata = dbKeyInfo.getMetadata();
+    // Update existing metadata with new entries or values from newMetadata
+    for (Map.Entry<String, String> entry : newMetadata.entrySet()) {
+      String key = entry.getKey();
+      String value = entry.getValue();
+      // Update or add new metadata entry
+      existingMetadata.put(key, value);
+    }
   }
 
   /**
