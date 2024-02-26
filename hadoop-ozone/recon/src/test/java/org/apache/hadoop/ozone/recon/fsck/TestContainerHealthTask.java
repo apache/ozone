@@ -343,6 +343,65 @@ public class TestContainerHealthTask extends AbstractReconSqlDBTest {
         .isGreaterThan(currentTime);
   }
 
+  @Test
+  public void testNegativeSizeContainers() throws Exception {
+    // Setup mock objects and test environment
+    UnhealthyContainersDao unhealthyContainersDao =
+        getDao(UnhealthyContainersDao.class);
+    ContainerHealthSchemaManager containerHealthSchemaManager =
+        new ContainerHealthSchemaManager(
+            getSchemaDefinition(ContainerSchemaDefinition.class),
+            unhealthyContainersDao);
+    ReconStorageContainerManagerFacade scmMock =
+        mock(ReconStorageContainerManagerFacade.class);
+    ContainerManager containerManagerMock = mock(ContainerManager.class);
+    StorageContainerServiceProvider scmClientMock =
+        mock(StorageContainerServiceProvider.class);
+    ReconContainerMetadataManager reconContainerMetadataManager =
+        mock(ReconContainerMetadataManager.class);
+    MockPlacementPolicy placementMock = new MockPlacementPolicy();
+
+    // Mock container info setup
+    List<ContainerInfo> mockContainers = getMockContainers(3);
+    when(scmMock.getContainerManager()).thenReturn(containerManagerMock);
+    when(scmMock.getScmServiceProvider()).thenReturn(scmClientMock);
+    when(containerManagerMock.getContainers(any(ContainerID.class),
+        anyInt())).thenReturn(mockContainers);
+    for (ContainerInfo c : mockContainers) {
+      when(containerManagerMock.getContainer(
+          c.containerID())).thenReturn(c);
+      when(scmClientMock.getContainerWithPipeline(
+          c.getContainerID())).thenReturn(new ContainerWithPipeline(c, null));
+      when(containerManagerMock.getContainer(c.containerID())
+          .getUsedBytes()).thenReturn(Long.valueOf(-10));
+    }
+
+    // Verify the table is initially empty
+    assertThat(unhealthyContainersDao.findAll()).isEmpty();
+
+    // Setup and start the container health task
+    ReconTaskStatusDao reconTaskStatusDao = getDao(ReconTaskStatusDao.class);
+    ReconTaskConfig reconTaskConfig = new ReconTaskConfig();
+    reconTaskConfig.setMissingContainerTaskInterval(Duration.ofSeconds(2));
+    ContainerHealthTask containerHealthTask = new ContainerHealthTask(
+        scmMock.getContainerManager(), scmMock.getScmServiceProvider(),
+        reconTaskStatusDao,
+        containerHealthSchemaManager, placementMock, reconTaskConfig,
+        reconContainerMetadataManager,
+        new OzoneConfiguration());
+    containerHealthTask.start();
+
+    // Wait for the task to identify unhealthy containers
+    LambdaTestUtils.await(6000, 1000,
+        () -> unhealthyContainersDao.count() == 3);
+
+    // Assert that all unhealthy containers have been identified as NEGATIVE_SIZE states
+    List<UnhealthyContainers> negativeSizeContainers =
+        unhealthyContainersDao.fetchByContainerState("NEGATIVE_SIZE");
+    assertThat(negativeSizeContainers).hasSize(3);
+  }
+
+
   private Set<ContainerReplica> getMockReplicas(
       long containerId, State...states) {
     Set<ContainerReplica> replicas = new HashSet<>();

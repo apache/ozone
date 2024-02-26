@@ -35,6 +35,8 @@ import org.apache.hadoop.ozone.om.snapshot.SnapshotUtils;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SnapshotPurgeRequest;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.util.HashMap;
@@ -48,6 +50,8 @@ import java.util.UUID;
  * This is an OM internal request. Does not need @RequireSnapshotFeatureState.
  */
 public class OMSnapshotPurgeRequest extends OMClientRequest {
+
+  private static final Logger LOG = LoggerFactory.getLogger(OMSnapshotPurgeRequest.class);
 
   public OMSnapshotPurgeRequest(OMRequest omRequest) {
     super(omRequest);
@@ -82,6 +86,13 @@ public class OMSnapshotPurgeRequest extends OMClientRequest {
       for (String snapTableKey : snapshotDbKeys) {
         SnapshotInfo fromSnapshot = omMetadataManager.getSnapshotInfoTable()
             .get(snapTableKey);
+
+        if (fromSnapshot == null) {
+          // Snapshot may have been purged in the previous iteration of SnapshotDeletingService.
+          LOG.warn("The snapshot {} is not longer in snapshot table, It maybe removed in the previous " +
+                  "Snapshot purge request.", snapTableKey);
+          continue;
+        }
 
         SnapshotInfo nextSnapshot = SnapshotUtils
             .getNextActiveSnapshot(fromSnapshot,

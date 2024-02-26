@@ -43,8 +43,6 @@ import java.util.Set;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ExecutionException;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
@@ -66,7 +64,6 @@ public final class ECKeyOutputStream extends KeyOutputStream
   private final int numParityBlks;
   private final ByteBufferPool bufferPool;
   private final RawErasureEncoder encoder;
-  private final ExecutorService flushExecutor;
   private final Future<Boolean> flushFuture;
   private final AtomicLong flushCheckpoint;
 
@@ -119,12 +116,13 @@ public final class ECKeyOutputStream extends KeyOutputStream
     this.writeOffset = 0;
     this.encoder = CodecUtil.createRawEncoderWithFallback(
         builder.getReplicationConfig());
-    this.flushExecutor = Executors.newSingleThreadExecutor();
     S3Auth s3Auth = builder.getS3CredentialsProvider().get();
     ThreadLocal<S3Auth> s3CredentialsProvider =
         builder.getS3CredentialsProvider();
-    flushExecutor.submit(() -> s3CredentialsProvider.set(s3Auth));
-    this.flushFuture = this.flushExecutor.submit(this::flushStripeFromQueue);
+    this.flushFuture = builder.getExecutorServiceSupplier().get().submit(() -> {
+      s3CredentialsProvider.set(s3Auth);
+      return flushStripeFromQueue();
+    });
     this.flushCheckpoint = new AtomicLong(0);
     this.atomicKeyCreation = builder.getAtomicKeyCreation();
   }
@@ -495,7 +493,6 @@ public final class ECKeyOutputStream extends KeyOutputStream
     } catch (InterruptedException e) {
       throw new IOException("Flushing thread was interrupted", e);
     } finally {
-      flushExecutor.shutdownNow();
       closeCurrentStreamEntry();
       blockOutputStreamEntryPool.cleanup();
     }
