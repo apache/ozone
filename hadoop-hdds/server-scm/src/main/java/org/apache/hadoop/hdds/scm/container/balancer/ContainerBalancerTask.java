@@ -173,9 +173,7 @@ public class ContainerBalancerTask implements Runnable {
             TimeUnit.SECONDS);
         LOG.info("ContainerBalancer will sleep for {} seconds before starting" +
             " balancing.", delayDuration);
-        if (isBalancerRunning()) {
-          Thread.sleep(Duration.ofSeconds(delayDuration).toMillis());
-        }
+        Thread.sleep(Duration.ofSeconds(delayDuration).toMillis());
       }
       balance();
     } catch (Exception e) {
