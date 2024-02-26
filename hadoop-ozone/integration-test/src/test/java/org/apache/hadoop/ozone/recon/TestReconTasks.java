@@ -62,7 +62,7 @@ import static org.junit.jupiter.api.Assertions.assertNotEquals;
 /**
  * Integration Tests for Recon's tasks.
  */
-//@Timeout(300)
+@Timeout(300)
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 @TestMethodOrder(OrderAnnotation.class)
 public class TestReconTasks {
@@ -173,10 +173,10 @@ public class TestReconTasks {
     // Bring down the Datanode that had the container replica.
     cluster.shutdownHddsDatanode(pipeline.getFirstNode());
 
-    System.out.println("RRR reconPipelineManager.getPipelines().size():"+reconPipelineManager.getPipelines().size());
-    System.out.println("RRR reconContainerManager.getContainers().size():"+reconContainerManager.getContainers().size());
-    System.out.println("RRR reconContainerManager.getContainers().size():"+reconContainerManager.getContainers().size());
-    System.out.println("RRR pipeline.getFirstNode():"+pipeline.getFirstNode());
+//    System.out.println("RRR reconPipelineManager.getPipelines().size():"+reconPipelineManager.getPipelines().size());
+//    System.out.println("RRR reconContainerManager.getContainers().size():"+reconContainerManager.getContainers().size());
+//    System.out.println("RRR reconContainerManager.getContainers().size():"+reconContainerManager.getContainers().size());
+//    System.out.println("RRR pipeline.getFirstNode():"+pipeline.getFirstNode());
 
     LambdaTestUtils.await(120000, 6000, () -> {
       List<UnhealthyContainers> allMissingContainers =
@@ -184,7 +184,6 @@ public class TestReconTasks {
               .getUnhealthyContainers(
                   ContainerSchemaDefinition.UnHealthyContainerStates.MISSING,
                   0, 1);
-      System.out.println("RRR found allMissingContainers: "+allMissingContainers.size());
       return (allMissingContainers.size() >= 1);
     });
 
