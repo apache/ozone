@@ -110,7 +110,7 @@ public class TestOzoneManagerSnapshotAcl {
     final String omServiceId = "om-service-test-1"
         + RandomStringUtils.randomNumeric(32);
 
-    cluster = MiniOzoneCluster.newOMHABuilder(conf)
+    cluster = MiniOzoneCluster.newHABuilder(conf)
         .setOMServiceId(omServiceId)
         .setNumOfOzoneManagers(1)
         .build();

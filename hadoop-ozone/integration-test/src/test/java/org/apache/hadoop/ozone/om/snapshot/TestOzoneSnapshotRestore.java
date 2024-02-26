@@ -105,7 +105,7 @@ public class TestOzoneSnapshotRestore {
 
     String serviceID = OM_SERVICE_ID + RandomStringUtils.randomNumeric(5);
 
-    cluster = MiniOzoneCluster.newOMHABuilder(conf)
+    cluster = MiniOzoneCluster.newHABuilder(conf)
             .setOMServiceId(serviceID)
             .setNumOfOzoneManagers(3)
             .build();

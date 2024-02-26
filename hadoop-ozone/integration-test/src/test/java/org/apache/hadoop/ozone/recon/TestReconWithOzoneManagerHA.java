@@ -73,7 +73,7 @@ public class TestReconWithOzoneManagerHA {
     dbConf.setSyncOption(true);
     conf.setFromObject(dbConf);
 
-    cluster = (MiniOzoneHAClusterImpl) MiniOzoneCluster.newOMHABuilder(conf)
+    cluster = (MiniOzoneHAClusterImpl) MiniOzoneCluster.newHABuilder(conf)
         .setOMServiceId(OM_SERVICE_ID)
         .setNumDatanodes(1)
         .setNumOfOzoneManagers(3)
