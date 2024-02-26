@@ -40,8 +40,12 @@ import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.service.SnapshotDeletingService;
 import org.apache.hadoop.ozone.om.snapshot.ReferenceCounted;
 import org.apache.ozone.test.GenericTestUtils;
-import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.MethodOrderer.OrderAnnotation;
+import org.junit.jupiter.api.Order;
+import org.junit.jupiter.api.TestMethodOrder;
+import org.junit.jupiter.api.TestInstance;
 import org.junit.jupiter.api.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -65,6 +69,8 @@ import static org.junit.jupiter.api.Assertions.fail;
 /**
  * Test Snapshot Deleting Service.
  */
+@TestInstance(TestInstance.Lifecycle.PER_CLASS)
+@TestMethodOrder(OrderAnnotation.class)
 public class TestSnapshotDeletingService {
 
   private static final Logger LOG =
@@ -81,7 +87,7 @@ public class TestSnapshotDeletingService {
   private static final String BUCKET_NAME_ONE = "bucket1";
   private static final String BUCKET_NAME_TWO = "bucket2";
 
-  @BeforeEach
+  @BeforeAll
   public void setup() throws Exception {
     OzoneConfiguration conf = new OzoneConfiguration();
     conf.setStorageSize(OzoneConfigKeys.OZONE_SCM_BLOCK_SIZE,
@@ -110,7 +116,7 @@ public class TestSnapshotDeletingService {
         client, VOLUME_NAME, BUCKET_NAME_ONE, BucketLayout.DEFAULT);
   }
 
-  @AfterEach
+  @AfterAll
   public void teardown() {
     IOUtils.closeQuietly(client);
     if (cluster != null) {
@@ -119,6 +125,7 @@ public class TestSnapshotDeletingService {
   }
 
   @Test
+  @Order(2)
   public void testSnapshotSplitAndMove() throws Exception {
     SnapshotDeletingService snapshotDeletingService =
         om.getKeyManager().getSnapshotDeletingService();
@@ -143,6 +150,7 @@ public class TestSnapshotDeletingService {
   }
 
   @Test
+  @Order(3)
   public void testMultipleSnapshotKeyReclaim() throws Exception {
 
     Table<String, RepeatedOmKeyInfo> deletedTable =
@@ -150,7 +158,7 @@ public class TestSnapshotDeletingService {
     Table<String, SnapshotInfo> snapshotInfoTable =
         om.getMetadataManager().getSnapshotInfoTable();
 
-    createSnapshotDataForBucket1();
+//    createSnapshotDataForBucket1();
 
     BucketArgs bucketArgs = new BucketArgs.Builder()
         .setBucketLayout(BucketLayout.LEGACY)
@@ -192,6 +200,7 @@ public class TestSnapshotDeletingService {
 
   @SuppressWarnings("checkstyle:MethodLength")
   @Test
+  @Order(1)
   public void testSnapshotWithFSO() throws Exception {
     Table<String, OmDirectoryInfo> dirTable =
         om.getMetadataManager().getDirectoryTable();

@@ -96,7 +96,7 @@ public class TestReconTasks {
   }
 
   @Test
-  @Order(2)
+  @Order(3)
   public void testSyncSCMContainerInfo() throws Exception {
     ReconStorageContainerManagerFacade reconScm =
         (ReconStorageContainerManagerFacade)
@@ -131,7 +131,7 @@ public class TestReconTasks {
   }
 
   @Test
-  @Order(3)
+  @Order(2)
   public void testMissingContainerDownNode() throws Exception {
     ReconStorageContainerManagerFacade reconScm =
         (ReconStorageContainerManagerFacade)
