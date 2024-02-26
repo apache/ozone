@@ -87,8 +87,7 @@ public class TestOzoneDebugShell {
     // Init HA cluster
     omServiceId = "om-service-test1";
     final int numDNs = 3;
-    cluster = MiniOzoneCluster.newHABuilder(conf)
-        .setOMServiceId(omServiceId)
+    cluster = MiniOzoneCluster.newBuilder(conf)
         .setNumDatanodes(numDNs)
         .build();
     cluster.waitForClusterToBeReady();
