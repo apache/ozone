@@ -174,8 +174,10 @@ public class TestReconTasks {
     cluster.shutdownHddsDatanode(pipeline.getFirstNode());
 
 //    System.out.println("RRR reconPipelineManager.getPipelines().size():"+reconPipelineManager.getPipelines().size());
-//    System.out.println("RRR reconContainerManager.getContainers().size():"+reconContainerManager.getContainers().size());
-//    System.out.println("RRR reconContainerManager.getContainers().size():"+reconContainerManager.getContainers().size());
+//    System.out.println("RRR reconContainerManager.getContainers().size():"
+//    +reconContainerManager.getContainers().size());
+//    System.out.println("RRR reconContainerManager.getContainers().size():"
+//    +reconContainerManager.getContainers().size());
 //    System.out.println("RRR pipeline.getFirstNode():"+pipeline.getFirstNode());
 
     LambdaTestUtils.await(120000, 6000, () -> {
