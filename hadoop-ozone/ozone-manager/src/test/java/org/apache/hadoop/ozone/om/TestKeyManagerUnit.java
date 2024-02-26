@@ -68,6 +68,7 @@ import org.apache.hadoop.ozone.om.helpers.OmMultipartUpload;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartUploadList;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartUploadListParts;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
+import org.apache.hadoop.ozone.om.helpers.OpenKeySession;
 import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
 import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
@@ -165,6 +166,60 @@ class TestKeyManagerUnit extends OzoneTestBase {
 
     assertEquals(0,
         omMultipartUploadListParts.getPartInfoList().size());
+  }
+
+  @Test
+  public void listMultipartUploadPartsWithoutEtagField() throws IOException {
+    // For backward compatibility reasons
+    final String volume = volumeName();
+    final String bucket = "bucketForEtag";
+    final String key = "dir/key1";
+    createBucket(metadataManager, volume, bucket);
+    OmMultipartInfo omMultipartInfo =
+        initMultipartUpload(writeClient, volume, bucket, key);
+
+
+    // Commit some MPU parts without eTag field
+    for (int i = 1; i <= 5; i++) {
+      OmKeyArgs partKeyArgs =
+          new OmKeyArgs.Builder()
+              .setVolumeName(volume)
+              .setBucketName(bucket)
+              .setKeyName(key)
+              .setIsMultipartKey(true)
+              .setMultipartUploadID(omMultipartInfo.getUploadID())
+              .setMultipartUploadPartNumber(i)
+              .setAcls(Collections.emptyList())
+              .setReplicationConfig(
+                  RatisReplicationConfig.getInstance(ReplicationFactor.THREE))
+              .build();
+
+      OpenKeySession openKey = writeClient.openKey(partKeyArgs);
+
+      OmKeyArgs commitPartKeyArgs =
+          new OmKeyArgs.Builder()
+              .setVolumeName(volume)
+              .setBucketName(bucket)
+              .setKeyName(key)
+              .setIsMultipartKey(true)
+              .setMultipartUploadID(omMultipartInfo.getUploadID())
+              .setMultipartUploadPartNumber(i)
+              .setAcls(Collections.emptyList())
+              .setReplicationConfig(
+                  RatisReplicationConfig.getInstance(ReplicationFactor.THREE))
+              .setLocationInfoList(Collections.emptyList())
+              .build();
+
+      writeClient.commitMultipartUploadPart(commitPartKeyArgs, openKey.getId());
+    }
+
+
+    OmMultipartUploadListParts omMultipartUploadListParts = keyManager
+        .listParts(volume, bucket, key, omMultipartInfo.getUploadID(),
+            0, 10);
+    assertEquals(5,
+        omMultipartUploadListParts.getPartInfoList().size());
+
   }
 
   private String volumeName() {

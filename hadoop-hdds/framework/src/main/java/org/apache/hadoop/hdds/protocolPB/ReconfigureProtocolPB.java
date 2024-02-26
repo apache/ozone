@@ -23,7 +23,7 @@ import org.apache.hadoop.ipc.ProtocolInfo;
 import org.apache.hadoop.security.KerberosInfo;
 
 /**
- * Protocol that clients use to communicate with the OM/SCM to do
+ * Protocol that clients use to communicate with the SCM to do
  * reconfiguration on the fly.
  */
 @ProtocolInfo(

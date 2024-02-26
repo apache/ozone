@@ -32,6 +32,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.Set;
 import java.util.Stack;
 import java.util.TreeMap;
@@ -48,6 +49,7 @@ import org.apache.hadoop.hdds.DFSConfigKeysLegacy;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
 import org.apache.hadoop.hdds.scm.net.InnerNode;
 import org.apache.hadoop.hdds.scm.net.Node;
@@ -842,13 +844,19 @@ public class KeyManagerImpl implements KeyManager {
           if (nextPartNumberMarker > partNumberMarker) {
             String partName = getPartName(partKeyInfo, volumeName, bucketName,
                 keyName);
+            // Before HDDS-9680, MPU part does not have eTag metadata, for
+            // this case, we return null. The S3G will handle this case by
+            // using the MPU part name as the eTag field instead.
+            Optional<HddsProtos.KeyValue> eTag = partKeyInfo.getPartKeyInfo()
+                .getMetadataList()
+                .stream()
+                .filter(keyValue -> keyValue.getKey().equals(ETAG))
+                .findFirst();
             OmPartInfo omPartInfo = new OmPartInfo(partKeyInfo.getPartNumber(),
                 partName,
                 partKeyInfo.getPartKeyInfo().getModificationTime(),
                 partKeyInfo.getPartKeyInfo().getDataSize(),
-                partKeyInfo.getPartKeyInfo().getMetadataList().stream()
-                    .filter(keyValue -> keyValue.getKey().equals(ETAG))
-                    .findFirst().get().getValue());
+                eTag.map(HddsProtos.KeyValue::getValue).orElse(null));
             omPartInfoList.add(omPartInfo);
 
             //if there are parts, use replication type from one of the parts

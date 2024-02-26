@@ -31,7 +31,7 @@ start_docker_env
 
 execute_robot_test s3g kinit.robot
 
-execute_robot_test s3g admincli
+execute_robot_test s3g admincli/scmrole.robot
 
 execute_robot_test s3g omha/om-fetch-key.robot
 
