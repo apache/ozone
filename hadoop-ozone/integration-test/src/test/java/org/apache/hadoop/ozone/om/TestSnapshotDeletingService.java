@@ -70,7 +70,7 @@ import static org.junit.jupiter.api.Assertions.fail;
  * Test Snapshot Deleting Service.
  */
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
-//@TestMethodOrder(OrderAnnotation.class)
+@TestMethodOrder(OrderAnnotation.class)
 public class TestSnapshotDeletingService {
 
   private static final Logger LOG =
