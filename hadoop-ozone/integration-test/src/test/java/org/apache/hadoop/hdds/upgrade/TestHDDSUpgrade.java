@@ -168,9 +168,9 @@ public class TestHDDSUpgrade {
 
     MiniOzoneCluster.Builder builder =
         new MiniOzoneHAClusterImpl.Builder(conf)
-        .setNumDatanodes(NUM_DATA_NODES)
         .setNumOfStorageContainerManagers(NUM_SCMS)
         .setSCMConfigurator(scmConfigurator)
+        .setNumDatanodes(NUM_DATA_NODES)
         .setDatanodeFactory(UniformDatanodesFactory.newBuilder()
             .setLayoutVersion(HDDSLayoutFeature.INITIAL_VERSION.layoutVersion())
             .build());

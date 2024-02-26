@@ -210,7 +210,7 @@ public abstract class TestOmSnapshot {
     conf.setBoolean(OMConfigKeys.OZONE_FILESYSTEM_SNAPSHOT_ENABLED_KEY, true);
     conf.setInt(OZONE_OM_INIT_DEFAULT_LAYOUT_VERSION, OMLayoutFeature.BUCKET_LAYOUT_SUPPORT.layoutVersion());
 
-    cluster = MiniOzoneCluster.newBuilder(conf)
+    cluster = MiniOzoneCluster.newHABuilder(conf)
         .setNumOfOzoneManagers(3)
         .build();
 

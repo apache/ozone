@@ -380,7 +380,6 @@ public final class TestBlockTokens {
     OzoneManager.setTestSecureOmFlag(true);
     MiniOzoneCluster.Builder builder = MiniOzoneCluster.newHABuilder(conf)
         .setSCMServiceId("TestSecretKey")
-        .setNumDatanodes(3)
         .setNumOfStorageContainerManagers(3)
         .setNumOfOzoneManagers(1);
 

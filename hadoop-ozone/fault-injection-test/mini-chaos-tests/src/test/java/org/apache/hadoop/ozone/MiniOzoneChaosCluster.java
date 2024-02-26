@@ -287,7 +287,7 @@ public class MiniOzoneChaosCluster extends MiniOzoneHAClusterImpl {
       DatanodeStoreCache.setMiniClusterMode();
 
       initializeConfiguration();
-      if (numOfOMs > 1) {
+      if (numberOfOzoneManagers() > 1) {
         initOMRatisConf();
       }
 

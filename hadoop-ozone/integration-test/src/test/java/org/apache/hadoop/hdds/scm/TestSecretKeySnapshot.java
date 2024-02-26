@@ -121,10 +121,10 @@ public final class TestSecretKeySnapshot {
     MiniOzoneCluster.Builder builder = MiniOzoneCluster.newHABuilder(conf)
         .setSCMServiceId("TestSecretKeySnapshot")
         .setSCMServiceId("SCMServiceId")
-        .setNumDatanodes(1)
         .setNumOfStorageContainerManagers(3)
         .setNumOfActiveSCMs(2)
-        .setNumOfOzoneManagers(1);
+        .setNumOfOzoneManagers(1)
+        .setNumDatanodes(1);
 
     cluster = (MiniOzoneHAClusterImpl) builder.build();
     cluster.waitForClusterToBeReady();
