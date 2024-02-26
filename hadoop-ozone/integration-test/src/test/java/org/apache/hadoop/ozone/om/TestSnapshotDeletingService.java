@@ -150,7 +150,7 @@ public class TestSnapshotDeletingService {
   }
 
   @Test
-  @Order(2)
+  @Order(1)
   public void testMultipleSnapshotKeyReclaim() throws Exception {
 
     Table<String, RepeatedOmKeyInfo> deletedTable =
@@ -200,7 +200,7 @@ public class TestSnapshotDeletingService {
 
   @SuppressWarnings("checkstyle:MethodLength")
   @Test
-  @Order(1)
+  @Order(2)
   public void testSnapshotWithFSO() throws Exception {
     Table<String, OmDirectoryInfo> dirTable =
         om.getMetadataManager().getDirectoryTable();
