@@ -81,7 +81,7 @@ public class TestReconTasks {
 
     conf.set("ozone.scm.stale.node.interval", "6s");
     conf.set("ozone.scm.dead.node.interval", "10s");
-    cluster =  MiniOzoneCluster.newBuilder(conf).setNumDatanodes(1)
+    cluster =  MiniOzoneCluster.newBuilder(conf).setNumDatanodes(3)
         .includeRecon(true).build();
     cluster.waitForClusterToBeReady();
     GenericTestUtils.setLogLevel(SCMDatanodeHeartbeatDispatcher.LOG,

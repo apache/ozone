@@ -197,6 +197,11 @@ public class TestSnapshotDeletingService {
     // verify the cache of purged snapshot
     // /vol1/bucket2/bucket2snap1 has been cleaned up from cache map
     assertEquals(2, om.getOmSnapshotManager().getSnapshotCacheSize());
+    //clean data
+    //    // cleaning up the data
+    client.getProxy().deleteSnapshot(VOLUME_NAME, BUCKET_NAME_ONE, "bucket1snap1");
+    client.getProxy().deleteSnapshot(VOLUME_NAME, BUCKET_NAME_ONE, "bucket1snap3");
+    client.getProxy().deleteBucket(VOLUME_NAME, BUCKET_NAME_TWO);
   }
 
   @SuppressWarnings("checkstyle:MethodLength")
@@ -523,10 +528,6 @@ public class TestSnapshotDeletingService {
         "bucket1snap2");
     assertTableRowCount(snapshotInfoTable, 2);
     verifySnapshotChain(snapshotInfo, "/vol1/bucket1/bucket1snap3");
-    // cleaning up the data
-    client.getProxy().deleteSnapshot(VOLUME_NAME, BUCKET_NAME_ONE, "bucket1snap1");
-    client.getProxy().deleteSnapshot(VOLUME_NAME, BUCKET_NAME_ONE, "bucket1snap3");
-    client.getProxy().deleteVolume(BUCKET_NAME_ONE);
   }
 
   private void verifySnapshotChain(SnapshotInfo deletedSnapshot,
