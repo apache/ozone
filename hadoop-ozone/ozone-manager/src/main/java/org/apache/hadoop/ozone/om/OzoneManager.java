@@ -2159,8 +2159,8 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       return 0;
     }
     // If there exists a last transaction index in DB, including two cases:
-    // 1. the term is -1 corresponds to an existing non-Ratis cluster
-    // 2. or the term is not -1 indicates that the DB may be migrated from Ratis cluster
+    // 1. transactionInfo.getTerm() == -1 corresponds to a non-Ratis cluster
+    // 2. transactionInfo.getTerm() != -1 indicates that the DB may be migrated from Ratis cluster
     // For both cases above, the new incoming requests in non-Ratis cluster must have
     // transaction index incrementally increasing from the stored transaction index onwards.
     return transactionInfo.getTransactionIndex();
