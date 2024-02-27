@@ -129,8 +129,6 @@ public class TestNSSummaryEndpointWithOBS {
   private static final String KEY_THREE = "file3";
   private static final String KEY_FOUR = "file4";
   private static final String KEY_FIVE = "file5";
-  private static final String KEY_SIX = "file6";
-  private static final String KEY_SEVEN = "file7";
   private static final String KEY_EIGHT = "file8";
   private static final String KEY_NINE = "file9";
   private static final String KEY_TEN = "file10";
@@ -143,8 +141,6 @@ public class TestNSSummaryEndpointWithOBS {
   private static final String FILE_THREE = "file3";
   private static final String FILE_FOUR = "file4";
   private static final String FILE_FIVE = "file5";
-  private static final String FILE_SIX = "file6";
-  private static final String FILE_SEVEN = "file7";
   private static final String FILE_EIGHT = "file8";
   private static final String FILE_NINE = "file9";
   private static final String FILE_TEN = "file10";
