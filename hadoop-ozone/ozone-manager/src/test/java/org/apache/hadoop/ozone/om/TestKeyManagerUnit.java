@@ -650,9 +650,6 @@ class TestKeyManagerUnit extends OzoneTestBase {
     OMRequestTestUtils.addBucketToDB(volume, bucket, metadataManager);
 
     final Pipeline pipeline = MockPipeline.createPipeline(3);
-    final List<String> nodes = pipeline.getNodes().stream()
-        .map(DatanodeDetails::getUuidString)
-        .collect(toList());
 
     Set<Long> containerIDs = new HashSet<>();
     List<ContainerWithPipeline> containersWithPipeline = new ArrayList<>();
@@ -702,7 +699,6 @@ class TestKeyManagerUnit extends OzoneTestBase {
 
     assertEquals(10, fileStatusList.size());
     verify(containerClient).getContainerWithPipelineBatch(containerIDs);
-    verify(blockClient).sortDatanodes(nodes, client);
 
     // call list status the second time, and verify no more calls to
     // SCM.
@@ -710,67 +706,4 @@ class TestKeyManagerUnit extends OzoneTestBase {
         null, Long.MAX_VALUE, client);
     verify(containerClient, times(1)).getContainerWithPipelineBatch(anySet());
   }
-
-  @ParameterizedTest
-  @ValueSource(strings = {"anyhost", ""})
-  public void sortDatanodes(String client) throws Exception {
-    // GIVEN
-    int pipelineCount = 3;
-    int keysPerPipeline = 5;
-    OmKeyInfo[] keyInfos = new OmKeyInfo[pipelineCount * keysPerPipeline];
-    List<List<String>> expectedSortDatanodesInvocations = new ArrayList<>();
-    Map<Pipeline, List<DatanodeDetails>> expectedSortedNodes = new HashMap<>();
-    int ki = 0;
-    for (int p = 0; p < pipelineCount; p++) {
-      final Pipeline pipeline = MockPipeline.createPipeline(3);
-      final List<String> nodes = pipeline.getNodes().stream()
-          .map(DatanodeDetails::getUuidString)
-          .collect(toList());
-      expectedSortDatanodesInvocations.add(nodes);
-      final List<DatanodeDetails> sortedNodes = pipeline.getNodes().stream()
-          .sorted(comparing(DatanodeDetails::getUuidString))
-          .collect(toList());
-      expectedSortedNodes.put(pipeline, sortedNodes);
-
-      when(blockClient.sortDatanodes(nodes, client))
-          .thenReturn(sortedNodes);
-
-      for (int i = 1; i <= keysPerPipeline; i++) {
-        OmKeyLocationInfo keyLocationInfo = new OmKeyLocationInfo.Builder()
-            .setBlockID(new BlockID(i, 1L))
-            .setPipeline(pipeline)
-            .setOffset(0)
-            .setLength(256000)
-            .build();
-
-        OmKeyInfo keyInfo = new OmKeyInfo.Builder()
-            .setOmKeyLocationInfos(Arrays.asList(
-                new OmKeyLocationInfoGroup(0, emptyList()),
-                new OmKeyLocationInfoGroup(1, singletonList(keyLocationInfo))))
-            .build();
-        keyInfos[ki++] = keyInfo;
-      }
-    }
-
-    // WHEN
-    keyManager.sortDatanodes(client, keyInfos);
-
-    // THEN
-    // verify all key info locations got updated
-    for (OmKeyInfo keyInfo : keyInfos) {
-      OmKeyLocationInfoGroup locations = keyInfo.getLatestVersionLocations();
-      assertNotNull(locations);
-      for (OmKeyLocationInfo locationInfo : locations.getLocationList()) {
-        Pipeline pipeline = locationInfo.getPipeline();
-        List<DatanodeDetails> expectedOrder = expectedSortedNodes.get(pipeline);
-        assertEquals(expectedOrder, pipeline.getNodesInOrder());
-      }
-    }
-
-    // expect one invocation per pipeline
-    for (List<String> nodes : expectedSortDatanodesInvocations) {
-      verify(blockClient).sortDatanodes(nodes, client);
-    }
-  }
-
 }
