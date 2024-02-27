@@ -18,7 +18,6 @@
 
 package org.apache.hadoop.ozone.recon.scm;
 
-import java.io.File;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.time.Clock;
@@ -80,7 +79,6 @@ import org.apache.hadoop.hdds.server.events.EventQueue;
 import org.apache.hadoop.hdds.server.events.FixedThreadPoolWithAffinityExecutor;
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager;
 import org.apache.hadoop.hdds.utils.IOUtils;
-import org.apache.hadoop.hdds.utils.db.DBColumnFamilyDefinition;
 import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.utils.db.DBStoreBuilder;
 import org.apache.hadoop.hdds.utils.db.RDBBatchOperation;
@@ -108,7 +106,6 @@ import static org.apache.hadoop.hdds.scm.server.StorageContainerManager.buildRpc
 import static org.apache.hadoop.ozone.OzoneConfigKeys.HDDS_SCM_CLIENT_FAILOVER_MAX_RETRY;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.HDDS_SCM_CLIENT_MAX_RETRY_TIMEOUT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.HDDS_SCM_CLIENT_RPC_TIME_OUT;
-import static org.apache.hadoop.ozone.recon.ReconConstants.RECON_SCM_SNAPSHOT_DB;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_SCM_CLIENT_FAILOVER_MAX_RETRY_DEFAULT;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_SCM_CLIENT_FAILOVER_MAX_RETRY_KEY;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_SCM_CLIENT_MAX_RETRY_TIMEOUT_DEFAULT;
@@ -119,7 +116,6 @@ import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_SC
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_SCM_CONTAINER_INFO_SYNC_TASK_INITIAL_DELAY_DEFAULT;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_SCM_CONTAINER_INFO_SYNC_TASK_INTERVAL_DEFAULT;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_SCM_CONTAINER_INFO_SYNC_TASK_INTERVAL_DELAY;
-import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_SCM_DB_DIR;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_SCM_SNAPSHOT_TASK_INITIAL_DELAY;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_SCM_SNAPSHOT_TASK_INITIAL_DELAY_DEFAULT;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_SCM_SNAPSHOT_TASK_INTERVAL_DEFAULT;
@@ -246,7 +242,6 @@ public class ReconStorageContainerManagerFacade
     this.clusterMap = new NetworkTopologyImpl(conf);
 
     this.dbStore = DBStoreBuilder.createDBStore(ozoneConfiguration, new ReconSCMDBDefinition());
-    //checkAndInitializeSCMDBSnapshot(reconUtils);
 
     this.scmLayoutVersionManager =
         new HDDSLayoutVersionManager(scmStorageConfig.getLayoutVersion());
@@ -398,21 +393,6 @@ public class ReconStorageContainerManagerFacade
     this.threadFactory =
         new ThreadFactoryBuilder().setNameFormat(threadNamePrefix + "ReconSyncSCM-%d")
             .build();
-  }
-
-  private DBStore checkAndInitializeSCMDBSnapshot(ReconUtils reconUtils) throws IOException {
-    File reconDbDir =
-        reconUtils.getReconDbDir(ozoneConfiguration, OZONE_RECON_SCM_DB_DIR);
-    File lastKnownSCMSnapshot =
-        reconUtils.getLastKnownDB(reconDbDir, RECON_SCM_SNAPSHOT_DB);
-    if (lastKnownSCMSnapshot != null) {
-      LOG.info("Last known snapshot for SCM : {}", lastKnownSCMSnapshot.getAbsolutePath());
-      return createDBAndAddSCMTablesAndCodecs(
-          lastKnownSCMSnapshot, new ReconSCMDBDefinition());
-    } else {
-      return DBStoreBuilder
-          .createDBStore(ozoneConfiguration, new ReconSCMDBDefinition());
-    }
   }
 
   /**
@@ -713,6 +693,14 @@ public class ReconStorageContainerManagerFacade
       LOG.debug("SCM DB sync is already running.");
       return false;
     }
+    try {
+      long scmContainersCount = scmServiceProvider.getContainerCount();
+      long reconContainerCount = containerManager.getContainers().size();
+      LOG.info("Recon Container Count: {}, SCM Container Count: {}",
+          reconContainerCount, scmContainersCount);
+    } catch (IOException ioe) {
+      LOG.error("Failed to get container count from SCM - {}", ioe);
+    }
     return true;
   }
 
@@ -929,20 +917,4 @@ public class ReconStorageContainerManagerFacade
     return this.dbStore;
   }
 
-  private DBStore createDBAndAddSCMTablesAndCodecs(File dbFile,
-                                                   ReconSCMDBDefinition definition) throws IOException {
-    DBStoreBuilder dbStoreBuilder =
-        DBStoreBuilder.newBuilder(ozoneConfiguration)
-            .setName(dbFile.getName())
-            .setPath(dbFile.toPath().getParent());
-    for (DBColumnFamilyDefinition columnFamily :
-        definition.getColumnFamilies()) {
-      dbStoreBuilder.addTable(columnFamily.getName());
-      dbStoreBuilder.addCodec(columnFamily.getKeyType(),
-          columnFamily.getKeyCodec());
-      dbStoreBuilder.addCodec(columnFamily.getValueType(),
-          columnFamily.getValueCodec());
-    }
-    return dbStoreBuilder.build();
-  }
 }

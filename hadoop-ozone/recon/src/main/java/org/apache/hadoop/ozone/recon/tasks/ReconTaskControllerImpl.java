@@ -58,7 +58,8 @@ public class ReconTaskControllerImpl implements ReconTaskController {
 
   private Map<String, ReconOmTask> reconOmTasks;
   private Map<String, ReconSCMMetadataProcessingTask> reconSCMMetadataProcessingTasks;
-  private ExecutorService executorService;
+  private ExecutorService omReconTasksExecutorService;
+  private ExecutorService scmReconTasksExecutorService;
   private final int threadCount;
   private Map<String, AtomicInteger> taskFailureCounter = new HashMap<>();
   private static final int TASK_FAILURE_THRESHOLD = 2;
@@ -143,7 +144,7 @@ public class ReconTaskControllerImpl implements ReconTaskController {
         }
 
         List<Future<Pair<String, Boolean>>> results =
-            executorService.invokeAll(tasks);
+            omReconTasksExecutorService.invokeAll(tasks);
         List<String> failedTasks = processTaskResults(results, events);
 
         // Retry
@@ -155,7 +156,7 @@ public class ReconTaskControllerImpl implements ReconTaskController {
             // events passed to process method is no longer filtered
             tasks.add(() -> task.process(events));
           }
-          results = executorService.invokeAll(tasks);
+          results = omReconTasksExecutorService.invokeAll(tasks);
           retryFailedTasks = processTaskResults(results, events);
         }
 
@@ -166,7 +167,7 @@ public class ReconTaskControllerImpl implements ReconTaskController {
             ReconOmTask task = reconOmTasks.get(taskName);
             tasks.add(() -> task.reprocess(omMetadataManager));
           }
-          results = executorService.invokeAll(tasks);
+          results = omReconTasksExecutorService.invokeAll(tasks);
           List<String> reprocessFailedTasks =
               processTaskResults(results, events);
           ignoreFailedTasks(reprocessFailedTasks);
@@ -203,16 +204,16 @@ public class ReconTaskControllerImpl implements ReconTaskController {
         ReconOmTask task = taskEntry.getValue();
         tasks.add(() -> task.reprocess(omMetadataManager));
       }
-      invokeTasks(omMetadataManager.getLastSequenceNumberFromDB(), tasks);
+      invokeTasks(omMetadataManager.getLastSequenceNumberFromDB(), tasks, omReconTasksExecutorService);
     } catch (ExecutionException e) {
       LOG.error("Unexpected error while reinitializing OM tasks:: ", e);
     }
   }
 
-  private void invokeTasks(long lastSequenceNumberFromDB, Collection<Callable<Pair<String, Boolean>>> tasks)
+  private void invokeTasks(long lastSequenceNumberFromDB, Collection<Callable<Pair<String, Boolean>>> tasks,
+                           ExecutorService omTasksExecutorService)
       throws InterruptedException, ExecutionException {
-    List<Future<Pair<String, Boolean>>> results =
-        executorService.invokeAll(tasks);
+    List<Future<Pair<String, Boolean>>> results = omTasksExecutorService.invokeAll(tasks);
     for (Future<Pair<String, Boolean>> f : results) {
       String taskName = f.get().getLeft();
       if (!f.get().getRight()) {
@@ -240,7 +241,7 @@ public class ReconTaskControllerImpl implements ReconTaskController {
         ReconSCMMetadataProcessingTask task = taskEntry.getValue();
         tasks.add(() -> task.reprocess(reconScmMetadataManager));
       }
-      invokeTasks(reconScmMetadataManager.getLastSequenceNumberFromDB(), tasks);
+      invokeTasks(reconScmMetadataManager.getLastSequenceNumberFromDB(), tasks, scmReconTasksExecutorService);
     } catch (ExecutionException e) {
       LOG.error("Unexpected error while reinitializing SCM tasks: ", e);
     }
@@ -272,16 +273,22 @@ public class ReconTaskControllerImpl implements ReconTaskController {
   @Override
   public synchronized void start() {
     LOG.info("Starting Recon Task Controller.");
-    executorService = Executors.newFixedThreadPool(threadCount,
-        new ThreadFactoryBuilder().setNameFormat("ReconTaskThread-%d")
+    omReconTasksExecutorService = Executors.newFixedThreadPool(threadCount,
+        new ThreadFactoryBuilder().setNameFormat("ReconOmTaskThread-%d")
+            .build());
+    scmReconTasksExecutorService = Executors.newFixedThreadPool(threadCount,
+        new ThreadFactoryBuilder().setNameFormat("ReconSCMMetadataProcessingTask-%d")
             .build());
   }
 
   @Override
   public synchronized void stop() {
     LOG.info("Stopping Recon Task Controller.");
-    if (this.executorService != null) {
-      this.executorService.shutdownNow();
+    if (this.omReconTasksExecutorService != null) {
+      this.omReconTasksExecutorService.shutdownNow();
+    }
+    if (this.scmReconTasksExecutorService != null) {
+      this.scmReconTasksExecutorService.shutdownNow();
     }
   }
 
@@ -331,8 +338,7 @@ public class ReconTaskControllerImpl implements ReconTaskController {
           tasks.add(() -> task.process(events));
         }
 
-        List<Future<Pair<String, Boolean>>> results =
-            executorService.invokeAll(tasks);
+        List<Future<Pair<String, Boolean>>> results = scmReconTasksExecutorService.invokeAll(tasks);
         List<String> failedTasks = processTaskResults(results, events);
 
         // Retry
@@ -344,7 +350,7 @@ public class ReconTaskControllerImpl implements ReconTaskController {
             // events passed to process method is no longer filtered
             tasks.add(() -> task.process(events));
           }
-          results = executorService.invokeAll(tasks);
+          results = scmReconTasksExecutorService.invokeAll(tasks);
           retryFailedTasks = processTaskResults(results, events);
         }
 
@@ -355,7 +361,7 @@ public class ReconTaskControllerImpl implements ReconTaskController {
             ReconSCMMetadataProcessingTask task = reconSCMMetadataProcessingTasks.get(taskName);
             tasks.add(() -> task.reprocess(scmMetadataManager));
           }
-          results = executorService.invokeAll(tasks);
+          results = scmReconTasksExecutorService.invokeAll(tasks);
           List<String> reprocessFailedTasks =
               processTaskResults(results, events);
           ignoreFailedTasks(reprocessFailedTasks);

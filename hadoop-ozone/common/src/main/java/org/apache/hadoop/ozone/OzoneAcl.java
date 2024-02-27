@@ -97,9 +97,23 @@ public class OzoneAcl {
    *
    * @param type   - Type
    * @param name   - Name of user
-   * @param acls   - Rights
    * @param scope  - AclScope
+   * @param acls   - Rights
    */
+  public OzoneAcl(ACLIdentityType type, String name, AclScope scope, ACLType... acls) {
+    this(type, name, bitSetOf(acls), scope);
+  }
+
+  private static BitSet bitSetOf(ACLType... acls) {
+    BitSet bits = new BitSet();
+    if (acls != null && acls.length > 0) {
+      for (ACLType acl : acls) {
+        bits.set(acl.ordinal());
+      }
+    }
+    return bits;
+  }
+
   public OzoneAcl(ACLIdentityType type, String name, BitSet acls,
       AclScope scope) {
     Objects.requireNonNull(type);

@@ -21,6 +21,8 @@ package org.apache.hadoop.ozone.recon.scm;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.ozone.recon.tasks.RocksDBUpdateEventBatch;
 
+import java.io.IOException;
+
 /**
  * Interface used to denote a Recon task that needs to act on SCM metadata DB events.
  */
@@ -44,6 +46,6 @@ public interface ReconSCMMetadataProcessingTask {
    * @param reconScmMetadataManager Recon SCM Metadata manager instance.
    * @return Pair of task name -> task success.
    */
-  Pair<String, Boolean> reprocess(ReconScmMetadataManager reconScmMetadataManager);
+  Pair<String, Boolean> reprocess(ReconScmMetadataManager reconScmMetadataManager) throws IOException;
 
 }

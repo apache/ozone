@@ -33,8 +33,6 @@ public final class ReconConstants {
 
   public static final String RECON_OM_SNAPSHOT_DB = "om.snapshot.db";
 
-  public static final String RECON_SCM_SNAPSHOT_DB = "scm.snapshot.db";
-
   // By default, limit the number of results returned
   public static final String DEFAULT_OPEN_KEY_INCLUDE_NON_FSO = "false";
   public static final String DEFAULT_OPEN_KEY_INCLUDE_FSO = "false";

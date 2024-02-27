@@ -477,6 +477,8 @@ public interface StorageContainerLocationProtocol extends Closeable {
   DecommissionScmResponseProto decommissionScm(
       String scmId) throws IOException;
 
+  String getMetrics(String query) throws IOException;
+
   /**
    * Get DB updates since a specific sequence number.
    * @param dbUpdatesRequest request that encapsulates a sequence number.

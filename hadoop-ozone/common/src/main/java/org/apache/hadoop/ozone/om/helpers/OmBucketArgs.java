@@ -80,7 +80,7 @@ public final class OmBucketArgs extends WithMetadata implements Auditable {
     this.bucketName = bucketName;
     this.isVersionEnabled = isVersionEnabled;
     this.storageType = storageType;
-    this.metadata = metadata;
+    setMetadata(metadata);
     this.ownerName = ownerName;
   }
 
@@ -206,7 +206,7 @@ public final class OmBucketArgs extends WithMetadata implements Auditable {
     auditMap.put(OzoneConsts.VOLUME, this.volumeName);
     auditMap.put(OzoneConsts.BUCKET, this.bucketName);
     auditMap.put(OzoneConsts.GDPR_FLAG,
-        this.metadata.get(OzoneConsts.GDPR_FLAG));
+        getMetadata().get(OzoneConsts.GDPR_FLAG));
     auditMap.put(OzoneConsts.IS_VERSION_ENABLED,
                 String.valueOf(this.isVersionEnabled));
     if (this.storageType != null) {

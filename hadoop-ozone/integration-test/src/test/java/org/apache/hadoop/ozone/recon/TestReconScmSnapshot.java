@@ -86,8 +86,6 @@ public class TestReconScmSnapshot {
 
     //Stopping Recon to add Containers in SCM
     cluster.stopRecon();
-    System.gc();
-    Thread.sleep(3000);
     ContainerManager containerManager;
     containerManager = cluster.getStorageContainerManager()
         .getContainerManager();
@@ -98,16 +96,18 @@ public class TestReconScmSnapshot {
     }
 
     cluster.startRecon();
-    Thread.sleep(1200);
     //ContainerCount after Recon DB is updated with SCM DB
     containerManager = cluster.getStorageContainerManager()
         .getContainerManager();
 
     ContainerManager reconContainerManager = cluster.getReconServer()
         .getReconStorageContainerManager().getContainerManager();
-    /*assertTrue(logCapturer.getOutput()
+
+    // wait for SCM DB sync scheduler thread to run
+    ContainerManager finalContainerManager = containerManager;
+    GenericTestUtils.waitFor(() -> logCapturer.getOutput()
         .contains("Recon Container Count: " + reconContainerManager.getContainers().size() +
-        ", SCM Container Count: " + containerManager.getContainers().size()));*/
+            ", SCM Container Count: " + finalContainerManager.getContainers().size()), 1000, 60000);
     assertEquals(containerManager.getContainers().size(), reconContainerManager.getContainers().size());
 
     //PipelineCount after Recon DB is updated with SCM DB
@@ -127,6 +127,9 @@ public class TestReconScmSnapshot {
 
   @Test
   public void testFullSCMDbSync() throws Exception {
+    GenericTestUtils.LogCapturer logCapturer = GenericTestUtils.LogCapturer
+        .captureLogs(LoggerFactory.getLogger(
+            ReconStorageContainerManagerFacade.class));
     List<ContainerInfo> reconContainers = ozoneCluster.getReconServer()
         .getReconStorageContainerManager().getContainerManager()
         .getContainers();
@@ -139,8 +142,6 @@ public class TestReconScmSnapshot {
 
     //Stopping Recon to add Containers in SCM
     ozoneCluster.stopRecon();
-    System.gc();
-    Thread.sleep(3000);
     ContainerManager containerManager;
     containerManager = ozoneCluster.getStorageContainerManager()
         .getContainerManager();
@@ -151,7 +152,6 @@ public class TestReconScmSnapshot {
     }
 
     ozoneCluster.startRecon();
-    Thread.sleep(1200);
     //ContainerCount after Recon DB is updated with SCM DB
     containerManager = ozoneCluster.getStorageContainerManager()
         .getContainerManager();
@@ -161,6 +161,9 @@ public class TestReconScmSnapshot {
     ContainerManager reconContainerManager = ozoneCluster.getReconServer()
         .getReconStorageContainerManager().getContainerManager();
 
+    // wait for SCM DB sync scheduler thread to run
+    GenericTestUtils.waitFor(() -> logCapturer.getOutput()
+        .contains("Obtaining full snapshot from SCM"), 1000, 60000);
     assertEquals(containerManager.getContainers().size(), reconContainerManager.getContainers().size());
     assertEquals(containerManager.getContainers().size(),
         reconContainerMetadataManager.getCountForContainers(HddsProtos.LifeCycleState.OPEN));

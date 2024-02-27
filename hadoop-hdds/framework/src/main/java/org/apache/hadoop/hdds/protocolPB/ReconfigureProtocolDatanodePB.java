@@ -1,4 +1,4 @@
-/*
+/**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -15,23 +15,19 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+package org.apache.hadoop.hdds.protocolPB;
 
-#include "Pipe.h"
-#include <unistd.h>
+import org.apache.hadoop.hdds.DFSConfigKeysLegacy;
+import org.apache.hadoop.ipc.ProtocolInfo;
+import org.apache.hadoop.security.KerberosInfo;
 
-const int Pipe::READ_FILE_DESCRIPTOR_IDX = 0;
-const int Pipe::WRITE_FILE_DESCRIPTOR_IDX = 1;
-
-Pipe::Pipe() {
-    pipe(p);
-    open = true;
-}
-
-Pipe::~Pipe() {
-    ::close(p[Pipe::READ_FILE_DESCRIPTOR_IDX]);
-    ::close(p[Pipe::WRITE_FILE_DESCRIPTOR_IDX]);
-}
-
-void Pipe::close() {
-    open = false;
+/**
+ * Protocol that clients use to communicate with the DN to do
+ * reconfiguration on the fly.
+ */
+@ProtocolInfo(
+    protocolName = "org.apache.hadoop.hdds.protocol.ReconfigureProtocol",
+    protocolVersion = 1)
+@KerberosInfo(serverPrincipal = DFSConfigKeysLegacy.DFS_DATANODE_KERBEROS_PRINCIPAL_KEY)
+public interface ReconfigureProtocolDatanodePB extends ReconfigureProtocolPB {
 }

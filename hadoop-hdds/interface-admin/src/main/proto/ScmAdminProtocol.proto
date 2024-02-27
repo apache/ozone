@@ -83,7 +83,8 @@ message ScmContainerLocationRequest {
   optional DecommissionScmRequestProto decommissionScmRequest = 44;
   optional SingleNodeQueryRequestProto singleNodeQueryRequest = 45;
   optional GetContainersOnDecomNodeRequestProto getContainersOnDecomNodeRequest = 46;
-  optional DBUpdatesRequestProto dbUpdatesRequest = 47;
+  optional GetMetricsRequestProto getMetricsRequest = 47;
+  optional DBUpdatesRequestProto dbUpdatesRequest = 48;
 }
 
 message ScmContainerLocationResponse {
@@ -138,7 +139,8 @@ message ScmContainerLocationResponse {
   optional DecommissionScmResponseProto decommissionScmResponse = 44;
   optional SingleNodeQueryResponseProto singleNodeQueryResponse = 45;
   optional GetContainersOnDecomNodeResponseProto getContainersOnDecomNodeResponse = 46;
-  optional DBUpdatesResponseProto dbUpdatesResponse = 47;
+  optional GetMetricsResponseProto getMetricsResponse = 47;
+  optional DBUpdatesResponseProto dbUpdatesResponse = 48;
 
   enum Status {
     OK = 1;
@@ -192,7 +194,8 @@ enum Type {
   DecommissionScm = 40;
   SingleNodeQuery = 41;
   GetContainersOnDecomNode = 42;
-  DBUpdates = 43;
+  GetMetrics = 43;
+  DBUpdates = 44;
 }
 
 /**
@@ -619,6 +622,14 @@ message ContainersOnDecomNodeProto {
 
 message GetContainersOnDecomNodeResponseProto {
   repeated ContainersOnDecomNodeProto containersOnDecomNode = 1;
+}
+
+message GetMetricsRequestProto {
+  optional string query = 1;
+}
+
+message GetMetricsResponseProto {
+  optional string metricsJson = 1;
 }
 
 /**

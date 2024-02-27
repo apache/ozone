@@ -28,7 +28,6 @@ import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.ozone.common.BlockGroup;
-import org.apache.hadoop.ozone.om.IOmMetadataReader;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
 import org.apache.hadoop.ozone.om.OmSnapshot;
@@ -44,7 +43,6 @@ import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServer;
 import org.apache.hadoop.ozone.om.request.file.OMFileRequest;
 import org.apache.hadoop.ozone.om.snapshot.ReferenceCounted;
-import org.apache.hadoop.ozone.om.snapshot.SnapshotCache;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SetSnapshotPropertyRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SnapshotSize;
@@ -63,7 +61,6 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Collectors;
 
-import static org.apache.hadoop.ozone.om.OmSnapshotManager.getSnapshotPrefix;
 import static org.apache.hadoop.ozone.om.helpers.SnapshotInfo.SnapshotStatus.SNAPSHOT_ACTIVE;
 import static org.apache.hadoop.ozone.om.request.file.OMFileRequest.getDirectoryInfo;
 import static org.apache.hadoop.ozone.om.snapshot.SnapshotUtils.getOzonePathKeyForFso;
@@ -158,10 +155,8 @@ public class SnapshotDirectoryCleaningService
             continue;
           }
 
-          ReferenceCounted<IOmMetadataReader, SnapshotCache>
-              rcPrevOmSnapshot = null;
-          ReferenceCounted<IOmMetadataReader, SnapshotCache>
-              rcPrevToPrevOmSnapshot = null;
+          ReferenceCounted<OmSnapshot> rcPrevOmSnapshot = null;
+          ReferenceCounted<OmSnapshot> rcPrevToPrevOmSnapshot = null;
           try {
             long volumeId = metadataManager
                 .getVolumeId(currSnapInfo.getVolumeName());
@@ -189,12 +184,11 @@ public class SnapshotDirectoryCleaningService
             Table<String, String> prevRenamedTable = null;
 
             if (previousSnapshot != null) {
-              rcPrevOmSnapshot = omSnapshotManager.checkForSnapshot(
+              rcPrevOmSnapshot = omSnapshotManager.getActiveSnapshot(
                   previousSnapshot.getVolumeName(),
                   previousSnapshot.getBucketName(),
-                  getSnapshotPrefix(previousSnapshot.getName()), false);
-              OmSnapshot omPreviousSnapshot = (OmSnapshot)
-                  rcPrevOmSnapshot.get();
+                  previousSnapshot.getName());
+              OmSnapshot omPreviousSnapshot = rcPrevOmSnapshot.get();
 
               previousKeyTable = omPreviousSnapshot.getMetadataManager()
                   .getKeyTable(bucketInfo.getBucketLayout());
@@ -206,12 +200,11 @@ public class SnapshotDirectoryCleaningService
 
             Table<String, OmKeyInfo> previousToPrevKeyTable = null;
             if (previousToPrevSnapshot != null) {
-              rcPrevToPrevOmSnapshot = omSnapshotManager.checkForSnapshot(
+              rcPrevToPrevOmSnapshot = omSnapshotManager.getActiveSnapshot(
                   previousToPrevSnapshot.getVolumeName(),
                   previousToPrevSnapshot.getBucketName(),
-                  getSnapshotPrefix(previousToPrevSnapshot.getName()), false);
-              OmSnapshot omPreviousToPrevSnapshot = (OmSnapshot)
-                  rcPrevToPrevOmSnapshot.get();
+                  previousToPrevSnapshot.getName());
+              OmSnapshot omPreviousToPrevSnapshot = rcPrevToPrevOmSnapshot.get();
 
               previousToPrevKeyTable = omPreviousToPrevSnapshot
                   .getMetadataManager()
@@ -220,14 +213,13 @@ public class SnapshotDirectoryCleaningService
 
             String dbBucketKeyForDir = getOzonePathKeyForFso(metadataManager,
                 currSnapInfo.getVolumeName(), currSnapInfo.getBucketName());
-            try (ReferenceCounted<IOmMetadataReader, SnapshotCache>
-                     rcCurrOmSnapshot = omSnapshotManager.checkForSnapshot(
+            try (ReferenceCounted<OmSnapshot>
+                     rcCurrOmSnapshot = omSnapshotManager.getActiveSnapshot(
                 currSnapInfo.getVolumeName(),
                 currSnapInfo.getBucketName(),
-                getSnapshotPrefix(currSnapInfo.getName()),
-                false)) {
+                currSnapInfo.getName())) {
 
-              OmSnapshot currOmSnapshot = (OmSnapshot) rcCurrOmSnapshot.get();
+              OmSnapshot currOmSnapshot = rcCurrOmSnapshot.get();
               Table<String, OmKeyInfo> snapDeletedDirTable =
                   currOmSnapshot.getMetadataManager().getDeletedDirTable();
 

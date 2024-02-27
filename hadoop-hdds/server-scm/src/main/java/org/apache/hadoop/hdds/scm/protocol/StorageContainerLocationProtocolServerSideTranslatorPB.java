@@ -72,6 +72,8 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolPro
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetPipelineResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetSafeModeRuleStatusesRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetSafeModeRuleStatusesResponseProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetMetricsRequestProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetMetricsResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.InSafeModeRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.InSafeModeResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ListPipelineRequestProto;
@@ -715,6 +717,12 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
               .setDecommissionScmResponse(decommissionScm(
                   request.getDecommissionScmRequest()))
               .build();
+      case GetMetrics:
+        return ScmContainerLocationResponse.newBuilder()
+            .setCmdType(request.getCmdType())
+            .setStatus(Status.OK)
+            .setGetMetricsResponse(getMetrics(request.getGetMetricsRequest()))
+            .build();
       case DBUpdates:
         return ScmContainerLocationResponse.newBuilder()
             .setCmdType(request.getCmdType())
@@ -1293,6 +1301,10 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
       DecommissionScmRequestProto request) throws IOException {
     return impl.decommissionScm(
         request.getScmId());
+  }
+
+  public GetMetricsResponseProto getMetrics(GetMetricsRequestProto request) throws IOException {
+    return GetMetricsResponseProto.newBuilder().setMetricsJson(impl.getMetrics(request.getQuery())).build();
   }
 
   public StorageContainerLocationProtocolProtos.DBUpdatesResponseProto getDBUpdates(

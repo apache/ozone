@@ -43,7 +43,6 @@ import org.apache.hadoop.hdds.scm.storage.ContainerProtocolCalls;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientException;
-import org.apache.hadoop.ozone.container.common.helpers.ChunkInfo;
 import org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
@@ -158,7 +157,7 @@ public class ChunkKeyHandler extends KeyHandler implements
               String fileName = containerLayoutVersion.getChunkFile(new File(
                       getChunkLocationPath(containerData.getContainerPath())),
                   keyLocation.getBlockID(),
-                  ChunkInfo.getFromProtoBuf(chunkInfo)).toString();
+                  chunkInfo.getChunkName()).toString();
               chunkPaths.add(fileName);
               ChunkDetails chunkDetails = new ChunkDetails();
               chunkDetails.setChunkName(fileName);

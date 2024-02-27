@@ -1,4 +1,4 @@
-/*
+/**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -15,41 +15,19 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+package org.apache.hadoop.hdds.protocolPB;
 
-#ifndef ROCKS_NATIVE_PIPE_H
-#define ROCKS_NATIVE_PIPE_H
+import org.apache.hadoop.ipc.ProtocolInfo;
+import org.apache.hadoop.security.KerberosInfo;
 
-#include <stdio.h>
-
-class Pipe {
-    public:
-        static const int READ_FILE_DESCRIPTOR_IDX;
-        static const int WRITE_FILE_DESCRIPTOR_IDX;
-        Pipe();
-        ~Pipe();
-        void close();
-        int getReadFd() {
-            return getPipeFileDescriptorIndex(READ_FILE_DESCRIPTOR_IDX);
-        }
-
-        int getWriteFd() {
-            return getPipeFileDescriptorIndex(WRITE_FILE_DESCRIPTOR_IDX);
-        }
-
-        int getPipeFileDescriptorIndex(int idx) {
-            return p[idx];
-        }
-
-        bool isOpen() {
-            return open;
-        }
-
-
-    private:
-        int p[2];
-        FILE* wr;
-        bool open;
-
-};
-
-#endif //ROCKS_NATIVE_PIPE_H
+/**
+ * Protocol that clients use to communicate with the OM to do
+ * reconfiguration on the fly.
+ */
+@ProtocolInfo(
+    protocolName = "org.apache.hadoop.hdds.protocol.ReconfigureProtocol",
+    protocolVersion = 1)
+// TODO: move OMConfigKeys.OZONE_OM_KERBEROS_PRINCIPAL_KEY to hdds-common.
+@KerberosInfo(serverPrincipal = "ozone.om.kerberos.principal")
+public interface ReconfigureProtocolOmPB extends ReconfigureProtocolPB {
+}

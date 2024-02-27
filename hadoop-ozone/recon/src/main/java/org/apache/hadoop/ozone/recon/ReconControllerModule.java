@@ -53,7 +53,7 @@ import org.apache.hadoop.ozone.recon.spi.impl.ReconDBProvider;
 import org.apache.hadoop.ozone.recon.spi.impl.ReconNamespaceSummaryManagerImpl;
 import org.apache.hadoop.ozone.recon.spi.impl.StorageContainerServiceProviderImpl;
 import org.apache.hadoop.ozone.recon.tasks.ContainerKeyMapperTask;
-import org.apache.hadoop.ozone.recon.tasks.ContainerStatsTask;
+import org.apache.hadoop.ozone.recon.tasks.SCMDBMetaDataInitializationTask;
 import org.apache.hadoop.ozone.recon.tasks.FileSizeCountTask;
 import org.apache.hadoop.ozone.recon.tasks.NSSummaryTask;
 import org.apache.hadoop.ozone.recon.tasks.ReconOmTask;
@@ -148,7 +148,7 @@ public class ReconControllerModule extends AbstractModule {
     protected void configure() {
       Multibinder<ReconSCMMetadataProcessingTask> taskBinder =
           Multibinder.newSetBinder(binder(), ReconSCMMetadataProcessingTask.class);
-      taskBinder.addBinding().to(ContainerStatsTask.class);
+      taskBinder.addBinding().to(SCMDBMetaDataInitializationTask.class);
     }
   }
 

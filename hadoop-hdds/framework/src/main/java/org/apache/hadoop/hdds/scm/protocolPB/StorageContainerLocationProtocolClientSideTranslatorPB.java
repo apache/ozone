@@ -69,6 +69,8 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolPro
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetPipelineResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetContainerCountRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetContainerCountResponseProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetMetricsRequestProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetMetricsResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.InSafeModeRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ListPipelineRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ListPipelineResponseProto;
@@ -1144,6 +1146,15 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
             builder -> builder.setDecommissionScmRequest(request))
                 .getDecommissionScmResponse();
     return response;
+  }
+
+  @Override
+  public String getMetrics(String query) throws IOException {
+    GetMetricsRequestProto request = GetMetricsRequestProto.newBuilder().setQuery(query).build();
+    GetMetricsResponseProto response = submitRequest(Type.GetMetrics,
+        builder -> builder.setGetMetricsRequest(request)).getGetMetricsResponse();
+    String metricsJsonStr = response.getMetricsJson();
+    return metricsJsonStr;
   }
 
   /**

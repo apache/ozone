@@ -28,6 +28,7 @@ import org.apache.ratis.thirdparty.io.netty.buffer.PooledByteBufAllocator;
 import org.apache.ratis.thirdparty.io.netty.buffer.Unpooled;
 import org.apache.ratis.util.MemoizedSupplier;
 import org.apache.ratis.util.Preconditions;
+import org.apache.ratis.util.UncheckedAutoCloseable;
 import org.apache.ratis.util.function.CheckedFunction;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -50,7 +51,7 @@ import static org.apache.hadoop.hdds.HddsUtils.getStackTrace;
  * A buffer used by {@link Codec}
  * for supporting RocksDB direct {@link ByteBuffer} APIs.
  */
-public class CodecBuffer implements AutoCloseable {
+public class CodecBuffer implements UncheckedAutoCloseable {
   public static final Logger LOG = LoggerFactory.getLogger(CodecBuffer.class);
 
   /** To create {@link CodecBuffer} instances. */
@@ -338,6 +339,12 @@ public class CodecBuffer implements AutoCloseable {
   /** @return the number of bytes can be read. */
   public int readableBytes() {
     return buf.readableBytes();
+  }
+
+  /** @return a writable {@link ByteBuffer}. */
+  public ByteBuffer asWritableByteBuffer() {
+    assertRefCnt(1);
+    return buf.nioBuffer(0, buf.maxCapacity());
   }
 
   /** @return a readonly {@link ByteBuffer} view of this buffer. */

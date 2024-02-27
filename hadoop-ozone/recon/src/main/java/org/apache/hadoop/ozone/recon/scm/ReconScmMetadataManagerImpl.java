@@ -60,6 +60,7 @@ public class ReconScmMetadataManagerImpl extends SCMMetadataStoreImpl
   private OzoneStorageContainerManager ozoneStorageContainerManager;
   private SequenceIdGenerator sequenceIdGen;
   private ReconNodeManager nodeManager;
+  private Table<UUID, DatanodeDetails> nodesTable;
 
   @Inject
   public ReconScmMetadataManagerImpl(OzoneConfiguration configuration,
@@ -118,23 +119,17 @@ public class ReconScmMetadataManagerImpl extends SCMMetadataStoreImpl
           newNodeTable.put(keyValue.getKey(), keyValue.getValue());
         }
       }
+      setStore(newStore);
+      this.nodesTable = ReconSCMDBDefinition.NODES.getTable(newStore);
       sequenceIdGen.reinitialize(
           ReconSCMDBDefinition.SEQUENCE_ID.getTable(newStore));
       ozoneStorageContainerManager.getPipelineManager().reinitialize(
           ReconSCMDBDefinition.PIPELINES.getTable(newStore));
       ozoneStorageContainerManager.getContainerManager().reinitialize(
           ReconSCMDBDefinition.CONTAINERS.getTable(newStore));
-      nodeManager.reinitialize(
-          ReconSCMDBDefinition.NODES.getTable(newStore));
+      nodeManager.reinitialize(nodesTable);
 
-      setStore(newStore);
       ozoneStorageContainerManager.setStore(newStore);
-      /*File newDb = new File(dbFile.getParent() +
-          OZONE_URI_DELIMITER + RECON_SCM_DB_NAME);
-      boolean success = dbFile.renameTo(newDb);
-      if (success) {
-        LOG.info("SCM snapshot linked to Recon DB.");
-      }*/
       LOG.info("Created SCM DB handle from snapshot at {}.", dbFile.getAbsolutePath());
     } catch (IOException ioEx) {
       LOG.error("Unable to initialize Recon SCM DB snapshot store.", ioEx);
@@ -234,4 +229,10 @@ public class ReconScmMetadataManagerImpl extends SCMMetadataStoreImpl
   public ReconNodeManager getNodeManager() {
     return nodeManager;
   }
+
+  public Table<UUID, DatanodeDetails> getNodesTable() {
+    return nodesTable;
+  }
+
+
 }

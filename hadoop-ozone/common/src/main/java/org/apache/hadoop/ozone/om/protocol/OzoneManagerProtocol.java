@@ -682,6 +682,21 @@ public interface OzoneManagerProtocol
   }
 
   /**
+   * Rename snapshot.
+   * @param volumeName vol to be used
+   * @param bucketName bucket to be used
+   * @param snapshotOldName Old name of the snapshot
+   * @param snapshotNewName New name of the snapshot
+   *
+   * @throws IOException
+   */
+  default void renameSnapshot(String volumeName,
+      String bucketName, String snapshotOldName, String snapshotNewName) throws IOException {
+    throw new UnsupportedOperationException("OzoneManager does not require " +
+         "this to be implemented");
+  }
+
+  /**
    * Delete snapshot.
    * @param volumeName vol to be used
    * @param bucketName bucket to be used

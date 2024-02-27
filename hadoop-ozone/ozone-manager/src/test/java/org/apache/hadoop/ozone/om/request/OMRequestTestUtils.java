@@ -19,12 +19,19 @@
 
 package org.apache.hadoop.ozone.om.request;
 
+import java.io.ByteArrayInputStream;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.security.DigestInputStream;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
 
+import javax.xml.bind.DatatypeConverter;
+import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.client.BlockID;
@@ -1005,14 +1012,31 @@ public final class OMRequestTestUtils {
       String bucketName, String keyName, long clientID, long size,
       String multipartUploadID, int partNumber) {
 
+    MessageDigest eTagProvider;
+    try {
+      eTagProvider = MessageDigest.getInstance(OzoneConsts.MD5_HASH);
+    } catch (NoSuchAlgorithmException e) {
+      throw new RuntimeException(e);
+    }
+
     // Just set dummy size.
-    KeyArgs.Builder keyArgs =
-        KeyArgs.newBuilder().setVolumeName(volumeName).setKeyName(keyName)
-            .setBucketName(bucketName)
-            .setDataSize(size)
-            .setMultipartNumber(partNumber)
-            .setMultipartUploadID(multipartUploadID)
-            .addAllKeyLocations(new ArrayList<>());
+    KeyArgs.Builder  keyArgs = KeyArgs.newBuilder().setVolumeName(volumeName)
+        .setKeyName(keyName)
+        .setBucketName(bucketName)
+        .setDataSize(size)
+        .setMultipartNumber(partNumber)
+        .setMultipartUploadID(multipartUploadID)
+        .addAllKeyLocations(new ArrayList<>())
+        .addMetadata(HddsProtos.KeyValue.newBuilder()
+            .setKey(OzoneConsts.ETAG)
+            .setValue(DatatypeConverter.printHexBinary(
+                new DigestInputStream(
+                    new ByteArrayInputStream(
+                        RandomStringUtils.randomAlphanumeric((int) size)
+                            .getBytes(StandardCharsets.UTF_8)),
+                    eTagProvider)
+                    .getMessageDigest().digest()))
+            .build());
     // Just adding dummy list. As this is for UT only.
 
     MultipartCommitUploadPartRequest multipartCommitUploadPartRequest =
@@ -1269,6 +1293,41 @@ public final class OMRequestTestUtils {
     return OMRequest.newBuilder()
         .setCreateSnapshotRequest(createSnapshotRequest)
         .setCmdType(Type.CreateSnapshot)
+        .setClientId(UUID.randomUUID().toString())
+        .setUserInfo(userInfo)
+        .build();
+  }
+
+  /**
+   * Create OMRequest for Rename Snapshot.
+   *
+   * @param volumeName vol to be used
+   * @param bucketName bucket to be used
+   * @param snapshotOldName Old name of the snapshot
+   * @param snapshotNewName New name of the snapshot
+   */
+  public static OMRequest renameSnapshotRequest(String volumeName,
+                                                String bucketName,
+                                                String snapshotOldName,
+                                                String snapshotNewName) {
+    OzoneManagerProtocolProtos.RenameSnapshotRequest renameSnapshotRequest =
+        OzoneManagerProtocolProtos.RenameSnapshotRequest.newBuilder()
+            .setVolumeName(volumeName)
+            .setBucketName(bucketName)
+            .setSnapshotOldName(snapshotOldName)
+            .setSnapshotNewName(snapshotNewName)
+            .build();
+
+    OzoneManagerProtocolProtos.UserInfo userInfo =
+        OzoneManagerProtocolProtos.UserInfo.newBuilder()
+            .setUserName("user")
+            .setHostName("host")
+            .setRemoteAddress("remote-address")
+            .build();
+
+    return OMRequest.newBuilder()
+        .setRenameSnapshotRequest(renameSnapshotRequest)
+        .setCmdType(Type.RenameSnapshot)
         .setClientId(UUID.randomUUID().toString())
         .setUserInfo(userInfo)
         .build();
