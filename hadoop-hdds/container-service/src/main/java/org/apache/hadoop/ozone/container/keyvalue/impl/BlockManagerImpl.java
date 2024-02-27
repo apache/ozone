@@ -42,7 +42,6 @@ import com.google.common.base.Preconditions;
 
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.BCSID_MISMATCH;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.UNKNOWN_BCSID;
-import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.UNSUPPORTED_REQUEST;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_CHUNK_LIST_INCREMENTAL;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_CHUNK_LIST_INCREMENTAL_DEFAULT;
 
@@ -103,13 +102,11 @@ public class BlockManagerImpl implements BlockManager {
       boolean endOfBlock) throws IOException {
     return persistPutBlock(
         (KeyValueContainer) container,
-        data,
-        config,
-        endOfBlock);
+        data, endOfBlock);
   }
 
   public long persistPutBlock(KeyValueContainer container,
-      BlockData data, ConfigurationSource config, boolean endOfBlock)
+      BlockData data, boolean endOfBlock)
       throws IOException {
     Preconditions.checkNotNull(data, "BlockData cannot be null for put " +
         "operation.");
