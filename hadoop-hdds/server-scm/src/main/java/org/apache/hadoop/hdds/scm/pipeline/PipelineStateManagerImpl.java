@@ -98,8 +98,8 @@ public class PipelineStateManagerImpl implements PipelineStateManager {
       if (pipelineStore != null) {
         pipelineStateMap.addPipeline(pipeline);
         nodeManager.addPipeline(pipeline);
-        transactionBuffer
-            .addToBuffer(pipelineStore, pipeline.getId(), pipeline);
+        /*transactionBuffer
+            .addToBuffer(pipelineStore, pipeline.getId(), pipeline);*/
       }
     } finally {
       lock.writeLock().unlock();
@@ -240,9 +240,9 @@ public class PipelineStateManagerImpl implements PipelineStateManager {
       try {
         pipeline = pipelineStateMap.removePipeline(pipelineID);
         nodeManager.removePipeline(pipeline);
-        if (pipelineStore != null) {
+        /*if (pipelineStore != null) {
           transactionBuffer.removeFromBuffer(pipelineStore, pipelineID);
-        }
+        }*/
       } finally {
         lock.writeLock().unlock();
       }
@@ -292,8 +292,8 @@ public class PipelineStateManagerImpl implements PipelineStateManager {
         // still try to access it.
         if (pipelineStore != null) {
           pipelineStateMap.updatePipelineState(pipelineID, newPipelineState);
-          transactionBuffer
-              .addToBuffer(pipelineStore, pipelineID, getPipeline(pipelineID));
+          /*transactionBuffer
+              .addToBuffer(pipelineStore, pipelineID, getPipeline(pipelineID));*/
         }
       } finally {
         lock.writeLock().unlock();

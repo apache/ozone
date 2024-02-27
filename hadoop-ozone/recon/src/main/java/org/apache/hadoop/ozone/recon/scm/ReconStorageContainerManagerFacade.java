@@ -743,7 +743,7 @@ public class ReconStorageContainerManagerFacade
     LOG.info("Flushing container replica history to DB.");
     containerManager.flushReplicaHistoryMapToDB(true);
     IOUtils.close(LOG, dbStore);
-    IOUtils.close(LOG, scmMetadataManager.getStore());
+    //IOUtils.close(LOG, scmMetadataManager.getStore());
   }
 
   @Override

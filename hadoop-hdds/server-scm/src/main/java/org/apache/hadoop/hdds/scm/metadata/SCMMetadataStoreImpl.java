@@ -63,13 +63,11 @@ import org.apache.ratis.util.ExitUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import javax.inject.Singleton;
 
 /**
  * A RocksDB based implementation of SCM Metadata Store.
  *
  */
-@Singleton
 public class SCMMetadataStoreImpl implements SCMMetadataStore {
 
   private Table<Long, DeletedBlocksTransaction> deletedBlocksTable;

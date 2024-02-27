@@ -238,6 +238,7 @@ public final class ContainerStateManagerImpl
    * @throws IOException in case of error while loading the containers
    */
   private void initialize() throws IOException {
+    LOG.error("container manager initialize: {}", containerStore.getEstimatedKeyCount());
     try (TableIterator<ContainerID,
         ? extends KeyValue<ContainerID, ContainerInfo>> iterator =
              containerStore.iterator()) {

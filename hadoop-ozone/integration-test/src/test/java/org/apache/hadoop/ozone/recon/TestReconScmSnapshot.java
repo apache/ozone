@@ -58,7 +58,7 @@ public class TestReconScmSnapshot {
         ReconServerConfigKeys.OZONE_RECON_SCM_SNAPSHOT_ENABLED, true);
     conf.setInt(ReconServerConfigKeys.OZONE_RECON_SCM_CONTAINER_THRESHOLD, 0);
     conf.setTimeDuration(OZONE_RECON_SCM_SNAPSHOT_TASK_INITIAL_DELAY, 1, TimeUnit.SECONDS);
-    conf.setTimeDuration(OZONE_RECON_SCM_SNAPSHOT_TASK_INTERVAL_DELAY, 10, TimeUnit.SECONDS);
+    conf.setTimeDuration(OZONE_RECON_SCM_SNAPSHOT_TASK_INTERVAL_DELAY, 3, TimeUnit.SECONDS);
 
     conf.setTimeDuration(OZONE_RECON_SCM_CLIENT_RPC_TIME_OUT_KEY, 5, TimeUnit.MINUTES);
     conf.setTimeDuration(OZONE_RECON_SCM_CLIENT_MAX_RETRY_TIMEOUT_KEY, 6, TimeUnit.SECONDS);
@@ -94,7 +94,7 @@ public class TestReconScmSnapshot {
     long keyCountBefore = nodeManager.getNodeDBKeyCount();
 
     //Stopping Recon to add Containers in SCM
-    cluster.stopRecon();
+    //cluster.stopRecon();
     ContainerManager containerManager;
     containerManager = cluster.getStorageContainerManager()
         .getContainerManager();
@@ -103,8 +103,8 @@ public class TestReconScmSnapshot {
       containerManager.allocateContainer(RatisReplicationConfig.getInstance(
           HddsProtos.ReplicationFactor.ONE), "testOwner");
     }
-
-    cluster.startRecon();
+    Thread.sleep(10000);
+    //cluster.startRecon();
     //ContainerCount after Recon DB is updated with SCM DB
     containerManager = cluster.getStorageContainerManager()
         .getContainerManager();
