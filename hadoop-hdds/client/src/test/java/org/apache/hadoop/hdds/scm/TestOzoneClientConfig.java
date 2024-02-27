@@ -20,6 +20,7 @@ package org.apache.hadoop.hdds.scm;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.junit.jupiter.api.Test;
 
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_CLIENT_BYTES_PER_CHECKSUM_MIN_SIZE;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 class TestOzoneClientConfig {
@@ -33,6 +34,6 @@ class TestOzoneClientConfig {
 
     OzoneClientConfig subject = conf.getObject(OzoneClientConfig.class);
 
-    assertEquals(bytes, subject.getBytesPerChecksum());
+    assertEquals(OZONE_CLIENT_BYTES_PER_CHECKSUM_MIN_SIZE, subject.getBytesPerChecksum());
   }
 }
