@@ -109,68 +109,27 @@ public final class OmBucketInfo extends WithObjectID implements Auditable {
 
   private String owner;
 
-  /**
-   * Private constructor, constructed via builder.
-   * @param volumeName - Volume name.
-   * @param bucketName - Bucket name.
-   * @param acls - list of ACLs.
-   * @param isVersionEnabled - Bucket version flag.
-   * @param storageType - Storage type to be used.
-   * @param creationTime - Bucket creation time.
-   * @param modificationTime - Bucket modification time.
-   * @param metadata - metadata.
-   * @param bekInfo - bucket encryption key info.
-   * @param sourceVolume - source volume for bucket links, null otherwise
-   * @param sourceBucket - source bucket for bucket links, null otherwise
-   * @param usedBytes - Bucket Quota Usage in bytes.
-   * @param quotaInBytes Bucket quota in bytes.
-   * @param quotaInNamespace Bucket quota in counts.
-   * @param bucketLayout bucket layout.
-   * @param owner owner of the bucket.
-   * @param defaultReplicationConfig default replication config.
-   * @param bucketLayout Bucket Layout.
-   */
-  @SuppressWarnings("checkstyle:ParameterNumber")
-  private OmBucketInfo(String volumeName,
-      String bucketName,
-      List<OzoneAcl> acls,
-      boolean isVersionEnabled,
-      StorageType storageType,
-      long creationTime,
-      long modificationTime,
-      long objectID,
-      long updateID,
-      Map<String, String> metadata,
-      BucketEncryptionKeyInfo bekInfo,
-      String sourceVolume,
-      String sourceBucket,
-      long usedBytes,
-      long usedNamespace,
-      long quotaInBytes,
-      long quotaInNamespace,
-      BucketLayout bucketLayout,
-      String owner,
-      DefaultReplicationConfig defaultReplicationConfig) {
-    this.volumeName = volumeName;
-    this.bucketName = bucketName;
-    this.acls = acls;
-    this.isVersionEnabled = isVersionEnabled;
-    this.storageType = storageType;
-    this.creationTime = creationTime;
-    this.modificationTime = modificationTime;
-    this.objectID = objectID;
-    this.updateID = updateID;
-    this.metadata = metadata;
-    this.bekInfo = bekInfo;
-    this.sourceVolume = sourceVolume;
-    this.sourceBucket = sourceBucket;
-    this.usedBytes = usedBytes;
-    this.usedNamespace = usedNamespace;
-    this.quotaInBytes = quotaInBytes;
-    this.quotaInNamespace = quotaInNamespace;
-    this.bucketLayout = bucketLayout;
-    this.owner = owner;
-    this.defaultReplicationConfig = defaultReplicationConfig;
+  private OmBucketInfo(Builder b) {
+    setMetadata(b.metadata);
+    setObjectID(b.objectID);
+    setUpdateID(b.updateID);
+    this.volumeName = b.volumeName;
+    this.bucketName = b.bucketName;
+    this.acls = b.acls;
+    this.isVersionEnabled = b.isVersionEnabled;
+    this.storageType = b.storageType;
+    this.creationTime = b.creationTime;
+    this.modificationTime = b.modificationTime;
+    this.bekInfo = b.bekInfo;
+    this.sourceVolume = b.sourceVolume;
+    this.sourceBucket = b.sourceBucket;
+    this.usedBytes = b.usedBytes;
+    this.usedNamespace = b.usedNamespace;
+    this.quotaInBytes = b.quotaInBytes;
+    this.quotaInNamespace = b.quotaInNamespace;
+    this.bucketLayout = b.bucketLayout;
+    this.owner = b.owner;
+    this.defaultReplicationConfig = b.defaultReplicationConfig;
   }
 
   /**
@@ -351,7 +310,7 @@ public final class OmBucketInfo extends WithObjectID implements Auditable {
     auditMap.put(OzoneConsts.BUCKET, this.bucketName);
     auditMap.put(OzoneConsts.BUCKET_LAYOUT, String.valueOf(this.bucketLayout));
     auditMap.put(OzoneConsts.GDPR_FLAG,
-        this.metadata.get(OzoneConsts.GDPR_FLAG));
+        getMetadata().get(OzoneConsts.GDPR_FLAG));
     auditMap.put(OzoneConsts.ACLS,
         (this.acls != null) ? this.acls.toString() : null);
     auditMap.put(OzoneConsts.IS_VERSION_ENABLED,
@@ -403,13 +362,13 @@ public final class OmBucketInfo extends WithObjectID implements Auditable {
         .setIsVersionEnabled(isVersionEnabled)
         .setCreationTime(creationTime)
         .setModificationTime(modificationTime)
-        .setObjectID(objectID)
-        .setUpdateID(updateID)
+        .setObjectID(getObjectID())
+        .setUpdateID(getUpdateID())
         .setBucketEncryptionKey(bekInfo)
         .setSourceVolume(sourceVolume)
         .setSourceBucket(sourceBucket)
         .setAcls(acls)
-        .addAllMetadata(metadata)
+        .addAllMetadata(getMetadata())
         .setUsedBytes(usedBytes)
         .setUsedNamespace(usedNamespace)
         .setQuotaInBytes(quotaInBytes)
@@ -531,31 +490,37 @@ public final class OmBucketInfo extends WithObjectID implements Auditable {
       return this;
     }
 
+    /** @param volume - source volume for bucket links, null otherwise */
     public Builder setSourceVolume(String volume) {
       this.sourceVolume = volume;
       return this;
     }
 
+    /** @param bucket - source bucket for bucket links, null otherwise */
     public Builder setSourceBucket(String bucket) {
       this.sourceBucket = bucket;
       return this;
     }
 
+    /** @param quotaUsage - Bucket Quota Usage in bytes. */
     public Builder setUsedBytes(long quotaUsage) {
       this.usedBytes = quotaUsage;
       return this;
     }
 
+    /** @param quotaUsage - Bucket Quota Usage in counts. */
     public Builder setUsedNamespace(long quotaUsage) {
       this.usedNamespace = quotaUsage;
       return this;
     }
 
+    /** @param quota Bucket quota in bytes. */
     public Builder setQuotaInBytes(long quota) {
       this.quotaInBytes = quota;
       return this;
     }
 
+    /** @param quota Bucket quota in counts. */
     public Builder setQuotaInNamespace(long quota) {
       this.quotaInNamespace = quota;
       return this;
@@ -587,11 +552,7 @@ public final class OmBucketInfo extends WithObjectID implements Auditable {
       Preconditions.checkNotNull(acls);
       Preconditions.checkNotNull(isVersionEnabled);
       Preconditions.checkNotNull(storageType);
-      return new OmBucketInfo(volumeName, bucketName, acls, isVersionEnabled,
-          storageType, creationTime, modificationTime, objectID, updateID,
-          metadata, bekInfo, sourceVolume, sourceBucket, usedBytes,
-          usedNamespace, quotaInBytes, quotaInNamespace, bucketLayout, owner,
-          defaultReplicationConfig);
+      return new OmBucketInfo(this);
     }
   }
 
@@ -607,11 +568,11 @@ public final class OmBucketInfo extends WithObjectID implements Auditable {
         .setStorageType(storageType.toProto())
         .setCreationTime(creationTime)
         .setModificationTime(modificationTime)
-        .setObjectID(objectID)
-        .setUpdateID(updateID)
+        .setObjectID(getObjectID())
+        .setUpdateID(getUpdateID())
         .setUsedBytes(usedBytes)
         .setUsedNamespace(usedNamespace)
-        .addAllMetadata(KeyValueUtil.toProtobuf(metadata))
+        .addAllMetadata(KeyValueUtil.toProtobuf(getMetadata()))
         .setQuotaInBytes(quotaInBytes)
         .setQuotaInNamespace(quotaInNamespace);
     if (bucketLayout != null) {
@@ -739,13 +700,13 @@ public final class OmBucketInfo extends WithObjectID implements Auditable {
         Objects.equals(acls, that.acls) &&
         Objects.equals(isVersionEnabled, that.isVersionEnabled) &&
         storageType == that.storageType &&
-        objectID == that.objectID &&
-        updateID == that.updateID &&
+        getObjectID() == that.getObjectID() &&
+        getUpdateID() == that.getUpdateID() &&
         usedBytes == that.usedBytes &&
         usedNamespace == that.usedNamespace &&
         Objects.equals(sourceVolume, that.sourceVolume) &&
         Objects.equals(sourceBucket, that.sourceBucket) &&
-        Objects.equals(metadata, that.metadata) &&
+        Objects.equals(getMetadata(), that.getMetadata()) &&
         Objects.equals(bekInfo, that.bekInfo) &&
         Objects.equals(owner, that.owner) &&
         Objects.equals(defaultReplicationConfig, that.defaultReplicationConfig);
@@ -768,9 +729,9 @@ public final class OmBucketInfo extends WithObjectID implements Auditable {
         ", bekInfo=" + bekInfo +
         ", sourceVolume='" + sourceVolume + "'" +
         ", sourceBucket='" + sourceBucket + "'" +
-        ", objectID=" + objectID +
-        ", updateID=" + updateID +
-        ", metadata=" + metadata +
+        ", objectID=" + getObjectID() +
+        ", updateID=" + getUpdateID() +
+        ", metadata=" + getMetadata() +
         ", usedBytes=" + usedBytes +
         ", usedNamespace=" + usedNamespace +
         ", quotaInBytes=" + quotaInBytes +

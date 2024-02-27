@@ -37,7 +37,7 @@ import java.util.concurrent.TimeUnit;
 @InterfaceStability.Unstable
 public final class OzoneConfigKeys {
   public static final String DFS_CONTAINER_IPC_PORT =
-      "dfs.container.ipc";
+      "hdds.container.ipc.port";
   public static final int DFS_CONTAINER_IPC_PORT_DEFAULT = 9859;
 
   public static final String OZONE_METADATA_DIRS = "ozone.metadata.dirs";
@@ -60,47 +60,47 @@ public final class OzoneConfigKeys {
    * as {@link #DFS_CONTAINER_IPC_PORT_DEFAULT}.
    */
   public static final String DFS_CONTAINER_IPC_RANDOM_PORT =
-      "dfs.container.ipc.random.port";
+      "hdds.container.ipc.random.port";
   public static final boolean DFS_CONTAINER_IPC_RANDOM_PORT_DEFAULT =
       false;
 
   public static final String DFS_CONTAINER_RATIS_DATASTREAM_RANDOM_PORT =
-      "dfs.container.ratis.datastream.random.port";
+      "hdds.container.ratis.datastream.random.port";
   public static final boolean
       DFS_CONTAINER_RATIS_DATASTREAM_RANDOM_PORT_DEFAULT =
       false;
 
   public static final String DFS_CONTAINER_CHUNK_WRITE_SYNC_KEY =
-      "dfs.container.chunk.write.sync";
+      "hdds.container.chunk.write.sync";
   public static final boolean DFS_CONTAINER_CHUNK_WRITE_SYNC_DEFAULT = false;
   /**
    * Ratis Port where containers listen to.
    */
   public static final String DFS_CONTAINER_RATIS_IPC_PORT =
-      "dfs.container.ratis.ipc";
+      "hdds.container.ratis.ipc.port";
   public static final int DFS_CONTAINER_RATIS_IPC_PORT_DEFAULT = 9858;
   /**
    * Ratis Port where containers listen to admin requests.
    */
   public static final String DFS_CONTAINER_RATIS_ADMIN_PORT =
-      "dfs.container.ratis.admin.port";
+      "hdds.container.ratis.admin.port";
   public static final int DFS_CONTAINER_RATIS_ADMIN_PORT_DEFAULT = 9857;
   /**
    * Ratis Port where containers listen to server-to-server requests.
    */
   public static final String DFS_CONTAINER_RATIS_SERVER_PORT =
-      "dfs.container.ratis.server.port";
+      "hdds.container.ratis.server.port";
   public static final int DFS_CONTAINER_RATIS_SERVER_PORT_DEFAULT = 9856;
 
   /**
    * Ratis Port where containers listen to datastream requests.
    */
   public static final String DFS_CONTAINER_RATIS_DATASTREAM_ENABLED
-      = "dfs.container.ratis.datastream.enabled";
+      = "hdds.container.ratis.datastream.enabled";
   public static final boolean DFS_CONTAINER_RATIS_DATASTREAM_ENABLED_DEFAULT
       = false;
   public static final String DFS_CONTAINER_RATIS_DATASTREAM_PORT
-      = "dfs.container.ratis.datastream.port";
+      = "hdds.container.ratis.datastream.port";
   public static final int DFS_CONTAINER_RATIS_DATASTREAM_PORT_DEFAULT
       = 9855;
 
@@ -134,7 +134,7 @@ public final class OzoneConfigKeys {
    * a mini cluster is able to launch multiple containers on a node.
    */
   public static final String DFS_CONTAINER_RATIS_IPC_RANDOM_PORT =
-      "dfs.container.ratis.ipc.random.port";
+      "hdds.container.ratis.ipc.random.port";
   public static final boolean DFS_CONTAINER_RATIS_IPC_RANDOM_PORT_DEFAULT =
       false;
 
@@ -368,7 +368,7 @@ public final class OzoneConfigKeys {
       ScmConfigKeys.DFS_CONTAINER_RATIS_STATEMACHINEDATA_SYNC_TIMEOUT_DEFAULT;
 
   public static final String DFS_CONTAINER_RATIS_DATANODE_STORAGE_DIR =
-      "dfs.container.ratis.datanode.storage.dir";
+      "hdds.container.ratis.datanode.storage.dir";
 
   public static final String DFS_RATIS_SERVER_RETRY_CACHE_TIMEOUT_DURATION_KEY =
       ScmConfigKeys.DFS_RATIS_SERVER_RETRY_CACHE_TIMEOUT_DURATION_KEY;

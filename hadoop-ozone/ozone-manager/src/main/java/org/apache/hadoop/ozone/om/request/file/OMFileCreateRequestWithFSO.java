@@ -172,6 +172,7 @@ public class OMFileCreateRequestWithFSO extends OMFileCreateRequest {
               bucketInfo, pathInfoFSO, trxnLogIndex,
               pathInfoFSO.getLeafNodeObjectId(),
               ozoneManager.isRatisEnabled(), repConfig);
+      validateEncryptionKeyInfo(bucketInfo, keyArgs);
 
       long openVersion = omFileInfo.getLatestVersionLocations().getVersion();
       long clientID = createFileRequest.getClientID();

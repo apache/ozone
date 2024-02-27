@@ -23,22 +23,21 @@ import java.util.Map;
 /**
  * Mixin class to handle custom metadata.
  */
-public class WithMetadata {
+public abstract class WithMetadata {
 
-  @SuppressWarnings("visibilitymodifier")
-  protected Map<String, String> metadata = new HashMap<>();
+  private Map<String, String> metadata = new HashMap<>();
 
   /**
    * Custom key value metadata.
    */
-  public Map<String, String> getMetadata() {
+  public final Map<String, String> getMetadata() {
     return metadata;
   }
 
   /**
    * Set custom key value metadata.
    */
-  public void setMetadata(Map<String, String> metadata) {
+  public final void setMetadata(Map<String, String> metadata) {
     this.metadata = metadata;
   }
 

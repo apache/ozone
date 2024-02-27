@@ -87,7 +87,6 @@ share/ozone/lib/httpclient.jar
 share/ozone/lib/httpcore.jar
 share/ozone/lib/httpcore-nio.jar
 share/ozone/lib/httpmime.jar
-share/ozone/lib/ion-java.jar
 share/ozone/lib/istack-commons-runtime.jar
 share/ozone/lib/j2objc-annotations.jar
 share/ozone/lib/jackson-annotations.jar
@@ -108,6 +107,7 @@ share/ozone/lib/jakarta.activation.jar
 share/ozone/lib/jakarta.activation-api.jar
 share/ozone/lib/jakarta.annotation-api.jar
 share/ozone/lib/jakarta.inject.jar
+share/ozone/lib/jakarta.inject-api.jar
 share/ozone/lib/jakarta.validation-api.jar
 share/ozone/lib/jakarta.ws.rs-api.jar
 share/ozone/lib/jakarta.xml.bind-api.jar

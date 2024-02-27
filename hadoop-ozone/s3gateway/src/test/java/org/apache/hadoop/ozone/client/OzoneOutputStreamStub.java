@@ -24,8 +24,6 @@ import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.client.io.KeyMetadataAware;
-import org.apache.hadoop.hdds.scm.OzoneClientConfig;
-import org.apache.hadoop.hdds.scm.StreamBufferArgs;
 import org.apache.hadoop.ozone.client.io.KeyOutputStream;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartCommitUploadPartInfo;
@@ -81,10 +79,7 @@ public class OzoneOutputStreamStub extends OzoneOutputStream {
     OzoneConfiguration conf = new OzoneConfiguration();
     ReplicationConfig replicationConfig =
         ReplicationConfig.getDefault(conf);
-    OzoneClientConfig ozoneClientConfig = conf.getObject(OzoneClientConfig.class);
-    StreamBufferArgs streamBufferArgs =
-        StreamBufferArgs.getDefaultStreamBufferArgs(replicationConfig, ozoneClientConfig);
-    return new KeyOutputStream(replicationConfig, null, ozoneClientConfig, streamBufferArgs) {
+    return new KeyOutputStream(replicationConfig, null) {
       @Override
       public synchronized OmMultipartCommitUploadPartInfo
           getCommitUploadPartInfo() {
