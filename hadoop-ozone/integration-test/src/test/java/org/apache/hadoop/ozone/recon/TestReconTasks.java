@@ -200,6 +200,7 @@ public class TestReconTasks {
       return (allMissingContainers.isEmpty());
     });
     scmContainerManager.deleteContainer(containerInfo.containerID());
+    cluster.restartHddsDatanode(pipeline.getFirstNode(), true);
     IOUtils.closeQuietly(client);
   }
 

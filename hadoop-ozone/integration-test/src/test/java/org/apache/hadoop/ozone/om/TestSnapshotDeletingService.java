@@ -86,7 +86,7 @@ public class TestSnapshotDeletingService {
   private static final String VOLUME_NAME = "vol1";
   private static final String BUCKET_NAME_ONE = "bucket1";
   private static final String BUCKET_NAME_TWO = "bucket2";
-  private static final String BUCKET_NAME_FSO = "bucketFSO";
+  private static final String BUCKET_NAME_FSO = "bucketfso";
 
   @BeforeAll
   public void setup() throws Exception {
@@ -523,6 +523,10 @@ public class TestSnapshotDeletingService {
         "bucket1snap2");
     assertTableRowCount(snapshotInfoTable, 2);
     verifySnapshotChain(snapshotInfo, "/vol1/bucket1/bucket1snap3");
+    // cleaning up the data
+    client.getProxy().deleteSnapshot(VOLUME_NAME, BUCKET_NAME_ONE, "bucket1snap1");
+    client.getProxy().deleteSnapshot(VOLUME_NAME, BUCKET_NAME_ONE, "bucket1snap3");
+    client.getProxy().deleteVolume(BUCKET_NAME_ONE);
   }
 
   private void verifySnapshotChain(SnapshotInfo deletedSnapshot,
