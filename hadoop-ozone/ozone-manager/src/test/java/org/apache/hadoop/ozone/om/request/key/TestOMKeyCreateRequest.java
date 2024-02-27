@@ -484,7 +484,7 @@ public class TestOMKeyCreateRequest extends TestOMKeyRequest {
     OMRequest initialRequest =
         createKeyRequest(false, 0, keyName, initialMetadata);
     OMKeyCreateRequest initialOmKeyCreateRequest =
-        new OMKeyCreateRequest(initialRequest, BucketLayout.OBJECT_STORE);
+        new OMKeyCreateRequest(initialRequest, getBucketLayout());
     OMClientResponse initialResponse =
         initialOmKeyCreateRequest.validateAndUpdateCache(ozoneManager, 100L);
     verifyMetadataInResponse(initialResponse, initialMetadata);
@@ -502,50 +502,11 @@ public class TestOMKeyCreateRequest extends TestOMKeyRequest {
     OMRequest updatedRequest =
         createKeyRequest(false, 0, keyName, updatedMetadata);
     OMKeyCreateRequest updatedOmKeyCreateRequest =
-        new OMKeyCreateRequest(updatedRequest, BucketLayout.OBJECT_STORE);
+        new OMKeyCreateRequest(updatedRequest, getBucketLayout());
 
     OMClientResponse updatedResponse =
         updatedOmKeyCreateRequest.validateAndUpdateCache(ozoneManager, 101L);
     verifyMetadataInResponse(updatedResponse, updatedMetadata);
-  }
-
-  @ParameterizedTest
-  @MethodSource("data")
-  public void testAddingNewMetadataEntries(
-      boolean setKeyPathLock, boolean setFileSystemPaths) throws Exception {
-    when(ozoneManager.getOzoneLockProvider()).thenReturn(
-        new OzoneLockProvider(setKeyPathLock, setFileSystemPaths));
-
-    addVolumeAndBucketToDB(volumeName, bucketName, omMetadataManager,
-        getBucketLayout());
-
-    Map<String, String> initialMetadata =
-        Collections.singletonMap("initialKey", "initialValue");
-    OMRequest initialRequest =
-        createKeyRequest(false, 0, keyName, initialMetadata);
-    OMKeyCreateRequest initialOmKeyCreateRequest =
-        new OMKeyCreateRequest(initialRequest, BucketLayout.OBJECT_STORE);
-
-    // Building the OmKeyInfo object with initial metadata and adding to table
-    // as validateAndUpdateCache only updates the cache and not the DB.
-    OmKeyInfo keyInfo = createOmKeyInfo(volumeName, bucketName, keyName,
-        replicationConfig).build();
-    keyInfo.setMetadata(initialMetadata);
-    omMetadataManager.getKeyTable(initialOmKeyCreateRequest.getBucketLayout())
-        .put(getOzoneKey(), keyInfo);
-
-    Map<String, String> newMetadata = new HashMap<>();
-    newMetadata.put("newKey", "newValue"); // Add new metadata
-
-    OMRequest newRequest = createKeyRequest(false, 0, keyName, newMetadata);
-    OMKeyCreateRequest newOmKeyCreateRequest =
-        new OMKeyCreateRequest(newRequest, BucketLayout.OBJECT_STORE);
-
-    OMClientResponse newResponse =
-        newOmKeyCreateRequest.validateAndUpdateCache(ozoneManager, 102L);
-    // The previous metadata should be present in the response
-    newMetadata.put("initialKey", "initialValue");
-    verifyMetadataInResponse(newResponse, newMetadata);
   }
 
   @ParameterizedTest
@@ -561,8 +522,7 @@ public class TestOMKeyCreateRequest extends TestOMKeyRequest {
     OMRequest createRequestWithoutMetadata = createKeyRequest(false, 0, keyName,
         null); // Passing 'null' for metadata
     OMKeyCreateRequest createOmKeyCreateRequest =
-        new OMKeyCreateRequest(createRequestWithoutMetadata,
-            BucketLayout.OBJECT_STORE);
+        new OMKeyCreateRequest(createRequestWithoutMetadata, getBucketLayout());
 
     // Perform the create operation without any metadata
     OMClientResponse createResponse =
@@ -585,8 +545,7 @@ public class TestOMKeyCreateRequest extends TestOMKeyRequest {
     OMRequest overwriteRequestWithMetadata =
         createKeyRequest(false, 0, keyName, overwriteMetadata);
     OMKeyCreateRequest overwriteOmKeyCreateRequest =
-        new OMKeyCreateRequest(overwriteRequestWithMetadata,
-            BucketLayout.OBJECT_STORE);
+        new OMKeyCreateRequest(overwriteRequestWithMetadata, getBucketLayout());
 
     // Perform the overwrite operation and capture the response
     OMClientResponse overwriteResponse =

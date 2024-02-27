@@ -31,7 +31,6 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.HashMap;
 import java.util.stream.Collectors;
 
 import com.google.common.annotations.VisibleForTesting;
@@ -69,7 +68,6 @@ import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos.KeyValue;
 
 import org.apache.hadoop.crypto.key.KeyProviderCryptoExtension
     .EncryptedKeyVersion;
@@ -778,15 +776,11 @@ public abstract class OMKeyRequest extends OMClientRequest {
       dbKeyInfo.setUpdateID(transactionLogIndex, isRatisEnabled);
       dbKeyInfo.setReplicationConfig(replicationConfig);
 
-      // Construct new metadata map from KeyArgs
-      List<KeyValue> keyValueList = keyArgs.getMetadataList();
-      Map<String, String> newMetadata = new HashMap<>();
-      for (KeyValue keyValue : keyValueList) {
-        newMetadata.put(keyValue.getKey(), keyValue.getValue());
-      }
-
-      updateMetadata(dbKeyInfo, newMetadata);
-
+      // Construct a new metadata map from KeyArgs.
+      // Clear the old one when the key is overwritten.
+      dbKeyInfo.getMetadata().clear();
+      dbKeyInfo.getMetadata().putAll(KeyValueUtil.getFromProtobuf(
+          keyArgs.getMetadataList()));
       return dbKeyInfo;
     }
 
