@@ -118,10 +118,12 @@ public class ContainerHealthSchemaManager {
   }
 
   public void insertUnhealthyContainerRecords(List<UnhealthyContainers> recs) {
-    recs.forEach(rec -> {
-      LOG.debug("rec.getContainerId() : {}, rec.getContainerState(): {} ", rec.getContainerId(),
-          rec.getContainerState());
-    });
+    if (LOG.isDebugEnabled()) {
+      recs.forEach(rec -> {
+        LOG.debug("rec.getContainerId() : {}, rec.getContainerState(): {} ", rec.getContainerId(),
+            rec.getContainerState());
+      });
+    }
     unhealthyContainersDao.insert(recs);
   }
 

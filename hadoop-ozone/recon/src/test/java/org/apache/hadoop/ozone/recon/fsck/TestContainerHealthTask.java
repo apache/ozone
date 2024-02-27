@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.ozone.recon.fsck;
 
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.THREE;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.hadoop.ozone.recon.schema.ContainerSchemaDefinition.UnHealthyContainerStates.ALL_REPLICAS_UNHEALTHY;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -113,32 +114,7 @@ public class TestContainerHealthTask extends AbstractReconSqlDBTest {
           .thenReturn(new ContainerWithPipeline(c, null));
     }
 
-    ReplicatedReplicationConfig replicationConfig = new ReplicatedReplicationConfig() {
-      @Override
-      public HddsProtos.ReplicationFactor getReplicationFactor() {
-        return HddsProtos.ReplicationFactor.THREE;
-      }
-
-      @Override
-      public HddsProtos.ReplicationType getReplicationType() {
-        return HddsProtos.ReplicationType.RATIS;
-      }
-
-      @Override
-      public int getRequiredNodes() {
-        return 3;
-      }
-
-      @Override
-      public String getReplication() {
-        return null;
-      }
-
-      @Override
-      public String configFormat() {
-        return null;
-      }
-    };
+    ReplicatedReplicationConfig replicationConfig = RatisReplicationConfig.getInstance(THREE);
     // Under replicated
     ContainerInfo containerInfo1 =
         TestContainerInfo.newBuilderForTest().setContainerID(1).setReplicationConfig(replicationConfig).build();
@@ -429,9 +405,9 @@ public class TestContainerHealthTask extends AbstractReconSqlDBTest {
       when(c.getContainerID()).thenReturn((long)i);
       when(c.getReplicationConfig())
           .thenReturn(RatisReplicationConfig.getInstance(
-              HddsProtos.ReplicationFactor.THREE));
+              THREE));
       when(c.getReplicationFactor())
-          .thenReturn(HddsProtos.ReplicationFactor.THREE);
+          .thenReturn(THREE);
       when(c.getState()).thenReturn(HddsProtos.LifeCycleState.CLOSED);
       when(c.containerID()).thenReturn(ContainerID.valueOf(i));
       containers.add(c);
@@ -444,7 +420,7 @@ public class TestContainerHealthTask extends AbstractReconSqlDBTest {
     when(c.getContainerID()).thenReturn((long)containerID);
     when(c.getReplicationConfig())
         .thenReturn(RatisReplicationConfig
-            .getInstance(HddsProtos.ReplicationFactor.THREE));
+            .getInstance(THREE));
     when(c.containerID()).thenReturn(ContainerID.valueOf(containerID));
     when(c.getState()).thenReturn(HddsProtos.LifeCycleState.DELETED);
     return c;
