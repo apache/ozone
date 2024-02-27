@@ -90,41 +90,28 @@ public class TestListStatus {
   }
 
   @MethodSource("sortedListStatusParametersSource")
-  @ParameterizedTest
+  @ParameterizedTest(name = "{index} {5}")
   public void testSortedListStatus(String keyPrefix, String startKey, int numEntries, int expectedNumKeys,
-                                   boolean isPartialPrefix) throws Exception {
+                                   boolean isPartialPrefix, String testName) throws Exception {
     checkKeyList(keyPrefix, startKey, numEntries, expectedNumKeys, isPartialPrefix);
   }
 
   private static Stream<Arguments> sortedListStatusParametersSource() {
     return Stream.of(
-        // 1) test if output is sorted
-        arguments("", "", 1000, 10, false),
-        // 2) number of keys returns is expected
-        arguments("", "", 2, 2, false),
-        // 3) check if the full prefix works
-        arguments("a1", "", 100, 3, false),
-        // 4) check if full prefix with numEntries work
-        arguments("a1", "", 2, 2, false),
-        // 5) check if existing start key >>>
-        arguments("a1", "a1/a12", 100, 2, false),
-        // 6) check with a non-existing start key
-        arguments("", "a7", 100, 6, false),
-        // 7) check if half-prefix works
-        arguments("b", "", 100, 4, true),
-        // 8) check half prefix with non-existing start key
-        arguments("b", "b5", 100, 2, true),
-        // 9) check half prefix with non-existing parent in a start key
-        arguments("b", "c", 100, 0, true),
-        // 10) check half prefix with non-existing parent in a start key
-        arguments("b", "b/g5", 100, 4, true),
-        // 11) check half prefix with non-existing parent in a start key
-        arguments("b", "c/g5", 100, 0, true),
-        // 12) check prefix with a non-existing prefix key
-        //    and non-existing parent in a start key
-        arguments("a1/a111", "a1/a111/a100", 100, 0, true),
-        // 13) check start key is null
-        arguments("a1/a111", null, 100, 0, true)
+        arguments("", "", 1000, 10, false, "Test if output is sorted"),
+        arguments("", "", 2, 2, false, "Number of keys returns is expected"),
+        arguments("a1", "", 100, 3, false, "Check if the full prefix works"),
+        arguments("a1", "", 2, 2, false, "Check if full prefix with numEntries work"),
+        arguments("a1", "a1/a12", 100, 2, false, "Check if existing start key >>>"),
+        arguments("", "a7", 100, 6, false, "Check with a non-existing start key"),
+        arguments("b", "", 100, 4, true, "Check if half-prefix works"),
+        arguments("b", "b5", 100, 2, true, "Check half prefix with non-existing start key"),
+        arguments("b", "c", 100, 0, true, "Check half prefix with non-existing parent in a start key"),
+        arguments("b", "b/g5", 100, 4, true, "Check half prefix with non-existing parent in a start key"),
+        arguments("b", "c/g5", 100, 0, true, "Check half prefix with non-existing parent in a start key"),
+        arguments("a1/a111", "a1/a111/a100", 100, 0, true, "Check prefix with a non-existing prefix key\n" +
+            " and non-existing parent in a start key"),
+        arguments("a1/a111", null, 100, 0, true, "Check start key is null")
     );
   }
 
