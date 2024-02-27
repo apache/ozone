@@ -111,6 +111,7 @@ public class GeneratorDatanode extends BaseGenerator {
   private int overlap;
 
   private ChunkManager chunkManager;
+  private BlockManagerImpl blockManager;
 
   private RoundRobinVolumeChoosingPolicy volumeChoosingPolicy;
 
@@ -136,6 +137,7 @@ public class GeneratorDatanode extends BaseGenerator {
     BlockManager blockManager = new BlockManagerImpl(config);
     chunkManager = ChunkManagerFactory
         .createChunkManager(config, blockManager, null);
+    blockManager = new BlockManagerImpl(config);
 
     final Collection<String> storageDirs =
         HddsServerUtil.getDatanodeStorageDirs(config);
@@ -286,7 +288,7 @@ public class GeneratorDatanode extends BaseGenerator {
           writtenBytes += currentChunkSize;
         }
 
-        BlockManagerImpl.persistPutBlock(container, blockData, config, true);
+        blockManager.persistPutBlock(container, blockData, config, true);
 
       }
 
