@@ -59,6 +59,7 @@ import java.net.ConnectException;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeoutException;
 
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_RATIS_PIPELINE_LIMIT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_CLIENT_READ_TIMEOUT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_CLIENT_WAIT_BETWEEN_RETRIES_MILLIS_KEY;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SCM_BLOCK_SIZE;
@@ -118,9 +119,11 @@ public class TestLeaseRecovery {
     conf.setBoolean(OZONE_OM_RATIS_ENABLE_KEY, false);
     conf.setBoolean(OzoneConfigKeys.OZONE_FS_HSYNC_ENABLED, true);
     conf.set(OZONE_DEFAULT_BUCKET_LAYOUT, layout.name());
+    conf.setInt(OZONE_SCM_RATIS_PIPELINE_LIMIT, 10);
     conf.set(OzoneConfigKeys.OZONE_OM_LEASE_SOFT_LIMIT, "0s");
     // make sure flush will write data to DN
     conf.setBoolean("ozone.client.stream.buffer.flush.delay", false);
+
     ClientConfigForTesting.newBuilder(StorageUnit.BYTES)
         .setBlockSize(blockSize)
         .setChunkSize(chunkSize)
@@ -133,7 +136,6 @@ public class TestLeaseRecovery {
 
     cluster = MiniOzoneCluster.newBuilder(conf)
       .setNumDatanodes(3)
-      .setTotalPipelineNumLimit(10)
       .build();
     cluster.waitForClusterToBeReady();
     client = cluster.newClient();

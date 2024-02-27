@@ -1,0 +1,1209 @@
+{
+  "annotations": {
+    "list": [
+      {
+        "builtIn": 1,
+        "datasource": {
+          "type": "grafana",
+          "uid": "-- Grafana --"
+        },
+        "enable": true,
+        "hide": true,
+        "iconColor": "rgba(0, 211, 255, 1)",
+        "name": "Annotations & Alerts",
+        "type": "dashboard"
+      }
+    ]
+  },
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 0,
+  "id": 7,
+  "links": [],
+  "liveNow": false,
+  "panels": [
+    {
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 0
+      },
+      "id": 9,
+      "panels": [],
+      "title": "S3 Latency measurements",
+      "type": "row"
+    },
+    {
+      "datasource": {
+        "type": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          },
+          "unit": "ns",
+          "unitScale": true
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 1
+      },
+      "id": 1,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "label_replace({__name__=~\"s3_gateway_metrics_${S3API}_success_latency_ns_avg_time\"}, \"api\", \"$1\", \"__name__\", \"s3_gateway_metrics_(.+)_success_latency_ns_avg_time\")",
+          "instant": false,
+          "legendFormat": "{{api}} {{hostname}}",
+          "range": true,
+          "refId": "A"
+        }
+      ],
+      "title": "API avg latency - Success",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          },
+          "unit": "ns",
+          "unitScale": true
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 1
+      },
+      "id": 3,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "label_replace({__name__=~\"s3_gateway_metrics_${S3API}_failure_latency_ns_avg_time\"}, \"api\", \"$1\", \"__name__\", \"s3_gateway_metrics_(.+)_failure_latency_ns_avg_time\")",
+          "instant": false,
+          "legendFormat": "{{api}} {{hostname}}",
+          "range": true,
+          "refId": "A"
+        }
+      ],
+      "title": "API  avg latency - Failure",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          },
+          "unit": "ns",
+          "unitScale": true
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 9
+      },
+      "id": 26,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "label_replace({__name__=~\"s3_gateway_metrics_${S3API}_success_latency_ns60s${percentile}_percentile_time\"}, \"api\", \"$1 $2\", \"__name__\", \"s3_gateway_metrics_(.*)_success_latency_ns60s(.*)_percentile_time\")",
+          "instant": false,
+          "legendFormat": "{{api}} {{hostname}}",
+          "range": true,
+          "refId": "A"
+        }
+      ],
+      "title": "Combined Percentile - Success",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          },
+          "unit": "ns",
+          "unitScale": true
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 9
+      },
+      "id": 27,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "label_replace({__name__=~\"s3_gateway_metrics_${S3API}_failure_latency_ns60s${percentile}_percentile_time\"}, \"api\", \"$1 $2\", \"__name__\", \"s3_gateway_metrics_(.*)_failure_latency_ns60s(.*)_percentile_time\")",
+          "instant": false,
+          "legendFormat": "{{api}} {{hostname}}",
+          "range": true,
+          "refId": "A"
+        }
+      ],
+      "title": "Combined Percentile - Failure",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          },
+          "unit": "ns",
+          "unitScale": true
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 17
+      },
+      "id": 20,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "label_replace({__name__=~\"(s3_gateway_metrics_)${S3API}_success_latency_.*_max_time\"}, \"api\", \"$1\", \"__name__\", \"s3_gateway_metrics_(.+)_success_latency_.*_max_time\")",
+          "hide": false,
+          "instant": false,
+          "legendFormat": "{{api}}, {{hostname}}",
+          "range": true,
+          "refId": "B"
+        }
+      ],
+      "title": "Max latency - Success",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          },
+          "unit": "ns",
+          "unitScale": true
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 17
+      },
+      "id": 14,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "label_replace({__name__=~\"(s3_gateway_metrics_)${S3API}_failure_latency_.*_max_time\"}, \"api\", \"$1\", \"__name__\", \"s3_gateway_metrics_(.+)_failure_latency_.*_max_time\")",
+          "hide": false,
+          "instant": false,
+          "legendFormat": "{{api}}, {{hostname}}",
+          "range": true,
+          "refId": "B"
+        }
+      ],
+      "title": "Max latency - Failure",
+      "type": "timeseries"
+    },
+    {
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 25
+      },
+      "id": 8,
+      "panels": [],
+      "title": "Rate of S3 operations",
+      "type": "row"
+    },
+    {
+      "datasource": {
+        "type": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          },
+          "unitScale": true
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 26
+      },
+      "id": 4,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus"
+          },
+          "disableTextWrap": false,
+          "editorMode": "builder",
+          "exemplar": true,
+          "expr": "rate(label_replace({__name__=~\"(s3_gateway_metrics_)${S3API}_success\"}, \"api\", \"$1\", \"__name__\", \"s3_gateway_metrics_(.+)_success\")[5m:30s])",
+          "fullMetaSearch": false,
+          "includeNullMetadata": true,
+          "instant": false,
+          "legendFormat": "{{api}}, {{hostname}}",
+          "range": true,
+          "refId": "A",
+          "useBackend": false
+        }
+      ],
+      "title": "APIs per second - Success",
+      "transformations": [],
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          },
+          "unitScale": true
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 26
+      },
+      "id": 5,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus"
+          },
+          "disableTextWrap": false,
+          "editorMode": "code",
+          "expr": "rate(label_replace({__name__=~\"(s3_gateway_metrics_)${S3API}_failure\"}, \"api\", \"$1\", \"__name__\", \"s3_gateway_metrics_(.+)_failure\")[5m:30s])",
+          "fullMetaSearch": false,
+          "includeNullMetadata": true,
+          "instant": false,
+          "legendFormat": "{{api}} {{hostname}}",
+          "range": true,
+          "refId": "A",
+          "useBackend": false
+        }
+      ],
+      "title": "APIs per second - Failure",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          },
+          "unit": "bytes",
+          "unitScale": true
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 34
+      },
+      "id": 6,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "rate(label_replace({__name__=~\"(s3_gateway_metrics_)${S3API}_success_length\"}, \"api\", \"$1\", \"__name__\", \"s3_gateway_metrics_(.+)_success_length\")[3m:30s])",
+          "hide": false,
+          "instant": false,
+          "legendFormat": "{{api}}, {{hostname}}",
+          "range": true,
+          "refId": "A"
+        }
+      ],
+      "title": "Data transfer per second",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          },
+          "unit": "bytes",
+          "unitScale": true
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 34
+      },
+      "id": 16,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "rate(sum(label_replace({__name__=~\"(s3_gateway_metrics_)${S3API}_success_length\"}, \"api\", \"$1\", \"__name__\", \"s3_gateway_metrics_(.+)_success_length\"))[3m:30s])",
+          "hide": false,
+          "instant": false,
+          "legendFormat": "Total Data transfer across all S3 Gateways",
+          "range": true,
+          "refId": "A"
+        }
+      ],
+      "title": "Aggregate Data transfer per second",
+      "type": "timeseries"
+    }
+  ],
+  "refresh": "",
+  "schemaVersion": 39,
+  "tags": [],
+  "templating": {
+    "list": [
+      {
+        "current": {
+          "selected": false,
+          "text": [
+            "All"
+          ],
+          "value": [
+            "$__all"
+          ]
+        },
+        "hide": 0,
+        "includeAll": true,
+        "label": "S3API",
+        "multi": true,
+        "name": "S3API",
+        "options": [
+          {
+            "selected": true,
+            "text": "All",
+            "value": "$__all"
+          },
+          {
+            "selected": false,
+            "text": "abort_multipart_upload",
+            "value": "abort_multipart_upload"
+          },
+          {
+            "selected": false,
+            "text": "complete_multipart_upload",
+            "value": "complete_multipart_upload"
+          },
+          {
+            "selected": false,
+            "text": "copy_key_metadata",
+            "value": "copy_key_metadata"
+          },
+          {
+            "selected": false,
+            "text": "copy_object",
+            "value": "copy_object"
+          },
+          {
+            "selected": false,
+            "text": "create_bucket",
+            "value": "create_bucket"
+          },
+          {
+            "selected": false,
+            "text": "create_key",
+            "value": "create_key"
+          },
+          {
+            "selected": false,
+            "text": "create_multipart_key",
+            "value": "create_multipart_key"
+          },
+          {
+            "selected": false,
+            "text": "delete_bucket",
+            "value": "delete_bucket"
+          },
+          {
+            "selected": false,
+            "text": "delete_key",
+            "value": "delete_key"
+          },
+          {
+            "selected": false,
+            "text": "get_acl",
+            "value": "get_acl"
+          },
+          {
+            "selected": false,
+            "text": "get_bucket",
+            "value": "get_bucket"
+          },
+          {
+            "selected": false,
+            "text": "get_key",
+            "value": "get_key"
+          },
+          {
+            "selected": false,
+            "text": "head_bucket",
+            "value": "head_bucket"
+          },
+          {
+            "selected": false,
+            "text": "head_key",
+            "value": "head_key"
+          },
+          {
+            "selected": false,
+            "text": "init_multipart_uploads",
+            "value": "init_multipart_uploads"
+          },
+          {
+            "selected": false,
+            "text": "list_multipart_uploads",
+            "value": "list_multipart_uploads"
+          },
+          {
+            "selected": false,
+            "text": "list_parts",
+            "value": "list_parts"
+          },
+          {
+            "selected": false,
+            "text": "list_s3_buckets",
+            "value": "list_s3_buckets"
+          },
+          {
+            "selected": false,
+            "text": "put_acl",
+            "value": "put_acl"
+          },
+          {
+            "selected": false,
+            "text": "put_key",
+            "value": "put_key"
+          }
+        ],
+        "query": "abort_multipart_upload, complete_multipart_upload, copy_key_metadata, copy_object, create_bucket, create_key, create_multipart_key, delete_bucket, delete_key, get_acl, get_bucket, get_key, head_bucket, head_key, init_multipart_uploads, list_multipart_uploads, list_parts, list_s3_buckets, put_acl, put_key ",
+        "queryValue": "",
+        "skipUrlSync": false,
+        "type": "custom"
+      },
+      {
+        "current": {
+          "selected": false,
+          "text": [
+            "99th"
+          ],
+          "value": [
+            "99th"
+          ]
+        },
+        "hide": 0,
+        "includeAll": true,
+        "label": "Latency Percentile",
+        "multi": true,
+        "name": "percentile",
+        "options": [
+          {
+            "selected": false,
+            "text": "All",
+            "value": "$__all"
+          },
+          {
+            "selected": true,
+            "text": "99th",
+            "value": "99th"
+          },
+          {
+            "selected": false,
+            "text": "95th",
+            "value": "95th"
+          },
+          {
+            "selected": false,
+            "text": "90th",
+            "value": "90th"
+          },
+          {
+            "selected": false,
+            "text": "75th",
+            "value": "75th"
+          },
+          {
+            "selected": false,
+            "text": "50th",
+            "value": "50th"
+          }
+        ],
+        "query": "99th, 95th, 90th, 75th, 50th",
+        "queryValue": "",
+        "skipUrlSync": false,
+        "type": "custom"
+      }
+    ]
+  },
+  "time": {
+    "from": "now-5m",
+    "to": "now"
+  },
+  "timepicker": {},
+  "timezone": "",
+  "title": "S3 API Dashboard",
+  "version": 16,
+  "weekStart": ""
+}

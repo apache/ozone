@@ -23,7 +23,6 @@ import java.nio.file.DirectoryStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.List;
 
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 
@@ -32,7 +31,6 @@ import org.apache.hadoop.hdds.utils.MetadataKeyFilters;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
-import org.apache.hadoop.ozone.container.common.helpers.ChunkInfo;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerUtils;
 import org.apache.hadoop.ozone.container.common.interfaces.BlockIterator;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
@@ -64,12 +62,6 @@ public final class KeyValueContainerUtil {
 
   private static final Logger LOG = LoggerFactory.getLogger(
       KeyValueContainerUtil.class);
-
-  /**
-   *
-   * @param containerMetaDataPath
-   * @throws IOException
-   */
 
   /**
    * creates metadata path, chunks path and metadata DB for the specified
@@ -434,46 +426,9 @@ public final class KeyValueContainerUtil {
   }
 
   public static long getBlockLength(BlockData block) throws IOException {
-    long blockLen = 0;
-    List<ContainerProtos.ChunkInfo> chunkInfoList = block.getChunks();
-
-    for (ContainerProtos.ChunkInfo chunk : chunkInfoList) {
-      ChunkInfo info = ChunkInfo.getFromProtoBuf(chunk);
-      blockLen += info.getLen();
-    }
-
-    return blockLen;
-  }
-
-  /**
-   * Returns the path where data or chunks live for a given container.
-   *
-   * @param kvContainerData - KeyValueContainerData
-   * @return - Path to the chunks directory
-   */
-  public static Path getDataDirectory(KeyValueContainerData kvContainerData) {
-
-    String chunksPath = kvContainerData.getChunksPath();
-    Preconditions.checkNotNull(chunksPath);
-
-    return Paths.get(chunksPath);
-  }
-
-  /**
-   * Container metadata directory -- here is where the RocksDB and
-   * .container file lives.
-   *
-   * @param kvContainerData - KeyValueContainerData
-   * @return Path to the metadata directory
-   */
-  public static Path getMetadataDirectory(
-      KeyValueContainerData kvContainerData) {
-
-    String metadataPath = kvContainerData.getMetadataPath();
-    Preconditions.checkNotNull(metadataPath);
-
-    return Paths.get(metadataPath);
-
+    return block.getChunks().stream()
+        .mapToLong(ContainerProtos.ChunkInfo::getLen)
+        .sum();
   }
 
   public static boolean isSameSchemaVersion(String schema, String other) {

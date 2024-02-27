@@ -55,9 +55,9 @@ public final class OmPrefixInfo extends WithObjectID {
       Map<String, String> metadata, long objectId, long updateId) {
     this.name = name;
     this.acls = acls;
-    this.metadata = metadata;
-    this.objectID = objectId;
-    this.updateID = updateId;
+    setMetadata(metadata);
+    setObjectID(objectId);
+    setUpdateID(updateId);
   }
 
   /**
@@ -164,9 +164,9 @@ public final class OmPrefixInfo extends WithObjectID {
   public PersistedPrefixInfo getProtobuf() {
     PersistedPrefixInfo.Builder pib =
         PersistedPrefixInfo.newBuilder().setName(name)
-        .addAllMetadata(KeyValueUtil.toProtobuf(metadata))
-        .setObjectID(objectID)
-        .setUpdateID(updateID);
+        .addAllMetadata(KeyValueUtil.toProtobuf(getMetadata()))
+        .setObjectID(getObjectID())
+        .setUpdateID(getUpdateID());
     if (acls != null) {
       pib.addAllAcls(OzoneAclStorageUtil.toProtobuf(acls));
     }
@@ -210,14 +210,14 @@ public final class OmPrefixInfo extends WithObjectID {
     OmPrefixInfo that = (OmPrefixInfo) o;
     return name.equals(that.name) &&
         Objects.equals(acls, that.acls) &&
-        Objects.equals(metadata, that.metadata) &&
-        objectID == that.objectID &&
-        updateID == that.updateID;
+        Objects.equals(getMetadata(), that.getMetadata()) &&
+        getObjectID() == that.getObjectID() &&
+        getUpdateID() == that.getUpdateID();
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(name, acls, metadata, objectID, updateID);
+    return Objects.hash(name, acls, getMetadata(), getObjectID(), getUpdateID());
   }
 
   @Override
@@ -225,9 +225,9 @@ public final class OmPrefixInfo extends WithObjectID {
     return "OmPrefixInfo{" +
         "name='" + name + '\'' +
         ", acls=" + acls +
-        ", metadata=" + metadata +
-        ", objectID=" + objectID +
-        ", updateID=" + updateID +
+        ", metadata=" + getMetadata() +
+        ", objectID=" + getObjectID() +
+        ", updateID=" + getUpdateID() +
         '}';
   }
 
@@ -241,10 +241,10 @@ public final class OmPrefixInfo extends WithObjectID {
         .collect(Collectors.toList());
 
     Map<String, String> metadataList = new HashMap<>();
-    if (metadata != null) {
-      metadata.forEach((k, v) -> metadataList.put(k, v));
+    if (getMetadata() != null) {
+      getMetadata().forEach((k, v) -> metadataList.put(k, v));
     }
-    return new OmPrefixInfo(name, aclList, metadataList, objectID, updateID);
+    return new OmPrefixInfo(name, aclList, metadataList, getObjectID(), getUpdateID());
   }
 }
 

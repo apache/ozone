@@ -19,8 +19,10 @@ package org.apache.hadoop.ozone.common;
 
 import org.apache.hadoop.util.PureJavaCrc32;
 import org.apache.hadoop.util.PureJavaCrc32C;
+import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
+import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import org.apache.commons.lang3.RandomUtils;
 import java.util.zip.Checksum;
@@ -43,6 +45,23 @@ public class TestChecksumByteBuffer {
     final Checksum expected = new PureJavaCrc32C();
     final ChecksumByteBuffer testee = ChecksumByteBufferFactory.crc32CImpl();
     new VerifyChecksumByteBuffer(expected, testee).testCorrectness();
+  }
+
+  @Test
+  public void testWithDirectBuffer() {
+    final ChecksumByteBuffer checksum = ChecksumByteBufferFactory.crc32CImpl();
+    byte[] value = "test".getBytes(StandardCharsets.UTF_8);
+    checksum.reset();
+    checksum.update(value, 0, value.length);
+    long checksum1 = checksum.getValue();
+
+    ByteBuffer byteBuffer = ByteBuffer.allocateDirect(value.length);
+    byteBuffer.put(value).rewind();
+    checksum.reset();
+    checksum.update(byteBuffer);
+    long checksum2 = checksum.getValue();
+
+    Assertions.assertEquals(checksum1, checksum2);
   }
 
   static class VerifyChecksumByteBuffer {

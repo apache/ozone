@@ -62,8 +62,6 @@ public abstract class AbstractDatanodeStore implements DatanodeStore {
 
   private Table<String, BlockData> blockDataTableWithIterator;
 
-  private Table<String, ChunkInfoList> deletedBlocksTable;
-
   private Table<String, Long> finalizeBlocksTable;
 
   private Table<String, Long> finalizeBlocksTableWithIterator;
@@ -161,10 +159,6 @@ public abstract class AbstractDatanodeStore implements DatanodeStore {
       blockDataTable = new DatanodeTable<>(blockDataTableWithIterator);
       checkTableStatus(blockDataTable, blockDataTable.getName());
 
-      deletedBlocksTable = new DatanodeTable<>(
-              dbDef.getDeletedBlocksColumnFamily().getTable(this.store));
-      checkTableStatus(deletedBlocksTable, deletedBlocksTable.getName());
-
       if (dbDef.getFinalizeBlocksColumnFamily() != null) {
         finalizeBlocksTableWithIterator =
             dbDef.getFinalizeBlocksColumnFamily().getTable(this.store);
@@ -217,7 +211,7 @@ public abstract class AbstractDatanodeStore implements DatanodeStore {
 
   @Override
   public Table<String, ChunkInfoList> getDeletedBlocksTable() {
-    return deletedBlocksTable;
+    throw new UnsupportedOperationException("DeletedBlocksTable is only supported in Container Schema One");
   }
 
   @Override
@@ -292,7 +286,7 @@ public abstract class AbstractDatanodeStore implements DatanodeStore {
     return this.finalizeBlocksTableWithIterator;
   }
 
-  private static void checkTableStatus(Table<?, ?> table, String name)
+  protected static void checkTableStatus(Table<?, ?> table, String name)
           throws IOException {
     String logMessage = "Unable to get a reference to %s table. Cannot " +
             "continue.";

@@ -42,93 +42,93 @@ public final class ScmConfigKeys {
       "ozone.scm.db.dirs.permissions";
 
   public static final String DFS_CONTAINER_RATIS_ENABLED_KEY
-      = "dfs.container.ratis.enabled";
+      = "hdds.container.ratis.enabled";
   public static final boolean DFS_CONTAINER_RATIS_ENABLED_DEFAULT
       = false;
   public static final String DFS_CONTAINER_RATIS_RPC_TYPE_KEY
-      = "dfs.container.ratis.rpc.type";
+      = "hdds.container.ratis.rpc.type";
   public static final String DFS_CONTAINER_RATIS_RPC_TYPE_DEFAULT
       = "GRPC";
   public static final String
       DFS_CONTAINER_RATIS_NUM_WRITE_CHUNK_THREADS_PER_VOLUME
-      = "dfs.container.ratis.num.write.chunk.threads.per.volume";
+      = "hdds.container.ratis.num.write.chunk.threads.per.volume";
   public static final int
       DFS_CONTAINER_RATIS_NUM_WRITE_CHUNK_THREADS_PER_VOLUME_DEFAULT
       = 10;
   public static final String DFS_CONTAINER_RATIS_REPLICATION_LEVEL_KEY
-      = "dfs.container.ratis.replication.level";
+      = "hdds.container.ratis.replication.level";
   public static final ReplicationLevel
       DFS_CONTAINER_RATIS_REPLICATION_LEVEL_DEFAULT = ReplicationLevel.MAJORITY;
   public static final String DFS_CONTAINER_RATIS_NUM_CONTAINER_OP_EXECUTORS_KEY
-      = "dfs.container.ratis.num.container.op.executors";
+      = "hdds.container.ratis.num.container.op.executors";
   public static final int DFS_CONTAINER_RATIS_NUM_CONTAINER_OP_EXECUTORS_DEFAULT
       = 10;
   public static final String DFS_CONTAINER_RATIS_SEGMENT_SIZE_KEY =
-      "dfs.container.ratis.segment.size";
+      "hdds.container.ratis.segment.size";
   public static final String DFS_CONTAINER_RATIS_SEGMENT_SIZE_DEFAULT =
       "64MB";
   public static final String DFS_CONTAINER_RATIS_SEGMENT_PREALLOCATED_SIZE_KEY =
-      "dfs.container.ratis.segment.preallocated.size";
+      "hdds.container.ratis.segment.preallocated.size";
   public static final String
       DFS_CONTAINER_RATIS_SEGMENT_PREALLOCATED_SIZE_DEFAULT = "4MB";
   public static final String
       DFS_CONTAINER_RATIS_STATEMACHINEDATA_SYNC_TIMEOUT =
-      "dfs.container.ratis.statemachinedata.sync.timeout";
+      "hdds.container.ratis.statemachinedata.sync.timeout";
   public static final TimeDuration
       DFS_CONTAINER_RATIS_STATEMACHINEDATA_SYNC_TIMEOUT_DEFAULT =
       TimeDuration.valueOf(10, TimeUnit.SECONDS);
   public static final String
       DFS_CONTAINER_RATIS_STATEMACHINEDATA_SYNC_RETRIES =
-      "dfs.container.ratis.statemachinedata.sync.retries";
+      "hdds.container.ratis.statemachinedata.sync.retries";
   public static final String
       DFS_CONTAINER_RATIS_STATEMACHINE_MAX_PENDING_APPLY_TXNS =
-      "dfs.container.ratis.statemachine.max.pending.apply-transactions";
+      "hdds.container.ratis.statemachine.max.pending.apply-transactions";
   // The default value of maximum number of pending state machine apply
   // transactions is kept same as default snapshot threshold.
   public static final int
       DFS_CONTAINER_RATIS_STATEMACHINE_MAX_PENDING_APPLY_TXNS_DEFAULT =
       100000;
   public static final String DFS_CONTAINER_RATIS_LOG_QUEUE_NUM_ELEMENTS =
-      "dfs.container.ratis.log.queue.num-elements";
+      "hdds.container.ratis.log.queue.num-elements";
   public static final int DFS_CONTAINER_RATIS_LOG_QUEUE_NUM_ELEMENTS_DEFAULT =
       1024;
   public static final String DFS_CONTAINER_RATIS_LOG_QUEUE_BYTE_LIMIT =
-      "dfs.container.ratis.log.queue.byte-limit";
+      "hdds.container.ratis.log.queue.byte-limit";
   public static final String DFS_CONTAINER_RATIS_LOG_QUEUE_BYTE_LIMIT_DEFAULT =
       "4GB";
   public static final String
       DFS_CONTAINER_RATIS_LOG_APPENDER_QUEUE_NUM_ELEMENTS =
-      "dfs.container.ratis.log.appender.queue.num-elements";
+      "hdds.container.ratis.log.appender.queue.num-elements";
   public static final int
       DFS_CONTAINER_RATIS_LOG_APPENDER_QUEUE_NUM_ELEMENTS_DEFAULT = 1;
   public static final String DFS_CONTAINER_RATIS_LOG_APPENDER_QUEUE_BYTE_LIMIT =
-      "dfs.container.ratis.log.appender.queue.byte-limit";
+      "hdds.container.ratis.log.appender.queue.byte-limit";
   public static final String
       DFS_CONTAINER_RATIS_LOG_APPENDER_QUEUE_BYTE_LIMIT_DEFAULT = "32MB";
   public static final String DFS_CONTAINER_RATIS_LOG_PURGE_GAP =
-      "dfs.container.ratis.log.purge.gap";
+      "hdds.container.ratis.log.purge.gap";
   // TODO: Set to 1024 once RATIS issue around purge is fixed.
   public static final int DFS_CONTAINER_RATIS_LOG_PURGE_GAP_DEFAULT =
       1000000;
   public static final String DFS_CONTAINER_RATIS_LEADER_PENDING_BYTES_LIMIT =
-      "dfs.container.ratis.leader.pending.bytes.limit";
+      "hdds.container.ratis.leader.pending.bytes.limit";
   public static final String
       DFS_CONTAINER_RATIS_LEADER_PENDING_BYTES_LIMIT_DEFAULT = "1GB";
 
   public static final String DFS_RATIS_SERVER_RETRY_CACHE_TIMEOUT_DURATION_KEY =
-      "dfs.ratis.server.retry-cache.timeout.duration";
+      "hdds.ratis.server.retry-cache.timeout.duration";
   public static final TimeDuration
       DFS_RATIS_SERVER_RETRY_CACHE_TIMEOUT_DURATION_DEFAULT =
       TimeDuration.valueOf(600000, TimeUnit.MILLISECONDS);
   public static final String
       DFS_RATIS_LEADER_ELECTION_MINIMUM_TIMEOUT_DURATION_KEY =
-      "dfs.ratis.leader.election.minimum.timeout.duration";
+      "hdds.ratis.leader.election.minimum.timeout.duration";
   public static final TimeDuration
       DFS_RATIS_LEADER_ELECTION_MINIMUM_TIMEOUT_DURATION_DEFAULT =
       TimeDuration.valueOf(5, TimeUnit.SECONDS);
 
   public static final String DFS_RATIS_SNAPSHOT_THRESHOLD_KEY =
-      "dfs.ratis.snapshot.threshold";
+      "hdds.ratis.snapshot.threshold";
   public static final long DFS_RATIS_SNAPSHOT_THRESHOLD_DEFAULT = 100000;
 
   // TODO : this is copied from OzoneConsts, may need to move to a better place

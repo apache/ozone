@@ -37,6 +37,8 @@ import java.util.stream.Stream;
 
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.conf.StorageUnit;
+import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
+import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
@@ -44,9 +46,7 @@ import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType;
 import org.apache.hadoop.hdds.scm.HddsWhiteboxTestUtils;
 import org.apache.hadoop.hdds.scm.HddsTestUtils;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
@@ -110,7 +110,9 @@ import static org.apache.hadoop.ozone.OzoneAcl.AclScope.ACCESS;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_KEY_PREALLOCATION_BLOCKS_MAX;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SCM_BLOCK_SIZE;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SCM_BLOCK_SIZE_DEFAULT;
+import static org.apache.hadoop.ozone.OzoneConsts.OZONE_OFS_URI_SCHEME;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ADDRESS_KEY;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.SCM_GET_PIPELINE_EXCEPTION;
 import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType.ALL;
 
@@ -118,12 +120,14 @@ import org.apache.ratis.util.ExitUtils;
 import jakarta.annotation.Nonnull;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
+import org.junit.jupiter.params.provider.ValueSource;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -164,7 +168,7 @@ public class TestKeyManagerImpl {
   private static final String KEY_NAME = "key1";
   private static final String BUCKET_NAME = "bucket1";
   private static final String BUCKET2_NAME = "bucket2";
-  private static final String VERSIONED_BUCKET_NAME = "versionedBucket1";
+  private static final String VERSIONED_BUCKET_NAME = "versionedbucket1";
   private static final String VOLUME_NAME = "vol1";
   private static OzoneManagerProtocol writeClient;
   private static OzoneManager om;
@@ -176,6 +180,9 @@ public class TestKeyManagerImpl {
     dir = GenericTestUtils.getRandomizedTestDir();
     conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, dir.toString());
     conf.set(OzoneConfigKeys.OZONE_NETWORK_TOPOLOGY_AWARE_READ_KEY, "true");
+    final String rootPath = String.format("%s://%s/", OZONE_OFS_URI_SCHEME,
+        conf.get(OZONE_OM_ADDRESS_KEY));
+    conf.set(CommonConfigurationKeysPublic.FS_DEFAULT_NAME_KEY, rootPath);
     mockScmBlockLocationProtocol = mock(ScmBlockLocationProtocol.class);
     nodeManager = new MockNodeManager(true, 10);
     NodeSchema[] schemas = new NodeSchema[]
@@ -224,9 +231,6 @@ public class TestKeyManagerImpl {
                 new SCMException("SafeModePrecheck failed for allocateBlock",
             ResultCodes.SAFE_MODE_EXCEPTION));
     createVolume(VOLUME_NAME);
-    createBucket(VOLUME_NAME, BUCKET_NAME, false);
-    createBucket(VOLUME_NAME, BUCKET2_NAME, false);
-    createBucket(VOLUME_NAME, VERSIONED_BUCKET_NAME, true);
   }
 
   @AfterAll
@@ -237,21 +241,21 @@ public class TestKeyManagerImpl {
     FileUtils.deleteDirectory(dir);
   }
 
+  @BeforeEach
+  public void init() throws Exception {
+    createBucket(VOLUME_NAME, BUCKET_NAME, false);
+    createBucket(VOLUME_NAME, BUCKET2_NAME, false);
+    createBucket(VOLUME_NAME, VERSIONED_BUCKET_NAME, true);
+  }
+
   @AfterEach
   public void cleanupTest() throws IOException {
     mockContainerClient();
-    List<OzoneFileStatus> fileStatuses = keyManager
-        .listStatus(createBuilder().setKeyName("").build(), true, "", 100000);
-    for (OzoneFileStatus fileStatus : fileStatuses) {
-      if (fileStatus.isFile()) {
-        writeClient.deleteKey(
-            createKeyArgs(fileStatus.getKeyInfo().getKeyName()));
-      } else {
-        writeClient.deleteKey(createKeyArgs(OzoneFSUtils
-            .addTrailingSlashIfNeeded(
-                fileStatus.getKeyInfo().getKeyName())));
-      }
-    }
+    org.apache.hadoop.fs.Path volumePath = new org.apache.hadoop.fs.Path(OZONE_URI_DELIMITER, VOLUME_NAME);
+    FileSystem fs = FileSystem.get(conf);
+    fs.delete(new org.apache.hadoop.fs.Path(volumePath, BUCKET_NAME), true);
+    fs.delete(new org.apache.hadoop.fs.Path(volumePath, BUCKET2_NAME), true);
+    fs.delete(new org.apache.hadoop.fs.Path(volumePath, VERSIONED_BUCKET_NAME), true);
   }
 
   private static void mockContainerClient() {
@@ -976,12 +980,11 @@ public class TestKeyManagerImpl {
       if (i % 2 == 0) {  // Add to DB
         OMRequestTestUtils.addKeyToTable(false,
             VOLUME_NAME, BUCKET_NAME, prefixKeyInDB + i,
-            1000L, HddsProtos.ReplicationType.RATIS,
-            ONE, metadataManager);
+            1000L, RatisReplicationConfig.getInstance(ONE), metadataManager);
       } else {  // Add to TableCache
         OMRequestTestUtils.addKeyToTableCache(
             VOLUME_NAME, BUCKET_NAME, prefixKeyInCache + i,
-            HddsProtos.ReplicationType.RATIS, ONE,
+            RatisReplicationConfig.getInstance(ONE),
             metadataManager);
       }
     }
@@ -1012,8 +1015,10 @@ public class TestKeyManagerImpl {
     }
   }
 
-  @Test
-  public void testListStatusWithTableCacheRecursive() throws Exception {
+  @ParameterizedTest
+  @ValueSource(booleans = {true, false})
+  public void testListStatusWithTableCacheRecursive(boolean enablePath) throws Exception {
+    conf.setBoolean(OMConfigKeys.OZONE_OM_ENABLE_FILESYSTEM_PATHS, enablePath);
     String keyNameDir1 = "dir1";
     OmKeyArgs keyArgsDir1 =
         createBuilder().setKeyName(keyNameDir1).build();
@@ -1048,13 +1053,12 @@ public class TestKeyManagerImpl {
         OMRequestTestUtils.addKeyToTable(false,
             VOLUME_NAME, BUCKET_NAME,
             keyNameDir1Subdir1 + OZONE_URI_DELIMITER + prefixKeyInDB + i,
-            1000L, HddsProtos.ReplicationType.RATIS,
-            ONE, metadataManager);
+            1000L, RatisReplicationConfig.getInstance(ONE), metadataManager);
       } else {  // Add to TableCache
         OMRequestTestUtils.addKeyToTableCache(
             VOLUME_NAME, BUCKET_NAME,
             keyNameDir1Subdir1 + OZONE_URI_DELIMITER + prefixKeyInCache + i,
-            HddsProtos.ReplicationType.RATIS, ONE,
+            RatisReplicationConfig.getInstance(ONE),
             metadataManager);
       }
     }
@@ -1092,13 +1096,12 @@ public class TestKeyManagerImpl {
       if (i % 2 == 0) {
         OMRequestTestUtils.addKeyToTable(false,
             VOLUME_NAME, BUCKET_NAME, prefixKey + i,
-            1000L, HddsProtos.ReplicationType.RATIS,
-            ONE, metadataManager);
+            1000L, RatisReplicationConfig.getInstance(ONE), metadataManager);
         existKeySet.add(prefixKey + i);
       } else {
         OMRequestTestUtils.addKeyToTableCache(
             VOLUME_NAME, BUCKET_NAME, prefixKey + i,
-            HddsProtos.ReplicationType.RATIS, ONE,
+            RatisReplicationConfig.getInstance(ONE),
             metadataManager);
 
         String key = metadataManager.getOzoneKey(
@@ -1199,8 +1202,10 @@ public class TestKeyManagerImpl {
     assertTrue(existKeySet.isEmpty());
   }
 
-  @Test
-  public void testListStatus() throws IOException {
+  @ParameterizedTest
+  @ValueSource(booleans = {true, false})
+  public void testListStatus(boolean enablePath) throws IOException {
+    conf.setBoolean(OMConfigKeys.OZONE_OM_ENABLE_FILESYSTEM_PATHS, enablePath);
     String superDir = RandomStringUtils.randomAlphabetic(5);
 
     int numDirectories = 5;
@@ -1446,8 +1451,7 @@ public class TestKeyManagerImpl {
     when(scmClientMock.getContainerClient()).thenReturn(sclProtocolMock);
 
     OmKeyInfo omKeyInfo = OMRequestTestUtils.createOmKeyInfo("v1",
-        "b1", "k1", ReplicationType.RATIS,
-        ReplicationFactor.THREE);
+        "b1", "k1", RatisReplicationConfig.getInstance(THREE)).build();
 
     // Add block to key.
     List<OmKeyLocationInfo> omKeyLocationInfoList = new ArrayList<>();
@@ -1501,8 +1505,7 @@ public class TestKeyManagerImpl {
     OMPerformanceMetrics metrics = mock(OMPerformanceMetrics.class);
 
     OmKeyInfo omKeyInfo = OMRequestTestUtils.createOmKeyInfo("v1",
-        "b1", "k1", ReplicationType.RATIS,
-        ReplicationFactor.THREE);
+        "b1", "k1", RatisReplicationConfig.getInstance(THREE)).build();
 
     // Add block to key.
     List<OmKeyLocationInfo> omKeyLocationInfoList = new ArrayList<>();

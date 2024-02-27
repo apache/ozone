@@ -104,6 +104,7 @@ import org.slf4j.event.Level;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_CHUNK_LIST_INCREMENTAL;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_RATIS_PIPELINE_LIMIT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_SERVICE_INTERVAL;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_OFS_URI_SCHEME;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_ROOT;
@@ -151,6 +152,7 @@ public class TestHSync {
     CONF.setBoolean(OZONE_OM_RATIS_ENABLE_KEY, false);
     CONF.set(OZONE_DEFAULT_BUCKET_LAYOUT, layout.name());
     CONF.setBoolean(OzoneConfigKeys.OZONE_FS_HSYNC_ENABLED, true);
+    CONF.setInt(OZONE_SCM_RATIS_PIPELINE_LIMIT, 10);
     // Reduce KeyDeletingService interval
     CONF.setTimeDuration(OZONE_BLOCK_DELETING_SERVICE_INTERVAL, 100, TimeUnit.MILLISECONDS);
     CONF.setBoolean("ozone.client.incremental.chunk.list", true);
@@ -167,7 +169,6 @@ public class TestHSync {
 
     cluster = MiniOzoneCluster.newBuilder(CONF)
         .setNumDatanodes(5)
-        .setTotalPipelineNumLimit(10)
         .build();
     cluster.waitForClusterToBeReady();
     client = cluster.newClient();

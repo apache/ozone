@@ -110,7 +110,7 @@ public class TestOzoneManagerSnapshotAcl {
     final String omServiceId = "om-service-test-1"
         + RandomStringUtils.randomNumeric(32);
 
-    cluster = MiniOzoneCluster.newOMHABuilder(conf)
+    cluster = MiniOzoneCluster.newHABuilder(conf)
         .setOMServiceId(omServiceId)
         .setNumOfOzoneManagers(1)
         .build();
@@ -630,7 +630,7 @@ public class TestOzoneManagerSnapshotAcl {
   private void createVolume() throws IOException {
     final String volumePrefix = "volume-";
     volumeName = volumePrefix + RandomStringUtils.randomNumeric(32);
-    final VolumeArgs volumeArgs = new VolumeArgs.Builder()
+    final VolumeArgs volumeArgs = VolumeArgs.newBuilder()
         .setAdmin(ADMIN)
         .setOwner(ADMIN)
         .build();

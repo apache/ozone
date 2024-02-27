@@ -6,32 +6,34 @@
  * to you under the Apache License, Version 2.0 (the
  * "License"); you may not use this file except in compliance
  * with the License.  You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
+ * <p>
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * <p>
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+package org.apache.hadoop.hdds.scm;
 
-#include "Pipe.h"
-#include <unistd.h>
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.junit.jupiter.api.Test;
 
-const int Pipe::READ_FILE_DESCRIPTOR_IDX = 0;
-const int Pipe::WRITE_FILE_DESCRIPTOR_IDX = 1;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_CLIENT_BYTES_PER_CHECKSUM_MIN_SIZE;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
-Pipe::Pipe() {
-    pipe(p);
-    open = true;
-}
+class TestOzoneClientConfig {
 
-Pipe::~Pipe() {
-    ::close(p[Pipe::READ_FILE_DESCRIPTOR_IDX]);
-    ::close(p[Pipe::WRITE_FILE_DESCRIPTOR_IDX]);
-}
+  @Test
+  void missingSizeSuffix() {
+    final int bytes = 1024;
 
-void Pipe::close() {
-    open = false;
+    OzoneConfiguration conf = new OzoneConfiguration();
+    conf.setInt("ozone.client.bytes.per.checksum", bytes);
+
+    OzoneClientConfig subject = conf.getObject(OzoneClientConfig.class);
+
+    assertEquals(OZONE_CLIENT_BYTES_PER_CHECKSUM_MIN_SIZE, subject.getBytesPerChecksum());
+  }
 }

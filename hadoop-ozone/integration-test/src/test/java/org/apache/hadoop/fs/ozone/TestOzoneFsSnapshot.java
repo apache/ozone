@@ -86,7 +86,7 @@ class TestOzoneFsSnapshot {
     conf.setBoolean(OMConfigKeys.OZONE_FILESYSTEM_SNAPSHOT_ENABLED_KEY, true);
 
     // Start the cluster
-    cluster = MiniOzoneCluster.newOMHABuilder(conf)
+    cluster = MiniOzoneCluster.newHABuilder(conf)
         .setOMServiceId(OM_SERVICE_ID)
         .setNumOfOzoneManagers(1)
         .build();

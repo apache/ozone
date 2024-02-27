@@ -19,7 +19,6 @@ package org.apache.hadoop.ozone;
 
 import java.io.IOException;
 import java.util.List;
-import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.TimeoutException;
 
@@ -39,6 +38,7 @@ import org.apache.hadoop.ozone.recon.ReconServer;
 import org.apache.hadoop.security.authentication.client.AuthenticationException;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ratis.util.ExitUtils;
+import org.apache.ratis.util.function.CheckedFunction;
 
 /**
  * Interface used for MiniOzoneClusters.
@@ -63,10 +63,6 @@ public interface MiniOzoneCluster extends AutoCloseable {
    *
    * @return MiniOzoneCluster builder
    */
-  static Builder newOMHABuilder(OzoneConfiguration conf) {
-    return new MiniOzoneHAClusterImpl.Builder(conf);
-  }
-
   static Builder newHABuilder(OzoneConfiguration conf) {
     return new MiniOzoneHAClusterImpl.Builder(conf);
   }
@@ -94,7 +90,7 @@ public interface MiniOzoneCluster extends AutoCloseable {
   void waitForClusterToBeReady() throws TimeoutException, InterruptedException;
 
   /**
-   * Waits for atleast one RATIS pipeline of given factor to be reported in open
+   * Waits for at least one RATIS pipeline of given factor to be reported in open
    * state.
    *
    * @param factor replication factor
@@ -121,21 +117,6 @@ public interface MiniOzoneCluster extends AutoCloseable {
    * @throws InterruptedException In case of interrupt while waiting
    */
   void waitTobeOutOfSafeMode() throws TimeoutException, InterruptedException;
-
-  /**
-   * Returns OzoneManager Service ID.
-   *
-   * @return Service ID String
-   */
-  String getOMServiceId();
-
-
-  /**
-   * Returns StorageContainerManager Service ID.
-   *
-   * @return Service ID String
-   */
-  String getSCMServiceId();
 
   /**
    * Returns {@link StorageContainerManager} associated with this
@@ -181,20 +162,12 @@ public interface MiniOzoneCluster extends AutoCloseable {
   /**
    * Returns StorageContainerLocationClient to communicate with
    * {@link StorageContainerManager} associated with the MiniOzoneCluster.
-   *
-   * @return StorageContainerLocation Client
-   * @throws IOException
    */
   StorageContainerLocationProtocolClientSideTranslatorPB
       getStorageContainerLocationClient() throws IOException;
 
   /**
    * Restarts StorageContainerManager instance.
-   *
-   * @param waitForDatanode
-   * @throws IOException
-   * @throws TimeoutException
-   * @throws InterruptedException
    */
   void restartStorageContainerManager(boolean waitForDatanode)
       throws InterruptedException, TimeoutException, IOException,
@@ -202,8 +175,6 @@ public interface MiniOzoneCluster extends AutoCloseable {
 
   /**
    * Restarts OzoneManager instance.
-   *
-   * @throws IOException
    */
   void restartOzoneManager() throws IOException;
 
@@ -268,11 +239,6 @@ public interface MiniOzoneCluster extends AutoCloseable {
   void stop();
 
   /**
-   * Start Scm.
-   */
-  void startScm() throws IOException;
-
-  /**
    * Start DataNodes.
    */
   void startHddsDatanodes();
@@ -298,11 +264,8 @@ public interface MiniOzoneCluster extends AutoCloseable {
   @SuppressWarnings("visibilitymodifier")
   abstract class Builder {
 
-    protected static final int DEFAULT_HB_INTERVAL_MS = 1000;
-    protected static final int DEFAULT_HB_PROCESSOR_INTERVAL_MS = 100;
     protected static final int ACTIVE_OMS_NOT_SET = -1;
     protected static final int ACTIVE_SCMS_NOT_SET = -1;
-    protected static final int DEFAULT_PIPELINE_LIMIT = 3;
     protected static final int DEFAULT_RATIS_RPC_TIMEOUT_SEC = 1;
 
     protected OzoneConfiguration conf;
@@ -318,30 +281,19 @@ public interface MiniOzoneCluster extends AutoCloseable {
     protected int numOfActiveSCMs = ACTIVE_SCMS_NOT_SET;
     protected SCMConfigurator scmConfigurator;
 
-    protected Optional<Integer> hbInterval = Optional.empty();
-    protected Optional<Integer> hbProcessorInterval = Optional.empty();
     protected String scmId = UUID.randomUUID().toString();
     protected String omId = UUID.randomUUID().toString();
 
-    protected Optional<String> datanodeReservedSpace = Optional.empty();
     protected boolean includeRecon = false;
-
-    protected Optional<Integer> omLayoutVersion = Optional.empty();
-    protected Optional<Integer> scmLayoutVersion = Optional.empty();
-    protected Optional<Integer> dnLayoutVersion = Optional.empty();
 
     protected int dnInitialVersion = DatanodeVersion.FUTURE_VERSION.toProtoValue();
     protected int dnCurrentVersion = DatanodeVersion.FUTURE_VERSION.toProtoValue();
 
-    // Use relative smaller number of handlers for testing
-    protected int numOfOmHandlers = 20;
-    protected int numOfScmHandlers = 20;
     protected int numOfDatanodes = 3;
-    protected int numDataVolumes = 1;
     protected boolean  startDataNodes = true;
     protected CertificateClient certClient;
     protected SecretKeyClient secretKeyClient;
-    protected int pipelineNumLimit = DEFAULT_PIPELINE_LIMIT;
+    protected DatanodeFactory dnFactory = UniformDatanodesFactory.newBuilder().build();
 
     protected Builder(OzoneConfiguration conf) {
       this.conf = conf;
@@ -388,13 +340,6 @@ public interface MiniOzoneCluster extends AutoCloseable {
       return this;
     }
 
-    /**
-     * Sets the certificate client.
-     *
-     * @param client
-     *
-     * @return MiniOzoneCluster.Builder
-     */
     public Builder setCertificateClient(CertificateClient client) {
       this.certClient = client;
       return this;
@@ -442,69 +387,8 @@ public interface MiniOzoneCluster extends AutoCloseable {
       return this;
     }
 
-    /**
-     * Sets the number of data volumes per datanode.
-     *
-     * @param val number of volumes per datanode.
-     *
-     * @return MiniOzoneCluster.Builder
-     */
-    public Builder setNumDataVolumes(int val) {
-      numDataVolumes = val;
-      return this;
-    }
-
-    /**
-     * Sets the total number of pipelines to create.
-     * @param val number of pipelines
-     * @return MiniOzoneCluster.Builder
-     */
-    public Builder setTotalPipelineNumLimit(int val) {
-      pipelineNumLimit = val;
-      return this;
-    }
-
-    /**
-     * Sets the number of HeartBeat Interval of Datanodes, the value should be
-     * in MilliSeconds.
-     *
-     * @param val HeartBeat interval in milliseconds
-     *
-     * @return MiniOzoneCluster.Builder
-     */
-    public Builder setHbInterval(int val) {
-      hbInterval = Optional.of(val);
-      return this;
-    }
-
-    /**
-     * Sets the number of HeartBeat Processor Interval of Datanodes,
-     * the value should be in MilliSeconds.
-     *
-     * @param val HeartBeat Processor interval in milliseconds
-     *
-     * @return MiniOzoneCluster.Builder
-     */
-    public Builder setHbProcessorInterval(int val) {
-      hbProcessorInterval = Optional.of(val);
-      return this;
-    }
-
-    /**
-     * Sets the reserved space
-     * {@link org.apache.hadoop.hdds.scm.ScmConfigKeys}
-     * HDDS_DATANODE_DIR_DU_RESERVED
-     * for each volume in each datanode.
-     * @param reservedSpace String that contains the numeric size value and
-     *                      ends with a
-     *                      {@link org.apache.hadoop.hdds.conf.StorageUnit}
-     *                      suffix. For example, "50GB".
-     * @see org.apache.hadoop.ozone.container.common.volume.VolumeInfo
-     *
-     * @return {@link MiniOzoneCluster} Builder
-     */
-    public Builder setDatanodeReservedSpace(String reservedSpace) {
-      datanodeReservedSpace = Optional.of(reservedSpace);
+    public Builder setDatanodeFactory(DatanodeFactory factory) {
+      this.dnFactory = factory;
       return this;
     }
 
@@ -543,28 +427,18 @@ public interface MiniOzoneCluster extends AutoCloseable {
       return this;
     }
 
-    public Builder setScmLayoutVersion(int layoutVersion) {
-      scmLayoutVersion = Optional.of(layoutVersion);
-      return this;
-    }
-
-    public Builder setOmLayoutVersion(int layoutVersion) {
-      omLayoutVersion = Optional.of(layoutVersion);
-      return this;
-    }
-
-    public Builder setDnLayoutVersion(int layoutVersion) {
-      dnLayoutVersion = Optional.of(layoutVersion);
-      return this;
-    }
-
     /**
      * Constructs and returns MiniOzoneCluster.
      *
      * @return {@link MiniOzoneCluster}
-     *
-     * @throws IOException
      */
     public abstract MiniOzoneCluster build() throws IOException;
+  }
+
+  /**
+   * Factory to customize configuration of each datanode.
+   */
+  interface DatanodeFactory extends CheckedFunction<OzoneConfiguration, OzoneConfiguration, IOException> {
+    // marker
   }
 }

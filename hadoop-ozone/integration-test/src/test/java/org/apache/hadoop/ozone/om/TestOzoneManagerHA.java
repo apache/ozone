@@ -177,7 +177,7 @@ public abstract class TestOzoneManagerHA {
     conf.set(OZONE_BLOCK_DELETING_SERVICE_INTERVAL, "10s");
     conf.set(OZONE_KEY_DELETING_LIMIT_PER_TASK, "2");
 
-    clusterBuilder = MiniOzoneCluster.newOMHABuilder(conf)
+    clusterBuilder = MiniOzoneCluster.newHABuilder(conf)
         .setOMServiceId(omServiceId)
         .setNumOfOzoneManagers(numOfOMs);
 

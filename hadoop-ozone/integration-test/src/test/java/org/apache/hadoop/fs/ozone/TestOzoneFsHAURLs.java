@@ -107,9 +107,8 @@ public class TestOzoneFsHAURLs {
     conf.setBoolean(OMConfigKeys.OZONE_OM_ENABLE_FILESYSTEM_PATHS, true);
 
     // Start the cluster
-    cluster = MiniOzoneCluster.newOMHABuilder(conf)
+    cluster = MiniOzoneCluster.newHABuilder(conf)
         .setNumDatanodes(5)
-        .setTotalPipelineNumLimit(3)
         .setOMServiceId(omServiceId)
         .setNumOfOzoneManagers(numOfOMs)
         .build();

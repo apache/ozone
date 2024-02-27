@@ -201,6 +201,13 @@ public class OzoneClientConfig {
   // 3 concurrent stripe read should be enough.
   private int ecReconstructStripeReadPoolLimit = 10 * 3;
 
+  @Config(key = "ec.reconstruct.stripe.write.pool.limit",
+      defaultValue = "30",
+      description = "Thread pool max size for parallelly write" +
+          " available ec chunks to reconstruct the whole stripe.",
+      tags = ConfigTag.CLIENT)
+  private int ecReconstructStripeWritePoolLimit = 10 * 3;
+
   @Config(key = "checksum.combine.mode",
       defaultValue = "COMPOSITE_CRC",
       description = "The combined checksum type [MD5MD5CRC / COMPOSITE_CRC] "
@@ -233,7 +240,7 @@ public class OzoneClientConfig {
   private boolean incrementalChunkList = false;
 
   @PostConstruct
-  private void validate() {
+  public void validate() {
     Preconditions.checkState(streamBufferSize > 0);
     Preconditions.checkState(streamBufferFlushSize > 0);
     Preconditions.checkState(streamBufferMaxSize > 0);
@@ -394,6 +401,14 @@ public class OzoneClientConfig {
 
   public int getEcReconstructStripeReadPoolLimit() {
     return ecReconstructStripeReadPoolLimit;
+  }
+
+  public void setEcReconstructStripeWritePoolLimit(int poolLimit) {
+    this.ecReconstructStripeWritePoolLimit = poolLimit;
+  }
+
+  public int getEcReconstructStripeWritePoolLimit() {
+    return ecReconstructStripeWritePoolLimit;
   }
 
   public void setFsDefaultBucketLayout(String bucketLayout) {

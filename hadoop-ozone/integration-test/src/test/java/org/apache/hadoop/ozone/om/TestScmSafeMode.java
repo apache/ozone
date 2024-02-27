@@ -63,9 +63,12 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeoutException;
 
+import static java.util.concurrent.TimeUnit.MILLISECONDS;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_HEARTBEAT_INTERVAL;
 import static org.apache.hadoop.hdds.client.ReplicationType.RATIS;
 import static org.apache.hadoop.hdds.client.ReplicationFactor.ONE;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_DEADNODE_INTERVAL;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HEARTBEAT_PROCESS_INTERVAL;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_STALENODE_INTERVAL;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_OFS_URI_SCHEME;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ADDRESS_KEY;
@@ -106,9 +109,9 @@ public class TestScmSafeMode {
     conf = new OzoneConfiguration();
     conf.set(OZONE_SCM_STALENODE_INTERVAL, "10s");
     conf.set(OZONE_SCM_DEADNODE_INTERVAL, "25s");
+    conf.setTimeDuration(HDDS_HEARTBEAT_INTERVAL, 1000, MILLISECONDS);
+    conf.setTimeDuration(OZONE_SCM_HEARTBEAT_PROCESS_INTERVAL, 500, MILLISECONDS);
     builder = MiniOzoneCluster.newBuilder(conf)
-        .setHbInterval(1000)
-        .setHbProcessorInterval(500)
         .setStartDataNodes(false);
     cluster = builder.build();
     cluster.startHddsDatanodes();
@@ -332,8 +335,6 @@ public class TestScmSafeMode {
     conf.setBoolean(HddsConfigKeys.HDDS_SCM_SAFEMODE_ENABLED, false);
     conf.setInt(HddsConfigKeys.HDDS_SCM_SAFEMODE_MIN_DATANODE, 3);
     builder = MiniOzoneCluster.newBuilder(conf)
-        .setHbInterval(1000)
-        .setHbProcessorInterval(500)
         .setNumDatanodes(3);
     cluster = builder.build();
     StorageContainerManager scm = cluster.getStorageContainerManager();
