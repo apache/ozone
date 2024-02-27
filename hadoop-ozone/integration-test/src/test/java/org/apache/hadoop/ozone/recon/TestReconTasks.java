@@ -199,6 +199,7 @@ public class TestReconTasks {
                   0, 1000);
       return (allMissingContainers.isEmpty());
     });
+    scmContainerManager.deleteContainer(containerInfo.containerID());
     IOUtils.closeQuietly(client);
   }
 
