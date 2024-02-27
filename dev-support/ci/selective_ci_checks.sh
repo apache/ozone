@@ -265,6 +265,9 @@ function get_count_integration_files() {
         "src/test/java"
         "src/test/resources"
     )
+    local ignore_array=(
+        $(grep -Flr 'org.apache.ozone.test.tag.Native' hadoop-ozone/integration-test)
+    )
     filter_changed_files true
     COUNT_INTEGRATION_CHANGED_FILES=${match_count}
     readonly COUNT_INTEGRATION_CHANGED_FILES
