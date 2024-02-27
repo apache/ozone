@@ -659,7 +659,6 @@ public class ReconStorageContainerManagerFacade
             fullSnapshot = true;
           }
         }
-
         if (fullSnapshot) {
           try {
             LOG.info("Obtaining full snapshot from SCM");
@@ -686,20 +685,20 @@ public class ReconStorageContainerManagerFacade
             LOG.error("Unable to update Recon's metadata with new SCM DB. ", e);
           }
         }
+        try {
+          long scmContainersCount = scmServiceProvider.getContainerCount();
+          long reconContainerCount = containerManager.getContainers().size();
+          LOG.info("Recon Container Count: {}, SCM Container Count: {}",
+              reconContainerCount, scmContainersCount);
+        } catch (IOException ioe) {
+          LOG.error("Failed to get container count from SCM - {}", ioe);
+        }
       } finally {
         isSyncDataFromSCMRunning.compareAndSet(true, false);
       }
     } else {
       LOG.debug("SCM DB sync is already running.");
       return false;
-    }
-    try {
-      long scmContainersCount = scmServiceProvider.getContainerCount();
-      long reconContainerCount = containerManager.getContainers().size();
-      LOG.info("Recon Container Count: {}, SCM Container Count: {}",
-          reconContainerCount, scmContainersCount);
-    } catch (IOException ioe) {
-      LOG.error("Failed to get container count from SCM - {}", ioe);
     }
     return true;
   }

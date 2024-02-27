@@ -37,6 +37,10 @@ import org.slf4j.LoggerFactory;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 
+import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_SCM_CLIENT_FAILOVER_MAX_RETRY_DEFAULT;
+import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_SCM_CLIENT_FAILOVER_MAX_RETRY_KEY;
+import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_SCM_CLIENT_MAX_RETRY_TIMEOUT_KEY;
+import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_SCM_CLIENT_RPC_TIME_OUT_KEY;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_SCM_SNAPSHOT_TASK_INITIAL_DELAY;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_SCM_SNAPSHOT_TASK_INTERVAL_DELAY;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -55,6 +59,11 @@ public class TestReconScmSnapshot {
     conf.setInt(ReconServerConfigKeys.OZONE_RECON_SCM_CONTAINER_THRESHOLD, 0);
     conf.setTimeDuration(OZONE_RECON_SCM_SNAPSHOT_TASK_INITIAL_DELAY, 1, TimeUnit.SECONDS);
     conf.setTimeDuration(OZONE_RECON_SCM_SNAPSHOT_TASK_INTERVAL_DELAY, 10, TimeUnit.SECONDS);
+
+    conf.setTimeDuration(OZONE_RECON_SCM_CLIENT_RPC_TIME_OUT_KEY, 5, TimeUnit.MINUTES);
+    conf.setTimeDuration(OZONE_RECON_SCM_CLIENT_MAX_RETRY_TIMEOUT_KEY, 6, TimeUnit.SECONDS);
+    conf.setInt(OZONE_RECON_SCM_CLIENT_FAILOVER_MAX_RETRY_KEY, OZONE_RECON_SCM_CLIENT_FAILOVER_MAX_RETRY_DEFAULT);
+
     ozoneCluster = MiniOzoneCluster.newBuilder(conf)
         .setNumDatanodes(4)
         .includeRecon(true)

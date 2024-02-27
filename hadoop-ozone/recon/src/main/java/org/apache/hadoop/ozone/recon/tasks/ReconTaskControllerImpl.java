@@ -211,9 +211,9 @@ public class ReconTaskControllerImpl implements ReconTaskController {
   }
 
   private void invokeTasks(long lastSequenceNumberFromDB, Collection<Callable<Pair<String, Boolean>>> tasks,
-                           ExecutorService omTasksExecutorService)
+                           ExecutorService tasksExecutorService)
       throws InterruptedException, ExecutionException {
-    List<Future<Pair<String, Boolean>>> results = omTasksExecutorService.invokeAll(tasks);
+    List<Future<Pair<String, Boolean>>> results = tasksExecutorService.invokeAll(tasks);
     for (Future<Pair<String, Boolean>> f : results) {
       String taskName = f.get().getLeft();
       if (!f.get().getRight()) {

@@ -34,9 +34,9 @@ import java.util.UUID;
  */
 public interface ReconScmMetadataManager extends SCMMetadataStore {
 
-  public static final String CONTAINERS_TABLE = "containers";
-  public static final String PIPELINES_TABLE = "pipelines";
-  public static final String NODES_TABLE = "nodes";
+  String CONTAINERS_TABLE = "containers";
+  String PIPELINES_TABLE = "pipelines";
+  String NODES_TABLE = "nodes";
 
   /**
    * Refresh the DB instance to point to a new location. Get rid of the old
