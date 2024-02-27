@@ -66,6 +66,7 @@ import org.apache.hadoop.ozone.recon.tasks.NSSummaryTaskWithOBS;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+
 import javax.ws.rs.core.Response;
 
 import java.io.File;
@@ -133,8 +134,8 @@ public class TestNSSummaryEndpointWithOBS {
   private static final String KEY_NINE = "file9";
   private static final String KEY_TEN = "file10";
   private static final String KEY_ELEVEN = "file11";
-  private static final String MULTI_BLOCK_KEY = "file7";
-  private static final String MULTI_BLOCK_FILE = "file7";
+  private static final String MULTI_BLOCK_KEY = "file3";
+  private static final String MULTI_BLOCK_FILE = "file3";
 
   private static final String FILE_ONE = "file1";
   private static final String FILE_TWO = "file2";
@@ -218,12 +219,7 @@ public class TestNSSummaryEndpointWithOBS {
   private static final long FILE5_SIZE_WITH_REPLICA =
       getReplicatedSize(KEY_FIVE_SIZE,
           StandaloneReplicationConfig.getInstance(ONE));
-  private static final long FILE6_SIZE_WITH_REPLICA =
-      getReplicatedSize(KEY_SIX_SIZE,
-          StandaloneReplicationConfig.getInstance(ONE));;
-  private static final long FILE7_SIZE_WITH_REPLICA =
-      getReplicatedSize(KEY_SEVEN_SIZE,
-          StandaloneReplicationConfig.getInstance(ONE));;
+
   private static final long FILE8_SIZE_WITH_REPLICA =
       getReplicatedSize(KEY_EIGHT_SIZE,
           StandaloneReplicationConfig.getInstance(ONE));
@@ -238,7 +234,7 @@ public class TestNSSummaryEndpointWithOBS {
           StandaloneReplicationConfig.getInstance(ONE));
 
   private static final long MULTI_BLOCK_KEY_SIZE_WITH_REPLICA
-      = FILE7_SIZE_WITH_REPLICA;
+      = FILE3_SIZE_WITH_REPLICA;
   private static final long
       MULTI_BLOCK_TOTAL_SIZE_WITH_REPLICA_UNDER_ROOT
       = FILE1_SIZE_WITH_REPLICA
@@ -286,7 +282,7 @@ public class TestNSSummaryEndpointWithOBS {
   private static final String BUCKET_ONE_PATH = "/vol/bucket1";
   private static final String BUCKET_TWO_PATH = "/vol/bucket2";
   private static final String KEY_PATH = "/vol/bucket2/file4";
-  private static final String MULTI_BLOCK_KEY_PATH = "/vol/bucket1/file7";
+  private static final String MULTI_BLOCK_KEY_PATH = "/vol/bucket1/file3";
   private static final String INVALID_PATH = "/vol/path/not/found";
 
   // some expected answers
@@ -376,11 +372,11 @@ public class TestNSSummaryEndpointWithOBS {
         volResponseObj.getEntityType());
     assertEquals(2, volResponseObj.getCountStats().getNumBucket());
     assertEquals(5, volResponseObj.getCountStats().getNumTotalKey());
-    assertEquals("TestUser", ((VolumeObjectDBInfo) volResponseObj.
+    assertEquals(TEST_USER, ((VolumeObjectDBInfo) volResponseObj.
         getObjectDBInfo()).getAdmin());
-    assertEquals("TestUser", ((VolumeObjectDBInfo) volResponseObj.
+    assertEquals(TEST_USER, ((VolumeObjectDBInfo) volResponseObj.
         getObjectDBInfo()).getOwner());
-    assertEquals("vol", volResponseObj.getObjectDBInfo().getName());
+    assertEquals(VOL, volResponseObj.getObjectDBInfo().getName());
     assertEquals(2097152, volResponseObj.getObjectDBInfo().getQuotaInBytes());
     assertEquals(-1, volResponseObj.getObjectDBInfo().getQuotaInNamespace());
   }
@@ -394,7 +390,7 @@ public class TestNSSummaryEndpointWithOBS {
         (NamespaceSummaryResponse) bucketOneResponse.getEntity();
     assertEquals(EntityType.BUCKET, bucketOneObj.getEntityType());
     assertEquals(3, bucketOneObj.getCountStats().getNumTotalKey());
-    assertEquals("vol",
+    assertEquals(VOL,
         ((BucketObjectDBInfo) bucketOneObj.getObjectDBInfo()).getVolumeName());
     assertEquals(StorageType.DISK,
         ((BucketObjectDBInfo)
@@ -402,7 +398,7 @@ public class TestNSSummaryEndpointWithOBS {
     assertEquals(getBucketLayout(),
         ((BucketObjectDBInfo)
             bucketOneObj.getObjectDBInfo()).getBucketLayout());
-    assertEquals("bucket1",
+    assertEquals(BUCKET_ONE,
         ((BucketObjectDBInfo) bucketOneObj.getObjectDBInfo()).getName());
   }
 
@@ -751,6 +747,7 @@ public class TestNSSummaryEndpointWithOBS {
   /**
    * Create a new OM Metadata manager instance with one user, one vol, and two
    * buckets.
+   *
    * @throws IOException ioEx
    */
   private static OMMetadataManager initializeNewOmMetadataManager(
@@ -1042,8 +1039,9 @@ public class TestNSSummaryEndpointWithOBS {
   /**
    * Generate a set of mock container replica with a size of
    * replication factor for container.
+   *
    * @param replicationFactor number of replica
-   * @param containerID the container replicated based upon
+   * @param containerID       the container replicated based upon
    * @return a set of container replica for testing
    */
   private static Set<ContainerReplica> generateMockContainerReplicas(
@@ -1123,7 +1121,7 @@ public class TestNSSummaryEndpointWithOBS {
 
   private static SCMNodeStat getMockSCMRootStat() {
     return new SCMNodeStat(ROOT_QUOTA, ROOT_DATA_SIZE,
-        ROOT_QUOTA - ROOT_DATA_SIZE,0L,0L);
+        ROOT_QUOTA - ROOT_DATA_SIZE, 0L, 0L);
   }
 
 }
