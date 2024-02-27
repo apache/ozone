@@ -1870,8 +1870,7 @@ public class KeyManagerImpl implements KeyManager {
     return encInfo;
   }
 
-  @VisibleForTesting
-  void sortDatanodes(String clientMachine, OmKeyInfo... keyInfos) {
+  private void sortDatanodes(String clientMachine, OmKeyInfo... keyInfos) {
     if (keyInfos != null && clientMachine != null) {
       Map<Set<String>, List<DatanodeDetails>> sortedPipelines = new HashMap<>();
       for (OmKeyInfo keyInfo : keyInfos) {
@@ -1905,6 +1904,7 @@ public class KeyManagerImpl implements KeyManager {
     }
   }
 
+  @VisibleForTesting
   public List<DatanodeDetails> sortDatanodes(List<DatanodeDetails> nodes,
                                              String clientMachine) {
     final Node client = getClientNode(clientMachine, nodes);
@@ -1928,19 +1928,6 @@ public class KeyManagerImpl implements KeyManager {
         getOtherNode(clientMachine);
   }
 
-  public String resolveNodeLocation(String hostname) {
-    List<String> hosts = Collections.singletonList(hostname);
-    List<String> resolvedHosts = dnsToSwitchMapping.resolve(hosts);
-    if (resolvedHosts != null && !resolvedHosts.isEmpty()) {
-      String location = resolvedHosts.get(0);
-      LOG.debug("Node {} resolved to location {}", hostname, location);
-      return location;
-    } else {
-      LOG.debug("Node resolution did not yield any result for {}", hostname);
-      return null;
-    }
-  }
-
   private Node getOtherNode(String clientMachine) {
     try {
       String clientLocation = resolveNodeLocation(clientMachine);
@@ -1957,6 +1944,19 @@ public class KeyManagerImpl implements KeyManager {
           clientMachine, e.getMessage());
     }
     return null;
+  }
+
+  private String resolveNodeLocation(String hostname) {
+    List<String> hosts = Collections.singletonList(hostname);
+    List<String> resolvedHosts = dnsToSwitchMapping.resolve(hosts);
+    if (resolvedHosts != null && !resolvedHosts.isEmpty()) {
+      String location = resolvedHosts.get(0);
+      LOG.debug("Node {} resolved to location {}", hostname, location);
+      return location;
+    } else {
+      LOG.debug("Node resolution did not yield any result for {}", hostname);
+      return null;
+    }
   }
 
   private static List<String> toNodeUuid(Collection<DatanodeDetails> nodes) {

@@ -24,6 +24,7 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Test;
 
+import org.junit.jupiter.api.Timeout;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
@@ -40,6 +41,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
  * This class is to test the serialization/deserialization of cluster tree
  * information from SCM.
  */
+@Timeout(300)
 public class TestGetClusterTreeInformation {
 
   public static final Logger LOG =

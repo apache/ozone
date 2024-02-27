@@ -1153,7 +1153,6 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   }
 
   public NetworkTopology getClusterMap() {
-
     InnerNode currentTree = scmTopologyClient.getClusterTree();
     return new NetworkTopologyImpl(configuration.get(
         ScmConfigKeys.OZONE_SCM_NETWORK_TOPOLOGY_SCHEMA_FILE,
