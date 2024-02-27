@@ -2264,6 +2264,8 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
 
     if (startKey != null) {
       listStatusRequestBuilder.setStartKey(startKey);
+    } else {
+      listStatusRequestBuilder.setStartKey("");
     }
 
     if (allowPartialPrefixes) {
