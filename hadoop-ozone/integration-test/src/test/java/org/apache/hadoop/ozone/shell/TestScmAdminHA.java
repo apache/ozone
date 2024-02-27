@@ -45,7 +45,7 @@ public class TestScmAdminHA {
     // Init HA cluster
     omServiceId = "om-service-test1";
     numOfOMs = 3;
-    cluster = MiniOzoneCluster.newOMHABuilder(conf)
+    cluster = MiniOzoneCluster.newHABuilder(conf)
         .setOMServiceId(omServiceId)
         .setNumOfOzoneManagers(numOfOMs)
         .build();

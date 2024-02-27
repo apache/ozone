@@ -106,7 +106,7 @@ public class OzoneVolume extends WithMetadata {
   private long refCount;
 
   protected OzoneVolume(Builder builder) {
-    this.metadata = builder.metadata;
+    setMetadata(builder.metadata);
     this.proxy = builder.proxy;
     this.name = builder.name;
     this.admin = builder.admin;

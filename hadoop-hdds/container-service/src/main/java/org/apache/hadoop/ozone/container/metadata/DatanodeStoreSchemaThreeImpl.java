@@ -99,7 +99,6 @@ public class DatanodeStoreSchemaThreeImpl extends AbstractDatanodeStore
     try (BatchOperation batch = getBatchHandler().initBatchOperation()) {
       getMetadataTable().deleteBatchWithPrefix(batch, prefix);
       getBlockDataTable().deleteBatchWithPrefix(batch, prefix);
-      getDeletedBlocksTable().deleteBatchWithPrefix(batch, prefix);
       getDeleteTransactionTable().deleteBatchWithPrefix(batch, prefix);
       getBatchHandler().commitBatchOperation(batch);
     }
@@ -112,8 +111,6 @@ public class DatanodeStoreSchemaThreeImpl extends AbstractDatanodeStore
         getTableDumpFile(getMetadataTable(), dumpDir), prefix);
     getBlockDataTable().dumpToFileWithPrefix(
         getTableDumpFile(getBlockDataTable(), dumpDir), prefix);
-    getDeletedBlocksTable().dumpToFileWithPrefix(
-        getTableDumpFile(getDeletedBlocksTable(), dumpDir), prefix);
     getDeleteTransactionTable().dumpToFileWithPrefix(
         getTableDumpFile(getDeleteTransactionTable(), dumpDir),
         prefix);
@@ -125,8 +122,6 @@ public class DatanodeStoreSchemaThreeImpl extends AbstractDatanodeStore
         getTableDumpFile(getMetadataTable(), dumpDir));
     getBlockDataTable().loadFromFile(
         getTableDumpFile(getBlockDataTable(), dumpDir));
-    getDeletedBlocksTable().loadFromFile(
-        getTableDumpFile(getDeletedBlocksTable(), dumpDir));
     getDeleteTransactionTable().loadFromFile(
         getTableDumpFile(getDeleteTransactionTable(), dumpDir));
   }
