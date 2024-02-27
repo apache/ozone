@@ -75,7 +75,7 @@ public class TestOMSortDatanodes {
   );
 
   @BeforeEach
-  void setup() throws Exception {
+  public static void setup() throws Exception {
     config = new OzoneConfiguration();
     dir = GenericTestUtils.getRandomizedTestDir();
     config.set(HddsConfigKeys.OZONE_METADATA_DIRS, dir.toString());
@@ -113,7 +113,7 @@ public class TestOMSortDatanodes {
   }
 
   @AfterEach
-  public void cleanup() throws Exception {
+  public static void cleanup() throws Exception {
     if (scm != null) {
       scm.stop();
       scm.join();
