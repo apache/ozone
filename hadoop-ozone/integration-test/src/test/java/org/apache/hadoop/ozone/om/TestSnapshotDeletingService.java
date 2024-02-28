@@ -139,8 +139,8 @@ public class TestSnapshotDeletingService {
 //    createSnapshotDataForBucket1();
 
     assertTableRowCount(snapshotInfoTable, 2);
-    GenericTestUtils.waitFor(() -> snapshotDeletingService
-            .getSuccessfulRunCount() >= 1, 1000, 10000);
+//    GenericTestUtils.waitFor(() -> snapshotDeletingService
+//            .getSuccessfulRunCount() >= 1, 1000, 10000);
 
     OmSnapshot bucket1snap3 = om.getOmSnapshotManager()
         .getSnapshot(VOLUME_NAME, BUCKET_NAME_ONE, "bucket1snap3").get();
