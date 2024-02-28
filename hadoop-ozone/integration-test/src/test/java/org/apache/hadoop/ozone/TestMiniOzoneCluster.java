@@ -258,8 +258,10 @@ public class TestMiniOzoneCluster {
     String reservedSpace = "1B";
     cluster = MiniOzoneCluster.newBuilder(conf)
         .setNumDatanodes(1)
-        .setNumDataVolumes(3)
-        .setDatanodeReservedSpace(reservedSpace)
+        .setDatanodeFactory(UniformDatanodesFactory.newBuilder()
+            .setNumDataVolumes(3)
+            .setReservedSpace(reservedSpace)
+            .build())
         .build();
     cluster.waitForClusterToBeReady();
 

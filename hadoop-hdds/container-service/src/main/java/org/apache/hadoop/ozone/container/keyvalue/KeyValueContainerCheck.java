@@ -345,7 +345,7 @@ public class KeyValueContainerCheck {
       File chunkFile;
       try {
         chunkFile = layout.getChunkFile(onDiskContainerData,
-            block.getBlockID(), ChunkInfo.getFromProtoBuf(chunk));
+            block.getBlockID(), chunk.getChunkName());
       } catch (IOException ex) {
         return ScanResult.unhealthy(
             ScanResult.FailureType.MISSING_CHUNK_FILE,

@@ -26,12 +26,8 @@ import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.protocol.SCMSecurityProtocol;
 
 import org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateCodec;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import picocli.CommandLine.Command;
-import picocli.CommandLine.Model.CommandSpec;
 import picocli.CommandLine.Parameters;
-import picocli.CommandLine.Spec;
 
 /**
  * This is the handler that process certificate info command.
@@ -44,12 +40,6 @@ import picocli.CommandLine.Spec;
 
 class InfoSubcommand extends ScmCertSubcommand {
 
-  private static final Logger LOG =
-      LoggerFactory.getLogger(InfoSubcommand.class);
-
-  @Spec
-  private CommandSpec spec;
-
   @Parameters(description = "Serial id of the certificate in decimal.")
   private String serialId;
 
@@ -61,12 +51,12 @@ class InfoSubcommand extends ScmCertSubcommand {
         "Certificate can't be found");
 
     // Print container report info.
-    LOG.info("Certificate id: {}", serialId);
+    System.out.printf("Certificate id: %s%n", serialId);
     try {
       X509Certificate cert = CertificateCodec.getX509Certificate(certPemStr);
-      LOG.info(cert.toString());
+      System.out.println(cert);
     } catch (CertificateException ex) {
-      LOG.error("Failed to get certificate id " + serialId);
+      System.err.println("Failed to get certificate id " + serialId);
       throw new IOException("Fail to get certificate id " + serialId, ex);
     }
   }

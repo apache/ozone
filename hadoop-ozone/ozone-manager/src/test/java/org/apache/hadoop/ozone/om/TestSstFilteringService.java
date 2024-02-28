@@ -38,11 +38,8 @@ import org.apache.hadoop.ozone.om.snapshot.ReferenceCounted;
 import org.apache.ratis.util.ExitUtils;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
-import org.junit.jupiter.api.Order;
-import org.junit.jupiter.api.TestMethodOrder;
 import org.junit.jupiter.api.TestInstance;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.MethodOrderer.OrderAnnotation;
 import org.junit.jupiter.api.io.TempDir;
 import org.rocksdb.LiveFileMetaData;
 
@@ -75,7 +72,6 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * Test SST Filtering Service.
  */
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
-@TestMethodOrder(OrderAnnotation.class)
 public class TestSstFilteringService {
   private static final String SST_FILE_EXTENSION = ".sst";
   private OzoneManagerProtocol writeClient;
@@ -133,7 +129,6 @@ public class TestSstFilteringService {
    * @throws IOException - on Failure.
    */
   @Test
-  @Order(1)
   public void testIrrelevantSstFileDeletion()
       throws Exception {
     RDBStore activeDbStore = (RDBStore) om.getMetadataManager().getStore();
@@ -141,10 +136,23 @@ public class TestSstFilteringService {
         keyManager.getSnapshotSstFilteringService();
 
     final int keyCount = 100;
-    String volumeName = "vol1";
+    String volumeName = "volz";
     String bucketName1 = "buck1";
     createVolume(volumeName);
     addBucketToVolume(volumeName, bucketName1);
+
+    long countExistingSnapshots = filteringService.getSnapshotFilteredCount().get();
+    List<LiveFileMetaData> previousFiles = activeDbStore.getDb().getSstFileList();
+    List<String> listPreviousFiles = new ArrayList<String>();
+    int level0FilesCountDiff = 0;
+    int totalFileCountDiff = 0;
+    for (LiveFileMetaData fileMetaData : previousFiles) {
+      totalFileCountDiff++;
+      listPreviousFiles.add(fileMetaData.fileName());
+      if (fileMetaData.level() == 0) {
+        level0FilesCountDiff++;
+      }
+    }
 
     createKeys(volumeName, bucketName1, keyCount / 2);
     activeDbStore.getDb().flush(OmMetadataManagerImpl.KEY_TABLE);
@@ -155,8 +163,7 @@ public class TestSstFilteringService {
     int level0FilesCount = 0;
     int totalFileCount = 0;
 
-    List<LiveFileMetaData> initialsstFileList =
-        activeDbStore.getDb().getSstFileList();
+    List<LiveFileMetaData> initialsstFileList = activeDbStore.getDb().getSstFileList();
     for (LiveFileMetaData fileMetaData : initialsstFileList) {
       totalFileCount++;
       if (fileMetaData.level() == 0) {
@@ -164,18 +171,18 @@ public class TestSstFilteringService {
       }
     }
 
-    assertEquals(totalFileCount, level0FilesCount);
+    assertEquals(totalFileCount - totalFileCountDiff, level0FilesCount - level0FilesCountDiff);
 
     activeDbStore.getDb().compactRange(OmMetadataManagerImpl.KEY_TABLE);
 
     int nonLevel0FilesCountAfterCompact = 0;
 
-    List<LiveFileMetaData> nonLevelOFiles = new ArrayList<>();
+    List<String> nonLevelOFiles = new ArrayList<>();
     for (LiveFileMetaData fileMetaData : activeDbStore.getDb()
         .getSstFileList()) {
       if (fileMetaData.level() != 0) {
         nonLevel0FilesCountAfterCompact++;
-        nonLevelOFiles.add(fileMetaData);
+        nonLevelOFiles.add(fileMetaData.fileName());
       }
     }
 
@@ -192,8 +199,8 @@ public class TestSstFilteringService {
     SnapshotInfo snapshotInfo = om.getMetadataManager().getSnapshotInfoTable()
         .get(SnapshotInfo.getTableKey(volumeName, bucketName2, snapshotName1));
     assertFalse(snapshotInfo.isSstFiltered());
-    waitForSnapshotsAtLeast(filteringService, 1);
-    assertEquals(1, filteringService.getSnapshotFilteredCount().get());
+    waitForSnapshotsAtLeast(filteringService, countExistingSnapshots + 1);
+    assertEquals(countExistingSnapshots + 1, filteringService.getSnapshotFilteredCount().get());
 
     Set<String> keysFromActiveDb = getKeysFromDb(om.getMetadataManager(),
         volumeName, bucketName2);
@@ -208,17 +215,23 @@ public class TestSstFilteringService {
         OmSnapshotManager.getSnapshotPath(conf, snapshotInfo);
 
     for (LiveFileMetaData file : allFiles) {
+      //Skipping the previous files from this check even those also works.
+      if (listPreviousFiles.contains(file.fileName())) {
+        continue;
+      }
       File sstFile =
           new File(snapshotDirName + OM_KEY_PREFIX + file.fileName());
-      if (nonLevelOFiles.stream()
-          .anyMatch(o -> file.fileName().equals(o.fileName()))) {
+      if (nonLevelOFiles.contains(file.fileName())) {
         assertFalse(sstFile.exists());
       } else {
         assertTrue(sstFile.exists());
       }
     }
 
-    assertTrue(snapshotInfo.isSstFiltered());
+    // Need to read the sstFiltered flag which is set in background process and
+    // hence snapshotInfo.isSstFiltered() may not work sometimes.
+    assertTrue(om.getMetadataManager().getSnapshotInfoTable().get(SnapshotInfo
+        .getTableKey(volumeName, bucketName2, snapshotName1)).isSstFiltered());
 
     String snapshotName2 = "snapshot2";
     final long count;
@@ -228,7 +241,7 @@ public class TestSstFilteringService {
       createSnapshot(volumeName, bucketName2, snapshotName2);
 
       assertThrows(TimeoutException.class,
-          () -> waitForSnapshotsAtLeast(filteringService, count + 1));
+          () -> waitForSnapshotsAtLeast(filteringService, count + 1 + countExistingSnapshots));
       assertEquals(count, filteringService.getSnapshotFilteredCount().get());
     }
 
@@ -242,7 +255,6 @@ public class TestSstFilteringService {
   }
 
   @Test
-  @Order(2)
   public void testActiveAndDeletedSnapshotCleanup() throws Exception {
     RDBStore activeDbStore = (RDBStore) om.getMetadataManager().getStore();
     String volumeName = "volume1";
@@ -374,7 +386,6 @@ public class TestSstFilteringService {
    * snapshot bucket.
    */
   @Test
-  @Order(3)
   public void testSstFilteringService() throws Exception {
     RDBStore activeDbStore = (RDBStore) om.getMetadataManager().getStore();
     String volumeName = "volume";

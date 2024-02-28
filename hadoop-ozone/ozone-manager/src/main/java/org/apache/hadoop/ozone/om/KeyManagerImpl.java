@@ -32,6 +32,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.Set;
 import java.util.Stack;
 import java.util.TreeMap;
@@ -47,6 +48,7 @@ import org.apache.hadoop.fs.FileEncryptionInfo;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.storage.BlockLocationInfo;
@@ -121,6 +123,7 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SNAPSHOT_DELETING_SE
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SNAPSHOT_DELETING_SERVICE_TIMEOUT_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SNAPSHOT_SST_FILTERING_SERVICE_TIMEOUT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SNAPSHOT_SST_FILTERING_SERVICE_TIMEOUT_DEFAULT;
+import static org.apache.hadoop.ozone.OzoneConsts.ETAG;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_DIR_DELETING_SERVICE_INTERVAL;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_DIR_DELETING_SERVICE_INTERVAL_DEFAULT;
@@ -821,10 +824,19 @@ public class KeyManagerImpl implements KeyManager {
           if (nextPartNumberMarker > partNumberMarker) {
             String partName = getPartName(partKeyInfo, volumeName, bucketName,
                 keyName);
+            // Before HDDS-9680, MPU part does not have eTag metadata, for
+            // this case, we return null. The S3G will handle this case by
+            // using the MPU part name as the eTag field instead.
+            Optional<HddsProtos.KeyValue> eTag = partKeyInfo.getPartKeyInfo()
+                .getMetadataList()
+                .stream()
+                .filter(keyValue -> keyValue.getKey().equals(ETAG))
+                .findFirst();
             OmPartInfo omPartInfo = new OmPartInfo(partKeyInfo.getPartNumber(),
                 partName,
                 partKeyInfo.getPartKeyInfo().getModificationTime(),
-                partKeyInfo.getPartKeyInfo().getDataSize());
+                partKeyInfo.getPartKeyInfo().getDataSize(),
+                eTag.map(HddsProtos.KeyValue::getValue).orElse(null));
             omPartInfoList.add(omPartInfo);
 
             //if there are parts, use replication type from one of the parts
