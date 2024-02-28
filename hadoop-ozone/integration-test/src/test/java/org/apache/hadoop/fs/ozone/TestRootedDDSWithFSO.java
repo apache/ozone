@@ -47,7 +47,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.FileNotFoundException;
-import java.io.IOException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicLong;
@@ -227,12 +226,11 @@ public class TestRootedDDSWithFSO {
   private boolean assertTableRowCount(int expectedCount,
       Table<String, ?> table) {
     AtomicLong count = new AtomicLong(0L);
-    assertDoesNotThrow(() -> count.set(cluster.getOzoneManager().getMetadataManager().countRowsInTable(table)));
-    try {
+    assertDoesNotThrow(() -> {
+      count.set(cluster.getOzoneManager().getMetadataManager().countRowsInTable(table));
       LOG.info("{} actual row count={}, expectedCount={}", table.getName(),
           count.get(), expectedCount);
-    } catch (IOException e) {
-    }
+    });
     return count.get() == expectedCount;
   }
 

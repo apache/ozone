@@ -628,12 +628,11 @@ class TestKeyDeletingService extends OzoneTestBase {
                                       Table<String, ?> table,
                                       OMMetadataManager metadataManager) {
     AtomicLong count = new AtomicLong(0L);
-    assertDoesNotThrow(() -> count.set(metadataManager.countRowsInTable(table)));
-    try {
+    assertDoesNotThrow(() -> {
+      count.set(metadataManager.countRowsInTable(table));
       LOG.info("{} actual row count={}, expectedCount={}", table.getName(),
           count.get(), expectedCount);
-    } catch (IOException e) {
-    }
+    });
     return count.get() == expectedCount;
   }
 
