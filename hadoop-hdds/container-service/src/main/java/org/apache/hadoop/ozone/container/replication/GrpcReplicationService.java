@@ -62,18 +62,26 @@ public class GrpcReplicationService extends
   private final boolean zeroCopyEnabled;
 
   private final ZeroCopyMessageMarshaller<SendContainerRequest>
-      sendContainerZeroCopyMessageMarshaller = new ZeroCopyMessageMarshaller<>(
-      SendContainerRequest.getDefaultInstance());
+      sendContainerZeroCopyMessageMarshaller;
 
   private final ZeroCopyMessageMarshaller<CopyContainerRequestProto>
-      copyContainerZeroCopyMessageMarshaller = new ZeroCopyMessageMarshaller<>(
-      CopyContainerRequestProto.getDefaultInstance());
+      copyContainerZeroCopyMessageMarshaller;
 
   public GrpcReplicationService(ContainerReplicationSource source,
       ContainerImporter importer, boolean zeroCopyEnabled) {
     this.source = source;
     this.importer = importer;
     this.zeroCopyEnabled = zeroCopyEnabled;
+
+    if (zeroCopyEnabled) {
+      sendContainerZeroCopyMessageMarshaller = new ZeroCopyMessageMarshaller<>(
+          SendContainerRequest.getDefaultInstance());
+      copyContainerZeroCopyMessageMarshaller = new ZeroCopyMessageMarshaller<>(
+          CopyContainerRequestProto.getDefaultInstance());
+    } else {
+      sendContainerZeroCopyMessageMarshaller = null;
+      copyContainerZeroCopyMessageMarshaller = null;
+    }
   }
 
   public ServerServiceDefinition bindServiceWithZeroCopy() {
@@ -148,10 +156,12 @@ public class GrpcReplicationService extends
       // output may have already been closed, ignore such errors
       IOUtils.cleanupWithLogger(LOG, outputStream);
 
-      InputStream popStream =
-          copyContainerZeroCopyMessageMarshaller.popStream(request);
-      if (popStream != null) {
-        IOUtils.cleanupWithLogger(LOG, popStream);
+      if (copyContainerZeroCopyMessageMarshaller != null) {
+        InputStream popStream =
+            copyContainerZeroCopyMessageMarshaller.popStream(request);
+        if (popStream != null) {
+          IOUtils.cleanupWithLogger(LOG, popStream);
+        }
       }
     }
   }
