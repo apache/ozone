@@ -57,6 +57,8 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ReadContai
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Type;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.WriteChunkRequestProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.FinalizeBlockRequestProto;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.EchoRequestProto;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.EchoResponseProto;
 import org.apache.hadoop.hdds.scm.XceiverClientReply;
 import org.apache.hadoop.hdds.scm.XceiverClientSpi;
 import org.apache.hadoop.hdds.scm.XceiverClientSpi.Validator;
@@ -65,6 +67,7 @@ import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerNotOpenExcep
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.security.token.OzoneBlockTokenIdentifier;
+import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.ozone.common.Checksum;
 import org.apache.hadoop.ozone.common.ChecksumData;
 import org.apache.hadoop.security.token.Token;
@@ -659,6 +662,38 @@ public final class ContainerProtocolCalls  {
     ContainerCommandResponseProto response =
         client.sendCommand(request, getValidatorList());
     return response.getGetSmallFile();
+  }
+
+  /**
+   * Send an echo to DataNode.
+   *
+   * @return EchoResponseProto
+   */
+  public static EchoResponseProto echo(XceiverClientSpi client, long containerID, ByteString payloadReqBytes,
+      int payloadRespSizeKB, int sleepTimeMs) throws IOException {
+    ContainerProtos.EchoRequestProto getEcho =
+        EchoRequestProto
+            .newBuilder()
+            .setPayload(payloadReqBytes)
+            .setPayloadSizeResp(payloadRespSizeKB)
+            .setSleepTimeMs(sleepTimeMs)
+            .build();
+    String id = client.getPipeline().getClosestNode().getUuidString();
+
+    ContainerCommandRequestProto.Builder builder = ContainerCommandRequestProto
+        .newBuilder()
+        .setCmdType(Type.Echo)
+        .setContainerID(containerID)
+        .setDatanodeUuid(id)
+        .setEcho(getEcho);
+    String traceId = TracingUtil.exportCurrentSpan();
+    if (traceId != null) {
+      builder.setTraceID(traceId);
+    }
+    ContainerCommandRequestProto request = builder.build();
+    ContainerCommandResponseProto response =
+        client.sendCommand(request, getValidatorList());
+    return response.getEcho();
   }
 
   /**
