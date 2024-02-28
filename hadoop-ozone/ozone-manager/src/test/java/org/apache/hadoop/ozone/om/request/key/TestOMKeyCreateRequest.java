@@ -530,7 +530,7 @@ public class TestOMKeyCreateRequest extends TestOMKeyRequest {
     // Verify that no metadata exists in the response
     assertThat(
         createResponse.getOMResponse().getCreateKeyResponse().getKeyInfo()
-            .getMetadataList().isEmpty());
+            .getMetadataList()).isEmpty();
 
     OmKeyInfo keyInfo = createOmKeyInfo(volumeName, bucketName, keyName,
         replicationConfig).build();
