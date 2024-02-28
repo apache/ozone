@@ -981,22 +981,16 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
 
     if (networkTopologyEnable.isPresent()) {
       Boolean nt = networkTopologyEnable.get();
-      Preconditions.checkState(nt != null,
-              "networkTopologyEnable must be either true or false");
       builder.setNetworkTopologyEnable(nt);
     }
 
     if (includeNodes.isPresent()) {
       String in = includeNodes.get();
-      Preconditions.checkState(in != null,
-              "includeNodes must contain comma separated hostnames or ip addresses");
       builder.setIncludeNodes(in);
     }
 
     if (excludeNodes.isPresent()) {
       String ex = excludeNodes.get();
-      Preconditions.checkState(ex != null,
-              "excludeNodes must contain comma separated hostnames or ip addresses");
       builder.setExcludeNodes(ex);
     }
 

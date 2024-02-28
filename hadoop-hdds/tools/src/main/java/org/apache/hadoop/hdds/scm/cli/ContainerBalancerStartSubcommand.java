@@ -74,39 +74,39 @@ public class ContainerBalancerStartSubcommand extends ScmSubcommand {
           "(for example, '26' for 26GB).")
   private Optional<Long> maxSizeLeavingSourceInGB;
 
-  @Option(names = {"-b", "--balancing-iteration-interval"},
-      description = "The interval period between each iteration of Container Balancer." +
-          "(for example, '70' for 70m).")
+  @Option(names = {"--balancing-iteration-interval-minutes"},
+      description = "The interval period in minutes between each iteration of Container Balancer." +
+          "Value should be greater than '0' (for example, '70' for 70 minutes).")
   private Optional<Long> balancingInterval;
 
-  @Option(names = {"-mt", "--move-timeout"},
-      description = "The amount of time to allow a single container to move " +
-          "from source to target (for example, '65' for 65m).")
+  @Option(names = {"--move-timeout-minutes"},
+      description = "The amount of time in minutes to allow a single container to move " +
+          "from source to target. Value should be greater than '0' (for example, '65' for 65 minutes).")
   private Optional<Long> moveTimeout;
 
-  @Option(names = {"-mrt", "--move-replication-timeout"},
+  @Option(names = {"--move-replication-timeout-minutes"},
       description = "The " +
-          "amount of time to allow a single container's replication from source " +
-          "to target as part of container move. For example, if \"hdds.container" +
+          "amount of time in minutes to allow a single container's replication from source " +
+          "to target as part of container move. Value should be greater than '0'. For example, if \"hdds.container" +
           ".balancer.move.timeout\" is 65 minutes, then out of those 65 minutes " +
           "50 minutes will be the deadline for replication to complete (for example," +
-          "'50' for 50m).")
+          "'50' for 50 minutes).")
   private Optional<Long> moveReplicationTimeout;
 
-  @Option(names = {"-nt", "--move-network-topology-enable"},
+  @Option(names = {"--move-network-topology-enable"},
       description = "Whether to take network topology into account when " +
           "selecting a target for a source. " +
           "This configuration is false by default.")
   private Optional<Boolean> networkTopologyEnable;
 
-  @Option(names = {"-in", "--include-datanodes"},
+  @Option(names = {"--include-datanodes"},
       description = "A list of Datanode " +
           "hostnames or ip addresses separated by commas. Only the Datanodes " +
           "specified in this list are balanced. This configuration is empty by " +
           "default and is applicable only if it is non-empty (for example, \"hostname1,hostname2,hostname3\").")
   private Optional<String> includeNodes;
 
-  @Option(names = {"-ex", "--exclude-datanodes"},
+  @Option(names = {"--exclude-datanodes"},
       description =  "A list of Datanode " +
           "hostnames or ip addresses separated by commas. The Datanodes specified " +
           "in this list are excluded from balancing. This configuration is empty " +
@@ -116,12 +116,12 @@ public class ContainerBalancerStartSubcommand extends ScmSubcommand {
   @Override
   public void execute(ScmClient scmClient) throws IOException {
     StartContainerBalancerResponseProto response = scmClient.
-            startContainerBalancer(threshold, iterations,
-            maxDatanodesPercentageToInvolvePerIteration,
-            maxSizeToMovePerIterationInGB, maxSizeEnteringTargetInGB,
-            maxSizeLeavingSourceInGB, balancingInterval, moveTimeout,
-            moveReplicationTimeout, networkTopologyEnable, includeNodes,
-            excludeNodes);
+        startContainerBalancer(threshold, iterations,
+        maxDatanodesPercentageToInvolvePerIteration,
+        maxSizeToMovePerIterationInGB, maxSizeEnteringTargetInGB,
+        maxSizeLeavingSourceInGB, balancingInterval, moveTimeout,
+        moveReplicationTimeout, networkTopologyEnable, includeNodes,
+        excludeNodes);
     if (response.getStart()) {
       System.out.println("Container Balancer started successfully.");
     } else {

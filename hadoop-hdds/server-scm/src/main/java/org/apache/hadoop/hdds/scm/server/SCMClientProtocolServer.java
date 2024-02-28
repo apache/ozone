@@ -100,6 +100,7 @@ import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -1116,7 +1117,7 @@ public class SCMClientProtocolServer implements
       auditMap.put("balancingInterval", String.valueOf(bi));
       Preconditions.checkState(bi > 0,
               "balancingInterval must be greater than zero.");
-      cbc.setBalancingInterval(bi);
+      cbc.setBalancingInterval(Duration.ofMinutes(bi));
     }
 
     if (moveTimeout.isPresent()) {
@@ -1124,7 +1125,7 @@ public class SCMClientProtocolServer implements
       auditMap.put("moveTimeout", String.valueOf(mt));
       Preconditions.checkState(mt > 0,
               "moveTimeout must be greater than zero.");
-      cbc.setMoveTimeout(mt);
+      cbc.setMoveTimeout(Duration.ofMinutes(mt));
     }
 
     if (moveReplicationTimeout.isPresent()) {
@@ -1132,30 +1133,24 @@ public class SCMClientProtocolServer implements
       auditMap.put("moveReplicationTimeout", String.valueOf(mrt));
       Preconditions.checkState(mrt > 0,
               "moveTimeout must be greater than zero.");
-      cbc.setMoveReplicationTimeout(mrt);
+      cbc.setMoveReplicationTimeout(Duration.ofMinutes(mrt));
     }
 
     if (networkTopologyEnable.isPresent()) {
       Boolean nt = networkTopologyEnable.get();
       auditMap.put("networkTopologyEnable", String.valueOf(nt));
-      Preconditions.checkState(nt != null,
-              "networkTopologyEnable must be either true or false");
       cbc.setNetworkTopologyEnable(nt);
     }
 
     if (includeNodes.isPresent()) {
       String in = includeNodes.get();
       auditMap.put("includeNodes", (in));
-      Preconditions.checkState(in != null,
-              "includeNodes must contain comma separated hostnames or ip addresses");
       cbc.setIncludeNodes(in);
     }
 
     if (excludeNodes.isPresent()) {
       String ex = excludeNodes.get();
       auditMap.put("excludeNodes", (ex));
-      Preconditions.checkState(ex != null,
-              "includeNodes must contain comma separated hostnames or ip addresses");
       cbc.setExcludeNodes(ex);
     }
 
