@@ -555,11 +555,12 @@ public class TestSnapshotDeletingService {
   private boolean assertTableRowCount(int expectedCount,
                                       Table<String, ?> table) {
     AtomicLong count = new AtomicLong(0L);
-    assertDoesNotThrow(() -> {
-      count.set(cluster.getOzoneManager().getMetadataManager().countRowsInTable(table));
+    assertDoesNotThrow(() -> count.set(cluster.getOzoneManager().getMetadataManager().countRowsInTable(table)));
+    try {
       LOG.info("{} actual row count={}, expectedCount={}", table.getName(),
           count.get(), expectedCount);
-    });
+    } catch (IOException e) {
+    }
     return count.get() == expectedCount;
   }
 }

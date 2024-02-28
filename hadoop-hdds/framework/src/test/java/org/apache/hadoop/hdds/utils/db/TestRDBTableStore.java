@@ -96,7 +96,7 @@ public class TestRDBTableStore {
 
   private static boolean consume(Table.KeyValue keyValue)  {
     count++;
-    assertDoesNotThrow(() -> assertNotNull(keyValue.getKey()));
+    assertNotNull(assertDoesNotThrow(keyValue::getKey));
     return true;
   }
 
