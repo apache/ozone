@@ -106,8 +106,8 @@ import static javax.ws.rs.core.HttpHeaders.LAST_MODIFIED;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType.EC;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CHUNK_SIZE_DEFAULT;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CHUNK_SIZE_KEY;
-import static org.apache.hadoop.ozone.OzoneConfigKeys.DFS_CONTAINER_RATIS_DATASTREAM_ENABLED;
-import static org.apache.hadoop.ozone.OzoneConfigKeys.DFS_CONTAINER_RATIS_DATASTREAM_ENABLED_DEFAULT;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.HDDS_CONTAINER_RATIS_DATASTREAM_ENABLED;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.HDDS_CONTAINER_RATIS_DATASTREAM_ENABLED_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_FS_DATASTREAM_AUTO_THRESHOLD;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_FS_DATASTREAM_AUTO_THRESHOLD_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_REPLICATION;
@@ -196,8 +196,8 @@ public class ObjectEndpoint extends EndpointBase {
         OZONE_SCM_CHUNK_SIZE_DEFAULT,
         StorageUnit.BYTES);
     datastreamEnabled = ozoneConfiguration.getBoolean(
-        DFS_CONTAINER_RATIS_DATASTREAM_ENABLED,
-        DFS_CONTAINER_RATIS_DATASTREAM_ENABLED_DEFAULT);
+        HDDS_CONTAINER_RATIS_DATASTREAM_ENABLED,
+        HDDS_CONTAINER_RATIS_DATASTREAM_ENABLED_DEFAULT);
     datastreamMinLength = (long) ozoneConfiguration.getStorageSize(
         OZONE_FS_DATASTREAM_AUTO_THRESHOLD,
         OZONE_FS_DATASTREAM_AUTO_THRESHOLD_DEFAULT, StorageUnit.BYTES);

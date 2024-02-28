@@ -165,7 +165,7 @@ public class TestOzoneContainer {
       throws Exception {
     initTest(versionInfo);
     String path = folder.toString();
-    conf.set(OzoneConfigKeys.DFS_CONTAINER_RATIS_DATANODE_STORAGE_DIR,
+    conf.set(OzoneConfigKeys.HDDS_CONTAINER_RATIS_DATANODE_STORAGE_DIR,
         String.join(",",
             path + "/ratis1", path + "/ratis2", path + "ratis3"));
 

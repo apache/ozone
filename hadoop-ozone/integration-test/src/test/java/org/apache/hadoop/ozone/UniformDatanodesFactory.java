@@ -39,12 +39,12 @@ import static org.apache.hadoop.hdds.HddsConfigKeys.OZONE_METADATA_DIRS;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.HDDS_DATANODE_DIR_DU_RESERVED;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.HDDS_DATANODE_DIR_KEY;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.HDDS_REST_HTTP_ADDRESS_KEY;
-import static org.apache.hadoop.ozone.OzoneConfigKeys.DFS_CONTAINER_IPC_PORT;
-import static org.apache.hadoop.ozone.OzoneConfigKeys.DFS_CONTAINER_RATIS_ADMIN_PORT;
-import static org.apache.hadoop.ozone.OzoneConfigKeys.DFS_CONTAINER_RATIS_DATANODE_STORAGE_DIR;
-import static org.apache.hadoop.ozone.OzoneConfigKeys.DFS_CONTAINER_RATIS_DATASTREAM_PORT;
-import static org.apache.hadoop.ozone.OzoneConfigKeys.DFS_CONTAINER_RATIS_IPC_PORT;
-import static org.apache.hadoop.ozone.OzoneConfigKeys.DFS_CONTAINER_RATIS_SERVER_PORT;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.HDDS_CONTAINER_IPC_PORT;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.HDDS_CONTAINER_RATIS_ADMIN_PORT;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.HDDS_CONTAINER_RATIS_DATANODE_STORAGE_DIR;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.HDDS_CONTAINER_RATIS_DATASTREAM_PORT;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.HDDS_CONTAINER_RATIS_IPC_PORT;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.HDDS_CONTAINER_RATIS_SERVER_PORT;
 import static org.apache.ozone.test.GenericTestUtils.PortAllocator.anyHostWithFreePort;
 import static org.apache.ozone.test.GenericTestUtils.PortAllocator.getFreePort;
 
@@ -96,7 +96,7 @@ public class UniformDatanodesFactory implements MiniOzoneCluster.DatanodeFactory
 
     Path ratisDir = baseDir.resolve("ratis");
     Files.createDirectories(ratisDir);
-    dnConf.set(DFS_CONTAINER_RATIS_DATANODE_STORAGE_DIR, ratisDir.toString());
+    dnConf.set(HDDS_CONTAINER_RATIS_DATANODE_STORAGE_DIR, ratisDir.toString());
 
     if (layoutVersion != null) {
       DatanodeLayoutStorage layoutStorage = new DatanodeLayoutStorage(
@@ -111,11 +111,11 @@ public class UniformDatanodesFactory implements MiniOzoneCluster.DatanodeFactory
     conf.set(HDDS_REST_HTTP_ADDRESS_KEY, anyHostWithFreePort());
     conf.set(HDDS_DATANODE_HTTP_ADDRESS_KEY, anyHostWithFreePort());
     conf.set(HDDS_DATANODE_CLIENT_ADDRESS_KEY, anyHostWithFreePort());
-    conf.setInt(DFS_CONTAINER_IPC_PORT, getFreePort());
-    conf.setInt(DFS_CONTAINER_RATIS_IPC_PORT, getFreePort());
-    conf.setInt(DFS_CONTAINER_RATIS_ADMIN_PORT, getFreePort());
-    conf.setInt(DFS_CONTAINER_RATIS_SERVER_PORT, getFreePort());
-    conf.setInt(DFS_CONTAINER_RATIS_DATASTREAM_PORT, getFreePort());
+    conf.setInt(HDDS_CONTAINER_IPC_PORT, getFreePort());
+    conf.setInt(HDDS_CONTAINER_RATIS_IPC_PORT, getFreePort());
+    conf.setInt(HDDS_CONTAINER_RATIS_ADMIN_PORT, getFreePort());
+    conf.setInt(HDDS_CONTAINER_RATIS_SERVER_PORT, getFreePort());
+    conf.setInt(HDDS_CONTAINER_RATIS_DATASTREAM_PORT, getFreePort());
     conf.setFromObject(new ReplicationServer.ReplicationConfig().setPort(getFreePort()));
   }
 
