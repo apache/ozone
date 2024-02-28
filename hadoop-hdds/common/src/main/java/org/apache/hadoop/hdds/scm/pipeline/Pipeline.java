@@ -72,14 +72,60 @@ public final class Pipeline {
   }
 
   private static final Logger LOG = LoggerFactory.getLogger(Pipeline.class);
+
+  static class NodesInOrder {
+    private final List<DatanodeDetails> nodes = new ArrayList<>();
+
+    synchronized DatanodeDetails getClosest(PipelineID id, Set<DatanodeDetails> excluded) throws IOException {
+      if (nodes.isEmpty()) {
+        LOG.debug("Nodes in order is empty, delegate to getFirstNode");
+        return null;
+      }
+      for (DatanodeDetails d : nodes) {
+        if (!excluded.contains(d)) {
+          return d;
+        }
+      }
+      throw new IOException(String.format("All nodes are excluded: %s, nodesInOrder=%s, excluded=%s",
+          id, nodes, excluded));
+    }
+
+    synchronized void setAll(List<DatanodeDetails> newNodes) {
+      nodes.clear();
+      if (newNodes != null) {
+        nodes.addAll(newNodes);
+      }
+    }
+
+    synchronized List<DatanodeDetails> getAll() {
+      return nodes.isEmpty() ? null : Collections.unmodifiableList(nodes);
+    }
+
+    synchronized void addTo(HddsProtos.Pipeline.Builder builder, Set<DatanodeDetails> members) {
+      // To save the message size on wire, only transfer the node order based on network topology
+      if (nodes.isEmpty()) {
+        return;
+      }
+      for (DatanodeDetails n : nodes) {
+        final Iterator<DatanodeDetails> it = members.iterator();
+        for (int j = 0; j < members.size(); j++) {
+          if (it.next().equals(n)) {
+            builder.addMemberOrders(j);
+            break;
+          }
+        }
+      }
+    }
+  }
+
   private final PipelineID id;
   private final ReplicationConfig replicationConfig;
 
   private final PipelineState state;
-  private Map<DatanodeDetails, Long> nodeStatus;
+  private final Map<DatanodeDetails, Long> nodeStatus;
   private Map<DatanodeDetails, Integer> replicaIndexes;
   // nodes with ordered distance to client
-  private List<DatanodeDetails> nodesInOrder = new ArrayList<>();
+  private final NodesInOrder nodesInOrder = new NodesInOrder();
   // Current reported Leader for the pipeline
   private UUID leaderId;
   // Timestamp for pipeline upon creation
@@ -287,17 +333,8 @@ public final class Pipeline {
     if (excluded == null) {
       excluded = Collections.emptySet();
     }
-    if (nodesInOrder.isEmpty()) {
-      LOG.debug("Nodes in order is empty, delegate to getFirstNode");
-      return getFirstNode(excluded);
-    }
-    for (DatanodeDetails d : nodesInOrder) {
-      if (!excluded.contains(d)) {
-        return d;
-      }
-    }
-    throw new IOException(String.format(
-        "All nodes are excluded: Pipeline=%s, excluded=%s", id, excluded));
+    final DatanodeDetails closest = nodesInOrder.getClosest(id, excluded);
+    return closest != null? closest : getFirstNode(excluded);
   }
 
   @JsonIgnore
@@ -316,19 +353,16 @@ public final class Pipeline {
   }
 
   public void setNodesInOrder(List<DatanodeDetails> nodes) {
-    nodesInOrder.clear();
-    if (null == nodes) {
-      return;
-    }
-    nodesInOrder.addAll(nodes);
+    nodesInOrder.setAll(nodes);
   }
 
   public List<DatanodeDetails> getNodesInOrder() {
-    if (nodesInOrder.isEmpty()) {
+    final List<DatanodeDetails> nodes = nodesInOrder.getAll();
+    if (nodes == null) {
       LOG.debug("Nodes in order is empty, delegate to getNodes");
       return getNodes();
     }
-    return nodesInOrder;
+    return nodes;
   }
 
   void reportDatanode(DatanodeDetails dn) throws IOException {
@@ -404,23 +438,7 @@ public final class Pipeline {
       builder.setSuggestedLeaderID(uuid128);
     }
 
-    // To save the message size on wire, only transfer the node order based on
-    // network topology
-    List<DatanodeDetails> nodes = nodesInOrder;
-    if (!nodes.isEmpty()) {
-      for (int i = 0; i < nodes.size(); i++) {
-        Iterator<DatanodeDetails> it = nodeStatus.keySet().iterator();
-        for (int j = 0; j < nodeStatus.keySet().size(); j++) {
-          if (it.next().equals(nodes.get(i))) {
-            builder.addMemberOrders(j);
-            break;
-          }
-        }
-      }
-      if (LOG.isDebugEnabled()) {
-        LOG.debug("Serialize pipeline {} with nodesInOrder {}", id, nodes);
-      }
-    }
+    nodesInOrder.addTo(builder, nodeStatus.keySet());
     return builder.build();
   }
 
@@ -555,7 +573,7 @@ public final class Pipeline {
       this.replicationConfig = pipeline.replicationConfig;
       this.state = pipeline.state;
       this.nodeStatus = pipeline.nodeStatus;
-      this.nodesInOrder = pipeline.nodesInOrder;
+      this.nodesInOrder = pipeline.nodesInOrder.getAll();
       this.leaderId = pipeline.getLeaderId();
       this.creationTimestamp = pipeline.getCreationTimestamp();
       this.suggestedLeaderId = pipeline.getSuggestedLeaderId();
