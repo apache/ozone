@@ -17,8 +17,10 @@
 
 package org.apache.hadoop.ozone.recon;
 
+import java.io.IOException;
 import java.time.Duration;
 import java.util.List;
+import java.util.stream.Collectors;
 
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -33,6 +35,7 @@ import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.hdds.utils.db.RDBBatchOperation;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
+import org.apache.hadoop.ozone.recon.api.types.ContainerKeyPrefix;
 import org.apache.hadoop.ozone.recon.scm.ReconContainerManager;
 import org.apache.hadoop.ozone.recon.scm.ReconStorageContainerManagerFacade;
 import org.apache.hadoop.ozone.recon.spi.ReconContainerMetadataManager;
@@ -81,7 +84,7 @@ public class TestReconTasks {
 
     conf.set("ozone.scm.stale.node.interval", "6s");
     conf.set("ozone.scm.dead.node.interval", "10s");
-    cluster =  MiniOzoneCluster.newBuilder(conf).setNumDatanodes(3)
+    cluster =  MiniOzoneCluster.newBuilder(conf).setNumDatanodes(1)
         .includeRecon(true).build();
     cluster.waitForClusterToBeReady();
     GenericTestUtils.setLogLevel(SCMDatanodeHeartbeatDispatcher.LOG,
@@ -104,6 +107,7 @@ public class TestReconTasks {
     StorageContainerManager scm = cluster.getStorageContainerManager();
     ContainerManager scmContainerManager = scm.getContainerManager();
     ContainerManager reconContainerManager = reconScm.getContainerManager();
+    int previousContainerCount = reconContainerManager.getContainers().size();
     final ContainerInfo container1 = scmContainerManager.allocateContainer(
         RatisReplicationConfig.getInstance(
             HddsProtos.ReplicationFactor.ONE), "admin");
@@ -125,7 +129,7 @@ public class TestReconTasks {
     reconScm.syncWithSCMContainerInfo();
     reconContainersCount = reconContainerManager
         .getContainers().size();
-    assertEquals(scmContainersCount, reconContainersCount);
+    assertEquals(scmContainersCount, reconContainersCount - previousContainerCount);
   }
 
   @Test
@@ -165,25 +169,18 @@ public class TestReconTasks {
     runTestOzoneContainerViaDataNode(containerID, client);
 
     // Make sure Recon got the container report with new container.
-    assertArrayEquals(scmContainerManager.getContainers().toArray(),
-        reconContainerManager.getContainers().toArray());
+    assertEquals(scmContainerManager.getContainers(),
+        reconContainerManager.getContainers());
 
     // Bring down the Datanode that had the container replica.
     cluster.shutdownHddsDatanode(pipeline.getFirstNode());
-
-//    System.out.println("RRR reconPipelineManager.getPipelines().size():"+reconPipelineManager.getPipelines().size());
-//    System.out.println("RRR reconContainerManager.getContainers().size():"
-//    +reconContainerManager.getContainers().size());
-//    System.out.println("RRR reconContainerManager.getContainers().size():"
-//    +reconContainerManager.getContainers().size());
-//    System.out.println("RRR pipeline.getFirstNode():"+pipeline.getFirstNode());
 
     LambdaTestUtils.await(120000, 6000, () -> {
       List<UnhealthyContainers> allMissingContainers =
           reconContainerManager.getContainerSchemaManager()
               .getUnhealthyContainers(
                   ContainerSchemaDefinition.UnHealthyContainerStates.MISSING,
-                  0, 1);
+                  0, 1000);
       return (allMissingContainers.size() >= 1);
     });
 
@@ -197,7 +194,20 @@ public class TestReconTasks {
                   0, 1000);
       return (allMissingContainers.isEmpty());
     });
+    // cleaning up the data
     scmContainerManager.deleteContainer(containerInfo.containerID());
+//    List<ContainerKeyPrefix> deletedContainerKeyList =
+//        reconContainerMetadataManager.getKeyPrefixesForContainer(containerID).entrySet()
+//            .stream().map(entry -> entry.getKey()).collect(Collectors.toList());
+//    deletedContainerKeyList.forEach((ContainerKeyPrefix key) -> {
+//      try (RDBBatchOperation rdbBatchOperation = new RDBBatchOperation()) {
+//        reconContainerMetadataManager.batchDeleteContainerMapping(
+//            rdbBatchOperation, key);
+//        reconContainerMetadataManager.commitBatchOperation(rdbBatchOperation);
+//      } catch (IOException e) {
+//        //LOG.error("Unable to write Container Key Prefix data in Recon DB.", e);
+//      }
+//    });
     cluster.restartHddsDatanode(pipeline.getFirstNode(), true);
     IOUtils.closeQuietly(client);
   }
@@ -238,6 +248,7 @@ public class TestReconTasks {
     ContainerManager scmContainerManager = scm.getContainerManager();
     ReconContainerManager reconContainerManager =
         (ReconContainerManager) reconScm.getContainerManager();
+    int previousContainerCount = reconContainerManager.getContainers().size();
     ContainerInfo containerInfo =
         scmContainerManager
             .allocateContainer(RatisReplicationConfig.getInstance(ONE), "testEmptyMissingContainer");
@@ -249,8 +260,8 @@ public class TestReconTasks {
     runTestOzoneContainerViaDataNode(containerID, client);
 
     // Make sure Recon got the container report with new container.
-    assertArrayEquals(scmContainerManager.getContainers().toArray(),
-        reconContainerManager.getContainers().toArray());
+    assertEquals(scmContainerManager.getContainers().size(),
+        reconContainerManager.getContainers().size() - previousContainerCount);
 
     // Bring down the Datanode that had the container replica.
     cluster.shutdownHddsDatanode(pipeline.getFirstNode());

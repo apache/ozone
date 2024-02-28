@@ -357,7 +357,7 @@ public class TestSnapshotDeletingService {
     assertTableRowCount(deletedTable, 0);
     assertTableRowCount(keyTable, 11);
     SnapshotInfo deletedSnap = om.getMetadataManager()
-        .getSnapshotInfoTable().get("/vol1/bucket2/snap2");
+        .getSnapshotInfoTable().get("/vol1/bucketfso/snap2");
 
     client.getObjectStore().deleteSnapshot(VOLUME_NAME, BUCKET_NAME_FSO,
         "snap2");
@@ -372,7 +372,7 @@ public class TestSnapshotDeletingService {
     // Once all the tables are moved, the snapshot is deleted
     assertTableRowCount(om.getMetadataManager().getSnapshotInfoTable(), 2);
 
-    verifySnapshotChain(deletedSnap, "/vol1/bucket2/snap3");
+    verifySnapshotChain(deletedSnap, "/vol1/bucketfso/snap3");
     OmSnapshot snap3 = om.getOmSnapshotManager()
         .getSnapshot(VOLUME_NAME, BUCKET_NAME_FSO, "snap3").get();
 
