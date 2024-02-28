@@ -131,8 +131,8 @@ public class TestSnapshotDeletingService {
   @Test
   @Order(3)
   public void testSnapshotSplitAndMove() throws Exception {
-    SnapshotDeletingService snapshotDeletingService =
-        om.getKeyManager().getSnapshotDeletingService();
+//    SnapshotDeletingService snapshotDeletingService =
+//        om.getKeyManager().getSnapshotDeletingService();
     Table<String, SnapshotInfo> snapshotInfoTable =
         om.getMetadataManager().getSnapshotInfoTable();
 
