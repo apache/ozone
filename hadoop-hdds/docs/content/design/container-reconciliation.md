@@ -47,7 +47,7 @@ Even when all container replicas are closed, the system assumes that these close
 The scanner validates periodically that the checksums of the chunks on disk match the checksums provided by the client. It is possible that the checksum of a chunk on disk does not match the client provided checksum recorded at the time of write. Additionally, during container replica copying, the consistency of the data is not validated, opening the possibility of silent data corruption propagating through the system.
 
 This document proposes a container reconciliation protocol to solve these problems. After implementing the proposal:
-1. It should be possible for a cluster to progress to a state where it has only properly replicated closed and open containers.
+1. It should be possible for a cluster to progress to a state where all not open containers are closed and meeting the desired replication factor.
 2. We can verify the equality and integrity of all closed containers.
 
 Note: This document does not cover the case where the checksums recorded at the time of write match the chunks locally within a Datanode but differ across replicas. We assume that the replication code path is correct and that the checksums are correct. If this is not the case, the system is already in a failed state and the reconciliation protocol will not be able to recover it. Chunks once written are not updated, thus this scenario is not expected to occur.
