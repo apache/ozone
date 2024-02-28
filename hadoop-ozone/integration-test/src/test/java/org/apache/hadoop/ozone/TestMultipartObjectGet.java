@@ -106,7 +106,6 @@ public class TestMultipartObjectGet {
     MiniOzoneCluster.Builder builder = MiniOzoneCluster.newHABuilder(conf)
         .setSCMServiceId(scmServiceId)
         .setOMServiceId(omServiceId)
-        .setNumDatanodes(3)
         .setNumOfStorageContainerManagers(3)
         .setNumOfOzoneManagers(3);
     cluster = (MiniOzoneHAClusterImpl) builder.build();

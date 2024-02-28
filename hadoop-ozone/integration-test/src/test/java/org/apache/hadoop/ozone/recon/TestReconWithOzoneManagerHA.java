@@ -75,8 +75,8 @@ public class TestReconWithOzoneManagerHA {
 
     cluster = (MiniOzoneHAClusterImpl) MiniOzoneCluster.newHABuilder(conf)
         .setOMServiceId(OM_SERVICE_ID)
-        .setNumDatanodes(1)
         .setNumOfOzoneManagers(3)
+        .setNumDatanodes(1)
         .includeRecon(true)
         .build();
     cluster.waitForClusterToBeReady();
