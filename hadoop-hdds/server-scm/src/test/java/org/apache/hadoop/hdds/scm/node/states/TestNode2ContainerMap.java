@@ -20,6 +20,7 @@
 package org.apache.hadoop.hdds.scm.node.states;
 
 import org.apache.hadoop.hdds.scm.container.ContainerID;
+import org.apache.hadoop.hdds.scm.container.Node2ContainerMap;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
