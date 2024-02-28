@@ -93,12 +93,22 @@ import static org.mockito.Mockito.when;
 /**
  * Test for NSSummary REST APIs with OBS.
  * Testing is done on a simple object store model with a flat hierarchy:
- *         vol
- *        /   \
- *    bucket1 bucket2
- *      |       |
- *    file1   file2
- *
+ * Testing the following case.
+ *  ├── vol
+ *  │   ├── bucket1
+ *  │   │   ├── file1
+ *  │   │   └── file2
+ *  │   │   └── file3
+ *  │   └── bucket2
+ *  │       ├── file4
+ *  │       └── file5
+ *  └── vol2
+ *      ├── bucket3
+ *      │   ├── file8
+ *      │   ├── file9
+ *      │   └── file10
+ *      └── bucket4
+ *          └── file11
  * This tests the Rest APIs for NSSummary in the context of OBS buckets,
  * focusing on disk usage, quota usage, and file size distribution.
  */
@@ -125,18 +135,6 @@ public class TestNSSummaryEndpointWithOBS {
   private static final String BUCKET_TWO = "bucket2";
   private static final String BUCKET_THREE = "bucket3";
   private static final String BUCKET_FOUR = "bucket4";
-  private static final String KEY_ONE = "file1";
-  private static final String KEY_TWO = "file2";
-  private static final String KEY_THREE = "file3";
-  private static final String KEY_FOUR = "file4";
-  private static final String KEY_FIVE = "file5";
-  private static final String KEY_EIGHT = "file8";
-  private static final String KEY_NINE = "file9";
-  private static final String KEY_TEN = "file10";
-  private static final String KEY_ELEVEN = "file11";
-  private static final String MULTI_BLOCK_KEY = "file3";
-  private static final String MULTI_BLOCK_FILE = "file3";
-
   private static final String FILE_ONE = "file1";
   private static final String FILE_TWO = "file2";
   private static final String FILE_THREE = "file3";
@@ -146,26 +144,25 @@ public class TestNSSummaryEndpointWithOBS {
   private static final String FILE_NINE = "file9";
   private static final String FILE_TEN = "file10";
   private static final String FILE_ELEVEN = "file11";
-  // objects IDs
+  private static final String MULTI_BLOCK_FILE = FILE_THREE;
+
   private static final long PARENT_OBJECT_ID_ZERO = 0L;
   private static final long VOL_OBJECT_ID = 0L;
+  private static final long VOL_TWO_OBJECT_ID = 14L;
   private static final long BUCKET_ONE_OBJECT_ID = 1L;
   private static final long BUCKET_TWO_OBJECT_ID = 2L;
-  private static final long KEY_ONE_OBJECT_ID = 3L;
-  private static final long KEY_TWO_OBJECT_ID = 5L;
-  private static final long KEY_FOUR_OBJECT_ID = 6L;
-  private static final long KEY_THREE_OBJECT_ID = 8L;
-  private static final long KEY_FIVE_OBJECT_ID = 9L;
-  private static final long KEY_SIX_OBJECT_ID = 10L;
-  private static final long MULTI_BLOCK_KEY_OBJECT_ID = 13L;
-  private static final long KEY_SEVEN_OBJECT_ID = 13L;
-  private static final long VOL_TWO_OBJECT_ID = 14L;
   private static final long BUCKET_THREE_OBJECT_ID = 15L;
   private static final long BUCKET_FOUR_OBJECT_ID = 16L;
+  private static final long KEY_ONE_OBJECT_ID = 3L;
+  private static final long KEY_TWO_OBJECT_ID = 5L;
+  private static final long KEY_THREE_OBJECT_ID = 8L;
+  private static final long KEY_FOUR_OBJECT_ID = 6L;
+  private static final long KEY_FIVE_OBJECT_ID = 9L;
   private static final long KEY_EIGHT_OBJECT_ID = 17L;
   private static final long KEY_NINE_OBJECT_ID = 19L;
   private static final long KEY_TEN_OBJECT_ID = 20L;
   private static final long KEY_ELEVEN_OBJECT_ID = 21L;
+  private static final long MULTI_BLOCK_KEY_OBJECT_ID = 13L;
 
   // container IDs
   private static final long CONTAINER_ONE_ID = 1L;
@@ -192,45 +189,43 @@ public class TestNSSummaryEndpointWithOBS {
   private static final long BLOCK_SIX_LENGTH = 6000L;
 
   // data size in bytes
-  private static final long KEY_ONE_SIZE = 500L; // bin 0
-  private static final long KEY_TWO_SIZE = OzoneConsts.KB + 1; // bin 1
-  private static final long KEY_THREE_SIZE = 4 * OzoneConsts.KB + 1; // bin 3
-  private static final long KEY_FOUR_SIZE = 2 * OzoneConsts.KB + 1; // bin 2
-  private static final long KEY_FIVE_SIZE = 100L; // bin 0
-  private static final long KEY_SIX_SIZE = 2 * OzoneConsts.KB + 1; // bin 2
-  private static final long KEY_SEVEN_SIZE = 4 * OzoneConsts.KB + 1;
-  private static final long KEY_EIGHT_SIZE = OzoneConsts.KB + 1; // bin 1
-  private static final long KEY_NINE_SIZE = 2 * OzoneConsts.KB + 1; // bin 2
-  private static final long KEY_TEN_SIZE = 2 * OzoneConsts.KB + 1; // bin 2
-  private static final long KEY_ELEVEN_SIZE = OzoneConsts.KB + 1; // bin 1
+  private static final long FILE_ONE_SIZE = 500L; // bin 0
+  private static final long FILE_TWO_SIZE = OzoneConsts.KB + 1; // bin 1
+  private static final long FILE_THREE_SIZE = 4 * OzoneConsts.KB + 1; // bin 3
+  private static final long FILE_FOUR_SIZE = 2 * OzoneConsts.KB + 1; // bin 2
+  private static final long FILE_FIVE_SIZE = 100L; // bin 0
+  private static final long FILE_EIGHT_SIZE = OzoneConsts.KB + 1; // bin 1
+  private static final long FILE_NINE_SIZE = 2 * OzoneConsts.KB + 1; // bin 2
+  private static final long FILE_TEN_SIZE = 2 * OzoneConsts.KB + 1; // bin 2
+  private static final long FILE_ELEVEN_SIZE = OzoneConsts.KB + 1; // bin 1
 
   private static final long FILE1_SIZE_WITH_REPLICA =
-      getReplicatedSize(KEY_ONE_SIZE,
+      getReplicatedSize(FILE_ONE_SIZE,
           StandaloneReplicationConfig.getInstance(ONE));
   private static final long FILE2_SIZE_WITH_REPLICA =
-      getReplicatedSize(KEY_TWO_SIZE,
+      getReplicatedSize(FILE_TWO_SIZE,
           StandaloneReplicationConfig.getInstance(ONE));
   private static final long FILE3_SIZE_WITH_REPLICA =
-      getReplicatedSize(KEY_THREE_SIZE,
+      getReplicatedSize(FILE_THREE_SIZE,
           StandaloneReplicationConfig.getInstance(ONE));
   private static final long FILE4_SIZE_WITH_REPLICA =
-      getReplicatedSize(KEY_FOUR_SIZE,
+      getReplicatedSize(FILE_FOUR_SIZE,
           StandaloneReplicationConfig.getInstance(ONE));
   private static final long FILE5_SIZE_WITH_REPLICA =
-      getReplicatedSize(KEY_FIVE_SIZE,
+      getReplicatedSize(FILE_FIVE_SIZE,
           StandaloneReplicationConfig.getInstance(ONE));
 
   private static final long FILE8_SIZE_WITH_REPLICA =
-      getReplicatedSize(KEY_EIGHT_SIZE,
+      getReplicatedSize(FILE_EIGHT_SIZE,
           StandaloneReplicationConfig.getInstance(ONE));
   private static final long FILE9_SIZE_WITH_REPLICA =
-      getReplicatedSize(KEY_NINE_SIZE,
+      getReplicatedSize(FILE_NINE_SIZE,
           StandaloneReplicationConfig.getInstance(ONE));
   private static final long FILE10_SIZE_WITH_REPLICA =
-      getReplicatedSize(KEY_TEN_SIZE,
+      getReplicatedSize(FILE_TEN_SIZE,
           StandaloneReplicationConfig.getInstance(ONE));
   private static final long FILE11_SIZE_WITH_REPLICA =
-      getReplicatedSize(KEY_ELEVEN_SIZE,
+      getReplicatedSize(FILE_ELEVEN_SIZE,
           StandaloneReplicationConfig.getInstance(ONE));
 
   private static final long MULTI_BLOCK_KEY_SIZE_WITH_REPLICA
@@ -277,30 +272,35 @@ public class TestNSSummaryEndpointWithOBS {
   // mock client's path requests
   private static final String TEST_USER = "TestUser";
   private static final String ROOT_PATH = "/";
-  private static final String VOL_PATH = "/vol";
-  private static final String VOL_TWO_PATH = "/vol2";
-  private static final String BUCKET_ONE_PATH = "/vol/bucket1";
-  private static final String BUCKET_TWO_PATH = "/vol/bucket2";
-  private static final String KEY_PATH = "/vol/bucket2/file4";
-  private static final String MULTI_BLOCK_KEY_PATH = "/vol/bucket1/file3";
+  private static final String VOL_PATH = ROOT_PATH + VOL;
+  private static final String VOL_TWO_PATH = ROOT_PATH + VOL_TWO;
+  private static final String BUCKET_ONE_PATH =
+      ROOT_PATH + VOL + ROOT_PATH + BUCKET_ONE;
+  private static final String BUCKET_TWO_PATH =
+      ROOT_PATH + VOL + ROOT_PATH + BUCKET_TWO;
+  private static final String KEY_PATH =
+      ROOT_PATH + VOL + ROOT_PATH + BUCKET_TWO + ROOT_PATH + FILE_FOUR;
+  private static final String MULTI_BLOCK_KEY_PATH =
+      ROOT_PATH + VOL + ROOT_PATH + BUCKET_ONE + ROOT_PATH + FILE_THREE;
   private static final String INVALID_PATH = "/vol/path/not/found";
 
   // some expected answers
   private static final long ROOT_DATA_SIZE =
-      KEY_ONE_SIZE + KEY_TWO_SIZE + KEY_THREE_SIZE + KEY_FOUR_SIZE +
-          KEY_FIVE_SIZE + KEY_EIGHT_SIZE + KEY_NINE_SIZE + KEY_TEN_SIZE +
-          KEY_ELEVEN_SIZE;
-  private static final long VOL_DATA_SIZE = KEY_ONE_SIZE + KEY_TWO_SIZE +
-      KEY_THREE_SIZE + KEY_FOUR_SIZE + KEY_FIVE_SIZE;
+      FILE_ONE_SIZE + FILE_TWO_SIZE + FILE_THREE_SIZE + FILE_FOUR_SIZE +
+          FILE_FIVE_SIZE + FILE_EIGHT_SIZE + FILE_NINE_SIZE + FILE_TEN_SIZE +
+          FILE_ELEVEN_SIZE;
+  private static final long VOL_DATA_SIZE = FILE_ONE_SIZE + FILE_TWO_SIZE +
+      FILE_THREE_SIZE + FILE_FOUR_SIZE + FILE_FIVE_SIZE;
 
   private static final long VOL_TWO_DATA_SIZE =
-      KEY_EIGHT_SIZE + KEY_NINE_SIZE + KEY_TEN_SIZE + KEY_ELEVEN_SIZE;
+      FILE_EIGHT_SIZE + FILE_NINE_SIZE + FILE_TEN_SIZE + FILE_ELEVEN_SIZE;
 
-  private static final long BUCKET_ONE_DATA_SIZE = KEY_ONE_SIZE + KEY_TWO_SIZE +
-      KEY_THREE_SIZE;
+  private static final long BUCKET_ONE_DATA_SIZE = FILE_ONE_SIZE +
+      FILE_TWO_SIZE +
+      FILE_THREE_SIZE;
 
   private static final long BUCKET_TWO_DATA_SIZE =
-      KEY_FOUR_SIZE + KEY_FIVE_SIZE;
+      FILE_FOUR_SIZE + FILE_FIVE_SIZE;
 
 
   @BeforeEach
@@ -478,7 +478,7 @@ public class TestNSSummaryEndpointWithOBS {
         false, false);
     DUResponse keyObj = (DUResponse) keyResponse.getEntity();
     assertEquals(0, keyObj.getCount());
-    assertEquals(KEY_FOUR_SIZE, keyObj.getSize());
+    assertEquals(FILE_FOUR_SIZE, keyObj.getSize());
   }
 
   @Test
@@ -643,7 +643,7 @@ public class TestNSSummaryEndpointWithOBS {
 
     // write all keys
     writeKeyToOm(reconOMMetadataManager,
-        KEY_ONE,
+        FILE_ONE,
         BUCKET_ONE,
         VOL,
         FILE_ONE,
@@ -651,10 +651,10 @@ public class TestNSSummaryEndpointWithOBS {
         BUCKET_ONE_OBJECT_ID,
         BUCKET_ONE_OBJECT_ID,
         VOL_OBJECT_ID,
-        KEY_ONE_SIZE,
+        FILE_ONE_SIZE,
         getBucketLayout());
     writeKeyToOm(reconOMMetadataManager,
-        KEY_TWO,
+        FILE_TWO,
         BUCKET_ONE,
         VOL,
         FILE_TWO,
@@ -662,10 +662,10 @@ public class TestNSSummaryEndpointWithOBS {
         BUCKET_ONE_OBJECT_ID,
         BUCKET_ONE_OBJECT_ID,
         VOL_OBJECT_ID,
-        KEY_TWO_SIZE,
+        FILE_TWO_SIZE,
         getBucketLayout());
     writeKeyToOm(reconOMMetadataManager,
-        KEY_THREE,
+        FILE_THREE,
         BUCKET_ONE,
         VOL,
         FILE_THREE,
@@ -673,10 +673,10 @@ public class TestNSSummaryEndpointWithOBS {
         BUCKET_ONE_OBJECT_ID,
         BUCKET_ONE_OBJECT_ID,
         VOL_OBJECT_ID,
-        KEY_THREE_SIZE,
+        FILE_THREE_SIZE,
         getBucketLayout());
     writeKeyToOm(reconOMMetadataManager,
-        KEY_FOUR,
+        FILE_FOUR,
         BUCKET_TWO,
         VOL,
         FILE_FOUR,
@@ -684,10 +684,10 @@ public class TestNSSummaryEndpointWithOBS {
         BUCKET_TWO_OBJECT_ID,
         BUCKET_TWO_OBJECT_ID,
         VOL_OBJECT_ID,
-        KEY_FOUR_SIZE,
+        FILE_FOUR_SIZE,
         getBucketLayout());
     writeKeyToOm(reconOMMetadataManager,
-        KEY_FIVE,
+        FILE_FIVE,
         BUCKET_TWO,
         VOL,
         FILE_FIVE,
@@ -695,11 +695,11 @@ public class TestNSSummaryEndpointWithOBS {
         BUCKET_TWO_OBJECT_ID,
         BUCKET_TWO_OBJECT_ID,
         VOL_OBJECT_ID,
-        KEY_FIVE_SIZE,
+        FILE_FIVE_SIZE,
         getBucketLayout());
 
     writeKeyToOm(reconOMMetadataManager,
-        KEY_EIGHT,
+        FILE_EIGHT,
         BUCKET_THREE,
         VOL_TWO,
         FILE_EIGHT,
@@ -707,10 +707,10 @@ public class TestNSSummaryEndpointWithOBS {
         BUCKET_THREE_OBJECT_ID,
         BUCKET_THREE_OBJECT_ID,
         VOL_TWO_OBJECT_ID,
-        KEY_EIGHT_SIZE,
+        FILE_EIGHT_SIZE,
         getBucketLayout());
     writeKeyToOm(reconOMMetadataManager,
-        KEY_NINE,
+        FILE_NINE,
         BUCKET_THREE,
         VOL_TWO,
         FILE_NINE,
@@ -718,10 +718,10 @@ public class TestNSSummaryEndpointWithOBS {
         BUCKET_THREE_OBJECT_ID,
         BUCKET_THREE_OBJECT_ID,
         VOL_TWO_OBJECT_ID,
-        KEY_NINE_SIZE,
+        FILE_NINE_SIZE,
         getBucketLayout());
     writeKeyToOm(reconOMMetadataManager,
-        KEY_TEN,
+        FILE_TEN,
         BUCKET_THREE,
         VOL_TWO,
         FILE_TEN,
@@ -729,10 +729,10 @@ public class TestNSSummaryEndpointWithOBS {
         BUCKET_THREE_OBJECT_ID,
         BUCKET_THREE_OBJECT_ID,
         VOL_TWO_OBJECT_ID,
-        KEY_TEN_SIZE,
+        FILE_TEN_SIZE,
         getBucketLayout());
     writeKeyToOm(reconOMMetadataManager,
-        KEY_ELEVEN,
+        FILE_ELEVEN,
         BUCKET_FOUR,
         VOL_TWO,
         FILE_ELEVEN,
@@ -740,7 +740,7 @@ public class TestNSSummaryEndpointWithOBS {
         PARENT_OBJECT_ID_ZERO,
         BUCKET_FOUR_OBJECT_ID,
         VOL_TWO_OBJECT_ID,
-        KEY_ELEVEN_SIZE,
+        FILE_ELEVEN_SIZE,
         getBucketLayout());
   }
 
@@ -838,7 +838,7 @@ public class TestNSSummaryEndpointWithOBS {
 
     // add the multi-block key to Recon's OM
     writeKeyToOm(reconOMMetadataManager,
-        MULTI_BLOCK_KEY,
+        MULTI_BLOCK_FILE,
         BUCKET_ONE,
         VOL,
         MULTI_BLOCK_FILE,
@@ -848,7 +848,7 @@ public class TestNSSummaryEndpointWithOBS {
         VOL_OBJECT_ID,
         Collections.singletonList(locationInfoGroup),
         getBucketLayout(),
-        KEY_SEVEN_SIZE);
+        FILE_THREE_SIZE);
   }
 
   private OmKeyLocationInfoGroup getLocationInfoGroup1() {
@@ -911,7 +911,7 @@ public class TestNSSummaryEndpointWithOBS {
 
     //vol/bucket1/file1
     writeKeyToOm(reconOMMetadataManager,
-        KEY_ONE,
+        FILE_ONE,
         BUCKET_ONE,
         VOL,
         FILE_ONE,
@@ -921,11 +921,11 @@ public class TestNSSummaryEndpointWithOBS {
         VOL_OBJECT_ID,
         Collections.singletonList(locationInfoGroup1),
         getBucketLayout(),
-        KEY_ONE_SIZE);
+        FILE_ONE_SIZE);
 
     //vol/bucket1/file2
     writeKeyToOm(reconOMMetadataManager,
-        KEY_TWO,
+        FILE_TWO,
         BUCKET_ONE,
         VOL,
         FILE_TWO,
@@ -935,11 +935,11 @@ public class TestNSSummaryEndpointWithOBS {
         VOL_OBJECT_ID,
         Collections.singletonList(locationInfoGroup2),
         getBucketLayout(),
-        KEY_TWO_SIZE);
+        FILE_TWO_SIZE);
 
     //vol/bucket1/file3
     writeKeyToOm(reconOMMetadataManager,
-        KEY_THREE,
+        FILE_THREE,
         BUCKET_ONE,
         VOL,
         FILE_THREE,
@@ -949,11 +949,11 @@ public class TestNSSummaryEndpointWithOBS {
         VOL_OBJECT_ID,
         Collections.singletonList(locationInfoGroup1),
         getBucketLayout(),
-        KEY_THREE_SIZE);
+        FILE_THREE_SIZE);
 
     //vol/bucket2/file4
     writeKeyToOm(reconOMMetadataManager,
-        KEY_FOUR,
+        FILE_FOUR,
         BUCKET_TWO,
         VOL,
         FILE_FOUR,
@@ -963,11 +963,11 @@ public class TestNSSummaryEndpointWithOBS {
         VOL_OBJECT_ID,
         Collections.singletonList(locationInfoGroup2),
         getBucketLayout(),
-        KEY_FOUR_SIZE);
+        FILE_FOUR_SIZE);
 
     //vol/bucket2/file5
     writeKeyToOm(reconOMMetadataManager,
-        KEY_FIVE,
+        FILE_FIVE,
         BUCKET_TWO,
         VOL,
         FILE_FIVE,
@@ -977,11 +977,11 @@ public class TestNSSummaryEndpointWithOBS {
         VOL_OBJECT_ID,
         Collections.singletonList(locationInfoGroup1),
         getBucketLayout(),
-        KEY_FIVE_SIZE);
+        FILE_FIVE_SIZE);
 
     //vol2/bucket3/file8
     writeKeyToOm(reconOMMetadataManager,
-        KEY_EIGHT,
+        FILE_EIGHT,
         BUCKET_THREE,
         VOL_TWO,
         FILE_EIGHT,
@@ -991,11 +991,11 @@ public class TestNSSummaryEndpointWithOBS {
         VOL_TWO_OBJECT_ID,
         Collections.singletonList(locationInfoGroup2),
         getBucketLayout(),
-        KEY_EIGHT_SIZE);
+        FILE_EIGHT_SIZE);
 
     //vol2/bucket3/file9
     writeKeyToOm(reconOMMetadataManager,
-        KEY_NINE,
+        FILE_NINE,
         BUCKET_THREE,
         VOL_TWO,
         FILE_NINE,
@@ -1005,11 +1005,11 @@ public class TestNSSummaryEndpointWithOBS {
         VOL_TWO_OBJECT_ID,
         Collections.singletonList(locationInfoGroup1),
         getBucketLayout(),
-        KEY_NINE_SIZE);
+        FILE_NINE_SIZE);
 
     //vol2/bucket3/file10
     writeKeyToOm(reconOMMetadataManager,
-        KEY_TEN,
+        FILE_TEN,
         BUCKET_THREE,
         VOL_TWO,
         FILE_TEN,
@@ -1019,11 +1019,11 @@ public class TestNSSummaryEndpointWithOBS {
         VOL_TWO_OBJECT_ID,
         Collections.singletonList(locationInfoGroup2),
         getBucketLayout(),
-        KEY_TEN_SIZE);
+        FILE_TEN_SIZE);
 
     //vol2/bucket4/file11
     writeKeyToOm(reconOMMetadataManager,
-        KEY_ELEVEN,
+        FILE_ELEVEN,
         BUCKET_FOUR,
         VOL_TWO,
         FILE_ELEVEN,
@@ -1033,7 +1033,7 @@ public class TestNSSummaryEndpointWithOBS {
         VOL_TWO_OBJECT_ID,
         Collections.singletonList(locationInfoGroup1),
         getBucketLayout(),
-        KEY_ELEVEN_SIZE);
+        FILE_ELEVEN_SIZE);
   }
 
   /**
