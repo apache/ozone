@@ -56,7 +56,7 @@ import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_PIPELINE_REPORT_INTERVA
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.ONE;
 import static org.apache.hadoop.ozone.container.ozoneimpl.TestOzoneContainer.runTestOzoneContainerViaDataNode;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-//import static org.junit.jupiter.api.Assertions.assertArrayEquals;
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 
 /**
@@ -126,8 +126,6 @@ public class TestReconTasks {
     reconContainersCount = reconContainerManager
         .getContainers().size();
     assertEquals(scmContainersCount, reconContainersCount);
-    scmContainerManager.deleteContainer(container1.containerID());
-    scmContainerManager.deleteContainer(container2.containerID());
   }
 
   @Test
@@ -167,8 +165,8 @@ public class TestReconTasks {
     runTestOzoneContainerViaDataNode(containerID, client);
 
     // Make sure Recon got the container report with new container.
-//    assertArrayEquals(scmContainerManager.getContainers().toArray(),
-//        reconContainerManager.getContainers().toArray());
+    assertArrayEquals(scmContainerManager.getContainers().toArray(),
+        reconContainerManager.getContainers().toArray());
 
     // Bring down the Datanode that had the container replica.
     cluster.shutdownHddsDatanode(pipeline.getFirstNode());
@@ -251,8 +249,8 @@ public class TestReconTasks {
     runTestOzoneContainerViaDataNode(containerID, client);
 
     // Make sure Recon got the container report with new container.
-//    assertArrayEquals(scmContainerManager.getContainers().toArray(),
-//        reconContainerManager.getContainers().toArray());
+    assertArrayEquals(scmContainerManager.getContainers().toArray(),
+        reconContainerManager.getContainers().toArray());
 
     // Bring down the Datanode that had the container replica.
     cluster.shutdownHddsDatanode(pipeline.getFirstNode());
