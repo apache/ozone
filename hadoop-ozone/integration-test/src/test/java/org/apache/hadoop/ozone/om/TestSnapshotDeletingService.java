@@ -71,7 +71,7 @@ import static org.junit.jupiter.api.Assertions.fail;
  * Test Snapshot Deleting Service.
  */
 
-@Timeout(1200)
+@Timeout(300)
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 @TestMethodOrder(OrderAnnotation.class)
 public class TestSnapshotDeletingService {
