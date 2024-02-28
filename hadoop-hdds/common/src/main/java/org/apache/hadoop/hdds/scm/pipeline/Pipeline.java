@@ -73,6 +73,9 @@ public final class Pipeline {
 
   private static final Logger LOG = LoggerFactory.getLogger(Pipeline.class);
 
+  /**
+   * Inner class that provides thread-safe access to DN list.
+   */
   static class NodesInOrder {
     private final List<DatanodeDetails> nodes = new ArrayList<>();
 
@@ -334,7 +337,7 @@ public final class Pipeline {
       excluded = Collections.emptySet();
     }
     final DatanodeDetails closest = nodesInOrder.getClosest(id, excluded);
-    return closest != null? closest : getFirstNode(excluded);
+    return closest != null ? closest : getFirstNode(excluded);
   }
 
   @JsonIgnore
