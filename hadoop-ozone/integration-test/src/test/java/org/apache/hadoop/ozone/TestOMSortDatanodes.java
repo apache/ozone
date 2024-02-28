@@ -36,8 +36,8 @@ import org.apache.hadoop.ozone.om.KeyManagerImpl;
 import org.apache.hadoop.ozone.om.OmTestManagers;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.ozone.test.GenericTestUtils;
-import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 
@@ -74,7 +74,7 @@ public class TestOMSortDatanodes {
       "edge1", "/rack1"
   );
 
-  @BeforeEach
+  @BeforeAll
   public static void setup() throws Exception {
     config = new OzoneConfiguration();
     dir = GenericTestUtils.getRandomizedTestDir();
@@ -112,7 +112,7 @@ public class TestOMSortDatanodes {
     keyManager = (KeyManagerImpl)omTestManagers.getKeyManager();
   }
 
-  @AfterEach
+  @AfterAll
   public static void cleanup() throws Exception {
     if (scm != null) {
       scm.stop();
