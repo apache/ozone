@@ -231,7 +231,7 @@ public class OzoneClientConfig {
   private String fsDefaultBucketLayout = "FILE_SYSTEM_OPTIMIZED";
 
   @PostConstruct
-  private void validate() {
+  public void validate() {
     Preconditions.checkState(streamBufferSize > 0);
     Preconditions.checkState(streamBufferFlushSize > 0);
     Preconditions.checkState(streamBufferMaxSize > 0);

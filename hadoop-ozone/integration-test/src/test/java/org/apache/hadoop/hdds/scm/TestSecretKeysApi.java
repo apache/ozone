@@ -328,7 +328,6 @@ public final class TestSecretKeysApi {
     OzoneManager.setTestSecureOmFlag(true);
     MiniOzoneCluster.Builder builder = MiniOzoneCluster.newHABuilder(conf)
         .setSCMServiceId("TestSecretKey")
-        .setNumDatanodes(3)
         .setNumOfStorageContainerManagers(numSCMs)
         .setNumOfOzoneManagers(1);
 

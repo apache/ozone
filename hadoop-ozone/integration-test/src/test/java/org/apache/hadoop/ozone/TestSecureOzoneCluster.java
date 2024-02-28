@@ -179,7 +179,6 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.junit.jupiter.api.Assertions.fail;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.anyString;
 import static org.mockito.Mockito.mock;
@@ -1346,27 +1345,16 @@ final class TestSecureOzoneCluster {
       }
 
       // get new client, it should succeed.
-      try {
-        OzoneClient client1 = OzoneClientFactory.getRpcClient(conf);
-        client1.close();
-      } catch (Exception e) {
-        System.out.println("OzoneClientFactory.getRpcClient failed for " +
-            e.getMessage());
-        fail("Create client should succeed for certificate is renewed");
-      }
+      OzoneClient client1 = OzoneClientFactory.getRpcClient(conf);
+      client1.close();
+
 
       // Wait for old OM certificate to expire
       GenericTestUtils.waitFor(() -> omCert.getNotAfter().before(new Date()),
           500, certLifetime * 1000);
       // get new client, it should succeed too.
-      try {
-        OzoneClient client1 = OzoneClientFactory.getRpcClient(conf);
-        client1.close();
-      } catch (Exception e) {
-        System.out.println("OzoneClientFactory.getRpcClient failed for " +
-            e.getMessage());
-        fail("Create client should succeed for certificate is renewed");
-      }
+      OzoneClient client2 = OzoneClientFactory.getRpcClient(conf);
+      client2.close();
     } finally {
       OzoneManager.setUgi(null);
       GrpcOmTransport.setCaCerts(null);

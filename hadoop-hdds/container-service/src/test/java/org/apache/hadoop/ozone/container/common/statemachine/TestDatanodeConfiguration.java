@@ -178,7 +178,7 @@ public class TestDatanodeConfiguration {
   public void testConf() throws Exception {
     final OzoneConfiguration conf = new OzoneConfiguration();
     final String dir = "dummy/dir";
-    conf.set(OzoneConfigKeys.DFS_CONTAINER_RATIS_DATANODE_STORAGE_DIR, dir);
+    conf.set(OzoneConfigKeys.HDDS_CONTAINER_RATIS_DATANODE_STORAGE_DIR, dir);
 
     final DatanodeRatisServerConfig ratisConf = conf.getObject(
         DatanodeRatisServerConfig.class);

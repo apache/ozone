@@ -108,9 +108,9 @@ public class TestOzoneFsHAURLs {
 
     // Start the cluster
     cluster = MiniOzoneCluster.newHABuilder(conf)
-        .setNumDatanodes(5)
         .setOMServiceId(omServiceId)
         .setNumOfOzoneManagers(numOfOMs)
+        .setNumDatanodes(5)
         .build();
     cluster.waitForClusterToBeReady();
     client = OzoneClientFactory.getRpcClient(omServiceId, conf);
