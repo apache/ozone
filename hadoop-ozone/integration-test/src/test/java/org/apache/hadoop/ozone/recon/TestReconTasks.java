@@ -191,19 +191,7 @@ public class TestReconTasks {
     });
     // cleaning up the data
     scmContainerManager.deleteContainer(containerInfo.containerID());
-//    List<ContainerKeyPrefix> deletedContainerKeyList =
-//        reconContainerMetadataManager.getKeyPrefixesForContainer(containerID).entrySet()
-//            .stream().map(entry -> entry.getKey()).collect(Collectors.toList());
-//    deletedContainerKeyList.forEach((ContainerKeyPrefix key) -> {
-//      try (RDBBatchOperation rdbBatchOperation = new RDBBatchOperation()) {
-//        reconContainerMetadataManager.batchDeleteContainerMapping(
-//            rdbBatchOperation, key);
-//        reconContainerMetadataManager.commitBatchOperation(rdbBatchOperation);
-//      } catch (IOException e) {
-//        //LOG.error("Unable to write Container Key Prefix data in Recon DB.", e);
-//      }
-//    });
-    cluster.restartHddsDatanode(pipeline.getFirstNode(), true);
+//    cluster.restartHddsDatanode(pipeline.getFirstNode(), true);
     IOUtils.closeQuietly(client);
   }
 
