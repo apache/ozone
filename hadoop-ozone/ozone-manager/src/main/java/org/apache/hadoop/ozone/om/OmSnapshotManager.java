@@ -23,7 +23,6 @@ import com.google.common.base.Preconditions;
 import com.google.common.cache.CacheLoader;
 import java.io.File;
 import java.io.IOException;
-import java.lang.ref.Reference;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
