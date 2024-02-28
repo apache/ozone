@@ -856,7 +856,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     omSnapshotManager = new OmSnapshotManager(this);
 
     // Snapshot metrics
-    metrics.setNumSnapshotCacheSize(omSnapshotManager.getSnapshotCache().size());
+    metrics.setNumSnapshotCacheSize(omSnapshotManager.getSnapshotCacheSize());
     updateActiveSnapshotMetrics();
 
     if (withNewSnapshot) {

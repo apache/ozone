@@ -23,6 +23,7 @@ import com.google.common.base.Preconditions;
 import com.google.common.cache.CacheLoader;
 import java.io.File;
 import java.io.IOException;
+import java.lang.ref.Reference;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -418,6 +419,7 @@ public final class OmSnapshotManager implements AutoCloseable {
   public void invalidateCache() {
     if (snapshotCache != null) {
       snapshotCache.invalidateAll();
+      updateSnapshotCacheSizeMetric();
     }
   }
 
@@ -429,6 +431,7 @@ public final class OmSnapshotManager implements AutoCloseable {
   public void invalidateCacheEntry(UUID key) throws IOException {
     if (snapshotCache != null) {
       snapshotCache.invalidate(key);
+      updateSnapshotCacheSizeMetric();
     }
   }
 
@@ -679,7 +682,9 @@ public final class OmSnapshotManager implements AutoCloseable {
     }
 
     // retrieve the snapshot from the cache
-    return snapshotCache.get(snapshotInfo.getSnapshotId());
+    ReferenceCounted<OmSnapshot> snapshot = snapshotCache.get(snapshotInfo.getSnapshotId());
+    updateSnapshotCacheSizeMetric();
+    return snapshot;
   }
 
   /**
@@ -980,9 +985,8 @@ public final class OmSnapshotManager implements AutoCloseable {
 
   /**
    * Updates the SnapshotCache size jmx metric.
-   * @param cacheSize SnapshotCache size
    */
-  public void updateSnapshotCacheSizeMetric(int cacheSize) {
-    this.ozoneManager.getMetrics().setNumSnapshotCacheSize(cacheSize);
+  public void updateSnapshotCacheSizeMetric() {
+    this.ozoneManager.getMetrics().setNumSnapshotCacheSize(getSnapshotCacheSize());
   }
 }

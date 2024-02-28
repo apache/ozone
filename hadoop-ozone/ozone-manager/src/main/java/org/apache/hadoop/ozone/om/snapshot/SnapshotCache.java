@@ -86,7 +86,6 @@ public class SnapshotCache {
       }
       return null;
     });
-    this.omSnapshotManager.updateSnapshotCacheSizeMetric(size());
   }
 
   /**
@@ -106,7 +105,6 @@ public class SnapshotCache {
       }
       it.remove();
     }
-    this.omSnapshotManager.updateSnapshotCacheSizeMetric(size());
   }
 
   /**
@@ -159,7 +157,6 @@ public class SnapshotCache {
           }
           return v;
         });
-    this.omSnapshotManager.updateSnapshotCacheSizeMetric(size());
     if (rcOmSnapshot == null) {
       // The only exception that would fall through the loader logic above
       // is OMException with FILE_NOT_FOUND.
@@ -232,7 +229,6 @@ public class SnapshotCache {
           return null;
         }
       });
-      this.omSnapshotManager.updateSnapshotCacheSizeMetric(size());
     }
   }
 }
