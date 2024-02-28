@@ -136,7 +136,7 @@ public class TestSnapshotDeletingService {
 //    Table<String, SnapshotInfo> snapshotInfoTable =
 //        om.getMetadataManager().getSnapshotInfoTable();
 
-//    createSnapshotDataForBucket1();
+    createSnapshotDataForBucket1();
 
 //    assertTableRowCount(snapshotInfoTable, 2);
 //    GenericTestUtils.waitFor(() -> snapshotDeletingService
