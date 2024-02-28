@@ -230,7 +230,7 @@ public class TestVolumeSetDiskChecks {
     for (int i = 0; i < numDirs; ++i) {
       metaDirs.add(GenericTestUtils.getRandomizedTestDir().getPath());
     }
-    ozoneConf.set(OzoneConfigKeys.DFS_CONTAINER_RATIS_DATANODE_STORAGE_DIR,
+    ozoneConf.set(OzoneConfigKeys.HDDS_CONTAINER_RATIS_DATANODE_STORAGE_DIR,
         String.join(",", metaDirs));
 
     final List<String> dbDirs = new ArrayList<>();

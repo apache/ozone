@@ -95,11 +95,11 @@ import static org.apache.hadoop.hdds.scm.ScmConfig.ConfigStrings.HDDS_SCM_INIT_D
 import static org.apache.hadoop.ozone.MiniOzoneCluster.PortAllocator.anyHostWithFreePort;
 import static org.apache.hadoop.ozone.MiniOzoneCluster.PortAllocator.getFreePort;
 import static org.apache.hadoop.ozone.MiniOzoneCluster.PortAllocator.localhostWithFreePort;
-import static org.apache.hadoop.ozone.OzoneConfigKeys.DFS_CONTAINER_IPC_PORT;
-import static org.apache.hadoop.ozone.OzoneConfigKeys.DFS_CONTAINER_RATIS_ADMIN_PORT;
-import static org.apache.hadoop.ozone.OzoneConfigKeys.DFS_CONTAINER_RATIS_DATASTREAM_PORT;
-import static org.apache.hadoop.ozone.OzoneConfigKeys.DFS_CONTAINER_RATIS_IPC_PORT;
-import static org.apache.hadoop.ozone.OzoneConfigKeys.DFS_CONTAINER_RATIS_SERVER_PORT;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.HDDS_CONTAINER_IPC_PORT;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.HDDS_CONTAINER_RATIS_ADMIN_PORT;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.HDDS_CONTAINER_RATIS_DATASTREAM_PORT;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.HDDS_CONTAINER_RATIS_IPC_PORT;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.HDDS_CONTAINER_RATIS_SERVER_PORT;
 import static org.apache.hadoop.ozone.om.OmUpgradeConfig.ConfigStrings.OZONE_OM_INIT_DEFAULT_LAYOUT_VERSION;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_DB_DIR;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_OM_SNAPSHOT_DB_DIR;
@@ -870,7 +870,7 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
         dnConf.set(ScmConfigKeys.HDDS_DATANODE_DIR_KEY, listOfDirs);
         dnConf.set(ScmConfigKeys.HDDS_DATANODE_DIR_DU_RESERVED,
             reservedSpaceString);
-        dnConf.set(OzoneConfigKeys.DFS_CONTAINER_RATIS_DATANODE_STORAGE_DIR,
+        dnConf.set(OzoneConfigKeys.HDDS_CONTAINER_RATIS_DATANODE_STORAGE_DIR,
             ratisDir.toString());
         if (reconServer != null) {
           OzoneStorageContainerManager reconScm =
@@ -948,7 +948,7 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
     }
 
     private void configureHddsDatanodes() {
-      conf.setBoolean(OzoneConfigKeys.DFS_CONTAINER_RATIS_DATASTREAM_ENABLED,
+      conf.setBoolean(OzoneConfigKeys.HDDS_CONTAINER_RATIS_DATASTREAM_ENABLED,
           enableContainerDatastream);
     }
 
@@ -959,11 +959,11 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
           anyHostWithFreePort());
       conf.set(HddsConfigKeys.HDDS_DATANODE_CLIENT_ADDRESS_KEY,
           anyHostWithFreePort());
-      conf.setInt(DFS_CONTAINER_IPC_PORT, getFreePort());
-      conf.setInt(DFS_CONTAINER_RATIS_IPC_PORT, getFreePort());
-      conf.setInt(DFS_CONTAINER_RATIS_ADMIN_PORT, getFreePort());
-      conf.setInt(DFS_CONTAINER_RATIS_SERVER_PORT, getFreePort());
-      conf.setInt(DFS_CONTAINER_RATIS_DATASTREAM_PORT, getFreePort());
+      conf.setInt(HDDS_CONTAINER_IPC_PORT, getFreePort());
+      conf.setInt(HDDS_CONTAINER_RATIS_IPC_PORT, getFreePort());
+      conf.setInt(HDDS_CONTAINER_RATIS_ADMIN_PORT, getFreePort());
+      conf.setInt(HDDS_CONTAINER_RATIS_SERVER_PORT, getFreePort());
+      conf.setInt(HDDS_CONTAINER_RATIS_DATASTREAM_PORT, getFreePort());
       conf.setFromObject(new ReplicationConfig().setPort(getFreePort()));
     }
 
