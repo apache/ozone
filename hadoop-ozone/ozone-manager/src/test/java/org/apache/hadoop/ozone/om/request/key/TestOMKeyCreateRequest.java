@@ -528,7 +528,7 @@ public class TestOMKeyCreateRequest extends TestOMKeyRequest {
     OMClientResponse createResponse =
         createOmKeyCreateRequest.validateAndUpdateCache(ozoneManager, 100L);
     // Verify that no metadata exists in the response
-    assertTrue(
+    assertThat(
         createResponse.getOMResponse().getCreateKeyResponse().getKeyInfo()
             .getMetadataList().isEmpty());
 
@@ -561,8 +561,7 @@ public class TestOMKeyCreateRequest extends TestOMKeyRequest {
     List<KeyValue> metadataList =
         response.getOMResponse().getCreateKeyResponse().getKeyInfo()
             .getMetadataList();
-    assertEquals(expectedMetadata.size(), metadataList.size(),
-        "Metadata size mismatch.");
+    assertEquals(expectedMetadata.size(), metadataList.size());
     metadataList.forEach(kv -> {
       String expectedValue = expectedMetadata.get(kv.getKey());
       assertEquals(expectedValue, kv.getValue(),

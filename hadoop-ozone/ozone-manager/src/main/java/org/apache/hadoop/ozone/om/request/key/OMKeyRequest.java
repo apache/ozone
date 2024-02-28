@@ -960,27 +960,6 @@ public abstract class OMKeyRequest extends OMClientRequest {
   }
 
   /**
-   * Updates the metadata of an OmKeyInfo object with new metadata.
-   *
-   * @param dbKeyInfo   The existing OmKeyInfo object whose metadata is to be updated.
-   * @param newMetadata The new metadata map to update the existing metadata with.
-   */
-  protected void updateMetadata(OmKeyInfo dbKeyInfo,
-                                Map<String, String> newMetadata) {
-    if (dbKeyInfo == null || newMetadata == null || newMetadata.isEmpty()) {
-      return;
-    }
-    Map<String, String> existingMetadata = dbKeyInfo.getMetadata();
-    // Update existing metadata with new entries or values from newMetadata
-    for (Map.Entry<String, String> entry : newMetadata.entrySet()) {
-      String key = entry.getKey();
-      String value = entry.getValue();
-      // Update or add new metadata entry
-      existingMetadata.put(key, value);
-    }
-  }
-
-  /**
    * Remove blocks in-place from keysToBeFiltered that exist in referenceKey.
    * <p>
    * keysToBeFiltered.getOmKeyInfoList() becomes an empty list when all blocks
