@@ -91,9 +91,8 @@ public class TestScmHAFinalization {
 
     conf.setInt(HDDS_SCM_INIT_DEFAULT_LAYOUT_VERSION, HDDSLayoutFeature.INITIAL_VERSION.layoutVersion());
 
-    MiniOzoneCluster.Builder clusterBuilder =
-        new MiniOzoneHAClusterImpl.Builder(conf)
-        .setNumOfStorageContainerManagers(NUM_SCMS)
+    MiniOzoneHAClusterImpl.Builder clusterBuilder = MiniOzoneCluster.newHABuilder(conf);
+    clusterBuilder.setNumOfStorageContainerManagers(NUM_SCMS)
         .setNumOfActiveSCMs(NUM_SCMS - numInactiveSCMs)
         .setSCMServiceId("scmservice")
         .setNumOfOzoneManagers(1)
@@ -102,7 +101,7 @@ public class TestScmHAFinalization {
         .setDatanodeFactory(UniformDatanodesFactory.newBuilder()
             .setLayoutVersion(HDDSLayoutFeature.INITIAL_VERSION.layoutVersion())
             .build());
-    this.cluster = (MiniOzoneHAClusterImpl) clusterBuilder.build();
+    this.cluster = clusterBuilder.build();
 
     scmClient = cluster.getStorageContainerLocationClient();
     cluster.waitForClusterToBeReady();
