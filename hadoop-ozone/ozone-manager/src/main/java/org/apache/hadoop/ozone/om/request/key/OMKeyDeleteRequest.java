@@ -77,6 +77,7 @@ public class OMKeyDeleteRequest extends OMKeyRequest {
     DeleteKeyRequest deleteKeyRequest = super.preExecute(ozoneManager)
         .getDeleteKeyRequest();
     Preconditions.checkNotNull(deleteKeyRequest);
+    OMPerformanceMetrics perfMetrics = ozoneManager.getPerfMetrics();
 
     OzoneManagerProtocolProtos.KeyArgs keyArgs = deleteKeyRequest.getKeyArgs();
     String keyPath = keyArgs.getKeyName();
@@ -88,7 +89,10 @@ public class OMKeyDeleteRequest extends OMKeyRequest {
     OzoneManagerProtocolProtos.KeyArgs.Builder newKeyArgs =
         keyArgs.toBuilder().setModificationTime(Time.now()).setKeyName(keyPath);
 
+    long startNano = Time.monotonicNowNanos();
     KeyArgs resolvedArgs = resolveBucketAndCheckAcls(ozoneManager, newKeyArgs);
+    perfMetrics.setDeleteKeyResolveBucketAndAclCheckLatencyNs(
+        Time.monotonicNowNanos() - startNano);
     return getOmRequest().toBuilder()
         .setDeleteKeyRequest(deleteKeyRequest.toBuilder()
             .setKeyArgs(resolvedArgs))

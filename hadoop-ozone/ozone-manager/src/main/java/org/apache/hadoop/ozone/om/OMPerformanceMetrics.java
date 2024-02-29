@@ -125,6 +125,14 @@ public class OMPerformanceMetrics {
   @Metric(about = "deleteKeySuccess latency in nano seconds")
   private MutableRate deleteKeySuccessLatencyNs;
 
+  @Metric(about = "resolveBucketLink latency in deleteKeys")
+  private MutableRate deleteKeysResolveBucketLatencyNs;
+
+  @Metric(about = "ACLs check latency in deleteKeys")
+  private MutableRate deleteKeysAclCheckLatencyNs;
+
+  @Metric(about = "resolveBucketLink and ACLs check latency in deleteKey")
+  private MutableRate deleteKeyResolveBucketAndAclCheckLatencyNs;
 
   public void addLookupLatency(long latencyInNs) {
     lookupLatencyNs.add(latencyInNs);
@@ -237,5 +245,17 @@ public class OMPerformanceMetrics {
 
   public void setDeleteKeySuccessLatencyNs(long latencyInNs) {
     deleteKeySuccessLatencyNs.add(latencyInNs);
+  }
+
+  public void setDeleteKeysResolveBucketLatencyNs(long latencyInNs) {
+    deleteKeysResolveBucketLatencyNs.add(latencyInNs);
+  }
+
+  public void setDeleteKeysAclCheckLatencyNs(long latencyInNs) {
+    deleteKeysAclCheckLatencyNs.add(latencyInNs);
+  }
+
+  public void setDeleteKeyResolveBucketAndAclCheckLatencyNs(long latencyInNs) {
+    deleteKeyResolveBucketAndAclCheckLatencyNs.add(latencyInNs);
   }
 }
