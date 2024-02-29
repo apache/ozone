@@ -75,6 +75,7 @@ import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
 import org.apache.hadoop.ozone.om.service.SnapshotDiffCleanupService;
+import org.apache.hadoop.ozone.om.service.SnapshotDeletingService;
 import org.apache.hadoop.ozone.om.upgrade.OMLayoutFeature;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
 import org.apache.hadoop.ozone.security.acl.OzoneObjInfo;
@@ -2481,5 +2482,41 @@ public abstract class TestOmSnapshot {
     assertEquals(200,
         fetchReportPage(volume1, bucket3, "bucket3-snap1", "bucket3-snap3",
             null, 0).getDiffList().size());
+  }
+
+  @Test
+  public void testSnapshotReuseSnapName() throws Exception {
+    String volume = "vol-" + counter.incrementAndGet();
+    String bucket = "buck-" + counter.incrementAndGet();
+    store.createVolume(volume);
+    OzoneVolume volume1 = store.getVolume(volume);
+    volume1.createBucket(bucket);
+    OzoneBucket bucket1 = volume1.getBucket(bucket);
+    // Create Key1 and take snapshot
+    String key1 = "key-1-";
+    createFileKeyWithPrefix(bucket1, key1);
+    String snap1 = "snap" + counter.incrementAndGet();
+    String snapshotKeyPrefix = createSnapshot(volume, bucket, snap1);
+
+    int keyCount1 = keyCount(bucket1, snapshotKeyPrefix + "key-");
+    assertEquals(1, keyCount1);
+
+    store.deleteSnapshot(volume, bucket, snap1);
+
+    SnapshotInfo snapshotInfo = ozoneManager.getMetadataManager()
+        .getSnapshotInfoTable()
+        .get(SnapshotInfo.getTableKey(volume, bucket, snap1));
+    assertEquals(snapshotInfo.getSnapshotStatus(), SnapshotInfo.SnapshotStatus.SNAPSHOT_DELETED);
+
+    createFileKeyWithPrefix(bucket1, key1);
+    String snap2 = "snap" + counter.incrementAndGet();
+    createSnapshot(volume, bucket, snap2);
+
+    String key2 = "key-2-";
+    createFileKeyWithPrefix(bucket1, key2);
+    createSnapshot(volume, bucket, snap1);
+
+    int keyCount2 = keyCount(bucket1, snapshotKeyPrefix + "key-");
+    assertEquals(2, keyCount2);
   }
 }
