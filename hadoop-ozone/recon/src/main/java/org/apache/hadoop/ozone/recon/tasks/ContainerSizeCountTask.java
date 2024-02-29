@@ -25,6 +25,7 @@ import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.ozone.recon.ReconUtils;
 import org.apache.hadoop.ozone.recon.scm.ReconScmTask;
 import org.apache.hadoop.ozone.recon.spi.StorageContainerServiceProvider;
+import org.hadoop.ozone.recon.schema.ContainerSchemaDefinition;
 import org.hadoop.ozone.recon.schema.UtilizationSchemaDefinition;
 import org.hadoop.ozone.recon.schema.tables.daos.ContainerCountBySizeDao;
 import org.hadoop.ozone.recon.schema.tables.daos.ReconTaskStatusDao;
@@ -34,13 +35,14 @@ import org.jooq.Record1;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.ArrayList;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState.DELETED;
 import static org.hadoop.ozone.recon.schema.tables.ContainerCountBySizeTable.CONTAINER_COUNT_BY_SIZE;
 
 
@@ -60,6 +62,8 @@ public class ContainerSizeCountTask extends ReconScmTask {
   private ContainerCountBySizeDao containerCountBySizeDao;
   private DSLContext dslContext;
   private HashMap<ContainerID, Long> processedContainers = new HashMap<>();
+  private Map<ContainerSchemaDefinition.UnHealthyContainerStates, Map<String, Long>>
+      unhealthyContainerStateStatsMap;
   private ReadWriteLock lock = new ReentrantReadWriteLock(true);
 
   public ContainerSizeCountTask(
@@ -121,7 +125,17 @@ public class ContainerSizeCountTask extends ReconScmTask {
   private void process(ContainerInfo container,
       Map<ContainerSizeCountKey, Long> map) {
     final ContainerID id = container.containerID();
-    final long currentSize = container.getUsedBytes();
+    final long usedBytes = container.getUsedBytes();
+    final long currentSize;
+
+    if (usedBytes < 0) {
+      LOG.warn("Negative usedBytes ({}) for container {}, treating it as 0",
+          usedBytes, id);
+      currentSize = 0;
+    } else {
+      currentSize = usedBytes;
+    }
+
     final Long previousSize = processedContainers.put(id, currentSize);
     if (previousSize != null) {
       decrementContainerSizeCount(previousSize, map);
@@ -132,24 +146,27 @@ public class ContainerSizeCountTask extends ReconScmTask {
   /**
    * The process() function is responsible for updating the counts of
    * containers being tracked in a containerSizeCountMap based on the
-   * ContainerInfo objects in the list containers.It then iterates through
+   * ContainerInfo objects in the list containers. It then iterates through
    * the list of containers and does the following for each container:
    *
-   * 1) If the container is not present in processedContainers,
-   * it is a new container, so it is added to the processedContainers map
-   * and the count for its size in the containerSizeCountMap is incremented
-   * by 1 using the handlePutKeyEvent() function.
-   * 2) If the container is present in processedContainers but its size has
-   * been updated to the new size then the count for the old size in the
-   * containerSizeCountMap is decremented by 1 using the
-   * handleDeleteKeyEvent() function. The count for the new size is then
-   * incremented by 1 using the handlePutKeyEvent() function.
-   * 3) If the container is not present in containers list, it means the
-   * container has been deleted.
-   * The remaining containers inside the deletedContainers map are the ones
-   * that are not in the cluster and need to be deleted. Finally, the counts in
-   * the containerSizeCountMap are written to the database using the
-   * writeCountsToDB() function.
+   * 1) If the container's state is not "deleted," it will be processed:
+   *    - If the container is not present in processedContainers, it is a new
+   *      container. Therefore, it is added to the processedContainers map, and
+   *      the count for its size in the containerSizeCountMap is incremented by
+   *      1 using the handlePutKeyEvent() function.
+   *    - If the container is present in processedContainers but its size has
+   *      been updated to a new size, the count for the old size in the
+   *      containerSizeCountMap is decremented by 1 using the
+   *      handleDeleteKeyEvent() function. Subsequently, the count for the new
+   *      size is incremented by 1 using the handlePutKeyEvent() function.
+   *
+   * 2) If the container's state is "deleted," it is skipped, as deleted
+   *    containers are not processed.
+   *
+   * After processing, the remaining containers inside the deletedContainers map
+   * are those that are not in the cluster and need to be deleted from the total
+   * size counts. Finally, the counts in the containerSizeCountMap are written
+   * to the database using the writeCountsToDB() function.
    */
   public void process(List<ContainerInfo> containers) {
     lock.writeLock().lock();
@@ -161,7 +178,9 @@ public class ContainerSizeCountTask extends ReconScmTask {
 
       // Loop to handle container create and size-update operations
       for (ContainerInfo container : containers) {
-        // The containers present in the cache hence it is not yet deleted
+        if (container.getState().equals(DELETED)) {
+          continue; // Skip deleted containers
+        }
         deletedContainers.remove(container.containerID());
         // For New Container being created
         try {
@@ -246,10 +265,10 @@ public class ContainerSizeCountTask extends ReconScmTask {
 
   /**
    *
-   * The handleContainerDeleteOperations() function loops through the entries
-   * in the deletedContainers map and calls the handleDeleteKeyEvent() function
-   * for each one. This will decrement the size counts of those containers by
-   * one which are no longer present in the cluster
+   * Handles the deletion of containers by updating the tracking of processed containers
+   * and adjusting the count of containers based on their sizes. When a container is deleted,
+   * it is removed from the tracking of processed containers, and the count of containers
+   * corresponding to its size is decremented in the container size count map.
    *
    * Used by process()
    *
@@ -261,6 +280,9 @@ public class ContainerSizeCountTask extends ReconScmTask {
       Map<ContainerSizeCountKey, Long> containerSizeCountMap) {
     for (Map.Entry<ContainerID, Long> containerId :
         deletedContainers.entrySet()) {
+      // processedContainers will only keep a track of all containers that have
+      // been processed except DELETED containers.
+      processedContainers.remove(containerId.getKey());
       long containerSize = deletedContainers.get(containerId.getKey());
       decrementContainerSizeCount(containerSize, containerSizeCountMap);
     }
@@ -316,19 +338,26 @@ public class ContainerSizeCountTask extends ReconScmTask {
   }
 
   /**
-   *
    * The purpose of this function is to categorize containers into different
    * size ranges, or "bins," based on their size.
    * The ContainerSizeCountKey object is used to store the upper bound value
    * for each size range, and is later used to lookup the count of containers
    * in that size range within a Map.
    *
-   * Used by decrementContainerSizeCount() and incrementContainerSizeCount()
+   * If the container size is 0, the method sets the size of
+   * ContainerSizeCountKey as zero without calculating the upper bound. Used by
+   * decrementContainerSizeCount() and incrementContainerSizeCount()
    *
    * @param containerSize to calculate the upperSizeBound
    */
   private static ContainerSizeCountKey getContainerSizeCountKey(
       long containerSize) {
+    // If containerSize is 0, return a ContainerSizeCountKey with size 0
+    if (containerSize == 0) {
+      return new ContainerSizeCountKey(0L);
+    }
+
+    // Otherwise, calculate the upperSizeBound
     return new ContainerSizeCountKey(
         ReconUtils.getContainerSizeUpperBound(containerSize));
   }

@@ -36,9 +36,9 @@ import java.util.concurrent.TimeUnit;
 @InterfaceAudience.Public
 @InterfaceStability.Unstable
 public final class OzoneConfigKeys {
-  public static final String DFS_CONTAINER_IPC_PORT =
-      "dfs.container.ipc";
-  public static final int DFS_CONTAINER_IPC_PORT_DEFAULT = 9859;
+  public static final String HDDS_CONTAINER_IPC_PORT =
+      "hdds.container.ipc.port";
+  public static final int HDDS_CONTAINER_IPC_PORT_DEFAULT = 9859;
 
   public static final String OZONE_METADATA_DIRS = "ozone.metadata.dirs";
 
@@ -56,52 +56,52 @@ public final class OzoneConfigKeys {
    * so that a mini cluster is able to launch multiple containers on a node.
    *
    * When set to false (default), the container port will be specified as
-   * {@link #DFS_CONTAINER_IPC_PORT} and the default value will be specified
-   * as {@link #DFS_CONTAINER_IPC_PORT_DEFAULT}.
+   * {@link #HDDS_CONTAINER_IPC_PORT} and the default value will be specified
+   * as {@link #HDDS_CONTAINER_IPC_PORT_DEFAULT}.
    */
-  public static final String DFS_CONTAINER_IPC_RANDOM_PORT =
-      "dfs.container.ipc.random.port";
-  public static final boolean DFS_CONTAINER_IPC_RANDOM_PORT_DEFAULT =
+  public static final String HDDS_CONTAINER_IPC_RANDOM_PORT =
+      "hdds.container.ipc.random.port";
+  public static final boolean HDDS_CONTAINER_IPC_RANDOM_PORT_DEFAULT =
       false;
 
-  public static final String DFS_CONTAINER_RATIS_DATASTREAM_RANDOM_PORT =
-      "dfs.container.ratis.datastream.random.port";
+  public static final String HDDS_CONTAINER_RATIS_DATASTREAM_RANDOM_PORT =
+      "hdds.container.ratis.datastream.random.port";
   public static final boolean
-      DFS_CONTAINER_RATIS_DATASTREAM_RANDOM_PORT_DEFAULT =
+      HDDS_CONTAINER_RATIS_DATASTREAM_RANDOM_PORT_DEFAULT =
       false;
 
-  public static final String DFS_CONTAINER_CHUNK_WRITE_SYNC_KEY =
-      "dfs.container.chunk.write.sync";
-  public static final boolean DFS_CONTAINER_CHUNK_WRITE_SYNC_DEFAULT = false;
+  public static final String HDDS_CONTAINER_CHUNK_WRITE_SYNC_KEY =
+      "hdds.container.chunk.write.sync";
+  public static final boolean HDDS_CONTAINER_CHUNK_WRITE_SYNC_DEFAULT = false;
   /**
    * Ratis Port where containers listen to.
    */
-  public static final String DFS_CONTAINER_RATIS_IPC_PORT =
-      "dfs.container.ratis.ipc";
-  public static final int DFS_CONTAINER_RATIS_IPC_PORT_DEFAULT = 9858;
+  public static final String HDDS_CONTAINER_RATIS_IPC_PORT =
+      "hdds.container.ratis.ipc.port";
+  public static final int HDDS_CONTAINER_RATIS_IPC_PORT_DEFAULT = 9858;
   /**
    * Ratis Port where containers listen to admin requests.
    */
-  public static final String DFS_CONTAINER_RATIS_ADMIN_PORT =
-      "dfs.container.ratis.admin.port";
-  public static final int DFS_CONTAINER_RATIS_ADMIN_PORT_DEFAULT = 9857;
+  public static final String HDDS_CONTAINER_RATIS_ADMIN_PORT =
+      "hdds.container.ratis.admin.port";
+  public static final int HDDS_CONTAINER_RATIS_ADMIN_PORT_DEFAULT = 9857;
   /**
    * Ratis Port where containers listen to server-to-server requests.
    */
-  public static final String DFS_CONTAINER_RATIS_SERVER_PORT =
-      "dfs.container.ratis.server.port";
-  public static final int DFS_CONTAINER_RATIS_SERVER_PORT_DEFAULT = 9856;
+  public static final String HDDS_CONTAINER_RATIS_SERVER_PORT =
+      "hdds.container.ratis.server.port";
+  public static final int HDDS_CONTAINER_RATIS_SERVER_PORT_DEFAULT = 9856;
 
   /**
    * Ratis Port where containers listen to datastream requests.
    */
-  public static final String DFS_CONTAINER_RATIS_DATASTREAM_ENABLED
-      = "dfs.container.ratis.datastream.enabled";
-  public static final boolean DFS_CONTAINER_RATIS_DATASTREAM_ENABLED_DEFAULT
+  public static final String HDDS_CONTAINER_RATIS_DATASTREAM_ENABLED
+      = "hdds.container.ratis.datastream.enabled";
+  public static final boolean HDDS_CONTAINER_RATIS_DATASTREAM_ENABLED_DEFAULT
       = false;
-  public static final String DFS_CONTAINER_RATIS_DATASTREAM_PORT
-      = "dfs.container.ratis.datastream.port";
-  public static final int DFS_CONTAINER_RATIS_DATASTREAM_PORT_DEFAULT
+  public static final String HDDS_CONTAINER_RATIS_DATASTREAM_PORT
+      = "hdds.container.ratis.datastream.port";
+  public static final int HDDS_CONTAINER_RATIS_DATASTREAM_PORT_DEFAULT
       = 9855;
 
   /**
@@ -133,9 +133,9 @@ public final class OzoneConfigKeys {
    * When set to true, allocate a random free port for ozone container, so that
    * a mini cluster is able to launch multiple containers on a node.
    */
-  public static final String DFS_CONTAINER_RATIS_IPC_RANDOM_PORT =
-      "dfs.container.ratis.ipc.random.port";
-  public static final boolean DFS_CONTAINER_RATIS_IPC_RANDOM_PORT_DEFAULT =
+  public static final String HDDS_CONTAINER_RATIS_IPC_RANDOM_PORT =
+      "hdds.container.ratis.ipc.random.port";
+  public static final boolean HDDS_CONTAINER_RATIS_IPC_RANDOM_PORT_DEFAULT =
       false;
 
   public static final String OZONE_METADATA_STORE_ROCKSDB_STATISTICS =
@@ -325,97 +325,97 @@ public final class OzoneConfigKeys {
   public static final int
       OZONE_BLOCK_DELETING_CONTAINER_LIMIT_PER_INTERVAL_DEFAULT = 10;
 
-  public static final String DFS_CONTAINER_RATIS_ENABLED_KEY
-      = ScmConfigKeys.DFS_CONTAINER_RATIS_ENABLED_KEY;
-  public static final boolean DFS_CONTAINER_RATIS_ENABLED_DEFAULT
-      = ScmConfigKeys.DFS_CONTAINER_RATIS_ENABLED_DEFAULT;
-  public static final String DFS_CONTAINER_RATIS_RPC_TYPE_KEY
-      = ScmConfigKeys.DFS_CONTAINER_RATIS_RPC_TYPE_KEY;
-  public static final String DFS_CONTAINER_RATIS_RPC_TYPE_DEFAULT
-      = ScmConfigKeys.DFS_CONTAINER_RATIS_RPC_TYPE_DEFAULT;
+  public static final String HDDS_CONTAINER_RATIS_ENABLED_KEY
+      = ScmConfigKeys.HDDS_CONTAINER_RATIS_ENABLED_KEY;
+  public static final boolean HDDS_CONTAINER_RATIS_ENABLED_DEFAULT
+      = ScmConfigKeys.HDDS_CONTAINER_RATIS_ENABLED_DEFAULT;
+  public static final String HDDS_CONTAINER_RATIS_RPC_TYPE_KEY
+      = ScmConfigKeys.HDDS_CONTAINER_RATIS_RPC_TYPE_KEY;
+  public static final String HDDS_CONTAINER_RATIS_RPC_TYPE_DEFAULT
+      = ScmConfigKeys.HDDS_CONTAINER_RATIS_RPC_TYPE_DEFAULT;
   public static final String
-      DFS_CONTAINER_RATIS_NUM_WRITE_CHUNK_THREADS_PER_VOLUME_KEY
-      = ScmConfigKeys.DFS_CONTAINER_RATIS_NUM_WRITE_CHUNK_THREADS_PER_VOLUME;
+      HDDS_CONTAINER_RATIS_NUM_WRITE_CHUNK_THREADS_PER_VOLUME_KEY
+      = ScmConfigKeys.HDDS_CONTAINER_RATIS_NUM_WRITE_CHUNK_THREADS_PER_VOLUME;
   public static final int
-      DFS_CONTAINER_RATIS_NUM_WRITE_CHUNK_THREADS_PER_VOLUME_DEFAULT
+      HDDS_CONTAINER_RATIS_NUM_WRITE_CHUNK_THREADS_PER_VOLUME_DEFAULT
       = ScmConfigKeys.
-      DFS_CONTAINER_RATIS_NUM_WRITE_CHUNK_THREADS_PER_VOLUME_DEFAULT;
-  public static final String DFS_CONTAINER_RATIS_REPLICATION_LEVEL_KEY
-      = ScmConfigKeys.DFS_CONTAINER_RATIS_REPLICATION_LEVEL_KEY;
+      HDDS_CONTAINER_RATIS_NUM_WRITE_CHUNK_THREADS_PER_VOLUME_DEFAULT;
+  public static final String HDDS_CONTAINER_RATIS_REPLICATION_LEVEL_KEY
+      = ScmConfigKeys.HDDS_CONTAINER_RATIS_REPLICATION_LEVEL_KEY;
   public static final ReplicationLevel
-      DFS_CONTAINER_RATIS_REPLICATION_LEVEL_DEFAULT
-      = ScmConfigKeys.DFS_CONTAINER_RATIS_REPLICATION_LEVEL_DEFAULT;
-  public static final String DFS_CONTAINER_RATIS_NUM_CONTAINER_OP_EXECUTORS_KEY
-      = ScmConfigKeys.DFS_CONTAINER_RATIS_NUM_CONTAINER_OP_EXECUTORS_KEY;
-  public static final int DFS_CONTAINER_RATIS_NUM_CONTAINER_OP_EXECUTORS_DEFAULT
-      = ScmConfigKeys.DFS_CONTAINER_RATIS_NUM_CONTAINER_OP_EXECUTORS_DEFAULT;
-  public static final String DFS_CONTAINER_RATIS_SEGMENT_SIZE_KEY
-      = ScmConfigKeys.DFS_CONTAINER_RATIS_SEGMENT_SIZE_KEY;
-  public static final String DFS_CONTAINER_RATIS_SEGMENT_SIZE_DEFAULT
-      = ScmConfigKeys.DFS_CONTAINER_RATIS_SEGMENT_SIZE_DEFAULT;
-  public static final String DFS_CONTAINER_RATIS_SEGMENT_PREALLOCATED_SIZE_KEY
-      = ScmConfigKeys.DFS_CONTAINER_RATIS_SEGMENT_PREALLOCATED_SIZE_KEY;
+      HDDS_CONTAINER_RATIS_REPLICATION_LEVEL_DEFAULT
+      = ScmConfigKeys.HDDS_CONTAINER_RATIS_REPLICATION_LEVEL_DEFAULT;
+  public static final String HDDS_CONTAINER_RATIS_NUM_CONTAINER_OP_EXECUTORS_KEY
+      = ScmConfigKeys.HDDS_CONTAINER_RATIS_NUM_CONTAINER_OP_EXECUTORS_KEY;
+  public static final int HDDS_CONTAINER_RATIS_NUM_CONTAINER_OP_EXECUTORS_DEFAULT
+      = ScmConfigKeys.HDDS_CONTAINER_RATIS_NUM_CONTAINER_OP_EXECUTORS_DEFAULT;
+  public static final String HDDS_CONTAINER_RATIS_SEGMENT_SIZE_KEY
+      = ScmConfigKeys.HDDS_CONTAINER_RATIS_SEGMENT_SIZE_KEY;
+  public static final String HDDS_CONTAINER_RATIS_SEGMENT_SIZE_DEFAULT
+      = ScmConfigKeys.HDDS_CONTAINER_RATIS_SEGMENT_SIZE_DEFAULT;
+  public static final String HDDS_CONTAINER_RATIS_SEGMENT_PREALLOCATED_SIZE_KEY
+      = ScmConfigKeys.HDDS_CONTAINER_RATIS_SEGMENT_PREALLOCATED_SIZE_KEY;
   public static final String
-      DFS_CONTAINER_RATIS_SEGMENT_PREALLOCATED_SIZE_DEFAULT =
-      ScmConfigKeys.DFS_CONTAINER_RATIS_SEGMENT_PREALLOCATED_SIZE_DEFAULT;
+      HDDS_CONTAINER_RATIS_SEGMENT_PREALLOCATED_SIZE_DEFAULT =
+      ScmConfigKeys.HDDS_CONTAINER_RATIS_SEGMENT_PREALLOCATED_SIZE_DEFAULT;
 
   // config settings to enable stateMachineData write timeout
   public static final String
-      DFS_CONTAINER_RATIS_STATEMACHINEDATA_SYNC_TIMEOUT =
-      ScmConfigKeys.DFS_CONTAINER_RATIS_STATEMACHINEDATA_SYNC_TIMEOUT;
+      HDDS_CONTAINER_RATIS_STATEMACHINEDATA_SYNC_TIMEOUT =
+      ScmConfigKeys.HDDS_CONTAINER_RATIS_STATEMACHINEDATA_SYNC_TIMEOUT;
   public static final TimeDuration
-      DFS_CONTAINER_RATIS_STATEMACHINEDATA_SYNC_TIMEOUT_DEFAULT =
-      ScmConfigKeys.DFS_CONTAINER_RATIS_STATEMACHINEDATA_SYNC_TIMEOUT_DEFAULT;
+      HDDS_CONTAINER_RATIS_STATEMACHINEDATA_SYNC_TIMEOUT_DEFAULT =
+      ScmConfigKeys.HDDS_CONTAINER_RATIS_STATEMACHINEDATA_SYNC_TIMEOUT_DEFAULT;
 
-  public static final String DFS_CONTAINER_RATIS_DATANODE_STORAGE_DIR =
-      "dfs.container.ratis.datanode.storage.dir";
+  public static final String HDDS_CONTAINER_RATIS_DATANODE_STORAGE_DIR =
+      "hdds.container.ratis.datanode.storage.dir";
 
-  public static final String DFS_RATIS_SERVER_RETRY_CACHE_TIMEOUT_DURATION_KEY =
-      ScmConfigKeys.DFS_RATIS_SERVER_RETRY_CACHE_TIMEOUT_DURATION_KEY;
+  public static final String HDDS_RATIS_SERVER_RETRY_CACHE_TIMEOUT_DURATION_KEY =
+      ScmConfigKeys.HDDS_RATIS_SERVER_RETRY_CACHE_TIMEOUT_DURATION_KEY;
   public static final TimeDuration
-      DFS_RATIS_SERVER_RETRY_CACHE_TIMEOUT_DURATION_DEFAULT =
-      ScmConfigKeys.DFS_RATIS_SERVER_RETRY_CACHE_TIMEOUT_DURATION_DEFAULT;
+      HDDS_RATIS_SERVER_RETRY_CACHE_TIMEOUT_DURATION_DEFAULT =
+      ScmConfigKeys.HDDS_RATIS_SERVER_RETRY_CACHE_TIMEOUT_DURATION_DEFAULT;
   public static final String
-      DFS_CONTAINER_RATIS_STATEMACHINEDATA_SYNC_RETRIES =
-      ScmConfigKeys.DFS_CONTAINER_RATIS_STATEMACHINEDATA_SYNC_RETRIES;
-  public static final String DFS_CONTAINER_RATIS_LOG_QUEUE_NUM_ELEMENTS =
-      ScmConfigKeys.DFS_CONTAINER_RATIS_LOG_QUEUE_NUM_ELEMENTS;
-  public static final int DFS_CONTAINER_RATIS_LOG_QUEUE_NUM_ELEMENTS_DEFAULT =
-      ScmConfigKeys.DFS_CONTAINER_RATIS_LOG_QUEUE_NUM_ELEMENTS_DEFAULT;
-  public static final String DFS_CONTAINER_RATIS_LOG_QUEUE_BYTE_LIMIT =
-      ScmConfigKeys.DFS_CONTAINER_RATIS_LOG_QUEUE_BYTE_LIMIT;
-  public static final String DFS_CONTAINER_RATIS_LOG_QUEUE_BYTE_LIMIT_DEFAULT =
-      ScmConfigKeys.DFS_CONTAINER_RATIS_LOG_QUEUE_BYTE_LIMIT_DEFAULT;
+      HDDS_CONTAINER_RATIS_STATEMACHINEDATA_SYNC_RETRIES =
+      ScmConfigKeys.HDDS_CONTAINER_RATIS_STATEMACHINEDATA_SYNC_RETRIES;
+  public static final String HDDS_CONTAINER_RATIS_LOG_QUEUE_NUM_ELEMENTS =
+      ScmConfigKeys.HDDS_CONTAINER_RATIS_LOG_QUEUE_NUM_ELEMENTS;
+  public static final int HDDS_CONTAINER_RATIS_LOG_QUEUE_NUM_ELEMENTS_DEFAULT =
+      ScmConfigKeys.HDDS_CONTAINER_RATIS_LOG_QUEUE_NUM_ELEMENTS_DEFAULT;
+  public static final String HDDS_CONTAINER_RATIS_LOG_QUEUE_BYTE_LIMIT =
+      ScmConfigKeys.HDDS_CONTAINER_RATIS_LOG_QUEUE_BYTE_LIMIT;
+  public static final String HDDS_CONTAINER_RATIS_LOG_QUEUE_BYTE_LIMIT_DEFAULT =
+      ScmConfigKeys.HDDS_CONTAINER_RATIS_LOG_QUEUE_BYTE_LIMIT_DEFAULT;
   public static final String
-      DFS_CONTAINER_RATIS_LOG_APPENDER_QUEUE_NUM_ELEMENTS =
-      ScmConfigKeys.DFS_CONTAINER_RATIS_LOG_APPENDER_QUEUE_NUM_ELEMENTS;
+      HDDS_CONTAINER_RATIS_LOG_APPENDER_QUEUE_NUM_ELEMENTS =
+      ScmConfigKeys.HDDS_CONTAINER_RATIS_LOG_APPENDER_QUEUE_NUM_ELEMENTS;
   public static final int
-      DFS_CONTAINER_RATIS_LOG_APPENDER_QUEUE_NUM_ELEMENTS_DEFAULT =
-      ScmConfigKeys.DFS_CONTAINER_RATIS_LOG_APPENDER_QUEUE_NUM_ELEMENTS_DEFAULT;
-  public static final String DFS_CONTAINER_RATIS_LOG_APPENDER_QUEUE_BYTE_LIMIT =
-      ScmConfigKeys.DFS_CONTAINER_RATIS_LOG_APPENDER_QUEUE_BYTE_LIMIT;
+      HDDS_CONTAINER_RATIS_LOG_APPENDER_QUEUE_NUM_ELEMENTS_DEFAULT =
+      ScmConfigKeys.HDDS_CONTAINER_RATIS_LOG_APPENDER_QUEUE_NUM_ELEMENTS_DEFAULT;
+  public static final String HDDS_CONTAINER_RATIS_LOG_APPENDER_QUEUE_BYTE_LIMIT =
+      ScmConfigKeys.HDDS_CONTAINER_RATIS_LOG_APPENDER_QUEUE_BYTE_LIMIT;
   public static final String
-      DFS_CONTAINER_RATIS_LOG_APPENDER_QUEUE_BYTE_LIMIT_DEFAULT =
-      ScmConfigKeys.DFS_CONTAINER_RATIS_LOG_APPENDER_QUEUE_BYTE_LIMIT_DEFAULT;
-  public static final String DFS_CONTAINER_RATIS_LOG_PURGE_GAP =
-      ScmConfigKeys.DFS_CONTAINER_RATIS_LOG_PURGE_GAP;
-  public static final int DFS_CONTAINER_RATIS_LOG_PURGE_GAP_DEFAULT =
-      ScmConfigKeys.DFS_CONTAINER_RATIS_LOG_PURGE_GAP_DEFAULT;
-  public static final String DFS_CONTAINER_RATIS_LEADER_PENDING_BYTES_LIMIT =
-      ScmConfigKeys.DFS_CONTAINER_RATIS_LEADER_PENDING_BYTES_LIMIT;
+      HDDS_CONTAINER_RATIS_LOG_APPENDER_QUEUE_BYTE_LIMIT_DEFAULT =
+      ScmConfigKeys.HDDS_CONTAINER_RATIS_LOG_APPENDER_QUEUE_BYTE_LIMIT_DEFAULT;
+  public static final String HDDS_CONTAINER_RATIS_LOG_PURGE_GAP =
+      ScmConfigKeys.HDDS_CONTAINER_RATIS_LOG_PURGE_GAP;
+  public static final int HDDS_CONTAINER_RATIS_LOG_PURGE_GAP_DEFAULT =
+      ScmConfigKeys.HDDS_CONTAINER_RATIS_LOG_PURGE_GAP_DEFAULT;
+  public static final String HDDS_CONTAINER_RATIS_LEADER_PENDING_BYTES_LIMIT =
+      ScmConfigKeys.HDDS_CONTAINER_RATIS_LEADER_PENDING_BYTES_LIMIT;
   public static final String
-      DFS_CONTAINER_RATIS_LEADER_PENDING_BYTES_LIMIT_DEFAULT =
-      ScmConfigKeys.DFS_CONTAINER_RATIS_LEADER_PENDING_BYTES_LIMIT_DEFAULT;
+      HDDS_CONTAINER_RATIS_LEADER_PENDING_BYTES_LIMIT_DEFAULT =
+      ScmConfigKeys.HDDS_CONTAINER_RATIS_LEADER_PENDING_BYTES_LIMIT_DEFAULT;
   public static final String
-      DFS_RATIS_LEADER_ELECTION_MINIMUM_TIMEOUT_DURATION_KEY =
-      ScmConfigKeys.DFS_RATIS_LEADER_ELECTION_MINIMUM_TIMEOUT_DURATION_KEY;
+      HDDS_RATIS_LEADER_ELECTION_MINIMUM_TIMEOUT_DURATION_KEY =
+      ScmConfigKeys.HDDS_RATIS_LEADER_ELECTION_MINIMUM_TIMEOUT_DURATION_KEY;
   public static final TimeDuration
-      DFS_RATIS_LEADER_ELECTION_MINIMUM_TIMEOUT_DURATION_DEFAULT =
-      ScmConfigKeys.DFS_RATIS_LEADER_ELECTION_MINIMUM_TIMEOUT_DURATION_DEFAULT;
-  public static final String DFS_RATIS_SNAPSHOT_THRESHOLD_KEY =
-      ScmConfigKeys.DFS_RATIS_SNAPSHOT_THRESHOLD_KEY;
-  public static final long DFS_RATIS_SNAPSHOT_THRESHOLD_DEFAULT =
-      ScmConfigKeys.DFS_RATIS_SNAPSHOT_THRESHOLD_DEFAULT;
+      HDDS_RATIS_LEADER_ELECTION_MINIMUM_TIMEOUT_DURATION_DEFAULT =
+      ScmConfigKeys.HDDS_RATIS_LEADER_ELECTION_MINIMUM_TIMEOUT_DURATION_DEFAULT;
+  public static final String HDDS_RATIS_SNAPSHOT_THRESHOLD_KEY =
+      ScmConfigKeys.HDDS_RATIS_SNAPSHOT_THRESHOLD_KEY;
+  public static final long HDDS_RATIS_SNAPSHOT_THRESHOLD_DEFAULT =
+      ScmConfigKeys.HDDS_RATIS_SNAPSHOT_THRESHOLD_DEFAULT;
 
   public static final String HDDS_DATANODE_PLUGINS_KEY =
       "hdds.datanode.plugins";

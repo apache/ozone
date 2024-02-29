@@ -54,6 +54,7 @@ import javax.ws.rs.core.Response;
 import java.io.IOException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicLong;
 
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ACL_ENABLED;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_SERVICE_INTERVAL;
@@ -61,6 +62,7 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_FS_ITERATE_BATCH_SIZ
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_DIR_DELETING_SERVICE_INTERVAL;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_PATH_DELETING_LIMIT_PER_TASK;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_RATIS_ENABLE_KEY;
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.fail;
@@ -127,15 +129,13 @@ public class TestReconInsightsForDeletedDirectories {
 
   @AfterEach
   public void cleanup() {
-    try {
+    assertDoesNotThrow(() -> {
       Path root = new Path("/");
       FileStatus[] fileStatuses = fs.listStatus(root);
       for (FileStatus fileStatus : fileStatuses) {
         fs.delete(fileStatus.getPath(), true);
       }
-    } catch (IOException ex) {
-      fail("Failed to cleanup files.");
-    }
+    });
   }
 
   /**
@@ -461,21 +461,19 @@ public class TestReconInsightsForDeletedDirectories {
 
   private boolean assertTableRowCount(int expectedCount,
                                       Table<String, ?> table, boolean isRecon) {
-    long count = 0L;
-    try {
+    AtomicLong count = new AtomicLong(0L);
+    assertDoesNotThrow(() -> {
       if (isRecon) {
-        count = cluster.getReconServer().getOzoneManagerServiceProvider()
-            .getOMMetadataManagerInstance().countRowsInTable(table);
+        count.set(cluster.getReconServer().getOzoneManagerServiceProvider()
+            .getOMMetadataManagerInstance().countRowsInTable(table));
       } else {
-        count = cluster.getOzoneManager().getMetadataManager()
-            .countRowsInTable(table);
+        count.set(cluster.getOzoneManager().getMetadataManager()
+            .countRowsInTable(table));
       }
       LOG.info("{} actual row count={}, expectedCount={}", table.getName(),
-          count, expectedCount);
-    } catch (IOException ex) {
-      fail("Test failed with: " + ex);
-    }
-    return count == expectedCount;
+          count.get(), expectedCount);
+    });
+    return count.get() == expectedCount;
   }
 
   private void syncDataFromOM() {

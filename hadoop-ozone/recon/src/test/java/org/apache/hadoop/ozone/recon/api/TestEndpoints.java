@@ -113,6 +113,7 @@ import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.writeDele
 import static org.apache.hadoop.ozone.recon.spi.impl.PrometheusServiceProviderImpl.PROMETHEUS_INSTANT_QUERY_API;
 import static org.hadoop.ozone.recon.schema.tables.GlobalStatsTable.GLOBAL_STATS;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -406,7 +407,7 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
             .addStorageReport(storageReportProto4).build();
     LayoutVersionProto layoutInfo = defaultLayoutVersionProto();
 
-    try {
+    assertDoesNotThrow(() -> {
       reconScm.getDatanodeProtocolServer()
           .register(extendedDatanodeDetailsProto, nodeReportProto,
               containerReportsProto, pipelineReportsProto, layoutInfo);
@@ -417,9 +418,7 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
               defaultLayoutVersionProto());
       // Process all events in the event queue
       reconScm.getEventQueue().processAll(1000);
-    } catch (Exception ex) {
-      fail(ex.getMessage());
-    }
+    });
     // Write Data to OM
     // A sample volume (sampleVol) and a bucket (bucketOne) is already created
     // in AbstractOMMetadataManagerTest.
@@ -867,10 +866,12 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
     ContainerInfo omContainerInfo1 = mock(ContainerInfo.class);
     given(omContainerInfo1.containerID()).willReturn(new ContainerID(1));
     given(omContainerInfo1.getUsedBytes()).willReturn(1500000000L); // 1.5GB
+    given(omContainerInfo1.getState()).willReturn(LifeCycleState.OPEN);
 
     ContainerInfo omContainerInfo2 = mock(ContainerInfo.class);
     given(omContainerInfo2.containerID()).willReturn(new ContainerID(2));
     given(omContainerInfo2.getUsedBytes()).willReturn(2500000000L); // 2.5GB
+    given(omContainerInfo2.getState()).willReturn(LifeCycleState.OPEN);
 
     // Create a list of container info objects
     List<ContainerInfo> containers = new ArrayList<>();

@@ -6,32 +6,26 @@
  * to you under the Apache License, Version 2.0 (the
  * "License"); you may not use this file except in compliance
  * with the License.  You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
+ * <p>
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * <p>
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+package org.apache.hadoop.ozone.container.replication;
 
-#include "Pipe.h"
-#include <unistd.h>
+import org.junit.jupiter.api.BeforeEach;
 
-const int Pipe::READ_FILE_DESCRIPTOR_IDX = 0;
-const int Pipe::WRITE_FILE_DESCRIPTOR_IDX = 1;
-
-Pipe::Pipe() {
-    pipe(p);
-    open = true;
-}
-
-Pipe::~Pipe() {
-    ::close(p[Pipe::READ_FILE_DESCRIPTOR_IDX]);
-    ::close(p[Pipe::WRITE_FILE_DESCRIPTOR_IDX]);
-}
-
-void Pipe::close() {
-    open = false;
+/**
+ * Tests {@link GrpcReplicationService}.
+ */
+class TestGrpcReplicationServiceWithZeroCopy
+    extends TestGrpcReplicationService {
+  @BeforeEach
+  public void setUp() throws Exception {
+    init(true);
+  }
 }

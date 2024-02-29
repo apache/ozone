@@ -209,7 +209,7 @@ public class OzoneBucketStub extends OzoneBucket {
                                                Map<String, String> keyMetadata)
       throws IOException {
     ByteBufferStreamOutput byteBufferStreamOutput =
-        new ByteBufferStreamOutput() {
+        new KeyMetadataAwareByteBufferStreamOutput(keyMetadata) {
 
           private final ByteBuffer buffer = ByteBuffer.allocate((int) size);
 

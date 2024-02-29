@@ -67,7 +67,7 @@ public class TestFilePerChunkStrategy extends CommonChunkManagerTestCases {
     long term = 0;
     long index = 0;
     File chunkFile = ContainerLayoutVersion.FILE_PER_CHUNK
-        .getChunkFile(container.getContainerData(), blockID, chunkInfo);
+        .getChunkFile(container.getContainerData(), blockID, chunkInfo.getChunkName());
     File tempChunkFile = new File(chunkFile.getParent(),
         chunkFile.getName() + OzoneConsts.CONTAINER_CHUNK_NAME_DELIMITER
             + OzoneConsts.CONTAINER_TEMPORARY_CHUNK_PREFIX
@@ -109,7 +109,7 @@ public class TestFilePerChunkStrategy extends CommonChunkManagerTestCases {
     ChunkInfo oldDatanodeChunkInfo = new ChunkInfo(chunkInfo.getChunkName(),
         offset, chunkInfo.getLen());
     File file = ContainerLayoutVersion.FILE_PER_CHUNK.getChunkFile(
-        container.getContainerData(), blockID, chunkInfo);
+        container.getContainerData(), blockID, chunkInfo.getChunkName());
     ChunkUtils.writeData(file,
         ChunkBuffer.wrap(getData()), offset, chunkInfo.getLen(),
         null, true);

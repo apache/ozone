@@ -294,9 +294,9 @@ public class NodeDecommissionManager {
         TimeUnit.SECONDS);
   }
 
-  public Map<String, List<ContainerID>> getContainersReplicatedOnNode(DatanodeDetails dn)
+  public Map<String, List<ContainerID>> getContainersPendingReplication(DatanodeDetails dn)
       throws NodeNotFoundException {
-    return getMonitor().getContainersReplicatedOnNode(dn);
+    return getMonitor().getContainersPendingReplication(dn);
   }
 
   @VisibleForTesting

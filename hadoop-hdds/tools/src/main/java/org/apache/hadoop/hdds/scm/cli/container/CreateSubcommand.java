@@ -25,8 +25,6 @@ import org.apache.hadoop.hdds.scm.client.ScmClient;
 import org.apache.hadoop.hdds.scm.container.common.helpers
     .ContainerWithPipeline;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
 
@@ -40,9 +38,6 @@ import picocli.CommandLine.Option;
     versionProvider = HddsVersionProvider.class)
 public class CreateSubcommand extends ScmSubcommand {
 
-  private static final Logger LOG =
-      LoggerFactory.getLogger(CreateSubcommand.class);
-
   @Option(description = "Owner of the new container", defaultValue = "OZONE",
       names = { "-o", "--owner"})
   private String owner;
@@ -50,7 +45,7 @@ public class CreateSubcommand extends ScmSubcommand {
   @Override
   public void execute(ScmClient scmClient) throws IOException {
     ContainerWithPipeline container = scmClient.createContainer(owner);
-    LOG.info("Container {} is created.",
+    System.out.printf("Container %s is created.%n",
         container.getContainerInfo().getContainerID());
   }
 }

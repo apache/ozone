@@ -1093,6 +1093,19 @@ public interface ClientProtocol {
       String bucketName, String snapshotName) throws IOException;
 
   /**
+   * Rename snapshot.
+   *
+   * @param volumeName Vol to be used
+   * @param bucketName Bucket to be used
+   * @param snapshotOldName Old name of the snapshot
+   * @param snapshotNewName New name of the snapshot
+   *
+   * @throws IOException
+   */
+  void renameSnapshot(String volumeName,
+      String bucketName, String snapshotOldName, String snapshotNewName) throws IOException;
+
+  /**
    * Delete snapshot.
    * @param volumeName vol to be used
    * @param bucketName bucket to be used

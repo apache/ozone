@@ -78,8 +78,7 @@ public abstract class OMClientRequest implements RequestAuditor {
 
   private UserGroupInformation userGroupInformation;
   private InetAddress inetAddress;
-  private final ThreadLocal<OMLockDetails> omLockDetails =
-      ThreadLocal.withInitial(OMLockDetails::new);
+  private final OMLockDetails omLockDetails = new OMLockDetails();
 
   /**
    * Stores the result of request execution in
@@ -94,7 +93,7 @@ public abstract class OMClientRequest implements RequestAuditor {
   public OMClientRequest(OMRequest omRequest) {
     Preconditions.checkNotNull(omRequest);
     this.omRequest = omRequest;
-    this.omLockDetails.get().clear();
+    this.omLockDetails.clear();
   }
   /**
    * Perform pre-execute steps on a OMRequest.
@@ -575,10 +574,10 @@ public abstract class OMClientRequest implements RequestAuditor {
   }
 
   public OMLockDetails getOmLockDetails() {
-    return omLockDetails.get();
+    return omLockDetails;
   }
 
   public void mergeOmLockDetails(OMLockDetails details) {
-    omLockDetails.get().merge(details);
+    omLockDetails.merge(details);
   }
 }

@@ -48,6 +48,7 @@ import org.slf4j.LoggerFactory;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -55,7 +56,6 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.junit.jupiter.api.Assertions.fail;
 
 /**
  * Tests for RocksDBTable Store.
@@ -96,11 +96,7 @@ public class TestRDBTableStore {
 
   private static boolean consume(Table.KeyValue keyValue)  {
     count++;
-    try {
-      assertNotNull(keyValue.getKey());
-    } catch (IOException ex) {
-      fail("Unexpected Exception " + ex);
-    }
+    assertNotNull(assertDoesNotThrow(keyValue::getKey));
     return true;
   }
 
