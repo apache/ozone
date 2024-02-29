@@ -856,7 +856,7 @@
     </description>
   </property>
   <property>
-    <name>ozone.chunk.list.incremental</name>
+    <name>ozone.incremental.chunk.list</name>
     <value>true</value>
     <tag>OZONE, CLIENT, DATANODE, PERFORMANCE</tag>
     <description>
