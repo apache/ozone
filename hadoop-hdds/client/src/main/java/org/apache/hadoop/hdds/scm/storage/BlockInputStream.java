@@ -577,7 +577,7 @@ public class BlockInputStream extends BlockExtendedInputStream {
     if (retryAction.action == RetryPolicy.RetryAction.RetryDecision.RETRY) {
       if (retryAction.delayMillis > 0) {
         try {
-          LOG.info("Retry read after {}ms", retryAction.delayMillis);
+          LOG.debug("Retry read after {}ms", retryAction.delayMillis);
           Thread.sleep(retryAction.delayMillis);
         } catch (InterruptedException e) {
           Thread.currentThread().interrupt();

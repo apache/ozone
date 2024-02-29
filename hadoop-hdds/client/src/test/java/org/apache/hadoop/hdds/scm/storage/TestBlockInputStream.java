@@ -43,6 +43,7 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.mockito.stubbing.OngoingStubbing;
+import org.slf4j.event.Level;
 
 import java.io.EOFException;
 import java.io.IOException;
@@ -261,6 +262,7 @@ public class TestBlockInputStream {
   public void testRefreshPipelineFunction() throws Exception {
     GenericTestUtils.LogCapturer logCapturer = GenericTestUtils.LogCapturer
         .captureLogs(BlockInputStream.LOG);
+    GenericTestUtils.setLogLevel(BlockInputStream.LOG, Level.DEBUG);
     BlockID blockID = new BlockID(new ContainerBlockID(1, 1));
     AtomicBoolean isRefreshed = new AtomicBoolean();
     createChunkList(5);
