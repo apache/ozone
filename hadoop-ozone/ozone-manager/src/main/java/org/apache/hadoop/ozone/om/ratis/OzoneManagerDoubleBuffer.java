@@ -211,11 +211,15 @@ public final class OzoneManagerDoubleBuffer {
 
     this.isTracingEnabled = b.isTracingEnabled;
 
-    isRunning.set(true);
     // Daemon thread which runs in background and flushes transactions to DB.
     daemon = new Daemon(this::flushTransactions);
     daemon.setName(b.threadPrefix + "OMDoubleBufferFlushThread");
+  }
+
+  public OzoneManagerDoubleBuffer start() {
     daemon.start();
+    isRunning.set(true);
+    return this;
   }
 
   private boolean isRatisEnabled() {
