@@ -71,6 +71,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 
+import static org.apache.hadoop.hdds.HddsUtils.toProtobuf;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_SNAPSHOT_KEY_DELETING_LIMIT_PER_TASK;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_SNAPSHOT_KEY_DELETING_LIMIT_PER_TASK_DEFAULT;
@@ -145,7 +146,7 @@ public class SnapshotDeletingService extends AbstractKeyDeletingService {
 
       Table<String, SnapshotInfo> snapshotInfoTable =
           ozoneManager.getMetadataManager().getSnapshotInfoTable();
-      List<String> purgeSnapshotKeys = new ArrayList<>();
+      List<HddsProtos.UUID> purgeSnapshotIds = new ArrayList<>();
       try (TableIterator<String, ? extends Table.KeyValue
           <String, SnapshotInfo>> iterator = snapshotInfoTable.iterator()) {
 
@@ -203,7 +204,7 @@ public class SnapshotDeletingService extends AbstractKeyDeletingService {
 
           if (isSnapshotReclaimable(snapshotDeletedTable,
               snapshotDeletedDirTable, snapshotBucketKey, dbBucketKeyForDir)) {
-            purgeSnapshotKeys.add(snapInfo.getTableKey());
+            purgeSnapshotIds.add(toProtobuf(snapInfo.getSnapshotId()));
             // Decrement ref count
             rcOmSnapshot.close();
             rcOmSnapshot = null;
@@ -306,7 +307,7 @@ public class SnapshotDeletingService extends AbstractKeyDeletingService {
 
             // Delete keys From deletedTable
             processKeyDeletes(keysToPurge, omSnapshot.getKeyManager(),
-                null, snapInfo.getTableKey());
+                null, snapInfo.getSnapshotId());
             successRunCount.incrementAndGet();
           } catch (IOException ex) {
             LOG.error("Error while running Snapshot Deleting Service for " +
@@ -337,7 +338,7 @@ public class SnapshotDeletingService extends AbstractKeyDeletingService {
           rcOmSnapshot.close();
         }
       }
-      submitSnapshotPurgeRequest(purgeSnapshotKeys);
+      submitSnapshotPurgeRequest(purgeSnapshotIds);
 
       return BackgroundTaskResult.EmptyTaskResult.newResult();
     }
@@ -443,7 +444,7 @@ public class SnapshotDeletingService extends AbstractKeyDeletingService {
 
         remainNum = optimizeDirDeletesAndSubmitRequest(remainNum, dirNum,
             subDirNum, subFileNum, allSubDirList, purgePathRequestList,
-            snapInfo.getTableKey(), startTime, ratisByteLimit - consumedSize,
+            snapInfo.getSnapshotId(), startTime, ratisByteLimit - consumedSize,
             omSnapshot.getKeyManager());
       } catch (IOException e) {
         LOG.error("Error while running delete directories and files for " +
@@ -454,11 +455,11 @@ public class SnapshotDeletingService extends AbstractKeyDeletingService {
       return remainNum;
     }
 
-    private void submitSnapshotPurgeRequest(List<String> purgeSnapshotKeys) {
+    private void submitSnapshotPurgeRequest(List<HddsProtos.UUID> purgeSnapshotKeys) {
       if (!purgeSnapshotKeys.isEmpty()) {
         SnapshotPurgeRequest snapshotPurgeRequest = SnapshotPurgeRequest
             .newBuilder()
-            .addAllSnapshotDBKeys(purgeSnapshotKeys)
+            .addAllSnapshotIds(purgeSnapshotKeys)
             .build();
 
         OMRequest omRequest = OMRequest.newBuilder()
@@ -545,7 +546,7 @@ public class SnapshotDeletingService extends AbstractKeyDeletingService {
 
       SnapshotMoveDeletedKeysRequest.Builder moveDeletedKeysBuilder =
           SnapshotMoveDeletedKeysRequest.newBuilder()
-              .setFromSnapshot(snapInfo.getProtobuf());
+              .setSnapshotId(toProtobuf(snapInfo.getSnapshotId()));
 
       SnapshotMoveDeletedKeysRequest moveDeletedKeys = moveDeletedKeysBuilder
           .addAllReclaimKeys(toReclaimList)

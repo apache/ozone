@@ -19,6 +19,7 @@
 
 package org.apache.hadoop.ozone.om.request.snapshot;
 
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.ratis.server.protocol.TermIndex;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
@@ -39,11 +40,14 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.UUID;
+
+import static org.apache.hadoop.hdds.HddsUtils.fromProtobuf;
 
 /**
  * Handles OMSnapshotPurge Request.
@@ -74,8 +78,9 @@ public class OMSnapshotPurgeRequest extends OMClientRequest {
         .getSnapshotPurgeRequest();
 
     try {
-      List<String> snapshotDbKeys = snapshotPurgeRequest
-          .getSnapshotDBKeysList();
+      List<HddsProtos.UUID> snapshotIds = snapshotPurgeRequest
+          .getSnapshotIdsList();
+      List<String> snapshotDbKeys = new ArrayList<>();
       Map<String, SnapshotInfo> updatedSnapInfos = new HashMap<>();
       Map<String, SnapshotInfo> updatedPathPreviousAndGlobalSnapshots =
           new HashMap<>();
@@ -83,7 +88,15 @@ public class OMSnapshotPurgeRequest extends OMClientRequest {
       // Snapshots that are purged by the SnapshotDeletingService
       // will update the next snapshot so that is can be deep cleaned
       // by the KeyDeletingService in the next run.
-      for (String snapTableKey : snapshotDbKeys) {
+      for (HddsProtos.UUID snapshotId : snapshotIds) {
+        String snapTableKey = snapshotChainManager.getTableKey(fromProtobuf(snapshotId));
+
+        if (snapTableKey == null) {
+          LOG.warn("The snapshotId {} is not longer in snapshot chain, It maybe removed in the previous " +
+              "Snapshot purge request.", snapshotId);
+          continue;
+        }
+
         SnapshotInfo fromSnapshot = omMetadataManager.getSnapshotInfoTable()
             .get(snapTableKey);
 
@@ -94,6 +107,7 @@ public class OMSnapshotPurgeRequest extends OMClientRequest {
           continue;
         }
 
+        snapshotDbKeys.add(snapTableKey);
         SnapshotInfo nextSnapshot = SnapshotUtils
             .getNextActiveSnapshot(fromSnapshot,
                 snapshotChainManager, omSnapshotManager);

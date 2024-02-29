@@ -25,6 +25,8 @@ import java.util.Map;
 import java.util.Set;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.ozone.om.OMMetrics;
+import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
+import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.ratis.server.protocol.TermIndex;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OzoneManager;
@@ -40,7 +42,10 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMReque
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 
 import java.util.List;
+import java.util.UUID;
 
+import static org.apache.hadoop.hdds.HddsUtils.fromProtobuf;
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INVALID_SNAPSHOT_ERROR;
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.BUCKET_LOCK;
 
 /**
@@ -54,10 +59,11 @@ public class OMDirectoriesPurgeRequestWithFSO extends OMKeyRequest {
 
   @Override
   public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager, TermIndex termIndex) {
+    OmMetadataManagerImpl metadataManager = (OmMetadataManagerImpl) ozoneManager.getMetadataManager();
     OzoneManagerProtocolProtos.PurgeDirectoriesRequest purgeDirsRequest =
         getOmRequest().getPurgeDirectoriesRequest();
-    String fromSnapshot = purgeDirsRequest.hasSnapshotTableKey() ?
-        purgeDirsRequest.getSnapshotTableKey() : null;
+    UUID fromSnapshotId = purgeDirsRequest.hasSnapshotId() ?
+        fromProtobuf(purgeDirsRequest.getSnapshotId()) : null;
 
     List<OzoneManagerProtocolProtos.PurgePathRequest> purgeRequests =
             purgeDirsRequest.getDeletedPathList();
@@ -69,10 +75,18 @@ public class OMDirectoriesPurgeRequestWithFSO extends OMKeyRequest {
 
     OMMetrics omMetrics = ozoneManager.getMetrics();
     try {
-      if (fromSnapshot != null) {
+      if (fromSnapshotId != null) {
+        String snapTableKey = metadataManager.getSnapshotChainManager()
+            .getTableKey(fromSnapshotId);
         fromSnapshotInfo = ozoneManager.getMetadataManager()
             .getSnapshotInfoTable()
-            .get(fromSnapshot);
+            .get(snapTableKey);
+
+        if (fromSnapshotInfo == null) {
+          LOG.error("SnapshotInfo for Snapshot: {} is not found", snapTableKey);
+          throw new OMException("SnapshotInfo for Snapshot: " + snapTableKey +
+              " is not found", INVALID_SNAPSHOT_ERROR);
+        }
       }
 
       for (OzoneManagerProtocolProtos.PurgePathRequest path : purgeRequests) {

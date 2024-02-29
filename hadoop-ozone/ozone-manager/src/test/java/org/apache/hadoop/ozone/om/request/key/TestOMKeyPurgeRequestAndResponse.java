@@ -42,6 +42,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
 
+import static org.apache.hadoop.hdds.HddsUtils.toProtobuf;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -93,8 +94,7 @@ public class TestOMKeyPurgeRequestAndResponse extends TestOMKeyRequest {
    * Create OMRequest which encapsulates DeleteKeyRequest.
    * @return OMRequest
    */
-  private OMRequest createPurgeKeysRequest(List<String> deletedKeys,
-       String snapshotDbKey) {
+  private OMRequest createPurgeKeysRequest(List<String> deletedKeys, UUID snapshotId) {
     DeletedKeys deletedKeysInBucket = DeletedKeys.newBuilder()
         .setVolumeName(volumeName)
         .setBucketName(bucketName)
@@ -103,8 +103,8 @@ public class TestOMKeyPurgeRequestAndResponse extends TestOMKeyRequest {
     PurgeKeysRequest.Builder purgeKeysRequest = PurgeKeysRequest.newBuilder()
         .addDeletedKeys(deletedKeysInBucket);
 
-    if (snapshotDbKey != null) {
-      purgeKeysRequest.setSnapshotTableKey(snapshotDbKey);
+    if (snapshotId != null) {
+      purgeKeysRequest.setSnapshotId(toProtobuf(snapshotId));
     }
     purgeKeysRequest.build();
 
@@ -231,7 +231,7 @@ public class TestOMKeyPurgeRequestAndResponse extends TestOMKeyRequest {
 
     // Create PurgeKeysRequest to purge the deleted keys
     OMRequest omRequest = createPurgeKeysRequest(deletedKeyNames,
-        snapInfo.getTableKey());
+        snapInfo.getSnapshotId());
 
     OMRequest preExecutedRequest = preExecute(omRequest);
     OMKeyPurgeRequest omKeyPurgeRequest =

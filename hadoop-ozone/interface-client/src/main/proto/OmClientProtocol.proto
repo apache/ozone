@@ -1315,8 +1315,9 @@ message DeletedKeys {
 message PurgeKeysRequest {
     repeated DeletedKeys deletedKeys = 1;
     // if set, will purge keys in a snapshot DB instead of active DB
-    optional string snapshotTableKey = 2;
+    optional string snapshotTableKey = 2 [deprecated = true];
     repeated SnapshotMoveKeyInfos keysToUpdate = 3;
+    optional hadoop.hdds.UUID snapshotId = 4;
 }
 
 message PurgeKeysResponse {
@@ -1338,7 +1339,8 @@ message PurgePathsResponse {
 
 message PurgeDirectoriesRequest {
   repeated PurgePathRequest deletedPath = 1;
-  optional string snapshotTableKey = 2;
+  optional string snapshotTableKey = 2 [deprecated = true];
+  optional hadoop.hdds.UUID snapshotId = 3;
 }
 
 message PurgeDirectoriesResponse {
@@ -1893,11 +1895,12 @@ message PrintCompactionLogDagRequest {
 }
 
 message SnapshotMoveDeletedKeysRequest {
-  optional SnapshotInfo fromSnapshot = 1;
+  optional SnapshotInfo fromSnapshot = 1 [deprecated = true];
   repeated SnapshotMoveKeyInfos nextDBKeys = 2;
   repeated SnapshotMoveKeyInfos reclaimKeys = 3;
   repeated hadoop.hdds.KeyValue renamedKeys = 4;
   repeated string deletedDirsToMove = 5;
+  optional hadoop.hdds.UUID snapshotId = 6;
 }
 
 message SnapshotMoveKeyInfos {
@@ -1906,16 +1909,18 @@ message SnapshotMoveKeyInfos {
 }
 
 message SnapshotPurgeRequest {
-  repeated string snapshotDBKeys = 1;
+  repeated string snapshotDBKeys = 1 [deprecated = true];
   repeated string updatedSnapshotDBKey = 2 [deprecated = true];
+  repeated hadoop.hdds.UUID snapshotIds = 3;
 }
 
 message SetSnapshotPropertyRequest {
   optional SnapshotProperty snapshotProperty = 1 [deprecated = true];
-  optional string snapshotKey = 2;
+  optional string snapshotKey = 2 [deprecated = true];
   optional SnapshotSize snapshotSize = 3;
   optional bool deepCleanedDeletedDir = 4;
   optional bool deepCleanedDeletedKey = 5;
+  optional hadoop.hdds.UUID snapshotId = 6;
 }
 
 // SnapshotProperty in entirely deprecated, Keeping it here for proto.lock compatibility

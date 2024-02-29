@@ -21,6 +21,8 @@ package org.apache.hadoop.ozone.om.request.key;
 import java.io.IOException;
 import java.util.ArrayList;
 
+import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
+import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.ratis.server.protocol.TermIndex;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
@@ -37,6 +39,10 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.List;
+import java.util.UUID;
+
+import static org.apache.hadoop.hdds.HddsUtils.fromProtobuf;
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INVALID_SNAPSHOT_ERROR;
 
 /**
  * Handles purging of keys from OM DB.
@@ -52,13 +58,14 @@ public class OMKeyPurgeRequest extends OMKeyRequest {
 
   @Override
   public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager, TermIndex termIndex) {
+    OmMetadataManagerImpl metadataManager = (OmMetadataManagerImpl) ozoneManager.getMetadataManager();
     PurgeKeysRequest purgeKeysRequest = getOmRequest().getPurgeKeysRequest();
     List<DeletedKeys> bucketDeletedKeysList = purgeKeysRequest
         .getDeletedKeysList();
     List<SnapshotMoveKeyInfos> keysToUpdateList = purgeKeysRequest
         .getKeysToUpdateList();
-    String fromSnapshot = purgeKeysRequest.hasSnapshotTableKey() ?
-        purgeKeysRequest.getSnapshotTableKey() : null;
+    UUID fromSnapshotId = purgeKeysRequest.hasSnapshotId() ?
+        fromProtobuf(purgeKeysRequest.getSnapshotId()) : null;
     List<String> keysToBePurgedList = new ArrayList<>();
 
     OMResponse.Builder omResponse = OmResponseUtil.getOMResponseBuilder(
@@ -73,9 +80,16 @@ public class OMKeyPurgeRequest extends OMKeyRequest {
 
     try {
       SnapshotInfo fromSnapshotInfo = null;
-      if (fromSnapshot != null) {
-        fromSnapshotInfo = ozoneManager.getMetadataManager()
-            .getSnapshotInfoTable().get(fromSnapshot);
+      if (fromSnapshotId != null) {
+        String snapTableKey = metadataManager.getSnapshotChainManager()
+            .getTableKey(fromSnapshotId);
+        fromSnapshotInfo = metadataManager.getSnapshotInfoTable().get(snapTableKey);
+
+        if (fromSnapshotInfo == null) {
+          LOG.error("SnapshotInfo for Snapshot: {} is not found", snapTableKey);
+          throw new OMException("SnapshotInfo for Snapshot: " + snapTableKey +
+              " is not found", INVALID_SNAPSHOT_ERROR);
+        }
       }
       omClientResponse = new OMKeyPurgeResponse(omResponse.build(),
           keysToBePurgedList, fromSnapshotInfo, keysToUpdateList);

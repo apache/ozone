@@ -20,6 +20,7 @@
 package org.apache.hadoop.ozone.om.request.snapshot;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.hdds.utils.db.RDBStore;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
@@ -63,6 +64,8 @@ import java.util.UUID;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
+import static org.apache.hadoop.hdds.HddsUtils.fromProtobuf;
+import static org.apache.hadoop.hdds.HddsUtils.toProtobuf;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
@@ -127,7 +130,7 @@ public class TestOMSnapshotPurgeRequestAndResponse {
   /**
    * Creates volume, bucket and snapshot entries.
    */
-  private List<String> createSnapshots(int numSnapshotKeys)
+  private List<HddsProtos.UUID> createSnapshots(int numSnapshotKeys)
       throws Exception {
 
     Random random = new Random();
@@ -136,12 +139,11 @@ public class TestOMSnapshotPurgeRequestAndResponse {
         omMetadataManager);
 
     // Create Snapshot and CheckpointDir
-    List<String> purgeSnapshots = new ArrayList<>(numSnapshotKeys);
+    List<HddsProtos.UUID> purgeSnapshots = new ArrayList<>(numSnapshotKeys);
     for (int i = 1; i <= numSnapshotKeys; i++) {
       String snapshotName = keyName + "-" + random.nextLong();
-      createSnapshotCheckpoint(snapshotName);
-      purgeSnapshots.add(SnapshotInfo.getTableKey(volumeName,
-          bucketName, snapshotName));
+      UUID snapshotId = createSnapshotCheckpoint(snapshotName);
+      purgeSnapshots.add(toProtobuf(snapshotId));
     }
 
     return purgeSnapshots;
@@ -152,10 +154,10 @@ public class TestOMSnapshotPurgeRequestAndResponse {
    *
    * @return OMRequest
    */
-  private OMRequest createPurgeKeysRequest(List<String> purgeSnapshotKeys) {
+  private OMRequest createPurgeKeysRequest(List<HddsProtos.UUID> purgeSnapshotIds) {
     SnapshotPurgeRequest snapshotPurgeRequest = SnapshotPurgeRequest
         .newBuilder()
-        .addAllSnapshotDBKeys(purgeSnapshotKeys)
+        .addAllSnapshotIds(purgeSnapshotIds)
         .build();
 
     OMRequest omRequest = OMRequest.newBuilder()
@@ -170,11 +172,11 @@ public class TestOMSnapshotPurgeRequestAndResponse {
   /**
    * Create snapshot and checkpoint directory.
    */
-  private void createSnapshotCheckpoint(String snapshotName) throws Exception {
-    createSnapshotCheckpoint(volumeName, bucketName, snapshotName);
+  private UUID createSnapshotCheckpoint(String snapshotName) throws Exception {
+    return createSnapshotCheckpoint(volumeName, bucketName, snapshotName);
   }
 
-  private void createSnapshotCheckpoint(String volume,
+  private UUID createSnapshotCheckpoint(String volume,
                                         String bucket,
                                         String snapshotName) throws Exception {
     batchOperation = omMetadataManager.getStore().initBatchOperation();
@@ -204,6 +206,7 @@ public class TestOMSnapshotPurgeRequestAndResponse {
     // Check the DB is still there
     assertTrue(Files.exists(snapshotDirPath));
     checkpointPaths.add(snapshotDirPath);
+    return snapshotInfo.getSnapshotId();
   }
 
   private OMSnapshotPurgeRequest preExecute(OMRequest originalOmRequest)
@@ -234,7 +237,7 @@ public class TestOMSnapshotPurgeRequestAndResponse {
   @Test
   public void testValidateAndUpdateCache() throws Exception {
 
-    List<String> snapshotDbKeysToPurge = createSnapshots(10);
+    List<HddsProtos.UUID> snapshotDbKeysToPurge = createSnapshots(10);
     assertFalse(omMetadataManager.getSnapshotInfoTable().isEmpty());
     OMRequest snapshotPurgeRequest = createPurgeKeysRequest(
         snapshotDbKeysToPurge);
@@ -254,16 +257,17 @@ public class TestOMSnapshotPurgeRequestAndResponse {
   @ParameterizedTest
   @ValueSource(ints = {0, 1, 2, 3, 4})
   public void testSnapshotChainCleanup(int index) throws Exception {
-    List<String> snapshots = createSnapshots(5);
-    String snapShotToPurge = snapshots.get(index);
+    List<HddsProtos.UUID> snapshots = createSnapshots(5);
+    HddsProtos.UUID snapShotToPurge = snapshots.get(index);
 
     // Before purge, check snapshot chain
     OmMetadataManagerImpl metadataManager =
         (OmMetadataManagerImpl) omMetadataManager;
     SnapshotChainManager chainManager = metadataManager
         .getSnapshotChainManager();
+    String tableKey = chainManager.getTableKey(fromProtobuf(snapShotToPurge));
     SnapshotInfo snapInfo = metadataManager.getSnapshotInfoTable()
-        .get(snapShotToPurge);
+        .get(tableKey);
 
     // Get previous and next snapshotInfos to verify if the SnapInfo
     // is changed.
@@ -296,7 +300,7 @@ public class TestOMSnapshotPurgeRequestAndResponse {
     long rowsInTableBeforePurge = omMetadataManager
         .countRowsInTable(omMetadataManager.getSnapshotInfoTable());
     // Purge Snapshot of the given index.
-    List<String> toPurgeList = Collections.singletonList(snapShotToPurge);
+    List<HddsProtos.UUID> toPurgeList = Collections.singletonList(snapShotToPurge);
     OMRequest snapshotPurgeRequest = createPurgeKeysRequest(
         toPurgeList);
     purgeSnapshots(snapshotPurgeRequest);
@@ -390,11 +394,9 @@ public class TestOMSnapshotPurgeRequestAndResponse {
         int bucketIndex = createInBucketOrder ? i : j;
         String bucket = buckets.get(bucketIndex % numberOfBuckets);
         String snapshotName = UUID.randomUUID().toString();
-        createSnapshotCheckpoint(volumeName, bucket, snapshotName);
-        String snapshotTableKey =
-            SnapshotInfo.getTableKey(volumeName, bucket, snapshotName);
-        SnapshotInfo snapshotInfo =
-            omMetadataManager.getSnapshotInfoTable().get(snapshotTableKey);
+        UUID snapshotId = createSnapshotCheckpoint(volumeName, bucket, snapshotName);
+        String snapshotTableKey = chainManager.getTableKey(snapshotId);
+        SnapshotInfo snapshotInfo = omMetadataManager.getSnapshotInfoTable().get(snapshotTableKey);
         snapshotInfoList.add(snapshotInfo);
       }
     }
@@ -406,13 +408,10 @@ public class TestOMSnapshotPurgeRequestAndResponse {
 
     validateSnapshotOrderInSnapshotInfoTableAndSnapshotChain(snapshotInfoList);
 
-    List<String> purgeSnapshotKeys = new ArrayList<>();
+    List<HddsProtos.UUID> purgeSnapshotKeys = new ArrayList<>();
     for (int i = fromIndex; i <= toIndex; i++) {
       SnapshotInfo purgeSnapshotInfo = snapshotInfoList.get(i);
-      String purgeSnapshotKey = SnapshotInfo.getTableKey(volumeName,
-          purgeSnapshotInfo.getBucketName(),
-          purgeSnapshotInfo.getName());
-      purgeSnapshotKeys.add(purgeSnapshotKey);
+      purgeSnapshotKeys.add(toProtobuf(purgeSnapshotInfo.getSnapshotId()));
     }
 
     OMRequest snapshotPurgeRequest = createPurgeKeysRequest(purgeSnapshotKeys);

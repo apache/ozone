@@ -25,13 +25,17 @@ import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
+import org.apache.hadoop.ozone.audit.AuditLogger;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
+import org.apache.hadoop.ozone.om.OMMetrics;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
 import org.apache.hadoop.ozone.om.OzoneManager;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 
+import org.apache.hadoop.ozone.om.response.snapshot.OMSnapshotCreateResponse;
 import org.apache.hadoop.ozone.om.response.snapshot.OMSnapshotSetPropertyResponse;
 import org.apache.hadoop.ozone.om.upgrade.OMLayoutVersionManager;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
@@ -48,8 +52,11 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
+import static org.apache.hadoop.hdds.HddsUtils.toProtobuf;
+import static org.apache.hadoop.ozone.om.request.OMRequestTestUtils.addVolumeAndBucketToDB;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.anyString;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -68,14 +75,21 @@ public class TestOMSnapshotSetPropertyRequestAndResponse {
   private String snapName;
   private long exclusiveSize;
   private long exclusiveSizeAfterRepl;
+  private OMMetrics omMetrics;
+  private AuditLogger auditLogger;
 
   @BeforeEach
   void setup(@TempDir File testDir) throws Exception {
     ozoneManager = mock(OzoneManager.class);
+    omMetrics = OMMetrics.create();
     OMLayoutVersionManager lvm = mock(OMLayoutVersionManager.class);
+    auditLogger = mock(AuditLogger.class);
+    when(ozoneManager.getAuditLogger()).thenReturn(auditLogger);
     when(lvm.isAllowed(anyString())).thenReturn(true);
     when(ozoneManager.getVersionManager()).thenReturn(lvm);
     when(ozoneManager.isRatisEnabled()).thenReturn(true);
+    when(ozoneManager.isFilesystemSnapshotEnabled()).thenReturn(true);
+    when(ozoneManager.getMetrics()).thenReturn(omMetrics);
     OzoneConfiguration ozoneConfiguration = new OzoneConfiguration();
     ozoneConfiguration.set(OMConfigKeys.OZONE_OM_DB_DIRS,
         testDir.getAbsolutePath());
@@ -93,14 +107,14 @@ public class TestOMSnapshotSetPropertyRequestAndResponse {
   }
 
   @Test
-  public void testValidateAndUpdateCache() throws IOException {
+  public void testValidateAndUpdateCache() throws Exception {
     createSnapshotDataForTest();
     assertFalse(omMetadataManager.getSnapshotInfoTable().isEmpty());
     List<OMRequest> snapshotUpdateSizeRequests =
         createSnapshotUpdateSizeRequest();
 
     // Pre-Execute
-    for (OMRequest request: snapshotUpdateSizeRequests) {
+    for (OMRequest request : snapshotUpdateSizeRequests) {
       OMSnapshotSetPropertyRequest omSnapshotSetPropertyRequest = new
           OMSnapshotSetPropertyRequest(request);
       OMRequest modifiedOmRequest = omSnapshotSetPropertyRequest
@@ -149,14 +163,14 @@ public class TestOMSnapshotSetPropertyRequestAndResponse {
     try (TableIterator<String, ? extends Table.KeyValue<String, SnapshotInfo>>
              iterator = omMetadataManager.getSnapshotInfoTable().iterator()) {
       while (iterator.hasNext()) {
-        String snapDbKey = iterator.next().getKey();
+        SnapshotInfo snapshotInfo = iterator.next().getValue();
         SnapshotSize snapshotSize = SnapshotSize.newBuilder()
             .setExclusiveSize(exclusiveSize)
             .setExclusiveReplicatedSize(exclusiveSizeAfterRepl)
             .build();
         SetSnapshotPropertyRequest snapshotUpdateSizeRequest =
             SetSnapshotPropertyRequest.newBuilder()
-                .setSnapshotKey(snapDbKey)
+                .setSnapshotId(toProtobuf(snapshotInfo.getSnapshotId()))
                 .setSnapshotSize(snapshotSize)
                 .build();
 
@@ -171,11 +185,26 @@ public class TestOMSnapshotSetPropertyRequestAndResponse {
     return omRequests;
   }
 
-  private void createSnapshotDataForTest() throws IOException {
+  private void createSnapshotDataForTest() throws Exception {
     // Create 10 Snapshots
+    addVolumeAndBucketToDB(volumeName, bucketName, omMetadataManager,
+        BucketLayout.DEFAULT);
     for (int i = 0; i < 10; i++) {
-      OMRequestTestUtils.addSnapshotToTableCache(volumeName, bucketName,
-          snapName + i, omMetadataManager);
+      when(ozoneManager.isAdmin(any())).thenReturn(true);
+      batchOperation = omMetadataManager.getStore().initBatchOperation();
+      OMRequest omRequest = OMRequestTestUtils
+          .createSnapshotRequest(volumeName, bucketName, snapName + i);
+      // Pre-Execute OMSnapshotCreateRequest.
+      OMSnapshotCreateRequest omSnapshotCreateRequest =
+          TestOMSnapshotCreateRequest.doPreExecute(omRequest, ozoneManager);
+
+      // validateAndUpdateCache OMSnapshotCreateResponse.
+      OMSnapshotCreateResponse omClientResponse = (OMSnapshotCreateResponse)
+          omSnapshotCreateRequest.validateAndUpdateCache(ozoneManager, 1L);
+      // Add to batch and commit to DB.
+      omClientResponse.addToDBBatch(omMetadataManager, batchOperation);
+      omMetadataManager.getStore().commitBatchOperation(batchOperation);
+      batchOperation.close();
     }
   }
 }

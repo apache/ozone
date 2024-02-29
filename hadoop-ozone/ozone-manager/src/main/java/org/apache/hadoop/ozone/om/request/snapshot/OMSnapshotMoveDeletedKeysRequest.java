@@ -41,7 +41,9 @@ import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.util.List;
+import java.util.UUID;
 
+import static org.apache.hadoop.hdds.HddsUtils.fromProtobuf;
 import static org.apache.hadoop.ozone.om.upgrade.OMLayoutFeature.FILESYSTEM_SNAPSHOT;
 
 /**
@@ -68,8 +70,7 @@ public class OMSnapshotMoveDeletedKeysRequest extends OMClientRequest {
 
     SnapshotMoveDeletedKeysRequest moveDeletedKeysRequest =
         getOmRequest().getSnapshotMoveDeletedKeysRequest();
-    SnapshotInfo fromSnapshot = SnapshotInfo.getFromProtobuf(
-        moveDeletedKeysRequest.getFromSnapshot());
+    UUID fromSnapshotId = fromProtobuf(moveDeletedKeysRequest.getSnapshotId());
 
     // If there is no Non-Deleted Snapshot move the
     // keys to Active Object Store.
@@ -78,6 +79,8 @@ public class OMSnapshotMoveDeletedKeysRequest extends OMClientRequest {
     OzoneManagerProtocolProtos.OMResponse.Builder omResponse =
         OmResponseUtil.getOMResponseBuilder(getOmRequest());
     try {
+      String fromSnapshotKey = snapshotChainManager.getTableKey(fromSnapshotId);
+      SnapshotInfo fromSnapshot = omMetadataManager.getSnapshotInfoTable().get(fromSnapshotKey);
       nextSnapshot = SnapshotUtils.getNextActiveSnapshot(fromSnapshot,
           snapshotChainManager, omSnapshotManager);
 

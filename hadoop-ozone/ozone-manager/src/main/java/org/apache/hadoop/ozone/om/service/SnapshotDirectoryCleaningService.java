@@ -57,10 +57,12 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Stack;
+import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Collectors;
 
+import static org.apache.hadoop.hdds.HddsUtils.toProtobuf;
 import static org.apache.hadoop.ozone.om.helpers.SnapshotInfo.SnapshotStatus.SNAPSHOT_ACTIVE;
 import static org.apache.hadoop.ozone.om.request.file.OMFileRequest.getDirectoryInfo;
 import static org.apache.hadoop.ozone.om.snapshot.SnapshotUtils.getOzonePathKeyForFso;
@@ -77,8 +79,8 @@ public class SnapshotDirectoryCleaningService
   private static final int SNAPSHOT_DIR_CORE_POOL_SIZE = 1;
 
   private final AtomicBoolean suspended;
-  private final Map<String, Long> exclusiveSizeMap;
-  private final Map<String, Long> exclusiveReplicatedSizeMap;
+  private final Map<UUID, Long> exclusiveSizeMap;
+  private final Map<UUID, Long> exclusiveReplicatedSizeMap;
 
   public SnapshotDirectoryCleaningService(long interval, TimeUnit unit,
                                           long serviceTimeout,
@@ -238,9 +240,9 @@ public class SnapshotDirectoryCleaningService
                       currOmSnapshot, previousKeyTable, prevRenamedTable,
                       previousToPrevKeyTable, dbBucketKeyForDir);
                 }
-                updateDeepCleanSnapshotDir(currSnapInfo.getTableKey());
+                updateDeepCleanSnapshotDir(currSnapInfo.getSnapshotId());
                 if (previousSnapshot != null) {
-                  updateExclusiveSize(previousSnapshot.getTableKey());
+                  updateExclusiveSize(previousSnapshot.getSnapshotId());
                 }
               }
             }
@@ -335,21 +337,21 @@ public class SnapshotDirectoryCleaningService
     }
   }
 
-  private void updateExclusiveSize(String prevSnapshotKeyTable) {
+  private void updateExclusiveSize(UUID prevSnapshotId) {
     ClientId clientId = ClientId.randomId();
     SnapshotSize snapshotSize = SnapshotSize.newBuilder()
             .setExclusiveSize(
-                exclusiveSizeMap.getOrDefault(prevSnapshotKeyTable, 0L))
+                exclusiveSizeMap.getOrDefault(prevSnapshotId, 0L))
             .setExclusiveReplicatedSize(
                 exclusiveReplicatedSizeMap.getOrDefault(
-                    prevSnapshotKeyTable, 0L))
+                    prevSnapshotId, 0L))
             .build();
-    exclusiveSizeMap.remove(prevSnapshotKeyTable);
-    exclusiveReplicatedSizeMap.remove(prevSnapshotKeyTable);
+    exclusiveSizeMap.remove(prevSnapshotId);
+    exclusiveReplicatedSizeMap.remove(prevSnapshotId);
     SetSnapshotPropertyRequest
         setSnapshotPropertyRequest =
         SetSnapshotPropertyRequest.newBuilder()
-            .setSnapshotKey(prevSnapshotKeyTable)
+            .setSnapshotId(toProtobuf(prevSnapshotId))
             .setSnapshotSize(snapshotSize)
             .build();
 
@@ -419,11 +421,11 @@ public class SnapshotDirectoryCleaningService
     }
   }
 
-  private void updateDeepCleanSnapshotDir(String snapshotKeyTable) {
+  private void updateDeepCleanSnapshotDir(UUID snapshotId) {
     ClientId clientId = ClientId.randomId();
     SetSnapshotPropertyRequest setSnapshotPropertyRequest =
         SetSnapshotPropertyRequest.newBuilder()
-            .setSnapshotKey(snapshotKeyTable)
+            .setSnapshotId(toProtobuf(snapshotId))
             .setDeepCleanedDeletedDir(true)
             .build();
 

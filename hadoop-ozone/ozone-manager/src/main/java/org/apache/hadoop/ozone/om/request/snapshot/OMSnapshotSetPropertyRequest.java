@@ -17,10 +17,10 @@
  */
 package org.apache.hadoop.ozone.om.request.snapshot;
 
+import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
 import org.apache.ratis.server.protocol.TermIndex;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
-import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
@@ -35,7 +35,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.util.UUID;
 
+import static org.apache.hadoop.hdds.HddsUtils.fromProtobuf;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INVALID_SNAPSHOT_ERROR;
 
 /**
@@ -53,7 +55,7 @@ public class OMSnapshotSetPropertyRequest extends OMClientRequest {
   public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager, TermIndex termIndex) {
 
     OMClientResponse omClientResponse = null;
-    OMMetadataManager metadataManager = ozoneManager.getMetadataManager();
+    OmMetadataManagerImpl metadataManager = (OmMetadataManagerImpl) ozoneManager.getMetadataManager();
 
     OzoneManagerProtocolProtos.OMResponse.Builder omResponse =
         OmResponseUtil.getOMResponseBuilder(getOmRequest());
@@ -63,9 +65,9 @@ public class OMSnapshotSetPropertyRequest extends OMClientRequest {
     SnapshotInfo updatedSnapInfo = null;
 
     try {
-      String snapshotKey = setSnapshotPropertyRequest.getSnapshotKey();
-      updatedSnapInfo = metadataManager.getSnapshotInfoTable()
-          .get(snapshotKey);
+      UUID snapshotId = fromProtobuf(setSnapshotPropertyRequest.getSnapshotId());
+      String snapshotKey = metadataManager.getSnapshotChainManager().getTableKey(snapshotId);
+      updatedSnapInfo = metadataManager.getSnapshotInfoTable().get(snapshotKey);
 
       if (updatedSnapInfo == null) {
         LOG.error("SnapshotInfo for Snapshot: {} is not found", snapshotKey);
