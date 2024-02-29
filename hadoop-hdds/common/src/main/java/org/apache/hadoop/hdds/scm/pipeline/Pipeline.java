@@ -74,14 +74,18 @@ public final class Pipeline {
   private static final Logger LOG = LoggerFactory.getLogger(Pipeline.class);
 
   /**
-   * Inner class that provides thread-safe access to DN list.
+   * Inner class that provides thread-safe access to DN list ordered by distance.
    */
   static class NodesInOrder {
     private final List<DatanodeDetails> nodes = new ArrayList<>();
 
+    synchronized boolean isEmpty() {
+      return nodes.isEmpty();
+    }
+
     synchronized DatanodeDetails getClosest(PipelineID id, Set<DatanodeDetails> excluded) throws IOException {
       if (nodes.isEmpty()) {
-        LOG.debug("Nodes in order is empty, delegate to getFirstNode");
+        LOG.debug("Nodes in order is empty");
         return null;
       }
       for (DatanodeDetails d : nodes) {
@@ -336,7 +340,13 @@ public final class Pipeline {
     if (excluded == null) {
       excluded = Collections.emptySet();
     }
-    final DatanodeDetails closest = nodesInOrder.getClosest(id, excluded);
+    final DatanodeDetails closest;
+    if (nodesInOrder.isEmpty()) {
+      LOG.debug("Nodes in order is empty, delegate to getFirstNode");
+      closest = null;
+    } else {
+      closest = nodesInOrder.getClosest(id, excluded);
+    }
     return closest != null ? closest : getFirstNode(excluded);
   }
 
