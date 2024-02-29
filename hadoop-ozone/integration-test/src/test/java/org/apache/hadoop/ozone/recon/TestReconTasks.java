@@ -176,7 +176,7 @@ public class TestReconTasks {
               .getUnhealthyContainers(
                   ContainerSchemaDefinition.UnHealthyContainerStates.MISSING,
                   0, 1000);
-      return (allMissingContainers.size() >= 1);
+      return (allMissingContainers.size() == 1);
     });
 
     // Restart the Datanode to make sure we remove the missing container.
@@ -189,9 +189,8 @@ public class TestReconTasks {
                   0, 1000);
       return (allMissingContainers.isEmpty());
     });
-    // cleaning up the data
+    // Cleaning up some data
     scmContainerManager.deleteContainer(containerInfo.containerID());
-//    cluster.restartHddsDatanode(pipeline.getFirstNode(), true);
     IOUtils.closeQuietly(client);
   }
 
@@ -256,7 +255,7 @@ public class TestReconTasks {
                   ContainerSchemaDefinition.UnHealthyContainerStates.
                       EMPTY_MISSING,
                   0, 1000);
-      return (allEmptyMissingContainers.size() >= 1);
+      return (allEmptyMissingContainers.size() == 1);
     });
 
     // Now add a container to key mapping count as 3. This data is used to
@@ -274,7 +273,7 @@ public class TestReconTasks {
               .getUnhealthyContainers(
                   ContainerSchemaDefinition.UnHealthyContainerStates.MISSING,
                   0, 1000);
-      return (allMissingContainers.size() >= 1);
+      return (allMissingContainers.size() == 1);
     });
 
     LambdaTestUtils.await(25000, 1000, () -> {
@@ -297,7 +296,8 @@ public class TestReconTasks {
                   0, 1000);
       return (allMissingContainers.isEmpty());
     });
-//    reconContainerManager.deleteContainer(containerInfo.containerID());
+    // Cleaning up some data
+    reconContainerManager.deleteContainer(containerInfo.containerID());
     IOUtils.closeQuietly(client);
   }
 }

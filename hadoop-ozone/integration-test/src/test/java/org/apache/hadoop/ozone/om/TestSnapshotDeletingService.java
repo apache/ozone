@@ -131,16 +131,27 @@ public class TestSnapshotDeletingService {
   @Test
   @Order(3)
   public void testSnapshotSplitAndMove() throws Exception {
-//    SnapshotDeletingService snapshotDeletingService =
-//        om.getKeyManager().getSnapshotDeletingService();
-//    Table<String, SnapshotInfo> snapshotInfoTable =
-//        om.getMetadataManager().getSnapshotInfoTable();
+    // Reinitializing cluster
+    cluster.shutdown();
+    cluster = MiniOzoneCluster.newBuilder(conf)
+        .setNumDatanodes(3)
+        .build();
+    cluster.waitForClusterToBeReady();
+    client = cluster.newClient();
+    om = cluster.getOzoneManager();
+    bucket1 = TestDataUtil.createVolumeAndBucket(
+        client, VOLUME_NAME, BUCKET_NAME_ONE, BucketLayout.DEFAULT);
+    // resume to test
+    SnapshotDeletingService snapshotDeletingService =
+        om.getKeyManager().getSnapshotDeletingService();
+    Table<String, SnapshotInfo> snapshotInfoTable =
+        om.getMetadataManager().getSnapshotInfoTable();
 
     createSnapshotDataForBucket1();
 
-//    assertTableRowCount(snapshotInfoTable, 2);
-//    GenericTestUtils.waitFor(() -> snapshotDeletingService
-//            .getSuccessfulRunCount() >= 1, 1000, 10000);
+    assertTableRowCount(snapshotInfoTable, 2);
+    GenericTestUtils.waitFor(() -> snapshotDeletingService
+            .getSuccessfulRunCount() >= 1, 1000, 10000);
 
     OmSnapshot bucket1snap3 = om.getOmSnapshotManager()
         .getSnapshot(VOLUME_NAME, BUCKET_NAME_ONE, "bucket1snap3").get();
