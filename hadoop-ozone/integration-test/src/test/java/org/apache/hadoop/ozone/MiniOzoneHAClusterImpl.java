@@ -392,7 +392,7 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
     }
 
     @Override
-    public MiniOzoneCluster build() throws IOException {
+    public MiniOzoneHAClusterImpl build() throws IOException {
       if (numOfActiveOMs > numOfOMs) {
         throw new IllegalArgumentException("Number of active OMs cannot be " +
             "more than the total number of OMs");
