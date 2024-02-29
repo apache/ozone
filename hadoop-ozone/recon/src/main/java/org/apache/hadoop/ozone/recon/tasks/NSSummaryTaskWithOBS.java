@@ -133,11 +133,16 @@ public class NSSummaryTaskWithOBS extends NSSummaryTaskDbEventHandler {
         OMDBUpdateEvent<String, ?> keyTableUpdateEvent = omdbUpdateEvent;
         Object value = keyTableUpdateEvent.getValue();
         Object oldValue = keyTableUpdateEvent.getOldValue();
-        if (!(value instanceof OmKeyInfo)) {
+        if (value == null) {
+          LOG.warn("Value is null for key {}. Skipping processing.",
+              updatedKey);
+          continue;
+        } else if (!(value instanceof OmKeyInfo)) {
           LOG.warn("Unexpected value type {} for key {}. Skipping processing.",
               value.getClass().getName(), updatedKey);
           continue;
         }
+
         OmKeyInfo updatedKeyInfo = (OmKeyInfo) value;
         OmKeyInfo oldKeyInfo = (OmKeyInfo) oldValue;
 
