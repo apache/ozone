@@ -37,7 +37,7 @@ import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
-//import org.apache.hadoop.ozone.om.service.SnapshotDeletingService;
+import org.apache.hadoop.ozone.om.service.SnapshotDeletingService;
 import org.apache.hadoop.ozone.om.snapshot.ReferenceCounted;
 import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.AfterAll;
@@ -133,14 +133,7 @@ public class TestSnapshotDeletingService {
   public void testSnapshotSplitAndMove() throws Exception {
     // Reinitializing cluster
     cluster.shutdown();
-    cluster = MiniOzoneCluster.newBuilder(conf)
-        .setNumDatanodes(3)
-        .build();
-    cluster.waitForClusterToBeReady();
-    client = cluster.newClient();
-    om = cluster.getOzoneManager();
-    bucket1 = TestDataUtil.createVolumeAndBucket(
-        client, VOLUME_NAME, BUCKET_NAME_ONE, BucketLayout.DEFAULT);
+    setup();
     // resume to test
     SnapshotDeletingService snapshotDeletingService =
         om.getKeyManager().getSnapshotDeletingService();
