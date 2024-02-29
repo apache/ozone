@@ -85,7 +85,6 @@ public final class Pipeline {
 
     synchronized DatanodeDetails getClosest(PipelineID id, Set<DatanodeDetails> excluded) throws IOException {
       if (nodes.isEmpty()) {
-        LOG.debug("Nodes in order is empty");
         return null;
       }
       for (DatanodeDetails d : nodes) {
@@ -340,14 +339,13 @@ public final class Pipeline {
     if (excluded == null) {
       excluded = Collections.emptySet();
     }
-    final DatanodeDetails closest;
-    if (nodesInOrder.isEmpty()) {
+    final DatanodeDetails closest = nodesInOrder.getClosest(id, excluded);
+    if (closest == null) {
       LOG.debug("Nodes in order is empty, delegate to getFirstNode");
-      closest = null;
+      return getFirstNode(excluded);
     } else {
-      closest = nodesInOrder.getClosest(id, excluded);
+      return closest;
     }
-    return closest != null ? closest : getFirstNode(excluded);
   }
 
   @JsonIgnore
