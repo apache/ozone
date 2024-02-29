@@ -29,6 +29,7 @@ import static java.net.HttpURLConnection.HTTP_NOT_FOUND;
 import static java.net.HttpURLConnection.HTTP_PRECON_FAILED;
 import static java.net.HttpURLConnection.HTTP_NOT_IMPLEMENTED;
 import static java.net.HttpURLConnection.HTTP_INTERNAL_ERROR;
+import static java.net.HttpURLConnection.HTTP_UNAVAILABLE;
 import static org.apache.hadoop.ozone.OzoneConsts.S3_REQUEST_HEADER_METADATA_SIZE_LIMIT_KB;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.RANGE_NOT_SATISFIABLE;
 
@@ -138,6 +139,9 @@ public final class S3ErrorTable {
   public static final OS3Exception BUCKET_ALREADY_EXISTS = new OS3Exception(
       "BucketAlreadyExists", "The requested bucket name is not available" +
       " as it already exists.", HTTP_CONFLICT);
+
+  public static final OS3Exception SLOW_DOWN = new OS3Exception(
+      "SlowDown", "Please reduce your request rate.", HTTP_UNAVAILABLE);
 
   public static OS3Exception newError(OS3Exception e, String resource) {
     return newError(e, resource, null);

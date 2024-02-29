@@ -23,6 +23,8 @@ import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
 
+import javax.ws.rs.WebApplicationException;
+import javax.ws.rs.core.Response;
 import java.io.UnsupportedEncodingException;
 import java.net.URLDecoder;
 import java.net.URLEncoder;
@@ -115,5 +117,18 @@ public final class S3Utils {
     } catch (IllegalArgumentException ex) {
       throw newError(INVALID_ARGUMENT, storageType, ex);
     }
+  }
+
+  /**
+   * Wraps an OS3Exception into a WebApplicationException.
+   *
+   * @param os3Exception The OS3Exception to be wrapped.
+   * @return A WebApplicationException wrapping the OS3Exception.
+   */
+  public static WebApplicationException wrapOS3Exception(OS3Exception os3Exception) {
+    return new WebApplicationException(os3Exception.getErrorMessage(),
+      os3Exception,
+      Response.status(os3Exception.getHttpCode())
+              .entity(os3Exception.toXml()).build());
   }
 }

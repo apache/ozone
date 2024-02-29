@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone.s3;
 
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.ozone.s3.exception.S3ErrorTable;
 import org.apache.hadoop.ozone.s3.throttler.Request;
 import org.apache.hadoop.ozone.s3.throttler.RequestScheduler;
 import org.apache.hadoop.ozone.s3.throttler.ThrottlerUtils;
@@ -31,6 +32,8 @@ import javax.ws.rs.container.ContainerResponseFilter;
 import javax.ws.rs.core.Response;
 import javax.ws.rs.ext.Provider;
 import java.io.IOException;
+
+import static org.apache.hadoop.ozone.s3.util.S3Utils.wrapOS3Exception;
 
 /**
  * Filter to reject incoming requests from specific users based on scheduler
@@ -50,10 +53,8 @@ public class ThrottlerFilter implements
     Request request = getRequests(ctx);
 
     if (scheduler.shouldReject(request)) {
-      ctx.abortWith(Response
-          .status(Response.Status.SERVICE_UNAVAILABLE)
-          .entity("Too many requests")
-          .build());
+      throw wrapOS3Exception(S3ErrorTable.newError(S3ErrorTable.SLOW_DOWN,
+          ctx.getUriInfo().getPath()));
     } else {
       scheduler.addRequest(request);
     }
