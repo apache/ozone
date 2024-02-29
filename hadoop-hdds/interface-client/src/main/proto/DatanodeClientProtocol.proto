@@ -162,7 +162,6 @@ message DatanodeBlockID {
   required int64 localID = 2;
   optional uint64 blockCommitSequenceId = 3 [default = 0];
   optional int32 replicaIndex = 4;
-
 }
 
 message KeyValue {
@@ -382,6 +381,7 @@ message ChunkInfo {
   repeated KeyValue metadata = 4;
   required ChecksumData checksumData =5;
   optional bytes stripeChecksum = 6;
+  optional bool healthy = 7; // If all the chunks on disk match the expected checksums provided by the client during write
 }
 
 message ChunkInfoList {
@@ -524,4 +524,38 @@ service IntraDatanodeProtocolService {
   // An intradatanode service to copy the raw container data between nodes
   rpc download (CopyContainerRequestProto) returns (stream CopyContainerResponseProto);
   rpc upload (stream SendContainerRequest) returns (SendContainerResponse);
+}
+
+/*
+BlockMerkle tree stores the checksums of the chunks in a block.
+The Block checksum is derived from the checksums of the chunks in case of replicated blocks and derived from the
+metadata of the chunks in case of erasure coding.
+Two Blocks across container instances on two nodes have the same checksum if they have the same set of chunks.
+A Block upon deletion will be marked as deleted but will preserve the rest of the metadata.
+*/
+message BlockMerkleTree {
+  optional BlockData blockData = 1; // The chunks in this should be sorted by the order of chunks written.
+  optional ChecksumData checksumData = 2; // Checksum of the checksums of the chunks.
+  optional bool deleted = 3; // If the block is deleted.
+}
+
+/*
+ContainerMerkleTree stores the checksums of the blocks in a container.
+The Container checksum is derived from the checksums of the blocks.
+Two containers across container instances on two nodes have the same checksum if they have the same set of blocks.
+If a block is deleted within the container, the checksum of the container will remain unchanged.
+ */
+message ContainerMerkleTree {
+  enum FailureCause {
+    NO_HEALTHY_CHUNK_FOUND_WITH_PEERS = 1; // No healthy chunk found with peers.
+    NO_PEER_FOUND = 2; // No peer found.
+  }
+  optional int64 containerID = 1; // The container ID.
+  repeated BlockMerkleTree blockMerkleTrees = 2; // The blocks in this should be sorted by the order of blocks written.
+  optional ChecksumData dataChecksumData = 3; // Checksum of the checksums of the blocks.
+  optional ChecksumData deletedChecksumData = 4; // Checksum of the checksums of the deleted blocks.
+  optional int64 length = 5; // Length of the container.
+  optional int64 blockCount = 6; // Number of blocks in the container.
+  optional FailureCause failureCause = 7; // The cause of the failure.
+  optional int64 reconciliationCount = 8; // The reconciliation count.
 }
