@@ -220,7 +220,7 @@ public final class TestNSSummaryTaskWithOBS implements Serializable {
   }
 
   /**
-   * Nested class for testing NSSummaryTaskWithLegacy process.
+   * Nested class for testing NSSummaryTaskWithOBS process.
    */
   @Nested
   public class TestProcess {

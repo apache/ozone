@@ -135,16 +135,16 @@ public class TestNSSummaryEndpointWithOBS {
   private static final String BUCKET_TWO = "bucket2";
   private static final String BUCKET_THREE = "bucket3";
   private static final String BUCKET_FOUR = "bucket4";
-  private static final String FILE_ONE = "file1";
-  private static final String FILE_TWO = "file2";
-  private static final String FILE_THREE = "file3";
-  private static final String FILE_FOUR = "file4";
-  private static final String FILE_FIVE = "file5";
-  private static final String FILE_EIGHT = "file8";
-  private static final String FILE_NINE = "file9";
-  private static final String FILE_TEN = "file10";
-  private static final String FILE_ELEVEN = "file11";
-  private static final String MULTI_BLOCK_FILE = FILE_THREE;
+  private static final String KEY_ONE = "file1";
+  private static final String KEY_TWO = "file2";
+  private static final String KEY_THREE = "file3";
+  private static final String KEY_FOUR = "file4";
+  private static final String KEY_FIVE = "file5";
+  private static final String KEY_EIGHT = "file8";
+  private static final String KEY_NINE = "file9";
+  private static final String KEY_TEN = "file10";
+  private static final String KEY_ELEVEN = "file11";
+  private static final String MULTI_BLOCK_FILE = KEY_THREE;
 
   private static final long PARENT_OBJECT_ID_ZERO = 0L;
   private static final long VOL_OBJECT_ID = 0L;
@@ -279,9 +279,9 @@ public class TestNSSummaryEndpointWithOBS {
   private static final String BUCKET_TWO_PATH =
       ROOT_PATH + VOL + ROOT_PATH + BUCKET_TWO;
   private static final String KEY_PATH =
-      ROOT_PATH + VOL + ROOT_PATH + BUCKET_TWO + ROOT_PATH + FILE_FOUR;
+      ROOT_PATH + VOL + ROOT_PATH + BUCKET_TWO + ROOT_PATH + KEY_FOUR;
   private static final String MULTI_BLOCK_KEY_PATH =
-      ROOT_PATH + VOL + ROOT_PATH + BUCKET_ONE + ROOT_PATH + FILE_THREE;
+      ROOT_PATH + VOL + ROOT_PATH + BUCKET_ONE + ROOT_PATH + KEY_THREE;
   private static final String INVALID_PATH = "/vol/path/not/found";
 
   // some expected answers
@@ -643,10 +643,10 @@ public class TestNSSummaryEndpointWithOBS {
 
     // write all keys
     writeKeyToOm(reconOMMetadataManager,
-        FILE_ONE,
+        KEY_ONE,
         BUCKET_ONE,
         VOL,
-        FILE_ONE,
+        KEY_ONE,
         KEY_ONE_OBJECT_ID,
         BUCKET_ONE_OBJECT_ID,
         BUCKET_ONE_OBJECT_ID,
@@ -654,10 +654,10 @@ public class TestNSSummaryEndpointWithOBS {
         FILE_ONE_SIZE,
         getBucketLayout());
     writeKeyToOm(reconOMMetadataManager,
-        FILE_TWO,
+        KEY_TWO,
         BUCKET_ONE,
         VOL,
-        FILE_TWO,
+        KEY_TWO,
         KEY_TWO_OBJECT_ID,
         BUCKET_ONE_OBJECT_ID,
         BUCKET_ONE_OBJECT_ID,
@@ -665,10 +665,10 @@ public class TestNSSummaryEndpointWithOBS {
         FILE_TWO_SIZE,
         getBucketLayout());
     writeKeyToOm(reconOMMetadataManager,
-        FILE_THREE,
+        KEY_THREE,
         BUCKET_ONE,
         VOL,
-        FILE_THREE,
+        KEY_THREE,
         KEY_THREE_OBJECT_ID,
         BUCKET_ONE_OBJECT_ID,
         BUCKET_ONE_OBJECT_ID,
@@ -676,10 +676,10 @@ public class TestNSSummaryEndpointWithOBS {
         FILE_THREE_SIZE,
         getBucketLayout());
     writeKeyToOm(reconOMMetadataManager,
-        FILE_FOUR,
+        KEY_FOUR,
         BUCKET_TWO,
         VOL,
-        FILE_FOUR,
+        KEY_FOUR,
         KEY_FOUR_OBJECT_ID,
         BUCKET_TWO_OBJECT_ID,
         BUCKET_TWO_OBJECT_ID,
@@ -687,10 +687,10 @@ public class TestNSSummaryEndpointWithOBS {
         FILE_FOUR_SIZE,
         getBucketLayout());
     writeKeyToOm(reconOMMetadataManager,
-        FILE_FIVE,
+        KEY_FIVE,
         BUCKET_TWO,
         VOL,
-        FILE_FIVE,
+        KEY_FIVE,
         KEY_FIVE_OBJECT_ID,
         BUCKET_TWO_OBJECT_ID,
         BUCKET_TWO_OBJECT_ID,
@@ -699,10 +699,10 @@ public class TestNSSummaryEndpointWithOBS {
         getBucketLayout());
 
     writeKeyToOm(reconOMMetadataManager,
-        FILE_EIGHT,
+        KEY_EIGHT,
         BUCKET_THREE,
         VOL_TWO,
-        FILE_EIGHT,
+        KEY_EIGHT,
         KEY_EIGHT_OBJECT_ID,
         BUCKET_THREE_OBJECT_ID,
         BUCKET_THREE_OBJECT_ID,
@@ -710,10 +710,10 @@ public class TestNSSummaryEndpointWithOBS {
         FILE_EIGHT_SIZE,
         getBucketLayout());
     writeKeyToOm(reconOMMetadataManager,
-        FILE_NINE,
+        KEY_NINE,
         BUCKET_THREE,
         VOL_TWO,
-        FILE_NINE,
+        KEY_NINE,
         KEY_NINE_OBJECT_ID,
         BUCKET_THREE_OBJECT_ID,
         BUCKET_THREE_OBJECT_ID,
@@ -721,10 +721,10 @@ public class TestNSSummaryEndpointWithOBS {
         FILE_NINE_SIZE,
         getBucketLayout());
     writeKeyToOm(reconOMMetadataManager,
-        FILE_TEN,
+        KEY_TEN,
         BUCKET_THREE,
         VOL_TWO,
-        FILE_TEN,
+        KEY_TEN,
         KEY_TEN_OBJECT_ID,
         BUCKET_THREE_OBJECT_ID,
         BUCKET_THREE_OBJECT_ID,
@@ -732,10 +732,10 @@ public class TestNSSummaryEndpointWithOBS {
         FILE_TEN_SIZE,
         getBucketLayout());
     writeKeyToOm(reconOMMetadataManager,
-        FILE_ELEVEN,
+        KEY_ELEVEN,
         BUCKET_FOUR,
         VOL_TWO,
-        FILE_ELEVEN,
+        KEY_ELEVEN,
         KEY_ELEVEN_OBJECT_ID,
         PARENT_OBJECT_ID_ZERO,
         BUCKET_FOUR_OBJECT_ID,
@@ -911,10 +911,10 @@ public class TestNSSummaryEndpointWithOBS {
 
     //vol/bucket1/file1
     writeKeyToOm(reconOMMetadataManager,
-        FILE_ONE,
+        KEY_ONE,
         BUCKET_ONE,
         VOL,
-        FILE_ONE,
+        KEY_ONE,
         KEY_ONE_OBJECT_ID,
         BUCKET_ONE_OBJECT_ID,
         BUCKET_ONE_OBJECT_ID,
@@ -925,10 +925,10 @@ public class TestNSSummaryEndpointWithOBS {
 
     //vol/bucket1/file2
     writeKeyToOm(reconOMMetadataManager,
-        FILE_TWO,
+        KEY_TWO,
         BUCKET_ONE,
         VOL,
-        FILE_TWO,
+        KEY_TWO,
         KEY_TWO_OBJECT_ID,
         BUCKET_ONE_OBJECT_ID,
         BUCKET_ONE_OBJECT_ID,
@@ -939,10 +939,10 @@ public class TestNSSummaryEndpointWithOBS {
 
     //vol/bucket1/file3
     writeKeyToOm(reconOMMetadataManager,
-        FILE_THREE,
+        KEY_THREE,
         BUCKET_ONE,
         VOL,
-        FILE_THREE,
+        KEY_THREE,
         KEY_THREE_OBJECT_ID,
         BUCKET_ONE_OBJECT_ID,
         BUCKET_ONE_OBJECT_ID,
@@ -953,10 +953,10 @@ public class TestNSSummaryEndpointWithOBS {
 
     //vol/bucket2/file4
     writeKeyToOm(reconOMMetadataManager,
-        FILE_FOUR,
+        KEY_FOUR,
         BUCKET_TWO,
         VOL,
-        FILE_FOUR,
+        KEY_FOUR,
         KEY_FOUR_OBJECT_ID,
         BUCKET_TWO_OBJECT_ID,
         BUCKET_TWO_OBJECT_ID,
@@ -967,10 +967,10 @@ public class TestNSSummaryEndpointWithOBS {
 
     //vol/bucket2/file5
     writeKeyToOm(reconOMMetadataManager,
-        FILE_FIVE,
+        KEY_FIVE,
         BUCKET_TWO,
         VOL,
-        FILE_FIVE,
+        KEY_FIVE,
         KEY_FIVE_OBJECT_ID,
         BUCKET_TWO_OBJECT_ID,
         BUCKET_TWO_OBJECT_ID,
@@ -981,10 +981,10 @@ public class TestNSSummaryEndpointWithOBS {
 
     //vol2/bucket3/file8
     writeKeyToOm(reconOMMetadataManager,
-        FILE_EIGHT,
+        KEY_EIGHT,
         BUCKET_THREE,
         VOL_TWO,
-        FILE_EIGHT,
+        KEY_EIGHT,
         KEY_EIGHT_OBJECT_ID,
         BUCKET_THREE_OBJECT_ID,
         BUCKET_THREE_OBJECT_ID,
@@ -995,10 +995,10 @@ public class TestNSSummaryEndpointWithOBS {
 
     //vol2/bucket3/file9
     writeKeyToOm(reconOMMetadataManager,
-        FILE_NINE,
+        KEY_NINE,
         BUCKET_THREE,
         VOL_TWO,
-        FILE_NINE,
+        KEY_NINE,
         KEY_NINE_OBJECT_ID,
         BUCKET_THREE_OBJECT_ID,
         BUCKET_THREE_OBJECT_ID,
@@ -1009,10 +1009,10 @@ public class TestNSSummaryEndpointWithOBS {
 
     //vol2/bucket3/file10
     writeKeyToOm(reconOMMetadataManager,
-        FILE_TEN,
+        KEY_TEN,
         BUCKET_THREE,
         VOL_TWO,
-        FILE_TEN,
+        KEY_TEN,
         KEY_TEN_OBJECT_ID,
         BUCKET_THREE_OBJECT_ID,
         BUCKET_THREE_OBJECT_ID,
@@ -1023,10 +1023,10 @@ public class TestNSSummaryEndpointWithOBS {
 
     //vol2/bucket4/file11
     writeKeyToOm(reconOMMetadataManager,
-        FILE_ELEVEN,
+        KEY_ELEVEN,
         BUCKET_FOUR,
         VOL_TWO,
-        FILE_ELEVEN,
+        KEY_ELEVEN,
         KEY_ELEVEN_OBJECT_ID,
         BUCKET_FOUR_OBJECT_ID,
         BUCKET_FOUR_OBJECT_ID,
