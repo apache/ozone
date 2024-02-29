@@ -96,8 +96,7 @@ public class TestOzoneTenantShell {
   private static final File AUDIT_LOG_FILE = new File("audit.log");
 
   private static OzoneConfiguration conf = null;
-  private static MiniOzoneCluster cluster = null;
-  private static MiniOzoneHAClusterImpl haCluster = null;
+  private static MiniOzoneHAClusterImpl cluster = null;
   private static OzoneShell ozoneSh = null;
   private static TenantShell tenantShell = null;
 
@@ -153,12 +152,11 @@ public class TestOzoneTenantShell {
     // Init cluster
     omServiceId = "om-service-test1";
     numOfOMs = 3;
-    cluster = MiniOzoneCluster.newHABuilder(conf)
-        .setOMServiceId(omServiceId)
+    MiniOzoneHAClusterImpl.Builder builder = MiniOzoneCluster.newHABuilder(conf);
+    builder.setOMServiceId(omServiceId)
         .setNumOfOzoneManagers(numOfOMs)
-        .withoutDatanodes()  // Remove this once we are actually writing data
-        .build();
-    haCluster = (MiniOzoneHAClusterImpl) cluster;
+        .withoutDatanodes();  // Remove this once we are actually writing data
+    cluster = builder.build();
     cluster.waitForClusterToBeReady();
   }
 
@@ -641,7 +639,7 @@ public class TestOzoneTenantShell {
     // Because InMemoryMultiTenantAccessController is used in OMs for this
     // integration test, we need to trigger BG sync on all OMs just
     // in case a leader changed right after the last operation.
-    haCluster.getOzoneManagersList().forEach(om -> om.getMultiTenantManager()
+    cluster.getOzoneManagersList().forEach(om -> om.getMultiTenantManager()
         .getOMRangerBGSyncService().triggerRangerSyncOnce());
 
     // Delete dev volume should fail because the volume reference count > 0L

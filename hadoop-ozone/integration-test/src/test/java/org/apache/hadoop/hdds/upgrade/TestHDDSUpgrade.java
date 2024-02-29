@@ -166,9 +166,8 @@ public class TestHDDSUpgrade {
     SCMConfigurator scmConfigurator = new SCMConfigurator();
     scmConfigurator.setUpgradeFinalizationExecutor(scmFinalizationExecutor);
 
-    MiniOzoneCluster.Builder builder =
-        new MiniOzoneHAClusterImpl.Builder(conf)
-        .setNumOfStorageContainerManagers(NUM_SCMS)
+    MiniOzoneHAClusterImpl.Builder builder = MiniOzoneCluster.newHABuilder(conf);
+    builder.setNumOfStorageContainerManagers(NUM_SCMS)
         .setSCMConfigurator(scmConfigurator)
         .setNumDatanodes(NUM_DATA_NODES)
         .setDatanodeFactory(UniformDatanodesFactory.newBuilder()

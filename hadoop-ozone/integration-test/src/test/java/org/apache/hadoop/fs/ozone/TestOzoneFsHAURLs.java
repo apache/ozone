@@ -72,7 +72,7 @@ public class TestOzoneFsHAURLs {
       TestOzoneFsHAURLs.class);
 
   private OzoneConfiguration conf;
-  private static MiniOzoneCluster cluster;
+  private static MiniOzoneHAClusterImpl cluster;
   private static String omServiceId;
   private static OzoneManager om;
   private static int numOfOMs;
@@ -107,11 +107,11 @@ public class TestOzoneFsHAURLs {
     conf.setBoolean(OMConfigKeys.OZONE_OM_ENABLE_FILESYSTEM_PATHS, true);
 
     // Start the cluster
-    cluster = MiniOzoneCluster.newHABuilder(conf)
-        .setOMServiceId(omServiceId)
+    MiniOzoneHAClusterImpl.Builder builder = MiniOzoneCluster.newHABuilder(conf);
+    builder.setOMServiceId(omServiceId)
         .setNumOfOzoneManagers(numOfOMs)
-        .setNumDatanodes(5)
-        .build();
+        .setNumDatanodes(5);
+    cluster = builder.build();
     cluster.waitForClusterToBeReady();
     client = OzoneClientFactory.getRpcClient(omServiceId, conf);
 
@@ -160,8 +160,7 @@ public class TestOzoneFsHAURLs {
    * @return the leader OM's RPC address in the MiniOzoneHACluster
    */
   private String getLeaderOMNodeAddr() {
-    MiniOzoneHAClusterImpl haCluster = (MiniOzoneHAClusterImpl) cluster;
-    OzoneManager omLeader = haCluster.getOMLeader();
+    OzoneManager omLeader = cluster.getOMLeader();
     assertNotNull(omLeader, "There should be a leader OM at this point.");
     String omNodeId = omLeader.getOMNodeId();
     // omLeaderAddrKey=ozone.om.address.omServiceId.omNodeId
