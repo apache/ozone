@@ -15,7 +15,7 @@
 
 # This workflow reads its configuration from the .github/labeler.yml file.
 # This workflow and its configuration can be deleted once the website's feature branch is merged.
-name: "Pull Request Labeler"
+name: pull-request-labeler
 on:
 - pull_request_target
 
