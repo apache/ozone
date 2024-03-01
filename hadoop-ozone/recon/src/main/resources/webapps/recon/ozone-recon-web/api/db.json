@@ -6697,7 +6697,7 @@
         "path": ".Trash/hadoop/231010153900",
         "inStateSince": 1696952297266,
         "size": 17289,
-        "replicatedSize": 0,
+        "replicatedSize": 100,
         "replicationInfo": {
           "replicationFactor": "THREE",
           "requiredNodes": 3,
@@ -6708,7 +6708,7 @@
         "key": "/-4611686018427388160/-9223372036854775552/-9223372036854775552/dir3/-9223372036854774015",
         "path": "dir1",
         "inStateSince": 1696954980154,
-        "size": 0,
+        "size": 1200,
         "replicatedSize": 0,
         "replicationInfo": {
           "replicationFactor": "THREE",

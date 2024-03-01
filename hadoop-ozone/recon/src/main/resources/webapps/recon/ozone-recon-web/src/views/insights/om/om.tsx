@@ -289,7 +289,7 @@ const PENDINGDIR_TAB_COLUMNS = [
     }
   },
   {
-    title: 'Key',
+    title: 'Path',
     dataIndex: 'key',
     key: 'key',
     isSearchable: true,
