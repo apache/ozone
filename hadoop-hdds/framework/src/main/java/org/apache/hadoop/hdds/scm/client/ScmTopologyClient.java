@@ -61,6 +61,12 @@ public class ScmTopologyClient {
         "ScmBlockLocationClient must have been initialized already.");
   }
 
+  public boolean refetchClusterTree() {
+    // this would perform a force refresh of the network topology tree
+    // information from SCM.
+    return checkAndRefresh();
+  }
+
   public void start(ConfigurationSource conf) throws IOException {
     final InnerNode initialTopology =
         scmBlockLocationProtocol.getNetworkTopology();
@@ -110,7 +116,7 @@ public class ScmTopologyClient {
     return Duration.ofMillis(refreshDurationInMs);
   }
 
-  private synchronized void checkAndRefresh() {
+  private synchronized boolean checkAndRefresh() {
     InnerNode current = cache.get();
     try {
       InnerNode newTopology = scmBlockLocationProtocol.getNetworkTopology();
@@ -118,10 +124,12 @@ public class ScmTopologyClient {
         cache.set(newTopology);
         LOG.info("Updated network topology cluster tree fetched from " +
             "SCM: {}.", newTopology);
+        return true;
       }
     } catch (IOException e) {
       throw new UncheckedIOException(
           "Error fetching updated network topology cluster tree from SCM", e);
     }
+    return false;
   }
 }
