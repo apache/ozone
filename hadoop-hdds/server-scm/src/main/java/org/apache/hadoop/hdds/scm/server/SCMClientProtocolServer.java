@@ -1380,4 +1380,35 @@ public class SCMClientProtocolServer implements
     FetchMetrics fetchMetrics = new FetchMetrics();
     return fetchMetrics.getMetrics(query);
   }
+
+  @Override
+  public void reconcileContainer(long containerID) throws IOException {
+    getScm().checkAdminAccess(getRemoteUser(), false);
+    final UserGroupInformation remoteUser = getRemoteUser();
+    final Map<String, String> auditMap = Maps.newHashMap();
+    auditMap.put("containerID", String.valueOf(containerID));
+    auditMap.put("remoteUser", remoteUser.getUserName());
+    try {
+      // Reconcile is not allowed on open containers.
+      ContainerInfo container = scm.getContainerManager().getContainer(ContainerID.valueOf(containerID));
+      final HddsProtos.LifeCycleState state = container.getState();
+      if (state.equals(HddsProtos.LifeCycleState.OPEN)) {
+        throw new SCMException("Cannot reconcile a " + state + " container.", ResultCodes.UNEXPECTED_CONTAINER_STATE);
+      }
+      // Reconcile on EC containers is not yet implemented.
+      final HddsProtos.ReplicationType repType = container.getReplicationType();
+      if (repType == HddsProtos.ReplicationType.EC) {
+        throw new SCMException("Reconciliation for erasure coded containers is not yet supported.",
+            ResultCodes.UNSUPPORTED_OPERATION);
+      }
+      scm.getEventQueue().fireEvent(SCMEvents.RECONCILE_CONTAINER, ContainerID.valueOf(containerID));
+      AUDIT.logWriteSuccess(buildAuditMessageForSuccess(
+          SCMAction.RECONCILE_CONTAINER, auditMap));
+    } catch (Exception ex) {
+      AUDIT.logWriteFailure(buildAuditMessageForFailure(
+          SCMAction.RECONCILE_CONTAINER, auditMap, ex));
+      throw ex;
+    }
+
+  }
 }
