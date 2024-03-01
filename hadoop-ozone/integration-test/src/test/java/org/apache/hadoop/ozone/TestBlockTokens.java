@@ -22,6 +22,7 @@ import org.apache.commons.lang3.RandomUtils;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.conf.DefaultConfigManager;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.scm.OzoneClientConfig;
 import org.apache.hadoop.hdds.scm.ScmConfig;
 import org.apache.hadoop.hdds.scm.XceiverClientFactory;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
@@ -138,6 +139,7 @@ public final class TestBlockTokens {
     startCluster();
     client = cluster.newClient();
     createTestData();
+    KeyInputStream.setRetryPolicy(conf.getObject(OzoneClientConfig.class));
   }
 
   private static void createTestData() throws IOException {
