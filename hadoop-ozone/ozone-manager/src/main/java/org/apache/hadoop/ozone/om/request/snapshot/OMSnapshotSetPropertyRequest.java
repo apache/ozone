@@ -65,6 +65,11 @@ public class OMSnapshotSetPropertyRequest extends OMClientRequest {
     SnapshotInfo updatedSnapInfo = null;
 
     try {
+      if (setSnapshotPropertyRequest.hasSnapshotKey()) {
+        throw new OMException("The field snapshotKey from SetSnapshotPropertyRequest is deprecated." +
+            " The request will be retried in the next try", OMException.ResultCodes.INTERNAL_ERROR);
+      }
+
       UUID snapshotId = fromProtobuf(setSnapshotPropertyRequest.getSnapshotId());
       String snapshotKey = metadataManager.getSnapshotChainManager().getTableKey(snapshotId);
       updatedSnapInfo = metadataManager.getSnapshotInfoTable().get(snapshotKey);

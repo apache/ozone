@@ -20,6 +20,7 @@
 package org.apache.hadoop.ozone.om.request.snapshot;
 
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.ratis.server.protocol.TermIndex;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
 import org.apache.hadoop.ozone.om.OmSnapshotManager;
@@ -79,6 +80,11 @@ public class OMSnapshotMoveDeletedKeysRequest extends OMClientRequest {
     OzoneManagerProtocolProtos.OMResponse.Builder omResponse =
         OmResponseUtil.getOMResponseBuilder(getOmRequest());
     try {
+      if (moveDeletedKeysRequest.hasFromSnapshot()) {
+        throw new OMException("The field fromSnapshot from SnapshotMoveDeletedKeysRequest is deprecated." +
+            " The request will be retried in the next try", OMException.ResultCodes.INTERNAL_ERROR);
+      }
+
       String fromSnapshotKey = snapshotChainManager.getTableKey(fromSnapshotId);
       SnapshotInfo fromSnapshot = omMetadataManager.getSnapshotInfoTable().get(fromSnapshotKey);
       nextSnapshot = SnapshotUtils.getNextActiveSnapshot(fromSnapshot,

@@ -75,6 +75,11 @@ public class OMDirectoriesPurgeRequestWithFSO extends OMKeyRequest {
 
     OMMetrics omMetrics = ozoneManager.getMetrics();
     try {
+      if (purgeDirsRequest.hasSnapshotTableKey()) {
+        throw new OMException("The field snapshotTableKey from PurgeDirectoriesRequest is deprecated." +
+            " The request will be retried in the next try", OMException.ResultCodes.INTERNAL_ERROR);
+      }
+
       if (fromSnapshotId != null) {
         String snapTableKey = metadataManager.getSnapshotChainManager()
             .getTableKey(fromSnapshotId);

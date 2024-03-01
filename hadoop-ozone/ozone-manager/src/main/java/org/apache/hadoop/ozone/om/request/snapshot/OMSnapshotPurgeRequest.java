@@ -20,6 +20,7 @@
 package org.apache.hadoop.ozone.om.request.snapshot;
 
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.ratis.server.protocol.TermIndex;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
@@ -78,6 +79,11 @@ public class OMSnapshotPurgeRequest extends OMClientRequest {
         .getSnapshotPurgeRequest();
 
     try {
+      if (!snapshotPurgeRequest.getSnapshotDBKeysList().isEmpty()) {
+        throw new OMException("The field snapshotDBKeys from SnapshotPurgeRequest is deprecated." +
+            " The request will be retried in the next try", OMException.ResultCodes.INTERNAL_ERROR);
+      }
+
       List<HddsProtos.UUID> snapshotIds = snapshotPurgeRequest
           .getSnapshotIdsList();
       List<String> snapshotDbKeys = new ArrayList<>();

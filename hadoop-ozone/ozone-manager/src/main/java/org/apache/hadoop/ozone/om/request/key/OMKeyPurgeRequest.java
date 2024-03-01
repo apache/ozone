@@ -79,6 +79,11 @@ public class OMKeyPurgeRequest extends OMKeyRequest {
     }
 
     try {
+      if (purgeKeysRequest.hasSnapshotTableKey()) {
+        throw new OMException("The field snapshotTableKey from PurgeKeysRequest is deprecated." +
+            " The request will be retried in the next try", OMException.ResultCodes.INTERNAL_ERROR);
+      }
+
       SnapshotInfo fromSnapshotInfo = null;
       if (fromSnapshotId != null) {
         String snapTableKey = metadataManager.getSnapshotChainManager()
