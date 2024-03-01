@@ -14,7 +14,7 @@
 # limitations under the License.
 
 # This workflow reads its configuration from the .github/labeler.yml file.
-# This workflow and its configuration can be deleted once the website's feature branch is merged.
+# This workflow and its configuration can be deleted once the container reconciliation feature branch is merged.
 name: pull-request-labeler
 on:
 - pull_request_target
