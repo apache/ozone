@@ -1880,7 +1880,7 @@ public class KeyManagerImpl implements KeyManager {
             LOG.debug("Found sorted datanodes for pipeline {} and client {} "
                 + "in cache", pipeline.getId(), clientMachine);
           }
-          pipeline.setNodesInOrder(sortedNodes);
+          k.setPipeline(pipeline.toBuilder().setNodesInOrder(sortedNodes).build());
         }
       }
     }

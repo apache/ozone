@@ -203,15 +203,20 @@ public class SCMBlockProtocolServer implements
         AllocatedBlock block = scm.getScmBlockManager()
             .allocateBlock(size, replicationConfig, owner, excludeList);
         if (block != null) {
-          blocks.add(block);
           // Sort the datanodes if client machine is specified
           final Node client = getClientNode(clientMachine);
           if (client != null) {
             final List<DatanodeDetails> nodes = block.getPipeline().getNodes();
             final List<DatanodeDetails> sorted = scm.getClusterMap()
                 .sortByDistanceCost(client, nodes, nodes.size());
-            block.getPipeline().setNodesInOrder(sorted);
+            block = block.toBuilder()
+                .setPipeline(block.getPipeline()
+                    .toBuilder()
+                    .setNodesInOrder(sorted)
+                    .build())
+                .build();
           }
+          blocks.add(block);
         }
       }
 

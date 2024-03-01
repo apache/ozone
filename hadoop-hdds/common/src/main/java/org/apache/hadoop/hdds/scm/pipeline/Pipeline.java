@@ -34,6 +34,7 @@ import java.util.Set;
 import java.util.UUID;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.google.common.collect.ImmutableList;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.builder.EqualsBuilder;
 import org.apache.commons.lang3.builder.HashCodeBuilder;
@@ -76,10 +77,10 @@ public final class Pipeline {
   private final ReplicationConfig replicationConfig;
 
   private final PipelineState state;
-  private Map<DatanodeDetails, Long> nodeStatus;
+  private final Map<DatanodeDetails, Long> nodeStatus;
   private Map<DatanodeDetails, Integer> replicaIndexes;
   // nodes with ordered distance to client
-  private List<DatanodeDetails> nodesInOrder = new ArrayList<>();
+  private final ImmutableList<DatanodeDetails> nodesInOrder;
   // Current reported Leader for the pipeline
   private UUID leaderId;
   // Timestamp for pipeline upon creation
@@ -103,17 +104,17 @@ public final class Pipeline {
    * set to <i>Instant.now</i> when you crate the Pipeline object as part of
    * state change.
    */
-  private Pipeline(PipelineID id,
-      ReplicationConfig replicationConfig, PipelineState state,
-      Map<DatanodeDetails, Long> nodeStatus, UUID suggestedLeaderId) {
-    this.id = id;
-    this.replicationConfig = replicationConfig;
-    this.state = state;
-    this.nodeStatus = nodeStatus;
-    this.creationTimestamp = Instant.now();
-    this.suggestedLeaderId = suggestedLeaderId;
-    this.replicaIndexes = new HashMap<>();
-    this.stateEnterTime = Instant.now();
+  private Pipeline(Builder b) {
+    id = b.id;
+    replicationConfig = b.replicationConfig;
+    state = b.state;
+    nodeStatus = b.nodeStatus;
+    nodesInOrder = b.nodesInOrder == null ? ImmutableList.of() : ImmutableList.copyOf(b.nodesInOrder);
+    suggestedLeaderId = b.suggestedLeaderId;
+    creationTimestamp = b.creationTimestamp != null ? b.creationTimestamp : Instant.now();
+    leaderId = b.leaderId;
+    replicaIndexes = b.replicaIndexes;
+    stateEnterTime = Instant.now();
   }
 
   /**
@@ -315,14 +316,6 @@ public final class Pipeline {
     return false;
   }
 
-  public void setNodesInOrder(List<DatanodeDetails> nodes) {
-    nodesInOrder.clear();
-    if (null == nodes) {
-      return;
-    }
-    nodesInOrder.addAll(nodes);
-  }
-
   public List<DatanodeDetails> getNodesInOrder() {
     if (nodesInOrder.isEmpty()) {
       LOG.debug("Nodes in order is empty, delegate to getNodes");
@@ -424,15 +417,18 @@ public final class Pipeline {
     return builder.build();
   }
 
-  static Pipeline getFromProtobufSetCreationTimestamp(
+  private static Pipeline getFromProtobufSetCreationTimestamp(
       HddsProtos.Pipeline proto) throws UnknownPipelineStateException {
-    final Pipeline pipeline = getFromProtobuf(proto);
-    // When SCM is restarted, set Creation time with current time.
-    pipeline.setCreationTimestamp(Instant.now());
-    return pipeline;
+    return toBuilder(proto)
+        .setCreateTimestamp(Instant.now())
+        .build();
   }
 
-  public static Pipeline getFromProtobuf(HddsProtos.Pipeline pipeline)
+  public Builder toBuilder() {
+    return newBuilder(this);
+  }
+
+  public static Builder toBuilder(HddsProtos.Pipeline pipeline)
       throws UnknownPipelineStateException {
     Preconditions.checkNotNull(pipeline, "Pipeline is null");
 
@@ -473,9 +469,13 @@ public final class Pipeline {
         .setReplicaIndexes(nodes)
         .setLeaderId(leaderId)
         .setSuggestedLeaderId(suggestedLeaderId)
-        .setNodesInOrder(pipeline.getMemberOrdersList())
-        .setCreateTimestamp(pipeline.getCreationTimeStamp())
-        .build();
+        .setNodeOrder(pipeline.getMemberOrdersList())
+        .setCreateTimestamp(pipeline.getCreationTimeStamp());
+  }
+
+  public static Pipeline getFromProtobuf(HddsProtos.Pipeline pipeline)
+      throws UnknownPipelineStateException {
+    return toBuilder(pipeline).build();
   }
 
   @Override
@@ -601,8 +601,19 @@ public final class Pipeline {
       return this;
     }
 
-    public Builder setNodesInOrder(List<Integer> orders) {
+    public Builder setNodeOrder(List<Integer> orders) {
+      // for build from ProtoBuf
       this.nodeOrder = orders;
+      return this;
+    }
+
+    public Builder setNodesInOrder(List<DatanodeDetails> nodes) {
+      this.nodesInOrder = new LinkedList<>(nodes);
+      return this;
+    }
+
+    public Builder setCreateTimestamp(Instant instant) {
+      this.creationTimestamp = instant;
       return this;
     }
 
@@ -627,19 +638,8 @@ public final class Pipeline {
       Preconditions.checkNotNull(replicationConfig);
       Preconditions.checkNotNull(state);
       Preconditions.checkNotNull(nodeStatus);
-      Pipeline pipeline =
-          new Pipeline(id, replicationConfig, state, nodeStatus,
-              suggestedLeaderId);
-      pipeline.setLeaderId(leaderId);
-      // overwrite with original creationTimestamp
-      if (creationTimestamp != null) {
-        pipeline.setCreationTimestamp(creationTimestamp);
-      }
-
-      pipeline.setReplicaIndexes(replicaIndexes);
 
       if (nodeOrder != null && !nodeOrder.isEmpty()) {
-        // This branch is for build from ProtoBuf
         List<DatanodeDetails> nodesWithOrder = new ArrayList<>();
         for (int i = 0; i < nodeOrder.size(); i++) {
           int nodeIndex = nodeOrder.get(i);
@@ -657,13 +657,10 @@ public final class Pipeline {
           LOG.debug("Deserialize nodesInOrder {} in pipeline {}",
               nodesWithOrder, id);
         }
-        pipeline.setNodesInOrder(nodesWithOrder);
-      } else if (nodesInOrder != null) {
-        // This branch is for pipeline clone
-        pipeline.setNodesInOrder(nodesInOrder);
+        nodesInOrder = nodesWithOrder;
       }
 
-      return pipeline;
+      return new Pipeline(this);
     }
   }
 
