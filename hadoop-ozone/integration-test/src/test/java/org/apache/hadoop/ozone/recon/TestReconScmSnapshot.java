@@ -94,7 +94,7 @@ public class TestReconScmSnapshot {
     long keyCountBefore = nodeManager.getNodeDBKeyCount();
 
     //Stopping Recon to add Containers in SCM
-    //cluster.stopRecon();
+    cluster.stopRecon();
     ContainerManager containerManager;
     containerManager = cluster.getStorageContainerManager()
         .getContainerManager();
@@ -103,8 +103,7 @@ public class TestReconScmSnapshot {
       containerManager.allocateContainer(RatisReplicationConfig.getInstance(
           HddsProtos.ReplicationFactor.ONE), "testOwner");
     }
-    Thread.sleep(10000);
-    //cluster.startRecon();
+    cluster.startRecon();
     //ContainerCount after Recon DB is updated with SCM DB
     containerManager = cluster.getStorageContainerManager()
         .getContainerManager();

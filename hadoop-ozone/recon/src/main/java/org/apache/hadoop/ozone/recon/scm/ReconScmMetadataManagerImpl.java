@@ -29,7 +29,6 @@ import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.utils.db.DBStoreBuilder;
 import org.apache.hadoop.hdds.utils.db.RDBStore;
 import org.apache.hadoop.hdds.utils.db.Table;
-import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.ozone.recon.ReconUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -40,8 +39,8 @@ import java.io.File;
 import java.io.IOException;
 import java.util.UUID;
 
+import static org.apache.hadoop.ozone.recon.ReconConstants.RECON_SCM_SNAPSHOT_DB;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_SCM_DB_DIR;
-import static org.apache.hadoop.ozone.recon.scm.ReconSCMDBDefinition.RECON_SCM_DB_NAME;
 
 /**
  * Recon's implementation of the SCM Metadata manager. By extending and
@@ -75,14 +74,14 @@ public class ReconScmMetadataManagerImpl extends SCMMetadataStoreImpl
     File reconDbDir =
         reconUtils.getReconDbDir(configuration, OZONE_RECON_SCM_DB_DIR);
     File lastKnownSCMSnapshot =
-        reconUtils.getLastKnownDB(reconDbDir, RECON_SCM_DB_NAME);
+        reconUtils.getLastKnownDB(reconDbDir, RECON_SCM_SNAPSHOT_DB);
     if (lastKnownSCMSnapshot != null) {
       LOG.info("Last known snapshot for SCM : {}", lastKnownSCMSnapshot.getAbsolutePath());
     }
   }
 
   private DBStore createDBAndAddSCMTablesAndCodecs(File dbFile,
-                                                   ReconSCMDBDefinition definition) throws IOException {
+                                                   ReconSCMSnapshotDBDefinition definition) throws IOException {
     DBStoreBuilder dbStoreBuilder =
         DBStoreBuilder.newBuilder(ozoneConfiguration)
             .setName(dbFile.getName())
@@ -107,8 +106,8 @@ public class ReconScmMetadataManagerImpl extends SCMMetadataStoreImpl
       throws IOException {
     try {
       DBStore newStore = createDBAndAddSCMTablesAndCodecs(
-          dbFile, new ReconSCMDBDefinition());
-      Table<UUID, DatanodeDetails> newNodeTable =
+          dbFile, new ReconSCMSnapshotDBDefinition());
+      /*Table<UUID, DatanodeDetails> newNodeTable =
           ReconSCMDBDefinition.NODES.getTable(newStore);
       Table<UUID, DatanodeDetails> nodeTable =
           ReconSCMDBDefinition.NODES.getTable(ozoneStorageContainerManager.getStore());
@@ -120,14 +119,14 @@ public class ReconScmMetadataManagerImpl extends SCMMetadataStoreImpl
         }
       }
 
-      this.nodesTable = ReconSCMDBDefinition.NODES.getTable(newStore);
+      this.nodesTable = ReconSCMDBDefinition.NODES.getTable(newStore);*/
       sequenceIdGen.reinitialize(
-          ReconSCMDBDefinition.SEQUENCE_ID.getTable(newStore));
+          ReconSCMSnapshotDBDefinition.SEQUENCE_ID.getTable(newStore));
       ozoneStorageContainerManager.getPipelineManager().reinitialize(
-          ReconSCMDBDefinition.PIPELINES.getTable(newStore));
+          ReconSCMSnapshotDBDefinition.PIPELINES.getTable(newStore));
       ozoneStorageContainerManager.getContainerManager().reinitialize(
-          ReconSCMDBDefinition.CONTAINERS.getTable(newStore));
-      nodeManager.reinitialize(nodesTable);
+          ReconSCMSnapshotDBDefinition.CONTAINERS.getTable(newStore));
+      //nodeManager.reinitialize(nodesTable);
 
       setStore(newStore);
       ozoneStorageContainerManager.setStore(newStore);

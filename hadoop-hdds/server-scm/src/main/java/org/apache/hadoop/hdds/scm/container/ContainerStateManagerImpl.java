@@ -297,8 +297,8 @@ public final class ContainerStateManagerImpl
         AutoCloseableLock ignored = writeLock(containerID)) {
       if (!containers.contains(containerID)) {
         ExecutionUtil.create(() -> {
-          /*transactionBuffer.addToBuffer(containerStore,
-              containerID, container);*/
+          transactionBuffer.addToBuffer(containerStore,
+              containerID, container);
           containers.addContainer(container);
           if (pipelineManager.containsPipeline(pipelineID)) {
             pipelineManager.addContainerToPipeline(pipelineID, containerID);
@@ -312,7 +312,7 @@ public final class ContainerStateManagerImpl
           // just only add the container.
         }).onException(() -> {
           containers.removeContainer(containerID);
-          //transactionBuffer.removeFromBuffer(containerStore, containerID);
+          transactionBuffer.removeFromBuffer(containerStore, containerID);
         }).execute();
       }
     }
@@ -341,10 +341,10 @@ public final class ContainerStateManagerImpl
         if (newState.getNumber() > oldState.getNumber()) {
           ExecutionUtil.create(() -> {
             containers.updateState(id, oldState, newState);
-            /*transactionBuffer.addToBuffer(containerStore, id,
-                containers.getContainerInfo(id));*/
+            transactionBuffer.addToBuffer(containerStore, id,
+                containers.getContainerInfo(id));
           }).onException(() -> {
-            //transactionBuffer.addToBuffer(containerStore, id, oldInfo);
+            transactionBuffer.addToBuffer(containerStore, id, oldInfo);
             containers.updateState(id, newState, oldState);
           }).execute();
           containerStateChangeActions.getOrDefault(event, info -> { })
@@ -402,7 +402,7 @@ public final class ContainerStateManagerImpl
           continue;
         }
         info.updateDeleteTransactionId(transaction.getValue());
-        //transactionBuffer.addToBuffer(containerStore, info.containerID(), info);
+        transactionBuffer.addToBuffer(containerStore, info.containerID(), info);
       }
     }
   }
@@ -472,7 +472,7 @@ public final class ContainerStateManagerImpl
          AutoCloseableLock ignored = writeLock(cid)) {
       final ContainerInfo containerInfo = containers.getContainerInfo(cid);
       ExecutionUtil.create(() -> {
-        //transactionBuffer.removeFromBuffer(containerStore, cid);
+        transactionBuffer.removeFromBuffer(containerStore, cid);
         containers.removeContainer(cid);
       }).onException(() -> LOG.error("Error in removing container {}", cid));
     }

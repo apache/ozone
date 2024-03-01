@@ -64,7 +64,6 @@ import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.ha.SCMNodeDetails;
 import org.apache.hadoop.hdds.scm.ha.SCMHAManager;
 import org.apache.hadoop.hdds.scm.ha.SequenceIdGenerator;
-import org.apache.hadoop.hdds.scm.metadata.SCMDBTransactionBufferImpl;
 import org.apache.hadoop.hdds.scm.net.NetworkTopology;
 import org.apache.hadoop.hdds.scm.net.NetworkTopologyImpl;
 import org.apache.hadoop.hdds.scm.node.DeadNodeHandler;
@@ -162,7 +161,8 @@ public class ReconStorageContainerManagerFacade
   private final SCMHAManager scmhaManager;
   private final SequenceIdGenerator sequenceIdGen;
 
-  private DBStore dbStore;
+  private DBStore scmDbSnapshotStore;
+  private DBStore reconSCMDbStore;
   private ReconNodeManager nodeManager;
   private ReconPipelineManager pipelineManager;
   private ReconContainerManager containerManager;
@@ -241,17 +241,18 @@ public class ReconStorageContainerManagerFacade
     this.scmStorageConfig = new ReconStorageConfig(conf, reconUtils);
     this.clusterMap = new NetworkTopologyImpl(conf);
 
-    this.dbStore = DBStoreBuilder.createDBStore(ozoneConfiguration, new ReconSCMDBDefinition());
+    this.scmDbSnapshotStore = DBStoreBuilder.createDBStore(ozoneConfiguration, new ReconSCMSnapshotDBDefinition());
+    this.reconSCMDbStore = DBStoreBuilder.createDBStore(ozoneConfiguration, new ReconSCMDBDefinition());
 
     this.scmLayoutVersionManager =
         new HDDSLayoutVersionManager(scmStorageConfig.getLayoutVersion());
     this.scmhaManager = SCMHAManagerStub.getInstance(
-        true, new SCMDBTransactionBufferImpl());
+        true, new SCMDBNoOpTransactionBufferImpl());
     this.sequenceIdGen = new SequenceIdGenerator(
-        conf, scmhaManager, ReconSCMDBDefinition.SEQUENCE_ID.getTable(dbStore));
+        conf, scmhaManager, ReconSCMSnapshotDBDefinition.SEQUENCE_ID.getTable(scmDbSnapshotStore));
     this.nodeManager =
         new ReconNodeManager(conf, scmStorageConfig, eventQueue, clusterMap,
-            ReconSCMDBDefinition.NODES.getTable(dbStore),
+            ReconSCMDBDefinition.NODES.getTable(reconSCMDbStore),
             this.scmLayoutVersionManager);
     placementMetrics = SCMContainerPlacementMetrics.create();
     this.containerPlacementPolicy =
@@ -261,15 +262,15 @@ public class ReconStorageContainerManagerFacade
         conf, this, eventQueue);
     this.pipelineManager = ReconPipelineManager.newReconPipelineManager(
         conf, nodeManager,
-        ReconSCMDBDefinition.PIPELINES.getTable(dbStore),
+        ReconSCMSnapshotDBDefinition.PIPELINES.getTable(scmDbSnapshotStore),
         eventQueue,
         scmhaManager,
         scmContext);
     ContainerReplicaPendingOps pendingOps = new ContainerReplicaPendingOps(
         Clock.system(ZoneId.systemDefault()));
     this.containerManager = new ReconContainerManager(conf,
-        dbStore,
-        ReconSCMDBDefinition.CONTAINERS.getTable(dbStore),
+        reconSCMDbStore,
+        ReconSCMSnapshotDBDefinition.CONTAINERS.getTable(scmDbSnapshotStore),
         pipelineManager, scmServiceProvider,
         containerHealthSchemaManager, reconContainerMetadataManager,
         scmhaManager, sequenceIdGen, pendingOps);
@@ -533,7 +534,7 @@ public class ReconStorageContainerManagerFacade
 
   private void stopSyncDataFromSCMThread() {
     reconSCMSyncScheduler.shutdownNow();
-    LOG.debug("Shutdown the Recon SCM DB sync scheduler.");
+    LOG.info("Shutdown the Recon SCM DB sync scheduler.");
   }
 
   /**
@@ -677,7 +678,7 @@ public class ReconStorageContainerManagerFacade
               LOG.info("Calling reprocess on Recon SCM tasks.");
               reconTaskController.reInitializeSCMTasks(scmMetadataManager);
               // Reinitialize Recon managers with new DB store.
-              dbStore = scmServiceProvider.getStore();
+              scmDbSnapshotStore = scmServiceProvider.getStore();
             }
           } catch (InterruptedException intEx) {
             Thread.currentThread().interrupt();
@@ -742,8 +743,8 @@ public class ReconStorageContainerManagerFacade
     IOUtils.cleanupWithLogger(LOG, pipelineManager);
     LOG.info("Flushing container replica history to DB.");
     containerManager.flushReplicaHistoryMapToDB(true);
-    IOUtils.close(LOG, dbStore);
-    //IOUtils.close(LOG, scmMetadataManager.getStore());
+    IOUtils.close(LOG, scmDbSnapshotStore);
+    IOUtils.close(LOG, reconSCMDbStore);
   }
 
   @Override
@@ -873,7 +874,7 @@ public class ReconStorageContainerManagerFacade
   }
 
   public DBStore getScmDBStore() {
-    return dbStore;
+    return scmDbSnapshotStore;
   }
 
   public EventQueue getEventQueue() {
@@ -908,12 +909,12 @@ public class ReconStorageContainerManagerFacade
    */
   @Override
   public void setStore(DBStore store) {
-    this.dbStore = store;
+    this.scmDbSnapshotStore = store;
   }
 
   @Override
   public DBStore getStore() {
-    return this.dbStore;
+    return this.scmDbSnapshotStore;
   }
 
 }

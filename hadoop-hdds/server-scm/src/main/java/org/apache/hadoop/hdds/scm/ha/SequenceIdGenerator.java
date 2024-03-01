@@ -260,12 +260,12 @@ public class SequenceIdGenerator {
         return false;
       }
 
-      /*try {
+      try {
         transactionBuffer
             .addToBuffer(sequenceIdTable, sequenceIdName, newLastId);
       } catch (IOException ioe) {
         throw new RuntimeException("Failed to put lastId to Batch", ioe);
-      }*/
+      }
 
       sequenceIdToLastIdMap.put(sequenceIdName, newLastId);
       return true;

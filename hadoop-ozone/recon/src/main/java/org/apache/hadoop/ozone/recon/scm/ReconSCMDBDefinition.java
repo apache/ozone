@@ -25,19 +25,22 @@ import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.scm.metadata.SCMDBDefinition;
 import org.apache.hadoop.hdds.utils.db.Codec;
 import org.apache.hadoop.hdds.utils.db.DBColumnFamilyDefinition;
+import org.apache.hadoop.hdds.utils.db.DBDefinition;
 import org.apache.hadoop.hdds.utils.db.DelegatedCodec;
 import org.apache.hadoop.hdds.utils.db.StringCodec;
 import org.apache.hadoop.ozone.recon.ReconServerConfigKeys;
 
+import static org.apache.hadoop.ozone.recon.ReconConstants.RECON_SCM_DB;
+
 /**
  * Recon SCM db file for ozone.
  */
-public class ReconSCMDBDefinition extends SCMDBDefinition {
+public class ReconSCMDBDefinition extends DBDefinition.WithMap {
   private static final Codec<UUID> UUID_CODEC = new DelegatedCodec<>(
       StringCodec.get(), UUID::fromString, UUID::toString,
       DelegatedCodec.CopyType.SHALLOW);
 
-  public static final String RECON_SCM_DB_NAME = "recon-scm.db";
+  public static final String RECON_SCM_DB_NAME = RECON_SCM_DB;
 
   public static final DBColumnFamilyDefinition<UUID, DatanodeDetails>
       NODES =

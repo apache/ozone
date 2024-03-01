@@ -78,6 +78,7 @@ public class AbstractReconContainerManagerTest {
   private ReconPipelineManager pipelineManager;
   private ReconContainerManager containerManager;
   private DBStore store;
+  private DBStore reconSCMDbStore;
   private HDDSLayoutVersionManager layoutVersionManager;
   private SCMHAManager scmhaManager;
   private SCMContext scmContext;
@@ -88,11 +89,12 @@ public class AbstractReconContainerManagerTest {
     conf = new OzoneConfiguration();
     conf.set(OZONE_METADATA_DIRS, tempDir.getAbsolutePath());
     conf.set(OZONE_SCM_NAMES, "localhost");
-    store = DBStoreBuilder.createDBStore(conf, new ReconSCMDBDefinition());
+    store = DBStoreBuilder.createDBStore(conf, new ReconSCMSnapshotDBDefinition());
+    reconSCMDbStore = DBStoreBuilder.createDBStore(conf, new ReconSCMDBDefinition());
     scmhaManager = SCMHAManagerStub.getInstance(
         true, new SCMHADBTransactionBufferStub(store));
     sequenceIdGen = new SequenceIdGenerator(
-        conf, scmhaManager, ReconSCMDBDefinition.SEQUENCE_ID.getTable(store));
+        conf, scmhaManager, ReconSCMSnapshotDBDefinition.SEQUENCE_ID.getTable(store));
     scmContext = SCMContext.emptyContext();
     scmStorageConfig = new ReconStorageConfig(conf, new ReconUtils());
     NetworkTopology clusterMap = new NetworkTopologyImpl(conf);
@@ -107,7 +109,7 @@ public class AbstractReconContainerManagerTest {
     pipelineManager = ReconPipelineManager.newReconPipelineManager(
         conf,
         nodeManager,
-        ReconSCMDBDefinition.PIPELINES.getTable(store),
+        ReconSCMSnapshotDBDefinition.PIPELINES.getTable(store),
         eventQueue,
         scmhaManager,
         scmContext);
@@ -116,8 +118,8 @@ public class AbstractReconContainerManagerTest {
 
     containerManager = new ReconContainerManager(
         conf,
-        store,
-        ReconSCMDBDefinition.CONTAINERS.getTable(store),
+        reconSCMDbStore,
+        ReconSCMSnapshotDBDefinition.CONTAINERS.getTable(store),
         pipelineManager,
         getScmServiceProvider(),
         mock(ContainerHealthSchemaManager.class),
