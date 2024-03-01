@@ -40,7 +40,7 @@ public abstract class ExtendedInputStream extends InputStream
     implements Seekable, CanUnbuffer, ByteBufferReadable, StreamCapabilities {
 
   protected static final int EOF = -1;
-  protected static RetryPolicy retryPolicy;
+  private static RetryPolicy retryPolicy;
 
   @Override
   public synchronized int read() throws IOException {
@@ -114,6 +114,6 @@ public abstract class ExtendedInputStream extends InputStream
   }
 
   public static RetryPolicy getRetryPolicy() {
-     return retryPolicy;
+    return retryPolicy;
   }
 }

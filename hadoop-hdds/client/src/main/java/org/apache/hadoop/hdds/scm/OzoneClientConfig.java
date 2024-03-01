@@ -152,9 +152,9 @@ public class OzoneClientConfig {
   private int maxReadRetryCount = 3;
 
   @Config(key = "read.retry.interval",
-      defaultValue = "0",
+      defaultValue = "1",
       description =
-          "Indicates the time duration in milliseconds a client will wait "
+          "Indicates the time duration in seconds a client will wait "
               + "before retrying a read key request on encountering "
               + "a connectivity excepetion from Datanodes . "
               + "By default the interval is 1millisecond",
