@@ -961,21 +961,21 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
     if (balancingInterval.isPresent()) {
       long bi = balancingInterval.get();
       Preconditions.checkState(bi > 0,
-              "balancingInterval must be greater than zero.");
+              "Balancing Interval must be greater than zero.");
       builder.setBalancingInterval(bi);
     }
 
     if (moveTimeout.isPresent()) {
       long mt = moveTimeout.get();
       Preconditions.checkState(mt > 0,
-              "moveTimeout must be greater than zero.");
+              "Move Timeout must be greater than zero.");
       builder.setMoveTimeout(mt);
     }
 
     if (moveReplicationTimeout.isPresent()) {
       long mrt = moveReplicationTimeout.get();
       Preconditions.checkState(mrt > 0,
-              "moveTimeout must be greater than zero.");
+              "Move Replication Timeout must be greater than zero.");
       builder.setMoveReplicationTimeout(mrt);
     }
 

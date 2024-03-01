@@ -1116,15 +1116,15 @@ public class SCMClientProtocolServer implements
       long bi = balancingInterval.get();
       auditMap.put("balancingInterval", String.valueOf(bi));
       Preconditions.checkState(bi > 0,
-              "balancingInterval must be greater than zero.");
-      cbc.setBalancingInterval(Duration.ofMinutes(bi));
+              "Balancing Interval must be greater than zero.");
+      cbc.setMoveTimeout(Duration.ofMinutes(bi));
     }
 
     if (moveTimeout.isPresent()) {
       long mt = moveTimeout.get();
       auditMap.put("moveTimeout", String.valueOf(mt));
       Preconditions.checkState(mt > 0,
-              "moveTimeout must be greater than zero.");
+              "Move Timeout must be greater than zero.");
       cbc.setMoveTimeout(Duration.ofMinutes(mt));
     }
 
@@ -1132,7 +1132,7 @@ public class SCMClientProtocolServer implements
       long mrt = moveReplicationTimeout.get();
       auditMap.put("moveReplicationTimeout", String.valueOf(mrt));
       Preconditions.checkState(mrt > 0,
-              "moveTimeout must be greater than zero.");
+              "Move Replication Timeout must be greater than zero.");
       cbc.setMoveReplicationTimeout(Duration.ofMinutes(mrt));
     }
 

@@ -75,19 +75,21 @@ public class ContainerBalancerStartSubcommand extends ScmSubcommand {
   private Optional<Long> maxSizeLeavingSourceInGB;
 
   @Option(names = {"--balancing-iteration-interval-minutes"},
-      description = "The interval period in minutes between each iteration of Container Balancer." +
-          "Value should be greater than '0' (for example, '70' for 70 minutes).")
+      description = "The interval period in minutes between each iteration of Container Balancer. " +
+          "Value should be greater than '0' and default value is 70 (for example, '70' for 70 minutes).")
   private Optional<Long> balancingInterval;
 
   @Option(names = {"--move-timeout-minutes"},
       description = "The amount of time in minutes to allow a single container to move " +
-          "from source to target. Value should be greater than '0' (for example, '65' for 65 minutes).")
+          "from source to target. Value should be greater than '0' and default value is" +
+          " 65 (for example, '65' for 65 minutes).")
   private Optional<Long> moveTimeout;
 
   @Option(names = {"--move-replication-timeout-minutes"},
       description = "The " +
           "amount of time in minutes to allow a single container's replication from source " +
-          "to target as part of container move. Value should be greater than '0'. For example, if \"hdds.container" +
+          "to target as part of container move. Value should be greater than '0' and " +
+          "default value is 50. For example, if \"hdds.container" +
           ".balancer.move.timeout\" is 65 minutes, then out of those 65 minutes " +
           "50 minutes will be the deadline for replication to complete (for example," +
           "'50' for 50 minutes).")
