@@ -43,7 +43,9 @@ import java.util.concurrent.Future;
 
 import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.TransactionInfo;
+import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.MiniOzoneHAClusterImpl;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneVolume;
@@ -63,6 +65,9 @@ import org.apache.ozone.test.tag.Flaky;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.TestMethodOrder;
+import org.junit.jupiter.api.MethodOrderer;
+import org.junit.jupiter.api.Order;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -70,6 +75,7 @@ import org.slf4j.LoggerFactory;
  * Test OM prepare against actual mini cluster.
  */
 @Flaky("HDDS-5990")
+@TestMethodOrder(MethodOrderer.MethodName.class)
 public class TestOzoneManagerPrepare extends TestOzoneManagerHA {
   private static final String BUCKET = "bucket";
   private static final String VOLUME = "volume";
@@ -79,8 +85,10 @@ public class TestOzoneManagerPrepare extends TestOzoneManagerHA {
   private static final int WAIT_TIMEOUT_MILLIS = 120000;
   private static final long PREPARE_FLUSH_WAIT_TIMEOUT_SECONDS = 120L;
   private static final long PREPARE_FLUSH_INTERVAL_SECONDS = 5L;
+  private static final long SNAPSHOT_THRESHOLD = 1;
 
   private MiniOzoneHAClusterImpl cluster;
+  private static MiniOzoneCluster.Builder clusterBuilder = null;
   private ClientProtocol clientProtocol;
   private ObjectStore store;
 
@@ -89,6 +97,7 @@ public class TestOzoneManagerPrepare extends TestOzoneManagerHA {
 
   private void initInstanceVariables() {
     cluster = getCluster();
+    clusterBuilder = getClusterBuilder();
     store = getObjectStore();
     clientProtocol = store.getClientProxy();
   }
@@ -121,6 +130,7 @@ public class TestOzoneManagerPrepare extends TestOzoneManagerHA {
    * Checks that every OM is prepared successfully.
    */
   @Test
+  @Order(1)
   public void testPrepareWithTransactions() throws Exception {
     long prepareIndex = submitPrepareRequest();
     assertClusterPrepared(prepareIndex);
@@ -154,6 +164,7 @@ public class TestOzoneManagerPrepare extends TestOzoneManagerHA {
    * @throws Exception
    */
   @Test
+  @Order(2)
   @Unhealthy("RATIS-1481") // until upgrade to Ratis 2.3.0
   public void testPrepareDownedOM() throws Exception {
     // Index of the OM that will be shut down during this test.
@@ -210,6 +221,7 @@ public class TestOzoneManagerPrepare extends TestOzoneManagerHA {
   }
 
   @Test
+  @Order(3)
   public void testPrepareWithRestart() throws Exception {
     // Create fresh cluster for this test to prevent timeout from restarting
     // modified cluster.
@@ -234,6 +246,7 @@ public class TestOzoneManagerPrepare extends TestOzoneManagerHA {
   @Slow("Saving on CI time since this is a pessimistic test. We should not " +
       "be able to do anything with 2 OMs down.")
   @Test
+  @Order(4)
   public void testPrepareFailsWhenTwoOmsAreDown() throws Exception {
     // Shut down 2 OMs.
     for (int i : Arrays.asList(1, 2)) {
@@ -258,6 +271,7 @@ public class TestOzoneManagerPrepare extends TestOzoneManagerHA {
    * @throws Exception
    */
   @Test
+  @Order(5)
   public void testPrepareWithMultipleThreads() throws Exception {
     final int numThreads = 10;
     final int prepareTaskIndex = 5;
@@ -310,6 +324,7 @@ public class TestOzoneManagerPrepare extends TestOzoneManagerHA {
   }
 
   @Test
+  @Order(6)
   public void testCancelPrepare() throws Exception {
     String volumeName = VOLUME + UUID.randomUUID().toString();
     Set<String> writtenKeys = writeKeysAndWaitForLogs(volumeName, 10);
@@ -341,7 +356,19 @@ public class TestOzoneManagerPrepare extends TestOzoneManagerHA {
   }
 
   @Test
+  @Order(7)
   public void testPrepare() throws Exception {
+    cluster.shutdown();
+    OzoneConfiguration conf = getConf();
+    conf.setLong(
+        OMConfigKeys.OZONE_OM_RATIS_SNAPSHOT_AUTO_TRIGGER_THRESHOLD_KEY,
+        SNAPSHOT_THRESHOLD);
+    clusterBuilder = MiniOzoneCluster.newOMHABuilder(conf)
+        .setOMServiceId(getOmServiceId())
+        .setNumOfOzoneManagers(getNumOfOMs());
+    cluster = (MiniOzoneHAClusterImpl) clusterBuilder.build();
+    cluster.waitForClusterToBeReady();
+
     long prepareIndex = submitPrepareRequest();
 
     // Make sure all OMs are prepared.
