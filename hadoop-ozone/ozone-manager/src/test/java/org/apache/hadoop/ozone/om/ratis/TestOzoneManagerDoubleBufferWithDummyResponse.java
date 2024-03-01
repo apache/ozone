@@ -79,7 +79,8 @@ public class TestOzoneManagerDoubleBufferWithDummyResponse {
         .setOmMetadataManager(omMetadataManager)
         .setMaxUnFlushedTransactionCount(10000)
         .enableRatis(true)
-        .build();
+        .build()
+        .start();
   }
 
   @AfterEach
