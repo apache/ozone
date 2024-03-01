@@ -226,7 +226,7 @@
           },
           "disableTextWrap": false,
           "editorMode": "builder",
-          "expr": "List Keys Count",
+          "expr": "s3_gateway_metrics_list_key_count",
           "fullMetaSearch": false,
           "includeNullMetadata": true,
           "instant": false,
@@ -236,7 +236,7 @@
           "useBackend": false
         }
       ],
-      "title": "s3_gateway_metrics_list_key_count",
+      "title": "List Keys Count",
       "type": "timeseries"
     },
     {
