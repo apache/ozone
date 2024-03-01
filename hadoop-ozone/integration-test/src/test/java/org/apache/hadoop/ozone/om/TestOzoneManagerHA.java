@@ -76,7 +76,6 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 public abstract class TestOzoneManagerHA {
 
   private static MiniOzoneHAClusterImpl cluster = null;
-  private static MiniOzoneCluster.Builder clusterBuilder = null;
   private static ObjectStore objectStore;
   private static OzoneConfiguration conf;
   private static String omServiceId;
@@ -104,10 +103,6 @@ public abstract class TestOzoneManagerHA {
 
   public OzoneConfiguration getConf() {
     return conf;
-  }
-
-  public MiniOzoneCluster.Builder getClusterBuilder() {
-    return clusterBuilder;
   }
 
   public String getOmServiceId() {
@@ -177,11 +172,11 @@ public abstract class TestOzoneManagerHA {
     conf.set(OZONE_BLOCK_DELETING_SERVICE_INTERVAL, "10s");
     conf.set(OZONE_KEY_DELETING_LIMIT_PER_TASK, "2");
 
-    clusterBuilder = MiniOzoneCluster.newHABuilder(conf)
+    MiniOzoneHAClusterImpl.Builder clusterBuilder = MiniOzoneCluster.newHABuilder(conf)
         .setOMServiceId(omServiceId)
         .setNumOfOzoneManagers(numOfOMs);
 
-    cluster = (MiniOzoneHAClusterImpl) clusterBuilder.build();
+    cluster = clusterBuilder.build();
     cluster.waitForClusterToBeReady();
     client = OzoneClientFactory.getRpcClient(omServiceId, conf);
     objectStore = client.getObjectStore();

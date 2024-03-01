@@ -96,7 +96,7 @@ public class TestDecommissionStatusSubCommand {
     p = Pattern.compile("Datanode:\\s.*host1\\)");
     m = p.matcher(outContent.toString(DEFAULT_ENCODING));
     assertTrue(m.find());
-    p = Pattern.compile("No\\. of Pipelines:");
+    p = Pattern.compile("No\\. of Unclosed Pipelines:");
     m = p.matcher(outContent.toString(DEFAULT_ENCODING));
     assertTrue(m.find());
     assertTrue(m.find()); // metrics for both are shown
