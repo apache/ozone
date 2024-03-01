@@ -2259,6 +2259,7 @@ public class RpcClient implements ClientProtocol {
     // When Key is not MPU or when Key is MPU and encryption is not enabled
     // Need to revisit for GDP.
     FileEncryptionInfo feInfo = keyInfo.getFileEncryptionInfo();
+    KeyInputStream.setRetryPolicy(clientConfig);
 
     if (feInfo == null) {
       LengthInputStream lengthInputStream = KeyInputStream

@@ -76,8 +76,11 @@ public class BlockInputStream extends BlockExtendedInputStream {
   private XceiverClientSpi xceiverClient;
   private boolean initialized = false;
   // TODO: do we need to change retrypolicy based on exception.
-  private final RetryPolicy retryPolicy =
-      HddsClientUtils.createRetryPolicy(3, TimeUnit.SECONDS.toMillis(1));
+  // Default retry, retry for DN connectivity issues & what else?
+  private final RetryPolicy retryPolicy = getRetryPolicy();
+      //=
+     // HddsClientUtils.createRetryPolicy(3, TimeUnit.SECONDS.toMillis(1));
+
   private int retries;
 
   // List of ChunkInputStreams, one for each chunk in the block

@@ -22,8 +22,10 @@ import com.google.common.primitives.Bytes;
 import org.apache.commons.lang3.RandomUtils;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.client.ContainerBlockID;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ChecksumType;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ChunkInfo;
+import org.apache.hadoop.hdds.scm.OzoneClientConfig;
 import org.apache.hadoop.hdds.scm.XceiverClientFactory;
 import org.apache.hadoop.hdds.scm.XceiverClientSpi;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
@@ -96,6 +98,8 @@ public class TestBlockInputStream {
     Pipeline pipeline = MockPipeline.createSingleNodePipeline();
     blockStream = new DummyBlockInputStream(blockID, blockSize, pipeline, null,
         false, null, refreshFunction, chunks, chunkDataMap);
+    BlockInputStream.setRetryPolicy(new OzoneConfiguration()
+        .getObject(OzoneClientConfig.class));
   }
 
   /**

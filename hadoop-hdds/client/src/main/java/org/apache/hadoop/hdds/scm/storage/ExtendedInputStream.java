@@ -22,11 +22,15 @@ import org.apache.hadoop.fs.ByteBufferReadable;
 import org.apache.hadoop.fs.CanUnbuffer;
 import org.apache.hadoop.fs.Seekable;
 import org.apache.hadoop.fs.StreamCapabilities;
+import org.apache.hadoop.hdds.scm.OzoneClientConfig;
+import org.apache.hadoop.hdds.scm.client.HddsClientUtils;
+import org.apache.hadoop.io.retry.RetryPolicy;
 import org.apache.hadoop.util.StringUtils;
 
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.ByteBuffer;
+import java.util.concurrent.TimeUnit;
 
 /**
  * Abstact class which extends InputStream and some common interfaces used by
@@ -36,6 +40,7 @@ public abstract class ExtendedInputStream extends InputStream
     implements Seekable, CanUnbuffer, ByteBufferReadable, StreamCapabilities {
 
   protected static final int EOF = -1;
+  protected static RetryPolicy retryPolicy;
 
   @Override
   public synchronized int read() throws IOException {
@@ -100,5 +105,15 @@ public abstract class ExtendedInputStream extends InputStream
     default:
       return false;
     }
+  }
+
+  public static void setRetryPolicy(OzoneClientConfig config) {
+    retryPolicy =
+        HddsClientUtils.createRetryPolicy(config.getMaxReadRetryCount(),
+            TimeUnit.SECONDS.toMillis(config.getReadRetryInterval()));
+  }
+
+  public static RetryPolicy getRetryPolicy() {
+     return retryPolicy;
   }
 }
