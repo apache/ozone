@@ -107,7 +107,7 @@ public class FindSourceGreedy implements FindSourceStrategy {
     if (currentSize != null) {
       sizeLeavingNode.put(dui, currentSize + size);
       //reorder according to the latest sizeLeavingNode
-      potentialSources.add(nodeManager.getUsageInfo(dui));
+      addBackSourceDataNode(dui);
       return;
     }
     LOG.warn("Cannot find datanode {} in candidate source datanodes",
@@ -136,6 +136,11 @@ public class FindSourceGreedy implements FindSourceStrategy {
   @Override
   public void removeCandidateSourceDataNode(DatanodeDetails dui) {
     potentialSources.removeIf(a -> a.getDatanodeDetails().equals(dui));
+  }
+
+  @Override
+  public void addBackSourceDataNode(DatanodeDetails dui) {
+    potentialSources.add(nodeManager.getUsageInfo(dui));
   }
 
   /**

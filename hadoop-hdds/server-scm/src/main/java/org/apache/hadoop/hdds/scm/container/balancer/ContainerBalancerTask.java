@@ -553,6 +553,8 @@ public class ContainerBalancerTask implements Runnable {
           containerID,
           containerToSourceMap.get(containerID),
           containerToTargetMap.get(containerID));
+      // add source back to queue as a different container can be selected in next run.
+      findSourceStrategy.addBackSourceDataNode(source);
       return false;
     }
 
@@ -563,6 +565,8 @@ public class ContainerBalancerTask implements Runnable {
     } catch (ContainerNotFoundException e) {
       LOG.warn("Could not get container {} from Container Manager before " +
           "starting a container move", containerID, e);
+      // add source back to queue as a different container can be selected in next run.
+      findSourceStrategy.addBackSourceDataNode(source);
       return false;
     }
     LOG.info("ContainerBalancer is trying to move container {} with size " +
@@ -856,18 +860,33 @@ public class ContainerBalancerTask implements Runnable {
                     " {} failed: {}",
                 moveSelection.getContainerID(), source.getUuidString(),
                 moveSelection.getTargetNode().getUuidString(), result);
+            // add source back if move failed due to container related errors
+            if (result == MoveManager.MoveResult.REPLICATION_FAIL_NOT_EXIST_IN_SOURCE ||
+                result == MoveManager.MoveResult.REPLICATION_FAIL_EXIST_IN_TARGET ||
+                result == MoveManager.MoveResult.REPLICATION_FAIL_CONTAINER_NOT_CLOSED ||
+                result == MoveManager.MoveResult.REPLICATION_FAIL_INFLIGHT_DELETION ||
+                result == MoveManager.MoveResult.REPLICATION_FAIL_INFLIGHT_REPLICATION) {
+              findSourceStrategy.addBackSourceDataNode(source);
+            }
           }
         }
       });
     } catch (ContainerNotFoundException e) {
       LOG.warn("Could not find Container {} for container move",
           containerID, e);
+      // add source back to queue
+      findSourceStrategy.addBackSourceDataNode(source);
       metrics.incrementNumContainerMovesFailedInLatestIteration(1);
       return false;
-    } catch (NodeNotFoundException | TimeoutException |
-             ContainerReplicaNotFoundException e) {
+    } catch (NodeNotFoundException | TimeoutException e) {
       LOG.warn("Container move failed for container {}", containerID, e);
       metrics.incrementNumContainerMovesFailedInLatestIteration(1);
+      return false;
+    } catch (ContainerReplicaNotFoundException e) {
+      LOG.warn("Container move failed for container {}", containerID, e);
+      metrics.incrementNumContainerMovesFailedInLatestIteration(1);
+      // add source back to queue for replica not found only
+      findSourceStrategy.addBackSourceDataNode(source);
       return false;
     }
 

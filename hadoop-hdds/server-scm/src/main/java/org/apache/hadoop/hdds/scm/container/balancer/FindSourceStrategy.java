@@ -46,6 +46,12 @@ public interface FindSourceStrategy {
   void removeCandidateSourceDataNode(DatanodeDetails dui);
 
   /**
+   * add the specified data node to the candidate source
+   * data nodes.
+   */
+  void addBackSourceDataNode(DatanodeDetails dui);
+
+  /**
    * increase the Leaving size of a candidate source data node.
    */
   void increaseSizeLeaving(DatanodeDetails dui, long size);
