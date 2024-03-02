@@ -35,6 +35,10 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
+import java.util.Map;
+import java.util.HashMap;
+import java.util.Comparator;
+import java.util.stream.Collectors;
 
 /**
  * Class for handling bucket entity type.
@@ -105,10 +109,24 @@ public class BucketEntityHandler extends EntityHandler {
     // get object IDs for all its subdirectories
     Set<Long> bucketSubdirs = bucketNSSummary.getChildDir();
     duResponse.setKeySize(bucketNSSummary.getSizeOfFiles());
+
+    // Map to hold sizes for each subdir for sorting
+    Map<Long, Long> subdirSizes = new HashMap<>();
+    for (long subdirObjectId : bucketSubdirs) {
+      long dataSize = getTotalSize(subdirObjectId);
+      subdirSizes.put(subdirObjectId, dataSize);
+    }
+
+    // Sort subdirs based on their size in descending order
+    List<Long> sortedSubdirObjectIds = bucketSubdirs.stream().sorted(
+            Comparator.comparingLong(
+                subdirObjectId -> subdirSizes.get(subdirObjectId)).reversed())
+        .collect(Collectors.toList());
+
     List<DUResponse.DiskUsage> dirDUData = new ArrayList<>();
     long bucketDataSize = duResponse.getKeySize();
     long bucketDataSizeWithReplica = 0L;
-    for (long subdirObjectId: bucketSubdirs) {
+    for (long subdirObjectId : sortedSubdirObjectIds) {
       NSSummary subdirNSSummary = getReconNamespaceSummaryManager()
               .getNSSummary(subdirObjectId);
 
@@ -119,7 +137,8 @@ public class BucketEntityHandler extends EntityHandler {
       // format with leading slash and without trailing slash
       DUResponse.DiskUsage diskUsage = new DUResponse.DiskUsage();
       diskUsage.setSubpath(subpath);
-      long dataSize = getTotalSize(subdirObjectId);
+      long dataSize = subdirSizes.get(subdirObjectId);
+
       bucketDataSize += dataSize;
 
       if (withReplica) {
@@ -136,7 +155,10 @@ public class BucketEntityHandler extends EntityHandler {
       bucketDataSizeWithReplica += getBucketHandler()
               .handleDirectKeys(bucketObjectId, withReplica,
                   listFile, dirDUData, getNormalizedPath());
+      // Sort dirDUData by size in descending order after adding files
+      dirDUData.sort((du1, du2) -> Long.compare(du2.getSize(), du1.getSize()));
     }
+
     if (withReplica) {
       duResponse.setSizeWithReplica(bucketDataSizeWithReplica);
     }

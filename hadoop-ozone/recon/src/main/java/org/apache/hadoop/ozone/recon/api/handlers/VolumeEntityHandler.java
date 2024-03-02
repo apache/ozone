@@ -100,6 +100,11 @@ public class VolumeEntityHandler extends EntityHandler {
     String volName = names[0];
     List<OmBucketInfo> buckets = getOmMetadataManager().
         listBucketsUnderVolume(volName);
+
+    // Sort buckets in descending order by size
+    buckets.sort(
+        (b1, b2) -> Long.compare(b2.getUsedBytes(), b1.getUsedBytes()));
+
     duResponse.setCount(buckets.size());
 
     // List of DiskUsage data for all buckets

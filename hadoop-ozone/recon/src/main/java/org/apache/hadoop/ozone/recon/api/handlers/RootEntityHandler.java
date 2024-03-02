@@ -34,6 +34,12 @@ import org.apache.hadoop.ozone.recon.api.types.ResponseStatus;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 import org.apache.hadoop.ozone.recon.spi.ReconNamespaceSummaryManager;
 import org.apache.hadoop.hdds.scm.container.placement.metrics.SCMNodeStat;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -95,6 +101,23 @@ public class RootEntityHandler extends EntityHandler {
     ReconOMMetadataManager omMetadataManager = getOmMetadataManager();
     List<OmVolumeArgs> volumes = getOmMetadataManager().listVolumes();
     duResponse.setCount(volumes.size());
+
+    // Map to hold total size for each volume
+    Map<String, Long> volumeSizes = new HashMap<>();
+    for (OmVolumeArgs volume : volumes) {
+      long totalVolumeSize = 0;
+      List<OmBucketInfo> buckets =
+          omMetadataManager.listBucketsUnderVolume(volume.getVolume());
+      for (OmBucketInfo bucket : buckets) {
+        long bucketObjectID = bucket.getObjectID();
+        totalVolumeSize += getTotalSize(bucketObjectID);
+      }
+      volumeSizes.put(volume.getVolume(), totalVolumeSize);
+    }
+
+    // Sort volumes based on the total size in descending order
+    volumes.sort((v1, v2) -> volumeSizes.get(v2.getVolume())
+        .compareTo(volumeSizes.get(v1.getVolume())));
 
     List<DUResponse.DiskUsage> volumeDuData = new ArrayList<>();
     long totalDataSize = 0L;
