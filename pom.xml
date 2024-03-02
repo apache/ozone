@@ -223,7 +223,7 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
     <zookeeper.version>3.7.2</zookeeper.version>
 
     <!-- Maven protoc compiler -->
-    <protobuf-maven-plugin.version>0.5.1</protobuf-maven-plugin.version>
+    <protobuf-maven-plugin.version>0.6.1</protobuf-maven-plugin.version>
     <grpc.protobuf-compile.version>3.19.6</grpc.protobuf-compile.version>
     <os-maven-plugin.version>1.7.1</os-maven-plugin.version>
 
