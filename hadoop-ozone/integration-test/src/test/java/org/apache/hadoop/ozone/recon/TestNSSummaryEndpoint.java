@@ -1,9 +1,8 @@
 package org.apache.hadoop.ozone.recon;
 
-import static org.apache.hadoop.ozone.OzoneConfigKeys.*;
-import static org.apache.hadoop.ozone.om.OMConfigKeys.*;
-import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.Mockito.mock;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_FS_ITERATE_BATCH_SIZE;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -12,9 +11,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Random;
 import java.util.Comparator;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
-import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.BiConsumer;
 
 import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
@@ -22,36 +18,24 @@ import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.Path;
-import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
-import org.apache.hadoop.hdds.utils.db.Table;
-import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.TestDataUtil;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneVolume;
-import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
-import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
-import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.recon.api.NSSummaryEndpoint;
-import org.apache.hadoop.ozone.recon.api.OMDBInsightEndpoint;
 import org.apache.hadoop.ozone.recon.api.types.DUResponse;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
-import org.apache.hadoop.ozone.recon.scm.ReconStorageContainerManagerFacade;
 import org.apache.hadoop.ozone.recon.spi.impl.OzoneManagerServiceProviderImpl;
 import org.apache.hadoop.ozone.recon.spi.impl.ReconNamespaceSummaryManagerImpl;
-import org.apache.ozone.test.GenericTestUtils;
-import org.hadoop.ozone.recon.schema.tables.daos.GlobalStatsDao;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
-import org.junit.platform.commons.logging.Logger;
-import org.junit.platform.commons.logging.LoggerFactory;
 
 import javax.ws.rs.core.Response;
 
@@ -60,8 +44,6 @@ import javax.ws.rs.core.Response;
  */
 public class TestNSSummaryEndpoint {
 
-  private static Logger LOG =
-      LoggerFactory.getLogger(TestNSSummaryEndpoint.class);
   private static boolean omRatisEnabled = true;
 
   private static MiniOzoneCluster cluster;
@@ -80,12 +62,6 @@ public class TestNSSummaryEndpoint {
   @BeforeAll
   public static void init() throws Exception {
     OzoneConfiguration conf = new OzoneConfiguration();
-    conf.setInt(OZONE_DIR_DELETING_SERVICE_INTERVAL, 1000000);
-    conf.setInt(OZONE_PATH_DELETING_LIMIT_PER_TASK, 0);
-    conf.setTimeDuration(OZONE_BLOCK_DELETING_SERVICE_INTERVAL, 10000000,
-        TimeUnit.MILLISECONDS);
-    conf.setBoolean(OZONE_OM_RATIS_ENABLE_KEY, omRatisEnabled);
-    conf.setBoolean(OZONE_ACL_ENABLED, true);
     cluster = MiniOzoneCluster.newBuilder(conf)
         .setNumDatanodes(3)
         .includeRecon(true)
@@ -198,10 +174,10 @@ public class TestNSSummaryEndpoint {
     verifyOrdering(nsSummaryEndpoint, VOLUME_B + "/" + BUCKET_B1);
   }
 
-  private void verifyOrdering(NSSummaryEndpoint nsSummaryEndpoint, String Path)
+  private void verifyOrdering(NSSummaryEndpoint nsSummaryEndpoint, String path)
       throws IOException {
     Response response =
-        nsSummaryEndpoint.getDiskUsage(Path, true, false);
+        nsSummaryEndpoint.getDiskUsage(path, true, false);
     DUResponse duRes = (DUResponse) response.getEntity();
     List<DUResponse.DiskUsage> duData = duRes.getDuData();
     List<DUResponse.DiskUsage> sortedDuData = new ArrayList<>(duData);
@@ -212,7 +188,7 @@ public class TestNSSummaryEndpoint {
     for (int i = 0; i < duData.size(); i++) {
       assertEquals(sortedDuData.get(i).getSubpath(),
           duData.get(i).getSubpath(),
-          "DU-Sub-Path under " + Path +
+          "DU-Sub-Path under " + path +
               " should be sorted by descending order of size");
     }
   }
@@ -241,29 +217,27 @@ public class TestNSSummaryEndpoint {
     volumeB.createBucket(BUCKET_B1);
 
     // Define the structure and size in KB for the filesystem
-    Map<String, Integer> fileSystemStructure =
-        new LinkedHashMap<String, Integer>() {{
-          put("vola/bucketa1/fileA1", 600);
-          put("vola/bucketa1/fileA2", 800);
-          put("vola/bucketa1/dirA1", 1500);
-          put("vola/bucketa1/dirA2", 1700);
-          put("vola/bucketa1/dirA3", 1300);
-          put("vola/bucketa2/fileA3", 200);
-          put("vola/bucketa2/fileA4", 400);
-          put("vola/bucketa2/dirA4", 1100);
-          put("vola/bucketa2/dirA5", 1900);
-          put("vola/bucketa2/dirA6", 2100);
-          put("vola/bucketa3/fileA5", 500);
-          put("vola/bucketa3/fileA6", 700);
-          put("vola/bucketa3/dirA7", 1200);
-          put("vola/bucketa3/dirA8", 1600);
-          put("vola/bucketa3/dirA9", 1800);
-          put("volb/bucketb1/fileB1", 300);
-          put("volb/bucketb1/fileB2", 500);
-          put("volb/bucketb1/dirB1", 1400);
-          put("volb/bucketb1/dirB2", 1800);
-          put("volb/bucketb1/dirB3", 2200);
-        }};
+    Map<String, Integer> fileSystemStructure = new LinkedHashMap<>();
+    fileSystemStructure.put("vola/bucketa1/fileA1", 600);
+    fileSystemStructure.put("vola/bucketa1/fileA2", 800);
+    fileSystemStructure.put("vola/bucketa1/dirA1", 1500);
+    fileSystemStructure.put("vola/bucketa1/dirA2", 1700);
+    fileSystemStructure.put("vola/bucketa1/dirA3", 1300);
+    fileSystemStructure.put("vola/bucketa2/fileA3", 200);
+    fileSystemStructure.put("vola/bucketa2/fileA4", 400);
+    fileSystemStructure.put("vola/bucketa2/dirA4", 1100);
+    fileSystemStructure.put("vola/bucketa2/dirA5", 1900);
+    fileSystemStructure.put("vola/bucketa2/dirA6", 2100);
+    fileSystemStructure.put("vola/bucketa3/fileA5", 500);
+    fileSystemStructure.put("vola/bucketa3/fileA6", 700);
+    fileSystemStructure.put("vola/bucketa3/dirA7", 1200);
+    fileSystemStructure.put("vola/bucketa3/dirA8", 1600);
+    fileSystemStructure.put("vola/bucketa3/dirA9", 1800);
+    fileSystemStructure.put("volb/bucketb1/fileB1", 300);
+    fileSystemStructure.put("volb/bucketb1/fileB2", 500);
+    fileSystemStructure.put("volb/bucketb1/dirB1", 1400);
+    fileSystemStructure.put("volb/bucketb1/dirB2", 1800);
+    fileSystemStructure.put("volb/bucketb1/dirB3", 2200);
 
     // Create files and directories
     for (Map.Entry<String, Integer> entry : fileSystemStructure.entrySet()) {
