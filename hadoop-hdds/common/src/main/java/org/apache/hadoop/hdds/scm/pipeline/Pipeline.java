@@ -35,6 +35,7 @@ import java.util.UUID;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableMap;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.builder.EqualsBuilder;
 import org.apache.commons.lang3.builder.HashCodeBuilder;
@@ -78,7 +79,7 @@ public final class Pipeline {
 
   private final PipelineState state;
   private final Map<DatanodeDetails, Long> nodeStatus;
-  private Map<DatanodeDetails, Integer> replicaIndexes;
+  private final Map<DatanodeDetails, Integer> replicaIndexes;
   // nodes with ordered distance to client
   private final ImmutableList<DatanodeDetails> nodesInOrder;
   // Current reported Leader for the pipeline
@@ -108,12 +109,12 @@ public final class Pipeline {
     id = b.id;
     replicationConfig = b.replicationConfig;
     state = b.state;
-    nodeStatus = b.nodeStatus;
-    nodesInOrder = b.nodesInOrder == null ? ImmutableList.of() : ImmutableList.copyOf(b.nodesInOrder);
-    suggestedLeaderId = b.suggestedLeaderId;
-    creationTimestamp = b.creationTimestamp != null ? b.creationTimestamp : Instant.now();
     leaderId = b.leaderId;
-    replicaIndexes = b.replicaIndexes;
+    suggestedLeaderId = b.suggestedLeaderId;
+    nodeStatus = b.nodeStatus;
+    nodesInOrder = b.nodesInOrder != null ? ImmutableList.copyOf(b.nodesInOrder) : ImmutableList.of();
+    replicaIndexes = b.replicaIndexes != null ? ImmutableMap.copyOf(b.replicaIndexes) : ImmutableMap.of();
+    creationTimestamp = b.creationTimestamp != null ? b.creationTimestamp : Instant.now();
     stateEnterTime = Instant.now();
   }
 
@@ -311,11 +312,6 @@ public final class Pipeline {
     return state == PipelineState.OPEN;
   }
 
-  public boolean isAllocationTimeout() {
-    //TODO: define a system property to control the timeout value
-    return false;
-  }
-
   public List<DatanodeDetails> getNodesInOrder() {
     if (nodesInOrder.isEmpty()) {
       LOG.debug("Nodes in order is empty, delegate to getNodes");
@@ -399,19 +395,18 @@ public final class Pipeline {
 
     // To save the message size on wire, only transfer the node order based on
     // network topology
-    List<DatanodeDetails> nodes = nodesInOrder;
-    if (!nodes.isEmpty()) {
-      for (int i = 0; i < nodes.size(); i++) {
+    if (!nodesInOrder.isEmpty()) {
+      for (int i = 0; i < nodesInOrder.size(); i++) {
         Iterator<DatanodeDetails> it = nodeStatus.keySet().iterator();
         for (int j = 0; j < nodeStatus.keySet().size(); j++) {
-          if (it.next().equals(nodes.get(i))) {
+          if (it.next().equals(nodesInOrder.get(i))) {
             builder.addMemberOrders(j);
             break;
           }
         }
       }
       if (LOG.isDebugEnabled()) {
-        LOG.debug("Serialize pipeline {} with nodesInOrder {}", id, nodes);
+        LOG.debug("Serialize pipeline {} with nodesInOrder {}", id, nodesInOrder);
       }
     }
     return builder.build();
@@ -422,6 +417,10 @@ public final class Pipeline {
     return toBuilder(proto)
         .setCreateTimestamp(Instant.now())
         .build();
+  }
+
+  public Pipeline copyWithNodesInOrder(List<DatanodeDetails> nodes) {
+    return toBuilder().setNodesInOrder(nodes).build();
   }
 
   public Builder toBuilder() {
@@ -529,10 +528,6 @@ public final class Pipeline {
     return new Builder(pipeline);
   }
 
-  private void setReplicaIndexes(Map<DatanodeDetails, Integer> replicaIndexes) {
-    this.replicaIndexes = replicaIndexes;
-  }
-
   /**
    * Builder class for Pipeline.
    */
@@ -546,7 +541,7 @@ public final class Pipeline {
     private UUID leaderId = null;
     private Instant creationTimestamp = null;
     private UUID suggestedLeaderId = null;
-    private Map<DatanodeDetails, Integer> replicaIndexes = new HashMap<>();
+    private Map<DatanodeDetails, Integer> replicaIndexes;
 
     public Builder() { }
 
@@ -559,8 +554,8 @@ public final class Pipeline {
       this.leaderId = pipeline.getLeaderId();
       this.creationTimestamp = pipeline.getCreationTimestamp();
       this.suggestedLeaderId = pipeline.getSuggestedLeaderId();
-      this.replicaIndexes = new HashMap<>();
       if (nodeStatus != null) {
+        replicaIndexes = new HashMap<>();
         for (DatanodeDetails dn : nodeStatus.keySet()) {
           int index = pipeline.getReplicaIndex(dn);
           if (index > 0) {

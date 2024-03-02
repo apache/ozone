@@ -27,6 +27,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.concurrent.TimeoutException;
 
 import org.apache.commons.lang3.StringUtils;
@@ -209,12 +210,11 @@ public class SCMBlockProtocolServer implements
             final List<DatanodeDetails> nodes = block.getPipeline().getNodes();
             final List<DatanodeDetails> sorted = scm.getClusterMap()
                 .sortByDistanceCost(client, nodes, nodes.size());
-            block = block.toBuilder()
-                .setPipeline(block.getPipeline()
-                    .toBuilder()
-                    .setNodesInOrder(sorted)
-                    .build())
-                .build();
+            if (!Objects.equals(sorted, block.getPipeline().getNodesInOrder())) {
+              block = block.toBuilder()
+                  .setPipeline(block.getPipeline().copyWithNodesInOrder(sorted))
+                  .build();
+            }
           }
           blocks.add(block);
         }
