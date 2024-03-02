@@ -19,7 +19,7 @@
 
 package org.apache.hadoop.ozone;
 
-import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.google.protobuf.ByteString;
 import org.apache.hadoop.hdds.utils.db.CopyObject;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OzoneAclInfo;
@@ -48,12 +48,12 @@ import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType.NON
  * <li>world::rw
  * </ul>
  */
-@JsonIgnoreProperties(value = {"aclBitSet"})
 public class OzoneAcl implements CopyObject<OzoneAcl> {
 
   private static final String ACL_SCOPE_REGEX = ".*\\[(ACCESS|DEFAULT)\\]";
   private final ACLIdentityType type;
   private final String name;
+  @JsonIgnore
   private final BitSet aclBitSet;
   private final AclScope aclScope;
   private static final List<ACLType> EMPTY_LIST = new ArrayList<>(0);
@@ -252,6 +252,7 @@ public class OzoneAcl implements CopyObject<OzoneAcl> {
     return name;
   }
 
+  @JsonIgnore
   public boolean isEmpty() {
     return aclBitSet.isEmpty();
   }
@@ -284,6 +285,7 @@ public class OzoneAcl implements CopyObject<OzoneAcl> {
         : new OzoneAcl(type, name, aclScope, cloneBits);
   }
 
+  @JsonIgnore
   public byte[] getAclByteArray() {
     return aclBitSet.toByteArray();
   }
