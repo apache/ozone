@@ -19,6 +19,7 @@
 package org.apache.hadoop.ozone.om.helpers;
 
 import com.google.common.base.Preconditions;
+import com.google.common.collect.ImmutableList;
 import org.apache.hadoop.hdds.utils.db.Codec;
 import org.apache.hadoop.hdds.utils.db.DelegatedCodec;
 import org.apache.hadoop.hdds.utils.db.Proto2Codec;
@@ -48,7 +49,7 @@ public final class OmPrefixInfo extends WithObjectID {
   }
 
   private String name;
-  private List<OzoneAcl> acls;
+  private final List<OzoneAcl> acls;
 
   public OmPrefixInfo(String name, List<OzoneAcl> acls,
       Map<String, String> metadata, long objectId, long updateId) {
@@ -64,7 +65,7 @@ public final class OmPrefixInfo extends WithObjectID {
    * @return {@literal List<OzoneAcl>}
    */
   public List<OzoneAcl> getAcls() {
-    return acls;
+    return ImmutableList.copyOf(acls);
   }
 
   public boolean addAcl(OzoneAcl acl) {
