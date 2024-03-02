@@ -29,7 +29,10 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.BitSet;
 import java.util.List;
+import java.util.Objects;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
+
 import org.apache.hadoop.security.UserGroupInformation;
 
 import static org.apache.hadoop.ozone.OzoneAcl.AclScope.ACCESS;
@@ -91,23 +94,22 @@ public final class OzoneAclUtil {
 
   private static boolean checkAccessInAcl(OzoneAcl a, UserGroupInformation ugi,
       ACLType aclToCheck) {
-    BitSet rights = a.getAclBitSet();
     switch (a.getType()) {
     case USER:
       if (a.getName().equals(ugi.getShortUserName())) {
-        return checkIfAclBitIsSet(aclToCheck, rights);
+        return a.checkAccess(aclToCheck);
       }
       break;
     case GROUP:
       for (String grp : ugi.getGroupNames()) {
         if (a.getName().equals(grp)) {
-          return checkIfAclBitIsSet(aclToCheck, rights);
+          return a.checkAccess(aclToCheck);
         }
       }
       break;
 
     default:
-      return checkIfAclBitIsSet(aclToCheck, rights);
+      return a.checkAccess(aclToCheck);
     }
     return false;
   }
@@ -160,33 +162,28 @@ public final class OzoneAclUtil {
    * OzoneUtils.addAcl().
    * @param acls
    * @param parentAcls
+   * @param scope
    * @return true if acls inherited DEFAULT acls from parentAcls successfully,
    * false otherwise.
    */
   public static boolean inheritDefaultAcls(List<OzoneAcl> acls,
-      List<OzoneAcl> parentAcls) {
+      List<OzoneAcl> parentAcls, OzoneAcl.AclScope scope) {
     List<OzoneAcl> inheritedAcls = null;
     if (parentAcls != null && !parentAcls.isEmpty()) {
-      inheritedAcls = parentAcls.stream()
-          .filter(a -> a.getAclScope() == DEFAULT)
-          .map(acl -> new OzoneAcl(acl.getType(), acl.getName(),
-              acl.getAclBitSet(), ACCESS))
-          .collect(Collectors.toList());
+      Stream<OzoneAcl> aclStream = parentAcls.stream()
+          .filter(a -> a.getAclScope() == DEFAULT);
+
+      if (scope != DEFAULT) {
+        aclStream = aclStream.map(acl -> acl.withScope(scope));
+      }
+
+      inheritedAcls = aclStream.collect(Collectors.toList());
     }
     if (inheritedAcls != null && !inheritedAcls.isEmpty()) {
       inheritedAcls.stream().forEach(acl -> addAcl(acls, acl));
       return true;
     }
     return false;
-  }
-
-  /**
-   * Helper function to convert the scope of ACLs to DEFAULT.
-   * This method is called in ACL inheritance scenarios.
-   * @param acls
-   */
-  public static void toDefaultScope(List<OzoneAcl> acls) {
-    acls.forEach(a -> a.setAclScope(DEFAULT));
   }
 
   /**
@@ -217,8 +214,6 @@ public final class OzoneAclUtil {
 
   /**
    * Add an OzoneAcl to existing list of OzoneAcls.
-   * @param existingAcls
-   * @param acl
    * @return true if current OzoneAcls are changed, false otherwise.
    */
   public static boolean addAcl(List<OzoneAcl> existingAcls, OzoneAcl acl) {
@@ -226,17 +221,17 @@ public final class OzoneAclUtil {
       return false;
     }
 
-    for (OzoneAcl a: existingAcls) {
+    for (int i = 0; i < existingAcls.size(); i++) {
+      final OzoneAcl a = existingAcls.get(i);
       if (a.getName().equals(acl.getName()) &&
           a.getType().equals(acl.getType()) &&
           a.getAclScope().equals(acl.getAclScope())) {
-        BitSet current = a.getAclBitSet();
-        BitSet original = (BitSet) current.clone();
-        current.or(acl.getAclBitSet());
-        if (current.equals(original)) {
-          return false;
+        final OzoneAcl updated = a.add(acl);
+        final boolean changed = !Objects.equals(updated, a);
+        if (changed) {
+          existingAcls.set(i, updated);
         }
-        return true;
+        return changed;
       }
     }
 
@@ -246,8 +241,6 @@ public final class OzoneAclUtil {
 
   /**
    * remove OzoneAcl from existing list of OzoneAcls.
-   * @param existingAcls
-   * @param acl
    * @return true if current OzoneAcls are changed, false otherwise.
    */
   public static boolean removeAcl(List<OzoneAcl> existingAcls, OzoneAcl acl) {
@@ -255,22 +248,19 @@ public final class OzoneAclUtil {
       return false;
     }
 
-    for (OzoneAcl a: existingAcls) {
+    for (int i = 0; i < existingAcls.size(); i++) {
+      final OzoneAcl a = existingAcls.get(i);
       if (a.getName().equals(acl.getName()) &&
           a.getType().equals(acl.getType()) &&
           a.getAclScope().equals(acl.getAclScope())) {
-        BitSet current = a.getAclBitSet();
-        BitSet original = (BitSet) current.clone();
-        current.andNot(acl.getAclBitSet());
-
-        if (current.equals(original)) {
-          return false;
+        final OzoneAcl updated = a.remove(acl);
+        final boolean changed = !Objects.equals(updated, a);
+        if (updated.isEmpty()) {
+          existingAcls.remove(i);
+        } else if (changed) {
+          existingAcls.set(i, updated);
         }
-
-        if (current.isEmpty()) {
-          existingAcls.remove(a);
-        }
-        return true;
+        return changed;
       }
     }
     return false;
@@ -293,5 +283,14 @@ public final class OzoneAclUtil {
       }
     }
     return true;
+  }
+
+  public static List<OzoneAcl> deepCopy(List<OzoneAcl> acls) {
+    if (acls == null || acls.isEmpty()) {
+      return acls;
+    }
+    return acls.stream()
+        .map(OzoneAcl::copyObject)
+        .collect(Collectors.toList());
   }
 }

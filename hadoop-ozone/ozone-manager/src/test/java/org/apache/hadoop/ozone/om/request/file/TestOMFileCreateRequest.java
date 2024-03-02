@@ -495,7 +495,7 @@ public class TestOMFileCreateRequest extends TestOMKeyRequest {
           List<OzoneAcl> fileAcls = omDirInfo.getAcls();
           System.out.println("  file acls : " + omKeyInfo + " ==> " + fileAcls);
           assertEquals(expectedInheritAcls.stream()
-                  .map(acl -> acl.setAclScope(OzoneAcl.AclScope.ACCESS))
+                  .map(acl -> acl.withScope(OzoneAcl.AclScope.ACCESS))
                   .collect(Collectors.toList()), fileAcls,
               "Failed to inherit parent DEFAULT acls!");
         }
@@ -514,7 +514,7 @@ public class TestOMFileCreateRequest extends TestOMKeyRequest {
       // Should inherit parent DEFAULT acls
       // [user:newUser:rw[ACCESS], group:newGroup:rwl[ACCESS]]
       assertEquals(parentDefaultAcl.stream()
-              .map(acl -> acl.setAclScope(OzoneAcl.AclScope.ACCESS))
+              .map(acl -> acl.withScope(OzoneAcl.AclScope.ACCESS))
               .collect(Collectors.toList()), keyAcls,
           "Failed to inherit bucket DEFAULT acls!");
       // Should not inherit parent ACCESS acls

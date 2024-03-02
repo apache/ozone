@@ -19,7 +19,6 @@ package org.apache.hadoop.ozone.om.helpers;
 
 
 import java.util.ArrayList;
-import java.util.BitSet;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -343,9 +342,7 @@ public final class OmBucketInfo extends WithObjectID implements Auditable {
     }
 
     builder.acls.clear();
-    acls.forEach(acl -> builder.addAcl(new OzoneAcl(acl.getType(),
-        acl.getName(), (BitSet) acl.getAclBitSet().clone(),
-        acl.getAclScope())));
+    acls.forEach(acl -> builder.addAcl(acl.copyObject()));
 
     if (defaultReplicationConfig != null) {
       builder.setDefaultReplicationConfig(defaultReplicationConfig.copy());

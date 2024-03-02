@@ -18,7 +18,6 @@
 package org.apache.hadoop.ozone.om.helpers;
 
 import java.util.ArrayList;
-import java.util.BitSet;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -477,14 +476,10 @@ public final class OmVolumeArgs extends WithObjectID
   public OmVolumeArgs copyObject() {
     Map<String, String> cloneMetadata = new HashMap<>();
     if (getMetadata() != null) {
-      getMetadata().forEach((k, v) -> cloneMetadata.put(k, v));
+      cloneMetadata.putAll(getMetadata());
     }
 
-    List<OzoneAcl> cloneAcls = new ArrayList(acls.size());
-
-    acls.forEach(acl -> cloneAcls.add(new OzoneAcl(acl.getType(),
-        acl.getName(), (BitSet) acl.getAclBitSet().clone(),
-        acl.getAclScope())));
+    List<OzoneAcl> cloneAcls = OzoneAclUtil.deepCopy(acls);
 
     return new OmVolumeArgs(adminName, ownerName, volume, quotaInBytes,
         quotaInNamespace, usedNamespace, cloneMetadata, cloneAcls,

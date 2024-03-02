@@ -920,7 +920,7 @@ public class TestOMKeyCreateRequest extends TestOMKeyRequest {
 
     // Should inherit parent DEFAULT Acls
     assertEquals(parentDefaultAcl.stream()
-            .map(acl -> acl.setAclScope(OzoneAcl.AclScope.ACCESS))
+            .map(acl -> acl.withScope(OzoneAcl.AclScope.ACCESS))
             .collect(Collectors.toList()), keyAcls,
         "Failed to inherit parent DEFAULT acls!,");
 

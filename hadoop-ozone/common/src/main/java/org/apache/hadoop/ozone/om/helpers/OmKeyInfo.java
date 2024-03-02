@@ -19,7 +19,6 @@ package org.apache.hadoop.ozone.om.helpers;
 
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.BitSet;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -798,9 +797,7 @@ public final class OmKeyInfo extends WithParentObjectId
                 keyLocationVersion.getLocationList(),
                 keyLocationVersion.isMultipartKey())));
 
-    acls.forEach(acl -> builder.addAcl(new OzoneAcl(acl.getType(),
-            acl.getName(), (BitSet) acl.getAclBitSet().clone(),
-        acl.getAclScope())));
+    acls.forEach(acl -> builder.addAcl(acl.copyObject()));
 
     if (getMetadata() != null) {
       getMetadata().forEach((k, v) -> builder.addMetadata(k, v));

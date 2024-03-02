@@ -39,6 +39,7 @@ import java.util.List;
 import java.util.Objects;
 import java.util.stream.Collectors;
 
+import static org.apache.hadoop.ozone.OzoneAcl.AclScope.ACCESS;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.BUCKET_NOT_FOUND;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.PREFIX_NOT_FOUND;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.VOLUME_NOT_FOUND;
@@ -294,7 +295,7 @@ public class PrefixManagerImpl implements PrefixManager {
       OmPrefixInfo parentPrefixInfo = prefixList.get(prefixList.size() - 1);
       if (parentPrefixInfo != null) {
         prefixParentFound = OzoneAclUtil.inheritDefaultAcls(
-            aclsToBeSet, parentPrefixInfo.getAcls());
+            aclsToBeSet, parentPrefixInfo.getAcls(), ACCESS);
       }
     }
 
@@ -305,7 +306,7 @@ public class PrefixManagerImpl implements PrefixManager {
       OmBucketInfo bucketInfo = metadataManager.getBucketTable().
           get(bucketKey);
       if (bucketInfo != null) {
-        OzoneAclUtil.inheritDefaultAcls(aclsToBeSet, bucketInfo.getAcls());
+        OzoneAclUtil.inheritDefaultAcls(aclsToBeSet, bucketInfo.getAcls(), ACCESS);
       }
     }
   }

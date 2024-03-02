@@ -25,7 +25,6 @@ import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.DirectoryInfo;
 
-import java.util.BitSet;
 import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
@@ -266,9 +265,7 @@ public class OmDirectoryInfo extends WithParentObjectId
             .setObjectID(getObjectID())
             .setUpdateID(getUpdateID());
 
-    acls.forEach(acl -> builder.addAcl(new OzoneAcl(acl.getType(),
-            acl.getName(), (BitSet) acl.getAclBitSet().clone(),
-            acl.getAclScope())));
+    acls.forEach(acl -> builder.addAcl(acl.copyObject()));
 
     if (getMetadata() != null) {
       builder.addAllMetadata(getMetadata());
