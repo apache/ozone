@@ -492,7 +492,7 @@ public class TestOMFileCreateRequest extends TestOMKeyRequest {
         if (indx == dirs.size() - 1) {
           // verify file acls
           assertEquals(omDirInfo.getObjectID(), omKeyInfo.getParentObjectID());
-          List<OzoneAcl> fileAcls = omDirInfo.getAcls();
+          List<OzoneAcl> fileAcls = omKeyInfo.getAcls();
           System.out.println("  file acls : " + omKeyInfo + " ==> " + fileAcls);
           assertEquals(expectedInheritAcls.stream()
                   .map(acl -> acl.withScope(OzoneAcl.AclScope.ACCESS))
