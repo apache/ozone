@@ -19,11 +19,9 @@ package org.apache.hadoop.ozone.s3;
 
 import javax.annotation.Priority;
 import javax.inject.Inject;
-import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.container.ContainerRequestContext;
 import javax.ws.rs.container.ContainerRequestFilter;
 import javax.ws.rs.container.PreMatching;
-import javax.ws.rs.core.Response;
 import javax.ws.rs.ext.Provider;
 
 import com.google.common.annotations.VisibleForTesting;
