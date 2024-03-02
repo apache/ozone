@@ -128,7 +128,7 @@ public class TestOzoneShellHA {
   private static File baseDir;
   private static File testFile;
   private static String testFilePathString;
-  private static MiniOzoneCluster cluster = null;
+  private static MiniOzoneHAClusterImpl cluster = null;
   private static File testDir;
   private static MiniKMS miniKMS;
   private static OzoneClient client;
@@ -184,11 +184,11 @@ public class TestOzoneShellHA {
     conf.set(CommonConfigurationKeysPublic.HADOOP_SECURITY_KEY_PROVIDER_PATH,
         getKeyProviderURI(miniKMS));
     conf.setBoolean(OMConfigKeys.OZONE_OM_ENABLE_FILESYSTEM_PATHS, true);
-    cluster = MiniOzoneCluster.newOMHABuilder(conf)
-        .setOMServiceId(omServiceId)
+    MiniOzoneHAClusterImpl.Builder builder = MiniOzoneCluster.newHABuilder(conf);
+    builder.setOMServiceId(omServiceId)
         .setNumOfOzoneManagers(numOfOMs)
-        .setNumDatanodes(numDNs)
-        .build();
+        .setNumDatanodes(numDNs);
+    cluster = builder.build();
     cluster.waitForClusterToBeReady();
     client = cluster.newClient();
   }
@@ -285,8 +285,7 @@ public class TestOzoneShellHA {
    * @return the leader OM's Node ID in the MiniOzoneHACluster.
    */
   private String getLeaderOMNodeId() {
-    MiniOzoneHAClusterImpl haCluster = (MiniOzoneHAClusterImpl) cluster;
-    OzoneManager omLeader = haCluster.getOMLeader();
+    OzoneManager omLeader = cluster.getOMLeader();
     assertNotNull(omLeader, "There should be a leader OM at this point.");
     return omLeader.getOMNodeId();
   }

@@ -86,7 +86,6 @@ import org.apache.hadoop.hdds.utils.db.RocksDatabase;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedWriteBatch;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedWriteOptions;
 import org.apache.hadoop.ozone.common.DBUpdates;
-import org.apache.hadoop.ozone.recon.ReconServerConfigKeys;
 import org.apache.hadoop.ozone.recon.ReconUtils;
 import org.apache.hadoop.ozone.recon.fsck.ContainerHealthTask;
 import org.apache.hadoop.ozone.recon.fsck.ReconSafeModeMgrTask;
@@ -435,12 +434,8 @@ public class ReconStorageContainerManagerFacade
       LOG.error("Error staring Recon SCM Metadata Manager.", ioEx);
     }
     reconTaskController.start();
-    long initialDelay = ozoneConfiguration.getTimeDuration(
-        OZONE_RECON_SCM_SNAPSHOT_TASK_INITIAL_DELAY,
-        ozoneConfiguration.get(
-            ReconServerConfigKeys.RECON_OM_SNAPSHOT_TASK_INITIAL_DELAY,
-            OZONE_RECON_SCM_SNAPSHOT_TASK_INITIAL_DELAY_DEFAULT),
-        TimeUnit.MILLISECONDS);
+    long initialDelay = ozoneConfiguration.getTimeDuration(OZONE_RECON_SCM_SNAPSHOT_TASK_INITIAL_DELAY,
+            OZONE_RECON_SCM_SNAPSHOT_TASK_INITIAL_DELAY_DEFAULT, TimeUnit.MILLISECONDS);
 
     // This schedules a periodic task to sync Recon's copy of SCM metadata
     // with SCM metadata rocks DB. Gets full snapshot or delta updates.
@@ -509,9 +504,7 @@ public class ReconStorageContainerManagerFacade
 
   private void scheduleSyncDataFromSCM(long initialDelay) {
     long interval = ozoneConfiguration.getTimeDuration(OZONE_RECON_SCM_SNAPSHOT_TASK_INTERVAL_DELAY,
-        ozoneConfiguration.get(OZONE_RECON_SCM_SNAPSHOT_TASK_INTERVAL_DELAY,
-            OZONE_RECON_SCM_SNAPSHOT_TASK_INTERVAL_DEFAULT),
-        TimeUnit.MILLISECONDS);
+            OZONE_RECON_SCM_SNAPSHOT_TASK_INTERVAL_DEFAULT, TimeUnit.MILLISECONDS);
     if (LOG.isDebugEnabled()) {
       LOG.debug("Started the Recon SCM DB sync scheduler.");
     }

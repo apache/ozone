@@ -81,6 +81,8 @@ import org.apache.hadoop.ozone.recon.persistence.AbstractReconSqlDBTest;
 import org.apache.hadoop.ozone.recon.persistence.ContainerHealthSchemaManager;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 import org.apache.hadoop.ozone.recon.scm.ReconPipelineManager;
+import org.apache.hadoop.ozone.recon.scm.ReconScmMetadataManager;
+import org.apache.hadoop.ozone.recon.scm.ReconScmMetadataManagerImpl;
 import org.apache.hadoop.ozone.recon.scm.ReconStorageContainerManagerFacade;
 import org.apache.hadoop.ozone.recon.spi.StorageContainerServiceProvider;
 import org.apache.hadoop.ozone.recon.spi.impl.OzoneManagerServiceProviderImpl;
@@ -88,6 +90,8 @@ import org.apache.hadoop.ozone.recon.spi.impl.StorageContainerServiceProviderImp
 import org.apache.hadoop.ozone.recon.tasks.ContainerSizeCountTask;
 import org.apache.hadoop.ozone.recon.tasks.FileSizeCountTask;
 import org.apache.hadoop.ozone.recon.tasks.OmTableInsightTask;
+import org.apache.hadoop.ozone.recon.tasks.ReconTaskController;
+import org.apache.hadoop.ozone.recon.tasks.ReconTaskControllerImpl;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
 import org.apache.ozone.test.LambdaTestUtils;
 import org.hadoop.ozone.recon.schema.UtilizationSchemaDefinition;
@@ -113,6 +117,7 @@ import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.writeDele
 import static org.apache.hadoop.ozone.recon.spi.impl.PrometheusServiceProviderImpl.PROMETHEUS_INSTANT_QUERY_API;
 import static org.hadoop.ozone.recon.schema.tables.GlobalStatsTable.GLOBAL_STATS;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -252,6 +257,10 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
         new ReconTestInjector.Builder(temporaryFolder.toFile())
             .withReconSqlDb()
             .withReconOm(reconOMMetadataManager)
+            .addModule(new AbstractReconSqlDBTest.ReconOmTaskBindingModule())
+            .addModule(new AbstractReconSqlDBTest.ReconSCMMetadataTaskBindingModule())
+            .addBinding(ReconTaskController.class, ReconTaskControllerImpl.class)
+            .addBinding(ReconScmMetadataManager.class, ReconScmMetadataManagerImpl.class)
             .withOmServiceProvider(mock(OzoneManagerServiceProviderImpl.class))
             .addBinding(StorageContainerServiceProvider.class,
                 mockScmServiceProvider)
@@ -406,7 +415,7 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
             .addStorageReport(storageReportProto4).build();
     LayoutVersionProto layoutInfo = defaultLayoutVersionProto();
 
-    try {
+    assertDoesNotThrow(() -> {
       reconScm.getDatanodeProtocolServer()
           .register(extendedDatanodeDetailsProto, nodeReportProto,
               containerReportsProto, pipelineReportsProto, layoutInfo);
@@ -417,9 +426,7 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
               defaultLayoutVersionProto());
       // Process all events in the event queue
       reconScm.getEventQueue().processAll(1000);
-    } catch (Exception ex) {
-      fail(ex.getMessage());
-    }
+    });
     // Write Data to OM
     // A sample volume (sampleVol) and a bucket (bucketOne) is already created
     // in AbstractOMMetadataManagerTest.

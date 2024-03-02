@@ -24,17 +24,14 @@ import moment from 'moment';
 import { showDataFetchError, byteToSize } from 'utils/common';
 import './om.less';
 import { ColumnSearch } from 'utils/columnSearch';
-import { Link } from 'react-router-dom';
 import { AxiosGetHelper, cancelRequests } from 'utils/axiosRequestHelper';
+import {IOption} from "../../../components/multiSelect/multiSelect";
+import {ActionMeta, ValueType} from "react-select";
+import CreatableSelect from "react-select/creatable";
 
 
 const size = filesize.partial({ standard: 'iec' });
 const { TabPane } = Tabs;
-//Previous Key Need to store respective Lastkey of each API
-let mismatchPrevKeyList = [0];
-let openPrevKeyList =[""];
-let keysPendingPrevList =[""];
-let deletedKeysPrevList =[0];
 let keysPendingExpanded: any = [];
 interface IContainerResponse {
   containerId: number;
@@ -166,7 +163,7 @@ const MISMATCH_TAB_COLUMNS = [
 
 const OPEN_KEY_TAB_COLUMNS = [
   {
-    title: 'Key',
+    title: 'Key Name',
     dataIndex: 'path',
     key: 'path',
     isSearchable: true
@@ -295,18 +292,21 @@ interface IOmdbInsightsState {
   pendingDeleteKeyDataSource: any[];
   expandedRowData: IExpandedRow;
   deletedContainerKeysDataSource: [];
-  prevKeyMismatch: number;
   mismatchMissingState: any;
-  prevKeyOpen: string;
-  prevKeyDeleted: number;
-  prevKeyDeletePending: string;
   activeTab: string;
-  DEFAULT_LIMIT: number,
-  nextClickable: boolean;
   includeFso: boolean;
   includeNonFso: boolean;
-  prevClickable: boolean
+  selectedLimit: IOption;
 }
+
+const LIMIT_OPTIONS: IOption[] = [
+  {label: "1000", value: "1000"},
+  {label: "5000", value: "5000"},
+  {label: "10000", value: "10000"},
+  {label: "20000", value: "20000"}
+]
+
+const INITIAL_LIMIT_OPTION = LIMIT_OPTIONS[0]
 
 let cancelMismatchedEndpointSignal: AbortController;
 let cancelOpenKeysSignal: AbortController;
@@ -326,18 +326,12 @@ export class Om extends React.Component<Record<string, object>, IOmdbInsightsSta
       openKeysDataSource: [],
       pendingDeleteKeyDataSource: [],
       deletedContainerKeysDataSource: [],
-      prevKeyMismatch: 0,
       mismatchMissingState: 'SCM',
-      prevKeyOpen: "",
-      prevKeyDeletePending: "",
-      prevKeyDeleted: 0,
       expandedRowData: {},
       activeTab: props.location.state ? props.location.state.activeTab : '1',
-      DEFAULT_LIMIT: 10,
-      nextClickable: true,
       includeFso: true,
       includeNonFso: false,
-      prevClickable: false
+      selectedLimit: INITIAL_LIMIT_OPTION
     };
   }
 
@@ -389,12 +383,10 @@ export class Om extends React.Component<Record<string, object>, IOmdbInsightsSta
   handleExistsAtChange = (e: any) => {
     console.log("handleExistsAtChange", e.key);
     if (e.key === 'OM') {
-      mismatchPrevKeyList = [0];
-      this.fetchMismatchContainers(this.state.DEFAULT_LIMIT, 0, 'SCM');
+      this.fetchMismatchContainers('SCM');
     }
     else {
-      mismatchPrevKeyList = [0];
-      this.fetchMismatchContainers(this.state.DEFAULT_LIMIT, 0, 'OM');
+      this.fetchMismatchContainers('OM');
     }
   };
 
@@ -439,26 +431,28 @@ export class Om extends React.Component<Record<string, object>, IOmdbInsightsSta
 
   handlefsoNonfsoMenuChange = (e: any) => {
     if (e.key === 'fso') {
-      openPrevKeyList =[""];
-      this.fetchOpenKeys(true, false, this.state.DEFAULT_LIMIT, "");
+      this.fetchOpenKeys(true, false);
     }
     else {
-      openPrevKeyList = [""];
-      this.fetchOpenKeys(false, true, this.state.DEFAULT_LIMIT, "");
+      this.fetchOpenKeys(false, true);
     }
   };
 
-  componentDidMount(): void {
+  _loadData = () => {
     if (this.state.activeTab  === '1') {
-      this.fetchMismatchContainers(this.state.DEFAULT_LIMIT, this.state.prevKeyMismatch, this.state.mismatchMissingState);
+      this.fetchMismatchContainers(this.state.mismatchMissingState);
     } else if (this.state.activeTab === '2') {
-      this.fetchOpenKeys(this.state.includeFso, this.state.includeNonFso, this.state.DEFAULT_LIMIT, this.state.prevKeyOpen);
+      this.fetchOpenKeys(this.state.includeFso, this.state.includeNonFso);
     } else if (this.state.activeTab  === '3') {
       keysPendingExpanded =[];
-      this.fetchDeletePendingKeys(this.state.DEFAULT_LIMIT, this.state.prevKeyDeletePending);
+      this.fetchDeletePendingKeys();
     } else if (this.state.activeTab  === '4') {
-      this.fetchDeletedKeys(this.state.DEFAULT_LIMIT, this.state.prevKeyDeleted);
+      this.fetchDeletedKeys();
     }
+  }
+
+  componentDidMount(): void {
+    this._loadData();
   };
 
   componentWillUnmount(): void {
@@ -469,11 +463,9 @@ export class Om extends React.Component<Record<string, object>, IOmdbInsightsSta
     cancelRowExpandSignal && cancelRowExpandSignal.abort();
   }
 
-  fetchMismatchContainers = (limit: number, prevKeyMismatch: number, mismatchMissingState: any) => {
+  fetchMismatchContainers = (mismatchMissingState: any) => {
     this.setState({
       loading: true,
-      nextClickable: true,
-      prevClickable: true,
       mismatchMissingState
     });
 
@@ -486,36 +478,17 @@ export class Om extends React.Component<Record<string, object>, IOmdbInsightsSta
       cancelRowExpandSignal
     ]);
 
-    const mismatchEndpoint = `/api/v1/containers/mismatch?limit=${limit}&prevKey=${prevKeyMismatch}&missingIn=${mismatchMissingState}`
+    const mismatchEndpoint = `/api/v1/containers/mismatch?limit=${this.state.selectedLimit.value}&missingIn=${mismatchMissingState}`
     const { request, controller } = AxiosGetHelper(mismatchEndpoint, cancelMismatchedEndpointSignal)
     cancelMismatchedEndpointSignal = controller;
     request.then(mismatchContainersResponse => {
       const mismatchContainers: IContainerResponse[] = mismatchContainersResponse && mismatchContainersResponse.data && mismatchContainersResponse.data.containerDiscrepancyInfo;
-      if (mismatchContainersResponse && mismatchContainersResponse.data && mismatchContainersResponse.data.lastKey === null) {
-        //No Further Records may be last record
-        mismatchPrevKeyList = [0];
-        this.setState({
-          loading: false,
-          nextClickable: false,
-          mismatchDataSource: mismatchContainers,
-          expandedRowData: {},
-        })
-      }
-      else {
-        if (this.state.prevKeyMismatch === 0 ){
-          this.setState({
-            prevClickable: false
-          })
-        }
-        if (mismatchPrevKeyList.includes(mismatchContainersResponse.data.lastKey) === false) {
-          mismatchPrevKeyList.push(mismatchContainersResponse.data.lastKey);
-        }
-        this.setState({
-          loading: false,
-          prevKeyMismatch: mismatchContainersResponse && mismatchContainersResponse.data && mismatchContainersResponse.data.lastKey,
-          mismatchDataSource: mismatchContainers,
-        });
-      }
+
+      this.setState({
+        loading: false,
+        mismatchDataSource: mismatchContainers
+      });
+
     }).catch(error => {
       this.setState({
         loading: false,
@@ -524,11 +497,9 @@ export class Om extends React.Component<Record<string, object>, IOmdbInsightsSta
     });
   };
 
-  fetchOpenKeys = (includeFso: boolean, includeNonFso: boolean, limit: number, prevKeyOpen: string) => {
+  fetchOpenKeys = (includeFso: boolean, includeNonFso: boolean) => {
     this.setState({
       loading: true,
-      nextClickable: true,
-      prevClickable: true,
       includeFso,
       includeNonFso
     });
@@ -542,13 +513,7 @@ export class Om extends React.Component<Record<string, object>, IOmdbInsightsSta
       cancelRowExpandSignal
     ]);
 
-    let openKeysEndpoint;
-    if (prevKeyOpen === "") {
-      openKeysEndpoint = `/api/v1/keys/open?includeFso=${includeFso}&includeNonFso=${includeNonFso}&limit=${limit}`;
-    }
-    else {
-      openKeysEndpoint = `/api/v1/keys/open?includeFso=${includeFso}&includeNonFso=${includeNonFso}&limit=${limit}&prevKey=${prevKeyOpen}`;
-    }
+    let openKeysEndpoint = `/api/v1/keys/open?includeFso=${includeFso}&includeNonFso=${includeNonFso}&limit=${this.state.selectedLimit.value}`;
 
     const { request, controller } = AxiosGetHelper(openKeysEndpoint, cancelOpenKeysSignal)
     cancelOpenKeysSignal = controller
@@ -560,31 +525,11 @@ export class Om extends React.Component<Record<string, object>, IOmdbInsightsSta
           openKeys[key] && openKeys[key].map((item: any) => (allopenKeysResponse.push({ ...item, type: key })));
         }
       }
+      this.setState({
+        loading: false,
+        openKeysDataSource: allopenKeysResponse,
+      })
 
-      if (openKeysResponse && openKeysResponse.data && openKeysResponse.data.lastKey === "") {
-        //last key of api is null may be last record no further records
-        openPrevKeyList = [""];
-        this.setState({
-          loading: false,
-          nextClickable: false,
-          openKeysDataSource: allopenKeysResponse
-        })
-      }
-      else {
-         if (this.state.prevKeyOpen === "" ){
-          this.setState({
-            prevClickable: false
-          })
-        }
-        if (openPrevKeyList.includes(openKeysResponse.data.lastKey) === false) {
-          openPrevKeyList.push(openKeysResponse.data.lastKey);
-        }
-        this.setState({
-          loading: false,
-          prevKeyOpen: openKeysResponse && openKeysResponse.data && openKeysResponse.data.lastKey,
-          openKeysDataSource: allopenKeysResponse,
-        })
-      };
     }).catch(error => {
       this.setState({
         loading: false
@@ -594,11 +539,9 @@ export class Om extends React.Component<Record<string, object>, IOmdbInsightsSta
 
   };
 
-  fetchDeletePendingKeys = (limit: number, prevKeyDeletePending: string) => {
+  fetchDeletePendingKeys = () => {
     this.setState({
-      loading: true,
-      nextClickable: true,
-      prevClickable :true
+      loading: true
     });
 
      //Cancel any previous pending request
@@ -611,13 +554,7 @@ export class Om extends React.Component<Record<string, object>, IOmdbInsightsSta
     ]);
 
     keysPendingExpanded =[];
-    let deletePendingKeysEndpoint;
-    if (prevKeyDeletePending === "" || prevKeyDeletePending === undefined ) {
-      deletePendingKeysEndpoint = `/api/v1/keys/deletePending?limit=${limit}`;
-    }
-    else {
-      deletePendingKeysEndpoint = `/api/v1/keys/deletePending?limit=${limit}&prevKey=${prevKeyDeletePending}`;
-    }
+    let deletePendingKeysEndpoint = `/api/v1/keys/deletePending?limit=${this.state.selectedLimit.value}`;
 
     const { request, controller } = AxiosGetHelper(deletePendingKeysEndpoint, cancelDeletePendingSignal);
     cancelDeletePendingSignal = controller;
@@ -646,30 +583,11 @@ export class Om extends React.Component<Record<string, object>, IOmdbInsightsSta
         }
       });
 
-      if (deletePendingKeysResponse && deletePendingKeysResponse.data && deletePendingKeysResponse.data.lastKey === "") {
-        //last key of api is empty may be last record no further records
-        keysPendingPrevList =[""];
-        this.setState({
-          loading: false,
-          nextClickable: false,
-          pendingDeleteKeyDataSource: deletedKeyInfoData
-        })
-      }
-      else {
-           if (this.state.prevKeyDeletePending === "" ||this.state.prevKeyDeletePending === undefined ){
-          this.setState({
-            prevClickable: false
-          })
-        }
-        if (keysPendingPrevList.includes(deletePendingKeysResponse.data.lastKey) === false) {
-          keysPendingPrevList.push(deletePendingKeysResponse.data.lastKey);
-        }
-        this.setState({
-          loading: false,
-          prevKeyDeletePending: deletePendingKeysResponse && deletePendingKeysResponse.data && deletePendingKeysResponse.data.lastKey,
-          pendingDeleteKeyDataSource: deletedKeyInfoData
-        });
-      }
+      this.setState({
+        loading: false,
+        pendingDeleteKeyDataSource: deletedKeyInfoData
+      });
+
     }).catch(error => {
       this.setState({
         loading: false,
@@ -722,11 +640,9 @@ export class Om extends React.Component<Record<string, object>, IOmdbInsightsSta
     );
   }
 
-  fetchDeletedKeys = (limit: number, prevKeyDeleted: number) => {
+  fetchDeletedKeys = () => {
     this.setState({
-      loading: true,
-      nextClickable: true,
-      prevClickable: true
+      loading: true
     });
 
     //Cancel any previous pending request
@@ -738,37 +654,16 @@ export class Om extends React.Component<Record<string, object>, IOmdbInsightsSta
       cancelRowExpandSignal
     ]);
 
-    const deletedKeysEndpoint = `/api/v1/containers/mismatch/deleted?limit=${limit}&prevKey=${prevKeyDeleted}`;
+    const deletedKeysEndpoint = `/api/v1/containers/mismatch/deleted?limit=${this.state.selectedLimit.value}`;
     const { request, controller } = AxiosGetHelper(deletedKeysEndpoint, cancelDeletedKeysSignal);
     cancelDeletedKeysSignal = controller 
     request.then(deletedKeysResponse => {
       let deletedContainerKeys = [];
       deletedContainerKeys = deletedKeysResponse && deletedKeysResponse.data && deletedKeysResponse.data.containers;
-      if (deletedKeysResponse && deletedKeysResponse.data && deletedKeysResponse.data.lastKey === null) {
-        // no more further records last key
-        deletedKeysPrevList = [0];
-        this.setState({
-          loading: false,
-          nextClickable: false,
-          deletedContainerKeysDataSource: deletedContainerKeys,
-          expandedRowData: {},
-        })
-      }
-      else {
-        if (this.state.prevKeyDeleted === 0 ){
-          this.setState({
-            prevClickable: false
-          })
-        }
-        if (deletedKeysPrevList.includes(deletedKeysResponse.data.lastKey) === false) {
-          deletedKeysPrevList.push(deletedKeysResponse.data.lastKey);
-        }
-        this.setState({
-          loading: false,
-          prevKeyDeleted: deletedKeysResponse && deletedKeysResponse.data && deletedKeysResponse.data.lastKey,
-          deletedContainerKeysDataSource: deletedContainerKeys
-        })
-      };
+      this.setState({
+        loading: false,
+        deletedContainerKeysDataSource: deletedContainerKeys
+      })
     }).catch(error => {
       this.setState({
         loading: false
@@ -778,11 +673,6 @@ export class Om extends React.Component<Record<string, object>, IOmdbInsightsSta
   };
 
   changeTab = (activeKey: any) => {
-    //when changing tab make empty all datasets and prevkey and deafult filtering to intial values also cancel all pending requests
-    mismatchPrevKeyList = [0];
-    openPrevKeyList =[""];
-    keysPendingPrevList =[""];
-    deletedKeysPrevList =[0];
     this.setState({
       activeTab: activeKey,
       mismatchDataSource: [],
@@ -790,121 +680,27 @@ export class Om extends React.Component<Record<string, object>, IOmdbInsightsSta
       pendingDeleteKeyDataSource: [],
       deletedContainerKeysDataSource: [],
       expandedRowData: {},
-      prevKeyOpen: "",
-      prevKeyDeletePending: "",
-      prevKeyDeleted: 0,
-      prevKeyMismatch: 0,
       mismatchMissingState: 'SCM',
       includeFso: true,
       includeNonFso: false,
-      DEFAULT_LIMIT: 10,
-
+      selectedLimit: INITIAL_LIMIT_OPTION
     }, () => {
       if (activeKey === '2') {
-        this.fetchOpenKeys(this.state.includeFso, this.state.includeNonFso, this.state.DEFAULT_LIMIT, this.state.prevKeyOpen);
+        this.fetchOpenKeys(this.state.includeFso, this.state.includeNonFso);
       } else if (activeKey === '3') {
         keysPendingExpanded =[];
-        this.fetchDeletePendingKeys(this.state.DEFAULT_LIMIT, this.state.prevKeyDeletePending);
+        this.fetchDeletePendingKeys();
       } else if (activeKey === '4') {
-        this.fetchDeletedKeys(this.state.DEFAULT_LIMIT, this.state.prevKeyDeleted);
+        this.fetchDeletedKeys();
       }
       else {
-        this.fetchMismatchContainers(this.state.DEFAULT_LIMIT, this.state.prevKeyMismatch, this.state.mismatchMissingState);
+        this.fetchMismatchContainers(this.state.mismatchMissingState);
       }
     })
   };
 
-  fetchPreviousRecords = () => {
-    // to fetch previous call stored all prevkey in array and fetching in respective tabs
-    if (this.state.activeTab === '2') {
-        this.setState({
-          prevKeyOpen: openPrevKeyList[openPrevKeyList.indexOf(this.state.prevKeyOpen)-2]
-        }, () => {
-          this.fetchOpenKeys(this.state.includeFso, this.state.includeNonFso, this.state.DEFAULT_LIMIT,this.state.prevKeyOpen);
-        })
-    } else if (this.state.activeTab === '3') {
-      this.setState({
-        prevKeyDeletePending: keysPendingPrevList[keysPendingPrevList.indexOf(this.state.prevKeyDeletePending)-2]
-      }, () => {
-        this.fetchDeletePendingKeys(this.state.DEFAULT_LIMIT, this.state.prevKeyDeletePending);
-      })
-    } else if (this.state.activeTab === '4') {
-      this.setState({
-        prevKeyDeleted: deletedKeysPrevList[deletedKeysPrevList.indexOf(this.state.prevKeyDeleted)-2]
-      }, () => {
-        this.fetchDeletedKeys(this.state.DEFAULT_LIMIT,this.state.prevKeyDeleted);
-      })
-    }
-      else {
-        this.setState({
-          prevKeyMismatch: mismatchPrevKeyList[mismatchPrevKeyList.indexOf(this.state.prevKeyMismatch)-2]
-        }, () => {
-          this.fetchMismatchContainers(this.state.DEFAULT_LIMIT,this.state.prevKeyMismatch, this.state.mismatchMissingState);
-        })
-      }
-  };
-
-  fetchNextRecords = () => {
-    // To Call API for Page Level for each page fetch next records
-    if (this.state.activeTab === '2') {
-      this.fetchOpenKeys(this.state.includeFso, this.state.includeNonFso, this.state.DEFAULT_LIMIT, this.state.prevKeyOpen);
-    } else if (this.state.activeTab === '3') {
-      this.fetchDeletePendingKeys(this.state.DEFAULT_LIMIT, this.state.prevKeyDeletePending);
-    } else if (this.state.activeTab === '4') {
-      this.fetchDeletedKeys(this.state.DEFAULT_LIMIT, this.state.prevKeyDeleted);
-    }
-    else {
-      this.fetchMismatchContainers(this.state.DEFAULT_LIMIT, this.state.prevKeyMismatch, this.state.mismatchMissingState);
-    }
-  };
-
-  itemRender = (_: any, type: string, originalElement: any) => {
-    if (type === 'prev') {
-      return <div>{this.state.prevClickable ? <Link to="/Om" onClick={this.fetchPreviousRecords}> Prev</Link>: <Link to="/Om" style={{ pointerEvents: 'none' }}>No Records</Link>}</div>;
-    }
-    if (type === 'next') {
-      return <div> {this.state.nextClickable ? <Link to="/Om" onClick={this.fetchNextRecords}> {'>>'} </Link> : <Link to="/Om" style={{ pointerEvents: 'none' }}>No More Further Records</Link>}</div>;
-    }
-    return originalElement;
-  };
-
   onShowSizeChange = (current: number, pageSize: number) => {
-    if (this.state.activeTab === '2') {
-      //open keys
-      this.setState({
-        DEFAULT_LIMIT: pageSize,
-        prevKeyOpen: openPrevKeyList[openPrevKeyList.indexOf(this.state.prevKeyOpen)-1]
-      }, () => {
-        this.fetchOpenKeys(this.state.includeFso, this.state.includeNonFso, this.state.DEFAULT_LIMIT,this.state.prevKeyOpen);
-      });
-    }
-    else if (this.state.activeTab === '3') {
-      //keys pending for deletion
-      this.setState({
-        DEFAULT_LIMIT: pageSize,
-        prevKeyDeletePending: keysPendingPrevList[keysPendingPrevList.indexOf(this.state.prevKeyDeletePending)-1]
-      }, () => {
-        this.fetchDeletePendingKeys(this.state.DEFAULT_LIMIT, this.state.prevKeyDeletePending);
-      })
-    }
-    else if (this.state.activeTab === '4') {
-      //deleted container keys
-      this.setState({
-        DEFAULT_LIMIT: pageSize,
-        prevKeyDeleted: deletedKeysPrevList[deletedKeysPrevList.indexOf(this.state.prevKeyDeleted)-1]
-      }, () => {
-        this.fetchDeletedKeys(this.state.DEFAULT_LIMIT, this.state.prevKeyDeleted);
-      })
-    }
-    else {
-      // active tab 1 for mismatch
-      this.setState({
-        DEFAULT_LIMIT: pageSize,
-        prevKeyMismatch: mismatchPrevKeyList[mismatchPrevKeyList.indexOf(this.state.prevKeyMismatch)-1]
-      }, () => {
-        this.fetchMismatchContainers(this.state.DEFAULT_LIMIT,this.state.prevKeyMismatch, this.state.mismatchMissingState);
-      });
-    }
+    console.log(current, pageSize);
   };
 
   onRowExpandClick = (expanded: boolean, record: IContainerResponse) => {
@@ -1039,16 +835,35 @@ export class Om extends React.Component<Record<string, object>, IOmdbInsightsSta
     }, [])
   };
 
+  _handleLimitChange = (selected: ValueType<IOption>, _action: ActionMeta<IOption>) => {
+    const selectedLimit = (selected as IOption)
+    this.setState({
+      selectedLimit
+    }, this._loadData);
+  }
+
+  _onCreateOption = (created: string) => {
+    // Check that it's a numeric and non-negative
+    if (parseInt(created)) {
+      const createdOption: IOption = {
+        label: created,
+        value: created
+      }
+      this.setState({
+        selectedLimit: createdOption
+      }, this._loadData);
+    } else {
+      console.log('Not a valid option')
+    }
+  }
+
   render() {
-    const { mismatchDataSource, loading, openKeysDataSource, pendingDeleteKeyDataSource, deletedContainerKeysDataSource } = this.state;
+    const { mismatchDataSource, loading, openKeysDataSource, pendingDeleteKeyDataSource, deletedContainerKeysDataSource, selectedLimit } = this.state;
 
     const paginationConfig: PaginationConfig = {
-      pageSize:this.state.DEFAULT_LIMIT,
-      defaultPageSize: this.state.DEFAULT_LIMIT,
-      pageSizeOptions: ['10', '20', '30', '50'],
+      showTotal: (total: number, range) => `${range[0]}-${range[1]} of ${total}`,
       showSizeChanger: true,
       onShowSizeChange: this.onShowSizeChange,
-      itemRender: this.itemRender
     };
 
     const generateMismatchTable = (dataSource: any) => {
@@ -1065,7 +880,7 @@ export class Om extends React.Component<Record<string, object>, IOmdbInsightsSta
       return <Table
         expandRowByClick dataSource={dataSource}
         columns={this.searchOpenKeyColumn()}
-        loading={loading} rowKey='path'
+        loading={loading} rowKey='key'
         pagination={paginationConfig}
         locale={{filterTitle: ""}} />
     }
@@ -1093,11 +908,32 @@ export class Om extends React.Component<Record<string, object>, IOmdbInsightsSta
   
 
     return (
-      <div className='missing-containers-container'>
+      <div>
         <div className='page-header'>
           OM DB Insights
         </div>
         <div className='content-div'>
+          <div className='limit-block'>
+            <CreatableSelect
+                className='multi-select-container'
+                isClearable={false}
+                isDisabled={loading}
+                isLoading={loading}
+                onChange={this._handleLimitChange}
+                onCreateOption={this._onCreateOption}
+                isValidNewOption={(input, value, _option) => {
+                  // Only number will be accepted
+                  return !isNaN(parseInt(input))
+                }}
+                options={LIMIT_OPTIONS}
+                hideSelectedOptions={false}
+                value={selectedLimit}
+                createOptionPosition='last'
+                formatCreateLabel={(input) => {
+                  return `new limit... ${input}`
+                }}
+            /> Limit
+          </div>
           <Tabs defaultActiveKey={this.state.activeTab} onChange={this.changeTab}>
             <TabPane key='1' tab={`Container Mismatch Info`}>
               {generateMismatchTable(mismatchDataSource)}

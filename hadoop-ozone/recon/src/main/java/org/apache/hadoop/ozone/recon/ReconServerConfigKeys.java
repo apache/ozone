@@ -137,11 +137,9 @@ public final class  ReconServerConfigKeys {
 
   public static final String OZONE_RECON_SCM_CONTAINER_THRESHOLD =
       "ozone.recon.scm.container.threshold";
-  public static final int OZONE_RECON_SCM_CONTAINER_THRESHOLD_DEFAULT = 100;
 
   public static final String OZONE_RECON_SCM_SNAPSHOT_ENABLED =
       "ozone.recon.scm.snapshot.enabled";
-  public static final boolean OZONE_RECON_SCM_SNAPSHOT_ENABLED_DEFAULT = true;
 
   public static final String OZONE_RECON_SCM_CONNECTION_TIMEOUT =
       "ozone.recon.scm.connection.timeout";
@@ -172,7 +170,7 @@ public final class  ReconServerConfigKeys {
       = "24h";
 
   public static final String OZONE_RECON_SCM_CONTAINER_INFO_SYNC_TASK_INITIAL_DELAY =
-      "ozone.recon.scm.snapshot.task.initial.delay";
+      "ozone.recon.scm.container.info.sync.task.initial.delay";
 
   public static final String
       OZONE_RECON_SCM_CONTAINER_INFO_SYNC_TASK_INITIAL_DELAY_DEFAULT = "5m";

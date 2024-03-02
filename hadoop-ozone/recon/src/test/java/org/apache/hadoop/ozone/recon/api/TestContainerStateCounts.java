@@ -32,11 +32,15 @@ import org.apache.hadoop.ozone.recon.persistence.ContainerHealthSchemaManager;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 import org.apache.hadoop.ozone.recon.scm.ReconContainerManager;
 import org.apache.hadoop.ozone.recon.scm.ReconPipelineManager;
+import org.apache.hadoop.ozone.recon.scm.ReconScmMetadataManager;
+import org.apache.hadoop.ozone.recon.scm.ReconScmMetadataManagerImpl;
 import org.apache.hadoop.ozone.recon.scm.ReconStorageContainerManagerFacade;
 import org.apache.hadoop.ozone.recon.spi.StorageContainerServiceProvider;
 import org.apache.hadoop.ozone.recon.spi.impl.OzoneManagerServiceProviderImpl;
 import org.apache.hadoop.ozone.recon.spi.impl.StorageContainerServiceProviderImpl;
 
+import org.apache.hadoop.ozone.recon.tasks.ReconTaskController;
+import org.apache.hadoop.ozone.recon.tasks.ReconTaskControllerImpl;
 import org.hadoop.ozone.recon.schema.tables.daos.GlobalStatsDao;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -78,7 +82,6 @@ public class TestContainerStateCounts extends AbstractReconSqlDBTest {
     super();
   }
 
-
   @BeforeEach
   public void setUp() throws Exception {
     reconOMMetadataManager = getTestReconOmMetadataManager(
@@ -92,6 +95,10 @@ public class TestContainerStateCounts extends AbstractReconSqlDBTest {
             .withOmServiceProvider(mock(OzoneManagerServiceProviderImpl.class))
             // No longer using mock reconSCM as we need nodeDB in Facade
             //  to establish datanode UUID to hostname mapping
+            .addModule(new AbstractReconSqlDBTest.ReconOmTaskBindingModule())
+            .addModule(new AbstractReconSqlDBTest.ReconSCMMetadataTaskBindingModule())
+            .addBinding(ReconTaskController.class, ReconTaskControllerImpl.class)
+            .addBinding(ReconScmMetadataManager.class, ReconScmMetadataManagerImpl.class)
             .addBinding(OzoneStorageContainerManager.class,
                 ReconStorageContainerManagerFacade.class)
             .withContainerDB()

@@ -349,12 +349,7 @@ public class TestScmSafeMode {
   public void testCreateRetryWhileSCMSafeMode() throws Exception {
     // Test1: Test safe mode  when there are no containers in system.
     cluster.stop();
-
-    try {
-      cluster = builder.build();
-    } catch (IOException e) {
-      fail("Cluster startup failed.");
-    }
+    cluster = builder.build();
 
     final String rootPath = String.format("%s://%s/",
         OZONE_OFS_URI_SCHEME, conf.get(OZONE_OM_ADDRESS_KEY));

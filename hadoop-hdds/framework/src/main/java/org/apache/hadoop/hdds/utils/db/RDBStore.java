@@ -113,7 +113,6 @@ public class RDBStore implements DBStore {
       } else {
         rocksDBCheckpointDiffer = null;
       }
-      LOG.error("RDBStore Opened DBPath: {}", dbFile.getAbsolutePath());
       db = RocksDatabase.open(dbFile, dbOptions, writeOptions,
           families, readOnly);
 
@@ -180,7 +179,6 @@ public class RDBStore implements DBStore {
           e.getClass().getCanonicalName() + " " + e.getMessage() :
           e.getCause().getClass().getCanonicalName() + " " +
               e.getCause().getMessage());
-      LOG.error("Error in Closing DBPath: {}", dbFile.getAbsolutePath());
       throw new IOException(msg, e);
     }
 
@@ -238,7 +236,6 @@ public class RDBStore implements DBStore {
       IOUtils.close(LOG, statistics);
     }
     IOUtils.close(LOG, db);
-    LOG.error("RDBStore Close DBPath: {}", dbLocation.getAbsolutePath());
   }
 
   @Override

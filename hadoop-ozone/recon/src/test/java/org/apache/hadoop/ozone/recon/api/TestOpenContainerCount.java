@@ -50,13 +50,18 @@ import org.apache.hadoop.ozone.recon.ReconUtils;
 import org.apache.hadoop.ozone.recon.api.types.DatanodeMetadata;
 import org.apache.hadoop.ozone.recon.api.types.DatanodesResponse;
 import org.apache.hadoop.ozone.recon.common.CommonUtils;
+import org.apache.hadoop.ozone.recon.persistence.AbstractReconSqlDBTest;
 import org.apache.hadoop.ozone.recon.persistence.ContainerHealthSchemaManager;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 import org.apache.hadoop.ozone.recon.scm.ReconPipelineManager;
+import org.apache.hadoop.ozone.recon.scm.ReconScmMetadataManager;
+import org.apache.hadoop.ozone.recon.scm.ReconScmMetadataManagerImpl;
 import org.apache.hadoop.ozone.recon.scm.ReconStorageContainerManagerFacade;
 import org.apache.hadoop.ozone.recon.spi.StorageContainerServiceProvider;
 import org.apache.hadoop.ozone.recon.spi.impl.OzoneManagerServiceProviderImpl;
 import org.apache.hadoop.ozone.recon.spi.impl.StorageContainerServiceProviderImpl;
+import org.apache.hadoop.ozone.recon.tasks.ReconTaskController;
+import org.apache.hadoop.ozone.recon.tasks.ReconTaskControllerImpl;
 import org.apache.ozone.test.LambdaTestUtils;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -67,8 +72,8 @@ import static org.apache.hadoop.ozone.container.upgrade.UpgradeUtils.defaultLayo
 import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.getRandomPipeline;
 import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.getTestReconOmMetadataManager;
 import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.initializeNewOmMetadataManager;
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.fail;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.anyBoolean;
 import static org.mockito.Mockito.anyString;
@@ -209,6 +214,10 @@ public class TestOpenContainerCount {
                             mock(OzoneManagerServiceProviderImpl.class))
                     .addBinding(StorageContainerServiceProvider.class,
                             mockScmServiceProvider)
+                    .addModule(new AbstractReconSqlDBTest.ReconOmTaskBindingModule())
+                    .addModule(new AbstractReconSqlDBTest.ReconSCMMetadataTaskBindingModule())
+                    .addBinding(ReconTaskController.class, ReconTaskControllerImpl.class)
+                    .addBinding(ReconScmMetadataManager.class, ReconScmMetadataManagerImpl.class)
                     .addBinding(OzoneStorageContainerManager.class,
                             ReconStorageContainerManagerFacade.class)
                     .withContainerDB()
@@ -329,16 +338,14 @@ public class TestOpenContainerCount {
                     .addStorageReport(storageReportProto1)
                     .addStorageReport(storageReportProto2).build();
 
-    try {
+    assertDoesNotThrow(() -> {
       reconScm.getDatanodeProtocolServer()
-              .register(extendedDatanodeDetailsProto, nodeReportProto,
-                      containerReportsProto, pipelineReportsProto,
-                  defaultLayoutVersionProto());
+          .register(extendedDatanodeDetailsProto, nodeReportProto,
+              containerReportsProto, pipelineReportsProto,
+              defaultLayoutVersionProto());
       // Process all events in the event queue
       reconScm.getEventQueue().processAll(1000);
-    } catch (Exception ex) {
-      fail(ex.getMessage());
-    }
+    });
   }
 
   @Test
@@ -421,16 +428,14 @@ public class TestOpenContainerCount {
                     .setOriginNodeId(datanodeId)
                     .build())
             .build();
-    try {
+    assertDoesNotThrow(() -> {
       reconScm.getDatanodeProtocolServer()
-              .register(extendedDatanodeDetailsProto, nodeReportProto,
-                      containerReportsProto, pipelineReportsProto,
-                  defaultLayoutVersionProto());
+          .register(extendedDatanodeDetailsProto, nodeReportProto,
+              containerReportsProto, pipelineReportsProto,
+              defaultLayoutVersionProto());
       // Process all events in the event queue
       reconScm.getEventQueue().processAll(1000);
-    } catch (Exception ex) {
-      fail(ex.getMessage());
-    }
+    });
   }
 
   private void waitAndCheckConditionAfterHeartbeat(Callable<Boolean> check)

@@ -238,11 +238,9 @@ public final class ContainerStateManagerImpl
    * @throws IOException in case of error while loading the containers
    */
   private void initialize() throws IOException {
-    LOG.error("container manager initialize: {}", containerStore.getEstimatedKeyCount());
     try (TableIterator<ContainerID,
         ? extends KeyValue<ContainerID, ContainerInfo>> iterator =
              containerStore.iterator()) {
-
       while (iterator.hasNext()) {
         final ContainerInfo container = iterator.next().getValue();
         initialize(container);
@@ -474,7 +472,7 @@ public final class ContainerStateManagerImpl
       ExecutionUtil.create(() -> {
         transactionBuffer.removeFromBuffer(containerStore, cid);
         containers.removeContainer(cid);
-      }).onException(() -> LOG.error("Error in removing container {}", cid));
+      }).onException(() -> containerStore.put(cid, containerInfo)).execute();
     }
   }
 

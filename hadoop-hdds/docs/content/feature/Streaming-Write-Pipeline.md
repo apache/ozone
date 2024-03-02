@@ -43,7 +43,7 @@ Set the following properties to the Ozone configuration file `ozone-site.xml`.
 - To enable the Streaming Write Pipeline feature, set the following property to true.
 ```XML
   <property>
-    <name>dfs.container.ratis.datastream.enabled</name>
+    <name>hdds.container.ratis.datastream.enabled</name>
     <value>false</value>
     <tag>OZONE, CONTAINER, RATIS, DATASTREAM</tag>
     <description>It specifies whether to enable data stream of container.</description>
@@ -52,7 +52,7 @@ Set the following properties to the Ozone configuration file `ozone-site.xml`.
 - Datanodes listen to the following port for the streaming traffic.
 ```XML
   <property>
-    <name>dfs.container.ratis.datastream.port</name>
+    <name>hdds.container.ratis.datastream.port</name>
     <value>9855</value>
     <tag>OZONE, CONTAINER, RATIS, DATASTREAM</tag>
     <description>The datastream port number of container.</description>
