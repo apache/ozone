@@ -24,14 +24,18 @@
  */
 package org.apache.hadoop.hdds.scm.storage;
 
+import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandResponseProto;
 import org.apache.hadoop.hdds.scm.XceiverClientSpi;
 import org.apache.hadoop.ozone.common.ChunkBuffer;
 
+import java.util.LinkedList;
+import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
+import java.util.concurrent.ExecutionException;
 
 /**
  * This class executes watchForCommit on ratis pipeline and releases
@@ -42,8 +46,8 @@ class CommitWatcher extends AbstractCommitWatcher<ChunkBuffer> {
   private final BufferPool bufferPool;
 
   // future Map to hold up all putBlock futures
-  private final ConcurrentMap<Long, CompletableFuture<
-      ContainerCommandResponseProto>> futureMap = new ConcurrentHashMap<>();
+  private final ConcurrentMap<Long, List<CompletableFuture<ContainerCommandResponseProto>>>
+      futureMap = new ConcurrentHashMap<>();
 
   CommitWatcher(BufferPool bufferPool, XceiverClientSpi xceiverClient) {
     super(xceiverClient);
@@ -61,15 +65,28 @@ class CommitWatcher extends AbstractCommitWatcher<ChunkBuffer> {
     // When putBlock is called, a future is added.
     // When putBlock is replied, the future is removed below.
     // Therefore, the removed future should not be null.
-    final CompletableFuture<ContainerCommandResponseProto> removed =
+    final List<CompletableFuture<ContainerCommandResponseProto>> removed =
         futureMap.remove(totalLength);
     Objects.requireNonNull(removed, () -> "Future not found for "
         + totalLength + ": existing = " + futureMap.keySet());
   }
 
-  ConcurrentMap<Long, CompletableFuture<
-      ContainerCommandResponseProto>> getFutureMap() {
+  @VisibleForTesting
+  ConcurrentMap<Long, List<CompletableFuture<ContainerCommandResponseProto>>> getFutureMap() {
     return futureMap;
+  }
+
+  public void putFlushFuture(long flushPos, CompletableFuture<ContainerCommandResponseProto> flushFuture) {
+    futureMap.computeIfAbsent(flushPos, k -> new LinkedList<>()).add(flushFuture);
+  }
+
+
+  public void waitOnFlushFutures() throws InterruptedException, ExecutionException {
+    CompletableFuture.allOf(
+        futureMap.values().stream()
+            .flatMap(List::stream)
+            .toArray(CompletableFuture[]::new)
+    ).get();
   }
 
   @Override
