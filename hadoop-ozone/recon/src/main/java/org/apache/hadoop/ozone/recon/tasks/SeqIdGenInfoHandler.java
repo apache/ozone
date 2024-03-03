@@ -20,8 +20,6 @@ package org.apache.hadoop.ozone.recon.tasks;
 
 import org.apache.commons.lang3.tuple.ImmutablePair;
 import org.apache.commons.lang3.tuple.Pair;
-import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
-import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.ozone.recon.scm.ReconScmMetadataManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -29,17 +27,17 @@ import org.slf4j.LoggerFactory;
 import java.io.IOException;
 
 /**
- * Manages Pipeline Table info of SCM MetaData DB, updates Recon's in-memory
- * Pipeline manager objects.
+ * Manages sequenceId Table info of SCM MetaData DB, updates Recon's in-memory
+ * SequenceIdGenerator objects.
  */
-public class PipelineInfoHandler implements SCMMetaDataTableHandler {
+public class SeqIdGenInfoHandler implements SCMMetaDataTableHandler {
 
   private static final Logger LOG =
-      LoggerFactory.getLogger(PipelineInfoHandler.class);
+      LoggerFactory.getLogger(SeqIdGenInfoHandler.class);
 
   private ReconScmMetadataManager scmMetadataManager;
 
-  public PipelineInfoHandler(ReconScmMetadataManager scmMetadataManager) {
+  public SeqIdGenInfoHandler(ReconScmMetadataManager scmMetadataManager) {
     this.scmMetadataManager = scmMetadataManager;
   }
 
@@ -50,17 +48,17 @@ public class PipelineInfoHandler implements SCMMetaDataTableHandler {
    */
   @Override
   public void handlePutEvent(RocksDBUpdateEvent<?, Object> event) {
-    PipelineID pipelineID = (PipelineID) event.getKey();
-    Pipeline pipeline = (Pipeline) event.getValue();
+    final String sequenceIdName = (String) event.getKey();
+    final Long lastId = (Long) event.getValue();
     try {
-      handlePutPipelineEvent(pipeline);
+      handlePutSequenceIdGenEvent(sequenceIdName, lastId);
     } catch (IOException ioe) {
-      LOG.error("Unexpected error while handling add new pipeline event for pipelineId: {} - ", pipelineID, ioe);
+      LOG.error("Unexpected error while handling add new seqIdGen event for sequence name: {} - ", sequenceIdName, ioe);
     }
   }
 
-  private void handlePutPipelineEvent(Pipeline pipeline) throws IOException {
-    scmMetadataManager.getOzoneStorageContainerManager().getPipelineManager().initialize(pipeline);
+  private void handlePutSequenceIdGenEvent(String sequenceIdName, Long lastId) throws IOException {
+    scmMetadataManager.getSequenceIdGen().initialize(sequenceIdName, lastId);
   }
 
   /**
@@ -70,17 +68,8 @@ public class PipelineInfoHandler implements SCMMetaDataTableHandler {
    */
   @Override
   public void handleDeleteEvent(RocksDBUpdateEvent<?, Object> event) {
-    PipelineID pipelineID = (PipelineID) event.getKey();
-    Pipeline pipeline = (Pipeline) event.getValue();
-    try {
-      handleDeletePipelineEvent(pipeline);
-    } catch (IOException ioe) {
-      LOG.error("Unexpected error while handling delete pipeline event for pipelineId: {} - ", pipelineID, ioe);
-    }
-  }
-
-  private void handleDeletePipelineEvent(Pipeline pipeline) throws IOException {
-    scmMetadataManager.getOzoneStorageContainerManager().getPipelineManager().deletePipeline(pipeline.getId());
+    final String sequenceIdName = (String) event.getKey();
+    LOG.error("Delete event should not be raised on sequenceId table for sequence name: {} - ", sequenceIdName);
   }
 
   /**
@@ -90,18 +79,8 @@ public class PipelineInfoHandler implements SCMMetaDataTableHandler {
    */
   @Override
   public void handleUpdateEvent(RocksDBUpdateEvent<?, Object> event) {
-    PipelineID pipelineID = (PipelineID) event.getKey();
-    Pipeline pipeline = (Pipeline) event.getValue();
-    try {
-      handleUpdatePipelineEvent(pipeline);
-    } catch (IOException ioe) {
-      LOG.error("Unexpected error while handling update of pipeline event for  pipelineID: {} - ", pipelineID, ioe);
-    }
-  }
-
-  private void handleUpdatePipelineEvent(Pipeline pipeline) throws IOException {
-    scmMetadataManager.getOzoneStorageContainerManager().getPipelineManager().deletePipeline(pipeline.getId());
-    scmMetadataManager.getOzoneStorageContainerManager().getPipelineManager().initialize(pipeline);
+    final String sequenceIdName = (String) event.getKey();
+    LOG.error("Update event should not be raised on sequenceId table for sequence name: {} - ", sequenceIdName);
   }
 
   /**
@@ -111,7 +90,7 @@ public class PipelineInfoHandler implements SCMMetaDataTableHandler {
    */
   @Override
   public String getHandler() {
-    return "PipelineInfoHandler";
+    return "SeqIdGenInfoHandler";
   }
 
   /**
@@ -125,9 +104,9 @@ public class PipelineInfoHandler implements SCMMetaDataTableHandler {
   @Override
   public Pair<String, Boolean> reprocess(ReconScmMetadataManager reconScmMetadataManager) throws IOException {
     LOG.info("Starting a 'reprocess' run of {}", getHandler());
-    // Left NoOps implementation as pipeline manager reinitialization is being done
+    // Left NoOps implementation as SequenceIdGenerator reinitialization is being done
     // during full SCM metadata DB sync already. Later, in future this impl can be extended
-    // for capturing or processing any further stats specific to Recon, related to pipeline.
+    // for capturing or processing any further stats specific to Recon, related to SequenceIdGen.
     return new ImmutablePair<>(getHandler(), true);
   }
 }

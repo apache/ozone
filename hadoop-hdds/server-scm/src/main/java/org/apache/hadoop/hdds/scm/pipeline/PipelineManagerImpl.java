@@ -802,6 +802,17 @@ public class PipelineManagerImpl implements PipelineManager {
     stateManager.reinitialize(pipelineStore);
   }
 
+  /**
+   * Initializes the PipelineStateManager with new pipeline object.
+   *
+   * @param pipeline
+   * @throws IOException
+   */
+  @Override
+  public void initialize(Pipeline pipeline) throws IOException {
+    stateManager.initialize(pipeline);
+  }
+
   @Override
   public void freezePipelineCreation() {
     freezePipelineCreation.set(true);

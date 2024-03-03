@@ -70,8 +70,8 @@ public class SCMDBMetaDataInitializationTask implements ReconSCMMetadataProcessi
     tableHandlers = new HashMap<>();
     tableHandlers.put(ReconScmMetadataManager.CONTAINERS_TABLE,
         new ContainersInfoHandler(reconContainerMetadataManager, scmMetadataManager, containerCountMap));
-    tableHandlers.put(ReconScmMetadataManager.PIPELINES_TABLE, new PipelineInfoHandler());
-    tableHandlers.put(ReconScmMetadataManager.NODES_TABLE, new NodeInfoHandler());
+    tableHandlers.put(ReconScmMetadataManager.PIPELINES_TABLE, new PipelineInfoHandler(scmMetadataManager));
+    tableHandlers.put(ReconScmMetadataManager.SEQUENCE_ID_TABLE, new SeqIdGenInfoHandler(scmMetadataManager));
   }
 
   /**
@@ -148,7 +148,7 @@ public class SCMDBMetaDataInitializationTask implements ReconSCMMetadataProcessi
     SCMMetaDataTableHandler scmMetaDataTableHandler = tableHandlers.get(tableName);
     if (event.getValue() != null) {
       if (scmMetaDataTableHandler != null) {
-        scmMetaDataTableHandler.handleUpdateEvent(event, tableName);
+        scmMetaDataTableHandler.handleUpdateEvent(event);
       }
     }
   }
@@ -157,7 +157,7 @@ public class SCMDBMetaDataInitializationTask implements ReconSCMMetadataProcessi
     SCMMetaDataTableHandler scmMetaDataTableHandler = tableHandlers.get(tableName);
     if (event.getValue() != null) {
       if (scmMetaDataTableHandler != null) {
-        scmMetaDataTableHandler.handleDeleteEvent(event, tableName);
+        scmMetaDataTableHandler.handleDeleteEvent(event);
       }
     }
   }
@@ -166,7 +166,7 @@ public class SCMDBMetaDataInitializationTask implements ReconSCMMetadataProcessi
     SCMMetaDataTableHandler scmMetaDataTableHandler = tableHandlers.get(tableName);
     if (event.getValue() != null) {
       if (scmMetaDataTableHandler != null) {
-        scmMetaDataTableHandler.handlePutEvent(event, tableName);
+        scmMetaDataTableHandler.handlePutEvent(event);
       }
     }
   }

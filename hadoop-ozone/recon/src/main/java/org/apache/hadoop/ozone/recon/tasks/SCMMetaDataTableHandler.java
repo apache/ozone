@@ -48,27 +48,24 @@ public interface SCMMetaDataTableHandler {
   /**
    * Handles a PUT event on scm metadata DB tables.
    *
-   * @param event                    The PUT event to be processed.
-   * @param tableName                Table name associated with the event.
+   * @param event The PUT event to be processed.
    */
-  void handlePutEvent(RocksDBUpdateEvent<?, Object> event, String tableName);
+  void handlePutEvent(RocksDBUpdateEvent<?, Object> event);
 
 
   /**
    * Handles a DELETE event on scm metadata DB tables.
    *
-   * @param event                    The DELETE event to be processed.
-   * @param tableName                Table name associated with the event.
+   * @param event The DELETE event to be processed.
    */
-  void handleDeleteEvent(RocksDBUpdateEvent<?, Object> event, String tableName);
+  void handleDeleteEvent(RocksDBUpdateEvent<?, Object> event);
 
 
   /**
    * Handles an UPDATE event on scm metadata DB tables.
    *
-   * @param event                    The UPDATE event to be processed.
-   * @param tableName                Table name associated with the event.
+   * @param event The UPDATE event to be processed.
    */
-  void handleUpdateEvent(RocksDBUpdateEvent<?, Object> event, String tableName);
+  void handleUpdateEvent(RocksDBUpdateEvent<?, Object> event);
 
 }

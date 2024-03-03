@@ -586,19 +586,21 @@ public final class ContainerStateManagerImpl
    */
   @Override
   public void initialize(ContainerInfo container) throws IOException {
-    Preconditions.checkNotNull(container);
-    containers.addContainer(container);
-    if (container.getState() == LifeCycleState.OPEN) {
-      try {
-        pipelineManager.addContainerToPipelineSCMStart(
-            container.getPipelineID(), container.containerID());
-      } catch (PipelineNotFoundException ex) {
-        // We are ignoring this here. The container will be moved to
-        // CLOSING state by ReplicationManager's OpenContainerHandler
-        // For more info: HDDS-10231
-        LOG.warn("Found container {} which is in OPEN state with " +
-                "pipeline {} that does not exist.",
-            container, container.getPipelineID());
+    try (AutoCloseableLock ignored = writeLock()) {
+      Preconditions.checkNotNull(container);
+      containers.addContainer(container);
+      if (container.getState() == LifeCycleState.OPEN) {
+        try {
+          pipelineManager.addContainerToPipelineSCMStart(
+              container.getPipelineID(), container.containerID());
+        } catch (PipelineNotFoundException ex) {
+          // We are ignoring this here. The container will be moved to
+          // CLOSING state by ReplicationManager's OpenContainerHandler
+          // For more info: HDDS-10231
+          LOG.warn("Found container {} which is in OPEN state with " +
+                  "pipeline {} that does not exist.",
+              container, container.getPipelineID());
+        }
       }
     }
   }

@@ -118,4 +118,12 @@ public interface PipelineStateManager {
   void reinitialize(Table<PipelineID, Pipeline> pipelineStore)
       throws IOException;
 
+  /**
+   * Initializes the PipelineStateManager with new pipeline object.
+   *
+   * @throws IOException
+   */
+  default void initialize(Pipeline pipeline) throws IOException {
+
+  }
 }

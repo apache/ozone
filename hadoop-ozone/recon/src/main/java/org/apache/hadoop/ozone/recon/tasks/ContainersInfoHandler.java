@@ -64,17 +64,15 @@ public class ContainersInfoHandler implements SCMMetaDataTableHandler {
     scmMetadataManager.getOzoneStorageContainerManager().getContainerManager().initialize(containerInfo);
   }
 
-  private void handleDeleteContainerEvent(ContainerInfo containerInfo,
-                                          Map<HddsProtos.LifeCycleState, Long> containerStateCountMap)
+  private void handleDeleteContainerEvent(ContainerInfo containerInfo)
       throws IOException {
-    containerStateCountMap.compute(containerInfo.getState(), (k, v) -> (v != null ? v : 0L) - 1);
+    containerCountMap.compute(containerInfo.getState(), (k, v) -> (v != null ? v : 0L) - 1);
     scmMetadataManager.getOzoneStorageContainerManager().getContainerManager()
         .deleteContainer(ContainerID.valueOf(containerInfo.getContainerID()));
   }
 
-  private void handlePutContainerEvent(ContainerInfo containerInfo,
-                                       Map<HddsProtos.LifeCycleState, Long> containerStateCountMap) throws IOException {
-    containerStateCountMap.compute(containerInfo.getState(), (k, v) -> (v != null ? v : 0L) + 1);
+  private void handlePutContainerEvent(ContainerInfo containerInfo) throws IOException {
+    containerCountMap.compute(containerInfo.getState(), (k, v) -> (v != null ? v : 0L) + 1);
     scmMetadataManager.getOzoneStorageContainerManager().getContainerManager().initialize(containerInfo);
 
   }
@@ -82,15 +80,14 @@ public class ContainersInfoHandler implements SCMMetaDataTableHandler {
   /**
    * Handles a PUT event on scm metadata DB tables.
    *
-   * @param event     The PUT event to be processed.
-   * @param tableName Table name associated with the event.
+   * @param event The PUT event to be processed.
    */
   @Override
-  public void handlePutEvent(RocksDBUpdateEvent<?, Object> event, String tableName) {
+  public void handlePutEvent(RocksDBUpdateEvent<?, Object> event) {
     ContainerID containerId = (ContainerID) event.getKey();
     ContainerInfo containerInfo = (ContainerInfo) event.getValue();
     try {
-      handlePutContainerEvent(containerInfo, containerCountMap);
+      handlePutContainerEvent(containerInfo);
     } catch (IOException ioe) {
       LOG.error("Unexpected error while handling add new container event and processing container stats for" +
           " containerId: {} - ", containerId, ioe);
@@ -100,15 +97,14 @@ public class ContainersInfoHandler implements SCMMetaDataTableHandler {
   /**
    * Handles a DELETE event on scm metadata DB tables.
    *
-   * @param event     The DELETE event to be processed.
-   * @param tableName Table name associated with the event.
+   * @param event The DELETE event to be processed.
    */
   @Override
-  public void handleDeleteEvent(RocksDBUpdateEvent<?, Object> event, String tableName) {
+  public void handleDeleteEvent(RocksDBUpdateEvent<?, Object> event) {
     ContainerID containerId = (ContainerID) event.getKey();
     ContainerInfo containerInfo = (ContainerInfo) event.getValue();
     try {
-      handleDeleteContainerEvent(containerInfo, containerCountMap);
+      handleDeleteContainerEvent(containerInfo);
     } catch (IOException ioe) {
       LOG.error("Unexpected error while handling delete container event and processing container stats for" +
           " containerId: {} - ", containerId, ioe);
@@ -118,11 +114,10 @@ public class ContainersInfoHandler implements SCMMetaDataTableHandler {
   /**
    * Handles an UPDATE event on scm metadata DB tables.
    *
-   * @param event     The UPDATE event to be processed.
-   * @param tableName Table name associated with the event.
+   * @param event The UPDATE event to be processed.
    */
   @Override
-  public void handleUpdateEvent(RocksDBUpdateEvent<?, Object> event, String tableName) {
+  public void handleUpdateEvent(RocksDBUpdateEvent<?, Object> event) {
     ContainerID containerId = (ContainerID) event.getKey();
     ContainerInfo containerInfo = (ContainerInfo) event.getValue();
     try {

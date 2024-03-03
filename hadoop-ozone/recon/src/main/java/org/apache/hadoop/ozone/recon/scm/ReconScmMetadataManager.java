@@ -36,7 +36,7 @@ public interface ReconScmMetadataManager extends SCMMetadataStore {
 
   String CONTAINERS_TABLE = "containers";
   String PIPELINES_TABLE = "pipelines";
-  String NODES_TABLE = "nodes";
+  String SEQUENCE_ID_TABLE = "sequenceId";
 
   /**
    * Refresh the DB instance to point to a new location. Get rid of the old

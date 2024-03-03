@@ -83,9 +83,19 @@ public class PipelineStateManagerImpl implements PipelineStateManager {
              pipelineStore.iterator()) {
       while (iterator.hasNext()) {
         Pipeline pipeline = iterator.next().getValue();
-        pipelineStateMap.addPipeline(pipeline);
-        nodeManager.addPipeline(pipeline);
+        initialize(pipeline);
       }
+    }
+  }
+
+  @Override
+  public void initialize(Pipeline pipeline) throws IOException {
+    lock.writeLock().lock();
+    try {
+      pipelineStateMap.addPipeline(pipeline);
+      nodeManager.addPipeline(pipeline);
+    } finally {
+      lock.writeLock().unlock();
     }
   }
 
@@ -96,8 +106,7 @@ public class PipelineStateManagerImpl implements PipelineStateManager {
     lock.writeLock().lock();
     try {
       if (pipelineStore != null) {
-        pipelineStateMap.addPipeline(pipeline);
-        nodeManager.addPipeline(pipeline);
+        initialize(pipeline);
         transactionBuffer
             .addToBuffer(pipelineStore, pipeline.getId(), pipeline);
       }

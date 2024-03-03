@@ -223,4 +223,13 @@ public interface PipelineManager extends Closeable, PipelineManagerMXBean {
    * Release write lock.
    */
   void releaseWriteLock();
+
+  /**
+   * Initializes the PipelineStateManager with new pipeline object.
+   *
+   * @throws IOException
+   */
+  default void initialize(Pipeline pipeline) throws IOException {
+
+  }
 }

@@ -193,6 +193,16 @@ public class SequenceIdGenerator {
     }
   }
 
+  public void initialize(String sequenceIdName, Long lastId) throws IOException {
+    LOG.info("initialize SequenceIdGenerator for sequenceIdName: {} and lastId: {}.", sequenceIdName, lastId);
+    lock.lock();
+    try {
+      stateManager.initialize(sequenceIdName, lastId);
+    } finally {
+      lock.unlock();
+    }
+  }
+
   /**
    * Maintain SequenceIdTable in RocksDB.
    */
@@ -222,6 +232,15 @@ public class SequenceIdGenerator {
      * during SCM reload.
      */
     void reinitialize(Table<String, Long> sequenceIdTable) throws IOException;
+
+    /**
+     * Initializes the SequenceIdGenerator's StateManager with the new sequenceIdName and lastId.
+     *
+     * @param sequenceIdName the sequenceIdName
+     * @param lastId the lastId
+     * @throws IOException
+     */
+    void initialize(String sequenceIdName, Long lastId) throws IOException;
   }
 
   /**
@@ -292,13 +311,18 @@ public class SequenceIdGenerator {
           Table.KeyValue<String, Long> kv = iterator.next();
           final String sequenceIdName = kv.getKey();
           final Long lastId = kv.getValue();
-          Preconditions.checkNotNull(sequenceIdName,
-              "sequenceIdName should not be null");
-          Preconditions.checkNotNull(lastId,
-              "lastId should not be null");
-          sequenceIdToLastIdMap.put(sequenceIdName, lastId);
+          initialize(sequenceIdName, lastId);
         }
       }
+    }
+
+    @Override
+    public void initialize(String sequenceIdName, Long lastId) {
+      Preconditions.checkNotNull(sequenceIdName,
+          "sequenceIdName should not be null");
+      Preconditions.checkNotNull(lastId,
+          "lastId should not be null");
+      sequenceIdToLastIdMap.put(sequenceIdName, lastId);
     }
 
     /**
