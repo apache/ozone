@@ -25,6 +25,7 @@ import org.apache.hadoop.ozone.storage.proto.OzoneManagerStorageProtos;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
 import org.junit.jupiter.api.Test;
 
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 
@@ -74,9 +75,9 @@ public class TestOmPrefixInfo {
       IAccessAuthorizer.ACLType aclType,
       OzoneAcl.AclScope scope) {
     return new OmPrefixInfo(path,
-        Collections.singletonList(new OzoneAcl(
+        new ArrayList<>(Collections.singletonList(new OzoneAcl(
             identityType, identityString,
-            aclType, scope)), new HashMap<>(), 10, 100);
+            aclType, scope))), new HashMap<>(), 10, 100);
   }
 
 

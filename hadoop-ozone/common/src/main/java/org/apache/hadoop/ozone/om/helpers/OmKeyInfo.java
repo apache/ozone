@@ -786,6 +786,7 @@ public final class OmKeyInfo extends WithParentObjectId
         .setDataSize(dataSize)
         .setReplicationConfig(replicationConfig)
         .setFileEncryptionInfo(encInfo)
+        .setAcls(acls)
         .setObjectID(getObjectID())
         .setUpdateID(getUpdateID())
         .setParentObjectID(getParentObjectID())
@@ -797,8 +798,6 @@ public final class OmKeyInfo extends WithParentObjectId
             new OmKeyLocationInfoGroup(keyLocationVersion.getVersion(),
                 keyLocationVersion.getLocationList(),
                 keyLocationVersion.isMultipartKey())));
-
-    acls.forEach(acl -> builder.addAcl(acl.copyObject()));
 
     if (getMetadata() != null) {
       getMetadata().forEach((k, v) -> builder.addMetadata(k, v));

@@ -480,10 +480,8 @@ public final class OmVolumeArgs extends WithObjectID
       cloneMetadata.putAll(getMetadata());
     }
 
-    List<OzoneAcl> cloneAcls = OzoneAclUtil.deepCopy(acls);
-
     return new OmVolumeArgs(adminName, ownerName, volume, quotaInBytes,
-        quotaInNamespace, usedNamespace, cloneMetadata, cloneAcls,
+        quotaInNamespace, usedNamespace, cloneMetadata, new ArrayList<>(acls),
         creationTime, modificationTime, getObjectID(), getUpdateID(), refCount);
   }
 }

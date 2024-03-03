@@ -342,9 +342,6 @@ public final class OmBucketInfo extends WithObjectID implements Auditable {
       builder.setBucketEncryptionKey(bekInfo.copy());
     }
 
-    builder.acls.clear();
-    acls.forEach(acl -> builder.addAcl(acl.copyObject()));
-
     if (defaultReplicationConfig != null) {
       builder.setDefaultReplicationConfig(defaultReplicationConfig.copy());
     }

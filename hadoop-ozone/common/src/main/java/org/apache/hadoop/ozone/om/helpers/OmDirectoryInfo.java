@@ -261,11 +261,10 @@ public class OmDirectoryInfo extends WithParentObjectId
             .setName(name)
             .setCreationTime(creationTime)
             .setModificationTime(modificationTime)
+            .setAcls(acls)
             .setParentObjectID(getParentObjectID())
             .setObjectID(getObjectID())
             .setUpdateID(getUpdateID());
-
-    acls.forEach(acl -> builder.addAcl(acl.copyObject()));
 
     if (getMetadata() != null) {
       builder.addAllMetadata(getMetadata());

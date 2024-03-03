@@ -53,7 +53,7 @@ public final class OmPrefixInfo extends WithObjectID {
   public OmPrefixInfo(String name, List<OzoneAcl> acls,
       Map<String, String> metadata, long objectId, long updateId) {
     this.name = name;
-    this.acls = new ArrayList<>(acls);
+    this.acls = acls;
     setMetadata(metadata);
     setObjectID(objectId);
     setUpdateID(updateId);
@@ -234,13 +234,11 @@ public final class OmPrefixInfo extends WithObjectID {
    * Return a new copy of the object.
    */
   public OmPrefixInfo copyObject() {
-    List<OzoneAcl> aclList = OzoneAclUtil.deepCopy(acls);
-
     Map<String, String> metadataList = new HashMap<>();
     if (getMetadata() != null) {
       metadataList.putAll(getMetadata());
     }
-    return new OmPrefixInfo(name, aclList, metadataList, getObjectID(), getUpdateID());
+    return new OmPrefixInfo(name, new ArrayList<>(acls), metadataList, getObjectID(), getUpdateID());
   }
 }
 

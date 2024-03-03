@@ -284,13 +284,4 @@ public final class OzoneAclUtil {
     }
     return true;
   }
-
-  public static List<OzoneAcl> deepCopy(List<OzoneAcl> acls) {
-    if (acls == null || acls.isEmpty()) {
-      return acls;
-    }
-    return acls.stream()
-        .map(OzoneAcl::copyObject)
-        .collect(Collectors.toList());
-  }
 }
