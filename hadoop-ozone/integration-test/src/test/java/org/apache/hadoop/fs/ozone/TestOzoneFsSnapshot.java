@@ -29,11 +29,8 @@ import java.util.stream.Stream;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import org.apache.commons.io.FileUtils;
-import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
-import org.apache.hadoop.ozone.client.OzoneBucket;
-import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.om.KeyManagerImpl;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OzoneManager;
@@ -73,7 +70,7 @@ class TestOzoneFsSnapshot {
   private static final String OM_SERVICE_ID = "om-service-test1";
   private static OzoneManager ozoneManager;
   private static OzoneFsShell shell;
-  private static final AtomicInteger counter = new AtomicInteger();
+  private static AtomicInteger counter = new AtomicInteger();
   private static final String VOLUME =
       "vol-" + counter.incrementAndGet();
   private static final String BUCKET =
