@@ -27,7 +27,6 @@ import org.apache.hadoop.ozone.security.acl.RequestContext;
 
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.BitSet;
 import java.util.List;
 import java.util.Objects;
 import java.util.stream.Collectors;
@@ -39,8 +38,6 @@ import static org.apache.hadoop.ozone.OzoneAcl.AclScope.ACCESS;
 import static org.apache.hadoop.ozone.OzoneAcl.AclScope.DEFAULT;
 import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLIdentityType.GROUP;
 import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLIdentityType.USER;
-import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType.ALL;
-import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType.NONE;
 
 /**
  * Helper class for ozone acls operations.
@@ -136,23 +133,6 @@ public final class OzoneAclUtil {
       }
     }
     return false;
-  }
-
-  /**
-   * Helper function to check if bit for given acl is set.
-   * @param acl
-   * @param bitset
-   * @return True of acl bit is set else false.
-   * */
-  public static boolean checkIfAclBitIsSet(IAccessAuthorizer.ACLType acl,
-      BitSet bitset) {
-    if (bitset == null) {
-      return false;
-    }
-
-    return ((bitset.get(acl.ordinal())
-        || bitset.get(ALL.ordinal()))
-        && !bitset.get(NONE.ordinal()));
   }
 
   /**
