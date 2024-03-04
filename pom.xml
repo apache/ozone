@@ -306,6 +306,7 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
     <native.lib.tmp.dir></native.lib.tmp.dir>
     <properties.maven.plugin.version>1.2.1</properties.maven.plugin.version>
     <maven.core.version>3.9.6</maven.core.version>
+    <snappy-java.version>1.1.10.5</snappy-java.version>
   </properties>
 
   <dependencyManagement>
@@ -1547,6 +1548,11 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
         <groupId>org.mockito</groupId>
         <artifactId>mockito-inline</artifactId>
         <version>${mockito.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.xerial.snappy</groupId>
+        <artifactId>snappy-java</artifactId>
+        <version>${snappy-java.version}</version>
       </dependency>
     </dependencies>
   </dependencyManagement>
