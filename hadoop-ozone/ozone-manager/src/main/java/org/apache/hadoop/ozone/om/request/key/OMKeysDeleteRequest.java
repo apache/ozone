@@ -129,7 +129,8 @@ public class OMKeysDeleteRequest extends OMKeyRequest {
       long startNanosDeleteKeysResolveBucketLatency = Time.monotonicNowNanos();
       ResolvedBucket bucket =
           ozoneManager.resolveBucketLink(Pair.of(volumeName, bucketName), this);
-      perfMetrics.setDeleteKeysResolveBucketLatencyNs(Time.monotonicNowNanos() - startNanosDeleteKeysResolveBucketLatency);
+      perfMetrics.setDeleteKeysResolveBucketLatencyNs(
+          Time.monotonicNowNanos() - startNanosDeleteKeysResolveBucketLatency);
       bucket.audit(auditMap);
       volumeName = bucket.realVolume();
       bucketName = bucket.realBucket();
