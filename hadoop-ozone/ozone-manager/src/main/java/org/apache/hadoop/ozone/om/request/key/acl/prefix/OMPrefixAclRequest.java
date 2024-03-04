@@ -85,7 +85,8 @@ public abstract class OMPrefixAclRequest extends OMClientRequest {
       if (ozoneManager.getAclsEnabled()) {
         checkAcls(ozoneManager, OzoneObj.ResourceType.PREFIX,
             OzoneObj.StoreType.OZONE, IAccessAuthorizer.ACLType.WRITE_ACL,
-            volume, bucket, prefix);
+            resolvedPrefixObj.getVolumeName(), resolvedPrefixObj.getBucketName(),
+            resolvedPrefixObj.getPrefixName());
       }
 
       mergeOmLockDetails(omMetadataManager.getLock()
