@@ -322,9 +322,8 @@ public class TestOzoneRpcClientWithRatis extends TestOzoneRpcClientAbstract {
         new OMRequestHandlerPauseInjector();
     omSM.getHandler().setInjector(injector);
     thread1.start();
-    Thread.sleep(1000);
     thread2.start();
-    Thread.sleep(10000);
+    Thread.sleep(2000);
     injector.resume();
 
     try {
