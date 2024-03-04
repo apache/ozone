@@ -37,14 +37,14 @@ import static org.apache.hadoop.hdds.scm.exceptions.SCMException.ResultCodes.NO_
  * This data structure maintains the list of containers that is on a datanode.
  * This information is built from the DN container reports.
  */
-public class Node2ContainerMap {
+class Node2ContainerMap {
   private final Map<UUID, Set<ContainerID>> dn2ContainerMap = new ConcurrentHashMap<>();
 
 
   /**
    * Constructs a Node2ContainerMap Object.
    */
-  public Node2ContainerMap() {
+  Node2ContainerMap() {
     super();
   }
 
