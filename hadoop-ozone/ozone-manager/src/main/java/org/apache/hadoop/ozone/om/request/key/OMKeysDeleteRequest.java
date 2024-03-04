@@ -126,10 +126,10 @@ public class OMKeysDeleteRequest extends OMKeyRequest {
     boolean deleteStatus = true;
     long startNanos = Time.monotonicNowNanos();
     try {
-      long startNs = Time.monotonicNowNanos();
+      long startNanosDeleteKeysResolveBucketLatency = Time.monotonicNowNanos();
       ResolvedBucket bucket =
           ozoneManager.resolveBucketLink(Pair.of(volumeName, bucketName), this);
-      perfMetrics.setDeleteKeysResolveBucketLatencyNs(Time.monotonicNowNanos() - startNs);
+      perfMetrics.setDeleteKeysResolveBucketLatencyNs(Time.monotonicNowNanos() - startNanosDeleteKeysResolveBucketLatency);
       bucket.audit(auditMap);
       volumeName = bucket.realVolume();
       bucketName = bucket.realBucket();
@@ -158,7 +158,7 @@ public class OMKeysDeleteRequest extends OMKeyRequest {
 
         try {
           // check Acl
-          long startNano = Time.monotonicNowNanos();
+          long startNanosDeleteKeysAclCheckLatency = Time.monotonicNowNanos();
           checkKeyAcls(ozoneManager, volumeName, bucketName, keyName,
               IAccessAuthorizer.ACLType.DELETE, OzoneObj.ResourceType.KEY,
               volumeOwner);
@@ -166,7 +166,7 @@ public class OMKeysDeleteRequest extends OMKeyRequest {
               ozoneManager, omMetadataManager, volumeName, bucketName, keyName);
           addKeyToAppropriateList(omKeyInfoList, omKeyInfo, dirList,
               fileStatus);
-          perfMetrics.setDeleteKeysAclCheckLatencyNs(Time.monotonicNowNanos() - startNano);
+          perfMetrics.setDeleteKeysAclCheckLatencyNs(Time.monotonicNowNanos() - startNanosDeleteKeysAclCheckLatency);
         } catch (Exception ex) {
           deleteStatus = false;
           LOG.error("Acl check failed for Key: {}", objectKey, ex);
@@ -192,7 +192,8 @@ public class OMKeysDeleteRequest extends OMKeyRequest {
               unDeletedKeys, deleteStatus, omBucketInfo, volumeId);
 
       result = Result.SUCCESS;
-
+      long endNanosDeleteKeySuccessLatencyNs = Time.monotonicNowNanos();
+      perfMetrics.setDeleteKeySuccessLatencyNs(endNanosDeleteKeySuccessLatencyNs - startNanos);
     } catch (IOException | InvalidPathException ex) {
       result = Result.FAILURE;
       exception = ex;
@@ -210,7 +211,8 @@ public class OMKeysDeleteRequest extends OMKeyRequest {
               .setUnDeletedKeys(unDeletedKeys).build()).build();
       omClientResponse =
           new OMKeysDeleteResponse(omResponse.build(), getBucketLayout());
-
+      long endNanosDeleteKeyFailureLatencyNs = Time.monotonicNowNanos();
+      perfMetrics.setDeleteKeyFailureLatencyNs(endNanosDeleteKeyFailureLatencyNs - startNanos);
     } finally {
       if (acquiredLock) {
         mergeOmLockDetails(omMetadataManager.getLock()
@@ -222,14 +224,12 @@ public class OMKeysDeleteRequest extends OMKeyRequest {
     }
 
     addDeletedKeys(auditMap, deleteKeys, unDeletedKeys.getKeysList());
-    long endNanos = Time.monotonicNowNanos();
     auditLog(auditLogger,
         buildAuditMessage(DELETE_KEYS, auditMap, exception, userInfo));
 
     switch (result) {
     case SUCCESS:
       omMetrics.decNumKeys(deleteKeys.size());
-      perfMetrics.setDeleteKeySuccessLatencyNs(endNanos - startNanos);
       if (LOG.isDebugEnabled()) {
         LOG.debug("Keys delete success. Volume:{}, Bucket:{}, Keys:{}",
             volumeName, bucketName, auditMap.get(DELETED_KEYS_LIST));
@@ -237,7 +237,6 @@ public class OMKeysDeleteRequest extends OMKeyRequest {
       break;
     case FAILURE:
       omMetrics.incNumKeyDeleteFails();
-      perfMetrics.setDeleteKeyFailureLatencyNs(endNanos - startNanos);
       if (LOG.isDebugEnabled()) {
         LOG.debug("Keys delete failed. Volume:{}, Bucket:{}, DeletedKeys:{}, "
                 + "UnDeletedKeys:{}", volumeName, bucketName,
