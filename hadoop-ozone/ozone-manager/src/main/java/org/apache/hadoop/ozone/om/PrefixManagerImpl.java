@@ -218,7 +218,7 @@ public class PrefixManagerImpl implements PrefixManager {
       throw new OMException("Prefix name is required.", PREFIX_NOT_FOUND);
     }
     if (!prefixName.endsWith("/")) {
-      throw new OMException("Invalid prefix name: " + prefixName,
+      throw new OMException("Missing trailing slash '/' in prefix name: " + prefixName,
           PREFIX_NOT_FOUND);
     }
   }
