@@ -17,7 +17,6 @@
  */
 package org.apache.hadoop.ozone;
 
-import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -117,7 +116,6 @@ public class MiniOzoneClusterProvider {
   private final int clusterLimit;
   private int consumedClusterCount = 0;
 
-  private final OzoneConfiguration conf;
   private final MiniOzoneCluster.Builder builder;
   private final Thread createThread;
   private final Thread reapThread;
@@ -129,16 +127,13 @@ public class MiniOzoneClusterProvider {
       = new ArrayBlockingQueue<>(EXPIRED_LIMIT);
 
   /**
-   *
-   * @param conf The configuration to use when creating the cluster
    * @param builder A builder object with all cluster options set
    * @param clusterLimit The total number of clusters this provider should
    *                     create. If another is requested after this limit has
    *                     been reached, an exception will be thrown.
    */
-  public MiniOzoneClusterProvider(OzoneConfiguration conf,
+  public MiniOzoneClusterProvider(
       MiniOzoneCluster.Builder builder, int clusterLimit) {
-    this.conf = conf;
     this.builder = builder;
     this.clusterLimit = clusterLimit;
     createThread = createClusters();
