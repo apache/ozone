@@ -574,7 +574,20 @@ public class BlockInputStream extends BlockExtendedInputStream {
     } catch (Exception e) {
       throw new IOException(e);
     }
-    return retryAction.action == RetryPolicy.RetryAction.RetryDecision.RETRY;
+    if (retryAction.action == RetryPolicy.RetryAction.RetryDecision.RETRY) {
+      if (retryAction.delayMillis > 0) {
+        try {
+          LOG.debug("Retry read after {}ms", retryAction.delayMillis);
+          Thread.sleep(retryAction.delayMillis);
+        } catch (InterruptedException e) {
+          Thread.currentThread().interrupt();
+          String msg = "Interrupted: action=" + retryAction.action + ", retry policy=" + retryPolicy;
+          throw new IOException(msg, e);
+        }
+      }
+      return true;
+    }
+    return false;
   }
 
   private void handleReadError(IOException cause) throws IOException {
