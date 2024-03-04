@@ -53,8 +53,7 @@ ozone admin datanode decommission [-hV] [-id=<scmServiceId>]
 查看 Decommission时datanode 的状态，可以执行下面的命令,
 
 ```shell
-ozone admin datanode status decommission [-hV] [-id=<scmServiceId>]
-       [--scm=<scm>] [--id=<uuid>] [--ip=<ipAddress>]
+ozone admin datanode status decommission [-hV] [-id=<scmServiceId>] [--scm=<scm>] [--id=<uuid>] [--ip=<ipAddress>]
 ```
 您可以传递一个 Datanode 的 ipAddress 或 uuid 以仅查看与该 Datanode 相关的详细信息。
 

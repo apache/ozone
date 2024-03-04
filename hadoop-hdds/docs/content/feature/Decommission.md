@@ -54,8 +54,7 @@ You can enter multiple hosts to decommission multiple datanodes together.
 To view the status of a decommissioning datanode, you can execute the following command in cli,
 
 ```shell
-ozone admin datanode status decommission [-hV] [-id=<scmServiceId>]
-       [--scm=<scm>] [--id=<uuid>] [--ip=<ipAddress>]
+ozone admin datanode status decommission [-hV] [-id=<scmServiceId>] [--scm=<scm>] [--id=<uuid>] [--ip=<ipAddress>]
 ```
 You can pass the ipAddress or uuid of one datanode to view only the details related to that datanode.
 
