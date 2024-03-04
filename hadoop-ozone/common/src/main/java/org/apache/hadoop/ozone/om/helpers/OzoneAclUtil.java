@@ -156,19 +156,14 @@ public final class OzoneAclUtil {
   }
 
   /**
-   * Helper function to inherit default ACL as access ACL for child object.
-   * 1. deep copy of OzoneAcl to avoid unexpected parent default ACL change
-   * 2. merge inherited access ACL with existing access ACL via
-   * OzoneUtils.addAcl().
-   * @param acls
-   * @param parentAcls
-   * @param scope
-   * @return true if acls inherited DEFAULT acls from parentAcls successfully,
-   * false otherwise.
+   * Helper function to inherit default ACL with given {@code scope} for child object.
+   * @param acls child object ACL list
+   * @param parentAcls parent object ACL list
+   * @param scope scope applied to inherited ACL
+   * @return true if any ACL was inherited from parent, false otherwise
    */
   public static boolean inheritDefaultAcls(List<OzoneAcl> acls,
       List<OzoneAcl> parentAcls, OzoneAcl.AclScope scope) {
-    List<OzoneAcl> inheritedAcls = null;
     if (parentAcls != null && !parentAcls.isEmpty()) {
       Stream<OzoneAcl> aclStream = parentAcls.stream()
           .filter(a -> a.getAclScope() == DEFAULT);
@@ -177,12 +172,13 @@ public final class OzoneAclUtil {
         aclStream = aclStream.map(acl -> acl.withScope(scope));
       }
 
-      inheritedAcls = aclStream.collect(Collectors.toList());
+      List<OzoneAcl> inheritedAcls = aclStream.collect(Collectors.toList());
+      if (!inheritedAcls.isEmpty()) {
+        inheritedAcls.forEach(acl -> addAcl(acls, acl));
+        return true;
+      }
     }
-    if (inheritedAcls != null && !inheritedAcls.isEmpty()) {
-      inheritedAcls.stream().forEach(acl -> addAcl(acls, acl));
-      return true;
-    }
+
     return false;
   }
 
