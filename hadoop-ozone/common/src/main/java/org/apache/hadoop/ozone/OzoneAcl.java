@@ -20,6 +20,7 @@
 package org.apache.hadoop.ozone;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.google.common.annotations.VisibleForTesting;
 import com.google.protobuf.ByteString;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OzoneAclInfo;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OzoneAclInfo.OzoneAclScope;
@@ -251,14 +252,13 @@ public class OzoneAcl {
     return aclBitSet.isEmpty();
   }
 
+  @VisibleForTesting
   public boolean isSet(ACLType acl) {
     return aclBitSet.get(acl.ordinal());
   }
 
   public boolean checkAccess(ACLType acl) {
-    return ((aclBitSet.get(acl.ordinal())
-        || aclBitSet.get(ALL.ordinal()))
-        && !aclBitSet.get(NONE.ordinal()));
+    return (isSet(acl) || isSet(ALL)) && !isSet(NONE);
   }
 
   public OzoneAcl add(OzoneAcl other) {
