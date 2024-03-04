@@ -122,13 +122,13 @@ public class ResolvedBucket {
         : args;
   }
 
-  public OzoneObj update(OzoneObj ozoneObjInfo) {
+  public OzoneObj update(OzoneObj ozoneObj) {
     return isLink()
-        ? OzoneObjInfo.Builder.fromOzoneObj(ozoneObjInfo)
+        ? OzoneObjInfo.Builder.fromOzoneObj(ozoneObj)
             .setVolumeName(realVolume())
             .setBucketName(realBucket())
             .build()
-        : ozoneObjInfo;
+        : ozoneObj;
   }
 
   public boolean isLink() {
