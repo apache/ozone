@@ -24,7 +24,6 @@ import org.slf4j.LoggerFactory;
 import java.io.IOException;
 import java.util.HashSet;
 import java.util.Set;
-import java.util.UUID;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.TimeUnit;
@@ -214,9 +213,6 @@ public class MiniOzoneClusterProvider {
       while (!Thread.interrupted() && createdCount < clusterLimit) {
         MiniOzoneCluster cluster = null;
         try {
-          builder.setClusterId(UUID.randomUUID().toString());
-          builder.setConf(new OzoneConfiguration(conf));
-
           cluster = builder.build();
           cluster.waitForClusterToBeReady();
           createdCount++;
