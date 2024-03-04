@@ -22,10 +22,7 @@ import java.io.IOException;
 import java.nio.file.InvalidPathException;
 import java.util.Map;
 
-import org.apache.commons.lang3.tuple.Pair;
-import org.apache.hadoop.ozone.om.ResolvedBucket;
 import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
-import org.apache.hadoop.ozone.security.acl.OzoneObjInfo;
 import org.apache.ratis.server.protocol.TermIndex;
 import org.apache.hadoop.ozone.audit.AuditLogger;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
@@ -79,16 +76,7 @@ public abstract class OMPrefixAclRequest extends OMClientRequest {
     PrefixManagerImpl prefixManager =
         (PrefixManagerImpl) ozoneManager.getPrefixManager();
     try {
-      ResolvedBucket resolvedBucket = ozoneManager.resolveBucketLink(
-          Pair.of(getOzoneObj().getVolumeName(), getOzoneObj().getBucketName()));
-      volume = resolvedBucket.realVolume();
-      bucket = resolvedBucket.realBucket();
-      prefix = getOzoneObj().getPrefixName();
-      resolvedPrefixObj = OzoneObjInfo.Builder
-          .fromOzoneObj(getOzoneObj())
-          .setVolumeName(volume)
-          .setBucketName(bucket)
-          .build();
+      resolvedPrefixObj = prefixManager.getResolvedPrefixObj(getOzoneObj());
       prefixManager.validateOzoneObj(getOzoneObj());
       validatePrefixPath(resolvedPrefixObj.getPath());
       prefixPath = resolvedPrefixObj.getPath();

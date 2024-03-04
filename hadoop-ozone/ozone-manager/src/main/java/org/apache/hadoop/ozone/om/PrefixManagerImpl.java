@@ -27,7 +27,6 @@ import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmPrefixInfo;
 import org.apache.hadoop.ozone.om.helpers.OzoneAclUtil;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
-import org.apache.hadoop.ozone.security.acl.OzoneObjInfo;
 import org.apache.hadoop.ozone.security.acl.RequestContext;
 import org.apache.hadoop.ozone.util.RadixNode;
 import org.apache.hadoop.ozone.util.RadixTree;
@@ -352,22 +351,14 @@ public class PrefixManagerImpl implements PrefixManager {
    * Otherwise, return the same prefix object.
    * @throws IOException Exception thrown when resolving the bucket link.
    */
-  private OzoneObj getResolvedPrefixObj(OzoneObj obj) throws IOException {
+  public OzoneObj getResolvedPrefixObj(OzoneObj obj) throws IOException {
     if (StringUtils.isEmpty(obj.getVolumeName()) || StringUtils.isEmpty(obj.getBucketName())) {
       return obj;
     }
 
     ResolvedBucket resolvedBucket = ozoneManager.resolveBucketLink(
         Pair.of(obj.getVolumeName(), obj.getBucketName()));
-    String realVolume = resolvedBucket.realVolume();
-    String realBucket = resolvedBucket.realBucket();
-    // If the bucket is not a link bucket, just return the Ozone object
-    if (realVolume.equals(obj.getVolumeName()) && realBucket.equals(obj.getBucketName())) {
-      return obj;
-    }
-    // If the bucket is a link bucket, return a new OzoneObj with resolved volume and bucket name
-    return OzoneObjInfo.Builder.fromOzoneObj(obj)
-        .setVolumeName(realVolume).setBucketName(realBucket).build();
+    return resolvedBucket.update(obj);
   }
 
   /**
