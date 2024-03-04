@@ -66,7 +66,7 @@ class TestOzoneHARatisLogParser {
     String omServiceId = "omServiceId1";
     OzoneConfiguration conf = new OzoneConfiguration();
     String scmServiceId = "scmServiceId";
-    cluster =  (MiniOzoneHAClusterImpl) MiniOzoneCluster.newHABuilder(conf)
+    cluster =  MiniOzoneCluster.newHABuilder(conf)
         .setOMServiceId(omServiceId)
         .setSCMServiceId(scmServiceId)
         .setNumOfOzoneManagers(3)

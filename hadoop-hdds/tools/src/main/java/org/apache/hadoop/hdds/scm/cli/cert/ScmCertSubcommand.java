@@ -20,7 +20,6 @@ package org.apache.hadoop.hdds.scm.cli.cert;
 import org.apache.hadoop.hdds.protocol.SCMSecurityProtocol;
 import org.apache.hadoop.hdds.scm.cli.ScmOption;
 import org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateCodec;
-import org.slf4j.Logger;
 import picocli.CommandLine;
 
 import java.io.IOException;
@@ -37,29 +36,29 @@ public abstract class ScmCertSubcommand implements Callable<Void> {
   @CommandLine.Mixin
   private ScmOption scmOption;
 
-  private static final String OUTPUT_FORMAT = "%-17s %-30s %-30s %-110s %-110s";
+  private static final String OUTPUT_FORMAT = "%-17s %-30s %-30s %-110s %-110s%n";
 
-  protected void printCertList(Logger log, List<String> pemEncodedCerts) {
+  protected void printCertList(List<String> pemEncodedCerts) {
     if (pemEncodedCerts.isEmpty()) {
-      log.info("No certificates to list");
+      System.out.println("No certificates to list");
       return;
     }
-    log.info(String.format(OUTPUT_FORMAT, "SerialNumber", "Valid From",
-        "Expiry", "Subject", "Issuer"));
+    System.out.printf(OUTPUT_FORMAT, "SerialNumber", "Valid From",
+        "Expiry", "Subject", "Issuer");
     for (String certPemStr : pemEncodedCerts) {
       try {
         X509Certificate cert = CertificateCodec.getX509Certificate(certPemStr);
-        printCert(cert, log);
+        printCert(cert);
       } catch (CertificateException e) {
-        log.error("Failed to parse certificate.", e);
+        System.err.println("Failed to parse certificate: " + e.getMessage());
       }
     }
   }
 
-  protected void printCert(X509Certificate cert, Logger log) {
-    log.info(String.format(OUTPUT_FORMAT, cert.getSerialNumber(),
+  protected void printCert(X509Certificate cert) {
+    System.out.printf(OUTPUT_FORMAT, cert.getSerialNumber(),
         cert.getNotBefore(), cert.getNotAfter(), cert.getSubjectDN(),
-        cert.getIssuerDN()));
+        cert.getIssuerDN());
   }
 
   protected abstract void execute(SCMSecurityProtocol client)

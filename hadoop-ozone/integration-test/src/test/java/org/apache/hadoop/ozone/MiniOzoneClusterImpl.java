@@ -27,18 +27,15 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
 import java.util.Set;
-import java.util.UUID;
 import java.util.Iterator;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
 import org.apache.commons.lang3.StringUtils;
-import org.apache.hadoop.hdds.DFSConfigKeysLegacy;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
-import org.apache.hadoop.hdds.conf.ConfigurationTarget;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
@@ -68,10 +65,8 @@ import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientFactory;
 import org.apache.hadoop.ozone.common.Storage.StorageState;
-import org.apache.hadoop.ozone.container.common.DatanodeLayoutStorage;
 import org.apache.hadoop.ozone.container.common.utils.ContainerCache;
 import org.apache.hadoop.ozone.container.common.utils.DatanodeStoreCache;
-import org.apache.hadoop.ozone.container.replication.ReplicationServer.ReplicationConfig;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OMStorage;
 import org.apache.hadoop.ozone.om.OzoneManager;
@@ -88,11 +83,6 @@ import static org.apache.hadoop.hdds.recon.ReconConfigKeys.OZONE_RECON_ADDRESS_K
 import static org.apache.hadoop.hdds.recon.ReconConfigKeys.OZONE_RECON_DATANODE_ADDRESS_KEY;
 import static org.apache.hadoop.hdds.recon.ReconConfigKeys.OZONE_RECON_HTTP_ADDRESS_KEY;
 import static org.apache.hadoop.hdds.recon.ReconConfigKeys.OZONE_RECON_TASK_SAFEMODE_WAIT_THRESHOLD;
-import static org.apache.hadoop.ozone.OzoneConfigKeys.DFS_CONTAINER_IPC_PORT;
-import static org.apache.hadoop.ozone.OzoneConfigKeys.DFS_CONTAINER_RATIS_ADMIN_PORT;
-import static org.apache.hadoop.ozone.OzoneConfigKeys.DFS_CONTAINER_RATIS_DATASTREAM_PORT;
-import static org.apache.hadoop.ozone.OzoneConfigKeys.DFS_CONTAINER_RATIS_IPC_PORT;
-import static org.apache.hadoop.ozone.OzoneConfigKeys.DFS_CONTAINER_RATIS_SERVER_PORT;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_DB_DIR;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_OM_SNAPSHOT_DB_DIR;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_SCM_DB_DIR;
@@ -744,53 +734,13 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
         throws IOException {
       List<HddsDatanodeService> hddsDatanodes = new ArrayList<>();
       for (int i = 0; i < numOfDatanodes; i++) {
-        OzoneConfiguration dnConf = new OzoneConfiguration(conf);
-        configureDatanodePorts(dnConf);
-        String datanodeBaseDir = path + "/datanode-" + i;
-        Path metaDir = Paths.get(datanodeBaseDir, "meta");
-        List<String> dataDirs = new ArrayList<>();
-        List<String> reservedSpaceList = new ArrayList<>();
-        for (int j = 0; j < numDataVolumes; j++) {
-          Path dir = Paths.get(datanodeBaseDir, "data-" + j, "containers");
-          Files.createDirectories(dir);
-          dataDirs.add(dir.toString());
-          datanodeReservedSpace.ifPresent(
-              s -> reservedSpaceList.add(dir + ":" + s));
-        }
-        String reservedSpaceString = String.join(",", reservedSpaceList);
-        String listOfDirs = String.join(",", dataDirs);
-        Path ratisDir = Paths.get(datanodeBaseDir, "data", "ratis");
-        Path workDir = Paths.get(datanodeBaseDir, "data", "replication",
-            "work");
-        Files.createDirectories(metaDir);
-        Files.createDirectories(ratisDir);
-        Files.createDirectories(workDir);
-        dnConf.set(HddsConfigKeys.OZONE_METADATA_DIRS, metaDir.toString());
-        dnConf.set(DFSConfigKeysLegacy.DFS_DATANODE_DATA_DIR_KEY, listOfDirs);
-        dnConf.set(ScmConfigKeys.HDDS_DATANODE_DIR_KEY, listOfDirs);
-        dnConf.set(ScmConfigKeys.HDDS_DATANODE_DIR_DU_RESERVED,
-            reservedSpaceString);
-        dnConf.set(OzoneConfigKeys.DFS_CONTAINER_RATIS_DATANODE_STORAGE_DIR,
-            ratisDir.toString());
+        OzoneConfiguration dnConf = dnFactory.apply(conf);
 
         HddsDatanodeService datanode = new HddsDatanodeService(NO_ARGS);
         datanode.setConfiguration(dnConf);
         hddsDatanodes.add(datanode);
       }
-      if (dnLayoutVersion.isPresent()) {
-        configureLayoutVersionInDatanodes(hddsDatanodes, dnLayoutVersion.get());
-      }
       return hddsDatanodes;
-    }
-
-    private void configureLayoutVersionInDatanodes(
-        List<HddsDatanodeService> dns, int layoutVersion) throws IOException {
-      for (HddsDatanodeService dn : dns) {
-        DatanodeLayoutStorage layoutStorage;
-        layoutStorage = new DatanodeLayoutStorage(dn.getConf(),
-            UUID.randomUUID().toString(), layoutVersion);
-        layoutStorage.initialize();
-      }
     }
 
     protected void configureSCM() {
@@ -812,21 +762,6 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
       conf.set(OMConfigKeys.OZONE_OM_HTTPS_ADDRESS_KEY,
           localhostWithFreePort());
       conf.setInt(OMConfigKeys.OZONE_OM_RATIS_PORT_KEY, getFreePort());
-    }
-
-    protected void configureDatanodePorts(ConfigurationTarget conf) {
-      conf.set(ScmConfigKeys.HDDS_REST_HTTP_ADDRESS_KEY,
-          anyHostWithFreePort());
-      conf.set(HddsConfigKeys.HDDS_DATANODE_HTTP_ADDRESS_KEY,
-          anyHostWithFreePort());
-      conf.set(HddsConfigKeys.HDDS_DATANODE_CLIENT_ADDRESS_KEY,
-          anyHostWithFreePort());
-      conf.setInt(DFS_CONTAINER_IPC_PORT, getFreePort());
-      conf.setInt(DFS_CONTAINER_RATIS_IPC_PORT, getFreePort());
-      conf.setInt(DFS_CONTAINER_RATIS_ADMIN_PORT, getFreePort());
-      conf.setInt(DFS_CONTAINER_RATIS_SERVER_PORT, getFreePort());
-      conf.setInt(DFS_CONTAINER_RATIS_DATASTREAM_PORT, getFreePort());
-      conf.setFromObject(new ReplicationConfig().setPort(getFreePort()));
     }
 
     protected void configureRecon() {

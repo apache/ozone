@@ -1036,7 +1036,7 @@
     ]
   },
   "keys": {
-    "totalCount": 534,
+    "totalCount": 15,
     "keys": [
       {
         "Volume": "vol-0-20448",
@@ -1098,7 +1098,7 @@
       {
         "Volume": "vol-0-20448",
         "Bucket": "bucket-0-12811",
-        "Key": "key-0-77505",
+        "Key": "key-0-77506",
         "DataSize": 10240,
         "Versions": [
           0
@@ -1117,7 +1117,7 @@
       {
         "Volume": "vol-0-20448",
         "Bucket": "bucket-0-12811",
-        "Key": "key-21-64511",
+        "Key": "key-21-64512",
         "DataSize": 5692407,
         "Versions": [
           0
@@ -1136,7 +1136,7 @@
       {
         "Volume": "vol-0-20448",
         "Bucket": "bucket-0-12811",
-        "Key": "key-22-69104",
+        "Key": "key-22-69105",
         "DataSize": 189407,
         "Versions": [
           0
@@ -1155,7 +1155,7 @@
       {
         "Volume": "vol-0-20448",
         "Bucket": "bucket-0-12811",
-        "Key": "key-0-77505",
+        "Key": "key-0-77507",
         "DataSize": 10240,
         "Versions": [
           0
@@ -1174,7 +1174,7 @@
       {
         "Volume": "vol-0-20448",
         "Bucket": "bucket-0-12811",
-        "Key": "key-21-64511",
+        "Key": "key-21-64513",
         "DataSize": 5692407,
         "Versions": [
           0
@@ -1193,7 +1193,7 @@
       {
         "Volume": "vol-0-20448",
         "Bucket": "bucket-0-12811",
-        "Key": "key-22-69104",
+        "Key": "key-22-69106",
         "DataSize": 189407,
         "Versions": [
           0
@@ -1212,7 +1212,7 @@
       {
         "Volume": "vol-0-20448",
         "Bucket": "bucket-0-12811",
-        "Key": "key-0-77505",
+        "Key": "key-0-77508",
         "DataSize": 10240,
         "Versions": [
           0
@@ -1231,7 +1231,7 @@
       {
         "Volume": "vol-0-20448",
         "Bucket": "bucket-0-12811",
-        "Key": "key-21-64511",
+        "Key": "key-21-64514",
         "DataSize": 5692407,
         "Versions": [
           0
@@ -1250,7 +1250,7 @@
       {
         "Volume": "vol-0-20448",
         "Bucket": "bucket-0-12811",
-        "Key": "key-22-69104",
+        "Key": "key-22-69107",
         "DataSize": 189407,
         "Versions": [
           0
@@ -1269,7 +1269,7 @@
       {
         "Volume": "vol-0-20448",
         "Bucket": "bucket-0-12811",
-        "Key": "key-0-77505",
+        "Key": "key-0-77509",
         "DataSize": 10240,
         "Versions": [
           0
@@ -1288,7 +1288,7 @@
       {
         "Volume": "vol-0-20448",
         "Bucket": "bucket-0-12811",
-        "Key": "key-21-64511",
+        "Key": "key-21-64515",
         "DataSize": 5692407,
         "Versions": [
           0
@@ -1307,7 +1307,7 @@
       {
         "Volume": "vol-0-20448",
         "Bucket": "bucket-0-12811",
-        "Key": "key-22-69104",
+        "Key": "key-22-69109",
         "DataSize": 189407,
         "Versions": [
           0
@@ -3765,7 +3765,6 @@
       "totalDeletedKeys": 3
   },
   "omMismatch":{
-    "lastKey":11,
     "containerDiscrepancyInfo": [
       {
         "containerId": 1,
@@ -3960,12 +3959,7 @@
           }
         ],
         "existsAt": "SCM"
-      }
-    ]
-  },
-  "omMismatch1":{
-    "lastKey":21,
-    "containerDiscrepancyInfo": [
+      },
       {
         "containerId": 11,
         "numberOfKeys": 1,
@@ -4198,12 +4192,7 @@
       }
     ]
   },
-  "omMismatch2":{
-    "lastKey": null,
-    "containerDiscrepancyInfo": []
-  },
   "scmMismatch":{
-    "lastKey":11,
     "containerDiscrepancyInfo": [
       {
         "containerId": 1,
@@ -4398,12 +4387,7 @@
           }
         ],
         "existsAt": "OM"
-      }
-    ]
-  },
-  "scmMismatch1":{
-    "lastKey":21,
-    "containerDiscrepancyInfo": [
+      },
       {
         "containerId": 11,
         "numberOfKeys": 1,
@@ -4597,12 +4581,7 @@
           }
         ],
         "existsAt": "OM"
-      }
-    ]
-  },
-  "scmMismatch2":{
-    "lastKey":31,
-    "containerDiscrepancyInfo": [
+      },
       {
         "containerId": 21,
         "numberOfKeys": 1,
@@ -4796,12 +4775,7 @@
           }
         ],
         "existsAt": "OM"
-      }
-    ]
-  },
-  "scmMismatch3":{
-    "lastKey":41,
-    "containerDiscrepancyInfo": [
+      },
       {
         "containerId": 31,
         "numberOfKeys": 1,
@@ -4995,12 +4969,7 @@
           }
         ],
         "existsAt": "OM"
-      }
-    ]
-  },
-  "scmMismatch4":{
-    "lastKey":51,
-    "containerDiscrepancyInfo": [
+      },
       {
         "containerId": 41,
         "numberOfKeys": 1,
@@ -5197,12 +5166,7 @@
       }
     ]
   },
-  "scmMismatch5":{
-    "lastKey": null,
-    "containerDiscrepancyInfo": []
-  },
   "nonFSO": {
-    "lastKey": "11",
     "keysSummary": {
         "totalUnreplicatedDataSize": 10485760,
         "totalReplicatedDataSize": 31457280,
@@ -5232,13 +5196,7 @@
           "requiredNodes": 1,
           "replicationType": "RATIS"
         }
-      }
-    ],
-    "status": "OK"
-  },
-  "nonFSO1": {
-    "lastKey": "21",
-    "nonFSO": [
+      },
       {
         "key": "/-9223372036854775552/-9223372036854775040/-9223372036852420095/2440/110569623850191713",
         "path": "nonfso 11",
@@ -5262,13 +5220,7 @@
           "requiredNodes": 1,
           "replicationType": "RATIS"
         }
-      }
-    ],
-    "status": "OK"
-  },
-  "nonFSO2": {
-    "lastKey": "31",
-    "nonFSO": [
+      },
       {
         "key": "/-9223372036854775552/-9223372036854775040/-9223372036852420095/2440/110569623850191713",
         "path": "nonfso 21",
@@ -5296,19 +5248,7 @@
     ],
     "status": "OK"
   },
-  "nonFSO3": {
-    "keysSummary": {
-        "totalUnreplicatedDataSize": 10485760,
-        "totalReplicatedDataSize": 31457280,
-        "totalOpenKeys": 10
-    },
-    "lastKey": "",
-    "replicatedDataSize": 0,
-    "unreplicatedDataSize": 0,
-    "status": "OK"
-  },
   "fso": {
-    "lastKey": "11",
     "fso": [
       {
         "key": "/-9223372036854775552/-9223372036854775040/-9223372036852420095/2401/110569623850191713",
@@ -5436,14 +5376,7 @@
           "requiredNodes": 1,
           "replicationType": "RATIS"
         }
-
-      }
-    ],
-    "status": "OK"
-  },
-  "fso1": {
-    "lastKey": "21",
-    "fso": [
+      },
       {
         "key": "/-9223372036854775552/-9223372036854775040/-9223372036852420095/2411/110569623850191713",
         "path": "11",
@@ -5551,13 +5484,7 @@
           "requiredNodes": 1,
           "replicationType": "RATIS"
         }
-      }
-    ],
-    "status": "OK"
-  },
-  "fso2": {
-    "lastKey": "31",
-    "fso": [
+      },
       {
         "key": "/-9223372036854775552/-9223372036854775040/-9223372036852420095/2411/110569623850191713",
         "path": "21",
@@ -5681,19 +5608,7 @@
     ],
     "status": "OK"
   },
-  "fso3": {
-    "keysSummary": {
-      "totalUnreplicatedDataSize": 10485760,
-      "totalReplicatedDataSize": 31457280,
-      "totalOpenKeys": 10
-   },
-    "lastKey": "",
-    "replicatedDataSize": 0,
-    "unreplicatedDataSize": 0,
-    "status": "OK"
-  },
   "keydeletePending":{
-    "lastKey": "/volume/bucket1/rcmeevblsf/106/-9223372036843950335",
     "keysSummary": {
       "totalUnreplicatedDataSize": 29291,
       "totalReplicatedDataSize": 87873,
@@ -6051,16 +5966,7 @@
             "updateIDset": true
           }
         ]
-      }
-    ],
-    "status": "OK"
-  },
-
-  "keydeletePending1": {
-    "lastKey":"/-9223372036854775552/-9223372036854775040/-9223372036852420095/2421/110569623850191",
-    "replicatedTotal": -1530804718628866300,
-    "unreplicatedTotal": -1530804718628866300,
-    "deletedKeyInfo": [
+      },
       {
         "omKeyInfoList": [
           {
@@ -6117,15 +6023,7 @@
             "updateIDset": false
           }
         ]
-      }
-    ],
-    "status": "OK"
-  },
-  "keydeletePending2": {
-    "lastKey":"31",
-    "replicatedTotal": -1530804718628866300,
-    "unreplicatedTotal": -1530804718628866300,
-    "deletedKeyInfo": [
+      },
       {
         "omKeyInfoList": [
           {
@@ -6241,12 +6139,7 @@
     ],
     "status": "OK"
   },
-  "keydeletePending3": {
-    "lastKey":"",
-    "deletedKeyInfo": []
-  },
   "deleted": {
-    "lastKey": "11",
     "containers": [
       {
         "containerId": 1,
@@ -6417,12 +6310,7 @@
             "healthy": true
           }
         ]
-      }
-    ]
-  },
-  "deleted1": {
-    "lastKey": "21",
-    "containers": [
+      },
       {
         "containerId": 11,
         "numberOfKeys": 2,
@@ -6592,12 +6480,7 @@
             "healthy": true
           }
         ]
-      }
-    ]
-  },
-  "deleted2": {
-    "lastKey": "31",
-    "containers": [
+      },
       {
         "containerId": 21,
         "numberOfKeys": 2,
@@ -6767,12 +6650,7 @@
             "healthy": true
           }
         ]
-      }
-    ]
-  },
-  "deleted3": {
-    "lastKey": "41",
-    "containers": [
+      },
       {
         "containerId": 31,
         "numberOfKeys": 2,
@@ -6808,9 +6686,5 @@
         ]
       }
     ]
-  },
-  "deleted4": {
-    "lastKey": null,
-    "containers": []
   }
 }

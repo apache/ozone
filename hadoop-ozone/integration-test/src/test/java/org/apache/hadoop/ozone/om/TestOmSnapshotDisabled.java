@@ -43,7 +43,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
  */
 public class TestOmSnapshotDisabled {
 
-  private static MiniOzoneCluster cluster = null;
+  private static MiniOzoneHAClusterImpl cluster = null;
   private static OzoneClient client;
   private static ObjectStore store;
 
@@ -57,15 +57,14 @@ public class TestOmSnapshotDisabled {
     // Disable filesystem snapshot feature for this test
     conf.setBoolean(OMConfigKeys.OZONE_FILESYSTEM_SNAPSHOT_ENABLED_KEY, false);
 
-    cluster = MiniOzoneCluster.newOMHABuilder(conf)
+    cluster = MiniOzoneCluster.newHABuilder(conf)
         .setOMServiceId("om-service-test1")
         .setNumOfOzoneManagers(3)
         .build();
     cluster.waitForClusterToBeReady();
     client = cluster.newClient();
 
-    OzoneManager leaderOzoneManager =
-        ((MiniOzoneHAClusterImpl) cluster).getOMLeader();
+    OzoneManager leaderOzoneManager = cluster.getOMLeader();
     OzoneConfiguration leaderConfig = leaderOzoneManager.getConfiguration();
     cluster.setConf(leaderConfig);
     store = client.getObjectStore();

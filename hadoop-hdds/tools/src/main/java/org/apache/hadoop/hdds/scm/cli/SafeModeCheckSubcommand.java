@@ -24,8 +24,6 @@ import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.scm.client.ScmClient;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import picocli.CommandLine;
 import picocli.CommandLine.Command;
 
@@ -39,9 +37,6 @@ import picocli.CommandLine.Command;
     versionProvider = HddsVersionProvider.class)
 public class SafeModeCheckSubcommand extends ScmSubcommand {
 
-  private static final Logger LOG =
-      LoggerFactory.getLogger(SafeModeCheckSubcommand.class);
-
   @CommandLine.Option(names = {"--verbose"},
       description = "Show detailed status of rules.")
   private boolean verbose;
@@ -52,17 +47,17 @@ public class SafeModeCheckSubcommand extends ScmSubcommand {
 
     // Output data list
     if (execReturn) {
-      LOG.info("SCM is in safe mode.");
+      System.out.println("SCM is in safe mode.");
       if (verbose) {
         for (Map.Entry<String, Pair<Boolean, String>> entry :
             scmClient.getSafeModeRuleStatuses().entrySet()) {
           Pair<Boolean, String> value = entry.getValue();
-          LOG.info("validated:{}, {}, {}",
+          System.out.printf("validated:%s, %s, %s%n",
               value.getLeft(), entry.getKey(), value.getRight());
         }
       }
     } else {
-      LOG.info("SCM is out of safe mode.");
+      System.out.println("SCM is out of safe mode.");
     }
   }
 }
