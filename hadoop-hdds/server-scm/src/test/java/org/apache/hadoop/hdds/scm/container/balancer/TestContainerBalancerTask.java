@@ -1114,6 +1114,38 @@ public class TestContainerBalancerTask {
     }
   }
 
+  @Test
+  public void addSourceBackIfMoveFails()
+      throws IllegalContainerBalancerStateException, IOException,
+      InvalidContainerBalancerConfigurationException, TimeoutException, NodeNotFoundException {
+    when(moveManager.move(any(ContainerID.class),
+        any(DatanodeDetails.class), any(DatanodeDetails.class)))
+        .thenReturn(CompletableFuture.completedFuture(
+            MoveManager.MoveResult.REPLICATION_FAIL_NOT_EXIST_IN_SOURCE));
+
+    // only these nodes should be included
+    // the ones also specified in excludeNodes should be excluded
+    int firstIncludeIndex = 0, secondIncludeIndex = 1;
+    int thirdIncludeIndex = nodesInCluster.size() - 2;
+    String includeNodes =
+        nodesInCluster.get(firstIncludeIndex).getDatanodeDetails()
+            .getIpAddress() + ", " +
+            nodesInCluster.get(secondIncludeIndex).getDatanodeDetails()
+                .getIpAddress() + ", " +
+            nodesInCluster.get(thirdIncludeIndex).getDatanodeDetails()
+                .getHostName();
+
+    balancerConfiguration.setIncludeNodes(includeNodes);
+
+    startBalancer(balancerConfiguration);
+    stopBalancer();
+
+    assertTrue(containerBalancerTask.checkSourceInPotentialSources(nodesInCluster.get(firstIncludeIndex).getDatanodeDetails()));
+    assertTrue(containerBalancerTask.checkSourceInPotentialSources(nodesInCluster.get(secondIncludeIndex).getDatanodeDetails()));
+    assertTrue(containerBalancerTask.checkSourceInPotentialSources(nodesInCluster.get(thirdIncludeIndex).getDatanodeDetails()));
+
+  }
+
   /**
    * Determines unBalanced nodes, that is, over and under utilized nodes,
    * according to the generated utilization values for nodes and the threshold.

@@ -554,7 +554,7 @@ public class ContainerBalancerTask implements Runnable {
           containerToSourceMap.get(containerID),
           containerToTargetMap.get(containerID));
       // add source back to queue as a different container can be selected in next run.
-      findSourceStrategy.addBackSourceDataNode(source);
+      //findSourceStrategy.addBackSourceDataNode(source);
       return false;
     }
 
@@ -566,7 +566,7 @@ public class ContainerBalancerTask implements Runnable {
       LOG.warn("Could not get container {} from Container Manager before " +
           "starting a container move", containerID, e);
       // add source back to queue as a different container can be selected in next run.
-      findSourceStrategy.addBackSourceDataNode(source);
+      //findSourceStrategy.addBackSourceDataNode(source);
       return false;
     }
     LOG.info("ContainerBalancer is trying to move container {} with size " +
@@ -866,7 +866,7 @@ public class ContainerBalancerTask implements Runnable {
                 result == MoveManager.MoveResult.REPLICATION_FAIL_CONTAINER_NOT_CLOSED ||
                 result == MoveManager.MoveResult.REPLICATION_FAIL_INFLIGHT_DELETION ||
                 result == MoveManager.MoveResult.REPLICATION_FAIL_INFLIGHT_REPLICATION) {
-              findSourceStrategy.addBackSourceDataNode(source);
+              //findSourceStrategy.addBackSourceDataNode(source);
             }
           }
         }
@@ -875,7 +875,7 @@ public class ContainerBalancerTask implements Runnable {
       LOG.warn("Could not find Container {} for container move",
           containerID, e);
       // add source back to queue
-      findSourceStrategy.addBackSourceDataNode(source);
+      //findSourceStrategy.addBackSourceDataNode(source);
       metrics.incrementNumContainerMovesFailedInLatestIteration(1);
       return false;
     } catch (NodeNotFoundException | TimeoutException e) {
@@ -886,7 +886,7 @@ public class ContainerBalancerTask implements Runnable {
       LOG.warn("Container move failed for container {}", containerID, e);
       metrics.incrementNumContainerMovesFailedInLatestIteration(1);
       // add source back to queue for replica not found only
-      findSourceStrategy.addBackSourceDataNode(source);
+      //findSourceStrategy.addBackSourceDataNode(source);
       return false;
     }
 
@@ -1144,6 +1144,17 @@ public class ContainerBalancerTask implements Runnable {
   @VisibleForTesting
   void setTaskStatus(Status taskStatus) {
     this.taskStatus = taskStatus;
+  }
+
+  @VisibleForTesting
+  boolean checkSourceInPotentialSources(DatanodeDetails checkDn) {
+    List<DatanodeUsageInfo> sources = findSourceStrategy.getPotentialSources();
+    for (DatanodeUsageInfo dn : sources) {
+      if (checkDn.equals(dn.getDatanodeDetails())) {
+        return true;
+      }
+    }
+    return false;
   }
 
   public Status getBalancerStatus() {
