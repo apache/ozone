@@ -1890,7 +1890,8 @@ public class KeyManagerImpl implements KeyManager {
               LOG.warn("No datanodes in pipeline {}", pipeline.getId());
               continue;
             }
-            sortedNodes = sortDatanodes(nodes, clientMachine);
+            sortedNodes = captureLatencyNs(metrics.getSortDatanodesLatencyNs(),
+                () -> sortDatanodes(nodes, clientMachine));
             if (sortedNodes != null) {
               sortedPipelines.put(uuidSet, sortedNodes);
             }
@@ -1907,9 +1908,12 @@ public class KeyManagerImpl implements KeyManager {
   @VisibleForTesting
   public List<DatanodeDetails> sortDatanodes(List<DatanodeDetails> nodes,
                                              String clientMachine) {
+    metrics.incNumSortDatanodesCalls();
     final Node client = getClientNode(clientMachine, nodes);
-    return ozoneManager.getClusterMap()
-        .sortByDistanceCost(client, nodes, nodes.size());
+    return captureLatencyNs(
+        metrics.getSortDatanodesSortByDistanceCostLatencyNs(),
+        () -> ozoneManager.getClusterMap()
+            .sortByDistanceCost(client, nodes, nodes.size()));
   }
 
   private Node getClientNode(String clientMachine,
@@ -1929,8 +1933,11 @@ public class KeyManagerImpl implements KeyManager {
   }
 
   private Node getOtherNode(String clientMachine) {
+    metrics.incNumSortDatanodesNonDatanodeHostReads();
     try {
-      String clientLocation = resolveNodeLocation(clientMachine);
+      String clientLocation = captureLatencyNs(
+          metrics.getSortDatanodesResolveNodeLocationLatencyNs(),
+          () -> resolveNodeLocation(clientMachine));
       if (clientLocation != null) {
         Node rack = ozoneManager.getClusterMap().getNode(clientLocation);
         if (rack instanceof InnerNode) {
