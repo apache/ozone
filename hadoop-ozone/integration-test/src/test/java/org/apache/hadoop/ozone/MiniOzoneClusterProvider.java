@@ -47,10 +47,10 @@ import static java.util.concurrent.TimeUnit.SECONDS;
  * however shutting down the cluster in the background while the new cluster is
  * getting created will likely save about 10 seconds per test.
  *
- * To use this class, setup the Cluster Provider in a static method annotated
- * with @BeforeClass, eg:
- *
- *   @BeforeClass
+ * To use this class, set up the Cluster Provider in a static method annotated
+ * with {@code @BeforeAll}, eg:
+ * <pre>
+ *   &#64;BeforeAll
  *   public static void init() {
  *     OzoneConfiguration conf = new OzoneConfiguration();
  *     final int interval = 100;
@@ -69,29 +69,34 @@ import static java.util.concurrent.TimeUnit.SECONDS;
  *
  *     clusterProvider = new MiniOzoneClusterProvider(conf, builder, 5);
  *   }
+ * </pre>
  *
- * Ensure you shutdown the provider in a @AfterClass annotated method:
+ * Ensure you shut down the provider in an {@code @AfterAll} annotated method:
  *
- *   @AfterClass
+ * <pre>
+ *   &#64;AfterAll
  *   public static void shutdown() throws InterruptedException {
  *     if (clusterProvider != null) {
  *       clusterProvider.shutdown();
  *     }
  *   }
+ * </pre>
  *
- * Then in the @Before method, or in the test itself, obtain a cluster:
+ * Then in the {@code @BeforeEach} method, or in the test itself, obtain a cluster:
  *
- *   @Before
+ * <pre>
+ *   &#64;BeforeEach
  *   public void setUp() throws Exception {
  *     cluster = clusterProvider.provide();
  *   }
  *
- *   @After
+ *   &#64;AfterEach
  *   public void tearDown() throws InterruptedException, IOException {
  *     if (cluster != null) {
  *       clusterProvider.destroy(cluster);
  *     }
  *   }
+ * </pre>
  *
  *  This only works if the same config / builder object can be passed to each
  *  cluster in the test suite.
