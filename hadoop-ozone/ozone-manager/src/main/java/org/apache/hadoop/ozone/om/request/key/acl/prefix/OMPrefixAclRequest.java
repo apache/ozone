@@ -64,9 +64,6 @@ public abstract class OMPrefixAclRequest extends OMClientRequest {
 
     OMMetadataManager omMetadataManager = ozoneManager.getMetadataManager();
     boolean lockAcquired = false;
-    String volume = null;
-    String bucket = null;
-    String prefix = null;
     String prefixPath = null;
     OzoneObj resolvedPrefixObj = null;
     OMPrefixAclOpResult operationResult = null;
