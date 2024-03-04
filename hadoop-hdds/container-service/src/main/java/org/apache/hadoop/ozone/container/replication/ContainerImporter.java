@@ -95,17 +95,17 @@ public class ContainerImporter {
       throws IOException {
     if (!importContainerProgress.add(containerID)) {
       deleteFileQuietely(tarFilePath);
-      String log = "Container import in progress with container Id ";
-      LOG.warn(log + "{}", containerID);
-      throw new StorageContainerException(log + containerID,
+      String log = "Container import in progress with container Id " + containerID;
+      LOG.warn(log);
+      throw new StorageContainerException(log,
           ContainerProtos.Result.CONTAINER_EXISTS);
     }
 
     try {
       if (containerSet.getContainer(containerID) != null) {
-        String log = "Container already exists with container Id ";
-        LOG.warn(log + "{}", containerID);
-        throw new StorageContainerException(log + containerID,
+        String log = "Container already exists with container Id " + containerID;
+        LOG.warn(log);
+        throw new StorageContainerException(log,
             ContainerProtos.Result.CONTAINER_EXISTS);
       }
 
