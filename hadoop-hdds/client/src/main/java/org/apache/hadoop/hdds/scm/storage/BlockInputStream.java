@@ -76,8 +76,6 @@ public class BlockInputStream extends BlockExtendedInputStream {
   // TODO: do we need to change retrypolicy based on exception.
   // Default retry, retry for DN connectivity issues & what else?
   private final RetryPolicy retryPolicy = getRetryPolicy();
-      //=
-     // HddsClientUtils.createRetryPolicy(3, TimeUnit.SECONDS.toMillis(1));
 
   private int retries;
 
