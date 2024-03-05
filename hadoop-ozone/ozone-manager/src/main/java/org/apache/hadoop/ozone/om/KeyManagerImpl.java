@@ -923,12 +923,6 @@ public class KeyManagerImpl implements KeyManager {
     return partName;
   }
 
-  /**
-   * Returns list of ACLs for given Ozone object.
-   *
-   * @param obj Ozone object.
-   * @throws IOException if there is error.
-   */
   @Override
   public List<OzoneAcl> getAcl(OzoneObj obj) throws IOException {
     validateOzoneObj(obj);

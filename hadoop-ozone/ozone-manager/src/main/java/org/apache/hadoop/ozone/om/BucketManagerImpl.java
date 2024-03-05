@@ -154,7 +154,8 @@ public class BucketManagerImpl implements BucketManager {
             && context.getAclRights() != ACLType.READ);
 
     if (bucketNeedResolved ||
-        ozObject.getResourceType() == OzoneObj.ResourceType.KEY) {
+        ozObject.getResourceType() == OzoneObj.ResourceType.KEY ||
+        ozObject.getResourceType() == OzoneObj.ResourceType.PREFIX) {
       try {
         ResolvedBucket resolvedBucket =
             ozoneManager.resolveBucketLink(

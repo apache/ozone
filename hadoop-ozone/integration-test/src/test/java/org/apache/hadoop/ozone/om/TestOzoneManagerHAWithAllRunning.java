@@ -70,6 +70,7 @@ import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.DIRE
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.FILE_ALREADY_EXISTS;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.NOT_A_FILE;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.PARTIAL_DELETE;
+import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLIdentityType.GROUP;
 import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLIdentityType.USER;
 import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType.READ;
 import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType.WRITE;
@@ -860,6 +861,79 @@ class TestOzoneManagerHAWithAllRunning extends TestOzoneManagerHA {
 
   }
 
+  @Test
+  void testLinkBucketAddPrefixAcl() throws Exception {
+    OzoneBucket srcBucket = setupBucket();
+    OzoneBucket linkedBucket = linkBucket(srcBucket);
+    String prefix = createPrefixName();
+    OzoneObj linkObj = buildPrefixObj(linkedBucket, prefix);
+    OzoneObj srcObj = buildPrefixObj(srcBucket, prefix);
+    createPrefix(linkObj);
+
+    String user1 = "remoteUser1";
+    OzoneAcl acl1 = new OzoneAcl(USER, user1, READ, DEFAULT);
+    testAddAcl(user1, linkObj, acl1);  // case1: set link acl
+    assertEqualsAcls(srcObj, linkObj);
+
+    String user2 = "remoteUser2";
+    OzoneAcl acl2 = new OzoneAcl(USER, user2, READ, DEFAULT);
+    testAddAcl(user2, srcObj, acl2);  // case2: set src acl
+    assertEqualsAcls(srcObj, linkObj);
+
+  }
+
+  @Test
+  void testLinkBucketRemovePrefixAcl() throws Exception {
+
+    // CASE 1: from link bucket
+    OzoneBucket srcBucket = setupBucket();
+    OzoneBucket linkedBucket = linkBucket(srcBucket);
+    String prefix = createPrefixName();
+    OzoneObj linkObj = buildPrefixObj(linkedBucket, prefix);
+    OzoneObj srcObj = buildPrefixObj(srcBucket, prefix);
+    createPrefix(linkObj);
+
+    String user = "remoteUser1";
+    OzoneAcl acl = new OzoneAcl(USER, user, READ, DEFAULT);
+    testRemoveAcl(user, linkObj, acl);
+    assertEqualsAcls(srcObj, linkObj);
+
+    // CASE 2: from src bucket
+    OzoneBucket srcBucket2 = setupBucket();
+    OzoneBucket linkedBucket2 = linkBucket(srcBucket2);
+    String prefix2 = createPrefixName();
+    OzoneObj linkObj2 = buildPrefixObj(linkedBucket2, prefix2);
+    OzoneObj srcObj2 = buildPrefixObj(srcBucket2, prefix2);
+    createPrefix(srcObj2);
+
+    String user2 = "remoteUser2";
+    OzoneAcl acl2 = new OzoneAcl(USER, user2, READ, DEFAULT);
+    testRemoveAcl(user2, srcObj2, acl2);
+    assertEqualsAcls(srcObj2, linkObj2);
+
+  }
+
+  @Test
+  void testLinkBucketSetPrefixAcl() throws Exception {
+    OzoneBucket srcBucket = setupBucket();
+    OzoneBucket linkedBucket = linkBucket(srcBucket);
+    String prefix = createPrefixName();
+    OzoneObj linkObj = buildPrefixObj(linkedBucket, prefix);
+    OzoneObj srcObj = buildPrefixObj(srcBucket, prefix);
+    createPrefix(linkObj);
+
+    String user1 = "remoteUser1";
+    OzoneAcl acl1 = new OzoneAcl(USER, user1, READ, DEFAULT);
+    testSetAcl(user1, linkObj, acl1);  // case1: set link acl
+    assertEqualsAcls(srcObj, linkObj);
+
+    String user2 = "remoteUser2";
+    OzoneAcl acl2 = new OzoneAcl(USER, user2, READ, DEFAULT);
+    testSetAcl(user2, srcObj, acl2);  // case2: set src acl
+    assertEqualsAcls(srcObj, linkObj);
+
+  }
+
   private OzoneObj buildBucketObj(OzoneBucket bucket) {
     return OzoneObjInfo.Builder.newBuilder()
         .setResType(OzoneObj.ResourceType.BUCKET)
@@ -990,8 +1064,16 @@ class TestOzoneManagerHAWithAllRunning extends TestOzoneManagerHA {
       OzoneAcl userAcl) throws Exception {
     ObjectStore objectStore = getObjectStore();
 
-    // As by default create will add some default acls in RpcClient.
-    List<OzoneAcl> acls = objectStore.getAcl(ozoneObj);
+    // Other than prefix, by default create will add some default acls in RpcClient.
+    List<OzoneAcl> acls;
+    if (ozoneObj.getResourceType().equals(OzoneObj.ResourceType.PREFIX)) {
+      objectStore.addAcl(ozoneObj, userAcl);
+      // Add another arbitrary group ACL since the prefix will be removed when removing
+      // the last ACL for the prefix and PREFIX_NOT_FOUND will be thrown
+      OzoneAcl groupAcl = new OzoneAcl(GROUP, "arbitrary-group", READ, ACCESS);
+      objectStore.addAcl(ozoneObj, groupAcl);
+    }
+    acls = objectStore.getAcl(ozoneObj);
 
     assertTrue(acls.size() > 0);
 
