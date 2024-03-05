@@ -69,11 +69,11 @@ public class TestReconTasks {
     conf.set(HDDS_PIPELINE_REPORT_INTERVAL, "5s");
 
     ReconTaskConfig taskConfig = conf.getObject(ReconTaskConfig.class);
-    taskConfig.setMissingContainerTaskInterval(Duration.ofSeconds(15));
+    taskConfig.setMissingContainerTaskInterval(Duration.ofSeconds(10));
     conf.setFromObject(taskConfig);
 
     conf.set("ozone.scm.stale.node.interval", "6s");
-    conf.set("ozone.scm.dead.node.interval", "10s");
+    conf.set("ozone.scm.dead.node.interval", "8s");
     cluster =  MiniOzoneCluster.newBuilder(conf).setNumDatanodes(1)
         .includeRecon(true).build();
     cluster.waitForClusterToBeReady();
@@ -246,6 +246,7 @@ public class TestReconTasks {
       return (allEmptyMissingContainers.size() == 1);
     });
 
+
     // Now add a container to key mapping count as 3. This data is used to
     // identify if container is empty in terms of keys mapped to container.
     try (RDBBatchOperation rdbBatchOperation = new RDBBatchOperation()) {
@@ -272,6 +273,26 @@ public class TestReconTasks {
                       EMPTY_MISSING,
                   0, 1000);
       return (allEmptyMissingContainers.isEmpty());
+    });
+
+    // Now remove keys from container. This data is used to
+    // identify if container is empty in terms of keys mapped to container.
+    try (RDBBatchOperation rdbBatchOperation = new RDBBatchOperation()) {
+      reconContainerMetadataManager
+          .batchStoreContainerKeyCounts(rdbBatchOperation, containerID, 0L);
+      reconContainerMetadataManager.commitBatchOperation(rdbBatchOperation);
+    }
+
+    // Check existing container state in UNHEALTHY_CONTAINER table
+    // will be updated as EMPTY_MISSING
+    LambdaTestUtils.await(25000, 1000, () -> {
+      List<UnhealthyContainers> allEmptyMissingContainers =
+          reconContainerManager.getContainerSchemaManager()
+              .getUnhealthyContainers(
+                  ContainerSchemaDefinition.UnHealthyContainerStates.
+                      EMPTY_MISSING,
+                  0, 1000);
+      return (allEmptyMissingContainers.size() == 1);
     });
 
     // Now restart the cluster and verify the container is no longer missing.

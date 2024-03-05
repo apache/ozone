@@ -129,10 +129,10 @@ class TestSecureOzoneContainer {
     try {
       Pipeline pipeline = MockPipeline.createSingleNodePipeline();
       conf.set(HDDS_DATANODE_DIR_KEY, tempFolder.toString());
-      conf.setInt(OzoneConfigKeys.DFS_CONTAINER_IPC_PORT, pipeline
+      conf.setInt(OzoneConfigKeys.HDDS_CONTAINER_IPC_PORT, pipeline
           .getFirstNode().getPort(DatanodeDetails.Port.Name.STANDALONE)
           .getValue());
-      conf.setBoolean(OzoneConfigKeys.DFS_CONTAINER_IPC_RANDOM_PORT, false);
+      conf.setBoolean(OzoneConfigKeys.HDDS_CONTAINER_IPC_RANDOM_PORT, false);
 
       DatanodeDetails dn = MockDatanodeDetails.randomDatanodeDetails();
       container = new OzoneContainer(dn, conf, ContainerTestUtils

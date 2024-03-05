@@ -44,6 +44,10 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
       <version>${hadoop.version}</version>
       <exclusions>
         <exclusion>
+          <groupId>org.xerial.snappy</groupId>
+          <artifactId>snappy-java</artifactId>
+        </exclusion>
+        <exclusion>
           <groupId>org.apache.hadoop</groupId>
           <artifactId>hadoop-annotations</artifactId>
         </exclusion>
@@ -289,6 +293,10 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
           <artifactId>jackson-databind</artifactId>
         </exclusion>
       </exclusions>
+    </dependency>
+    <dependency>
+      <groupId>org.xerial.snappy</groupId>
+      <artifactId>snappy-java</artifactId>
     </dependency>
   </dependencies>
 </project>

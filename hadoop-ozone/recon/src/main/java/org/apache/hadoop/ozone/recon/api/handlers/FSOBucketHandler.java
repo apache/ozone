@@ -42,7 +42,7 @@ import java.util.Set;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 
 /**
- * Class for handling FSO buckets.
+ * Class for handling FSO buckets NameSpaceSummaries.
  */
 public class FSOBucketHandler extends BucketHandler {
   private static final Logger LOG =

@@ -24,9 +24,13 @@ import java.util.List;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
+import org.apache.hadoop.crypto.CipherSuite;
+import org.apache.hadoop.crypto.CryptoProtocolVersion;
+import org.apache.hadoop.crypto.key.KeyProviderCryptoExtension;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.OzoneAcl;
+import org.apache.hadoop.ozone.om.helpers.BucketEncryptionKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
@@ -58,6 +62,9 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 /**
  * Tests OMFileCreateRequest.
@@ -200,6 +207,44 @@ public class TestOMFileCreateRequest extends TestOMKeyRequest {
         omFileCreateRequest.validateAndUpdateCache(ozoneManager, 100L);
     assertSame(omFileCreateResponse.getOMResponse().getStatus(),
         OzoneManagerProtocolProtos.Status.QUOTA_EXCEEDED);
+  }
+
+  @Test
+  public void testValidateAndUpdateEncryption() throws Exception {
+    KeyProviderCryptoExtension.EncryptedKeyVersion eKV =
+        KeyProviderCryptoExtension.EncryptedKeyVersion.createForDecryption(
+            "key1", "v1", new byte[0], new byte[0]);
+    KeyProviderCryptoExtension mockKeyProvider = mock(KeyProviderCryptoExtension.class);
+    when(mockKeyProvider.generateEncryptedKey(any())).thenReturn(eKV);
+
+    when(ozoneManager.getKmsProvider()).thenReturn(mockKeyProvider);
+    keyName = "test/" + keyName;
+    OMRequest omRequest = createFileRequest(volumeName, bucketName, keyName,
+        HddsProtos.ReplicationFactor.ONE, HddsProtos.ReplicationType.RATIS,
+        false, true);
+
+    // add volume and create bucket with bucket encryption key
+    OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, omMetadataManager,
+        OmBucketInfo.newBuilder().setVolumeName(volumeName)
+            .setBucketName(bucketName)
+            .setBucketLayout(getBucketLayout())
+            .setBucketEncryptionKey(
+                new BucketEncryptionKeyInfo.Builder()
+                    .setKeyName("key1")
+                    .setSuite(mock(CipherSuite.class))
+                    .setVersion(mock(CryptoProtocolVersion.class))
+                    .build()));
+
+    OMFileCreateRequest omFileCreateRequest = getOMFileCreateRequest(omRequest);
+    OMRequest modifiedOmRequest = omFileCreateRequest.preExecute(ozoneManager);
+
+    OMFileCreateRequest omFileCreateRequestPreExecuted = getOMFileCreateRequest(modifiedOmRequest);
+    OMClientResponse omClientResponse = omFileCreateRequestPreExecuted
+        .validateAndUpdateCache(ozoneManager, 100L);
+    assertEquals(
+        OzoneManagerProtocolProtos.Status.OK, omClientResponse.getOMResponse().getStatus());
+    assertTrue(omClientResponse.getOMResponse().getCreateFileResponse().getKeyInfo().hasFileEncryptionInfo());
+    when(ozoneManager.getKmsProvider()).thenReturn(null);
   }
 
   @Test

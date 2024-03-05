@@ -137,7 +137,8 @@ class TestOzoneManagerDoubleBuffer {
         .setMaxUnFlushedTransactionCount(1000)
         .enableRatis(true)
         .setFlushNotifier(spyFlushNotifier)
-        .build();
+        .build()
+        .start();
 
     doNothing().when(omKeyCreateResponse).checkAndUpdateDB(any(), any());
     doNothing().when(omBucketCreateResponse).checkAndUpdateDB(any(), any());

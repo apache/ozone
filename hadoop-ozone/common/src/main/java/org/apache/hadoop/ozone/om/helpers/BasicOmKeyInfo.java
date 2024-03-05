@@ -28,31 +28,40 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ListKey
 /**
  * Lightweight OmKeyInfo class.
  */
-public class BasicOmKeyInfo {
+public final class BasicOmKeyInfo {
 
-  private String volumeName;
-  private String bucketName;
-  private String keyName;
-  private long dataSize;
-  private long creationTime;
-  private long modificationTime;
-  private ReplicationConfig replicationConfig;
-  private boolean isFile;
+  private final String volumeName;
+  private final String bucketName;
+  private final String keyName;
+  private final long dataSize;
+  private final long creationTime;
+  private final long modificationTime;
+  private final ReplicationConfig replicationConfig;
+  private final boolean isFile;
   private String ownerName;
 
-  @SuppressWarnings("parameternumber")
-  public BasicOmKeyInfo(String volumeName, String bucketName, String keyName,
-                        long dataSize, long creationTime, long modificationTime,
-                        ReplicationConfig replicationConfig, boolean isFile, String ownerName) {
-    this.volumeName = volumeName;
-    this.bucketName = bucketName;
-    this.keyName = keyName;
-    this.dataSize = dataSize;
-    this.creationTime = creationTime;
-    this.modificationTime = modificationTime;
-    this.replicationConfig = replicationConfig;
-    this.isFile = isFile;
-    this.ownerName = ownerName;
+  private BasicOmKeyInfo(Builder b) {
+    this.volumeName = b.volumeName;
+    this.bucketName = b.bucketName;
+    this.keyName = b.keyName;
+    this.dataSize = b.dataSize;
+    this.creationTime = b.creationTime;
+    this.modificationTime = b.modificationTime;
+    this.replicationConfig = b.replicationConfig;
+    this.isFile = b.isFile;
+    this.ownerName = b.ownerName;
+  }
+
+  private BasicOmKeyInfo(OmKeyInfo b) {
+    this.volumeName = b.getVolumeName();
+    this.bucketName = b.getBucketName();
+    this.keyName = b.getKeyName();
+    this.dataSize = b.getDataSize();
+    this.creationTime = b.getCreationTime();
+    this.modificationTime = b.getModificationTime();
+    this.replicationConfig = b.getReplicationConfig();
+    this.isFile = b.isFile();
+    this.ownerName = b.ownerName;
   }
 
   public String getVolumeName() {
@@ -151,8 +160,7 @@ public class BasicOmKeyInfo {
     }
 
     public BasicOmKeyInfo build() {
-      return new BasicOmKeyInfo(volumeName, bucketName, keyName, dataSize,
-          creationTime, modificationTime, replicationConfig, isFile, ownerName);
+      return new BasicOmKeyInfo(this);
     }
   }
 
@@ -251,15 +259,6 @@ public class BasicOmKeyInfo {
   }
 
   public static BasicOmKeyInfo fromOmKeyInfo(OmKeyInfo omKeyInfo) {
-    return new BasicOmKeyInfo(
-        omKeyInfo.getVolumeName(),
-        omKeyInfo.getBucketName(),
-        omKeyInfo.getKeyName(),
-        omKeyInfo.getDataSize(),
-        omKeyInfo.getCreationTime(),
-        omKeyInfo.getModificationTime(),
-        omKeyInfo.getReplicationConfig(),
-        omKeyInfo.isFile(),
-        omKeyInfo.getOwnerName());
+    return new BasicOmKeyInfo(omKeyInfo);
   }
 }

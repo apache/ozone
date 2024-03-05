@@ -23,8 +23,6 @@ import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.server.OzoneAdmins;
-import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
-import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.om.BucketManager;
 import org.apache.hadoop.ozone.om.KeyManager;
@@ -34,7 +32,6 @@ import org.apache.hadoop.ozone.om.PrefixManager;
 import org.apache.hadoop.ozone.om.VolumeManager;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
-import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.helpers.OpenKeySession;
 import org.apache.hadoop.ozone.om.helpers.OzoneAclUtil;
@@ -265,88 +262,46 @@ public class TestParentAcl {
   }
 
   private void addVolumeAcl(String vol, OzoneAcl ozoneAcl) throws IOException {
-    String volumeKey = metadataManager.getVolumeKey(vol);
-    OmVolumeArgs omVolumeArgs =
-        metadataManager.getVolumeTable().get(volumeKey);
-
-    omVolumeArgs.addAcl(ozoneAcl);
-
-    metadataManager.getVolumeTable().addCacheEntry(new CacheKey<>(volumeKey),
-        CacheValue.get(1L, omVolumeArgs));
+    OzoneNativeAclTestUtil.addVolumeAcl(metadataManager, vol, ozoneAcl);
   }
 
   private List<OzoneAcl> getVolumeAcls(String vol) throws IOException {
-    String volumeKey = metadataManager.getVolumeKey(vol);
-    OmVolumeArgs omVolumeArgs =
-        metadataManager.getVolumeTable().get(volumeKey);
-
-    return omVolumeArgs.getAcls();
+    return OzoneNativeAclTestUtil.getVolumeAcls(metadataManager, vol);
   }
 
   private void setVolumeAcl(String vol, List<OzoneAcl> ozoneAcls)
       throws IOException {
-    String volumeKey = metadataManager.getVolumeKey(vol);
-    OmVolumeArgs omVolumeArgs = metadataManager.getVolumeTable().get(volumeKey);
-
-    omVolumeArgs.setAcls(ozoneAcls);
-
-    metadataManager.getVolumeTable().addCacheEntry(new CacheKey<>(volumeKey),
-        CacheValue.get(1L, omVolumeArgs));
+    OzoneNativeAclTestUtil.setVolumeAcl(metadataManager, vol, ozoneAcls);
   }
 
   private void addKeyAcl(String vol, String buck, String key,
       OzoneAcl ozoneAcl) throws IOException {
-    String objKey = metadataManager.getOzoneKey(vol, buck, key);
-    OmKeyInfo omKeyInfo =
-        metadataManager.getKeyTable(getBucketLayout()).get(objKey);
-
-    omKeyInfo.addAcl(ozoneAcl);
-
-    metadataManager.getKeyTable(getBucketLayout())
-        .addCacheEntry(new CacheKey<>(objKey),
-            CacheValue.get(1L, omKeyInfo));
+    OzoneNativeAclTestUtil.addKeyAcl(metadataManager, vol, buck, getBucketLayout(), key, ozoneAcl);
   }
 
   private void setKeyAcl(String vol, String buck, String key,
                          List<OzoneAcl> ozoneAcls) throws IOException {
-    String objKey = metadataManager.getOzoneKey(vol, buck, key);
-    OmKeyInfo omKeyInfo =
-        metadataManager.getKeyTable(getBucketLayout()).get(objKey);
-    omKeyInfo.setAcls(ozoneAcls);
-
-    metadataManager.getKeyTable(getBucketLayout())
-        .addCacheEntry(new CacheKey<>(objKey),
-            CacheValue.get(1L, omKeyInfo));
+    OzoneNativeAclTestUtil.setKeyAcl(metadataManager, vol, buck, getBucketLayout(), key, ozoneAcls);
   }
 
   private void addBucketAcl(String vol, String buck, OzoneAcl ozoneAcl)
       throws IOException {
-    String bucketKey = metadataManager.getBucketKey(vol, buck);
-    OmBucketInfo omBucketInfo = metadataManager.getBucketTable().get(bucketKey);
-
-    omBucketInfo.addAcl(ozoneAcl);
-
-    metadataManager.getBucketTable().addCacheEntry(new CacheKey<>(bucketKey),
-        CacheValue.get(1L, omBucketInfo));
+    OzoneNativeAclTestUtil.addBucketAcl(metadataManager, vol, buck, ozoneAcl);
   }
 
   private List<OzoneAcl> getBucketAcls(String vol, String buck)
       throws IOException {
-    String bucketKey = metadataManager.getBucketKey(vol, buck);
-    OmBucketInfo omBucketInfo = metadataManager.getBucketTable().get(bucketKey);
+    return OzoneNativeAclTestUtil.getBucketAcls(metadataManager, vol, buck);
+  }
 
-    return omBucketInfo.getAcls();
+  private List<OzoneAcl> getKeyAcls(String vol, String buck, String key)
+      throws IOException {
+    return OzoneNativeAclTestUtil.getKeyAcls(metadataManager, vol, buck, getBucketLayout(), key);
   }
 
   private void setBucketAcl(String vol, String buck,
       List<OzoneAcl> ozoneAcls) throws IOException {
-    String bucketKey = metadataManager.getBucketKey(vol, buck);
-    OmBucketInfo omBucketInfo = metadataManager.getBucketTable().get(bucketKey);
-
-    omBucketInfo.setAcls(ozoneAcls);
-
-    metadataManager.getBucketTable().addCacheEntry(new CacheKey<>(bucketKey),
-        CacheValue.get(1L, omBucketInfo));
+    OzoneNativeAclTestUtil.setBucketAcl(metadataManager, vol, buck, ozoneAcls);
   }
 
   private static OzoneObjInfo createVolume(String volumeName)

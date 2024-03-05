@@ -24,7 +24,9 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.ExecutorService;
 import java.util.function.Function;
+import java.util.function.Supplier;
 import java.util.stream.Collectors;
 
 import org.apache.hadoop.fs.FSExceptionMessages;
@@ -69,7 +71,6 @@ import org.slf4j.LoggerFactory;
 public class KeyOutputStream extends OutputStream
     implements Syncable, KeyMetadataAware {
 
-  private OzoneClientConfig config;
   private final ReplicationConfig replication;
 
   /**
@@ -105,11 +106,8 @@ public class KeyOutputStream extends OutputStream
    */
   private boolean atomicKeyCreation;
 
-  public KeyOutputStream(ReplicationConfig replicationConfig,
-      ContainerClientMetrics clientMetrics, OzoneClientConfig clientConfig,
-      StreamBufferArgs streamBufferArgs) {
+  public KeyOutputStream(ReplicationConfig replicationConfig, BlockOutputStreamEntryPool blockOutputStreamEntryPool) {
     this.replication = replicationConfig;
-    this.config = clientConfig;
     closed = false;
     this.retryPolicyMap = HddsClientUtils.getExceptionList()
         .stream()
@@ -117,18 +115,16 @@ public class KeyOutputStream extends OutputStream
             e -> RetryPolicies.TRY_ONCE_THEN_FAIL));
     retryCount = 0;
     offset = 0;
-    blockOutputStreamEntryPool =
-        new BlockOutputStreamEntryPool(clientMetrics, clientConfig, streamBufferArgs);
+    this.blockOutputStreamEntryPool = blockOutputStreamEntryPool;
+  }
+
+  protected BlockOutputStreamEntryPool getBlockOutputStreamEntryPool() {
+    return blockOutputStreamEntryPool;
   }
 
   @VisibleForTesting
   public List<BlockOutputStreamEntry> getStreamEntries() {
     return blockOutputStreamEntryPool.getStreamEntries();
-  }
-
-  @VisibleForTesting
-  public XceiverClientFactory getXceiverClientFactory() {
-    return blockOutputStreamEntryPool.getXceiverClientFactory();
   }
 
   @VisibleForTesting
@@ -146,39 +142,18 @@ public class KeyOutputStream extends OutputStream
     return clientID;
   }
 
-  @SuppressWarnings({"parameternumber", "squid:S00107"})
-  public KeyOutputStream(
-      OzoneClientConfig config,
-      OpenKeySession handler,
-      XceiverClientFactory xceiverClientManager,
-      OzoneManagerProtocol omClient,
-      String requestId, ReplicationConfig replicationConfig,
-      String uploadID, int partNumber, boolean isMultipart,
-      boolean unsafeByteBufferConversion,
-      ContainerClientMetrics clientMetrics,
-      boolean atomicKeyCreation, StreamBufferArgs streamBufferArgs
-  ) {
-    this.config = config;
-    this.replication = replicationConfig;
-    blockOutputStreamEntryPool =
-        new BlockOutputStreamEntryPool(
-            config,
-            omClient,
-            requestId, replicationConfig,
-            uploadID, partNumber,
-            isMultipart, handler.getKeyInfo(),
-            unsafeByteBufferConversion,
-            xceiverClientManager,
-            handler.getId(),
-            clientMetrics, streamBufferArgs);
+  public KeyOutputStream(Builder b) {
+    this.replication = b.replicationConfig;
+    this.blockOutputStreamEntryPool = new BlockOutputStreamEntryPool(b);
+    final OzoneClientConfig config = b.getClientConfig();
     this.retryPolicyMap = HddsClientUtils.getRetryPolicyByException(
         config.getMaxRetryCount(), config.getRetryInterval());
     this.retryCount = 0;
     this.isException = false;
     this.writeOffset = 0;
-    this.clientID = handler.getId();
-    this.atomicKeyCreation = atomicKeyCreation;
-    this.streamBufferArgs = streamBufferArgs;
+    this.clientID = b.getOpenHandler().getId();
+    this.atomicKeyCreation = b.getAtomicKeyCreation();
+    this.streamBufferArgs = b.getStreamBufferArgs();
   }
 
   /**
@@ -192,10 +167,8 @@ public class KeyOutputStream extends OutputStream
    *
    * @param version the set of blocks that are pre-allocated.
    * @param openVersion the version corresponding to the pre-allocation.
-   * @throws IOException
    */
-  public synchronized void addPreallocateBlocks(OmKeyLocationInfoGroup version,
-      long openVersion) throws IOException {
+  public synchronized void addPreallocateBlocks(OmKeyLocationInfoGroup version, long openVersion) {
     blockOutputStreamEntryPool.addPreallocateBlocks(version, openVersion);
   }
 
@@ -615,6 +588,7 @@ public class KeyOutputStream extends OutputStream
     private ContainerClientMetrics clientMetrics;
     private boolean atomicKeyCreation = false;
     private StreamBufferArgs streamBufferArgs;
+    private Supplier<ExecutorService> executorServiceSupplier;
 
     public String getMultipartUploadID() {
       return multipartUploadID;
@@ -728,21 +702,17 @@ public class KeyOutputStream extends OutputStream
       return atomicKeyCreation;
     }
 
+    public Builder setExecutorServiceSupplier(Supplier<ExecutorService> executorServiceSupplier) {
+      this.executorServiceSupplier = executorServiceSupplier;
+      return this;
+    }
+
+    public Supplier<ExecutorService> getExecutorServiceSupplier() {
+      return executorServiceSupplier;
+    }
+
     public KeyOutputStream build() {
-      return new KeyOutputStream(
-          clientConfig,
-          openHandler,
-          xceiverManager,
-          omClient,
-          requestID,
-          replicationConfig,
-          multipartUploadID,
-          multipartNumber,
-          isMultipartKey,
-          unsafeByteBufferConversion,
-          clientMetrics,
-          atomicKeyCreation,
-          streamBufferArgs);
+      return new KeyOutputStream(this);
     }
 
   }

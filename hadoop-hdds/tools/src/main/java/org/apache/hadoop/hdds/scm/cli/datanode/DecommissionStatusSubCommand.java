@@ -124,12 +124,12 @@ public class DecommissionStatusSubCommand extends ScmSubcommand {
           double underReplicated = Double.parseDouble(counts.get("UnderReplicatedDN." + i).toString());
           double unclosed = Double.parseDouble(counts.get("UnclosedContainersDN." + i).toString());
           long startTime = Long.parseLong(counts.get("StartTimeDN." + i).toString());
-          System.out.print("Decommission started at : ");
+          System.out.print("Decommission Started At : ");
           Date date = new Date(startTime);
           DateFormat formatter = new SimpleDateFormat("dd/MM/yyyy hh:mm:ss z");
           System.out.println(formatter.format(date));
-          System.out.println("No. of Pipelines: " + pipelines);
-          System.out.println("No. of UnderReplicated containers: " + underReplicated);
+          System.out.println("No. of Unclosed Pipelines: " + pipelines);
+          System.out.println("No. of UnderReplicated Containers: " + underReplicated);
           System.out.println("No. of Unclosed Containers: " + unclosed);
           return;
         }

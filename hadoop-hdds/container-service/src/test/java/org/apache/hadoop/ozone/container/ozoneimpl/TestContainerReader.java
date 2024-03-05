@@ -378,7 +378,7 @@ public class TestContainerReader {
     BlockUtils.shutdownCache(conf);
     conf.set(ScmConfigKeys.HDDS_DATANODE_DIR_KEY,
         datanodeDirs.toString());
-    conf.set(OzoneConfigKeys.DFS_CONTAINER_RATIS_DATANODE_STORAGE_DIR,
+    conf.set(OzoneConfigKeys.HDDS_CONTAINER_RATIS_DATANODE_STORAGE_DIR,
         datanodeDirs.toString());
     MutableVolumeSet volumeSets =
         new MutableVolumeSet(datanodeId.toString(), clusterId, conf, null,

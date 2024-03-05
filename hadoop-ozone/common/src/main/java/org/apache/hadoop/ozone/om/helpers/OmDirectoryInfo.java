@@ -60,10 +60,10 @@ public class OmDirectoryInfo extends WithParentObjectId
     this.name = builder.name;
     this.owner = builder.owner;
     this.acls = builder.acls;
-    this.metadata = builder.metadata;
-    this.objectID = builder.objectID;
-    this.updateID = builder.updateID;
-    this.parentObjectID = builder.parentObjectID;
+    setMetadata(builder.metadata);
+    setObjectID(builder.objectID);
+    setUpdateID(builder.updateID);
+    setParentObjectID(builder.parentObjectID);
     this.creationTime = builder.creationTime;
     this.modificationTime = builder.modificationTime;
   }
@@ -172,10 +172,6 @@ public class OmDirectoryInfo extends WithParentObjectId
     return getPath() + ":" + getObjectID();
   }
 
-  public long getParentObjectID() {
-    return parentObjectID;
-  }
-
   public String getPath() {
     return getParentObjectID() + OzoneConsts.OM_KEY_PREFIX + getName();
   }
@@ -208,10 +204,10 @@ public class OmDirectoryInfo extends WithParentObjectId
             DirectoryInfo.newBuilder().setName(name)
                     .setCreationTime(creationTime)
                     .setModificationTime(modificationTime)
-                    .addAllMetadata(KeyValueUtil.toProtobuf(metadata))
-                    .setObjectID(objectID)
-                    .setUpdateID(updateID)
-                    .setParentID(parentObjectID);
+                    .addAllMetadata(KeyValueUtil.toProtobuf(getMetadata()))
+                    .setObjectID(getObjectID())
+                    .setUpdateID(getUpdateID())
+                    .setParentID(getParentObjectID());
     if (owner != null) {
       pib.setOwnerName(owner);
     }
@@ -264,16 +260,16 @@ public class OmDirectoryInfo extends WithParentObjectId
             modificationTime == omDirInfo.modificationTime &&
             name.equals(omDirInfo.name) &&
             Objects.equals(owner, omDirInfo.owner) &&
-            Objects.equals(metadata, omDirInfo.metadata) &&
+            Objects.equals(getMetadata(), omDirInfo.getMetadata()) &&
             Objects.equals(acls, omDirInfo.acls) &&
-            objectID == omDirInfo.objectID &&
-            updateID == omDirInfo.updateID &&
-            parentObjectID == omDirInfo.parentObjectID;
+            getObjectID() == omDirInfo.getObjectID() &&
+            getUpdateID() == omDirInfo.getUpdateID() &&
+            getParentObjectID() == omDirInfo.getParentObjectID();
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(objectID, parentObjectID, name);
+    return Objects.hash(getObjectID(), getParentObjectID(), name);
   }
 
   /**
@@ -286,16 +282,16 @@ public class OmDirectoryInfo extends WithParentObjectId
             .setOwner(owner)
             .setCreationTime(creationTime)
             .setModificationTime(modificationTime)
-            .setParentObjectID(parentObjectID)
-            .setObjectID(objectID)
-            .setUpdateID(updateID);
+            .setParentObjectID(getParentObjectID())
+            .setObjectID(getObjectID())
+            .setUpdateID(getUpdateID());
 
     acls.forEach(acl -> builder.addAcl(new OzoneAcl(acl.getType(),
             acl.getName(), (BitSet) acl.getAclBitSet().clone(),
             acl.getAclScope())));
 
-    if (metadata != null) {
-      builder.addAllMetadata(metadata);
+    if (getMetadata() != null) {
+      builder.addAllMetadata(getMetadata());
     }
 
     return builder.build();

@@ -75,7 +75,7 @@ import org.apache.hadoop.hdds.conf.ReconfigurationHandler;
 import org.apache.hadoop.hdds.protocol.SecretKeyProtocol;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.ReconfigureProtocolProtos.ReconfigureProtocolService;
-import org.apache.hadoop.hdds.protocolPB.ReconfigureProtocolPB;
+import org.apache.hadoop.hdds.protocolPB.ReconfigureProtocolOmPB;
 import org.apache.hadoop.hdds.protocolPB.ReconfigureProtocolServerSideTranslatorPB;
 import org.apache.hadoop.hdds.protocolPB.SCMSecurityProtocolClientSideTranslatorPB;
 import org.apache.hadoop.hdds.ratis.RatisHelper;
@@ -839,7 +839,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       delegationTokenMgr = createDelegationTokenSecretManager(configuration);
     }
 
-    prefixManager = new PrefixManagerImpl(metadataManager, isRatisEnabled);
+    prefixManager = new PrefixManagerImpl(this, metadataManager, isRatisEnabled);
     keyManager = new KeyManagerImpl(this, scmClient, configuration,
         perfMetrics);
     accessAuthorizer = OzoneAuthorizerFactory.forOM(this);
@@ -1283,7 +1283,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
         interOMProtocolService, rpcServer);
     HddsServerUtil.addPBProtocol(conf, OMAdminProtocolPB.class,
         omAdminProtocolService, rpcServer);
-    HddsServerUtil.addPBProtocol(conf, ReconfigureProtocolPB.class,
+    HddsServerUtil.addPBProtocol(conf, ReconfigureProtocolOmPB.class,
         reconfigureProtocolService, rpcServer);
 
     if (conf.getBoolean(CommonConfigurationKeys.HADOOP_SECURITY_AUTHORIZATION,
@@ -2153,15 +2153,16 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   long getLastTrxnIndexForNonRatis() throws IOException {
     TransactionInfo transactionInfo =
         TransactionInfo.readTransactionInfo(metadataManager);
-    // If the OMTransactionInfo does not exist in DB or if the term is not -1
-    // (corresponding to non-Ratis cluster), return 0 so that new incoming
+    // If the OMTransactionInfo does not exist in DB, return 0 so that new incoming
     // requests can have transaction index starting from 1.
-    if (transactionInfo == null || transactionInfo.getTerm() != -1) {
+    if (transactionInfo == null) {
       return 0;
     }
-    // If there exists a last transaction index in DB, the new incoming
-    // requests in non-Ratis cluster must have transaction index
-    // incrementally increasing from the stored transaction index onwards.
+    // If there exists a last transaction index in DB, including two cases:
+    // 1. transactionInfo.getTerm() == -1 corresponds to a non-Ratis cluster
+    // 2. transactionInfo.getTerm() != -1 indicates that the DB may be migrated from Ratis cluster
+    // For both cases above, the new incoming requests in non-Ratis cluster must have
+    // transaction index incrementally increasing from the stored transaction index onwards.
     return transactionInfo.getTransactionIndex();
   }
 

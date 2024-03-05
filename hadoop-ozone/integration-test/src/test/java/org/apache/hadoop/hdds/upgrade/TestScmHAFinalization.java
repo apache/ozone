@@ -30,6 +30,7 @@ import org.apache.hadoop.hdds.scm.server.upgrade.FinalizationStateManagerImpl;
 import org.apache.hadoop.hdds.scm.server.upgrade.SCMUpgradeFinalizationContext;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.MiniOzoneHAClusterImpl;
+import org.apache.hadoop.ozone.UniformDatanodesFactory;
 import org.apache.hadoop.ozone.upgrade.DefaultUpgradeFinalizationExecutor;
 import org.apache.hadoop.ozone.upgrade.InjectedUpgradeFinalizationExecutor.UpgradeTestInjectionPoints;
 import org.apache.hadoop.ozone.upgrade.UpgradeFinalizationExecutor;
@@ -90,16 +91,17 @@ public class TestScmHAFinalization {
 
     conf.setInt(HDDS_SCM_INIT_DEFAULT_LAYOUT_VERSION, HDDSLayoutFeature.INITIAL_VERSION.layoutVersion());
 
-    MiniOzoneCluster.Builder clusterBuilder =
-        new MiniOzoneHAClusterImpl.Builder(conf)
-        .setNumOfStorageContainerManagers(NUM_SCMS)
+    MiniOzoneHAClusterImpl.Builder clusterBuilder = MiniOzoneCluster.newHABuilder(conf);
+    clusterBuilder.setNumOfStorageContainerManagers(NUM_SCMS)
         .setNumOfActiveSCMs(NUM_SCMS - numInactiveSCMs)
         .setSCMServiceId("scmservice")
-        .setSCMConfigurator(configurator)
         .setNumOfOzoneManagers(1)
+        .setSCMConfigurator(configurator)
         .setNumDatanodes(NUM_DATANODES)
-        .setDnLayoutVersion(HDDSLayoutFeature.INITIAL_VERSION.layoutVersion());
-    this.cluster = (MiniOzoneHAClusterImpl) clusterBuilder.build();
+        .setDatanodeFactory(UniformDatanodesFactory.newBuilder()
+            .setLayoutVersion(HDDSLayoutFeature.INITIAL_VERSION.layoutVersion())
+            .build());
+    this.cluster = clusterBuilder.build();
 
     scmClient = cluster.getStorageContainerLocationClient();
     cluster.waitForClusterToBeReady();
