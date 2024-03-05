@@ -188,7 +188,7 @@ public final class OmBucketArgs extends WithMetadata implements Auditable {
       auditMap.put(OzoneConsts.OWNER, this.ownerName);
     }
     if (this.quotaInBytesSet && quotaInBytes > 0 ||
-        !(this.quotaInBytes == OzoneConsts.QUOTA_RESET)) {
+        (this.quotaInBytes != OzoneConsts.QUOTA_RESET)) {
       auditMap.put(OzoneConsts.QUOTA_IN_BYTES,
           String.valueOf(this.quotaInBytes));
     }
