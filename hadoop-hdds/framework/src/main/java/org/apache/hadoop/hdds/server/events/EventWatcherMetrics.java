@@ -57,22 +57,22 @@ public class EventWatcherMetrics {
   }
 
   @VisibleForTesting
-  public MutableCounterLong getTrackedEvents() {
+  MutableCounterLong getTrackedEvents() {
     return trackedEvents;
   }
 
   @VisibleForTesting
-  public MutableCounterLong getTimedOutEvents() {
+  MutableCounterLong getTimedOutEvents() {
     return timedOutEvents;
   }
 
   @VisibleForTesting
-  public MutableCounterLong getCompletedEvents() {
+  MutableCounterLong getCompletedEvents() {
     return completedEvents;
   }
 
   @VisibleForTesting
-  public MutableRate getCompletionTime() {
+  MutableRate getCompletionTime() {
     return completionTime;
   }
 }

@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.ozone.om.ratis.metrics;
+package org.apache.hadoop.ozone.om.ratis;
 
 import com.google.common.annotations.VisibleForTesting;
 
@@ -115,7 +115,7 @@ public class OzoneManagerDoubleBufferMetrics {
   }
 
   @VisibleForTesting
-  public MutableRate getFlushTime() {
+  MutableRate getFlushTime() {
     return flushTime;
   }
 
@@ -143,7 +143,7 @@ public class OzoneManagerDoubleBufferMetrics {
   }
 
   @VisibleForTesting
-  public MutableStat getQueueSize() {
+  MutableStat getQueueSize() {
     return queueSize;
   }
 

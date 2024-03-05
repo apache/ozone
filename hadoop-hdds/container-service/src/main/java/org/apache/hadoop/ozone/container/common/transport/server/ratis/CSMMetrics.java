@@ -192,7 +192,7 @@ public class CSMMetrics {
     return numBytesCommittedCount.value();
   }
 
-  public MutableRate getApplyTransactionLatencyNs() {
+  MutableRate getApplyTransactionLatencyNs() {
     return applyTransactionNs;
   }
 
