@@ -128,7 +128,7 @@ public class TestOMPrefixAclRequest extends TestOMKeyRequest {
     );
     OMClientResponse response1 =
         invalidRequest1.validateAndUpdateCache(ozoneManager, 1);
-    assertEquals(OzoneManagerProtocolProtos.Status.PREFIX_NOT_FOUND,
+    assertEquals(OzoneManagerProtocolProtos.Status.INVALID_PATH_IN_ACL_REQUEST,
         response1.getOMResponse().getStatus());
 
     // Not a valid FS path
