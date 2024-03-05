@@ -20,7 +20,6 @@ package org.apache.hadoop.hdds.scm.storage;
 import java.io.IOException;
 import java.time.Duration;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
@@ -221,10 +220,10 @@ public class TestCommitWatcher {
         CompletableFuture<ContainerCommandResponseProto> future2 =
             futures.get(1);
         future1.get();
-        assertEquals(Collections.singletonList(future1), watcher.getFutureMap().get((long) chunkSize));
+        assertEquals(future1, watcher.getFutureMap().get((long) chunkSize));
         // wait on 2nd putBlock to complete
         future2.get();
-        assertEquals(Collections.singletonList(future2), watcher.getFutureMap().get((long) 2 * chunkSize));
+        assertEquals(future2, watcher.getFutureMap().get((long) 2 * chunkSize));
         assertEquals(2, watcher.
             getCommitIndexMap().size());
         watcher.watchOnFirstIndex();
@@ -294,10 +293,10 @@ public class TestCommitWatcher {
         CompletableFuture<ContainerCommandResponseProto> future2 =
             futures.get(1);
         future1.get();
-        assertEquals(Collections.singletonList(future1), watcher.getFutureMap().get((long) chunkSize));
+        assertEquals(future1, watcher.getFutureMap().get((long) chunkSize));
         // wait on 2nd putBlock to complete
         future2.get();
-        assertEquals(Collections.singletonList(future2), watcher.getFutureMap().get((long) 2 * chunkSize));
+        assertEquals(future2, watcher.getFutureMap().get((long) 2 * chunkSize));
         assertEquals(2, watcher.getCommitIndexMap().size());
         watcher.watchOnFirstIndex();
         assertThat(watcher.getCommitIndexMap()).doesNotContainKey(replies.get(0).getLogIndex());

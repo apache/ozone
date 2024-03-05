@@ -46,7 +46,7 @@ class CommitWatcher extends AbstractCommitWatcher<ChunkBuffer> {
   private final BufferPool bufferPool;
 
   // future Map to hold up all putBlock futures
-  private final ConcurrentMap<Long, List<CompletableFuture<ContainerCommandResponseProto>>>
+  private final ConcurrentMap<Long, CompletableFuture<ContainerCommandResponseProto>>
       futureMap = new ConcurrentHashMap<>();
 
   CommitWatcher(BufferPool bufferPool, XceiverClientSpi xceiverClient) {
@@ -65,28 +65,28 @@ class CommitWatcher extends AbstractCommitWatcher<ChunkBuffer> {
     // When putBlock is called, a future is added.
     // When putBlock is replied, the future is removed below.
     // Therefore, the removed future should not be null.
-    final List<CompletableFuture<ContainerCommandResponseProto>> removed =
+    final CompletableFuture<ContainerCommandResponseProto> removed =
         futureMap.remove(totalLength);
     Objects.requireNonNull(removed, () -> "Future not found for "
         + totalLength + ": existing = " + futureMap.keySet());
   }
 
   @VisibleForTesting
-  ConcurrentMap<Long, List<CompletableFuture<ContainerCommandResponseProto>>> getFutureMap() {
+  ConcurrentMap<Long, CompletableFuture<ContainerCommandResponseProto>> getFutureMap() {
     return futureMap;
   }
 
   public void putFlushFuture(long flushPos, CompletableFuture<ContainerCommandResponseProto> flushFuture) {
-    futureMap.computeIfAbsent(flushPos, k -> new LinkedList<>()).add(flushFuture);
+    futureMap.compute(flushPos,
+        (key, previous) -> previous == null ? flushFuture :
+            previous.thenCombine(flushFuture, (prev, curr) -> curr));
   }
 
 
   public void waitOnFlushFutures() throws InterruptedException, ExecutionException {
-    CompletableFuture.allOf(
-        futureMap.values().stream()
-            .flatMap(List::stream)
-            .toArray(CompletableFuture[]::new)
-    ).get();
+    // wait for all the transactions to complete
+    CompletableFuture.allOf(futureMap.values().toArray(
+        new CompletableFuture[0])).get();
   }
 
   @Override
