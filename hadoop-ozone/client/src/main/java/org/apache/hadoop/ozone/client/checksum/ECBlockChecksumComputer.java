@@ -126,7 +126,7 @@ public class ECBlockChecksumComputer extends AbstractBlockChecksumComputer {
     long chunkSize = replicationConfig.getEcChunkSize();
 
     //When EC chunk size is not a multiple of ozone.client.bytes.per.checksum
-    // (default = 1MB) the last checksum in an EC chunk is only generated for
+    // (default = 16KB) the last checksum in an EC chunk is only generated for
     // offset.
     long bytesPerCrcOffset = chunkSize % bytesPerCrc;
 

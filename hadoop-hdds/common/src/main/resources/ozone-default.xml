@@ -841,7 +841,7 @@
   </property>
   <property>
     <name>ozone.chunk.read.buffer.default.size</name>
-    <value>1MB</value>
+    <value>16KB</value>
     <tag>OZONE, SCM, CONTAINER, PERFORMANCE</tag>
     <description>
       The default read buffer size during read chunk operations when checksum
