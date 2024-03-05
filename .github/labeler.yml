@@ -14,7 +14,8 @@
 # limitations under the License.
 
 # Configuration for .github/workflows/label-pr.yml
-# This workflow and its configuration can be deleted once the container reconciliation feature branch is merged.
+
+# This rule can be deleted once the container reconciliation feature branch is merged.
 container-reconciliation:
 - base-branch: HDDS-10239-container-reconciliation
 
