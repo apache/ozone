@@ -162,10 +162,10 @@ public class MockDatanodeStorage {
     if (data.containsKey(blockKey)) {
       block = data.get(blockKey);
       assert block.size() == chunkInfo.getOffset();
-      data.put(blockKey, block.concat(bytes));
+      data.put(blockKey, block.concat(ByteString.copyFrom(bytes.asReadOnlyByteBuffer())));
     } else {
       assert chunkInfo.getOffset() == 0;
-      data.put(blockKey, bytes);
+      data.put(blockKey, ByteString.copyFrom(bytes.asReadOnlyByteBuffer()));
     }
 
     fullBlockData
