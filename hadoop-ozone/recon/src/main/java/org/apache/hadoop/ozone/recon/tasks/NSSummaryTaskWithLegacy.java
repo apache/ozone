@@ -158,6 +158,9 @@ public class NSSummaryTaskWithLegacy extends NSSummaryTaskDbEventHandler {
         }
         handlePutKeyEvent(updatedKeyInfo, nsSummaryMap);
         break;
+
+      default:
+        LOG.debug("Skipping DB update event fir Key: {}", action);
       }
     } else {
       OmDirectoryInfo updatedDirectoryInfo = new OmDirectoryInfo.Builder()
@@ -195,6 +198,9 @@ public class NSSummaryTaskWithLegacy extends NSSummaryTaskDbEventHandler {
         }
         handlePutDirEvent(updatedDirectoryInfo, nsSummaryMap);
         break;
+
+      default:
+        LOG.debug("Skipping DB update event for Directory: {}", action);
       }
     }
   }
@@ -225,6 +231,9 @@ public class NSSummaryTaskWithLegacy extends NSSummaryTaskDbEventHandler {
       }
       handlePutKeyEvent(updatedKeyInfo, nsSummaryMap);
       break;
+
+    default:
+      LOG.debug("Skipping DB update event for Key: {}", action);
     }
   }
 
