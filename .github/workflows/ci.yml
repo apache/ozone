@@ -232,6 +232,7 @@ jobs:
     needs:
       - build-info
       - basic
+      - build
     runs-on: ubuntu-20.04
     timeout-minutes: 150
     if: needs.build-info.outputs.needs-unit-check == 'true'
