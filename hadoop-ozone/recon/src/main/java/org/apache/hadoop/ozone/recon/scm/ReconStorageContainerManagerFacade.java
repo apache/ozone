@@ -625,7 +625,7 @@ public class ReconStorageContainerManagerFacade
       try {
         LOG.info("Syncing data from SCM.");
         long currentSequenceNumber = getCurrentSCMDBSequenceNumber();
-        LOG.debug("Seq number of Recon's SCM DB : {}", currentSequenceNumber);
+        LOG.info("Seq number of Recon's SCM DB : {}", currentSequenceNumber);
         boolean fullSnapshot = false;
 
         if (currentSequenceNumber <= 0) {
@@ -910,4 +910,11 @@ public class ReconStorageContainerManagerFacade
     return this.scmDbSnapshotStore;
   }
 
+  /**
+   * Returns SequenceIdGen.
+   */
+  @Override
+  public SequenceIdGenerator getSequenceIdGen() {
+    return sequenceIdGen;
+  }
 }

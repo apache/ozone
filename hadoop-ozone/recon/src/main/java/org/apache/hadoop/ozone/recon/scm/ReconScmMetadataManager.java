@@ -18,7 +18,6 @@
 
 package org.apache.hadoop.ozone.recon.scm;
 
-import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.scm.ha.SequenceIdGenerator;
 import org.apache.hadoop.hdds.scm.metadata.SCMMetadataStore;
 import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
@@ -26,7 +25,6 @@ import org.apache.hadoop.hdds.utils.db.Table;
 
 import java.io.File;
 import java.io.IOException;
-import java.util.UUID;
 
 /**
  * Interface for the SCM Metadata Manager + SCM DB store maintained by
@@ -70,5 +68,4 @@ public interface ReconScmMetadataManager extends SCMMetadataStore {
 
   ReconNodeManager getNodeManager();
 
-  Table<UUID, DatanodeDetails> getNodesTable();
 }

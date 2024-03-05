@@ -813,6 +813,19 @@ public class PipelineManagerImpl implements PipelineManager {
     stateManager.initialize(pipeline);
   }
 
+  /**
+   * Updating pipeline state would be replicated to Ratis.
+   *
+   * @param pipelineIDProto
+   * @param newState
+   * @throws IOException
+   */
+  @Override
+  public void updatePipelineState(HddsProtos.PipelineID pipelineIDProto, HddsProtos.PipelineState newState)
+      throws IOException {
+    stateManager.updatePipelineState(pipelineIDProto, newState);
+  }
+
   @Override
   public void freezePipelineCreation() {
     freezePipelineCreation.set(true);

@@ -102,6 +102,8 @@ public class SCMDBMetaDataInitializationTask implements ReconSCMMetadataProcessi
   public Collection<String> getTaskTables() throws IOException {
     List<String> taskTables = new ArrayList<>();
     taskTables.add(scmMetadataManager.getContainerTable().getName());
+    taskTables.add(scmMetadataManager.getPipelineTable().getName());
+    taskTables.add(scmMetadataManager.getSequenceIdTable().getName());
     return taskTables;
   }
 

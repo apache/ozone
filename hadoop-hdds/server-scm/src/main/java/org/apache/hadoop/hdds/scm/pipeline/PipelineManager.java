@@ -27,6 +27,7 @@ import java.util.Set;
 
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.utils.db.Table;
@@ -230,6 +231,18 @@ public interface PipelineManager extends Closeable, PipelineManagerMXBean {
    * @throws IOException
    */
   default void initialize(Pipeline pipeline) throws IOException {
+
+  }
+
+  /**
+   * Updating pipeline state would be replicated to Ratis.
+   *
+   * @param pipelineIDProto
+   * @param newState
+   * @throws IOException
+   */
+  default void updatePipelineState(HddsProtos.PipelineID pipelineIDProto,
+                           HddsProtos.PipelineState newState) throws IOException {
 
   }
 }

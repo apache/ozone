@@ -22,6 +22,7 @@ import org.apache.commons.lang3.tuple.ImmutablePair;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
+import org.apache.hadoop.ozone.ClientVersion;
 import org.apache.hadoop.ozone.recon.scm.ReconScmMetadataManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -53,6 +54,7 @@ public class PipelineInfoHandler implements SCMMetaDataTableHandler {
     PipelineID pipelineID = (PipelineID) event.getKey();
     Pipeline pipeline = (Pipeline) event.getValue();
     try {
+      LOG.info("handlePutEvent for add new pipeline event for pipelineId: {}", pipelineID);
       handlePutPipelineEvent(pipeline);
     } catch (IOException ioe) {
       LOG.error("Unexpected error while handling add new pipeline event for pipelineId: {} - ", pipelineID, ioe);
@@ -100,8 +102,9 @@ public class PipelineInfoHandler implements SCMMetaDataTableHandler {
   }
 
   private void handleUpdatePipelineEvent(Pipeline pipeline) throws IOException {
-    scmMetadataManager.getOzoneStorageContainerManager().getPipelineManager().deletePipeline(pipeline.getId());
-    scmMetadataManager.getOzoneStorageContainerManager().getPipelineManager().initialize(pipeline);
+    scmMetadataManager.getOzoneStorageContainerManager().getPipelineManager()
+        .updatePipelineState(pipeline.getId().getProtobuf(),
+            pipeline.getProtobufMessage(ClientVersion.CURRENT_VERSION).getState());
   }
 
   /**

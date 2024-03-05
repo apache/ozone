@@ -19,10 +19,14 @@ package org.apache.hadoop.ozone.recon;
 
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
+import org.apache.hadoop.hdds.scm.node.NodeManager;
+import org.apache.hadoop.hdds.scm.node.NodeStatus;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
+import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.recon.scm.ReconNodeManager;
 import org.apache.hadoop.ozone.recon.scm.ReconStorageContainerManagerFacade;
@@ -37,6 +41,7 @@ import org.slf4j.LoggerFactory;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 
+import static org.apache.hadoop.hdds.scm.ha.SequenceIdGenerator.CONTAINER_ID;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_SCM_CLIENT_FAILOVER_MAX_RETRY_DEFAULT;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_SCM_CLIENT_FAILOVER_MAX_RETRY_KEY;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_SCM_CLIENT_MAX_RETRY_TIMEOUT_KEY;
@@ -189,6 +194,56 @@ public class TestReconScmSnapshot {
         .getReconStorageContainerManager().getScmNodeManager();
     long keyCountAfter = nodeManager.getNodeDBKeyCount();
     assertEquals(keyCountAfter, keyCountBefore);
+  }
+
+  @Test
+  public void testIncrementalSCMDbSync() throws Exception {
+    OzoneStorageContainerManager reconStorageContainerManager =
+        ozoneCluster.getReconServer().getReconStorageContainerManager();
+    ContainerManager reconContainerManager = reconStorageContainerManager.getContainerManager();
+    List<ContainerInfo> reconContainers = reconContainerManager.getContainers();
+    assertEquals(0, reconContainers.size());
+
+    ContainerManager containerManager = ozoneCluster.getStorageContainerManager()
+        .getContainerManager();
+
+    // Allocating 2 containers in SCM.
+    for (int i = 0; i < 2; i++) {
+      containerManager.allocateContainer(RatisReplicationConfig.getInstance(
+          HddsProtos.ReplicationFactor.ONE), "testOwner");
+    }
+    GenericTestUtils.waitFor(() -> {
+      return containerManager.getContainers().size() == reconContainerManager.getContainers().size();
+    }, 1000, 10000);
+
+    PipelineManager pipelineManager = ozoneCluster.getStorageContainerManager().getPipelineManager();
+    assertEquals(pipelineManager.getPipelines().size(),
+        reconStorageContainerManager.getPipelineManager().getPipelines().size());
+
+    assertEquals(pipelineManager.getPipelines().get(0).getNodes().size(),
+        reconStorageContainerManager.getPipelineManager().getPipelines().get(0).getNodes().size());
+    assertEquals(pipelineManager.getPipelines().get(0).getPipelineState().name(),
+        reconStorageContainerManager.getPipelineManager().getPipelines().get(0).getPipelineState().name());
+
+    NodeManager scmNodeManager = ozoneCluster.getStorageContainerManager().getScmNodeManager();
+    assertEquals(scmNodeManager.getAllNodes().size(),
+        reconStorageContainerManager.getScmNodeManager().getAllNodes().size());
+
+    assertEquals(scmNodeManager.getNodes(NodeStatus.inServiceHealthy()).size(),
+        reconStorageContainerManager.getScmNodeManager().getNodes(NodeStatus.inServiceHealthy()).size());
+
+    DatanodeDetails datanodeDetails = ozoneCluster.getHddsDatanodes().get(0).getDatanodeDetails();
+    HddsProtos.NodeOperationalState scmNodePersistedOpState =
+        scmNodeManager.getNodeByUuid(datanodeDetails.getUuid()).getPersistedOpState();
+    HddsProtos.NodeOperationalState reconNodePersistedOpState =
+        reconStorageContainerManager.getScmNodeManager().getNodeByUuid(datanodeDetails.getUuid()).getPersistedOpState();
+    assertEquals(scmNodePersistedOpState.name(), reconNodePersistedOpState.name());
+
+    // Assertions related to sequence Id generator, Sequence Id generator is used for generating
+    // container Id, so since we allocated 2 containers and scm and recon metadata is in sync, so
+    // next sequence id should be total containers count at recon plus 1 for nextId.
+    assertEquals(ozoneCluster.getStorageContainerManager().getSequenceIdGen().getNextId(CONTAINER_ID),
+        reconStorageContainerManager.getContainerManager().getContainers().size() + 1);
   }
 
   @AfterEach

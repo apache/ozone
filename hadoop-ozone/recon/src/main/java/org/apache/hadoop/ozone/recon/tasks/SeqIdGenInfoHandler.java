@@ -51,6 +51,7 @@ public class SeqIdGenInfoHandler implements SCMMetaDataTableHandler {
     final String sequenceIdName = (String) event.getKey();
     final Long lastId = (Long) event.getValue();
     try {
+      LOG.info("handlePutEvent for add new seqIdGen event for sequence name: {}", sequenceIdName);
       handlePutSequenceIdGenEvent(sequenceIdName, lastId);
     } catch (IOException ioe) {
       LOG.error("Unexpected error while handling add new seqIdGen event for sequence name: {} - ", sequenceIdName, ioe);
@@ -80,7 +81,7 @@ public class SeqIdGenInfoHandler implements SCMMetaDataTableHandler {
   @Override
   public void handleUpdateEvent(RocksDBUpdateEvent<?, Object> event) {
     final String sequenceIdName = (String) event.getKey();
-    LOG.error("Update event should not be raised on sequenceId table for sequence name: {} - ", sequenceIdName);
+    LOG.error("No action to be taken for update event on sequenceId table for sequence name: {} - ", sequenceIdName);
   }
 
   /**
