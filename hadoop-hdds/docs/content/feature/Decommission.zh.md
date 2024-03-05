@@ -55,7 +55,7 @@ ozone admin datanode decommission [-hV] [-id=<scmServiceId>]
 ```shell
 ozone admin datanode status decommission [-hV] [-id=<scmServiceId>] [--scm=<scm>] [--id=<uuid>] [--ip=<ipAddress>]
 ```
-您可以传递一个 Datanode 的 ipAddress 或 uuid 以仅查看与该 Datanode 相关的详细信息。
+您可以指定一个 Datanode 的 IP address 或 UUID 以查看该 Datanode 相关的详细信息。
 
 
 **Note:** 要Recommission某台DataNode的时候，可在命令行执行以下命令,
