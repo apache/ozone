@@ -74,7 +74,6 @@ public class BlockInputStream extends BlockExtendedInputStream {
   private XceiverClientSpi xceiverClient;
   private boolean initialized = false;
   // TODO: do we need to change retrypolicy based on exception.
-  // Default retry, retry for DN connectivity issues & what else?
   private final RetryPolicy retryPolicy = getRetryPolicy();
 
   private int retries;
