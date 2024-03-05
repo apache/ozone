@@ -363,10 +363,10 @@ public class TestOzoneManagerPrepare extends TestOzoneManagerHA {
     conf.setLong(
         OMConfigKeys.OZONE_OM_RATIS_SNAPSHOT_AUTO_TRIGGER_THRESHOLD_KEY,
         SNAPSHOT_THRESHOLD);
-    clusterBuilder = MiniOzoneCluster.newOMHABuilder(conf)
-        .setOMServiceId(getOmServiceId())
-        .setNumOfOzoneManagers(getNumOfOMs());
-    cluster = (MiniOzoneHAClusterImpl) clusterBuilder.build();
+    MiniOzoneHAClusterImpl.Builder clusterBuilder =
+        MiniOzoneCluster.newHABuilder(conf).setOMServiceId(getOmServiceId())
+            .setNumOfOzoneManagers(getNumOfOMs());
+    cluster = clusterBuilder.build();
     cluster.waitForClusterToBeReady();
 
     long prepareIndex = submitPrepareRequest();
