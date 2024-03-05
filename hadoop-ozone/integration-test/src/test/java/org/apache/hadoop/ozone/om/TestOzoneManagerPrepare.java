@@ -88,7 +88,6 @@ public class TestOzoneManagerPrepare extends TestOzoneManagerHA {
   private static final long SNAPSHOT_THRESHOLD = 1;
 
   private MiniOzoneHAClusterImpl cluster;
-  private static MiniOzoneCluster.Builder clusterBuilder = null;
   private ClientProtocol clientProtocol;
   private ObjectStore store;
 
@@ -97,7 +96,6 @@ public class TestOzoneManagerPrepare extends TestOzoneManagerHA {
 
   private void initInstanceVariables() {
     cluster = getCluster();
-    clusterBuilder = getClusterBuilder();
     store = getObjectStore();
     clientProtocol = store.getClientProxy();
   }
