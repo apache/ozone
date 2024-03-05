@@ -204,7 +204,7 @@ public final class OmBucketArgs extends WithMetadata implements Auditable {
     if (this.defaultReplicationConfig != null) {
       auditMap.put(OzoneConsts.REPLICATION_TYPE, String.valueOf(
           this.defaultReplicationConfig.getType()));
-      auditMap.put(OzoneConsts.REPLICATION_FACTOR,
+      auditMap.put(OzoneConsts.REPLICATION_CONFIG,
           this.defaultReplicationConfig.getReplicationConfig()
               .getReplication());
     }
