@@ -45,6 +45,7 @@ import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.BUCK
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INTERNAL_ERROR;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.PREFIX_NOT_FOUND;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.VOLUME_NOT_FOUND;
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INVALID_PATH_IN_ACL_REQUEST;
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.PREFIX_LOCK;
 import static org.apache.hadoop.ozone.security.acl.OzoneObj.ResourceType.PREFIX;
 
@@ -225,8 +226,8 @@ public class PrefixManagerImpl implements PrefixManager {
       throw new OMException("Prefix name is required.", PREFIX_NOT_FOUND);
     }
     if (!prefixName.endsWith("/")) {
-      throw new OMException("Invalid prefix name: " + prefixName,
-          PREFIX_NOT_FOUND);
+      throw new OMException("Missing trailing slash '/' in prefix name: " + prefixName,
+          INVALID_PATH_IN_ACL_REQUEST);
     }
   }
 
