@@ -323,7 +323,8 @@ public class TestOzoneRpcClientWithRatis extends TestOzoneRpcClientAbstract {
     omSM.getHandler().setInjector(injector);
     thread1.start();
     thread2.start();
-    Thread.sleep(2000);
+    // Wait long enough for createKey's preExecute to finish executing
+    Thread.sleep(10000);
     injector.resume();
 
     try {
