@@ -24,12 +24,14 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Stream;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import org.apache.commons.io.FileUtils;
-import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
+import org.apache.hadoop.ozone.om.KeyManagerImpl;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
@@ -47,9 +49,11 @@ import org.junit.jupiter.params.provider.ValueSource;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.fs.FileSystem.FS_DEFAULT_NAME_KEY;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SNAPSHOT_DELETING_SERVICE_INTERVAL;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_OFS_URI_SCHEME;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_SNAPSHOT_INDICATOR;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_SNAPSHOT_SST_FILTERING_SERVICE_INTERVAL;
 import static org.apache.hadoop.ozone.om.OmSnapshotManager.getSnapshotPath;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -66,12 +70,13 @@ class TestOzoneFsSnapshot {
   private static final String OM_SERVICE_ID = "om-service-test1";
   private static OzoneManager ozoneManager;
   private static OzoneFsShell shell;
+  private static AtomicInteger counter = new AtomicInteger();
   private static final String VOLUME =
-      "vol-" + RandomStringUtils.randomNumeric(5);
+      "vol-" + counter.incrementAndGet();
   private static final String BUCKET =
-      "buck-" + RandomStringUtils.randomNumeric(5);
+      "buck-" + counter.incrementAndGet();
   private static final String KEY =
-      "key-" + RandomStringUtils.randomNumeric(5);
+      "key-" + counter.incrementAndGet();
   private static final String BUCKET_PATH =
       OM_KEY_PREFIX + VOLUME + OM_KEY_PREFIX + BUCKET;
   private static final String BUCKET_WITH_SNAPSHOT_INDICATOR_PATH =
@@ -84,6 +89,8 @@ class TestOzoneFsSnapshot {
     OzoneConfiguration conf = new OzoneConfiguration();
     // Enable filesystem snapshot feature for the test regardless of the default
     conf.setBoolean(OMConfigKeys.OZONE_FILESYSTEM_SNAPSHOT_ENABLED_KEY, true);
+    conf.setTimeDuration(OZONE_SNAPSHOT_DELETING_SERVICE_INTERVAL, 1, TimeUnit.SECONDS);
+    conf.setInt(OZONE_SNAPSHOT_SST_FILTERING_SERVICE_INTERVAL, KeyManagerImpl.DISABLE_VALUE);
 
     // Start the cluster
     cluster = MiniOzoneCluster.newHABuilder(conf)
@@ -128,7 +135,7 @@ class TestOzoneFsSnapshot {
 
   @Test
   void testCreateSnapshotDuplicateName() throws Exception {
-    String snapshotName = "snap-" + RandomStringUtils.randomNumeric(5);
+    String snapshotName = "snap-" + counter.incrementAndGet();
 
     int res = ToolRunner.run(shell,
         new String[]{"-createSnapshot", BUCKET_PATH, snapshotName});
@@ -152,7 +159,7 @@ class TestOzoneFsSnapshot {
     // rather than:
     // Created snapshot ofs://om/vol1/buck2/dir3/.snapshot/snap1
 
-    String snapshotName = "snap-" + RandomStringUtils.randomNumeric(5);
+    String snapshotName = "snap-" + counter.incrementAndGet();
 
     String dirPath = BUCKET_PATH + "/dir1/";
 
@@ -257,7 +264,7 @@ class TestOzoneFsSnapshot {
    */
   @Test
   void testFsLsSnapshot(@TempDir Path tempDir) throws Exception {
-    String key1 = "key-" + RandomStringUtils.randomNumeric(5);
+    String key1 = "key-" + counter.incrementAndGet();
     String newKeyPath = BUCKET_PATH + OM_KEY_PREFIX + key1;
     // Pause SnapshotDeletingService so that Snapshot marked deleted is not reclaimed.
     ozoneManager.getKeyManager().getSnapshotDeletingService().suspend();
@@ -274,7 +281,7 @@ class TestOzoneFsSnapshot {
       String snapshotPath1 = BUCKET_WITH_SNAPSHOT_INDICATOR_PATH +
           OM_KEY_PREFIX + snapshotName1;
 
-      String key2 = "key-" + RandomStringUtils.randomNumeric(5);
+      String key2 = "key-" + counter.incrementAndGet();
       String newKeyPath2 = BUCKET_PATH + OM_KEY_PREFIX + key2;
       execShellCommandAndGetOutput(0,
           new String[]{"-put", tempFile.toString(), newKeyPath2});
@@ -413,6 +420,64 @@ class TestOzoneFsSnapshot {
     assertThat(errorMessage).contains(expectedMessage);
   }
 
+  @Test
+  public void testSnapshotReuseSnapName() throws Exception {
+    String key1 = "key-" + counter.incrementAndGet();
+    int res = ToolRunner.run(shell, new String[]{"-touch",
+        BUCKET_PATH + OM_KEY_PREFIX + key1});
+    assertEquals(0, res);
+
+    String snap1 = "snap" + counter.incrementAndGet();
+    res = ToolRunner.run(shell,
+        new String[]{"-createSnapshot", BUCKET_PATH, snap1});
+    // Asserts that create request succeeded
+    assertEquals(0, res);
+
+    String listSnapOut = execShellCommandAndGetOutput(0,
+        new String[]{"-ls", BUCKET_WITH_SNAPSHOT_INDICATOR_PATH + OM_KEY_PREFIX + snap1});
+    assertThat(listSnapOut).contains(key1);
+
+    res = ToolRunner.run(shell,
+        new String[]{"-deleteSnapshot", BUCKET_PATH, snap1});
+    // Asserts that delete request succeeded
+    assertEquals(0, res);
+
+    GenericTestUtils.waitFor(() -> {
+      try {
+        return !ozoneManager.getMetadataManager().getSnapshotInfoTable()
+            .isExist(SnapshotInfo.getTableKey(VOLUME, BUCKET, snap1));
+      } catch (IOException e) {
+        throw new RuntimeException(e);
+      }
+    }, 200, 10000);
+
+    String key2 = "key-" + counter.incrementAndGet();
+    res = ToolRunner.run(shell, new String[]{"-touch",
+        BUCKET_PATH + OM_KEY_PREFIX + key2});
+    assertEquals(0, res);
+    String snap2 = "snap" + counter.incrementAndGet();
+    res = ToolRunner.run(shell,
+        new String[]{"-createSnapshot", BUCKET_PATH, snap2});
+    // Asserts that create request succeeded
+    assertEquals(0, res);
+
+    String key3 = "key-" + counter.incrementAndGet();
+    res = ToolRunner.run(shell, new String[]{"-touch",
+        BUCKET_PATH + OM_KEY_PREFIX + key3});
+    assertEquals(0, res);
+
+    res = ToolRunner.run(shell,
+        new String[]{"-createSnapshot", BUCKET_PATH, snap1});
+    // Asserts that create request succeeded
+    assertEquals(0, res);
+
+    listSnapOut = execShellCommandAndGetOutput(0,
+        new String[]{"-ls", BUCKET_WITH_SNAPSHOT_INDICATOR_PATH + OM_KEY_PREFIX + snap1});
+    assertThat(listSnapOut).contains(key1);
+    assertThat(listSnapOut).contains(key2);
+    assertThat(listSnapOut).contains(key3);
+  }
+
   /**
    * Execute a shell command with provided arguments
    * and return a string of the output.
@@ -453,7 +518,7 @@ class TestOzoneFsSnapshot {
   }
 
   private String createSnapshot() throws Exception {
-    String snapshotName = "snap-" + RandomStringUtils.randomNumeric(5);
+    String snapshotName = "snap-" + counter.incrementAndGet();
 
     // Create snapshot
     int res = ToolRunner.run(shell,

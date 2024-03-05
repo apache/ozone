@@ -74,11 +74,6 @@ public interface MiniOzoneCluster extends AutoCloseable {
   OzoneConfiguration getConf();
 
   /**
-   * Set the configuration for the MiniOzoneCluster.
-   */
-  void setConf(OzoneConfiguration newConf);
-
-  /**
    * Waits for the cluster to be ready, this call blocks till all the
    * configured {@link HddsDatanodeService} registers with
    * {@link StorageContainerManager}.
