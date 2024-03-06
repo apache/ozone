@@ -56,6 +56,10 @@ jobs:
         if: steps.restore-cache.outputs.cache-hit != 'true'
         run: mvn --batch-mode --fail-never --no-transfer-progress --show-version dependency:go-offline
 
+      - name: Delete Ozone jars from repo
+        if: steps.restore-cache.outputs.cache-hit != 'true'
+        run: rm -frv ~/.m2/repository/org/apache/ozone
+
       - name: List repo contents
         if: steps.restore-cache.outputs.cache-hit != 'true'
         run: find ~/.m2/repository -type f | sort | xargs ls -lh
