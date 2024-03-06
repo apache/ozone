@@ -861,8 +861,8 @@
     </description>
   </property>
   <property>
-    <name>ozone.chunk.list.incremental</name>
-    <value>false</value>
+    <name>ozone.incremental.chunk.list</name>
+    <value>true</value>
     <tag>OZONE, CLIENT, DATANODE, PERFORMANCE</tag>
     <description>
       By default, a writer client sends full chunk list of a block when it
@@ -4137,7 +4137,7 @@
 
   <property>
     <name>ozone.fs.hsync.enabled</name>
-    <value>false</value>
+    <value>true</value>
     <tag>OZONE, CLIENT</tag>
     <description>
       Enable hsync/hflush. By default they are disabled.

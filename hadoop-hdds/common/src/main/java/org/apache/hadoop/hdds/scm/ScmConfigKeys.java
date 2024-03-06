@@ -146,8 +146,8 @@ public final class ScmConfigKeys {
       "32KB";
 
   public static final String OZONE_CHUNK_LIST_INCREMENTAL =
-      "ozone.chunk.list.incremental";
-  public static final boolean OZONE_CHUNK_LIST_INCREMENTAL_DEFAULT = false;
+      "ozone.incremental.chunk.list";
+  public static final boolean OZONE_CHUNK_LIST_INCREMENTAL_DEFAULT = true;
 
   public static final String OZONE_SCM_CONTAINER_LAYOUT_KEY =
       "ozone.scm.container.layout";
