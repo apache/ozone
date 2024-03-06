@@ -22,6 +22,7 @@ import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
+import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.audit.AuditAction;
@@ -76,7 +77,8 @@ public interface RequestAuditor {
         auditMap.put(OzoneConsts.REPLICATION_FACTOR, keyArgs.getFactor().name());
       }
       if (keyArgs.hasEcReplicationConfig()) {
-        auditMap.put(OzoneConsts.REPLICATION_CONFIG, String.valueOf(keyArgs.getEcReplicationConfig()));
+        auditMap.put(OzoneConsts.REPLICATION_CONFIG,
+            ECReplicationConfig.toString(keyArgs.getEcReplicationConfig()));
       }
       return auditMap;
     }
