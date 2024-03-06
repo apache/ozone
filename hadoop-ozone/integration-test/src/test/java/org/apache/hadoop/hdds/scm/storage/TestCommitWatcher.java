@@ -214,7 +214,7 @@ public class TestCommitWatcher {
                 return v;
               });
           futures.add(future);
-          watcher.getFutureMap().put(length, future);
+          watcher.putFlushFuture(length, future);
           replies.add(reply);
         }
 
@@ -288,7 +288,7 @@ public class TestCommitWatcher {
                 return v;
               });
           futures.add(future);
-          watcher.getFutureMap().put(length, future);
+          watcher.putFlushFuture(length, future);
           replies.add(reply);
         }
 
