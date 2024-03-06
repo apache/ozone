@@ -198,7 +198,7 @@ public final class OmBucketArgs extends WithMetadata implements Auditable {
           String.valueOf(this.quotaInNamespace));
     }
     if (this.bekInfo != null) {
-      auditMap.put(OzoneConsts.BUCKET_ENCRYPTION_KEY_NAME,
+      auditMap.put(OzoneConsts.BUCKET_ENCRYPTION_KEY,
           this.bekInfo.getKeyName());
     }
     if (this.defaultReplicationConfig != null) {
