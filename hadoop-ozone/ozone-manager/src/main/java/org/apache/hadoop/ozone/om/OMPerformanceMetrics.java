@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone.om;
 import org.apache.hadoop.metrics2.MetricsSystem;
 import org.apache.hadoop.metrics2.annotation.Metric;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
+import org.apache.hadoop.metrics2.lib.MutableCounterLong;
 import org.apache.hadoop.metrics2.lib.MutableRate;
 
 /**
@@ -119,6 +120,21 @@ public class OMPerformanceMetrics {
   @Metric(about = "resolveBucketLink latency in listKeys")
   private MutableRate listKeysResolveBucketLatencyNs;
 
+  @Metric(about = "sortDatanodes latency in nanoseconds")
+  private MutableRate sortDatanodesLatencyNs;
+
+  @Metric(about = "sortByDistanceCost latency in sortDatanodes")
+  private MutableRate sortDatanodesSortByDistanceCostLatencyNs;
+
+  @Metric(about = "resolveNodeLocation latency in sortDatanodes")
+  private MutableRate sortDatanodesResolveNodeLocationLatencyNs;
+
+  @Metric(about = "number of sortDatanodes calls")
+  private MutableCounterLong numSortDatanodesCalls;
+
+  @Metric(about = "number of non-datanodes host reads in sortDatanodes")
+  private MutableCounterLong numSortDatanodesNonDatanodeHostReads;
+
   public void addLookupLatency(long latencyInNs) {
     lookupLatencyNs.add(latencyInNs);
   }
@@ -218,6 +234,26 @@ public class OMPerformanceMetrics {
 
   public MutableRate getListKeysAclCheckLatencyNs() {
     return listKeysAclCheckLatencyNs;
+  }
+
+  public MutableRate getSortDatanodesLatencyNs() {
+    return sortDatanodesLatencyNs;
+  }
+
+  public MutableRate getSortDatanodesSortByDistanceCostLatencyNs() {
+    return sortDatanodesSortByDistanceCostLatencyNs;
+  }
+
+  public MutableRate getSortDatanodesResolveNodeLocationLatencyNs() {
+    return sortDatanodesResolveNodeLocationLatencyNs;
+  }
+
+  public void incNumSortDatanodesCalls() {
+    numSortDatanodesCalls.incr();
+  }
+
+  public void incNumSortDatanodesNonDatanodeHostReads() {
+    numSortDatanodesNonDatanodeHostReads.incr();
   }
 
   public MutableRate getListKeysResolveBucketLatencyNs() {
