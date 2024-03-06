@@ -17,8 +17,11 @@
  */
 package org.apache.hadoop.ozone.recon.api.handlers;
 
+import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
 import org.apache.hadoop.ozone.OmUtils;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
+import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.recon.ReconConstants;
 import org.apache.hadoop.ozone.recon.api.types.NamespaceSummaryResponse;
 import org.apache.hadoop.ozone.recon.api.types.DUResponse;
@@ -155,21 +158,36 @@ public abstract class EntityHandler {
     } else { // length > 3. check dir or key existence
       String volName = names[0];
       String bucketName = names[1];
-
-      String keyName = BucketHandler.getKeyName(names);
+      String keyName;
 
       bucketHandler = BucketHandler.getBucketHandler(
               reconNamespaceSummaryManager,
               omMetadataManager, reconSCM,
               volName, bucketName);
 
-      // check if either volume or bucket doesn't exist
-      if (bucketHandler == null
-          || !omMetadataManager.volumeExists(volName)
-          || !bucketHandler.bucketExists(volName, bucketName)) {
+      // Check if the bucketHandler is null or if the volume/bucket does not exist
+      if (bucketHandler == null ||
+          !omMetadataManager.volumeExists(volName) ||
+          !bucketHandler.bucketExists(volName, bucketName)) {
         return EntityType.UNKNOWN.create(reconNamespaceSummaryManager,
-                omMetadataManager, reconSCM, null, path);
+            omMetadataManager, reconSCM, null, path);
       }
+
+      // If the bucket layout is OBJECT_STORE, use parseObjectStorePath to get the key name
+      if (bucketHandler.getBucketLayout() == BucketLayout.OBJECT_STORE) {
+        String[] parsedObjectStorePath = parseObjectStorePath(path);
+        if (parsedObjectStorePath == null ||
+            parsedObjectStorePath.length != 3) {
+          // Handle invalid path format when expecting OBJECT_STORE layout
+          return EntityType.UNKNOWN.create(reconNamespaceSummaryManager,
+              omMetadataManager, reconSCM, null, path);
+        }
+        keyName = parsedObjectStorePath[2];
+      } else {
+        // For non-OBJECT_STORE layouts, derive the keyName using the existing names array
+        keyName = BucketHandler.getKeyName(names);
+      }
+
       return bucketHandler.determineKeyPath(keyName)
           .create(reconNamespaceSummaryManager,
           omMetadataManager, reconSCM, bucketHandler, path);
@@ -255,6 +273,39 @@ public abstract class EntityHandler {
     String[] names = path.split(OM_KEY_PREFIX);
     return names;
   }
+
+  /**
+   * Splits an object store path into volume, bucket, and key name components.
+   * <p>
+   * This method parses a path of the format "/volumeName/bucketName/keyName",
+   * including paths with additional '/' characters within the key name. It's
+   * designed for object store paths where the first three '/' characters separate
+   * the root, volume and bucket names from the key name.
+   *
+   * @param path The object store path to parse, starting with a slash.
+   * @return A String array with three elements: volume name, bucket name, and key name,
+   * or {@code null} if the path format is invalid.
+   */
+  public static String[] parseObjectStorePath(String path) {
+    // Ensure the path starts with a slash and has a sufficient length
+    if (!path.startsWith("/") || path.length() < 2) {
+      return null;
+    }
+
+    // Removing the leading slash for correct splitting
+    path = path.substring(1);
+
+    // Splitting the modified path by "/", limiting to 3 parts
+    String[] parts = path.split("/", 3);
+
+    // Checking if we correctly obtained 3 parts after removing the leading slash
+    if (parts.length == 3) {
+      return parts;
+    } else {
+      return null;
+    }
+  }
+
 
   private static String normalizePath(String path) {
     return OM_KEY_PREFIX + OmUtils.normalizeKey(path, false);
