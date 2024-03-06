@@ -2556,6 +2556,11 @@ abstract class AbstractRootedOzoneFileSystemTest {
     dstFileStatus = fs.listStatus(dstBucketPath)[0];
     // src and dst should have same replication
     assertEquals(sourceRepFactor, dstFileStatus.getReplication());
+
+    // test if copy is skipped due to matching checksums
+    assertFalse(options.shouldSkipCRC());
+    distcpJob = new DistCp(conf, options).execute();
+    verifyCopy(dstBucketPath, distcpJob, 0, 2);
   }
 
   private void verifyCopy(Path dstBucketPath, Job distcpJob,
