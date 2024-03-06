@@ -383,6 +383,11 @@ public class ContainerBalancer extends StatefulService {
         .build());
   }
 
+  @VisibleForTesting
+  public ContainerBalancerConfiguration getConfig() {
+    return this.config;
+  }
+
   private void validateConfiguration(ContainerBalancerConfiguration conf)
       throws InvalidContainerBalancerConfigurationException {
     // maxSizeEnteringTarget and maxSizeLeavingSource should by default be

@@ -1063,14 +1063,14 @@ public class SCMClientProtocolServer implements
       double tsd = threshold.get();
       auditMap.put("threshold", String.valueOf(tsd));
       Preconditions.checkState(tsd >= 0.0D && tsd < 100.0D,
-          "threshold should be specified in range [0.0, 100.0).");
+          "Threshold should be specified in the range [0.0, 100.0).");
       cbc.setThreshold(tsd);
     }
     if (maxSizeToMovePerIterationInGB.isPresent()) {
       long mstm = maxSizeToMovePerIterationInGB.get();
       auditMap.put("maxSizeToMovePerIterationInGB", String.valueOf(mstm));
       Preconditions.checkState(mstm > 0,
-          "maxSizeToMovePerIterationInGB must be positive.");
+          "Max Size To Move Per Iteration In GB must be positive.");
       cbc.setMaxSizeToMovePerIteration(mstm * OzoneConsts.GB);
     }
     if (maxDatanodesPercentageToInvolvePerIteration.isPresent()) {
@@ -1078,10 +1078,10 @@ public class SCMClientProtocolServer implements
       auditMap.put("maxDatanodesPercentageToInvolvePerIteration",
           String.valueOf(mdti));
       Preconditions.checkState(mdti >= 0,
-          "maxDatanodesPercentageToInvolvePerIteration must be " +
+          "Max Datanodes Percentage To Involve Per Iteration must be " +
               "greater than equal to zero.");
       Preconditions.checkState(mdti <= 100,
-          "maxDatanodesPercentageToInvolvePerIteration must be " +
+          "Max Datanodes Percentage To Involve Per Iteration must be " +
               "lesser than or equal to 100.");
       cbc.setMaxDatanodesPercentageToInvolvePerIteration(mdti);
     }
@@ -1089,7 +1089,7 @@ public class SCMClientProtocolServer implements
       int i = iterations.get();
       auditMap.put("iterations", String.valueOf(i));
       Preconditions.checkState(i > 0 || i == -1,
-          "number of iterations must be positive or" +
+          "Number of Iterations must be positive or" +
               " -1 (for running container balancer infinitely).");
       cbc.setIterations(i);
     }
@@ -1098,7 +1098,7 @@ public class SCMClientProtocolServer implements
       long mset = maxSizeEnteringTarget.get();
       auditMap.put("maxSizeEnteringTarget", String.valueOf(mset));
       Preconditions.checkState(mset > 0,
-          "maxSizeEnteringTarget must be " +
+          "Max Size Entering Target must be " +
               "greater than zero.");
       cbc.setMaxSizeEnteringTarget(mset * OzoneConsts.GB);
     }
@@ -1107,7 +1107,7 @@ public class SCMClientProtocolServer implements
       long msls = maxSizeLeavingSource.get();
       auditMap.put("maxSizeLeavingSource", String.valueOf(msls));
       Preconditions.checkState(msls > 0,
-          "maxSizeLeavingSource must be " +
+          "Max Size Leaving Source must be " +
               "greater than zero.");
       cbc.setMaxSizeLeavingSource(msls * OzoneConsts.GB);
     }
@@ -1117,7 +1117,7 @@ public class SCMClientProtocolServer implements
       auditMap.put("balancingInterval", String.valueOf(bi));
       Preconditions.checkState(bi > 0,
               "Balancing Interval must be greater than zero.");
-      cbc.setMoveTimeout(Duration.ofMinutes(bi));
+      cbc.setBalancingInterval(Duration.ofMinutes(bi));
     }
 
     if (moveTimeout.isPresent()) {
