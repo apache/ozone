@@ -34,7 +34,9 @@ import org.junit.jupiter.api.Timeout;
 import java.util.Optional;
 import java.util.concurrent.TimeUnit;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
 /**
  * This class tests container balancer operations
@@ -126,7 +128,7 @@ public class TestContainerBalancerOperations {
   //TODO: add more acceptance after container balancer is fully completed
 
   /**
-   * Test if Container Balancer CLI options override the default configurations
+   * Test if Container Balancer CLI options override the default configurations.
    */
   @Test
   public void testIfCBCLIOverridesConfigs() throws Exception {
