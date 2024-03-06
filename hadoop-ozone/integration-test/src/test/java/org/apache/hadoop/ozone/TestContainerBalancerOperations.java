@@ -42,7 +42,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
  * This class tests container balancer operations
  * from cblock clients.
  */
-@Timeout(value = 300, unit = TimeUnit.MILLISECONDS)
+@Timeout(value = 300)
 public class TestContainerBalancerOperations {
 
   private static ScmClient containerBalancerClient;
