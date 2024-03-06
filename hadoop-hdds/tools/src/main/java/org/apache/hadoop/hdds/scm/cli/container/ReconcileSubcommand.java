@@ -20,6 +20,7 @@ package org.apache.hadoop.hdds.scm.cli.container;
 import java.io.IOException;
 
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ReconcileContainerResponseProto;
 import org.apache.hadoop.hdds.scm.cli.ScmSubcommand;
 import org.apache.hadoop.hdds.scm.client.ScmClient;
 
@@ -41,7 +42,21 @@ public class ReconcileSubcommand extends ScmSubcommand {
 
   @Override
   public void execute(ScmClient scmClient) throws IOException {
-    // TODO output a status message?
-    scmClient.reconcileContainer(containerId);
+    ReconcileContainerResponseProto response = scmClient.reconcileContainer(containerId);
+    if (response.hasStatus()) {
+      switch (response.getStatus()) {
+      case OK:
+        System.out.println("Reconciliation has been triggered for container " + containerId);
+        System.out.println("Use \"ozone admin container info " + containerId + "\" to check the hashes of each " +
+            "container replica");
+        break;
+      case CONTAINER_STILL_OPEN:
+        System.err.println("Cannot reconcile an open container");
+      case UNSUPPORTED_CONTAINER_TYPE:
+        System.err.println("Reconciliation is currently only supported on Ratis containers");
+      default:
+        System.err.println("Reconciliation encountered an unknown error");
+      }
+    }
   }
 }

@@ -37,6 +37,7 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.ReconfigureProtocolProtos.ReconfigureProtocolService;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.DeletedBlocksTransactionInfo;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ReconcileContainerResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.DecommissionScmResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.DecommissionScmResponseProto.Builder;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.StartContainerBalancerResponseProto;
@@ -1382,26 +1383,18 @@ public class SCMClientProtocolServer implements
   }
 
   @Override
-  public void reconcileContainer(long containerID) throws IOException {
+  public ReconcileContainerResponseProto reconcileContainer(long longContainerID) throws IOException {
+    ContainerID containerID = ContainerID.valueOf(longContainerID);
     getScm().checkAdminAccess(getRemoteUser(), false);
     final UserGroupInformation remoteUser = getRemoteUser();
     final Map<String, String> auditMap = Maps.newHashMap();
-    auditMap.put("containerID", String.valueOf(containerID));
+    auditMap.put("containerID", containerID.toString());
     auditMap.put("remoteUser", remoteUser.getUserName());
     try {
-      // Reconcile is not allowed on open containers.
-      ContainerInfo container = scm.getContainerManager().getContainer(ContainerID.valueOf(containerID));
-      final HddsProtos.LifeCycleState state = container.getState();
-      if (state.equals(HddsProtos.LifeCycleState.OPEN)) {
-        throw new SCMException("Cannot reconcile a " + state + " container.", ResultCodes.UNEXPECTED_CONTAINER_STATE);
-      }
-      // Reconcile on EC containers is not yet implemented.
-      final HddsProtos.ReplicationType repType = container.getReplicationType();
-      if (repType == HddsProtos.ReplicationType.EC) {
-        throw new SCMException("Reconciliation for erasure coded containers is not yet supported.",
-            ResultCodes.UNSUPPORTED_OPERATION);
-      }
-      scm.getEventQueue().fireEvent(SCMEvents.RECONCILE_CONTAINER, ContainerID.valueOf(containerID));
+      // TODO container manager should return status.
+      ReconcileContainerResponseProto.Status status = scm.getContainerManager().canReconcileContainer(containerID);
+
+      scm.getEventQueue().fireEvent(SCMEvents.RECONCILE_CONTAINER, containerID);
       AUDIT.logWriteSuccess(buildAuditMessageForSuccess(
           SCMAction.RECONCILE_CONTAINER, auditMap));
     } catch (Exception ex) {
@@ -1409,6 +1402,5 @@ public class SCMClientProtocolServer implements
           SCMAction.RECONCILE_CONTAINER, auditMap, ex));
       throw ex;
     }
-
   }
 }

@@ -328,6 +328,7 @@ message SCMCommandProto {
     finalizeNewLayoutVersionCommand = 9;
     refreshVolumeUsageInfo = 10;
     reconstructECContainersCommand = 11;
+    reconcileContainerCommand = 12;
   }
   // TODO: once we start using protoc 3.x, refactor this message using "oneof"
   required Type commandType = 1;
@@ -343,6 +344,7 @@ message SCMCommandProto {
   finalizeNewLayoutVersionCommandProto = 10;
   optional RefreshVolumeUsageCommandProto refreshVolumeUsageCommandProto = 11;
   optional ReconstructECContainersCommandProto reconstructECContainersCommandProto = 12;
+  optional ReconcileContainerCommandProto reconcileContainerCommandProto = 13;
 
 
   // If running upon Ratis, holds term of underlying RaftServer iff current
@@ -496,6 +498,15 @@ message ProcessCRLCommandProto {
 message FinalizeNewLayoutVersionCommandProto {
   required bool finalizeNewLayoutVersion = 1 [default = false];
   required LayoutVersionProto dataNodeLayoutVersion = 2;
+  required int64 cmdId = 3;
+}
+
+/**
+This command asks the datanode to replicate a container from specific sources.
+*/
+message ReconcileContainerCommandProto {
+  required int64 containerID = 1;
+  repeated DatanodeDetailsProto sources = 2;
   required int64 cmdId = 3;
 }
 

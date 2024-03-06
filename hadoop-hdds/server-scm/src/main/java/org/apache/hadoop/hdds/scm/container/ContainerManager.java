@@ -26,6 +26,7 @@ import java.util.Set;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleEvent;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ReconcileContainerResponseProto;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.common.statemachine.InvalidStateTransitionException;
@@ -203,6 +204,8 @@ public interface ContainerManager extends Closeable {
    */
   void deleteContainer(ContainerID containerID)
       throws IOException;
+
+  ReconcileContainerResponseProto.Status canReconcileContainer(ContainerID containerID) throws ContainerNotFoundException;
 
   /**
    * Returns containerStateManger.

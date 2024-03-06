@@ -1158,26 +1158,11 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
   }
 
   @Override
-  public void reconcileContainer(long containerID) throws IOException {
+  public ReconcileContainerResponseProto reconcileContainer(long containerID) throws IOException {
     ReconcileContainerRequestProto request = ReconcileContainerRequestProto.newBuilder()
         .setContainerID(containerID)
         .build();
-    ReconcileContainerResponseProto response = submitRequest(Type.ReconcileContainer,
+    return submitRequest(Type.ReconcileContainer,
         builder -> builder.setReconcileContainerRequest(request)).getReconcileContainerResponse();
-    if (response.hasStatus()) {
-      switch (response.getStatus()) {
-      case OK:
-        break;
-      case CONTAINER_STILL_OPEN:
-        throw new IOException("Cannot reconcile an open container");
-        break;
-      case UNSUPPORTED_CONTAINER_TYPE:
-        throw new IOException("Reconciliation is currently only supported on Ratis containers");
-        break;
-      default:
-        throw new IOException("Reconciliation encountered an unknown error");
-        break;
-      }
-    }
   }
 }
