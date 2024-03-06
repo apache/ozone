@@ -77,7 +77,7 @@ public class ReplicatedBlockChecksumComputer extends
       List<ByteString> checksums = checksumData.getChecksumsList();
 
       for (ByteString checksum : checksums) {
-        bytes.concat(checksum);
+        bytes = bytes.concat(checksum);
       }
     }
 
