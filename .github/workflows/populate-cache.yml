@@ -58,7 +58,7 @@ jobs:
 
       - name: Delete Ozone jars from repo
         if: steps.restore-cache.outputs.cache-hit != 'true'
-        run: rm -frv ~/.m2/repository/org/apache/ozone
+        run: rm -fr ~/.m2/repository/org/apache/ozone
 
       - name: List repo contents
         if: steps.restore-cache.outputs.cache-hit != 'true'
