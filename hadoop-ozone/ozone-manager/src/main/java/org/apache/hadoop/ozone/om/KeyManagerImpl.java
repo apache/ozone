@@ -45,11 +45,15 @@ import org.apache.hadoop.conf.StorageUnit;
 import org.apache.hadoop.crypto.key.KeyProviderCryptoExtension;
 import org.apache.hadoop.crypto.key.KeyProviderCryptoExtension.EncryptedKeyVersion;
 import org.apache.hadoop.fs.FileEncryptionInfo;
+import org.apache.hadoop.hdds.DFSConfigKeysLegacy;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
+import org.apache.hadoop.hdds.scm.net.InnerNode;
+import org.apache.hadoop.hdds.scm.net.Node;
+import org.apache.hadoop.hdds.scm.net.NodeImpl;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.storage.BlockLocationInfo;
 import org.apache.hadoop.hdds.utils.BackgroundService;
@@ -58,6 +62,9 @@ import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
+import org.apache.hadoop.net.CachedDNSToSwitchMapping;
+import org.apache.hadoop.net.DNSToSwitchMapping;
+import org.apache.hadoop.net.TableMapping;
 import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
@@ -96,6 +103,7 @@ import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
 import org.apache.hadoop.ozone.security.acl.RequestContext;
 import org.apache.hadoop.security.SecurityUtil;
+import org.apache.hadoop.util.ReflectionUtils;
 import org.apache.hadoop.util.Time;
 
 import com.google.common.annotations.VisibleForTesting;
@@ -108,6 +116,7 @@ import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.HADOOP_SECURITY
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_BLOCK_TOKEN_ENABLED;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_BLOCK_TOKEN_ENABLED_DEFAULT;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.BlockTokenSecretProto.AccessModeProto.READ;
+import static org.apache.hadoop.hdds.scm.net.NetConstants.NODE_COST_DEFAULT;
 import static org.apache.hadoop.hdds.utils.HddsServerUtil.getRemoteUser;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_SERVICE_INTERVAL;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_SERVICE_INTERVAL_DEFAULT;
@@ -190,6 +199,7 @@ public class KeyManagerImpl implements KeyManager {
   private BackgroundService openKeyCleanupService;
   private BackgroundService multipartUploadCleanupService;
   private SnapshotDirectoryCleaningService snapshotDirectoryCleaningService;
+  private DNSToSwitchMapping dnsToSwitchMapping;
 
   public KeyManagerImpl(OzoneManager om, ScmClient scmClient,
       OzoneConfiguration conf, OMPerformanceMetrics metrics) {
@@ -339,6 +349,16 @@ public class KeyManagerImpl implements KeyManager {
           ozoneManager, configuration);
       multipartUploadCleanupService.start();
     }
+
+    Class<? extends DNSToSwitchMapping> dnsToSwitchMappingClass =
+        configuration.getClass(
+            DFSConfigKeysLegacy.NET_TOPOLOGY_NODE_SWITCH_MAPPING_IMPL_KEY,
+            TableMapping.class, DNSToSwitchMapping.class);
+    DNSToSwitchMapping newInstance = ReflectionUtils.newInstance(
+        dnsToSwitchMappingClass, configuration);
+    dnsToSwitchMapping =
+        ((newInstance instanceof CachedDNSToSwitchMapping) ? newInstance
+            : new CachedDNSToSwitchMapping(newInstance));
   }
 
   KeyProviderCryptoExtension getKMSProvider() {
@@ -1844,8 +1864,7 @@ public class KeyManagerImpl implements KeyManager {
     return encInfo;
   }
 
-  @VisibleForTesting
-  void sortDatanodes(String clientMachine, OmKeyInfo... keyInfos) {
+  private void sortDatanodes(String clientMachine, OmKeyInfo... keyInfos) {
     if (keyInfos != null && clientMachine != null) {
       Map<Set<String>, List<DatanodeDetails>> sortedPipelines = new HashMap<>();
       for (OmKeyInfo keyInfo : keyInfos) {
@@ -1865,8 +1884,7 @@ public class KeyManagerImpl implements KeyManager {
               LOG.warn("No datanodes in pipeline {}", pipeline.getId());
               continue;
             }
-            sortedNodes = sortDatanodes(clientMachine, nodes, keyInfo,
-                uuidList);
+            sortedNodes = sortDatanodes(nodes, clientMachine);
             if (sortedNodes != null) {
               sortedPipelines.put(uuidSet, sortedNodes);
             }
@@ -1882,24 +1900,59 @@ public class KeyManagerImpl implements KeyManager {
     }
   }
 
-  private List<DatanodeDetails> sortDatanodes(String clientMachine,
-      List<DatanodeDetails> nodes, OmKeyInfo keyInfo, List<String> nodeList) {
-    List<DatanodeDetails> sortedNodes = null;
-    try {
-      sortedNodes = scmClient.getBlockClient()
-          .sortDatanodes(nodeList, clientMachine);
-      if (LOG.isDebugEnabled()) {
-        LOG.debug("Sorted datanodes {} for client {}, result: {}", nodes,
-            clientMachine, sortedNodes);
+  @VisibleForTesting
+  public List<DatanodeDetails> sortDatanodes(List<DatanodeDetails> nodes,
+                                             String clientMachine) {
+    final Node client = getClientNode(clientMachine, nodes);
+    return ozoneManager.getClusterMap()
+        .sortByDistanceCost(client, nodes, nodes.size());
+  }
+
+  private Node getClientNode(String clientMachine,
+                             List<DatanodeDetails> nodes) {
+    List<DatanodeDetails> matchingNodes = new ArrayList<>();
+    boolean useHostname = ozoneManager.getConfiguration().getBoolean(
+        DFSConfigKeysLegacy.DFS_DATANODE_USE_DN_HOSTNAME,
+        DFSConfigKeysLegacy.DFS_DATANODE_USE_DN_HOSTNAME_DEFAULT);
+    for (DatanodeDetails node : nodes) {
+      if ((useHostname ? node.getHostName() : node.getIpAddress()).equals(
+          clientMachine)) {
+        matchingNodes.add(node);
       }
-    } catch (IOException e) {
-      LOG.warn("Unable to sort datanodes based on distance to client, "
-          + " volume={}, bucket={}, key={}, client={}, datanodes={}, "
-          + " exception={}",
-          keyInfo.getVolumeName(), keyInfo.getBucketName(),
-          keyInfo.getKeyName(), clientMachine, nodeList, e.getMessage());
     }
-    return sortedNodes;
+    return !matchingNodes.isEmpty() ? matchingNodes.get(0) :
+        getOtherNode(clientMachine);
+  }
+
+  private Node getOtherNode(String clientMachine) {
+    try {
+      String clientLocation = resolveNodeLocation(clientMachine);
+      if (clientLocation != null) {
+        Node rack = ozoneManager.getClusterMap().getNode(clientLocation);
+        if (rack instanceof InnerNode) {
+          return new NodeImpl(clientMachine, clientLocation,
+              (InnerNode) rack, rack.getLevel() + 1,
+              NODE_COST_DEFAULT);
+        }
+      }
+    } catch (Exception e) {
+      LOG.info("Could not resolve client {}: {}",
+          clientMachine, e.getMessage());
+    }
+    return null;
+  }
+
+  private String resolveNodeLocation(String hostname) {
+    List<String> hosts = Collections.singletonList(hostname);
+    List<String> resolvedHosts = dnsToSwitchMapping.resolve(hosts);
+    if (resolvedHosts != null && !resolvedHosts.isEmpty()) {
+      String location = resolvedHosts.get(0);
+      LOG.debug("Node {} resolved to location {}", hostname, location);
+      return location;
+    } else {
+      LOG.debug("Node resolution did not yield any result for {}", hostname);
+      return null;
+    }
   }
 
   private static List<String> toNodeUuid(Collection<DatanodeDetails> nodes) {

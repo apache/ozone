@@ -178,6 +178,8 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Recover
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.RecoverTrashResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.RefetchSecretKeyRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.RefetchSecretKeyResponse;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.RefetchNetworkTopologyTreeRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.RefetchNetworkTopologyTreeResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.RemoveAclRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.RemoveAclResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.RenameKeyRequest;
@@ -2561,6 +2563,19 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
     SetSafeModeResponse setSafeModeResponse =
         handleError(submitRequest(omRequest)).getSetSafeModeResponse();
     return setSafeModeResponse.getResponse();
+  }
+
+  @Override
+  public boolean refetchNetworkTopologyTree() throws IOException {
+    final RefetchNetworkTopologyTreeRequest.Builder requestBuilder =
+        RefetchNetworkTopologyTreeRequest.newBuilder();
+    final OMRequest omRequest = createOMRequest(Type.RefetchNetworkTopologyTree)
+        .setRefetchNetworkTopologyTreeRequest(requestBuilder)
+        .build();
+    final OMResponse omResponse = submitRequest(omRequest);
+    final RefetchNetworkTopologyTreeResponse resp =
+        handleError(omResponse).getRefetchNetworkTopologyTreeResponse();
+    return resp.getStatus();
   }
 
   private SafeMode toProtoBuf(SafeModeAction action) {

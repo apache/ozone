@@ -62,6 +62,14 @@ public final class NodeSchemaManager {
     String schemaFile = conf.get(
         ScmConfigKeys.OZONE_SCM_NETWORK_TOPOLOGY_SCHEMA_FILE,
         ScmConfigKeys.OZONE_SCM_NETWORK_TOPOLOGY_SCHEMA_FILE_DEFAULT);
+    loadSchemaFile(schemaFile);
+  }
+
+  public void init(String schemaFile) {
+    loadSchemaFile(schemaFile);
+  }
+
+  private void loadSchemaFile(String schemaFile) {
     NodeSchemaLoadResult result;
     try {
       result = NodeSchemaLoader.getInstance().loadSchemaFromFile(schemaFile);

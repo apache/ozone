@@ -30,7 +30,6 @@ package hadoop.hdds.block;
 
 import "hdds.proto";
 
-
 // SCM Block protocol
 
 enum Type {
@@ -39,6 +38,7 @@ enum Type {
   GetScmInfo         = 13;
   SortDatanodes      = 14;
   AddScm             = 15;
+  GetClusterTree     = 16;
 }
 
 message SCMBlockLocationRequest {
@@ -56,6 +56,7 @@ message SCMBlockLocationRequest {
   optional hadoop.hdds.GetScmInfoRequestProto getScmInfoRequest         = 13;
   optional SortDatanodesRequestProto          sortDatanodesRequest      = 14;
   optional hadoop.hdds.AddScmRequestProto     addScmRequestProto       = 15;
+  optional GetClusterTreeRequestProto         getClusterTreeRequest     = 16;
 }
 
 message SCMBlockLocationResponse {
@@ -80,6 +81,7 @@ message SCMBlockLocationResponse {
   optional hadoop.hdds.GetScmInfoResponseProto getScmInfoResponse         = 13;
   optional SortDatanodesResponseProto          sortDatanodesResponse      = 14;
   optional hadoop.hdds.AddScmResponseProto     addScmResponse        = 15;
+  optional GetClusterTreeResponseProto         getClusterTreeResponse     = 16;
 }
 
 /**
@@ -228,6 +230,13 @@ message SortDatanodesRequestProto{
 
 message SortDatanodesResponseProto{
   repeated DatanodeDetailsProto node = 1;
+}
+
+message GetClusterTreeRequestProto {
+}
+
+message GetClusterTreeResponseProto {
+  required InnerNode clusterTree = 1;
 }
 
 /**

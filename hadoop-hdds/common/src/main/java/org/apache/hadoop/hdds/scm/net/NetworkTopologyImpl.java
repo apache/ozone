@@ -75,6 +75,15 @@ public class NetworkTopologyImpl implements NetworkTopology {
         schemaManager.getCost(NetConstants.ROOT_LEVEL));
   }
 
+  public NetworkTopologyImpl(String schemaFile, InnerNode clusterTree) {
+    schemaManager = NodeSchemaManager.getInstance();
+    schemaManager.init(schemaFile);
+    maxLevel = schemaManager.getMaxLevel();
+    shuffleOperation = Collections::shuffle;
+    factory = InnerNodeImpl.FACTORY;
+    this.clusterTree = clusterTree;
+  }
+
   @VisibleForTesting
   public NetworkTopologyImpl(NodeSchemaManager manager,
                              Consumer<List<? extends Node>> shuffleOperation) {
@@ -726,8 +735,13 @@ public class NetworkTopologyImpl implements NetworkTopology {
     int cost = 0;
     netlock.readLock().lock();
     try {
-      if ((node1.getAncestor(level1 - 1) != clusterTree) ||
-          (node2.getAncestor(level2 - 1) != clusterTree)) {
+      Node ancestor1 = node1.getAncestor(level1 - 1);
+      boolean node1Topology = (ancestor1 != null && clusterTree != null &&
+          !ancestor1.equals(clusterTree)) || (ancestor1 != clusterTree);
+      Node ancestor2 = node2.getAncestor(level2 - 1);
+      boolean node2Topology = (ancestor2 != null && clusterTree != null &&
+          !ancestor2.equals(clusterTree)) || (ancestor2 != clusterTree);
+      if (node1Topology || node2Topology) {
         LOG.debug("One of the nodes is outside of network topology");
         return Integer.MAX_VALUE;
       }
@@ -741,7 +755,7 @@ public class NetworkTopologyImpl implements NetworkTopology {
         level2--;
         cost += node2 == null ? 0 : node2.getCost();
       }
-      while (node1 != null && node2 != null && node1 != node2) {
+      while (node1 != null && node2 != null && !node1.equals(node2)) {
         node1 = node1.getParent();
         node2 = node2.getParent();
         cost += node1 == null ? 0 : node1.getCost();
