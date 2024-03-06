@@ -18,8 +18,6 @@
 
 package org.apache.hadoop.ozone.om.ratis;
 
-import com.google.common.annotations.VisibleForTesting;
-
 import org.apache.hadoop.metrics2.MetricsSystem;
 import org.apache.hadoop.metrics2.annotation.Metric;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
@@ -114,7 +112,6 @@ public class OzoneManagerDoubleBufferMetrics {
     flushTime.add(time);
   }
 
-  @VisibleForTesting
   MutableRate getFlushTime() {
     return flushTime;
   }
@@ -142,7 +139,6 @@ public class OzoneManagerDoubleBufferMetrics {
     updateQueueSize(flushedTransactionsInOneIteration);
   }
 
-  @VisibleForTesting
   MutableStat getQueueSize() {
     return queueSize;
   }

@@ -111,27 +111,22 @@ public final class ContainerClientMetrics {
     totalWriteChunkBytes.incr(chunkSizeBytes);
   }
 
-  @VisibleForTesting
   MutableCounterLong getTotalWriteChunkBytes() {
     return totalWriteChunkBytes;
   }
 
-  @VisibleForTesting
   MutableCounterLong getTotalWriteChunkCalls() {
     return totalWriteChunkCalls;
   }
 
-  @VisibleForTesting
   Map<PipelineID, MutableCounterLong> getWriteChunkBytesByPipeline() {
     return writeChunkBytesByPipeline;
   }
 
-  @VisibleForTesting
   Map<PipelineID, MutableCounterLong> getWriteChunkCallsByPipeline() {
     return writeChunkCallsByPipeline;
   }
 
-  @VisibleForTesting
   Map<UUID, MutableCounterLong> getWriteChunksCallsByLeaders() {
     return writeChunksCallsByLeaders;
   }

@@ -21,8 +21,6 @@ import org.apache.hadoop.metrics2.annotation.Metric;
 import org.apache.hadoop.metrics2.lib.MutableCounterLong;
 import org.apache.hadoop.metrics2.lib.MutableRate;
 
-import com.google.common.annotations.VisibleForTesting;
-
 /**
  * Metrics for any event watcher.
  */
@@ -56,22 +54,18 @@ public class EventWatcherMetrics {
     completionTime.add(duration);
   }
 
-  @VisibleForTesting
   MutableCounterLong getTrackedEvents() {
     return trackedEvents;
   }
 
-  @VisibleForTesting
   MutableCounterLong getTimedOutEvents() {
     return timedOutEvents;
   }
 
-  @VisibleForTesting
   MutableCounterLong getCompletedEvents() {
     return completedEvents;
   }
 
-  @VisibleForTesting
   MutableRate getCompletionTime() {
     return completionTime;
   }

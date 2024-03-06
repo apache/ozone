@@ -594,29 +594,24 @@ public final class OzoneManagerDoubleBuffer {
     readyBuffer = temp;
   }
 
-  @VisibleForTesting
   OzoneManagerDoubleBufferMetrics getMetrics() {
     return metrics;
   }
 
   /** @return the flushed transaction count to OM DB. */
-  @VisibleForTesting
   long getFlushedTransactionCountForTesting() {
     return flushedTransactionCount.get();
   }
 
   /** @return total number of flush iterations run by sync thread. */
-  @VisibleForTesting
   long getFlushIterationsForTesting() {
     return flushIterations.get();
   }
 
-  @VisibleForTesting
   int getCurrentBufferSize() {
     return currentBuffer.size();
   }
 
-  @VisibleForTesting
   int getReadyBufferSize() {
     return readyBuffer.size();
   }
