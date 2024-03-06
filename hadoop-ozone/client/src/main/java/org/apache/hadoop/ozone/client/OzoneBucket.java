@@ -154,7 +154,7 @@ public class OzoneBucket extends WithMetadata {
   private String owner;
 
   protected OzoneBucket(Builder builder) {
-    this.metadata = builder.metadata;
+    setMetadata(builder.metadata);
     this.proxy = builder.proxy;
     this.volumeName = builder.volumeName;
     this.name = builder.name;  // bucket name
@@ -301,6 +301,10 @@ public class OzoneBucket extends WithMetadata {
     return owner;
   }
 
+  public int getListCacheSize() {
+    return listCacheSize;
+  }
+
   /**
    * Builder for OmBucketInfo.
   /**
@@ -403,6 +407,16 @@ public class OzoneBucket extends WithMetadata {
   public void setReplicationConfig(ReplicationConfig replicationConfig)
       throws IOException {
     proxy.setReplicationConfig(volumeName, name, replicationConfig);
+  }
+
+  public void setListCacheSize(int listCacheSize) {
+    this.listCacheSize = listCacheSize;
+  }
+
+  @Deprecated
+  public void setEncryptionKey(String bekName) throws IOException {
+    proxy.setEncryptionKey(volumeName, name, bekName);
+    encryptionKeyName = bekName;
   }
 
   /**
@@ -1239,7 +1253,7 @@ public class OzoneBucket extends WithMetadata {
           proxy.listStatusLight(volumeName, name, delimiterKeyPrefix, false,
               startKey, listCacheSize, false);
 
-      if (addedKeyPrefix) {
+      if (addedKeyPrefix && statuses.size() > 0) {
         // previous round already include the startKey, so remove it
         statuses.remove(0);
       } else {

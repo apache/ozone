@@ -338,6 +338,9 @@ public final class HddsConfigKeys {
       HDDS_SECURITY_CLIENT_SCM_SECRET_KEY_DATANODE_PROTOCOL_ACL =
       "hdds.security.client.scm.secretkey.datanode.protocol.acl";
 
+  public static final String OZONE_SECURITY_RECONFIGURE_PROTOCOL_ACL =
+      "ozone.security.reconfigure.protocol.acl";
+
   // Determines if the Container Chunk Manager will write user data to disk
   // Set to false only for specific performance tests
   public static final String HDDS_CONTAINER_PERSISTDATA =
@@ -392,4 +395,9 @@ public final class HddsConfigKeys {
 
   public static final String OZONE_AUDIT_LOG_DEBUG_CMD_LIST_DNAUDIT =
       "ozone.audit.log.debug.cmd.list.dnaudit";
+
+  public static final String HDDS_DATANODE_SLOW_OP_WARNING_THRESHOLD_KEY =
+      "hdds.datanode.slow.op.warning.threshold";
+  public static final String HDDS_DATANODE_SLOW_OP_WARNING_THRESHOLD_DEFAULT =
+      "500ms";
 }

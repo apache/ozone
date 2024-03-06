@@ -72,8 +72,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.junit.jupiter.api.Assertions.fail;
-import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -370,13 +369,8 @@ public class TestSchemaOneBackwardsCompatibility {
 
       for (Table.KeyValue<String, ChunkInfoList> chunkListKV: deletedBlocks) {
         preUpgradeBlocks.add(chunkListKV.getKey());
-        try {
-          chunkListKV.getValue();
-          fail("No exception thrown when trying to retrieve old " +
-              "deleted blocks values as chunk lists.");
-        } catch (IOException ex) {
-          // Exception thrown as expected.
-        }
+        assertThrows(IOException.class, () -> chunkListKV.getValue(),
+            "No exception thrown when trying to retrieve old deleted blocks values as chunk lists.");
       }
 
       assertEquals(TestDB.NUM_DELETED_BLOCKS, preUpgradeBlocks.size());

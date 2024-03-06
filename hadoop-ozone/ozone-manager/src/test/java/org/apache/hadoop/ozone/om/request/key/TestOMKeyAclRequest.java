@@ -20,8 +20,12 @@ package org.apache.hadoop.ozone.om.request.key;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+
 import java.util.List;
 import java.util.UUID;
+
+import org.apache.hadoop.hdds.client.RatisReplicationConfig;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
@@ -247,7 +251,7 @@ public class TestOMKeyAclRequest extends TestOMKeyRequest {
 
   protected String addKeyToTable() throws Exception {
     OMRequestTestUtils.addKeyToTable(false, false, volumeName, bucketName,
-        keyName, clientID, replicationType, replicationFactor, 1L,
+        keyName, clientID, RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.ONE), 1L,
         omMetadataManager);
 
     return omMetadataManager.getOzoneKey(volumeName, bucketName,

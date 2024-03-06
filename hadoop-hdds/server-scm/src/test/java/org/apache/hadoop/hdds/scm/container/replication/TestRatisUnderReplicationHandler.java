@@ -41,8 +41,10 @@ import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
 import org.apache.ratis.protocol.exceptions.NotLeaderException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 import org.mockito.ArgumentCaptor;
 
+import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -65,9 +67,9 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyInt;
-import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.Mockito.any;
+import static org.mockito.Mockito.anyInt;
+import static org.mockito.Mockito.anyLong;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 import static org.mockito.Mockito.eq;
@@ -89,13 +91,13 @@ public class TestRatisUnderReplicationHandler {
   private ReplicationManagerMetrics metrics;
 
   @BeforeEach
-  public void setup() throws NodeNotFoundException,
+  void setup(@TempDir File testDir) throws NodeNotFoundException,
       CommandTargetOverloadedException, NotLeaderException {
     container = ReplicationTestUtil.createContainer(
         HddsProtos.LifeCycleState.CLOSED, RATIS_REPLICATION_CONFIG);
 
     nodeManager = mock(NodeManager.class);
-    conf = SCMTestUtils.getConf();
+    conf = SCMTestUtils.getConf(testDir);
     policy = ReplicationTestUtil
         .getSimpleTestPlacementPolicy(nodeManager, conf);
     replicationManager = mock(ReplicationManager.class);
@@ -572,6 +574,35 @@ public class TestRatisUnderReplicationHandler {
     }
     final ContainerReplica unhealthyReplica = createContainerReplica(container.containerID(), 0,
             DECOMMISSIONING, State.UNHEALTHY, sequenceID);
+    replicas.add(unhealthyReplica);
+    UnderReplicatedHealthResult result = getUnderReplicatedHealthResult();
+    when(result.hasVulnerableUnhealthy()).thenReturn(true);
+
+    final Set<Pair<DatanodeDetails, SCMCommand<?>>> commands = testProcessing(replicas, Collections.emptyList(),
+        result, 2, 1);
+    assertEquals(unhealthyReplica.getDatanodeDetails(), commands.iterator().next().getKey());
+  }
+
+  /**
+   * A QUASI_CLOSED container may have UNHEALTHY replicas with the correct sequence ID which have unique
+   * origin Datanodes. If any of these UNHEALTHY replicas is being taken offline, then it needs to be replicated to
+   * another DN for decommission to progress. This test asserts that a replicate command is sent for one such replica.
+   */
+  @Test
+  public void testUnderReplicationWithVulnerableReplicasOnUniqueOrigins() throws IOException {
+    final long sequenceID = 20;
+    container = ReplicationTestUtil.createContainerInfo(RATIS_REPLICATION_CONFIG, 1,
+        HddsProtos.LifeCycleState.QUASI_CLOSED, sequenceID);
+
+    final Set<ContainerReplica> replicas = new HashSet<>(4);
+    for (int i = 0; i < 3; i++) {
+      replicas.add(createContainerReplica(container.containerID(), 0, IN_SERVICE, State.QUASI_CLOSED,
+          sequenceID));
+    }
+
+    // create an UNHEALTHY replica with a unique origin
+    final ContainerReplica unhealthyReplica = createContainerReplica(container.containerID(), 0,
+        DECOMMISSIONING, State.UNHEALTHY, sequenceID);
     replicas.add(unhealthyReplica);
     UnderReplicatedHealthResult result = getUnderReplicatedHealthResult();
     when(result.hasVulnerableUnhealthy()).thenReturn(true);

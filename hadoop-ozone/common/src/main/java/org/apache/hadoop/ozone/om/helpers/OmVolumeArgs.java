@@ -102,12 +102,12 @@ public final class OmVolumeArgs extends WithObjectID
     this.quotaInBytes = quotaInBytes;
     this.quotaInNamespace = quotaInNamespace;
     this.usedNamespace = usedNamespace;
-    this.metadata = metadata;
+    setMetadata(metadata);
     this.acls = acls;
     this.creationTime = creationTime;
     this.modificationTime = modificationTime;
-    this.objectID = objectID;
-    this.updateID = updateID;
+    setObjectID(objectID);
+    setUpdateID(updateID);
     this.refCount = refCount;
   }
 
@@ -286,12 +286,12 @@ public final class OmVolumeArgs extends WithObjectID
       return false;
     }
     OmVolumeArgs that = (OmVolumeArgs) o;
-    return Objects.equals(this.objectID, that.objectID);
+    return Objects.equals(this.getObjectID(), that.getObjectID());
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(this.objectID);
+    return Objects.hash(getObjectID());
   }
 
   /**
@@ -430,13 +430,13 @@ public final class OmVolumeArgs extends WithObjectID
         .setQuotaInBytes(quotaInBytes)
         .setQuotaInNamespace(quotaInNamespace)
         .setUsedNamespace(usedNamespace)
-        .addAllMetadata(KeyValueUtil.toProtobuf(metadata))
+        .addAllMetadata(KeyValueUtil.toProtobuf(getMetadata()))
         .addAllVolumeAcls(aclList)
         .setCreationTime(
             creationTime == 0 ? System.currentTimeMillis() : creationTime)
         .setModificationTime(modificationTime)
-        .setObjectID(objectID)
-        .setUpdateID(updateID)
+        .setObjectID(getObjectID())
+        .setUpdateID(getUpdateID())
         .setRefCount(refCount)
         .build();
   }
@@ -476,8 +476,8 @@ public final class OmVolumeArgs extends WithObjectID
   @Override
   public OmVolumeArgs copyObject() {
     Map<String, String> cloneMetadata = new HashMap<>();
-    if (metadata != null) {
-      metadata.forEach((k, v) -> cloneMetadata.put(k, v));
+    if (getMetadata() != null) {
+      getMetadata().forEach((k, v) -> cloneMetadata.put(k, v));
     }
 
     List<OzoneAcl> cloneAcls = new ArrayList(acls.size());
@@ -488,6 +488,6 @@ public final class OmVolumeArgs extends WithObjectID
 
     return new OmVolumeArgs(adminName, ownerName, volume, quotaInBytes,
         quotaInNamespace, usedNamespace, cloneMetadata, cloneAcls,
-        creationTime, modificationTime, objectID, updateID, refCount);
+        creationTime, modificationTime, getObjectID(), getUpdateID(), refCount);
   }
 }

@@ -35,58 +35,9 @@ public class RemoveSCMRequest {
     this.ratisAddr = addr;
   }
 
-  public static RemoveSCMRequest getFromProtobuf(
-      HddsProtos.RemoveScmRequestProto proto) {
-    return new Builder().setClusterId(proto.getClusterId())
-        .setScmId(proto.getScmId()).setRatisAddr(proto.getRatisAddr()).build();
-  }
-
   public HddsProtos.RemoveScmRequestProto getProtobuf() {
     return HddsProtos.RemoveScmRequestProto.newBuilder().setClusterId(clusterId)
         .setScmId(scmId).setRatisAddr(ratisAddr).build();
-  }
-  /**
-   * Builder for RemoveSCMRequest.
-   */
-  public static class Builder {
-    private String clusterId;
-    private String scmId;
-    private String ratisAddr;
-
-
-    /**
-     * sets the cluster id.
-     * @param cid clusterId to be set
-     * @return Builder for RemoveSCMRequest
-     */
-    public RemoveSCMRequest.Builder setClusterId(String cid) {
-      this.clusterId = cid;
-      return this;
-    }
-
-    /**
-     * sets the scmId.
-     * @param id scmId
-     * @return Builder for RemoveSCMRequest
-     */
-    public RemoveSCMRequest.Builder setScmId(String id) {
-      this.scmId = id;
-      return this;
-    }
-
-    /**
-     * Set ratis address in Scm HA.
-     * @param   addr  address in the format of [ip|hostname]:port
-     * @return  Builder for RemoveSCMRequest
-     */
-    public RemoveSCMRequest.Builder setRatisAddr(String addr) {
-      this.ratisAddr = addr;
-      return this;
-    }
-
-    public RemoveSCMRequest build() {
-      return new RemoveSCMRequest(clusterId, scmId, ratisAddr);
-    }
   }
 
   /**

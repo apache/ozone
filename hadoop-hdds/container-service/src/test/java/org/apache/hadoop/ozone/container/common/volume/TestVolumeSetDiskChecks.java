@@ -40,7 +40,6 @@ import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.container.ContainerTestHelper;
 import org.apache.hadoop.ozone.container.common.ContainerTestUtils;
-import org.apache.hadoop.ozone.container.common.TestDatanodeStateMachine;
 import org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion;
 import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
@@ -49,7 +48,6 @@ import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainer;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
-import org.apache.ozone.test.GenericTestUtils;
 import org.apache.hadoop.util.DiskChecker.DiskErrorException;
 import org.apache.hadoop.util.Timer;
 
@@ -59,9 +57,11 @@ import org.apache.commons.io.FileUtils;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
+import org.junit.jupiter.api.io.TempDir;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import static org.apache.commons.lang3.RandomStringUtils.randomAlphanumeric;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -78,6 +78,8 @@ import static org.mockito.Mockito.when;
 public class TestVolumeSetDiskChecks {
   public static final Logger LOG = LoggerFactory.getLogger(
       TestVolumeSetDiskChecks.class);
+  @TempDir
+  private File dir;
 
   private OzoneConfiguration conf = null;
 
@@ -217,21 +219,21 @@ public class TestVolumeSetDiskChecks {
     final OzoneConfiguration ozoneConf = new OzoneConfiguration();
     final List<String> dirs = new ArrayList<>();
     for (int i = 0; i < numDirs; ++i) {
-      dirs.add(GenericTestUtils.getRandomizedTestDir().getPath());
+      dirs.add(new File(dir, randomAlphanumeric(10)).toString());
     }
     ozoneConf.set(DFSConfigKeysLegacy.DFS_DATANODE_DATA_DIR_KEY,
         String.join(",", dirs));
 
     final List<String> metaDirs = new ArrayList<>();
     for (int i = 0; i < numDirs; ++i) {
-      metaDirs.add(GenericTestUtils.getRandomizedTestDir().getPath());
+      metaDirs.add(new File(dir, randomAlphanumeric(10)).toString());
     }
-    ozoneConf.set(OzoneConfigKeys.DFS_CONTAINER_RATIS_DATANODE_STORAGE_DIR,
+    ozoneConf.set(OzoneConfigKeys.HDDS_CONTAINER_RATIS_DATANODE_STORAGE_DIR,
         String.join(",", metaDirs));
 
     final List<String> dbDirs = new ArrayList<>();
     for (int i = 0; i < numDirs; ++i) {
-      dbDirs.add(GenericTestUtils.getRandomizedTestDir().getPath());
+      dbDirs.add(new File(dir, randomAlphanumeric(10)).toString());
     }
     ozoneConf.set(OzoneConfigKeys.HDDS_DATANODE_CONTAINER_DB_DIR,
         String.join(",", dbDirs));
@@ -264,8 +266,7 @@ public class TestVolumeSetDiskChecks {
     ContainerSet conSet = new ContainerSet(20);
     when(ozoneContainer.getContainerSet()).thenReturn(conSet);
 
-    String path = GenericTestUtils
-        .getTempPath(TestDatanodeStateMachine.class.getSimpleName());
+    String path = dir.getPath();
     File testRoot = new File(path);
 
     conf.set(HddsConfigKeys.OZONE_METADATA_DIRS,

@@ -23,14 +23,14 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.storage.proto.OzoneManagerStorageProtos;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
 import java.util.Collections;
 import java.util.HashMap;
 
-
 import static org.apache.hadoop.ozone.OzoneAcl.AclScope.ACCESS;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 
 /**
  * Class to test OmPrefixInfo.
@@ -91,7 +91,7 @@ public class TestOmPrefixInfo {
         ACCESS);
     OmPrefixInfo clonePrefixInfo = omPrefixInfo.copyObject();
 
-    Assertions.assertEquals(omPrefixInfo, clonePrefixInfo);
+    assertEquals(omPrefixInfo, clonePrefixInfo);
 
 
     // Change acls and check.
@@ -99,7 +99,7 @@ public class TestOmPrefixInfo {
         IAccessAuthorizer.ACLIdentityType.USER, username,
         IAccessAuthorizer.ACLType.READ, ACCESS));
 
-    Assertions.assertNotEquals(omPrefixInfo, clonePrefixInfo);
+    assertNotEquals(omPrefixInfo, clonePrefixInfo);
 
   }
 
@@ -116,10 +116,10 @@ public class TestOmPrefixInfo {
 
     OmPrefixInfo ompri = OmPrefixInfo.getFromProtobuf(prefixInfo);
 
-    Assertions.assertEquals(prefixInfoPath, ompri.getName());
-    Assertions.assertEquals(1, ompri.getMetadata().size());
-    Assertions.assertEquals(metaval, ompri.getMetadata().get(metakey));
-    Assertions.assertEquals(1, ompri.getAcls().size());
+    assertEquals(prefixInfoPath, ompri.getName());
+    assertEquals(1, ompri.getMetadata().size());
+    assertEquals(metaval, ompri.getMetadata().get(metakey));
+    assertEquals(1, ompri.getAcls().size());
   }
 
   @Test
@@ -133,8 +133,8 @@ public class TestOmPrefixInfo {
     omPrefixInfo.getMetadata().put("key", "value");
     OzoneManagerStorageProtos.PersistedPrefixInfo pi =
         omPrefixInfo.getProtobuf();
-    Assertions.assertEquals(testPath, pi.getName());
-    Assertions.assertEquals(1, pi.getAclsCount());
-    Assertions.assertEquals(1, pi.getMetadataCount());
+    assertEquals(testPath, pi.getName());
+    assertEquals(1, pi.getAclsCount());
+    assertEquals(1, pi.getMetadataCount());
   }
 }

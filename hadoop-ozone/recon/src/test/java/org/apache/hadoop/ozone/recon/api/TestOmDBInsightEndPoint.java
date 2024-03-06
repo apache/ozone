@@ -69,8 +69,8 @@ import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.getRandom
 import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.getTestReconOmMetadataManager;
 import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.initializeNewOmMetadataManager;
 import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.writeDataToOm;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -91,6 +91,10 @@ public class TestOmDBInsightEndPoint extends AbstractReconSqlDBTest {
   private Random random = new Random();
   private OzoneConfiguration ozoneConfiguration;
   private Set<Long> generatedIds = new HashSet<>();
+
+  public TestOmDBInsightEndPoint() {
+    super();
+  }
 
   private long generateUniqueRandomLong() {
     long newValue;
@@ -589,7 +593,7 @@ public class TestOmDBInsightEndPoint extends AbstractReconSqlDBTest {
                 repeatedOmKeyInfo -> repeatedOmKeyInfo.getOmKeyInfoList().get(0)
                     .getKeyName())
             .collect(Collectors.toList());
-    assertFalse(pendingDeleteKeys.contains("key_one"));
+    assertThat(pendingDeleteKeys).doesNotContain("key_one");
   }
 
   @Test
@@ -660,7 +664,7 @@ public class TestOmDBInsightEndPoint extends AbstractReconSqlDBTest {
     assertNotNull(keyInsightInfoResp);
     assertEquals(2,
         keyInsightInfoResp.getDeletedDirInfoList().size());
-    assertEquals("/sampleVol/bucketOne/dir_one",
+    assertEquals("dir_one",
         keyInsightInfoResp.getDeletedDirInfoList().get(0).getKey());
   }
 
@@ -692,7 +696,7 @@ public class TestOmDBInsightEndPoint extends AbstractReconSqlDBTest {
     assertNotNull(keyInsightInfoResp);
     assertEquals(2,
         keyInsightInfoResp.getDeletedDirInfoList().size());
-    assertEquals("/sampleVol/bucketOne/dir_three",
+    assertEquals("dir_three",
         keyInsightInfoResp.getDeletedDirInfoList().get(0).getKey());
     assertEquals("/sampleVol/bucketOne/dir_two",
         keyInsightInfoResp.getLastKey());
@@ -725,7 +729,9 @@ public class TestOmDBInsightEndPoint extends AbstractReconSqlDBTest {
     assertNotNull(keyInsightInfoResp);
     assertEquals(3,
         keyInsightInfoResp.getDeletedDirInfoList().size());
-    assertEquals("/sampleVol/bucketOne/dir_one",
+    assertEquals("sampleVol/bucketOne/dir_one", keyInsightInfoResp
+        .getDeletedDirInfoList().get(0).getPath());
+    assertEquals("dir_one",
         keyInsightInfoResp.getDeletedDirInfoList().get(0).getKey());
     assertEquals("/sampleVol/bucketOne/dir_two",
         keyInsightInfoResp.getLastKey());

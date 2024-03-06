@@ -23,7 +23,7 @@ import org.apache.ratis.util.Preconditions;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import javax.annotation.Nonnull;
+import jakarta.annotation.Nonnull;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.CharBuffer;
@@ -88,8 +88,7 @@ abstract class StringCodecBase implements Codec<String> {
    *         When {@link #isFixedLength()} is true,
    *         the upper bound equals to the serialized size.
    */
-  @Override
-  public int getSerializedSizeUpperBound(String s) {
+  private int getSerializedSizeUpperBound(String s) {
     return maxBytesPerChar * s.length();
   }
 
@@ -177,8 +176,7 @@ abstract class StringCodecBase implements Codec<String> {
   }
 
   @Override
-  public String fromCodecBuffer(@Nonnull CodecBuffer buffer)
-      throws IOException {
+  public String fromCodecBuffer(@Nonnull CodecBuffer buffer) {
     return decode(buffer.asReadOnlyByteBuffer());
   }
 

@@ -39,9 +39,7 @@ import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.service.SnapshotDeletingService;
 import org.apache.hadoop.ozone.om.snapshot.ReferenceCounted;
-import org.apache.hadoop.ozone.om.snapshot.SnapshotCache;
 import org.apache.ozone.test.GenericTestUtils;
-import org.apache.ozone.test.tag.Flaky;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -55,15 +53,15 @@ import java.util.Objects;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicLong;
 
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CHUNK_SIZE_KEY;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ACL_ENABLED;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_SERVICE_INTERVAL;
-import static org.apache.hadoop.ozone.om.OmSnapshotManager.getSnapshotPrefix;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SNAPSHOT_DELETING_SERVICE_INTERVAL;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SNAPSHOT_DELETING_SERVICE_TIMEOUT;
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.fail;
 
 /**
  * Test Snapshot Deleting Service.
@@ -134,9 +132,8 @@ public class TestSnapshotDeletingService {
     GenericTestUtils.waitFor(() -> snapshotDeletingService
             .getSuccessfulRunCount() >= 1, 1000, 10000);
 
-    OmSnapshot bucket1snap3 = (OmSnapshot) om.getOmSnapshotManager()
-        .checkForSnapshot(VOLUME_NAME, BUCKET_NAME_ONE,
-            getSnapshotPrefix("bucket1snap3"), true).get();
+    OmSnapshot bucket1snap3 = om.getOmSnapshotManager()
+        .getSnapshot(VOLUME_NAME, BUCKET_NAME_ONE, "bucket1snap3").get();
 
     // Check bucket1key1 added to next non deleted snapshot db.
     List<? extends Table.KeyValue<String, RepeatedOmKeyInfo>> omKeyInfos =
@@ -147,7 +144,6 @@ public class TestSnapshotDeletingService {
   }
 
   @Test
-  @Flaky("HDDS-9288")
   public void testMultipleSnapshotKeyReclaim() throws Exception {
 
     Table<String, RepeatedOmKeyInfo> deletedTable =
@@ -192,13 +188,10 @@ public class TestSnapshotDeletingService {
 
     // verify the cache of purged snapshot
     // /vol1/bucket2/bucket2snap1 has been cleaned up from cache map
-    SnapshotCache snapshotCache = om.getOmSnapshotManager().getSnapshotCache();
-    assertEquals(2, snapshotCache.size());
-    assertEquals(2, snapshotCache.getPendingEvictionListSize());
+    assertEquals(2, om.getOmSnapshotManager().getSnapshotCacheSize());
   }
 
   @SuppressWarnings("checkstyle:MethodLength")
-  @Flaky("HDDS-9023")
   @Test
   public void testSnapshotWithFSO() throws Exception {
     Table<String, OmDirectoryInfo> dirTable =
@@ -363,9 +356,8 @@ public class TestSnapshotDeletingService {
     assertTableRowCount(om.getMetadataManager().getSnapshotInfoTable(), 2);
 
     verifySnapshotChain(deletedSnap, "/vol1/bucket2/snap3");
-    OmSnapshot snap3 = (OmSnapshot) om.getOmSnapshotManager()
-        .checkForSnapshot(VOLUME_NAME, BUCKET_NAME_TWO,
-            getSnapshotPrefix("snap3"), true).get();
+    OmSnapshot snap3 = om.getOmSnapshotManager()
+        .getSnapshot(VOLUME_NAME, BUCKET_NAME_TWO, "snap3").get();
 
     Table<String, OmKeyInfo> snapDeletedDirTable =
         snap3.getMetadataManager().getDeletedDirTable();
@@ -392,10 +384,10 @@ public class TestSnapshotDeletingService {
     assertTableRowCount(renamedTable, 4);
     assertTableRowCount(deletedDirTable, 3);
 
-    ReferenceCounted<IOmMetadataReader, SnapshotCache> rcSnap1 =
-        om.getOmSnapshotManager().checkForSnapshot(
-            VOLUME_NAME, BUCKET_NAME_TWO, getSnapshotPrefix("snap1"), true);
-    OmSnapshot snap1 = (OmSnapshot) rcSnap1.get();
+    ReferenceCounted<OmSnapshot> rcSnap1 =
+        om.getOmSnapshotManager().getSnapshot(
+            VOLUME_NAME, BUCKET_NAME_TWO, "snap1");
+    OmSnapshot snap1 = rcSnap1.get();
     Table<String, OmKeyInfo> snap1KeyTable =
         snap1.getMetadataManager().getFileTable();
     try (TableIterator<String, ? extends Table.KeyValue<String,
@@ -488,8 +480,9 @@ public class TestSnapshotDeletingService {
     client.getProxy().deleteKey(VOLUME_NAME, BUCKET_NAME_ONE,
         "bucket1key0", false);
     assertTableRowCount(keyTable, 0);
-    // bucket1key0 should also be reclaimed as it not same
-    assertTableRowCount(deletedTable, 1);
+    // one copy of bucket1key0 should also be reclaimed as it not same
+    // but original deleted key created during overwrite should not be deleted
+    assertTableRowCount(deletedTable, 2);
 
     // Create Snapshot 2.
     client.getProxy().createSnapshot(VOLUME_NAME, BUCKET_NAME_ONE,
@@ -561,15 +554,12 @@ public class TestSnapshotDeletingService {
 
   private boolean assertTableRowCount(int expectedCount,
                                       Table<String, ?> table) {
-    long count = 0L;
-    try {
-      count = cluster.getOzoneManager().getMetadataManager()
-          .countRowsInTable(table);
+    AtomicLong count = new AtomicLong(0L);
+    assertDoesNotThrow(() -> {
+      count.set(cluster.getOzoneManager().getMetadataManager().countRowsInTable(table));
       LOG.info("{} actual row count={}, expectedCount={}", table.getName(),
-          count, expectedCount);
-    } catch (IOException ex) {
-      fail("testDoubleBuffer failed with: " + ex);
-    }
-    return count == expectedCount;
+          count.get(), expectedCount);
+    });
+    return count.get() == expectedCount;
   }
 }

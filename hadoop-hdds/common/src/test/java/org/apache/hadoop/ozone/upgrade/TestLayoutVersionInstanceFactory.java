@@ -169,17 +169,12 @@ public class TestLayoutVersionInstanceFactory {
    * Mock Interface.
    */
   interface MockInterface {
-    String mockMethod();
   }
 
   /**
    * Mock Impl v1.
    */
   static class MockClassV1 implements MockInterface {
-    @Override
-    public String mockMethod() {
-      return getClass().getSimpleName();
-    }
   }
 
   /**

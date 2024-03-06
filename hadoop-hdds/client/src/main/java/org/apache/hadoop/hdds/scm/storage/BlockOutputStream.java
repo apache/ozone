@@ -28,6 +28,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Supplier;
 
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
@@ -124,6 +125,7 @@ public class BlockOutputStream extends OutputStream {
   //current buffer allocated to write
   private ChunkBuffer currentBuffer;
   private final Token<? extends TokenIdentifier> token;
+  private final String tokenString;
   private int replicationIndex;
   private Pipeline pipeline;
   private final ContainerClientMetrics clientMetrics;
@@ -144,7 +146,8 @@ public class BlockOutputStream extends OutputStream {
       BufferPool bufferPool,
       OzoneClientConfig config,
       Token<? extends TokenIdentifier> token,
-      ContainerClientMetrics clientMetrics, StreamBufferArgs streamBufferArgs
+      ContainerClientMetrics clientMetrics, StreamBufferArgs streamBufferArgs,
+      Supplier<ExecutorService> blockOutputStreamResourceProvider
   ) throws IOException {
     this.xceiverClientFactory = xceiverClientManager;
     this.config = config;
@@ -166,6 +169,8 @@ public class BlockOutputStream extends OutputStream {
     this.xceiverClient = xceiverClientManager.acquireClient(pipeline);
     this.bufferPool = bufferPool;
     this.token = token;
+    this.tokenString = (this.token == null) ? null :
+        this.token.encodeToUrlString();
 
     //number of buffers used before doing a flush
     refreshCurrentBuffer();
@@ -232,10 +237,6 @@ public class BlockOutputStream extends OutputStream {
     return ioException.get();
   }
 
-  XceiverClientSpi getXceiverClientSpi() {
-    return this.xceiverClient;
-  }
-
   public BlockData.Builder getContainerBlockData() {
     return this.containerBlockData;
   }
@@ -244,8 +245,8 @@ public class BlockOutputStream extends OutputStream {
     return this.pipeline;
   }
 
-  Token<? extends TokenIdentifier> getToken() {
-    return this.token;
+  protected String getTokenString() {
+    return this.tokenString;
   }
 
   ExecutorService getResponseExecutor() {
@@ -322,10 +323,6 @@ public class BlockOutputStream extends OutputStream {
 
   private void updateFlushLength() {
     totalDataFlushedLength = writtenDataLength;
-  }
-
-  private boolean isBufferPoolFull() {
-    return bufferPool.computeBufferData() == streamBufferArgs.getStreamBufferMaxSize();
   }
 
   /**
@@ -466,7 +463,7 @@ public class BlockOutputStream extends OutputStream {
     try {
       BlockData blockData = containerBlockData.build();
       XceiverClientReply asyncReply =
-          putBlockAsync(xceiverClient, blockData, close, token);
+          putBlockAsync(xceiverClient, blockData, close, tokenString);
       CompletableFuture<ContainerProtos.ContainerCommandResponseProto> future =
           asyncReply.getResponse();
       flushFuture = future.thenApplyAsync(e -> {
@@ -724,7 +721,7 @@ public class BlockOutputStream extends OutputStream {
 
     try {
       XceiverClientReply asyncReply = writeChunkAsync(xceiverClient, chunkInfo,
-          blockID.get(), data, token, replicationIndex);
+          blockID.get(), data, tokenString, replicationIndex);
       CompletableFuture<ContainerProtos.ContainerCommandResponseProto>
           respFuture = asyncReply.getResponse();
       CompletableFuture<ContainerProtos.ContainerCommandResponseProto>
@@ -753,11 +750,6 @@ public class BlockOutputStream extends OutputStream {
       handleInterruptedException(ex, false);
     }
     return null;
-  }
-
-  @VisibleForTesting
-  public void setXceiverClient(XceiverClientSpi xceiverClient) {
-    this.xceiverClient = xceiverClient;
   }
 
   /**

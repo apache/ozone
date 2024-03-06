@@ -20,6 +20,7 @@ import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience.Private;
 import org.apache.hadoop.hdds.annotation.InterfaceStability;
 import org.apache.hadoop.hdds.annotation.InterfaceStability.Unstable;
+import org.apache.hadoop.hdds.protocol.ReconfigureProtocol;
 import org.apache.hadoop.ozone.om.protocol.OMInterServiceProtocol;
 import org.apache.hadoop.ozone.om.protocol.OMAdminProtocol;
 import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
@@ -31,6 +32,7 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.function.Supplier;
 
+import static org.apache.hadoop.hdds.HddsConfigKeys.OZONE_SECURITY_RECONFIGURE_PROTOCOL_ACL;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SECURITY_ADMIN_PROTOCOL_ACL;
 import static org.apache.hadoop.ozone.om.OMConfigKeys
     .OZONE_OM_SECURITY_CLIENT_PROTOCOL_ACL;
@@ -61,7 +63,9 @@ public final class OMPolicyProvider extends PolicyProvider {
           new Service(OZONE_OM_SECURITY_ADMIN_PROTOCOL_ACL,
               OMInterServiceProtocol.class),
           new Service(OZONE_OM_SECURITY_ADMIN_PROTOCOL_ACL,
-              OMAdminProtocol.class)
+              OMAdminProtocol.class),
+          new Service(OZONE_SECURITY_RECONFIGURE_PROTOCOL_ACL,
+              ReconfigureProtocol.class)
       );
 
   @Override

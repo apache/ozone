@@ -19,15 +19,16 @@ package org.apache.hadoop.hdds.conf;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.junit.jupiter.api.Assertions.fail;
-import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+
+import com.google.common.base.Strings;
 import com.google.gson.Gson;
-import org.apache.hadoop.http.HttpServer2;
-import org.apache.hadoop.thirdparty.com.google.common.base.Strings;
+import org.apache.hadoop.hdds.server.http.HttpServer2;
 import org.apache.hadoop.util.XMLUtils;
 import org.eclipse.jetty.util.ajax.JSON;
 import org.junit.jupiter.api.Test;
@@ -169,12 +170,8 @@ public class TestHddsConfServlet {
   @Test
   public void testBadFormat() throws Exception {
     StringWriter sw = new StringWriter();
-    try {
-      HddsConfServlet.writeResponse(getTestConf(), sw, "not a format", null);
-      fail("writeResponse with bad format didn't throw!");
-    } catch (HddsConfServlet.BadFormatException bfe) {
-      // expected
-    }
+    assertThrows(HddsConfServlet.BadFormatException.class,
+        () -> HddsConfServlet.writeResponse(getTestConf(), sw, "not a format", null));
     assertEquals("", sw.toString());
   }
 

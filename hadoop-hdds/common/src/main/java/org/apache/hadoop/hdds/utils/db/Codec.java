@@ -17,7 +17,7 @@
  */
 package org.apache.hadoop.hdds.utils.db;
 
-import javax.annotation.Nonnull;
+import jakarta.annotation.Nonnull;
 import java.io.IOException;
 
 /**
@@ -40,14 +40,6 @@ public interface Codec<T> {
    */
   default boolean supportCodecBuffer() {
     return false;
-  }
-
-  /**
-   * @return an upper bound, which should be obtained without serialization,
-   *         of the serialized size of the given object.
-   */
-  default int getSerializedSizeUpperBound(T object) {
-    throw new UnsupportedOperationException();
   }
 
   /**

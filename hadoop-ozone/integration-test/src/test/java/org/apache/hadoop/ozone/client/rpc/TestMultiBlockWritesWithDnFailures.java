@@ -43,7 +43,6 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 
@@ -56,6 +55,8 @@ import java.util.concurrent.TimeUnit;
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_DATANODE_PIPELINE_LIMIT;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_STALENODE_INTERVAL;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 
 /**
  * Tests MultiBlock Writes with Dn failures by Ozone Client.
@@ -104,14 +105,13 @@ public class TestMultiBlockWritesWithDnFailures {
     conf.setFromObject(ratisClientConfig);
 
     conf.setTimeDuration(
-        OzoneConfigKeys.DFS_RATIS_LEADER_ELECTION_MINIMUM_TIMEOUT_DURATION_KEY,
+        OzoneConfigKeys.HDDS_RATIS_LEADER_ELECTION_MINIMUM_TIMEOUT_DURATION_KEY,
         1, TimeUnit.SECONDS);
     conf.setInt(OZONE_DATANODE_PIPELINE_LIMIT, 2);
 
     conf.setQuietMode(false);
     cluster = MiniOzoneCluster.newBuilder(conf)
         .setNumDatanodes(datanodes)
-        .setTotalPipelineNumLimit(0)
         .build();
     cluster.waitForClusterToBeReady();
     //the easiest way to create an open container is creating a key
@@ -146,12 +146,11 @@ public class TestMultiBlockWritesWithDnFailures {
     key.write(data.getBytes(UTF_8));
 
     // get the name of a valid container
-    Assertions.assertTrue(key.getOutputStream() instanceof KeyOutputStream);
     KeyOutputStream groupOutputStream =
-        (KeyOutputStream) key.getOutputStream();
+        assertInstanceOf(KeyOutputStream.class, key.getOutputStream());
     List<OmKeyLocationInfo> locationInfoList =
         groupOutputStream.getLocationInfoList();
-    Assertions.assertEquals(2, locationInfoList.size());
+    assertEquals(2, locationInfoList.size());
     long containerId = locationInfoList.get(1).getContainerID();
     ContainerInfo container = cluster.getStorageContainerManager()
         .getContainerManager()
@@ -175,7 +174,7 @@ public class TestMultiBlockWritesWithDnFailures {
         .setKeyName(keyName)
         .build();
     OmKeyInfo keyInfo = cluster.getOzoneManager().lookupKey(keyArgs);
-    Assertions.assertEquals(2 * data.getBytes(UTF_8).length, keyInfo.getDataSize());
+    assertEquals(2 * data.getBytes(UTF_8).length, keyInfo.getDataSize());
     validateData(keyName, data.concat(data).getBytes(UTF_8));
   }
 
@@ -191,14 +190,13 @@ public class TestMultiBlockWritesWithDnFailures {
     key.write(data.getBytes(UTF_8));
 
     // get the name of a valid container
-    Assertions.assertTrue(key.getOutputStream() instanceof KeyOutputStream);
     KeyOutputStream keyOutputStream =
-        (KeyOutputStream) key.getOutputStream();
+        assertInstanceOf(KeyOutputStream.class, key.getOutputStream());
     List<BlockOutputStreamEntry> streamEntryList =
         keyOutputStream.getStreamEntries();
 
     // Assert that 6 block will be preallocated
-    Assertions.assertEquals(6, streamEntryList.size());
+    assertEquals(6, streamEntryList.size());
     key.write(data.getBytes(UTF_8));
     key.flush();
     long containerId = streamEntryList.get(0).getBlockID().getContainerID();
@@ -227,7 +225,7 @@ public class TestMultiBlockWritesWithDnFailures {
         .setKeyName(keyName)
         .build();
     OmKeyInfo keyInfo = cluster.getOzoneManager().lookupKey(keyArgs);
-    Assertions.assertEquals(4 * data.getBytes(UTF_8).length, keyInfo.getDataSize());
+    assertEquals(4 * data.getBytes(UTF_8).length, keyInfo.getDataSize());
     validateData(keyName,
         data.concat(data).concat(data).concat(data).getBytes(UTF_8));
   }

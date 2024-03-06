@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.fs.ozone;
 
+import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
@@ -25,6 +26,7 @@ import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.ozone.ClientConfigForTesting;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.TestDataUtil;
@@ -40,9 +42,9 @@ import org.junit.jupiter.api.Timeout;
 
 import java.io.IOException;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.apache.hadoop.hdds.StringUtils.string2Bytes;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Test OM Metrics for OzoneFileSystem operations.
@@ -72,12 +74,16 @@ public class TestOzoneFileSystemMetrics {
     conf.set(OMConfigKeys.OZONE_DEFAULT_BUCKET_LAYOUT,
         BucketLayout.LEGACY.name());
     conf.setBoolean(OMConfigKeys.OZONE_OM_ENABLE_FILESYSTEM_PATHS, true);
+
+    ClientConfigForTesting.newBuilder(StorageUnit.MB)
+        .setChunkSize(2)
+        .setBlockSize(8)
+        .setStreamBufferFlushSize(2)
+        .setStreamBufferMaxSize(4)
+        .applyTo(conf);
+
     cluster = MiniOzoneCluster.newBuilder(conf)
         .setNumDatanodes(3)
-        .setChunkSize(2) // MB
-        .setBlockSize(8) // MB
-        .setStreamBufferFlushSize(2) // MB
-        .setStreamBufferMaxSize(4) // MB
         .build();
     cluster.waitForClusterToBeReady();
     client = cluster.newClient();
@@ -149,13 +155,13 @@ public class TestOzoneFileSystemMetrics {
 
     long numKeysAfterCommit = cluster
         .getOzoneManager().getMetrics().getNumKeys();
-    assertTrue(numKeysAfterCommit > 0);
+    assertThat(numKeysAfterCommit).isGreaterThan(0);
     assertEquals(numKeysBeforeCreate + 2, numKeysAfterCommit);
     fs.delete(parentDir, true);
 
     long numKeysAfterDelete = cluster
         .getOzoneManager().getMetrics().getNumKeys();
-    assertTrue(numKeysAfterDelete >= 0);
+    assertThat(numKeysAfterDelete).isGreaterThanOrEqualTo(0);
     assertEquals(numKeysBeforeCreate, numKeysAfterDelete);
   }
 }

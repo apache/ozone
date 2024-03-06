@@ -38,9 +38,10 @@ import java.util.List;
 
 import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.initializeNewOmMetadataManager;
 import static org.apache.hadoop.ozone.recon.tasks.OMDBUpdateEvent.OMDBUpdateAction.PUT;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.anyString;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -139,7 +140,7 @@ public class TestOmUpdateEventValidator {
     // Assert that the captured log messages are not empty
     List<String> logMessages = captor.getAllValues();
     for (String logMessage : logMessages) {
-      assertFalse(logMessage.isEmpty(), "Warning message is empty");
+      assertThat(logMessage).isNotEmpty();
     }
   }
 

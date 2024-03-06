@@ -70,6 +70,7 @@ import java.io.IOException;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Iterator;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ThreadFactory;
@@ -111,6 +112,7 @@ public class OzoneContainer {
   private final ContainerController controller;
   private BackgroundContainerMetadataScanner metadataScanner;
   private List<BackgroundContainerDataScanner> dataScanners;
+  private List<AbstractBackgroundContainerScanner> backgroundScanners;
   private final BlockDeletingService blockDeletingService;
   private final StaleRecoveringContainerScrubbingService
       recoveringContainerScrubbingService;
@@ -167,7 +169,6 @@ public class OzoneContainer {
     containerSet = new ContainerSet(recoveringContainerTimeout);
     metadataScanner = null;
 
-    buildContainerSet();
     metrics = ContainerMetrics.create(conf);
     handlers = Maps.newHashMap();
 
@@ -284,9 +285,10 @@ public class OzoneContainer {
   }
 
   /**
-   * Build's container map.
+   * Build's container map after volume format.
    */
-  private void buildContainerSet() {
+  @VisibleForTesting
+  public void buildContainerSet() {
     Iterator<StorageVolume> volumeSetIterator = volumeSet.getVolumesList()
         .iterator();
     ArrayList<Thread> volumeThreads = new ArrayList<>();
@@ -338,8 +340,10 @@ public class OzoneContainer {
           "the on-demand container scanner have been disabled.");
       return;
     }
+
     initOnDemandContainerScanner(c);
 
+    backgroundScanners = new LinkedList<>();
     // This config is for testing the scanners in isolation.
     if (c.isMetadataScanEnabled()) {
       initMetadataScanner(c);
@@ -363,6 +367,7 @@ public class OzoneContainer {
           new BackgroundContainerDataScanner(c, controller, (HddsVolume) v);
       s.start();
       dataScanners.add(s);
+      backgroundScanners.add(s);
     }
   }
 
@@ -370,6 +375,7 @@ public class OzoneContainer {
     if (this.metadataScanner == null) {
       this.metadataScanner =
           new BackgroundContainerMetadataScanner(c, controller);
+      backgroundScanners.add(metadataScanner);
     }
     this.metadataScanner.start();
   }
@@ -402,6 +408,16 @@ public class OzoneContainer {
     OnDemandContainerDataScanner.shutdown();
   }
 
+  @VisibleForTesting
+  public void pauseContainerScrub() {
+    backgroundScanners.forEach(AbstractBackgroundContainerScanner::pause);
+  }
+
+  @VisibleForTesting
+  public void resumeContainerScrub() {
+    backgroundScanners.forEach(AbstractBackgroundContainerScanner::unpause);
+  }
+
   /**
    * Starts serving requests to ozone container.
    *
@@ -425,6 +441,8 @@ public class OzoneContainer {
       LOG.info("Ignore. OzoneContainer already started.");
       return;
     }
+
+    buildContainerSet();
 
     // Start background volume checks, which will begin after the configured
     // delay.
@@ -566,6 +584,10 @@ public class OzoneContainer {
 
   public BlockDeletingService getBlockDeletingService() {
     return blockDeletingService;
+  }
+
+  public ReplicationServer getReplicationServer() {
+    return replicationServer;
   }
 
 }

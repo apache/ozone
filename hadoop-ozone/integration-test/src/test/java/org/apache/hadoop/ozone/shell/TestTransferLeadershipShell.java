@@ -27,7 +27,6 @@ import org.apache.hadoop.ozone.MiniOzoneHAClusterImpl;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.ratis.protocol.RaftPeer;
 import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -35,7 +34,11 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
-import java.util.UUID;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNotSame;
 
 /**
  * Test transferLeadership with SCM HA setup.
@@ -43,8 +46,6 @@ import java.util.UUID;
 public class TestTransferLeadershipShell {
   private MiniOzoneHAClusterImpl cluster = null;
   private OzoneConfiguration conf;
-  private String clusterId;
-  private String scmId;
   private String omServiceId;
   private String scmServiceId;
   private int numOfOMs = 3;
@@ -60,15 +61,13 @@ public class TestTransferLeadershipShell {
   @BeforeEach
   public void init() throws Exception {
     conf = new OzoneConfiguration();
-    clusterId = UUID.randomUUID().toString();
-    scmId = UUID.randomUUID().toString();
     omServiceId = "om-service-test1";
     scmServiceId = "scm-service-test1";
     conf.setLong(ScmConfigKeys.OZONE_SCM_HA_RATIS_SNAPSHOT_THRESHOLD,
         SNAPSHOT_THRESHOLD);
 
-    cluster = (MiniOzoneHAClusterImpl) MiniOzoneCluster.newHABuilder(conf)
-        .setClusterId(clusterId).setScmId(scmId).setOMServiceId(omServiceId)
+    cluster = MiniOzoneCluster.newHABuilder(conf)
+        .setOMServiceId(omServiceId)
         .setSCMServiceId(scmServiceId).setNumOfOzoneManagers(numOfOMs)
         .setNumOfStorageContainerManagers(numOfSCMs)
         .setNumOfActiveSCMs(numOfSCMs).setNumOfActiveOMs(numOfOMs)
@@ -90,7 +89,7 @@ public class TestTransferLeadershipShell {
   public void testOmTransfer() throws Exception {
     OzoneManager oldLeader = cluster.getOMLeader();
     List<OzoneManager> omList = new ArrayList<>(cluster.getOzoneManagersList());
-    Assertions.assertTrue(omList.contains(oldLeader));
+    assertThat(omList).contains(oldLeader);
     omList.remove(oldLeader);
     OzoneManager newLeader = omList.get(0);
     cluster.waitForClusterToBeReady();
@@ -98,14 +97,14 @@ public class TestTransferLeadershipShell {
     String[] args1 = {"om", "transfer", "-n", newLeader.getOMNodeId()};
     ozoneAdmin.execute(args1);
     Thread.sleep(3000);
-    Assertions.assertEquals(newLeader, cluster.getOMLeader());
+    assertEquals(newLeader, cluster.getOMLeader());
     assertOMResetPriorities();
 
     oldLeader = cluster.getOMLeader();
     String[] args3 = {"om", "transfer", "-r"};
     ozoneAdmin.execute(args3);
     Thread.sleep(3000);
-    Assertions.assertNotSame(oldLeader, cluster.getOMLeader());
+    assertNotSame(oldLeader, cluster.getOMLeader());
     assertOMResetPriorities();
   }
 
@@ -114,7 +113,7 @@ public class TestTransferLeadershipShell {
     StorageContainerManager oldLeader = getScmLeader(cluster);
     List<StorageContainerManager> scmList = new ArrayList<>(cluster.
         getStorageContainerManagersList());
-    Assertions.assertTrue(scmList.contains(oldLeader));
+    assertThat(scmList).contains(oldLeader);
     scmList.remove(oldLeader);
     StorageContainerManager newLeader = scmList.get(0);
 
@@ -122,14 +121,14 @@ public class TestTransferLeadershipShell {
     String[] args1 = {"scm", "transfer", "-n", newLeader.getScmId()};
     ozoneAdmin.execute(args1);
     cluster.waitForClusterToBeReady();
-    Assertions.assertEquals(newLeader, getScmLeader(cluster));
+    assertEquals(newLeader, getScmLeader(cluster));
     assertSCMResetPriorities();
 
     oldLeader = getScmLeader(cluster);
     String[] args3 = {"scm", "transfer", "-r"};
     ozoneAdmin.execute(args3);
     cluster.waitForClusterToBeReady();
-    Assertions.assertNotSame(oldLeader, getScmLeader(cluster));
+    assertNotSame(oldLeader, getScmLeader(cluster));
     assertSCMResetPriorities();
   }
 
@@ -141,14 +140,14 @@ public class TestTransferLeadershipShell {
         .getPeers();
 
     for (RaftPeer raftPeer: raftPeers) {
-      Assertions.assertEquals(RatisHelper.NEUTRAL_PRIORITY,
+      assertEquals(RatisHelper.NEUTRAL_PRIORITY,
           raftPeer.getPriority());
     }
   }
 
   private void assertSCMResetPriorities() {
     StorageContainerManager scm = getScmLeader(cluster);
-    Assertions.assertNotNull(scm);
+    assertNotNull(scm);
     Collection<RaftPeer> raftPeers = scm
         .getScmHAManager()
         .getRatisServer()
@@ -156,7 +155,7 @@ public class TestTransferLeadershipShell {
         .getGroup()
         .getPeers();
     for (RaftPeer raftPeer: raftPeers) {
-      Assertions.assertEquals(RatisHelper.NEUTRAL_PRIORITY,
+      assertEquals(RatisHelper.NEUTRAL_PRIORITY,
           raftPeer.getPriority());
     }
   }

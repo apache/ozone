@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.om.protocolPB;
 
 import static org.apache.hadoop.ozone.ClientVersion.CURRENT_VERSION;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_GRPC_MAXIMUM_RESPONSE_LENGTH_DEFAULT;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.AdditionalAnswers.delegatesTo;
 import static org.mockito.Mockito.mock;
 
@@ -46,8 +47,6 @@ import java.io.IOException;
 import com.google.protobuf.ServiceException;
 import org.apache.ratis.protocol.RaftPeerId;
 
-import static org.junit.jupiter.api.Assertions.fail;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.apache.hadoop.ozone.om.OMConfigKeys
     .OZONE_OM_GRPC_MAXIMUM_RESPONSE_LENGTH;
@@ -61,13 +60,13 @@ public class TestS3GrpcOmTransport {
   private static final Logger LOG =
       LoggerFactory.getLogger(TestS3GrpcOmTransport.class);
 
-  private final String leaderOMNodeId = "TestOM";
+  private static final String LEADER_OM_NODE_ID = "TestOM";
 
   private final OMResponse omResponse = OMResponse.newBuilder()
       .setSuccess(true)
       .setStatus(org.apache.hadoop.ozone.protocol
           .proto.OzoneManagerProtocolProtos.Status.OK)
-      .setLeaderOMNodeId(leaderOMNodeId)
+      .setLeaderOMNodeId(LEADER_OM_NODE_ID)
       .setCmdType(Type.AllocateBlock)
       .build();
 
@@ -168,7 +167,7 @@ public class TestS3GrpcOmTransport {
     final OMResponse resp = client.submitRequest(omRequest);
     assertEquals(resp.getStatus(), org.apache.hadoop.ozone.protocol
         .proto.OzoneManagerProtocolProtos.Status.OK);
-    assertEquals(resp.getLeaderOMNodeId(), leaderOMNodeId);
+    assertEquals(resp.getLeaderOMNodeId(), LEADER_OM_NODE_ID);
   }
 
   @Test
@@ -192,7 +191,7 @@ public class TestS3GrpcOmTransport {
     final OMResponse resp = client.submitRequest(omRequest);
     assertEquals(resp.getStatus(), org.apache.hadoop.ozone.protocol
         .proto.OzoneManagerProtocolProtos.Status.OK);
-    assertEquals(resp.getLeaderOMNodeId(), leaderOMNodeId);
+    assertEquals(resp.getLeaderOMNodeId(), LEADER_OM_NODE_ID);
   }
 
   @Test
@@ -216,12 +215,7 @@ public class TestS3GrpcOmTransport {
     // OMFailoverProvider returns Fail retry due to #attempts >
     // max failovers
 
-    try {
-      final OMResponse resp = client.submitRequest(omRequest);
-      fail();
-    } catch (Exception e) {
-      assertTrue(true);
-    }
+    assertThrows(Exception.class, () -> client.submitRequest(omRequest));
   }
 
   @Test
@@ -251,11 +245,6 @@ public class TestS3GrpcOmTransport {
     // len > 0, causing RESOURCE_EXHAUSTED exception.
     // This exception should cause failover to NOT retry,
     // rather to fail.
-    try {
-      final OMResponse resp = client.submitRequest(omRequest);
-      fail();
-    } catch (Exception e) {
-      assertTrue(true);
-    }
+    assertThrows(Exception.class, () -> client.submitRequest(omRequest));
   }
 }

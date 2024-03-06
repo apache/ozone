@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.ozone.container.replication;
 
+import java.io.File;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -65,8 +66,9 @@ import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.TestClock;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.io.TempDir;
 
-import javax.annotation.Nonnull;
+import jakarta.annotation.Nonnull;
 
 import static com.google.common.util.concurrent.MoreExecutors.newDirectExecutorService;
 import static java.util.Collections.emptyList;
@@ -77,13 +79,13 @@ import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalSt
 import static org.apache.hadoop.ozone.container.replication.AbstractReplicationTask.Status.DONE;
 import static org.apache.hadoop.ozone.protocol.commands.ReplicateContainerCommand.fromSources;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.fail;
 import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ReplicationCommandPriority.LOW;
 import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ReplicationCommandPriority.NORMAL;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyList;
-import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.Mockito.any;
+import static org.mockito.Mockito.anyList;
+import static org.mockito.Mockito.anyLong;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -276,7 +278,8 @@ public class TestReplicationSupervisor {
   }
 
   @ContainerLayoutTestInfo.ContainerTest
-  public void testDownloadAndImportReplicatorFailure() throws IOException {
+  public void testDownloadAndImportReplicatorFailure(ContainerLayoutVersion layout,
+      @TempDir File tempFile) throws IOException {
     OzoneConfiguration conf = new OzoneConfiguration();
 
     ReplicationSupervisor supervisor = ReplicationSupervisor.newBuilder()
@@ -294,9 +297,7 @@ public class TestReplicationSupervisor {
             any(Path.class), any()))
         .thenReturn(res);
 
-    final String testDir = GenericTestUtils.getTempPath(
-        TestReplicationSupervisor.class.getSimpleName() +
-            "-" + UUID.randomUUID());
+    final String testDir = tempFile.getPath();
     MutableVolumeSet volumeSet = mock(MutableVolumeSet.class);
     when(volumeSet.getVolumesList())
         .thenReturn(singletonList(
@@ -477,11 +478,8 @@ public class TestReplicationSupervisor {
     @Override
     public void runTask() {
       runningLatch.countDown();
-      try {
-        waitForCompleteLatch.await();
-      } catch (InterruptedException e) {
-        fail("Interrupted waiting for the completion latch to be released");
-      }
+      assertDoesNotThrow(() -> waitForCompleteLatch.await(),
+          "Interrupted waiting for the completion latch to be released");
       setStatus(DONE);
     }
   }
@@ -606,13 +604,10 @@ public class TestReplicationSupervisor {
               UUID.randomUUID().toString(), UUID.randomUUID().toString());
       KeyValueContainer kvc =
           new KeyValueContainer(kvcd, conf);
-
-      try {
+      assertDoesNotThrow(() -> {
         set.addContainer(kvc);
         task.setStatus(DONE);
-      } catch (Exception e) {
-        fail("Unexpected error: " + e.getMessage());
-      }
+      });
     }
   }
 

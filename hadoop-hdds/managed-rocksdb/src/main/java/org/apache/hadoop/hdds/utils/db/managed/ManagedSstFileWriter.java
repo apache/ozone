@@ -38,7 +38,10 @@ public class ManagedSstFileWriter extends SstFileWriter {
 
   @Override
   public void close() {
-    super.close();
-    leakTracker.close();
+    try {
+      super.close();
+    } finally {
+      leakTracker.close();
+    }
   }
 }

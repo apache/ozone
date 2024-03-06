@@ -38,7 +38,6 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 
 import java.io.IOException;
-import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
@@ -48,7 +47,7 @@ import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 import static org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse.JobStatus.DONE;
 import static org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse.JobStatus.IN_PROGRESS;
-import static org.awaitility.Awaitility.await;
+import static org.apache.ozone.test.LambdaTestUtils.await;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -69,13 +68,9 @@ public class TestOzoneManagerHASnapshot {
   @BeforeAll
   public static void staticInit() throws Exception {
     OzoneConfiguration conf = new OzoneConfiguration();
-    String clusterId = UUID.randomUUID().toString();
-    String scmId = UUID.randomUUID().toString();
     conf.setBoolean(OMConfigKeys.OZONE_FILESYSTEM_SNAPSHOT_ENABLED_KEY, true);
 
-    cluster = (MiniOzoneHAClusterImpl) MiniOzoneCluster.newOMHABuilder(conf)
-        .setClusterId(clusterId)
-        .setScmId(scmId)
+    cluster = MiniOzoneCluster.newHABuilder(conf)
         .setOMServiceId("om-service-test")
         .setNumOfOzoneManagers(3)
         .build();
@@ -124,8 +119,7 @@ public class TestOzoneManagerHASnapshot {
     cluster.shutdownOzoneManager(omLeader);
     cluster.restartOzoneManager(omLeader, true);
 
-    await().atMost(Duration.ofSeconds(120))
-        .until(() -> cluster.getOMLeader() != null);
+    cluster.waitForLeaderOM();
 
     String newLeader = cluster.getOMLeader().getOMNodeId();
 
@@ -165,24 +159,23 @@ public class TestOzoneManagerHASnapshot {
     List<UUID> snapshotIds = new ArrayList<>();
 
     for (OzoneManager ozoneManager : ozoneManagers) {
-      await().atMost(Duration.ofSeconds(120))
-          .until(() -> {
-            SnapshotInfo snapshotInfo;
-            try {
-              snapshotInfo = ozoneManager.getMetadataManager()
-                  .getSnapshotInfoTable()
-                  .get(SnapshotInfo.getTableKey(volumeName,
-                      bucketName,
-                      snapshotName));
-            } catch (IOException e) {
-              throw new RuntimeException(e);
-            }
+      await(120_000, 100, () -> {
+        SnapshotInfo snapshotInfo;
+        try {
+          snapshotInfo = ozoneManager.getMetadataManager()
+              .getSnapshotInfoTable()
+              .get(SnapshotInfo.getTableKey(volumeName,
+                  bucketName,
+                  snapshotName));
+        } catch (IOException e) {
+          throw new RuntimeException(e);
+        }
 
-            if (snapshotInfo != null) {
-              snapshotIds.add(snapshotInfo.getSnapshotId());
-            }
-            return snapshotInfo != null;
-          });
+        if (snapshotInfo != null) {
+          snapshotIds.add(snapshotInfo.getSnapshotId());
+        }
+        return snapshotInfo != null;
+      });
     }
 
     assertEquals(1, snapshotIds.stream().distinct().count());
@@ -199,27 +192,26 @@ public class TestOzoneManagerHASnapshot {
     List<String> snapshotNames = new ArrayList<>();
 
     for (OzoneManager ozoneManager : ozoneManagers) {
-      await().atMost(Duration.ofSeconds(120))
-          .until(() -> {
-            String snapshotPrefix = OM_KEY_PREFIX + volumeName +
-                OM_KEY_PREFIX + bucketName;
-            SnapshotInfo snapshotInfo = null;
-            try (TableIterator<String, ?
-                extends Table.KeyValue<String, SnapshotInfo>>
-                     iterator = ozoneManager.getMetadataManager()
-                .getSnapshotInfoTable().iterator(snapshotPrefix)) {
-              while (iterator.hasNext()) {
-                snapshotInfo = iterator.next().getValue();
-              }
-            } catch (IOException e) {
-              throw new RuntimeException(e);
-            }
+      await(120_000, 100, () -> {
+        String snapshotPrefix = OM_KEY_PREFIX + volumeName +
+            OM_KEY_PREFIX + bucketName;
+        SnapshotInfo snapshotInfo = null;
+        try (TableIterator<String, ?
+            extends Table.KeyValue<String, SnapshotInfo>>
+                 iterator = ozoneManager.getMetadataManager()
+            .getSnapshotInfoTable().iterator(snapshotPrefix)) {
+          while (iterator.hasNext()) {
+            snapshotInfo = iterator.next().getValue();
+          }
+        } catch (IOException e) {
+          throw new RuntimeException(e);
+        }
 
-            if (snapshotInfo != null) {
-              snapshotNames.add(snapshotInfo.getName());
-            }
-            return snapshotInfo != null;
-          });
+        if (snapshotInfo != null) {
+          snapshotNames.add(snapshotInfo.getName());
+        }
+        return snapshotInfo != null;
+      });
     }
 
     assertEquals(1, snapshotNames.stream().distinct().count());
@@ -254,8 +246,7 @@ public class TestOzoneManagerHASnapshot {
     cluster.shutdownOzoneManager(omLeader);
     cluster.restartOzoneManager(omLeader, true);
 
-    await().atMost(Duration.ofSeconds(180))
-        .until(() -> cluster.getOMLeader() != null);
+    cluster.waitForLeaderOM();
     assertNotNull(cluster.getOMLeader());
     OmMetadataManagerImpl metadataManager = (OmMetadataManagerImpl) cluster
         .getOMLeader().getMetadataManager();

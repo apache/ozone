@@ -235,10 +235,15 @@ public final class ReplicationManagerMetrics implements MetricsSource {
   }
 
   public static ReplicationManagerMetrics create(ReplicationManager manager) {
-    return DefaultMetricsSystem.instance().register(METRICS_SOURCE_NAME,
-        "SCM Replication manager (closed container replication) related "
-            + "metrics",
-        new ReplicationManagerMetrics(manager));
+    ReplicationManagerMetrics replicationManagerMetrics = (ReplicationManagerMetrics)
+        DefaultMetricsSystem.instance().getSource(METRICS_SOURCE_NAME);
+    if (replicationManagerMetrics == null) {
+      return DefaultMetricsSystem.instance().register(METRICS_SOURCE_NAME,
+          "SCM Replication manager (closed container replication) related "
+              + "metrics",
+          new ReplicationManagerMetrics(manager));
+    }
+    return replicationManagerMetrics;
   }
 
   @Override

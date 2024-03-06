@@ -20,10 +20,10 @@ package org.apache.hadoop.hdds.scm.storage;
 
 import java.io.IOException;
 import java.util.Map;
-import java.util.Random;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicInteger;
 
+import org.apache.commons.lang3.RandomUtils;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ChecksumType;
@@ -42,12 +42,14 @@ import org.apache.hadoop.hdds.scm.XceiverClientReply;
 import org.apache.hadoop.hdds.scm.XceiverClientSpi;
 import org.apache.hadoop.hdds.scm.pipeline.MockPipeline;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
-
+import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
-import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
+import static java.util.concurrent.Executors.newFixedThreadPool;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -56,37 +58,28 @@ import static org.mockito.Mockito.when;
  * <p>
  * Compares bytes written to the stream and received in the ChunkWriteRequests.
  */
-public class TestBlockOutputStreamCorrectness {
+class TestBlockOutputStreamCorrectness {
 
-  private static final long SEED = 18480315L;
+  private static final int DATA_SIZE = 256 * (int) OzoneConsts.MB;
+  private static final byte[] DATA = RandomUtils.nextBytes(DATA_SIZE);
 
-  private int writeUnitSize = 1;
-
-  @Test
-  public void test() throws IOException {
+  @ParameterizedTest
+  @ValueSource(ints = { 1, 1024, 1024 * 1024 })
+  void test(final int writeSize) throws IOException {
+    assertEquals(0, DATA_SIZE % writeSize);
 
     final BufferPool bufferPool = new BufferPool(4 * 1024 * 1024, 32 / 4);
 
     for (int block = 0; block < 10; block++) {
-      BlockOutputStream outputStream =
-          createBlockOutputStream(bufferPool);
-
-      Random random = new Random(SEED);
-
-      int max = 256 * 1024 * 1024 / writeUnitSize;
-
-      byte[] writeBuffer = new byte[writeUnitSize];
-      for (int t = 0; t < max; t++) {
-        if (writeUnitSize > 1) {
-          for (int i = 0; i < writeBuffer.length; i++) {
-            writeBuffer[i] = (byte) random.nextInt();
+      try (BlockOutputStream outputStream = createBlockOutputStream(bufferPool)) {
+        for (int i = 0; i < DATA_SIZE / writeSize; i++) {
+          if (writeSize > 1) {
+            outputStream.write(DATA, i * writeSize, writeSize);
+          } else {
+            outputStream.write(DATA[i]);
           }
-          outputStream.write(writeBuffer, 0, writeBuffer.length);
-        } else {
-          outputStream.write((byte) random.nextInt());
         }
       }
-      outputStream.close();
     }
   }
 
@@ -116,7 +109,9 @@ public class TestBlockOutputStreamCorrectness {
         bufferPool,
         config,
         null,
-        ContainerClientMetrics.acquire(), streamBufferArgs);
+        ContainerClientMetrics.acquire(),
+        streamBufferArgs,
+        () -> newFixedThreadPool(10));
   }
 
   /**
@@ -126,9 +121,8 @@ public class TestBlockOutputStreamCorrectness {
 
     private final Pipeline pipeline;
 
-    private final Random expectedRandomStream = new Random(SEED);
-
     private final AtomicInteger counter = new AtomicInteger();
+    private int i;
 
     MockXceiverClientSpi(Pipeline pipeline) {
       super();
@@ -175,8 +169,8 @@ public class TestBlockOutputStreamCorrectness {
         ByteString data = request.getWriteChunk().getData();
         final byte[] writePayload = data.toByteArray();
         for (byte b : writePayload) {
-          byte expectedByte = (byte) expectedRandomStream.nextInt();
-          assertEquals(expectedByte, b);
+          assertEquals(DATA[i], b);
+          ++i;
         }
         break;
       default:

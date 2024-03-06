@@ -21,22 +21,22 @@ package org.apache.hadoop.ozone.freon;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.container.TestHelper;
-import org.apache.ozone.test.UnhealthyTest;
 import org.apache.ozone.test.tag.Unhealthy;
 import org.apache.ratis.server.protocol.TermIndex;
 import org.apache.ratis.statemachine.StateMachine;
 import org.apache.ratis.statemachine.impl.SimpleStateMachineStorage;
 import org.apache.ratis.statemachine.impl.SingleFileSnapshotInfo;
 
-import org.junit.experimental.categories.Category;
 import org.junit.jupiter.api.AfterAll;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 import picocli.CommandLine;
-
 import java.util.concurrent.TimeUnit;
+
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HEARTBEAT_PROCESS_INTERVAL;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
 /**
  * Tests Freon with Datanode restarts without waiting for pipeline to close.
@@ -55,9 +55,8 @@ public class TestFreonWithDatanodeFastRestart {
   @BeforeAll
   public static void init() throws Exception {
     conf = new OzoneConfiguration();
+    conf.setTimeDuration(OZONE_SCM_HEARTBEAT_PROCESS_INTERVAL, 1000, TimeUnit.MILLISECONDS);
     cluster = MiniOzoneCluster.newBuilder(conf)
-      .setHbProcessorInterval(1000)
-      .setHbInterval(1000)
       .setNumDatanodes(3)
       .build();
     cluster.waitForClusterToBeReady();
@@ -74,7 +73,7 @@ public class TestFreonWithDatanodeFastRestart {
   }
 
   @Test
-  @Category(UnhealthyTest.class) @Unhealthy("HDDS-1160")
+  @Unhealthy("HDDS-1160")
   public void testRestart() throws Exception {
     startFreon();
     StateMachine sm = getStateMachine();
@@ -88,15 +87,14 @@ public class TestFreonWithDatanodeFastRestart {
     String expectedSnapFile =
         storage.getSnapshotFile(termIndexBeforeRestart.getTerm(),
             termIndexBeforeRestart.getIndex()).getAbsolutePath();
-    Assertions.assertEquals(expectedSnapFile,
-        snapshotInfo.getFile().getPath().toString());
-    Assertions.assertEquals(termInSnapshot, termIndexBeforeRestart);
+    assertEquals(expectedSnapFile, snapshotInfo.getFile().getPath().toString());
+    assertEquals(termInSnapshot, termIndexBeforeRestart);
 
     // After restart the term index might have progressed to apply pending
     // transactions.
     TermIndex termIndexAfterRestart = sm.getLastAppliedTermIndex();
-    Assertions.assertTrue(termIndexAfterRestart.getIndex() >=
-        termIndexBeforeRestart.getIndex());
+    assertThat(termIndexAfterRestart.getIndex())
+        .isGreaterThanOrEqualTo(termIndexBeforeRestart.getIndex());
     // TODO: fix me
     // Give some time for the datanode to register again with SCM.
     // If we try to use the pipeline before the datanode registers with SCM
@@ -121,10 +119,10 @@ public class TestFreonWithDatanodeFastRestart {
         "--validate-writes"
     );
 
-    Assertions.assertEquals(1, randomKeyGenerator.getNumberOfVolumesCreated());
-    Assertions.assertEquals(1, randomKeyGenerator.getNumberOfBucketsCreated());
-    Assertions.assertEquals(1, randomKeyGenerator.getNumberOfKeysAdded());
-    Assertions.assertEquals(0, randomKeyGenerator.getUnsuccessfulValidationCount());
+    assertEquals(1, randomKeyGenerator.getNumberOfVolumesCreated());
+    assertEquals(1, randomKeyGenerator.getNumberOfBucketsCreated());
+    assertEquals(1, randomKeyGenerator.getNumberOfKeysAdded());
+    assertEquals(0, randomKeyGenerator.getUnsuccessfulValidationCount());
   }
 
   private StateMachine getStateMachine() throws Exception {

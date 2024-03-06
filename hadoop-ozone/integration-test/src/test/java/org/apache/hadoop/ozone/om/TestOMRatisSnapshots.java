@@ -31,6 +31,7 @@ import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
 import org.apache.hadoop.hdds.utils.db.RDBCheckpointUtils;
+import org.apache.hadoop.hdds.utils.db.RDBStore;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.MiniOzoneHAClusterImpl;
 import org.apache.hadoop.ozone.client.BucketArgs;
@@ -51,18 +52,16 @@ import org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServerConfig;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils;
 import org.apache.hadoop.ozone.om.snapshot.OmSnapshotUtils;
 import org.apache.ozone.test.GenericTestUtils;
-import org.apache.ozone.test.tag.Unhealthy;
 import org.apache.ratis.server.protocol.TermIndex;
 import org.assertj.core.api.Fail;
 import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInfo;
 import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.api.io.TempDir;
-import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.ValueSource;
+import org.rocksdb.RocksDB;
+import org.rocksdb.RocksDBException;
 import org.slf4j.Logger;
 import org.slf4j.event.Level;
 
@@ -79,7 +78,6 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
-import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -110,8 +108,6 @@ public class TestOMRatisSnapshots {
   private MiniOzoneHAClusterImpl cluster = null;
   private ObjectStore objectStore;
   private OzoneConfiguration conf;
-  private String clusterId;
-  private String scmId;
   private String omServiceId;
   private int numOfOMs = 3;
   private OzoneBucket ozoneBucket;
@@ -137,8 +133,6 @@ public class TestOMRatisSnapshots {
   @BeforeEach
   public void init(TestInfo testInfo) throws Exception {
     conf = new OzoneConfiguration();
-    clusterId = UUID.randomUUID().toString();
-    scmId = UUID.randomUUID().toString();
     omServiceId = "om-service-test1";
     conf.setInt(OMConfigKeys.OZONE_OM_RATIS_LOG_PURGE_GAP, LOG_PURGE_GAP);
     conf.setStorageSize(OMConfigKeys.OZONE_OM_RATIS_SEGMENT_SIZE_KEY, 16,
@@ -161,9 +155,7 @@ public class TestOMRatisSnapshots {
     omRatisConf.setLogAppenderWaitTimeMin(10);
     conf.setFromObject(omRatisConf);
 
-    cluster = (MiniOzoneHAClusterImpl) MiniOzoneCluster.newOMHABuilder(conf)
-        .setClusterId(clusterId)
-        .setScmId(scmId)
+    cluster = MiniOzoneCluster.newHABuilder(conf)
         .setOMServiceId("om-service-test1")
         .setNumOfOzoneManagers(numOfOMs)
         .setNumOfActiveOMs(2)
@@ -199,12 +191,12 @@ public class TestOMRatisSnapshots {
     }
   }
 
-  @ParameterizedTest
-  @ValueSource(ints = {100})
   // tried up to 1000 snapshots and this test works, but some of the
   //  timeouts have to be increased.
-  @Unhealthy("HDDS-10059")
-  void testInstallSnapshot(int numSnapshotsToCreate, @TempDir Path tempDir) throws Exception {
+  private static final int SNAPSHOTS_TO_CREATE = 100;
+
+  @Test
+  public void testInstallSnapshot(@TempDir Path tempDir) throws Exception {
     // Get the leader OM
     String leaderOMNodeId = OmFailoverProxyUtil
         .getFailoverProxyProvider(objectStore.getClientProxy())
@@ -232,8 +224,7 @@ public class TestOMRatisSnapshots {
     String snapshotName = "";
     List<String> keys = new ArrayList<>();
     SnapshotInfo snapshotInfo = null;
-    for (int snapshotCount = 0; snapshotCount < numSnapshotsToCreate;
-        snapshotCount++) {
+    for (int snapshotCount = 0; snapshotCount < SNAPSHOTS_TO_CREATE; snapshotCount++) {
       snapshotName = snapshotNamePrefix + snapshotCount;
       keys = writeKeys(keyIncrement);
       snapshotInfo = createOzoneSnapshot(leaderOM, snapshotName);
@@ -327,7 +318,7 @@ public class TestOMRatisSnapshots {
   private void checkSnapshot(OzoneManager leaderOM, OzoneManager followerOM,
                              String snapshotName,
                              List<String> keys, SnapshotInfo snapshotInfo)
-      throws IOException {
+      throws IOException, RocksDBException {
     // Read back data from snapshot.
     OmKeyArgs omKeyArgs = new OmKeyArgs.Builder()
         .setVolumeName(volumeName)
@@ -336,8 +327,8 @@ public class TestOMRatisSnapshots {
             keys.get(keys.size() - 1)).build();
     OmKeyInfo omKeyInfo;
     omKeyInfo = followerOM.lookupKey(omKeyArgs);
-    Assertions.assertNotNull(omKeyInfo);
-    Assertions.assertEquals(omKeyInfo.getKeyName(), omKeyArgs.getKeyName());
+    assertNotNull(omKeyInfo);
+    assertEquals(omKeyInfo.getKeyName(), omKeyArgs.getKeyName());
 
     // Confirm followers snapshot hard links are as expected
     File followerMetaDir = OMStorage.getOmDbDir(followerOM.getConfiguration());
@@ -348,10 +339,19 @@ public class TestOMRatisSnapshots {
     Path leaderActiveDir = Paths.get(leaderMetaDir.toString(), OM_DB_NAME);
     Path leaderSnapshotDir =
         Paths.get(getSnapshotPath(leaderOM.getConfiguration(), snapshotInfo));
+
+    // Get list of live files on the leader.
+    RocksDB activeRocksDB = ((RDBStore) leaderOM.getMetadataManager().getStore())
+        .getDb().getManagedRocksDb().get();
+    // strip the leading "/".
+    Set<String> liveSstFiles = activeRocksDB.getLiveFiles().files.stream()
+        .map(s -> s.substring(1))
+        .collect(Collectors.toSet());
+
     // Get the list of hardlinks from the leader.  Then confirm those links
     //  are on the follower
     int hardLinkCount = 0;
-    try (Stream<Path>list = Files.list(leaderSnapshotDir)) {
+    try (Stream<Path> list = Files.list(leaderSnapshotDir)) {
       for (Path leaderSnapshotSST: list.collect(Collectors.toList())) {
         String fileName = leaderSnapshotSST.getFileName().toString();
         if (fileName.toLowerCase().endsWith(".sst")) {
@@ -359,7 +359,8 @@ public class TestOMRatisSnapshots {
           Path leaderActiveSST =
               Paths.get(leaderActiveDir.toString(), fileName);
           // Skip if not hard link on the leader
-          if (!leaderActiveSST.toFile().exists()) {
+          // First confirm it is live
+          if (!liveSstFiles.contains(fileName)) {
             continue;
           }
           // If it is a hard link on the leader, it should be a hard
@@ -370,7 +371,7 @@ public class TestOMRatisSnapshots {
                 Paths.get(followerSnapshotDir.toString(), fileName);
             Path followerActiveSST =
                 Paths.get(followerActiveDir.toString(), fileName);
-            Assertions.assertEquals(
+            assertEquals(
                 OmSnapshotUtils.getINode(followerActiveSST),
                 OmSnapshotUtils.getINode(followerSnapshotSST),
                 "Snapshot sst file is supposed to be a hard link");
@@ -505,7 +506,7 @@ public class TestOMRatisSnapshots {
         firstIncrement.getSnapshotInfo());
     checkSnapshot(leaderOM, followerOM, "snap240", secondIncrement.getKeys(),
         secondIncrement.getSnapshotInfo());
-    Assertions.assertEquals(
+    assertEquals(
         followerOM.getOmSnapshotProvider().getInitCount(), 2,
         "Only initialized twice");
   }
@@ -651,7 +652,7 @@ public class TestOMRatisSnapshots {
     assertThat(sstList.size()).isGreaterThan(0);
     for (int i = 0; i < sstList.size(); i += 2) {
       File victimSst = new File(followerCandidateDir, sstList.get(i));
-      Assertions.assertTrue(victimSst.delete());
+      assertTrue(victimSst.delete());
     }
 
     // Resume the follower thread, it would download the full snapshot again

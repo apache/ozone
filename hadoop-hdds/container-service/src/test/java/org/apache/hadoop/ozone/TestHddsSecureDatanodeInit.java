@@ -29,7 +29,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.Callable;
 
-import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.hdds.DFSConfigKeysLegacy;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -59,23 +58,24 @@ import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.mockito.ArgumentMatchers.anyObject;
-import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.any;
+import static org.mockito.Mockito.anyString;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import org.apache.ozone.test.tag.Flaky;
 import org.bouncycastle.cert.X509CertificateHolder;
-import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
 /**
  * Test class for {@link HddsDatanodeService}.
  */
 public class TestHddsSecureDatanodeInit {
+  @TempDir
   private static File testDir;
   private static OzoneConfiguration conf;
   private static HddsDatanodeService service;
@@ -96,7 +96,6 @@ public class TestHddsSecureDatanodeInit {
 
   @BeforeAll
   public static void setUp() throws Exception {
-    testDir = GenericTestUtils.getRandomizedTestDir();
     conf = new OzoneConfiguration();
     conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, testDir.getPath());
     //conf.set(ScmConfigKeys.OZONE_SCM_NAMES, "localhost");
@@ -141,11 +140,6 @@ public class TestHddsSecureDatanodeInit {
     datanodeDetails = MockDatanodeDetails.randomDatanodeDetails();
 
     scmClient = mock(SCMSecurityProtocolClientSideTranslatorPB.class);
-  }
-
-  @AfterAll
-  public static void tearDown() {
-    FileUtil.fullyDelete(testDir);
   }
 
   @BeforeEach
@@ -250,7 +244,7 @@ public class TestHddsSecureDatanodeInit {
             .setX509Certificate(pemCert)
             .setX509CACertificate(pemCert)
             .build();
-    when(scmClient.getDataNodeCertificateChain(anyObject(), anyString()))
+    when(scmClient.getDataNodeCertificateChain(any(), anyString()))
         .thenReturn(responseProto);
     service.initializeCertificateClient(client);
     assertNotNull(client.getPrivateKey());
@@ -260,7 +254,7 @@ public class TestHddsSecureDatanodeInit {
         .contains("Init response: GETCERT");
     dnLogs.clearOutput();
     // reset scmClient behavior
-    when(scmClient.getDataNodeCertificateChain(anyObject(), anyString()))
+    when(scmClient.getDataNodeCertificateChain(any(), anyString()))
         .thenReturn(null);
   }
 
@@ -338,7 +332,7 @@ public class TestHddsSecureDatanodeInit {
             .setX509CACertificate(pemCert)
             .setX509RootCACertificate(pemCert)
             .build();
-    when(scmClient.getDataNodeCertificateChain(anyObject(), anyString()))
+    when(scmClient.getDataNodeCertificateChain(any(), anyString()))
         .thenReturn(responseProto);
 
     List<String> rootCaList = new ArrayList<>();
@@ -374,7 +368,7 @@ public class TestHddsSecureDatanodeInit {
         .setX509CACertificate(pemCert)
         .setX509RootCACertificate(pemCert)
         .build();
-    when(scmClient.getDataNodeCertificateChain(anyObject(), anyString()))
+    when(scmClient.getDataNodeCertificateChain(any(), anyString()))
         .thenReturn(responseProto);
     rootCaList.add(pemCert);
     when(scmClient.getAllRootCaCertificates()).thenReturn(rootCaList);
@@ -413,7 +407,7 @@ public class TestHddsSecureDatanodeInit {
                 .SCMGetCertResponseProto.ResponseCode.success)
             .setX509Certificate(pemCert)
             .build();
-    when(scmClient.getDataNodeCertificateChain(anyObject(), anyString()))
+    when(scmClient.getDataNodeCertificateChain(any(), anyString()))
         .thenReturn(responseProto);
 
     // check that new cert ID should not equal to current cert ID
@@ -442,7 +436,7 @@ public class TestHddsSecureDatanodeInit {
         .setX509Certificate(pemCert)
         .setX509CACertificate(pemCert)
         .build();
-    when(scmClient.getDataNodeCertificateChain(anyObject(), anyString()))
+    when(scmClient.getDataNodeCertificateChain(any(), anyString()))
         .thenReturn(responseProto);
     String certId2 = newCertHolder.getSerialNumber().toString();
 

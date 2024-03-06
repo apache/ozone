@@ -18,17 +18,18 @@
 
 package org.apache.hadoop.ozone.om.response.key;
 
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
-import org.apache.hadoop.util.Time;
-import org.jetbrains.annotations.NotNull;
+import jakarta.annotation.Nonnull;
 
 import java.io.IOException;
+
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.ONE;
 
 /**
  * Tests OMAllocateBlockResponse - prefix layout.
@@ -49,12 +50,11 @@ public class TestOMAllocateBlockResponseWithFSO
     long txnId = 50;
     long objectId = parentID + 1;
 
-    OmKeyInfo omKeyInfoFSO =
-            OMRequestTestUtils.createOmKeyInfo(volumeName, bucketName, keyName,
-                    HddsProtos.ReplicationType.RATIS,
-                    HddsProtos.ReplicationFactor.ONE, objectId, parentID, txnId,
-                    Time.now());
-    return omKeyInfoFSO;
+    return OMRequestTestUtils.createOmKeyInfo(volumeName, bucketName, keyName, RatisReplicationConfig.getInstance(ONE))
+        .setObjectID(objectId)
+        .setParentObjectID(parentID)
+        .setUpdateID(txnId)
+        .build();
   }
 
   @Override
@@ -66,7 +66,7 @@ public class TestOMAllocateBlockResponseWithFSO
             parentID, fileName, clientID);
   }
 
-  @NotNull
+  @Nonnull
   @Override
   protected OMAllocateBlockResponse getOmAllocateBlockResponse(
       OmKeyInfo omKeyInfo, OmBucketInfo omBucketInfo,

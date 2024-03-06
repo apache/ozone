@@ -31,7 +31,6 @@ import java.nio.file.Path;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertSame;
-import static org.junit.jupiter.api.Assertions.fail;
 
 /**
  * Test DatanodeStoreCache.
@@ -43,7 +42,7 @@ public class TestDatanodeStoreCache {
   private OzoneConfiguration conf = new OzoneConfiguration();
 
   @Test
-  public void testBasicOperations() throws IOException {
+  void testBasicOperations() throws IOException {
     DatanodeStoreCache cache = DatanodeStoreCache.getInstance();
     String dbPath1 = Files.createDirectory(folder.resolve("basic1"))
         .toFile().toString();
@@ -71,11 +70,7 @@ public class TestDatanodeStoreCache {
     assertEquals(1, cache.size());
 
     // test remove non-exist
-    try {
-      cache.removeDB(dbPath1);
-    } catch (Exception e) {
-      fail("Should not throw " + e);
-    }
+    cache.removeDB(dbPath1);
 
     // test shutdown
     cache.shutdownCache();

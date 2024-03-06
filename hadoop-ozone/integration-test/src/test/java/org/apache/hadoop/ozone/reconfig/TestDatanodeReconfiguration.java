@@ -33,6 +33,7 @@ import java.util.concurrent.ThreadPoolExecutor;
 
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_SERVICE_WORKERS;
 import static org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration.HDDS_DATANODE_BLOCK_DELETE_THREAD_MAX;
+import static org.apache.hadoop.ozone.container.replication.ReplicationServer.ReplicationConfig.REPLICATION_STREAMS_LIMIT_KEY;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 /**
@@ -49,6 +50,7 @@ class TestDatanodeReconfiguration extends ReconfigurationTestBase {
     Set<String> expected = ImmutableSet.<String>builder()
         .add(HDDS_DATANODE_BLOCK_DELETE_THREAD_MAX)
         .add(OZONE_BLOCK_DELETING_SERVICE_WORKERS)
+        .add(REPLICATION_STREAMS_LIMIT_KEY)
         .addAll(new DatanodeConfiguration().reconfigurableProperties())
         .build();
 
@@ -88,6 +90,20 @@ class TestDatanodeReconfiguration extends ReconfigurationTestBase {
 
     getFirstDatanode().getReconfigurationHandler().reconfigurePropertyImpl(
         OZONE_BLOCK_DELETING_SERVICE_WORKERS, String.valueOf(newValue));
+    assertEquals(newValue, executor.getCorePoolSize());
+  }
+
+  @ParameterizedTest
+  @ValueSource(ints = { -1, +1 })
+  void replicationStreamsLimit(int delta) throws ReconfigurationException {
+    ThreadPoolExecutor executor =
+        getFirstDatanode().getDatanodeStateMachine().getContainer()
+            .getReplicationServer().getExecutor();
+    int newValue = executor.getCorePoolSize() + delta;
+
+    getFirstDatanode().getReconfigurationHandler().reconfigurePropertyImpl(
+        REPLICATION_STREAMS_LIMIT_KEY, String.valueOf(newValue));
+    assertEquals(newValue, executor.getMaximumPoolSize());
     assertEquals(newValue, executor.getCorePoolSize());
   }
 
