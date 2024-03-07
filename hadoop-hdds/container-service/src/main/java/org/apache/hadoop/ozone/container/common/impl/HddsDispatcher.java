@@ -91,6 +91,16 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
   static final Logger LOG = LoggerFactory.getLogger(HddsDispatcher.class);
   private static final AuditLogger AUDIT =
       new AuditLogger(AuditLoggerType.DNLOGGER);
+  private static final String AUDIT_PARAM_CONTAINER_ID = "containerID";
+  private static final String AUDIT_PARAM_CONTAINER_TYPE = "containerType";
+  private static final String AUDIT_PARAM_FORCE_UPDATE = "forceUpdate";
+  private static final String AUDIT_PARAM_FORCE_DELETE = "forceDelete";
+  private static final String AUDIT_PARAM_START_CONTAINER_ID = "startContainerID";
+  private static final String AUDIT_PARAM_BLOCK_DATA = "blockData";
+  private static final String AUDIT_PARAM_BLOCK_DATA_SIZE = "blockDataSize";
+  private static final String AUDIT_PARAM_COUNT = "count";
+  private static final String AUDIT_PARAM_START_LOCAL_ID = "startLocalID";
+  private static final String AUDIT_PARAM_PREV_CHUNKNAME = "prevChunkName";
   private final Map<ContainerType, Handler> handlers;
   private final ConfigurationSource conf;
   private final ContainerSet containerSet;
@@ -810,17 +820,6 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
       return null;
     }
   }
-
-  private static final String AUDIT_PARAM_CONTAINER_ID = "containerID";
-  private static final String AUDIT_PARAM_CONTAINER_TYPE = "containerType";
-  private static final String AUDIT_PARAM_FORCE_UPDATE = "forceUpdate";
-  private static final String AUDIT_PARAM_FORCE_DELETE = "forceDelete";
-  private static final String AUDIT_PARAM_START_CONTAINER_ID = "startContainerID";
-  private static final String AUDIT_PARAM_BLOCK_DATA = "blockData";
-  private static final String AUDIT_PARAM_BLOCK_DATA_SIZE = "blockDataSize";
-  private static final String AUDIT_PARAM_COUNT = "count";
-  private static final String AUDIT_PARAM_START_LOCAL_ID = "startLocalID";
-  private static final String AUDIT_PARAM_PREV_CHUNKNAME = "prevChunkName";
 
   private static Map<String, String> getAuditParams(
       ContainerCommandRequestProto msg) {
