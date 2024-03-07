@@ -17,6 +17,9 @@
  */
 package org.apache.hadoop.hdds.scm.net;
 
+import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+
 /**
  * The interface defines a node in a network topology.
  * A node may be a leave representing a data node or an inner
@@ -126,4 +129,21 @@ public interface Node {
    * @return true if this node is under a specific scope
    */
   boolean isDescendant(String nodePath);
+
+  default HddsProtos.NetworkNode toProtobuf(
+      int clientVersion) {
+    return null;
+  }
+
+  static Node fromProtobuf(
+      HddsProtos.NetworkNode networkNode) {
+    if (networkNode.hasDatanodeDetails()) {
+      return DatanodeDetails.getFromProtoBuf(
+          networkNode.getDatanodeDetails());
+    } else if (networkNode.hasInnerNode()) {
+      return InnerNode.fromProtobuf(networkNode.getInnerNode());
+    } else {
+      return null;
+    }
+  }
 }

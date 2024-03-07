@@ -40,6 +40,7 @@ import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.client.rpc.RpcClient;
 import org.apache.hadoop.ozone.om.ha.HadoopRpcOMFailoverProxyProvider;
 import org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServerConfig;
+import org.apache.hadoop.ozone.security.acl.OzoneObj;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Timeout;
@@ -47,6 +48,7 @@ import org.junit.jupiter.api.Timeout;
 import java.io.IOException;
 import java.net.ConnectException;
 import java.time.Duration;
+import java.util.Collections;
 import java.util.Iterator;
 import java.util.UUID;
 import java.util.HashMap;
@@ -61,6 +63,7 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_SERVI
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_CLIENT_FAILOVER_MAX_ATTEMPTS_KEY;
 
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
+import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_DEFAULT_BUCKET_LAYOUT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_KEY_DELETING_LIMIT_PER_TASK;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -76,7 +79,6 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 public abstract class TestOzoneManagerHA {
 
   private static MiniOzoneHAClusterImpl cluster = null;
-  private static MiniOzoneCluster.Builder clusterBuilder = null;
   private static ObjectStore objectStore;
   private static OzoneConfiguration conf;
   private static String omServiceId;
@@ -104,10 +106,6 @@ public abstract class TestOzoneManagerHA {
 
   public OzoneConfiguration getConf() {
     return conf;
-  }
-
-  public MiniOzoneCluster.Builder getClusterBuilder() {
-    return clusterBuilder;
   }
 
   public String getOmServiceId() {
@@ -177,11 +175,11 @@ public abstract class TestOzoneManagerHA {
     conf.set(OZONE_BLOCK_DELETING_SERVICE_INTERVAL, "10s");
     conf.set(OZONE_KEY_DELETING_LIMIT_PER_TASK, "2");
 
-    clusterBuilder = MiniOzoneCluster.newHABuilder(conf)
+    MiniOzoneHAClusterImpl.Builder clusterBuilder = MiniOzoneCluster.newHABuilder(conf)
         .setOMServiceId(omServiceId)
         .setNumOfOzoneManagers(numOfOMs);
 
-    cluster = (MiniOzoneHAClusterImpl) clusterBuilder.build();
+    cluster = clusterBuilder.build();
     cluster.waitForClusterToBeReady();
     client = OzoneClientFactory.getRpcClient(omServiceId, conf);
     objectStore = client.getObjectStore();
@@ -215,6 +213,14 @@ public abstract class TestOzoneManagerHA {
         ReplicationFactor.ONE, new HashMap<>());
     ozoneOutputStream.write(data.getBytes(UTF_8), 0, data.length());
     ozoneOutputStream.close();
+  }
+
+  public static String createPrefixName() {
+    return "prefix" + RandomStringUtils.randomNumeric(5) + OZONE_URI_DELIMITER;
+  }
+
+  public static void createPrefix(OzoneObj prefixObj) throws IOException {
+    assertTrue(objectStore.setAcl(prefixObj, Collections.emptyList()));
   }
 
   protected OzoneBucket setupBucket() throws Exception {

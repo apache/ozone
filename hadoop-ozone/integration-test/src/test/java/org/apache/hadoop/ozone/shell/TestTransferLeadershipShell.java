@@ -66,7 +66,7 @@ public class TestTransferLeadershipShell {
     conf.setLong(ScmConfigKeys.OZONE_SCM_HA_RATIS_SNAPSHOT_THRESHOLD,
         SNAPSHOT_THRESHOLD);
 
-    cluster = (MiniOzoneHAClusterImpl) MiniOzoneCluster.newHABuilder(conf)
+    cluster = MiniOzoneCluster.newHABuilder(conf)
         .setOMServiceId(omServiceId)
         .setSCMServiceId(scmServiceId).setNumOfOzoneManagers(numOfOMs)
         .setNumOfStorageContainerManagers(numOfSCMs)

@@ -88,7 +88,7 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
   private final OzoneManager ozoneManager;
   private RequestHandler handler;
   private RaftGroupId raftGroupId;
-  private OzoneManagerDoubleBuffer ozoneManagerDoubleBuffer;
+  private volatile OzoneManagerDoubleBuffer ozoneManagerDoubleBuffer;
   private final ExecutorService executorService;
   private final ExecutorService installSnapshotExecutor;
   private final boolean isTracingEnabled;
@@ -109,9 +109,7 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
     this.threadPrefix = ozoneManager.getThreadNamePrefix();
 
     this.ozoneManagerDoubleBuffer = buildDoubleBufferForRatis();
-
-    this.handler = new OzoneManagerRequestHandler(ozoneManager,
-        ozoneManagerDoubleBuffer);
+    this.handler = new OzoneManagerRequestHandler(ozoneManager);
 
     ThreadFactory build = new ThreadFactoryBuilder().setDaemon(true)
         .setNameFormat(threadPrefix +
@@ -415,7 +413,6 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
     if (statePausedCount.decrementAndGet() == 0) {
       getLifeCycle().startAndTransition(() -> {
         this.ozoneManagerDoubleBuffer = buildDoubleBufferForRatis();
-        handler.updateDoubleBuffer(ozoneManagerDoubleBuffer);
         this.setLastAppliedTermIndex(TermIndex.valueOf(
             newLastAppliedSnapShotTermIndex, newLastAppliedSnaphsotIndex));
       });
@@ -434,7 +431,8 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
         .setS3SecretManager(ozoneManager.getS3SecretManager())
         .enableRatis(true)
         .enableTracing(isTracingEnabled)
-        .build();
+        .build()
+        .start();
   }
 
   /**
@@ -524,7 +522,8 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
    */
   private OMResponse runCommand(OMRequest request, TermIndex termIndex) {
     try {
-      OMClientResponse omClientResponse = handler.handleWriteRequest(request, termIndex);
+      final OMClientResponse omClientResponse = handler.handleWriteRequest(
+          request, termIndex, ozoneManagerDoubleBuffer);
       OMLockDetails omLockDetails = omClientResponse.getOmLockDetails();
       OMResponse omResponse = omClientResponse.getOMResponse();
       if (omLockDetails != null) {

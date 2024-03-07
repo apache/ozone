@@ -297,8 +297,8 @@ public class TestOzoneManagerServiceProviderImpl {
 
     OzoneManagerSyncMetrics metrics = ozoneManagerServiceProvider.getMetrics();
     assertEquals(4.0,
-        metrics.getAverageNumUpdatesInDeltaRequest().value(), 0.0);
-    assertEquals(1, metrics.getNumNonZeroDeltaRequests().value());
+        metrics.getAverageNumUpdatesInDeltaRequest(), 0.0);
+    assertEquals(1, metrics.getNumNonZeroDeltaRequests());
 
     // In this method, we have to assert the "GET" path and the "APPLY" path.
 
@@ -372,8 +372,8 @@ public class TestOzoneManagerServiceProviderImpl {
 
     OzoneManagerSyncMetrics metrics = ozoneManagerServiceProvider.getMetrics();
     assertEquals(1.0,
-        metrics.getAverageNumUpdatesInDeltaRequest().value(), 0.0);
-    assertEquals(3, metrics.getNumNonZeroDeltaRequests().value());
+        metrics.getAverageNumUpdatesInDeltaRequest(), 0.0);
+    assertEquals(3, metrics.getNumNonZeroDeltaRequests());
 
     // In this method, we have to assert the "GET" path and the "APPLY" path.
 
@@ -417,7 +417,7 @@ public class TestOzoneManagerServiceProviderImpl {
             reconTaskControllerMock, new ReconUtils(), ozoneManagerProtocol);
 
     OzoneManagerSyncMetrics metrics = ozoneManagerServiceProvider.getMetrics();
-    assertEquals(0, metrics.getNumSnapshotRequests().value());
+    assertEquals(0, metrics.getNumSnapshotRequests());
 
     // Should trigger full snapshot request.
     ozoneManagerServiceProvider.syncDataFromOM();
@@ -429,7 +429,7 @@ public class TestOzoneManagerServiceProviderImpl {
     assertEquals(OmSnapshotRequest.name(), captor.getValue().getTaskName());
     verify(reconTaskControllerMock, times(1))
         .reInitializeTasks(omMetadataManager);
-    assertEquals(1, metrics.getNumSnapshotRequests().value());
+    assertEquals(1, metrics.getNumSnapshotRequests());
   }
 
   @Test
@@ -470,7 +470,7 @@ public class TestOzoneManagerServiceProviderImpl {
     verify(reconTaskControllerMock, times(1))
         .consumeOMEvents(any(OMUpdateEventBatch.class),
             any(OMMetadataManager.class));
-    assertEquals(0, metrics.getNumSnapshotRequests().value());
+    assertEquals(0, metrics.getNumSnapshotRequests());
   }
 
   @Test
@@ -509,7 +509,7 @@ public class TestOzoneManagerServiceProviderImpl {
     assertEquals(OmSnapshotRequest.name(), captor.getValue().getTaskName());
     verify(reconTaskControllerMock, times(1))
         .reInitializeTasks(omMetadataManager);
-    assertEquals(1, metrics.getNumSnapshotRequests().value());
+    assertEquals(1, metrics.getNumSnapshotRequests());
   }
 
   private ReconTaskController getMockTaskController() {
