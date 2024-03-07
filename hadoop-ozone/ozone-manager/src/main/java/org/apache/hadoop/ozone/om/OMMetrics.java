@@ -27,6 +27,7 @@ import org.apache.hadoop.metrics2.annotation.Metrics;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.metrics2.lib.MutableCounterInt;
 import org.apache.hadoop.metrics2.lib.MutableCounterLong;
+import org.apache.hadoop.metrics2.lib.MutableGaugeInt;
 
 /**
  * This class is for maintaining Ozone Manager statistics.
@@ -75,7 +76,7 @@ public class OMMetrics implements OmMetadataReaderMetrics {
   private @Metric MutableCounterLong numSnapshotLists;
   private @Metric MutableCounterLong numSnapshotDiffJobs;
   private @Metric MutableCounterLong numSnapshotInfos;
-  private @Metric MutableCounterInt numSnapshotCacheSize;
+  private @Metric MutableGaugeInt numSnapshotCacheSize;
   private @Metric MutableCounterLong numGetFileStatus;
   private @Metric MutableCounterLong numCreateDirectory;
   private @Metric MutableCounterLong numCreateFile;
@@ -531,7 +532,7 @@ public class OMMetrics implements OmMetadataReaderMetrics {
   }
 
   public void decNumSnapshotCacheSize() {
-    numSnapshotCacheSize.incr(-1);
+    numSnapshotCacheSize.decr();
   }
 
   public void incNumCompleteMultipartUploadFails() {
