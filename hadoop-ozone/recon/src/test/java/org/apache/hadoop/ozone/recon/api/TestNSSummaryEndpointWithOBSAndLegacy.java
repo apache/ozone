@@ -146,14 +146,14 @@ public class TestNSSummaryEndpointWithOBSAndLegacy {
   private static final String BUCKET_THREE = "bucket3";
   private static final String BUCKET_FOUR = "bucket4";
   private static final String KEY_ONE = "file1";
-  private static final String KEY_TWO = "file2";
-  private static final String KEY_THREE = "file3";
+  private static final String KEY_TWO = "////file2";
+  private static final String KEY_THREE = "file3///";
   private static final String KEY_FOUR = "file4";
-  private static final String KEY_FIVE = "file5";
+  private static final String KEY_FIVE = "//////";
   private static final String KEY_EIGHT = "file8";
-  private static final String KEY_NINE = "file9";
-  private static final String KEY_TEN = "file10";
-  private static final String KEY_ELEVEN = "file11";
+  private static final String KEY_NINE = "//////";
+  private static final String KEY_TEN = "///__file10";
+  private static final String KEY_ELEVEN = "////file11";
   private static final String MULTI_BLOCK_FILE = KEY_THREE;
 
   private static final long PARENT_OBJECT_ID_ZERO = 0L;
@@ -948,7 +948,7 @@ public class TestNSSummaryEndpointWithOBSAndLegacy {
     omConfiguration.set(OZONE_OM_DB_DIRS,
         omDbDir.getAbsolutePath());
     omConfiguration.set(OMConfigKeys
-        .OZONE_OM_ENABLE_FILESYSTEM_PATHS, "true");
+        .OZONE_OM_ENABLE_FILESYSTEM_PATHS, "false");
     OMMetadataManager omMetadataManager = new OmMetadataManagerImpl(
         omConfiguration, null);
 
