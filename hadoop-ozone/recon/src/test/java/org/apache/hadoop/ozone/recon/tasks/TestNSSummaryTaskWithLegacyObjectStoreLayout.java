@@ -367,8 +367,8 @@ public final class TestNSSummaryTaskWithLegacyObjectStoreLayout {
 
   /**
    * Populate OMDB with the following configs.
-   * vol
-   * /       \
+   *         vol
+   *      /       \
    * bucket1     bucket2
    * /    \   \        \  \
    * key1  key2   key3   key4 key5
