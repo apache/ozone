@@ -698,7 +698,7 @@ public class TestOmMetadataManager {
               RatisReplicationConfig.getInstance(ONE), new OmKeyLocationInfoGroup(0L, new ArrayList<>(), true))
           .setCreationTime(expiredOpenKeyCreationTime)
           .build();
-      assertTrue(keyInfo.getModificationTime() > 0L);
+      assertThat(keyInfo.getModificationTime()).isPositive();
 
       final String uploadId = OMMultipartUploadUtils.getMultipartUploadId();
       final OmMultipartKeyInfo multipartKeyInfo = OMRequestTestUtils.
