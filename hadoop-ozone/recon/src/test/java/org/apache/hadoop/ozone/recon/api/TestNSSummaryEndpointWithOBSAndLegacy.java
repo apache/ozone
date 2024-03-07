@@ -149,7 +149,7 @@ public class TestNSSummaryEndpointWithOBSAndLegacy {
   private static final String KEY_TWO = "////file2";
   private static final String KEY_THREE = "file3///";
   private static final String KEY_FOUR = "file4";
-  private static final String KEY_FIVE = "//////";
+  private static final String KEY_FIVE = "_//////";
   private static final String KEY_EIGHT = "file8";
   private static final String KEY_NINE = "//////";
   private static final String KEY_TEN = "///__file10";
@@ -299,7 +299,25 @@ public class TestNSSummaryEndpointWithOBSAndLegacy {
       ROOT_PATH + VOL_TWO + ROOT_PATH + BUCKET_THREE;
   private static final String BUCKET_FOUR_PATH =
       ROOT_PATH + VOL_TWO + ROOT_PATH + BUCKET_FOUR;
-  private static final String KEY_PATH =
+  private static final String KEY_ONE_PATH =
+      ROOT_PATH + VOL + ROOT_PATH + BUCKET_ONE + ROOT_PATH + KEY_ONE;
+  private static final String KEY_TWO_PATH =
+      ROOT_PATH + VOL + ROOT_PATH + BUCKET_ONE + ROOT_PATH + KEY_TWO;
+  private static final String KEY_THREE_PATH =
+      ROOT_PATH + VOL + ROOT_PATH + BUCKET_ONE + ROOT_PATH + KEY_THREE;
+  private static final String KEY_FOUR_PATH =
+      ROOT_PATH + VOL + ROOT_PATH + BUCKET_TWO + ROOT_PATH + KEY_FOUR;
+  private static final String KEY_FIVE_PATH =
+      ROOT_PATH + VOL + ROOT_PATH + BUCKET_TWO + ROOT_PATH + KEY_FIVE;
+  private static final String KEY_EIGHT_PATH =
+      ROOT_PATH + VOL_TWO + ROOT_PATH + BUCKET_THREE + ROOT_PATH + KEY_EIGHT;
+  private static final String KEY_NINE_PATH =
+      ROOT_PATH + VOL_TWO + ROOT_PATH + BUCKET_THREE + ROOT_PATH + KEY_NINE;
+  private static final String KEY_TEN_PATH =
+      ROOT_PATH + VOL_TWO + ROOT_PATH + BUCKET_THREE + ROOT_PATH + KEY_TEN;
+  private static final String KEY_ELEVEN_PATH =
+      ROOT_PATH + VOL_TWO + ROOT_PATH + BUCKET_FOUR + ROOT_PATH + KEY_ELEVEN;
+  private static final String KEY4_PATH =
       ROOT_PATH + VOL + ROOT_PATH + BUCKET_TWO + ROOT_PATH + KEY_FOUR;
   private static final String MULTI_BLOCK_KEY_PATH =
       ROOT_PATH + VOL + ROOT_PATH + BUCKET_ONE + ROOT_PATH + KEY_THREE;
@@ -640,13 +658,63 @@ public class TestNSSummaryEndpointWithOBSAndLegacy {
   }
 
   @Test
-  public void testDiskUsageKey() throws Exception {
+  public void testDiskUsageKey1() throws Exception {
     // key level DU
-    Response keyResponse = nsSummaryEndpoint.getDiskUsage(KEY_PATH,
+    Response keyResponse = nsSummaryEndpoint.getDiskUsage(KEY_ONE_PATH,
         false, false);
-    DUResponse keyObj = (DUResponse) keyResponse.getEntity();
-    assertEquals(0, keyObj.getCount());
-    assertEquals(FILE_FOUR_SIZE, keyObj.getSize());
+    DUResponse duKeyResponse = (DUResponse) keyResponse.getEntity();
+    assertEquals(0, duKeyResponse.getCount());
+    assertEquals(FILE_ONE_SIZE, duKeyResponse.getSize());
+  }
+
+  @Test
+  public void testDiskUsageKey2() throws Exception {
+    // key level DU
+    Response keyResponse = nsSummaryEndpoint.getDiskUsage(KEY_TWO_PATH,
+        false, false);
+    DUResponse duKeyResponse = (DUResponse) keyResponse.getEntity();
+    assertEquals(0, duKeyResponse.getCount());
+    assertEquals(FILE_TWO_SIZE, duKeyResponse.getSize());
+  }
+
+  @Test
+  public void testDiskUsageKey4() throws Exception {
+    // key level DU
+    Response keyResponse = nsSummaryEndpoint.getDiskUsage(KEY4_PATH,
+        true, false);
+    DUResponse duKeyResponse = (DUResponse) keyResponse.getEntity();
+    assertEquals(0, duKeyResponse.getCount());
+    assertEquals(FILE_FOUR_SIZE, duKeyResponse.getSize());
+  }
+
+  @Test
+  public void testDiskUsageKey5() throws Exception {
+    // key level DU
+    Response keyResponse = nsSummaryEndpoint.getDiskUsage(KEY_FIVE_PATH,
+        false, false);
+    DUResponse duKeyResponse = (DUResponse) keyResponse.getEntity();
+    assertEquals(0, duKeyResponse.getCount());
+    assertEquals(FILE_FIVE_SIZE, duKeyResponse.getSize());
+  }
+
+  @Test
+  public void testDiskUsageKey8() throws Exception {
+    // key level DU
+    Response keyResponse = nsSummaryEndpoint.getDiskUsage(KEY_EIGHT_PATH,
+        false, false);
+    DUResponse duKeyResponse = (DUResponse) keyResponse.getEntity();
+    assertEquals(0, duKeyResponse.getCount());
+    assertEquals(FILE_EIGHT_SIZE, duKeyResponse.getSize());
+  }
+
+  @Test
+  public void testDiskUsageKey11() throws Exception {
+    // key level DU
+    Response keyResponse = nsSummaryEndpoint.getDiskUsage(KEY_ELEVEN_PATH,
+        false, false);
+    DUResponse duKeyResponse = (DUResponse) keyResponse.getEntity();
+    assertEquals(0, duKeyResponse.getCount());
+    assertEquals(FILE_ELEVEN_SIZE, duKeyResponse.getSize());
   }
 
   @Test
@@ -723,7 +791,7 @@ public class TestNSSummaryEndpointWithOBSAndLegacy {
   @Test
   public void testDataSizeUnderKeyWithReplication() throws IOException {
     setUpMultiBlockReplicatedKeys();
-    Response keyResponse = nsSummaryEndpoint.getDiskUsage(KEY_PATH,
+    Response keyResponse = nsSummaryEndpoint.getDiskUsage(KEY4_PATH,
         false, true);
     DUResponse replicaDUResponse = (DUResponse) keyResponse.getEntity();
     assertEquals(ResponseStatus.OK, replicaDUResponse.getStatus());
@@ -771,7 +839,7 @@ public class TestNSSummaryEndpointWithOBSAndLegacy {
     assertEquals(BUCKET_FOUR_DATA_SIZE, quBucketRes4.getQuotaUsed());
 
     // other level not applicable
-    Response naResponse2 = nsSummaryEndpoint.getQuotaUsage(KEY_PATH);
+    Response naResponse2 = nsSummaryEndpoint.getQuotaUsage(KEY4_PATH);
     QuotaUsageResponse quotaUsageResponse2 =
         (QuotaUsageResponse) naResponse2.getEntity();
     assertEquals(ResponseStatus.TYPE_NOT_APPLICABLE,
