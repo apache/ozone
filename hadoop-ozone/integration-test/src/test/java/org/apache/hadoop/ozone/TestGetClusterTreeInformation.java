@@ -55,10 +55,10 @@ public class TestGetClusterTreeInformation {
   public static void init() throws IOException, TimeoutException,
       InterruptedException {
     conf = new OzoneConfiguration();
-    cluster = MiniOzoneCluster.newBuilder(conf)
-        .setNumDatanodes(numOfDatanodes)
+    cluster = MiniOzoneCluster.newHABuilder(conf)
         .setNumOfOzoneManagers(3)
         .setNumOfStorageContainerManagers(3)
+        .setNumDatanodes(numOfDatanodes)
         .build();
     cluster.waitForClusterToBeReady();
     scm = cluster.getStorageContainerManager();
