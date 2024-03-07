@@ -168,8 +168,7 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
     return conf;
   }
 
-  @Override
-  public void setConf(OzoneConfiguration newConf) {
+  protected void setConf(OzoneConfiguration newConf) {
     this.conf = newConf;
   }
 

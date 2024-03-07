@@ -27,7 +27,6 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Supplier;
@@ -201,8 +200,7 @@ public class BlockOutputStream extends OutputStream {
             (long) flushPeriod * streamBufferArgs.getStreamBufferSize() == streamBufferArgs
                 .getStreamBufferFlushSize());
 
-    // A single thread executor handle the responses of async requests
-    responseExecutor = Executors.newSingleThreadExecutor();
+    this.responseExecutor = blockOutputStreamResourceProvider.get();
     bufferList = null;
     totalDataFlushedLength = 0;
     writtenDataLength = 0;
@@ -684,7 +682,6 @@ public class BlockOutputStream extends OutputStream {
       bufferList.clear();
     }
     bufferList = null;
-    responseExecutor.shutdown();
   }
 
   /**

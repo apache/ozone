@@ -21,6 +21,7 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Objects;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -69,7 +70,6 @@ import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.helpers.TenantStateList;
 import org.apache.hadoop.ozone.om.helpers.TenantUserInfoValue;
 import org.apache.hadoop.ozone.om.helpers.TenantUserList;
-import org.apache.hadoop.ozone.om.ratis.OzoneManagerDoubleBuffer;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils;
 import org.apache.hadoop.ozone.om.request.OMClientRequest;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
@@ -163,7 +163,6 @@ import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.
 import static org.apache.hadoop.util.MetricUtil.captureLatencyNs;
 
 import org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.StatusAndMessages;
-import org.apache.hadoop.util.Preconditions;
 import org.apache.hadoop.util.ProtobufUtils;
 import org.apache.ratis.server.protocol.TermIndex;
 import org.slf4j.Logger;
@@ -177,13 +176,10 @@ public class OzoneManagerRequestHandler implements RequestHandler {
   static final Logger LOG =
       LoggerFactory.getLogger(OzoneManagerRequestHandler.class);
   private final OzoneManager impl;
-  private OzoneManagerDoubleBuffer ozoneManagerDoubleBuffer;
   private FaultInjector injector;
 
-  public OzoneManagerRequestHandler(OzoneManager om,
-      OzoneManagerDoubleBuffer ozoneManagerDoubleBuffer) {
+  public OzoneManagerRequestHandler(OzoneManager om) {
     this.impl = om;
-    this.ozoneManagerDoubleBuffer = ozoneManagerDoubleBuffer;
   }
 
   //TODO simplify it to make it shorter
@@ -401,27 +397,14 @@ public class OzoneManagerRequestHandler implements RequestHandler {
   }
 
   @Override
-  public OMClientResponse handleWriteRequest(OMRequest omRequest, TermIndex termIndex) throws IOException {
+  public OMClientResponse handleWriteRequestImpl(OMRequest omRequest, TermIndex termIndex) throws IOException {
     injectPause();
     OMClientRequest omClientRequest =
         OzoneManagerRatisUtils.createClientRequest(omRequest, impl);
     return captureLatencyNs(
         impl.getPerfMetrics().getValidateAndUpdateCacheLatencyNs(),
-        () -> {
-          OMClientResponse omClientResponse =
-              omClientRequest.validateAndUpdateCache(getOzoneManager(), termIndex);
-          Preconditions.checkNotNull(omClientResponse,
-              "omClientResponse returned by validateAndUpdateCache cannot be null");
-          if (omRequest.getCmdType() != Type.Prepare) {
-            ozoneManagerDoubleBuffer.add(omClientResponse, termIndex);
-          }
-          return omClientResponse;
-        });
-  }
-
-  @Override
-  public void updateDoubleBuffer(OzoneManagerDoubleBuffer omDoubleBuffer) {
-    this.ozoneManagerDoubleBuffer = omDoubleBuffer;
+        () -> Objects.requireNonNull(omClientRequest.validateAndUpdateCache(getOzoneManager(), termIndex),
+            "omClientResponse returned by validateAndUpdateCache cannot be null"));
   }
 
   @VisibleForTesting

@@ -70,7 +70,7 @@ public class TestOzoneManagerHASnapshot {
     OzoneConfiguration conf = new OzoneConfiguration();
     conf.setBoolean(OMConfigKeys.OZONE_FILESYSTEM_SNAPSHOT_ENABLED_KEY, true);
 
-    cluster = (MiniOzoneHAClusterImpl) MiniOzoneCluster.newHABuilder(conf)
+    cluster = MiniOzoneCluster.newHABuilder(conf)
         .setOMServiceId("om-service-test")
         .setNumOfOzoneManagers(3)
         .build();

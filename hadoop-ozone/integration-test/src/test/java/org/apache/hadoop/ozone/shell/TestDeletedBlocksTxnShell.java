@@ -96,7 +96,7 @@ public class TestDeletedBlocksTxnShell {
     conf.setBoolean(ScmConfigKeys.OZONE_SCM_HA_ENABLE_KEY, true);
     conf.setInt(OZONE_SCM_BLOCK_DELETION_MAX_RETRY, 20);
 
-    cluster = (MiniOzoneHAClusterImpl) MiniOzoneCluster.newHABuilder(conf)
+    cluster = MiniOzoneCluster.newHABuilder(conf)
         .setSCMServiceId(scmServiceId)
         .setNumOfStorageContainerManagers(numOfSCMs)
         .setNumOfActiveSCMs(numOfSCMs)

@@ -126,7 +126,6 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
     <commons-logging-api.version>1.1</commons-logging-api.version>
     <commons-math3.version>3.6.1</commons-math3.version>
     <commons-net.version>3.10.0</commons-net.version>
-    <commons-pool2.version>2.6.0</commons-pool2.version>
     <commons-text.version>1.11.0</commons-text.version>
     <commons-validator.version>1.6</commons-validator.version>
     <commons-fileupload.version>1.5</commons-fileupload.version>
@@ -175,11 +174,11 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
     <hk2.version>2.6.1</hk2.version>
 
     <!-- httpcomponents versions -->
-    <httpclient.version>4.5.13</httpclient.version>
+    <httpclient.version>4.5.14</httpclient.version>
     <httpcore.version>4.4.16</httpcore.version>
 
     <!-- SLF4J/LOG4J version -->
-    <slf4j.version>2.0.10</slf4j.version>
+    <slf4j.version>2.0.12</slf4j.version>
     <log4j2.version>2.17.1</log4j2.version>
     <disruptor.version>3.4.2</disruptor.version>
     <reload4j.version>1.2.25</reload4j.version>
@@ -223,7 +222,7 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
     <zookeeper.version>3.7.2</zookeeper.version>
 
     <!-- Maven protoc compiler -->
-    <protobuf-maven-plugin.version>0.5.1</protobuf-maven-plugin.version>
+    <protobuf-maven-plugin.version>0.6.1</protobuf-maven-plugin.version>
     <grpc.protobuf-compile.version>3.19.6</grpc.protobuf-compile.version>
     <os-maven-plugin.version>1.7.1</os-maven-plugin.version>
 
@@ -306,6 +305,7 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
     <native.lib.tmp.dir></native.lib.tmp.dir>
     <properties.maven.plugin.version>1.2.1</properties.maven.plugin.version>
     <maven.core.version>3.9.6</maven.core.version>
+    <snappy-java.version>1.1.10.5</snappy-java.version>
   </properties>
 
   <dependencyManagement>
@@ -789,11 +789,6 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
         <groupId>commons-net</groupId>
         <artifactId>commons-net</artifactId>
         <version>${commons-net.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>org.apache.commons</groupId>
-        <artifactId>commons-pool2</artifactId>
-        <version>${commons-pool2.version}</version>
       </dependency>
       <dependency>
         <groupId>commons-validator</groupId>
@@ -1547,6 +1542,11 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
         <groupId>org.mockito</groupId>
         <artifactId>mockito-inline</artifactId>
         <version>${mockito.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.xerial.snappy</groupId>
+        <artifactId>snappy-java</artifactId>
+        <version>${snappy-java.version}</version>
       </dependency>
     </dependencies>
   </dependencyManagement>

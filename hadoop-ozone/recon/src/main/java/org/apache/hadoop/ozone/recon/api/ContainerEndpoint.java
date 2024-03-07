@@ -397,6 +397,9 @@ public class ContainerEndpoint {
       summary = containerHealthSchemaManager.getUnhealthyContainersSummary();
       List<UnhealthyContainers> containers = containerHealthSchemaManager
           .getUnhealthyContainers(internalState, offset, limit);
+      containers.stream()
+          .filter(
+              container -> !container.getContainerState().equals(UnHealthyContainerStates.EMPTY_MISSING.toString()));
       for (UnhealthyContainers c : containers) {
         long containerID = c.getContainerId();
         ContainerInfo containerInfo =

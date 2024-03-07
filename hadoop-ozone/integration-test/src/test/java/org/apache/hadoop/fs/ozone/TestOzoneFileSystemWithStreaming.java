@@ -45,7 +45,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_RATIS_PIPELINE_LIMIT;
-import static org.apache.hadoop.ozone.OzoneConfigKeys.DFS_CONTAINER_RATIS_DATASTREAM_ENABLED;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.HDDS_CONTAINER_RATIS_DATASTREAM_ENABLED;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_FS_DATASTREAM_AUTO_THRESHOLD;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_FS_DATASTREAM_ENABLED;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_OFS_URI_SCHEME;
@@ -83,7 +83,7 @@ public class TestOzoneFileSystemWithStreaming {
     final int blockSize = 2 * maxFlushSize;
     final BucketLayout layout = BucketLayout.FILE_SYSTEM_OPTIMIZED;
 
-    CONF.setBoolean(DFS_CONTAINER_RATIS_DATASTREAM_ENABLED, true);
+    CONF.setBoolean(HDDS_CONTAINER_RATIS_DATASTREAM_ENABLED, true);
     CONF.setBoolean(OZONE_FS_DATASTREAM_ENABLED, true);
     CONF.set(OZONE_FS_DATASTREAM_AUTO_THRESHOLD, AUTO_THRESHOLD + "B");
     CONF.setBoolean(OZONE_OM_RATIS_ENABLE_KEY, true);

@@ -155,7 +155,7 @@ public class TestOMRatisSnapshots {
     omRatisConf.setLogAppenderWaitTimeMin(10);
     conf.setFromObject(omRatisConf);
 
-    cluster = (MiniOzoneHAClusterImpl) MiniOzoneCluster.newHABuilder(conf)
+    cluster = MiniOzoneCluster.newHABuilder(conf)
         .setOMServiceId("om-service-test1")
         .setNumOfOzoneManagers(numOfOMs)
         .setNumOfActiveOMs(2)

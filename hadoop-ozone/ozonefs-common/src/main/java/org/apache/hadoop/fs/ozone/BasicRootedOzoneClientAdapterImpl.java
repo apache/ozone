@@ -210,8 +210,8 @@ public class BasicRootedOzoneClientAdapterImpl
       proxy = objectStore.getClientProxy();
 
       this.configuredDnPort = conf.getInt(
-          OzoneConfigKeys.DFS_CONTAINER_IPC_PORT,
-          OzoneConfigKeys.DFS_CONTAINER_IPC_PORT_DEFAULT);
+          OzoneConfigKeys.HDDS_CONTAINER_IPC_PORT,
+          OzoneConfigKeys.HDDS_CONTAINER_IPC_PORT_DEFAULT);
 
       // Fetches the bucket layout to be used by OFS.
       initDefaultFsBucketLayout(conf);

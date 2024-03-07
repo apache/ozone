@@ -167,9 +167,9 @@ public class KeyValueHandler extends Handler {
     // Requests.
     final int threadCountPerDisk = conf.getInt(
         OzoneConfigKeys
-            .DFS_CONTAINER_RATIS_NUM_WRITE_CHUNK_THREADS_PER_VOLUME_KEY,
+            .HDDS_CONTAINER_RATIS_NUM_WRITE_CHUNK_THREADS_PER_VOLUME_KEY,
         OzoneConfigKeys
-            .DFS_CONTAINER_RATIS_NUM_WRITE_CHUNK_THREADS_PER_VOLUME_DEFAULT);
+            .HDDS_CONTAINER_RATIS_NUM_WRITE_CHUNK_THREADS_PER_VOLUME_DEFAULT);
     final int numberOfDisks =
         HddsServerUtil.getDatanodeStorageDirs(conf).size();
     containerCreationLocks = Striped.lazyWeakLock(

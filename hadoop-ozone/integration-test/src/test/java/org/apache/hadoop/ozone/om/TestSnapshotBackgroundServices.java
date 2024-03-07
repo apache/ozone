@@ -151,7 +151,7 @@ public class TestSnapshotBackgroundServices {
         OMConfigKeys.OZONE_OM_RATIS_SNAPSHOT_AUTO_TRIGGER_THRESHOLD_KEY,
         SNAPSHOT_THRESHOLD);
     int numOfOMs = 3;
-    cluster = (MiniOzoneHAClusterImpl) MiniOzoneCluster.newHABuilder(conf)
+    cluster = MiniOzoneCluster.newHABuilder(conf)
         .setOMServiceId("om-service-test1")
         .setNumOfOzoneManagers(numOfOMs)
         .setNumOfActiveOMs(2)

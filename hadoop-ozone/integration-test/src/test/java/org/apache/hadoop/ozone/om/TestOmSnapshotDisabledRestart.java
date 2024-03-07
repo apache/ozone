@@ -54,16 +54,13 @@ public class TestOmSnapshotDisabledRestart {
     // Enable filesystem snapshot feature at the beginning
     conf.setBoolean(OMConfigKeys.OZONE_FILESYSTEM_SNAPSHOT_ENABLED_KEY, true);
 
-    cluster = (MiniOzoneHAClusterImpl) MiniOzoneCluster.newHABuilder(conf)
+    cluster = MiniOzoneCluster.newHABuilder(conf)
         .setOMServiceId("om-service-test2")
         .setNumOfOzoneManagers(3)
         .build();
     cluster.waitForClusterToBeReady();
     client = cluster.newClient();
 
-    OzoneManager leaderOzoneManager = cluster.getOMLeader();
-    OzoneConfiguration leaderConfig = leaderOzoneManager.getConfiguration();
-    cluster.setConf(leaderConfig);
     store = client.getObjectStore();
   }
 

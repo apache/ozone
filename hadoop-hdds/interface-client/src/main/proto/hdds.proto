@@ -48,6 +48,7 @@ message DatanodeDetailsProto {
     optional int32 currentVersion = 10;  // Current datanode wire version
     // TODO(runzhiwang): when uuid is gone, specify 1 as the index of uuid128 and mark as required
     optional UUID uuid128 = 100; // UUID with 128 bits assigned to the Datanode.
+    optional uint32 level = 101;
 }
 
 /**
@@ -497,4 +498,27 @@ message CompactionLogEntryProto {
     repeated CompactionFileInfoProto inputFileIntoList = 3;
     repeated CompactionFileInfoProto outputFileIntoList = 4;
     optional string compactionReason = 5;
+}
+
+message NodeTopology {
+    optional string name = 1;
+    optional string location = 2;
+    optional uint32 cost = 3;
+    optional uint32 level = 4;
+}
+
+message NetworkNode {
+    optional DatanodeDetailsProto datanodeDetails = 1;
+    optional InnerNode innerNode = 3;
+}
+
+message ChildrenMap {
+    optional string networkName = 1;
+    optional NetworkNode networkNode = 2;
+}
+
+message InnerNode {
+    optional NodeTopology nodeTopology = 1;
+    optional uint32 numOfLeaves = 2;
+    repeated ChildrenMap childrenMap = 3;
 }

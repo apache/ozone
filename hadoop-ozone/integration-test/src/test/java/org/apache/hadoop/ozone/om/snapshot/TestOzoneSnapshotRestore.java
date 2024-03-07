@@ -72,7 +72,7 @@ import static org.junit.jupiter.params.provider.Arguments.arguments;
 @Timeout(value = 300)
 public class TestOzoneSnapshotRestore {
   private static final String OM_SERVICE_ID = "om-service-test-1";
-  private MiniOzoneCluster cluster;
+  private MiniOzoneHAClusterImpl cluster;
   private ObjectStore store;
   private OzoneManager leaderOzoneManager;
   private OzoneConfiguration clientConf;
@@ -111,12 +111,11 @@ public class TestOzoneSnapshotRestore {
             .build();
     cluster.waitForClusterToBeReady();
 
-    leaderOzoneManager = ((MiniOzoneHAClusterImpl) cluster).getOMLeader();
+    leaderOzoneManager = cluster.getOMLeader();
     OzoneConfiguration leaderConfig = leaderOzoneManager.getConfiguration();
-    cluster.setConf(leaderConfig);
 
     String hostPrefix = OZONE_OFS_URI_SCHEME + "://" + serviceID;
-    clientConf = new OzoneConfiguration(cluster.getConf());
+    clientConf = new OzoneConfiguration(leaderConfig);
     clientConf.set(FS_DEFAULT_NAME_KEY, hostPrefix);
 
     client = cluster.newClient();

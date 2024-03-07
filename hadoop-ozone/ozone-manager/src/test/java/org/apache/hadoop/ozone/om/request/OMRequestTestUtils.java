@@ -556,6 +556,7 @@ public final class OMRequestTestUtils {
         .setObjectID(0L)
         .setUpdateID(0L)
         .setCreationTime(Time.now())
+        .setModificationTime(Time.now())
         .addOmKeyLocationInfoGroup(omKeyLocationInfoGroup)
         .setDataSize(1000L);
   }

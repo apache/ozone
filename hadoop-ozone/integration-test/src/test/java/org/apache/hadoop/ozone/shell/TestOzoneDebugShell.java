@@ -88,7 +88,6 @@ public class TestOzoneDebugShell {
     omServiceId = "om-service-test1";
     final int numDNs = 3;
     cluster = MiniOzoneCluster.newBuilder(conf)
-        .setOMServiceId(omServiceId)
         .setNumDatanodes(numDNs)
         .build();
     cluster.waitForClusterToBeReady();

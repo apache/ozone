@@ -775,6 +775,12 @@ public abstract class OMKeyRequest extends OMClientRequest {
       dbKeyInfo.setModificationTime(keyArgs.getModificationTime());
       dbKeyInfo.setUpdateID(transactionLogIndex, isRatisEnabled);
       dbKeyInfo.setReplicationConfig(replicationConfig);
+
+      // Construct a new metadata map from KeyArgs.
+      // Clear the old one when the key is overwritten.
+      dbKeyInfo.getMetadata().clear();
+      dbKeyInfo.getMetadata().putAll(KeyValueUtil.getFromProtobuf(
+          keyArgs.getMetadataList()));
       return dbKeyInfo;
     }
 

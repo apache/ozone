@@ -269,7 +269,6 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
   private OmTransport transport;
   private ThreadLocal<S3Auth> threadLocalS3Auth
       = new ThreadLocal<>();
-    
   private boolean s3AuthCheck;
 
   public static final int BLOCK_ALLOCATION_RETRY_COUNT = 5;
@@ -1052,7 +1051,7 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
     reqBuilder.setBucketName(bucketName);
     reqBuilder.setCount(maxKeys);
 
-    if (StringUtils.isNotEmpty(startKey)) {
+    if (startKey != null) {
       reqBuilder.setStartKey(startKey);
     }
 
@@ -2322,16 +2321,9 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
         .setSortDatanodes(args.getSortDatanodes())
         .setLatestVersionLocation(args.getLatestVersionLocation())
         .build();
-    ListStatusRequest.Builder listStatusRequestBuilder =
-        ListStatusRequest.newBuilder()
-            .setKeyArgs(keyArgs)
-            .setRecursive(recursive)
-            .setStartKey(startKey)
-            .setNumEntries(numEntries);
 
-    if (allowPartialPrefixes) {
-      listStatusRequestBuilder.setAllowPartialPrefix(allowPartialPrefixes);
-    }
+    ListStatusRequest.Builder listStatusRequestBuilder = createListStatusRequestBuilder(keyArgs, recursive, startKey,
+        numEntries, allowPartialPrefixes);
 
     OMRequest omRequest = createOMRequest(Type.ListStatus)
         .setListStatusRequest(listStatusRequestBuilder.build())
@@ -2358,16 +2350,9 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
         .setSortDatanodes(false)
         .setLatestVersionLocation(true)
         .build();
-    ListStatusRequest.Builder listStatusRequestBuilder =
-        ListStatusRequest.newBuilder()
-            .setKeyArgs(keyArgs)
-            .setRecursive(recursive)
-            .setStartKey(startKey)
-            .setNumEntries(numEntries);
 
-    if (allowPartialPrefixes) {
-      listStatusRequestBuilder.setAllowPartialPrefix(allowPartialPrefixes);
-    }
+    ListStatusRequest.Builder listStatusRequestBuilder = createListStatusRequestBuilder(keyArgs, recursive, startKey,
+        numEntries, allowPartialPrefixes);
 
     OMRequest omRequest = createOMRequest(Type.ListStatusLight)
         .setListStatusRequest(listStatusRequestBuilder.build())
@@ -2382,6 +2367,26 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
       statusList.add(OzoneFileStatusLight.getFromProtobuf(fileStatus));
     }
     return statusList;
+  }
+
+  private ListStatusRequest.Builder createListStatusRequestBuilder(KeyArgs keyArgs, boolean recursive, String startKey,
+      long numEntries, boolean allowPartialPrefixes) {
+    ListStatusRequest.Builder listStatusRequestBuilder =
+        ListStatusRequest.newBuilder()
+            .setKeyArgs(keyArgs)
+            .setRecursive(recursive)
+            .setNumEntries(numEntries);
+
+    if (startKey != null) {
+      listStatusRequestBuilder.setStartKey(startKey);
+    } else {
+      listStatusRequestBuilder.setStartKey("");
+    }
+
+    if (allowPartialPrefixes) {
+      listStatusRequestBuilder.setAllowPartialPrefix(allowPartialPrefixes);
+    }
+    return listStatusRequestBuilder;
   }
 
   @Override

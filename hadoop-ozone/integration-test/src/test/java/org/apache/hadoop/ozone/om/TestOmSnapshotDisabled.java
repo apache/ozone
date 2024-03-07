@@ -43,7 +43,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
  */
 public class TestOmSnapshotDisabled {
 
-  private static MiniOzoneCluster cluster = null;
+  private static MiniOzoneHAClusterImpl cluster = null;
   private static OzoneClient client;
   private static ObjectStore store;
 
@@ -64,10 +64,6 @@ public class TestOmSnapshotDisabled {
     cluster.waitForClusterToBeReady();
     client = cluster.newClient();
 
-    OzoneManager leaderOzoneManager =
-        ((MiniOzoneHAClusterImpl) cluster).getOMLeader();
-    OzoneConfiguration leaderConfig = leaderOzoneManager.getConfiguration();
-    cluster.setConf(leaderConfig);
     store = client.getObjectStore();
   }
 
