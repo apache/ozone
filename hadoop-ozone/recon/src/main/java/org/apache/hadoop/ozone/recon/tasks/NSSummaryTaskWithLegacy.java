@@ -47,7 +47,7 @@ import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.KEY_TABLE;
  */
 public class NSSummaryTaskWithLegacy extends NSSummaryTaskDbEventHandler {
 
-  private static final BucketLayout BUCKET_LAYOUT = BucketLayout.LEGACY;
+  private static final BucketLayout LEGACY_BUCKET_LAYOUT = BucketLayout.LEGACY;
 
   private static final Logger LOG =
       LoggerFactory.getLogger(NSSummaryTaskWithLegacy.class);
@@ -242,7 +242,7 @@ public class NSSummaryTaskWithLegacy extends NSSummaryTaskDbEventHandler {
 
     try {
       Table<String, OmKeyInfo> keyTable =
-          omMetadataManager.getKeyTable(BUCKET_LAYOUT);
+          omMetadataManager.getKeyTable(LEGACY_BUCKET_LAYOUT);
 
       try (TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>>
           keyTableIter = keyTable.iterator()) {
@@ -320,7 +320,7 @@ public class NSSummaryTaskWithLegacy extends NSSummaryTaskDbEventHandler {
           getReconOMMetadataManager().getOzoneKey(keyInfo.getVolumeName(),
               keyInfo.getBucketName(), parentKeyName);
       OmKeyInfo parentKeyInfo = getReconOMMetadataManager()
-          .getKeyTable(BUCKET_LAYOUT)
+          .getKeyTable(LEGACY_BUCKET_LAYOUT)
           .getSkipCache(fullParentKeyName);
 
       if (parentKeyInfo != null) {
@@ -369,7 +369,7 @@ public class NSSummaryTaskWithLegacy extends NSSummaryTaskDbEventHandler {
     OmBucketInfo omBucketInfo =
         metadataManager.getBucketTable().getSkipCache(bucketDBKey);
 
-    if (omBucketInfo.getBucketLayout() != BUCKET_LAYOUT) {
+    if (omBucketInfo.getBucketLayout() != LEGACY_BUCKET_LAYOUT) {
       LOG.debug(
           "Skipping processing for bucket {} as bucket layout is not LEGACY",
           bucketName);
