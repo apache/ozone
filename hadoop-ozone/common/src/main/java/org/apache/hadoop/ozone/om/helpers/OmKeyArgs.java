@@ -71,7 +71,7 @@ public final class OmKeyArgs implements Auditable {
     this.recursive = b.recursive;
     this.headOp = b.headOp;
     this.forceUpdateContainerCacheFromSCM = b.forceUpdateContainerCacheFromSCM;
-    this.ownerName = b.owner;
+    this.ownerName = b.ownerName;
   }
 
   public boolean getIsMultipartKey() {

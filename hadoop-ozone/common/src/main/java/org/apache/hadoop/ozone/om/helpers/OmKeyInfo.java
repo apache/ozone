@@ -119,7 +119,7 @@ public final class OmKeyInfo extends WithParentObjectId
     this.fileChecksum = b.fileChecksum;
     this.fileName = b.fileName;
     this.isFile = b.isFile;
-    this.ownerName = b.owner;
+    this.ownerName = b.ownerName;
   }
 
   public String getVolumeName() {

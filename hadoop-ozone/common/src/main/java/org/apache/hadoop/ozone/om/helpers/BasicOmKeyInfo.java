@@ -61,7 +61,7 @@ public final class BasicOmKeyInfo {
     this.modificationTime = b.getModificationTime();
     this.replicationConfig = b.getReplicationConfig();
     this.isFile = b.isFile();
-    this.ownerName = b.ownerName;
+    this.ownerName = b.getOwnerName();
   }
 
   public String getVolumeName() {
