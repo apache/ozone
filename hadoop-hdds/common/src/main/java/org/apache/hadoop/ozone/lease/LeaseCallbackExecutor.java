@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.ozone.lease;
 
+import com.google.common.collect.ImmutableList;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -45,7 +46,7 @@ public class LeaseCallbackExecutor<T> implements Runnable {
    */
   public LeaseCallbackExecutor(T resource, List<Callable<Void>> callbacks) {
     this.resource = resource;
-    this.callbacks = callbacks;
+    this.callbacks = callbacks == null ? ImmutableList.of() : ImmutableList.copyOf(callbacks);
   }
 
   @Override

@@ -18,6 +18,7 @@
 package org.apache.hadoop.hdds.freon;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Random;
 import java.util.UUID;
@@ -36,20 +37,20 @@ import org.slf4j.LoggerFactory;
  * Class to store pre-generated topology information for load-tests.
  */
 @SuppressWarnings("java:S2245") // no need for secure random
-public class FakeClusterTopology {
+public final class FakeClusterTopology {
 
   private static final Logger LOGGER =
       LoggerFactory.getLogger(FakeClusterTopology.class);
 
   public static final FakeClusterTopology INSTANCE = new FakeClusterTopology();
 
-  private List<DatanodeDetailsProto> datanodes = new ArrayList<>();
+  private final List<DatanodeDetailsProto> datanodes = new ArrayList<>();
 
-  private List<Pipeline> pipelines = new ArrayList<>();
+  private final List<Pipeline> pipelines = new ArrayList<>();
 
-  private Random random = new Random();
+  private final Random random = new Random();
 
-  public FakeClusterTopology() {
+  private FakeClusterTopology() {
     try {
       for (int i = 0; i < 9; i++) {
         datanodes.add(createDatanode());
@@ -87,7 +88,7 @@ public class FakeClusterTopology {
     return pipelines.get(random.nextInt(pipelines.size()));
   }
 
-  public List<DatanodeDetailsProto> getAllDatanodes() {
-    return datanodes;
+  public Iterable<DatanodeDetailsProto> getAllDatanodes() {
+    return Collections.unmodifiableList(datanodes);
   }
 }

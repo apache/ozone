@@ -26,7 +26,6 @@ import java.util.Map;
 import java.util.TreeMap;
 import org.apache.hadoop.ozone.common.Checksum;
 import org.apache.hadoop.ozone.common.ChecksumData;
-import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 
 /**
  * Java class that represents ChunkInfo ProtoBuf class. This helper class allows
@@ -38,7 +37,6 @@ public class ChunkInfo {
   private final long len;
   private ChecksumData checksumData;
   private final Map<String, String> metadata;
-  private ByteString stripeChecksum;
 
   // For older clients reading chunks in V0 version (all read data should
   // reside in one buffer). This variable should be set to true for older
@@ -64,7 +62,6 @@ public class ChunkInfo {
    *
    * @param key   - Key Name.
    * @param value - Value.
-   * @throws IOException
    */
   public void addMetadata(String key, String value) throws IOException {
     synchronized (this.metadata) {
@@ -80,7 +77,6 @@ public class ChunkInfo {
    *
    * @param info - Protobuf class
    * @return ChunkInfo
-   * @throws IOException
    */
   public static ChunkInfo getFromProtoBuf(ContainerProtos.ChunkInfo info)
       throws IOException {
@@ -96,10 +92,6 @@ public class ChunkInfo {
 
     chunkInfo.setChecksumData(
         ChecksumData.getFromProtoBuf(info.getChecksumData()));
-
-    if (info.hasStripeChecksum()) {
-      chunkInfo.setStripeChecksum(info.getStripeChecksum());
-    }
 
     return chunkInfo;
   }
@@ -175,21 +167,8 @@ public class ChunkInfo {
     this.checksumData = cData;
   }
 
-  public ByteString getStripeChecksum() {
-    return stripeChecksum;
-  }
-
-  public void setStripeChecksum(ByteString stripeChecksum) {
-    this.stripeChecksum = stripeChecksum;
-  }
-  
-  /**
-   * Returns Metadata associated with this Chunk.
-   *
-   * @return - Map of Key,values.
-   */
-  public Map<String, String> getMetadata() {
-    return metadata;
+  public String getMetadata(String key) {
+    return metadata.get(key);
   }
 
   @Override

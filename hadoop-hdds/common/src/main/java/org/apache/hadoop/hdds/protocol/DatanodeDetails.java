@@ -238,7 +238,7 @@ public class DatanodeDetails extends NodeImpl implements
    * @return DataNode Ports
    */
   public synchronized List<Port> getPorts() {
-    return ports;
+    return new ArrayList<>(ports);
   }
 
   /**
