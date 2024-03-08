@@ -425,9 +425,9 @@ public class RpcClient implements ClientProtocol {
     verifySpaceQuota(volArgs.getQuotaInBytes());
 
     String admin = volArgs.getAdmin() == null ?
-        getRealUserInfo().getShortUserName() : volArgs.getAdmin();
+        ugi.getShortUserName() : volArgs.getAdmin();
     String owner = volArgs.getOwner() == null ?
-        getRealUserInfo().getShortUserName() : volArgs.getOwner();
+        ugi.getShortUserName() : volArgs.getOwner();
     long quotaInNamespace = volArgs.getQuotaInNamespace();
     long quotaInBytes = volArgs.getQuotaInBytes();
     List<OzoneAcl> listOfAcls = new ArrayList<>();
@@ -634,7 +634,7 @@ public class RpcClient implements ClientProtocol {
       owner = s3gUGI.getShortUserName();
     } else {
       owner = bucketArgs.getOwner() == null ?
-          getRealUserInfo().getShortUserName() : bucketArgs.getOwner();
+          ugi.getShortUserName() : bucketArgs.getOwner();
     }
 
     boolean isVersionEnabled = bucketArgs.getVersioning();
@@ -753,8 +753,7 @@ public class RpcClient implements ClientProtocol {
     // as S3G uses single RpcClient. So we should be checking thread-local
     // S3Auth and use it during proxy.
     if (ozoneManagerClient.getThreadLocalS3Auth() != null) {
-      return UserGroupInformation.createRemoteUser(
-          ozoneManagerClient.getThreadLocalS3Auth().getAccessID());
+      return UserGroupInformation.createRemoteUser(getThreadLocalS3Auth().getUserPrincipal());
     }
     return ugi;
   }
