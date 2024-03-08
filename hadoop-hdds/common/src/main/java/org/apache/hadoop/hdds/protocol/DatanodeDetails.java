@@ -97,46 +97,29 @@ public class DatanodeDetails extends NodeImpl implements
   private int initialVersion;
   private int currentVersion;
 
-  /**
-   * Constructs DatanodeDetails instance. DatanodeDetails.Builder is used
-   * for instantiating DatanodeDetails.
-   * @param uuid DataNode's UUID
-   * @param ipAddress IP Address of this DataNode
-   * @param hostName DataNode's hostname
-   * @param networkLocation DataNode's network location path
-   * @param ports Ports used by the DataNode
-   * @param certSerialId serial id from SCM issued certificate.
-   * @param version DataNode's version
-   * @param setupTime the setup time of DataNode
-   * @param revision DataNodes's revision
-   * @param buildDate DataNodes's build timestamp
-   * @param persistedOpState Operational State stored on DN.
-   * @param persistedOpStateExpiryEpochSec Seconds after the epoch the stored
-   *                                       state should expire.
-   */
-  @SuppressWarnings("parameternumber")
-  private DatanodeDetails(UUID uuid, String ipAddress, String hostName,
-      String networkLocation, List<Port> ports, String certSerialId,
-      String version, long setupTime, String revision, String buildDate,
-      HddsProtos.NodeOperationalState persistedOpState,
-      long persistedOpStateExpiryEpochSec,
-      int initialVersion, int currentVersion) {
-    super(hostName, networkLocation, NetConstants.NODE_COST_DEFAULT);
-    this.uuid = uuid;
-    this.uuidString = uuid.toString();
+  private DatanodeDetails(Builder b) {
+    super(b.hostName, b.networkLocation, NetConstants.NODE_COST_DEFAULT);
+    uuid = b.id;
+    uuidString = uuid.toString();
     threadNamePrefix = HddsUtils.threadNamePrefix(uuidString);
-    this.ipAddress = ipAddress;
-    this.hostName = hostName;
-    this.ports = ports;
-    this.certSerialId = certSerialId;
-    this.version = version;
-    this.setupTime = setupTime;
-    this.revision = revision;
-    this.buildDate = buildDate;
-    this.persistedOpState = persistedOpState;
-    this.persistedOpStateExpiryEpochSec = persistedOpStateExpiryEpochSec;
-    this.initialVersion = initialVersion;
-    this.currentVersion = currentVersion;
+    ipAddress = b.ipAddress;
+    hostName = b.hostName;
+    ports = b.ports;
+    certSerialId = b.certSerialId;
+    version = b.version;
+    setupTime = b.setupTime;
+    revision = b.revision;
+    buildDate = b.buildDate;
+    persistedOpState = b.persistedOpState;
+    persistedOpStateExpiryEpochSec = b.persistedOpStateExpiryEpochSec;
+    initialVersion = b.initialVersion;
+    currentVersion = b.currentVersion;
+    if (b.networkName != null) {
+      setNetworkName(b.networkName);
+    }
+    if (b.level > 0) {
+      setLevel(b.level);
+    }
   }
 
   public DatanodeDetails(DatanodeDetails datanodeDetails) {
@@ -813,17 +796,7 @@ public class DatanodeDetails extends NodeImpl implements
       if (networkLocation == null) {
         networkLocation = NetConstants.DEFAULT_RACK;
       }
-      DatanodeDetails dn = new DatanodeDetails(id, ipAddress, hostName,
-          networkLocation, ports, certSerialId, version, setupTime, revision,
-          buildDate, persistedOpState, persistedOpStateExpiryEpochSec,
-          initialVersion, currentVersion);
-      if (networkName != null) {
-        dn.setNetworkName(networkName);
-      }
-      if (level > 0) {
-        dn.setLevel(level);
-      }
-      return dn;
+      return new DatanodeDetails(this);
     }
   }
 
