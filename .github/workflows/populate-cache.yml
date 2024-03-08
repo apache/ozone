@@ -45,6 +45,10 @@ jobs:
             !~/.m2/repository/org/apache/ozone
           key: maven-repo-${{ hashFiles('**/pom.xml') }}
 
+      - name: List repo contents
+        run: find ~/.m2/repository -type f | sort | xargs ls -lh
+        continue-on-error: true
+
       - name: Setup Java
         if: steps.restore-cache.outputs.cache-hit != 'true'
         uses: actions/setup-java@v4
