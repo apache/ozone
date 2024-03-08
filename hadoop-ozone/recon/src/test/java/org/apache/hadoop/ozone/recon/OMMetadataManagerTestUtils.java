@@ -22,7 +22,6 @@ import static org.apache.hadoop.hdds.protocol.MockDatanodeDetails.randomDatanode
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.ONE;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.THREE;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_DB_DIRS;
-import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ENABLE_FILESYSTEM_PATHS;
 import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.BUCKET_TABLE;
 import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.DIRECTORY_TABLE;
 import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.FILE_TABLE;
@@ -66,7 +65,7 @@ import org.apache.hadoop.ozone.recon.spi.impl.OzoneManagerServiceProviderImpl;
  */
 public final class OMMetadataManagerTestUtils {
 
-  public static OzoneConfiguration configuration;
+  private static OzoneConfiguration configuration;
   private OMMetadataManagerTestUtils() {
   }
 
@@ -504,4 +503,14 @@ public final class OMMetadataManagerTestUtils {
   public static BucketLayout getBucketLayout() {
     return BucketLayout.DEFAULT;
   }
+
+  public static OzoneConfiguration getConfiguration() {
+    return configuration;
+  }
+
+  public static void setConfiguration(
+      OzoneConfiguration configuration) {
+    OMMetadataManagerTestUtils.configuration = configuration;
+  }
+
 }
