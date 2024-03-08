@@ -92,10 +92,10 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-pnpm-
       - name: Cache for maven dependencies
-        uses: actions/cache@v4
+        uses: actions/cache/restore@v4
         with:
           path: |
-            ~/.m2/repository
+            ~/.m2/repository/*/*/*
             !~/.m2/repository/org/apache/ozone
           key: maven-repo-${{ hashFiles('**/pom.xml') }}
           restore-keys: |
@@ -160,7 +160,7 @@ jobs:
         uses: actions/cache/restore@v4
         with:
           path: |
-            ~/.m2/repository
+            ~/.m2/repository/*/*/*
             !~/.m2/repository/org/apache/ozone
           key: maven-repo-${{ hashFiles('**/pom.xml') }}
           restore-keys: |
@@ -198,7 +198,7 @@ jobs:
         uses: actions/cache/restore@v4
         with:
           path: |
-            ~/.m2/repository
+            ~/.m2/repository/*/*/*
             !~/.m2/repository/org/apache/ozone
           key: maven-repo-${{ hashFiles('**/pom.xml') }}
           restore-keys: |
@@ -242,7 +242,7 @@ jobs:
         uses: actions/cache/restore@v4
         with:
           path: |
-            ~/.m2/repository
+            ~/.m2/repository/*/*/*
             !~/.m2/repository/org/apache/ozone
           key: maven-repo-${{ hashFiles('**/pom.xml') }}
           restore-keys: |
@@ -310,7 +310,7 @@ jobs:
         uses: actions/cache/restore@v4
         with:
           path: |
-            ~/.m2/repository
+            ~/.m2/repository/*/*/*
             !~/.m2/repository/org/apache/ozone
           key: maven-repo-${{ hashFiles('**/pom.xml') }}
           restore-keys: |
@@ -446,7 +446,7 @@ jobs:
         uses: actions/cache/restore@v4
         with:
           path: |
-            ~/.m2/repository
+            ~/.m2/repository/*/*/*
             !~/.m2/repository/org/apache/ozone
           key: maven-repo-${{ hashFiles('**/pom.xml') }}
           restore-keys: |
@@ -506,7 +506,7 @@ jobs:
         uses: actions/cache/restore@v4
         with:
           path: |
-            ~/.m2/repository
+            ~/.m2/repository/*/*/*
             !~/.m2/repository/org/apache/ozone
           key: maven-repo-${{ hashFiles('**/pom.xml') }}
           restore-keys: |
