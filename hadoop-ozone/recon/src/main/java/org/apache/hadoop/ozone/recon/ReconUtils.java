@@ -343,7 +343,8 @@ public class ReconUtils {
    * @return a list of the top N DiskUsage objects sorted in descending order by size,
    *  where N is the specified limit.
    */
-  public static List<DUResponse.DiskUsage> sortDiskUsageDescendingWithLimit(List<DUResponse.DiskUsage> diskUsageList, int limit) {
+  public static List<DUResponse.DiskUsage> sortDiskUsageDescendingWithLimit(
+      List<DUResponse.DiskUsage> diskUsageList, int limit) {
     return diskUsageList.parallelStream()
         .sorted((du1, du2) -> Long.compare(du2.getSize(), du1.getSize()))
         .limit(limit)

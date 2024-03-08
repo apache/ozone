@@ -89,23 +89,23 @@ import static org.mockito.Mockito.when;
 /**
  * Test for NSSummary REST APIs with FSO.
  * We tested on a mini file system with the following setting:
- * vol
- * /       \
- * bucket1      bucket2
- * /    \         /    \
- * file1    dir1    file4  file5
- * /   \   \
- * dir2  dir3  dir4
- * /     \      \
- * file2   file3  file6
- * ----------------------------------------
- * vol2
- * /         \
- * bucket3          bucket4
- * /      \           /
- * file8     dir5      file11
- * /    \
- * file9    file10
+ *                vol
+ *             /       \
+ *        bucket1      bucket2
+ *        /    \         /    \
+ *     file1    dir1    file4  file5
+ *           /   \   \
+ *        dir2  dir3  dir4
+ *         /     \      \
+ *       file2   file3  file6
+ *  ----------------------------------------
+ *                  vol2
+ *              /         \
+ *      bucket3          bucket4
+ *      /      \           /
+ *   file8     dir5      file11
+ *            /    \
+ *        file9    file10
  * This is a test for the Rest APIs only. We have tested NSSummaryTask before,
  * so there is no need to test process() on DB's updates
  */
@@ -119,10 +119,10 @@ public class TestNSSummaryEndpointWithFSO {
   private CommonUtils commonUtils;
 
   private static final String TEST_PATH_UTILITY =
-      "/vol1/buck1/a/b/c/d/e/file1.txt";
+          "/vol1/buck1/a/b/c/d/e/file1.txt";
   private static final String PARENT_DIR = "vol1/buck1/a/b/c/d/e";
   private static final String[] TEST_NAMES =
-      new String[]{"vol1", "buck1", "a", "b", "c", "d", "e", "file1.txt"};
+          new String[]{"vol1", "buck1", "a", "b", "c", "d", "e", "file1.txt"};
   private static final String TEST_KEY_NAMES = "a/b/c/d/e/file1.txt";
 
   // Object names in FSO-enabled format
@@ -197,12 +197,12 @@ public class TestNSSummaryEndpointWithFSO {
   private static final long CONTAINER_SIX_ID = 6L;
 
   // replication factors
-  private static final int CONTAINER_ONE_REPLICA_COUNT = 3;
-  private static final int CONTAINER_TWO_REPLICA_COUNT = 2;
-  private static final int CONTAINER_THREE_REPLICA_COUNT = 4;
-  private static final int CONTAINER_FOUR_REPLICA_COUNT = 5;
-  private static final int CONTAINER_FIVE_REPLICA_COUNT = 2;
-  private static final int CONTAINER_SIX_REPLICA_COUNT = 3;
+  private static final int CONTAINER_ONE_REPLICA_COUNT  = 3;
+  private static final int CONTAINER_TWO_REPLICA_COUNT  = 2;
+  private static final int CONTAINER_THREE_REPLICA_COUNT  = 4;
+  private static final int CONTAINER_FOUR_REPLICA_COUNT  = 5;
+  private static final int CONTAINER_FIVE_REPLICA_COUNT  = 2;
+  private static final int CONTAINER_SIX_REPLICA_COUNT  = 3;
 
   // block lengths
   private static final long BLOCK_ONE_LENGTH = 1000L;
@@ -227,39 +227,39 @@ public class TestNSSummaryEndpointWithFSO {
 
   private static final long FILE1_SIZE_WITH_REPLICA =
       getReplicatedSize(KEY_ONE_SIZE,
-          StandaloneReplicationConfig.getInstance(ONE));
+              StandaloneReplicationConfig.getInstance(ONE));
   private static final long FILE2_SIZE_WITH_REPLICA =
       getReplicatedSize(KEY_TWO_SIZE,
-          StandaloneReplicationConfig.getInstance(ONE));
+              StandaloneReplicationConfig.getInstance(ONE));
   private static final long FILE3_SIZE_WITH_REPLICA =
       getReplicatedSize(KEY_THREE_SIZE,
-          StandaloneReplicationConfig.getInstance(ONE));
+              StandaloneReplicationConfig.getInstance(ONE));
   private static final long FILE4_SIZE_WITH_REPLICA =
       getReplicatedSize(KEY_FOUR_SIZE,
-          StandaloneReplicationConfig.getInstance(ONE));
+              StandaloneReplicationConfig.getInstance(ONE));
   private static final long FILE5_SIZE_WITH_REPLICA =
       getReplicatedSize(KEY_FIVE_SIZE,
-          StandaloneReplicationConfig.getInstance(ONE));
+              StandaloneReplicationConfig.getInstance(ONE));
   private static final long FILE6_SIZE_WITH_REPLICA =
       getReplicatedSize(KEY_SIX_SIZE,
-          StandaloneReplicationConfig.getInstance(ONE));
+              StandaloneReplicationConfig.getInstance(ONE));
   private static final long FILE7_SIZE_WITH_REPLICA =
       getReplicatedSize(KEY_SEVEN_SIZE,
-          StandaloneReplicationConfig.getInstance(ONE));
+              StandaloneReplicationConfig.getInstance(ONE));
   private static final long FILE8_SIZE_WITH_REPLICA =
       getReplicatedSize(KEY_EIGHT_SIZE,
-          StandaloneReplicationConfig.getInstance(ONE));
+              StandaloneReplicationConfig.getInstance(ONE));
   private static final long FILE9_SIZE_WITH_REPLICA =
       getReplicatedSize(KEY_NINE_SIZE,
-          StandaloneReplicationConfig.getInstance(ONE));
+              StandaloneReplicationConfig.getInstance(ONE));
   private static final long FILE10_SIZE_WITH_REPLICA =
       getReplicatedSize(KEY_TEN_SIZE,
-          StandaloneReplicationConfig.getInstance(ONE));
+              StandaloneReplicationConfig.getInstance(ONE));
   private static final long FILE11_SIZE_WITH_REPLICA =
       getReplicatedSize(KEY_ELEVEN_SIZE,
-          StandaloneReplicationConfig.getInstance(ONE));
+              StandaloneReplicationConfig.getInstance(ONE));
   private static final long MULTI_BLOCK_KEY_SIZE_WITH_REPLICA
-      = FILE7_SIZE_WITH_REPLICA;
+          = FILE7_SIZE_WITH_REPLICA;
   private static final long
       MULTI_BLOCK_TOTAL_SIZE_WITH_REPLICA_UNDER_ROOT
       = FILE1_SIZE_WITH_REPLICA
@@ -336,19 +336,19 @@ public class TestNSSummaryEndpointWithFSO {
       KEY_THREE_SIZE + KEY_FOUR_SIZE + KEY_FIVE_SIZE + KEY_SIX_SIZE +
       KEY_EIGHT_SIZE + KEY_NINE_SIZE + KEY_TEN_SIZE + KEY_ELEVEN_SIZE;
   private static final long VOL_DATA_SIZE = KEY_ONE_SIZE + KEY_TWO_SIZE +
-      KEY_THREE_SIZE + KEY_FOUR_SIZE + KEY_FIVE_SIZE + KEY_SIX_SIZE;
+          KEY_THREE_SIZE + KEY_FOUR_SIZE + KEY_FIVE_SIZE + KEY_SIX_SIZE;
 
   private static final long VOL_TWO_DATA_SIZE =
       KEY_EIGHT_SIZE + KEY_NINE_SIZE + KEY_TEN_SIZE + KEY_ELEVEN_SIZE;
 
   private static final long BUCKET_ONE_DATA_SIZE = KEY_ONE_SIZE + KEY_TWO_SIZE +
-      KEY_THREE_SIZE + KEY_SIX_SIZE;
+          KEY_THREE_SIZE + KEY_SIX_SIZE;
 
   private static final long BUCKET_TWO_DATA_SIZE =
-      KEY_FOUR_SIZE + KEY_FIVE_SIZE;
+          KEY_FOUR_SIZE + KEY_FIVE_SIZE;
 
   private static final long DIR_ONE_DATA_SIZE = KEY_TWO_SIZE +
-      KEY_THREE_SIZE + KEY_SIX_SIZE;
+          KEY_THREE_SIZE + KEY_SIX_SIZE;
 
   @BeforeEach
   public void setUp() throws Exception {
@@ -364,17 +364,17 @@ public class TestNSSummaryEndpointWithFSO {
         Files.createDirectory(temporaryFolder.resolve("OmMetataDir")).toFile());
 
     ReconTestInjector reconTestInjector =
-        new ReconTestInjector.Builder(temporaryFolder.toFile())
-            .withReconOm(reconOMMetadataManager)
-            .withOmServiceProvider(ozoneManagerServiceProvider)
-            .withReconSqlDb()
-            .withContainerDB()
-            .addBinding(OzoneStorageContainerManager.class,
-                getMockReconSCM())
-            .addBinding(StorageContainerServiceProvider.class,
-                mock(StorageContainerServiceProviderImpl.class))
-            .addBinding(NSSummaryEndpoint.class)
-            .build();
+            new ReconTestInjector.Builder(temporaryFolder.toFile())
+                    .withReconOm(reconOMMetadataManager)
+                    .withOmServiceProvider(ozoneManagerServiceProvider)
+                    .withReconSqlDb()
+                    .withContainerDB()
+                    .addBinding(OzoneStorageContainerManager.class,
+                            getMockReconSCM())
+                    .addBinding(StorageContainerServiceProvider.class,
+                            mock(StorageContainerServiceProviderImpl.class))
+                    .addBinding(NSSummaryEndpoint.class)
+                    .build();
     ReconNamespaceSummaryManager reconNamespaceSummaryManager =
         reconTestInjector.getInstance(ReconNamespaceSummaryManager.class);
     nsSummaryEndpoint = reconTestInjector.getInstance(NSSummaryEndpoint.class);
@@ -474,7 +474,7 @@ public class TestNSSummaryEndpointWithFSO {
     List<DUResponse.DiskUsage> duData = duVolRes.getDuData();
     // sort based on subpath
     Collections.sort(duData,
-        Comparator.comparing(DUResponse.DiskUsage::getSubpath));
+            Comparator.comparing(DUResponse.DiskUsage::getSubpath));
     DUResponse.DiskUsage duBucket1 = duData.get(0);
     DUResponse.DiskUsage duBucket2 = duData.get(1);
     assertEquals(BUCKET_ONE_PATH, duBucket1.getSubpath());
@@ -539,7 +539,7 @@ public class TestNSSummaryEndpointWithFSO {
         false, false, false);
     DUResponse invalidObj = (DUResponse) invalidResponse.getEntity();
     assertEquals(ResponseStatus.PATH_NOT_FOUND,
-        invalidObj.getStatus());
+            invalidObj.getStatus());
   }
 
   @Test
@@ -550,7 +550,7 @@ public class TestNSSummaryEndpointWithFSO {
     DUResponse replicaDUResponse = (DUResponse) keyResponse.getEntity();
     assertEquals(ResponseStatus.OK, replicaDUResponse.getStatus());
     assertEquals(MULTI_BLOCK_KEY_SIZE_WITH_REPLICA,
-        replicaDUResponse.getSizeWithReplica());
+            replicaDUResponse.getSizeWithReplica());
   }
 
   @Test
@@ -598,7 +598,6 @@ public class TestNSSummaryEndpointWithFSO {
    * When calculating DU under dir1
    * there are 3 keys, file2, file3, file6.
    * There is one direct key, file7.
-   *
    * @throws IOException
    */
   @Test
@@ -683,10 +682,10 @@ public class TestNSSummaryEndpointWithFSO {
   }
 
   public void checkFileSizeDist(String path, int bin0,
-                                int bin1, int bin2, int bin3) throws Exception {
+      int bin1, int bin2, int bin3) throws Exception {
     Response res = nsSummaryEndpoint.getFileSizeDistribution(path);
     FileSizeDistributionResponse fileSizeDistResObj =
-        (FileSizeDistributionResponse) res.getEntity();
+            (FileSizeDistributionResponse) res.getEntity();
     int[] fileSizeDist = fileSizeDistResObj.getFileSizeDist();
     assertEquals(bin0, fileSizeDist[0]);
     assertEquals(bin1, fileSizeDist[1]);
@@ -699,7 +698,6 @@ public class TestNSSummaryEndpointWithFSO {
 
   /**
    * Write directories and keys info into OM DB.
-   *
    * @throws Exception
    */
   private void populateOMDB() throws Exception {
@@ -836,7 +834,6 @@ public class TestNSSummaryEndpointWithFSO {
   /**
    * Create a new OM Metadata manager instance with one user, one vol, and two
    * buckets.
-   *
    * @throws IOException ioEx
    */
   private static OMMetadataManager initializeNewOmMetadataManager(
@@ -1176,7 +1173,6 @@ public class TestNSSummaryEndpointWithFSO {
   /**
    * Generate a set of mock container replica with a size of
    * replication factor for container.
-   *
    * @param replicationFactor number of replica
    * @param containerID the container replicated based upon
    * @return a set of container replica for testing

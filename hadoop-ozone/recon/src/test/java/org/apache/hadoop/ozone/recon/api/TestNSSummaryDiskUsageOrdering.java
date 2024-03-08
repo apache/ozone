@@ -30,7 +30,6 @@ import org.apache.hadoop.ozone.recon.spi.StorageContainerServiceProvider;
 import org.apache.hadoop.ozone.recon.spi.impl.OzoneManagerServiceProviderImpl;
 import org.apache.hadoop.ozone.recon.spi.impl.StorageContainerServiceProviderImpl;
 import org.apache.hadoop.ozone.recon.tasks.NSSummaryTaskWithFSO;
-import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.getMockOzoneManagerServiceProviderWithFSO;
 import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.getTestReconOmMetadataManager;
@@ -159,7 +158,7 @@ public class TestNSSummaryDiskUsageOrdering {
   private void verifyOrdering(String path)
       throws IOException {
     Response response =
-        nsSummaryEndpoint.getDiskUsage(path, true, false,true);
+        nsSummaryEndpoint.getDiskUsage(path, true, false, true);
     DUResponse duRes = (DUResponse) response.getEntity();
     List<DUResponse.DiskUsage> duData = duRes.getDuData();
     List<DUResponse.DiskUsage> sortedDuData = new ArrayList<>(duData);
