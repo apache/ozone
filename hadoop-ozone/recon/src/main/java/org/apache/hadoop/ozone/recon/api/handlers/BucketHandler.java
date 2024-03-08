@@ -165,10 +165,8 @@ public abstract class BucketHandler {
                 ReconOMMetadataManager omMetadataManager,
                 OzoneStorageContainerManager reconSCM,
                 OmBucketInfo bucketInfo) throws IOException {
-    OzoneConfiguration configuration = new OzoneConfiguration();
-    boolean enableFileSystemPaths = configuration
-        .getBoolean(OMConfigKeys.OZONE_OM_ENABLE_FILESYSTEM_PATHS,
-            OMConfigKeys.OZONE_OM_ENABLE_FILESYSTEM_PATHS_DEFAULT);
+    // Check if enableFileSystemPaths flag is set to true.
+    boolean enableFileSystemPaths = isEnableFileSystemPaths(omMetadataManager);
 
     // If bucketInfo is null then entity type is UNKNOWN
     if (Objects.isNull(bucketInfo)) {
@@ -199,6 +197,22 @@ public abstract class BucketHandler {
         return null;
       }
     }
+  }
+
+  /**
+   * Determines whether FileSystemPaths are enabled for Legacy Buckets
+   * based on the Ozone configuration.
+   *
+   * @param ReconOMMetadataManager Instance
+   * @return True if FileSystemPaths are enabled, false otherwise.
+   */
+  private static boolean isEnableFileSystemPaths(ReconOMMetadataManager omMetadataManager) {
+    OzoneConfiguration configuration = omMetadataManager.getOzoneConfiguration();
+    if (configuration == null) {
+      configuration = new OzoneConfiguration();
+    }
+    return configuration.getBoolean(OMConfigKeys.OZONE_OM_ENABLE_FILESYSTEM_PATHS,
+        OMConfigKeys.OZONE_OM_ENABLE_FILESYSTEM_PATHS_DEFAULT);
   }
 
   public static BucketHandler getBucketHandler(

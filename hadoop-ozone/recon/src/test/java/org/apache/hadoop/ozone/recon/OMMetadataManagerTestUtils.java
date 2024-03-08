@@ -22,6 +22,7 @@ import static org.apache.hadoop.hdds.protocol.MockDatanodeDetails.randomDatanode
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.ONE;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.THREE;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_DB_DIRS;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ENABLE_FILESYSTEM_PATHS;
 import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.BUCKET_TABLE;
 import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.DIRECTORY_TABLE;
 import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.FILE_TABLE;
@@ -65,6 +66,7 @@ import org.apache.hadoop.ozone.recon.spi.impl.OzoneManagerServiceProviderImpl;
  */
 public final class OMMetadataManagerTestUtils {
 
+  public static OzoneConfiguration configuration;
   private OMMetadataManagerTestUtils() {
   }
 
@@ -129,8 +131,9 @@ public final class OMMetadataManagerTestUtils {
     DBCheckpoint checkpoint = omMetadataManager.getStore()
         .getCheckpoint(true);
     assertNotNull(checkpoint.getCheckpointLocation());
-
-    OzoneConfiguration configuration = new OzoneConfiguration();
+    if (configuration == null) {
+      configuration = new OzoneConfiguration();
+    }
     configuration.set(OZONE_RECON_OM_SNAPSHOT_DB_DIR, reconOmDbDir
         .getAbsolutePath());
 
