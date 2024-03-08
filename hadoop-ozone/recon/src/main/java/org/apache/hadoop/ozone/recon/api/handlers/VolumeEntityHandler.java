@@ -36,6 +36,10 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 
+
+import static org.apache.hadoop.ozone.recon.ReconConstants.DISK_USAGE_TOP_RECORDS_LIMIT;
+import static org.apache.hadoop.ozone.recon.ReconUtils.sortDiskUsageDescendingWithLimit;
+
 /**
  * Class for handling volume entity type.
  */
@@ -100,13 +104,6 @@ public class VolumeEntityHandler extends EntityHandler {
     String volName = names[0];
     List<OmBucketInfo> buckets = getOmMetadataManager().
         listBucketsUnderVolume(volName);
-
-    if (sortSubPaths) {
-      // Sort buckets in descending order by size if sortSubPaths is true
-      buckets.sort(
-          (b1, b2) -> Long.compare(b2.getUsedBytes(), b1.getUsedBytes()));
-    }
-
     duResponse.setCount(buckets.size());
 
     // List of DiskUsage data for all buckets
@@ -138,6 +135,13 @@ public class VolumeEntityHandler extends EntityHandler {
       duResponse.setSizeWithReplica(volDataSizeWithReplica);
     }
     duResponse.setSize(volDataSize);
+
+    if (sortSubPaths) {
+      // Parallel sort bucketDuData in descending order of size
+      bucketDuData = sortDiskUsageDescendingWithLimit(bucketDuData,
+          DISK_USAGE_TOP_RECORDS_LIMIT);
+    }
+
     duResponse.setDuData(bucketDuData);
     return duResponse;
   }

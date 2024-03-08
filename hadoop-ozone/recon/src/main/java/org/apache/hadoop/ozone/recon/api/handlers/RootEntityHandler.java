@@ -34,13 +34,13 @@ import org.apache.hadoop.ozone.recon.api.types.ResponseStatus;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 import org.apache.hadoop.ozone.recon.spi.ReconNamespaceSummaryManager;
 import org.apache.hadoop.hdds.scm.container.placement.metrics.SCMNodeStat;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.stream.Collectors;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.List;
+
+import static org.apache.hadoop.ozone.recon.ReconConstants.DISK_USAGE_TOP_RECORDS_LIMIT;
+import static org.apache.hadoop.ozone.recon.ReconUtils.sortDiskUsageDescendingWithLimit;
 
 /**
  * Class for handling root entity type.
@@ -99,26 +99,10 @@ public class RootEntityHandler extends EntityHandler {
     List<OmVolumeArgs> volumes = getOmMetadataManager().listVolumes();
     duResponse.setCount(volumes.size());
 
-    // Map to hold total size for each volume
-    Map<String, Long> volumeSizes = new HashMap<>();
-    for (OmVolumeArgs volume : volumes) {
-      long totalVolumeSize = 0;
-      List<OmBucketInfo> buckets =
-          omMetadataManager.listBucketsUnderVolume(volume.getVolume());
-      for (OmBucketInfo bucket : buckets) {
-        long bucketObjectID = bucket.getObjectID();
-        totalVolumeSize += getTotalSize(bucketObjectID);
-      }
-      volumeSizes.put(volume.getVolume(), totalVolumeSize);
-    }
-
-    // Apply sorting based on sortSubPaths flag
-    SortedResult sortedResult = getSortedResult(volumes, volumeSizes, sortSubPaths);
     List<DUResponse.DiskUsage> volumeDuData = new ArrayList<>();
     long totalDataSize = 0L;
     long totalDataSizeWithReplica = 0L;
-
-    for (OmVolumeArgs volume : sortedResult.sortedVolumes) {
+    for (OmVolumeArgs volume: volumes) {
       String volumeName = volume.getVolume();
       String subpath = omMetadataManager.getVolumeKey(volumeName);
       DUResponse.DiskUsage diskUsage = new DUResponse.DiskUsage();
@@ -156,6 +140,13 @@ public class RootEntityHandler extends EntityHandler {
       duResponse.setSizeWithReplica(totalDataSizeWithReplica);
     }
     duResponse.setSize(totalDataSize);
+
+    if (sortSubPaths) {
+      // Parallel sort volumeDuData in descending order of size
+      volumeDuData = sortDiskUsageDescendingWithLimit(volumeDuData,
+          DISK_USAGE_TOP_RECORDS_LIMIT);
+    }
+
     duResponse.setDuData(volumeDuData);
 
     return duResponse;
@@ -167,7 +158,8 @@ public class RootEntityHandler extends EntityHandler {
     QuotaUsageResponse quotaUsageResponse = new QuotaUsageResponse();
     SCMNodeStat stats = getReconSCM().getScmNodeManager().getStats();
     long quotaInBytes = stats.getCapacity().get();
-    long quotaUsedInBytes = getDuResponse(true, true, false).getSizeWithReplica();
+    long quotaUsedInBytes =
+        getDuResponse(true, true, false).getSizeWithReplica();
     quotaUsageResponse.setQuota(quotaInBytes);
     quotaUsageResponse.setQuotaUsed(quotaUsedInBytes);
     return quotaUsageResponse;
@@ -193,32 +185,6 @@ public class RootEntityHandler extends EntityHandler {
     }
     distResponse.setFileSizeDist(fileSizeDist);
     return distResponse;
-  }
-
-  private SortedResult getSortedResult(List<OmVolumeArgs> volumes,
-                                       Map<String, Long> volumeSizes,
-                                       boolean sortSubPaths) {
-    if (sortSubPaths) {
-      // Sort volumes based on the total size in descending order
-      List<OmVolumeArgs> sortedVolumes = volumes.stream()
-          .sorted((v1, v2) -> volumeSizes.get(v2.getVolume())
-              .compareTo(volumeSizes.get(v1.getVolume())))
-          .collect(Collectors.toList());
-      return new SortedResult(sortedVolumes, volumeSizes);
-    } else {
-      // Return volumes as is without sorting
-      return new SortedResult(new ArrayList<>(volumes), volumeSizes);
-    }
-  }
-
-  private static class SortedResult {
-    public final List<OmVolumeArgs> sortedVolumes;
-    public final Map<String, Long> volumeSizes;
-
-    public SortedResult(List<OmVolumeArgs> sortedVolumes, Map<String, Long> volumeSizes) {
-      this.sortedVolumes = sortedVolumes;
-      this.volumeSizes = volumeSizes;
-    }
   }
 
 }

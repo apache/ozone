@@ -30,16 +30,14 @@ import org.apache.hadoop.ozone.recon.api.types.NSSummary;
 import org.apache.hadoop.ozone.recon.api.types.ResponseStatus;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 import org.apache.hadoop.ozone.recon.spi.ReconNamespaceSummaryManager;
-import org.jetbrains.annotations.NotNull;
 
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
-import java.util.Map;
-import java.util.HashMap;
-import java.util.Comparator;
-import java.util.stream.Collectors;
+
+import static org.apache.hadoop.ozone.recon.ReconConstants.DISK_USAGE_TOP_RECORDS_LIMIT;
+import static org.apache.hadoop.ozone.recon.ReconUtils.sortDiskUsageDescendingWithLimit;
 
 /**
  * Class for handling bucket entity type.
@@ -110,13 +108,10 @@ public class BucketEntityHandler extends EntityHandler {
     // get object IDs for all its subdirectories
     Set<Long> bucketSubdirs = bucketNSSummary.getChildDir();
     duResponse.setKeySize(bucketNSSummary.getSizeOfFiles());
-
-    SortedResult result = getSortedResult(bucketSubdirs, sortSubpaths);
-
     List<DUResponse.DiskUsage> dirDUData = new ArrayList<>();
     long bucketDataSize = duResponse.getKeySize();
     long bucketDataSizeWithReplica = 0L;
-    for (long subdirObjectId : result.sortedSubdirObjectIds) {
+    for (long subdirObjectId: bucketSubdirs) {
       NSSummary subdirNSSummary = getReconNamespaceSummaryManager()
               .getNSSummary(subdirObjectId);
 
@@ -127,8 +122,7 @@ public class BucketEntityHandler extends EntityHandler {
       // format with leading slash and without trailing slash
       DUResponse.DiskUsage diskUsage = new DUResponse.DiskUsage();
       diskUsage.setSubpath(subpath);
-      long dataSize = result.subdirSizes.get(subdirObjectId);
-
+      long dataSize = getTotalSize(subdirObjectId);
       bucketDataSize += dataSize;
 
       if (withReplica) {
@@ -145,16 +139,21 @@ public class BucketEntityHandler extends EntityHandler {
       bucketDataSizeWithReplica += getBucketHandler()
               .handleDirectKeys(bucketObjectId, withReplica,
                   listFile, dirDUData, getNormalizedPath());
-      // Sort dirDUData by size in descending order after adding files
-      dirDUData.sort((du1, du2) -> Long.compare(du2.getSize(), du1.getSize()));
     }
-
     if (withReplica) {
       duResponse.setSizeWithReplica(bucketDataSizeWithReplica);
     }
     duResponse.setCount(dirDUData.size());
     duResponse.setSize(bucketDataSize);
+
+    if (sortSubpaths) {
+      // Parallel sort directory/files DU data in descending order of size
+      dirDUData = sortDiskUsageDescendingWithLimit(dirDUData,
+          DISK_USAGE_TOP_RECORDS_LIMIT);
+    }
+
     duResponse.setDuData(dirDUData);
+
     return duResponse;
   }
 
@@ -184,42 +183,5 @@ public class BucketEntityHandler extends EntityHandler {
     distResponse.setFileSizeDist(bucketFileSizeDist);
     return distResponse;
   }
-
-  @NotNull
-  private SortedResult getSortedResult(Set<Long> bucketSubdirs, boolean sortSubpaths)
-      throws IOException {
-    // Map to hold sizes for each subdir
-    Map<Long, Long> subdirSizes = new HashMap<>();
-    for (long subdirObjectId : bucketSubdirs) {
-      long dataSize = getTotalSize(subdirObjectId);
-      subdirSizes.put(subdirObjectId, dataSize);
-    }
-
-    List<Long> subdirObjectIds;
-    if (sortSubpaths) {
-      // Sort subdirs based on their size in descending order if sortSubpaths is true
-      subdirObjectIds = bucketSubdirs.stream().sorted(
-              Comparator.comparingLong(
-                  subdirObjectId -> subdirSizes.get(subdirObjectId)).reversed())
-          .collect(Collectors.toList());
-    } else {
-      // If sortSubpaths is false, return the subdirs as is, without sorting
-      subdirObjectIds = new ArrayList<>(bucketSubdirs);
-    }
-    return new SortedResult(subdirSizes, subdirObjectIds);
-  }
-
-
-  private static class SortedResult {
-    public final Map<Long, Long> subdirSizes;
-    public final List<Long> sortedSubdirObjectIds;
-
-    public SortedResult(Map<Long, Long> subdirSizes,
-                        List<Long> sortedSubdirObjectIds) {
-      this.subdirSizes = subdirSizes;
-      this.sortedSubdirObjectIds = sortedSubdirObjectIds;
-    }
-  }
-
 
 }

@@ -35,14 +35,12 @@ import org.apache.hadoop.ozone.recon.spi.ReconNamespaceSummaryManager;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.Comparator;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
 
-import java.util.stream.Collectors;
+import static org.apache.hadoop.ozone.recon.ReconConstants.DISK_USAGE_TOP_RECORDS_LIMIT;
+import static org.apache.hadoop.ozone.recon.ReconUtils.sortDiskUsageDescendingWithLimit;
 
 /**
  * Class for handling directory entity type.
@@ -105,12 +103,9 @@ public class DirectoryEntityHandler extends EntityHandler {
     duResponse.setKeySize(dirNSSummary.getSizeOfFiles());
     long dirDataSize = duResponse.getKeySize();
     long dirDataSizeWithReplica = 0L;
-
-    SortedSubdirsResult sortedResult = new SortedSubdirsResult(subdirs, sortSubPaths);
-
     List<DUResponse.DiskUsage> subdirDUData = new ArrayList<>();
     // iterate all subdirectories to get disk usage data
-    for (long subdirObjectId : sortedResult.sortedSubdirObjectIds) {
+    for (long subdirObjectId: subdirs) {
       NSSummary subdirNSSummary =
               getReconNamespaceSummaryManager().getNSSummary(subdirObjectId);
       // for the subdirName we need the subdir filename, not the key name
@@ -136,7 +131,7 @@ public class DirectoryEntityHandler extends EntityHandler {
       DUResponse.DiskUsage diskUsage = new DUResponse.DiskUsage();
       // reformat the response
       diskUsage.setSubpath(subpath);
-      long dataSize = sortedResult.subdirSizes.get(subdirObjectId);
+      long dataSize = getTotalSize(subdirObjectId);
       dirDataSize += dataSize;
 
       if (withReplica) {
@@ -155,9 +150,6 @@ public class DirectoryEntityHandler extends EntityHandler {
       dirDataSizeWithReplica += getBucketHandler()
               .handleDirectKeys(dirObjectId, withReplica,
                   listFile, subdirDUData, getNormalizedPath());
-      // Sort dirDUData by size in descending order after adding files
-      subdirDUData.sort(
-          (du1, du2) -> Long.compare(du2.getSize(), du1.getSize()));
     }
 
     if (withReplica) {
@@ -165,6 +157,13 @@ public class DirectoryEntityHandler extends EntityHandler {
     }
     duResponse.setCount(subdirDUData.size());
     duResponse.setSize(dirDataSize);
+
+    if (sortSubPaths) {
+      // Parallel sort subdirDUData in descending order of size
+      subdirDUData = sortDiskUsageDescendingWithLimit(subdirDUData,
+          DISK_USAGE_TOP_RECORDS_LIMIT);
+    }
+
     duResponse.setDuData(subdirDUData);
 
     return duResponse;
@@ -189,27 +188,5 @@ public class DirectoryEntityHandler extends EntityHandler {
     distResponse.setFileSizeDist(dirFileSizeDist);
     return distResponse;
   }
-
-  private class SortedSubdirsResult {
-    public final List<Long> sortedSubdirObjectIds;
-    public final Map<Long, Long> subdirSizes;
-
-    public SortedSubdirsResult(Set<Long> subdirs, boolean sortSubPaths) throws IOException {
-      this.subdirSizes = new HashMap<>();
-      for (long subdirObjectId : subdirs) {
-        long dataSize = getTotalSize(subdirObjectId);
-        this.subdirSizes.put(subdirObjectId, dataSize);
-      }
-
-      if (sortSubPaths) {
-        this.sortedSubdirObjectIds = subdirs.stream()
-            .sorted(Comparator.comparingLong(subdirObjectId -> this.subdirSizes.get(subdirObjectId)).reversed())
-            .collect(Collectors.toList());
-      } else {
-        this.sortedSubdirObjectIds = new ArrayList<>(subdirs);
-      }
-    }
-  }
-
 
 }
