@@ -86,14 +86,14 @@ public class DatanodeDetails extends NodeImpl implements
 
   private String ipAddress;
   private String hostName;
-  private List<Port> ports;
+  private final List<Port> ports;
   private String certSerialId;
   private String version;
   private long setupTime;
   private String revision;
   private String buildDate;
   private volatile HddsProtos.NodeOperationalState persistedOpState;
-  private volatile long persistedOpStateExpiryEpochSec = 0;
+  private volatile long persistedOpStateExpiryEpochSec;
   private int initialVersion;
   private int currentVersion;
 
@@ -843,9 +843,6 @@ public class DatanodeDetails extends NodeImpl implements
     /**
      * Private constructor for constructing Port object. Use
      * DatanodeDetails#newPort to create a new Port object.
-     *
-     * @param name
-     * @param value
      */
     private Port(Name name, Integer value) {
       this.name = name;
@@ -1004,9 +1001,8 @@ public class DatanodeDetails extends NodeImpl implements
   @Override
   public HddsProtos.NetworkNode toProtobuf(
       int clientVersion) {
-    HddsProtos.NetworkNode networkNode =
-        HddsProtos.NetworkNode.newBuilder()
-            .setDatanodeDetails(toProtoBuilder(clientVersion).build()).build();
-    return networkNode;
+    return HddsProtos.NetworkNode.newBuilder()
+        .setDatanodeDetails(toProtoBuilder(clientVersion).build())
+        .build();
   }
 }
