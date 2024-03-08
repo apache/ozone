@@ -30,6 +30,7 @@ import org.apache.hadoop.ozone.recon.spi.StorageContainerServiceProvider;
 import org.apache.hadoop.ozone.recon.spi.impl.OzoneManagerServiceProviderImpl;
 import org.apache.hadoop.ozone.recon.spi.impl.StorageContainerServiceProviderImpl;
 import org.apache.hadoop.ozone.recon.tasks.NSSummaryTaskWithFSO;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.getMockOzoneManagerServiceProviderWithFSO;
 import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.getTestReconOmMetadataManager;
@@ -158,7 +159,7 @@ public class TestNSSummaryDiskUsageOrdering {
   private void verifyOrdering(String path)
       throws IOException {
     Response response =
-        nsSummaryEndpoint.getDiskUsage(path, true, false);
+        nsSummaryEndpoint.getDiskUsage(path, true, false,true);
     DUResponse duRes = (DUResponse) response.getEntity();
     List<DUResponse.DiskUsage> duData = duRes.getDuData();
     List<DUResponse.DiskUsage> sortedDuData = new ArrayList<>(duData);
@@ -182,27 +183,27 @@ public class TestNSSummaryDiskUsageOrdering {
    * ├── volA
    * │   ├── bucketA1
    * │   │   ├── fileA1 (Size: 600KB)
-   * │   │   ├── fileA2 (Size: 800KB)
+   * │   │   ├── fileA2 (Size: 80KB)
    * │   │   ├── dirA1 (Total Size: 1500KB)
    * │   │   ├── dirA2 (Total Size: 1700KB)
    * │   │   └── dirA3 (Total Size: 1300KB)
    * │   ├── bucketA2
    * │   │   ├── fileA3 (Size: 200KB)
-   * │   │   ├── fileA4 (Size: 400KB)
+   * │   │   ├── fileA4 (Size: 4000KB)
    * │   │   ├── dirA4 (Total Size: 1100KB)
    * │   │   ├── dirA5 (Total Size: 1900KB)
-   * │   │   └── dirA6 (Total Size: 2100KB)
+   * │   │   └── dirA6 (Total Size: 210KB)
    * │   └── bucketA3
-   * │       ├── fileA5 (Size: 500KB)
+   * │       ├── fileA5 (Size: 5000KB)
    * │       ├── fileA6 (Size: 700KB)
    * │       ├── dirA7 (Total Size: 1200KB)
    * │       ├── dirA8 (Total Size: 1600KB)
-   * │       └── dirA9 (Total Size: 1800KB)
+   * │       └── dirA9 (Total Size: 180KB)
    * └── volB
    *     └── bucketB1
    *         ├── fileB1 (Size: 300KB)
    *         ├── fileB2 (Size: 500KB)
-   *         ├── dirB1 (Total Size: 1400KB)
+   *         ├── dirB1 (Total Size: 14000KB)
    *         ├── dirB2 (Total Size: 1800KB)
    *         └── dirB3 (Total Size: 2200KB)
    *
@@ -215,15 +216,15 @@ public class TestNSSummaryDiskUsageOrdering {
 
     // Create Buckets in volA
     long bucketA1ObjectId =
-        createBucket("volA", "bucketA1", 600 + 800 + 1500 + 1700 + 1300);
+        createBucket("volA", "bucketA1", 600 + 80 + 1500 + 1700 + 1300);
     long bucketA2ObjectId =
-        createBucket("volA", "bucketA2", 200 + 400 + 1100 + 1900 + 2100);
+        createBucket("volA", "bucketA2", 200 + 4000 + 1100 + 1900 + 210);
     long bucketA3ObjectId =
-        createBucket("volA", "bucketA3", 500 + 700 + 1200 + 1600 + 1800);
+        createBucket("volA", "bucketA3", 5000 + 700 + 1200 + 1600 + 180);
 
     // Create Bucket in volB
     long bucketB1ObjectId =
-        createBucket("volB", "bucketB1", 300 + 500 + 1400 + 1800 + 2200);
+        createBucket("volB", "bucketB1", 300 + 500 + 14000 + 1800 + 2200);
 
     // Create Directories and Files under bucketA1
     long dirA1ObjectId =
@@ -240,7 +241,7 @@ public class TestNSSummaryDiskUsageOrdering {
     createFile("fileA1", "bucketA1", "volA", "fileA1", bucketA1ObjectId,
         bucketA1ObjectId, volAObjectId, 600 * 1024);
     createFile("fileA2", "bucketA1", "volA", "fileA2", bucketA1ObjectId,
-        bucketA1ObjectId, volAObjectId, 800 * 1024);
+        bucketA1ObjectId, volAObjectId, 80 * 1024);
 
     // Create Directories and Files under bucketA2
     long dirA4ObjectId =
@@ -257,7 +258,7 @@ public class TestNSSummaryDiskUsageOrdering {
     createFile("fileA3", "bucketA2", "volA", "fileA3", bucketA2ObjectId,
         bucketA2ObjectId, volAObjectId, 200 * 1024);
     createFile("fileA4", "bucketA2", "volA", "fileA4", bucketA2ObjectId,
-        bucketA2ObjectId, volAObjectId, 400 * 1024);
+        bucketA2ObjectId, volAObjectId, 4000 * 1024);
 
     // Create Directories and Files under bucketA3
     long dirA7ObjectId =
@@ -272,7 +273,7 @@ public class TestNSSummaryDiskUsageOrdering {
 
     // Files directly under bucketA3
     createFile("fileA5", "bucketA3", "volA", "fileA5", bucketA3ObjectId,
-        bucketA3ObjectId, volAObjectId, 500 * 1024);
+        bucketA3ObjectId, volAObjectId, 5000 * 1024);
     createFile("fileA6", "bucketA3", "volA", "fileA6", bucketA3ObjectId,
         bucketA3ObjectId, volAObjectId, 700 * 1024);
 
@@ -305,15 +306,15 @@ public class TestNSSummaryDiskUsageOrdering {
     createFile("dirA5/innerFile", "bucketA2", "volA", "innerFile",
         dirA5ObjectId, bucketA2ObjectId, volAObjectId, 1900 * 1024);
     createFile("dirA6/innerFile", "bucketA2", "volA", "innerFile",
-        dirA6ObjectId, bucketA2ObjectId, volAObjectId, 2100 * 1024);
+        dirA6ObjectId, bucketA2ObjectId, volAObjectId, 210 * 1024);
     createFile("dirA7/innerFile", "bucketA3", "volA", "innerFile",
         dirA7ObjectId, bucketA3ObjectId, volAObjectId, 1200 * 1024);
     createFile("dirA8/innerFile", "bucketA3", "volA", "innerFile",
         dirA8ObjectId, bucketA3ObjectId, volAObjectId, 1600 * 1024);
     createFile("dirA9/innerFile", "bucketA3", "volA", "innerFile",
-        dirA9ObjectId, bucketA3ObjectId, volAObjectId, 1800 * 1024);
+        dirA9ObjectId, bucketA3ObjectId, volAObjectId, 180 * 1024);
     createFile("dirB1/innerFile", "bucketB1", "volB", "innerFile",
-        dirB1ObjectId, bucketB1ObjectId, volBObjectId, 1400 * 1024);
+        dirB1ObjectId, bucketB1ObjectId, volBObjectId, 14000 * 1024);
     createFile("dirB2/innerFile", "bucketB1", "volB", "innerFile",
         dirB2ObjectId, bucketB1ObjectId, volBObjectId, 1800 * 1024);
     createFile("dirB3/innerFile", "bucketB1", "volB", "innerFile",

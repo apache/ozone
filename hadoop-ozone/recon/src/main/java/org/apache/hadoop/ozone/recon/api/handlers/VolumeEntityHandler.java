@@ -92,7 +92,7 @@ public class VolumeEntityHandler extends EntityHandler {
 
   @Override
   public DUResponse getDuResponse(
-          boolean listFile, boolean withReplica)
+      boolean listFile, boolean withReplica, boolean sortSubPaths)
           throws IOException {
     DUResponse duResponse = new DUResponse();
     duResponse.setPath(getNormalizedPath());
@@ -101,9 +101,11 @@ public class VolumeEntityHandler extends EntityHandler {
     List<OmBucketInfo> buckets = getOmMetadataManager().
         listBucketsUnderVolume(volName);
 
-    // Sort buckets in descending order by size
-    buckets.sort(
-        (b1, b2) -> Long.compare(b2.getUsedBytes(), b1.getUsedBytes()));
+    if (sortSubPaths) {
+      // Sort buckets in descending order by size if sortSubPaths is true
+      buckets.sort(
+          (b1, b2) -> Long.compare(b2.getUsedBytes(), b1.getUsedBytes()));
+    }
 
     duResponse.setCount(buckets.size());
 

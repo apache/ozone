@@ -30,6 +30,7 @@ import org.apache.hadoop.ozone.recon.api.types.NSSummary;
 import org.apache.hadoop.ozone.recon.api.types.ResponseStatus;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 import org.apache.hadoop.ozone.recon.spi.ReconNamespaceSummaryManager;
+import org.jetbrains.annotations.NotNull;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -91,7 +92,7 @@ public class BucketEntityHandler extends EntityHandler {
 
   @Override
   public DUResponse getDuResponse(
-          boolean listFile, boolean withReplica)
+      boolean listFile, boolean withReplica, boolean sortSubpaths)
           throws IOException {
     DUResponse duResponse = new DUResponse();
     duResponse.setPath(getNormalizedPath());
@@ -110,23 +111,12 @@ public class BucketEntityHandler extends EntityHandler {
     Set<Long> bucketSubdirs = bucketNSSummary.getChildDir();
     duResponse.setKeySize(bucketNSSummary.getSizeOfFiles());
 
-    // Map to hold sizes for each subdir for sorting
-    Map<Long, Long> subdirSizes = new HashMap<>();
-    for (long subdirObjectId : bucketSubdirs) {
-      long dataSize = getTotalSize(subdirObjectId);
-      subdirSizes.put(subdirObjectId, dataSize);
-    }
-
-    // Sort subdirs based on their size in descending order
-    List<Long> sortedSubdirObjectIds = bucketSubdirs.stream().sorted(
-            Comparator.comparingLong(
-                subdirObjectId -> subdirSizes.get(subdirObjectId)).reversed())
-        .collect(Collectors.toList());
+    SortedResult result = getSortedResult(bucketSubdirs, sortSubpaths);
 
     List<DUResponse.DiskUsage> dirDUData = new ArrayList<>();
     long bucketDataSize = duResponse.getKeySize();
     long bucketDataSizeWithReplica = 0L;
-    for (long subdirObjectId : sortedSubdirObjectIds) {
+    for (long subdirObjectId : result.sortedSubdirObjectIds) {
       NSSummary subdirNSSummary = getReconNamespaceSummaryManager()
               .getNSSummary(subdirObjectId);
 
@@ -137,7 +127,7 @@ public class BucketEntityHandler extends EntityHandler {
       // format with leading slash and without trailing slash
       DUResponse.DiskUsage diskUsage = new DUResponse.DiskUsage();
       diskUsage.setSubpath(subpath);
-      long dataSize = subdirSizes.get(subdirObjectId);
+      long dataSize = result.subdirSizes.get(subdirObjectId);
 
       bucketDataSize += dataSize;
 
@@ -194,5 +184,42 @@ public class BucketEntityHandler extends EntityHandler {
     distResponse.setFileSizeDist(bucketFileSizeDist);
     return distResponse;
   }
+
+  @NotNull
+  private SortedResult getSortedResult(Set<Long> bucketSubdirs, boolean sortSubpaths)
+      throws IOException {
+    // Map to hold sizes for each subdir
+    Map<Long, Long> subdirSizes = new HashMap<>();
+    for (long subdirObjectId : bucketSubdirs) {
+      long dataSize = getTotalSize(subdirObjectId);
+      subdirSizes.put(subdirObjectId, dataSize);
+    }
+
+    List<Long> subdirObjectIds;
+    if (sortSubpaths) {
+      // Sort subdirs based on their size in descending order if sortSubpaths is true
+      subdirObjectIds = bucketSubdirs.stream().sorted(
+              Comparator.comparingLong(
+                  subdirObjectId -> subdirSizes.get(subdirObjectId)).reversed())
+          .collect(Collectors.toList());
+    } else {
+      // If sortSubpaths is false, return the subdirs as is, without sorting
+      subdirObjectIds = new ArrayList<>(bucketSubdirs);
+    }
+    return new SortedResult(subdirSizes, subdirObjectIds);
+  }
+
+
+  private static class SortedResult {
+    public final Map<Long, Long> subdirSizes;
+    public final List<Long> sortedSubdirObjectIds;
+
+    public SortedResult(Map<Long, Long> subdirSizes,
+                        List<Long> sortedSubdirObjectIds) {
+      this.subdirSizes = subdirSizes;
+      this.sortedSubdirObjectIds = sortedSubdirObjectIds;
+    }
+  }
+
 
 }

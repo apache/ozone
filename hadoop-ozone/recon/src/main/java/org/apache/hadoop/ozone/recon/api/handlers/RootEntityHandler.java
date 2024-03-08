@@ -37,6 +37,7 @@ import org.apache.hadoop.hdds.scm.container.placement.metrics.SCMNodeStat;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -90,7 +91,7 @@ public class RootEntityHandler extends EntityHandler {
 
   @Override
   public DUResponse getDuResponse(
-          boolean listFile, boolean withReplica)
+      boolean listFile, boolean withReplica, boolean sortSubPaths)
           throws IOException {
     DUResponse duResponse = new DUResponse();
     duResponse.setPath(getNormalizedPath());
@@ -111,14 +112,13 @@ public class RootEntityHandler extends EntityHandler {
       volumeSizes.put(volume.getVolume(), totalVolumeSize);
     }
 
-    // Sort volumes based on the total size in descending order
-    volumes.sort((v1, v2) -> volumeSizes.get(v2.getVolume())
-        .compareTo(volumeSizes.get(v1.getVolume())));
-
+    // Apply sorting based on sortSubPaths flag
+    SortedResult sortedResult = getSortedResult(volumes, volumeSizes, sortSubPaths);
     List<DUResponse.DiskUsage> volumeDuData = new ArrayList<>();
     long totalDataSize = 0L;
     long totalDataSizeWithReplica = 0L;
-    for (OmVolumeArgs volume: volumes) {
+
+    for (OmVolumeArgs volume : sortedResult.sortedVolumes) {
       String volumeName = volume.getVolume();
       String subpath = omMetadataManager.getVolumeKey(volumeName);
       DUResponse.DiskUsage diskUsage = new DUResponse.DiskUsage();
@@ -167,7 +167,7 @@ public class RootEntityHandler extends EntityHandler {
     QuotaUsageResponse quotaUsageResponse = new QuotaUsageResponse();
     SCMNodeStat stats = getReconSCM().getScmNodeManager().getStats();
     long quotaInBytes = stats.getCapacity().get();
-    long quotaUsedInBytes = getDuResponse(true, true).getSizeWithReplica();
+    long quotaUsedInBytes = getDuResponse(true, true, false).getSizeWithReplica();
     quotaUsageResponse.setQuota(quotaInBytes);
     quotaUsageResponse.setQuotaUsed(quotaUsedInBytes);
     return quotaUsageResponse;
@@ -193,6 +193,32 @@ public class RootEntityHandler extends EntityHandler {
     }
     distResponse.setFileSizeDist(fileSizeDist);
     return distResponse;
+  }
+
+  private SortedResult getSortedResult(List<OmVolumeArgs> volumes,
+                                       Map<String, Long> volumeSizes,
+                                       boolean sortSubPaths) {
+    if (sortSubPaths) {
+      // Sort volumes based on the total size in descending order
+      List<OmVolumeArgs> sortedVolumes = volumes.stream()
+          .sorted((v1, v2) -> volumeSizes.get(v2.getVolume())
+              .compareTo(volumeSizes.get(v1.getVolume())))
+          .collect(Collectors.toList());
+      return new SortedResult(sortedVolumes, volumeSizes);
+    } else {
+      // Return volumes as is without sorting
+      return new SortedResult(new ArrayList<>(volumes), volumeSizes);
+    }
+  }
+
+  private static class SortedResult {
+    public final List<OmVolumeArgs> sortedVolumes;
+    public final Map<String, Long> volumeSizes;
+
+    public SortedResult(List<OmVolumeArgs> sortedVolumes, Map<String, Long> volumeSizes) {
+      this.sortedVolumes = sortedVolumes;
+      this.volumeSizes = volumeSizes;
+    }
   }
 
 }

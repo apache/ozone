@@ -85,7 +85,7 @@ public class DirectoryEntityHandler extends EntityHandler {
 
   @Override
   public DUResponse getDuResponse(
-          boolean listFile, boolean withReplica)
+      boolean listFile, boolean withReplica, boolean sortSubPaths)
           throws IOException {
     DUResponse duResponse = new DUResponse();
     duResponse.setPath(getNormalizedPath());
@@ -106,22 +106,11 @@ public class DirectoryEntityHandler extends EntityHandler {
     long dirDataSize = duResponse.getKeySize();
     long dirDataSizeWithReplica = 0L;
 
-    // Map to hold sizes for each subdir for sorting
-    Map<Long, Long> subdirSizes = new HashMap<>();
-    for (long subdirObjectId : subdirs) {
-      long dataSize = getTotalSize(subdirObjectId);
-      subdirSizes.put(subdirObjectId, dataSize);
-    }
-
-    // Sort subdirs based on their size in descending order
-    List<Long> sortedSubdirObjectIds = subdirs.stream()
-        .sorted(Comparator.comparingLong(
-            subdirObjectId -> subdirSizes.get(subdirObjectId)).reversed())
-        .collect(Collectors.toList());
+    SortedSubdirsResult sortedResult = new SortedSubdirsResult(subdirs, sortSubPaths);
 
     List<DUResponse.DiskUsage> subdirDUData = new ArrayList<>();
     // iterate all subdirectories to get disk usage data
-    for (long subdirObjectId : sortedSubdirObjectIds) {
+    for (long subdirObjectId : sortedResult.sortedSubdirObjectIds) {
       NSSummary subdirNSSummary =
               getReconNamespaceSummaryManager().getNSSummary(subdirObjectId);
       // for the subdirName we need the subdir filename, not the key name
@@ -147,7 +136,7 @@ public class DirectoryEntityHandler extends EntityHandler {
       DUResponse.DiskUsage diskUsage = new DUResponse.DiskUsage();
       // reformat the response
       diskUsage.setSubpath(subpath);
-      long dataSize = subdirSizes.get(subdirObjectId);
+      long dataSize = sortedResult.subdirSizes.get(subdirObjectId);
       dirDataSize += dataSize;
 
       if (withReplica) {
@@ -200,5 +189,27 @@ public class DirectoryEntityHandler extends EntityHandler {
     distResponse.setFileSizeDist(dirFileSizeDist);
     return distResponse;
   }
+
+  private class SortedSubdirsResult {
+    public final List<Long> sortedSubdirObjectIds;
+    public final Map<Long, Long> subdirSizes;
+
+    public SortedSubdirsResult(Set<Long> subdirs, boolean sortSubPaths) throws IOException {
+      this.subdirSizes = new HashMap<>();
+      for (long subdirObjectId : subdirs) {
+        long dataSize = getTotalSize(subdirObjectId);
+        this.subdirSizes.put(subdirObjectId, dataSize);
+      }
+
+      if (sortSubPaths) {
+        this.sortedSubdirObjectIds = subdirs.stream()
+            .sorted(Comparator.comparingLong(subdirObjectId -> this.subdirSizes.get(subdirObjectId)).reversed())
+            .collect(Collectors.toList());
+      } else {
+        this.sortedSubdirObjectIds = new ArrayList<>(subdirs);
+      }
+    }
+  }
+
 
 }
