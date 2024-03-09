@@ -2105,6 +2105,13 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
           </dependency>
         </dependencies>
       </plugin>
+      <plugin>
+        <groupId>org.apache.rat</groupId>
+        <artifactId>apache-rat-plugin</artifactId>
+        <configuration>
+          <excludesFile>dev-support/rat/rat-exclusions.txt</excludesFile>
+        </configuration>
+      </plugin>
     </plugins>
   </build>
 
