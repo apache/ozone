@@ -407,6 +407,13 @@
       </modules>
     </profile>
     <profile>
+      <id>go-offline</id>
+      <modules>
+        <module>ozonefs-shaded</module>
+        <module>ozonefs-hadoop2</module>
+      </modules>
+    </profile>
+    <profile>
       <id>build-with-recon</id>
       <activation>
         <property>
