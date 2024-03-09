@@ -256,7 +256,7 @@ public abstract class EntityHandler {
     return names;
   }
 
-  private static String normalizePath(String path) {
+  public static String normalizePath(String path) {
     return OM_KEY_PREFIX + OmUtils.normalizeKey(path, false);
   }
 }
