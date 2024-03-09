@@ -217,7 +217,6 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
     <okio.version>3.6.0</okio.version>
     <mockito.version>4.11.0</mockito.version>
     <hamcrest.version>2.2</hamcrest.version>
-    <jmockit.version>1.24</jmockit.version>
     <junit5.version>5.10.1</junit5.version>
     <zookeeper.version>3.7.2</zookeeper.version>
 
@@ -1268,11 +1267,6 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
         <version>${jackson2-bom.version}</version>
         <type>pom</type>
         <scope>import</scope>
-      </dependency>
-      <dependency>
-        <groupId>org.jmockit</groupId>
-        <artifactId>jmockit</artifactId>
-        <version>${jmockit.version}</version>
       </dependency>
       <dependency>
         <groupId>org.mockito</groupId>
