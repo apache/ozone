@@ -45,9 +45,7 @@ import javax.ws.rs.Produces;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Set;
+import java.util.*;
 
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 import static org.apache.hadoop.ozone.recon.api.handlers.BucketHandler.getBucketHandler;
@@ -62,30 +60,23 @@ import static org.apache.hadoop.ozone.recon.api.handlers.EntityHandler.parseRequ
 @AdminOnly
 public class OMDBInsightSearchEndpoint {
 
-  @Inject
-  private ContainerEndpoint containerEndpoint;
   private OzoneStorageContainerManager reconSCM;
-  @Inject
-  private ReconContainerMetadataManager reconContainerMetadataManager;
   private final ReconOMMetadataManager omMetadataManager;
   private final ReconContainerManager containerManager;
   private static final Logger LOG =
       LoggerFactory.getLogger(OMDBInsightSearchEndpoint.class);
-  private final GlobalStatsDao globalStatsDao;
   private ReconNamespaceSummaryManagerImpl reconNamespaceSummaryManager;
 
 
   @Inject
   public OMDBInsightSearchEndpoint(OzoneStorageContainerManager reconSCM,
-                             ReconOMMetadataManager omMetadataManager,
-                             GlobalStatsDao globalStatsDao,
-                             ReconNamespaceSummaryManagerImpl
-                                 reconNamespaceSummaryManager) {
+                                   ReconOMMetadataManager omMetadataManager,
+                                   ReconNamespaceSummaryManagerImpl
+                                       reconNamespaceSummaryManager) {
     this.reconSCM = reconSCM;
     this.containerManager =
         (ReconContainerManager) reconSCM.getContainerManager();
     this.omMetadataManager = omMetadataManager;
-    this.globalStatsDao = globalStatsDao;
     this.reconNamespaceSummaryManager = reconNamespaceSummaryManager;
   }
 
@@ -100,40 +91,42 @@ public class OMDBInsightSearchEndpoint {
    */
   @GET
   @Path("/openKeys/search")
-  public Response searchOpenKeys(@QueryParam("searchPrefix") String searchPrefix,
-                                 @DefaultValue("10") @QueryParam("limit") int limit)
+  public Response searchOpenKeys(
+      @QueryParam("searchPrefix") String searchPrefix,
+      @DefaultValue("10") @QueryParam("limit") int limit)
       throws IOException {
     if (searchPrefix == null || searchPrefix.trim().isEmpty()) {
-      return createBadRequestResponse("The searchPrefix query parameter is required.");
+      return createBadRequestResponse(
+          "The searchPrefix query parameter is required.");
     }
 
     KeyInsightInfoResponse insightResponse = new KeyInsightInfoResponse();
-    List<KeyEntityInfo> fsoKeyInfoList = new ArrayList<>();
-    List<KeyEntityInfo> nonFsoKeyInfoList = new ArrayList<>();
     long replicatedTotal = 0;
     long unreplicatedTotal = 0;
 
-    // Fetch keys from OBS layout
-    List<OmKeyInfo> obsKeys = searchOpenKeysInOBS(searchPrefix, limit);
-    for (OmKeyInfo keyInfo : obsKeys) {
-      KeyEntityInfo keyEntityInfo = createKeyEntityInfoFromOmKeyInfo(keyInfo);
-      nonFsoKeyInfoList.add(keyEntityInfo); // Add to non-FSO list
-      replicatedTotal += keyInfo.getReplicatedSize();
-      unreplicatedTotal += keyInfo.getDataSize() - keyInfo.getReplicatedSize();
+    // Fetch keys from OBS layout and convert them into KeyEntityInfo objects
+    Map<String, OmKeyInfo> obsKeys = searchOpenKeysInOBS(searchPrefix, limit);
+    for (Map.Entry<String, OmKeyInfo> entry : obsKeys.entrySet()) {
+      KeyEntityInfo keyEntityInfo =
+          createKeyEntityInfoFromOmKeyInfo(entry.getKey(), entry.getValue());
+      insightResponse.getNonFSOKeyInfoList()
+          .add(keyEntityInfo); // Add to non-FSO list
+      replicatedTotal += entry.getValue().getReplicatedSize();
+      unreplicatedTotal += entry.getValue().getDataSize();
     }
 
     // Fetch keys from FSO layout, if the limit is not yet reached
-    List<OmKeyInfo> fsoKeys = searchOpenKeysInFSO(searchPrefix, limit);
-    for (OmKeyInfo keyInfo : fsoKeys) {
-      KeyEntityInfo keyEntityInfo = createKeyEntityInfoFromOmKeyInfo(keyInfo);
-      fsoKeyInfoList.add(keyEntityInfo); // Add to FSO list
-      replicatedTotal += keyInfo.getReplicatedSize();
-      unreplicatedTotal += keyInfo.getDataSize();
+    Map<String, OmKeyInfo> fsoKeys =
+        searchOpenKeysInFSO(searchPrefix, limit - obsKeys.size());
+    for (Map.Entry<String, OmKeyInfo> entry : fsoKeys.entrySet()) {
+      KeyEntityInfo keyEntityInfo =
+          createKeyEntityInfoFromOmKeyInfo(entry.getKey(), entry.getValue());
+      insightResponse.getFsoKeyInfoList().add(keyEntityInfo); // Add to FSO list
+      replicatedTotal += entry.getValue().getReplicatedSize();
+      unreplicatedTotal += entry.getValue().getDataSize();
     }
 
-    // Set the fetched keys and totals in the response
-    insightResponse.setFsoKeyInfoList(fsoKeyInfoList);
-    insightResponse.setNonFSOKeyInfoList(nonFsoKeyInfoList);
+    // Set the aggregated totals in the response
     insightResponse.setReplicatedDataSize(replicatedTotal);
     insightResponse.setUnreplicatedDataSize(unreplicatedTotal);
 
@@ -141,15 +134,18 @@ public class OMDBInsightSearchEndpoint {
   }
 
   /**
-   * Creates a KeyEntityInfo object from an OmKeyInfo object.
+   * Creates a KeyEntityInfo object from an OmKeyInfo object and the corresponding key.
    *
+   * @param dbKey   The key in the database corresponding to the OmKeyInfo object.
    * @param keyInfo The OmKeyInfo object to create the KeyEntityInfo from.
-   * @return The KeyEntityInfo object created from the OmKeyInfo object.
+   * @return The KeyEntityInfo object created from the OmKeyInfo object and the key.
    */
-  private KeyEntityInfo createKeyEntityInfoFromOmKeyInfo(OmKeyInfo keyInfo) {
+  private KeyEntityInfo createKeyEntityInfoFromOmKeyInfo(String dbKey,
+                                                         OmKeyInfo keyInfo) {
     KeyEntityInfo keyEntityInfo = new KeyEntityInfo();
-    keyEntityInfo.setKey(keyInfo.getKeyName());
-    keyEntityInfo.setPath(keyInfo.getKeyName()); // Assuming path is the same as key name
+    keyEntityInfo.setKey(dbKey); // Set the DB key
+    keyEntityInfo.setPath(
+        keyInfo.getKeyName()); // Assuming path is the same as key name
     keyEntityInfo.setInStateSince(keyInfo.getCreationTime());
     keyEntityInfo.setSize(keyInfo.getDataSize());
     keyEntityInfo.setReplicatedSize(keyInfo.getReplicatedSize());
@@ -157,10 +153,13 @@ public class OMDBInsightSearchEndpoint {
     return keyEntityInfo;
   }
 
-  public List<OmKeyInfo> searchOpenKeysInOBS(String searchPrefix, int limit)
+
+  public Map<String, OmKeyInfo> searchOpenKeysInOBS(String searchPrefix,
+                                                    int limit)
       throws IOException {
 
-    List<OmKeyInfo> matchedKeys = new ArrayList<>();
+    Map<String, OmKeyInfo> matchedKeys =
+        new LinkedHashMap<>(); // Preserves the insertion order
     Table<String, OmKeyInfo> openKeyTable =
         omMetadataManager.getOpenKeyTable(BucketLayout.LEGACY);
 
@@ -170,23 +169,26 @@ public class OMDBInsightSearchEndpoint {
       keyIter.seek(searchPrefix);
       while (keyIter.hasNext() && matchedKeys.size() < limit) {
         Table.KeyValue<String, OmKeyInfo> entry = keyIter.next();
-        String key = entry.getKey();
-        if (!key.startsWith(searchPrefix)) {
+        String dbKey = entry.getKey(); // Get the DB key
+        if (!dbKey.startsWith(searchPrefix)) {
           break; // Exit the loop if the key no longer matches the prefix
         }
-        matchedKeys.add(entry.getValue());
+        // Add the DB key and OmKeyInfo object to the map
+        matchedKeys.put(dbKey, entry.getValue());
       }
     } catch (NullPointerException | IOException exception) {
-      LOG.error("Error retrieving keys from openFileTable for path: {} ",
+      LOG.error("Error retrieving keys from openKeyTable for path: {}",
           searchPrefix, exception);
     }
 
     return matchedKeys;
   }
 
-  public List<OmKeyInfo> searchOpenKeysInFSO(String searchPrefix, int limit)
+
+  public Map<String, OmKeyInfo> searchOpenKeysInFSO(String searchPrefix,
+                                                    int limit)
       throws IOException {
-    List<OmKeyInfo> matchedKeys = new ArrayList<>();
+    Map<String, OmKeyInfo> matchedKeys = new LinkedHashMap<>();
     // Convert the search prefix to an object path for FSO buckets
     String searchPrefixObjectPath = convertToObjectPath(searchPrefix);
     String[] names = parseRequestPath(searchPrefixObjectPath);
@@ -214,7 +216,7 @@ public class OMDBInsightSearchEndpoint {
 
       // Iterate over the subpaths and retrieve the open files
       for (String subPath : subPaths) {
-        matchedKeys.addAll(
+        matchedKeys.putAll(
             retrieveKeysFromOpenFileTable(subPath, limit - matchedKeys.size()));
         if (matchedKeys.size() >= limit) {
           break;
@@ -224,42 +226,37 @@ public class OMDBInsightSearchEndpoint {
     }
 
     // Iterate over for bucket and volume level search
-    matchedKeys.addAll(retrieveKeysFromOpenFileTable(searchPrefixObjectPath,
+    matchedKeys.putAll(retrieveKeysFromOpenFileTable(searchPrefixObjectPath,
         limit - matchedKeys.size()));
     return matchedKeys;
   }
 
 
-  private List<OmKeyInfo> retrieveKeysFromOpenFileTable(String subPath,
-                                                        int limit)
+  private Map<String, OmKeyInfo> retrieveKeysFromOpenFileTable(String subPath,
+                                                               int limit)
       throws IOException {
 
-    // Iterate the file table.
-    Table<String,OmKeyInfo> table = omMetadataManager.getFileTable();
-    TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>> iterator = table.iterator();
-    while (iterator.hasNext()) {
-      OmKeyInfo keyInfo = iterator.next().getValue();
-      System.out.println("Key: " + iterator.next().getKey() + " Size: " + keyInfo.getDataSize());
-    }
-
-
-    List<OmKeyInfo> matchedKeys = new ArrayList<>();
+    Map<String, OmKeyInfo> matchedKeys =
+        new LinkedHashMap<>(); // Preserves the insertion order
     Table<String, OmKeyInfo> openFileTable =
         omMetadataManager.getOpenKeyTable(BucketLayout.FILE_SYSTEM_OPTIMIZED);
+
     try (
         TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>> keyIter =
             openFileTable.iterator()) {
       keyIter.seek(subPath);
       while (keyIter.hasNext() && matchedKeys.size() < limit) {
         Table.KeyValue<String, OmKeyInfo> entry = keyIter.next();
-        String key = entry.getKey();
-        if (!key.startsWith(subPath)) {
+        String dbKey = entry.getKey(); // Get the DB key
+        if (!dbKey.startsWith(subPath)) {
           break; // Exit the loop if the key no longer matches the prefix
         }
-        matchedKeys.add(entry.getValue());
+        // Add the DB key and OmKeyInfo object to the map
+        matchedKeys.put(dbKey, entry.getValue());
       }
     } catch (NullPointerException | IOException exception) {
-      LOG.error("Error retrieving keys from openFileTable for path: {} ", subPath, exception);
+      LOG.error("Error retrieving keys from openFileTable for path: {}",
+          subPath, exception);
     }
     return matchedKeys;
   }
@@ -269,34 +266,39 @@ public class OMDBInsightSearchEndpoint {
    * Finds all subdirectories under a parent directory in an FSO bucket. It builds
    * a list of paths for these subdirectories. These sub-directories are then used
    * to search for open files in the openFileTable.
-   *
+   * <p>
    * How it works:
    * - Starts from a parent directory identified by parentId.
    * - Looks through all child directories of this parent.
    * - For each child, it creates a path that starts with volumeID/bucketID/parentId,
-   *   following our openFileTable format
+   * following our openFileTable format
    * - Adds these paths to a list and explores each child further for more subdirectories.
    *
    * @param parentId The ID of the directory we start exploring from.
    * @param subPaths A list where we collect paths to all subdirectories.
-   * @param names An array with at least two elements: the first is volumeID and the second is bucketID.
-   *              These are used to start each path.
+   * @param names    An array with at least two elements: the first is volumeID and the second is bucketID.
+   *                 These are used to start each path.
    * @throws IOException If there are problems accessing directory information.
-
    */
-  private void gatherSubPaths(long parentId, List<String> subPaths,  String[] names) throws IOException {
+  private void gatherSubPaths(long parentId, List<String> subPaths,
+                              String[] names) throws IOException {
     // Fetch the NSSummary object for parentId
-    NSSummary parentSummary = reconNamespaceSummaryManager.getNSSummary(parentId);
-    if (parentSummary == null) return;
+    NSSummary parentSummary =
+        reconNamespaceSummaryManager.getNSSummary(parentId);
+    if (parentSummary == null) {
+      return;
+    }
 
     Set<Long> childDirIds = parentSummary.getChildDir();
     for (Long childId : childDirIds) {
       // Fetch the NSSummary for each child directory
-      NSSummary childSummary = reconNamespaceSummaryManager.getNSSummary(childId);
+      NSSummary childSummary =
+          reconNamespaceSummaryManager.getNSSummary(childId);
       if (childSummary != null) {
         long volumeID = Long.parseLong(names[0]);
         long bucketID = Long.parseLong(names[1]);
-        String subPath = constructObjectPathWithPrefix(volumeID, bucketID, childId);
+        String subPath =
+            constructObjectPathWithPrefix(volumeID, bucketID, childId);
         // Add to subPaths
         subPaths.add(subPath);
         // Recurse into this child directory
@@ -308,7 +310,7 @@ public class OMDBInsightSearchEndpoint {
 
   /**
    * Converts a key prefix into an object path for FSO buckets, using IDs.
-   *
+   * <p>
    * This method transforms a user-provided path (e.g., "volume/bucket/dir1") into
    * a database-friendly format ("/volumeID/bucketID/ParentId/") by replacing names
    * with their corresponding IDs. It simplifies database queries for FSO bucket operations.
@@ -349,7 +351,8 @@ public class OMDBInsightSearchEndpoint {
           getBucketHandler(reconNamespaceSummaryManager, omMetadataManager,
               reconSCM, bucketInfo);
       OmDirectoryInfo dirInfo = handler.getDirInfo(names);
-      return constructObjectPathWithPrefix(volumeId, bucketId, dirInfo.getObjectID());
+      return constructObjectPathWithPrefix(volumeId, bucketId,
+          dirInfo.getObjectID());
 
     } catch (IOException e) {
       LOG.error("Error converting key prefix to object path: {}", prevKeyPrefix,
@@ -403,6 +406,7 @@ public class OMDBInsightSearchEndpoint {
 
   /**
    * Utility method to create a bad request response with a custom message.
+   *
    * @param message The message to include in the response body.
    * @return A Response object configured with the provided message.
    */
