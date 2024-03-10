@@ -88,6 +88,10 @@ import org.slf4j.LoggerFactory;
  */
 public class NodeStateManager implements Runnable, Closeable {
 
+  public void removeNode(DatanodeDetails datanodeDetails) throws NodeNotFoundException {
+    nodeStateMap.removeNode(datanodeDetails);
+  }
+
   /**
    * Node's life cycle events.
    */

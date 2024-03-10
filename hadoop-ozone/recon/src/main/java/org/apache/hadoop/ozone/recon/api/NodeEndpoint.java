@@ -18,11 +18,13 @@
 
 package org.apache.hadoop.ozone.recon.api;
 
+import com.google.common.base.Preconditions;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState;
 import org.apache.hadoop.hdds.scm.container.placement.metrics.SCMNodeStat;
 import org.apache.hadoop.hdds.scm.node.DatanodeInfo;
+import org.apache.hadoop.hdds.scm.node.NodeStatus;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
@@ -33,13 +35,17 @@ import org.apache.hadoop.ozone.recon.api.types.DatanodeMetadata;
 import org.apache.hadoop.ozone.recon.api.types.DatanodePipeline;
 import org.apache.hadoop.ozone.recon.api.types.DatanodeStorageReport;
 import org.apache.hadoop.ozone.recon.api.types.DatanodesResponse;
+import org.apache.hadoop.ozone.recon.api.types.RemoveDataNodesResponseWrapper;
 import org.apache.hadoop.ozone.recon.scm.ReconNodeManager;
 import org.apache.hadoop.ozone.recon.scm.ReconContainerManager;
 
 import javax.inject.Inject;
+import javax.ws.rs.Consumes;
 import javax.ws.rs.GET;
+import javax.ws.rs.PUT;
 import javax.ws.rs.Path;
 import javax.ws.rs.Produces;
+import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import java.io.IOException;
@@ -170,5 +176,58 @@ public class NodeEndpoint {
     long remaining = nodeStat.getRemaining().get();
     long committed = nodeStat.getCommitted().get();
     return new DatanodeStorageReport(capacity, used, remaining, committed);
+  }
+
+  @PUT
+  @Path("/remove")
+  @Consumes(MediaType.APPLICATION_JSON)
+  public Response removeDatanodes(List<String> uuids) {
+    List<DatanodeMetadata> notFoundDatanodes = new ArrayList<>();
+    List<DatanodeMetadata> removedDatanodes = new ArrayList<>();
+
+    Preconditions.checkNotNull(uuids, "Datanode list argument should not be null");
+    Preconditions.checkArgument(!uuids.isEmpty(), "Datanode list argument should not be empty");
+    try {
+      for (String uuid : uuids) {
+        DatanodeDetails nodeByUuid = nodeManager.getNodeByUuid(uuid);
+        try {
+          NodeStatus nodeStatus = nodeManager.getNodeStatus(nodeByUuid);
+          if (nodeByUuid.isDecommissioned() || nodeByUuid.isMaintenance() || nodeStatus.isDead()) {
+            removedDatanodes.add(DatanodeMetadata.newBuilder()
+                .withHostname(nodeManager.getHostName(nodeByUuid))
+                .withUUid(uuid)
+                .withState(nodeManager.getNodeStatus(nodeByUuid).getHealth())
+                .build());
+            nodeManager.removeNode(nodeByUuid);
+          } else {
+            Response.ResponseBuilder builder = Response.status(Response.Status.BAD_REQUEST);
+            builder.entity("Invalid request: Node: " + uuid + " should be in either DECOMMISSIONED or " +
+                "IN_MAINTENANCE mode or DEAD.");
+            // Build and return the response
+            return builder.build();
+          }
+        } catch (NodeNotFoundException nnfe) {
+          LOG.error("Selected node {} not found : {} ", uuid, nnfe);
+          notFoundDatanodes.add(DatanodeMetadata.newBuilder().withUUid(uuid).build());
+        }
+      }
+    } catch (Exception exp) {
+      LOG.error("Unexpected Error while removing datanodes : {} ", exp);
+      throw new WebApplicationException(exp, Response.Status.INTERNAL_SERVER_ERROR);
+    }
+
+    RemoveDataNodesResponseWrapper removeDataNodesResponseWrapper = new RemoveDataNodesResponseWrapper();
+    if (!notFoundDatanodes.isEmpty()) {
+      DatanodesResponse notFoundNodesResp =
+          new DatanodesResponse(notFoundDatanodes.size(), notFoundDatanodes);
+      notFoundNodesResp.setMessage("Invalid request: Selected nodes not found. Kindly send correct node " +
+          "details to remove it !!!");
+      removeDataNodesResponseWrapper.setErrorDataNodes(notFoundNodesResp);
+    }
+    DatanodesResponse removedNodesResp =
+        new DatanodesResponse(removedDatanodes.size(), removedDatanodes);
+    removedNodesResp.setMessage("Successfully removed " + removedDatanodes.size() + " datanodes !!!");
+    removeDataNodesResponseWrapper.setRemovedNodes(removedNodesResp);
+    return Response.ok(removeDataNodesResponseWrapper).build();
   }
 }

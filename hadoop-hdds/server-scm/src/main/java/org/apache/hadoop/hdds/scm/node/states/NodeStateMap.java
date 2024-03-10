@@ -456,4 +456,15 @@ public class NodeStateMap {
   private static Predicate<DatanodeInfo> matching(NodeState health) {
     return dn -> health.equals(dn.getNodeStatus().getHealth());
   }
+
+  public void removeNode(DatanodeDetails datanodeDetails) throws NodeNotFoundException {
+    lock.readLock().lock();
+    try {
+      UUID uuid = datanodeDetails.getUuid();
+      getNodeInfo(uuid);
+      nodeMap.remove(uuid);
+    } finally {
+      lock.readLock().unlock();
+    }
+  }
 }

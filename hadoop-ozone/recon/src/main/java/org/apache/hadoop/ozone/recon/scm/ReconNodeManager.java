@@ -321,4 +321,18 @@ public class ReconNodeManager extends SCMNodeManager {
       return nodeCount;
     }
   }
+
+  /**
+   * Remove an existing node from the NodeDB. Explicit removal from admin user.
+   * First this API call removes the node info from NodeManager memory and
+   * if successful, then remove the node finally from NODES table as well.
+   *
+   * @param datanodeDetails Datanode details.
+   * @throws IOException, NodeNotFoundException
+   */
+  public void removeNode(DatanodeDetails datanodeDetails) throws IOException, NodeNotFoundException {
+    getNodeStateManager().removeNode(datanodeDetails);
+    nodeDB.delete(datanodeDetails.getUuid());
+    LOG.info("Removing existing node {} from Node DB.", datanodeDetails.getUuid());
+  }
 }
