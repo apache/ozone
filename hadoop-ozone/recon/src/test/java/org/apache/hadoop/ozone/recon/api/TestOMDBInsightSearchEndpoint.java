@@ -127,7 +127,8 @@ public class TestOMDBInsightSearchEndpoint extends AbstractReconSqlDBTest {
     // Search for keys in 'bucketOne'
     String searchPrefixBucketOne = "/sampleVol/bucketOne/";
     Response responseBucketOne =
-        omdbInsightSearchEndpoint.searchOpenKeys(searchPrefixBucketOne, 10);
+        omdbInsightSearchEndpoint.searchOpenKeys(searchPrefixBucketOne, true,
+            true, 10);
 
     // Assert that the search response for 'bucketOne' is OK and verify the results
     assertEquals(Response.Status.OK.getStatusCode(),
@@ -146,7 +147,8 @@ public class TestOMDBInsightSearchEndpoint extends AbstractReconSqlDBTest {
     // Search for keys in 'bucketTwo'
     String searchPrefixBucketTwo = "/sampleVol/bucketTwo/";
     Response responseBucketTwo =
-        omdbInsightSearchEndpoint.searchOpenKeys(searchPrefixBucketTwo, 10);
+        omdbInsightSearchEndpoint.searchOpenKeys(searchPrefixBucketTwo, true,
+            true, 10);
 
     // Assert that the search response for 'bucketTwo' is OK and verify the results
     assertEquals(Response.Status.OK.getStatusCode(),
@@ -214,7 +216,8 @@ public class TestOMDBInsightSearchEndpoint extends AbstractReconSqlDBTest {
     // Search for keys under the LEGACY bucket
     String searchPrefixLegacy = "/sampleVol/legacyBucket/";
     Response responseLegacy =
-        omdbInsightSearchEndpoint.searchOpenKeys(searchPrefixLegacy, 10);
+        omdbInsightSearchEndpoint.searchOpenKeys(searchPrefixLegacy, true, true,
+            10);
 
     // Verify response for LEGACY bucket layout
     assertEquals(Response.Status.OK.getStatusCode(),
@@ -230,7 +233,8 @@ public class TestOMDBInsightSearchEndpoint extends AbstractReconSqlDBTest {
     // Search for keys under the FSO bucket
     String searchPrefixFso = "/sampleVol/fsoBucket/";
     Response responseFso =
-        omdbInsightSearchEndpoint.searchOpenKeys(searchPrefixFso, 10);
+        omdbInsightSearchEndpoint.searchOpenKeys(searchPrefixFso, true, true,
+            10);
 
     // Verify response for FSO bucket layout
     assertEquals(Response.Status.OK.getStatusCode(), responseFso.getStatus());
@@ -244,7 +248,8 @@ public class TestOMDBInsightSearchEndpoint extends AbstractReconSqlDBTest {
     // Pass only the volume name and verify the response.
     String searchPrefixVolume = "/sampleVol/";
     Response responseVolume =
-        omdbInsightSearchEndpoint.searchOpenKeys(searchPrefixVolume, 10);
+        omdbInsightSearchEndpoint.searchOpenKeys(searchPrefixVolume, true, true,
+            10);
 
     // Verify response for volume name
     assertEquals(Response.Status.OK.getStatusCode(),
