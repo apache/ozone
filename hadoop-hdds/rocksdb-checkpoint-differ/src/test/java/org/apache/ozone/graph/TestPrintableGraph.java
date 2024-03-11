@@ -24,6 +24,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.EnumSource;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -51,16 +52,8 @@ public class TestPrintableGraph {
   @Mock
   private MutableGraph<CompactionNode> mutableGraph;
 
-  private static Stream<Arguments> graphTypes() {
-    return Stream.of(
-      Arguments.of(PrintableGraph.GraphType.KEY_SIZE),
-      Arguments.of(PrintableGraph.GraphType.CUMULATIVE_SIZE),
-      Arguments.of(PrintableGraph.GraphType.FILE_NAME)
-    );
-  }
-
   @ParameterizedTest
-  @MethodSource("graphTypes")
+  @EnumSource(PrintableGraph.GraphType.class)
   void testPrintNoGraphMessage(PrintableGraph.GraphType graphType) {
     PrintableGraph graph = new PrintableGraph(mutableGraph, graphType);
     try {
@@ -71,7 +64,7 @@ public class TestPrintableGraph {
   }
 
   @ParameterizedTest
-  @MethodSource("graphTypes")
+  @EnumSource(PrintableGraph.GraphType.class)
   void testPrintActualGraph(PrintableGraph.GraphType graphType) throws IOException {
     Set<CompactionNode> nodes = Stream.of(
         new CompactionNode("fileName1",
