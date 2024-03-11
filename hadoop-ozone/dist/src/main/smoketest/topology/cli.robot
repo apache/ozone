@@ -22,27 +22,30 @@ Test Timeout        5 minutes
 
 *** Variables ***
 
+*** Keywords ***
+Validate PrintTopology Output
+    [Arguments]           ${output}
+    Should Contain        ${output}         State = HEALTHY
+    Should Contain        ${output}         IN_SERVICE
+    Should Match Regexp   ${output}         .*ozone.*datanode[-_]\\d+.*IN_SERVICE.*rack.*
+
+
 *** Test Cases ***
 Run printTopology
     ${output} =         Execute          ozone admin printTopology
-                        Should Contain   ${output}         State = HEALTHY
-                        Should Contain          ${output}         IN_SERVICE
-                        Should Match Regexp     ${output}         .*datanode[-_]\\d+.*IN_SERVICE.*
+                        Validate PrintTopology Output    ${output}
 
 Run printTopology -o
     ${output} =         Execute          ozone admin printTopology -o
-                        Should Contain   ${output}         State = HEALTHY
-                        Should Contain   ${output}         Location:
+                        Should Contain        ${output}         State = HEALTHY
+                        Should Match Regexp   ${output}         Location: /.*rack.*
                         Should Match Regexp   ${output}         .*ozone.*datanode[-_]\\d+.*IN_SERVICE.*
 
 Run printTopology --operational-state IN_SERVICE
     ${output} =         Execute          ozone admin printTopology --operational-state IN_SERVICE
-                        Should Contain   ${output}         State = HEALTHY
-                        Should Contain   ${output}         IN_SERVICE
-                        Should Match Regexp   ${output}         .*ozone.*datanode[-_]\\d+.*IN_SERVICE.*
+                        Validate PrintTopology Output    ${output}
 
 Run printTopology --node-state HEALTHY
     ${output} =         Execute          ozone admin printTopology --node-state HEALTHY
-                        Should Contain   ${output}         State = HEALTHY
-                        Should Contain   ${output}         IN_SERVICE
-                        Should Match Regexp   ${output}         .*ozone.*datanode[-_]\\d+.*IN_SERVICE.*rack.*
+                        Validate PrintTopology Output    ${output}
+
