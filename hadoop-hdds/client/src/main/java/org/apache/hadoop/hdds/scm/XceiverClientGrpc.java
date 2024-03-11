@@ -20,6 +20,7 @@ package org.apache.hadoop.hdds.scm;
 
 import java.io.IOException;
 import java.io.InterruptedIOException;
+import java.nio.ByteBuffer;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
@@ -39,6 +40,7 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandRequestProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandResponseProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.DatanodeBlockID;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ReadBlockResponseProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.XceiverClientProtocolServiceGrpc;
 import org.apache.hadoop.hdds.protocol.datanode.proto.XceiverClientProtocolServiceGrpc.XceiverClientProtocolServiceStub;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
@@ -350,39 +352,7 @@ public class XceiverClientGrpc extends XceiverClientSpi {
     // In case of an exception or an error, we will try to read from the
     // datanodes in the pipeline in a round-robin fashion.
     XceiverClientReply reply = new XceiverClientReply(null);
-    List<DatanodeDetails> datanodeList = null;
-
-    DatanodeBlockID blockID = null;
-    if (request.getCmdType() == ContainerProtos.Type.GetBlock) {
-      blockID = request.getGetBlock().getBlockID();
-    } else if  (request.getCmdType() == ContainerProtos.Type.ReadChunk) {
-      blockID = request.getReadChunk().getBlockID();
-    } else if (request.getCmdType() == ContainerProtos.Type.GetSmallFile) {
-      blockID = request.getGetSmallFile().getBlock().getBlockID();
-    }
-
-    if (blockID != null) {
-      // Check if the DN to which the GetBlock command was sent has been cached.
-      DatanodeDetails cachedDN = getBlockDNcache.get(blockID);
-      if (cachedDN != null) {
-        datanodeList = pipeline.getNodes();
-        int getBlockDNCacheIndex = datanodeList.indexOf(cachedDN);
-        if (getBlockDNCacheIndex > 0) {
-          // Pull the Cached DN to the top of the DN list
-          Collections.swap(datanodeList, 0, getBlockDNCacheIndex);
-        }
-      }
-    }
-    if (datanodeList == null) {
-      if (topologyAwareRead) {
-        datanodeList = pipeline.getNodesInOrder();
-      } else {
-        datanodeList = pipeline.getNodes();
-        // Shuffle datanode list so that clients do not read in the same order
-        // every time.
-        Collections.shuffle(datanodeList);
-      }
-    }
+    List<DatanodeDetails> datanodeList = getDatanodeList(request);
 
     for (DatanodeDetails dn : datanodeList) {
       try {
@@ -552,6 +522,73 @@ public class XceiverClientGrpc extends XceiverClientSpi {
     return new XceiverClientReply(replyFuture);
   }
 
+  public CompletableFuture<DatanodeBlockID> sendCommandOnlyRead(
+      ContainerCommandRequestProto request, ByteBuffer buffer,
+      List<Validator> validators) throws SCMSecurityException {
+    XceiverClientReply reply = new XceiverClientReply(null);
+    List<DatanodeDetails> datanodeList = getDatanodeList(request);
+    CompletableFuture<DatanodeBlockID> future = new CompletableFuture<>();
+    for (DatanodeDetails dn : datanodeList) {
+      try {
+        checkOpen(dn);
+        UUID dnID = dn.getUuid();
+        semaphore.acquire();
+        final StreamObserver<ContainerCommandRequestProto> requestObserver =
+            asyncStubs.get(dnID).withDeadlineAfter(timeout, TimeUnit.SECONDS)
+                .send(new StreamObserver<ContainerCommandResponseProto>() {
+                  @Override
+                  public void onNext(
+                      ContainerCommandResponseProto responseProto) {
+                    for (Validator validator : validators) {
+                      try {
+                        validator.accept(request, responseProto);
+                      } catch (IOException e) {
+                        LOG.debug("Failed to execute command {} on datanode {}",
+                            processForDebug(request), dn, e);
+
+                      }
+                    }
+                    ReadBlockResponseProto readChunkResponse =
+                        responseProto.getReadBlock();
+                    if (readChunkResponse.hasData()) {
+                      buffer.put(readChunkResponse.getData()
+                          .asReadOnlyByteBuffer());
+                    } else if (readChunkResponse.hasDataBuffers()) {
+                      readChunkResponse.getDataBuffers().getBuffersList()
+                          .stream().forEach(
+                              data -> buffer.put(data.asReadOnlyByteBuffer()));
+                    }
+                  }
+
+                  @Override
+                  public void onError(Throwable t) {
+                    future.completeExceptionally(t);
+                  }
+
+                  @Override
+                  public void onCompleted() {
+                    future.complete(request.getReadBlock().getBlockID());
+                    semaphore.release();
+                  }
+                });
+        reply.addDatanode(dn);
+        requestObserver.onNext(request);
+        requestObserver.onCompleted();
+      } catch (IOException e) {
+        if (LOG.isDebugEnabled()) {
+          LOG.debug("Failed to execute command {} on datanode {}",
+              processForDebug(request), dn, e);
+        }
+      } catch (InterruptedException e) {
+        LOG.error("Command execution was interrupted ", e);
+        Thread.currentThread().interrupt();
+      }
+    }
+
+
+    return future;
+  }
+
   private synchronized void checkOpen(DatanodeDetails dn)
       throws IOException {
     if (closed) {
@@ -611,5 +648,42 @@ public class XceiverClientGrpc extends XceiverClientSpi {
 
   public void setTimeout(long timeout) {
     this.timeout = timeout;
+  }
+
+  private List<DatanodeDetails> getDatanodeList(
+      ContainerCommandRequestProto request) {
+    List<DatanodeDetails> datanodeList = null;
+    DatanodeBlockID blockID = null;
+    if (request.getCmdType() == ContainerProtos.Type.GetBlock) {
+      blockID = request.getGetBlock().getBlockID();
+    } else if  (request.getCmdType() == ContainerProtos.Type.ReadChunk) {
+      blockID = request.getReadChunk().getBlockID();
+    } else if (request.getCmdType() == ContainerProtos.Type.GetSmallFile) {
+      blockID = request.getGetSmallFile().getBlock().getBlockID();
+    }
+
+    if (blockID != null) {
+      // Check if the DN to which the GetBlock command was sent has been cached.
+      DatanodeDetails cachedDN = getBlockDNcache.get(blockID);
+      if (cachedDN != null) {
+        datanodeList = pipeline.getNodes();
+        int getBlockDNCacheIndex = datanodeList.indexOf(cachedDN);
+        if (getBlockDNCacheIndex > 0) {
+          // Pull the Cached DN to the top of the DN list
+          Collections.swap(datanodeList, 0, getBlockDNCacheIndex);
+        }
+      }
+    }
+    if (datanodeList == null) {
+      if (topologyAwareRead) {
+        datanodeList = pipeline.getNodesInOrder();
+      } else {
+        datanodeList = pipeline.getNodes();
+        // Shuffle datanode list so that clients do not read in the same order
+        // every time.
+        Collections.shuffle(datanodeList);
+      }
+    }
+    return datanodeList;
   }
 }

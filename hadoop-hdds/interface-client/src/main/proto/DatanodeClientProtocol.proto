@@ -196,6 +196,7 @@ message ContainerCommandRequestProto {
   optional   GetBlockRequestProto getBlock = 13;
   optional   DeleteBlockRequestProto deleteBlock = 14 [deprecated = true];
   optional   ListBlockRequestProto listBlock = 15;
+  optional   ReadBlockRequestProto readBlock = 25;
 
   optional   ReadChunkRequestProto readChunk = 16;
   optional   WriteChunkRequestProto writeChunk = 17;
@@ -228,6 +229,7 @@ message ContainerCommandResponseProto {
   optional   GetBlockResponseProto getBlock = 12;
   optional   DeleteBlockResponseProto deleteBlock = 13;
   optional   ListBlockResponseProto listBlock = 14;
+  optional   ReadBlockResponseProto readBlock = 22;
 
   optional   WriteChunkResponseProto writeChunk = 15;
   optional   ReadChunkResponseProto readChunk = 16;
@@ -371,6 +373,23 @@ message  ListBlockRequestProto {
 
 message  ListBlockResponseProto {
   repeated BlockData blockData = 1;
+}
+
+message ReadBlockRequestProto {
+  required DatanodeBlockID blockID = 1;
+  required uint64 offset = 2;
+  required uint64 len = 3;
+  optional ReadChunkVersion version = 4;
+}
+
+message ReadBlockResponseProto {
+  required DatanodeBlockID blockID = 1;
+  required ChunkInfo chunkData = 2;
+  // Chunk data should be returned in one of the two for
+  oneof responseData {
+    bytes data = 3; // Chunk data is returned as single buffer for V0
+    DataBuffers dataBuffers = 4; // Chunk data is returned as a list of buffers
+  }
 }
 
 // Chunk Operations
