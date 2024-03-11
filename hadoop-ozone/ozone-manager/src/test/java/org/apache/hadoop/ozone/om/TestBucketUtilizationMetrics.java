@@ -41,7 +41,7 @@ import static org.mockito.Mockito.when;
 /**
  * Test class for BucketUtilizationMetrics.
  */
-public class BucketUtilizationMetricsTest {
+public class TestBucketUtilizationMetrics {
 
   private static final String VOLUME_NAME_1 = "volume1";
   private static final String VOLUME_NAME_2 = "volume2";
