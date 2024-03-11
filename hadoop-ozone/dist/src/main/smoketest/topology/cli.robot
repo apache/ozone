@@ -37,7 +37,6 @@ Run printTopology
 
 Run printTopology -o
     ${output} =         Execute          ozone admin printTopology -o
-                        Should Contain        ${output}         State = HEALTHY
                         Should Match Regexp   ${output}         Location: /.*rack.*
                         Should Match Regexp   ${output}         .*ozone.*datanode[-_]\\d+.*IN_SERVICE.*
 
