@@ -34,7 +34,7 @@ import {AutoReloadHelper} from 'utils/autoReloadHelper';
 import AutoReloadPanel from 'components/autoReloadPanel/autoReloadPanel';
 import {IOption, MultiSelect} from 'components/multiSelect/multiSelect';
 import {ActionMeta, ValueType} from 'react-select';
-import {showDataFetchError} from 'utils/common';
+import {getCapacityPercent, showDataFetchError} from 'utils/common';
 import {ColumnSearch} from 'utils/columnSearch';
 import {AxiosGetHelper} from 'utils/axiosRequestHelper';
 import {ColumnProps} from "antd/es/table";
@@ -223,7 +223,10 @@ export class Datanodes extends React.Component<Record<string, object>, IDatanode
             text: 'Storage Total',
             value: 'storageTotal',
           },
-
+          {
+            text: 'Storage Utilization',
+            value: 'storageUtilization',
+          }
         ],
         filterIcon: () => (
           <Icon type={'sort-ascending'} />
@@ -249,6 +252,10 @@ export class Datanodes extends React.Component<Record<string, object>, IDatanode
             return a.storageCommitted - b.storageCommitted;
           } else if (sortBy === "storageTotal") {
             return a.storageTotal- b.storageTotal;
+          } else if (sortBy === 'storageUtilization') {
+            // See totalUsed calculation in storageBar.tsx
+            return getCapacityPercent(a.storageTotal - a.storageRemaining, a.storageRemaining) -
+                getCapacityPercent(b.storageTotal - b.storageRemaining, b.storageRemaining)
           } else {
             return a.storageRemaining - b.storageRemaining
           }
