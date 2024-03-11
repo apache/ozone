@@ -100,11 +100,6 @@ public final class VolumeInfo {
   // Space usage calculator
   private final VolumeUsage usage;
 
-  // Capacity configured. This is useful when we want to
-  // limit the visible capacity for tests. If negative, then we just
-  // query from the filesystem.
-  private long configuredCapacity;
-
   private long reservedInBytes;
 
   /**
@@ -115,7 +110,6 @@ public final class VolumeInfo {
     private final String rootDir;
     private SpaceUsageCheckFactory usageCheckFactory;
     private StorageType storageType;
-    private long configuredCapacity;
 
     public Builder(String root, ConfigurationSource config) {
       this.rootDir = root;
@@ -124,11 +118,6 @@ public final class VolumeInfo {
 
     public Builder storageType(StorageType st) {
       this.storageType = st;
-      return this;
-    }
-
-    public Builder configuredCapacity(long capacity) {
-      this.configuredCapacity = capacity;
       return this;
     }
 
@@ -206,9 +195,6 @@ public final class VolumeInfo {
     this.storageType = (b.storageType != null ?
         b.storageType : StorageType.DEFAULT);
 
-    this.configuredCapacity = (b.configuredCapacity != 0 ?
-        b.configuredCapacity : -1);
-
     SpaceUsageCheckFactory usageCheckFactory = b.usageCheckFactory;
     if (usageCheckFactory == null) {
       usageCheckFactory = SpaceUsageCheckFactory.create(b.conf);
@@ -222,10 +208,7 @@ public final class VolumeInfo {
   }
 
   public long getCapacity() {
-    if (configuredCapacity < 0) {
-      return Math.max(usage.getCapacity() - reservedInBytes, 0);
-    }
-    return configuredCapacity;
+    return Math.max(usage.getCapacity() - reservedInBytes, 0);
   }
 
   /**
