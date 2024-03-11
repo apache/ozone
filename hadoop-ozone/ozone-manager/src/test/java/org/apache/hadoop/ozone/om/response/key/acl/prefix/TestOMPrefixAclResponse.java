@@ -17,8 +17,12 @@
 
 package org.apache.hadoop.ozone.om.response.key.acl.prefix;
 
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.ozone.OzoneAcl;
+import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.PrefixManagerImpl;
+import org.apache.hadoop.ozone.om.ResolvedBucket;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmPrefixInfo;
 import org.apache.hadoop.ozone.om.response.key.TestOMKeyResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
@@ -36,6 +40,8 @@ import static org.apache.hadoop.ozone.OzoneAcl.AclScope.ACCESS;
 import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLIdentityType.USER;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 /**
  * Tests TestOMPrefixAclResponse.
@@ -77,13 +83,22 @@ public class TestOMPrefixAclResponse extends TestOMKeyResponse {
         .getSkipCache(prefixName);
     assertEquals(omPrefixInfo, persistedPrefixInfo);
 
+    String volumeName = "vol";
+    String bucketName = "buck";
+
+    OzoneManager ozoneManager = mock(OzoneManager.class);
+    when(ozoneManager.resolveBucketLink(Pair.of(volumeName, bucketName)))
+        .thenReturn(new ResolvedBucket(volumeName, bucketName, volumeName,
+            bucketName, "", BucketLayout.DEFAULT));
+
+
     // Verify that in-memory Prefix Tree (Radix Tree) is able to reload from
     // DB successfully
     PrefixManagerImpl prefixManager =
-        new PrefixManagerImpl(omMetadataManager, true);
+        new PrefixManagerImpl(ozoneManager, omMetadataManager, true);
     OzoneObj prefixObj = OzoneObjInfo.Builder.newBuilder()
-        .setVolumeName("vol")
-        .setBucketName("buck")
+        .setVolumeName(volumeName)
+        .setBucketName(bucketName)
         .setPrefixName("prefix/")
         .setResType(OzoneObj.ResourceType.PREFIX)
         .setStoreType(OzoneObj.StoreType.OZONE)
@@ -123,7 +138,7 @@ public class TestOMPrefixAclResponse extends TestOMKeyResponse {
 
     // Reload prefix tree from DB and validate again.
     prefixManager =
-        new PrefixManagerImpl(omMetadataManager, true);
+        new PrefixManagerImpl(ozoneManager, omMetadataManager, true);
     prefixInfo = prefixManager.getPrefixInfo(prefixObj);
     assertEquals(2L, prefixInfo.getUpdateID());
 

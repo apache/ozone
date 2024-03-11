@@ -641,7 +641,7 @@ public class TestKeyManagerImpl {
     // add acl with invalid prefix name
     Exception ex = assertThrows(OMException.class,
         () -> writeClient.addAcl(ozInvalidPrefix, ozAcl1));
-    assertTrue(ex.getMessage().startsWith("Invalid prefix name"));
+    assertTrue(ex.getMessage().startsWith("Missing trailing slash"));
 
     OzoneObj ozPrefix1 = new OzoneObjInfo.Builder()
         .setVolumeName(volumeName)
@@ -659,7 +659,7 @@ public class TestKeyManagerImpl {
     // get acl with invalid prefix name
     ex = assertThrows(OMException.class,
         () -> writeClient.getAcl(ozInvalidPrefix));
-    assertTrue(ex.getMessage().startsWith("Invalid prefix name"));
+    assertTrue(ex.getMessage().startsWith("Missing trailing slash"));
 
     // set acl with invalid prefix name
     List<OzoneAcl> ozoneAcls = new ArrayList<OzoneAcl>();
@@ -667,12 +667,12 @@ public class TestKeyManagerImpl {
 
     ex = assertThrows(OMException.class,
         () -> writeClient.setAcl(ozInvalidPrefix, ozoneAcls));
-    assertTrue(ex.getMessage().startsWith("Invalid prefix name"));
+    assertTrue(ex.getMessage().startsWith("Missing trailing slash"));
 
     // remove acl with invalid prefix name
     ex = assertThrows(OMException.class,
         () -> writeClient.removeAcl(ozInvalidPrefix, ozAcl1));
-    assertTrue(ex.getMessage().startsWith("Invalid prefix name"));
+    assertTrue(ex.getMessage().startsWith("Missing trailing slash"));
   }
 
   @Test

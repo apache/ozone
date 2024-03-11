@@ -426,7 +426,7 @@ public class TestOMKeyCreateRequest extends TestOMKeyRequest {
   @MethodSource("data")
   public void testValidateAndUpdateCacheWithInvalidPath(
       boolean setKeyPathLock, boolean setFileSystemPaths) throws Exception {
-    PrefixManager prefixManager = new PrefixManagerImpl(
+    PrefixManager prefixManager = new PrefixManagerImpl(ozoneManager,
         ozoneManager.getMetadataManager(), true);
     when(ozoneManager.getPrefixManager()).thenReturn(prefixManager);
     when(ozoneManager.getOzoneLockProvider()).thenReturn(

@@ -67,7 +67,7 @@ public final class RootCARotationMetrics {
     this.ms = ms;
   }
 
-  public MutableGaugeLong getSuccessTimeInNs() {
+  MutableGaugeLong getSuccessTimeInNs() {
     return successTimeInNs;
   }
 

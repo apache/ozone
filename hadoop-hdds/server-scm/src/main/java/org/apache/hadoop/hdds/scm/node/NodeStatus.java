@@ -261,5 +261,4 @@ public class NodeStatus implements Comparable<NodeStatus> {
     }
     return order;
   }
-
 }

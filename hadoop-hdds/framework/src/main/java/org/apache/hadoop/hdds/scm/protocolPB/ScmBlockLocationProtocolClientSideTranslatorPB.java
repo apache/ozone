@@ -20,6 +20,7 @@ import java.io.Closeable;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 import org.apache.commons.lang3.StringUtils;
@@ -39,6 +40,8 @@ import org.apache.hadoop.hdds.protocol.proto.ScmBlockLocationProtocolProtos.Allo
 import org.apache.hadoop.hdds.protocol.proto.ScmBlockLocationProtocolProtos.AllocateScmBlockResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.ScmBlockLocationProtocolProtos.DeleteScmKeyBlocksRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.ScmBlockLocationProtocolProtos.DeleteScmKeyBlocksResponseProto;
+import org.apache.hadoop.hdds.protocol.proto.ScmBlockLocationProtocolProtos.GetClusterTreeRequestProto;
+import org.apache.hadoop.hdds.protocol.proto.ScmBlockLocationProtocolProtos.GetClusterTreeResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.ScmBlockLocationProtocolProtos.KeyBlocks;
 import org.apache.hadoop.hdds.protocol.proto.ScmBlockLocationProtocolProtos
     .SortDatanodesRequestProto;
@@ -49,6 +52,9 @@ import org.apache.hadoop.hdds.scm.ScmInfo;
 import org.apache.hadoop.hdds.scm.container.common.helpers.AllocatedBlock;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
+import org.apache.hadoop.hdds.scm.net.InnerNode;
+import org.apache.hadoop.hdds.scm.net.InnerNodeImpl;
+import org.apache.hadoop.hdds.scm.net.Node;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.protocol.ScmBlockLocationProtocol;
 import org.apache.hadoop.hdds.scm.proxy.SCMBlockLocationFailoverProxyProvider;
@@ -326,6 +332,43 @@ public final class ScmBlockLocationProtocolClientSideTranslatorPB
         .map(node -> DatanodeDetails.getFromProtoBuf(node))
         .collect(Collectors.toList()));
     return results;
+  }
+
+  @Override
+  public InnerNode getNetworkTopology() throws IOException {
+    GetClusterTreeRequestProto request =
+        GetClusterTreeRequestProto.newBuilder().build();
+    SCMBlockLocationRequest wrapper = createSCMBlockRequest(Type.GetClusterTree)
+        .setGetClusterTreeRequest(request)
+        .build();
+
+    final SCMBlockLocationResponse wrappedResponse =
+        handleError(submitRequest(wrapper));
+    GetClusterTreeResponseProto resp =
+        wrappedResponse.getGetClusterTreeResponse();
+
+    return (InnerNode) setParent(
+        InnerNodeImpl.fromProtobuf(resp.getClusterTree()));
+  }
+
+  /**
+   * Sets the parent field for the clusterTree nodes recursively.
+   *
+   * @param node cluster tree without parents set.
+   * @return updated cluster tree with parents set.
+   */
+  private Node setParent(Node node) {
+    if (node instanceof InnerNodeImpl) {
+      InnerNodeImpl innerNode = (InnerNodeImpl) node;
+      if (innerNode.getChildrenMap() != null) {
+        for (Map.Entry<String, Node> child : innerNode.getChildrenMap()
+            .entrySet()) {
+          child.getValue().setParent(innerNode);
+          setParent(child.getValue());
+        }
+      }
+    }
+    return node;
   }
 
   @Override
