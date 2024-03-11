@@ -17,26 +17,26 @@
  */
 
 import React from 'react';
-import {Icon, Popover, Table, Tooltip} from 'antd';
+import {Table, Icon, Tooltip, Popover} from 'antd';
 import {PaginationConfig} from 'antd/lib/pagination';
 import moment from 'moment';
 import {ReplicationIcon} from 'utils/themeIcons';
 import StorageBar from 'components/storageBar/storageBar';
 import {
-  DatanodeOpState,
-  DatanodeOpStateList,
   DatanodeState,
   DatanodeStateList,
+  DatanodeOpState,
+  DatanodeOpStateList,
   IStorageReport
 } from 'types/datanode.types';
 import './datanodes.less';
 import {AutoReloadHelper} from 'utils/autoReloadHelper';
 import AutoReloadPanel from 'components/autoReloadPanel/autoReloadPanel';
-import {IOption, MultiSelect} from 'components/multiSelect/multiSelect';
+import {MultiSelect, IOption} from 'components/multiSelect/multiSelect';
 import {ActionMeta, ValueType} from 'react-select';
 import {getCapacityPercent, showDataFetchError} from 'utils/common';
 import {ColumnSearch} from 'utils/columnSearch';
-import {AxiosGetHelper} from 'utils/axiosRequestHelper';
+import { AxiosGetHelper } from 'utils/axiosRequestHelper';
 import {ColumnProps} from "antd/es/table";
 
 interface IDatanodeResponse {
