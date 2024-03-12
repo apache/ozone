@@ -21,10 +21,14 @@ import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState;
 import org.apache.hadoop.hdds.scm.DatanodeAdminError;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
+import org.apache.hadoop.hdds.scm.container.ContainerInfo;
+import org.apache.hadoop.hdds.scm.container.ContainerManager;
+import org.apache.hadoop.hdds.scm.container.ContainerNotFoundException;
 import org.apache.hadoop.hdds.scm.container.replication.ReplicationManager;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
@@ -39,9 +43,11 @@ import java.net.URISyntaxException;
 import java.net.UnknownHostException;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -56,6 +62,7 @@ public class NodeDecommissionManager {
   private final DatanodeAdminMonitor monitor;
 
   private final NodeManager nodeManager;
+  private ContainerManager containerManager;
   private final SCMContext scmContext;
   private final boolean useHostnames;
 
@@ -256,6 +263,7 @@ public class NodeDecommissionManager {
              SCMContext scmContext,
              EventPublisher eventQueue, ReplicationManager rm) {
     this.nodeManager = nm;
+    this.containerManager = scmContext.getScm().getContainerManager();
     this.scmContext = scmContext;
 
     executor = Executors.newScheduledThreadPool(1,
@@ -308,6 +316,12 @@ public class NodeDecommissionManager {
       List<String> nodes) {
     List<DatanodeAdminError> errors = new ArrayList<>();
     List<DatanodeDetails> dns = mapHostnamesToDatanodes(nodes, errors);
+    // add check for fail-early
+    boolean decommissionPossible = checkIfDecommissionPossible(dns, errors);
+    if (!decommissionPossible) {
+      LOG.error("Cannot decommission nodes as sufficient node are not available.");
+      errors.add(new DatanodeAdminError("AllHosts", "Sufficient nodes are not available."));
+    }
     for (DatanodeDetails dn : dns) {
       try {
         startDecommission(dn);
@@ -366,6 +380,50 @@ public class NodeDecommissionManager {
       throw new InvalidNodeStateException("Cannot decommission node " +
           dn + " in state " + opState);
     }
+  }
+
+  private synchronized boolean checkIfDecommissionPossible(List<DatanodeDetails> dns, List<DatanodeAdminError> errors) {
+    // do we require method synchronization?
+    int minInService = -1; // maxRatis = -1, maxEc = -1;
+    for (DatanodeDetails dn : dns) {
+      Set<ContainerID> containers = new HashSet<>();
+      try {
+        containers = nodeManager.getContainers(dn);
+      } catch (NodeNotFoundException ex) {
+        LOG.warn("The host {} was not found in SCM. Ignoring the request to " +
+            "decommission it", dn.getHostName());
+        errors.add(new DatanodeAdminError(dn.getHostName(),
+            "The host was not found in SCM"));
+        continue; // ignore the DN and continue to next one
+      }
+      for (ContainerID cid : containers) {
+        ContainerInfo cif;
+        try {
+          cif = containerManager.getContainer(cid);
+        } catch (ContainerNotFoundException ex) {
+          continue; // ignore the container and continue to next one
+        }
+        if (cif.getState().equals(HddsProtos.LifeCycleState.DELETED) ||
+            cif.getState().equals(HddsProtos.LifeCycleState.DELETING)) {
+          continue;
+        }
+        int reqNodes = cif.getReplicationConfig().getRequiredNodes();
+        if (reqNodes > minInService) {
+          minInService = reqNodes;
+        }
+      /* *below code would check the replication type and then get the factor,
+        but as we have a simpler way i.e., getRequiredNodes(), I don't think we need to care about the replication type
+
+      HddsProtos.ReplicationType replicationType = cif.getReplicationType();
+      if (replicationType.equals(HddsProtos.ReplicationType.RATIS)) {
+        maxRatis = cif.getReplicationFactor().getNumber();
+      } else if (replicationType.equals(HddsProtos.ReplicationType.EC) {
+        //cif.getReplicationConfig();
+      }*/
+      }
+    }
+
+    return ((nodeManager.getNodeCount(NodeStatus.inServiceHealthy()) - dns.size()) >= minInService);
   }
 
   public synchronized List<DatanodeAdminError> recommissionNodes(
