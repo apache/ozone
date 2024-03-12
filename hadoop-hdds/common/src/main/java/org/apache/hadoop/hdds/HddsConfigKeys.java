@@ -400,5 +400,4 @@ public final class HddsConfigKeys {
       "hdds.datanode.slow.op.warning.threshold";
   public static final String HDDS_DATANODE_SLOW_OP_WARNING_THRESHOLD_DEFAULT =
       "500ms";
-  public static final String HDDS_DATANODE_VERSION = "hdds.datanode.version";
 }
