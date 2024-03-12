@@ -254,8 +254,8 @@ export class Datanodes extends React.Component<Record<string, object>, IDatanode
             return a.storageTotal- b.storageTotal;
           } else if (sortBy === 'storageUtilization') {
             // See totalUsed calculation in storageBar.tsx
-            return getCapacityPercent(a.storageTotal - a.storageRemaining, a.storageRemaining) -
-                getCapacityPercent(b.storageTotal - b.storageRemaining, b.storageRemaining)
+            return getCapacityPercent(a.storageTotal - a.storageRemaining, a.storageTotal) -
+                getCapacityPercent(b.storageTotal - b.storageRemaining, b.storageTotal)
           } else {
             return a.storageRemaining - b.storageRemaining
           }
