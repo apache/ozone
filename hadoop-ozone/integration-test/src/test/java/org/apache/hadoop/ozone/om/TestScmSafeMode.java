@@ -140,7 +140,7 @@ public class TestScmSafeMode {
   @Test
   void testSafeModeOperations() throws Exception {
     // Create {numKeys} random names keys.
-    Map<String, OmKeyInfo> keyLocations = StorageContainerManagerTestHelper.createKeys(cluster, 100, 4096);
+    Map<String, OmKeyInfo> keyLocations = StorageContainerManagerTestHelper.createKeys(cluster, 100);
     final List<ContainerInfo> containers = cluster
         .getStorageContainerManager().getContainerManager().getContainers();
     GenericTestUtils.waitFor(() -> containers.size() >= 3, 100, 1000);
@@ -227,7 +227,7 @@ public class TestScmSafeMode {
 
     // Test2: Test safe mode  when containers are there in system.
     // Create {numKeys} random names keys.
-    Map<String, OmKeyInfo> keyLocations = StorageContainerManagerTestHelper.createKeys(cluster, 100 * 2, 4096);
+    Map<String, OmKeyInfo> keyLocations = StorageContainerManagerTestHelper.createKeys(cluster, 100 * 2);
     final List<ContainerInfo> containers = cluster
         .getStorageContainerManager().getContainerManager().getContainers();
     GenericTestUtils.waitFor(() -> containers.size() >= 3, 100, 1000 * 30);
@@ -299,7 +299,7 @@ public class TestScmSafeMode {
     cluster.waitTobeOutOfSafeMode();
     assertFalse(scm.isInSafeMode());
 
-    StorageContainerManagerTestHelper.createKeys(cluster, 10, 4096);
+    StorageContainerManagerTestHelper.createKeys(cluster, 10);
     SCMClientProtocolServer clientProtocolServer = cluster
         .getStorageContainerManager().getClientProtocolServer();
     assertFalse((scm.getClientProtocolServer()).getSafeModeStatus());

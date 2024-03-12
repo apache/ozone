@@ -48,7 +48,7 @@ public class StorageContainerManagerTestHelper {
     this.conf = conf;
   }
 
-  public static Map<String, OmKeyInfo> createKeys(MiniOzoneCluster cluster, int numOfKeys, int keySize)
+  public static Map<String, OmKeyInfo> createKeys(MiniOzoneCluster cluster, int numOfKeys)
       throws Exception {
     Map<String, OmKeyInfo> keyLocationMap = Maps.newHashMap();
 
