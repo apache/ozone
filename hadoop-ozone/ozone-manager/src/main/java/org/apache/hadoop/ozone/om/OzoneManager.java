@@ -82,7 +82,11 @@ import org.apache.hadoop.hdds.ratis.RatisHelper;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.ScmInfo;
 import org.apache.hadoop.hdds.scm.client.HddsClientUtils;
+import org.apache.hadoop.hdds.scm.client.ScmTopologyClient;
 import org.apache.hadoop.hdds.scm.ha.SCMHAUtils;
+import org.apache.hadoop.hdds.scm.net.InnerNode;
+import org.apache.hadoop.hdds.scm.net.NetworkTopology;
+import org.apache.hadoop.hdds.scm.net.NetworkTopologyImpl;
 import org.apache.hadoop.hdds.server.OzoneAdmins;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.Table.KeyValue;
@@ -354,6 +358,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   private OzoneBlockTokenSecretManager blockTokenMgr;
   private CertificateClient certClient;
   private SecretKeySignerClient secretKeyClient;
+  private ScmTopologyClient scmTopologyClient;
   private final Text omRpcAddressTxt;
   private OzoneConfiguration configuration;
   private RPC.Server omRpcServer;
@@ -386,6 +391,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   private OzoneManagerHttpServer httpServer;
   private final OMStorage omStorage;
   private ObjectName omInfoBeanName;
+  private NetworkTopology clusterMap;
   private Timer metricsTimer;
   private ScheduleOMMetricsWriteTask scheduleOMMetricsWriteTask;
   private static final ObjectWriter WRITER =
@@ -603,6 +609,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     final StorageContainerLocationProtocol scmContainerClient = getScmContainerClient(configuration);
     // verifies that the SCM info in the OM Version file is correct.
     final ScmBlockLocationProtocol scmBlockClient = getScmBlockClient(configuration);
+    scmTopologyClient = new ScmTopologyClient(scmBlockClient);
     this.scmClient = new ScmClient(scmBlockClient, scmContainerClient,
         configuration);
     this.ozoneLockProvider = new OzoneLockProvider(getKeyPathLockEnabled(),
@@ -839,7 +846,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       delegationTokenMgr = createDelegationTokenSecretManager(configuration);
     }
 
-    prefixManager = new PrefixManagerImpl(metadataManager, isRatisEnabled);
+    prefixManager = new PrefixManagerImpl(this, metadataManager, isRatisEnabled);
     keyManager = new KeyManagerImpl(this, scmClient, configuration,
         perfMetrics);
     accessAuthorizer = OzoneAuthorizerFactory.forOM(this);
@@ -1133,6 +1140,24 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     }
     certClient = newClient;
     serviceInfo = new ServiceInfoProvider(secConfig, this, certClient);
+  }
+
+  /**
+   * For testing purpose only. This allows setting up ScmBlockLocationClient
+   * without having to fully setup a working cluster.
+   */
+  @VisibleForTesting
+  public void setScmTopologyClient(
+      ScmTopologyClient scmTopologyClient) {
+    this.scmTopologyClient = scmTopologyClient;
+  }
+
+  public NetworkTopology getClusterMap() {
+    InnerNode currentTree = scmTopologyClient.getClusterTree();
+    return new NetworkTopologyImpl(configuration.get(
+        ScmConfigKeys.OZONE_SCM_NETWORK_TOPOLOGY_SCHEMA_FILE,
+        ScmConfigKeys.OZONE_SCM_NETWORK_TOPOLOGY_SCHEMA_FILE_DEFAULT),
+        currentTree);
   }
 
   /**
@@ -1672,6 +1697,18 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     metricsTimer.schedule(scheduleOMMetricsWriteTask, 0, period);
 
     keyManager.start(configuration);
+
+    try {
+      scmTopologyClient.start(configuration);
+    } catch (IOException ex) {
+      LOG.error("Unable to initialize network topology schema file. ", ex);
+      throw new UncheckedIOException(ex);
+    }
+
+    clusterMap = new NetworkTopologyImpl(configuration.get(
+        ScmConfigKeys.OZONE_SCM_NETWORK_TOPOLOGY_SCHEMA_FILE,
+        ScmConfigKeys.OZONE_SCM_NETWORK_TOPOLOGY_SCHEMA_FILE_DEFAULT),
+        scmTopologyClient.getClusterTree());
 
     try {
       httpServer = new OzoneManagerHttpServer(configuration, this);
@@ -2232,6 +2269,11 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       }
       keyManager.stop();
       stopSecretManager();
+
+      if (scmTopologyClient != null) {
+        scmTopologyClient.stop();
+      }
+
       if (httpServer != null) {
         httpServer.stop();
       }

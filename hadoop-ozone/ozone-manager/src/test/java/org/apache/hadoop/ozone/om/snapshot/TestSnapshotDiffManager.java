@@ -390,6 +390,7 @@ public class TestSnapshotDiffManager {
 
   @AfterEach
   public void tearDown() {
+    IOUtils.closeQuietly(snapshotDiffManager);
     if (columnFamilyHandles != null) {
       columnFamilyHandles.forEach(IOUtils::closeQuietly);
     }
@@ -397,7 +398,6 @@ public class TestSnapshotDiffManager {
     IOUtils.closeQuietly(db);
     IOUtils.closeQuietly(dbOptions);
     IOUtils.closeQuietly(columnFamilyOptions);
-    IOUtils.closeQuietly(snapshotDiffManager);
   }
 
   private OmSnapshot getMockedOmSnapshot(UUID snapshotId) {
@@ -674,8 +674,6 @@ public class TestSnapshotDiffManager {
       Table<String, ? extends WithParentObjectId> fromSnapshotTable =
           getMockedTable(fromSnapshotTableMap, snapshotTableName);
 
-      snapshotDiffManager = new SnapshotDiffManager(db, differ, ozoneManager,
-          snapDiffJobTable, snapDiffReportTable, columnFamilyOptions, codecRegistry);
       SnapshotDiffManager spy = spy(snapshotDiffManager);
 
       doAnswer(invocation -> {
