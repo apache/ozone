@@ -101,7 +101,8 @@ public class NSSummaryEndpoint {
    * @param path request path
    * @param listFile show subpath/disk usage for each key
    * @param withReplica count actual DU with replication
-   * @param sort whether to sort the subpaths by their sizes in descending order
+   * @param sortSubpaths determines whether to sort the subpaths by their sizes in descending order
+   * and returns the N largest subpaths based on the configuration value DISK_USAGE_TOP_RECORDS_LIMIT.
    * @return DU response
    * @throws IOException
    */

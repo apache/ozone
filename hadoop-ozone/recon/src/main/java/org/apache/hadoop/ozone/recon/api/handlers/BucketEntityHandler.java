@@ -147,7 +147,7 @@ public class BucketEntityHandler extends EntityHandler {
     duResponse.setSize(bucketDataSize);
 
     if (sortSubpaths) {
-      // Parallel sort directory/files DU data in descending order of size
+      // Parallel sort directory/files DU data in descending order of size and returns the top N elements.
       dirDUData = sortDiskUsageDescendingWithLimit(dirDUData,
           DISK_USAGE_TOP_RECORDS_LIMIT);
     }

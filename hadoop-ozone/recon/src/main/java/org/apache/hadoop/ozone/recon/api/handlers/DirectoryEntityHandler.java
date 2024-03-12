@@ -159,7 +159,7 @@ public class DirectoryEntityHandler extends EntityHandler {
     duResponse.setSize(dirDataSize);
 
     if (sortSubPaths) {
-      // Parallel sort subdirDUData in descending order of size
+      // Parallel sort subdirDUData in descending order of size and returns the top N elements.
       subdirDUData = sortDiskUsageDescendingWithLimit(subdirDUData,
           DISK_USAGE_TOP_RECORDS_LIMIT);
     }

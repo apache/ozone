@@ -137,7 +137,7 @@ public class VolumeEntityHandler extends EntityHandler {
     duResponse.setSize(volDataSize);
 
     if (sortSubPaths) {
-      // Parallel sort bucketDuData in descending order of size
+      // Parallel sort bucketDuData in descending order of size and returns the top N elements.
       bucketDuData = sortDiskUsageDescendingWithLimit(bucketDuData,
           DISK_USAGE_TOP_RECORDS_LIMIT);
     }
