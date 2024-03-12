@@ -62,6 +62,7 @@ import org.apache.hadoop.hdds.server.events.EventPublisher;
 import org.apache.hadoop.hdds.server.events.EventQueue;
 import org.apache.hadoop.hdds.server.events.FixedThreadPoolWithAffinityExecutor;
 import org.apache.hadoop.hdds.utils.HddsVersionInfo;
+import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.net.DNSToSwitchMapping;
 import org.apache.hadoop.net.NetUtils;
 import org.apache.hadoop.net.StaticMapping;
@@ -71,11 +72,19 @@ import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.OzoneTestUtils;
 import org.apache.hadoop.ozone.container.ContainerTestHelper;
+import org.apache.hadoop.ozone.container.common.helpers.BlockData;
+import org.apache.hadoop.ozone.container.common.interfaces.DBHandle;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine;
 import org.apache.hadoop.ozone.container.common.statemachine.EndpointStateMachine;
 import org.apache.hadoop.ozone.container.common.states.endpoint.HeartbeatEndpointTask;
 import org.apache.hadoop.ozone.container.common.states.endpoint.VersionEndpointTask;
+import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
+import org.apache.hadoop.ozone.container.keyvalue.helpers.BlockUtils;
+import org.apache.hadoop.ozone.container.metadata.DatanodeSchemaThreeDBDefinition;
+import org.apache.hadoop.ozone.container.metadata.DatanodeStore;
+import org.apache.hadoop.ozone.container.metadata.DatanodeStoreSchemaThreeImpl;
+import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.protocol.commands.CloseContainerCommand;
@@ -304,7 +313,7 @@ public class TestStorageContainerManager {
       }
       Map<Long, List<Long>> containerBlocks = createDeleteTXLog(
           cluster.getStorageContainerManager(),
-          delLog, keyLocations, helper);
+          delLog, keyLocations, cluster, conf);
 
       // Verify a few TX gets created in the TX log.
       assertThat(delLog.getNumOfValidTransactions()).isGreaterThan(0);
@@ -325,7 +334,7 @@ public class TestStorageContainerManager {
           return false;
         }
       }, 1000, 22000);
-      assertTrue(helper.verifyBlocksWithTxnTable(containerBlocks));
+      assertTrue(verifyBlocksWithTxnTable(cluster, conf, containerBlocks));
       // Continue the work, add some TXs that with known container names,
       // but unknown block IDs.
       for (Long containerID : containerBlocks.keySet()) {
@@ -483,7 +492,7 @@ public class TestStorageContainerManager {
       }
 
       createDeleteTXLog(cluster.getStorageContainerManager(),
-          delLog, keyLocations, helper);
+          delLog, keyLocations, cluster, conf);
       // Verify a few TX gets created in the TX log.
       assertThat(delLog.getNumOfValidTransactions()).isGreaterThan(0);
 
@@ -510,8 +519,7 @@ public class TestStorageContainerManager {
   private Map<Long, List<Long>> createDeleteTXLog(
       StorageContainerManager scm,
       DeletedBlockLog delLog,
-      Map<String, OmKeyInfo> keyLocations,
-      StorageContainerManagerTestHelper helper)
+      Map<String, OmKeyInfo> keyLocations, MiniOzoneCluster cluster, OzoneConfiguration conf)
       throws IOException, TimeoutException {
     // These keys will be written into a bunch of containers,
     // gets a set of container names, verify container containerBlocks
@@ -530,7 +538,7 @@ public class TestStorageContainerManager {
     }
     assertThat(totalCreatedBlocks).isGreaterThan(0);
     assertEquals(totalCreatedBlocks,
-        helper.getAllBlocks(containerNames).size());
+        getAllBlocks(cluster, conf, containerNames).size());
 
     // Create a deletion TX for each key.
     Map<Long, List<Long>> containerBlocks = Maps.newHashMap();
@@ -1020,4 +1028,85 @@ public class TestStorageContainerManager {
           && left.getProto().equals(right.getProto());
     }
   }
+
+  public List<Long> getAllBlocks(MiniOzoneCluster cluster, OzoneConfiguration conf, Set<Long> containerIDs)
+      throws IOException {
+    List<Long> allBlocks = Lists.newArrayList();
+    for (Long containerID : containerIDs) {
+      allBlocks.addAll(getAllBlocks(cluster, conf, containerID));
+    }
+    return allBlocks;
+  }
+
+  public List<Long> getAllBlocks(MiniOzoneCluster cluster, OzoneConfiguration conf, Long containerID) throws IOException {
+    List<Long> allBlocks = Lists.newArrayList();
+    KeyValueContainerData cData = getContainerMetadata(cluster, containerID);
+    try (DBHandle db = BlockUtils.getDB(cData, conf)) {
+
+      List<? extends Table.KeyValue<String, BlockData>> kvs =
+          db.getStore().getBlockDataTable()
+              .getRangeKVs(cData.startKeyEmpty(), Integer.MAX_VALUE,
+                  cData.containerPrefix(), cData.getUnprefixedKeyFilter());
+
+      for (Table.KeyValue<String, BlockData> entry : kvs) {
+        allBlocks.add(Long.valueOf(DatanodeSchemaThreeDBDefinition
+            .getKeyWithoutPrefix(entry.getKey())));
+      }
+    }
+    return allBlocks;
+  }
+
+  public boolean verifyBlocksWithTxnTable(MiniOzoneCluster cluster, OzoneConfiguration conf,
+      Map<Long, List<Long>> containerBlocks)
+      throws IOException {
+    for (Map.Entry<Long, List<Long>> entry : containerBlocks.entrySet()) {
+      KeyValueContainerData cData = getContainerMetadata(cluster, entry.getKey());
+      try (DBHandle db = BlockUtils.getDB(cData, conf)) {
+        DatanodeStore ds = db.getStore();
+        DatanodeStoreSchemaThreeImpl dnStoreImpl =
+            (DatanodeStoreSchemaThreeImpl) ds;
+        List<? extends Table.KeyValue<String, DeletedBlocksTransaction>>
+            txnsInTxnTable = dnStoreImpl.getDeleteTransactionTable()
+            .getRangeKVs(cData.startKeyEmpty(), Integer.MAX_VALUE,
+                cData.containerPrefix());
+        List<Long> conID = new ArrayList<>();
+        for (Table.KeyValue<String, DeletedBlocksTransaction> txn :
+            txnsInTxnTable) {
+          conID.addAll(txn.getValue().getLocalIDList());
+        }
+        if (!conID.equals(containerBlocks.get(entry.getKey()))) {
+          return false;
+        }
+      }
+    }
+    return true;
+  }
+
+  private KeyValueContainerData getContainerMetadata(MiniOzoneCluster cluster, Long containerID)
+      throws IOException {
+    ContainerWithPipeline containerWithPipeline = cluster
+        .getStorageContainerManager().getClientProtocolServer()
+        .getContainerWithPipeline(containerID);
+
+    DatanodeDetails dn =
+        containerWithPipeline.getPipeline().getFirstNode();
+    OzoneContainer containerServer =
+        getContainerServerByDatanodeUuid(cluster, dn.getUuidString());
+    KeyValueContainerData containerData =
+        (KeyValueContainerData) containerServer.getContainerSet()
+            .getContainer(containerID).getContainerData();
+    return containerData;
+  }
+
+  private OzoneContainer getContainerServerByDatanodeUuid(MiniOzoneCluster cluster, String dnUUID)
+      throws IOException {
+    for (HddsDatanodeService dn : cluster.getHddsDatanodes()) {
+      if (dn.getDatanodeDetails().getUuidString().equals(dnUUID)) {
+        return dn.getDatanodeStateMachine().getContainer();
+      }
+    }
+    throw new IOException("Unable to get the ozone container "
+        + "for given datanode ID " + dnUUID);
+  }
+
 }
