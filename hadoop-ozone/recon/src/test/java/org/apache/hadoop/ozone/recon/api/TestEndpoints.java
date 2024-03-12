@@ -74,6 +74,7 @@ import org.apache.hadoop.ozone.recon.api.types.DatanodeMetadata;
 import org.apache.hadoop.ozone.recon.api.types.DatanodesResponse;
 import org.apache.hadoop.ozone.recon.api.types.PipelineMetadata;
 import org.apache.hadoop.ozone.recon.api.types.PipelinesResponse;
+import org.apache.hadoop.ozone.recon.api.types.RemoveDataNodesResponseWrapper;
 import org.apache.hadoop.ozone.recon.api.types.VolumeObjectDBInfo;
 import org.apache.hadoop.ozone.recon.api.types.VolumesResponse;
 import org.apache.hadoop.ozone.recon.common.CommonUtils;
@@ -169,17 +170,21 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
   private String pipelineId;
   private DatanodeDetails datanodeDetails;
   private DatanodeDetails datanodeDetails2;
+  private DatanodeDetails datanodeDetails3;
   private long containerId = 1L;
   private ContainerReportsProto containerReportsProto;
   private ExtendedDatanodeDetailsProto extendedDatanodeDetailsProto;
+  private ExtendedDatanodeDetailsProto extendedDatanodeDetailsProto3;
   private Pipeline pipeline;
   private FileCountBySizeDao fileCountBySizeDao;
   private ContainerCountBySizeDao containerCountBySizeDao;
   private DSLContext dslContext;
   private static final String HOST1 = "host1.datanode";
   private static final String HOST2 = "host2.datanode";
+  private static final String HOST3 = "host3.datanode";
   private static final String IP1 = "1.1.1.1";
   private static final String IP2 = "2.2.2.2";
+  private static final String IP3 = "3.3.3.3";
   private static final String PROMETHEUS_TEST_RESPONSE_FILE =
       "prometheus-test-response.txt";
   private ReconUtils reconUtilsMock;
@@ -200,10 +205,13 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
         Files.createDirectory(temporaryFolder.resolve("NewDir")).toFile());
     datanodeDetails = randomDatanodeDetails();
     datanodeDetails2 = randomDatanodeDetails();
+    datanodeDetails3 = randomDatanodeDetails();
     datanodeDetails.setHostName(HOST1);
     datanodeDetails.setIpAddress(IP1);
     datanodeDetails2.setHostName(HOST2);
     datanodeDetails2.setIpAddress(IP2);
+    datanodeDetails3.setHostName(HOST3);
+    datanodeDetails3.setIpAddress(IP3);
     pipeline = getRandomPipeline(datanodeDetails);
     pipelineId = pipeline.getId().getId().toString();
 
@@ -407,12 +415,48 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
             .addStorageReport(storageReportProto4).build();
     LayoutVersionProto layoutInfo = defaultLayoutVersionProto();
 
+    DatanodeDetailsProto datanodeDetailsProto3 =
+        DatanodeDetailsProto.newBuilder()
+            .setHostName(HOST3)
+            .setUuid(datanodeDetails3.getUuid().toString())
+            .setIpAddress(IP3)
+            .build();
+    extendedDatanodeDetailsProto3 =
+        HddsProtos.ExtendedDatanodeDetailsProto.newBuilder()
+            .setDatanodeDetails(datanodeDetailsProto3)
+            .setVersion("0.6.0")
+            .setSetupTime(1596347628802L)
+            .setBuildDate("2020-08-01T08:50Z")
+            .setRevision("3346f493fa1690358add7bb9f3e5b52545993f36")
+            .build();
+    StorageReportProto storageReportProto5 =
+        StorageReportProto.newBuilder().setStorageType(StorageTypeProto.DISK)
+            .setStorageLocation("/disk1").setScmUsed(20000).setRemaining(7800)
+            .setCapacity(50000)
+            .setStorageUuid(UUID.randomUUID().toString())
+            .setFailed(false).build();
+    StorageReportProto storageReportProto6 =
+        StorageReportProto.newBuilder().setStorageType(StorageTypeProto.DISK)
+            .setStorageLocation("/disk2").setScmUsed(60000).setRemaining(10000)
+            .setCapacity(80000)
+            .setStorageUuid(UUID.randomUUID().toString())
+            .setFailed(false).build();
+    NodeReportProto nodeReportProto3 =
+        NodeReportProto.newBuilder()
+            .addStorageReport(storageReportProto5)
+            .addStorageReport(storageReportProto6).build();
+
     assertDoesNotThrow(() -> {
       reconScm.getDatanodeProtocolServer()
           .register(extendedDatanodeDetailsProto, nodeReportProto,
               containerReportsProto, pipelineReportsProto, layoutInfo);
       reconScm.getDatanodeProtocolServer()
           .register(extendedDatanodeDetailsProto2, nodeReportProto2,
+              ContainerReportsProto.newBuilder().build(),
+              PipelineReportsProto.newBuilder().build(),
+              defaultLayoutVersionProto());
+      reconScm.getDatanodeProtocolServer()
+          .register(extendedDatanodeDetailsProto3, nodeReportProto3,
               ContainerReportsProto.newBuilder().build(),
               PipelineReportsProto.newBuilder().build(),
               defaultLayoutVersionProto());
@@ -564,6 +608,17 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
       assertEquals(0, datanodeMetadata.getPipelines().size());
       assertEquals(0, datanodeMetadata.getLeaderCount());
       break;
+    case HOST3:
+      assertEquals(130000,
+          datanodeMetadata.getDatanodeStorageReport().getCapacity());
+      assertEquals(17800,
+          datanodeMetadata.getDatanodeStorageReport().getRemaining());
+      assertEquals(80000,
+          datanodeMetadata.getDatanodeStorageReport().getUsed());
+
+      assertEquals(0, datanodeMetadata.getPipelines().size());
+      assertEquals(0, datanodeMetadata.getLeaderCount());
+      break;
     default:
       fail(String.format("Datanode %s not registered",
           hostname));
@@ -577,8 +632,8 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
     Response response = nodeEndpoint.getDatanodes();
     DatanodesResponse datanodesResponse =
         (DatanodesResponse) response.getEntity();
-    assertEquals(2, datanodesResponse.getTotalCount());
-    assertEquals(2, datanodesResponse.getDatanodes().size());
+    assertEquals(3, datanodesResponse.getTotalCount());
+    assertEquals(3, datanodesResponse.getDatanodes().size());
 
     datanodesResponse.getDatanodes().forEach(datanodeMetadata -> {
       try {
@@ -713,8 +768,8 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
     assertEquals(0, clusterStateResponse.getVolumes());
     assertEquals(0, clusterStateResponse.getBuckets());
     assertEquals(0, clusterStateResponse.getKeys());
-    assertEquals(2, clusterStateResponse.getTotalDatanodes());
-    assertEquals(2, clusterStateResponse.getHealthyDatanodes());
+    assertEquals(3, clusterStateResponse.getTotalDatanodes());
+    assertEquals(3, clusterStateResponse.getHealthyDatanodes());
     assertEquals(0, clusterStateResponse.getMissingContainers());
 
     waitAndCheckConditionAfterHeartbeat(() -> {
@@ -1180,5 +1235,56 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
 
   private BucketLayout getBucketLayout() {
     return BucketLayout.DEFAULT;
+  }
+
+  @Test
+  public void testExplicitRemovalOfDecommissionedNode() throws Exception {
+    Response response = nodeEndpoint.getDatanodes();
+
+    DatanodesResponse datanodesResponse =
+        (DatanodesResponse) response.getEntity();
+    assertEquals(3, datanodesResponse.getTotalCount());
+    assertEquals(3, datanodesResponse.getDatanodes().size());
+
+    // Change Node3 OperationalState with NodeManager to NodeOperationalState.DECOMMISSIONED
+    final NodeManager nodeManager = reconScm.getScmNodeManager();
+    final DatanodeDetails dnDetailsInternal =
+        nodeManager.getNodeByUuid(datanodeDetails3.getUuidString());
+    // Backup existing state and sanity check
+    final NodeStatus nStatus = nodeManager.getNodeStatus(dnDetailsInternal);
+    final NodeOperationalState backupOpState =
+        dnDetailsInternal.getPersistedOpState();
+    final long backupOpStateExpiry =
+        dnDetailsInternal.getPersistedOpStateExpiryEpochSec();
+    assertEquals(backupOpState, nStatus.getOperationalState());
+    assertEquals(backupOpStateExpiry, nStatus.getOpStateExpiryEpochSeconds());
+
+    dnDetailsInternal.setPersistedOpState(NodeOperationalState.DECOMMISSIONED);
+    dnDetailsInternal.setPersistedOpStateExpiryEpochSec(666L);
+    nodeManager.setNodeOperationalState(dnDetailsInternal,
+        NodeOperationalState.DECOMMISSIONED, 666L);
+
+    Response removedDNResponse = nodeEndpoint.removeDatanodes(Arrays.asList(datanodeDetails3.getUuid().toString()));
+
+    RemoveDataNodesResponseWrapper removeDataNodesResponseWrapper =
+        (RemoveDataNodesResponseWrapper) removedDNResponse.getEntity();
+    DatanodesResponse errorDataNodes = removeDataNodesResponseWrapper.getErrorDataNodes();
+    DatanodesResponse removedNodes = removeDataNodesResponseWrapper.getRemovedNodes();
+    assertEquals(1, removedNodes.getTotalCount());
+    assertNull(errorDataNodes);
+    assertEquals("Successfully removed 1 datanodes !!!", removedNodes.getMessage());
+    removedNodes.getDatanodes().forEach(datanodeMetadata -> {
+      assertEquals("host3.datanode", datanodeMetadata.getHostname());
+    });
+  }
+
+  @Test
+  public void testExplicitRemovalOfHealthyNode() throws Exception {
+    String dnUUID = datanodeDetails2.getUuid().toString();
+    Response removedDNResponse = nodeEndpoint.removeDatanodes(Arrays.asList(dnUUID));
+    String removedDNResponseEntity = (String) removedDNResponse.getEntity();
+    assertEquals("Invalid request: Node: " + dnUUID + " should be in either DECOMMISSIONED or " +
+        "IN_MAINTENANCE mode or DEAD.", removedDNResponseEntity);
+    assertEquals(Response.Status.BAD_REQUEST.getStatusCode(), removedDNResponse.getStatus());
   }
 }
