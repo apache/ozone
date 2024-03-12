@@ -106,9 +106,9 @@ public class StorageContainerManagerTestHelper {
     return allBlocks;
   }
 
-  public List<Long> getAllBlocks(Long containeID) throws IOException {
+  public List<Long> getAllBlocks(Long containerID) throws IOException {
     List<Long> allBlocks = Lists.newArrayList();
-    KeyValueContainerData cData = getContainerMetadata(containeID);
+    KeyValueContainerData cData = getContainerMetadata(containerID);
     try (DBHandle db = BlockUtils.getDB(cData, conf)) {
 
       List<? extends Table.KeyValue<String, BlockData>> kvs =
