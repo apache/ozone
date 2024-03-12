@@ -54,12 +54,14 @@ import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.OzoneConsts;
 import java.util.concurrent.TimeoutException;
+import java.util.stream.Collectors;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import io.opentracing.Scope;
 import io.opentracing.Span;
 import io.opentracing.util.GlobalTracer;
+import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 import org.apache.ratis.thirdparty.io.grpc.ManagedChannel;
 import org.apache.ratis.thirdparty.io.grpc.Status;
 import org.apache.ratis.thirdparty.io.grpc.netty.GrpcSslContexts;
@@ -523,7 +525,7 @@ public class XceiverClientGrpc extends XceiverClientSpi {
   }
 
   public CompletableFuture<DatanodeBlockID> sendCommandOnlyRead(
-      ContainerCommandRequestProto request, ByteBuffer buffer,
+      ContainerCommandRequestProto request, List<ByteBuffer> buffers,
       List<Validator> validators) throws SCMSecurityException {
     XceiverClientReply reply = new XceiverClientReply(null);
     List<DatanodeDetails> datanodeList = getDatanodeList(request);
@@ -551,12 +553,13 @@ public class XceiverClientGrpc extends XceiverClientSpi {
                     ReadBlockResponseProto readChunkResponse =
                         responseProto.getReadBlock();
                     if (readChunkResponse.hasData()) {
-                      buffer.put(readChunkResponse.getData()
+                      buffers.add(readChunkResponse.getData()
                           .asReadOnlyByteBuffer());
                     } else if (readChunkResponse.hasDataBuffers()) {
-                      readChunkResponse.getDataBuffers().getBuffersList()
-                          .stream().forEach(
-                              data -> buffer.put(data.asReadOnlyByteBuffer()));
+                      buffers.addAll(readChunkResponse.getDataBuffers()
+                          .getBuffersList().stream()
+                          .map(ByteString::asReadOnlyByteBuffer)
+                          .collect(Collectors.toList()));
                     }
                   }
 
