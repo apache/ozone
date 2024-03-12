@@ -97,26 +97,6 @@ public class StorageContainerManagerTestHelper {
     return keyLocationMap;
   }
 
-  public List<String> getPendingDeletionBlocks(Long containerID)
-      throws IOException {
-    List<String> pendingDeletionBlocks = Lists.newArrayList();
-    KeyValueContainerData cData = getContainerMetadata(containerID);
-    try (DBHandle db = BlockUtils.getDB(cData, conf)) {
-      KeyPrefixFilter filter = cData.getDeletingBlockKeyFilter();
-
-      List<? extends Table.KeyValue<String, BlockData>> kvs =
-          db.getStore().getBlockDataTable()
-              .getRangeKVs(cData.startKeyEmpty(), Integer.MAX_VALUE,
-                  cData.containerPrefix(), filter);
-
-      for (Table.KeyValue<String, BlockData> entry : kvs) {
-        pendingDeletionBlocks
-            .add(entry.getKey().replace(cData.getDeletingBlockKeyPrefix(), ""));
-      }
-    }
-    return pendingDeletionBlocks;
-  }
-
   public List<Long> getAllBlocks(Set<Long> containerIDs)
       throws IOException {
     List<Long> allBlocks = Lists.newArrayList();
