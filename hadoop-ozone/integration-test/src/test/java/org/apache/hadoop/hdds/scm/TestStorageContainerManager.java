@@ -71,6 +71,7 @@ import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.OzoneTestUtils;
+import org.apache.hadoop.ozone.TestDataUtil;
 import org.apache.hadoop.ozone.container.ContainerTestHelper;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.interfaces.DBHandle;
@@ -301,7 +302,7 @@ public class TestStorageContainerManager {
           .getScmBlockManager().getDeletedBlockLog();
       assertEquals(0, delLog.getNumOfValidTransactions());
 
-      Map<String, OmKeyInfo> keyLocations = StorageContainerManagerTestHelper.createKeys(cluster, numKeys);
+      Map<String, OmKeyInfo> keyLocations = TestDataUtil.createKeys(cluster, numKeys);
       // Wait for container report
       Thread.sleep(1000);
       for (OmKeyInfo keyInfo : keyLocations.values()) {
@@ -477,7 +478,7 @@ public class TestStorageContainerManager {
           .getScmBlockManager().getSCMBlockDeletingService();
       delService.setBlockDeleteTXNum(limitSize);
 
-      Map<String, OmKeyInfo> keyLocations = StorageContainerManagerTestHelper.createKeys(cluster, numKeys);
+      Map<String, OmKeyInfo> keyLocations = TestDataUtil.createKeys(cluster, numKeys);
       // Wait for container report
       Thread.sleep(5000);
       for (OmKeyInfo keyInfo : keyLocations.values()) {
@@ -747,7 +748,7 @@ public class TestStorageContainerManager {
       cluster.waitForClusterToBeReady();
       cluster.waitForPipelineTobeReady(HddsProtos.ReplicationFactor.ONE, 30000);
 
-      StorageContainerManagerTestHelper.createKeys(cluster, 10);
+      TestDataUtil.createKeys(cluster, 10);
       GenericTestUtils.waitFor(() ->
           cluster.getStorageContainerManager().getContainerManager()
               .getContainers() != null, 1000, 10000);
