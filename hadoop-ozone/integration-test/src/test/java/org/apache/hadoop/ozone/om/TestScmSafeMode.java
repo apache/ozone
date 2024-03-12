@@ -139,8 +139,7 @@ public class TestScmSafeMode {
 
   @Test
   void testSafeModeOperations() throws Exception {
-    // Create {numKeys} random names keys.
-    Map<String, OmKeyInfo> keyLocations = StorageContainerManagerTestHelper.createKeys(cluster, 100);
+    StorageContainerManagerTestHelper.createKeys(cluster, 100);
     final List<ContainerInfo> containers = cluster
         .getStorageContainerManager().getContainerManager().getContainers();
     GenericTestUtils.waitFor(() -> containers.size() >= 3, 100, 1000);
@@ -226,8 +225,7 @@ public class TestScmSafeMode {
     assertFalse(cluster.getStorageContainerManager().isInSafeMode());
 
     // Test2: Test safe mode  when containers are there in system.
-    // Create {numKeys} random names keys.
-    Map<String, OmKeyInfo> keyLocations = StorageContainerManagerTestHelper.createKeys(cluster, 100 * 2);
+    StorageContainerManagerTestHelper.createKeys(cluster, 100 * 2);
     final List<ContainerInfo> containers = cluster
         .getStorageContainerManager().getContainerManager().getContainers();
     GenericTestUtils.waitFor(() -> containers.size() >= 3, 100, 1000 * 30);

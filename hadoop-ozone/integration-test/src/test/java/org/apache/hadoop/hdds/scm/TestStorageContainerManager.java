@@ -301,7 +301,6 @@ public class TestStorageContainerManager {
           .getScmBlockManager().getDeletedBlockLog();
       assertEquals(0, delLog.getNumOfValidTransactions());
 
-      // Create {numKeys} random names keys.
       Map<String, OmKeyInfo> keyLocations = StorageContainerManagerTestHelper.createKeys(cluster, numKeys);
       // Wait for container report
       Thread.sleep(1000);
@@ -478,7 +477,6 @@ public class TestStorageContainerManager {
           .getScmBlockManager().getSCMBlockDeletingService();
       delService.setBlockDeleteTXNum(limitSize);
 
-      // Create {numKeys} random names keys.
       Map<String, OmKeyInfo> keyLocations = StorageContainerManagerTestHelper.createKeys(cluster, numKeys);
       // Wait for container report
       Thread.sleep(5000);

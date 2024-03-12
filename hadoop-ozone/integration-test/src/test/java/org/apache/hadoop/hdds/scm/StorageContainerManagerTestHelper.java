@@ -54,7 +54,6 @@ public class StorageContainerManagerTestHelper {
 
     try (OzoneClient client = cluster.newClient()) {
       OzoneBucket bucket = TestDataUtil.createVolumeAndBucket(client);
-      // Write 20 keys in bucketName.
       Set<String> keyNames = Sets.newHashSet();
       for (int i = 0; i < numOfKeys; i++) {
         String keyName = RandomStringUtils.randomAlphabetic(5) + i;
