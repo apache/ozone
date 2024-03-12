@@ -302,9 +302,7 @@ public class TestStorageContainerManager {
       assertEquals(0, delLog.getNumOfValidTransactions());
 
       // Create {numKeys} random names keys.
-      StorageContainerManagerTestHelper helper =
-          new StorageContainerManagerTestHelper(cluster, conf);
-      Map<String, OmKeyInfo> keyLocations = helper.createKeys(numKeys, 4096);
+      Map<String, OmKeyInfo> keyLocations = StorageContainerManagerTestHelper.createKeys(cluster, numKeys, 4096);
       // Wait for container report
       Thread.sleep(1000);
       for (OmKeyInfo keyInfo : keyLocations.values()) {
@@ -481,9 +479,7 @@ public class TestStorageContainerManager {
       delService.setBlockDeleteTXNum(limitSize);
 
       // Create {numKeys} random names keys.
-      StorageContainerManagerTestHelper helper =
-          new StorageContainerManagerTestHelper(cluster, conf);
-      Map<String, OmKeyInfo> keyLocations = helper.createKeys(numKeys, 4096);
+      Map<String, OmKeyInfo> keyLocations = StorageContainerManagerTestHelper.createKeys(cluster, numKeys, 4096);
       // Wait for container report
       Thread.sleep(5000);
       for (OmKeyInfo keyInfo : keyLocations.values()) {
@@ -752,10 +748,8 @@ public class TestStorageContainerManager {
         .build()) {
       cluster.waitForClusterToBeReady();
       cluster.waitForPipelineTobeReady(HddsProtos.ReplicationFactor.ONE, 30000);
-      StorageContainerManagerTestHelper helper =
-          new StorageContainerManagerTestHelper(cluster, conf);
 
-      helper.createKeys(10, 4096);
+      StorageContainerManagerTestHelper.createKeys(cluster, 10, 4096);
       GenericTestUtils.waitFor(() ->
           cluster.getStorageContainerManager().getContainerManager()
               .getContainers() != null, 1000, 10000);

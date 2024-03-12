@@ -17,36 +17,18 @@
 package org.apache.hadoop.hdds.scm;
 
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.hdds.protocol.DatanodeDetails;
-import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
-import org.apache.hadoop.hdds.utils.MetadataKeyFilters.KeyPrefixFilter;
-import org.apache.hadoop.hdds.utils.db.Table;
-import org.apache.hadoop.ozone.HddsDatanodeService;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.TestDataUtil;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
-import org.apache.hadoop.ozone.container.common.helpers.BlockData;
-import org.apache.hadoop.ozone.container.common.interfaces.DBHandle;
-import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
-import org.apache.hadoop.ozone.container.keyvalue.helpers.BlockUtils;
-import org.apache.hadoop.ozone.container.metadata.DatanodeSchemaThreeDBDefinition;
-import org.apache.hadoop.ozone.container.metadata.DatanodeStore;
-import org.apache.hadoop.ozone.container.metadata.DatanodeStoreSchemaThreeImpl;
-import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
-import org.apache.hadoop.hdds.protocol.proto
-    .StorageContainerDatanodeProtocolProtos.DeletedBlocksTransaction;
 
 
-import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
 import org.apache.commons.lang3.RandomStringUtils;
@@ -66,7 +48,7 @@ public class StorageContainerManagerTestHelper {
     this.conf = conf;
   }
 
-  public Map<String, OmKeyInfo> createKeys(int numOfKeys, int keySize)
+  public static Map<String, OmKeyInfo> createKeys(MiniOzoneCluster cluster, int numOfKeys, int keySize)
       throws Exception {
     Map<String, OmKeyInfo> keyLocationMap = Maps.newHashMap();
 
