@@ -3266,7 +3266,9 @@
     <value>2000</value>
     <tag>OZONE, RECON</tag>
     <description>
-      Recon each time get a limited delta updates from SCM.
+      Since Recon fetches delta SCM DB updates from last updated sequence number, so for
+      each periodic delta update sync, a delta DB update request being sent to SCM with this
+      update limit count in order to fetch the maximum limited number of DB update logs.
       The actual fetched data might be larger than this limit.
     </description>
   </property>
@@ -3275,8 +3277,9 @@
     <value>10</value>
     <tag>OZONE, RECON</tag>
     <description>
-      The sync between Recon and SCM consists of several small
-      fetch loops.
+      The sync between Recon and SCM consists of several small fetch loops and each loop iteration makes a
+      a delta DB update request to SCM. Number of delta DB update request to SCM or iteration count is
+      being restricted through this config.
     </description>
   </property>
   <property>
