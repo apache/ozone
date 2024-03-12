@@ -92,7 +92,7 @@ public class DecommissionStatusSubCommand extends ScmSubcommand {
       }
     } else {
       decommissioningNodes = allNodes.collect(Collectors.toList());
-      if(!json) {
+      if (!json) {
         System.out.println("\nDecommission Status: DECOMMISSIONING - " +
                 decommissioningNodes.size() + " node(s)");
       }
@@ -110,7 +110,7 @@ public class DecommissionStatusSubCommand extends ScmSubcommand {
       numDecomNodes = (totalDecom == null ? -1 : Integer.parseInt(totalDecom.toString()));
     }
 
-    if(json) {
+    if (json) {
       List<Map<String, Object>> decommissioningNodesDetails = new ArrayList<>();
 
       for (HddsProtos.Node node : decommissioningNodes) {
@@ -184,9 +184,12 @@ public class DecommissionStatusSubCommand extends ScmSubcommand {
           Date date = new Date(startTime);
           DateFormat formatter = new SimpleDateFormat("dd/MM/yyyy hh:mm:ss z");
           countsMap.put("decommissionStartTime", formatter.format(date));
-          countsMap.put("numOfUnclosedPipelines", Integer.parseInt(counts.get("PipelinesWaitingToCloseDN." + i).toString()));
-          countsMap.put("numOfUnderReplicatedContainers", Double.parseDouble(counts.get("UnderReplicatedDN." + i).toString()));
-          countsMap.put("numOfUnclosedContainers", Double.parseDouble(counts.get("UnclosedContainersDN." + i).toString()));
+          countsMap.put("numOfUnclosedPipelines",
+                  Integer.parseInt(counts.get("PipelinesWaitingToCloseDN." + i).toString()));
+          countsMap.put("numOfUnderReplicatedContainers",
+                  Double.parseDouble(counts.get("UnderReplicatedDN." + i).toString()));
+          countsMap.put("numOfUnclosedContainers",
+                  Double.parseDouble(counts.get("UnclosedContainersDN." + i).toString()));
           return countsMap;
         }
       }
