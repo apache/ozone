@@ -18,7 +18,6 @@ package org.apache.hadoop.hdds.scm;
 
 import java.io.IOException;
 import java.util.Map;
-import java.util.Set;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
@@ -30,7 +29,6 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 
 
 import com.google.common.collect.Maps;
-import com.google.common.collect.Sets;
 import org.apache.commons.lang3.RandomStringUtils;
 
 /**
@@ -54,28 +52,21 @@ public class StorageContainerManagerTestHelper {
 
     try (OzoneClient client = cluster.newClient()) {
       OzoneBucket bucket = TestDataUtil.createVolumeAndBucket(client);
-      Set<String> keyNames = Sets.newHashSet();
       for (int i = 0; i < numOfKeys; i++) {
         String keyName = RandomStringUtils.randomAlphabetic(5) + i;
-        keyNames.add(keyName);
-
-        TestDataUtil
-            .createKey(bucket, keyName, RandomStringUtils.randomAlphabetic(5));
-      }
-
-      for (String key : keyNames) {
-        OmKeyArgs arg = new OmKeyArgs.Builder()
-            .setVolumeName(bucket.getVolumeName())
-            .setBucketName(bucket.getName())
-            .setKeyName(key)
-            .build();
-        OmKeyInfo location = cluster.getOzoneManager()
-            .lookupKey(arg);
-        keyLocationMap.put(key, location);
+        TestDataUtil.createKey(bucket, keyName, RandomStringUtils.randomAlphabetic(5));
+        keyLocationMap.put(keyName, lookupOmKeyInfo(cluster, bucket, keyName));
       }
     }
-
     return keyLocationMap;
   }
 
+  private static OmKeyInfo lookupOmKeyInfo(MiniOzoneCluster cluster, OzoneBucket bucket, String key) throws IOException {
+    OmKeyArgs arg = new OmKeyArgs.Builder()
+        .setVolumeName(bucket.getVolumeName())
+        .setBucketName(bucket.getName())
+        .setKeyName(key)
+        .build();
+    return cluster.getOzoneManager().lookupKey(arg);
   }
+}
