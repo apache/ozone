@@ -50,10 +50,12 @@ import org.apache.hadoop.hdds.scm.ScmConfig;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.ScmInfo;
 import org.apache.hadoop.hdds.scm.HddsTestUtils;
+import org.apache.hadoop.hdds.scm.client.ScmTopologyClient;
 import org.apache.hadoop.hdds.scm.ha.HASecurityUtils;
 import org.apache.hadoop.hdds.scm.ha.SCMHANodeDetails;
 import org.apache.hadoop.hdds.scm.ha.SCMHAUtils;
 import org.apache.hadoop.hdds.scm.ha.SCMRatisServerImpl;
+import org.apache.hadoop.hdds.scm.protocol.ScmBlockLocationProtocol;
 import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocol;
 import org.apache.hadoop.hdds.scm.server.SCMHTTPServerConfig;
 import org.apache.hadoop.hdds.scm.server.SCMStorageConfig;
@@ -87,6 +89,7 @@ import org.apache.hadoop.ozone.common.Storage;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OMStorage;
 import org.apache.hadoop.ozone.om.OzoneManager;
+import org.apache.hadoop.ozone.om.ScmBlockLocationTestingClient;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.helpers.S3SecretValue;
@@ -208,6 +211,7 @@ final class TestSecureOzoneCluster {
   private File testUserKeytab;
   private String testUserPrincipal;
   private StorageContainerManager scm;
+  private ScmBlockLocationProtocol scmBlockClient;
   private OzoneManager om;
   private HddsProtos.OzoneManagerDetailsProto omInfo;
   private String host;
@@ -264,6 +268,7 @@ final class TestSecureOzoneCluster {
       clusterId = UUID.randomUUID().toString();
       scmId = UUID.randomUUID().toString();
       omId = UUID.randomUUID().toString();
+      scmBlockClient = new ScmBlockLocationTestingClient(null, null, 0);
 
       startMiniKdc();
       setSecureConfig();
@@ -609,6 +614,7 @@ final class TestSecureOzoneCluster {
 
       setupOm(conf);
       om.setCertClient(new CertificateClientTestImpl(conf));
+      om.setScmTopologyClient(new ScmTopologyClient(scmBlockClient));
       om.start();
     } catch (Exception ex) {
       // Expects timeout failure from scmClient in om but om user login via
@@ -676,6 +682,7 @@ final class TestSecureOzoneCluster {
       setupOm(conf);
       OzoneManager.setTestSecureOmFlag(true);
       om.setCertClient(new CertificateClientTestImpl(conf));
+      om.setScmTopologyClient(new ScmTopologyClient(scmBlockClient));
       om.start();
 
       UserGroupInformation ugi = UserGroupInformation.getCurrentUser();
@@ -763,6 +770,7 @@ final class TestSecureOzoneCluster {
       setupOm(conf);
       // Start OM
       om.setCertClient(new CertificateClientTestImpl(conf));
+      om.setScmTopologyClient(new ScmTopologyClient(scmBlockClient));
       om.start();
       UserGroupInformation ugi = UserGroupInformation.getCurrentUser();
       String username = ugi.getUserName();
@@ -999,6 +1007,7 @@ final class TestSecureOzoneCluster {
       // create Ozone Manager instance, it will start the monitor task
       conf.set(OZONE_SCM_CLIENT_ADDRESS_KEY, "localhost");
       om = OzoneManager.createOm(conf);
+      om.setScmTopologyClient(new ScmTopologyClient(scmBlockClient));
       om.setCertClient(client);
 
       // check after renew, client will have the new cert ID
@@ -1164,6 +1173,7 @@ final class TestSecureOzoneCluster {
       // create Ozone Manager instance, it will start the monitor task
       conf.set(OZONE_SCM_CLIENT_ADDRESS_KEY, "localhost");
       om = OzoneManager.createOm(conf);
+      om.setScmTopologyClient(new ScmTopologyClient(scmBlockClient));
       om.setCertClient(mockClient);
 
       // check error message during renew
@@ -1202,6 +1212,7 @@ final class TestSecureOzoneCluster {
       String omCertId1 = omCert.getSerialNumber().toString();
       // Start OM
       om.setCertClient(certClient);
+      om.setScmTopologyClient(new ScmTopologyClient(scmBlockClient));
       om.start();
       GenericTestUtils.waitFor(() -> om.isLeaderReady(), 100, 10000);
 
