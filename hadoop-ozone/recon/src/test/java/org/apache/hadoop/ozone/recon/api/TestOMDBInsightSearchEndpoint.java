@@ -18,76 +18,85 @@
 
 package org.apache.hadoop.ozone.recon.api;
 
-import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
-import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
-import org.apache.hadoop.hdds.utils.db.Table;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
-import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
-import org.apache.hadoop.ozone.recon.ReconTestInjector;
+
+import org.apache.hadoop.ozone.recon.api.types.KeyInsightInfoResponse;
 import org.apache.hadoop.ozone.recon.persistence.AbstractReconSqlDBTest;
 import org.apache.hadoop.ozone.recon.persistence.ContainerHealthSchemaManager;
-import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
-import org.apache.hadoop.ozone.recon.scm.ReconStorageContainerManagerFacade;
+import org.apache.hadoop.ozone.recon.spi.ReconNamespaceSummaryManager;
 import org.apache.hadoop.ozone.recon.spi.StorageContainerServiceProvider;
 import org.apache.hadoop.ozone.recon.spi.impl.OzoneManagerServiceProviderImpl;
 import org.apache.hadoop.ozone.recon.spi.impl.StorageContainerServiceProviderImpl;
+import org.apache.hadoop.ozone.recon.tasks.NSSummaryTaskWithFSO;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.io.TempDir;
-import javax.ws.rs.core.Response;
 
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Random;
-import java.util.Set;
-
-import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.getTestReconOmMetadataManager;
-import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.initializeNewOmMetadataManager;
-import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.getBucketLayout;
+import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.*;
+import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_NSSUMMARY_FLUSH_TO_DB_MAX_THRESHOLD;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
+
+import org.apache.hadoop.hdds.scm.container.ContainerManager;
+import org.apache.hadoop.hdds.scm.container.ContainerNotFoundException;
+import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
+import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
+import org.apache.hadoop.ozone.recon.ReconTestInjector;
+import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
+import org.apache.hadoop.ozone.recon.scm.ReconNodeManager;
+import org.apache.hadoop.ozone.recon.scm.ReconStorageContainerManagerFacade;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
+import org.junit.platform.commons.logging.Logger;
+import org.junit.platform.commons.logging.LoggerFactory;
+
+import javax.ws.rs.core.Response;
+
+import java.io.File;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.*;
+
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_DB_DIRS;
+import static org.mockito.Mockito.when;
+
 
 /**
  * Test for OMDBInsightSearchEndpoint.
  */
 public class TestOMDBInsightSearchEndpoint extends AbstractReconSqlDBTest {
+
   @TempDir
   private Path temporaryFolder;
-  private OMMetadataManager omMetadataManager;
+
+  Logger LOG = LoggerFactory.getLogger(TestOMDBInsightSearchEndpoint.class);
+
   private ReconOMMetadataManager reconOMMetadataManager;
   private OMDBInsightSearchEndpoint omdbInsightSearchEndpoint;
-  private Random random = new Random();
-  private Set<Long> generatedIds = new HashSet<>();
-  public TestOMDBInsightSearchEndpoint() {
-    super();
-  }
+  private OzoneConfiguration ozoneConfiguration;
+  private static final String ROOT_PATH = "/";
+  private static final String TEST_USER = "TestUser";
+  private OMMetadataManager omMetadataManager;
 
-  private long generateUniqueRandomLong() {
-    long newValue;
-    do {
-      newValue = random.nextLong();
-    } while (generatedIds.contains(newValue));
-
-    generatedIds.add(newValue);
-    return newValue;
-  }
+  private ReconNamespaceSummaryManager reconNamespaceSummaryManager;
 
   @BeforeEach
   public void setUp() throws Exception {
+    ozoneConfiguration = new OzoneConfiguration();
+    ozoneConfiguration.setLong(OZONE_RECON_NSSUMMARY_FLUSH_TO_DB_MAX_THRESHOLD,
+        100);
     omMetadataManager = initializeNewOmMetadataManager(
-        Files.createDirectory(temporaryFolder.resolve(
-            "JunitOmMetadata")).toFile());
+        Files.createDirectory(temporaryFolder.resolve("JunitOmDBDir"))
+            .toFile());
+    OzoneManagerServiceProviderImpl ozoneManagerServiceProvider =
+        getMockOzoneManagerServiceProviderWithFSO();
     reconOMMetadataManager = getTestReconOmMetadataManager(omMetadataManager,
-        Files.createDirectory(temporaryFolder.resolve(
-            "JunitOmMetadataTest")).toFile());
+        Files.createDirectory(temporaryFolder.resolve("OmMetataDir")).toFile());
+
     ReconTestInjector reconTestInjector =
         new ReconTestInjector.Builder(temporaryFolder.toFile())
             .withReconSqlDb()
@@ -101,210 +110,357 @@ public class TestOMDBInsightSearchEndpoint extends AbstractReconSqlDBTest {
             .addBinding(OMDBInsightEndpoint.class)
             .addBinding(ContainerHealthSchemaManager.class)
             .build();
+    reconNamespaceSummaryManager =
+        reconTestInjector.getInstance(ReconNamespaceSummaryManager.class);
     omdbInsightSearchEndpoint = reconTestInjector.getInstance(
         OMDBInsightSearchEndpoint.class);
+
+    // populate OM DB and reprocess into Recon RocksDB
+    populateOMDB();
+    NSSummaryTaskWithFSO nSSummaryTaskWithFso =
+        new NSSummaryTaskWithFSO(reconNamespaceSummaryManager,
+            reconOMMetadataManager, ozoneConfiguration);
+    nSSummaryTaskWithFso.reprocessWithFSO(reconOMMetadataManager);
+  }
+
+  /**
+   * Create a new OM Metadata manager instance with one user, one vol, and two
+   * buckets.
+   *
+   * @throws IOException ioEx
+   */
+  private static OMMetadataManager initializeNewOmMetadataManager(
+      File omDbDir)
+      throws IOException {
+    OzoneConfiguration omConfiguration = new OzoneConfiguration();
+    omConfiguration.set(OZONE_OM_DB_DIRS,
+        omDbDir.getAbsolutePath());
+    OMMetadataManager omMetadataManager = new OmMetadataManagerImpl(
+        omConfiguration, null);
+    return omMetadataManager;
   }
 
   @Test
-  public void testSearchOpenKeys() throws Exception {
-    // Create 3 keys in 'bucketOne' and 2 keys in 'bucketTwo'
-    for (int i = 1; i <= 3; i++) {
-      OmKeyInfo omKeyInfo =
-          getOmKeyInfo("sampleVol", "bucketOne", "key_" + i, true);
-      String keyPath = String.format("/sampleVol/%s/key_%d", "bucketOne", i);
-      reconOMMetadataManager.getOpenKeyTable(getBucketLayout())
-          .put(keyPath, omKeyInfo);
-    }
+  public void testRootLevelSearch() throws IOException {
+    Response response =
+        omdbInsightSearchEndpoint.searchOpenKeys(ROOT_PATH, true, true, 20);
+    assertEquals(200, response.getStatus());
+    KeyInsightInfoResponse result =
+        (KeyInsightInfoResponse) response.getEntity();
+    assertEquals(10, result.getFsoKeyInfoList().size());
+    assertEquals(5, result.getNonFSOKeyInfoList().size());
+    // Assert Total Size
+    assertEquals(15000, result.getUnreplicatedDataSize());
+    assertEquals(15000 * 3, result.getReplicatedDataSize());
 
-    for (int i = 1; i <= 2; i++) {
-      OmKeyInfo omKeyInfo =
-          getOmKeyInfo("sampleVol", "bucketTwo", "key_" + i, true);
-      String keyPath = String.format("/sampleVol/%s/key_%d", "bucketTwo", i);
-      reconOMMetadataManager.getOpenKeyTable(getBucketLayout())
-          .put(keyPath, omKeyInfo);
-    }
+    // Switch of the include Fso flag
+    response =
+        omdbInsightSearchEndpoint.searchOpenKeys(ROOT_PATH, false, true, 20);
+    result = (KeyInsightInfoResponse) response.getEntity();
+    assertEquals(0, result.getFsoKeyInfoList().size());
+    assertEquals(5, result.getNonFSOKeyInfoList().size());
 
-    // Search for keys in 'bucketOne'
-    String searchPrefixBucketOne = "/sampleVol/bucketOne/";
-    Response responseBucketOne =
-        omdbInsightSearchEndpoint.searchOpenKeys(searchPrefixBucketOne, true,
-            true, 10);
-
-    // Assert that the search response for 'bucketOne' is OK and verify the results
-    assertEquals(Response.Status.OK.getStatusCode(),
-        responseBucketOne.getStatus());
-    List<OmKeyInfo> searchResultsBucketOne =
-        (List<OmKeyInfo>) responseBucketOne.getEntity();
-    assertNotNull(searchResultsBucketOne);
-    assertEquals(3, searchResultsBucketOne.size());
-
-    searchResultsBucketOne.forEach(keyInfo -> {
-      assertTrue(keyInfo.getKeyName().startsWith("key_"));
-      assertTrue(keyInfo.getVolumeName().startsWith("sampleVol"));
-      assertTrue(keyInfo.getBucketName().startsWith("bucketOne"));
-    });
-
-    // Search for keys in 'bucketTwo'
-    String searchPrefixBucketTwo = "/sampleVol/bucketTwo/";
-    Response responseBucketTwo =
-        omdbInsightSearchEndpoint.searchOpenKeys(searchPrefixBucketTwo, true,
-            true, 10);
-
-    // Assert that the search response for 'bucketTwo' is OK and verify the results
-    assertEquals(Response.Status.OK.getStatusCode(),
-        responseBucketTwo.getStatus());
-    List<OmKeyInfo> searchResultsBucketTwo =
-        (List<OmKeyInfo>) responseBucketTwo.getEntity();
-    assertNotNull(searchResultsBucketTwo);
-    assertEquals(2, searchResultsBucketTwo.size());
-
-    searchResultsBucketTwo.forEach(keyInfo -> {
-      assertTrue(keyInfo.getKeyName().startsWith("key_"));
-      assertTrue(keyInfo.getVolumeName().startsWith("sampleVol"));
-      assertTrue(keyInfo.getBucketName().startsWith("bucketTwo"));
-    });
+    // Switch of the include Non Fso flag
+    response =
+        omdbInsightSearchEndpoint.searchOpenKeys(ROOT_PATH, true, false, 20);
+    result = (KeyInsightInfoResponse) response.getEntity();
+    assertEquals(10, result.getFsoKeyInfoList().size());
   }
 
   @Test
-  public void testConvertToObjectPathForEmptyPrefix() throws Exception {
-    String result = omdbInsightSearchEndpoint.convertToObjectPath("");
-    assertEquals("", result, "Expected an empty string for empty input");
+  public void testBucketLevelSearch() throws IOException {
+    Response response =
+        omdbInsightSearchEndpoint.searchOpenKeys("/volA/bucketA1", true, true, 20);
+    assertEquals(200, response.getStatus());
+    KeyInsightInfoResponse result =
+        (KeyInsightInfoResponse) response.getEntity();
+    assertEquals(5, result.getFsoKeyInfoList().size());
+    assertEquals(0, result.getNonFSOKeyInfoList().size());
+    // Assert Total Size
+    assertEquals(5000, result.getUnreplicatedDataSize());
+    assertEquals(5000 * 3, result.getReplicatedDataSize());
+
+    response =
+        omdbInsightSearchEndpoint.searchOpenKeys("/volB/bucketB1", true, true, 20);
+    assertEquals(200, response.getStatus());
+    result =
+        (KeyInsightInfoResponse) response.getEntity();
+    assertEquals(5, result.getNonFSOKeyInfoList().size());
+    assertEquals(0, result.getFsoKeyInfoList().size());
+    // Assert Total Size
+    assertEquals(5000, result.getUnreplicatedDataSize());
+    assertEquals(5000 * 3, result.getReplicatedDataSize());
   }
 
   @Test
-  public void testConvertToObjectPathForVolumeOnly() throws Exception {
-    setupVolume("vol1", 100L);
+  public void testDirectoryLevelSearch() throws IOException {
+    Response response =
+        omdbInsightSearchEndpoint.searchOpenKeys("/volA/bucketA1/dirA1", true, true, 20);
+    assertEquals(200, response.getStatus());
+    KeyInsightInfoResponse result =
+        (KeyInsightInfoResponse) response.getEntity();
+    assertEquals(1, result.getFsoKeyInfoList().size());
+    assertEquals(0, result.getNonFSOKeyInfoList().size());
+    // Assert Total Size
+    assertEquals(1000, result.getUnreplicatedDataSize());
+    assertEquals(1000 * 3, result.getReplicatedDataSize());
 
-    String result = omdbInsightSearchEndpoint.convertToObjectPath("/vol1");
-    assertEquals("/100", result, "Incorrect conversion for volume only path");
+    response =
+        omdbInsightSearchEndpoint.searchOpenKeys("/volA/bucketA1/dirA2", true, true, 20);
+    assertEquals(200, response.getStatus());
+    result =
+        (KeyInsightInfoResponse) response.getEntity();
+    assertEquals(1, result.getFsoKeyInfoList().size());
+    assertEquals(0, result.getNonFSOKeyInfoList().size());
+    // Assert Total Size
+    assertEquals(1000, result.getUnreplicatedDataSize());
+    assertEquals(1000 * 3, result.getReplicatedDataSize());
+
+    response =
+        omdbInsightSearchEndpoint.searchOpenKeys("/volA/bucketA1/dirA3", true, true, 20);
+    assertEquals(200, response.getStatus());
+    result =
+        (KeyInsightInfoResponse) response.getEntity();
+    assertEquals(1, result.getFsoKeyInfoList().size());
+    assertEquals(0, result.getNonFSOKeyInfoList().size());
+    // Assert Total Size
+    assertEquals(1000, result.getUnreplicatedDataSize());
+    assertEquals(1000 * 3, result.getReplicatedDataSize());
   }
 
   @Test
-  public void testConvertToObjectPathForVolumeAndBucket() throws Exception {
-    setupVolume("vol1", 100L);
-    setupBucket("vol1", "bucketOne", 200L, BucketLayout.LEGACY);
-
-    String result =
-        omdbInsightSearchEndpoint.convertToObjectPath("vol1/bucketOne");
-    assertEquals("/100/200", result,
-        "Incorrect conversion for volume and bucket path");
+  public void testLimitSearch() throws IOException {
+    Response response =
+        omdbInsightSearchEndpoint.searchOpenKeys(ROOT_PATH, true, true, 5);
+    assertEquals(200, response.getStatus());
+    KeyInsightInfoResponse result =
+        (KeyInsightInfoResponse) response.getEntity();
+    assertEquals(5, result.getFsoKeyInfoList().size());
+    assertEquals(5, result.getNonFSOKeyInfoList().size());
   }
 
-  @Test
-  public void testSearchOpenKeysWithDifferentBucketLayouts() throws Exception {
-    // Setup for LEGACY bucket layout
-    OmKeyInfo legacyKeyInfo =
-        getOmKeyInfo("sampleVol", "legacyBucket", "legacy_key_1", true);
-    String legacyKeyPath =
-        String.format("/sampleVol/%s/%s", "legacyBucket", "legacy_key_1");
-    reconOMMetadataManager.getOpenKeyTable(BucketLayout.LEGACY)
-        .put(legacyKeyPath, legacyKeyInfo);
 
-    // Setup for FSO bucket layout
-    OmKeyInfo fsoKeyInfo =
-        getOmKeyInfo("sampleVol", "fsoBucket", "fso_key_1", true);
-    setupBucket("sampleVol", "fsoBucket", 200L,
-        BucketLayout.FILE_SYSTEM_OPTIMIZED);
-    long fsoKeyObjectId = fsoKeyInfo.getObjectID();
-    long bucketId = 200L;
-    long volumeId = 0L;
-    String fsoKeyPath =
-        String.format("/%s/%s/%s", volumeId, bucketId, fsoKeyObjectId);
-    reconOMMetadataManager.getOpenKeyTable(BucketLayout.FILE_SYSTEM_OPTIMIZED)
-        .put(fsoKeyPath, fsoKeyInfo);
+  /**
+   * Tests the NSSummaryEndpoint for a given volume, bucket, and directory structure.
+   * The test setup mimics the following filesystem structure with specified sizes:
+   * <p>
+   * root   (Total Size: 15000KB)
+   * ├── volA   (Total Size: 10000KB)
+   * │   ├── bucketA1   (FSO) Total Size: 5000KB
+   * │   │   ├── fileA1 (Size: 1000KB)
+   * │   │   ├── fileA2 (Size: 1000KB)
+   * │   │   ├── dirA1 (Total Size: 1000KB)
+   * │   │   ├── dirA2 (Total Size: 1000KB)
+   * │   │   └── dirA3 (Total Size: 1000KB)
+   * │   ├── bucketA2   (FSO) Total Size: 5000KB
+   * │   │   ├── fileA3 (Size: 1000KB)
+   * │   │   ├── fileA4 (Size: 1000KB)
+   * │   │   ├── dirA4 (Total Size: 1000KB)
+   * │   │   ├── dirA5 (Total Size: 1000KB)
+   * │   │   └── dirA6 (Total Size: 1000KB)
+   * └── volB   (Total Size: 5000KB)
+   *     └── bucketB1   (OBS) Total Size: 5000KB
+   *         ├── fileB1 (Size: 1000KB)
+   *         ├── fileB2 (Size: 1000KB)
+   *         ├── fileB3 (Size: 1000KB)
+   *         ├── fileB4 (Size: 1000KB)
+   *         └── fileB5 (Size: 1000KB)
+   *
+   * @throws Exception
+   */
+  private void populateOMDB() throws Exception {
+    // Create Volumes
+    long volAObjectId = createVolume("volA");
+    long volBObjectId = createVolume("volB");
 
-    // Search for keys under the LEGACY bucket
-    String searchPrefixLegacy = "/sampleVol/legacyBucket/";
-    Response responseLegacy =
-        omdbInsightSearchEndpoint.searchOpenKeys(searchPrefixLegacy, true, true,
-            10);
+    // Create Buckets in volA
+    long bucketA1ObjectId =
+        createBucket("volA", "bucketA1", 1000 + 1000 + 1000 + 1000 + 1000,
+            getFSOBucketLayout());
+    long bucketA2ObjectId =
+        createBucket("volA", "bucketA2", 1000 + 1000 + 1000 + 1000 + 1000,
+            getFSOBucketLayout());
 
-    // Verify response for LEGACY bucket layout
-    assertEquals(Response.Status.OK.getStatusCode(),
-        responseLegacy.getStatus());
-    List<OmKeyInfo> searchResultsLegacy =
-        (List<OmKeyInfo>) responseLegacy.getEntity();
-    assertNotNull(searchResultsLegacy);
-    assertEquals(1, searchResultsLegacy.size());
-    assertTrue(
-        searchResultsLegacy.get(0).getKeyName().startsWith("legacy_key_"));
-    assertEquals("legacyBucket", searchResultsLegacy.get(0).getBucketName());
+    // Create Bucket in volB
+    long bucketB1ObjectId =
+        createBucket("volB", "bucketB1", 1000 + 1000 + 1000 + 1000 + 1000,
+            getOBSBucketLayout());
 
-    // Search for keys under the FSO bucket
-    String searchPrefixFso = "/sampleVol/fsoBucket/";
-    Response responseFso =
-        omdbInsightSearchEndpoint.searchOpenKeys(searchPrefixFso, true, true,
-            10);
+    // Create Directories and Files under bucketA1
+    long dirA1ObjectId =
+        createDirectory(bucketA1ObjectId, bucketA1ObjectId, volAObjectId,
+            "dirA1");
+    long dirA2ObjectId =
+        createDirectory(bucketA1ObjectId, bucketA1ObjectId, volAObjectId,
+            "dirA2");
+    long dirA3ObjectId =
+        createDirectory(bucketA1ObjectId, bucketA1ObjectId, volAObjectId,
+            "dirA3");
 
-    // Verify response for FSO bucket layout
-    assertEquals(Response.Status.OK.getStatusCode(), responseFso.getStatus());
-    List<OmKeyInfo> searchResultsFso =
-        (List<OmKeyInfo>) responseFso.getEntity();
-    assertNotNull(searchResultsFso);
-    assertEquals(1, searchResultsFso.size());
-    assertTrue(searchResultsFso.get(0).getKeyName().startsWith("fso_key_"));
-    assertEquals("fsoBucket", searchResultsFso.get(0).getBucketName());
+    // Files directly under bucketA1
+    createOpenFile("fileA1", "bucketA1", "volA", "fileA1", bucketA1ObjectId,
+        bucketA1ObjectId, volAObjectId, 1000);
+    createOpenFile("fileA2", "bucketA1", "volA", "fileA2", bucketA1ObjectId,
+        bucketA1ObjectId, volAObjectId, 1000);
 
-    // Pass only the volume name and verify the response.
-    String searchPrefixVolume = "/sampleVol/";
-    Response responseVolume =
-        omdbInsightSearchEndpoint.searchOpenKeys(searchPrefixVolume, true, true,
-            10);
+    // Create Directories and Files under bucketA2
+    long dirA4ObjectId =
+        createDirectory(bucketA2ObjectId, bucketA2ObjectId, volAObjectId,
+            "dirA4");
+    long dirA5ObjectId =
+        createDirectory(bucketA2ObjectId, bucketA2ObjectId, volAObjectId,
+            "dirA5");
+    long dirA6ObjectId =
+        createDirectory(bucketA2ObjectId, bucketA2ObjectId, volAObjectId,
+            "dirA6");
 
-    // Verify response for volume name
-    assertEquals(Response.Status.OK.getStatusCode(),
-        responseVolume.getStatus());
-    List<OmKeyInfo> searchResultsVolume =
-        (List<OmKeyInfo>) responseVolume.getEntity();
-    assertNotNull(searchResultsVolume);
-    assertEquals(2, searchResultsVolume.size());
+    // Files directly under bucketA2
+    createOpenFile("fileA3", "bucketA2", "volA", "fileA3", bucketA2ObjectId,
+        bucketA2ObjectId, volAObjectId, 1000);
+    createOpenFile("fileA4", "bucketA2", "volA", "fileA4", bucketA2ObjectId,
+        bucketA2ObjectId, volAObjectId, 1000);
+
+    // Files directly under bucketB1
+    createOpenKey("fileB1", "bucketB1", "volB", "fileB1", bucketB1ObjectId,
+        bucketB1ObjectId, volBObjectId, 1000);
+    createOpenKey("fileB2", "bucketB1", "volB", "fileB2", bucketB1ObjectId,
+        bucketB1ObjectId, volBObjectId, 1000);
+    createOpenKey("fileB3", "bucketB1", "volB", "fileB3", bucketB1ObjectId,
+        bucketB1ObjectId, volBObjectId, 1000);
+    createOpenKey("fileB4", "bucketB1", "volB", "fileB4", bucketB1ObjectId,
+        bucketB1ObjectId, volBObjectId, 1000);
+    createOpenKey("fileB5", "bucketB1", "volB", "fileB5", bucketB1ObjectId,
+        bucketB1ObjectId, volBObjectId, 1000);
+
+    // Create Inner files under directories
+    createOpenFile("dirA1/innerFile", "bucketA1", "volA", "innerFile",
+        dirA1ObjectId, bucketA1ObjectId, volAObjectId, 1000);
+    createOpenFile("dirA2/innerFile", "bucketA1", "volA", "innerFile",
+        dirA2ObjectId, bucketA1ObjectId, volAObjectId, 1000);
+    createOpenFile("dirA3/innerFile", "bucketA1", "volA", "innerFile",
+        dirA3ObjectId, bucketA1ObjectId, volAObjectId, 1000);
+    createOpenFile("dirA4/innerFile", "bucketA2", "volA", "innerFile",
+        dirA4ObjectId, bucketA2ObjectId, volAObjectId, 1000);
+    createOpenFile("dirA5/innerFile", "bucketA2", "volA", "innerFile",
+        dirA5ObjectId, bucketA2ObjectId, volAObjectId, 1000);
+    createOpenFile("dirA6/innerFile", "bucketA2", "volA", "innerFile",
+        dirA6ObjectId, bucketA2ObjectId, volAObjectId, 1000);
   }
 
-  private OmKeyInfo getOmKeyInfo(String volumeName, String bucketName,
-                                 String keyName, boolean isFile) {
-    return new OmKeyInfo.Builder()
-        .setVolumeName(volumeName)
-        .setBucketName(bucketName)
-        .setKeyName(keyName)
-        .setFile(isFile)
-        .setObjectID(generateUniqueRandomLong())
-        .setReplicationConfig(StandaloneReplicationConfig
-            .getInstance(HddsProtos.ReplicationFactor.ONE))
-        .setDataSize(random.nextLong())
-        .build();
-  }
-
-  public void setupVolume(String volumeName, long volumeId) throws Exception {
-    Table<String, OmVolumeArgs> volumeTable =
-        reconOMMetadataManager.getVolumeTable();
-
-    OmVolumeArgs omVolumeArgs = OmVolumeArgs.newBuilder()
-        .setVolume(volumeName)
-        .setAdminName("TestUser")
-        .setOwnerName("TestUser")
+  /**
+   * Create a volume and add it to the Volume Table.
+   *
+   * @return volume Object ID
+   * @throws IOException
+   */
+  private long createVolume(String volumeName) throws Exception {
+    String volumeKey = reconOMMetadataManager.getVolumeKey(volumeName);
+    long volumeId = UUID.randomUUID().getMostSignificantBits() &
+        Long.MAX_VALUE; // Generate positive ID
+    OmVolumeArgs args = OmVolumeArgs.newBuilder()
         .setObjectID(volumeId)
+        .setVolume(volumeName)
+        .setAdminName(TEST_USER)
+        .setOwnerName(TEST_USER)
         .build();
-    // Insert the volume into the table
-    volumeTable.put(reconOMMetadataManager.getVolumeKey(volumeName),
-        omVolumeArgs);
+
+    reconOMMetadataManager.getVolumeTable().put(volumeKey, args);
+    return volumeId;
   }
 
-  private void setupBucket(String volumeName, String bucketName, long bucketId,
-                           BucketLayout layout)
+  /**
+   * Create a bucket and add it to the Bucket Table.
+   *
+   * @return bucket Object ID
+   * @throws IOException
+   */
+  private long createBucket(String volumeName, String bucketName, long dataSize,
+                            BucketLayout bucketLayout)
       throws Exception {
-    Table<String, OmBucketInfo> bucketTable =
-        reconOMMetadataManager.getBucketTable();
-
-    OmBucketInfo omBucketInfo = OmBucketInfo.newBuilder()
+    String bucketKey =
+        reconOMMetadataManager.getBucketKey(volumeName, bucketName);
+    long bucketId = UUID.randomUUID().getMostSignificantBits() &
+        Long.MAX_VALUE; // Generate positive ID
+    OmBucketInfo bucketInfo = OmBucketInfo.newBuilder()
         .setVolumeName(volumeName)
         .setBucketName(bucketName)
         .setObjectID(bucketId)
-        .setBucketLayout(layout)
+        .setBucketLayout(bucketLayout)
+        .setUsedBytes(dataSize)
         .build();
 
-    String bucketKey =
-        reconOMMetadataManager.getBucketKey(volumeName, bucketName);
-    bucketTable.put(bucketKey, omBucketInfo);
+    reconOMMetadataManager.getBucketTable().put(bucketKey, bucketInfo);
+    return bucketId;
+  }
+
+  /**
+   * Create a directory and add it to the Directory Table.
+   *
+   * @return directory Object ID
+   * @throws IOException
+   */
+  private long createDirectory(long parentObjectId,
+                               long bucketObjectId,
+                               long volumeObjectId,
+                               String dirName) throws IOException {
+    long objectId = UUID.randomUUID().getMostSignificantBits() &
+        Long.MAX_VALUE; // Ensure positive ID
+    writeDirToOm(reconOMMetadataManager, objectId, parentObjectId,
+        bucketObjectId,
+        volumeObjectId, dirName);
+    return objectId;
+  }
+
+  /**
+   * Create a file and add it to the Open File Table.
+   *
+   * @return file Object ID
+   * @throws IOException
+   */
+  @SuppressWarnings("checkstyle:ParameterNumber")
+  private long createOpenFile(String key,
+                              String bucket,
+                              String volume,
+                              String fileName,
+                              long parentObjectId,
+                              long bucketObjectId,
+                              long volumeObjectId,
+                              long dataSize) throws IOException {
+    long objectId = UUID.randomUUID().getMostSignificantBits() &
+        Long.MAX_VALUE; // Ensure positive ID
+    writeOpenFileToOm(reconOMMetadataManager, key, bucket, volume, fileName,
+        objectId, parentObjectId, bucketObjectId, volumeObjectId, null,
+        dataSize);
+    return objectId;
+  }
+
+  /**
+   * Create a key and add it to the Open Key Table.
+   *
+   * @return key Object ID
+   * @throws IOException
+   */
+  private long createOpenKey(String key,
+                             String bucket,
+                             String volume,
+                             String fileName,
+                             long parentObjectId,
+                             long bucketObjectId,
+                             long volumeObjectId,
+                             long dataSize) throws IOException {
+    long objectId = UUID.randomUUID().getMostSignificantBits() &
+        Long.MAX_VALUE; // Ensure positive ID
+    writeOpenKeyToOm(reconOMMetadataManager, key, bucket, volume, null,
+        dataSize);
+    return objectId;
+  }
+
+  private static BucketLayout getFSOBucketLayout() {
+    return BucketLayout.FILE_SYSTEM_OPTIMIZED;
+  }
+
+  private static BucketLayout getOBSBucketLayout() {
+    return BucketLayout.OBJECT_STORE;
   }
 
 }

@@ -84,12 +84,14 @@ public class OMDBInsightSearchEndpoint {
 
 
   /**
-   * Search for open keys in the OM DB Insight.
-   *
-   * @param searchPrefix The prefix to search for.
-   * @param limit The maximum number of keys to return.
-   * @return The response containing the matched keys.
-   * @throws IOException if an error occurs during the search.
+   * This method searches for open keys in the OM DB based on the search prefix
+   * provided. It returns a list of keys that match the search prefix, along with
+   * the total size of the data and replicated data for the matched keys.
+   * The search can be performed on FSO layout, non-FSO layout, or both.
+   * The search is performed in the following order:
+   * 1. Search for open keys in the OBS layout (non-FSO layout).
+   * 2. Search for open keys in the FSO layout.
+   * The search is performed for fso and non-fso keys separately and the results.
    */
   @GET
   @Path("/openKeys/search")
@@ -112,7 +114,7 @@ public class OMDBInsightSearchEndpoint {
     long unreplicatedTotal = 0;
 
     // Fetch keys from OBS layout and convert them into KeyEntityInfo objects
-    Map<String, OmKeyInfo> obsKeys = null;
+    Map<String, OmKeyInfo> obsKeys = new LinkedHashMap<>();
     if (includeNonFso) {
       obsKeys = searchOpenKeysInOBS(searchPrefix, limit);
       for (Map.Entry<String, OmKeyInfo> entry : obsKeys.entrySet()) {
@@ -128,7 +130,7 @@ public class OMDBInsightSearchEndpoint {
     // Fetch keys from FSO layout, if the limit is not yet reached
     if (includeFso) {
       Map<String, OmKeyInfo> fsoKeys =
-          searchOpenKeysInFSO(searchPrefix, limit - obsKeys.size());
+          searchOpenKeysInFSO(searchPrefix, limit);
       for (Map.Entry<String, OmKeyInfo> entry : fsoKeys.entrySet()) {
         KeyEntityInfo keyEntityInfo =
             createKeyEntityInfoFromOmKeyInfo(entry.getKey(), entry.getValue());
@@ -137,6 +139,12 @@ public class OMDBInsightSearchEndpoint {
         replicatedTotal += entry.getValue().getReplicatedSize();
         unreplicatedTotal += entry.getValue().getDataSize();
       }
+    }
+
+    // If no keys were found, return a response indicating that no keys matched
+    if (insightResponse.getNonFSOKeyInfoList().isEmpty() &&
+        insightResponse.getFsoKeyInfoList().isEmpty()) {
+      return noMatchedKeysResponse(searchPrefix);
     }
 
     // Set the aggregated totals in the response
@@ -279,7 +287,7 @@ public class OMDBInsightSearchEndpoint {
    * Finds all subdirectories under a parent directory in an FSO bucket. It builds
    * a list of paths for these subdirectories. These sub-directories are then used
    * to search for open files in the openFileTable.
-   * <p>
+   *
    * How it works:
    * - Starts from a parent directory identified by parentId.
    * - Looks through all child directories of this parent.
@@ -289,8 +297,8 @@ public class OMDBInsightSearchEndpoint {
    *
    * @param parentId The ID of the directory we start exploring from.
    * @param subPaths A list where we collect paths to all subdirectories.
-   * @param names    An array with at least two elements: the first is volumeID and the second is bucketID.
-   *                 These are used to start each path.
+   * @param names    An array with at least two elements: the first is volumeID and
+   *                 the second is bucketID. These are used to start each path.
    * @throws IOException If there are problems accessing directory information.
    */
   private void gatherSubPaths(long parentId, List<String> subPaths,
@@ -371,16 +379,6 @@ public class OMDBInsightSearchEndpoint {
       LOG.error("Unexpected error during conversion: {}", prevKeyPrefix, e);
       return prevKeyPrefix;
     }
-  }
-
-  private long getParentId(BucketHandler handler, String[] names,
-                           String bucketName, long bucketId)
-      throws IOException {
-    String parentName = names[names.length - 2];
-    if (bucketName.equals(parentName) && names.length == 3) {
-      return bucketId;
-    }
-    return handler.getDirObjectId(names, names.length - 1);
   }
 
   /**
