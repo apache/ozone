@@ -41,7 +41,7 @@ import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.server.events.EventQueue;
 import org.apache.hadoop.ozone.HddsDatanodeService;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
-import org.apache.hadoop.hdds.scm.TestStorageContainerManagerHelper;
+import org.apache.hadoop.hdds.scm.StorageContainerManagerTestHelper;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
@@ -140,8 +140,8 @@ public class TestScmSafeMode {
   @Test
   void testSafeModeOperations() throws Exception {
     // Create {numKeys} random names keys.
-    TestStorageContainerManagerHelper helper =
-        new TestStorageContainerManagerHelper(cluster, conf);
+    StorageContainerManagerTestHelper helper =
+        new StorageContainerManagerTestHelper(cluster, conf);
     Map<String, OmKeyInfo> keyLocations = helper.createKeys(100, 4096);
     final List<ContainerInfo> containers = cluster
         .getStorageContainerManager().getContainerManager().getContainers();
@@ -229,8 +229,8 @@ public class TestScmSafeMode {
 
     // Test2: Test safe mode  when containers are there in system.
     // Create {numKeys} random names keys.
-    TestStorageContainerManagerHelper helper =
-        new TestStorageContainerManagerHelper(cluster, conf);
+    StorageContainerManagerTestHelper helper =
+        new StorageContainerManagerTestHelper(cluster, conf);
     Map<String, OmKeyInfo> keyLocations = helper.createKeys(100 * 2, 4096);
     final List<ContainerInfo> containers = cluster
         .getStorageContainerManager().getContainerManager().getContainers();
@@ -303,8 +303,8 @@ public class TestScmSafeMode {
     cluster.waitTobeOutOfSafeMode();
     assertFalse(scm.isInSafeMode());
 
-    TestStorageContainerManagerHelper helper =
-        new TestStorageContainerManagerHelper(cluster, conf);
+    StorageContainerManagerTestHelper helper =
+        new StorageContainerManagerTestHelper(cluster, conf);
     helper.createKeys(10, 4096);
     SCMClientProtocolServer clientProtocolServer = cluster
         .getStorageContainerManager().getClientProtocolServer();

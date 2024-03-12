@@ -55,12 +55,12 @@ import org.apache.commons.lang3.RandomStringUtils;
  * A helper class used by {@link TestStorageContainerManager} to generate
  * some keys and helps to verify containers and blocks locations.
  */
-public class TestStorageContainerManagerHelper {
+public class StorageContainerManagerTestHelper {
 
   private final MiniOzoneCluster cluster;
   private final OzoneConfiguration conf;
 
-  public TestStorageContainerManagerHelper(MiniOzoneCluster cluster,
+  public StorageContainerManagerTestHelper(MiniOzoneCluster cluster,
       OzoneConfiguration conf) throws IOException {
     this.cluster = cluster;
     this.conf = conf;
