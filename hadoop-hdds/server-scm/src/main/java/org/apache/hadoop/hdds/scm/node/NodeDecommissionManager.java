@@ -386,7 +386,7 @@ public class NodeDecommissionManager {
     // do we require method synchronization?
     int minInService = -1; // maxRatis = -1, maxEc = -1;
     for (DatanodeDetails dn : dns) {
-      Set<ContainerID> containers = new HashSet<>();
+      Set<ContainerID> containers;
       try {
         containers = nodeManager.getContainers(dn);
       } catch (NodeNotFoundException ex) {

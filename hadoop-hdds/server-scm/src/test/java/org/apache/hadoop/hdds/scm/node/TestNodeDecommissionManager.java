@@ -94,7 +94,7 @@ public class TestNodeDecommissionManager {
 
   @Test
   public void testAnyInvalidHostThrowsException() {
-    List<DatanodeDetails> dns = generateDatanodes();
+    List<DatanodeDetails> dns = generateDatanodes(10);
 
     // Try to decommission a host that does exist, but give incorrect port
     List<DatanodeAdminError> error =
@@ -136,9 +136,20 @@ public class TestNodeDecommissionManager {
   }
 
   @Test
+  public void testInsufficientNodeDecommissionThrowsException() {
+    List<DatanodeDetails> dns = generateDatanodes(5);
+    List<DatanodeAdminError> error;
+
+    error = decom.decommissionNodes(Arrays.asList(dns.get(1).getIpAddress(),
+        dns.get(2).getIpAddress(), dns.get(3).getIpAddress()));
+    assertEquals(2, error.size());
+    assertTrue(error.get(0).getHostname().contains("AllHosts"));
+  }
+
+  @Test
   public void testNodesCanBeDecommissionedAndRecommissioned()
       throws InvalidHostStringException, NodeNotFoundException {
-    List<DatanodeDetails> dns = generateDatanodes();
+    List<DatanodeDetails> dns = generateDatanodes(10);
 
     // Decommission 2 valid nodes
     decom.decommissionNodes(Arrays.asList(dns.get(1).getIpAddress(),
@@ -188,7 +199,7 @@ public class TestNodeDecommissionManager {
   @Test
   public void testNodesCanBeDecommissionedAndRecommissionedMixedPorts()
       throws InvalidHostStringException, NodeNotFoundException {
-    List<DatanodeDetails> dns = generateDatanodes();
+    List<DatanodeDetails> dns = generateDatanodes(10);
 
     // From the generateDatanodes method we have DNs at index 9 and 11 with the
     // same IP and port. We can add another DN with a different port on the
@@ -256,7 +267,7 @@ public class TestNodeDecommissionManager {
   @Test
   public void testNodesCanBePutIntoMaintenanceAndRecommissioned()
       throws InvalidHostStringException, NodeNotFoundException {
-    List<DatanodeDetails> dns = generateDatanodes();
+    List<DatanodeDetails> dns = generateDatanodes(10);
 
     // Put 2 valid nodes into maintenance
     decom.startMaintenanceNodes(Arrays.asList(dns.get(1).getIpAddress(),
@@ -310,7 +321,7 @@ public class TestNodeDecommissionManager {
 
   @Test
   public void testNodesCannotTransitionFromDecomToMaint() throws Exception {
-    List<DatanodeDetails> dns = generateDatanodes();
+    List<DatanodeDetails> dns = generateDatanodes(10);
 
     // Put 1 node into maintenance and another into decom
     decom.startMaintenance(dns.get(1), 100);
@@ -343,7 +354,7 @@ public class TestNodeDecommissionManager {
 
   @Test
   public void testNodeDecommissionManagerOnBecomeLeader() throws Exception {
-    List<DatanodeDetails> dns = generateDatanodes();
+    List<DatanodeDetails> dns = generateDatanodes(10);
 
     long maintenanceEnd =
         (System.currentTimeMillis() / 1000L) + (100 * 60L * 60L);
@@ -383,9 +394,9 @@ public class TestNodeDecommissionManager {
    * DNs will have ports set to 0.
    * @return The list of DatanodeDetails Generated
    */
-  private List<DatanodeDetails> generateDatanodes() {
+  private List<DatanodeDetails> generateDatanodes(int n) {
     List<DatanodeDetails> dns = new ArrayList<>();
-    for (int i = 0; i < 10; i++) {
+    for (int i = 0; i < n; i++) {
       DatanodeDetails dn = MockDatanodeDetails.randomDatanodeDetails();
       dns.add(dn);
       nodeManager.register(dn, null, null);
