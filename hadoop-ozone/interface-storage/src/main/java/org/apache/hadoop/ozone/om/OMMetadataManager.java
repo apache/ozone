@@ -122,7 +122,6 @@ public interface OMMetadataManager extends DBStoreHAManager {
    * @param key    - key name
    * @return DB key as String.
    */
-
   String getOzoneKey(String volume, String bucket, String key);
 
   /**
@@ -390,6 +389,19 @@ public interface OMMetadataManager extends DBStoreHAManager {
    */
   String getMultipartKey(String volume, String bucket, String key, String
       uploadId);
+
+  /**
+   * Returns the DB key name of a multipart upload key in OM metadata store
+   * for FSO-enabled buckets.
+   *
+   * @param volume - volume name
+   * @param bucket - bucket name
+   * @param key - key name
+   * @param uploadId - the upload id for this key
+   * @return bytes of DB key.
+   */
+  String getMultipartKeyFSO(String volume, String bucket, String key, String
+          uploadId) throws IOException;
 
 
   /**

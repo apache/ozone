@@ -28,6 +28,9 @@ import java.io.IOException;
  * places all data in the default column family.
  */
 public class DatanodeStoreSchemaOneImpl extends AbstractDatanodeStore {
+
+  private Table<String, ChunkInfoList> deletedBlocksTable;
+
   /**
    * Constructs the metadata store and starts the DB Services.
    *
@@ -38,12 +41,15 @@ public class DatanodeStoreSchemaOneImpl extends AbstractDatanodeStore {
       boolean openReadOnly) throws IOException {
     super(config, new DatanodeSchemaOneDBDefinition(dbPath, config),
         openReadOnly);
+    deletedBlocksTable = new DatanodeTable<>(
+        ((DatanodeSchemaOneDBDefinition) getDbDef()).getDeletedBlocksColumnFamily().getTable(getStore()));
+    checkTableStatus(deletedBlocksTable, deletedBlocksTable.getName());
   }
 
   @Override
   public Table<String, ChunkInfoList> getDeletedBlocksTable() {
     // Return a wrapper around the deleted blocks table to handle prefixes
     // when all data is stored in a single table.
-    return new SchemaOneDeletedBlocksTable(super.getDeletedBlocksTable());
+    return new SchemaOneDeletedBlocksTable(deletedBlocksTable);
   }
 }

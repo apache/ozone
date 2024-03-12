@@ -25,12 +25,15 @@ import org.apache.hadoop.hdds.scm.metadata.SCMDBTransactionBufferImpl;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.container.common.SCMTestUtils;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
+
+import java.io.File;
 
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_SEQUENCE_ID_BATCH_SIZE;
-import static org.mockito.ArgumentMatchers.anyLong;
-import static org.mockito.ArgumentMatchers.anyString;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.fail;
+import static org.mockito.Mockito.anyLong;
+import static org.mockito.Mockito.anyString;
 import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.when;
 
@@ -38,9 +41,13 @@ import static org.mockito.Mockito.when;
  * Tests for {@link SequenceIdGenerator}.
  */
 public class TestSequenceIDGenerator {
+
+  @TempDir
+  private File testDir;
+
   @Test
   public void testSequenceIDGenUponNonRatis() throws Exception {
-    OzoneConfiguration conf = SCMTestUtils.getConf();
+    OzoneConfiguration conf = SCMTestUtils.getConf(testDir);
     SCMMetadataStore scmMetadataStore = new SCMMetadataStoreImpl(conf);
     scmMetadataStore.start(conf);
 
@@ -82,7 +89,7 @@ public class TestSequenceIDGenerator {
 
   @Test
   public void testSequenceIDGenUponRatis() throws Exception {
-    OzoneConfiguration conf = SCMTestUtils.getConf();
+    OzoneConfiguration conf = SCMTestUtils.getConf(testDir);
     
     // change batchSize to 100
     conf.setInt(OZONE_SCM_SEQUENCE_ID_BATCH_SIZE, 100);
@@ -129,7 +136,7 @@ public class TestSequenceIDGenerator {
   public void testSequenceIDGenUponRatisWhenCurrentScmIsNotALeader()
       throws Exception {
     int batchSize = 100;
-    OzoneConfiguration conf = SCMTestUtils.getConf();
+    OzoneConfiguration conf = SCMTestUtils.getConf(testDir);
     conf.setInt(OZONE_SCM_SEQUENCE_ID_BATCH_SIZE, batchSize);
     SCMMetadataStore scmMetadataStore = new SCMMetadataStoreImpl(conf);
     scmMetadataStore.start(conf);

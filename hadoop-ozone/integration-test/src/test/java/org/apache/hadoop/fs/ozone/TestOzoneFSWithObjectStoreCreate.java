@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.fs.ozone;
 
+import javax.xml.bind.DatatypeConverter;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.fs.FileAlreadyExistsException;
@@ -47,8 +48,8 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 
 import java.io.FileNotFoundException;
-import java.io.IOException;
 import java.net.URI;
+import java.security.MessageDigest;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -58,13 +59,15 @@ import java.util.List;
 import java.util.Map;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
+import static org.apache.hadoop.ozone.OzoneConsts.ETAG;
+import static org.apache.hadoop.ozone.OzoneConsts.MD5_HASH;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_SCHEME;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.NOT_A_FILE;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.junit.jupiter.api.Assertions.fail;
 
 /**
  * Class tests create with object store and getFileStatus.
@@ -264,16 +267,8 @@ public class TestOzoneFSWithObjectStoreCreate {
 
     // Before close create directory with same name.
     o3fs.mkdirs(new Path("/a/b/c"));
-
-    try {
-      ozoneOutputStream.close();
-      fail("testKeyCreationFailDuetoDirectoryCreationBeforeCommit");
-    } catch (IOException ex) {
-      assertTrue(ex instanceof OMException);
-      assertEquals(NOT_A_FILE,
-          ((OMException) ex).getResult());
-    }
-
+    OMException ex = assertThrows(OMException.class, () -> ozoneOutputStream.close());
+    assertEquals(NOT_A_FILE, ex.getResult());
   }
 
 
@@ -302,20 +297,19 @@ public class TestOzoneFSWithObjectStoreCreate {
 
     // This should succeed, as we check during creation of part or during
     // complete MPU.
+    ozoneOutputStream.getMetadata().put(ETAG,
+        DatatypeConverter.printHexBinary(MessageDigest.getInstance(MD5_HASH)
+            .digest(b)).toLowerCase());
     ozoneOutputStream.close();
 
     Map<Integer, String> partsMap = new HashMap<>();
-    partsMap.put(1, ozoneOutputStream.getCommitUploadPartInfo().getPartName());
+    partsMap.put(1, ozoneOutputStream.getCommitUploadPartInfo().getETag());
 
     // Should fail, as we have directory with same name.
-    try {
-      ozoneBucket.completeMultipartUpload(keyName,
-          omMultipartInfo.getUploadID(), partsMap);
-      fail("testMPUFailDuetoDirectoryCreationBeforeComplete failed");
-    } catch (OMException ex) {
-      assertTrue(ex instanceof OMException);
-      assertEquals(NOT_A_FILE, ex.getResult());
-    }
+    OMException ex = assertThrows(OMException.class, () -> ozoneBucket.completeMultipartUpload(keyName,
+        omMultipartInfo.getUploadID(), partsMap));
+    assertEquals(NOT_A_FILE, ex.getResult());
+
 
     // Delete directory
     o3fs.delete(new Path(keyName), true);
@@ -338,25 +332,16 @@ public class TestOzoneFSWithObjectStoreCreate {
   public void testCreateDirectoryFirstThenKeyAndFileWithSameName()
       throws Exception {
     o3fs.mkdirs(new Path("/t1/t2"));
-
-    try {
-      o3fs.create(new Path("/t1/t2"));
-      fail("testCreateDirectoryFirstThenFileWithSameName failed");
-    } catch (FileAlreadyExistsException ex) {
-      assertTrue(ex.getMessage().contains(NOT_A_FILE.name()));
-    }
+    FileAlreadyExistsException e =
+        assertThrows(FileAlreadyExistsException.class, () -> o3fs.create(new Path("/t1/t2")));
+    assertThat(e.getMessage()).contains(NOT_A_FILE.name());
 
     OzoneVolume ozoneVolume =
         client.getObjectStore().getVolume(volumeName);
     OzoneBucket ozoneBucket = ozoneVolume.getBucket(bucketName);
     ozoneBucket.createDirectory("t1/t2");
-    try {
-      ozoneBucket.createKey("t1/t2", 0);
-      fail("testCreateDirectoryFirstThenFileWithSameName failed");
-    } catch (OMException ex) {
-      assertTrue(ex instanceof OMException);
-      assertEquals(NOT_A_FILE, ex.getResult());
-    }
+    OMException ex = assertThrows(OMException.class, () -> ozoneBucket.createKey("t1/t2", 0));
+    assertEquals(NOT_A_FILE, ex.getResult());
   }
 
 
@@ -463,7 +448,7 @@ public class TestOzoneFSWithObjectStoreCreate {
     FileNotFoundException ex = assertThrows(FileNotFoundException.class, () ->
         o3fs.getFileStatus(path),
         "testObjectStoreCreateWithO3fs failed for Path" + path);
-    assertTrue(ex.getMessage().contains("No such file or directory"));
+    assertThat(ex.getMessage()).contains("No such file or directory");
   }
 
   private void checkAncestors(Path p) throws Exception {

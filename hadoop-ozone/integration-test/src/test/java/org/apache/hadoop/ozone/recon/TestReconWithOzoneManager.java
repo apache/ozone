@@ -202,7 +202,7 @@ public class TestReconWithOzoneManager {
 
     // verify sequence number after full snapshot
     assertEquals(omLatestSeqNumber, reconLatestSeqNumber);
-    assertEquals(0, metrics.getSequenceNumberLag().value());
+    assertEquals(0, metrics.getSequenceNumberLag());
 
     //add 4 keys to check for delta updates
     addKeys(1, 5);
@@ -220,7 +220,7 @@ public class TestReconWithOzoneManager {
 
     //verify sequence number after Delta Updates
     assertEquals(omLatestSeqNumber, reconLatestSeqNumber);
-    assertEquals(0, metrics.getSequenceNumberLag().value());
+    assertEquals(0, metrics.getSequenceNumberLag());
 
     long beforeRestartSnapShotTimeStamp = getReconTaskAttributeFromJson(
         taskStatusResponse,
@@ -260,7 +260,7 @@ public class TestReconWithOzoneManager {
 
     //verify sequence number after Delta Updates
     assertEquals(omLatestSeqNumber, reconLatestSeqNumber);
-    assertEquals(0, metrics.getSequenceNumberLag().value());
+    assertEquals(0, metrics.getSequenceNumberLag());
   }
 
   // This test simulates the mis-match in sequence number between Recon OM
@@ -314,7 +314,7 @@ public class TestReconWithOzoneManager {
 
     // verify sequence number after incremental delta snapshot
     assertEquals(omLatestSeqNumber, reconLatestSeqNumber);
-    assertEquals(0, metrics.getSequenceNumberLag().value());
+    assertEquals(0, metrics.getSequenceNumberLag());
 
     String volume = "vol15";
     String bucket = "bucket15";
@@ -356,7 +356,7 @@ public class TestReconWithOzoneManager {
     reconLatestSeqNumber =
         ((RDBStore) reconMetadataManagerInstance.getStore()).getDb()
             .getLatestSequenceNumber();
-    assertEquals(0, metrics.getSequenceNumberLag().value());
+    assertEquals(0, metrics.getSequenceNumberLag());
     assertEquals(omLatestSeqNumber, reconLatestSeqNumber);
     reconLatestSeqNumber =
         ((RDBStore) reconMetadataManagerInstance.getStore()).getDb()

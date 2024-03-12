@@ -106,9 +106,9 @@ public class TestOzoneDelegationTokenSecretManager {
     serviceRpcAdd = new Text("localhost");
     final Map<String, S3SecretValue> s3Secrets = new HashMap<>();
     s3Secrets.put("testuser1",
-        new S3SecretValue("testuser1", "dbaksbzljandlkandlsd"));
+        S3SecretValue.of("testuser1", "dbaksbzljandlkandlsd"));
     s3Secrets.put("abc",
-        new S3SecretValue("abc", "djakjahkd"));
+        S3SecretValue.of("abc", "djakjahkd"));
     om = mock(OzoneManager.class);
     OMMetadataManager metadataManager = new OmMetadataManagerImpl(conf, om);
     when(om.getMetadataManager()).thenReturn(metadataManager);

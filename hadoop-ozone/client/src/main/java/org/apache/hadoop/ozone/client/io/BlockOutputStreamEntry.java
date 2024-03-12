@@ -21,6 +21,8 @@ import java.io.IOException;
 import java.io.OutputStream;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.concurrent.ExecutorService;
+import java.util.function.Supplier;
 
 import org.apache.hadoop.fs.Syncable;
 import org.apache.hadoop.hdds.client.BlockID;
@@ -37,6 +39,7 @@ import org.apache.hadoop.hdds.security.token.OzoneBlockTokenIdentifier;
 import org.apache.hadoop.security.token.Token;
 
 import com.google.common.annotations.VisibleForTesting;
+import org.apache.ratis.util.JavaUtils;
 
 /**
  * A BlockOutputStreamEntry manages the data writes into the DataNodes.
@@ -60,33 +63,30 @@ public class BlockOutputStreamEntry extends OutputStream {
   private long currentPosition;
   private final Token<OzoneBlockTokenIdentifier> token;
 
-  private BufferPool bufferPool;
-  private ContainerClientMetrics clientMetrics;
-  private StreamBufferArgs streamBufferArgs;
+  private final BufferPool bufferPool;
+  private final ContainerClientMetrics clientMetrics;
+  private final StreamBufferArgs streamBufferArgs;
+  private final Supplier<ExecutorService> executorServiceSupplier;
 
-  @SuppressWarnings({"parameternumber", "squid:S00107"})
-  BlockOutputStreamEntry(
-      BlockID blockID, String key,
-      XceiverClientFactory xceiverClientManager,
-      Pipeline pipeline,
-      long length,
-      BufferPool bufferPool,
-      Token<OzoneBlockTokenIdentifier> token,
-      OzoneClientConfig config,
-      ContainerClientMetrics clientMetrics, StreamBufferArgs streamBufferArgs
-  ) {
-    this.config = config;
+  BlockOutputStreamEntry(Builder b) {
+    this.config = b.config;
     this.outputStream = null;
-    this.blockID = blockID;
-    this.key = key;
-    this.xceiverClientManager = xceiverClientManager;
-    this.pipeline = pipeline;
-    this.token = token;
-    this.length = length;
+    this.blockID = b.blockID;
+    this.key = b.key;
+    this.xceiverClientManager = b.xceiverClientManager;
+    this.pipeline = b.pipeline;
+    this.token = b.token;
+    this.length = b.length;
     this.currentPosition = 0;
-    this.bufferPool = bufferPool;
-    this.clientMetrics = clientMetrics;
-    this.streamBufferArgs = streamBufferArgs;
+    this.bufferPool = b.bufferPool;
+    this.clientMetrics = b.clientMetrics;
+    this.streamBufferArgs = b.streamBufferArgs;
+    this.executorServiceSupplier = b.executorServiceSupplier;
+  }
+
+  @Override
+  public String toString() {
+    return JavaUtils.getClassSimpleName(getClass()) + ":" + key + " " + blockID;
   }
 
   /**
@@ -108,11 +108,16 @@ public class BlockOutputStreamEntry extends OutputStream {
    */
   void createOutputStream() throws IOException {
     outputStream = new RatisBlockOutputStream(blockID, xceiverClientManager,
-        pipeline, bufferPool, config, token, clientMetrics, streamBufferArgs);
+        pipeline, bufferPool, config, token, clientMetrics, streamBufferArgs,
+        executorServiceSupplier);
   }
 
   ContainerClientMetrics getClientMetrics() {
     return clientMetrics;
+  }
+
+  Supplier<ExecutorService> getExecutorServiceSupplier() {
+    return executorServiceSupplier;
   }
 
   StreamBufferArgs getStreamBufferArgs() {
@@ -361,6 +366,15 @@ public class BlockOutputStreamEntry extends OutputStream {
     private OzoneClientConfig config;
     private ContainerClientMetrics clientMetrics;
     private StreamBufferArgs streamBufferArgs;
+    private Supplier<ExecutorService> executorServiceSupplier;
+
+    public Pipeline getPipeline() {
+      return pipeline;
+    }
+
+    public long getLength() {
+      return length;
+    }
 
     public Builder setBlockID(BlockID bID) {
       this.blockID = bID;
@@ -402,23 +416,24 @@ public class BlockOutputStreamEntry extends OutputStream {
       this.token = bToken;
       return this;
     }
+
     public Builder setClientMetrics(ContainerClientMetrics clientMetrics) {
       this.clientMetrics = clientMetrics;
       return this;
     }
+
     public Builder setStreamBufferArgs(StreamBufferArgs streamBufferArgs) {
       this.streamBufferArgs = streamBufferArgs;
       return this;
     }
 
+    public Builder setExecutorServiceSupplier(Supplier<ExecutorService> executorServiceSupplier) {
+      this.executorServiceSupplier = executorServiceSupplier;
+      return this;
+    }
+
     public BlockOutputStreamEntry build() {
-      return new BlockOutputStreamEntry(blockID,
-          key,
-          xceiverClientManager,
-          pipeline,
-          length,
-          bufferPool,
-          token, config, clientMetrics, streamBufferArgs);
+      return new BlockOutputStreamEntry(this);
     }
   }
 }

@@ -35,7 +35,6 @@ import org.apache.hadoop.hdds.scm.node.NodeStatus;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.mockito.Mockito;
 
 import java.util.Collections;
 import java.util.HashSet;
@@ -190,7 +189,7 @@ public class TestVulnerableUnhealthyReplicasHandler {
     ContainerReplica unhealthy =
         createContainerReplica(container.containerID(), 0, DECOMMISSIONING, State.UNHEALTHY, sequenceId);
     replicas.add(unhealthy);
-    Mockito.when(replicationManager.getNodeStatus(Mockito.any(DatanodeDetails.class)))
+    when(replicationManager.getNodeStatus(any(DatanodeDetails.class)))
         .thenAnswer(invocation -> {
           DatanodeDetails dn = invocation.getArgument(0);
           if (dn.equals(unhealthy.getDatanodeDetails())) {

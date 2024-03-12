@@ -23,13 +23,13 @@ summary: HA setup for Ozone Manager to avoid any single point of failure.
   limitations under the License.
 -->
 
-Ozone has two metadata-manager nodes (*Ozone Manager* for key space management and *Storage Container Management* for block space management) and multiple storage nodes (Datanode). Data is replicated between Datanodes with the help of RAFT consensus algorithm.
+Ozone has two metadata-manager nodes (*Ozone Manager* for key space management and *Storage Container Manager* for block space management) and multiple storage nodes (Datanode). Data is replicated between Datanodes with the help of RAFT consensus algorithm.
 
 To avoid any single point of failure the metadata-manager nodes also should have a HA setup.
 
 Both Ozone Manager and Storage Container Manager supports HA. In this mode the internal state is replicated via RAFT (with Apache Ratis) 
 
-This document explain the HA setup of Ozone Manager (OM) HA, please check [this page]({{< ref "SCM-HA" >}}) for SCM HA.  While they can be setup for HA independently, a reliable, full HA setup requires enabling HA for both services.
+This document explains the HA setup of Ozone Manager (OM) HA, please check [this page]({{< ref "SCM-HA" >}}) for SCM HA.  While they can be setup for HA independently, a reliable, full HA setup requires enabling HA for both services.
 
 ## Ozone Manager HA
 
@@ -104,18 +104,18 @@ hdfs dfs -ls ofs://cluster1/volume/bucket/prefix/
 
 Raft can guarantee the replication of any request if the request is persisted to the RAFT log on the majority of the nodes. To achieve high throughput with Ozone Manager, it returns with the response even if the request is persisted only to the RAFT logs.
 
-RocksDB instance are updated by a background thread with batching transactions (so called "double buffer" as when one of the buffers is used to commit the data the other one collects all the new requests for the next commit.) To make all data available for the next request even if the background process is not yet wrote them the key data is cached in the memory.
+RocksDB instance are updated by a background thread with batching transactions (so called "double buffer" as when one of the buffers is used to commit the data the other one collects all the new requests for the next commit.) To make all data available for the next request even if the background process has not yet written them, the key data is cached in the memory.
 
 ![HA - OM Double Buffer](HA-OM-doublebuffer.png)
 
-The details of this approach discussed in a separated [design doc]({{< ref "design/omha.md" >}}) but it's integral part of the OM HA design.
+The details of this approach are discussed in a separate [design doc]({{< ref "design/omha.md" >}}) but it's an integral part of the OM HA design.
 
 ## OM Bootstrap
 
 To convert a non-HA OM to be HA or to add new OM nodes to existing HA OM ring, new OM node(s) need to be bootstrapped.
 
 Before bootstrapping a new OM node, all the existing OM's on-disk configuration file (ozone-site.xml) must be updated with the configuration details
-of the new OM such nodeId, address, port etc. Note that the existing OM's need not be restarted. They will reload the configuration from disk when
+of the new OM such as nodeId, address, port etc. Note that the existing OM's need not be restarted. They will reload the configuration from disk when
 they receive a bootstrap request from the bootstrapping node.
 
 To bootstrap an OM, the following command needs to be run:

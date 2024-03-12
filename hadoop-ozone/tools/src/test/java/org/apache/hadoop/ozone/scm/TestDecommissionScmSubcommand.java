@@ -25,14 +25,14 @@ import org.apache.ozone.test.GenericTestUtils;
 
 import java.io.IOException;
 import java.util.UUID;
-
 import org.junit.jupiter.api.Test;
-import static org.junit.jupiter.api.Assertions.assertTrue;
-import org.mockito.Mockito;
 
-import static org.junit.jupiter.api.Assertions.fail;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
+
 import picocli.CommandLine;
 
 /**
@@ -52,8 +52,8 @@ public class TestDecommissionScmSubcommand {
              new GenericTestUtils.SystemErrCapturer()) {
       String[] args = {"scm", "decommission"};
       admin.execute(args);
-      assertTrue(capture.getOutput().contains(
-          "Usage: ozone admin scm decommission"));
+      assertThat(capture.getOutput()).contains(
+          "Usage: ozone admin scm decommission");
     }
 
     // now give required String <nodeId>
@@ -66,15 +66,14 @@ public class TestDecommissionScmSubcommand {
             .setSuccess(true)
             .build();
 
-    Mockito.when(client.decommissionScm(any()))
+    when(client.decommissionScm(any()))
         .thenAnswer(invocation -> (
             response));
 
     try (GenericTestUtils.SystemOutCapturer capture =
              new GenericTestUtils.SystemOutCapturer()) {
       cmd.execute(client);
-      assertTrue(capture.getOutput().contains(
-          scmId));
+      assertThat(capture.getOutput()).contains(scmId);
     }
   }
 
@@ -94,16 +93,13 @@ public class TestDecommissionScmSubcommand {
             .setErrorMsg("Cannot remove current leader.")
             .build();
 
-    Mockito.when(client.decommissionScm(any()))
+    when(client.decommissionScm(any()))
         .thenAnswer(invocation -> (
             response));
 
-    try (GenericTestUtils.SystemOutCapturer capture =
-             new GenericTestUtils.SystemOutCapturer()) {
-      cmd.execute(client);
-      fail();
-    } catch (IOException ex) {
-      assertTrue(ex.getMessage().contains("remove current leader"));
+    try (GenericTestUtils.SystemOutCapturer capture = new GenericTestUtils.SystemOutCapturer()) {
+      IOException ioe = assertThrows(IOException.class, () -> cmd.execute(client));
+      assertThat(ioe.getMessage()).contains("remove current leader");
     }
   }
 }

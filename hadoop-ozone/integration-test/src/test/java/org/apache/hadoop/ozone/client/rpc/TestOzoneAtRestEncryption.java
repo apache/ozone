@@ -22,6 +22,7 @@ import java.io.IOException;
 import java.net.URI;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -34,21 +35,26 @@ import java.util.TreeMap;
 import java.util.UUID;
 
 import com.google.common.cache.Cache;
-import org.apache.hadoop.conf.StorageUnit;
+import javax.xml.bind.DatatypeConverter;
 import org.apache.hadoop.crypto.key.KeyProvider;
 import org.apache.hadoop.crypto.key.kms.KMSClientProvider;
 import org.apache.hadoop.crypto.key.kms.server.MiniKMS;
 import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
+import org.apache.hadoop.fs.FSDataOutputStream;
+import org.apache.hadoop.fs.FileSystem;
+import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.protocolPB.StorageContainerLocationProtocolClientSideTranslatorPB;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClientTestImpl;
 import org.apache.hadoop.hdds.utils.db.Table;
+import org.apache.hadoop.ozone.ClientConfigForTesting;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.client.BucketArgs;
@@ -63,8 +69,10 @@ import org.apache.hadoop.ozone.client.io.OzoneDataStreamOutput;
 import org.apache.hadoop.ozone.client.SecretKeyTestClient;
 import org.apache.hadoop.ozone.client.io.OzoneInputStream;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
+import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OzoneManager;
+import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
@@ -78,6 +86,14 @@ import org.apache.ozone.test.GenericTestUtils;
 import static org.apache.hadoop.hdds.HddsConfigKeys.OZONE_METADATA_DIRS;
 import static org.apache.hadoop.hdds.client.ReplicationFactor.ONE;
 import static org.apache.hadoop.hdds.client.ReplicationType.RATIS;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_REPLICATION;
+import static org.apache.hadoop.ozone.OzoneConsts.OZONE_OFS_URI_SCHEME;
+import static org.apache.hadoop.ozone.OzoneConsts.OZONE_ROOT;
+import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
+import static org.apache.hadoop.hdds.utils.ClusterContainersUtil.getContainerByID;
+import static org.apache.hadoop.hdds.utils.ClusterContainersUtil.verifyOnDiskData;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ADDRESS_KEY;
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.NO_SUCH_MULTIPART_UPLOAD_ERROR;
 import static org.apache.ozone.test.GenericTestUtils.getTestStartTime;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
@@ -87,6 +103,7 @@ import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.verify;
@@ -108,8 +125,6 @@ class TestOzoneAtRestEncryption {
   private static StorageContainerLocationProtocolClientSideTranslatorPB
       storageContainerLocationClient;
 
-  private static final String SCM_ID = UUID.randomUUID().toString();
-  private static final String CLUSTER_ID = UUID.randomUUID().toString();
   private static File testDir;
   private static OzoneConfiguration conf;
   private static final String TEST_KEY = "key1";
@@ -121,6 +136,7 @@ class TestOzoneAtRestEncryption {
   private static final int DEFAULT_CRYPTO_BUFFER_SIZE = 8 * 1024; // 8KB
   // (this is the default Crypto Buffer size as determined by the config
   // hadoop.security.crypto.buffer.size)
+  private static MessageDigest eTagProvider;
 
   @BeforeAll
   static void init() throws Exception {
@@ -142,13 +158,14 @@ class TestOzoneAtRestEncryption {
     conf.set(OZONE_METADATA_DIRS, testDir.getAbsolutePath());
     CertificateClientTestImpl certificateClientTest =
         new CertificateClientTestImpl(conf);
-    cluster = MiniOzoneCluster.newBuilder(conf)
-        .setNumDatanodes(10)
-        .setScmId(SCM_ID)
-        .setClusterId(CLUSTER_ID)
+
+    ClientConfigForTesting.newBuilder(StorageUnit.BYTES)
         .setBlockSize(BLOCK_SIZE)
         .setChunkSize(CHUNK_SIZE)
-        .setStreamBufferSizeUnit(StorageUnit.BYTES)
+        .applyTo(conf);
+
+    cluster = MiniOzoneCluster.newBuilder(conf)
+        .setNumDatanodes(10)
         .setCertificateClient(certificateClientTest)
         .setSecretKeyClient(new SecretKeyTestClient())
         .build();
@@ -166,10 +183,15 @@ class TestOzoneAtRestEncryption {
     TestOzoneRpcClient.setStorageContainerLocationClient(
         storageContainerLocationClient);
     TestOzoneRpcClient.setStore(store);
-    TestOzoneRpcClient.setClusterId(CLUSTER_ID);
 
     // create test key
     createKey(TEST_KEY, cluster.getOzoneManager().getKmsProvider(), conf);
+    eTagProvider = MessageDigest.getInstance(OzoneConsts.MD5_HASH);
+
+    final String rootPath = String.format("%s://%s/",
+        OZONE_OFS_URI_SCHEME, conf.get(OZONE_OM_ADDRESS_KEY));
+    conf.set(CommonConfigurationKeysPublic.FS_DEFAULT_NAME_KEY, rootPath);
+    conf.setInt(OZONE_REPLICATION, 1);
   }
 
   @AfterAll
@@ -191,6 +213,14 @@ class TestOzoneAtRestEncryption {
     }
   }
 
+  static void reInitClient() throws IOException {
+    ozClient = OzoneClientFactory.getRpcClient(conf);
+    store = ozClient.getObjectStore();
+    TestOzoneRpcClient.setOzClient(ozClient);
+    TestOzoneRpcClient.setStore(store);
+  }
+
+
   @ParameterizedTest
   @EnumSource
   void testPutKeyWithEncryption(BucketLayout bucketLayout) throws Exception {
@@ -207,6 +237,7 @@ class TestOzoneAtRestEncryption {
 
     createAndVerifyKeyData(bucket);
     createAndVerifyStreamKeyData(bucket);
+    createAndVerifyFileSystemData(bucket);
   }
 
   @ParameterizedTest
@@ -255,6 +286,27 @@ class TestOzoneAtRestEncryption {
     verifyKeyData(bucket, keyName, value, testStartTime);
   }
 
+  static void createAndVerifyFileSystemData(
+      OzoneBucket bucket) throws Exception {
+    // OBS does not support file system semantics.
+    if (bucket.getBucketLayout() == BucketLayout.OBJECT_STORE) {
+      return;
+    }
+    Instant testStartTime = getTestStartTime();
+    String keyName = UUID.randomUUID().toString();
+    String value = "sample value";
+
+    final String dir = OZONE_ROOT + bucket.getVolumeName()
+        + OZONE_URI_DELIMITER + bucket.getName();
+    final Path file = new Path(dir, keyName);
+    try (FileSystem fs = FileSystem.get(conf)) {
+      try (FSDataOutputStream out = fs.create(file, true)) {
+        out.write(value.getBytes(StandardCharsets.UTF_8));
+      }
+    }
+    verifyKeyData(bucket, keyName, value, testStartTime);
+  }
+
   static void verifyKeyData(OzoneBucket bucket, String keyName, String value,
       Instant testStartTime) throws Exception {
     // Verify content.
@@ -281,6 +333,13 @@ class TestOzoneAtRestEncryption {
     assertEquals(value, new String(fileContent, StandardCharsets.UTF_8));
     assertFalse(key.getCreationTime().isBefore(testStartTime));
     assertFalse(key.getModificationTime().isBefore(testStartTime));
+
+    long containerID = key.getOzoneKeyLocations().get(0)
+        .getContainerID();
+    Container container = getContainerByID(cluster, containerID);
+    // the data stored on disk should not be the same as the input.
+    assertFalse(verifyOnDiskData(cluster, container, key, value),
+        "On disk block is written in clear text!");
   }
 
   private OzoneBucket createVolumeAndBucket(String volumeName,
@@ -442,6 +501,18 @@ class TestOzoneAtRestEncryption {
 
   @ParameterizedTest
   @EnumSource
+  void mpuOnePartInvalidUploadID(BucketLayout bucketLayout) throws Exception {
+    String volumeName = UUID.randomUUID().toString();
+    String bucketName = UUID.randomUUID().toString();
+    OMException e = assertThrows(OMException.class, () ->
+        testMultipartUploadWithEncryption(
+        createVolumeAndBucket(volumeName, bucketName, bucketLayout), 1, false, true)
+    );
+    assertEquals(NO_SUCH_MULTIPART_UPLOAD_ERROR, e.getResult());
+  }
+
+  @ParameterizedTest
+  @EnumSource
   void mpuTwoParts(BucketLayout bucketLayout) throws Exception {
     String volumeName = UUID.randomUUID().toString();
     String bucketName = UUID.randomUUID().toString();
@@ -517,11 +588,20 @@ class TestOzoneAtRestEncryption {
 
   private void testMultipartUploadWithEncryption(OzoneBucket bucket,
       int numParts, boolean isStream) throws Exception {
+    testMultipartUploadWithEncryption(bucket, numParts, isStream, false);
+  }
+
+  private void testMultipartUploadWithEncryption(OzoneBucket bucket,
+      int numParts, boolean isStream, boolean invalidUploadID) throws Exception {
     String keyName = "mpu_test_key_" + numParts;
 
     // Initiate multipart upload
     String uploadID = initiateMultipartUpload(bucket, keyName,
         ReplicationConfig.fromTypeAndFactor(RATIS, ONE));
+
+    if (invalidUploadID) {
+      uploadID += "random1234";
+    }
 
     // Upload Parts
     Map<Integer, String> partsMap = new TreeMap<>();
@@ -632,14 +712,17 @@ class TestOzoneAtRestEncryption {
 
     ByteBuffer dataBuffer = ByteBuffer.wrap(data);
     multipartStreamKey.write(dataBuffer, 0, length);
+    multipartStreamKey.getMetadata().put(OzoneConsts.ETAG,
+        DatatypeConverter.printHexBinary(eTagProvider.digest(data))
+            .toLowerCase());
     multipartStreamKey.close();
 
     OmMultipartCommitUploadPartInfo omMultipartCommitUploadPartInfo =
         multipartStreamKey.getCommitUploadPartInfo();
 
     assertNotNull(omMultipartCommitUploadPartInfo);
-    assertNotNull(omMultipartCommitUploadPartInfo.getPartName());
-    return omMultipartCommitUploadPartInfo.getPartName();
+    assertNotNull(omMultipartCommitUploadPartInfo.getETag());
+    return omMultipartCommitUploadPartInfo.getETag();
   }
 
   private String uploadPart(OzoneBucket bucket, String keyName,
@@ -647,14 +730,17 @@ class TestOzoneAtRestEncryption {
     OzoneOutputStream ozoneOutputStream = bucket.createMultipartKey(keyName,
         data.length, partNumber, uploadID);
     ozoneOutputStream.write(data, 0, data.length);
+    ozoneOutputStream.getMetadata().put(OzoneConsts.ETAG,
+        DatatypeConverter.printHexBinary(eTagProvider.digest(data))
+            .toLowerCase());
     ozoneOutputStream.close();
 
     OmMultipartCommitUploadPartInfo omMultipartCommitUploadPartInfo =
         ozoneOutputStream.getCommitUploadPartInfo();
 
     assertNotNull(omMultipartCommitUploadPartInfo);
-    assertNotNull(omMultipartCommitUploadPartInfo.getPartName());
-    return omMultipartCommitUploadPartInfo.getPartName();
+    assertNotNull(omMultipartCommitUploadPartInfo.getETag());
+    return omMultipartCommitUploadPartInfo.getETag();
   }
 
   private void completeMultipartUpload(OzoneBucket bucket, String keyName,
@@ -692,9 +778,7 @@ class TestOzoneAtRestEncryption {
 
     KeyProvider kp3 = ozClient.getObjectStore().getKeyProvider();
     assertNotEquals(kp3, kpSpy);
-    // Restore ozClient and store
-    TestOzoneRpcClient.setOzClient(OzoneClientFactory.getRpcClient(conf));
-    TestOzoneRpcClient.setStore(ozClient.getObjectStore());
+    reInitClient();
   }
 
   private static RepeatedOmKeyInfo getMatchedKeyInfo(

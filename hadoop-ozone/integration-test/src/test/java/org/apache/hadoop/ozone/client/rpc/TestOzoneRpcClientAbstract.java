@@ -17,9 +17,10 @@
 
 package org.apache.hadoop.ozone.client.rpc;
 
-import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.security.PrivilegedExceptionAction;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -38,7 +39,9 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Stream;
 
-import org.apache.hadoop.conf.StorageUnit;
+import javax.xml.bind.DatatypeConverter;
+import org.apache.commons.codec.digest.DigestUtils;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.client.DefaultReplicationConfig;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.ECReplicationConfig.EcCodec;
@@ -49,6 +52,7 @@ import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.StorageType;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
@@ -62,6 +66,7 @@ import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.protocolPB.StorageContainerLocationProtocolClientSideTranslatorPB;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.utils.db.Table;
+import org.apache.hadoop.ozone.ClientConfigForTesting;
 import org.apache.hadoop.ozone.HddsDatanodeService;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OmUtils;
@@ -84,14 +89,12 @@ import org.apache.hadoop.ozone.client.VolumeArgs;
 import org.apache.hadoop.ozone.client.io.OzoneInputStream;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.client.protocol.ClientProtocol;
-import org.apache.hadoop.ozone.common.OzoneChecksumException;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.interfaces.BlockIterator;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.apache.hadoop.ozone.container.common.interfaces.DBHandle;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.BlockUtils;
-import org.apache.hadoop.ozone.container.keyvalue.helpers.KeyValueContainerLocationUtil;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OmFailoverProxyUtil;
@@ -122,20 +125,26 @@ import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.tag.Flaky;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
-import org.apache.commons.io.FileUtils;
+
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.commons.lang3.RandomUtils;
 import static org.apache.hadoop.hdds.StringUtils.string2Bytes;
 import static org.apache.hadoop.hdds.client.ReplicationFactor.ONE;
 import static org.apache.hadoop.hdds.client.ReplicationFactor.THREE;
 import static org.apache.hadoop.hdds.client.ReplicationType.RATIS;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_RATIS_PIPELINE_LIMIT;
+import static org.apache.hadoop.ozone.OmUtils.LOG;
 import static org.apache.hadoop.ozone.OmUtils.MAX_TRXN_ID;
 import static org.apache.hadoop.ozone.OzoneAcl.AclScope.ACCESS;
 import static org.apache.hadoop.ozone.OzoneAcl.AclScope.DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SCM_BLOCK_SIZE;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SCM_BLOCK_SIZE_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConsts.DEFAULT_OM_UPDATE_ID;
+import static org.apache.hadoop.ozone.OzoneConsts.ETAG;
 import static org.apache.hadoop.ozone.OzoneConsts.GB;
+import static org.apache.hadoop.ozone.OzoneConsts.MD5_HASH;
+import static org.apache.hadoop.hdds.utils.ClusterContainersUtil.corruptData;
+import static org.apache.hadoop.hdds.utils.ClusterContainersUtil.getContainerByID;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.KEY_NOT_FOUND;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.NO_SUCH_MULTIPART_UPLOAD_ERROR;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.PARTIAL_RENAME;
@@ -149,7 +158,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
@@ -160,6 +168,7 @@ import static org.junit.jupiter.api.Assertions.fail;
 import static org.slf4j.event.Level.DEBUG;
 
 import org.apache.ozone.test.tag.Unhealthy;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.MethodOrderer;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestMethodOrder;
@@ -193,10 +202,12 @@ public abstract class TestOzoneRpcClientAbstract {
       READ, ACCESS);
   private static OzoneAcl inheritedGroupAcl = new OzoneAcl(GROUP,
       remoteGroupName, READ, ACCESS);
+  private static MessageDigest eTagProvider;
 
-  private static String scmId = UUID.randomUUID().toString();
-  private static String clusterId;
-
+  @BeforeAll
+  public static void initialize() throws NoSuchAlgorithmException {
+    eTagProvider = MessageDigest.getInstance(MD5_HASH);
+  }
 
   /**
    * Create a MiniOzoneCluster for testing.
@@ -206,14 +217,15 @@ public abstract class TestOzoneRpcClientAbstract {
   static void startCluster(OzoneConfiguration conf) throws Exception {
     // Reduce long wait time in MiniOzoneClusterImpl#waitForHddsDatanodesStop
     //  for testZReadKeyWithUnhealthyContainerReplica.
-    clusterId = UUID.randomUUID().toString();
     conf.set("ozone.scm.stale.node.interval", "10s");
+    conf.setInt(OZONE_SCM_RATIS_PIPELINE_LIMIT, 10);
+
+    ClientConfigForTesting.newBuilder(StorageUnit.MB)
+        .setDataStreamMinPacketSize(1)
+        .applyTo(conf);
+
     cluster = MiniOzoneCluster.newBuilder(conf)
         .setNumDatanodes(14)
-        .setTotalPipelineNumLimit(10)
-        .setScmId(scmId)
-        .setClusterId(clusterId)
-        .setDataStreamMinPacketSize(1) // 1MB
         .build();
     cluster.waitForClusterToBeReady();
     ozClient = OzoneClientFactory.getRpcClient(conf);
@@ -265,10 +277,6 @@ public abstract class TestOzoneRpcClientAbstract {
 
   public static ObjectStore getStore() {
     return TestOzoneRpcClientAbstract.store;
-  }
-
-  public static void setClusterId(String clusterId) {
-    TestOzoneRpcClientAbstract.clusterId = clusterId;
   }
 
   public static OzoneClient getClient() {
@@ -667,12 +675,10 @@ public abstract class TestOzoneRpcClientAbstract {
     String bucketName = UUID.randomUUID().toString();
     OzoneAcl userAcl = new OzoneAcl(USER, "test",
         READ, ACCESS);
-    List<OzoneAcl> acls = new ArrayList<>();
-    acls.add(userAcl);
     store.createVolume(volumeName);
     OzoneVolume volume = store.getVolume(volumeName);
-    BucketArgs.Builder builder = BucketArgs.newBuilder();
-    builder.setAcls(acls);
+    BucketArgs.Builder builder = BucketArgs.newBuilder()
+        .addAcl(userAcl);
     volume.createBucket(bucketName, builder.build());
     OzoneBucket bucket = volume.getBucket(bucketName);
     assertEquals(bucketName, bucket.getName());
@@ -703,15 +709,13 @@ public abstract class TestOzoneRpcClientAbstract {
     String bucketName = UUID.randomUUID().toString();
     OzoneAcl userAcl = new OzoneAcl(USER, "test",
         ACLType.ALL, ACCESS);
-    List<OzoneAcl> acls = new ArrayList<>();
-    acls.add(userAcl);
     ReplicationConfig repConfig = new ECReplicationConfig(3, 2);
     store.createVolume(volumeName);
     OzoneVolume volume = store.getVolume(volumeName);
     BucketArgs.Builder builder = BucketArgs.newBuilder();
     builder.setVersioning(true)
         .setStorageType(StorageType.SSD)
-        .setAcls(acls)
+        .addAcl(userAcl)
         .setDefaultReplicationConfig(new DefaultReplicationConfig(repConfig));
     volume.createBucket(bucketName, builder.build());
     OzoneBucket bucket = volume.getBucket(bucketName);
@@ -760,20 +764,16 @@ public abstract class TestOzoneRpcClientAbstract {
     String bucketName = UUID.randomUUID().toString();
     OzoneAcl userAcl = new OzoneAcl(USER, "test",
         ACLType.ALL, ACCESS);
-    List<OzoneAcl> acls = new ArrayList<>();
-    acls.add(userAcl);
     store.createVolume(volumeName);
     OzoneVolume volume = store.getVolume(volumeName);
-    BucketArgs.Builder builder = BucketArgs.newBuilder();
-    builder.setAcls(acls);
+    BucketArgs.Builder builder = BucketArgs.newBuilder()
+        .addAcl(userAcl);
     volume.createBucket(bucketName, builder.build());
     OzoneBucket bucket = volume.getBucket(bucketName);
-    for (OzoneAcl acl : acls) {
-      assertTrue(bucket.removeAcl(acl));
-    }
+    assertTrue(bucket.removeAcl(userAcl));
     OzoneBucket newBucket = volume.getBucket(bucketName);
     assertEquals(bucketName, newBucket.getName());
-    assertThat(bucket.getAcls()).doesNotContain(acls.get(0));
+    assertThat(newBucket.getAcls()).doesNotContain(userAcl);
   }
 
   @Test
@@ -783,14 +783,13 @@ public abstract class TestOzoneRpcClientAbstract {
     String bucketName = UUID.randomUUID().toString();
     OzoneAcl userAcl = new OzoneAcl(USER, "test",
         ACLType.ALL, ACCESS);
-    List<OzoneAcl> acls = new ArrayList<>();
-    acls.add(userAcl);
-    acls.add(new OzoneAcl(USER, "test1",
-        ACLType.ALL, ACCESS));
+    OzoneAcl acl2 = new OzoneAcl(USER, "test1",
+        ACLType.ALL, ACCESS);
     store.createVolume(volumeName);
     OzoneVolume volume = store.getVolume(volumeName);
-    BucketArgs.Builder builder = BucketArgs.newBuilder();
-    builder.setAcls(acls);
+    BucketArgs.Builder builder = BucketArgs.newBuilder()
+        .addAcl(userAcl)
+        .addAcl(acl2);
     volume.createBucket(bucketName, builder.build());
     OzoneObj ozoneObj = OzoneObjInfo.Builder.newBuilder()
         .setBucketName(bucketName)
@@ -799,13 +798,11 @@ public abstract class TestOzoneRpcClientAbstract {
         .setResType(OzoneObj.ResourceType.BUCKET).build();
 
     // Remove the 2nd acl added to the list.
-    boolean remove = store.removeAcl(ozoneObj, acls.get(1));
-    assertTrue(remove);
-    assertThat(store.getAcl(ozoneObj)).doesNotContain(acls.get(1));
+    assertTrue(store.removeAcl(ozoneObj, acl2));
+    assertThat(store.getAcl(ozoneObj)).doesNotContain(acl2);
 
-    remove = store.removeAcl(ozoneObj, acls.get(0));
-    assertTrue(remove);
-    assertThat(store.getAcl(ozoneObj)).doesNotContain(acls.get(0));
+    assertTrue(store.removeAcl(ozoneObj, userAcl));
+    assertThat(store.getAcl(ozoneObj)).doesNotContain(userAcl);
   }
 
   @Test
@@ -1336,7 +1333,6 @@ public abstract class TestOzoneRpcClientAbstract {
     if (layout.equals(BucketLayout.LEGACY)) {
       OzoneConfiguration conf = cluster.getConf();
       conf.setBoolean(OMConfigKeys.OZONE_OM_ENABLE_FILESYSTEM_PATHS, true);
-      cluster.setConf(conf);
     }
 
     // the directory "/dir1", ""/dir1/dir2/", "/dir1/dir2/dir3/"
@@ -1498,6 +1494,7 @@ public abstract class TestOzoneRpcClientAbstract {
         sampleData.length(), 1, uploadID);
     ozoneOutputStream.write(string2Bytes(sampleData), 0,
         sampleData.length());
+    ozoneOutputStream.getMetadata().put(ETAG, DigestUtils.md5Hex(sampleData));
     ozoneOutputStream.close();
 
     assertEquals(valueLength, store.getVolume(volumeName)
@@ -1653,6 +1650,7 @@ public abstract class TestOzoneRpcClientAbstract {
         }
         latch.countDown();
       } catch (IOException ex) {
+        LOG.error("Execution failed: ", ex);
         latch.countDown();
         failCount.incrementAndGet();
       }
@@ -1724,16 +1722,9 @@ public abstract class TestOzoneRpcClientAbstract {
 
     // Get the container by traversing the datanodes. Atleast one of the
     // datanode must have this container.
-    Container container = null;
-    for (HddsDatanodeService hddsDatanode : cluster.getHddsDatanodes()) {
-      container = hddsDatanode.getDatanodeStateMachine().getContainer()
-          .getContainerSet().getContainer(containerID);
-      if (container != null) {
-        break;
-      }
-    }
+    Container container = getContainerByID(cluster, containerID);
     assertNotNull(container, "Container not found");
-    corruptData(container, key);
+    corruptData(cluster, container, key);
   }
 
 
@@ -1896,7 +1887,7 @@ public abstract class TestOzoneRpcClientAbstract {
       }
     }
     assertNotNull(container, "Container not found");
-    corruptData(container, key);
+    corruptData(cluster, container, key);
 
     // Try reading the key. Since the chunk file is corrupted, it should
     // throw a checksum mismatch exception.
@@ -1912,7 +1903,7 @@ public abstract class TestOzoneRpcClientAbstract {
   // Make this executed at last, for it has some side effect to other UTs
   @Test
   @Flaky("HDDS-6151")
-  public void testZReadKeyWithUnhealthyContainerReplica() throws Exception {
+  void testZReadKeyWithUnhealthyContainerReplica() throws Exception {
     String volumeName = UUID.randomUUID().toString();
     String bucketName = UUID.randomUUID().toString();
 
@@ -1995,16 +1986,12 @@ public abstract class TestOzoneRpcClientAbstract {
     }, 1000, 10000);
 
     // Try reading keyName2
-    try {
-      GenericTestUtils.setLogLevel(XceiverClientGrpc.getLogger(), DEBUG);
-      try (OzoneInputStream is = bucket.readKey(keyName2)) {
-        byte[] content = new byte[100];
-        is.read(content);
-        String retValue = new String(content, UTF_8);
-        assertEquals(value, retValue.trim());
-      }
-    } catch (IOException e) {
-      fail("Reading unhealthy replica should succeed.");
+    GenericTestUtils.setLogLevel(XceiverClientGrpc.getLogger(), DEBUG);
+    try (OzoneInputStream is = bucket.readKey(keyName2)) {
+      byte[] content = new byte[100];
+      is.read(content);
+      String retValue = new String(content, UTF_8);
+      assertEquals(value, retValue.trim());
     }
   }
 
@@ -2013,7 +2000,7 @@ public abstract class TestOzoneRpcClientAbstract {
    * @throws IOException
    */
   @Test
-  public void testReadKeyWithCorruptedDataWithMutiNodes() throws IOException {
+  void testReadKeyWithCorruptedDataWithMutiNodes() throws IOException {
     String volumeName = UUID.randomUUID().toString();
     String bucketName = UUID.randomUUID().toString();
 
@@ -2055,27 +2042,23 @@ public abstract class TestOzoneRpcClientAbstract {
       }
     }
     assertThat(containerList).withFailMessage("Container not found").isNotEmpty();
-    corruptData(containerList.get(0), key);
+    corruptData(cluster, containerList.get(0), key);
     // Try reading the key. Read will fail on the first node and will eventually
     // failover to next replica
     try (OzoneInputStream is = bucket.readKey(keyName)) {
       byte[] b = new byte[data.length];
       is.read(b);
       assertArrayEquals(b, data);
-    } catch (OzoneChecksumException e) {
-      fail("Reading corrupted data should not fail.");
     }
-    corruptData(containerList.get(1), key);
+    corruptData(cluster, containerList.get(1), key);
     // Try reading the key. Read will fail on the first node and will eventually
     // failover to next replica
     try (OzoneInputStream is = bucket.readKey(keyName)) {
       byte[] b = new byte[data.length];
       is.read(b);
       assertArrayEquals(b, data);
-    } catch (OzoneChecksumException e) {
-      fail("Reading corrupted data should not fail.");
     }
-    corruptData(containerList.get(2), key);
+    corruptData(cluster, containerList.get(2), key);
     // Try reading the key. Read will fail here as all the replicas are corrupt
 
     IOException ioException = assertThrows(IOException.class, () -> {
@@ -2085,43 +2068,6 @@ public abstract class TestOzoneRpcClientAbstract {
       }
     });
     assertThat(ioException).hasMessageContaining("Checksum mismatch");
-  }
-
-  private void corruptData(Container container, OzoneKey key)
-      throws IOException {
-    long containerID = ((OzoneKeyDetails) key).getOzoneKeyLocations().get(0)
-        .getContainerID();
-    long localID = ((OzoneKeyDetails) key).getOzoneKeyLocations().get(0)
-        .getLocalID();
-    // From the containerData, get the block iterator for all the blocks in
-    // the container.
-    KeyValueContainerData containerData =
-        (KeyValueContainerData) container.getContainerData();
-    try (DBHandle db = BlockUtils.getDB(containerData, cluster.getConf());
-         BlockIterator<BlockData> keyValueBlockIterator =
-                 db.getStore().getBlockIterator(containerID)) {
-      // Find the block corresponding to the key we put. We use the localID of
-      // the BlockData to identify out key.
-      BlockData blockData = null;
-      while (keyValueBlockIterator.hasNext()) {
-        blockData = keyValueBlockIterator.nextBlock();
-        if (blockData.getBlockID().getLocalID() == localID) {
-          break;
-        }
-      }
-      assertNotNull(blockData, "Block not found");
-
-      // Get the location of the chunk file
-      String containreBaseDir =
-          container.getContainerData().getVolume().getHddsRootDir().getPath();
-      File chunksLocationPath = KeyValueContainerLocationUtil
-          .getChunksLocationPath(containreBaseDir, clusterId, containerID);
-      byte[] corruptData = "corrupted data".getBytes(UTF_8);
-      // Corrupt the contents of chunk files
-      for (File file : FileUtils.listFiles(chunksLocationPath, null, false)) {
-        FileUtils.writeByteArrayToFile(file, corruptData);
-      }
-    }
   }
 
   @Test
@@ -2652,13 +2598,14 @@ public abstract class TestOzoneRpcClientAbstract {
     OzoneOutputStream ozoneOutputStream = bucket.createMultipartKey(keyName,
         sampleData.length(), 1, uploadID);
     ozoneOutputStream.write(string2Bytes(sampleData), 0, sampleData.length());
+    ozoneOutputStream.getMetadata().put(ETAG, DigestUtils.md5Hex(sampleData));
     ozoneOutputStream.close();
 
     OmMultipartCommitUploadPartInfo commitUploadPartInfo = ozoneOutputStream
         .getCommitUploadPartInfo();
 
     assertNotNull(commitUploadPartInfo);
-    assertNotNull(commitUploadPartInfo.getPartName());
+    assertNotNull(commitUploadPartInfo.getETag());
   }
 
   @ParameterizedTest
@@ -2686,6 +2633,7 @@ public abstract class TestOzoneRpcClientAbstract {
     OzoneOutputStream ozoneOutputStream = bucket.createMultipartKey(keyName,
         sampleData.length(), partNumber, uploadID);
     ozoneOutputStream.write(string2Bytes(sampleData), 0, sampleData.length());
+    ozoneOutputStream.getMetadata().put(ETAG, DigestUtils.md5Hex(sampleData));
     ozoneOutputStream.close();
 
     OmMultipartCommitUploadPartInfo commitUploadPartInfo = ozoneOutputStream
@@ -2693,7 +2641,7 @@ public abstract class TestOzoneRpcClientAbstract {
 
     assertNotNull(commitUploadPartInfo);
     String partName = commitUploadPartInfo.getPartName();
-    assertNotNull(commitUploadPartInfo.getPartName());
+    assertNotNull(commitUploadPartInfo.getETag());
 
     // Overwrite the part by creating part key with same part number
     // and different content.
@@ -2701,13 +2649,14 @@ public abstract class TestOzoneRpcClientAbstract {
     ozoneOutputStream = bucket.createMultipartKey(keyName,
         sampleData.length(), partNumber, uploadID);
     ozoneOutputStream.write(string2Bytes(sampleData), 0, "name".length());
+    ozoneOutputStream.getMetadata().put(ETAG, DigestUtils.md5Hex(sampleData));
     ozoneOutputStream.close();
 
     commitUploadPartInfo = ozoneOutputStream
         .getCommitUploadPartInfo();
 
     assertNotNull(commitUploadPartInfo);
-    assertNotNull(commitUploadPartInfo.getPartName());
+    assertNotNull(commitUploadPartInfo.getETag());
 
     // AWS S3 for same content generates same partName during upload part.
     // In AWS S3 ETag is generated from md5sum. In Ozone right now we
@@ -2809,13 +2758,10 @@ public abstract class TestOzoneRpcClientAbstract {
       String keyName2 = UUID.randomUUID().toString();
       OzoneBucket bucket2 = client.getObjectStore().getVolume(volumeName)
           .getBucket(bucketName);
-      try {
-        initiateMultipartUpload(bucket2, keyName2, anyReplication());
-        fail("User without permission should fail");
-      } catch (Exception e) {
-        OMException ome = assertInstanceOf(OMException.class, e);
-        assertEquals(ResultCodes.PERMISSION_DENIED, ome.getResult());
-      }
+      OMException ome =
+          assertThrows(OMException.class, () -> initiateMultipartUpload(bucket2, keyName2, anyReplication()),
+              "User without permission should fail");
+      assertEquals(ResultCodes.PERMISSION_DENIED, ome.getResult());
 
       // Add create permission for user, and try multi-upload init again
       OzoneAcl acl7 = new OzoneAcl(USER, userName, ACLType.CREATE, DEFAULT);
@@ -2836,20 +2782,21 @@ public abstract class TestOzoneRpcClientAbstract {
 
       // Upload part
       byte[] data = generateData(OzoneConsts.OM_MULTIPART_MIN_SIZE, (byte) 1);
-      String partName = uploadPart(bucket, keyName2, uploadId, 1, data);
-      Map<Integer, String> partsMap = new TreeMap<>();
-      partsMap.put(1, partName);
+      Pair<String, String> partNameAndETag = uploadPart(bucket, keyName2,
+          uploadId, 1, data);
+      Map<Integer, String> eTagsMaps = new TreeMap<>();
+      eTagsMaps.put(1, partNameAndETag.getValue());
 
       // Complete multipart upload request
-      completeMultipartUpload(bucket2, keyName2, uploadId, partsMap);
+      completeMultipartUpload(bucket2, keyName2, uploadId, eTagsMaps);
 
       // User without permission cannot read multi-uploaded object
-      try (OzoneInputStream ignored = bucket2.readKey(keyName)) {
-        fail("User without permission should fail");
-      } catch (Exception e) {
-        OMException ome = assertInstanceOf(OMException.class, e);
-        assertEquals(ResultCodes.PERMISSION_DENIED, ome.getResult());
-      }
+      OMException ex = assertThrows(OMException.class, () -> {
+        try (OzoneInputStream ignored = bucket2.readKey(keyName)) {
+          LOG.error("User without permission should fail");
+        }
+      }, "User without permission should fail");
+      assertEquals(ResultCodes.PERMISSION_DENIED, ex.getResult());
     }
   }
 
@@ -2891,21 +2838,21 @@ public abstract class TestOzoneRpcClientAbstract {
         anyReplication());
 
     // Upload Parts
-    Map<Integer, String> partsMap = new TreeMap<>();
+    Map<Integer, String> eTagsMaps = new TreeMap<>();
     // Uploading part 1 with less than min size
-    String partName = uploadPart(bucket, keyName, uploadID, 1,
-        "data".getBytes(UTF_8));
-    partsMap.put(1, partName);
+    Pair<String, String> partNameAndETag = uploadPart(bucket, keyName,
+        uploadID, 1, "data".getBytes(UTF_8));
+    eTagsMaps.put(1, partNameAndETag.getValue());
 
-    partName = uploadPart(bucket, keyName, uploadID, 2,
+    partNameAndETag = uploadPart(bucket, keyName, uploadID, 2,
         "data".getBytes(UTF_8));
-    partsMap.put(2, partName);
+    eTagsMaps.put(2, partNameAndETag.getValue());
 
 
     // Complete multipart upload
 
     OzoneTestUtils.expectOmException(ResultCodes.ENTITY_TOO_SMALL,
-        () -> completeMultipartUpload(bucket, keyName, uploadID, partsMap));
+        () -> completeMultipartUpload(bucket, keyName, uploadID, eTagsMaps));
 
   }
   @Test
@@ -2952,11 +2899,11 @@ public abstract class TestOzoneRpcClientAbstract {
     uploadPart(bucket, keyName, uploadID, 1, "data".getBytes(UTF_8));
     // We have not uploaded any parts, but passing some list it should throw
     // error.
-    TreeMap<Integer, String> partsMap = new TreeMap<>();
-    partsMap.put(1, UUID.randomUUID().toString());
+    TreeMap<Integer, String> eTagsMaps = new TreeMap<>();
+    eTagsMaps.put(1, DigestUtils.md5Hex(UUID.randomUUID().toString()));
 
     OzoneTestUtils.expectOmException(ResultCodes.INVALID_PART,
-        () -> completeMultipartUpload(bucket, keyName, uploadID, partsMap));
+        () -> completeMultipartUpload(bucket, keyName, uploadID, eTagsMaps));
 
   }
 
@@ -2978,11 +2925,11 @@ public abstract class TestOzoneRpcClientAbstract {
     uploadPart(bucket, keyName, uploadID, 1, "data".getBytes(UTF_8));
     // We have not uploaded any parts, but passing some list it should throw
     // error.
-    TreeMap<Integer, String> partsMap = new TreeMap<>();
-    partsMap.put(3, "random");
+    TreeMap<Integer, String> eTagsMap = new TreeMap<>();
+    eTagsMap.put(3, DigestUtils.md5Hex("random"));
 
     OzoneTestUtils.expectOmException(ResultCodes.INVALID_PART,
-        () -> completeMultipartUpload(bucket, keyName, uploadID, partsMap));
+        () -> completeMultipartUpload(bucket, keyName, uploadID, eTagsMap));
   }
 
   @Test
@@ -3053,14 +3000,8 @@ public abstract class TestOzoneRpcClientAbstract {
 
     // Abort before completing part upload.
     bucket.abortMultipartUpload(keyName, omMultipartInfo.getUploadID());
-
-    try {
-      ozoneOutputStream.close();
-      fail("testAbortUploadFailWithInProgressPartUpload failed");
-    } catch (IOException ex) {
-      OMException ome = assertInstanceOf(OMException.class, ex);
-      assertEquals(NO_SUCH_MULTIPART_UPLOAD_ERROR, ome.getResult());
-    }
+    OMException ome = assertThrows(OMException.class, () -> ozoneOutputStream.close());
+    assertEquals(NO_SUCH_MULTIPART_UPLOAD_ERROR, ome.getResult());
   }
 
   @Test
@@ -3087,6 +3028,9 @@ public abstract class TestOzoneRpcClientAbstract {
     OzoneOutputStream ozoneOutputStream = bucket.createMultipartKey(keyName,
         data.length, 1, uploadID);
     ozoneOutputStream.write(data, 0, data.length);
+    ozoneOutputStream.getMetadata().put(ETAG,
+        DatatypeConverter.printHexBinary(eTagProvider.digest(data))
+            .toLowerCase());
     ozoneOutputStream.close();
 
     OmMultipartCommitUploadPartInfo omMultipartCommitUploadPartInfo =
@@ -3095,10 +3039,13 @@ public abstract class TestOzoneRpcClientAbstract {
     // Do not close output stream for part 2.
     ozoneOutputStream = bucket.createMultipartKey(keyName,
         data.length, 2, omMultipartInfo.getUploadID());
+    ozoneOutputStream.getMetadata().put(ETAG,
+        DatatypeConverter.printHexBinary(eTagProvider.digest(data))
+            .toLowerCase());
     ozoneOutputStream.write(data, 0, data.length);
 
     Map<Integer, String> partsMap = new LinkedHashMap<>();
-    partsMap.put(1, omMultipartCommitUploadPartInfo.getPartName());
+    partsMap.put(1, omMultipartCommitUploadPartInfo.getETag());
     OmMultipartUploadCompleteInfo omMultipartUploadCompleteInfo =
         bucket.completeMultipartUpload(keyName,
         uploadID, partsMap);
@@ -3115,14 +3062,8 @@ public abstract class TestOzoneRpcClientAbstract {
     String part1 = new String(data, UTF_8);
     sb.append(part1);
     assertEquals(sb.toString(), new String(fileContent, UTF_8));
-
-    try {
-      ozoneOutputStream.close();
-      fail("testCommitPartAfterCompleteUpload failed");
-    } catch (IOException ex) {
-      OMException ome = assertInstanceOf(OMException.class, ex);
-      assertEquals(NO_SUCH_MULTIPART_UPLOAD_ERROR, ome.getResult());
-    }
+    OMException ex = assertThrows(OMException.class, ozoneOutputStream::close);
+    assertEquals(NO_SUCH_MULTIPART_UPLOAD_ERROR, ex.getResult());
   }
 
 
@@ -3174,17 +3115,17 @@ public abstract class TestOzoneRpcClientAbstract {
 
     Map<Integer, String> partsMap = new TreeMap<>();
     String uploadID = initiateMultipartUpload(bucket, keyName, replication);
-    String partName1 = uploadPart(bucket, keyName, uploadID, 1,
-        generateData(OzoneConsts.OM_MULTIPART_MIN_SIZE, (byte)97));
-    partsMap.put(1, partName1);
+    Pair<String, String> partNameAndETag1 = uploadPart(bucket, keyName,
+        uploadID, 1, generateData(OzoneConsts.OM_MULTIPART_MIN_SIZE, (byte)97));
+    partsMap.put(1, partNameAndETag1.getKey());
 
-    String partName2 = uploadPart(bucket, keyName, uploadID, 2,
-        generateData(OzoneConsts.OM_MULTIPART_MIN_SIZE, (byte)97));
-    partsMap.put(2, partName2);
+    Pair<String, String> partNameAndETag2 = uploadPart(bucket, keyName,
+        uploadID, 2, generateData(OzoneConsts.OM_MULTIPART_MIN_SIZE, (byte)97));
+    partsMap.put(2, partNameAndETag2.getKey());
 
-    String partName3 = uploadPart(bucket, keyName, uploadID, 3,
-        generateData(OzoneConsts.OM_MULTIPART_MIN_SIZE, (byte)97));
-    partsMap.put(3, partName3);
+    Pair<String, String> partNameAndETag3 = uploadPart(bucket, keyName,
+        uploadID, 3, generateData(OzoneConsts.OM_MULTIPART_MIN_SIZE, (byte)97));
+    partsMap.put(3, partNameAndETag3.getKey());
 
     OzoneMultipartUploadPartListParts ozoneMultipartUploadPartListParts =
         bucket.listParts(keyName, uploadID, 0, 3);
@@ -3225,17 +3166,17 @@ public abstract class TestOzoneRpcClientAbstract {
 
     Map<Integer, String> partsMap = new TreeMap<>();
     String uploadID = initiateMultipartUpload(bucket, keyName, replication);
-    String partName1 = uploadPart(bucket, keyName, uploadID, 1,
-        generateData(OzoneConsts.OM_MULTIPART_MIN_SIZE, (byte)97));
-    partsMap.put(1, partName1);
+    Pair<String, String> partNameAndETag1 = uploadPart(bucket, keyName,
+        uploadID, 1, generateData(OzoneConsts.OM_MULTIPART_MIN_SIZE, (byte)97));
+    partsMap.put(1, partNameAndETag1.getKey());
 
-    String partName2 = uploadPart(bucket, keyName, uploadID, 2,
-        generateData(OzoneConsts.OM_MULTIPART_MIN_SIZE, (byte)97));
-    partsMap.put(2, partName2);
+    Pair<String, String> partNameAndETag2 = uploadPart(bucket, keyName,
+        uploadID, 2, generateData(OzoneConsts.OM_MULTIPART_MIN_SIZE, (byte)97));
+    partsMap.put(2, partNameAndETag2.getKey());
 
-    String partName3 = uploadPart(bucket, keyName, uploadID, 3,
-        generateData(OzoneConsts.OM_MULTIPART_MIN_SIZE, (byte)97));
-    partsMap.put(3, partName3);
+    Pair<String, String> partNameAndETag3 = uploadPart(bucket, keyName,
+        uploadID, 3, generateData(OzoneConsts.OM_MULTIPART_MIN_SIZE, (byte)97));
+    partsMap.put(3, partNameAndETag3.getKey());
 
     OzoneMultipartUploadPartListParts ozoneMultipartUploadPartListParts =
         bucket.listParts(keyName, uploadID, 0, 2);
@@ -3672,19 +3613,20 @@ public abstract class TestOzoneRpcClientAbstract {
     // than 5mb
     int length = 0;
     byte[] data = generateData(OzoneConsts.OM_MULTIPART_MIN_SIZE, val);
-    String partName = uploadPart(bucket, keyName, uploadID, 1, data);
-    partsMap.put(1, partName);
+    Pair<String, String> partNameAndEtag = uploadPart(bucket, keyName, uploadID,
+        1, data);
+    partsMap.put(1, partNameAndEtag.getValue());
     length += data.length;
 
 
-    partName = uploadPart(bucket, keyName, uploadID, 2, data);
-    partsMap.put(2, partName);
+    partNameAndEtag = uploadPart(bucket, keyName, uploadID, 2, data);
+    partsMap.put(2, partNameAndEtag.getValue());
     length += data.length;
 
     String part3 = UUID.randomUUID().toString();
-    partName = uploadPart(bucket, keyName, uploadID, 3, part3.getBytes(
+    partNameAndEtag = uploadPart(bucket, keyName, uploadID, 3, part3.getBytes(
         UTF_8));
-    partsMap.put(3, partName);
+    partsMap.put(3, partNameAndEtag.getValue());
     length += part3.getBytes(UTF_8).length;
 
     // Complete multipart upload request
@@ -3741,20 +3683,26 @@ public abstract class TestOzoneRpcClientAbstract {
     return uploadID;
   }
 
-  private String uploadPart(OzoneBucket bucket, String keyName, String
-      uploadID, int partNumber, byte[] data) throws Exception {
+  private Pair<String, String> uploadPart(OzoneBucket bucket, String keyName,
+                                          String uploadID, int partNumber,
+                                          byte[] data) throws Exception {
     OzoneOutputStream ozoneOutputStream = bucket.createMultipartKey(keyName,
         data.length, partNumber, uploadID);
     ozoneOutputStream.write(data, 0,
         data.length);
+    ozoneOutputStream.getMetadata().put(ETAG,
+        DatatypeConverter.printHexBinary(eTagProvider.digest(data))
+            .toLowerCase());
     ozoneOutputStream.close();
 
     OmMultipartCommitUploadPartInfo omMultipartCommitUploadPartInfo =
         ozoneOutputStream.getCommitUploadPartInfo();
 
     assertNotNull(omMultipartCommitUploadPartInfo);
+    assertNotNull(omMultipartCommitUploadPartInfo.getETag());
     assertNotNull(omMultipartCommitUploadPartInfo.getPartName());
-    return omMultipartCommitUploadPartInfo.getPartName();
+    return Pair.of(omMultipartCommitUploadPartInfo.getPartName(),
+        omMultipartCommitUploadPartInfo.getETag());
 
   }
 

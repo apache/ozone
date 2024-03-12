@@ -428,7 +428,6 @@ public class SimpleMockNodeManager implements NodeManager {
 
   @Override
   public List<SCMCommand> processHeartbeat(DatanodeDetails datanodeDetails,
-      LayoutVersionProto layoutInfo,
       CommandQueueReportProto commandQueueReportProto) {
     return null;
   }

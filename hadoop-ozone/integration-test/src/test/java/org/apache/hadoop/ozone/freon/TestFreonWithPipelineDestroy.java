@@ -61,6 +61,8 @@ public class TestFreonWithPipelineDestroy {
             1, TimeUnit.SECONDS);
     conf.setTimeDuration(HddsConfigKeys.HDDS_PIPELINE_REPORT_INTERVAL,
             1, TimeUnit.SECONDS);
+    conf.setTimeDuration(ScmConfigKeys.OZONE_SCM_HEARTBEAT_PROCESS_INTERVAL, 1000, TimeUnit.MILLISECONDS);
+    conf.setInt(ScmConfigKeys.OZONE_SCM_RATIS_PIPELINE_LIMIT, 8);
     DatanodeRatisServerConfig ratisServerConfig =
         conf.getObject(DatanodeRatisServerConfig.class);
     ratisServerConfig.setRequestTimeOut(Duration.ofSeconds(3));
@@ -74,10 +76,7 @@ public class TestFreonWithPipelineDestroy {
     conf.setFromObject(raftClientConfig);
 
     cluster = MiniOzoneCluster.newBuilder(conf)
-      .setHbProcessorInterval(1000)
-      .setHbInterval(1000)
       .setNumDatanodes(3)
-      .setTotalPipelineNumLimit(8)
       .build();
     cluster.waitForClusterToBeReady();
   }

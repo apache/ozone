@@ -63,14 +63,10 @@ class TestOzoneHARatisLogParser {
 
   @BeforeEach
   void setup() throws Exception {
-    String clusterId = UUID.randomUUID().toString();
-    String scmId = UUID.randomUUID().toString();
     String omServiceId = "omServiceId1";
     OzoneConfiguration conf = new OzoneConfiguration();
     String scmServiceId = "scmServiceId";
-    cluster =  (MiniOzoneHAClusterImpl) MiniOzoneCluster.newHABuilder(conf)
-        .setClusterId(clusterId)
-        .setScmId(scmId)
+    cluster =  MiniOzoneCluster.newHABuilder(conf)
         .setOMServiceId(omServiceId)
         .setSCMServiceId(scmServiceId)
         .setNumOfOzoneManagers(3)

@@ -18,7 +18,6 @@
 
 package org.apache.hadoop.hdds.scm.pipeline;
 
-import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
@@ -41,10 +40,10 @@ import org.apache.hadoop.hdds.scm.node.NodeStatus;
 import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.utils.db.DBStoreBuilder;
 import org.apache.hadoop.ozone.ClientVersion;
-import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
 import java.io.File;
 import java.io.IOException;
@@ -67,10 +66,9 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.junit.jupiter.api.Assertions.fail;
 
 /**
- * Test for RatisPipelineProvider.
+ * Test for {@link RatisPipelineProvider}.
  */
 public class TestRatisPipelineProvider {
 
@@ -80,6 +78,7 @@ public class TestRatisPipelineProvider {
   private MockNodeManager nodeManager;
   private RatisPipelineProvider provider;
   private PipelineStateManager stateManager;
+  @TempDir
   private File testDir;
   private DBStore dbStore;
 
@@ -89,9 +88,11 @@ public class TestRatisPipelineProvider {
 
   public void init(int maxPipelinePerNode, OzoneConfiguration conf)
       throws Exception {
-    testDir = GenericTestUtils.getTestDir(
-        TestRatisPipelineProvider.class.getSimpleName() + UUID.randomUUID());
-    conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, testDir.getAbsolutePath());
+    init(maxPipelinePerNode, conf, testDir);
+  }
+
+  public void init(int maxPipelinePerNode, OzoneConfiguration conf, File dir) throws Exception {
+    conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, dir.getAbsolutePath());
     dbStore = DBStoreBuilder.createDBStore(
         conf, new SCMDBDefinition());
     nodeManager = new MockNodeManager(true, 10);
@@ -114,8 +115,6 @@ public class TestRatisPipelineProvider {
     if (dbStore != null) {
       dbStore.close();
     }
-
-    FileUtil.fullyDelete(testDir);
   }
 
   private static void assertPipelineProperties(
@@ -332,7 +331,7 @@ public class TestRatisPipelineProvider {
   }
 
   @Test
-  public void testCreatePipelinesWhenNotEnoughSpace() throws Exception {
+  public void testCreatePipelinesWhenNotEnoughSpace(@TempDir File tempDir) throws Exception {
     String expectedErrorSubstring = "Unable to find enough" +
         " nodes that meet the space requirement";
 
@@ -345,29 +344,23 @@ public class TestRatisPipelineProvider {
       if (factor == ReplicationFactor.ZERO) {
         continue;
       }
-      try {
-        provider.create(RatisReplicationConfig.getInstance(factor));
-        fail("Expected SCMException for large container size with " +
-            "replication factor " + factor.toString());
-      } catch (SCMException ex) {
-        assertThat(ex.getMessage()).contains(expectedErrorSubstring);
-      }
+      SCMException ex =
+          assertThrows(SCMException.class, () -> provider.create(RatisReplicationConfig.getInstance(factor)),
+              "Expected SCMException for large container size with replication factor " + factor.toString());
+      assertThat(ex.getMessage()).contains(expectedErrorSubstring);
     }
 
     OzoneConfiguration largeMetadataConf = new OzoneConfiguration();
     largeMetadataConf.set(OZONE_DATANODE_RATIS_VOLUME_FREE_SPACE_MIN, "300TB");
-    init(1, largeMetadataConf);
+    init(1, largeMetadataConf, tempDir);
     for (ReplicationFactor factor: ReplicationFactor.values()) {
       if (factor == ReplicationFactor.ZERO) {
         continue;
       }
-      try {
-        provider.create(RatisReplicationConfig.getInstance(factor));
-        fail("Expected SCMException for large metadata size with " +
-            "replication factor " + factor.toString());
-      } catch (SCMException ex) {
-        assertThat(ex.getMessage()).contains(expectedErrorSubstring);
-      }
+      SCMException ex =
+          assertThrows(SCMException.class, () -> provider.create(RatisReplicationConfig.getInstance(factor)),
+              "Expected SCMException for large metadata size with replication factor " + factor.toString());
+      assertThat(ex.getMessage()).contains(expectedErrorSubstring);
     }
   }
 

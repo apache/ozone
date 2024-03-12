@@ -50,6 +50,7 @@ import java.util.UUID;
 
 import static org.apache.hadoop.ozone.OzoneConsts.LAYOUT_VERSION_KEY;
 import static org.apache.hadoop.ozone.om.OMUpgradeTestUtils.waitForFinalization;
+import static org.apache.hadoop.ozone.om.OmUpgradeConfig.ConfigStrings.OZONE_OM_INIT_DEFAULT_LAYOUT_VERSION;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.NOT_SUPPORTED_OPERATION_PRIOR_FINALIZATION;
 import static org.apache.hadoop.ozone.om.upgrade.OMLayoutFeature.INITIAL_VERSION;
 import static org.apache.hadoop.ozone.om.upgrade.OMLayoutVersionManager.maxLayoutVersion;
@@ -91,15 +92,13 @@ class TestOMBucketLayoutUpgrade {
   @BeforeAll
   void setup() throws Exception {
     OzoneConfiguration conf = new OzoneConfiguration();
+    conf.setInt(OZONE_OM_INIT_DEFAULT_LAYOUT_VERSION, fromLayoutVersion);
     String omServiceId = UUID.randomUUID().toString();
-    cluster = (MiniOzoneHAClusterImpl) MiniOzoneCluster.newOMHABuilder(conf)
-        .setClusterId(UUID.randomUUID().toString())
-        .setScmId(UUID.randomUUID().toString())
-        .setOMServiceId(omServiceId)
+    MiniOzoneHAClusterImpl.Builder builder = MiniOzoneCluster.newHABuilder(conf);
+    builder.setOMServiceId(omServiceId)
         .setNumOfOzoneManagers(3)
-        .setNumDatanodes(1)
-        .setOmLayoutVersion(fromLayoutVersion)
-        .build();
+        .setNumDatanodes(1);
+    cluster = builder.build();
 
     cluster.waitForClusterToBeReady();
     ozoneManager = cluster.getOzoneManager();

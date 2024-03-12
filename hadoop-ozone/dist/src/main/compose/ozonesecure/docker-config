@@ -84,7 +84,7 @@ OZONE-SITE.XML_ozone.scm.dead.node.interval=45s
 OZONE-SITE.XML_hdds.container.report.interval=60s
 OZONE-SITE.XML_ozone.scm.close.container.wait.duration=5s
 
-OZONE-SITE.XML_dfs.container.ratis.datastream.enabled=true
+OZONE-SITE.XML_hdds.container.ratis.datastream.enabled=true
 
 HDFS-SITE.XML_dfs.datanode.kerberos.principal=dn/dn@EXAMPLE.COM
 HDFS-SITE.XML_dfs.datanode.kerberos.keytab.file=/etc/security/keytabs/dn.keytab
@@ -130,6 +130,7 @@ HADOOP-POLICY.XML_hdds.security.client.datanode.container.protocol.acl=*
 HADOOP-POLICY.XML_hdds.security.client.scm.container.protocol.acl=*
 HADOOP-POLICY.XML_hdds.security.client.scm.block.protocol.acl=*
 HADOOP-POLICY.XML_hdds.security.client.scm.certificate.protocol.acl=*
+HADOOP-POLICY.XML_ozone.security.reconfigure.protocol.acl=*
 
 HDFS-SITE.XML_rpc.metrics.quantile.enable=true
 HDFS-SITE.XML_rpc.metrics.percentiles.intervals=60,300

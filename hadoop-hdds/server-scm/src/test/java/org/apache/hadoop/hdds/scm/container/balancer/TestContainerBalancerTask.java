@@ -53,7 +53,6 @@ import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.ozone.test.GenericTestUtils;
-import org.apache.ozone.test.tag.Unhealthy;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.slf4j.Logger;
@@ -941,7 +940,6 @@ public class TestContainerBalancerTask {
     stopBalancer();
   }
 
-  @Unhealthy("HDDS-8941")
   @Test
   public void testDelayedStart() throws InterruptedException, TimeoutException {
     conf.setTimeDuration("hdds.scm.wait.time.after.safemode.exit", 10,
@@ -959,7 +957,7 @@ public class TestContainerBalancerTask {
      This is the delay before it starts balancing.
      */
     GenericTestUtils.waitFor(
-        () -> balancingThread.getState() == Thread.State.TIMED_WAITING, 1, 20);
+        () -> balancingThread.getState() == Thread.State.TIMED_WAITING, 1, 40);
     assertEquals(Thread.State.TIMED_WAITING,
         balancingThread.getState());
 

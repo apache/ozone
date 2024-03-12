@@ -35,11 +35,12 @@ import org.apache.hadoop.security.authorize.AuthorizationException;
 import org.apache.hadoop.util.ExitUtil;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ratis.util.ExitUtils;
-import org.jetbrains.annotations.NotNull;
+import jakarta.annotation.Nonnull;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
+import org.junit.jupiter.api.io.TempDir;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -74,11 +75,11 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_HTTP_KERBEROS_PRI
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_KERBEROS_KEYTAB_FILE_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_KERBEROS_PRINCIPAL_KEY;
 import static org.apache.hadoop.security.UserGroupInformation.AuthenticationMethod.KERBEROS;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Integration test to verify symmetric SecretKeys APIs in a secure cluster.
@@ -91,14 +92,13 @@ public final class TestSecretKeysApi {
       .getLogger(TestSecretKeysApi.class);
   private MiniKdc miniKdc;
   private OzoneConfiguration conf;
+  @TempDir
   private File workDir;
   private File ozoneKeytab;
   private File spnegoKeytab;
   private File testUserKeytab;
   private String testUserPrincipal;
   private String ozonePrincipal;
-  private String clusterId;
-  private String scmId;
   private MiniOzoneHAClusterImpl cluster;
 
   @BeforeEach
@@ -108,10 +108,6 @@ public final class TestSecretKeysApi {
 
     ExitUtils.disableSystemExit();
     ExitUtil.disableSystemExit();
-
-    workDir = GenericTestUtils.getTestDir(getClass().getSimpleName());
-    clusterId = UUID.randomUUID().toString();
-    scmId = UUID.randomUUID().toString();
 
     startMiniKdc();
     setSecureConfig();
@@ -309,9 +305,9 @@ public final class TestSecretKeysApi {
         assertThrows(RemoteException.class,
             secretKeyProtocol::getCurrentSecretKey);
     assertEquals(AuthorizationException.class.getName(), ex.getClassName());
-    assertTrue(ex.getMessage().contains(
+    assertThat(ex.getMessage()).contains(
         "User test@EXAMPLE.COM (auth:KERBEROS) is not authorized " +
-            "for protocol"));
+            "for protocol");
   }
 
   @Test
@@ -330,24 +326,21 @@ public final class TestSecretKeysApi {
   private void startCluster(int numSCMs)
       throws IOException, TimeoutException, InterruptedException {
     OzoneManager.setTestSecureOmFlag(true);
-    MiniOzoneCluster.Builder builder = MiniOzoneCluster.newHABuilder(conf)
-        .setClusterId(clusterId)
+    MiniOzoneHAClusterImpl.Builder builder = MiniOzoneCluster.newHABuilder(conf)
         .setSCMServiceId("TestSecretKey")
-        .setScmId(scmId)
-        .setNumDatanodes(3)
         .setNumOfStorageContainerManagers(numSCMs)
         .setNumOfOzoneManagers(1);
 
-    cluster = (MiniOzoneHAClusterImpl) builder.build();
+    cluster = builder.build();
     cluster.waitForClusterToBeReady();
   }
 
-  @NotNull
+  @Nonnull
   private SecretKeyProtocol getSecretKeyProtocol() throws IOException {
     return getSecretKeyProtocol(ozonePrincipal, ozoneKeytab);
   }
 
-  @NotNull
+  @Nonnull
   private SecretKeyProtocol getSecretKeyProtocol(
       String user, File keyTab) throws IOException {
     UserGroupInformation ugi =

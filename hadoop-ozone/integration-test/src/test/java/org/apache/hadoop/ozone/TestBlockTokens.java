@@ -116,8 +116,6 @@ public final class TestBlockTokens {
   private static File testUserKeytab;
   private static String testUserPrincipal;
   private static String host;
-  private static String clusterId;
-  private static String scmId;
   private static MiniOzoneHAClusterImpl cluster;
   private static OzoneClient client;
   private static BlockInputStreamFactory blockInputStreamFactory =
@@ -132,8 +130,6 @@ public final class TestBlockTokens {
 
     workDir =
         GenericTestUtils.getTestDir(TestBlockTokens.class.getSimpleName());
-    clusterId = UUID.randomUUID().toString();
-    scmId = UUID.randomUUID().toString();
 
     startMiniKdc();
     setSecureConfig();
@@ -382,15 +378,12 @@ public final class TestBlockTokens {
   private static void startCluster()
       throws IOException, TimeoutException, InterruptedException {
     OzoneManager.setTestSecureOmFlag(true);
-    MiniOzoneCluster.Builder builder = MiniOzoneCluster.newHABuilder(conf)
-        .setClusterId(clusterId)
+    MiniOzoneHAClusterImpl.Builder builder = MiniOzoneCluster.newHABuilder(conf)
         .setSCMServiceId("TestSecretKey")
-        .setScmId(scmId)
-        .setNumDatanodes(3)
         .setNumOfStorageContainerManagers(3)
         .setNumOfOzoneManagers(1);
 
-    cluster = (MiniOzoneHAClusterImpl) builder.build();
+    cluster = builder.build();
     cluster.waitForClusterToBeReady();
   }
 

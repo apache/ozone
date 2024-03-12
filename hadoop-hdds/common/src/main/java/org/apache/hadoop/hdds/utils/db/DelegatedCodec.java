@@ -19,7 +19,7 @@ package org.apache.hadoop.hdds.utils.db;
 
 import org.apache.ratis.util.function.CheckedFunction;
 
-import javax.annotation.Nonnull;
+import jakarta.annotation.Nonnull;
 import java.io.IOException;
 
 /**
