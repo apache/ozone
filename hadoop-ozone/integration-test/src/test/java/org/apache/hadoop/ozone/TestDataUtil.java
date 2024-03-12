@@ -200,7 +200,8 @@ public final class TestDataUtil {
     return keyLocationMap;
   }
 
-  private static OmKeyInfo lookupOmKeyInfo(MiniOzoneCluster cluster, OzoneBucket bucket, String key) throws IOException {
+  private static OmKeyInfo lookupOmKeyInfo(MiniOzoneCluster cluster,
+      OzoneBucket bucket, String key) throws IOException {
     OmKeyArgs arg = new OmKeyArgs.Builder()
         .setVolumeName(bucket.getVolumeName())
         .setBucketName(bucket.getName())

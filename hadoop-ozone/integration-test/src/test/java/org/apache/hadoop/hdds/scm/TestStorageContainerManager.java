@@ -1031,7 +1031,8 @@ public class TestStorageContainerManager {
     return allBlocks;
   }
 
-  public List<Long> getAllBlocks(MiniOzoneCluster cluster, OzoneConfiguration conf, Long containerID) throws IOException {
+  public List<Long> getAllBlocks(MiniOzoneCluster cluster,
+      OzoneConfiguration conf, Long containerID) throws IOException {
     List<Long> allBlocks = Lists.newArrayList();
     KeyValueContainerData cData = getContainerMetadata(cluster, containerID);
     try (DBHandle db = BlockUtils.getDB(cData, conf)) {
