@@ -329,6 +329,17 @@ public final class OmBucketInfo extends WithObjectID implements Auditable {
     auditMap.put(OzoneConsts.USED_BYTES, String.valueOf(this.usedBytes));
     auditMap.put(OzoneConsts.USED_NAMESPACE,
         String.valueOf(this.usedNamespace));
+    auditMap.put(OzoneConsts.OWNER, this.owner);
+    auditMap.put(OzoneConsts.REPLICATION_TYPE,
+        (this.defaultReplicationConfig != null) ?
+            String.valueOf(this.defaultReplicationConfig.getType()) : null);
+    auditMap.put(OzoneConsts.REPLICATION_CONFIG,
+        (this.defaultReplicationConfig != null) ?
+            this.defaultReplicationConfig.getReplicationConfig()
+                .getReplication() : null);
+    auditMap.put(OzoneConsts.QUOTA_IN_BYTES, String.valueOf(this.quotaInBytes));
+    auditMap.put(OzoneConsts.QUOTA_IN_NAMESPACE,
+        String.valueOf(this.quotaInNamespace));
     return auditMap;
   }
 
