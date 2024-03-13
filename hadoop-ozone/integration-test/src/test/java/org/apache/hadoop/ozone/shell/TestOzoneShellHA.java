@@ -424,7 +424,8 @@ public class TestOzoneShellHA {
     String jsonOutput = out.toString(DEFAULT_ENCODING);
     try {
       return objectMapper.readValue(jsonOutput,
-          new TypeReference<ArrayList<LinkedHashMap<String, Object>>>() {});
+          new TypeReference<ArrayList<LinkedHashMap<String, Object>>>() {
+          });
     } catch (JsonProcessingException e) {
       throw new RuntimeException(e);
     }

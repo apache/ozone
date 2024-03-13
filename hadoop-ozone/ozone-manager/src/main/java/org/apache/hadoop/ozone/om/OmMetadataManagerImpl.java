@@ -179,8 +179,8 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
    * |----------------------------------------------------------------------|
    * | deletedTable       | /volumeName/bucketName/keyName->RepeatedKeyInfo |
    * |----------------------------------------------------------------------|
-   * | openKey            | /volumeName/bucketName/keyName/id->KeyInfo      |     // Example Entry :- vol1/buck1/dir1/dir2/dir3/file1
-   * |----------------------------------------------------------------------|     // Record in this OpenKeyTable :- vol1ID/buck1ID/dir3ID/file1/file1ID
+   * | openKey            | /volumeName/bucketName/keyName/id->KeyInfo      |
+   * |----------------------------------------------------------------------|
    *
    * Prefix Tables:
    * |----------------------------------------------------------------------|
@@ -189,12 +189,11 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
    * |  directoryTable  | /volumeId/bucketId/parentId/dirName -> DirInfo    |
    * |----------------------------------------------------------------------|
    * |  fileTable       | /volumeId/bucketId/parentId/fileName -> KeyInfo   |
-   * |----------------------------------------------------------------------|    // Example Entry :- vol1/buck1/dir1/dir2/dir3/file1
-   *                                                                             // Record in this OpenFileTable :- vol1ID/buck1ID/dir3ID/file1/file1ID
-   * |  openFileTable   | /volumeId/bucketId/parentId/fileName/id -> KeyInfo|    // User given path :- vol1/buck1/dir1/                 -> vol1ID/buck1ID/dir1ID
-   * |----------------------------------------------------------------------|    // User given path :- vol1/buck1/dir1/dir2/dir3/       -> vol1ID/buck1ID/dir3ID
-   * |  deletedDirTable | /volumeId/bucketId/parentId/dirName/objectId ->   |    // User given path :- vol1/buck1/dir1/dir2/dir3/file1  -> vol1ID/buck1ID/dir3ID/file1ID
-   * |                  |                                      KeyInfo      |    // User given path :- vol1/buck1/                      -> vol1ID/buck1ID
+   * |----------------------------------------------------------------------|
+   * |  openFileTable   | /volumeId/bucketId/parentId/fileName/id -> KeyInfo|
+   * |----------------------------------------------------------------------|
+   * |  deletedDirTable | /volumeId/bucketId/parentId/dirName/objectId ->   |
+   * |                  |                                      KeyInfo      |
    * |----------------------------------------------------------------------|
    *
    * Snapshot Tables:
@@ -211,16 +210,6 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
    * | compactionLogTable    | dbTrxId-compactionTime -> compactionLogEntry    |
    * |-------------------------------------------------------------------------|
    */
-
-  // vol1/buck1/dir1/dir2/dir3/file1
-  //vol1/buck2/dir1/dir2/dir3/file2
-  //vol1/buck3/dir1/dir2/dir3/file3. <-- iterator
-  //vol1/buck3/dir1/dir2/dir3/file4
-
-  //vol1Id/buck1Id//dir3Id/file1Id
-  //vol1Id/buck2Id//dir3Id/file2Id
-  //vol1Id/buck3Id//dir3Id/file3Id
-  //vol1Id/buck3Id//dir3Id/file4Id
 
   public static final String USER_TABLE = "userTable";
   public static final String VOLUME_TABLE = "volumeTable";
