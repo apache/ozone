@@ -210,8 +210,8 @@ public class OMDBInsightSearchEndpoint {
         matchedKeys.put(dbKey, entry.getValue());
       }
     } catch (NullPointerException | IOException exception) {
-      LOG.error("Error retrieving keys from openKeyTable for path: {}",
-          searchPrefix, exception);
+      createInternalServerErrorResponse(
+          "Error retrieving keys from openKeyTable for path: " + searchPrefix);
     }
 
     return matchedKeys;
@@ -288,8 +288,8 @@ public class OMDBInsightSearchEndpoint {
         matchedKeys.put(dbKey, entry.getValue());
       }
     } catch (NullPointerException | IOException exception) {
-      LOG.error("Error retrieving keys from openFileTable for path: {}",
-          subPath, exception);
+      createInternalServerErrorResponse(
+          "Error retrieving keys from openFileTable for path: " + subPath);
     }
     return matchedKeys;
   }
@@ -424,6 +424,8 @@ public class OMDBInsightSearchEndpoint {
 
   /**
    * Utility method to create a bad request response with a custom message.
+   * Which means the request sent by the client to the server is incorrect
+   * or malformed and cannot be processed by the server.
    *
    * @param message The message to include in the response body.
    * @return A Response object configured with the provided message.
@@ -431,6 +433,22 @@ public class OMDBInsightSearchEndpoint {
   private Response createBadRequestResponse(String message) {
     String jsonResponse = String.format("{\"message\": \"%s\"}", message);
     return Response.status(Response.Status.BAD_REQUEST)
+        .entity(jsonResponse)
+        .type(MediaType.APPLICATION_JSON)
+        .build();
+  }
+
+  /**
+   * Utility method to create an internal server error response with a custom message.
+   * Which means the server encountered an unexpected condition that prevented it
+   * from fulfilling the request.
+   *
+   * @param message The message to include in the response body.
+   * @return A Response object configured with the provided message.
+   */
+  private Response createInternalServerErrorResponse(String message) {
+    String jsonResponse = String.format("{\"message\": \"%s\"}", message);
+    return Response.status(Response.Status.INTERNAL_SERVER_ERROR)
         .entity(jsonResponse)
         .type(MediaType.APPLICATION_JSON)
         .build();

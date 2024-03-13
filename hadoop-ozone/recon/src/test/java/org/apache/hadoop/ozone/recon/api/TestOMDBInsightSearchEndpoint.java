@@ -257,6 +257,23 @@ public class TestOMDBInsightSearchEndpoint extends AbstractReconSqlDBTest {
         "Expected a message indicating no keys were found");
   }
 
+  @Test
+  public void testSearchOpenKeysWithBadRequest() throws IOException {
+    // Given a search prefix that is empty
+    String searchPrefix = "";
+
+    Response response =
+        omdbInsightSearchEndpoint.searchOpenKeys(searchPrefix, true, true, 10);
+
+    // Then the response should indicate that the request was bad
+    assertEquals(Response.Status.BAD_REQUEST.getStatusCode(),
+        response.getStatus(), "Expected a 400 BAD REQUEST status");
+
+    String entity = (String) response.getEntity();
+    assertTrue(entity.contains("The searchPrefix query parameter is required."),
+        "Expected a message indicating the search prefix cannot be empty");
+  }
+
 
   /**
    * Tests the NSSummaryEndpoint for a given volume, bucket, and directory structure.
