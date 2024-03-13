@@ -70,6 +70,7 @@ import static org.apache.hadoop.ozone.OzoneConsts.OM_SNAPSHOT_INDICATOR;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ENABLE_FILESYSTEM_PATHS;
 import static org.apache.hadoop.ozone.om.request.OMRequestTestUtils.addVolumeAndBucketToDB;
 import static org.apache.hadoop.ozone.om.request.OMRequestTestUtils.createOmKeyInfo;
+import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status.KEY_NOT_FOUND;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status.NOT_A_FILE;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status.OK;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -120,9 +121,9 @@ public class TestOMKeyCreateRequest extends TestOMKeyRequest {
     long scmBlockSize = ozoneManager.getScmBlockSize();
     for (int i = 0; i <= repConfig.getRequiredNodes(); i++) {
       doPreExecute(createKeyRequest(isMultipartKey, partNumber,
-          scmBlockSize * i, repConfig));
+          scmBlockSize * i, repConfig, null, null));
       doPreExecute(createKeyRequest(isMultipartKey, partNumber,
-          scmBlockSize * i + 1, repConfig));
+          scmBlockSize * i + 1, repConfig, null, null));
     }
   }
 
@@ -701,7 +702,7 @@ public class TestOMKeyCreateRequest extends TestOMKeyRequest {
 
   private OMRequest createKeyRequest(
       boolean isMultipartKey, int partNumber, long keyLength,
-      ReplicationConfig repConfig) {
+      ReplicationConfig repConfig, Long overwriteObjectID, Long overwriteUpdateID) {
 
     KeyArgs.Builder keyArgs = KeyArgs.newBuilder()
         .setVolumeName(volumeName).setBucketName(bucketName)
@@ -719,6 +720,12 @@ public class TestOMKeyCreateRequest extends TestOMKeyRequest {
 
     if (isMultipartKey) {
       keyArgs.setMultipartNumber(partNumber);
+    }
+    if (overwriteObjectID != null) {
+      keyArgs.setOverwriteObjectID(overwriteObjectID);
+    }
+    if (overwriteUpdateID != null) {
+      keyArgs.setOverwriteUpdateID(overwriteUpdateID);
     }
 
     OzoneManagerProtocolProtos.CreateKeyRequest createKeyRequest =
@@ -901,6 +908,63 @@ public class TestOMKeyCreateRequest extends TestOMKeyRequest {
 
     verifyKeyInheritAcls(omKeyInfo.getAcls(), bucketAcls);
 
+  }
+
+  @ParameterizedTest
+  @MethodSource("data")
+  public void testOptimisticOverwrite(
+      boolean setKeyPathLock, boolean setFileSystemPaths) throws Exception {
+    when(ozoneManager.getOzoneLockProvider()).thenReturn(
+        new OzoneLockProvider(setKeyPathLock, setFileSystemPaths));
+
+    OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, omMetadataManager,
+        OmBucketInfo.newBuilder().setVolumeName(volumeName)
+            .setBucketName(bucketName)
+            .setBucketLayout(getBucketLayout()));
+
+    // First, create a key with the overwrite IDs - this should fail as no key exists
+    OMRequest omRequest = createKeyRequest(false, 0, 100,
+        RatisReplicationConfig.getInstance(THREE), 1L, 1L);
+    omRequest = doPreExecute(omRequest);
+    OMKeyCreateRequest omKeyCreateRequest = getOMKeyCreateRequest(omRequest);
+    OMClientResponse response = omKeyCreateRequest.validateAndUpdateCache(ozoneManager, 100L);
+    assertEquals(KEY_NOT_FOUND, response.getOMResponse().getStatus());
+
+    // Now pre-create the key in the system so we can overwrite it.
+    createAndCheck(keyName);
+    // Commit openKey entry.
+    OMRequestTestUtils.addKeyToTable(false, volumeName, bucketName,
+        keyName, 0L, RatisReplicationConfig.getInstance(THREE), omMetadataManager);
+    // Retrieve the committed key info
+    String ozoneKey = omMetadataManager.getOzoneKey(volumeName, bucketName, keyName);
+    OmKeyInfo existingKeyInfo = omMetadataManager.getKeyTable(getBucketLayout()).get(ozoneKey);
+
+    // Create a request with object and update IDs which don't match the current key
+    omRequest = createKeyRequest(false, 0, 100,
+        RatisReplicationConfig.getInstance(THREE), existingKeyInfo.getObjectID() + 1,
+        existingKeyInfo.getUpdateID() + 1);
+    omRequest = doPreExecute(omRequest);
+    omKeyCreateRequest = getOMKeyCreateRequest(omRequest);
+    response = omKeyCreateRequest.validateAndUpdateCache(ozoneManager, 100L);
+    // Still fails, as the matching key is not present.
+    assertEquals(KEY_NOT_FOUND, response.getOMResponse().getStatus());
+
+    // Now create the key with the correct overwrite IDs
+    omRequest = createKeyRequest(false, 0, 100,
+        RatisReplicationConfig.getInstance(THREE), existingKeyInfo.getObjectID(),
+        existingKeyInfo.getUpdateID());
+    omRequest = doPreExecute(omRequest);
+    omKeyCreateRequest = getOMKeyCreateRequest(omRequest);
+    response = omKeyCreateRequest.validateAndUpdateCache(ozoneManager, 100L);
+    assertEquals(OK, response.getOMResponse().getStatus());
+
+    // Ensure the update / object IDs are persisted in the open key table
+    String openKey = omMetadataManager.getOpenKey(volumeName, bucketName,
+        keyName, omRequest.getCreateKeyRequest().getClientID());
+    OmKeyInfo openKeyInfo = omMetadataManager.getOpenKeyTable(omKeyCreateRequest.getBucketLayout()).get(openKey);
+
+    assertEquals(existingKeyInfo.getObjectID(), openKeyInfo.getOverwriteObjectID());
+    assertEquals(existingKeyInfo.getUpdateID(), openKeyInfo.getOverwriteUpdateID());
   }
 
   /**

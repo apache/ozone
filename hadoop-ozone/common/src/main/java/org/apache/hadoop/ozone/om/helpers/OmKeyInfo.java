@@ -170,16 +170,16 @@ public final class OmKeyInfo extends WithParentObjectId
     return fileName;
   }
 
-  public void setExistingObjectID(Long existingObjectID) {
-    this.overwriteObjectID = existingObjectID;
+  public void setOverwriteObjectID(Long overwriteObjectID) {
+    this.overwriteObjectID = overwriteObjectID;
   }
 
   public Long getOverwriteObjectID() {
     return overwriteObjectID;
   }
 
-  public void setOverwriteUpdateID(Long existingUpdateID) {
-    this.overwriteUpdateID = existingUpdateID;
+  public void setOverwriteUpdateID(Long overwriteUpdateID) {
+    this.overwriteUpdateID = overwriteUpdateID;
   }
 
   public Long getOverwriteUpdateID() {

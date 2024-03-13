@@ -231,6 +231,7 @@ public class OMKeyCreateRequest extends OMKeyRequest {
           keyName);
       OmKeyInfo dbKeyInfo = omMetadataManager.getKeyTable(getBucketLayout())
           .getIfExist(dbKeyName);
+      validateOptimisticLockingOverwrite(dbKeyInfo, keyArgs);
 
       OmBucketInfo bucketInfo =
           getBucketInfo(omMetadataManager, volumeName, bucketName);
@@ -439,5 +440,23 @@ public class OMKeyCreateRequest extends OMKeyRequest {
       }
     }
     return req;
+  }
+
+  private void validateOptimisticLockingOverwrite(OmKeyInfo dbKeyInfo, KeyArgs keyArgs)
+      throws OMException {
+    if (keyArgs.hasOverwriteObjectID() || keyArgs.hasOverwriteUpdateID()) {
+      // If a key does not exist, or if it exists but the objectID or updateID
+      // do not match, then fail this request.
+      if (dbKeyInfo == null) {
+        throw new OMException("Key not found during expected overwrite", OMException.ResultCodes.KEY_NOT_FOUND);
+      }
+      if (dbKeyInfo.getObjectID() != keyArgs.getOverwriteObjectID()) {
+        throw new OMException("ObjectID mismatch during expected overwrite",
+            OMException.ResultCodes.KEY_NOT_FOUND);
+      }
+      if (dbKeyInfo.getUpdateID() != keyArgs.getOverwriteUpdateID()) {
+        throw new OMException("UpdateID mismatch during expected overwrite", OMException.ResultCodes.KEY_NOT_FOUND);
+      }
+    }
   }
 }
