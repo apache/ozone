@@ -253,7 +253,7 @@ public class TestOMDBInsightSearchEndpoint extends AbstractReconSqlDBTest {
         response.getStatus(), "Expected a 404 NOT FOUND status");
 
     String entity = (String) response.getEntity();
-    assertTrue(entity.contains("No keys exist for the specified search prefix"),
+    assertTrue(entity.contains("No keys matched the search prefix"),
         "Expected a message indicating no keys were found");
   }
 
@@ -356,16 +356,11 @@ public class TestOMDBInsightSearchEndpoint extends AbstractReconSqlDBTest {
         bucketA2ObjectId, volAObjectId, 1000);
 
     // Files directly under bucketB1
-    createOpenKey("fileB1", "bucketB1", "volB", "fileB1", bucketB1ObjectId,
-        bucketB1ObjectId, volBObjectId, 1000);
-    createOpenKey("fileB2", "bucketB1", "volB", "fileB2", bucketB1ObjectId,
-        bucketB1ObjectId, volBObjectId, 1000);
-    createOpenKey("fileB3", "bucketB1", "volB", "fileB3", bucketB1ObjectId,
-        bucketB1ObjectId, volBObjectId, 1000);
-    createOpenKey("fileB4", "bucketB1", "volB", "fileB4", bucketB1ObjectId,
-        bucketB1ObjectId, volBObjectId, 1000);
-    createOpenKey("fileB5", "bucketB1", "volB", "fileB5", bucketB1ObjectId,
-        bucketB1ObjectId, volBObjectId, 1000);
+    createOpenKey("fileB1", "bucketB1", "volB", 1000);
+    createOpenKey("fileB2", "bucketB1", "volB", 1000);
+    createOpenKey("fileB3", "bucketB1", "volB", 1000);
+    createOpenKey("fileB4", "bucketB1", "volB", 1000);
+    createOpenKey("fileB5", "bucketB1", "volB", 1000);
 
     // Create Inner files under directories
     createOpenFile("dirA1/innerFile", "bucketA1", "volA", "innerFile",
@@ -478,10 +473,6 @@ public class TestOMDBInsightSearchEndpoint extends AbstractReconSqlDBTest {
   private long createOpenKey(String key,
                              String bucket,
                              String volume,
-                             String fileName,
-                             long parentObjectId,
-                             long bucketObjectId,
-                             long volumeObjectId,
                              long dataSize) throws IOException {
     long objectId = UUID.randomUUID().getMostSignificantBits() &
         Long.MAX_VALUE; // Ensure positive ID
