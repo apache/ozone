@@ -24,6 +24,8 @@ import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.HddsTestUtils;
 import org.apache.hadoop.hdds.scm.DatanodeAdminError;
+import org.apache.hadoop.hdds.scm.container.ContainerManager;
+import org.apache.hadoop.hdds.scm.container.ContainerNotFoundException;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
@@ -56,14 +58,17 @@ public class TestNodeDecommissionManager {
   private NodeDecommissionManager decom;
   private StorageContainerManager scm;
   private NodeManager nodeManager;
+  private ContainerManager containerManager;
   private OzoneConfiguration conf;
 
   @BeforeEach
   void setup(@TempDir File dir) throws Exception {
     conf = new OzoneConfiguration();
     conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, dir.getAbsolutePath());
-    nodeManager = createNodeManager(conf);
-    decom = new NodeDecommissionManager(conf, nodeManager,
+    scm = HddsTestUtils.getScm(conf);
+    nodeManager = scm.getScmNodeManager();
+    containerManager = scm.getContainerManager();
+    decom = new NodeDecommissionManager(conf, nodeManager, containerManager,
         SCMContext.emptyContext(), new EventQueue(), null);
   }
 
@@ -136,15 +141,56 @@ public class TestNodeDecommissionManager {
   }
 
   @Test
-  public void testInsufficientNodeDecommissionThrowsException() {
-    List<DatanodeDetails> dns = generateDatanodes(5);
+  public void testInsufficientNodeDecommissionThrowsException() throws ContainerNotFoundException,
+      NodeNotFoundException {
     List<DatanodeAdminError> error;
+    List<DatanodeDetails> dns = new ArrayList<>();
+    for (int i = 0; i < 5; i++) {
+      DatanodeDetails dn = MockDatanodeDetails.randomDatanodeDetails();
+      dns.add(dn);
+      nodeManager.register(dn, null, null);
+    }
+    /*
+    Map<ContainerID, ContainerInfo> cidToInfoMap = new HashMap<>();
+    cidToInfoMap.put(ContainerID.valueOf(1), createContainer(1));
+    cidToInfoMap.put(ContainerID.valueOf(2), createContainer(2));
+    cidToInfoMap.put(ContainerID.valueOf(3), createContainer(3));
+    when(containerManager.getContainer(any(ContainerID.class)))
+        .thenAnswer(invocationOnMock -> {
+          ContainerID cid = (ContainerID) invocationOnMock.getArguments()[0];
+          return (cidToInfoMap.get(cid) != null ? cidToInfoMap.get(cid) : );
+        });
+     when(nodeManager.getContainers(any()))
+        .thenReturn( new Set<ContainerID>(cidToInfoMap.values().));
+
+    Set<ContainerID> containerSet = new HashSet<>();
+    containerSet.add(ContainerID.valueOf(1));
+    containerSet.add(ContainerID.valueOf(2));
+    containerSet.add(ContainerID.valueOf(3));
+
+    when(nodeManager.getContainers(any()))
+        .thenReturn(containerSet);
+    when(containerManager.getContainer(any(ContainerID.class)))
+        .thenAnswer(invocationOnMock -> {
+        ContainerID cid = (ContainerID) invocationOnMock.getArguments()[0];
+        return createContainer(cid.hashCode());
+            }); */
+
 
     error = decom.decommissionNodes(Arrays.asList(dns.get(1).getIpAddress(),
-        dns.get(2).getIpAddress(), dns.get(3).getIpAddress()));
+        dns.get(2).getIpAddress(), dns.get(3).getIpAddress(), dns.get(4).getIpAddress()));
     assertEquals(2, error.size());
     assertTrue(error.get(0).getHostname().contains("AllHosts"));
   }
+
+  /*private ContainerInfo createContainer(long id) {
+    ContainerInfo.Builder builder = new ContainerInfo.Builder()
+        .setContainerID(id)
+        .setState(HddsProtos.LifeCycleState.CLOSED)
+        .setReplicationConfig(RatisReplicationConfig
+            .getInstance(HddsProtos.ReplicationFactor.THREE));
+    return builder.build();
+  }*/
 
   @Test
   public void testNodesCanBeDecommissionedAndRecommissioned()

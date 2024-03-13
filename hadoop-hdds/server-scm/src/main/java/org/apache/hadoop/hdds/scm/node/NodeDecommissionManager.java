@@ -258,11 +258,11 @@ public class NodeDecommissionManager {
     return false;
   }
 
-  public NodeDecommissionManager(OzoneConfiguration config, NodeManager nm,
+  public NodeDecommissionManager(OzoneConfiguration config, NodeManager nm, ContainerManager cm,
              SCMContext scmContext,
              EventPublisher eventQueue, ReplicationManager rm) {
     this.nodeManager = nm;
-    this.containerManager = scmContext.getScm().getContainerManager();
+    this.containerManager = cm;
     this.scmContext = scmContext;
 
     executor = Executors.newScheduledThreadPool(1,
