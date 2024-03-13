@@ -18,6 +18,8 @@
 
 package org.apache.hadoop.ozone.recon.api;
 
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState;
@@ -33,6 +35,7 @@ import org.apache.hadoop.ozone.recon.api.types.DatanodeMetadata;
 import org.apache.hadoop.ozone.recon.api.types.DatanodePipeline;
 import org.apache.hadoop.ozone.recon.api.types.DatanodeStorageReport;
 import org.apache.hadoop.ozone.recon.api.types.DatanodesResponse;
+import org.apache.hadoop.ozone.recon.api.types.DecommissionStatusInfoResponse;
 import org.apache.hadoop.ozone.recon.scm.ReconNodeManager;
 import org.apache.hadoop.ozone.recon.scm.ReconContainerManager;
 
@@ -42,13 +45,17 @@ import javax.ws.rs.Path;
 import javax.ws.rs.Produces;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
+import java.io.BufferedReader;
 import java.io.IOException;
+import java.io.InputStreamReader;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import org.apache.hadoop.ozone.recon.scm.ReconPipelineManager;
+import org.apache.hadoop.security.SecurityUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -170,5 +177,54 @@ public class NodeEndpoint {
     long remaining = nodeStat.getRemaining().get();
     long committed = nodeStat.getCommitted().get();
     return new DatanodeStorageReport(capacity, used, remaining, committed);
+  }
+
+  @GET
+  @Path("/decommission/info")
+  public Response getDatanodesDecommissionInfo() {
+    // Command to execute
+    List<String> command = Arrays.asList("ozone", "admin", "datanode", "status", "decommission", "--json");
+    Response.ResponseBuilder builder = Response.status(Response.Status.OK);
+    ProcessBuilder pb = new ProcessBuilder(command);
+    try {
+      SecurityUtil.doAsLoginUser(() -> {
+        Process process = pb.start();
+        try (BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()))) {
+          String processOutput = readProcessStream(reader);
+          // Wait for the process to complete
+          int exitCode = process.waitFor();
+          LOG.info("Datanode decommission status info command exitcode: {}", exitCode);
+          if (exitCode != 0) {
+            try (BufferedReader errReader = new BufferedReader(new InputStreamReader(process.getErrorStream()))) {
+              String processErrorOutput = readProcessStream(errReader);
+              builder.status(exitCode);
+              builder.entity("Datanode decommission status info command is not successful : " + processErrorOutput);
+              // Build and return the response
+              return builder.build();
+            }
+          }
+          // Create ObjectMapper
+          ObjectMapper objectMapper = new ObjectMapper();
+          LOG.info("processOutput: {}", processOutput);
+          // Deserialize JSON to Java object
+          List<DecommissionStatusInfoResponse> decommissionStatusInfoResponseList =
+              objectMapper.readValue(processOutput, new TypeReference<List<DecommissionStatusInfoResponse>>() { });
+          builder.entity(decommissionStatusInfoResponseList);
+        }
+        return builder.build();
+      });
+    } catch (IOException ioException) {
+      LOG.error("Failed to run datanode decommission status info command. ", ioException);
+    }
+    return builder.build();
+  }
+
+  private static String readProcessStream(BufferedReader reader) throws IOException {
+    StringBuilder processOutputBuilder = new StringBuilder();
+    String line;
+    while ((line = reader.readLine()) != null) {
+      processOutputBuilder.append(line);
+    }
+    return processOutputBuilder.toString();
   }
 }

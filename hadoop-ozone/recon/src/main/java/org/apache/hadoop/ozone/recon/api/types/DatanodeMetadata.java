@@ -17,6 +17,7 @@
  */
 package org.apache.hadoop.ozone.recon.api.types;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
 import com.google.common.base.Preconditions;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState;
@@ -39,46 +40,65 @@ public final class DatanodeMetadata {
   private String hostname;
 
   @XmlElement(name = "state")
+  @JsonInclude(JsonInclude.Include.NON_NULL)
   private NodeState state;
 
   @XmlElement(name = "opState")
+  @JsonInclude(JsonInclude.Include.NON_NULL)
   private NodeOperationalState opState;
 
   @XmlElement(name = "lastHeartbeat")
+  @JsonInclude(JsonInclude.Include.NON_DEFAULT)
   private long lastHeartbeat;
 
   @XmlElement(name = "storageReport")
+  @JsonInclude(JsonInclude.Include.NON_NULL)
   private DatanodeStorageReport datanodeStorageReport;
 
   @XmlElement(name = "pipelines")
+  @JsonInclude(JsonInclude.Include.NON_NULL)
   private List<DatanodePipeline> pipelines;
 
   @XmlElement(name = "containers")
+  @JsonInclude(JsonInclude.Include.NON_DEFAULT)
   private int containers;
 
   @XmlElement(name = "openContainers")
+  @JsonInclude(JsonInclude.Include.NON_DEFAULT)
   private int openContainers;
 
   @XmlElement(name = "leaderCount")
+  @JsonInclude(JsonInclude.Include.NON_DEFAULT)
   private int leaderCount;
 
   @XmlElement(name = "version")
+  @JsonInclude(JsonInclude.Include.NON_NULL)
   private String version;
 
   @XmlElement(name = "setupTime")
+  @JsonInclude(JsonInclude.Include.NON_DEFAULT)
   private long setupTime;
 
   @XmlElement(name = "revision")
+  @JsonInclude(JsonInclude.Include.NON_NULL)
   private String revision;
 
   @XmlElement(name = "buildDate")
+  @JsonInclude(JsonInclude.Include.NON_NULL)
   private String buildDate;
 
   @XmlElement(name = "layoutVersion")
+  @JsonInclude(JsonInclude.Include.NON_DEFAULT)
   private int layoutVersion;
 
   @XmlElement(name = "networkLocation")
   private String networkLocation;
+
+  @XmlElement(name = "ipAddress")
+  private String ipAddress;
+
+  public DatanodeMetadata() {
+  }
 
   private DatanodeMetadata(Builder builder) {
     this.hostname = builder.hostname;
@@ -97,6 +117,7 @@ public final class DatanodeMetadata {
     this.buildDate = builder.buildDate;
     this.layoutVersion = builder.layoutVersion;
     this.networkLocation = builder.networkLocation;
+    this.ipAddress = builder.ipAddress;
   }
 
   public String getHostname() {
@@ -163,6 +184,10 @@ public final class DatanodeMetadata {
     return networkLocation;
   }
 
+  public String getIpAddress() {
+    return ipAddress;
+  }
+
   /**
    * Returns new builder class that builds a DatanodeMetadata.
    *
@@ -193,6 +218,7 @@ public final class DatanodeMetadata {
     private String buildDate;
     private int layoutVersion;
     private String networkLocation;
+    private String ipAddress;
 
     public Builder() {
       this.containers = 0;
@@ -278,6 +304,11 @@ public final class DatanodeMetadata {
 
     public Builder withNetworkLocation(String networkLocation) {
       this.networkLocation = networkLocation;
+      return this;
+    }
+
+    public Builder withIpAddress(String ipAddress) {
+      this.ipAddress = ipAddress;
       return this;
     }
     /**
