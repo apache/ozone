@@ -166,6 +166,6 @@ public class TestContainerBalancerOperations {
 
     //If CLI option is passed, it overrides the default configuration
     assertEquals(10000, config.getIterations());
-    assertEquals(config.getNetworkTopologyEnable(), true);
+    assertTrue(config.getNetworkTopologyEnable());
   }
 }
