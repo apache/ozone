@@ -24,6 +24,10 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.HashSet;
+
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ArrayNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.google.gson.GsonBuilder;
 import com.google.gson.Gson;
 import com.google.gson.JsonObject;
@@ -74,37 +78,33 @@ public class ChunkKeyHandler extends KeyHandler implements
     return containerLocation + File.separator + OzoneConsts.STORAGE_DIR_CHUNKS;
   }
 
-  @Override
   protected void execute(OzoneClient client, OzoneAddress address)
           throws IOException, OzoneClientException {
     try (ContainerOperationClient containerOperationClient = new ContainerOperationClient(parent.getOzoneConf());
         XceiverClientManager xceiverClientManager = containerOperationClient.getXceiverClientManager()) {
       OzoneManagerProtocol ozoneManagerClient = client.getObjectStore().getClientProxy().getOzoneManagerClient();
       address.ensureKeyAddress();
-      JsonElement element;
-      JsonObject result = new JsonObject();
+      ObjectMapper objectMapper = new ObjectMapper();
+      ObjectNode result = objectMapper.createObjectNode();
       String volumeName = address.getVolumeName();
       String bucketName = address.getBucketName();
       String keyName = address.getKeyName();
-      List<ContainerProtos.ChunkInfo> tempchunks = null;
-      List<ChunkDetails> chunkDetailsList = new ArrayList<ChunkDetails>();
+      List<ContainerProtos.ChunkInfo> tempchunks;
+      List<ChunkDetails> chunkDetailsList = new ArrayList<>();
       HashSet<String> chunkPaths = new HashSet<>();
       OmKeyArgs keyArgs = new OmKeyArgs.Builder().setVolumeName(volumeName)
           .setBucketName(bucketName).setKeyName(keyName).build();
       OmKeyInfo keyInfo = ozoneManagerClient.lookupKey(keyArgs);
-      // querying  the keyLocations.The OM is queried to get containerID and
-      // localID pertaining to a given key
-      List<OmKeyLocationInfo> locationInfos =
-          keyInfo.getLatestVersionLocations().getBlocksLatestVersionOnly();
-      // for zero-sized key
-      if (locationInfos.isEmpty()) {
+      if (keyInfo.getLatestVersionLocations().getBlocksLatestVersionOnly()
+          .isEmpty()) {
         System.out.println("No Key Locations Found");
         return;
       }
       ContainerLayoutVersion containerLayoutVersion = ContainerLayoutVersion
           .getConfiguredVersion(getConf());
-      JsonArray responseArrayList = new JsonArray();
-      for (OmKeyLocationInfo keyLocation : locationInfos) {
+      ArrayNode responseArrayList = objectMapper.createArrayNode();
+      for (OmKeyLocationInfo keyLocation : keyInfo.getLatestVersionLocations()
+          .getBlocksLatestVersionOnly()) {
         ContainerChunkInfo containerChunkInfoVerbose = new ContainerChunkInfo();
         ContainerChunkInfo containerChunkInfo = new ContainerChunkInfo();
         long containerId = keyLocation.getContainerID();
@@ -129,24 +129,17 @@ public class ChunkKeyHandler extends KeyHandler implements
               keyLocation.getBlockID().getDatanodeBlockIDProtobuf();
           // doing a getBlock on all nodes
           Map<DatanodeDetails, ContainerProtos.GetBlockResponseProto>
-              responses = null;
-          Map<DatanodeDetails, ContainerProtos.ReadContainerResponseProto>
-              readContainerResponses = null;
-          try {
-            responses = ContainerProtocolCalls.getBlockFromAllNodes(xceiverClient,
-                datanodeBlockID, keyLocation.getToken());
-            readContainerResponses =
+              responses =
+              ContainerProtocolCalls.getBlockFromAllNodes(xceiverClient,
+                  keyLocation.getBlockID().getDatanodeBlockIDProtobuf(),
+                  keyLocation.getToken());
+          Map<DatanodeDetails, ContainerProtos.ReadContainerResponseProto> readContainerResponses =
                 containerOperationClient.readContainerFromAllNodes(
                     keyLocation.getContainerID(), pipeline);
-          } catch (InterruptedException e) {
-            LOG.error("Execution interrupted due to " + e);
-            Thread.currentThread().interrupt();
-          }
-          JsonArray responseFromAllNodes = new JsonArray();
-          for (Map.Entry<DatanodeDetails, ContainerProtos.GetBlockResponseProto>
-              entry : responses.entrySet()) {
+          ArrayNode responseFromAllNodes = objectMapper.createArrayNode();
+          for (Map.Entry<DatanodeDetails, ContainerProtos.GetBlockResponseProto> entry : responses.entrySet()) {
             chunkPaths.clear();
-            JsonObject jsonObj = new JsonObject();
+            ObjectNode jsonObj = objectMapper.createObjectNode();
             if (entry.getValue() == null) {
               LOG.error("Cant execute getBlock on this node");
               continue;
@@ -165,8 +158,8 @@ public class ChunkKeyHandler extends KeyHandler implements
               chunkDetails.setChunkOffset(chunkInfo.getOffset());
               chunkDetailsList.add(chunkDetails);
             }
-            containerChunkInfoVerbose.setContainerPath(containerData
-                .getContainerPath());
+            containerChunkInfoVerbose.setContainerPath(
+                containerData.getContainerPath());
             containerChunkInfoVerbose.setPipeline(keyPipeline);
             containerChunkInfoVerbose.setChunkInfos(chunkDetailsList);
             containerChunkInfo.setFiles(chunkPaths);
@@ -178,29 +171,31 @@ public class ChunkKeyHandler extends KeyHandler implements
               containerChunkInfoVerbose.setChunkType(blockChunksType);
               containerChunkInfo.setChunkType(blockChunksType);
             }
-            Gson gson = new GsonBuilder().create();
+
+            // Convert ContainerChunkInfo objects to JSON using Jackson
             if (isVerbose()) {
-              element = gson.toJsonTree(containerChunkInfoVerbose);
+              jsonObj.set("Locations",
+                  objectMapper.valueToTree(containerChunkInfoVerbose));
             } else {
-              element = gson.toJsonTree(containerChunkInfo);
+              jsonObj.set("Locations",
+                  objectMapper.valueToTree(containerChunkInfo));
             }
-            jsonObj.addProperty("Datanode-HostName", entry.getKey()
-                .getHostName());
-            jsonObj.addProperty("Datanode-IP", entry.getKey()
-                .getIpAddress());
-            jsonObj.addProperty("Container-ID", containerId);
-            jsonObj.addProperty("Block-ID", keyLocation.getLocalID());
-            jsonObj.add("Locations", element);
+            jsonObj.put("Datanode-HostName", entry.getKey().getHostName());
+            jsonObj.put("Datanode-IP", entry.getKey().getIpAddress());
+            jsonObj.put("Container-ID", containerId);
+            jsonObj.put("Block-ID", keyLocation.getLocalID());
             responseFromAllNodes.add(jsonObj);
           }
           responseArrayList.add(responseFromAllNodes);
+        } catch (InterruptedException e) {
+          throw new RuntimeException(e);
         } finally {
           xceiverClientManager.releaseClientForReadData(xceiverClient, false);
         }
       }
-      result.add("KeyLocations", responseArrayList);
-      Gson gson2 = new GsonBuilder().setPrettyPrinting().create();
-      String prettyJson = gson2.toJson(result);
+      result.set("KeyLocations", responseArrayList);
+      String prettyJson = objectMapper.writerWithDefaultPrettyPrinter()
+          .writeValueAsString(result);
       System.out.println(prettyJson);
     }
   }
