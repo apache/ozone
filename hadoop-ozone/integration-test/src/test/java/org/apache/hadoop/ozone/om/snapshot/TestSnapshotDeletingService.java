@@ -71,7 +71,6 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SNAPSHOT_DELETING_SE
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SNAPSHOT_DELETING_SERVICE_TIMEOUT;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.fail;
 
 /**
  * Test Snapshot Deleting Service.
@@ -140,18 +139,7 @@ public class TestSnapshotDeletingService {
   @Order(2)
   public void testSnapshotSplitAndMove() throws Exception {
 
-//    SnapshotDeletingService snapshotDeletingService =
-//        om.getKeyManager().getSnapshotDeletingService();
-//    Table<String, SnapshotInfo> snapshotInfoTable =
-//        om.getMetadataManager().getSnapshotInfoTable();
-//
-//    createSnapshotDataForBucket1();
-//
-//    assertTableRowCount(snapshotInfoTable, 2);
-//    GenericTestUtils.waitFor(() -> snapshotDeletingService
-//            .getSuccessfulRunCount() >= 1, 1000, 10000);
-
-    if(runIndividualTest) {
+    if (runIndividualTest) {
       SnapshotDeletingService snapshotDeletingService =
           om.getKeyManager().getSnapshotDeletingService();
       Table<String, SnapshotInfo> snapshotInfoTable =
