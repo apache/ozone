@@ -19,6 +19,7 @@
 package org.apache.hadoop.fs.ozone;
 
 import java.io.BufferedInputStream;
+import java.io.EOFException;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
@@ -58,6 +59,7 @@ import org.junit.jupiter.api.Timeout;
 import static org.apache.hadoop.hdds.StringUtils.string2Bytes;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 /**
  * Test OzoneFSInputStream by reading through multiple interfaces.
@@ -161,6 +163,76 @@ public class TestOzoneFSInputStream {
       assertArrayEquals(value, data);
     }
   }
+
+  @Test
+  public void testByteBufferPositionedRead() throws IOException {
+    try (FSDataInputStream inputStream = fs.open(filePath)) {
+      ByteBuffer buffer = ByteBuffer.allocate(20);
+      // Read positional from 50th index
+      int readBytes = inputStream.read(50, buffer);
+      byte[] value1 = new byte[readBytes];
+      System.arraycopy(buffer.array(), 0, value1, 0, readBytes);
+      byte[] value2 = new byte[readBytes];
+      System.arraycopy(data, 50, value2, 0, readBytes);
+      // Verify input and positional read data
+      assertArrayEquals(value1, value2, "value mismatch");
+
+      buffer.clear();
+      // Verify offset of file didn't change
+      // Read positional from 8th index again using same inputStream
+      readBytes = inputStream.read(8, buffer);
+      byte[] value3 = new byte[readBytes];
+      System.arraycopy(buffer.array(), 0, value3, 0, readBytes);
+      byte[] value4 = new byte[readBytes];
+      System.arraycopy(data, 8, value4, 0, readBytes);
+      // Verify input and positional read data
+      assertArrayEquals(value3, value4, "value mismatch");
+
+      // Buffer size more than actual data, still read should succeed
+      ByteBuffer buffer1 = ByteBuffer.allocate(30 * 1024 * 1024 * 2);
+      readBytes = inputStream.read(12, buffer1);
+      byte[] value5 = new byte[readBytes];
+      System.arraycopy(buffer1.array(), 0, value5, 0, readBytes);
+      byte[] value6 = new byte[readBytes];
+      System.arraycopy(data, 12, value6, 0, readBytes);
+      // Verify input and positional read data
+      assertArrayEquals(value5, value6, "value mismatch");
+    }
+  }
+
+
+  @Test
+  public void testByteBufferPositionedReadFully() throws IOException {
+    try (FSDataInputStream inputStream = fs.open(filePath)) {
+      int bufferCapacity = 20;
+      ByteBuffer buffer = ByteBuffer.allocate(bufferCapacity);
+      // Read positional from 50th index
+      inputStream.readFully(50, buffer);
+      byte[] value1 = new byte[bufferCapacity];
+      System.arraycopy(buffer.array(), 0, value1, 0, bufferCapacity);
+      byte[] value2 = new byte[bufferCapacity];
+      System.arraycopy(data, 50, value2, 0, bufferCapacity);
+      // Verify input and positional read data
+      assertArrayEquals(value1, value2, "value mismatch");
+
+      buffer.clear();
+      // Verify offset of file didn't change
+      // Read positional from 8th index again using same inputStream
+      inputStream.readFully(8, buffer);
+      byte[] value3 = new byte[bufferCapacity];
+      System.arraycopy(buffer.array(), 0, value3, 0, bufferCapacity);
+      byte[] value4 = new byte[bufferCapacity];
+      System.arraycopy(data, 8, value4, 0, bufferCapacity);
+      // Verify input and positional read data
+      assertArrayEquals(value3, value4, "value mismatch");
+
+      // Buffer size is more than actual data, readFully should fail in this case
+      ByteBuffer buffer1 = ByteBuffer.allocate(30 * 1024 * 1024 * 2);
+      assertThrows(EOFException.class, () -> inputStream.readFully(12, buffer1));
+    }
+  }
+
+
 
   @Test
   public void testO3FSMultiByteRead() throws IOException {
