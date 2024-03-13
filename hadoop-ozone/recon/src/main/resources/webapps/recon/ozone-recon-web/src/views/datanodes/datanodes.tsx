@@ -224,7 +224,7 @@ export class Datanodes extends React.Component<Record<string, object>, IDatanode
             value: 'storageTotal',
           },
           {
-            text: 'Storage Utilization',
+            text: 'Total Storage Utilization %',
             value: 'storageUtilization',
           }
         ],
