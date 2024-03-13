@@ -61,8 +61,8 @@ import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor
  * Class that gives chunk location given a specific key.
  */
 @Command(name = "chunkinfo",
-    description = "returns chunk location"
-        + " information about an existing key")
+        description = "returns chunk location"
+                + " information about an existing key")
 @MetaInfServices(SubcommandWithParent.class)
 public class ChunkKeyHandler extends KeyHandler implements
     SubcommandWithParent {
@@ -76,9 +76,9 @@ public class ChunkKeyHandler extends KeyHandler implements
 
   @Override
   protected void execute(OzoneClient client, OzoneAddress address)
-      throws IOException, OzoneClientException {
+          throws IOException, OzoneClientException {
     try (ContainerOperationClient containerOperationClient = new ContainerOperationClient(parent.getOzoneConf());
-         XceiverClientManager xceiverClientManager = containerOperationClient.getXceiverClientManager()) {
+        XceiverClientManager xceiverClientManager = containerOperationClient.getXceiverClientManager()) {
       OzoneManagerProtocol ozoneManagerClient = client.getObjectStore().getClientProxy().getOzoneManagerClient();
       address.ensureKeyAddress();
       JsonElement element;
