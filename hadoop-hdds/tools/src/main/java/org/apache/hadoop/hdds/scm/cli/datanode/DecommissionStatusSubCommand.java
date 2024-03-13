@@ -171,7 +171,7 @@ public class DecommissionStatusSubCommand extends ScmSubcommand {
     detailsMap.put("uuid", datanode.getUuid().toString());
     detailsMap.put("networkLocation", datanode.getNetworkLocation());
     detailsMap.put("ipAddress", datanode.getIpAddress());
-    detailsMap.put("hostName", datanode.getHostName());
+    detailsMap.put("hostname", datanode.getHostName());
     return detailsMap;
   }
 
