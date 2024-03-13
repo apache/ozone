@@ -18,13 +18,13 @@
 package org.apache.hadoop.ozone.om.helpers;
 
 import java.util.ArrayList;
-import java.util.BitSet;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 
+import com.google.common.collect.ImmutableList;
 import org.apache.hadoop.hdds.utils.db.Codec;
 import org.apache.hadoop.hdds.utils.db.CopyObject;
 import org.apache.hadoop.hdds.utils.db.DelegatedCodec;
@@ -221,7 +221,7 @@ public final class OmVolumeArgs extends WithObjectID
   }
 
   public List<OzoneAcl> getAcls() {
-    return acls;
+    return ImmutableList.copyOf(acls);
   }
 
   public List<OzoneAcl> getDefaultAcls() {
@@ -477,17 +477,11 @@ public final class OmVolumeArgs extends WithObjectID
   public OmVolumeArgs copyObject() {
     Map<String, String> cloneMetadata = new HashMap<>();
     if (getMetadata() != null) {
-      getMetadata().forEach((k, v) -> cloneMetadata.put(k, v));
+      cloneMetadata.putAll(getMetadata());
     }
 
-    List<OzoneAcl> cloneAcls = new ArrayList(acls.size());
-
-    acls.forEach(acl -> cloneAcls.add(new OzoneAcl(acl.getType(),
-        acl.getName(), (BitSet) acl.getAclBitSet().clone(),
-        acl.getAclScope())));
-
     return new OmVolumeArgs(adminName, ownerName, volume, quotaInBytes,
-        quotaInNamespace, usedNamespace, cloneMetadata, cloneAcls,
+        quotaInNamespace, usedNamespace, cloneMetadata, new ArrayList<>(acls),
         creationTime, modificationTime, getObjectID(), getUpdateID(), refCount);
   }
 }

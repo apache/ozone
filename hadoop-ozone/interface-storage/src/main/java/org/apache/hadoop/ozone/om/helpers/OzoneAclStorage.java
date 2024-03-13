@@ -49,7 +49,7 @@ final class OzoneAclStorage {
         .setName(acl.getName())
         .setType(OzoneAclType.valueOf(acl.getType().name()))
         .setAclScope(OzoneAclScope.valueOf(acl.getAclScope().name()))
-        .setRights(ByteString.copyFrom(acl.getAclBitSet().toByteArray()));
+        .setRights(ByteString.copyFrom(acl.getAclByteArray()));
     return builder.build();
   }
 
