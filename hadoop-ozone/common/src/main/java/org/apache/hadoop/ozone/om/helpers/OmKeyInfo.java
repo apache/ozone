@@ -101,10 +101,7 @@ public final class OmKeyInfo extends WithParentObjectId
   private final List<OzoneAcl> acls;
 
   private OmKeyInfo(Builder b) {
-    setMetadata(b.metadata);
-    setObjectID(b.objectID);
-    setUpdateID(b.updateID);
-    setParentObjectID(b.parentObjectID);
+    super(b);
     this.volumeName = b.volumeName;
     this.bucketName = b.bucketName;
     this.keyName = b.keyName;
@@ -413,7 +410,7 @@ public final class OmKeyInfo extends WithParentObjectId
   /**
    * Builder of OmKeyInfo.
    */
-  public static class Builder {
+  public static class Builder extends WithParentObjectId.Builder {
     private String volumeName;
     private String bucketName;
     private String keyName;
@@ -423,21 +420,19 @@ public final class OmKeyInfo extends WithParentObjectId
     private long creationTime;
     private long modificationTime;
     private ReplicationConfig replicationConfig;
-    private final Map<String, String> metadata;
     private FileEncryptionInfo encInfo;
-    private final List<OzoneAcl> acls;
-    private long objectID;
-    private long updateID;
+    private final List<OzoneAcl> acls = new ArrayList<>();
     // not persisted to DB. FileName will be the last element in path keyName.
     private String fileName;
-    private long parentObjectID;
     private FileChecksum fileChecksum;
 
     private boolean isFile;
 
     public Builder() {
-      this.metadata = new HashMap<>();
-      acls = new ArrayList<>();
+    }
+
+    public Builder(OmKeyInfo obj) {
+      super(obj);
     }
 
     public Builder setVolumeName(String volume) {
@@ -492,12 +487,12 @@ public final class OmKeyInfo extends WithParentObjectId
     }
 
     public Builder addMetadata(String key, String value) {
-      metadata.put(key, value);
+      super.addMetadata(key, value);
       return this;
     }
 
     public Builder addAllMetadata(Map<String, String> newMetadata) {
-      metadata.putAll(newMetadata);
+      super.addAllMetadata(newMetadata);
       return this;
     }
 
@@ -521,12 +516,12 @@ public final class OmKeyInfo extends WithParentObjectId
     }
 
     public Builder setObjectID(long obId) {
-      this.objectID = obId;
+      super.setObjectID(obId);
       return this;
     }
 
     public Builder setUpdateID(long id) {
-      this.updateID = id;
+      super.setUpdateID(id);
       return this;
     }
 
@@ -536,7 +531,7 @@ public final class OmKeyInfo extends WithParentObjectId
     }
 
     public Builder setParentObjectID(long parentID) {
-      this.parentObjectID = parentID;
+      super.setParentObjectID(parentID);
       return this;
     }
 
@@ -777,7 +772,7 @@ public final class OmKeyInfo extends WithParentObjectId
    */
   @Override
   public OmKeyInfo copyObject() {
-    OmKeyInfo.Builder builder = new OmKeyInfo.Builder()
+    OmKeyInfo.Builder builder = new OmKeyInfo.Builder(this)
         .setVolumeName(volumeName)
         .setBucketName(bucketName)
         .setKeyName(keyName)
@@ -787,9 +782,6 @@ public final class OmKeyInfo extends WithParentObjectId
         .setReplicationConfig(replicationConfig)
         .setFileEncryptionInfo(encInfo)
         .setAcls(acls)
-        .setObjectID(getObjectID())
-        .setUpdateID(getUpdateID())
-        .setParentObjectID(getParentObjectID())
         .setFileName(fileName)
         .setFile(isFile);
 
