@@ -25,18 +25,15 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.HddsTestUtils;
 import org.apache.hadoop.hdds.scm.DatanodeAdminError;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
-import org.apache.hadoop.hdds.scm.container.ContainerNotFoundException;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.server.events.EventQueue;
-import org.apache.hadoop.security.authentication.client.AuthenticationException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 import java.io.File;
-import java.io.IOException;
 import java.util.List;
 import java.util.UUID;
 import java.util.Arrays;
@@ -99,7 +96,7 @@ public class TestNodeDecommissionManager {
 
   @Test
   public void testAnyInvalidHostThrowsException() {
-    List<DatanodeDetails> dns = generateDatanodes(10);
+    List<DatanodeDetails> dns = generateDatanodes();
 
     // Try to decommission a host that does exist, but give incorrect port
     List<DatanodeAdminError> error =
@@ -141,61 +138,9 @@ public class TestNodeDecommissionManager {
   }
 
   @Test
-  public void testInsufficientNodeDecommissionThrowsException() throws ContainerNotFoundException,
-      NodeNotFoundException {
-    List<DatanodeAdminError> error;
-    List<DatanodeDetails> dns = new ArrayList<>();
-    for (int i = 0; i < 5; i++) {
-      DatanodeDetails dn = MockDatanodeDetails.randomDatanodeDetails();
-      dns.add(dn);
-      nodeManager.register(dn, null, null);
-    }
-    /*
-    Map<ContainerID, ContainerInfo> cidToInfoMap = new HashMap<>();
-    cidToInfoMap.put(ContainerID.valueOf(1), createContainer(1));
-    cidToInfoMap.put(ContainerID.valueOf(2), createContainer(2));
-    cidToInfoMap.put(ContainerID.valueOf(3), createContainer(3));
-    when(containerManager.getContainer(any(ContainerID.class)))
-        .thenAnswer(invocationOnMock -> {
-          ContainerID cid = (ContainerID) invocationOnMock.getArguments()[0];
-          return (cidToInfoMap.get(cid) != null ? cidToInfoMap.get(cid) : );
-        });
-     when(nodeManager.getContainers(any()))
-        .thenReturn( new Set<ContainerID>(cidToInfoMap.values().));
-
-    Set<ContainerID> containerSet = new HashSet<>();
-    containerSet.add(ContainerID.valueOf(1));
-    containerSet.add(ContainerID.valueOf(2));
-    containerSet.add(ContainerID.valueOf(3));
-
-    when(nodeManager.getContainers(any()))
-        .thenReturn(containerSet);
-    when(containerManager.getContainer(any(ContainerID.class)))
-        .thenAnswer(invocationOnMock -> {
-        ContainerID cid = (ContainerID) invocationOnMock.getArguments()[0];
-        return createContainer(cid.hashCode());
-            }); */
-
-
-    error = decom.decommissionNodes(Arrays.asList(dns.get(1).getIpAddress(),
-        dns.get(2).getIpAddress(), dns.get(3).getIpAddress(), dns.get(4).getIpAddress()));
-    assertEquals(2, error.size());
-    assertTrue(error.get(0).getHostname().contains("AllHosts"));
-  }
-
-  /*private ContainerInfo createContainer(long id) {
-    ContainerInfo.Builder builder = new ContainerInfo.Builder()
-        .setContainerID(id)
-        .setState(HddsProtos.LifeCycleState.CLOSED)
-        .setReplicationConfig(RatisReplicationConfig
-            .getInstance(HddsProtos.ReplicationFactor.THREE));
-    return builder.build();
-  }*/
-
-  @Test
   public void testNodesCanBeDecommissionedAndRecommissioned()
       throws InvalidHostStringException, NodeNotFoundException {
-    List<DatanodeDetails> dns = generateDatanodes(10);
+    List<DatanodeDetails> dns = generateDatanodes();
 
     // Decommission 2 valid nodes
     decom.decommissionNodes(Arrays.asList(dns.get(1).getIpAddress(),
@@ -245,7 +190,7 @@ public class TestNodeDecommissionManager {
   @Test
   public void testNodesCanBeDecommissionedAndRecommissionedMixedPorts()
       throws InvalidHostStringException, NodeNotFoundException {
-    List<DatanodeDetails> dns = generateDatanodes(10);
+    List<DatanodeDetails> dns = generateDatanodes();
 
     // From the generateDatanodes method we have DNs at index 9 and 11 with the
     // same IP and port. We can add another DN with a different port on the
@@ -313,7 +258,7 @@ public class TestNodeDecommissionManager {
   @Test
   public void testNodesCanBePutIntoMaintenanceAndRecommissioned()
       throws InvalidHostStringException, NodeNotFoundException {
-    List<DatanodeDetails> dns = generateDatanodes(10);
+    List<DatanodeDetails> dns = generateDatanodes();
 
     // Put 2 valid nodes into maintenance
     decom.startMaintenanceNodes(Arrays.asList(dns.get(1).getIpAddress(),
@@ -367,7 +312,7 @@ public class TestNodeDecommissionManager {
 
   @Test
   public void testNodesCannotTransitionFromDecomToMaint() throws Exception {
-    List<DatanodeDetails> dns = generateDatanodes(10);
+    List<DatanodeDetails> dns = generateDatanodes();
 
     // Put 1 node into maintenance and another into decom
     decom.startMaintenance(dns.get(1), 100);
@@ -400,7 +345,7 @@ public class TestNodeDecommissionManager {
 
   @Test
   public void testNodeDecommissionManagerOnBecomeLeader() throws Exception {
-    List<DatanodeDetails> dns = generateDatanodes(10);
+    List<DatanodeDetails> dns = generateDatanodes();
 
     long maintenanceEnd =
         (System.currentTimeMillis() / 1000L) + (100 * 60L * 60L);
@@ -426,12 +371,6 @@ public class TestNodeDecommissionManager {
     assertEquals(decom.getMonitor().getTrackedNodes().size(), 3);
   }
 
-  private SCMNodeManager createNodeManager(OzoneConfiguration config)
-      throws IOException, AuthenticationException {
-    scm = HddsTestUtils.getScm(config);
-    return (SCMNodeManager) scm.getScmNodeManager();
-  }
-
   /**
    * Generate a list of random DNs and return the list. A total of 11 DNs will
    * be generated and registered with the node manager. Index 0 and 10 will
@@ -440,9 +379,9 @@ public class TestNodeDecommissionManager {
    * DNs will have ports set to 0.
    * @return The list of DatanodeDetails Generated
    */
-  private List<DatanodeDetails> generateDatanodes(int n) {
+  private List<DatanodeDetails> generateDatanodes() {
     List<DatanodeDetails> dns = new ArrayList<>();
-    for (int i = 0; i < n; i++) {
+    for (int i = 0; i < 10; i++) {
       DatanodeDetails dn = MockDatanodeDetails.randomDatanodeDetails();
       dns.add(dn);
       nodeManager.register(dn, null, null);
