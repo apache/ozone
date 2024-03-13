@@ -162,7 +162,7 @@ public class TestContainerBalancerOperations {
     ContainerBalancerConfiguration config = cluster.getStorageContainerManager().getContainerBalancer().getConfig();
 
     //If CLI option is not passed, it takes the default configuration
-    assertEquals(config.getThreshold(), 10);
+    assertEquals(10, config.getThreshold());
 
     //If CLI option is passed, it overrides the default configuration
     assertEquals(config.getIterations(), 10000);
