@@ -32,6 +32,7 @@ import org.apache.hadoop.ozone.recon.spi.StorageContainerServiceProvider;
 import org.apache.hadoop.ozone.recon.spi.impl.OzoneManagerServiceProviderImpl;
 import org.apache.hadoop.ozone.recon.spi.impl.StorageContainerServiceProviderImpl;
 import org.apache.hadoop.ozone.recon.tasks.NSSummaryTaskWithFSO;
+import org.glassfish.jersey.internal.Errors;
 import org.junit.jupiter.api.BeforeEach;
 
 import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.*;
@@ -239,11 +240,28 @@ public class TestOMDBInsightSearchEndpoint extends AbstractReconSqlDBTest {
     assertEquals(5, result.getNonFSOKeyInfoList().size());
   }
 
+  @Test
+  public void testSearchOpenKeysWithNoMatchFound() throws IOException {
+    // Given a search prefix that matches no keys
+    String searchPrefix = "nonexistentKeyPrefix";
+
+    Response response =
+        omdbInsightSearchEndpoint.searchOpenKeys(searchPrefix, true, true, 10);
+
+    // Then the response should indicate that no keys were found
+    assertEquals(Response.Status.NOT_FOUND.getStatusCode(),
+        response.getStatus(), "Expected a 404 NOT FOUND status");
+
+    String entity = (String) response.getEntity();
+    assertTrue(entity.contains("No keys exist for the specified search prefix"),
+        "Expected a message indicating no keys were found");
+  }
+
 
   /**
    * Tests the NSSummaryEndpoint for a given volume, bucket, and directory structure.
    * The test setup mimics the following filesystem structure with specified sizes:
-   * <p>
+   *
    * root   (Total Size: 15000KB)
    * ├── volA   (Total Size: 10000KB)
    * │   ├── bucketA1   (FSO) Total Size: 5000KB

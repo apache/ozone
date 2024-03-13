@@ -30,9 +30,7 @@ import org.apache.hadoop.ozone.recon.api.types.KeyInsightInfoResponse;
 import org.apache.hadoop.ozone.recon.api.types.NSSummary;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 import org.apache.hadoop.ozone.recon.scm.ReconContainerManager;
-import org.apache.hadoop.ozone.recon.spi.ReconContainerMetadataManager;
 import org.apache.hadoop.ozone.recon.spi.impl.ReconNamespaceSummaryManagerImpl;
-import org.hadoop.ozone.recon.schema.tables.daos.GlobalStatsDao;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -45,10 +43,16 @@ import javax.ws.rs.Produces;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import java.io.IOException;
-import java.util.*;
+import java.util.Map;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.ArrayList;
+import java.util.Set;
 
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
-import static org.apache.hadoop.ozone.recon.ReconConstants.*;
+import static org.apache.hadoop.ozone.recon.ReconConstants.DEFAULT_OPEN_KEY_INCLUDE_FSO;
+import static org.apache.hadoop.ozone.recon.ReconConstants.DEFAULT_OPEN_KEY_INCLUDE_NON_FSO;
+import static org.apache.hadoop.ozone.recon.ReconConstants.RECON_OPEN_KEY_INCLUDE_FSO;
 import static org.apache.hadoop.ozone.recon.ReconConstants.RECON_OPEN_KEY_INCLUDE_NON_FSO;
 import static org.apache.hadoop.ozone.recon.api.handlers.BucketHandler.getBucketHandler;
 import static org.apache.hadoop.ozone.recon.api.handlers.EntityHandler.normalizePath;
@@ -64,7 +68,6 @@ public class OMDBInsightSearchEndpoint {
 
   private OzoneStorageContainerManager reconSCM;
   private final ReconOMMetadataManager omMetadataManager;
-  private final ReconContainerManager containerManager;
   private static final Logger LOG =
       LoggerFactory.getLogger(OMDBInsightSearchEndpoint.class);
   private ReconNamespaceSummaryManagerImpl reconNamespaceSummaryManager;
@@ -73,25 +76,33 @@ public class OMDBInsightSearchEndpoint {
   @Inject
   public OMDBInsightSearchEndpoint(OzoneStorageContainerManager reconSCM,
                                    ReconOMMetadataManager omMetadataManager,
-                                   ReconNamespaceSummaryManagerImpl
-                                       reconNamespaceSummaryManager) {
+                                   ReconNamespaceSummaryManagerImpl reconNamespaceSummaryManager) {
     this.reconSCM = reconSCM;
-    this.containerManager =
-        (ReconContainerManager) reconSCM.getContainerManager();
     this.omMetadataManager = omMetadataManager;
     this.reconNamespaceSummaryManager = reconNamespaceSummaryManager;
   }
 
 
   /**
-   * This method searches for open keys in the OM DB based on the search prefix
-   * provided. It returns a list of keys that match the search prefix, along with
-   * the total size of the data and replicated data for the matched keys.
-   * The search can be performed on FSO layout, non-FSO layout, or both.
-   * The search is performed in the following order:
-   * 1. Search for open keys in the OBS layout (non-FSO layout).
-   * 2. Search for open keys in the FSO layout.
-   * The search is performed for fso and non-fso keys separately and the results.
+   * Performs a search for open keys in the Ozone Manager (OM) database using a specified search prefix.
+   * This endpoint can search across both File System Optimized (FSO) and Object Store (non-FSO) layouts,
+   * compiling a list of keys that match the given prefix along with their data sizes.
+   *
+   * The search prefix may range from the root level ('/') to any specific directory
+   * or key level (e.g., '/volA/' for everything under 'volA'). The search operation matches
+   * the prefix against the start of keys' names within the OM DB.
+   *
+   * Example Usage:
+   *  1. A searchPrefix of "/" will return all keys in the database.
+   *  2. A searchPrefix of "/volA/" retrieves every key under volume 'volA'.
+   *  3. Specifying "/volA/bucketA/dir1" focuses the search within 'dir1' inside 'bucketA' of 'volA'.
+   *
+   * @param searchPrefix The prefix for searching keys, starting from the root ('/') or any specific path.
+   * @param includeFso Indicates whether to include FSO layout keys in the search.
+   * @param includeNonFso Indicates whether to include non-FSO layout keys in the search.
+   * @param limit Limits the number of returned keys.
+   * @return A KeyInsightInfoResponse, containing matching keys and their data sizes.
+   * @throws IOException On failure to access the OM database or process the operation.
    */
   @GET
   @Path("/openKeys/search")
@@ -112,12 +123,14 @@ public class OMDBInsightSearchEndpoint {
     KeyInsightInfoResponse insightResponse = new KeyInsightInfoResponse();
     long replicatedTotal = 0;
     long unreplicatedTotal = 0;
+    boolean keysFound = false; // Flag to track if any keys are found
 
     // Fetch keys from OBS layout and convert them into KeyEntityInfo objects
     Map<String, OmKeyInfo> obsKeys = new LinkedHashMap<>();
     if (includeNonFso) {
       obsKeys = searchOpenKeysInOBS(searchPrefix, limit);
       for (Map.Entry<String, OmKeyInfo> entry : obsKeys.entrySet()) {
+        keysFound = true;
         KeyEntityInfo keyEntityInfo =
             createKeyEntityInfoFromOmKeyInfo(entry.getKey(), entry.getValue());
         insightResponse.getNonFSOKeyInfoList()
@@ -129,9 +142,9 @@ public class OMDBInsightSearchEndpoint {
 
     // Fetch keys from FSO layout, if the limit is not yet reached
     if (includeFso) {
-      Map<String, OmKeyInfo> fsoKeys =
-          searchOpenKeysInFSO(searchPrefix, limit);
+      Map<String, OmKeyInfo> fsoKeys = searchOpenKeysInFSO(searchPrefix, limit);
       for (Map.Entry<String, OmKeyInfo> entry : fsoKeys.entrySet()) {
+        keysFound = true;
         KeyEntityInfo keyEntityInfo =
             createKeyEntityInfoFromOmKeyInfo(entry.getKey(), entry.getValue());
         insightResponse.getFsoKeyInfoList()
@@ -142,8 +155,7 @@ public class OMDBInsightSearchEndpoint {
     }
 
     // If no keys were found, return a response indicating that no keys matched
-    if (insightResponse.getNonFSOKeyInfoList().isEmpty() &&
-        insightResponse.getFsoKeyInfoList().isEmpty()) {
+    if (!keysFound) {
       return noMatchedKeysResponse(searchPrefix);
     }
 
@@ -340,7 +352,7 @@ public class OMDBInsightSearchEndpoint {
    * @return The object path as "/volumeID/bucketID/ParentId/".
    * @throws IOException If database access fails.
    */
-  public String convertToObjectPath(String prevKeyPrefix) throws IOException {
+  public String convertToObjectPath(String prevKeyPrefix) {
     if (prevKeyPrefix.isEmpty()) {
       return "";
     }
@@ -402,9 +414,8 @@ public class OMDBInsightSearchEndpoint {
    * @return The response indicating that no keys matched the search prefix.
    */
   private Response noMatchedKeysResponse(String searchPrefix) {
-    String message =
-        "{\"message\": \"No keys exist for the specified search prefix";
-    message += ".\"}";
+    String message = String.format(
+        "No keys matched the search prefix: '%s'.", searchPrefix);
     return Response.status(Response.Status.NOT_FOUND)
         .entity(message)
         .type(MediaType.APPLICATION_JSON)
