@@ -22,7 +22,7 @@ import {withRouter} from 'react-router-dom';
 import {RouteComponentProps} from 'react-router';
 import {FilledIcon} from 'utils/themeIcons';
 import Tooltip from 'antd/lib/tooltip';
-import {getCapacityPercent} from 'utils/common';
+import {getCapacityPercent, getNonOzoneUsed, getTotalUsed} from 'utils/common';
 import filesize from 'filesize';
 import './storageBar.less';
 
@@ -49,16 +49,16 @@ class StorageBar extends React.Component<IStorageBarProps> {
 
   render() {
     const {total, used, remaining, committed, showMeta} = this.props;
-    const nonOzoneUsed = total - remaining - used;
-    const totalUsed = total - remaining;
+    const nonOzoneUsed = getNonOzoneUsed(total, remaining, used);
+    const totalUsed = getTotalUsed(total, remaining);
     const percentageUsed = getCapacityPercent(totalUsed, total)
     const tooltip = (
       <div>
         <div> Total storage utilization ({percentageUsed}%)</div>
         <div><Icon component={FilledIcon} className='ozone-used-bg'/> Ozone Used ({size(used)})</div>
         <div><Icon component={FilledIcon} className='non-ozone-used-bg'/> Non Ozone Used ({size(nonOzoneUsed)})</div>
+        <div><Icon component={FilledIcon} className='committed-bg'/> Pre-allocated ({size(committed)})</div>
         <div><Icon component={FilledIcon} className='remaining-bg'/> Remaining ({size(remaining)})</div>
-        <div><Icon component={FilledIcon} className='committed-bg'/> Committed ({size(committed)})</div>
       </div>
     );
     const metaElement = showMeta ? <div>{size(used)} + {size(nonOzoneUsed)} / {size(total)}</div> : null;

@@ -34,7 +34,7 @@ import {AutoReloadHelper} from 'utils/autoReloadHelper';
 import AutoReloadPanel from 'components/autoReloadPanel/autoReloadPanel';
 import {MultiSelect, IOption} from 'components/multiSelect/multiSelect';
 import {ActionMeta, ValueType} from 'react-select';
-import {getCapacityPercent, showDataFetchError} from 'utils/common';
+import {getCapacityPercent, getNonOzoneUsed, getTotalUsed, showDataFetchError} from 'utils/common';
 import {ColumnSearch} from 'utils/columnSearch';
 import { AxiosGetHelper } from 'utils/axiosRequestHelper';
 import {ColumnProps} from "antd/es/table";
@@ -212,21 +212,29 @@ export class Datanodes extends React.Component<Record<string, object>, IDatanode
             value: 'storageRemaining',
           },
           {
-            text: 'Storage Used',
-            value: 'storageUsed',
+            text: 'Storage Used - Ozone',
+            value: 'storageUsedOzone',
           },
           {
-            text: 'Storage Committed',
+            text: 'Storage Used - Non-Ozone',
+            value: 'storageUsedNonOzone',
+          },
+          {
+            text: 'Storage Total Used',
+            value: 'storageUsedTotal',
+          },
+          {
+            text: 'Storage Total Used (%)',
+            value: 'storageUsedTotalUtilization',
+          },
+          {
+            text: 'Storage Pre-allocated',
             value: 'storageCommitted'
           },
           {
             text: 'Storage Total',
             value: 'storageTotal',
           },
-          {
-            text: 'Total Storage Utilization %',
-            value: 'storageUtilization',
-          }
         ],
         filterIcon: () => (
           <Icon type={'sort-ascending'} />
@@ -246,16 +254,20 @@ export class Datanodes extends React.Component<Record<string, object>, IDatanode
             return a.storageRemaining - b.storageRemaining
           }
 
-          if (sortBy === "storageUsed") {
+          if (sortBy === "storageUsedOzone") {
             return a.storageUsed - b.storageUsed;
+          } else if (sortBy === "storageUsedNonOzone") {
+            return getNonOzoneUsed(a.storageTotal, a.storageRemaining, a.storageUsed) -
+                getNonOzoneUsed(b.storageTotal, b.storageRemaining, a.storageUsed);
+          } else if (sortBy === "storageUsedTotal") {
+            return getTotalUsed(a.storageTotal, a.storageRemaining) - getTotalUsed(a.storageTotal, a.storageRemaining)
+          } else if (sortBy === 'storageUsedTotalUtilization') {
+            return getCapacityPercent(a.storageTotal - a.storageRemaining, a.storageTotal) -
+                getCapacityPercent(b.storageTotal - b.storageRemaining, b.storageTotal)
           } else if (sortBy === "storageCommitted") {
             return a.storageCommitted - b.storageCommitted;
           } else if (sortBy === "storageTotal") {
             return a.storageTotal- b.storageTotal;
-          } else if (sortBy === 'storageUtilization') {
-            // See totalUsed calculation in storageBar.tsx
-            return getCapacityPercent(a.storageTotal - a.storageRemaining, a.storageTotal) -
-                getCapacityPercent(b.storageTotal - b.storageRemaining, b.storageTotal)
           } else {
             return a.storageRemaining - b.storageRemaining
           }

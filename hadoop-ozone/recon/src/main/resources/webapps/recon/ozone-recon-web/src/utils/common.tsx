@@ -21,6 +21,9 @@ import {notification} from 'antd';
 
 export const getCapacityPercent = (used: number, total: number) => Math.round((used / total) * 100);
 
+export const getNonOzoneUsed = (total: number, remaining: number, ozoneUsed: number) => getTotalUsed(total, remaining) - ozoneUsed;
+export const getTotalUsed = (total: number, remaining: number) => total - remaining;
+
 export const timeFormat = (time: number) => time > 0 ?
   moment(time).format('lll') : 'NA';
 
