@@ -446,7 +446,7 @@ public class ReconUtils {
   }
 
   private static void readProcessStream(StringBuilder processOutputBuilder, InputStream stream) throws IOException {
-    try (BufferedReader reader = new BufferedReader(new InputStreamReader(stream))) {
+    try (BufferedReader reader = new BufferedReader(new InputStreamReader(stream, "UTF-8"))) {
       String line;
       while ((line = reader.readLine()) != null) {
         processOutputBuilder.append(line);
