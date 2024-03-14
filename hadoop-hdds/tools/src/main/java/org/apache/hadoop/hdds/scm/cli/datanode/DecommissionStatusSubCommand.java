@@ -153,6 +153,7 @@ public class DecommissionStatusSubCommand extends ScmSubcommand {
   }
 
   private void printCounts(DatanodeDetails datanode, JsonNode counts, int numDecomNodes) {
+    String errMsg = getErrorMessage() + datanode.getHostName();
     try {
       for (int i = 1; i <= numDecomNodes; i++) {
         if (datanode.getHostName().equals(counts.get("tag.datanode." + i).asText())) {
@@ -161,7 +162,7 @@ public class DecommissionStatusSubCommand extends ScmSubcommand {
           JsonNode unclosedDN = counts.get("UnclosedContainersDN." + i);
           JsonNode startTimeDN = counts.get("StartTimeDN." + i);
           if (pipelinesDN == null || underReplicatedDN == null || unclosedDN == null || startTimeDN == null) {
-            throw new IOException("Error getting pipeline and container metrics for " + datanode.getHostName());
+            throw new IOException(errMsg);
           }
 
           int pipelines = Integer.parseInt(pipelinesDN.toString());
@@ -178,9 +179,9 @@ public class DecommissionStatusSubCommand extends ScmSubcommand {
           return;
         }
       }
-      System.err.println(getErrorMessage() + datanode.getHostName());
+      System.err.println(errMsg);
     } catch (IOException e) {
-      System.err.println(getErrorMessage() + datanode.getHostName());
+      System.err.println(errMsg);
     }
   }
 
@@ -195,6 +196,7 @@ public class DecommissionStatusSubCommand extends ScmSubcommand {
 
   private Map<String, Object> getCounts(DatanodeDetails datanode, JsonNode counts, int numDecomNodes) {
     Map<String, Object> countsMap = new LinkedHashMap<>();
+    String errMsg = getErrorMessage() + datanode.getHostName();
     try {
       for (int i = 1; i <= numDecomNodes; i++) {
         if (datanode.getHostName().equals(counts.get("tag.datanode." + i).asText())) {
@@ -203,7 +205,7 @@ public class DecommissionStatusSubCommand extends ScmSubcommand {
           JsonNode unclosedDN = counts.get("UnclosedContainersDN." + i);
           JsonNode startTimeDN = counts.get("StartTimeDN." + i);
           if (pipelinesDN == null || underReplicatedDN == null || unclosedDN == null || startTimeDN == null) {
-            throw new IOException("Error getting pipeline and container metrics for " + datanode.getHostName());
+            throw new IOException(errMsg);
           }
 
           int pipelines = Integer.parseInt(pipelinesDN.toString());
@@ -219,9 +221,9 @@ public class DecommissionStatusSubCommand extends ScmSubcommand {
           return countsMap;
         }
       }
-      System.err.println(getErrorMessage() + datanode.getHostName());
+      System.err.println(errMsg);
     } catch (IOException e) {
-      System.err.println(getErrorMessage() + datanode.getHostName());
+      System.err.println(errMsg);
     }
     return countsMap;
   }
