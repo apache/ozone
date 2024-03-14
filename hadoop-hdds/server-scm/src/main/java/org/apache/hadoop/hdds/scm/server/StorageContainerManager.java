@@ -50,6 +50,7 @@ import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.container.ContainerManagerImpl;
 import org.apache.hadoop.hdds.scm.PlacementPolicyValidateProxy;
 import org.apache.hadoop.hdds.scm.container.balancer.MoveManager;
+import org.apache.hadoop.hdds.scm.container.placement.metrics.SCMPerformanceMetrics;
 import org.apache.hadoop.hdds.scm.container.replication.ContainerReplicaPendingOps;
 import org.apache.hadoop.hdds.scm.container.replication.DatanodeCommandCountUpdatedHandler;
 import org.apache.hadoop.hdds.scm.container.replication.LegacyReplicationManager;
@@ -236,6 +237,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
    * SCM metrics.
    */
   private static SCMMetrics metrics;
+  private static SCMPerformanceMetrics perfMetrics;
   private SCMHAMetrics scmHAMetrics;
 
   /*
@@ -1428,6 +1430,10 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
    */
   public static SCMMetrics getMetrics() {
     return metrics == null ? SCMMetrics.create() : metrics;
+  }
+
+  public static SCMPerformanceMetrics getPerfMetrics() {
+    return perfMetrics == null ? SCMPerformanceMetrics.create() : perfMetrics;
   }
 
   public SCMStorageConfig getScmStorageConfig() {
