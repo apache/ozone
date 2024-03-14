@@ -18,8 +18,10 @@
 
 package org.apache.hadoop.ozone.recon.api;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.google.common.base.Preconditions;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState;
@@ -31,6 +33,7 @@ import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineNotFoundException;
 import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
+import org.apache.hadoop.ozone.recon.ReconUtils;
 import org.apache.hadoop.ozone.recon.api.types.DatanodeMetadata;
 import org.apache.hadoop.ozone.recon.api.types.DatanodePipeline;
 import org.apache.hadoop.ozone.recon.api.types.DatanodeStorageReport;
@@ -42,20 +45,20 @@ import org.apache.hadoop.ozone.recon.scm.ReconContainerManager;
 import javax.inject.Inject;
 import javax.ws.rs.GET;
 import javax.ws.rs.Path;
+import javax.ws.rs.PathParam;
 import javax.ws.rs.Produces;
+import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
-import java.io.BufferedReader;
 import java.io.IOException;
-import java.io.InputStreamReader;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import org.apache.hadoop.ozone.recon.scm.ReconPipelineManager;
-import org.apache.hadoop.security.SecurityUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -179,52 +182,68 @@ public class NodeEndpoint {
     return new DatanodeStorageReport(capacity, used, remaining, committed);
   }
 
+  /**
+   * This GET API provides the information of all datanodes for which decommissioning is initiated.
+   * @return the wrapped  Response output
+   */
   @GET
   @Path("/decommission/info")
   public Response getDatanodesDecommissionInfo() {
     // Command to execute
-    List<String> command = Arrays.asList("ozone", "admin", "datanode", "status", "decommission", "--json");
-    Response.ResponseBuilder builder = Response.status(Response.Status.OK);
-    ProcessBuilder pb = new ProcessBuilder(command);
-    try {
-      SecurityUtil.doAsLoginUser(() -> {
-        Process process = pb.start();
-        try (BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()))) {
-          String processOutput = readProcessStream(reader);
-          // Wait for the process to complete
-          int exitCode = process.waitFor();
-          LOG.info("Datanode decommission status info command exitcode: {}", exitCode);
-          if (exitCode != 0) {
-            try (BufferedReader errReader = new BufferedReader(new InputStreamReader(process.getErrorStream()))) {
-              String processErrorOutput = readProcessStream(errReader);
-              builder.status(exitCode);
-              builder.entity("Datanode decommission status info command is not successful : " + processErrorOutput);
-              // Build and return the response
-              return builder.build();
-            }
-          }
-          // Create ObjectMapper
-          ObjectMapper objectMapper = new ObjectMapper();
-          LOG.info("processOutput: {}", processOutput);
-          // Deserialize JSON to Java object
-          List<DecommissionStatusInfoResponse> decommissionStatusInfoResponseList =
-              objectMapper.readValue(processOutput, new TypeReference<List<DecommissionStatusInfoResponse>>() { });
-          builder.entity(decommissionStatusInfoResponseList);
-        }
-        return builder.build();
-      });
-    } catch (IOException ioException) {
-      LOG.error("Failed to run datanode decommission status info command. ", ioException);
-    }
-    return builder.build();
+    List<String> commandArgs = Arrays.asList("ozone", "admin", "datanode", "status", "decommission", "--json");
+
+    return getDecommissionStatusResponse(commandArgs);
   }
 
-  private static String readProcessStream(BufferedReader reader) throws IOException {
-    StringBuilder processOutputBuilder = new StringBuilder();
-    String line;
-    while ((line = reader.readLine()) != null) {
-      processOutputBuilder.append(line);
+  /**
+   * This GET API provides the information of a specific datanode for which decommissioning is initiated.
+   * @return the wrapped  Response output
+   */
+  @GET
+  @Path("/decommission/info/{uuid}")
+  public Response getDecommissionInfoForDatanode(@PathParam("uuid") String uuid) {
+    Preconditions.checkNotNull(uuid, "uuid of a datanode cannot be null !!!");
+    Preconditions.checkArgument(uuid.isEmpty(), "uuid of a datanode cannot be empty !!!");
+
+    // Command to execute
+    List<String> commandArgs =
+        Arrays.asList("ozone", "admin", "datanode", "status", "decommission", "--id", uuid, "--json");
+
+    return getDecommissionStatusResponse(commandArgs);
+  }
+
+  private static Response getDecommissionStatusResponse(List<String> commandArgs) {
+    Response.ResponseBuilder builder = Response.status(Response.Status.OK);
+    Map<Integer, String> commandOutputMap = ReconUtils.executeCommand(commandArgs);
+
+    for (Map.Entry<Integer, String> entry : commandOutputMap.entrySet()) {
+      Integer exitCode = entry.getKey();
+      String processOutput = entry.getValue();
+      if (exitCode != 0) {
+        builder.status(Response.Status.INTERNAL_SERVER_ERROR);
+        builder.entity(
+            ReconUtils.joinListArgs(commandArgs) + " command execution is not successful : " + processOutput);
+        return builder.build();
+      } else {
+        // Create ObjectMapper
+        ObjectMapper objectMapper = new ObjectMapper();
+        LOG.info("processOutput: {}", processOutput);
+        // Deserialize JSON to Java object
+        List<DecommissionStatusInfoResponse> decommissionStatusInfoResponseList = null;
+        try {
+          decommissionStatusInfoResponseList =
+              objectMapper.readValue(processOutput, new TypeReference<List<DecommissionStatusInfoResponse>>() { });
+          builder.entity(decommissionStatusInfoResponseList);
+          return builder.build();
+        } catch (JsonProcessingException jsonProcessingException) {
+          LOG.error("Unexpected JSON Error: {}", jsonProcessingException);
+          throw new WebApplicationException(jsonProcessingException, Response.Status.INTERNAL_SERVER_ERROR);
+        } catch (Exception exception) {
+          LOG.error("Unexpected Error: {}", exception);
+          throw new WebApplicationException(exception, Response.Status.INTERNAL_SERVER_ERROR);
+        }
+      }
     }
-    return processOutputBuilder.toString();
+    return builder.build();
   }
 }

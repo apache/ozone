@@ -20,21 +20,30 @@ package org.apache.hadoop.ozone.recon;
 
 import java.io.BufferedInputStream;
 import java.io.BufferedOutputStream;
+import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.security.PrivilegedExceptionAction;
 import java.sql.Timestamp;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.atomic.AtomicReference;
+import java.util.stream.Collectors;
 
 import com.google.common.base.Preconditions;
 import com.google.inject.Singleton;
+import jakarta.annotation.Nonnull;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
@@ -60,13 +69,15 @@ import static org.jooq.impl.DSL.select;
 import static org.jooq.impl.DSL.using;
 
 import org.apache.hadoop.ozone.recon.scm.ReconContainerReportQueue;
+import org.apache.hadoop.security.SecurityUtil;
 import org.apache.hadoop.security.authentication.client.AuthenticationException;
 import org.hadoop.ozone.recon.schema.tables.daos.GlobalStatsDao;
 import org.hadoop.ozone.recon.schema.tables.pojos.GlobalStats;
-import jakarta.annotation.Nonnull;
 import org.jooq.Configuration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import javax.validation.constraints.NotNull;
 
 /**
  * Recon Utility class.
@@ -384,5 +395,62 @@ public class ReconUtils {
     builder.setDatanodeProtocolServerAddress(
         HddsServerUtil.getReconDataNodeBindAddress(conf));
     return builder.build();
+  }
+
+  /**
+   * This method accepts the list of command args and supports execution of ozone CLI based commands only.
+   *
+   * @param commandArgs the list of command args
+   * @return the command output map with its exit code
+   */
+  public static Map<Integer, String> executeCommand(List<String> commandArgs) {
+    String command = joinListArgs(commandArgs);
+    Map<Integer, String> processOutputMap = new HashMap<>();
+    LOG.info("Received command : '{}' to execute", command);
+    AtomicReference<String> processOutput = new AtomicReference<>();
+    ProcessBuilder pb = new ProcessBuilder(commandArgs);
+    try {
+      SecurityUtil.doAsLoginUser((PrivilegedExceptionAction<Map<Integer, String>>) () -> {
+        Process process = pb.start();
+        int exitCode = process.waitFor();
+        LOG.info("'{}' command : exitcode: {}", command, exitCode);
+        validateAndReadProcessOutput(processOutput, process, exitCode);
+        processOutputMap.put(exitCode, processOutput.get());
+        return processOutputMap;
+      });
+    } catch (IOException ioException) {
+      processOutputMap.put(1, "Failed to run command :" + command);
+      LOG.error("Failed to run '{}' command : {}", command, ioException);
+    }
+    return processOutputMap;
+  }
+
+  @NotNull
+  public static String joinListArgs(List<String> commandArgs) {
+    String command = commandArgs.stream().collect(Collectors.joining(" "));
+    return command;
+  }
+
+  private static void validateAndReadProcessOutput(AtomicReference<String> processOutput,
+                                                   Process process,
+                                                   int exitCode) throws IOException {
+    StringBuilder processOutputBuilder = new StringBuilder();
+    InputStream inputStream;
+    if (exitCode != 0) {
+      inputStream = process.getErrorStream();
+    } else {
+      inputStream = process.getInputStream();
+    }
+    readProcessStream(processOutputBuilder, inputStream);
+    processOutput.set(processOutputBuilder.toString());
+  }
+
+  private static void readProcessStream(StringBuilder processOutputBuilder, InputStream stream) throws IOException {
+    try (BufferedReader reader = new BufferedReader(new InputStreamReader(stream))) {
+      String line;
+      while ((line = reader.readLine()) != null) {
+        processOutputBuilder.append(line);
+      }
+    }
   }
 }
