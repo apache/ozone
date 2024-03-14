@@ -75,6 +75,7 @@ import org.slf4j.LoggerFactory;
 import java.io.File;
 import java.io.IOException;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.TreeMap;
@@ -616,7 +617,7 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
     if (isOpen) {
       HddsVolume volume = container.getContainerData().getVolume();
       SpaceUsageSource precomputedVolumeSpace = cachedVolumeUsage.getIfPresent(volume);
-      long volumeCapacity = precomputedVolumeSpace.getCapacity();
+      long volumeCapacity = Objects.requireNonNull(precomputedVolumeSpace).getCapacity();
       long volumeFreeSpaceToSpare =
           VolumeUsage.getMinVolumeFreeSpace(conf, volumeCapacity);
       long volumeFree = volume.getAvailable(precomputedVolumeSpace);
