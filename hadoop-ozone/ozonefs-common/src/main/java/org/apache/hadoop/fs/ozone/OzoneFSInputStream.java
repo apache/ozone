@@ -171,7 +171,7 @@ public class OzoneFSInputStream extends FSInputStream
    * @param position offset
    * @return void
    * @throws IOException if there is some error performing the read
-   * @throws EOFException if end of file reched before reading fully
+   * @throws EOFException if end of file reached before reading fully
    */
   @Override
   public void readFully(long position, ByteBuffer buf) throws IOException {
@@ -179,7 +179,7 @@ public class OzoneFSInputStream extends FSInputStream
     for (int readCount = 0; buf.hasRemaining(); readCount += bytesRead) {
       bytesRead = this.read(position + (long)readCount, buf);
       if (bytesRead < 0) {
-        // Still buffer had space to read but stream has already reached EOF
+        // Still buffer has space to read but stream has already reached EOF
         throw new EOFException("End of file reached before reading fully.");
       }
     }
