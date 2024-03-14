@@ -35,7 +35,7 @@ import org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes;
 import org.apache.hadoop.ozone.om.helpers.ServiceInfoEx;
 import org.apache.hadoop.ozone.om.protocolPB.OmTransport;
 import org.apache.ozone.test.LambdaTestUtils.VoidCallable;
-import org.jetbrains.annotations.NotNull;
+import jakarta.annotation.Nonnull;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -47,7 +47,7 @@ import java.util.UUID;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.hdds.client.ReplicationFactor.ONE;
-import static org.junit.jupiter.api.Assertions.fail;
+import static org.apache.ozone.test.GenericTestUtils.getTestStartTime;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -67,12 +67,8 @@ public class TestOzoneClient {
       OMException.ResultCodes code,
       VoidCallable eval)
       throws Exception {
-    try {
-      eval.call();
-      fail("OMException is expected");
-    } catch (OMException ex) {
-      assertEquals(code, ex.getResult());
-    }
+    OMException ex = assertThrows(OMException.class, () -> eval.call());
+    assertEquals(code, ex.getResult());
   }
 
   @BeforeEach
@@ -90,7 +86,7 @@ public class TestOzoneClient {
         return new MockOmTransport(blkAllocator);
       }
 
-      @NotNull
+      @Nonnull
       @Override
       protected XceiverClientFactory createXceiverClientFactory(
           ServiceInfoEx serviceInfo) {
@@ -138,7 +134,7 @@ public class TestOzoneClient {
   @Test
   public void testCreateBucket()
       throws IOException {
-    Instant testStartTime = Instant.now();
+    Instant testStartTime = getTestStartTime();
     String volumeName = UUID.randomUUID().toString();
     String bucketName = UUID.randomUUID().toString();
     store.createVolume(volumeName);
@@ -152,7 +148,7 @@ public class TestOzoneClient {
 
   @Test
   public void testPutKeyRatisOneNode() throws IOException {
-    Instant testStartTime = Instant.now();
+    Instant testStartTime = getTestStartTime();
     String value = "sample value";
     OzoneBucket bucket = getOzoneBucket();
 

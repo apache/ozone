@@ -30,6 +30,7 @@ import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
+import org.apache.hadoop.ozone.container.common.helpers.ContainerUtils;
 import org.apache.hadoop.ozone.container.common.impl.ContainerDataYaml;
 import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
@@ -41,7 +42,7 @@ import org.apache.hadoop.ozone.container.common.volume.VolumeChoosingPolicyFacto
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.apache.hadoop.ozone.container.keyvalue.TarContainerPacker;
 import org.apache.hadoop.ozone.container.ozoneimpl.ContainerController;
-import org.jetbrains.annotations.NotNull;
+import jakarta.annotation.Nonnull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -64,10 +65,12 @@ public class ContainerImporter {
   private final Set<Long> importContainerProgress
       = Collections.synchronizedSet(new HashSet<>());
 
-  public ContainerImporter(@NotNull ConfigurationSource conf,
-                           @NotNull ContainerSet containerSet,
-                           @NotNull ContainerController controller,
-                           @NotNull MutableVolumeSet volumeSet) {
+  private final ConfigurationSource conf;
+
+  public ContainerImporter(@Nonnull ConfigurationSource conf,
+                           @Nonnull ContainerSet containerSet,
+                           @Nonnull ContainerController controller,
+                           @Nonnull MutableVolumeSet volumeSet) {
     this.containerSet = containerSet;
     this.controller = controller;
     this.volumeSet = volumeSet;
@@ -79,6 +82,7 @@ public class ContainerImporter {
     containerSize = (long) conf.getStorageSize(
         ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE,
         ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE_DEFAULT, StorageUnit.BYTES);
+    this.conf = conf;
   }
 
   public boolean isAllowedContainerImport(long containerID) {
@@ -91,18 +95,17 @@ public class ContainerImporter {
       throws IOException {
     if (!importContainerProgress.add(containerID)) {
       deleteFileQuietely(tarFilePath);
-      LOG.warn("Container import in progress with container Id {}",
-          containerID);
-      throw new StorageContainerException("Container " +
-          "import in progress with container Id " + containerID,
+      String log = "Container import in progress with container Id " + containerID;
+      LOG.warn(log);
+      throw new StorageContainerException(log,
           ContainerProtos.Result.CONTAINER_EXISTS);
     }
 
     try {
       if (containerSet.getContainer(containerID) != null) {
-        LOG.warn("Container already exists with container Id {}", containerID);
-        throw new StorageContainerException("Container already exists " +
-            "with container Id " + containerID,
+        String log = "Container already exists with container Id " + containerID;
+        LOG.warn(log);
+        throw new StorageContainerException(log,
             ContainerProtos.Result.CONTAINER_EXISTS);
       }
 
@@ -112,14 +115,14 @@ public class ContainerImporter {
       }
 
       KeyValueContainerData containerData;
-      TarContainerPacker packer = new TarContainerPacker(compression);
+      TarContainerPacker packer = getPacker(compression);
 
       try (FileInputStream input = new FileInputStream(tarFilePath.toFile())) {
         byte[] containerDescriptorYaml =
             packer.unpackContainerDescriptor(input);
-        containerData = (KeyValueContainerData) ContainerDataYaml
-            .readContainer(containerDescriptorYaml);
+        containerData = getKeyValueContainerData(containerDescriptorYaml);
       }
+      ContainerUtils.verifyChecksum(containerData, conf);
       containerData.setVolume(targetVolume);
 
       try (FileInputStream input = new FileInputStream(tarFilePath.toFile())) {
@@ -154,4 +157,19 @@ public class ContainerImporter {
     return Paths.get(hddsVolume.getVolumeRootDir())
         .resolve(CONTAINER_COPY_TMP_DIR).resolve(CONTAINER_COPY_DIR);
   }
+
+  protected KeyValueContainerData getKeyValueContainerData(
+      byte[] containerDescriptorYaml) throws IOException {
+    return  (KeyValueContainerData) ContainerDataYaml
+        .readContainer(containerDescriptorYaml);
+  }
+
+  protected Set<Long> getImportContainerProgress() {
+    return this.importContainerProgress;
+  }
+
+  protected TarContainerPacker getPacker(CopyContainerCompression compression) {
+    return new TarContainerPacker(compression);
+  }
+
 }

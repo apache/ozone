@@ -75,6 +75,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import static java.util.Collections.singletonList;
+import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.BLOCK_TOKEN_VERIFICATION_FAILED;
 
 /**
  * Implementation of all container protocol calls performed by Container
@@ -145,6 +146,14 @@ public final class ContainerProtocolCalls  {
       try {
         return op.apply(d);
       } catch (IOException e) {
+        if (e instanceof StorageContainerException) {
+          StorageContainerException sce = (StorageContainerException)e;
+          // Block token expired. There's no point retrying other DN.
+          // Throw the exception to request a new block token right away.
+          if (sce.getResult() == BLOCK_TOKEN_VERIFICATION_FAILED) {
+            throw e;
+          }
+        }
         excluded.add(d);
         if (excluded.size() < pipeline.size()) {
           LOG.warn(toErrorMessage.apply(d)
@@ -248,53 +257,24 @@ public final class ContainerProtocolCalls  {
    *
    * @param xceiverClient client to perform call
    * @param containerBlockData block data to identify container
-   * @param token a token for this block (may be null)
-   * @return putBlockResponse
-   * @throws IOException if there is an I/O error while performing the call
-   */
-  public static ContainerProtos.PutBlockResponseProto putBlock(
-      XceiverClientSpi xceiverClient, BlockData containerBlockData,
-      Token<OzoneBlockTokenIdentifier> token)
-      throws IOException {
-    PutBlockRequestProto.Builder createBlockRequest =
-        PutBlockRequestProto.newBuilder().setBlockData(containerBlockData);
-    String id = xceiverClient.getPipeline().getFirstNode().getUuidString();
-    ContainerCommandRequestProto.Builder builder =
-        ContainerCommandRequestProto.newBuilder().setCmdType(Type.PutBlock)
-            .setContainerID(containerBlockData.getBlockID().getContainerID())
-            .setDatanodeUuid(id)
-            .setPutBlock(createBlockRequest);
-    if (token != null) {
-      builder.setEncodedToken(token.encodeToUrlString());
-    }
-    ContainerCommandRequestProto request = builder.build();
-    ContainerCommandResponseProto response =
-        xceiverClient.sendCommand(request, getValidatorList());
-    return response.getPutBlock();
-  }
-
-  /**
-   * Calls the container protocol to put a container block.
-   *
-   * @param xceiverClient client to perform call
-   * @param containerBlockData block data to identify container
    * @param eof whether this is the last putBlock for the same block
-   * @param token a token for this block (may be null)
+   * @param tokenString a serialized token for this block (may be null)
    * @return putBlockResponse
    * @throws IOException if there is an error while performing the call
    */
   public static XceiverClientReply putBlockAsync(XceiverClientSpi xceiverClient,
-      BlockData containerBlockData, boolean eof,
-      Token<? extends TokenIdentifier> token)
+                                                 BlockData containerBlockData,
+                                                 boolean eof,
+                                                 String tokenString)
       throws IOException, InterruptedException, ExecutionException {
     final ContainerCommandRequestProto request = getPutBlockRequest(
-        xceiverClient.getPipeline(), containerBlockData, eof, token);
+        xceiverClient.getPipeline(), containerBlockData, eof, tokenString);
     return xceiverClient.sendCommandAsync(request);
   }
 
   public static ContainerCommandRequestProto getPutBlockRequest(
       Pipeline pipeline, BlockData containerBlockData, boolean eof,
-      Token<? extends TokenIdentifier> token) throws IOException {
+      String tokenString) throws IOException {
     PutBlockRequestProto.Builder createBlockRequest =
         PutBlockRequestProto.newBuilder()
             .setBlockData(containerBlockData)
@@ -305,8 +285,8 @@ public final class ContainerProtocolCalls  {
             .setContainerID(containerBlockData.getBlockID().getContainerID())
             .setDatanodeUuid(id)
             .setPutBlock(createBlockRequest);
-    if (token != null) {
-      builder.setEncodedToken(token.encodeToUrlString());
+    if (tokenString != null) {
+      builder.setEncodedToken(tokenString);
     }
     return builder.build();
   }
@@ -387,14 +367,12 @@ public final class ContainerProtocolCalls  {
    * @param chunk information about chunk to write
    * @param blockID ID of the block
    * @param data the data of the chunk to write
-   * @param token a token for this block (may be null)
+   * @param tokenString serialized block token
    * @throws IOException if there is an I/O error while performing the call
    */
   public static XceiverClientReply writeChunkAsync(
       XceiverClientSpi xceiverClient, ChunkInfo chunk, BlockID blockID,
-      ByteString data, Token<? extends TokenIdentifier> token,
-      int replicationIndex
-  )
+      ByteString data, String tokenString, int replicationIndex)
       throws IOException, ExecutionException, InterruptedException {
     WriteChunkRequestProto.Builder writeChunkRequest =
         WriteChunkRequestProto.newBuilder()
@@ -413,8 +391,9 @@ public final class ContainerProtocolCalls  {
             .setContainerID(blockID.getContainerID())
             .setDatanodeUuid(id)
             .setWriteChunk(writeChunkRequest);
-    if (token != null) {
-      builder.setEncodedToken(token.encodeToUrlString());
+
+    if (tokenString != null) {
+      builder.setEncodedToken(tokenString);
     }
     ContainerCommandRequestProto request = builder.build();
     return xceiverClient.sendCommandAsync(request);

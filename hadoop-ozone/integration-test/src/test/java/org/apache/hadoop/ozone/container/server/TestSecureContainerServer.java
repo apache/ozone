@@ -95,23 +95,21 @@ import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.commons.lang3.RandomUtils;
 import org.apache.commons.lang3.exception.ExceptionUtils;
 import org.apache.ratis.rpc.RpcType;
-
-import static org.apache.ratis.rpc.SupportedRpcType.GRPC;
-
 import org.apache.ratis.util.ExitUtils;
 import org.apache.ratis.util.function.CheckedBiConsumer;
 import org.apache.ratis.util.function.CheckedBiFunction;
-import org.junit.jupiter.api.AfterEach;
 
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Test;
+
+import static org.apache.ratis.rpc.SupportedRpcType.GRPC;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertTrue;
-
-import org.junit.jupiter.api.AfterAll;
-import org.junit.jupiter.api.Assertions;
-import org.junit.jupiter.api.BeforeAll;
-import org.junit.jupiter.api.Test;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 /**
  * Test Container servers when security is enabled.
@@ -160,7 +158,7 @@ public class TestSecureContainerServer {
     HddsDispatcher hddsDispatcher = createDispatcher(dd,
         UUID.randomUUID(), CONF);
     runTestClientServer(1, (pipeline, conf) -> conf
-            .setInt(OzoneConfigKeys.DFS_CONTAINER_IPC_PORT,
+            .setInt(OzoneConfigKeys.HDDS_CONTAINER_IPC_PORT,
                 pipeline.getFirstNode()
                     .getPort(DatanodeDetails.Port.Name.STANDALONE).getValue()),
         XceiverClientGrpc::new,
@@ -203,14 +201,14 @@ public class TestSecureContainerServer {
 
   static XceiverServerRatis newXceiverServerRatis(
       DatanodeDetails dn, OzoneConfiguration conf) throws IOException {
-    conf.setInt(OzoneConfigKeys.DFS_CONTAINER_RATIS_IPC_PORT,
+    conf.setInt(OzoneConfigKeys.HDDS_CONTAINER_RATIS_IPC_PORT,
         dn.getPort(DatanodeDetails.Port.Name.RATIS).getValue());
-    conf.setBoolean(OzoneConfigKeys.DFS_CONTAINER_RATIS_DATASTREAM_ENABLED,
+    conf.setBoolean(OzoneConfigKeys.HDDS_CONTAINER_RATIS_DATASTREAM_ENABLED,
         true);
     conf.setBoolean(
-        OzoneConfigKeys.DFS_CONTAINER_RATIS_DATASTREAM_RANDOM_PORT, true);
+        OzoneConfigKeys.HDDS_CONTAINER_RATIS_DATASTREAM_RANDOM_PORT, true);
     final String dir = TEST_DIR + dn.getUuid();
-    conf.set(OzoneConfigKeys.DFS_CONTAINER_RATIS_DATANODE_STORAGE_DIR, dir);
+    conf.set(OzoneConfigKeys.HDDS_CONTAINER_RATIS_DATANODE_STORAGE_DIR, dir);
     final ContainerDispatcher dispatcher = createDispatcher(dn,
         UUID.randomUUID(), conf);
     return XceiverServerRatis.newXceiverServerRatis(dn, conf, dispatcher,
@@ -318,9 +316,9 @@ public class TestSecureContainerServer {
       ContainerCommandResponseProto response = client.sendCommand(request);
       assertNotEquals(response.getResult(), ContainerProtos.Result.SUCCESS);
       String msg = response.getMessage();
-      assertTrue(msg.contains(BLOCK_TOKEN_VERIFICATION_FAILED.name()), msg);
+      assertThat(msg).contains(BLOCK_TOKEN_VERIFICATION_FAILED.name());
     } else {
-      final Throwable t = Assertions.assertThrows(Throwable.class,
+      final Throwable t = assertThrows(Throwable.class,
           () -> client.sendCommand(request));
       assertRootCauseMessage(BLOCK_TOKEN_VERIFICATION_FAILED.name(), t);
     }
@@ -331,7 +329,7 @@ public class TestSecureContainerServer {
     Throwable rootCause = ExceptionUtils.getRootCause(t);
     assertNotNull(rootCause);
     String msg = rootCause.getMessage();
-    assertTrue(msg.contains(contained), msg);
+    assertThat(msg).contains(contained);
   }
 
   private static String getToken(ContainerID containerID) throws IOException {

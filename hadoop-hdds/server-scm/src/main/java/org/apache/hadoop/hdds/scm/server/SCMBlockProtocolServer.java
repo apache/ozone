@@ -27,6 +27,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.concurrent.TimeoutException;
 
 import org.apache.commons.lang3.StringUtils;
@@ -70,8 +71,10 @@ import com.google.protobuf.BlockingService;
 import com.google.protobuf.ProtocolMessageEnum;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HANDLER_COUNT_DEFAULT;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HANDLER_COUNT_KEY;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_BLOCK_HANDLER_COUNT_KEY;
 import static org.apache.hadoop.hdds.scm.exceptions.SCMException.ResultCodes.IO_EXCEPTION;
 import static org.apache.hadoop.hdds.scm.net.NetConstants.NODE_COST_DEFAULT;
+import static org.apache.hadoop.hdds.scm.net.NetConstants.ROOT;
 import static org.apache.hadoop.hdds.scm.server.StorageContainerManager.startRpcServer;
 import static org.apache.hadoop.hdds.server.ServerUtils.getRemoteUserName;
 import static org.apache.hadoop.hdds.server.ServerUtils.updateRPCListenAddress;
@@ -106,9 +109,9 @@ public class SCMBlockProtocolServer implements
       StorageContainerManager scm) throws IOException {
     this.scm = scm;
     this.conf = conf;
-    final int handlerCount =
-        conf.getInt(OZONE_SCM_HANDLER_COUNT_KEY,
-            OZONE_SCM_HANDLER_COUNT_DEFAULT);
+    final int handlerCount = conf.getInt(OZONE_SCM_BLOCK_HANDLER_COUNT_KEY,
+        OZONE_SCM_HANDLER_COUNT_KEY, OZONE_SCM_HANDLER_COUNT_DEFAULT,
+            LOG::info);
 
     RPC.setProtocolEngine(conf, ScmBlockLocationProtocolPB.class,
         ProtobufRpcEngine.class);
@@ -202,15 +205,19 @@ public class SCMBlockProtocolServer implements
         AllocatedBlock block = scm.getScmBlockManager()
             .allocateBlock(size, replicationConfig, owner, excludeList);
         if (block != null) {
-          blocks.add(block);
           // Sort the datanodes if client machine is specified
           final Node client = getClientNode(clientMachine);
           if (client != null) {
             final List<DatanodeDetails> nodes = block.getPipeline().getNodes();
             final List<DatanodeDetails> sorted = scm.getClusterMap()
                 .sortByDistanceCost(client, nodes, nodes.size());
-            block.getPipeline().setNodesInOrder(sorted);
+            if (!Objects.equals(sorted, block.getPipeline().getNodesInOrder())) {
+              block = block.toBuilder()
+                  .setPipeline(block.getPipeline().copyWithNodesInOrder(sorted))
+                  .build();
+            }
           }
+          blocks.add(block);
         }
       }
 
@@ -409,6 +416,11 @@ public class SCMBlockProtocolServer implements
           clientMachine, e.getMessage());
     }
     return null;
+  }
+
+  @Override
+  public InnerNode getNetworkTopology() {
+    return (InnerNode) scm.getClusterMap().getNode(ROOT);
   }
 
   @Override

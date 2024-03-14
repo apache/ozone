@@ -26,8 +26,8 @@ import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
  * contains a Pipeline and the key.
  */
 public final class AllocatedBlock {
-  private Pipeline pipeline;
-  private ContainerBlockID containerBlockID;
+  private final Pipeline pipeline;
+  private final ContainerBlockID containerBlockID;
 
   /**
    * Builder for AllocatedBlock.
@@ -62,5 +62,15 @@ public final class AllocatedBlock {
 
   public ContainerBlockID getBlockID() {
     return containerBlockID;
+  }
+
+  public static Builder newBuilder() {
+    return new Builder();
+  }
+
+  public Builder toBuilder() {
+    return new Builder()
+        .setContainerBlockID(containerBlockID)
+        .setPipeline(pipeline);
   }
 }

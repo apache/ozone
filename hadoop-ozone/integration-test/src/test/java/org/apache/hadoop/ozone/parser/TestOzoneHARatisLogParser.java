@@ -34,7 +34,6 @@ import org.apache.hadoop.ozone.segmentparser.SCMRatisLogParser;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.tag.Flaky;
 import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
@@ -46,6 +45,9 @@ import java.util.UUID;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.hdds.HddsConfigKeys.OZONE_METADATA_DIRS;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 /**
  * Test Ozone OM and SCM HA Ratis log parser.
@@ -61,14 +63,10 @@ class TestOzoneHARatisLogParser {
 
   @BeforeEach
   void setup() throws Exception {
-    String clusterId = UUID.randomUUID().toString();
-    String scmId = UUID.randomUUID().toString();
     String omServiceId = "omServiceId1";
     OzoneConfiguration conf = new OzoneConfiguration();
     String scmServiceId = "scmServiceId";
-    cluster =  (MiniOzoneHAClusterImpl) MiniOzoneCluster.newHABuilder(conf)
-        .setClusterId(clusterId)
-        .setScmId(scmId)
+    cluster =  MiniOzoneCluster.newHABuilder(conf)
         .setOMServiceId(omServiceId)
         .setSCMServiceId(scmServiceId)
         .setNumOfOzoneManagers(3)
@@ -113,20 +111,20 @@ class TestOzoneHARatisLogParser {
 
     File omMetaDir = new File(ozoneConfiguration.get(OZONE_METADATA_DIRS),
         "ratis");
-    Assertions.assertTrue(omMetaDir.isDirectory());
+    assertThat(omMetaDir).isDirectory();
 
     String[] ratisDirs = omMetaDir.list();
-    Assertions.assertNotNull(ratisDirs);
-    Assertions.assertEquals(1, ratisDirs.length);
+    assertNotNull(ratisDirs);
+    assertEquals(1, ratisDirs.length);
 
     File groupDir = new File(omMetaDir, ratisDirs[0]);
 
-    Assertions.assertNotNull(groupDir);
-    Assertions.assertTrue(groupDir.isDirectory());
+    assertNotNull(groupDir);
+    assertThat(groupDir).isDirectory();
     File currentDir = new File(groupDir, "current");
     File logFile = new File(currentDir, "log_inprogress_0");
     GenericTestUtils.waitFor(logFile::exists, 100, 15000);
-    Assertions.assertTrue(logFile.isFile());
+    assertThat(logFile).isFile();
 
     OMRatisLogParser omRatisLogParser = new OMRatisLogParser();
     omRatisLogParser.setSegmentFile(logFile);
@@ -135,27 +133,26 @@ class TestOzoneHARatisLogParser {
 
     // Not checking total entry count, because of not sure of exact count of
     // metadata entry changes.
-    Assertions.assertTrue(out.toString(UTF_8.name())
-        .contains("Num Total Entries:"));
+    assertThat(out.toString(UTF_8.name())).contains("Num Total Entries:");
     out.reset();
 
     // Now check for SCM.
     File scmMetadataDir =
         new File(SCMHAUtils.getRatisStorageDir(leaderSCMConfig));
-    Assertions.assertTrue(scmMetadataDir.isDirectory());
+    assertThat(scmMetadataDir).isDirectory();
 
     ratisDirs = scmMetadataDir.list();
-    Assertions.assertNotNull(ratisDirs);
-    Assertions.assertEquals(1, ratisDirs.length);
+    assertNotNull(ratisDirs);
+    assertEquals(1, ratisDirs.length);
 
     groupDir = new File(scmMetadataDir, ratisDirs[0]);
 
-    Assertions.assertNotNull(groupDir);
-    Assertions.assertTrue(groupDir.isDirectory());
+    assertNotNull(groupDir);
+    assertThat(groupDir).isDirectory();
     currentDir = new File(groupDir, "current");
     logFile = new File(currentDir, "log_inprogress_1");
     GenericTestUtils.waitFor(logFile::exists, 100, 15000);
-    Assertions.assertTrue(logFile.isFile());
+    assertThat(logFile).isFile();
 
     SCMRatisLogParser scmRatisLogParser = new SCMRatisLogParser();
     scmRatisLogParser.setSegmentFile(logFile);
@@ -163,7 +160,6 @@ class TestOzoneHARatisLogParser {
 
     // Not checking total entry count, because of not sure of exact count of
     // metadata entry changes.
-    Assertions.assertTrue(out.toString(UTF_8.name())
-        .contains("Num Total Entries:"));
+    assertThat(out.toString(UTF_8.name())).contains("Num Total Entries:");
   }
 }

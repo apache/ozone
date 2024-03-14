@@ -17,20 +17,15 @@
  */
 package org.apache.ozone.rocksdb.util;
 
-import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.StringUtils;
-import org.apache.hadoop.hdds.utils.NativeLibraryLoader;
 import org.apache.hadoop.hdds.utils.NativeLibraryNotLoadedException;
 import org.apache.hadoop.hdds.utils.TestUtils;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedEnvOptions;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedOptions;
-import org.apache.hadoop.hdds.utils.db.managed.ManagedSSTDumpTool;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedRawSSTFileReader;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedSstFileWriter;
 import org.apache.ozone.test.tag.Native;
-import org.apache.ozone.test.tag.Unhealthy;
-import org.junit.jupiter.api.Assertions;
-import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
@@ -44,16 +39,16 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.SortedMap;
 import java.util.TreeMap;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.SynchronousQueue;
-import java.util.concurrent.ThreadPoolExecutor;
-import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import java.util.stream.Stream;
 
 import static org.apache.hadoop.hdds.utils.NativeConstants.ROCKS_TOOLS_NATIVE_LIBRARY_NAME;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
 /**
  * ManagedSstFileReader tests.
@@ -90,7 +85,7 @@ class TestSstFileSetReader {
       }
       sstFileWriter.finish();
     }
-    Assertions.assertTrue(file.exists());
+    assertTrue(file.exists());
     return file.getAbsolutePath();
   }
 
@@ -149,11 +144,11 @@ class TestSstFileSetReader {
                  new SstFileSetReader(files).getKeyStream(
                      lowerBound.orElse(null), upperBound.orElse(null))) {
           keyStream.forEach(key -> {
-            Assertions.assertEquals(1, keysInBoundary.get(key));
-            Assertions.assertNotNull(keysInBoundary.remove(key));
+            assertEquals(1, keysInBoundary.get(key));
+            assertNotNull(keysInBoundary.remove(key));
           });
           keysInBoundary.values()
-              .forEach(val -> Assertions.assertEquals(0, val));
+              .forEach(val -> assertEquals(0, val));
         }
       }
     }
@@ -162,51 +157,38 @@ class TestSstFileSetReader {
   @Native(ROCKS_TOOLS_NATIVE_LIBRARY_NAME)
   @ParameterizedTest
   @ValueSource(ints = {0, 1, 2, 3, 7, 10})
-  @Unhealthy("HDDS-9274")
   public void testGetKeyStreamWithTombstone(int numberOfFiles)
       throws RocksDBException, IOException, NativeLibraryNotLoadedException {
-    Assumptions.assumeTrue(NativeLibraryLoader.getInstance()
-        .loadLibrary(ROCKS_TOOLS_NATIVE_LIBRARY_NAME));
+    assumeTrue(ManagedRawSSTFileReader.loadLibrary());
     Pair<SortedMap<String, Integer>, List<String>> data =
         createDummyData(numberOfFiles);
     List<String> files = data.getRight();
     SortedMap<String, Integer> keys = data.getLeft();
-    ExecutorService executorService = new ThreadPoolExecutor(0,
-        2, 60, TimeUnit.SECONDS,
-        new SynchronousQueue<>(), new ThreadFactoryBuilder()
-        .setNameFormat("snapshot-diff-manager-sst-dump-tool-TID-%d")
-        .build(), new ThreadPoolExecutor.DiscardPolicy());
-    ManagedSSTDumpTool sstDumpTool =
-        new ManagedSSTDumpTool(executorService, 256);
     // Getting every possible combination of 2 elements from the sampled keys.
     // Reading the sst file lying within the given bounds and
     // validating the keys read from the sst file.
     List<Optional<String>> bounds = TestUtils.getTestingBounds(keys);
-    try {
-      for (Optional<String> lowerBound : bounds) {
-        for (Optional<String> upperBound : bounds) {
-          // Calculating the expected keys which lie in the given boundary.
-          Map<String, Integer> keysInBoundary =
-              keys.entrySet().stream().filter(entry -> lowerBound
-                      .map(l -> entry.getKey().compareTo(l) >= 0)
-                      .orElse(true)  &&
-                      upperBound.map(u -> entry.getKey().compareTo(u) < 0)
-                          .orElse(true))
-                  .collect(Collectors.toMap(Map.Entry::getKey,
-                      Map.Entry::getValue));
-          try (Stream<String> keyStream = new SstFileSetReader(files)
-              .getKeyStreamWithTombstone(sstDumpTool, lowerBound.orElse(null),
-                  upperBound.orElse(null))) {
-            keyStream.forEach(
-                key -> {
-                  Assertions.assertNotNull(keysInBoundary.remove(key));
-                });
-          }
-          Assertions.assertEquals(0, keysInBoundary.size());
+    for (Optional<String> lowerBound : bounds) {
+      for (Optional<String> upperBound : bounds) {
+        // Calculating the expected keys which lie in the given boundary.
+        Map<String, Integer> keysInBoundary =
+            keys.entrySet().stream().filter(entry -> lowerBound
+                    .map(l -> entry.getKey().compareTo(l) >= 0)
+                    .orElse(true)  &&
+                    upperBound.map(u -> entry.getKey().compareTo(u) < 0)
+                        .orElse(true))
+                .collect(Collectors.toMap(Map.Entry::getKey,
+                    Map.Entry::getValue));
+        try (Stream<String> keyStream = new SstFileSetReader(files)
+            .getKeyStreamWithTombstone(lowerBound.orElse(null),
+                upperBound.orElse(null))) {
+          keyStream.forEach(
+              key -> {
+                assertNotNull(keysInBoundary.remove(key));
+              });
         }
+        assertEquals(0, keysInBoundary.size());
       }
-    } finally {
-      executorService.shutdown();
     }
   }
 }

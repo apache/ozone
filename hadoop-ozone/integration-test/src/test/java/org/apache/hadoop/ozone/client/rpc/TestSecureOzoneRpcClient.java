@@ -76,6 +76,7 @@ import java.util.UUID;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.hdds.HddsConfigKeys.OZONE_METADATA_DIRS;
+import static org.apache.ozone.test.GenericTestUtils.getTestStartTime;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -94,8 +95,6 @@ public class TestSecureOzoneRpcClient extends TestOzoneRpcClient {
   private static StorageContainerLocationProtocolClientSideTranslatorPB
       storageContainerLocationClient;
 
-  private static final String SCM_ID = UUID.randomUUID().toString();
-  private static final String CLUSTER_ID = UUID.randomUUID().toString();
   private static File testDir;
   private static OzoneConfiguration conf;
 
@@ -128,8 +127,6 @@ public class TestSecureOzoneRpcClient extends TestOzoneRpcClient {
         OMConfigKeys.OZONE_BUCKET_LAYOUT_OBJECT_STORE);
     cluster = MiniOzoneCluster.newBuilder(conf)
         .setNumDatanodes(14)
-        .setScmId(SCM_ID)
-        .setClusterId(CLUSTER_ID)
         .setCertificateClient(certificateClientTest)
         .setSecretKeyClient(new SecretKeyTestClient())
         .build();
@@ -146,7 +143,6 @@ public class TestSecureOzoneRpcClient extends TestOzoneRpcClient {
     TestOzoneRpcClient.setStorageContainerLocationClient(
         storageContainerLocationClient);
     TestOzoneRpcClient.setStore(store);
-    TestOzoneRpcClient.setClusterId(CLUSTER_ID);
   }
 
   /**
@@ -166,7 +162,7 @@ public class TestSecureOzoneRpcClient extends TestOzoneRpcClient {
       BucketLayout bucketLayout) throws Exception {
     String volumeName = UUID.randomUUID().toString();
     String bucketName = UUID.randomUUID().toString();
-    Instant testStartTime = Instant.now();
+    Instant testStartTime = getTestStartTime();
     OMMetadataManager omMetadataManager = ozoneManager.getMetadataManager();
 
     String value = "sample value";
@@ -263,7 +259,7 @@ public class TestSecureOzoneRpcClient extends TestOzoneRpcClient {
 
     // Add secret to S3Secret table.
     s3SecretManager.storeSecret(accessKey,
-        new S3SecretValue(accessKey, secret));
+        S3SecretValue.of(accessKey, secret));
 
     OMRequest writeRequest = OMRequest.newBuilder()
         .setCmdType(OzoneManagerProtocolProtos.Type.CreateVolume)
@@ -312,7 +308,7 @@ public class TestSecureOzoneRpcClient extends TestOzoneRpcClient {
 
     // Override secret to S3Secret store with some dummy value
     s3SecretManager
-        .storeSecret(accessKey, new S3SecretValue(accessKey, "dummy"));
+        .storeSecret(accessKey, S3SecretValue.of(accessKey, "dummy"));
 
     // Write request with invalid credentials.
     omResponse = cluster.getOzoneManager().getOmServerProtocol()

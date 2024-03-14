@@ -52,7 +52,7 @@ import org.apache.hadoop.ozone.om.protocolPB.OmTransport;
 import org.apache.hadoop.util.DataChecksum;
 import org.apache.hadoop.util.Time;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
-import org.jetbrains.annotations.NotNull;
+import jakarta.annotation.Nonnull;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -72,9 +72,9 @@ import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Che
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.when;
 import static org.mockito.Mockito.mock;
-import static org.mockito.ArgumentMatchers.any;
 
 /**
  * Unit tests for ReplicatedFileChecksumHelper class.
@@ -101,7 +101,7 @@ public class TestReplicatedFileChecksumHelper {
         return new MockOmTransport();
       }
 
-      @NotNull
+      @Nonnull
       @Override
       protected XceiverClientFactory createXceiverClientFactory(
           ServiceInfoEx serviceInfo) {

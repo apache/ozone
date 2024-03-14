@@ -26,9 +26,11 @@ import java.io.InputStream;
 import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.Response;
 import org.apache.commons.io.IOUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
@@ -52,10 +54,12 @@ import static org.apache.hadoop.ozone.s3.util.S3Consts.STORAGE_CLASS_HEADER;
 import static org.apache.hadoop.ozone.s3.util.S3Utils.urlEncode;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.eq;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -108,9 +112,12 @@ public class TestObjectPut {
             .readKey(keyName);
     String keyContent =
         IOUtils.toString(ozoneInputStream, UTF_8);
+    OzoneKeyDetails keyDetails = clientStub.getObjectStore().getS3Bucket(bucketName).getKey(keyName);
 
     assertEquals(200, response.getStatus());
     assertEquals(CONTENT, keyContent);
+    assertNotNull(keyDetails.getMetadata());
+    assertTrue(StringUtils.isNotEmpty(keyDetails.getMetadata().get(OzoneConsts.ETAG)));
   }
 
   @Test
@@ -136,9 +143,12 @@ public class TestObjectPut {
             .readKey(keyName);
     String keyContent =
         IOUtils.toString(ozoneInputStream, UTF_8);
+    OzoneKeyDetails keyDetails = clientStub.getObjectStore().getS3Bucket(bucketName).getKey(keyName);
 
     assertEquals(200, response.getStatus());
     assertEquals(CONTENT, keyContent);
+    assertNotNull(keyDetails.getMetadata());
+    assertTrue(StringUtils.isNotEmpty(keyDetails.getMetadata().get(OzoneConsts.ETAG)));
   }
 
   @Test
@@ -208,9 +218,12 @@ public class TestObjectPut {
         clientStub.getObjectStore().getS3Bucket(bucketName)
             .readKey(keyName);
     String keyContent = IOUtils.toString(ozoneInputStream, UTF_8);
+    OzoneKeyDetails keyDetails = clientStub.getObjectStore().getS3Bucket(bucketName).getKey(keyName);
 
     assertEquals(200, response.getStatus());
     assertEquals("1234567890abcde", keyContent);
+    assertNotNull(keyDetails.getMetadata());
+    assertTrue(StringUtils.isNotEmpty(keyDetails.getMetadata().get(OzoneConsts.ETAG)));
   }
 
   @Test
@@ -230,10 +243,14 @@ public class TestObjectPut {
         .readKey(keyName);
 
     String keyContent = IOUtils.toString(ozoneInputStream, UTF_8);
+    OzoneKeyDetails keyDetails = clientStub.getObjectStore().getS3Bucket(bucketName).getKey(keyName);
 
     assertEquals(200, response.getStatus());
     assertEquals(CONTENT, keyContent);
+    assertNotNull(keyDetails.getMetadata());
+    assertTrue(StringUtils.isNotEmpty(keyDetails.getMetadata().get(OzoneConsts.ETAG)));
 
+    String sourceETag = keyDetails.getMetadata().get(OzoneConsts.ETAG);
 
     // Add copy header, and then call put
     when(headers.getHeaderString(COPY_SOURCE_HEADER)).thenReturn(
@@ -247,9 +264,19 @@ public class TestObjectPut {
         .readKey(destkey);
 
     keyContent = IOUtils.toString(ozoneInputStream, UTF_8);
+    OzoneKeyDetails sourceKeyDetails = clientStub.getObjectStore()
+        .getS3Bucket(bucketName).getKey(keyName);
+    OzoneKeyDetails destKeyDetails = clientStub.getObjectStore()
+        .getS3Bucket(destBucket).getKey(destkey);
 
     assertEquals(200, response.getStatus());
     assertEquals(CONTENT, keyContent);
+    assertNotNull(keyDetails.getMetadata());
+    assertTrue(StringUtils.isNotEmpty(keyDetails.getMetadata().get(OzoneConsts.ETAG)));
+    // Source key eTag should remain unchanged and the dest key should have
+    // the same Etag since the key content is the same
+    assertEquals(sourceETag, sourceKeyDetails.getMetadata().get(OzoneConsts.ETAG));
+    assertEquals(sourceETag, destKeyDetails.getMetadata().get(OzoneConsts.ETAG));
 
     // source and dest same
     OS3Exception e = assertThrows(OS3Exception.class, () -> objectEndpoint.put(

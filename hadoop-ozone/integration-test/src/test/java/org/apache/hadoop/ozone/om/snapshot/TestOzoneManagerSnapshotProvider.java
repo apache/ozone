@@ -18,8 +18,6 @@
 
 package org.apache.hadoop.ozone.om.snapshot;
 
-import java.util.UUID;
-
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.IOUtils;
@@ -54,8 +52,6 @@ public class TestOzoneManagerSnapshotProvider {
   private MiniOzoneHAClusterImpl cluster = null;
   private ObjectStore objectStore;
   private OzoneConfiguration conf;
-  private String clusterId;
-  private String scmId;
   private String omServiceId;
   private int numOfOMs = 3;
 
@@ -67,14 +63,10 @@ public class TestOzoneManagerSnapshotProvider {
   @BeforeEach
   public void init() throws Exception {
     conf = new OzoneConfiguration();
-    clusterId = UUID.randomUUID().toString();
-    scmId = UUID.randomUUID().toString();
     omServiceId = "om-service-test1";
     conf.setBoolean(OMConfigKeys.OZONE_OM_HTTP_ENABLED_KEY, true);
     conf.setBoolean(OMConfigKeys.OZONE_OM_RATIS_ENABLE_KEY, true);
-    cluster = (MiniOzoneHAClusterImpl) MiniOzoneCluster.newOMHABuilder(conf)
-        .setClusterId(clusterId)
-        .setScmId(scmId)
+    cluster = MiniOzoneCluster.newHABuilder(conf)
         .setOMServiceId(omServiceId)
         .setNumOfOzoneManagers(numOfOMs)
         .build();

@@ -22,7 +22,6 @@ import java.io.IOException;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.Collections;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
@@ -91,11 +90,9 @@ public class TestOzoneManagerRatisServer {
   }
   
   @BeforeEach
-  public void init() throws Exception {
+  public void init(@TempDir Path metaDirPath) throws Exception {
     conf = new OzoneConfiguration();
     omID = UUID.randomUUID().toString();
-    final String path = GenericTestUtils.getTempPath(omID);
-    Path metaDirPath = Paths.get(path, "om-meta");
     conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, metaDirPath.toString());
     conf.setTimeDuration(OMConfigKeys.OZONE_OM_RATIS_MINIMUM_TIMEOUT_KEY,
         RATIS_RPC_TIMEOUT, TimeUnit.MILLISECONDS);
@@ -215,13 +212,11 @@ public class TestOzoneManagerRatisServer {
   }
 
   @Test
-  public void verifyRaftGroupIdGenerationWithCustomOmServiceId() throws
+  public void verifyRaftGroupIdGenerationWithCustomOmServiceId(@TempDir Path metaDirPath) throws
       Exception {
     String customOmServiceId = "omSIdCustom123";
     OzoneConfiguration newConf = new OzoneConfiguration();
     String newOmId = UUID.randomUUID().toString();
-    String path = GenericTestUtils.getTempPath(newOmId);
-    Path metaDirPath = Paths.get(path, "om-meta");
     newConf.set(HddsConfigKeys.OZONE_METADATA_DIRS, metaDirPath.toString());
     newConf.setTimeDuration(OMConfigKeys.OZONE_OM_RATIS_MINIMUM_TIMEOUT_KEY,
         RATIS_RPC_TIMEOUT, TimeUnit.MILLISECONDS);

@@ -42,7 +42,6 @@ import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.junit.jupiter.api.Assertions.fail;
 
 /**
  * Testing OMStorage class.
@@ -103,16 +102,12 @@ public class TestOMStorage {
   }
 
   @Test
-  public void testSetOmIdOnNotInitializedStorage() throws Exception {
+  void testSetOmIdOnNotInitializedStorage() throws Exception {
     OMStorage storage = new OMStorage(configWithOMDBDir());
     assertNotEquals(INITIALIZED, storage.getState());
 
     String omId = "omId";
-    try {
-      storage.setOmId(omId);
-    } catch (IOException e) {
-      fail("Can not set OmId on a Storage that is not initialized.");
-    }
+    storage.setOmId(omId);
     assertEquals(omId, storage.getOmId());
     assertGetNodeProperties(storage, omId);
   }
@@ -145,16 +140,12 @@ public class TestOMStorage {
   }
 
   @Test
-  public void testSetOmNodeIdOnNotInitializedStorage() throws Exception {
+  void testSetOmNodeIdOnNotInitializedStorage() throws Exception {
     OMStorage storage = new OMStorage(configWithOMDBDir());
     assertNotEquals(INITIALIZED, storage.getState());
 
     String nodeId = "nodeId";
-    try {
-      storage.setOmNodeId(nodeId);
-    } catch (IOException e) {
-      fail("Can not set OmNodeId on a Storage that is not initialized.");
-    }
+    storage.setOmNodeId(nodeId);
     assertEquals(nodeId, storage.getOmNodeId());
     assertGetNodeProperties(storage, null, nodeId);
   }

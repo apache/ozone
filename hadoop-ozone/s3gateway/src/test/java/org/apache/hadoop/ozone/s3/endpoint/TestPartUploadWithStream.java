@@ -22,6 +22,7 @@ package org.apache.hadoop.ozone.s3.endpoint;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
+import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientStub;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
@@ -39,8 +40,8 @@ import static org.apache.hadoop.ozone.s3.util.S3Consts.STORAGE_CLASS_HEADER;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.junit.jupiter.api.Assertions.fail;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -67,7 +68,7 @@ public class TestPartUploadWithStream {
     REST.setClient(client);
 
     OzoneConfiguration conf = new OzoneConfiguration();
-    conf.setBoolean(OzoneConfigKeys.DFS_CONTAINER_RATIS_DATASTREAM_ENABLED,
+    conf.setBoolean(OzoneConfigKeys.HDDS_CONTAINER_RATIS_DATASTREAM_ENABLED,
         true);
     REST.setOzoneConfiguration(conf);
     REST.init();
@@ -95,7 +96,7 @@ public class TestPartUploadWithStream {
     response = REST.put(S3BUCKET, S3KEY,
         content.length(), 1, uploadID, body);
 
-    assertNotNull(response.getHeaderString("ETag"));
+    assertNotNull(response.getHeaderString(OzoneConsts.ETAG));
 
   }
 
@@ -116,31 +117,29 @@ public class TestPartUploadWithStream {
     response = REST.put(S3BUCKET, S3KEY,
         content.length(), 1, uploadID, body);
 
-    assertNotNull(response.getHeaderString("ETag"));
+    assertNotNull(response.getHeaderString(OzoneConsts.ETAG));
 
-    String eTag = response.getHeaderString("ETag");
+    String eTag = response.getHeaderString(OzoneConsts.ETAG);
 
     // Upload part again with same part Number, the ETag should be changed.
     content = "Multipart Upload Changed";
     response = REST.put(S3BUCKET, S3KEY,
         content.length(), 1, uploadID, body);
-    assertNotNull(response.getHeaderString("ETag"));
-    assertNotEquals(eTag, response.getHeaderString("ETag"));
+    assertNotNull(response.getHeaderString(OzoneConsts.ETAG));
+    assertNotEquals(eTag, response.getHeaderString(OzoneConsts.ETAG));
 
   }
 
   @Test
   public void testPartUploadWithIncorrectUploadID() throws Exception {
-    try {
+    OS3Exception ex = assertThrows(OS3Exception.class, () -> {
       String content = "Multipart Upload With Incorrect uploadID";
       ByteArrayInputStream body =
           new ByteArrayInputStream(content.getBytes(UTF_8));
       REST.put(S3BUCKET, S3KEY, content.length(), 1,
           "random", body);
-      fail("testPartUploadWithIncorrectUploadID failed");
-    } catch (OS3Exception ex) {
-      assertEquals("NoSuchUpload", ex.getCode());
-      assertEquals(HTTP_NOT_FOUND, ex.getHttpCode());
-    }
+    });
+    assertEquals("NoSuchUpload", ex.getCode());
+    assertEquals(HTTP_NOT_FOUND, ex.getHttpCode());
   }
 }

@@ -23,7 +23,8 @@ import com.google.common.base.Preconditions;
 /**
  * SCM Node Metric that is used in the placement classes.
  */
-public class SCMNodeMetric  implements DatanodeMetric<SCMNodeStat, Long> {
+public class SCMNodeMetric implements DatanodeMetric<SCMNodeStat, Long>,
+    Comparable<SCMNodeMetric> {
   private SCMNodeStat stat;
 
   /**
@@ -195,12 +196,12 @@ public class SCMNodeMetric  implements DatanodeMetric<SCMNodeStat, Long> {
    * @throws ClassCastException   if the specified object's type prevents it
    *                              from being compared to this object.
    */
-  //@Override
-  public int compareTo(SCMNodeStat o) {
-    if (isEqual(o)) {
+  @Override
+  public int compareTo(SCMNodeMetric o) {
+    if (isEqual(o.get())) {
       return 0;
     }
-    if (isGreater(o)) {
+    if (isGreater(o.get())) {
       return 1;
     } else {
       return -1;
@@ -224,5 +225,10 @@ public class SCMNodeMetric  implements DatanodeMetric<SCMNodeStat, Long> {
   @Override
   public int hashCode() {
     return stat != null ? stat.hashCode() : 0;
+  }
+
+  @Override
+  public String toString() {
+    return "SCMNodeMetric{" + stat.toString() + '}';
   }
 }

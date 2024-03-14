@@ -43,8 +43,8 @@ import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.FEAT
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.junit.jupiter.api.Assertions.fail;
 import static org.mockito.Mockito.doCallRealMethod;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -116,12 +116,10 @@ public class TestOMMultiTenantManager {
    */
   private void expectConfigCheckToFail(OzoneManager ozoneManager,
       OzoneConfiguration conf) {
-    try {
-      OMMultiTenantManager.checkAndEnableMultiTenancy(ozoneManager, conf);
-      fail("Should have thrown RuntimeException");
-    } catch (RuntimeException e) {
-      assertThat(e.getMessage()).contains("Failed to meet");
-    }
+    RuntimeException e =
+        assertThrows(RuntimeException.class,
+            () -> OMMultiTenantManager.checkAndEnableMultiTenancy(ozoneManager, conf));
+    assertThat(e.getMessage()).contains("Failed to meet");
   }
 
   /**
@@ -158,7 +156,7 @@ public class TestOMMultiTenantManager {
 
     // Check that Multi-Tenancy read requests are blocked when not enabled
     final OzoneManagerRequestHandler ozoneManagerRequestHandler =
-        new OzoneManagerRequestHandler(ozoneManager, null);
+        new OzoneManagerRequestHandler(ozoneManager);
 
     expectReadRequestToFail(ozoneManagerRequestHandler,
         OMRequestTestUtils.listUsersInTenantRequest(tenantId));
@@ -176,12 +174,9 @@ public class TestOMMultiTenantManager {
    */
   private void expectWriteRequestToFail(OzoneManager om, OMRequest omRequest)
       throws IOException {
-    try {
-      OzoneManagerRatisUtils.createClientRequest(omRequest, om);
-      fail("Should have thrown OMException");
-    } catch (OMException e) {
-      assertEquals(FEATURE_NOT_ENABLED, e.getResult());
-    }
+    OMException e =
+        assertThrows(OMException.class, () -> OzoneManagerRatisUtils.createClientRequest(omRequest, om));
+    assertEquals(FEATURE_NOT_ENABLED, e.getResult());
   }
 
   /**

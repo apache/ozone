@@ -25,13 +25,12 @@ import org.apache.hadoop.hdds.utils.db.Proto2Codec;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.storage.proto.OzoneManagerStorageProtos.PersistedPrefixInfo;
 
-import java.util.BitSet;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.stream.Collectors;
 
 /**
  * Wrapper class for Ozone prefix path info, currently mainly target for ACL but
@@ -49,15 +48,15 @@ public final class OmPrefixInfo extends WithObjectID {
   }
 
   private String name;
-  private List<OzoneAcl> acls;
+  private final List<OzoneAcl> acls;
 
   public OmPrefixInfo(String name, List<OzoneAcl> acls,
       Map<String, String> metadata, long objectId, long updateId) {
     this.name = name;
     this.acls = acls;
-    this.metadata = metadata;
-    this.objectID = objectId;
-    this.updateID = updateId;
+    setMetadata(metadata);
+    setObjectID(objectId);
+    setUpdateID(updateId);
   }
 
   /**
@@ -164,7 +163,9 @@ public final class OmPrefixInfo extends WithObjectID {
   public PersistedPrefixInfo getProtobuf() {
     PersistedPrefixInfo.Builder pib =
         PersistedPrefixInfo.newBuilder().setName(name)
-        .addAllMetadata(KeyValueUtil.toProtobuf(metadata));
+        .addAllMetadata(KeyValueUtil.toProtobuf(getMetadata()))
+        .setObjectID(getObjectID())
+        .setUpdateID(getUpdateID());
     if (acls != null) {
       pib.addAllAcls(OzoneAclStorageUtil.toProtobuf(acls));
     }
@@ -186,6 +187,14 @@ public final class OmPrefixInfo extends WithObjectID {
     if (prefixInfo.getAclsList() != null) {
       opib.setAcls(OzoneAclStorageUtil.fromProtobuf(prefixInfo.getAclsList()));
     }
+
+    if (prefixInfo.hasObjectID()) {
+      opib.setObjectID(prefixInfo.getObjectID());
+    }
+
+    if (prefixInfo.hasUpdateID()) {
+      opib.setUpdateID(prefixInfo.getUpdateID());
+    }
     return opib.build();
   }
 
@@ -200,28 +209,36 @@ public final class OmPrefixInfo extends WithObjectID {
     OmPrefixInfo that = (OmPrefixInfo) o;
     return name.equals(that.name) &&
         Objects.equals(acls, that.acls) &&
-        Objects.equals(metadata, that.metadata);
+        Objects.equals(getMetadata(), that.getMetadata()) &&
+        getObjectID() == that.getObjectID() &&
+        getUpdateID() == that.getUpdateID();
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(name);
+    return Objects.hash(name, acls, getMetadata(), getObjectID(), getUpdateID());
+  }
+
+  @Override
+  public String toString() {
+    return "OmPrefixInfo{" +
+        "name='" + name + '\'' +
+        ", acls=" + acls +
+        ", metadata=" + getMetadata() +
+        ", objectID=" + getObjectID() +
+        ", updateID=" + getUpdateID() +
+        '}';
   }
 
   /**
    * Return a new copy of the object.
    */
   public OmPrefixInfo copyObject() {
-    List<OzoneAcl> aclList = acls.stream().map(acl ->
-        new OzoneAcl(acl.getType(), acl.getName(),
-            (BitSet) acl.getAclBitSet().clone(), acl.getAclScope()))
-        .collect(Collectors.toList());
-
     Map<String, String> metadataList = new HashMap<>();
-    if (metadata != null) {
-      metadata.forEach((k, v) -> metadataList.put(k, v));
+    if (getMetadata() != null) {
+      metadataList.putAll(getMetadata());
     }
-    return new OmPrefixInfo(name, aclList, metadataList, objectID, updateID);
+    return new OmPrefixInfo(name, new ArrayList<>(acls), metadataList, getObjectID(), getUpdateID());
   }
 }
 

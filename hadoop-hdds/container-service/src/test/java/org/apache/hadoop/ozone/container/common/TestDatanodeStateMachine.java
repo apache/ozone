@@ -28,8 +28,6 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
-import org.apache.hadoop.fs.FileUtil;
-import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
@@ -52,10 +50,10 @@ import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import static org.apache.hadoop.hdds.scm.ScmConfigKeys.HDDS_DATANODE_DIR_KEY;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HEARTBEAT_RPC_TIMEOUT;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -70,29 +68,30 @@ public class TestDatanodeStateMachine {
       LoggerFactory.getLogger(TestDatanodeStateMachine.class);
   // Changing it to 1, as current code checks for multiple scm directories,
   // and fail if exists
-  private final int scmServerCount = 1;
+  private static final int SCM_SERVER_COUNT = 1;
   private List<String> serverAddresses;
   private List<RPC.Server> scmServers;
   private List<ScmTestMock> mockServers;
   private ExecutorService executorService;
   private OzoneConfiguration conf;
+  @TempDir
   private File testRoot;
 
   @BeforeEach
-  public void setUp() throws Exception {
-    conf = SCMTestUtils.getConf();
+  void setUp() throws Exception {
+    conf = SCMTestUtils.getConf(testRoot);
     conf.setTimeDuration(OZONE_SCM_HEARTBEAT_RPC_TIMEOUT, 500,
         TimeUnit.MILLISECONDS);
-    conf.setBoolean(OzoneConfigKeys.DFS_CONTAINER_RATIS_IPC_RANDOM_PORT, true);
-    conf.setBoolean(OzoneConfigKeys.DFS_CONTAINER_IPC_RANDOM_PORT, true);
-    conf.setBoolean(OzoneConfigKeys.DFS_CONTAINER_RATIS_DATASTREAM_ENABLED,
+    conf.setBoolean(OzoneConfigKeys.HDDS_CONTAINER_RATIS_IPC_RANDOM_PORT, true);
+    conf.setBoolean(OzoneConfigKeys.HDDS_CONTAINER_IPC_RANDOM_PORT, true);
+    conf.setBoolean(OzoneConfigKeys.HDDS_CONTAINER_RATIS_DATASTREAM_ENABLED,
         true);
     conf.setBoolean(
-        OzoneConfigKeys.DFS_CONTAINER_RATIS_DATASTREAM_RANDOM_PORT, true);
+        OzoneConfigKeys.HDDS_CONTAINER_RATIS_DATASTREAM_RANDOM_PORT, true);
     serverAddresses = new ArrayList<>();
     scmServers = new ArrayList<>();
     mockServers = new ArrayList<>();
-    for (int x = 0; x < scmServerCount; x++) {
+    for (int x = 0; x < SCM_SERVER_COUNT; x++) {
       int port = SCMTestUtils.getReuseableAddress().getPort();
       String address = "127.0.0.1";
       serverAddresses.add(address + ":" + port);
@@ -105,22 +104,6 @@ public class TestDatanodeStateMachine {
     conf.setStrings(ScmConfigKeys.OZONE_SCM_NAMES,
         serverAddresses.toArray(new String[0]));
 
-    String path = GenericTestUtils
-        .getTempPath(TestDatanodeStateMachine.class.getSimpleName());
-    testRoot = new File(path);
-    if (!testRoot.mkdirs()) {
-      LOG.info("Required directories {} already exist.", testRoot);
-    }
-
-    File dataDir = new File(testRoot, "data");
-    conf.set(HDDS_DATANODE_DIR_KEY, dataDir.getAbsolutePath());
-    if (!dataDir.mkdirs()) {
-      LOG.info("Data dir create failed.");
-    }
-    conf.set(HddsConfigKeys.OZONE_METADATA_DIRS,
-        new File(testRoot, "scm").getAbsolutePath());
-    path = new File(testRoot, "datanodeID").getAbsolutePath();
-    conf.set(ScmConfigKeys.OZONE_SCM_DATANODE_ID_DIR, path);
     executorService = HadoopExecutors.newCachedThreadPool(
         new ThreadFactoryBuilder().setDaemon(true)
             .setNameFormat("TestDataNodeStateMachineThread-%d").build());
@@ -149,8 +132,6 @@ public class TestDatanodeStateMachine {
       }
     } catch (Exception e) {
       //ignore all exception from the shutdown
-    } finally {
-      FileUtil.fullyDelete(testRoot);
     }
   }
 
@@ -219,7 +200,7 @@ public class TestDatanodeStateMachine {
     DatanodeDetails datanodeDetails = getNewDatanodeDetails();
     DatanodeDetails.Port port = DatanodeDetails.newPort(
         DatanodeDetails.Port.Name.STANDALONE,
-        OzoneConfigKeys.DFS_CONTAINER_IPC_PORT_DEFAULT);
+        OzoneConfigKeys.HDDS_CONTAINER_IPC_PORT_DEFAULT);
     datanodeDetails.setPort(port);
     ContainerUtils.writeDatanodeDetailsTo(datanodeDetails, idPath, conf);
     try (DatanodeStateMachine stateMachine =
@@ -346,7 +327,7 @@ public class TestDatanodeStateMachine {
     DatanodeDetails datanodeDetails = getNewDatanodeDetails();
     DatanodeDetails.Port port = DatanodeDetails.newPort(
         DatanodeDetails.Port.Name.STANDALONE,
-        OzoneConfigKeys.DFS_CONTAINER_IPC_PORT_DEFAULT);
+        OzoneConfigKeys.HDDS_CONTAINER_IPC_PORT_DEFAULT);
     datanodeDetails.setPort(port);
 
     try (DatanodeStateMachine stateMachine =

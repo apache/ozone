@@ -48,7 +48,6 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
-import org.mockito.Mockito;
 
 import java.io.File;
 import java.io.IOException;
@@ -68,7 +67,10 @@ import java.util.UUID;
 import java.util.stream.Stream;
 
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_SCM_WAIT_TIME_AFTER_SAFE_MODE_EXIT;
-import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.any;
+import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
@@ -166,36 +168,36 @@ public class TestReplicationManagerScenarios {
   public void setup() throws IOException, NodeNotFoundException {
     configuration = new OzoneConfiguration();
     configuration.set(HDDS_SCM_WAIT_TIME_AFTER_SAFE_MODE_EXIT, "0s");
-    containerManager = Mockito.mock(ContainerManager.class);
+    containerManager = mock(ContainerManager.class);
 
-    scmContext = Mockito.mock(SCMContext.class);
-    nodeManager = Mockito.mock(NodeManager.class);
+    scmContext = mock(SCMContext.class);
+    nodeManager = mock(NodeManager.class);
 
     ratisPlacementPolicy = ReplicationTestUtil.getSimpleTestPlacementPolicy(nodeManager, configuration);
     ecPlacementPolicy = ReplicationTestUtil.getSimpleTestPlacementPolicy(nodeManager, configuration);
 
     commandsSent = new HashSet<>();
-    eventPublisher = Mockito.mock(EventPublisher.class);
-    Mockito.doAnswer(invocation -> {
+    eventPublisher = mock(EventPublisher.class);
+    doAnswer(invocation -> {
       commandsSent.add(Pair.of(invocation.getArgument(0),
           invocation.getArgument(1)));
       return null;
     }).when(nodeManager).addDatanodeCommand(any(), any());
 
-    legacyReplicationManager = Mockito.mock(LegacyReplicationManager.class);
+    legacyReplicationManager = mock(LegacyReplicationManager.class);
     clock = new TestClock(Instant.now(), ZoneId.systemDefault());
     containerReplicaPendingOps = new ContainerReplicaPendingOps(clock);
 
-    Mockito.when(containerManager.getContainerReplicas(Mockito.any(ContainerID.class))).thenAnswer(
+    when(containerManager.getContainerReplicas(any(ContainerID.class))).thenAnswer(
         invocation -> {
           ContainerID cid = invocation.getArgument(0);
           return containerReplicaMap.get(cid);
         });
 
-    Mockito.when(containerManager.getContainers()).thenAnswer(
+    when(containerManager.getContainers()).thenAnswer(
         invocation -> new ArrayList<>(containerInfoSet));
 
-    Mockito.when(nodeManager.getNodeStatus(any(DatanodeDetails.class)))
+    when(nodeManager.getNodeStatus(any(DatanodeDetails.class)))
         .thenAnswer(invocation -> {
           DatanodeDetails dn = invocation.getArgument(0);
           return NODE_STATUS_MAP.getOrDefault(dn, NodeStatus.inServiceHealthy());
@@ -205,14 +207,14 @@ public class TestReplicationManagerScenarios {
     for (SCMCommandProto.Type type : SCMCommandProto.Type.values()) {
       countMap.put(type, 0);
     }
-    Mockito.when(
+    when(
         nodeManager.getTotalDatanodeCommandCounts(any(DatanodeDetails.class),
             any(SCMCommandProto.Type.class), any(SCMCommandProto.Type.class)))
         .thenReturn(countMap);
 
     // Ensure that RM will run when asked.
-    Mockito.when(scmContext.isLeaderReady()).thenReturn(true);
-    Mockito.when(scmContext.isInSafeMode()).thenReturn(false);
+    when(scmContext.isLeaderReady()).thenReturn(true);
+    when(scmContext.isInSafeMode()).thenReturn(false);
     containerReplicaMap = new HashMap<>();
     containerInfoSet = new HashSet<>();
     ORIGINS.clear();

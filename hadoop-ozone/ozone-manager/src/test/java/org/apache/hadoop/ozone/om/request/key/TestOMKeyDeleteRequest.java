@@ -28,7 +28,6 @@ import java.util.UUID;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
@@ -52,7 +51,7 @@ public class TestOMKeyDeleteRequest extends TestOMKeyRequest {
     OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName, omMetadataManager, getBucketLayout());
     String ozoneKey = addKeyToTable(testKeyName);
     OmKeyInfo omKeyInfo = omMetadataManager.getKeyTable(getBucketLayout()).get(ozoneKey);
-    Assertions.assertNotNull(omKeyInfo);
+    assertNotNull(omKeyInfo);
 
     doPreExecute(createDeleteKeyRequest(testKeyName));
   }
@@ -193,8 +192,8 @@ public class TestOMKeyDeleteRequest extends TestOMKeyRequest {
 
   protected String addKeyToTable(String key) throws Exception {
     OMRequestTestUtils.addKeyToTable(false, volumeName,
-            bucketName, key, clientID, replicationType, replicationFactor,
-            omMetadataManager);
+        bucketName, key, clientID, replicationConfig,
+        omMetadataManager);
 
     return omMetadataManager.getOzoneKey(volumeName, bucketName, key);
   }

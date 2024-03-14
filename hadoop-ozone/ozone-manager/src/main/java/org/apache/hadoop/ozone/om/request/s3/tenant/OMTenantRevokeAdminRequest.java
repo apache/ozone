@@ -18,7 +18,6 @@
  */
 package org.apache.hadoop.ozone.om.request.s3.tenant;
 
-import com.google.common.base.Optional;
 import com.google.common.base.Preconditions;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.ratis.server.protocol.TermIndex;
@@ -48,6 +47,7 @@ import java.io.IOException;
 import java.nio.file.InvalidPathException;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Optional;
 
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.VOLUME_LOCK;
 import static org.apache.hadoop.ozone.om.upgrade.OMLayoutFeature.MULTITENANCY_SCHEMA;

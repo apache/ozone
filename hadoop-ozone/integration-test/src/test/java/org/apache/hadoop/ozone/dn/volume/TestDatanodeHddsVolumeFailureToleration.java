@@ -24,6 +24,7 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.ozone.HddsDatanodeService;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
+import org.apache.hadoop.ozone.UniformDatanodesFactory;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
@@ -34,7 +35,6 @@ import org.apache.hadoop.util.ExitUtil;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.GenericTestUtils.LogCapturer;
 import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
@@ -56,6 +56,7 @@ import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_DEADNODE_INTERV
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HEARTBEAT_PROCESS_INTERVAL;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_STALENODE_INTERVAL;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_REPLICATION;
+import static org.assertj.core.api.Assertions.assertThat;
 
 /**
  * This class tests datanode can tolerate configured num of failed volumes.
@@ -90,7 +91,9 @@ public class TestDatanodeHddsVolumeFailureToleration {
     ozoneConfig.setFromObject(dnConf);
     cluster = MiniOzoneCluster.newBuilder(ozoneConfig)
         .setNumDatanodes(1)
-        .setNumDataVolumes(3)
+        .setDatanodeFactory(UniformDatanodesFactory.newBuilder()
+            .setNumDataVolumes(3)
+            .build())
         .build();
     cluster.waitForClusterToBeReady();
     datanodes = cluster.getHddsDatanodes();
@@ -141,8 +144,8 @@ public class TestDatanodeHddsVolumeFailureToleration {
     // cluster.
     GenericTestUtils.waitFor(() -> exitCapturer.getOutput()
         .contains("Exiting with status 1: ExitException"), 500, 60000);
-    Assertions.assertTrue(dsmCapturer.getOutput()
-        .contains("DatanodeStateMachine Shutdown due to too many bad volumes"));
+    assertThat(dsmCapturer.getOutput())
+        .contains("DatanodeStateMachine Shutdown due to too many bad volumes");
 
     // restore bad volumes
     DatanodeTestUtils.restoreBadRootDir(volRootDir0);

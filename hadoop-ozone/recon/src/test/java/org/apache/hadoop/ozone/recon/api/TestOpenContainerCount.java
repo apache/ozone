@@ -57,7 +57,6 @@ import org.apache.hadoop.ozone.recon.scm.ReconStorageContainerManagerFacade;
 import org.apache.hadoop.ozone.recon.spi.StorageContainerServiceProvider;
 import org.apache.hadoop.ozone.recon.spi.impl.OzoneManagerServiceProviderImpl;
 import org.apache.hadoop.ozone.recon.spi.impl.StorageContainerServiceProviderImpl;
-import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.LambdaTestUtils;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -68,11 +67,11 @@ import static org.apache.hadoop.ozone.container.upgrade.UpgradeUtils.defaultLayo
 import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.getRandomPipeline;
 import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.getTestReconOmMetadataManager;
 import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.initializeNewOmMetadataManager;
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.fail;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyBoolean;
-import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.any;
+import static org.mockito.Mockito.anyBoolean;
+import static org.mockito.Mockito.anyString;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -197,7 +196,7 @@ public class TestOpenContainerCount {
     when(reconUtilsMock.makeHttpCall(any(URLConnectionFactory.class),
             anyString(), anyBoolean())).thenReturn(urlConnectionMock);
     when(reconUtilsMock.getReconDbDir(any(OzoneConfiguration.class),
-        anyString())).thenReturn(GenericTestUtils.getRandomizedTestDir());
+        anyString())).thenReturn(temporaryFolder.resolve("reconDbDir").toFile());
     when(reconUtilsMock.getReconNodeDetails(
         any(OzoneConfiguration.class))).thenReturn(
         commonUtils.getReconNodeDetails());
@@ -330,16 +329,14 @@ public class TestOpenContainerCount {
                     .addStorageReport(storageReportProto1)
                     .addStorageReport(storageReportProto2).build();
 
-    try {
+    assertDoesNotThrow(() -> {
       reconScm.getDatanodeProtocolServer()
-              .register(extendedDatanodeDetailsProto, nodeReportProto,
-                      containerReportsProto, pipelineReportsProto,
-                  defaultLayoutVersionProto());
+          .register(extendedDatanodeDetailsProto, nodeReportProto,
+              containerReportsProto, pipelineReportsProto,
+              defaultLayoutVersionProto());
       // Process all events in the event queue
       reconScm.getEventQueue().processAll(1000);
-    } catch (Exception ex) {
-      fail(ex.getMessage());
-    }
+    });
   }
 
   @Test
@@ -422,16 +419,14 @@ public class TestOpenContainerCount {
                     .setOriginNodeId(datanodeId)
                     .build())
             .build();
-    try {
+    assertDoesNotThrow(() -> {
       reconScm.getDatanodeProtocolServer()
-              .register(extendedDatanodeDetailsProto, nodeReportProto,
-                      containerReportsProto, pipelineReportsProto,
-                  defaultLayoutVersionProto());
+          .register(extendedDatanodeDetailsProto, nodeReportProto,
+              containerReportsProto, pipelineReportsProto,
+              defaultLayoutVersionProto());
       // Process all events in the event queue
       reconScm.getEventQueue().processAll(1000);
-    } catch (Exception ex) {
-      fail(ex.getMessage());
-    }
+    });
   }
 
   private void waitAndCheckConditionAfterHeartbeat(Callable<Boolean> check)

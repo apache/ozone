@@ -130,7 +130,9 @@ public class TestMiniChaosOzoneCluster extends GenericCli {
         .setOMServiceID(omServiceId)
         .setNumStorageContainerManagers(numStorageContainerManagerss)
         .setSCMServiceID(scmServiceId)
-        .setNumDataVolumes(numDataVolumes);
+        .setDatanodeFactory(UniformDatanodesFactory.newBuilder()
+            .setNumDataVolumes(numDataVolumes)
+            .build());
     failureClasses.forEach(chaosBuilder::addFailures);
 
     cluster = chaosBuilder.build();

@@ -34,7 +34,7 @@ import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DATANODE_VOLUME_MIN_FRE
  * Class that wraps the space df of the Datanode Volumes used by SCM
  * containers.
  */
-public class VolumeUsage implements SpaceUsageSource {
+public class VolumeUsage {
 
   private final CachingSpaceUsageSource source;
   private boolean shutdownComplete;
@@ -47,7 +47,6 @@ public class VolumeUsage implements SpaceUsageSource {
     start(); // TODO should start only on demand
   }
 
-  @Override
   public long getCapacity() {
     return Math.max(source.getCapacity(), 0);
   }
@@ -60,7 +59,6 @@ public class VolumeUsage implements SpaceUsageSource {
    *                      remainingReserved
    * B) avail = fsAvail - Max(reserved - other, 0);
    */
-  @Override
   public long getAvailable() {
     return source.getAvailable() - getRemainingReserved();
   }
@@ -70,12 +68,10 @@ public class VolumeUsage implements SpaceUsageSource {
     return available - getRemainingReserved(precomputedVolumeSpace);
   }
 
-  @Override
   public long getUsedSpace() {
     return source.getUsedSpace();
   }
 
-  @Override
   public SpaceUsageSource snapshot() {
     return source.snapshot();
   }

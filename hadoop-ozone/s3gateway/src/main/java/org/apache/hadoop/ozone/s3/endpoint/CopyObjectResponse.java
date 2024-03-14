@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.ozone.s3.endpoint;
 
+import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.s3.commontypes.IsoDateAdapter;
 
 import javax.xml.bind.annotation.XmlAccessType;
@@ -39,7 +40,7 @@ public class CopyObjectResponse {
   @XmlElement(name = "LastModified")
   private Instant lastModified;
 
-  @XmlElement(name = "ETag")
+  @XmlElement(name = OzoneConsts.ETAG)
   private String eTag;
 
 

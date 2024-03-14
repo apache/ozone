@@ -26,7 +26,6 @@ import org.apache.hadoop.hdds.scm.container.ReplicationManagerReport;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.mockito.Mockito;
 import picocli.CommandLine;
 
 import java.io.ByteArrayOutputStream;
@@ -40,6 +39,7 @@ import java.util.regex.Pattern;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 /**
  * Tests for the Container ReportSubCommand class.
@@ -70,23 +70,24 @@ public class TestReportSubCommand {
   @Test
   public void testCorrectValuesAppearInEmptyReport() throws IOException {
     ScmClient scmClient = mock(ScmClient.class);
-    Mockito.when(scmClient.getReplicationManagerReport())
-        .thenAnswer(invocation -> new ReplicationManagerReport());
+    when(scmClient.getReplicationManagerReport()).thenAnswer(invocation -> new ReplicationManagerReport());
 
     cmd.execute(scmClient);
 
+    Pattern p = Pattern.compile("^The Container Report is not available until Replication Manager completes.*");
+    Matcher m = p.matcher(errContent.toString(DEFAULT_ENCODING));
+    assertTrue(m.find());
+
     for (HddsProtos.LifeCycleState state : HddsProtos.LifeCycleState.values()) {
-      Pattern p = Pattern.compile(
-          "^" + state.toString() + ": 0$", Pattern.MULTILINE);
-      Matcher m = p.matcher(outContent.toString(DEFAULT_ENCODING));
+      p = Pattern.compile("^" + state.toString() + ": 0$", Pattern.MULTILINE);
+      m = p.matcher(outContent.toString(DEFAULT_ENCODING));
       assertTrue(m.find());
     }
 
     for (ReplicationManagerReport.HealthState state :
         ReplicationManagerReport.HealthState.values()) {
-      Pattern p = Pattern.compile(
-          "^" + state.toString() + ": 0$", Pattern.MULTILINE);
-      Matcher m = p.matcher(outContent.toString(DEFAULT_ENCODING));
+      p = Pattern.compile("^" + state.toString() + ": 0$", Pattern.MULTILINE);
+      m = p.matcher(outContent.toString(DEFAULT_ENCODING));
       assertTrue(m.find());
     }
   }
@@ -96,12 +97,15 @@ public class TestReportSubCommand {
     // More complete testing of the Report JSON output is in
     // TestReplicationManagerReport.
     ScmClient scmClient = mock(ScmClient.class);
-    Mockito.when(scmClient.getReplicationManagerReport())
-        .thenAnswer(invocation -> new ReplicationManagerReport());
+    when(scmClient.getReplicationManagerReport()).thenAnswer(invocation -> new ReplicationManagerReport());
 
     CommandLine c = new CommandLine(cmd);
     c.parseArgs("--json");
     cmd.execute(scmClient);
+
+    Pattern p = Pattern.compile("^The Container Report is not available until Replication Manager completes.*");
+    Matcher m = p.matcher(errContent.toString(DEFAULT_ENCODING));
+    assertTrue(m.find());
 
     ObjectMapper mapper = new ObjectMapper();
     JsonNode json = mapper.readTree(outContent.toString("UTF-8"));
@@ -114,8 +118,7 @@ public class TestReportSubCommand {
   @Test
   public void testCorrectValuesAppearInReport() throws IOException {
     ScmClient scmClient = mock(ScmClient.class);
-    Mockito.when(scmClient.getReplicationManagerReport())
-        .thenAnswer(invocation -> createReport());
+    when(scmClient.getReplicationManagerReport()).thenAnswer(invocation -> createReport());
 
     cmd.execute(scmClient);
 

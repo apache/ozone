@@ -78,28 +78,28 @@ public class SafeModeMetrics {
     this.currentContainersWithOneReplicaReportedCount.incr();
   }
 
-  public MutableCounterLong getNumHealthyPipelinesThreshold() {
+  MutableCounterLong getNumHealthyPipelinesThreshold() {
     return numHealthyPipelinesThreshold;
   }
 
-  public MutableCounterLong getCurrentHealthyPipelinesCount() {
+  MutableCounterLong getCurrentHealthyPipelinesCount() {
     return currentHealthyPipelinesCount;
   }
 
-  public MutableCounterLong
+  MutableCounterLong
       getNumPipelinesWithAtleastOneReplicaReportedThreshold() {
     return numPipelinesWithAtleastOneReplicaReportedThreshold;
   }
 
-  public MutableCounterLong getCurrentPipelinesWithAtleastOneReplicaCount() {
+  MutableCounterLong getCurrentPipelinesWithAtleastOneReplicaCount() {
     return currentPipelinesWithAtleastOneReplicaReportedCount;
   }
 
-  public MutableCounterLong getNumContainerWithOneReplicaReportedThreshold() {
+  MutableCounterLong getNumContainerWithOneReplicaReportedThreshold() {
     return numContainerWithOneReplicaReportedThreshold;
   }
 
-  public MutableCounterLong getCurrentContainersWithOneReplicaReportedCount() {
+  MutableCounterLong getCurrentContainersWithOneReplicaReportedCount() {
     return currentContainersWithOneReplicaReportedCount;
   }
 

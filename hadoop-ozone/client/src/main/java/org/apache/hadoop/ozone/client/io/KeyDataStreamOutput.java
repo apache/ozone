@@ -30,6 +30,7 @@ import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.scm.storage.AbstractDataStreamOutput;
+import org.apache.hadoop.hdds.scm.storage.BlockDataStreamOutput;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
@@ -260,6 +261,23 @@ public class KeyDataStreamOutput extends AbstractDataStreamOutput
     long containerId = streamEntry.getBlockID().getContainerID();
     Collection<DatanodeDetails> failedServers = streamEntry.getFailedServers();
     Preconditions.checkNotNull(failedServers);
+    if (!containerExclusionException) {
+      BlockDataStreamOutputEntry currentStreamEntry =
+          blockDataStreamOutputEntryPool.getCurrentStreamEntry();
+      if (currentStreamEntry != null) {
+        try {
+          BlockDataStreamOutput blockDataStreamOutput =
+              (BlockDataStreamOutput) currentStreamEntry
+                  .getByteBufStreamOutput();
+          blockDataStreamOutput.executePutBlock(false, false);
+          blockDataStreamOutput.watchForCommit(false);
+        } catch (IOException e) {
+          LOG.error(
+              "Failed to execute putBlock/watchForCommit. " +
+                  "Continuing to write chunks" + "in new block", e);
+        }
+      }
+    }
     ExcludeList excludeList = blockDataStreamOutputEntryPool.getExcludeList();
     long bufferedDataLen = blockDataStreamOutputEntryPool.computeBufferData();
     if (!failedServers.isEmpty()) {

@@ -47,7 +47,6 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.Map;
 import java.util.Properties;
-import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
@@ -71,11 +70,13 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_KERBEROS_KEYTAB_F
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_KERBEROS_PRINCIPAL_KEY;
 import static org.apache.hadoop.security.UserGroupInformation.AuthenticationMethod.KERBEROS;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
+
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
-import org.junit.jupiter.api.Assertions;
+
 /**
  * Integration test class to verify block token CLI commands functionality in a
  * secure cluster.
@@ -92,8 +93,6 @@ public final class TestBlockTokensCLI {
   private static File ozoneKeytab;
   private static File spnegoKeytab;
   private static String host;
-  private static String clusterId;
-  private static String scmId;
   private static String omServiceId;
   private static String scmServiceId;
   private static MiniOzoneHAClusterImpl cluster;
@@ -108,8 +107,6 @@ public final class TestBlockTokensCLI {
 
     workDir =
         GenericTestUtils.getTestDir(TestBlockTokens.class.getSimpleName());
-    clusterId = UUID.randomUUID().toString();
-    scmId = UUID.randomUUID().toString();
     omServiceId = "om-service-test";
     scmServiceId = "scm-service-test";
 
@@ -264,7 +261,7 @@ public final class TestBlockTokensCLI {
     // rotating.
     String currentKey =
         getScmSecretKeyManager().getCurrentSecretKey().toString();
-    Assertions.assertEquals(initialKey, currentKey);
+    assertEquals(initialKey, currentKey);
 
     // Rotate the secret key.
     ozoneAdmin.execute(args);
@@ -280,9 +277,9 @@ public final class TestBlockTokensCLI {
     // Otherwise, both keys should be the same.
     if (isForceFlagPresent(args) ||
         shouldRotate(getScmSecretKeyManager().getCurrentSecretKey())) {
-      Assertions.assertNotEquals(initialKey, newKey);
+      assertNotEquals(initialKey, newKey);
     } else {
-      Assertions.assertEquals(initialKey, newKey);
+      assertEquals(initialKey, newKey);
     }
   }
 
@@ -321,16 +318,13 @@ public final class TestBlockTokensCLI {
   private static void startCluster()
       throws IOException, TimeoutException, InterruptedException {
     OzoneManager.setTestSecureOmFlag(true);
-    MiniOzoneCluster.Builder builder = MiniOzoneCluster.newHABuilder(conf)
-        .setClusterId(clusterId)
+    MiniOzoneHAClusterImpl.Builder builder = MiniOzoneCluster.newHABuilder(conf)
         .setSCMServiceId(scmServiceId)
         .setOMServiceId(omServiceId)
-        .setScmId(scmId)
-        .setNumDatanodes(3)
         .setNumOfStorageContainerManagers(3)
         .setNumOfOzoneManagers(3);
 
-    cluster = (MiniOzoneHAClusterImpl) builder.build();
+    cluster = builder.build();
     cluster.waitForClusterToBeReady();
   }
 }

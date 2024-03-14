@@ -43,7 +43,6 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.ArrayList;
 import java.util.Optional;
-import java.util.UUID;
 import java.util.stream.Stream;
 
 import static com.google.common.collect.Lists.newLinkedList;
@@ -62,11 +61,10 @@ public class TestListKeys {
   private static MiniOzoneCluster cluster = null;
 
   private static OzoneConfiguration conf;
-  private static String clusterId;
-  private static String scmId;
-  private static String omId;
 
   private static OzoneBucket legacyOzoneBucket;
+
+  private static OzoneBucket obsOzoneBucket;
   private static OzoneClient client;
 
   /**
@@ -79,20 +77,20 @@ public class TestListKeys {
   public static void init() throws Exception {
     conf = new OzoneConfiguration();
     conf.setBoolean(OMConfigKeys.OZONE_OM_ENABLE_FILESYSTEM_PATHS, true);
-    clusterId = UUID.randomUUID().toString();
-    scmId = UUID.randomUUID().toString();
-    omId = UUID.randomUUID().toString();
     // Set the number of keys to be processed during batch operate.
     conf.setInt(OZONE_FS_ITERATE_BATCH_SIZE, 3);
     conf.setInt(OZONE_CLIENT_LIST_CACHE_SIZE, 3);
-    cluster = MiniOzoneCluster.newBuilder(conf).setClusterId(clusterId)
-        .setScmId(scmId).setOmId(omId).build();
+    cluster = MiniOzoneCluster.newBuilder(conf).build();
     cluster.waitForClusterToBeReady();
     client = cluster.newClient();
 
     // create a volume and a LEGACY bucket
     legacyOzoneBucket = TestDataUtil
         .createVolumeAndBucket(client, BucketLayout.LEGACY);
+
+    // create a volume and a OBJECT_STORE bucket
+    obsOzoneBucket = TestDataUtil
+        .createVolumeAndBucket(client, BucketLayout.OBJECT_STORE);
 
     initFSNameSpace();
   }
@@ -107,6 +105,7 @@ public class TestListKeys {
 
   private static void initFSNameSpace() throws Exception {
     buildNameSpaceTree(legacyOzoneBucket);
+    buildNameSpaceTree(obsOzoneBucket);
   }
 
   /**
@@ -116,9 +115,9 @@ public class TestListKeys {
    *                    |
    *                    a1
    *                    |
-   *      -----------------------------------
-   *     |              |                       |
-   *     b1             b2                      b3
+   *      --------------------------------------------------------
+   *     |              |                       |                |
+   *     b1             b2                      b3               b4
    *    -------         ---------              -----------
    *   |      |        |    |   |             |    |     |
    *  c1     c2       d1   d2  d3             e1   e2   e3
@@ -133,25 +132,27 @@ public class TestListKeys {
   private static void buildNameSpaceTree(OzoneBucket ozoneBucket)
       throws Exception {
     LinkedList<String> keys = new LinkedList<>();
-    keys.add("/a1/b1/c1111.tx");
-    keys.add("/a1/b1/c1222.tx");
-    keys.add("/a1/b1/c1333.tx");
-    keys.add("/a1/b1/c1444.tx");
-    keys.add("/a1/b1/c1555.tx");
-    keys.add("/a1/b1/c1/c1.tx");
-    keys.add("/a1/b1/c12/c2.tx");
-    keys.add("/a1/b1/c12/c3.tx");
+    keys.add("a1/b1/c1111.tx");
+    keys.add("a1/b1/c1222.tx");
+    keys.add("a1/b1/c1333.tx");
+    keys.add("a1/b1/c1444.tx");
+    keys.add("a1/b1/c1555.tx");
+    keys.add("a1/b1/c1/c1.tx");
+    keys.add("a1/b1/c12/c2.tx");
+    keys.add("a1/b1/c12/c3.tx");
 
-    keys.add("/a1/b2/d1/d11.tx");
-    keys.add("/a1/b2/d2/d21.tx");
-    keys.add("/a1/b2/d2/d22.tx");
-    keys.add("/a1/b2/d3/d31.tx");
+    keys.add("a1/b2/d1/d11.tx");
+    keys.add("a1/b2/d2/d21.tx");
+    keys.add("a1/b2/d2/d22.tx");
+    keys.add("a1/b2/d3/d31.tx");
 
-    keys.add("/a1/b3/e1/e11.tx");
-    keys.add("/a1/b3/e2/e21.tx");
-    keys.add("/a1/b3/e3/e31.tx");
+    keys.add("a1/b3/e1/e11.tx");
+    keys.add("a1/b3/e2/e21.tx");
+    keys.add("a1/b3/e3/e31.tx");
 
     createKeys(ozoneBucket, keys);
+
+    ozoneBucket.createDirectory("a1/b4/");
   }
 
   private static Stream<Arguments> shallowListDataWithTrailingSlash() {
@@ -194,6 +195,58 @@ public class TestListKeys {
             "a1/b1/c1333.tx",
             "a1/b1/c1444.tx",
             "a1/b1/c1555.tx"
+        ))),
+
+        // Case-7: StartKey is empty, return key that is same as keyPrefix.
+        of("a1/b4/", "", newLinkedList(Arrays.asList(
+            "a1/b4/"
+        )))
+    );
+  }
+
+  private static Stream<Arguments> shallowListObsDataWithTrailingSlash() {
+    return Stream.of(
+
+        // Case-1: StartKey is less than prefixKey, return emptyList.
+        of("a1/b2/", "a1", newLinkedList(Collections.emptyList())),
+
+        // Case-2: StartKey is empty, return all immediate node.
+        of("a1/b2/", "", newLinkedList(Arrays.asList(
+            "a1/b2/d1/",
+            "a1/b2/d2/",
+            "a1/b2/d3/"
+        ))),
+
+        // Case-3: StartKey is same as prefixKey, return all immediate nodes.
+        of("a1/b2/", "a1/b2", newLinkedList(Arrays.asList(
+            "a1/b2/d1/",
+            "a1/b2/d2/",
+            "a1/b2/d3/"
+        ))),
+
+        // Case-4: StartKey is greater than prefixKey
+        of("a1/b2/", "a1/b2/d2/d21.tx", newLinkedList(Arrays.asList(
+            "a1/b2/d2/",
+            "a1/b2/d3/"
+        ))),
+
+        // Case-5: StartKey reaches last element, return emptyList
+        of("a1/b2/", "a1/b2/d3/d31.tx", newLinkedList(
+            Collections.emptyList()
+        )),
+
+        // Case-6: Mix result
+        of("a1/b1/", "a1/b1/c12", newLinkedList(Arrays.asList(
+            "a1/b1/c12/",
+            "a1/b1/c1222.tx",
+            "a1/b1/c1333.tx",
+            "a1/b1/c1444.tx",
+            "a1/b1/c1555.tx"
+        ))),
+
+        // Case-7: StartKey is empty, return key that is same as keyPrefix.
+        of("a1/b4/", "", newLinkedList(Arrays.asList(
+            "a1/b4/"
         )))
     );
   }
@@ -260,6 +313,11 @@ public class TestListKeys {
         of("a1/b1/c12", "", newLinkedList(Arrays.asList(
             "a1/b1/c12/",
             "a1/b1/c1222.tx"
+        ))),
+
+        // Case-10:
+        of("a1/b4", "", newLinkedList(Arrays.asList(
+            "a1/b4/"
         )))
 
     );
@@ -273,10 +331,18 @@ public class TestListKeys {
   }
 
   @ParameterizedTest
+  @MethodSource("shallowListObsDataWithTrailingSlash")
+  public void testShallowListObsKeysWithPrefixTrailingSlash(String keyPrefix,
+      String startKey, List<String> expectedKeys) throws Exception {
+    checkKeyShallowList(keyPrefix, startKey, expectedKeys, obsOzoneBucket);
+  }
+
+  @ParameterizedTest
   @MethodSource("shallowListDataWithoutTrailingSlash")
   public void testShallowListKeysWithoutPrefixTrailingSlash(String keyPrefix,
       String startKey, List<String> expectedKeys) throws Exception {
     checkKeyShallowList(keyPrefix, startKey, expectedKeys, legacyOzoneBucket);
+    checkKeyShallowList(keyPrefix, startKey, expectedKeys, obsOzoneBucket);
   }
 
   private void checkKeyShallowList(String keyPrefix, String startKey,

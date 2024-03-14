@@ -28,7 +28,7 @@ import io.grpc.MethodDescriptor;
 import org.junit.jupiter.api.Test;
 import org.mockito.MockedStatic;
 
-import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;

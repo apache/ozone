@@ -35,7 +35,10 @@ public class ManagedLRUCache extends LRUCache {
 
   @Override
   public void close() {
-    super.close();
-    leakTracker.close();
+    try {
+      super.close();
+    } finally {
+      leakTracker.close();
+    }
   }
 }

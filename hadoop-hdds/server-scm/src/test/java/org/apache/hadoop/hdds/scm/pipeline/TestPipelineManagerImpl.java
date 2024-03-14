@@ -17,7 +17,6 @@
  */
 package org.apache.hadoop.hdds.scm.pipeline;
 
-import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
@@ -88,8 +87,8 @@ import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_PIPELINE_ALLOCA
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_PIPELINE_DESTROY_TIMEOUT;
 import static org.apache.hadoop.hdds.scm.pipeline.Pipeline.PipelineState.ALLOCATED;
 import static org.apache.hadoop.hdds.scm.pipeline.Pipeline.PipelineState.OPEN;
-import static org.apache.hadoop.test.MetricsAsserts.getLongCounter;
-import static org.apache.hadoop.test.MetricsAsserts.getMetrics;
+import static org.apache.ozone.test.MetricsAsserts.getLongCounter;
+import static org.apache.ozone.test.MetricsAsserts.getMetrics;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.apache.ratis.util.Preconditions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
@@ -100,11 +99,11 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.fail;
-import static org.mockito.ArgumentMatchers.anyLong;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.ArgumentMatchers.anyList;
+import static org.mockito.Mockito.anyLong;
+import static org.mockito.Mockito.any;
+import static org.mockito.Mockito.anyString;
+import static org.mockito.Mockito.eq;
+import static org.mockito.Mockito.anyList;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.doAnswer;
@@ -128,11 +127,11 @@ public class TestPipelineManagerImpl {
   private TestClock testClock;
 
   @BeforeEach
-  void init(@TempDir File testDir) throws Exception {
+  void init(@TempDir File testDir, @TempDir File dbDir) throws Exception {
     testClock = new TestClock(Instant.now(), ZoneOffset.UTC);
-    conf = SCMTestUtils.getConf();
-    scm = HddsTestUtils.getScm(conf);
-    conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, testDir.getAbsolutePath());
+    conf = SCMTestUtils.getConf(dbDir);
+    scm = HddsTestUtils.getScm(SCMTestUtils.getConf(testDir));
+
     // Mock Node Manager is not able to correctly set up things for the EC
     // placement policy (Rack Scatter), so just use the random one.
     conf.set(ScmConfigKeys.OZONE_SCM_CONTAINER_PLACEMENT_EC_IMPL_KEY,
@@ -216,7 +215,7 @@ public class TestPipelineManagerImpl {
     PipelineManagerImpl pipelineManager2 =
         createPipelineManager(true, buffer2);
     // Should be able to load previous pipelines.
-    assertFalse(pipelineManager2.getPipelines().isEmpty());
+    assertThat(pipelineManager2.getPipelines()).isNotEmpty();
     assertEquals(3, pipelineManager.getPipelines().size());
     Pipeline pipeline3 = pipelineManager2.createPipeline(
         RatisReplicationConfig.getInstance(ReplicationFactor.THREE));
@@ -261,10 +260,10 @@ public class TestPipelineManagerImpl {
     assertEquals(Pipeline.PipelineState.DORMANT, pipelineManager.getPipeline(pipelineID).getPipelineState());
     buffer.flush();
     assertEquals(Pipeline.PipelineState.DORMANT, pipelineStore.get(pipeline.getId()).getPipelineState());
-    assertFalse(pipelineManager
+    assertThat(pipelineManager
         .getPipelines(RatisReplicationConfig
             .getInstance(ReplicationFactor.THREE),
-            Pipeline.PipelineState.OPEN).contains(pipeline));
+            Pipeline.PipelineState.OPEN)).doesNotContain(pipeline);
     assertEquals(1, pipelineManager.getPipelineCount(
         RatisReplicationConfig.getInstance(ReplicationFactor.THREE),
             Pipeline.PipelineState.DORMANT));
@@ -332,28 +331,16 @@ public class TestPipelineManagerImpl {
           .getPipelines(RatisReplicationConfig
                   .getInstance(ReplicationFactor.THREE),
               Pipeline.PipelineState.OPEN).contains(pipeline));
-
-      try {
-        pipelineManager.removePipeline(pipeline);
-        fail();
-      } catch (IOException ioe) {
-        // Should not be able to remove the OPEN pipeline.
-        assertEquals(1, pipelineManager.getPipelines().size());
-      } catch (Exception e) {
-        fail("Should not reach here.");
-      }
+      assertThrows(IOException.class, () -> pipelineManager.removePipeline(pipeline));
+      // Should not be able to remove the OPEN pipeline.
+      assertEquals(1, pipelineManager.getPipelines().size());
 
       // Destroy pipeline
       pipelineManager.closePipeline(pipeline.getId());
       pipelineManager.deletePipeline(pipeline.getId());
 
-      try {
-        pipelineManager.getPipeline(pipeline.getId());
-        fail("Pipeline should not have been retrieved");
-      } catch (PipelineNotFoundException e) {
-        // There may be pipelines created by BackgroundPipelineCreator
-        // exist in pipelineManager, just ignore them.
-      }
+      assertThrows(PipelineNotFoundException.class, () -> pipelineManager.getPipeline(pipeline.getId()),
+          "Pipeline should not have been retrieved");
     }
   }
 
@@ -443,17 +430,11 @@ public class TestPipelineManagerImpl {
     assertEquals(0, numPipelineCreateFailed);
 
     //This should fail...
-    try {
-      pipelineManager
-          .createPipeline(RatisReplicationConfig
-              .getInstance(ReplicationFactor.THREE));
-      fail();
-    } catch (SCMException ioe) {
-      // pipeline creation failed this time.
-      assertEquals(
-          ResultCodes.FAILED_TO_FIND_SUITABLE_NODE,
-          ioe.getResult());
-    }
+    SCMException e =
+        assertThrows(SCMException.class,
+            () -> pipelineManager.createPipeline(RatisReplicationConfig.getInstance(ReplicationFactor.THREE)));
+    // pipeline creation failed this time.
+    assertEquals(ResultCodes.FAILED_TO_FIND_SUITABLE_NODE, e.getResult());
 
     metrics = getMetrics(
         SCMPipelineMetrics.class.getSimpleName());
@@ -573,16 +554,16 @@ public class TestPipelineManagerImpl {
     pipelineManager.scrubPipelines();
 
     // The allocatedPipeline should now be scrubbed as the interval has passed
-    assertFalse(pipelineManager
+    assertThat(pipelineManager
         .getPipelines(RatisReplicationConfig
                 .getInstance(ReplicationFactor.THREE),
-            Pipeline.PipelineState.ALLOCATED).contains(allocatedPipeline));
+            Pipeline.PipelineState.ALLOCATED)).doesNotContain(allocatedPipeline);
 
     // The closedPipeline should now be scrubbed as the interval has passed
-    assertFalse(pipelineManager
+    assertThat(pipelineManager
         .getPipelines(RatisReplicationConfig
                 .getInstance(ReplicationFactor.THREE),
-            Pipeline.PipelineState.CLOSED).contains(closedPipeline));
+            Pipeline.PipelineState.CLOSED)).doesNotContain(closedPipeline);
 
     pipelineManager.close();
   }
@@ -636,15 +617,11 @@ public class TestPipelineManagerImpl {
         new SCMSafeModeManager.SafeModeStatus(true, false));
 
     PipelineManagerImpl pipelineManager = createPipelineManager(true);
-    try {
-      pipelineManager
-          .createPipeline(RatisReplicationConfig
-              .getInstance(ReplicationFactor.THREE));
-      fail("Pipelines should not have been created");
-    } catch (IOException e) {
-      // No pipeline is created.
-      assertTrue(pipelineManager.getPipelines().isEmpty());
-    }
+    assertThrows(IOException.class,
+        () -> pipelineManager.createPipeline(RatisReplicationConfig.getInstance(ReplicationFactor.THREE)),
+        "Pipelines should not have been created");
+    // No pipeline is created.
+    assertTrue(pipelineManager.getPipelines().isEmpty());
 
     // Ensure a pipeline of factor ONE can be created - no exceptions should be
     // raised.
