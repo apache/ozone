@@ -274,7 +274,7 @@ public class SCMBlockProtocolServer implements
           DeleteScmBlockResult.Result.success;
     } catch (IOException ioe) {
       e = ioe;
-     perfMetrics.updateDeleteKeyFailureStats(startNanos);
+      perfMetrics.updateDeleteKeyFailureStats(startNanos);
       LOG.warn("Fail to delete {} keys", keyBlocksInfoList.size(), ioe);
       switch (ioe instanceof SCMException ? ((SCMException) ioe).getResult() :
           IO_EXCEPTION) {
