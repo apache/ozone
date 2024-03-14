@@ -75,10 +75,10 @@ import org.slf4j.LoggerFactory;
 import java.io.File;
 import java.io.IOException;
 import java.util.Map;
-import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.TreeMap;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 
 import static org.apache.hadoop.ozone.audit.AuditLogger.PerformanceStringBuilder;
@@ -108,7 +108,7 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
   private ContainerMetrics metrics;
   private final TokenVerifier tokenVerifier;
   private long slowOpThresholdMs;
-  private Cache<HddsVolume, SpaceUsageSource> cachedVolumeUsage;
+  private final Cache<HddsVolume, SpaceUsageSource> cachedVolumeUsage;
 
   /**
    * Constructs an OzoneContainer that receives calls from
@@ -146,14 +146,7 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
     this.cachedVolumeUsage = CacheBuilder.newBuilder()
         .maximumSize(1000)
         .refreshAfterWrite(1, TimeUnit.MINUTES)
-        .build(
-            new CacheLoader<HddsVolume, SpaceUsageSource>() {
-              @Override
-              public SpaceUsageSource load(HddsVolume volume) throws Exception {
-                return volume.getCurrentUsage();
-              }
-            }
-        );
+        .build();
   }
 
   @Override
@@ -616,8 +609,15 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
         .orElse(Boolean.FALSE);
     if (isOpen) {
       HddsVolume volume = container.getContainerData().getVolume();
-      SpaceUsageSource precomputedVolumeSpace = cachedVolumeUsage.getIfPresent(volume);
-      long volumeCapacity = Objects.requireNonNull(precomputedVolumeSpace).getCapacity();
+      SpaceUsageSource precomputedVolumeSpace;
+      try {
+        precomputedVolumeSpace = cachedVolumeUsage.get(volume,
+            volume::getCurrentUsage);
+      } catch (ExecutionException e) {
+        // it shouldn't happen
+        throw new RuntimeException(e);
+      }
+      long volumeCapacity = precomputedVolumeSpace.getCapacity();
       long volumeFreeSpaceToSpare =
           VolumeUsage.getMinVolumeFreeSpace(conf, volumeCapacity);
       long volumeFree = volume.getAvailable(precomputedVolumeSpace);
