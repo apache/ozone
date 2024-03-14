@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.container.common.impl;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
+import com.google.common.cache.CacheLoader;
 import com.google.protobuf.ServiceException;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.HddsUtils;
@@ -145,7 +146,14 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
     this.cachedVolumeUsage = CacheBuilder.newBuilder()
         .maximumSize(1000)
         .refreshAfterWrite(1, TimeUnit.MINUTES)
-        .build();
+        .build(
+            new CacheLoader<HddsVolume, SpaceUsageSource>() {
+              @Override
+              public SpaceUsageSource load(HddsVolume volume) throws Exception {
+                return volume.getCurrentUsage();
+              }
+            }
+        );
   }
 
   @Override
