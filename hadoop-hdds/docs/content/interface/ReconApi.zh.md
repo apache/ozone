@@ -255,8 +255,8 @@ Recon API v1 是一组 HTTP 端点，可以帮助您了解 Ozone 集群的当前
 
 * prevKey (可选)
 
-返回在SCM中被标记为已删除状态且在OM中存在的容器集合，以便找出给定prevKey（容器ID）
-后映射到这些已删除状态容器的键列表。例如：prevKey=5，跳过容器直到准确地定位到前一个容器ID。 
+返回在SCM中，给定prevKey(容器ID) 后被标记为已删除状态，且在OM中存在的容器集合，
+以便找出映射到这些已删除状态容器的键列表。例如：prevKey=5，跳过直到准确地定位到前一个容器ID。 
 
 * limit (可选)
 
@@ -516,7 +516,7 @@ Recon API v1 是一组 HTTP 端点，可以帮助您了解 Ozone 集群的当前
 
 **回传**
 
-返回路径的基本摘要，包括实体类型和路径下对象的聚合计数。
+返回路径的基本信息汇总，包括实体类型和路径下对象的聚合计数。
 
 如果路径存在，则 `status` 为 `OK`，否则为 `PATH_NOT_FOUND`。
 
@@ -600,7 +600,7 @@ Recon API v1 是一组 HTTP 端点，可以帮助您了解 Ozone 集群的当前
 
 **回传**
 
-返回路径下所有子路径的磁盘使用情况。规范化 `path` 字段，直接返回路径下键的总大小作为
+返回路径下所有子路径的磁盘使用情况。规范化 `path` 字段，返回路径下直接健的总大小作为
 `sizeDirectKey`，并以字节为单位返回 `size/sizeWithReplica`。
 
 如果路径存在，则 `status` 为 `OK`，否则为 `PATH_NOT_FOUND`。
@@ -803,7 +803,7 @@ Recon跟踪所有大小从`1 KB`到`1 PB`的键。对于小于`1 KB`的键，映
 
 * prevKey (可选)
 
-  如果未指定卷，则忽略 prevKey，并且仅返回给定 prevKey 之后的存储桶。
+  返回给定 prevKey 之后的存储桶。 如果未指定卷，则忽略 prevKey。
   示例: prevKey=bucket1
 
 * limit (可选)
