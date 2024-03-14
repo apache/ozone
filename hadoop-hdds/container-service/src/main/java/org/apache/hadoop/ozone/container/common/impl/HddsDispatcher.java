@@ -65,6 +65,9 @@ import org.apache.hadoop.ozone.container.common.volume.VolumeUsage;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.util.Time;
 import org.apache.ratis.statemachine.StateMachine;
+import org.apache.ratis.thirdparty.com.google.common.cache.Cache;
+import org.apache.ratis.thirdparty.com.google.common.cache.CacheBuilder;
+import org.apache.ratis.thirdparty.com.google.common.cache.CacheLoader;
 import org.apache.ratis.thirdparty.com.google.protobuf.ProtocolMessageEnum;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -104,6 +107,7 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
   private ContainerMetrics metrics;
   private final TokenVerifier tokenVerifier;
   private long slowOpThresholdMs;
+  private Cache<HddsVolume, SpaceUsageSource> cachedVolumeUsage;
 
   /**
    * Constructs an OzoneContainer that receives calls from
@@ -138,6 +142,17 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
             LOG,
             HddsUtils::processForDebug,
             HddsUtils::processForDebug);
+    this.cachedVolumeUsage = CacheBuilder.newBuilder()
+        .maximumSize(1000)
+        .refreshAfterWrite(1, TimeUnit.MINUTES)
+        .build(
+            new CacheLoader<HddsVolume, SpaceUsageSource>() {
+              @Override
+              public SpaceUsageSource load(HddsVolume volume) throws Exception {
+                return volume.getCurrentUsage();
+              }
+            }
+        );
   }
 
   @Override
@@ -600,8 +615,7 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
         .orElse(Boolean.FALSE);
     if (isOpen) {
       HddsVolume volume = container.getContainerData().getVolume();
-      SpaceUsageSource precomputedVolumeSpace =
-          volume.getCurrentUsage();
+      SpaceUsageSource precomputedVolumeSpace = cachedVolumeUsage.getIfPresent(volume);
       long volumeCapacity = precomputedVolumeSpace.getCapacity();
       long volumeFreeSpaceToSpare =
           VolumeUsage.getMinVolumeFreeSpace(conf, volumeCapacity);
