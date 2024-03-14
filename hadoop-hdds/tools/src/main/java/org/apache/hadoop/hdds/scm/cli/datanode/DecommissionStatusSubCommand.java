@@ -136,6 +136,8 @@ public class DecommissionStatusSubCommand extends ScmSubcommand {
     }
   }
 
+  String errorMessage = "Error getting pipeline and container metrics for ";
+
   private void printDetails(DatanodeDetails datanode) {
     System.out.println("\nDatanode: " + datanode.getUuid().toString() +
         " (" + datanode.getNetworkLocation() + "/" + datanode.getIpAddress()
@@ -168,9 +170,9 @@ public class DecommissionStatusSubCommand extends ScmSubcommand {
           return;
         }
       }
-      System.err.println("Error getting pipeline and container metrics for " + datanode.getHostName());
+      System.err.println(errorMessage + datanode.getHostName());
     } catch (IOException e) {
-      System.err.println("Error getting pipeline and container metrics for " + datanode.getHostName());
+      System.err.println(errorMessage + datanode.getHostName());
     }
   }
 
@@ -209,9 +211,9 @@ public class DecommissionStatusSubCommand extends ScmSubcommand {
           return countsMap;
         }
       }
-      System.err.println("Error getting pipeline and container metrics for " + datanode.getHostName());
+      System.err.println(errorMessage + datanode.getHostName());
     } catch (IOException e) {
-      System.err.println("Error getting pipeline and container metrics for " + datanode.getHostName());
+      System.err.println(errorMessage + datanode.getHostName());
     }
     return countsMap;
   }
