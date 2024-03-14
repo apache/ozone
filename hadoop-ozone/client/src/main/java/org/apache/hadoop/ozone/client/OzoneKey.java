@@ -70,11 +70,19 @@ public class OzoneKey {
    * Constructs OzoneKey from OmKeyInfo.
    *
    */
+
+  /**
+   * The object and update ID of an existing key. These will be null
+   * if the key is not yet created on OM and read from OM.
+   */
+  private final Long objectID;
+  private final Long updateID;
+
   @SuppressWarnings("parameternumber")
   public OzoneKey(String volumeName, String bucketName,
       String keyName, long size, long creationTime,
       long modificationTime, ReplicationConfig replicationConfig,
-      boolean isFile) {
+      boolean isFile, Long objectID, Long updateID) {
     this.volumeName = volumeName;
     this.bucketName = bucketName;
     this.name = keyName;
@@ -83,15 +91,17 @@ public class OzoneKey {
     this.modificationTime = Instant.ofEpochMilli(modificationTime);
     this.replicationConfig = replicationConfig;
     this.isFile = isFile;
+    this.objectID = objectID;
+    this.updateID = updateID;
   }
 
   @SuppressWarnings("parameternumber")
   public OzoneKey(String volumeName, String bucketName,
                   String keyName, long size, long creationTime,
                   long modificationTime, ReplicationConfig replicationConfig,
-                  Map<String, String> metadata, boolean isFile) {
+                  Map<String, String> metadata, boolean isFile, Long objectID, Long updateID) {
     this(volumeName, bucketName, keyName, size, creationTime,
-        modificationTime, replicationConfig, isFile);
+        modificationTime, replicationConfig, isFile, objectID, updateID);
     this.metadata.putAll(metadata);
   }
 
@@ -179,6 +189,16 @@ public class OzoneKey {
     return replicationConfig;
   }
 
+  @JsonIgnore
+  public Long getObjectID() {
+    return objectID;
+  }
+
+  @JsonIgnore
+  public Long getUpdateID() {
+    return updateID;
+  }
+
   /**
    * Returns indicator if key is a file.
    * @return file
@@ -191,7 +211,7 @@ public class OzoneKey {
     return new OzoneKey(keyInfo.getVolumeName(), keyInfo.getBucketName(),
         keyInfo.getKeyName(), keyInfo.getDataSize(), keyInfo.getCreationTime(),
         keyInfo.getModificationTime(), keyInfo.getReplicationConfig(),
-        keyInfo.getMetadata(), keyInfo.isFile());
+        keyInfo.getMetadata(), keyInfo.isFile(), keyInfo.getObjectID(), keyInfo.getUpdateID());
   }
 
 }
