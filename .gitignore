@@ -61,14 +61,8 @@ log.html
 output.xml
 report.html
 
-hadoop-hdds/docs/public
-hadoop-hdds/docs/.hugo_build.lock
-hadoop-ozone/recon/node_modules
-
 .dev-tools
 dev-support/ci/bats-assert
 dev-support/ci/bats-support
-
-hadoop-ozone/dist/src/main/license/current.txt
 
 .mvn/.gradle-enterprise/
