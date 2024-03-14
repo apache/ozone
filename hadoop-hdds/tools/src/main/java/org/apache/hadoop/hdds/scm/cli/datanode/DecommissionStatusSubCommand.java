@@ -136,7 +136,15 @@ public class DecommissionStatusSubCommand extends ScmSubcommand {
     }
   }
 
-  String errorMessage = "Error getting pipeline and container metrics for ";
+  private String errorMessage = "Error getting pipeline and container metrics for ";
+
+  public String getErrorMessage() {
+    return errorMessage;
+  }
+
+  public void setErrorMessage(String errorMessage) {
+    this.errorMessage = errorMessage;
+  }
 
   private void printDetails(DatanodeDetails datanode) {
     System.out.println("\nDatanode: " + datanode.getUuid().toString() +
@@ -170,9 +178,9 @@ public class DecommissionStatusSubCommand extends ScmSubcommand {
           return;
         }
       }
-      System.err.println(errorMessage + datanode.getHostName());
+      System.err.println(getErrorMessage() + datanode.getHostName());
     } catch (IOException e) {
-      System.err.println(errorMessage + datanode.getHostName());
+      System.err.println(getErrorMessage() + datanode.getHostName());
     }
   }
 
@@ -211,9 +219,9 @@ public class DecommissionStatusSubCommand extends ScmSubcommand {
           return countsMap;
         }
       }
-      System.err.println(errorMessage + datanode.getHostName());
+      System.err.println(getErrorMessage() + datanode.getHostName());
     } catch (IOException e) {
-      System.err.println(errorMessage + datanode.getHostName());
+      System.err.println(getErrorMessage() + datanode.getHostName());
     }
     return countsMap;
   }
