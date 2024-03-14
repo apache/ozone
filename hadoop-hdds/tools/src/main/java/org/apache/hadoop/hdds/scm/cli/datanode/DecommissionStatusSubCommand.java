@@ -146,10 +146,18 @@ public class DecommissionStatusSubCommand extends ScmSubcommand {
     try {
       for (int i = 1; i <= numDecomNodes; i++) {
         if (datanode.getHostName().equals(counts.get("tag.datanode." + i).asText())) {
-          int pipelines = Integer.parseInt(counts.get("PipelinesWaitingToCloseDN." + i).toString());
-          double underReplicated = Double.parseDouble(counts.get("UnderReplicatedDN." + i).toString());
-          double unclosed = Double.parseDouble(counts.get("UnclosedContainersDN." + i).toString());
-          long startTime = Long.parseLong(counts.get("StartTimeDN." + i).toString());
+          JsonNode pipelinesDN = counts.get("PipelinesWaitingToCloseDN." + i);
+          JsonNode underReplicatedDN = counts.get("UnderReplicatedDN." + i);
+          JsonNode unclosedDN = counts.get("UnclosedContainersDN." + i);
+          JsonNode startTimeDN = counts.get("StartTimeDN." + i);
+          if (pipelinesDN == null || underReplicatedDN == null || unclosedDN == null || startTimeDN == null) {
+            throw new IOException("Error getting pipeline and container metrics for " + datanode.getHostName());
+          }
+
+          int pipelines = Integer.parseInt(pipelinesDN.toString());
+          double underReplicated = Double.parseDouble(underReplicatedDN.toString());
+          double unclosed = Double.parseDouble(unclosedDN.toString());
+          long startTime = Long.parseLong(startTimeDN.toString());
           System.out.print("Decommission Started At : ");
           Date date = new Date(startTime);
           DateFormat formatter = new SimpleDateFormat("dd/MM/yyyy hh:mm:ss z");
@@ -160,9 +168,9 @@ public class DecommissionStatusSubCommand extends ScmSubcommand {
           return;
         }
       }
-      System.err.println("Error getting pipeline and container counts for " + datanode.getHostName());
-    } catch (NullPointerException ex) {
-      System.err.println("Error getting pipeline and container counts for " + datanode.getHostName());
+      System.err.println("Error getting pipeline and container metrics for " + datanode.getHostName());
+    } catch (IOException e) {
+      System.err.println("Error getting pipeline and container metrics for " + datanode.getHostName());
     }
   }
 
@@ -180,21 +188,29 @@ public class DecommissionStatusSubCommand extends ScmSubcommand {
     try {
       for (int i = 1; i <= numDecomNodes; i++) {
         if (datanode.getHostName().equals(counts.get("tag.datanode." + i).asText())) {
-          long startTime = Long.parseLong(counts.get("StartTimeDN." + i).toString());
+          JsonNode pipelinesDN = counts.get("PipelinesWaitingToCloseDN." + i);
+          JsonNode underReplicatedDN = counts.get("UnderReplicatedDN." + i);
+          JsonNode unclosedDN = counts.get("UnclosedContainersDN." + i);
+          JsonNode startTimeDN = counts.get("StartTimeDN." + i);
+          if (pipelinesDN == null || underReplicatedDN == null || unclosedDN == null || startTimeDN == null) {
+            throw new IOException("Error getting pipeline and container metrics for " + datanode.getHostName());
+          }
+
+          int pipelines = Integer.parseInt(pipelinesDN.toString());
+          double underReplicated = Double.parseDouble(underReplicatedDN.toString());
+          double unclosed = Double.parseDouble(unclosedDN.toString());
+          long startTime = Long.parseLong(startTimeDN.toString());
           Date date = new Date(startTime);
           DateFormat formatter = new SimpleDateFormat("dd/MM/yyyy hh:mm:ss z");
           countsMap.put("decommissionStartTime", formatter.format(date));
-          countsMap.put("numOfUnclosedPipelines",
-                  Integer.parseInt(counts.get("PipelinesWaitingToCloseDN." + i).toString()));
-          countsMap.put("numOfUnderReplicatedContainers",
-                  Double.parseDouble(counts.get("UnderReplicatedDN." + i).toString()));
-          countsMap.put("numOfUnclosedContainers",
-                  Double.parseDouble(counts.get("UnclosedContainersDN." + i).toString()));
+          countsMap.put("numOfUnclosedPipelines", pipelines);
+          countsMap.put("numOfUnderReplicatedContainers", underReplicated);
+          countsMap.put("numOfUnclosedContainers", unclosed);
           return countsMap;
         }
       }
       System.err.println("Error getting pipeline and container metrics for " + datanode.getHostName());
-    } catch (NullPointerException ex) {
+    } catch (IOException e) {
       System.err.println("Error getting pipeline and container metrics for " + datanode.getHostName());
     }
     return countsMap;
