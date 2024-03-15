@@ -142,6 +142,16 @@ public final class TracingUtil {
   /**
    * Execute {@code supplier} inside an activated new span.
    */
+  public static <E extends Exception> void executeInNewSpan(String spanName,
+      CheckedRunnable<E> runnable) throws E {
+    Span span = GlobalTracer.get()
+        .buildSpan(spanName).start();
+    executeInSpan(span, runnable);
+  }
+
+  /**
+   * Execute {@code supplier} inside an activated new span.
+   */
   public static <R, E extends Exception> R executeInNewSpan(String spanName,
       CheckedSupplier<R, E> supplier) throws E {
     Span span = GlobalTracer.get()
