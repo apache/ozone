@@ -140,7 +140,7 @@ public final class TracingUtil {
   }
 
   /**
-   * Execute {@code supplier} inside an activated new span.
+   * Execute {@code runnable} inside an activated new span.
    */
   public static <E extends Exception> void executeInNewSpan(String spanName,
       CheckedRunnable<E> runnable) throws E {
