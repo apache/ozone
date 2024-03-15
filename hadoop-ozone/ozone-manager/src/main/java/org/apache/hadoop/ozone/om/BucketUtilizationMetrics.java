@@ -81,7 +81,7 @@ public class BucketUtilizationMetrics implements MetricsSource {
           .addGauge(BucketMetricsInfo.BucketUsedBytes, bucketInfo.getUsedBytes())
           .addGauge(BucketMetricsInfo.BucketQuotaBytes, bucketInfo.getQuotaInBytes())
           .addGauge(BucketMetricsInfo.BucketQuotaNamespace, bucketInfo.getQuotaInNamespace())
-          .addGauge(BucketMetricsInfo.BucketAvailableBytes, availableSpace > 0 ? availableSpace : -1);
+          .addGauge(BucketMetricsInfo.BucketAvailableBytes, Math.max(availableSpace, 0));
     }
   }
 
