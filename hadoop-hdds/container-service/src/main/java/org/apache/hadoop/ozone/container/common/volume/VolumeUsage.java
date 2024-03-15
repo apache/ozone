@@ -143,7 +143,10 @@ public class VolumeUsage implements SpaceUsageSource {
       minFreeSpacePercentConfigured = conf.isConfigured(HDDS_DATANODE_VOLUME_MIN_FREE_SPACE_PERCENT);
       freeSpace = (long)conf.getStorageSize(HDDS_DATANODE_VOLUME_MIN_FREE_SPACE,
           HDDS_DATANODE_VOLUME_MIN_FREE_SPACE_DEFAULT, StorageUnit.BYTES);
-      freeSpacePercent = Float.parseFloat(conf.get(HDDS_DATANODE_VOLUME_MIN_FREE_SPACE_PERCENT));
+      if (minFreeSpacePercentConfigured) {
+        freeSpacePercent = Float.parseFloat(
+            conf.get(HDDS_DATANODE_VOLUME_MIN_FREE_SPACE_PERCENT));
+      }
     }
 
     public long get(long capacity) {
