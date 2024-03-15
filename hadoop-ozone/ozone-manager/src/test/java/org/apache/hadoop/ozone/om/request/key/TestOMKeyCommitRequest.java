@@ -77,8 +77,6 @@ import static org.mockito.Mockito.when;
 public class TestOMKeyCommitRequest extends TestOMKeyRequest {
 
   private String parentDir;
-  private Long overwriteObjectID = null;
-  private Long overwriteUpdateID = null;
 
   @Test
   public void testPreExecute() throws Exception {
