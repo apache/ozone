@@ -2239,6 +2239,17 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
       </build>
     </profile>
     <profile>
+      <id>go-offline</id>
+      <properties>
+        <test>void</test>
+        <skip.npx>true</skip.npx>
+        <skip.installnpx>true</skip.installnpx>
+        <skipDocs>true</skipDocs>
+        <maven.javadoc.skip>true</maven.javadoc.skip>
+        <maven.shade.skip>true</maven.shade.skip>
+      </properties>
+    </profile>
+    <profile>
       <id>client</id>
       <build>
         <plugins>

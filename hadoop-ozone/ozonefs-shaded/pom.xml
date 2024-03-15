@@ -91,6 +91,7 @@
               <goal>shade</goal>
             </goals>
             <configuration>
+              <skip>${maven.shade.skip}</skip>
               <transformers>
                 <transformer
                         implementation="org.apache.maven.plugins.shade.resource.DontIncludeResourceTransformer">
