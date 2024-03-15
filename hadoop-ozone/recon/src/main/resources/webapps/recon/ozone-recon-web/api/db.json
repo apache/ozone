@@ -6688,7 +6688,6 @@
     ]
   },
   "dirdeletePending": {
-    "lastKey": "dir11",
     "replicatedDataSize": 0,
     "unreplicatedDataSize": 0,
     "deletedDirInfo": [
