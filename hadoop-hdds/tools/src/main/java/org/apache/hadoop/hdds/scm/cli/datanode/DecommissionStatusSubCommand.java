@@ -117,7 +117,7 @@ public class DecommissionStatusSubCommand extends ScmSubcommand {
         DatanodeDetails datanode = DatanodeDetails.getFromProtoBuf(
             node.getNodeID());
         Map<String, Object> datanodeMap = new LinkedHashMap<>();
-        datanodeMap.put("datanodeDetails", getDatanodeDetails(datanode));
+        datanodeMap.put("datanodeDetails", datanode);
         datanodeMap.put("metrics", getCounts(datanode, jsonNode, numDecomNodes));
         datanodeMap.put("containers", getContainers(scmClient, datanode));
         decommissioningNodesDetails.add(datanodeMap);
@@ -153,45 +153,11 @@ public class DecommissionStatusSubCommand extends ScmSubcommand {
   }
 
   private void printCounts(DatanodeDetails datanode, JsonNode counts, int numDecomNodes) {
-    String errMsg = getErrorMessage() + datanode.getHostName();
-    try {
-      for (int i = 1; i <= numDecomNodes; i++) {
-        if (datanode.getHostName().equals(counts.get("tag.datanode." + i).asText())) {
-          JsonNode pipelinesDN = counts.get("PipelinesWaitingToCloseDN." + i);
-          JsonNode underReplicatedDN = counts.get("UnderReplicatedDN." + i);
-          JsonNode unclosedDN = counts.get("UnclosedContainersDN." + i);
-          JsonNode startTimeDN = counts.get("StartTimeDN." + i);
-          if (pipelinesDN == null || underReplicatedDN == null || unclosedDN == null || startTimeDN == null) {
-            throw new IOException(errMsg);
-          }
-
-          int pipelines = Integer.parseInt(pipelinesDN.toString());
-          double underReplicated = Double.parseDouble(underReplicatedDN.toString());
-          double unclosed = Double.parseDouble(unclosedDN.toString());
-          long startTime = Long.parseLong(startTimeDN.toString());
-          System.out.print("Decommission Started At : ");
-          Date date = new Date(startTime);
-          DateFormat formatter = new SimpleDateFormat("dd/MM/yyyy hh:mm:ss z");
-          System.out.println(formatter.format(date));
-          System.out.println("No. of Unclosed Pipelines: " + pipelines);
-          System.out.println("No. of UnderReplicated Containers: " + underReplicated);
-          System.out.println("No. of Unclosed Containers: " + unclosed);
-          return;
-        }
-      }
-      System.err.println(errMsg);
-    } catch (IOException e) {
-      System.err.println(errMsg);
-    }
-  }
-
-  private Map<String, Object> getDatanodeDetails(DatanodeDetails datanode) {
-    Map<String, Object> detailsMap = new LinkedHashMap<>();
-    detailsMap.put("uuid", datanode.getUuid().toString());
-    detailsMap.put("networkLocation", datanode.getNetworkLocation());
-    detailsMap.put("ipAddress", datanode.getIpAddress());
-    detailsMap.put("hostname", datanode.getHostName());
-    return detailsMap;
+    Map<String, Object> countsMap = getCounts(datanode, counts, numDecomNodes);
+    System.out.println("Decommission Started At : " + countsMap.get("decommissionStartTime"));
+    System.out.println("No. of Unclosed Pipelines: " + countsMap.get("numOfUnclosedPipelines"));
+    System.out.println("No. of UnderReplicated Containers: " + countsMap.get("numOfUnderReplicatedContainers"));
+    System.out.println("No. of Unclosed Containers: " + countsMap.get("numOfUnclosedContainers"));
   }
 
   private Map<String, Object> getCounts(DatanodeDetails datanode, JsonNode counts, int numDecomNodes) {
