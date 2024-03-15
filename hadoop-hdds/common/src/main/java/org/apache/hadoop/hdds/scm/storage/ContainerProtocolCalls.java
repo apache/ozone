@@ -229,7 +229,7 @@ public final class ContainerProtocolCalls  {
     final ContainerCommandRequestProto request = builder
         .setDatanodeUuid(datanode.getUuidString()).build();
     ContainerCommandResponseProto response =
-        xceiverClient.sendCommand(builder.build(), validators);
+        xceiverClient.sendCommand(request, validators);
     return response.getGetBlock();
   }
 
