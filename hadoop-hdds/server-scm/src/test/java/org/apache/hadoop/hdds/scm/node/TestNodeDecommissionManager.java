@@ -18,6 +18,7 @@
 package org.apache.hadoop.hdds.scm.node;
 
 import org.apache.hadoop.hdds.HddsConfigKeys;
+import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
@@ -89,21 +90,21 @@ public class TestNodeDecommissionManager {
     conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, dir.getAbsolutePath());
     scm = HddsTestUtils.getScm(conf);
     nodeManager = scm.getScmNodeManager();
-    final OzoneConfiguration conf = SCMTestUtils.getConf(testDir);
+    final OzoneConfiguration OzConf = SCMTestUtils.getConf(testDir);
     dbStore = DBStoreBuilder.createDBStore(
-        conf, new SCMDBDefinition());
+        OzConf, new SCMDBDefinition());
     scmhaManager = SCMHAManagerStub.getInstance(true);
     sequenceIdGen = new SequenceIdGenerator(
-        conf, scmhaManager, SCMDBDefinition.SEQUENCE_ID.getTable(dbStore));
+        OzConf, scmhaManager, SCMDBDefinition.SEQUENCE_ID.getTable(dbStore));
     final PipelineManager pipelineManager =
         new MockPipelineManager(dbStore, scmhaManager, nodeManager);
     pipelineManager.createPipeline(RatisReplicationConfig.getInstance(
         HddsProtos.ReplicationFactor.THREE));
     pendingOpsMock = mock(ContainerReplicaPendingOps.class);
-    containerManager = new ContainerManagerImpl(conf,
+    containerManager = new ContainerManagerImpl(OzConf,
         scmhaManager, sequenceIdGen, pipelineManager,
         SCMDBDefinition.CONTAINERS.getTable(dbStore), pendingOpsMock);
-    decom = new NodeDecommissionManager(conf, nodeManager, containerManager,
+    decom = new NodeDecommissionManager(OzConf, nodeManager, containerManager,
         SCMContext.emptyContext(), new EventQueue(), null);
   }
 
@@ -421,7 +422,7 @@ public class TestNodeDecommissionManager {
   }
 
   @Test
-  public void testInsufficientNodeDecommissionThrowsException() throws
+  public void testInsufficientNodeDecommissionThrowsExceptionForRatis() throws
       NodeNotFoundException, IOException {
     List<DatanodeAdminError> error;
     List<DatanodeDetails> dns = new ArrayList<>();
@@ -432,19 +433,76 @@ public class TestNodeDecommissionManager {
       nodeManager.register(dn, null, null);
     }
 
-    Set<ContainerID> ids = new HashSet<>();
+    Set<ContainerID> idsRatis = new HashSet<>();
     for (int i = 0; i < 5; i++) {
       ContainerInfo container = containerManager.allocateContainer(
           RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.THREE), "admin");
-      ids.add(container.containerID());
+      idsRatis.add(container.containerID());
     }
 
-    for (DatanodeDetails dn  : nodeManager.getAllNodes()) {
-      nodeManager.setContainers(dn, ids);
+    for (DatanodeDetails dn  : nodeManager.getAllNodes().subList(0,3)) {
+      nodeManager.setContainers(dn, idsRatis);
     }
 
     error = decom.decommissionNodes(Arrays.asList(dns.get(1).getIpAddress(),
         dns.get(2).getIpAddress(), dns.get(3).getIpAddress(), dns.get(4).getIpAddress()));
+    assertTrue(error.get(0).getHostname().contains("AllHosts"));
+  }
+
+  @Test
+  public void testInsufficientNodeDecommissionThrowsExceptionForEc() throws
+      NodeNotFoundException, IOException {
+    List<DatanodeAdminError> error;
+    List<DatanodeDetails> dns = new ArrayList<>();
+
+    for (int i = 0; i < 5; i++) {
+      DatanodeDetails dn = MockDatanodeDetails.randomDatanodeDetails();
+      dns.add(dn);
+      nodeManager.register(dn, null, null);
+    }
+
+    Set<ContainerID> idsEC = new HashSet<>();
+    for (int i = 0; i < 5; i++) {
+      ContainerInfo container = containerManager.allocateContainer(new ECReplicationConfig(3,2), "admin");
+      idsEC.add(container.containerID());
+    }
+
+    for (DatanodeDetails dn  : nodeManager.getAllNodes()) {
+      nodeManager.setContainers(dn, idsEC);
+    }
+
+    error = decom.decommissionNodes(Arrays.asList(dns.get(1).getIpAddress()));
+    assertTrue(error.get(0).getHostname().contains("AllHosts"));
+  }
+
+  @Test
+  public void testInsufficientNodeDecommissionThrowsExceptionRatisAndEc() throws
+      NodeNotFoundException, IOException {
+    List<DatanodeAdminError> error;
+    List<DatanodeDetails> dns = new ArrayList<>();
+
+    for (int i = 0; i < 5; i++) {
+      DatanodeDetails dn = MockDatanodeDetails.randomDatanodeDetails();
+      dns.add(dn);
+      nodeManager.register(dn, null, null);
+    }
+
+    Set<ContainerID> idsRatis = new HashSet<>();
+    ContainerInfo containerRatis = containerManager.allocateContainer(
+        RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.THREE), "admin");
+    idsRatis.add(containerRatis.containerID());
+    Set<ContainerID> idsEC = new HashSet<>();
+    ContainerInfo containerEC = containerManager.allocateContainer(new ECReplicationConfig(3,2), "admin");
+    idsEC.add(containerEC.containerID());
+
+    for (DatanodeDetails dn  : nodeManager.getAllNodes().subList(0,3)) {
+      nodeManager.setContainers(dn, idsRatis);
+    }
+    for (DatanodeDetails dn  : nodeManager.getAllNodes()) {
+      nodeManager.setContainers(dn, idsEC);
+    }
+
+    error = decom.decommissionNodes(Arrays.asList(dns.get(1).getIpAddress()));
     assertTrue(error.get(0).getHostname().contains("AllHosts"));
   }
 
