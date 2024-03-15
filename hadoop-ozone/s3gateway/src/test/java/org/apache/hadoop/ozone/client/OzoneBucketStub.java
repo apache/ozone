@@ -204,6 +204,38 @@ public class OzoneBucketStub extends OzoneBucket {
   }
 
   @Override
+  public OzoneOutputStream overWriteKey(OzoneKeyDetails existingKey, ReplicationConfig rConfig)
+      throws IOException {
+    final ReplicationConfig repConfig;
+    if (rConfig == null) {
+      repConfig = getReplicationConfig();
+    } else {
+      repConfig = rConfig;
+    }
+    ReplicationConfig finalReplicationCon = repConfig;
+    ByteArrayOutputStream byteArrayOutputStream =
+        new KeyMetadataAwareOutputStream(existingKey.getMetadata()) {
+          @Override
+          public void close() throws IOException {
+            keyContents.put(existingKey.getName(), toByteArray());
+            keyDetails.put(existingKey.getName(), new OzoneKeyDetails(
+                getVolumeName(),
+                getName(),
+                existingKey.getName(),
+                existingKey.getDataSize(),
+                System.currentTimeMillis(),
+                System.currentTimeMillis(),
+                new ArrayList<>(), finalReplicationCon, existingKey.getMetadata(), null,
+                () -> readKey(existingKey.getName()), true, null, null
+            ));
+            super.close();
+          }
+        };
+
+    return new OzoneOutputStream(byteArrayOutputStream, null);
+  }
+
+  @Override
   public OzoneDataStreamOutput createStreamKey(String key, long size,
                                                ReplicationConfig rConfig,
                                                Map<String, String> keyMetadata)

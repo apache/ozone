@@ -470,6 +470,25 @@ public class OzoneBucket extends WithMetadata {
   }
 
   /**
+   * Overwrite an existing key using optimistic locking. The existingKey must exist in Ozone to allow
+   * the new key to be created with the same name. Additionally, the existingKey must not have been
+   * modified since the time its details were read. This is controlled by the objectID and updateID
+   * fields in the existingKey. If the key is replaced the objectID will change. If it has been updated
+   * (eg appended) the updateID will change. If either of these have changed since the existingKey
+   * was read, either the initial key create will fail, or the key will fail to commit after the data
+   * has been written.
+   *
+   * @param existingKey       Name of the key to be created.
+   * @param replicationConfig Replication configuration.
+   * @return OzoneOutputStream to which the data has to be written.
+   * @throws IOException
+   */
+  public OzoneOutputStream overWriteKey(OzoneKeyDetails existingKey, ReplicationConfig replicationConfig)
+      throws IOException {
+    return proxy.overWriteKey(existingKey, replicationConfig);
+  }
+
+  /**
    * Creates a new key in the bucket, with default replication type RATIS and
    * with replication factor THREE.
    *

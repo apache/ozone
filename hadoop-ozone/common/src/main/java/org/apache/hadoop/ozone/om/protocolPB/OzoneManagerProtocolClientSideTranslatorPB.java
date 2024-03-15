@@ -734,6 +734,13 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
 
     keyArgs.setSortDatanodes(args.getSortDatanodes());
 
+    if (args.getOverwriteObjectID() != null) {
+      keyArgs.setOverwriteObjectID(args.getOverwriteObjectID());
+    }
+    if (args.getOverwriteUpdateID() != null) {
+      keyArgs.setOverwriteUpdateID(args.getOverwriteUpdateID());
+    }
+
     req.setKeyArgs(keyArgs.build());
 
     OMRequest omRequest = createOMRequest(Type.CreateKey)

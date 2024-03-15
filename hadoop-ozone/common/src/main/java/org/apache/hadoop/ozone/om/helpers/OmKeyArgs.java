@@ -183,7 +183,7 @@ public final class OmKeyArgs implements Auditable {
   }
 
   public OmKeyArgs.Builder toBuilder() {
-    return new OmKeyArgs.Builder()
+    OmKeyArgs.Builder builder = new OmKeyArgs.Builder()
         .setVolumeName(volumeName)
         .setBucketName(bucketName)
         .setKeyName(keyName)
@@ -198,9 +198,15 @@ public final class OmKeyArgs implements Auditable {
         .setHeadOp(headOp)
         .setLatestVersionLocation(latestVersionLocation)
         .setAcls(acls)
-        .setForceUpdateContainerCacheFromSCM(forceUpdateContainerCacheFromSCM)
-        .setOverwriteUpdateID(overwriteUpdateID)
-        .setOverwriteObjectID(overwriteObjectID);
+        .setForceUpdateContainerCacheFromSCM(forceUpdateContainerCacheFromSCM);
+
+    if (overwriteUpdateID != null) {
+      builder.setOverwriteObjectID(overwriteUpdateID);
+    }
+    if (overwriteUpdateID != null) {
+      builder.setOverwriteUpdateID(overwriteUpdateID);
+    }
+    return builder;
   }
 
   @Nonnull
@@ -216,10 +222,10 @@ public final class OmKeyArgs implements Auditable {
         .setForceUpdateContainerCacheFromSCM(
             isForceUpdateContainerCacheFromSCM());
     if (overwriteUpdateID != null) {
-      toBuilder().setOverwriteObjectID(overwriteUpdateID);
+      builder.setOverwriteObjectID(overwriteUpdateID);
     }
     if (overwriteUpdateID != null) {
-      toBuilder().setOverwriteUpdateID(overwriteUpdateID);
+      builder.setOverwriteUpdateID(overwriteUpdateID);
     }
     return builder.build();
   }

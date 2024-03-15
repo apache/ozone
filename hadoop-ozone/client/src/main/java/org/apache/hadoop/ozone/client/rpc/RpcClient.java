@@ -1378,26 +1378,7 @@ public class RpcClient implements ClientProtocol {
       ReplicationConfig replicationConfig,
       Map<String, String> metadata)
       throws IOException {
-    verifyVolumeName(volumeName);
-    verifyBucketName(bucketName);
-    if (checkKeyNameEnabled) {
-      HddsClientUtils.verifyKeyName(keyName);
-    }
-    HddsClientUtils.checkNotNull(keyName);
-    if (omVersion
-        .compareTo(OzoneManagerVersion.ERASURE_CODED_STORAGE_SUPPORT) < 0) {
-      if (replicationConfig != null &&
-          replicationConfig.getReplicationType()
-              == HddsProtos.ReplicationType.EC) {
-        throw new IOException("Can not set the replication of the key to"
-            + " Erasure Coded replication, as OzoneManager does not support"
-            + " Erasure Coded replication.");
-      }
-    }
-
-    if (replicationConfig != null) {
-      replicationConfigValidator.validate(replicationConfig);
-    }
+    createKeyPreChecks(volumeName, bucketName, keyName, replicationConfig);
 
     OmKeyArgs.Builder builder = new OmKeyArgs.Builder()
         .setVolumeName(volumeName)
@@ -1418,6 +1399,70 @@ public class RpcClient implements ClientProtocol {
       openKey.getKeyInfo().setDataSize(size);
     }
     return createOutputStream(openKey);
+  }
+
+  @Override
+  public OzoneOutputStream  overWriteKey(OzoneKeyDetails keyToOverwrite, ReplicationConfig replicationConfig)
+      throws IOException {
+    if (keyToOverwrite == null) {
+      throw new IllegalArgumentException("KeyToOverwrite cannot be null");
+    }
+    if (keyToOverwrite.getObjectID() == null) {
+      throw new IllegalArgumentException("KeyToOverwrite ObjectID cannot be null");
+    }
+    if (keyToOverwrite.getUpdateID() == null) {
+      throw new IllegalArgumentException("KeyToOverwrite UpdateID cannot be null");
+    }
+    createKeyPreChecks(keyToOverwrite.getVolumeName(), keyToOverwrite.getBucketName(),
+        keyToOverwrite.getName(), replicationConfig);
+
+    OmKeyArgs.Builder builder = new OmKeyArgs.Builder()
+        .setVolumeName(keyToOverwrite.getVolumeName())
+        .setBucketName(keyToOverwrite.getBucketName())
+        .setKeyName(keyToOverwrite.getName())
+        .setDataSize(keyToOverwrite.getDataSize())
+        .setReplicationConfig(replicationConfig)
+        .addAllMetadataGdpr(keyToOverwrite.getMetadata())
+        // TODO - if we are effectively cloning a key, probably the ACLs should
+        //        be copied over server side. I am not too sure how this works.
+        .setAcls(getAclList())
+        .setLatestVersionLocation(getLatestVersionLocation)
+        .setOverwriteObjectID(keyToOverwrite.getObjectID())
+        .setOverwriteUpdateID(keyToOverwrite.getUpdateID());
+
+    OpenKeySession openKey = ozoneManagerClient.openKey(builder.build());
+    // For bucket with layout OBJECT_STORE, when create an empty file (size=0),
+    // OM will set DataSize to OzoneConfigKeys#OZONE_SCM_BLOCK_SIZE,
+    // which will cause S3G's atomic write length check to fail,
+    // so reset size to 0 here.
+    if (isS3GRequest.get() && keyToOverwrite.getDataSize() == 0) {
+      openKey.getKeyInfo().setDataSize(0);
+    }
+    return createOutputStream(openKey);
+  }
+
+  private void createKeyPreChecks(String volumeName, String bucketName, String keyName,
+      ReplicationConfig replicationConfig) throws IOException {
+    verifyVolumeName(volumeName);
+    verifyBucketName(bucketName);
+    if (checkKeyNameEnabled) {
+      HddsClientUtils.verifyKeyName(keyName);
+    }
+    HddsClientUtils.checkNotNull(keyName);
+    if (omVersion
+        .compareTo(OzoneManagerVersion.ERASURE_CODED_STORAGE_SUPPORT) < 0) {
+      if (replicationConfig != null &&
+          replicationConfig.getReplicationType()
+              == HddsProtos.ReplicationType.EC) {
+        throw new IOException("Can not set the replication of the key to"
+            + " Erasure Coded replication, as OzoneManager does not support"
+            + " Erasure Coded replication.");
+      }
+    }
+
+    if (replicationConfig != null) {
+      replicationConfigValidator.validate(replicationConfig);
+    }
   }
 
   @Override

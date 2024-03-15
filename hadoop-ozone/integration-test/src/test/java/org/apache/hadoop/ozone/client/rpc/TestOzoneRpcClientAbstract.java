@@ -1035,6 +1035,54 @@ public abstract class TestOzoneRpcClientAbstract {
   }
 
   @Test
+  public void testOverwriteKey() throws IOException {
+    String volumeName = UUID.randomUUID().toString();
+    String bucketName = UUID.randomUUID().toString();
+
+    String value = "sample value";
+    String overwriteValue = "overwrite value";
+    store.createVolume(volumeName);
+    OzoneVolume volume = store.getVolume(volumeName);
+
+    // TODO - only works on object store layout for now.
+    BucketArgs args = BucketArgs.newBuilder()
+        .setBucketLayout(BucketLayout.OBJECT_STORE)
+        .build();
+
+    volume.createBucket(bucketName, args);
+    OzoneBucket bucket = volume.getBucket(bucketName);
+
+    String keyName = UUID.randomUUID().toString();
+    try (OzoneOutputStream out = bucket.createKey(keyName, value.getBytes(UTF_8).length,
+        RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.ONE), new HashMap<>())) {
+      out.write(value.getBytes(UTF_8));
+    }
+    OzoneKeyDetails keyDetails = bucket.getKey(keyName);
+
+    try (OzoneOutputStream out = bucket.overWriteKey(
+        keyDetails, RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.ONE))) {
+      out.write(overwriteValue.getBytes(UTF_8));
+    }
+
+    try (OzoneInputStream is = bucket.readKey(keyName)) {
+      byte[] fileContent = new byte[overwriteValue.getBytes(UTF_8).length];
+      is.read(fileContent);
+      assertEquals(overwriteValue, new String(fileContent, UTF_8));
+    }
+
+    // Delete the key
+    bucket.deleteKey(keyName);
+
+    // Now try the over write again, and it should fail as the originally read key is no longer there.
+    assertThrows(IOException.class, () -> {
+      try (OzoneOutputStream out = bucket.overWriteKey(
+          keyDetails, RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.ONE))) {
+        out.write(overwriteValue.getBytes(UTF_8));
+      }
+    });
+  }
+
+  @Test
   public void testCheckUsedBytesQuota() throws IOException {
     String volumeName = UUID.randomUUID().toString();
     String bucketName = UUID.randomUUID().toString();
