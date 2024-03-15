@@ -73,6 +73,12 @@ public abstract class WithMetadata {
       return this;
     }
 
+    public Builder setMetadata(Map<String, String> map) {
+      metadata.clear();
+      addAllMetadata(map);
+      return this;
+    }
+
     protected Map<String, String> getMetadata() {
       return metadata;
     }

@@ -983,7 +983,7 @@ public class OzoneBucket extends WithMetadata {
     }
 
     public Builder setMetadata(Map<String, String> metadata) {
-      addAllMetadata(metadata);
+      setMetadata(metadata);
       return this;
     }
 
