@@ -90,21 +90,21 @@ public class TestNodeDecommissionManager {
     conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, dir.getAbsolutePath());
     scm = HddsTestUtils.getScm(conf);
     nodeManager = scm.getScmNodeManager();
-    final OzoneConfiguration OzConf = SCMTestUtils.getConf(testDir);
+    final OzoneConfiguration ozConf = SCMTestUtils.getConf(testDir);
     dbStore = DBStoreBuilder.createDBStore(
-        OzConf, new SCMDBDefinition());
+        ozConf, new SCMDBDefinition());
     scmhaManager = SCMHAManagerStub.getInstance(true);
     sequenceIdGen = new SequenceIdGenerator(
-        OzConf, scmhaManager, SCMDBDefinition.SEQUENCE_ID.getTable(dbStore));
+        ozConf, scmhaManager, SCMDBDefinition.SEQUENCE_ID.getTable(dbStore));
     final PipelineManager pipelineManager =
         new MockPipelineManager(dbStore, scmhaManager, nodeManager);
     pipelineManager.createPipeline(RatisReplicationConfig.getInstance(
         HddsProtos.ReplicationFactor.THREE));
     pendingOpsMock = mock(ContainerReplicaPendingOps.class);
-    containerManager = new ContainerManagerImpl(OzConf,
+    containerManager = new ContainerManagerImpl(ozConf,
         scmhaManager, sequenceIdGen, pipelineManager,
         SCMDBDefinition.CONTAINERS.getTable(dbStore), pendingOpsMock);
-    decom = new NodeDecommissionManager(OzConf, nodeManager, containerManager,
+    decom = new NodeDecommissionManager(ozConf, nodeManager, containerManager,
         SCMContext.emptyContext(), new EventQueue(), null);
   }
 
@@ -440,7 +440,7 @@ public class TestNodeDecommissionManager {
       idsRatis.add(container.containerID());
     }
 
-    for (DatanodeDetails dn  : nodeManager.getAllNodes().subList(0,3)) {
+    for (DatanodeDetails dn  : nodeManager.getAllNodes().subList(0, 3)) {
       nodeManager.setContainers(dn, idsRatis);
     }
 
@@ -463,7 +463,7 @@ public class TestNodeDecommissionManager {
 
     Set<ContainerID> idsEC = new HashSet<>();
     for (int i = 0; i < 5; i++) {
-      ContainerInfo container = containerManager.allocateContainer(new ECReplicationConfig(3,2), "admin");
+      ContainerInfo container = containerManager.allocateContainer(new ECReplicationConfig(3, 2), "admin");
       idsEC.add(container.containerID());
     }
 
@@ -492,10 +492,10 @@ public class TestNodeDecommissionManager {
         RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.THREE), "admin");
     idsRatis.add(containerRatis.containerID());
     Set<ContainerID> idsEC = new HashSet<>();
-    ContainerInfo containerEC = containerManager.allocateContainer(new ECReplicationConfig(3,2), "admin");
+    ContainerInfo containerEC = containerManager.allocateContainer(new ECReplicationConfig(3, 2), "admin");
     idsEC.add(containerEC.containerID());
 
-    for (DatanodeDetails dn  : nodeManager.getAllNodes().subList(0,3)) {
+    for (DatanodeDetails dn  : nodeManager.getAllNodes().subList(0, 3)) {
       nodeManager.setContainers(dn, idsRatis);
     }
     for (DatanodeDetails dn  : nodeManager.getAllNodes()) {
