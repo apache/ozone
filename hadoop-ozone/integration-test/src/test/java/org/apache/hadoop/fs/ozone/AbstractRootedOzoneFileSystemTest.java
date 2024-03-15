@@ -1197,7 +1197,7 @@ abstract class AbstractRootedOzoneFileSystemTest {
         .setAdmin("admin")
         .setOwner("admin")
         .addAcl(new OzoneAcl(ACLIdentityType.WORLD, "", aclRights, ACCESS))
-        .addAcl(new OzoneAcl(ACLIdentityType.USER, "admin", userRights, ACCESS))
+        .addAcl(new OzoneAcl(ACLIdentityType.USER, "admin", ACCESS, userRights))
         .setQuotaInNamespace(1000)
         .setQuotaInBytes(Long.MAX_VALUE).build();
     // Sanity check
@@ -1232,7 +1232,7 @@ abstract class AbstractRootedOzoneFileSystemTest {
     BucketArgs bucketArgs = new BucketArgs.Builder()
         .setOwner("admin")
         .addAcl(new OzoneAcl(ACLIdentityType.WORLD, "", ACCESS, READ, WRITE, LIST))
-        .addAcl(new OzoneAcl(ACLIdentityType.USER, "admin", userRights, ACCESS))
+        .addAcl(new OzoneAcl(ACLIdentityType.USER, "admin", ACCESS, userRights))
         .setQuotaInNamespace(1000)
         .setQuotaInBytes(Long.MAX_VALUE).build();
 
@@ -1292,7 +1292,7 @@ abstract class AbstractRootedOzoneFileSystemTest {
     ACLType userRights = aclConfig.getUserDefaultRights();
     // Construct ACL for world access
     OzoneAcl aclWorldAccess = new OzoneAcl(ACLIdentityType.WORLD, "",
-        userRights, ACCESS);
+        ACCESS, userRights);
     // Construct VolumeArgs
     VolumeArgs volumeArgs = VolumeArgs.newBuilder()
         .addAcl(aclWorldAccess)
@@ -2293,7 +2293,7 @@ abstract class AbstractRootedOzoneFileSystemTest {
     ACLType userRights = aclConfig.getUserDefaultRights();
     // Construct ACL for world access
     OzoneAcl aclWorldAccess = new OzoneAcl(ACLIdentityType.WORLD, "",
-        userRights, ACCESS);
+        ACCESS, userRights);
     // Construct VolumeArgs, set ACL to world access
     VolumeArgs volumeArgs = VolumeArgs.newBuilder()
         .addAcl(aclWorldAccess)

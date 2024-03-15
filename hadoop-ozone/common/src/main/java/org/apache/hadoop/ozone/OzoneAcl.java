@@ -59,7 +59,7 @@ public class OzoneAcl {
   private static final List<ACLType> EMPTY_LIST = new ArrayList<>(0);
 
   // TODO use varargs constructor
-  public OzoneAcl(ACLIdentityType type, String name, ACLType acl, AclScope scope) {
+  public OzoneAcl(ACLIdentityType type, String name, AclScope scope, ACLType acl) {
     this(type, name, scope, bitSetOf(acl));
   }
 

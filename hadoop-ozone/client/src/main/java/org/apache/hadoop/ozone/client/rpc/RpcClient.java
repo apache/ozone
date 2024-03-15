@@ -432,12 +432,12 @@ public class RpcClient implements ClientProtocol {
     List<OzoneAcl> listOfAcls = new ArrayList<>();
     //User ACL
     listOfAcls.add(new OzoneAcl(ACLIdentityType.USER,
-        owner, userRights, ACCESS));
+        owner, ACCESS, userRights));
     //Group ACLs of the User
     List<String> userGroups = Arrays.asList(UserGroupInformation
         .createRemoteUser(owner).getGroupNames());
     userGroups.stream().forEach((group) -> listOfAcls.add(
-        new OzoneAcl(ACLIdentityType.GROUP, group, groupRights, ACCESS)));
+        new OzoneAcl(ACLIdentityType.GROUP, group, ACCESS, groupRights)));
     //ACLs from VolumeArgs
     List<OzoneAcl> volumeAcls = volArgs.getAcls();
     if (volumeAcls != null) {

@@ -629,7 +629,7 @@ public class TestOmMetrics {
       // Test addAcl
       writeClient.addAcl(volObj,
           new OzoneAcl(IAccessAuthorizer.ACLIdentityType.USER, "ozoneuser",
-              IAccessAuthorizer.ACLType.ALL, ACCESS));
+              ACCESS, IAccessAuthorizer.ACLType.ALL));
       omMetrics = getMetrics("OMMetrics");
       assertCounter("NumAddAcl", 1L, omMetrics);
 
@@ -695,7 +695,7 @@ public class TestOmMetrics {
     long initialValue = metrics.getNumAddAcl();
     objectStore.addAcl(volObj,
         new OzoneAcl(IAccessAuthorizer.ACLIdentityType.USER, "ozoneuser",
-            IAccessAuthorizer.ACLType.ALL, ACCESS));
+            ACCESS, IAccessAuthorizer.ACLType.ALL));
 
     assertEquals(initialValue + 1, metrics.getNumAddAcl());
 

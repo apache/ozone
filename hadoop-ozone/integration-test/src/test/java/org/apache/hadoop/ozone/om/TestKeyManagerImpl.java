@@ -531,7 +531,7 @@ public class TestKeyManagerImpl {
         .build();
 
     OzoneAcl ozAcl1 = new OzoneAcl(ACLIdentityType.USER, "user1",
-        ACLType.READ, ACCESS);
+        ACCESS, ACLType.READ);
     writeClient.addAcl(ozPrefix1, ozAcl1);
 
     List<OzoneAcl> ozAclGet = writeClient.getAcl(ozPrefix1);
@@ -540,7 +540,7 @@ public class TestKeyManagerImpl {
 
     List<OzoneAcl> acls = new ArrayList<>();
     OzoneAcl ozAcl2 = new OzoneAcl(ACLIdentityType.USER, "admin",
-        ACLType.ALL, ACCESS);
+        ACCESS, ACLType.ALL);
 
     BitSet rwRights = new BitSet();
     rwRights.set(IAccessAuthorizer.ACLType.WRITE.ordinal());
@@ -628,7 +628,7 @@ public class TestKeyManagerImpl {
     // Invalid prefix not ending with "/"
     String invalidPrefix = "invalid/pf";
     OzoneAcl ozAcl1 = new OzoneAcl(ACLIdentityType.USER, "user1",
-        ACLType.READ, ACCESS);
+        ACCESS, ACLType.READ);
 
     OzoneObj ozInvalidPrefix = new OzoneObjInfo.Builder()
         .setVolumeName(volumeName)
@@ -692,7 +692,7 @@ public class TestKeyManagerImpl {
         .build();
 
     OzoneAcl ozAcl1 = new OzoneAcl(ACLIdentityType.USER, "user1",
-        ACLType.READ, ACCESS);
+        ACCESS, ACLType.READ);
     writeClient.addAcl(ozPrefix1, ozAcl1);
 
     OzoneObj ozFile1 = new OzoneObjInfo.Builder()
