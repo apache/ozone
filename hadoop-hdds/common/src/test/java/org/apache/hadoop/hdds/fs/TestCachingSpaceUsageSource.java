@@ -42,13 +42,13 @@ import static org.mockito.Mockito.when;
 /**
  * Tests for {@link CachingSpaceUsageSource}.
  */
-public class TestCachingSpaceUsageSource {
+class TestCachingSpaceUsageSource {
 
   @TempDir
   private static File dir;
 
   @Test
-  public void providesInitialValueUntilStarted() {
+  void providesInitialValueUntilStarted() {
     final long initialValue = validInitialValue();
     SpaceUsageCheckParams params = paramsBuilder(new AtomicLong(initialValue))
         .withRefresh(Duration.ZERO)
@@ -61,7 +61,7 @@ public class TestCachingSpaceUsageSource {
   }
 
   @Test
-  public void ignoresMissingInitialValue() {
+  void ignoresMissingInitialValue() {
     SpaceUsageCheckParams params = paramsBuilder()
         .withRefresh(Duration.ZERO)
         .build();
@@ -73,7 +73,7 @@ public class TestCachingSpaceUsageSource {
   }
 
   @Test
-  public void updatesValueFromSourceUponStartIfPeriodicRefreshNotConfigured() {
+  void updatesValueFromSourceUponStartIfPeriodicRefreshNotConfigured() {
     AtomicLong savedValue = new AtomicLong(validInitialValue());
     SpaceUsageCheckParams params = paramsBuilder(savedValue)
         .withRefresh(Duration.ZERO).build();
@@ -85,7 +85,7 @@ public class TestCachingSpaceUsageSource {
   }
 
   @Test
-  public void schedulesRefreshWithDelayIfConfigured() {
+  void schedulesRefreshWithDelayIfConfigured() {
     long initialValue = validInitialValue();
     AtomicLong savedValue = new AtomicLong(initialValue);
     SpaceUsageCheckParams params = paramsBuilder(savedValue)
@@ -104,7 +104,7 @@ public class TestCachingSpaceUsageSource {
   }
 
   @Test
-  public void schedulesImmediateRefreshIfInitialValueMissing() {
+  void schedulesImmediateRefreshIfInitialValueMissing() {
     final long initialValue = missingInitialValue();
     AtomicLong savedValue = new AtomicLong(initialValue);
     SpaceUsageCheckParams params = paramsBuilder(savedValue).build();
@@ -121,7 +121,7 @@ public class TestCachingSpaceUsageSource {
   }
 
   @Test
-  public void savesValueOnShutdown() {
+  void savesValueOnShutdown() {
     AtomicLong savedValue = new AtomicLong(validInitialValue());
     SpaceUsageSource source = mock(SpaceUsageSource.class);
     final long usedSpace = 4L;
