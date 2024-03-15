@@ -72,7 +72,13 @@ public class BucketUtilizationMetrics implements MetricsSource {
         continue;
       }
 
-      long availableSpace = bucketInfo.getQuotaInBytes() - bucketInfo.getUsedBytes();
+      long availableSpace;
+      long quotaInBytes = bucketInfo.getQuotaInBytes();
+      if (quotaInBytes == -1) {
+        availableSpace = quotaInBytes;
+      } else {
+        availableSpace = Math.max(bucketInfo.getQuotaInBytes() - bucketInfo.getUsedBytes(), 0);
+      }
 
       collector.addRecord(SOURCE)
           .setContext("Bucket metrics")
@@ -81,7 +87,7 @@ public class BucketUtilizationMetrics implements MetricsSource {
           .addGauge(BucketMetricsInfo.BucketUsedBytes, bucketInfo.getUsedBytes())
           .addGauge(BucketMetricsInfo.BucketQuotaBytes, bucketInfo.getQuotaInBytes())
           .addGauge(BucketMetricsInfo.BucketQuotaNamespace, bucketInfo.getQuotaInNamespace())
-          .addGauge(BucketMetricsInfo.BucketAvailableBytes, Math.max(availableSpace, 0));
+          .addGauge(BucketMetricsInfo.BucketAvailableBytes, availableSpace);
     }
   }
 

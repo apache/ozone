@@ -29,6 +29,7 @@ import org.junit.jupiter.api.Test;
 import java.util.Iterator;
 import java.util.Map;
 
+import static org.apache.hadoop.ozone.OzoneConsts.QUOTA_RESET;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyLong;
@@ -48,7 +49,7 @@ public class TestBucketUtilizationMetrics {
   private static final String BUCKET_NAME_1 = "bucket1";
   private static final String BUCKET_NAME_2 = "bucket2";
   private static final long USED_BYTES_1 = 100;
-  private static final long USED_BYTES_2 = 200;
+  private static final long USED_BYTES_2 = QUOTA_RESET;
   private static final long QUOTA_IN_BYTES_1 = 200;
   private static final long QUOTA_IN_BYTES_2 = 400;
   private static final long QUOTA_IN_NAMESPACE_1 = 1;
@@ -101,8 +102,7 @@ public class TestBucketUtilizationMetrics {
     verify(mb, times(1)).addGauge(BucketMetricsInfo.BucketUsedBytes, USED_BYTES_2);
     verify(mb, times(1)).addGauge(BucketMetricsInfo.BucketQuotaBytes, QUOTA_IN_BYTES_2);
     verify(mb, times(1)).addGauge(BucketMetricsInfo.BucketQuotaNamespace, QUOTA_IN_NAMESPACE_2);
-    verify(mb, times(1)).addGauge(BucketMetricsInfo.BucketAvailableBytes,
-        QUOTA_IN_BYTES_2 - USED_BYTES_2);
+    verify(mb, times(1)).addGauge(BucketMetricsInfo.BucketAvailableBytes, QUOTA_RESET);
   }
 
   private static Map.Entry<CacheKey<String>, CacheValue<OmBucketInfo>> createMockEntry(String volumeName,
