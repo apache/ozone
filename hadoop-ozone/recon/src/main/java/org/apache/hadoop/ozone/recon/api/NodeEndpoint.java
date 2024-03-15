@@ -53,6 +53,7 @@ import javax.ws.rs.core.Response;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -75,14 +76,16 @@ public class NodeEndpoint {
   private ReconNodeManager nodeManager;
   private ReconPipelineManager pipelineManager;
   private ReconContainerManager reconContainerManager;
+  private ReconUtils reconUtils;
 
   @Inject
-  NodeEndpoint(OzoneStorageContainerManager reconSCM) {
+  NodeEndpoint(OzoneStorageContainerManager reconSCM, ReconUtils reconUtils) {
     this.nodeManager =
         (ReconNodeManager) reconSCM.getScmNodeManager();
     this.reconContainerManager = 
         (ReconContainerManager) reconSCM.getContainerManager();
     this.pipelineManager = (ReconPipelineManager) reconSCM.getPipelineManager();
+    this.reconUtils = reconUtils;
   }
 
   /**
@@ -203,7 +206,7 @@ public class NodeEndpoint {
   @Path("/decommission/info/{uuid}")
   public Response getDecommissionInfoForDatanode(@PathParam("uuid") String uuid) {
     Preconditions.checkNotNull(uuid, "uuid of a datanode cannot be null !!!");
-    Preconditions.checkArgument(uuid.isEmpty(), "uuid of a datanode cannot be empty !!!");
+    Preconditions.checkArgument(!uuid.isEmpty(), "uuid of a datanode cannot be empty !!!");
 
     // Command to execute
     List<String> commandArgs =
@@ -212,9 +215,10 @@ public class NodeEndpoint {
     return getDecommissionStatusResponse(commandArgs);
   }
 
-  private static Response getDecommissionStatusResponse(List<String> commandArgs) {
+  private Response getDecommissionStatusResponse(List<String> commandArgs) {
     Response.ResponseBuilder builder = Response.status(Response.Status.OK);
-    Map<Integer, String> commandOutputMap = ReconUtils.executeCommand(commandArgs);
+    Map<Integer, String> commandOutputMap = reconUtils.executeCommand(commandArgs);
+    Map<String, Object> responseMap = new HashMap<>();
 
     for (Map.Entry<Integer, String> entry : commandOutputMap.entrySet()) {
       Integer exitCode = entry.getKey();
@@ -222,7 +226,7 @@ public class NodeEndpoint {
       if (exitCode != 0) {
         builder.status(Response.Status.INTERNAL_SERVER_ERROR);
         builder.entity(
-            ReconUtils.joinListArgs(commandArgs) + " command execution is not successful : " + processOutput);
+            reconUtils.joinListArgs(commandArgs) + " command execution is not successful : " + processOutput);
         return builder.build();
       } else {
         // Create ObjectMapper
@@ -233,7 +237,8 @@ public class NodeEndpoint {
         try {
           decommissionStatusInfoResponseList =
               objectMapper.readValue(processOutput, new TypeReference<List<DecommissionStatusInfoResponse>>() { });
-          builder.entity(decommissionStatusInfoResponseList);
+          responseMap.put("DatanodesDecommissionInfo", decommissionStatusInfoResponseList);
+          builder.entity(responseMap);
           return builder.build();
         } catch (JsonProcessingException jsonProcessingException) {
           LOG.error("Unexpected JSON Error: {}", jsonProcessingException);

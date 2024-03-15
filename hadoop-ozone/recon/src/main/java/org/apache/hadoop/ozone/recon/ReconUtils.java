@@ -403,7 +403,7 @@ public class ReconUtils {
    * @param commandArgs the list of command args
    * @return the command output map with its exit code
    */
-  public static Map<Integer, String> executeCommand(List<String> commandArgs) {
+  public Map<Integer, String> executeCommand(List<String> commandArgs) {
     String command = joinListArgs(commandArgs);
     Map<Integer, String> processOutputMap = new HashMap<>();
     LOG.info("Received command : '{}' to execute", command);
@@ -426,12 +426,12 @@ public class ReconUtils {
   }
 
   @NotNull
-  public static String joinListArgs(List<String> commandArgs) {
+  public String joinListArgs(List<String> commandArgs) {
     String command = commandArgs.stream().collect(Collectors.joining(" "));
     return command;
   }
 
-  private static void validateAndReadProcessOutput(AtomicReference<String> processOutput,
+  private void validateAndReadProcessOutput(AtomicReference<String> processOutput,
                                                    Process process,
                                                    int exitCode) throws IOException {
     StringBuilder processOutputBuilder = new StringBuilder();
@@ -445,7 +445,7 @@ public class ReconUtils {
     processOutput.set(processOutputBuilder.toString());
   }
 
-  private static void readProcessStream(StringBuilder processOutputBuilder, InputStream stream) throws IOException {
+  private void readProcessStream(StringBuilder processOutputBuilder, InputStream stream) throws IOException {
     try (BufferedReader reader = new BufferedReader(new InputStreamReader(stream, "UTF-8"))) {
       String line;
       while ((line = reader.readLine()) != null) {
