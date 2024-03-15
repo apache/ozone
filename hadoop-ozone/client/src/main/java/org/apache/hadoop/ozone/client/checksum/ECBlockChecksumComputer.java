@@ -121,8 +121,6 @@ public class ECBlockChecksumComputer extends AbstractBlockChecksumComputer {
 
     // Bytes required to create a CRC
     long bytesPerCrc = firstChunkInfo.getChecksumData().getBytesPerChecksum();
-    ECReplicationConfig replicationConfig =
-        (ECReplicationConfig) keyInfo.getReplicationConfig();
     long chunkSize = firstChunkInfo.getLen();
 
     //When EC chunk size is not a multiple of ozone.client.bytes.per.checksum
