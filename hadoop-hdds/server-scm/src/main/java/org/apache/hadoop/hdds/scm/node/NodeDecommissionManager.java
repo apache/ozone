@@ -320,6 +320,7 @@ public class NodeDecommissionManager {
     if (!decommissionPossible) {
       LOG.error("Cannot decommission nodes as sufficient node are not available.");
       errors.add(new DatanodeAdminError("AllHosts", "Sufficient nodes are not available."));
+      return errors;
     }
     for (DatanodeDetails dn : dns) {
       try {
