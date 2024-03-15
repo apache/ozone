@@ -267,7 +267,7 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
     <maven-javadoc-plugin.version>3.0.1</maven-javadoc-plugin.version>
     <maven-assembly-plugin.version>3.6.0</maven-assembly-plugin.version>
     <apache-rat-plugin.version>0.16.1</apache-rat-plugin.version>
-    <maven-deploy-plugin.version>2.8.1</maven-deploy-plugin.version>
+    <maven-deploy-plugin.version>3.1.1</maven-deploy-plugin.version>
     <build-helper-maven-plugin.version>1.9</build-helper-maven-plugin.version>
     <maven-dependency-plugin.version>3.6.1</maven-dependency-plugin.version>
     <plexus-archiver.version>4.2.2</plexus-archiver.version>
@@ -295,7 +295,7 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
     <aspectj.version>1.9.7</aspectj.version>
     <aspectj-plugin.version>1.14.0</aspectj-plugin.version>
     <restrict-imports.enforcer.version>2.5.0</restrict-imports.enforcer.version>
-    <jgrapht.version>1.0.1</jgrapht.version>
+    <jgrapht.version>1.4.0</jgrapht.version>
 
     <spring.version>5.3.27</spring.version>
     <jooq.version>3.11.10</jooq.version>
@@ -2093,6 +2093,13 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
           </dependency>
         </dependencies>
       </plugin>
+      <plugin>
+        <groupId>org.apache.rat</groupId>
+        <artifactId>apache-rat-plugin</artifactId>
+        <configuration>
+          <excludesFile>dev-support/rat/rat-exclusions.txt</excludesFile>
+        </configuration>
+      </plugin>
     </plugins>
   </build>
 
@@ -2244,6 +2251,17 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
           </plugin>
         </plugins>
       </build>
+    </profile>
+    <profile>
+      <id>go-offline</id>
+      <properties>
+        <test>void</test>
+        <skip.npx>true</skip.npx>
+        <skip.installnpx>true</skip.installnpx>
+        <skipDocs>true</skipDocs>
+        <maven.javadoc.skip>true</maven.javadoc.skip>
+        <maven.shade.skip>true</maven.shade.skip>
+      </properties>
     </profile>
     <profile>
       <id>client</id>

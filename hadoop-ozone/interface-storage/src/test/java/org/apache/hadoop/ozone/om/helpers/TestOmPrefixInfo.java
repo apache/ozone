@@ -25,6 +25,7 @@ import org.apache.hadoop.ozone.storage.proto.OzoneManagerStorageProtos;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
 import org.junit.jupiter.api.Test;
 
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 
@@ -40,7 +41,7 @@ public class TestOmPrefixInfo {
   private static OzoneManagerStorageProtos.OzoneAclInfo buildTestOzoneAclInfo(
       String aclString) {
     OzoneAcl oacl = OzoneAcl.parseAcl(aclString);
-    ByteString rights = ByteString.copyFrom(oacl.getAclBitSet().toByteArray());
+    ByteString rights = ByteString.copyFrom(oacl.getAclByteArray());
     return OzoneManagerStorageProtos.OzoneAclInfo.newBuilder()
         .setType(OzoneManagerStorageProtos.OzoneAclInfo.OzoneAclType.USER)
         .setName(oacl.getName())
@@ -74,9 +75,9 @@ public class TestOmPrefixInfo {
       IAccessAuthorizer.ACLType aclType,
       OzoneAcl.AclScope scope) {
     return new OmPrefixInfo(path,
-        Collections.singletonList(new OzoneAcl(
+        new ArrayList<>(Collections.singletonList(new OzoneAcl(
             identityType, identityString,
-            aclType, scope)), new HashMap<>(), 10, 100);
+            aclType, scope))), new HashMap<>(), 10, 100);
   }
 
 
