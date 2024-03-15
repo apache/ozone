@@ -339,7 +339,7 @@ public class TestOzoneTenantShell {
   }
 
   private void checkOutput(ByteArrayOutputStream stream, String stringToMatch,
-      boolean exactMatch, boolean expectValidJSON) throws IOException {
+                           boolean exactMatch, boolean expectValidJSON) throws IOException {
     stream.flush();
     final String str = stream.toString(DEFAULT_ENCODING);
     if (expectValidJSON) {
@@ -353,6 +353,8 @@ public class TestOzoneTenantShell {
 
   private void checkOutput(String str, String stringToMatch,
                            boolean exactMatch) {
+    LOG.error("str = \n" + str);
+    LOG.error("stringToMatch = \n" + stringToMatch);
     if (exactMatch) {
       assertEquals(stringToMatch, str);
     } else {
@@ -388,17 +390,17 @@ public class TestOzoneTenantShell {
       executeHA(tenantShell, new String[] {"--verbose", "user", "assign-admin",
           tenantName + "$" + userName, "--tenant=" + tenantName,
           "--delegated=true"});
-      checkOutput(out, "{\n" + "  \"accessId\": \"devaa$alice\",\n"
-          + "  \"tenantId\": \"devaa\",\n" + "  \"isAdmin\": true,\n"
-          + "  \"isDelegatedAdmin\": true\n" + "}\n", true, true);
+      checkOutput(out, "{\n" + "  \"accessId\" : \"devaa$alice\",\n"
+          + "  \"tenantId\" : \"devaa\",\n" + "  \"isAdmin\" : true,\n"
+          + "  \"isDelegatedAdmin\" : true\n" + "}\n", true, true);
       checkOutput(err, "", true);
 
       // Clean up
       executeHA(tenantShell, new String[] {"--verbose", "user", "revoke-admin",
           tenantName + "$" + userName, "--tenant=" + tenantName});
-      checkOutput(out, "{\n" + "  \"accessId\": \"devaa$alice\",\n"
-          + "  \"tenantId\": \"devaa\",\n" + "  \"isAdmin\": false,\n"
-          + "  \"isDelegatedAdmin\": false\n" + "}\n", true, true);
+      checkOutput(out, "{\n" + "  \"accessId\" : \"devaa$alice\",\n"
+          + "  \"tenantId\" : \"devaa\",\n" + "  \"isAdmin\" : false,\n"
+          + "  \"isDelegatedAdmin\" : false\n" + "}\n", true, true);
       checkOutput(err, "", true);
 
       executeHA(tenantShell, new String[] {
@@ -471,7 +473,7 @@ public class TestOzoneTenantShell {
 
     executeHA(tenantShell, new String[] {"list", "--json"});
     // Not checking the full output here
-    checkOutput(out, "\"tenantId\": \"dev\",", false);
+    checkOutput(out, "\"tenantId\" : \"dev\",", false);
     checkOutput(err, "", true);
 
     // Attempt user getsecret before assignment, should fail
@@ -540,17 +542,28 @@ public class TestOzoneTenantShell {
 
     executeHA(tenantShell, new String[] {
         "user", "info", "--json", "bob"});
-    checkOutput(out, "{\n" + "  \"user\": \"bob\",\n" + "  \"tenants\": [\n"
-        + "    {\n" + "      \"accessId\": \"research$bob\",\n"
-        + "      \"tenantId\": \"research\",\n" + "      \"isAdmin\": false,\n"
-        + "      \"isDelegatedAdmin\": false\n" + "    },\n" + "    {\n"
-        + "      \"accessId\": \"finance$bob\",\n"
-        + "      \"tenantId\": \"finance\",\n" + "      \"isAdmin\": false,\n"
-        + "      \"isDelegatedAdmin\": false\n" + "    },\n" + "    {\n"
-        + "      \"accessId\": \"dev$bob\",\n"
-        + "      \"tenantId\": \"dev\",\n" + "      \"isAdmin\": true,\n"
-        + "      \"isDelegatedAdmin\": true\n" + "    }\n" + "  ]\n" + "}\n",
+    checkOutput(out,
+        "{\n" +
+            "  \"user\" : \"bob\",\n" +
+            "  \"tenants\" : [ {\n" +
+            "    \"accessId\" : \"research$bob\",\n" +
+            "    \"tenantId\" : \"research\",\n" +
+            "    \"isAdmin\" : false,\n" +
+            "    \"isDelegatedAdmin\" : false\n" +
+            "  }, {\n" +
+            "    \"accessId\" : \"finance$bob\",\n" +
+            "    \"tenantId\" : \"finance\",\n" +
+            "    \"isAdmin\" : false,\n" +
+            "    \"isDelegatedAdmin\" : false\n" +
+            "  }, {\n" +
+            "    \"accessId\" : \"dev$bob\",\n" +
+            "    \"tenantId\" : \"dev\",\n" +
+            "    \"isAdmin\" : true,\n" +
+            "    \"isDelegatedAdmin\" : true\n" +
+            "  } ]\n" +
+            "}\n",
         true, true);
+
     checkOutput(err, "", true);
 
     // Revoke admin
@@ -675,8 +688,8 @@ public class TestOzoneTenantShell {
 
     // Then delete tenant, should succeed
     executeHA(tenantShell, new String[] {"--verbose", "delete", "dev"});
-    checkOutput(out, "{\n" + "  \"tenantId\": \"dev\",\n"
-        + "  \"volumeName\": \"dev\",\n" + "  \"volumeRefCount\": 0\n" + "}\n",
+    checkOutput(out, "{\n" + "  \"tenantId\" : \"dev\",\n"
+            + "  \"volumeName\" : \"dev\",\n" + "  \"volumeRefCount\" : 0\n" + "}\n",
         true, true);
     checkOutput(err, "Deleted tenant 'dev'.\n", false);
     deleteVolume("dev");
@@ -691,7 +704,7 @@ public class TestOzoneTenantShell {
   public void testListTenantUsers() throws IOException {
     executeHA(tenantShell, new String[] {"--verbose", "create", "tenant1"});
     checkOutput(out, "{\n" +
-        "  \"tenantId\": \"tenant1\"\n" + "}\n", true, true);
+        "  \"tenantId\" : \"tenant1\"\n" + "}\n", true, true);
     checkOutput(err, "", true);
 
     executeHA(tenantShell, new String[] {
@@ -715,10 +728,14 @@ public class TestOzoneTenantShell {
 
     executeHA(tenantShell, new String[] {
         "user", "list", "tenant1", "--json"});
-    checkOutput(out, "[\n" + "  {\n" + "    \"user\": \"bob\",\n"
-        + "    \"accessId\": \"tenant1$bob\"\n" + "  },\n" + "  {\n"
-        + "    \"user\": \"alice\",\n" + "    \"accessId\": \"tenant1$alice\"\n"
-        + "  }\n" + "]\n", true);
+    checkOutput(out,
+        "[ {\n" +
+            "  \"user\" : \"bob\",\n" +
+            "  \"accessId\" : \"tenant1$bob\"\n" +
+            "}, {\n" +
+            "  \"user\" : \"alice\",\n" +
+            "  \"accessId\" : \"tenant1$alice\"\n" +
+            "} ]\n", true);
     checkOutput(err, "", true);
 
     executeHA(tenantShell, new String[] {
@@ -729,8 +746,10 @@ public class TestOzoneTenantShell {
 
     executeHA(tenantShell, new String[] {
         "user", "list", "tenant1", "--prefix=b", "--json"});
-    checkOutput(out, "[\n" + "  {\n" + "    \"user\": \"bob\",\n"
-        + "    \"accessId\": \"tenant1$bob\"\n" + "  }\n" + "]\n", true);
+    checkOutput(out, "[ {\n" +
+        "  \"user\" : \"bob\",\n" +
+        "  \"accessId\" : \"tenant1$bob\"\n" +
+        "} ]\n", true);
     checkOutput(err, "", true);
 
     int exitCode = executeHA(tenantShell, new String[] {
