@@ -133,11 +133,14 @@ public class VolumeUsage implements SpaceUsageSource {
     this.reservedInBytes = reserved;
   }
 
+  /**
+   * Convenience class to calculate minimum free space.
+   */
   public static class MinFreeSpaceCalculator {
-    boolean minFreeSpaceConfigured;
-    boolean minFreeSpacePercentConfigured;
-    long freeSpace;
-    float freeSpacePercent;
+    private final boolean minFreeSpaceConfigured;
+    private final boolean minFreeSpacePercentConfigured;
+    private final long freeSpace;
+    private float freeSpacePercent;
     public MinFreeSpaceCalculator(ConfigurationSource conf) {
       minFreeSpaceConfigured = conf.isConfigured(HDDS_DATANODE_VOLUME_MIN_FREE_SPACE);
       minFreeSpacePercentConfigured = conf.isConfigured(HDDS_DATANODE_VOLUME_MIN_FREE_SPACE_PERCENT);
