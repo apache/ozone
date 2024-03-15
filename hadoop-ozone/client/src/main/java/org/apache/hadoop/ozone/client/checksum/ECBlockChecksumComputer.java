@@ -123,7 +123,7 @@ public class ECBlockChecksumComputer extends AbstractBlockChecksumComputer {
     long bytesPerCrc = firstChunkInfo.getChecksumData().getBytesPerChecksum();
     ECReplicationConfig replicationConfig =
         (ECReplicationConfig) keyInfo.getReplicationConfig();
-    long chunkSize = replicationConfig.getEcChunkSize();
+    long chunkSize = firstChunkInfo.getLen();
 
     //When EC chunk size is not a multiple of ozone.client.bytes.per.checksum
     // (default = 16KB) the last checksum in an EC chunk is only generated for
