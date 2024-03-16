@@ -80,7 +80,7 @@ public class SnapshotRepair implements Callable<Void>, SubcommandWithParent {
       description = "Path previous snapshotId to set for the given snapshot")
   private UUID pathPreviousSnapshotId;
 
-  @CommandLine.Option(names = {"--dryRun"},
+  @CommandLine.Option(names = {"--dry-run"},
       required = true,
       description = "To dry-run the command.", defaultValue = "true")
   private boolean dryRun;
@@ -102,13 +102,13 @@ public class SnapshotRepair implements Callable<Void>, SubcommandWithParent {
 
       SnapshotInfo snapshotInfo = getSnapshotInfo(db, snapshotInfoCfh, snapshotInfoTableKey);
       if (snapshotInfo == null) {
-        System.err.println(snapshotName + " doesn't not exist for given bucketUri: " + OM_KEY_PREFIX +
+        System.err.println(snapshotName + " does not exist for given bucketUri: " + OM_KEY_PREFIX +
             bucketUri.getValue().getVolumeName() + OM_KEY_PREFIX + bucketUri.getValue().getBucketName());
         return null;
       }
 
       // snapshotIdSet is the set of the all existed snapshots ID to make that the provided global previous and path
-      // previous exist and after the update snapshot doesn't point to ghost snapshot.
+      // previous exist and after the update snapshot does not point to ghost snapshot.
       Set<UUID> snapshotIdSet = getSnapshotIdSet(db, snapshotInfoCfh);
 
       if (Objects.equals(snapshotInfo.getSnapshotId(), globalPreviousSnapshotId)) {
@@ -125,18 +125,18 @@ public class SnapshotRepair implements Callable<Void>, SubcommandWithParent {
 
       if (!snapshotIdSet.contains(globalPreviousSnapshotId)) {
         System.err.println("globalPreviousSnapshotId: '" + globalPreviousSnapshotId +
-            "' doesn't not exist in snapshotInfoTable.");
+            "' does not exist in snapshotInfoTable.");
         return null;
       }
 
       if (!snapshotIdSet.contains(pathPreviousSnapshotId)) {
         System.err.println("pathPreviousSnapshotId: '" + pathPreviousSnapshotId +
-            "' doesn't not exist in snapshotInfoTable.");
+            "' does not exist in snapshotInfoTable.");
         return null;
       }
 
       if (dryRun) {
-        System.out.println("SnapshotInfo will be updated to : " + snapshotInfo);
+        System.out.println("SnapshotInfo would be updated to : " + snapshotInfo);
       } else {
         byte[] snapshotInfoBytes = SnapshotInfo.getCodec().toPersistedFormat(snapshotInfo);
         db.get()
@@ -146,11 +146,12 @@ public class SnapshotRepair implements Callable<Void>, SubcommandWithParent {
             getSnapshotInfo(db, snapshotInfoCfh, snapshotInfoTableKey));
       }
     } catch (RocksDBException exception) {
-      System.err.println("Failed to update the RocksDB for the given path: " + parent.getDbPath() +
-          "\nMake sure that Ozone entity (OM, SCM or DN) is not running for the give dbPath and current host.\n" +
-          exception);
+      System.err.println("Failed to update the RocksDB for the given path: " + parent.getDbPath());
+      System.err.println(
+          "Make sure that Ozone entity (OM, SCM or DN) is not running for the give dbPath and current host.");
+      System.err.println(exception);
     } finally {
-      cfHandleList.forEach(IOUtils::closeQuietly);
+      IOUtils.closeQuietly(cfHandleList);
     }
 
     return null;

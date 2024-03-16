@@ -717,13 +717,26 @@ public final class SnapshotInfo implements Auditable, CopyObject<SnapshotInfo> {
 
   @Override
   public String toString() {
-    return String.format("snapshotId: '%s', name: '%s', volumeName: '%s', bucketName: '%s', " +
-            "snapshotStatus: '%s', creationTime : '%s', deletionTime : '%s', pathPreviousSnapshotId : '%s', " +
-            "globalPreviousSnapshotId: '%s', snapshotPath: '%s', checkpointDir: '%s', dbTxSequenceNumber: '%s', " +
-            "deepClean: '%s', sstFiltered: '%s', referencedSize: '%s', referencedReplicatedSize: '%s', " +
-            "exclusiveSize: '%s', exclusiveReplicatedSize: '%s', deepCleanedDeletedDir: '%s'.",
-        snapshotId, name, volumeName, bucketName, snapshotStatus, creationTime, deletionTime, pathPreviousSnapshotId,
-        globalPreviousSnapshotId, snapshotPath, checkpointDir, dbTxSequenceNumber, deepClean, sstFiltered,
-        referencedSize, referencedReplicatedSize, exclusiveSize, exclusiveReplicatedSize, deepCleanedDeletedDir);
+    return "SnapshotInfo{" +
+        ", snapshotId: '" + snapshotId + '\'' +
+        ", name: '" + name + "'," +
+        ", volumeName: '" + volumeName + '\'' +
+        ", bucketName: '" + bucketName + '\'' +
+        ", snapshotStatus: '" + snapshotStatus + '\'' +
+        ", creationTime: '" + creationTime + '\'' +
+        ", deletionTime: '" + deletionTime + '\'' +
+        ", pathPreviousSnapshotId: '" + pathPreviousSnapshotId + '\'' +
+        ", globalPreviousSnapshotId: '" + globalPreviousSnapshotId + '\'' +
+        ", snapshotPath: '" + snapshotPath + '\'' +
+        ", checkpointDir: '" + checkpointDir + '\'' +
+        ", dbTxSequenceNumber: '" + dbTxSequenceNumber + '\'' +
+        ", deepClean: '" + deepClean + '\'' +
+        ", sstFiltered: '" + sstFiltered + '\'' +
+        ", referencedSize: '" + referencedSize + '\'' +
+        ", referencedReplicatedSize: '" + referencedReplicatedSize + '\'' +
+        ", exclusiveSize: '" + exclusiveSize + '\'' +
+        ", exclusiveReplicatedSize: '" + exclusiveReplicatedSize + '\'' +
+        ", deepCleanedDeletedDir: '" + deepCleanedDeletedDir + '\'' +
+        '}';
   }
 }
