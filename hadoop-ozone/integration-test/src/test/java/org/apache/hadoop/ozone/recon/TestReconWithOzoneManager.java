@@ -395,7 +395,8 @@ public class TestReconWithOzoneManager {
             .filter(task -> taskName.equals(task.get("taskName")))
             .findFirst();
     assertTrue(taskEntity.isPresent());
-    return (long) (double) taskEntity.get().get(entityAttribute);
+    Number number = (Number) taskEntity.get().get(entityAttribute);
+    return number.longValue();
   }
 
   /**
