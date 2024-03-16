@@ -212,7 +212,6 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
     <guice.version>6.0.0</guice.version>
     <gson.version>2.9.0</gson.version>
 
-    <objenesis.version>1.0</objenesis.version>
     <okhttp.version>2.7.5</okhttp.version>
     <okio.version>3.6.0</okio.version>
     <mockito.version>4.11.0</mockito.version>
@@ -1282,11 +1281,6 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
         <groupId>com.google.testing.compile</groupId>
         <artifactId>compile-testing</artifactId>
         <version>${compile-testing.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>org.objenesis</groupId>
-        <artifactId>objenesis</artifactId>
-        <version>${objenesis.version}</version>
       </dependency>
       <dependency>
         <groupId>com.google.re2j</groupId>
