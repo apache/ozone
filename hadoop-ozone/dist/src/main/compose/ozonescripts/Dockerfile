@@ -35,5 +35,4 @@ RUN sudo chown hadoop /opt
 RUN sudo chmod 600 /opt/.ssh/*
 RUN sudo chmod 700 /opt/.ssh
 
-RUN sudo sh -c 'echo "export JAVA_HOME=/usr/lib/jvm/jre/" >> /etc/profile'
 CMD ["sudo","/usr/sbin/sshd","-D"]

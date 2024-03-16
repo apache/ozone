@@ -36,8 +36,6 @@ RUN sudo chown hadoop /opt
 RUN sudo chmod 600 /opt/.ssh/*
 RUN sudo chmod 700 /opt/.ssh
 
-RUN sudo sh -c 'echo "export JAVA_HOME=/usr/lib/jvm/jre/" >> /etc/profile'
-
 # Install required robot framework libraries
 RUN sudo pip3 install robotframework-sshlibrary
 
