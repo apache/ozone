@@ -317,7 +317,7 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
         "    {\n" +
         "        \"datanodeDetails\": {\n" +
         "            \"uuid\": \"5416ef8e-6e6e-476f-a4d7-3744f7c282ab\",\n" +
-        "            \"hostName\": \"ozone-ha-datanode-1.ozone-ha_default\",\n" +
+        "            \"hostname\": \"ozone-ha-datanode-1.ozone-ha_default\",\n" +
         "            \"networkLocation\": \"/default-rack\",\n" +
         "            \"ipAddress\": \"172.25.0.9\"\n" +
         "        },\n" +
@@ -1216,9 +1216,9 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
       List<DecommissionStatusInfoResponse> decommissionStatusInfoResponseList =
           (List<DecommissionStatusInfoResponse>) entry.getValue();
       decommissionStatusInfoResponseList.forEach(decommissionStatusInfoResponse -> {
-        DatanodeDetails dataNodeDetails = decommissionStatusInfoResponse.getDataNodeDetails();
-        assertEquals("5416ef8e-6e6e-476f-a4d7-3744f7c282ab", dataNodeDetails.getUuid().toString());
-        assertEquals("ozone-ha-datanode-1.ozone-ha_default", dataNodeDetails.getHostName());
+        DatanodeMetadata dataNodeDetails = decommissionStatusInfoResponse.getDataNodeDetails();
+        assertEquals("5416ef8e-6e6e-476f-a4d7-3744f7c282ab", dataNodeDetails.getUuid());
+        assertEquals("ozone-ha-datanode-1.ozone-ha_default", dataNodeDetails.getHostname());
         assertEquals("/default-rack", dataNodeDetails.getNetworkLocation());
         assertEquals("172.25.0.9", dataNodeDetails.getIpAddress());
 
@@ -1243,9 +1243,9 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
       List<DecommissionStatusInfoResponse> decommissionStatusInfoResponseList =
           (List<DecommissionStatusInfoResponse>) entry.getValue();
       decommissionStatusInfoResponseList.forEach(decommissionStatusInfoResponse -> {
-        DatanodeDetails dataNodeDetails = decommissionStatusInfoResponse.getDataNodeDetails();
-        assertEquals("5416ef8e-6e6e-476f-a4d7-3744f7c282ab", dataNodeDetails.getUuid().toString());
-        assertEquals("ozone-ha-datanode-1.ozone-ha_default", dataNodeDetails.getHostName());
+        DatanodeMetadata dataNodeDetails = decommissionStatusInfoResponse.getDataNodeDetails();
+        assertEquals("5416ef8e-6e6e-476f-a4d7-3744f7c282ab", dataNodeDetails.getUuid());
+        assertEquals("ozone-ha-datanode-1.ozone-ha_default", dataNodeDetails.getHostname());
         assertEquals("/default-rack", dataNodeDetails.getNetworkLocation());
         assertEquals("172.25.0.9", dataNodeDetails.getIpAddress());
 

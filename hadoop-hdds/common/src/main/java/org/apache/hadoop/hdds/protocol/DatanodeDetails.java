@@ -25,8 +25,6 @@ import java.util.Set;
 import java.util.UUID;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
-import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
-import com.fasterxml.jackson.databind.annotation.JsonPOJOBuilder;
 import com.google.common.collect.ImmutableSet;
 import org.apache.hadoop.hdds.DatanodeVersion;
 import org.apache.hadoop.hdds.HddsUtils;
@@ -64,7 +62,6 @@ import static org.apache.hadoop.ozone.ClientVersion.VERSION_HANDLES_UNKNOWN_DN_P
  */
 @InterfaceAudience.Private
 @InterfaceStability.Evolving
-@JsonDeserialize(builder = DatanodeDetails.Builder.class)
 public class DatanodeDetails extends NodeImpl implements
     Comparable<DatanodeDetails> {
 
@@ -572,7 +569,6 @@ public class DatanodeDetails extends NodeImpl implements
   /**
    * Builder class for building DatanodeDetails.
    */
-  @JsonPOJOBuilder(withPrefix = "set")
   public static final class Builder {
     private UUID id;
     private String ipAddress;
