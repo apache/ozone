@@ -217,7 +217,7 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
     <okio.version>3.6.0</okio.version>
     <mockito.version>4.11.0</mockito.version>
     <hamcrest.version>2.2</hamcrest.version>
-    <junit5.version>5.10.1</junit5.version>
+    <junit5.version>5.10.2</junit5.version>
     <zookeeper.version>3.7.2</zookeeper.version>
 
     <!-- Maven protoc compiler -->
