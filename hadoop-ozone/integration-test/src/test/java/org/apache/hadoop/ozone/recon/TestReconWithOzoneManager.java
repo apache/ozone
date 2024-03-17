@@ -392,7 +392,7 @@ public class TestReconWithOzoneManager {
     Optional<LinkedTreeMap> taskEntity =
         taskStatusList
             .stream()
-            .filter(task -> taskName.equals(task.get("taskName")))
+            .filter(task -> task.get("taskName").equals(taskName))
             .findFirst();
     assertTrue(taskEntity.isPresent());
     Number number = (Number) taskEntity.get().get(entityAttribute);

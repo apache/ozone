@@ -86,7 +86,6 @@ public class QuotaUsageSubCommand implements Callable {
 
       printWithUnderline("Quota", true);
 
-      // Safe conversion using Number interface
       long quotaAllowed = ((Number) quotaResponse.get("allowed")).longValue();
       long quotaUsed = ((Number) quotaResponse.get("used")).longValue();
 

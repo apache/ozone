@@ -167,7 +167,6 @@ public class ChunkKeyHandler extends KeyHandler implements
               containerChunkInfo.setChunkType(blockChunksType);
             }
 
-            // Convert ContainerChunkInfo objects to JSON using Jackson
             if (isVerbose()) {
               jsonObj.set("Locations",
                   objectMapper.valueToTree(containerChunkInfoVerbose));

@@ -17,6 +17,7 @@
  */
 package org.apache.hadoop.ozone.om.multitenant;
 
+import com.fasterxml.jackson.core.JsonParseException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.apache.kerby.util.Base64;
@@ -227,7 +228,7 @@ public class RangerUserRequest {
         }
       }
       LOG.debug("User ID is: {}", userIDCreated);
-    } catch (IOException e) {
+    } catch (JsonParseException e) {
       e.printStackTrace();
       throw e;
     }
@@ -258,7 +259,7 @@ public class RangerUserRequest {
       JsonNode jNode = objectMapper.readTree(userInfo);
       userId = jNode.get("id").asText();
       LOG.debug("Ranger returned userId: {}", userId);
-    } catch (IOException e) {
+    } catch (JsonParseException e) {
       e.printStackTrace();
       throw e;
     }

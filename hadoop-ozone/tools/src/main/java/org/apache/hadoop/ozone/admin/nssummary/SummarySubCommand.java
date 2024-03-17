@@ -84,7 +84,6 @@ public class SummarySubCommand implements Callable<Void> {
       printKVSeparator();
       System.out.println(summaryResponse.get("type"));
 
-      // Convert using Number to handle different possible types.
       int numVol = ((Number) summaryResponse.get("numVolume")).intValue();
       int numBucket = ((Number) summaryResponse.get("numBucket")).intValue();
       int numDir = ((Number) summaryResponse.get("numDir")).intValue();
