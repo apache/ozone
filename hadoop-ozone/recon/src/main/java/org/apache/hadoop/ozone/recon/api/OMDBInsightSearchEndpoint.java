@@ -127,7 +127,8 @@ public class OMDBInsightSearchEndpoint {
     // Fetch keys from OBS layout and convert them into KeyEntityInfo objects
     Map<String, OmKeyInfo> obsKeys = new LinkedHashMap<>();
     if (includeNonFso) {
-      obsKeys = searchOpenKeysInOBS(startPrefix, limit);
+      Table<String, OmKeyInfo> openKeyTable = omMetadataManager.getOpenKeyTable(BucketLayout.LEGACY);
+      obsKeys = retrieveKeysFromTable(openKeyTable, startPrefix, limit);
       for (Map.Entry<String, OmKeyInfo> entry : obsKeys.entrySet()) {
         keysFound = true;
         KeyEntityInfo keyEntityInfo =
@@ -165,57 +166,6 @@ public class OMDBInsightSearchEndpoint {
     return Response.ok(insightResponse).build();
   }
 
-  /**
-   * Creates a KeyEntityInfo object from an OmKeyInfo object and the corresponding key.
-   *
-   * @param dbKey   The key in the database corresponding to the OmKeyInfo object.
-   * @param keyInfo The OmKeyInfo object to create the KeyEntityInfo from.
-   * @return The KeyEntityInfo object created from the OmKeyInfo object and the key.
-   */
-  private KeyEntityInfo createKeyEntityInfoFromOmKeyInfo(String dbKey,
-                                                         OmKeyInfo keyInfo) {
-    KeyEntityInfo keyEntityInfo = new KeyEntityInfo();
-    keyEntityInfo.setKey(dbKey); // Set the DB key
-    keyEntityInfo.setPath(
-        keyInfo.getKeyName()); // Assuming path is the same as key name
-    keyEntityInfo.setInStateSince(keyInfo.getCreationTime());
-    keyEntityInfo.setSize(keyInfo.getDataSize());
-    keyEntityInfo.setReplicatedSize(keyInfo.getReplicatedSize());
-    keyEntityInfo.setReplicationConfig(keyInfo.getReplicationConfig());
-    return keyEntityInfo;
-  }
-
-
-  public Map<String, OmKeyInfo> searchOpenKeysInOBS(String startPrefix, int limit)
-      throws IOException {
-
-    Map<String, OmKeyInfo> matchedKeys =
-        new LinkedHashMap<>(); // Preserves the insertion order
-    Table<String, OmKeyInfo> openKeyTable =
-        omMetadataManager.getOpenKeyTable(BucketLayout.LEGACY);
-
-    try (
-        TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>>
-            keyIter = openKeyTable.iterator()) {
-      keyIter.seek(startPrefix);
-      while (keyIter.hasNext() && matchedKeys.size() < limit) {
-        Table.KeyValue<String, OmKeyInfo> entry = keyIter.next();
-        String dbKey = entry.getKey(); // Get the DB key
-        if (!dbKey.startsWith(startPrefix)) {
-          break; // Exit the loop if the key no longer matches the prefix
-        }
-        // Add the DB key and OmKeyInfo object to the map
-        matchedKeys.put(dbKey, entry.getValue());
-      }
-    } catch (IOException exception) {
-      createInternalServerErrorResponse(
-          "Error retrieving keys from openKeyTable for path: " + startPrefix);
-    }
-
-    return matchedKeys;
-  }
-
-
   public Map<String, OmKeyInfo> searchOpenKeysInFSO(String startPrefix,
                                                     int limit)
       throws IOException {
@@ -223,6 +173,7 @@ public class OMDBInsightSearchEndpoint {
     // Convert the search prefix to an object path for FSO buckets
     String startPrefixObjectPath = convertToObjectPath(startPrefix);
     String[] names = parseRequestPath(startPrefixObjectPath);
+    Table<String, OmKeyInfo> openFileTable = omMetadataManager.getOpenKeyTable(BucketLayout.FILE_SYSTEM_OPTIMIZED);
 
     // If names.length > 2, then the search prefix is at the volume or bucket level hence
     // no need to find parent or extract id's or find subpaths as the openFileTable is
@@ -248,7 +199,7 @@ public class OMDBInsightSearchEndpoint {
       // Iterate over the subpaths and retrieve the open files
       for (String subPath : subPaths) {
         matchedKeys.putAll(
-            retrieveKeysFromOpenFileTable(subPath, limit - matchedKeys.size()));
+            retrieveKeysFromTable(openFileTable, subPath, limit - matchedKeys.size()));
         if (matchedKeys.size() >= limit) {
           break;
         }
@@ -257,41 +208,9 @@ public class OMDBInsightSearchEndpoint {
     }
 
     // Iterate over for bucket and volume level search
-    matchedKeys.putAll(retrieveKeysFromOpenFileTable(startPrefixObjectPath,
-        limit - matchedKeys.size()));
+    matchedKeys.putAll(retrieveKeysFromTable(openFileTable, startPrefixObjectPath, limit));
     return matchedKeys;
   }
-
-
-  private Map<String, OmKeyInfo> retrieveKeysFromOpenFileTable(String subPath,
-                                                               int limit)
-      throws IOException {
-
-    Map<String, OmKeyInfo> matchedKeys =
-        new LinkedHashMap<>(); // Preserves the insertion order
-    Table<String, OmKeyInfo> openFileTable =
-        omMetadataManager.getOpenKeyTable(BucketLayout.FILE_SYSTEM_OPTIMIZED);
-
-    try (
-        TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>> keyIter =
-            openFileTable.iterator()) {
-      keyIter.seek(subPath);
-      while (keyIter.hasNext() && matchedKeys.size() < limit) {
-        Table.KeyValue<String, OmKeyInfo> entry = keyIter.next();
-        String dbKey = entry.getKey(); // Get the DB key
-        if (!dbKey.startsWith(subPath)) {
-          break; // Exit the loop if the key no longer matches the prefix
-        }
-        // Add the DB key and OmKeyInfo object to the map
-        matchedKeys.put(dbKey, entry.getValue());
-      }
-    } catch (IOException exception) {
-      createInternalServerErrorResponse(
-          "Error retrieving keys from openFileTable for path: " + subPath);
-    }
-    return matchedKeys;
-  }
-
 
   /**
    * Finds all subdirectories under a parent directory in an FSO bucket. It builds
@@ -389,6 +308,58 @@ public class OMDBInsightSearchEndpoint {
       LOG.error("Unexpected error during conversion: {}", prevKeyPrefix, e);
       return prevKeyPrefix;
     }
+  }
+
+  /**
+   * Common method to retrieve keys from a table based on a search prefix and a limit.
+   *
+   * @param table       The table to retrieve keys from.
+   * @param startPrefix The search prefix to match keys against.
+   * @param limit       The maximum number of keys to retrieve.
+   * @return A map of keys and their corresponding OmKeyInfo objects.
+   * @throws IOException If there are problems accessing the table.
+   */
+  private Map<String, OmKeyInfo> retrieveKeysFromTable(
+      Table<String, OmKeyInfo> table, String startPrefix, int limit)
+      throws IOException {
+    Map<String, OmKeyInfo> matchedKeys = new LinkedHashMap<>();
+    try (
+        TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>> keyIter = table.iterator()) {
+      keyIter.seek(startPrefix);
+      while (keyIter.hasNext() && matchedKeys.size() < limit) {
+        Table.KeyValue<String, OmKeyInfo> entry = keyIter.next();
+        String dbKey = entry.getKey();
+        if (!dbKey.startsWith(startPrefix)) {
+          break; // Exit the loop if the key no longer matches the prefix
+        }
+        matchedKeys.put(dbKey, entry.getValue());
+      }
+    } catch (IOException exception) {
+      LOG.error("Error retrieving keys from table for path: {}", startPrefix,
+          exception);
+      throw exception;
+    }
+    return matchedKeys;
+  }
+
+  /**
+   * Creates a KeyEntityInfo object from an OmKeyInfo object and the corresponding key.
+   *
+   * @param dbKey   The key in the database corresponding to the OmKeyInfo object.
+   * @param keyInfo The OmKeyInfo object to create the KeyEntityInfo from.
+   * @return The KeyEntityInfo object created from the OmKeyInfo object and the key.
+   */
+  private KeyEntityInfo createKeyEntityInfoFromOmKeyInfo(String dbKey,
+                                                         OmKeyInfo keyInfo) {
+    KeyEntityInfo keyEntityInfo = new KeyEntityInfo();
+    keyEntityInfo.setKey(dbKey); // Set the DB key
+    keyEntityInfo.setPath(
+        keyInfo.getKeyName()); // Assuming path is the same as key name
+    keyEntityInfo.setInStateSince(keyInfo.getCreationTime());
+    keyEntityInfo.setSize(keyInfo.getDataSize());
+    keyEntityInfo.setReplicatedSize(keyInfo.getReplicatedSize());
+    keyEntityInfo.setReplicationConfig(keyInfo.getReplicationConfig());
+    return keyEntityInfo;
   }
 
   /**

@@ -259,19 +259,19 @@ public class TestOMDBInsightSearchEndpoint extends AbstractReconSqlDBTest {
 
   @Test
   public void testSearchOpenKeysWithBadRequest() throws IOException {
-    // Given a search prefix that is empty
-    String searchPrefix = "";
-
+    // Give a negative limit
+    int negativeLimit = -1;
     Response response =
-        omdbInsightSearchEndpoint.searchOpenKeys(searchPrefix, true, true, 10);
+        omdbInsightSearchEndpoint.searchOpenKeys("searchPrefix", true, true,
+            negativeLimit);
 
     // Then the response should indicate that the request was bad
     assertEquals(Response.Status.BAD_REQUEST.getStatusCode(),
         response.getStatus(), "Expected a 400 BAD REQUEST status");
 
     String entity = (String) response.getEntity();
-    assertTrue(entity.contains("The startPrefix query parameter is required."),
-        "Expected a message indicating the search prefix cannot be empty");
+    assertTrue(entity.contains("Limit cannot be negative."),
+        "Expected a message indicating the limit was negative");
   }
 
 
