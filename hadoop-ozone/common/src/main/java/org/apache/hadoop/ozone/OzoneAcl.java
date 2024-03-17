@@ -63,18 +63,8 @@ public class OzoneAcl {
     this(type, name, scope, bitSetOf(acls));
   }
 
-  public OzoneAcl(ACLIdentityType type, String name, BitSet acls, AclScope scope) {
-    this(type, name, scope, validateAndCopy(acls));
-  }
-
   public OzoneAcl(ACLIdentityType type, String name, EnumSet<ACLType> acls, AclScope scope) {
     this(type, name, scope, validateAndCopy(acls));
-  }
-
-  private static BitSet validateAndCopy(EnumSet<ACLType> enumSet) {
-    BitSet aclBitSet = new BitSet();
-    enumSet.forEach(aclType -> aclBitSet.set(aclType.ordinal()));
-    return validateAndCopy(aclBitSet);
   }
 
   private OzoneAcl(ACLIdentityType type, String name, AclScope scope, BitSet acls) {
@@ -103,6 +93,12 @@ public class OzoneAcl {
     }
 
     return copyBitSet(acls);
+  }
+
+  private static BitSet validateAndCopy(EnumSet<ACLType> enumSet) {
+    BitSet aclBitSet = new BitSet();
+    enumSet.forEach(aclType -> aclBitSet.set(aclType.ordinal()));
+    return validateAndCopy(aclBitSet);
   }
 
   private static BitSet copyBitSet(BitSet acls) {

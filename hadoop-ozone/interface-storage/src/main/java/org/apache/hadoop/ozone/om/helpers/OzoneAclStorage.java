@@ -18,9 +18,15 @@
 package org.apache.hadoop.ozone.om.helpers;
 
 import com.google.protobuf.ByteString;
+
 import java.util.BitSet;
+import java.util.EnumSet;
+import java.util.List;
+import java.util.stream.Collectors;
+
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.OzoneAcl.AclScope;
+import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLIdentityType;
 import org.apache.hadoop.ozone.storage.proto.OzoneManagerStorageProtos.OzoneAclInfo;
 import org.apache.hadoop.ozone.storage.proto.OzoneManagerStorageProtos.OzoneAclInfo.OzoneAclScope;
@@ -55,9 +61,12 @@ final class OzoneAclStorage {
 
   public static OzoneAcl fromProtobuf(OzoneAclInfo protoAcl) {
     BitSet aclRights = BitSet.valueOf(protoAcl.getRights().toByteArray());
+    List<IAccessAuthorizer.ACLType> aclTypeList = aclRights.stream()
+        .mapToObj(a -> IAccessAuthorizer.ACLType.values()[a])
+        .collect(Collectors.toList());
+    EnumSet<IAccessAuthorizer.ACLType> aclSet = EnumSet.copyOf(aclTypeList);
     return new OzoneAcl(ACLIdentityType.valueOf(protoAcl.getType().name()),
-        protoAcl.getName(), aclRights,
-        AclScope.valueOf(protoAcl.getAclScope().name()));
+        protoAcl.getName(), aclSet, AclScope.valueOf(protoAcl.getAclScope().name()));
   }
 
 }
