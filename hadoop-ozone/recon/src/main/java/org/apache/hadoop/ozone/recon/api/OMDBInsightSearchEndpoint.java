@@ -23,7 +23,10 @@ import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.ozone.OmUtils;
-import org.apache.hadoop.ozone.om.helpers.*;
+import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
+import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
+import org.apache.hadoop.ozone.recon.ReconConstants;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.recon.api.handlers.BucketHandler;
 import org.apache.hadoop.ozone.recon.api.types.KeyEntityInfo;
 import org.apache.hadoop.ozone.recon.api.types.KeyInsightInfoResponse;
@@ -50,10 +53,7 @@ import java.util.ArrayList;
 import java.util.Set;
 
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
-import static org.apache.hadoop.ozone.recon.ReconConstants.DEFAULT_OPEN_KEY_INCLUDE_FSO;
-import static org.apache.hadoop.ozone.recon.ReconConstants.DEFAULT_OPEN_KEY_INCLUDE_NON_FSO;
-import static org.apache.hadoop.ozone.recon.ReconConstants.RECON_OPEN_KEY_INCLUDE_FSO;
-import static org.apache.hadoop.ozone.recon.ReconConstants.RECON_OPEN_KEY_INCLUDE_NON_FSO;
+import static org.apache.hadoop.ozone.recon.ReconConstants.*;
 import static org.apache.hadoop.ozone.recon.api.handlers.BucketHandler.getBucketHandler;
 import static org.apache.hadoop.ozone.recon.api.handlers.EntityHandler.normalizePath;
 import static org.apache.hadoop.ozone.recon.api.handlers.EntityHandler.parseRequestPath;
@@ -93,31 +93,30 @@ public class OMDBInsightSearchEndpoint {
    * the prefix against the start of keys' names within the OM DB.
    *
    * Example Usage:
-   *  1. A searchPrefix of "/" will return all keys in the database.
-   *  2. A searchPrefix of "/volA/" retrieves every key under volume 'volA'.
-   *  3. Specifying "/volA/bucketA/dir1" focuses the search within 'dir1' inside 'bucketA' of 'volA'.
+   * 1. A startPrefix of "/" will return all keys in the database.
+   * 2. A startPrefix of "/volA/" retrieves every key under volume 'volA'.
+   * 3. Specifying "/volA/bucketA/dir1" focuses the search within 'dir1' inside 'bucketA' of 'volA'.
    *
-   * @param searchPrefix The prefix for searching keys, starting from the root ('/') or any specific path.
-   * @param includeFso Indicates whether to include FSO layout keys in the search.
+   * @param startPrefix   The prefix for searching keys, starting from the root ('/') or any specific path.
+   * @param includeFso    Indicates whether to include FSO layout keys in the search.
    * @param includeNonFso Indicates whether to include non-FSO layout keys in the search.
-   * @param limit Limits the number of returned keys.
+   * @param limit         Limits the number of returned keys.
    * @return A KeyInsightInfoResponse, containing matching keys and their data sizes.
    * @throws IOException On failure to access the OM database or process the operation.
    */
   @GET
   @Path("/openKeys/search")
   public Response searchOpenKeys(
-      @QueryParam("searchPrefix")
-      String searchPrefix,
-      @DefaultValue(DEFAULT_OPEN_KEY_INCLUDE_FSO) @QueryParam(RECON_OPEN_KEY_INCLUDE_FSO)
+      @DefaultValue(DEFAULT_SEARCH_PREFIX) @QueryParam("startPrefix")
+      String startPrefix,
+      @DefaultValue(DEFAULT_OPEN_KEY_INCLUDE_FSO) @QueryParam("includeFso")
       boolean includeFso,
-      @DefaultValue(DEFAULT_OPEN_KEY_INCLUDE_NON_FSO) @QueryParam(RECON_OPEN_KEY_INCLUDE_NON_FSO)
+      @DefaultValue(DEFAULT_OPEN_KEY_INCLUDE_NON_FSO) @QueryParam("includeNonFso")
       boolean includeNonFso,
-      @DefaultValue("10") @QueryParam("limit")
+      @DefaultValue(RECON_OPEN_KEY_SEARCH_LIMIT) @QueryParam("limit")
       int limit) throws IOException {
-    if (searchPrefix == null || searchPrefix.trim().isEmpty()) {
-      return createBadRequestResponse(
-          "The searchPrefix query parameter is required.");
+    if (limit < 0) {
+      return createBadRequestResponse("Limit cannot be negative.");
     }
 
     KeyInsightInfoResponse insightResponse = new KeyInsightInfoResponse();
@@ -128,7 +127,7 @@ public class OMDBInsightSearchEndpoint {
     // Fetch keys from OBS layout and convert them into KeyEntityInfo objects
     Map<String, OmKeyInfo> obsKeys = new LinkedHashMap<>();
     if (includeNonFso) {
-      obsKeys = searchOpenKeysInOBS(searchPrefix, limit);
+      obsKeys = searchOpenKeysInOBS(startPrefix, limit);
       for (Map.Entry<String, OmKeyInfo> entry : obsKeys.entrySet()) {
         keysFound = true;
         KeyEntityInfo keyEntityInfo =
@@ -142,7 +141,7 @@ public class OMDBInsightSearchEndpoint {
 
     // Fetch keys from FSO layout, if the limit is not yet reached
     if (includeFso) {
-      Map<String, OmKeyInfo> fsoKeys = searchOpenKeysInFSO(searchPrefix, limit);
+      Map<String, OmKeyInfo> fsoKeys = searchOpenKeysInFSO(startPrefix, limit);
       for (Map.Entry<String, OmKeyInfo> entry : fsoKeys.entrySet()) {
         keysFound = true;
         KeyEntityInfo keyEntityInfo =
@@ -156,7 +155,7 @@ public class OMDBInsightSearchEndpoint {
 
     // If no keys were found, return a response indicating that no keys matched
     if (!keysFound) {
-      return noMatchedKeysResponse(searchPrefix);
+      return noMatchedKeysResponse(startPrefix);
     }
 
     // Set the aggregated totals in the response
@@ -187,8 +186,7 @@ public class OMDBInsightSearchEndpoint {
   }
 
 
-  public Map<String, OmKeyInfo> searchOpenKeysInOBS(String searchPrefix,
-                                                    int limit)
+  public Map<String, OmKeyInfo> searchOpenKeysInOBS(String startPrefix, int limit)
       throws IOException {
 
     Map<String, OmKeyInfo> matchedKeys =
@@ -199,32 +197,32 @@ public class OMDBInsightSearchEndpoint {
     try (
         TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>>
             keyIter = openKeyTable.iterator()) {
-      keyIter.seek(searchPrefix);
+      keyIter.seek(startPrefix);
       while (keyIter.hasNext() && matchedKeys.size() < limit) {
         Table.KeyValue<String, OmKeyInfo> entry = keyIter.next();
         String dbKey = entry.getKey(); // Get the DB key
-        if (!dbKey.startsWith(searchPrefix)) {
+        if (!dbKey.startsWith(startPrefix)) {
           break; // Exit the loop if the key no longer matches the prefix
         }
         // Add the DB key and OmKeyInfo object to the map
         matchedKeys.put(dbKey, entry.getValue());
       }
-    } catch (NullPointerException | IOException exception) {
+    } catch (IOException exception) {
       createInternalServerErrorResponse(
-          "Error retrieving keys from openKeyTable for path: " + searchPrefix);
+          "Error retrieving keys from openKeyTable for path: " + startPrefix);
     }
 
     return matchedKeys;
   }
 
 
-  public Map<String, OmKeyInfo> searchOpenKeysInFSO(String searchPrefix,
+  public Map<String, OmKeyInfo> searchOpenKeysInFSO(String startPrefix,
                                                     int limit)
       throws IOException {
     Map<String, OmKeyInfo> matchedKeys = new LinkedHashMap<>();
     // Convert the search prefix to an object path for FSO buckets
-    String searchPrefixObjectPath = convertToObjectPath(searchPrefix);
-    String[] names = parseRequestPath(searchPrefixObjectPath);
+    String startPrefixObjectPath = convertToObjectPath(startPrefix);
+    String[] names = parseRequestPath(startPrefixObjectPath);
 
     // If names.length > 2, then the search prefix is at the volume or bucket level hence
     // no need to find parent or extract id's or find subpaths as the openFileTable is
@@ -242,7 +240,7 @@ public class OMDBInsightSearchEndpoint {
       List<String> subPaths = new ArrayList<>();
       // Add the initial search prefix object path because it can have both openFiles
       // and sub-directories with openFiles
-      subPaths.add(searchPrefixObjectPath);
+      subPaths.add(startPrefixObjectPath);
 
       // Recursively gather all subpaths
       gatherSubPaths(parentId, subPaths, names);
@@ -259,7 +257,7 @@ public class OMDBInsightSearchEndpoint {
     }
 
     // Iterate over for bucket and volume level search
-    matchedKeys.putAll(retrieveKeysFromOpenFileTable(searchPrefixObjectPath,
+    matchedKeys.putAll(retrieveKeysFromOpenFileTable(startPrefixObjectPath,
         limit - matchedKeys.size()));
     return matchedKeys;
   }
@@ -287,7 +285,7 @@ public class OMDBInsightSearchEndpoint {
         // Add the DB key and OmKeyInfo object to the map
         matchedKeys.put(dbKey, entry.getValue());
       }
-    } catch (NullPointerException | IOException exception) {
+    } catch (IOException exception) {
       createInternalServerErrorResponse(
           "Error retrieving keys from openFileTable for path: " + subPath);
     }
@@ -410,14 +408,15 @@ public class OMDBInsightSearchEndpoint {
   /**
    * Returns a response indicating that no keys matched the search prefix.
    *
-   * @param searchPrefix The search prefix that was used.
+   * @param startPrefix The search prefix that was used.
    * @return The response indicating that no keys matched the search prefix.
    */
-  private Response noMatchedKeysResponse(String searchPrefix) {
-    String message = String.format(
-        "No keys matched the search prefix: '%s'.", searchPrefix);
+  private Response noMatchedKeysResponse(String startPrefix) {
+    String jsonResponse = String.format(
+        "{\"message\": \"No keys matched the search prefix: '%s'.\"}",
+        startPrefix);
     return Response.status(Response.Status.NOT_FOUND)
-        .entity(message)
+        .entity(jsonResponse)
         .type(MediaType.APPLICATION_JSON)
         .build();
   }

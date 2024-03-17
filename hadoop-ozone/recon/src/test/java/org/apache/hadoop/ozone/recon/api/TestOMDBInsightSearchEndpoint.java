@@ -270,7 +270,7 @@ public class TestOMDBInsightSearchEndpoint extends AbstractReconSqlDBTest {
         response.getStatus(), "Expected a 400 BAD REQUEST status");
 
     String entity = (String) response.getEntity();
-    assertTrue(entity.contains("The searchPrefix query parameter is required."),
+    assertTrue(entity.contains("The startPrefix query parameter is required."),
         "Expected a message indicating the search prefix cannot be empty");
   }
 
