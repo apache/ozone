@@ -20,7 +20,6 @@ package org.apache.hadoop.hdds.scm;
 
 import java.io.IOException;
 import java.io.InterruptedIOException;
-import java.nio.ByteBuffer;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
@@ -54,14 +53,12 @@ import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.OzoneConsts;
 import java.util.concurrent.TimeoutException;
-import java.util.stream.Collectors;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import io.opentracing.Scope;
 import io.opentracing.Span;
 import io.opentracing.util.GlobalTracer;
-import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 import org.apache.ratis.thirdparty.io.grpc.ManagedChannel;
 import org.apache.ratis.thirdparty.io.grpc.Status;
 import org.apache.ratis.thirdparty.io.grpc.netty.GrpcSslContexts;
@@ -109,12 +106,12 @@ public class XceiverClientGrpc extends XceiverClientSpi {
    * Constructs a client that can communicate with the Container framework on
    * data nodes via DatanodeClientProtocol.
    *
-   * @param pipeline - Pipeline that defines the machines.
-   * @param config   -- Ozone Config
+   * @param pipeline     - Pipeline that defines the machines.
+   * @param config       -- Ozone Config
    * @param trustManager - a {@link ClientTrustManager} with proper CA handling.
    */
   public XceiverClientGrpc(Pipeline pipeline, ConfigurationSource config,
-      ClientTrustManager trustManager) {
+                           ClientTrustManager trustManager) {
     super();
     Preconditions.checkNotNull(pipeline);
     Preconditions.checkNotNull(config);
@@ -366,7 +363,11 @@ public class XceiverClientGrpc extends XceiverClientSpi {
         // sendCommandAsyncCall will create a new channel and async stub
         // in case these don't exist for the specific datanode.
         reply.addDatanode(dn);
-        responseProto = sendCommandAsync(request, dn).getResponse().get();
+        if (responseProto.getCmdType() == ContainerProtos.Type.ReadBlock) {
+          responseProto = sendCommandAsyncReadOnly(request, dn).getResponse().get();
+        } else {
+          responseProto = sendCommandAsync(request, dn).getResponse().get();
+        }
         if (validators != null && !validators.isEmpty()) {
           for (Validator validator : validators) {
             validator.accept(request, responseProto);
@@ -410,10 +411,10 @@ public class XceiverClientGrpc extends XceiverClientSpi {
       String message = "Failed to execute command {}";
       if (LOG.isDebugEnabled()) {
         LOG.debug(message + " on the pipeline {}.",
-                processForDebug(request), pipeline);
+            processForDebug(request), pipeline);
       } else {
         LOG.error(message + " on the pipeline {}.",
-                request.getCmdType(), pipeline);
+            request.getCmdType(), pipeline);
       }
       throw ioException;
     }
@@ -524,72 +525,44 @@ public class XceiverClientGrpc extends XceiverClientSpi {
     return new XceiverClientReply(replyFuture);
   }
 
-  public CompletableFuture<DatanodeBlockID> sendCommandOnlyRead(
-      ContainerCommandRequestProto request, List<ByteBuffer> buffers,
-      List<Validator> validators) throws SCMSecurityException {
-    XceiverClientReply reply = new XceiverClientReply(null);
-    List<DatanodeDetails> datanodeList = getDatanodeList(request);
-    CompletableFuture<DatanodeBlockID> future = new CompletableFuture<>();
-    for (DatanodeDetails dn : datanodeList) {
-      try {
-        checkOpen(dn);
-        UUID dnID = dn.getUuid();
-        semaphore.acquire();
-        final StreamObserver<ContainerCommandRequestProto> requestObserver =
-            asyncStubs.get(dnID).withDeadlineAfter(timeout, TimeUnit.SECONDS)
-                .send(new StreamObserver<ContainerCommandResponseProto>() {
-                  @Override
-                  public void onNext(
-                      ContainerCommandResponseProto responseProto) {
-                    for (Validator validator : validators) {
-                      try {
-                        validator.accept(request, responseProto);
-                      } catch (IOException e) {
-                        LOG.debug("Failed to execute command {} on datanode {}",
-                            processForDebug(request), dn, e);
+  public XceiverClientReply sendCommandAsyncReadOnly(
+      ContainerCommandRequestProto request, DatanodeDetails dn)
+      throws IOException, InterruptedException {
 
-                      }
-                    }
-                    ReadBlockResponseProto readChunkResponse =
-                        responseProto.getReadBlock();
-                    if (readChunkResponse.hasData()) {
-                      buffers.add(readChunkResponse.getData()
-                          .asReadOnlyByteBuffer());
-                    } else if (readChunkResponse.hasDataBuffers()) {
-                      buffers.addAll(readChunkResponse.getDataBuffers()
-                          .getBuffersList().stream()
-                          .map(ByteString::asReadOnlyByteBuffer)
-                          .collect(Collectors.toList()));
-                    }
-                  }
+    CompletableFuture<ContainerCommandResponseProto> future =
+        new CompletableFuture<>();
+    ContainerCommandResponseProto.Builder response =
+        ContainerCommandResponseProto.newBuilder();
+    ContainerProtos.StreamDataResponseProto.Builder streamData =
+        ContainerProtos.StreamDataResponseProto.newBuilder();
+    checkOpen(dn);
+    UUID dnID = dn.getUuid();
+    semaphore.acquire();
+    final StreamObserver<ContainerCommandRequestProto> requestObserver =
+        asyncStubs.get(dnID).withDeadlineAfter(timeout, TimeUnit.SECONDS)
+            .send(new StreamObserver<ContainerCommandResponseProto>() {
+              @Override
+              public void onNext(
+                  ContainerCommandResponseProto responseProto) {
+                ReadBlockResponseProto readBlock =
+                    responseProto.getReadBlock();
+                streamData.addReadBlock(readBlock);
+              }
 
-                  @Override
-                  public void onError(Throwable t) {
-                    future.completeExceptionally(t);
-                  }
+              @Override
+              public void onError(Throwable t) {
+                future.completeExceptionally(t);
+              }
 
-                  @Override
-                  public void onCompleted() {
-                    future.complete(request.getReadBlock().getBlockID());
-                    semaphore.release();
-                  }
-                });
-        reply.addDatanode(dn);
-        requestObserver.onNext(request);
-        requestObserver.onCompleted();
-      } catch (IOException e) {
-        if (LOG.isDebugEnabled()) {
-          LOG.debug("Failed to execute command {} on datanode {}",
-              processForDebug(request), dn, e);
-        }
-      } catch (InterruptedException e) {
-        LOG.error("Command execution was interrupted ", e);
-        Thread.currentThread().interrupt();
-      }
-    }
-
-
-    return future;
+              @Override
+              public void onCompleted() {
+                semaphore.release();
+                future.complete(response.setStreamData(streamData).build());
+              }
+            });
+    requestObserver.onNext(request);
+    requestObserver.onCompleted();
+    return new XceiverClientReply(future);
   }
 
   private synchronized void checkOpen(DatanodeDetails dn)

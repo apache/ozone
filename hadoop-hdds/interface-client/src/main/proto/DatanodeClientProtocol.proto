@@ -88,6 +88,7 @@ enum Type {
   GetBlock = 7;
   DeleteBlock = 8;
   ListBlock = 9;
+  ReadBlock = 21;
 
   ReadChunk = 10;
   DeleteChunk = 11;
@@ -230,6 +231,7 @@ message ContainerCommandResponseProto {
   optional   DeleteBlockResponseProto deleteBlock = 13;
   optional   ListBlockResponseProto listBlock = 14;
   optional   ReadBlockResponseProto readBlock = 22;
+  optional   StreamDataResponseProto streamData = 23;
 
   optional   WriteChunkResponseProto writeChunk = 15;
   optional   ReadChunkResponseProto readChunk = 16;
@@ -390,6 +392,10 @@ message ReadBlockResponseProto {
     bytes data = 3; // Chunk data is returned as single buffer for V0
     DataBuffers dataBuffers = 4; // Chunk data is returned as a list of buffers
   }
+}
+
+message StreamDataResponseProto {
+  repeated ReadBlockResponseProto readBlock = 1;
 }
 
 // Chunk Operations
