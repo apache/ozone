@@ -26,6 +26,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.BitSet;
 import java.util.Collections;
+import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -129,6 +130,8 @@ import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.junit.jupiter.params.provider.ValueSource;
 
+import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType.READ;
+import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType.WRITE;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
@@ -542,21 +545,14 @@ public class TestKeyManagerImpl {
     OzoneAcl ozAcl2 = new OzoneAcl(ACLIdentityType.USER, "admin",
         ACCESS, ACLType.ALL);
 
-    BitSet rwRights = new BitSet();
-    rwRights.set(IAccessAuthorizer.ACLType.WRITE.ordinal());
-    rwRights.set(IAccessAuthorizer.ACLType.READ.ordinal());
     OzoneAcl ozAcl3 = new OzoneAcl(ACLIdentityType.GROUP, "dev",
-        rwRights, ACCESS);
+        EnumSet.of(READ, WRITE), ACCESS);
 
-    BitSet wRights = new BitSet();
-    wRights.set(IAccessAuthorizer.ACLType.WRITE.ordinal());
     OzoneAcl ozAcl4 = new OzoneAcl(ACLIdentityType.GROUP, "dev",
-        wRights, ACCESS);
+        EnumSet.of(WRITE), ACCESS);
 
-    BitSet rRights = new BitSet();
-    rRights.set(IAccessAuthorizer.ACLType.READ.ordinal());
     OzoneAcl ozAcl5 = new OzoneAcl(ACLIdentityType.GROUP, "dev",
-        rRights, ACCESS);
+        EnumSet.of(READ), ACCESS);
 
     acls.add(ozAcl2);
     acls.add(ozAcl3);

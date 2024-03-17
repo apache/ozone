@@ -26,6 +26,7 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.BitSet;
+import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
@@ -3444,11 +3445,8 @@ public abstract class TestOzoneRpcClientAbstract {
         .setStoreType(OzoneObj.StoreType.OZONE)
         .build();
 
-    // add acl
-    BitSet aclRights1 = new BitSet();
-    aclRights1.set(READ.ordinal());
     OzoneAcl user1Acl = new OzoneAcl(USER,
-        "user1", aclRights1, ACCESS);
+        "user1", EnumSet.of(READ), ACCESS);
     assertTrue(store.addAcl(prefixObj, user1Acl));
 
     // get acl
@@ -3461,11 +3459,8 @@ public abstract class TestOzoneRpcClientAbstract {
     aclsGet = store.getAcl(prefixObj);
     assertEquals(0, aclsGet.size());
 
-    // set acl
-    BitSet aclRights2 = new BitSet();
-    aclRights2.set(ACLType.ALL.ordinal());
     OzoneAcl group1Acl = new OzoneAcl(GROUP,
-        "group1", aclRights2, ACCESS);
+        "group1", EnumSet.of(ACLType.ALL), ACCESS);
     List<OzoneAcl> acls = new ArrayList<>();
     acls.add(user1Acl);
     acls.add(group1Acl);

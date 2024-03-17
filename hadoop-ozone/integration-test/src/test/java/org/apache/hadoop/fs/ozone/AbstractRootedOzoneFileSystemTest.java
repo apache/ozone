@@ -97,6 +97,7 @@ import java.util.Arrays;
 import java.util.BitSet;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.LinkedList;
@@ -1187,9 +1188,7 @@ abstract class AbstractRootedOzoneFileSystemTest {
     ACLType userRights = aclConfig.getUserDefaultRights();
     // Construct ACL for world access
     // ACL admin owner, world read+write
-    BitSet aclRights = new BitSet();
-    aclRights.set(READ.ordinal());
-    aclRights.set(WRITE.ordinal());
+    EnumSet aclRights = EnumSet.of(READ, WRITE);
     // volume acls have all access to admin and read+write access to world
 
     // Construct VolumeArgs

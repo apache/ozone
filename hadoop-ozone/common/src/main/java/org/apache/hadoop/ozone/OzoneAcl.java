@@ -30,6 +30,7 @@ import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType;
 
 import java.util.ArrayList;
 import java.util.BitSet;
+import java.util.EnumSet;
 import java.util.List;
 import java.util.Objects;
 import java.util.function.Consumer;
@@ -64,6 +65,16 @@ public class OzoneAcl {
 
   public OzoneAcl(ACLIdentityType type, String name, BitSet acls, AclScope scope) {
     this(type, name, scope, validateAndCopy(acls));
+  }
+
+  public OzoneAcl(ACLIdentityType type, String name, EnumSet<ACLType> acls, AclScope scope) {
+    this(type, name, scope, validateAndCopy(acls));
+  }
+
+  private static BitSet validateAndCopy(EnumSet<ACLType> enumSet) {
+    BitSet aclBitSet = new BitSet();
+    enumSet.forEach(aclType -> aclBitSet.set(aclType.ordinal()));
+    return validateAndCopy(aclBitSet);
   }
 
   private OzoneAcl(ACLIdentityType type, String name, AclScope scope, BitSet acls) {
@@ -165,7 +176,7 @@ public class OzoneAcl {
 
     // TODO : Support sanitation of these user names by calling into
     // userAuth Interface.
-    return new OzoneAcl(aclType, parts[1], acls, aclScope);
+    return new OzoneAcl(aclType, parts[1], aclScope, validateAndCopy(acls));
   }
 
   /**
@@ -203,9 +214,8 @@ public class OzoneAcl {
 
   public static OzoneAcl fromProtobuf(OzoneAclInfo protoAcl) {
     BitSet aclRights = BitSet.valueOf(protoAcl.getRights().toByteArray());
-    return new OzoneAcl(ACLIdentityType.valueOf(protoAcl.getType().name()),
-        protoAcl.getName(), aclRights,
-        AclScope.valueOf(protoAcl.getAclScope().name()));
+    return new OzoneAcl(ACLIdentityType.valueOf(protoAcl.getType().name()), protoAcl.getName(),
+        AclScope.valueOf(protoAcl.getAclScope().name()), validateAndCopy(aclRights));
   }
 
   public AclScope getAclScope() {
