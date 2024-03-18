@@ -499,7 +499,7 @@ public class StreamBlockInputStream extends BlockExtendedInputStream
   }
 
   @VisibleForTesting
-  protected long readData(long startByteIndex, long len)
+  protected synchronized long readData(long startByteIndex, long len)
       throws IOException {
     Pipeline pipeline = pipelineRef.get();
     buffers = new ArrayList<>();
