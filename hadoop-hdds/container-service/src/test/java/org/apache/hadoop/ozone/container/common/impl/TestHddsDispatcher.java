@@ -27,6 +27,7 @@ import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.fs.MockSpaceUsageCheckFactory;
+import org.apache.hadoop.hdds.fs.MockSpaceUsageSource;
 import org.apache.hadoop.hdds.fs.SpaceUsageCheckFactory;
 import org.apache.hadoop.hdds.fs.SpaceUsageSource;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
@@ -86,7 +87,6 @@ import java.util.concurrent.atomic.AtomicLong;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.hdds.fs.MockSpaceUsagePersistence.inMemory;
-import static org.apache.hadoop.hdds.fs.MockSpaceUsageSource.fixed;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.HDDS_DATANODE_DIR_KEY;
 import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuilders.getContainerCommandResponse;
 import static org.apache.hadoop.ozone.container.common.ContainerTestUtils.COMMIT_STAGE;
@@ -258,7 +258,8 @@ public class TestHddsDispatcher {
             .conf(conf).usageCheckFactory(MockSpaceUsageCheckFactory.NONE);
     // state of cluster : available (140) > 100  ,datanode volume
     // utilisation threshold not yet reached. container creates are successful.
-    SpaceUsageSource spaceUsage = fixed(500, 140, 360);
+    AtomicLong usedSpace = new AtomicLong(360);
+    SpaceUsageSource spaceUsage = MockSpaceUsageSource.of(500, usedSpace);
 
     SpaceUsageCheckFactory factory = MockSpaceUsageCheckFactory.of(
         spaceUsage, Duration.ZERO, inMemory(new AtomicLong(0)));
@@ -292,6 +293,7 @@ public class TestHddsDispatcher {
       hddsDispatcher.setClusterId(scmId.toString());
       containerData.getVolume().getVolumeInfo()
           .ifPresent(volumeInfo -> volumeInfo.incrementUsedSpace(50));
+      usedSpace.addAndGet(50);
       ContainerCommandResponseProto response = hddsDispatcher
           .dispatch(getWriteChunkRequest(dd.getUuidString(), 1L, 1L), null);
       Assert.assertEquals(ContainerProtos.Result.SUCCESS,

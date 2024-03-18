@@ -17,6 +17,8 @@
  */
 package org.apache.hadoop.hdds.fs;
 
+import java.util.concurrent.atomic.AtomicLong;
+
 /**
  * {@link SpaceUsageSource} implementations for testing.
  */
@@ -37,6 +39,26 @@ public final class MockSpaceUsageSource {
   public static SpaceUsageSource fixed(long capacity, long available,
       long used) {
     return new SpaceUsageSource.Fixed(capacity, available, used);
+  }
+
+  /** @return {@code SpaceUsageSource} with fixed capacity and dynamic usage */
+  public static SpaceUsageSource of(long capacity, AtomicLong used) {
+    return new SpaceUsageSource() {
+      @Override
+      public long getUsedSpace() {
+        return used.get();
+      }
+
+      @Override
+      public long getCapacity() {
+        return capacity;
+      }
+
+      @Override
+      public long getAvailable() {
+        return getCapacity() - getUsedSpace();
+      }
+    };
   }
 
   private MockSpaceUsageSource() {
