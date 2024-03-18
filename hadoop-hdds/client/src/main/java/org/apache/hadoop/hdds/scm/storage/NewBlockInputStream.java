@@ -510,11 +510,11 @@ public class NewBlockInputStream extends InputStream
         .newBuilder().setReadBlock(readBlockRequest).build();
     ContainerProtos.ContainerCommandResponseProto response =
         xceiverClient.sendCommand(request, validators);
-    response.getStreamData().getReadBlockList().stream().map(readBlock -> {
+    response.getStreamData().getReadBlockList().forEach(readBlock -> {
       if (readBlock.hasData()) {
-        return this.buffers.add(readBlock.getData().asReadOnlyByteBuffer());
+        buffers.add(readBlock.getData().asReadOnlyByteBuffer());
       } else if (readBlock.hasDataBuffers()) {
-        return this.buffers.addAll(BufferUtils.getReadOnlyByteBuffers(
+        buffers.addAll(BufferUtils.getReadOnlyByteBuffers(
             readBlock.getDataBuffers().getBuffersList()));
       } else {
         throw new RuntimeException("Unexpected error while reading chunk data " +
