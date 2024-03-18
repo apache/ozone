@@ -498,7 +498,7 @@ public class NewBlockInputStream extends InputStream
   }
 
   @VisibleForTesting
-  protected long readData(long startByteIndex, long len)
+  protected synchronized long readData(long startByteIndex, long len)
       throws IOException {
     ReadBlockRequestProto.Builder readBlockRequest =
         ReadBlockRequestProto.newBuilder()
