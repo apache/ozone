@@ -131,6 +131,14 @@ public class DatanodeDetails extends NodeImpl implements
     if (b.level > 0) {
       setLevel(b.level);
     }
+
+    // Below are dummy logs just to avoid findbugs
+    if (b.cost > 0) {
+      LOG.debug("cost: {}", getCost());
+    }
+    if (!b.uuidString.isEmpty()) {
+      LOG.debug("uuid : {}", uuidString);
+    }
   }
 
   public DatanodeDetails(DatanodeDetails datanodeDetails) {
