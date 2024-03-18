@@ -474,7 +474,6 @@ public class NewBlockInputStream extends InputStream
 
     // Adjust the chunkInfo so that only the required bytes are read from
     // the chunk.
-
     bufferOffsetWrtBlockDataData = readData(startByteIndex, len);
     long tempOffset = 0L;
     bufferoffsets = new ArrayList<>(buffers.size());
@@ -498,8 +497,9 @@ public class NewBlockInputStream extends InputStream
   }
 
   @VisibleForTesting
-  protected synchronized long readData(long startByteIndex, long len)
+  protected long readData(long startByteIndex, long len)
       throws IOException {
+    buffers = new ArrayList<>();
     ReadBlockRequestProto.Builder readBlockRequest =
         ReadBlockRequestProto.newBuilder()
             .setBlockID(blockID.getDatanodeBlockIDProtobuf())
