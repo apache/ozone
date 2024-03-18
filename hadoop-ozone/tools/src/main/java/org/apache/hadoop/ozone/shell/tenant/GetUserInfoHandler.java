@@ -21,6 +21,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import org.apache.hadoop.hdds.cli.GenericCli;
+import org.apache.hadoop.hdds.server.JsonUtils;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.om.helpers.TenantUserInfoValue;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ExtendedUserAccessIdInfo;
@@ -79,13 +80,12 @@ public class GetUserInfoHandler extends TenantHandler {
             accessIdInfo.getAccessId());
       });
     } else {
-      ObjectMapper objectMapper = new ObjectMapper();
-      ObjectNode resObj = objectMapper.createObjectNode();
+      ObjectNode resObj = JsonUtils.createObjectNode(null);
       resObj.put("user", userPrincipal);
 
-      ArrayNode arr = objectMapper.createArrayNode();
+      ArrayNode arr = JsonUtils.createArrayNode();
       accessIdInfoList.forEach(accessIdInfo -> {
-        ObjectNode tenantObj = objectMapper.createObjectNode();
+        ObjectNode tenantObj = JsonUtils.createObjectNode(null);
         tenantObj.put("accessId", accessIdInfo.getAccessId());
         tenantObj.put("tenantId", accessIdInfo.getTenantId());
         tenantObj.put("isAdmin", accessIdInfo.getIsAdmin());
@@ -94,9 +94,8 @@ public class GetUserInfoHandler extends TenantHandler {
       });
 
       resObj.set("tenants", arr);
-
-      String prettyJson = objectMapper.writerWithDefaultPrettyPrinter()
-          .writeValueAsString(resObj);
+      String prettyJson =
+          JsonUtils.toJsonStringWithDefaultPrettyPrinter(resObj);
       out().println(prettyJson);
     }
 
