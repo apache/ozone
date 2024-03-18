@@ -28,6 +28,7 @@ import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandRequestProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ReadBlockRequestProto;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ReadBlockResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.XceiverClientFactory;
 import org.apache.hadoop.hdds.scm.XceiverClientSpi;
@@ -510,17 +511,18 @@ public class NewBlockInputStream extends InputStream
         .newBuilder().setReadBlock(readBlockRequest).build();
     ContainerProtos.ContainerCommandResponseProto response =
         xceiverClient.sendCommand(request, validators);
-    response.getStreamData().getReadBlockList().forEach(readBlock -> {
+    List<ReadBlockResponseProto> readBlocks = response.getStreamData().getReadBlockList();
+    for (ReadBlockResponseProto readBlock : readBlocks) {
       if (readBlock.hasData()) {
         buffers.add(readBlock.getData().asReadOnlyByteBuffer());
       } else if (readBlock.hasDataBuffers()) {
         buffers.addAll(BufferUtils.getReadOnlyByteBuffers(
             readBlock.getDataBuffers().getBuffersList()));
       } else {
-        throw new RuntimeException("Unexpected error while reading chunk data " +
+        throw new IOException("Unexpected error while reading chunk data " +
             "from container. No data returned.");
       }
-    });
+    }
     return response.getStreamData().getReadBlock(0)
         .getChunkData().getOffset();
   }
