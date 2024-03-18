@@ -173,11 +173,11 @@ public class TestNewBlockInputStream {
 
     matchWithInputData(b, 0, len);
 
-    // To read chunk data from index 0 to 49 (len = 50), we need to read
-    // chunk from offset 0 to 60 as the checksum boundary is at every 20
+    // To read block data from index 0 to 225 (len = 225), we need to read
+    // chunk from offset 0 to 240 as the checksum boundary is at every 20
     // bytes. Verify that 60 bytes of chunk data are read and stored in the
     // buffers. Since checksum boundary is at every 20 bytes, there should be
-    // 60/20 number of buffers.
+    // 240/20 number of buffers.
     matchWithInputData(blockStream.getReadByteBuffers(), 0, 240);
   }
 
@@ -187,11 +187,11 @@ public class TestNewBlockInputStream {
     EOFException eofException = assertThrows(EOFException.class, () ->  seekAndVerify(blockSize + 1));
     assertThat(eofException).hasMessage("EOF encountered at pos: " + (blockSize + 1) + " for block: " + blockID);
 
-    // Seek before read should update the ChunkInputStream#chunkPosition
+    // Seek before read should update the BlockInputStream#blockPosition
     seekAndVerify(25);
 
     // Read from the sought position.
-    // Reading from index 25 to 54 should result in the ChunkInputStream
+    // Reading from index 25 to 54 should result in the BlockInputStream
     // copying chunk data from index 20 to 59 into the buffers (checksum
     // boundaries).
     byte[] b = new byte[30];
@@ -199,13 +199,13 @@ public class TestNewBlockInputStream {
     matchWithInputData(b, 25, 30);
     matchWithInputData(blockStream.getReadByteBuffers(), 20, 40);
 
-    // After read, the position of the chunkStream is evaluated from the
+    // After read, the position of the blockStream is evaluated from the
     // buffers and the chunkPosition should be reset to -1.
 
     // Only the last BYTES_PER_CHECKSUM will be cached in the buffers as
     // buffers are released after each checksum boundary is read. So the
     // buffers should contain data from index 40 to 59.
-    // Seek to a position within the cached buffers. ChunkPosition should
+    // Seek to a position within the cached buffers. BlockPosition should
     // still not be used to set the position.
     seekAndVerify(45);
 
@@ -251,51 +251,4 @@ public class TestNewBlockInputStream {
     matchWithInputData(b2, 20, 20);
   }
 
-//  @Test
-//  public void connectsToNewPipeline() throws Exception {
-//    // GIVEN
-//    Pipeline pipeline = MockPipeline.createSingleNodePipeline();
-//    Pipeline newPipeline = MockPipeline.createSingleNodePipeline();
-//
-//    Token<?> token = mock(Token.class);
-//    when(token.encodeToUrlString())
-//        .thenReturn("oldToken");
-//    Token<?> newToken = mock(Token.class);
-//    when(newToken.encodeToUrlString())
-//        .thenReturn("newToken");
-//
-//    AtomicReference<Pipeline> pipelineRef = new AtomicReference<>(pipeline);
-//    AtomicReference<Token<?>> tokenRef = new AtomicReference<>(token);
-//
-//    XceiverClientFactory clientFactory = mock(XceiverClientFactory.class);
-//    XceiverClientSpi client = mock(XceiverClientSpi.class);
-//    when(clientFactory.acquireClientForReadData(any()))
-//        .thenReturn(client);
-//    ArgumentCaptor<ContainerCommandRequestProto> requestCaptor =
-//        ArgumentCaptor.forClass(ContainerCommandRequestProto.class);
-//    when(client.getPipeline())
-//        .thenAnswer(invocation -> pipelineRef.get());
-//    when(client.sendCommand(requestCaptor.capture(), any()))
-//        .thenAnswer(invocation ->
-//            getReadChunkResponse(
-//                requestCaptor.getValue(),
-//                ChunkBuffer.wrap(ByteBuffer.wrap(blockData)),
-//                ByteStringConversion::safeWrap));
-//
-//    try (BlockInputStream subject = new ChunkInputStream(blockStream, blockID,
-//        clientFactory, pipelineRef::get, false, tokenRef::get)) {
-//      // WHEN
-//      subject.unbuffer();
-//      pipelineRef.set(newPipeline);
-//      tokenRef.set(newToken);
-//      byte[] buffer = new byte[CHUNK_SIZE];
-//      int read = subject.read(buffer);
-//
-//      // THEN
-//      assertEquals(CHUNK_SIZE, read);
-//      assertArrayEquals(blockData, buffer);
-//      verify(clientFactory).acquireClientForReadData(newPipeline);
-//      verify(newToken).encodeToUrlString();
-//    }
-//  }
 }

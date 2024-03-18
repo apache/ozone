@@ -135,7 +135,7 @@ public class NewBlockInputStream extends InputStream
       return length;
     }
     if (buffersHaveData()) {
-      // BufferOffset w.r.t to ChunkData + BufferOffset w.r.t buffers +
+      // BufferOffset w.r.t to BlockData + BufferOffset w.r.t buffers +
       // Position of current Buffer
       return bufferOffsetWrtBlockDataData + bufferoffsets.get(bufferIndex) +
           buffers.get(bufferIndex).position();
@@ -211,7 +211,7 @@ public class NewBlockInputStream extends InputStream
         while (len > 0) {
           int available = prepareRead(len);
           if (available == EOF) {
-            // There is no more data in the chunk stream. The buffers should have
+            // There is no more data in the block stream. The buffers should have
             // been released by now
             Preconditions.checkState(buffers == null);
             return total != 0 ? total : EOF;
@@ -260,7 +260,7 @@ public class NewBlockInputStream extends InputStream
         while (len > 0) {
           int available = prepareRead(len);
           if (available == EOF) {
-            // There is no more data in the chunk stream. The buffers should have
+            // There is no more data in the block stream. The buffers should have
             // been released by now
             Preconditions.checkState(buffers == null);
             return total != 0 ? total : EOF;
@@ -304,7 +304,7 @@ public class NewBlockInputStream extends InputStream
     }
 
     if (buffersHavePosition(pos)) {
-      // The bufferPosition is w.r.t the current chunk.
+      // The bufferPosition is w.r.t the current block.
       // Adjust the bufferIndex and position to the seeked position.
       adjustBufferPosition(pos - bufferOffsetWrtBlockDataData);
     } else {
@@ -359,10 +359,10 @@ public class NewBlockInputStream extends InputStream
       if (blockPosition >= 0) {
         if (buffersHavePosition(blockPosition)) {
           // The current buffers have the seeked position. Adjust the buffer
-          // index and position to point to the chunkPosition.
+          // index and position to point to the buffer position.
           adjustBufferPosition(blockPosition - bufferOffsetWrtBlockDataData);
         } else {
-          // Read a required chunk data to fill the buffers with seeked
+          // Read a required block data to fill the buffers with seeked
           // position data
           readDataFromContainer(len);
         }
@@ -372,11 +372,11 @@ public class NewBlockInputStream extends InputStream
         ByteBuffer bb = buffers.get(bufferIndex);
         return Math.min(len, bb.remaining());
       } else if (dataRemainingInBlock()) {
-        // There is more data in the chunk stream which has not
+        // There is more data in the block stream which has not
         // been read into the buffers yet.
         readDataFromContainer(len);
       } else {
-        // All available input from this chunk stream has been consumed.
+        // All available input from this block stream has been consumed.
         return EOF;
       }
     }
@@ -440,7 +440,7 @@ public class NewBlockInputStream extends InputStream
       buffers.get(i).position(0);
     }
 
-    // Reset the chunkPosition as chunk stream has been initialized i.e. the
+    // Reset the blockPosition as chunk stream has been initialized i.e. the
     // buffers have been allocated.
     blockPosition = -1;
   }
@@ -456,14 +456,14 @@ public class NewBlockInputStream extends InputStream
    * to Datanode
    */
   private synchronized void readDataFromContainer(int len) throws IOException {
-    // index of first byte to be read from the chunk
+    // index of first byte to be read from the block
     long startByteIndex;
     if (blockPosition >= 0) {
       // If seek operation was called to advance the buffer position, the
       // chunk should be read from that position onwards.
       startByteIndex = blockPosition;
     } else {
-      // Start reading the chunk from the last chunkPosition onwards.
+      // Start reading the block from the last blockPosition onwards.
       startByteIndex = bufferOffsetWrtBlockDataData + buffersSize;
     }
 
@@ -472,9 +472,6 @@ public class NewBlockInputStream extends InputStream
     // and is retried, we need the previous position.  Position is reset after
     // successful read in adjustBufferPosition()
     blockPosition = getPos();
-
-    // Adjust the chunkInfo so that only the required bytes are read from
-    // the chunk.
     bufferOffsetWrtBlockDataData = readData(startByteIndex, len);
     long tempOffset = 0L;
     bufferoffsets = new ArrayList<>(buffers.size());
@@ -486,13 +483,6 @@ public class NewBlockInputStream extends InputStream
     }
     bufferIndex = 0;
     allocated = true;
-    // If the stream was seeked to position before, then the buffer
-    // position should be adjusted as the reads happen at checksum boundaries.
-    // The buffers position might need to be adjusted for the following
-    // scenarios:
-    //    1. Stream was seeked to a position before the chunk was read
-    //    2. Chunk was read from index < the current position to account for
-    //    checksum boundaries.
     adjustBufferPosition(startByteIndex - bufferOffsetWrtBlockDataData);
 
   }
@@ -587,10 +577,10 @@ public class NewBlockInputStream extends InputStream
   private void releaseBuffers(int releaseUptoBufferIndex) {
     int buffersLen = buffers.size();
     if (releaseUptoBufferIndex == buffersLen - 1) {
-      // Before releasing all the buffers, if chunk EOF is not reached, then
-      // chunkPosition should be set to point to the last position of the
+      // Before releasing all the buffers, if block EOF is not reached, then
+      // blockPosition should be set to point to the last position of the
       // buffers. This should be done so that getPos() can return the current
-      // chunk position
+      // block position
       blockPosition = bufferOffsetWrtBlockDataData +
           bufferoffsets.get(releaseUptoBufferIndex) +
           buffers.get(releaseUptoBufferIndex).capacity();
@@ -610,7 +600,7 @@ public class NewBlockInputStream extends InputStream
     buffers = null;
     bufferIndex = 0;
     // We should not reset bufferOffsetWrtChunkData and buffersSize here
-    // because when getPos() is called in chunkStreamEOF() we use these
+    // because when getPos() is called we use these
     // values and determine whether chunk is read completely or not.
   }
 
