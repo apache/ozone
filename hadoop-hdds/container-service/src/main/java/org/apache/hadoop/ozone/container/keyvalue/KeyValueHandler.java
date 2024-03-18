@@ -756,7 +756,7 @@ public class KeyValueHandler extends Handler {
       throws StorageContainerException {
     if (validateChunkChecksumData) {
       try {
-        Checksum.verifyChecksum(data, info.getChecksumData(), 0);
+        Checksum.verifyChecksum(data.toByteString(byteBufferToByteString), info.getChecksumData(), 0);
       } catch (OzoneChecksumException ex) {
         throw ChunkUtils.wrapInStorageContainerException(ex);
       }
@@ -857,9 +857,9 @@ public class KeyValueHandler extends Handler {
 
       // chunks will be committed as a part of handling putSmallFile
       // here. There is no need to maintain this info in openContainerBlockMap.
+      validateChunkChecksumData(data, chunkInfo);
       chunkManager
           .writeChunk(kvContainer, blockID, chunkInfo, data, dispatcherContext);
-      validateChunkChecksumData(data, chunkInfo);
       chunkManager.finishWriteChunks(kvContainer, blockData);
 
       List<ContainerProtos.ChunkInfo> chunks = new LinkedList<>();
