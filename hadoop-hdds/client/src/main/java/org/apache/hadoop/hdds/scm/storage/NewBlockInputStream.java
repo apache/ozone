@@ -119,7 +119,7 @@ public class NewBlockInputStream extends InputStream
   }
 
   @Override
-  public long getPos() {
+  public synchronized long getPos() {
     if (length == 0) {
       return 0;
     }

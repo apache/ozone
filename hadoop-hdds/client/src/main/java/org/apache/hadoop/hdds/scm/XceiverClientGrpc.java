@@ -363,7 +363,7 @@ public class XceiverClientGrpc extends XceiverClientSpi {
         // sendCommandAsyncCall will create a new channel and async stub
         // in case these don't exist for the specific datanode.
         reply.addDatanode(dn);
-        if (responseProto.getCmdType() == ContainerProtos.Type.ReadBlock) {
+        if (request.getCmdType() == ContainerProtos.Type.ReadBlock) {
           responseProto = sendCommandAsyncReadOnly(request, dn).getResponse().get();
         } else {
           responseProto = sendCommandAsync(request, dn).getResponse().get();
