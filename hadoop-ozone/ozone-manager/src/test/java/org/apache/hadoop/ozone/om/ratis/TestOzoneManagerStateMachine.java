@@ -37,7 +37,6 @@ import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.ratis.proto.RaftProtos;
 import org.apache.ratis.protocol.exceptions.StateMachineException;
 import org.apache.ratis.server.protocol.TermIndex;
-import org.apache.ratis.server.raftlog.RaftLog;
 import org.apache.ratis.statemachine.TransactionContext;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
