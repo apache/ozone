@@ -218,7 +218,7 @@ public class ReadReplicas extends KeyHandler implements SubcommandWithParent {
   }
 
   private Map<DatanodeDetails, OzoneInputStream> replicasOf(BlockID blockID,
-                                                            Map<OmKeyLocationInfo, Map<DatanodeDetails, OzoneInputStream>> replicas) {
+                Map<OmKeyLocationInfo, Map<DatanodeDetails, OzoneInputStream>> replicas) {
     for (Map.Entry<OmKeyLocationInfo, Map<DatanodeDetails, OzoneInputStream>>
         block : replicas.entrySet()) {
       if (block.getKey().getBlockID().equals(blockID)) {
