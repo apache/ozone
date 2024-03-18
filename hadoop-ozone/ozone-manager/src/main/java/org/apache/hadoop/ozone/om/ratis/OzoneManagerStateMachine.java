@@ -183,12 +183,13 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
 
   @Override
   protected synchronized boolean updateLastAppliedTermIndex(TermIndex newTermIndex) {
-    assertUpdateIncreasingly("lastApplied", getLastAppliedTermIndex(), newTermIndex);
+    TermIndex lastApplied = getLastAppliedTermIndex();
+    assertUpdateIncreasingly("lastApplied", lastApplied, newTermIndex);
     // if newTermIndex getting updated is within sequence of notifiedTermIndex (i.e. from lastSkippedIndex and
     // notifiedTermIndex), then can update directly to lastNotifiedTermIndex as it ensure previous double buffer's
     // Index is notified or getting notified matching lastSkippedIndex
-    if (newTermIndex.getIndex() <= getLastNotifiedTermIndex().getIndex()
-        && getLastAppliedTermIndex().getIndex() >= lastSkippedIndex) {
+    if (newTermIndex.getIndex() < getLastNotifiedTermIndex().getIndex()
+        && lastApplied.getIndex() >= lastSkippedIndex) {
       newTermIndex = getLastNotifiedTermIndex();
     }
     return super.updateLastAppliedTermIndex(newTermIndex);
