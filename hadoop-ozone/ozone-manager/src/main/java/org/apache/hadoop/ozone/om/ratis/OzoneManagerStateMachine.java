@@ -172,7 +172,9 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
     }
     final TermIndex newTermIndex = TermIndex.valueOf(currentTerm, newIndex);
     lastNotifiedTermIndex = assertUpdateIncreasingly("lastNotified", lastNotifiedTermIndex, newTermIndex);
-    updateLastAppliedTermIndex(lastNotifiedTermIndex);
+    if (lastNotifiedTermIndex.getIndex() - getLastAppliedTermIndex().getIndex() == 1) {
+      updateLastAppliedTermIndex(lastNotifiedTermIndex);
+    }
   }
 
   public TermIndex getLastNotifiedTermIndex() {
