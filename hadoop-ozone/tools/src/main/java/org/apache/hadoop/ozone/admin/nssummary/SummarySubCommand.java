@@ -83,10 +83,11 @@ public class SummarySubCommand implements Callable<Void> {
       printWithUnderline("Entity Type", false);
       printKVSeparator();
       System.out.println(summaryResponse.get("type"));
-      int numVol = ((Double) summaryResponse.get("numVolume")).intValue();
-      int numBucket = ((Double) summaryResponse.get("numBucket")).intValue();
-      int numDir = ((Double) summaryResponse.get("numDir")).intValue();
-      int numKey = ((Double) summaryResponse.get("numKey")).intValue();
+
+      int numVol = ((Number) summaryResponse.get("numVolume")).intValue();
+      int numBucket = ((Number) summaryResponse.get("numBucket")).intValue();
+      int numDir = ((Number) summaryResponse.get("numDir")).intValue();
+      int numKey = ((Number) summaryResponse.get("numKey")).intValue();
 
       if (numVol != -1) {
         printWithUnderline("Volumes", false);

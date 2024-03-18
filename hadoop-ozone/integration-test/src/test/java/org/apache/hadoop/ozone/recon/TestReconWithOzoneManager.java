@@ -40,6 +40,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.TimeUnit;
 
+import com.google.gson.internal.LinkedTreeMap;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -64,9 +65,9 @@ import org.apache.http.client.methods.HttpGet;
 import org.apache.http.impl.client.CloseableHttpClient;
 import org.apache.http.impl.client.HttpClientBuilder;
 import org.apache.http.util.EntityUtils;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.core.type.TypeReference;
 
-import com.google.gson.Gson;
-import com.google.gson.internal.LinkedTreeMap;
 import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
@@ -381,16 +382,21 @@ public class TestReconWithOzoneManager {
 
   private long getReconTaskAttributeFromJson(String taskStatusResponse,
                                              String taskName,
-                                             String entityAttribute) {
-    ArrayList<LinkedTreeMap> taskStatusList = new Gson()
-        .fromJson(taskStatusResponse, ArrayList.class);
+                                             String entityAttribute)
+      throws IOException {
+    ObjectMapper objectMapper = new ObjectMapper();
+    ArrayList<LinkedTreeMap> taskStatusList = objectMapper.readValue(
+        taskStatusResponse, new TypeReference<ArrayList<LinkedTreeMap>>() {
+        });
+
     Optional<LinkedTreeMap> taskEntity =
         taskStatusList
             .stream()
             .filter(task -> task.get("taskName").equals(taskName))
             .findFirst();
     assertTrue(taskEntity.isPresent());
-    return (long) (double) taskEntity.get().get(entityAttribute);
+    Number number = (Number) taskEntity.get().get(entityAttribute);
+    return number.longValue();
   }
 
   /**
