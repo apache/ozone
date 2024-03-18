@@ -18,6 +18,7 @@
 package org.apache.hadoop.ozone.recon.api.types;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
+import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 
 import java.util.List;
@@ -31,7 +32,7 @@ public class DecommissionStatusInfoResponse {
    * Metadata of a datanode when decommissioning of datanode is in progress.
    */
   @JsonProperty("datanodeDetails")
-  private DatanodeMetadata dataNodeDetails;
+  private DatanodeDetails dataNodeDetails;
 
   /**
    * Metrics of datanode when decommissioning of datanode is in progress.
@@ -45,11 +46,11 @@ public class DecommissionStatusInfoResponse {
   @JsonProperty("containers")
   private Map<String, List<ContainerID>> containers;
 
-  public DatanodeMetadata getDataNodeDetails() {
+  public DatanodeDetails getDataNodeDetails() {
     return dataNodeDetails;
   }
 
-  public void setDataNodeDetails(DatanodeMetadata dataNodeDetails) {
+  public void setDataNodeDetails(DatanodeDetails dataNodeDetails) {
     this.dataNodeDetails = dataNodeDetails;
   }
 

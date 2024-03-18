@@ -24,7 +24,13 @@ import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 
+import com.fasterxml.jackson.annotation.JsonAutoDetect;
+import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonFormat;
 import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
+import com.fasterxml.jackson.databind.annotation.JsonSerialize;
 import com.google.common.collect.ImmutableSet;
 import org.apache.hadoop.hdds.DatanodeVersion;
 import org.apache.hadoop.hdds.HddsUtils;
@@ -33,6 +39,8 @@ import org.apache.hadoop.hdds.annotation.InterfaceStability;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails.Port.Name;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ExtendedDatanodeDetailsProto;
+import org.apache.hadoop.hdds.recon.CustomDatanodeDetailsDeserializer;
+import org.apache.hadoop.hdds.recon.CustomDatanodeDetailsSerializer;
 import org.apache.hadoop.hdds.scm.net.NetConstants;
 import org.apache.hadoop.hdds.scm.net.NodeImpl;
 
@@ -62,6 +70,8 @@ import static org.apache.hadoop.ozone.ClientVersion.VERSION_HANDLES_UNKNOWN_DN_P
  */
 @InterfaceAudience.Private
 @InterfaceStability.Evolving
+@JsonSerialize(using = CustomDatanodeDetailsSerializer.class)
+@JsonDeserialize(using = CustomDatanodeDetailsDeserializer.class)
 public class DatanodeDetails extends NodeImpl implements
     Comparable<DatanodeDetails> {
 
@@ -86,6 +96,7 @@ public class DatanodeDetails extends NodeImpl implements
 
   private String ipAddress;
   private String hostName;
+  @JsonProperty("ports")
   private final List<Port> ports;
   private String certSerialId;
   private String version;
@@ -571,11 +582,14 @@ public class DatanodeDetails extends NodeImpl implements
    */
   public static final class Builder {
     private UUID id;
+    private String uuidString;
     private String ipAddress;
     private String hostName;
     private String networkName;
     private String networkLocation;
     private int level;
+    // This field is being added here only for custom serialization and deserialization.
+    private int cost;
     private List<Port> ports;
     private String certSerialId;
     private String version;
@@ -608,6 +622,7 @@ public class DatanodeDetails extends NodeImpl implements
       this.networkName = details.getNetworkName();
       this.networkLocation = details.getNetworkLocation();
       this.level = details.getLevel();
+      this.cost = details.getCost();
       this.ports = details.getPorts();
       this.certSerialId = details.getCertSerialId();
       this.version = details.getVersion();
@@ -632,6 +647,17 @@ public class DatanodeDetails extends NodeImpl implements
     }
 
     /**
+     * Sets the DatanodeUuid as String.
+     *
+     * @param uuidStr DatanodeUuid as String
+     * @return DatanodeDetails.Builder
+     */
+    public Builder setUuidAsString(String uuidStr) {
+      this.uuidString = uuidStr;
+      return this;
+    }
+
+    /**
      * Sets the IP address of DataNode.
      *
      * @param ip address
@@ -650,6 +676,17 @@ public class DatanodeDetails extends NodeImpl implements
      */
     public Builder setHostName(String host) {
       this.hostName = host;
+      return this;
+    }
+
+    /**
+     * Sets the ports of DataNode.
+     *
+     * @param ports hostname
+     * @return DatanodeDetails.Builder
+     */
+    public Builder setPorts(List<Port> ports) {
+      this.ports = ports;
       return this;
     }
 
@@ -677,6 +714,11 @@ public class DatanodeDetails extends NodeImpl implements
 
     public Builder setLevel(int level) {
       this.level = level;
+      return this;
+    }
+
+    public Builder setCost(int cost) {
+      this.cost = cost;
       return this;
     }
 
@@ -816,11 +858,13 @@ public class DatanodeDetails extends NodeImpl implements
   /**
    * Container to hold DataNode Port details.
    */
+  @JsonAutoDetect
   public static final class Port {
 
     /**
      * Ports that are supported in DataNode.
      */
+    @JsonFormat(shape = JsonFormat.Shape.OBJECT)
     public enum Name {
       STANDALONE, RATIS, REST, REPLICATION, RATIS_ADMIN, RATIS_SERVER,
       @BelongsToHDDSLayoutVersion(RATIS_DATASTREAM_PORT_IN_DATANODEDETAILS)
@@ -838,14 +882,17 @@ public class DatanodeDetails extends NodeImpl implements
           EnumSet.of(STANDALONE, RATIS, REST));
     }
 
+    @JsonProperty("name")
     private final Name name;
+    @JsonProperty("value")
     private final Integer value;
 
     /**
      * Private constructor for constructing Port object. Use
      * DatanodeDetails#newPort to create a new Port object.
      */
-    private Port(Name name, Integer value) {
+    @JsonCreator
+    public Port(Name name, Integer value) {
       this.name = name;
       this.value = value;
     }

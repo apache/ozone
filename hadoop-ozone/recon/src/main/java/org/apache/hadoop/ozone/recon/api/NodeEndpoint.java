@@ -21,10 +21,13 @@ package org.apache.hadoop.ozone.recon.api;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.module.SimpleModule;
 import com.google.common.base.Preconditions;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState;
+import org.apache.hadoop.hdds.recon.CustomDatanodeDetailsDeserializer;
+import org.apache.hadoop.hdds.recon.CustomDatanodeDetailsSerializer;
 import org.apache.hadoop.hdds.scm.container.placement.metrics.SCMNodeStat;
 import org.apache.hadoop.hdds.scm.node.DatanodeInfo;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
@@ -231,6 +234,10 @@ public class NodeEndpoint {
       } else {
         // Create ObjectMapper
         ObjectMapper objectMapper = new ObjectMapper();
+        SimpleModule module = new SimpleModule();
+        module.addDeserializer(DatanodeDetails.class, new CustomDatanodeDetailsDeserializer());
+        module.addSerializer(DatanodeDetails.class, new CustomDatanodeDetailsSerializer());
+        objectMapper.registerModule(module);
         LOG.info("processOutput: {}", processOutput);
         // Deserialize JSON to Java object
         List<DecommissionStatusInfoResponse> decommissionStatusInfoResponseList = null;
