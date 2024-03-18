@@ -454,7 +454,7 @@ public class NewBlockInputStream extends InputStream
    * @throws IOException if there is an I/O error while performing the call
    * to Datanode
    */
-  private void readDataFromContainer(int len) throws IOException {
+  private synchronized void readDataFromContainer(int len) throws IOException {
     // index of first byte to be read from the chunk
     long startByteIndex;
     if (blockPosition >= 0) {

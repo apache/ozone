@@ -62,7 +62,7 @@ public class TestNewBlockInputStream {
   private Checksum checksum;
   private Function<BlockID, BlockLocationInfo> refreshFunction;
   private BlockID blockID;
-  private static String CHUNK_NAME = "chunk-";
+  private static final String CHUNK_NAME = "chunk-";
 
 
   @BeforeEach
@@ -184,7 +184,7 @@ public class TestNewBlockInputStream {
   @Test
   public void testSeek() throws Exception {
     seekAndVerify(0);
-    EOFException eofException = assertThrows(EOFException.class, () ->  seekAndVerify( blockSize+ 1));
+    EOFException eofException = assertThrows(EOFException.class, () ->  seekAndVerify(blockSize + 1));
     assertThat(eofException).hasMessage("EOF encountered at pos: " + (blockSize + 1) + " for block: " + blockID);
 
     // Seek before read should update the ChunkInputStream#chunkPosition

@@ -18,7 +18,10 @@
 package org.apache.hadoop.hdds.scm.storage;
 
 import java.io.IOException;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+import java.util.Map;
 import java.util.function.Function;
 
 import org.apache.hadoop.hdds.client.BlockID;
@@ -105,7 +108,7 @@ class DummyNewBlockInputStream extends NewBlockInputStream {
           ChecksumData checksumData = ChecksumData.getFromProtoBuf(
               chunkInfo.getChecksumData());
           int bytesPerChecksum = checksumData.getBytesPerChecksum();
-          remainingToRead =( len / bytesPerChecksum + 1) * bytesPerChecksum;
+          remainingToRead = (len / bytesPerChecksum + 1) * bytesPerChecksum;
         } else {
           remainingToRead = chunkLen;
         }
