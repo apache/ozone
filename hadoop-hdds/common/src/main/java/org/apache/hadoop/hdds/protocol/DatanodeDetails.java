@@ -136,7 +136,7 @@ public class DatanodeDetails extends NodeImpl implements
     if (b.cost > 0) {
       LOG.debug("cost: {}", getCost());
     }
-    if (!b.uuidString.isEmpty()) {
+    if (null != b.uuidString && !b.uuidString.isEmpty()) {
       LOG.debug("uuid : {}", uuidString);
     }
   }
