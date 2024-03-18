@@ -654,7 +654,7 @@ public class NewBlockInputStream extends InputStream
   }
 
   @VisibleForTesting
-  protected void setBuffers(List<ByteBuffer> buffers) {
+  protected synchronized void setBuffers(List<ByteBuffer> buffers) {
     this.buffers = buffers;
   }
 
