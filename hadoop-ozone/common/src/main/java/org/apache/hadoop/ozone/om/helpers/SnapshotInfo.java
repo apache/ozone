@@ -49,8 +49,8 @@ import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
  * This class is used for storing info related to Snapshots.
  *
  * Each snapshot created has an associated SnapshotInfo entry
- * containing the snapshotid, snapshot path,
- * snapshot checkpoint directory, previous snapshotid
+ * containing the snapshotId, snapshot path,
+ * snapshot checkpoint directory, previous snapshotId
  * for the snapshot path & global amongst other necessary fields.
  */
 public final class SnapshotInfo implements Auditable, CopyObject<SnapshotInfo> {
