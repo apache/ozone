@@ -64,7 +64,7 @@ public class OzoneAcl {
   }
 
   public OzoneAcl(ACLIdentityType type, String name, EnumSet<ACLType> acls, AclScope scope) {
-    this(type, name, scope, validateAndCopy(acls));
+    this(type, name, scope, bitSetOf(acls.toArray(new ACLType[0])));
   }
 
   private OzoneAcl(ACLIdentityType type, String name, AclScope scope, BitSet acls) {
@@ -93,12 +93,6 @@ public class OzoneAcl {
     }
 
     return copyBitSet(acls);
-  }
-
-  private static BitSet validateAndCopy(EnumSet<ACLType> enumSet) {
-    BitSet aclBitSet = new BitSet();
-    enumSet.forEach(aclType -> aclBitSet.set(aclType.ordinal()));
-    return validateAndCopy(aclBitSet);
   }
 
   private static BitSet copyBitSet(BitSet acls) {
@@ -150,7 +144,6 @@ public class OzoneAcl {
     }
 
     ACLIdentityType aclType = ACLIdentityType.valueOf(parts[0].toUpperCase());
-    BitSet acls = new BitSet(ACLType.getNoOfAcls());
 
     String bits = parts[2];
 
@@ -165,14 +158,14 @@ public class OzoneAcl {
           parts[2].indexOf("]")));
     }
 
-    // Set all acl bits.
+    EnumSet<ACLType> acls = EnumSet.noneOf(ACLType.class);
     for (char ch : bits.toCharArray()) {
-      acls.set(ACLType.getACLRight(String.valueOf(ch)).ordinal());
+      acls.add(ACLType.getACLRight(String.valueOf(ch)));
     }
 
     // TODO : Support sanitation of these user names by calling into
     // userAuth Interface.
-    return new OzoneAcl(aclType, parts[1], aclScope, validateAndCopy(acls));
+    return new OzoneAcl(aclType, parts[1], acls, aclScope);
   }
 
   /**
