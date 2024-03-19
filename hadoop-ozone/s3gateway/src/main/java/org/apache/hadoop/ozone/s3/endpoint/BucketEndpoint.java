@@ -669,9 +669,7 @@ public class BucketEndpoint extends EndpointBase {
       OzoneAcl defaultOzoneAcl = new OzoneAcl(
           IAccessAuthorizer.ACLIdentityType.USER, part[1], OzoneAcl.AclScope.DEFAULT, aclsOnBucket
       );
-      OzoneAcl accessOzoneAcl = new OzoneAcl(
-          IAccessAuthorizer.ACLIdentityType.USER, part[1], ACCESS, aclsOnBucket
-      );
+      OzoneAcl accessOzoneAcl = new OzoneAcl(IAccessAuthorizer.ACLIdentityType.USER, part[1], ACCESS, aclsOnBucket);
       ozoneAclList.add(defaultOzoneAcl);
       ozoneAclList.add(accessOzoneAcl);
     }
@@ -700,9 +698,7 @@ public class BucketEndpoint extends EndpointBase {
       // Build ACL on Volume
       EnumSet<IAccessAuthorizer.ACLType> aclsOnVolume =
           S3Acl.getOzoneAclOnVolumeFromS3Permission(permission);
-      OzoneAcl accessOzoneAcl = new OzoneAcl(
-          IAccessAuthorizer.ACLIdentityType.USER, part[1], ACCESS, aclsOnVolume
-      );
+      OzoneAcl accessOzoneAcl = new OzoneAcl(IAccessAuthorizer.ACLIdentityType.USER, part[1], ACCESS, aclsOnVolume);
       ozoneAclList.add(accessOzoneAcl);
     }
     return ozoneAclList;

@@ -157,7 +157,6 @@ import java.security.PrivilegedExceptionAction;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
-import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -757,7 +756,7 @@ public class RpcClient implements ClientProtocol {
    * @return OzoneAcl
    */
   private OzoneAcl linkBucketDefaultAcl() {
-    return new OzoneAcl(ACLIdentityType.WORLD, "", ACCESS, EnumSet.of(READ, WRITE));
+    return new OzoneAcl(ACLIdentityType.WORLD, "", ACCESS, READ, WRITE);
   }
 
   /**

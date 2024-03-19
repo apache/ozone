@@ -1187,7 +1187,7 @@ abstract class AbstractRootedOzoneFileSystemTest {
     ACLType userRights = aclConfig.getUserDefaultRights();
     // Construct ACL for world access
     // ACL admin owner, world read+write
-    EnumSet aclRights = EnumSet.of(READ, WRITE);
+    EnumSet<ACLType> aclRights = EnumSet.of(READ, WRITE);
     // volume acls have all access to admin and read+write access to world
 
     // Construct VolumeArgs

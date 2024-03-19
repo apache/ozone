@@ -25,7 +25,6 @@ import java.security.PrivilegedExceptionAction;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
@@ -3444,8 +3443,7 @@ public abstract class TestOzoneRpcClientAbstract {
         .setStoreType(OzoneObj.StoreType.OZONE)
         .build();
 
-    OzoneAcl user1Acl = new OzoneAcl(USER,
-        "user1", ACCESS, EnumSet.of(READ));
+    OzoneAcl user1Acl = new OzoneAcl(USER, "user1", ACCESS, READ);
     assertTrue(store.addAcl(prefixObj, user1Acl));
 
     // get acl
@@ -3458,8 +3456,7 @@ public abstract class TestOzoneRpcClientAbstract {
     aclsGet = store.getAcl(prefixObj);
     assertEquals(0, aclsGet.size());
 
-    OzoneAcl group1Acl = new OzoneAcl(GROUP,
-        "group1", ACCESS, EnumSet.of(ACLType.ALL));
+    OzoneAcl group1Acl = new OzoneAcl(GROUP, "group1", ACCESS, ACLType.ALL);
     List<OzoneAcl> acls = new ArrayList<>();
     acls.add(user1Acl);
     acls.add(group1Acl);
@@ -3499,8 +3496,7 @@ public abstract class TestOzoneRpcClientAbstract {
     ACLType userRights = aclConfig.getUserDefaultRights();
     ACLType groupRights = aclConfig.getGroupDefaultRights();
 
-    listOfAcls.add(new OzoneAcl(USER,
-        ugi.getUserName(), ACCESS, userRights));
+    listOfAcls.add(new OzoneAcl(USER, ugi.getUserName(), ACCESS, userRights));
     //Group ACLs of the User
     List<String> userGroups = Arrays.asList(ugi.getGroupNames());
     userGroups.stream().forEach((group) -> listOfAcls.add(

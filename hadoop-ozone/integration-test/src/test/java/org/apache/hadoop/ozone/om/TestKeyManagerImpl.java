@@ -25,7 +25,6 @@ import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
-import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -540,17 +539,13 @@ public class TestKeyManagerImpl {
     assertEquals(ozAcl1, ozAclGet.get(0));
 
     List<OzoneAcl> acls = new ArrayList<>();
-    OzoneAcl ozAcl2 = new OzoneAcl(ACLIdentityType.USER, "admin",
-        ACCESS, ACLType.ALL);
+    OzoneAcl ozAcl2 = new OzoneAcl(ACLIdentityType.USER, "admin", ACCESS, ACLType.ALL);
 
-    OzoneAcl ozAcl3 = new OzoneAcl(ACLIdentityType.GROUP, "dev",
-        ACCESS, EnumSet.of(READ, WRITE));
+    OzoneAcl ozAcl3 = new OzoneAcl(ACLIdentityType.GROUP, "dev", ACCESS, READ, WRITE);
 
-    OzoneAcl ozAcl4 = new OzoneAcl(ACLIdentityType.GROUP, "dev",
-        ACCESS, EnumSet.of(WRITE));
+    OzoneAcl ozAcl4 = new OzoneAcl(ACLIdentityType.GROUP, "dev", ACCESS, WRITE);
 
-    OzoneAcl ozAcl5 = new OzoneAcl(ACLIdentityType.GROUP, "dev",
-        ACCESS, EnumSet.of(READ));
+    OzoneAcl ozAcl5 = new OzoneAcl(ACLIdentityType.GROUP, "dev", ACCESS, READ);
 
     acls.add(ozAcl2);
     acls.add(ozAcl3);
