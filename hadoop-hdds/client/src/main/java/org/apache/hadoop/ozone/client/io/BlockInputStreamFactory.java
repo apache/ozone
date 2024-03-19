@@ -47,6 +47,7 @@ public interface BlockInputStreamFactory {
    * @param refreshFunction Function to refresh the block location if needed
    * @return BlockExtendedInputStream of the correct type.
    */
+  @SuppressWarnings("checkstyle:ParameterNumber")
   BlockExtendedInputStream create(ReplicationConfig repConfig,
       BlockLocationInfo blockInfo, Pipeline pipeline,
       Token<OzoneBlockTokenIdentifier> token, boolean verifyChecksum,

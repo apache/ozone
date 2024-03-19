@@ -75,6 +75,7 @@ public class BlockInputStreamFactoryImpl implements BlockInputStreamFactory {
    * @param refreshFunction Function to refresh the pipeline if needed
    * @return BlockExtendedInputStream of the correct type.
    */
+  @SuppressWarnings("checkstyle:ParameterNumber")
   public BlockExtendedInputStream create(ReplicationConfig repConfig,
       BlockLocationInfo blockInfo, Pipeline pipeline,
       Token<OzoneBlockTokenIdentifier> token, boolean verifyChecksum,

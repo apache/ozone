@@ -76,7 +76,7 @@ public class TestECBlockReconstructedStripeInputStream {
   private ExecutorService ecReconstructExecutor =
       Executors.newFixedThreadPool(3);
   private OzoneConfiguration conf = new OzoneConfiguration();
-;
+  
   static List<Set<Integer>> recoveryCases() { // TODO better name
     List<Set<Integer>> params = new ArrayList<>();
     params.add(emptySet()); // non-recovery

@@ -256,6 +256,7 @@ public final class ECStreamTestUtil {
       failIndexes.addAll(Arrays.asList(fail));
     }
 
+    @SuppressWarnings("checkstyle:ParameterNumber")
     public synchronized BlockExtendedInputStream create(
         ReplicationConfig repConfig,
         BlockLocationInfo blockInfo, Pipeline pipeline,

@@ -535,6 +535,7 @@ public class TestECBlockInputStream {
       return blockStreams;
     }
 
+    @SuppressWarnings("checkstyle:ParameterNumber")
     public synchronized BlockExtendedInputStream create(
         ReplicationConfig repConfig, BlockLocationInfo blockInfo,
         Pipeline pipeline, Token<OzoneBlockTokenIdentifier> token,
