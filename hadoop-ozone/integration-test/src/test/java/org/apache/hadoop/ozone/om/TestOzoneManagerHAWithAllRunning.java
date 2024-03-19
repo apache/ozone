@@ -59,7 +59,6 @@ import java.lang.management.ManagementFactory;
 import java.net.InetSocketAddress;
 import java.time.Instant;
 import java.util.ArrayList;
-import java.util.BitSet;
 import java.util.Collections;
 import java.util.List;
 
@@ -609,9 +608,7 @@ class TestOzoneManagerHAWithAllRunning extends TestOzoneManagerHA {
     if (givenAcl.getType().equals(existingAcl.getType())
         && givenAcl.getName().equals(existingAcl.getName())
         && givenAcl.getAclScope().equals(existingAcl.getAclScope())) {
-      BitSet bitSet = (BitSet) givenAcl.getAclBitSet().clone();
-      bitSet.and(existingAcl.getAclBitSet());
-      return bitSet.equals(existingAcl.getAclBitSet());
+      return givenAcl.equals(existingAcl);
     }
     return false;
   }

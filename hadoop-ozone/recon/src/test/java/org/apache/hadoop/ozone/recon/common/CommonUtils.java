@@ -38,6 +38,7 @@ import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
 import javax.ws.rs.core.Response;
 
 import java.net.InetSocketAddress;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 
@@ -64,9 +65,9 @@ public class CommonUtils {
       IAccessAuthorizer.ACLType aclType,
       OzoneAcl.AclScope scope) {
     return new OmPrefixInfo(path,
-        Collections.singletonList(new OzoneAcl(
+        new ArrayList<>(Collections.singletonList(new OzoneAcl(
             identityType, identityString,
-            aclType, scope)), new HashMap<>(), 10, 100);
+            aclType, scope))), new HashMap<>(), 10, 100);
   }
 
   public void testNSSummaryBasicInfoRoot(
