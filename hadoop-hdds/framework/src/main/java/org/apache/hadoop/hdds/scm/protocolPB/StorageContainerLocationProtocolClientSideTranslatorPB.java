@@ -903,9 +903,9 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
       Optional<Long> maxSizeToMovePerIterationInGB,
       Optional<Long> maxSizeEnteringTargetInGB,
       Optional<Long> maxSizeLeavingSourceInGB,
-      Optional<Long> balancingInterval,
-      Optional<Long> moveTimeout,
-      Optional<Long> moveReplicationTimeout,
+      Optional<Integer> balancingInterval,
+      Optional<Integer> moveTimeout,
+      Optional<Integer> moveReplicationTimeout,
       Optional<Boolean> networkTopologyEnable,
       Optional<String> includeNodes,
       Optional<String> excludeNodes) throws IOException {
@@ -959,21 +959,21 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
     }
 
     if (balancingInterval.isPresent()) {
-      long bi = balancingInterval.get();
+      int bi = balancingInterval.get();
       Preconditions.checkState(bi > 0,
               "Balancing Interval must be greater than zero.");
       builder.setBalancingInterval(bi);
     }
 
     if (moveTimeout.isPresent()) {
-      long mt = moveTimeout.get();
+      int mt = moveTimeout.get();
       Preconditions.checkState(mt > 0,
               "Move Timeout must be greater than zero.");
       builder.setMoveTimeout(mt);
     }
 
     if (moveReplicationTimeout.isPresent()) {
-      long mrt = moveReplicationTimeout.get();
+      int mrt = moveReplicationTimeout.get();
       Preconditions.checkState(mrt > 0,
               "Move Replication Timeout must be greater than zero.");
       builder.setMoveReplicationTimeout(mrt);

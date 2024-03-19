@@ -84,9 +84,9 @@ public class TestContainerBalancerOperations {
     Optional<Long> maxSizeToMovePerIterationInGB = Optional.of(1L);
     Optional<Long> maxSizeEnteringTargetInGB = Optional.of(1L);
     Optional<Long> maxSizeLeavingSourceInGB = Optional.of(1L);
-    Optional<Long> balancingInterval = Optional.of(1L);
-    Optional<Long> moveTimeout = Optional.of(1L);
-    Optional<Long> moveReplicationTimeout = Optional.of(1L);
+    Optional<Integer> balancingInterval = Optional.of(1);
+    Optional<Integer> moveTimeout = Optional.of(1);
+    Optional<Integer> moveReplicationTimeout = Optional.of(1);
     Optional<Boolean> networkTopologyEnable = Optional.of(false);
     Optional<String> includeNodes = Optional.of("");
     Optional<String> excludeNodes = Optional.of("");
@@ -130,7 +130,7 @@ public class TestContainerBalancerOperations {
    * Test if Container Balancer CLI options override the default configurations.
    */
   @Test
-  public void testIfCBCLIOverridesConfigs() throws Exception {
+  public void testIfCBCLIOverridesDefaultConfigs() throws Exception {
     boolean running = containerBalancerClient.getContainerBalancerStatus();
     assertFalse(running);
 
@@ -144,9 +144,9 @@ public class TestContainerBalancerOperations {
     Optional<Long> maxSizeEnteringTargetInGB = Optional.of(6L);
     Optional<Long> maxSizeLeavingSourceInGB = Optional.of(6L);
     Optional<Integer> iterations = Optional.of(10000);
-    Optional<Long> moveTimeout = Optional.of(65L);
-    Optional<Long> moveReplicationTimeout = Optional.of(55L);
-    Optional<Long> balancingInterval = Optional.of(70L);
+    Optional<Integer> moveTimeout = Optional.of(65);
+    Optional<Integer> moveReplicationTimeout = Optional.of(55);
+    Optional<Integer> balancingInterval = Optional.of(70);
     Optional<Boolean> networkTopologyEnable = Optional.of(true);
     Optional<String> includeNodes = Optional.of("");
     Optional<String> excludeNodes = Optional.of("");
@@ -166,6 +166,60 @@ public class TestContainerBalancerOperations {
 
     //If CLI option is passed, it overrides the default configuration
     assertEquals(10000, config.getIterations());
+    assertEquals(70, config.getBalancingInterval().toMinutes());
     assertTrue(config.getNetworkTopologyEnable());
+  }
+
+  /**
+   * Test if Container Balancer CLI option overrides an option specified in the configs.
+   *
+   */
+  @Test
+  public void testIfCBCLIOverridesConfigs() throws Exception {
+    //Configurations added in ozone-site.xml
+    ozoneConf.setInt("hdds.container.balancer.iterations", 40);
+    ozoneConf.setInt("hdds.container.balancer.datanodes.involved.max.percentage.per.iteration", 30);
+
+    boolean running = containerBalancerClient.getContainerBalancerStatus();
+    assertFalse(running);
+
+    //CLI option for iterations and balancing interval is not passed
+    Optional<Integer> iterations = Optional.empty();
+    Optional<Integer> balancingInterval = Optional.empty();
+
+    //CLI options are passed
+    Optional<Double> threshold = Optional.of(0.1);
+    Optional<Integer> maxDatanodesPercentageToInvolvePerIteration =
+            Optional.of(100);
+    Optional<Long> maxSizeToMovePerIterationInGB = Optional.of(1L);
+    Optional<Long> maxSizeEnteringTargetInGB = Optional.of(6L);
+    Optional<Long> maxSizeLeavingSourceInGB = Optional.of(6L);
+    Optional<Integer> moveTimeout = Optional.of(65);
+    Optional<Integer> moveReplicationTimeout = Optional.of(55);
+    Optional<Boolean> networkTopologyEnable = Optional.of(true);
+    Optional<String> includeNodes = Optional.of("");
+    Optional<String> excludeNodes = Optional.of("");
+    containerBalancerClient.startContainerBalancer(threshold, iterations,
+            maxDatanodesPercentageToInvolvePerIteration,
+            maxSizeToMovePerIterationInGB, maxSizeEnteringTargetInGB,
+            maxSizeLeavingSourceInGB, balancingInterval, moveTimeout,
+            moveReplicationTimeout, networkTopologyEnable, includeNodes,
+            excludeNodes);
+    running = containerBalancerClient.getContainerBalancerStatus();
+    assertTrue(running);
+
+    ContainerBalancerConfiguration config = cluster.getStorageContainerManager().getContainerBalancer().getConfig();
+
+    //If config value is not added in ozone-site.xml and CLI option is not passed
+    //then it takes the default configuration
+    assertEquals(70, config.getBalancingInterval().toMinutes());
+
+    //If config value is added in ozone-site.xml and CLI option is not passed
+    //then it takes the value from ozone-site.xml
+    assertEquals(40, config.getIterations());
+
+    //If config value is added in ozone-site.xml and CLI option is passed
+    //then it takes the CLI option.
+    assertEquals(100, config.getMaxDatanodesPercentageToInvolvePerIteration());
   }
 }

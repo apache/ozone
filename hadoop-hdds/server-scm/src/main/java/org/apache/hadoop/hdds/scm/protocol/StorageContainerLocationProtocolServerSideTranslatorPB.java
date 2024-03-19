@@ -1107,9 +1107,9 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
     Optional<Long> maxSizeToMovePerIterationInGB = Optional.empty();
     Optional<Long> maxSizeEnteringTargetInGB = Optional.empty();
     Optional<Long> maxSizeLeavingSourceInGB = Optional.empty();
-    Optional<Long> balancingInterval = Optional.empty();
-    Optional<Long> moveTimeout = Optional.empty();
-    Optional<Long> moveReplicationTimeout = Optional.empty();
+    Optional<Integer> balancingInterval = Optional.empty();
+    Optional<Integer> moveTimeout = Optional.empty();
+    Optional<Integer> moveReplicationTimeout = Optional.empty();
     Optional<Boolean> networkTopologyEnable = Optional.empty();
     Optional<String> includeNodes = Optional.empty();
     Optional<String> excludeNodes = Optional.empty();

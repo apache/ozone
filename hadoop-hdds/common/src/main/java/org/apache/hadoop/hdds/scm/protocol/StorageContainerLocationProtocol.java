@@ -410,9 +410,9 @@ public interface StorageContainerLocationProtocol extends Closeable {
       Optional<Long> maxSizeToMovePerIterationInGB,
       Optional<Long> maxSizeEnteringTargetInGB,
       Optional<Long> maxSizeLeavingSourceInGB,
-      Optional<Long> balancingInterval,
-      Optional<Long> moveTimeout,
-      Optional<Long> moveReplicationTimeout,
+      Optional<Integer> balancingInterval,
+      Optional<Integer> moveTimeout,
+      Optional<Integer> moveReplicationTimeout,
       Optional<Boolean> networkTopologyEnable,
       Optional<String> includeNodes,
       Optional<String> excludeNodes) throws IOException;

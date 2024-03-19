@@ -1049,9 +1049,9 @@ public class SCMClientProtocolServer implements
       Optional<Long> maxSizeToMovePerIterationInGB,
       Optional<Long> maxSizeEnteringTarget,
       Optional<Long> maxSizeLeavingSource,
-      Optional<Long> balancingInterval,
-      Optional<Long> moveTimeout,
-      Optional<Long> moveReplicationTimeout,
+      Optional<Integer> balancingInterval,
+      Optional<Integer> moveTimeout,
+      Optional<Integer> moveReplicationTimeout,
       Optional<Boolean> networkTopologyEnable,
       Optional<String> includeNodes,
       Optional<String> excludeNodes) throws IOException {
@@ -1113,7 +1113,7 @@ public class SCMClientProtocolServer implements
     }
 
     if (balancingInterval.isPresent()) {
-      long bi = balancingInterval.get();
+      int bi = balancingInterval.get();
       auditMap.put("balancingInterval", String.valueOf(bi));
       Preconditions.checkState(bi > 0,
               "Balancing Interval must be greater than zero.");
@@ -1121,7 +1121,7 @@ public class SCMClientProtocolServer implements
     }
 
     if (moveTimeout.isPresent()) {
-      long mt = moveTimeout.get();
+      int mt = moveTimeout.get();
       auditMap.put("moveTimeout", String.valueOf(mt));
       Preconditions.checkState(mt > 0,
               "Move Timeout must be greater than zero.");
@@ -1129,7 +1129,7 @@ public class SCMClientProtocolServer implements
     }
 
     if (moveReplicationTimeout.isPresent()) {
-      long mrt = moveReplicationTimeout.get();
+      int mrt = moveReplicationTimeout.get();
       auditMap.put("moveReplicationTimeout", String.valueOf(mrt));
       Preconditions.checkState(mrt > 0,
               "Move Replication Timeout must be greater than zero.");

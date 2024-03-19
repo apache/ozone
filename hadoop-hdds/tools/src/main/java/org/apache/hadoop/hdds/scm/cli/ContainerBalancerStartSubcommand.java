@@ -38,68 +38,67 @@ public class ContainerBalancerStartSubcommand extends ScmSubcommand {
 
   @Option(names = {"-t", "--threshold"},
       description = "Percentage deviation from average utilization of " +
-          "the cluster after which a datanode will be rebalanced. Value " +
-          "should be in the range [0.0, 100.0) and default value is 10 " +
-          "(for example, '10' for 10%%).")
+          "the cluster after which a datanode will be rebalanced. The value " +
+          "should be in the range [0.0, 100.0), with a default of 10 " +
+          "(specify '10' for 10%%).")
   private Optional<Double> threshold;
 
   @Option(names = {"-i", "--iterations"},
       description = "Maximum consecutive iterations that " +
-          "balancer will run for. Value should be positive " +
-          "or -1 and default value is 10 (for example, '10' for 10 iterations).")
+          "balancer will run for. The value should be positive " +
+          "or -1, with a default of 10 (specify '10' for 10 iterations).")
   private Optional<Integer> iterations;
 
   @Option(names = {"-d", "--max-datanodes-percentage-to-involve-per-iteration",
       "--maxDatanodesPercentageToInvolvePerIteration"},
       description = "Max percentage of healthy, in service datanodes " +
-          "that can be involved in balancing in one iteration. Value " +
-          "should be in the range [0,100] and default value is 20 (for " +
-          "example, '20' for 20%%).")
+          "that can be involved in balancing in one iteration. The value " +
+          "should be in the range [0,100], with a default of 20 (specify " +
+          "'20' for 20%%).")
   private Optional<Integer> maxDatanodesPercentageToInvolvePerIteration;
 
   @Option(names = {"-s", "--max-size-to-move-per-iteration-in-gb",
       "--maxSizeToMovePerIterationInGB"},
       description = "Maximum size that can be moved per iteration of " +
-          "balancing. Value should be positive and default value is 500 " +
-          "(for example, '500' for 500GB).")
+          "balancing. The value should be positive, with a default of 500 " +
+          "(specify '500' for 500GB).")
   private Optional<Long> maxSizeToMovePerIterationInGB;
 
   @Option(names = {"-e", "--max-size-entering-target-in-gb",
       "--maxSizeEnteringTargetInGB"},
       description = "Maximum size that can enter a target datanode while " +
-          "balancing. This is the sum of data from multiple sources. Value " +
-           "should be positive and default value is 26 (for example, " +
-          "'26' for 26GB).")
+          "balancing. This is the sum of data from multiple sources. The value " +
+          "should be positive, with a default of 26 (specify '26' for 26GB).")
   private Optional<Long> maxSizeEnteringTargetInGB;
 
   @Option(names = {"-l", "--max-size-leaving-source-in-gb",
       "--maxSizeLeavingSourceInGB"},
       description = "Maximum size that can leave a source datanode while " +
           "balancing. This is the sum of data moving to multiple targets. " +
-          "Value should be positive and default value is 26 " +
-          "(for example, '26' for 26GB).")
+          "The value should be positive, with a default of 26 " +
+          "(specify '26' for 26GB).")
   private Optional<Long> maxSizeLeavingSourceInGB;
 
   @Option(names = {"--balancing-iteration-interval-minutes"},
       description = "The interval period in minutes between each iteration of Container Balancer. " +
-          "Value should be greater than '0' and default value is 70 (for example, '70' for 70 minutes).")
-  private Optional<Long> balancingInterval;
+          "The value should be positive, with a default of 70 (specify '70' for 70 minutes).")
+  private Optional<Integer> balancingInterval;
 
   @Option(names = {"--move-timeout-minutes"},
       description = "The amount of time in minutes to allow a single container to move " +
-          "from source to target. Value should be greater than '0' and default value is " +
-          "65 (for example, '65' for 65 minutes).")
-  private Optional<Long> moveTimeout;
+          "from source to target. The value should be positive, with a default of 65 " +
+          "(specify '65' for 65 minutes).")
+  private Optional<Integer> moveTimeout;
 
   @Option(names = {"--move-replication-timeout-minutes"},
       description = "The " +
           "amount of time in minutes to allow a single container's replication from source " +
-          "to target as part of container move. Value should be greater than '0' and " +
-          "default value is 50. For example, if \"hdds.container" +
+          "to target as part of container move. The value should be positive, with " +
+          "a default of 50. For example, if \"hdds.container" +
           ".balancer.move.timeout\" is 65 minutes, then out of those 65 minutes " +
-          "50 minutes will be the deadline for replication to complete (for example," +
+          "50 minutes will be the deadline for replication to complete (specify " +
           "'50' for 50 minutes).")
-  private Optional<Long> moveReplicationTimeout;
+  private Optional<Integer> moveReplicationTimeout;
 
   @Option(names = {"--move-network-topology-enable"},
       description = "Whether to take network topology into account when " +
@@ -111,14 +110,14 @@ public class ContainerBalancerStartSubcommand extends ScmSubcommand {
       description = "A list of Datanode " +
           "hostnames or ip addresses separated by commas. Only the Datanodes " +
           "specified in this list are balanced. This configuration is empty by " +
-          "default and is applicable only if it is non-empty (for example, \"hostname1,hostname2,hostname3\").")
+          "default and is applicable only if it is non-empty (specify \"hostname1,hostname2,hostname3\").")
   private Optional<String> includeNodes;
 
   @Option(names = {"--exclude-datanodes"},
       description =  "A list of Datanode " +
           "hostnames or ip addresses separated by commas. The Datanodes specified " +
           "in this list are excluded from balancing. This configuration is empty " +
-          "by default (for example, \"hostname1,hostname2,hostname3\").")
+          "by default (specify \"hostname1,hostname2,hostname3\").")
   private Optional<String> excludeNodes;
 
   @Override
