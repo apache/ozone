@@ -273,7 +273,8 @@ public class ECReconstructionCoordinator implements Closeable {
         repConfig, blockLocationInfo, true,
         this.containerOperationClient.getXceiverClientManager(), null,
         this.blockInputStreamFactory, byteBufferPool,
-        this.ecReconstructReadExecutor)) {
+        this.ecReconstructReadExecutor,
+        this.ozoneClientConfig)) {
 
       ECBlockOutputStream[] targetBlockStreams =
           new ECBlockOutputStream[toReconstructIndexes.size()];

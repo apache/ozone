@@ -20,8 +20,10 @@ package org.apache.hadoop.ozone.client.io;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
+import org.apache.hadoop.hdds.scm.OzoneClientConfig;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.scm.storage.BlockExtendedInputStream;
@@ -49,6 +51,8 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
  */
 public class TestKeyInputStreamEC {
 
+  private OzoneConfiguration conf = new OzoneConfiguration();
+
   @Test
   public void testReadAgainstLargeBlockGroup() throws IOException {
     int dataBlocks = 10;
@@ -68,10 +72,11 @@ public class TestKeyInputStreamEC {
     BlockInputStreamFactory mockStreamFactory =
         mock(BlockInputStreamFactory.class);
     when(mockStreamFactory.create(any(), any(), any(), any(),
-        anyBoolean(), any(), any())).thenReturn(blockInputStream);
+        anyBoolean(), any(), any(), any())).thenReturn(blockInputStream);
 
     try (LengthInputStream kis = KeyInputStream.getFromOmKeyInfo(keyInfo,
-        null, true,  null, mockStreamFactory)) {
+        null, true,  null, mockStreamFactory,
+        conf.getObject(OzoneClientConfig.class))) {
       byte[] buf = new byte[100];
       int readBytes = kis.read(buf, 0, 100);
       assertEquals(100, readBytes);

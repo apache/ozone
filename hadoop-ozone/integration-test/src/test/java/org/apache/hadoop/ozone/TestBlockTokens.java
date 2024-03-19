@@ -139,7 +139,6 @@ public final class TestBlockTokens {
     startCluster();
     client = cluster.newClient();
     createTestData();
-    KeyInputStream.setRetryPolicy(conf.getObject(OzoneClientConfig.class));
   }
 
   private static void createTestData() throws IOException {
@@ -299,7 +298,8 @@ public final class TestBlockTokens {
         ((RpcClient) client.getProxy()).getXceiverClientManager();
     try (InputStream is = KeyInputStream.getFromOmKeyInfo(keyInfo,
         xceiverClientManager,
-        false, retryFunc, blockInputStreamFactory)) {
+        false, retryFunc, blockInputStreamFactory,
+        conf.getObject(OzoneClientConfig.class))) {
       byte[] buf = new byte[100];
       int readBytes = is.read(buf, 0, 100);
       assertEquals(100, readBytes);

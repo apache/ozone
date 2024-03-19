@@ -2259,14 +2259,12 @@ public class RpcClient implements ClientProtocol {
     // When Key is not MPU or when Key is MPU and encryption is not enabled
     // Need to revisit for GDP.
     FileEncryptionInfo feInfo = keyInfo.getFileEncryptionInfo();
-    // Set read retry policy for the streams
-    KeyInputStream.setRetryPolicy(clientConfig);
 
     if (feInfo == null) {
       LengthInputStream lengthInputStream = KeyInputStream
           .getFromOmKeyInfo(keyInfo, xceiverClientManager,
               clientConfig.isChecksumVerify(), retryFunction,
-              blockInputStreamFactory);
+              blockInputStreamFactory, clientConfig);
       try {
         final GDPRSymmetricKey gk = getGDPRSymmetricKey(
             keyInfo.getMetadata(), Cipher.DECRYPT_MODE);
@@ -2283,7 +2281,7 @@ public class RpcClient implements ClientProtocol {
       LengthInputStream lengthInputStream = KeyInputStream
           .getFromOmKeyInfo(keyInfo, xceiverClientManager,
               clientConfig.isChecksumVerify(), retryFunction,
-              blockInputStreamFactory);
+              blockInputStreamFactory, clientConfig);
       final KeyProvider.KeyVersion decrypted = getDEK(feInfo);
       final CryptoInputStream cryptoIn =
           new CryptoInputStream(lengthInputStream.getWrappedStream(),
@@ -2295,7 +2293,7 @@ public class RpcClient implements ClientProtocol {
       List<LengthInputStream> lengthInputStreams = KeyInputStream
           .getStreamsFromKeyInfo(keyInfo, xceiverClientManager,
               clientConfig.isChecksumVerify(), retryFunction,
-              blockInputStreamFactory);
+              blockInputStreamFactory, clientConfig);
       final KeyProvider.KeyVersion decrypted = getDEK(feInfo);
 
       List<OzoneCryptoInputStream> cryptoInputStreams = new ArrayList<>();

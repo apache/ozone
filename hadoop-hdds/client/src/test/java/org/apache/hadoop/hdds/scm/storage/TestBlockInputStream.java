@@ -87,6 +87,8 @@ public class TestBlockInputStream {
 
   private Function<BlockID, BlockLocationInfo> refreshFunction;
 
+  private OzoneConfiguration conf = new OzoneConfiguration();
+
   @BeforeEach
   @SuppressWarnings("unchecked")
   public void setup() throws Exception {
@@ -97,9 +99,8 @@ public class TestBlockInputStream {
 
     Pipeline pipeline = MockPipeline.createSingleNodePipeline();
     blockStream = new DummyBlockInputStream(blockID, blockSize, pipeline, null,
-        false, null, refreshFunction, chunks, chunkDataMap);
-    BlockInputStream.setRetryPolicy(new OzoneConfiguration()
-        .getObject(OzoneClientConfig.class));
+        false, null, refreshFunction, chunks, chunkDataMap,
+        conf.getObject(OzoneClientConfig.class));
   }
 
   /**
@@ -267,7 +268,8 @@ public class TestBlockInputStream {
     try (BlockInputStream blockInputStreamWithRetry =
              new DummyBlockInputStreamWithRetry(blockID, blockSize,
                  MockPipeline.createSingleNodePipeline(), null,
-                 false, null, chunks, chunkDataMap, isRefreshed, null)) {
+                 false, null, chunks, chunkDataMap, isRefreshed, null,
+                 conf.getObject(OzoneClientConfig.class))) {
       assertFalse(isRefreshed.get());
       seekAndVerify(50);
       byte[] b = new byte[200];
@@ -352,7 +354,8 @@ public class TestBlockInputStream {
   private BlockInputStream createSubject(BlockID blockID, Pipeline pipeline,
       ChunkInputStream stream) {
     return new DummyBlockInputStream(blockID, blockSize, pipeline, null, false,
-        null, refreshFunction, chunks, null) {
+        null, refreshFunction, chunks, null,
+        conf.getObject(OzoneClientConfig.class)) {
       @Override
       protected ChunkInputStream createChunkInputStream(ChunkInfo chunkInfo) {
         return stream;
@@ -405,7 +408,8 @@ public class TestBlockInputStream {
     when(blockLocationInfo.getPipeline()).thenReturn(newPipeline);
 
     BlockInputStream subject = new BlockInputStream(blockID, blockSize,
-        pipeline, null, false, clientFactory, refreshFunction) {
+        pipeline, null, false, clientFactory, refreshFunction,
+        conf.getObject(OzoneClientConfig.class)) {
       @Override
       protected List<ChunkInfo> getChunkInfoListUsingClient() {
         return chunks;
