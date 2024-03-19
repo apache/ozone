@@ -49,9 +49,9 @@ public class TestBucketUtilizationMetrics {
   private static final String BUCKET_NAME_1 = "bucket1";
   private static final String BUCKET_NAME_2 = "bucket2";
   private static final long USED_BYTES_1 = 100;
-  private static final long USED_BYTES_2 = QUOTA_RESET;
+  private static final long USED_BYTES_2 = 200;
   private static final long QUOTA_IN_BYTES_1 = 200;
-  private static final long QUOTA_IN_BYTES_2 = 400;
+  private static final long QUOTA_IN_BYTES_2 = QUOTA_RESET;
   private static final long QUOTA_IN_NAMESPACE_1 = 1;
   private static final long QUOTA_IN_NAMESPACE_2 = 2;
 
