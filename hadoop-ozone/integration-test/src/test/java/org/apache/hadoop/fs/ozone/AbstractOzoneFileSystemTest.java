@@ -113,6 +113,8 @@ import static org.apache.hadoop.fs.ozone.Constants.OZONE_DEFAULT_USER;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.ONE;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ACL_ENABLED;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_FS_ITERATE_BATCH_SIZE;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_REPLICATION;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_REPLICATION_TYPE;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.KEY_NOT_FOUND;
@@ -165,6 +167,7 @@ abstract class AbstractOzoneFileSystemTest {
   private OzoneManagerProtocol writeClient;
   private FileSystem fs;
   private OzoneFileSystem o3fs;
+  private OzoneConfiguration conf;
   private OzoneFSStorageStatistics statistics;
   private OzoneBucket ozoneBucket;
   private String volumeName;
@@ -174,7 +177,8 @@ abstract class AbstractOzoneFileSystemTest {
 
   @BeforeAll
   void init() throws Exception {
-    OzoneConfiguration conf = new OzoneConfiguration();
+    conf = new OzoneConfiguration();
+    conf.set("fs.o3fs.impl.disable.cache", "true");
     conf.setFloat(OMConfigKeys.OZONE_FS_TRASH_INTERVAL_KEY, TRASH_INTERVAL);
     conf.setFloat(FS_TRASH_INTERVAL_KEY, TRASH_INTERVAL);
     conf.setFloat(FS_TRASH_CHECKPOINT_INTERVAL_KEY, TRASH_INTERVAL / 2);
@@ -424,6 +428,23 @@ abstract class AbstractOzoneFileSystemTest {
     // List status on the parent should show the child file
     assertEquals(1L, fs.listStatus(parent).length, "List status of parent should include the 1 child file");
     assertTrue(fs.getFileStatus(parent).isDirectory(), "Parent directory does not appear to be a directory");
+  }
+
+  @Test
+  public void testCreateKeyWithECReplicationConfig() throws Exception {
+    Path root = new Path("/" + volumeName + "/" + bucketName);
+    Path testKeyPath = new Path(root, "testKey");
+    conf.set(OZONE_REPLICATION, "rs-3-2-1024k");
+    conf.set(OZONE_REPLICATION_TYPE, "EC");
+    FileSystem fileSystem = FileSystem.get(conf);
+    ContractTestUtils.touch(fileSystem, testKeyPath);
+
+    OzoneKeyDetails key = getKey(testKeyPath, false);
+    assertEquals(HddsProtos.ReplicationType.EC,
+        key.getReplicationConfig().getReplicationType());
+    assertEquals("rs-3-2-1024k",
+        key.getReplicationConfig().getReplication());
+    fileSystem.close();
   }
 
   @Test
@@ -1451,10 +1472,10 @@ abstract class AbstractOzoneFileSystemTest {
             bucket.getVolumeName());
 
     // Set the fs.defaultFS and start the filesystem
-    Configuration conf = new OzoneConfiguration(cluster.getConf());
-    conf.set(FS_DEFAULT_NAME_KEY, rootPath);
+    Configuration configuration = new OzoneConfiguration(cluster.getConf());
+    configuration.set(FS_DEFAULT_NAME_KEY, rootPath);
     // Set the number of keys to be processed during batch operate.
-    OzoneFileSystem o3FS = (OzoneFileSystem) FileSystem.get(conf);
+    OzoneFileSystem o3FS = (OzoneFileSystem) FileSystem.get(configuration);
 
     //Let's reset the clock to control the time.
     ((BasicOzoneClientAdapterImpl) (o3FS.getAdapter())).setClock(testClock);
