@@ -135,6 +135,9 @@ public class SnapshotRepair implements Callable<Void>, SubcommandWithParent {
         return null;
       }
 
+      snapshotInfo.setGlobalPreviousSnapshotId(globalPreviousSnapshotId);
+      snapshotInfo.setPathPreviousSnapshotId(pathPreviousSnapshotId);
+
       if (dryRun) {
         System.out.println("SnapshotInfo would be updated to : " + snapshotInfo);
       } else {
