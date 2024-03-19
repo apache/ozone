@@ -86,6 +86,9 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements OzoneManagerP
   // always true, only used in tests
   private boolean shouldFlushCache = true;
 
+  private OMRequest lastRequestToSubmit;
+
+
   /**
    * Constructs an instance of the server handler.
    *
@@ -210,6 +213,7 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements OzoneManagerP
         assert (omClientRequest != null);
         OMClientRequest finalOmClientRequest = omClientRequest;
         requestToSubmit = preExecute(finalOmClientRequest);
+        this.lastRequestToSubmit = requestToSubmit;
       } catch (IOException ex) {
         if (omClientRequest != null) {
           omClientRequest.handleRequestFailure(ozoneManager);
@@ -231,6 +235,11 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements OzoneManagerP
       throws IOException {
     return captureLatencyNs(perfMetrics.getPreExecuteLatencyNs(),
         () -> finalOmClientRequest.preExecute(ozoneManager));
+  }
+
+  @VisibleForTesting
+  public OMRequest getLastRequestToSubmit() {
+    return lastRequestToSubmit;
   }
 
   /**
