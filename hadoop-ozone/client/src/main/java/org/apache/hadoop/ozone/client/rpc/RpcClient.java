@@ -757,7 +757,7 @@ public class RpcClient implements ClientProtocol {
    * @return OzoneAcl
    */
   private OzoneAcl linkBucketDefaultAcl() {
-    return new OzoneAcl(ACLIdentityType.WORLD, "", EnumSet.of(READ, WRITE), ACCESS);
+    return new OzoneAcl(ACLIdentityType.WORLD, "", ACCESS, EnumSet.of(READ, WRITE));
   }
 
   /**

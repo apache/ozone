@@ -63,7 +63,7 @@ public class OzoneAcl {
     this(type, name, scope, bitSetOf(acls));
   }
 
-  public OzoneAcl(ACLIdentityType type, String name, EnumSet<ACLType> acls, AclScope scope) {
+  public OzoneAcl(ACLIdentityType type, String name, AclScope scope, EnumSet<ACLType> acls) {
     this(type, name, scope, bitSetOf(acls.toArray(new ACLType[0])));
   }
 
@@ -165,7 +165,7 @@ public class OzoneAcl {
 
     // TODO : Support sanitation of these user names by calling into
     // userAuth Interface.
-    return new OzoneAcl(aclType, parts[1], acls, aclScope);
+    return new OzoneAcl(aclType, parts[1], aclScope, acls);
   }
 
   /**

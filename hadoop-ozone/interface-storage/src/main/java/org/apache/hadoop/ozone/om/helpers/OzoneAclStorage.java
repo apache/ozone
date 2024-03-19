@@ -66,7 +66,7 @@ final class OzoneAclStorage {
         .collect(Collectors.toList());
     EnumSet<IAccessAuthorizer.ACLType> aclSet = EnumSet.copyOf(aclTypeList);
     return new OzoneAcl(ACLIdentityType.valueOf(protoAcl.getType().name()),
-        protoAcl.getName(), aclSet, AclScope.valueOf(protoAcl.getAclScope().name()));
+        protoAcl.getName(), AclScope.valueOf(protoAcl.getAclScope().name()), aclSet);
   }
 
 }

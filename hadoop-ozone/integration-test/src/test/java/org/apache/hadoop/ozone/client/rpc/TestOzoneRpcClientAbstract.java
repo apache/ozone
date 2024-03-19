@@ -3445,7 +3445,7 @@ public abstract class TestOzoneRpcClientAbstract {
         .build();
 
     OzoneAcl user1Acl = new OzoneAcl(USER,
-        "user1", EnumSet.of(READ), ACCESS);
+        "user1", ACCESS, EnumSet.of(READ));
     assertTrue(store.addAcl(prefixObj, user1Acl));
 
     // get acl
@@ -3459,7 +3459,7 @@ public abstract class TestOzoneRpcClientAbstract {
     assertEquals(0, aclsGet.size());
 
     OzoneAcl group1Acl = new OzoneAcl(GROUP,
-        "group1", EnumSet.of(ACLType.ALL), ACCESS);
+        "group1", ACCESS, EnumSet.of(ACLType.ALL));
     List<OzoneAcl> acls = new ArrayList<>();
     acls.add(user1Acl);
     acls.add(group1Acl);

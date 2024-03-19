@@ -544,13 +544,13 @@ public class TestKeyManagerImpl {
         ACCESS, ACLType.ALL);
 
     OzoneAcl ozAcl3 = new OzoneAcl(ACLIdentityType.GROUP, "dev",
-        EnumSet.of(READ, WRITE), ACCESS);
+        ACCESS, EnumSet.of(READ, WRITE));
 
     OzoneAcl ozAcl4 = new OzoneAcl(ACLIdentityType.GROUP, "dev",
-        EnumSet.of(WRITE), ACCESS);
+        ACCESS, EnumSet.of(WRITE));
 
     OzoneAcl ozAcl5 = new OzoneAcl(ACLIdentityType.GROUP, "dev",
-        EnumSet.of(READ), ACCESS);
+        ACCESS, EnumSet.of(READ));
 
     acls.add(ozAcl2);
     acls.add(ozAcl3);

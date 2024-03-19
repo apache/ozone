@@ -231,12 +231,12 @@ public final class S3Acl {
         EnumSet<IAccessAuthorizer.ACLType> acls = getOzoneAclOnBucketFromS3Permission(permission);
         OzoneAcl defaultOzoneAcl = new OzoneAcl(
             IAccessAuthorizer.ACLIdentityType.USER,
-            grant.getGrantee().getId(), acls,
-            OzoneAcl.AclScope.DEFAULT);
+            grant.getGrantee().getId(), OzoneAcl.AclScope.DEFAULT, acls
+        );
         OzoneAcl accessOzoneAcl = new OzoneAcl(
             IAccessAuthorizer.ACLIdentityType.USER,
-            grant.getGrantee().getId(), acls,
-            OzoneAcl.AclScope.ACCESS);
+            grant.getGrantee().getId(), OzoneAcl.AclScope.ACCESS, acls
+        );
         ozoneAclList.add(defaultOzoneAcl);
         ozoneAclList.add(accessOzoneAcl);
       } else {
@@ -295,8 +295,8 @@ public final class S3Acl {
         EnumSet<IAccessAuthorizer.ACLType> acls = getOzoneAclOnVolumeFromS3Permission(permission);
         OzoneAcl accessOzoneAcl = new OzoneAcl(
             IAccessAuthorizer.ACLIdentityType.USER,
-            grant.getGrantee().getId(), acls,
-            OzoneAcl.AclScope.ACCESS);
+            grant.getGrantee().getId(), OzoneAcl.AclScope.ACCESS, acls
+        );
         ozoneAclList.add(accessOzoneAcl);
       } else {
         LOG.error("Grantee type {} is not supported",

@@ -1194,7 +1194,7 @@ abstract class AbstractRootedOzoneFileSystemTest {
     VolumeArgs volumeArgs = VolumeArgs.newBuilder()
         .setAdmin("admin")
         .setOwner("admin")
-        .addAcl(new OzoneAcl(ACLIdentityType.WORLD, "", aclRights, ACCESS))
+        .addAcl(new OzoneAcl(ACLIdentityType.WORLD, "", ACCESS, aclRights))
         .addAcl(new OzoneAcl(ACLIdentityType.USER, "admin", ACCESS, userRights))
         .setQuotaInNamespace(1000)
         .setQuotaInBytes(Long.MAX_VALUE).build();
