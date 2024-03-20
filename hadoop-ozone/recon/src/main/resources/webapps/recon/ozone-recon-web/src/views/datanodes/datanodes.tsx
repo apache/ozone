@@ -17,7 +17,7 @@
  */
 
 import React from 'react';
-import {Table, Icon, Tooltip, Popover} from 'antd';
+import {Table, Icon, Tooltip, Popover, Button, Popconfirm} from 'antd';
 import {PaginationConfig} from 'antd/lib/pagination';
 import moment from 'moment';
 import {ReplicationIcon} from 'utils/themeIcons';
@@ -37,6 +37,7 @@ import {ActionMeta, ValueType} from 'react-select';
 import {showDataFetchError} from 'utils/common';
 import {ColumnSearch} from 'utils/columnSearch';
 import { AxiosGetHelper } from 'utils/axiosRequestHelper';
+import axios from "axios";
 
 interface IDatanodeResponse {
   hostname: string;
@@ -96,6 +97,7 @@ interface IDatanodesState {
   lastUpdated: number;
   selectedColumns: IOption[];
   columnOptions: IOption[];
+  selectedRowKeys: string[];
 }
 
 const renderDatanodeState = (state: DatanodeState) => {
@@ -352,7 +354,8 @@ export class Datanodes extends React.Component<Record<string, object>, IDatanode
       totalCount: 0,
       lastUpdated: 0,
       selectedColumns: [],
-      columnOptions: defaultColumns
+      columnOptions: defaultColumns,
+      selectedRowKeys: []
     };
     this.autoReload = new AutoReloadHelper(this._loadData);
   }
@@ -420,6 +423,25 @@ export class Datanodes extends React.Component<Record<string, object>, IDatanode
       showDataFetchError(error.toString());
     });
   };
+  
+  removeDatanode= async (selectedRowKeys: any) => {
+    try {
+      await axios.put('/api/v1/datanodes/remove', selectedRowKeys);
+      //Load Datanodes after removal
+      this._loadData();
+      this.setState({
+        loading: false,
+        selectedRowKeys: []
+      });
+    }
+    catch (error) {
+      this.setState({
+        loading: false,
+        selectedRowKeys: []
+      });
+      showDataFetchError(error.toString());
+    }
+  };
 
   componentDidMount(): void {
     // Fetch datanodes on component mount
@@ -436,8 +458,31 @@ export class Datanodes extends React.Component<Record<string, object>, IDatanode
     console.log(current, pageSize);
   };
 
+  onSelectChange = (newSelectedRowKeys:any) => {
+    this.setState({
+      selectedRowKeys: newSelectedRowKeys
+    });
+  };
+  
+  popConfirm = () => {
+    this.setState({ loading: true });
+    this.removeDatanode(this.state.selectedRowKeys);
+  };
+
   render() {
-    const {dataSource, loading, totalCount, lastUpdated, selectedColumns, columnOptions} = this.state;
+    const {dataSource, loading, totalCount, lastUpdated, selectedColumns, columnOptions, selectedRowKeys} = this.state;
+    
+    const rowSelection = {
+      selectedRowKeys,
+      onChange: this.onSelectChange,
+      getCheckboxProps: record=> ({
+        disabled: record.opState === 'IN_SERVICE' || record.opState === 'ENTERING_MAINTENANCE' || record.opState === 'DECOMMISSIONING', // Column configuration not to be checked
+        opState: record.opState,
+      }),
+    };
+
+    const hasSelected = selectedRowKeys.length > 0;
+
     const paginationConfig: PaginationConfig = {
       showTotal: (total: number, range) => `${range[0]}-${range[1]} of ${total} datanodes`,
       showSizeChanger: true,
@@ -470,7 +515,22 @@ export class Datanodes extends React.Component<Record<string, object>, IDatanode
         </div>
 
         <div className='content-div'>
+          <div style={{ marginBottom: 16 }}>
+            <Popconfirm
+              placement="right"
+              title={`Are you sure want to remove ${selectedRowKeys.length} Data nodes？`}
+              icon={<Tooltip title='Deleted Data Nodes includes DECOMMISSIONED and  IN_MAINTENANCE.'>
+                <Icon type='question-circle-o' style={{ color: 'red', fontSize: '20px' }} />
+              </Tooltip>}
+              onConfirm={this.popConfirm}
+            >
+              <Button style={{ width: 130, fontSize: "large" }} type="primary" disabled={!hasSelected} loading={loading}>
+                Remove
+              </Button>
+            </Popconfirm>
+          </div>
           <Table
+            rowSelection={rowSelection}
             dataSource={dataSource}
             columns={COLUMNS.reduce<any[]>((filtered, column) => {
               if (selectedColumns.some(e => e.value === column.key)) {
@@ -489,7 +549,7 @@ export class Datanodes extends React.Component<Record<string, object>, IDatanode
             }, [])}
             loading={loading}
             pagination={paginationConfig}
-            rowKey='hostname'
+            rowKey='uuid'
             scroll={{x: true, y: false, scrollToFirstRowOnChange: true}}
             locale={{filterTitle: ""}}
           />
