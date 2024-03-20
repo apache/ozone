@@ -1423,9 +1423,6 @@ public class RpcClient implements ClientProtocol {
         .setDataSize(keyToOverwrite.getDataSize())
         .setReplicationConfig(replicationConfig)
         .addAllMetadataGdpr(keyToOverwrite.getMetadata())
-        // TODO - if we are effectively cloning a key, probably the ACLs should
-        //        be copied over server side. I am not too sure how this works.
-        .setAcls(getAclList())
         .setLatestVersionLocation(getLatestVersionLocation)
         .setOverwriteObjectID(keyToOverwrite.getObjectID())
         .setOverwriteUpdateID(keyToOverwrite.getUpdateID());

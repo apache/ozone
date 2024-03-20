@@ -64,6 +64,7 @@ import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -287,6 +288,10 @@ public class TestOMKeyCommitRequest extends TestOMKeyRequest {
     OmKeyInfo committedKey = closedKeyTable.get(getOzonePathKey());
     assertNull(committedKey.getOverwriteObjectID());
     assertNull(committedKey.getOverwriteUpdateID());
+    // The object ID should not change when overwriting.
+    assertEquals(openKeyInfo.getObjectID(), committedKey.getObjectID());
+    // Update ID should be changed
+    assertNotEquals(closedKeyInfo.getUpdateID(), committedKey.getUpdateID());
   }
 
   @Test

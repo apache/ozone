@@ -932,14 +932,15 @@ public class TestOMKeyCreateRequest extends TestOMKeyRequest {
         RatisReplicationConfig.getInstance(THREE), 1L, 1L);
     omRequest = doPreExecute(omRequest);
     OMKeyCreateRequest omKeyCreateRequest = getOMKeyCreateRequest(omRequest);
-    OMClientResponse response = omKeyCreateRequest.validateAndUpdateCache(ozoneManager, 100L);
+    OMClientResponse response = omKeyCreateRequest.validateAndUpdateCache(ozoneManager, 105L);
     assertEquals(KEY_NOT_FOUND, response.getOMResponse().getStatus());
 
     // Now pre-create the key in the system so we can overwrite it.
-    createAndCheck(keyName);
+    Map<String, String> metadata = Collections.singletonMap("metakey", "metavalue");
+    OmKeyInfo createdKeyInfo = createAndCheck(keyName, metadata);
     // Commit openKey entry.
-    OMRequestTestUtils.addKeyToTable(false, volumeName, bucketName,
-        keyName, 0L, RatisReplicationConfig.getInstance(THREE), omMetadataManager);
+    OMRequestTestUtils.addKeyToTable(false, false,
+        createdKeyInfo, 0L, 0L, omMetadataManager);
     // Retrieve the committed key info
     String ozoneKey = omMetadataManager.getOzoneKey(volumeName, bucketName, keyName);
     OmKeyInfo existingKeyInfo = omMetadataManager.getKeyTable(getBucketLayout()).get(ozoneKey);
@@ -950,7 +951,7 @@ public class TestOMKeyCreateRequest extends TestOMKeyRequest {
         existingKeyInfo.getUpdateID() + 1);
     omRequest = doPreExecute(omRequest);
     omKeyCreateRequest = getOMKeyCreateRequest(omRequest);
-    response = omKeyCreateRequest.validateAndUpdateCache(ozoneManager, 100L);
+    response = omKeyCreateRequest.validateAndUpdateCache(ozoneManager, 105L);
     // Still fails, as the matching key is not present.
     assertEquals(KEY_NOT_FOUND, response.getOMResponse().getStatus());
 
@@ -960,7 +961,7 @@ public class TestOMKeyCreateRequest extends TestOMKeyRequest {
         existingKeyInfo.getUpdateID());
     omRequest = doPreExecute(omRequest);
     omKeyCreateRequest = getOMKeyCreateRequest(omRequest);
-    response = omKeyCreateRequest.validateAndUpdateCache(ozoneManager, 100L);
+    response = omKeyCreateRequest.validateAndUpdateCache(ozoneManager, 105L);
     assertEquals(OK, response.getOMResponse().getStatus());
 
     // Ensure the update / object IDs are persisted in the open key table
@@ -970,6 +971,15 @@ public class TestOMKeyCreateRequest extends TestOMKeyRequest {
 
     assertEquals(existingKeyInfo.getObjectID(), openKeyInfo.getOverwriteObjectID());
     assertEquals(existingKeyInfo.getUpdateID(), openKeyInfo.getOverwriteUpdateID());
+    // The object ID should not change when overwriting.
+    assertEquals(existingKeyInfo.getObjectID(), openKeyInfo.getObjectID());
+    // Creation time should remain the same on overwrite.
+    assertEquals(existingKeyInfo.getCreationTime(), openKeyInfo.getCreationTime());
+    // Update ID should change
+    assertNotEquals(existingKeyInfo.getUpdateID(), openKeyInfo.getUpdateID());
+    // The metadata should be copied over from the existing key.
+    assertEquals(metadata, existingKeyInfo.getMetadata());
+    assertEquals(metadata, openKeyInfo.getMetadata());
   }
 
   /**
@@ -1028,9 +1038,12 @@ public class TestOMKeyCreateRequest extends TestOMKeyRequest {
     assertEquals(NOT_A_FILE, omClientResponse.getOMResponse().getStatus());
   }
 
-
   private void createAndCheck(String keyName) throws Exception {
-    OMRequest omRequest = createKeyRequest(false, 0, keyName);
+    createAndCheck(keyName, Collections.emptyMap());
+  }
+
+  private OmKeyInfo createAndCheck(String keyName, Map<String, String> metadata) throws Exception {
+    OMRequest omRequest = createKeyRequest(false, 0, keyName, metadata);
 
     OMKeyCreateRequest omKeyCreateRequest = getOMKeyCreateRequest(omRequest);
 
@@ -1043,10 +1056,10 @@ public class TestOMKeyCreateRequest extends TestOMKeyRequest {
 
     assertEquals(OK, omClientResponse.getOMResponse().getStatus());
 
-    checkCreatedPaths(omKeyCreateRequest, omRequest, keyName);
+    return checkCreatedPaths(omKeyCreateRequest, omRequest, keyName);
   }
 
-  protected void checkCreatedPaths(
+  protected OmKeyInfo checkCreatedPaths(
       OMKeyCreateRequest omKeyCreateRequest, OMRequest omRequest,
       String keyName) throws Exception {
     keyName = omKeyCreateRequest.validateAndNormalizeKey(true, keyName);
@@ -1061,6 +1074,7 @@ public class TestOMKeyCreateRequest extends TestOMKeyRequest {
         omMetadataManager.getOpenKeyTable(omKeyCreateRequest.getBucketLayout())
             .get(openKey);
     assertNotNull(omKeyInfo);
+    return omKeyInfo;
   }
 
   protected long checkIntermediatePaths(Path keyPath) throws Exception {
