@@ -99,12 +99,30 @@ public class OzoneKey {
   public OzoneKey(String volumeName, String bucketName,
                   String keyName, long size, long creationTime,
                   long modificationTime, ReplicationConfig replicationConfig,
+                  boolean isFile) {
+    this(volumeName, bucketName, keyName, size, creationTime, modificationTime, replicationConfig,
+        isFile, null, null);
+  }
+
+  @SuppressWarnings("parameternumber")
+  public OzoneKey(String volumeName, String bucketName,
+                  String keyName, long size, long creationTime,
+                  long modificationTime, ReplicationConfig replicationConfig,
+                  Map<String, String> metadata, boolean isFile) {
+    this(volumeName, bucketName, keyName, size, creationTime,
+        modificationTime, replicationConfig, isFile, null, null);
+    this.metadata.putAll(metadata);
+  }
+
+  @SuppressWarnings("parameternumber")
+  public OzoneKey(String volumeName, String bucketName,
+                  String keyName, long size, long creationTime,
+                  long modificationTime, ReplicationConfig replicationConfig,
                   Map<String, String> metadata, boolean isFile, Long objectID, Long updateID) {
     this(volumeName, bucketName, keyName, size, creationTime,
         modificationTime, replicationConfig, isFile, objectID, updateID);
     this.metadata.putAll(metadata);
   }
-
   /**
    * Returns Volume Name associated with the Key.
    *
