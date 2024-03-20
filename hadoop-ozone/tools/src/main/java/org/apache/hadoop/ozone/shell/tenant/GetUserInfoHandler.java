@@ -17,7 +17,6 @@
  */
 package org.apache.hadoop.ozone.shell.tenant;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import org.apache.hadoop.hdds.cli.GenericCli;
