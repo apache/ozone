@@ -30,7 +30,7 @@ import java.util.List;
 import java.util.UUID;
 
 /**
- * This is custom jackson deserializer class for DetanodeDetails class.
+ * This is custom jackson deserializer class for DatanodeDetails class.
  * Jackson deserializer is being used to deserialize json using JSON parser
  * and map JSON fields to respective DatanodeDetails class fields.
  */

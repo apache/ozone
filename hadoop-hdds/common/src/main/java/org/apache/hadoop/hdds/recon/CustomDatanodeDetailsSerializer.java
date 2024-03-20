@@ -26,7 +26,7 @@ import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import java.io.IOException;
 
 /**
- * This is custom jackson serializer class for DetanodeDetails class.
+ * This is custom jackson serializer class for DatanodeDetails class.
  * Jackson serializer is being used to serialize DatanodeDetails class object
  * to map and serialize respective object fields to JSON fields.
  */
