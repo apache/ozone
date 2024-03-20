@@ -395,17 +395,16 @@ public class BlockOutputStream extends OutputStream {
     waitForFlushAndCommit(true);
   }
 
-  void waitForFlushAndCommit(boolean bufferFull) throws IOException {
-    try {
-      checkOpen();
-      waitOnFlushFutures();
-    } catch (ExecutionException e) {
-      handleExecutionException(e);
-    } catch (InterruptedException ex) {
-      Thread.currentThread().interrupt();
-      handleInterruptedException(ex, true);
-    }
+  CompletableFuture<Void> waitForFlushAndCommit(boolean bufferFull) throws IOException {
+    checkOpen();
+    CompletableFuture<Void> future = waitOnFlushFutures();
+    // ExecutionException and InterruptedException are no longer handled at this level
+    // since the future is being returned all the way up to KeyOutputStream
+
+    // TODO: Can this call be removed?
     watchForCommit(bufferFull);
+
+    return future;
   }
 
   void releaseBuffersOnException() {
@@ -632,7 +631,9 @@ public class BlockOutputStream extends OutputStream {
     }
   }
 
-  void waitOnFlushFutures() throws InterruptedException, ExecutionException {
+  // TODO: Should rename this to getFlushFutures
+  CompletableFuture<Void> waitOnFlushFutures() {
+    return null;
   }
 
   void validateResponse(
@@ -948,6 +949,7 @@ public class BlockOutputStream extends OutputStream {
    * handle ExecutionException else skip it.
    * @throws IOException
    */
+  // TODO: Move this to separate class StreamUtil.
   void handleInterruptedException(Exception ex,
       boolean processExecutionException)
       throws IOException {
@@ -964,6 +966,7 @@ public class BlockOutputStream extends OutputStream {
    * @param ex
    * @throws IOException
    */
+  // TODO: Move this to separate class StreamUtil.
   private void handleExecutionException(Exception ex) throws IOException {
     setIoException(ex);
     adjustBuffersOnException();

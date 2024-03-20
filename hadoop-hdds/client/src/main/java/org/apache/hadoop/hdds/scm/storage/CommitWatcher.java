@@ -33,7 +33,6 @@ import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
-import java.util.concurrent.ExecutionException;
 
 /**
  * This class executes watchForCommit on ratis pipeline and releases
@@ -81,10 +80,10 @@ class CommitWatcher extends AbstractCommitWatcher<ChunkBuffer> {
   }
 
 
-  public void waitOnFlushFutures() throws InterruptedException, ExecutionException {
-    // wait for all the transactions to complete
-    CompletableFuture.allOf(futureMap.values().toArray(
-        new CompletableFuture[0])).get();
+  public CompletableFuture<Void> waitOnFlushFutures() {
+    // return future directly, do not wait here
+    return CompletableFuture.allOf(futureMap.values().toArray(
+        new CompletableFuture[0]));
   }
 
   @Override
