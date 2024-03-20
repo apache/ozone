@@ -71,6 +71,9 @@ public final class JsonUtils {
   }
 
   public static ObjectNode createObjectNode(Object next) {
+    if (next == null) {
+      return MAPPER.createObjectNode();
+    }
     return MAPPER.valueToTree(next);
   }
 
