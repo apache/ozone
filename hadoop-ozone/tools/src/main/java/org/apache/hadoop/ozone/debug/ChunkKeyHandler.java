@@ -25,7 +25,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.HashSet;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import org.apache.hadoop.hdds.cli.SubcommandWithParent;
@@ -39,6 +38,7 @@ import org.apache.hadoop.hdds.scm.XceiverClientSpi;
 import org.apache.hadoop.hdds.scm.cli.ContainerOperationClient;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.storage.ContainerProtocolCalls;
+import org.apache.hadoop.hdds.server.JsonUtils;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientException;
@@ -79,8 +79,7 @@ public class ChunkKeyHandler extends KeyHandler implements
         XceiverClientManager xceiverClientManager = containerOperationClient.getXceiverClientManager()) {
       OzoneManagerProtocol ozoneManagerClient = client.getObjectStore().getClientProxy().getOzoneManagerClient();
       address.ensureKeyAddress();
-      ObjectMapper objectMapper = new ObjectMapper();
-      ObjectNode result = objectMapper.createObjectNode();
+      ObjectNode result = JsonUtils.createObjectNode(null);
       String volumeName = address.getVolumeName();
       String bucketName = address.getBucketName();
       String keyName = address.getKeyName();
@@ -101,7 +100,7 @@ public class ChunkKeyHandler extends KeyHandler implements
       }
       ContainerLayoutVersion containerLayoutVersion = ContainerLayoutVersion
           .getConfiguredVersion(getConf());
-      ArrayNode responseArrayList = objectMapper.createArrayNode();
+      ArrayNode responseArrayList = JsonUtils.createArrayNode();
       for (OmKeyLocationInfo keyLocation : keyInfo.getLatestVersionLocations()
           .getBlocksLatestVersionOnly()) {
         ContainerChunkInfo containerChunkInfoVerbose = new ContainerChunkInfo();
@@ -135,10 +134,10 @@ public class ChunkKeyHandler extends KeyHandler implements
           Map<DatanodeDetails, ContainerProtos.ReadContainerResponseProto> readContainerResponses =
               containerOperationClient.readContainerFromAllNodes(
                   keyLocation.getContainerID(), pipeline);
-          ArrayNode responseFromAllNodes = objectMapper.createArrayNode();
+          ArrayNode responseFromAllNodes = JsonUtils.createArrayNode();
           for (Map.Entry<DatanodeDetails, ContainerProtos.GetBlockResponseProto> entry : responses.entrySet()) {
             chunkPaths.clear();
-            ObjectNode jsonObj = objectMapper.createObjectNode();
+            ObjectNode jsonObj = JsonUtils.createObjectNode(null);
             if (entry.getValue() == null) {
               LOG.error("Cant execute getBlock on this node");
               continue;
@@ -173,10 +172,10 @@ public class ChunkKeyHandler extends KeyHandler implements
 
             if (isVerbose()) {
               jsonObj.set("Locations",
-                  objectMapper.valueToTree(containerChunkInfoVerbose));
+                  JsonUtils.createObjectNode(containerChunkInfoVerbose));
             } else {
               jsonObj.set("Locations",
-                  objectMapper.valueToTree(containerChunkInfo));
+                  JsonUtils.createObjectNode(containerChunkInfo));
             }
             jsonObj.put("Datanode-HostName", entry.getKey().getHostName());
             jsonObj.put("Datanode-IP", entry.getKey().getIpAddress());
@@ -192,8 +191,7 @@ public class ChunkKeyHandler extends KeyHandler implements
         }
       }
       result.set("KeyLocations", responseArrayList);
-      String prettyJson = objectMapper.writerWithDefaultPrettyPrinter()
-          .writeValueAsString(result);
+      String prettyJson = JsonUtils.toJsonStringWithDefaultPrettyPrinter(result);
       System.out.println(prettyJson);
     }
   }
