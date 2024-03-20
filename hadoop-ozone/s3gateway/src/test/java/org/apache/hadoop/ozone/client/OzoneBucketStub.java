@@ -204,7 +204,7 @@ public class OzoneBucketStub extends OzoneBucket {
   }
 
   @Override
-  public OzoneOutputStream overWriteKey(OzoneKeyDetails existingKey, ReplicationConfig rConfig)
+  public OzoneOutputStream overwriteKey(OzoneKeyDetails existingKey, ReplicationConfig rConfig)
       throws IOException {
     final ReplicationConfig repConfig;
     if (rConfig == null) {

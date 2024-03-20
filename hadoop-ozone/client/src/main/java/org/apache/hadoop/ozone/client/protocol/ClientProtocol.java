@@ -363,7 +363,7 @@ public interface ClientProtocol {
    * @return {@link OzoneOutputStream}
    * @throws IOException
    */
-  OzoneOutputStream overWriteKey(OzoneKeyDetails keyToOverwrite, ReplicationConfig replicationConfig)
+  OzoneOutputStream overwriteKey(OzoneKeyDetails keyToOverwrite, ReplicationConfig replicationConfig)
       throws IOException;
 
   /**

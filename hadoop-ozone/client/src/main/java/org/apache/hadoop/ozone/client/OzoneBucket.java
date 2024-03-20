@@ -483,9 +483,9 @@ public class OzoneBucket extends WithMetadata {
    * @return OzoneOutputStream to which the data has to be written.
    * @throws IOException
    */
-  public OzoneOutputStream overWriteKey(OzoneKeyDetails existingKey, ReplicationConfig replicationConfig)
+  public OzoneOutputStream overwriteKey(OzoneKeyDetails existingKey, ReplicationConfig replicationConfig)
       throws IOException {
-    return proxy.overWriteKey(existingKey, replicationConfig);
+    return proxy.overwriteKey(existingKey, replicationConfig);
   }
 
   /**

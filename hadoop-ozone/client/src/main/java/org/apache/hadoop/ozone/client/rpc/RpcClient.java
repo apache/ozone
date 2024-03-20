@@ -1402,7 +1402,7 @@ public class RpcClient implements ClientProtocol {
   }
 
   @Override
-  public OzoneOutputStream  overWriteKey(OzoneKeyDetails keyToOverwrite, ReplicationConfig replicationConfig)
+  public OzoneOutputStream overwriteKey(OzoneKeyDetails keyToOverwrite, ReplicationConfig replicationConfig)
       throws IOException {
     if (keyToOverwrite == null) {
       throw new IllegalArgumentException("KeyToOverwrite cannot be null");
