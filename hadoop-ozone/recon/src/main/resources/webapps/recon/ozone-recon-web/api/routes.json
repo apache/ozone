@@ -48,5 +48,6 @@
 
   "/keys/deletePending?limit=*" : "/keydeletePending",
 
-  "/containers/mismatch/deleted?limit=*": "/deleted"
+  "/containers/mismatch/deleted?limit=*": "/deleted",
+  "/keys/deletePending/dirs?limit=*": "/dirdeletePending"
 }
