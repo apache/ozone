@@ -248,7 +248,7 @@ public abstract class EntityHandler {
     return totalSize;
   }
 
-  public static String[] parseRequestPath(String path) {
+  public static String[] parseRequestPath(String path) {  // path = /abcd
     if (path.startsWith(OM_KEY_PREFIX)) {
       path = path.substring(1);
     }

@@ -144,7 +144,7 @@ public class TestOMDBInsightSearchEndpoint extends AbstractReconSqlDBTest {
   @Test
   public void testRootLevelSearch() throws IOException {
     Response response =
-        omdbInsightSearchEndpoint.searchOpenKeys(ROOT_PATH, true, true, 20);
+        omdbInsightSearchEndpoint.searchOpenKeys(ROOT_PATH, 20);
     assertEquals(200, response.getStatus());
     KeyInsightInfoResponse result =
         (KeyInsightInfoResponse) response.getEntity();
@@ -156,14 +156,14 @@ public class TestOMDBInsightSearchEndpoint extends AbstractReconSqlDBTest {
 
     // Switch of the include Fso flag
     response =
-        omdbInsightSearchEndpoint.searchOpenKeys(ROOT_PATH, false, true, 20);
+        omdbInsightSearchEndpoint.searchOpenKeys(ROOT_PATH, 20);
     result = (KeyInsightInfoResponse) response.getEntity();
     assertEquals(0, result.getFsoKeyInfoList().size());
     assertEquals(5, result.getNonFSOKeyInfoList().size());
 
     // Switch of the include Non Fso flag
     response =
-        omdbInsightSearchEndpoint.searchOpenKeys(ROOT_PATH, true, false, 20);
+        omdbInsightSearchEndpoint.searchOpenKeys(ROOT_PATH, 20);
     result = (KeyInsightInfoResponse) response.getEntity();
     assertEquals(10, result.getFsoKeyInfoList().size());
   }
@@ -171,7 +171,7 @@ public class TestOMDBInsightSearchEndpoint extends AbstractReconSqlDBTest {
   @Test
   public void testBucketLevelSearch() throws IOException {
     Response response =
-        omdbInsightSearchEndpoint.searchOpenKeys("/volA/bucketA1", true, true, 20);
+        omdbInsightSearchEndpoint.searchOpenKeys("/volA/bucketA1",20);
     assertEquals(200, response.getStatus());
     KeyInsightInfoResponse result =
         (KeyInsightInfoResponse) response.getEntity();
@@ -182,7 +182,7 @@ public class TestOMDBInsightSearchEndpoint extends AbstractReconSqlDBTest {
     assertEquals(5000 * 3, result.getReplicatedDataSize());
 
     response =
-        omdbInsightSearchEndpoint.searchOpenKeys("/volB/bucketB1", true, true, 20);
+        omdbInsightSearchEndpoint.searchOpenKeys("/volB/bucketB1", 20);
     assertEquals(200, response.getStatus());
     result =
         (KeyInsightInfoResponse) response.getEntity();
@@ -196,7 +196,7 @@ public class TestOMDBInsightSearchEndpoint extends AbstractReconSqlDBTest {
   @Test
   public void testDirectoryLevelSearch() throws IOException {
     Response response =
-        omdbInsightSearchEndpoint.searchOpenKeys("/volA/bucketA1/dirA1", true, true, 20);
+        omdbInsightSearchEndpoint.searchOpenKeys("/volA/bucketA1/dirA1", 20);
     assertEquals(200, response.getStatus());
     KeyInsightInfoResponse result =
         (KeyInsightInfoResponse) response.getEntity();
@@ -207,7 +207,7 @@ public class TestOMDBInsightSearchEndpoint extends AbstractReconSqlDBTest {
     assertEquals(1000 * 3, result.getReplicatedDataSize());
 
     response =
-        omdbInsightSearchEndpoint.searchOpenKeys("/volA/bucketA1/dirA2", true, true, 20);
+        omdbInsightSearchEndpoint.searchOpenKeys("/volA/bucketA1/dirA2", 20);
     assertEquals(200, response.getStatus());
     result =
         (KeyInsightInfoResponse) response.getEntity();
@@ -218,7 +218,7 @@ public class TestOMDBInsightSearchEndpoint extends AbstractReconSqlDBTest {
     assertEquals(1000 * 3, result.getReplicatedDataSize());
 
     response =
-        omdbInsightSearchEndpoint.searchOpenKeys("/volA/bucketA1/dirA3", true, true, 20);
+        omdbInsightSearchEndpoint.searchOpenKeys("/volA/bucketA1/dirA3", 20);
     assertEquals(200, response.getStatus());
     result =
         (KeyInsightInfoResponse) response.getEntity();
@@ -232,7 +232,7 @@ public class TestOMDBInsightSearchEndpoint extends AbstractReconSqlDBTest {
   @Test
   public void testLimitSearch() throws IOException {
     Response response =
-        omdbInsightSearchEndpoint.searchOpenKeys(ROOT_PATH, true, true, 5);
+        omdbInsightSearchEndpoint.searchOpenKeys(ROOT_PATH, 5);
     assertEquals(200, response.getStatus());
     KeyInsightInfoResponse result =
         (KeyInsightInfoResponse) response.getEntity();
@@ -246,7 +246,7 @@ public class TestOMDBInsightSearchEndpoint extends AbstractReconSqlDBTest {
     String searchPrefix = "nonexistentKeyPrefix";
 
     Response response =
-        omdbInsightSearchEndpoint.searchOpenKeys(searchPrefix, true, true, 10);
+        omdbInsightSearchEndpoint.searchOpenKeys(searchPrefix, 10);
 
     // Then the response should indicate that no keys were found
     assertEquals(Response.Status.NOT_FOUND.getStatusCode(),
@@ -262,8 +262,7 @@ public class TestOMDBInsightSearchEndpoint extends AbstractReconSqlDBTest {
     // Give a negative limit
     int negativeLimit = -1;
     Response response =
-        omdbInsightSearchEndpoint.searchOpenKeys("searchPrefix", true, true,
-            negativeLimit);
+        omdbInsightSearchEndpoint.searchOpenKeys("searchPrefix", negativeLimit);
 
     // Then the response should indicate that the request was bad
     assertEquals(Response.Status.BAD_REQUEST.getStatusCode(),

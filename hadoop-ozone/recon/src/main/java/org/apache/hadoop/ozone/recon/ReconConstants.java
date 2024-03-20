@@ -38,14 +38,14 @@ public final class ReconConstants {
   // By default, limit the number of results returned
   public static final String DEFAULT_OPEN_KEY_INCLUDE_NON_FSO = "false";
   public static final String DEFAULT_OPEN_KEY_INCLUDE_FSO = "false";
-  public static final String DEFAULT_SEARCH_PREFIX = "/";
+  public static final String DEFAULT_START_PREFIX = "/";
   public static final String DEFAULT_FETCH_COUNT = "1000";
   public static final String DEFAULT_BATCH_NUMBER = "1";
   public static final String RECON_QUERY_BATCH_PARAM = "batchNum";
   public static final String RECON_QUERY_PREVKEY = "prevKey";
   public static final String RECON_OPEN_KEY_INCLUDE_NON_FSO = "includeNonFso";
   public static final String RECON_OPEN_KEY_INCLUDE_FSO = "includeFso";
-  public static final String RECON_OPEN_KEY_SEARCH_LIMIT = "10";
+  public static final String RECON_OPEN_KEY_DEFAULT_SEARCH_LIMIT = "30";
   public static final String RECON_QUERY_FILTER = "missingIn";
   public static final String PREV_CONTAINER_ID_DEFAULT_VALUE = "0";
   public static final String PREV_DELETED_BLOCKS_TRANSACTION_ID_DEFAULT_VALUE =

@@ -18,21 +18,18 @@
 
 package org.apache.hadoop.ozone.recon.api;
 
-import org.antlr.v4.runtime.misc.Pair;
 import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
-import org.apache.hadoop.ozone.OmUtils;
+import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
-import org.apache.hadoop.ozone.recon.ReconConstants;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.recon.api.handlers.BucketHandler;
 import org.apache.hadoop.ozone.recon.api.types.KeyEntityInfo;
 import org.apache.hadoop.ozone.recon.api.types.KeyInsightInfoResponse;
 import org.apache.hadoop.ozone.recon.api.types.NSSummary;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
-import org.apache.hadoop.ozone.recon.scm.ReconContainerManager;
 import org.apache.hadoop.ozone.recon.spi.impl.ReconNamespaceSummaryManagerImpl;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -61,7 +58,7 @@ import static org.apache.hadoop.ozone.recon.api.handlers.EntityHandler.parseRequ
 /**
  * REST endpoint for search implementation in OM DB Insight.
  */
-@Path("/insights")
+@Path("/keys")
 @Produces(MediaType.APPLICATION_JSON)
 @AdminOnly
 public class OMDBInsightSearchEndpoint {
@@ -85,7 +82,7 @@ public class OMDBInsightSearchEndpoint {
 
   /**
    * Performs a search for open keys in the Ozone Manager (OM) database using a specified search prefix.
-   * This endpoint can search across both File System Optimized (FSO) and Object Store (non-FSO) layouts,
+   * This endpoint searches across both File System Optimized (FSO) and Object Store (non-FSO) layouts,
    * compiling a list of keys that match the given prefix along with their data sizes.
    *
    * The search prefix may range from the root level ('/') to any specific directory
@@ -97,73 +94,63 @@ public class OMDBInsightSearchEndpoint {
    * 2. A startPrefix of "/volA/" retrieves every key under volume 'volA'.
    * 3. Specifying "/volA/bucketA/dir1" focuses the search within 'dir1' inside 'bucketA' of 'volA'.
    *
-   * @param startPrefix   The prefix for searching keys, starting from the root ('/') or any specific path.
-   * @param includeFso    Indicates whether to include FSO layout keys in the search.
-   * @param includeNonFso Indicates whether to include non-FSO layout keys in the search.
-   * @param limit         Limits the number of returned keys.
+   * @param startPrefix The prefix for searching keys, starting from the root ('/') or any specific path.
+   * @param limit       Limits the number of returned keys.
    * @return A KeyInsightInfoResponse, containing matching keys and their data sizes.
    * @throws IOException On failure to access the OM database or process the operation.
    */
   @GET
-  @Path("/openKeys/search")
+  @Path("/open/search")
   public Response searchOpenKeys(
-      @DefaultValue(DEFAULT_SEARCH_PREFIX) @QueryParam("startPrefix")
+      @DefaultValue(DEFAULT_START_PREFIX) @QueryParam("startPrefix")
       String startPrefix,
-      @DefaultValue(DEFAULT_OPEN_KEY_INCLUDE_FSO) @QueryParam("includeFso")
-      boolean includeFso,
-      @DefaultValue(DEFAULT_OPEN_KEY_INCLUDE_NON_FSO) @QueryParam("includeNonFso")
-      boolean includeNonFso,
-      @DefaultValue(RECON_OPEN_KEY_SEARCH_LIMIT) @QueryParam("limit")
+      @DefaultValue(RECON_OPEN_KEY_DEFAULT_SEARCH_LIMIT) @QueryParam("limit")
       int limit) throws IOException {
-    if (limit < 0) {
-      return createBadRequestResponse("Limit cannot be negative.");
-    }
+    try {
+      limit = Math.max(0, limit); // Ensure limit is non-negative
+      KeyInsightInfoResponse insightResponse = new KeyInsightInfoResponse();
+      long replicatedTotal = 0;
+      long unreplicatedTotal = 0;
+      boolean keysFound = false; // Flag to track if any keys are found
 
-    KeyInsightInfoResponse insightResponse = new KeyInsightInfoResponse();
-    long replicatedTotal = 0;
-    long unreplicatedTotal = 0;
-    boolean keysFound = false; // Flag to track if any keys are found
-
-    // Fetch keys from OBS layout and convert them into KeyEntityInfo objects
-    Map<String, OmKeyInfo> obsKeys = new LinkedHashMap<>();
-    if (includeNonFso) {
+      // Search keys from non-FSO layout.
+      Map<String, OmKeyInfo> obsKeys = new LinkedHashMap<>();
       Table<String, OmKeyInfo> openKeyTable = omMetadataManager.getOpenKeyTable(BucketLayout.LEGACY);
       obsKeys = retrieveKeysFromTable(openKeyTable, startPrefix, limit);
       for (Map.Entry<String, OmKeyInfo> entry : obsKeys.entrySet()) {
         keysFound = true;
         KeyEntityInfo keyEntityInfo =
             createKeyEntityInfoFromOmKeyInfo(entry.getKey(), entry.getValue());
-        insightResponse.getNonFSOKeyInfoList()
-            .add(keyEntityInfo); // Add to non-FSO list
+        insightResponse.getNonFSOKeyInfoList().add(keyEntityInfo); // Add to non-FSO list
         replicatedTotal += entry.getValue().getReplicatedSize();
         unreplicatedTotal += entry.getValue().getDataSize();
       }
-    }
 
-    // Fetch keys from FSO layout, if the limit is not yet reached
-    if (includeFso) {
+      // Search keys from FSO layout.
       Map<String, OmKeyInfo> fsoKeys = searchOpenKeysInFSO(startPrefix, limit);
       for (Map.Entry<String, OmKeyInfo> entry : fsoKeys.entrySet()) {
         keysFound = true;
         KeyEntityInfo keyEntityInfo =
             createKeyEntityInfoFromOmKeyInfo(entry.getKey(), entry.getValue());
-        insightResponse.getFsoKeyInfoList()
-            .add(keyEntityInfo); // Add to FSO list
+        insightResponse.getFsoKeyInfoList().add(keyEntityInfo); // Add to FSO list
         replicatedTotal += entry.getValue().getReplicatedSize();
         unreplicatedTotal += entry.getValue().getDataSize();
       }
+
+      // If no keys were found, return a response indicating that no keys matched
+      if (!keysFound) {
+        return noMatchedKeysResponse(startPrefix);
+      }
+
+      // Set the aggregated totals in the response
+      insightResponse.setReplicatedDataSize(replicatedTotal);
+      insightResponse.setUnreplicatedDataSize(unreplicatedTotal);
+
+      return Response.ok(insightResponse).build();
+    } catch (IOException e) {
+      return createInternalServerErrorResponse(
+          "Error searching open keys in OM DB: " + e.getMessage());
     }
-
-    // If no keys were found, return a response indicating that no keys matched
-    if (!keysFound) {
-      return noMatchedKeysResponse(startPrefix);
-    }
-
-    // Set the aggregated totals in the response
-    insightResponse.setReplicatedDataSize(replicatedTotal);
-    insightResponse.setUnreplicatedDataSize(unreplicatedTotal);
-
-    return Response.ok(insightResponse).build();
   }
 
   public Map<String, OmKeyInfo> searchOpenKeysInFSO(String startPrefix,
@@ -190,7 +177,7 @@ public class OMDBInsightSearchEndpoint {
       }
       List<String> subPaths = new ArrayList<>();
       // Add the initial search prefix object path because it can have both openFiles
-      // and sub-directories with openFiles
+      // and subdirectories with openFiles
       subPaths.add(startPrefixObjectPath);
 
       // Recursively gather all subpaths
@@ -270,14 +257,15 @@ public class OMDBInsightSearchEndpoint {
    * @throws IOException If database access fails.
    */
   public String convertToObjectPath(String prevKeyPrefix) {
-    if (prevKeyPrefix.isEmpty()) {
-      return "";
-    }
-
     try {
       String[] names = parseRequestPath(normalizePath(prevKeyPrefix));
 
-      // Fetch the volumeID
+      // Root-Level :- Return the original path
+      if (names.length == 0) {
+        return prevKeyPrefix;
+      }
+
+      // Volume-Level :- Fetch the volumeID
       String volumeName = names[0];
       String volumeKey = omMetadataManager.getVolumeKey(volumeName);
       long volumeId = omMetadataManager.getVolumeTable().getSkipCache(volumeKey).getObjectID();
@@ -285,7 +273,7 @@ public class OMDBInsightSearchEndpoint {
         return constructObjectPathWithPrefix(volumeId);
       }
 
-      // Fetch the bucketID
+      // Bucket-Level :- Fetch the bucketID
       String bucketName = names[1];
       String bucketKey = omMetadataManager.getBucketKey(volumeName, bucketName);
       OmBucketInfo bucketInfo =
@@ -374,6 +362,41 @@ public class OMDBInsightSearchEndpoint {
       pathBuilder.append(OM_KEY_PREFIX).append(id);
     }
     return pathBuilder.toString();
+  }
+
+  /**
+   * Validates volume or bucket names according to specific rules.
+   *
+   * @param resName The name to validate (volume or bucket).
+   * @return A Response object if validation fails, or null if the name is valid.
+   */
+  public Response validateNames(String resName) {
+    if (resName == null) {
+      return createBadRequestResponse("Volume or Bucket name cannot be null");
+    }
+
+    if (resName.length() < OzoneConsts.OZONE_MIN_BUCKET_NAME_LENGTH ||
+        resName.length() > OzoneConsts.OZONE_MAX_BUCKET_NAME_LENGTH) {
+      return createBadRequestResponse(
+          "Bucket or Volume name must be between 3 and 63 characters");
+    }
+
+    if (resName.charAt(0) == '.' || resName.charAt(0) == '-' ||
+        resName.charAt(resName.length() - 1) == '.' ||
+        resName.charAt(resName.length() - 1) == '-') {
+      return createBadRequestResponse(
+          "Bucket or Volume name cannot start or end with a period or dash");
+    }
+
+    // Regex to check for lowercase letters, numbers, hyphens, underscores, and periods only.
+    if (!resName.matches("^[a-z0-9._-]+$")) {
+      return createBadRequestResponse(
+          "Bucket or Volume name can only include lowercase letters, numbers," +
+              " hyphens, underscores, and periods");
+    }
+
+    // If all checks pass, the name is valid
+    return null;
   }
 
   /**
