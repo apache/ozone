@@ -187,6 +187,7 @@ class TestKeyManagerUnit extends OzoneTestBase {
               .setAcls(Collections.emptyList())
               .setReplicationConfig(
                   RatisReplicationConfig.getInstance(ReplicationFactor.THREE))
+              .setOwnerName(UserGroupInformation.getCurrentUser().getShortUserName())
               .build();
 
       OpenKeySession openKey = writeClient.openKey(partKeyArgs);
