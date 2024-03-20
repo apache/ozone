@@ -180,7 +180,7 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
     <!-- SLF4J/LOG4J version -->
     <slf4j.version>2.0.12</slf4j.version>
     <log4j2.version>2.17.1</log4j2.version>
-    <disruptor.version>3.4.2</disruptor.version>
+    <disruptor.version>3.4.4</disruptor.version>
     <reload4j.version>1.2.25</reload4j.version>
 
     <kotlin.version>1.9.22</kotlin.version>
@@ -217,7 +217,7 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
     <mockito.version>4.11.0</mockito.version>
     <hamcrest.version>2.2</hamcrest.version>
     <junit5.version>5.10.2</junit5.version>
-    <zookeeper.version>3.7.2</zookeeper.version>
+    <zookeeper.version>3.8.4</zookeeper.version>
 
     <!-- Maven protoc compiler -->
     <protobuf-maven-plugin.version>0.6.1</protobuf-maven-plugin.version>
@@ -248,7 +248,7 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
     <maven-surefire-plugin.argLine>-Xmx4096m -XX:+HeapDumpOnOutOfMemoryError</maven-surefire-plugin.argLine>
     <maven-surefire-plugin.argLineAccessArgs></maven-surefire-plugin.argLineAccessArgs>
     <unstable-test-groups>flaky | slow | unhealthy</unstable-test-groups>
-    <maven-surefire-plugin.version>3.0.0-M5</maven-surefire-plugin.version>
+    <maven-surefire-plugin.version>3.0.0-M4</maven-surefire-plugin.version>
     <maven-surefire-report-plugin.version>${maven-surefire-plugin.version}</maven-surefire-report-plugin.version>
     <maven-failsafe-plugin.version>${maven-surefire-plugin.version}</maven-failsafe-plugin.version>
 
@@ -1228,6 +1228,16 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
         <groupId>org.apache.zookeeper</groupId>
         <artifactId>zookeeper</artifactId>
         <version>${zookeeper.version}</version>
+        <exclusions>
+          <exclusion>
+            <groupId>ch.qos.logback</groupId>
+            <artifactId>logback-core</artifactId>
+          </exclusion>
+          <exclusion>
+            <groupId>ch.qos.logback</groupId>
+            <artifactId>logback-classic</artifactId>
+          </exclusion>
+        </exclusions>
       </dependency>
       <dependency>
         <groupId>org.slf4j</groupId>
