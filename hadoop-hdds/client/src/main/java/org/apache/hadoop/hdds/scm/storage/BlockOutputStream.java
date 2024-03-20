@@ -91,6 +91,8 @@ public class BlockOutputStream extends OutputStream {
   public static final KeyValue FULL_CHUNK_KV =
       KeyValue.newBuilder().setKey(FULL_CHUNK).build();
 
+  // Flushed chunk less than 100KB will combine PutBlock and WriteChunk in the same request.
+  private static final int SMALL_CHUNK_THRESHOLD = 100 * 1024;
   private AtomicReference<BlockID> blockID;
   private final AtomicReference<ChunkInfo> previousChunkInfo
       = new AtomicReference<>();
@@ -218,7 +220,7 @@ public class BlockOutputStream extends OutputStream {
             allDataNodesSupportPiggybacking();
   }
 
-  boolean allDataNodesSupportPiggybacking() {
+  private boolean allDataNodesSupportPiggybacking() {
     // return true only if all DataNodes in the pipeline are on a version
     // that supports PutBlock piggybacking.
     for (DatanodeDetails dn : pipeline.getNodes()) {
@@ -613,7 +615,7 @@ public class BlockOutputStream extends OutputStream {
       // here, we just limit this buffer to the current position. So that next
       // write will happen in new buffer
       if (currentBuffer.hasRemaining()) {
-        if (writtenDataLength - totalDataFlushedLength < 100 * 1024 &&
+        if (writtenDataLength - totalDataFlushedLength < SMALL_CHUNK_THRESHOLD &&
             allowPutBlockPiggybacking) {
           updateFlushLength();
           writeSmallChunk(currentBuffer);
@@ -780,7 +782,6 @@ public class BlockOutputStream extends OutputStream {
       } else {
         containerBlockData.addChunks(chunkInfo);
       }
-      //containerBlockData.addChunks(chunkInfo);
       if (smallChunk) {
         Preconditions.checkNotNull(bufferList);
         byteBufferList = bufferList;
@@ -823,7 +824,6 @@ public class BlockOutputStream extends OutputStream {
         setIoException(ce);
         throw ce;
       });
-      //containerBlockData.addChunks(chunkInfo);
       clientMetrics.recordWriteChunk(pipeline, chunkInfo.getLen());
 
     } catch (IOException | ExecutionException e) {
