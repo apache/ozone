@@ -214,7 +214,7 @@ public class ReadReplicas extends KeyHandler implements SubcommandWithParent {
   }
 
   private Map<DatanodeDetails, OzoneInputStream> replicasOf(BlockID blockID,
-                Map<OmKeyLocationInfo, Map<DatanodeDetails, OzoneInputStream>> replicas) {
+      Map<OmKeyLocationInfo, Map<DatanodeDetails, OzoneInputStream>> replicas) {
     for (Map.Entry<OmKeyLocationInfo, Map<DatanodeDetails, OzoneInputStream>>
         block : replicas.entrySet()) {
       if (block.getKey().getBlockID().equals(blockID)) {
@@ -233,7 +233,7 @@ public class ReadReplicas extends KeyHandler implements SubcommandWithParent {
 
   @Nonnull
   private File createDirectory(String volumeName, String bucketName,
-                               String keyName) throws IOException {
+                                 String keyName) throws IOException {
     String fileSuffix
         = new SimpleDateFormat("yyyyMMddHHmmss").format(new Date());
     String directoryName = volumeName + "_" + bucketName + "_" + keyName +
