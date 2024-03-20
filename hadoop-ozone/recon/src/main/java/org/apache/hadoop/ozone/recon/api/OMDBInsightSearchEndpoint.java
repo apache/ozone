@@ -84,11 +84,11 @@ public class OMDBInsightSearchEndpoint {
    * Performs a search for open keys in the Ozone Manager (OM) database using a specified search prefix.
    * This endpoint searches across both File System Optimized (FSO) and Object Store (non-FSO) layouts,
    * compiling a list of keys that match the given prefix along with their data sizes.
-   *
+   * <p>
    * The search prefix may range from the root level ('/') to any specific directory
    * or key level (e.g., '/volA/' for everything under 'volA'). The search operation matches
    * the prefix against the start of keys' names within the OM DB.
-   *
+   * <p>
    * Example Usage:
    * 1. A startPrefix of "/" will return all keys in the database.
    * 2. A startPrefix of "/volA/" retrieves every key under volume 'volA'.
@@ -115,13 +115,15 @@ public class OMDBInsightSearchEndpoint {
 
       // Search keys from non-FSO layout.
       Map<String, OmKeyInfo> obsKeys = new LinkedHashMap<>();
-      Table<String, OmKeyInfo> openKeyTable = omMetadataManager.getOpenKeyTable(BucketLayout.LEGACY);
+      Table<String, OmKeyInfo> openKeyTable =
+          omMetadataManager.getOpenKeyTable(BucketLayout.LEGACY);
       obsKeys = retrieveKeysFromTable(openKeyTable, startPrefix, limit);
       for (Map.Entry<String, OmKeyInfo> entry : obsKeys.entrySet()) {
         keysFound = true;
         KeyEntityInfo keyEntityInfo =
             createKeyEntityInfoFromOmKeyInfo(entry.getKey(), entry.getValue());
-        insightResponse.getNonFSOKeyInfoList().add(keyEntityInfo); // Add to non-FSO list
+        insightResponse.getNonFSOKeyInfoList()
+            .add(keyEntityInfo); // Add to non-FSO list
         replicatedTotal += entry.getValue().getReplicatedSize();
         unreplicatedTotal += entry.getValue().getDataSize();
       }
@@ -132,7 +134,8 @@ public class OMDBInsightSearchEndpoint {
         keysFound = true;
         KeyEntityInfo keyEntityInfo =
             createKeyEntityInfoFromOmKeyInfo(entry.getKey(), entry.getValue());
-        insightResponse.getFsoKeyInfoList().add(keyEntityInfo); // Add to FSO list
+        insightResponse.getFsoKeyInfoList()
+            .add(keyEntityInfo); // Add to FSO list
         replicatedTotal += entry.getValue().getReplicatedSize();
         unreplicatedTotal += entry.getValue().getDataSize();
       }
@@ -150,17 +153,21 @@ public class OMDBInsightSearchEndpoint {
     } catch (IOException e) {
       return createInternalServerErrorResponse(
           "Error searching open keys in OM DB: " + e.getMessage());
+    } catch (IllegalArgumentException e) {
+      return createBadRequestResponse(
+          "Invalid startPrefix: " + e.getMessage());
     }
   }
 
   public Map<String, OmKeyInfo> searchOpenKeysInFSO(String startPrefix,
                                                     int limit)
-      throws IOException {
+      throws IOException, IllegalArgumentException {
     Map<String, OmKeyInfo> matchedKeys = new LinkedHashMap<>();
     // Convert the search prefix to an object path for FSO buckets
     String startPrefixObjectPath = convertToObjectPath(startPrefix);
     String[] names = parseRequestPath(startPrefixObjectPath);
-    Table<String, OmKeyInfo> openFileTable = omMetadataManager.getOpenKeyTable(BucketLayout.FILE_SYSTEM_OPTIMIZED);
+    Table<String, OmKeyInfo> openFileTable =
+        omMetadataManager.getOpenKeyTable(BucketLayout.FILE_SYSTEM_OPTIMIZED);
 
     // If names.length > 2, then the search prefix is at the volume or bucket level hence
     // no need to find parent or extract id's or find subpaths as the openFileTable is
@@ -186,7 +193,8 @@ public class OMDBInsightSearchEndpoint {
       // Iterate over the subpaths and retrieve the open files
       for (String subPath : subPaths) {
         matchedKeys.putAll(
-            retrieveKeysFromTable(openFileTable, subPath, limit - matchedKeys.size()));
+            retrieveKeysFromTable(openFileTable, subPath,
+                limit - matchedKeys.size()));
         if (matchedKeys.size() >= limit) {
           break;
         }
@@ -195,7 +203,8 @@ public class OMDBInsightSearchEndpoint {
     }
 
     // Iterate over for bucket and volume level search
-    matchedKeys.putAll(retrieveKeysFromTable(openFileTable, startPrefixObjectPath, limit));
+    matchedKeys.putAll(
+        retrieveKeysFromTable(openFileTable, startPrefixObjectPath, limit));
     return matchedKeys;
   }
 
@@ -203,7 +212,7 @@ public class OMDBInsightSearchEndpoint {
    * Finds all subdirectories under a parent directory in an FSO bucket. It builds
    * a list of paths for these subdirectories. These sub-directories are then used
    * to search for open files in the openFileTable.
-   *
+   * <p>
    * How it works:
    * - Starts from a parent directory identified by parentId.
    * - Looks through all child directories of this parent.
@@ -256,8 +265,9 @@ public class OMDBInsightSearchEndpoint {
    * @return The object path as "/volumeID/bucketID/ParentId/".
    * @throws IOException If database access fails.
    */
-  public String convertToObjectPath(String prevKeyPrefix) {
-    try {
+  public String convertToObjectPath(String prevKeyPrefix)
+      throws IOException, IllegalArgumentException {
+
       String[] names = parseRequestPath(normalizePath(prevKeyPrefix));
 
       // Root-Level :- Return the original path
@@ -267,14 +277,17 @@ public class OMDBInsightSearchEndpoint {
 
       // Volume-Level :- Fetch the volumeID
       String volumeName = names[0];
+      validateNames(volumeName);
       String volumeKey = omMetadataManager.getVolumeKey(volumeName);
-      long volumeId = omMetadataManager.getVolumeTable().getSkipCache(volumeKey).getObjectID();
+      long volumeId = omMetadataManager.getVolumeTable().getSkipCache(volumeKey)
+          .getObjectID();
       if (names.length == 1) {
         return constructObjectPathWithPrefix(volumeId);
       }
 
       // Bucket-Level :- Fetch the bucketID
       String bucketName = names[1];
+      validateNames(bucketName);
       String bucketKey = omMetadataManager.getBucketKey(volumeName, bucketName);
       OmBucketInfo bucketInfo =
           omMetadataManager.getBucketTable().getSkipCache(bucketKey);
@@ -285,17 +298,10 @@ public class OMDBInsightSearchEndpoint {
 
       // Fetch the immediate parentID which could be a directory or the bucket itself
       BucketHandler handler =
-          getBucketHandler(reconNamespaceSummaryManager, omMetadataManager, reconSCM, bucketInfo);
+          getBucketHandler(reconNamespaceSummaryManager, omMetadataManager,
+              reconSCM, bucketInfo);
       long dirObjectId = handler.getDirInfo(names).getObjectID();
       return constructObjectPathWithPrefix(volumeId, bucketId, dirObjectId);
-
-    } catch (IOException e) {
-      LOG.error("Error converting key prefix to object path: {}", prevKeyPrefix, e);
-      return prevKeyPrefix; // Fallback to original prefix in case of exception
-    } catch (Exception e) {
-      LOG.error("Unexpected error during conversion: {}", prevKeyPrefix, e);
-      return prevKeyPrefix;
-    }
   }
 
   /**
@@ -370,29 +376,29 @@ public class OMDBInsightSearchEndpoint {
    * @param resName The name to validate (volume or bucket).
    * @return A Response object if validation fails, or null if the name is valid.
    */
-  public Response validateNames(String resName) {
-    if (resName == null) {
-      return createBadRequestResponse("Volume or Bucket name cannot be null");
-    }
-
+  public Response validateNames(String resName)
+      throws IllegalArgumentException {
     if (resName.length() < OzoneConsts.OZONE_MIN_BUCKET_NAME_LENGTH ||
         resName.length() > OzoneConsts.OZONE_MAX_BUCKET_NAME_LENGTH) {
-      return createBadRequestResponse(
-          "Bucket or Volume name must be between 3 and 63 characters");
+      throw new IllegalArgumentException(
+          "Bucket or Volume name length should be between " +
+              OzoneConsts.OZONE_MIN_BUCKET_NAME_LENGTH + " and " +
+              OzoneConsts.OZONE_MAX_BUCKET_NAME_LENGTH);
     }
 
     if (resName.charAt(0) == '.' || resName.charAt(0) == '-' ||
         resName.charAt(resName.length() - 1) == '.' ||
         resName.charAt(resName.length() - 1) == '-') {
-      return createBadRequestResponse(
-          "Bucket or Volume name cannot start or end with a period or dash");
+      throw new IllegalArgumentException(
+          "Bucket or Volume name cannot start or end with " +
+              "hyphen or period");
     }
 
     // Regex to check for lowercase letters, numbers, hyphens, underscores, and periods only.
     if (!resName.matches("^[a-z0-9._-]+$")) {
-      return createBadRequestResponse(
-          "Bucket or Volume name can only include lowercase letters, numbers," +
-              " hyphens, underscores, and periods");
+      throw new IllegalArgumentException(
+          "Bucket or Volume name can only contain lowercase " +
+              "letters, numbers, hyphens, underscores, and periods");
     }
 
     // If all checks pass, the name is valid
