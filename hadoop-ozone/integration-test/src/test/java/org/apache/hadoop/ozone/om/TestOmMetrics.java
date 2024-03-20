@@ -77,8 +77,8 @@ import static org.apache.hadoop.ozone.security.acl.OzoneObj.ResourceType.VOLUME;
 import static org.apache.hadoop.ozone.security.acl.OzoneObj.StoreType.OZONE;
 import static org.apache.ozone.test.MetricsAsserts.getLongCounter;
 import static org.apache.ozone.test.MetricsAsserts.getMetrics;
-import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.any;
@@ -196,8 +196,9 @@ public class TestOmMetrics {
 
     HddsWhiteboxTestUtils.setInternalState(ozoneManager,
         "volumeManager", mockVm);
+
     // inject exception to test for Failure Metrics on the write path
-    mockWritePathExceptions(OmVolumeArgs.class);
+    OMMetadataManager metadataManager = mockWritePathExceptions(OmVolumeArgs.class);
     volumeArgs = createVolumeArgs();
     doVolumeOps(volumeArgs);
 
@@ -215,6 +216,12 @@ public class TestOmMetrics {
     assertEquals(initialNumVolumeDeleteFails + 1, getLongCounter("NumVolumeDeleteFails", omMetrics));
     assertEquals(initialNumVolumeListFails + 1, getLongCounter("NumVolumeListFails", omMetrics));
     assertEquals(initialNumVolumes + 2, getLongCounter("NumVolumes", omMetrics));
+
+    // restore state
+    HddsWhiteboxTestUtils.setInternalState(ozoneManager,
+        "volumeManager", volumeManager);
+    HddsWhiteboxTestUtils.setInternalState(ozoneManager,
+        "metadataManager", metadataManager);
   }
 
   @Test
@@ -283,7 +290,7 @@ public class TestOmMetrics {
         ozoneManager, "bucketManager", mockBm);
 
     // inject exception to test for Failure Metrics on the write path
-    mockWritePathExceptions(OmBucketInfo.class);
+    OMMetadataManager metadataManager = mockWritePathExceptions(OmBucketInfo.class);
     doBucketOps(bucketInfo);
 
     ecBucketInfo = createBucketInfo(true);
@@ -307,142 +314,151 @@ public class TestOmMetrics {
     assertEquals(initialNumBucketDeleteFails + 1, getLongCounter("NumBucketDeleteFails", omMetrics));
     assertEquals(initialNumBucketListFails + 1, getLongCounter("NumBucketListFails", omMetrics));
     assertEquals(initialNumBuckets + 2, getLongCounter("NumBuckets", omMetrics));
+
+    // restore state
+    HddsWhiteboxTestUtils.setInternalState(ozoneManager,
+        "bucketManager", bucketManager);
+    HddsWhiteboxTestUtils.setInternalState(ozoneManager,
+        "metadataManager", metadataManager);
   }
 
-  @Test
-  public void testKeyOps() throws Exception {
-    shutdown();
-    startCluster();
+    @Test
+    public void testKeyOps() throws Exception {
+      String volumeName = UUID.randomUUID().toString();
+      String bucketName = UUID.randomUUID().toString();
+      KeyManager keyManager = (KeyManager) HddsWhiteboxTestUtils
+          .getInternalState(ozoneManager, "keyManager");
+      KeyManager mockKm = spy(keyManager);
 
-    String volumeName = UUID.randomUUID().toString();
-    String bucketName = UUID.randomUUID().toString();
-    KeyManager keyManager = (KeyManager) HddsWhiteboxTestUtils
-        .getInternalState(ozoneManager, "keyManager");
-    KeyManager mockKm = spy(keyManager);
+      // get initial values for metrics
+      MetricsRecordBuilder omMetrics = getMetrics("OMMetrics");
+      long initialNumKeyOps = getLongCounter("NumKeyOps", omMetrics);
+      long initialNumKeyAllocate = getLongCounter("NumKeyAllocate", omMetrics);
+      long initialNumKeyLookup = getLongCounter("NumKeyLookup", omMetrics);
+      long initialNumKeyDeletes = getLongCounter("NumKeyDeletes", omMetrics);
+      long initialNumKeyLists = getLongCounter("NumKeyLists", omMetrics);
+      long initialNumTrashKeyLists = getLongCounter("NumTrashKeyLists", omMetrics);
+      long initialNumKeys = getLongCounter("NumKeys", omMetrics);
+      long initialNumInitiateMultipartUploads = getLongCounter("NumInitiateMultipartUploads", omMetrics);
 
-    // get initial values for metrics
-    MetricsRecordBuilder omMetrics = getMetrics("OMMetrics");
-    long initialNumKeyOps = getLongCounter("NumKeyOps", omMetrics);
-    long initialNumKeyAllocate = getLongCounter("NumKeyAllocate", omMetrics);
-    long initialNumKeyLookup = getLongCounter("NumKeyLookup", omMetrics);
-    long initialNumKeyDeletes = getLongCounter("NumKeyDeletes", omMetrics);
-    long initialNumKeyLists = getLongCounter("NumKeyLists", omMetrics);
-    long initialNumTrashKeyLists = getLongCounter("NumTrashKeyLists", omMetrics);
-    long initialNumKeys = getLongCounter("NumKeys", omMetrics);
-    long initialNumInitiateMultipartUploads = getLongCounter("NumInitiateMultipartUploads", omMetrics);
+      long initialEcKeyCreateTotal = getLongCounter("EcKeyCreateTotal", omMetrics);
+      long initialNumKeyAllocateFails = getLongCounter("NumKeyAllocateFails", omMetrics);
+      long initialNumKeyLookupFails = getLongCounter("NumKeyLookupFails", omMetrics);
+      long initialNumKeyDeleteFails = getLongCounter("NumKeyDeleteFails", omMetrics);
+      long initialNumTrashKeyListFails = getLongCounter("NumTrashKeyListFails", omMetrics);
+      long initialNumInitiateMultipartUploadFails = getLongCounter("NumInitiateMultipartUploadFails", omMetrics);
+      long initialNumBlockAllocationFails = getLongCounter("NumBlockAllocationFails", omMetrics);
+      long initialNumKeyListFails = getLongCounter("NumKeyListFails", omMetrics);
+      long initialEcKeyCreateFailsTotal = getLongCounter("EcKeyCreateFailsTotal", omMetrics);
 
-    long initialEcKeyCreateTotal = getLongCounter("EcKeyCreateTotal", omMetrics);
-    long initialNumKeyAllocateFails = getLongCounter("NumKeyAllocateFails", omMetrics);
-    long initialNumKeyLookupFails = getLongCounter("NumKeyLookupFails", omMetrics);
-    long initialNumKeyDeleteFails = getLongCounter("NumKeyDeleteFails", omMetrics);
-    long initialNumTrashKeyListFails = getLongCounter("NumTrashKeyListFails", omMetrics);
-    long initialNumInitiateMultipartUploadFails = getLongCounter("NumInitiateMultipartUploadFails", omMetrics);
-    long initialNumBlockAllocationFails = getLongCounter("NumBlockAllocationFails", omMetrics);
-    long initialNumKeyListFails = getLongCounter("NumKeyListFails", omMetrics);
-    long initialEcKeyCreateFailsTotal = getLongCounter("EcKeyCreateFailsTotal", omMetrics);
+      // see HDDS-10078 for making this work with FILE_SYSTEM_OPTIMIZED layout
+      TestDataUtil.createVolumeAndBucket(client, volumeName, bucketName, BucketLayout.LEGACY);
+      OmKeyArgs keyArgs = createKeyArgs(volumeName, bucketName,
+          RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.THREE));
+      doKeyOps(keyArgs);
 
-    // see HDDS-10078 for making this work with FILE_SYSTEM_OPTIMIZED layout
-    TestDataUtil.createVolumeAndBucket(client, volumeName, bucketName, BucketLayout.LEGACY);
-    OmKeyArgs keyArgs = createKeyArgs(volumeName, bucketName,
-        RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.THREE));
-    doKeyOps(keyArgs);
+      omMetrics = getMetrics("OMMetrics");
 
-    omMetrics = getMetrics("OMMetrics");
+      assertEquals(initialNumKeyOps + 7, getLongCounter("NumKeyOps", omMetrics));
+      assertEquals(initialNumKeyAllocate + 1, getLongCounter("NumKeyAllocate", omMetrics));
+      assertEquals(initialNumKeyLookup + 1, getLongCounter("NumKeyLookup", omMetrics));
+      assertEquals(initialNumKeyDeletes + 1, getLongCounter("NumKeyDeletes", omMetrics));
+      assertEquals(initialNumKeyLists + 1, getLongCounter("NumKeyLists", omMetrics));
+      assertEquals(initialNumTrashKeyLists + 1, getLongCounter("NumTrashKeyLists", omMetrics));
+      assertEquals(initialNumKeys, getLongCounter("NumKeys", omMetrics));
+      assertEquals(initialNumInitiateMultipartUploads + 1, getLongCounter("NumInitiateMultipartUploads", omMetrics));
 
-    assertEquals(initialNumKeyOps + 7, getLongCounter("NumKeyOps", omMetrics));
-    assertEquals(initialNumKeyAllocate + 1, getLongCounter("NumKeyAllocate", omMetrics));
-    assertEquals(initialNumKeyLookup + 1, getLongCounter("NumKeyLookup", omMetrics));
-    assertEquals(initialNumKeyDeletes + 1, getLongCounter("NumKeyDeletes", omMetrics));
-    assertEquals(initialNumKeyLists + 1, getLongCounter("NumKeyLists", omMetrics));
-    assertEquals(initialNumTrashKeyLists + 1, getLongCounter("NumTrashKeyLists", omMetrics));
-    assertEquals(initialNumKeys, getLongCounter("NumKeys", omMetrics));
-    assertEquals(initialNumInitiateMultipartUploads + 1, getLongCounter("NumInitiateMultipartUploads", omMetrics));
+      keyArgs = createKeyArgs(volumeName, bucketName,
+          new ECReplicationConfig("rs-3-2-1024K"));
+      doKeyOps(keyArgs);
 
-    keyArgs = createKeyArgs(volumeName, bucketName,
-        new ECReplicationConfig("rs-3-2-1024K"));
-    doKeyOps(keyArgs);
+      omMetrics = getMetrics("OMMetrics");
+      assertEquals(initialNumKeys, getLongCounter("NumKeys", omMetrics));
+      assertEquals(initialEcKeyCreateTotal + 1, getLongCounter("EcKeyCreateTotal", omMetrics));
 
-    omMetrics = getMetrics("OMMetrics");
-    assertEquals(initialNumKeys, getLongCounter("NumKeys", omMetrics));
-    assertEquals(initialEcKeyCreateTotal + 1, getLongCounter("EcKeyCreateTotal", omMetrics));
-
-    keyArgs = createKeyArgs(volumeName, bucketName,
-        RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.THREE));
-    OpenKeySession keySession = writeClient.openKey(keyArgs);
-    writeClient.commitKey(keyArgs, keySession.getId());
-    keyArgs = createKeyArgs(volumeName, bucketName,
-        RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.THREE));
-    keySession = writeClient.openKey(keyArgs);
-    writeClient.commitKey(keyArgs, keySession.getId());
-    keyArgs = createKeyArgs(volumeName, bucketName,
-        RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.THREE));
-    keySession = writeClient.openKey(keyArgs);
-    writeClient.commitKey(keyArgs, keySession.getId());
-    writeClient.deleteKey(keyArgs);
-
-    keyArgs = createKeyArgs(volumeName, bucketName,
-        new ECReplicationConfig("rs-6-3-1024K"));
-    try {
+      keyArgs = createKeyArgs(volumeName, bucketName,
+          RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.THREE));
+      OpenKeySession keySession = writeClient.openKey(keyArgs);
+      writeClient.commitKey(keyArgs, keySession.getId());
+      keyArgs = createKeyArgs(volumeName, bucketName,
+          RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.THREE));
       keySession = writeClient.openKey(keyArgs);
       writeClient.commitKey(keyArgs, keySession.getId());
-    } catch (Exception e) {
-      //Expected Failure in preExecute due to not enough datanode
-      assertThat(e.getMessage()).contains("No enough datanodes to choose");
-    }
-
-    omMetrics = getMetrics("OMMetrics");
-    assertEquals(initialNumKeys + 2, getLongCounter("NumKeys", omMetrics));
-    assertEquals(initialNumBlockAllocationFails + 1, getLongCounter("NumBlockAllocationFails", omMetrics));
-
-    // inject exception to test for Failure Metrics on the read path
-    doThrow(exception).when(mockKm).lookupKey(any(), any(), any());
-    doThrow(exception).when(mockKm).listKeys(
-        any(), any(), any(), any(), anyInt());
-    doThrow(exception).when(mockKm).listTrash(
-        any(), any(), any(), any(), anyInt());
-    OmMetadataReader omMetadataReader =
-        (OmMetadataReader) ozoneManager.getOmMetadataReader().get();
-    HddsWhiteboxTestUtils.setInternalState(
-        ozoneManager, "keyManager", mockKm);
-
-    HddsWhiteboxTestUtils.setInternalState(
-        omMetadataReader, "keyManager", mockKm);
-
-    // inject exception to test for Failure Metrics on the write path
-    mockWritePathExceptions(OmBucketInfo.class);
-    keyArgs = createKeyArgs(volumeName, bucketName,
-        RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.THREE));
-    doKeyOps(keyArgs);
-
-    omMetrics = getMetrics("OMMetrics");
-    assertEquals(initialNumKeyOps + 28, getLongCounter("NumKeyOps", omMetrics));
-    assertEquals(initialNumKeyAllocate + 6, getLongCounter("NumKeyAllocate", omMetrics));
-    assertEquals(initialNumKeyLookup + 3, getLongCounter("NumKeyLookup", omMetrics));
-    assertEquals(initialNumKeyDeletes + 4, getLongCounter("NumKeyDeletes", omMetrics));
-    assertEquals(initialNumKeyLists + 3, getLongCounter("NumKeyLists", omMetrics));
-    assertEquals(initialNumTrashKeyLists + 3, getLongCounter("NumTrashKeyLists", omMetrics));
-    assertEquals(initialNumInitiateMultipartUploads + 3, getLongCounter("NumInitiateMultipartUploads", omMetrics));
-
-    assertEquals(initialNumKeyAllocateFails + 1, getLongCounter("NumKeyAllocateFails", omMetrics));
-    assertEquals(initialNumKeyLookupFails + 1, getLongCounter("NumKeyLookupFails", omMetrics));
-    assertEquals(initialNumKeyDeleteFails + 1, getLongCounter("NumKeyDeleteFails", omMetrics));
-    assertEquals(initialNumKeyListFails + 1, getLongCounter("NumKeyListFails", omMetrics));
-    assertEquals(initialNumTrashKeyListFails + 1, getLongCounter("NumTrashKeyListFails", omMetrics));
-    assertEquals(initialNumInitiateMultipartUploadFails + 1, getLongCounter(
-        "NumInitiateMultipartUploadFails", omMetrics));
-    assertEquals(initialNumKeys + 2, getLongCounter("NumKeys", omMetrics));
-
-    keyArgs = createKeyArgs(volumeName, bucketName,
-        new ECReplicationConfig("rs-3-2-1024K"));
-    try {
+      keyArgs = createKeyArgs(volumeName, bucketName,
+          RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.THREE));
       keySession = writeClient.openKey(keyArgs);
       writeClient.commitKey(keyArgs, keySession.getId());
-    } catch (Exception e) {
-      //Expected Failure
+      writeClient.deleteKey(keyArgs);
+
+      keyArgs = createKeyArgs(volumeName, bucketName,
+          new ECReplicationConfig("rs-6-3-1024K"));
+      try {
+        keySession = writeClient.openKey(keyArgs);
+        writeClient.commitKey(keyArgs, keySession.getId());
+      } catch (Exception e) {
+        //Expected Failure in preExecute due to not enough datanode
+        assertThat(e.getMessage()).contains("No enough datanodes to choose");
+      }
+
+      omMetrics = getMetrics("OMMetrics");
+      assertEquals(initialNumKeys + 2, getLongCounter("NumKeys", omMetrics));
+      assertEquals(initialNumBlockAllocationFails + 1, getLongCounter("NumBlockAllocationFails", omMetrics));
+
+      // inject exception to test for Failure Metrics on the read path
+      doThrow(exception).when(mockKm).lookupKey(any(), any(), any());
+      doThrow(exception).when(mockKm).listKeys(
+          any(), any(), any(), any(), anyInt());
+      doThrow(exception).when(mockKm).listTrash(
+          any(), any(), any(), any(), anyInt());
+      OmMetadataReader omMetadataReader =
+          (OmMetadataReader) ozoneManager.getOmMetadataReader().get();
+      HddsWhiteboxTestUtils.setInternalState(
+          ozoneManager, "keyManager", mockKm);
+
+      HddsWhiteboxTestUtils.setInternalState(
+          omMetadataReader, "keyManager", mockKm);
+
+      // inject exception to test for Failure Metrics on the write path
+      OMMetadataManager metadataManager = mockWritePathExceptions(OmBucketInfo.class);
+      keyArgs = createKeyArgs(volumeName, bucketName,
+          RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.THREE));
+      doKeyOps(keyArgs);
+
+      omMetrics = getMetrics("OMMetrics");
+      assertEquals(initialNumKeyOps + 28, getLongCounter("NumKeyOps", omMetrics));
+      assertEquals(initialNumKeyAllocate + 6, getLongCounter("NumKeyAllocate", omMetrics));
+      assertEquals(initialNumKeyLookup + 3, getLongCounter("NumKeyLookup", omMetrics));
+      assertEquals(initialNumKeyDeletes + 4, getLongCounter("NumKeyDeletes", omMetrics));
+      assertEquals(initialNumKeyLists + 3, getLongCounter("NumKeyLists", omMetrics));
+      assertEquals(initialNumTrashKeyLists + 3, getLongCounter("NumTrashKeyLists", omMetrics));
+      assertEquals(initialNumInitiateMultipartUploads + 3, getLongCounter("NumInitiateMultipartUploads", omMetrics));
+
+      assertEquals(initialNumKeyAllocateFails + 1, getLongCounter("NumKeyAllocateFails", omMetrics));
+      assertEquals(initialNumKeyLookupFails + 1, getLongCounter("NumKeyLookupFails", omMetrics));
+      assertEquals(initialNumKeyDeleteFails + 1, getLongCounter("NumKeyDeleteFails", omMetrics));
+      assertEquals(initialNumKeyListFails + 1, getLongCounter("NumKeyListFails", omMetrics));
+      assertEquals(initialNumTrashKeyListFails + 1, getLongCounter("NumTrashKeyListFails", omMetrics));
+      assertEquals(initialNumInitiateMultipartUploadFails + 1, getLongCounter(
+          "NumInitiateMultipartUploadFails", omMetrics));
+      assertEquals(initialNumKeys + 2, getLongCounter("NumKeys", omMetrics));
+
+      keyArgs = createKeyArgs(volumeName, bucketName,
+          new ECReplicationConfig("rs-3-2-1024K"));
+      try {
+        keySession = writeClient.openKey(keyArgs);
+        writeClient.commitKey(keyArgs, keySession.getId());
+      } catch (Exception e) {
+        //Expected Failure
+      }
+      omMetrics = getMetrics("OMMetrics");
+      assertEquals(initialEcKeyCreateFailsTotal + 1, getLongCounter("EcKeyCreateFailsTotal", omMetrics));
+
+      // restore state
+      HddsWhiteboxTestUtils.setInternalState(ozoneManager,
+          "keyManager", keyManager);
+      HddsWhiteboxTestUtils.setInternalState(ozoneManager,
+          "metadataManager", metadataManager);
     }
-    omMetrics = getMetrics("OMMetrics");
-    assertEquals(initialEcKeyCreateFailsTotal + 1, getLongCounter("EcKeyCreateFailsTotal", omMetrics));
-  }
 
   @ParameterizedTest
   @EnumSource(value = BucketLayout.class, names = {"FILE_SYSTEM_OPTIMIZED", "LEGACY"})
@@ -541,8 +557,6 @@ public class TestOmMetrics {
 
   @Test
   public void testSnapshotOps() throws Exception {
-    shutdown();
-    startCluster();
     // This tests needs enough dataNodes to allocate the blocks for the keys.
     // get initial values for metrics
     MetricsRecordBuilder omMetrics = getMetrics("OMMetrics");
@@ -625,7 +639,7 @@ public class TestOmMetrics {
     assertEquals(initialNumSnapshotListFails + 1, getLongCounter("NumSnapshotListFails", omMetrics));
   }
 
-  private <T> void mockWritePathExceptions(Class<T>klass) throws Exception {
+  private <T> OMMetadataManager mockWritePathExceptions(Class<T>klass) throws Exception {
     String tableName;
     if (klass == OmBucketInfo.class) {
       tableName = "bucketTable";
@@ -647,12 +661,13 @@ public class TestOmMetrics {
     }
     HddsWhiteboxTestUtils.setInternalState(
         ozoneManager, "metadataManager", mockMm);
+
+    // Return the original metadataManager so it can be restored later
+    return metadataManager;
   }
 
   @Test
   public void testAclOperations() throws Exception {
-    shutdown();
-    startCluster();
     // get initial values for metrics
     MetricsRecordBuilder omMetrics = getMetrics("OMMetrics");
     long initialNumGetAcl = getLongCounter("NumGetAcl", omMetrics);
@@ -684,8 +699,6 @@ public class TestOmMetrics {
 
   @Test
   public void testAclOperationsHA() throws Exception {
-    shutdown();
-    startCluster();
     ObjectStore objectStore = client.getObjectStore();
     // Create a volume.
     objectStore.createVolume("volumeaclha");
