@@ -392,7 +392,12 @@ public class BlockOutputStream extends OutputStream {
    * @throws IOException
    */
   private void handleFullBuffer() throws IOException {
-    waitForFlushAndCommit(true);
+    try {
+      waitForFlushAndCommit(true).get();
+    } catch (InterruptedException | ExecutionException e) {
+      // TODO: Handle exception
+      LOG.error("Exception caught but ignored in this POC", e);
+    }
   }
 
   CompletableFuture<Void> waitForFlushAndCommit(boolean bufferFull) throws IOException {
@@ -606,7 +611,7 @@ public class BlockOutputStream extends OutputStream {
       // data since latest flush - we need to send the "EOF" flag
       executePutBlock(true, true);
     }
-    waitOnFlushFutures();
+    waitOnFlushFutures().get();
     watchForCommit(false);
     // just check again if the exception is hit while waiting for the
     // futures to ensure flush has indeed succeeded
