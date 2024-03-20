@@ -333,6 +333,8 @@ public class BlockOutputStream extends OutputStream {
 
   private void allocateNewBufferIfNeeded() {
     if (currentBufferRemaining == 0) {
+      // TODO: Remove debug print
+      LOG.debug("allocateBuffer(increment = {})", config.getBufferIncrement());
       currentBuffer = bufferPool.allocateBuffer(config.getBufferIncrement());
       currentBufferRemaining = currentBuffer.remaining();
     }
@@ -406,7 +408,7 @@ public class BlockOutputStream extends OutputStream {
     // ExecutionException and InterruptedException are no longer handled at this level
     // since the future is being returned all the way up to KeyOutputStream
 
-    // TODO: Can this call be removed?
+    // TODO: Can this call be safely removed? HDDS-10108 could help?
     watchForCommit(bufferFull);
 
     return future;

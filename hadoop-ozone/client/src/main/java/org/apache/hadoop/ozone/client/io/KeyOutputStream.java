@@ -176,7 +176,7 @@ public class KeyOutputStream extends OutputStream
   }
 
   @Override
-  public synchronized void write(int b) throws IOException {  // TODO: Remove synchronized
+  public void write(int b) throws IOException {
     byte[] buf = new byte[1];
     buf[0] = (byte) b;
     write(buf, 0, 1);
@@ -195,7 +195,7 @@ public class KeyOutputStream extends OutputStream
    * @throws IOException
    */
   @Override
-  public synchronized void write(byte[] b, int off, int len)  // TODO: Remove synchronized
+  public void write(byte[] b, int off, int len)
       throws IOException {
     checkNotClosed();
     if (b == null) {
@@ -208,11 +208,24 @@ public class KeyOutputStream extends OutputStream
     if (len == 0) {
       return;
     }
-    handleWrite(b, off, len, false);
-    writeOffset += len;
+
+    CompletableFuture<Void> future = null;
+    synchronized (this) {
+      future = handleWrite(b, off, len, false);
+      writeOffset += len;
+    }
+
+    if (future != null) {
+      try {
+        future.get();
+      } catch (InterruptedException | ExecutionException e) {
+        // TODO: Handle this properly
+        LOG.error("Exception caught but ignored in this POC", e);
+      }
+    }
   }
 
-  private void handleWrite(byte[] b, int off, long len, boolean retry)
+  private CompletableFuture<Void> handleWrite(byte[] b, int off, long len, boolean retry)
       throws IOException {
     CompletableFuture<Void> future = null;
     while (len > 0) {
@@ -228,16 +241,18 @@ public class KeyOutputStream extends OutputStream
         // writeLen will be updated based on whether the write was succeeded
         // or if it sees an exception, how much the actual write was
         // acknowledged.
+
+        // TODO: Remove debug print
+//        LOG.debug("writeToOutputStream(current = {}, retry = {}, len = {}, b = {}, " +
+//            "expectedWriteLen = {}, off = {}, currentPos = {})",
+//            current, retry, len, b, expectedWriteLen, off, currentPos);
+
         int writtenLength =
                 writeToOutputStream(current, retry, len, b, expectedWriteLen,
                 off, currentPos);
         if (current.getRemaining() <= 0) {
           // since the current block is already written close the stream.
           future = handleFlushOrClose(StreamAction.FULL);
-          // TODO: Return future instead
-          if (future != null) {
-            future.get();
-          }
         }
         len -= writtenLength;
         off += writtenLength;
@@ -245,8 +260,8 @@ public class KeyOutputStream extends OutputStream
         markStreamClosed();
         throw new IOException(e);
       }
-//      return future;
     }
+    return future;
   }
 
   private int writeToOutputStream(BlockOutputStreamEntry current,
@@ -361,7 +376,11 @@ public class KeyOutputStream extends OutputStream
     if (bufferedDataLen > 0) {
       // If the data is still cached in the underlying stream, we need to
       // allocate new block and write this data in the datanode.
-      handleRetry(exception, bufferedDataLen);
+      try {
+        handleRetry(exception, bufferedDataLen).get();
+      } catch (InterruptedException | ExecutionException e) {
+        LOG.error("Exception caught but ignored in this POC", e);
+      }
       // reset the retryCount after handling the exception
       retryCount = 0;
     }
@@ -372,7 +391,7 @@ public class KeyOutputStream extends OutputStream
     closed = true;
   }
 
-  private void handleRetry(IOException exception, long len) throws IOException {
+  private CompletableFuture<Void> handleRetry(IOException exception, long len) throws IOException {
     RetryPolicy retryPolicy = retryPolicyMap
         .get(HddsClientUtils.checkForException(exception).getClass());
     if (retryPolicy == null) {
@@ -416,7 +435,7 @@ public class KeyOutputStream extends OutputStream
       LOG.trace("Retrying Write request. Already tried {} time(s); " +
           "retry policy is {} ", retryCount, retryPolicy);
     }
-    handleWrite(null, 0, len, true);
+    return handleWrite(null, 0, len, true);
   }
 
   private void setExceptionAndThrow(IOException ioe) throws IOException {
@@ -547,17 +566,17 @@ public class KeyOutputStream extends OutputStream
     switch (op) {
     case CLOSE:
       entry.close();
-      // TODO: Revisit. Return entry or wait for it to complete with get().
+      // TODO: Revisit this
       break;
     case FULL:
       if (entry.getRemaining() == 0) {
         entry.close();
-        // TODO: Revisit. Return entry or wait for it to complete with get().
+        // TODO: Revisit this
       }
       break;
     case FLUSH:
       entry.flush();
-      // TODO: Revisit. Return entry or wait for it to complete with get().
+      // TODO: Revisit this
       break;
     case HSYNC:
       future = entry.hsync();
@@ -574,13 +593,16 @@ public class KeyOutputStream extends OutputStream
    * @throws IOException
    */
   @Override
-  public synchronized void close() throws IOException {  // TODO: Remove synchronized
+  public void close() throws IOException {
     if (closed) {
       return;
     }
     closed = true;
     try {
-      CompletableFuture<Void> future = handleFlushOrClose(StreamAction.CLOSE);
+      CompletableFuture<Void> future = null;
+      synchronized (this) {
+        future = handleFlushOrClose(StreamAction.CLOSE);
+      }
       if (future != null) {
         future.get();
       }
