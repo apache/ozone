@@ -115,11 +115,10 @@ import static org.apache.hadoop.fs.CommonPathCapabilities.FS_CHECKSUMS;
 import static org.apache.hadoop.fs.FileSystem.TRASH_PREFIX;
 import static org.apache.hadoop.fs.contract.ContractTestUtils.assertHasPathCapabilities;
 import static org.apache.hadoop.fs.ozone.Constants.LISTING_PAGE_SIZE;
+import static org.apache.hadoop.fs.ozone.OzoneFileSystemTests.createKeyWithECReplicationConfiguration;
 import static org.apache.hadoop.hdds.client.ECReplicationConfig.EcCodec.RS;
 import static org.apache.hadoop.ozone.OzoneAcl.AclScope.ACCESS;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_FS_ITERATE_BATCH_SIZE;
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_REPLICATION;
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_REPLICATION_TYPE;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ADDRESS_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ENABLE_OFS_SHARED_TMP_DIR;
@@ -234,7 +233,6 @@ abstract class AbstractRootedOzoneFileSystemTest {
   @BeforeAll
   void initClusterAndEnv() throws IOException, InterruptedException, TimeoutException {
     conf = new OzoneConfiguration();
-    conf.set("fs.ofs.impl.disable.cache", "true");
     conf.setFloat(OMConfigKeys.OZONE_FS_TRASH_INTERVAL_KEY, TRASH_INTERVAL);
     conf.setFloat(FS_TRASH_INTERVAL_KEY, TRASH_INTERVAL);
     conf.setFloat(FS_TRASH_CHECKPOINT_INTERVAL_KEY, TRASH_INTERVAL / 2);
@@ -332,17 +330,13 @@ abstract class AbstractRootedOzoneFileSystemTest {
   public void testCreateKeyWithECReplicationConfig() throws Exception {
     String testKeyName = "testKey";
     Path testKeyPath = new Path(bucketPath, testKeyName);
-    conf.set(OZONE_REPLICATION, "rs-3-2-1024k");
-    conf.set(OZONE_REPLICATION_TYPE, "EC");
-    FileSystem fileSystem = FileSystem.get(conf);
-    ContractTestUtils.touch(fileSystem, testKeyPath);
+    createKeyWithECReplicationConfiguration(cluster.getConf(), testKeyPath);
 
     OzoneKeyDetails key = getKey(testKeyPath, false);
     assertEquals(HddsProtos.ReplicationType.EC,
         key.getReplicationConfig().getReplicationType());
     assertEquals("rs-3-2-1024k",
         key.getReplicationConfig().getReplication());
-    fileSystem.close();
   }
 
   @Test
