@@ -23,6 +23,10 @@ import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.RemoteIterator;
 import org.apache.hadoop.fs.contract.ContractTestUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.client.OzoneClient;
+import org.apache.hadoop.ozone.client.OzoneKeyDetails;
 
 import java.io.IOException;
 import java.net.URI;
@@ -99,19 +103,34 @@ final class OzoneFileSystemTests {
     assertEquals(total, iCount);
   }
 
-  static void createKeyWithECReplicationConfiguration(OzoneConfiguration conf, Path keyPath) throws IOException {
+  static void testCreateKeyWithECReplicationConfiguration(OzoneConfiguration inputConf,
+      String volumeName, String bucketName, OzoneClient client) throws IOException {
+    String keyName = "testKey";
+    Path keyPath = new Path("/" + volumeName + "/" + bucketName + "/" + keyName);
+    OzoneConfiguration conf = new OzoneConfiguration(inputConf);
     conf.set(OZONE_REPLICATION, "rs-3-2-1024k");
     conf.set(OZONE_REPLICATION_TYPE, "EC");
     URI uri = FileSystem.getDefaultUri(conf);
     conf.setBoolean(
         String.format("fs.%s.impl.disable.cache", uri.getScheme()), true);
-    FileSystem fileSystem = FileSystem.get(uri, conf);
-    ContractTestUtils.touch(fileSystem, keyPath);
-
-    // Refresh the cache of FileSystem
-    conf.unset(OZONE_REPLICATION);
-    conf.unset(OZONE_REPLICATION_TYPE);
-    fileSystem = FileSystem.get(uri, conf);
-    fileSystem.close();
+    try (FileSystem fileSystem = FileSystem.get(uri, conf)) {
+      ContractTestUtils.touch(fileSystem, keyPath);
+      OzoneKeyDetails key;
+      if (uri.getScheme().equals(OzoneConsts.OZONE_OFS_URI_SCHEME)) {
+        key = client.getObjectStore()
+            .getVolume(volumeName)
+            .getBucket(bucketName)
+            .getKey(keyName);
+      } else {
+        key = client.getObjectStore()
+            .getVolume(volumeName)
+            .getBucket(bucketName)
+            .getKey(volumeName + "/" + bucketName + "/" + keyName);
+      }
+      assertEquals(HddsProtos.ReplicationType.EC,
+          key.getReplicationConfig().getReplicationType());
+      assertEquals("rs-3-2-1024k",
+          key.getReplicationConfig().getReplication());
+    }
   }
 }
