@@ -619,7 +619,7 @@ public class TestHSync {
         + OZONE_URI_DELIMITER + bucket.getName();
 
     try (FileSystem fs = FileSystem.get(CONF)) {
-      for (int i = 0; i < 2; i++) {
+      for (int i = 0; i < 5; i++) {
         final Path file = new Path(dir, "file" + i);
         try (FSDataOutputStream out =
             fs.create(file, true)) {
