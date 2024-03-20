@@ -17,8 +17,7 @@
  */
 package org.apache.hadoop.ozone.shell.tenant;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.SerializationFeature;
+import org.apache.hadoop.hdds.server.JsonUtils;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import org.apache.hadoop.ozone.client.OzoneClient;
@@ -50,10 +49,9 @@ public class TenantListHandler extends TenantHandler {
       tenantStateList.getTenantStateList().forEach(tenantState ->
           out().println(tenantState.getTenantId()));
     } else {
-      ObjectMapper objectMapper = new ObjectMapper();
-      ArrayNode resArray = objectMapper.createArrayNode();
+      ArrayNode resArray = JsonUtils.createArrayNode();
       tenantStateList.getTenantStateList().forEach(tenantState -> {
-        ObjectNode obj = objectMapper.createObjectNode();
+        ObjectNode obj = JsonUtils.createObjectNode(null);
         obj.put("tenantId", tenantState.getTenantId());
         obj.put("bucketNamespaceName", tenantState.getBucketNamespaceName());
         obj.put("userRoleName", tenantState.getUserRoleName());
@@ -63,10 +61,8 @@ public class TenantListHandler extends TenantHandler {
         obj.put("bucketPolicyName", tenantState.getBucketPolicyName());
         resArray.add(obj);
       });
-      if (printJson) {
-        objectMapper.enable(SerializationFeature.INDENT_OUTPUT);
-      }
-      String jsonString = objectMapper.writeValueAsString(resArray);
+      // Serialize and print the JSON string with pretty printing
+      String jsonString = JsonUtils.toJsonStringWithDefaultPrettyPrinter(resArray);
       out().println(jsonString);
     }
   }

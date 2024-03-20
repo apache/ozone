@@ -20,7 +20,7 @@ package org.apache.hadoop.ozone.shell.tenant;
 
 import java.io.IOException;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
+import org.apache.hadoop.hdds.server.JsonUtils;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import org.apache.hadoop.ozone.client.OzoneClient;
@@ -65,15 +65,15 @@ public class TenantListUsersHandler extends S3Handler {
             "' with accessId '" + accessIdInfo.getAccessId() + "'");
       });
     } else {
-      final ArrayNode resArray = new ObjectMapper().createArrayNode();
+      ArrayNode resArray = JsonUtils.createArrayNode();
       usersInTenant.getUserAccessIds().forEach(accessIdInfo -> {
-        final ObjectNode obj = new ObjectMapper().createObjectNode();
+        ObjectNode obj = JsonUtils.createObjectNode(null);
         obj.put("user", accessIdInfo.getUserPrincipal());
         obj.put("accessId", accessIdInfo.getAccessId());
         resArray.add(obj);
       });
-      out().println(new ObjectMapper().writerWithDefaultPrettyPrinter()
-          .writeValueAsString(resArray));
+      String prettyJsonString = JsonUtils.toJsonStringWithDefaultPrettyPrinter(resArray);
+      out().println(prettyJsonString);
     }
 
   }

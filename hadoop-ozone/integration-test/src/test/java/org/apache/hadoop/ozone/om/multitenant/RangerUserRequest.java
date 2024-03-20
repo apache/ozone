@@ -19,7 +19,7 @@ package org.apache.hadoop.ozone.om.multitenant;
 
 import com.fasterxml.jackson.core.JsonParseException;
 import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import org.apache.hadoop.hdds.server.JsonUtils;
 import org.apache.kerby.util.Base64;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -214,8 +214,8 @@ public class RangerUserRequest {
     String response = getResponseData(conn);
     String userIDCreated = null;
     try {
-      ObjectMapper objectMapper = new ObjectMapper();
-      JsonNode jResponse = objectMapper.readTree(response);
+      JsonNode jResponse =
+          JsonUtils.readTree(response);
       JsonNode userinfo = jResponse.path("vXUsers");
       int numIndex = userinfo.size();
 
@@ -255,8 +255,7 @@ public class RangerUserRequest {
     String userId;
     try {
       assert userInfo != null;
-      ObjectMapper objectMapper = new ObjectMapper();
-      JsonNode jNode = objectMapper.readTree(userInfo);
+      JsonNode jNode = JsonUtils.readTree(userInfo);
       userId = jNode.get("id").asText();
       LOG.debug("Ranger returned userId: {}", userId);
     } catch (JsonParseException e) {

@@ -17,9 +17,8 @@
  */
 package org.apache.hadoop.ozone.shell.tenant;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import org.apache.hadoop.hdds.server.JsonUtils;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.shell.OzoneAddress;
 import picocli.CommandLine;
@@ -48,15 +47,13 @@ public class TenantRevokeAdminHandler extends TenantHandler {
     client.getObjectStore().tenantRevokeAdmin(accessId, tenantId);
 
     if (isVerbose()) {
-      ObjectMapper objectMapper = new ObjectMapper();
-      ObjectNode obj = objectMapper.createObjectNode();
+      ObjectNode obj = JsonUtils.createObjectNode(null);
       obj.put("accessId", accessId);
       obj.put("tenantId", tenantId);
       obj.put("isAdmin", false);
       obj.put("isDelegatedAdmin", false);
 
-      objectMapper.enable(SerializationFeature.INDENT_OUTPUT);
-      String jsonString = objectMapper.writeValueAsString(obj);
+      String jsonString = JsonUtils.toJsonStringWithDefaultPrettyPrinter(obj);
       out().println(jsonString);
     }
   }

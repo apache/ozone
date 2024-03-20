@@ -17,9 +17,8 @@
  */
 package org.apache.hadoop.ozone.shell.tenant;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import org.apache.hadoop.hdds.server.JsonUtils;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.TenantArgs;
 import org.apache.hadoop.ozone.shell.OzoneAddress;
@@ -58,13 +57,10 @@ public class TenantCreateHandler extends TenantHandler {
     // RpcClient#createTenant prints INFO level log of tenant and volume name
 
     if (isVerbose()) {
-      ObjectMapper objectMapper = new ObjectMapper();
-      ObjectNode obj = objectMapper.createObjectNode();
+      ObjectNode obj = JsonUtils.createObjectNode(null);
       obj.put("tenantId", tenantId);
 
-      // Enable pretty printing
-      objectMapper.enable(SerializationFeature.INDENT_OUTPUT);
-      String jsonString = objectMapper.writeValueAsString(obj);
+      String jsonString = JsonUtils.toJsonStringWithDefaultPrettyPrinter(obj);
       out().println(jsonString);
     }
   }
