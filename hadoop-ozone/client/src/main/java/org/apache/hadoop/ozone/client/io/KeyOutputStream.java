@@ -444,7 +444,10 @@ public class KeyOutputStream extends OutputStream
   public synchronized void flush() throws IOException {  // TODO: Remove synchronized
     checkNotClosed();
     try {
-      handleFlushOrClose(StreamAction.FLUSH).get();  // TODO: Don't wait
+      CompletableFuture<Void> future = handleFlushOrClose(StreamAction.FLUSH);
+      if (future != null) {
+        future.get();
+      }
     } catch (InterruptedException | ExecutionException e) {
       // TODO: Handle this properly
       LOG.error("Exception caught but ignored in this POC", e);
@@ -577,7 +580,10 @@ public class KeyOutputStream extends OutputStream
     }
     closed = true;
     try {
-      handleFlushOrClose(StreamAction.CLOSE).get();  // TODO: Don't wait
+      CompletableFuture<Void> future = handleFlushOrClose(StreamAction.CLOSE);
+      if (future != null) {
+        future.get();
+      }
       if (!isException) {
         Preconditions.checkArgument(writeOffset == offset);
       }
