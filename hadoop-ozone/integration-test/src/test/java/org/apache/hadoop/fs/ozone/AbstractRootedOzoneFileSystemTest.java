@@ -45,6 +45,7 @@ import org.apache.hadoop.hdds.protocol.StorageType;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.hdfs.protocol.SnapshotDiffReport;
+import org.apache.hadoop.mapreduce.Job;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OFSPath;
 import org.apache.hadoop.ozone.OzoneAcl;
@@ -70,6 +71,9 @@ import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLIdentityType;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType;
 import org.apache.hadoop.ozone.security.acl.OzoneAclConfig;
 import org.apache.hadoop.security.UserGroupInformation;
+import org.apache.hadoop.tools.DistCp;
+import org.apache.hadoop.tools.DistCpOptions;
+import org.apache.hadoop.tools.mapred.CopyMapper;
 import org.apache.hadoop.util.ToolRunner;
 import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.AfterAll;
@@ -78,6 +82,8 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -90,6 +96,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.BitSet;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.LinkedList;
@@ -2320,6 +2327,20 @@ abstract class AbstractRootedOzoneFileSystemTest {
     ozoneVolume.createBucket(linkBucket, builder.build());
   }
 
+  private Path createAndGetBucketPath()
+      throws IOException {
+    BucketArgs.Builder builder = BucketArgs.newBuilder();
+    builder.setStorageType(StorageType.DISK);
+    builder.setBucketLayout(bucketLayout);
+    BucketArgs omBucketArgs = builder.build();
+    String vol = UUID.randomUUID().toString();
+    String buck = UUID.randomUUID().toString();
+    final OzoneBucket bucket =
+        TestDataUtil.createVolumeAndBucket(client, vol, buck, omBucketArgs);
+    Path volume = new Path(OZONE_URI_DELIMITER, bucket.getVolumeName());
+    return new Path(volume, bucket.getName());
+  }
+
   @Test
   void testSnapshotRead() throws Exception {
     if (useOnlyCache) {
@@ -2496,4 +2517,78 @@ abstract class AbstractRootedOzoneFileSystemTest {
     // verify that mtime is NOT updated as expected.
     assertEquals(mtime, fileStatus.getModificationTime());
   }
+
+  @ParameterizedTest(name = "Source Replication Factor = {0}")
+  @ValueSource(shorts = { 1, 3 })
+  public void testDistcp(short sourceRepFactor) throws Exception {
+    Path srcBucketPath = createAndGetBucketPath();
+    Path insideSrcBucket = new Path(srcBucketPath, "*");
+    Path dstBucketPath = createAndGetBucketPath();
+    // create 2 files on source
+    List<String> fileNames = createFiles(srcBucketPath, 2, sourceRepFactor);
+    // Create target directory/bucket
+    fs.mkdirs(dstBucketPath);
+
+    // perform distcp
+    DistCpOptions options =
+        new DistCpOptions.Builder(Collections.singletonList(insideSrcBucket),
+            dstBucketPath).build();
+    options.appendToConf(conf);
+    Job distcpJob = new DistCp(conf, options).execute();
+    verifyCopy(dstBucketPath, distcpJob, 2, 2);
+    FileStatus sourceFileStatus = fs.listStatus(srcBucketPath)[0];
+    FileStatus dstFileStatus = fs.listStatus(dstBucketPath)[0];
+    assertEquals(sourceRepFactor, sourceFileStatus.getReplication());
+    // without preserve distcp should create file with default replication
+    assertEquals(fs.getDefaultReplication(dstBucketPath),
+        dstFileStatus.getReplication());
+
+    deleteFiles(dstBucketPath, fileNames);
+
+    // test preserve option
+    options =
+        new DistCpOptions.Builder(Collections.singletonList(insideSrcBucket),
+            dstBucketPath).preserve(DistCpOptions.FileAttribute.REPLICATION)
+            .build();
+    options.appendToConf(conf);
+    distcpJob = new DistCp(conf, options).execute();
+    verifyCopy(dstBucketPath, distcpJob, 2, 2);
+    dstFileStatus = fs.listStatus(dstBucketPath)[0];
+    // src and dst should have same replication
+    assertEquals(sourceRepFactor, dstFileStatus.getReplication());
+
+    // test if copy is skipped due to matching checksums
+    assertFalse(options.shouldSkipCRC());
+    distcpJob = new DistCp(conf, options).execute();
+    verifyCopy(dstBucketPath, distcpJob, 0, 2);
+  }
+
+  private void verifyCopy(Path dstBucketPath, Job distcpJob,
+      long expectedFilesToBeCopied, long expectedTotalFilesInDest) throws IOException {
+    long filesCopied =
+        distcpJob.getCounters().findCounter(CopyMapper.Counter.COPY).getValue();
+    FileStatus[] destinationFileStatus = fs.listStatus(dstBucketPath);
+    assertEquals(expectedTotalFilesInDest, destinationFileStatus.length);
+    assertEquals(expectedFilesToBeCopied, filesCopied);
+  }
+
+  private List<String> createFiles(Path srcBucketPath, int fileCount, short factor) throws IOException {
+    List<String> createdFiles = new ArrayList<>();
+    for (int i = 1; i <= fileCount; i++) {
+      String keyName = "key" + RandomStringUtils.randomNumeric(5);
+      Path file = new Path(srcBucketPath, keyName);
+      try (FSDataOutputStream fsDataOutputStream = fs.create(file, factor)) {
+        fsDataOutputStream.writeBytes("Hello");
+      }
+      createdFiles.add(keyName);
+    }
+    return createdFiles;
+  }
+
+  private void deleteFiles(Path base, List<String> fileNames) throws IOException {
+    for (String key : fileNames) {
+      fs.delete(new Path(base, key));
+    }
+  }
+
 }

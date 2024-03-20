@@ -27,7 +27,6 @@ import org.junit.jupiter.api.Test;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.BitSet;
 import java.util.List;
 
 import static org.apache.hadoop.hdds.conf.OzoneConfiguration.newInstanceOf;
@@ -35,6 +34,7 @@ import static org.apache.hadoop.ozone.OzoneAcl.AclScope.ACCESS;
 import static org.apache.hadoop.ozone.OzoneAcl.AclScope.DEFAULT;
 import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLIdentityType.GROUP;
 import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLIdentityType.USER;
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
@@ -143,9 +143,12 @@ public class TestOzoneAclUtil {
       if (acl.getName().equals(removedAcl.getName()) &&
           acl.getType().equals(removedAcl.getType()) &&
           acl.getAclScope().equals(removedAcl.getAclScope())) {
-        BitSet temp = (BitSet) acl.getAclBitSet().clone();
-        temp.and(removedAcl.getAclBitSet());
-        return !temp.equals(removedAcl.getAclBitSet());
+        for (ACLType t : removedAcl.getAclList()) {
+          if (acl.isSet(t)) {
+            return false;
+          }
+        }
+        return true;
       }
     }
     return true;
@@ -156,9 +159,12 @@ public class TestOzoneAclUtil {
       if (acl.getName().equals(newAcl.getName()) &&
           acl.getType().equals(newAcl.getType()) &&
           acl.getAclScope().equals(newAcl.getAclScope())) {
-        BitSet temp = (BitSet) acl.getAclBitSet().clone();
-        temp.and(newAcl.getAclBitSet());
-        return temp.equals(newAcl.getAclBitSet());
+        for (ACLType t : newAcl.getAclList()) {
+          if (!acl.isSet(t)) {
+            return false;
+          }
+        }
+        return true;
       }
     }
     return false;
@@ -226,7 +232,7 @@ public class TestOzoneAclUtil {
     assertEquals(2, ozoneAcls.size());
     assertNotEquals(ozoneAcls.get(0).getAclScope(),
         ozoneAcls.get(1).getAclScope());
-    assertEquals(ozoneAcls.get(0).getAclBitSet(),
-        ozoneAcls.get(1).getAclBitSet());
+    assertArrayEquals(ozoneAcls.get(0).getAclByteArray(),
+        ozoneAcls.get(1).getAclByteArray());
   }
 }

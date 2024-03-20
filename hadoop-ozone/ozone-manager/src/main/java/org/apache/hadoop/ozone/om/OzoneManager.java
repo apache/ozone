@@ -82,7 +82,11 @@ import org.apache.hadoop.hdds.ratis.RatisHelper;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.ScmInfo;
 import org.apache.hadoop.hdds.scm.client.HddsClientUtils;
+import org.apache.hadoop.hdds.scm.client.ScmTopologyClient;
 import org.apache.hadoop.hdds.scm.ha.SCMHAUtils;
+import org.apache.hadoop.hdds.scm.net.InnerNode;
+import org.apache.hadoop.hdds.scm.net.NetworkTopology;
+import org.apache.hadoop.hdds.scm.net.NetworkTopologyImpl;
 import org.apache.hadoop.hdds.server.OzoneAdmins;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.Table.KeyValue;
@@ -354,6 +358,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   private OzoneBlockTokenSecretManager blockTokenMgr;
   private CertificateClient certClient;
   private SecretKeySignerClient secretKeyClient;
+  private ScmTopologyClient scmTopologyClient;
   private final Text omRpcAddressTxt;
   private OzoneConfiguration configuration;
   private RPC.Server omRpcServer;
@@ -452,6 +457,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
 
   private final OzoneLockProvider ozoneLockProvider;
   private final OMPerformanceMetrics perfMetrics;
+  private final BucketUtilizationMetrics bucketUtilizationMetrics;
 
   private boolean fsSnapshotEnabled;
 
@@ -603,6 +609,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     final StorageContainerLocationProtocol scmContainerClient = getScmContainerClient(configuration);
     // verifies that the SCM info in the OM Version file is correct.
     final ScmBlockLocationProtocol scmBlockClient = getScmBlockClient(configuration);
+    scmTopologyClient = new ScmTopologyClient(scmBlockClient);
     this.scmClient = new ScmClient(scmBlockClient, scmContainerClient,
         configuration);
     this.ozoneLockProvider = new OzoneLockProvider(getKeyPathLockEnabled(),
@@ -714,6 +721,8 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     } else {
       omState = State.INITIALIZED;
     }
+
+    bucketUtilizationMetrics = BucketUtilizationMetrics.create(metadataManager);
   }
 
   public boolean isStopped() {
@@ -839,7 +848,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       delegationTokenMgr = createDelegationTokenSecretManager(configuration);
     }
 
-    prefixManager = new PrefixManagerImpl(metadataManager, isRatisEnabled);
+    prefixManager = new PrefixManagerImpl(this, metadataManager, isRatisEnabled);
     keyManager = new KeyManagerImpl(this, scmClient, configuration,
         perfMetrics);
     accessAuthorizer = OzoneAuthorizerFactory.forOM(this);
@@ -1133,6 +1142,24 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     }
     certClient = newClient;
     serviceInfo = new ServiceInfoProvider(secConfig, this, certClient);
+  }
+
+  /**
+   * For testing purpose only. This allows setting up ScmBlockLocationClient
+   * without having to fully setup a working cluster.
+   */
+  @VisibleForTesting
+  public void setScmTopologyClient(
+      ScmTopologyClient scmTopologyClient) {
+    this.scmTopologyClient = scmTopologyClient;
+  }
+
+  public NetworkTopology getClusterMap() {
+    InnerNode currentTree = scmTopologyClient.getClusterTree();
+    return new NetworkTopologyImpl(configuration.get(
+        ScmConfigKeys.OZONE_SCM_NETWORK_TOPOLOGY_SCHEMA_FILE,
+        ScmConfigKeys.OZONE_SCM_NETWORK_TOPOLOGY_SCHEMA_FILE_DEFAULT),
+        currentTree);
   }
 
   /**
@@ -1671,6 +1698,13 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     metricsTimer = new Timer();
     metricsTimer.schedule(scheduleOMMetricsWriteTask, 0, period);
 
+    try {
+      scmTopologyClient.start(configuration);
+    } catch (IOException ex) {
+      LOG.error("Unable to initialize network topology schema file. ", ex);
+      throw new UncheckedIOException(ex);
+    }
+
     keyManager.start(configuration);
 
     try {
@@ -2153,15 +2187,16 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   long getLastTrxnIndexForNonRatis() throws IOException {
     TransactionInfo transactionInfo =
         TransactionInfo.readTransactionInfo(metadataManager);
-    // If the OMTransactionInfo does not exist in DB or if the term is not -1
-    // (corresponding to non-Ratis cluster), return 0 so that new incoming
+    // If the OMTransactionInfo does not exist in DB, return 0 so that new incoming
     // requests can have transaction index starting from 1.
-    if (transactionInfo == null || transactionInfo.getTerm() != -1) {
+    if (transactionInfo == null) {
       return 0;
     }
-    // If there exists a last transaction index in DB, the new incoming
-    // requests in non-Ratis cluster must have transaction index
-    // incrementally increasing from the stored transaction index onwards.
+    // If there exists a last transaction index in DB, including two cases:
+    // 1. transactionInfo.getTerm() == -1 corresponds to a non-Ratis cluster
+    // 2. transactionInfo.getTerm() != -1 indicates that the DB may be migrated from Ratis cluster
+    // For both cases above, the new incoming requests in non-Ratis cluster must have
+    // transaction index incrementally increasing from the stored transaction index onwards.
     return transactionInfo.getTransactionIndex();
   }
 
@@ -2231,6 +2266,11 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       }
       keyManager.stop();
       stopSecretManager();
+
+      if (scmTopologyClient != null) {
+        scmTopologyClient.stop();
+      }
+
       if (httpServer != null) {
         httpServer.stop();
       }
@@ -2260,6 +2300,10 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
         OMHAMetrics.unRegister();
       }
       omRatisServer = null;
+
+      if (bucketUtilizationMetrics != null) {
+        bucketUtilizationMetrics.unRegister();
+      }
       return true;
     } catch (Exception e) {
       LOG.error("OzoneManager stop failed.", e);
@@ -3994,7 +4038,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     startSecretManagerIfNecessary();
     startTrashEmptier(configuration);
 
-    // Set metrics and start metrics back ground thread
+    // Set metrics and start metrics background thread
     metrics.setNumVolumes(metadataManager.countRowsInTable(metadataManager
         .getVolumeTable()));
     metrics.setNumBuckets(metadataManager.countRowsInTable(metadataManager
@@ -4008,7 +4052,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     metrics.setNumFiles(metadataManager
         .countEstimatedRowsInTable(metadataManager.getFileTable()));
 
-    // Delete the omMetrics file if it exists and save the a new metrics file
+    // Delete the omMetrics file if it exists and save a new metrics file
     // with new data
     Files.deleteIfExists(getMetricsStorageFile().toPath());
     saveOmMetrics();

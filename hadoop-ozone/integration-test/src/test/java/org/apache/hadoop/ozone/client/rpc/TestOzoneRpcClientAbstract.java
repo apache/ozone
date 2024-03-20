@@ -1333,7 +1333,6 @@ public abstract class TestOzoneRpcClientAbstract {
     if (layout.equals(BucketLayout.LEGACY)) {
       OzoneConfiguration conf = cluster.getConf();
       conf.setBoolean(OMConfigKeys.OZONE_OM_ENABLE_FILESYSTEM_PATHS, true);
-      cluster.setConf(conf);
     }
 
     // the directory "/dir1", ""/dir1/dir2/", "/dir1/dir2/dir3/"
@@ -1651,6 +1650,7 @@ public abstract class TestOzoneRpcClientAbstract {
         }
         latch.countDown();
       } catch (IOException ex) {
+        LOG.error("Execution failed: ", ex);
         latch.countDown();
         failCount.incrementAndGet();
       }

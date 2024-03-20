@@ -71,8 +71,8 @@ public class TestXceiverClientGrpc {
             RatisReplicationConfig.getInstance(ReplicationFactor.THREE))
         .setState(Pipeline.PipelineState.CLOSED)
         .setNodes(dns)
+        .setNodesInOrder(dnsInOrder)
         .build();
-    pipeline.setNodesInOrder(dnsInOrder);
   }
 
   @Test

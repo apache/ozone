@@ -166,11 +166,10 @@ public class TestHDDSUpgrade {
     SCMConfigurator scmConfigurator = new SCMConfigurator();
     scmConfigurator.setUpgradeFinalizationExecutor(scmFinalizationExecutor);
 
-    MiniOzoneCluster.Builder builder =
-        new MiniOzoneHAClusterImpl.Builder(conf)
-        .setNumDatanodes(NUM_DATA_NODES)
-        .setNumOfStorageContainerManagers(NUM_SCMS)
+    MiniOzoneHAClusterImpl.Builder builder = MiniOzoneCluster.newHABuilder(conf);
+    builder.setNumOfStorageContainerManagers(NUM_SCMS)
         .setSCMConfigurator(scmConfigurator)
+        .setNumDatanodes(NUM_DATA_NODES)
         .setDatanodeFactory(UniformDatanodesFactory.newBuilder()
             .setLayoutVersion(HDDSLayoutFeature.INITIAL_VERSION.layoutVersion())
             .build());
@@ -179,7 +178,7 @@ public class TestHDDSUpgrade {
     // use multiple clusters, so its hard to know exactly how many will be
     // needed. This means the provider will create 1 extra cluster than needed
     // but that will not greatly affect runtimes.
-    clusterProvider = new MiniOzoneClusterProvider(conf, builder, 100);
+    clusterProvider = new MiniOzoneClusterProvider(builder, 100);
   }
 
   @AfterAll

@@ -342,10 +342,13 @@ public class ContainerBalancer extends StatefulService {
     // NOTE: join should be called outside the lock in hierarchy
     // to avoid locking others waiting
     // wait for balancingThread to die with interrupt
-    balancingThread.interrupt();
     LOG.info("Container Balancer waiting for {} to stop", balancingThread);
     try {
-      balancingThread.join();
+      while (balancingThread.isAlive()) {
+        // retry interrupt every 5ms to avoid waiting when thread is sleeping
+        balancingThread.interrupt();
+        balancingThread.join(5);
+      }
     } catch (InterruptedException exception) {
       Thread.currentThread().interrupt();
     }

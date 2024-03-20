@@ -164,9 +164,9 @@ public class KeyValueHandler extends Handler {
     // Requests.
     final int threadCountPerDisk = conf.getInt(
         OzoneConfigKeys
-            .DFS_CONTAINER_RATIS_NUM_WRITE_CHUNK_THREADS_PER_VOLUME_KEY,
+            .HDDS_CONTAINER_RATIS_NUM_WRITE_CHUNK_THREADS_PER_VOLUME_KEY,
         OzoneConfigKeys
-            .DFS_CONTAINER_RATIS_NUM_WRITE_CHUNK_THREADS_PER_VOLUME_DEFAULT);
+            .HDDS_CONTAINER_RATIS_NUM_WRITE_CHUNK_THREADS_PER_VOLUME_DEFAULT);
     final int numberOfDisks =
         HddsServerUtil.getDatanodeStorageDirs(conf).size();
     containerCreationLocks = Striped.lazyWeakLock(
@@ -722,6 +722,8 @@ public class KeyValueHandler extends Handler {
       //  For client reads, the client is expected to validate.
       if (DispatcherContext.op(dispatcherContext).readFromTmpFile()) {
         validateChunkChecksumData(data, chunkInfo);
+        metrics.incBytesReadStateMachine(chunkInfo.getLen());
+        metrics.incNumReadStateMachine();
       }
       metrics.incContainerBytesStats(Type.ReadChunk, chunkInfo.getLen());
     } catch (StorageContainerException ex) {
