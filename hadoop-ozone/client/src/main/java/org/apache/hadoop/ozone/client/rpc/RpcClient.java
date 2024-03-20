@@ -156,7 +156,6 @@ import java.security.InvalidKeyException;
 import java.security.PrivilegedExceptionAction;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.BitSet;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
@@ -432,12 +431,12 @@ public class RpcClient implements ClientProtocol {
     List<OzoneAcl> listOfAcls = new ArrayList<>();
     //User ACL
     listOfAcls.add(new OzoneAcl(ACLIdentityType.USER,
-        owner, userRights, ACCESS));
+        owner, ACCESS, userRights));
     //Group ACLs of the User
     List<String> userGroups = Arrays.asList(UserGroupInformation
         .createRemoteUser(owner).getGroupNames());
     userGroups.stream().forEach((group) -> listOfAcls.add(
-        new OzoneAcl(ACLIdentityType.GROUP, group, groupRights, ACCESS)));
+        new OzoneAcl(ACLIdentityType.GROUP, group, ACCESS, groupRights)));
     //ACLs from VolumeArgs
     List<OzoneAcl> volumeAcls = volArgs.getAcls();
     if (volumeAcls != null) {
@@ -757,10 +756,7 @@ public class RpcClient implements ClientProtocol {
    * @return OzoneAcl
    */
   private OzoneAcl linkBucketDefaultAcl() {
-    BitSet aclRights = new BitSet();
-    aclRights.set(READ.ordinal());
-    aclRights.set(WRITE.ordinal());
-    return new OzoneAcl(ACLIdentityType.WORLD, "", aclRights, ACCESS);
+    return new OzoneAcl(ACLIdentityType.WORLD, "", ACCESS, READ, WRITE);
   }
 
   /**

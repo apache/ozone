@@ -67,7 +67,7 @@ public class CommonUtils {
     return new OmPrefixInfo(path,
         new ArrayList<>(Collections.singletonList(new OzoneAcl(
             identityType, identityString,
-            aclType, scope))), new HashMap<>(), 10, 100);
+            scope, aclType))), new HashMap<>(), 10, 100);
   }
 
   public void testNSSummaryBasicInfoRoot(
