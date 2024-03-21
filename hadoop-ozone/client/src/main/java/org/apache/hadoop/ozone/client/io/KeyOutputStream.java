@@ -537,12 +537,23 @@ public class KeyOutputStream extends OutputStream
           if (entry != null) {
             try {
               future = handleStreamAction(entry, op);
+              // TODO: Revisit this workaround. This is a workaround as only HSYNC is returning a future, for now
+              if (op == StreamAction.CLOSE || op == StreamAction.FULL || op == StreamAction.FLUSH) {
+                if (future != null) {
+                  future.get();
+                } else {
+                  LOG.warn("null future from op {}", op);
+                }
+              }
             } catch (IOException ioe) {
               handleException(entry, ioe);
               continue;
             }
           }
           return future;
+        } catch (ExecutionException | InterruptedException e) {
+          // TODO: Handle this properly, or remove when the workaround is no longer needed
+          LOG.error("Exception caught but ignored in this POC", e);
         } catch (Exception e) {
           markStreamClosed();
           throw e;
