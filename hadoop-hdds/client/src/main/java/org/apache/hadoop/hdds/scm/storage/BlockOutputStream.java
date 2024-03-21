@@ -408,16 +408,17 @@ public class BlockOutputStream extends OutputStream {
     // ExecutionException and InterruptedException are no longer handled at this level
     // since the future is being returned all the way up to KeyOutputStream
 
-    // TODO: Can this call be safely removed? HDDS-10108 could help?
     return future.thenApplyAsync(r -> {
       try {
-        watchForCommit(bufferFull);  // TODO: looks like the source of problem
+        // TODO: HDDS-10108 could remove this call
+        watchForCommit(bufferFull);
       } catch (IOException e) {
+        // TODO: Handle exception
+        LOG.error("IOException caught but ignored in this POC", e);
         throw new CompletionException(e);
       }
       return r;
     });
-
   }
 
   void releaseBuffersOnException() {

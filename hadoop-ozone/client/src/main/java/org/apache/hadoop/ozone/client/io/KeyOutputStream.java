@@ -377,7 +377,10 @@ public class KeyOutputStream extends OutputStream
       // If the data is still cached in the underlying stream, we need to
       // allocate new block and write this data in the datanode.
       try {
-        handleRetry(exception, bufferedDataLen).get();
+        CompletableFuture<Void> future = handleRetry(exception, bufferedDataLen);
+        if (future != null) {
+          future.get();
+        }
       } catch (InterruptedException | ExecutionException e) {
         LOG.error("Exception caught but ignored in this POC", e);
       }
