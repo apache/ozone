@@ -19,10 +19,10 @@
 package org.apache.hadoop.ozone.admin.nssummary;
 
 import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import org.apache.commons.io.IOUtils;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
+import org.apache.hadoop.hdds.server.JsonUtils;
 import org.apache.hadoop.hdfs.web.URLConnectionFactory;
 import picocli.CommandLine.Help.Ansi;
 
@@ -111,10 +111,7 @@ public final class NSSummaryCLIUtils {
 
   public static HashMap<String, Object> getResponseMap(String response)
       throws IOException {
-    ObjectMapper objectMapper = new ObjectMapper();
-    return objectMapper.readValue(response,
-        new TypeReference<HashMap<String, Object>>() {
-        });
+    return JsonUtils.getResponseMap(response);
   }
 
   public static void printNewLines(int cnt) {

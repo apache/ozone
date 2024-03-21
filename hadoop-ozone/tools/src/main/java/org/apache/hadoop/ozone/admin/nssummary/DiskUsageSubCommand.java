@@ -19,12 +19,12 @@ package org.apache.hadoop.ozone.admin.nssummary;
 
 import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
+import org.apache.hadoop.hdds.server.JsonUtils;
 import org.apache.hadoop.ozone.shell.ListOptions;
 import picocli.CommandLine;
 
 import java.util.concurrent.Callable;
 import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 import static org.apache.hadoop.ozone.admin.nssummary.NSSummaryCLIUtils.makeHttpCall;
@@ -99,8 +99,7 @@ public class DiskUsageSubCommand implements Callable {
       return null;
     }
 
-    ObjectMapper objectMapper = new ObjectMapper();
-    JsonNode duResponse = objectMapper.readTree(response);
+    JsonNode duResponse = JsonUtils.readTree(response);
 
     if (duResponse.get("status").asText().equals("PATH_NOT_FOUND")) {
       printPathNotFound();

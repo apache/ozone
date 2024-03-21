@@ -34,10 +34,7 @@ import static org.slf4j.event.Level.INFO;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
-import java.util.Optional;
+import java.util.*;
 import java.util.concurrent.TimeUnit;
 
 import com.google.gson.internal.LinkedTreeMap;
@@ -47,6 +44,7 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.HddsTestUtils;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
+import org.apache.hadoop.hdds.server.JsonUtils;
 import org.apache.hadoop.hdds.utils.db.RDBStore;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
@@ -65,7 +63,6 @@ import org.apache.http.client.methods.HttpGet;
 import org.apache.http.impl.client.CloseableHttpClient;
 import org.apache.http.impl.client.HttpClientBuilder;
 import org.apache.http.util.EntityUtils;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.core.type.TypeReference;
 
 import org.apache.ozone.test.GenericTestUtils;
@@ -384,19 +381,21 @@ public class TestReconWithOzoneManager {
                                              String taskName,
                                              String entityAttribute)
       throws IOException {
-    ObjectMapper objectMapper = new ObjectMapper();
-    ArrayList<LinkedTreeMap> taskStatusList = objectMapper.readValue(
-        taskStatusResponse, new TypeReference<ArrayList<LinkedTreeMap>>() {
-        });
+    List<HashMap<String, Object>> taskStatusList =
+        JsonUtils.readTreeAsListOfMaps(taskStatusResponse);
 
-    Optional<LinkedTreeMap> taskEntity =
-        taskStatusList
-            .stream()
-            .filter(task -> task.get("taskName").equals(taskName))
-            .findFirst();
-    assertTrue(taskEntity.isPresent());
-    Number number = (Number) taskEntity.get().get(entityAttribute);
-    return number.longValue();
+    // Stream through the list to find the task entity matching the taskName
+    Optional<HashMap<String, Object>> taskEntity = taskStatusList.stream()
+        .filter(task -> taskName.equals(task.get("taskName")))
+        .findFirst();
+
+    if (taskEntity.isPresent()) {
+      Number number = (Number) taskEntity.get().get(entityAttribute);
+      return number.longValue();
+    } else {
+      throw new IOException(
+          "Task entity for task name " + taskName + " not found");
+    }
   }
 
   /**
