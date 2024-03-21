@@ -409,9 +409,15 @@ public class BlockOutputStream extends OutputStream {
     // since the future is being returned all the way up to KeyOutputStream
 
     // TODO: Can this call be safely removed? HDDS-10108 could help?
-    watchForCommit(bufferFull);  // TODO: looks like the source of problem
+    return future.thenApplyAsync(r -> {
+      try {
+        watchForCommit(bufferFull);  // TODO: looks like the source of problem
+      } catch (IOException e) {
+        throw new CompletionException(e);
+      }
+      return r;
+    });
 
-    return future;
   }
 
   void releaseBuffersOnException() {
