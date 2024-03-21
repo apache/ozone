@@ -258,7 +258,6 @@
                       <env key="CFLAGS" value="-fPIC"/>
                       <env key="CXXFLAGS" value="-fPIC"/>
                       <arg line="${basedir}/src"/>
-                      <arg line="-DCMAKE_VERBOSE_MAKEFILE:BOOL=ON"/>
                       <arg line="-DGENERATED_JAVAH=${project.build.directory}/native/javah"/>
                       <arg line="-DNATIVE_DIR=${basedir}/src/main/native"/>
                       <arg line="-DSST_DUMP_INCLUDE=${sstDump.include}"/>
