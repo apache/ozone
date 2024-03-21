@@ -83,7 +83,7 @@ class CommitWatcher extends AbstractCommitWatcher<ChunkBuffer> {
   public CompletableFuture<Void> waitOnFlushFutures() {
     // return future directly, do not wait here
     return CompletableFuture.allOf(futureMap.values().toArray(
-        new CompletableFuture[0]));
+        new CompletableFuture[0]));  // TODO: Do we need to remove the CompletableFuture.allOf()
   }
 
   @Override
