@@ -754,6 +754,31 @@ public class TestOzoneShellHA {
   }
 
   @Test
+  public void testListBucket() throws Exception {
+    final String hostPrefix = OZONE_OFS_URI_SCHEME + "://" + omServiceId;
+    OzoneConfiguration clientConf =
+            getClientConfForOFS(hostPrefix, cluster.getConf());
+    OzoneFsShell shell = new OzoneFsShell(clientConf);
+
+    String volName = "testlistbucket";
+    int numBuckets = 1025;
+
+    try {
+      generateBuckets("/" + volName, numBuckets);
+      int res;
+
+      out.reset();
+      res = ToolRunner.run(shell, new String[]{"-ls", "/" + volName});
+      assertEquals(0, res);
+      String r = out.toString(DEFAULT_ENCODING);
+      assertTrue(r.matches("(?s)^Found " + numBuckets + " items.*"));
+
+    } finally {
+      shell.close();
+    }
+  }
+
+  @Test
   public void testDeleteTrashNoSkipTrash() throws Exception {
 
     // Test delete from Trash directory removes item from filesystem
