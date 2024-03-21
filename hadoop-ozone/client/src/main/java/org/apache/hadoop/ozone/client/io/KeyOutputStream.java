@@ -489,10 +489,11 @@ public class KeyOutputStream extends OutputStream
           + replication.getRequiredNodes() + " <= 1");
     }
     checkNotClosed();
-    final long hsyncPos = writeOffset;
+    final long hsyncPos;
 
     CompletableFuture<Void> future = null;
     synchronized (this) {
+      hsyncPos = writeOffset;
       future = handleFlushOrClose(StreamAction.HSYNC);
     }
     try {
