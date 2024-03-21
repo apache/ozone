@@ -2861,6 +2861,14 @@
     </description>
   </property>
   <property>
+    <name>hdds.datanode.chunk.data.validation.check</name>
+    <value>false</value>
+    <tag>HDDS</tag>
+    <description>
+      Enable safety checks such as checksum validation on the datanode side.
+    </description>
+  </property>
+  <property>
     <name>hdds.datanode.client.address</name>
     <value/>
     <tag>OZONE, HDDS, MANAGEMENT</tag>
