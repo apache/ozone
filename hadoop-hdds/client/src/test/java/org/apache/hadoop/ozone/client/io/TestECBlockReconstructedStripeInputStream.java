@@ -19,8 +19,10 @@ package org.apache.hadoop.ozone.client.io;
 
 import com.google.common.collect.ImmutableSet;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
+import org.apache.hadoop.hdds.scm.OzoneClientConfig;
 import org.apache.hadoop.hdds.scm.storage.BlockLocationInfo;
 import org.apache.hadoop.io.ByteBufferPool;
 import org.apache.hadoop.io.ElasticByteBufferPool;
@@ -70,7 +72,8 @@ public class TestECBlockReconstructedStripeInputStream {
   private ByteBufferPool bufferPool = new ElasticByteBufferPool();
   private ExecutorService ecReconstructExecutor =
       Executors.newFixedThreadPool(3);
-
+  private OzoneConfiguration conf = new OzoneConfiguration();
+  
   static List<Set<Integer>> recoveryCases() { // TODO better name
     List<Set<Integer>> params = new ArrayList<>();
     params.add(emptySet()); // non-recovery
@@ -821,8 +824,11 @@ public class TestECBlockReconstructedStripeInputStream {
 
   private ECBlockReconstructedStripeInputStream createInputStream(
       BlockLocationInfo keyInfo) {
-    return new ECBlockReconstructedStripeInputStream(repConfig, keyInfo, true,
-        null, null, streamFactory, bufferPool, ecReconstructExecutor);
+    OzoneClientConfig clientConfig = conf.getObject(OzoneClientConfig.class);
+    clientConfig.setChecksumVerify(true);
+    return new ECBlockReconstructedStripeInputStream(repConfig, keyInfo,
+        null, null, streamFactory, bufferPool, ecReconstructExecutor,
+        clientConfig);
   }
 
   private void addDataStreamsToFactory(ByteBuffer[] data, ByteBuffer[] parity) {
