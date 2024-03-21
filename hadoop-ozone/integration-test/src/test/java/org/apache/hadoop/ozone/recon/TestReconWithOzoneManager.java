@@ -34,10 +34,13 @@ import static org.slf4j.event.Level.INFO;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+import java.util.Optional;
+import java.util.HashMap;
 import java.util.concurrent.TimeUnit;
 
-import com.google.gson.internal.LinkedTreeMap;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -63,7 +66,6 @@ import org.apache.http.client.methods.HttpGet;
 import org.apache.http.impl.client.CloseableHttpClient;
 import org.apache.http.impl.client.HttpClientBuilder;
 import org.apache.http.util.EntityUtils;
-import com.fasterxml.jackson.core.type.TypeReference;
 
 import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.AfterAll;

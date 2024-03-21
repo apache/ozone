@@ -18,7 +18,6 @@
 
 package org.apache.hadoop.ozone.admin.nssummary;
 
-import com.fasterxml.jackson.core.type.TypeReference;
 import org.apache.commons.io.IOUtils;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
