@@ -112,9 +112,8 @@ public class BlockInputStream extends BlockExtendedInputStream {
 
   private final Function<BlockID, BlockLocationInfo> refreshFunction;
 
-  @SuppressWarnings("checkstyle:ParameterNumber")
   public BlockInputStream(BlockID blockId, long blockLen, Pipeline pipeline,
-      Token<OzoneBlockTokenIdentifier> token, boolean verifyChecksum,
+      Token<OzoneBlockTokenIdentifier> token,
       XceiverClientFactory xceiverClientFactory,
       Function<BlockID, BlockLocationInfo> refreshFunction,
       OzoneClientConfig config) {
@@ -122,7 +121,7 @@ public class BlockInputStream extends BlockExtendedInputStream {
     this.length = blockLen;
     setPipeline(pipeline);
     tokenRef.set(token);
-    this.verifyChecksum = verifyChecksum;
+    this.verifyChecksum = config.isChecksumVerify();
     this.xceiverClientFactory = xceiverClientFactory;
     this.refreshFunction = refreshFunction;
     this.retryPolicy =
@@ -132,11 +131,10 @@ public class BlockInputStream extends BlockExtendedInputStream {
 
   public BlockInputStream(BlockID blockId, long blockLen, Pipeline pipeline,
                           Token<OzoneBlockTokenIdentifier> token,
-                          boolean verifyChecksum,
                           XceiverClientFactory xceiverClientFactory,
                           OzoneClientConfig config
   ) {
-    this(blockId, blockLen, pipeline, token, verifyChecksum,
+    this(blockId, blockLen, pipeline, token,
         xceiverClientFactory, null, config);
   }
   /**

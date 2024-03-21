@@ -345,9 +345,11 @@ public class TestECBlockInputStreamProxy {
 
   private ECBlockInputStreamProxy createBISProxy(ECReplicationConfig rConfig,
       BlockLocationInfo blockInfo) {
+    OzoneClientConfig clientConfig = conf.getObject(OzoneClientConfig.class);
+    clientConfig.setChecksumVerify(true);
     return new ECBlockInputStreamProxy(
-        rConfig, blockInfo, true, null, null, streamFactory,
-        conf.getObject(OzoneClientConfig.class));
+        rConfig, blockInfo, null, null, streamFactory,
+        clientConfig);
   }
 
   private static class TestECBlockInputStreamFactory
@@ -376,7 +378,7 @@ public class TestECBlockInputStreamProxy {
     public BlockExtendedInputStream create(boolean missingLocations,
         List<DatanodeDetails> failedDatanodes,
         ReplicationConfig repConfig, BlockLocationInfo blockInfo,
-        boolean verifyChecksum, XceiverClientFactory xceiverFactory,
+        XceiverClientFactory xceiverFactory,
         Function<BlockID, BlockLocationInfo> refreshFunction,
         OzoneClientConfig config) {
       this.failedLocations = failedDatanodes;

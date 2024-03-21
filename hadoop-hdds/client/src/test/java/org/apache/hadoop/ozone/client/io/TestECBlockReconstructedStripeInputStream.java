@@ -811,9 +811,11 @@ public class TestECBlockReconstructedStripeInputStream {
 
   private ECBlockReconstructedStripeInputStream createInputStream(
       BlockLocationInfo keyInfo) {
-    return new ECBlockReconstructedStripeInputStream(repConfig, keyInfo, true,
+    OzoneClientConfig clientConfig = conf.getObject(OzoneClientConfig.class);
+    clientConfig.setChecksumVerify(true);
+    return new ECBlockReconstructedStripeInputStream(repConfig, keyInfo,
         null, null, streamFactory, bufferPool, ecReconstructExecutor,
-        conf.getObject(OzoneClientConfig.class));
+        clientConfig);
   }
 
   private void addDataStreamsToFactory(ByteBuffer[] data, ByteBuffer[] parity) {

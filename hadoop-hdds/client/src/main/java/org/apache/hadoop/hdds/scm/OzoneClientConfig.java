@@ -144,7 +144,7 @@ public class OzoneClientConfig {
       tags = ConfigTag.CLIENT)
   private int retryInterval = 0;
 
-  @Config(key = "max.read.retries",
+  @Config(key = "read.max.retries",
       defaultValue = "3",
       description = "Maximum number of retries by Ozone Client on "
           + "encountering connectivity exception when reading a key.",

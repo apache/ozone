@@ -75,20 +75,19 @@ public class BlockInputStreamFactoryImpl implements BlockInputStreamFactory {
    * @param refreshFunction Function to refresh the pipeline if needed
    * @return BlockExtendedInputStream of the correct type.
    */
-  @SuppressWarnings("checkstyle:ParameterNumber")
   public BlockExtendedInputStream create(ReplicationConfig repConfig,
       BlockLocationInfo blockInfo, Pipeline pipeline,
-      Token<OzoneBlockTokenIdentifier> token, boolean verifyChecksum,
+      Token<OzoneBlockTokenIdentifier> token,
       XceiverClientFactory xceiverFactory,
       Function<BlockID, BlockLocationInfo> refreshFunction,
       OzoneClientConfig config) {
     if (repConfig.getReplicationType().equals(HddsProtos.ReplicationType.EC)) {
       return new ECBlockInputStreamProxy((ECReplicationConfig)repConfig,
-          blockInfo, verifyChecksum, xceiverFactory, refreshFunction,
+          blockInfo, xceiverFactory, refreshFunction,
           ecBlockStreamFactory, config);
     } else {
       return new BlockInputStream(blockInfo.getBlockID(), blockInfo.getLength(),
-          pipeline, token, verifyChecksum, xceiverFactory, refreshFunction,
+          pipeline, token, xceiverFactory, refreshFunction,
           config);
     }
   }

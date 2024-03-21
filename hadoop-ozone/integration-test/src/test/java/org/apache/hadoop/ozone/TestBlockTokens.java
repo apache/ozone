@@ -296,10 +296,11 @@ public final class TestBlockTokens {
       Function<OmKeyInfo, OmKeyInfo> retryFunc) throws IOException {
     XceiverClientFactory xceiverClientManager =
         ((RpcClient) client.getProxy()).getXceiverClientManager();
+    OzoneClientConfig clientConfig = conf.getObject(OzoneClientConfig.class);
+    clientConfig.setChecksumVerify(false);
     try (InputStream is = KeyInputStream.getFromOmKeyInfo(keyInfo,
-        xceiverClientManager,
-        false, retryFunc, blockInputStreamFactory,
-        conf.getObject(OzoneClientConfig.class))) {
+        xceiverClientManager, retryFunc, blockInputStreamFactory,
+        clientConfig)) {
       byte[] buf = new byte[100];
       int readBytes = is.read(buf, 0, 100);
       assertEquals(100, readBytes);

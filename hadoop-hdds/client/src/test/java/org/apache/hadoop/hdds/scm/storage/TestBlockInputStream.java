@@ -96,11 +96,12 @@ public class TestBlockInputStream {
     BlockID blockID = new BlockID(new ContainerBlockID(1, 1));
     checksum = new Checksum(ChecksumType.NONE, CHUNK_SIZE);
     createChunkList(5);
+    OzoneClientConfig clientConfig = conf.getObject(OzoneClientConfig.class);
+    clientConfig.setChecksumVerify(false);
 
     Pipeline pipeline = MockPipeline.createSingleNodePipeline();
     blockStream = new DummyBlockInputStream(blockID, blockSize, pipeline, null,
-        false, null, refreshFunction, chunks, chunkDataMap,
-        conf.getObject(OzoneClientConfig.class));
+        null, refreshFunction, chunks, chunkDataMap, clientConfig);
   }
 
   /**
@@ -264,12 +265,14 @@ public class TestBlockInputStream {
     BlockID blockID = new BlockID(new ContainerBlockID(1, 1));
     AtomicBoolean isRefreshed = new AtomicBoolean();
     createChunkList(5);
+    OzoneClientConfig clientConfig = conf.getObject(OzoneClientConfig.class);
+    clientConfig.setChecksumVerify(false);
 
     try (BlockInputStream blockInputStreamWithRetry =
              new DummyBlockInputStreamWithRetry(blockID, blockSize,
                  MockPipeline.createSingleNodePipeline(), null,
-                 false, null, chunks, chunkDataMap, isRefreshed, null,
-                 conf.getObject(OzoneClientConfig.class))) {
+                 null, chunks, chunkDataMap, isRefreshed, null,
+                 clientConfig)) {
       assertFalse(isRefreshed.get());
       seekAndVerify(50);
       byte[] b = new byte[200];
@@ -353,9 +356,10 @@ public class TestBlockInputStream {
 
   private BlockInputStream createSubject(BlockID blockID, Pipeline pipeline,
       ChunkInputStream stream) {
-    return new DummyBlockInputStream(blockID, blockSize, pipeline, null, false,
-        null, refreshFunction, chunks, null,
-        conf.getObject(OzoneClientConfig.class)) {
+    OzoneClientConfig clientConfig = conf.getObject(OzoneClientConfig.class);
+    clientConfig.setChecksumVerify(false);
+    return new DummyBlockInputStream(blockID, blockSize, pipeline, null,
+        null, refreshFunction, chunks, null, clientConfig) {
       @Override
       protected ChunkInputStream createChunkInputStream(ChunkInfo chunkInfo) {
         return stream;
@@ -407,9 +411,11 @@ public class TestBlockInputStream {
         .thenReturn(blockLocationInfo);
     when(blockLocationInfo.getPipeline()).thenReturn(newPipeline);
 
+    OzoneClientConfig clientConfig = conf.getObject(OzoneClientConfig.class);
+    clientConfig.setChecksumVerify(false);
     BlockInputStream subject = new BlockInputStream(blockID, blockSize,
-        pipeline, null, false, clientFactory, refreshFunction,
-        conf.getObject(OzoneClientConfig.class)) {
+        pipeline, null, clientFactory, refreshFunction,
+        clientConfig) {
       @Override
       protected List<ChunkInfo> getChunkInfoListUsingClient() {
         return chunks;

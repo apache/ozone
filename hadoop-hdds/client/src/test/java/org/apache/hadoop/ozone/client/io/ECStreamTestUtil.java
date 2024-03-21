@@ -256,11 +256,10 @@ public final class ECStreamTestUtil {
       failIndexes.addAll(Arrays.asList(fail));
     }
 
-    @SuppressWarnings("checkstyle:ParameterNumber")
     public synchronized BlockExtendedInputStream create(
         ReplicationConfig repConfig,
         BlockLocationInfo blockInfo, Pipeline pipeline,
-        Token<OzoneBlockTokenIdentifier> token, boolean verifyChecksum,
+        Token<OzoneBlockTokenIdentifier> token,
         XceiverClientFactory xceiverFactory,
         Function<BlockID, BlockLocationInfo> refreshFunction,
         OzoneClientConfig config) {

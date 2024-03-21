@@ -73,10 +73,9 @@ public final class ECBlockInputStreamFactoryImpl implements
    * @param refreshFunction Function to refresh the pipeline if needed
    * @return BlockExtendedInputStream of the correct type.
    */
-  @SuppressWarnings("checkstyle:ParameterNumber")
   public BlockExtendedInputStream create(boolean missingLocations,
       List<DatanodeDetails> failedLocations, ReplicationConfig repConfig,
-      BlockLocationInfo blockInfo, boolean verifyChecksum,
+      BlockLocationInfo blockInfo,
       XceiverClientFactory xceiverFactory,
       Function<BlockID, BlockLocationInfo> refreshFunction,
       OzoneClientConfig config) {
@@ -84,7 +83,7 @@ public final class ECBlockInputStreamFactoryImpl implements
       // We create the reconstruction reader
       ECBlockReconstructedStripeInputStream sis =
           new ECBlockReconstructedStripeInputStream(
-              (ECReplicationConfig)repConfig, blockInfo, verifyChecksum,
+              (ECReplicationConfig)repConfig, blockInfo,
               xceiverFactory, refreshFunction, inputStreamFactory,
               byteBufferPool, ecReconstructExecutorSupplier.get(), config);
       if (failedLocations != null) {
@@ -95,7 +94,7 @@ public final class ECBlockInputStreamFactoryImpl implements
     } else {
       // Otherwise create the more efficient non-reconstruction reader
       return new ECBlockInputStream((ECReplicationConfig)repConfig, blockInfo,
-          verifyChecksum, xceiverFactory, refreshFunction, inputStreamFactory,
+          xceiverFactory, refreshFunction, inputStreamFactory,
           config);
     }
   }

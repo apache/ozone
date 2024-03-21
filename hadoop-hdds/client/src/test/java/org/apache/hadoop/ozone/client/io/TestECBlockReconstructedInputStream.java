@@ -77,9 +77,11 @@ public class TestECBlockReconstructedInputStream {
     BlockLocationInfo keyInfo =
         ECStreamTestUtil.createKeyInfo(repConfig, blockLength, dnMap);
     streamFactory.setCurrentPipeline(keyInfo.getPipeline());
-    return new ECBlockReconstructedStripeInputStream(repConfig, keyInfo, true,
+    OzoneClientConfig clientConfig = conf.getObject(OzoneClientConfig.class);
+    clientConfig.setChecksumVerify(true);
+    return new ECBlockReconstructedStripeInputStream(repConfig, keyInfo,
         null, null, streamFactory, bufferPool, ecReconstructExecutor,
-        conf.getObject(OzoneClientConfig.class));
+        clientConfig);
   }
 
   @Test

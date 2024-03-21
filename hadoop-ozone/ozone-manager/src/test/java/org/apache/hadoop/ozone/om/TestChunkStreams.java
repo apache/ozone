@@ -94,8 +94,10 @@ public class TestChunkStreams {
   }
 
   private BlockInputStream createStream(byte[] buf, int offset) {
-    return new BlockInputStream(null, 100, null, null, true, null,
-        conf.getObject(OzoneClientConfig.class)) {
+    OzoneClientConfig clientConfig = conf.getObject(OzoneClientConfig.class);
+    clientConfig.setChecksumVerify(true);
+    return new BlockInputStream(null, 100, null, null, null,
+        clientConfig) {
       private long pos;
       private final ByteArrayInputStream in =
           new ByteArrayInputStream(buf, offset, 100);

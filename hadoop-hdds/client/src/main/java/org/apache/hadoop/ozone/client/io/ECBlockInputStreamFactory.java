@@ -50,10 +50,9 @@ public interface ECBlockInputStreamFactory {
    * @param refreshFunction Function to refresh the block location if needed
    * @return BlockExtendedInputStream of the correct type.
    */
-  @SuppressWarnings("checkstyle:ParameterNumber")
   BlockExtendedInputStream create(boolean missingLocations,
       List<DatanodeDetails> failedLocations, ReplicationConfig repConfig,
-      BlockLocationInfo blockInfo, boolean verifyChecksum,
+      BlockLocationInfo blockInfo,
       XceiverClientFactory xceiverFactory,
       Function<BlockID, BlockLocationInfo> refreshFunction,
       OzoneClientConfig config);

@@ -59,7 +59,6 @@ public class KeyInputStream extends MultipartInputStream {
       OmKeyInfo keyInfo,
       List<OmKeyLocationInfo> blockInfos,
       XceiverClientFactory xceiverClientFactory,
-      boolean verifyChecksum,
       Function<OmKeyInfo, OmKeyInfo> retryFunction,
       BlockInputStreamFactory blockStreamFactory,
       OzoneClientConfig config) {
@@ -93,7 +92,6 @@ public class KeyInputStream extends MultipartInputStream {
               omKeyLocationInfo,
               omKeyLocationInfo.getPipeline(),
               omKeyLocationInfo.getToken(),
-              verifyChecksum,
               xceiverClientFactory,
               retry,
               config);
@@ -120,13 +118,12 @@ public class KeyInputStream extends MultipartInputStream {
   private static LengthInputStream getFromOmKeyInfo(
       OmKeyInfo keyInfo,
       XceiverClientFactory xceiverClientFactory,
-      boolean verifyChecksum,
       Function<OmKeyInfo, OmKeyInfo> retryFunction,
       BlockInputStreamFactory blockStreamFactory,
       List<OmKeyLocationInfo> locationInfos,
       OzoneClientConfig config) {
     List<BlockExtendedInputStream> streams = createStreams(keyInfo,
-        locationInfos, xceiverClientFactory, verifyChecksum, retryFunction,
+        locationInfos, xceiverClientFactory, retryFunction,
         blockStreamFactory, config);
     KeyInputStream keyInputStream =
         new KeyInputStream(keyInfo.getKeyName(), streams);
@@ -138,19 +135,19 @@ public class KeyInputStream extends MultipartInputStream {
    */
   public static LengthInputStream getFromOmKeyInfo(OmKeyInfo keyInfo,
       XceiverClientFactory xceiverClientFactory,
-      boolean verifyChecksum,  Function<OmKeyInfo, OmKeyInfo> retryFunction,
+      Function<OmKeyInfo, OmKeyInfo> retryFunction,
       BlockInputStreamFactory blockStreamFactory,
       OzoneClientConfig config) {
 
     List<OmKeyLocationInfo> keyLocationInfos = keyInfo
         .getLatestVersionLocations().getBlocksLatestVersionOnly();
 
-    return getFromOmKeyInfo(keyInfo, xceiverClientFactory, verifyChecksum,
+    return getFromOmKeyInfo(keyInfo, xceiverClientFactory,
         retryFunction, blockStreamFactory, keyLocationInfos, config);
   }
 
   public static List<LengthInputStream> getStreamsFromKeyInfo(OmKeyInfo keyInfo,
-      XceiverClientFactory xceiverClientFactory, boolean verifyChecksum,
+      XceiverClientFactory xceiverClientFactory,
       Function<OmKeyInfo, OmKeyInfo> retryFunction,
       BlockInputStreamFactory blockStreamFactory,
       OzoneClientConfig config) {
@@ -168,7 +165,7 @@ public class KeyInputStream extends MultipartInputStream {
     // Create a KeyInputStream for each part.
     for (List<OmKeyLocationInfo> locationInfo : partsToBlocksMap.values()) {
       lengthInputStreams.add(getFromOmKeyInfo(keyInfo, xceiverClientFactory,
-          verifyChecksum, retryFunction, blockStreamFactory, locationInfo,
+          retryFunction, blockStreamFactory, locationInfo,
           config));
     }
     return lengthInputStreams;

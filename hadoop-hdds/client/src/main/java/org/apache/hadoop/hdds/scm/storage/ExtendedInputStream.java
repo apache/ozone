@@ -101,5 +101,4 @@ public abstract class ExtendedInputStream extends InputStream
       return false;
     }
   }
-
 }

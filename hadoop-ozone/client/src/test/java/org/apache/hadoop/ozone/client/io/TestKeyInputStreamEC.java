@@ -41,7 +41,6 @@ import java.util.Map;
 
 import static org.apache.hadoop.ozone.OzoneConsts.MB;
 import static org.mockito.Mockito.any;
-import static org.mockito.Mockito.anyBoolean;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -72,11 +71,13 @@ public class TestKeyInputStreamEC {
     BlockInputStreamFactory mockStreamFactory =
         mock(BlockInputStreamFactory.class);
     when(mockStreamFactory.create(any(), any(), any(), any(),
-        anyBoolean(), any(), any(), any())).thenReturn(blockInputStream);
+        any(), any(), any())).thenReturn(blockInputStream);
 
+    OzoneClientConfig clientConfig = conf.getObject(OzoneClientConfig.class);
+    clientConfig.setChecksumVerify(true);
     try (LengthInputStream kis = KeyInputStream.getFromOmKeyInfo(keyInfo,
-        null, true,  null, mockStreamFactory,
-        conf.getObject(OzoneClientConfig.class))) {
+        null,  null, mockStreamFactory,
+        clientConfig)) {
       byte[] buf = new byte[100];
       int readBytes = kis.read(buf, 0, 100);
       assertEquals(100, readBytes);

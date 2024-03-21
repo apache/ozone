@@ -52,13 +52,12 @@ final class DummyBlockInputStreamWithRetry
       long blockLen,
       Pipeline pipeline,
       Token<OzoneBlockTokenIdentifier> token,
-      boolean verifyChecksum,
       XceiverClientFactory xceiverClientManager,
       List<ChunkInfo> chunkList,
       Map<String, byte[]> chunkMap,
       AtomicBoolean isRerfreshed, IOException ioException,
       OzoneClientConfig config) {
-    super(blockId, blockLen, pipeline, token, verifyChecksum,
+    super(blockId, blockLen, pipeline, token,
         xceiverClientManager, blockID -> {
           isRerfreshed.set(true);
           try {

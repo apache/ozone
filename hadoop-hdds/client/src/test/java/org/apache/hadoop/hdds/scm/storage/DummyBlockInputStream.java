@@ -45,13 +45,12 @@ class DummyBlockInputStream extends BlockInputStream {
       long blockLen,
       Pipeline pipeline,
       Token<OzoneBlockTokenIdentifier> token,
-      boolean verifyChecksum,
       XceiverClientFactory xceiverClientManager,
       Function<BlockID, BlockLocationInfo> refreshFunction,
       List<ChunkInfo> chunkList,
       Map<String, byte[]> chunks,
       OzoneClientConfig config) {
-    super(blockId, blockLen, pipeline, token, verifyChecksum,
+    super(blockId, blockLen, pipeline, token,
         xceiverClientManager, refreshFunction, config);
     this.chunkDataMap = chunks;
     this.chunks = chunkList;

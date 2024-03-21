@@ -50,7 +50,6 @@ public class ECBlockInputStreamProxy extends BlockExtendedInputStream {
       LoggerFactory.getLogger(ECBlockInputStreamProxy.class);
 
   private final ECReplicationConfig repConfig;
-  private final boolean verifyChecksum;
   private final XceiverClientFactory xceiverClientFactory;
   private final Function<BlockID, BlockLocationInfo> refreshFunction;
   private final BlockLocationInfo blockInfo;
@@ -99,13 +98,12 @@ public class ECBlockInputStreamProxy extends BlockExtendedInputStream {
   }
 
   public ECBlockInputStreamProxy(ECReplicationConfig repConfig,
-      BlockLocationInfo blockInfo, boolean verifyChecksum,
+      BlockLocationInfo blockInfo,
       XceiverClientFactory xceiverClientFactory, Function<BlockID,
       BlockLocationInfo> refreshFunction,
       ECBlockInputStreamFactory streamFactory,
       OzoneClientConfig config) {
     this.repConfig = repConfig;
-    this.verifyChecksum = verifyChecksum;
     this.blockInfo = blockInfo;
     this.ecBlockInputStreamFactory = streamFactory;
     this.xceiverClientFactory = xceiverClientFactory;
@@ -128,7 +126,7 @@ public class ECBlockInputStreamProxy extends BlockExtendedInputStream {
           .incECReconstructionTotal();
     }
     blockReader = ecBlockInputStreamFactory.create(reconstructionReader,
-        failedLocations, repConfig, blockInfo, verifyChecksum,
+        failedLocations, repConfig, blockInfo,
         xceiverClientFactory, refreshFunction, config);
   }
 

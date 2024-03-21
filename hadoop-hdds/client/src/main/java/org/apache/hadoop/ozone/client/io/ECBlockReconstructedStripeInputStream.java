@@ -153,14 +153,14 @@ public class ECBlockReconstructedStripeInputStream extends ECBlockInputStream {
 
   @SuppressWarnings("checkstyle:ParameterNumber")
   public ECBlockReconstructedStripeInputStream(ECReplicationConfig repConfig,
-      BlockLocationInfo blockInfo, boolean verifyChecksum,
+      BlockLocationInfo blockInfo,
       XceiverClientFactory xceiverClientFactory,
       Function<BlockID, BlockLocationInfo> refreshFunction,
       BlockInputStreamFactory streamFactory,
       ByteBufferPool byteBufferPool,
       ExecutorService ecReconstructExecutor,
       OzoneClientConfig config) {
-    super(repConfig, blockInfo, verifyChecksum, xceiverClientFactory,
+    super(repConfig, blockInfo, xceiverClientFactory,
         refreshFunction, streamFactory, config);
     this.byteBufferPool = byteBufferPool;
     this.executor = ecReconstructExecutor;

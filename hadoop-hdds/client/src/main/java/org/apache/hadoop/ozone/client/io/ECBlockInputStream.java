@@ -61,7 +61,6 @@ public class ECBlockInputStream extends BlockExtendedInputStream {
   private final int ecChunkSize;
   private final long stripeSize;
   private final BlockInputStreamFactory streamFactory;
-  private final boolean verifyChecksum;
   private final XceiverClientFactory xceiverClientFactory;
   private final Function<BlockID, BlockLocationInfo> refreshFunction;
   private final BlockLocationInfo blockInfo;
@@ -109,14 +108,13 @@ public class ECBlockInputStream extends BlockExtendedInputStream {
   }
 
   public ECBlockInputStream(ECReplicationConfig repConfig,
-      BlockLocationInfo blockInfo, boolean verifyChecksum,
+      BlockLocationInfo blockInfo,
       XceiverClientFactory xceiverClientFactory,
       Function<BlockID, BlockLocationInfo> refreshFunction,
       BlockInputStreamFactory streamFactory,
       OzoneClientConfig config) {
     this.repConfig = repConfig;
     this.ecChunkSize = repConfig.getEcChunkSize();
-    this.verifyChecksum = verifyChecksum;
     this.blockInfo = blockInfo;
     this.streamFactory = streamFactory;
     this.xceiverClientFactory = xceiverClientFactory;
@@ -194,7 +192,7 @@ public class ECBlockInputStream extends BlockExtendedInputStream {
           StandaloneReplicationConfig.getInstance(
               HddsProtos.ReplicationFactor.ONE),
           blkInfo, pipeline,
-          blockInfo.getToken(), verifyChecksum, xceiverClientFactory,
+          blockInfo.getToken(), xceiverClientFactory,
           ecPipelineRefreshFunction(locationIndex + 1, refreshFunction),
           config);
       blockStreams[locationIndex] = stream;
