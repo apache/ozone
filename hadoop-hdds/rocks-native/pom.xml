@@ -394,7 +394,7 @@
                     <argument>-h</argument>
                     <argument>${project.build.directory}/native/javah</argument>
                     <argument>${project.basedir}/src/main/java/org/apache/hadoop/hdds/utils/db/managed/ManagedRawSSTFileReader.java</argument>
-                    <argument>${project.basedir}/src/main/java/org/apache/hadoop/hdds/utils/db/managed/ManagedRawSSTFileReaderIterator.java</argument>
+                    <argument>${project.basedir}/src/main/java/org/apache/hadoop/hdds/utils/db/managed/ManagedRawSSTFileIterator.java</argument>
                   </arguments>
                 </configuration>
               </execution>
