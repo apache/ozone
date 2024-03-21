@@ -2257,9 +2257,8 @@ public class RpcClient implements ClientProtocol {
 
     if (feInfo == null) {
       LengthInputStream lengthInputStream = KeyInputStream
-          .getFromOmKeyInfo(keyInfo, xceiverClientManager,
-              clientConfig.isChecksumVerify(), retryFunction,
-              blockInputStreamFactory);
+          .getFromOmKeyInfo(keyInfo, xceiverClientManager, retryFunction,
+              blockInputStreamFactory, clientConfig);
       try {
         final GDPRSymmetricKey gk = getGDPRSymmetricKey(
             keyInfo.getMetadata(), Cipher.DECRYPT_MODE);
@@ -2274,9 +2273,8 @@ public class RpcClient implements ClientProtocol {
     } else if (!keyInfo.getLatestVersionLocations().isMultipartKey()) {
       // Regular Key with FileEncryptionInfo
       LengthInputStream lengthInputStream = KeyInputStream
-          .getFromOmKeyInfo(keyInfo, xceiverClientManager,
-              clientConfig.isChecksumVerify(), retryFunction,
-              blockInputStreamFactory);
+          .getFromOmKeyInfo(keyInfo, xceiverClientManager, retryFunction,
+              blockInputStreamFactory, clientConfig);
       final KeyProvider.KeyVersion decrypted = getDEK(feInfo);
       final CryptoInputStream cryptoIn =
           new CryptoInputStream(lengthInputStream.getWrappedStream(),
@@ -2286,9 +2284,8 @@ public class RpcClient implements ClientProtocol {
     } else {
       // Multipart Key with FileEncryptionInfo
       List<LengthInputStream> lengthInputStreams = KeyInputStream
-          .getStreamsFromKeyInfo(keyInfo, xceiverClientManager,
-              clientConfig.isChecksumVerify(), retryFunction,
-              blockInputStreamFactory);
+          .getStreamsFromKeyInfo(keyInfo, xceiverClientManager, retryFunction,
+              blockInputStreamFactory, clientConfig);
       final KeyProvider.KeyVersion decrypted = getDEK(feInfo);
 
       List<OzoneCryptoInputStream> cryptoInputStreams = new ArrayList<>();
