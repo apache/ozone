@@ -563,10 +563,6 @@ public final class OzoneConfigKeys {
       "ozone.om.keyname.character.check.enabled";
   public static final boolean OZONE_OM_KEYNAME_CHARACTER_CHECK_ENABLED_DEFAULT =
       false;
-  public static final String HDDS_DN_CHUNK_DATA_CHECK_ENABLED_KEY =
-      "hdds.datanode.chunk.data.validation.check";
-  public static final boolean HDDS_DN_CHUNK_DATA_CHECK_ENABLED_DEFAULT =
-      false;
 
   public static final int OZONE_INIT_DEFAULT_LAYOUT_VERSION_DEFAULT = -1;
   public static final String OZONE_CLIENT_KEY_PROVIDER_CACHE_EXPIRY =

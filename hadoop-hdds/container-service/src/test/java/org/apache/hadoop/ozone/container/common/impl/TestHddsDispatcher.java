@@ -49,6 +49,7 @@ import org.apache.hadoop.ozone.container.common.helpers.ContainerMetrics;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.apache.hadoop.ozone.container.common.interfaces.Handler;
 import org.apache.hadoop.ozone.container.common.report.IncrementalReportSender;
+import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
 import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
 import org.apache.hadoop.ozone.container.common.transport.server.ratis.DispatcherContext;
 import org.apache.hadoop.ozone.container.common.transport.server.ratis.DispatcherContext.Op;
@@ -175,7 +176,9 @@ public class TestHddsDispatcher {
       OzoneConfiguration conf = new OzoneConfiguration();
       conf.set(HDDS_DATANODE_DIR_KEY, testDirPath);
       conf.set(OzoneConfigKeys.OZONE_METADATA_DIRS, testDirPath);
-      conf.setBoolean(OzoneConfigKeys.HDDS_DN_CHUNK_DATA_CHECK_ENABLED_KEY, true);
+      DatanodeConfiguration dnConf = conf.getObject(DatanodeConfiguration.class);
+      dnConf.setChunkDataValidationCheck(true);
+      conf.setFromObject(dnConf);
       DatanodeDetails dd = randomDatanodeDetails();
       HddsDispatcher hddsDispatcher = createDispatcher(dd, scmId, conf);
 
@@ -196,7 +199,9 @@ public class TestHddsDispatcher {
       OzoneConfiguration conf = new OzoneConfiguration();
       conf.set(HDDS_DATANODE_DIR_KEY, testDirPath);
       conf.set(OzoneConfigKeys.OZONE_METADATA_DIRS, testDirPath);
-      conf.setBoolean(OzoneConfigKeys.HDDS_DN_CHUNK_DATA_CHECK_ENABLED_KEY, true);
+      DatanodeConfiguration dnConf = conf.getObject(DatanodeConfiguration.class);
+      dnConf.setChunkDataValidationCheck(true);
+      conf.setFromObject(dnConf);
       DatanodeDetails dd = randomDatanodeDetails();
       HddsDispatcher hddsDispatcher = createDispatcher(dd, scmId, conf);
       //Send a few WriteChunkRequests
