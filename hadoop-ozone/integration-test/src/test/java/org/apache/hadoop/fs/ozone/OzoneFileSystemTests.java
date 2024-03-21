@@ -99,19 +99,16 @@ final class OzoneFileSystemTests {
     assertEquals(total, iCount);
   }
 
-  static void createKeyWithECReplicationConfiguration(OzoneConfiguration conf, Path keyPath) throws IOException {
+  static void createKeyWithECReplicationConfiguration(OzoneConfiguration inputConf, Path keyPath)
+      throws IOException {
+    OzoneConfiguration conf = new OzoneConfiguration(inputConf);
     conf.set(OZONE_REPLICATION, "rs-3-2-1024k");
     conf.set(OZONE_REPLICATION_TYPE, "EC");
     URI uri = FileSystem.getDefaultUri(conf);
     conf.setBoolean(
         String.format("fs.%s.impl.disable.cache", uri.getScheme()), true);
-    FileSystem fileSystem = FileSystem.get(uri, conf);
-    ContractTestUtils.touch(fileSystem, keyPath);
-
-    // Refresh the cache of FileSystem
-    conf.unset(OZONE_REPLICATION);
-    conf.unset(OZONE_REPLICATION_TYPE);
-    fileSystem = FileSystem.get(uri, conf);
-    fileSystem.close();
+    try (FileSystem fileSystem = FileSystem.get(uri, conf)) {
+      ContractTestUtils.touch(fileSystem, keyPath);
+    }
   }
 }
