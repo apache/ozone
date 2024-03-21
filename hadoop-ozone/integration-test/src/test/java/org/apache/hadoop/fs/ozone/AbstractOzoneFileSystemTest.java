@@ -110,7 +110,7 @@ import static org.apache.hadoop.fs.StorageStatistics.CommonStatisticNames.OP_OPE
 import static org.apache.hadoop.fs.contract.ContractTestUtils.assertHasPathCapabilities;
 import static org.apache.hadoop.fs.ozone.Constants.LISTING_PAGE_SIZE;
 import static org.apache.hadoop.fs.ozone.Constants.OZONE_DEFAULT_USER;
-import static org.apache.hadoop.fs.ozone.OzoneFileSystemTests.testCreateKeyWithECReplicationConfiguration;
+import static org.apache.hadoop.fs.ozone.OzoneFileSystemTests.createKeyWithECReplicationConfiguration;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.ONE;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ACL_ENABLED;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_FS_ITERATE_BATCH_SIZE;
@@ -429,7 +429,15 @@ abstract class AbstractOzoneFileSystemTest {
 
   @Test
   public void testCreateKeyWithECReplicationConfig() throws Exception {
-    testCreateKeyWithECReplicationConfiguration(cluster.getConf(), volumeName, bucketName, client);
+    Path root = new Path("/" + volumeName + "/" + bucketName);
+    Path testKeyPath = new Path(root, "testKey");
+    createKeyWithECReplicationConfiguration(cluster.getConf(), testKeyPath);
+
+    OzoneKeyDetails key = getKey(testKeyPath, false);
+    assertEquals(HddsProtos.ReplicationType.EC,
+        key.getReplicationConfig().getReplicationType());
+    assertEquals("rs-3-2-1024k",
+        key.getReplicationConfig().getReplication());
   }
 
   @Test
