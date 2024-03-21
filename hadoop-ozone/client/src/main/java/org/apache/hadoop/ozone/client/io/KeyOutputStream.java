@@ -499,15 +499,18 @@ public class KeyOutputStream extends OutputStream
       hsyncPos = writeOffset;
       future = handleFlushOrClose(StreamAction.HSYNC);
     }
-    try {
-      future.get();
-    } catch (ExecutionException e) {
-//      handleExecutionException(e);
-      LOG.error("ExecutionException caught but ignored in this POC", e);
-    } catch (InterruptedException ex) {
-      Thread.currentThread().interrupt();
-//      handleInterruptedException(ex, true);
-      LOG.error("InterruptedException caught but ignored in this POC", ex);
+
+    if (future != null) {
+      try {
+        future.get();
+      } catch (ExecutionException e) {
+//        handleExecutionException(e);
+        LOG.error("ExecutionException caught but ignored in this POC", e);
+      } catch (InterruptedException ex) {
+        Thread.currentThread().interrupt();
+//        handleInterruptedException(ex, true);
+        LOG.error("InterruptedException caught but ignored in this POC", ex);
+      }
     }
 
     Preconditions.checkState(offset >= hsyncPos,
