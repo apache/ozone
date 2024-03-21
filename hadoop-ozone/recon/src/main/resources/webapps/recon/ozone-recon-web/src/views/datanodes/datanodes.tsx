@@ -515,7 +515,7 @@ export class Datanodes extends React.Component<Record<string, object>, IDatanode
         </div>
 
         <div className='content-div'>
-          <div style={{ marginBottom: 16 }}>
+          {totalCount > 0 && <div style={{ marginBottom: 16 }}>
             <Popconfirm
               placement="right"
               title={`Are you sure want to remove ${selectedRowKeys.length} Data nodes？`}
@@ -528,7 +528,7 @@ export class Datanodes extends React.Component<Record<string, object>, IDatanode
                 Remove
               </Button>
             </Popconfirm>
-          </div>
+          </div>}
           <Table
             rowSelection={rowSelection}
             dataSource={dataSource}
