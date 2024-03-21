@@ -97,7 +97,7 @@ public final class ManagedRocksObjectUtils {
   }
 
   /**
-   * Returns RocksDB lib name
+   * Returns RocksDB library file name.
    */
   public static String getRocksDBLibFileName() {
     return Environment.getJniLibraryFileName("rocksdb");
