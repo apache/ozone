@@ -39,8 +39,10 @@ public final class JniLibNamePropertyWriter {
     String filePath = args[0];
     try (Writer writer = new OutputStreamWriter(
         Files.newOutputStream(Paths.get(filePath)), StandardCharsets.UTF_8)) {
-      writer.write("rocksdbLibName=" +
-          Environment.getJniLibraryFileName("rocksdb"));
+      String libName = Environment.getJniLibraryFileName("rocksdb");
+      writer.write("rocksdbLibName=" + libName+"\n");
+      writer.write("rocksdbLibWithoutPlatform="+libName.split("-")[0] +
+          libName.substring(libName.lastIndexOf('.')));
     } catch (IOException e) {
       e.printStackTrace();
     }
