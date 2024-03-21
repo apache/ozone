@@ -208,8 +208,7 @@ public class ReadReplicas extends KeyHandler implements SubcommandWithParent {
       blockJson.set(JSON_PROPERTY_BLOCK_REPLICAS, replicasJson);
       blocks.add(blockJson);
 
-      blockReplicasWithoutChecksum.values()
-          .forEach(each -> IOUtils.close(LOG, each));
+      IOUtils.close(LOG, blockReplicasWithoutChecksum.values());
     }
   }
 

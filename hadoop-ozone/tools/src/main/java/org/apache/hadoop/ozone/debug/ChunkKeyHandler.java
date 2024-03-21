@@ -101,8 +101,7 @@ public class ChunkKeyHandler extends KeyHandler implements
       ContainerLayoutVersion containerLayoutVersion = ContainerLayoutVersion
           .getConfiguredVersion(getConf());
       ArrayNode responseArrayList = JsonUtils.createArrayNode();
-      for (OmKeyLocationInfo keyLocation : keyInfo.getLatestVersionLocations()
-          .getBlocksLatestVersionOnly()) {
+      for (OmKeyLocationInfo keyLocation : locationInfos) {
         ContainerChunkInfo containerChunkInfoVerbose = new ContainerChunkInfo();
         ContainerChunkInfo containerChunkInfo = new ContainerChunkInfo();
         long containerId = keyLocation.getContainerID();
