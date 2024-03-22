@@ -22,7 +22,6 @@ import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.server.JsonUtils;
 import picocli.CommandLine;
 
-import java.util.HashMap;
 import java.util.concurrent.Callable;
 
 import static org.apache.hadoop.ozone.admin.nssummary.NSSummaryCLIUtils.makeHttpCall;

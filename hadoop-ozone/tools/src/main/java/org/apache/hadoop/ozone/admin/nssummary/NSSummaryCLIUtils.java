@@ -21,18 +21,15 @@ package org.apache.hadoop.ozone.admin.nssummary;
 import org.apache.commons.io.IOUtils;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
-import org.apache.hadoop.hdds.server.JsonUtils;
 import org.apache.hadoop.hdfs.web.URLConnectionFactory;
 import picocli.CommandLine.Help.Ansi;
 
 import javax.security.sasl.AuthenticationException;
-import java.io.IOException;
 import java.io.InputStream;
 import java.net.ConnectException;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
-import java.util.HashMap;
 
 import static java.net.HttpURLConnection.HTTP_CREATED;
 import static java.net.HttpURLConnection.HTTP_OK;
