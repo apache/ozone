@@ -23,6 +23,7 @@ import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.PrintStream;
 import java.io.UnsupportedEncodingException;
+import java.net.URI;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashSet;
@@ -771,10 +772,8 @@ public class TestOzoneShellHA {
 
     try {
       generateBuckets("/" + volName, numBuckets);
-      int res;
-
       out.reset();
-      res = ToolRunner.run(shell, new String[]{"-ls", "/" + volName});
+      int res = ToolRunner.run(shell, new String[]{"-ls", "/" + volName});
       assertEquals(0, res);
       String r = out.toString(DEFAULT_ENCODING);
       assertThat(r).matches("(?s)^Found " + numBuckets + " items.*");
