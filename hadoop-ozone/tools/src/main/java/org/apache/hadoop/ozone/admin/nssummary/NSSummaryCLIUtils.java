@@ -108,11 +108,6 @@ public final class NSSummaryCLIUtils {
     }
   }
 
-  public static HashMap<String, Object> getResponseMap(String response)
-      throws IOException {
-    return JsonUtils.readTreeAsMap(response);
-  }
-
   public static void printNewLines(int cnt) {
     for (int i = 0; i < cnt; ++i) {
       System.out.println();

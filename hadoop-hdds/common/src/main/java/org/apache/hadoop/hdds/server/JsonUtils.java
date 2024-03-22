@@ -83,13 +83,6 @@ public final class JsonUtils {
     return MAPPER.readTree(content);
   }
 
-  public static HashMap<String, Object> readTreeAsMap(String response)
-      throws IOException {
-    return MAPPER.readValue(response,
-        new TypeReference<HashMap<String, Object>>() {
-        });
-  }
-
   public static List<HashMap<String, Object>> readTreeAsListOfMaps(String json)
       throws IOException {
     return MAPPER.readValue(json,

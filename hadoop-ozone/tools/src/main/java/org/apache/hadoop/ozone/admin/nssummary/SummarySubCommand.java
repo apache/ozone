@@ -17,13 +17,14 @@
  */
 package org.apache.hadoop.ozone.admin.nssummary;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
+import org.apache.hadoop.hdds.server.JsonUtils;
 import picocli.CommandLine;
 
 import java.util.HashMap;
 import java.util.concurrent.Callable;
 
-import static org.apache.hadoop.ozone.admin.nssummary.NSSummaryCLIUtils.getResponseMap;
 import static org.apache.hadoop.ozone.admin.nssummary.NSSummaryCLIUtils.makeHttpCall;
 import static org.apache.hadoop.ozone.admin.nssummary.NSSummaryCLIUtils.parseInputPath;
 import static org.apache.hadoop.ozone.admin.nssummary.NSSummaryCLIUtils.printEmptyPathRequest;
@@ -71,7 +72,7 @@ public class SummarySubCommand implements Callable<Void> {
       printNewLines(1);
       return null;
     }
-    HashMap<String, Object> summaryResponse = getResponseMap(response);
+    JsonNode summaryResponse = JsonUtils.readTree(response);
 
     if (summaryResponse.get("status").equals("PATH_NOT_FOUND")) {
       printPathNotFound();
@@ -84,10 +85,10 @@ public class SummarySubCommand implements Callable<Void> {
       printKVSeparator();
       System.out.println(summaryResponse.get("type"));
 
-      int numVol = ((Number) summaryResponse.get("numVolume")).intValue();
-      int numBucket = ((Number) summaryResponse.get("numBucket")).intValue();
-      int numDir = ((Number) summaryResponse.get("numDir")).intValue();
-      int numKey = ((Number) summaryResponse.get("numKey")).intValue();
+      int numVol = summaryResponse.get("numVolume").asInt();
+      int numBucket = summaryResponse.get("numBucket").asInt();
+      int numDir = summaryResponse.get("numDir").asInt();
+      int numKey = summaryResponse.get("numKey").asInt();
 
       if (numVol != -1) {
         printWithUnderline("Volumes", false);

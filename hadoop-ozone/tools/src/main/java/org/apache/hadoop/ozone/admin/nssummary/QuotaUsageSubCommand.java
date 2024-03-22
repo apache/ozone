@@ -17,14 +17,15 @@
  */
 package org.apache.hadoop.ozone.admin.nssummary;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
+import org.apache.hadoop.hdds.server.JsonUtils;
 import picocli.CommandLine;
 
 import java.util.HashMap;
 import java.util.concurrent.Callable;
 
-import static org.apache.hadoop.ozone.admin.nssummary.NSSummaryCLIUtils.getResponseMap;
 import static org.apache.hadoop.ozone.admin.nssummary.NSSummaryCLIUtils.makeHttpCall;
 import static org.apache.hadoop.ozone.admin.nssummary.NSSummaryCLIUtils.printEmptyPathRequest;
 import static org.apache.hadoop.ozone.admin.nssummary.NSSummaryCLIUtils.printBucketReminder;
@@ -73,7 +74,7 @@ public class QuotaUsageSubCommand implements Callable {
       return null;
     }
 
-    HashMap<String, Object> quotaResponse = getResponseMap(response);
+    JsonNode quotaResponse = JsonUtils.readTree(response);
 
     if (quotaResponse.get("status").equals("PATH_NOT_FOUND")) {
       printPathNotFound();
@@ -86,8 +87,8 @@ public class QuotaUsageSubCommand implements Callable {
 
       printWithUnderline("Quota", true);
 
-      long quotaAllowed = ((Number) quotaResponse.get("allowed")).longValue();
-      long quotaUsed = ((Number) quotaResponse.get("used")).longValue();
+      long quotaAllowed = quotaResponse.get("allowed").asLong();
+      long quotaUsed = quotaResponse.get("used").asLong();
 
       printSpaces(2);
       System.out.print("Allowed");
