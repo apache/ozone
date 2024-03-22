@@ -206,12 +206,34 @@ public class SnapshotCache implements ReferenceCountedCallback, AutoCloseable {
   }
 
   /**
-   * Wrapper for cleanupInternal() that is synchronized to prevent multiple
-   * threads from interleaving into the cleanup method.
+   * If cache size exceeds soft limit, attempt to clean up and close the
+     instances that has zero reference count.
    */
   private void cleanup() {
     if (dbMap.size() > cacheSizeLimit) {
-      cleanupInternal();
+      for (UUID evictionKey : pendingEvictionQueue) {
+        dbMap.compute(evictionKey, (k, v) -> {
+          pendingEvictionQueue.remove(k);
+          if (v == null) {
+            throw new IllegalStateException("SnapshotId '" + k + "' does not exist in cache. The RocksDB " +
+                "instance of the Snapshot may not be closed properly.");
+          }
+
+          if (v.getTotalRefCount() > 0) {
+            LOG.debug("SnapshotId {} is still being referenced ({}), skipping its clean up.", k, v.getTotalRefCount());
+            return v;
+          } else {
+            LOG.debug("Closing SnapshotId {}. It is not being referenced anymore.", k);
+            // Close the instance, which also closes its DB handle.
+            try {
+              v.get().close();
+            } catch (IOException ex) {
+              throw new IllegalStateException("Error while closing snapshot DB.", ex);
+            }
+            return null;
+          }
+        });
+      }
     }
   }
 
@@ -226,37 +248,6 @@ public class SnapshotCache implements ReferenceCountedCallback, AutoCloseable {
       // Reference count reaches zero, add to pendingEvictionList
       pendingEvictionQueue.add(((OmSnapshot) referenceCounted.get())
           .getSnapshotID());
-    }
-  }
-
-  /**
-   * If cache size exceeds soft limit, attempt to clean up and close the
-   * instances that has zero reference count.
-   * TODO: [SNAPSHOT] Add new ozone debug CLI command to trigger this directly.
-   */
-  private void cleanupInternal() {
-    for (UUID evictionKey : pendingEvictionQueue) {
-      dbMap.compute(evictionKey, (k, v) -> {
-        pendingEvictionQueue.remove(k);
-        if (v == null) {
-          throw new IllegalStateException("SnapshotId '" + k + "' does not exist in cache. The RocksDB " +
-              "instance of the Snapshot may not be closed properly.");
-        }
-
-        if (v.getTotalRefCount() > 0) {
-          LOG.debug("SnapshotId {} is still being referenced ({}), skipping its clean up.", k, v.getTotalRefCount());
-          return v;
-        } else {
-          LOG.debug("Closing SnapshotId {}. It is not being referenced anymore.", k);
-          // Close the instance, which also closes its DB handle.
-          try {
-            v.get().close();
-          } catch (IOException ex) {
-            throw new IllegalStateException("Error while closing snapshot DB.", ex);
-          }
-          return null;
-        }
-      });
     }
   }
 }
