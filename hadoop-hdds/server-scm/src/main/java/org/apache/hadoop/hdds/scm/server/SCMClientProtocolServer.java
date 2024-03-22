@@ -22,7 +22,6 @@
 package org.apache.hadoop.hdds.scm.server;
 
 import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Preconditions;
 import com.google.common.base.Strings;
 import com.google.common.collect.Maps;
 import com.google.protobuf.BlockingService;
@@ -1114,7 +1113,7 @@ public class SCMClientProtocolServer implements
         long msls = maxSizeLeavingSource.get();
         auditMap.put("maxSizeLeavingSource", String.valueOf(msls));
         if (msls < 0) {
-          throw new SCMException("Max Size Leaving Source must be "+
+          throw new SCMException("Max Size Leaving Source must be " +
               "greater than zero.", resultCodes);
         }
         cbc.setMaxSizeLeavingSource(msls * OzoneConsts.GB);
