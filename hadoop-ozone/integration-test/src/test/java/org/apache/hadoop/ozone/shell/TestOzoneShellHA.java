@@ -762,6 +762,8 @@ public class TestOzoneShellHA {
             getClientConfForOFS(hostPrefix, cluster.getConf());
     int pageSize = 20;
     clientConf.setInt(OZONE_FS_LISTING_PAGE_SIZE, pageSize);
+    URI uri = FileSystem.getDefaultUri(clientConf);
+    clientConf.setBoolean(String.format("fs.%s.impl.disable.cache", uri.getScheme()), true);
     OzoneFsShell shell = new OzoneFsShell(clientConf);
 
     String volName = "testlistbucket";
