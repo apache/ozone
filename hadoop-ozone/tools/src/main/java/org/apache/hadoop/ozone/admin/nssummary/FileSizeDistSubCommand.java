@@ -76,7 +76,7 @@ public class FileSizeDistSubCommand implements Callable {
 
     if ("PATH_NOT_FOUND".equals(distResponse.path("status").asText())) {
       printPathNotFound();
-    } else if (distResponse.get("status").equals("TYPE_NOT_APPLICABLE")) {
+    } else if ("TYPE_NOT_APPLICABLE".equals(distResponse.path("status").asText())) {
       printTypeNA("File Size Distribution");
     } else {
       if (parent.isNotValidBucketOrOBSBucket(path)) {

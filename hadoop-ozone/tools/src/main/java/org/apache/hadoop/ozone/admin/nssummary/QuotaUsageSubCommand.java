@@ -77,7 +77,7 @@ public class QuotaUsageSubCommand implements Callable {
 
     if ("PATH_NOT_FOUND".equals(quotaResponse.path("status").asText())) {
       printPathNotFound();
-    } else if (quotaResponse.get("status").equals("TYPE_NOT_APPLICABLE")) {
+    } else if ("TYPE_NOT_APPLICABLE".equals(quotaResponse.path("status").asText())) {
       printTypeNA("Quota");
     } else {
       if (parent.isNotValidBucketOrOBSBucket(path)) {
