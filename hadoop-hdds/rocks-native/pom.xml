@@ -235,6 +235,7 @@
                       <arg line="${project.build.directory}/rocksdb/rocksdb-${rocksdb.version}"/>
                     </exec>
                     <exec executable="make" dir="${project.build.directory}/rocksdb/rocksdb-${rocksdb.version}" failonerror="true">
+                      <arg line="PORTABLE=1"/>
                       <arg line="DEBUG_LEVEL=0"/>
                       <arg line="EXTRA_CXXFLAGS='-fPIC -D_GLIBCXX_USE_CXX11_ABI=0'"/>
                       <arg line="-j${system.numCores}"/>
@@ -393,7 +394,7 @@
                     <argument>-h</argument>
                     <argument>${project.build.directory}/native/javah</argument>
                     <argument>${project.basedir}/src/main/java/org/apache/hadoop/hdds/utils/db/managed/ManagedRawSSTFileReader.java</argument>
-                    <argument>${project.basedir}/src/main/java/org/apache/hadoop/hdds/utils/db/managed/ManagedRawSSTFileReaderIterator.java</argument>
+                    <argument>${project.basedir}/src/main/java/org/apache/hadoop/hdds/utils/db/managed/ManagedRawSSTFileIterator.java</argument>
                   </arguments>
                 </configuration>
               </execution>

@@ -20,8 +20,6 @@ package org.apache.hadoop.hdds.scm;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
-import java.util.concurrent.ConcurrentHashMap;
-import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.RandomUtils;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.HddsUtils;
@@ -64,20 +62,30 @@ import org.apache.hadoop.hdds.server.events.EventPublisher;
 import org.apache.hadoop.hdds.server.events.EventQueue;
 import org.apache.hadoop.hdds.server.events.FixedThreadPoolWithAffinityExecutor;
 import org.apache.hadoop.hdds.utils.HddsVersionInfo;
+import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.net.DNSToSwitchMapping;
 import org.apache.hadoop.net.NetUtils;
 import org.apache.hadoop.net.StaticMapping;
+import org.apache.hadoop.ozone.HddsDatanodeService;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.OzoneTestUtils;
+import org.apache.hadoop.ozone.TestDataUtil;
 import org.apache.hadoop.ozone.container.ContainerTestHelper;
-import org.apache.hadoop.ozone.HddsDatanodeService;
+import org.apache.hadoop.ozone.container.common.helpers.BlockData;
+import org.apache.hadoop.ozone.container.common.interfaces.DBHandle;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine;
 import org.apache.hadoop.ozone.container.common.statemachine.EndpointStateMachine;
 import org.apache.hadoop.ozone.container.common.states.endpoint.HeartbeatEndpointTask;
 import org.apache.hadoop.ozone.container.common.states.endpoint.VersionEndpointTask;
+import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
+import org.apache.hadoop.ozone.container.keyvalue.helpers.BlockUtils;
+import org.apache.hadoop.ozone.container.metadata.DatanodeSchemaThreeDBDefinition;
+import org.apache.hadoop.ozone.container.metadata.DatanodeStore;
+import org.apache.hadoop.ozone.container.metadata.DatanodeStoreSchemaThreeImpl;
+import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.protocol.commands.CloseContainerCommand;
@@ -94,11 +102,12 @@ import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ratis.conf.RaftProperties;
 import org.apache.ratis.protocol.RaftGroupId;
 import org.apache.ratis.server.RaftServerConfigKeys;
-import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
+import org.junit.jupiter.api.io.TempDir;
 import org.mockito.ArgumentMatcher;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -106,11 +115,9 @@ import org.slf4j.LoggerFactory;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -119,6 +126,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
@@ -128,14 +136,16 @@ import java.util.function.Predicate;
 import java.util.stream.Stream;
 
 import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.NET_TOPOLOGY_NODE_SWITCH_MAPPING_IMPL_KEY;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_COMMAND_STATUS_REPORT_INTERVAL;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_CONTAINER_REPORT_INTERVAL;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_HEARTBEAT_INTERVAL;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_SCM_SAFEMODE_PIPELINE_CREATION;
-import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_COMMAND_STATUS_REPORT_INTERVAL;
-import static org.apache.hadoop.hdds.scm.HddsWhiteboxTestUtils.setInternalState;
 import static org.apache.hadoop.hdds.scm.HddsTestUtils.mockRemoteUser;
+import static org.apache.hadoop.hdds.scm.HddsWhiteboxTestUtils.setInternalState;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_SERVICE_INTERVAL;
+import static org.apache.ozone.test.GenericTestUtils.PortAllocator.getFreePort;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
@@ -144,7 +154,6 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.junit.jupiter.api.Assertions.fail;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.argThat;
 import static org.mockito.Mockito.doAnswer;
@@ -160,7 +169,7 @@ import static org.mockito.Mockito.verify;
 public class TestStorageContainerManager {
   private static XceiverClientManager xceiverClientManager;
   private static final Logger LOG = LoggerFactory.getLogger(
-            TestStorageContainerManager.class);
+      TestStorageContainerManager.class);
 
   @BeforeAll
   public static void setup() throws IOException {
@@ -199,16 +208,13 @@ public class TestStorageContainerManager {
       OzoneConfiguration ozoneConf,
       Predicate<String> isAdmin,
       String... usernames) throws Exception {
-    MiniOzoneCluster cluster = MiniOzoneCluster.newBuilder(ozoneConf).build();
-    try {
+    try (MiniOzoneCluster cluster = MiniOzoneCluster.newBuilder(ozoneConf).build()) {
       cluster.waitForClusterToBeReady();
       for (String username : usernames) {
         testRpcPermission(cluster, username,
             !isAdmin.test(username));
       }
-    } finally {
-      cluster.shutdown();
-    }
+    } // The cluster is automatically closed here
   }
 
   private void testRpcPermission(MiniOzoneCluster cluster,
@@ -227,17 +233,17 @@ public class TestStorageContainerManager {
       assertInstanceOf(ContainerNotFoundException.class, ex);
     }
 
-    try {
-      ContainerWithPipeline container2 = mockClientServer.allocateContainer(
-          HddsProtos.ReplicationType.RATIS,
-          HddsProtos.ReplicationFactor.ONE, OzoneConsts.OZONE);
-      if (expectPermissionDenied) {
-        fail("Operation should fail, expecting an IOException here.");
-      } else {
-        assertEquals(1, container2.getPipeline().getNodes().size());
-      }
-    } catch (Exception e) {
-      verifyPermissionDeniedException(e, fakeRemoteUsername);
+    if (expectPermissionDenied) {
+      Exception allocateException = assertThrows(Exception.class, () ->
+          mockClientServer.allocateContainer(HddsProtos.ReplicationType.RATIS,
+              HddsProtos.ReplicationFactor.ONE, OzoneConsts.OZONE));
+      verifyPermissionDeniedException(allocateException, fakeRemoteUsername);
+    } else {
+      // If not expecting permission denied, validate the successful operation's result
+      ContainerWithPipeline container2 = assertDoesNotThrow(() ->
+          mockClientServer.allocateContainer(HddsProtos.ReplicationType.RATIS,
+              HddsProtos.ReplicationFactor.ONE, OzoneConsts.OZONE));
+      assertEquals(1, container2.getPipeline().getNodes().size());
     }
 
     Exception e = assertThrows(Exception.class, () -> mockClientServer.getContainer(
@@ -290,19 +296,14 @@ public class TestStorageContainerManager {
     conf.setInt(ScmConfigKeys.OZONE_SCM_PIPELINE_OWNER_CONTAINER_COUNT,
         numKeys);
 
-    MiniOzoneCluster cluster = MiniOzoneCluster.newBuilder(conf)
-        .build();
-    cluster.waitForClusterToBeReady();
-
-    try {
+    try (MiniOzoneCluster cluster = MiniOzoneCluster.newBuilder(conf)
+        .build()) {
+      cluster.waitForClusterToBeReady();
       DeletedBlockLog delLog = cluster.getStorageContainerManager()
           .getScmBlockManager().getDeletedBlockLog();
       assertEquals(0, delLog.getNumOfValidTransactions());
 
-      // Create {numKeys} random names keys.
-      TestStorageContainerManagerHelper helper =
-          new TestStorageContainerManagerHelper(cluster, conf);
-      Map<String, OmKeyInfo> keyLocations = helper.createKeys(numKeys, 4096);
+      Map<String, OmKeyInfo> keyLocations = TestDataUtil.createKeys(cluster, numKeys);
       // Wait for container report
       Thread.sleep(1000);
       for (OmKeyInfo keyInfo : keyLocations.values()) {
@@ -311,7 +312,7 @@ public class TestStorageContainerManager {
       }
       Map<Long, List<Long>> containerBlocks = createDeleteTXLog(
           cluster.getStorageContainerManager(),
-          delLog, keyLocations, helper);
+          delLog, keyLocations, cluster, conf);
 
       // Verify a few TX gets created in the TX log.
       assertThat(delLog.getNumOfValidTransactions()).isGreaterThan(0);
@@ -332,7 +333,7 @@ public class TestStorageContainerManager {
           return false;
         }
       }, 1000, 22000);
-      assertTrue(helper.verifyBlocksWithTxnTable(containerBlocks));
+      assertTrue(verifyBlocksWithTxnTable(cluster, conf, containerBlocks));
       // Continue the work, add some TXs that with known container names,
       // but unknown block IDs.
       for (Long containerID : containerBlocks.keySet()) {
@@ -362,8 +363,6 @@ public class TestStorageContainerManager {
           return false;
         }
       }, 1000, 20000);
-    } finally {
-      cluster.shutdown();
     }
   }
 
@@ -372,12 +371,13 @@ public class TestStorageContainerManager {
     OzoneConfiguration conf = new OzoneConfiguration();
     conf.setTimeDuration(HDDS_HEARTBEAT_INTERVAL, 1000, TimeUnit.MILLISECONDS);
     conf.setTimeDuration(ScmConfigKeys.OZONE_SCM_HEARTBEAT_PROCESS_INTERVAL, 3000, TimeUnit.MILLISECONDS);
-    MiniOzoneCluster cluster = MiniOzoneCluster.newBuilder(conf)
-        .setNumDatanodes(1)
-        .build();
-    cluster.waitForClusterToBeReady();
 
-    try {
+
+
+    try (MiniOzoneCluster cluster = MiniOzoneCluster.newBuilder(conf)
+        .setNumDatanodes(1)
+        .build()) {
+      cluster.waitForClusterToBeReady();
       HddsDatanodeService datanode = cluster.getHddsDatanodes().get(0);
       StorageContainerManager scm = cluster.getStorageContainerManager();
       scm.stop();
@@ -443,8 +443,6 @@ public class TestStorageContainerManager {
       assertThat(versionEndPointTaskLog.getOutput()).contains(
           "org.apache.hadoop.ozone.common" +
               ".InconsistentStorageStateException: Mismatched ClusterIDs");
-    } finally {
-      cluster.shutdown();
     }
   }
 
@@ -465,13 +463,11 @@ public class TestStorageContainerManager {
     conf.setTimeDuration(HDDS_HEARTBEAT_INTERVAL, 1000, TimeUnit.MILLISECONDS);
     conf.setTimeDuration(ScmConfigKeys.OZONE_SCM_HEARTBEAT_PROCESS_INTERVAL, 3000, TimeUnit.MILLISECONDS);
 
-    MiniOzoneCluster cluster = MiniOzoneCluster.newBuilder(conf)
+    try (MiniOzoneCluster cluster = MiniOzoneCluster.newBuilder(conf)
         .setNumDatanodes(1)
-        .build();
-    cluster.waitForClusterToBeReady();
-    cluster.waitForPipelineTobeReady(HddsProtos.ReplicationFactor.ONE, 30000);
-
-    try {
+        .build()) {
+      cluster.waitForClusterToBeReady();
+      cluster.waitForPipelineTobeReady(HddsProtos.ReplicationFactor.ONE, 30000);
       DeletedBlockLog delLog = cluster.getStorageContainerManager()
           .getScmBlockManager().getDeletedBlockLog();
       assertEquals(0, delLog.getNumOfValidTransactions());
@@ -483,10 +479,7 @@ public class TestStorageContainerManager {
           .getScmBlockManager().getSCMBlockDeletingService();
       delService.setBlockDeleteTXNum(limitSize);
 
-      // Create {numKeys} random names keys.
-      TestStorageContainerManagerHelper helper =
-          new TestStorageContainerManagerHelper(cluster, conf);
-      Map<String, OmKeyInfo> keyLocations = helper.createKeys(numKeys, 4096);
+      Map<String, OmKeyInfo> keyLocations = TestDataUtil.createKeys(cluster, numKeys);
       // Wait for container report
       Thread.sleep(5000);
       for (OmKeyInfo keyInfo : keyLocations.values()) {
@@ -495,7 +488,7 @@ public class TestStorageContainerManager {
       }
 
       createDeleteTXLog(cluster.getStorageContainerManager(),
-          delLog, keyLocations, helper);
+          delLog, keyLocations, cluster, conf);
       // Verify a few TX gets created in the TX log.
       assertThat(delLog.getNumOfValidTransactions()).isGreaterThan(0);
 
@@ -516,16 +509,13 @@ public class TestStorageContainerManager {
         }
         return false;
       }, 500, 10000);
-    } finally {
-      cluster.shutdown();
     }
   }
 
   private Map<Long, List<Long>> createDeleteTXLog(
       StorageContainerManager scm,
       DeletedBlockLog delLog,
-      Map<String, OmKeyInfo> keyLocations,
-      TestStorageContainerManagerHelper helper)
+      Map<String, OmKeyInfo> keyLocations, MiniOzoneCluster cluster, OzoneConfiguration conf)
       throws IOException, TimeoutException {
     // These keys will be written into a bunch of containers,
     // gets a set of container names, verify container containerBlocks
@@ -544,7 +534,7 @@ public class TestStorageContainerManager {
     }
     assertThat(totalCreatedBlocks).isGreaterThan(0);
     assertEquals(totalCreatedBlocks,
-        helper.getAllBlocks(containerNames).size());
+        getAllBlocks(cluster, conf, containerNames).size());
 
     // Create a deletion TX for each key.
     Map<Long, List<Long>> containerBlocks = Maps.newHashMap();
@@ -568,11 +558,9 @@ public class TestStorageContainerManager {
   }
 
   @Test
-  public void testSCMInitialization() throws Exception {
+  public void testSCMInitialization(@TempDir Path tempDir) throws Exception {
     OzoneConfiguration conf = new OzoneConfiguration();
-    final String path = GenericTestUtils.getTempPath(
-        UUID.randomUUID().toString());
-    Path scmPath = Paths.get(path, "scm-meta");
+    Path scmPath = tempDir.resolve("scm-meta");
     conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, scmPath.toString());
 
     UUID clusterId = UUID.randomUUID();
@@ -590,13 +578,11 @@ public class TestStorageContainerManager {
   }
 
   @Test
-  public void testSCMInitializationWithHAEnabled() throws Exception {
+  public void testSCMInitializationWithHAEnabled(@TempDir Path tempDir) throws Exception {
     OzoneConfiguration conf = new OzoneConfiguration();
     conf.setBoolean(ScmConfigKeys.OZONE_SCM_HA_ENABLE_KEY, true);
     conf.set(ScmConfigKeys.OZONE_SCM_PIPELINE_CREATION_INTERVAL, "10s");
-    final String path = GenericTestUtils.getTempPath(
-        UUID.randomUUID().toString());
-    Path scmPath = Paths.get(path, "scm-meta");
+    Path scmPath = tempDir.resolve("scm-meta");
     conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, scmPath.toString());
 
     final UUID clusterId = UUID.randomUUID();
@@ -608,52 +594,24 @@ public class TestStorageContainerManager {
   }
 
   @Test
-  public void testSCMReinitialization() throws Exception {
+  public void testSCMReinitialization(@TempDir Path tempDir) throws Exception {
     OzoneConfiguration conf = new OzoneConfiguration();
-    final String path = GenericTestUtils.getTempPath(
-        UUID.randomUUID().toString());
-    Path scmPath = Paths.get(path, "scm-meta");
+    Path scmPath = tempDir.resolve("scm-meta");
     conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, scmPath.toString());
     //This will set the cluster id in the version file
-    MiniOzoneCluster cluster =
-        MiniOzoneCluster.newBuilder(conf).setNumDatanodes(3).build();
-    cluster.waitForClusterToBeReady();
-    cluster.getStorageContainerManager().stop();
-    try {
+
+
+    try (MiniOzoneCluster cluster =
+             MiniOzoneCluster.newBuilder(conf).setNumDatanodes(3).build()) {
+      cluster.waitForClusterToBeReady();
+      cluster.getStorageContainerManager().stop();
       final UUID clusterId = UUID.randomUUID();
       // This will initialize SCM
       StorageContainerManager.scmInit(conf, clusterId.toString());
       SCMStorageConfig scmStore = new SCMStorageConfig(conf);
       assertNotEquals(clusterId.toString(), scmStore.getClusterID());
       assertTrue(scmStore.isSCMHAEnabled());
-    } finally {
-      cluster.shutdown();
     }
-  }
-
-  // Unsupported Test case. Non Ratis SCM -> Ratis SCM not supported
-  //@Test
-  public void testSCMReinitializationWithHAUpgrade() throws Exception {
-    OzoneConfiguration conf = new OzoneConfiguration();
-    final String path = GenericTestUtils.getTempPath(
-        UUID.randomUUID().toString());
-    Path scmPath = Paths.get(path, "scm-meta");
-    conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, scmPath.toString());
-    //This will set the cluster id in the version file
-    final UUID clusterId = UUID.randomUUID();
-      // This will initialize SCM
-
-    StorageContainerManager.scmInit(conf, clusterId.toString());
-    SCMStorageConfig scmStore = new SCMStorageConfig(conf);
-    assertEquals(clusterId.toString(), scmStore.getClusterID());
-    assertFalse(scmStore.isSCMHAEnabled());
-
-    conf.setBoolean(ScmConfigKeys.OZONE_SCM_HA_ENABLE_KEY, true);
-    StorageContainerManager.scmInit(conf, clusterId.toString());
-    scmStore = new SCMStorageConfig(conf);
-    assertTrue(scmStore.isSCMHAEnabled());
-    validateRatisGroupExists(conf, clusterId.toString());
-
   }
 
   @VisibleForTesting
@@ -696,45 +654,10 @@ public class TestStorageContainerManager {
     }
   }
 
-  // Non Ratis SCM -> Ratis SCM is not supported {@see HDDS-6695}
-  // Invalid Testcase
-  // @Test
-  public void testSCMReinitializationWithHAEnabled() throws Exception {
-    OzoneConfiguration conf = new OzoneConfiguration();
-    conf.setBoolean(ScmConfigKeys.OZONE_SCM_HA_ENABLE_KEY, false);
-    final String path = GenericTestUtils.getTempPath(
-        UUID.randomUUID().toString());
-    Path scmPath = Paths.get(path, "scm-meta");
-    conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, scmPath.toString());
-    //This will set the cluster id in the version file
-    MiniOzoneCluster cluster =
-        MiniOzoneCluster.newBuilder(conf).setNumDatanodes(3).build();
-    cluster.waitForClusterToBeReady();
-    try {
-      final String clusterId =
-          cluster.getStorageContainerManager().getClusterId();
-      // validate there is no ratis group pre existing
-      assertThrows(IOException.class, () -> validateRatisGroupExists(conf, clusterId));
-
-      conf.setBoolean(ScmConfigKeys.OZONE_SCM_HA_ENABLE_KEY, true);
-      // This will re-initialize SCM
-      StorageContainerManager.scmInit(conf, clusterId);
-      cluster.getStorageContainerManager().start();
-      // Ratis group with cluster id exists now
-      validateRatisGroupExists(conf, clusterId);
-      SCMStorageConfig scmStore = new SCMStorageConfig(conf);
-      assertTrue(scmStore.isSCMHAEnabled());
-    } finally {
-      cluster.shutdown();
-    }
-  }
-
   @Test
-  void testSCMInitializationFailure() {
+  void testSCMInitializationFailure(@TempDir Path tempDir) {
     OzoneConfiguration conf = new OzoneConfiguration();
-    final String path =
-        GenericTestUtils.getTempPath(UUID.randomUUID().toString());
-    Path scmPath = Paths.get(path, "scm-meta");
+    Path scmPath = tempDir.resolve("scm-meta");
     conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, scmPath.toString());
 
     Exception e = assertThrows(SCMException.class, () -> HddsTestUtils.getScmSimple(conf));
@@ -742,32 +665,27 @@ public class TestStorageContainerManager {
   }
 
   @Test
-  public void testScmInfo() throws Exception {
+  public void testScmInfo(@TempDir Path tempDir) throws Exception {
     OzoneConfiguration conf = new OzoneConfiguration();
-    final String path =
-        GenericTestUtils.getTempPath(UUID.randomUUID().toString());
-    try {
-      Path scmPath = Paths.get(path, "scm-meta");
-      conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, scmPath.toString());
-      SCMStorageConfig scmStore = new SCMStorageConfig(conf);
-      String clusterId = UUID.randomUUID().toString();
-      String scmId = UUID.randomUUID().toString();
-      scmStore.setClusterId(clusterId);
-      scmStore.setScmId(scmId);
-      // writes the version file properties
-      scmStore.initialize();
-      StorageContainerManager scm = HddsTestUtils.getScmSimple(conf);
-      //Reads the SCM Info from SCM instance
-      ScmInfo scmInfo = scm.getClientProtocolServer().getScmInfo();
-      assertEquals(clusterId, scmInfo.getClusterId());
-      assertEquals(scmId, scmInfo.getScmId());
+    Path scmPath = tempDir.resolve("scm-meta");
 
-      String expectedVersion = HddsVersionInfo.HDDS_VERSION_INFO.getVersion();
-      String actualVersion = scm.getSoftwareVersion();
-      assertEquals(expectedVersion, actualVersion);
-    } finally {
-      FileUtils.deleteQuietly(new File(path));
-    }
+    conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, scmPath.toString());
+    SCMStorageConfig scmStore = new SCMStorageConfig(conf);
+    String clusterId = UUID.randomUUID().toString();
+    String scmId = UUID.randomUUID().toString();
+    scmStore.setClusterId(clusterId);
+    scmStore.setScmId(scmId);
+    // writes the version file properties
+    scmStore.initialize();
+    StorageContainerManager scm = HddsTestUtils.getScmSimple(conf);
+    //Reads the SCM Info from SCM instance
+    ScmInfo scmInfo = scm.getClientProtocolServer().getScmInfo();
+    assertEquals(clusterId, scmInfo.getClusterId());
+    assertEquals(scmId, scmInfo.getScmId());
+
+    String expectedVersion = HddsVersionInfo.HDDS_VERSION_INFO.getVersion();
+    String actualVersion = scm.getSoftwareVersion();
+    assertEquals(expectedVersion, actualVersion);
   }
 
   /**
@@ -778,18 +696,16 @@ public class TestStorageContainerManager {
     OzoneConfiguration conf = new OzoneConfiguration();
     conf.setClass(NET_TOPOLOGY_NODE_SWITCH_MAPPING_IMPL_KEY,
         StaticMapping.class, DNSToSwitchMapping.class);
-    StaticMapping.addNodeToRack(NetUtils.normalizeHostNames(
-        Collections.singleton(HddsUtils.getHostName(conf))).get(0),
+    StaticMapping.addNodeToRack(NetUtils.normalizeHostName(HddsUtils.getHostName(conf)),
         "/rack1");
 
     final int datanodeNum = 3;
-    MiniOzoneCluster cluster = MiniOzoneCluster.newBuilder(conf)
-        .setNumDatanodes(datanodeNum)
-        .build();
-    cluster.waitForClusterToBeReady();
-    StorageContainerManager scm = cluster.getStorageContainerManager();
 
-    try {
+    try (MiniOzoneCluster cluster = MiniOzoneCluster.newBuilder(conf)
+        .setNumDatanodes(datanodeNum)
+        .build()) {
+      cluster.waitForClusterToBeReady();
+      StorageContainerManager scm = cluster.getStorageContainerManager();
       // first sleep 10s
       Thread.sleep(10000);
       // verify datanode heartbeats are well processed
@@ -809,8 +725,6 @@ public class TestStorageContainerManager {
             datanodeInfo.getNetworkName());
         assertEquals("/rack1", datanodeInfo.getNetworkLocation());
       }
-    } finally {
-      cluster.shutdown();
     }
   }
 
@@ -829,17 +743,13 @@ public class TestStorageContainerManager {
     conf.setTimeDuration(HDDS_HEARTBEAT_INTERVAL, 1000, TimeUnit.MILLISECONDS);
     conf.setTimeDuration(ScmConfigKeys.OZONE_SCM_HEARTBEAT_PROCESS_INTERVAL, 3000, TimeUnit.MILLISECONDS);
 
-    MiniOzoneCluster cluster = MiniOzoneCluster.newBuilder(conf)
+    try (MiniOzoneCluster cluster = MiniOzoneCluster.newBuilder(conf)
         .setNumDatanodes(1)
-        .build();
-    cluster.waitForClusterToBeReady();
-    cluster.waitForPipelineTobeReady(HddsProtos.ReplicationFactor.ONE, 30000);
+        .build()) {
+      cluster.waitForClusterToBeReady();
+      cluster.waitForPipelineTobeReady(HddsProtos.ReplicationFactor.ONE, 30000);
 
-    try {
-      TestStorageContainerManagerHelper helper =
-          new TestStorageContainerManagerHelper(cluster, conf);
-
-      helper.createKeys(10, 4096);
+      TestDataUtil.createKeys(cluster, 10);
       GenericTestUtils.waitFor(() ->
           cluster.getStorageContainerManager().getContainerManager()
               .getContainers() != null, 1000, 10000);
@@ -905,8 +815,6 @@ public class TestStorageContainerManager {
       } else {
         verify(nodeManager).addDatanodeCommand(dnUuid, closeContainerCommand);
       }
-    } finally {
-      cluster.shutdown();
     }
   }
 
@@ -926,7 +834,7 @@ public class TestStorageContainerManager {
     ContainerReportHandler containerReportHandler =
         mock(ContainerReportHandler.class);
     doAnswer((inv) -> {
-      Thread.currentThread().sleep(500);
+      Thread.sleep(500);
       return null;
     }).when(containerReportHandler).onMessage(dndata, eventQueue);
     List<ThreadPoolExecutor> executors = FixedThreadPoolWithAffinityExecutor
@@ -948,7 +856,7 @@ public class TestStorageContainerManager {
     eventQueue.fireEvent(SCMEvents.CONTAINER_REPORT, dndata);
     eventQueue.fireEvent(SCMEvents.CONTAINER_REPORT, dndata);
     assertThat(containerReportExecutors.droppedEvents()).isGreaterThan(1);
-    Thread.currentThread().sleep(1000);
+    Thread.sleep(1000);
     assertEquals(containerReportExecutors.droppedEvents()
             + containerReportExecutors.scheduledEvents(),
         containerReportExecutors.queuedEvents());
@@ -968,7 +876,7 @@ public class TestStorageContainerManager {
     ContainerReportHandler containerReportHandler =
         mock(ContainerReportHandler.class);
     doAnswer((inv) -> {
-      Thread.currentThread().sleep(1000);
+      Thread.sleep(1000);
       semaphore.release(1);
       return null;
     }).when(containerReportHandler).onMessage(any(), eq(eventQueue));
@@ -987,7 +895,7 @@ public class TestStorageContainerManager {
             reportExecutorMap);
     containerReportExecutors.setQueueWaitThreshold(800);
     containerReportExecutors.setExecWaitThreshold(800);
-    
+
     eventQueue.addHandler(SCMEvents.CONTAINER_REPORT, containerReportExecutors,
         containerReportHandler);
     ContainerReportsProto report = ContainerReportsProto.getDefaultInstance();
@@ -1026,7 +934,7 @@ public class TestStorageContainerManager {
     IncrementalContainerReportHandler icr =
         mock(IncrementalContainerReportHandler.class);
     doAnswer((inv) -> {
-      Thread.currentThread().sleep(500);
+      Thread.sleep(500);
       return null;
     }).when(icr).onMessage(dndata, eventQueue);
     List<ThreadPoolExecutor> executors = FixedThreadPoolWithAffinityExecutor
@@ -1048,7 +956,7 @@ public class TestStorageContainerManager {
     eventQueue.fireEvent(SCMEvents.INCREMENTAL_CONTAINER_REPORT, dndata);
     eventQueue.fireEvent(SCMEvents.INCREMENTAL_CONTAINER_REPORT, dndata);
     assertEquals(0, containerReportExecutors.droppedEvents());
-    Thread.currentThread().sleep(3000);
+    Thread.sleep(3000);
     assertEquals(containerReportExecutors.scheduledEvents(),
         containerReportExecutors.queuedEvents());
     containerReportExecutors.close();
@@ -1072,13 +980,14 @@ public class TestStorageContainerManager {
       DefaultConfigManager.clearDefaultConfigs();
       conf.setBoolean(ScmConfigKeys.OZONE_SCM_HA_ENABLE_KEY, true);
       StorageContainerManager.scmInit(conf, cluster.getClusterId());
+      conf.setInt(ScmConfigKeys.OZONE_SCM_DATANODE_PORT_KEY, getFreePort());
+      conf.unset(ScmConfigKeys.OZONE_SCM_DATANODE_ADDRESS_KEY);
       cluster.restartStorageContainerManager(false);
 
       final StorageContainerManager ratisSCM = cluster
           .getStorageContainerManager();
       assertNotNull(ratisSCM.getScmHAManager().getRatisServer());
       assertTrue(ratisSCM.getScmStorageConfig().isSCMHAEnabled());
-
     }
   }
 
@@ -1115,4 +1024,86 @@ public class TestStorageContainerManager {
           && left.getProto().equals(right.getProto());
     }
   }
+
+  public List<Long> getAllBlocks(MiniOzoneCluster cluster, OzoneConfiguration conf, Set<Long> containerIDs)
+      throws IOException {
+    List<Long> allBlocks = Lists.newArrayList();
+    for (Long containerID : containerIDs) {
+      allBlocks.addAll(getAllBlocks(cluster, conf, containerID));
+    }
+    return allBlocks;
+  }
+
+  public List<Long> getAllBlocks(MiniOzoneCluster cluster,
+      OzoneConfiguration conf, Long containerID) throws IOException {
+    List<Long> allBlocks = Lists.newArrayList();
+    KeyValueContainerData cData = getContainerMetadata(cluster, containerID);
+    try (DBHandle db = BlockUtils.getDB(cData, conf)) {
+
+      List<? extends Table.KeyValue<String, BlockData>> kvs =
+          db.getStore().getBlockDataTable()
+              .getRangeKVs(cData.startKeyEmpty(), Integer.MAX_VALUE,
+                  cData.containerPrefix(), cData.getUnprefixedKeyFilter());
+
+      for (Table.KeyValue<String, BlockData> entry : kvs) {
+        allBlocks.add(Long.valueOf(DatanodeSchemaThreeDBDefinition
+            .getKeyWithoutPrefix(entry.getKey())));
+      }
+    }
+    return allBlocks;
+  }
+
+  public boolean verifyBlocksWithTxnTable(MiniOzoneCluster cluster, OzoneConfiguration conf,
+      Map<Long, List<Long>> containerBlocks)
+      throws IOException {
+    for (Map.Entry<Long, List<Long>> entry : containerBlocks.entrySet()) {
+      KeyValueContainerData cData = getContainerMetadata(cluster, entry.getKey());
+      try (DBHandle db = BlockUtils.getDB(cData, conf)) {
+        DatanodeStore ds = db.getStore();
+        DatanodeStoreSchemaThreeImpl dnStoreImpl =
+            (DatanodeStoreSchemaThreeImpl) ds;
+        List<? extends Table.KeyValue<String, DeletedBlocksTransaction>>
+            txnsInTxnTable = dnStoreImpl.getDeleteTransactionTable()
+            .getRangeKVs(cData.startKeyEmpty(), Integer.MAX_VALUE,
+                cData.containerPrefix());
+        List<Long> conID = new ArrayList<>();
+        for (Table.KeyValue<String, DeletedBlocksTransaction> txn :
+            txnsInTxnTable) {
+          conID.addAll(txn.getValue().getLocalIDList());
+        }
+        if (!conID.equals(containerBlocks.get(entry.getKey()))) {
+          return false;
+        }
+      }
+    }
+    return true;
+  }
+
+  private KeyValueContainerData getContainerMetadata(MiniOzoneCluster cluster, Long containerID)
+      throws IOException {
+    ContainerWithPipeline containerWithPipeline = cluster
+        .getStorageContainerManager().getClientProtocolServer()
+        .getContainerWithPipeline(containerID);
+
+    DatanodeDetails dn =
+        containerWithPipeline.getPipeline().getFirstNode();
+    OzoneContainer containerServer =
+        getContainerServerByDatanodeUuid(cluster, dn.getUuidString());
+    KeyValueContainerData containerData =
+        (KeyValueContainerData) containerServer.getContainerSet()
+            .getContainer(containerID).getContainerData();
+    return containerData;
+  }
+
+  private OzoneContainer getContainerServerByDatanodeUuid(MiniOzoneCluster cluster, String dnUUID)
+      throws IOException {
+    for (HddsDatanodeService dn : cluster.getHddsDatanodes()) {
+      if (dn.getDatanodeDetails().getUuidString().equals(dnUUID)) {
+        return dn.getDatanodeStateMachine().getContainer();
+      }
+    }
+    throw new IOException("Unable to get the ozone container "
+        + "for given datanode ID " + dnUUID);
+  }
+
 }

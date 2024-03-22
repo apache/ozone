@@ -777,6 +777,8 @@ public class KeyValueHandler extends Handler {
       //  For client reads, the client is expected to validate.
       if (DispatcherContext.op(dispatcherContext).readFromTmpFile()) {
         validateChunkChecksumData(data, chunkInfo);
+        metrics.incBytesReadStateMachine(chunkInfo.getLen());
+        metrics.incNumReadStateMachine();
       }
       metrics.incContainerBytesStats(Type.ReadChunk, chunkInfo.getLen());
     } catch (StorageContainerException ex) {
