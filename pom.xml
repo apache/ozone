@@ -117,7 +117,7 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
     <commons-codec.version>1.15</commons-codec.version>
     <commons-collections.version>3.2.2</commons-collections.version>
     <commons-compress.version>1.26.0</commons-compress.version>
-    <commons-configuration2.version>2.8.0</commons-configuration2.version>
+    <commons-configuration2.version>2.10.1</commons-configuration2.version>
     <zstd-jni.version>1.5.2-5</zstd-jni.version>
     <commons-daemon.version>1.0.13</commons-daemon.version>
     <commons-io.version>2.15.1</commons-io.version>
@@ -217,7 +217,7 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
     <mockito.version>4.11.0</mockito.version>
     <hamcrest.version>2.2</hamcrest.version>
     <junit5.version>5.10.2</junit5.version>
-    <zookeeper.version>3.7.2</zookeeper.version>
+    <zookeeper.version>3.8.4</zookeeper.version>
 
     <!-- Maven protoc compiler -->
     <protobuf-maven-plugin.version>0.6.1</protobuf-maven-plugin.version>
@@ -248,7 +248,7 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
     <maven-surefire-plugin.argLine>-Xmx4096m -XX:+HeapDumpOnOutOfMemoryError</maven-surefire-plugin.argLine>
     <maven-surefire-plugin.argLineAccessArgs></maven-surefire-plugin.argLineAccessArgs>
     <unstable-test-groups>flaky | slow | unhealthy</unstable-test-groups>
-    <maven-surefire-plugin.version>3.0.0-M5</maven-surefire-plugin.version>
+    <maven-surefire-plugin.version>3.0.0-M4</maven-surefire-plugin.version>
     <maven-surefire-report-plugin.version>${maven-surefire-plugin.version}</maven-surefire-report-plugin.version>
     <maven-failsafe-plugin.version>${maven-surefire-plugin.version}</maven-failsafe-plugin.version>
 
@@ -1228,6 +1228,16 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
         <groupId>org.apache.zookeeper</groupId>
         <artifactId>zookeeper</artifactId>
         <version>${zookeeper.version}</version>
+        <exclusions>
+          <exclusion>
+            <groupId>ch.qos.logback</groupId>
+            <artifactId>logback-core</artifactId>
+          </exclusion>
+          <exclusion>
+            <groupId>ch.qos.logback</groupId>
+            <artifactId>logback-classic</artifactId>
+          </exclusion>
+        </exclusions>
       </dependency>
       <dependency>
         <groupId>org.slf4j</groupId>

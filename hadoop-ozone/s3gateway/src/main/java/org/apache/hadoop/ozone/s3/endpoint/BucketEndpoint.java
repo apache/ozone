@@ -63,7 +63,7 @@ import javax.ws.rs.core.Response;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.ArrayList;
-import java.util.BitSet;
+import java.util.EnumSet;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
@@ -665,14 +665,11 @@ public class BucketEndpoint extends EndpointBase {
         throw newError(NOT_IMPLEMENTED, part[0]);
       }
       // Build ACL on Bucket
-      BitSet aclsOnBucket =
-          S3Acl.getOzoneAclOnBucketFromS3Permission(permission);
+      EnumSet<IAccessAuthorizer.ACLType> aclsOnBucket = S3Acl.getOzoneAclOnBucketFromS3Permission(permission);
       OzoneAcl defaultOzoneAcl = new OzoneAcl(
-          IAccessAuthorizer.ACLIdentityType.USER, part[1], aclsOnBucket,
-          OzoneAcl.AclScope.DEFAULT);
-      OzoneAcl accessOzoneAcl = new OzoneAcl(
-          IAccessAuthorizer.ACLIdentityType.USER, part[1], aclsOnBucket,
-          ACCESS);
+          IAccessAuthorizer.ACLIdentityType.USER, part[1], OzoneAcl.AclScope.DEFAULT, aclsOnBucket
+      );
+      OzoneAcl accessOzoneAcl = new OzoneAcl(IAccessAuthorizer.ACLIdentityType.USER, part[1], ACCESS, aclsOnBucket);
       ozoneAclList.add(defaultOzoneAcl);
       ozoneAclList.add(accessOzoneAcl);
     }
@@ -699,11 +696,9 @@ public class BucketEndpoint extends EndpointBase {
         throw newError(NOT_IMPLEMENTED, part[0]);
       }
       // Build ACL on Volume
-      BitSet aclsOnVolume =
+      EnumSet<IAccessAuthorizer.ACLType> aclsOnVolume =
           S3Acl.getOzoneAclOnVolumeFromS3Permission(permission);
-      OzoneAcl accessOzoneAcl = new OzoneAcl(
-          IAccessAuthorizer.ACLIdentityType.USER, part[1], aclsOnVolume,
-          ACCESS);
+      OzoneAcl accessOzoneAcl = new OzoneAcl(IAccessAuthorizer.ACLIdentityType.USER, part[1], ACCESS, aclsOnVolume);
       ozoneAclList.add(accessOzoneAcl);
     }
     return ozoneAclList;

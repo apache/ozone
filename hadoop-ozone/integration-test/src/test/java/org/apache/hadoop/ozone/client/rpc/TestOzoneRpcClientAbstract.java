@@ -25,7 +25,6 @@ import java.security.PrivilegedExceptionAction;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.BitSet;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
@@ -199,13 +198,13 @@ public abstract class TestOzoneRpcClientAbstract {
   private static String remoteUserName = "remoteUser";
   private static String remoteGroupName = "remoteGroup";
   private static OzoneAcl defaultUserAcl = new OzoneAcl(USER, remoteUserName,
-      READ, DEFAULT);
+      DEFAULT, READ);
   private static OzoneAcl defaultGroupAcl = new OzoneAcl(GROUP, remoteGroupName,
-      READ, DEFAULT);
+      DEFAULT, READ);
   private static OzoneAcl inheritedUserAcl = new OzoneAcl(USER, remoteUserName,
-      READ, ACCESS);
+      ACCESS, READ);
   private static OzoneAcl inheritedGroupAcl = new OzoneAcl(GROUP,
-      remoteGroupName, READ, ACCESS);
+      remoteGroupName, ACCESS, READ);
   private static MessageDigest eTagProvider;
 
   @BeforeAll
@@ -729,7 +728,7 @@ public abstract class TestOzoneRpcClientAbstract {
     String volumeName = UUID.randomUUID().toString();
     String bucketName = UUID.randomUUID().toString();
     OzoneAcl userAcl = new OzoneAcl(USER, "test",
-        READ, ACCESS);
+        ACCESS, READ);
     store.createVolume(volumeName);
     OzoneVolume volume = store.getVolume(volumeName);
     BucketArgs.Builder builder = BucketArgs.newBuilder()
@@ -763,7 +762,7 @@ public abstract class TestOzoneRpcClientAbstract {
     String volumeName = UUID.randomUUID().toString();
     String bucketName = UUID.randomUUID().toString();
     OzoneAcl userAcl = new OzoneAcl(USER, "test",
-        ACLType.ALL, ACCESS);
+        ACCESS, ACLType.ALL);
     ReplicationConfig repConfig = new ECReplicationConfig(3, 2);
     store.createVolume(volumeName);
     OzoneVolume volume = store.getVolume(volumeName);
@@ -802,7 +801,7 @@ public abstract class TestOzoneRpcClientAbstract {
     OzoneVolume volume = store.getVolume(volumeName);
     volume.createBucket(bucketName);
     List<OzoneAcl> acls = new ArrayList<>();
-    acls.add(new OzoneAcl(USER, "test", ACLType.ALL, ACCESS));
+    acls.add(new OzoneAcl(USER, "test", ACCESS, ACLType.ALL));
     OzoneBucket bucket = volume.getBucket(bucketName);
     for (OzoneAcl acl : acls) {
       assertTrue(bucket.addAcl(acl));
@@ -818,7 +817,7 @@ public abstract class TestOzoneRpcClientAbstract {
     String volumeName = UUID.randomUUID().toString();
     String bucketName = UUID.randomUUID().toString();
     OzoneAcl userAcl = new OzoneAcl(USER, "test",
-        ACLType.ALL, ACCESS);
+        ACCESS, ACLType.ALL);
     store.createVolume(volumeName);
     OzoneVolume volume = store.getVolume(volumeName);
     BucketArgs.Builder builder = BucketArgs.newBuilder()
@@ -837,9 +836,9 @@ public abstract class TestOzoneRpcClientAbstract {
     String volumeName = UUID.randomUUID().toString();
     String bucketName = UUID.randomUUID().toString();
     OzoneAcl userAcl = new OzoneAcl(USER, "test",
-        ACLType.ALL, ACCESS);
+        ACCESS, ACLType.ALL);
     OzoneAcl acl2 = new OzoneAcl(USER, "test1",
-        ACLType.ALL, ACCESS);
+        ACCESS, ACLType.ALL);
     store.createVolume(volumeName);
     OzoneVolume volume = store.getVolume(volumeName);
     BucketArgs.Builder builder = BucketArgs.newBuilder()
@@ -2758,10 +2757,10 @@ public abstract class TestOzoneRpcClientAbstract {
     OzoneBucket bucket = volume.getBucket(bucketName);
 
     // Add ACL on Bucket
-    OzoneAcl acl1 = new OzoneAcl(USER, "Monday", ACLType.ALL, DEFAULT);
-    OzoneAcl acl2 = new OzoneAcl(USER, "Friday", ACLType.ALL, DEFAULT);
-    OzoneAcl acl3 = new OzoneAcl(USER, "Jan", ACLType.ALL, ACCESS);
-    OzoneAcl acl4 = new OzoneAcl(USER, "Feb", ACLType.ALL, ACCESS);
+    OzoneAcl acl1 = new OzoneAcl(USER, "Monday", DEFAULT, ACLType.ALL);
+    OzoneAcl acl2 = new OzoneAcl(USER, "Friday", DEFAULT, ACLType.ALL);
+    OzoneAcl acl3 = new OzoneAcl(USER, "Jan", ACCESS, ACLType.ALL);
+    OzoneAcl acl4 = new OzoneAcl(USER, "Feb", ACCESS, ACLType.ALL);
     bucket.addAcl(acl1);
     bucket.addAcl(acl2);
     bucket.addAcl(acl3);
@@ -2795,8 +2794,8 @@ public abstract class TestOzoneRpcClientAbstract {
     try (OzoneClient client =
         remoteUser.doAs((PrivilegedExceptionAction<OzoneClient>)
             () -> OzoneClientFactory.getRpcClient(cluster.getConf()))) {
-      OzoneAcl acl5 = new OzoneAcl(USER, userName, ACLType.READ, DEFAULT);
-      OzoneAcl acl6 = new OzoneAcl(USER, userName, ACLType.READ, ACCESS);
+      OzoneAcl acl5 = new OzoneAcl(USER, userName, DEFAULT, ACLType.READ);
+      OzoneAcl acl6 = new OzoneAcl(USER, userName, ACCESS, ACLType.READ);
       OzoneObj volumeObj = OzoneObjInfo.Builder.newBuilder()
           .setVolumeName(volumeName).setStoreType(OzoneObj.StoreType.OZONE)
           .setResType(OzoneObj.ResourceType.VOLUME).build();
@@ -2819,10 +2818,10 @@ public abstract class TestOzoneRpcClientAbstract {
       assertEquals(ResultCodes.PERMISSION_DENIED, ome.getResult());
 
       // Add create permission for user, and try multi-upload init again
-      OzoneAcl acl7 = new OzoneAcl(USER, userName, ACLType.CREATE, DEFAULT);
-      OzoneAcl acl8 = new OzoneAcl(USER, userName, ACLType.CREATE, ACCESS);
-      OzoneAcl acl9 = new OzoneAcl(USER, userName, WRITE, DEFAULT);
-      OzoneAcl acl10 = new OzoneAcl(USER, userName, WRITE, ACCESS);
+      OzoneAcl acl7 = new OzoneAcl(USER, userName, DEFAULT, ACLType.CREATE);
+      OzoneAcl acl8 = new OzoneAcl(USER, userName, ACCESS, ACLType.CREATE);
+      OzoneAcl acl9 = new OzoneAcl(USER, userName, DEFAULT, WRITE);
+      OzoneAcl acl10 = new OzoneAcl(USER, userName, ACCESS, WRITE);
       store.addAcl(volumeObj, acl7);
       store.addAcl(volumeObj, acl8);
       store.addAcl(volumeObj, acl9);
@@ -3573,11 +3572,7 @@ public abstract class TestOzoneRpcClientAbstract {
         .setStoreType(OzoneObj.StoreType.OZONE)
         .build();
 
-    // add acl
-    BitSet aclRights1 = new BitSet();
-    aclRights1.set(READ.ordinal());
-    OzoneAcl user1Acl = new OzoneAcl(USER,
-        "user1", aclRights1, ACCESS);
+    OzoneAcl user1Acl = new OzoneAcl(USER, "user1", ACCESS, READ);
     assertTrue(store.addAcl(prefixObj, user1Acl));
 
     // get acl
@@ -3590,11 +3585,7 @@ public abstract class TestOzoneRpcClientAbstract {
     aclsGet = store.getAcl(prefixObj);
     assertEquals(0, aclsGet.size());
 
-    // set acl
-    BitSet aclRights2 = new BitSet();
-    aclRights2.set(ACLType.ALL.ordinal());
-    OzoneAcl group1Acl = new OzoneAcl(GROUP,
-        "group1", aclRights2, ACCESS);
+    OzoneAcl group1Acl = new OzoneAcl(GROUP, "group1", ACCESS, ACLType.ALL);
     List<OzoneAcl> acls = new ArrayList<>();
     acls.add(user1Acl);
     acls.add(group1Acl);
@@ -3634,12 +3625,11 @@ public abstract class TestOzoneRpcClientAbstract {
     ACLType userRights = aclConfig.getUserDefaultRights();
     ACLType groupRights = aclConfig.getGroupDefaultRights();
 
-    listOfAcls.add(new OzoneAcl(USER,
-        ugi.getUserName(), userRights, ACCESS));
+    listOfAcls.add(new OzoneAcl(USER, ugi.getUserName(), ACCESS, userRights));
     //Group ACLs of the User
     List<String> userGroups = Arrays.asList(ugi.getGroupNames());
     userGroups.stream().forEach((group) -> listOfAcls.add(
-        new OzoneAcl(GROUP, group, groupRights, ACCESS)));
+        new OzoneAcl(GROUP, group, ACCESS, groupRights)));
     return listOfAcls;
   }
 
@@ -3655,7 +3645,7 @@ public abstract class TestOzoneRpcClientAbstract {
     if (expectedAcls.size() > 0) {
       OzoneAcl oldAcl = expectedAcls.get(0);
       OzoneAcl newAcl = new OzoneAcl(oldAcl.getType(), oldAcl.getName(),
-          ACLType.READ_ACL, oldAcl.getAclScope());
+          oldAcl.getAclScope(), ACLType.READ_ACL);
       // Verify that operation successful.
       assertTrue(store.addAcl(ozObj, newAcl));
 
@@ -3706,9 +3696,9 @@ public abstract class TestOzoneRpcClientAbstract {
 
     // Reset acl's.
     OzoneAcl ua = new OzoneAcl(USER, "userx",
-        ACLType.READ_ACL, ACCESS);
+        ACCESS, ACLType.READ_ACL);
     OzoneAcl ug = new OzoneAcl(GROUP, "userx",
-        ACLType.ALL, ACCESS);
+        ACCESS, ACLType.ALL);
     store.setAcl(ozObj, Arrays.asList(ua, ug));
     newAcls = store.getAcl(ozObj);
     assertEquals(2, newAcls.size());
@@ -4036,7 +4026,7 @@ public abstract class TestOzoneRpcClientAbstract {
         .setStoreType(OzoneObj.StoreType.OZONE)
         .build();
 
-    OzoneAcl ozoneAcl = new OzoneAcl(USER, remoteUserName, WRITE, DEFAULT);
+    OzoneAcl ozoneAcl = new OzoneAcl(USER, remoteUserName, DEFAULT, WRITE);
 
     boolean result = store.addAcl(s3vVolume, ozoneAcl);
 
