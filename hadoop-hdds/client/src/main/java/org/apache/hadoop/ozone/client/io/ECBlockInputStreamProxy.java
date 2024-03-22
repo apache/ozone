@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.client.io;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.scm.OzoneClientConfig;
 import org.apache.hadoop.hdds.scm.XceiverClientFactory;
 import org.apache.hadoop.hdds.scm.XceiverClientManager;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
@@ -49,7 +50,6 @@ public class ECBlockInputStreamProxy extends BlockExtendedInputStream {
       LoggerFactory.getLogger(ECBlockInputStreamProxy.class);
 
   private final ECReplicationConfig repConfig;
-  private final boolean verifyChecksum;
   private final XceiverClientFactory xceiverClientFactory;
   private final Function<BlockID, BlockLocationInfo> refreshFunction;
   private final BlockLocationInfo blockInfo;
@@ -59,6 +59,7 @@ public class ECBlockInputStreamProxy extends BlockExtendedInputStream {
   private boolean reconstructionReader = false;
   private List<DatanodeDetails> failedLocations = new ArrayList<>();
   private boolean closed = false;
+  private OzoneClientConfig config;
 
   /**
    * Given the ECReplicationConfig and the block length, calculate how many
@@ -97,16 +98,17 @@ public class ECBlockInputStreamProxy extends BlockExtendedInputStream {
   }
 
   public ECBlockInputStreamProxy(ECReplicationConfig repConfig,
-      BlockLocationInfo blockInfo, boolean verifyChecksum,
+      BlockLocationInfo blockInfo,
       XceiverClientFactory xceiverClientFactory, Function<BlockID,
       BlockLocationInfo> refreshFunction,
-      ECBlockInputStreamFactory streamFactory) {
+      ECBlockInputStreamFactory streamFactory,
+      OzoneClientConfig config) {
     this.repConfig = repConfig;
-    this.verifyChecksum = verifyChecksum;
     this.blockInfo = blockInfo;
     this.ecBlockInputStreamFactory = streamFactory;
     this.xceiverClientFactory = xceiverClientFactory;
     this.refreshFunction = refreshFunction;
+    this.config = config;
 
     setReaderType();
     createBlockReader();
@@ -124,8 +126,8 @@ public class ECBlockInputStreamProxy extends BlockExtendedInputStream {
           .incECReconstructionTotal();
     }
     blockReader = ecBlockInputStreamFactory.create(reconstructionReader,
-        failedLocations, repConfig, blockInfo, verifyChecksum,
-        xceiverClientFactory, refreshFunction);
+        failedLocations, repConfig, blockInfo,
+        xceiverClientFactory, refreshFunction, config);
   }
 
   @Override

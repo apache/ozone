@@ -83,8 +83,10 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
       <artifactId>log4j-core</artifactId>
     </dependency>
     <dependency>
+      <!-- required for async logging in Log4j2 -->
       <groupId>com.lmax</groupId>
       <artifactId>disruptor</artifactId>
+      <scope>runtime</scope>
     </dependency>
     <dependency>
       <groupId>org.eclipse.jetty</groupId>

@@ -51,9 +51,9 @@ public class TestOMPrefixAclResponse extends TestOMKeyResponse {
   @Test
   public void testAddToDBBatch() throws Exception {
     final OzoneAcl user1 = new OzoneAcl(USER, "user1",
-        ACLType.READ_ACL, ACCESS);
+        ACCESS, ACLType.READ_ACL);
     final OzoneAcl user2 = new OzoneAcl(USER, "user2",
-        ACLType.WRITE, ACCESS);
+        ACCESS, ACLType.WRITE);
     final String prefixName = "/vol/buck/prefix/";
     List<OzoneAcl> acls = Arrays.asList(user1, user2);
 

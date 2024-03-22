@@ -17,7 +17,6 @@
 package org.apache.hadoop.ozone.freon;
 
 
-import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.RandomUtils;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdds.DatanodeVersion;
@@ -43,6 +42,7 @@ import org.apache.hadoop.hdds.server.ServerUtils;
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager;
 import org.apache.hadoop.hdds.utils.HAUtils;
 import org.apache.hadoop.hdds.utils.HddsServerUtil;
+import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.hdds.utils.LegacyHadoopConfigurationSource;
 import org.apache.hadoop.io.retry.RetryPolicies;
 import org.apache.hadoop.io.retry.RetryPolicy;
@@ -186,7 +186,7 @@ public class DatanodeSimulator implements Callable<Void> {
           } catch (InterruptedException e) {
             throw new RuntimeException(e);
           }
-          scmClients.values().forEach(IOUtils::closeQuietly);
+          IOUtils.closeQuietly(scmClients.values());
           IOUtils.closeQuietly(reconClient);
           LOGGER.info("Successfully closed all the used resources");
           saveDatanodesToFile();

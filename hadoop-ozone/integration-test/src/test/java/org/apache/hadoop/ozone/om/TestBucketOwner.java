@@ -123,7 +123,7 @@ public class TestBucketOwner {
       ozoneBucket.getAcls();
       //Add Acls
       OzoneAcl acl = new OzoneAcl(USER, "testuser",
-          IAccessAuthorizer.ACLType.ALL, DEFAULT);
+          DEFAULT, IAccessAuthorizer.ACLType.ALL);
       ozoneBucket.addAcl(acl);
     }
   }
@@ -179,7 +179,7 @@ public class TestBucketOwner {
         OzoneVolume volume = client.getObjectStore().getVolume("volume1");
         OzoneBucket ozoneBucket = volume.getBucket("bucket1");
         OzoneAcl acl = new OzoneAcl(USER, "testuser1",
-            IAccessAuthorizer.ACLType.ALL, DEFAULT);
+            DEFAULT, IAccessAuthorizer.ACLType.ALL);
         ozoneBucket.addAcl(acl);
       }, "Add Acls as non-volume and non-bucket owner should fail");
     }
@@ -202,7 +202,7 @@ public class TestBucketOwner {
       ozoneBucket.getAcls();
       //Add Acls
       OzoneAcl acl = new OzoneAcl(USER, "testuser2",
-          IAccessAuthorizer.ACLType.ALL, DEFAULT);
+          DEFAULT, IAccessAuthorizer.ACLType.ALL);
       ozoneBucket.addAcl(acl);
       //Bucket Delete
       volume.deleteBucket("bucket2");

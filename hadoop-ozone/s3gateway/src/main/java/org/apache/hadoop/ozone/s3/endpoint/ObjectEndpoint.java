@@ -483,8 +483,11 @@ public class ObjectEndpoint extends EndpointBase {
         responseBuilder.header(CONTENT_RANGE_HEADER, contentRangeVal);
       }
       responseBuilder
-          .header(ETAG, wrapInQuotes(keyDetails.getMetadata().get(ETAG)))
           .header(ACCEPT_RANGE_HEADER, RANGE_HEADER_SUPPORTED_UNIT);
+
+      if (keyDetails.getMetadata().get(ETAG) != null) {
+        responseBuilder.header(ETAG, wrapInQuotes(keyDetails.getMetadata().get(ETAG)));
+      }
 
       // if multiple query parameters having same name,
       // Only the first parameters will be recognized
@@ -591,9 +594,16 @@ public class ObjectEndpoint extends EndpointBase {
     }
 
     ResponseBuilder response = Response.ok().status(HttpStatus.SC_OK)
-        .header(ETAG, "" + wrapInQuotes(key.getMetadata().get(ETAG)))
         .header("Content-Length", key.getDataSize())
         .header("Content-Type", "binary/octet-stream");
+
+    if (key.getMetadata().get(ETAG) != null) {
+      // Should not return ETag header if the ETag is not set
+      // doing so will result in "null" string being returned instead
+      // which breaks some AWS SDK implementation
+      response.header(ETAG, "" + wrapInQuotes(key.getMetadata().get(ETAG)));
+    }
+
     addLastModifiedDate(response, key);
     addCustomMetadataHeaders(response, key);
     getMetrics().updateHeadKeySuccessStats(startNanos);

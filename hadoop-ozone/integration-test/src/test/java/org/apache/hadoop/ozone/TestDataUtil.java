@@ -22,8 +22,10 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.nio.ByteBuffer;
 import java.util.HashMap;
+import java.util.Map;
 import java.util.Scanner;
 
+import com.google.common.collect.Maps;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
@@ -38,6 +40,8 @@ import org.apache.hadoop.ozone.client.VolumeArgs;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
+import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
+import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_DEFAULT_BUCKET_LAYOUT;
@@ -179,5 +183,30 @@ public final class TestDataUtil {
     throw new IllegalStateException(
         "Could not create unique volume/bucket " + "in " + attempts
             + " attempts");
+  }
+
+  public static Map<String, OmKeyInfo> createKeys(MiniOzoneCluster cluster, int numOfKeys)
+      throws Exception {
+    Map<String, OmKeyInfo> keyLocationMap = Maps.newHashMap();
+
+    try (OzoneClient client = cluster.newClient()) {
+      OzoneBucket bucket = createVolumeAndBucket(client);
+      for (int i = 0; i < numOfKeys; i++) {
+        String keyName = RandomStringUtils.randomAlphabetic(5) + i;
+        createKey(bucket, keyName, RandomStringUtils.randomAlphabetic(5));
+        keyLocationMap.put(keyName, lookupOmKeyInfo(cluster, bucket, keyName));
+      }
+    }
+    return keyLocationMap;
+  }
+
+  private static OmKeyInfo lookupOmKeyInfo(MiniOzoneCluster cluster,
+      OzoneBucket bucket, String key) throws IOException {
+    OmKeyArgs arg = new OmKeyArgs.Builder()
+        .setVolumeName(bucket.getVolumeName())
+        .setBucketName(bucket.getName())
+        .setKeyName(key)
+        .build();
+    return cluster.getOzoneManager().lookupKey(arg);
   }
 }

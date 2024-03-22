@@ -309,6 +309,7 @@ public class MiniOzoneChaosCluster extends MiniOzoneHAClusterImpl {
       if (startDataNodes) {
         cluster.startHddsDatanodes();
       }
+      prepareForNextBuild();
       return cluster;
     }
   }

@@ -30,7 +30,7 @@ ${S3G_ENDPOINT_URL}     http://s3g:9878
 Create Tenant Success with Cluster Admin
     Run Keyword         Kinit test user     testuser     testuser.keytab
     ${output} =         Execute          ozone tenant --verbose create tenantone
-                        Should contain   ${output}         "tenantId": "tenantone"
+                        Should contain   ${output}         "tenantId" : "tenantone"
 
 Assign User Success with Cluster Admin
     ${output} =         Execute          ozone tenant --verbose user assign testuser --tenant=tenantone

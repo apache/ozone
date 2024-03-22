@@ -1090,7 +1090,7 @@ public abstract class TestOmSnapshot {
     createSnapshot(testVolumeName, testBucketName, snap1);
     OzoneObj keyObj = buildKeyObj(bucket, key1);
     OzoneAcl userAcl = new OzoneAcl(USER, "user",
-        WRITE, DEFAULT);
+        DEFAULT, WRITE);
     store.addAcl(keyObj, userAcl);
 
     String snap2 = "snap2";

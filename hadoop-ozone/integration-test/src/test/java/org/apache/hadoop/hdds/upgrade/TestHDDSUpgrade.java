@@ -178,7 +178,7 @@ public class TestHDDSUpgrade {
     // use multiple clusters, so its hard to know exactly how many will be
     // needed. This means the provider will create 1 extra cluster than needed
     // but that will not greatly affect runtimes.
-    clusterProvider = new MiniOzoneClusterProvider(conf, builder, 100);
+    clusterProvider = new MiniOzoneClusterProvider(builder, 100);
   }
 
   @AfterAll

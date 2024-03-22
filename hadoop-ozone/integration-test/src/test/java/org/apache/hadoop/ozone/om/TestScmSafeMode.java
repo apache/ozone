@@ -41,13 +41,12 @@ import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.server.events.EventQueue;
 import org.apache.hadoop.ozone.HddsDatanodeService;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
-import org.apache.hadoop.hdds.scm.TestStorageContainerManagerHelper;
+import org.apache.hadoop.ozone.TestDataUtil;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.common.statemachine.InvalidStateTransitionException;
-import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.tag.Unhealthy;
 import org.junit.jupiter.api.AfterEach;
@@ -60,7 +59,6 @@ import org.slf4j.LoggerFactory;
 import java.io.IOException;
 import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.concurrent.TimeoutException;
 
 import static java.util.concurrent.TimeUnit.MILLISECONDS;
@@ -139,10 +137,7 @@ public class TestScmSafeMode {
 
   @Test
   void testSafeModeOperations() throws Exception {
-    // Create {numKeys} random names keys.
-    TestStorageContainerManagerHelper helper =
-        new TestStorageContainerManagerHelper(cluster, conf);
-    Map<String, OmKeyInfo> keyLocations = helper.createKeys(100, 4096);
+    TestDataUtil.createKeys(cluster, 100);
     final List<ContainerInfo> containers = cluster
         .getStorageContainerManager().getContainerManager().getContainers();
     GenericTestUtils.waitFor(() -> containers.size() >= 3, 100, 1000);
@@ -228,10 +223,7 @@ public class TestScmSafeMode {
     assertFalse(cluster.getStorageContainerManager().isInSafeMode());
 
     // Test2: Test safe mode  when containers are there in system.
-    // Create {numKeys} random names keys.
-    TestStorageContainerManagerHelper helper =
-        new TestStorageContainerManagerHelper(cluster, conf);
-    Map<String, OmKeyInfo> keyLocations = helper.createKeys(100 * 2, 4096);
+    TestDataUtil.createKeys(cluster, 100 * 2);
     final List<ContainerInfo> containers = cluster
         .getStorageContainerManager().getContainerManager().getContainers();
     GenericTestUtils.waitFor(() -> containers.size() >= 3, 100, 1000 * 30);
@@ -303,9 +295,7 @@ public class TestScmSafeMode {
     cluster.waitTobeOutOfSafeMode();
     assertFalse(scm.isInSafeMode());
 
-    TestStorageContainerManagerHelper helper =
-        new TestStorageContainerManagerHelper(cluster, conf);
-    helper.createKeys(10, 4096);
+    TestDataUtil.createKeys(cluster, 10);
     SCMClientProtocolServer clientProtocolServer = cluster
         .getStorageContainerManager().getClientProtocolServer();
     assertFalse((scm.getClientProtocolServer()).getSafeModeStatus());

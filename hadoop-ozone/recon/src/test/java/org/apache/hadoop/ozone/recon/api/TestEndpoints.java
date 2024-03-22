@@ -435,14 +435,12 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
             .addOzoneAcls(new OzoneAcl(
                 IAccessAuthorizer.ACLIdentityType.USER,
                 "TestUser2",
-                IAccessAuthorizer.ACLType.WRITE,
-                OzoneAcl.AclScope.ACCESS
+                OzoneAcl.AclScope.ACCESS, IAccessAuthorizer.ACLType.WRITE
             ))
             .addOzoneAcls(new OzoneAcl(
                 IAccessAuthorizer.ACLIdentityType.USER,
                 "TestUser2",
-                IAccessAuthorizer.ACLType.READ,
-                OzoneAcl.AclScope.ACCESS
+                OzoneAcl.AclScope.ACCESS, IAccessAuthorizer.ACLType.READ
             ))
             .build();
     reconOMMetadataManager.getVolumeTable().put(volumeKey, args);
@@ -453,8 +451,7 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
         .addAcl(new OzoneAcl(
             IAccessAuthorizer.ACLIdentityType.GROUP,
             "TestGroup2",
-            IAccessAuthorizer.ACLType.WRITE,
-            OzoneAcl.AclScope.ACCESS
+            OzoneAcl.AclScope.ACCESS, IAccessAuthorizer.ACLType.WRITE
         ))
         .setQuotaInBytes(OzoneConsts.GB)
         .setUsedBytes(OzoneConsts.MB)
@@ -477,8 +474,7 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
         .addAcl(new OzoneAcl(
             IAccessAuthorizer.ACLIdentityType.GROUP,
             "TestGroup2",
-            IAccessAuthorizer.ACLType.READ,
-            OzoneAcl.AclScope.ACCESS
+            OzoneAcl.AclScope.ACCESS, IAccessAuthorizer.ACLType.READ
         ))
         .setQuotaInBytes(OzoneConsts.GB)
         .setUsedBytes(100 * OzoneConsts.MB)

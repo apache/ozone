@@ -29,7 +29,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
-import java.util.BitSet;
+import java.util.EnumSet;
 import java.util.List;
 
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.INVALID_ARGUMENT;
@@ -228,15 +228,15 @@ public final class S3Acl {
           grant.getGrantee().getXsiType());
       if (identityType != null && identityType.isSupported()) {
         String permission = grant.getPermission();
-        BitSet acls = getOzoneAclOnBucketFromS3Permission(permission);
+        EnumSet<IAccessAuthorizer.ACLType> acls = getOzoneAclOnBucketFromS3Permission(permission);
         OzoneAcl defaultOzoneAcl = new OzoneAcl(
             IAccessAuthorizer.ACLIdentityType.USER,
-            grant.getGrantee().getId(), acls,
-            OzoneAcl.AclScope.DEFAULT);
+            grant.getGrantee().getId(), OzoneAcl.AclScope.DEFAULT, acls
+        );
         OzoneAcl accessOzoneAcl = new OzoneAcl(
             IAccessAuthorizer.ACLIdentityType.USER,
-            grant.getGrantee().getId(), acls,
-            OzoneAcl.AclScope.ACCESS);
+            grant.getGrantee().getId(), OzoneAcl.AclScope.ACCESS, acls
+        );
         ozoneAclList.add(defaultOzoneAcl);
         ozoneAclList.add(accessOzoneAcl);
       } else {
@@ -249,31 +249,31 @@ public final class S3Acl {
     return ozoneAclList;
   }
 
-  public static BitSet getOzoneAclOnBucketFromS3Permission(String permission)
+  public static EnumSet<IAccessAuthorizer.ACLType> getOzoneAclOnBucketFromS3Permission(String permission)
       throws OS3Exception {
     ACLType permissionType = ACLType.getType(permission);
     if (permissionType == null) {
       throw S3ErrorTable.newError(S3ErrorTable.INVALID_ARGUMENT, permission);
     }
-    BitSet acls = new BitSet(IAccessAuthorizer.ACLType.getNoOfAcls());
+    EnumSet<IAccessAuthorizer.ACLType> acls = EnumSet.noneOf(IAccessAuthorizer.ACLType.class);
     switch (permissionType) {
     case FULL_CONTROL:
-      acls.set(IAccessAuthorizer.ACLType.ALL.ordinal());
+      acls.add(IAccessAuthorizer.ACLType.ALL);
       break;
     case WRITE_ACP:
-      acls.set(IAccessAuthorizer.ACLType.WRITE_ACL.ordinal());
+      acls.add(IAccessAuthorizer.ACLType.WRITE_ACL);
       break;
     case READ_ACP:
-      acls.set(IAccessAuthorizer.ACLType.READ_ACL.ordinal());
+      acls.add(IAccessAuthorizer.ACLType.READ_ACL);
       break;
     case WRITE:
-      acls.set(IAccessAuthorizer.ACLType.WRITE.ordinal());
-      acls.set(IAccessAuthorizer.ACLType.DELETE.ordinal());
-      acls.set(IAccessAuthorizer.ACLType.CREATE.ordinal());
+      acls.add(IAccessAuthorizer.ACLType.WRITE);
+      acls.add(IAccessAuthorizer.ACLType.DELETE);
+      acls.add(IAccessAuthorizer.ACLType.CREATE);
       break;
     case READ:
-      acls.set(IAccessAuthorizer.ACLType.READ.ordinal());
-      acls.set(IAccessAuthorizer.ACLType.LIST.ordinal());
+      acls.add(IAccessAuthorizer.ACLType.READ);
+      acls.add(IAccessAuthorizer.ACLType.LIST);
       break;
     default:
       LOG.error("Failed to recognize S3 permission {}", permission);
@@ -292,11 +292,11 @@ public final class S3Acl {
           grant.getGrantee().getXsiType());
       if (identityType != null && identityType.isSupported()) {
         String permission = grant.getPermission();
-        BitSet acls = getOzoneAclOnVolumeFromS3Permission(permission);
+        EnumSet<IAccessAuthorizer.ACLType> acls = getOzoneAclOnVolumeFromS3Permission(permission);
         OzoneAcl accessOzoneAcl = new OzoneAcl(
             IAccessAuthorizer.ACLIdentityType.USER,
-            grant.getGrantee().getId(), acls,
-            OzoneAcl.AclScope.ACCESS);
+            grant.getGrantee().getId(), OzoneAcl.AclScope.ACCESS, acls
+        );
         ozoneAclList.add(accessOzoneAcl);
       } else {
         LOG.error("Grantee type {} is not supported",
@@ -309,35 +309,35 @@ public final class S3Acl {
   }
 
   // User privilege on volume follows the "lest privilege" principle.
-  public static BitSet getOzoneAclOnVolumeFromS3Permission(String permission)
+  public static EnumSet<IAccessAuthorizer.ACLType> getOzoneAclOnVolumeFromS3Permission(String permission)
       throws OS3Exception {
-    BitSet acls = new BitSet(IAccessAuthorizer.ACLType.getNoOfAcls());
+    EnumSet<IAccessAuthorizer.ACLType> acls = EnumSet.noneOf(IAccessAuthorizer.ACLType.class);
     ACLType permissionType = ACLType.getType(permission);
     if (permissionType == null) {
       throw S3ErrorTable.newError(S3ErrorTable.INVALID_ARGUMENT, permission);
     }
     switch (permissionType) {
     case FULL_CONTROL:
-      acls.set(IAccessAuthorizer.ACLType.READ.ordinal());
-      acls.set(IAccessAuthorizer.ACLType.WRITE.ordinal());
-      acls.set(IAccessAuthorizer.ACLType.READ_ACL.ordinal());
-      acls.set(IAccessAuthorizer.ACLType.WRITE_ACL.ordinal());
+      acls.add(IAccessAuthorizer.ACLType.READ);
+      acls.add(IAccessAuthorizer.ACLType.WRITE);
+      acls.add(IAccessAuthorizer.ACLType.READ_ACL);
+      acls.add(IAccessAuthorizer.ACLType.WRITE_ACL);
       break;
     case WRITE_ACP:
-      acls.set(IAccessAuthorizer.ACLType.READ.ordinal());
-      acls.set(IAccessAuthorizer.ACLType.READ_ACL.ordinal());
-      acls.set(IAccessAuthorizer.ACLType.WRITE_ACL.ordinal());
+      acls.add(IAccessAuthorizer.ACLType.READ);
+      acls.add(IAccessAuthorizer.ACLType.READ_ACL);
+      acls.add(IAccessAuthorizer.ACLType.WRITE_ACL);
       break;
     case READ_ACP:
-      acls.set(IAccessAuthorizer.ACLType.READ.ordinal());
-      acls.set(IAccessAuthorizer.ACLType.READ_ACL.ordinal());
+      acls.add(IAccessAuthorizer.ACLType.READ);
+      acls.add(IAccessAuthorizer.ACLType.READ_ACL);
       break;
     case WRITE:
-      acls.set(IAccessAuthorizer.ACLType.READ.ordinal());
-      acls.set(IAccessAuthorizer.ACLType.WRITE.ordinal());
+      acls.add(IAccessAuthorizer.ACLType.READ);
+      acls.add(IAccessAuthorizer.ACLType.WRITE);
       break;
     case READ:
-      acls.set(IAccessAuthorizer.ACLType.READ.ordinal());
+      acls.add(IAccessAuthorizer.ACLType.READ);
       break;
     default:
       LOG.error("Failed to recognize S3 permission {}", permission);

@@ -193,7 +193,7 @@ public class DatanodeChunkValidator extends BaseFreonGenerator
       throws OzoneChecksumException {
     ContainerProtos.ReadChunkResponseProto readChunk = response.getReadChunk();
     if (readChunk.hasData()) {
-      return checksum.computeChecksum(readChunk.getData().toByteArray());
+      return checksum.computeChecksum(readChunk.getData().asReadOnlyByteBuffer());
     } else {
       return checksum.computeChecksum(
           readChunk.getDataBuffers().getBuffersList());

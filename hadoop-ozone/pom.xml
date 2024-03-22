@@ -306,66 +306,6 @@
         </executions>
       </plugin>
       <plugin>
-        <groupId>org.apache.rat</groupId>
-        <artifactId>apache-rat-plugin</artifactId>
-        <configuration>
-          <excludes>
-            <exclude>**/*.json</exclude>
-            <exclude>**/hs_err*.log</exclude>
-            <exclude>**/target/**</exclude>
-            <exclude>.gitattributes</exclude>
-            <exclude>**/.attach_*</exclude>
-            <exclude>**/**.rej</exclude>
-            <exclude>**/.factorypath</exclude>
-            <exclude>public</exclude>
-            <exclude>**/*.iml</exclude>
-            <exclude>**/output.xml</exclude>
-            <exclude>**/log.html</exclude>
-            <exclude>**/report.html</exclude>
-            <exclude>**/.idea/**</exclude>
-            <exclude>**/.ssh/id_rsa*</exclude>
-            <exclude>dev-support/*tests</exclude>
-            <exclude>dev-support/checkstyle*</exclude>
-            <exclude>dev-support/jdiff/**</exclude>
-            <exclude>src/contrib/**</exclude>
-            <exclude>src/main/webapps/datanode/robots.txt</exclude>
-            <exclude>src/main/webapps/hdfs/robots.txt</exclude>
-            <exclude>src/main/webapps/journal/robots.txt</exclude>
-            <exclude>src/main/webapps/router/robots.txt</exclude>
-            <exclude>src/main/webapps/secondary/robots.txt</exclude>
-            <exclude>src/site/resources/images/*</exclude>
-            <exclude>src/test/all-tests</exclude>
-            <exclude>src/test/empty-file</exclude>
-            <exclude>src/test/resources/*.log</exclude>
-            <exclude>src/test/resources/*.tgz</exclude>
-            <exclude>src/test/resources/data*</exclude>
-            <exclude>src/test/resources/empty-file</exclude>
-            <exclude>src/test/resources/ssl/*</exclude>
-            <exclude>src/main/compose/ozonesecure/docker-image/runner/build/apache-rat-0.12/README-CLI.txt</exclude>
-            <exclude>src/main/compose/ozonesecure/docker-image/runner/build/apache-rat-0.12/README-ANT.txt</exclude>
-            <exclude>webapps/static/angular-1.8.0.min.js</exclude>
-            <exclude>webapps/static/angular-nvd3-1.0.9.min.js</exclude>
-            <exclude>webapps/static/angular-route-1.8.0.min.js</exclude>
-            <exclude>webapps/static/bootstrap-3.4.1/**</exclude>
-            <exclude>webapps/static/d3-3.5.17.min.js</exclude>
-            <exclude>webapps/static/jquery-3.5.1.min.js</exclude>
-            <exclude>webapps/static/jquery.dataTables.min.js</exclude>
-            <exclude>webapps/static/nvd3-1.8.5.min.css.map</exclude>
-            <exclude>webapps/static/nvd3-1.8.5.min.css</exclude>
-            <exclude>webapps/static/nvd3-1.8.5.min.js.map</exclude>
-            <exclude>webapps/static/nvd3-1.8.5.min.js</exclude>
-            <exclude>**/dependency-reduced-pom.xml</exclude>
-            <exclude>**/node_modules/**</exclude>
-            <exclude>**/yarn.lock</exclude>
-            <exclude>**/pnpm-lock.yaml</exclude>
-            <exclude>**/ozone-recon-web/build/**</exclude>
-            <exclude>src/test/resources/prometheus-test-response.txt</exclude>
-            <exclude>src/main/license/**</exclude>
-            <exclude>src/main/resources/proto.lock</exclude>
-          </excludes>
-        </configuration>
-      </plugin>
-      <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-jar-plugin</artifactId>
         <configuration>
@@ -404,6 +344,13 @@
         <module>ozonefs-hadoop2</module>
         <module>ozonefs-hadoop3</module>
         <module>ozonefs-hadoop3-client</module>
+      </modules>
+    </profile>
+    <profile>
+      <id>go-offline</id>
+      <modules>
+        <module>ozonefs-shaded</module>
+        <module>ozonefs-hadoop2</module>
       </modules>
     </profile>
     <profile>

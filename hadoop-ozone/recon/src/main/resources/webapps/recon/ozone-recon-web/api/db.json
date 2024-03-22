@@ -6686,5 +6686,72 @@
         ]
       }
     ]
+  },
+  "dirdeletePending": {
+    "replicatedDataSize": 0,
+    "unreplicatedDataSize": 0,
+    "deletedDirInfo": [
+      {
+        "key": "/-4611686018427388160/-9223372036854775552/-9223372036854764286/231010153900/-9223372036854760111",
+        "path": ".Trash/hadoop/231010153900",
+        "inStateSince": 1696952297266,
+        "size": 17289,
+        "replicatedSize": 100,
+        "replicationInfo": {
+          "replicationFactor": "THREE",
+          "requiredNodes": 3,
+          "replicationType": "RATIS"
+        }
+      },
+      {
+        "key": "/-4611686018427388160/-9223372036854775552/-9223372036854775552/dir3/-9223372036854774015",
+        "path": "dir1",
+        "inStateSince": 1696954980154,
+        "size": 1200,
+        "replicatedSize": 0,
+        "replicationInfo": {
+          "replicationFactor": "THREE",
+          "requiredNodes": 3,
+          "replicationType": "RATIS"
+        }
+      },
+      {
+        "key": "/-4611686018427388160/-9223372036854775552/-9223372036854764286/231010153900/-9223372036854760191",
+        "path": ".Trash/hadoop/231010153900",
+        "inStateSince": 1696952297266,
+        "size": 17289,
+        "replicatedSize": 0,
+        "replicationInfo": {
+          "replicationFactor": "THREE",
+          "requiredNodes": 3,
+          "replicationType": "RATIS"
+        }
+      },
+      {
+        "key": "/-4611686018427388160/-9223372036854775552/-9223372036854775552/dir3/-9223372036854774112",
+        "path": "dir21",
+        "inStateSince": 1696954980154,
+        "size": 17289,
+        "replicatedSize": 0,
+        "replicationInfo": {
+          "replicationFactor": "THREE",
+          "requiredNodes": 3,
+          "replicationType": "RATIS"
+        }
+      },
+      {
+        "key": "/-4611686018427388160/-9223372036854775552/-9223372036854775552/dir3/-922337203685477303",
+        "path": "dir22",
+        "inStateSince": 1696954980900,
+        "size": 20289,
+        "replicatedSize": 0,
+        "replicationInfo": {
+          "replicationFactor": "THREE",
+          "requiredNodes": 3,
+          "replicationType": "RATIS"
+        }
+      }
+    ],
+    "status": "OK"
   }
 }

@@ -27,17 +27,17 @@ import org.apache.hadoop.ozone.security.acl.RequestContext;
 
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.BitSet;
 import java.util.List;
+import java.util.Objects;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
+
 import org.apache.hadoop.security.UserGroupInformation;
 
 import static org.apache.hadoop.ozone.OzoneAcl.AclScope.ACCESS;
 import static org.apache.hadoop.ozone.OzoneAcl.AclScope.DEFAULT;
 import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLIdentityType.GROUP;
 import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLIdentityType.USER;
-import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType.ALL;
-import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType.NONE;
 
 /**
  * Helper class for ozone acls operations.
@@ -60,11 +60,11 @@ public final class OzoneAclUtil {
     List<OzoneAcl> listOfAcls = new ArrayList<>();
 
     // User ACL.
-    listOfAcls.add(new OzoneAcl(USER, userName, userRights, ACCESS));
+    listOfAcls.add(new OzoneAcl(USER, userName, ACCESS, userRights));
     if (userGroups != null) {
       // Group ACLs of the User.
       Arrays.asList(userGroups).forEach((group) -> listOfAcls.add(
-          new OzoneAcl(GROUP, group, groupRights, ACCESS)));
+          new OzoneAcl(GROUP, group, ACCESS, groupRights)));
     }
     return listOfAcls;
   }
@@ -91,23 +91,22 @@ public final class OzoneAclUtil {
 
   private static boolean checkAccessInAcl(OzoneAcl a, UserGroupInformation ugi,
       ACLType aclToCheck) {
-    BitSet rights = a.getAclBitSet();
     switch (a.getType()) {
     case USER:
       if (a.getName().equals(ugi.getShortUserName())) {
-        return checkIfAclBitIsSet(aclToCheck, rights);
+        return a.checkAccess(aclToCheck);
       }
       break;
     case GROUP:
       for (String grp : ugi.getGroupNames()) {
         if (a.getName().equals(grp)) {
-          return checkIfAclBitIsSet(aclToCheck, rights);
+          return a.checkAccess(aclToCheck);
         }
       }
       break;
 
     default:
-      return checkIfAclBitIsSet(aclToCheck, rights);
+      return a.checkAccess(aclToCheck);
     }
     return false;
   }
@@ -137,56 +136,30 @@ public final class OzoneAclUtil {
   }
 
   /**
-   * Helper function to check if bit for given acl is set.
-   * @param acl
-   * @param bitset
-   * @return True of acl bit is set else false.
-   * */
-  public static boolean checkIfAclBitIsSet(IAccessAuthorizer.ACLType acl,
-      BitSet bitset) {
-    if (bitset == null) {
-      return false;
-    }
-
-    return ((bitset.get(acl.ordinal())
-        || bitset.get(ALL.ordinal()))
-        && !bitset.get(NONE.ordinal()));
-  }
-
-  /**
-   * Helper function to inherit default ACL as access ACL for child object.
-   * 1. deep copy of OzoneAcl to avoid unexpected parent default ACL change
-   * 2. merge inherited access ACL with existing access ACL via
-   * OzoneUtils.addAcl().
-   * @param acls
-   * @param parentAcls
-   * @return true if acls inherited DEFAULT acls from parentAcls successfully,
-   * false otherwise.
+   * Helper function to inherit default ACL with given {@code scope} for child object.
+   * @param acls child object ACL list
+   * @param parentAcls parent object ACL list
+   * @param scope scope applied to inherited ACL
+   * @return true if any ACL was inherited from parent, false otherwise
    */
   public static boolean inheritDefaultAcls(List<OzoneAcl> acls,
-      List<OzoneAcl> parentAcls) {
-    List<OzoneAcl> inheritedAcls = null;
+      List<OzoneAcl> parentAcls, OzoneAcl.AclScope scope) {
     if (parentAcls != null && !parentAcls.isEmpty()) {
-      inheritedAcls = parentAcls.stream()
-          .filter(a -> a.getAclScope() == DEFAULT)
-          .map(acl -> new OzoneAcl(acl.getType(), acl.getName(),
-              acl.getAclBitSet(), ACCESS))
-          .collect(Collectors.toList());
-    }
-    if (inheritedAcls != null && !inheritedAcls.isEmpty()) {
-      inheritedAcls.stream().forEach(acl -> addAcl(acls, acl));
-      return true;
-    }
-    return false;
-  }
+      Stream<OzoneAcl> aclStream = parentAcls.stream()
+          .filter(a -> a.getAclScope() == DEFAULT);
 
-  /**
-   * Helper function to convert the scope of ACLs to DEFAULT.
-   * This method is called in ACL inheritance scenarios.
-   * @param acls
-   */
-  public static void toDefaultScope(List<OzoneAcl> acls) {
-    acls.forEach(a -> a.setAclScope(DEFAULT));
+      if (scope != DEFAULT) {
+        aclStream = aclStream.map(acl -> acl.withScope(scope));
+      }
+
+      List<OzoneAcl> inheritedAcls = aclStream.collect(Collectors.toList());
+      if (!inheritedAcls.isEmpty()) {
+        inheritedAcls.forEach(acl -> addAcl(acls, acl));
+        return true;
+      }
+    }
+
+    return false;
   }
 
   /**
@@ -217,8 +190,6 @@ public final class OzoneAclUtil {
 
   /**
    * Add an OzoneAcl to existing list of OzoneAcls.
-   * @param existingAcls
-   * @param acl
    * @return true if current OzoneAcls are changed, false otherwise.
    */
   public static boolean addAcl(List<OzoneAcl> existingAcls, OzoneAcl acl) {
@@ -226,17 +197,17 @@ public final class OzoneAclUtil {
       return false;
     }
 
-    for (OzoneAcl a: existingAcls) {
+    for (int i = 0; i < existingAcls.size(); i++) {
+      final OzoneAcl a = existingAcls.get(i);
       if (a.getName().equals(acl.getName()) &&
           a.getType().equals(acl.getType()) &&
           a.getAclScope().equals(acl.getAclScope())) {
-        BitSet current = a.getAclBitSet();
-        BitSet original = (BitSet) current.clone();
-        current.or(acl.getAclBitSet());
-        if (current.equals(original)) {
-          return false;
+        final OzoneAcl updated = a.add(acl);
+        final boolean changed = !Objects.equals(updated, a);
+        if (changed) {
+          existingAcls.set(i, updated);
         }
-        return true;
+        return changed;
       }
     }
 
@@ -246,8 +217,6 @@ public final class OzoneAclUtil {
 
   /**
    * remove OzoneAcl from existing list of OzoneAcls.
-   * @param existingAcls
-   * @param acl
    * @return true if current OzoneAcls are changed, false otherwise.
    */
   public static boolean removeAcl(List<OzoneAcl> existingAcls, OzoneAcl acl) {
@@ -255,22 +224,19 @@ public final class OzoneAclUtil {
       return false;
     }
 
-    for (OzoneAcl a: existingAcls) {
+    for (int i = 0; i < existingAcls.size(); i++) {
+      final OzoneAcl a = existingAcls.get(i);
       if (a.getName().equals(acl.getName()) &&
           a.getType().equals(acl.getType()) &&
           a.getAclScope().equals(acl.getAclScope())) {
-        BitSet current = a.getAclBitSet();
-        BitSet original = (BitSet) current.clone();
-        current.andNot(acl.getAclBitSet());
-
-        if (current.equals(original)) {
-          return false;
+        final OzoneAcl updated = a.remove(acl);
+        final boolean changed = !Objects.equals(updated, a);
+        if (updated.isEmpty()) {
+          existingAcls.remove(i);
+        } else if (changed) {
+          existingAcls.set(i, updated);
         }
-
-        if (current.isEmpty()) {
-          existingAcls.remove(a);
-        }
-        return true;
+        return changed;
       }
     }
     return false;

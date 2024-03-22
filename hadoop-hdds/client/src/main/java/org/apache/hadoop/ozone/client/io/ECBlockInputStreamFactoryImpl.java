@@ -21,6 +21,7 @@ import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.scm.OzoneClientConfig;
 import org.apache.hadoop.hdds.scm.XceiverClientFactory;
 import org.apache.hadoop.hdds.scm.storage.BlockExtendedInputStream;
 import org.apache.hadoop.hdds.scm.storage.BlockLocationInfo;
@@ -74,16 +75,17 @@ public final class ECBlockInputStreamFactoryImpl implements
    */
   public BlockExtendedInputStream create(boolean missingLocations,
       List<DatanodeDetails> failedLocations, ReplicationConfig repConfig,
-      BlockLocationInfo blockInfo, boolean verifyChecksum,
+      BlockLocationInfo blockInfo,
       XceiverClientFactory xceiverFactory,
-      Function<BlockID, BlockLocationInfo> refreshFunction) {
+      Function<BlockID, BlockLocationInfo> refreshFunction,
+      OzoneClientConfig config) {
     if (missingLocations) {
       // We create the reconstruction reader
       ECBlockReconstructedStripeInputStream sis =
           new ECBlockReconstructedStripeInputStream(
-              (ECReplicationConfig)repConfig, blockInfo, verifyChecksum,
+              (ECReplicationConfig)repConfig, blockInfo,
               xceiverFactory, refreshFunction, inputStreamFactory,
-              byteBufferPool, ecReconstructExecutorSupplier.get());
+              byteBufferPool, ecReconstructExecutorSupplier.get(), config);
       if (failedLocations != null) {
         sis.addFailedDatanodes(failedLocations);
       }
@@ -92,7 +94,8 @@ public final class ECBlockInputStreamFactoryImpl implements
     } else {
       // Otherwise create the more efficient non-reconstruction reader
       return new ECBlockInputStream((ECReplicationConfig)repConfig, blockInfo,
-          verifyChecksum, xceiverFactory, refreshFunction, inputStreamFactory);
+          xceiverFactory, refreshFunction, inputStreamFactory,
+          config);
     }
   }
 

@@ -26,6 +26,8 @@ import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.io.IOUtils;
 import org.assertj.core.api.Assertions;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -53,6 +55,7 @@ public abstract class AbstractContractSeekTest extends AbstractFSContractTestBas
   private Path zeroByteFile;
   private FSDataInputStream instream;
 
+  @BeforeEach
   @Override
   public void setup() throws Exception {
     super.setup();
@@ -74,6 +77,7 @@ public abstract class AbstractContractSeekTest extends AbstractFSContractTestBas
     return conf;
   }
 
+  @AfterEach
   @Override
   public void teardown() throws Exception {
     IOUtils.closeStream(instream);

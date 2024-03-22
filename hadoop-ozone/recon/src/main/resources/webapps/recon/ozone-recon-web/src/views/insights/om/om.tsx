@@ -274,6 +274,35 @@ const DELETED_TAB_COLUMNS = [
   }
 ];
 
+const PENDINGDIR_TAB_COLUMNS = [
+  {
+    title: 'Directory Name',
+    dataIndex: 'path',
+    key: 'path'
+  },
+  {
+    title: 'In state since',
+    dataIndex: 'inStateSince',
+    key: 'inStateSince',
+    render: (inStateSince: number) => {
+      return inStateSince > 0 ? moment(inStateSince).format('ll LTS') : 'NA';
+    }
+  },
+  {
+    title: 'Path',
+    dataIndex: 'key',
+    key: 'key',
+    isSearchable: true,
+    width: '450px'
+  },
+  {
+    title: 'Data Size',
+    dataIndex: 'size',
+    key: 'size',
+    render: (dataSize :any) => dataSize = byteToSize(dataSize,1)
+  }
+];
+
 interface IExpandedRow {
   [key: number]: IExpandedRowState;
 }
@@ -293,6 +322,7 @@ interface IOmdbInsightsState {
   expandedRowData: IExpandedRow;
   deletedContainerKeysDataSource: [];
   mismatchMissingState: any;
+  pendingDeleteDirDataSource: any[];
   activeTab: string;
   includeFso: boolean;
   includeNonFso: boolean;
@@ -313,6 +343,7 @@ let cancelOpenKeysSignal: AbortController;
 let cancelDeletePendingSignal: AbortController;
 let cancelDeletedKeysSignal: AbortController;
 let cancelRowExpandSignal: AbortController;
+let cancelDeletedPendingDirSignal: AbortController;
 
 export class Om extends React.Component<Record<string, object>, IOmdbInsightsState> {
 
@@ -326,6 +357,7 @@ export class Om extends React.Component<Record<string, object>, IOmdbInsightsSta
       openKeysDataSource: [],
       pendingDeleteKeyDataSource: [],
       deletedContainerKeysDataSource: [],
+      pendingDeleteDirDataSource:[],
       mismatchMissingState: 'SCM',
       expandedRowData: {},
       activeTab: props.location.state ? props.location.state.activeTab : '1',
@@ -448,6 +480,8 @@ export class Om extends React.Component<Record<string, object>, IOmdbInsightsSta
       this.fetchDeletePendingKeys();
     } else if (this.state.activeTab  === '4') {
       this.fetchDeletedKeys();
+    } else if (this.state.activeTab  === '5') {
+      this.fetchDeletePendingDir();
     }
   }
 
@@ -461,6 +495,7 @@ export class Om extends React.Component<Record<string, object>, IOmdbInsightsSta
     cancelDeletePendingSignal && cancelDeletePendingSignal.abort();
     cancelDeletedKeysSignal && cancelDeletedKeysSignal.abort();
     cancelRowExpandSignal && cancelRowExpandSignal.abort();
+    cancelDeletedPendingDirSignal && cancelDeletedPendingDirSignal.abort();
   }
 
   fetchMismatchContainers = (mismatchMissingState: any) => {
@@ -475,7 +510,8 @@ export class Om extends React.Component<Record<string, object>, IOmdbInsightsSta
       cancelOpenKeysSignal,
       cancelDeletePendingSignal,
       cancelDeletedKeysSignal,
-      cancelRowExpandSignal
+      cancelRowExpandSignal,
+      cancelDeletedPendingDirSignal
     ]);
 
     const mismatchEndpoint = `/api/v1/containers/mismatch?limit=${this.state.selectedLimit.value}&missingIn=${mismatchMissingState}`
@@ -510,7 +546,8 @@ export class Om extends React.Component<Record<string, object>, IOmdbInsightsSta
       cancelOpenKeysSignal,
       cancelDeletePendingSignal,
       cancelDeletedKeysSignal,
-      cancelRowExpandSignal
+      cancelRowExpandSignal,
+      cancelDeletedPendingDirSignal
     ]);
 
     let openKeysEndpoint = `/api/v1/keys/open?includeFso=${includeFso}&includeNonFso=${includeNonFso}&limit=${this.state.selectedLimit.value}`;
@@ -550,7 +587,8 @@ export class Om extends React.Component<Record<string, object>, IOmdbInsightsSta
       cancelOpenKeysSignal,
       cancelDeletePendingSignal,
       cancelDeletedKeysSignal,
-      cancelRowExpandSignal
+       cancelRowExpandSignal,
+       cancelDeletedPendingDirSignal
     ]);
 
     keysPendingExpanded =[];
@@ -651,7 +689,8 @@ export class Om extends React.Component<Record<string, object>, IOmdbInsightsSta
       cancelOpenKeysSignal,
       cancelDeletePendingSignal,
       cancelDeletedKeysSignal,
-      cancelRowExpandSignal
+      cancelRowExpandSignal,
+      cancelDeletedPendingDirSignal
     ]);
 
     const deletedKeysEndpoint = `/api/v1/containers/mismatch/deleted?limit=${this.state.selectedLimit.value}`;
@@ -671,6 +710,41 @@ export class Om extends React.Component<Record<string, object>, IOmdbInsightsSta
       showDataFetchError(error.toString());
     });
   };
+
+   // Pending Delete Directories
+   fetchDeletePendingDir = () => {
+    this.setState({
+      loading: true
+    });
+
+    //Cancel any previous pending request
+    cancelRequests([
+      cancelMismatchedEndpointSignal,
+      cancelOpenKeysSignal,
+      cancelDeletePendingSignal,
+      cancelDeletedKeysSignal,
+      cancelRowExpandSignal,
+      cancelDeletedPendingDirSignal
+    ]);
+    
+    const DELETE_PENDING_DIR_ENDPOINT = `/api/v1/keys/deletePending/dirs?limit=${this.state.selectedLimit.value}`;
+    const { request, controller } = AxiosGetHelper(DELETE_PENDING_DIR_ENDPOINT, cancelDeletedPendingDirSignal);
+    cancelDeletedPendingDirSignal = controller 
+     request.then(deletePendingDirResponse => {
+      let deletedDirInfo  = [];
+       deletedDirInfo = deletePendingDirResponse && deletePendingDirResponse.data && deletePendingDirResponse.data.deletedDirInfo;
+        this.setState({
+          loading: false,
+          pendingDeleteDirDataSource: deletedDirInfo
+        });
+    }).catch(error => {
+      this.setState({
+        loading: false,
+      });
+      showDataFetchError(error.toString());
+    });
+  };
+
 
   changeTab = (activeKey: any) => {
     this.setState({
@@ -692,6 +766,8 @@ export class Om extends React.Component<Record<string, object>, IOmdbInsightsSta
         this.fetchDeletePendingKeys();
       } else if (activeKey === '4') {
         this.fetchDeletedKeys();
+      } else if (activeKey === '5') {
+        this.fetchDeletePendingDir ();
       }
       else {
         this.fetchMismatchContainers(this.state.mismatchMissingState);
@@ -835,6 +911,21 @@ export class Om extends React.Component<Record<string, object>, IOmdbInsightsSta
     }, [])
   };
 
+  searchDirPendingColumn = () => {
+    return PENDINGDIR_TAB_COLUMNS.reduce<any[]>((filtered, column) => {
+      if (column.isSearchable) {
+        const newColumn = {
+          ...column,
+          ...new ColumnSearch(column).getColumnSearchProps(column.dataIndex)
+        };
+        filtered.push(newColumn);
+      } else {
+        filtered.push(column);
+      }
+      return filtered;
+    }, [])
+  };
+
   _handleLimitChange = (selected: ValueType<IOption>, _action: ActionMeta<IOption>) => {
     const selectedLimit = (selected as IOption)
     this.setState({
@@ -858,7 +949,7 @@ export class Om extends React.Component<Record<string, object>, IOmdbInsightsSta
   }
 
   render() {
-    const { mismatchDataSource, loading, openKeysDataSource, pendingDeleteKeyDataSource, deletedContainerKeysDataSource, selectedLimit } = this.state;
+    const { mismatchDataSource, loading, openKeysDataSource, pendingDeleteKeyDataSource, deletedContainerKeysDataSource, pendingDeleteDirDataSource, selectedLimit } = this.state;
 
     const paginationConfig: PaginationConfig = {
       showTotal: (total: number, range) => `${range[0]}-${range[1]} of ${total}`,
@@ -905,7 +996,15 @@ export class Om extends React.Component<Record<string, object>, IOmdbInsightsSta
       />
     }
 
-  
+    const generateDirPendingTable = (dataSource: any) => {
+      return <Table
+        expandRowByClick dataSource={dataSource}
+        columns={this.searchDirPendingColumn()}
+        loading={loading}
+        pagination={paginationConfig}
+        rowKey='key'
+        />
+    }
 
     return (
       <div>
@@ -958,6 +1057,15 @@ export class Om extends React.Component<Record<string, object>, IOmdbInsightsSta
               </label>
               }>
               {generateDeletedKeysTable(deletedContainerKeysDataSource)}
+            </TabPane>
+            <TabPane key='5'
+              tab={<label>Directories Pending for Deletion&nbsp;&nbsp;
+                <Tooltip placement='top' title="Directories that are pending for deletion.">
+                  <Icon type='info-circle' />
+                </Tooltip>
+              </label>
+              }>
+              {generateDirPendingTable(pendingDeleteDirDataSource)}
             </TabPane>
           </Tabs>
         </div>
