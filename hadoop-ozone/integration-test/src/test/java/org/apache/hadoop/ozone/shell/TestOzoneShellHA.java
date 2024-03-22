@@ -76,6 +76,7 @@ import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.FS_TRASH_INTERVAL_KEY;
 import static org.apache.hadoop.fs.FileSystem.FS_DEFAULT_NAME_KEY;
 import static org.apache.hadoop.fs.FileSystem.TRASH_PREFIX;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_FS_LISTING_PAGE_SIZE;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_OFS_URI_SCHEME;
 
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
@@ -758,10 +759,12 @@ public class TestOzoneShellHA {
     final String hostPrefix = OZONE_OFS_URI_SCHEME + "://" + omServiceId;
     OzoneConfiguration clientConf =
             getClientConfForOFS(hostPrefix, cluster.getConf());
+    int pageSize = 20;
+    clientConf.setInt(OZONE_FS_LISTING_PAGE_SIZE, pageSize);
     OzoneFsShell shell = new OzoneFsShell(clientConf);
 
     String volName = "testlistbucket";
-    int numBuckets = 1025;
+    int numBuckets = pageSize;
 
     try {
       generateBuckets("/" + volName, numBuckets);
