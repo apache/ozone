@@ -242,9 +242,9 @@ public class TestOzoneNativeAuthorizer {
       ACLType groupRight, boolean expectedResult) throws Exception {
     createAll(keyName, prefixName, userRight, groupRight, expectedResult);
     OzoneAcl userAcl = new OzoneAcl(USER, testUgi.getUserName(),
-        parentDirUserAcl, ACCESS);
+        ACCESS, parentDirUserAcl);
     OzoneAcl groupAcl = new OzoneAcl(GROUP, testUgi.getGroups().size() > 0 ?
-        testUgi.getGroups().get(0) : "", parentDirGroupAcl, ACCESS);
+        testUgi.getGroups().get(0) : "", ACCESS, parentDirGroupAcl);
     // Set access for volume.
     // We should directly add to table because old API's update to DB.
 
@@ -264,9 +264,9 @@ public class TestOzoneNativeAuthorizer {
       ACLType groupRight, boolean expectedResult) throws Exception {
     createAll(keyName, prefixName, userRight, groupRight, expectedResult);
     OzoneAcl userAcl = new OzoneAcl(USER, testUgi.getUserName(),
-        parentDirUserAcl, ACCESS);
+        ACCESS, parentDirUserAcl);
     OzoneAcl groupAcl = new OzoneAcl(GROUP, testUgi.getGroups().size() > 0 ?
-        testUgi.getGroups().get(0) : "", parentDirGroupAcl, ACCESS);
+        testUgi.getGroups().get(0) : "", ACCESS, parentDirGroupAcl);
     // Set access for volume & bucket. We should directly add to table
     // because old API's update to DB.
 
@@ -294,9 +294,9 @@ public class TestOzoneNativeAuthorizer {
         .build();
 
     OzoneAcl userAcl = new OzoneAcl(USER, testUgi.getUserName(),
-        parentDirUserAcl, ACCESS);
+        ACCESS, parentDirUserAcl);
     OzoneAcl groupAcl = new OzoneAcl(GROUP, testUgi.getGroups().size() > 0 ?
-        testUgi.getGroups().get(0) : "", parentDirGroupAcl, ACCESS);
+        testUgi.getGroups().get(0) : "", ACCESS, parentDirGroupAcl);
     // Set access for volume & bucket. We should directly add to table
     // because old API's update to DB.
 
@@ -351,8 +351,8 @@ public class TestOzoneNativeAuthorizer {
      *    if user/group has access to them.
      */
     for (ACLType a1 : allAcls) {
-      OzoneAcl newAcl = new OzoneAcl(accessType, getAclName(accessType), a1,
-          ACCESS);
+      OzoneAcl newAcl = new OzoneAcl(accessType, getAclName(accessType), ACCESS, a1
+      );
 
       // Reset acls to only one right.
       if (obj.getResourceType() == VOLUME) {
@@ -431,7 +431,7 @@ public class TestOzoneNativeAuthorizer {
           ACLIdentityType identityType = ACLIdentityType.values()[type];
           // Add remaining acls one by one and then check access.
           OzoneAcl addAcl = new OzoneAcl(identityType,
-              getAclName(identityType), a2, ACCESS);
+              getAclName(identityType), ACCESS, a2);
 
           // For volume and bucket update to cache. As Old API's update to
           // only DB not cache.

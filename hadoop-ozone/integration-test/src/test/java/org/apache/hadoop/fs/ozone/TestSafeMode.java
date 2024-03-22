@@ -62,7 +62,7 @@ class TestSafeMode {
   static void setup() {
     OzoneConfiguration conf = new OzoneConfiguration();
     clusterProvider = new MiniOzoneClusterProvider(
-        conf, MiniOzoneCluster.newBuilder(conf), 2);
+        MiniOzoneCluster.newBuilder(conf), 2);
   }
 
   @BeforeEach
