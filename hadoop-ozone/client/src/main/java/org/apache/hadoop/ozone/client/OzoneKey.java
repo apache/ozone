@@ -72,8 +72,9 @@ public class OzoneKey {
    */
 
   /**
-   * The object and update ID of an existing key. These will be null
-   * if the key is not yet created on OM and read from OM.
+   * The update ID of an existing key. This will be null if this OzoneKey
+   * object has not been created from an existing key read from OM, as OM allocates
+   * the update ID on commit of the key.
    */
   private final Long objectID;
   private final Long updateID;

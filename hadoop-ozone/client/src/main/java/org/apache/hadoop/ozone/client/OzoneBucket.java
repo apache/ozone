@@ -472,11 +472,13 @@ public class OzoneBucket extends WithMetadata {
   /**
    * Overwrite an existing key using optimistic locking. The existingKey must exist in Ozone to allow
    * the new key to be created with the same name. Additionally, the existingKey must not have been
-   * modified since the time its details were read. This is controlled by the objectID and updateID
-   * fields in the existingKey. If the key is replaced the objectID will change. If it has been updated
-   * (eg appended) the updateID will change. If either of these have changed since the existingKey
-   * was read, either the initial key create will fail, or the key will fail to commit after the data
-   * has been written.
+   * modified since the time its details were read. This is controlled by the updateID
+   * field in the existingKey. If the key is replaced or updated the updateID will change. If the
+   * updateID has changed since the existingKey was read, either the initial key create will fail,
+   * or the key will fail to commit after the data has been written as the checks are carried out
+   * both a key open and commit time.
+   *
+   * For now this feature only works on Object Store Buckets. FSO support will be added a later.
    *
    * @param existingKey       Name of the key to be created.
    * @param replicationConfig Replication configuration.
