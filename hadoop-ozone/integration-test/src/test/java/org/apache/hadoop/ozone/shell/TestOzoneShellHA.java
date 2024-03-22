@@ -755,6 +755,7 @@ public class TestOzoneShellHA {
   }
 
   @Test
+  @Timeout(10)
   public void testListBucket() throws Exception {
     final String hostPrefix = OZONE_OFS_URI_SCHEME + "://" + omServiceId;
     OzoneConfiguration clientConf =
