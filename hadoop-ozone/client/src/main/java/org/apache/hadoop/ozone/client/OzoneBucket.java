@@ -487,6 +487,9 @@ public class OzoneBucket extends WithMetadata {
    */
   public OzoneOutputStream overwriteKey(OzoneKeyDetails existingKey, ReplicationConfig replicationConfig)
       throws IOException {
+    if (this.bucketLayout != BucketLayout.OBJECT_STORE) {
+      throw new IllegalArgumentException("Optimistic locking is only supported on Object Store Buckets");
+    }
     return proxy.overwriteKey(existingKey, replicationConfig);
   }
 
