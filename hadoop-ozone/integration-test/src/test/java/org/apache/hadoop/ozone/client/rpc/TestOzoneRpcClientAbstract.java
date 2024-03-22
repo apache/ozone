@@ -379,11 +379,11 @@ public abstract class TestOzoneRpcClientAbstract {
       store.createVolume(volumeName);
       store.getVolume(volumeName).createBucket(bucketName);
       OzoneVolume volume = store.getVolume(volumeName);
-      volume.addAcl(new OzoneAcl(USER, "user1", ACLType.ALL, ACCESS));
-      volume.addAcl(new OzoneAcl(USER, "user2", ACLType.ALL, ACCESS));
+      volume.addAcl(new OzoneAcl(USER, "user1", ACCESS, ACLType.ALL));
+      volume.addAcl(new OzoneAcl(USER, "user2", ACCESS, ACLType.ALL));
       OzoneBucket bucket = store.getVolume(volumeName).getBucket(bucketName);
-      bucket.addAcl(new OzoneAcl(USER, "user1", ACLType.ALL, ACCESS));
-      bucket.addAcl(new OzoneAcl(USER, "user2", ACLType.ALL, ACCESS));
+      bucket.addAcl(new OzoneAcl(USER, "user1", ACCESS, ACLType.ALL));
+      bucket.addAcl(new OzoneAcl(USER, "user2", ACCESS, ACLType.ALL));
 
       createKeyForUser(volumeName, bucketName, key1, content, user1);
       createKeyForUser(volumeName, bucketName, key2, content, user2);
@@ -2894,11 +2894,11 @@ public abstract class TestOzoneRpcClientAbstract {
       store.createVolume(volumeName);
       store.getVolume(volumeName).createBucket(bucketName);
       OzoneVolume volume = store.getVolume(volumeName);
-      volume.addAcl(new OzoneAcl(USER, "user1", ACLType.ALL, ACCESS));
-      volume.addAcl(new OzoneAcl(USER, "awsUser1", ACLType.ALL, ACCESS));
+      volume.addAcl(new OzoneAcl(USER, "user1", ACCESS, ACLType.ALL));
+      volume.addAcl(new OzoneAcl(USER, "awsUser1", ACCESS, ACLType.ALL));
       OzoneBucket bucket = store.getVolume(volumeName).getBucket(bucketName);
-      bucket.addAcl(new OzoneAcl(USER, "user1", ACLType.ALL, ACCESS));
-      bucket.addAcl(new OzoneAcl(USER, "awsUser1", ACLType.ALL, ACCESS));
+      bucket.addAcl(new OzoneAcl(USER, "user1", ACCESS, ACLType.ALL));
+      bucket.addAcl(new OzoneAcl(USER, "awsUser1", ACCESS, ACLType.ALL));
 
       // user1 MultipartUpload a key
       UserGroupInformation.setLoginUser(user1);
