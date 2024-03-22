@@ -74,7 +74,7 @@ public class FileSizeDistSubCommand implements Callable {
     }
     JsonNode distResponse = JsonUtils.readTree(response);
 
-    if (distResponse.get("status").equals("PATH_NOT_FOUND")) {
+    if ("PATH_NOT_FOUND".equals(distResponse.path("status").asText())) {
       printPathNotFound();
     } else if (distResponse.get("status").equals("TYPE_NOT_APPLICABLE")) {
       printTypeNA("File Size Distribution");

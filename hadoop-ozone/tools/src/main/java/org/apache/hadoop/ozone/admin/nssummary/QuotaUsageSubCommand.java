@@ -75,7 +75,7 @@ public class QuotaUsageSubCommand implements Callable {
 
     JsonNode quotaResponse = JsonUtils.readTree(response);
 
-    if (quotaResponse.get("status").equals("PATH_NOT_FOUND")) {
+    if ("PATH_NOT_FOUND".equals(quotaResponse.path("status").asText())) {
       printPathNotFound();
     } else if (quotaResponse.get("status").equals("TYPE_NOT_APPLICABLE")) {
       printTypeNA("Quota");

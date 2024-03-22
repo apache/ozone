@@ -73,7 +73,7 @@ public class SummarySubCommand implements Callable<Void> {
     }
     JsonNode summaryResponse = JsonUtils.readTree(response);
 
-    if (summaryResponse.get("status").equals("PATH_NOT_FOUND")) {
+    if ("PATH_NOT_FOUND".equals(summaryResponse.path("status").asText())) {
       printPathNotFound();
     } else {
       if (parent.isNotValidBucketOrOBSBucket(path)) {
