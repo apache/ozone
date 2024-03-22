@@ -127,51 +127,8 @@ public class TestContainerBalancerOperations {
   //TODO: add more acceptance after container balancer is fully completed
 
   /**
-   * Test if Container Balancer CLI options override the default configurations.
-   */
-  @Test
-  public void testIfCBCLIOverridesDefaultConfigs() throws Exception {
-    boolean running = containerBalancerClient.getContainerBalancerStatus();
-    assertFalse(running);
-
-    //CLI option for threshold is not passed
-    Optional<Double> threshold = Optional.empty();
-
-    //CLI options are passed
-    Optional<Integer> maxDatanodesPercentageToInvolvePerIteration =
-            Optional.of(100);
-    Optional<Long> maxSizeToMovePerIterationInGB = Optional.of(1L);
-    Optional<Long> maxSizeEnteringTargetInGB = Optional.of(6L);
-    Optional<Long> maxSizeLeavingSourceInGB = Optional.of(6L);
-    Optional<Integer> iterations = Optional.of(10000);
-    Optional<Integer> moveTimeout = Optional.of(65);
-    Optional<Integer> moveReplicationTimeout = Optional.of(55);
-    Optional<Integer> balancingInterval = Optional.of(70);
-    Optional<Boolean> networkTopologyEnable = Optional.of(true);
-    Optional<String> includeNodes = Optional.of("");
-    Optional<String> excludeNodes = Optional.of("");
-    containerBalancerClient.startContainerBalancer(threshold, iterations,
-            maxDatanodesPercentageToInvolvePerIteration,
-            maxSizeToMovePerIterationInGB, maxSizeEnteringTargetInGB,
-            maxSizeLeavingSourceInGB, balancingInterval, moveTimeout,
-            moveReplicationTimeout, networkTopologyEnable, includeNodes,
-            excludeNodes);
-    running = containerBalancerClient.getContainerBalancerStatus();
-    assertTrue(running);
-
-    ContainerBalancerConfiguration config = cluster.getStorageContainerManager().getContainerBalancer().getConfig();
-
-    //If CLI option is not passed, it takes the default configuration
-    assertEquals(10, config.getThreshold());
-
-    //If CLI option is passed, it overrides the default configuration
-    assertEquals(10000, config.getIterations());
-    assertEquals(70, config.getBalancingInterval().toMinutes());
-    assertTrue(config.getNetworkTopologyEnable());
-  }
-
-  /**
-   * Test if Container Balancer CLI option overrides an option specified in the configs.
+   * Test if Container Balancer CLI overrides default configs and
+   * options specified in the configs.
    */
   @Test
   public void testIfCBCLIOverridesConfigs() throws Exception {
@@ -220,5 +177,9 @@ public class TestContainerBalancerOperations {
     //If config value is added in ozone-site.xml and CLI option is passed
     //then it takes the CLI option.
     assertEquals(100, config.getMaxDatanodesPercentageToInvolvePerIteration());
+
+    containerBalancerClient.stopContainerBalancer();
+    running = containerBalancerClient.getContainerBalancerStatus();
+    assertFalse(running);
   }
 }
