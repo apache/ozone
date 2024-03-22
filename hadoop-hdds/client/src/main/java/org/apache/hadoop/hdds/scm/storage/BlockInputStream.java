@@ -217,7 +217,7 @@ public class BlockInputStream extends BlockExtendedInputStream {
   }
 
   private void refreshBlockInfo(IOException cause) throws IOException {
-    LOG.info("Unable to read information for block {} from pipeline {}: {}",
+    LOG.info("Attempting to update pipeline and block token for block {} from pipeline {}: {}",
         blockID, pipelineRef.get().getId(), cause.getMessage());
     if (refreshFunction != null) {
       LOG.debug("Re-fetching pipeline and block token for block {}", blockID);
@@ -225,10 +225,11 @@ public class BlockInputStream extends BlockExtendedInputStream {
       if (blockLocationInfo == null) {
         LOG.debug("No new block location info for block {}", blockID);
       } else {
-        LOG.debug("New pipeline for block {}: {}", blockID,
-            blockLocationInfo.getPipeline());
         setPipeline(blockLocationInfo.getPipeline());
         tokenRef.set(blockLocationInfo.getToken());
+        LOG.info("New pipeline for block {}: {}", blockID,
+            blockLocationInfo.getPipeline());
+        LOG.info("A new token is added {}", blockLocationInfo.getToken());
       }
     } else {
       throw cause;
