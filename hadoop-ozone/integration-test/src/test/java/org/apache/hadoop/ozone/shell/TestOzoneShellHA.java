@@ -775,7 +775,7 @@ public class TestOzoneShellHA {
       res = ToolRunner.run(shell, new String[]{"-ls", "/" + volName});
       assertEquals(0, res);
       String r = out.toString(DEFAULT_ENCODING);
-      assertTrue(r.matches("(?s)^Found " + numBuckets + " items.*"));
+      assertThat(r).matches("(?s)^Found " + numBuckets + " items.*");
 
     } finally {
       shell.close();
