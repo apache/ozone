@@ -51,7 +51,7 @@ public class TestScmAdminHA {
         .build();
     conf.setQuietMode(false);
     // enable ratis for Scm.
-    conf.setBoolean(ScmConfigKeys.DFS_CONTAINER_RATIS_ENABLED_KEY, true);
+    conf.setBoolean(ScmConfigKeys.HDDS_CONTAINER_RATIS_ENABLED_KEY, true);
     cluster.waitForClusterToBeReady();
   }
 

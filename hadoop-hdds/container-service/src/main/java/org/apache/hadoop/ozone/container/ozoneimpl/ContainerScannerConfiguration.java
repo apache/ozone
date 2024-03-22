@@ -71,10 +71,10 @@ public class ContainerScannerConfiguration {
 
   @Config(key = "enabled",
       type = ConfigType.BOOLEAN,
-      defaultValue = "false",
+      defaultValue = "true",
       tags = {ConfigTag.STORAGE},
       description = "Config parameter to enable all container scanners.")
-  private boolean enabled = false;
+  private boolean enabled = true;
 
   @Config(key = "dev.data.scan.enabled",
       type = ConfigType.BOOLEAN,

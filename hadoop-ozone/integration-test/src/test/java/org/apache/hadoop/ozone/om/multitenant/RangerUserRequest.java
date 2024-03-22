@@ -17,10 +17,9 @@
  */
 package org.apache.hadoop.ozone.om.multitenant;
 
-import com.google.gson.JsonArray;
-import com.google.gson.JsonObject;
-import com.google.gson.JsonParseException;
-import com.google.gson.JsonParser;
+import com.fasterxml.jackson.core.JsonParseException;
+import com.fasterxml.jackson.databind.JsonNode;
+import org.apache.hadoop.hdds.server.JsonUtils;
 import org.apache.kerby.util.Base64;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -191,7 +190,7 @@ public class RangerUserRequest {
   }
 
   private HttpURLConnection makeHttpGetCall(String urlString,
-      String method, boolean isSpnego) throws IOException {
+                                            String method, boolean isSpnego) throws IOException {
 
     URL url = new URL(urlString);
     final HttpURLConnection urlConnection = openURLConnection(url);
@@ -215,14 +214,16 @@ public class RangerUserRequest {
     String response = getResponseData(conn);
     String userIDCreated = null;
     try {
-      JsonObject jResonse = JsonParser.parseString(response).getAsJsonObject();
-      JsonArray userinfo = jResonse.get("vXUsers").getAsJsonArray();
+      JsonNode jResponse =
+          JsonUtils.readTree(response);
+      JsonNode userinfo = jResponse.path("vXUsers");
       int numIndex = userinfo.size();
+
       for (int i = 0; i < numIndex; ++i) {
-        if (userinfo.get(i).getAsJsonObject().get("name").getAsString()
-            .equals(userPrincipal)) {
-          userIDCreated =
-              userinfo.get(i).getAsJsonObject().get("id").getAsString();
+        JsonNode userNode = userinfo.get(i);
+        String name = userNode.path("name").asText();
+        if (name.equals(userPrincipal)) {
+          userIDCreated = userNode.path("id").asText();
           break;
         }
       }
@@ -231,6 +232,7 @@ public class RangerUserRequest {
       e.printStackTrace();
       throw e;
     }
+
     return userIDCreated;
   }
 
@@ -253,8 +255,8 @@ public class RangerUserRequest {
     String userId;
     try {
       assert userInfo != null;
-      JsonObject jObject = JsonParser.parseString(userInfo).getAsJsonObject();
-      userId = jObject.get("id").getAsString();
+      JsonNode jNode = JsonUtils.readTree(userInfo);
+      userId = jNode.get("id").asText();
       LOG.debug("Ranger returned userId: {}", userId);
     } catch (JsonParseException e) {
       e.printStackTrace();

@@ -24,11 +24,13 @@ import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerExcep
 import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerUtils;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
+import org.apache.ratis.grpc.util.ZeroCopyMessageMarshaller;
 import org.apache.ratis.thirdparty.io.grpc.stub.StreamObserver;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.OutputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -53,12 +55,15 @@ class SendContainerRequestHandler
   private HddsVolume volume;
   private Path path;
   private CopyContainerCompression compression;
+  private final ZeroCopyMessageMarshaller<SendContainerRequest> marshaller;
 
   SendContainerRequestHandler(
       ContainerImporter importer,
-      StreamObserver<SendContainerResponse> responseObserver) {
+      StreamObserver<SendContainerResponse> responseObserver,
+      ZeroCopyMessageMarshaller<SendContainerRequest> marshaller) {
     this.importer = importer;
     this.responseObserver = responseObserver;
+    this.marshaller = marshaller;
   }
 
   @Override
@@ -98,6 +103,13 @@ class SendContainerRequestHandler
       nextOffset += length;
     } catch (Throwable t) {
       onError(t);
+    } finally {
+      if (marshaller != null) {
+        InputStream popStream = marshaller.popStream(req);
+        if (popStream != null) {
+          IOUtils.cleanupWithLogger(LOG, popStream);
+        }
+      }
     }
   }
 

@@ -164,8 +164,7 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
     return conf;
   }
 
-  @Override
-  public void setConf(OzoneConfiguration newConf) {
+  protected void setConf(OzoneConfiguration newConf) {
     this.conf = newConf;
   }
 
@@ -546,6 +545,8 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
         if (startDataNodes) {
           cluster.startHddsDatanodes();
         }
+
+        prepareForNextBuild();
         return cluster;
       } catch (Exception ex) {
         stopOM(om);

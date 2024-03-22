@@ -187,6 +187,27 @@ public final class OmBucketArgs extends WithMetadata implements Auditable {
     if (this.ownerName != null) {
       auditMap.put(OzoneConsts.OWNER, this.ownerName);
     }
+    if (this.quotaInBytesSet && quotaInBytes > 0 ||
+        (this.quotaInBytes != OzoneConsts.QUOTA_RESET)) {
+      auditMap.put(OzoneConsts.QUOTA_IN_BYTES,
+          String.valueOf(this.quotaInBytes));
+    }
+    if (this.quotaInNamespaceSet && quotaInNamespace > 0 ||
+        (this.quotaInNamespace != OzoneConsts.QUOTA_RESET)) {
+      auditMap.put(OzoneConsts.QUOTA_IN_NAMESPACE,
+          String.valueOf(this.quotaInNamespace));
+    }
+    if (this.bekInfo != null) {
+      auditMap.put(OzoneConsts.BUCKET_ENCRYPTION_KEY,
+          this.bekInfo.getKeyName());
+    }
+    if (this.defaultReplicationConfig != null) {
+      auditMap.put(OzoneConsts.REPLICATION_TYPE, String.valueOf(
+          this.defaultReplicationConfig.getType()));
+      auditMap.put(OzoneConsts.REPLICATION_CONFIG,
+          this.defaultReplicationConfig.getReplicationConfig()
+              .getReplication());
+    }
     return auditMap;
   }
 
