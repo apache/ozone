@@ -20,7 +20,6 @@ package org.apache.hadoop.ozone.om.snapshot;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.cache.CacheLoader;
 import org.apache.hadoop.hdds.utils.Scheduler;
-import org.apache.hadoop.ozone.om.IOmMetadataReader;
 import org.apache.hadoop.ozone.om.OmSnapshot;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.slf4j.Logger;
