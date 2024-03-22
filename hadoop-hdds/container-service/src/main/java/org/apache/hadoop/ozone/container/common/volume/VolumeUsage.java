@@ -18,38 +18,60 @@
 
 package org.apache.hadoop.ozone.container.common.volume;
 
+import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
+import org.apache.hadoop.hdds.conf.StorageSize;
 import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.fs.CachingSpaceUsageSource;
 import org.apache.hadoop.hdds.fs.SpaceUsageCheckParams;
 import org.apache.hadoop.hdds.fs.SpaceUsageSource;
+import org.apache.ratis.util.Preconditions;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import java.util.Collection;
 
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DATANODE_VOLUME_MIN_FREE_SPACE;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DATANODE_VOLUME_MIN_FREE_SPACE_DEFAULT;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DATANODE_VOLUME_MIN_FREE_SPACE_PERCENT;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.HDDS_DATANODE_DIR_DU_RESERVED;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.HDDS_DATANODE_DIR_DU_RESERVED_PERCENT;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.HDDS_DATANODE_DIR_DU_RESERVED_PERCENT_DEFAULT;
 
 /**
  * Class that wraps the space df of the Datanode Volumes used by SCM
  * containers.
  */
-public class VolumeUsage implements SpaceUsageSource {
+public class VolumeUsage {
 
   private final CachingSpaceUsageSource source;
   private boolean shutdownComplete;
-  private long reservedInBytes;
+  private final long reservedInBytes;
 
   private static final Logger LOG = LoggerFactory.getLogger(VolumeUsage.class);
 
-  VolumeUsage(SpaceUsageCheckParams checkParams) {
+  VolumeUsage(SpaceUsageCheckParams checkParams, ConfigurationSource conf) {
     source = new CachingSpaceUsageSource(checkParams);
+    reservedInBytes = getReserved(conf, checkParams.getPath(), source.getCapacity());
+    Preconditions.assertTrue(reservedInBytes >= 0, reservedInBytes + " < 0");
     start(); // TODO should start only on demand
   }
 
-  @Override
+  @VisibleForTesting
+  SpaceUsageSource realUsage() {
+    return source.snapshot();
+  }
+
   public long getCapacity() {
-    return Math.max(source.getCapacity(), 0);
+    return getCurrentUsage().getCapacity();
+  }
+
+  public long getAvailable() {
+    return getCurrentUsage().getAvailable();
+  }
+
+  public long getUsedSpace() {
+    return getCurrentUsage().getUsedSpace();
   }
 
   /**
@@ -60,24 +82,15 @@ public class VolumeUsage implements SpaceUsageSource {
    *                      remainingReserved
    * B) avail = fsAvail - Max(reserved - other, 0);
    */
-  @Override
-  public long getAvailable() {
-    return source.getAvailable() - getRemainingReserved();
-  }
+  public SpaceUsageSource getCurrentUsage() {
+    SpaceUsageSource real = realUsage();
 
-  public long getAvailable(SpaceUsageSource precomputedVolumeSpace) {
-    long available = precomputedVolumeSpace.getAvailable();
-    return available - getRemainingReserved(precomputedVolumeSpace);
-  }
-
-  @Override
-  public long getUsedSpace() {
-    return source.getUsedSpace();
-  }
-
-  @Override
-  public SpaceUsageSource snapshot() {
-    return source.snapshot();
+    return reservedInBytes == 0
+        ? real
+        : new SpaceUsageSource.Fixed(
+            Math.max(real.getCapacity() - reservedInBytes, 0),
+            Math.max(real.getAvailable() - getRemainingReserved(real), 0),
+            real.getUsedSpace());
   }
 
   public void incrementUsedSpace(long usedSpace) {
@@ -94,19 +107,10 @@ public class VolumeUsage implements SpaceUsageSource {
    * so there could be that DU value > totalUsed when there are deletes.
    * @return other used space
    */
-  private long getOtherUsed() {
-    long totalUsed = source.getCapacity() - source.getAvailable();
-    return Math.max(totalUsed - source.getUsedSpace(), 0L);
-  }
-
-  private long getOtherUsed(SpaceUsageSource precomputedVolumeSpace) {
+  private static long getOtherUsed(SpaceUsageSource precomputedVolumeSpace) {
     long totalUsed = precomputedVolumeSpace.getCapacity() -
         precomputedVolumeSpace.getAvailable();
-    return Math.max(totalUsed - source.getUsedSpace(), 0L);
-  }
-
-  private long getRemainingReserved() {
-    return Math.max(reservedInBytes - getOtherUsed(), 0L);
+    return Math.max(totalUsed - precomputedVolumeSpace.getUsedSpace(), 0L);
   }
 
   private long getRemainingReserved(
@@ -129,8 +133,8 @@ public class VolumeUsage implements SpaceUsageSource {
     source.refreshNow();
   }
 
-  public void setReserved(long reserved) {
-    this.reservedInBytes = reserved;
+  public long getReservedBytes() {
+    return reservedInBytes;
   }
 
   /**
@@ -174,4 +178,55 @@ public class VolumeUsage implements SpaceUsageSource {
     return (volumeAvailableSpace - volumeCommittedBytesCount) >
         Math.max(requiredSpace, volumeFreeSpaceToSpare);
   }
+
+  private static long getReserved(ConfigurationSource conf, String rootDir,
+      long capacity) {
+    if (conf.isConfigured(HDDS_DATANODE_DIR_DU_RESERVED_PERCENT)
+        && conf.isConfigured(HDDS_DATANODE_DIR_DU_RESERVED)) {
+      LOG.error("Both {} and {} are set. Set either one, not both. If the " +
+          "volume matches with volume parameter in former config, it is set " +
+          "as reserved space. If not it fall backs to the latter config.",
+          HDDS_DATANODE_DIR_DU_RESERVED, HDDS_DATANODE_DIR_DU_RESERVED_PERCENT);
+    }
+
+    // 1. If hdds.datanode.dir.du.reserved is set for a volume then make it
+    // as the reserved bytes.
+    Collection<String> reserveList = conf.getTrimmedStringCollection(
+        HDDS_DATANODE_DIR_DU_RESERVED);
+    for (String reserve : reserveList) {
+      String[] words = reserve.split(":");
+      if (words.length < 2) {
+        LOG.error("Reserved space should config in pair, but current is {}",
+            reserve);
+        continue;
+      }
+
+      if (words[0].trim().equals(rootDir)) {
+        try {
+          StorageSize size = StorageSize.parse(words[1].trim());
+          return (long) size.getUnit().toBytes(size.getValue());
+        } catch (Exception e) {
+          LOG.error("Failed to parse StorageSize: {}", words[1].trim(), e);
+          break;
+        }
+      }
+    }
+
+    // 2. If hdds.datanode.dir.du.reserved not set and
+    // hdds.datanode.dir.du.reserved.percent is set, fall back to this config.
+    if (conf.isConfigured(HDDS_DATANODE_DIR_DU_RESERVED_PERCENT)) {
+      float percentage = conf.getFloat(HDDS_DATANODE_DIR_DU_RESERVED_PERCENT,
+          HDDS_DATANODE_DIR_DU_RESERVED_PERCENT_DEFAULT);
+      if (0 <= percentage && percentage <= 1) {
+        return (long) Math.ceil(capacity * percentage);
+      }
+      //If it comes here then the percentage is not between 0-1.
+      LOG.error("The value of {} should be between 0 to 1. Defaulting to 0.",
+          HDDS_DATANODE_DIR_DU_RESERVED_PERCENT);
+    }
+
+    //Both configs are not set, return 0.
+    return 0;
+  }
+
 }

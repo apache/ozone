@@ -19,12 +19,12 @@ package org.apache.hadoop.ozone.om.helpers;
 
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.BitSet;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 
+import com.google.common.collect.ImmutableList;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.fs.FileChecksum;
@@ -374,7 +374,7 @@ public final class OmKeyInfo extends WithParentObjectId
   }
 
   public List<OzoneAcl> getAcls() {
-    return acls;
+    return ImmutableList.copyOf(acls);
   }
 
   public boolean addAcl(OzoneAcl acl) {
@@ -812,6 +812,7 @@ public final class OmKeyInfo extends WithParentObjectId
         .setDataSize(dataSize)
         .setReplicationConfig(replicationConfig)
         .setFileEncryptionInfo(encInfo)
+        .setAcls(acls)
         .setObjectID(getObjectID())
         .setUpdateID(getUpdateID())
         .setParentObjectID(getParentObjectID())
@@ -823,10 +824,6 @@ public final class OmKeyInfo extends WithParentObjectId
             new OmKeyLocationInfoGroup(keyLocationVersion.getVersion(),
                 keyLocationVersion.getLocationList(),
                 keyLocationVersion.isMultipartKey())));
-
-    acls.forEach(acl -> builder.addAcl(new OzoneAcl(acl.getType(),
-            acl.getName(), (BitSet) acl.getAclBitSet().clone(),
-        acl.getAclScope())));
 
     if (getMetadata() != null) {
       getMetadata().forEach((k, v) -> builder.addMetadata(k, v));

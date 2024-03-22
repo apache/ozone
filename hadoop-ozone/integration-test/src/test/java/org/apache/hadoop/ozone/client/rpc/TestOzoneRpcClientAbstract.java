@@ -1705,6 +1705,7 @@ public abstract class TestOzoneRpcClientAbstract {
         }
         latch.countDown();
       } catch (IOException ex) {
+        LOG.error("Execution failed: ", ex);
         latch.countDown();
         failCount.incrementAndGet();
       }

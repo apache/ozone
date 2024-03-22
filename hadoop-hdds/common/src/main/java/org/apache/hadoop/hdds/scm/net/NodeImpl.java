@@ -18,6 +18,7 @@
 package org.apache.hadoop.hdds.scm.net;
 
 import com.google.common.base.Preconditions;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 
 import static org.apache.hadoop.hdds.scm.net.NetConstants.ROOT;
 import static org.apache.hadoop.hdds.scm.net.NetConstants.PATH_SEPARATOR_STR;
@@ -227,6 +228,20 @@ public class NodeImpl implements Node {
     }
     return NetUtils.addSuffix(this.getNetworkFullPath()).startsWith(
         NetUtils.addSuffix(nodePath));
+  }
+
+  public static HddsProtos.NodeTopology toProtobuf(String name, String location,
+      int level, int cost) {
+
+    HddsProtos.NodeTopology.Builder nodeTopologyBuilder =
+        HddsProtos.NodeTopology.newBuilder()
+            .setName(name)
+            .setLocation(location)
+            .setLevel(level)
+            .setCost(cost);
+
+    HddsProtos.NodeTopology nodeTopology = nodeTopologyBuilder.build();
+    return nodeTopology;
   }
 
   @Override

@@ -673,6 +673,16 @@ public final class OzoneConfigKeys {
       "hdds.scmclient.failover.max.retry";
 
 
+  public static final String OZONE_XCEIVER_CLIENT_METRICS_PERCENTILES_INTERVALS_SECONDS_KEY =
+      "ozone.xceiver.client.metrics.percentiles.intervals.seconds";
+
+  public static final String
+      OZONE_OM_NETWORK_TOPOLOGY_REFRESH_DURATION =
+      "ozone.om.network.topology.refresh.duration";
+  public static final String
+      OZONE_OM_NETWORK_TOPOLOGY_REFRESH_DURATION_DEFAULT = "1h";
+
+
   /**
    * There is no need to instantiate this class.
    */

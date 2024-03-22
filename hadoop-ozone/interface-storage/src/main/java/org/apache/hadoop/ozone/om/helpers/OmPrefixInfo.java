@@ -25,13 +25,12 @@ import org.apache.hadoop.hdds.utils.db.Proto2Codec;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.storage.proto.OzoneManagerStorageProtos.PersistedPrefixInfo;
 
-import java.util.BitSet;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.stream.Collectors;
 
 /**
  * Wrapper class for Ozone prefix path info, currently mainly target for ACL but
@@ -49,7 +48,7 @@ public final class OmPrefixInfo extends WithObjectID {
   }
 
   private String name;
-  private List<OzoneAcl> acls;
+  private final List<OzoneAcl> acls;
 
   public OmPrefixInfo(String name, List<OzoneAcl> acls,
       Map<String, String> metadata, long objectId, long updateId) {
@@ -235,16 +234,11 @@ public final class OmPrefixInfo extends WithObjectID {
    * Return a new copy of the object.
    */
   public OmPrefixInfo copyObject() {
-    List<OzoneAcl> aclList = acls.stream().map(acl ->
-        new OzoneAcl(acl.getType(), acl.getName(),
-            (BitSet) acl.getAclBitSet().clone(), acl.getAclScope()))
-        .collect(Collectors.toList());
-
     Map<String, String> metadataList = new HashMap<>();
     if (getMetadata() != null) {
-      getMetadata().forEach((k, v) -> metadataList.put(k, v));
+      metadataList.putAll(getMetadata());
     }
-    return new OmPrefixInfo(name, aclList, metadataList, getObjectID(), getUpdateID());
+    return new OmPrefixInfo(name, new ArrayList<>(acls), metadataList, getObjectID(), getUpdateID());
   }
 }
 
