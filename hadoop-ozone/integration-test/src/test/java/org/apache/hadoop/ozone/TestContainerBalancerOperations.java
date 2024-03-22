@@ -172,7 +172,6 @@ public class TestContainerBalancerOperations {
 
   /**
    * Test if Container Balancer CLI option overrides an option specified in the configs.
-   *
    */
   @Test
   public void testIfCBCLIOverridesConfigs() throws Exception {
