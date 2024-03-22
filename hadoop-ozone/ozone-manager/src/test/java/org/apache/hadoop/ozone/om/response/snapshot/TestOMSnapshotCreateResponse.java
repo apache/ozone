@@ -32,7 +32,6 @@ import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
-import org.apache.hadoop.ozone.om.snapshot.SnapshotUtils;
 import org.apache.hadoop.util.Time;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -215,8 +214,8 @@ public class TestOMSnapshotCreateResponse {
     // Add deletedDirectoryTable key entries that "surround" the snapshot scope
     Set<String> sentinelKeys = new HashSet<>();
 
-    final String dbKeyPfx = SnapshotUtils.getOzonePathKeyForFso(
-            omMetadataManager, volumeName, bucketName);
+    final String dbKeyPfx = omMetadataManager
+        .getOzonePathKeyForFso(volumeName, bucketName);
 
     // Calculate offset to bucketId's last character in dbKeyPfx.
     // First -1 for offset, second -1 for second to last char (before '/')
