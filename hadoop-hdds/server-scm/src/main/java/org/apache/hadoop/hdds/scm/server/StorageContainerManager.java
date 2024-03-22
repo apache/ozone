@@ -844,6 +844,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
           containerManager.getContainers(), containerManager,
           pipelineManager, eventQueue, serviceManager, scmContext);
     }
+    scmSafeModeManager.setScmHaManager(scmHAManager);
 
     scmDecommissionManager = new NodeDecommissionManager(conf, scmNodeManager,
         scmContext, eventQueue, replicationManager);
