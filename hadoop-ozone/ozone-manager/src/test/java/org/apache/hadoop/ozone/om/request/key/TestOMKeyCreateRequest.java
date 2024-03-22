@@ -483,7 +483,7 @@ public class TestOMKeyCreateRequest extends TestOMKeyRequest {
     Map<String, String> initialMetadata =
         Collections.singletonMap("initialKey", "initialValue");
     OMRequest initialRequest =
-        createKeyRequest(false, 0, keyName, initialMetadata);
+        createKeyRequest(false, 0, keyName, initialMetadata, Collections.emptyList());
     OMKeyCreateRequest initialOmKeyCreateRequest =
         new OMKeyCreateRequest(initialRequest, getBucketLayout());
     OMClientResponse initialResponse =
@@ -501,7 +501,7 @@ public class TestOMKeyCreateRequest extends TestOMKeyRequest {
     Map<String, String> updatedMetadata =
         Collections.singletonMap("initialKey", "updatedValue");
     OMRequest updatedRequest =
-        createKeyRequest(false, 0, keyName, updatedMetadata);
+        createKeyRequest(false, 0, keyName, updatedMetadata, Collections.emptyList());
     OMKeyCreateRequest updatedOmKeyCreateRequest =
         new OMKeyCreateRequest(updatedRequest, getBucketLayout());
 
@@ -521,7 +521,7 @@ public class TestOMKeyCreateRequest extends TestOMKeyRequest {
 
     // Create the key request without any initial metadata
     OMRequest createRequestWithoutMetadata = createKeyRequest(false, 0, keyName,
-        null); // Passing 'null' for metadata
+        null, Collections.emptyList()); // Passing 'null' for metadata
     OMKeyCreateRequest createOmKeyCreateRequest =
         new OMKeyCreateRequest(createRequestWithoutMetadata, getBucketLayout());
 
@@ -544,7 +544,7 @@ public class TestOMKeyCreateRequest extends TestOMKeyRequest {
 
     // Overwrite the previously created key with new metadata
     OMRequest overwriteRequestWithMetadata =
-        createKeyRequest(false, 0, keyName, overwriteMetadata);
+        createKeyRequest(false, 0, keyName, overwriteMetadata, Collections.emptyList());
     OMKeyCreateRequest overwriteOmKeyCreateRequest =
         new OMKeyCreateRequest(overwriteRequestWithMetadata, getBucketLayout());
 
@@ -649,7 +649,7 @@ public class TestOMKeyCreateRequest extends TestOMKeyRequest {
 
   private OMRequest createKeyRequest(boolean isMultipartKey, int partNumber,
                                      String keyName) {
-    return createKeyRequest(isMultipartKey, partNumber, keyName, null);
+    return createKeyRequest(isMultipartKey, partNumber, keyName, null, Collections.emptyList());
   }
 
   /**
@@ -666,7 +666,8 @@ public class TestOMKeyCreateRequest extends TestOMKeyRequest {
    */
   protected OMRequest createKeyRequest(boolean isMultipartKey, int partNumber,
                                        String keyName,
-                                       Map<String, String> metadata) {
+                                       Map<String, String> metadata,
+                                       List<OzoneAcl> acls) {
     KeyArgs.Builder keyArgs = KeyArgs.newBuilder()
         .setVolumeName(volumeName)
         .setBucketName(bucketName)
@@ -677,6 +678,9 @@ public class TestOMKeyCreateRequest extends TestOMKeyRequest {
         .setType(replicationConfig.getReplicationType())
         .setLatestVersionLocation(true);
 
+    for (OzoneAcl acl : acls) {
+      keyArgs.addAcls(OzoneAcl.toProtobuf(acl));
+    }
     // Configure for multipart upload, if applicable
     if (isMultipartKey) {
       keyArgs.setDataSize(dataSize).setMultipartNumber(partNumber);
@@ -934,13 +938,16 @@ public class TestOMKeyCreateRequest extends TestOMKeyRequest {
 
     // Now pre-create the key in the system so we can overwrite it.
     Map<String, String> metadata = Collections.singletonMap("metakey", "metavalue");
-    OmKeyInfo createdKeyInfo = createAndCheck(keyName, metadata);
+    List<OzoneAcl> acls = Collections.singletonList(OzoneAcl.parseAcl("user:foo:rw"));
+    OmKeyInfo createdKeyInfo = createAndCheck(keyName, metadata, acls);
     // Commit openKey entry.
     OMRequestTestUtils.addKeyToTable(false, false,
         createdKeyInfo, 0L, 0L, omMetadataManager);
     // Retrieve the committed key info
     String ozoneKey = omMetadataManager.getOzoneKey(volumeName, bucketName, keyName);
     OmKeyInfo existingKeyInfo = omMetadataManager.getKeyTable(getBucketLayout()).get(ozoneKey);
+    List<OzoneAcl> existingAcls = existingKeyInfo.getAcls();
+    assertEquals(acls, existingAcls);
 
     // Create a request with an update ID which doesn't match the current key
     omRequest = createKeyRequest(false, 0, 100,
@@ -972,6 +979,8 @@ public class TestOMKeyCreateRequest extends TestOMKeyRequest {
     // The metadata should be copied over from the existing key.
     assertEquals(metadata, existingKeyInfo.getMetadata());
     assertEquals(metadata, openKeyInfo.getMetadata());
+    // Ensure the ACLS are copied over from the existing key.
+    assertEquals(existingAcls, openKeyInfo.getAcls());
   }
 
   /**
@@ -1031,11 +1040,12 @@ public class TestOMKeyCreateRequest extends TestOMKeyRequest {
   }
 
   private void createAndCheck(String keyName) throws Exception {
-    createAndCheck(keyName, Collections.emptyMap());
+    createAndCheck(keyName, Collections.emptyMap(), Collections.emptyList());
   }
 
-  private OmKeyInfo createAndCheck(String keyName, Map<String, String> metadata) throws Exception {
-    OMRequest omRequest = createKeyRequest(false, 0, keyName, metadata);
+  private OmKeyInfo createAndCheck(String keyName, Map<String, String> metadata, List<OzoneAcl> acls)
+      throws Exception {
+    OMRequest omRequest = createKeyRequest(false, 0, keyName, metadata, acls);
 
     OMKeyCreateRequest omKeyCreateRequest = getOMKeyCreateRequest(omRequest);
 

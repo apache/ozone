@@ -21,6 +21,7 @@ package org.apache.hadoop.ozone.om.request.key;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -31,6 +32,7 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.OmUtils;
+import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
@@ -250,12 +252,15 @@ public class TestOMKeyCommitRequest extends TestOMKeyRequest {
     omKeyInfoBuilder.setOverwriteUpdateID(1L);
     OmKeyInfo omKeyInfo = omKeyInfoBuilder.build();
     omKeyInfo.appendNewBlocks(allocatedLocationList, false);
+    List<OzoneAcl> acls = Collections.singletonList(OzoneAcl.parseAcl("user:foo:rw"));
+    omKeyInfo.addAcl(acls.get(0));
 
     String openKey = getOzonePathKey() + "/" + modifiedOmRequest.getCommitKeyRequest().getClientID();
 
     openKeyTable.put(openKey, omKeyInfo);
     OmKeyInfo openKeyInfo = openKeyTable.get(openKey);
     assertNotNull(openKeyInfo);
+    assertEquals(acls, openKeyInfo.getAcls());
     // At this stage, we have an openKey, with overwrite update ID of 1.
     // However there is no closed key entry, so the commit should fail.
     OMClientResponse omClientResponse =
@@ -285,6 +290,7 @@ public class TestOMKeyCommitRequest extends TestOMKeyRequest {
     assertNull(committedKey.getOverwriteUpdateID());
     // Update ID should be changed
     assertNotEquals(closedKeyInfo.getUpdateID(), committedKey.getUpdateID());
+    assertEquals(acls, committedKey.getAcls());
   }
 
   @Test
