@@ -471,10 +471,10 @@ public class OzoneBucket extends WithMetadata {
 
   /**
    * Overwrite an existing key using optimistic locking. The existingKey must exist in Ozone to allow
-   * the new key to be created with the same name. Additionally, the existingKey must not have been
-   * modified since the time its details were read. This is controlled by the updateID
-   * field in the existingKey. If the key is replaced or updated the updateID will change. If the
-   * updateID has changed since the existingKey was read, either the initial key create will fail,
+   * the new key to be created with the same name. Additionally, the existing Key must not have been
+   * modified since the time it's details were read. This is controlled by the updateID
+   * field in the existing Key. If the key is replaced or updated the updateID will change. If the
+   * updateID has changed since the existing Key was read, either the initial key create will fail,
    * or the key will fail to commit after the data has been written as the checks are carried out
    * both a key open and commit time.
    *
@@ -1800,7 +1800,7 @@ public class OzoneBucket extends WithMetadata {
             keyInfo.getDataSize(), keyInfo.getCreationTime(),
             keyInfo.getModificationTime(),
             keyInfo.getReplicationConfig(),
-            keyInfo.isFile(), keyInfo.getObjectID(), keyInfo.getUpdateID());
+            keyInfo.isFile(), keyInfo.getUpdateID());
         keysResultList.add(ozoneKey);
       }
     }

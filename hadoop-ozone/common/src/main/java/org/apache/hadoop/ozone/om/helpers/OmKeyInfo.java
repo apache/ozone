@@ -100,12 +100,11 @@ public final class OmKeyInfo extends WithParentObjectId
    */
   private final List<OzoneAcl> acls;
 
-  // Overwrite objectID and updateID when used in key creation indicate that a
-  // key with the same keyName should exist with the given object and update IDs,
-  // and upon commit, the object and updateID of that existing key should be unchanged.
+  // OverwriteUpdateID when used in key creation indicates that a key with the same keyName
+  // should exist with the given updateID.
+  // Upon commit, the updateID of that existing key should be unchanged.
   // This is a form of optimistic locking, to ensure the key is not modified between
   // the time the key is read and the time the key is written.
-  private Long overwriteObjectID = null;
   private Long overwriteUpdateID = null;
 
   private OmKeyInfo(Builder b) {
@@ -126,7 +125,6 @@ public final class OmKeyInfo extends WithParentObjectId
     this.fileChecksum = b.fileChecksum;
     this.fileName = b.fileName;
     this.isFile = b.isFile;
-    this.overwriteObjectID = b.overwriteObjectID;
     this.overwriteUpdateID = b.overwriteUpdateID;
   }
 
@@ -168,14 +166,6 @@ public final class OmKeyInfo extends WithParentObjectId
 
   public String getFileName() {
     return fileName;
-  }
-
-  public void setOverwriteObjectID(Long overwriteObjectID) {
-    this.overwriteObjectID = overwriteObjectID;
-  }
-
-  public Long getOverwriteObjectID() {
-    return overwriteObjectID;
   }
 
   public void setOverwriteUpdateID(Long overwriteUpdateID) {
@@ -460,7 +450,6 @@ public final class OmKeyInfo extends WithParentObjectId
     private FileChecksum fileChecksum;
 
     private boolean isFile;
-    private Long overwriteObjectID = null;
     private Long overwriteUpdateID = null;
 
     public Builder() {
@@ -578,11 +567,6 @@ public final class OmKeyInfo extends WithParentObjectId
       return this;
     }
 
-    public Builder setOverwriteObjectID(Long existingObjectID) {
-      this.overwriteObjectID = existingObjectID;
-      return this;
-    }
-
     public Builder setOverwriteUpdateID(Long existingUpdateID) {
       this.overwriteUpdateID = existingUpdateID;
       return this;
@@ -695,9 +679,6 @@ public final class OmKeyInfo extends WithParentObjectId
     if (overwriteUpdateID != null) {
       kb.setOverwriteUpdateID(overwriteUpdateID);
     }
-    if (overwriteObjectID != null) {
-      kb.setOverwriteObjectID(overwriteObjectID);
-    }
     return kb.build();
   }
 
@@ -743,9 +724,6 @@ public final class OmKeyInfo extends WithParentObjectId
 
     if (keyInfo.hasIsFile()) {
       builder.setFile(keyInfo.getIsFile());
-    }
-    if (keyInfo.hasOverwriteObjectID()) {
-      builder.setOverwriteObjectID(keyInfo.getOverwriteObjectID());
     }
     if (keyInfo.hasOverwriteUpdateID()) {
       builder.setOverwriteUpdateID(keyInfo.getOverwriteUpdateID());
@@ -855,9 +833,6 @@ public final class OmKeyInfo extends WithParentObjectId
 
     if (fileChecksum != null) {
       builder.setFileChecksum(fileChecksum);
-    }
-    if (overwriteObjectID != null) {
-      builder.setOverwriteObjectID(overwriteObjectID);
     }
     if (overwriteUpdateID != null) {
       builder.setOverwriteUpdateID(overwriteUpdateID);

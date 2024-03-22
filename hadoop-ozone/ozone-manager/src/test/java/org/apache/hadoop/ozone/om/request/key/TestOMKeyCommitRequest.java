@@ -225,7 +225,7 @@ public class TestOMKeyCommitRequest extends TestOMKeyRequest {
   @Test
   public void testCommitWithOptimisticLocking() throws Exception {
     if (getBucketLayout() == BucketLayout.FILE_SYSTEM_OPTIMIZED) {
-     // TODO - does not with in FSO for now
+     // TODO - does not work with in FSO for now
       return;
     }
 
@@ -248,7 +248,6 @@ public class TestOMKeyCommitRequest extends TestOMKeyRequest {
     OmKeyInfo.Builder omKeyInfoBuilder = OMRequestTestUtils.createOmKeyInfo(
         volumeName, bucketName, keyName, replicationConfig, new OmKeyLocationInfoGroup(version, new ArrayList<>()));
     omKeyInfoBuilder.setOverwriteUpdateID(1L);
-    omKeyInfoBuilder.setOverwriteObjectID(1L);
     OmKeyInfo omKeyInfo = omKeyInfoBuilder.build();
     omKeyInfo.appendNewBlocks(allocatedLocationList, false);
 
@@ -257,16 +256,14 @@ public class TestOMKeyCommitRequest extends TestOMKeyRequest {
     openKeyTable.put(openKey, omKeyInfo);
     OmKeyInfo openKeyInfo = openKeyTable.get(openKey);
     assertNotNull(openKeyInfo);
-    // At this stage, we have an openKey, with overwrite object / update ID of 1.
+    // At this stage, we have an openKey, with overwrite update ID of 1.
     // However there is no closed key entry, so the commit should fail.
     OMClientResponse omClientResponse =
         omKeyCommitRequest.validateAndUpdateCache(ozoneManager, 100L);
     assertEquals(KEY_NOT_FOUND, omClientResponse.getOMResponse().getStatus());
 
-    // Now add the key to the key table, and try again, but with different object_ID / update_ID
-    omKeyInfoBuilder.setOverwriteObjectID(null);
+    // Now add the key to the key table, and try again, but with different update_ID
     omKeyInfoBuilder.setOverwriteUpdateID(null);
-    omKeyInfoBuilder.setObjectID(0L);
     omKeyInfoBuilder.setUpdateID(0L);
     OmKeyInfo invalidKeyInfo = omKeyInfoBuilder.build();
     closedKeyTable.put(getOzonePathKey(), invalidKeyInfo);
@@ -274,7 +271,6 @@ public class TestOMKeyCommitRequest extends TestOMKeyRequest {
     omClientResponse = omKeyCommitRequest.validateAndUpdateCache(ozoneManager, 100L);
     assertEquals(KEY_NOT_FOUND, omClientResponse.getOMResponse().getStatus());
 
-    omKeyInfoBuilder.setObjectID(1L);
     omKeyInfoBuilder.setUpdateID(1L);
     OmKeyInfo closedKeyInfo = omKeyInfoBuilder.build();
 
@@ -286,10 +282,7 @@ public class TestOMKeyCommitRequest extends TestOMKeyRequest {
     assertEquals(OK, omClientResponse.getOMResponse().getStatus());
 
     OmKeyInfo committedKey = closedKeyTable.get(getOzonePathKey());
-    assertNull(committedKey.getOverwriteObjectID());
     assertNull(committedKey.getOverwriteUpdateID());
-    // The object ID should not change when overwriting.
-    assertEquals(openKeyInfo.getObjectID(), committedKey.getObjectID());
     // Update ID should be changed
     assertNotEquals(closedKeyInfo.getUpdateID(), committedKey.getUpdateID());
   }

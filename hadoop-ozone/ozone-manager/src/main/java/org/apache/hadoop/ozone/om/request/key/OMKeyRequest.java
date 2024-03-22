@@ -782,9 +782,6 @@ public abstract class OMKeyRequest extends OMClientRequest {
         dbKeyInfo.getMetadata().putAll(KeyValueUtil.getFromProtobuf(
             keyArgs.getMetadataList()));
       }
-      if (keyArgs.hasOverwriteObjectID()) {
-        dbKeyInfo.setOverwriteObjectID(keyArgs.getOverwriteObjectID());
-      }
       if (keyArgs.hasOverwriteUpdateID()) {
         dbKeyInfo.setOverwriteUpdateID(keyArgs.getOverwriteUpdateID());
       }

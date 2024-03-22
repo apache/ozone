@@ -76,14 +76,13 @@ public class OzoneKey {
    * object has not been created from an existing key read from OM, as OM allocates
    * the update ID on commit of the key.
    */
-  private final Long objectID;
   private final Long updateID;
 
   @SuppressWarnings("parameternumber")
   public OzoneKey(String volumeName, String bucketName,
       String keyName, long size, long creationTime,
       long modificationTime, ReplicationConfig replicationConfig,
-      boolean isFile, Long objectID, Long updateID) {
+      boolean isFile, Long updateID) {
     this.volumeName = volumeName;
     this.bucketName = bucketName;
     this.name = keyName;
@@ -92,7 +91,6 @@ public class OzoneKey {
     this.modificationTime = Instant.ofEpochMilli(modificationTime);
     this.replicationConfig = replicationConfig;
     this.isFile = isFile;
-    this.objectID = objectID;
     this.updateID = updateID;
   }
 
@@ -102,7 +100,7 @@ public class OzoneKey {
                   long modificationTime, ReplicationConfig replicationConfig,
                   boolean isFile) {
     this(volumeName, bucketName, keyName, size, creationTime, modificationTime, replicationConfig,
-        isFile, null, null);
+        isFile, null);
   }
 
   @SuppressWarnings("parameternumber")
@@ -111,7 +109,7 @@ public class OzoneKey {
                   long modificationTime, ReplicationConfig replicationConfig,
                   Map<String, String> metadata, boolean isFile) {
     this(volumeName, bucketName, keyName, size, creationTime,
-        modificationTime, replicationConfig, isFile, null, null);
+        modificationTime, replicationConfig, isFile, null);
     this.metadata.putAll(metadata);
   }
 
@@ -119,9 +117,9 @@ public class OzoneKey {
   public OzoneKey(String volumeName, String bucketName,
                   String keyName, long size, long creationTime,
                   long modificationTime, ReplicationConfig replicationConfig,
-                  Map<String, String> metadata, boolean isFile, Long objectID, Long updateID) {
+                  Map<String, String> metadata, boolean isFile, Long updateID) {
     this(volumeName, bucketName, keyName, size, creationTime,
-        modificationTime, replicationConfig, isFile, objectID, updateID);
+        modificationTime, replicationConfig, isFile, updateID);
     this.metadata.putAll(metadata);
   }
   /**
@@ -209,11 +207,6 @@ public class OzoneKey {
   }
 
   @JsonIgnore
-  public Long getObjectID() {
-    return objectID;
-  }
-
-  @JsonIgnore
   public Long getUpdateID() {
     return updateID;
   }
@@ -230,7 +223,7 @@ public class OzoneKey {
     return new OzoneKey(keyInfo.getVolumeName(), keyInfo.getBucketName(),
         keyInfo.getKeyName(), keyInfo.getDataSize(), keyInfo.getCreationTime(),
         keyInfo.getModificationTime(), keyInfo.getReplicationConfig(),
-        keyInfo.getMetadata(), keyInfo.isFile(), keyInfo.getObjectID(), keyInfo.getUpdateID());
+        keyInfo.getMetadata(), keyInfo.isFile(), keyInfo.getUpdateID());
   }
 
 }

@@ -355,9 +355,11 @@ public interface ClientProtocol {
 
   /**
    * Overwrite an existing key using optimistic locking. The OzoneKeyDetails passed must contain
-   * the objectID and updateID of the key to be overwritten. The existing key must also exist on
-   * OM and have the same ObjectID and UpdateID as the one passed in or the key create / commit
-   * will fail.
+   * the updateID of the key to be overwritten. The existing key must also exist on
+   * OM and have the same UpdateID as the one passed in or the key create / commit will fail.
+   *
+   * Currently does not work for FSO buckets. Support will be added later.
+   *
    * @param keyToOverwrite Existing key to overwrite
    * @param replicationConfig The replication configuration for the new key
    * @return {@link OzoneOutputStream}

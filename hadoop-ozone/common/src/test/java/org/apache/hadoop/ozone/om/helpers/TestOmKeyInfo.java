@@ -67,7 +67,6 @@ public class TestOmKeyInfo {
     assertFalse(key.isHsync());
     key.getMetadata().put(OzoneConsts.HSYNC_CLIENT_ID, "clientid");
     assertTrue(key.isHsync());
-    assertEquals(1234L, key.getOverwriteObjectID());
     assertEquals(5678L, key.getOverwriteUpdateID());
   }
 
@@ -125,7 +124,6 @@ public class TestOmKeyInfo {
         .setReplicationConfig(replicationConfig)
         .addMetadata("key1", "value1")
         .addMetadata("key2", "value2")
-        .setOverwriteObjectID(1234L)
         .setOverwriteUpdateID(5678L)
         .build();
   }

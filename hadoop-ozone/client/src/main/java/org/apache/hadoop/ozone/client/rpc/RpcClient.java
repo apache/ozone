@@ -1407,9 +1407,6 @@ public class RpcClient implements ClientProtocol {
     if (keyToOverwrite == null) {
       throw new IllegalArgumentException("KeyToOverwrite cannot be null");
     }
-    if (keyToOverwrite.getObjectID() == null) {
-      throw new IllegalArgumentException("KeyToOverwrite ObjectID cannot be null");
-    }
     if (keyToOverwrite.getUpdateID() == null) {
       throw new IllegalArgumentException("KeyToOverwrite UpdateID cannot be null");
     }
@@ -1424,7 +1421,6 @@ public class RpcClient implements ClientProtocol {
         .setReplicationConfig(replicationConfig)
         .addAllMetadataGdpr(keyToOverwrite.getMetadata())
         .setLatestVersionLocation(getLatestVersionLocation)
-        .setOverwriteObjectID(keyToOverwrite.getObjectID())
         .setOverwriteUpdateID(keyToOverwrite.getUpdateID());
 
     OpenKeySession openKey = ozoneManagerClient.openKey(builder.build());
@@ -1699,7 +1695,6 @@ public class RpcClient implements ClientProtocol {
               key.getModificationTime(),
               key.getReplicationConfig(),
               key.isFile(),
-              key.getObjectID(),
               key.getUpdateID()))
           .collect(Collectors.toList());
     }
@@ -1751,8 +1746,7 @@ public class RpcClient implements ClientProtocol {
         keyInfo.getModificationTime(), ozoneKeyLocations,
         keyInfo.getReplicationConfig(), keyInfo.getMetadata(),
         keyInfo.getFileEncryptionInfo(),
-        () -> getInputStreamWithRetryFunction(keyInfo), keyInfo.isFile(),
-        keyInfo.getObjectID(), keyInfo.getUpdateID());
+        () -> getInputStreamWithRetryFunction(keyInfo), keyInfo.isFile(), keyInfo.getUpdateID());
   }
 
   @Override

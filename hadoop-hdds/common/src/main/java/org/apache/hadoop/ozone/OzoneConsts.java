@@ -343,9 +343,7 @@ public final class OzoneConsts {
   public static final String BUCKET_LAYOUT = "bucketLayout";
   public static final String TENANT = "tenant";
   public static final String USER_PREFIX = "userPrefix";
-  public static final String OVERWRITE_OBJECT_ID = "overwriteObjectID";
   public static final String OVERWRITE_UPDATE_ID = "overwriteUpdateID";
-
 
   // For multi-tenancy
   public static final String TENANT_ID_USERNAME_DELIMITER = "$";
