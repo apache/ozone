@@ -46,7 +46,9 @@ public class CachingSpaceUsageSource implements SpaceUsageSource {
       LoggerFactory.getLogger(CachingSpaceUsageSource.class);
 
   private final ScheduledExecutorService executor;
-  private final AtomicLong cachedValue = new AtomicLong();
+  private final AtomicLong cachedUsedSpace = new AtomicLong();
+  private final AtomicLong cachedAvailable = new AtomicLong();
+  private final AtomicLong cachedCapacity = new AtomicLong();
   private final Duration refresh;
   private final SpaceUsageSource source;
   private final SpaceUsagePersistence persistence;
@@ -76,30 +78,31 @@ public class CachingSpaceUsageSource implements SpaceUsageSource {
 
   @Override
   public long getCapacity() {
-    return source.getCapacity();
+    return cachedCapacity.get();
   }
 
   @Override
   public long getAvailable() {
-    return source.getAvailable();
+    return cachedAvailable.get();
   }
 
   @Override
   public long getUsedSpace() {
-    return cachedValue.get();
+    return cachedUsedSpace.get();
   }
 
   public void incrementUsedSpace(long usedSpace) {
-    cachedValue.addAndGet(usedSpace);
+    cachedUsedSpace.addAndGet(usedSpace);
+    cachedAvailable.addAndGet(-usedSpace);
   }
 
   public void decrementUsedSpace(long reclaimedSpace) {
-    cachedValue.addAndGet(-1 * reclaimedSpace);
+    incrementUsedSpace(-1 * reclaimedSpace);
   }
 
   public void start() {
     if (executor != null) {
-      long initialDelay = cachedValue.get() > 0 ? refresh.toMillis() : 0;
+      long initialDelay = cachedUsedSpace.get() > 0 ? refresh.toMillis() : 0;
       if (!running) {
         scheduledFuture = executor.scheduleWithFixedDelay(
             this::refresh, initialDelay, refresh.toMillis(), MILLISECONDS);
@@ -130,14 +133,21 @@ public class CachingSpaceUsageSource implements SpaceUsageSource {
 
   private void loadInitialValue() {
     final OptionalLong initialValue = persistence.load();
-    initialValue.ifPresent(cachedValue::set);
+    initialValue.ifPresent(cachedUsedSpace::set);
+    updateAvailableSpace();
+  }
+
+  private void updateAvailableSpace() {
+    cachedCapacity.set(source.getCapacity());
+    cachedAvailable.set(source.getAvailable());
   }
 
   private void refresh() {
     //only one `refresh` can be running at a certain moment
     if (isRefreshRunning.compareAndSet(false, true)) {
       try {
-        cachedValue.set(source.getUsedSpace());
+        updateAvailableSpace();
+        cachedUsedSpace.set(source.getUsedSpace());
       } catch (RuntimeException e) {
         LOG.warn("Error refreshing space usage for {}", source, e);
       } finally {

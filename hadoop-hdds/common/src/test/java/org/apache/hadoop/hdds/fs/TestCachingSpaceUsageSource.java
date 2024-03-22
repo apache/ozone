@@ -42,13 +42,13 @@ import static org.mockito.Mockito.when;
 /**
  * Tests for {@link CachingSpaceUsageSource}.
  */
-public class TestCachingSpaceUsageSource {
+class TestCachingSpaceUsageSource {
 
   @TempDir
   private static File dir;
 
   @Test
-  public void providesInitialValueUntilStarted() {
+  void providesInitialValueUntilStarted() {
     final long initialValue = validInitialValue();
     SpaceUsageCheckParams params = paramsBuilder(new AtomicLong(initialValue))
         .withRefresh(Duration.ZERO)
@@ -57,10 +57,11 @@ public class TestCachingSpaceUsageSource {
     SpaceUsageSource subject = new CachingSpaceUsageSource(params);
 
     assertEquals(initialValue, subject.getUsedSpace());
+    assertAvailableWasUpdated(params.getSource(), subject);
   }
 
   @Test
-  public void ignoresMissingInitialValue() {
+  void ignoresMissingInitialValue() {
     SpaceUsageCheckParams params = paramsBuilder()
         .withRefresh(Duration.ZERO)
         .build();
@@ -68,10 +69,11 @@ public class TestCachingSpaceUsageSource {
     SpaceUsageSource subject = new CachingSpaceUsageSource(params);
 
     assertEquals(0, subject.getUsedSpace());
+    assertAvailableWasUpdated(params.getSource(), subject);
   }
 
   @Test
-  public void updatesValueFromSourceUponStartIfPeriodicRefreshNotConfigured() {
+  void updatesValueFromSourceUponStartIfPeriodicRefreshNotConfigured() {
     AtomicLong savedValue = new AtomicLong(validInitialValue());
     SpaceUsageCheckParams params = paramsBuilder(savedValue)
         .withRefresh(Duration.ZERO).build();
@@ -79,11 +81,11 @@ public class TestCachingSpaceUsageSource {
     CachingSpaceUsageSource subject = new CachingSpaceUsageSource(params);
     subject.start();
 
-    assertSubjectWasRefreshed(params.getSource().getUsedSpace(), subject);
+    assertSubjectWasRefreshed(params.getSource(), subject);
   }
 
   @Test
-  public void schedulesRefreshWithDelayIfConfigured() {
+  void schedulesRefreshWithDelayIfConfigured() {
     long initialValue = validInitialValue();
     AtomicLong savedValue = new AtomicLong(initialValue);
     SpaceUsageCheckParams params = paramsBuilder(savedValue)
@@ -96,13 +98,13 @@ public class TestCachingSpaceUsageSource {
     subject.start();
 
     verifyRefreshWasScheduled(executor, refresh.toMillis(), refresh);
-    assertSubjectWasRefreshed(params.getSource().getUsedSpace(), subject);
+    assertSubjectWasRefreshed(params.getSource(), subject);
     assertEquals(initialValue, savedValue.get(),
         "value should not have been saved to file yet");
   }
 
   @Test
-  public void schedulesImmediateRefreshIfInitialValueMissing() {
+  void schedulesImmediateRefreshIfInitialValueMissing() {
     final long initialValue = missingInitialValue();
     AtomicLong savedValue = new AtomicLong(initialValue);
     SpaceUsageCheckParams params = paramsBuilder(savedValue).build();
@@ -113,13 +115,13 @@ public class TestCachingSpaceUsageSource {
     subject.start();
 
     verifyRefreshWasScheduled(executor, 0L, params.getRefresh());
-    assertSubjectWasRefreshed(params.getSource().getUsedSpace(), subject);
+    assertSubjectWasRefreshed(params.getSource(), subject);
     assertEquals(initialValue, savedValue.get(),
         "value should not have been saved to file yet");
   }
 
   @Test
-  public void savesValueOnShutdown() {
+  void savesValueOnShutdown() {
     AtomicLong savedValue = new AtomicLong(validInitialValue());
     SpaceUsageSource source = mock(SpaceUsageSource.class);
     final long usedSpace = 4L;
@@ -187,10 +189,18 @@ public class TestCachingSpaceUsageSource {
         eq(refresh.toMillis()), eq(TimeUnit.MILLISECONDS));
   }
 
-  private static void assertSubjectWasRefreshed(long expected,
+  private static void assertAvailableWasUpdated(SpaceUsageSource source,
       SpaceUsageSource subject) {
 
-    assertEquals(expected, subject.getUsedSpace(),
+    assertEquals(source.getCapacity(), subject.getCapacity());
+    assertEquals(source.getAvailable(), subject.getAvailable());
+  }
+
+  private static void assertSubjectWasRefreshed(SpaceUsageSource source,
+      SpaceUsageSource subject) {
+
+    assertAvailableWasUpdated(source, subject);
+    assertEquals(source.getUsedSpace(), subject.getUsedSpace(),
         "subject should have been refreshed");
   }
 
