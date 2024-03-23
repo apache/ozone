@@ -67,7 +67,7 @@ public class CommonUtils {
         .setName(path)
         .setAcls(new ArrayList<>(Collections.singletonList(new OzoneAcl(
             identityType, identityString,
-            aclType, scope))))
+            scope, aclType))))
         .setObjectID(10)
         .setUpdateID(100)
         .build();

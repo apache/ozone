@@ -117,7 +117,7 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
     <commons-codec.version>1.15</commons-codec.version>
     <commons-collections.version>3.2.2</commons-collections.version>
     <commons-compress.version>1.26.0</commons-compress.version>
-    <commons-configuration2.version>2.8.0</commons-configuration2.version>
+    <commons-configuration2.version>2.10.1</commons-configuration2.version>
     <zstd-jni.version>1.5.2-5</zstd-jni.version>
     <commons-daemon.version>1.0.13</commons-daemon.version>
     <commons-io.version>2.15.1</commons-io.version>
@@ -159,7 +159,7 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
 
     <!-- jersey version -->
     <jersey.version>1.19.4</jersey.version>
-    <jersey2.version>2.41</jersey2.version>
+    <jersey2.version>2.42</jersey2.version>
 
     <!-- jackson versions -->
     <jackson1.version>1.9.13</jackson1.version>
@@ -180,7 +180,7 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
     <!-- SLF4J/LOG4J version -->
     <slf4j.version>2.0.12</slf4j.version>
     <log4j2.version>2.17.1</log4j2.version>
-    <disruptor.version>3.4.2</disruptor.version>
+    <disruptor.version>3.4.4</disruptor.version>
     <reload4j.version>1.2.25</reload4j.version>
 
     <kotlin.version>1.9.22</kotlin.version>
@@ -212,13 +212,12 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
     <guice.version>6.0.0</guice.version>
     <gson.version>2.9.0</gson.version>
 
-    <objenesis.version>1.0</objenesis.version>
     <okhttp.version>2.7.5</okhttp.version>
     <okio.version>3.6.0</okio.version>
     <mockito.version>4.11.0</mockito.version>
     <hamcrest.version>2.2</hamcrest.version>
-    <junit5.version>5.10.1</junit5.version>
-    <zookeeper.version>3.7.2</zookeeper.version>
+    <junit5.version>5.10.2</junit5.version>
+    <zookeeper.version>3.8.4</zookeeper.version>
 
     <!-- Maven protoc compiler -->
     <protobuf-maven-plugin.version>0.6.1</protobuf-maven-plugin.version>
@@ -249,7 +248,7 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
     <maven-surefire-plugin.argLine>-Xmx4096m -XX:+HeapDumpOnOutOfMemoryError</maven-surefire-plugin.argLine>
     <maven-surefire-plugin.argLineAccessArgs></maven-surefire-plugin.argLineAccessArgs>
     <unstable-test-groups>flaky | slow | unhealthy</unstable-test-groups>
-    <maven-surefire-plugin.version>3.0.0-M5</maven-surefire-plugin.version>
+    <maven-surefire-plugin.version>3.0.0-M4</maven-surefire-plugin.version>
     <maven-surefire-report-plugin.version>${maven-surefire-plugin.version}</maven-surefire-report-plugin.version>
     <maven-failsafe-plugin.version>${maven-surefire-plugin.version}</maven-failsafe-plugin.version>
 
@@ -257,7 +256,7 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
     <maven-compiler-plugin.version>3.9.0</maven-compiler-plugin.version>
     <maven-install-plugin.version>3.1.1</maven-install-plugin.version>
     <maven-resources-plugin.version>3.1.0</maven-resources-plugin.version>
-    <maven-shade-plugin.version>3.5.1</maven-shade-plugin.version>
+    <maven-shade-plugin.version>3.5.2</maven-shade-plugin.version>
     <maven-jar-plugin.version>3.3.0</maven-jar-plugin.version>
     <maven-war-plugin.version>3.4.0</maven-war-plugin.version>
     <maven-source-plugin.version>3.3.0</maven-source-plugin.version>
@@ -265,13 +264,13 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
     <maven-remote-resources-plugin.version>1.5</maven-remote-resources-plugin.version>
     <maven-enforcer-plugin.version>3.4.1</maven-enforcer-plugin.version>
     <maven-javadoc-plugin.version>3.0.1</maven-javadoc-plugin.version>
-    <maven-assembly-plugin.version>3.6.0</maven-assembly-plugin.version>
+    <maven-assembly-plugin.version>3.7.1</maven-assembly-plugin.version>
     <apache-rat-plugin.version>0.16.1</apache-rat-plugin.version>
     <maven-deploy-plugin.version>3.1.1</maven-deploy-plugin.version>
     <build-helper-maven-plugin.version>1.9</build-helper-maven-plugin.version>
     <maven-dependency-plugin.version>3.6.1</maven-dependency-plugin.version>
     <plexus-archiver.version>4.2.2</plexus-archiver.version>
-    <docker-maven-plugin.version>0.29.0</docker-maven-plugin.version>
+    <docker-maven-plugin.version>0.44.0</docker-maven-plugin.version>
     <exec-maven-plugin.version>3.1.1</exec-maven-plugin.version>
     <license-maven-plugin.version>2.3.0</license-maven-plugin.version>
     <make-maven-plugin.version>1.0-beta-1</make-maven-plugin.version>
@@ -1229,6 +1228,16 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
         <groupId>org.apache.zookeeper</groupId>
         <artifactId>zookeeper</artifactId>
         <version>${zookeeper.version}</version>
+        <exclusions>
+          <exclusion>
+            <groupId>ch.qos.logback</groupId>
+            <artifactId>logback-core</artifactId>
+          </exclusion>
+          <exclusion>
+            <groupId>ch.qos.logback</groupId>
+            <artifactId>logback-classic</artifactId>
+          </exclusion>
+        </exclusions>
       </dependency>
       <dependency>
         <groupId>org.slf4j</groupId>
@@ -1282,11 +1291,6 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
         <groupId>com.google.testing.compile</groupId>
         <artifactId>compile-testing</artifactId>
         <version>${compile-testing.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>org.objenesis</groupId>
-        <artifactId>objenesis</artifactId>
-        <version>${objenesis.version}</version>
       </dependency>
       <dependency>
         <groupId>com.google.re2j</groupId>
@@ -2093,6 +2097,13 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
           </dependency>
         </dependencies>
       </plugin>
+      <plugin>
+        <groupId>org.apache.rat</groupId>
+        <artifactId>apache-rat-plugin</artifactId>
+        <configuration>
+          <excludesFile>dev-support/rat/rat-exclusions.txt</excludesFile>
+        </configuration>
+      </plugin>
     </plugins>
   </build>
 
@@ -2244,6 +2255,17 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
           </plugin>
         </plugins>
       </build>
+    </profile>
+    <profile>
+      <id>go-offline</id>
+      <properties>
+        <test>void</test>
+        <skip.npx>true</skip.npx>
+        <skip.installnpx>true</skip.installnpx>
+        <skipDocs>true</skipDocs>
+        <maven.javadoc.skip>true</maven.javadoc.skip>
+        <maven.shade.skip>true</maven.shade.skip>
+      </properties>
     </profile>
     <profile>
       <id>client</id>

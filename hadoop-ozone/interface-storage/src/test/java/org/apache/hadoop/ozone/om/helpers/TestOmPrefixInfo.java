@@ -77,7 +77,7 @@ public class TestOmPrefixInfo {
         .setName(path)
         .setAcls(new ArrayList<>(Collections.singletonList(new OzoneAcl(
             identityType, identityString,
-            aclType, scope))))
+            scope, aclType))))
         .setObjectID(10)
         .setUpdateID(100)
         .build();
@@ -101,7 +101,7 @@ public class TestOmPrefixInfo {
     // Change acls and check.
     omPrefixInfo.addAcl(new OzoneAcl(
         IAccessAuthorizer.ACLIdentityType.USER, username,
-        IAccessAuthorizer.ACLType.READ, ACCESS));
+        ACCESS, IAccessAuthorizer.ACLType.READ));
 
     assertNotEquals(omPrefixInfo, clonePrefixInfo);
 
