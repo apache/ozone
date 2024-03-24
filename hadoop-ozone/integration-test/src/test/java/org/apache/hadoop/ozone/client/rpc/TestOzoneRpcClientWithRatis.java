@@ -60,6 +60,7 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartInfo;
 import org.apache.hadoop.ozone.om.ratis.OzoneManagerStateMachine;
 import org.apache.hadoop.ozone.om.ratis.metrics.OzoneManagerStateMachineMetrics;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
 import org.apache.ozone.test.GenericTestUtils;
 import org.junit.Assert;
 import org.junit.jupiter.api.AfterAll;
@@ -340,9 +341,11 @@ public class TestOzoneRpcClientWithRatis extends TestOzoneRpcClientAbstract {
     omSM.getHandler().setInjector(injector);
     thread1.start();
     thread2.start();
-    GenericTestUtils.waitFor(() -> metrics.getApplyTransactionMapSize() > 0,
-        100, 5000);
-    Thread.sleep(2000);
+    // Wait long enough for createKey's preExecute to finish executing
+    GenericTestUtils.waitFor(() -> {
+      return getCluster().getOzoneManager().getOmServerProtocol().getLastRequestToSubmit().getCmdType().equals(
+          Type.CreateKey);
+    }, 100, 10000);
     injector.resume();
 
     try {
