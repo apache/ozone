@@ -84,10 +84,10 @@ public class SummarySubCommand implements Callable<Void> {
       printKVSeparator();
       System.out.println(summaryResponse.get("type"));
 
-      int numVol = summaryResponse.get("numVolume").asInt();
-      int numBucket = summaryResponse.get("numBucket").asInt();
-      int numDir = summaryResponse.get("numDir").asInt();
-      int numKey = summaryResponse.get("numKey").asInt();
+      int numVol = summaryResponse.path("numVolume").asInt(-1);
+      int numBucket = summaryResponse.path("numBucket").asInt(-1);
+      int numDir = summaryResponse.path("numDir").asInt(-1);
+      int numKey = summaryResponse.path("numKey").asInt(-1);
 
       if (numVol != -1) {
         printWithUnderline("Volumes", false);
