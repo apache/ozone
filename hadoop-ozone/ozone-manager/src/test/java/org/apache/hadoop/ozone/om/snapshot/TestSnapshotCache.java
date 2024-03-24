@@ -74,7 +74,7 @@ class TestSnapshotCache {
   @BeforeEach
   void setUp() {
     // Reset cache for each test case
-    snapshotCache = new SnapshotCache(cacheLoader, CACHE_SIZE_LIMIT);
+    snapshotCache = new SnapshotCache(cacheLoader, CACHE_SIZE_LIMIT, 0);
   }
 
   @AfterEach

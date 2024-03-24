@@ -4302,6 +4302,15 @@
   </property>
 
   <property>
+    <name>ozone.om.snapshot.cache.cleanup.service.run.internal</name>
+    <value>1m</value>
+    <tag>OZONE, OM</tag>
+    <description>
+      Interval at which snapshot cache clean up will run.
+      Uses millisecond by default when no time unit is specified.
+    </description>
+  </property>
+
     <name>ozone.om.snapshot.load.native.lib</name>
     <value>true</value>
     <tag>OZONE, OM</tag>
