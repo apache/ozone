@@ -17,18 +17,16 @@
  */
 package org.apache.hadoop.ozone.admin.nssummary;
 
-import com.google.gson.internal.LinkedTreeMap;
 import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
+import org.apache.hadoop.hdds.server.JsonUtils;
 import org.apache.hadoop.ozone.shell.ListOptions;
 import picocli.CommandLine;
 
-import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.concurrent.Callable;
-
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.node.ArrayNode;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
-import static org.apache.hadoop.ozone.admin.nssummary.NSSummaryCLIUtils.getResponseMap;
 import static org.apache.hadoop.ozone.admin.nssummary.NSSummaryCLIUtils.makeHttpCall;
 import static org.apache.hadoop.ozone.admin.nssummary.NSSummaryCLIUtils.parseInputPath;
 import static org.apache.hadoop.ozone.admin.nssummary.NSSummaryCLIUtils.printEmptyPathRequest;
@@ -101,21 +99,20 @@ public class DiskUsageSubCommand implements Callable {
       return null;
     }
 
-    HashMap<String, Object> duResponse = getResponseMap(response);
+    JsonNode duResponse = JsonUtils.readTree(response);
 
-    if (duResponse.get("status").equals("PATH_NOT_FOUND")) {
+    if (duResponse.get("status").asText().equals("PATH_NOT_FOUND")) {
       printPathNotFound();
     } else {
       if (parent.isNotValidBucketOrOBSBucket(path)) {
         printBucketReminder();
       }
 
-      long totalSize = (long)(double)duResponse.get("size");
-
+      long totalSize = duResponse.get("size").asLong();
       if (!noHeader) {
         printWithUnderline("Path", false);
         printKVSeparator();
-        System.out.println(duResponse.get("path"));
+        System.out.println(duResponse.get("path").asText());
 
         printWithUnderline("Total Size", false);
         printKVSeparator();
@@ -124,11 +121,11 @@ public class DiskUsageSubCommand implements Callable {
         if (withReplica) {
           printWithUnderline("Total Disk Usage", false);
           printKVSeparator();
-          long du = (long)(double)duResponse.get("sizeWithReplica");
+          long du = duResponse.get("sizeWithReplica").asLong();
           System.out.println(FileUtils.byteCountToDisplaySize(du));
         }
 
-        long sizeDirectKey = (long)(double)duResponse.get("sizeDirectKey");
+        long sizeDirectKey = duResponse.get("sizeDirectKey").asLong();
         if (!listFiles && sizeDirectKey != -1) {
           printWithUnderline("Size of Direct Keys", false);
           printKVSeparator();
@@ -137,7 +134,7 @@ public class DiskUsageSubCommand implements Callable {
         printNewLines(1);
       }
 
-      if ((double)duResponse.get("subPathCount") == 0) {
+      if (duResponse.get("subPathCount").asInt() == 0) {
         if (totalSize == 0) {
           // the object is empty
           System.out.println("The object is empty.\n" +
@@ -160,20 +157,19 @@ public class DiskUsageSubCommand implements Callable {
           seekStr = "";
         }
 
-        ArrayList duData = (ArrayList)duResponse.get("subPaths");
+        ArrayNode subPaths = (ArrayNode) duResponse.get("subPaths");
         int cnt = 0;
-        for (int i = 0; i < duData.size(); ++i) {
+        for (JsonNode subPathDU : subPaths) {
           if (cnt >= limit) {
             break;
           }
-          LinkedTreeMap subPathDU = (LinkedTreeMap) duData.get(i);
-          String subPath = subPathDU.get("path").toString();
+          String subPath = subPathDU.get("path").asText();
           // differentiate key from other types
-          if (!(boolean)subPathDU.get("isKey")) {
+          if (!subPathDU.get("isKey").asBoolean()) {
             subPath += OM_KEY_PREFIX;
           }
-          long size = (long)(double)subPathDU.get("size");
-          long sizeWithReplica = (long)(double)subPathDU.get("sizeWithReplica");
+          long size = subPathDU.get("size").asLong();
+          long sizeWithReplica = subPathDU.get("sizeWithReplica").asLong();
           if (subPath.startsWith(seekStr)) {
             printDURow(subPath, size, sizeWithReplica);
             ++cnt;

@@ -30,6 +30,7 @@ import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType;
 
 import java.util.ArrayList;
 import java.util.BitSet;
+import java.util.EnumSet;
 import java.util.List;
 import java.util.Objects;
 import java.util.function.Consumer;
@@ -58,17 +59,12 @@ public class OzoneAcl {
   private final AclScope aclScope;
   private static final List<ACLType> EMPTY_LIST = new ArrayList<>(0);
 
-  // TODO use varargs constructor
-  public OzoneAcl(ACLIdentityType type, String name, ACLType acl, AclScope scope) {
-    this(type, name, scope, bitSetOf(acl));
-  }
-
   public OzoneAcl(ACLIdentityType type, String name, AclScope scope, ACLType... acls) {
     this(type, name, scope, bitSetOf(acls));
   }
 
-  public OzoneAcl(ACLIdentityType type, String name, BitSet acls, AclScope scope) {
-    this(type, name, scope, validateAndCopy(acls));
+  public OzoneAcl(ACLIdentityType type, String name, AclScope scope, EnumSet<ACLType> acls) {
+    this(type, name, scope, bitSetOf(acls.toArray(new ACLType[0])));
   }
 
   private OzoneAcl(ACLIdentityType type, String name, AclScope scope, BitSet acls) {
@@ -148,7 +144,6 @@ public class OzoneAcl {
     }
 
     ACLIdentityType aclType = ACLIdentityType.valueOf(parts[0].toUpperCase());
-    BitSet acls = new BitSet(ACLType.getNoOfAcls());
 
     String bits = parts[2];
 
@@ -163,14 +158,14 @@ public class OzoneAcl {
           parts[2].indexOf("]")));
     }
 
-    // Set all acl bits.
+    EnumSet<ACLType> acls = EnumSet.noneOf(ACLType.class);
     for (char ch : bits.toCharArray()) {
-      acls.set(ACLType.getACLRight(String.valueOf(ch)).ordinal());
+      acls.add(ACLType.getACLRight(String.valueOf(ch)));
     }
 
     // TODO : Support sanitation of these user names by calling into
     // userAuth Interface.
-    return new OzoneAcl(aclType, parts[1], acls, aclScope);
+    return new OzoneAcl(aclType, parts[1], aclScope, acls);
   }
 
   /**
@@ -208,9 +203,8 @@ public class OzoneAcl {
 
   public static OzoneAcl fromProtobuf(OzoneAclInfo protoAcl) {
     BitSet aclRights = BitSet.valueOf(protoAcl.getRights().toByteArray());
-    return new OzoneAcl(ACLIdentityType.valueOf(protoAcl.getType().name()),
-        protoAcl.getName(), aclRights,
-        AclScope.valueOf(protoAcl.getAclScope().name()));
+    return new OzoneAcl(ACLIdentityType.valueOf(protoAcl.getType().name()), protoAcl.getName(),
+        AclScope.valueOf(protoAcl.getAclScope().name()), validateAndCopy(aclRights));
   }
 
   public AclScope getAclScope() {

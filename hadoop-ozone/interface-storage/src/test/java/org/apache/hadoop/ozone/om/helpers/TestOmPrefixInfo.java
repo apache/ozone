@@ -77,7 +77,7 @@ public class TestOmPrefixInfo {
     return new OmPrefixInfo(path,
         new ArrayList<>(Collections.singletonList(new OzoneAcl(
             identityType, identityString,
-            aclType, scope))), new HashMap<>(), 10, 100);
+            scope, aclType))), new HashMap<>(), 10, 100);
   }
 
 
@@ -98,7 +98,7 @@ public class TestOmPrefixInfo {
     // Change acls and check.
     omPrefixInfo.addAcl(new OzoneAcl(
         IAccessAuthorizer.ACLIdentityType.USER, username,
-        IAccessAuthorizer.ACLType.READ, ACCESS));
+        ACCESS, IAccessAuthorizer.ACLType.READ));
 
     assertNotEquals(omPrefixInfo, clonePrefixInfo);
 

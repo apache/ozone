@@ -19,6 +19,7 @@
 package org.apache.hadoop.fs.contract;
 
 import org.assertj.core.api.Assertions;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
@@ -38,6 +39,7 @@ public abstract class AbstractContractUnbufferTest extends AbstractFSContractTes
   private Path file;
   private byte[] fileBytes;
 
+  @BeforeEach
   @Override
   public void setup() throws Exception {
     super.setup();
