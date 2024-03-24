@@ -101,18 +101,18 @@ public class DiskUsageSubCommand implements Callable {
 
     JsonNode duResponse = JsonUtils.readTree(response);
 
-    if (duResponse.get("status").asText().equals("PATH_NOT_FOUND")) {
+    if ("PATH_NOT_FOUND".equals(duResponse.path("status").asText(""))) {
       printPathNotFound();
     } else {
       if (parent.isNotValidBucketOrOBSBucket(path)) {
         printBucketReminder();
       }
 
-      long totalSize = duResponse.get("size").asLong();
+      long totalSize = duResponse.path("size").asLong(-1);
       if (!noHeader) {
         printWithUnderline("Path", false);
         printKVSeparator();
-        System.out.println(duResponse.get("path").asText());
+        System.out.println(duResponse.path("path").asText(""));
 
         printWithUnderline("Total Size", false);
         printKVSeparator();
@@ -121,11 +121,11 @@ public class DiskUsageSubCommand implements Callable {
         if (withReplica) {
           printWithUnderline("Total Disk Usage", false);
           printKVSeparator();
-          long du = duResponse.get("sizeWithReplica").asLong();
+          long du = duResponse.path("sizeWithReplica").asLong(-1);
           System.out.println(FileUtils.byteCountToDisplaySize(du));
         }
 
-        long sizeDirectKey = duResponse.get("sizeDirectKey").asLong();
+        long sizeDirectKey = duResponse.path("sizeDirectKey").asLong(-1);
         if (!listFiles && sizeDirectKey != -1) {
           printWithUnderline("Size of Direct Keys", false);
           printKVSeparator();
@@ -134,7 +134,7 @@ public class DiskUsageSubCommand implements Callable {
         printNewLines(1);
       }
 
-      if (duResponse.get("subPathCount").asInt() == 0) {
+      if (duResponse.path("subPathCount").asInt(-1) == 0) {
         if (totalSize == 0) {
           // the object is empty
           System.out.println("The object is empty.\n" +
@@ -157,19 +157,19 @@ public class DiskUsageSubCommand implements Callable {
           seekStr = "";
         }
 
-        ArrayNode subPaths = (ArrayNode) duResponse.get("subPaths");
+        ArrayNode subPaths = (ArrayNode) duResponse.path("subPaths");
         int cnt = 0;
         for (JsonNode subPathDU : subPaths) {
           if (cnt >= limit) {
             break;
           }
-          String subPath = subPathDU.get("path").asText();
+          String subPath = subPathDU.path("path").asText("");
           // differentiate key from other types
-          if (!subPathDU.get("isKey").asBoolean()) {
+          if (!subPathDU.path("isKey").asBoolean(false)) {
             subPath += OM_KEY_PREFIX;
           }
-          long size = subPathDU.get("size").asLong();
-          long sizeWithReplica = subPathDU.get("sizeWithReplica").asLong();
+          long size = subPathDU.path("size").asLong(-1);
+          long sizeWithReplica = subPathDU.path("sizeWithReplica").asLong(-1);
           if (subPath.startsWith(seekStr)) {
             printDURow(subPath, size, sizeWithReplica);
             ++cnt;
