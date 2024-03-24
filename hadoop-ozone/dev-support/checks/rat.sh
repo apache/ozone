@@ -24,13 +24,7 @@ mkdir -p "$REPORT_DIR"
 
 REPORT_FILE="$REPORT_DIR/summary.txt"
 
-dirs="hadoop-hdds hadoop-ozone"
-
-for d in $dirs; do
-  pushd "$d" || exit 1
-  mvn -B --no-transfer-progress -fn org.apache.rat:apache-rat-plugin:0.13:check
-  popd
-done
+mvn -B --no-transfer-progress -fn org.apache.rat:apache-rat-plugin:check "$@"
 
 grep -r --include=rat.txt "!????" $dirs | tee "$REPORT_FILE"
 

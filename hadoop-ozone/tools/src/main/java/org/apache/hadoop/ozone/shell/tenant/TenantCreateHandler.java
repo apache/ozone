@@ -17,9 +17,8 @@
  */
 package org.apache.hadoop.ozone.shell.tenant;
 
-import com.google.gson.Gson;
-import com.google.gson.GsonBuilder;
-import com.google.gson.JsonObject;
+import com.fasterxml.jackson.databind.node.ObjectNode;
+import org.apache.hadoop.hdds.server.JsonUtils;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.TenantArgs;
 import org.apache.hadoop.ozone.shell.OzoneAddress;
@@ -58,11 +57,11 @@ public class TenantCreateHandler extends TenantHandler {
     // RpcClient#createTenant prints INFO level log of tenant and volume name
 
     if (isVerbose()) {
-      final JsonObject obj = new JsonObject();
-      obj.addProperty("tenantId", tenantId);
-      final Gson gson = new GsonBuilder().setPrettyPrinting().create();
-      out().println(gson.toJson(obj));
-    }
+      ObjectNode obj = JsonUtils.createObjectNode(null);
+      obj.put("tenantId", tenantId);
 
+      String jsonString = JsonUtils.toJsonStringWithDefaultPrettyPrinter(obj);
+      out().println(jsonString);
+    }
   }
 }

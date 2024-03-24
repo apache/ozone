@@ -52,6 +52,9 @@ public class ContainerMetrics {
   @Metric private MutableCounterLong containerDeleteFailedNonEmpty;
   @Metric private MutableCounterLong containerDeleteFailedBlockCountNotZero;
   @Metric private MutableCounterLong containerForceDelete;
+  @Metric private MutableCounterLong numReadStateMachine;
+  @Metric private MutableCounterLong bytesReadStateMachine;
+
 
   private MutableCounterLong[] numOpsArray;
   private MutableCounterLong[] opsBytesArray;
@@ -151,5 +154,21 @@ public class ContainerMetrics {
 
   public long getContainerForceDelete() {
     return containerForceDelete.value();
+  }
+
+  public void incNumReadStateMachine() {
+    numReadStateMachine.incr();
+  }
+
+  public long getNumReadStateMachine() {
+    return numReadStateMachine.value();
+  }
+
+  public void incBytesReadStateMachine(long bytes) {
+    bytesReadStateMachine.incr(bytes);
+  }
+
+  public long getBytesReadStateMachine() {
+    return bytesReadStateMachine.value();
   }
 }

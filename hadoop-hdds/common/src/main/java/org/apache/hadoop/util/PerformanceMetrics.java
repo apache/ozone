@@ -65,7 +65,7 @@ public class PerformanceMetrics {
    * @param valueName value name
    * @param intervals intervals for quantiles
    */
-  PerformanceMetrics(
+  public PerformanceMetrics(
       MetricsRegistry registry, String name, String description,
       String sampleName, String valueName, int[] intervals) {
     stat = registry.newStat(name, description, sampleName, valueName, false);
