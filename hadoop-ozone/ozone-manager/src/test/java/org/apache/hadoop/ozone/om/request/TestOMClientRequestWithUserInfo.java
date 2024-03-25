@@ -25,8 +25,7 @@ import java.nio.file.Path;
 import java.util.UUID;
 
 import io.grpc.Context;
-import mockit.Mock;
-import mockit.MockUp;
+import org.apache.hadoop.ipc.Server;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.request.key.OMKeyCommitRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.BucketInfo;
@@ -37,7 +36,6 @@ import org.junit.jupiter.api.io.TempDir;
 import org.mockito.MockedStatic;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.ipc.ProtobufRpcEngine;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OMMetrics;
@@ -89,54 +87,46 @@ public class TestOMClientRequestWithUserInfo {
 
   @Test
   public void testUserInfoInCaseOfHadoopTransport() throws Exception {
-    new MockUp<ProtobufRpcEngine.Server>() {
-      @Mock
-      public UserGroupInformation getRemoteUser() {
-        return userGroupInformation;
-      }
+    try (MockedStatic<Server> mockedRpcServer =
+             mockStatic(Server.class)) {
 
-      @Mock
-      public InetAddress getRemoteIp() {
-        return inetAddress;
-      }
+      mockedRpcServer.when(Server::getRemoteUser).thenReturn(userGroupInformation);
+      mockedRpcServer.when(Server::getRemoteIp).thenReturn(inetAddress);
+      mockedRpcServer.when(Server::getRemoteAddress).thenReturn(inetAddress.toString());
 
-      public InetAddress getRemoteAddress() {
-        return inetAddress;
-      }
-    };
+      String bucketName = UUID.randomUUID().toString();
+      String volumeName = UUID.randomUUID().toString();
+      BucketInfo.Builder bucketInfo =
+          newBucketInfoBuilder(bucketName, volumeName)
+              .setIsVersionEnabled(true)
+              .setStorageType(OzoneManagerProtocolProtos.StorageTypeProto.DISK);
+      OMRequest omRequest = newCreateBucketRequest(bucketInfo).build();
 
-    String bucketName = UUID.randomUUID().toString();
-    String volumeName = UUID.randomUUID().toString();
-    BucketInfo.Builder bucketInfo =
-        newBucketInfoBuilder(bucketName, volumeName)
-            .setIsVersionEnabled(true)
-            .setStorageType(OzoneManagerProtocolProtos.StorageTypeProto.DISK);
-    OMRequest omRequest = newCreateBucketRequest(bucketInfo).build();
+      OMBucketCreateRequest omBucketCreateRequest =
+          new OMBucketCreateRequest(omRequest);
 
-    OMBucketCreateRequest omBucketCreateRequest =
-        new OMBucketCreateRequest(omRequest);
+      assertFalse(omRequest.hasUserInfo());
 
-    assertFalse(omRequest.hasUserInfo());
+      OMRequest modifiedRequest =
+          omBucketCreateRequest.preExecute(ozoneManager);
 
-    OMRequest modifiedRequest =
-        omBucketCreateRequest.preExecute(ozoneManager);
+      assertTrue(modifiedRequest.hasUserInfo());
 
-    assertTrue(modifiedRequest.hasUserInfo());
+      // Now pass modified request to OMBucketCreateRequest and check ugi and
+      // remote Address.
+      omBucketCreateRequest = new OMBucketCreateRequest(modifiedRequest);
 
-    // Now pass modified request to OMBucketCreateRequest and check ugi and
-    // remote Address.
-    omBucketCreateRequest = new OMBucketCreateRequest(modifiedRequest);
-
-    InetAddress remoteAddress = omBucketCreateRequest.getRemoteAddress();
-    UserGroupInformation ugi = omBucketCreateRequest.createUGI();
-    String hostName = omBucketCreateRequest.getHostName();
+      InetAddress remoteAddress = omBucketCreateRequest.getRemoteAddress();
+      UserGroupInformation ugi = omBucketCreateRequest.createUGI();
+      String hostName = omBucketCreateRequest.getHostName();
 
 
-    // Now check we have original user info, remote address and hostname or not.
-    // Here from OMRequest user info, converted to UGI, InetAddress and String.
-    assertEquals(inetAddress.getHostAddress(), remoteAddress.getHostAddress());
-    assertEquals(userGroupInformation.getUserName(), ugi.getUserName());
-    assertEquals(inetAddress.getHostName(), hostName);
+      // Now check we have original user info, remote address and hostname or not.
+      // Here from OMRequest user info, converted to UGI, InetAddress and String.
+      assertEquals(inetAddress.getHostAddress(), remoteAddress.getHostAddress());
+      assertEquals(userGroupInformation.getUserName(), ugi.getUserName());
+      assertEquals(inetAddress.getHostName(), hostName);
+    }
   }
 
   @Test

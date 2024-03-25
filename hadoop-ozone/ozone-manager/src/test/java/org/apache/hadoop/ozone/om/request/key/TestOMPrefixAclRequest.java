@@ -50,7 +50,7 @@ public class TestOMPrefixAclRequest extends TestOMKeyRequest {
 
   @Test
   public void testAddAclRequest() throws Exception {
-    PrefixManagerImpl prefixManager = new PrefixManagerImpl(
+    PrefixManagerImpl prefixManager = new PrefixManagerImpl(ozoneManager,
         ozoneManager.getMetadataManager(), true);
     when(ozoneManager.getPrefixManager()).thenReturn(prefixManager);
     String prefixName = UUID.randomUUID() + OZONE_URI_DELIMITER;
@@ -116,7 +116,7 @@ public class TestOMPrefixAclRequest extends TestOMKeyRequest {
 
   @Test
   public void testValidationFailure() {
-    PrefixManagerImpl prefixManager = new PrefixManagerImpl(
+    PrefixManagerImpl prefixManager = new PrefixManagerImpl(ozoneManager,
         ozoneManager.getMetadataManager(), true);
     when(ozoneManager.getPrefixManager()).thenReturn(prefixManager);
 
@@ -128,7 +128,7 @@ public class TestOMPrefixAclRequest extends TestOMKeyRequest {
     );
     OMClientResponse response1 =
         invalidRequest1.validateAndUpdateCache(ozoneManager, 1);
-    assertEquals(OzoneManagerProtocolProtos.Status.PREFIX_NOT_FOUND,
+    assertEquals(OzoneManagerProtocolProtos.Status.INVALID_PATH_IN_ACL_REQUEST,
         response1.getOMResponse().getStatus());
 
     // Not a valid FS path
@@ -143,7 +143,7 @@ public class TestOMPrefixAclRequest extends TestOMKeyRequest {
 
   @Test
   public void testRemoveAclRequest() throws Exception {
-    PrefixManagerImpl prefixManager = new PrefixManagerImpl(
+    PrefixManagerImpl prefixManager = new PrefixManagerImpl(ozoneManager,
         ozoneManager.getMetadataManager(), true);
     when(ozoneManager.getPrefixManager()).thenReturn(prefixManager);
     String prefixName = UUID.randomUUID() + OZONE_URI_DELIMITER;
@@ -223,7 +223,7 @@ public class TestOMPrefixAclRequest extends TestOMKeyRequest {
 
   @Test
   public void testSetAclRequest() throws Exception {
-    PrefixManagerImpl prefixManager = new PrefixManagerImpl(
+    PrefixManagerImpl prefixManager = new PrefixManagerImpl(ozoneManager,
         ozoneManager.getMetadataManager(), true);
     when(ozoneManager.getPrefixManager()).thenReturn(prefixManager);
     String prefixName = UUID.randomUUID() + OZONE_URI_DELIMITER;

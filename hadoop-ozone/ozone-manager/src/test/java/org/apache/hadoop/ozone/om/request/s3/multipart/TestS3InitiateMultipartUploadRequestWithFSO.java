@@ -256,7 +256,7 @@ public class TestS3InitiateMultipartUploadRequestWithFSO
         List<OzoneAcl> fileAcls = fileInfo.getAcls();
         System.out.println("  file acls : " + fileInfo + " ==> " + fileAcls);
         assertEquals(expectedInheritAcls.stream()
-                .map(acl -> acl.setAclScope(OzoneAcl.AclScope.ACCESS))
+                .map(acl -> acl.withScope(OzoneAcl.AclScope.ACCESS))
                 .collect(Collectors.toList()), fileAcls,
             "Failed to inherit parent DEFAULT acls!");
       }

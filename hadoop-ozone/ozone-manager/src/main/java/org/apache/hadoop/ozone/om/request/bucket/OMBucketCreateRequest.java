@@ -67,6 +67,7 @@ import java.nio.file.InvalidPathException;
 import java.util.ArrayList;
 import java.util.List;
 
+import static org.apache.hadoop.ozone.OzoneAcl.AclScope.ACCESS;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.BUCKET_ALREADY_EXISTS;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.VOLUME_NOT_FOUND;
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.BUCKET_LOCK;
@@ -330,7 +331,7 @@ public class OMBucketCreateRequest extends OMClientRequest {
 
     // Add default acls from volume.
     List<OzoneAcl> defaultVolumeAcls = omVolumeArgs.getDefaultAcls();
-    OzoneAclUtil.inheritDefaultAcls(acls, defaultVolumeAcls);
+    OzoneAclUtil.inheritDefaultAcls(acls, defaultVolumeAcls, ACCESS);
     omBucketInfo.setAcls(acls);
   }
 

@@ -437,6 +437,7 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
       if (startDataNodes) {
         cluster.startHddsDatanodes();
       }
+      prepareForNextBuild();
       return cluster;
     }
 

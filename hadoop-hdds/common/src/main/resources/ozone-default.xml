@@ -1914,7 +1914,14 @@
       Setting this interval equal to the metrics sampling time ensures more detailed metrics.
     </description>
   </property>
-
+  <property>
+    <name>ozone.xceiver.client.metrics.percentiles.intervals.seconds</name>
+    <value>60</value>
+    <tag>XCEIVER, PERFORMANCE</tag>
+    <description>Specifies the interval in seconds for the rollover of XceiverClient MutableQuantiles metrics.
+      Setting this interval equal to the metrics sampling time ensures more detailed metrics.
+    </description>
+  </property>
   <property>
     <name>ozone.om.save.metrics.interval</name>
     <value>5m</value>
@@ -3790,6 +3797,14 @@
     <tag>SCM, OZONE, RECON</tag>
     <description>Wait duration before which close container
       is send to DN.</description>
+  </property>
+  <property>
+    <name>ozone.om.network.topology.refresh.duration</name>
+    <value>1h</value>
+    <tag>SCM, OZONE, OM</tag>
+    <description>The duration at which we periodically fetch the updated network
+      topology cluster tree from SCM.
+    </description>
   </property>
   <property>
     <name>ozone.scm.ha.ratis.server.snapshot.creation.gap</name>
