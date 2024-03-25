@@ -359,6 +359,8 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   private CertificateClient certClient;
   private SecretKeySignerClient secretKeyClient;
   private ScmTopologyClient scmTopologyClient;
+  private NetworkTopology clusterMap;
+  private InnerNode clusterTree;
   private final Text omRpcAddressTxt;
   private OzoneConfiguration configuration;
   private RPC.Server omRpcServer;
@@ -1155,11 +1157,15 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   }
 
   public NetworkTopology getClusterMap() {
-    InnerNode currentTree = scmTopologyClient.getClusterTree();
-    return new NetworkTopologyImpl(configuration.get(
-        ScmConfigKeys.OZONE_SCM_NETWORK_TOPOLOGY_SCHEMA_FILE,
-        ScmConfigKeys.OZONE_SCM_NETWORK_TOPOLOGY_SCHEMA_FILE_DEFAULT),
-        currentTree);
+    InnerNode fetchedTree = scmTopologyClient.getClusterTree();
+    if (!clusterTree.equals(fetchedTree)) {
+      clusterTree = fetchedTree;
+      clusterMap = new NetworkTopologyImpl(configuration.get(
+          ScmConfigKeys.OZONE_SCM_NETWORK_TOPOLOGY_SCHEMA_FILE,
+          ScmConfigKeys.OZONE_SCM_NETWORK_TOPOLOGY_SCHEMA_FILE_DEFAULT),
+          clusterTree);
+    }
+    return clusterMap;
   }
 
   /**
@@ -1704,6 +1710,12 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       LOG.error("Unable to initialize network topology schema file. ", ex);
       throw new UncheckedIOException(ex);
     }
+
+    clusterTree = scmTopologyClient.getClusterTree();
+    clusterMap = new NetworkTopologyImpl(configuration.get(
+        ScmConfigKeys.OZONE_SCM_NETWORK_TOPOLOGY_SCHEMA_FILE,
+        ScmConfigKeys.OZONE_SCM_NETWORK_TOPOLOGY_SCHEMA_FILE_DEFAULT),
+        clusterTree);
 
     keyManager.start(configuration);
 
