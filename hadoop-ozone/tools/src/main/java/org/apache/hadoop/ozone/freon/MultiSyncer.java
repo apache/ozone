@@ -148,12 +148,9 @@ public class MultiSyncer extends BaseFreonGenerator
       while (!shutdown.get()) {
         try {
           output.hsync();
-          //Thread.sleep(0, 1000 * 10);
         } catch (IOException e) {
           throw new RuntimeException(e);
-        }/* catch (InterruptedException e) {
-          throw new RuntimeException(e);
-        }*/
+        }
       }
     };
 
