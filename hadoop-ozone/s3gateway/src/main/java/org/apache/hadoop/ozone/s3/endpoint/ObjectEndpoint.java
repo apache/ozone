@@ -311,7 +311,7 @@ public class ObjectEndpoint extends EndpointBase {
         perf.appendStreamMode();
         Pair<String, Long> keyWriteResult = ObjectEndpointStreaming
             .put(bucket, keyPath, length, replicationConfig, chunkSize,
-                customMetadata, (DigestInputStream) digestInputStream, perf);
+                customMetadata, digestInputStream, perf);
         eTag = keyWriteResult.getKey();
         putLength = keyWriteResult.getValue();
       } else {
