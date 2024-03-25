@@ -107,7 +107,6 @@ public class MultiSyncer extends BaseFreonGenerator
     fileSystem.mkdirs(file.getParent());
 
     timer = getMetrics().timer("file-create");
-
     runTests(this::createFile);
 
     fileSystem.close();
@@ -149,12 +148,12 @@ public class MultiSyncer extends BaseFreonGenerator
       while (!shutdown.get()) {
         try {
           output.hsync();
-          Thread.sleep(0, 1000 * 10);
+          //Thread.sleep(0, 1000 * 10);
         } catch (IOException e) {
           throw new RuntimeException(e);
-        } catch (InterruptedException e) {
+        }/* catch (InterruptedException e) {
           throw new RuntimeException(e);
-        }
+        }*/
       }
     };
 
