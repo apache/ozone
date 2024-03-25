@@ -367,6 +367,7 @@ public class ObjectEndpoint extends EndpointBase {
       }
       throw ex;
     } finally {
+      ((DigestInputStream) body).getMessageDigest().reset();
       if (auditSuccess) {
         long opLatencyNs = getMetrics().updateCreateKeySuccessStats(startNanos);
         perf.appendOpLatencyNanos(opLatencyNs);
@@ -1122,21 +1123,20 @@ public class ObjectEndpoint extends EndpointBase {
   }
 
   @SuppressWarnings("checkstyle:ParameterNumber")
-  void copy(OzoneVolume volume, InputStream src, long srcKeyLen,
+  void copy(OzoneVolume volume, DigestInputStream src, long srcKeyLen,
       String destKey, String destBucket,
       ReplicationConfig replication,
       Map<String, String> metadata,
       PerformanceStringBuilder perf, long startNanos)
       throws IOException {
     long copyLength;
-    src = new DigestInputStream(src, E_TAG_PROVIDER.get());
     if (datastreamEnabled && !(replication != null &&
         replication.getReplicationType() == EC) &&
         srcKeyLen > datastreamMinLength) {
       perf.appendStreamMode();
       copyLength = ObjectEndpointStreaming
           .copyKeyWithStream(volume.getBucket(destBucket), destKey, srcKeyLen,
-              chunkSize, replication, metadata, (DigestInputStream) src, perf, startNanos);
+              chunkSize, replication, metadata, src, perf, startNanos);
     } else {
       try (OzoneOutputStream dest = getClientProtocol()
           .createKey(volume.getName(), destBucket, destKey, srcKeyLen,
@@ -1145,9 +1145,7 @@ public class ObjectEndpoint extends EndpointBase {
             getMetrics().updateCopyKeyMetadataStats(startNanos);
         perf.appendMetaLatencyNanos(metadataLatencyNs);
         copyLength = IOUtils.copyLarge(src, dest);
-        String eTag = DatatypeConverter.printHexBinary(
-                ((DigestInputStream) src).getMessageDigest().digest())
-            .toLowerCase();
+        String eTag = DatatypeConverter.printHexBinary(src.getMessageDigest().digest()).toLowerCase();
         dest.getMetadata().put(ETAG, eTag);
       }
     }
@@ -1166,6 +1164,7 @@ public class ObjectEndpoint extends EndpointBase {
 
     String sourceBucket = result.getLeft();
     String sourceKey = result.getRight();
+    DigestInputStream sourceDigestInputStream = null;
     try {
       OzoneKeyDetails sourceKeyDetails = getClientProtocol().getKeyDetails(
           volume.getName(), sourceBucket, sourceKey);
@@ -1195,11 +1194,11 @@ public class ObjectEndpoint extends EndpointBase {
         }
       }
       long sourceKeyLen = sourceKeyDetails.getDataSize();
-
       try (OzoneInputStream src = getClientProtocol().getKey(volume.getName(),
           sourceBucket, sourceKey)) {
         getMetrics().updateCopyKeyMetadataStats(startNanos);
-        copy(volume, src, sourceKeyLen, destkey, destBucket, replicationConfig,
+        sourceDigestInputStream = new DigestInputStream(src, E_TAG_PROVIDER.get());
+        copy(volume, sourceDigestInputStream, sourceKeyLen, destkey, destBucket, replicationConfig,
                 sourceKeyDetails.getMetadata(), perf, startNanos);
       }
 
@@ -1221,6 +1220,10 @@ public class ObjectEndpoint extends EndpointBase {
             destBucket + "/" + destkey, ex);
       }
       throw ex;
+    } finally {
+      if (sourceDigestInputStream != null) {
+        sourceDigestInputStream.getMessageDigest().reset();
+      }
     }
   }
 
