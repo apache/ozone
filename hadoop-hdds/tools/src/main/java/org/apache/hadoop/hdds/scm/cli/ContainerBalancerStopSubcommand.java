@@ -34,8 +34,8 @@ import java.io.IOException;
 public class ContainerBalancerStopSubcommand extends ScmSubcommand {
   @Override
   public void execute(ScmClient scmClient) throws IOException {
-    System.out.println("ContainerBalancer is in stopping state. Waiting for current iteration to finish");
+    System.out.println("ContainerBalancer is in stopping state. Waiting for current iteration to finish...");
     scmClient.stopContainerBalancer();
-    System.out.println("Stopping ContainerBalancer...");
+    System.out.println("ContainerBalancer stopped.");
   }
 }

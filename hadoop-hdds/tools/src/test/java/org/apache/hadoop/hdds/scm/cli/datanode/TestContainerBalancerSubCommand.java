@@ -105,8 +105,9 @@ public class TestContainerBalancerSubCommand {
     stopCmd.execute(scmClient);
 
     Pattern p = Pattern.compile("^ContainerBalancer\\sis\\sin\\sstopping\\sstate." +
-            "\\sWaiting\\sfor\\scurrent\\siteration\\sto\\sfinish\\n" +
-            "Stopping\\sContainerBalancer...");
+            "\\sWaiting\\sfor\\scurrent\\siteration\\sto\\sfinish...\\n" +
+            "ContainerBalancer\\sstopped.");
+
     Matcher m = p.matcher(outContent.toString(DEFAULT_ENCODING));
     assertTrue(m.find());
   }
