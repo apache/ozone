@@ -1184,9 +1184,12 @@ public class TestContainerBalancerTask {
 
     LOG.info("tej source dns: " + containerBalancerTask.getSourceInPotentialSources());
 
-    /*assertTrue(containerBalancerTask.checkSourceInPotentialSources(nodesInCluster.get(firstIncludeIndex).getDatanodeDetails()));
-    assertTrue(containerBalancerTask.checkSourceInPotentialSources(nodesInCluster.get(secondIncludeIndex).getDatanodeDetails()));
-    assertTrue(containerBalancerTask.checkSourceInPotentialSources(nodesInCluster.get(thirdIncludeIndex).getDatanodeDetails()));
+    /*assertTrue(containerBalancerTask.checkSourceInPotentialSources(nodesInCluster.get(firstIncludeIndex)
+    .getDatanodeDetails()));
+    assertTrue(containerBalancerTask.checkSourceInPotentialSources(nodesInCluster.get(secondIncludeIndex)
+    .getDatanodeDetails()));
+    assertTrue(containerBalancerTask.checkSourceInPotentialSources(nodesInCluster.get(thirdIncludeIndex)
+    .getDatanodeDetails()));
 */
     stopBalancer(); // -> doesn't do anything
   }
