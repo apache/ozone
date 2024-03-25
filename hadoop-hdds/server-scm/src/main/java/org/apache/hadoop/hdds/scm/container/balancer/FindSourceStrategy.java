@@ -49,8 +49,12 @@ public interface FindSourceStrategy {
   /**
    * add the specified data node to the candidate source
    * data nodes.
+   * Caller of this method must ensure that Datanode is
+   * not currently a candidate source
+   *
+   * @param dn datanode to be added to potentialSources
    */
-  void addBackSourceDataNode(DatanodeDetails dui);
+  void addBackSourceDataNode(DatanodeDetails dn);
 
   /**
    * increase the Leaving size of a candidate source data node.

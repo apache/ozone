@@ -554,7 +554,8 @@ public class ContainerBalancerTask implements Runnable {
           containerToSourceMap.get(containerID),
           containerToTargetMap.get(containerID));
       // add source back to queue as a different container can be selected in next run.
-      //findSourceStrategy.addBackSourceDataNode(source);
+      findSourceStrategy.addBackSourceDataNode(source);
+      selectionCriteria.addToExcludeDueToFailContainers(moveSelection.getContainerID());
       return false;
     }
 
@@ -566,7 +567,8 @@ public class ContainerBalancerTask implements Runnable {
       LOG.warn("Could not get container {} from Container Manager before " +
           "starting a container move", containerID, e);
       // add source back to queue as a different container can be selected in next run.
-      //findSourceStrategy.addBackSourceDataNode(source);
+      findSourceStrategy.addBackSourceDataNode(source);
+      selectionCriteria.addToExcludeDueToFailContainers(moveSelection.getContainerID());
       return false;
     }
     LOG.info("ContainerBalancer is trying to move container {} with size " +
@@ -860,14 +862,6 @@ public class ContainerBalancerTask implements Runnable {
                     " {} failed: {}",
                 moveSelection.getContainerID(), source.getUuidString(),
                 moveSelection.getTargetNode().getUuidString(), result);
-            // add source back if move failed due to container related errors
-            if (result == MoveManager.MoveResult.REPLICATION_FAIL_NOT_EXIST_IN_SOURCE ||
-                result == MoveManager.MoveResult.REPLICATION_FAIL_EXIST_IN_TARGET ||
-                result == MoveManager.MoveResult.REPLICATION_FAIL_CONTAINER_NOT_CLOSED ||
-                result == MoveManager.MoveResult.REPLICATION_FAIL_INFLIGHT_DELETION ||
-                result == MoveManager.MoveResult.REPLICATION_FAIL_INFLIGHT_REPLICATION) {
-              //findSourceStrategy.addBackSourceDataNode(source);
-            }
           }
         }
       });
@@ -875,7 +869,8 @@ public class ContainerBalancerTask implements Runnable {
       LOG.warn("Could not find Container {} for container move",
           containerID, e);
       // add source back to queue
-      //findSourceStrategy.addBackSourceDataNode(source);
+      findSourceStrategy.addBackSourceDataNode(source);
+      selectionCriteria.addToExcludeDueToFailContainers(moveSelection.getContainerID());
       metrics.incrementNumContainerMovesFailedInLatestIteration(1);
       return false;
     } catch (NodeNotFoundException | TimeoutException e) {
@@ -886,7 +881,8 @@ public class ContainerBalancerTask implements Runnable {
       LOG.warn("Container move failed for container {}", containerID, e);
       metrics.incrementNumContainerMovesFailedInLatestIteration(1);
       // add source back to queue for replica not found only
-      //findSourceStrategy.addBackSourceDataNode(source);
+      findSourceStrategy.addBackSourceDataNode(source);
+      selectionCriteria.addToExcludeDueToFailContainers(moveSelection.getContainerID());
       return false;
     }
 
@@ -900,6 +896,14 @@ public class ContainerBalancerTask implements Runnable {
       } else {
         MoveManager.MoveResult result = future.join();
         moveSelectionToFutureMap.put(moveSelection, future);
+        if (result == MoveManager.MoveResult.REPLICATION_FAIL_NOT_EXIST_IN_SOURCE ||
+            result == MoveManager.MoveResult.REPLICATION_FAIL_EXIST_IN_TARGET ||
+            result == MoveManager.MoveResult.REPLICATION_FAIL_CONTAINER_NOT_CLOSED ||
+            result == MoveManager.MoveResult.REPLICATION_FAIL_INFLIGHT_DELETION ||
+            result == MoveManager.MoveResult.REPLICATION_FAIL_INFLIGHT_REPLICATION) {
+          findSourceStrategy.addBackSourceDataNode(source);
+          selectionCriteria.addToExcludeDueToFailContainers(moveSelection.getContainerID());
+        }
         return result == MoveManager.MoveResult.COMPLETED;
       }
     } else {
@@ -1144,6 +1148,12 @@ public class ContainerBalancerTask implements Runnable {
   @VisibleForTesting
   void setTaskStatus(Status taskStatus) {
     this.taskStatus = taskStatus;
+  }
+
+  @VisibleForTesting
+  List<DatanodeUsageInfo> getSourceInPotentialSources() {
+    List<DatanodeUsageInfo> sources = findSourceStrategy.getPotentialSources();
+    return sources;
   }
 
   @VisibleForTesting
