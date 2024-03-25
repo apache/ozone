@@ -17,7 +17,6 @@
  */
 package org.apache.hadoop.hdds.utils.db.managed;
 
-import org.rocksdb.util.Environment;
 
 import java.io.IOException;
 import java.io.OutputStreamWriter;
