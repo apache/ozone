@@ -75,7 +75,6 @@ CORE-SITE.XML_hadoop.security.authorization=false
 #BYTEMAN_SCRIPT_URL=https://raw.githubusercontent.com/apache/hadoop/trunk/dev-support/byteman/hadooprpc.btm
 
 OZONE_DATANODE_SECURE_USER=root
-JAVA_HOME=/usr/lib/jvm/jre
 JSVC_HOME=/usr/bin
 
 OZONE_CLASSPATH=
