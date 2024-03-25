@@ -21,6 +21,7 @@ import java.net.URI;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import com.google.common.annotations.VisibleForTesting;
@@ -133,14 +134,13 @@ public class MultiSyncer extends BaseFreonGenerator
 
         shutdown.set(true);
         executor.shutdown();
+        executor.awaitTermination(10, TimeUnit.SECONDS);
       }
       return null;
     });
   }
 
   void startSyncer(ExecutorService executor, FSDataOutputStream output, AtomicBoolean shutdown) {
-
-
     // Create a Runnable task
     Runnable task = () -> {
       // Continuous task to be executed
