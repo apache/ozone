@@ -110,6 +110,8 @@ public class MultiSyncer extends BaseFreonGenerator
 
     runTests(this::createFile);
 
+    fileSystem.close();
+
     return null;
   }
 
