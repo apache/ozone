@@ -367,6 +367,8 @@ public class ObjectEndpoint extends EndpointBase {
       }
       throw ex;
     } finally {
+      // Reset the thread-local message digest instance in case of exception
+      // and MessageDigest#digest is never called
       ((DigestInputStream) body).getMessageDigest().reset();
       if (auditSuccess) {
         long opLatencyNs = getMetrics().updateCreateKeySuccessStats(startNanos);
@@ -1221,6 +1223,8 @@ public class ObjectEndpoint extends EndpointBase {
       }
       throw ex;
     } finally {
+      // Reset the thread-local message digest instance in case of exception
+      // and MessageDigest#digest is never called
       if (sourceDigestInputStream != null) {
         sourceDigestInputStream.getMessageDigest().reset();
       }
