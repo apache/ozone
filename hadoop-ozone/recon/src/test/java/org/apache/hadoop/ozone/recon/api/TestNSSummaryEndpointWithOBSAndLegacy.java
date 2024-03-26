@@ -33,6 +33,7 @@ import org.apache.hadoop.hdds.scm.container.ContainerNotFoundException;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.container.placement.metrics.SCMNodeStat;
 import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
+import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
@@ -875,6 +876,34 @@ public class TestNSSummaryEndpointWithOBSAndLegacy {
       assertEquals(0, fileSizeDist[i]);
     }
   }
+
+  @Test
+  public void testNormalizePathUptilBucket_AllScenarios() {
+    // Test null or empty path
+    assertEquals("/", OmUtils.normalizePathUptilBucket(null));
+    assertEquals("/", OmUtils.normalizePathUptilBucket(""));
+
+    // Test path with leading slashes
+    assertEquals("volume1/bucket1/key1/key2",
+        OmUtils.normalizePathUptilBucket("///volume1/bucket1/key1/key2"));
+
+    // Test volume and bucket names
+    assertEquals("volume1/bucket1",
+        OmUtils.normalizePathUptilBucket("volume1/bucket1"));
+
+    // Test with additional segments
+    assertEquals("volume1/bucket1/key1/key2",
+        OmUtils.normalizePathUptilBucket("volume1/bucket1/key1/key2"));
+
+    // Test path with multiple slashes in key names.
+    assertEquals("volume1/bucket1/key1//key2",
+        OmUtils.normalizePathUptilBucket("volume1/bucket1/key1//key2"));
+
+    // Test path with volume, bucket, and special characters in keys
+    assertEquals("volume/bucket/key$%#1/./////////key$%#2",
+        OmUtils.normalizePathUptilBucket("volume/bucket/key$%#1/./////////key$%#2"));
+  }
+
 
   /**
    * Testing the following case.
