@@ -299,10 +299,10 @@ public class ObjectEndpoint extends EndpointBase {
       if ("STREAMING-AWS4-HMAC-SHA256-PAYLOAD"
           .equals(headers.getHeaderString("x-amz-content-sha256"))) {
         digestInputStream = new DigestInputStream(new SignedChunksInputStream(body),
-            E_TAG_PROVIDER.get());
+            getMessageDigestInstance());
         length = Long.parseLong(amzDecodedLength);
       } else {
-        digestInputStream = new DigestInputStream(body, E_TAG_PROVIDER.get());
+        digestInputStream = new DigestInputStream(body, getMessageDigestInstance());
       }
 
       long putLength;
@@ -895,11 +895,11 @@ public class ObjectEndpoint extends EndpointBase {
       if ("STREAMING-AWS4-HMAC-SHA256-PAYLOAD"
           .equals(headers.getHeaderString("x-amz-content-sha256"))) {
         digestInputStream = new DigestInputStream(new SignedChunksInputStream(body),
-            E_TAG_PROVIDER.get());
+            getMessageDigestInstance());
         length = Long.parseLong(
             headers.getHeaderString(DECODED_CONTENT_LENGTH_HEADER));
       } else {
-        digestInputStream = new DigestInputStream(body, E_TAG_PROVIDER.get());
+        digestInputStream = new DigestInputStream(body, getMessageDigestInstance());
       }
 
       copyHeader = headers.getHeaderString(COPY_SOURCE_HEADER);
@@ -1209,7 +1209,7 @@ public class ObjectEndpoint extends EndpointBase {
       try (OzoneInputStream src = getClientProtocol().getKey(volume.getName(),
           sourceBucket, sourceKey)) {
         getMetrics().updateCopyKeyMetadataStats(startNanos);
-        sourceDigestInputStream = new DigestInputStream(src, E_TAG_PROVIDER.get());
+        sourceDigestInputStream = new DigestInputStream(src, getMessageDigestInstance());
         copy(volume, sourceDigestInputStream, sourceKeyLen, destkey, destBucket, replicationConfig,
                 sourceKeyDetails.getMetadata(), perf, startNanos);
       }
@@ -1336,6 +1336,11 @@ public class ObjectEndpoint extends EndpointBase {
 
   private String wrapInQuotes(String value) {
     return "\"" + value + "\"";
+  }
+
+  @VisibleForTesting
+  public MessageDigest getMessageDigestInstance() {
+    return E_TAG_PROVIDER.get();
   }
 
 }
