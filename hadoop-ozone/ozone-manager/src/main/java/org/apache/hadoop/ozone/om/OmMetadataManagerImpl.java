@@ -89,7 +89,6 @@ import org.apache.hadoop.ozone.om.protocolPB.OzoneManagerProtocolClientSideTrans
 import org.apache.hadoop.ozone.om.request.file.OMFileRequest;
 import org.apache.hadoop.ozone.om.request.util.OMMultipartUploadUtils;
 import org.apache.hadoop.ozone.om.snapshot.ReferenceCounted;
-import org.apache.hadoop.ozone.om.snapshot.SnapshotCache;
 import org.apache.hadoop.ozone.om.snapshot.SnapshotUtils;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ExpiredMultipartUploadInfo;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ExpiredMultipartUploadsBucket;
@@ -109,7 +108,6 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_FS_SNAPSHOT_MAX_L
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_FS_SNAPSHOT_MAX_LIMIT_DEFAULT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_SNAPSHOT_CHECKPOINT_DIR_CREATION_POLL_TIMEOUT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_SNAPSHOT_CHECKPOINT_DIR_CREATION_POLL_TIMEOUT_DEFAULT;
-import static org.apache.hadoop.ozone.om.OmSnapshotManager.getSnapshotPrefix;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.BUCKET_NOT_FOUND;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.FILE_NOT_FOUND;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.VOLUME_NOT_FOUND;
@@ -916,40 +914,6 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
   }
 
   /**
-   * Returns true if the firstArray startsWith the bytes of secondArray.
-   *
-   * @param firstArray - Byte array
-   * @param secondArray - Byte array
-   * @return true if the first array bytes match the bytes in the second array.
-   */
-  private boolean startsWith(byte[] firstArray, byte[] secondArray) {
-
-    if (firstArray == null) {
-      // if both are null, then the arrays match, else if first is null and
-      // second is not, then this function returns false.
-      return secondArray == null;
-    }
-
-
-    if (secondArray != null) {
-      // If the second array is longer then first array cannot be starting with
-      // the bytes of second array.
-      if (secondArray.length > firstArray.length) {
-        return false;
-      }
-
-      for (int ndx = 0; ndx < secondArray.length; ndx++) {
-        if (firstArray[ndx] != secondArray[ndx]) {
-          return false;
-        }
-      }
-      return true; //match, return true.
-    }
-    return false; // if first is not null and second is null, we define that
-    // array does not start with same chars.
-  }
-
-  /**
    * Given a volume, check if it is empty, i.e there are no buckets inside it.
    * We iterate in the bucket table and see if there is any key that starts with
    * the volume prefix. We actually look for /volume/, since if we don't have
@@ -1588,7 +1552,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
           OmBucketInfo bucketInfo = getBucketTable().get(bucketKey);
 
           // Get the latest snapshot in snapshot path.
-          try (ReferenceCounted<IOmMetadataReader, SnapshotCache>
+          try (ReferenceCounted<OmSnapshot>
               rcLatestSnapshot = getLatestActiveSnapshot(
                   keySplit[1], keySplit[2], omSnapshotManager)) {
 
@@ -1606,13 +1570,12 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
 
               if (rcLatestSnapshot != null) {
                 Table<String, OmKeyInfo> prevKeyTable =
-                    ((OmSnapshot) rcLatestSnapshot.get())
+                    rcLatestSnapshot.get()
                         .getMetadataManager()
                         .getKeyTable(bucketInfo.getBucketLayout());
 
                 Table<String, RepeatedOmKeyInfo> prevDeletedTable =
-                    ((OmSnapshot) rcLatestSnapshot.get())
-                        .getMetadataManager().getDeletedTable();
+                    rcLatestSnapshot.get().getMetadataManager().getDeletedTable();
                 String prevKeyTableDBKey = getSnapshotRenamedTable()
                     .get(dbRenameKey);
                 String prevDelTableDBKey = getOzoneKey(info.getVolumeName(),
@@ -1698,8 +1661,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
   /**
    * Get the latest OmSnapshot for a snapshot path.
    */
-  public ReferenceCounted<
-      IOmMetadataReader, SnapshotCache> getLatestActiveSnapshot(
+  public ReferenceCounted<OmSnapshot> getLatestActiveSnapshot(
           String volumeName, String bucketName,
           OmSnapshotManager snapshotManager)
       throws IOException {
@@ -1733,13 +1695,12 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
       }
     }
 
-    Optional<ReferenceCounted<IOmMetadataReader, SnapshotCache>> rcOmSnapshot =
+    Optional<ReferenceCounted<OmSnapshot>> rcOmSnapshot =
         snapshotInfo.isPresent() ?
             Optional.ofNullable(
-                snapshotManager.checkForSnapshot(volumeName,
+                snapshotManager.getSnapshot(volumeName,
                     bucketName,
-                    getSnapshotPrefix(snapshotInfo.get().getName()),
-                    true)
+                    snapshotInfo.get().getName())
             ) :
             Optional.empty();
 

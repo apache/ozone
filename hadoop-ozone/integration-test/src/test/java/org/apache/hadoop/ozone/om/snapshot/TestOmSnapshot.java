@@ -102,6 +102,7 @@ import java.util.Collections;
 import java.util.Iterator;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.regex.Matcher;
@@ -111,6 +112,7 @@ import java.util.stream.Collectors;
 import static org.apache.commons.lang3.StringUtils.leftPad;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DB_PROFILE;
 import static org.apache.hadoop.ozone.OzoneAcl.AclScope.DEFAULT;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SNAPSHOT_DELETING_SERVICE_INTERVAL;
 import static org.apache.hadoop.ozone.admin.scm.FinalizeUpgradeCommandUtil.isDone;
 import static org.apache.hadoop.ozone.admin.scm.FinalizeUpgradeCommandUtil.isStarting;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
@@ -118,7 +120,9 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_DEFAULT_BUCKET_LAYOU
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ENABLE_FILESYSTEM_PATHS;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_DIFF_DISABLE_NATIVE_LIBS;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_FORCE_FULL_DIFF;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_SNAPSHOT_SST_FILTERING_SERVICE_INTERVAL;
 import static org.apache.hadoop.ozone.om.OmSnapshotManager.DELIMITER;
+import static org.apache.hadoop.ozone.om.OmUpgradeConfig.ConfigStrings.OZONE_OM_INIT_DEFAULT_LAYOUT_VERSION;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.BUCKET_NOT_FOUND;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.CONTAINS_SNAPSHOT;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.KEY_NOT_FOUND;
@@ -171,6 +175,7 @@ public abstract class TestOmSnapshot {
   private ObjectStore store;
   private OzoneManager ozoneManager;
   private OzoneBucket ozoneBucket;
+  private OzoneConfiguration conf;
 
   private final BucketLayout bucketLayout;
   private final boolean enabledFileSystemPaths;
@@ -195,7 +200,7 @@ public abstract class TestOmSnapshot {
    * Create a MiniDFSCluster for testing.
    */
   private void init() throws Exception {
-    OzoneConfiguration conf = new OzoneConfiguration();
+    conf = new OzoneConfiguration();
     conf.setBoolean(OZONE_OM_ENABLE_FILESYSTEM_PATHS, enabledFileSystemPaths);
     conf.set(OZONE_DEFAULT_BUCKET_LAYOUT, bucketLayout.name());
     conf.setBoolean(OZONE_OM_SNAPSHOT_FORCE_FULL_DIFF, forceFullSnapshotDiff);
@@ -207,10 +212,11 @@ public abstract class TestOmSnapshot {
     conf.setEnum(HDDS_DB_PROFILE, DBProfile.TEST);
     // Enable filesystem snapshot feature for the test regardless of the default
     conf.setBoolean(OMConfigKeys.OZONE_FILESYSTEM_SNAPSHOT_ENABLED_KEY, true);
+    conf.setInt(OZONE_OM_INIT_DEFAULT_LAYOUT_VERSION, OMLayoutFeature.BUCKET_LAYOUT_SUPPORT.layoutVersion());
+    conf.setTimeDuration(OZONE_SNAPSHOT_DELETING_SERVICE_INTERVAL, 1, TimeUnit.SECONDS);
+    conf.setInt(OZONE_SNAPSHOT_SST_FILTERING_SERVICE_INTERVAL, KeyManagerImpl.DISABLE_VALUE);
 
     cluster = MiniOzoneCluster.newBuilder(conf)
-        .setNumOfOzoneManagers(3)
-        .setOmLayoutVersion(OMLayoutFeature.BUCKET_LAYOUT_SUPPORT.layoutVersion())
         .build();
 
     cluster.waitForClusterToBeReady();
@@ -234,6 +240,12 @@ public abstract class TestOmSnapshot {
     KeyManagerImpl keyManager = (KeyManagerImpl) HddsWhiteboxTestUtils
         .getInternalState(ozoneManager, "keyManager");
     keyManager.stop();
+  }
+
+  private void startKeyManager() throws IOException {
+    KeyManagerImpl keyManager = (KeyManagerImpl) HddsWhiteboxTestUtils
+        .getInternalState(ozoneManager, "keyManager");
+    keyManager.start(conf);
   }
 
   private RDBStore getRdbStore() {
@@ -1078,7 +1090,7 @@ public abstract class TestOmSnapshot {
     createSnapshot(testVolumeName, testBucketName, snap1);
     OzoneObj keyObj = buildKeyObj(bucket, key1);
     OzoneAcl userAcl = new OzoneAcl(USER, "user",
-        WRITE, DEFAULT);
+        DEFAULT, WRITE);
     store.addAcl(keyObj, userAcl);
 
     String snap2 = "snap2";
@@ -2030,7 +2042,7 @@ public abstract class TestOmSnapshot {
     String snapPrefix = createSnapshot(volumeName, bucketName);
     try (RDBStore snapshotDBStore = (RDBStore)
         ((OmSnapshot) cluster.getOzoneManager().getOmSnapshotManager()
-            .checkForSnapshot(volumeName, bucketName, snapPrefix, false).get())
+            .getActiveFsMetadataOrSnapshot(volumeName, bucketName, snapPrefix).get())
             .getMetadataManager().getStore()) {
       for (String table : snapshotDBStore.getTableNames().values()) {
         assertTrue(snapshotDBStore.getDb().getColumnFamily(table)
@@ -2160,7 +2172,7 @@ public abstract class TestOmSnapshot {
 
     OmSnapshot omSnapshot = (OmSnapshot) cluster.getOzoneManager()
         .getOmSnapshotManager()
-        .checkForSnapshot(volumeName, bucketName, snapshotName, false).get();
+        .getActiveFsMetadataOrSnapshot(volumeName, bucketName, snapshotName).get();
 
     RDBStore snapshotDbStore =
         (RDBStore) omSnapshot.getMetadataManager().getStore();
@@ -2480,5 +2492,50 @@ public abstract class TestOmSnapshot {
     assertEquals(200,
         fetchReportPage(volume1, bucket3, "bucket3-snap1", "bucket3-snap3",
             null, 0).getDiffList().size());
+  }
+
+  @Test
+  public void testSnapshotReuseSnapName() throws Exception {
+    // start KeyManager for this test
+    startKeyManager();
+    String volume = "vol-" + counter.incrementAndGet();
+    String bucket = "buck-" + counter.incrementAndGet();
+    store.createVolume(volume);
+    OzoneVolume volume1 = store.getVolume(volume);
+    volume1.createBucket(bucket);
+    OzoneBucket bucket1 = volume1.getBucket(bucket);
+    // Create Key1 and take snapshot
+    String key1 = "key-1-";
+    createFileKeyWithPrefix(bucket1, key1);
+    String snap1 = "snap" + counter.incrementAndGet();
+    String snapshotKeyPrefix = createSnapshot(volume, bucket, snap1);
+
+    int keyCount1 = keyCount(bucket1, snapshotKeyPrefix + "key-");
+    assertEquals(1, keyCount1);
+
+    store.deleteSnapshot(volume, bucket, snap1);
+
+    GenericTestUtils.waitFor(() -> {
+      try {
+        return !ozoneManager.getMetadataManager().getSnapshotInfoTable()
+            .isExist(SnapshotInfo.getTableKey(volume, bucket, snap1));
+      } catch (IOException e) {
+        throw new RuntimeException(e);
+      }
+    }, 200, 10000);
+
+    createFileKeyWithPrefix(bucket1, key1);
+    String snap2 = "snap" + counter.incrementAndGet();
+    createSnapshot(volume, bucket, snap2);
+
+    String key2 = "key-2-";
+    createFileKeyWithPrefix(bucket1, key2);
+    createSnapshot(volume, bucket, snap1);
+
+    int keyCount2 = keyCount(bucket1, snapshotKeyPrefix + "key-");
+    assertEquals(3, keyCount2);
+
+    // Stop key manager after testcase executed
+    stopKeyManager();
   }
 }

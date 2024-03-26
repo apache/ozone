@@ -110,15 +110,11 @@ public class TestOzoneManagerSnapshotAcl {
     final String omServiceId = "om-service-test-1"
         + RandomStringUtils.randomNumeric(32);
 
-    cluster = MiniOzoneCluster.newOMHABuilder(conf)
+    cluster = MiniOzoneCluster.newHABuilder(conf)
         .setOMServiceId(omServiceId)
         .setNumOfOzoneManagers(1)
         .build();
     cluster.waitForClusterToBeReady();
-
-    ozoneManager = cluster.getOzoneManager();
-    final OzoneConfiguration ozoneManagerConf = ozoneManager.getConfiguration();
-    cluster.setConf(ozoneManagerConf);
 
     final String hostPrefix = OZONE_OFS_URI_SCHEME + "://" + omServiceId;
     final OzoneConfiguration clientConf =
@@ -128,12 +124,13 @@ public class TestOzoneManagerSnapshotAcl {
     client = cluster.newClient();
     objectStore = client.getObjectStore();
 
+    ozoneManager = cluster.getOzoneManager();
     final KeyManagerImpl keyManager = (KeyManagerImpl) HddsWhiteboxTestUtils
         .getInternalState(ozoneManager, "keyManager");
 
     // stop the deletion services so that keys can still be read
     keyManager.stop();
-    OMStorage.getOmDbDir(ozoneManagerConf);
+    OMStorage.getOmDbDir(cluster.getConf());
   }
 
   @AfterAll
@@ -630,7 +627,7 @@ public class TestOzoneManagerSnapshotAcl {
   private void createVolume() throws IOException {
     final String volumePrefix = "volume-";
     volumeName = volumePrefix + RandomStringUtils.randomNumeric(32);
-    final VolumeArgs volumeArgs = new VolumeArgs.Builder()
+    final VolumeArgs volumeArgs = VolumeArgs.newBuilder()
         .setAdmin(ADMIN)
         .setOwner(ADMIN)
         .build();

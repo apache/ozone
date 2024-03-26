@@ -113,6 +113,7 @@ import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.writeDele
 import static org.apache.hadoop.ozone.recon.spi.impl.PrometheusServiceProviderImpl.PROMETHEUS_INSTANT_QUERY_API;
 import static org.hadoop.ozone.recon.schema.tables.GlobalStatsTable.GLOBAL_STATS;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -288,8 +289,9 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
         utilizationSchemaDefinition);
     fileSizeCountTask =
         new FileSizeCountTask(fileCountBySizeDao, utilizationSchemaDefinition);
-    omTableInsightTask = new OmTableInsightTask(
-        globalStatsDao, sqlConfiguration, reconOMMetadataManager);
+    omTableInsightTask =
+        new OmTableInsightTask(globalStatsDao, sqlConfiguration,
+            reconOMMetadataManager);
     containerHealthSchemaManager =
         reconTestInjector.getInstance(ContainerHealthSchemaManager.class);
     clusterStateEndpoint =
@@ -405,7 +407,7 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
             .addStorageReport(storageReportProto4).build();
     LayoutVersionProto layoutInfo = defaultLayoutVersionProto();
 
-    try {
+    assertDoesNotThrow(() -> {
       reconScm.getDatanodeProtocolServer()
           .register(extendedDatanodeDetailsProto, nodeReportProto,
               containerReportsProto, pipelineReportsProto, layoutInfo);
@@ -416,9 +418,7 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
               defaultLayoutVersionProto());
       // Process all events in the event queue
       reconScm.getEventQueue().processAll(1000);
-    } catch (Exception ex) {
-      fail(ex.getMessage());
-    }
+    });
     // Write Data to OM
     // A sample volume (sampleVol) and a bucket (bucketOne) is already created
     // in AbstractOMMetadataManagerTest.
@@ -435,14 +435,12 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
             .addOzoneAcls(new OzoneAcl(
                 IAccessAuthorizer.ACLIdentityType.USER,
                 "TestUser2",
-                IAccessAuthorizer.ACLType.WRITE,
-                OzoneAcl.AclScope.ACCESS
+                OzoneAcl.AclScope.ACCESS, IAccessAuthorizer.ACLType.WRITE
             ))
             .addOzoneAcls(new OzoneAcl(
                 IAccessAuthorizer.ACLIdentityType.USER,
                 "TestUser2",
-                IAccessAuthorizer.ACLType.READ,
-                OzoneAcl.AclScope.ACCESS
+                OzoneAcl.AclScope.ACCESS, IAccessAuthorizer.ACLType.READ
             ))
             .build();
     reconOMMetadataManager.getVolumeTable().put(volumeKey, args);
@@ -453,8 +451,7 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
         .addAcl(new OzoneAcl(
             IAccessAuthorizer.ACLIdentityType.GROUP,
             "TestGroup2",
-            IAccessAuthorizer.ACLType.WRITE,
-            OzoneAcl.AclScope.ACCESS
+            OzoneAcl.AclScope.ACCESS, IAccessAuthorizer.ACLType.WRITE
         ))
         .setQuotaInBytes(OzoneConsts.GB)
         .setUsedBytes(OzoneConsts.MB)
@@ -477,8 +474,7 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
         .addAcl(new OzoneAcl(
             IAccessAuthorizer.ACLIdentityType.GROUP,
             "TestGroup2",
-            IAccessAuthorizer.ACLType.READ,
-            OzoneAcl.AclScope.ACCESS
+            OzoneAcl.AclScope.ACCESS, IAccessAuthorizer.ACLType.READ
         ))
         .setQuotaInBytes(OzoneConsts.GB)
         .setUsedBytes(100 * OzoneConsts.MB)
@@ -515,11 +511,11 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
 
     // Populate the deletedDirectories table in OM DB
     writeDeletedDirToOm(reconOMMetadataManager, "Bucket1", "Volume1", "dir1",
-        3L, 2L, 1L);
+        3L, 2L, 1L, 23L);
     writeDeletedDirToOm(reconOMMetadataManager, "Bucket2", "Volume2", "dir2",
-        6L, 5L, 4L);
+        6L, 5L, 4L, 22L);
     writeDeletedDirToOm(reconOMMetadataManager, "Bucket3", "Volume3", "dir3",
-        9L, 8L, 7L);
+        9L, 8L, 7L, 21L);
 
     // Truncate global stats table before running each test
     dslContext.truncate(GLOBAL_STATS);
@@ -594,7 +590,7 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
           (DatanodesResponse) response1.getEntity();
       DatanodeMetadata datanodeMetadata1 =
           datanodesResponse1.getDatanodes().stream().filter(datanodeMetadata ->
-              datanodeMetadata.getHostname().equals("host1.datanode"))
+                  datanodeMetadata.getHostname().equals("host1.datanode"))
               .findFirst().orElse(null);
       return (datanodeMetadata1 != null &&
           datanodeMetadata1.getContainers() == 1 &&
@@ -699,7 +695,7 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
     byte[] fileBytes = FileUtils.readFileToByteArray(
         new File(classLoader.getResource(PROMETHEUS_TEST_RESPONSE_FILE)
             .getFile())
-        );
+    );
     verify(outputStreamMock).write(fileBytes, 0, fileBytes.length);
   }
 
@@ -866,10 +862,12 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
     ContainerInfo omContainerInfo1 = mock(ContainerInfo.class);
     given(omContainerInfo1.containerID()).willReturn(new ContainerID(1));
     given(omContainerInfo1.getUsedBytes()).willReturn(1500000000L); // 1.5GB
+    given(omContainerInfo1.getState()).willReturn(LifeCycleState.OPEN);
 
     ContainerInfo omContainerInfo2 = mock(ContainerInfo.class);
     given(omContainerInfo2.containerID()).willReturn(new ContainerID(2));
     given(omContainerInfo2.getUsedBytes()).willReturn(2500000000L); // 2.5GB
+    given(omContainerInfo2.getState()).willReturn(LifeCycleState.OPEN);
 
     // Create a list of container info objects
     List<ContainerInfo> containers = new ArrayList<>();

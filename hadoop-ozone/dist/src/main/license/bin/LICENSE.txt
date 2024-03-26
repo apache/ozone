@@ -283,7 +283,6 @@ Apache License 2.0
    com.github.stephenc.jcip:jcip-annotations
    com.google.android:annotations
    com.google.api.grpc:proto-google-common-protos
-   com.google.code.findbugs:jsr305
    com.google.code.gson:gson
    com.google.errorprone:error_prone_annotations
    com.google.guava:failureaccess
@@ -352,6 +351,7 @@ Apache License 2.0
    io.prometheus:simpleclient_common
    io.prometheus:simpleclient_dropwizard
    joda-time:joda-time
+   jakarta.inject:jakarta.inject-api
    jakarta.validation:jakarta.validation-api
    javax.enterprise:cdi-api
    javax.inject:javax.inject
@@ -360,7 +360,6 @@ Apache License 2.0
    org.apache.commons:commons-compress
    org.apache.commons:commons-configuration2
    org.apache.commons:commons-lang3
-   org.apache.commons:commons-pool2
    org.apache.commons:commons-text
    org.apache.curator:curator-client
    org.apache.curator:curator-framework
@@ -442,7 +441,6 @@ Apache License 2.0
    org.xerial.snappy:snappy-java
    org.xerial:sqlite-jdbc
    org.yaml:snakeyaml
-   software.amazon.ion:ion-java
 
 MIT
 =====================

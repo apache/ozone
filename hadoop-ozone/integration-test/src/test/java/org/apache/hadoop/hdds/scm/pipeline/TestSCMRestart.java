@@ -35,6 +35,7 @@ import java.io.IOException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_HEARTBEAT_INTERVAL;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_PIPELINE_REPORT_INTERVAL;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotSame;
@@ -60,17 +61,17 @@ public class TestSCMRestart {
    */
   @BeforeAll
   public static void init() throws Exception {
+    final int numOfNodes = 4;
     conf = new OzoneConfiguration();
     conf.setTimeDuration(HDDS_PIPELINE_REPORT_INTERVAL, 1000,
             TimeUnit.MILLISECONDS);
+    conf.setTimeDuration(HDDS_HEARTBEAT_INTERVAL, 1000, TimeUnit.MILLISECONDS);
+    conf.setTimeDuration(ScmConfigKeys.OZONE_SCM_HEARTBEAT_PROCESS_INTERVAL, 1000, TimeUnit.MILLISECONDS);
     conf.setInt(ScmConfigKeys.OZONE_DATANODE_PIPELINE_LIMIT, 1);
-    int numOfNodes = 4;
+    // allow only one FACTOR THREE pipeline.
+    conf.setInt(ScmConfigKeys.OZONE_SCM_RATIS_PIPELINE_LIMIT, numOfNodes + 1);
     cluster = MiniOzoneCluster.newBuilder(conf)
         .setNumDatanodes(numOfNodes)
-        // allow only one FACTOR THREE pipeline.
-        .setTotalPipelineNumLimit(numOfNodes + 1)
-        .setHbInterval(1000)
-        .setHbProcessorInterval(1000)
         .build();
     cluster.waitForClusterToBeReady();
     StorageContainerManager scm = cluster.getStorageContainerManager();

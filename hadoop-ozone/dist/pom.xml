@@ -28,7 +28,7 @@
   <properties>
     <file.encoding>UTF-8</file.encoding>
     <downloadSources>true</downloadSources>
-    <docker.ozone-runner.version>20230615-1</docker.ozone-runner.version>
+    <docker.ozone-runner.version>20240316-jdk17-1</docker.ozone-runner.version>
     <docker.ozone-testkr5b.image>apache/ozone-testkrb5:20230318-1</docker.ozone-testkr5b.image>
     <maven.test.skip>true</maven.test.skip> <!-- no tests in this module so far -->
   </properties>

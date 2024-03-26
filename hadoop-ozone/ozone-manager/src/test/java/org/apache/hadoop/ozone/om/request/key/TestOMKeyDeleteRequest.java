@@ -192,8 +192,8 @@ public class TestOMKeyDeleteRequest extends TestOMKeyRequest {
 
   protected String addKeyToTable(String key) throws Exception {
     OMRequestTestUtils.addKeyToTable(false, volumeName,
-            bucketName, key, clientID, replicationType, replicationFactor,
-            omMetadataManager);
+        bucketName, key, clientID, replicationConfig,
+        omMetadataManager);
 
     return omMetadataManager.getOzoneKey(volumeName, bucketName, key);
   }

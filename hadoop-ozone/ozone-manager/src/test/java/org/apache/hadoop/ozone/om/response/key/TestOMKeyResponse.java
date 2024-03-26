@@ -24,6 +24,7 @@ import java.nio.file.Path;
 import java.util.Random;
 import java.util.UUID;
 
+import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.protocol.StorageType;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
@@ -60,8 +61,7 @@ public class TestOMKeyResponse {
   protected String volumeName;
   protected String bucketName;
   protected String keyName;
-  protected HddsProtos.ReplicationFactor replicationFactor;
-  protected HddsProtos.ReplicationType replicationType;
+  protected ReplicationConfig replicationConfig;
   protected OmBucketInfo omBucketInfo;
   protected long clientID;
   protected Random random;
@@ -80,18 +80,18 @@ public class TestOMKeyResponse {
     volumeName = UUID.randomUUID().toString();
     bucketName = UUID.randomUUID().toString();
     keyName = UUID.randomUUID().toString();
-    replicationFactor = HddsProtos.ReplicationFactor.ONE;
-    replicationType = HddsProtos.ReplicationType.RATIS;
+    replicationConfig = ReplicationConfig.fromProtoTypeAndFactor(
+        HddsProtos.ReplicationType.RATIS, HddsProtos.ReplicationFactor.ONE);
     clientID = 1000L;
     random = new Random();
     keysToDelete = null;
 
     final OmVolumeArgs volumeArgs = OmVolumeArgs.newBuilder()
-            .setVolume(volumeName)
-            .setAdminName("admin")
-            .setOwnerName("owner")
-            .setObjectID(System.currentTimeMillis())
-            .build();
+        .setVolume(volumeName)
+        .setAdminName("admin")
+        .setOwnerName("owner")
+        .setObjectID(System.currentTimeMillis())
+        .build();
 
     omMetadataManager.getVolumeTable().addCacheEntry(
             new CacheKey<>(omMetadataManager.getVolumeKey(volumeName)),
@@ -119,8 +119,7 @@ public class TestOMKeyResponse {
 
   @Nonnull
   protected OmKeyInfo getOmKeyInfo() {
-    return OMRequestTestUtils.createOmKeyInfo(volumeName, bucketName, keyName,
-            replicationType, replicationFactor);
+    return OMRequestTestUtils.createOmKeyInfo(volumeName, bucketName, keyName, replicationConfig).build();
   }
 
   @Nonnull

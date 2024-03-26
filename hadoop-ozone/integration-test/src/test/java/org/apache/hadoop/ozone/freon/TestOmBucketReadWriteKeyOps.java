@@ -34,7 +34,8 @@ import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ratis.server.RaftServer;
 import org.apache.ratis.server.raftlog.RaftLog;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.event.Level;
@@ -88,8 +89,9 @@ public class TestOmBucketReadWriteKeyOps {
    *
    * @throws IOException
    */
-  private void startCluster() throws Exception {
+  private void startCluster(boolean fsPathsEnabled) throws Exception {
     conf = getOzoneConfiguration();
+    conf.setBoolean(OMConfigKeys.OZONE_OM_ENABLE_FILESYSTEM_PATHS, fsPathsEnabled);
     conf.set(OMConfigKeys.OZONE_DEFAULT_BUCKET_LAYOUT,
         BucketLayout.OBJECT_STORE.name());
     cluster = MiniOzoneCluster.newBuilder(conf).setNumDatanodes(5).build();
@@ -104,10 +106,11 @@ public class TestOmBucketReadWriteKeyOps {
     return new OzoneConfiguration();
   }
 
-  @Test
-  public void testOmBucketReadWriteKeyOps() throws Exception {
+  @ParameterizedTest(name = "Filesystem Paths Enabled: {0}")
+  @ValueSource(booleans = {false, true})
+  public void testOmBucketReadWriteKeyOps(boolean fsPathsEnabled) throws Exception {
     try {
-      startCluster();
+      startCluster(fsPathsEnabled);
       FileOutputStream out = FileUtils.openOutputStream(new File(path,
           "conf"));
       cluster.getConf().writeXml(out);
