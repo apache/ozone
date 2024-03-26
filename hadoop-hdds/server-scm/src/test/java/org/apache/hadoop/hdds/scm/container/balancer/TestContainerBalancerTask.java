@@ -1114,7 +1114,7 @@ public class TestContainerBalancerTask {
     }
   }
 
-  //@Test
+  @Test
   public void testSourceDatanodeAddedBack()
       throws NodeNotFoundException, IOException, IllegalContainerBalancerStateException,
       InvalidContainerBalancerConfigurationException, TimeoutException, InterruptedException {
@@ -1141,57 +1141,6 @@ public class TestContainerBalancerTask {
     assertTrue(containerBalancerTask.getMetrics().getNumContainerMovesCompletedInLatestIteration() >= 1);
     assertThat(containerBalancerTask.getMetrics().getNumContainerMovesFailed()).isEqualTo(1);
     stopBalancer();
-  }
-
-  //@Test
-  public void addSourceBackIfMoveFails()
-      throws IllegalContainerBalancerStateException, IOException,
-      InvalidContainerBalancerConfigurationException, TimeoutException, NodeNotFoundException {
-    // only these nodes should be included
-    // the ones also specified in excludeNodes should be excluded
-    int firstIncludeIndex = 0, secondIncludeIndex = 1;
-    int thirdIncludeIndex = nodesInCluster.size() - 2;
-    String includeNodes =
-        nodesInCluster.get(firstIncludeIndex).getDatanodeDetails()
-            .getIpAddress() + ", " +
-            nodesInCluster.get(secondIncludeIndex).getDatanodeDetails()
-                .getIpAddress() + ", " +
-            nodesInCluster.get(thirdIncludeIndex).getDatanodeDetails()
-                .getHostName();
-
-    CompletableFuture<MoveManager.MoveResult> future =
-        new CompletableFuture<>();
-    future.completeExceptionally(new RuntimeException("Runtime Exception"));
-    when(moveManager.move(any(ContainerID.class),
-        any(DatanodeDetails.class),
-        any(DatanodeDetails.class)))
-        .thenReturn(CompletableFuture.supplyAsync(() -> {
-          try {
-            Thread.sleep(1);
-          } catch (Exception ignored) {
-          }
-          throw new RuntimeException("Runtime Exception after doing work");
-        }))
-        .thenThrow(new ContainerNotFoundException("Test Container not found"))
-        .thenReturn(future);
-
-    /*when(containerManager.getContainer(any()))
-        .thenThrow(new ContainerNotFoundException("Test Container not found")); // should fail move operation*/
-
-    balancerConfiguration.setIncludeNodes(includeNodes);
-
-    startBalancer(balancerConfiguration);
-
-    LOG.info("tej source dns: " + containerBalancerTask.getSourceInPotentialSources());
-
-    /*assertTrue(containerBalancerTask.checkSourceInPotentialSources(nodesInCluster.get(firstIncludeIndex)
-    .getDatanodeDetails()));
-    assertTrue(containerBalancerTask.checkSourceInPotentialSources(nodesInCluster.get(secondIncludeIndex)
-    .getDatanodeDetails()));
-    assertTrue(containerBalancerTask.checkSourceInPotentialSources(nodesInCluster.get(thirdIncludeIndex)
-    .getDatanodeDetails()));
-*/
-    stopBalancer(); // -> doesn't do anything
   }
 
   /**

@@ -142,7 +142,7 @@ public class FindSourceGreedy implements FindSourceStrategy {
   @Override
   public void addBackSourceDataNode(DatanodeDetails dn) {
     DatanodeUsageInfo dui = nodeManager.getUsageInfo(dn);
-    if (potentialSources.contains(dui)) {
+    if (!potentialSources.contains(dui)) {
       potentialSources.add(dui);
     }
   }
