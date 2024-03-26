@@ -98,8 +98,6 @@ public class OMSnapshotPurgeResponse extends OMClientResponse {
       // Delete Snapshot checkpoint directory.
       deleteCheckpointDirectory(omMetadataManager, snapshotInfo);
       omMetadataManager.getSnapshotInfoTable().deleteWithBatch(batchOperation, dbKey);
-      ((OmMetadataManagerImpl) omMetadataManager).getSnapshotChainManager()
-          .deleteSnapshotFromSnapshotIdToTableKey(snapshotInfo.getSnapshotId());
     }
   }
 
