@@ -19,7 +19,10 @@ package org.apache.hadoop.hdds.scm.client;
 
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
+import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.net.InnerNode;
+import org.apache.hadoop.hdds.scm.net.NetworkTopology;
+import org.apache.hadoop.hdds.scm.net.NetworkTopologyImpl;
 import org.apache.hadoop.hdds.scm.protocol.ScmBlockLocationProtocol;
 
 import org.slf4j.Logger;
@@ -36,6 +39,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 
 import static java.util.Objects.requireNonNull;
+import static org.apache.hadoop.hdds.scm.net.NetConstants.ROOT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_OM_NETWORK_TOPOLOGY_REFRESH_DURATION;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_OM_NETWORK_TOPOLOGY_REFRESH_DURATION_DEFAULT;
 
@@ -48,7 +52,8 @@ public class ScmTopologyClient {
       LoggerFactory.getLogger(ScmTopologyClient.class);
 
   private final ScmBlockLocationProtocol scmBlockLocationProtocol;
-  private final AtomicReference<InnerNode> cache = new AtomicReference<>();
+  private final AtomicReference<NetworkTopology> cache =
+      new AtomicReference<>();
   private ScheduledExecutorService executorService;
 
   public ScmTopologyClient(
@@ -56,7 +61,7 @@ public class ScmTopologyClient {
     this.scmBlockLocationProtocol = scmBlockLocationProtocol;
   }
 
-  public InnerNode getClusterTree() {
+  public NetworkTopology getClusterMap() {
     return requireNonNull(cache.get(),
         "ScmBlockLocationClient must have been initialized already.");
   }
@@ -66,7 +71,10 @@ public class ScmTopologyClient {
         scmBlockLocationProtocol.getNetworkTopology();
     LOG.info("Initial network topology fetched from SCM: {}.",
         initialTopology);
-    cache.set(initialTopology);
+    cache.set(new NetworkTopologyImpl(conf.get(
+        ScmConfigKeys.OZONE_SCM_NETWORK_TOPOLOGY_SCHEMA_FILE,
+        ScmConfigKeys.OZONE_SCM_NETWORK_TOPOLOGY_SCHEMA_FILE_DEFAULT),
+        initialTopology));
     scheduleNetworkTopologyPoller(conf, Instant.now());
   }
 
@@ -97,7 +105,7 @@ public class ScmTopologyClient {
 
     LOG.debug("Scheduling NetworkTopologyPoller with an initial delay of {}.",
         initialDelay);
-    executorService.scheduleAtFixedRate(() -> checkAndRefresh(),
+    executorService.scheduleAtFixedRate(() -> checkAndRefresh(conf),
         initialDelay.toMillis(), refreshDuration.toMillis(),
         TimeUnit.MILLISECONDS);
   }
@@ -110,18 +118,20 @@ public class ScmTopologyClient {
     return Duration.ofMillis(refreshDurationInMs);
   }
 
-  private synchronized void checkAndRefresh() {
-    InnerNode current = cache.get();
+  private synchronized void checkAndRefresh(ConfigurationSource conf) {
+    InnerNode current = (InnerNode) cache.get().getNode(ROOT);
     try {
       InnerNode newTopology = scmBlockLocationProtocol.getNetworkTopology();
       if (!newTopology.equals(current)) {
-        cache.set(newTopology);
-        LOG.info("Updated network topology cluster tree fetched from " +
-            "SCM: {}.", newTopology);
+        cache.set(new NetworkTopologyImpl(conf.get(
+            ScmConfigKeys.OZONE_SCM_NETWORK_TOPOLOGY_SCHEMA_FILE,
+            ScmConfigKeys.OZONE_SCM_NETWORK_TOPOLOGY_SCHEMA_FILE_DEFAULT),
+            newTopology));
+        LOG.info("Updated network topology fetched from SCM: {}.", newTopology);
       }
     } catch (IOException e) {
       throw new UncheckedIOException(
-          "Error fetching updated network topology cluster tree from SCM", e);
+          "Error fetching updated network topology from SCM", e);
     }
   }
 }
