@@ -22,6 +22,7 @@ import java.io.IOException;
 import java.nio.file.InvalidPathException;
 import java.util.Map;
 
+import org.apache.hadoop.ozone.om.OMPerformanceMetrics;
 import org.apache.ratis.server.protocol.TermIndex;
 import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
@@ -76,6 +77,7 @@ public class OMKeyDeleteRequest extends OMKeyRequest {
     DeleteKeyRequest deleteKeyRequest = super.preExecute(ozoneManager)
         .getDeleteKeyRequest();
     Preconditions.checkNotNull(deleteKeyRequest);
+    OMPerformanceMetrics perfMetrics = ozoneManager.getPerfMetrics();
 
     OzoneManagerProtocolProtos.KeyArgs keyArgs = deleteKeyRequest.getKeyArgs();
     String keyPath = keyArgs.getKeyName();
@@ -87,7 +89,10 @@ public class OMKeyDeleteRequest extends OMKeyRequest {
     OzoneManagerProtocolProtos.KeyArgs.Builder newKeyArgs =
         keyArgs.toBuilder().setModificationTime(Time.now()).setKeyName(keyPath);
 
+    long startNanosDeleteKeyResolveBucketAndCheckAclsLatency = Time.monotonicNowNanos();
     KeyArgs resolvedArgs = resolveBucketAndCheckAcls(ozoneManager, newKeyArgs);
+    perfMetrics.setDeleteKeyResolveBucketAndAclCheckLatencyNs(
+        Time.monotonicNowNanos() - startNanosDeleteKeyResolveBucketAndCheckAclsLatency);
     return getOmRequest().toBuilder()
         .setDeleteKeyRequest(deleteKeyRequest.toBuilder()
             .setKeyArgs(resolvedArgs))
@@ -115,7 +120,7 @@ public class OMKeyDeleteRequest extends OMKeyRequest {
 
     OMMetrics omMetrics = ozoneManager.getMetrics();
     omMetrics.incNumKeyDeletes();
-
+    OMPerformanceMetrics perfMetrics = ozoneManager.getPerfMetrics();
     AuditLogger auditLogger = ozoneManager.getAuditLogger();
     OzoneManagerProtocolProtos.UserInfo userInfo = getOmRequest().getUserInfo();
 
@@ -126,7 +131,7 @@ public class OMKeyDeleteRequest extends OMKeyRequest {
     boolean acquiredLock = false;
     OMClientResponse omClientResponse = null;
     Result result = null;
-
+    long startNanos = Time.monotonicNowNanos();
     try {
       String objectKey =
           omMetadataManager.getOzoneKey(volumeName, bucketName, keyName);
@@ -171,12 +176,16 @@ public class OMKeyDeleteRequest extends OMKeyRequest {
           omBucketInfo.copyObject());
 
       result = Result.SUCCESS;
+      long endNanosDeleteKeySuccessLatencyNs = Time.monotonicNowNanos();
+      perfMetrics.setDeleteKeySuccessLatencyNs(endNanosDeleteKeySuccessLatencyNs - startNanos);
     } catch (IOException | InvalidPathException ex) {
       result = Result.FAILURE;
       exception = ex;
       omClientResponse =
           new OMKeyDeleteResponse(createErrorOMResponse(omResponse, exception),
               getBucketLayout());
+      long endNanosDeleteKeyFailureLatencyNs = Time.monotonicNowNanos();
+      perfMetrics.setDeleteKeyFailureLatencyNs(endNanosDeleteKeyFailureLatencyNs - startNanos);
     } finally {
       if (acquiredLock) {
         mergeOmLockDetails(omMetadataManager.getLock()
@@ -186,7 +195,6 @@ public class OMKeyDeleteRequest extends OMKeyRequest {
         omClientResponse.setOmLockDetails(getOmLockDetails());
       }
     }
-
     // Performing audit logging outside of the lock.
     auditLog(auditLogger,
         buildAuditMessage(OMAction.DELETE_KEY, auditMap, exception, userInfo));
