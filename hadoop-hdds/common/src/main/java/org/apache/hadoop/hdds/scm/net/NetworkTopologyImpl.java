@@ -232,12 +232,11 @@ public class NetworkTopologyImpl implements NetworkTopology {
 
   private boolean containsNode(Node node) {
     Node parent = node.getParent();
-    while ((parent != null && clusterTree != null &&
-        !parent.equals(clusterTree)) || (parent != clusterTree)) {
+    while ((parent != null && !parent.equals(clusterTree))) {
       parent = parent.getParent();
     }
-    return (parent != null && clusterTree != null &&
-        parent.equals(clusterTree)) || parent == clusterTree;
+    return (parent != null && parent.equals(clusterTree)) ||
+        (parent == null && clusterTree == null);
   }
 
   /**
@@ -253,8 +252,8 @@ public class NetworkTopologyImpl implements NetworkTopology {
     try {
       Node ancestor1 = node1.getAncestor(ancestorGen);
       Node ancestor2 = node2.getAncestor(ancestorGen);
-      return (ancestor1 != null && ancestor2 != null &&
-          ancestor1.equals(ancestor2)) || ancestor1 == ancestor2;
+      return (ancestor1 != null && ancestor1.equals(ancestor2)) ||
+          (ancestor1 == null && ancestor2 == null);
     } finally {
       netlock.readLock().unlock();
     }
@@ -273,8 +272,8 @@ public class NetworkTopologyImpl implements NetworkTopology {
     try {
       node1 = node1.getParent();
       node2 = node2.getParent();
-      return (node1 != null && node2 != null && node1.equals(node2)) ||
-          node1 == node2;
+      return (node1 != null && node1.equals(node2)) ||
+          (node1 == null && node2 == null);
     } finally {
       netlock.readLock().unlock();
     }
