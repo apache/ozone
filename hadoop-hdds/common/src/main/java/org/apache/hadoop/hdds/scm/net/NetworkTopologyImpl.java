@@ -232,7 +232,7 @@ public class NetworkTopologyImpl implements NetworkTopology {
 
   private boolean containsNode(Node node) {
     Node parent = node.getParent();
-    while ((parent != null && !parent.equals(clusterTree))) {
+    while (parent != null && !parent.equals(clusterTree)) {
       parent = parent.getParent();
     }
     return (parent != null && parent.equals(clusterTree)) ||
