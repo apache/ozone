@@ -104,9 +104,9 @@ public class TestContainerBalancerSubCommand {
     ScmClient scmClient = mock(ScmClient.class);
     stopCmd.execute(scmClient);
 
-    Pattern p = Pattern.compile("^ContainerBalancer\\sis\\sin\\sstopping\\sstate." +
-            "\\sWaiting\\sfor\\scurrent\\siteration\\sto\\sfinish...\\n" +
-            "ContainerBalancer\\sstopped.");
+    Pattern p = Pattern.compile("^Sending\\sstop\\scommand." +
+            "\\sWaiting\\sfor\\sContainer\\sBalancer\\sto\\sstop...\\n" +
+            "Container\\sBalancer\\sstopped.");
 
     Matcher m = p.matcher(outContent.toString(DEFAULT_ENCODING));
     assertTrue(m.find());
