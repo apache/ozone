@@ -385,19 +385,27 @@ public class NodeDecommissionManager {
   }
 
   private synchronized boolean checkIfDecommissionPossible(List<DatanodeDetails> dns, List<DatanodeAdminError> errors) {
-    int minInService = -1;
+    int minInService = -1, numDecom = dns.size();
     int inServiceTotal = nodeManager.getNodeCount(NodeStatus.inServiceHealthy());
     for (DatanodeDetails dn : dns) {
       Set<ContainerID> containers;
       try {
+        NodeStatus nodeStatus = getNodeStatus(dn);
+        NodeOperationalState opState = nodeStatus.getOperationalState();
+        if (opState != NodeOperationalState.IN_SERVICE) {
+          numDecom--;
+          continue; // ignore the DN as it cannot be put into decommissioning
+        }
         containers = nodeManager.getContainers(dn);
       } catch (NodeNotFoundException ex) {
         LOG.warn("The host {} was not found in SCM. Ignoring the request to " +
             "decommission it", dn.getHostName());
         errors.add(new DatanodeAdminError(dn.getHostName(),
             "The host was not found in SCM"));
+        numDecom--;
         continue; // ignore the DN and continue to next one
       }
+
       for (ContainerID cid : containers) {
         ContainerInfo cif;
         try {
@@ -410,7 +418,7 @@ public class NodeDecommissionManager {
           continue;
         }
         int reqNodes = cif.getReplicationConfig().getRequiredNodes();
-        if ((inServiceTotal - dns.size()) < reqNodes) {
+        if ((inServiceTotal - numDecom) < reqNodes) {
           return false;
         }
         if (reqNodes > minInService) {

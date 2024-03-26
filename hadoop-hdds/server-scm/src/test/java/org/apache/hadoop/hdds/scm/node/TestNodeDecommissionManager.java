@@ -20,6 +20,7 @@ package org.apache.hadoop.hdds.scm.node;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
+import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
@@ -29,22 +30,11 @@ import org.apache.hadoop.hdds.scm.DatanodeAdminError;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
-import org.apache.hadoop.hdds.scm.container.ContainerManagerImpl;
-import org.apache.hadoop.hdds.scm.container.replication.ContainerReplicaPendingOps;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
-import org.apache.hadoop.hdds.scm.ha.SCMHAManager;
-import org.apache.hadoop.hdds.scm.ha.SCMHAManagerStub;
-import org.apache.hadoop.hdds.scm.ha.SequenceIdGenerator;
-import org.apache.hadoop.hdds.scm.metadata.SCMDBDefinition;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
-import org.apache.hadoop.hdds.scm.pipeline.MockPipelineManager;
-import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
+import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.server.events.EventQueue;
-import org.apache.hadoop.hdds.utils.db.DBStore;
-import org.apache.hadoop.hdds.utils.db.DBStoreBuilder;
-import org.apache.hadoop.ozone.container.common.SCMTestUtils;
-import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -59,12 +49,16 @@ import java.util.Set;
 import java.util.HashSet;
 
 import static java.util.Collections.singletonList;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState.OPEN;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 /**
  * Unit tests for the decommission manager.
@@ -77,12 +71,7 @@ public class TestNodeDecommissionManager {
   private NodeManager nodeManager;
   private ContainerManager containerManager;
   private OzoneConfiguration conf;
-  @TempDir
-  private File testDir;
-  private DBStore dbStore;
-  private SCMHAManager scmhaManager;
-  private SequenceIdGenerator sequenceIdGen;
-  private ContainerReplicaPendingOps pendingOpsMock;
+  private static int id = 1;
 
   @BeforeEach
   void setup(@TempDir File dir) throws Exception {
@@ -90,33 +79,32 @@ public class TestNodeDecommissionManager {
     conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, dir.getAbsolutePath());
     scm = HddsTestUtils.getScm(conf);
     nodeManager = scm.getScmNodeManager();
-    final OzoneConfiguration ozConf = SCMTestUtils.getConf(testDir);
-    dbStore = DBStoreBuilder.createDBStore(
-        ozConf, new SCMDBDefinition());
-    scmhaManager = SCMHAManagerStub.getInstance(true);
-    sequenceIdGen = new SequenceIdGenerator(
-        ozConf, scmhaManager, SCMDBDefinition.SEQUENCE_ID.getTable(dbStore));
-    final PipelineManager pipelineManager =
-        new MockPipelineManager(dbStore, scmhaManager, nodeManager);
-    pipelineManager.createPipeline(RatisReplicationConfig.getInstance(
-        HddsProtos.ReplicationFactor.THREE));
-    pendingOpsMock = mock(ContainerReplicaPendingOps.class);
-    containerManager = new ContainerManagerImpl(ozConf,
-        scmhaManager, sequenceIdGen, pipelineManager,
-        SCMDBDefinition.CONTAINERS.getTable(dbStore), pendingOpsMock);
-    decom = new NodeDecommissionManager(ozConf, nodeManager, containerManager,
+    containerManager = mock(ContainerManager.class);
+    decom = new NodeDecommissionManager(conf, nodeManager, containerManager,
         SCMContext.emptyContext(), new EventQueue(), null);
+    when(containerManager.allocateContainer(any(ReplicationConfig.class), anyString()))
+        .thenAnswer(invocation -> createMockContainer((ReplicationConfig)invocation.getArguments()[0],
+            (String) invocation.getArguments()[1]));
   }
 
-  @AfterEach
-  public void cleanup() throws Exception {
-    if (containerManager != null) {
-      containerManager.close();
-    }
-
-    if (dbStore != null) {
-      dbStore.close();
-    }
+  private ContainerInfo createMockContainer(ReplicationConfig rep, String owner) {
+    ContainerInfo.Builder builder = new ContainerInfo.Builder()
+        .setReplicationConfig(rep)
+        .setContainerID(id)
+        .setPipelineID(PipelineID.randomId())
+        .setState(OPEN)
+        .setOwner(owner);
+    id++;
+    return builder.build();
+  }
+  private ContainerInfo getMockContainer(ReplicationConfig rep, ContainerID id) {
+    ContainerInfo.Builder builder = new ContainerInfo.Builder()
+        .setReplicationConfig(rep)
+        .setContainerID(id.getId())
+        .setPipelineID(PipelineID.randomId())
+        .setState(OPEN)
+        .setOwner("admin");
+    return builder.build();
   }
 
   @Test
@@ -424,6 +412,9 @@ public class TestNodeDecommissionManager {
   @Test
   public void testInsufficientNodeDecommissionThrowsExceptionForRatis() throws
       NodeNotFoundException, IOException {
+    when(containerManager.getContainer(any(ContainerID.class)))
+        .thenAnswer(invocation -> getMockContainer(RatisReplicationConfig
+                .getInstance(HddsProtos.ReplicationFactor.THREE), (ContainerID)invocation.getArguments()[0]));
     List<DatanodeAdminError> error;
     List<DatanodeDetails> dns = new ArrayList<>();
 
@@ -452,6 +443,9 @@ public class TestNodeDecommissionManager {
   @Test
   public void testInsufficientNodeDecommissionThrowsExceptionForEc() throws
       NodeNotFoundException, IOException {
+    when(containerManager.getContainer(any(ContainerID.class)))
+        .thenAnswer(invocation -> getMockContainer(new ECReplicationConfig(3, 2),
+            (ContainerID)invocation.getArguments()[0]));
     List<DatanodeAdminError> error;
     List<DatanodeDetails> dns = new ArrayList<>();
 
@@ -494,6 +488,17 @@ public class TestNodeDecommissionManager {
     Set<ContainerID> idsEC = new HashSet<>();
     ContainerInfo containerEC = containerManager.allocateContainer(new ECReplicationConfig(3, 2), "admin");
     idsEC.add(containerEC.containerID());
+
+    when(containerManager.getContainer(any(ContainerID.class)))
+        .thenAnswer(invocation -> {
+          ContainerID containerID = (ContainerID)invocation.getArguments()[0];
+          if(idsEC.contains(containerID)) {
+            return getMockContainer(new ECReplicationConfig(3, 2),
+                (ContainerID)invocation.getArguments()[0]);
+          }
+          return getMockContainer(RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.THREE),
+              (ContainerID)invocation.getArguments()[0]);
+        });
 
     for (DatanodeDetails dn  : nodeManager.getAllNodes().subList(0, 3)) {
       nodeManager.setContainers(dn, idsRatis);
