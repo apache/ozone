@@ -669,8 +669,8 @@ public final class ContainerProtocolCalls  {
    *
    * @return EchoResponseProto
    */
-  public static EchoResponseProto echo(XceiverClientSpi client, long containerID, ByteString payloadReqBytes,
-      int payloadRespSizeKB, int sleepTimeMs) throws IOException {
+  public static EchoResponseProto echo(XceiverClientSpi client, String encodedContainerID,
+      long containerID, ByteString payloadReqBytes, int payloadRespSizeKB, int sleepTimeMs) throws IOException {
     ContainerProtos.EchoRequestProto getEcho =
         EchoRequestProto
             .newBuilder()
@@ -686,6 +686,9 @@ public final class ContainerProtocolCalls  {
         .setContainerID(containerID)
         .setDatanodeUuid(id)
         .setEcho(getEcho);
+    if (!encodedContainerID.isEmpty()) {
+      builder.setEncodedToken(encodedContainerID);
+    }
     String traceId = TracingUtil.exportCurrentSpan();
     if (traceId != null) {
       builder.setTraceID(traceId);

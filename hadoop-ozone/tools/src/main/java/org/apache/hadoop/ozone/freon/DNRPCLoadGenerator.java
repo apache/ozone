@@ -67,6 +67,7 @@ public class DNRPCLoadGenerator extends BaseFreonGenerator
   private ByteString payloadReqBytes;
   private int payloadRespSize;
   private List<XceiverClientSpi> clients;
+  private String encodedContainerToken;
   @Option(names = {"--payload-req"},
           description =
                   "Specifies the size of payload in KB in RPC request. " +
@@ -117,7 +118,7 @@ public class DNRPCLoadGenerator extends BaseFreonGenerator
     if (configuration == null) {
       configuration = freon.createOzoneConfiguration();
     }
-    ScmClient scmClient = new ContainerOperationClient(configuration);
+    ContainerOperationClient scmClient = new ContainerOperationClient(configuration);
     ContainerInfo containerInfo = scmClient.getContainer(containerID);
 
     List<Pipeline> pipelineList = scmClient.listPipelines();
@@ -125,6 +126,7 @@ public class DNRPCLoadGenerator extends BaseFreonGenerator
         .filter(p -> p.getId().equals(containerInfo.getPipelineID()))
         .findFirst()
         .orElse(null);
+    encodedContainerToken = scmClient.getEncodedContainerToken(containerID);
     XceiverClientFactory xceiverClientManager;
     if (OzoneSecurityUtil.isSecurityEnabled(configuration)) {
       CACertificateProvider caCerts = () -> HAUtils.buildCAX509List(null, configuration);
@@ -169,7 +171,7 @@ public class DNRPCLoadGenerator extends BaseFreonGenerator
     timer.time(() -> {
       int clientIndex = (numClients == 1) ? 0 : (int)l % numClients;
       ContainerProtos.EchoResponseProto response =
-          ContainerProtocolCalls.echo(clients.get(clientIndex),
+          ContainerProtocolCalls.echo(clients.get(clientIndex), encodedContainerToken,
               containerID, payloadReqBytes, payloadRespSize, sleepTimeMs);
       return null;
     });
