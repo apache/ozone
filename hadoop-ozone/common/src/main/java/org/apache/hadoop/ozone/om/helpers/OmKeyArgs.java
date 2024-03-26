@@ -39,6 +39,7 @@ public final class OmKeyArgs implements Auditable {
   private final String volumeName;
   private final String bucketName;
   private final String keyName;
+  private final String ownerName;
   private long dataSize;
   private final ReplicationConfig replicationConfig;
   private List<OmKeyLocationInfo> locationInfoList;
@@ -70,6 +71,7 @@ public final class OmKeyArgs implements Auditable {
     this.recursive = b.recursive;
     this.headOp = b.headOp;
     this.forceUpdateContainerCacheFromSCM = b.forceUpdateContainerCacheFromSCM;
+    this.ownerName = b.ownerName;
   }
 
   public boolean getIsMultipartKey() {
@@ -102,6 +104,10 @@ public final class OmKeyArgs implements Auditable {
 
   public String getKeyName() {
     return keyName;
+  }
+
+  public String getOwner() {
+    return ownerName;
   }
 
   public long getDataSize() {
@@ -150,6 +156,7 @@ public final class OmKeyArgs implements Auditable {
     auditMap.put(OzoneConsts.VOLUME, this.volumeName);
     auditMap.put(OzoneConsts.BUCKET, this.bucketName);
     auditMap.put(OzoneConsts.KEY, this.keyName);
+    auditMap.put(OzoneConsts.OWNER, this.ownerName);
     auditMap.put(OzoneConsts.DATA_SIZE, String.valueOf(this.dataSize));
     auditMap.put(OzoneConsts.REPLICATION_CONFIG,
         (this.replicationConfig != null) ?
@@ -170,6 +177,7 @@ public final class OmKeyArgs implements Auditable {
         .setVolumeName(volumeName)
         .setBucketName(bucketName)
         .setKeyName(keyName)
+        .setOwnerName(ownerName)
         .setDataSize(dataSize)
         .setReplicationConfig(replicationConfig)
         .setLocationInfoList(locationInfoList)
@@ -206,6 +214,7 @@ public final class OmKeyArgs implements Auditable {
     private String volumeName;
     private String bucketName;
     private String keyName;
+    private String ownerName;
     private long dataSize;
     private ReplicationConfig replicationConfig;
     private List<OmKeyLocationInfo> locationInfoList;
@@ -232,6 +241,11 @@ public final class OmKeyArgs implements Auditable {
 
     public Builder setKeyName(String key) {
       this.keyName = key;
+      return this;
+    }
+
+    public Builder setOwnerName(String owner) {
+      this.ownerName = owner;
       return this;
     }
 

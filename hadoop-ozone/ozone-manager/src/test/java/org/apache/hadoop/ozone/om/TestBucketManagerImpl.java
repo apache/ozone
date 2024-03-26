@@ -42,6 +42,7 @@ import org.apache.hadoop.ozone.om.helpers.OpenKeySession;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
+import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.ozone.test.OzoneTestBase;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
@@ -337,6 +338,8 @@ class TestBucketManagerImpl extends OzoneTestBase {
             .setVolumeName(volume)
             .setBucketName("bucket-one")
             .setKeyName("key-one")
+            .setOwnerName(
+                UserGroupInformation.getCurrentUser().getShortUserName())
             .setAcls(Collections.emptyList())
             .setLocationInfoList(new ArrayList<>())
             .setReplicationConfig(
@@ -350,6 +353,8 @@ class TestBucketManagerImpl extends OzoneTestBase {
             .setVolumeName(volume)
             .setBucketName("bucket-one")
             .setKeyName("key-two")
+            .setOwnerName(
+                UserGroupInformation.getCurrentUser().getShortUserName())
             .setAcls(Collections.emptyList())
             .setLocationInfoList(new ArrayList<>())
             .setReplicationConfig(

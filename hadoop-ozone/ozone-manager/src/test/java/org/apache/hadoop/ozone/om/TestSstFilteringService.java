@@ -34,6 +34,7 @@ import org.apache.hadoop.ozone.om.helpers.OpenKeySession;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
+import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.ozone.om.snapshot.ReferenceCounted;
 import org.apache.ratis.util.ExitUtils;
 import org.junit.jupiter.api.AfterAll;
@@ -368,6 +369,8 @@ public class TestSstFilteringService {
             .setReplicationConfig(StandaloneReplicationConfig.getInstance(
                 HddsProtos.ReplicationFactor.ONE))
             .setLocationInfoList(new ArrayList<>())
+            .setOwnerName(
+                UserGroupInformation.getCurrentUser().getShortUserName())
             .build();
     //Open and Commit the Key in the Key Manager.
     OpenKeySession session = managerProtocol.openKey(keyArg);

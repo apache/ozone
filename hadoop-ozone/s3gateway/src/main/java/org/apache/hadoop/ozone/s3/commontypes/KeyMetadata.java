@@ -17,6 +17,8 @@
  */
 package org.apache.hadoop.ozone.s3.commontypes;
 
+import org.apache.hadoop.ozone.s3.endpoint.S3Owner;
+
 import javax.xml.bind.annotation.XmlAccessType;
 import javax.xml.bind.annotation.XmlAccessorType;
 import javax.xml.bind.annotation.XmlElement;
@@ -34,6 +36,9 @@ public class KeyMetadata {
   @XmlJavaTypeAdapter(ObjectKeyNameAdapter.class)
   @XmlElement(name = "Key")
   private EncodingTypeObject key; // or the Object Name
+
+  @XmlElement(name = "Owner")
+  private S3Owner owner;
 
   @XmlJavaTypeAdapter(IsoDateAdapter.class)
   @XmlElement(name = "LastModified")
@@ -54,6 +59,14 @@ public class KeyMetadata {
 
   public void setKey(EncodingTypeObject key) {
     this.key = key;
+  }
+
+  public S3Owner getOwner() {
+    return owner;
+  }
+
+  public void setOwner(S3Owner owner) {
+    this.owner = owner;
   }
 
   public Instant getLastModified() {

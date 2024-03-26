@@ -1694,7 +1694,8 @@ public class TestKeyManagerImpl {
             StandaloneReplicationConfig.getInstance(ONE))
         .setAcls(OzoneAclUtil.getAclList(ugi.getUserName(), ugi.getGroupNames(),
             ALL, ALL))
-        .setVolumeName(VOLUME_NAME);
+        .setVolumeName(VOLUME_NAME)
+        .setOwnerName(ugi.getShortUserName());
   }
 
   private RequestContext currentUserReads() throws IOException {

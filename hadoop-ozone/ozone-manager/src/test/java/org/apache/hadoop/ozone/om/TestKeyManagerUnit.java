@@ -70,6 +70,7 @@ import org.apache.hadoop.ozone.om.helpers.OpenKeySession;
 import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
 import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
+import org.apache.hadoop.security.UserGroupInformation;
 
 import org.apache.hadoop.util.Time;
 import org.apache.ozone.test.OzoneTestBase;
@@ -185,6 +186,7 @@ class TestKeyManagerUnit extends OzoneTestBase {
               .setAcls(Collections.emptyList())
               .setReplicationConfig(
                   RatisReplicationConfig.getInstance(ReplicationFactor.THREE))
+              .setOwnerName(UserGroupInformation.getCurrentUser().getShortUserName())
               .build();
 
       OpenKeySession openKey = writeClient.openKey(partKeyArgs);
@@ -385,6 +387,7 @@ class TestKeyManagerUnit extends OzoneTestBase {
         .setReplicationConfig(
             RatisReplicationConfig.getInstance(ReplicationFactor.THREE))
         .setAcls(new ArrayList<>())
+        .setOwnerName(UserGroupInformation.getCurrentUser().getShortUserName())
         .build();
     OmMultipartInfo omMultipartInfo = omtest.initiateMultipartUpload(key1);
     return omMultipartInfo;
