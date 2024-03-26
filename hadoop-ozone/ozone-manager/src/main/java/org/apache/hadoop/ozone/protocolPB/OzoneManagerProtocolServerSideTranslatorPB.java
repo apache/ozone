@@ -57,6 +57,7 @@ import com.google.protobuf.RpcController;
 import com.google.protobuf.ServiceException;
 import org.apache.hadoop.ozone.security.S3SecurityUtil;
 import org.apache.ratis.protocol.RaftPeerId;
+import org.apache.ratis.server.protocol.TermIndex;
 import org.apache.ratis.util.ExitUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -86,6 +87,9 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements OzoneManagerP
   // always true, only used in tests
   private boolean shouldFlushCache = true;
 
+  private OMRequest lastRequestToSubmit;
+
+
   /**
    * Constructs an instance of the server handler.
    *
@@ -109,8 +113,9 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements OzoneManagerP
         : OzoneManagerDoubleBuffer.newBuilder()
           .setOmMetadataManager(ozoneManager.getMetadataManager())
           .enableTracing(TracingUtil.isTracingEnabled(ozoneManager.getConfiguration()))
-          .build();
-    this.handler = new OzoneManagerRequestHandler(impl, ozoneManagerDoubleBuffer);
+          .build()
+          .start();
+    this.handler = new OzoneManagerRequestHandler(impl);
     this.omRatisServer = ratisServer;
     dispatcher = new OzoneProtocolMessageDispatcher<>("OzoneProtocol",
         metrics, LOG, OMPBHelper::processForDebug, OMPBHelper::processForDebug);
@@ -210,6 +215,7 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements OzoneManagerP
         assert (omClientRequest != null);
         OMClientRequest finalOmClientRequest = omClientRequest;
         requestToSubmit = preExecute(finalOmClientRequest);
+        this.lastRequestToSubmit = requestToSubmit;
       } catch (IOException ex) {
         if (omClientRequest != null) {
           omClientRequest.handleRequestFailure(ozoneManager);
@@ -231,6 +237,11 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements OzoneManagerP
       throws IOException {
     return captureLatencyNs(perfMetrics.getPreExecuteLatencyNs(),
         () -> finalOmClientRequest.preExecute(ozoneManager));
+  }
+
+  @VisibleForTesting
+  public OMRequest getLastRequestToSubmit() {
+    return lastRequestToSubmit;
   }
 
   /**
@@ -278,7 +289,7 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements OzoneManagerP
    * Submits request directly to OM.
    */
   private OMResponse submitRequestDirectlyToOM(OMRequest request) {
-    OMClientResponse omClientResponse;
+    final OMClientResponse omClientResponse;
     try {
       if (OmUtils.isReadOnly(request)) {
         return handler.handleReadRequest(request);
@@ -286,8 +297,8 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements OzoneManagerP
         OMClientRequest omClientRequest =
             createClientRequest(request, ozoneManager);
         request = omClientRequest.preExecute(ozoneManager);
-        long index = transactionIndex.incrementAndGet();
-        omClientResponse = handler.handleWriteRequest(request, TransactionInfo.getTermIndex(index));
+        final TermIndex termIndex = TransactionInfo.getTermIndex(transactionIndex.incrementAndGet());
+        omClientResponse = handler.handleWriteRequest(request, termIndex, ozoneManagerDoubleBuffer);
       }
     } catch (IOException ex) {
       // As some preExecute returns error. So handle here.

@@ -45,7 +45,7 @@ public class TestOmPrefixInfoCodec extends Proto2CodecTestBase<OmPrefixInfo> {
 
     List<OzoneAcl> acls = new LinkedList<>();
     OzoneAcl ozoneAcl = new OzoneAcl(ACLIdentityType.USER,
-        "hive", ACLType.ALL, ACCESS);
+        "hive", ACCESS, ACLType.ALL);
     acls.add(ozoneAcl);
     OmPrefixInfo opiSave = OmPrefixInfo.newBuilder()
         .setName("/user/hive/warehouse")

@@ -61,9 +61,6 @@ public class TestOmSnapshotDisabledRestart {
     cluster.waitForClusterToBeReady();
     client = cluster.newClient();
 
-    OzoneManager leaderOzoneManager = cluster.getOMLeader();
-    OzoneConfiguration leaderConfig = leaderOzoneManager.getConfiguration();
-    cluster.setConf(leaderConfig);
     store = client.getObjectStore();
   }
 
