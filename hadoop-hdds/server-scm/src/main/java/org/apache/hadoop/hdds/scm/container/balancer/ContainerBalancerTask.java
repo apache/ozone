@@ -1150,23 +1150,6 @@ public class ContainerBalancerTask implements Runnable {
     this.taskStatus = taskStatus;
   }
 
-  @VisibleForTesting
-  List<DatanodeUsageInfo> getSourceInPotentialSources() {
-    List<DatanodeUsageInfo> sources = findSourceStrategy.getPotentialSources();
-    return sources;
-  }
-
-  @VisibleForTesting
-  boolean checkSourceInPotentialSources(DatanodeDetails checkDn) {
-    List<DatanodeUsageInfo> sources = findSourceStrategy.getPotentialSources();
-    for (DatanodeUsageInfo dn : sources) {
-      if (checkDn.equals(dn.getDatanodeDetails())) {
-        return true;
-      }
-    }
-    return false;
-  }
-
   public Status getBalancerStatus() {
     return taskStatus;
   }

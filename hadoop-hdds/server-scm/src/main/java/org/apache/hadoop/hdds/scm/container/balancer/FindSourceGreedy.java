@@ -17,7 +17,6 @@
 
 package org.apache.hadoop.hdds.scm.container.balancer;
 
-import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.scm.node.DatanodeUsageInfo;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
@@ -198,11 +197,5 @@ public class FindSourceGreedy implements FindSourceStrategy {
     setLowerLimit(lowLimit);
     sizeLeavingNode.clear();
     resetSources(potentialDataNodes);
-  }
-
-  @Override
-  @VisibleForTesting
-  public List<DatanodeUsageInfo> getPotentialSources() {
-    return new ArrayList<>(potentialSources);
   }
 }

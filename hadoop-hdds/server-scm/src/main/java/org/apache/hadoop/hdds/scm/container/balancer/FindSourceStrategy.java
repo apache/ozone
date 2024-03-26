@@ -18,7 +18,6 @@
 
 package org.apache.hadoop.hdds.scm.container.balancer;
 
-import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.scm.node.DatanodeUsageInfo;
 
@@ -86,7 +85,4 @@ public interface FindSourceStrategy {
    *                {@link DatanodeDetails} that containers can move from
    */
   void resetPotentialSources(@Nonnull Collection<DatanodeDetails> sources);
-
-  @VisibleForTesting
-  List<DatanodeUsageInfo> getPotentialSources();
 }
