@@ -113,11 +113,20 @@ public class OMPerformanceMetrics {
   @Metric(about = "Ratis local command execution latency in nano seconds")
   private MutableRate validateAndUpdateCacheLatencyNs;
 
+  @Metric(about = "average pagination for listKeys")
+  private MutableRate listKeysAveragePagination;
+
+  @Metric(about = "ops per second for listKeys")
+  private MutableRate listKeysOpsPerSec;
+
   @Metric(about = "ACLs check latency in listKeys")
   private MutableRate listKeysAclCheckLatencyNs;
 
   @Metric(about = "resolveBucketLink latency in listKeys")
   private MutableRate listKeysResolveBucketLatencyNs;
+
+  @Metric(about = "readFromRockDb latency in listKeys")
+  private MutableRate listKeysReadFromRocksDbLatencyNs;
 
   public void addLookupLatency(long latencyInNs) {
     lookupLatencyNs.add(latencyInNs);
@@ -216,11 +225,23 @@ public class OMPerformanceMetrics {
     return validateAndUpdateCacheLatencyNs;
   }
 
+  public void setListKeysAveragePagination(long averagePagination) {
+    listKeysAveragePagination.add(averagePagination);
+  }
+
+  public void setListKeysOpsPerSec(long opsPerSec) {
+    listKeysOpsPerSec.add(opsPerSec);
+  }
+  
   MutableRate getListKeysAclCheckLatencyNs() {
     return listKeysAclCheckLatencyNs;
   }
 
   MutableRate getListKeysResolveBucketLatencyNs() {
     return listKeysResolveBucketLatencyNs;
+  }
+
+  public void addListKeysReadFromRocksDbLatencyNs(long latencyInNs) {
+    listKeysReadFromRocksDbLatencyNs.add(latencyInNs);
   }
 }

@@ -31,6 +31,7 @@ import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.audit.AuditLogger;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OMMetrics;
+import org.apache.hadoop.ozone.om.OMPerformanceMetrics;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
@@ -260,14 +261,16 @@ public class TestCleanupTableInfo {
    * @throws IOException if I/O error occurs in setting up data store for the
    *                     metadata manager.
    */
-  private OMMetadataManager createOMMetadataManagerSpy() throws IOException {
+  private OmMetadataManagerImpl createOMMetadataManagerSpy()
+      throws IOException {
     OzoneConfiguration conf = new OzoneConfiguration();
     File newFolder = folder.toFile();
     if (!newFolder.exists()) {
       assertTrue(newFolder.mkdirs());
     }
     ServerUtils.setOzoneMetaDirPath(conf, newFolder.toString());
-    return spy(new OmMetadataManagerImpl(conf, null));
+    return spy(
+        new OmMetadataManagerImpl(conf, null, new OMPerformanceMetrics()));
   }
 
   private OMFileCreateRequest anOMFileCreateRequest() {
