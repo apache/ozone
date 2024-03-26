@@ -718,7 +718,7 @@ public final class SnapshotInfo implements Auditable, CopyObject<SnapshotInfo> {
   @Override
   public String toString() {
     return "SnapshotInfo{" +
-        ", snapshotId: '" + snapshotId + '\'' +
+        "snapshotId: '" + snapshotId + '\'' +
         ", name: '" + name + "'," +
         ", volumeName: '" + volumeName + '\'' +
         ", bucketName: '" + bucketName + '\'' +
