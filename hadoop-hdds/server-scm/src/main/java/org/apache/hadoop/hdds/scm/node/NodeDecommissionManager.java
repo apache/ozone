@@ -312,15 +312,17 @@ public class NodeDecommissionManager {
   }
 
   public synchronized List<DatanodeAdminError> decommissionNodes(
-      List<String> nodes) {
+      List<String> nodes, boolean force) {
     List<DatanodeAdminError> errors = new ArrayList<>();
     List<DatanodeDetails> dns = mapHostnamesToDatanodes(nodes, errors);
-    // add check for fail-early
-    boolean decommissionPossible = checkIfDecommissionPossible(dns, errors);
-    if (!decommissionPossible) {
-      LOG.error("Cannot decommission nodes as sufficient node are not available.");
-      errors.add(new DatanodeAdminError("AllHosts", "Sufficient nodes are not available."));
-      return errors;
+    // add check for fail-early if force flag is not set
+    if (!force) {
+      boolean decommissionPossible = checkIfDecommissionPossible(dns, errors);
+      if (!decommissionPossible) {
+        LOG.error("Cannot decommission nodes as sufficient node are not available.");
+        errors.add(new DatanodeAdminError("AllHosts", "Sufficient nodes are not available."));
+        return errors;
+      }
     }
     for (DatanodeDetails dn : dns) {
       try {
@@ -383,8 +385,8 @@ public class NodeDecommissionManager {
   }
 
   private synchronized boolean checkIfDecommissionPossible(List<DatanodeDetails> dns, List<DatanodeAdminError> errors) {
-    // do we require method synchronization?
-    int minInService = -1; // maxRatis = -1, maxEc = -1;
+    int minInService = -1;
+    int inServiceTotal = nodeManager.getNodeCount(NodeStatus.inServiceHealthy());
     for (DatanodeDetails dn : dns) {
       Set<ContainerID> containers;
       try {
@@ -408,22 +410,16 @@ public class NodeDecommissionManager {
           continue;
         }
         int reqNodes = cif.getReplicationConfig().getRequiredNodes();
+        if ((inServiceTotal - dns.size()) < reqNodes) {
+          return false;
+        }
         if (reqNodes > minInService) {
           minInService = reqNodes;
         }
-      /* *below code would check the replication type and then get the factor,
-        but as we have a simpler way i.e., getRequiredNodes(), I don't think we need to care about the replication type
-
-      HddsProtos.ReplicationType replicationType = cif.getReplicationType();
-      if (replicationType.equals(HddsProtos.ReplicationType.RATIS)) {
-        maxRatis = cif.getReplicationFactor().getNumber();
-      } else if (replicationType.equals(HddsProtos.ReplicationType.EC) {
-        //cif.getReplicationConfig();
-      }*/
       }
     }
 
-    return ((nodeManager.getNodeCount(NodeStatus.inServiceHealthy()) - dns.size()) >= minInService);
+    return true;
   }
 
   public synchronized List<DatanodeAdminError> recommissionNodes(

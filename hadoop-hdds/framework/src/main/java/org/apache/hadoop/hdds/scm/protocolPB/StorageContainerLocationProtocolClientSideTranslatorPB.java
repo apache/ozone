@@ -528,10 +528,11 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
   /**
    * Attempts to decommission the list of nodes.
    * @param nodes The list of hostnames or hostname:ports to decommission
+   * @param force boolean flag that skips fail-early checks and tries to decommission nodes
    * @throws IOException
    */
   @Override
-  public List<DatanodeAdminError> decommissionNodes(List<String> nodes)
+  public List<DatanodeAdminError> decommissionNodes(List<String> nodes, boolean force)
       throws IOException {
     Preconditions.checkNotNull(nodes);
     DecommissionNodesRequestProto request =

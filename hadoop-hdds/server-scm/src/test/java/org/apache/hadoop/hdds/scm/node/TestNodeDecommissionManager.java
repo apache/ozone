@@ -151,37 +151,37 @@ public class TestNodeDecommissionManager {
     // Try to decommission a host that does exist, but give incorrect port
     List<DatanodeAdminError> error =
         decom.decommissionNodes(
-            singletonList(dns.get(1).getIpAddress() + ":10"));
+            singletonList(dns.get(1).getIpAddress() + ":10"), false);
     assertEquals(1, error.size());
     assertThat(error.get(0).getHostname()).contains(dns.get(1).getIpAddress());
 
     // Try to decommission a host that does not exist
-    error = decom.decommissionNodes(singletonList("123.123.123.123"));
+    error = decom.decommissionNodes(singletonList("123.123.123.123"), false);
     assertEquals(1, error.size());
     assertThat(error.get(0).getHostname()).contains("123.123.123.123");
 
     // Try to decommission a host that does exist and a host that does not
     error  = decom.decommissionNodes(Arrays.asList(dns.get(1).getIpAddress(),
-        "123,123,123,123"));
+        "123,123,123,123"), false);
     assertEquals(1, error.size());
     assertThat(error.get(0).getHostname()).contains("123,123,123,123");
 
     // Try to decommission a host with many DNs on the address with no port
-    error = decom.decommissionNodes(singletonList(dns.get(0).getIpAddress()));
+    error = decom.decommissionNodes(singletonList(dns.get(0).getIpAddress()), false);
     assertEquals(1, error.size());
     assertThat(error.get(0).getHostname()).contains(dns.get(0).getIpAddress());
 
     // Try to decommission a host with many DNs on the address with a port
     // that does not exist
     error = decom.decommissionNodes(singletonList(dns.get(0).getIpAddress()
-        + ":10"));
+        + ":10"), false);
     assertEquals(1, error.size());
     assertThat(error.get(0).getHostname()).contains(dns.get(0).getIpAddress() + ":10");
 
     // Try to decommission 2 hosts with address that does not exist
     // Both should return error
     error  = decom.decommissionNodes(Arrays.asList(
-        "123.123.123.123", "234.234.234.234"));
+        "123.123.123.123", "234.234.234.234"), false);
     assertEquals(2, error.size());
     assertTrue(error.get(0).getHostname().contains("123.123.123.123") &&
         error.get(1).getHostname().contains("234.234.234.234"));
@@ -194,7 +194,7 @@ public class TestNodeDecommissionManager {
 
     // Decommission 2 valid nodes
     decom.decommissionNodes(Arrays.asList(dns.get(1).getIpAddress(),
-        dns.get(2).getIpAddress()));
+        dns.get(2).getIpAddress()), false);
     assertEquals(HddsProtos.NodeOperationalState.DECOMMISSIONING,
         nodeManager.getNodeStatus(dns.get(1)).getOperationalState());
     assertEquals(HddsProtos.NodeOperationalState.DECOMMISSIONING,
@@ -203,14 +203,14 @@ public class TestNodeDecommissionManager {
     // Running the command again gives no error - nodes already decommissioning
     // are silently ignored.
     decom.decommissionNodes(Arrays.asList(dns.get(1).getIpAddress(),
-        dns.get(2).getIpAddress()));
+        dns.get(2).getIpAddress()), false);
 
     // Attempt to decommission dn(10) which has multiple hosts on the same IP
     // and we hardcoded ports to 3456, 4567, 5678
     DatanodeDetails multiDn = dns.get(10);
     String multiAddr =
         multiDn.getIpAddress() + ":" + multiDn.getPorts().get(0).getValue();
-    decom.decommissionNodes(singletonList(multiAddr));
+    decom.decommissionNodes(singletonList(multiAddr), false);
     assertEquals(HddsProtos.NodeOperationalState.DECOMMISSIONING,
         nodeManager.getNodeStatus(multiDn).getOperationalState());
 
@@ -218,7 +218,7 @@ public class TestNodeDecommissionManager {
     // dn(11) with identical ports.
     nodeManager.processHeartbeat(dns.get(9));
     DatanodeDetails duplicatePorts = dns.get(9);
-    decom.decommissionNodes(singletonList(duplicatePorts.getIpAddress()));
+    decom.decommissionNodes(singletonList(duplicatePorts.getIpAddress()), false);
     assertEquals(HddsProtos.NodeOperationalState.DECOMMISSIONING,
         nodeManager.getNodeStatus(duplicatePorts).getOperationalState());
 
@@ -269,13 +269,13 @@ public class TestNodeDecommissionManager {
 
     // Attempt to decommission with just the IP, which should fail.
     List<DatanodeAdminError> error =
-        decom.decommissionNodes(singletonList(extraDN.getIpAddress()));
+        decom.decommissionNodes(singletonList(extraDN.getIpAddress()), false);
     assertEquals(1, error.size());
     assertThat(error.get(0).getHostname()).contains(extraDN.getIpAddress());
 
     // Now try the one with the unique port
     decom.decommissionNodes(
-        singletonList(extraDN.getIpAddress() + ":" + ratisPort + 1));
+        singletonList(extraDN.getIpAddress() + ":" + ratisPort + 1), false);
 
     assertEquals(HddsProtos.NodeOperationalState.DECOMMISSIONING,
         nodeManager.getNodeStatus(extraDN).getOperationalState());
@@ -291,7 +291,7 @@ public class TestNodeDecommissionManager {
     nodeManager.processHeartbeat(expectedDN);
 
     decom.decommissionNodes(singletonList(
-        expectedDN.getIpAddress() + ":" + ratisPort));
+        expectedDN.getIpAddress() + ":" + ratisPort), false);
     assertEquals(HddsProtos.NodeOperationalState.DECOMMISSIONING,
         nodeManager.getNodeStatus(expectedDN).getOperationalState());
     // The other duplicate is still in service
@@ -375,7 +375,7 @@ public class TestNodeDecommissionManager {
     // Try to go from maint to decom:
     List<String> dn = new ArrayList<>();
     dn.add(dns.get(1).getIpAddress());
-    List<DatanodeAdminError> errors = decom.decommissionNodes(dn);
+    List<DatanodeAdminError> errors = decom.decommissionNodes(dn, false);
     assertEquals(1, errors.size());
     assertEquals(dns.get(1).getHostName(), errors.get(0).getHostname());
 
@@ -445,7 +445,7 @@ public class TestNodeDecommissionManager {
     }
 
     error = decom.decommissionNodes(Arrays.asList(dns.get(1).getIpAddress(),
-        dns.get(2).getIpAddress(), dns.get(3).getIpAddress(), dns.get(4).getIpAddress()));
+        dns.get(2).getIpAddress(), dns.get(3).getIpAddress(), dns.get(4).getIpAddress()), false);
     assertTrue(error.get(0).getHostname().contains("AllHosts"));
   }
 
@@ -471,7 +471,7 @@ public class TestNodeDecommissionManager {
       nodeManager.setContainers(dn, idsEC);
     }
 
-    error = decom.decommissionNodes(Arrays.asList(dns.get(1).getIpAddress()));
+    error = decom.decommissionNodes(Arrays.asList(dns.get(1).getIpAddress()), false);
     assertTrue(error.get(0).getHostname().contains("AllHosts"));
   }
 
@@ -502,7 +502,7 @@ public class TestNodeDecommissionManager {
       nodeManager.setContainers(dn, idsEC);
     }
 
-    error = decom.decommissionNodes(Arrays.asList(dns.get(1).getIpAddress()));
+    error = decom.decommissionNodes(Arrays.asList(dns.get(1).getIpAddress()), false);
     assertTrue(error.get(0).getHostname().contains("AllHosts"));
   }
 
