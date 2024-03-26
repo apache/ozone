@@ -1072,7 +1072,7 @@ public class SCMClientProtocolServer implements
       if (maxSizeToMovePerIterationInGB.isPresent()) {
         long mstm = maxSizeToMovePerIterationInGB.get();
         auditMap.put("maxSizeToMovePerIterationInGB", String.valueOf(mstm));
-        if (mstm < 0) {
+        if (mstm <= 0) {
           throw new SCMException("Max Size To Move Per Iteration In GB must be positive.", resultCodes);
         }
         cbc.setMaxSizeToMovePerIteration(mstm * OzoneConsts.GB);
@@ -1102,7 +1102,7 @@ public class SCMClientProtocolServer implements
       if (maxSizeEnteringTarget.isPresent()) {
         long mset = maxSizeEnteringTarget.get();
         auditMap.put("maxSizeEnteringTarget", String.valueOf(mset));
-        if (mset < 0) {
+        if (mset <= 0) {
           throw new SCMException("Max Size Entering Target must be " +
               "greater than zero.", resultCodes);
         }
@@ -1112,7 +1112,7 @@ public class SCMClientProtocolServer implements
       if (maxSizeLeavingSource.isPresent()) {
         long msls = maxSizeLeavingSource.get();
         auditMap.put("maxSizeLeavingSource", String.valueOf(msls));
-        if (msls < 0) {
+        if (msls <= 0) {
           throw new SCMException("Max Size Leaving Source must be " +
               "greater than zero.", resultCodes);
         }
@@ -1122,7 +1122,7 @@ public class SCMClientProtocolServer implements
       if (balancingInterval.isPresent()) {
         int bi = balancingInterval.get();
         auditMap.put("balancingInterval", String.valueOf(bi));
-        if (bi < 0) {
+        if (bi <= 0) {
           throw new SCMException("Balancing Interval must be greater than zero.", resultCodes);
         }
         cbc.setBalancingInterval(Duration.ofMinutes(bi));
@@ -1131,7 +1131,7 @@ public class SCMClientProtocolServer implements
       if (moveTimeout.isPresent()) {
         int mt = moveTimeout.get();
         auditMap.put("moveTimeout", String.valueOf(mt));
-        if (mt < 0) {
+        if (mt <= 0) {
           throw new SCMException("Move Timeout must be greater than zero.", resultCodes);
         }
         cbc.setMoveTimeout(Duration.ofMinutes(mt));
@@ -1140,7 +1140,7 @@ public class SCMClientProtocolServer implements
       if (moveReplicationTimeout.isPresent()) {
         int mrt = moveReplicationTimeout.get();
         auditMap.put("moveReplicationTimeout", String.valueOf(mrt));
-        if (mrt < 0) {
+        if (mrt <= 0) {
           throw new SCMException("Move Replication Timeout must be greater than zero.", resultCodes);
         }
         cbc.setMoveReplicationTimeout(Duration.ofMinutes(mrt));
