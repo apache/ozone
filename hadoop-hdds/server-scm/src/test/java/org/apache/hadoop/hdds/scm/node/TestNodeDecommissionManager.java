@@ -97,10 +97,10 @@ public class TestNodeDecommissionManager {
     id++;
     return builder.build();
   }
-  private ContainerInfo getMockContainer(ReplicationConfig rep, ContainerID id) {
+  private ContainerInfo getMockContainer(ReplicationConfig rep, ContainerID conId) {
     ContainerInfo.Builder builder = new ContainerInfo.Builder()
         .setReplicationConfig(rep)
-        .setContainerID(id.getId())
+        .setContainerID(conId.getId())
         .setPipelineID(PipelineID.randomId())
         .setState(OPEN)
         .setOwner("admin");
@@ -492,7 +492,7 @@ public class TestNodeDecommissionManager {
     when(containerManager.getContainer(any(ContainerID.class)))
         .thenAnswer(invocation -> {
           ContainerID containerID = (ContainerID)invocation.getArguments()[0];
-          if(idsEC.contains(containerID)) {
+          if (idsEC.contains(containerID)) {
             return getMockContainer(new ECReplicationConfig(3, 2),
                 (ContainerID)invocation.getArguments()[0]);
           }
