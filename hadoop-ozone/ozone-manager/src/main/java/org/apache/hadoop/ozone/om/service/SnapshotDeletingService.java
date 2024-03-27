@@ -51,6 +51,7 @@ import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServer;
 import org.apache.hadoop.ozone.om.snapshot.ReferenceCounted;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PurgePathRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SnapshotMoveDeletedKeysRequest;
@@ -565,7 +566,7 @@ public class SnapshotDeletingService extends AbstractKeyDeletingService {
       }
     }
 
-    public void submitRequest(OMRequest omRequest) {
+    public OzoneManagerProtocolProtos.Status submitRequest(OMRequest omRequest) {
       try {
         if (isRatisEnabled()) {
           OzoneManagerRatisServer server = ozoneManager.getOmRatisServer();
@@ -580,13 +581,14 @@ public class SnapshotDeletingService extends AbstractKeyDeletingService {
               .setType(RaftClientRequest.writeRequestType())
               .build();
 
-          server.submitRequest(omRequest, raftClientRequest);
+          return server.submitRequest(omRequest, raftClientRequest).getStatus();
         } else {
-          ozoneManager.getOmServerProtocol().submitRequest(null, omRequest);
+          return ozoneManager.getOmServerProtocol().submitRequest(null, omRequest).getStatus();
         }
       } catch (ServiceException e) {
         LOG.error("Snapshot Deleting request failed. " +
             "Will retry at next run.", e);
+        return null;
       }
     }
   }
