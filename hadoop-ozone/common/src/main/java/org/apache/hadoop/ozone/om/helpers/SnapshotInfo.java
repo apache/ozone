@@ -728,4 +728,28 @@ public final class SnapshotInfo implements Auditable, CopyObject<SnapshotInfo> {
         .setExclusiveReplicatedSize(exclusiveReplicatedSize)
         .build();
   }
+
+  @Override
+  public String toString() {
+    return "SnapshotInfo{" +
+        "snapshotId: '" + snapshotId + '\'' +
+        ", name: '" + name + "'," +
+        ", volumeName: '" + volumeName + '\'' +
+        ", bucketName: '" + bucketName + '\'' +
+        ", snapshotStatus: '" + snapshotStatus + '\'' +
+        ", creationTime: '" + creationTime + '\'' +
+        ", deletionTime: '" + deletionTime + '\'' +
+        ", pathPreviousSnapshotId: '" + pathPreviousSnapshotId + '\'' +
+        ", globalPreviousSnapshotId: '" + globalPreviousSnapshotId + '\'' +
+        ", snapshotPath: '" + snapshotPath + '\'' +
+        ", checkpointDir: '" + checkpointDir + '\'' +
+        ", dbTxSequenceNumber: '" + dbTxSequenceNumber + '\'' +
+        ", deepClean: '" + deepClean + '\'' +
+        ", sstFiltered: '" + sstFiltered + '\'' +
+        ", referencedSize: '" + referencedSize + '\'' +
+        ", referencedReplicatedSize: '" + referencedReplicatedSize + '\'' +
+        ", exclusiveSize: '" + exclusiveSize + '\'' +
+        ", exclusiveReplicatedSize: '" + exclusiveReplicatedSize + '\'' +
+        '}';
+  }
 }
