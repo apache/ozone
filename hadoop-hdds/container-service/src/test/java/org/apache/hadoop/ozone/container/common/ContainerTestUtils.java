@@ -67,6 +67,8 @@ import org.mockito.Mockito;
 import java.io.File;
 import java.io.IOException;
 import java.net.InetSocketAddress;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.Collections;
 import java.util.Map;
 import java.util.Random;
@@ -130,8 +132,13 @@ public final class ContainerTestUtils {
   public static OzoneContainer getOzoneContainer(
       DatanodeDetails datanodeDetails, OzoneConfiguration conf)
       throws IOException {
+    Path tempDir = Files.createTempDirectory("");
     StateContext context = getMockContext(datanodeDetails, conf);
-    return new OzoneContainer(datanodeDetails, conf, context);
+    OzoneContainer container = new OzoneContainer(datanodeDetails, conf, context);
+    MutableVolumeSet volumeSet = container.getVolumeSet();
+    StorageVolumeUtil.getHddsVolumesList(volumeSet.getVolumesList())
+        .forEach(hddsVolume -> hddsVolume.setDbParentDir(tempDir.toFile()));
+    return container;
   }
 
   public static StateContext getMockContext(DatanodeDetails datanodeDetails,

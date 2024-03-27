@@ -319,6 +319,11 @@ public class HddsVolume extends StorageVolume {
     return this.dbParentDir;
   }
 
+  @VisibleForTesting
+  public void setDbParentDir(File dbParentDir) {
+    this.dbParentDir = dbParentDir;
+  }
+
   public File getDeletedContainerDir() {
     return this.deletedContainerDir;
   }
