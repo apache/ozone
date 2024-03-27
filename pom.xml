@@ -303,6 +303,7 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
     <properties.maven.plugin.version>1.2.1</properties.maven.plugin.version>
     <maven.core.version>3.9.6</maven.core.version>
     <snappy-java.version>1.1.10.5</snappy-java.version>
+    <hadoop-shaded-guava.version>1.2.0</hadoop-shaded-guava.version>
   </properties>
 
   <dependencyManagement>
@@ -1214,6 +1215,11 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
         <groupId>org.xerial.snappy</groupId>
         <artifactId>snappy-java</artifactId>
         <version>${snappy-java.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.hadoop.thirdparty</groupId>
+        <artifactId>hadoop-shaded-guava</artifactId>
+        <version>${hadoop-shaded-guava.version}</version>
       </dependency>
     </dependencies>
   </dependencyManagement>
