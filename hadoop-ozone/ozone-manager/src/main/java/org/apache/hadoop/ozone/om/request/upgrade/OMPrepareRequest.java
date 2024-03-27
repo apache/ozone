@@ -212,12 +212,6 @@ public class OMPrepareRequest extends OMClientRequest {
               "OM database flushed index %d which is less than the minimum " +
               "required index %d.",
           flushTimeout.getSeconds(), lastOMDBFlushIndex, minOMDBFlushIndex));
-    } else if (!ratisStateMachineApplied) {
-      throw new IOException(String.format("After waiting for %d seconds, " +
-              "Ratis state machine applied index %d which is less than" +
-              " the minimum required index %d.",
-          flushTimeout.getSeconds(), lastRatisCommitIndex,
-          minRatisStateMachineIndex));
     }
     return lastRatisCommitIndex;
   }
