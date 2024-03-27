@@ -183,9 +183,6 @@ public class TestHSync {
     GenericTestUtils.setLogLevel(BlockOutputStream.LOG, Level.DEBUG);
     GenericTestUtils.setLogLevel(BlockInputStream.LOG, Level.DEBUG);
     GenericTestUtils.setLogLevel(KeyValueHandler.LOG, Level.DEBUG);
-    //GenericTestUtils.setLogLevel(OMKeyRequest.LOG, Level.DEBUG);
-    //GenericTestUtils.setLogLevel(OMKeyCommitRequest.LOG, Level.DEBUG);
-    //GenericTestUtils.setLogLevel(OMKeyCommitRequestWithFSO.LOG, Level.DEBUG);
   }
 
   @AfterAll

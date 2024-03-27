@@ -212,7 +212,7 @@ public final class ContainerCommandResponseBuilders {
   }
 
   /**
-   * Gets a response for the putSmallFile RPC.
+   * Gets a response for the WriteChunk RPC.
    * @param msg - ContainerCommandRequestProto
    * @return - ContainerCommandResponseProto
    */

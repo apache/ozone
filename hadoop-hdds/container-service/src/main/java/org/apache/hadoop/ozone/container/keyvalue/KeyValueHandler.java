@@ -862,7 +862,7 @@ public class KeyValueHandler extends Handler {
         metrics.incContainerOpsMetrics(Type.PutBlock);
         BlockData blockData = BlockData.getFromProtoBuf(
             writeChunk.getBlock().getBlockData());
-        // optimization for hsync when WriteChunk is commit phase:
+        // optimization for hsync when WriteChunk is in commit phase:
         //
         // block metadata is piggybacked in the same message.
         // there will not be an additional PutBlock request.

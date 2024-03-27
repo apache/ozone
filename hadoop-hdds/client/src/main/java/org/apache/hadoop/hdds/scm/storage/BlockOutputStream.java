@@ -91,8 +91,6 @@ public class BlockOutputStream extends OutputStream {
   public static final KeyValue FULL_CHUNK_KV =
       KeyValue.newBuilder().setKey(FULL_CHUNK).build();
 
-  // Flushed chunk less than 100KB will combine PutBlock and WriteChunk in the same request.
-  private static final int SMALL_CHUNK_THRESHOLD = 100 * 1024;
   private AtomicReference<BlockID> blockID;
   private final AtomicReference<ChunkInfo> previousChunkInfo
       = new AtomicReference<>();
@@ -615,8 +613,7 @@ public class BlockOutputStream extends OutputStream {
       // here, we just limit this buffer to the current position. So that next
       // write will happen in new buffer
       if (currentBuffer.hasRemaining()) {
-        if (writtenDataLength - totalDataFlushedLength < SMALL_CHUNK_THRESHOLD &&
-            allowPutBlockPiggybacking) {
+        if (allowPutBlockPiggybacking) {
           updateFlushLength();
           writeSmallChunk(currentBuffer);
         } else {
