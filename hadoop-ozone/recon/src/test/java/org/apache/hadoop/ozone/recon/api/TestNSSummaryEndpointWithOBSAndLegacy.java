@@ -878,7 +878,7 @@ public class TestNSSummaryEndpointWithOBSAndLegacy {
   }
 
   @Test
-  public void testNormalizePathUptilBucket_AllScenarios() {
+  public void testNormalizePathUptilBucket() {
     // Test null or empty path
     assertEquals("/", OmUtils.normalizePathUptilBucket(null));
     assertEquals("/", OmUtils.normalizePathUptilBucket(""));
