@@ -23,7 +23,7 @@
       {
         "hostname": "localhost2.storage.enterprise.com",
         "uuid": "b590734e-a5f2-11ea-bb37-0242ac130010",
-        "state": "HEALTHY",
+        "state": "DEAD",
         "opState": "IN_SERVICE",
         "lastHeartbeat": 1574728876059,
         "storageReport": {

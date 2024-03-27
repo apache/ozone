@@ -463,6 +463,13 @@ export class Datanodes extends React.Component<Record<string, object>, IDatanode
       selectedRowKeys: newSelectedRowKeys
     });
   };
+
+  onDisable = (record:any) => {
+    //Enable Record for Remove whos state is Dead or operation state Decommissioned or In Maintenance
+    if (record.state !== 'DEAD') {
+      return record.opState === 'IN_SERVICE' || record.opState === 'ENTERING_MAINTENANCE' || record.opState === 'DECOMMISSIONING';
+    }
+  };
   
   popConfirm = () => {
     this.setState({ loading: true });
@@ -476,7 +483,7 @@ export class Datanodes extends React.Component<Record<string, object>, IDatanode
       selectedRowKeys,
       onChange: this.onSelectChange,
       getCheckboxProps: record=> ({
-        disabled: record.opState === 'IN_SERVICE' || record.opState === 'ENTERING_MAINTENANCE' || record.opState === 'DECOMMISSIONING', // Column configuration not to be checked
+        disabled:  this.onDisable(record),
         opState: record.opState,
       }),
     };
@@ -515,20 +522,26 @@ export class Datanodes extends React.Component<Record<string, object>, IDatanode
         </div>
 
         <div className='content-div'>
-          {totalCount > 0 && <div style={{ marginBottom: 16 }}>
-            <Popconfirm
-              placement="right"
-              title={`Are you sure want to remove ${selectedRowKeys.length} Data nodes？`}
-              icon={<Tooltip title='Deleted Data Nodes includes DECOMMISSIONED and  IN_MAINTENANCE.'>
-                <Icon type='question-circle-o' style={{ color: 'red', fontSize: '20px' }} />
-              </Tooltip>}
-              onConfirm={this.popConfirm}
-            >
-              <Button style={{ width: 130, fontSize: "large" }} type="primary" disabled={!hasSelected} loading={loading}>
-                Remove
-              </Button>
-            </Popconfirm>
-          </div>}
+          {totalCount > 0 &&
+            <div style={{ marginBottom: 16 }}>
+              <Popconfirm
+                disabled={!hasSelected}
+                placement="topLeft"
+                title={`Are you sure you want Recon to stop tracking these selected ${selectedRowKeys.length} datanodes ?`}
+                icon={
+                  <Icon type='question-circle-o' style={{ color: 'red' }} />
+                }
+                onConfirm={this.popConfirm}
+              >
+                <Tooltip placement="topLeft" title="Remove and stop tracking the DECOMMISSIONED, IN_MAINTENANCE AND DEAD nodes!!!.">
+                  <Icon type="info-circle"/>
+                </Tooltip>
+                &nbsp;&nbsp;
+                <Button type="primary" shape="round" icon="stop" size="large" disabled={!hasSelected} loading={loading}>
+                </Button>
+              </Popconfirm>
+            </div>
+          }
           <Table
             rowSelection={rowSelection}
             dataSource={dataSource}
