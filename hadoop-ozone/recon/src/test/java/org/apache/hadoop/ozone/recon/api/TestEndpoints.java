@@ -71,7 +71,9 @@ import org.apache.hadoop.ozone.recon.api.types.BucketObjectDBInfo;
 import org.apache.hadoop.ozone.recon.api.types.BucketsResponse;
 import org.apache.hadoop.ozone.recon.api.types.ClusterStateResponse;
 import org.apache.hadoop.ozone.recon.api.types.DatanodeMetadata;
+import org.apache.hadoop.ozone.recon.api.types.DatanodeMetrics;
 import org.apache.hadoop.ozone.recon.api.types.DatanodesResponse;
+import org.apache.hadoop.ozone.recon.api.types.DecommissionStatusInfoResponse;
 import org.apache.hadoop.ozone.recon.api.types.PipelineMetadata;
 import org.apache.hadoop.ozone.recon.api.types.PipelinesResponse;
 import org.apache.hadoop.ozone.recon.api.types.VolumeObjectDBInfo;
@@ -141,8 +143,10 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Arrays;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.Callable;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -193,6 +197,7 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
     super();
   }
 
+  @SuppressWarnings("methodlength")
   private void initializeInjector() throws Exception {
     reconOMMetadataManager = getTestReconOmMetadataManager(
         initializeNewOmMetadataManager(Files.createDirectory(
@@ -306,6 +311,64 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
     pipelineManager = reconScm.getPipelineManager();
     reconPipelineManager = (ReconPipelineManager) pipelineManager;
     reconPipelineManager.addPipeline(pipeline);
+
+    // Mocking for command execution output.
+    Map<Integer, String> commandOutputMap = new HashMap<>();
+    commandOutputMap.put(0, "[\n" +
+        "    {\n" +
+        "        \"datanodeDetails\": {\n" +
+        "            \"level\": 3,\n" +
+        "            \"cost\": 0,\n" +
+        "            \"uuid\": \"77bae1b4-0c33-44bd-84f9-fe91508495fe\",\n" +
+        "            \"uuidString\": \"77bae1b4-0c33-44bd-84f9-fe91508495fe\",\n" +
+        "            \"ipAddress\": \"172.22.0.12\",\n" +
+        "            \"hostName\": \"ozone-ha-datanode-1.ozone-ha_default\",\n" +
+        "            \"ports\": [\n" +
+        "                {\n" +
+        "                    \"name\": \"HTTP\",\n" +
+        "                    \"value\": 9882\n" +
+        "                },\n" +
+        "                {\n" +
+        "                    \"name\": \"CLIENT_RPC\",\n" +
+        "                    \"value\": 19864\n" +
+        "                },\n" +
+        "                {\n" +
+        "                    \"name\": \"REPLICATION\",\n" +
+        "                    \"value\": 9886\n" +
+        "                },\n" +
+        "                {\n" +
+        "                    \"name\": \"RATIS\",\n" +
+        "                    \"value\": 9858\n" +
+        "                },\n" +
+        "                {\n" +
+        "                    \"name\": \"RATIS_ADMIN\",\n" +
+        "                    \"value\": 9857\n" +
+        "                },\n" +
+        "                {\n" +
+        "                    \"name\": \"RATIS_SERVER\",\n" +
+        "                    \"value\": 9856\n" +
+        "                },\n" +
+        "                {\n" +
+        "                    \"name\": \"RATIS_DATASTREAM\",\n" +
+        "                    \"value\": 9855\n" +
+        "                },\n" +
+        "                {\n" +
+        "                    \"name\": \"STANDALONE\",\n" +
+        "                    \"value\": 9859\n" +
+        "                }\n" +
+        "            ]\n" +
+        "        },\n" +
+        "        \"metrics\": {\n" +
+        "            \"decommissionStartTime\": \"18/03/2024 05:41:10 UTC\",\n" +
+        "            \"numOfUnclosedPipelines\": 1,\n" +
+        "            \"numOfUnderReplicatedContainers\": 0.0,\n" +
+        "            \"numOfUnclosedContainers\": 0.0\n" +
+        "        },\n" +
+        "        \"containers\": {}\n" +
+        "    }\n" +
+        "]");
+    when(reconUtilsMock.executeCommand(any(List.class))).thenReturn(commandOutputMap);
+
   }
 
   @SuppressWarnings("checkstyle:MethodLength")
@@ -688,7 +751,6 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
     when(urlConnectionMock.getInputStream()).thenReturn(inputStream);
     when(reconUtilsMock.makeHttpCall(any(URLConnectionFactory.class),
         anyString(), anyBoolean())).thenReturn(urlConnectionMock);
-
     metricsProxyEndpoint.getMetricsResponse(PROMETHEUS_INSTANT_QUERY_API,
         uriInfoMock, responseMock);
 
@@ -1176,5 +1238,66 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
 
   private BucketLayout getBucketLayout() {
     return BucketLayout.DEFAULT;
+  }
+
+  @Test
+  public void testDatanodesDecommissionInfoAPI() throws Exception {
+    Response response = nodeEndpoint.getDatanodesDecommissionInfo();
+    Map<String, Object> responseMap = (Map<String, Object>) response.getEntity();
+    responseMap.entrySet().forEach(entry -> {
+      assertEquals("DatanodesDecommissionInfo", entry.getKey());
+      List<DecommissionStatusInfoResponse> decommissionStatusInfoResponseList =
+          (List<DecommissionStatusInfoResponse>) entry.getValue();
+      decommissionStatusInfoResponseList.forEach(decommissionStatusInfoResponse -> {
+        DatanodeDetails dataNodeDetails = decommissionStatusInfoResponse.getDataNodeDetails();
+
+        assertEquals(3, dataNodeDetails.getLevel());
+        assertEquals(0, dataNodeDetails.getCost());
+        assertEquals("77bae1b4-0c33-44bd-84f9-fe91508495fe", dataNodeDetails.getUuid().toString());
+        assertEquals("172.22.0.12", dataNodeDetails.getIpAddress());
+        assertEquals("ozone-ha-datanode-1.ozone-ha_default", dataNodeDetails.getHostName());
+        assertEquals(8, dataNodeDetails.getPorts().size());
+        assertEquals("CLIENT_RPC", dataNodeDetails.getPorts().get(1).getName().name());
+        assertEquals(19864, dataNodeDetails.getPorts().get(1).getValue());
+
+        DatanodeMetrics datanodeMetrics = decommissionStatusInfoResponse.getDatanodeMetrics();
+        assertEquals("18/03/2024 05:41:10 UTC", datanodeMetrics.getDecommissionStartTime());
+        assertEquals(0.0, datanodeMetrics.getNumOfUnclosedContainers());
+        assertEquals(1, datanodeMetrics.getNumOfUnclosedPipelines());
+        assertEquals(0.0, datanodeMetrics.getNumOfUnderReplicatedContainers());
+        Map<String, List<ContainerID>> containers = decommissionStatusInfoResponse.getContainers();
+        assertEquals(0, containers.size());
+      });
+    });
+  }
+
+  @Test
+  public void testDecommissionInfoForDatanodeAPI() throws Exception {
+    Response response = nodeEndpoint.getDecommissionInfoForDatanode("77bae1b4-0c33-44bd-84f9-fe91508495fe");
+    Map<String, Object> responseMap = (Map<String, Object>) response.getEntity();
+    responseMap.entrySet().forEach(entry -> {
+      assertEquals("DatanodesDecommissionInfo", entry.getKey());
+      List<DecommissionStatusInfoResponse> decommissionStatusInfoResponseList =
+          (List<DecommissionStatusInfoResponse>) entry.getValue();
+      decommissionStatusInfoResponseList.forEach(decommissionStatusInfoResponse -> {
+        DatanodeDetails dataNodeDetails = decommissionStatusInfoResponse.getDataNodeDetails();
+        assertEquals("77bae1b4-0c33-44bd-84f9-fe91508495fe", dataNodeDetails.getUuid().toString());
+        assertEquals("ozone-ha-datanode-1.ozone-ha_default", dataNodeDetails.getHostName());
+        assertEquals("/default-rack", dataNodeDetails.getNetworkLocation());
+        assertEquals("172.22.0.12", dataNodeDetails.getIpAddress());
+        assertEquals(8, dataNodeDetails.getPorts().size());
+        assertEquals("CLIENT_RPC", dataNodeDetails.getPorts().get(1).getName().name());
+        assertEquals(19864, dataNodeDetails.getPorts().get(1).getValue());
+
+        DatanodeMetrics datanodeMetrics = decommissionStatusInfoResponse.getDatanodeMetrics();
+        assertEquals("18/03/2024 05:41:10 UTC", datanodeMetrics.getDecommissionStartTime());
+        assertEquals(0.0, datanodeMetrics.getNumOfUnclosedContainers());
+        assertEquals(1, datanodeMetrics.getNumOfUnclosedPipelines());
+        assertEquals(0.0, datanodeMetrics.getNumOfUnderReplicatedContainers());
+
+        Map<String, List<ContainerID>> containers = decommissionStatusInfoResponse.getContainers();
+        assertEquals(0, containers.size());
+      });
+    });
   }
 }

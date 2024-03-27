@@ -18,9 +18,16 @@
 
 package org.apache.hadoop.ozone.recon.api;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.module.SimpleModule;
+import com.google.common.base.Preconditions;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState;
+import org.apache.hadoop.hdds.recon.CustomDatanodeDetailsDeserializer;
+import org.apache.hadoop.hdds.recon.CustomDatanodeDetailsSerializer;
 import org.apache.hadoop.hdds.scm.container.placement.metrics.SCMNodeStat;
 import org.apache.hadoop.hdds.scm.node.DatanodeInfo;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
@@ -29,22 +36,29 @@ import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineNotFoundException;
 import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
+import org.apache.hadoop.ozone.recon.ReconUtils;
 import org.apache.hadoop.ozone.recon.api.types.DatanodeMetadata;
 import org.apache.hadoop.ozone.recon.api.types.DatanodePipeline;
 import org.apache.hadoop.ozone.recon.api.types.DatanodeStorageReport;
 import org.apache.hadoop.ozone.recon.api.types.DatanodesResponse;
+import org.apache.hadoop.ozone.recon.api.types.DecommissionStatusInfoResponse;
 import org.apache.hadoop.ozone.recon.scm.ReconNodeManager;
 import org.apache.hadoop.ozone.recon.scm.ReconContainerManager;
 
 import javax.inject.Inject;
 import javax.ws.rs.GET;
 import javax.ws.rs.Path;
+import javax.ws.rs.PathParam;
 import javax.ws.rs.Produces;
+import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -65,14 +79,16 @@ public class NodeEndpoint {
   private ReconNodeManager nodeManager;
   private ReconPipelineManager pipelineManager;
   private ReconContainerManager reconContainerManager;
+  private ReconUtils reconUtils;
 
   @Inject
-  NodeEndpoint(OzoneStorageContainerManager reconSCM) {
+  NodeEndpoint(OzoneStorageContainerManager reconSCM, ReconUtils reconUtils) {
     this.nodeManager =
         (ReconNodeManager) reconSCM.getScmNodeManager();
     this.reconContainerManager = 
         (ReconContainerManager) reconSCM.getContainerManager();
     this.pipelineManager = (ReconPipelineManager) reconSCM.getPipelineManager();
+    this.reconUtils = reconUtils;
   }
 
   /**
@@ -170,5 +186,76 @@ public class NodeEndpoint {
     long remaining = nodeStat.getRemaining().get();
     long committed = nodeStat.getCommitted().get();
     return new DatanodeStorageReport(capacity, used, remaining, committed);
+  }
+
+  /**
+   * This GET API provides the information of all datanodes for which decommissioning is initiated.
+   * @return the wrapped  Response output
+   */
+  @GET
+  @Path("/decommission/info")
+  public Response getDatanodesDecommissionInfo() {
+    // Command to execute
+    List<String> commandArgs = Arrays.asList("ozone", "admin", "datanode", "status", "decommission", "--json");
+
+    return getDecommissionStatusResponse(commandArgs);
+  }
+
+  /**
+   * This GET API provides the information of a specific datanode for which decommissioning is initiated.
+   * @return the wrapped  Response output
+   */
+  @GET
+  @Path("/decommission/info/{uuid}")
+  public Response getDecommissionInfoForDatanode(@PathParam("uuid") String uuid) {
+    Preconditions.checkNotNull(uuid, "uuid of a datanode cannot be null !!!");
+    Preconditions.checkArgument(!uuid.isEmpty(), "uuid of a datanode cannot be empty !!!");
+
+    // Command to execute
+    List<String> commandArgs =
+        Arrays.asList("ozone", "admin", "datanode", "status", "decommission", "--id", uuid, "--json");
+
+    return getDecommissionStatusResponse(commandArgs);
+  }
+
+  private Response getDecommissionStatusResponse(List<String> commandArgs) {
+    Response.ResponseBuilder builder = Response.status(Response.Status.OK);
+    Map<Integer, String> commandOutputMap = reconUtils.executeCommand(commandArgs);
+    Map<String, Object> responseMap = new HashMap<>();
+
+    for (Map.Entry<Integer, String> entry : commandOutputMap.entrySet()) {
+      Integer exitCode = entry.getKey();
+      String processOutput = entry.getValue();
+      if (exitCode != 0) {
+        builder.status(Response.Status.INTERNAL_SERVER_ERROR);
+        builder.entity(
+            reconUtils.joinListArgs(commandArgs) + " command execution is not successful : " + processOutput);
+        return builder.build();
+      } else {
+        // Create ObjectMapper
+        ObjectMapper objectMapper = new ObjectMapper();
+        SimpleModule module = new SimpleModule();
+        module.addDeserializer(DatanodeDetails.class, new CustomDatanodeDetailsDeserializer());
+        module.addSerializer(DatanodeDetails.class, new CustomDatanodeDetailsSerializer());
+        objectMapper.registerModule(module);
+        LOG.info("processOutput: {}", processOutput);
+        // Deserialize JSON to Java object
+        List<DecommissionStatusInfoResponse> decommissionStatusInfoResponseList = null;
+        try {
+          decommissionStatusInfoResponseList =
+              objectMapper.readValue(processOutput, new TypeReference<List<DecommissionStatusInfoResponse>>() { });
+          responseMap.put("DatanodesDecommissionInfo", decommissionStatusInfoResponseList);
+          builder.entity(responseMap);
+          return builder.build();
+        } catch (JsonProcessingException jsonProcessingException) {
+          LOG.error("Unexpected JSON Error: {}", jsonProcessingException);
+          throw new WebApplicationException(jsonProcessingException, Response.Status.INTERNAL_SERVER_ERROR);
+        } catch (Exception exception) {
+          LOG.error("Unexpected Error: {}", exception);
+          throw new WebApplicationException(exception, Response.Status.INTERNAL_SERVER_ERROR);
+        }
+      }
+    }
+    return builder.build();
   }
 }
