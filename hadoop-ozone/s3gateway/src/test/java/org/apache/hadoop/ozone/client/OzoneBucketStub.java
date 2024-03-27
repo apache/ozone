@@ -155,6 +155,38 @@ public final class OzoneBucketStub extends OzoneBucket {
   }
 
   @Override
+  public OzoneOutputStream overwriteKey(OzoneKeyDetails existingKey, ReplicationConfig rConfig)
+      throws IOException {
+    final ReplicationConfig repConfig;
+    if (rConfig == null) {
+      repConfig = getReplicationConfig();
+    } else {
+      repConfig = rConfig;
+    }
+    ReplicationConfig finalReplicationCon = repConfig;
+    ByteArrayOutputStream byteArrayOutputStream =
+        new KeyMetadataAwareOutputStream(existingKey.getMetadata()) {
+          @Override
+          public void close() throws IOException {
+            keyContents.put(existingKey.getName(), toByteArray());
+            keyDetails.put(existingKey.getName(), new OzoneKeyDetails(
+                getVolumeName(),
+                getName(),
+                existingKey.getName(),
+                existingKey.getDataSize(),
+                System.currentTimeMillis(),
+                System.currentTimeMillis(),
+                new ArrayList<>(), finalReplicationCon, existingKey.getMetadata(), null,
+                () -> readKey(existingKey.getName()), true
+            ));
+            super.close();
+          }
+        };
+
+    return new OzoneOutputStream(byteArrayOutputStream, null);
+  }
+
+  @Override
   public OzoneDataStreamOutput createStreamKey(String key, long size,
                                                ReplicationConfig rConfig,
                                                Map<String, String> keyMetadata)
@@ -275,7 +307,7 @@ public final class OzoneBucketStub extends OzoneBucket {
           ozoneKeyDetails.getCreationTime().toEpochMilli(),
           ozoneKeyDetails.getModificationTime().toEpochMilli(),
           ozoneKeyDetails.getReplicationConfig(),
-          ozoneKeyDetails.isFile());
+          ozoneKeyDetails.isFile(), ozoneKeyDetails.getUpdateID());
     } else {
       throw new OMException(ResultCodes.KEY_NOT_FOUND);
     }
@@ -330,7 +362,7 @@ public final class OzoneBucketStub extends OzoneBucket {
               key.getDataSize(),
               key.getCreationTime().getEpochSecond() * 1000,
               key.getModificationTime().getEpochSecond() * 1000,
-              key.getReplicationConfig(), key.isFile());
+              key.getReplicationConfig(), key.isFile(), key.getUpdateID());
         }).collect(Collectors.toList());
 
     if (prevKey != null) {

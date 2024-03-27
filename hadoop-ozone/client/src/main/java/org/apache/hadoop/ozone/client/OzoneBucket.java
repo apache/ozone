@@ -470,6 +470,30 @@ public class OzoneBucket extends WithMetadata {
   }
 
   /**
+   * Overwrite an existing key using optimistic locking. The existingKey must exist in Ozone to allow
+   * the new key to be created with the same name. Additionally, the existing Key must not have been
+   * modified since the time it's details were read. This is controlled by the updateID
+   * field in the existing Key. If the key is replaced or updated the updateID will change. If the
+   * updateID has changed since the existing Key was read, either the initial key create will fail,
+   * or the key will fail to commit after the data has been written as the checks are carried out
+   * both a key open and commit time.
+   *
+   * For now this feature only works on Object Store Buckets. FSO support will be added a later.
+   *
+   * @param existingKey       Name of the key to be created.
+   * @param replicationConfig Replication configuration.
+   * @return OzoneOutputStream to which the data has to be written.
+   * @throws IOException
+   */
+  public OzoneOutputStream overwriteKey(OzoneKeyDetails existingKey, ReplicationConfig replicationConfig)
+      throws IOException {
+    if (this.bucketLayout != BucketLayout.OBJECT_STORE) {
+      throw new IllegalArgumentException("Optimistic locking is only supported on Object Store Buckets");
+    }
+    return proxy.overwriteKey(existingKey, replicationConfig);
+  }
+
+  /**
    * Creates a new key in the bucket, with default replication type RATIS and
    * with replication factor THREE.
    *
@@ -1779,7 +1803,7 @@ public class OzoneBucket extends WithMetadata {
             keyInfo.getDataSize(), keyInfo.getCreationTime(),
             keyInfo.getModificationTime(),
             keyInfo.getReplicationConfig(),
-            keyInfo.isFile());
+            keyInfo.isFile(), keyInfo.getUpdateID());
         keysResultList.add(ozoneKey);
       }
     }

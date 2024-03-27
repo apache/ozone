@@ -100,6 +100,13 @@ public final class OmKeyInfo extends WithParentObjectId
    */
   private final List<OzoneAcl> acls;
 
+  // OverwriteUpdateID when used in key creation indicates that a key with the same keyName
+  // should exist with the given updateID.
+  // Upon commit, the updateID of that existing key should be unchanged.
+  // This is a form of optimistic locking, to ensure the key is not modified between
+  // the time the key is read and the time the key is written.
+  private Long overwriteUpdateID = null;
+
   private OmKeyInfo(Builder b) {
     super(b);
     this.volumeName = b.volumeName;
@@ -115,6 +122,7 @@ public final class OmKeyInfo extends WithParentObjectId
     this.fileChecksum = b.fileChecksum;
     this.fileName = b.fileName;
     this.isFile = b.isFile;
+    this.overwriteUpdateID = b.overwriteUpdateID;
   }
 
   public String getVolumeName() {
@@ -155,6 +163,14 @@ public final class OmKeyInfo extends WithParentObjectId
 
   public String getFileName() {
     return fileName;
+  }
+
+  public void setOverwriteUpdateID(Long overwriteUpdateID) {
+    this.overwriteUpdateID = overwriteUpdateID;
+  }
+
+  public Long getOverwriteUpdateID() {
+    return overwriteUpdateID;
   }
 
   public synchronized OmKeyLocationInfoGroup getLatestVersionLocations() {
@@ -427,6 +443,7 @@ public final class OmKeyInfo extends WithParentObjectId
     private FileChecksum fileChecksum;
 
     private boolean isFile;
+    private Long overwriteUpdateID = null;
 
     public Builder() {
     }
@@ -550,6 +567,11 @@ public final class OmKeyInfo extends WithParentObjectId
       return this;
     }
 
+    public Builder setOverwriteUpdateID(Long existingUpdateID) {
+      this.overwriteUpdateID = existingUpdateID;
+      return this;
+    }
+
     public OmKeyInfo build() {
       return new OmKeyInfo(this);
     }
@@ -654,6 +676,9 @@ public final class OmKeyInfo extends WithParentObjectId
       kb.setFileEncryptionInfo(OMPBHelper.convert(encInfo));
     }
     kb.setIsFile(isFile);
+    if (overwriteUpdateID != null) {
+      kb.setOverwriteUpdateID(overwriteUpdateID);
+    }
     return kb.build();
   }
 
@@ -699,6 +724,9 @@ public final class OmKeyInfo extends WithParentObjectId
 
     if (keyInfo.hasIsFile()) {
       builder.setFile(keyInfo.getIsFile());
+    }
+    if (keyInfo.hasOverwriteUpdateID()) {
+      builder.setOverwriteUpdateID(keyInfo.getOverwriteUpdateID());
     }
 
     // not persisted to DB. FileName will be filtered out from keyName
@@ -802,6 +830,9 @@ public final class OmKeyInfo extends WithParentObjectId
 
     if (fileChecksum != null) {
       builder.setFileChecksum(fileChecksum);
+    }
+    if (overwriteUpdateID != null) {
+      builder.setOverwriteUpdateID(overwriteUpdateID);
     }
 
     return builder.build();

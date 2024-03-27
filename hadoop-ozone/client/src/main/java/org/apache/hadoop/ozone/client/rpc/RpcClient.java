@@ -1374,26 +1374,7 @@ public class RpcClient implements ClientProtocol {
       ReplicationConfig replicationConfig,
       Map<String, String> metadata)
       throws IOException {
-    verifyVolumeName(volumeName);
-    verifyBucketName(bucketName);
-    if (checkKeyNameEnabled) {
-      HddsClientUtils.verifyKeyName(keyName);
-    }
-    HddsClientUtils.checkNotNull(keyName);
-    if (omVersion
-        .compareTo(OzoneManagerVersion.ERASURE_CODED_STORAGE_SUPPORT) < 0) {
-      if (replicationConfig != null &&
-          replicationConfig.getReplicationType()
-              == HddsProtos.ReplicationType.EC) {
-        throw new IOException("Can not set the replication of the key to"
-            + " Erasure Coded replication, as OzoneManager does not support"
-            + " Erasure Coded replication.");
-      }
-    }
-
-    if (replicationConfig != null) {
-      replicationConfigValidator.validate(replicationConfig);
-    }
+    createKeyPreChecks(volumeName, bucketName, keyName, replicationConfig);
 
     OmKeyArgs.Builder builder = new OmKeyArgs.Builder()
         .setVolumeName(volumeName)
@@ -1414,6 +1395,63 @@ public class RpcClient implements ClientProtocol {
       openKey.getKeyInfo().setDataSize(size);
     }
     return createOutputStream(openKey);
+  }
+
+  @Override
+  public OzoneOutputStream overwriteKey(OzoneKeyDetails keyToOverwrite, ReplicationConfig replicationConfig)
+      throws IOException {
+    if (keyToOverwrite == null) {
+      throw new IllegalArgumentException("KeyToOverwrite cannot be null");
+    }
+    if (keyToOverwrite.getUpdateID() == null) {
+      throw new IllegalArgumentException("KeyToOverwrite UpdateID cannot be null");
+    }
+    createKeyPreChecks(keyToOverwrite.getVolumeName(), keyToOverwrite.getBucketName(),
+        keyToOverwrite.getName(), replicationConfig);
+
+    OmKeyArgs.Builder builder = new OmKeyArgs.Builder()
+        .setVolumeName(keyToOverwrite.getVolumeName())
+        .setBucketName(keyToOverwrite.getBucketName())
+        .setKeyName(keyToOverwrite.getName())
+        .setDataSize(keyToOverwrite.getDataSize())
+        .setReplicationConfig(replicationConfig)
+        .addAllMetadataGdpr(keyToOverwrite.getMetadata())
+        .setLatestVersionLocation(getLatestVersionLocation)
+        .setOverwriteUpdateID(keyToOverwrite.getUpdateID());
+
+    OpenKeySession openKey = ozoneManagerClient.openKey(builder.build());
+    // For bucket with layout OBJECT_STORE, when create an empty file (size=0),
+    // OM will set DataSize to OzoneConfigKeys#OZONE_SCM_BLOCK_SIZE,
+    // which will cause S3G's atomic write length check to fail,
+    // so reset size to 0 here.
+    if (isS3GRequest.get() && keyToOverwrite.getDataSize() == 0) {
+      openKey.getKeyInfo().setDataSize(0);
+    }
+    return createOutputStream(openKey);
+  }
+
+  private void createKeyPreChecks(String volumeName, String bucketName, String keyName,
+      ReplicationConfig replicationConfig) throws IOException {
+    verifyVolumeName(volumeName);
+    verifyBucketName(bucketName);
+    if (checkKeyNameEnabled) {
+      HddsClientUtils.verifyKeyName(keyName);
+    }
+    HddsClientUtils.checkNotNull(keyName);
+    if (omVersion
+        .compareTo(OzoneManagerVersion.ERASURE_CODED_STORAGE_SUPPORT) < 0) {
+      if (replicationConfig != null &&
+          replicationConfig.getReplicationType()
+              == HddsProtos.ReplicationType.EC) {
+        throw new IOException("Can not set the replication of the key to"
+            + " Erasure Coded replication, as OzoneManager does not support"
+            + " Erasure Coded replication.");
+      }
+    }
+
+    if (replicationConfig != null) {
+      replicationConfigValidator.validate(replicationConfig);
+    }
   }
 
   @Override
@@ -1652,7 +1690,8 @@ public class RpcClient implements ClientProtocol {
               key.getCreationTime(),
               key.getModificationTime(),
               key.getReplicationConfig(),
-              key.isFile()))
+              key.isFile(),
+              key.getUpdateID()))
           .collect(Collectors.toList());
     }
   }
@@ -1703,7 +1742,7 @@ public class RpcClient implements ClientProtocol {
         keyInfo.getModificationTime(), ozoneKeyLocations,
         keyInfo.getReplicationConfig(), keyInfo.getMetadata(),
         keyInfo.getFileEncryptionInfo(),
-        () -> getInputStreamWithRetryFunction(keyInfo), keyInfo.isFile());
+        () -> getInputStreamWithRetryFunction(keyInfo), keyInfo.isFile(), keyInfo.getUpdateID());
   }
 
   @Override

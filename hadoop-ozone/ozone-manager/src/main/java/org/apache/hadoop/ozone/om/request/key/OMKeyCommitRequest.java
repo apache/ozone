@@ -240,6 +240,12 @@ public class OMKeyCommitRequest extends OMKeyRequest {
         throw new OMException("Failed to " + action + " key, as " + dbOpenKey +
             "entry is not found in the OpenKey table", KEY_NOT_FOUND);
       }
+
+      validateOptimisticLockingOverwrite(keyToDelete, omKeyInfo, auditMap);
+      // Optimistic locking validation has passed. Now set the overwrite fields to null so they are
+      // not persisted in the key table.
+      omKeyInfo.setOverwriteUpdateID(null);
+
       omKeyInfo.getMetadata().putAll(KeyValueUtil.getFromProtobuf(
           commitKeyArgs.getMetadataList()));
       if (isHSync) {
@@ -497,4 +503,21 @@ public class OMKeyCommitRequest extends OMKeyRequest {
     }
     return req;
   }
+
+  private void validateOptimisticLockingOverwrite(OmKeyInfo existing, OmKeyInfo toCommit, Map<String, String> auditMap)
+      throws OMException {
+    if (toCommit.getOverwriteUpdateID() != null) {
+      // These values are no passed in the request keyArgs, so add them into the auditMap if they are present
+      // in the open key entry.
+      auditMap.put(OzoneConsts.OVERWRITE_UPDATE_ID, String.valueOf(toCommit.getOverwriteUpdateID()));
+      if (existing == null) {
+        throw new OMException("Overwrite with optimistic locking is not allowed for a new key", KEY_NOT_FOUND);
+      }
+      if (!toCommit.getOverwriteUpdateID().equals(existing.getUpdateID())) {
+        throw new OMException("Cannot commit as current updateID (" + existing.getUpdateID() +
+            ") does not match with the overwrite updateID (" + toCommit.getOverwriteUpdateID() + ")", KEY_NOT_FOUND);
+      }
+    }
+  }
+
 }
