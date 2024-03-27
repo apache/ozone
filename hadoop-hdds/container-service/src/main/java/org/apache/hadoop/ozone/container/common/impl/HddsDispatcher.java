@@ -25,6 +25,7 @@ import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
+import org.apache.hadoop.hdds.fs.SpaceUsageSource;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandRequestProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandResponseProto;
@@ -74,11 +75,12 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.TreeMap;
+import java.util.concurrent.TimeUnit;
 
+import static org.apache.hadoop.ozone.audit.AuditLogger.PerformanceStringBuilder;
 import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuilders.malformedRequest;
 import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuilders.unsupportedRequest;
 import static org.apache.hadoop.ozone.container.common.interfaces.Container.ScanResult;
-import static org.apache.hadoop.ozone.container.common.volume.VolumeUsage.PrecomputedVolumeSpace;
 
 /**
  * Ozone Container dispatcher takes a call from the netty server and routes it
@@ -89,6 +91,16 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
   static final Logger LOG = LoggerFactory.getLogger(HddsDispatcher.class);
   private static final AuditLogger AUDIT =
       new AuditLogger(AuditLoggerType.DNLOGGER);
+  private static final String AUDIT_PARAM_CONTAINER_ID = "containerID";
+  private static final String AUDIT_PARAM_CONTAINER_TYPE = "containerType";
+  private static final String AUDIT_PARAM_FORCE_UPDATE = "forceUpdate";
+  private static final String AUDIT_PARAM_FORCE_DELETE = "forceDelete";
+  private static final String AUDIT_PARAM_START_CONTAINER_ID = "startContainerID";
+  private static final String AUDIT_PARAM_BLOCK_DATA = "blockData";
+  private static final String AUDIT_PARAM_BLOCK_DATA_SIZE = "blockDataSize";
+  private static final String AUDIT_PARAM_COUNT = "count";
+  private static final String AUDIT_PARAM_START_LOCAL_ID = "startLocalID";
+  private static final String AUDIT_PARAM_PREV_CHUNKNAME = "prevChunkName";
   private final Map<ContainerType, Handler> handlers;
   private final ConfigurationSource conf;
   private final ContainerSet containerSet;
@@ -101,6 +113,7 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
   private String clusterId;
   private ContainerMetrics metrics;
   private final TokenVerifier tokenVerifier;
+  private long slowOpThresholdMs;
 
   /**
    * Constructs an OzoneContainer that receives calls from
@@ -121,6 +134,7 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
         HddsConfigKeys.HDDS_CONTAINER_CLOSE_THRESHOLD_DEFAULT);
     this.tokenVerifier = tokenVerifier != null ? tokenVerifier
         : new NoopTokenVerifier();
+    this.slowOpThresholdMs = getSlowOpThresholdMs(conf);
 
     protocolMetrics =
         new ProtocolMessageMetrics<>(
@@ -196,6 +210,7 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
     AuditAction action = getAuditAction(msg.getCmdType());
     EventType eventType = getEventType(msg);
     Map<String, String> params = getAuditParams(msg);
+    PerformanceStringBuilder perf = new PerformanceStringBuilder();
 
     ContainerType containerType;
     ContainerCommandResponseProto responseProto = null;
@@ -215,11 +230,14 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
             == DispatcherContext.WriteChunkStage.COMMIT_DATA);
 
     try {
-      validateToken(msg);
+      if (DispatcherContext.op(dispatcherContext).validateToken()) {
+        validateToken(msg);
+      }
     } catch (IOException ioe) {
-      StorageContainerException sce = new StorageContainerException(
-          "Block token verification failed. " + ioe.getMessage(), ioe,
-          ContainerProtos.Result.BLOCK_TOKEN_VERIFICATION_FAILED);
+      final String s = ContainerProtos.Result.BLOCK_TOKEN_VERIFICATION_FAILED
+          + " for " + dispatcherContext + ": " + ioe.getMessage();
+      final StorageContainerException sce = new StorageContainerException(
+          s, ioe, ContainerProtos.Result.BLOCK_TOKEN_VERIFICATION_FAILED);
       return ContainerUtils.logAndReturnError(LOG, sce, msg);
     }
     // if the command gets executed other than Ratis, the default write stage
@@ -249,7 +267,7 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
     if (getMissingContainerSet().contains(containerID)) {
       StorageContainerException sce = new StorageContainerException(
           "ContainerID " + containerID
-              + " has been lost and and cannot be recreated on this DataNode",
+              + " has been lost and cannot be recreated on this DataNode",
           ContainerProtos.Result.CONTAINER_MISSING);
       audit(action, eventType, params, AuditEventStatus.FAILURE, sce);
       return ContainerUtils.logAndReturnError(LOG, sce, msg);
@@ -323,10 +341,11 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
       audit(action, eventType, params, AuditEventStatus.FAILURE, ex);
       return ContainerUtils.logAndReturnError(LOG, ex, msg);
     }
+    perf.appendPreOpLatencyMs(Time.monotonicNow() - startTime);
     responseProto = handler.handle(msg, container, dispatcherContext);
+    long oPLatencyMS = Time.monotonicNow() - startTime;
     if (responseProto != null) {
-      metrics.incContainerOpsLatencies(cmdType,
-              Time.monotonicNow() - startTime);
+      metrics.incContainerOpsLatencies(cmdType, oPLatencyMS);
 
       // If the request is of Write Type and the container operation
       // is unsuccessful, it implies the applyTransaction on the container
@@ -399,6 +418,8 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
         audit(action, eventType, params, AuditEventStatus.FAILURE,
             new Exception(responseProto.getMessage()));
       }
+      perf.appendOpLatencyMs(oPLatencyMS);
+      performanceAudit(action, params, perf, oPLatencyMS);
 
       return responseProto;
     } else {
@@ -407,6 +428,13 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
           new Exception("UNSUPPORTED_REQUEST"));
       return unsupportedRequest(msg);
     }
+  }
+
+  private long getSlowOpThresholdMs(ConfigurationSource config) {
+    return config.getTimeDuration(
+        HddsConfigKeys.HDDS_DATANODE_SLOW_OP_WARNING_THRESHOLD_KEY,
+        HddsConfigKeys.HDDS_DATANODE_SLOW_OP_WARNING_THRESHOLD_DEFAULT,
+            TimeUnit.MILLISECONDS);
   }
 
   private void updateBCSID(Container container,
@@ -486,6 +514,15 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
   @Override
   public void validateContainerCommand(
       ContainerCommandRequestProto msg) throws StorageContainerException {
+    try {
+      validateToken(msg);
+    } catch (IOException ioe) {
+      throw new StorageContainerException(
+          ContainerProtos.Result.BLOCK_TOKEN_VERIFICATION_FAILED
+          + ": " + ioe.getMessage(), ioe,
+          ContainerProtos.Result.BLOCK_TOKEN_VERIFICATION_FAILED);
+    }
+
     long containerID = msg.getContainerID();
     Container container = getContainer(containerID);
     if (container == null) {
@@ -499,13 +536,14 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
     Handler handler = getHandler(containerType);
     if (handler == null) {
       StorageContainerException ex = new StorageContainerException(
-          "Invalid " + "ContainerType " + containerType,
+          "Invalid ContainerType " + containerType,
           ContainerProtos.Result.CONTAINER_INTERNAL_ERROR);
       audit(action, eventType, params, AuditEventStatus.FAILURE, ex);
       throw ex;
     }
 
     State containerState = container.getContainerState();
+    String log = "Container " + containerID + " in " + containerState + " state";
     if (!HddsUtils.isReadOnly(msg)
         && !HddsUtils.isOpenToWriteState(containerState)) {
       switch (cmdType) {
@@ -519,24 +557,14 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
       default:
         // if the container is not open/recovering, no updates can happen. Just
         // throw an exception
-        ContainerNotOpenException cex = new ContainerNotOpenException(
-            "Container " + containerID + " in " + containerState + " state");
+        ContainerNotOpenException cex = new ContainerNotOpenException(log);
         audit(action, eventType, params, AuditEventStatus.FAILURE, cex);
         throw cex;
       }
     } else if (HddsUtils.isReadOnly(msg) && containerState == State.INVALID) {
-      InvalidContainerStateException iex = new InvalidContainerStateException(
-          "Container " + containerID + " in " + containerState + " state");
+      InvalidContainerStateException iex = new InvalidContainerStateException(log);
       audit(action, eventType, params, AuditEventStatus.FAILURE, iex);
       throw iex;
-    }
-
-    try {
-      validateToken(msg);
-    } catch (IOException ioe) {
-      throw new StorageContainerException(
-          "Block token verification failed. " + ioe.getMessage(), ioe,
-          ContainerProtos.Result.BLOCK_TOKEN_VERIFICATION_FAILED);
     }
   }
 
@@ -581,12 +609,12 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
         .orElse(Boolean.FALSE);
     if (isOpen) {
       HddsVolume volume = container.getContainerData().getVolume();
-      PrecomputedVolumeSpace precomputedVolumeSpace =
-          volume.getPrecomputedVolumeSpace();
+      SpaceUsageSource precomputedVolumeSpace =
+          volume.getCurrentUsage();
       long volumeCapacity = precomputedVolumeSpace.getCapacity();
       long volumeFreeSpaceToSpare =
           VolumeUsage.getMinVolumeFreeSpace(conf, volumeCapacity);
-      long volumeFree = volume.getAvailable(precomputedVolumeSpace);
+      long volumeFree = precomputedVolumeSpace.getAvailable();
       long volumeCommitted = volume.getCommittedBytes();
       long volumeAvailable = volumeFree - volumeCommitted;
       return (volumeAvailable <= volumeFreeSpaceToSpare);
@@ -676,6 +704,26 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
         LOG.debug("Invalid audit event status - {}", result);
       }
     }
+  }
+
+  private void performanceAudit(AuditAction action, Map<String, String> params,
+      PerformanceStringBuilder performance, long opLatencyMs) {
+    if (isOperationSlow(opLatencyMs)) {
+      AuditMessage msg =
+          buildAuditMessageForPerformance(action, params, performance);
+      AUDIT.logPerformance(msg);
+    }
+  }
+
+  public AuditMessage buildAuditMessageForPerformance(AuditAction op,
+      Map<String, String> auditMap, PerformanceStringBuilder performance) {
+    return new AuditMessage.Builder()
+        .setUser(null)
+        .atIp(null)
+        .forOperation(op)
+        .withParams(auditMap)
+        .setPerformance(performance)
+        .build();
   }
 
   //TODO: use GRPC to fetch user and ip details
@@ -780,36 +828,36 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
     String containerID = String.valueOf(msg.getContainerID());
     switch (cmdType) {
     case CreateContainer:
-      auditParams.put("containerID", containerID);
-      auditParams.put("containerType",
+      auditParams.put(AUDIT_PARAM_CONTAINER_ID, containerID);
+      auditParams.put(AUDIT_PARAM_CONTAINER_TYPE,
           msg.getCreateContainer().getContainerType().toString());
       return auditParams;
 
     case ReadContainer:
-      auditParams.put("containerID", containerID);
+      auditParams.put(AUDIT_PARAM_CONTAINER_ID, containerID);
       return auditParams;
 
     case UpdateContainer:
-      auditParams.put("containerID", containerID);
-      auditParams.put("forceUpdate",
+      auditParams.put(AUDIT_PARAM_CONTAINER_ID, containerID);
+      auditParams.put(AUDIT_PARAM_FORCE_UPDATE,
           String.valueOf(msg.getUpdateContainer().getForceUpdate()));
       return auditParams;
 
     case DeleteContainer:
-      auditParams.put("containerID", containerID);
-      auditParams.put("forceDelete",
+      auditParams.put(AUDIT_PARAM_CONTAINER_ID, containerID);
+      auditParams.put(AUDIT_PARAM_FORCE_DELETE,
           String.valueOf(msg.getDeleteContainer().getForceDelete()));
       return auditParams;
 
     case ListContainer:
-      auditParams.put("startContainerID", containerID);
-      auditParams.put("count",
+      auditParams.put(AUDIT_PARAM_START_CONTAINER_ID, containerID);
+      auditParams.put(AUDIT_PARAM_COUNT,
           String.valueOf(msg.getListContainer().getCount()));
       return auditParams;
 
     case PutBlock:
       try {
-        auditParams.put("blockData",
+        auditParams.put(AUDIT_PARAM_BLOCK_DATA,
             BlockData.getFromProtoBuf(msg.getPutBlock().getBlockData())
                 .toString());
       } catch (IOException ex) {
@@ -822,53 +870,59 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
       return auditParams;
 
     case GetBlock:
-      auditParams.put("blockData",
+      auditParams.put(AUDIT_PARAM_BLOCK_DATA,
           BlockID.getFromProtobuf(msg.getGetBlock().getBlockID()).toString());
       return auditParams;
 
     case DeleteBlock:
-      auditParams.put("blockData",
+      auditParams.put(AUDIT_PARAM_BLOCK_DATA,
           BlockID.getFromProtobuf(msg.getDeleteBlock().getBlockID())
               .toString());
       return auditParams;
 
     case ListBlock:
-      auditParams.put("startLocalID",
+      auditParams.put(AUDIT_PARAM_START_LOCAL_ID,
           String.valueOf(msg.getListBlock().getStartLocalID()));
-      auditParams.put("count", String.valueOf(msg.getListBlock().getCount()));
+      auditParams.put(AUDIT_PARAM_COUNT, String.valueOf(msg.getListBlock().getCount()));
       return auditParams;
 
     case ReadChunk:
-      auditParams.put("blockData",
+      auditParams.put(AUDIT_PARAM_BLOCK_DATA,
           BlockID.getFromProtobuf(msg.getReadChunk().getBlockID()).toString());
+      auditParams.put(AUDIT_PARAM_BLOCK_DATA_SIZE,
+          String.valueOf(msg.getReadChunk().getChunkData().getLen()));
       return auditParams;
 
     case DeleteChunk:
-      auditParams.put("blockData",
+      auditParams.put(AUDIT_PARAM_BLOCK_DATA,
           BlockID.getFromProtobuf(msg.getDeleteChunk().getBlockID())
               .toString());
       return auditParams;
 
     case WriteChunk:
-      auditParams.put("blockData",
+      auditParams.put(AUDIT_PARAM_BLOCK_DATA,
           BlockID.getFromProtobuf(msg.getWriteChunk().getBlockID())
               .toString());
+      auditParams.put(AUDIT_PARAM_BLOCK_DATA_SIZE,
+          String.valueOf(msg.getWriteChunk().getChunkData().getLen()));
       return auditParams;
 
     case ListChunk:
-      auditParams.put("blockData",
+      auditParams.put(AUDIT_PARAM_BLOCK_DATA,
           BlockID.getFromProtobuf(msg.getListChunk().getBlockID()).toString());
-      auditParams.put("prevChunkName", msg.getListChunk().getPrevChunkName());
-      auditParams.put("count", String.valueOf(msg.getListChunk().getCount()));
+      auditParams.put(AUDIT_PARAM_PREV_CHUNKNAME, msg.getListChunk().getPrevChunkName());
+      auditParams.put(AUDIT_PARAM_COUNT, String.valueOf(msg.getListChunk().getCount()));
       return auditParams;
 
     case CompactChunk: return null; //CompactChunk operation
 
     case PutSmallFile:
       try {
-        auditParams.put("blockData",
+        auditParams.put(AUDIT_PARAM_BLOCK_DATA,
             BlockData.getFromProtoBuf(msg.getPutSmallFile()
                 .getBlock().getBlockData()).toString());
+        auditParams.put(AUDIT_PARAM_BLOCK_DATA_SIZE,
+            String.valueOf(msg.getPutSmallFile().getChunkInfo().getLen()));
       } catch (IOException ex) {
         if (LOG.isTraceEnabled()) {
           LOG.trace("Encountered error parsing BlockData from protobuf: "
@@ -878,17 +932,17 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
       return auditParams;
 
     case GetSmallFile:
-      auditParams.put("blockData",
+      auditParams.put(AUDIT_PARAM_BLOCK_DATA,
           BlockID.getFromProtobuf(msg.getGetSmallFile().getBlock().getBlockID())
               .toString());
       return auditParams;
 
     case CloseContainer:
-      auditParams.put("containerID", containerID);
+      auditParams.put(AUDIT_PARAM_CONTAINER_ID, containerID);
       return auditParams;
 
     case GetCommittedBlockLength:
-      auditParams.put("blockData",
+      auditParams.put(AUDIT_PARAM_BLOCK_DATA,
           BlockID.getFromProtobuf(msg.getGetCommittedBlockLength().getBlockID())
               .toString());
       return auditParams;
@@ -900,4 +954,7 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
 
   }
 
+  private boolean isOperationSlow(long opLatencyMs) {
+    return opLatencyMs >= slowOpThresholdMs;
+  }
 }

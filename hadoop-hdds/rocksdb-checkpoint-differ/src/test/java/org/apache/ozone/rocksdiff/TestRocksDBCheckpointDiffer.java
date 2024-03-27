@@ -56,6 +56,7 @@ import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.hdds.StringUtils;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.utils.IOUtils;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedOptions;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksDB;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksIterator;
 import org.apache.hadoop.ozone.lock.BootstrapStateHandler;
@@ -64,13 +65,11 @@ import org.apache.ozone.compaction.log.CompactionLogEntry;
 import org.apache.ozone.rocksdiff.RocksDBCheckpointDiffer.NodeComparator;
 import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
-import org.mockito.Mockito;
 import org.rocksdb.Checkpoint;
 import org.rocksdb.ColumnFamilyDescriptor;
 import org.rocksdb.ColumnFamilyHandle;
@@ -82,6 +81,7 @@ import org.rocksdb.Options;
 import org.rocksdb.RocksDB;
 import org.rocksdb.RocksDBException;
 import org.rocksdb.RocksIterator;
+import org.rocksdb.SstFileReader;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.event.Level;
@@ -91,15 +91,19 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_OM_SNAPSHOT_COMPACTI
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_OM_SNAPSHOT_COMPACTION_DAG_PRUNE_DAEMON_RUN_INTERVAL;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_OM_SNAPSHOT_PRUNE_COMPACTION_DAG_DAEMON_RUN_INTERVAL_DEFAULT;
 import static org.apache.hadoop.util.Time.now;
+import static org.apache.ozone.rocksdiff.RocksDBCheckpointDiffer.COLUMN_FAMILIES_TO_TRACK_IN_DAG;
 import static org.apache.ozone.rocksdiff.RocksDBCheckpointDiffer.COMPACTION_LOG_FILE_NAME_SUFFIX;
 import static org.apache.ozone.rocksdiff.RocksDBCheckpointDiffer.DEBUG_DAG_LIVE_NODES;
 import static org.apache.ozone.rocksdiff.RocksDBCheckpointDiffer.DEBUG_READ_ALL_DB_KEYS;
 import static org.apache.ozone.rocksdiff.RocksDBCheckpointDiffer.SST_FILE_EXTENSION;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 /**
  * Test RocksDBCheckpointDiffer basic functionality.
@@ -118,12 +122,14 @@ public class TestRocksDBCheckpointDiffer {
   private static final String CP_PATH_PREFIX = "rocksdb-cp-";
   private final List<DifferSnapshotInfo> snapshots = new ArrayList<>();
 
+  private final List<File> cpDirList = new ArrayList<>();
+
   private final List<List<ColumnFamilyHandle>> colHandles = new ArrayList<>();
 
-  private final String activeDbDirName = "./rocksdb-data";
-  private final String metadataDirName = "./metadata";
-  private final String compactionLogDirName = "compaction-log";
-  private final String sstBackUpDirName = "compaction-sst-backup";
+  private static final String ACTIVE_DB_DIR_NAME = "./rocksdb-data";
+  private static final String METADATA_DIR_NAME = "./metadata";
+  private static final String COMPACTION_LOG_DIR_NAME = "compaction-log";
+  private static final String SST_BACK_UP_DIR_NAME = "compaction-sst-backup";
   private File activeDbDir;
   private File metadataDirDir;
   private File compactionLogDir;
@@ -133,6 +139,8 @@ public class TestRocksDBCheckpointDiffer {
   private RocksDBCheckpointDiffer rocksDBCheckpointDiffer;
   private RocksDB activeRocksDB;
   private ColumnFamilyHandle keyTableCFHandle;
+  private ColumnFamilyHandle directoryTableCFHandle;
+  private ColumnFamilyHandle fileTableCFHandle;
   private ColumnFamilyHandle compactionLogTableCFHandle;
 
   @BeforeEach
@@ -142,34 +150,34 @@ public class TestRocksDBCheckpointDiffer {
     // Test class log level. Set to DEBUG for verbose output
     GenericTestUtils.setLogLevel(TestRocksDBCheckpointDiffer.LOG, Level.INFO);
 
-    activeDbDir = new File(activeDbDirName);
-    createDir(activeDbDir, activeDbDirName);
+    activeDbDir = new File(ACTIVE_DB_DIR_NAME);
+    createDir(activeDbDir, ACTIVE_DB_DIR_NAME);
 
-    metadataDirDir = new File(metadataDirName);
-    createDir(metadataDirDir, metadataDirName);
+    metadataDirDir = new File(METADATA_DIR_NAME);
+    createDir(metadataDirDir, METADATA_DIR_NAME);
 
-    compactionLogDir = new File(metadataDirName, compactionLogDirName);
-    createDir(compactionLogDir, metadataDirName + "/" + compactionLogDirName);
+    compactionLogDir = new File(METADATA_DIR_NAME, COMPACTION_LOG_DIR_NAME);
+    createDir(compactionLogDir, METADATA_DIR_NAME + "/" + COMPACTION_LOG_DIR_NAME);
 
-    sstBackUpDir = new File(metadataDirName, sstBackUpDirName);
-    createDir(sstBackUpDir, metadataDirName + "/" + sstBackUpDirName);
+    sstBackUpDir = new File(METADATA_DIR_NAME, SST_BACK_UP_DIR_NAME);
+    createDir(sstBackUpDir, METADATA_DIR_NAME + "/" + SST_BACK_UP_DIR_NAME);
 
-    config = Mockito.mock(ConfigurationSource.class);
+    config = mock(ConfigurationSource.class);
 
-    Mockito.when(config.getTimeDuration(
+    when(config.getTimeDuration(
         OZONE_OM_SNAPSHOT_COMPACTION_DAG_MAX_TIME_ALLOWED,
         OZONE_OM_SNAPSHOT_COMPACTION_DAG_MAX_TIME_ALLOWED_DEFAULT,
         TimeUnit.MILLISECONDS)).thenReturn(MINUTES.toMillis(10));
 
-    Mockito.when(config.getTimeDuration(
+    when(config.getTimeDuration(
         OZONE_OM_SNAPSHOT_COMPACTION_DAG_PRUNE_DAEMON_RUN_INTERVAL,
         OZONE_OM_SNAPSHOT_PRUNE_COMPACTION_DAG_DAEMON_RUN_INTERVAL_DEFAULT,
         TimeUnit.MILLISECONDS)).thenReturn(0L);
 
-    rocksDBCheckpointDiffer = new RocksDBCheckpointDiffer(metadataDirName,
-        sstBackUpDirName,
-        compactionLogDirName,
-        activeDbDirName,
+    rocksDBCheckpointDiffer = new RocksDBCheckpointDiffer(METADATA_DIR_NAME,
+        SST_BACK_UP_DIR_NAME,
+        COMPACTION_LOG_DIR_NAME,
+        ACTIVE_DB_DIR_NAME,
         config);
 
     ColumnFamilyOptions cfOpts = new ColumnFamilyOptions()
@@ -181,9 +189,11 @@ public class TestRocksDBCheckpointDiffer {
         .setCreateMissingColumnFamilies(true);
 
     rocksDBCheckpointDiffer.setRocksDBForCompactionTracking(dbOptions);
-    activeRocksDB = RocksDB.open(dbOptions, activeDbDirName, cfDescriptors,
+    activeRocksDB = RocksDB.open(dbOptions, ACTIVE_DB_DIR_NAME, cfDescriptors,
         cfHandles);
     keyTableCFHandle = cfHandles.get(1);
+    directoryTableCFHandle = cfHandles.get(2);
+    fileTableCFHandle = cfHandles.get(3);
     compactionLogTableCFHandle = cfHandles.get(4);
 
     rocksDBCheckpointDiffer.setCompactionLogTableCFHandle(cfHandles.get(4));
@@ -207,12 +217,18 @@ public class TestRocksDBCheckpointDiffer {
   public void cleanUp() {
     IOUtils.closeQuietly(rocksDBCheckpointDiffer);
     IOUtils.closeQuietly(keyTableCFHandle);
+    IOUtils.closeQuietly(directoryTableCFHandle);
+    IOUtils.closeQuietly(fileTableCFHandle);
     IOUtils.closeQuietly(compactionLogTableCFHandle);
     IOUtils.closeQuietly(activeRocksDB);
     deleteDirectory(compactionLogDir);
     deleteDirectory(sstBackUpDir);
     deleteDirectory(metadataDirDir);
     deleteDirectory(activeDbDir);
+
+    for (File dir : cpDirList) {
+      deleteDirectory(dir);
+    }
   }
 
   /**
@@ -485,8 +501,8 @@ public class TestRocksDBCheckpointDiffer {
     }
 
     // Check same and different SST files result
-    Assertions.assertEquals(expectedSameSstFiles, actualSameSstFiles);
-    Assertions.assertEquals(expectedDiffSstFiles, actualDiffSstFiles);
+    assertEquals(expectedSameSstFiles, actualSameSstFiles);
+    assertEquals(expectedDiffSstFiles, actualDiffSstFiles);
 
     if (expectingException && !exceptionThrown) {
       fail("Expecting exception but none thrown.");
@@ -502,7 +518,7 @@ public class TestRocksDBCheckpointDiffer {
   @Test
   void testDifferWithDB() throws Exception {
     writeKeysAndCheckpointing();
-    readRocksDBInstance(activeDbDirName, activeRocksDB, null,
+    readRocksDBInstance(ACTIVE_DB_DIR_NAME, activeRocksDB, null,
         rocksDBCheckpointDiffer);
 
     if (LOG.isDebugEnabled()) {
@@ -519,7 +535,7 @@ public class TestRocksDBCheckpointDiffer {
     try (Stream<Path> sstPathStream = Files.list(sstBackUpDir.toPath())) {
       List<String> expectedLinks = sstPathStream.map(Path::getFileName)
               .map(Object::toString).sorted().collect(Collectors.toList());
-      Assertions.assertEquals(expectedLinks, asList(
+      assertEquals(expectedLinks, asList(
               "000017.sst", "000019.sst", "000021.sst", "000023.sst",
           "000024.sst", "000026.sst", "000029.sst"));
     }
@@ -566,7 +582,7 @@ public class TestRocksDBCheckpointDiffer {
         Collections.singletonList("000031"),
         Collections.emptyList()
     );
-    Assertions.assertEquals(snapshots.size(), expectedDifferResult.size());
+    assertEquals(snapshots.size(), expectedDifferResult.size());
 
     int index = 0;
     for (DifferSnapshotInfo snap : snapshots) {
@@ -575,7 +591,7 @@ public class TestRocksDBCheckpointDiffer {
       LOG.info("SST diff list from '{}' to '{}': {}",
           src.getDbPath(), snap.getDbPath(), sstDiffList);
 
-      Assertions.assertEquals(expectedDifferResult.get(index), sstDiffList);
+      assertEquals(expectedDifferResult.get(index), sstDiffList);
       ++index;
     }
   }
@@ -596,8 +612,9 @@ public class TestRocksDBCheckpointDiffer {
     if (dir.exists()) {
       deleteDirectory(dir);
     }
+    cpDirList.add(dir);
 
-    createCheckPoint(activeDbDirName, cpPath, rocksDB);
+    createCheckPoint(ACTIVE_DB_DIR_NAME, cpPath, rocksDB);
     final UUID snapshotId = UUID.randomUUID();
     List<ColumnFamilyHandle> colHandle = new ArrayList<>();
     colHandles.add(colHandle);
@@ -992,8 +1009,8 @@ public class TestRocksDBCheckpointDiffer {
                                    Set<String> expectedFileNodesRemoved) {
     Set<String> actualFileNodesRemoved =
         rocksDBCheckpointDiffer.pruneBackwardDag(originalDag, levelToBeRemoved);
-    Assertions.assertEquals(expectedDag, originalDag);
-    Assertions.assertEquals(actualFileNodesRemoved, expectedFileNodesRemoved);
+    assertEquals(expectedDag, originalDag);
+    assertEquals(actualFileNodesRemoved, expectedFileNodesRemoved);
   }
 
 
@@ -1047,8 +1064,8 @@ public class TestRocksDBCheckpointDiffer {
                                   Set<String> expectedFileNodesRemoved) {
     Set<String> actualFileNodesRemoved =
         rocksDBCheckpointDiffer.pruneForwardDag(originalDag, levelToBeRemoved);
-    Assertions.assertEquals(expectedDag, originalDag);
-    Assertions.assertEquals(actualFileNodesRemoved, expectedFileNodesRemoved);
+    assertEquals(expectedDag, originalDag);
+    assertEquals(actualFileNodesRemoved, expectedFileNodesRemoved);
   }
 
   @SuppressWarnings("methodlength")
@@ -1256,7 +1273,7 @@ public class TestRocksDBCheckpointDiffer {
 
     if (compactionLogs != null) {
       for (int i = 0; i < compactionLogs.size(); i++) {
-        String compactionFileName = metadataDirName + "/" + compactionLogDirName
+        String compactionFileName = METADATA_DIR_NAME + "/" + COMPACTION_LOG_DIR_NAME
             + "/0000" + i + COMPACTION_LOG_FILE_NAME_SUFFIX;
         File compactionFile = new File(compactionFileName);
         Files.write(compactionFile.toPath(),
@@ -1333,10 +1350,10 @@ public class TestRocksDBCheckpointDiffer {
           });
       // Confirm that the consumer doesn't finish with lock taken.
       assertThrows(TimeoutException.class,
-          () -> future.get(5000, TimeUnit.MILLISECONDS));
+          () -> future.get(1000, TimeUnit.MILLISECONDS));
     }
     // Confirm consumer finishes when unlocked.
-    assertTrue(future.get(1000, TimeUnit.MILLISECONDS));
+    assertTrue(future.get(100, TimeUnit.MILLISECONDS));
   }
 
   private static Stream<Arguments> sstFilePruningScenarios() {
@@ -1474,8 +1491,8 @@ public class TestRocksDBCheckpointDiffer {
 
     Path compactionLogFilePath = null;
     if (compactionLog != null) {
-      String compactionLogFileName = metadataDirName + "/" +
-          compactionLogDirName + "/compaction_log" +
+      String compactionLogFileName = METADATA_DIR_NAME + "/" +
+          COMPACTION_LOG_DIR_NAME + "/compaction_log" +
           COMPACTION_LOG_FILE_NAME_SUFFIX;
       compactionLogFilePath = new File(compactionLogFileName).toPath();
       createFileWithContext(compactionLogFileName, compactionLog);
@@ -1495,7 +1512,7 @@ public class TestRocksDBCheckpointDiffer {
 
     Set<String> actualFileSetAfterPruning;
     try (Stream<Path> pathStream = Files.list(
-            Paths.get(metadataDirName + "/" + sstBackUpDirName))
+            Paths.get(METADATA_DIR_NAME + "/" + SST_BACK_UP_DIR_NAME))
         .filter(e -> e.toString().toLowerCase()
             .endsWith(SST_FILE_EXTENSION))
         .sorted()) {
@@ -1746,8 +1763,8 @@ public class TestRocksDBCheckpointDiffer {
         actualDiffSstFiles);
 
     // Check same and different SST files result
-    Assertions.assertEquals(expectedSameSstFiles, actualSameSstFiles);
-    Assertions.assertEquals(expectedDiffSstFiles, actualDiffSstFiles);
+    assertEquals(expectedSameSstFiles, actualSameSstFiles);
+    assertEquals(expectedDiffSstFiles, actualDiffSstFiles);
   }
 
   private static Stream<Arguments> shouldSkipNodeCases() {
@@ -1818,5 +1835,116 @@ public class TestRocksDBCheckpointDiffer {
 
     assertEquals(expectedResponse, rocksDBCheckpointDiffer.shouldSkipNode(node,
         columnFamilyToPrefixMap));
+  }
+
+  private void createKeys(ColumnFamilyHandle cfh,
+                          String keyPrefix,
+                          String valuePrefix,
+                          int numberOfKeys) throws RocksDBException {
+
+    for (int i = 0; i < numberOfKeys; ++i) {
+      String generatedString = RandomStringUtils.randomAlphabetic(7);
+      String keyStr = keyPrefix + i + "-" + generatedString;
+      String valueStr = valuePrefix + i + "-" + generatedString;
+      byte[] key = keyStr.getBytes(UTF_8);
+      activeRocksDB.put(cfh, key, valueStr.getBytes(UTF_8));
+      if (i % 10 == 0) {
+        activeRocksDB.flush(new FlushOptions(), cfh);
+      }
+    }
+  }
+
+  // End-to-end to verify that only 'keyTable', 'directoryTable'
+  // and 'fileTable' column families SST files are added to compaction DAG.
+  @Test
+  public void testDagOnlyContainsDesiredCfh()
+      throws RocksDBException, IOException {
+    // Setting is not non-empty table so that 'isSnapshotInfoTableEmpty'
+    // returns true.
+    rocksDBCheckpointDiffer.setSnapshotInfoTableCFHandle(keyTableCFHandle);
+    createKeys(keyTableCFHandle, "keyName-", "keyValue-", 100);
+    createKeys(directoryTableCFHandle, "dirName-", "dirValue-", 100);
+    createKeys(fileTableCFHandle, "fileName-", "fileValue-", 100);
+    createKeys(compactionLogTableCFHandle, "logName-", "logValue-", 100);
+
+    // Make sures that some compaction happened.
+    assertThat(rocksDBCheckpointDiffer.getCompactionNodeMap()).isNotEmpty();
+
+    List<CompactionNode> compactionNodes = rocksDBCheckpointDiffer.
+        getCompactionNodeMap().values().stream()
+        .filter(node -> !COLUMN_FAMILIES_TO_TRACK_IN_DAG.contains(
+            node.getColumnFamily()))
+        .collect(Collectors.toList());
+
+    // CompactionNodeMap should not contain any node other than 'keyTable',
+    // 'directoryTable' and 'fileTable' column families nodes.
+    assertThat(compactionNodes).isEmpty();
+
+    // Assert that only 'keyTable', 'directoryTable' and 'fileTable'
+    // column families SST files are backed-up.
+    try (ManagedOptions options = new ManagedOptions();
+         Stream<Path> pathStream = Files.list(
+             Paths.get(rocksDBCheckpointDiffer.getSSTBackupDir()))) {
+      pathStream.forEach(path -> {
+        try (SstFileReader fileReader = new SstFileReader(options)) {
+          fileReader.open(path.toAbsolutePath().toString());
+          String columnFamily = StringUtils.bytes2String(
+              fileReader.getTableProperties().getColumnFamilyName());
+          assertThat(COLUMN_FAMILIES_TO_TRACK_IN_DAG).contains(columnFamily);
+        } catch (RocksDBException rocksDBException) {
+          fail("Failed to read file: " + path.toAbsolutePath());
+        }
+      });
+    }
+  }
+
+  private static Stream<Arguments> shouldSkipFileCases() {
+    return Stream.of(
+        Arguments.of("Case#1: volumeTable is irrelevant column family.",
+            "volumeTable".getBytes(UTF_8),
+            Arrays.asList("inputFile1", "inputFile2", "inputFile3"),
+            Arrays.asList("outputFile1", "outputFile2"), true),
+        Arguments.of("Case#2: bucketTable is irrelevant column family.",
+            "bucketTable".getBytes(UTF_8),
+            Arrays.asList("inputFile1", "inputFile2", "inputFile3"),
+            Arrays.asList("outputFile1", "outputFile2"), true),
+        Arguments.of("Case#3: snapshotInfoTable is irrelevant column family.",
+            "snapshotInfoTable".getBytes(UTF_8),
+            Arrays.asList("inputFile1", "inputFile2", "inputFile3"),
+            Arrays.asList("outputFile1", "outputFile2"), true),
+        Arguments.of("Case#4: compactionLogTable is irrelevant column family.",
+            "compactionLogTable".getBytes(UTF_8),
+            Arrays.asList("inputFile1", "inputFile2", "inputFile3"),
+            Arrays.asList("outputFile1", "outputFile2"), true),
+        Arguments.of("Case#5: Input file list is empty..",
+            "keyTable".getBytes(UTF_8), Collections.emptyList(),
+            Arrays.asList("outputFile1", "outputFile2"), true),
+        Arguments.of("Case#6: Input and output file lists are same.",
+            "keyTable".getBytes(UTF_8),
+            Arrays.asList("inputFile1", "inputFile2", "inputFile3"),
+            Arrays.asList("inputFile1", "inputFile2", "inputFile3"), true),
+        Arguments.of("Case#7: keyTable is relevant column family.",
+            "keyTable".getBytes(UTF_8),
+            Arrays.asList("inputFile1", "inputFile2", "inputFile3"),
+            Arrays.asList("outputFile1", "outputFile2"), false),
+        Arguments.of("Case#8: directoryTable is relevant column family.",
+            "directoryTable".getBytes(UTF_8),
+            Arrays.asList("inputFile1", "inputFile2", "inputFile3"),
+            Arrays.asList("outputFile1", "outputFile2"), false),
+        Arguments.of("Case#9: fileTable is relevant column family.",
+            "fileTable".getBytes(UTF_8),
+            Arrays.asList("inputFile1", "inputFile2", "inputFile3"),
+            Arrays.asList("outputFile1", "outputFile2"), false));
+  }
+
+  @MethodSource("shouldSkipFileCases")
+  @ParameterizedTest(name = "{0}")
+  public void testShouldSkipFile(String description,
+                                 byte[] columnFamilyBytes,
+                                 List<String> inputFiles,
+                                 List<String> outputFiles,
+                                 boolean expectedResult) {
+    assertEquals(expectedResult, rocksDBCheckpointDiffer
+        .shouldSkipCompaction(columnFamilyBytes, inputFiles, outputFiles));
   }
 }

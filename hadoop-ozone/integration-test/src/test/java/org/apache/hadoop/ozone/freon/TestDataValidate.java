@@ -22,12 +22,16 @@ import org.apache.hadoop.hdds.conf.DatanodeRatisServerConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.ratis.conf.RatisClientConfig;
+import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
-import org.junit.Assert;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 import picocli.CommandLine;
 
 import java.time.Duration;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Tests Freon, with MiniOzoneCluster and validate data.
@@ -49,8 +53,10 @@ public abstract class TestDataValidate {
     raftClientConfig.setRpcWatchRequestTimeout(Duration.ofSeconds(10));
     conf.setFromObject(raftClientConfig);
 
+    conf.setInt(ScmConfigKeys.OZONE_SCM_RATIS_PIPELINE_LIMIT, 8);
+
     cluster = MiniOzoneCluster.newBuilder(conf)
-        .setNumDatanodes(5).setTotalPipelineNumLimit(8).build();
+        .setNumDatanodes(5).build();
     cluster.waitForClusterToBeReady();
     cluster.waitForPipelineTobeReady(HddsProtos.ReplicationFactor.THREE,
             180000);
@@ -70,16 +76,16 @@ public abstract class TestDataValidate {
     cmd.execute("--num-of-volumes", "1",
         "--num-of-buckets", "1",
         "--num-of-keys", "1",
-        "--key-size", "20971520",
+        "--key-size", "20MB",
         "--factor", "THREE",
         "--type", "RATIS",
         "--validate-writes"
     );
 
-    Assert.assertEquals(1, randomKeyGenerator.getNumberOfVolumesCreated());
-    Assert.assertEquals(1, randomKeyGenerator.getNumberOfBucketsCreated());
-    Assert.assertEquals(1, randomKeyGenerator.getNumberOfKeysAdded());
-    Assert.assertEquals(0, randomKeyGenerator.getUnsuccessfulValidationCount());
+    assertEquals(1, randomKeyGenerator.getNumberOfVolumesCreated());
+    assertEquals(1, randomKeyGenerator.getNumberOfBucketsCreated());
+    assertEquals(1, randomKeyGenerator.getNumberOfKeysAdded());
+    assertEquals(0, randomKeyGenerator.getUnsuccessfulValidationCount());
   }
 
   @Test
@@ -95,14 +101,12 @@ public abstract class TestDataValidate {
         "--validate-writes"
     );
 
-    Assert.assertEquals(2, randomKeyGenerator.getNumberOfVolumesCreated());
-    Assert.assertEquals(10, randomKeyGenerator.getNumberOfBucketsCreated());
-    Assert.assertEquals(100, randomKeyGenerator.getNumberOfKeysAdded());
-    Assert.assertTrue(randomKeyGenerator.getValidateWrites());
-    Assert.assertNotEquals(0, randomKeyGenerator.getTotalKeysValidated());
-    Assert.assertNotEquals(0, randomKeyGenerator
-        .getSuccessfulValidationCount());
-    Assert.assertEquals(0, randomKeyGenerator
-        .getUnsuccessfulValidationCount());
+    assertEquals(2, randomKeyGenerator.getNumberOfVolumesCreated());
+    assertEquals(10, randomKeyGenerator.getNumberOfBucketsCreated());
+    assertEquals(100, randomKeyGenerator.getNumberOfKeysAdded());
+    assertTrue(randomKeyGenerator.getValidateWrites());
+    assertNotEquals(0, randomKeyGenerator.getTotalKeysValidated());
+    assertNotEquals(0, randomKeyGenerator.getSuccessfulValidationCount());
+    assertEquals(0, randomKeyGenerator.getUnsuccessfulValidationCount());
   }
 }

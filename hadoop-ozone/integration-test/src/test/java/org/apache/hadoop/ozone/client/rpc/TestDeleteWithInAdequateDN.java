@@ -26,6 +26,7 @@ import java.util.concurrent.TimeUnit;
 
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
+import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.DatanodeRatisServerConfig;
@@ -64,15 +65,20 @@ import org.apache.ozone.test.GenericTestUtils;
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_COMMAND_STATUS_REPORT_INTERVAL;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_CONTAINER_REPORT_INTERVAL;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_HEARTBEAT_INTERVAL;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.THREE;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_PIPELINE_CREATION_INTERVAL;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_PIPELINE_DESTROY_TIMEOUT;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_STALENODE_INTERVAL;
-import org.junit.AfterClass;
-import org.junit.Assert;
-import org.junit.Assume;
-import org.junit.BeforeClass;
-import org.junit.Test;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.Assumptions;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Test;
 
 /**
  * Tests delete key operation with inadequate datanodes.
@@ -94,24 +100,29 @@ public class TestDeleteWithInAdequateDN {
    *
    * @throws IOException
    */
-  @BeforeClass
+  @BeforeAll
   public static void init() throws Exception {
+    final int numOfDatanodes = 3;
+
     conf = new OzoneConfiguration();
     path = GenericTestUtils
         .getTempPath(TestContainerStateMachineFailures.class.getSimpleName());
     File baseDir = new File(path);
     baseDir.mkdirs();
 
+    conf.setTimeDuration(HDDS_HEARTBEAT_INTERVAL, 100,
+        TimeUnit.MILLISECONDS);
     conf.setTimeDuration(HDDS_CONTAINER_REPORT_INTERVAL, 200,
         TimeUnit.MILLISECONDS);
     conf.setInt(ScmConfigKeys.OZONE_DATANODE_PIPELINE_LIMIT, 1);
+    conf.setInt(ScmConfigKeys.OZONE_SCM_RATIS_PIPELINE_LIMIT, numOfDatanodes + FACTOR_THREE_PIPELINE_COUNT);
     // Make the stale, dead and server failure timeout higher so that a dead
     // node is not detecte at SCM as well as the pipeline close action
     // never gets initiated early at Datanode in the test.
     conf.setTimeDuration(HDDS_COMMAND_STATUS_REPORT_INTERVAL, 200,
         TimeUnit.MILLISECONDS);
     conf.setTimeDuration(OZONE_SCM_STALENODE_INTERVAL, 1000,
-            TimeUnit.SECONDS);
+        TimeUnit.SECONDS);
     conf.setTimeDuration(ScmConfigKeys.OZONE_SCM_DEADNODE_INTERVAL, 2000,
         TimeUnit.SECONDS);
     conf.setTimeDuration(OZONE_SCM_PIPELINE_DESTROY_TIMEOUT, 1000,
@@ -133,7 +144,7 @@ public class TestDeleteWithInAdequateDN {
     conf.setFromObject(raftClientConfig);
 
     conf.setTimeDuration(OzoneConfigKeys.OZONE_BLOCK_DELETING_SERVICE_INTERVAL,
-            1, TimeUnit.SECONDS);
+        1, TimeUnit.SECONDS);
 
     ScmConfig scmConfig = conf.getObject(ScmConfig.class);
     scmConfig.setBlockDeletionInterval(Duration.ofSeconds(1));
@@ -151,13 +162,9 @@ public class TestDeleteWithInAdequateDN {
     conf.setFromObject(ratisClientConfig);
 
     conf.setQuietMode(false);
-    int numOfDatanodes = 3;
     cluster = MiniOzoneCluster.newBuilder(conf)
-            .setNumDatanodes(numOfDatanodes)
-            .setTotalPipelineNumLimit(
-                numOfDatanodes + FACTOR_THREE_PIPELINE_COUNT)
-            .setHbInterval(100)
-            .build();
+        .setNumDatanodes(numOfDatanodes)
+        .build();
     cluster.waitForClusterToBeReady();
     cluster.waitForPipelineTobeReady(THREE, 60000);
     //the easiest way to create an open container is creating a key
@@ -173,7 +180,7 @@ public class TestDeleteWithInAdequateDN {
   /**
    * Shutdown MiniDFSCluster.
    */
-  @AfterClass
+  @AfterAll
   public static void shutdown() {
     IOUtils.closeQuietly(client);
     if (xceiverClientManager != null) {
@@ -195,12 +202,13 @@ public class TestDeleteWithInAdequateDN {
    * data is not deleted from any of the nodes which have the closed replica.
    */
   @Test
-  public void testDeleteKeyWithInAdequateDN() throws Exception {
+  void testDeleteKeyWithInAdequateDN() throws Exception {
     String keyName = "ratis";
     OzoneOutputStream key =
         objectStore.getVolume(volumeName).getBucket(bucketName)
-            .createKey(keyName, 0, ReplicationType.RATIS,
-                ReplicationFactor.THREE, new HashMap<>());
+            .createKey(keyName, 0,
+                ReplicationConfig.fromTypeAndFactor(ReplicationType.RATIS,
+                    ReplicationFactor.THREE), new HashMap<>());
     byte[] testData = "ratis".getBytes(UTF_8);
     // First write and flush creates a container in the datanode
     key.write(testData);
@@ -209,8 +217,9 @@ public class TestDeleteWithInAdequateDN {
     KeyOutputStream groupOutputStream = (KeyOutputStream) key.getOutputStream();
     List<OmKeyLocationInfo> locationInfoList =
         groupOutputStream.getLocationInfoList();
-    Assume.assumeTrue("Expected exactly a single location, but got: " +
-        locationInfoList.size(), 1 == locationInfoList.size());
+    Assumptions.assumeTrue(1 == locationInfoList.size(),
+        "Expected exactly a single location, but got: " +
+            locationInfoList.size());
     OmKeyLocationInfo omKeyLocationInfo = locationInfoList.get(0);
     long containerID = omKeyLocationInfo.getContainerID();
     // A container is created on the datanode. Now figure out a follower node to
@@ -221,7 +230,7 @@ public class TestDeleteWithInAdequateDN {
     List<Pipeline> pipelineList =
         cluster.getStorageContainerManager().getPipelineManager()
             .getPipelines(RatisReplicationConfig.getInstance(THREE));
-    Assume.assumeTrue(pipelineList.size() >= FACTOR_THREE_PIPELINE_COUNT);
+    Assumptions.assumeTrue(pipelineList.size() >= FACTOR_THREE_PIPELINE_COUNT);
     Pipeline pipeline = pipelineList.get(0);
     for (HddsDatanodeService dn : cluster.getHddsDatanodes()) {
       if (RatisTestHelper.isRatisFollower(dn, pipeline)) {
@@ -230,9 +239,10 @@ public class TestDeleteWithInAdequateDN {
         leader = dn;
       }
     }
-    Assume.assumeNotNull(follower, leader);
+    assertNotNull(follower);
+    assertNotNull(leader);
     //ensure that the chosen follower is still a follower
-    Assume.assumeTrue(RatisTestHelper.isRatisFollower(follower, pipeline));
+    Assumptions.assumeTrue(RatisTestHelper.isRatisFollower(follower, pipeline));
     // shutdown the  follower node
     cluster.shutdownHddsDatanode(follower.getDatanodeDetails());
     key.write(testData);
@@ -277,22 +287,18 @@ public class TestDeleteWithInAdequateDN {
         keyValueHandler.getBlockManager().getBlock(container, blockID);
     //cluster.getOzoneManager().deleteKey(keyArgs);
     client.getObjectStore().getVolume(volumeName).getBucket(bucketName).
-            deleteKey("ratis");
+        deleteKey("ratis");
     // make sure the chunk was never deleted on the leader even though
     // deleteBlock handler is invoked
-    try {
-      for (ContainerProtos.ChunkInfo chunkInfo : blockData.getChunks()) {
-        keyValueHandler.getChunkManager()
-            .readChunk(container, blockID, ChunkInfo.getFromProtoBuf(chunkInfo),
-                null);
-      }
-    } catch (IOException ioe) {
-      Assert.fail("Exception should not be thrown.");
+
+    for (ContainerProtos.ChunkInfo chunkInfo : blockData.getChunks()) {
+      keyValueHandler.getChunkManager()
+          .readChunk(container, blockID, ChunkInfo.getFromProtoBuf(chunkInfo),
+              null);
     }
     long numReadStateMachineOps =
         stateMachine.getMetrics().getNumReadStateMachineOps();
-    Assert.assertTrue(
-        stateMachine.getMetrics().getNumReadStateMachineFails() == 0);
+    assertEquals(0, stateMachine.getMetrics().getNumReadStateMachineFails());
     stateMachine.evictStateMachineCache();
     cluster.restartHddsDatanode(follower.getDatanodeDetails(), false);
     // wait for the raft server to come up and join the ratis ring
@@ -300,10 +306,9 @@ public class TestDeleteWithInAdequateDN {
 
     // Make sure the readStateMachine call got triggered after the follower
     // caught up
-    Assert.assertTrue(stateMachine.getMetrics().getNumReadStateMachineOps()
-        > numReadStateMachineOps);
-    Assert.assertTrue(
-        stateMachine.getMetrics().getNumReadStateMachineFails() == 0);
+    assertThat(stateMachine.getMetrics().getNumReadStateMachineOps())
+        .isGreaterThan(numReadStateMachineOps);
+    assertEquals(0, stateMachine.getMetrics().getNumReadStateMachineFails());
     // wait for the chunk to get deleted now
     Thread.sleep(10000);
     for (HddsDatanodeService dn : cluster.getHddsDatanodes()) {
@@ -312,17 +317,14 @@ public class TestDeleteWithInAdequateDN {
               .getDispatcher()
               .getHandler(ContainerProtos.ContainerType.KeyValueContainer);
       // make sure the chunk is now deleted on the all dns
-      try {
+      KeyValueHandler finalKeyValueHandler = keyValueHandler;
+      StorageContainerException e = assertThrows(StorageContainerException.class, () -> {
         for (ContainerProtos.ChunkInfo chunkInfo : blockData.getChunks()) {
-          keyValueHandler.getChunkManager().readChunk(container, blockID,
-              ChunkInfo.getFromProtoBuf(chunkInfo), null);
+          finalKeyValueHandler.getChunkManager().readChunk(container, blockID,
+                  ChunkInfo.getFromProtoBuf(chunkInfo), null);
         }
-        Assert.fail("Expected exception is not thrown");
-      } catch (IOException ioe) {
-        Assert.assertTrue(ioe instanceof StorageContainerException);
-        Assert.assertTrue(((StorageContainerException) ioe).getResult()
-            == ContainerProtos.Result.UNABLE_TO_FIND_CHUNK);
-      }
+      });
+      assertSame(ContainerProtos.Result.UNABLE_TO_FIND_CHUNK, e.getResult());
     }
   }
 }

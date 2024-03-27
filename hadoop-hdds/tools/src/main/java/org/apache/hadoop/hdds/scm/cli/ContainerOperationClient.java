@@ -35,6 +35,8 @@ import org.apache.hadoop.hdds.scm.DatanodeAdminError;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.XceiverClientManager;
 import org.apache.hadoop.hdds.scm.XceiverClientSpi;
+import org.apache.hadoop.hdds.scm.client.ClientTrustManager;
+import org.apache.hadoop.hdds.security.x509.certificate.client.CACertificateProvider;
 import org.apache.hadoop.hdds.scm.client.ScmClient;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
@@ -53,11 +55,11 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
-import java.security.cert.X509Certificate;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.UUID;
 
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_CONTAINER_TOKEN_ENABLED;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_CONTAINER_TOKEN_ENABLED_DEFAULT;
@@ -96,8 +98,8 @@ public class ContainerOperationClient implements ScmClient {
     containerSizeB = (int) conf.getStorageSize(OZONE_SCM_CONTAINER_SIZE,
         OZONE_SCM_CONTAINER_SIZE_DEFAULT, StorageUnit.BYTES);
     boolean useRatis = conf.getBoolean(
-        ScmConfigKeys.DFS_CONTAINER_RATIS_ENABLED_KEY,
-        ScmConfigKeys.DFS_CONTAINER_RATIS_ENABLED_DEFAULT);
+        ScmConfigKeys.HDDS_CONTAINER_RATIS_ENABLED_KEY,
+        ScmConfigKeys.HDDS_CONTAINER_RATIS_ENABLED_DEFAULT);
     if (useRatis) {
       replicationFactor = HddsProtos.ReplicationFactor.THREE;
       replicationType = HddsProtos.ReplicationType.RATIS;
@@ -113,11 +115,10 @@ public class ContainerOperationClient implements ScmClient {
       throws IOException {
     XceiverClientManager manager;
     if (OzoneSecurityUtil.isSecurityEnabled(conf)) {
-      List<X509Certificate> caCertificates =
-          HAUtils.buildCAX509List(null, conf);
+      CACertificateProvider caCerts = () -> HAUtils.buildCAX509List(null, conf);
       manager = new XceiverClientManager(conf,
           conf.getObject(XceiverClientManager.ScmClientConfig.class),
-          caCertificates);
+          new ClientTrustManager(caCerts, null));
     } else {
       manager = new XceiverClientManager(conf);
     }
@@ -216,6 +217,11 @@ public class ContainerOperationClient implements ScmClient {
   }
 
   @Override
+  public Map<String, List<ContainerID>> getContainersOnDecomNode(DatanodeDetails dn) throws IOException {
+    return storageContainerLocationClient.getContainersOnDecomNode(dn);
+  }
+
+  @Override
   public List<HddsProtos.Node> queryNode(
       HddsProtos.NodeOperationalState opState,
       HddsProtos.NodeState nodeState,
@@ -223,6 +229,11 @@ public class ContainerOperationClient implements ScmClient {
       throws IOException {
     return storageContainerLocationClient.queryNode(opState, nodeState,
         queryScope, poolName, ClientVersion.CURRENT_VERSION);
+  }
+
+  @Override
+  public HddsProtos.Node queryNode(UUID uuid) throws IOException {
+    return storageContainerLocationClient.queryNode(uuid);
   }
 
   @Override
@@ -519,8 +530,8 @@ public class ContainerOperationClient implements ScmClient {
 
   @Override
   public List<HddsProtos.DatanodeUsageInfoProto> getDatanodeUsageInfo(
-      String ipaddress, String uuid) throws IOException {
-    return storageContainerLocationClient.getDatanodeUsageInfo(ipaddress,
+      String address, String uuid) throws IOException {
+    return storageContainerLocationClient.getDatanodeUsageInfo(address,
         uuid, ClientVersion.CURRENT_VERSION);
   }
 
@@ -550,6 +561,11 @@ public class ContainerOperationClient implements ScmClient {
       String scmId)
       throws IOException {
     return storageContainerLocationClient.decommissionScm(scmId);
+  }
+
+  @Override
+  public String getMetrics(String query) throws IOException {
+    return storageContainerLocationClient.getMetrics(query);
   }
 
 }

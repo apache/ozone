@@ -20,14 +20,18 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
   <parent>
     <groupId>org.apache.ozone</groupId>
     <artifactId>hdds</artifactId>
-    <version>1.4.0-SNAPSHOT</version>
+    <version>1.5.0-SNAPSHOT</version>
   </parent>
   <artifactId>hdds-hadoop-dependency-client</artifactId>
-  <version>1.4.0-SNAPSHOT</version>
+  <version>1.5.0-SNAPSHOT</version>
   <description>Apache Ozone Distributed Data Store Hadoop client dependencies
   </description>
   <name>Apache Ozone HDDS Hadoop Client dependencies</name>
   <packaging>jar</packaging>
+
+  <properties>
+    <maven.test.skip>true</maven.test.skip> <!-- no tests in this module -->
+  </properties>
 
   <dependencies>
     <dependency>
@@ -39,6 +43,10 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
       <artifactId>hadoop-common</artifactId>
       <version>${hadoop.version}</version>
       <exclusions>
+        <exclusion>
+          <groupId>org.xerial.snappy</groupId>
+          <artifactId>snappy-java</artifactId>
+        </exclusion>
         <exclusion>
           <groupId>org.apache.hadoop</groupId>
           <artifactId>hadoop-annotations</artifactId>
@@ -96,6 +104,10 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
           <artifactId>jersey-json</artifactId>
         </exclusion>
         <exclusion>
+          <groupId>com.google.code.findbugs</groupId>
+          <artifactId>jsr305</artifactId>
+        </exclusion>
+        <exclusion>
           <groupId>com.sun.jersey</groupId>
           <artifactId>jersey-core</artifactId>
         </exclusion>
@@ -130,10 +142,6 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
         <exclusion>
           <groupId>org.apache.commons</groupId>
           <artifactId>commons-lang3</artifactId>
-        </exclusion>
-        <exclusion>
-          <groupId>org.apache.commons</groupId>
-          <artifactId>commons-text</artifactId>
         </exclusion>
         <exclusion>
           <groupId>org.slf4j</groupId>
@@ -285,6 +293,10 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
           <artifactId>jackson-databind</artifactId>
         </exclusion>
       </exclusions>
+    </dependency>
+    <dependency>
+      <groupId>org.xerial.snappy</groupId>
+      <artifactId>snappy-java</artifactId>
     </dependency>
   </dependencies>
 </project>

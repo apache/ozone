@@ -20,7 +20,7 @@ package org.apache.hadoop.ozone.client.io;
 
 import org.apache.hadoop.hdds.scm.storage.ByteBufferStreamOutput;
 
-import javax.annotation.Nonnull;
+import jakarta.annotation.Nonnull;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.nio.ByteBuffer;
@@ -37,6 +37,11 @@ public abstract class ByteBufferOutputStream extends OutputStream
   @Override
   public void write(@Nonnull byte[] byteArray) throws IOException {
     write(ByteBuffer.wrap(byteArray));
+  }
+
+  @Override
+  public void write(@Nonnull byte[] byteArray, int off, int len) throws IOException {
+    write(ByteBuffer.wrap(byteArray), off, len);
   }
 
   @Override

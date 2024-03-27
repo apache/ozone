@@ -146,6 +146,7 @@ enum Type {
   SetSnapshotProperty = 128;
   ListStatusLight = 129;
   GetSnapshotInfo = 130;
+  RenameSnapshot = 131;
 }
 
 enum SafeMode {
@@ -281,6 +282,7 @@ message OMRequest {
   optional MultipartUploadsExpiredAbortRequest multipartUploadsExpiredAbortRequest = 126;
   optional SetSnapshotPropertyRequest       SetSnapshotPropertyRequest     = 127;
   optional SnapshotInfoRequest              SnapshotInfoRequest            = 128;
+  optional RenameSnapshotRequest            RenameSnapshotRequest          = 129;
 }
 
 message OMResponse {
@@ -402,6 +404,8 @@ message OMResponse {
   optional SetSnapshotPropertyResponse       SetSnapshotPropertyResponse   = 128;
   optional ListStatusLightResponse           listStatusLightResponse       = 129;
   optional SnapshotInfoResponse              SnapshotInfoResponse          = 130;
+  optional OMLockDetailsProto                omLockDetails                 = 131;
+  optional RenameSnapshotResponse            RenameSnapshotResponse        = 132;
 }
 
 enum Status {
@@ -521,8 +525,10 @@ enum Status {
     UNAUTHORIZED = 91;
 
     S3_SECRET_ALREADY_EXISTS = 92;
-    
+
     INVALID_PATH = 93;
+
+    TOO_MANY_BUCKETS = 94;
 }
 
 /**
@@ -802,6 +808,7 @@ message BucketArgs {
     optional uint64 quotaInNamespace = 9;
     optional string ownerName = 10;
     optional hadoop.hdds.DefaultReplicationConfig defaultReplicationConfig = 11;
+    optional BucketEncryptionInfoProto bekInfo = 12;
 }
 
 message PrefixInfo {
@@ -848,6 +855,7 @@ message SnapshotInfo {
   // snapshot exclusive size after replication
   optional uint64 exclusiveReplicatedSize = 18;
   // note: shared sizes can be calculated from: referenced - exclusive
+  optional bool deepCleanedDeletedDir = 19;
 }
 
 message SnapshotDiffJobProto {
@@ -1579,8 +1587,9 @@ message MultipartCommitUploadPartRequest {
 }
 
 message MultipartCommitUploadPartResponse {
-    // This one is returned as Etag for S3.
     optional string partName = 1;
+    // This one is returned as Etag for S3.
+    optional string eTag = 2;
 }
 
 message MultipartUploadCompleteRequest {
@@ -1598,6 +1607,7 @@ message MultipartUploadCompleteResponse {
 message Part {
     required uint32 partNumber = 1;
     required string partName = 2;
+    optional string eTag = 3;
 }
 
 message MultipartUploadAbortRequest {
@@ -1670,6 +1680,7 @@ message PartInfo {
     required string partName = 2;
     required uint64 modificationTime = 3;
     required uint64 size = 4;
+    optional string eTag = 5;
 }
 
 /**
@@ -1822,6 +1833,14 @@ message CreateSnapshotRequest {
   optional uint64 creationTime = 5;
 }
 
+message RenameSnapshotRequest {
+  optional string volumeName = 1;
+  optional string bucketName = 2;
+  optional string snapshotOldName = 3;
+  optional string snapshotNewName = 4;
+  optional uint64 renameTime = 5;
+}
+
 message ListSnapshotRequest {
   optional string volumeName = 1;
   optional string bucketName = 2;
@@ -1888,17 +1907,27 @@ message SnapshotMoveKeyInfos {
 
 message SnapshotPurgeRequest {
   repeated string snapshotDBKeys = 1;
-  repeated string updatedSnapshotDBKey = 2;
+  repeated string updatedSnapshotDBKey = 2 [deprecated = true];
 }
 
 message SetSnapshotPropertyRequest {
-  optional SnapshotProperty snapshotProperty = 1;
+  optional SnapshotProperty snapshotProperty = 1 [deprecated = true];
+  optional string snapshotKey = 2;
+  optional SnapshotSize snapshotSize = 3;
+  optional bool deepCleanedDeletedDir = 4;
+  optional bool deepCleanedDeletedKey = 5;
 }
 
+// SnapshotProperty in entirely deprecated, Keeping it here for proto.lock compatibility
 message SnapshotProperty {
-  optional string snapshotKey = 1;
-  optional uint64 exclusiveSize = 2;
-  optional uint64 exclusiveReplicatedSize = 3;
+  optional string snapshotKey = 1 [deprecated = true];
+  optional uint64 exclusiveSize = 2 [deprecated = true];
+  optional uint64 exclusiveReplicatedSize = 3 [deprecated = true];
+}
+
+message SnapshotSize {
+  optional uint64 exclusiveSize = 1;
+  optional uint64 exclusiveReplicatedSize = 2;
 }
 
 message DeleteTenantRequest {
@@ -1972,6 +2001,10 @@ message ListSnapshotDiffJobResponse {
 
 message DeleteSnapshotResponse {
 
+}
+
+message RenameSnapshotResponse {
+  optional SnapshotInfo snapshotInfo = 1;
 }
 
 message SnapshotInfoResponse {
@@ -2087,6 +2120,13 @@ message SetSafeModeRequest {
 
 message SetSafeModeResponse {
   optional bool response = 1;
+}
+
+message OMLockDetailsProto {
+  optional bool isLockAcquired = 1;
+  optional uint64 waitLockNanos    = 2;
+  optional uint64 readLockNanos    = 3;
+  optional uint64 writeLockNanos   = 4;
 }
 
 /**

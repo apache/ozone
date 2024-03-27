@@ -24,6 +24,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ChunkInfo;
+import org.apache.hadoop.hdds.scm.OzoneClientConfig;
 import org.apache.hadoop.hdds.scm.XceiverClientFactory;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
 import org.apache.hadoop.hdds.scm.pipeline.MockPipeline;
@@ -51,12 +52,12 @@ final class DummyBlockInputStreamWithRetry
       long blockLen,
       Pipeline pipeline,
       Token<OzoneBlockTokenIdentifier> token,
-      boolean verifyChecksum,
       XceiverClientFactory xceiverClientManager,
       List<ChunkInfo> chunkList,
       Map<String, byte[]> chunkMap,
-      AtomicBoolean isRerfreshed, IOException ioException) {
-    super(blockId, blockLen, pipeline, token, verifyChecksum,
+      AtomicBoolean isRerfreshed, IOException ioException,
+      OzoneClientConfig config) {
+    super(blockId, blockLen, pipeline, token,
         xceiverClientManager, blockID -> {
           isRerfreshed.set(true);
           try {
@@ -68,12 +69,12 @@ final class DummyBlockInputStreamWithRetry
             throw new RuntimeException(e);
           }
 
-        }, chunkList, chunkMap);
+        }, chunkList, chunkMap, config);
     this.ioException  = ioException;
   }
 
   @Override
-  protected List<ChunkInfo> getChunkInfos() throws IOException {
+  protected List<ChunkInfo> getChunkInfoList() throws IOException {
     if (getChunkInfoCount == 0) {
       getChunkInfoCount++;
       if (ioException != null) {
@@ -82,7 +83,7 @@ final class DummyBlockInputStreamWithRetry
       throw new StorageContainerException("Exception encountered",
           CONTAINER_NOT_FOUND);
     } else {
-      return super.getChunkInfos();
+      return super.getChunkInfoList();
     }
   }
 }

@@ -20,10 +20,10 @@ import java.io.IOException;
 import java.io.OutputStream;
 import java.util.UUID;
 
-import org.apache.hadoop.conf.StorageUnit;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ChecksumType;
 import org.apache.hadoop.hdds.scm.OzoneClientConfig;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
@@ -35,7 +35,9 @@ import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.storage.BlockOutputStream;
 import org.apache.hadoop.hdds.utils.IOUtils;
+import org.apache.hadoop.ozone.ClientConfigForTesting;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
+import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientFactory;
@@ -45,28 +47,21 @@ import org.apache.hadoop.ozone.container.ContainerTestHelper;
 import org.apache.hadoop.ozone.container.TestHelper;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import org.apache.ratis.protocol.exceptions.GroupMismatchException;
-import org.junit.After;
-import org.junit.Assert;
-import org.junit.Before;
-import org.junit.Rule;
-import org.junit.Test;
-import org.junit.rules.TestRule;
-import org.junit.rules.Timeout;
-import org.apache.ozone.test.JUnit5AwareTimeout;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
 
 /**
  * Tests failure detection and handling in BlockOutputStream Class by set
  * flush delay.
  */
+@Timeout(300)
 public class TestOzoneClientRetriesOnExceptionFlushDelay {
-
-  /**
-   * Set a timeout for each test.
-   */
-  @Rule
-  public TestRule timeout = new JUnit5AwareTimeout(Timeout.seconds(300));
-
   private MiniOzoneCluster cluster;
   private OzoneConfiguration conf = new OzoneConfiguration();
   private OzoneClient client;
@@ -87,28 +82,33 @@ public class TestOzoneClientRetriesOnExceptionFlushDelay {
    *
    * @throws IOException
    */
-  @Before
+  @BeforeEach
   public void init() throws Exception {
     chunkSize = 100;
     flushSize = 2 * chunkSize;
     maxFlushSize = 2 * flushSize;
     blockSize = 2 * maxFlushSize;
 
-    OzoneClientConfig config = new OzoneClientConfig();
+    OzoneClientConfig config = conf.getObject(OzoneClientConfig.class);
     config.setChecksumType(ChecksumType.NONE);
     config.setMaxRetryCount(3);
     conf.setFromObject(config);
 
     conf.setInt(ScmConfigKeys.OZONE_SCM_PIPELINE_OWNER_CONTAINER_COUNT, 3);
+    conf.set(OzoneConfigKeys.OZONE_SCM_CLOSE_CONTAINER_WAIT_DURATION, "2s");
+    conf.set(ScmConfigKeys.OZONE_SCM_PIPELINE_SCRUB_INTERVAL, "2s");
+    conf.set(ScmConfigKeys.OZONE_SCM_PIPELINE_DESTROY_TIMEOUT, "5s");
     conf.setQuietMode(false);
-    cluster = MiniOzoneCluster.newBuilder(conf)
-        .setNumDatanodes(7)
-        .setTotalPipelineNumLimit(10)
+
+    ClientConfigForTesting.newBuilder(StorageUnit.BYTES)
         .setBlockSize(blockSize)
         .setChunkSize(chunkSize)
         .setStreamBufferFlushSize(flushSize)
         .setStreamBufferMaxSize(maxFlushSize)
-        .setStreamBufferSizeUnit(StorageUnit.BYTES)
+        .applyTo(conf);
+
+    cluster = MiniOzoneCluster.newBuilder(conf)
+        .setNumDatanodes(5)
         .build();
     cluster.waitForClusterToBeReady();
     //the easiest way to create an open container is creating a key
@@ -129,7 +129,7 @@ public class TestOzoneClientRetriesOnExceptionFlushDelay {
   /**
    * Shutdown MiniDFSCluster.
    */
-  @After
+  @AfterEach
   public void shutdown() {
     IOUtils.closeQuietly(client);
     if (cluster != null) {
@@ -148,12 +148,12 @@ public class TestOzoneClientRetriesOnExceptionFlushDelay {
     byte[] data1 =
         ContainerTestHelper.getFixedLengthString(keyString, dataLength)
             .getBytes(UTF_8);
-    Assert.assertTrue(key.getOutputStream() instanceof KeyOutputStream);
-    KeyOutputStream keyOutputStream = (KeyOutputStream) key.getOutputStream();
+    KeyOutputStream keyOutputStream =
+        assertInstanceOf(KeyOutputStream.class, key.getOutputStream());
     long containerID =
         keyOutputStream.getStreamEntries().get(0).
             getBlockID().getContainerID();
-    Assert.assertTrue(keyOutputStream.getStreamEntries().size() == 1);
+    assertEquals(1, keyOutputStream.getStreamEntries().size());
     ContainerInfo container =
         cluster.getStorageContainerManager().getContainerManager()
             .getContainer(ContainerID.valueOf(containerID));
@@ -168,17 +168,16 @@ public class TestOzoneClientRetriesOnExceptionFlushDelay {
     key.write(data1);
     OutputStream stream = keyOutputStream.getStreamEntries().get(0)
         .getOutputStream();
-    Assert.assertTrue(stream instanceof BlockOutputStream);
-    BlockOutputStream blockOutputStream = (BlockOutputStream) stream;
+    BlockOutputStream blockOutputStream = assertInstanceOf(BlockOutputStream.class, stream);
     TestHelper.waitForPipelineClose(key, cluster, false);
     key.flush();
-    Assert.assertTrue(HddsClientUtils.checkForException(blockOutputStream
-        .getIoException()) instanceof GroupMismatchException);
-    Assert.assertTrue(keyOutputStream.getExcludeList().getPipelineIds()
-        .contains(pipeline.getId()));
-    Assert.assertTrue(keyOutputStream.getStreamEntries().size() == 2);
+    assertInstanceOf(GroupMismatchException.class,
+        HddsClientUtils.checkForException(blockOutputStream.getIoException()));
+    assertThat(keyOutputStream.getExcludeList().getPipelineIds())
+        .contains(pipeline.getId());
+    assertEquals(2, keyOutputStream.getStreamEntries().size());
     key.close();
-    Assert.assertTrue(keyOutputStream.getStreamEntries().size() == 0);
+    assertEquals(0, keyOutputStream.getStreamEntries().size());
     validateData(keyName, data1);
   }
 

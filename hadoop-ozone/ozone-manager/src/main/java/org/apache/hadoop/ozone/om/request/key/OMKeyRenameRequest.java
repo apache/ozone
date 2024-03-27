@@ -23,11 +23,11 @@ import java.nio.file.InvalidPathException;
 import java.util.Map;
 
 import com.google.common.base.Preconditions;
+import org.apache.ratis.server.protocol.TermIndex;
 import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
-import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
 import org.apache.hadoop.ozone.om.request.validation.RequestFeatureValidator;
 import org.apache.hadoop.ozone.om.request.validation.RequestProcessingPhase;
@@ -79,8 +79,8 @@ public class OMKeyRenameRequest extends OMKeyRequest {
 
   @Override
   public OMRequest preExecute(OzoneManager ozoneManager) throws IOException {
-
-    RenameKeyRequest renameKeyRequest = getOmRequest().getRenameKeyRequest();
+    RenameKeyRequest renameKeyRequest = super.preExecute(ozoneManager)
+        .getRenameKeyRequest();
     Preconditions.checkNotNull(renameKeyRequest);
 
     // Verify key name
@@ -100,18 +100,36 @@ public class OMKeyRenameRequest extends OMKeyRequest {
     KeyArgs.Builder newKeyArgs = renameKeyArgs.toBuilder()
         .setModificationTime(Time.now()).setKeyName(srcKey);
 
+    KeyArgs resolvedArgs = resolveBucketAndCheckAcls(newKeyArgs.build(),
+        ozoneManager, srcKey, dstKey);
+
     return getOmRequest().toBuilder()
         .setRenameKeyRequest(renameKeyRequest.toBuilder().setToKeyName(dstKey)
-            .setKeyArgs(newKeyArgs))
+            .setKeyArgs(resolvedArgs))
         .setUserInfo(getUserIfNotExists(ozoneManager)).build();
 
+  }
+
+  protected KeyArgs resolveBucketAndCheckAcls(KeyArgs keyArgs,
+      OzoneManager ozoneManager, String fromKeyName, String toKeyName)
+      throws IOException {
+    KeyArgs resolvedArgs = resolveBucketLink(ozoneManager, keyArgs);
+    // check Acl
+    String volumeName = resolvedArgs.getVolumeName();
+    String bucketName = resolvedArgs.getBucketName();
+
+    checkKeyAcls(ozoneManager, volumeName, bucketName, fromKeyName,
+        IAccessAuthorizer.ACLType.DELETE, OzoneObj.ResourceType.KEY);
+    checkKeyAcls(ozoneManager, volumeName, bucketName, toKeyName,
+        IAccessAuthorizer.ACLType.CREATE, OzoneObj.ResourceType.KEY);
+    return resolvedArgs;
   }
 
 
   @Override
   @SuppressWarnings("methodlength")
-  public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager,
-      long trxnLogIndex, OzoneManagerDoubleBufferHelper omDoubleBufferHelper) {
+  public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager, TermIndex termIndex) {
+    final long trxnLogIndex = termIndex.getIndex();
 
     RenameKeyRequest renameKeyRequest = getOmRequest().getRenameKeyRequest();
     OzoneManagerProtocolProtos.KeyArgs keyArgs =
@@ -143,20 +161,9 @@ public class OMKeyRenameRequest extends OMKeyRequest {
         throw new OMException("Key name is empty",
             OMException.ResultCodes.INVALID_KEY_NAME);
       }
-
-      keyArgs = resolveBucketLink(ozoneManager, keyArgs, auditMap);
-      volumeName = keyArgs.getVolumeName();
-      bucketName = keyArgs.getBucketName();
-
-      // check Acls to see if user has access to perform delete operation on
-      // old key and create operation on new key
-      checkKeyAcls(ozoneManager, volumeName, bucketName, fromKeyName,
-          IAccessAuthorizer.ACLType.DELETE, OzoneObj.ResourceType.KEY);
-      checkKeyAcls(ozoneManager, volumeName, bucketName, toKeyName,
-          IAccessAuthorizer.ACLType.CREATE, OzoneObj.ResourceType.KEY);
-
-      acquiredLock = omMetadataManager.getLock().acquireWriteLock(BUCKET_LOCK,
-          volumeName, bucketName);
+      mergeOmLockDetails(omMetadataManager.getLock()
+          .acquireWriteLock(BUCKET_LOCK, volumeName, bucketName));
+      acquiredLock = getOmLockDetails().isLockAcquired();
 
       // Validate bucket and volume exists or not.
       validateBucketAndVolume(omMetadataManager, volumeName, bucketName);
@@ -211,11 +218,12 @@ public class OMKeyRenameRequest extends OMKeyRequest {
       omClientResponse = new OMKeyRenameResponse(createErrorOMResponse(
           omResponse, exception), getBucketLayout());
     } finally {
-      addResponseToDoubleBuffer(trxnLogIndex, omClientResponse,
-            omDoubleBufferHelper);
       if (acquiredLock) {
-        omMetadataManager.getLock().releaseWriteLock(BUCKET_LOCK, volumeName,
-            bucketName);
+        mergeOmLockDetails(omMetadataManager.getLock()
+            .releaseWriteLock(BUCKET_LOCK, volumeName, bucketName));
+      }
+      if (omClientResponse != null) {
+        omClientResponse.setOmLockDetails(getOmLockDetails());
       }
     }
 

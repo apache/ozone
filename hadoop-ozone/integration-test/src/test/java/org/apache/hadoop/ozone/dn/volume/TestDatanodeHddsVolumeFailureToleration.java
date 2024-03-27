@@ -24,6 +24,7 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.ozone.HddsDatanodeService;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
+import org.apache.hadoop.ozone.UniformDatanodesFactory;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
@@ -33,14 +34,10 @@ import org.apache.hadoop.ozone.dn.DatanodeTestUtils;
 import org.apache.hadoop.util.ExitUtil;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.GenericTestUtils.LogCapturer;
-import org.junit.After;
-import org.junit.Assert;
-import org.junit.Before;
-import org.junit.Rule;
-import org.junit.Test;
-import org.junit.rules.TestRule;
-import org.junit.rules.Timeout;
-import org.apache.ozone.test.JUnit5AwareTimeout;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
 import org.slf4j.LoggerFactory;
 
 import java.io.File;
@@ -59,21 +56,19 @@ import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_DEADNODE_INTERV
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HEARTBEAT_PROCESS_INTERVAL;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_STALENODE_INTERVAL;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_REPLICATION;
+import static org.assertj.core.api.Assertions.assertThat;
 
 /**
  * This class tests datanode can tolerate configured num of failed volumes.
  */
+@Timeout(300)
 public class TestDatanodeHddsVolumeFailureToleration {
-  /**
-   * Set a timeout for each test.
-   */
-  @Rule
-  public TestRule timeout = new JUnit5AwareTimeout(Timeout.seconds(300));
+
   private MiniOzoneCluster cluster;
   private OzoneConfiguration ozoneConfig;
   private List<HddsDatanodeService> datanodes;
 
-  @Before
+  @BeforeEach
   public void init() throws Exception {
     ozoneConfig = new OzoneConfiguration();
     ozoneConfig.set(OZONE_SCM_CONTAINER_SIZE, "1GB");
@@ -96,13 +91,15 @@ public class TestDatanodeHddsVolumeFailureToleration {
     ozoneConfig.setFromObject(dnConf);
     cluster = MiniOzoneCluster.newBuilder(ozoneConfig)
         .setNumDatanodes(1)
-        .setNumDataVolumes(3)
+        .setDatanodeFactory(UniformDatanodesFactory.newBuilder()
+            .setNumDataVolumes(3)
+            .build())
         .build();
     cluster.waitForClusterToBeReady();
     datanodes = cluster.getHddsDatanodes();
   }
 
-  @After
+  @AfterEach
   public void shutdown() throws IOException {
     if (cluster != null) {
       cluster.shutdown();
@@ -147,8 +144,8 @@ public class TestDatanodeHddsVolumeFailureToleration {
     // cluster.
     GenericTestUtils.waitFor(() -> exitCapturer.getOutput()
         .contains("Exiting with status 1: ExitException"), 500, 60000);
-    Assert.assertTrue(dsmCapturer.getOutput()
-        .contains("DatanodeStateMachine Shutdown due to too many bad volumes"));
+    assertThat(dsmCapturer.getOutput())
+        .contains("DatanodeStateMachine Shutdown due to too many bad volumes");
 
     // restore bad volumes
     DatanodeTestUtils.restoreBadRootDir(volRootDir0);

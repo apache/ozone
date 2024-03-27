@@ -18,11 +18,12 @@
 package org.apache.hadoop.hdds.scm.cli.container.upgrade;
 
 import com.google.common.collect.Lists;
-import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
+import org.apache.hadoop.hdds.utils.db.CodecBuffer;
+import org.apache.hadoop.hdds.utils.db.CodecTestUtil;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.common.Checksum;
@@ -33,7 +34,6 @@ import org.apache.hadoop.ozone.container.common.helpers.ChunkInfo;
 import org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion;
 import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
-import org.apache.hadoop.ozone.container.common.transport.server.ratis.DispatcherContext;
 import org.apache.hadoop.ozone.container.common.utils.StorageVolumeUtil;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
@@ -46,11 +46,11 @@ import org.apache.hadoop.ozone.container.keyvalue.impl.FilePerBlockStrategy;
 import org.apache.hadoop.ozone.container.keyvalue.interfaces.BlockManager;
 import org.apache.hadoop.ozone.container.metadata.DatanodeSchemaThreeDBDefinition;
 import org.apache.hadoop.ozone.container.metadata.DatanodeStoreSchemaThreeImpl;
-import org.apache.ozone.test.GenericTestUtils;
-import org.junit.After;
-import org.junit.Before;
-import org.junit.Test;
-import org.mockito.Mockito;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
 import java.io.File;
 import java.io.IOException;
@@ -63,48 +63,38 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.apache.hadoop.hdds.HddsConfigKeys.OZONE_METADATA_DIRS;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.HDDS_DATANODE_DIR_KEY;
+import static org.apache.hadoop.ozone.container.common.ContainerTestUtils.COMMIT_STAGE;
+import static org.apache.hadoop.ozone.container.common.ContainerTestUtils.WRITE_STAGE;
 import static org.apache.hadoop.ozone.container.common.states.endpoint.VersionEndpointTask.LOG;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertTrue;
-import static org.mockito.ArgumentMatchers.anyList;
-import static org.mockito.ArgumentMatchers.anyLong;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.Mockito.anyList;
+import static org.mockito.Mockito.anyLong;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 /**
  * Tests for UpgradeManager class.
  */
 public class TestUpgradeManager {
+  private static final String SCM_ID = UUID.randomUUID().toString();
+  private static final OzoneConfiguration CONF = new OzoneConfiguration();
 
+  @TempDir
   private File testRoot;
-  private String scmId = UUID.randomUUID().toString();
   private MutableVolumeSet volumeSet;
   private UUID datanodeId;
   private RoundRobinVolumeChoosingPolicy volumeChoosingPolicy;
-  private static final OzoneConfiguration CONF = new OzoneConfiguration();
 
   private BlockManager blockManager;
   private FilePerBlockStrategy chunkManager;
   private ContainerSet containerSet;
 
-  private static final DispatcherContext WRITE_STAGE =
-      new DispatcherContext.Builder()
-          .setStage(DispatcherContext.WriteChunkStage.WRITE_DATA).build();
-
-  private static final DispatcherContext COMMIT_STAGE =
-      new DispatcherContext.Builder()
-          .setStage(DispatcherContext.WriteChunkStage.COMMIT_DATA).build();
-
-  @Before
+  @BeforeEach
   public void setup() throws Exception {
     DatanodeConfiguration dc = CONF.getObject(DatanodeConfiguration.class);
     dc.setContainerSchemaV3Enabled(true);
     CONF.setFromObject(dc);
-
-    testRoot =
-        GenericTestUtils.getTestDir(TestUpgradeManager.class.getSimpleName());
-    if (testRoot.exists()) {
-      FileUtils.cleanDirectory(testRoot);
-    }
 
     final File volume1Path = new File(testRoot, "volume1");
     final File volume2Path = new File(testRoot, "volume2");
@@ -119,25 +109,25 @@ public class TestUpgradeManager {
         volume1Path.getAbsolutePath() + "," + volume2Path.getAbsolutePath());
     CONF.set(OZONE_METADATA_DIRS, metadataPath.getAbsolutePath());
     datanodeId = UUID.randomUUID();
-    volumeSet = new MutableVolumeSet(datanodeId.toString(), scmId, CONF,
+    volumeSet = new MutableVolumeSet(datanodeId.toString(), SCM_ID, CONF,
         null, StorageVolume.VolumeType.DATA_VOLUME, null);
 
     // create rocksdb instance in volume dir
     final List<HddsVolume> volumes = new ArrayList<>();
     for (StorageVolume storageVolume : volumeSet.getVolumesList()) {
       HddsVolume hddsVolume = (HddsVolume) storageVolume;
-      StorageVolumeUtil.checkVolume(hddsVolume, scmId, scmId, CONF, null, null);
+      StorageVolumeUtil.checkVolume(hddsVolume, SCM_ID, SCM_ID, CONF, null,
+          null);
       volumes.add(hddsVolume);
     }
 
-    DatanodeDetails datanodeDetails = Mockito.mock(DatanodeDetails.class);
-    Mockito.when(datanodeDetails.getUuidString())
-        .thenReturn(datanodeId.toString());
-    Mockito.when(datanodeDetails.getUuid()).thenReturn(datanodeId);
+    DatanodeDetails datanodeDetails = mock(DatanodeDetails.class);
+    when(datanodeDetails.getUuidString()).thenReturn(datanodeId.toString());
+    when(datanodeDetails.getUuid()).thenReturn(datanodeId);
 
     volumeChoosingPolicy = mock(RoundRobinVolumeChoosingPolicy.class);
     final AtomicInteger loopCount = new AtomicInteger(0);
-    Mockito.when(volumeChoosingPolicy.chooseVolume(anyList(), anyLong()))
+    when(volumeChoosingPolicy.chooseVolume(anyList(), anyLong()))
         .thenAnswer(invocation -> {
           final int ii = loopCount.getAndIncrement() % volumes.size();
           return volumes.get(ii);
@@ -149,9 +139,14 @@ public class TestUpgradeManager {
     chunkManager = new FilePerBlockStrategy(true, blockManager, null);
   }
 
-  @After
-  public void after() throws IOException {
-    FileUtils.deleteDirectory(testRoot);
+  @BeforeAll
+  public static void beforeClass() {
+    CodecBuffer.enableLeakDetection();
+  }
+
+  @AfterEach
+  public void after() throws Exception {
+    CodecTestUtil.gc();
   }
 
   @Test
@@ -165,9 +160,9 @@ public class TestUpgradeManager {
     shutdownAllVolume();
 
     final UpgradeManager upgradeManager = new UpgradeManager();
-    upgradeManager.initVolumeStoreMap(volumeSet, CONF);
     final List<UpgradeManager.Result> results =
-        upgradeManager.upgradeAll(volumeSet, CONF);
+        upgradeManager.run(CONF,
+            StorageVolumeUtil.getHddsVolumesList(volumeSet.getVolumesList()));
 
     checkV3MetaData(keyValueContainerBlockDataMap, results, upgradeManager);
   }
@@ -206,7 +201,7 @@ public class TestUpgradeManager {
   private void putChunksInBlock(int numOfChunksPerBlock, int i,
                                 List<ContainerProtos.ChunkInfo> chunks,
                                 KeyValueContainer container, BlockID blockID) {
-    long chunkLength = 100;
+    final long chunkLength = 100;
     try {
       for (int k = 0; k < numOfChunksPerBlock; k++) {
         final String chunkName = String.format("%d_chunk_%d_block_%d",
@@ -218,11 +213,10 @@ public class TestUpgradeManager {
                 .setChecksumData(Checksum.getNoChecksumDataProto()).build();
         chunks.add(info);
         ChunkInfo chunkInfo = new ChunkInfo(chunkName, offset, chunkLength);
-        final ChunkBuffer chunkData = ChunkBuffer.allocate((int) chunkLength);
-        chunkManager
-            .writeChunk(container, blockID, chunkInfo, chunkData, WRITE_STAGE);
-        chunkManager
-            .writeChunk(container, blockID, chunkInfo, chunkData, COMMIT_STAGE);
+        try (ChunkBuffer chunkData = ChunkBuffer.allocate((int) chunkLength)) {
+          chunkManager.writeChunk(container, blockID, chunkInfo, chunkData, WRITE_STAGE);
+          chunkManager.writeChunk(container, blockID, chunkInfo, chunkData, COMMIT_STAGE);
+        }
       }
     } catch (IOException ex) {
       LOG.warn("Putting chunks in blocks was not successful for BlockID: "
@@ -249,7 +243,7 @@ public class TestUpgradeManager {
       data.setSchemaVersion(OzoneConsts.SCHEMA_V2);
 
       KeyValueContainer container = new KeyValueContainer(data, CONF);
-      container.create(volumeSet, volumeChoosingPolicy, scmId);
+      container.create(volumeSet, volumeChoosingPolicy, SCM_ID);
 
       containerSet.addContainer(container);
       data = (KeyValueContainerData) containerSet.getContainer(containerId)
@@ -275,8 +269,7 @@ public class TestUpgradeManager {
 
   private void checkV3MetaData(Map<KeyValueContainerData,
       Map<String, BlockData>> blockDataMap, List<UpgradeManager.Result> results,
-                               UpgradeManager upgradeManager)
-      throws IOException {
+      UpgradeManager upgradeManager) throws IOException {
     Map<Long, UpgradeTask.UpgradeContainerResult> resultMap = new HashMap<>();
 
     for (UpgradeManager.Result result : results) {

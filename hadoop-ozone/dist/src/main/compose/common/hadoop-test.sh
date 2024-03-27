@@ -19,9 +19,8 @@ extra_compose_file=hadoop.yaml
 if [[ ${SECURITY_ENABLED} == "true" ]]; then
   extra_compose_file=hadoop-secure.yaml
 fi
-export COMPOSE_FILE=${COMPOSE_FILE:-docker-compose.yaml}:../common/${extra_compose_file}
+export COMPOSE_FILE="${COMPOSE_FILE:-docker-compose.yaml}":../common/${extra_compose_file}
 
-export COMPOSE_FILE
 export HADOOP_MAJOR_VERSION=3
 export HADOOP_VERSION=unused # will be set for each test version below
 export OZONE_REPLICATION_FACTOR=3
@@ -43,11 +42,10 @@ export OZONE_DIR=/opt/ozone
 # shellcheck source=/dev/null
 source "$COMPOSE_DIR/../testlib.sh"
 
-for HADOOP_VERSION in 2.7.3 3.1.2 3.2.2 3.3.6; do
+for HADOOP_VERSION in ${hadoop2.version} 3.1.2 ${hadoop.version}; do
   export HADOOP_VERSION
   export HADOOP_MAJOR_VERSION=${HADOOP_VERSION%%.*}
-  # Check if $HADOOP_VERSION starts with the prefix "3.3."
-  if [[ $HADOOP_VERSION == 3.3.* ]]; then
+  if [[ "${HADOOP_VERSION}" == "${hadoop2.version}" ]] || [[ "${HADOOP_VERSION}" == "${hadoop.version}" ]]; then
     export HADOOP_IMAGE=apache/hadoop
   else
     export HADOOP_IMAGE=flokkr/hadoop

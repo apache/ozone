@@ -66,6 +66,9 @@ import org.apache.ratis.thirdparty.io.netty.handler.ssl.SslContextBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_EC_GRPC_ZERO_COPY_ENABLED;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_EC_GRPC_ZERO_COPY_ENABLED_DEFAULT;
+
 /**
  * Creates a Grpc server endpoint that acts as the communication layer for
  * Ozone containers.
@@ -96,11 +99,11 @@ public final class XceiverServerGrpc implements XceiverServerSpi {
 
     this.id = datanodeDetails.getUuid();
     this.datanodeDetails = datanodeDetails;
-    this.port = conf.getInt(OzoneConfigKeys.DFS_CONTAINER_IPC_PORT,
-        OzoneConfigKeys.DFS_CONTAINER_IPC_PORT_DEFAULT);
+    this.port = conf.getInt(OzoneConfigKeys.HDDS_CONTAINER_IPC_PORT,
+        OzoneConfigKeys.HDDS_CONTAINER_IPC_PORT_DEFAULT);
 
-    if (conf.getBoolean(OzoneConfigKeys.DFS_CONTAINER_IPC_RANDOM_PORT,
-        OzoneConfigKeys.DFS_CONTAINER_IPC_RANDOM_PORT_DEFAULT)) {
+    if (conf.getBoolean(OzoneConfigKeys.HDDS_CONTAINER_IPC_RANDOM_PORT,
+        OzoneConfigKeys.HDDS_CONTAINER_IPC_RANDOM_PORT_DEFAULT)) {
       this.port = 0;
     }
 
@@ -131,8 +134,13 @@ public final class XceiverServerGrpc implements XceiverServerSpi {
       eventLoopGroup = new NioEventLoopGroup(poolSize / 10, factory);
       channelType = NioServerSocketChannel.class;
     }
+    final boolean zeroCopyEnabled = conf.getBoolean(
+        OZONE_EC_GRPC_ZERO_COPY_ENABLED,
+        OZONE_EC_GRPC_ZERO_COPY_ENABLED_DEFAULT);
 
     LOG.info("GrpcServer channel type {}", channelType.getSimpleName());
+    GrpcXceiverService xceiverService = new GrpcXceiverService(dispatcher,
+        zeroCopyEnabled);
     NettyServerBuilder nettyServerBuilder = NettyServerBuilder.forPort(port)
         .maxInboundMessageSize(OzoneConsts.OZONE_SCM_CHUNK_MAX_SIZE)
         .bossEventLoopGroup(eventLoopGroup)
@@ -140,7 +148,8 @@ public final class XceiverServerGrpc implements XceiverServerSpi {
         .channelType(channelType)
         .executor(readExecutors)
         .addService(ServerInterceptors.intercept(
-            new GrpcXceiverService(dispatcher), new GrpcServerInterceptor()));
+            xceiverService.bindServiceWithZeroCopy(),
+            new GrpcServerInterceptor()));
 
     SecurityConfig secConf = new SecurityConfig(conf);
     if (secConf.isSecurityEnabled() && secConf.isGrpcTlsEnabled()) {

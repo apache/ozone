@@ -38,10 +38,9 @@ import org.apache.hadoop.ozone.om.upgrade.OMLayoutFeature;
 import org.apache.hadoop.ozone.upgrade.UpgradeFinalizer;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.LambdaTestUtils.VoidCallable;
-import org.junit.AfterClass;
-import org.junit.Assert;
-import org.junit.BeforeClass;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.BeforeAll;
 
 import java.io.IOException;
 import java.util.UUID;
@@ -50,8 +49,12 @@ import java.util.concurrent.TimeoutException;
 import static org.apache.hadoop.ozone.admin.scm.FinalizeUpgradeCommandUtil.isDone;
 import static org.apache.hadoop.ozone.admin.scm.FinalizeUpgradeCommandUtil.isStarting;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_MULTITENANCY_ENABLED;
+import static org.apache.hadoop.ozone.om.OmUpgradeConfig.ConfigStrings.OZONE_OM_INIT_DEFAULT_LAYOUT_VERSION;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.fail;
 
 /**
  * Tests that S3 requests for a tenant are directed to that tenant's volume,
@@ -68,15 +71,15 @@ public class TestMultiTenantVolume {
   private static final String ACCESS_ID = "tenant$username";
   private static OzoneClient client;
 
-  @BeforeClass
+  @BeforeAll
   public static void initClusterProvider() throws Exception {
     OzoneConfiguration conf = new OzoneConfiguration();
     conf.setBoolean(
         OMMultiTenantManagerImpl.OZONE_OM_TENANT_DEV_SKIP_RANGER, true);
     conf.setBoolean(OZONE_OM_MULTITENANCY_ENABLED, true);
+    conf.setInt(OZONE_OM_INIT_DEFAULT_LAYOUT_VERSION, OMLayoutFeature.INITIAL_VERSION.layoutVersion());
     MiniOzoneCluster.Builder builder = MiniOzoneCluster.newBuilder(conf)
-        .withoutDatanodes()
-        .setOmLayoutVersion(OMLayoutFeature.INITIAL_VERSION.layoutVersion());
+        .withoutDatanodes();
     cluster = builder.build();
     client = cluster.newClient();
     s3VolumeName = HddsClientUtils.getDefaultS3VolumeName(conf);
@@ -85,7 +88,7 @@ public class TestMultiTenantVolume {
     finalizeOMUpgrade();
   }
 
-  @AfterClass
+  @AfterAll
   public static void shutdownClusterProvider() {
     IOUtils.closeQuietly(client);
     cluster.shutdown();
@@ -93,8 +96,8 @@ public class TestMultiTenantVolume {
 
   private static void expectFailurePreFinalization(VoidCallable eval) {
     OMException omException = assertThrows(OMException.class, eval::call);
-    assertTrue(omException.getMessage()
-        .contains("cannot be invoked before finalization"));
+    assertThat(omException.getMessage())
+        .contains("cannot be invoked before finalization");
   }
 
   /**
@@ -126,11 +129,11 @@ public class TestMultiTenantVolume {
     // S3 get/set/revoke secret APIs still work before finalization
     final String accessId = "testUser1accessId1";
     S3SecretValue s3SecretValue = store.getS3Secret(accessId);
-    Assert.assertEquals(accessId, s3SecretValue.getAwsAccessKey());
+    assertEquals(accessId, s3SecretValue.getAwsAccessKey());
     final String setSecret = "testsecret";
     s3SecretValue = store.setS3Secret(accessId, setSecret);
-    Assert.assertEquals(accessId, s3SecretValue.getAwsAccessKey());
-    Assert.assertEquals(setSecret, s3SecretValue.getAwsSecret());
+    assertEquals(accessId, s3SecretValue.getAwsAccessKey());
+    assertEquals(setSecret, s3SecretValue.getAwsSecret());
     store.revokeS3Secret(accessId);
   }
 
@@ -149,7 +152,7 @@ public class TestMultiTenantVolume {
         omClient.finalizeUpgrade(upgradeClientID);
 
     // The status should transition as soon as the client call above returns
-    Assert.assertTrue(isStarting(finalizationResponse.status()));
+    assertTrue(isStarting(finalizationResponse.status()));
 
     // Wait for the finalization to be marked as done.
     // 10s timeout should be plenty.
@@ -160,7 +163,7 @@ public class TestMultiTenantVolume {
                 upgradeClientID, false, false);
         return isDone(progress.status());
       } catch (IOException e) {
-        Assert.fail("Unexpected exception while waiting for "
+        fail("Unexpected exception while waiting for "
             + "the OM upgrade to finalize: " + e.getMessage());
       }
       return false;
@@ -173,11 +176,11 @@ public class TestMultiTenantVolume {
 
     // Default client not belonging to a tenant should end up in the S3 volume.
     ObjectStore store = client.getObjectStore();
-    Assert.assertEquals(s3VolumeName, store.getS3Volume().getName());
+    assertEquals(s3VolumeName, store.getS3Volume().getName());
 
     // Create bucket.
     store.createS3Bucket(bucketName);
-    Assert.assertEquals(s3VolumeName,
+    assertEquals(s3VolumeName,
         store.getS3Bucket(bucketName).getVolumeName());
 
     // Delete bucket.
@@ -194,12 +197,12 @@ public class TestMultiTenantVolume {
     store.tenantAssignUserAccessId(USER_PRINCIPAL, TENANT_ID, ACCESS_ID);
 
     // S3 volume pointed to by the store should be for the tenant.
-    Assert.assertEquals(TENANT_ID, store.getS3Volume().getName());
+    assertEquals(TENANT_ID, store.getS3Volume().getName());
 
     // Create bucket in the tenant volume.
     store.createS3Bucket(BUCKET_NAME);
     OzoneBucket bucket = store.getS3Bucket(BUCKET_NAME);
-    Assert.assertEquals(TENANT_ID, bucket.getVolumeName());
+    assertEquals(TENANT_ID, bucket.getVolumeName());
 
     // A different user should not see bucket, since they will be directed to
     // the s3 volume.
@@ -267,7 +270,7 @@ public class TestMultiTenantVolume {
         .get(OzoneConsts.RANGER_OZONE_SERVICE_VERSION_KEY);
     long readBackVersion = Long.parseLong(readBackVersionStr);
 
-    Assert.assertEquals(writtenVersion, readBackVersion);
+    assertEquals(writtenVersion, readBackVersion);
   }
 
   @Test
@@ -279,8 +282,8 @@ public class TestMultiTenantVolume {
     store.createTenant(TENANT_ID);
     OzoneVolume volume;
     volume = store.getVolume(TENANT_ID);
-    Assert.assertEquals(OzoneConsts.QUOTA_RESET, volume.getQuotaInNamespace());
-    Assert.assertEquals(OzoneConsts.QUOTA_RESET, volume.getQuotaInBytes());
+    assertEquals(OzoneConsts.QUOTA_RESET, volume.getQuotaInNamespace());
+    assertEquals(OzoneConsts.QUOTA_RESET, volume.getQuotaInBytes());
 
     long spaceQuota = 10;
     long namespaceQuota = 20;
@@ -289,8 +292,8 @@ public class TestMultiTenantVolume {
 
     // Check quota
     volume = store.getVolume(TENANT_ID);
-    Assert.assertEquals(namespaceQuota, volume.getQuotaInNamespace());
-    Assert.assertEquals(spaceQuota, volume.getQuotaInBytes());
+    assertEquals(namespaceQuota, volume.getQuotaInNamespace());
+    assertEquals(spaceQuota, volume.getQuotaInBytes());
 
     // Delete tenant and volume
     store.deleteTenant(TENANT_ID);
@@ -309,8 +312,7 @@ public class TestMultiTenantVolume {
           OMException.class,
           () -> store.createTenant(tenantId));
 
-      Assert.assertTrue(e.getMessage().contains("Invalid volume name: "
-          + tenantId));
+      assertThat(e.getMessage()).contains("Invalid volume name: " + tenantId);
     }
   }
 }

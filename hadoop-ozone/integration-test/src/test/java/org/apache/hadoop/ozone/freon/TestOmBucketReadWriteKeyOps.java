@@ -33,9 +33,9 @@ import org.apache.hadoop.ozone.om.lock.OMLockMetrics;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ratis.server.RaftServer;
 import org.apache.ratis.server.raftlog.RaftLog;
-import org.junit.Assert;
-import org.junit.Before;
-import org.junit.Test;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.event.Level;
@@ -44,6 +44,9 @@ import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.util.Iterator;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
 /**
  * Test for OmBucketReadWriteKeyOps.
@@ -61,7 +64,7 @@ public class TestOmBucketReadWriteKeyOps {
       LoggerFactory.getLogger(TestOmBucketReadWriteKeyOps.class);
   private OzoneClient client;
 
-  @Before
+  @BeforeEach
   public void setup() {
     path = GenericTestUtils
         .getTempPath(TestHadoopDirTreeGenerator.class.getSimpleName());
@@ -86,8 +89,9 @@ public class TestOmBucketReadWriteKeyOps {
    *
    * @throws IOException
    */
-  private void startCluster() throws Exception {
+  private void startCluster(boolean fsPathsEnabled) throws Exception {
     conf = getOzoneConfiguration();
+    conf.setBoolean(OMConfigKeys.OZONE_OM_ENABLE_FILESYSTEM_PATHS, fsPathsEnabled);
     conf.set(OMConfigKeys.OZONE_DEFAULT_BUCKET_LAYOUT,
         BucketLayout.OBJECT_STORE.name());
     cluster = MiniOzoneCluster.newBuilder(conf).setNumDatanodes(5).build();
@@ -102,10 +106,11 @@ public class TestOmBucketReadWriteKeyOps {
     return new OzoneConfiguration();
   }
 
-  @Test
-  public void testOmBucketReadWriteKeyOps() throws Exception {
+  @ParameterizedTest(name = "Filesystem Paths Enabled: {0}")
+  @ValueSource(booleans = {false, true})
+  public void testOmBucketReadWriteKeyOps(boolean fsPathsEnabled) throws Exception {
     try {
-      startCluster();
+      startCluster(fsPathsEnabled);
       FileOutputStream out = FileUtils.openOutputStream(new File(path,
           "conf"));
       cluster.getConf().writeXml(out);
@@ -129,7 +134,7 @@ public class TestOmBucketReadWriteKeyOps {
           new ParameterBuilder().setVolumeName("vol4").setBucketName("bucket1")
               .setTotalThreadCount(10).setNumOfReadOperations(5)
               .setNumOfWriteOperations(3).setKeyCountForRead(5)
-              .setKeyCountForWrite(3).setKeySizeInBytes(64)
+              .setKeyCountForWrite(3).setKeySize("64B")
               .setBufferSize(16));
       verifyFreonCommand(
           new ParameterBuilder().setVolumeName("vol5").setBucketName("bucket1")
@@ -161,7 +166,7 @@ public class TestOmBucketReadWriteKeyOps {
             "-b", parameterBuilder.bucketName,
             "-k", String.valueOf(parameterBuilder.keyCountForRead),
             "-w", String.valueOf(parameterBuilder.keyCountForWrite),
-            "-g", String.valueOf(parameterBuilder.keySizeInBytes),
+            "-g", parameterBuilder.keySize,
             "--buffer", String.valueOf(parameterBuilder.bufferSize),
             "-l", String.valueOf(parameterBuilder.length),
             "-c", String.valueOf(parameterBuilder.totalThreadCount),
@@ -193,7 +198,7 @@ public class TestOmBucketReadWriteKeyOps {
       ozoneKeyIterator.next();
       ++actual;
     }
-    Assert.assertEquals("Mismatch Count!", expectedCount, actual);
+    assertEquals(expectedCount, actual, "Mismatch Count!");
   }
 
   private void verifyOMLockMetrics(OMLockMetrics omLockMetrics) {
@@ -204,8 +209,7 @@ public class TestOmBucketReadWriteKeyOps {
         omLockMetrics.getLongestReadLockWaitingTimeMs());
     int readWaitingSamples =
         Integer.parseInt(readLockWaitingTimeMsStat.split(" ")[2]);
-    Assert.assertTrue("Read Lock Waiting Samples should be positive",
-        readWaitingSamples > 0);
+    assertThat(readWaitingSamples).isGreaterThan(0);
 
     String readLockHeldTimeMsStat = omLockMetrics.getReadLockHeldTimeMsStat();
     LOG.info("Read Lock Held Time Stat: " + readLockHeldTimeMsStat);
@@ -213,8 +217,7 @@ public class TestOmBucketReadWriteKeyOps {
         omLockMetrics.getLongestReadLockHeldTimeMs());
     int readHeldSamples =
         Integer.parseInt(readLockHeldTimeMsStat.split(" ")[2]);
-    Assert.assertTrue("Read Lock Held Samples should be positive",
-        readHeldSamples > 0);
+    assertThat(readHeldSamples).isGreaterThan(0);
 
     String writeLockWaitingTimeMsStat =
         omLockMetrics.getWriteLockWaitingTimeMsStat();
@@ -223,8 +226,7 @@ public class TestOmBucketReadWriteKeyOps {
         omLockMetrics.getLongestWriteLockWaitingTimeMs());
     int writeWaitingSamples =
         Integer.parseInt(writeLockWaitingTimeMsStat.split(" ")[2]);
-    Assert.assertTrue("Write Lock Waiting Samples should be positive",
-        writeWaitingSamples > 0);
+    assertThat(writeWaitingSamples).isGreaterThan(0);
 
     String writeLockHeldTimeMsStat = omLockMetrics.getWriteLockHeldTimeMsStat();
     LOG.info("Write Lock Held Time Stat: " + writeLockHeldTimeMsStat);
@@ -232,8 +234,7 @@ public class TestOmBucketReadWriteKeyOps {
         omLockMetrics.getLongestWriteLockHeldTimeMs());
     int writeHeldSamples =
         Integer.parseInt(writeLockHeldTimeMsStat.split(" ")[2]);
-    Assert.assertTrue("Write Lock Held Samples should be positive",
-        writeHeldSamples > 0);
+    assertThat(writeHeldSamples).isGreaterThan(0);
   }
 
   private static class ParameterBuilder {
@@ -242,7 +243,7 @@ public class TestOmBucketReadWriteKeyOps {
     private String bucketName = "bucket1";
     private int keyCountForRead = 100;
     private int keyCountForWrite = 10;
-    private long keySizeInBytes = 256;
+    private String keySize = "256B";
     private int bufferSize = 64;
     private int length = 10;
     private int totalThreadCount = 100;
@@ -270,8 +271,8 @@ public class TestOmBucketReadWriteKeyOps {
       return this;
     }
 
-    private ParameterBuilder setKeySizeInBytes(long keySizeInBytesParam) {
-      keySizeInBytes = keySizeInBytesParam;
+    private ParameterBuilder setKeySize(String keySizeParam) {
+      keySize = keySizeParam;
       return this;
     }
 

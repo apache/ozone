@@ -19,6 +19,7 @@
 
 package org.apache.hadoop.ozone.om.request.snapshot;
 
+import org.apache.ratis.server.protocol.TermIndex;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
@@ -26,7 +27,6 @@ import org.apache.hadoop.ozone.om.OmSnapshotManager;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.SnapshotChainManager;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
-import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
 import org.apache.hadoop.ozone.om.request.OMClientRequest;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
@@ -35,6 +35,8 @@ import org.apache.hadoop.ozone.om.snapshot.SnapshotUtils;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SnapshotPurgeRequest;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.util.HashMap;
@@ -49,13 +51,15 @@ import java.util.UUID;
  */
 public class OMSnapshotPurgeRequest extends OMClientRequest {
 
+  private static final Logger LOG = LoggerFactory.getLogger(OMSnapshotPurgeRequest.class);
+
   public OMSnapshotPurgeRequest(OMRequest omRequest) {
     super(omRequest);
   }
 
   @Override
-  public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager,
-      long trxnLogIndex, OzoneManagerDoubleBufferHelper omDoubleBufferHelper) {
+  public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager, TermIndex termIndex) {
+    final long trxnLogIndex = termIndex.getIndex();
     OmSnapshotManager omSnapshotManager = ozoneManager.getOmSnapshotManager();
     OmMetadataManagerImpl omMetadataManager = (OmMetadataManagerImpl)
         ozoneManager.getMetadataManager();
@@ -72,21 +76,9 @@ public class OMSnapshotPurgeRequest extends OMClientRequest {
     try {
       List<String> snapshotDbKeys = snapshotPurgeRequest
           .getSnapshotDBKeysList();
-      List<String> snapInfosToUpdate = snapshotPurgeRequest
-          .getUpdatedSnapshotDBKeyList();
       Map<String, SnapshotInfo> updatedSnapInfos = new HashMap<>();
       Map<String, SnapshotInfo> updatedPathPreviousAndGlobalSnapshots =
           new HashMap<>();
-
-      // Snapshots that are already deepCleaned by the KeyDeletingService
-      // can be marked as deepCleaned.
-      for (String snapTableKey : snapInfosToUpdate) {
-        SnapshotInfo snapInfo = omMetadataManager.getSnapshotInfoTable()
-            .get(snapTableKey);
-
-        updateSnapshotInfoAndCache(snapInfo, omMetadataManager,
-            trxnLogIndex, updatedSnapInfos, false);
-      }
 
       // Snapshots that are purged by the SnapshotDeletingService
       // will update the next snapshot so that is can be deep cleaned
@@ -95,16 +87,22 @@ public class OMSnapshotPurgeRequest extends OMClientRequest {
         SnapshotInfo fromSnapshot = omMetadataManager.getSnapshotInfoTable()
             .get(snapTableKey);
 
+        if (fromSnapshot == null) {
+          // Snapshot may have been purged in the previous iteration of SnapshotDeletingService.
+          LOG.warn("The snapshot {} is not longer in snapshot table, It maybe removed in the previous " +
+                  "Snapshot purge request.", snapTableKey);
+          continue;
+        }
+
         SnapshotInfo nextSnapshot = SnapshotUtils
             .getNextActiveSnapshot(fromSnapshot,
                 snapshotChainManager, omSnapshotManager);
 
         updateSnapshotInfoAndCache(nextSnapshot, omMetadataManager,
-            trxnLogIndex, updatedSnapInfos, true);
+            trxnLogIndex, updatedSnapInfos);
         updateSnapshotChainAndCache(omMetadataManager, fromSnapshot,
             trxnLogIndex, updatedPathPreviousAndGlobalSnapshots);
-        ozoneManager.getOmSnapshotManager().getSnapshotCache()
-            .invalidate(snapTableKey);
+        ozoneManager.getOmSnapshotManager().invalidateCacheEntry(fromSnapshot.getSnapshotId());
       }
 
       omClientResponse = new OMSnapshotPurgeResponse(omResponse.build(),
@@ -113,9 +111,6 @@ public class OMSnapshotPurgeRequest extends OMClientRequest {
     } catch (IOException ex) {
       omClientResponse = new OMSnapshotPurgeResponse(
           createErrorOMResponse(omResponse, ex));
-    } finally {
-      addResponseToDoubleBuffer(trxnLogIndex, omClientResponse,
-          omDoubleBufferHelper);
     }
 
     return omClientResponse;
@@ -123,9 +118,12 @@ public class OMSnapshotPurgeRequest extends OMClientRequest {
 
   private void updateSnapshotInfoAndCache(SnapshotInfo snapInfo,
       OmMetadataManagerImpl omMetadataManager, long trxnLogIndex,
-      Map<String, SnapshotInfo> updatedSnapInfos, boolean deepClean) {
+      Map<String, SnapshotInfo> updatedSnapInfos) {
     if (snapInfo != null) {
-      snapInfo.setDeepClean(deepClean);
+      // Setting next snapshot deep clean to false, Since the
+      // current snapshot is deleted. We can potentially
+      // reclaim more keys in the next snapshot.
+      snapInfo.setDeepClean(false);
 
       // Update table cache first
       omMetadataManager.getSnapshotInfoTable().addCacheEntry(

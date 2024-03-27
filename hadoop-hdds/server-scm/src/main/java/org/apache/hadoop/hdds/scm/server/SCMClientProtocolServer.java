@@ -63,6 +63,7 @@ import org.apache.hadoop.hdds.scm.ha.SCMHAUtils;
 import org.apache.hadoop.hdds.scm.ha.SCMRatisServer;
 import org.apache.hadoop.hdds.scm.ha.SCMRatisServerImpl;
 import org.apache.hadoop.hdds.scm.node.DatanodeUsageInfo;
+import org.apache.hadoop.hdds.scm.FetchMetrics;
 import org.apache.hadoop.hdds.scm.node.NodeStatus;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
@@ -109,10 +110,12 @@ import java.util.Set;
 import java.util.TreeSet;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
+import java.util.UUID;
 
 import static org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.StorageContainerLocationProtocolService.newReflectiveBlockingService;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HANDLER_COUNT_DEFAULT;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HANDLER_COUNT_KEY;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CLIENT_HANDLER_COUNT_KEY;
 import static org.apache.hadoop.hdds.scm.ScmUtils.checkIfCertSignRequestAllowed;
 import static org.apache.hadoop.hdds.scm.ha.HASecurityUtils.createSCMRatisTLSConfig;
 import static org.apache.hadoop.hdds.scm.server.StorageContainerManager.startRpcServer;
@@ -140,9 +143,9 @@ public class SCMClientProtocolServer implements
       ReconfigurationHandler reconfigurationHandler) throws IOException {
     this.scm = scm;
     this.config = conf;
-    final int handlerCount =
-        conf.getInt(OZONE_SCM_HANDLER_COUNT_KEY,
-            OZONE_SCM_HANDLER_COUNT_DEFAULT);
+    final int handlerCount = conf.getInt(OZONE_SCM_CLIENT_HANDLER_COUNT_KEY,
+        OZONE_SCM_HANDLER_COUNT_KEY, OZONE_SCM_HANDLER_COUNT_DEFAULT,
+            LOG::info);
     RPC.setProtocolEngine(conf, StorageContainerLocationProtocolPB.class,
         ProtobufRpcEngine.class);
 
@@ -587,6 +590,15 @@ public class SCMClientProtocolServer implements
   }
 
   @Override
+  public Map<String, List<ContainerID>> getContainersOnDecomNode(DatanodeDetails dn) throws IOException {
+    try {
+      return scm.getScmDecommissionManager().getContainersPendingReplication(dn);
+    } catch (NodeNotFoundException e) {
+      throw new IOException("Failed to get containers list. Unable to find required node", e);
+    }
+  }
+
+  @Override
   public List<HddsProtos.Node> queryNode(
       HddsProtos.NodeOperationalState opState, HddsProtos.NodeState state,
       HddsProtos.QueryScope queryScope, String poolName, int clientVersion)
@@ -608,6 +620,27 @@ public class SCMClientProtocolServer implements
         throw new IOException(
             "An unexpected error occurred querying the NodeStatus", e);
       }
+    }
+    return result;
+  }
+
+  @Override
+  public HddsProtos.Node queryNode(UUID uuid)
+      throws IOException {
+    HddsProtos.Node result = null;
+    try {
+      DatanodeDetails node = scm.getScmNodeManager().getNodeByUuid(uuid);
+      if (node != null) {
+        NodeStatus ns = scm.getScmNodeManager().getNodeStatus(node);
+        result = HddsProtos.Node.newBuilder()
+            .setNodeID(node.getProtoBufMessage())
+            .addNodeStates(ns.getHealth())
+            .addNodeOperationalStates(ns.getOperationalState())
+            .build();
+      }
+    } catch (NodeNotFoundException e) {
+      throw new IOException(
+          "An unexpected error occurred querying the NodeStatus", e);
     }
     return result;
   }
@@ -662,8 +695,15 @@ public class SCMClientProtocolServer implements
       final HddsProtos.LifeCycleState state = scm.getContainerManager()
           .getContainer(cid).getState();
       if (!state.equals(HddsProtos.LifeCycleState.OPEN)) {
+        ResultCodes resultCode = ResultCodes.UNEXPECTED_CONTAINER_STATE;
+        if (state.equals(HddsProtos.LifeCycleState.CLOSED)) {
+          resultCode = ResultCodes.CONTAINER_ALREADY_CLOSED;
+        }
+        if (state.equals(HddsProtos.LifeCycleState.CLOSING)) {
+          resultCode = ResultCodes.CONTAINER_ALREADY_CLOSING;
+        }
         throw new SCMException("Cannot close a " + state + " container.",
-            ResultCodes.UNEXPECTED_CONTAINER_STATE);
+            resultCode);
       }
       scm.getEventQueue().fireEvent(SCMEvents.CLOSE_CONTAINER,
           ContainerID.valueOf(containerID));
@@ -1106,9 +1146,9 @@ public class SCMClientProtocolServer implements
 
   /**
    * Get Datanode usage info such as capacity, SCMUsed, and remaining by ip
-   * or uuid.
+   * or hostname or uuid.
    *
-   * @param ipaddress Datanode Address String
+   * @param address Datanode Address String
    * @param uuid Datanode UUID String
    * @return List of DatanodeUsageInfoProto. Each element contains usage info
    * such as capacity, SCMUsed, and remaining space.
@@ -1116,7 +1156,7 @@ public class SCMClientProtocolServer implements
    */
   @Override
   public List<HddsProtos.DatanodeUsageInfoProto> getDatanodeUsageInfo(
-      String ipaddress, String uuid, int clientVersion) throws IOException {
+      String address, String uuid, int clientVersion) throws IOException {
 
     // check admin authorisation
     try {
@@ -1130,8 +1170,8 @@ public class SCMClientProtocolServer implements
     List<DatanodeDetails> nodes = new ArrayList<>();
     if (!Strings.isNullOrEmpty(uuid)) {
       nodes.add(scm.getScmNodeManager().getNodeByUuid(uuid));
-    } else if (!Strings.isNullOrEmpty(ipaddress)) {
-      nodes = scm.getScmNodeManager().getNodesByAddress(ipaddress);
+    } else if (!Strings.isNullOrEmpty(address)) {
+      nodes = scm.getScmNodeManager().getNodesByAddress(address);
     } else {
       throw new IOException(
           "Could not get datanode with the specified parameters."
@@ -1333,5 +1373,11 @@ public class SCMClientProtocolServer implements
           .setErrorMsg(ex.getMessage());
     }
     return decommissionScmResponseBuilder.build();
+  }
+
+  @Override
+  public String getMetrics(String query) throws IOException {
+    FetchMetrics fetchMetrics = new FetchMetrics();
+    return fetchMetrics.getMetrics(query);
   }
 }

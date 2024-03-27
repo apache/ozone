@@ -28,6 +28,7 @@ import org.apache.ratis.thirdparty.io.netty.buffer.PooledByteBufAllocator;
 import org.apache.ratis.thirdparty.io.netty.buffer.Unpooled;
 import org.apache.ratis.util.MemoizedSupplier;
 import org.apache.ratis.util.Preconditions;
+import org.apache.ratis.util.UncheckedAutoCloseable;
 import org.apache.ratis.util.function.CheckedFunction;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -50,7 +51,7 @@ import static org.apache.hadoop.hdds.HddsUtils.getStackTrace;
  * A buffer used by {@link Codec}
  * for supporting RocksDB direct {@link ByteBuffer} APIs.
  */
-public class CodecBuffer implements AutoCloseable {
+public class CodecBuffer implements UncheckedAutoCloseable {
   public static final Logger LOG = LoggerFactory.getLogger(CodecBuffer.class);
 
   /** To create {@link CodecBuffer} instances. */
@@ -340,6 +341,12 @@ public class CodecBuffer implements AutoCloseable {
     return buf.readableBytes();
   }
 
+  /** @return a writable {@link ByteBuffer}. */
+  public ByteBuffer asWritableByteBuffer() {
+    assertRefCnt(1);
+    return buf.nioBuffer(0, buf.maxCapacity());
+  }
+
   /** @return a readonly {@link ByteBuffer} view of this buffer. */
   public ByteBuffer asReadOnlyByteBuffer() {
     assertRefCnt(1);
@@ -379,7 +386,8 @@ public class CodecBuffer implements AutoCloseable {
    */
   public CodecBuffer putShort(short n) {
     assertRefCnt(1);
-    buf.writeShort(n);
+    final ByteBuf returned = buf.writeShort(n);
+    Preconditions.assertSame(buf, returned, "buf");
     return this;
   }
 
@@ -390,7 +398,8 @@ public class CodecBuffer implements AutoCloseable {
    */
   public CodecBuffer putInt(int n) {
     assertRefCnt(1);
-    buf.writeInt(n);
+    final ByteBuf returned = buf.writeInt(n);
+    Preconditions.assertSame(buf, returned, "buf");
     return this;
   }
 
@@ -401,7 +410,8 @@ public class CodecBuffer implements AutoCloseable {
    */
   public CodecBuffer putLong(long n) {
     assertRefCnt(1);
-    buf.writeLong(n);
+    final ByteBuf returned = buf.writeLong(n);
+    Preconditions.assertSame(buf, returned, "buf");
     return this;
   }
 
@@ -412,18 +422,8 @@ public class CodecBuffer implements AutoCloseable {
    */
   public CodecBuffer put(byte val) {
     assertRefCnt(1);
-    buf.writeByte(val);
-    return this;
-  }
-
-  /**
-   * Similar to {@link ByteBuffer#put(byte[])}.
-   *
-   * @return this object.
-   */
-  public CodecBuffer put(byte[] array) {
-    assertRefCnt(1);
-    buf.writeBytes(array);
+    final ByteBuf returned = buf.writeByte(val);
+    Preconditions.assertSame(buf, returned, "buf");
     return this;
   }
 
@@ -449,7 +449,8 @@ public class CodecBuffer implements AutoCloseable {
     final int w = buf.writerIndex();
     final ByteBuffer buffer = buf.nioBuffer(w, buf.writableBytes());
     final int size = source.applyAsInt(buffer);
-    buf.setIndex(buf.readerIndex(), w + size);
+    final ByteBuf returned = buf.setIndex(buf.readerIndex(), w + size);
+    Preconditions.assertSame(buf, returned, "buf");
     return this;
   }
 
@@ -470,7 +471,8 @@ public class CodecBuffer implements AutoCloseable {
     try (ByteBufOutputStream out = new ByteBufOutputStream(buf)) {
       size = source.apply(out);
     }
-    buf.setIndex(buf.readerIndex(), w + size);
+    final ByteBuf returned = buf.setIndex(buf.readerIndex(), w + size);
+    Preconditions.assertSame(buf, returned, "buf");
     return this;
   }
 
@@ -497,7 +499,8 @@ public class CodecBuffer implements AutoCloseable {
     if (size != null) {
       Preconditions.assertTrue(size >= 0, () -> "size = " + size + " < 0");
       if (size > 0 && size <= writable) {
-        buf.setIndex(buf.readerIndex(), i + size);
+        final ByteBuf returned = buf.setIndex(buf.readerIndex(), i + size);
+        Preconditions.assertSame(buf, returned, "buf");
       }
     }
     return size;

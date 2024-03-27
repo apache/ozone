@@ -200,11 +200,11 @@ public class GrpcMetrics implements MetricsSource {
     return unknownMessagesReceived.value();
   }
   
-  public MutableRate getGrpcQueueTime() {
+  MutableRate getGrpcQueueTime() {
     return grpcQueueTime;
   }
 
-  public MutableRate getGrpcProcessingTime() {
+  MutableRate getGrpcProcessingTime() {
     return grpcProcessingTime;
   }
 

@@ -17,8 +17,15 @@
  */
 package org.apache.hadoop.ozone.om.request.key;
 
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+
 import java.util.List;
 import java.util.UUID;
+
+import org.apache.hadoop.hdds.client.RatisReplicationConfig;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
@@ -35,7 +42,6 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMReque
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
 import org.apache.hadoop.ozone.security.acl.OzoneObjInfo;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -54,7 +60,7 @@ public class TestOMKeyAclRequest extends TestOMKeyRequest {
         omMetadataManager.getKeyTable(getBucketLayout()).get(ozoneKey);
 
     // As we added manually to key table.
-    Assertions.assertNotNull(omKeyInfo);
+    assertNotNull(omKeyInfo);
 
     OzoneAcl acl = OzoneAcl.parseAcl("user:bilbo:rwdlncxy[ACCESS]");
 
@@ -70,13 +76,12 @@ public class TestOMKeyAclRequest extends TestOMKeyRequest {
         .getModificationTime();
     long newModTime = preExecuteRequest.getAddAclRequest()
         .getModificationTime();
-    Assertions.assertTrue(newModTime > originModTime);
+    assertThat(newModTime).isGreaterThan(originModTime);
 
     // Execute original request
     OMClientResponse omClientResponse = omKeyAddAclRequest
-        .validateAndUpdateCache(ozoneManager, 100L,
-            ozoneManagerDoubleBufferHelper);
-    Assertions.assertEquals(OzoneManagerProtocolProtos.Status.OK,
+        .validateAndUpdateCache(ozoneManager, 100L);
+    assertEquals(OzoneManagerProtocolProtos.Status.OK,
         omClientResponse.getOMResponse().getStatus());
 
   }
@@ -91,7 +96,7 @@ public class TestOMKeyAclRequest extends TestOMKeyRequest {
         omMetadataManager.getKeyTable(getBucketLayout()).get(ozoneKey);
 
     // As we added manually to key table.
-    Assertions.assertNotNull(omKeyInfo);
+    assertNotNull(omKeyInfo);
 
     OzoneAcl acl = OzoneAcl.parseAcl("user:bilbo:rwdlncxy[ACCESS]");
 
@@ -101,19 +106,18 @@ public class TestOMKeyAclRequest extends TestOMKeyRequest {
         getOmKeyAddAclRequest(addAclRequest);
     omKeyAddAclRequest.preExecute(ozoneManager);
     OMClientResponse omClientAddAclResponse = omKeyAddAclRequest
-        .validateAndUpdateCache(ozoneManager, 100L,
-            ozoneManagerDoubleBufferHelper);
+        .validateAndUpdateCache(ozoneManager, 100L);
     OMResponse omAddAclResponse = omClientAddAclResponse.getOMResponse();
-    Assertions.assertNotNull(omAddAclResponse.getAddAclResponse());
-    Assertions.assertEquals(OzoneManagerProtocolProtos.Status.OK,
+    assertNotNull(omAddAclResponse.getAddAclResponse());
+    assertEquals(OzoneManagerProtocolProtos.Status.OK,
         omAddAclResponse.getStatus());
 
     // Verify result of adding acl.
     List<OzoneAcl> keyAcls =
         omMetadataManager.getKeyTable(getBucketLayout()).get(ozoneKey)
             .getAcls();
-    Assertions.assertEquals(1, keyAcls.size());
-    Assertions.assertEquals(acl, keyAcls.get(0));
+    assertEquals(1, keyAcls.size());
+    assertEquals(acl, keyAcls.get(0));
 
     // Remove acl.
     OMRequest removeAclRequest = createRemoveAclKeyRequest(acl);
@@ -128,21 +132,20 @@ public class TestOMKeyAclRequest extends TestOMKeyRequest {
         .getModificationTime();
     long newModTime = preExecuteRequest.getRemoveAclRequest()
         .getModificationTime();
-    Assertions.assertTrue(newModTime > originModTime);
+    assertThat(newModTime).isGreaterThan(originModTime);
 
     OMClientResponse omClientRemoveAclResponse = omKeyRemoveAclRequest
-        .validateAndUpdateCache(ozoneManager, 100L,
-            ozoneManagerDoubleBufferHelper);
+        .validateAndUpdateCache(ozoneManager, 100L);
     OMResponse omRemoveAclResponse = omClientRemoveAclResponse.getOMResponse();
-    Assertions.assertNotNull(omRemoveAclResponse.getRemoveAclResponse());
-    Assertions.assertEquals(OzoneManagerProtocolProtos.Status.OK,
+    assertNotNull(omRemoveAclResponse.getRemoveAclResponse());
+    assertEquals(OzoneManagerProtocolProtos.Status.OK,
         omRemoveAclResponse.getStatus());
 
     // Verify result of removing acl.
     List<OzoneAcl> newAcls =
         omMetadataManager.getKeyTable(getBucketLayout()).get(ozoneKey)
             .getAcls();
-    Assertions.assertEquals(0, newAcls.size());
+    assertEquals(0, newAcls.size());
   }
 
   @Test
@@ -155,7 +158,7 @@ public class TestOMKeyAclRequest extends TestOMKeyRequest {
         omMetadataManager.getKeyTable(getBucketLayout()).get(ozoneKey);
 
     // As we added manually to key table.
-    Assertions.assertNotNull(omKeyInfo);
+    assertNotNull(omKeyInfo);
 
     OzoneAcl acl = OzoneAcl.parseAcl("user:bilbo:rwdlncxy[ACCESS]");
 
@@ -170,21 +173,20 @@ public class TestOMKeyAclRequest extends TestOMKeyRequest {
         .getModificationTime();
     long newModTime = preExecuteRequest.getSetAclRequest()
         .getModificationTime();
-    Assertions.assertTrue(newModTime > originModTime);
+    assertThat(newModTime).isGreaterThan(originModTime);
 
     OMClientResponse omClientResponse = omKeySetAclRequest
-        .validateAndUpdateCache(ozoneManager, 100L,
-            ozoneManagerDoubleBufferHelper);
+        .validateAndUpdateCache(ozoneManager, 100L);
     OMResponse omSetAclResponse = omClientResponse.getOMResponse();
-    Assertions.assertNotNull(omSetAclResponse.getSetAclResponse());
-    Assertions.assertEquals(OzoneManagerProtocolProtos.Status.OK,
+    assertNotNull(omSetAclResponse.getSetAclResponse());
+    assertEquals(OzoneManagerProtocolProtos.Status.OK,
         omSetAclResponse.getStatus());
 
     // Verify result of setting acl.
     List<OzoneAcl> newAcls =
         omMetadataManager.getKeyTable(getBucketLayout()).get(ozoneKey)
             .getAcls();
-    Assertions.assertEquals(newAcls.get(0), acl);
+    assertEquals(newAcls.get(0), acl);
   }
 
   /**
@@ -249,7 +251,7 @@ public class TestOMKeyAclRequest extends TestOMKeyRequest {
 
   protected String addKeyToTable() throws Exception {
     OMRequestTestUtils.addKeyToTable(false, false, volumeName, bucketName,
-        keyName, clientID, replicationType, replicationFactor, 1L,
+        keyName, clientID, RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.ONE), 1L,
         omMetadataManager);
 
     return omMetadataManager.getOzoneKey(volumeName, bucketName,

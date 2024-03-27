@@ -18,6 +18,11 @@
 
 package org.apache.hadoop.ozone.recon.tasks;
 
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState.OPEN;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState.CLOSED;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState.DELETED;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState.QUASI_CLOSED;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState.CLOSING;
 import static org.hadoop.ozone.recon.schema.tables.ContainerCountBySizeTable.CONTAINER_COUNT_BY_SIZE;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.BDDMockito.given;
@@ -54,6 +59,10 @@ public class TestContainerSizeCountTask extends AbstractReconSqlDBTest {
   private ContainerSizeCountTask task;
   private DSLContext dslContext;
 
+  public TestContainerSizeCountTask() {
+    super();
+  }
+
   @BeforeEach
   public void setUp() {
     utilizationSchemaDefinition =
@@ -79,24 +88,33 @@ public class TestContainerSizeCountTask extends AbstractReconSqlDBTest {
 
   @Test
   public void testProcess() {
+    // mock a container with invalid used bytes
+    ContainerInfo omContainerInfo0 = mock(ContainerInfo.class);
+    given(omContainerInfo0.containerID()).willReturn(new ContainerID(0));
+    given(omContainerInfo0.getUsedBytes()).willReturn(-1L);
+    given(omContainerInfo0.getState()).willReturn(OPEN);
+
     // Write 2 keys
     ContainerInfo omContainerInfo1 = mock(ContainerInfo.class);
     given(omContainerInfo1.containerID()).willReturn(new ContainerID(1));
     given(omContainerInfo1.getUsedBytes()).willReturn(1500000000L); // 1.5GB
+    given(omContainerInfo1.getState()).willReturn(CLOSED);
 
     ContainerInfo omContainerInfo2 = mock(ContainerInfo.class);
     given(omContainerInfo2.containerID()).willReturn(new ContainerID(2));
     given(omContainerInfo2.getUsedBytes()).willReturn(2500000000L); // 2.5GB
+    given(omContainerInfo2.getState()).willReturn(CLOSING);
 
     // mock getContainers method to return a list of containers
     List<ContainerInfo> containers = new ArrayList<>();
+    containers.add(omContainerInfo0);
     containers.add(omContainerInfo1);
     containers.add(omContainerInfo2);
 
     task.process(containers);
 
-    // Verify 2 containers are in correct bins.
-    assertEquals(2, containerCountBySizeDao.count());
+    // Verify 3 containers are in correct bins.
+    assertEquals(3, containerCountBySizeDao.count());
 
     // container size upper bound for
     // 1500000000L (1.5GB) is 2147483648L = 2^31 = 2GB (next highest power of 2)
@@ -114,10 +132,11 @@ public class TestContainerSizeCountTask extends AbstractReconSqlDBTest {
         containerCountBySizeDao.findById(recordToFind.value1()).getCount()
             .longValue());
 
-    // Add a new key
+    // Add a new container
     ContainerInfo omContainerInfo3 = mock(ContainerInfo.class);
     given(omContainerInfo3.containerID()).willReturn(new ContainerID(3));
     given(omContainerInfo3.getUsedBytes()).willReturn(1000000000L); // 1GB
+    given(omContainerInfo3.getState()).willReturn(QUASI_CLOSED);
     containers.add(omContainerInfo3);
 
     // Update existing key.
@@ -127,7 +146,7 @@ public class TestContainerSizeCountTask extends AbstractReconSqlDBTest {
     task.process(containers);
 
     // Total size groups added to the database
-    assertEquals(4, containerCountBySizeDao.count());
+    assertEquals(5, containerCountBySizeDao.count());
 
     // Check whether container size upper bound for
     // 50000L is 536870912L = 2^29 = 512MB (next highest power of 2)
@@ -154,4 +173,59 @@ public class TestContainerSizeCountTask extends AbstractReconSqlDBTest {
         .getCount()
         .longValue());
   }
+
+  @Test
+  public void testProcessDeletedAndNegativeSizedContainers() {
+    // Create a list of containers, including one that is deleted
+    ContainerInfo omContainerInfo1 = mock(ContainerInfo.class);
+    given(omContainerInfo1.containerID()).willReturn(new ContainerID(1));
+    given(omContainerInfo1.getUsedBytes()).willReturn(1500000000L); // 1.5GB
+    given(omContainerInfo1.getState()).willReturn(OPEN);
+
+    ContainerInfo omContainerInfo2 = mock(ContainerInfo.class);
+    given(omContainerInfo2.containerID()).willReturn(new ContainerID(2));
+    given(omContainerInfo2.getUsedBytes()).willReturn(2500000000L); // 2.5GB
+    given(omContainerInfo2.getState()).willReturn(CLOSED);
+
+    ContainerInfo omContainerInfoDeleted = mock(ContainerInfo.class);
+    given(omContainerInfoDeleted.containerID()).willReturn(new ContainerID(3));
+    given(omContainerInfoDeleted.getUsedBytes()).willReturn(1000000000L);
+    given(omContainerInfoDeleted.getState()).willReturn(DELETED); // 1GB
+
+    // Create a mock container with negative size
+    final ContainerInfo negativeSizeContainer = mock(ContainerInfo.class);
+    given(negativeSizeContainer.containerID()).willReturn(new ContainerID(0));
+    given(negativeSizeContainer.getUsedBytes()).willReturn(-1L);
+    given(negativeSizeContainer.getState()).willReturn(OPEN);
+
+    // Create a mock container with negative size and DELETE state
+    final ContainerInfo negativeSizeDeletedContainer =
+        mock(ContainerInfo.class);
+    given(negativeSizeDeletedContainer.containerID()).willReturn(
+        new ContainerID(0));
+    given(negativeSizeDeletedContainer.getUsedBytes()).willReturn(-1L);
+    given(negativeSizeDeletedContainer.getState()).willReturn(DELETED);
+
+    // Create a mock container with id 1 and updated size of 1GB from 1.5GB
+    final ContainerInfo validSizeContainer = mock(ContainerInfo.class);
+    given(validSizeContainer.containerID()).willReturn(new ContainerID(1));
+    given(validSizeContainer.getUsedBytes()).willReturn(1000000000L); // 1GB
+    given(validSizeContainer.getState()).willReturn(CLOSED);
+
+    // Mock getContainers method to return a list of containers including
+    // both valid and invalid ones
+    List<ContainerInfo> containers = new ArrayList<>();
+    containers.add(omContainerInfo1);
+    containers.add(omContainerInfo2);
+    containers.add(omContainerInfoDeleted);
+    containers.add(negativeSizeContainer);
+    containers.add(negativeSizeDeletedContainer);
+    containers.add(validSizeContainer);
+
+    task.process(containers);
+
+    // Verify that only the valid containers are counted
+    assertEquals(3, containerCountBySizeDao.count());
+  }
+
 }

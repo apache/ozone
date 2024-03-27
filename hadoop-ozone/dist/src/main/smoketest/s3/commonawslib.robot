@@ -80,8 +80,12 @@ Setup v4 headers
 
 Setup secure v4 headers
     ${result} =         Execute and Ignore error             ozone s3 getsecret ${OM_HA_PARAM}
-    ${output} =         Run Keyword And Return Status    Should Contain    ${result}    S3_SECRET_ALREADY_EXISTS
-    Return From Keyword if      ${output}
+    ${exists} =         Run Keyword And Return Status    Should Contain    ${result}    S3_SECRET_ALREADY_EXISTS
+    IF                  ${exists}
+                        Execute    ozone s3 revokesecret -y ${OM_HA_PARAM}
+        ${result} =     Execute    ozone s3 getsecret ${OM_HA_PARAM}
+    END
+
     ${accessKey} =      Get Regexp Matches         ${result}     (?<=awsAccessKey=).*
     # Use a valid user that are created in the Docket image Ex: testuser if it is not a secure cluster
     ${accessKey} =      Get Variable Value         ${accessKey}  testuser
@@ -203,3 +207,9 @@ Verify Multipart Upload
     ${tmp} =    Catenate    @{files}
     Execute    cat ${tmp} > /tmp/original${random}
     Compare files    /tmp/original${random}    /tmp/verify${random}
+
+Revoke S3 secrets
+    Execute and Ignore Error             ozone s3 revokesecret -y
+    Execute and Ignore Error             ozone s3 revokesecret -y -u testuser
+    Execute and Ignore Error             ozone s3 revokesecret -y -u testuser2
+

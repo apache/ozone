@@ -40,6 +40,7 @@ import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.audit.AuditAction;
 import org.apache.hadoop.ozone.audit.AuditEventStatus;
 import org.apache.hadoop.ozone.audit.AuditLogger;
+import org.apache.hadoop.ozone.audit.AuditLogger.PerformanceStringBuilder;
 import org.apache.hadoop.ozone.audit.AuditLoggerType;
 import org.apache.hadoop.ozone.audit.AuditMessage;
 import org.apache.hadoop.ozone.audit.Auditor;
@@ -64,6 +65,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
+import static org.apache.hadoop.ozone.OzoneConsts.ETAG;
 import static org.apache.hadoop.ozone.OzoneConsts.KB;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.newError;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.CUSTOM_METADATA_HEADER_PREFIX;
@@ -72,8 +74,6 @@ import static org.apache.hadoop.ozone.s3.util.S3Consts.CUSTOM_METADATA_HEADER_PR
  * Basic helpers for all the REST endpoints.
  */
 public abstract class EndpointBase implements Auditor {
-
-  protected static final String ETAG = "ETag";
 
   protected static final String ETAG_CUSTOM = "etag-custom";
 
@@ -353,6 +353,14 @@ public abstract class EndpointBase implements Auditor {
     return builder.build();
   }
 
+  public AuditMessage buildAuditMessageForSuccess(AuditAction op,
+      Map<String, String> auditMap, PerformanceStringBuilder performance) {
+    AuditMessage.Builder builder = auditMessageBaseBuilder(op, auditMap)
+        .withResult(AuditEventStatus.SUCCESS);
+    builder.setPerformance(performance);
+    return builder.build();
+  }
+
   @Override
   public AuditMessage buildAuditMessageForFailure(AuditAction op,
       Map<String, String> auditMap, Throwable throwable) {
@@ -378,7 +386,7 @@ public abstract class EndpointBase implements Auditor {
 
   @VisibleForTesting
   public S3GatewayMetrics getMetrics() {
-    return S3GatewayMetrics.create();
+    return S3GatewayMetrics.getMetrics();
   }
 
   protected Map<String, String> getAuditParameters() {

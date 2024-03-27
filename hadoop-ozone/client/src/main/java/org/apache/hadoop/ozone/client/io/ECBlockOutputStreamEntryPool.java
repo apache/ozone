@@ -17,18 +17,7 @@
  */
 package org.apache.hadoop.ozone.client.io;
 
-import org.apache.hadoop.hdds.client.ECReplicationConfig;
-import org.apache.hadoop.hdds.client.ReplicationConfig;
-import org.apache.hadoop.hdds.scm.ContainerClientMetrics;
-import org.apache.hadoop.hdds.scm.OzoneClientConfig;
-import org.apache.hadoop.hdds.scm.XceiverClientFactory;
-import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
-import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
-import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
-
-import java.time.Clock;
-import java.time.ZoneOffset;
 
 /**
  * {@link BlockOutputStreamEntryPool} is responsible to manage OM communication
@@ -43,37 +32,14 @@ import java.time.ZoneOffset;
  * @see ECBlockOutputStreamEntry
  */
 public class ECBlockOutputStreamEntryPool extends BlockOutputStreamEntryPool {
-
-  @SuppressWarnings({"parameternumber", "squid:S00107"})
-  public ECBlockOutputStreamEntryPool(OzoneClientConfig config,
-      OzoneManagerProtocol omClient,
-      String requestId,
-      ReplicationConfig replicationConfig,
-      String uploadID,
-      int partNumber,
-      boolean isMultipart,
-      OmKeyInfo info,
-      boolean unsafeByteBufferConversion,
-      XceiverClientFactory xceiverClientFactory,
-      long openID,
-      ContainerClientMetrics clientMetrics) {
-    super(config, omClient, requestId, replicationConfig, uploadID, partNumber,
-        isMultipart, info, unsafeByteBufferConversion, xceiverClientFactory,
-        openID, clientMetrics);
-    assert replicationConfig instanceof ECReplicationConfig;
+  public ECBlockOutputStreamEntryPool(ECKeyOutputStream.Builder builder) {
+    super(builder);
   }
 
   @Override
-  ExcludeList createExcludeList() {
-    return new ExcludeList(getConfig().getExcludeNodesExpiryTime(),
-        Clock.system(ZoneOffset.UTC));
-  }
-
-  @Override
-  BlockOutputStreamEntry createStreamEntry(OmKeyLocationInfo subKeyInfo) {
-    return
-        new ECBlockOutputStreamEntry.Builder()
-            .setBlockID(subKeyInfo.getBlockID())
+  ECBlockOutputStreamEntry createStreamEntry(OmKeyLocationInfo subKeyInfo) {
+    final ECBlockOutputStreamEntry.Builder b = new ECBlockOutputStreamEntry.Builder();
+    b.setBlockID(subKeyInfo.getBlockID())
             .setKey(getKeyName())
             .setXceiverClientManager(getXceiverClientFactory())
             .setPipeline(subKeyInfo.getPipeline())
@@ -82,7 +48,9 @@ public class ECBlockOutputStreamEntryPool extends BlockOutputStreamEntryPool {
             .setBufferPool(getBufferPool())
             .setToken(subKeyInfo.getToken())
             .setClientMetrics(getClientMetrics())
-            .build();
+            .setStreamBufferArgs(getStreamBufferArgs())
+            .setExecutorServiceSupplier(getExecutorServiceSupplier());
+    return b.build();
   }
 
   @Override

@@ -20,7 +20,7 @@ package org.apache.hadoop.hdds.utils.db;
 
 import java.nio.ByteBuffer;
 
-import javax.annotation.Nonnull;
+import jakarta.annotation.Nonnull;
 
 /**
  * Codec to serialize/deserialize {@link Short}.

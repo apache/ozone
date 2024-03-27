@@ -108,8 +108,7 @@ public class DatanodeConfiguration extends ReconfigurableConfig {
       ROCKSDB_DELETE_OBSOLETE_FILES_PERIOD_MICRO_SECONDS_KEY =
       "hdds.datanode.rocksdb.delete_obsolete_files_period";
   public static final Boolean
-      OZONE_DATANODE_CHECK_EMPTY_CONTAINER_DIR_ON_DELETE_DEFAULT =
-      false;
+      OZONE_DATANODE_CHECK_EMPTY_CONTAINER_DIR_ON_DELETE_DEFAULT = false;
 
   /**
    * Number of threads per volume that Datanode will use for chunk read.
@@ -126,6 +125,11 @@ public class DatanodeConfiguration extends ReconfigurableConfig {
   static final int CONTAINER_DELETE_THREADS_DEFAULT = 2;
   static final int CONTAINER_CLOSE_THREADS_DEFAULT = 3;
   static final int BLOCK_DELETE_THREADS_DEFAULT = 5;
+
+  public static final String BLOCK_DELETE_COMMAND_WORKER_INTERVAL =
+      "hdds.datanode.block.delete.command.worker.interval";
+  public static final Duration BLOCK_DELETE_COMMAND_WORKER_INTERVAL_DEFAULT =
+      Duration.ofSeconds(2);
 
   /**
    * The maximum number of threads used to delete containers on a datanode
@@ -180,9 +184,23 @@ public class DatanodeConfiguration extends ReconfigurableConfig {
       defaultValue = "5",
       tags = {DATANODE},
       description = "The maximum number of block delete commands queued on " +
-          " a datanode"
+          " a datanode, This configuration is also used by the SCM to " +
+          "control whether to send delete commands to the DN. If the DN" +
+          " has more commands waiting in the queue than this value, " +
+          "the SCM will not send any new block delete commands. until the " +
+          "DN has processed some commands and the queue length is reduced."
   )
   private int blockDeleteQueueLimit = 5;
+
+  @Config(key = "block.delete.command.worker.interval",
+      type = ConfigType.TIME,
+      defaultValue = "2s",
+      tags = {DATANODE},
+      description = "The interval between DeleteCmdWorker execution of " +
+          "delete commands."
+  )
+  private Duration blockDeleteCommandWorkerInterval =
+      BLOCK_DELETE_COMMAND_WORKER_INTERVAL_DEFAULT;
 
   /**
    * The maximum number of commands in queued list.
@@ -522,7 +540,7 @@ public class DatanodeConfiguration extends ReconfigurableConfig {
    * Whether to check container directory or not to determine
    * container is empty.
    */
-  @Config(key = "hdds.datanode.check.empty.container.dir.on.delete",
+  @Config(key = "check.empty.container.dir.on.delete",
       type = ConfigType.BOOLEAN,
       defaultValue = "false",
       tags = { DATANODE },
@@ -632,6 +650,15 @@ public class DatanodeConfiguration extends ReconfigurableConfig {
               " must be greater than zero and was set to {}. Defaulting to {}",
           diskCheckTimeout, DISK_CHECK_TIMEOUT_DEFAULT);
       diskCheckTimeout = DISK_CHECK_TIMEOUT_DEFAULT;
+    }
+
+    if (blockDeleteCommandWorkerInterval.isNegative()) {
+      LOG.warn(BLOCK_DELETE_COMMAND_WORKER_INTERVAL +
+          " must be greater than zero and was set to {}. Defaulting to {}",
+          blockDeleteCommandWorkerInterval,
+          BLOCK_DELETE_COMMAND_WORKER_INTERVAL_DEFAULT);
+      blockDeleteCommandWorkerInterval =
+          BLOCK_DELETE_COMMAND_WORKER_INTERVAL_DEFAULT;
     }
 
     if (rocksdbLogMaxFileSize < 0) {
@@ -769,6 +796,15 @@ public class DatanodeConfiguration extends ReconfigurableConfig {
 
   public void setBlockDeleteQueueLimit(int queueLimit) {
     this.blockDeleteQueueLimit = queueLimit;
+  }
+
+  public Duration getBlockDeleteCommandWorkerInterval() {
+    return blockDeleteCommandWorkerInterval;
+  }
+
+  public void setBlockDeleteCommandWorkerInterval(
+      Duration blockDeleteCommandWorkerInterval) {
+    this.blockDeleteCommandWorkerInterval = blockDeleteCommandWorkerInterval;
   }
 
   public int getCommandQueueLimit() {

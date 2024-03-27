@@ -22,14 +22,14 @@ import org.apache.hadoop.hdds.utils.db.Proto2CodecTestBase;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLIdentityType;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType;
-import org.junit.Assert;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
 import java.util.LinkedList;
 import java.util.List;
 
 import static org.apache.hadoop.ozone.OzoneAcl.AclScope.ACCESS;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
 /**
  * Test {@link OmPrefixInfo#getCodec()}.
@@ -45,7 +45,7 @@ public class TestOmPrefixInfoCodec extends Proto2CodecTestBase<OmPrefixInfo> {
 
     List<OzoneAcl> acls = new LinkedList<>();
     OzoneAcl ozoneAcl = new OzoneAcl(ACLIdentityType.USER,
-        "hive", ACLType.ALL, ACCESS);
+        "hive", ACCESS, ACLType.ALL);
     acls.add(ozoneAcl);
     OmPrefixInfo opiSave = OmPrefixInfo.newBuilder()
         .setName("/user/hive/warehouse")
@@ -57,6 +57,6 @@ public class TestOmPrefixInfoCodec extends Proto2CodecTestBase<OmPrefixInfo> {
     OmPrefixInfo opiLoad = codec.fromPersistedFormat(
         codec.toPersistedFormat(opiSave));
 
-    Assert.assertEquals("Loaded not equals to saved", opiSave, opiLoad);
+    assertEquals(opiSave, opiLoad, "Loaded not equals to saved");
   }
 }

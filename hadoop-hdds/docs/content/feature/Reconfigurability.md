@@ -28,10 +28,11 @@ If a property is reconfigurable, you can modify it in the configuration file (`o
 
 command:
 ```shell
-ozone admin reconfig --address=<ip:port> start|status|properties
+ozone admin reconfig --service=[OM|SCM|DATANODE] --address=<ip:port> start|status|properties
 ```
 
 The meaning of command options:
+- **--service**: The node type of the server specified with --address
 - **--address**: RPC address for one server
 - Three operations are provided:
     - **start**:      Execute the reconfig operation asynchronously
@@ -40,61 +41,61 @@ The meaning of command options:
 
 ## Retrieve the reconfigurable properties list
 To retrieve all the reconfigurable properties list for a specific component in Ozone,
-you can use the command: `ozone admin reconfig --address=<ip:port> properties`.
+you can use the command: `ozone admin reconfig --service=[OM|SCM|DATANODE] --address=<ip:port> properties`.
 This command will list all the properties that can be dynamically reconfigured at runtime for specific component.<br>
 
 > For example, get the Ozone OM reconfigurable properties list.
 >
->$ `ozone admin reconfig --address=hadoop1:9862 properties`<br>
+>$ `ozone admin reconfig --service=OM --address=hadoop1:9862 properties`<br>
 OM: Node [hadoop1:9862] Reconfigurable properties:<br>
 ozone.administrators
 
 ## OM Reconfigurability
 >For example, modify `ozone.administrators` in ozone-site.xml and execute:
 >
-> $ `ozone admin reconfig --address=hadoop1:9862 start`<br>
+> $ `ozone admin reconfig --service=OM --address=hadoop1:9862 start`<br>
 OM: Started OM reconfiguration task on node [hadoop1:9862].
 >
->$ `ozone admin reconfig --address=hadoop1:9862 status`<br>
+>$ `ozone admin reconfig --service=OM --address=hadoop1:9862 status`<br>
 OM: Reconfiguring status for node [hadoop1:9862]: started at Wed Dec 28 19:04:44 CST 2022 and finished at Wed Dec 28 19:04:44 CST 2022.<br>
 SUCCESS: Changed property ozone.administrators<br>
 From: "hadoop"<br>
 To: "hadoop,bigdata"
 >
-> $ `ozone admin reconfig -address=hadoop1:9862 properties`<br>
+> $ `ozone admin reconfig --service=OM -address=hadoop1:9862 properties`<br>
 OM: Node [hadoop1:9862] Reconfigurable properties:<br>
 ozone.administrators
 
 ## SCM Reconfigurability
 >For example, modify `ozone.administrators` in ozone-site.xml and execute:
 >
-> $ `ozone admin reconfig --address=hadoop1:9860 start`<br>
+> $ `ozone admin reconfig --service=SCM --address=hadoop1:9860 start`<br>
 SCM: Started OM reconfiguration task on node [hadoop1:9860].
 >
->$ `ozone admin reconfig --address=hadoop1:9860 status`<br>
+>$ `ozone admin reconfig --service=SCM --address=hadoop1:9860 status`<br>
 SCM: Reconfiguring status for node [hadoop1:9860]: started at Wed Dec 28 19:04:44 CST 2022 and finished at Wed Dec 28 19:04:44 CST 2022.<br>
 SUCCESS: Changed property ozone.administrators<br>
 From: "hadoop"<br>
 To: "hadoop,bigdata"
 >
-> $ `ozone admin reconfig -address=hadoop1:9860 properties`<br>
+> $ `ozone admin reconfig --service=SCM -address=hadoop1:9860 properties`<br>
 SCM: Node [hadoop1:9860] Reconfigurable properties:<br>
 ozone.administrators
 
 ## Datanode Reconfigurability
 >For example, modify `ozone.example.config` in ozone-site.xml and execute:
 >
-> $ `ozone admin reconfig --address=hadoop1:9864 start`<br>
-Datanode: Started reconfiguration task on node [hadoop1:9864].
+> $ `ozone admin reconfig --service=DATANODE --address=hadoop1:19864 start`<br>
+Datanode: Started reconfiguration task on node [hadoop1:19864].
 >
->$ `ozone admin reconfig --address=hadoop1:9864 status`<br>
-Datanode: Reconfiguring status for node [hadoop1:9864]: started at Wed Dec 28 19:04:44 CST 2022 and finished at Wed Dec 28 19:04:44 CST 2022.<br>
+>$ `ozone admin reconfig --service=DATANODE --address=hadoop1:19864 status`<br>
+Datanode: Reconfiguring status for node [hadoop1:19864]: started at Wed Dec 28 19:04:44 CST 2022 and finished at Wed Dec 28 19:04:44 CST 2022.<br>
 SUCCESS: Changed property ozone.example.config<br>
 From: "old"<br>
 To: "new"
 >
-> $ `ozone admin reconfig -address=hadoop1:9864 properties`<br>
-Datanode: Node [hadoop1:9864] Reconfigurable properties:<br>
+> $ `ozone admin reconfig --service=DATANODE -address=hadoop1:19864 properties`<br>
+Datanode: Node [hadoop1:19864] Reconfigurable properties:<br>
 ozone.example.config
 
 ### Batch operation
@@ -104,11 +105,11 @@ Currently, only Datanode supports batch operations<br>
 
 
 >For example, to list the reconfigurable properties of all Datanodes:<br>
-> $ `ozone admin reconfig --in-service-datanodes properties`<br>
-Datanode: Node [hadoop1:9864] Reconfigurable properties:<br>
+> $ `ozone admin reconfig --service=DATANODE --in-service-datanodes properties`<br>
+Datanode: Node [hadoop1:19864] Reconfigurable properties:<br>
 ozone.example.config<br>
-Datanode: Node [hadoop2:9864] Reconfigurable properties:<br>
+Datanode: Node [hadoop2:19864] Reconfigurable properties:<br>
 ozone.example.config<br>
-Datanode: Node [hadoop3:9864] Reconfigurable properties:<br>
+Datanode: Node [hadoop3:19864] Reconfigurable properties:<br>
 ozone.example.config<br>
 Reconfig successfully 3 nodes, failure 0 nodes.<br>

@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone.freon;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.net.URI;
+import java.util.Optional;
 import java.util.concurrent.Callable;
 
 import org.apache.hadoop.fs.FSDataOutputStream;
@@ -28,6 +29,7 @@ import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 
 import com.codahale.metrics.Timer;
+import org.apache.hadoop.hdds.conf.StorageSize;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
 
@@ -44,14 +46,16 @@ public class HadoopFsGenerator extends BaseFreonGenerator
     implements Callable<Void> {
 
   @Option(names = {"--path"},
-      description = "Hadoop FS file system path",
+      description = "Hadoop FS file system path. Use full path.",
       defaultValue = "o3fs://bucket1.vol1")
   private String rootPath;
 
   @Option(names = {"-s", "--size"},
-      description = "Size of the generated files (in bytes)",
-      defaultValue = "10240")
-  private long fileSize;
+      description = "Size of the generated files. " +
+          StorageSizeConverter.STORAGE_SIZE_DESCRIPTION,
+      defaultValue = "10KB",
+      converter = StorageSizeConverter.class)
+  private StorageSize fileSize;
 
   @Option(names = {"--buffer"},
       description = "Size of buffer used store the generated key content",
@@ -84,8 +88,11 @@ public class HadoopFsGenerator extends BaseFreonGenerator
 
     configuration = createOzoneConfiguration();
     uri = URI.create(rootPath);
-    String disableCacheName = String.format("fs.%s.impl.disable.cache",
-        uri.getScheme());
+    String scheme = Optional.ofNullable(uri.getScheme())
+            .orElseGet(() -> FileSystem.getDefaultUri(configuration)
+                    .getScheme());
+    String disableCacheName =
+            String.format("fs.%s.impl.disable.cache", scheme);
     print("Disabling FS cache: " + disableCacheName);
     configuration.setBoolean(disableCacheName, true);
 
@@ -95,7 +102,8 @@ public class HadoopFsGenerator extends BaseFreonGenerator
     }
 
     contentGenerator =
-        new ContentGenerator(fileSize, bufferSize, copyBufferSize, flushOrSync);
+        new ContentGenerator(fileSize.toBytes(), bufferSize, copyBufferSize,
+            flushOrSync);
 
     timer = getMetrics().timer("file-create");
 

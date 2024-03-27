@@ -39,6 +39,7 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
 import org.apache.hadoop.ozone.om.helpers.OzoneFileStatusLight;
 import org.apache.hadoop.ozone.om.helpers.S3VolumeContext;
+import org.apache.hadoop.ozone.om.protocolPB.grpc.GrpcClientConstants;
 import org.apache.hadoop.ozone.security.acl.OzoneObjInfo;
 import org.apache.hadoop.ozone.security.acl.RequestContext;
 import org.apache.hadoop.security.UserGroupInformation;
@@ -324,8 +325,10 @@ public class OmMetadataReader implements IOmMetadataReader, Auditor {
   public ListKeysResult listKeys(String volumeName, String bucketName,
       String startKey, String keyPrefix, int maxKeys) throws IOException {
     long startNanos = Time.monotonicNowNanos();
-    ResolvedBucket bucket = ozoneManager.resolveBucketLink(
-        Pair.of(volumeName, bucketName));
+    ResolvedBucket bucket = captureLatencyNs(
+        perfMetrics.getListKeysResolveBucketLatencyNs(),
+        () -> ozoneManager.resolveBucketLink(
+            Pair.of(volumeName, bucketName)));
 
     boolean auditSuccess = true;
     Map<String, String> auditMap = bucket.audit();
@@ -335,8 +338,10 @@ public class OmMetadataReader implements IOmMetadataReader, Auditor {
 
     try {
       if (isAclEnabled) {
-        checkAcls(ResourceType.BUCKET, StoreType.OZONE, ACLType.LIST,
-            bucket.realVolume(), bucket.realBucket(), keyPrefix);
+        captureLatencyNs(perfMetrics.getListKeysAclCheckLatencyNs(), () ->
+            checkAcls(ResourceType.BUCKET, StoreType.OZONE, ACLType.LIST,
+            bucket.realVolume(), bucket.realBucket(), keyPrefix)
+        );
       }
       metrics.incNumKeyLists();
       return keyManager.listKeys(bucket.realVolume(), bucket.realBucket(),
@@ -382,7 +387,7 @@ public class OmMetadataReader implements IOmMetadataReader, Auditor {
     String volumeName = obj.getVolumeName();
     String bucketName = obj.getBucketName();
     String keyName = obj.getKeyName();
-    if (obj.getResourceType() == ResourceType.KEY) {
+    if (obj.getResourceType() == ResourceType.KEY || obj.getResourceType() == ResourceType.PREFIX) {
       ResolvedBucket resolvedBucket = ozoneManager.resolveBucketLink(
           Pair.of(volumeName, bucketName));
       volumeName = resolvedBucket.realVolume();
@@ -565,7 +570,13 @@ public class OmMetadataReader implements IOmMetadataReader, Auditor {
   static String getClientAddress() {
     String clientMachine = Server.getRemoteAddress();
     if (clientMachine == null) { //not a RPC client
-      clientMachine = "";
+      String clientIpAddress =
+          GrpcClientConstants.CLIENT_IP_ADDRESS_CTX_KEY.get();
+      if (clientIpAddress != null) {
+        clientMachine = clientIpAddress;
+      } else {
+        clientMachine = "";
+      }
     }
     return clientMachine;
   }
@@ -576,7 +587,7 @@ public class OmMetadataReader implements IOmMetadataReader, Auditor {
 
     return new AuditMessage.Builder()
         .setUser(getRemoteUserName())
-        .atIp(Server.getRemoteAddress())
+        .atIp(getClientAddress())
         .forOperation(op)
         .withParams(auditMap)
         .withResult(AuditEventStatus.SUCCESS)
@@ -589,7 +600,7 @@ public class OmMetadataReader implements IOmMetadataReader, Auditor {
 
     return new AuditMessage.Builder()
         .setUser(getRemoteUserName())
-        .atIp(Server.getRemoteAddress())
+        .atIp(getClientAddress())
         .forOperation(op)
         .withParams(auditMap)
         .withResult(AuditEventStatus.FAILURE)

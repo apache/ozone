@@ -20,8 +20,8 @@ package org.apache.hadoop.ozone.recon.persistence;
 import static org.apache.hadoop.ozone.recon.ReconControllerModule.ReconDaoBindingModule.RECON_DAO_LIST;
 import static org.hadoop.ozone.recon.codegen.SqlDbUtils.SQLITE_DRIVER_CLASS;
 import static org.hadoop.ozone.recon.schema.Tables.RECON_TASK_STATUS;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 import java.io.File;
 import java.io.IOException;
@@ -63,7 +63,7 @@ public class TestReconWithDifferentSqlDBs {
   public void testSchemaSetup(Provider<DataSourceConfiguration> provider)
       throws SQLException, IOException {
     AbstractReconSqlDBTest reconSqlDB = new AbstractReconSqlDBTest(provider);
-    reconSqlDB.createReconSchemaForTest();
+    reconSqlDB.createReconSchemaForTest(temporaryFolder);
     assertNotNull(reconSqlDB.getInjector());
     assertNotNull(reconSqlDB.getConfiguration());
     assertNotNull(reconSqlDB.getDslContext());

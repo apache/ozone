@@ -24,6 +24,7 @@ import java.util.Map;
 import java.util.HashMap;
 import java.util.ArrayList;
 import java.time.Instant;
+import java.util.Scanner;
 import java.util.stream.Collectors;
 
 import org.apache.hadoop.hdds.cli.GenericParentCommand;
@@ -39,11 +40,11 @@ import org.apache.hadoop.hdds.scm.container.common.helpers
     .ContainerWithPipeline;
 
 import com.google.common.base.Preconditions;
+import org.apache.hadoop.hdds.scm.ha.SCMHAUtils;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
+import org.apache.hadoop.hdds.scm.pipeline.PipelineNotFoundException;
 import org.apache.hadoop.hdds.server.JsonUtils;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import picocli.CommandLine;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Model.CommandSpec;
@@ -60,9 +61,6 @@ import picocli.CommandLine.Spec;
     versionProvider = HddsVersionProvider.class)
 public class InfoSubcommand extends ScmSubcommand {
 
-  private static final Logger LOG =
-      LoggerFactory.getLogger(InfoSubcommand.class);
-
   @Spec
   private CommandSpec spec;
 
@@ -71,51 +69,148 @@ public class InfoSubcommand extends ScmSubcommand {
       description = "Format output as JSON")
   private boolean json;
 
-  @Parameters(description = "Decimal id of the container.")
-  private long containerID;
+  @Parameters(description = "One or more container IDs separated by spaces. " +
+      "To read from stdin, specify '-' and supply the container IDs " +
+      "separated by newlines.",
+      arity = "1..*",
+      paramLabel = "<container ID>")
+  private String[] containerList;
+
+  private boolean multiContainer = false;
 
   @Override
   public void execute(ScmClient scmClient) throws IOException {
-    final ContainerWithPipeline container = scmClient.
-        getContainerWithPipeline(containerID);
-    Preconditions.checkNotNull(container, "Container cannot be null");
+    boolean first = true;
+    boolean stdin = false;
+    if (containerList.length > 1) {
+      multiContainer = true;
+    } else if (containerList[0].equals("-")) {
+      stdin = true;
+      // Assume multiple containers if reading from stdin
+      multiContainer = true;
+    }
+
+    printHeader();
+    if (stdin) {
+      Scanner scanner = new Scanner(System.in, "UTF-8");
+      while (scanner.hasNextLine()) {
+        String id = scanner.nextLine().trim();
+        printOutput(scmClient, id, first);
+        first = false;
+      }
+    } else {
+      for (String id : containerList) {
+        printOutput(scmClient, id, first);
+        first = false;
+      }
+    }
+    printFooter();
+  }
+
+  private void printOutput(ScmClient scmClient, String id, boolean first)
+      throws IOException {
+    long containerID;
+    try {
+      containerID = Long.parseLong(id);
+    } catch (NumberFormatException e) {
+      printError("Invalid container ID: " + id);
+      return;
+    }
+    printDetails(scmClient, containerID, first);
+  }
+
+  private void printHeader() {
+    if (json && multiContainer) {
+      System.out.println("[");
+    }
+  }
+
+  private void printFooter() {
+    if (json && multiContainer) {
+      System.out.println("]");
+    }
+  }
+
+  private void printError(String error) {
+    System.err.println(error);
+  }
+
+  private void printBreak() {
+    if (json) {
+      System.out.println(",");
+    } else {
+      System.out.println("");
+    }
+  }
+
+  private void printDetails(ScmClient scmClient, long containerID,
+      boolean first) throws IOException {
+    final ContainerWithPipeline container;
+    try {
+      container = scmClient.getContainerWithPipeline(containerID);
+      Preconditions.checkNotNull(container, "Container cannot be null");
+    } catch (IOException e) {
+      printError("Unable to retrieve the container details for " + containerID);
+      return;
+    }
+
     List<ContainerReplicaInfo> replicas = null;
     try {
       replicas = scmClient.getContainerReplicas(containerID);
     } catch (IOException e) {
-      LOG.error("Unable to retrieve the replica details", e);
+      printError("Unable to retrieve the replica details: " + e.getMessage());
     }
 
+    if (!first) {
+      printBreak();
+    }
     if (json) {
       if (container.getPipeline().size() != 0) {
         ContainerWithPipelineAndReplicas wrapper =
             new ContainerWithPipelineAndReplicas(container.getContainerInfo(),
-                container.getPipeline(), replicas);
-        LOG.info(JsonUtils.toJsonStringWithDefaultPrettyPrinter(wrapper));
+                container.getPipeline(), replicas,
+                container.getContainerInfo().getPipelineID());
+        System.out.println(JsonUtils.toJsonStringWithDefaultPrettyPrinter(wrapper));
       } else {
         ContainerWithoutDatanodes wrapper =
             new ContainerWithoutDatanodes(container.getContainerInfo(),
-                container.getPipeline(), replicas);
-        LOG.info(JsonUtils.toJsonStringWithDefaultPrettyPrinter(wrapper));
+                container.getPipeline(), replicas,
+                container.getContainerInfo().getPipelineID());
+        System.out.println(JsonUtils.toJsonStringWithDefaultPrettyPrinter(wrapper));
       }
     } else {
       // Print container report info.
-      LOG.info("Container id: {}", containerID);
+      System.out.printf("Container id: %s%n", containerID);
       boolean verbose = spec != null
           && spec.root().userObject() instanceof GenericParentCommand
           && ((GenericParentCommand) spec.root().userObject()).isVerbose();
       if (verbose) {
-        LOG.info("Pipeline Info: {}", container.getPipeline());
+        System.out.printf("Pipeline Info: %s%n", container.getPipeline());
       } else {
-        LOG.info("Pipeline id: {}", container.getPipeline().getId().getId());
+        System.out.printf("Pipeline id: %s%n", container.getPipeline().getId().getId());
       }
-      LOG.info("Container State: {}", container.getContainerInfo().getState());
+      System.out.printf("Write PipelineId: %s%n",
+          container.getContainerInfo().getPipelineID().getId());
+      try {
+        String pipelineState = scmClient.getPipeline(
+                container.getContainerInfo().getPipelineID().getProtobuf())
+            .getPipelineState().toString();
+        System.out.printf("Write Pipeline State: %s%n", pipelineState);
+      } catch (IOException ioe) {
+        if (SCMHAUtils.unwrapException(
+            ioe) instanceof PipelineNotFoundException) {
+          System.out.println("Write Pipeline State: CLOSED");
+        } else {
+          printError("Failed to retrieve pipeline info");
+        }
+      }
+      System.out.printf("Container State: %s%n", container.getContainerInfo().getState());
 
       // Print pipeline of an existing container.
       String machinesStr = container.getPipeline().getNodes().stream().map(
-          InfoSubcommand::buildDatanodeDetails)
+              InfoSubcommand::buildDatanodeDetails)
           .collect(Collectors.joining(",\n"));
-      LOG.info("Datanodes: [{}]", machinesStr);
+      System.out.printf("Datanodes: [%s]%n", machinesStr);
 
       // Print the replica details if available
       if (replicas != null) {
@@ -123,7 +218,7 @@ public class InfoSubcommand extends ScmSubcommand {
             .sorted(Comparator.comparing(ContainerReplicaInfo::getReplicaIndex))
             .map(InfoSubcommand::buildReplicaDetails)
             .collect(Collectors.joining(",\n"));
-        LOG.info("Replicas: [{}]", replicaStr);
+        System.out.printf("Replicas: [%s]%n", replicaStr);
       }
     }
   }
@@ -149,12 +244,14 @@ public class InfoSubcommand extends ScmSubcommand {
     private ContainerInfo containerInfo;
     private Pipeline pipeline;
     private List<ContainerReplicaInfo> replicas;
+    private PipelineID writePipelineID;
 
     ContainerWithPipelineAndReplicas(ContainerInfo container, Pipeline pipeline,
-                                     List<ContainerReplicaInfo> replicas) {
+        List<ContainerReplicaInfo> replicas, PipelineID pipelineID) {
       this.containerInfo = container;
       this.pipeline = pipeline;
       this.replicas = replicas;
+      this.writePipelineID = pipelineID;
     }
 
     public ContainerInfo getContainerInfo() {
@@ -168,6 +265,11 @@ public class InfoSubcommand extends ScmSubcommand {
     public List<ContainerReplicaInfo> getReplicas() {
       return replicas;
     }
+
+    public PipelineID getWritePipelineID() {
+      return writePipelineID;
+    }
+
   }
 
   private static class ContainerWithoutDatanodes {
@@ -175,12 +277,14 @@ public class InfoSubcommand extends ScmSubcommand {
     private ContainerInfo containerInfo;
     private PipelineWithoutDatanodes pipeline;
     private List<ContainerReplicaInfo> replicas;
+    private PipelineID writePipelineId;
 
     ContainerWithoutDatanodes(ContainerInfo container, Pipeline pipeline,
-                                     List<ContainerReplicaInfo> replicas) {
+        List<ContainerReplicaInfo> replicas, PipelineID pipelineID) {
       this.containerInfo = container;
       this.pipeline = new PipelineWithoutDatanodes(pipeline);
       this.replicas = replicas;
+      this.writePipelineId = pipelineID;
     }
 
     public ContainerInfo getContainerInfo() {
@@ -193,6 +297,10 @@ public class InfoSubcommand extends ScmSubcommand {
 
     public List<ContainerReplicaInfo> getReplicas() {
       return replicas;
+    }
+
+    public PipelineID getWritePipelineId() {
+      return writePipelineId;
     }
   }
 

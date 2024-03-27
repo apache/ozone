@@ -16,19 +16,23 @@
  */
 package org.apache.hadoop.ozone.om;
 
-import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience.Private;
 import org.apache.hadoop.hdds.annotation.InterfaceStability;
 import org.apache.hadoop.hdds.annotation.InterfaceStability.Unstable;
+import org.apache.hadoop.hdds.protocol.ReconfigureProtocol;
 import org.apache.hadoop.ozone.om.protocol.OMInterServiceProtocol;
 import org.apache.hadoop.ozone.om.protocol.OMAdminProtocol;
 import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
 import org.apache.hadoop.security.authorize.PolicyProvider;
 import org.apache.hadoop.security.authorize.Service;
+import org.apache.ratis.util.MemoizedSupplier;
 
-import java.util.concurrent.atomic.AtomicReference;
+import java.util.Arrays;
+import java.util.List;
+import java.util.function.Supplier;
 
+import static org.apache.hadoop.hdds.HddsConfigKeys.OZONE_SECURITY_RECONFIGURE_PROTOCOL_ACL;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SECURITY_ADMIN_PROTOCOL_ACL;
 import static org.apache.hadoop.ozone.om.OMConfigKeys
     .OZONE_OM_SECURITY_CLIENT_PROTOCOL_ACL;
@@ -40,8 +44,8 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys
 @InterfaceStability.Unstable
 public final class OMPolicyProvider extends PolicyProvider {
 
-  private static AtomicReference<OMPolicyProvider> atomicReference =
-      new AtomicReference<>();
+  private static final Supplier<OMPolicyProvider> SUPPLIER =
+      MemoizedSupplier.valueOf(OMPolicyProvider::new);
 
   private OMPolicyProvider() {
   }
@@ -49,26 +53,24 @@ public final class OMPolicyProvider extends PolicyProvider {
   @Private
   @Unstable
   public static OMPolicyProvider getInstance() {
-    if (atomicReference.get() == null) {
-      atomicReference.compareAndSet(null, new OMPolicyProvider());
-    }
-    return atomicReference.get();
+    return SUPPLIER.get();
   }
 
-  private static final Service[] OM_SERVICES =
-      new Service[]{
+  private static final List<Service> OM_SERVICES =
+      Arrays.asList(
           new Service(OZONE_OM_SECURITY_CLIENT_PROTOCOL_ACL,
               OzoneManagerProtocol.class),
           new Service(OZONE_OM_SECURITY_ADMIN_PROTOCOL_ACL,
               OMInterServiceProtocol.class),
           new Service(OZONE_OM_SECURITY_ADMIN_PROTOCOL_ACL,
-              OMAdminProtocol.class)
-      };
+              OMAdminProtocol.class),
+          new Service(OZONE_SECURITY_RECONFIGURE_PROTOCOL_ACL,
+              ReconfigureProtocol.class)
+      );
 
-  @SuppressFBWarnings("EI_EXPOSE_REP")
   @Override
   public Service[] getServices() {
-    return OM_SERVICES;
+    return OM_SERVICES.toArray(new Service[0]);
   }
 
 }

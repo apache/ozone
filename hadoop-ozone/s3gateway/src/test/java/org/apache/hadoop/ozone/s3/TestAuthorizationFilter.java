@@ -47,14 +47,16 @@ import static org.apache.hadoop.ozone.s3.signature.SignatureProcessor.CONTENT_TY
 import static org.apache.hadoop.ozone.s3.signature.SignatureProcessor.HOST_HEADER;
 import static org.apache.hadoop.ozone.s3.signature.StringToSignProducer.X_AMAZ_DATE;
 import static org.apache.hadoop.ozone.s3.signature.StringToSignProducer.X_AMZ_CONTENT_SHA256;
-import static org.junit.Assert.fail;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.fail;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.params.provider.Arguments.arguments;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
-import org.junit.Assert;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
-import org.mockito.Mockito;
 
 /**
  * This class test string to sign generation.
@@ -129,11 +131,11 @@ public class TestAuthorizationFilter {
   @SuppressWarnings("checkstyle:ParameterNumber")
   @ParameterizedTest
   @MethodSource("testAuthFilterFailuresInput")
-  public void testAuthFilterFailures(
+  void testAuthFilterFailures(
       String method, String authHeader, String contentMd5,
       String host, String amzContentSha256, String date, String contentType,
       String path, String expectedErrorMsg
-  ) {
+  ) throws Exception {
     try {
       ContainerRequestContext context = setupContext(method, authHeader,
           contentMd5, host, amzContentSha256, date, contentType, path);
@@ -155,20 +157,18 @@ public class TestAuthorizationFilter {
               authHeader.startsWith("AWS ")) {
         // Empty auth header and unsupported AWS signature
         // should fail with Invalid Request.
-        Assert.assertEquals(HTTP_FORBIDDEN, ex.getResponse().getStatus());
-        Assert.assertEquals(expectedErrorMsg,
+        assertEquals(HTTP_FORBIDDEN, ex.getResponse().getStatus());
+        assertEquals(expectedErrorMsg,
             ex.getMessage());
       } else {
         // Other requests have stale timestamp and
         // should fail with Malformed Authorization Header.
-        Assert.assertEquals(HTTP_BAD_REQUEST, ex.getResponse().getStatus());
-        Assert.assertEquals(expectedErrorMsg,
+        assertEquals(HTTP_BAD_REQUEST, ex.getResponse().getStatus());
+        assertEquals(expectedErrorMsg,
             ex.getMessage());
 
       }
 
-    } catch (Exception ex) {
-      fail("Unexpected exception: " + ex);
     }
   }
 
@@ -236,60 +236,54 @@ public class TestAuthorizationFilter {
   @SuppressWarnings("checkstyle:ParameterNumber")
   @ParameterizedTest
   @MethodSource("testAuthFilterInput")
-  public void testAuthFilter(
+  void testAuthFilter(
       String method, String authHeader, String contentMd5,
       String host, String amzContentSha256, String date, String contentType,
       String path
-  ) {
-    try {
-      ContainerRequestContext context = setupContext(method, authHeader,
-          contentMd5, host, amzContentSha256, date, contentType, path);
+  ) throws Exception {
+    ContainerRequestContext context = setupContext(method, authHeader,
+        contentMd5, host, amzContentSha256, date, contentType, path);
 
-      AWSSignatureProcessor awsSignatureProcessor = new AWSSignatureProcessor();
-      awsSignatureProcessor.setContext(context);
+    AWSSignatureProcessor awsSignatureProcessor = new AWSSignatureProcessor();
+    awsSignatureProcessor.setContext(context);
 
-      SignatureInfo signatureInfo = new SignatureInfo();
+    SignatureInfo signatureInfo = new SignatureInfo();
 
-      authorizationFilter.setSignatureParser(awsSignatureProcessor);
-      authorizationFilter.setSignatureInfo(signatureInfo);
+    authorizationFilter.setSignatureParser(awsSignatureProcessor);
+    authorizationFilter.setSignatureInfo(signatureInfo);
 
-      authorizationFilter.filter(context);
+    authorizationFilter.filter(context);
 
-      if (path.startsWith("/secret")) {
-        Assert.assertNull(
-            authorizationFilter.getSignatureInfo().getUnfilteredURI());
+    if (path.startsWith("/secret")) {
+      assertNull(authorizationFilter.getSignatureInfo().getUnfilteredURI());
 
-        Assert.assertNull(
-            authorizationFilter.getSignatureInfo().getStringToSign());
-      } else {
-        String canonicalRequest = method + "\n"
-            + path + "\n"
-            + "\n"
-            + "host:" + host + "\nx-amz-content-sha256:" + amzContentSha256 +
-            "\n"
-            + "x-amz-date:" + DATETIME + "\n"
-            + "\n"
-            + "host;x-amz-content-sha256;x-amz-date\n"
-            + amzContentSha256;
+      assertNull(authorizationFilter.getSignatureInfo().getStringToSign());
+    } else {
+      String canonicalRequest = method + "\n"
+          + path + "\n"
+          + "\n"
+          + "host:" + host + "\nx-amz-content-sha256:" + amzContentSha256 +
+          "\n"
+          + "x-amz-date:" + DATETIME + "\n"
+          + "\n"
+          + "host;x-amz-content-sha256;x-amz-date\n"
+          + amzContentSha256;
 
-        MessageDigest md = MessageDigest.getInstance("SHA-256");
-        md.update(canonicalRequest.getBytes(StandardCharsets.UTF_8));
+      MessageDigest md = MessageDigest.getInstance("SHA-256");
+      md.update(canonicalRequest.getBytes(StandardCharsets.UTF_8));
 
-        String expectedStrToSign = "AWS4-HMAC-SHA256\n"
-            + DATETIME + "\n"
-            + CURDATE + "/us-east-1/s3/aws4_request\n"
-            + Hex.encode(md.digest()).toLowerCase();
+      String expectedStrToSign = "AWS4-HMAC-SHA256\n"
+          + DATETIME + "\n"
+          + CURDATE + "/us-east-1/s3/aws4_request\n"
+          + Hex.encode(md.digest()).toLowerCase();
 
-        Assert.assertEquals("Unfiltered URI is not preserved",
-            path,
-            authorizationFilter.getSignatureInfo().getUnfilteredURI());
+      assertEquals(path,
+          authorizationFilter.getSignatureInfo().getUnfilteredURI(),
+          "Unfiltered URI is not preserved");
 
-        Assert.assertEquals("String to sign is invalid",
-            expectedStrToSign,
-            authorizationFilter.getSignatureInfo().getStringToSign());
-      }
-    } catch (Exception ex) {
-      fail("Unexpected exception: " + ex);
+      assertEquals(expectedStrToSign,
+          authorizationFilter.getSignatureInfo().getStringToSign(),
+          "String to sign is invalid");
     }
   }
 
@@ -310,21 +304,21 @@ public class TestAuthorizationFilter {
     headerMap.putSingle(X_AMAZ_DATE, date);
     headerMap.putSingle(CONTENT_TYPE, contentType);
 
-    UriInfo uriInfo = Mockito.mock(UriInfo.class);
-    ContainerRequestContext context = Mockito.mock(
+    UriInfo uriInfo = mock(UriInfo.class);
+    ContainerRequestContext context = mock(
         ContainerRequestContext.class);
-    Mockito.when(uriInfo.getQueryParameters()).thenReturn(queryMap);
-    Mockito.when(uriInfo.getRequestUri()).thenReturn(
+    when(uriInfo.getQueryParameters()).thenReturn(queryMap);
+    when(uriInfo.getRequestUri()).thenReturn(
         new URI("http://" + host + path));
 
-    Mockito.when(context.getMethod()).thenReturn(method);
-    Mockito.when(context.getUriInfo()).thenReturn(uriInfo);
-    Mockito.when(context.getHeaders()).thenReturn(headerMap);
-    Mockito.when(context.getHeaderString(AUTHORIZATION_HEADER))
+    when(context.getMethod()).thenReturn(method);
+    when(context.getUriInfo()).thenReturn(uriInfo);
+    when(context.getHeaders()).thenReturn(headerMap);
+    when(context.getHeaderString(AUTHORIZATION_HEADER))
         .thenReturn(authHeader);
-    Mockito.when(context.getUriInfo().getQueryParameters())
+    when(context.getUriInfo().getQueryParameters())
         .thenReturn(queryMap);
-    Mockito.when(context.getUriInfo().getPathParameters())
+    when(context.getUriInfo().getPathParameters())
         .thenReturn(pathParamsMap);
 
     return context;

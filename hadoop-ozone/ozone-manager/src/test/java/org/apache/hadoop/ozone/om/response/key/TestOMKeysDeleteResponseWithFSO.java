@@ -18,7 +18,7 @@
 
 package org.apache.hadoop.ozone.om.response.key;
 
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
@@ -33,16 +33,17 @@ import org.apache.hadoop.ozone.om.response.bucket.OMBucketDeleteResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.DeleteKeysResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
-import org.apache.hadoop.util.Time;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.ONE;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status.OK;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type.DeleteKeys;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 
 /**
  * Class to test OMKeysDeleteResponse with FSO bucket layout.
@@ -92,10 +93,11 @@ public class TestOMKeysDeleteResponseWithFSO
       keyName = keyPrefix + i;
 
       OmKeyInfo omKeyInfo =
-          OMRequestTestUtils.createOmKeyInfo(volumeName, bucketName, keyName,
-              HddsProtos.ReplicationType.RATIS,
-              HddsProtos.ReplicationFactor.ONE, dirId + 1, buckId,
-              dirId + 1, Time.now());
+          OMRequestTestUtils.createOmKeyInfo(volumeName, bucketName, keyName, RatisReplicationConfig.getInstance(ONE))
+              .setObjectID(dirId + 1)
+              .setParentObjectID(buckId)
+              .setUpdateID(dirId + 1)
+              .build();
       ozoneDBKey = OMRequestTestUtils.addFileToKeyTable(false, false,
           keyName, omKeyInfo, -1, 50, omMetadataManager);
 
@@ -134,31 +136,29 @@ public class TestOMKeysDeleteResponseWithFSO
 
     omMetadataManager.getStore().commitBatchOperation(batchOperation);
     for (String ozKey : getOzoneKeys()) {
-      Assertions.assertNull(
-          omMetadataManager.getKeyTable(getBucketLayout()).get(ozKey));
+      assertNull(omMetadataManager.getKeyTable(getBucketLayout()).get(ozKey));
 
       // ozKey had no block information associated with it, so it should have
       // been removed from the file table but not added to the delete table.
       RepeatedOmKeyInfo repeatedOmKeyInfo =
           omMetadataManager.getDeletedTable().get(ozKey);
-      Assertions.assertNull(repeatedOmKeyInfo);
+      assertNull(repeatedOmKeyInfo);
     }
 
     for (String dirDBKey : dirDBKeys) {
-      Assertions.assertNull(
-          omMetadataManager.getDirectoryTable().get(dirDBKey));
+      assertNull(omMetadataManager.getDirectoryTable().get(dirDBKey));
 
       // dir deleted from DirTable
       RepeatedOmKeyInfo repeatedOmKeyInfo =
           omMetadataManager.getDeletedTable().get(dirDBKey);
-      Assertions.assertNull(repeatedOmKeyInfo);
+      assertNull(repeatedOmKeyInfo);
     }
 
     for (String dirDelDBKey : dirDelDBKeys) {
       // dir added to the deleted dir table, for deep cleanups
       OmKeyInfo omDirInfo =
           omMetadataManager.getDeletedDirTable().get(dirDelDBKey);
-      Assertions.assertNotNull(omDirInfo);
+      assertNotNull(omDirInfo);
     }
 
   }

@@ -18,16 +18,37 @@
  */
 package org.apache.hadoop.hdds.utils.db.managed;
 
+import org.apache.hadoop.hdds.utils.IOUtils;
+import org.apache.ratis.util.UncheckedAutoCloseable;
 import org.rocksdb.DBOptions;
+import org.rocksdb.Logger;
+
+import java.util.concurrent.atomic.AtomicReference;
+
+import static org.apache.hadoop.hdds.utils.db.managed.ManagedRocksObjectUtils.LOG;
+import static org.apache.hadoop.hdds.utils.db.managed.ManagedRocksObjectUtils.track;
 
 /**
  * Managed DBOptions.
  */
 public class ManagedDBOptions extends DBOptions {
 
+  private final UncheckedAutoCloseable leakTracker = track(this);
+  private final AtomicReference<Logger> loggerRef = new AtomicReference<>();
+
   @Override
-  protected void finalize() throws Throwable {
-    ManagedRocksObjectUtils.assertClosed(this);
-    super.finalize();
+  public DBOptions setLogger(Logger logger) {
+    IOUtils.close(LOG, loggerRef.getAndSet(logger));
+    return super.setLogger(logger);
+  }
+
+  @Override
+  public void close() {
+    try {
+      IOUtils.close(LOG, loggerRef.getAndSet(null));
+      super.close();
+    } finally {
+      leakTracker.close();
+    }
   }
 }

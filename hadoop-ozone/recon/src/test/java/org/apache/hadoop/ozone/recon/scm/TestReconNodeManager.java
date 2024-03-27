@@ -22,13 +22,12 @@ import static org.apache.hadoop.hdds.protocol.MockDatanodeDetails.randomDatanode
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.DECOMMISSIONING;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.IN_SERVICE;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_NAMES;
-import static org.apache.hadoop.ozone.container.upgrade.UpgradeUtils.defaultLayoutVersionProto;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_METADATA_DIRS;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.assertThrows;
-import static org.junit.Assert.assertTrue;
-import static org.mockito.ArgumentMatchers.eq;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.mockito.Mockito.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -99,7 +98,7 @@ public class TestReconNodeManager {
         scmStorageConfig, eventQueue, clusterMap, nodeTable, versionManager);
     ReconNewNodeHandler reconNewNodeHandler =
         new ReconNewNodeHandler(reconNodeManager);
-    assertTrue(reconNodeManager.getAllNodes().isEmpty());
+    assertThat(reconNodeManager.getAllNodes()).isEmpty();
 
     DatanodeDetails datanodeDetails = randomDatanodeDetails();
     String uuidString = datanodeDetails.getUuidString();
@@ -138,8 +137,7 @@ public class TestReconNodeManager {
 
     // Upon processing the heartbeat, the illegal command should be filtered out
     List<SCMCommand> returnedCmds =
-        reconNodeManager.processHeartbeat(datanodeDetails,
-            defaultLayoutVersionProto());
+        reconNodeManager.processHeartbeat(datanodeDetails);
     assertEquals(1, returnedCmds.size());
     assertEquals(SCMCommandProto.Type.reregisterCommand,
         returnedCmds.get(0).getType());
@@ -148,8 +146,7 @@ public class TestReconNodeManager {
     datanodeDetails.setPersistedOpState(
         HddsProtos.NodeOperationalState.DECOMMISSIONED);
     datanodeDetails.setPersistedOpStateExpiryEpochSec(12345L);
-    reconNodeManager.processHeartbeat(datanodeDetails,
-        defaultLayoutVersionProto());
+    reconNodeManager.processHeartbeat(datanodeDetails);
     // Check both persistedOpState and NodeStatus#operationalState
     assertEquals(HddsProtos.NodeOperationalState.DECOMMISSIONED,
         dnDetails.getPersistedOpState());
@@ -219,7 +216,7 @@ public class TestReconNodeManager {
         scmStorageConfig, eventQueue, clusterMap, nodeTable, versionManager);
     ReconNewNodeHandler reconNewNodeHandler =
         new ReconNewNodeHandler(reconNodeManager);
-    assertTrue(reconNodeManager.getAllNodes().isEmpty());
+    assertThat(reconNodeManager.getAllNodes()).isEmpty();
 
     DatanodeDetails datanodeDetails = randomDatanodeDetails();
     datanodeDetails.setHostName("hostname1");
@@ -238,8 +235,7 @@ public class TestReconNodeManager {
     datanodeDetails.setHostName("hostname2");
     // Upon processing the heartbeat, the illegal command should be filtered out
     List<SCMCommand> returnedCmds =
-        reconNodeManager.processHeartbeat(datanodeDetails,
-            defaultLayoutVersionProto());
+        reconNodeManager.processHeartbeat(datanodeDetails);
     assertEquals(1, returnedCmds.size());
     assertEquals(SCMCommandProto.Type.reregisterCommand,
         returnedCmds.get(0).getType());

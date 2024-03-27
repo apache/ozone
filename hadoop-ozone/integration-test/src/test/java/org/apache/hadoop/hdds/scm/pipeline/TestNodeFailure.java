@@ -18,6 +18,8 @@
 
 package org.apache.hadoop.hdds.scm.pipeline;
 
+import static java.util.concurrent.TimeUnit.MILLISECONDS;
+import static org.junit.jupiter.api.Assertions.fail;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -28,7 +30,6 @@ import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.hdds.conf.DatanodeRatisServerConfig;
 import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.AfterAll;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
@@ -61,11 +62,11 @@ public class TestNodeFailure {
     conf.setFromObject(ratisServerConfig);
     conf.setInt(ScmConfigKeys.OZONE_DATANODE_PIPELINE_LIMIT, 1);
     conf.set(HddsConfigKeys.HDDS_PIPELINE_REPORT_INTERVAL, "2s");
+    conf.setTimeDuration(HddsConfigKeys.HDDS_HEARTBEAT_INTERVAL, 1000, MILLISECONDS);
+    conf.setTimeDuration(ScmConfigKeys.OZONE_SCM_HEARTBEAT_PROCESS_INTERVAL, 1000, MILLISECONDS);
 
     cluster = MiniOzoneCluster.newBuilder(conf)
         .setNumDatanodes(6)
-        .setHbInterval(1000)
-        .setHbProcessorInterval(1000)
         .build();
     cluster.waitForClusterToBeReady();
 
@@ -104,7 +105,7 @@ public class TestNodeFailure {
           }
         }, timeForFailure / 2, timeForFailure * 3);
       } catch (Exception e) {
-        Assertions.fail("Test Failed: " + e.getMessage());
+        fail("Test Failed: " + e.getMessage());
       }
     });
   }

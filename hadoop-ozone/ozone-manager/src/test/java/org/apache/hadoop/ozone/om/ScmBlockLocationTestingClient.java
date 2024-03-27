@@ -31,6 +31,9 @@ import org.apache.hadoop.hdds.scm.ScmInfo;
 import org.apache.hadoop.hdds.scm.container.common.helpers.AllocatedBlock;
 import org.apache.hadoop.hdds.scm.container.common.helpers.DeleteBlockResult;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
+import org.apache.hadoop.hdds.scm.net.InnerNode;
+import org.apache.hadoop.hdds.scm.net.InnerNodeImpl;
+import org.apache.hadoop.hdds.scm.net.NetConstants;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.scm.protocol.ScmBlockLocationProtocol;
@@ -121,7 +124,8 @@ public class ScmBlockLocationTestingClient implements ScmBlockLocationProtocol {
   @Override
   public List<AllocatedBlock> allocateBlock(long size, int num,
       ReplicationConfig config,
-      String owner, ExcludeList excludeList) throws IOException {
+      String owner, ExcludeList excludeList, String clientMachine)
+      throws IOException {
     DatanodeDetails datanodeDetails = randomDatanodeDetails();
     Pipeline pipeline = createPipeline(datanodeDetails);
     long containerID = Time.monotonicNow();
@@ -197,6 +201,14 @@ public class ScmBlockLocationTestingClient implements ScmBlockLocationProtocol {
   public List<DatanodeDetails> sortDatanodes(List<String> nodes,
       String clientMachine) throws IOException {
     return null;
+  }
+
+  @Override
+  public InnerNode getNetworkTopology() {
+    InnerNode.Factory factory = InnerNodeImpl.FACTORY;
+    InnerNode clusterTree = factory.newInnerNode("", "", null,
+        NetConstants.ROOT_LEVEL, 1);
+    return clusterTree;
   }
 
   /**

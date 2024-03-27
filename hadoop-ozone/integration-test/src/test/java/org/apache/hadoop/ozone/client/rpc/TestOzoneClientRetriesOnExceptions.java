@@ -22,10 +22,10 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
-import org.apache.hadoop.conf.StorageUnit;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ChecksumType;
 import org.apache.hadoop.hdds.scm.OzoneClientConfig;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
@@ -38,7 +38,9 @@ import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerNotOpenExcep
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.storage.BlockOutputStream;
 import org.apache.hadoop.hdds.utils.IOUtils;
+import org.apache.hadoop.ozone.ClientConfigForTesting;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
+import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientFactory;
@@ -49,29 +51,24 @@ import org.apache.hadoop.ozone.container.ContainerTestHelper;
 import org.apache.hadoop.ozone.container.TestHelper;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import org.apache.ratis.protocol.exceptions.GroupMismatchException;
-import org.junit.After;
-import org.junit.Assert;
-import org.junit.Assume;
-import org.junit.Before;
-import org.junit.Rule;
-import org.junit.Test;
-import org.junit.rules.TestRule;
-import org.junit.rules.Timeout;
-import org.apache.ozone.test.JUnit5AwareTimeout;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.Assumptions;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
 
 /**
  * Tests failure detection and handling in BlockOutputStream Class.
  */
+@Timeout(300)
 public class TestOzoneClientRetriesOnExceptions {
 
   private static final int MAX_RETRIES = 3;
-
-  /**
-    * Set a timeout for each test.
-    */
-  @Rule
-  public TestRule timeout = new JUnit5AwareTimeout(Timeout.seconds(300));
 
   private MiniOzoneCluster cluster;
   private OzoneConfiguration conf = new OzoneConfiguration();
@@ -93,7 +90,7 @@ public class TestOzoneClientRetriesOnExceptions {
    *
    * @throws IOException
    */
-  @Before
+  @BeforeEach
   public void init() throws Exception {
     chunkSize = 100;
     flushSize = 2 * chunkSize;
@@ -107,16 +104,20 @@ public class TestOzoneClientRetriesOnExceptions {
     conf.setFromObject(clientConfig);
 
     conf.setInt(ScmConfigKeys.OZONE_SCM_PIPELINE_OWNER_CONTAINER_COUNT, 3);
+    conf.set(OzoneConfigKeys.OZONE_SCM_CLOSE_CONTAINER_WAIT_DURATION, "2s");
+    conf.set(ScmConfigKeys.OZONE_SCM_PIPELINE_SCRUB_INTERVAL, "2s");
+    conf.set(ScmConfigKeys.OZONE_SCM_PIPELINE_DESTROY_TIMEOUT, "5s");
     conf.setQuietMode(false);
 
-    cluster = MiniOzoneCluster.newBuilder(conf)
-        .setNumDatanodes(7)
-        .setTotalPipelineNumLimit(10)
+    ClientConfigForTesting.newBuilder(StorageUnit.BYTES)
         .setBlockSize(blockSize)
         .setChunkSize(chunkSize)
         .setStreamBufferFlushSize(flushSize)
         .setStreamBufferMaxSize(maxFlushSize)
-        .setStreamBufferSizeUnit(StorageUnit.BYTES)
+        .applyTo(conf);
+
+    cluster = MiniOzoneCluster.newBuilder(conf)
+        .setNumDatanodes(5)
         .build();
     cluster.waitForClusterToBeReady();
     //the easiest way to create an open container is creating a key
@@ -137,7 +138,7 @@ public class TestOzoneClientRetriesOnExceptions {
   /**
    * Shutdown MiniDFSCluster.
    */
-  @After
+  @AfterEach
   public void shutdown() {
     IOUtils.closeQuietly(client);
     if (cluster != null) {
@@ -150,121 +151,109 @@ public class TestOzoneClientRetriesOnExceptions {
     String keyName = getKeyName();
     int dataLength = maxFlushSize + 50;
     OzoneOutputStream key = createKey(keyName, ReplicationType.RATIS,
-            dataLength);
-    // write data more than 1 chunk
-    byte[] data1 =
-            ContainerTestHelper.getFixedLengthString(keyString, dataLength)
-                    .getBytes(UTF_8);
-    Assert.assertTrue(key.getOutputStream() instanceof KeyOutputStream);
-    KeyOutputStream keyOutputStream = (KeyOutputStream) key.getOutputStream();
-    long containerID =
-            keyOutputStream.getStreamEntries().get(0).
-                    getBlockID().getContainerID();
-    Assert.assertTrue(keyOutputStream.getStreamEntries().size() == 1);
-    ContainerInfo container =
-            cluster.getStorageContainerManager().getContainerManager()
-                    .getContainer(ContainerID.valueOf(containerID));
-    Pipeline pipeline =
-            cluster.getStorageContainerManager().getPipelineManager()
-                    .getPipeline(container.getPipelineID());
-    XceiverClientSpi xceiverClient =
-            xceiverClientManager.acquireClient(pipeline);
-    xceiverClient.sendCommand(ContainerTestHelper
-            .getCreateContainerRequest(containerID, pipeline));
-    xceiverClientManager.releaseClient(xceiverClient, false);
-    key.write(data1);
-    OutputStream stream = keyOutputStream.getStreamEntries().get(0)
-            .getOutputStream();
-    Assert.assertTrue(stream instanceof BlockOutputStream);
-    BlockOutputStream blockOutputStream = (BlockOutputStream) stream;
-    TestHelper.waitForPipelineClose(key, cluster, false);
-    key.flush();
-    Assert.assertTrue(HddsClientUtils.checkForException(blockOutputStream
-            .getIoException()) instanceof GroupMismatchException);
-    Assert.assertTrue(keyOutputStream.getExcludeList().getPipelineIds()
-            .contains(pipeline.getId()));
-    Assert.assertTrue(keyOutputStream.getStreamEntries().size() == 2);
-    key.close();
-    Assert.assertTrue(keyOutputStream.getStreamEntries().size() == 0);
-    validateData(keyName, data1);
-  }
-
-  @Test
-  public void testMaxRetriesByOzoneClient() throws Exception {
-    String keyName = getKeyName();
-    OzoneOutputStream key = createKey(
-        keyName, ReplicationType.RATIS, (MAX_RETRIES + 1) * blockSize);
-    Assert.assertTrue(key.getOutputStream() instanceof KeyOutputStream);
-    KeyOutputStream keyOutputStream = (KeyOutputStream) key.getOutputStream();
-    List<BlockOutputStreamEntry> entries = keyOutputStream.getStreamEntries();
-    Assert.assertEquals((MAX_RETRIES + 1),
-        keyOutputStream.getStreamEntries().size());
-    int dataLength = maxFlushSize + 50;
+        dataLength);
     // write data more than 1 chunk
     byte[] data1 =
         ContainerTestHelper.getFixedLengthString(keyString, dataLength)
             .getBytes(UTF_8);
-    long containerID;
-    List<Long> containerList = new ArrayList<>();
-    for (BlockOutputStreamEntry entry : entries) {
-      containerID = entry.getBlockID().getContainerID();
-      ContainerInfo container =
-          cluster.getStorageContainerManager().getContainerManager()
-              .getContainer(ContainerID.valueOf(containerID));
-      Pipeline pipeline =
-          cluster.getStorageContainerManager().getPipelineManager()
-              .getPipeline(container.getPipelineID());
-      XceiverClientSpi xceiverClient =
-          xceiverClientManager.acquireClient(pipeline);
-      Assume.assumeFalse(containerList.contains(containerID));
-      containerList.add(containerID);
-      xceiverClient.sendCommand(ContainerTestHelper
-          .getCreateContainerRequest(containerID, pipeline));
-      xceiverClientManager.releaseClient(xceiverClient, false);
-    }
+    KeyOutputStream keyOutputStream =
+        assertInstanceOf(KeyOutputStream.class, key.getOutputStream());
+    long containerID =
+        keyOutputStream.getStreamEntries().get(0).
+            getBlockID().getContainerID();
+    assertEquals(1, keyOutputStream.getStreamEntries().size());
+    ContainerInfo container =
+        cluster.getStorageContainerManager().getContainerManager()
+            .getContainer(ContainerID.valueOf(containerID));
+    Pipeline pipeline =
+        cluster.getStorageContainerManager().getPipelineManager()
+            .getPipeline(container.getPipelineID());
+    XceiverClientSpi xceiverClient =
+        xceiverClientManager.acquireClient(pipeline);
+    xceiverClient.sendCommand(ContainerTestHelper
+        .getCreateContainerRequest(containerID, pipeline));
+    xceiverClientManager.releaseClient(xceiverClient, false);
     key.write(data1);
-    OutputStream stream = entries.get(0).getOutputStream();
-    Assert.assertTrue(stream instanceof BlockOutputStream);
-    BlockOutputStream blockOutputStream = (BlockOutputStream) stream;
-    TestHelper.waitForContainerClose(key, cluster);
-    // Ensure that blocks for the key have been allocated to at least N+1
-    // containers so that write request will be tried on N+1 different blocks
-    // of N+1 different containers and it will finally fail as it will hit
-    // the max retry count of N.
-    Assume.assumeTrue(containerList.size() + " <= " + MAX_RETRIES,
-        containerList.size() > MAX_RETRIES);
-    try {
+    OutputStream stream = keyOutputStream.getStreamEntries().get(0)
+        .getOutputStream();
+    BlockOutputStream blockOutputStream = assertInstanceOf(BlockOutputStream.class, stream);
+    TestHelper.waitForPipelineClose(key, cluster, false);
+    key.flush();
+    assertInstanceOf(GroupMismatchException.class,
+        HddsClientUtils.checkForException(blockOutputStream.getIoException()));
+    assertThat(keyOutputStream.getExcludeList().getPipelineIds())
+        .contains(pipeline.getId());
+    assertEquals(2, keyOutputStream.getStreamEntries().size());
+    key.close();
+    assertEquals(0, keyOutputStream.getStreamEntries().size());
+    validateData(keyName, data1);
+  }
+
+  @Test
+  void testMaxRetriesByOzoneClient() throws Exception {
+    String keyName = getKeyName();
+    try (OzoneOutputStream key = createKey(
+        keyName, ReplicationType.RATIS, (MAX_RETRIES + 1) * blockSize)) {
+      KeyOutputStream keyOutputStream =
+          assertInstanceOf(KeyOutputStream.class, key.getOutputStream());
+      List<BlockOutputStreamEntry> entries = keyOutputStream.getStreamEntries();
+      assertEquals((MAX_RETRIES + 1),
+          keyOutputStream.getStreamEntries().size());
+      int dataLength = maxFlushSize + 50;
+      // write data more than 1 chunk
+      byte[] data1 =
+          ContainerTestHelper.getFixedLengthString(keyString, dataLength)
+              .getBytes(UTF_8);
+      long containerID;
+      List<Long> containerList = new ArrayList<>();
+      for (BlockOutputStreamEntry entry : entries) {
+        containerID = entry.getBlockID().getContainerID();
+        ContainerInfo container =
+            cluster.getStorageContainerManager().getContainerManager()
+                .getContainer(ContainerID.valueOf(containerID));
+        Pipeline pipeline =
+            cluster.getStorageContainerManager().getPipelineManager()
+                .getPipeline(container.getPipelineID());
+        XceiverClientSpi xceiverClient =
+            xceiverClientManager.acquireClient(pipeline);
+        Assumptions.assumeFalse(containerList.contains(containerID));
+        containerList.add(containerID);
+        xceiverClient.sendCommand(ContainerTestHelper
+            .getCreateContainerRequest(containerID, pipeline));
+        xceiverClientManager.releaseClient(xceiverClient, false);
+      }
       key.write(data1);
-      // ensure that write is flushed to dn
-      key.flush();
-      Assert.fail("Expected exception not thrown");
-    } catch (IOException ioe) {
-      Assert.assertTrue(HddsClientUtils.checkForException(blockOutputStream
-              .getIoException()) instanceof ContainerNotOpenException);
-      Assert.assertTrue(ioe.
-              getMessage().contains(
-              "Retry request failed. " +
-                      "retries get failed due to exceeded maximum " +
-                      "allowed retries number: " + MAX_RETRIES));
-    }
-    try {
-      key.flush();
-      Assert.fail("Expected exception not thrown");
-    } catch (IOException ioe) {
-      Assert.assertTrue(ioe.getMessage().contains("Stream is closed"));
-    }
-    try {
-      key.close();
-    } catch (IOException ioe) {
-      Assert.fail("Expected should not be thrown");
+      OutputStream stream = entries.get(0).getOutputStream();
+      BlockOutputStream blockOutputStream = assertInstanceOf(BlockOutputStream.class, stream);
+      TestHelper.waitForContainerClose(key, cluster);
+      // Ensure that blocks for the key have been allocated to at least N+1
+      // containers so that write request will be tried on N+1 different blocks
+      // of N+1 different containers and it will finally fail as it will hit
+      // the max retry count of N.
+      Assumptions.assumeTrue(containerList.size() > MAX_RETRIES,
+          containerList.size() + " <= " + MAX_RETRIES);
+      IOException ioe = assertThrows(IOException.class, () -> {
+        key.write(data1);
+        // ensure that write is flushed to dn
+        key.flush();
+      });
+      assertInstanceOf(ContainerNotOpenException.class,
+          HddsClientUtils.checkForException(blockOutputStream.getIoException()));
+      assertThat(ioe.getMessage()).contains(
+          "Retry request failed. " +
+              "retries get failed due to exceeded maximum " +
+              "allowed retries number: " + MAX_RETRIES);
+
+      ioe = assertThrows(IOException.class, () -> key.flush());
+      assertThat(ioe.getMessage()).contains("Stream is closed");
     }
   }
 
   private OzoneOutputStream createKey(String keyName, ReplicationType type,
-      long size) throws Exception {
+                                      long size) throws Exception {
     return TestHelper
-            .createKey(keyName, type, ReplicationFactor.ONE,
-                    size, objectStore, volumeName, bucketName);
+        .createKey(keyName, type, ReplicationFactor.ONE,
+            size, objectStore, volumeName, bucketName);
   }
 
   private void validateData(String keyName, byte[] data) throws Exception {

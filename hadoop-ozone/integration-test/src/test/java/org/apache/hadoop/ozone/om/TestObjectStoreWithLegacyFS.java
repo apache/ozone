@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.ozone.om;
 
+import javax.xml.bind.DatatypeConverter;
 import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.commons.lang3.RandomUtils;
@@ -43,31 +44,32 @@ import org.apache.hadoop.ozone.om.helpers.OmMultipartCommitUploadPartInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartUploadCompleteInfo;
 
 import org.apache.ozone.test.GenericTestUtils;
-import org.junit.AfterClass;
-import org.junit.Assert;
-import org.junit.Before;
-import org.junit.BeforeClass;
-import org.junit.Rule;
-import org.junit.Test;
-import org.junit.rules.TestRule;
-import org.junit.rules.Timeout;
-import org.apache.ozone.test.JUnit5AwareTimeout;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.UUID;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.fail;
+
 /**
  * Test verifies object store with OZONE_OM_ENABLE_FILESYSTEM_PATHS enabled.
  */
+@Timeout(200)
 public class TestObjectStoreWithLegacyFS {
-
-  @Rule
-  public TestRule timeout = new JUnit5AwareTimeout(Timeout.seconds(200));
 
   private static MiniOzoneCluster cluster = null;
   private static OzoneClient client;
@@ -81,7 +83,7 @@ public class TestObjectStoreWithLegacyFS {
   private static final Logger LOG =
       LoggerFactory.getLogger(TestObjectStoreWithLegacyFS.class);
 
-  @BeforeClass
+  @BeforeAll
   public static void initClass() throws Exception {
     OzoneConfiguration conf = new OzoneConfiguration();
 
@@ -98,7 +100,7 @@ public class TestObjectStoreWithLegacyFS {
   /**
    * Shutdown MiniOzoneCluster.
    */
-  @AfterClass
+  @AfterAll
   public static void shutdown() {
     IOUtils.closeQuietly(client);
     if (cluster != null) {
@@ -106,7 +108,7 @@ public class TestObjectStoreWithLegacyFS {
     }
   }
 
-  @Before
+  @BeforeEach
   public void init() throws Exception {
     volumeName = RandomStringUtils.randomAlphabetic(10).toLowerCase();
     bucketName = RandomStringUtils.randomAlphabetic(10).toLowerCase();
@@ -167,10 +169,10 @@ public class TestObjectStoreWithLegacyFS {
       }
     } catch (IOException ex) {
       LOG.info("Test failed with: " + ex.getMessage(), ex);
-      Assert.fail("Test failed with: " + ex.getMessage());
+      fail("Test failed with: " + ex.getMessage());
     }
     if (countKeys > expectedCnt) {
-      Assert.fail("Test failed with: too many keys found, expected "
+      fail("Test failed with: too many keys found, expected "
           + expectedCnt + " keys, found " + countKeys + " keys");
     }
     if (matchingKeys != expectedCnt) {
@@ -196,7 +198,7 @@ public class TestObjectStoreWithLegacyFS {
         omMultipartUploadCompleteInfo =
         uploadMPUWithDirectoryExists(bucket, keyName);
     // successfully uploaded MPU key
-    Assert.assertNotNull(omMultipartUploadCompleteInfo);
+    assertNotNull(omMultipartUploadCompleteInfo);
 
     // Test-2: Upload MPU to an LEGACY layout with Directory Exists
     legacyBuckName = UUID.randomUUID().toString();
@@ -206,22 +208,20 @@ public class TestObjectStoreWithLegacyFS {
     omBucketArgs = builder.build();
     volume.createBucket(legacyBuckName, omBucketArgs);
     bucket = volume.getBucket(legacyBuckName);
-
-    try {
-      uploadMPUWithDirectoryExists(bucket, keyName);
-      Assert.fail("Must throw error as there is " +
-          "already directory in the given path");
-    } catch (OMException ome) {
-      Assert.assertEquals(OMException.ResultCodes.NOT_A_FILE, ome.getResult());
-    }
+    OzoneBucket finalBucket = bucket;
+    OMException ome =
+        assertThrows(OMException.class, () -> uploadMPUWithDirectoryExists(finalBucket, keyName),
+            "Must throw error as there is " + "already directory in the given path");
+    assertEquals(OMException.ResultCodes.NOT_A_FILE, ome.getResult());
   }
 
   private OmMultipartUploadCompleteInfo uploadMPUWithDirectoryExists(
-      OzoneBucket bucket, String keyName) throws IOException {
+      OzoneBucket bucket, String keyName)
+      throws IOException, NoSuchAlgorithmException {
     OmMultipartInfo omMultipartInfo = bucket.initiateMultipartUpload(keyName,
         RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.ONE));
 
-    Assert.assertNotNull(omMultipartInfo.getUploadID());
+    assertNotNull(omMultipartInfo.getUploadID());
 
     String uploadID = omMultipartInfo.getUploadID();
 
@@ -230,6 +230,9 @@ public class TestObjectStoreWithLegacyFS {
     OzoneOutputStream ozoneOutputStream = bucket.createMultipartKey(keyName,
         data.length, 1, uploadID);
     ozoneOutputStream.write(data, 0, data.length);
+    ozoneOutputStream.getMetadata().put(OzoneConsts.ETAG,
+        DatatypeConverter.printHexBinary(MessageDigest.getInstance(OzoneConsts.MD5_HASH)
+            .digest(data)).toLowerCase());
     ozoneOutputStream.close();
 
     if (bucket.getBucketLayout() == BucketLayout.OBJECT_STORE) {
@@ -249,7 +252,7 @@ public class TestObjectStoreWithLegacyFS {
         ozoneOutputStream.getCommitUploadPartInfo();
 
     Map<Integer, String> partsMap = new LinkedHashMap<>();
-    partsMap.put(1, omMultipartCommitUploadPartInfo.getPartName());
+    partsMap.put(1, omMultipartCommitUploadPartInfo.getETag());
     OmMultipartUploadCompleteInfo omMultipartUploadCompleteInfo =
         bucket.completeMultipartUpload(keyName,
             uploadID, partsMap);

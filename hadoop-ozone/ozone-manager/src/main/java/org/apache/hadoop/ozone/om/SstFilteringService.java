@@ -31,8 +31,8 @@ import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.ozone.lock.BootstrapStateHandler;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
+import org.apache.hadoop.ozone.om.lock.OMLockDetails;
 import org.apache.hadoop.ozone.om.snapshot.ReferenceCounted;
-import org.apache.hadoop.ozone.om.snapshot.SnapshotCache;
 import org.rocksdb.RocksDBException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -122,8 +122,9 @@ public class SstFilteringService extends BackgroundService
      */
     private void markSSTFilteredFlagForSnapshot(String volume, String bucket,
         String snapshotName) throws IOException {
-      boolean acquiredSnapshotLock = ozoneManager.getMetadataManager().getLock()
+      OMLockDetails omLockDetails = ozoneManager.getMetadataManager().getLock()
               .acquireWriteLock(SNAPSHOT_LOCK, volume, bucket, snapshotName);
+      boolean acquiredSnapshotLock = omLockDetails.isLockAcquired();
       if (acquiredSnapshotLock) {
         Table<String, SnapshotInfo> snapshotInfoTable =
             ozoneManager.getMetadataManager().getSnapshotInfoTable();
@@ -145,10 +146,9 @@ public class SstFilteringService extends BackgroundService
     @Override
     public BackgroundTaskResult call() throws Exception {
 
-      Optional<SnapshotCache> snapshotCache = Optional.ofNullable(ozoneManager)
-          .map(OzoneManager::getOmSnapshotManager)
-          .map(OmSnapshotManager::getSnapshotCache);
-      if (!snapshotCache.isPresent()) {
+      Optional<OmSnapshotManager> snapshotManager = Optional.ofNullable(ozoneManager)
+          .map(OzoneManager::getOmSnapshotManager);
+      if (!snapshotManager.isPresent()) {
         return BackgroundTaskResult.EmptyTaskResult.newResult();
       }
       Table<String, SnapshotInfo> snapshotInfoTable =
@@ -181,10 +181,12 @@ public class SstFilteringService extends BackgroundService
                     snapshotInfo.getBucketName());
 
             try (
-                ReferenceCounted<IOmMetadataReader, SnapshotCache>
-                    snapshotMetadataReader = snapshotCache.get().get(
-                        snapshotInfo.getTableKey())) {
-              OmSnapshot omSnapshot = (OmSnapshot) snapshotMetadataReader.get();
+                ReferenceCounted<OmSnapshot> snapshotMetadataReader =
+                    snapshotManager.get().getActiveSnapshot(
+                        snapshotInfo.getVolumeName(),
+                        snapshotInfo.getBucketName(),
+                        snapshotInfo.getName())) {
+              OmSnapshot omSnapshot = snapshotMetadataReader.get();
               RDBStore rdbStore = (RDBStore) omSnapshot.getMetadataManager()
                   .getStore();
               RocksDatabase db = rdbStore.getDb();

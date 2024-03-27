@@ -18,15 +18,14 @@
 
 package org.apache.hadoop.hdds.utils.db.cache;
 
-import com.google.common.base.Optional;
-
 import java.util.Objects;
 
 /**
  * CacheValue for the RocksDB Table.
  * @param <VALUE>
  */
-public class CacheValue<VALUE> {
+public final class CacheValue<VALUE> {
+
   /** @return a {@link CacheValue} with a non-null value. */
   public static <V> CacheValue<V> get(long epoch, V value) {
     Objects.requireNonNull(value, "value == null");
@@ -45,16 +44,6 @@ public class CacheValue<VALUE> {
 
   private CacheValue(long epoch, VALUE value) {
     this.value = value;
-    this.epoch = epoch;
-  }
-
-  /**
-   * @deprecated
-   * use {@link #get(long, Object)} or {@link #get(long)}.
-   */
-  @Deprecated
-  public CacheValue(Optional<VALUE> value, long epoch) {
-    this.value = value.orNull();
     this.epoch = epoch;
   }
 

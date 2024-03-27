@@ -20,6 +20,7 @@
 package org.apache.hadoop.ozone.om;
 
 
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
@@ -31,10 +32,8 @@ import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.helpers.OpenKeySession;
 import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
-import org.apache.hadoop.security.authentication.client.AuthenticationException;
 import org.apache.ratis.util.ExitUtils;
 import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -66,13 +65,13 @@ public class TestTrashService {
   private String bucketName;
 
   @BeforeEach
-  public void setup() throws IOException, AuthenticationException {
+  void setup() throws Exception {
     ExitUtils.disableSystemExit();
     OzoneConfiguration configuration = new OzoneConfiguration();
 
     File folder = tempFolder.toFile();
     if (!folder.exists()) {
-      Assertions.assertTrue(folder.mkdirs());
+      assertTrue(folder.mkdirs());
     }
     System.setProperty(DBConfigFromFile.CONFIG_DIR, "/");
     ServerUtils.setOzoneMetaDirPath(configuration, folder.toString());
@@ -99,7 +98,7 @@ public class TestTrashService {
 
     boolean recoverOperation = keyManager.getMetadataManager()
         .recoverTrash(volumeName, bucketName, keyName, destinationBucket);
-    Assertions.assertTrue(recoverOperation);
+    assertTrue(recoverOperation);
   }
 
   private void createAndDeleteKey(String keyName) throws IOException {

@@ -23,7 +23,6 @@ import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.common.ChunkBuffer;
 import org.apache.hadoop.ozone.container.common.helpers.ChunkInfo;
 import org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion;
-import org.apache.hadoop.ozone.container.common.transport.server.ratis.DispatcherContext;
 import org.apache.hadoop.ozone.container.keyvalue.ContainerLayoutTestInfo;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainer;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.ChunkUtils;
@@ -32,6 +31,8 @@ import org.junit.jupiter.api.Test;
 
 import java.io.File;
 
+import static org.apache.hadoop.ozone.container.common.ContainerTestUtils.COMMIT_STAGE;
+import static org.apache.hadoop.ozone.container.common.ContainerTestUtils.WRITE_STAGE;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -58,8 +59,7 @@ public class TestFilePerChunkStrategy extends CommonChunkManagerTestCases {
     BlockID blockID = getBlockID();
     ChunkInfo chunkInfo = getChunkInfo();
     chunkManager.writeChunk(container, blockID, chunkInfo, getData(),
-        new DispatcherContext.Builder()
-            .setStage(DispatcherContext.WriteChunkStage.WRITE_DATA).build());
+        WRITE_STAGE);
     // Now a chunk file is being written with Stage WRITE_DATA, so it should
     // create a temporary chunk file.
     checkChunkFileCount(1);
@@ -67,7 +67,7 @@ public class TestFilePerChunkStrategy extends CommonChunkManagerTestCases {
     long term = 0;
     long index = 0;
     File chunkFile = ContainerLayoutVersion.FILE_PER_CHUNK
-        .getChunkFile(container.getContainerData(), blockID, chunkInfo);
+        .getChunkFile(container.getContainerData(), blockID, chunkInfo.getChunkName());
     File tempChunkFile = new File(chunkFile.getParent(),
         chunkFile.getName() + OzoneConsts.CONTAINER_CHUNK_NAME_DELIMITER
             + OzoneConsts.CONTAINER_TEMPORARY_CHUNK_PREFIX
@@ -80,8 +80,7 @@ public class TestFilePerChunkStrategy extends CommonChunkManagerTestCases {
     checkWriteIOStats(chunkInfo.getLen(), 1);
 
     chunkManager.writeChunk(container, blockID, chunkInfo, getData(),
-        new DispatcherContext.Builder()
-            .setStage(DispatcherContext.WriteChunkStage.COMMIT_DATA).build());
+        COMMIT_STAGE);
 
     checkWriteIOStats(chunkInfo.getLen(), 1);
 
@@ -110,7 +109,7 @@ public class TestFilePerChunkStrategy extends CommonChunkManagerTestCases {
     ChunkInfo oldDatanodeChunkInfo = new ChunkInfo(chunkInfo.getChunkName(),
         offset, chunkInfo.getLen());
     File file = ContainerLayoutVersion.FILE_PER_CHUNK.getChunkFile(
-        container.getContainerData(), blockID, chunkInfo);
+        container.getContainerData(), blockID, chunkInfo.getChunkName());
     ChunkUtils.writeData(file,
         ChunkBuffer.wrap(getData()), offset, chunkInfo.getLen(),
         null, true);

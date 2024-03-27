@@ -18,6 +18,7 @@ package org.apache.hadoop.ozone.om;
 
 import java.io.File;
 import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.time.Duration;
@@ -28,6 +29,7 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.NoSuchElementException;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
@@ -84,9 +86,9 @@ import org.apache.hadoop.ozone.om.lock.OmReadOnlyLock;
 import org.apache.hadoop.ozone.om.lock.OzoneManagerLock;
 import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.hadoop.ozone.om.protocolPB.OzoneManagerProtocolClientSideTranslatorPB;
+import org.apache.hadoop.ozone.om.request.file.OMFileRequest;
 import org.apache.hadoop.ozone.om.request.util.OMMultipartUploadUtils;
 import org.apache.hadoop.ozone.om.snapshot.ReferenceCounted;
-import org.apache.hadoop.ozone.om.snapshot.SnapshotCache;
 import org.apache.hadoop.ozone.om.snapshot.SnapshotUtils;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ExpiredMultipartUploadInfo;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ExpiredMultipartUploadsBucket;
@@ -106,7 +108,6 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_FS_SNAPSHOT_MAX_L
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_FS_SNAPSHOT_MAX_LIMIT_DEFAULT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_SNAPSHOT_CHECKPOINT_DIR_CREATION_POLL_TIMEOUT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_SNAPSHOT_CHECKPOINT_DIR_CREATION_POLL_TIMEOUT_DEFAULT;
-import static org.apache.hadoop.ozone.om.OmSnapshotManager.getSnapshotPrefix;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.BUCKET_NOT_FOUND;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.FILE_NOT_FOUND;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.VOLUME_NOT_FOUND;
@@ -315,6 +316,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
   private final Map<String, TableCacheMetrics> tableCacheMetricsMap =
       new HashMap<>();
   private SnapshotChainManager snapshotChainManager;
+  private final S3Batcher s3Batcher = new S3SecretBatcher();
 
   /**
    * OmMetadataManagerImpl constructor.
@@ -380,7 +382,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
     omEpoch = 0;
     setStore(loadDB(conf, dir, name, true,
         java.util.Optional.of(Boolean.TRUE), Optional.empty()));
-    initializeOmTables(false);
+    initializeOmTables(CacheType.PARTIAL_CACHE, false);
   }
 
 
@@ -413,7 +415,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
       setStore(loadDB(conf, metaDir, dbName, false,
           java.util.Optional.of(Boolean.TRUE),
           Optional.of(maxOpenFiles), false, false));
-      initializeOmTables(false);
+      initializeOmTables(CacheType.PARTIAL_CACHE, false);
     } catch (IOException e) {
       stop();
       throw e;
@@ -526,7 +528,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
 
       // Check if there is a DB Inconsistent Marker in the metaDir. This
       // marker indicates that the DB is in an inconsistent state and hence
-      // the SCM process should be terminated.
+      // the OM process should be terminated.
       File markerFile = new File(metaDir, DB_TRANSIENT_MARKER);
       if (markerFile.exists()) {
         LOG.error("File {} marks that OM DB is in an inconsistent state.",
@@ -557,7 +559,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
 
       this.store = loadDB(configuration, metaDir);
 
-      initializeOmTables(true);
+      initializeOmTables(CacheType.FULL_CACHE, true);
     }
 
     snapshotChainManager = new SnapshotChainManager(this);
@@ -634,7 +636,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
         .addCodec(RepeatedOmKeyInfo.class, RepeatedOmKeyInfo.getCodec(true))
         .addCodec(OmBucketInfo.class, OmBucketInfo.getCodec())
         .addCodec(OmVolumeArgs.class, OmVolumeArgs.getCodec())
-        .addProto2Codec(PersistedUserVolumeInfo.class)
+        .addProto2Codec(PersistedUserVolumeInfo.getDefaultInstance())
         .addCodec(OmMultipartKeyInfo.class, OmMultipartKeyInfo.getCodec())
         .addCodec(S3SecretValue.class, S3SecretValue.getCodec())
         .addCodec(OmPrefixInfo.class, OmPrefixInfo.getCodec())
@@ -652,14 +654,13 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
    *
    * @throws IOException
    */
-  protected void initializeOmTables(boolean addCacheMetrics)
+  protected void initializeOmTables(CacheType cacheType,
+                                    boolean addCacheMetrics)
       throws IOException {
     userTable =
         this.store.getTable(USER_TABLE, String.class,
             PersistedUserVolumeInfo.class);
     checkTableStatus(userTable, USER_TABLE, addCacheMetrics);
-
-    CacheType cacheType = CacheType.FULL_CACHE;
 
     volumeTable =
         this.store.getTable(VOLUME_TABLE, String.class, OmVolumeArgs.class,
@@ -862,6 +863,20 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
     return OmMultipartUpload.getDbKey(volume, bucket, key, uploadId);
   }
 
+  @Override
+  public String getMultipartKeyFSO(String volume, String bucket, String key, String uploadId) throws IOException {
+    final long volumeId = getVolumeId(volume);
+    final long bucketId = getBucketId(volume,
+            bucket);
+    long parentId =
+            OMFileRequest.getParentID(volumeId, bucketId, key, this);
+
+    String fileName = OzoneFSUtils.getFileName(key);
+
+    return getMultipartKey(volumeId, bucketId, parentId,
+            fileName, uploadId);
+  }
+
   /**
    * Returns the OzoneManagerLock used on Metadata DB.
    *
@@ -875,40 +890,6 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
   @Override
   public long getOmEpoch() {
     return omEpoch;
-  }
-
-  /**
-   * Returns true if the firstArray startsWith the bytes of secondArray.
-   *
-   * @param firstArray - Byte array
-   * @param secondArray - Byte array
-   * @return true if the first array bytes match the bytes in the second array.
-   */
-  private boolean startsWith(byte[] firstArray, byte[] secondArray) {
-
-    if (firstArray == null) {
-      // if both are null, then the arrays match, else if first is null and
-      // second is not, then this function returns false.
-      return secondArray == null;
-    }
-
-
-    if (secondArray != null) {
-      // If the second array is longer then first array cannot be starting with
-      // the bytes of second array.
-      if (secondArray.length > firstArray.length) {
-        return false;
-      }
-
-      for (int ndx = 0; ndx < secondArray.length; ndx++) {
-        if (firstArray[ndx] != secondArray[ndx]) {
-          return false;
-        }
-      }
-      return true; //match, return true.
-    }
-    return false; // if first is not null and second is null, we define that
-    // array does not start with same chars.
   }
 
   /**
@@ -1031,10 +1012,13 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
    */
   private <T> boolean isKeyPresentInTable(String keyPrefix,
                                           Table<String, T> table)
-      throws IOException {
+          throws IOException {
     try (TableIterator<String, ? extends KeyValue<String, T>>
-             keyIter = table.iterator()) {
-      KeyValue<String, T> kv = keyIter.seek(keyPrefix);
+                 keyIter = table.iterator(keyPrefix)) {
+      KeyValue<String, T> kv = null;
+      if (keyIter.hasNext()) {
+        kv = keyIter.next();
+      }
 
       // Iterate through all the entries in the table which start with
       // the current bucket's prefix.
@@ -1365,66 +1349,26 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
               snapshotPrefix) ? snapshotPrefix : OM_KEY_PREFIX);
     }
 
-    TreeMap<String, SnapshotInfo> snapshotInfoMap = new TreeMap<>();
-
-    int count = appendSnapshotFromCacheToMap(
-        snapshotInfoMap, prefix, seek, maxListResult);
-    appendSnapshotFromDBToMap(
-        snapshotInfoMap, prefix, seek, count, maxListResult);
-
-    return new ArrayList<>(snapshotInfoMap.values());
-  }
-
-  private int appendSnapshotFromCacheToMap(
-      TreeMap snapshotInfoMap, String prefix,
-      String previous, int maxListResult) {
-    int count = 0;
-    Iterator<Map.Entry<CacheKey<String>, CacheValue<SnapshotInfo>>> iterator =
-        snapshotInfoTable.cacheIterator();
-    while (iterator.hasNext() && count < maxListResult) {
-      Map.Entry<CacheKey<String>, CacheValue<SnapshotInfo>> entry =
-          iterator.next();
-      String snapshotKey = entry.getKey().getCacheKey();
-      SnapshotInfo snapshotInfo = entry.getValue().getCacheValue();
-      if (snapshotInfo != null && snapshotKey.startsWith(prefix) &&
-          snapshotKey.compareTo(previous) > 0) {
-        snapshotInfoMap.put(snapshotKey, snapshotInfo);
-        count++;
-      }
-    }
-    return count;
-  }
-
-  private void appendSnapshotFromDBToMap(TreeMap snapshotInfoMap,
-                                         String prefix, String previous,
-                                         int count, int maxListResult)
-      throws IOException {
-    try (TableIterator<String, ? extends KeyValue<String, SnapshotInfo>>
-             snapshotIter = snapshotInfoTable.iterator()) {
-      KeyValue<String, SnapshotInfo> snapshotinfo;
-      snapshotIter.seek(previous);
-      while (snapshotIter.hasNext() && count < maxListResult) {
-        snapshotinfo = snapshotIter.next();
-        if (snapshotinfo != null &&
-            snapshotinfo.getKey().compareTo(previous) == 0) {
-          continue;
-        }
-        if (snapshotinfo != null && snapshotinfo.getKey().startsWith(prefix))  {
-          CacheValue<SnapshotInfo> cacheValue =
-              snapshotInfoTable.getCacheValue(
-                  new CacheKey<>(snapshotinfo.getKey()));
-          // There is always the latest data in the cache, so don't need to add
-          // earlier data from DB. We only add data from DB if there is no data
-          // in cache.
-          if (cacheValue == null) {
-            snapshotInfoMap.put(snapshotinfo.getKey(), snapshotinfo.getValue());
-            count++;
+    List<SnapshotInfo> snapshotInfos =  Lists.newArrayList();
+    try (ListIterator.MinHeapIterator snapshotIterator =
+        new ListIterator.MinHeapIterator(this, prefix, seek, volumeName,
+            bucketName, snapshotInfoTable)) {
+      try {
+        while (snapshotIterator.hasNext() && maxListResult > 0) {
+          SnapshotInfo snapshotInfo =
+              (SnapshotInfo) snapshotIterator.next().getValue();
+          if (!snapshotInfo.getName().equals(prevSnapshot)) {
+            snapshotInfos.add(snapshotInfo);
+            maxListResult--;
           }
-        } else {
-          break;
         }
+      } catch (NoSuchElementException e) {
+        throw new IOException(e);
+      } catch (UncheckedIOException e) {
+        throw e.getCause();
       }
     }
+    return snapshotInfos;
   }
 
   @Override
@@ -1575,7 +1519,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
           OmBucketInfo bucketInfo = getBucketTable().get(bucketKey);
 
           // Get the latest snapshot in snapshot path.
-          try (ReferenceCounted<IOmMetadataReader, SnapshotCache>
+          try (ReferenceCounted<OmSnapshot>
               rcLatestSnapshot = getLatestActiveSnapshot(
                   keySplit[1], keySplit[2], omSnapshotManager)) {
 
@@ -1593,13 +1537,12 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
 
               if (rcLatestSnapshot != null) {
                 Table<String, OmKeyInfo> prevKeyTable =
-                    ((OmSnapshot) rcLatestSnapshot.get())
+                    rcLatestSnapshot.get()
                         .getMetadataManager()
                         .getKeyTable(bucketInfo.getBucketLayout());
 
                 Table<String, RepeatedOmKeyInfo> prevDeletedTable =
-                    ((OmSnapshot) rcLatestSnapshot.get())
-                        .getMetadataManager().getDeletedTable();
+                    rcLatestSnapshot.get().getMetadataManager().getDeletedTable();
                 String prevKeyTableDBKey = getSnapshotRenamedTable()
                     .get(dbRenameKey);
                 String prevDelTableDBKey = getOzoneKey(info.getVolumeName(),
@@ -1685,8 +1628,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
   /**
    * Get the latest OmSnapshot for a snapshot path.
    */
-  public ReferenceCounted<
-      IOmMetadataReader, SnapshotCache> getLatestActiveSnapshot(
+  public ReferenceCounted<OmSnapshot> getLatestActiveSnapshot(
           String volumeName, String bucketName,
           OmSnapshotManager snapshotManager)
       throws IOException {
@@ -1720,13 +1662,12 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
       }
     }
 
-    Optional<ReferenceCounted<IOmMetadataReader, SnapshotCache>> rcOmSnapshot =
+    Optional<ReferenceCounted<OmSnapshot>> rcOmSnapshot =
         snapshotInfo.isPresent() ?
             Optional.ofNullable(
-                snapshotManager.checkForSnapshot(volumeName,
+                snapshotManager.getSnapshot(volumeName,
                     bucketName,
-                    getSnapshotPrefix(snapshotInfo.get().getName()),
-                    true)
+                    snapshotInfo.get().getName())
             ) :
             Optional.empty();
 
@@ -1979,25 +1920,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
 
   @Override
   public S3Batcher batcher() {
-    return new S3Batcher() {
-      @Override
-      public void addWithBatch(AutoCloseable batchOperator,
-                               String id, S3SecretValue s3SecretValue)
-          throws IOException {
-        if (batchOperator instanceof BatchOperation) {
-          s3SecretTable.putWithBatch((BatchOperation) batchOperator,
-              id, s3SecretValue);
-        }
-      }
-
-      @Override
-      public void deleteWithBatch(AutoCloseable batchOperator, String id)
-          throws IOException {
-        if (batchOperator instanceof BatchOperation) {
-          s3SecretTable.deleteWithBatch((BatchOperation) batchOperator, id);
-        }
-      }
-    };
+    return s3Batcher;
   }
 
   @Override
@@ -2208,5 +2131,24 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
     }
 
     return false;
+  }
+
+  private final class S3SecretBatcher implements S3Batcher {
+    @Override
+    public void addWithBatch(AutoCloseable batchOperator, String id, S3SecretValue s3SecretValue)
+        throws IOException {
+      if (batchOperator instanceof BatchOperation) {
+        s3SecretTable.putWithBatch((BatchOperation) batchOperator,
+            id, s3SecretValue);
+      }
+    }
+
+    @Override
+    public void deleteWithBatch(AutoCloseable batchOperator, String id)
+        throws IOException {
+      if (batchOperator instanceof BatchOperation) {
+        s3SecretTable.deleteWithBatch((BatchOperation) batchOperator, id);
+      }
+    }
   }
 }

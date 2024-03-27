@@ -21,7 +21,6 @@ package org.apache.hadoop.ozone.om.snapshot;
 
 import java.io.File;
 import java.io.IOException;
-import java.util.UUID;
 import java.util.stream.Stream;
 
 import org.apache.hadoop.hdds.utils.IOUtils;
@@ -50,7 +49,6 @@ import org.apache.hadoop.ozone.security.acl.OzoneObj;
 import org.apache.hadoop.ozone.security.acl.OzoneObjInfo;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.junit.jupiter.api.AfterAll;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -66,6 +64,9 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ACL_ENABLED;
 import static org.apache.hadoop.ozone.OzoneConsts.ADMIN;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_OFS_URI_SCHEME;
 import static org.apache.hadoop.ozone.om.OmSnapshotManager.getSnapshotPath;
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.params.provider.Arguments.arguments;
 
 /**
@@ -95,7 +96,8 @@ public class TestOzoneManagerSnapshotAcl {
   private static OzoneClient client;
   private String volumeName;
   private String bucketName;
-  private static final String KEY_PREFIX = "key-";
+  private static final String DIR_PREFIX = "dir1/";
+  private static final String KEY_PREFIX = DIR_PREFIX + "key-";
   private String keyName;
   private String snapshotKeyPrefix;
 
@@ -108,17 +110,11 @@ public class TestOzoneManagerSnapshotAcl {
     final String omServiceId = "om-service-test-1"
         + RandomStringUtils.randomNumeric(32);
 
-    cluster = MiniOzoneCluster.newOMHABuilder(conf)
-        .setClusterId(UUID.randomUUID().toString())
-        .setScmId(UUID.randomUUID().toString())
+    cluster = MiniOzoneCluster.newHABuilder(conf)
         .setOMServiceId(omServiceId)
         .setNumOfOzoneManagers(1)
         .build();
     cluster.waitForClusterToBeReady();
-
-    ozoneManager = cluster.getOzoneManager();
-    final OzoneConfiguration ozoneManagerConf = ozoneManager.getConfiguration();
-    cluster.setConf(ozoneManagerConf);
 
     final String hostPrefix = OZONE_OFS_URI_SCHEME + "://" + omServiceId;
     final OzoneConfiguration clientConf =
@@ -128,12 +124,13 @@ public class TestOzoneManagerSnapshotAcl {
     client = cluster.newClient();
     objectStore = client.getObjectStore();
 
+    ozoneManager = cluster.getOzoneManager();
     final KeyManagerImpl keyManager = (KeyManagerImpl) HddsWhiteboxTestUtils
         .getInternalState(ozoneManager, "keyManager");
 
     // stop the deletion services so that keys can still be read
     keyManager.stop();
-    OMStorage.getOmDbDir(ozoneManagerConf);
+    OMStorage.getOmDbDir(cluster.getConf());
   }
 
   @AfterAll
@@ -153,8 +150,7 @@ public class TestOzoneManagerSnapshotAcl {
     final OmKeyArgs snapshotKeyArgs = getOmKeyArgs(true);
 
     // WHEN-THEN
-    Assertions.assertDoesNotThrow(
-        () -> ozoneManager.lookupKey(snapshotKeyArgs));
+    assertDoesNotThrow(() -> ozoneManager.lookupKey(snapshotKeyArgs));
   }
 
   @ParameterizedTest
@@ -168,14 +164,14 @@ public class TestOzoneManagerSnapshotAcl {
 
     // when reading from snapshot, read disallowed.
     UserGroupInformation.setLoginUser(UGI2);
-    final OMException ex = Assertions.assertThrows(OMException.class,
+    final OMException ex = assertThrows(OMException.class,
         () -> ozoneManager.lookupKey(snapshotKeyArgs));
 
     // THEN
-    Assertions.assertEquals(OMException.ResultCodes.PERMISSION_DENIED,
+    assertEquals(OMException.ResultCodes.PERMISSION_DENIED,
         ex.getResult());
     // when same user reads same key from active fs, read allowed.
-    Assertions.assertDoesNotThrow(() -> ozoneManager.lookupKey(keyArgs));
+    assertDoesNotThrow(() -> ozoneManager.lookupKey(keyArgs));
   }
 
   @ParameterizedTest
@@ -188,7 +184,7 @@ public class TestOzoneManagerSnapshotAcl {
     final boolean assumeS3Context = false;
 
     // WHEN-THEN
-    Assertions.assertDoesNotThrow(
+    assertDoesNotThrow(
         () -> ozoneManager.getKeyInfo(snapshotKeyArgs, assumeS3Context));
   }
 
@@ -205,15 +201,15 @@ public class TestOzoneManagerSnapshotAcl {
     // when reading from snapshot, read disallowed.
     UserGroupInformation.setLoginUser(UGI2);
     final OMException ex =
-        Assertions.assertThrows(OMException.class,
+        assertThrows(OMException.class,
             () -> ozoneManager.getKeyInfo(snapshotKeyOmKeyArgs,
                 assumeS3Context));
 
     // THEN
-    Assertions.assertEquals(OMException.ResultCodes.PERMISSION_DENIED,
+    assertEquals(OMException.ResultCodes.PERMISSION_DENIED,
         ex.getResult());
     // when same user reads same key from active fs, read allowed.
-    Assertions.assertDoesNotThrow(
+    assertDoesNotThrow(
         () -> ozoneManager.getKeyInfo(omKeyArgs, assumeS3Context));
   }
 
@@ -228,7 +224,7 @@ public class TestOzoneManagerSnapshotAcl {
     final long numEntries = Long.parseLong(RandomStringUtils.randomNumeric(1));
 
     // WHEN-THEN
-    Assertions.assertDoesNotThrow(
+    assertDoesNotThrow(
         () -> ozoneManager.listStatus(snapshotKeyArgs, recursive,
             snapshotKeyArgs.getKeyName(), numEntries,
             allowPartialPrefixes));
@@ -248,16 +244,16 @@ public class TestOzoneManagerSnapshotAcl {
     // when reading from snapshot, read disallowed.
     UserGroupInformation.setLoginUser(UGI2);
     final OMException ex =
-        Assertions.assertThrows(OMException.class,
+        assertThrows(OMException.class,
             () -> ozoneManager.listStatus(snapshotKeyArgs, recursive,
                 snapshotKeyArgs.getKeyName(), numEntries,
                 allowPartialPrefixes));
 
     // THEN
-    Assertions.assertEquals(OMException.ResultCodes.PERMISSION_DENIED,
+    assertEquals(OMException.ResultCodes.PERMISSION_DENIED,
         ex.getResult());
     // when same user reads same key from active fs, read allowed.
-    Assertions.assertDoesNotThrow(() -> ozoneManager.listStatus(keyArgs,
+    assertDoesNotThrow(() -> ozoneManager.listStatus(keyArgs,
         recursive, keyName, numEntries, allowPartialPrefixes));
   }
 
@@ -270,7 +266,7 @@ public class TestOzoneManagerSnapshotAcl {
     final OmKeyArgs snapshotKeyArgs = getOmKeyArgs(true);
 
     // WHEN-THEN
-    Assertions.assertDoesNotThrow(
+    assertDoesNotThrow(
         () -> ozoneManager.lookupFile(snapshotKeyArgs));
   }
 
@@ -285,14 +281,14 @@ public class TestOzoneManagerSnapshotAcl {
 
     // when reading from snapshot, read disallowed.
     UserGroupInformation.setLoginUser(UGI2);
-    final OMException ex = Assertions.assertThrows(OMException.class,
+    final OMException ex = assertThrows(OMException.class,
         () -> ozoneManager.lookupFile(snapshotKeyArgs));
 
     // THEN
-    Assertions.assertEquals(OMException.ResultCodes.PERMISSION_DENIED,
+    assertEquals(OMException.ResultCodes.PERMISSION_DENIED,
         ex.getResult());
     // when same user reads same key from active fs, read allowed.
-    Assertions.assertDoesNotThrow(() -> ozoneManager.lookupFile(keyArgs));
+    assertDoesNotThrow(() -> ozoneManager.lookupFile(keyArgs));
   }
 
   @ParameterizedTest
@@ -305,7 +301,7 @@ public class TestOzoneManagerSnapshotAcl {
     final int maxKeys = Integer.parseInt(RandomStringUtils.randomNumeric(1));
 
     // WHEN-THEN
-    Assertions.assertDoesNotThrow(() -> ozoneManager.listKeys(volumeName,
+    assertDoesNotThrow(() -> ozoneManager.listKeys(volumeName,
         bucketName, snapshotKeyArgs.getKeyName(), snapshotKeyPrefix, maxKeys));
   }
 
@@ -322,10 +318,10 @@ public class TestOzoneManagerSnapshotAcl {
     UserGroupInformation.setLoginUser(UGI2);
 
     // THEN
-    Assertions.assertDoesNotThrow(
+    assertDoesNotThrow(
         () -> ozoneManager.listKeys(volumeName, bucketName,
             snapshotKeyArgs.getKeyName(), snapshotKeyPrefix, maxKeys));
-    Assertions.assertDoesNotThrow(() -> ozoneManager.listKeys(volumeName,
+    assertDoesNotThrow(() -> ozoneManager.listKeys(volumeName,
         bucketName, keyName, KEY_PREFIX, maxKeys));
   }
 
@@ -345,7 +341,7 @@ public class TestOzoneManagerSnapshotAcl {
         .build();
 
     // WHEN-THEN
-    Assertions.assertDoesNotThrow(() -> ozoneManager.getAcl(ozoneObj));
+    assertDoesNotThrow(() -> ozoneManager.getAcl(ozoneObj));
   }
 
   @ParameterizedTest
@@ -371,15 +367,78 @@ public class TestOzoneManagerSnapshotAcl {
 
     // when reading from snapshot, read disallowed.
     UserGroupInformation.setLoginUser(UGI2);
-    final OMException ex = Assertions.assertThrows(OMException.class,
+    final OMException ex = assertThrows(OMException.class,
         () -> ozoneManager.getAcl(snapshotObj));
 
     // THEN
-    Assertions.assertEquals(OMException.ResultCodes.PERMISSION_DENIED,
+    assertEquals(OMException.ResultCodes.PERMISSION_DENIED,
         ex.getResult());
     // when same user reads same key from active fs, read allowed.
-    Assertions.assertDoesNotThrow(() -> ozoneManager.getAcl(keyObj));
+    assertDoesNotThrow(() -> ozoneManager.getAcl(keyObj));
   }
+
+  @ParameterizedTest
+  @EnumSource(BucketLayout.class)
+  public void testLookupKeyWithAllowedUserForPrefixAcl(BucketLayout bucketLayout) throws Exception {
+    UserGroupInformation.setLoginUser(UGI1);
+
+    createVolume();
+
+    final OzoneVolume volume = objectStore.getVolume(volumeName);
+    createBucket(bucketLayout, volume);
+
+    final OzoneBucket bucket = volume.getBucket(bucketName);
+
+    setDefaultPrefixAcls();
+
+    createKey(bucket);
+
+    setDefaultVolumeAcls();
+    setDefaultBucketAcls();
+
+    createSnapshot();
+
+    final OmKeyArgs snapshotKeyArgs = getOmKeyArgs(true);
+    assertDoesNotThrow(() -> ozoneManager.lookupKey(snapshotKeyArgs));
+  }
+
+  @ParameterizedTest
+  @EnumSource(BucketLayout.class)
+  public void testLookupKeyWithNotAllowedUserForPrefixAcl(BucketLayout bucketLayout) throws Exception {
+    UserGroupInformation.setLoginUser(UGI1);
+
+    createVolume();
+
+    final OzoneVolume volume = objectStore.getVolume(volumeName);
+    createBucket(bucketLayout, volume);
+
+    final OzoneBucket bucket = volume.getBucket(bucketName);
+
+    setDefaultPrefixAcls();
+
+    createKey(bucket);
+
+    setDefaultVolumeAcls();
+    setDefaultBucketAcls();
+
+    createSnapshot();
+
+    final OmKeyArgs snapshotKeyArgs = getOmKeyArgs(true);
+
+    // Add user2 to bucket and prefix ACL
+    setBucketAcl();
+    setPrefixAcls();
+
+    createKey(bucket);
+    final OmKeyArgs keyArgs = getOmKeyArgs(false);
+
+    UserGroupInformation.setLoginUser(UGI2);
+    final OMException ex = assertThrows(OMException.class, () -> ozoneManager.lookupKey(snapshotKeyArgs));
+    assertEquals(OMException.ResultCodes.PERMISSION_DENIED, ex.getResult());
+
+    assertDoesNotThrow(() -> ozoneManager.lookupKey(keyArgs));
+  }
+
 
   private void setup(BucketLayout bucketLayout)
       throws IOException {
@@ -402,6 +461,12 @@ public class TestOzoneManagerSnapshotAcl {
   }
 
   private void setDefaultAcls() throws IOException {
+    setDefaultVolumeAcls();
+    setDefaultBucketAcls();
+    setDefaultKeyAcls();
+  }
+
+  private void setDefaultVolumeAcls() throws IOException {
     final OzoneObj volumeObj = OzoneObjInfo.Builder.newBuilder()
         .setResType(OzoneObj.ResourceType.VOLUME)
         .setStoreType(OzoneObj.StoreType.OZONE)
@@ -409,8 +474,10 @@ public class TestOzoneManagerSnapshotAcl {
         .build();
     objectStore.setAcl(volumeObj, OzoneAcl.parseAcls(
         "user:" + USER1 + ":r," +
-        "user:" + USER2 + ":r"));
+            "user:" + USER2 + ":r"));
+  }
 
+  private void setDefaultBucketAcls() throws IOException {
     final OzoneObj bucketObj = OzoneObjInfo.Builder.newBuilder()
         .setResType(OzoneObj.ResourceType.BUCKET)
         .setStoreType(OzoneObj.StoreType.OZONE)
@@ -419,8 +486,10 @@ public class TestOzoneManagerSnapshotAcl {
         .build();
     objectStore.setAcl(bucketObj, OzoneAcl.parseAcls(
         "user:" + USER1 + ":r," +
-        "user:" + USER1 + ":l"));
+            "user:" + USER1 + ":l"));
+  }
 
+  private void setDefaultKeyAcls() throws IOException {
     final OzoneObj keyObj = OzoneObjInfo.Builder.newBuilder()
         .setResType(RESOURCE_TYPE_KEY)
         .setStoreType(OzoneObj.StoreType.OZONE)
@@ -430,7 +499,36 @@ public class TestOzoneManagerSnapshotAcl {
         .build();
     objectStore.setAcl(keyObj, OzoneAcl.parseAcls(
         "user:" + USER1 + ":r," +
-        "user:" + USER1 + ":x"));
+            "user:" + USER1 + ":x"));
+  }
+
+  private void setDefaultPrefixAcls() throws IOException {
+    final OzoneObj prefixObj = OzoneObjInfo.Builder.newBuilder()
+        .setResType(OzoneObj.ResourceType.PREFIX)
+        .setStoreType(OzoneObj.StoreType.OZONE)
+        .setVolumeName(volumeName)
+        .setBucketName(bucketName)
+        .setPrefixName(DIR_PREFIX)
+        .build();
+
+    objectStore.setAcl(prefixObj, OzoneAcl.parseAcls(
+        "user:" + USER1 + ":r[DEFAULT]," +
+            "user:" + USER1 + ":x[DEFAULT]"));
+  }
+
+  private void setBucketAcl() throws IOException {
+    OzoneObj bucketObj = OzoneObjInfo.Builder.newBuilder()
+        .setResType(OzoneObj.ResourceType.BUCKET)
+        .setStoreType(OzoneObj.StoreType.OZONE)
+        .setVolumeName(volumeName)
+        .setBucketName(bucketName)
+        .build();
+
+    objectStore.setAcl(bucketObj, OzoneAcl.parseAcls(
+        "user:" + USER1 + ":r," +
+            "user:" + USER1 + ":l," +
+            "user:" + USER2 + ":r," +
+            "user:" + USER2 + ":l"));
   }
 
   private void setKeyAcl() throws IOException {
@@ -448,8 +546,23 @@ public class TestOzoneManagerSnapshotAcl {
             "user:" + USER2 + ":x"));
   }
 
-  private void createKey(OzoneBucket bucket)
-      throws IOException {
+  private void setPrefixAcls() throws IOException {
+    final OzoneObj prefixObj = OzoneObjInfo.Builder.newBuilder()
+        .setResType(OzoneObj.ResourceType.PREFIX)
+        .setStoreType(OzoneObj.StoreType.OZONE)
+        .setVolumeName(volumeName)
+        .setBucketName(bucketName)
+        .setPrefixName(DIR_PREFIX)
+        .build();
+
+    objectStore.setAcl(prefixObj, OzoneAcl.parseAcls(
+        "user:" + USER1 + ":r[DEFAULT]," +
+            "user:" + USER1 + ":x[DEFAULT]," +
+            "user:" + USER2 + ":r[DEFAULT]," +
+            "user:" + USER2 + ":x[DEFAULT]"));
+  }
+
+  private void createKey(OzoneBucket bucket) throws IOException {
     keyName = KEY_PREFIX + RandomStringUtils.randomNumeric(32);
     byte[] data = RandomStringUtils.randomAscii(1).getBytes(UTF_8);
     final OzoneOutputStream fileKey = bucket.createKey(keyName, data.length);
@@ -477,21 +590,6 @@ public class TestOzoneManagerSnapshotAcl {
         .waitForCheckpointDirectoryExist(snapshotDir)) {
       throw new IOException("snapshot directory doesn't exist");
     }
-  }
-
-  private void setBucketAcl() throws IOException {
-    OzoneObj bucketObj = OzoneObjInfo.Builder.newBuilder()
-        .setResType(OzoneObj.ResourceType.BUCKET)
-        .setStoreType(OzoneObj.StoreType.OZONE)
-        .setVolumeName(volumeName)
-        .setBucketName(bucketName)
-        .build();
-
-    objectStore.setAcl(bucketObj, OzoneAcl.parseAcls(
-        "user:" + USER1 + ":r," +
-            "user:" + USER1 + ":l," +
-            "user:" + USER2 + ":r," +
-            "user:" + USER2 + ":l"));
   }
 
   private static Stream<Arguments> getListStatusArguments() {
@@ -529,7 +627,7 @@ public class TestOzoneManagerSnapshotAcl {
   private void createVolume() throws IOException {
     final String volumePrefix = "volume-";
     volumeName = volumePrefix + RandomStringUtils.randomNumeric(32);
-    final VolumeArgs volumeArgs = new VolumeArgs.Builder()
+    final VolumeArgs volumeArgs = VolumeArgs.newBuilder()
         .setAdmin(ADMIN)
         .setOwner(ADMIN)
         .build();

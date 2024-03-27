@@ -18,8 +18,6 @@
 
 package org.apache.hadoop.ozone.om.snapshot;
 
-import java.util.UUID;
-
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.IOUtils;
@@ -37,46 +35,38 @@ import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils;
 
-import org.junit.After;
-import org.junit.Assert;
-import org.junit.Before;
-import org.junit.Rule;
-import org.junit.Test;
-import org.junit.rules.TestRule;
-import org.junit.rules.Timeout;
-import org.apache.ozone.test.JUnit5AwareTimeout;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
+
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
 /**
  * Test OM's snapshot provider service.
  */
+@Timeout(300)
 public class TestOzoneManagerSnapshotProvider {
 
   private MiniOzoneHAClusterImpl cluster = null;
   private ObjectStore objectStore;
   private OzoneConfiguration conf;
-  private String clusterId;
-  private String scmId;
   private String omServiceId;
   private int numOfOMs = 3;
 
-  @Rule
-  public TestRule timeout = new JUnit5AwareTimeout(Timeout.seconds(300));
   private OzoneClient client;
 
   /**
    * Create a MiniDFSCluster for testing.
    */
-  @Before
+  @BeforeEach
   public void init() throws Exception {
     conf = new OzoneConfiguration();
-    clusterId = UUID.randomUUID().toString();
-    scmId = UUID.randomUUID().toString();
     omServiceId = "om-service-test1";
     conf.setBoolean(OMConfigKeys.OZONE_OM_HTTP_ENABLED_KEY, true);
     conf.setBoolean(OMConfigKeys.OZONE_OM_RATIS_ENABLE_KEY, true);
-    cluster = (MiniOzoneHAClusterImpl) MiniOzoneCluster.newOMHABuilder(conf)
-        .setClusterId(clusterId)
-        .setScmId(scmId)
+    cluster = MiniOzoneCluster.newHABuilder(conf)
         .setOMServiceId(omServiceId)
         .setNumOfOzoneManagers(numOfOMs)
         .build();
@@ -88,7 +78,7 @@ public class TestOzoneManagerSnapshotProvider {
   /**
    * Shutdown MiniDFSCluster.
    */
-  @After
+  @AfterEach
   public void shutdown() {
     IOUtils.closeQuietly(client);
     if (cluster != null) {
@@ -132,9 +122,9 @@ public class TestOzoneManagerSnapshotProvider {
 
     // The snapshot index downloaded from leader OM should match the ratis
     // snapshot index on the leader OM
-    Assert.assertEquals("The snapshot index downloaded from leader OM does " +
-        "not match its ratis snapshot index",
-        leaderSnapshotIndex, downloadedSnapshotIndex);
+    assertEquals(leaderSnapshotIndex, downloadedSnapshotIndex,
+        "The snapshot index downloaded from leader OM " +
+            "does not match its ratis snapshot index");
   }
 
   private long getDownloadedSnapshotIndex(DBCheckpoint dbCheckpoint)

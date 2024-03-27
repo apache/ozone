@@ -29,7 +29,10 @@ import org.slf4j.LoggerFactory;
 import java.util.Collection;
 import java.util.HashSet;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Collectors;
 
@@ -46,11 +49,13 @@ public class AuditLogger {
   private static final Marker WRITE_MARKER = AuditMarker.WRITE.getMarker();
   private static final Marker READ_MARKER = AuditMarker.READ.getMarker();
   private static final Marker AUTH_MARKER = AuditMarker.AUTH.getMarker();
+  private static final Marker PERFORMANCE = AuditMarker.PERFORMANCE.getMarker();
   private final AtomicReference<Set<String>> debugCmdSetRef =
       new AtomicReference<>(new HashSet<>());
   public static final String AUDIT_LOG_DEBUG_CMD_LIST_PREFIX =
       "ozone.audit.log.debug.cmd.list.";
   private AuditLoggerType type;
+  private final Map<String, String> opNameCache = new ConcurrentHashMap<>();
 
   /**
    * Parametrized Constructor to initialize logger.
@@ -114,6 +119,10 @@ public class AuditLogger {
     }
   }
 
+  public void logPerformance(AuditMessage msg) {
+    this.logger.logIfEnabled(FQCN, Level.INFO, PERFORMANCE, msg, null);
+  }
+
   public void refreshDebugCmdSet() {
     OzoneConfiguration conf = new OzoneConfiguration();
     refreshDebugCmdSet(conf);
@@ -129,7 +138,97 @@ public class AuditLogger {
   }
 
   private boolean shouldLogAtDebug(AuditMessage auditMessage) {
-    return debugCmdSetRef.get()
-        .contains(auditMessage.getOp().toLowerCase(Locale.ROOT));
+    return debugCmdSetRef.get().contains(getLowerCaseOp(auditMessage.getOp()));
+  }
+
+  private String getLowerCaseOp(String op) {
+    return opNameCache.computeIfAbsent(op, k -> k.toLowerCase(Locale.ROOT));
+  }
+
+  /**
+   * Utility class for building performance log strings.
+   */
+  public static class PerformanceStringBuilder {
+    private final StringBuilder builder = new StringBuilder(128).append('{');
+    /**
+     * Appends metadata operation latency in milliseconds.
+     * @param nanos Latency in nanoseconds.
+     */
+    public void appendMetaLatencyNanos(long nanos) {
+      append("metaLatencyMs", TimeUnit.NANOSECONDS.toMillis(nanos));
+    }
+
+    /**
+     * Appends whole operation latency in milliseconds.
+     * @param nanos Latency in nanoseconds.
+     */
+    public void appendOpLatencyNanos(long nanos) {
+      append("opLatencyMs", TimeUnit.NANOSECONDS.toMillis(nanos));
+    }
+
+    /**
+     * Appends pre-operation operation latency in milliseconds.
+     * @param millis Latency in nanoseconds.
+     */
+    public void appendPreOpLatencyMs(long millis) {
+      append("preOpLatencyMs", millis);
+    }
+
+    /**
+     * Appends whole operation latency in milliseconds.
+     * @param millis Latency in milliseconds.
+     */
+    public void appendOpLatencyMs(long millis) {
+      append("opLatencyMs", millis);
+    }
+
+    /**
+     * Appends the size in bytes.
+     * @param bytes Size in bytes.
+     */
+    public void appendSizeBytes(long bytes) {
+      append("sizeByte", bytes);
+    }
+
+    /**
+     * Appends the count.
+     * @param count The count value to be appended.
+     */
+    public void appendCount(long count) {
+      append("count", count);
+    }
+
+    /**
+     * Appends a stream mode flag.
+     */
+    public void appendStreamMode() {
+      append("streamMode", "true");
+    }
+
+    private void append(String name, long value) {
+      append(name, String.valueOf(value));
+    }
+
+    /**
+     * Appends a name-value pair to the log string.
+     * @param name Name of the metric.
+     * @param value Value of the metric.
+     */
+    private void append(String name, String value) {
+      builder.append(name)
+          .append('=')
+          .append(value)
+          .append(", ");
+    }
+
+    public String build() {
+      final int length = builder.length();
+      if (length < 2) {
+        return "{}";
+      }
+      builder.setCharAt(length - 2, '}');
+      builder.setLength(length - 1);
+      return builder.toString();
+    }
   }
 }

@@ -94,26 +94,39 @@ Test Multipart Upload Complete
                         Should contain          ${result}    UploadId
 
 #upload parts
-    Run Keyword         Create Random file      5
-    ${result} =         Execute AWSS3APICli     upload-part --bucket ${BUCKET} --key ${PREFIX}/multipartKey1 --part-number 1 --body /tmp/part1 --upload-id ${uploadID}
-    ${eTag1} =          Execute and checkrc     echo '${result}' | jq -r '.ETag'   0
-                        Should contain          ${result}    ETag
+    Run Keyword         Create Random file            5
+    ${result} =         Execute AWSS3APICli           upload-part --bucket ${BUCKET} --key ${PREFIX}/multipartKey1 --part-number 1 --body /tmp/part1 --upload-id ${uploadID}
+    ${eTag1} =          Execute and checkrc           echo '${result}' | jq -r '.ETag'   0
+                        Should contain                ${result}    ETag
+    ${part1Md5Sum} =    Execute                       md5sum /tmp/part1 | awk '{print $1}'
+                        Should Be Equal As Strings    ${eTag1}  ${part1Md5Sum}
 
-                        Execute                 echo "Part2" > /tmp/part2
-    ${result} =         Execute AWSS3APICli     upload-part --bucket ${BUCKET} --key ${PREFIX}/multipartKey1 --part-number 2 --body /tmp/part2 --upload-id ${uploadID}
-    ${eTag2} =          Execute and checkrc     echo '${result}' | jq -r '.ETag'   0
-                        Should contain          ${result}    ETag
+                        Execute                       echo "Part2" > /tmp/part2
+    ${result} =         Execute AWSS3APICli           upload-part --bucket ${BUCKET} --key ${PREFIX}/multipartKey1 --part-number 2 --body /tmp/part2 --upload-id ${uploadID}
+    ${eTag2} =          Execute and checkrc           echo '${result}' | jq -r '.ETag'   0
+                        Should contain                ${result}    ETag
+    ${part2Md5Sum} =    Execute                       md5sum /tmp/part2 | awk '{print $1}'
+                        Should Be Equal As Strings    ${eTag2}  ${part2Md5Sum}
 
 #complete multipart upload
-    ${result} =         Execute AWSS3APICli     complete-multipart-upload --upload-id ${uploadID} --bucket ${BUCKET} --key ${PREFIX}/multipartKey1 --multipart-upload 'Parts=[{ETag=${eTag1},PartNumber=1},{ETag=${eTag2},PartNumber=2}]'
-                        Should contain          ${result}    ${BUCKET}
-                        Should contain          ${result}    ${PREFIX}/multipartKey1
-                        Should contain          ${result}    ETag
+    ${result} =                 Execute AWSS3APICli           complete-multipart-upload --upload-id ${uploadID} --bucket ${BUCKET} --key ${PREFIX}/multipartKey1 --multipart-upload 'Parts=[{ETag=${eTag1},PartNumber=1},{ETag=${eTag2},PartNumber=2}]'
+                                Should contain                ${result}    ${BUCKET}
+                                Should contain                ${result}    ${PREFIX}/multipartKey1
+    ${resultETag} =             Execute and checkrc           echo '${result}' | jq -r '.ETag'   0
+    ${expectedResultETag} =     Execute                       echo -n ${eTag1}${eTag2} | md5sum | awk '{print $1}'
+                                Should contain                ${result}    ETag
+                                Should Be Equal As Strings    ${resultETag}     "${expectedResultETag}-2"
 
 #read file and check the key
     ${result} =                 Execute AWSS3ApiCli        get-object --bucket ${BUCKET} --key ${PREFIX}/multipartKey1 /tmp/${PREFIX}-multipartKey1.result
                                 Execute                    cat /tmp/part1 /tmp/part2 > /tmp/${PREFIX}-multipartKey1
     Compare files               /tmp/${PREFIX}-multipartKey1         /tmp/${PREFIX}-multipartKey1.result
+
+    ${result} =                 Execute AWSS3ApiCli        get-object --bucket ${BUCKET} --key ${PREFIX}/multipartKey1 --part-number 1 /tmp/${PREFIX}-multipartKey1-part1.result
+    Compare files               /tmp/part1        /tmp/${PREFIX}-multipartKey1-part1.result
+
+    ${result} =                 Execute AWSS3ApiCli        get-object --bucket ${BUCKET} --key ${PREFIX}/multipartKey1 --part-number 2 /tmp/${PREFIX}-multipartKey1-part2.result
+    Compare files               /tmp/part2        /tmp/${PREFIX}-multipartKey1-part2.result
 
 Test Multipart Upload Complete Entity too small
     ${result} =         Execute AWSS3APICli     create-multipart-upload --bucket ${BUCKET} --key ${PREFIX}/multipartKey2
@@ -182,6 +195,12 @@ Test Multipart Upload Complete Invalid part errors and complete mpu with few par
     ${result} =         Execute AWSS3ApiCli        get-object --bucket ${BUCKET} --key ${PREFIX}/multipartKey3 /tmp/${PREFIX}-multipartKey3.result
                         Execute                    cat /tmp/part1 /tmp/part3 > /tmp/${PREFIX}-multipartKey3
     Compare files       /tmp/${PREFIX}-multipartKey3         /tmp/${PREFIX}-multipartKey3.result
+
+    ${result} =         Execute AWSS3ApiCli        get-object --bucket ${BUCKET} --key ${PREFIX}/multipartKey3 --part-number 1 /tmp/${PREFIX}-multipartKey3-part1.result
+    Compare files       /tmp/part1         /tmp/${PREFIX}-multipartKey3-part1.result
+
+    ${result} =         Execute AWSS3ApiCli        get-object --bucket ${BUCKET} --key ${PREFIX}/multipartKey3 --part-number 3 /tmp/${PREFIX}-multipartKey3-part3.result
+    Compare files       /tmp/part3         /tmp/${PREFIX}-multipartKey3-part3.result
 
 Test abort Multipart upload
     ${result} =         Execute AWSS3APICli     create-multipart-upload --bucket ${BUCKET} --key ${PREFIX}/multipartKey4 --storage-class REDUCED_REDUNDANCY

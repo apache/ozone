@@ -23,41 +23,40 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.MiniOzoneHAClusterImpl;
-import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneClient;
-import org.apache.hadoop.ozone.client.OzoneClientFactory;
-import org.apache.hadoop.ozone.client.protocol.ClientProtocol;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
-import org.apache.hadoop.ozone.om.upgrade.OMLayoutFeature;
 import org.apache.hadoop.ozone.upgrade.UpgradeFinalizer;
 import org.apache.ozone.test.LambdaTestUtils;
-import org.junit.Test;
-import org.junit.Before;
-import org.junit.After;
-import org.junit.Rule;
-import org.junit.rules.TestRule;
-import org.junit.rules.Timeout;
-import org.apache.ozone.test.JUnit5AwareTimeout;
-import org.junit.runner.RunWith;
-import org.junit.runners.Parameterized;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.MethodOrderer;
+import org.junit.jupiter.api.Order;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.TestInstance;
+import org.junit.jupiter.api.TestMethodOrder;
+import org.junit.jupiter.api.Timeout;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
+import org.junit.jupiter.params.provider.MethodSource;
 
-import java.util.Arrays;
-import java.util.Collection;
+import java.io.IOException;
+import java.util.EnumSet;
+import java.util.Set;
 import java.util.UUID;
 
 import static org.apache.hadoop.ozone.OzoneConsts.LAYOUT_VERSION_KEY;
 import static org.apache.hadoop.ozone.om.OMUpgradeTestUtils.waitForFinalization;
+import static org.apache.hadoop.ozone.om.OmUpgradeConfig.ConfigStrings.OZONE_OM_INIT_DEFAULT_LAYOUT_VERSION;
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.NOT_SUPPORTED_OPERATION_PRIOR_FINALIZATION;
 import static org.apache.hadoop.ozone.om.upgrade.OMLayoutFeature.INITIAL_VERSION;
 import static org.apache.hadoop.ozone.om.upgrade.OMLayoutVersionManager.maxLayoutVersion;
-import static org.junit.Assert.assertNull;
-import static org.junit.Assert.fail;
-import static org.junit.Assert.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 /**
  * Upgrade testing for Bucket Layout Feature.
@@ -68,67 +67,43 @@ import static org.junit.Assert.assertEquals;
  * <p>
  * 2. Post-Finalize: OM should allow creation of buckets with new bucket
  * layouts.
+ *
+ * Test cases are run on the same single cluster.  Order is important,
+ * because "upgrade" changes its state.  Test cases are therefore assigned to
+ * 3 groups: before, during and after upgrade.
  */
-@RunWith(Parameterized.class)
-public class TestOMBucketLayoutUpgrade {
-  /**
-   * Set a timeout for each test.
-   */
-  @Rule
-  public TestRule timeout = new JUnit5AwareTimeout(new Timeout(300000));
+@TestInstance(TestInstance.Lifecycle.PER_CLASS)
+@TestMethodOrder(MethodOrderer.OrderAnnotation.class)
+@Timeout(300)
+class TestOMBucketLayoutUpgrade {
+
+  private static final int PRE_UPGRADE = 100;
+  private static final int DURING_UPGRADE = 200;
+  private static final int POST_UPGRADE = 300;
+
   private MiniOzoneHAClusterImpl cluster;
   private OzoneManager ozoneManager;
-  private ClientProtocol clientProtocol;
   private static final String VOLUME_NAME = "vol-" + UUID.randomUUID();
-  private int fromLayoutVersion;
+  private final int fromLayoutVersion = INITIAL_VERSION.layoutVersion();
   private OzoneManagerProtocol omClient;
 
-  private static final Logger LOG =
-      LoggerFactory.getLogger(TestOMBucketLayoutUpgrade.class);
   private OzoneClient client;
 
-  /**
-   * Defines a "from" layout version to finalize from.
-   *
-   * @return
-   */
-  @Parameterized.Parameters
-  public static Collection<Object[]> data() {
-    return Arrays.asList(new Object[][]{
-        {INITIAL_VERSION}
-    });
-  }
-
-
-  public TestOMBucketLayoutUpgrade(OMLayoutFeature fromVersion) {
-    this.fromLayoutVersion = fromVersion.layoutVersion();
-  }
-
-  /**
-   * Create a MiniDFSCluster for testing.
-   */
-  @Before
-  public void setup() throws Exception {
-    org.junit.Assume.assumeTrue("Check if there is need to finalize.",
-        maxLayoutVersion() > fromLayoutVersion);
-
+  @BeforeAll
+  void setup() throws Exception {
     OzoneConfiguration conf = new OzoneConfiguration();
+    conf.setInt(OZONE_OM_INIT_DEFAULT_LAYOUT_VERSION, fromLayoutVersion);
     String omServiceId = UUID.randomUUID().toString();
-    cluster = (MiniOzoneHAClusterImpl) MiniOzoneCluster.newOMHABuilder(conf)
-        .setClusterId(UUID.randomUUID().toString())
-        .setScmId(UUID.randomUUID().toString())
-        .setOMServiceId(omServiceId)
+    MiniOzoneHAClusterImpl.Builder builder = MiniOzoneCluster.newHABuilder(conf);
+    builder.setOMServiceId(omServiceId)
         .setNumOfOzoneManagers(3)
-        .setNumDatanodes(1)
-        .setOmLayoutVersion(fromLayoutVersion)
-        .build();
+        .setNumDatanodes(1);
+    cluster = builder.build();
 
     cluster.waitForClusterToBeReady();
     ozoneManager = cluster.getOzoneManager();
-    client = OzoneClientFactory.getRpcClient(omServiceId, conf);
-    ObjectStore objectStore = client.getObjectStore();
-    clientProtocol = objectStore.getClientProxy();
-    omClient = clientProtocol.getOzoneManagerClient();
+    client = cluster.newClient();
+    omClient = client.getObjectStore().getClientProxy().getOzoneManagerClient();
 
     // create sample volume.
     omClient.createVolume(
@@ -139,102 +114,78 @@ public class TestOMBucketLayoutUpgrade {
             .build());
   }
 
-  /**
-   * Shutdown MiniDFSCluster.
-   */
-  @After
-  public void shutdown() {
+  @AfterAll
+  void shutdown() {
     IOUtils.closeQuietly(client);
     if (cluster != null) {
       cluster.shutdown();
     }
   }
 
-  /**
-   * Tests that OM blocks all requests to create any buckets with a new bucket
-   * layout.
-   *
-   * @throws Exception
-   */
   @Test
-  public void testCreateBucketWithBucketLayoutsDuringUpgrade()
-      throws Exception {
-    // Assert OM layout version is 'fromLayoutVersion' on deploy.
+  @Order(PRE_UPGRADE)
+  void omLayoutBeforeUpgrade() throws IOException {
     assertEquals(fromLayoutVersion,
         ozoneManager.getVersionManager().getMetadataLayoutVersion());
     assertNull(ozoneManager.getMetadataManager().getMetaTable()
         .get(LAYOUT_VERSION_KEY));
-
-    // Test bucket creation with new bucket layouts.
-    // FSO and OBS bucket creation should fail.
-    verifyBucketCreationBlockedWithNewLayouts();
-
-    // Bucket creation with LEGACY layout should succeed in Pre-Finalized state.
-    LOG.info("Creating legacy bucket during Pre-Finalize");
-    verifyBucketCreationWithLayout(new BucketLayout[]{BucketLayout.LEGACY});
-
-    // Finalize the cluster upgrade.
-    finalizeUpgrade();
-
-    // Cluster upgrade is now complete,
-    // Bucket creation should now succeed with all layouts.
-    verifyBucketCreationWithLayout(new BucketLayout[]{
-        BucketLayout.LEGACY,
-        BucketLayout.FILE_SYSTEM_OPTIMIZED,
-        BucketLayout.OBJECT_STORE
-    });
-  }
-
-
-  /**
-   * Tests that OM allows bucket creation with given bucket layouts.
-   *
-   * @param bucketLayouts bucket layouts to test
-   * @throws Exception if any
-   */
-  private void verifyBucketCreationWithLayout(BucketLayout[] bucketLayouts)
-      throws Exception {
-    String bucketName;
-    for (BucketLayout layout : bucketLayouts) {
-      LOG.info("Creating bucket with layout {} after OM finalization", layout);
-
-      bucketName = createBucketWithLayout(layout);
-
-      // Make sure the bucket exists in the bucket table with the
-      // expected layout.
-      assertEquals(
-          omClient.getBucketInfo(VOLUME_NAME, bucketName).getBucketName(),
-          bucketName);
-      assertEquals(
-          omClient.getBucketInfo(VOLUME_NAME, bucketName).getBucketLayout(),
-          layout);
-    }
   }
 
   /**
    * Tests that OM blocks all requests to create any buckets with a new bucket
    * layout.
-   *
-   * @throws Exception if any
    */
-  private void verifyBucketCreationBlockedWithNewLayouts() throws Exception {
-    BucketLayout[] bucketLayouts = new BucketLayout[]{
-        BucketLayout.OBJECT_STORE,
-        BucketLayout.FILE_SYSTEM_OPTIMIZED,
-    };
+  @Order(PRE_UPGRADE)
+  @ParameterizedTest
+  @MethodSource("layoutsNotAllowedBeforeUpgrade")
+  void blocksNewLayoutBeforeUpgrade(BucketLayout layout) {
+    OMException e = assertThrows(OMException.class,
+        () -> createBucketWithLayout(layout));
+    assertEquals(NOT_SUPPORTED_OPERATION_PRIOR_FINALIZATION, e.getResult());
+  }
 
-    for (BucketLayout layout : bucketLayouts) {
-      try {
-        LOG.info("Creating bucket with layout {} during Pre-Finalize", layout);
-        createBucketWithLayout(layout);
-        fail("Expected to fail creating bucket with layout " + layout);
-      } catch (OMException e) {
-        // Expected exception.
-        assertEquals(
-            OMException.ResultCodes.NOT_SUPPORTED_OPERATION_PRIOR_FINALIZATION,
-            e.getResult());
-      }
-    }
+  @Order(PRE_UPGRADE)
+  @Test
+  void allowsLegacyBucketBeforeUpgrade() throws Exception {
+    assertCreateBucketWithLayout(BucketLayout.LEGACY);
+  }
+
+  /**
+   * Complete the cluster upgrade.
+   */
+  @Test
+  @Order(DURING_UPGRADE)
+  void finalizeUpgrade() throws Exception {
+    UpgradeFinalizer.StatusAndMessages response =
+        omClient.finalizeUpgrade("finalize-test");
+    System.out.println("Finalization Messages : " + response.msgs());
+
+    waitForFinalization(omClient);
+
+    final String expectedVersion = String.valueOf(maxLayoutVersion());
+    LambdaTestUtils.await(30000, 3000,
+        () -> expectedVersion.equals(
+            ozoneManager.getMetadataManager().getMetaTable()
+                .get(LAYOUT_VERSION_KEY)));
+  }
+
+  @Order(POST_UPGRADE)
+  @ParameterizedTest
+  @EnumSource
+  void allowsBucketCreationWithAnyLayoutAfterUpgrade(BucketLayout layout)
+      throws Exception {
+    assertCreateBucketWithLayout(layout);
+  }
+
+  private void assertCreateBucketWithLayout(BucketLayout layout)
+      throws Exception {
+    String bucketName = createBucketWithLayout(layout);
+
+    // Make sure the bucket exists in the bucket table with the
+    // expected layout.
+    OmBucketInfo bucketInfo = omClient.getBucketInfo(VOLUME_NAME, bucketName);
+    assertEquals(bucketName, bucketInfo.getBucketName());
+    assertEquals(layout, bucketInfo.getBucketLayout());
   }
 
   /**
@@ -257,22 +208,7 @@ public class TestOMBucketLayoutUpgrade {
     return bucketName;
   }
 
-  /**
-   * Complete the cluster upgrade.
-   *
-   * @throws Exception if upgrade fails.
-   */
-  private void finalizeUpgrade() throws Exception {
-    UpgradeFinalizer.StatusAndMessages response =
-        omClient.finalizeUpgrade("finalize-test");
-    System.out.println("Finalization Messages : " + response.msgs());
-
-    waitForFinalization(omClient);
-
-    LambdaTestUtils.await(30000, 3000, () -> {
-      String lvString = ozoneManager.getMetadataManager().getMetaTable()
-          .get(LAYOUT_VERSION_KEY);
-      return maxLayoutVersion() == Integer.parseInt(lvString);
-    });
+  private static Set<BucketLayout> layoutsNotAllowedBeforeUpgrade() {
+    return EnumSet.complementOf(EnumSet.of(BucketLayout.LEGACY));
   }
 }

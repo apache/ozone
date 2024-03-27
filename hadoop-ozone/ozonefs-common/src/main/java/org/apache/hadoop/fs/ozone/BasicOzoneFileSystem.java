@@ -955,6 +955,12 @@ public class BasicOzoneFileSystem extends FileSystem {
   }
 
   @Override
+  public void renameSnapshot(Path path, String snapshotOldName, String snapshotNewName)
+      throws IOException {
+    getAdapter().renameSnapshot(pathToKey(path), snapshotOldName, snapshotNewName);
+  }
+
+  @Override
   public void deleteSnapshot(Path path, String snapshotName)
       throws IOException {
     adapter.deleteSnapshot(pathToKey(path), snapshotName);
@@ -1277,7 +1283,7 @@ public class BasicOzoneFileSystem extends FileSystem {
     FileStatus fileStatus = constructFileStatus(fileStatusAdapter);
 
     BlockLocation[] blockLocations = fileStatusAdapter.getBlockLocations();
-    if (blockLocations == null || blockLocations.length == 0) {
+    if (blockLocations.length == 0) {
       return fileStatus;
     }
     return new LocatedFileStatus(fileStatus, blockLocations);

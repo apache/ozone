@@ -32,6 +32,7 @@ import org.apache.hadoop.hdds.protocol.proto.ScmBlockLocationProtocolProtos.Allo
 import org.apache.hadoop.hdds.protocol.proto.ScmBlockLocationProtocolProtos.DeleteKeyBlocksResultProto;
 import org.apache.hadoop.hdds.protocol.proto.ScmBlockLocationProtocolProtos.DeleteScmKeyBlocksRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.ScmBlockLocationProtocolProtos.DeleteScmKeyBlocksResponseProto;
+import org.apache.hadoop.hdds.protocol.proto.ScmBlockLocationProtocolProtos.GetClusterTreeResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.ScmBlockLocationProtocolProtos.SCMBlockLocationRequest;
 import org.apache.hadoop.hdds.protocol.proto.ScmBlockLocationProtocolProtos.SCMBlockLocationResponse;
 import org.apache.hadoop.hdds.protocol.proto.ScmBlockLocationProtocolProtos.SortDatanodesRequestProto;
@@ -43,6 +44,7 @@ import org.apache.hadoop.hdds.scm.container.common.helpers.AllocatedBlock;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.ha.RatisUtil;
+import org.apache.hadoop.hdds.scm.net.InnerNode;
 import org.apache.hadoop.hdds.scm.protocolPB.ScmBlockLocationProtocolPB;
 import org.apache.hadoop.hdds.scm.protocolPB.StorageContainerLocationProtocolPB;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
@@ -159,6 +161,10 @@ public final class ScmBlockLocationProtocolServerSideTranslatorPB
             request.getSortDatanodesRequest(), request.getVersion()
         ));
         break;
+      case GetClusterTree:
+        response.setGetClusterTreeResponse(
+            getClusterTree(request.getVersion()));
+        break;
       default:
         // Should never happen
         throw new IOException("Unknown Operation " + request.getCmdType() +
@@ -196,7 +202,8 @@ public final class ScmBlockLocationProtocolServerSideTranslatorPB
                 request.getFactor(),
                 request.getEcReplicationConfig()),
             request.getOwner(),
-            ExcludeList.getFromProtoBuf(request.getExcludeList()));
+            ExcludeList.getFromProtoBuf(request.getExcludeList()),
+            request.getClient());
 
     AllocateScmBlockResponseProto.Builder builder =
         AllocateScmBlockResponseProto.newBuilder();
@@ -274,5 +281,14 @@ public final class ScmBlockLocationProtocolServerSideTranslatorPB
     } catch (IOException ex) {
       throw new ServiceException(ex);
     }
+  }
+
+  public GetClusterTreeResponseProto getClusterTree(int clientVersion)
+      throws IOException {
+    GetClusterTreeResponseProto.Builder resp =
+        GetClusterTreeResponseProto.newBuilder();
+    InnerNode clusterTree = impl.getNetworkTopology();
+    resp.setClusterTree(clusterTree.toProtobuf(clientVersion).getInnerNode());
+    return resp.build();
   }
 }

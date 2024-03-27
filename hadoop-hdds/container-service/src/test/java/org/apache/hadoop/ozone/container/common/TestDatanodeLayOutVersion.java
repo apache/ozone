@@ -17,8 +17,9 @@
 
 package org.apache.hadoop.ozone.container.common;
 
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
 /**
  * This class tests DatanodeLayOutVersion.
@@ -28,11 +29,11 @@ public class TestDatanodeLayOutVersion {
   @Test
   public void testDatanodeLayOutVersion() {
     // Check Latest Version and description
-    Assertions.assertEquals(1, HDDSVolumeLayoutVersion.getLatestVersion()
+    assertEquals(1, HDDSVolumeLayoutVersion.getLatestVersion()
         .getVersion());
-    Assertions.assertEquals("HDDS Datanode LayOut Version 1",
+    assertEquals("HDDS Datanode LayOut Version 1",
         HDDSVolumeLayoutVersion.getLatestVersion().getDescription());
-    Assertions.assertEquals(HDDSVolumeLayoutVersion.getAllVersions().length,
+    assertEquals(HDDSVolumeLayoutVersion.getAllVersions().length,
         HDDSVolumeLayoutVersion.getAllVersions().length);
   }
 }

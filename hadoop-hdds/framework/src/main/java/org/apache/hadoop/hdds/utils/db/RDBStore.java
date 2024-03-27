@@ -26,7 +26,6 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
 
@@ -37,6 +36,7 @@ import org.apache.hadoop.hdds.utils.db.cache.TableCache;
 import org.apache.hadoop.hdds.utils.db.RocksDatabase.ColumnFamily;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedCompactRangeOptions;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedDBOptions;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedStatistics;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedTransactionLogIterator;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedWriteOptions;
 import org.apache.ozone.rocksdiff.RocksDBCheckpointDiffer;
@@ -78,10 +78,11 @@ public class RDBStore implements DBStore {
   // number in request to avoid increase in heap memory.
   private final long maxDbUpdatesSizeThreshold;
   private final ManagedDBOptions dbOptions;
+  private final ManagedStatistics statistics;
   private final String threadNamePrefix;
 
   @SuppressWarnings("parameternumber")
-  public RDBStore(File dbFile, ManagedDBOptions dbOptions,
+  public RDBStore(File dbFile, ManagedDBOptions dbOptions, ManagedStatistics statistics,
                   ManagedWriteOptions writeOptions, Set<TableConfig> families,
                   CodecRegistry registry, boolean readOnly, int maxFSSnapshots,
                   String dbJmxBeanName, boolean enableCompactionDag,
@@ -98,6 +99,7 @@ public class RDBStore implements DBStore {
     codecRegistry = registry;
     dbLocation = dbFile;
     this.dbOptions = dbOptions;
+    this.statistics = statistics;
 
     try {
       if (enableCompactionDag) {
@@ -120,8 +122,8 @@ public class RDBStore implements DBStore {
       if (dbJmxBeanName == null) {
         dbJmxBeanName = dbFile.getName();
       }
-      metrics = RocksDBStoreMetrics.create(dbOptions.statistics(), db,
-          dbJmxBeanName);
+      // Use statistics instead of dbOptions.statistics() to avoid repeated init.
+      metrics = RocksDBStoreMetrics.create(statistics, db, dbJmxBeanName);
       if (metrics == null) {
         LOG.warn("Metrics registration failed during RocksDB init, " +
             "db path :{}", dbJmxBeanName);
@@ -198,6 +200,7 @@ public class RDBStore implements DBStore {
     return snapshotsParentDir;
   }
 
+  @Override
   public RocksDBCheckpointDiffer getRocksDBCheckpointDiffer() {
     return rocksDBCheckpointDiffer;
   }
@@ -226,12 +229,15 @@ public class RDBStore implements DBStore {
     }
 
     RDBMetrics.unRegister();
-    IOUtils.closeQuietly(checkPointManager);
+    IOUtils.close(LOG, checkPointManager);
     if (rocksDBCheckpointDiffer != null) {
       RocksDBCheckpointDifferHolder
           .invalidateCacheEntry(rocksDBCheckpointDiffer.getMetadataDir());
     }
-    IOUtils.closeQuietly(db);
+    if (statistics != null) {
+      IOUtils.close(LOG, statistics);
+    }
+    IOUtils.close(LOG, db);
   }
 
   @Override
@@ -344,13 +350,7 @@ public class RDBStore implements DBStore {
 
   @Override
   public Map<Integer, String> getTableNames() {
-    Map<Integer, String> tableNames = new HashMap<>();
-    StringCodec stringCodec = StringCodec.get();
-
-    for (ColumnFamily columnFamily : getColumnFamilies()) {
-      tableNames.put(columnFamily.getID(), columnFamily.getName(stringCodec));
-    }
-    return tableNames;
+    return db.getColumnFamilyNames();
   }
 
   public Collection<ColumnFamily> getColumnFamilies() {
@@ -446,6 +446,10 @@ public class RDBStore implements DBStore {
             dbUpdatesWrapper.getCurrentSequenceNumber() - sequenceNumber);
       }
     }
+    if (!dbUpdatesWrapper.isDBUpdateSuccess()) {
+      LOG.warn("Returned DBUpdates isDBUpdateSuccess: {}",
+          dbUpdatesWrapper.isDBUpdateSuccess());
+    }
     return dbUpdatesWrapper;
   }
 
@@ -469,5 +473,9 @@ public class RDBStore implements DBStore {
 
   public RDBMetrics getMetrics() {
     return rdbMetrics;
+  }
+
+  public static Logger getLogger() {
+    return LOG;
   }
 }

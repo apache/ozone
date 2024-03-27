@@ -21,15 +21,18 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.GatheringByteChannel;
 import java.util.List;
+import java.util.Objects;
 import java.util.function.Function;
 import java.util.function.Supplier;
 
 import org.apache.hadoop.hdds.scm.ByteStringConversion;
 
+import org.apache.hadoop.hdds.utils.db.CodecBuffer;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
+import org.apache.ratis.util.UncheckedAutoCloseable;
 
 /** Buffer for a block chunk. */
-public interface ChunkBuffer {
+public interface ChunkBuffer extends UncheckedAutoCloseable {
 
   /** Similar to {@link ByteBuffer#allocate(int)}. */
   static ChunkBuffer allocate(int capacity) {
@@ -48,7 +51,8 @@ public interface ChunkBuffer {
     if (increment > 0 && increment < capacity) {
       return new IncrementalChunkBuffer(capacity, increment, false);
     }
-    return new ChunkBufferImplWithByteBuffer(ByteBuffer.allocate(capacity));
+    CodecBuffer codecBuffer = CodecBuffer.allocateDirect(capacity);
+    return new ChunkBufferImplWithByteBuffer(codecBuffer.asWritableByteBuffer(), codecBuffer);
   }
 
   /** Wrap the given {@link ByteBuffer} as a {@link ChunkBuffer}. */
@@ -58,6 +62,10 @@ public interface ChunkBuffer {
 
   /** Wrap the given list of {@link ByteBuffer}s as a {@link ChunkBuffer}. */
   static ChunkBuffer wrap(List<ByteBuffer> buffers) {
+    Objects.requireNonNull(buffers, "buffers == null");
+    if (buffers.size() == 1) {
+      return wrap(buffers.get(0));
+    }
     return new ChunkBufferImplWithByteBufferList(buffers);
   }
 
@@ -81,6 +89,9 @@ public interface ChunkBuffer {
   /** Similar to {@link ByteBuffer#clear()}. */
   ChunkBuffer clear();
 
+  default void close() {
+  }
+
   /** Similar to {@link ByteBuffer#put(ByteBuffer)}. */
   ChunkBuffer put(ByteBuffer b);
 
@@ -91,8 +102,7 @@ public interface ChunkBuffer {
 
   /** Similar to {@link ByteBuffer#put(byte[])}. */
   default ChunkBuffer put(byte b) {
-    byte[] buf = new byte[1];
-    buf[0] = (byte) b;
+    final byte[] buf = {b};
     return put(buf, 0, 1);
   }
 
@@ -116,7 +126,6 @@ public interface ChunkBuffer {
 
   /**
    * Iterate the buffer from the current position to the current limit.
-   *
    * Upon the iteration complete,
    * the buffer's position will be equal to its limit.
    *

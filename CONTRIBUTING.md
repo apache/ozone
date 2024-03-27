@@ -119,7 +119,7 @@ We use GitHub pull requests for contributing changes to the repository. The main
 Basic code conventions followed by Ozone:
 
  * 2 spaces indentation
- * 80-char line length limit
+ * 120-char line length limit
  * Apache license header required in most files
  * no `@author` tags, authorship is indicated by Git history
 
@@ -158,18 +158,6 @@ The set of tests run by `integration` and `acceptance` may be limited via argume
 Some scripts require third-party tools, but most of these are installed during the first run, if needed.
 
 Most scripts (except `build.sh`) output results in `target/<name>`, e.g. `target/docs`.
-
-### False positive findbugs violation
-
-If you have __very good__ reasons, you can ignore any Fingbugs warning. Your good reason can be persisted with the `@SuppressFBWarnings` annotation.
-
-```java
-@SuppressFBWarnings(value="AT_OPERATION_SEQUENCE_ON_CONCURRENT_ABSTRACTION",
-      justification="The method is synchronized and this is the only place "+
-          "dnsToUuidMap is modified")
-private synchronized void addEntryTodnsToUuidMap(
-...
-```
 
 ## Using IDE
 

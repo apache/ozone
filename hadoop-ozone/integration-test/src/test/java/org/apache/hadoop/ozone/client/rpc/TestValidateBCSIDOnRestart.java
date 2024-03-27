@@ -26,6 +26,7 @@ import java.util.List;
 import java.util.concurrent.TimeUnit;
 
 import org.apache.hadoop.fs.FileUtil;
+import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.DatanodeRatisServerConfig;
@@ -56,15 +57,19 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_COMMAND_STATUS_REPORT_INTERVAL;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_CONTAINER_REPORT_INTERVAL;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_HEARTBEAT_INTERVAL;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_PIPELINE_REPORT_INTERVAL;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_PIPELINE_DESTROY_TIMEOUT;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_STALENODE_INTERVAL;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import org.apache.ratis.statemachine.impl.SimpleStateMachineStorage;
 import org.apache.ratis.statemachine.impl.StatemachineImplTestUtil;
-import org.junit.AfterClass;
-import org.junit.Assert;
-import org.junit.BeforeClass;
-import org.junit.Test;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Test;
 
 /**
  * Tests the containerStateMachine failure handling.
@@ -84,7 +89,7 @@ public class TestValidateBCSIDOnRestart {
    *
    * @throws IOException
    */
-  @BeforeClass
+  @BeforeAll
   public static void init() throws Exception {
     conf = new OzoneConfiguration();
 
@@ -93,14 +98,15 @@ public class TestValidateBCSIDOnRestart {
     conf.setFromObject(clientConfig);
 
     conf.setTimeDuration(HDDS_CONTAINER_REPORT_INTERVAL, 200,
-            TimeUnit.MILLISECONDS);
+        TimeUnit.MILLISECONDS);
     conf.setTimeDuration(HDDS_COMMAND_STATUS_REPORT_INTERVAL, 200,
-            TimeUnit.MILLISECONDS);
+        TimeUnit.MILLISECONDS);
+    conf.setTimeDuration(HDDS_HEARTBEAT_INTERVAL, 200, TimeUnit.MILLISECONDS);
     conf.setTimeDuration(HDDS_PIPELINE_REPORT_INTERVAL, 200,
-            TimeUnit.MILLISECONDS);
+        TimeUnit.MILLISECONDS);
     conf.setTimeDuration(OZONE_SCM_STALENODE_INTERVAL, 10, TimeUnit.SECONDS);
     conf.setTimeDuration(OZONE_SCM_PIPELINE_DESTROY_TIMEOUT, 1,
-            TimeUnit.SECONDS);
+        TimeUnit.SECONDS);
 
     RatisClientConfig ratisClientConfig =
         conf.getObject(RatisClientConfig.class);
@@ -121,9 +127,8 @@ public class TestValidateBCSIDOnRestart {
     conf.setFromObject(raftClientConfig);
 
     cluster =
-            MiniOzoneCluster.newBuilder(conf).setNumDatanodes(2).
-                    setHbInterval(200)
-                    .build();
+        MiniOzoneCluster.newBuilder(conf).setNumDatanodes(2)
+            .build();
     cluster.waitForClusterToBeReady();
     cluster.waitForPipelineTobeReady(HddsProtos.ReplicationFactor.ONE, 60000);
     //the easiest way to create an open container is creating a key
@@ -139,7 +144,7 @@ public class TestValidateBCSIDOnRestart {
   /**
    * Shutdown MiniDFSCluster.
    */
-  @AfterClass
+  @AfterAll
   public static void shutdown() {
     IOUtils.closeQuietly(client);
     if (cluster != null) {
@@ -150,29 +155,30 @@ public class TestValidateBCSIDOnRestart {
   @Test
   public void testValidateBCSIDOnDnRestart() throws Exception {
     OzoneOutputStream key =
-            objectStore.getVolume(volumeName).getBucket(bucketName)
-                    .createKey("ratis", 1024, ReplicationType.RATIS,
-                            ReplicationFactor.ONE, new HashMap<>());
+        objectStore.getVolume(volumeName).getBucket(bucketName)
+            .createKey("ratis", 1024,
+                ReplicationConfig.fromTypeAndFactor(
+                    ReplicationType.RATIS,
+                    ReplicationFactor.ONE), new HashMap<>());
     // First write and flush creates a container in the datanode
     key.write("ratis".getBytes(UTF_8));
     key.flush();
     key.write("ratis".getBytes(UTF_8));
     KeyOutputStream groupOutputStream = (KeyOutputStream) key.getOutputStream();
     List<OmKeyLocationInfo> locationInfoList =
-            groupOutputStream.getLocationInfoList();
-    Assert.assertEquals(1, locationInfoList.size());
+        groupOutputStream.getLocationInfoList();
+    assertEquals(1, locationInfoList.size());
     OmKeyLocationInfo omKeyLocationInfo = locationInfoList.get(0);
     HddsDatanodeService dn = TestHelper.getDatanodeService(omKeyLocationInfo,
-            cluster);
+        cluster);
     ContainerData containerData =
-            TestHelper.getDatanodeService(omKeyLocationInfo, cluster)
-                    .getDatanodeStateMachine()
-                    .getContainer().getContainerSet()
-                    .getContainer(omKeyLocationInfo.getContainerID())
-                    .getContainerData();
-    Assert.assertTrue(containerData instanceof KeyValueContainerData);
+        TestHelper.getDatanodeService(omKeyLocationInfo, cluster)
+            .getDatanodeStateMachine()
+            .getContainer().getContainerSet()
+            .getContainer(omKeyLocationInfo.getContainerID())
+            .getContainerData();
     KeyValueContainerData keyValueContainerData =
-            (KeyValueContainerData) containerData;
+        assertInstanceOf(KeyValueContainerData.class, containerData);
     key.close();
 
     long containerID = omKeyLocationInfo.getContainerID();
@@ -182,50 +188,48 @@ public class TestValidateBCSIDOnRestart {
 
     HddsDatanodeService dnService = cluster.getHddsDatanodes().get(index);
     OzoneContainer ozoneContainer =
-            dnService.getDatanodeStateMachine()
-                    .getContainer();
+        dnService.getDatanodeStateMachine()
+            .getContainer();
     ozoneContainer.getContainerSet().removeContainer(containerID);
     ContainerStateMachine stateMachine =
-            (ContainerStateMachine) TestHelper.getStateMachine(cluster.
-                    getHddsDatanodes().get(index),
-                    omKeyLocationInfo.getPipeline());
+        (ContainerStateMachine) TestHelper.getStateMachine(cluster.
+                getHddsDatanodes().get(index),
+            omKeyLocationInfo.getPipeline());
     SimpleStateMachineStorage storage =
-            (SimpleStateMachineStorage) stateMachine.getStateMachineStorage();
+        (SimpleStateMachineStorage) stateMachine.getStateMachineStorage();
     stateMachine.takeSnapshot();
     final Path parentPath = StatemachineImplTestUtil.findLatestSnapshot(storage)
         .getFile().getPath();
     stateMachine.buildMissingContainerSet(parentPath.toFile());
     // Since the snapshot threshold is set to 1, since there are
     // applyTransactions, we should see snapshots
-    Assert.assertTrue(parentPath.getParent().toFile().listFiles().length > 0);
+    assertThat(parentPath.getParent().toFile().listFiles().length).isGreaterThan(0);
 
     // make sure the missing containerSet is not empty
     HddsDispatcher dispatcher = (HddsDispatcher) ozoneContainer.getDispatcher();
-    Assert.assertTrue(!dispatcher.getMissingContainerSet().isEmpty());
-    Assert
-            .assertTrue(dispatcher.getMissingContainerSet()
-                    .contains(containerID));
+    assertThat(dispatcher.getMissingContainerSet()).isNotEmpty();
+    assertThat(dispatcher.getMissingContainerSet()).contains(containerID);
     // write a new key
     key = objectStore.getVolume(volumeName).getBucket(bucketName)
-            .createKey("ratis", 1024, ReplicationType.RATIS,
-                    ReplicationFactor.ONE, new HashMap<>());
+        .createKey("ratis", 1024,
+            ReplicationConfig.fromTypeAndFactor(ReplicationType.RATIS,
+                ReplicationFactor.ONE), new HashMap<>());
     // First write and flush creates a container in the datanode
     key.write("ratis1".getBytes(UTF_8));
     key.flush();
     groupOutputStream = (KeyOutputStream) key.getOutputStream();
     locationInfoList = groupOutputStream.getLocationInfoList();
-    Assert.assertEquals(1, locationInfoList.size());
+    assertEquals(1, locationInfoList.size());
     omKeyLocationInfo = locationInfoList.get(0);
     key.close();
     containerID = omKeyLocationInfo.getContainerID();
     dn = TestHelper.getDatanodeService(omKeyLocationInfo,
-            cluster);
+        cluster);
     containerData = dn.getDatanodeStateMachine()
-            .getContainer().getContainerSet()
-            .getContainer(omKeyLocationInfo.getContainerID())
-            .getContainerData();
-    Assert.assertTrue(containerData instanceof KeyValueContainerData);
-    keyValueContainerData = (KeyValueContainerData) containerData;
+        .getContainer().getContainerSet()
+        .getContainer(omKeyLocationInfo.getContainerID())
+        .getContainerData();
+    keyValueContainerData = assertInstanceOf(KeyValueContainerData.class, containerData);
     try (DBHandle db = BlockUtils.getDB(keyValueContainerData, conf)) {
 
       // modify the bcsid for the container in the ROCKS DB thereby inducing
@@ -239,11 +243,10 @@ public class TestValidateBCSIDOnRestart {
     index = cluster.getHddsDatanodeIndex(dn.getDatanodeDetails());
     cluster.restartHddsDatanode(dn.getDatanodeDetails(), true);
     // Make sure the container is marked unhealthy
-    Assert.assertTrue(
-            cluster.getHddsDatanodes().get(index)
-                    .getDatanodeStateMachine()
-                    .getContainer().getContainerSet().getContainer(containerID)
-                    .getContainerState()
-                    == ContainerProtos.ContainerDataProto.State.UNHEALTHY);
+    assertSame(cluster.getHddsDatanodes().get(index)
+            .getDatanodeStateMachine()
+            .getContainer().getContainerSet().getContainer(containerID)
+            .getContainerState(),
+        ContainerProtos.ContainerDataProto.State.UNHEALTHY);
   }
 }

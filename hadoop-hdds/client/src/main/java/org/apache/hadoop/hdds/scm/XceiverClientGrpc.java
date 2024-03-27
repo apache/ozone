@@ -20,7 +20,6 @@ package org.apache.hadoop.hdds.scm;
 
 import java.io.IOException;
 import java.io.InterruptedIOException;
-import java.security.cert.X509Certificate;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
@@ -43,6 +42,7 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.DatanodeBl
 import org.apache.hadoop.hdds.protocol.datanode.proto.XceiverClientProtocolServiceGrpc;
 import org.apache.hadoop.hdds.protocol.datanode.proto.XceiverClientProtocolServiceGrpc.XceiverClientProtocolServiceStub;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.scm.client.ClientTrustManager;
 import org.apache.hadoop.hdds.scm.client.HddsClientUtils;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.security.SecurityConfig;
@@ -94,7 +94,7 @@ public class XceiverClientGrpc extends XceiverClientSpi {
   private long timeout;
   private final SecurityConfig secConfig;
   private final boolean topologyAwareRead;
-  private final List<X509Certificate> caCerts;
+  private final ClientTrustManager trustManager;
   // Cache the DN which returned the GetBlock command so that the ReadChunk
   // command can be sent to the same DN.
   private final Map<DatanodeBlockID, DatanodeDetails> getBlockDNcache;
@@ -107,10 +107,10 @@ public class XceiverClientGrpc extends XceiverClientSpi {
    *
    * @param pipeline - Pipeline that defines the machines.
    * @param config   -- Ozone Config
-   * @param caCerts   - SCM ca certificate.
+   * @param trustManager - a {@link ClientTrustManager} with proper CA handling.
    */
   public XceiverClientGrpc(Pipeline pipeline, ConfigurationSource config,
-      List<X509Certificate> caCerts) {
+      ClientTrustManager trustManager) {
     super();
     Preconditions.checkNotNull(pipeline);
     Preconditions.checkNotNull(config);
@@ -128,7 +128,7 @@ public class XceiverClientGrpc extends XceiverClientSpi {
     this.topologyAwareRead = config.getBoolean(
         OzoneConfigKeys.OZONE_NETWORK_TOPOLOGY_AWARE_READ_KEY,
         OzoneConfigKeys.OZONE_NETWORK_TOPOLOGY_AWARE_READ_DEFAULT);
-    this.caCerts = caCerts;
+    this.trustManager = trustManager;
     this.getBlockDNcache = new ConcurrentHashMap<>();
   }
 
@@ -157,15 +157,6 @@ public class XceiverClientGrpc extends XceiverClientSpi {
     connectToDatanode(dn);
   }
 
-  /**
-   * Token based auth is not currently supported, so this method works the same
-   * way as {@link #connect()}.
-   */
-  @Override
-  public void connect(String encodedToken) throws Exception {
-    connect();
-  }
-
   private synchronized void connectToDatanode(DatanodeDetails dn)
       throws IOException {
     if (isConnected(dn)) {
@@ -175,8 +166,8 @@ public class XceiverClientGrpc extends XceiverClientSpi {
     // port.
     int port = dn.getPort(DatanodeDetails.Port.Name.STANDALONE).getValue();
     if (port == 0) {
-      port = config.getInt(OzoneConfigKeys.DFS_CONTAINER_IPC_PORT,
-          OzoneConfigKeys.DFS_CONTAINER_IPC_PORT_DEFAULT);
+      port = config.getInt(OzoneConfigKeys.HDDS_CONTAINER_IPC_PORT,
+          OzoneConfigKeys.HDDS_CONTAINER_IPC_PORT_DEFAULT);
     }
 
     // Add credential context to the client call
@@ -199,8 +190,8 @@ public class XceiverClientGrpc extends XceiverClientSpi {
             .intercept(new GrpcClientInterceptor());
     if (secConfig.isSecurityEnabled() && secConfig.isGrpcTlsEnabled()) {
       SslContextBuilder sslContextBuilder = GrpcSslContexts.forClient();
-      if (caCerts != null) {
-        sslContextBuilder.trustManager(caCerts);
+      if (trustManager != null) {
+        sslContextBuilder.trustManager(trustManager);
       }
       if (secConfig.useTestCert()) {
         channelBuilder.overrideAuthority("localhost");
@@ -292,23 +283,25 @@ public class XceiverClientGrpc extends XceiverClientSpi {
         Thread.currentThread().interrupt();
       }
     }
-    try {
-      for (Map.Entry<DatanodeDetails,
+    for (Map.Entry<DatanodeDetails,
               CompletableFuture<ContainerCommandResponseProto> >
               entry : futureHashMap.entrySet()) {
+      try {
         responseProtoHashMap.put(entry.getKey(), entry.getValue().get());
-      }
-    } catch (InterruptedException e) {
-      LOG.error("Command execution was interrupted.");
-      // Re-interrupt the thread while catching InterruptedException
-      Thread.currentThread().interrupt();
-    } catch (ExecutionException e) {
-      String message = "Failed to execute command {}.";
-      if (LOG.isDebugEnabled()) {
-        LOG.debug(message, processForDebug(request), e);
-      } else {
-        LOG.error(message + " Exception Class: {}, Exception Message: {}",
-                request.getCmdType(), e.getClass().getName(), e.getMessage());
+      } catch (InterruptedException e) {
+        LOG.error("Command execution was interrupted.");
+        // Re-interrupt the thread while catching InterruptedException
+        Thread.currentThread().interrupt();
+      } catch (ExecutionException e) {
+        String message =
+            "Failed to execute command {} on datanode " + entry.getKey()
+                .getHostName();
+        if (LOG.isDebugEnabled()) {
+          LOG.debug(message, processForDebug(request), e);
+        } else {
+          LOG.error(message + " Exception Class: {}, Exception Message: {}",
+              request.getCmdType(), e.getClass().getName(), e.getMessage());
+        }
       }
     }
     return responseProtoHashMap;

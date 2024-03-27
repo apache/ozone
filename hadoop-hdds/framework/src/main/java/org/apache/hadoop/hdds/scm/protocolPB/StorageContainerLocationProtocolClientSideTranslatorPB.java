@@ -24,6 +24,7 @@ import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicatedReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
+import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.DeletedBlocksTransactionInfo;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.GetScmInfoResponseProto;
@@ -55,6 +56,9 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolPro
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ForceExitSafeModeResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetContainerRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetContainerReplicasRequestProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetContainersOnDecomNodeRequestProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ContainersOnDecomNodeProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetContainersOnDecomNodeResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetContainerTokenRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetContainerTokenResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetContainerWithPipelineBatchRequestProto;
@@ -64,6 +68,8 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolPro
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetPipelineResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetContainerCountRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetContainerCountResponseProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetMetricsRequestProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetMetricsResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.InSafeModeRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ListPipelineRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ListPipelineResponseProto;
@@ -86,8 +92,11 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolPro
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ScmContainerLocationRequest;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ScmContainerLocationRequest.Builder;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ScmContainerLocationResponse;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.SCMCloseContainerResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.StartMaintenanceNodesRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.StartMaintenanceNodesResponseProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.SingleNodeQueryRequestProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.SingleNodeQueryResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.StartReplicationManagerRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.StopReplicationManagerRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.StartContainerBalancerRequestProto;
@@ -113,6 +122,7 @@ import org.apache.hadoop.ozone.ClientVersion;
 import org.apache.hadoop.ozone.upgrade.UpgradeFinalizer;
 import org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.StatusAndMessages;
 import org.apache.hadoop.security.token.Token;
+import org.apache.hadoop.util.ProtobufUtils;
 
 import java.io.Closeable;
 import java.io.IOException;
@@ -122,8 +132,11 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.function.Consumer;
+import java.util.UUID;
 
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType.EC;
+import static org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.SCMCloseContainerResponseProto.Status.CONTAINER_ALREADY_CLOSED;
+import static org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.SCMCloseContainerResponseProto.Status.CONTAINER_ALREADY_CLOSING;
 
 /**
  * This class is the client-side translator to translate the requests made on
@@ -452,6 +465,23 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
 
   }
 
+  @Override
+  public Map<String, List<ContainerID>> getContainersOnDecomNode(DatanodeDetails dn) throws IOException {
+    GetContainersOnDecomNodeRequestProto request = GetContainersOnDecomNodeRequestProto.newBuilder()
+        .setDatanodeDetails(dn.getProtoBufMessage()).build();
+    GetContainersOnDecomNodeResponseProto response = submitRequest(Type.GetContainersOnDecomNode,
+        builder -> builder.setGetContainersOnDecomNodeRequest(request)).getGetContainersOnDecomNodeResponse();
+    Map<String, List<ContainerID>> containerMap = new HashMap<>();
+    for (ContainersOnDecomNodeProto containersProto : response.getContainersOnDecomNodeList()) {
+      List<ContainerID> containerIds = new ArrayList<>();
+      for (HddsProtos.ContainerID id : containersProto.getIdList()) {
+        containerIds.add(ContainerID.getFromProtobuf(id));
+      }
+      containerMap.put(containersProto.getName(), containerIds);
+    }
+    return containerMap;
+  }
+
   /**
    * Queries a list of Nodes based on their operational state or health state.
    * Passing a null for either value acts as a wildcard for that state.
@@ -481,6 +511,18 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
         builder1 -> builder1.setNodeQueryRequest(request))
         .getNodeQueryResponse();
     return response.getDatanodesList();
+  }
+
+  @Override
+  public HddsProtos.Node queryNode(UUID uuid) throws IOException {
+    SingleNodeQueryRequestProto request = SingleNodeQueryRequestProto.newBuilder()
+        .setUuid(ProtobufUtils.toProtobuf(uuid))
+        .build();
+    SingleNodeQueryResponseProto response =
+        submitRequest(Type.SingleNodeQuery,
+            builder -> builder.setSingleNodeQueryRequest(request))
+            .getSingleNodeQueryResponse();
+    return response.getDatanode();
   }
 
   /**
@@ -576,8 +618,18 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
         .setTraceID(TracingUtil.exportCurrentSpan())
         .setContainerID(containerID)
         .build();
-    submitRequest(Type.CloseContainer,
-        builder -> builder.setScmCloseContainerRequest(request));
+    SCMCloseContainerResponseProto response = submitRequest(Type.CloseContainer,
+          builder -> builder.setScmCloseContainerRequest(
+            request)).getScmCloseContainerResponse();
+    if (response.hasStatus() && (response.getStatus()
+        .equals(CONTAINER_ALREADY_CLOSED) || response.getStatus()
+        .equals(CONTAINER_ALREADY_CLOSING))) {
+      String errorMessage =
+          response.getStatus().equals(CONTAINER_ALREADY_CLOSED) ?
+              String.format("Container %s already closed", containerID) :
+              String.format("Container %s is in closing state", containerID);
+      throw new IOException(errorMessage);
+    }
   }
 
   /**
@@ -932,7 +984,7 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
   /**
    * Builds request for datanode usage information and receives response.
    *
-   * @param ipaddress Address String
+   * @param address Address String
    * @param uuid UUID String
    * @return List of DatanodeUsageInfoProto. Each element contains info such as
    * capacity, SCMUsed, and remaining space.
@@ -940,11 +992,11 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
    */
   @Override
   public List<HddsProtos.DatanodeUsageInfoProto> getDatanodeUsageInfo(
-      String ipaddress, String uuid, int clientVersion) throws IOException {
+      String address, String uuid, int clientVersion) throws IOException {
 
     DatanodeUsageInfoRequestProto request =
         DatanodeUsageInfoRequestProto.newBuilder()
-            .setIpaddress(ipaddress)
+            .setIpaddress(address)
             .setUuid(uuid)
             .build();
 
@@ -1092,5 +1144,14 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
             builder -> builder.setDecommissionScmRequest(request))
                 .getDecommissionScmResponse();
     return response;
+  }
+
+  @Override
+  public String getMetrics(String query) throws IOException {
+    GetMetricsRequestProto request = GetMetricsRequestProto.newBuilder().setQuery(query).build();
+    GetMetricsResponseProto response = submitRequest(Type.GetMetrics,
+        builder -> builder.setGetMetricsRequest(request)).getGetMetricsResponse();
+    String metricsJsonStr = response.getMetricsJson();
+    return metricsJsonStr;
   }
 }

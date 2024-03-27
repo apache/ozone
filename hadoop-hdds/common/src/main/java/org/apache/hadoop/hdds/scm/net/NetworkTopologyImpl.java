@@ -29,10 +29,12 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.NavigableMap;
 import java.util.TreeMap;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
+import java.util.function.Consumer;
 
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import static org.apache.hadoop.hdds.scm.net.NetConstants.ROOT;
@@ -57,12 +59,36 @@ public class NetworkTopologyImpl implements NetworkTopology {
   private final int maxLevel;
   /** Schema manager. */
   private final NodeSchemaManager schemaManager;
+  /** The algorithm to randomize nodes with equal distances. */
+  private final Consumer<List<? extends Node>> shuffleOperation;
   /** Lock to coordinate cluster tree access. */
-  private ReadWriteLock netlock = new ReentrantReadWriteLock(true);
+  private final ReadWriteLock netlock = new ReentrantReadWriteLock(true);
 
   public NetworkTopologyImpl(ConfigurationSource conf) {
     schemaManager = NodeSchemaManager.getInstance();
     schemaManager.init(conf);
+    shuffleOperation = Collections::shuffle;
+    maxLevel = schemaManager.getMaxLevel();
+    factory = InnerNodeImpl.FACTORY;
+    clusterTree = factory.newInnerNode(ROOT, null, null,
+        NetConstants.ROOT_LEVEL,
+        schemaManager.getCost(NetConstants.ROOT_LEVEL));
+  }
+
+  public NetworkTopologyImpl(String schemaFile, InnerNode clusterTree) {
+    schemaManager = NodeSchemaManager.getInstance();
+    schemaManager.init(schemaFile);
+    maxLevel = schemaManager.getMaxLevel();
+    shuffleOperation = Collections::shuffle;
+    factory = InnerNodeImpl.FACTORY;
+    this.clusterTree = clusterTree;
+  }
+
+  @VisibleForTesting
+  public NetworkTopologyImpl(NodeSchemaManager manager,
+                             Consumer<List<? extends Node>> shuffleOperation) {
+    schemaManager = manager;
+    this.shuffleOperation = shuffleOperation;
     maxLevel = schemaManager.getMaxLevel();
     factory = InnerNodeImpl.FACTORY;
     clusterTree = factory.newInnerNode(ROOT, null, null,
@@ -72,12 +98,7 @@ public class NetworkTopologyImpl implements NetworkTopology {
 
   @VisibleForTesting
   public NetworkTopologyImpl(NodeSchemaManager manager) {
-    schemaManager = manager;
-    maxLevel = schemaManager.getMaxLevel();
-    factory = InnerNodeImpl.FACTORY;
-    clusterTree = factory.newInnerNode(ROOT, null, null,
-        NetConstants.ROOT_LEVEL,
-        schemaManager.getCost(NetConstants.ROOT_LEVEL));
+    this(manager, Collections::shuffle);
   }
 
   /**
@@ -125,7 +146,7 @@ public class NetworkTopologyImpl implements NetworkTopology {
   @Override
   public void update(Node oldNode, Node newNode) {
     Preconditions.checkArgument(newNode != null, "newNode cannot be null");
-    if (oldNode != null && oldNode instanceof InnerNode) {
+    if (oldNode instanceof InnerNode) {
       throw new IllegalArgumentException(
               "Not allowed to update an inner node: "
                       + oldNode.getNetworkFullPath());
@@ -214,10 +235,7 @@ public class NetworkTopologyImpl implements NetworkTopology {
     while (parent != null && parent != clusterTree) {
       parent = parent.getParent();
     }
-    if (parent == clusterTree) {
-      return true;
-    }
-    return false;
+    return parent == clusterTree;
   }
 
   /**
@@ -373,7 +391,7 @@ public class NetworkTopologyImpl implements NetworkTopology {
       scope = ROOT;
     }
     if (scope.startsWith(SCOPE_REVERSE_STR)) {
-      ArrayList<String> excludedScopes = new ArrayList();
+      ArrayList<String> excludedScopes = new ArrayList<>();
       excludedScopes.add(scope.substring(1));
       return chooseRandom(ROOT, excludedScopes, null, null,
           ANCESTOR_GENERATION_DEFAULT);
@@ -414,7 +432,7 @@ public class NetworkTopologyImpl implements NetworkTopology {
       scope = ROOT;
     }
     if (scope.startsWith(SCOPE_REVERSE_STR)) {
-      ArrayList<String> excludedScopes = new ArrayList();
+      ArrayList<String> excludedScopes = new ArrayList<>();
       excludedScopes.add(scope.substring(1));
       return chooseRandom(ROOT, excludedScopes, excludedNodes, null,
           ANCESTOR_GENERATION_DEFAULT);
@@ -449,7 +467,7 @@ public class NetworkTopologyImpl implements NetworkTopology {
       scope = ROOT;
     }
     if (scope.startsWith(SCOPE_REVERSE_STR)) {
-      ArrayList<String> excludedScopes = new ArrayList();
+      ArrayList<String> excludedScopes = new ArrayList<>();
       excludedScopes.add(scope.substring(1));
       return chooseRandom(ROOT, excludedScopes, excludedNodes, null,
           ancestorGen);
@@ -648,7 +666,7 @@ public class NetworkTopologyImpl implements NetworkTopology {
         ancestorGen);
 
     if (availableNodes <= 0) {
-      LOG.warn("No available node in (scope=\"{}\" excludedScope=\"{}\" " +
+      LOG.info("No available node in (scope=\"{}\" excludedScope=\"{}\" " +
               "excludedNodes=\"{}\"  ancestorGen=\"{}\").",
           scopeNode.getNetworkFullPath(), excludedScopes, excludedNodes,
           ancestorGen);
@@ -717,8 +735,13 @@ public class NetworkTopologyImpl implements NetworkTopology {
     int cost = 0;
     netlock.readLock().lock();
     try {
-      if ((node1.getAncestor(level1 - 1) != clusterTree) ||
-          (node2.getAncestor(level2 - 1) != clusterTree)) {
+      Node ancestor1 = node1.getAncestor(level1 - 1);
+      boolean node1Topology = (ancestor1 != null && clusterTree != null &&
+          !ancestor1.equals(clusterTree)) || (ancestor1 != clusterTree);
+      Node ancestor2 = node2.getAncestor(level2 - 1);
+      boolean node2Topology = (ancestor2 != null && clusterTree != null &&
+          !ancestor2.equals(clusterTree)) || (ancestor2 != clusterTree);
+      if (node1Topology || node2Topology) {
         LOG.debug("One of the nodes is outside of network topology");
         return Integer.MAX_VALUE;
       }
@@ -732,7 +755,7 @@ public class NetworkTopologyImpl implements NetworkTopology {
         level2--;
         cost += node2 == null ? 0 : node2.getCost();
       }
-      while (node1 != null && node2 != null && node1 != node2) {
+      while (node1 != null && node2 != null && !node1.equals(node2)) {
         node1 = node1.getParent();
         node2 = node2.getParent();
         cost += node1 == null ? 0 : node1.getCost();
@@ -754,38 +777,40 @@ public class NetworkTopologyImpl implements NetworkTopology {
    * @param reader    Node where need the data
    * @param nodes     Available replicas with the requested data
    * @param activeLen Number of active nodes at the front of the array
+   *
+   * @return list of sorted nodes if reader is not null,
+   * or shuffled input nodes otherwise. The size of returned list is limited
+   * by activeLen parameter.
    */
   @Override
-  public List<? extends Node> sortByDistanceCost(Node reader,
-      List<? extends Node> nodes, int activeLen) {
-    /** Sort weights for the nodes array */
+  public <N extends Node> List<N> sortByDistanceCost(Node reader,
+      List<N> nodes, int activeLen) {
+    // shuffle input list of nodes if reader is not defined
     if (reader == null) {
-      return nodes;
+      List<N> shuffledNodes =
+          new ArrayList<>(nodes.subList(0, activeLen));
+      shuffleOperation.accept(shuffledNodes);
+      return shuffledNodes;
     }
+    // Sort weights for the nodes array
     int[] costs = new int[activeLen];
     for (int i = 0; i < activeLen; i++) {
       costs[i] = getDistanceCost(reader, nodes.get(i));
     }
     // Add cost/node pairs to a TreeMap to sort
-    TreeMap<Integer, List<Node>> tree = new TreeMap<Integer, List<Node>>();
+    NavigableMap<Integer, List<N>> tree = new TreeMap<>();
     for (int i = 0; i < activeLen; i++) {
       int cost = costs[i];
-      Node node = nodes.get(i);
-      List<Node> list = tree.get(cost);
-      if (list == null) {
-        list = Lists.newArrayListWithExpectedSize(1);
-        tree.put(cost, list);
-      }
-      list.add(node);
+      N node = nodes.get(i);
+      tree.computeIfAbsent(cost, k -> Lists.newArrayListWithExpectedSize(1))
+          .add(node);
     }
 
-    List<Node> ret = new ArrayList<>();
-    for (List<Node> list: tree.values()) {
+    List<N> ret = new ArrayList<>();
+    for (List<N> list : tree.values()) {
       if (list != null) {
-        Collections.shuffle(list);
-        for (Node n: list) {
-          ret.add(n);
-        }
+        shuffleOperation.accept(list);
+        ret.addAll(list);
       }
     }
 

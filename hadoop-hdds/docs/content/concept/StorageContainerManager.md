@@ -43,7 +43,7 @@ read and write these blocks directly.
 
  2. SCM keeps track of all the block
 replicas. If there is a loss of data node or a disk, SCM
-detects it and instructs data nodes make copies of the
+detects it and instructs data nodes to make copies of the
 missing blocks to ensure high availability.
 
  3. **SCM's Certificate Authority** is in

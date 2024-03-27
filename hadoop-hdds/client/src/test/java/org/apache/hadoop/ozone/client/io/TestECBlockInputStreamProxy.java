@@ -20,15 +20,14 @@ package org.apache.hadoop.ozone.client.io;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.scm.OzoneClientConfig;
 import org.apache.hadoop.hdds.scm.XceiverClientFactory;
 import org.apache.hadoop.hdds.scm.storage.BlockExtendedInputStream;
 import org.apache.hadoop.hdds.scm.storage.BlockLocationInfo;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
@@ -39,15 +38,14 @@ import java.util.SplittableRandom;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.function.Function;
 
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 /**
  * Unit tests for the  ECBlockInputStreamProxy class.
  */
 public class TestECBlockInputStreamProxy {
-
-  private static final Logger LOG =
-      LoggerFactory.getLogger(TestECBlockInputStreamProxy.class);
 
   private static final int ONEMB = 1024 * 1024;
   private ECReplicationConfig repConfig;
@@ -56,6 +54,7 @@ public class TestECBlockInputStreamProxy {
   private long randomSeed;
   private ThreadLocalRandom random = ThreadLocalRandom.current();
   private SplittableRandom dataGenerator;
+  private OzoneConfiguration conf = new OzoneConfiguration();
 
   @BeforeEach
   public void setup() {
@@ -67,23 +66,23 @@ public class TestECBlockInputStreamProxy {
 
   @Test
   public void testExpectedDataLocations() {
-    Assertions.assertEquals(1,
+    assertEquals(1,
         ECBlockInputStreamProxy.expectedDataLocations(repConfig, 1));
-    Assertions.assertEquals(2,
+    assertEquals(2,
         ECBlockInputStreamProxy.expectedDataLocations(repConfig, ONEMB + 1));
-    Assertions.assertEquals(3,
+    assertEquals(3,
         ECBlockInputStreamProxy.expectedDataLocations(repConfig, 3 * ONEMB));
-    Assertions.assertEquals(3,
+    assertEquals(3,
         ECBlockInputStreamProxy.expectedDataLocations(repConfig, 10 * ONEMB));
 
     repConfig = new ECReplicationConfig(6, 3);
-    Assertions.assertEquals(1,
+    assertEquals(1,
         ECBlockInputStreamProxy.expectedDataLocations(repConfig, 1));
-    Assertions.assertEquals(2,
+    assertEquals(2,
         ECBlockInputStreamProxy.expectedDataLocations(repConfig, ONEMB + 1));
-    Assertions.assertEquals(3,
+    assertEquals(3,
         ECBlockInputStreamProxy.expectedDataLocations(repConfig, 3 * ONEMB));
-    Assertions.assertEquals(6,
+    assertEquals(6,
         ECBlockInputStreamProxy.expectedDataLocations(repConfig, 10 * ONEMB));
   }
 
@@ -93,21 +92,21 @@ public class TestECBlockInputStreamProxy {
         ECStreamTestUtil.createIndexMap(1, 2, 3, 4, 5);
     BlockLocationInfo blockInfo =
         ECStreamTestUtil.createKeyInfo(repConfig, 1024, dnMap);
-    Assertions.assertEquals(1, ECBlockInputStreamProxy.availableDataLocations(
+    assertEquals(1, ECBlockInputStreamProxy.availableDataLocations(
         blockInfo.getPipeline(), 1));
-    Assertions.assertEquals(2, ECBlockInputStreamProxy.availableDataLocations(
+    assertEquals(2, ECBlockInputStreamProxy.availableDataLocations(
         blockInfo.getPipeline(), 2));
-    Assertions.assertEquals(3, ECBlockInputStreamProxy.availableDataLocations(
+    assertEquals(3, ECBlockInputStreamProxy.availableDataLocations(
         blockInfo.getPipeline(), 3));
 
     dnMap = ECStreamTestUtil.createIndexMap(1, 4, 5);
     blockInfo = ECStreamTestUtil.createKeyInfo(repConfig, 1024, dnMap);
-    Assertions.assertEquals(1, ECBlockInputStreamProxy.availableDataLocations(
+    assertEquals(1, ECBlockInputStreamProxy.availableDataLocations(
         blockInfo.getPipeline(), 3));
 
     dnMap = ECStreamTestUtil.createIndexMap(2, 3, 4, 5);
     blockInfo = ECStreamTestUtil.createKeyInfo(repConfig, 1024, dnMap);
-    Assertions.assertEquals(0, ECBlockInputStreamProxy.availableDataLocations(
+    assertEquals(0, ECBlockInputStreamProxy.availableDataLocations(
         blockInfo.getPipeline(), 1));
   }
 
@@ -122,7 +121,7 @@ public class TestECBlockInputStreamProxy {
         ECStreamTestUtil.createKeyInfo(repConfig, blockLength, dnMap);
 
     try (ECBlockInputStreamProxy bis = createBISProxy(repConfig, blockInfo)) {
-      Assertions.assertEquals(blockInfo.getBlockID(), bis.getBlockID());
+      assertEquals(blockInfo.getBlockID(), bis.getBlockID());
     }
   }
 
@@ -137,7 +136,7 @@ public class TestECBlockInputStreamProxy {
         ECStreamTestUtil.createKeyInfo(repConfig, blockLength, dnMap);
 
     try (ECBlockInputStreamProxy bis = createBISProxy(repConfig, blockInfo)) {
-      Assertions.assertEquals(1234, bis.getLength());
+      assertEquals(1234, bis.getLength());
     }
   }
 
@@ -154,11 +153,11 @@ public class TestECBlockInputStreamProxy {
     dataGenerator = new SplittableRandom(randomSeed);
     ByteBuffer readBuffer = ByteBuffer.allocate(100);
     try (ECBlockInputStreamProxy bis = createBISProxy(repConfig, blockInfo)) {
-      Assertions.assertEquals(12345, bis.getRemaining());
-      Assertions.assertEquals(0, bis.getPos());
+      assertEquals(12345, bis.getRemaining());
+      assertEquals(0, bis.getPos());
       bis.read(readBuffer);
-      Assertions.assertEquals(12345 - 100, bis.getRemaining());
-      Assertions.assertEquals(100, bis.getPos());
+      assertEquals(12345 - 100, bis.getRemaining());
+      assertEquals(100, bis.getPos());
     }
   }
 
@@ -173,11 +172,11 @@ public class TestECBlockInputStreamProxy {
     BlockLocationInfo blockInfo =
         ECStreamTestUtil.createKeyInfo(repConfig, blockLength, dnMap);
 
-    try (ECBlockInputStreamProxy bis = createBISProxy(repConfig, blockInfo)) {
+    try (ECBlockInputStreamProxy ignored = createBISProxy(repConfig, blockInfo)) {
       // Not all locations present, so we expect on;y the "missing=true" stream
       // to be present.
-      Assertions.assertTrue(streamFactory.getStreams().containsKey(false));
-      Assertions.assertFalse(streamFactory.getStreams().containsKey(true));
+      assertThat(streamFactory.getStreams()).containsKey(false);
+      assertThat(streamFactory.getStreams()).doesNotContainKey(true);
     }
 
     streamFactory = new TestECBlockInputStreamFactory();
@@ -185,11 +184,11 @@ public class TestECBlockInputStreamProxy {
     dnMap = ECStreamTestUtil.createIndexMap(2, 3, 4, 5);
     blockInfo = ECStreamTestUtil.createKeyInfo(repConfig, blockLength, dnMap);
 
-    try (ECBlockInputStreamProxy bis = createBISProxy(repConfig, blockInfo)) {
+    try (ECBlockInputStreamProxy ignored = createBISProxy(repConfig, blockInfo)) {
       // Not all locations present, so we expect on;y the "missing=true" stream
       // to be present.
-      Assertions.assertFalse(streamFactory.getStreams().containsKey(false));
-      Assertions.assertTrue(streamFactory.getStreams().containsKey(true));
+      assertThat(streamFactory.getStreams()).doesNotContainKey(false);
+      assertThat(streamFactory.getStreams()).containsKey(true);
     }
   }
 
@@ -217,7 +216,7 @@ public class TestECBlockInputStreamProxy {
       }
       readBuffer.clear();
       int read = bis.read(readBuffer);
-      Assertions.assertEquals(-1, read);
+      assertEquals(-1, read);
     }
   }
 
@@ -245,7 +244,7 @@ public class TestECBlockInputStreamProxy {
       }
       readBuffer.clear();
       int read = bis.read(readBuffer);
-      Assertions.assertEquals(-1, read);
+      assertEquals(-1, read);
     }
   }
 
@@ -267,7 +266,7 @@ public class TestECBlockInputStreamProxy {
     try (ECBlockInputStreamProxy bis = createBISProxy(repConfig, blockInfo)) {
       // Perform one read to get the stream created
       int read = bis.read(readBuffer);
-      Assertions.assertEquals(100, read);
+      assertEquals(100, read);
       ECStreamTestUtil.assertBufferMatches(readBuffer, dataGenerator);
       // Setup an error to be thrown part through a read, so the dataBuffer
       // will have been advanced by 50 bytes before the error. This tests it
@@ -285,10 +284,10 @@ public class TestECBlockInputStreamProxy {
       }
       readBuffer.clear();
       read = bis.read(readBuffer);
-      Assertions.assertEquals(-1, read);
+      assertEquals(-1, read);
       // Ensure the bad location was passed into the factory to create the
       // reconstruction reader
-      Assertions.assertEquals(badDN, streamFactory.getFailedLocations().get(0));
+      assertEquals(badDN, streamFactory.getFailedLocations().get(0));
     }
   }
 
@@ -307,14 +306,14 @@ public class TestECBlockInputStreamProxy {
     try (ECBlockInputStreamProxy bis = createBISProxy(repConfig, blockInfo)) {
       // Perform one read to get the stream created
       int read = bis.read(readBuffer);
-      Assertions.assertEquals(100, read);
+      assertEquals(100, read);
 
       bis.seek(1024);
       readBuffer.clear();
       resetAndAdvanceDataGenerator(1024);
       bis.read(readBuffer);
       ECStreamTestUtil.assertBufferMatches(readBuffer, dataGenerator);
-      Assertions.assertEquals(1124, bis.getPos());
+      assertEquals(1124, bis.getPos());
 
       // Set the non-reconstruction reader to thrown an exception on seek
       streamFactory.getStreams().get(false).setShouldErrorOnSeek(true);
@@ -346,8 +345,11 @@ public class TestECBlockInputStreamProxy {
 
   private ECBlockInputStreamProxy createBISProxy(ECReplicationConfig rConfig,
       BlockLocationInfo blockInfo) {
+    OzoneClientConfig clientConfig = conf.getObject(OzoneClientConfig.class);
+    clientConfig.setChecksumVerify(true);
     return new ECBlockInputStreamProxy(
-        rConfig, blockInfo, true, null, null, streamFactory);
+        rConfig, blockInfo, null, null, streamFactory,
+        clientConfig);
   }
 
   private static class TestECBlockInputStreamFactory
@@ -376,8 +378,9 @@ public class TestECBlockInputStreamProxy {
     public BlockExtendedInputStream create(boolean missingLocations,
         List<DatanodeDetails> failedDatanodes,
         ReplicationConfig repConfig, BlockLocationInfo blockInfo,
-        boolean verifyChecksum, XceiverClientFactory xceiverFactory,
-        Function<BlockID, BlockLocationInfo> refreshFunction) {
+        XceiverClientFactory xceiverFactory,
+        Function<BlockID, BlockLocationInfo> refreshFunction,
+        OzoneClientConfig config) {
       this.failedLocations = failedDatanodes;
       ByteBuffer wrappedBuffer =
           ByteBuffer.wrap(data.array(), 0, data.capacity());

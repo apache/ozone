@@ -30,6 +30,7 @@ import org.apache.hadoop.hdds.scm.server.upgrade.FinalizationStateManagerImpl;
 import org.apache.hadoop.hdds.scm.server.upgrade.SCMUpgradeFinalizationContext;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.MiniOzoneHAClusterImpl;
+import org.apache.hadoop.ozone.UniformDatanodesFactory;
 import org.apache.hadoop.ozone.upgrade.DefaultUpgradeFinalizationExecutor;
 import org.apache.hadoop.ozone.upgrade.InjectedUpgradeFinalizationExecutor.UpgradeTestInjectionPoints;
 import org.apache.hadoop.ozone.upgrade.UpgradeFinalizationExecutor;
@@ -37,7 +38,6 @@ import org.apache.hadoop.ozone.upgrade.UpgradeTestUtils;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.tag.Flaky;
 import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
@@ -56,6 +56,13 @@ import java.util.concurrent.Future;
 import java.util.stream.Stream;
 
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto.State.CLOSED;
+import static org.apache.hadoop.hdds.scm.ScmConfig.ConfigStrings.HDDS_SCM_INIT_DEFAULT_LAYOUT_VERSION;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.fail;
 
 /**
  * Tests upgrade finalization failure scenarios and corner cases specific to SCM
@@ -82,17 +89,19 @@ public class TestScmHAFinalization {
     SCMConfigurator configurator = new SCMConfigurator();
     configurator.setUpgradeFinalizationExecutor(executor);
 
-    MiniOzoneCluster.Builder clusterBuilder =
-        new MiniOzoneHAClusterImpl.Builder(conf)
-        .setNumOfStorageContainerManagers(NUM_SCMS)
+    conf.setInt(HDDS_SCM_INIT_DEFAULT_LAYOUT_VERSION, HDDSLayoutFeature.INITIAL_VERSION.layoutVersion());
+
+    MiniOzoneHAClusterImpl.Builder clusterBuilder = MiniOzoneCluster.newHABuilder(conf);
+    clusterBuilder.setNumOfStorageContainerManagers(NUM_SCMS)
         .setNumOfActiveSCMs(NUM_SCMS - numInactiveSCMs)
-        .setScmLayoutVersion(HDDSLayoutFeature.INITIAL_VERSION.layoutVersion())
         .setSCMServiceId("scmservice")
-        .setSCMConfigurator(configurator)
         .setNumOfOzoneManagers(1)
+        .setSCMConfigurator(configurator)
         .setNumDatanodes(NUM_DATANODES)
-        .setDnLayoutVersion(HDDSLayoutFeature.INITIAL_VERSION.layoutVersion());
-    this.cluster = (MiniOzoneHAClusterImpl) clusterBuilder.build();
+        .setDatanodeFactory(UniformDatanodesFactory.newBuilder()
+            .setLayoutVersion(HDDSLayoutFeature.INITIAL_VERSION.layoutVersion())
+            .build());
+    this.cluster = clusterBuilder.build();
 
     scmClient = cluster.getStorageContainerLocationClient();
     cluster.waitForClusterToBeReady();
@@ -167,7 +176,7 @@ public class TestScmHAFinalization {
 
     // Make sure the original SCM leader is not the leader anymore.
     StorageContainerManager newLeaderScm  = cluster.getActiveSCM();
-    Assertions.assertNotEquals(newLeaderScm.getSCMNodeId(),
+    assertNotEquals(newLeaderScm.getSCMNodeId(),
         oldLeaderScm.getSCMNodeId());
 
     // Resume finalization from the new leader.
@@ -288,8 +297,8 @@ public class TestScmHAFinalization {
         inactiveScm, 0, NUM_DATANODES);
 
     // Use log to verify a snapshot was installed.
-    Assertions.assertTrue(logCapture.getOutput().contains("New SCM snapshot " +
-        "received with metadata layout version"));
+    assertThat(logCapture.getOutput()).contains("New SCM snapshot " +
+        "received with metadata layout version");
   }
 
   private void waitForScmsToFinalize(Collection<StorageContainerManager> scms)
@@ -319,35 +328,31 @@ public class TestScmHAFinalization {
     for (StorageContainerManager scm: scms) {
       switch (haltingPoint) {
       case BEFORE_PRE_FINALIZE_UPGRADE:
-        Assertions.assertFalse(
-            scm.getPipelineManager().isPipelineCreationFrozen());
-        Assertions.assertEquals(
+        assertFalse(scm.getPipelineManager().isPipelineCreationFrozen());
+        assertEquals(
             scm.getScmContext().getFinalizationCheckpoint(),
             FinalizationCheckpoint.FINALIZATION_REQUIRED);
         break;
       case AFTER_PRE_FINALIZE_UPGRADE:
-        Assertions.assertTrue(
-            scm.getPipelineManager().isPipelineCreationFrozen());
-        Assertions.assertEquals(
+        assertTrue(scm.getPipelineManager().isPipelineCreationFrozen());
+        assertEquals(
             scm.getScmContext().getFinalizationCheckpoint(),
             FinalizationCheckpoint.FINALIZATION_STARTED);
         break;
       case AFTER_COMPLETE_FINALIZATION:
-        Assertions.assertFalse(
-            scm.getPipelineManager().isPipelineCreationFrozen());
-        Assertions.assertEquals(
+        assertFalse(scm.getPipelineManager().isPipelineCreationFrozen());
+        assertEquals(
             scm.getScmContext().getFinalizationCheckpoint(),
             FinalizationCheckpoint.MLV_EQUALS_SLV);
         break;
       case AFTER_POST_FINALIZE_UPGRADE:
-        Assertions.assertFalse(
-            scm.getPipelineManager().isPipelineCreationFrozen());
-        Assertions.assertEquals(
+        assertFalse(scm.getPipelineManager().isPipelineCreationFrozen());
+        assertEquals(
             scm.getScmContext().getFinalizationCheckpoint(),
             FinalizationCheckpoint.FINALIZATION_COMPLETE);
         break;
       default:
-        Assertions.fail("Unknown halting point in test: " + haltingPoint);
+        fail("Unknown halting point in test: " + haltingPoint);
       }
     }
   }

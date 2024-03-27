@@ -19,22 +19,23 @@
 
 package org.apache.hadoop.ozone.om.request;
 
+import java.io.IOException;
 import java.net.InetAddress;
 import java.nio.file.Path;
 import java.util.UUID;
 
-import mockit.Mock;
-import mockit.MockUp;
+import io.grpc.Context;
+import org.apache.hadoop.ipc.Server;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
+import org.apache.hadoop.ozone.om.request.key.OMKeyCommitRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.BucketInfo;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
-import org.mockito.Mockito;
+import org.mockito.MockedStatic;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.ipc.ProtobufRpcEngine;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OMMetrics;
@@ -44,8 +45,14 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.om.request.bucket.OMBucketCreateRequest;
 import org.apache.hadoop.security.UserGroupInformation;
 
+import static org.apache.hadoop.ozone.om.request.OMRequestTestUtils.createRequestWithS3Credentials;
 import static org.apache.hadoop.ozone.om.request.OMRequestTestUtils.newBucketInfoBuilder;
 import static org.apache.hadoop.ozone.om.request.OMRequestTestUtils.newCreateBucketRequest;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.when;
 
 /**
@@ -65,7 +72,7 @@ public class TestOMClientRequestWithUserInfo {
 
   @BeforeEach
   public void setup() throws Exception {
-    ozoneManager = Mockito.mock(OzoneManager.class);
+    ozoneManager = mock(OzoneManager.class);
     omMetrics = OMMetrics.create();
     OzoneConfiguration ozoneConfiguration = new OzoneConfiguration();
     ozoneConfiguration.set(OMConfigKeys.OZONE_OM_DB_DIRS,
@@ -74,61 +81,84 @@ public class TestOMClientRequestWithUserInfo {
         ozoneManager);
     when(ozoneManager.getMetrics()).thenReturn(omMetrics);
     when(ozoneManager.getMetadataManager()).thenReturn(omMetadataManager);
+    when(ozoneManager.getConfiguration()).thenReturn(ozoneConfiguration);
     inetAddress = InetAddress.getByName("127.0.0.1");
-
-    new MockUp<ProtobufRpcEngine.Server>() {
-      @Mock
-      public UserGroupInformation getRemoteUser() {
-        return userGroupInformation;
-      }
-
-      @Mock
-      public InetAddress getRemoteIp() {
-        return inetAddress;
-      }
-
-      public InetAddress getRemoteAddress() {
-        return inetAddress;
-      }
-    };
   }
 
   @Test
-  public void testUserInfo() throws Exception {
+  public void testUserInfoInCaseOfHadoopTransport() throws Exception {
+    try (MockedStatic<Server> mockedRpcServer =
+             mockStatic(Server.class)) {
 
-    String bucketName = UUID.randomUUID().toString();
-    String volumeName = UUID.randomUUID().toString();
-    BucketInfo.Builder bucketInfo =
-        newBucketInfoBuilder(bucketName, volumeName)
-            .setIsVersionEnabled(true)
-            .setStorageType(OzoneManagerProtocolProtos.StorageTypeProto.DISK);
-    OMRequest omRequest = newCreateBucketRequest(bucketInfo).build();
+      mockedRpcServer.when(Server::getRemoteUser).thenReturn(userGroupInformation);
+      mockedRpcServer.when(Server::getRemoteIp).thenReturn(inetAddress);
+      mockedRpcServer.when(Server::getRemoteAddress).thenReturn(inetAddress.toString());
 
-    OMBucketCreateRequest omBucketCreateRequest =
-        new OMBucketCreateRequest(omRequest);
+      String bucketName = UUID.randomUUID().toString();
+      String volumeName = UUID.randomUUID().toString();
+      BucketInfo.Builder bucketInfo =
+          newBucketInfoBuilder(bucketName, volumeName)
+              .setIsVersionEnabled(true)
+              .setStorageType(OzoneManagerProtocolProtos.StorageTypeProto.DISK);
+      OMRequest omRequest = newCreateBucketRequest(bucketInfo).build();
 
-    Assertions.assertFalse(omRequest.hasUserInfo());
+      OMBucketCreateRequest omBucketCreateRequest =
+          new OMBucketCreateRequest(omRequest);
 
-    OMRequest modifiedRequest =
-        omBucketCreateRequest.preExecute(ozoneManager);
+      assertFalse(omRequest.hasUserInfo());
 
-    Assertions.assertTrue(modifiedRequest.hasUserInfo());
+      OMRequest modifiedRequest =
+          omBucketCreateRequest.preExecute(ozoneManager);
 
-    // Now pass modified request to OMBucketCreateRequest and check ugi and
-    // remote Address.
-    omBucketCreateRequest = new OMBucketCreateRequest(modifiedRequest);
+      assertTrue(modifiedRequest.hasUserInfo());
 
-    InetAddress remoteAddress = omBucketCreateRequest.getRemoteAddress();
-    UserGroupInformation ugi = omBucketCreateRequest.createUGI();
-    String hostName = omBucketCreateRequest.getHostName();
+      // Now pass modified request to OMBucketCreateRequest and check ugi and
+      // remote Address.
+      omBucketCreateRequest = new OMBucketCreateRequest(modifiedRequest);
+
+      InetAddress remoteAddress = omBucketCreateRequest.getRemoteAddress();
+      UserGroupInformation ugi = omBucketCreateRequest.createUGI();
+      String hostName = omBucketCreateRequest.getHostName();
 
 
-    // Now check we have original user info, remote address and hostname or not.
-    // Here from OMRequest user info, converted to UGI, InetAddress and String.
-    Assertions.assertEquals(inetAddress.getHostAddress(),
-        remoteAddress.getHostAddress());
-    Assertions.assertEquals(userGroupInformation.getUserName(),
-        ugi.getUserName());
-    Assertions.assertEquals(inetAddress.getHostName(), hostName);
+      // Now check we have original user info, remote address and hostname or not.
+      // Here from OMRequest user info, converted to UGI, InetAddress and String.
+      assertEquals(inetAddress.getHostAddress(), remoteAddress.getHostAddress());
+      assertEquals(userGroupInformation.getUserName(), ugi.getUserName());
+      assertEquals(inetAddress.getHostName(), hostName);
+    }
   }
+
+  @Test
+  public void testUserInfoInCaseOfGrpcTransport() throws IOException {
+    try (MockedStatic<Context> mockedGrpcRequestContextKey =
+             mockStatic(Context.class)) {
+      // given
+      Context.Key<String> hostnameKey = mock(Context.Key.class);
+      when(hostnameKey.get()).thenReturn("hostname");
+
+      Context.Key<String> ipAddress = mock(Context.Key.class);
+      when(ipAddress.get()).thenReturn("172.5.3.5");
+
+      mockedGrpcRequestContextKey.when(() -> Context.key("CLIENT_HOSTNAME"))
+          .thenReturn(hostnameKey);
+      mockedGrpcRequestContextKey.when(() -> Context.key("CLIENT_IP_ADDRESS"))
+          .thenReturn(ipAddress);
+
+      OMRequest s3SignedOMRequest = createRequestWithS3Credentials("AccessId",
+          "Signature", "StringToSign");
+      OMClientRequest omClientRequest =
+          new OMKeyCommitRequest(s3SignedOMRequest, mock(BucketLayout.class));
+
+      // when
+      OzoneManagerProtocolProtos.UserInfo userInfo =
+          omClientRequest.getUserInfo();
+
+      // then
+      assertEquals("hostname", userInfo.getHostName());
+      assertEquals("172.5.3.5", userInfo.getRemoteAddress());
+      assertEquals("AccessId", userInfo.getUserName());
+    }
+  }
+
 }

@@ -25,7 +25,6 @@ import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.common.ChunkBuffer;
 import org.apache.hadoop.ozone.container.ContainerTestHelper;
 import org.apache.hadoop.ozone.container.common.helpers.ChunkInfo;
-import org.apache.hadoop.ozone.container.common.transport.server.ratis.DispatcherContext;
 import org.apache.hadoop.ozone.container.keyvalue.ContainerLayoutTestInfo;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainer;
 import org.apache.hadoop.ozone.container.keyvalue.interfaces.ChunkManager;
@@ -36,8 +35,9 @@ import java.security.MessageDigest;
 
 import static org.apache.hadoop.ozone.container.ContainerTestHelper.getChunk;
 import static org.apache.hadoop.ozone.container.ContainerTestHelper.setDataChecksum;
+import static org.apache.hadoop.ozone.container.common.ContainerTestUtils.WRITE_STAGE;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.fail;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 /**
  * Test for FilePerBlockStrategy.
@@ -48,22 +48,18 @@ public class TestFilePerBlockStrategy extends CommonChunkManagerTestCases {
   public void testDeletePartialChunkWithOffsetUnsupportedRequest() {
     // GIVEN
     ChunkManager chunkManager = createTestSubject();
-    try {
+    StorageContainerException e = assertThrows(StorageContainerException.class, () -> {
       KeyValueContainer container = getKeyValueContainer();
       BlockID blockID = getBlockID();
       chunkManager.writeChunk(container, blockID,
-          getChunkInfo(), getData(), getDispatcherContext());
+          getChunkInfo(), getData(), WRITE_STAGE);
       ChunkInfo chunkInfo = new ChunkInfo(String.format("%d.data.%d",
           blockID.getLocalID(), 0), 123, getChunkInfo().getLen());
 
       // WHEN
       chunkManager.deleteChunk(container, blockID, chunkInfo);
-
-      // THEN
-      fail("testDeleteChunkUnsupportedRequest");
-    } catch (StorageContainerException ex) {
-      assertEquals(ContainerProtos.Result.UNSUPPORTED_REQUEST, ex.getResult());
-    }
+    });
+    assertEquals(ContainerProtos.Result.UNSUPPORTED_REQUEST, e.getResult());
   }
 
   /**
@@ -90,7 +86,7 @@ public class TestFilePerBlockStrategy extends CommonChunkManagerTestCases {
       data.rewind();
       setDataChecksum(info, data);
       subject.writeChunk(container, blockID, info, data,
-          getDispatcherContext());
+          WRITE_STAGE);
     }
 
     // Request to read the whole data in a single go.
@@ -98,7 +94,7 @@ public class TestFilePerBlockStrategy extends CommonChunkManagerTestCases {
         datalen * chunkCount);
     ChunkBuffer chunk =
         subject.readChunk(container, blockID, largeChunk,
-            getDispatcherContext());
+            null);
     ByteBuffer newdata = chunk.toByteString().asReadOnlyByteBuffer();
     MessageDigest newSha = MessageDigest.getInstance(OzoneConsts.FILE_HASH);
     newSha.update(newdata);
@@ -120,11 +116,10 @@ public class TestFilePerBlockStrategy extends CommonChunkManagerTestCases {
     ChunkInfo info = getChunk(blockID.getLocalID(), 0, 0, datalen);
     ChunkBuffer data = ContainerTestHelper.getData(datalen);
     setDataChecksum(info, data);
-    DispatcherContext ctx = getDispatcherContext();
     ChunkManager subject = createTestSubject();
-    subject.writeChunk(container, blockID, info, data, ctx);
+    subject.writeChunk(container, blockID, info, data, WRITE_STAGE);
 
-    ChunkBuffer readData = subject.readChunk(container, blockID, info, ctx);
+    ChunkBuffer readData = subject.readChunk(container, blockID, info, null);
     // data will be ChunkBufferImplWithByteBuffer and readData will return
     // ChunkBufferImplWithByteBufferList. Hence, convert both ByteStrings
     // before comparing.
@@ -132,7 +127,7 @@ public class TestFilePerBlockStrategy extends CommonChunkManagerTestCases {
         readData.rewind().toByteString());
 
     ChunkInfo info2 = getChunk(blockID.getLocalID(), 0, start, length);
-    ChunkBuffer readData2 = subject.readChunk(container, blockID, info2, ctx);
+    ChunkBuffer readData2 = subject.readChunk(container, blockID, info2, null);
     assertEquals(length, info2.getLen());
     assertEquals(data.rewind().toByteString().substring(start, start + length),
         readData2.rewind().toByteString());

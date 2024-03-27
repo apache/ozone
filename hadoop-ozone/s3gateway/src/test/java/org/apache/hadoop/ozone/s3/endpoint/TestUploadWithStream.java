@@ -29,9 +29,8 @@ import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientStub;
-import org.junit.BeforeClass;
-import org.junit.Test;
-import org.mockito.Mockito;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Test;
 
 import javax.ws.rs.container.ContainerRequestContext;
 import javax.ws.rs.core.HttpHeaders;
@@ -47,8 +46,9 @@ import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_FS_DATASTREAM_AUTO_THRESHOLD;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.COPY_SOURCE_HEADER;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.STORAGE_CLASS_HEADER;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 /**
@@ -68,11 +68,11 @@ public class TestUploadWithStream {
   private static ContainerRequestContext context;
 
   static {
-    HEADERS = Mockito.mock(HttpHeaders.class);
+    HEADERS = mock(HttpHeaders.class);
     when(HEADERS.getHeaderString(STORAGE_CLASS_HEADER)).thenReturn("STANDARD");
   }
 
-  @BeforeClass
+  @BeforeAll
   public static void setUp() throws Exception {
     client = new OzoneClientStub();
     client.getObjectStore().createS3Bucket(S3BUCKET);
@@ -81,15 +81,15 @@ public class TestUploadWithStream {
     REST.setClient(client);
 
     OzoneConfiguration conf = new OzoneConfiguration();
-    conf.setBoolean(OzoneConfigKeys.DFS_CONTAINER_RATIS_DATASTREAM_ENABLED,
+    conf.setBoolean(OzoneConfigKeys.HDDS_CONTAINER_RATIS_DATASTREAM_ENABLED,
         true);
     conf.setStorageSize(OZONE_FS_DATASTREAM_AUTO_THRESHOLD, 1,
         StorageUnit.BYTES);
     REST.setOzoneConfiguration(conf);
 
-    context = Mockito.mock(ContainerRequestContext.class);
-    Mockito.when(context.getUriInfo()).thenReturn(Mockito.mock(UriInfo.class));
-    Mockito.when(context.getUriInfo().getQueryParameters())
+    context = mock(ContainerRequestContext.class);
+    when(context.getUriInfo()).thenReturn(mock(UriInfo.class));
+    when(context.getUriInfo().getQueryParameters())
         .thenReturn(new MultivaluedHashMap<>());
     REST.setContext(context);
 
@@ -132,7 +132,7 @@ public class TestUploadWithStream {
     additionalHeaders
         .put(COPY_SOURCE_HEADER, S3BUCKET + "/" + S3_COPY_EXISTING_KEY);
 
-    HttpHeaders headers = Mockito.mock(HttpHeaders.class);
+    HttpHeaders headers = mock(HttpHeaders.class);
     when(headers.getHeaderString(STORAGE_CLASS_HEADER)).thenReturn(
         "STANDARD");
 

@@ -24,6 +24,7 @@ import java.util.Optional;
 
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.scm.block.DeletedBlockLog;
 import org.apache.hadoop.hdds.scm.container.ContainerException;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
@@ -41,6 +42,8 @@ import org.slf4j.LoggerFactory;
 
 import com.google.common.base.Preconditions;
 
+import jakarta.annotation.Nullable;
+
 import static org.apache.hadoop.hdds.scm.events.SCMEvents.CLOSE_CONTAINER;
 
 /**
@@ -51,6 +54,8 @@ public class DeadNodeHandler implements EventHandler<DatanodeDetails> {
   private final NodeManager nodeManager;
   private final PipelineManager pipelineManager;
   private final ContainerManager containerManager;
+  @Nullable
+  private final DeletedBlockLog deletedBlockLog;
 
   private static final Logger LOG =
       LoggerFactory.getLogger(DeadNodeHandler.class);
@@ -58,9 +63,17 @@ public class DeadNodeHandler implements EventHandler<DatanodeDetails> {
   public DeadNodeHandler(final NodeManager nodeManager,
                          final PipelineManager pipelineManager,
                          final ContainerManager containerManager) {
+    this(nodeManager, pipelineManager, containerManager, null);
+  }
+
+  public DeadNodeHandler(final NodeManager nodeManager,
+                         final PipelineManager pipelineManager,
+                         final ContainerManager containerManager,
+                         @Nullable final DeletedBlockLog deletedBlockLog) {
     this.nodeManager = nodeManager;
     this.pipelineManager = pipelineManager;
     this.containerManager = containerManager;
+    this.deletedBlockLog = deletedBlockLog;
   }
 
   @Override
@@ -80,8 +93,8 @@ public class DeadNodeHandler implements EventHandler<DatanodeDetails> {
        * action.
        */
       LOG.info("A dead datanode is detected. {}", datanodeDetails);
-      destroyPipelines(datanodeDetails);
       closeContainers(datanodeDetails, publisher);
+      destroyPipelines(datanodeDetails);
 
       // Remove the container replicas associated with the dead node unless it
       // is IN_MAINTENANCE
@@ -94,6 +107,13 @@ public class DeadNodeHandler implements EventHandler<DatanodeDetails> {
           datanodeDetails.getUuid());
       LOG.info("Clearing command queue of size {} for DN {}",
           cmdList.size(), datanodeDetails);
+
+      // remove DeleteBlocksCommand associated with the dead node unless it
+      // is IN_MAINTENANCE
+      if (deletedBlockLog != null &&
+          !nodeManager.getNodeStatus(datanodeDetails).isInMaintenance()) {
+        deletedBlockLog.onDatanodeDead(datanodeDetails.getUuid());
+      }
 
       //move dead datanode out of ClusterNetworkTopology
       NetworkTopology nt = nodeManager.getClusterNetworkTopologyMap();
@@ -122,8 +142,8 @@ public class DeadNodeHandler implements EventHandler<DatanodeDetails> {
         .ifPresent(pipelines ->
             pipelines.forEach(id -> {
               try {
-                pipelineManager.closePipeline(
-                    pipelineManager.getPipeline(id), false);
+                pipelineManager.closePipeline(id);
+                pipelineManager.deletePipeline(id);
               } catch (PipelineNotFoundException ignore) {
                 // Pipeline is not there in pipeline manager,
                 // should we care?

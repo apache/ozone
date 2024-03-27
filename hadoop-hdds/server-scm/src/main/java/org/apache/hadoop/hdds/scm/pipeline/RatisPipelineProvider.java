@@ -20,7 +20,6 @@ package org.apache.hadoop.hdds.scm.pipeline;
 
 import java.io.IOException;
 import java.util.Collections;
-import java.util.Comparator;
 import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -163,7 +162,7 @@ public class RatisPipelineProvider
     switch (factor) {
     case ONE:
       dns = pickNodesNotUsed(replicationConfig, minRatisVolumeSizeBytes,
-          containerSizeBytes);
+          containerSizeBytes, conf);
       break;
     case THREE:
       List<DatanodeDetails> excludeDueToEngagement = filterPipelineEngagement();
@@ -244,7 +243,6 @@ public class RatisPipelineProvider
                     getPipelineStateManager(), d)))
         .filter(d ->
             (d.getPipelines() >= getNodeManager().pipelineLimit(d.getDn())))
-        .sorted(Comparator.comparingInt(DnWithPipelines::getPipelines))
         .map(d -> d.getDn())
         .collect(Collectors.toList());
     return excluded;

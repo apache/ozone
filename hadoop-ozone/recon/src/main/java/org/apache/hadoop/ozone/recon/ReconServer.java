@@ -183,29 +183,7 @@ public class ReconServer extends GenericCli {
     SecurityConfig secConf = new SecurityConfig(configuration);
     certClient = new ReconCertificateClient(secConf, scmSecurityClient,
         reconStorage, this::saveNewCertId, this::terminateRecon);
-
-    CertificateClient.InitResponse response = certClient.init();
-    LOG.info("Init response: {}", response);
-    switch (response) {
-    case SUCCESS:
-      LOG.info("Initialization successful, case:{}.", response);
-      break;
-    case GETCERT:
-      String certId = certClient.signAndStoreCertificate(
-          certClient.getCSRBuilder().build());
-      reconStorage.setReconCertSerialId(certId);
-      reconStorage.persistCurrentState();
-      LOG.info("Successfully stored SCM signed certificate, case:{}.",
-          response);
-      break;
-    case FAILURE:
-      LOG.error("Recon security initialization failed, case:{}.", response);
-      throw new RuntimeException("Recon security initialization failed.");
-    default:
-      LOG.error("Recon security initialization failed. Init response: {}",
-          response);
-      throw new RuntimeException("Recon security initialization failed.");
-    }
+    certClient.initWithRecovery();
   }
 
   public void saveNewCertId(String newCertId) {

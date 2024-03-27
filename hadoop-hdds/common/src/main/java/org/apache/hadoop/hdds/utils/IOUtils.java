@@ -20,7 +20,6 @@ package org.apache.hadoop.hdds.utils;
 
 import org.slf4j.Logger;
 
-import java.io.Closeable;
 import java.util.Arrays;
 import java.util.Collection;
 
@@ -40,11 +39,11 @@ public final class IOUtils {
    *                   null.
    * @param closeables the objects to close
    */
-  public static void cleanupWithLogger(Logger logger, Closeable... closeables) {
+  public static void cleanupWithLogger(Logger logger, AutoCloseable... closeables) {
     if (closeables == null) {
       return;
     }
-    for (Closeable c : closeables) {
+    for (AutoCloseable c : closeables) {
       if (c != null) {
         try {
           c.close();
@@ -68,7 +67,7 @@ public final class IOUtils {
    * Close each argument, catching exceptions and logging them as error.
    */
   public static void close(Logger logger,
-      Collection<AutoCloseable> closeables) {
+      Collection<? extends AutoCloseable> closeables) {
     if (closeables == null) {
       return;
     }
@@ -95,7 +94,7 @@ public final class IOUtils {
   /**
    * Close each argument, swallowing exceptions.
    */
-  public static void closeQuietly(Collection<AutoCloseable> closeables) {
+  public static void closeQuietly(Collection<? extends AutoCloseable> closeables) {
     close(null, closeables);
   }
 }

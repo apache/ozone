@@ -17,8 +17,9 @@
  */
 package org.apache.hadoop.ozone;
 
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
 /**
  * Test Ozone Constants (e.g. for compatibility).
@@ -28,8 +29,7 @@ public class TestOzoneConsts {
   @Test
   public void testOzoneTenantPolicyLabelCompatibility() {
     // Value of the policy label should not be changed
-    Assertions.assertEquals(
-        "OzoneTenant", OzoneConsts.OZONE_TENANT_RANGER_POLICY_LABEL);
+    assertEquals("OzoneTenant", OzoneConsts.OZONE_TENANT_RANGER_POLICY_LABEL);
   }
 
 }

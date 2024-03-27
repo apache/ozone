@@ -121,7 +121,8 @@ public class DeleteBlocksCommandHandler implements CommandHandler {
         dnConf.getBlockDeleteThreads(), threadFactory);
     this.deleteCommandQueues =
         new LinkedBlockingQueue<>(dnConf.getBlockDeleteQueueLimit());
-    handlerThread = new Daemon(new DeleteCmdWorker());
+    long interval = dnConf.getBlockDeleteCommandWorkerInterval().toMillis();
+    handlerThread = new Daemon(new DeleteCmdWorker(interval));
     handlerThread.start();
   }
 
@@ -134,12 +135,22 @@ public class DeleteBlocksCommandHandler implements CommandHandler {
           SCMCommandProto.Type.deleteBlocksCommand, command.getType());
       return;
     }
-
+    DeleteCmdInfo cmd = new DeleteCmdInfo((DeleteBlocksCommand) command,
+        container, context, connectionManager);
     try {
-      DeleteCmdInfo cmd = new DeleteCmdInfo((DeleteBlocksCommand) command,
-          container, context, connectionManager);
       deleteCommandQueues.add(cmd);
     } catch (IllegalStateException e) {
+      String dnId = context.getParent().getDatanodeDetails().getUuidString();
+      Consumer<CommandStatus> updateFailure = (cmdStatus) -> {
+        cmdStatus.markAsFailed();
+        ContainerBlocksDeletionACKProto emptyACK =
+            ContainerBlocksDeletionACKProto
+                .newBuilder()
+                .setDnId(dnId)
+                .build();
+        ((DeleteBlockCommandStatus)cmdStatus).setBlocksDeletionAck(emptyACK);
+      };
+      updateCommandStatus(cmd.getContext(), cmd.getCmd(), updateFailure, LOG);
       LOG.warn("Command is discarded because of the command queue is full");
     }
   }
@@ -221,6 +232,17 @@ public class DeleteBlocksCommandHandler implements CommandHandler {
    */
   public final class DeleteCmdWorker implements Runnable {
 
+    private long intervalInMs;
+
+    public DeleteCmdWorker(long interval) {
+      this.intervalInMs = interval;
+    }
+
+    @VisibleForTesting
+    public long getInterval() {
+      return this.intervalInMs;
+    }
+
     @Override
     public void run() {
       while (true) {
@@ -234,7 +256,7 @@ public class DeleteBlocksCommandHandler implements CommandHandler {
         }
 
         try {
-          Thread.sleep(2000);
+          Thread.sleep(this.intervalInMs);
         } catch (InterruptedException e) {
           Thread.currentThread().interrupt();
           break;
@@ -370,9 +392,13 @@ public class DeleteBlocksCommandHandler implements CommandHandler {
     } finally {
       final ContainerBlocksDeletionACKProto deleteAck =
           blockDeletionACK;
-      final boolean status = cmdExecuted;
+      final boolean executedStatus = cmdExecuted;
       Consumer<CommandStatus> statusUpdater = (cmdStatus) -> {
-        cmdStatus.setStatus(status);
+        if (executedStatus) {
+          cmdStatus.markAsExecuted();
+        } else {
+          cmdStatus.markAsFailed();
+        }
         ((DeleteBlockCommandStatus)cmdStatus).setBlocksDeletionAck(deleteAck);
       };
       updateCommandStatus(cmd.getContext(), cmd.getCmd(), statusUpdater, LOG);

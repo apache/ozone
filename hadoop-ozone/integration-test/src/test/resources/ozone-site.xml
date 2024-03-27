@@ -37,8 +37,38 @@
   </property>
 
   <property>
-    <name>dfs.container.ratis.num.write.chunk.threads.per.volume</name>
+    <name>hdds.container.ratis.num.write.chunk.threads.per.volume</name>
     <value>4</value>
+  </property>
+
+  <property>
+    <name>ozone.scm.handler.count.key</name>
+    <value>20</value>
+  </property>
+
+  <property>
+    <name>ozone.om.handler.count.key</name>
+    <value>20</value>
+  </property>
+
+  <property>
+    <name>hdds.container.ratis.datastream.enabled</name>
+    <value>true</value>
+  </property>
+
+
+  <property>
+    <name>hdds.heartbeat.interval</name>
+    <value>1s</value>
+  </property>
+  <property>
+    <name>ozone.scm.heartbeat.thread.interval</name>
+    <value>100ms</value>
+  </property>
+
+  <property>
+    <name>ozone.scm.ratis.pipeline.limit</name>
+    <value>3</value>
   </property>
 
   <property>
@@ -49,6 +79,53 @@
   <property>
     <name>ozone.om.snapshot.diff.job.default.wait.time</name>
     <value>1s</value>
+  </property>
+
+  <property>
+    <name>hdds.container.ratis.log.appender.queue.byte-limit
+</name>
+    <value>8MB</value>
+  </property>
+  <property>
+    <name>ozone.om.ratis.log.appender.queue.byte-limit</name>
+    <value>4MB</value>
+  </property>
+  <property>
+    <name>ozone.scm.ha.ratis.log.appender.queue.byte-limit</name>
+    <value>4MB</value>
+  </property>
+
+  <property>
+    <name>ozone.scm.chunk.size</name>
+    <value>1MB</value>
+  </property>
+  <property>
+    <name>ozone.scm.block.size</name>
+    <value>4MB</value>
+  </property>
+  <property>
+    <name>ozone.client.stream.buffer.flush.size</name>
+    <value>1MB</value>
+  </property>
+  <property>
+    <name>ozone.client.stream.buffer.max.size</name>
+    <value>2MB</value>
+  </property>
+  <property>
+    <name>ozone.client.stream.buffer.size</name>
+    <value>1MB</value>
+  </property>
+  <property>
+    <name>ozone.client.datastream.buffer.flush.size</name>
+    <value>4MB</value>
+  </property>
+  <property>
+    <name>ozone.client.datastream.min.packet.size</name>
+    <value>256KB</value>
+  </property>
+  <property>
+    <name>ozone.client.datastream.window.size</name>
+    <value>8MB</value>
   </property>
 
 </configuration>

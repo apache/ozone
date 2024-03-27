@@ -25,18 +25,18 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientStub;
-import org.jetbrains.annotations.NotNull;
-import org.junit.Test;
-import org.mockito.Mockito;
+import jakarta.annotation.Nonnull;
+import org.junit.jupiter.api.Test;
 
 import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.Response;
 
 import static org.apache.hadoop.ozone.s3.util.S3Consts.STORAGE_CLASS_HEADER;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNotEquals;
-import static org.junit.Assert.assertNotNull;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 /**
  * This class tests Initiate Multipart Upload request.
@@ -51,7 +51,7 @@ public class TestInitiateMultipartUpload {
     OzoneClient client = new OzoneClientStub();
     client.getObjectStore().createS3Bucket(bucket);
 
-    HttpHeaders headers = Mockito.mock(HttpHeaders.class);
+    HttpHeaders headers = mock(HttpHeaders.class);
     when(headers.getHeaderString(STORAGE_CLASS_HEADER)).thenReturn(
         "STANDARD");
 
@@ -80,7 +80,7 @@ public class TestInitiateMultipartUpload {
     String key = OzoneConsts.KEY;
     OzoneClient client = new OzoneClientStub();
     client.getObjectStore().createS3Bucket(bucket);
-    HttpHeaders headers = Mockito.mock(HttpHeaders.class);
+    HttpHeaders headers = mock(HttpHeaders.class);
     ObjectEndpoint rest = getObjectEndpoint(client, headers);
     client.getObjectStore().getS3Bucket(bucket)
         .setReplicationConfig(new ECReplicationConfig("rs-3-2-1024K"));
@@ -92,7 +92,7 @@ public class TestInitiateMultipartUpload {
     assertNotNull(multipartUploadInitiateResponse.getUploadID());
   }
 
-  @NotNull
+  @Nonnull
   private ObjectEndpoint getObjectEndpoint(OzoneClient client,
       HttpHeaders headers) {
     ObjectEndpoint rest = new ObjectEndpoint();

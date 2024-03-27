@@ -21,15 +21,14 @@ import com.google.common.base.Preconditions;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.scm.OzoneClientConfig;
 import org.apache.hadoop.io.MD5Hash;
-import org.apache.hadoop.util.CrcComposer;
-import org.apache.hadoop.util.CrcUtil;
 import org.apache.hadoop.util.DataChecksum;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.nio.ByteBuffer;
+import java.security.MessageDigest;
 import java.util.List;
 
 /**
@@ -41,7 +40,13 @@ public class ReplicatedBlockChecksumComputer extends
   private static final Logger LOG =
       LoggerFactory.getLogger(ReplicatedBlockChecksumComputer.class);
 
-  private List<ContainerProtos.ChunkInfo> chunkInfoList;
+  static MD5Hash digest(ByteBuffer data) {
+    final MessageDigest digester = MD5Hash.getDigester();
+    digester.update(data);
+    return new MD5Hash(digester.digest());
+  }
+
+  private final List<ContainerProtos.ChunkInfo> chunkInfoList;
 
   public ReplicatedBlockChecksumComputer(
       List<ContainerProtos.ChunkInfo> chunkInfoList) {
@@ -64,20 +69,20 @@ public class ReplicatedBlockChecksumComputer extends
   }
 
   // compute the block checksum, which is the md5 of chunk checksums
-  private void computeMd5Crc() throws IOException {
-    ByteArrayOutputStream baos = new ByteArrayOutputStream();
-
+  private void computeMd5Crc() {
+    ByteString bytes = ByteString.EMPTY;
     for (ContainerProtos.ChunkInfo chunkInfo : chunkInfoList) {
       ContainerProtos.ChecksumData checksumData =
           chunkInfo.getChecksumData();
       List<ByteString> checksums = checksumData.getChecksumsList();
 
       for (ByteString checksum : checksums) {
-        baos.write(checksum.toByteArray());
+        bytes = bytes.concat(checksum);
       }
     }
 
-    MD5Hash fileMD5 = MD5Hash.digest(baos.toByteArray());
+    final MD5Hash fileMD5 = digest(bytes.asReadOnlyByteBuffer());
+
     setOutBytes(fileMD5.getDigest());
 
     LOG.debug("number of chunks={}, md5out={}",
@@ -123,7 +128,7 @@ public class ReplicatedBlockChecksumComputer extends
       Preconditions.checkArgument(remainingChunkSize <=
           checksums.size() * chunkSize);
       for (ByteString checksum : checksums) {
-        int checksumDataCrc = CrcUtil.readInt(checksum.toByteArray(), 0);
+        final int checksumDataCrc = checksum.asReadOnlyByteBuffer().getInt();
         chunkCrcComposer.update(checksumDataCrc,
             Math.min(bytesPerCrc, remainingChunkSize));
         remainingChunkSize -= bytesPerCrc;

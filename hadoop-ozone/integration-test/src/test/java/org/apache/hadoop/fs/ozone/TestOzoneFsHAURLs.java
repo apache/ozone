@@ -35,51 +35,45 @@ import org.apache.hadoop.ozone.client.OzoneClientFactory;
 import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.ha.ConfUtils;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
-import org.apache.hadoop.ozone.om.OMStorage;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.hadoop.util.ToolRunner;
 import org.apache.ratis.util.LifeCycle;
-import org.hamcrest.core.StringContains;
-import org.junit.AfterClass;
-import org.junit.Assert;
-import org.junit.Before;
-import org.junit.BeforeClass;
-import org.junit.Test;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
+import org.junit.jupiter.api.io.TempDir;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.File;
 import java.util.Optional;
 import java.util.OptionalInt;
-import java.util.UUID;
 
-import org.junit.Rule;
-import org.junit.rules.TestRule;
-import org.junit.rules.Timeout;
-import org.apache.ozone.test.JUnit5AwareTimeout;
 import static org.apache.hadoop.hdds.HddsUtils.getHostName;
 import static org.apache.hadoop.hdds.HddsUtils.getHostPort;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 /**
  * Test client-side URI handling with Ozone Manager HA.
  */
+@Timeout(300)
 public class TestOzoneFsHAURLs {
 
   /**
     * Set a timeout for each test.
     */
-  @Rule
-  public TestRule timeout = new JUnit5AwareTimeout(Timeout.seconds(300));
   public static final Logger LOG = LoggerFactory.getLogger(
       TestOzoneFsHAURLs.class);
 
   private OzoneConfiguration conf;
-  private static MiniOzoneCluster cluster;
-  private static String omId;
+  private static MiniOzoneHAClusterImpl cluster;
   private static String omServiceId;
-  private static String clusterId;
-  private static String scmId;
   private static OzoneManager om;
   private static int numOfOMs;
 
@@ -87,63 +81,50 @@ public class TestOzoneFsHAURLs {
   private String bucketName;
   private String rootPath;
 
-  private final String o3fsImplKey =
+  private static final String O3FS_IMPL_KEY =
       "fs." + OzoneConsts.OZONE_URI_SCHEME + ".impl";
-  private final String o3fsImplValue =
+  private static final String O3FS_IMPL_VALUE =
       "org.apache.hadoop.fs.ozone.OzoneFileSystem";
   private static OzoneClient client;
 
-  private final String ofsImplKey =
+  private static final String OFS_IMPL_KEY =
       "fs." + OzoneConsts.OZONE_OFS_URI_SCHEME + ".impl";
 
-  private final String ofsImplValue =
+  private static final String OFS_IMPL_VALUE =
       "org.apache.hadoop.fs.ozone.RootedOzoneFileSystem";
 
 
-  @BeforeClass
-  public static void initClass() throws Exception {
+  @BeforeAll
+  static void initClass(@TempDir File tempDir) throws Exception {
     OzoneConfiguration conf = new OzoneConfiguration();
-    omId = UUID.randomUUID().toString();
     omServiceId = "om-service-test1";
     numOfOMs = 3;
-    clusterId = UUID.randomUUID().toString();
-    scmId = UUID.randomUUID().toString();
-    final String path = GenericTestUtils.getTempPath(omId);
-    java.nio.file.Path metaDirPath = java.nio.file.Paths.get(path, "om-meta");
-    conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, metaDirPath.toString());
+    conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, tempDir.getAbsolutePath());
     conf.setInt(ScmConfigKeys.OZONE_DATANODE_PIPELINE_LIMIT, 3);
 
     conf.set(OMConfigKeys.OZONE_DEFAULT_BUCKET_LAYOUT,
         BucketLayout.LEGACY.name());
     conf.setBoolean(OMConfigKeys.OZONE_OM_ENABLE_FILESYSTEM_PATHS, true);
 
-    OMStorage omStore = new OMStorage(conf);
-    omStore.setClusterId(clusterId);
-    // writes the version file properties
-    omStore.initialize();
-
     // Start the cluster
-    cluster = MiniOzoneCluster.newOMHABuilder(conf)
-        .setNumDatanodes(7)
-        .setTotalPipelineNumLimit(10)
-        .setClusterId(clusterId)
-        .setScmId(scmId)
-        .setOMServiceId(omServiceId)
+    MiniOzoneHAClusterImpl.Builder builder = MiniOzoneCluster.newHABuilder(conf);
+    builder.setOMServiceId(omServiceId)
         .setNumOfOzoneManagers(numOfOMs)
-        .build();
+        .setNumDatanodes(5);
+    cluster = builder.build();
     cluster.waitForClusterToBeReady();
     client = OzoneClientFactory.getRpcClient(omServiceId, conf);
 
     om = cluster.getOzoneManager();
   }
 
-  @Before
+  @BeforeEach
   public void init() throws Exception {
     // Duplicate the conf for each test, so the client can change it, and each
     // test will still get the same base conf used to start the cluster.
     conf = new OzoneConfiguration(cluster.getConf());
 
-    Assert.assertEquals(LifeCycle.State.RUNNING, om.getOmRatisServerState());
+    assertEquals(LifeCycle.State.RUNNING, om.getOmRatisServerState());
 
     volumeName = "volume" + RandomStringUtils.randomNumeric(5);
     ObjectStore objectStore = client.getObjectStore();
@@ -167,7 +148,7 @@ public class TestOzoneFsHAURLs {
     fs.mkdirs(dir2);
   }
 
-  @AfterClass
+  @AfterAll
   public static void shutdown() {
     IOUtils.closeQuietly(client);
     if (cluster != null) {
@@ -179,10 +160,8 @@ public class TestOzoneFsHAURLs {
    * @return the leader OM's RPC address in the MiniOzoneHACluster
    */
   private String getLeaderOMNodeAddr() {
-    MiniOzoneHAClusterImpl haCluster = (MiniOzoneHAClusterImpl) cluster;
-    OzoneManager omLeader = haCluster.getOMLeader();
-    Assert.assertNotNull("There should be a leader OM at this point.",
-        omLeader);
+    OzoneManager omLeader = cluster.getOMLeader();
+    assertNotNull(omLeader, "There should be a leader OM at this point.");
     String omNodeId = omLeader.getOMNodeId();
     // omLeaderAddrKey=ozone.om.address.omServiceId.omNodeId
     String omLeaderAddrKey = ConfUtils.addKeySuffixes(
@@ -223,7 +202,7 @@ public class TestOzoneFsHAURLs {
   public void testWithQualifiedDefaultFS() throws Exception {
     OzoneConfiguration clientConf = new OzoneConfiguration(conf);
     clientConf.setQuietMode(false);
-    clientConf.set(o3fsImplKey, o3fsImplValue);
+    clientConf.set(O3FS_IMPL_KEY, O3FS_IMPL_VALUE);
     // fs.defaultFS = o3fs://bucketName.volumeName.omServiceId/
     clientConf.set(CommonConfigurationKeysPublic.FS_DEFAULT_NAME_KEY, rootPath);
 
@@ -240,12 +219,12 @@ public class TestOzoneFsHAURLs {
       // Expectation: Success.
       res = ToolRunner.run(shell, new String[] {"-ls", "/"});
       // Check return value, should be 0 (success)
-      Assert.assertEquals(0, res);
+      assertEquals(0, res);
 
       // Test case 2: ozone fs -ls o3fs:///
       // Expectation: Success. fs.defaultFS is a fully qualified path.
       res = ToolRunner.run(shell, new String[] {"-ls", "o3fs:///"});
-      Assert.assertEquals(0, res);
+      assertEquals(0, res);
 
       // Test case 3: ozone fs -ls o3fs://bucket.volume/
       // Expectation: Fail. Must have service id or host name when HA is enabled
@@ -255,14 +234,12 @@ public class TestOzoneFsHAURLs {
           new GenericTestUtils.SystemErrCapturer()) {
         res = ToolRunner.run(shell, new String[] {"-ls", unqualifiedPath1});
         // Check stderr, inspired by testDFSWithInvalidCommmand
-        Assert.assertThat("Command did not print the error message " +
-                "correctly for test case: ozone fs -ls o3fs://bucket.volume/",
-            capture.getOutput(), StringContains.containsString(
-                "-ls: Service ID or host name must not"
-                    + " be omitted when ozone.om.service.ids is defined."));
+        assertThat(capture.getOutput())
+            .as("ozone fs -ls o3fs://bucket.volume/")
+            .contains("-ls: Service ID or host name must not be omitted when ozone.om.service.ids is defined.");
       }
       // Check return value, should be -1 (failure)
-      Assert.assertEquals(res, -1);
+      assertEquals(-1, res);
 
       // Test case 4: ozone fs -ls o3fs://bucket.volume.om1/
       // Expectation: Success. The client should use the port number
@@ -272,7 +249,7 @@ public class TestOzoneFsHAURLs {
           getHostFromAddress(leaderOMNodeAddr));
       res = ToolRunner.run(shell, new String[] {"-ls", qualifiedPath1});
       // Note: this test case will fail if the port is not from the leader node
-      Assert.assertEquals(0, res);
+      assertEquals(0, res);
 
       // Test case 5: ozone fs -ls o3fs://bucket.volume.om1:port/
       // Expectation: Success.
@@ -280,14 +257,14 @@ public class TestOzoneFsHAURLs {
           OzoneConsts.OZONE_URI_SCHEME, bucketName, volumeName,
           leaderOMNodeAddr);
       res = ToolRunner.run(shell, new String[] {"-ls", qualifiedPath2});
-      Assert.assertEquals(0, res);
+      assertEquals(0, res);
 
       // Test case 6: ozone fs -ls o3fs://bucket.volume.id1/
       // Expectation: Success.
       String qualifiedPath3 = String.format("%s://%s.%s.%s/",
           OzoneConsts.OZONE_URI_SCHEME, bucketName, volumeName, omServiceId);
       res = ToolRunner.run(shell, new String[] {"-ls", qualifiedPath3});
-      Assert.assertEquals(0, res);
+      assertEquals(0, res);
 
       // Test case 7: ozone fs -ls o3fs://bucket.volume.id1:port/
       // Expectation: Fail. Service ID does not use port information.
@@ -299,14 +276,12 @@ public class TestOzoneFsHAURLs {
           new GenericTestUtils.SystemErrCapturer()) {
         res = ToolRunner.run(shell, new String[] {"-ls", unqualifiedPath2});
         // Check stderr
-        Assert.assertThat("Command did not print the error message " +
-                "correctly for test case: "
-                + "ozone fs -ls o3fs://bucket.volume.id1:port/",
-            capture.getOutput(), StringContains.containsString(
-                "does not use port information"));
+        assertThat(capture.getOutput())
+            .as("ozone fs -ls o3fs://bucket.volume.id1:port/")
+            .contains("does not use port information");
       }
       // Check return value, should be -1 (failure)
-      Assert.assertEquals(res, -1);
+      assertEquals(-1, res);
     } finally {
       shell.close();
     }
@@ -322,7 +297,7 @@ public class TestOzoneFsHAURLs {
   private void testWithDefaultFS(String defaultFS) throws Exception {
     OzoneConfiguration clientConf = new OzoneConfiguration(conf);
     clientConf.setQuietMode(false);
-    clientConf.set(o3fsImplKey, o3fsImplValue);
+    clientConf.set(O3FS_IMPL_KEY, O3FS_IMPL_VALUE);
     // fs.defaultFS = file:///
     clientConf.set(CommonConfigurationKeysPublic.FS_DEFAULT_NAME_KEY,
         defaultFS);
@@ -332,7 +307,7 @@ public class TestOzoneFsHAURLs {
       // Test case: ozone fs -ls o3fs:///
       // Expectation: Fail. fs.defaultFS is not a qualified o3fs URI.
       int res = ToolRunner.run(shell, new String[] {"-ls", "o3fs:///"});
-      Assert.assertEquals(res, -1);
+      assertEquals(-1, res);
     } finally {
       shell.close();
     }
@@ -367,8 +342,8 @@ public class TestOzoneFsHAURLs {
   public void testIncorrectAuthorityInURI() throws Exception {
     OzoneConfiguration clientConf = new OzoneConfiguration(conf);
     clientConf.setQuietMode(false);
-    clientConf.set(o3fsImplKey, o3fsImplValue);
-    clientConf.set(ofsImplKey, ofsImplValue);
+    clientConf.set(O3FS_IMPL_KEY, O3FS_IMPL_VALUE);
+    clientConf.set(OFS_IMPL_KEY, OFS_IMPL_VALUE);
     FsShell shell = new FsShell(clientConf);
     String incorrectSvcId = "dummy";
     String o3fsPathWithCorrectSvcId =
@@ -382,27 +357,25 @@ public class TestOzoneFsHAURLs {
     try {
       int res = ToolRunner.run(shell,
           new String[] {"-ls", ofsPathWithCorrectSvcId });
-      Assert.assertEquals(0, res);
+      assertEquals(0, res);
       res = ToolRunner.run(shell,
           new String[] {"-ls", o3fsPathWithCorrectSvcId });
-      Assert.assertEquals(0, res);
+      assertEquals(0, res);
 
       try (GenericTestUtils.SystemErrCapturer capture = new
           GenericTestUtils.SystemErrCapturer()) {
         res = ToolRunner.run(shell,
             new String[] {"-ls", ofsPathWithIncorrectSvcId });
-        Assert.assertEquals(1, res);
-        Assert.assertTrue(
-            capture.getOutput().contains("Cannot resolve OM host"));
+        assertEquals(1, res);
+        assertThat(capture.getOutput()).contains("Cannot resolve OM host");
       }
 
       try (GenericTestUtils.SystemErrCapturer capture = new
           GenericTestUtils.SystemErrCapturer()) {
         res = ToolRunner.run(shell,
             new String[] {"-ls", o3fsPathWithInCorrectSvcId });
-        Assert.assertEquals(1, res);
-        Assert.assertTrue(
-            capture.getOutput().contains("Cannot resolve OM host"));
+        assertEquals(1, res);
+        assertThat(capture.getOutput()).contains("Cannot resolve OM host");
       }
     } finally {
       shell.close();

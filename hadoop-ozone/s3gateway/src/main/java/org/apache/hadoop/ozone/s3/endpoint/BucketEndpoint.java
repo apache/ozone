@@ -17,7 +17,6 @@
  */
 package org.apache.hadoop.ozone.s3.endpoint;
 
-import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -64,12 +63,13 @@ import javax.ws.rs.core.Response;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.ArrayList;
-import java.util.BitSet;
+import java.util.EnumSet;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Set;
 
+import static org.apache.hadoop.ozone.audit.AuditLogger.PerformanceStringBuilder;
 import static org.apache.hadoop.ozone.OzoneAcl.AclScope.ACCESS;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
 import static org.apache.hadoop.ozone.s3.S3GatewayConfigKeys.OZONE_S3G_LIST_KEYS_SHALLOW_ENABLED;
@@ -99,7 +99,6 @@ public class BucketEndpoint extends EndpointBase {
    * for more details.
    */
   @GET
-  @SuppressFBWarnings
   @SuppressWarnings({"parameternumber", "methodlength"})
   public Response get(
       @PathParam("bucket") String bucketName,
@@ -115,10 +114,12 @@ public class BucketEndpoint extends EndpointBase {
       @Context HttpHeaders hh) throws OS3Exception, IOException {
     long startNanos = Time.monotonicNowNanos();
     S3GAction s3GAction = S3GAction.GET_BUCKET;
-    Iterator<? extends OzoneKey> ozoneKeyIterator;
+    PerformanceStringBuilder perf = new PerformanceStringBuilder();
+
+    Iterator<? extends OzoneKey> ozoneKeyIterator = null;
     ContinueToken decodedToken =
         ContinueToken.decodeFromString(continueToken);
-    OzoneBucket bucket;
+    OzoneBucket bucket = null;
 
     try {
       if (aclMarker != null) {
@@ -163,6 +164,9 @@ public class BucketEndpoint extends EndpointBase {
       getMetrics().updateGetBucketFailureStats(startNanos);
       if (isAccessDenied(ex)) {
         throw newError(S3ErrorTable.ACCESS_DENIED, bucketName, ex);
+      } else if (ex.getResult() == ResultCodes.FILE_NOT_FOUND) {
+        // File not found, continue and send normal response with 0 keyCount
+        LOG.debug("Key Not found prefix: {}", prefix);
       } else {
         throw ex;
       }
@@ -205,9 +209,9 @@ public class BucketEndpoint extends EndpointBase {
     }
     String lastKey = null;
     int count = 0;
-    while (ozoneKeyIterator.hasNext()) {
+    while (ozoneKeyIterator != null && ozoneKeyIterator.hasNext()) {
       OzoneKey next = ozoneKeyIterator.next();
-      if (bucket.getBucketLayout().isFileSystemOptimized() &&
+      if (bucket != null && bucket.getBucketLayout().isFileSystemOptimized() &&
           StringUtils.isNotEmpty(prefix) &&
           !next.getName().startsWith(prefix)) {
         // prefix has delimiter but key don't have
@@ -266,12 +270,15 @@ public class BucketEndpoint extends EndpointBase {
       response.setTruncated(false);
     }
 
-    AUDIT.logReadSuccess(buildAuditMessageForSuccess(s3GAction,
-        getAuditParameters()));
     int keyCount =
         response.getCommonPrefixes().size() + response.getContents().size();
-    getMetrics().updateGetBucketSuccessStats(startNanos);
+    long opLatencyNs =
+        getMetrics().updateGetBucketSuccessStats(startNanos);
     getMetrics().incListKeyCount(keyCount);
+    perf.appendCount(keyCount);
+    perf.appendOpLatencyNanos(opLatencyNs);
+    AUDIT.logReadSuccess(buildAuditMessageForSuccess(s3GAction,
+        getAuditParameters(), perf));
     response.setKeyCount(keyCount);
     return Response.ok(response).build();
   }
@@ -658,14 +665,11 @@ public class BucketEndpoint extends EndpointBase {
         throw newError(NOT_IMPLEMENTED, part[0]);
       }
       // Build ACL on Bucket
-      BitSet aclsOnBucket =
-          S3Acl.getOzoneAclOnBucketFromS3Permission(permission);
+      EnumSet<IAccessAuthorizer.ACLType> aclsOnBucket = S3Acl.getOzoneAclOnBucketFromS3Permission(permission);
       OzoneAcl defaultOzoneAcl = new OzoneAcl(
-          IAccessAuthorizer.ACLIdentityType.USER, part[1], aclsOnBucket,
-          OzoneAcl.AclScope.DEFAULT);
-      OzoneAcl accessOzoneAcl = new OzoneAcl(
-          IAccessAuthorizer.ACLIdentityType.USER, part[1], aclsOnBucket,
-          ACCESS);
+          IAccessAuthorizer.ACLIdentityType.USER, part[1], OzoneAcl.AclScope.DEFAULT, aclsOnBucket
+      );
+      OzoneAcl accessOzoneAcl = new OzoneAcl(IAccessAuthorizer.ACLIdentityType.USER, part[1], ACCESS, aclsOnBucket);
       ozoneAclList.add(defaultOzoneAcl);
       ozoneAclList.add(accessOzoneAcl);
     }
@@ -692,11 +696,9 @@ public class BucketEndpoint extends EndpointBase {
         throw newError(NOT_IMPLEMENTED, part[0]);
       }
       // Build ACL on Volume
-      BitSet aclsOnVolume =
+      EnumSet<IAccessAuthorizer.ACLType> aclsOnVolume =
           S3Acl.getOzoneAclOnVolumeFromS3Permission(permission);
-      OzoneAcl accessOzoneAcl = new OzoneAcl(
-          IAccessAuthorizer.ACLIdentityType.USER, part[1], aclsOnVolume,
-          ACCESS);
+      OzoneAcl accessOzoneAcl = new OzoneAcl(IAccessAuthorizer.ACLIdentityType.USER, part[1], ACCESS, aclsOnVolume);
       ozoneAclList.add(accessOzoneAcl);
     }
     return ozoneAclList;

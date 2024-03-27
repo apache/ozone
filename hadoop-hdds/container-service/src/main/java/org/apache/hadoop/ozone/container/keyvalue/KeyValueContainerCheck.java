@@ -18,11 +18,14 @@
 
 package org.apache.hadoop.ozone.container.keyvalue;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
+import org.apache.hadoop.hdds.StringUtils;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdfs.util.Canceler;
 import org.apache.hadoop.hdfs.util.DataTransferThrottler;
+import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.common.Checksum;
 import org.apache.hadoop.ozone.common.ChecksumData;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
@@ -43,7 +46,6 @@ import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
-import java.util.Arrays;
 
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 import org.slf4j.Logger;
@@ -263,10 +265,25 @@ public class KeyValueContainerCheck {
               if (getBlockDataFromDBWithLock(db, block) != null) {
                 // Block was not deleted, the failure is legitimate.
                 return result;
-              } else if (LOG.isDebugEnabled()) {
+              } else {
+                // If schema V3 and container details not in DB or
+                // if containerDBPath is removed
+                if ((onDiskContainerData.hasSchema(OzoneConsts.SCHEMA_V3) &&
+                    db.getStore().getMetadataTable().get(
+                      onDiskContainerData.getBcsIdKey()) == null)  ||
+                    !new File(onDiskContainerData.getDbFile()
+                        .getAbsolutePath()).exists()) {
+                  // Container has been deleted. Skip the rest of the blocks.
+                  return ScanResult.unhealthy(
+                      ScanResult.FailureType.DELETED_CONTAINER,
+                      result.getUnhealthyFile(), result.getException());
+                }
+
                 // Block may have been deleted during the scan.
-                LOG.debug("Scanned outdated blockData {} in container {}.",
-                    block, containerID);
+                if (LOG.isDebugEnabled()) {
+                  LOG.debug("Scanned outdated blockData {} in container {}.",
+                      block, containerID);
+                }
               }
             } else {
               // All other failures should be treated as errors.
@@ -328,7 +345,7 @@ public class KeyValueContainerCheck {
       File chunkFile;
       try {
         chunkFile = layout.getChunkFile(onDiskContainerData,
-            block.getBlockID(), ChunkInfo.getFromProtoBuf(chunk));
+            block.getBlockID(), chunk.getChunkName());
       } catch (IOException ex) {
         return ScanResult.unhealthy(
             ScanResult.FailureType.MISSING_CHUNK_FILE,
@@ -404,8 +421,8 @@ public class KeyValueContainerCheck {
                   " for block %s",
                   ChunkInfo.getFromProtoBuf(chunk),
                   i,
-                  Arrays.toString(expected.toByteArray()),
-                  Arrays.toString(actual.toByteArray()),
+                  StringUtils.bytes2Hex(expected.asReadOnlyByteBuffer()),
+                  StringUtils.bytes2Hex(actual.asReadOnlyByteBuffer()),
                   block.getBlockID());
           return ScanResult.unhealthy(
               ScanResult.FailureType.CORRUPT_CHUNK, chunkFile,
@@ -435,4 +452,16 @@ public class KeyValueContainerCheck {
         .readContainerFile(containerFile);
     onDiskContainerData.setVolume(volume);
   }
+
+  @VisibleForTesting
+  void setContainerData(KeyValueContainerData containerData) {
+    onDiskContainerData = containerData;
+  }
+
+  @VisibleForTesting
+  ScanResult scanContainer(DataTransferThrottler throttler,
+                           Canceler canceler) {
+    return scanData(throttler, canceler);
+  }
+
 }

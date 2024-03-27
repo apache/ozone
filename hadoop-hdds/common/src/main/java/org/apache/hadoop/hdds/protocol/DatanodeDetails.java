@@ -21,7 +21,6 @@ package org.apache.hadoop.hdds.protocol;
 import java.util.ArrayList;
 import java.util.EnumSet;
 import java.util.List;
-import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 
@@ -33,6 +32,7 @@ import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.annotation.InterfaceStability;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails.Port.Name;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ExtendedDatanodeDetailsProto;
 import org.apache.hadoop.hdds.scm.net.NetConstants;
 import org.apache.hadoop.hdds.scm.net.NodeImpl;
 
@@ -69,7 +69,7 @@ public class DatanodeDetails extends NodeImpl implements
       LoggerFactory.getLogger(DatanodeDetails.class);
 
   private static final Codec<DatanodeDetails> CODEC = new DelegatedCodec<>(
-      Proto2Codec.get(HddsProtos.ExtendedDatanodeDetailsProto.class),
+      Proto2Codec.get(ExtendedDatanodeDetailsProto.getDefaultInstance()),
       DatanodeDetails::getFromProtoBuf,
       DatanodeDetails::getExtendedProtoBufMessage);
 
@@ -86,57 +86,40 @@ public class DatanodeDetails extends NodeImpl implements
 
   private String ipAddress;
   private String hostName;
-  private List<Port> ports;
+  private final List<Port> ports;
   private String certSerialId;
   private String version;
   private long setupTime;
   private String revision;
   private String buildDate;
   private volatile HddsProtos.NodeOperationalState persistedOpState;
-  private volatile long persistedOpStateExpiryEpochSec = 0;
+  private volatile long persistedOpStateExpiryEpochSec;
   private int initialVersion;
   private int currentVersion;
 
-  /**
-   * Constructs DatanodeDetails instance. DatanodeDetails.Builder is used
-   * for instantiating DatanodeDetails.
-   * @param uuid DataNode's UUID
-   * @param ipAddress IP Address of this DataNode
-   * @param hostName DataNode's hostname
-   * @param networkLocation DataNode's network location path
-   * @param ports Ports used by the DataNode
-   * @param certSerialId serial id from SCM issued certificate.
-   * @param version DataNode's version
-   * @param setupTime the setup time of DataNode
-   * @param revision DataNodes's revision
-   * @param buildDate DataNodes's build timestamp
-   * @param persistedOpState Operational State stored on DN.
-   * @param persistedOpStateExpiryEpochSec Seconds after the epoch the stored
-   *                                       state should expire.
-   */
-  @SuppressWarnings("parameternumber")
-  private DatanodeDetails(UUID uuid, String ipAddress, String hostName,
-      String networkLocation, List<Port> ports, String certSerialId,
-      String version, long setupTime, String revision, String buildDate,
-      HddsProtos.NodeOperationalState persistedOpState,
-      long persistedOpStateExpiryEpochSec,
-      int initialVersion, int currentVersion) {
-    super(hostName, networkLocation, NetConstants.NODE_COST_DEFAULT);
-    this.uuid = uuid;
-    this.uuidString = uuid.toString();
+  private DatanodeDetails(Builder b) {
+    super(b.hostName, b.networkLocation, NetConstants.NODE_COST_DEFAULT);
+    uuid = b.id;
+    uuidString = uuid.toString();
     threadNamePrefix = HddsUtils.threadNamePrefix(uuidString);
-    this.ipAddress = ipAddress;
-    this.hostName = hostName;
-    this.ports = ports;
-    this.certSerialId = certSerialId;
-    this.version = version;
-    this.setupTime = setupTime;
-    this.revision = revision;
-    this.buildDate = buildDate;
-    this.persistedOpState = persistedOpState;
-    this.persistedOpStateExpiryEpochSec = persistedOpStateExpiryEpochSec;
-    this.initialVersion = initialVersion;
-    this.currentVersion = currentVersion;
+    ipAddress = b.ipAddress;
+    hostName = b.hostName;
+    ports = b.ports;
+    certSerialId = b.certSerialId;
+    version = b.version;
+    setupTime = b.setupTime;
+    revision = b.revision;
+    buildDate = b.buildDate;
+    persistedOpState = b.persistedOpState;
+    persistedOpStateExpiryEpochSec = b.persistedOpStateExpiryEpochSec;
+    initialVersion = b.initialVersion;
+    currentVersion = b.currentVersion;
+    if (b.networkName != null) {
+      setNetworkName(b.networkName);
+    }
+    if (b.level > 0) {
+      setLevel(b.level);
+    }
   }
 
   public DatanodeDetails(DatanodeDetails datanodeDetails) {
@@ -149,6 +132,7 @@ public class DatanodeDetails extends NodeImpl implements
     this.ipAddress = datanodeDetails.ipAddress;
     this.hostName = datanodeDetails.hostName;
     this.ports = datanodeDetails.ports;
+    this.certSerialId = datanodeDetails.certSerialId;
     this.setNetworkName(datanodeDetails.getNetworkName());
     this.setParent(datanodeDetails.getParent());
     this.version = datanodeDetails.version;
@@ -364,6 +348,9 @@ public class DatanodeDetails extends NodeImpl implements
     if (datanodeDetailsProto.hasNetworkLocation()) {
       builder.setNetworkLocation(datanodeDetailsProto.getNetworkLocation());
     }
+    if (datanodeDetailsProto.hasLevel()) {
+      builder.setLevel(datanodeDetailsProto.getLevel());
+    }
     if (datanodeDetailsProto.hasPersistedOpState()) {
       builder.setPersistedOpState(datanodeDetailsProto.getPersistedOpState());
     }
@@ -392,7 +379,7 @@ public class DatanodeDetails extends NodeImpl implements
    * @return DatanodeDetails
    */
   public static DatanodeDetails getFromProtoBuf(
-      HddsProtos.ExtendedDatanodeDetailsProto extendedDetailsProto) {
+      ExtendedDatanodeDetailsProto extendedDetailsProto) {
     DatanodeDetails.Builder builder;
     if (extendedDetailsProto.hasDatanodeDetails()) {
       builder = newBuilder(extendedDetailsProto.getDatanodeDetails());
@@ -456,6 +443,9 @@ public class DatanodeDetails extends NodeImpl implements
     if (!Strings.isNullOrEmpty(getNetworkLocation())) {
       builder.setNetworkLocation(getNetworkLocation());
     }
+    if (getLevel() > 0) {
+      builder.setLevel(getLevel());
+    }
     if (persistedOpState != null) {
       builder.setPersistedOpState(persistedOpState);
     }
@@ -480,12 +470,12 @@ public class DatanodeDetails extends NodeImpl implements
 
   /**
    * Returns a ExtendedDatanodeDetails protobuf message from a datanode ID.
-   * @return HddsProtos.ExtendedDatanodeDetailsProto
+   * @return ExtendedDatanodeDetailsProto
    */
   @JsonIgnore
-  public HddsProtos.ExtendedDatanodeDetailsProto getExtendedProtoBufMessage() {
-    HddsProtos.ExtendedDatanodeDetailsProto.Builder extendedBuilder =
-        HddsProtos.ExtendedDatanodeDetailsProto.newBuilder()
+  public ExtendedDatanodeDetailsProto getExtendedProtoBufMessage() {
+    final ExtendedDatanodeDetailsProto.Builder extendedBuilder
+        = ExtendedDatanodeDetailsProto.newBuilder()
             .setDatanodeDetails(getProtoBufMessage());
 
     if (!Strings.isNullOrEmpty(getVersion())) {
@@ -562,14 +552,6 @@ public class DatanodeDetails extends NodeImpl implements
     return uuid.hashCode();
   }
 
-  // Skip The OpStates which may change in Runtime.
-  public int getSignature() {
-    return Objects
-        .hash(uuid, uuidString, ipAddress, hostName, ports,
-            certSerialId, version, setupTime, revision, buildDate,
-            initialVersion, currentVersion);
-  }
-
   /**
    * Returns DatanodeDetails.Builder instance.
    *
@@ -593,6 +575,7 @@ public class DatanodeDetails extends NodeImpl implements
     private String hostName;
     private String networkName;
     private String networkLocation;
+    private int level;
     private List<Port> ports;
     private String certSerialId;
     private String version;
@@ -624,6 +607,7 @@ public class DatanodeDetails extends NodeImpl implements
       this.hostName = details.getHostName();
       this.networkName = details.getNetworkName();
       this.networkLocation = details.getNetworkLocation();
+      this.level = details.getLevel();
       this.ports = details.getPorts();
       this.certSerialId = details.getCertSerialId();
       this.version = details.getVersion();
@@ -688,6 +672,11 @@ public class DatanodeDetails extends NodeImpl implements
      */
     public Builder setNetworkLocation(String loc) {
       this.networkLocation = loc;
+      return this;
+    }
+
+    public Builder setLevel(int level) {
+      this.level = level;
       return this;
     }
 
@@ -808,14 +797,7 @@ public class DatanodeDetails extends NodeImpl implements
       if (networkLocation == null) {
         networkLocation = NetConstants.DEFAULT_RACK;
       }
-      DatanodeDetails dn = new DatanodeDetails(id, ipAddress, hostName,
-          networkLocation, ports, certSerialId, version, setupTime, revision,
-          buildDate, persistedOpState, persistedOpStateExpiryEpochSec,
-          initialVersion, currentVersion);
-      if (networkName != null) {
-        dn.setNetworkName(networkName);
-      }
-      return dn;
+      return new DatanodeDetails(this);
     }
   }
 
@@ -862,9 +844,6 @@ public class DatanodeDetails extends NodeImpl implements
     /**
      * Private constructor for constructing Port object. Use
      * DatanodeDetails#newPort to create a new Port object.
-     *
-     * @param name
-     * @param value
      */
     private Port(Name name, Integer value) {
       this.name = name;
@@ -1018,5 +997,13 @@ public class DatanodeDetails extends NodeImpl implements
    */
   public void setBuildDate(String date) {
     this.buildDate = date;
+  }
+
+  @Override
+  public HddsProtos.NetworkNode toProtobuf(
+      int clientVersion) {
+    return HddsProtos.NetworkNode.newBuilder()
+        .setDatanodeDetails(toProtoBuilder(clientVersion).build())
+        .build();
   }
 }

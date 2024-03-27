@@ -17,14 +17,15 @@
  */
 package org.apache.hadoop.hdds.server.http;
 
+import org.apache.commons.lang3.RandomUtils;
 import static org.apache.hadoop.hdds.server.http.HttpServer2Metrics.HttpServer2MetricsInfo.HttpServerIdleThreadCount;
 import static org.apache.hadoop.hdds.server.http.HttpServer2Metrics.HttpServer2MetricsInfo.HttpServerMaxThreadCount;
 import static org.apache.hadoop.hdds.server.http.HttpServer2Metrics.HttpServer2MetricsInfo.HttpServerThreadCount;
 import static org.apache.hadoop.hdds.server.http.HttpServer2Metrics.HttpServer2MetricsInfo.HttpServerThreadQueueWaitingTaskCount;
 import static org.apache.hadoop.hdds.server.http.HttpServer2Metrics.HttpServer2MetricsInfo.SERVER_NAME;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyInt;
-import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.any;
+import static org.mockito.Mockito.anyInt;
+import static org.mockito.Mockito.anyString;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -33,11 +34,8 @@ import org.apache.hadoop.metrics2.MetricsCollector;
 import org.apache.hadoop.metrics2.MetricsInfo;
 import org.apache.hadoop.metrics2.MetricsRecordBuilder;
 import org.eclipse.jetty.util.thread.QueuedThreadPool;
-import org.junit.Before;
-import org.junit.Test;
-import org.mockito.Mockito;
-
-import java.util.Random;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 
 /**
  * Testing HttpServer2Metrics.
@@ -48,27 +46,26 @@ public class TestHttpServer2Metrics {
   private MetricsCollector metricsCollector;
   private MetricsRecordBuilder recorder;
 
-  @Before
+  @BeforeEach
   public void setup() {
-    threadPool = Mockito.mock(QueuedThreadPool.class);
-    metricsCollector = Mockito.mock(MetricsCollector.class);
+    threadPool = mock(QueuedThreadPool.class);
+    metricsCollector = mock(MetricsCollector.class);
     recorder = mock(MetricsRecordBuilder.class);
   }
 
   @Test
   public void testMetrics() {
     // crate mock metrics
-    Random random = new Random();
-    int threadCount = random.nextInt();
-    int maxThreadCount = random.nextInt();
-    int idleThreadCount = random.nextInt();
-    int threadQueueWaitingTaskCount = random.nextInt();
+    int threadCount = RandomUtils.nextInt();
+    int maxThreadCount = RandomUtils.nextInt();
+    int idleThreadCount = RandomUtils.nextInt();
+    int threadQueueWaitingTaskCount = RandomUtils.nextInt();
     String name = "s3g";
 
-    Mockito.when(threadPool.getThreads()).thenReturn(threadCount);
-    Mockito.when(threadPool.getMaxThreads()).thenReturn(maxThreadCount);
-    Mockito.when(threadPool.getIdleThreads()).thenReturn(idleThreadCount);
-    Mockito.when(threadPool.getQueueSize())
+    when(threadPool.getThreads()).thenReturn(threadCount);
+    when(threadPool.getMaxThreads()).thenReturn(maxThreadCount);
+    when(threadPool.getIdleThreads()).thenReturn(idleThreadCount);
+    when(threadPool.getQueueSize())
             .thenReturn(threadQueueWaitingTaskCount);
     when(recorder.addGauge(any(MetricsInfo.class), anyInt()))
         .thenReturn(recorder);

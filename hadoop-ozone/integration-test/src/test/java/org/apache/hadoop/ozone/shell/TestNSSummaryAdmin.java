@@ -29,23 +29,21 @@ import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
-import org.apache.ozone.test.JUnit5AwareTimeout;
-import org.junit.AfterClass;
-import org.junit.Assert;
-import org.junit.BeforeClass;
-import org.junit.Rule;
-import org.junit.Test;
-import org.junit.rules.TestRule;
-import org.junit.rules.Timeout;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
 
 import java.io.UnsupportedEncodingException;
 import java.util.UUID;
 
 import static org.apache.hadoop.hdds.recon.ReconConfigKeys.OZONE_RECON_ADDRESS_KEY;
+import static org.assertj.core.api.Assertions.assertThat;
 
 /**
  * Test for Namespace CLI.
  */
+@Timeout(60)
 public class TestNSSummaryAdmin extends StandardOutputTestBase {
   private static ObjectStore store;
 
@@ -58,10 +56,7 @@ public class TestNSSummaryAdmin extends StandardOutputTestBase {
   private static String bucketFSO;
   private static OzoneClient client;
 
-  @Rule
-  public TestRule timeout = new JUnit5AwareTimeout(Timeout.seconds(60));
-
-  @BeforeClass
+  @BeforeAll
   public static void init() throws Exception {
     conf = new OzoneConfiguration();
     OMRequestTestUtils.configureFSOptimizedPaths(conf, true);
@@ -81,7 +76,7 @@ public class TestNSSummaryAdmin extends StandardOutputTestBase {
     createVolumeAndBuckets();
   }
 
-  @AfterClass
+  @AfterAll
   public static void shutdown() {
     IOUtils.closeQuietly(client);
     if (cluster != null) {
@@ -120,13 +115,9 @@ public class TestNSSummaryAdmin extends StandardOutputTestBase {
     String path = "/";
     executeAdminCommands(path);
     // Should throw warning - only buckets can have bucket layout.
-    Assert.assertTrue(
-        getOutContentString().contains(
-            "[Warning] Namespace CLI is not designed for OBS bucket layout."));
-    Assert.assertTrue(getOutContentString()
-        .contains("Put more files into it to visualize DU"));
-    Assert.assertTrue(getOutContentString().contains(
-        "Put more files into it to visualize file size distribution"));
+    assertThat(getOutContentString()).contains("[Warning] Namespace CLI is not designed for OBS bucket layout.");
+    assertThat(getOutContentString()).contains("Put more files into it to visualize DU");
+    assertThat(getOutContentString()).contains("Put more files into it to visualize file size distribution");
   }
 
   /**
@@ -138,13 +129,10 @@ public class TestNSSummaryAdmin extends StandardOutputTestBase {
     String path = "/" + volumeName + "/" + bucketFSO;
     executeAdminCommands(path);
     // Should not throw warning, since bucket is in FSO bucket layout.
-    Assert.assertFalse(
-        getOutContentString().contains(
-            "[Warning] Namespace CLI is not designed for OBS bucket layout."));
-    Assert.assertTrue(getOutContentString()
-        .contains("Put more files into it to visualize DU"));
-    Assert.assertTrue(getOutContentString().contains(
-        "Put more files into it to visualize file size distribution"));
+    assertThat(getOutContentString())
+        .doesNotContain("[Warning] Namespace CLI is not designed for OBS bucket layout.");
+    assertThat(getOutContentString()).contains("Put more files into it to visualize DU");
+    assertThat(getOutContentString()).contains("Put more files into it to visualize file size distribution");
   }
 
   /**
@@ -156,13 +144,9 @@ public class TestNSSummaryAdmin extends StandardOutputTestBase {
     String path = "/" + volumeName + "/" + bucketOBS;
     executeAdminCommands(path);
     // Should throw warning, since bucket is in OBS bucket layout.
-    Assert.assertTrue(
-        getOutContentString().contains(
-            "[Warning] Namespace CLI is not designed for OBS bucket layout."));
-    Assert.assertTrue(getOutContentString()
-        .contains("Put more files into it to visualize DU"));
-    Assert.assertTrue(getOutContentString().contains(
-        "Put more files into it to visualize file size distribution"));
+    assertThat(getOutContentString()).contains("[Warning] Namespace CLI is not designed for OBS bucket layout.");
+    assertThat(getOutContentString()).contains("Put more files into it to visualize DU");
+    assertThat(getOutContentString()).contains("Put more files into it to visualize file size distribution");
   }
 
   /**

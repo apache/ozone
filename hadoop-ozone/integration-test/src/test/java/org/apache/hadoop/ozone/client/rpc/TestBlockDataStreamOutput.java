@@ -17,9 +17,9 @@
 
 package org.apache.hadoop.ozone.client.rpc;
 
-import org.apache.hadoop.conf.StorageUnit;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.scm.OzoneClientConfig;
 import org.apache.hadoop.hdds.scm.XceiverClientManager;
@@ -27,6 +27,7 @@ import org.apache.hadoop.hdds.scm.XceiverClientMetrics;
 import org.apache.hadoop.hdds.scm.storage.BlockDataStreamOutput;
 import org.apache.hadoop.hdds.scm.storage.ByteBufferStreamOutput;
 import org.apache.hadoop.hdds.utils.IOUtils;
+import org.apache.hadoop.ozone.ClientConfigForTesting;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.client.ObjectStore;
@@ -37,14 +38,10 @@ import org.apache.hadoop.ozone.client.io.KeyDataStreamOutput;
 import org.apache.hadoop.ozone.client.io.OzoneDataStreamOutput;
 import org.apache.hadoop.ozone.container.ContainerTestHelper;
 import org.apache.hadoop.ozone.container.TestHelper;
-import org.junit.AfterClass;
-import org.junit.Assert;
-import org.junit.BeforeClass;
-import org.junit.Rule;
-import org.junit.Test;
-import org.junit.rules.TestRule;
-import org.junit.rules.Timeout;
-import org.apache.ozone.test.JUnit5AwareTimeout;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
@@ -53,17 +50,15 @@ import java.util.concurrent.TimeUnit;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_STALENODE_INTERVAL;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 
 /**
  * Tests BlockDataStreamOutput class.
  */
+@Timeout(300)
 public class TestBlockDataStreamOutput {
-
-  /**
-    * Set a timeout for each test.
-    */
-  @Rule
-  public TestRule timeout = new JUnit5AwareTimeout(Timeout.seconds(300));
   private static MiniOzoneCluster cluster;
   private static OzoneConfiguration conf = new OzoneConfiguration();
   private static OzoneClient client;
@@ -83,7 +78,7 @@ public class TestBlockDataStreamOutput {
    *
    * @throws IOException
    */
-  @BeforeClass
+  @BeforeAll
   public static void init() throws Exception {
     chunkSize = 100;
     flushSize = 2 * chunkSize;
@@ -98,17 +93,18 @@ public class TestBlockDataStreamOutput {
     conf.setStorageSize(OzoneConfigKeys.OZONE_SCM_BLOCK_SIZE, 4,
         StorageUnit.MB);
 
-    cluster = MiniOzoneCluster.newBuilder(conf)
-        .setNumDatanodes(7)
-        .setTotalPipelineNumLimit(10)
+    ClientConfigForTesting.newBuilder(StorageUnit.BYTES)
         .setBlockSize(blockSize)
         .setChunkSize(chunkSize)
         .setStreamBufferFlushSize(flushSize)
         .setStreamBufferMaxSize(maxFlushSize)
-        .setDataStreamBufferFlushize(maxFlushSize)
-        .setStreamBufferSizeUnit(StorageUnit.BYTES)
+        .setDataStreamBufferFlushSize(maxFlushSize)
         .setDataStreamMinPacketSize(chunkSize)
-        .setDataStreamStreamWindowSize(5 * chunkSize)
+        .setDataStreamWindowSize(5 * chunkSize)
+        .applyTo(conf);
+
+    cluster = MiniOzoneCluster.newBuilder(conf)
+        .setNumDatanodes(5)
         .build();
     cluster.waitForClusterToBeReady();
     //the easiest way to create an open container is creating a key
@@ -128,7 +124,7 @@ public class TestBlockDataStreamOutput {
   /**
    * Shutdown MiniDFSCluster.
    */
-  @AfterClass
+  @AfterAll
   public static void shutdown() {
     IOUtils.closeQuietly(client);
     if (cluster != null) {
@@ -184,7 +180,7 @@ public class TestBlockDataStreamOutput {
         (KeyDataStreamOutput) key.getByteBufStreamOutput();
     ByteBufferStreamOutput stream =
         keyDataStreamOutput.getStreamEntries().get(0).getByteBufStreamOutput();
-    Assert.assertTrue(stream instanceof BlockDataStreamOutput);
+    assertInstanceOf(BlockDataStreamOutput.class, stream);
     TestHelper.waitForContainerClose(key, cluster);
     key.write(b);
     key.close();
@@ -208,21 +204,20 @@ public class TestBlockDataStreamOutput {
         ContainerTestHelper.getFixedLengthString(keyString, dataLength)
             .getBytes(UTF_8);
     key.write(ByteBuffer.wrap(data));
-    Assert.assertTrue(
-        metrics.getPendingContainerOpCountMetrics(ContainerProtos.Type.PutBlock)
-            <= pendingPutBlockCount + 1);
+    assertThat(metrics.getPendingContainerOpCountMetrics(ContainerProtos.Type.PutBlock))
+        .isLessThanOrEqualTo(pendingPutBlockCount + 1);
     key.close();
     // Since data length is 500 , first putBlock will be at 400(flush boundary)
     // and the other at 500
-    Assert.assertTrue(
-        metrics.getContainerOpCountMetrics(ContainerProtos.Type.PutBlock)
-            == putBlockCount + 2);
+    assertEquals(
+        metrics.getContainerOpCountMetrics(ContainerProtos.Type.PutBlock),
+        putBlockCount + 2);
     validateData(keyName, data);
   }
 
 
   static OzoneDataStreamOutput createKey(String keyName, ReplicationType type,
-      long size) throws Exception {
+                                         long size) throws Exception {
     return TestHelper.createStreamKey(
         keyName, type, size, objectStore, volumeName, bucketName);
   }
@@ -245,10 +240,10 @@ public class TestBlockDataStreamOutput {
             .getBytes(UTF_8);
     key.write(ByteBuffer.wrap(data));
     // minPacketSize= 100, so first write of 50 wont trigger a writeChunk
-    Assert.assertEquals(writeChunkCount,
+    assertEquals(writeChunkCount,
         metrics.getContainerOpCountMetrics(ContainerProtos.Type.WriteChunk));
     key.write(ByteBuffer.wrap(data));
-    Assert.assertEquals(writeChunkCount + 1,
+    assertEquals(writeChunkCount + 1,
         metrics.getContainerOpCountMetrics(ContainerProtos.Type.WriteChunk));
     // now close the stream, It will update the key length.
     key.close();
@@ -271,7 +266,7 @@ public class TestBlockDataStreamOutput {
         keyDataStreamOutput.getStreamEntries().get(0);
     key.write(ByteBuffer.wrap(data));
     key.close();
-    Assert.assertEquals(dataLength, stream.getTotalAckDataLength());
+    assertEquals(dataLength, stream.getTotalAckDataLength());
   }
 
 }

@@ -16,14 +16,11 @@
  */
 package org.apache.hadoop.ozone.security.acl;
 
-import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.RandomUtils;
 import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.server.OzoneAdmins;
-import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
-import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.om.BucketManager;
 import org.apache.hadoop.ozone.om.KeyManager;
@@ -42,10 +39,9 @@ import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLIdentityType;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType;
 import org.apache.hadoop.security.UserGroupInformation;
-import org.apache.ozone.test.GenericTestUtils;
-import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -78,6 +74,7 @@ import static org.apache.hadoop.ozone.security.acl.OzoneObj.ResourceType.KEY;
 import static org.apache.hadoop.ozone.security.acl.OzoneObj.ResourceType.PREFIX;
 import static org.apache.hadoop.ozone.security.acl.OzoneObj.ResourceType.VOLUME;
 import static org.apache.hadoop.ozone.security.acl.OzoneObj.StoreType.OZONE;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -89,6 +86,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 public class TestOzoneNativeAuthorizer {
 
   private static final List<String> ADMIN_USERNAMES = singletonList("om");
+  @TempDir
   private static File testDir;
   private String vol;
   private String buck;
@@ -143,7 +141,6 @@ public class TestOzoneNativeAuthorizer {
     OzoneConfiguration ozConfig = new OzoneConfiguration();
     ozConfig.set(OZONE_ACL_AUTHORIZER_CLASS,
         OZONE_ACL_AUTHORIZER_CLASS_NATIVE);
-    testDir = GenericTestUtils.getRandomizedTestDir();
     ozConfig.set(OZONE_METADATA_DIRS, testDir.toString());
     ozConfig.set(OZONE_ADMINISTRATORS, "om");
 
@@ -161,11 +158,6 @@ public class TestOzoneNativeAuthorizer {
         new String[]{"ozone"});
     testUgi = UserGroupInformation.createUserForTesting("testuser",
         new String[]{"test"});
-  }
-
-  @AfterAll
-  public static void cleanup() throws IOException {
-    FileUtils.deleteDirectory(testDir);
   }
 
   private void createKey(String volume,
@@ -250,9 +242,9 @@ public class TestOzoneNativeAuthorizer {
       ACLType groupRight, boolean expectedResult) throws Exception {
     createAll(keyName, prefixName, userRight, groupRight, expectedResult);
     OzoneAcl userAcl = new OzoneAcl(USER, testUgi.getUserName(),
-        parentDirUserAcl, ACCESS);
+        ACCESS, parentDirUserAcl);
     OzoneAcl groupAcl = new OzoneAcl(GROUP, testUgi.getGroups().size() > 0 ?
-        testUgi.getGroups().get(0) : "", parentDirGroupAcl, ACCESS);
+        testUgi.getGroups().get(0) : "", ACCESS, parentDirGroupAcl);
     // Set access for volume.
     // We should directly add to table because old API's update to DB.
 
@@ -272,9 +264,9 @@ public class TestOzoneNativeAuthorizer {
       ACLType groupRight, boolean expectedResult) throws Exception {
     createAll(keyName, prefixName, userRight, groupRight, expectedResult);
     OzoneAcl userAcl = new OzoneAcl(USER, testUgi.getUserName(),
-        parentDirUserAcl, ACCESS);
+        ACCESS, parentDirUserAcl);
     OzoneAcl groupAcl = new OzoneAcl(GROUP, testUgi.getGroups().size() > 0 ?
-        testUgi.getGroups().get(0) : "", parentDirGroupAcl, ACCESS);
+        testUgi.getGroups().get(0) : "", ACCESS, parentDirGroupAcl);
     // Set access for volume & bucket. We should directly add to table
     // because old API's update to DB.
 
@@ -302,9 +294,9 @@ public class TestOzoneNativeAuthorizer {
         .build();
 
     OzoneAcl userAcl = new OzoneAcl(USER, testUgi.getUserName(),
-        parentDirUserAcl, ACCESS);
+        ACCESS, parentDirUserAcl);
     OzoneAcl groupAcl = new OzoneAcl(GROUP, testUgi.getGroups().size() > 0 ?
-        testUgi.getGroups().get(0) : "", parentDirGroupAcl, ACCESS);
+        testUgi.getGroups().get(0) : "", ACCESS, parentDirGroupAcl);
     // Set access for volume & bucket. We should directly add to table
     // because old API's update to DB.
 
@@ -320,45 +312,19 @@ public class TestOzoneNativeAuthorizer {
 
 
   private void setVolumeAcl(List<OzoneAcl> ozoneAcls) throws IOException {
-    String volumeKey = metadataManager.getVolumeKey(volObj.getVolumeName());
-    OmVolumeArgs omVolumeArgs =
-        metadataManager.getVolumeTable().get(volumeKey);
-
-    omVolumeArgs.setAcls(ozoneAcls);
-
-    metadataManager.getVolumeTable().addCacheEntry(new CacheKey<>(volumeKey),
-        CacheValue.get(1L, omVolumeArgs));
+    OzoneNativeAclTestUtil.setVolumeAcl(metadataManager, vol, ozoneAcls);
   }
 
   private void setBucketAcl(List<OzoneAcl> ozoneAcls) throws IOException {
-    String bucketKey = metadataManager.getBucketKey(vol, buck);
-    OmBucketInfo omBucketInfo = metadataManager.getBucketTable().get(bucketKey);
-
-    omBucketInfo.setAcls(ozoneAcls);
-
-    metadataManager.getBucketTable().addCacheEntry(new CacheKey<>(bucketKey),
-        CacheValue.get(1L, omBucketInfo));
+    OzoneNativeAclTestUtil.setBucketAcl(metadataManager, vol, buck, ozoneAcls);
   }
 
   private void addVolumeAcl(OzoneAcl ozoneAcl) throws IOException {
-    String volumeKey = metadataManager.getVolumeKey(volObj.getVolumeName());
-    OmVolumeArgs omVolumeArgs =
-        metadataManager.getVolumeTable().get(volumeKey);
-
-    omVolumeArgs.addAcl(ozoneAcl);
-
-    metadataManager.getVolumeTable().addCacheEntry(new CacheKey<>(volumeKey),
-        CacheValue.get(1L, omVolumeArgs));
+    OzoneNativeAclTestUtil.addVolumeAcl(metadataManager, vol, ozoneAcl);
   }
 
   private void addBucketAcl(OzoneAcl ozoneAcl) throws IOException {
-    String bucketKey = metadataManager.getBucketKey(vol, buck);
-    OmBucketInfo omBucketInfo = metadataManager.getBucketTable().get(bucketKey);
-
-    omBucketInfo.addAcl(ozoneAcl);
-
-    metadataManager.getBucketTable().addCacheEntry(new CacheKey<>(bucketKey),
-        CacheValue.get(1L, omBucketInfo));
+    OzoneNativeAclTestUtil.addBucketAcl(metadataManager, vol, buck, ozoneAcl);
   }
 
   private void resetAclsAndValidateAccess(
@@ -385,8 +351,8 @@ public class TestOzoneNativeAuthorizer {
      *    if user/group has access to them.
      */
     for (ACLType a1 : allAcls) {
-      OzoneAcl newAcl = new OzoneAcl(accessType, getAclName(accessType), a1,
-          ACCESS);
+      OzoneAcl newAcl = new OzoneAcl(accessType, getAclName(accessType), ACCESS, a1
+      );
 
       // Reset acls to only one right.
       if (obj.getResourceType() == VOLUME) {
@@ -401,7 +367,7 @@ public class TestOzoneNativeAuthorizer {
       // Fetch current acls and validate.
       acls = aclImplementor.getAcl(obj);
       assertEquals(1, acls.size());
-      assertTrue(acls.contains(newAcl));
+      assertThat(acls).contains(newAcl);
 
       // Special handling for ALL.
       if (a1.equals(ALL)) {
@@ -465,7 +431,7 @@ public class TestOzoneNativeAuthorizer {
           ACLIdentityType identityType = ACLIdentityType.values()[type];
           // Add remaining acls one by one and then check access.
           OzoneAcl addAcl = new OzoneAcl(identityType,
-              getAclName(identityType), a2, ACCESS);
+              getAclName(identityType), ACCESS, a2);
 
           // For volume and bucket update to cache. As Old API's update to
           // only DB not cache.

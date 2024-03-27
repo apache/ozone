@@ -51,6 +51,12 @@ public class UnhealthyContainersResponse {
   private long misReplicatedCount = 0;
 
   /**
+   * Total count of containers with negative size.
+   */
+  @JsonProperty("negativeSizeCount")
+  private long negativeSizeCount = 0;
+
+  /**
    * A collection of unhealthy containers.
    */
   @JsonProperty("containers")
@@ -59,6 +65,10 @@ public class UnhealthyContainersResponse {
   public UnhealthyContainersResponse(Collection<UnhealthyContainerMetadata>
                                        containers) {
     this.containers = containers;
+  }
+
+  // Default constructor, used by jackson lib for object deserialization.
+  public UnhealthyContainersResponse() {
   }
 
   public void setSummaryCount(String state, long count) {
@@ -73,6 +83,9 @@ public class UnhealthyContainersResponse {
     } else if (state.equals(
         UnHealthyContainerStates.MIS_REPLICATED.toString())) {
       this.misReplicatedCount = count;
+    } else if (state.equals(
+        UnHealthyContainerStates.NEGATIVE_SIZE.toString())) {
+      this.negativeSizeCount = count;
     }
   }
 
@@ -90,6 +103,10 @@ public class UnhealthyContainersResponse {
 
   public long getMisReplicatedCount() {
     return misReplicatedCount;
+  }
+
+  public long getNegativeSizeCount() {
+    return negativeSizeCount;
   }
 
   public Collection<UnhealthyContainerMetadata> getContainers() {

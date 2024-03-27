@@ -18,9 +18,9 @@
 package org.apache.hadoop.hdds.utils.db;
 
 import com.google.common.primitives.Longs;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 
-import static org.junit.Assert.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
 /**
  * Test for class {@link FixedLengthStringCodec}.

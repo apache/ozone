@@ -22,11 +22,13 @@ import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.getTestRe
 import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.initializeNewOmMetadataManager;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -405,14 +407,27 @@ public class TestReconContainerMetadataManagerImpl {
         reconContainerMetadataManager.getKeyPrefixesForContainer(containerId);
     assertEquals(2, keyPrefixMap.size());
 
+    keyPrefixMap.forEach((containerKeyPrefix, integer) -> {
+      try {
+        assertNotNull(reconContainerMetadataManager.getKeyContainerTable()
+                          .get(containerKeyPrefix.toKeyPrefixContainer()));
+      } catch (IOException e) {
+        throw new RuntimeException(e);
+      }
+    });
+
     RDBBatchOperation rdbBatchOperation = new RDBBatchOperation();
+    ContainerKeyPrefix prefixForDelete = ContainerKeyPrefix.get(
+        containerId, keyPrefix2, 0);
     reconContainerMetadataManager
-        .batchDeleteContainerMapping(rdbBatchOperation, ContainerKeyPrefix.get(
-        containerId, keyPrefix2, 0));
+        .batchDeleteContainerMapping(rdbBatchOperation, prefixForDelete);
     reconContainerMetadataManager.commitBatchOperation(rdbBatchOperation);
     keyPrefixMap =
         reconContainerMetadataManager.getKeyPrefixesForContainer(containerId);
     assertEquals(1, keyPrefixMap.size());
+
+    assertNull(reconContainerMetadataManager.getKeyContainerTable()
+                   .get(prefixForDelete.toKeyPrefixContainer()));
   }
 
   @Test

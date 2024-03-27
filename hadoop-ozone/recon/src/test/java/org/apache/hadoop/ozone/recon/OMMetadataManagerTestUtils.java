@@ -27,7 +27,7 @@ import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.DIRECTORY_TABLE;
 import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.FILE_TABLE;
 import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.VOLUME_TABLE;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_OM_SNAPSHOT_DB_DIR;
-import static org.junit.Assert.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -397,23 +397,31 @@ public final class OMMetadataManagerTestUtils {
                     .build());
   }
 
+  @SuppressWarnings("parameternumber")
   public static void writeDeletedDirToOm(OMMetadataManager omMetadataManager,
                                          String bucketName,
                                          String volumeName,
                                          String dirName,
                                          long parentObjectId,
                                          long bucketObjectId,
-                                         long volumeObjectId)
+                                         long volumeObjectId,
+                                         long objectId)
       throws IOException {
-    // DB key in DeletedDirectoryTable => "volumeID/bucketID/parentId/dirName"
-    String omKey = omMetadataManager.getOzonePathKey(volumeObjectId,
-            bucketObjectId, parentObjectId, dirName);
+    // DB key in DeletedDirectoryTable =>
+    // "volumeID/bucketID/parentId/dirName/dirObjectId"
 
-    omMetadataManager.getDeletedDirTable().put(omKey,
+    String ozoneDbKey = omMetadataManager.getOzonePathKey(volumeObjectId,
+        bucketObjectId, parentObjectId, dirName);
+    String ozoneDeleteKey = omMetadataManager.getOzoneDeletePathKey(
+        objectId, ozoneDbKey);
+
+
+    omMetadataManager.getDeletedDirTable().put(ozoneDeleteKey,
         new OmKeyInfo.Builder()
             .setBucketName(bucketName)
             .setVolumeName(volumeName)
             .setKeyName(dirName)
+            .setObjectID(objectId)
             .setReplicationConfig(StandaloneReplicationConfig.getInstance(ONE))
             .build());
   }
