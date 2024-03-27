@@ -32,6 +32,7 @@ import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 public class ContainerChunkInfo {
   private String containerPath;
   private List<ChunkDetails> chunkInfos;
+
   private HashSet<String> files;
   private UUID pipelineID;
   private Pipeline pipeline;
@@ -64,6 +65,27 @@ public class ContainerChunkInfo {
   public void setChunkType(ChunkType chunkType) {
     this.chunkType = chunkType;
   }
+
+  public String getContainerPath() {
+    return containerPath;
+  }
+
+  public List<ChunkDetails> getChunkInfos() {
+    return chunkInfos;
+  }
+
+  public HashSet<String> getFiles() {
+    return files;
+  }
+
+  public UUID getPipelineID() {
+    return pipelineID;
+  }
+
+  public ChunkType getChunkType() {
+    return chunkType;
+  }
+
 
   @Override
   public String toString() {

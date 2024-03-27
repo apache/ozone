@@ -545,6 +545,8 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
         if (startDataNodes) {
           cluster.startHddsDatanodes();
         }
+
+        prepareForNextBuild();
         return cluster;
       } catch (Exception ex) {
         stopOM(om);

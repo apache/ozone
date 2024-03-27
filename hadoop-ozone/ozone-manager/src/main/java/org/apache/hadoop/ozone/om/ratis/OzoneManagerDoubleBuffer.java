@@ -44,7 +44,6 @@ import org.apache.hadoop.hdds.utils.db.DBColumnFamilyDefinition;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.S3SecretManager;
 import org.apache.hadoop.ozone.om.codec.OMDBDefinition;
-import org.apache.hadoop.ozone.om.ratis.metrics.OzoneManagerDoubleBufferMetrics;
 import org.apache.hadoop.ozone.om.response.CleanupTableInfo;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
@@ -595,29 +594,24 @@ public final class OzoneManagerDoubleBuffer {
     readyBuffer = temp;
   }
 
-  @VisibleForTesting
   OzoneManagerDoubleBufferMetrics getMetrics() {
     return metrics;
   }
 
   /** @return the flushed transaction count to OM DB. */
-  @VisibleForTesting
   long getFlushedTransactionCountForTesting() {
     return flushedTransactionCount.get();
   }
 
   /** @return total number of flush iterations run by sync thread. */
-  @VisibleForTesting
   long getFlushIterationsForTesting() {
     return flushIterations.get();
   }
 
-  @VisibleForTesting
   int getCurrentBufferSize() {
     return currentBuffer.size();
   }
 
-  @VisibleForTesting
   int getReadyBufferSize() {
     return readyBuffer.size();
   }

@@ -23,6 +23,8 @@ package org.apache.hadoop.ozone.s3.endpoint;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.OutputStream;
+import java.security.MessageDigest;
 import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.Response;
 import org.apache.commons.io.IOUtils;
@@ -46,6 +48,7 @@ import org.apache.hadoop.ozone.s3.exception.S3ErrorTable;
 import org.apache.http.HttpStatus;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.MockedStatic;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.DECODED_CONTENT_LENGTH_HEADER;
@@ -57,10 +60,13 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.fail;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.eq;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.mockStatic;
+import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -88,7 +94,7 @@ public class TestObjectPut {
     clientStub.getObjectStore().createS3Bucket(destBucket);
 
     // Create PutObject and setClient to OzoneClientStub
-    objectEndpoint = new ObjectEndpoint();
+    objectEndpoint = spy(new ObjectEndpoint());
     objectEndpoint.setClient(clientStub);
     objectEndpoint.setOzoneConfiguration(new OzoneConfiguration());
   }
@@ -227,6 +233,31 @@ public class TestObjectPut {
   }
 
   @Test
+  public void testPutObjectMessageDigestResetDuringException() throws OS3Exception {
+    MessageDigest messageDigest = mock(MessageDigest.class);
+    try (MockedStatic<IOUtils> mocked = mockStatic(IOUtils.class)) {
+      // For example, EOFException during put-object due to client cancelling the operation before it completes
+      mocked.when(() -> IOUtils.copyLarge(any(InputStream.class), any(OutputStream.class)))
+          .thenThrow(IOException.class);
+      when(objectEndpoint.getMessageDigestInstance()).thenReturn(messageDigest);
+
+      HttpHeaders headers = mock(HttpHeaders.class);
+      ByteArrayInputStream body =
+          new ByteArrayInputStream(CONTENT.getBytes(UTF_8));
+      objectEndpoint.setHeaders(headers);
+      try {
+        objectEndpoint.put(bucketName, keyName, CONTENT
+            .length(), 1, null, body);
+        fail("Should throw IOException");
+      } catch (IOException ignored) {
+        // Verify that the message digest is reset so that the instance can be reused for the
+        // next request in the same thread
+        verify(messageDigest, times(1)).reset();
+      }
+    }
+  }
+
+  @Test
   public void testCopyObject() throws IOException, OS3Exception {
     // Put object in to source bucket
     HttpHeaders headers = mock(HttpHeaders.class);
@@ -312,6 +343,53 @@ public class TestObjectPut {
         "nonexistent", keyName, CONTENT.length(), 1, null, body),
         "test copy object failed");
     assertThat(e.getCode()).contains("NoSuchBucket");
+  }
+
+  @Test
+  public void testCopyObjectMessageDigestResetDuringException() throws IOException, OS3Exception {
+    // Put object in to source bucket
+    HttpHeaders headers = mock(HttpHeaders.class);
+    ByteArrayInputStream body =
+        new ByteArrayInputStream(CONTENT.getBytes(UTF_8));
+    objectEndpoint.setHeaders(headers);
+    keyName = "sourceKey";
+
+    Response response = objectEndpoint.put(bucketName, keyName,
+        CONTENT.length(), 1, null, body);
+
+    OzoneInputStream ozoneInputStream = clientStub.getObjectStore()
+        .getS3Bucket(bucketName)
+        .readKey(keyName);
+
+    String keyContent = IOUtils.toString(ozoneInputStream, UTF_8);
+    OzoneKeyDetails keyDetails = clientStub.getObjectStore().getS3Bucket(bucketName).getKey(keyName);
+
+    assertEquals(200, response.getStatus());
+    assertEquals(CONTENT, keyContent);
+    assertNotNull(keyDetails.getMetadata());
+    assertTrue(StringUtils.isNotEmpty(keyDetails.getMetadata().get(OzoneConsts.ETAG)));
+
+    MessageDigest messageDigest = mock(MessageDigest.class);
+    try (MockedStatic<IOUtils> mocked = mockStatic(IOUtils.class)) {
+      // Add the mocked methods only during the copy request
+      when(objectEndpoint.getMessageDigestInstance()).thenReturn(messageDigest);
+      mocked.when(() -> IOUtils.copyLarge(any(InputStream.class), any(OutputStream.class)))
+          .thenThrow(IOException.class);
+
+      // Add copy header, and then call put
+      when(headers.getHeaderString(COPY_SOURCE_HEADER)).thenReturn(
+          bucketName  + "/" + urlEncode(keyName));
+
+      try {
+        objectEndpoint.put(destBucket, destkey, CONTENT.length(), 1,
+            null, body);
+        fail("Should throw IOException");
+      } catch (IOException ignored) {
+        // Verify that the message digest is reset so that the instance can be reused for the
+        // next request in the same thread
+        verify(messageDigest, times(1)).reset();
+      }
+    }
   }
 
   @Test
