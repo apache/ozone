@@ -1219,10 +1219,10 @@ public class TestContainerBalancerTask {
       // create containers with varying used space
       int sizeMultiple = 0;
       for (int j = 0; j < i; j++) {
-        sizeMultiple %= 5;
-        sizeMultiple++;
         ContainerInfo container =
             createContainer((long) i * i + j, sizeMultiple);
+        sizeMultiple %= 5;
+        sizeMultiple++;
 
         cidToInfoMap.put(container.containerID(), container);
         containerIDSet.add(container.containerID());
