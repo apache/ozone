@@ -86,16 +86,19 @@ public class OmDirectoryInfo extends WithParentObjectId
       this.acls = new LinkedList<>();
     }
 
+    @Override
     public Builder setParentObjectID(long parentObjectId) {
       super.setParentObjectID(parentObjectId);
       return this;
     }
 
+    @Override
     public Builder setObjectID(long objectId) {
       super.setObjectID(objectId);
       return this;
     }
 
+    @Override
     public Builder setUpdateID(long updateId) {
       super.setUpdateID(updateId);
       return this;
@@ -130,11 +133,13 @@ public class OmDirectoryInfo extends WithParentObjectId
       return this;
     }
 
+    @Override
     public Builder addMetadata(String key, String value) {
       super.addMetadata(key, value);
       return this;
     }
 
+    @Override
     public Builder addAllMetadata(Map<String, String> additionalMetadata) {
       super.addAllMetadata(additionalMetadata);
       return this;

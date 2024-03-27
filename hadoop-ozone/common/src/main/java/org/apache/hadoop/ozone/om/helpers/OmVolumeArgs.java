@@ -323,11 +323,13 @@ public final class OmVolumeArgs extends WithObjectID
     private List<OzoneAcl> acls;
     private long refCount;
 
+    @Override
     public Builder setObjectID(long id) {
       super.setObjectID(id);
       return this;
     }
 
+    @Override
     public Builder setUpdateID(long id) {
       super.setUpdateID(id);
       return this;
@@ -382,11 +384,13 @@ public final class OmVolumeArgs extends WithObjectID
       return this;
     }
 
+    @Override
     public Builder addMetadata(String key, String value) {
       super.addMetadata(key, value);
       return this;
     }
 
+    @Override
     public Builder addAllMetadata(Map<String, String> additionalMetaData) {
       super.addAllMetadata(additionalMetaData);
       return this;

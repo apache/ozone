@@ -486,11 +486,13 @@ public final class OmKeyInfo extends WithParentObjectId
       return this;
     }
 
+    @Override
     public Builder addMetadata(String key, String value) {
       super.addMetadata(key, value);
       return this;
     }
 
+    @Override
     public Builder addAllMetadata(Map<String, String> newMetadata) {
       super.addAllMetadata(newMetadata);
       return this;
@@ -515,11 +517,13 @@ public final class OmKeyInfo extends WithParentObjectId
       return this;
     }
 
+    @Override
     public Builder setObjectID(long obId) {
       super.setObjectID(obId);
       return this;
     }
 
+    @Override
     public Builder setUpdateID(long id) {
       super.setUpdateID(id);
       return this;
@@ -530,6 +534,7 @@ public final class OmKeyInfo extends WithParentObjectId
       return this;
     }
 
+    @Override
     public Builder setParentObjectID(long parentID) {
       super.setParentObjectID(parentID);
       return this;

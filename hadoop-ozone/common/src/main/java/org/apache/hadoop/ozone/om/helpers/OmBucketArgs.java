@@ -256,6 +256,7 @@ public final class OmBucketArgs extends WithMetadata implements Auditable {
       return this;
     }
 
+    @Override
     public Builder addAllMetadata(Map<String, String> map) {
       super.addAllMetadata(map);
       return this;

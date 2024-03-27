@@ -982,6 +982,7 @@ public class OzoneBucket extends WithMetadata {
       this.proxy = proxy;
     }
 
+    @Override
     public Builder setMetadata(Map<String, String> metadata) {
       super.setMetadata(metadata);
       return this;

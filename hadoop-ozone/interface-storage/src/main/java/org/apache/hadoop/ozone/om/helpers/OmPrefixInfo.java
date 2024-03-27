@@ -122,22 +122,26 @@ public final class OmPrefixInfo extends WithObjectID {
       return this;
     }
 
+    @Override
     public OmPrefixInfo.Builder addMetadata(String key, String value) {
       super.addMetadata(key, value);
       return this;
     }
 
+    @Override
     public OmPrefixInfo.Builder addAllMetadata(
         Map<String, String> additionalMetadata) {
       super.addAllMetadata(additionalMetadata);
       return this;
     }
 
+    @Override
     public Builder setObjectID(long obId) {
       super.setObjectID(obId);
       return this;
     }
 
+    @Override
     public Builder setUpdateID(long id) {
       super.setUpdateID(id);
       return this;

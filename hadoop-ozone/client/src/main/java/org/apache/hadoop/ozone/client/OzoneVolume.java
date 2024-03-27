@@ -481,6 +481,7 @@ public class OzoneVolume extends WithMetadata {
       return this;
     }
 
+    @Override
     public Builder setMetadata(Map<String, String> metadata) {
       super.setMetadata(metadata);
       return this;
