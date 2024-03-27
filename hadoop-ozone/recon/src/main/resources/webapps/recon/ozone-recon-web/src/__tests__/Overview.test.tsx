@@ -11,6 +11,7 @@ import { BrowserRouter } from "react-router-dom";
 import "@testing-library/react/dont-cleanup-after-each";
 import { render, screen } from "@testing-library/react";
 
+import { overviewLocators } from "./locators/locators";
 import { overviewServer } from "./mocks/overviewMocks/overviewServer";
 import { Overview } from "../views/overview/overview";
 
@@ -39,20 +40,65 @@ describe("Overview Tests", () => {
   afterAll(() => {
     overviewServer.close();
   })
+
+  // Tests begin here
+  // All the data is being mocked by MSW, so we have a fixed data that we can verify
+  // the content against
   it("Datanode card has the correct count of Datanodes", () => {
-    // We are mocking the data, hence we are always expecting 5 datanodes
-    // out of which 3 are HEALTHY datanodes
-    const datanodeCard = screen.getByTestId("overview-Datanodes")
+    const datanodeCard = screen.getByTestId(overviewLocators.datanodeCard)
+    expect(datanodeCard).toBeVisible();
     expect(datanodeCard).toHaveTextContent("3/5");
   });
+
   it("Pipelines card has the correct count of Pipelines", () => {
-    // We are mocking the data, hence we are always expecting 7 pipelines
-    const pipelinesCard = screen.getByTestId("overview-Pipelines");
+    const pipelinesCard = screen.getByTestId(overviewLocators.pipelinesCard);
+    expect(pipelinesCard).toBeVisible();
     expect(pipelinesCard).toHaveTextContent("7");
   });
-  // it("Capacity card has the correct capacity data", () => {
-  //   const capacityCard = screen.getByTestId("overview-Cluster_Capacity");
-  //   expect(capacityCard).toBeVisible();
-  //   expect(capacityCard).toHaveTextContent("");
-  // });
+
+  it("Capacity card has the correct capacity data", () => {
+    const capacityCard = screen.getByTestId(overviewLocators.clusterCapacityCard);
+    expect(capacityCard).toBeVisible();
+    expect(capacityCard).toHaveTextContent("263.9 GB/1.2 TB");
+  });
+
+  it("Volumes card has the correct number of volumes", () => {
+    const volumeCard = screen.getByTestId(overviewLocators.volumesCard);
+    expect(volumeCard).toBeVisible();
+    expect(volumeCard).toHaveTextContent("2");
+  });
+
+  it("Buckets card has the correct number of buckets", () => {
+    const bucketsCard = screen.getByTestId(overviewLocators.bucketsCard);
+    expect(bucketsCard).toBeVisible();
+    expect(bucketsCard).toHaveTextContent("24");
+  });
+
+  it("Keys card has the correct number of keys", () => {
+    const keysCard = screen.getByTestId(overviewLocators.keysCard);
+    expect(keysCard).toBeVisible();
+    expect(keysCard).toHaveTextContent("1424");
+  });
+
+  it("Deleted containers card has the correct number of keys", () => {
+    const deletedContainersCard = screen.getByTestId(overviewLocators.deletedContainersCard);
+    expect(deletedContainersCard).toBeVisible();
+    expect(deletedContainersCard).toHaveTextContent("10");
+  });
+
+  it("Open keys summary card has the correct data", () => {
+    const openKeysSummaryCard = screen.getByTestId(overviewLocators.openKeysSummaryCard);
+    expect(openKeysSummaryCard).toBeVisible();
+    expect(openKeysSummaryCard).toHaveTextContent("1 KB Total Replicated Data Size");
+    expect(openKeysSummaryCard).toHaveTextContent("4 KB Total UnReplicated Data Size");
+    expect(openKeysSummaryCard).toHaveTextContent("10 Total Open KeysOpen Keys Summary");
+  });
+
+  it("Pending deleted keys summary card has the correct data", () => {
+    const pendingDelKeysCard = screen.getByTestId(overviewLocators.deletePendingSummaryCard);
+    expect(pendingDelKeysCard).toBeVisible();
+    expect(pendingDelKeysCard).toHaveTextContent("1 KB Total Replicated Data Size");
+    expect(pendingDelKeysCard).toHaveTextContent("4 KB Total UnReplicated Data Size");
+    expect(pendingDelKeysCard).toHaveTextContent("3 Total Pending Delete KeysPending Deleted Keys Summary");
+  });
 })

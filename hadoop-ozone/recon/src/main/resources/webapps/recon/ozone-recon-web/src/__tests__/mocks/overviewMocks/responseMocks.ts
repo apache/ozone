@@ -67,25 +67,13 @@ export const TaskStatus = [
 ]
 
 export const OpenKeys = {
-  "keysSummary": {
-    "totalUnreplicatedDataSize": 1024,
-    "totalReplicatedDataSize": 4096,
-    "totalOpenKeys": 12
-  },
-  "lastKey": "",
-  "replicatedDataSize": 0,
-  "unreplicatedDataSize": 0,
-  "status": "OK"
+  "totalUnreplicatedDataSize": 4096,
+  "totalReplicatedDataSize": 1024,
+  "totalOpenKeys": 10
 }
 
 export const DeletePendingSummary = {
-  "keysSummary": {
-    "totalUnreplicatedDataSize": 2048,
-    "totalReplicatedDataSize": 4096,
-    "totalDeletedKeys": 10
-  },
-  "lastKey": "",
-  "replicatedDataSize": 0,
-  "unreplicatedDataSize": 0,
-  "status": "OK"
+  "totalUnreplicatedDataSize": 4096,
+  "totalReplicatedDataSize": 1024,
+  "totalDeletedKeys": 3
 }

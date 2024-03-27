@@ -444,7 +444,7 @@ export class Datanodes extends React.Component<Record<string, object>, IDatanode
       onShowSizeChange: this.onShowSizeChange
     };
     return (
-      <div className='datanodes-container'>
+      <div className='datanodes-container' data-testid='datanodes-container'>
         <div className='page-header'>
           Datanodes ({totalCount})
           <div className='filter-block'>
@@ -459,6 +459,7 @@ export class Datanodes extends React.Component<Record<string, object>, IDatanode
               value={selectedColumns}
               allOption={allColumnsOption}
               onChange={this._handleColumnChange}
+              data-testid='datanodes-multiselect'
             /> Columns
           </div>
           <AutoReloadPanel
