@@ -528,7 +528,7 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
   /**
    * Attempts to decommission the list of nodes.
    * @param nodes The list of hostnames or hostname:ports to decommission
-   * @param force boolean flag that skips fail-early checks and tries to decommission nodes
+   * @param force true to skip fail-early checks and try to decommission nodes
    * @throws IOException
    */
   @Override
@@ -537,7 +537,7 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
     Preconditions.checkNotNull(nodes);
     DecommissionNodesRequestProto request =
         DecommissionNodesRequestProto.newBuilder()
-        .addAllHosts(nodes)
+        .addAllHosts(nodes).setForce(force)
         .build();
     DecommissionNodesResponseProto response =
         submitRequest(Type.DecommissionNodes,

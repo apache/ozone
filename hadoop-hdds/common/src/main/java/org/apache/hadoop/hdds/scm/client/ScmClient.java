@@ -217,7 +217,7 @@ public interface ScmClient extends Closeable {
    * Allows a list of hosts to be decommissioned. The hosts are identified
    * by their hostname and optionally port in the format foo.com:port.
    * @param hosts A list of hostnames, optionally with port
-   * @param force boolean flag that forcefully tries to decommission nodes
+   * @param force true to forcefully decommission Datanodes
    * @throws IOException
    * @return A list of DatanodeAdminError for any hosts which failed to
    *         decommission

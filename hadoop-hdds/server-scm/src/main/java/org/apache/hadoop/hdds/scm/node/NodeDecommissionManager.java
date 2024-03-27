@@ -317,12 +317,15 @@ public class NodeDecommissionManager {
     List<DatanodeDetails> dns = mapHostnamesToDatanodes(nodes, errors);
     // add check for fail-early if force flag is not set
     if (!force) {
+      LOG.info("Force flag = {}. Checking if decommission is possible for dns: {}", force, dns);
       boolean decommissionPossible = checkIfDecommissionPossible(dns, errors);
       if (!decommissionPossible) {
         LOG.error("Cannot decommission nodes as sufficient node are not available.");
         errors.add(new DatanodeAdminError("AllHosts", "Sufficient nodes are not available."));
         return errors;
       }
+    } else {
+      LOG.info("Force flag = {}. Skip checking if decommission is possible for dns: {}", force, dns);
     }
     for (DatanodeDetails dn : dns) {
       try {
@@ -385,7 +388,7 @@ public class NodeDecommissionManager {
   }
 
   private synchronized boolean checkIfDecommissionPossible(List<DatanodeDetails> dns, List<DatanodeAdminError> errors) {
-    int minInService = -1, numDecom = dns.size();
+    int numDecom = dns.size();
     int inServiceTotal = nodeManager.getNodeCount(NodeStatus.inServiceHealthy());
     for (DatanodeDetails dn : dns) {
       try {
@@ -418,20 +421,22 @@ public class NodeDecommissionManager {
         } catch (ContainerNotFoundException ex) {
           continue; // ignore the container and continue to next one
         }
-        if (cif.getState().equals(HddsProtos.LifeCycleState.DELETED) ||
-            cif.getState().equals(HddsProtos.LifeCycleState.DELETING)) {
-          continue;
-        }
-        int reqNodes = cif.getReplicationConfig().getRequiredNodes();
-        if ((inServiceTotal - numDecom) < reqNodes) {
-          return false;
-        }
-        if (reqNodes > minInService) {
-          minInService = reqNodes;
+        synchronized (cif) {
+          if (cif.getState().equals(HddsProtos.LifeCycleState.DELETED) ||
+              cif.getState().equals(HddsProtos.LifeCycleState.DELETING)) {
+            continue;
+          }
+          int reqNodes = cif.getReplicationConfig().getRequiredNodes();
+          if ((inServiceTotal - numDecom) < reqNodes) {
+            LOG.info("Cannot decommission nodes. Tried to decommission {} nodes of which valid nodes = {}. " +
+                    "Cluster state: In-service nodes = {}, nodes required for replication = {}. " +
+                    "Failing due to datanode : {}, container : {}",
+                dns.size(), numDecom, inServiceTotal, reqNodes, dn, cid);
+            return false;
+          }
         }
       }
     }
-
     return true;
   }
 
