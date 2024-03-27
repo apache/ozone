@@ -458,13 +458,14 @@ public class NodeStateMap {
   }
 
   public void removeNode(DatanodeDetails datanodeDetails) throws NodeNotFoundException {
-    lock.readLock().lock();
+    lock.writeLock().lock();
     try {
       UUID uuid = datanodeDetails.getUuid();
       getNodeInfo(uuid);
       nodeMap.remove(uuid);
+      nodeToContainer.remove(uuid);
     } finally {
-      lock.readLock().unlock();
+      lock.writeLock().unlock();
     }
   }
 }

@@ -328,11 +328,20 @@ public class ReconNodeManager extends SCMNodeManager {
    * if successful, then remove the node finally from NODES table as well.
    *
    * @param datanodeDetails Datanode details.
-   * @throws IOException, NodeNotFoundException
    */
-  public void removeNode(DatanodeDetails datanodeDetails) throws IOException, NodeNotFoundException {
-    getNodeStateManager().removeNode(datanodeDetails);
-    nodeDB.delete(datanodeDetails.getUuid());
-    LOG.info("Removing existing node {} from Node DB.", datanodeDetails.getUuid());
+  @Override
+  public void removeNode(DatanodeDetails datanodeDetails) throws NodeNotFoundException, IOException {
+    try {
+      nodeDB.delete(datanodeDetails.getUuid());
+    } catch (IOException ioException) {
+      LOG.error("Node {} deletion fails from Node DB.", datanodeDetails.getUuid());
+      // retry to delete the node from node db
+      nodeDB.delete(datanodeDetails.getUuid());
+    }
+    datanodeHeartbeatMap.remove(datanodeDetails);
+    inMemDatanodeDetails.remove(datanodeDetails);
+    super.removeNode(datanodeDetails);
+    LOG.info("Removed existing node {} from Node DB and NodeManager data structures in memory ",
+        datanodeDetails.getUuid());
   }
 }

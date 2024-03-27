@@ -192,7 +192,9 @@ public class NodeEndpoint {
         DatanodeDetails nodeByUuid = nodeManager.getNodeByUuid(uuid);
         try {
           NodeStatus nodeStatus = nodeManager.getNodeStatus(nodeByUuid);
-          if (nodeByUuid.isDecommissioned() || nodeByUuid.isMaintenance() || nodeStatus.isDead()) {
+          boolean isNodeDecommissioned = nodeByUuid.getPersistedOpState() == NodeOperationalState.DECOMMISSIONED;
+          boolean isNodeInMaintenance = nodeByUuid.getPersistedOpState() == NodeOperationalState.DECOMMISSIONED;
+          if (isNodeDecommissioned || isNodeInMaintenance || nodeStatus.isDead()) {
             removedDatanodes.add(DatanodeMetadata.newBuilder()
                 .withHostname(nodeManager.getHostName(nodeByUuid))
                 .withUUid(uuid)
