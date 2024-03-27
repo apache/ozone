@@ -131,9 +131,7 @@ public final class ContainerTestUtils {
       DatanodeDetails datanodeDetails, OzoneConfiguration conf)
       throws IOException {
     StateContext context = getMockContext(datanodeDetails, conf);
-    OzoneContainer container = new OzoneContainer(datanodeDetails, conf, context);
-    MutableVolumeSet volumeSet = container.getVolumeSet();
-    return container;
+    return new OzoneContainer(datanodeDetails, conf, context);
   }
 
   public static StateContext getMockContext(DatanodeDetails datanodeDetails,
