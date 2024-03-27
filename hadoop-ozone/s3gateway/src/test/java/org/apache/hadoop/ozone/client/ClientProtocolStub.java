@@ -482,7 +482,7 @@ public class ClientProtocolStub implements ClientProtocol {
   @Override
   public void createDirectory(String volumeName, String bucketName,
                               String keyName) throws IOException {
-
+    getBucket(volumeName, bucketName).createDirectory(keyName);
   }
 
   @Override
