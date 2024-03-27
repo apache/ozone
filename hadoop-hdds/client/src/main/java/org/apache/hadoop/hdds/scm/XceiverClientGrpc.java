@@ -21,6 +21,7 @@ package org.apache.hadoop.hdds.scm;
 import java.io.IOException;
 import java.io.InterruptedIOException;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -42,6 +43,7 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.DatanodeBl
 import org.apache.hadoop.hdds.protocol.datanode.proto.XceiverClientProtocolServiceGrpc;
 import org.apache.hadoop.hdds.protocol.datanode.proto.XceiverClientProtocolServiceGrpc.XceiverClientProtocolServiceStub;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState;
 import org.apache.hadoop.hdds.scm.client.ClientTrustManager;
 import org.apache.hadoop.hdds.scm.client.HddsClientUtils;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
@@ -382,6 +384,27 @@ public class XceiverClientGrpc extends XceiverClientSpi {
         // every time.
         Collections.shuffle(datanodeList);
       }
+    }
+
+    // Make IN_SERVICE's Datanode precede all other State's Datanodes.
+    // This is a stable sort that does not change the order of the
+    // IN_SERVICE's Datanode.
+    if (datanodeList.size() > 1) {
+      Comparator<DatanodeDetails> byOpStateStable = (first, second) -> {
+        boolean firstInService = first.getPersistedOpState() ==
+            NodeOperationalState.IN_SERVICE;
+        boolean secondInService = second.getPersistedOpState() ==
+            NodeOperationalState.IN_SERVICE;
+
+        if (firstInService == secondInService) {
+          return 0;
+        } else if (firstInService) {
+          return -1;
+        } else {
+          return 1;
+        }
+      };
+      datanodeList.sort(byOpStateStable);
     }
 
     for (DatanodeDetails dn : datanodeList) {
