@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.container.common.impl;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
+import com.google.common.cache.CacheLoader;
 import com.google.protobuf.ServiceException;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.HddsUtils;
@@ -65,6 +66,8 @@ import org.apache.hadoop.ozone.container.common.volume.VolumeUsage;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.util.Time;
 import org.apache.ratis.statemachine.StateMachine;
+import com.google.common.cache.Cache;
+import com.google.common.cache.CacheBuilder;
 import org.apache.ratis.thirdparty.com.google.protobuf.ProtocolMessageEnum;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -75,6 +78,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.TreeMap;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 
 import static org.apache.hadoop.ozone.audit.AuditLogger.PerformanceStringBuilder;
@@ -104,6 +108,8 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
   private ContainerMetrics metrics;
   private final TokenVerifier tokenVerifier;
   private long slowOpThresholdMs;
+  private final Cache<HddsVolume, SpaceUsageSource> cachedVolumeUsage;
+  private VolumeUsage.MinFreeSpaceCalculator freeSpaceCalculator;
 
   /**
    * Constructs an OzoneContainer that receives calls from
@@ -138,6 +144,18 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
             LOG,
             HddsUtils::processForDebug,
             HddsUtils::processForDebug);
+    this.cachedVolumeUsage = CacheBuilder.newBuilder()
+        .maximumSize(1000)
+        .refreshAfterWrite(1, TimeUnit.MINUTES)
+        .build(
+            new CacheLoader<HddsVolume, SpaceUsageSource>() {
+              @Override
+              public SpaceUsageSource load(HddsVolume volume) throws Exception {
+                return volume.getCurrentUsage();
+              }
+            }
+        );
+    this.freeSpaceCalculator = new VolumeUsage.MinFreeSpaceCalculator(conf);
   }
 
   @Override
@@ -600,11 +618,17 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
         .orElse(Boolean.FALSE);
     if (isOpen) {
       HddsVolume volume = container.getContainerData().getVolume();
-      SpaceUsageSource precomputedVolumeSpace =
-          volume.getCurrentUsage();
+      SpaceUsageSource precomputedVolumeSpace;
+      try {
+        precomputedVolumeSpace = cachedVolumeUsage.get(volume,
+            volume::getCurrentUsage);
+      } catch (ExecutionException e) {
+        // it shouldn't happen
+        throw new RuntimeException(e);
+      }
       long volumeCapacity = precomputedVolumeSpace.getCapacity();
       long volumeFreeSpaceToSpare =
-          VolumeUsage.getMinVolumeFreeSpace(conf, volumeCapacity);
+          freeSpaceCalculator.get(volumeCapacity);
       long volumeFree = volume.getAvailable(precomputedVolumeSpace);
       long volumeCommitted = volume.getCommittedBytes();
       long volumeAvailable = volumeFree - volumeCommitted;

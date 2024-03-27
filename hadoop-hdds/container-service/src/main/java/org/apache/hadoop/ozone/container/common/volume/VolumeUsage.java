@@ -134,6 +134,46 @@ public class VolumeUsage implements SpaceUsageSource {
   }
 
   /**
+   * Convenience class to calculate minimum free space.
+   */
+  public static class MinFreeSpaceCalculator {
+    private final boolean minFreeSpaceConfigured;
+    private final boolean minFreeSpacePercentConfigured;
+    private final long freeSpace;
+    private float freeSpacePercent;
+    public MinFreeSpaceCalculator(ConfigurationSource conf) {
+      minFreeSpaceConfigured = conf.isConfigured(HDDS_DATANODE_VOLUME_MIN_FREE_SPACE);
+      minFreeSpacePercentConfigured = conf.isConfigured(HDDS_DATANODE_VOLUME_MIN_FREE_SPACE_PERCENT);
+      freeSpace = (long)conf.getStorageSize(HDDS_DATANODE_VOLUME_MIN_FREE_SPACE,
+          HDDS_DATANODE_VOLUME_MIN_FREE_SPACE_DEFAULT, StorageUnit.BYTES);
+      if (minFreeSpacePercentConfigured) {
+        freeSpacePercent = Float.parseFloat(
+            conf.get(HDDS_DATANODE_VOLUME_MIN_FREE_SPACE_PERCENT));
+      }
+    }
+
+    public long get(long capacity) {
+      if (minFreeSpaceConfigured && minFreeSpacePercentConfigured) {
+        LOG.error(
+            "Both {} and {} are set. Set either one, not both. If both are set,"
+                + "it will use default value which is {} as min free space",
+            HDDS_DATANODE_VOLUME_MIN_FREE_SPACE,
+            HDDS_DATANODE_VOLUME_MIN_FREE_SPACE_PERCENT,
+            HDDS_DATANODE_VOLUME_MIN_FREE_SPACE_DEFAULT);
+      }
+
+      if (minFreeSpaceConfigured) {
+        return freeSpace;
+      } else if (minFreeSpacePercentConfigured) {
+        return (long) (capacity * freeSpacePercent);
+      }
+      // either properties are not configured,then return
+      // HDDS_DATANODE_VOLUME_MIN_FREE_SPACE_DEFAULT,
+      return freeSpace;
+    }
+  }
+
+  /**
    * If 'hdds.datanode.volume.min.free.space' is defined,
    * it will be honored first. If it is not defined and
    * 'hdds.datanode.volume.min.free.space.' is defined,it will honor this
