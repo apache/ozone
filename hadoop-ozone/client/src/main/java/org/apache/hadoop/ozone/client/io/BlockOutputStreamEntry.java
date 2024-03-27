@@ -37,6 +37,7 @@ import org.apache.hadoop.hdds.scm.storage.BufferPool;
 import org.apache.hadoop.hdds.scm.storage.RatisBlockOutputStream;
 import org.apache.hadoop.hdds.security.token.OzoneBlockTokenIdentifier;
 import org.apache.hadoop.security.token.Token;
+import org.apache.hadoop.util.Time;
 
 import com.google.common.annotations.VisibleForTesting;
 import org.apache.ratis.util.JavaUtils;
@@ -160,7 +161,10 @@ public class BlockOutputStreamEntry extends OutputStream {
             out.getClass() + " is not " + Syncable.class.getSimpleName());
       }
 
+      long start = Time.monotonicNowNanos();
       ((Syncable)out).hsync();
+      long datanodeHsyncLatency = Time.monotonicNowNanos() - start;
+      clientMetrics.addDataNodeHsyncLatency(datanodeHsyncLatency / 1000);
     }
   }
 

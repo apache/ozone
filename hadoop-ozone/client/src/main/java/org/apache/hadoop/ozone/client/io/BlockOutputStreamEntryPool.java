@@ -45,6 +45,7 @@ import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
+import org.apache.hadoop.util.Time;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -346,7 +347,10 @@ public class BlockOutputStreamEntryPool implements KeyMetadataAware {
       if (keyArgs.getIsMultipartKey()) {
         throw new IOException("Hsync is unsupported for multipart keys.");
       } else {
+        long start = Time.monotonicNowNanos();
         omClient.hsyncKey(keyArgs, openID);
+        long datanodeHsyncLatency = Time.monotonicNowNanos() - start;
+        clientMetrics.addOMHsyncLatency(datanodeHsyncLatency / 1000);
       }
     } else {
       LOG.warn("Closing KeyOutputStream, but key args is null");
