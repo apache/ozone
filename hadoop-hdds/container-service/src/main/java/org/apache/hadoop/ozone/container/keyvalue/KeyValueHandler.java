@@ -103,6 +103,7 @@ import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Res
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.PUT_SMALL_FILE_ERROR;
 import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuilders.getBlockDataResponse;
 import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuilders.getBlockLengthResponse;
+import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuilders.getEchoResponse;
 import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuilders.getFinalizeBlockResponse;
 import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuilders.getGetSmallFileResponseSuccess;
 import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuilders.getListBlockResponse;
@@ -279,6 +280,8 @@ public class KeyValueHandler extends Handler {
       return handler.handleGetCommittedBlockLength(request, kvContainer);
     case FinalizeBlock:
       return handler.handleFinalizeBlock(request, kvContainer);
+    case Echo:
+      return handler.handleEcho(request, kvContainer);
     default:
       return null;
     }
@@ -609,6 +612,11 @@ public class KeyValueHandler extends Handler {
               "Finalize Block failed", ex, IO_EXCEPTION), request);
     }
     return getFinalizeBlockResponse(request, responseData);
+  }
+
+  ContainerCommandResponseProto handleEcho(
+      ContainerCommandRequestProto request, KeyValueContainer kvContainer) {
+    return getEchoResponse(request);
   }
 
   /**
