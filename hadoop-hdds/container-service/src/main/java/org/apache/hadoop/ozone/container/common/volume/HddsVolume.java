@@ -258,7 +258,7 @@ public class HddsVolume extends StorageVolume {
     VolumeCheckResult result = super.check(unused);
 
     DatanodeConfiguration df = getConf().getObject(DatanodeConfiguration.class);
-    if (isDbLoadFailure()) {
+    if (isDbLoaded() && isDbLoadFailure()) {
       LOG.warn("Volume {} failed to access RocksDB: RocksDB parent directory is null, " +
           "the volume might not have been loaded properly.", getStorageDir());
       return VolumeCheckResult.FAILED;
@@ -269,12 +269,8 @@ public class HddsVolume extends StorageVolume {
     }
 
     // Check that per-volume RocksDB is present.
-    File dbFile = dbParentDir == null ? null : new File(dbParentDir, CONTAINER_DB_NAME);
-    if (dbFile == null || !dbFile.exists() || !dbFile.canRead()) {
-      if (dbFile == null) {
-        LOG.warn("Volume {} failed to access RocksDB: RocksDB parent directory is null, " +
-            "the volume might not have been loaded properly.", getStorageDir());
-      }
+    File dbFile = new File(dbParentDir, CONTAINER_DB_NAME);
+    if (!dbFile.exists() || !dbFile.canRead()) {
       LOG.warn("Volume {} failed health check. Could not access RocksDB at " +
           "{}", getStorageDir(), dbFile);
       return VolumeCheckResult.FAILED;
@@ -388,7 +384,7 @@ public class HddsVolume extends StorageVolume {
       dbLoadFailure.set(false);
       LOG.info("SchemaV3 db is loaded at {} for volume {}", containerDBPath,
           getStorageID());
-    } catch (IOException e) {
+    } catch (Throwable e) {
       dbLoadFailure.set(true);
       throw e;
     }
