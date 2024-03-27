@@ -258,7 +258,7 @@ public class HddsVolume extends StorageVolume {
     VolumeCheckResult result = super.check(unused);
 
     DatanodeConfiguration df = getConf().getObject(DatanodeConfiguration.class);
-    if (isDbLoaded() && isDbLoadFailure()) {
+    if (isDbLoadFailure()) {
       LOG.warn("Volume {} failed to access RocksDB: RocksDB parent directory is null, " +
           "the volume might not have been loaded properly.", getStorageDir());
       return VolumeCheckResult.FAILED;
