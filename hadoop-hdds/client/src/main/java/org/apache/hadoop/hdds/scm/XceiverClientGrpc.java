@@ -20,6 +20,7 @@ package org.apache.hadoop.hdds.scm;
 
 import java.io.IOException;
 import java.io.InterruptedIOException;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -386,25 +387,10 @@ public class XceiverClientGrpc extends XceiverClientSpi {
       }
     }
 
-    // Make IN_SERVICE's Datanode precede all other State's Datanodes.
-    // This is a stable sort that does not change the order of the
-    // IN_SERVICE's Datanode.
-    if (datanodeList.size() > 1) {
-      Comparator<DatanodeDetails> byOpStateStable = (first, second) -> {
-        boolean firstInService = first.getPersistedOpState() ==
-            NodeOperationalState.IN_SERVICE;
-        boolean secondInService = second.getPersistedOpState() ==
-            NodeOperationalState.IN_SERVICE;
-
-        if (firstInService == secondInService) {
-          return 0;
-        } else if (firstInService) {
-          return -1;
-        } else {
-          return 1;
-        }
-      };
-      datanodeList.sort(byOpStateStable);
+    boolean allInService = datanodeList.stream()
+        .allMatch(dn -> dn.getPersistedOpState() == NodeOperationalState.IN_SERVICE);
+    if (!allInService) {
+      datanodeList = sortDatanodeByOperationalState(datanodeList);
     }
 
     for (DatanodeDetails dn : datanodeList) {
@@ -468,6 +454,30 @@ public class XceiverClientGrpc extends XceiverClientSpi {
       }
       throw ioException;
     }
+  }
+
+  private static List<DatanodeDetails> sortDatanodeByOperationalState(
+      List<DatanodeDetails> datanodeList) {
+    List<DatanodeDetails> sortedDatanodeList = new ArrayList<>(datanodeList);
+    // Make IN_SERVICE's Datanode precede all other State's Datanodes.
+    // This is a stable sort that does not change the order of the
+    // IN_SERVICE's Datanode.
+    Comparator<DatanodeDetails> byOpStateStable = (first, second) -> {
+      boolean firstInService = first.getPersistedOpState() ==
+          NodeOperationalState.IN_SERVICE;
+      boolean secondInService = second.getPersistedOpState() ==
+          NodeOperationalState.IN_SERVICE;
+
+      if (firstInService == secondInService) {
+        return 0;
+      } else if (firstInService) {
+        return -1;
+      } else {
+        return 1;
+      }
+    };
+    sortedDatanodeList.sort(byOpStateStable);
+    return sortedDatanodeList;
   }
 
   @Override
