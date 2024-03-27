@@ -1660,7 +1660,9 @@ public class SCMNodeManager implements NodeManager {
     try {
       NodeStatus nodeStatus = this.getNodeStatus(datanodeDetails);
       if (datanodeDetails.isDecommissioned() || nodeStatus.isDead()) {
-        clusterMap.remove(datanodeDetails);
+        if (clusterMap.contains(datanodeDetails)) {
+          clusterMap.remove(datanodeDetails);
+        }
         nodeStateManager.removeNode(datanodeDetails);
         removeFromDnsToUuidMap(datanodeDetails.getUuid(), datanodeDetails.getIpAddress());
         commandQueue.removeCommand(datanodeDetails.getUuid());

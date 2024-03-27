@@ -338,8 +338,8 @@ public class ReconNodeManager extends SCMNodeManager {
       // retry to delete the node from node db
       nodeDB.delete(datanodeDetails.getUuid());
     }
-    datanodeHeartbeatMap.remove(datanodeDetails);
-    inMemDatanodeDetails.remove(datanodeDetails);
+    datanodeHeartbeatMap.remove(datanodeDetails.getUuid());
+    inMemDatanodeDetails.remove(datanodeDetails.getUuid());
     super.removeNode(datanodeDetails);
     LOG.info("Removed existing node {} from Node DB and NodeManager data structures in memory ",
         datanodeDetails.getUuid());
