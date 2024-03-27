@@ -1540,6 +1540,11 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
         <artifactId>snappy-java</artifactId>
         <version>${snappy-java.version}</version>
       </dependency>
+      <dependency>
+        <groupId>org.apache.hadoop.thirdparty</groupId>
+        <artifactId>hadoop-shaded-guava</artifactId>
+        <version>${hadoop-shaded-guava.version}</version>
+      </dependency>
     </dependencies>
   </dependencyManagement>
 

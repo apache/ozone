@@ -209,7 +209,6 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
     <dependency>
       <groupId>org.apache.hadoop.thirdparty</groupId>
       <artifactId>hadoop-shaded-guava</artifactId>
-      <version>${hadoop-shaded-guava.version}</version>
     </dependency>
     <dependency>
       <groupId>org.apache.hadoop</groupId>
