@@ -19,6 +19,7 @@
 
 package org.apache.hadoop.ozone.om.request.snapshot;
 
+import org.apache.hadoop.ozone.om.OMMetrics;
 import org.apache.ratis.server.protocol.TermIndex;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
@@ -59,6 +60,8 @@ public class OMSnapshotPurgeRequest extends OMClientRequest {
 
   @Override
   public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager, TermIndex termIndex) {
+    OMMetrics omMetrics = ozoneManager.getMetrics();
+
     final long trxnLogIndex = termIndex.getIndex();
     OmSnapshotManager omSnapshotManager = ozoneManager.getOmSnapshotManager();
     OmMetadataManagerImpl omMetadataManager = (OmMetadataManagerImpl)
@@ -112,9 +115,16 @@ public class OMSnapshotPurgeRequest extends OMClientRequest {
       omClientResponse = new OMSnapshotPurgeResponse(omResponse.build(),
           snapshotDbKeys, updatedSnapInfos,
           updatedPathPreviousAndGlobalSnapshots);
+
+      omMetrics.incNumSnapshotPurges();
+      LOG.info("Successfully executed snapshotPurgeRequest: {{}} along with updating deep clean flags for " +
+              "snapshots: {} and global and previous for snapshots:{}.",
+          snapshotPurgeRequest, updatedSnapInfos.keySet(), updatedPathPreviousAndGlobalSnapshots.keySet());
     } catch (IOException ex) {
       omClientResponse = new OMSnapshotPurgeResponse(
           createErrorOMResponse(omResponse, ex));
+      omMetrics.incNumSnapshotPurgeFails();
+      LOG.error("Failed to execute snapshotPurgeRequest:{{}}.", snapshotPurgeRequest, ex);
     }
 
     return omClientResponse;
