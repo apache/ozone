@@ -77,6 +77,16 @@ public class ReconScmMetadataManagerImpl extends SCMMetadataStoreImpl
     }
   }
 
+  /**
+   * This method configures the DBStore with tables and codecs based on the
+   * provided Recon SCM snapshot database definition. Each table from the
+   * database definition is added to the DBStore, along with its associated
+   * key and value codecs for serialization and deserialization purposes.
+   *
+   * @param dbFile The file location for the database.
+   * @param definition the recon scm db definition for scm db snapshot.
+   * @return A DBStore instance configured with tables and codecs.
+   */
   private DBStore createDBAndAddSCMTablesAndCodecs(File dbFile,
                                                    ReconSCMSnapshotDBDefinition definition) throws IOException {
     DBStoreBuilder dbStoreBuilder =
@@ -162,7 +172,6 @@ public class ReconScmMetadataManagerImpl extends SCMMetadataStoreImpl
       return 0;
     } else {
       try {
-        LOG.error("rocksDBStore.getDbLocation().getAbsolutePath(): {}", rocksDBStore.getDbLocation().getAbsolutePath());
         return rocksDBStore.getDb().getLatestSequenceNumber();
       } catch (IOException e) {
         return 0;

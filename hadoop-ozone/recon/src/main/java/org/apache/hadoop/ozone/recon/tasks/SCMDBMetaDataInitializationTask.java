@@ -111,7 +111,7 @@ public class SCMDBMetaDataInitializationTask implements ReconSCMMetadataProcessi
   public Pair<String, Boolean> process(RocksDBUpdateEventBatch events) {
     Iterator<RocksDBUpdateEvent> eventIterator = events.getIterator();
     int eventCount = 0;
-    Collection<String> taskTables = Collections.EMPTY_SET;
+    Collection<String> taskTables = Collections.emptySet();
     String tableName = StringUtils.EMPTY;
     try {
       taskTables = getTaskTables();

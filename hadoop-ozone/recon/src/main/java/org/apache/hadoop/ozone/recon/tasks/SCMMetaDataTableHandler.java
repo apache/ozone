@@ -33,7 +33,7 @@ public interface SCMMetaDataTableHandler {
    * Return handler name.
    * @return handler name
    */
-  String getHandler();
+  String getHandlerName();
 
   /**
    * Iterates all the rows of desired SCM metadata DB table to capture

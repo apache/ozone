@@ -70,7 +70,8 @@ public class SeqIdGenInfoHandler implements SCMMetaDataTableHandler {
   @Override
   public void handleDeleteEvent(RocksDBUpdateEvent<?, Object> event) {
     final String sequenceIdName = (String) event.getKey();
-    LOG.error("Delete event should not be raised on sequenceId table for sequence name: {} - ", sequenceIdName);
+    throw new UnsupportedOperationException("Delete event should not be raised on sequenceId table for sequence " +
+        "name: " + sequenceIdName);
   }
 
   /**
@@ -81,7 +82,8 @@ public class SeqIdGenInfoHandler implements SCMMetaDataTableHandler {
   @Override
   public void handleUpdateEvent(RocksDBUpdateEvent<?, Object> event) {
     final String sequenceIdName = (String) event.getKey();
-    LOG.error("No action to be taken for update event on sequenceId table for sequence name: {} - ", sequenceIdName);
+    throw new UnsupportedOperationException("No action to be taken for update event on sequenceId table for sequence " +
+        "name: " + sequenceIdName);
   }
 
   /**
@@ -90,7 +92,7 @@ public class SeqIdGenInfoHandler implements SCMMetaDataTableHandler {
    * @return handler name
    */
   @Override
-  public String getHandler() {
+  public String getHandlerName() {
     return "SeqIdGenInfoHandler";
   }
 
@@ -104,10 +106,10 @@ public class SeqIdGenInfoHandler implements SCMMetaDataTableHandler {
    */
   @Override
   public Pair<String, Boolean> reprocess(ReconScmMetadataManager reconScmMetadataManager) throws IOException {
-    LOG.info("Starting a 'reprocess' run of {}", getHandler());
+    LOG.info("Starting a 'reprocess' run of {}", getHandlerName());
     // Left NoOps implementation as SequenceIdGenerator reinitialization is being done
     // during full SCM metadata DB sync already. Later, in future this impl can be extended
     // for capturing or processing any further stats specific to Recon, related to SequenceIdGen.
-    return new ImmutablePair<>(getHandler(), true);
+    return new ImmutablePair<>(getHandlerName(), true);
   }
 }

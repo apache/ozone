@@ -113,7 +113,7 @@ public class PipelineInfoHandler implements SCMMetaDataTableHandler {
    * @return handler name
    */
   @Override
-  public String getHandler() {
+  public String getHandlerName() {
     return "PipelineInfoHandler";
   }
 
@@ -127,10 +127,10 @@ public class PipelineInfoHandler implements SCMMetaDataTableHandler {
    */
   @Override
   public Pair<String, Boolean> reprocess(ReconScmMetadataManager reconScmMetadataManager) throws IOException {
-    LOG.info("Starting a 'reprocess' run of {}", getHandler());
+    LOG.info("Starting a 'reprocess' run of {}", getHandlerName());
     // Left NoOps implementation as pipeline manager reinitialization is being done
     // during full SCM metadata DB sync already. Later, in future this impl can be extended
     // for capturing or processing any further stats specific to Recon, related to pipeline.
-    return new ImmutablePair<>(getHandler(), true);
+    return new ImmutablePair<>(getHandlerName(), true);
   }
 }

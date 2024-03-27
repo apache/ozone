@@ -141,7 +141,7 @@ public class ContainersInfoHandler implements SCMMetaDataTableHandler {
     long containerCount = 0;
     Map<HddsProtos.LifeCycleState, Long> containerStateCountMap = new HashMap<>();
     try {
-      LOG.info("Starting a 'reprocess' run of {}", getHandler());
+      LOG.info("Starting a 'reprocess' run of {}", getHandlerName());
       Instant start = Instant.now();
 
       // reset total count of deleted containers to zero
@@ -169,9 +169,9 @@ public class ContainersInfoHandler implements SCMMetaDataTableHandler {
     } catch (IOException ioEx) {
       LOG.error("Unable to populate Container Stats data in Recon DB. ",
           ioEx);
-      return new ImmutablePair<>(getHandler(), false);
+      return new ImmutablePair<>(getHandlerName(), false);
     }
-    return new ImmutablePair<>(getHandler(), true);
+    return new ImmutablePair<>(getHandlerName(), true);
   }
 
   @Nullable
@@ -180,7 +180,7 @@ public class ContainersInfoHandler implements SCMMetaDataTableHandler {
     if (!containerStateCountMap.isEmpty()) {
       if (!reconContainerMetadataManager.storeContainerStatesStats(containerStateCountMap)) {
         LOG.error("Unable to store container stats information to the GlobalStats table.");
-        return new ImmutablePair<>(getHandler(), false);
+        return new ImmutablePair<>(getHandlerName(), false);
       }
     }
     return null;
@@ -192,7 +192,7 @@ public class ContainersInfoHandler implements SCMMetaDataTableHandler {
   }
 
   @Override
-  public String getHandler() {
+  public String getHandlerName() {
     return "ContainersInfoHandler";
   }
 }
