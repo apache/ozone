@@ -440,7 +440,7 @@ public class XceiverClientGrpc extends XceiverClientSpi {
         LOG.debug(message + " on the pipeline {}.",
                 processForDebug(request), pipeline);
       } else {
-        LOG.error(message + " on the pipeline {}.",
+        LOG.warn(message + " on the pipeline {}.",
                 request.getCmdType(), pipeline);
       }
       throw ioException;
