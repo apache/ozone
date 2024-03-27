@@ -333,6 +333,8 @@ public class BlockOutputStream extends OutputStream {
 
   private void allocateNewBufferIfNeeded() {
     if (currentBufferRemaining == 0) {
+      // TODO: Remove debug print
+      LOG.debug("allocateBuffer(increment = {})", config.getBufferIncrement());
       currentBuffer = bufferPool.allocateBuffer(config.getBufferIncrement());
       currentBufferRemaining = currentBuffer.remaining();
     }
@@ -392,20 +394,31 @@ public class BlockOutputStream extends OutputStream {
    * @throws IOException
    */
   private void handleFullBuffer() throws IOException {
-    waitForFlushAndCommit(true);
+    try {
+      waitForFlushAndCommit(true).get();
+    } catch (InterruptedException | ExecutionException e) {
+      // TODO: Handle exception
+      LOG.error("Exception caught but ignored in this POC", e);
+    }
   }
 
-  void waitForFlushAndCommit(boolean bufferFull) throws IOException {
-    try {
-      checkOpen();
-      waitOnFlushFutures();
-    } catch (ExecutionException e) {
-      handleExecutionException(e);
-    } catch (InterruptedException ex) {
-      Thread.currentThread().interrupt();
-      handleInterruptedException(ex, true);
-    }
-    watchForCommit(bufferFull);
+  CompletableFuture<Void> waitForFlushAndCommit(boolean bufferFull) throws IOException {
+    checkOpen();
+    CompletableFuture<Void> future = waitOnFlushFutures();
+    // ExecutionException and InterruptedException are no longer handled at this level
+    // since the future is being returned all the way up to KeyOutputStream
+
+    return future.thenApplyAsync(r -> {
+      try {
+        // TODO: HDDS-10108 could remove this call
+        watchForCommit(bufferFull);
+      } catch (IOException e) {
+        // TODO: Handle exception
+        LOG.error("IOException caught but ignored in this POC", e);
+        throw new CompletionException(e);
+      }
+      return r;
+    });
   }
 
   void releaseBuffersOnException() {
@@ -607,7 +620,7 @@ public class BlockOutputStream extends OutputStream {
       // data since latest flush - we need to send the "EOF" flag
       executePutBlock(true, true);
     }
-    waitOnFlushFutures();
+    waitOnFlushFutures().get();
     watchForCommit(false);
     // just check again if the exception is hit while waiting for the
     // futures to ensure flush has indeed succeeded
@@ -632,7 +645,9 @@ public class BlockOutputStream extends OutputStream {
     }
   }
 
-  void waitOnFlushFutures() throws InterruptedException, ExecutionException {
+  // TODO: Should rename this to getFlushFutures
+  CompletableFuture<Void> waitOnFlushFutures() {
+    return null;
   }
 
   void validateResponse(
@@ -948,6 +963,7 @@ public class BlockOutputStream extends OutputStream {
    * handle ExecutionException else skip it.
    * @throws IOException
    */
+  // TODO: Move this to separate class StreamUtil.
   void handleInterruptedException(Exception ex,
       boolean processExecutionException)
       throws IOException {
@@ -964,6 +980,7 @@ public class BlockOutputStream extends OutputStream {
    * @param ex
    * @throws IOException
    */
+  // TODO: Move this to separate class StreamUtil.
   private void handleExecutionException(Exception ex) throws IOException {
     setIoException(ex);
     adjustBuffersOnException();
