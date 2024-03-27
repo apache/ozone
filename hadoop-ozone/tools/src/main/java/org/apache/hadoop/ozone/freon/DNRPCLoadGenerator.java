@@ -69,15 +69,13 @@ public class DNRPCLoadGenerator extends BaseFreonGenerator
   private String encodedContainerToken;
   @Option(names = {"--payload-req"},
           description =
-                  "Specifies the size of payload in KB in RPC request. " +
-                          "Max size is 2097151 KB",
+                  "Specifies the size of payload in KB in RPC request. ",
           defaultValue = "0")
   private int payloadReqSizeKB = 0;
 
   @Option(names = {"--payload-resp"},
           description =
-                  "Specifies the size of payload in KB in RPC response. " +
-                          "Max size is 2097151 KB",
+                  "Specifies the size of payload in KB in RPC response. ",
           defaultValue = "0")
   private int payloadRespSizeKB = 0;
 
