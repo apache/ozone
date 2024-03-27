@@ -82,8 +82,7 @@ public class SeqIdGenInfoHandler implements SCMMetaDataTableHandler {
   @Override
   public void handleUpdateEvent(RocksDBUpdateEvent<?, Object> event) {
     final String sequenceIdName = (String) event.getKey();
-    throw new UnsupportedOperationException("No action to be taken for update event on sequenceId table for sequence " +
-        "name: " + sequenceIdName);
+    LOG.info("No action to be taken for update event on sequenceId table for sequence name: {}", sequenceIdName);
   }
 
   /**

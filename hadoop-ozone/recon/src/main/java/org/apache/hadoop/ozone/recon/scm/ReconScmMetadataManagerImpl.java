@@ -174,6 +174,8 @@ public class ReconScmMetadataManagerImpl extends SCMMetadataStoreImpl
       try {
         return rocksDBStore.getDb().getLatestSequenceNumber();
       } catch (IOException e) {
+        LOG.error("Failed to access RocksDB at location: {}. Ensure the database path is correct and accessible.",
+              rocksDBStore.getDbLocation().getAbsolutePath());
         return 0;
       }
     }
