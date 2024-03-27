@@ -24,17 +24,20 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolPro
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.container.ReplicationManagerReport;
+import org.apache.hadoop.hdds.scm.container.ReplicationManagerReport.HealthState;
 import org.apache.hadoop.hdds.scm.container.replication.ContainerCheckRequest;
 import org.apache.hadoop.hdds.scm.container.replication.ReplicationManager;
 import org.apache.hadoop.hdds.scm.container.replication.ReplicationTestUtil;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.Mockito;
 
 import java.util.Collections;
 import java.util.Set;
 
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState.CLOSED;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState.OPEN;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.mockito.Mockito.mock;
@@ -58,6 +61,7 @@ public class TestOpenContainerHandler {
     ratisReplicationConfig = RatisReplicationConfig.getInstance(
         HddsProtos.ReplicationFactor.THREE);
     replicationManager = mock(ReplicationManager.class);
+    Mockito.when(replicationManager.hasHealthyPipeline(any())).thenReturn(true);
     openContainerHandler = new OpenContainerHandler(replicationManager);
   }
 
@@ -119,8 +123,36 @@ public class TestOpenContainerHandler {
     assertTrue(openContainerHandler.handle(readRequest));
     verify(replicationManager, times(1))
         .sendCloseContainerEvent(containerInfo.containerID());
+    assertEquals(1, request.getReport().getStat(HealthState.OPEN_UNHEALTHY));
   }
 
+  @Test
+  public void testOpenContainerWithoutPipelineIsClosed() {
+    Mockito.when(replicationManager.hasHealthyPipeline(any())).thenReturn(false);
+    ContainerInfo containerInfo = ReplicationTestUtil.createContainerInfo(
+        ecReplicationConfig, 1, OPEN);
+    Set<ContainerReplica> containerReplicas = ReplicationTestUtil
+        .createReplicas(containerInfo.containerID(),
+            ContainerReplicaProto.State.OPEN, 1, 2, 3, 4);
+    ContainerCheckRequest request = new ContainerCheckRequest.Builder()
+        .setPendingOps(Collections.emptyList())
+        .setReport(new ReplicationManagerReport())
+        .setContainerInfo(containerInfo)
+        .setContainerReplicas(containerReplicas)
+        .build();
+    ContainerCheckRequest readRequest = new ContainerCheckRequest.Builder()
+        .setPendingOps(Collections.emptyList())
+        .setReport(new ReplicationManagerReport())
+        .setContainerInfo(containerInfo)
+        .setContainerReplicas(containerReplicas)
+        .setReadOnly(true)
+        .build();
+    assertTrue(openContainerHandler.handle(request));
+    assertTrue(openContainerHandler.handle(readRequest));
+    verify(replicationManager, times(1))
+        .sendCloseContainerEvent(containerInfo.containerID());
+    assertEquals(1, request.getReport().getStat(HealthState.OPEN_WITHOUT_PIPELINE));
+  }
   @Test
   public void testClosedRatisContainerReturnsFalse() {
     ContainerInfo containerInfo = ReplicationTestUtil.createContainerInfo(
@@ -178,5 +210,33 @@ public class TestOpenContainerHandler {
     assertTrue(openContainerHandler.handle(request));
     assertTrue(openContainerHandler.handle(readRequest));
     verify(replicationManager, times(1)).sendCloseContainerEvent(any());
+    assertEquals(1, request.getReport().getStat(HealthState.OPEN_UNHEALTHY));
+  }
+
+  @Test
+  public void testOpenRatisContainerWithoutPipelineIsClosed() {
+    Mockito.when(replicationManager.hasHealthyPipeline(any())).thenReturn(false);
+    ContainerInfo containerInfo = ReplicationTestUtil.createContainerInfo(
+        ratisReplicationConfig, 1, OPEN);
+    Set<ContainerReplica> containerReplicas = ReplicationTestUtil
+        .createReplicas(containerInfo.containerID(),
+            ContainerReplicaProto.State.OPEN, 0, 0, 0);
+    ContainerCheckRequest request = new ContainerCheckRequest.Builder()
+        .setPendingOps(Collections.emptyList())
+        .setReport(new ReplicationManagerReport())
+        .setContainerInfo(containerInfo)
+        .setContainerReplicas(containerReplicas)
+        .build();
+    ContainerCheckRequest readRequest = new ContainerCheckRequest.Builder()
+        .setPendingOps(Collections.emptyList())
+        .setReport(new ReplicationManagerReport())
+        .setContainerInfo(containerInfo)
+        .setContainerReplicas(containerReplicas)
+        .setReadOnly(true)
+        .build();
+    assertTrue(openContainerHandler.handle(request));
+    assertTrue(openContainerHandler.handle(readRequest));
+    verify(replicationManager, times(1)).sendCloseContainerEvent(any());
+    assertEquals(1, request.getReport().getStat(HealthState.OPEN_WITHOUT_PIPELINE));
   }
 }

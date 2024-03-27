@@ -32,6 +32,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.Set;
 import java.util.Stack;
 import java.util.TreeMap;
@@ -44,10 +45,15 @@ import org.apache.hadoop.conf.StorageUnit;
 import org.apache.hadoop.crypto.key.KeyProviderCryptoExtension;
 import org.apache.hadoop.crypto.key.KeyProviderCryptoExtension.EncryptedKeyVersion;
 import org.apache.hadoop.fs.FileEncryptionInfo;
+import org.apache.hadoop.hdds.DFSConfigKeysLegacy;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
+import org.apache.hadoop.hdds.scm.net.InnerNode;
+import org.apache.hadoop.hdds.scm.net.Node;
+import org.apache.hadoop.hdds.scm.net.NodeImpl;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.storage.BlockLocationInfo;
 import org.apache.hadoop.hdds.utils.BackgroundService;
@@ -56,6 +62,9 @@ import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
+import org.apache.hadoop.net.CachedDNSToSwitchMapping;
+import org.apache.hadoop.net.DNSToSwitchMapping;
+import org.apache.hadoop.net.TableMapping;
 import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
@@ -86,6 +95,7 @@ import org.apache.hadoop.ozone.om.service.KeyDeletingService;
 import org.apache.hadoop.ozone.om.service.MultipartUploadCleanupService;
 import org.apache.hadoop.ozone.om.service.OpenKeyCleanupService;
 import org.apache.hadoop.ozone.om.service.SnapshotDeletingService;
+import org.apache.hadoop.ozone.om.service.SnapshotDirectoryCleaningService;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ExpiredMultipartUploadsBucket;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PartKeyInfo;
 import org.apache.hadoop.hdds.security.token.OzoneBlockTokenSecretManager;
@@ -93,6 +103,7 @@ import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
 import org.apache.hadoop.ozone.security.acl.RequestContext;
 import org.apache.hadoop.security.SecurityUtil;
+import org.apache.hadoop.util.ReflectionUtils;
 import org.apache.hadoop.util.Time;
 
 import com.google.common.annotations.VisibleForTesting;
@@ -105,6 +116,7 @@ import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.HADOOP_SECURITY
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_BLOCK_TOKEN_ENABLED;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_BLOCK_TOKEN_ENABLED_DEFAULT;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.BlockTokenSecretProto.AccessModeProto.READ;
+import static org.apache.hadoop.hdds.scm.net.NetConstants.NODE_COST_DEFAULT;
 import static org.apache.hadoop.hdds.utils.HddsServerUtil.getRemoteUser;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_SERVICE_INTERVAL;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_SERVICE_INTERVAL_DEFAULT;
@@ -120,6 +132,7 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SNAPSHOT_DELETING_SE
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SNAPSHOT_DELETING_SERVICE_TIMEOUT_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SNAPSHOT_SST_FILTERING_SERVICE_TIMEOUT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SNAPSHOT_SST_FILTERING_SERVICE_TIMEOUT_DEFAULT;
+import static org.apache.hadoop.ozone.OzoneConsts.ETAG;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_DIR_DELETING_SERVICE_INTERVAL;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_DIR_DELETING_SERVICE_INTERVAL_DEFAULT;
@@ -131,6 +144,10 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_OPEN_KEY_CLEANUP_
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_OPEN_KEY_CLEANUP_SERVICE_INTERVAL_DEFAULT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_OPEN_KEY_CLEANUP_SERVICE_TIMEOUT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_OPEN_KEY_CLEANUP_SERVICE_TIMEOUT_DEFAULT;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_SNAPSHOT_DIRECTORY_SERVICE_INTERVAL;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_SNAPSHOT_DIRECTORY_SERVICE_INTERVAL_DEFAULT;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_SNAPSHOT_DIRECTORY_SERVICE_TIMEOUT;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_SNAPSHOT_DIRECTORY_SERVICE_TIMEOUT_DEFAULT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_SNAPSHOT_SST_FILTERING_SERVICE_INTERVAL;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_SNAPSHOT_SST_FILTERING_SERVICE_INTERVAL_DEFAULT;
 import static org.apache.hadoop.ozone.om.OzoneManagerUtils.getBucketLayout;
@@ -146,7 +163,7 @@ import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.BUCKET_L
 import static org.apache.hadoop.ozone.security.acl.OzoneObj.ResourceType.KEY;
 import static org.apache.hadoop.util.Time.monotonicNow;
 
-import org.jetbrains.annotations.NotNull;
+import jakarta.annotation.Nonnull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -181,6 +198,8 @@ public class KeyManagerImpl implements KeyManager {
 
   private BackgroundService openKeyCleanupService;
   private BackgroundService multipartUploadCleanupService;
+  private SnapshotDirectoryCleaningService snapshotDirectoryCleaningService;
+  private DNSToSwitchMapping dnsToSwitchMapping;
 
   public KeyManagerImpl(OzoneManager om, ScmClient scmClient,
       OzoneConfiguration conf, OMPerformanceMetrics metrics) {
@@ -300,6 +319,22 @@ public class KeyManagerImpl implements KeyManager {
       }
     }
 
+    if (snapshotDirectoryCleaningService == null &&
+        ozoneManager.isFilesystemSnapshotEnabled()) {
+      long dirDeleteInterval = configuration.getTimeDuration(
+          OZONE_SNAPSHOT_DIRECTORY_SERVICE_INTERVAL,
+          OZONE_SNAPSHOT_DIRECTORY_SERVICE_INTERVAL_DEFAULT,
+          TimeUnit.MILLISECONDS);
+      long serviceTimeout = configuration.getTimeDuration(
+          OZONE_SNAPSHOT_DIRECTORY_SERVICE_TIMEOUT,
+          OZONE_SNAPSHOT_DIRECTORY_SERVICE_TIMEOUT_DEFAULT,
+          TimeUnit.MILLISECONDS);
+      snapshotDirectoryCleaningService = new SnapshotDirectoryCleaningService(
+          dirDeleteInterval, TimeUnit.MILLISECONDS, serviceTimeout,
+          ozoneManager, scmClient.getBlockClient());
+      snapshotDirectoryCleaningService.start();
+    }
+
     if (multipartUploadCleanupService == null) {
       long serviceInterval = configuration.getTimeDuration(
           OZONE_OM_MPU_CLEANUP_SERVICE_INTERVAL,
@@ -314,6 +349,16 @@ public class KeyManagerImpl implements KeyManager {
           ozoneManager, configuration);
       multipartUploadCleanupService.start();
     }
+
+    Class<? extends DNSToSwitchMapping> dnsToSwitchMappingClass =
+        configuration.getClass(
+            DFSConfigKeysLegacy.NET_TOPOLOGY_NODE_SWITCH_MAPPING_IMPL_KEY,
+            TableMapping.class, DNSToSwitchMapping.class);
+    DNSToSwitchMapping newInstance = ReflectionUtils.newInstance(
+        dnsToSwitchMappingClass, configuration);
+    dnsToSwitchMapping =
+        ((newInstance instanceof CachedDNSToSwitchMapping) ? newInstance
+            : new CachedDNSToSwitchMapping(newInstance));
   }
 
   KeyProviderCryptoExtension getKMSProvider() {
@@ -345,6 +390,10 @@ public class KeyManagerImpl implements KeyManager {
     if (multipartUploadCleanupService != null) {
       multipartUploadCleanupService.shutdown();
       multipartUploadCleanupService = null;
+    }
+    if (snapshotDirectoryCleaningService != null) {
+      snapshotDirectoryCleaningService.shutdown();
+      snapshotDirectoryCleaningService = null;
     }
   }
 
@@ -583,13 +632,17 @@ public class KeyManagerImpl implements KeyManager {
       int maxKeys) throws IOException {
     Preconditions.checkNotNull(volumeName);
     Preconditions.checkNotNull(bucketName);
-
+    OmBucketInfo omBucketInfo = getBucketInfo(volumeName, bucketName);
+    if (omBucketInfo == null) {
+      throw new OMException("Bucket " + bucketName + " not found.",
+          ResultCodes.BUCKET_NOT_FOUND);
+    }
+    BucketLayout bucketLayout = omBucketInfo.getBucketLayout();
     // We don't take a lock in this path, since we walk the
     // underlying table using an iterator. That automatically creates a
     // snapshot of the data, so we don't need these locks at a higher level
     // when we iterate.
-
-    if (enableFileSystemPaths) {
+    if (bucketLayout.shouldNormalizePaths(enableFileSystemPaths)) {
       startKey = OmUtils.normalizeKey(startKey, true);
       keyPrefix = OmUtils.normalizeKey(keyPrefix, true);
     }
@@ -679,6 +732,10 @@ public class KeyManagerImpl implements KeyManager {
   @Override
   public SnapshotDeletingService getSnapshotDeletingService() {
     return snapshotDeletingService;
+  }
+
+  public SnapshotDirectoryCleaningService getSnapshotDirectoryService() {
+    return snapshotDirectoryCleaningService;
   }
 
   public boolean isSstFilteringSvcEnabled() {
@@ -787,10 +844,19 @@ public class KeyManagerImpl implements KeyManager {
           if (nextPartNumberMarker > partNumberMarker) {
             String partName = getPartName(partKeyInfo, volumeName, bucketName,
                 keyName);
+            // Before HDDS-9680, MPU part does not have eTag metadata, for
+            // this case, we return null. The S3G will handle this case by
+            // using the MPU part name as the eTag field instead.
+            Optional<HddsProtos.KeyValue> eTag = partKeyInfo.getPartKeyInfo()
+                .getMetadataList()
+                .stream()
+                .filter(keyValue -> keyValue.getKey().equals(ETAG))
+                .findFirst();
             OmPartInfo omPartInfo = new OmPartInfo(partKeyInfo.getPartNumber(),
                 partName,
                 partKeyInfo.getPartKeyInfo().getModificationTime(),
-                partKeyInfo.getPartKeyInfo().getDataSize());
+                partKeyInfo.getPartKeyInfo().getDataSize(),
+                eTag.map(HddsProtos.KeyValue::getValue).orElse(null));
             omPartInfoList.add(omPartInfo);
 
             //if there are parts, use replication type from one of the parts
@@ -806,8 +872,8 @@ public class KeyManagerImpl implements KeyManager {
           //if there are no parts, use the replicationType from the open key.
           if (isBucketFSOptimized(volumeName, bucketName)) {
             multipartKey =
-                getMultipartOpenKeyFSO(volumeName, bucketName, keyName,
-                    uploadID);
+                    OMMultipartUploadUtils.getMultipartOpenKey(volumeName, bucketName, keyName, uploadID,
+                            metadataManager, BucketLayout.FILE_SYSTEM_OPTIMIZED);
           }
           OmKeyInfo omKeyInfo =
               metadataManager.getOpenKeyTable(bucketLayout)
@@ -877,19 +943,6 @@ public class KeyManagerImpl implements KeyManager {
     return partName;
   }
 
-  private String getMultipartOpenKeyFSO(String volumeName, String bucketName,
-      String keyName, String uploadID) throws IOException {
-    OMMetadataManager metaMgr = metadataManager;
-    return OMMultipartUploadUtils.getMultipartOpenKeyFSO(
-        volumeName, bucketName, keyName, uploadID, metaMgr);
-  }
-
-  /**
-   * Returns list of ACLs for given Ozone object.
-   *
-   * @param obj Ozone object.
-   * @throws IOException if there is error.
-   */
   @Override
   public List<OzoneAcl> getAcl(OzoneObj obj) throws IOException {
     validateOzoneObj(obj);
@@ -1811,8 +1864,7 @@ public class KeyManagerImpl implements KeyManager {
     return encInfo;
   }
 
-  @VisibleForTesting
-  void sortDatanodes(String clientMachine, OmKeyInfo... keyInfos) {
+  private void sortDatanodes(String clientMachine, OmKeyInfo... keyInfos) {
     if (keyInfos != null && clientMachine != null) {
       Map<Set<String>, List<DatanodeDetails>> sortedPipelines = new HashMap<>();
       for (OmKeyInfo keyInfo : keyInfos) {
@@ -1832,8 +1884,7 @@ public class KeyManagerImpl implements KeyManager {
               LOG.warn("No datanodes in pipeline {}", pipeline.getId());
               continue;
             }
-            sortedNodes = sortDatanodes(clientMachine, nodes, keyInfo,
-                uuidList);
+            sortedNodes = sortDatanodes(nodes, clientMachine);
             if (sortedNodes != null) {
               sortedPipelines.put(uuidSet, sortedNodes);
             }
@@ -1841,30 +1892,67 @@ public class KeyManagerImpl implements KeyManager {
             LOG.debug("Found sorted datanodes for pipeline {} and client {} "
                 + "in cache", pipeline.getId(), clientMachine);
           }
-          pipeline.setNodesInOrder(sortedNodes);
+          if (!Objects.equals(pipeline.getNodesInOrder(), sortedNodes)) {
+            k.setPipeline(pipeline.copyWithNodesInOrder(sortedNodes));
+          }
         }
       }
     }
   }
 
-  private List<DatanodeDetails> sortDatanodes(String clientMachine,
-      List<DatanodeDetails> nodes, OmKeyInfo keyInfo, List<String> nodeList) {
-    List<DatanodeDetails> sortedNodes = null;
-    try {
-      sortedNodes = scmClient.getBlockClient()
-          .sortDatanodes(nodeList, clientMachine);
-      if (LOG.isDebugEnabled()) {
-        LOG.debug("Sorted datanodes {} for client {}, result: {}", nodes,
-            clientMachine, sortedNodes);
+  @VisibleForTesting
+  public List<DatanodeDetails> sortDatanodes(List<DatanodeDetails> nodes,
+                                             String clientMachine) {
+    final Node client = getClientNode(clientMachine, nodes);
+    return ozoneManager.getClusterMap()
+        .sortByDistanceCost(client, nodes, nodes.size());
+  }
+
+  private Node getClientNode(String clientMachine,
+                             List<DatanodeDetails> nodes) {
+    List<DatanodeDetails> matchingNodes = new ArrayList<>();
+    boolean useHostname = ozoneManager.getConfiguration().getBoolean(
+        DFSConfigKeysLegacy.DFS_DATANODE_USE_DN_HOSTNAME,
+        DFSConfigKeysLegacy.DFS_DATANODE_USE_DN_HOSTNAME_DEFAULT);
+    for (DatanodeDetails node : nodes) {
+      if ((useHostname ? node.getHostName() : node.getIpAddress()).equals(
+          clientMachine)) {
+        matchingNodes.add(node);
       }
-    } catch (IOException e) {
-      LOG.warn("Unable to sort datanodes based on distance to client, "
-          + " volume={}, bucket={}, key={}, client={}, datanodes={}, "
-          + " exception={}",
-          keyInfo.getVolumeName(), keyInfo.getBucketName(),
-          keyInfo.getKeyName(), clientMachine, nodeList, e.getMessage());
     }
-    return sortedNodes;
+    return !matchingNodes.isEmpty() ? matchingNodes.get(0) :
+        getOtherNode(clientMachine);
+  }
+
+  private Node getOtherNode(String clientMachine) {
+    try {
+      String clientLocation = resolveNodeLocation(clientMachine);
+      if (clientLocation != null) {
+        Node rack = ozoneManager.getClusterMap().getNode(clientLocation);
+        if (rack instanceof InnerNode) {
+          return new NodeImpl(clientMachine, clientLocation,
+              (InnerNode) rack, rack.getLevel() + 1,
+              NODE_COST_DEFAULT);
+        }
+      }
+    } catch (Exception e) {
+      LOG.info("Could not resolve client {}: {}",
+          clientMachine, e.getMessage());
+    }
+    return null;
+  }
+
+  private String resolveNodeLocation(String hostname) {
+    List<String> hosts = Collections.singletonList(hostname);
+    List<String> resolvedHosts = dnsToSwitchMapping.resolve(hosts);
+    if (resolvedHosts != null && !resolvedHosts.isEmpty()) {
+      String location = resolvedHosts.get(0);
+      LOG.debug("Node {} resolved to location {}", hostname, location);
+      return location;
+    } else {
+      LOG.debug("Node resolution did not yield any result for {}", hostname);
+      return null;
+    }
   }
 
   private static List<String> toNodeUuid(Collection<DatanodeDetails> nodes) {
@@ -2079,7 +2167,7 @@ public class KeyManagerImpl implements KeyManager {
     }
   }
 
-  @NotNull
+  @Nonnull
   private Stream<Long> extractContainerIDs(OmKeyInfo keyInfo) {
     return keyInfo.getKeyLocationVersions().stream()
         .flatMap(v -> v.getLocationList().stream())

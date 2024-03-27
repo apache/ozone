@@ -25,7 +25,7 @@ import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.RemovalListener;
 import com.google.common.cache.RemovalNotification;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
-import javax.annotation.Nonnull;
+import jakarta.annotation.Nonnull;
 import javax.crypto.Cipher;
 import javax.crypto.CipherInputStream;
 import org.apache.commons.lang3.StringUtils;
@@ -145,7 +145,7 @@ import org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.token.Token;
 import org.apache.ratis.protocol.ClientId;
-import org.jetbrains.annotations.NotNull;
+import org.apache.ratis.util.MemoizedSupplier;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -156,7 +156,6 @@ import java.security.InvalidKeyException;
 import java.security.PrivilegedExceptionAction;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.BitSet;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
@@ -196,6 +195,8 @@ public class RpcClient implements ClientProtocol {
   // for reconstruction.
   private static final int EC_RECONSTRUCT_STRIPE_READ_POOL_MIN_SIZE = 3;
 
+  private static final int WRITE_POOL_MIN_SIZE = 1;
+
   private final ConfigurationSource conf;
   private final OzoneManagerClientProtocol ozoneManagerClient;
   private final XceiverClientFactory xceiverClientManager;
@@ -214,8 +215,9 @@ public class RpcClient implements ClientProtocol {
   private final ByteBufferPool byteBufferPool;
   private final BlockInputStreamFactory blockInputStreamFactory;
   private final OzoneManagerVersion omVersion;
-  private volatile ExecutorService ecReconstructExecutor;
+  private final MemoizedSupplier<ExecutorService> ecReconstructExecutor;
   private final ContainerClientMetrics clientMetrics;
+  private final MemoizedSupplier<ExecutorService> writeExecutor;
   private final AtomicBoolean isS3GRequest = new AtomicBoolean(false);
 
   /**
@@ -238,6 +240,11 @@ public class RpcClient implements ClientProtocol {
     this.groupRights = aclConfig.getGroupDefaultRights();
 
     this.clientConfig = conf.getObject(OzoneClientConfig.class);
+    this.ecReconstructExecutor = MemoizedSupplier.valueOf(() -> createThreadPoolExecutor(
+        EC_RECONSTRUCT_STRIPE_READ_POOL_MIN_SIZE, clientConfig.getEcReconstructStripeReadPoolLimit(),
+        "ec-reconstruct-reader-TID-%d"));
+    this.writeExecutor = MemoizedSupplier.valueOf(() -> createThreadPoolExecutor(
+        WRITE_POOL_MIN_SIZE, Integer.MAX_VALUE, "client-write-TID-%d"));
 
     OmTransport omTransport = createOmTransport(omServiceId);
     OzoneManagerProtocolClientSideTranslatorPB
@@ -312,7 +319,7 @@ public class RpcClient implements ClientProtocol {
         }).build();
     this.byteBufferPool = new ElasticByteBufferPool();
     this.blockInputStreamFactory = BlockInputStreamFactoryImpl
-        .getInstance(byteBufferPool, this::getECReconstructExecutor);
+        .getInstance(byteBufferPool, ecReconstructExecutor);
     this.clientMetrics = ContainerClientMetrics.acquire();
   }
 
@@ -364,7 +371,7 @@ public class RpcClient implements ClientProtocol {
     return found;
   }
 
-  @NotNull
+  @Nonnull
   @VisibleForTesting
   protected XceiverClientFactory createXceiverClientFactory(
       ServiceInfoEx serviceInfo) throws IOException {
@@ -424,15 +431,16 @@ public class RpcClient implements ClientProtocol {
     List<OzoneAcl> listOfAcls = new ArrayList<>();
     //User ACL
     listOfAcls.add(new OzoneAcl(ACLIdentityType.USER,
-        owner, userRights, ACCESS));
+        owner, ACCESS, userRights));
     //Group ACLs of the User
     List<String> userGroups = Arrays.asList(UserGroupInformation
         .createRemoteUser(owner).getGroupNames());
     userGroups.stream().forEach((group) -> listOfAcls.add(
-        new OzoneAcl(ACLIdentityType.GROUP, group, groupRights, ACCESS)));
+        new OzoneAcl(ACLIdentityType.GROUP, group, ACCESS, groupRights)));
     //ACLs from VolumeArgs
-    if (volArgs.getAcls() != null) {
-      listOfAcls.addAll(volArgs.getAcls());
+    List<OzoneAcl> volumeAcls = volArgs.getAcls();
+    if (volumeAcls != null) {
+      listOfAcls.addAll(volumeAcls);
     }
 
     OmVolumeArgs.Builder builder = OmVolumeArgs.newBuilder();
@@ -627,8 +635,7 @@ public class RpcClient implements ClientProtocol {
           ugi.getShortUserName() : bucketArgs.getOwner();
     }
 
-    Boolean isVersionEnabled = bucketArgs.getVersioning() == null ?
-        Boolean.FALSE : bucketArgs.getVersioning();
+    boolean isVersionEnabled = bucketArgs.getVersioning();
     StorageType storageType = bucketArgs.getStorageType() == null ?
         StorageType.DEFAULT : bucketArgs.getStorageType();
     BucketLayout bucketLayout = bucketArgs.getBucketLayout();
@@ -749,10 +756,7 @@ public class RpcClient implements ClientProtocol {
    * @return OzoneAcl
    */
   private OzoneAcl linkBucketDefaultAcl() {
-    BitSet aclRights = new BitSet();
-    aclRights.set(READ.ordinal());
-    aclRights.set(WRITE.ordinal());
-    return new OzoneAcl(ACLIdentityType.WORLD, "", aclRights, ACCESS);
+    return new OzoneAcl(ACLIdentityType.WORLD, "", ACCESS, READ, WRITE);
   }
 
   /**
@@ -963,6 +967,31 @@ public class RpcClient implements ClientProtocol {
         "bucket can't be null or empty.");
     return ozoneManagerClient.createSnapshot(volumeName,
         bucketName, snapshotName);
+  }
+
+  /**
+   * Rename Snapshot.
+   *
+   * @param volumeName vol to be used
+   * @param bucketName bucket to be used
+   * @param snapshotOldName Old name of the snapshot
+   * @param snapshotNewName New name of the snapshot
+   *
+   * @throws IOException
+   */
+  @Override
+  public void renameSnapshot(String volumeName,
+      String bucketName, String snapshotOldName, String snapshotNewName) throws IOException {
+    Preconditions.checkArgument(StringUtils.isNotBlank(volumeName),
+                                "volume can't be null or empty.");
+    Preconditions.checkArgument(StringUtils.isNotBlank(bucketName),
+                                "bucket can't be null or empty.");
+    Preconditions.checkArgument(StringUtils.isNotBlank(snapshotOldName),
+                                "old snapshot name can't be null or empty.");
+    Preconditions.checkArgument(StringUtils.isNotBlank(snapshotNewName),
+                                "new snapshot name can't be null or empty.");
+
+    ozoneManagerClient.renameSnapshot(volumeName, bucketName, snapshotOldName, snapshotNewName);
   }
 
   /**
@@ -1213,6 +1242,22 @@ public class RpcClient implements ClientProtocol {
 
   }
 
+  @Deprecated
+  @Override
+  public void setEncryptionKey(String volumeName, String bucketName,
+                               String bekName) throws IOException {
+    verifyVolumeName(volumeName);
+    verifyBucketName(bucketName);
+    OmBucketArgs.Builder builder = OmBucketArgs.newBuilder();
+    BucketEncryptionKeyInfo bek = new BucketEncryptionKeyInfo.Builder()
+        .setKeyName(bekName).build();
+    builder.setVolumeName(volumeName)
+        .setBucketName(bucketName)
+        .setBucketEncryptionKey(bek);
+    OmBucketArgs finalArgs = builder.build();
+    ozoneManagerClient.setBucketProperty(finalArgs);
+  }
+
   @Override
   public void setReplicationConfig(
       String volumeName, String bucketName, ReplicationConfig replicationConfig)
@@ -1382,7 +1427,7 @@ public class RpcClient implements ClientProtocol {
     if (checkKeyNameEnabled) {
       HddsClientUtils.verifyKeyName(keyName);
     }
-    HddsClientUtils.checkNotNull(keyName, replicationConfig);
+    HddsClientUtils.checkNotNull(keyName);
 
     OmKeyArgs.Builder builder = new OmKeyArgs.Builder()
         .setVolumeName(volumeName)
@@ -1640,7 +1685,7 @@ public class RpcClient implements ClientProtocol {
     return getOzoneKeyDetails(keyInfo);
   }
 
-  @NotNull
+  @Nonnull
   private OzoneKeyDetails getOzoneKeyDetails(OmKeyInfo keyInfo) {
     List<OzoneKeyLocation> ozoneKeyLocations = new ArrayList<>();
     long lastKeyOffset = 0L;
@@ -1684,7 +1729,7 @@ public class RpcClient implements ClientProtocol {
     return getOzoneKeyDetails(keyInfo);
   }
 
-  @NotNull
+  @Nonnull
   private OmKeyInfo getS3KeyInfo(
       String bucketName, String keyName, boolean isHeadOp) throws IOException {
     verifyBucketName(bucketName);
@@ -1737,9 +1782,11 @@ public class RpcClient implements ClientProtocol {
 
   @Override
   public void close() throws IOException {
-    if (ecReconstructExecutor != null) {
-      ecReconstructExecutor.shutdownNow();
-      ecReconstructExecutor = null;
+    if (ecReconstructExecutor.isInitialized()) {
+      ecReconstructExecutor.get().shutdownNow();
+    }
+    if (writeExecutor.isInitialized()) {
+      writeExecutor.get().shutdownNow();
     }
     IOUtils.cleanupWithLogger(LOG, ozoneManagerClient, xceiverClientManager);
     keyProviderCache.invalidateAll();
@@ -1767,7 +1814,7 @@ public class RpcClient implements ClientProtocol {
     HddsClientUtils.checkNotNull(keyName);
     if (omVersion
         .compareTo(OzoneManagerVersion.ERASURE_CODED_STORAGE_SUPPORT) < 0) {
-      if (replicationConfig.getReplicationType()
+      if (replicationConfig != null && replicationConfig.getReplicationType()
           == HddsProtos.ReplicationType.EC) {
         throw new IOException("Can not set the replication of the file to"
             + " Erasure Coded replication, as OzoneManager does not support"
@@ -1937,7 +1984,8 @@ public class RpcClient implements ClientProtocol {
       ozoneMultipartUploadPartListParts.addPart(
           new OzoneMultipartUploadPartListParts.PartInfo(
               omPartInfo.getPartNumber(), omPartInfo.getPartName(),
-              omPartInfo.getModificationTime(), omPartInfo.getSize()));
+              omPartInfo.getModificationTime(), omPartInfo.getSize(),
+              omPartInfo.getETag()));
     }
     return ozoneMultipartUploadPartListParts;
 
@@ -2209,9 +2257,8 @@ public class RpcClient implements ClientProtocol {
 
     if (feInfo == null) {
       LengthInputStream lengthInputStream = KeyInputStream
-          .getFromOmKeyInfo(keyInfo, xceiverClientManager,
-              clientConfig.isChecksumVerify(), retryFunction,
-              blockInputStreamFactory);
+          .getFromOmKeyInfo(keyInfo, xceiverClientManager, retryFunction,
+              blockInputStreamFactory, clientConfig);
       try {
         final GDPRSymmetricKey gk = getGDPRSymmetricKey(
             keyInfo.getMetadata(), Cipher.DECRYPT_MODE);
@@ -2226,9 +2273,8 @@ public class RpcClient implements ClientProtocol {
     } else if (!keyInfo.getLatestVersionLocations().isMultipartKey()) {
       // Regular Key with FileEncryptionInfo
       LengthInputStream lengthInputStream = KeyInputStream
-          .getFromOmKeyInfo(keyInfo, xceiverClientManager,
-              clientConfig.isChecksumVerify(), retryFunction,
-              blockInputStreamFactory);
+          .getFromOmKeyInfo(keyInfo, xceiverClientManager, retryFunction,
+              blockInputStreamFactory, clientConfig);
       final KeyProvider.KeyVersion decrypted = getDEK(feInfo);
       final CryptoInputStream cryptoIn =
           new CryptoInputStream(lengthInputStream.getWrappedStream(),
@@ -2238,9 +2284,8 @@ public class RpcClient implements ClientProtocol {
     } else {
       // Multipart Key with FileEncryptionInfo
       List<LengthInputStream> lengthInputStreams = KeyInputStream
-          .getStreamsFromKeyInfo(keyInfo, xceiverClientManager,
-              clientConfig.isChecksumVerify(), retryFunction,
-              blockInputStreamFactory);
+          .getStreamsFromKeyInfo(keyInfo, xceiverClientManager, retryFunction,
+              blockInputStreamFactory, clientConfig);
       final KeyProvider.KeyVersion decrypted = getDEK(feInfo);
 
       List<OzoneCryptoInputStream> cryptoInputStreams = new ArrayList<>();
@@ -2359,6 +2404,7 @@ public class RpcClient implements ClientProtocol {
         .setConfig(clientConfig)
         .setAtomicKeyCreation(isS3GRequest.get())
         .setClientMetrics(clientMetrics)
+        .setExecutorServiceSupplier(writeExecutor)
         .setStreamBufferArgs(streamBufferArgs);
   }
 
@@ -2480,26 +2526,11 @@ public class RpcClient implements ClientProtocol {
     ozoneManagerClient.setTimes(builder.build(), mtime, atime);
   }
 
-  public ExecutorService getECReconstructExecutor() {
-    // local ref to a volatile to ensure access
-    // to a completed initialized object
-    ExecutorService executor = ecReconstructExecutor;
-    if (executor == null) {
-      synchronized (this) {
-        executor = ecReconstructExecutor;
-        if (executor == null) {
-          ecReconstructExecutor = new ThreadPoolExecutor(
-              EC_RECONSTRUCT_STRIPE_READ_POOL_MIN_SIZE,
-              clientConfig.getEcReconstructStripeReadPoolLimit(),
-              60, TimeUnit.SECONDS, new SynchronousQueue<>(),
-              new ThreadFactoryBuilder()
-                  .setNameFormat("ec-reconstruct-reader-TID-%d")
-                  .build(),
-              new ThreadPoolExecutor.CallerRunsPolicy());
-          executor = ecReconstructExecutor;
-        }
-      }
-    }
-    return executor;
+  private static ExecutorService createThreadPoolExecutor(
+       int corePoolSize, int maximumPoolSize, String threadNameFormat) {
+    return new ThreadPoolExecutor(corePoolSize, maximumPoolSize,
+            60, TimeUnit.SECONDS, new SynchronousQueue<>(),
+               new ThreadFactoryBuilder().setNameFormat(threadNameFormat).setDaemon(true).build(),
+               new ThreadPoolExecutor.CallerRunsPolicy());
   }
 }

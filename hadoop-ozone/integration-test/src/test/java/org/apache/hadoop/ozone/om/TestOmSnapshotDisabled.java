@@ -33,8 +33,6 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 
-import java.util.UUID;
-
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DB_PROFILE;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.FEATURE_NOT_ENABLED;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -45,7 +43,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
  */
 public class TestOmSnapshotDisabled {
 
-  private static MiniOzoneCluster cluster = null;
+  private static MiniOzoneHAClusterImpl cluster = null;
   private static OzoneClient client;
   private static ObjectStore store;
 
@@ -53,27 +51,19 @@ public class TestOmSnapshotDisabled {
   @Timeout(60)
   public static void init() throws Exception {
     OzoneConfiguration conf = new OzoneConfiguration();
-    String clusterId = UUID.randomUUID().toString();
-    String scmId = UUID.randomUUID().toString();
     conf.set(OMConfigKeys.OZONE_DEFAULT_BUCKET_LAYOUT,
         BucketLayout.LEGACY.name());
     conf.setEnum(HDDS_DB_PROFILE, DBProfile.TEST);
     // Disable filesystem snapshot feature for this test
     conf.setBoolean(OMConfigKeys.OZONE_FILESYSTEM_SNAPSHOT_ENABLED_KEY, false);
 
-    cluster = MiniOzoneCluster.newOMHABuilder(conf)
-        .setClusterId(clusterId)
-        .setScmId(scmId)
+    cluster = MiniOzoneCluster.newHABuilder(conf)
         .setOMServiceId("om-service-test1")
         .setNumOfOzoneManagers(3)
         .build();
     cluster.waitForClusterToBeReady();
     client = cluster.newClient();
 
-    OzoneManager leaderOzoneManager =
-        ((MiniOzoneHAClusterImpl) cluster).getOMLeader();
-    OzoneConfiguration leaderConfig = leaderOzoneManager.getConfiguration();
-    cluster.setConf(leaderConfig);
     store = client.getObjectStore();
   }
 

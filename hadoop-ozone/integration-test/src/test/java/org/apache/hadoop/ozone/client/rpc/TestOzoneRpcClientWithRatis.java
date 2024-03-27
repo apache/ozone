@@ -24,12 +24,15 @@ import java.io.IOException;
 import java.io.RandomAccessFile;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.util.HashMap;
 import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeoutException;
 
+import javax.xml.bind.DatatypeConverter;
 import org.apache.hadoop.hdds.client.DefaultReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationType;
@@ -37,6 +40,7 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.utils.FaultInjector;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
+import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.client.BucketArgs;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneBucket;
@@ -48,11 +52,11 @@ import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.client.io.OzoneDataStreamOutput;
 import org.apache.hadoop.ozone.client.io.OzoneInputStream;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
-import org.apache.hadoop.ozone.common.OzoneChecksumException;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartInfo;
 import org.apache.hadoop.ozone.om.ratis.OzoneManagerStateMachine;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
 import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
@@ -135,8 +139,6 @@ public class TestOzoneRpcClientWithRatis extends TestOzoneRpcClientAbstract {
       byte[] b = new byte[value.getBytes(UTF_8).length];
       is.read(b);
       assertArrayEquals(b, value.getBytes(UTF_8));
-    } catch (OzoneChecksumException e) {
-      fail("Read key should succeed");
     }
 
     // read file with topology aware read enabled
@@ -144,8 +146,6 @@ public class TestOzoneRpcClientWithRatis extends TestOzoneRpcClientAbstract {
       byte[] b = new byte[value.getBytes(UTF_8).length];
       is.read(b);
       assertArrayEquals(b, value.getBytes(UTF_8));
-    } catch (OzoneChecksumException e) {
-      fail("Read file should succeed");
     }
 
     // read key with topology aware read disabled
@@ -159,8 +159,6 @@ public class TestOzoneRpcClientWithRatis extends TestOzoneRpcClientAbstract {
         byte[] b = new byte[value.getBytes(UTF_8).length];
         is.read(b);
         assertArrayEquals(b, value.getBytes(UTF_8));
-      } catch (OzoneChecksumException e) {
-        fail("Read key should succeed");
       }
 
       // read file with topology aware read disabled
@@ -168,14 +166,13 @@ public class TestOzoneRpcClientWithRatis extends TestOzoneRpcClientAbstract {
         byte[] b = new byte[value.getBytes(UTF_8).length];
         is.read(b);
         assertArrayEquals(b, value.getBytes(UTF_8));
-      } catch (OzoneChecksumException e) {
-        fail("Read file should succeed");
       }
     }
   }
 
   @Test
-  public void testMultiPartUploadWithStream() throws IOException {
+  public void testMultiPartUploadWithStream()
+      throws IOException, NoSuchAlgorithmException {
     String volumeName = UUID.randomUUID().toString();
     String bucketName = UUID.randomUUID().toString();
     String keyName = UUID.randomUUID().toString();
@@ -205,6 +202,9 @@ public class TestOzoneRpcClientWithRatis extends TestOzoneRpcClientAbstract {
         keyName, valueLength, 1, uploadID);
     ozoneStreamOutput.write(ByteBuffer.wrap(sampleData), 0,
         valueLength);
+    ozoneStreamOutput.getMetadata().put(OzoneConsts.ETAG,
+        DatatypeConverter.printHexBinary(MessageDigest.getInstance(OzoneConsts.MD5_HASH)
+            .digest(sampleData)).toLowerCase());
     ozoneStreamOutput.close();
 
     OzoneMultipartUploadPartListParts parts =
@@ -324,7 +324,11 @@ public class TestOzoneRpcClientWithRatis extends TestOzoneRpcClientAbstract {
     omSM.getHandler().setInjector(injector);
     thread1.start();
     thread2.start();
-    Thread.sleep(2000);
+    // Wait long enough for createKey's preExecute to finish executing
+    GenericTestUtils.waitFor(() -> {
+      return getCluster().getOzoneManager().getOmServerProtocol().getLastRequestToSubmit().getCmdType().equals(
+          Type.CreateKey);
+    }, 100, 10000);
     injector.resume();
 
     try {

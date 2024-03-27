@@ -19,8 +19,8 @@
 package org.apache.hadoop.ozone.om.request.file;
 
 import org.apache.commons.lang3.RandomStringUtils;
+import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.OzoneAcl;
@@ -46,7 +46,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CreateDirectoryRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyArgs;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
-import org.jetbrains.annotations.NotNull;
+import jakarta.annotation.Nonnull;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -59,6 +59,7 @@ import java.util.List;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.THREE;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status.VOLUME_NOT_FOUND;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
@@ -66,8 +67,8 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.any;
+import static org.mockito.Mockito.anyString;
 import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.framework;
 import static org.mockito.Mockito.mock;
@@ -422,8 +423,7 @@ public class TestOMDirectoryCreateRequestWithFSO {
 
     // Add a file into the FileTable, this is to simulate "file exists" check.
     OmKeyInfo omKeyInfo = OMRequestTestUtils.createOmKeyInfo(volumeName,
-            bucketName, keyName, HddsProtos.ReplicationType.RATIS,
-            HddsProtos.ReplicationFactor.THREE, objID++);
+        bucketName, keyName, RatisReplicationConfig.getInstance(THREE)).setObjectID(objID++).build();
     final long volumeId = omMetadataManager.getVolumeId(volumeName);
     final long bucketId = omBucketInfo.getObjectID();
 
@@ -492,21 +492,22 @@ public class TestOMDirectoryCreateRequestWithFSO {
 
     // for index=0, parentID is bucketID
     OmDirectoryInfo omDirInfo = OMRequestTestUtils.createOmDirectoryInfo(
-            dirs.get(0), objID++, parentID);
+        dirs.get(0), objID++, parentID);
     OMRequestTestUtils.addDirKeyToDirTable(true, omDirInfo,
-            volumeName, bucketName, txnID, omMetadataManager);
+        volumeName, bucketName, txnID, omMetadataManager);
     parentID = omDirInfo.getObjectID();
 
     // Add a key in second level.
-    OmKeyInfo omKeyInfo = OMRequestTestUtils.createOmKeyInfo(volumeName,
-            bucketName, keyName, HddsProtos.ReplicationType.RATIS,
-            HddsProtos.ReplicationFactor.THREE, objID);
+    OmKeyInfo omKeyInfo = OMRequestTestUtils.createOmKeyInfo(volumeName, bucketName, keyName,
+            RatisReplicationConfig.getInstance(THREE))
+        .setObjectID(objID)
+        .build();
 
     final long volumeId = omMetadataManager.getVolumeId(volumeName);
     final long bucketId = omBucketInfo.getObjectID();
 
     final String ozoneKey = omMetadataManager.getOzonePathKey(
-            volumeId, bucketId, parentID, dirs.get(1));
+        volumeId, bucketId, parentID, dirs.get(1));
     ++txnID;
     omMetadataManager.getKeyTable(getBucketLayout())
         .addCacheEntry(new CacheKey<>(ozoneKey),
@@ -736,7 +737,7 @@ public class TestOMDirectoryCreateRequestWithFSO {
     }
   }
 
-  @NotNull
+  @Nonnull
   private String createDirKey(List<String> dirs, int depth) {
     String keyName = RandomStringUtils.randomAlphabetic(5);
     dirs.add(keyName);

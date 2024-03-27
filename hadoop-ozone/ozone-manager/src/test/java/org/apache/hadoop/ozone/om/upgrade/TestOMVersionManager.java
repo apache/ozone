@@ -25,9 +25,9 @@ import static org.apache.hadoop.ozone.upgrade.LayoutFeature.UpgradeActionType.VA
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.junit.jupiter.api.Assertions.fail;
-import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.anyString;
 import static org.mockito.Mockito.doCallRealMethod;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
@@ -65,13 +65,8 @@ public class TestOMVersionManager {
   public void testOMLayoutVersionManagerInitError() {
     int lV = OMLayoutFeature.values()[OMLayoutFeature.values().length - 1]
         .layoutVersion() + 1;
-
-    try {
-      new OMLayoutVersionManager(lV);
-      fail();
-    } catch (OMException ex) {
-      assertEquals(NOT_SUPPORTED_OPERATION, ex.getResult());
-    }
+    OMException ome = assertThrows(OMException.class, () -> new OMLayoutVersionManager(lV));
+    assertEquals(NOT_SUPPORTED_OPERATION, ome.getResult());
   }
 
   @Test

@@ -39,7 +39,6 @@ import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.S3SecretManagerImpl;
 import org.apache.hadoop.ozone.om.S3SecretCache;
 import org.apache.hadoop.ozone.om.S3SecretLockedManager;
-import org.apache.hadoop.ozone.om.ratis.metrics.OzoneManagerDoubleBufferMetrics;
 import org.apache.hadoop.ozone.om.request.s3.security.S3GetSecretRequest;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.om.response.bucket.OMBucketCreateResponse;
@@ -67,7 +66,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.mock;
@@ -137,7 +136,8 @@ class TestOzoneManagerDoubleBuffer {
         .setMaxUnFlushedTransactionCount(1000)
         .enableRatis(true)
         .setFlushNotifier(spyFlushNotifier)
-        .build();
+        .build()
+        .start();
 
     doNothing().when(omKeyCreateResponse).checkAndUpdateDB(any(), any());
     doNothing().when(omBucketCreateResponse).checkAndUpdateDB(any(), any());

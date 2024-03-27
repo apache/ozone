@@ -52,6 +52,7 @@ import static org.rocksdb.RocksDB.DEFAULT_COLUMN_FAMILY;
 import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedColumnFamilyOptions;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedDBOptions;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedLogger;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksDB;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedStatistics;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedWriteOptions;
@@ -83,6 +84,9 @@ public final class DBStoreBuilder {
   // The column family options that will be used for any column families
   // added by name only (without specifying options).
   private ManagedColumnFamilyOptions defaultCfOptions;
+  // Initialize the Statistics instance if ROCKSDB_STATISTICS enabled
+  private ManagedStatistics statistics;
+
   private String dbname;
   private Path dbPath;
   private String dbJmxBeanNameName;
@@ -188,6 +192,11 @@ public final class DBStoreBuilder {
     if (maxNumberOfOpenFiles != null) {
       dbOptions.setMaxOpenFiles(maxNumberOfOpenFiles);
     }
+    if (!rocksDbStat.equals(OZONE_METADATA_STORE_ROCKSDB_STATISTICS_OFF)) {
+      statistics = new ManagedStatistics();
+      statistics.setStatsLevel(StatsLevel.valueOf(rocksDbStat));
+      dbOptions.setStatistics(statistics);
+    }
   }
 
   /**
@@ -217,7 +226,7 @@ public final class DBStoreBuilder {
         throw new IOException("The DB destination directory should exist.");
       }
 
-      return new RDBStore(dbFile, rocksDBOption, writeOptions, tableConfigs,
+      return new RDBStore(dbFile, rocksDBOption, statistics, writeOptions, tableConfigs,
           registry.build(), openReadOnly, maxFSSnapshots, dbJmxBeanNameName,
           enableCompactionDag, maxDbUpdatesSizeThreshold, createCheckpointDirs,
           configuration, threadNamePrefix);
@@ -397,12 +406,7 @@ public final class DBStoreBuilder {
 
     // Apply logging settings.
     if (rocksDBConfiguration.isRocksdbLoggingEnabled()) {
-      org.rocksdb.Logger logger = new org.rocksdb.Logger(dbOptions) {
-        @Override
-        protected void log(InfoLogLevel infoLogLevel, String s) {
-          ROCKS_DB_LOGGER.info(s);
-        }
-      };
+      ManagedLogger logger = new ManagedLogger(dbOptions, (infoLogLevel, s) -> ROCKS_DB_LOGGER.info(s));
       InfoLogLevel level = InfoLogLevel.valueOf(rocksDBConfiguration
           .getRocksdbLogLevel() + "_LEVEL");
       logger.setInfoLogLevel(level);
@@ -412,13 +416,6 @@ public final class DBStoreBuilder {
     // Apply WAL settings.
     dbOptions.setWalTtlSeconds(rocksDBConfiguration.getWalTTL());
     dbOptions.setWalSizeLimitMB(rocksDBConfiguration.getWalSizeLimit());
-
-    // Create statistics.
-    if (!rocksDbStat.equals(OZONE_METADATA_STORE_ROCKSDB_STATISTICS_OFF)) {
-      ManagedStatistics statistics = new ManagedStatistics();
-      statistics.setStatsLevel(StatsLevel.valueOf(rocksDbStat));
-      dbOptions.setStatistics(statistics);
-    }
 
     return dbOptions;
   }

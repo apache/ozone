@@ -34,7 +34,6 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
-import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -47,8 +46,6 @@ import static org.junit.jupiter.api.Assertions.assertNotSame;
 public class TestTransferLeadershipShell {
   private MiniOzoneHAClusterImpl cluster = null;
   private OzoneConfiguration conf;
-  private String clusterId;
-  private String scmId;
   private String omServiceId;
   private String scmServiceId;
   private int numOfOMs = 3;
@@ -64,15 +61,13 @@ public class TestTransferLeadershipShell {
   @BeforeEach
   public void init() throws Exception {
     conf = new OzoneConfiguration();
-    clusterId = UUID.randomUUID().toString();
-    scmId = UUID.randomUUID().toString();
     omServiceId = "om-service-test1";
     scmServiceId = "scm-service-test1";
     conf.setLong(ScmConfigKeys.OZONE_SCM_HA_RATIS_SNAPSHOT_THRESHOLD,
         SNAPSHOT_THRESHOLD);
 
-    cluster = (MiniOzoneHAClusterImpl) MiniOzoneCluster.newHABuilder(conf)
-        .setClusterId(clusterId).setScmId(scmId).setOMServiceId(omServiceId)
+    cluster = MiniOzoneCluster.newHABuilder(conf)
+        .setOMServiceId(omServiceId)
         .setSCMServiceId(scmServiceId).setNumOfOzoneManagers(numOfOMs)
         .setNumOfStorageContainerManagers(numOfSCMs)
         .setNumOfActiveSCMs(numOfSCMs).setNumOfActiveOMs(numOfOMs)

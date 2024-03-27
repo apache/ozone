@@ -82,12 +82,13 @@ import static org.apache.hadoop.ozone.container.ContainerTestHelper.getTestConta
 import static org.apache.hadoop.ozone.container.replication.CopyContainerCompression.NO_COMPRESSION;
 import static org.apache.ozone.test.GenericTestUtils.LogCapturer.captureLogs;
 import static org.apache.ozone.test.GenericTestUtils.waitFor;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 import static org.slf4j.LoggerFactory.getLogger;
 
@@ -258,7 +259,7 @@ public class TestOzoneContainerWithTLS {
         while (e.getCause() != null) {
           e = e.getCause();
         }
-        assertTrue((e instanceof CertificateExpiredException));
+        assertInstanceOf(CertificateExpiredException.class, e);
       } finally {
         clientManager.releaseClient(client, true);
       }
@@ -289,10 +290,12 @@ public class TestOzoneContainerWithTLS {
   }
 
   private void assertClientTrustManagerFailedAndRetried(LogCapturer logs) {
-    assertTrue(logs.getOutput().contains("trying to re-fetch rootCA"),
-        "Check client failed first, and initiates a reload.");
-    assertTrue(logs.getOutput().contains("Loading certificates for client."),
-        "Check client loaded certificates.");
+    assertThat(logs.getOutput())
+        .withFailMessage("Check client failed first, and initiates a reload.")
+        .contains("trying to re-fetch rootCA");
+    assertThat(logs.getOutput())
+        .withFailMessage("Check client loaded certificates.")
+        .contains("Loading certificates for client.");
     logs.clearOutput();
   }
 
@@ -324,8 +327,8 @@ public class TestOzoneContainerWithTLS {
         sourceDatanodes, tempFolder.resolve("tmp"), NO_COMPRESSION);
     downloader.close();
     assertNull(file);
-    assertTrue(logCapture.getOutput().contains(
-        "java.security.cert.CertificateExpiredException"));
+    assertThat(logCapture.getOutput())
+        .contains("java.security.cert.CertificateExpiredException");
   }
 
   private void assertDownloadContainerWorks(List<Long> containers,

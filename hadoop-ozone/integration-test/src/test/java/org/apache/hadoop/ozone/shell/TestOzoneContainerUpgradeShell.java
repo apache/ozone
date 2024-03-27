@@ -80,9 +80,6 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 public class TestOzoneContainerUpgradeShell {
   private static final Logger LOG =
       LoggerFactory.getLogger(TestOzoneContainerUpgradeShell.class);
-  private static String omServiceId;
-  private static String clusterId;
-  private static String scmId;
   private static MiniOzoneCluster cluster = null;
   private static OzoneClient client;
   private static OzoneConfiguration conf = null;
@@ -90,13 +87,7 @@ public class TestOzoneContainerUpgradeShell {
   private static final String BUCKET_NAME = UUID.randomUUID().toString();
 
   protected static void startCluster() throws Exception {
-    // Init HA cluster
-    omServiceId = "om-service-test-upgrade-container1";
-    clusterId = UUID.randomUUID().toString();
-    scmId = UUID.randomUUID().toString();
-    final int numDNs = 3;
-    cluster = MiniOzoneCluster.newBuilder(conf).setClusterId(clusterId)
-        .setScmId(scmId).setOMServiceId(omServiceId).setNumDatanodes(numDNs)
+    cluster = MiniOzoneCluster.newBuilder(conf)
         .build();
     cluster.waitForClusterToBeReady();
     client = cluster.newClient();

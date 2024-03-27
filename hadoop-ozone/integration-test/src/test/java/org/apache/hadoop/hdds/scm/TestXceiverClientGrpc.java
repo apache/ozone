@@ -17,9 +17,9 @@
  */
 package org.apache.hadoop.hdds.scm;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -71,8 +71,8 @@ public class TestXceiverClientGrpc {
             RatisReplicationConfig.getInstance(ReplicationFactor.THREE))
         .setState(Pipeline.PipelineState.CLOSED)
         .setNodes(dns)
+        .setNodesInOrder(dnsInOrder)
         .build();
-    pipeline.setNodesInOrder(dnsInOrder);
   }
 
   @Test
@@ -111,7 +111,7 @@ public class TestXceiverClientGrpc {
   @Timeout(5)
   public void testGetBlockRetryAlNodes() {
     final ArrayList<DatanodeDetails> allDNs = new ArrayList<>(dns);
-    assertTrue(allDNs.size() > 1);
+    assertThat(allDNs.size()).isGreaterThan(1);
     try (XceiverClientGrpc client = new XceiverClientGrpc(pipeline, conf) {
       @Override
       public XceiverClientReply sendCommandAsync(
@@ -132,7 +132,7 @@ public class TestXceiverClientGrpc {
   @Timeout(5)
   public void testReadChunkRetryAllNodes() {
     final ArrayList<DatanodeDetails> allDNs = new ArrayList<>(dns);
-    assertTrue(allDNs.size() > 1);
+    assertThat(allDNs.size()).isGreaterThan(1);
     try (XceiverClientGrpc client = new XceiverClientGrpc(pipeline, conf) {
       @Override
       public XceiverClientReply sendCommandAsync(

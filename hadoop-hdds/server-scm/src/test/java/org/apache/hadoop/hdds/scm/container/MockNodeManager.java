@@ -42,7 +42,6 @@ import org.apache.hadoop.hdds.scm.node.DatanodeInfo;
 import org.apache.hadoop.hdds.scm.node.DatanodeUsageInfo;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.node.NodeStatus;
-import org.apache.hadoop.hdds.scm.node.states.Node2ContainerMap;
 import org.apache.hadoop.hdds.scm.node.states.Node2PipelineMap;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
@@ -772,13 +771,11 @@ public class MockNodeManager implements NodeManager {
    * Send heartbeat to indicate the datanode is alive and doing well.
    *
    * @param datanodeDetails - Datanode ID.
-   * @param layoutInfo - DataNode Layout info
    * @param commandQueueReportProto - Command Queue Report Proto
    * @return SCMheartbeat response list
    */
   @Override
   public List<SCMCommand> processHeartbeat(DatanodeDetails datanodeDetails,
-      LayoutVersionProto layoutInfo,
       CommandQueueReportProto commandQueueReportProto) {
     return null;
   }
@@ -786,7 +783,7 @@ public class MockNodeManager implements NodeManager {
   @Override
   public Boolean isNodeRegistered(
       DatanodeDetails datanodeDetails) {
-    return false;
+    return healthyNodes.contains(datanodeDetails);
   }
 
   @Override

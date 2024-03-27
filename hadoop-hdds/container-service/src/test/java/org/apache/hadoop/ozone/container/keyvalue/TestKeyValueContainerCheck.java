@@ -25,7 +25,6 @@ import org.apache.hadoop.hdfs.util.Canceler;
 import org.apache.hadoop.hdfs.util.DataTransferThrottler;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
-import org.apache.hadoop.ozone.container.common.helpers.ChunkInfo;
 import org.apache.hadoop.ozone.container.common.interfaces.BlockIterator;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.apache.hadoop.ozone.container.common.interfaces.DBHandle;
@@ -41,8 +40,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.mockito.ArgumentMatchers.anyLong;
-import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.anyLong;
+import static org.mockito.Mockito.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -123,9 +122,7 @@ public class TestKeyValueContainerCheck
       assertFalse(block.getChunks().isEmpty());
       ContainerProtos.ChunkInfo c = block.getChunks().get(0);
       BlockID blockID = block.getBlockID();
-      ChunkInfo chunkInfo = ChunkInfo.getFromProtoBuf(c);
-      File chunkFile = getChunkLayout()
-          .getChunkFile(containerData, blockID, chunkInfo);
+      File chunkFile = getChunkLayout().getChunkFile(containerData, blockID, c.getChunkName());
       long length = chunkFile.length();
       assertThat(length).isGreaterThan(0);
       // forcefully truncate the file to induce failure.

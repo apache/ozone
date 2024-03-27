@@ -41,8 +41,10 @@ import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
 import org.apache.ratis.protocol.exceptions.NotLeaderException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 import org.mockito.stubbing.Answer;
 
+import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -63,10 +65,10 @@ import static org.apache.hadoop.hdds.scm.net.NetConstants.ROOT_SCHEMA;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
-import static org.junit.jupiter.api.Assertions.fail;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyBoolean;
-import static org.mockito.ArgumentMatchers.anyInt;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.Mockito.any;
+import static org.mockito.Mockito.anyBoolean;
+import static org.mockito.Mockito.anyInt;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 import static org.mockito.Mockito.doAnswer;
@@ -82,7 +84,7 @@ public class TestECOverReplicationHandler {
   private Set<Pair<DatanodeDetails, SCMCommand<?>>> commandsSent;
 
   @BeforeEach
-  public void setup() throws NodeNotFoundException, NotLeaderException,
+  void setup(@TempDir File testDir) throws NodeNotFoundException, NotLeaderException,
       CommandTargetOverloadedException {
     staleNode = null;
 
@@ -103,7 +105,7 @@ public class TestECOverReplicationHandler {
         commandsSent);
 
     NodeManager nodeManager = new MockNodeManager(true, 10);
-    OzoneConfiguration conf = SCMTestUtils.getConf();
+    OzoneConfiguration conf = SCMTestUtils.getConf(testDir);
     ECReplicationConfig repConfig = new ECReplicationConfig(3, 2);
     container = ReplicationTestUtil
         .createContainer(HddsProtos.LifeCycleState.CLOSED, repConfig);
@@ -311,13 +313,8 @@ public class TestECOverReplicationHandler {
     ECOverReplicationHandler ecORH =
         new ECOverReplicationHandler(policy, replicationManager);
 
-    try {
-      ecORH.processAndSendCommands(availableReplicas, ImmutableList.of(),
-          health, 1);
-      fail("Expected CommandTargetOverloadedException");
-    } catch (CommandTargetOverloadedException e) {
-      // This is expected.
-    }
+    assertThrows(CommandTargetOverloadedException.class,
+        () -> ecORH.processAndSendCommands(availableReplicas, ImmutableList.of(), health, 1));
     assertEquals(1, commandsSent.size());
   }
 

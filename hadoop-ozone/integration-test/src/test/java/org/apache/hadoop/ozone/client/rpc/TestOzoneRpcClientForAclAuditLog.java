@@ -51,7 +51,6 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
-import java.util.UUID;
 
 import static org.apache.hadoop.ozone.OzoneAcl.AclScope.ACCESS;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ACL_AUTHORIZER_CLASS;
@@ -84,18 +83,16 @@ public class TestOzoneRpcClientForAclAuditLog {
   private static UserGroupInformation ugi;
   private static final OzoneAcl USER_ACL =
       new OzoneAcl(IAccessAuthorizer.ACLIdentityType.USER,
-          "johndoe", IAccessAuthorizer.ACLType.ALL, ACCESS);
+          "johndoe", ACCESS, IAccessAuthorizer.ACLType.ALL);
   private static final OzoneAcl USER_ACL_2 =
       new OzoneAcl(IAccessAuthorizer.ACLIdentityType.USER,
-          "jane", IAccessAuthorizer.ACLType.ALL, ACCESS);
+          "jane", ACCESS, IAccessAuthorizer.ACLType.ALL);
   private static List<OzoneAcl> aclListToAdd = new ArrayList<>();
   private static MiniOzoneCluster cluster = null;
   private static OzoneClient ozClient = null;
   private static ObjectStore store = null;
   private static StorageContainerLocationProtocolClientSideTranslatorPB
       storageContainerLocationClient;
-  private static String scmId = UUID.randomUUID().toString();
-
 
   /**
    * Create a MiniOzoneCluster for testing.
@@ -127,7 +124,6 @@ public class TestOzoneRpcClientForAclAuditLog {
   private static void startCluster(OzoneConfiguration conf) throws Exception {
     cluster = MiniOzoneCluster.newBuilder(conf)
         .setNumDatanodes(3)
-        .setScmId(scmId)
         .build();
     cluster.waitForClusterToBeReady();
     ozClient = OzoneClientFactory.getRpcClient(conf);

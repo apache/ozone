@@ -26,10 +26,11 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import java.util.List;
 import java.util.UUID;
 
+import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
-import org.jetbrains.annotations.NotNull;
+import jakarta.annotation.Nonnull;
 import org.junit.jupiter.api.Test;
 
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
@@ -118,7 +119,7 @@ public class TestOMAllocateBlockRequest extends TestOMKeyRequest {
 
   }
 
-  @NotNull
+  @Nonnull
   protected OMAllocateBlockRequest getOmAllocateBlockRequest(
           OMRequest modifiedOmRequest) {
     return new OMAllocateBlockRequest(modifiedOmRequest, BucketLayout.DEFAULT);
@@ -236,7 +237,8 @@ public class TestOMAllocateBlockRequest extends TestOMKeyRequest {
     KeyArgs keyArgs = KeyArgs.newBuilder()
         .setVolumeName(volumeName).setBucketName(bucketName)
         .setKeyName(keyName)
-        .setFactor(replicationFactor).setType(replicationType)
+        .setFactor(((RatisReplicationConfig) replicationConfig).getReplicationFactor())
+        .setType(replicationConfig.getReplicationType())
         .build();
 
     AllocateBlockRequest allocateBlockRequest =
@@ -253,8 +255,8 @@ public class TestOMAllocateBlockRequest extends TestOMKeyRequest {
   protected String addKeyToOpenKeyTable(String volumeName, String bucketName)
           throws Exception {
     OMRequestTestUtils.addKeyToTable(true, volumeName, bucketName,
-            keyName, clientID, replicationType, replicationFactor,
-            omMetadataManager);
+        keyName, clientID, replicationConfig,
+        omMetadataManager);
     return "";
   }
 }

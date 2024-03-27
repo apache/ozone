@@ -23,9 +23,9 @@ import static org.apache.hadoop.hdds.server.http.HttpServer2Metrics.HttpServer2M
 import static org.apache.hadoop.hdds.server.http.HttpServer2Metrics.HttpServer2MetricsInfo.HttpServerThreadCount;
 import static org.apache.hadoop.hdds.server.http.HttpServer2Metrics.HttpServer2MetricsInfo.HttpServerThreadQueueWaitingTaskCount;
 import static org.apache.hadoop.hdds.server.http.HttpServer2Metrics.HttpServer2MetricsInfo.SERVER_NAME;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyInt;
-import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.any;
+import static org.mockito.Mockito.anyInt;
+import static org.mockito.Mockito.anyString;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;

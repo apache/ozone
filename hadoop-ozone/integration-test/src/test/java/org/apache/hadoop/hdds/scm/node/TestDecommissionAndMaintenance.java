@@ -64,6 +64,11 @@ import java.util.concurrent.TimeoutException;
 import java.util.stream.Collectors;
 
 import static java.util.concurrent.TimeUnit.SECONDS;
+import static org.apache.hadoop.hdds.scm.node.TestNodeUtil.getDNHostAndPort;
+import static org.apache.hadoop.hdds.scm.node.TestNodeUtil.waitForDnToReachHealthState;
+import static org.apache.hadoop.hdds.scm.node.TestNodeUtil.waitForDnToReachOpState;
+import static org.apache.hadoop.hdds.scm.node.TestNodeUtil.waitForDnToReachPersistedOpState;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -147,7 +152,7 @@ public class TestDecommissionAndMaintenance {
     MiniOzoneCluster.Builder builder = MiniOzoneCluster.newBuilder(conf)
         .setNumDatanodes(DATANODE_COUNT);
 
-    clusterProvider = new MiniOzoneClusterProvider(conf, builder, 7);
+    clusterProvider = new MiniOzoneClusterProvider(builder, 7);
   }
 
   @AfterAll
@@ -208,7 +213,7 @@ public class TestDecommissionAndMaintenance {
     scmClient.decommissionNodes(Arrays.asList(
         getDNHostAndPort(toDecommission)));
 
-    waitForDnToReachOpState(toDecommission, DECOMMISSIONED);
+    waitForDnToReachOpState(nm, toDecommission, DECOMMISSIONED);
     // Ensure one node transitioned to DECOMMISSIONING
     List<DatanodeDetails> decomNodes = nm.getNodes(
         DECOMMISSIONED,
@@ -224,7 +229,7 @@ public class TestDecommissionAndMaintenance {
     // Stop the decommissioned DN
     int dnIndex = cluster.getHddsDatanodeIndex(toDecommission);
     cluster.shutdownHddsDatanode(toDecommission);
-    waitForDnToReachHealthState(toDecommission, DEAD);
+    waitForDnToReachHealthState(nm, toDecommission, DEAD);
 
     // Now the decommissioned node is dead, we should have
     // 3 replicas for the tracked container.
@@ -235,7 +240,7 @@ public class TestDecommissionAndMaintenance {
     cluster.restartHddsDatanode(dnIndex, true);
     scmClient.recommissionNodes(Arrays.asList(
         getDNHostAndPort(toDecommission)));
-    waitForDnToReachOpState(toDecommission, IN_SERVICE);
+    waitForDnToReachOpState(nm, toDecommission, IN_SERVICE);
     waitForDnToReachPersistedOpState(toDecommission, IN_SERVICE);
   }
 
@@ -271,7 +276,7 @@ public class TestDecommissionAndMaintenance {
     // After the SCM restart, the DN should report as DECOMMISSIONING, then
     // it should re-enter the decommission workflow and move to DECOMMISSIONED
     DatanodeDetails newDn = nm.getNodeByUuid(dn.getUuid().toString());
-    waitForDnToReachOpState(newDn, DECOMMISSIONED);
+    waitForDnToReachOpState(nm, newDn, DECOMMISSIONED);
     waitForDnToReachPersistedOpState(newDn, DECOMMISSIONED);
 
     // Now the node is decommissioned, so restart SCM again
@@ -281,7 +286,7 @@ public class TestDecommissionAndMaintenance {
 
     // On initial registration, the DN should report its operational state
     // and if it is decommissioned, that should be updated in the NodeStatus
-    waitForDnToReachOpState(newDn, DECOMMISSIONED);
+    waitForDnToReachOpState(nm, newDn, DECOMMISSIONED);
     // Also confirm the datanodeDetails correctly reflect the operational
     // state.
     waitForDnToReachPersistedOpState(newDn, DECOMMISSIONED);
@@ -290,7 +295,7 @@ public class TestDecommissionAndMaintenance {
     // reflect the state of in SCM, in IN_SERVICE.
     int dnIndex = cluster.getHddsDatanodeIndex(dn);
     cluster.shutdownHddsDatanode(dnIndex);
-    waitForDnToReachHealthState(dn, DEAD);
+    waitForDnToReachHealthState(nm, dn, DEAD);
     // Datanode is shutdown and dead. Now recommission it in SCM
     scmClient.recommissionNodes(Arrays.asList(getDNHostAndPort(dn)));
     // Now restart it and ensure it remains IN_SERVICE
@@ -300,8 +305,8 @@ public class TestDecommissionAndMaintenance {
     // As this is not an initial registration since SCM was started, the DN
     // should report its operational state and if it differs from what SCM
     // has, then the SCM state should be used and the DN state updated.
-    waitForDnToReachHealthState(newDn, HEALTHY);
-    waitForDnToReachOpState(newDn, IN_SERVICE);
+    waitForDnToReachHealthState(nm, newDn, HEALTHY);
+    waitForDnToReachOpState(nm, newDn, IN_SERVICE);
     waitForDnToReachPersistedOpState(newDn, IN_SERVICE);
   }
 
@@ -341,7 +346,7 @@ public class TestDecommissionAndMaintenance {
     scmClient.startMaintenanceNodes(Arrays.asList(
         getDNHostAndPort(dn)), 0);
 
-    waitForDnToReachOpState(dn, IN_MAINTENANCE);
+    waitForDnToReachOpState(nm, dn, IN_MAINTENANCE);
     waitForDnToReachPersistedOpState(dn, IN_MAINTENANCE);
 
     // Should still be 3 replicas online as no replication should happen for
@@ -355,7 +360,7 @@ public class TestDecommissionAndMaintenance {
 
     // Stop the maintenance DN
     cluster.shutdownHddsDatanode(dn);
-    waitForDnToReachHealthState(dn, DEAD);
+    waitForDnToReachHealthState(nm, dn, DEAD);
 
     // Now the maintenance node is dead, we should still have
     // 3 replicas as we don't purge the replicas for a dead maintenance node
@@ -367,13 +372,13 @@ public class TestDecommissionAndMaintenance {
     // Restart the DN and it should keep the IN_MAINTENANCE state
     cluster.restartHddsDatanode(dn, true);
     DatanodeDetails newDN = nm.getNodeByUuid(dn.getUuid().toString());
-    waitForDnToReachHealthState(newDN, HEALTHY);
+    waitForDnToReachHealthState(nm, newDN, HEALTHY);
     waitForDnToReachPersistedOpState(newDN, IN_MAINTENANCE);
 
     // Stop the DN and wait for it to go dead.
     int dnIndex = cluster.getHddsDatanodeIndex(dn);
     cluster.shutdownHddsDatanode(dnIndex);
-    waitForDnToReachHealthState(dn, DEAD);
+    waitForDnToReachHealthState(nm, dn, DEAD);
 
     // Datanode is shutdown and dead. Now recommission it in SCM
     scmClient.recommissionNodes(Arrays.asList(getDNHostAndPort(dn)));
@@ -385,8 +390,8 @@ public class TestDecommissionAndMaintenance {
     // As this is not an initial registration since SCM was started, the DN
     // should report its operational state and if it differs from what SCM
     // has, then the SCM state should be used and the DN state updated.
-    waitForDnToReachHealthState(newDn, HEALTHY);
-    waitForDnToReachOpState(newDn, IN_SERVICE);
+    waitForDnToReachHealthState(nm, newDn, HEALTHY);
+    waitForDnToReachOpState(nm, newDn, IN_SERVICE);
     waitForDnToReachPersistedOpState(dn, IN_SERVICE);
   }
 
@@ -409,7 +414,7 @@ public class TestDecommissionAndMaintenance {
     replicas.forEach(r -> forMaintenance.add(r.getDatanodeDetails()));
 
     scmClient.startMaintenanceNodes(forMaintenance.stream()
-        .map(this::getDNHostAndPort)
+        .map(TestNodeUtil::getDNHostAndPort)
         .collect(Collectors.toList()), 0);
 
     // Ensure all 3 DNs go to maintenance
@@ -420,7 +425,7 @@ public class TestDecommissionAndMaintenance {
     // There should now be 5-6 replicas of the container we are tracking
     Set<ContainerReplica> newReplicas =
         cm.getContainerReplicas(container.containerID());
-    assertTrue(newReplicas.size() >= 5);
+    assertThat(newReplicas.size()).isGreaterThanOrEqualTo(5);
 
     scmClient.recommissionNodes(forMaintenance.stream()
         .map(d -> getDNHostAndPort(d))
@@ -428,7 +433,7 @@ public class TestDecommissionAndMaintenance {
 
     // Ensure all 3 DNs go to maintenance
     for (DatanodeDetails dn : forMaintenance) {
-      waitForDnToReachOpState(dn, IN_SERVICE);
+      waitForDnToReachOpState(nm, dn, IN_SERVICE);
     }
     waitForContainerReplicas(container, 3);
 
@@ -443,18 +448,18 @@ public class TestDecommissionAndMaintenance {
         .limit(2)
         .collect(Collectors.toList());
     scmClient.startMaintenanceNodes(ecMaintenance.stream()
-        .map(this::getDNHostAndPort)
+        .map(TestNodeUtil::getDNHostAndPort)
         .collect(Collectors.toList()), 0);
     for (DatanodeDetails dn : ecMaintenance) {
       waitForDnToReachPersistedOpState(dn, IN_MAINTENANCE);
     }
-    assertTrue(cm.getContainerReplicas(ecContainer.containerID()).size() >= 6);
+    assertThat(cm.getContainerReplicas(ecContainer.containerID()).size()).isGreaterThanOrEqualTo(6);
     scmClient.recommissionNodes(ecMaintenance.stream()
-        .map(this::getDNHostAndPort)
+        .map(TestNodeUtil::getDNHostAndPort)
         .collect(Collectors.toList()));
     // Ensure the 2 DNs go to IN_SERVICE
     for (DatanodeDetails dn : ecMaintenance) {
-      waitForDnToReachOpState(dn, IN_SERVICE);
+      waitForDnToReachOpState(nm, dn, IN_SERVICE);
     }
     waitForContainerReplicas(ecContainer, 5);
   }
@@ -477,7 +482,7 @@ public class TestDecommissionAndMaintenance {
     replicas.forEach(r -> forMaintenance.add(r.getDatanodeDetails()));
 
     scmClient.startMaintenanceNodes(forMaintenance.stream()
-        .map(this::getDNHostAndPort)
+        .map(TestNodeUtil::getDNHostAndPort)
         .collect(Collectors.toList()), 0);
 
     // Ensure all 3 DNs go to entering_maintenance
@@ -494,13 +499,13 @@ public class TestDecommissionAndMaintenance {
 
     // Ensure all 3 DNs go to maintenance
     for (DatanodeDetails dn : newDns) {
-      waitForDnToReachOpState(dn, IN_MAINTENANCE);
+      waitForDnToReachOpState(nm, dn, IN_MAINTENANCE);
     }
 
     // There should now be 5-6 replicas of the container we are tracking
     Set<ContainerReplica> newReplicas =
         cm.getContainerReplicas(container.containerID());
-    assertTrue(newReplicas.size() >= 5);
+    assertThat(newReplicas.size()).isGreaterThanOrEqualTo(5);
   }
 
   @Test
@@ -524,7 +529,7 @@ public class TestDecommissionAndMaintenance {
     // decommission interface only allows us to specify hours from now as the
     // end time, that is not really suitable for a test like this.
     nm.setNodeOperationalState(dn, IN_MAINTENANCE, newEndTime);
-    waitForDnToReachOpState(dn, IN_SERVICE);
+    waitForDnToReachOpState(nm, dn, IN_SERVICE);
     waitForDnToReachPersistedOpState(dn, IN_SERVICE);
 
     // Put the node back into maintenance and then stop it and wait for it to
@@ -532,11 +537,11 @@ public class TestDecommissionAndMaintenance {
     scmClient.startMaintenanceNodes(Arrays.asList(getDNHostAndPort(dn)), 0);
     waitForDnToReachPersistedOpState(dn, IN_MAINTENANCE);
     cluster.shutdownHddsDatanode(dn);
-    waitForDnToReachHealthState(dn, DEAD);
+    waitForDnToReachHealthState(nm, dn, DEAD);
 
     newEndTime = System.currentTimeMillis() / 1000 + 5;
     nm.setNodeOperationalState(dn, IN_MAINTENANCE, newEndTime);
-    waitForDnToReachOpState(dn, IN_SERVICE);
+    waitForDnToReachOpState(nm, dn, IN_SERVICE);
     // Ensure there are 3 replicas not including the dead node, indicating a new
     // replica was created
     GenericTestUtils.waitFor(() -> getContainerReplicas(container)
@@ -583,7 +588,7 @@ public class TestDecommissionAndMaintenance {
     // Now let the node go dead and repeat the test. This time ensure a new
     // replica is created.
     cluster.shutdownHddsDatanode(dn);
-    waitForDnToReachHealthState(dn, DEAD);
+    waitForDnToReachHealthState(nm, dn, DEAD);
 
     cluster.restartStorageContainerManager(false);
     setManagers();
@@ -631,18 +636,6 @@ public class TestDecommissionAndMaintenance {
   }
 
   /**
-   * Retrieves the NodeStatus for the given DN or fails the test if the
-   * Node cannot be found. This is a helper method to allow the nodeStatus to be
-   * checked in lambda expressions.
-   * @param dn Datanode for which to retrieve the NodeStatus.
-   * @return
-   */
-  private NodeStatus getNodeStatus(DatanodeDetails dn) {
-    return assertDoesNotThrow(() -> nm.getNodeStatus(dn),
-        "Unexpected exception getting the nodeState");
-  }
-
-  /**
    * Retrieves the containerReplica set for a given container or fails the test
    * if the container cannot be found. This is a helper method to allow the
    * container replica count to be checked in a lambda expression.
@@ -665,61 +658,6 @@ public class TestDecommissionAndMaintenance {
     Iterator<ContainerReplica> iter = replicas.iterator();
     ContainerReplica c = iter.next();
     return c.getDatanodeDetails();
-  }
-
-  /**
-   * Given a Datanode, return a string consisting of the hostname and one of its
-   * ports in the for host:post.
-   * @param dn Datanode for which to retrieve the host:post string
-   * @return host:port for the given DN.
-   */
-  private String getDNHostAndPort(DatanodeDetails dn) {
-    return dn.getHostName() + ":" + dn.getPorts().get(0).getValue();
-  }
-
-  /**
-   * Wait for the given datanode to reach the given operational state.
-   * @param dn Datanode for which to check the state
-   * @param state The state to wait for.
-   * @throws TimeoutException
-   * @throws InterruptedException
-   */
-  private void waitForDnToReachOpState(DatanodeDetails dn,
-      HddsProtos.NodeOperationalState state)
-      throws TimeoutException, InterruptedException {
-    GenericTestUtils.waitFor(
-        () -> getNodeStatus(dn).getOperationalState().equals(state),
-        200, 30000);
-  }
-
-  /**
-   * Wait for the given datanode to reach the given Health state.
-   * @param dn Datanode for which to check the state
-   * @param state The state to wait for.
-   * @throws TimeoutException
-   * @throws InterruptedException
-   */
-  private void waitForDnToReachHealthState(DatanodeDetails dn,
-      HddsProtos.NodeState state)
-      throws TimeoutException, InterruptedException {
-    GenericTestUtils.waitFor(
-        () -> getNodeStatus(dn).getHealth().equals(state),
-        200, 30000);
-  }
-
-  /**
-   * Wait for the given datanode to reach the given persisted state.
-   * @param dn Datanode for which to check the state
-   * @param state The state to wait for.
-   * @throws TimeoutException
-   * @throws InterruptedException
-   */
-  private void waitForDnToReachPersistedOpState(DatanodeDetails dn,
-      HddsProtos.NodeOperationalState state)
-      throws TimeoutException, InterruptedException {
-    GenericTestUtils.waitFor(
-        () -> dn.getPersistedOpState().equals(state),
-        200, 30000);
   }
 
   /**

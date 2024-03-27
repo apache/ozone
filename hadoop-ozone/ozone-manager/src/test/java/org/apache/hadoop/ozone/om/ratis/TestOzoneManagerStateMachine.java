@@ -37,7 +37,6 @@ import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.ratis.proto.RaftProtos;
 import org.apache.ratis.protocol.exceptions.StateMachineException;
 import org.apache.ratis.server.protocol.TermIndex;
-import org.apache.ratis.server.raftlog.RaftLog;
 import org.apache.ratis.statemachine.TransactionContext;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -49,8 +48,8 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertSame;
-import static org.junit.jupiter.api.Assertions.fail;
-import static org.mockito.ArgumentMatchers.any;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -101,12 +100,12 @@ public class TestOzoneManagerStateMachine {
   @Test
   public void testLastAppliedIndex() {
     ozoneManagerStateMachine.notifyTermIndexUpdated(0, 0);
-    assertTermIndex(0, RaftLog.INVALID_LOG_INDEX, ozoneManagerStateMachine.getLastAppliedTermIndex());
+    assertTermIndex(0, 0, ozoneManagerStateMachine.getLastAppliedTermIndex());
     assertTermIndex(0, 0, ozoneManagerStateMachine.getLastNotifiedTermIndex());
 
     // Conf/metadata transaction.
     ozoneManagerStateMachine.notifyTermIndexUpdated(0, 1);
-    assertTermIndex(0, RaftLog.INVALID_LOG_INDEX, ozoneManagerStateMachine.getLastAppliedTermIndex());
+    assertTermIndex(0, 1, ozoneManagerStateMachine.getLastAppliedTermIndex());
     assertTermIndex(0, 1, ozoneManagerStateMachine.getLastNotifiedTermIndex());
 
     // call update last applied index
@@ -119,7 +118,7 @@ public class TestOzoneManagerStateMachine {
     // Conf/metadata transaction.
     ozoneManagerStateMachine.notifyTermIndexUpdated(1L, 4L);
 
-    assertTermIndex(0, 3, ozoneManagerStateMachine.getLastAppliedTermIndex());
+    assertTermIndex(1, 4, ozoneManagerStateMachine.getLastAppliedTermIndex());
     assertTermIndex(1, 4, ozoneManagerStateMachine.getLastNotifiedTermIndex());
 
     // Add some apply transactions.
@@ -180,19 +179,15 @@ public class TestOzoneManagerStateMachine {
         prepareState.getState().getStatus());
 
     // Submitting a write request should now fail.
-    try {
-      ozoneManagerStateMachine.preAppendTransaction(
-          mockTransactionContext(createKeyRequest));
-      fail("Expected StateMachineException to be thrown when " +
-          "submitting write request while prepared.");
-    } catch (StateMachineException smEx) {
-      assertFalse(smEx.leaderShouldStepDown());
+    StateMachineException smEx =
+        assertThrows(StateMachineException.class,
+            () -> ozoneManagerStateMachine.preAppendTransaction(mockTransactionContext(createKeyRequest)),
+            "Expected StateMachineException to be thrown when submitting write request while prepared.");
+    assertFalse(smEx.leaderShouldStepDown());
 
-      Throwable cause = smEx.getCause();
-      assertInstanceOf(OMException.class, cause);
-      assertEquals(((OMException) cause).getResult(),
-          OMException.ResultCodes.NOT_SUPPORTED_OPERATION_WHEN_PREPARED);
-    }
+    Throwable cause = smEx.getCause();
+    OMException omException = assertInstanceOf(OMException.class, cause);
+    assertEquals(omException.getResult(), OMException.ResultCodes.NOT_SUPPORTED_OPERATION_WHEN_PREPARED);
 
     // Should be able to prepare again without issue.
     submittedTrx = mockTransactionContext(prepareRequest);

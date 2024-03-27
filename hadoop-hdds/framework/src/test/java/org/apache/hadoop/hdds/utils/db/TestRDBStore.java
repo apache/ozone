@@ -65,7 +65,7 @@ public class TestRDBStore {
       Set<TableConfig> families,
       long maxDbUpdatesSizeThreshold)
       throws IOException {
-    return new RDBStore(dbFile, options, new ManagedWriteOptions(), families,
+    return new RDBStore(dbFile, options, null, new ManagedWriteOptions(), families,
         CodecRegistry.newBuilder().build(), false, 1000, null, false,
         maxDbUpdatesSizeThreshold, true, null, "");
   }
@@ -248,7 +248,7 @@ public class TestRDBStore {
     int count = families.size();
     // Assert that we have all the tables in the list and no more.
     for (String name : families) {
-      assertTrue(hashTable.containsKey(name));
+      assertThat(hashTable).containsKey(name);
       count--;
     }
     assertEquals(0, count);

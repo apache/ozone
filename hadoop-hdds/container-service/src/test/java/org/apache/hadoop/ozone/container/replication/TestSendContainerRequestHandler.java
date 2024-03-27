@@ -35,7 +35,7 @@ import org.junit.jupiter.api.Test;
 import static org.apache.hadoop.ozone.container.replication.CopyContainerCompression.NO_COMPRESSION;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
-import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
 
@@ -75,7 +75,7 @@ class TestSendContainerRequestHandler {
       return null;
     }).when(observer).onError(any());
     SendContainerRequestHandler sendContainerRequestHandler
-        = new SendContainerRequestHandler(containerImporter, observer);
+        = new SendContainerRequestHandler(containerImporter, observer, null);
     ByteString data = ByteString.copyFromUtf8("test");
     ContainerProtos.SendContainerRequest request
         = ContainerProtos.SendContainerRequest.newBuilder()

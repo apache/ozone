@@ -44,7 +44,6 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.ArrayList;
 import java.util.Optional;
-import java.util.UUID;
 
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_CLIENT_LIST_CACHE_SIZE;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_FS_ITERATE_BATCH_SIZE;
@@ -59,14 +58,13 @@ public class TestListKeysWithFSO {
 
   private static MiniOzoneCluster cluster = null;
   private static OzoneConfiguration conf;
-  private static String clusterId;
-  private static String scmId;
-  private static String omId;
 
   private static OzoneBucket legacyOzoneBucket;
   private static OzoneBucket fsoOzoneBucket;
   private static OzoneBucket legacyOzoneBucket2;
   private static OzoneBucket fsoOzoneBucket2;
+  private static OzoneBucket emptyLegacyOzoneBucket;
+  private static OzoneBucket emptyFsoOzoneBucket;
   private static OzoneClient client;
 
   /**
@@ -80,14 +78,10 @@ public class TestListKeysWithFSO {
     conf = new OzoneConfiguration();
     conf.setBoolean(OMConfigKeys.OZONE_OM_ENABLE_FILESYSTEM_PATHS,
         true);
-    clusterId = UUID.randomUUID().toString();
-    scmId = UUID.randomUUID().toString();
-    omId = UUID.randomUUID().toString();
     // Set the number of keys to be processed during batch operate.
     conf.setInt(OZONE_FS_ITERATE_BATCH_SIZE, 3);
     conf.setInt(OZONE_CLIENT_LIST_CACHE_SIZE, 3);
-    cluster = MiniOzoneCluster.newBuilder(conf).setClusterId(clusterId)
-        .setScmId(scmId).setOmId(omId).build();
+    cluster = MiniOzoneCluster.newBuilder(conf).build();
     cluster.waitForClusterToBeReady();
     client = cluster.newClient();
 
@@ -113,6 +107,10 @@ public class TestListKeysWithFSO {
     ozoneVolume.createBucket(fsoBucketName, omBucketArgs);
     fsoOzoneBucket2 = ozoneVolume.getBucket(fsoBucketName);
 
+    fsoBucketName = "bucket" + RandomStringUtils.randomNumeric(5);
+    ozoneVolume.createBucket(fsoBucketName, omBucketArgs);
+    emptyFsoOzoneBucket = ozoneVolume.getBucket(fsoBucketName);
+
     builder = BucketArgs.newBuilder();
     builder.setStorageType(StorageType.DISK);
     builder.setBucketLayout(BucketLayout.LEGACY);
@@ -120,6 +118,10 @@ public class TestListKeysWithFSO {
     String legacyBucketName = "bucket" + RandomStringUtils.randomNumeric(5);
     ozoneVolume.createBucket(legacyBucketName, omBucketArgs);
     legacyOzoneBucket2 = ozoneVolume.getBucket(legacyBucketName);
+
+    legacyBucketName = "bucket" + RandomStringUtils.randomNumeric(5);
+    ozoneVolume.createBucket(legacyBucketName, omBucketArgs);
+    emptyLegacyOzoneBucket = ozoneVolume.getBucket(legacyBucketName);
 
     initFSNameSpace();
   }
@@ -417,6 +419,11 @@ public class TestListKeysWithFSO {
 
     expectedKeys = getExpectedKeyList("a", "a1", legacyOzoneBucket2);
     checkKeyList("a", "a1", expectedKeys, fsoOzoneBucket2);
+
+    // test when the keyPrefix = existing key
+    expectedKeys =
+        getExpectedKeyList("x/y/z/z1.tx", "", legacyOzoneBucket2);
+    checkKeyList("x/y/z/z1.tx", "", expectedKeys, fsoOzoneBucket2);
   }
 
   @Test
@@ -478,6 +485,23 @@ public class TestListKeysWithFSO {
     // startKey reaches last key
     keyPrefix = "a1/b1/c12";
     startKey = "a1/b1/c12/c3.tx";
+    // a1/b1/c1222.tx
+    expectedKeys =
+        getExpectedKeyShallowList(keyPrefix, startKey, legacyOzoneBucket);
+    checkKeyShallowList(keyPrefix, startKey, expectedKeys, fsoOzoneBucket);
+
+    // case-7: keyPrefix corresponds to multiple existing keys and
+    // startKey is null in empty bucket
+    keyPrefix = "a1/b1/c12";
+    startKey = null;
+    // a1/b1/c1222.tx
+    expectedKeys =
+        getExpectedKeyShallowList(keyPrefix, startKey, emptyLegacyOzoneBucket);
+    checkKeyShallowList(keyPrefix, startKey, expectedKeys, emptyFsoOzoneBucket);
+
+    // case-8: keyPrefix corresponds to multiple existing keys and
+    // startKey is null
+    keyPrefix = "a1/b1/c12";
     // a1/b1/c1222.tx
     expectedKeys =
         getExpectedKeyShallowList(keyPrefix, startKey, legacyOzoneBucket);
@@ -549,6 +573,7 @@ public class TestListKeysWithFSO {
     keys.add("/a3/b1/c1/c1.tx");
 
     keys.add("/x/y/z/z1.tx");
+    keys.add("/x/y/z/z1.txdir/z2.tx");
 
     keys.add("/dir1/dir2/dir3/d11.tx");
 

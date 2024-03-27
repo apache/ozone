@@ -40,9 +40,10 @@ import java.util.Map;
 import java.util.concurrent.TimeoutException;
 
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_STALENODE_INTERVAL;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Class which tests the SCMNodeManagerInfo Bean.
@@ -128,17 +129,16 @@ public class TestSCMNodeManagerMXBean {
     assertNotNull(actualData);
     assertNotNull(expectedData);
     for (Object obj : actualData.values()) {
-      assertTrue(obj instanceof CompositeData);
-      CompositeData cds = (CompositeData) obj;
+      CompositeData cds = assertInstanceOf(CompositeData.class, obj);
       assertEquals(2, cds.values().size());
       Iterator<?> it = cds.values().iterator();
       String key = it.next().toString();
       String value = it.next().toString();
       long num = Long.parseLong(value);
-      assertTrue(expectedData.containsKey(key));
+      assertThat(expectedData).containsKey(key);
       assertEquals(expectedData.remove(key).longValue(), num);
     }
-    assertTrue(expectedData.isEmpty());
+    assertThat(expectedData).isEmpty();
   }
 
 }

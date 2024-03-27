@@ -1,0 +1,74 @@
+# Licensed to the Apache Software Foundation (ASF) under one or more
+# contributor license agreements.  See the NOTICE file distributed with
+# this work for additional information regarding copyright ownership.
+# The ASF licenses this file to You under the Apache License, Version 2.0
+# (the "License"); you may not use this file except in compliance with
+# the License.  You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+# This workflow creates cache with Maven dependencies for Ozone build.
+
+name: populate-cache
+
+on:
+  push:
+    branches:
+      - master
+      - ozone-1.4
+    paths:
+      - 'pom.xml'
+      - '**/pom.xml'
+      - '.github/workflows/populate-cache.yml'
+  schedule:
+    - cron: '20 3 * * *'
+
+jobs:
+  build:
+    runs-on: ubuntu-20.04
+    steps:
+      - name: Checkout project
+        uses: actions/checkout@v4
+
+      - name: Restore cache for Maven dependencies
+        id: restore-cache
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            ~/.m2/repository/*/*/*
+            !~/.m2/repository/org/apache/ozone
+          key: maven-repo-${{ hashFiles('**/pom.xml') }}
+
+      - name: Setup Java
+        if: steps.restore-cache.outputs.cache-hit != 'true'
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: 8
+
+      - name: Fetch dependencies
+        if: steps.restore-cache.outputs.cache-hit != 'true'
+        run: mvn --batch-mode --fail-never --no-transfer-progress --show-version -Pgo-offline -Pdist clean verify
+
+      - name: Delete Ozone jars from repo
+        if: steps.restore-cache.outputs.cache-hit != 'true'
+        run: rm -fr ~/.m2/repository/org/apache/ozone
+
+      - name: List repo contents
+        if: steps.restore-cache.outputs.cache-hit != 'true'
+        run: find ~/.m2/repository -type f | sort | xargs ls -lh
+
+      - name: Save cache for Maven dependencies
+        if: steps.restore-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: |
+            ~/.m2/repository/*/*/*
+            !~/.m2/repository/org/apache/ozone
+          key: maven-repo-${{ hashFiles('**/pom.xml') }}

@@ -48,16 +48,15 @@ import org.slf4j.event.Level;
 
 import java.io.IOException;
 import java.util.Map;
-import java.util.UUID;
 import java.util.concurrent.TimeoutException;
 
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ContainerBalancerConfigurationProto;
 import static org.apache.hadoop.hdds.scm.HddsTestUtils.getContainer;
 import static org.apache.hadoop.hdds.protocol.MockDatanodeDetails.randomDatanodeDetails;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Tests failover with SCM HA setup.
@@ -65,8 +64,6 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 public class TestFailoverWithSCMHA {
   private MiniOzoneHAClusterImpl cluster = null;
   private OzoneConfiguration conf;
-  private String clusterId;
-  private String scmId;
   private String omServiceId;
   private String scmServiceId;
   private int numOfOMs = 1;
@@ -82,15 +79,13 @@ public class TestFailoverWithSCMHA {
   @BeforeEach
   public void init() throws Exception {
     conf = new OzoneConfiguration();
-    clusterId = UUID.randomUUID().toString();
-    scmId = UUID.randomUUID().toString();
     omServiceId = "om-service-test1";
     scmServiceId = "scm-service-test1";
     conf.setLong(ScmConfigKeys.OZONE_SCM_HA_RATIS_SNAPSHOT_THRESHOLD,
             SNAPSHOT_THRESHOLD);
 
-    cluster = (MiniOzoneHAClusterImpl) MiniOzoneCluster.newHABuilder(conf)
-        .setClusterId(clusterId).setScmId(scmId).setOMServiceId(omServiceId)
+    cluster = MiniOzoneCluster.newHABuilder(conf)
+        .setOMServiceId(omServiceId)
         .setSCMServiceId(scmServiceId).setNumOfOzoneManagers(numOfOMs)
         .setNumOfStorageContainerManagers(numOfSCMs).setNumOfActiveSCMs(3)
         .build();
@@ -132,8 +127,8 @@ public class TestFailoverWithSCMHA {
         .createProxy(scmBlockLocationClient, ScmBlockLocationProtocol.class,
             conf);
     scmBlockLocationProtocol.getScmInfo();
-    assertTrue(logCapture.getOutput()
-        .contains("Performing failover to suggested leader"));
+    assertThat(logCapture.getOutput())
+        .contains("Performing failover to suggested leader");
     scm = getLeader(cluster);
     SCMContainerLocationFailoverProxyProvider proxyProvider =
         new SCMContainerLocationFailoverProxyProvider(conf, null);
@@ -149,8 +144,8 @@ public class TestFailoverWithSCMHA {
 
     scmContainerClient.allocateContainer(HddsProtos.ReplicationType.RATIS,
         HddsProtos.ReplicationFactor.ONE, "ozone");
-    assertTrue(logCapture.getOutput()
-        .contains("Performing failover to suggested leader"));
+    assertThat(logCapture.getOutput())
+        .contains("Performing failover to suggested leader");
   }
 
   @Test
@@ -191,8 +186,8 @@ public class TestFailoverWithSCMHA {
         .createProxy(scmBlockLocationClient, ScmBlockLocationProtocol.class,
             conf);
     scmBlockLocationProtocol.getScmInfo();
-    assertTrue(logCapture.getOutput()
-        .contains("Performing failover to suggested leader"));
+    assertThat(logCapture.getOutput())
+        .contains("Performing failover to suggested leader");
     scm = getLeader(cluster);
     assertNotNull(scm);
 
@@ -200,7 +195,7 @@ public class TestFailoverWithSCMHA {
     //get the same inflightMove
     Map<ContainerID, MoveDataNodePair> inflightMove =
         scm.getReplicationManager().getMoveScheduler().getInflightMove();
-    assertTrue(inflightMove.containsKey(id));
+    assertThat(inflightMove).containsKey(id);
     MoveDataNodePair mp = inflightMove.get(id);
     assertEquals(dn2, mp.getTgt());
     assertEquals(dn1, mp.getSrc());
@@ -224,8 +219,8 @@ public class TestFailoverWithSCMHA {
 
     scmContainerClient.allocateContainer(HddsProtos.ReplicationType.RATIS,
         HddsProtos.ReplicationFactor.ONE, "ozone");
-    assertTrue(logCapture.getOutput()
-        .contains("Performing failover to suggested leader"));
+    assertThat(logCapture.getOutput())
+        .contains("Performing failover to suggested leader");
 
     //switch to the new leader successfully, new leader should
     //get the same inflightMove , which should not contains
@@ -234,7 +229,7 @@ public class TestFailoverWithSCMHA {
     assertNotNull(scm);
     inflightMove = scm.getReplicationManager()
         .getMoveScheduler().getInflightMove();
-    assertFalse(inflightMove.containsKey(id));
+    assertThat(inflightMove).doesNotContainKey(id);
   }
 
   /**

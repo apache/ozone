@@ -19,7 +19,6 @@ package org.apache.hadoop.ozone.container.common;
 
 
 import com.google.common.collect.Lists;
-import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.client.BlockID;
@@ -76,6 +75,7 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Timeout;
+import org.junit.jupiter.api.io.TempDir;
 import org.slf4j.LoggerFactory;
 
 import java.io.File;
@@ -111,7 +111,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -121,6 +121,7 @@ import static org.mockito.Mockito.when;
 @Timeout(30)
 public class TestBlockDeletingService {
 
+  @TempDir
   private File testRoot;
   private String scmId;
   private String datanodeUuid;
@@ -134,12 +135,6 @@ public class TestBlockDeletingService {
   @BeforeEach
   public void init() throws IOException {
     CodecBuffer.enableLeakDetection();
-
-    testRoot = GenericTestUtils
-        .getTestDir(TestBlockDeletingService.class.getSimpleName());
-    if (testRoot.exists()) {
-      FileUtils.cleanDirectory(testRoot);
-    }
     scmId = UUID.randomUUID().toString();
     conf.set(ScmConfigKeys.HDDS_DATANODE_DIR_KEY, testRoot.getAbsolutePath());
     conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, testRoot.getAbsolutePath());
@@ -152,7 +147,6 @@ public class TestBlockDeletingService {
   @AfterEach
   public void cleanup() throws IOException {
     BlockUtils.shutdownCache(conf);
-    FileUtils.deleteDirectory(testRoot);
     CodecBuffer.assertNoLeaks();
   }
 

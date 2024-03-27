@@ -66,20 +66,15 @@ public class TestReservedVolumeSpace {
         HDDS_DATANODE_DIR_DU_RESERVED_PERCENT_DEFAULT);
 
     long volumeCapacity = hddsVolume.getCapacity();
-    //Gets the actual total capacity
-    long totalCapacity = hddsVolume.getVolumeInfo().get()
-        .getUsageForTesting().getCapacity();
-    long reservedCapacity = hddsVolume.getVolumeInfo().get()
-            .getReservedInBytes();
-    //Volume Capacity with Reserved
-    long volumeCapacityReserved = totalCapacity - reservedCapacity;
+    VolumeUsage usage = hddsVolume.getVolumeInfo().get().getUsageForTesting();
 
-    long reservedFromVolume = hddsVolume.getVolumeInfo().get()
-            .getReservedInBytes();
+    //Gets the actual total capacity
+    long totalCapacity = usage.realUsage().getCapacity();
+    long reservedCapacity = usage.getReservedBytes();
     long reservedCalculated = (long) Math.ceil(totalCapacity * percentage);
 
-    assertEquals(reservedFromVolume, reservedCalculated);
-    assertEquals(volumeCapacity, volumeCapacityReserved);
+    assertEquals(reservedCalculated, reservedCapacity);
+    assertEquals(totalCapacity - reservedCapacity, volumeCapacity);
   }
 
   /**
@@ -119,16 +114,15 @@ public class TestReservedVolumeSpace {
         temp.toString() + ":500B");
     HddsVolume hddsVolume = volumeBuilder.conf(conf).build();
 
-    long reservedFromVolume = hddsVolume.getVolumeInfo().get()
-            .getReservedInBytes();
-    assertNotEquals(reservedFromVolume, 0);
+    VolumeUsage usage = hddsVolume.getVolumeInfo().get().getUsageForTesting();
+    long reservedFromVolume = usage.getReservedBytes();
+    assertNotEquals(0, reservedFromVolume);
 
-    long totalCapacity = hddsVolume.getVolumeInfo().get()
-        .getUsageForTesting().getCapacity();
+    long totalCapacity = usage.realUsage().getCapacity();
     float percentage = conf.getFloat(HDDS_DATANODE_DIR_DU_RESERVED_PERCENT,
         HDDS_DATANODE_DIR_DU_RESERVED_PERCENT_DEFAULT);
     long reservedCalculated = (long) Math.ceil(totalCapacity * percentage);
-    assertEquals(reservedFromVolume, reservedCalculated);
+    assertEquals(reservedCalculated, reservedFromVolume);
   }
 
   @Test

@@ -96,8 +96,8 @@ public class DatanodeAdminMonitorImpl implements DatanodeAdminMonitor {
   public static final class TrackedNode {
 
     private DatanodeDetails datanodeDetails;
-
     private long startTime = 0L;
+    private Map<String, List<ContainerID>> containersReplicatedOnNode = new ConcurrentHashMap<>();
 
     public TrackedNode(DatanodeDetails datanodeDetails, long startTime) {
       this.datanodeDetails = datanodeDetails;
@@ -121,6 +121,15 @@ public class DatanodeAdminMonitorImpl implements DatanodeAdminMonitor {
 
     public long getStartTime() {
       return startTime;
+    }
+
+    public Map<String, List<ContainerID>> getContainersReplicatedOnNode() {
+      return containersReplicatedOnNode;
+    }
+
+    public void setContainersReplicatedOnNode(List<ContainerID> underReplicated, List<ContainerID> unClosed) {
+      this.containersReplicatedOnNode.put("UnderReplicated", Collections.unmodifiableList(underReplicated));
+      this.containersReplicatedOnNode.put("UnClosed", Collections.unmodifiableList(unClosed));
     }
   }
 
@@ -423,9 +432,7 @@ public class DatanodeAdminMonitorImpl implements DatanodeAdminMonitor {
 
         boolean isHealthy = replicaSet.isHealthyEnoughForOffline();
         if (!isHealthy) {
-          if (LOG.isDebugEnabled()) {
-            unClosedIDs.add(cid);
-          }
+          unClosedIDs.add(cid);
           if (unclosed < containerDetailsLoggingLimit
               || LOG.isDebugEnabled()) {
             LOG.info("Unclosed Container {} {}; {}", cid, replicaSet, replicaDetails(replicaSet.getReplicas()));
@@ -448,20 +455,18 @@ public class DatanodeAdminMonitorImpl implements DatanodeAdminMonitor {
           replicationManager.checkContainerStatus(replicaSet.getContainer(), report);
           replicatedOK = report.getStat(ReplicationManagerReport.HealthState.UNDER_REPLICATED) == 0;
         }
-
         if (replicatedOK) {
           sufficientlyReplicated++;
         } else {
-          if (LOG.isDebugEnabled()) {
-            underReplicatedIDs.add(cid);
-          }
+          underReplicatedIDs.add(cid);
           if (underReplicated < containerDetailsLoggingLimit || LOG.isDebugEnabled()) {
             LOG.info("Under Replicated Container {} {}; {}", cid, replicaSet, replicaDetails(replicaSet.getReplicas()));
           }
           underReplicated++;
         }
       } catch (ContainerNotFoundException e) {
-        LOG.warn("ContainerID {} present in node list for {} but not found in containerManager", cid, dn);
+        LOG.warn("ContainerID {} present in node list for {} but not found in containerManager", cid,
+            dn.getDatanodeDetails());
       }
     }
     LOG.info("{} has {} sufficientlyReplicated, {} deleting, {} " +
@@ -485,7 +490,20 @@ public class DatanodeAdminMonitorImpl implements DatanodeAdminMonitor {
           unclosed, unClosedIDs.stream().map(
               Object::toString).collect(Collectors.joining(", ")));
     }
+    dn.setContainersReplicatedOnNode(underReplicatedIDs, unClosedIDs);
     return underReplicated == 0 && unclosed == 0;
+  }
+
+  @Override
+  public Map<String, List<ContainerID>> getContainersPendingReplication(DatanodeDetails dn) {
+    Iterator<TrackedNode> iterator = trackedNodes.iterator();
+    while (iterator.hasNext()) {
+      TrackedNode trackedNode = iterator.next();
+      if (trackedNode.equals(new TrackedNode(dn, 0L))) {
+        return trackedNode.getContainersReplicatedOnNode();
+      }
+    }
+    return new HashMap<>();
   }
 
   private String replicaDetails(Collection<ContainerReplica> replicas) {

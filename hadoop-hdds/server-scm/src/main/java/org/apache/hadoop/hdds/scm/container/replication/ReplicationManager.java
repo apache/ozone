@@ -61,6 +61,7 @@ import org.apache.hadoop.hdds.scm.ha.SCMService;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.node.NodeStatus;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
+import org.apache.hadoop.hdds.scm.pipeline.PipelineNotFoundException;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
 import org.apache.hadoop.ozone.common.statemachine.InvalidStateTransitionException;
@@ -293,6 +294,7 @@ public class ReplicationManager implements SCMService {
     if (!isRunning()) {
       LOG.info("Starting Replication Monitor Thread.");
       running = true;
+      metrics = ReplicationManagerMetrics.create(this);
       if (rmConf.isLegacyEnabled()) {
         legacyReplicationManager.setMetrics(metrics);
       }
@@ -1544,6 +1546,15 @@ public class ReplicationManager implements SCMService {
 
   private static boolean isEC(ReplicationConfig replicationConfig) {
     return replicationConfig.getReplicationType() == EC;
+  }
+
+  public boolean hasHealthyPipeline(ContainerInfo container) {
+    try {
+      return scmContext.getScm().getPipelineManager()
+          .getPipeline(container.getPipelineID()) != null;
+    } catch (PipelineNotFoundException e) {
+      return false;
+    }
   }
 }
 
