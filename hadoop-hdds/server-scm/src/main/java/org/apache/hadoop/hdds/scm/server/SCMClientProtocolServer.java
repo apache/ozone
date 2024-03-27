@@ -1058,13 +1058,12 @@ public class SCMClientProtocolServer implements
     ContainerBalancerConfiguration cbc =
         scm.getConfiguration().getObject(ContainerBalancerConfiguration.class);
     Map<String, String> auditMap = Maps.newHashMap();
-    ResultCodes resultCodes = ResultCodes.FAILED_TO_START_CONTAINER_BALANCER;
     try {
       if (threshold.isPresent()) {
         double tsd = threshold.get();
         auditMap.put("threshold", String.valueOf(tsd));
         if (tsd < 0.0D || tsd >= 100.0D) {
-          throw new SCMException("Threshold should be specified in the range [0.0, 100.0).", resultCodes);
+          throw new IOException("Threshold should be specified in the range [0.0, 100.0).");
         }
         cbc.setThreshold(tsd);
       }
@@ -1073,7 +1072,7 @@ public class SCMClientProtocolServer implements
         long mstm = maxSizeToMovePerIterationInGB.get();
         auditMap.put("maxSizeToMovePerIterationInGB", String.valueOf(mstm));
         if (mstm <= 0) {
-          throw new SCMException("Max Size To Move Per Iteration In GB must be positive.", resultCodes);
+          throw new IOException("Max Size To Move Per Iteration In GB must be positive.");
         }
         cbc.setMaxSizeToMovePerIteration(mstm * OzoneConsts.GB);
       }
@@ -1083,8 +1082,8 @@ public class SCMClientProtocolServer implements
         auditMap.put("maxDatanodesPercentageToInvolvePerIteration",
             String.valueOf(mdti));
         if (mdti < 0 || mdti > 100) {
-          throw new SCMException("Max Datanodes Percentage To Involve Per Iteration" +
-                  "should be specified in the range [0, 100]", resultCodes);
+          throw new IOException("Max Datanodes Percentage To Involve Per Iteration" +
+                  "should be specified in the range [0, 100]");
         }
         cbc.setMaxDatanodesPercentageToInvolvePerIteration(mdti);
       }
@@ -1093,8 +1092,8 @@ public class SCMClientProtocolServer implements
         int i = iterations.get();
         auditMap.put("iterations", String.valueOf(i));
         if (i < -1 || i == 0) {
-          throw new SCMException("Number of Iterations must be positive or" +
-              " -1 (for running container balancer infinitely).", resultCodes);
+          throw new IOException("Number of Iterations must be positive or" +
+              " -1 (for running container balancer infinitely).");
         }
         cbc.setIterations(i);
       }
@@ -1103,8 +1102,8 @@ public class SCMClientProtocolServer implements
         long mset = maxSizeEnteringTarget.get();
         auditMap.put("maxSizeEnteringTarget", String.valueOf(mset));
         if (mset <= 0) {
-          throw new SCMException("Max Size Entering Target must be " +
-              "greater than zero.", resultCodes);
+          throw new IOException("Max Size Entering Target must be " +
+              "greater than zero.");
         }
         cbc.setMaxSizeEnteringTarget(mset * OzoneConsts.GB);
       }
@@ -1113,8 +1112,8 @@ public class SCMClientProtocolServer implements
         long msls = maxSizeLeavingSource.get();
         auditMap.put("maxSizeLeavingSource", String.valueOf(msls));
         if (msls <= 0) {
-          throw new SCMException("Max Size Leaving Source must be " +
-              "greater than zero.", resultCodes);
+          throw new IOException("Max Size Leaving Source must be " +
+              "greater than zero.");
         }
         cbc.setMaxSizeLeavingSource(msls * OzoneConsts.GB);
       }
@@ -1123,7 +1122,7 @@ public class SCMClientProtocolServer implements
         int bi = balancingInterval.get();
         auditMap.put("balancingInterval", String.valueOf(bi));
         if (bi <= 0) {
-          throw new SCMException("Balancing Interval must be greater than zero.", resultCodes);
+          throw new IOException("Balancing Interval must be greater than zero.");
         }
         cbc.setBalancingInterval(Duration.ofMinutes(bi));
       }
@@ -1132,7 +1131,7 @@ public class SCMClientProtocolServer implements
         int mt = moveTimeout.get();
         auditMap.put("moveTimeout", String.valueOf(mt));
         if (mt <= 0) {
-          throw new SCMException("Move Timeout must be greater than zero.", resultCodes);
+          throw new IOException("Move Timeout must be greater than zero.");
         }
         cbc.setMoveTimeout(Duration.ofMinutes(mt));
       }
@@ -1141,7 +1140,7 @@ public class SCMClientProtocolServer implements
         int mrt = moveReplicationTimeout.get();
         auditMap.put("moveReplicationTimeout", String.valueOf(mrt));
         if (mrt <= 0) {
-          throw new SCMException("Move Replication Timeout must be greater than zero.", resultCodes);
+          throw new IOException("Move Replication Timeout must be greater than zero.");
         }
         cbc.setMoveReplicationTimeout(Duration.ofMinutes(mrt));
       }
