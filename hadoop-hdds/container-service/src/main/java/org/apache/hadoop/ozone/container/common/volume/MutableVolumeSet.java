@@ -442,12 +442,20 @@ public class MutableVolumeSet implements VolumeSet {
   public boolean hasEnoughVolumes() {
     // Max number of bad volumes allowed, should have at least
     // 1 good volume
+    boolean hasEnoughVolumes;
     if (maxVolumeFailuresTolerated ==
         StorageVolumeChecker.MAX_VOLUME_FAILURE_TOLERATED_LIMIT) {
-      return getVolumesList().size() >= 1;
+      hasEnoughVolumes = getVolumesList().size() >= 1;
     } else {
-      return getFailedVolumesList().size() <= maxVolumeFailuresTolerated;
+      hasEnoughVolumes = getFailedVolumesList().size() <= maxVolumeFailuresTolerated;
     }
+    if (!hasEnoughVolumes) {
+      LOG.error("Not enough volumes in MutableVolumeSet. DatanodeUUID: {}, VolumeType: {}, " +
+              "MaxVolumeFailuresTolerated: {}, ActiveVolumes: {}, FailedVolumes: {}",
+          datanodeUuid, volumeType, maxVolumeFailuresTolerated,
+          getVolumesList().size(), getFailedVolumesList().size());
+    }
+    return hasEnoughVolumes;
   }
 
   public StorageLocationReport[] getStorageReport() {
