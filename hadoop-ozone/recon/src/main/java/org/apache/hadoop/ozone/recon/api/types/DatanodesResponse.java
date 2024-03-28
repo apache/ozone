@@ -17,6 +17,7 @@
  */
 package org.apache.hadoop.ozone.recon.api.types;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -37,6 +38,13 @@ public class DatanodesResponse {
   @JsonProperty("datanodes")
   private Collection<DatanodeMetadata> datanodes;
 
+  /**
+   * An API response msg.
+   */
+  @JsonProperty("message")
+  @JsonInclude(JsonInclude.Include.NON_EMPTY)
+  private String message;
+
 
   public DatanodesResponse() {
     this(0, new ArrayList<>());
@@ -54,5 +62,13 @@ public class DatanodesResponse {
 
   public Collection<DatanodeMetadata> getDatanodes() {
     return datanodes;
+  }
+
+  public String getMessage() {
+    return message;
+  }
+
+  public void setMessage(String message) {
+    this.message = message;
   }
 }

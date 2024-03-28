@@ -1033,4 +1033,8 @@ public class NodeStateManager implements Runnable, Closeable {
 
     return healthCheckFuture;
   }
+
+  protected void removeNode(DatanodeDetails datanodeDetails) throws NodeNotFoundException {
+    nodeStateMap.removeNode(datanodeDetails);
+  }
 }
