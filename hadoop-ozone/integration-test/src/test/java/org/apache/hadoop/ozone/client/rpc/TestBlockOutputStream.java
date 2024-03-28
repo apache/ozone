@@ -80,8 +80,13 @@ class TestBlockOutputStream {
 
   static MiniOzoneCluster createCluster() throws IOException,
       InterruptedException, TimeoutException {
-
     OzoneConfiguration conf = new OzoneConfiguration();
+    OzoneClientConfig clientConfig = conf.getObject(OzoneClientConfig.class);
+    clientConfig.setChecksumType(ChecksumType.NONE);
+    clientConfig.setStreamBufferFlushDelay(false);
+    clientConfig.setEnablePutblockPiggybacking(true);
+    conf.setFromObject(clientConfig);
+
     conf.setTimeDuration(OZONE_SCM_STALENODE_INTERVAL, 3, TimeUnit.SECONDS);
     conf.setTimeDuration(OZONE_SCM_DEADNODE_INTERVAL, 6, TimeUnit.SECONDS);
     conf.setQuietMode(false);
@@ -397,7 +402,7 @@ class TestBlockOutputStream {
       key.flush();
       assertEquals(writeChunkCount + 2,
           metrics.getContainerOpCountMetrics(WriteChunk));
-      assertEquals(putBlockCount + 1,
+      assertEquals(putBlockCount,
           metrics.getContainerOpCountMetrics(PutBlock));
       assertEquals(pendingWriteChunkCount,
           metrics.getPendingContainerOpCountMetrics(WriteChunk));
@@ -426,9 +431,9 @@ class TestBlockOutputStream {
           metrics.getPendingContainerOpCountMetrics(PutBlock));
       assertEquals(writeChunkCount + 2,
           metrics.getContainerOpCountMetrics(WriteChunk));
-      assertEquals(putBlockCount + 2,
+      assertEquals(putBlockCount + 1,
           metrics.getContainerOpCountMetrics(PutBlock));
-      assertEquals(totalOpCount + 4, metrics.getTotalOpCount());
+      assertEquals(totalOpCount + 3, metrics.getTotalOpCount());
       assertEquals(0, keyOutputStream.getStreamEntries().size());
 
       validateData(keyName, data1, client.getObjectStore(), VOLUME, BUCKET);
@@ -493,9 +498,9 @@ class TestBlockOutputStream {
           metrics.getPendingContainerOpCountMetrics(PutBlock));
       assertEquals(writeChunkCount + 3,
           metrics.getContainerOpCountMetrics(WriteChunk));
-      assertEquals(putBlockCount + 2,
+      assertEquals(putBlockCount + 1,
           metrics.getContainerOpCountMetrics(PutBlock));
-      assertEquals(totalOpCount + 5, metrics.getTotalOpCount());
+      assertEquals(totalOpCount + 4, metrics.getTotalOpCount());
       assertEquals(dataLength, blockOutputStream.getTotalAckDataLength());
       // make sure the bufferPool is empty
       assertEquals(0, blockOutputStream.getBufferPool().computeBufferData());
@@ -686,9 +691,9 @@ class TestBlockOutputStream {
       assertEquals(writeChunkCount + 5,
           metrics.getContainerOpCountMetrics(WriteChunk));
       // The previous flush did not trigger any action with flushDelay enabled
-      assertEquals(putBlockCount + (flushDelay ? 3 : 4),
+      assertEquals(putBlockCount + (flushDelay ? 2 : 3),
           metrics.getContainerOpCountMetrics(PutBlock));
-      assertEquals(totalOpCount + (flushDelay ? 8 : 9),
+      assertEquals(totalOpCount + (flushDelay ? 7 : 8),
           metrics.getTotalOpCount());
       assertEquals(dataLength, blockOutputStream.getTotalAckDataLength());
       assertEquals(0, blockOutputStream.getCommitIndex2flushedDataMap().size());

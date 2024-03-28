@@ -31,6 +31,8 @@ public enum DatanodeVersion implements ComponentVersion {
   DEFAULT_VERSION(0, "Initial version"),
 
   SEPARATE_RATIS_PORTS_AVAILABLE(1, "Version with separated Ratis port."),
+  COMBINED_PUTBLOCK_WRITECHUNK_RPC(2, "WriteChunk can optionally support " +
+          "a PutBlock request"),
 
   FUTURE_VERSION(-1, "Used internally in the client when the server side is "
       + " newer and an unknown server version has arrived to the client.");

@@ -66,7 +66,7 @@ public abstract class AbstractDatanodeStore implements DatanodeStore {
 
   private Table<String, Long> finalizeBlocksTableWithIterator;
 
-  static final Logger LOG =
+  public static final Logger LOG =
       LoggerFactory.getLogger(AbstractDatanodeStore.class);
   private volatile DBStore store;
   private final AbstractDatanodeDBDefinition dbDef;
