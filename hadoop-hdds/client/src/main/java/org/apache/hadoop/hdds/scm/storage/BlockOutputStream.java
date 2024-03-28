@@ -573,7 +573,7 @@ public class BlockOutputStream extends OutputStream {
     writeChunkToContainer(buffer.duplicate(0, buffer.position()), false);
   }
 
-  private void writeSmallChunk(ChunkBuffer buffer)
+  private void writeChunkAndPutBlock(ChunkBuffer buffer)
       throws IOException {
     writeChunkCommon(buffer);
     writeChunkToContainer(buffer.duplicate(0, buffer.position()), true);
@@ -615,7 +615,7 @@ public class BlockOutputStream extends OutputStream {
       if (currentBuffer.hasRemaining()) {
         if (allowPutBlockPiggybacking) {
           updateFlushLength();
-          writeSmallChunk(currentBuffer);
+          writeChunkAndPutBlock(currentBuffer);
         } else {
           writeChunk(currentBuffer);
           updateFlushLength();
@@ -736,7 +736,7 @@ public class BlockOutputStream extends OutputStream {
    * @return
    */
   CompletableFuture<ContainerCommandResponseProto> writeChunkToContainer(
-      ChunkBuffer chunk, boolean smallChunk) throws IOException {
+      ChunkBuffer chunk, boolean putBlockPiggybacking) throws IOException {
     int effectiveChunkSize = chunk.remaining();
     final long offset = chunkOffset.getAndAdd(effectiveChunkSize);
     final ByteString data = chunk.toByteString(
@@ -779,7 +779,7 @@ public class BlockOutputStream extends OutputStream {
       } else {
         containerBlockData.addChunks(chunkInfo);
       }
-      if (smallChunk) {
+      if (putBlockPiggybacking) {
         Preconditions.checkNotNull(bufferList);
         byteBufferList = bufferList;
         bufferList = null;
@@ -808,7 +808,7 @@ public class BlockOutputStream extends OutputStream {
           respFuture.completeExceptionally(sce);
         }
         // if the ioException is not set, putBlock is successful
-        if (getIoException() == null && smallChunk) {
+        if (getIoException() == null && putBlockPiggybacking) {
           handleSuccessfulPutBlock(e.getWriteChunk().getCommittedBlockLength(),
               asyncReply, flushPos, byteBufferList);
         }
@@ -829,7 +829,7 @@ public class BlockOutputStream extends OutputStream {
       Thread.currentThread().interrupt();
       handleInterruptedException(ex, false);
     }
-    if (smallChunk) {
+    if (putBlockPiggybacking) {
       putFlushFuture(flushPos, validateFuture);
     }
     return validateFuture;
