@@ -43,6 +43,7 @@ import java.net.URISyntaxException;
 import java.net.UnknownHostException;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.Collections;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
@@ -389,6 +390,8 @@ public class NodeDecommissionManager {
 
   private synchronized boolean checkIfDecommissionPossible(List<DatanodeDetails> dns, List<DatanodeAdminError> errors) {
     int numDecom = dns.size();
+    List<DatanodeDetails> validDns = dns.stream().collect(Collectors.toList());
+    Collections.copy(validDns, dns);
     int inServiceTotal = nodeManager.getNodeCount(NodeStatus.inServiceHealthy());
     for (DatanodeDetails dn : dns) {
       try {
@@ -396,13 +399,15 @@ public class NodeDecommissionManager {
         NodeOperationalState opState = nodeStatus.getOperationalState();
         if (opState != NodeOperationalState.IN_SERVICE) {
           numDecom--;
+          validDns.remove(dn);
         }
       } catch (NodeNotFoundException ex) {
         numDecom--;
+        validDns.remove(dn);
       }
     }
 
-    for (DatanodeDetails dn : dns) {
+    for (DatanodeDetails dn : validDns) {
       Set<ContainerID> containers;
       try {
         containers = nodeManager.getContainers(dn);

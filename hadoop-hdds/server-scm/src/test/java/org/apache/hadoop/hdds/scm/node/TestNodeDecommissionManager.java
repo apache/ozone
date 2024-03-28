@@ -511,6 +511,41 @@ public class TestNodeDecommissionManager {
     assertTrue(error.get(0).getHostname().contains("AllHosts"));
   }
 
+  @Test
+  public void testInsufficientNodeDecommissionChecksNotInService() throws
+      NodeNotFoundException, IOException {
+    when(containerManager.getContainer(any(ContainerID.class)))
+        .thenAnswer(invocation -> getMockContainer(RatisReplicationConfig
+            .getInstance(HddsProtos.ReplicationFactor.THREE), (ContainerID)invocation.getArguments()[0]));
+
+    List<DatanodeAdminError> error;
+    List<DatanodeDetails> dns = new ArrayList<>();
+
+    for (int i = 0; i < 5; i++) {
+      DatanodeDetails dn = MockDatanodeDetails.randomDatanodeDetails();
+      dns.add(dn);
+      nodeManager.register(dn, null, null);
+    }
+
+    Set<ContainerID> idsRatis = new HashSet<>();
+    for (int i = 0; i < 5; i++) {
+      ContainerInfo container = containerManager.allocateContainer(
+          RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.THREE), "admin");
+      idsRatis.add(container.containerID());
+    }
+
+    for (DatanodeDetails dn  : nodeManager.getAllNodes().subList(0, 3)) {
+      nodeManager.setContainers(dn, idsRatis);
+    }
+
+    error = decom.decommissionNodes(Arrays.asList(dns.get(0).getIpAddress()), false);
+    assertTrue(error.size() == 0);
+
+    error = decom.decommissionNodes(Arrays.asList(dns.get(0).getIpAddress(),
+        dns.get(1).getIpAddress()), false);
+    assertTrue(error.size() == 0);
+  }
+
   /**
    * Generate a list of random DNs and return the list. A total of 11 DNs will
    * be generated and registered with the node manager. Index 0 and 10 will
