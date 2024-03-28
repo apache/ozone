@@ -44,6 +44,10 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
       <version>${hadoop.version}</version>
       <exclusions>
         <exclusion>
+          <groupId>com.nimbusds</groupId>
+          <artifactId>nimbus-jose-jwt</artifactId>
+        </exclusion>
+        <exclusion>
           <groupId>org.xerial.snappy</groupId>
           <artifactId>snappy-java</artifactId>
         </exclusion>
@@ -209,6 +213,10 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
     <dependency>
       <groupId>org.apache.hadoop.thirdparty</groupId>
       <artifactId>hadoop-shaded-guava</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>com.nimbusds</groupId>
+      <artifactId>nimbus-jose-jwt</artifactId>
     </dependency>
     <dependency>
       <groupId>org.apache.hadoop</groupId>
