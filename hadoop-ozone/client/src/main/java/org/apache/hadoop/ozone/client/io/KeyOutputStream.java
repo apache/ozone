@@ -54,7 +54,7 @@ import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
-import org.apache.hadoop.util.Time;
+import org.apache.hadoop.util.MetricUtil;
 import org.apache.ratis.protocol.exceptions.AlreadyClosedException;
 import org.apache.ratis.protocol.exceptions.RaftRetryFailureException;
 import org.slf4j.Logger;
@@ -458,15 +458,13 @@ public class KeyOutputStream extends OutputStream
     checkNotClosed();
     final long hsyncPos = writeOffset;
 
-    long start = Time.monotonicNowNanos();
     handleFlushOrClose(StreamAction.HSYNC);
 
     Preconditions.checkState(offset >= hsyncPos,
         "offset = %s < hsyncPos = %s", offset, hsyncPos);
-    blockOutputStreamEntryPool.hsyncKey(hsyncPos);
 
-    long hsyncLatency = Time.monotonicNowNanos() - start;
-    clientMetrics.addHsyncLatency(hsyncLatency / 1000);
+    MetricUtil.captureLatencyNs(clientMetrics::addHsyncLatency,
+        () -> blockOutputStreamEntryPool.hsyncKey(hsyncPos));
   }
 
   /**
