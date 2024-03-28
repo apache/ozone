@@ -37,6 +37,7 @@ import picocli.CommandLine;
 
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.Mockito.anyList;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -71,7 +72,7 @@ public class TestDecommissionSubCommand {
 
   @Test
   public void testMultipleHostnamesCanBeReadFromStdin() throws Exception {
-    when(scmClient.decommissionNodes(anyList()))
+    when(scmClient.decommissionNodes(anyList(), anyBoolean()))
             .thenAnswer(invocation -> new ArrayList<DatanodeAdminError>());
 
     String input = "host1\nhost2\nhost3\n";
@@ -100,7 +101,7 @@ public class TestDecommissionSubCommand {
 
   @Test
   public void testNoErrorsWhenDecommissioning() throws IOException  {
-    when(scmClient.decommissionNodes(anyList()))
+    when(scmClient.decommissionNodes(anyList(), anyBoolean()))
         .thenAnswer(invocation -> new ArrayList<DatanodeAdminError>());
 
     CommandLine c = new CommandLine(cmd);
@@ -123,7 +124,7 @@ public class TestDecommissionSubCommand {
 
   @Test
   public void testErrorsReportedWhenDecommissioning() throws IOException  {
-    when(scmClient.decommissionNodes(anyList()))
+    when(scmClient.decommissionNodes(anyList(), anyBoolean()))
         .thenAnswer(invocation -> {
           ArrayList<DatanodeAdminError> e = new ArrayList<>();
           e.add(new DatanodeAdminError("host1", "host1 error"));

@@ -48,6 +48,11 @@ public class DecommissionSubCommand extends ScmSubcommand {
           paramLabel = "<host name>")
   private List<String> parameters = new ArrayList<>();
 
+  @CommandLine.Option(names = { "--force" },
+      defaultValue = "false",
+      description = "Forcefully try to decommission the datanode(s)")
+  private boolean force;
+
   @Override
   public void execute(ScmClient scmClient) throws IOException {
     if (parameters.size() > 0) {
@@ -62,7 +67,7 @@ public class DecommissionSubCommand extends ScmSubcommand {
       } else {
         hosts = parameters;
       }
-      List<DatanodeAdminError> errors = scmClient.decommissionNodes(hosts);
+      List<DatanodeAdminError> errors = scmClient.decommissionNodes(hosts, force);
       System.out.println("Started decommissioning datanode(s):\n" +
           String.join("\n", hosts));
       if (errors.size() > 0) {

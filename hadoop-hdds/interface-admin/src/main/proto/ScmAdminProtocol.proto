@@ -362,6 +362,7 @@ message DatanodeUsageInfoResponseProto {
 */
 message DecommissionNodesRequestProto {
   repeated string hosts = 1;
+  optional bool force = 2;
 }
 
 

@@ -237,9 +237,9 @@ public class ContainerOperationClient implements ScmClient {
   }
 
   @Override
-  public List<DatanodeAdminError> decommissionNodes(List<String> hosts)
+  public List<DatanodeAdminError> decommissionNodes(List<String> hosts, boolean force)
       throws IOException {
-    return storageContainerLocationClient.decommissionNodes(hosts);
+    return storageContainerLocationClient.decommissionNodes(hosts, force);
   }
 
   @Override
