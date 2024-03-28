@@ -188,6 +188,14 @@ public class S3GetSecretRequest extends OMClientRequest {
                   OMException.ResultCodes.ACCESS_ID_NOT_FOUND);
             }
 
+            if (assignS3SecretValue != null && !s3SecretManager.isBatchSupported()) {
+              // A storage that does not support batch writing is likely to be a
+              // third-party secret storage that might throw an exception on write.
+              // In the case of the exception the request will fail.
+              s3SecretManager.storeSecret(assignS3SecretValue.getKerberosID(),
+                                          assignS3SecretValue);
+            }
+
             // Compose response
             final GetS3SecretResponse.Builder getS3SecretResponse =
                 GetS3SecretResponse.newBuilder().setS3Secret(
