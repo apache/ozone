@@ -80,9 +80,9 @@ public class OMSnapshotPurgeResponse extends OMClientResponse {
 
     OmMetadataManagerImpl metadataManager = (OmMetadataManagerImpl)
         omMetadataManager;
-    updateSnapInfo(metadataManager, batchOperation, updatedSnapInfos);
     updateSnapInfo(metadataManager, batchOperation,
         updatedPreviousAndGlobalSnapInfos);
+    updateSnapInfo(metadataManager, batchOperation, updatedSnapInfos);
     for (String dbKey: snapshotDbKeys) {
       // Skip the cache here because snapshot is purged from cache in OMSnapshotPurgeRequest.
       SnapshotInfo snapshotInfo = omMetadataManager
