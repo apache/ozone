@@ -1114,6 +1114,35 @@ public class TestContainerBalancerTask {
     }
   }
 
+  @Test
+  public void testSourceDatanodeAddedBack()
+      throws NodeNotFoundException, IOException, IllegalContainerBalancerStateException,
+      InvalidContainerBalancerConfigurationException, TimeoutException, InterruptedException {
+
+    when(moveManager.move(any(ContainerID.class),
+        any(DatanodeDetails.class),
+        any(DatanodeDetails.class)))
+        .thenReturn(CompletableFuture.completedFuture(MoveManager.MoveResult.REPLICATION_FAIL_NOT_EXIST_IN_SOURCE))
+        .thenReturn(CompletableFuture.completedFuture(MoveManager.MoveResult.COMPLETED));
+    balancerConfiguration.setThreshold(10);
+    balancerConfiguration.setIterations(1);
+    balancerConfiguration.setMaxSizeEnteringTarget(10 * STORAGE_UNIT);
+    balancerConfiguration.setMaxSizeToMovePerIteration(100 * STORAGE_UNIT);
+    balancerConfiguration.setMaxDatanodesPercentageToInvolvePerIteration(100);
+    String includeNodes = nodesInCluster.get(0).getDatanodeDetails().getHostName() + "," +
+        nodesInCluster.get(nodesInCluster.size() - 1).getDatanodeDetails().getHostName();
+    balancerConfiguration.setIncludeNodes(includeNodes);
+
+    startBalancer(balancerConfiguration);
+    GenericTestUtils.waitFor(() -> ContainerBalancerTask.IterationResult.ITERATION_COMPLETED ==
+        containerBalancerTask.getIterationResult(), 10, 50);
+
+    assertEquals(2, containerBalancerTask.getCountDatanodesInvolvedPerIteration());
+    assertTrue(containerBalancerTask.getMetrics().getNumContainerMovesCompletedInLatestIteration() >= 1);
+    assertThat(containerBalancerTask.getMetrics().getNumContainerMovesFailed()).isEqualTo(1);
+    stopBalancer();
+  }
+
   /**
    * Determines unBalanced nodes, that is, over and under utilized nodes,
    * according to the generated utilization values for nodes and the threshold.
