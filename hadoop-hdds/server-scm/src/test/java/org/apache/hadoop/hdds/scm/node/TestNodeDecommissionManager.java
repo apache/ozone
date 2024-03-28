@@ -438,6 +438,10 @@ public class TestNodeDecommissionManager {
     error = decom.decommissionNodes(Arrays.asList(dns.get(1).getIpAddress(),
         dns.get(2).getIpAddress(), dns.get(3).getIpAddress(), dns.get(4).getIpAddress()), false);
     assertTrue(error.get(0).getHostname().contains("AllHosts"));
+
+    error = decom.decommissionNodes(Arrays.asList(dns.get(1).getIpAddress(),
+        dns.get(2).getIpAddress(), dns.get(3).getIpAddress(), dns.get(4).getIpAddress()), true);
+    assertTrue(error.size() == 0);
   }
 
   @Test
@@ -467,6 +471,8 @@ public class TestNodeDecommissionManager {
 
     error = decom.decommissionNodes(Arrays.asList(dns.get(1).getIpAddress()), false);
     assertTrue(error.get(0).getHostname().contains("AllHosts"));
+    error = decom.decommissionNodes(Arrays.asList(dns.get(1).getIpAddress()), true);
+    assertTrue(error.size() == 0);
   }
 
   @Test
@@ -509,6 +515,8 @@ public class TestNodeDecommissionManager {
 
     error = decom.decommissionNodes(Arrays.asList(dns.get(1).getIpAddress()), false);
     assertTrue(error.get(0).getHostname().contains("AllHosts"));
+    error = decom.decommissionNodes(Arrays.asList(dns.get(1).getIpAddress()), true);
+    assertTrue(error.size() == 0);
   }
 
   @Test
@@ -538,9 +546,10 @@ public class TestNodeDecommissionManager {
       nodeManager.setContainers(dn, idsRatis);
     }
 
+    // decommission one node successfully
     error = decom.decommissionNodes(Arrays.asList(dns.get(0).getIpAddress()), false);
     assertTrue(error.size() == 0);
-
+    // try to decommission 2 nodes, one in service and one in decommissioning state, should be successful.
     error = decom.decommissionNodes(Arrays.asList(dns.get(0).getIpAddress(),
         dns.get(1).getIpAddress()), false);
     assertTrue(error.size() == 0);
