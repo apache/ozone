@@ -23,6 +23,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.Closeable;
+import java.util.Arrays;
 import java.util.function.Function;
 
 import static org.apache.hadoop.hdds.utils.NativeConstants.ROCKS_TOOLS_NATIVE_LIBRARY_NAME;
@@ -34,7 +35,8 @@ public class ManagedRawSSTFileReader<T> implements Closeable {
 
   public static boolean loadLibrary() throws NativeLibraryNotLoadedException {
     ManagedRocksObjectUtils.loadRocksDBLibrary();
-    if (!NativeLibraryLoader.getInstance().loadLibrary(ROCKS_TOOLS_NATIVE_LIBRARY_NAME)) {
+    if (!NativeLibraryLoader.getInstance().loadLibrary(ROCKS_TOOLS_NATIVE_LIBRARY_NAME, Arrays.asList(
+        ManagedRocksObjectUtils.getRocksDBLibFileName()))) {
       throw new NativeLibraryNotLoadedException(ROCKS_TOOLS_NATIVE_LIBRARY_NAME);
     }
     return true;
