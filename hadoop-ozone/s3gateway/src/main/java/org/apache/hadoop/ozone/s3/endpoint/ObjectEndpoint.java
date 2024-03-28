@@ -274,7 +274,9 @@ public class ObjectEndpoint extends EndpointBase {
       boolean hasAmzDecodedLengthZero = amzDecodedLength != null &&
           Long.parseLong(amzDecodedLength) == 0;
       if (canCreateDirectory &&
-          (length == 0 || hasAmzDecodedLengthZero)) {
+          (length == 0 || hasAmzDecodedLengthZero) &&
+          StringUtils.endsWith(keyPath, "/")
+      ) {
         s3GAction = S3GAction.CREATE_DIRECTORY;
         getClientProtocol()
             .createDirectory(volume.getName(), bucketName, keyPath);

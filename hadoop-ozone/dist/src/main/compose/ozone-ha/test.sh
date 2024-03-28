@@ -38,9 +38,11 @@ execute_robot_test ${SCM} -v SCHEME:ofs -v BUCKET_TYPE:link -N ozonefs-ofs-link 
 ## Exclude virtual-host tests. This is tested separately as it requires additional config.
 exclude="--exclude virtual-host"
 for bucket in generated; do
-  execute_robot_test ${SCM} -v BUCKET:${bucket} -N s3-${bucket} ${exclude} s3
-  # some tests are independent of the bucket type, only need to be run once
-  exclude="--exclude virtual-host --exclude no-bucket-type"
+  for layout in OBJECT_STORE LEGACY FILE_SYSTEM_OPTIMIZED; do
+    execute_robot_test ${SCM} -v BUCKET:${bucket} -v BUCKET_LAYOUT:${layout} -N s3-${layout}-${bucket} ${exclude} s3
+    # some tests are independent of the bucket type, only need to be run once
+    exclude="--exclude virtual-host --exclude no-bucket-type"
+  done
 done
 
 execute_robot_test ${SCM} freon

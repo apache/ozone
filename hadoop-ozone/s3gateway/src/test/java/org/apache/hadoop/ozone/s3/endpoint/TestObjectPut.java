@@ -95,7 +95,9 @@ class TestObjectPut {
     ReplicationConfig ratis3 = RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.THREE);
     ECReplicationConfig ec = new ECReplicationConfig("rs-3-2-1024K");
     return Stream.of(
+        Arguments.of(0, ratis3),
         Arguments.of(10, ratis3),
+        Arguments.of(0, ec),
         Arguments.of(10, ec)
     );
   }
@@ -410,7 +412,7 @@ class TestObjectPut {
   void testDirectoryCreation() throws IOException,
       OS3Exception {
     // GIVEN
-    final String path = "dir";
+    final String path = "dir/";
 
     // WHEN
     try (Response response = objectEndpoint.put(fsoBucket.getName(), path,
@@ -426,7 +428,7 @@ class TestObjectPut {
   @Test
   void testDirectoryCreationOverFile() throws IOException, OS3Exception {
     // GIVEN
-    final String path = "dir";
+    final String path = "key";
     final ByteArrayInputStream body =
         new ByteArrayInputStream(CONTENT.getBytes(UTF_8));
     objectEndpoint.put(FSO_BUCKET_NAME, path, CONTENT.length(), 0, "", body);
@@ -434,7 +436,7 @@ class TestObjectPut {
     // WHEN
     final OS3Exception exception = assertThrows(OS3Exception.class,
         () -> objectEndpoint
-            .put(FSO_BUCKET_NAME, path, 0, 0, "", null)
+            .put(FSO_BUCKET_NAME, path + "/", 0, 0, "", null)
             .close());
 
     // THEN
