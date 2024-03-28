@@ -232,10 +232,11 @@ public class NetworkTopologyImpl implements NetworkTopology {
 
   private boolean containsNode(Node node) {
     Node parent = node.getParent();
-    while (parent != null && parent != clusterTree) {
+    while (parent != null && !parent.equals(clusterTree)) {
       parent = parent.getParent();
     }
-    return parent == clusterTree;
+    return (parent != null && parent.equals(clusterTree)) ||
+        (parent == null && clusterTree == null);
   }
 
   /**
@@ -249,7 +250,10 @@ public class NetworkTopologyImpl implements NetworkTopology {
     }
     netlock.readLock().lock();
     try {
-      return node1.getAncestor(ancestorGen) == node2.getAncestor(ancestorGen);
+      Node ancestor1 = node1.getAncestor(ancestorGen);
+      Node ancestor2 = node2.getAncestor(ancestorGen);
+      return (ancestor1 != null && ancestor1.equals(ancestor2)) ||
+          (ancestor1 == null && ancestor2 == null);
     } finally {
       netlock.readLock().unlock();
     }
@@ -268,7 +272,8 @@ public class NetworkTopologyImpl implements NetworkTopology {
     try {
       node1 = node1.getParent();
       node2 = node2.getParent();
-      return node1 == node2;
+      return (node1 != null && node1.equals(node2)) ||
+          (node1 == null && node2 == null);
     } finally {
       netlock.readLock().unlock();
     }
@@ -736,11 +741,13 @@ public class NetworkTopologyImpl implements NetworkTopology {
     netlock.readLock().lock();
     try {
       Node ancestor1 = node1.getAncestor(level1 - 1);
-      boolean node1Topology = (ancestor1 != null && clusterTree != null &&
-          !ancestor1.equals(clusterTree)) || (ancestor1 != clusterTree);
       Node ancestor2 = node2.getAncestor(level2 - 1);
-      boolean node2Topology = (ancestor2 != null && clusterTree != null &&
-          !ancestor2.equals(clusterTree)) || (ancestor2 != clusterTree);
+      boolean node1Topology = (ancestor1 != null &&
+          !ancestor1.equals(clusterTree)) ||
+          (ancestor1 == null && clusterTree != null);
+      boolean node2Topology = (ancestor2 != null &&
+          !ancestor2.equals(clusterTree)) ||
+          (ancestor2 == null && clusterTree != null);
       if (node1Topology || node2Topology) {
         LOG.debug("One of the nodes is outside of network topology");
         return Integer.MAX_VALUE;
