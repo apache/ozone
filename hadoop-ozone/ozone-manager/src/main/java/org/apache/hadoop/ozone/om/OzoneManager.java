@@ -863,6 +863,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     omSnapshotManager = new OmSnapshotManager(this);
 
     // Snapshot metrics
+    metrics.setNumSnapshotCacheSize(omSnapshotManager.getSnapshotCacheSize());
     updateActiveSnapshotMetrics();
 
     if (withNewSnapshot) {
@@ -1829,7 +1830,6 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
         }
       }
     }
-
     metrics.setNumSnapshotActive(activeGauge);
     metrics.setNumSnapshotDeleted(deletedGauge);
   }

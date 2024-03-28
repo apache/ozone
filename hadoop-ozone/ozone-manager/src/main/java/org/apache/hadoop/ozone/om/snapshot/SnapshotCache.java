@@ -157,7 +157,6 @@ public class SnapshotCache {
           }
           return v;
         });
-
     if (rcOmSnapshot == null) {
       // The only exception that would fall through the loader logic above
       // is OMException with FILE_NOT_FOUND.

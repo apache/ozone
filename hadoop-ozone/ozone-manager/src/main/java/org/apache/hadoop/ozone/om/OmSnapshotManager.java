@@ -418,6 +418,7 @@ public final class OmSnapshotManager implements AutoCloseable {
   public void invalidateCache() {
     if (snapshotCache != null) {
       snapshotCache.invalidateAll();
+      updateSnapshotCacheSizeMetric();
     }
   }
 
@@ -429,6 +430,7 @@ public final class OmSnapshotManager implements AutoCloseable {
   public void invalidateCacheEntry(UUID key) throws IOException {
     if (snapshotCache != null) {
       snapshotCache.invalidate(key);
+      updateSnapshotCacheSizeMetric();
     }
   }
 
@@ -679,7 +681,9 @@ public final class OmSnapshotManager implements AutoCloseable {
     }
 
     // retrieve the snapshot from the cache
-    return snapshotCache.get(snapshotInfo.getSnapshotId());
+    ReferenceCounted<OmSnapshot> snapshot = snapshotCache.get(snapshotInfo.getSnapshotId());
+    updateSnapshotCacheSizeMetric();
+    return snapshot;
   }
 
   /**
@@ -976,5 +980,12 @@ public final class OmSnapshotManager implements AutoCloseable {
 
   public long getDiffCleanupServiceInterval() {
     return diffCleanupServiceInterval;
+  }
+
+  /**
+   * Updates the SnapshotCache size jmx metric.
+   */
+  public void updateSnapshotCacheSizeMetric() {
+    this.ozoneManager.getMetrics().setNumSnapshotCacheSize(getSnapshotCacheSize());
   }
 }
