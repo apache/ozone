@@ -17,6 +17,8 @@
  */
 package org.apache.hadoop.ozone.om.request.snapshot;
 
+import org.apache.commons.lang3.tuple.Triple;
+import org.apache.hadoop.ozone.om.snapshot.SnapshotUtils;
 import org.apache.ratis.server.protocol.TermIndex;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
@@ -37,6 +39,7 @@ import org.slf4j.LoggerFactory;
 import java.io.IOException;
 
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INVALID_SNAPSHOT_ERROR;
+import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.SNAPSHOT_LOCK;
 
 /**
  * Updates the exclusive size of the snapshot.
@@ -62,8 +65,23 @@ public class OMSnapshotSetPropertyRequest extends OMClientRequest {
         .getSetSnapshotPropertyRequest();
     SnapshotInfo updatedSnapInfo = null;
 
+    String snapshotKey = setSnapshotPropertyRequest.getSnapshotKey();
+    boolean acquiredSnapshotLock = false;
+    String volumeName = null;
+    String bucketName = null;
+    String snapshotName = null;
+
     try {
-      String snapshotKey = setSnapshotPropertyRequest.getSnapshotKey();
+      Triple<String, String, String> triple = SnapshotUtils.getSnapshotTableKeyFromString(snapshotKey);
+      volumeName = triple.getLeft();
+      bucketName = triple.getMiddle();
+      snapshotName = triple.getRight();
+
+      mergeOmLockDetails(metadataManager.getLock()
+          .acquireWriteLock(SNAPSHOT_LOCK, volumeName, bucketName, snapshotName));
+
+      acquiredSnapshotLock = getOmLockDetails().isLockAcquired();
+
       updatedSnapInfo = metadataManager.getSnapshotInfoTable()
           .get(snapshotKey);
 
@@ -104,6 +122,14 @@ public class OMSnapshotSetPropertyRequest extends OMClientRequest {
     } catch (IOException ex) {
       omClientResponse = new OMSnapshotSetPropertyResponse(
           createErrorOMResponse(omResponse, ex));
+    } finally {
+      if (acquiredSnapshotLock) {
+        mergeOmLockDetails(metadataManager.getLock()
+            .releaseWriteLock(SNAPSHOT_LOCK, volumeName, bucketName, snapshotName));
+      }
+      if (omClientResponse != null) {
+        omClientResponse.setOmLockDetails(getOmLockDetails());
+      }
     }
 
     return omClientResponse;
