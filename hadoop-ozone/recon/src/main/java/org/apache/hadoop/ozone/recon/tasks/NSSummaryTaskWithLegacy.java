@@ -68,26 +68,26 @@ public class NSSummaryTaskWithLegacy extends NSSummaryTaskDbEventHandler {
             OMConfigKeys.OZONE_OM_ENABLE_FILESYSTEM_PATHS_DEFAULT);
   }
 
-  public boolean processWithLegacy(OMUpdateEventBatch events) {
-    Iterator<OMDBUpdateEvent> eventIterator = events.getIterator();
+  public boolean processWithLegacy(RocksDBUpdateEventBatch events) {
+    Iterator<RocksDBUpdateEvent> eventIterator = events.getIterator();
     Map<Long, NSSummary> nsSummaryMap = new HashMap<>();
 
     while (eventIterator.hasNext()) {
-      OMDBUpdateEvent<String, ? extends
-          WithParentObjectId> omdbUpdateEvent = eventIterator.next();
-      OMDBUpdateEvent.OMDBUpdateAction action = omdbUpdateEvent.getAction();
+      RocksDBUpdateEvent<String, ? extends
+                WithParentObjectId> rocksDBUpdateEvent = eventIterator.next();
+      RocksDBUpdateEvent.RocksDBUpdateAction action = rocksDBUpdateEvent.getAction();
 
       // we only process updates on OM's KeyTable
-      String table = omdbUpdateEvent.getTable();
+      String table = rocksDBUpdateEvent.getTable();
       boolean updateOnKeyTable = table.equals(KEY_TABLE);
       if (!updateOnKeyTable) {
         continue;
       }
 
-      String updatedKey = omdbUpdateEvent.getKey();
+      String updatedKey = rocksDBUpdateEvent.getKey();
 
       try {
-        OMDBUpdateEvent<String, ?> keyTableUpdateEvent = omdbUpdateEvent;
+        RocksDBUpdateEvent<String, ?> keyTableUpdateEvent = rocksDBUpdateEvent;
         Object value = keyTableUpdateEvent.getValue();
         Object oldValue = keyTableUpdateEvent.getOldValue();
         if (!(value instanceof OmKeyInfo)) {
@@ -141,7 +141,7 @@ public class NSSummaryTaskWithLegacy extends NSSummaryTaskDbEventHandler {
 
           default:
             LOG.debug("Skipping DB update event : {}",
-                omdbUpdateEvent.getAction());
+                rocksDBUpdateEvent.getAction());
           }
         } else {
           OmDirectoryInfo updatedDirectoryInfo =
@@ -184,7 +184,7 @@ public class NSSummaryTaskWithLegacy extends NSSummaryTaskDbEventHandler {
 
           default:
             LOG.debug("Skipping DB update event : {}",
-                omdbUpdateEvent.getAction());
+                rocksDBUpdateEvent.getAction());
           }
         }
       } catch (IOException ioEx) {

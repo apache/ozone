@@ -145,7 +145,7 @@ public class TestReconPipelineManager {
              ReconPipelineManager.newReconPipelineManager(
                  conf,
                  nodeManager,
-                 ReconSCMDBDefinition.PIPELINES.getTable(store),
+                 ReconSCMSnapshotDBDefinition.PIPELINES.getTable(store),
                  eventQueue,
                  scmhaManager,
                  scmContext)) {
@@ -198,7 +198,7 @@ public class TestReconPipelineManager {
         ReconPipelineManager.newReconPipelineManager(
             conf,
             nodeManager,
-            ReconSCMDBDefinition.PIPELINES.getTable(store),
+            ReconSCMSnapshotDBDefinition.PIPELINES.getTable(store),
             eventQueue,
             scmhaManager,
             scmContext);
@@ -217,7 +217,7 @@ public class TestReconPipelineManager {
         ReconPipelineManager.newReconPipelineManager(
             conf,
             nodeManagerMock,
-            ReconSCMDBDefinition.PIPELINES.getTable(store),
+            ReconSCMSnapshotDBDefinition.PIPELINES.getTable(store),
             new EventQueue(),
             scmhaManager,
             scmContext);

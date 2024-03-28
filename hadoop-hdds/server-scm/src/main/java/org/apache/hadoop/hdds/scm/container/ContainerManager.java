@@ -209,4 +209,13 @@ public interface ContainerManager extends Closeable {
    * @return containerStateManger
    */
   ContainerStateManager getContainerStateManager();
+
+  /**
+   * Initializes the ContainerStateManager with new container object.
+   *
+   * @throws IOException
+   */
+  default void initialize(ContainerInfo containerInfo) throws IOException {
+
+  }
 }

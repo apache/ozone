@@ -54,7 +54,7 @@ public class DummyReconDBTask implements ReconOmTask {
   }
 
   @Override
-  public Pair<String, Boolean> process(OMUpdateEventBatch events) {
+  public Pair<String, Boolean> process(RocksDBUpdateEventBatch events) {
     if (++callCtr <= numFailuresAllowed) {
       return new ImmutablePair<>(getTaskName(), false);
     } else {

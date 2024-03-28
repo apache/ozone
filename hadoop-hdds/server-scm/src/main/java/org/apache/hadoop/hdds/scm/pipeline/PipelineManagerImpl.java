@@ -802,6 +802,30 @@ public class PipelineManagerImpl implements PipelineManager {
     stateManager.reinitialize(pipelineStore);
   }
 
+  /**
+   * Initializes the PipelineStateManager with new pipeline object.
+   *
+   * @param pipeline
+   * @throws IOException
+   */
+  @Override
+  public void initialize(Pipeline pipeline) throws IOException {
+    stateManager.initialize(pipeline);
+  }
+
+  /**
+   * Updating pipeline state would be replicated to Ratis.
+   *
+   * @param pipelineIDProto
+   * @param newState
+   * @throws IOException
+   */
+  @Override
+  public void updatePipelineState(HddsProtos.PipelineID pipelineIDProto, HddsProtos.PipelineState newState)
+      throws IOException {
+    stateManager.updatePipelineState(pipelineIDProto, newState);
+  }
+
   @Override
   public void freezePipelineCreation() {
     freezePipelineCreation.set(true);

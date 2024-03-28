@@ -127,6 +127,7 @@ import org.apache.hadoop.hdds.server.OzoneProtocolMessageDispatcher;
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature;
 import org.apache.hadoop.hdds.utils.ProtocolMessageMetrics;
 import org.apache.hadoop.ozone.ClientVersion;
+import org.apache.hadoop.ozone.common.DBUpdates;
 import org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.StatusAndMessages;
 import org.apache.hadoop.util.ProtobufUtils;
 import org.slf4j.Logger;
@@ -722,6 +723,12 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
             .setStatus(Status.OK)
             .setGetMetricsResponse(getMetrics(request.getGetMetricsRequest()))
             .build();
+      case DBUpdates:
+        return ScmContainerLocationResponse.newBuilder()
+            .setCmdType(request.getCmdType())
+            .setStatus(Status.OK)
+            .setDbUpdatesResponse(getDBUpdates(request.getDbUpdatesRequest()))
+            .build();
       default:
         throw new IllegalArgumentException(
             "Unknown command type: " + request.getCmdType());
@@ -1298,5 +1305,20 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
 
   public GetMetricsResponseProto getMetrics(GetMetricsRequestProto request) throws IOException {
     return GetMetricsResponseProto.newBuilder().setMetricsJson(impl.getMetrics(request.getQuery())).build();
+  }
+
+  public StorageContainerLocationProtocolProtos.DBUpdatesResponseProto getDBUpdates(
+      StorageContainerLocationProtocolProtos.DBUpdatesRequestProto request) throws IOException {
+    StorageContainerLocationProtocolProtos.DBUpdatesResponseProto.Builder builder =
+        StorageContainerLocationProtocolProtos.DBUpdatesResponseProto.newBuilder();
+    DBUpdates dbUpdatesWrapper = impl.getDBUpdates(request);
+    for (int i = 0; i < dbUpdatesWrapper.getData().size(); i++) {
+      builder.addData(OzonePBHelper.getByteString(
+          dbUpdatesWrapper.getData().get(i)));
+    }
+    builder.setSequenceNumber(dbUpdatesWrapper.getCurrentSequenceNumber());
+    builder.setLatestSequenceNumber(dbUpdatesWrapper.getLatestSequenceNumber());
+    builder.setDbUpdateSuccess(dbUpdatesWrapper.isDBUpdateSuccess());
+    return builder.build();
   }
 }

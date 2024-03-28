@@ -39,6 +39,7 @@ import javax.inject.Inject;
 import javax.inject.Singleton;
 
 import org.apache.commons.lang3.StringUtils;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.hdds.utils.db.RDBBatchOperation;
@@ -82,6 +83,8 @@ public class ReconContainerMetadataManagerImpl
 
   private DBStore containerDbStore;
 
+  private Map<HddsProtos.LifeCycleState, Enum> containerStateStatTypeMap = new HashMap<>();
+
   @Inject
   private Configuration sqlConfiguration;
 
@@ -93,7 +96,32 @@ public class ReconContainerMetadataManagerImpl
                                            Configuration sqlConfiguration) {
     containerDbStore = reconDBProvider.getDbStore();
     globalStatsDao = new GlobalStatsDao(sqlConfiguration);
+    initializeDataStructures();
     initializeTables();
+  }
+
+  private void initializeDataStructures() {
+    containerStateStatTypeMap.put(HddsProtos.LifeCycleState.OPEN, ContainerStatsType.OPEN_CONTAINER_COUNT);
+    containerStateStatTypeMap.put(HddsProtos.LifeCycleState.CLOSED, ContainerStatsType.CLOSED_CONTAINER_COUNT);
+    containerStateStatTypeMap.put(HddsProtos.LifeCycleState.DELETED, ContainerStatsType.DELETED_CONTAINER_COUNT);
+  }
+
+  /**
+   * Container Report Type.
+   */
+  public enum ContainerStatsType {
+    /**
+     * Deleted container count.
+     */
+    DELETED_CONTAINER_COUNT,
+    /**
+     * Open container count stats.
+     */
+    OPEN_CONTAINER_COUNT,
+    /**
+     * Closed container count stats.
+     */
+    CLOSED_CONTAINER_COUNT
   }
 
   /**
@@ -665,6 +693,56 @@ public class ReconContainerMetadataManagerImpl
       long duration = Duration.between(start, Instant.now()).toMillis();
       LOG.info("It took {} seconds to initialized {} records"
           + " to KEY_CONTAINER table", (double) duration / 1000, count);
+    }
+  }
+
+  /**
+   * Store the total count of deleted containers into the sql DB GlobalStats table.
+   *
+   * @param containerCountMap count of various container states to be
+   *                          inserted/updated in GlobalStats table.
+   */
+  @Override
+  public boolean storeContainerStatesStats(Map<HddsProtos.LifeCycleState, Long> containerCountMap) {
+    try {
+      ReconUtils.upsertGlobalStatsTable(sqlConfiguration, globalStatsDao,
+          ContainerStatsType.DELETED_CONTAINER_COUNT.name(), containerCountMap.get(HddsProtos.LifeCycleState.DELETED));
+      ReconUtils.upsertGlobalStatsTable(sqlConfiguration, globalStatsDao,
+          ContainerStatsType.OPEN_CONTAINER_COUNT.name(), containerCountMap.get(HddsProtos.LifeCycleState.OPEN));
+      ReconUtils.upsertGlobalStatsTable(sqlConfiguration, globalStatsDao,
+          ContainerStatsType.CLOSED_CONTAINER_COUNT.name(), containerCountMap.get(HddsProtos.LifeCycleState.CLOSED));
+      return true;
+    } catch (Exception exp) {
+      return false;
+    }
+  }
+
+  /**
+   * Get the total count of containers for a give state present in the global stats table.
+   *
+   * @param state
+   * @return total count of containers.
+   * @throws IOException
+   */
+  @Override
+  public long getCountForContainers(HddsProtos.LifeCycleState state) throws IOException {
+    GlobalStats globalStats = globalStatsDao.fetchOneByKey(containerStateStatTypeMap.get(state).name());
+    return globalStats != null ? globalStats.getValue() : 0;
+  }
+
+  /**
+   * Removes existing stats related to container states of all containers.
+   *
+   * @return return true if clear stats operation is successful else false.
+   */
+  @Override
+  public boolean clearContainerStats() {
+    try {
+      globalStatsDao.deleteById(ContainerStatsType.DELETED_CONTAINER_COUNT.name());
+      globalStatsDao.deleteById(ContainerStatsType.OPEN_CONTAINER_COUNT.name());
+      return true;
+    } catch (Exception exception) {
+      return false;
     }
   }
 }

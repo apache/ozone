@@ -31,8 +31,16 @@ import java.util.List;
 
 import javax.sql.DataSource;
 
+import com.google.inject.multibindings.Multibinder;
 import org.apache.hadoop.ozone.recon.ReconControllerModule.ReconDaoBindingModule;
 import org.apache.hadoop.ozone.recon.ReconSchemaManager;
+import org.apache.hadoop.ozone.recon.scm.ReconSCMMetadataProcessingTask;
+import org.apache.hadoop.ozone.recon.tasks.ContainerKeyMapperTask;
+import org.apache.hadoop.ozone.recon.tasks.FileSizeCountTask;
+import org.apache.hadoop.ozone.recon.tasks.NSSummaryTask;
+import org.apache.hadoop.ozone.recon.tasks.OmTableInsightTask;
+import org.apache.hadoop.ozone.recon.tasks.ReconOmTask;
+import org.apache.hadoop.ozone.recon.tasks.SCMDBMetaDataInitializationTask;
 import org.hadoop.ozone.recon.codegen.ReconSchemaGenerationModule;
 import org.jooq.Configuration;
 import org.jooq.DSLContext;
@@ -59,6 +67,35 @@ public class AbstractReconSqlDBTest {
   private Provider<DataSourceConfiguration> configurationProvider;
 
   public AbstractReconSqlDBTest() {
+  }
+
+  /**
+   * Guice binding module for multiple implementation classes
+   * for <ReconOmTask> interface.
+   */
+  public static class ReconOmTaskBindingModule extends AbstractModule {
+    @Override
+    protected void configure() {
+      Multibinder<ReconOmTask> taskBinder =
+          Multibinder.newSetBinder(binder(), ReconOmTask.class);
+      taskBinder.addBinding().to(ContainerKeyMapperTask.class);
+      taskBinder.addBinding().to(FileSizeCountTask.class);
+      taskBinder.addBinding().to(OmTableInsightTask.class);
+      taskBinder.addBinding().to(NSSummaryTask.class);
+    }
+  }
+
+  /**
+   * Guice binding module for multiple implementation classes
+   * for <ReconSCMMetadataTaskBindingModule> interface.
+   */
+  public static class ReconSCMMetadataTaskBindingModule extends AbstractModule {
+    @Override
+    protected void configure() {
+      Multibinder<ReconSCMMetadataProcessingTask> taskBinder =
+          Multibinder.newSetBinder(binder(), ReconSCMMetadataProcessingTask.class);
+      taskBinder.addBinding().to(SCMDBMetaDataInitializationTask.class);
+    }
   }
 
   public void init(Path temporaryFolder) {

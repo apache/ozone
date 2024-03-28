@@ -99,7 +99,7 @@ public class NSSummaryTask implements ReconOmTask {
   }
 
   @Override
-  public Pair<String, Boolean> process(OMUpdateEventBatch events) {
+  public Pair<String, Boolean> process(RocksDBUpdateEventBatch events) {
     boolean success = nsSummaryTaskWithFSO.processWithFSO(events);
     if (!success) {
       LOG.error("processWithFSO failed.");

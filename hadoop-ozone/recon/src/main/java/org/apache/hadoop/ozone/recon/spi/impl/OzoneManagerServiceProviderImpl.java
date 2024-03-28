@@ -46,7 +46,7 @@ import org.apache.hadoop.hdds.utils.db.RDBStore;
 import org.apache.hadoop.hdds.utils.db.RocksDBCheckpoint;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
-import org.apache.hadoop.ozone.om.helpers.DBUpdates;
+import org.apache.hadoop.ozone.common.DBUpdates;
 import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.DBUpdatesRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ServicePort.Type;
@@ -56,7 +56,7 @@ import org.apache.hadoop.ozone.recon.metrics.OzoneManagerSyncMetrics;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 import org.apache.hadoop.ozone.recon.spi.OzoneManagerServiceProvider;
 import org.apache.hadoop.ozone.recon.tasks.OMDBUpdatesHandler;
-import org.apache.hadoop.ozone.recon.tasks.OMUpdateEventBatch;
+import org.apache.hadoop.ozone.recon.tasks.RocksDBUpdateEventBatch;
 import org.apache.hadoop.ozone.recon.tasks.ReconTaskController;
 import org.apache.hadoop.security.SecurityUtil;
 import org.apache.hadoop.util.Time;
@@ -78,9 +78,9 @@ import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_OM
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_OM_SNAPSHOT_TASK_INTERVAL_DELAY;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_OM_SNAPSHOT_TASK_INTERVAL_DEFAULT;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.RECON_OM_DELTA_UPDATE_LIMIT;
-import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.RECON_OM_DELTA_UPDATE_LIMIT_DEFUALT;
+import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.RECON_OM_DELTA_UPDATE_LIMIT_DEFAULT;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.RECON_OM_DELTA_UPDATE_LOOP_LIMIT;
-import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.RECON_OM_DELTA_UPDATE_LOOP_LIMIT_DEFUALT;
+import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.RECON_OM_DELTA_UPDATE_LOOP_LIMIT_DEFAULT;
 import static org.apache.ratis.proto.RaftProtos.RaftPeerRole.LEADER;
 
 import org.hadoop.ozone.recon.schema.tables.daos.ReconTaskStatusDao;
@@ -161,10 +161,10 @@ public class OzoneManagerServiceProviderImpl
         .OZONE_OM_HTTPS_ADDRESS_KEY);
 
     long deltaUpdateLimits = configuration.getLong(RECON_OM_DELTA_UPDATE_LIMIT,
-        RECON_OM_DELTA_UPDATE_LIMIT_DEFUALT);
+        RECON_OM_DELTA_UPDATE_LIMIT_DEFAULT);
     int deltaUpdateLoopLimits = configuration.getInt(
         RECON_OM_DELTA_UPDATE_LOOP_LIMIT,
-        RECON_OM_DELTA_UPDATE_LOOP_LIMIT_DEFUALT);
+        RECON_OM_DELTA_UPDATE_LOOP_LIMIT_DEFAULT);
 
     omSnapshotDBParentDir = reconUtils.getReconDbDir(configuration,
         OZONE_RECON_OM_SNAPSHOT_DB_DIR);
@@ -519,7 +519,7 @@ public class OzoneManagerServiceProviderImpl
             reconTaskStatusDao.update(reconTaskStatusRecord);
 
             // Pass on DB update events to tasks that are listening.
-            reconTaskController.consumeOMEvents(new OMUpdateEventBatch(
+            reconTaskController.consumeOMEvents(new RocksDBUpdateEventBatch(
                 omdbUpdatesHandler.getEvents()), omMetadataManager);
           } catch (InterruptedException intEx) {
             Thread.currentThread().interrupt();
@@ -548,7 +548,7 @@ public class OzoneManagerServiceProviderImpl
 
               // Reinitialize tasks that are listening.
               LOG.info("Calling reprocess on Recon tasks.");
-              reconTaskController.reInitializeTasks(omMetadataManager);
+              reconTaskController.reInitializeOMTasks(omMetadataManager);
             }
           } catch (InterruptedException intEx) {
             Thread.currentThread().interrupt();

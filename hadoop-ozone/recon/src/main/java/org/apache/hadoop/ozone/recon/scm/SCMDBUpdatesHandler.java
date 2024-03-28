@@ -16,11 +16,16 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.ozone.recon.tasks;
+package org.apache.hadoop.ozone.recon.scm;
 
-import static org.apache.hadoop.ozone.recon.tasks.RocksDBUpdateEvent.RocksDBUpdateAction.DELETE;
-import static org.apache.hadoop.ozone.recon.tasks.RocksDBUpdateEvent.RocksDBUpdateAction.PUT;
-import static org.apache.hadoop.ozone.recon.tasks.RocksDBUpdateEvent.RocksDBUpdateAction.UPDATE;
+import org.apache.hadoop.hdds.utils.db.DBColumnFamilyDefinition;
+import org.apache.hadoop.hdds.utils.db.Table;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedWriteBatch;
+import org.apache.hadoop.ozone.recon.tasks.RocksDBDBUpdateEventValidator;
+import org.apache.hadoop.ozone.recon.tasks.RocksDBUpdateEvent;
+import org.rocksdb.RocksDBException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -28,35 +33,30 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import org.apache.hadoop.hdds.utils.db.DBColumnFamilyDefinition;
-import org.apache.hadoop.hdds.utils.db.Table;
-import org.apache.hadoop.hdds.utils.db.managed.ManagedWriteBatch;
-import org.apache.hadoop.ozone.om.OMMetadataManager;
-import org.apache.hadoop.ozone.om.codec.OMDBDefinition;
-import org.rocksdb.RocksDBException;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import static org.apache.hadoop.ozone.recon.tasks.RocksDBUpdateEvent.RocksDBUpdateAction.DELETE;
+import static org.apache.hadoop.ozone.recon.tasks.RocksDBUpdateEvent.RocksDBUpdateAction.PUT;
+import static org.apache.hadoop.ozone.recon.tasks.RocksDBUpdateEvent.RocksDBUpdateAction.UPDATE;
 
 /**
- * Class used to listen on OM RocksDB updates.
+ * Class used to listen on SCM RocksDB updates.
  */
-public class OMDBUpdatesHandler extends ManagedWriteBatch.Handler {
+public class SCMDBUpdatesHandler extends ManagedWriteBatch.Handler {
 
   private static final Logger LOG =
-      LoggerFactory.getLogger(OMDBUpdatesHandler.class);
+      LoggerFactory.getLogger(SCMDBUpdatesHandler.class);
 
   private Map<Integer, String> tablesNames;
-  private OMMetadataManager omMetadataManager;
-  private List<RocksDBUpdateEvent> omDBUpdateEvents = new ArrayList<>();
-  private Map<Object, RocksDBUpdateEvent> omDBLatestUpdateEventsMap = new HashMap<>();
-  private OMDBDefinition omdbDefinition;
-  private RocksDBDBUpdateEventValidator omDBUpdateEventValidator;
+  private ReconScmMetadataManager reconScmMetadataManager;
+  private List<RocksDBUpdateEvent> scmDBUpdateEvents = new ArrayList<>();
+  private Map<Object, RocksDBUpdateEvent> scmDBLatestUpdateEventsMap = new HashMap<>();
+  private ReconSCMDBDefinition reconSCMDBDefinition;
+  private RocksDBDBUpdateEventValidator scmDBUpdateEventValidator;
 
-  public OMDBUpdatesHandler(OMMetadataManager metadataManager) {
-    omMetadataManager = metadataManager;
-    tablesNames = metadataManager.getStore().getTableNames();
-    omdbDefinition = new OMDBDefinition();
-    omDBUpdateEventValidator = new RocksDBDBUpdateEventValidator(omdbDefinition);
+  public SCMDBUpdatesHandler(ReconScmMetadataManager reconScmMetadataManager) {
+    this.reconScmMetadataManager = reconScmMetadataManager;
+    tablesNames = reconScmMetadataManager.getStore().getTableNames();
+    reconSCMDBDefinition = new ReconSCMDBDefinition();
+    scmDBUpdateEventValidator = new RocksDBDBUpdateEventValidator(reconSCMDBDefinition);
   }
 
   @Override
@@ -80,7 +80,7 @@ public class OMDBUpdatesHandler extends ManagedWriteBatch.Handler {
   }
 
   /**
-   * Processes an OM DB update event based on the provided parameters.
+   * Processes an OM or SCM DB update event based on the provided parameters.
    *
    * @param cfIndex     Index of the column family.
    * @param keyBytes    Serialized key bytes.
@@ -92,17 +92,8 @@ public class OMDBUpdatesHandler extends ManagedWriteBatch.Handler {
       valueBytes, RocksDBUpdateEvent.RocksDBUpdateAction action)
       throws IOException {
     String tableName = tablesNames.get(cfIndex);
-    // DTOKEN_TABLE is using OzoneTokenIdentifier as key instead of String
-    // and assuming to typecast as String while de-serializing will throw error.
-    // omdbLatestUpdateEvents defines map key as String type to store in its map
-    // and to change to Object as key will have larger impact considering all
-    // ReconOmTasks. Currently, this table is not needed to sync in Recon OM DB
-    // snapshot as this table data not being used currently in Recon.
-    // When this table data will be needed, all events for this table will be
-    // saved using Object as key and new task will also retrieve using Object
-    // as key.
     final DBColumnFamilyDefinition<?, ?> cf
-        = omdbDefinition.getColumnFamily(tableName);
+        = reconSCMDBDefinition.getColumnFamily(tableName);
     if (cf != null) {
       RocksDBUpdateEvent.RocksDBUpdateEventBuilder builder =
           new RocksDBUpdateEvent.RocksDBUpdateEventBuilder<>();
@@ -117,9 +108,9 @@ public class OMDBUpdatesHandler extends ManagedWriteBatch.Handler {
       // - DELETE with an existing key: Remove the value.
       // - DELETE with a non-existing key: No action, log a warning if
       // necessary.
-      Table table = omMetadataManager.getTable(tableName);
+      Table table = reconScmMetadataManager.getTable(tableName);
 
-      RocksDBUpdateEvent latestEvent = omDBLatestUpdateEventsMap.get(key);
+      RocksDBUpdateEvent latestEvent = scmDBLatestUpdateEventsMap.get(key);
       Object oldValue;
       if (latestEvent != null) {
         oldValue = latestEvent.getValue();
@@ -133,7 +124,7 @@ public class OMDBUpdatesHandler extends ManagedWriteBatch.Handler {
         final Object value = cf.getValueCodec().fromPersistedFormat(valueBytes);
 
         // If the updated value is not valid for this event, we skip it.
-        if (!omDBUpdateEventValidator.isValidEvent(tableName, value, key,
+        if (!scmDBUpdateEventValidator.isValidEvent(tableName, value, key,
             action)) {
           return;
         }
@@ -143,7 +134,7 @@ public class OMDBUpdatesHandler extends ManagedWriteBatch.Handler {
         if (oldValue != null) {
 
           // If the oldValue is not valid for this event, we skip it.
-          if (!omDBUpdateEventValidator.isValidEvent(tableName, oldValue, key,
+          if (!scmDBUpdateEventValidator.isValidEvent(tableName, oldValue, key,
               action)) {
             return;
           }
@@ -168,7 +159,7 @@ public class OMDBUpdatesHandler extends ManagedWriteBatch.Handler {
               "for DELETE event ", keyStr, tableName);
           return;
         }
-        if (!omDBUpdateEventValidator.isValidEvent(tableName, oldValue, key,
+        if (!scmDBUpdateEventValidator.isValidEvent(tableName, oldValue, key,
             action)) {
           return;
         }
@@ -182,8 +173,8 @@ public class OMDBUpdatesHandler extends ManagedWriteBatch.Handler {
         LOG.debug(String.format("Generated OM update Event for table : %s, " +
                 "action = %s", tableName, action));
       }
-      omDBUpdateEvents.add(event);
-      omDBLatestUpdateEventsMap.put(key, event);
+      scmDBUpdateEvents.add(event);
+      scmDBLatestUpdateEventsMap.put(key, event);
     } else {
       // Log and ignore events if key or value types are undetermined.
       if (LOG.isWarnEnabled()) {
@@ -330,6 +321,6 @@ public class OMDBUpdatesHandler extends ManagedWriteBatch.Handler {
    * @return List of events.
    */
   public List<RocksDBUpdateEvent> getEvents() {
-    return omDBUpdateEvents;
+    return scmDBUpdateEvents;
   }
 }

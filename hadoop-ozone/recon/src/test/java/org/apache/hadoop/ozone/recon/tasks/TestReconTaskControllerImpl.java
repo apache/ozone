@@ -56,7 +56,7 @@ public class TestReconTaskControllerImpl extends AbstractReconSqlDBTest {
     OzoneConfiguration ozoneConfiguration = new OzoneConfiguration();
     reconTaskStatusDao = getDao(ReconTaskStatusDao.class);
     reconTaskController = new ReconTaskControllerImpl(ozoneConfiguration,
-        reconTaskStatusDao, new HashSet<>());
+        reconTaskStatusDao, new HashSet<>(), new HashSet<>());
     reconTaskController.start();
   }
 
@@ -74,10 +74,10 @@ public class TestReconTaskControllerImpl extends AbstractReconSqlDBTest {
   @Test
   public void testConsumeOMEvents() throws Exception {
     ReconOmTask reconOmTaskMock = getMockTask("MockTask");
-    when(reconOmTaskMock.process(any(OMUpdateEventBatch.class)))
+    when(reconOmTaskMock.process(any(RocksDBUpdateEventBatch.class)))
         .thenReturn(new ImmutablePair<>("MockTask", true));
     reconTaskController.registerTask(reconOmTaskMock);
-    OMUpdateEventBatch omUpdateEventBatchMock = mock(OMUpdateEventBatch.class);
+    RocksDBUpdateEventBatch omUpdateEventBatchMock = mock(RocksDBUpdateEventBatch.class);
     when(omUpdateEventBatchMock.getLastSequenceNumber()).thenReturn(100L);
     when(omUpdateEventBatchMock.isEmpty()).thenReturn(false);
 
@@ -108,7 +108,7 @@ public class TestReconTaskControllerImpl extends AbstractReconSqlDBTest {
     reconTaskController.registerTask(dummyReconDBTask);
 
     long currentTime = System.currentTimeMillis();
-    OMUpdateEventBatch omUpdateEventBatchMock = mock(OMUpdateEventBatch.class);
+    RocksDBUpdateEventBatch omUpdateEventBatchMock = mock(RocksDBUpdateEventBatch.class);
     when(omUpdateEventBatchMock.isEmpty()).thenReturn(false);
     when(omUpdateEventBatchMock.getLastSequenceNumber()).thenReturn(100L);
 
@@ -134,7 +134,7 @@ public class TestReconTaskControllerImpl extends AbstractReconSqlDBTest {
         new DummyReconDBTask(taskName, DummyReconDBTask.TaskType.ALWAYS_FAIL);
     reconTaskController.registerTask(dummyReconDBTask);
 
-    OMUpdateEventBatch omUpdateEventBatchMock = mock(OMUpdateEventBatch.class);
+    RocksDBUpdateEventBatch omUpdateEventBatchMock = mock(RocksDBUpdateEventBatch.class);
     when(omUpdateEventBatchMock.isEmpty()).thenReturn(false);
     when(omUpdateEventBatchMock.getLastSequenceNumber()).thenReturn(100L);
 
@@ -176,7 +176,7 @@ public class TestReconTaskControllerImpl extends AbstractReconSqlDBTest {
 
     long startTime = System.currentTimeMillis();
     reconTaskController.registerTask(reconOmTaskMock);
-    reconTaskController.reInitializeTasks(omMetadataManagerMock);
+    reconTaskController.reInitializeOMTasks(omMetadataManagerMock);
     long endTime = System.currentTimeMillis();
 
     verify(reconOmTaskMock, times(1))

@@ -41,7 +41,7 @@ public interface OmTableHandler {
    * @param unReplicatedSizeMap A map storing unReplicated size counts.
    * @param replicatedSizeMap   A map storing replicated size counts.
    */
-  void handlePutEvent(OMDBUpdateEvent<String, Object> event,
+  void handlePutEvent(RocksDBUpdateEvent<String, Object> event,
                       String tableName,
                       HashMap<String, Long> objectCountMap,
                       HashMap<String, Long> unReplicatedSizeMap,
@@ -58,7 +58,7 @@ public interface OmTableHandler {
    * @param unReplicatedSizeMap A map storing unReplicated size counts.
    * @param replicatedSizeMap   A map storing replicated size counts.
    */
-  void handleDeleteEvent(OMDBUpdateEvent<String, Object> event,
+  void handleDeleteEvent(RocksDBUpdateEvent<String, Object> event,
                          String tableName,
                          HashMap<String, Long> objectCountMap,
                          HashMap<String, Long> unReplicatedSizeMap,
@@ -75,7 +75,7 @@ public interface OmTableHandler {
    * @param unReplicatedSizeMap A map storing unReplicated size counts.
    * @param replicatedSizeMap   A map storing replicated size counts.
    */
-  void handleUpdateEvent(OMDBUpdateEvent<String, Object> event,
+  void handleUpdateEvent(RocksDBUpdateEvent<String, Object> event,
                          String tableName,
                          HashMap<String, Long> objectCountMap,
                          HashMap<String, Long> unReplicatedSizeMap,

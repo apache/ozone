@@ -271,7 +271,7 @@ public class ReconNodeManager extends SCMNodeManager {
       try {
         nodeDB.put(datanodeDetails.getUuid(), datanodeDetails);
         LOG.info("Updating nodeDB for " + datanodeDetails.getHostName());
-      } catch (IOException e) {
+      } catch (Exception e) {
         LOG.error("Can not update node {} to Node DB.",
             datanodeDetails.getUuid());
       }

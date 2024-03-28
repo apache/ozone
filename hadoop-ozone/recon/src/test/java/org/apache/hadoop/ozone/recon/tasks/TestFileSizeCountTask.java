@@ -25,7 +25,7 @@ import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.hdds.utils.db.TypedTable;
 import org.apache.hadoop.ozone.recon.persistence.AbstractReconSqlDBTest;
-import org.apache.hadoop.ozone.recon.tasks.OMDBUpdateEvent.OMUpdateEventBuilder;
+import org.apache.hadoop.ozone.recon.tasks.RocksDBUpdateEvent.RocksDBUpdateEventBuilder;
 import org.hadoop.ozone.recon.schema.UtilizationSchemaDefinition;
 import org.hadoop.ozone.recon.schema.tables.daos.FileCountBySizeDao;
 import org.hadoop.ozone.recon.schema.tables.pojos.FileCountBySize;
@@ -39,9 +39,9 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
-import static org.apache.hadoop.ozone.recon.tasks.OMDBUpdateEvent.OMDBUpdateAction.DELETE;
-import static org.apache.hadoop.ozone.recon.tasks.OMDBUpdateEvent.OMDBUpdateAction.PUT;
-import static org.apache.hadoop.ozone.recon.tasks.OMDBUpdateEvent.OMDBUpdateAction.UPDATE;
+import static org.apache.hadoop.ozone.recon.tasks.RocksDBUpdateEvent.RocksDBUpdateAction.DELETE;
+import static org.apache.hadoop.ozone.recon.tasks.RocksDBUpdateEvent.RocksDBUpdateAction.PUT;
+import static org.apache.hadoop.ozone.recon.tasks.RocksDBUpdateEvent.RocksDBUpdateAction.UPDATE;
 import static org.hadoop.ozone.recon.schema.tables.FileCountBySizeTable.FILE_COUNT_BY_SIZE;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
@@ -175,7 +175,7 @@ public class TestFileSizeCountTask extends AbstractReconSqlDBTest {
     given(toBeDeletedKey.getBucketName()).willReturn("bucket1");
     given(toBeDeletedKey.getKeyName()).willReturn("deletedKey");
     given(toBeDeletedKey.getDataSize()).willReturn(2000L); // Bin 1
-    OMDBUpdateEvent event = new OMUpdateEventBuilder()
+    RocksDBUpdateEvent event = new RocksDBUpdateEventBuilder()
         .setAction(PUT)
         .setKey("deletedKey")
         .setValue(toBeDeletedKey)
@@ -187,15 +187,15 @@ public class TestFileSizeCountTask extends AbstractReconSqlDBTest {
     given(toBeUpdatedKey.getBucketName()).willReturn("bucket1");
     given(toBeUpdatedKey.getKeyName()).willReturn("updatedKey");
     given(toBeUpdatedKey.getDataSize()).willReturn(10000L); // Bin 4
-    OMDBUpdateEvent event2 = new OMUpdateEventBuilder()
+    RocksDBUpdateEvent event2 = new RocksDBUpdateEventBuilder()
         .setAction(PUT)
         .setKey("updatedKey")
         .setValue(toBeUpdatedKey)
         .setTable(OmMetadataManagerImpl.FILE_TABLE)
         .build();
 
-    OMUpdateEventBatch omUpdateEventBatch =
-        new OMUpdateEventBatch(Arrays.asList(event, event2));
+    RocksDBUpdateEventBatch omUpdateEventBatch =
+        new RocksDBUpdateEventBatch(Arrays.asList(event, event2));
     fileSizeCountTask.process(omUpdateEventBatch);
 
     // Verify 2 keys are in correct bins.
@@ -220,7 +220,7 @@ public class TestFileSizeCountTask extends AbstractReconSqlDBTest {
     given(newKey.getBucketName()).willReturn("bucket1");
     given(newKey.getKeyName()).willReturn("newKey");
     given(newKey.getDataSize()).willReturn(1000L); // Bin 0
-    OMDBUpdateEvent putEvent = new OMUpdateEventBuilder()
+    RocksDBUpdateEvent putEvent = new RocksDBUpdateEventBuilder()
         .setAction(PUT)
         .setKey("newKey")
         .setValue(newKey)
@@ -233,7 +233,7 @@ public class TestFileSizeCountTask extends AbstractReconSqlDBTest {
     given(updatedKey.getBucketName()).willReturn("bucket1");
     given(updatedKey.getKeyName()).willReturn("updatedKey");
     given(updatedKey.getDataSize()).willReturn(50000L); // Bin 6
-    OMDBUpdateEvent updateEvent = new OMUpdateEventBuilder()
+    RocksDBUpdateEvent updateEvent = new RocksDBUpdateEventBuilder()
         .setAction(UPDATE)
         .setKey("updatedKey")
         .setValue(updatedKey)
@@ -242,14 +242,14 @@ public class TestFileSizeCountTask extends AbstractReconSqlDBTest {
         .build();
 
     // Delete another existing key.
-    OMDBUpdateEvent deleteEvent = new OMUpdateEventBuilder()
+    RocksDBUpdateEvent deleteEvent = new RocksDBUpdateEventBuilder()
         .setAction(DELETE)
         .setKey("deletedKey")
         .setValue(toBeDeletedKey)
         .setTable(OmMetadataManagerImpl.FILE_TABLE)
         .build();
 
-    omUpdateEventBatch = new OMUpdateEventBatch(
+    omUpdateEventBatch = new RocksDBUpdateEventBatch(
         Arrays.asList(updateEvent, putEvent, deleteEvent));
     fileSizeCountTask.process(omUpdateEventBatch);
 
@@ -353,7 +353,7 @@ public class TestFileSizeCountTask extends AbstractReconSqlDBTest {
   @Test
   public void testProcessAtScale() {
     // Write 10000 keys.
-    List<OMDBUpdateEvent> omDbEventList = new ArrayList<>();
+    List<RocksDBUpdateEvent> omDbEventList = new ArrayList<>();
     List<OmKeyInfo> omKeyInfoList = new ArrayList<>();
     for (int volIndex = 1; volIndex <= 10; volIndex++) {
       for (int bktIndex = 1; bktIndex <= 100; bktIndex++) {
@@ -368,7 +368,7 @@ public class TestFileSizeCountTask extends AbstractReconSqlDBTest {
           omKeyInfoList.add(omKeyInfo);
           // All the keys ending with even will be stored in KEY-TABLE
           if (keyIndex % 2 == 0) {
-            omDbEventList.add(new OMUpdateEventBuilder()
+            omDbEventList.add(new RocksDBUpdateEventBuilder()
                 .setAction(PUT)
                 .setKey("key" + keyIndex)
                 .setValue(omKeyInfo)
@@ -376,7 +376,7 @@ public class TestFileSizeCountTask extends AbstractReconSqlDBTest {
                 .build());
           } else {
             // All the keys ending with odd will be stored in FILE-TABLE
-            omDbEventList.add(new OMUpdateEventBuilder()
+            omDbEventList.add(new RocksDBUpdateEventBuilder()
                 .setAction(PUT)
                 .setKey("key" + keyIndex)
                 .setValue(omKeyInfo)
@@ -387,8 +387,8 @@ public class TestFileSizeCountTask extends AbstractReconSqlDBTest {
       }
     }
 
-    OMUpdateEventBatch omUpdateEventBatch =
-        new OMUpdateEventBatch(omDbEventList);
+    RocksDBUpdateEventBatch omUpdateEventBatch =
+        new RocksDBUpdateEventBatch(omDbEventList);
     fileSizeCountTask.process(omUpdateEventBatch);
 
     // Verify 2 keys are in correct bins.
@@ -422,14 +422,14 @@ public class TestFileSizeCountTask extends AbstractReconSqlDBTest {
             long fileSize = (long)Math.pow(2, keyIndex + 9) - 1L;
             given(omKeyInfo.getDataSize()).willReturn(fileSize);
             if (keyIndex % 2 == 0) {
-              omDbEventList.add(new OMUpdateEventBuilder()
+              omDbEventList.add(new RocksDBUpdateEventBuilder()
                   .setAction(DELETE)
                   .setKey("key" + keyIndex)
                   .setValue(omKeyInfo)
                   .setTable(OmMetadataManagerImpl.KEY_TABLE)
                   .build());
             } else {
-              omDbEventList.add(new OMUpdateEventBuilder()
+              omDbEventList.add(new RocksDBUpdateEventBuilder()
                   .setAction(DELETE)
                   .setKey("key" + keyIndex)
                   .setValue(omKeyInfo)
@@ -441,7 +441,7 @@ public class TestFileSizeCountTask extends AbstractReconSqlDBTest {
             // so that they get into first bin
             given(omKeyInfo.getDataSize()).willReturn(1023L);
             if (keyIndex % 2 == 0) {
-              omDbEventList.add(new OMUpdateEventBuilder()
+              omDbEventList.add(new RocksDBUpdateEventBuilder()
                   .setAction(UPDATE)
                   .setKey("key" + keyIndex)
                   .setValue(omKeyInfo)
@@ -450,7 +450,7 @@ public class TestFileSizeCountTask extends AbstractReconSqlDBTest {
                       omKeyInfoList.get((volIndex * bktIndex) + keyIndex))
                   .build());
             } else {
-              omDbEventList.add(new OMUpdateEventBuilder()
+              omDbEventList.add(new RocksDBUpdateEventBuilder()
                   .setAction(UPDATE)
                   .setKey("key" + keyIndex)
                   .setValue(omKeyInfo)
@@ -464,7 +464,7 @@ public class TestFileSizeCountTask extends AbstractReconSqlDBTest {
       }
     }
 
-    omUpdateEventBatch = new OMUpdateEventBatch(omDbEventList);
+    omUpdateEventBatch = new RocksDBUpdateEventBatch(omDbEventList);
     fileSizeCountTask.process(omUpdateEventBatch);
 
     assertEquals(10000, fileCountBySizeDao.count());
