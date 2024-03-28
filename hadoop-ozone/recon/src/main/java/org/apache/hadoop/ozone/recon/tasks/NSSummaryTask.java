@@ -63,7 +63,7 @@ import java.util.concurrent.TimeUnit;
  */
 public class NSSummaryTask implements ReconOmTask {
   private static final Logger LOG =
-          LoggerFactory.getLogger(NSSummaryTask.class);
+      LoggerFactory.getLogger(NSSummaryTask.class);
 
   private final ReconNamespaceSummaryManager reconNamespaceSummaryManager;
   private final ReconOMMetadataManager reconOMMetadataManager;
@@ -173,4 +173,3 @@ public class NSSummaryTask implements ReconOmTask {
   }
 
 }
-
