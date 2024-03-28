@@ -248,7 +248,7 @@ public abstract class EntityHandler {
     return totalSize;
   }
 
-  public static String[] parseRequestPath(String path) {
+  public static String[] parseRequestPath(String path) {  // path = /abcd
     if (path.startsWith(OM_KEY_PREFIX)) {
       path = path.substring(1);
     }
@@ -256,7 +256,7 @@ public abstract class EntityHandler {
     return names;
   }
 
-  private static String normalizePath(String path) {
+  public static String normalizePath(String path) {
     return OM_KEY_PREFIX + OmUtils.normalizeKey(path, false);
   }
 }
