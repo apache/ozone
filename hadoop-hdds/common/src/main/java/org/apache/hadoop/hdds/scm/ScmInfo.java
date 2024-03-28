@@ -19,6 +19,7 @@
 package org.apache.hadoop.hdds.scm;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 
 /**
@@ -26,9 +27,9 @@ import java.util.List;
  * contains clusterId and the SCM Id.
  */
 public final class ScmInfo {
-  private String clusterId;
-  private String scmId;
-  private List<String> peerRoles;
+  private final String clusterId;
+  private final String scmId;
+  private final List<String> peerRoles;
 
   /**
    * Builder for ScmInfo.
@@ -36,7 +37,7 @@ public final class ScmInfo {
   public static class Builder {
     private String clusterId;
     private String scmId;
-    private List<String> peerRoles;
+    private final List<String> peerRoles;
 
     public Builder() {
       peerRoles = new ArrayList<>();
@@ -104,6 +105,6 @@ public final class ScmInfo {
    * @return List of peer address
    */
   public List<String> getRatisPeerRoles() {
-    return peerRoles;
+    return Collections.unmodifiableList(peerRoles);
   }
 }

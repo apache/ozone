@@ -22,6 +22,7 @@ import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos
     .ContainerCommandResponseProto;
 
+import java.util.Collections;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
@@ -60,7 +61,7 @@ public class XceiverClientReply {
   }
 
   public List<DatanodeDetails> getDatanodes() {
-    return datanodes;
+    return Collections.unmodifiableList(datanodes);
   }
 
   public void addDatanode(DatanodeDetails dn) {

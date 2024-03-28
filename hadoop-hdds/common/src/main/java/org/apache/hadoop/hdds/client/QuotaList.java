@@ -19,7 +19,13 @@
 package org.apache.hadoop.hdds.client;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
+
+import static org.apache.hadoop.ozone.OzoneConsts.GB;
+import static org.apache.hadoop.ozone.OzoneConsts.KB;
+import static org.apache.hadoop.ozone.OzoneConsts.MB;
+import static org.apache.hadoop.ozone.OzoneConsts.TB;
 
 /**
  *This class contains arraylist for storage constant used in OzoneQuota.
@@ -33,9 +39,16 @@ public class QuotaList {
     ozoneQuota = new ArrayList<>();
     unitQuota = new ArrayList<>();
     sizeQuota = new ArrayList<>();
+
+    // Setting QuotaList parameters from large to small.
+    addQuotaList(OzoneQuota.OZONE_QUOTA_TB, OzoneQuota.Units.TB, TB);
+    addQuotaList(OzoneQuota.OZONE_QUOTA_GB, OzoneQuota.Units.GB, GB);
+    addQuotaList(OzoneQuota.OZONE_QUOTA_MB, OzoneQuota.Units.MB, MB);
+    addQuotaList(OzoneQuota.OZONE_QUOTA_KB, OzoneQuota.Units.KB, KB);
+    addQuotaList(OzoneQuota.OZONE_QUOTA_B, OzoneQuota.Units.B, 1L);
   }
 
-  public void addQuotaList(
+  private void addQuotaList(
       String oQuota, OzoneQuota.Units uQuota, Long sQuota) {
     ozoneQuota.add(oQuota);
     unitQuota.add(uQuota);
@@ -43,15 +56,15 @@ public class QuotaList {
   }
 
   public List<String> getOzoneQuotaArray() {
-    return this.ozoneQuota;
+    return Collections.unmodifiableList(this.ozoneQuota);
   }
 
   public List<Long> getSizeQuotaArray() {
-    return this.sizeQuota;
+    return Collections.unmodifiableList(this.sizeQuota);
   }
 
   public List<OzoneQuota.Units> getUnitQuotaArray() {
-    return this.unitQuota;
+    return Collections.unmodifiableList(this.unitQuota);
   }
 
   public OzoneQuota.Units getUnits(String oQuota) {

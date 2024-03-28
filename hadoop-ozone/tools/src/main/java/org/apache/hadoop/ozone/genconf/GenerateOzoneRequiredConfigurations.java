@@ -159,8 +159,7 @@ public final class GenerateOzoneRequiredConfigurations extends GenericCli {
     }
 
     OzoneConfiguration.XMLConfiguration generatedConfig =
-        new OzoneConfiguration.XMLConfiguration();
-    generatedConfig.setProperties(requiredProperties);
+        new OzoneConfiguration.XMLConfiguration(requiredProperties);
 
     File output = new File(path, "ozone-site.xml");
     if (output.createNewFile()) {

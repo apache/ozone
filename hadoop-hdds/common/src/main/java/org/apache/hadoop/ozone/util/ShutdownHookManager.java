@@ -18,7 +18,6 @@
 
 package org.apache.hadoop.ozone.util;
 
-import com.google.common.annotations.VisibleForTesting;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
@@ -122,9 +121,7 @@ public final class ShutdownHookManager {
    * This is exposed purely for testing: do not invoke it.
    * @return the number of shutdown hooks which timed out.
    */
-  @InterfaceAudience.Private
-  @VisibleForTesting
-  int executeShutdown() {
+  private int executeShutdown() {
     int timeouts = 0;
     for (HookEntry entry: getShutdownHooksInOrder()) {
       Future<?> future = EXECUTOR.submit(entry.getHook());
@@ -190,9 +187,7 @@ public final class ShutdownHookManager {
    * {@link org.apache.hadoop.ozone.conf.OzoneServiceConfig
    * #OZONE_SHUTDOWN_TIMEOUT_MINIMUM}
    */
-  @InterfaceAudience.Private
-  @VisibleForTesting
-  static long getShutdownTimeout(ConfigurationSource conf) {
+  private static long getShutdownTimeout(ConfigurationSource conf) {
     long duration = HddsUtils.getShutDownTimeOut(conf);
     if (duration < OZONE_SHUTDOWN_TIMEOUT_MINIMUM) {
       duration = OZONE_SHUTDOWN_TIMEOUT_MINIMUM;
@@ -204,9 +199,7 @@ public final class ShutdownHookManager {
    * Private structure to store ShutdownHook, its priority and timeout
    * settings.
    */
-  @InterfaceAudience.Private
-  @VisibleForTesting
-  static class HookEntry {
+  private static class HookEntry {
     private final Runnable hook;
     private final int priority;
     private final long timeout;
@@ -260,12 +253,9 @@ public final class ShutdownHookManager {
   private final Set<HookEntry> hooks =
       Collections.synchronizedSet(new HashSet<>());
 
-  private AtomicBoolean shutdownInProgress = new AtomicBoolean(false);
+  private final AtomicBoolean shutdownInProgress = new AtomicBoolean(false);
 
-  //private to constructor to ensure singularity
-  @VisibleForTesting
-  @InterfaceAudience.Private
-  ShutdownHookManager() {
+  private ShutdownHookManager() {
   }
 
   /**
@@ -274,21 +264,13 @@ public final class ShutdownHookManager {
    *
    * @return the list of shutdownHooks in order of execution.
    */
-  @InterfaceAudience.Private
-  @VisibleForTesting
-  List<HookEntry > getShutdownHooksInOrder() {
-    List<HookEntry > list;
+  private List<HookEntry > getShutdownHooksInOrder() {
+    List<HookEntry> list;
     synchronized (hooks) {
-      list = new ArrayList<HookEntry>(hooks);
+      list = new ArrayList<>(hooks);
     }
-    Collections.sort(list, new Comparator< HookEntry >() {
-
-      //reversing comparison so highest priority hooks are first
-      @Override
-      public int compare(HookEntry o1, HookEntry o2) {
-        return o2.priority - o1.priority;
-      }
-    });
+    //reversing comparison so highest priority hooks are first
+    list.sort(Comparator.comparing(HookEntry::getPriority).reversed());
     return list;
   }
 
