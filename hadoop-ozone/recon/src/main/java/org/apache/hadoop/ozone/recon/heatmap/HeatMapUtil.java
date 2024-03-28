@@ -71,7 +71,7 @@ public class HeatMapUtil {
         EntityHandler.getEntityHandler(reconNamespaceSummaryManager,
             omMetadataManager, reconSCM, path);
     if (null != entityHandler) {
-      DUResponse duResponse = entityHandler.getDuResponse(false, false);
+      DUResponse duResponse = entityHandler.getDuResponse(false, false, false);
       if (null != duResponse && duResponse.getStatus() == ResponseStatus.OK) {
         return duResponse.getSize();
       }

@@ -39,6 +39,9 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 
+import static org.apache.hadoop.ozone.recon.ReconConstants.DISK_USAGE_TOP_RECORDS_LIMIT;
+import static org.apache.hadoop.ozone.recon.ReconUtils.sortDiskUsageDescendingWithLimit;
+
 /**
  * Class for handling root entity type.
  */
@@ -88,7 +91,7 @@ public class RootEntityHandler extends EntityHandler {
 
   @Override
   public DUResponse getDuResponse(
-          boolean listFile, boolean withReplica)
+      boolean listFile, boolean withReplica, boolean sortSubPaths)
           throws IOException {
     DUResponse duResponse = new DUResponse();
     duResponse.setPath(getNormalizedPath());
@@ -137,6 +140,13 @@ public class RootEntityHandler extends EntityHandler {
       duResponse.setSizeWithReplica(totalDataSizeWithReplica);
     }
     duResponse.setSize(totalDataSize);
+
+    if (sortSubPaths) {
+      // Parallel sort volumeDuData in descending order of size and returns the top N elements.
+      volumeDuData = sortDiskUsageDescendingWithLimit(volumeDuData,
+          DISK_USAGE_TOP_RECORDS_LIMIT);
+    }
+
     duResponse.setDuData(volumeDuData);
 
     return duResponse;
@@ -148,7 +158,8 @@ public class RootEntityHandler extends EntityHandler {
     QuotaUsageResponse quotaUsageResponse = new QuotaUsageResponse();
     SCMNodeStat stats = getReconSCM().getScmNodeManager().getStats();
     long quotaInBytes = stats.getCapacity().get();
-    long quotaUsedInBytes = getDuResponse(true, true).getSizeWithReplica();
+    long quotaUsedInBytes =
+        getDuResponse(true, true, false).getSizeWithReplica();
     quotaUsageResponse.setQuota(quotaInBytes);
     quotaUsageResponse.setQuotaUsed(quotaUsedInBytes);
     return quotaUsageResponse;

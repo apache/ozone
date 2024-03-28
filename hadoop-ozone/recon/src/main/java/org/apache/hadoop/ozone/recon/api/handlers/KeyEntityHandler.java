@@ -71,7 +71,7 @@ public class KeyEntityHandler extends EntityHandler {
 
   @Override
   public DUResponse getDuResponse(
-          boolean listFile, boolean withReplica)
+      boolean listFile, boolean withReplica, boolean sort)
           throws IOException {
     DUResponse duResponse = new DUResponse();
     duResponse.setPath(getNormalizedPath());

@@ -101,6 +101,8 @@ public class NSSummaryEndpoint {
    * @param path request path
    * @param listFile show subpath/disk usage for each key
    * @param withReplica count actual DU with replication
+   * @param sortSubpaths determines whether to sort the subpaths by their sizes in descending order
+   * and returns the N largest subpaths based on the configuration value DISK_USAGE_TOP_RECORDS_LIMIT.
    * @return DU response
    * @throws IOException
    */
@@ -108,10 +110,9 @@ public class NSSummaryEndpoint {
   @Path("/du")
   @SuppressWarnings("methodlength")
   public Response getDiskUsage(@QueryParam("path") String path,
-                               @DefaultValue("false")
-                               @QueryParam("files") boolean listFile,
-                               @DefaultValue("false")
-                               @QueryParam("replica") boolean withReplica)
+                               @DefaultValue("false") @QueryParam("files") boolean listFile,
+                               @DefaultValue("false") @QueryParam("replica") boolean withReplica,
+                               @DefaultValue("true") @QueryParam("sortSubPaths") boolean sortSubpaths)
       throws IOException {
     if (path == null || path.length() == 0) {
       return Response.status(Response.Status.BAD_REQUEST).build();
@@ -127,8 +128,7 @@ public class NSSummaryEndpoint {
             reconNamespaceSummaryManager,
             omMetadataManager, reconSCM, path);
 
-    duResponse = handler.getDuResponse(
-            listFile, withReplica);
+    duResponse = handler.getDuResponse(listFile, withReplica, sortSubpaths);
 
     return Response.ok(duResponse).build();
   }
