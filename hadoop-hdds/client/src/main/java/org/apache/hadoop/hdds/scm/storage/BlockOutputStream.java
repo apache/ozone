@@ -181,7 +181,7 @@ public class BlockOutputStream extends OutputStream {
     if (config.getIncrementalChunkList()) {
       this.containerBlockData.addMetadata(INCREMENTAL_CHUNK_LIST_KV);
       this.lastChunkBuffer =
-          ByteBuffer.allocate(config.getStreamBufferSize());
+          ByteBuffer.allocateDirect(config.getStreamBufferSize());
       this.lastChunkOffset = 0;
     }
     this.xceiverClient = xceiverClientManager.acquireClient(pipeline);
