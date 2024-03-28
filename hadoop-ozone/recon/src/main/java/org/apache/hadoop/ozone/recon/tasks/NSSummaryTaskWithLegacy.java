@@ -136,7 +136,7 @@ public class NSSummaryTaskWithLegacy extends NSSummaryTaskDbEventHandler {
                                            OMDBUpdateEvent.OMDBUpdateAction action,
                                            Map<Long, NSSummary> nsSummaryMap)
       throws IOException {
-    setParentDirectoryId(updatedKeyInfo);
+    setKeyParentID(updatedKeyInfo);
 
     if (!updatedKeyInfo.getKeyName().endsWith(OM_KEY_PREFIX)) {
       switch (action) {
@@ -150,7 +150,7 @@ public class NSSummaryTaskWithLegacy extends NSSummaryTaskDbEventHandler {
 
       case UPDATE:
         if (oldKeyInfo != null) {
-          setParentDirectoryId(oldKeyInfo);
+          setKeyParentID(oldKeyInfo);
           handleDeleteKeyEvent(oldKeyInfo, nsSummaryMap);
         } else {
           LOG.warn("Update event does not have the old keyInfo for {}.",
@@ -261,7 +261,7 @@ public class NSSummaryTaskWithLegacy extends NSSummaryTaskDbEventHandler {
 
           if (enableFileSystemPaths) {
             // The LEGACY bucket is a file system bucket.
-            setParentDirectoryId(keyInfo);
+            setKeyParentID(keyInfo);
 
             if (keyInfo.getKeyName().endsWith(OM_KEY_PREFIX)) {
               OmDirectoryInfo directoryInfo =
@@ -305,7 +305,7 @@ public class NSSummaryTaskWithLegacy extends NSSummaryTaskDbEventHandler {
    * @param keyInfo
    * @throws IOException
    */
-  private void setParentDirectoryId(OmKeyInfo keyInfo) throws IOException {
+  private void setKeyParentID(OmKeyInfo keyInfo) throws IOException {
     String[] keyPath = keyInfo.getKeyName().split(OM_KEY_PREFIX);
 
     // If the path contains only one key then keyPath.length
