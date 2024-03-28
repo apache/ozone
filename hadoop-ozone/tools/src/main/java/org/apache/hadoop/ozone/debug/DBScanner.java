@@ -113,6 +113,8 @@ public class DBScanner implements Callable<Void>, SubcommandWithParent {
       description = "File to dump table scan data")
   private String fileName;
 
+  private int fileSuffix = 0;
+
   @CommandLine.Option(names = {"--startkey", "--sk", "-s"},
       description = "Key from which to iterate the DB")
   private String startKey;
@@ -147,6 +149,11 @@ public class DBScanner implements Callable<Void>, SubcommandWithParent {
       description = "Thread count for concurrent processing.",
       defaultValue = "10")
   private int threadCount;
+
+  @CommandLine.Option(names = {"--max-records-per-file"},
+      description = "The number of print records per file.",
+      defaultValue = "0")
+  private long preFileRecords;
 
   private static final String KEY_SEPARATOR_SCHEMA_V3 =
       new OzoneConfiguration().getObject(DatanodeConfiguration.class)
@@ -218,10 +225,24 @@ public class DBScanner implements Callable<Void>, SubcommandWithParent {
     }
 
     // Write to file output
-    try (PrintWriter out = new PrintWriter(new BufferedWriter(
-        new PrintWriter(fileName, UTF_8.name())))) {
-      return displayTable(iterator, dbColumnFamilyDef, out, schemaV3);
+    if (preFileRecords > 0) {
+      while (iterator.get().isValid()) {
+        try (PrintWriter out = new PrintWriter(new BufferedWriter(
+                new PrintWriter(fileName + fileSuffix, UTF_8.name())))) {
+          if (!displayTable(iterator, dbColumnFamilyDef, out, schemaV3)) {
+            return false;
+          }
+        }
+        fileSuffix++;
+      }
+    } else {
+      try (PrintWriter out = new PrintWriter(new BufferedWriter(
+              new PrintWriter(fileName, UTF_8.name())))) {
+        return displayTable(iterator, dbColumnFamilyDef, out, schemaV3);
+      }
     }
+
+    return true;
   }
 
   private boolean displayTable(ManagedRocksIterator iterator,
@@ -287,6 +308,9 @@ public class DBScanner implements Callable<Void>, SubcommandWithParent {
         futures.add(future);
         batch = new ArrayList<>(batchSize);
         sequenceId++;
+      }
+      if ((preFileRecords > 0) && (count >= preFileRecords)) {
+        break;
       }
     }
     if (!batch.isEmpty()) {
