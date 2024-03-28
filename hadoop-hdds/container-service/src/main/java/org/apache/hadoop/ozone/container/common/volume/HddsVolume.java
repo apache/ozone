@@ -358,41 +358,36 @@ public class HddsVolume extends StorageVolume {
     File clusterIdDir = new File(dbVolume == null ?
         getStorageDir() : dbVolume.getStorageDir(),
         getClusterID());
+    if (!clusterIdDir.exists()) {
+      throw new IOException("Working dir " + clusterIdDir.getAbsolutePath() +
+          " not created for HddsVolume: " + getStorageDir().getAbsolutePath());
+    }
+
+    File storageIdDir = new File(clusterIdDir, getStorageID());
+    if (!storageIdDir.exists()) {
+      throw new IOException("Db parent dir " + storageIdDir.getAbsolutePath() +
+          " not found for HddsVolume: " + getStorageDir().getAbsolutePath());
+    }
+
+    File containerDBFile = new File(storageIdDir, CONTAINER_DB_NAME);
+    if (!containerDBFile.exists()) {
+      throw new IOException("Db dir " + storageIdDir.getAbsolutePath() +
+          " not found for HddsVolume: " + getStorageDir().getAbsolutePath());
+    }
+
+    String containerDBPath = containerDBFile.getAbsolutePath();
     try {
-      if (!clusterIdDir.exists()) {
-        throw new IOException("Working dir " + clusterIdDir.getAbsolutePath() +
-            " not created for HddsVolume: " + getStorageDir().getAbsolutePath());
-      }
-
-      File storageIdDir = new File(clusterIdDir, getStorageID());
-      if (!storageIdDir.exists()) {
-        throw new IOException("Db parent dir " + storageIdDir.getAbsolutePath() +
-            " not found for HddsVolume: " + getStorageDir().getAbsolutePath());
-      }
-
-      File containerDBFile = new File(storageIdDir, CONTAINER_DB_NAME);
-      if (!containerDBFile.exists()) {
-        throw new IOException("Db dir " + storageIdDir.getAbsolutePath() +
-            " not found for HddsVolume: " + getStorageDir().getAbsolutePath());
-      }
-
-      String containerDBPath = containerDBFile.getAbsolutePath();
-      try {
-        initPerDiskDBStore(containerDBPath, getConf(), readOnly);
-      } catch (IOException e) {
-        throw new IOException("Can't init db instance under path "
-            + containerDBPath + " for volume " + getStorageID(), e);
-      }
-
-      dbParentDir = storageIdDir;
-      dbLoaded.set(true);
-      dbLoadFailure.set(false);
-      LOG.info("SchemaV3 db is loaded at {} for volume {}", containerDBPath,
-          getStorageID());
+      initPerDiskDBStore(containerDBPath, getConf(), readOnly);
     } catch (Throwable e) {
       dbLoadFailure.set(true);
-      throw e;
+      throw new IOException("Can't init db instance under path "
+          + containerDBPath + " for volume " + getStorageID(), e);
     }
+
+    dbParentDir = storageIdDir;
+    dbLoaded.set(true);
+    LOG.info("SchemaV3 db is loaded at {} for volume {}", containerDBPath,
+        getStorageID());
   }
 
   /**
