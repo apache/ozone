@@ -106,8 +106,6 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
     <jetty.version>9.4.53.v20231009</jetty.version>
     <java.dev.jna.version>5.2.0</java.dev.jna.version>
     <curator.version>4.2.0</curator.version>
-    <test.exclude>_</test.exclude>
-    <test.exclude.pattern>_</test.exclude.pattern>
 
     <!-- number of threads/forks to use when running tests in parallel, see parallel-tests profile -->
     <testsThreadCount>4</testsThreadCount>
@@ -246,7 +244,7 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
     <!-- Plugin versions and config -->
     <maven-surefire-plugin.argLine>-Xmx4096m -XX:+HeapDumpOnOutOfMemoryError</maven-surefire-plugin.argLine>
     <maven-surefire-plugin.argLineAccessArgs></maven-surefire-plugin.argLineAccessArgs>
-    <unstable-test-groups>flaky | slow | unhealthy</unstable-test-groups>
+    <unstable-test-groups>flaky | native | slow | unhealthy</unstable-test-groups>
     <maven-surefire-plugin.version>3.0.0-M4</maven-surefire-plugin.version>
     <maven-surefire-report-plugin.version>${maven-surefire-plugin.version}</maven-surefire-report-plugin.version>
     <maven-failsafe-plugin.version>${maven-surefire-plugin.version}</maven-failsafe-plugin.version>
@@ -1701,11 +1699,6 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
           <includes>
             <include>**/Test*.java</include>
           </includes>
-          <excludes>
-            <exclude>**/${test.exclude}.java</exclude>
-            <exclude>${test.exclude.pattern}</exclude>
-            <exclude>**/Test*$*.java</exclude>
-          </excludes>
         </configuration>
       </plugin>
       <plugin>
@@ -1966,6 +1959,24 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
       </build>
     </profile>
     <profile>
+      <id>container</id>
+      <build>
+        <plugins>
+          <plugin>
+            <groupId>org.apache.maven.plugins</groupId>
+            <artifactId>maven-surefire-plugin</artifactId>
+            <configuration>
+              <includes>
+                <include>org.apache.hadoop.hdds.scm.container.**</include>
+                <include>org.apache.hadoop.ozone.container.**</include>
+              </includes>
+              <excludedGroups>${unstable-test-groups}</excludedGroups>
+            </configuration>
+          </plugin>
+        </plugins>
+      </build>
+    </profile>
+    <profile>
       <id>om</id>
       <build>
         <plugins>
@@ -1976,6 +1987,9 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
               <includes>
                 <include>org.apache.hadoop.ozone.om.**</include>
               </includes>
+              <excludes>
+                <exclude>org.apache.hadoop.ozone.om.snapshot.**</exclude>
+              </excludes>
               <excludedGroups>${unstable-test-groups}</excludedGroups>
             </configuration>
           </plugin>
@@ -1983,7 +1997,7 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
       </build>
     </profile>
     <profile>
-      <id>contract</id>
+      <id>snapshot</id>
       <build>
         <plugins>
           <plugin>
@@ -1991,7 +2005,7 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
             <artifactId>maven-surefire-plugin</artifactId>
             <configuration>
               <includes>
-                <include>org.apache.hadoop.fs.ozone.contract.**</include>
+                <include>org.apache.hadoop.ozone.om.snapshot.**</include>
               </includes>
               <excludedGroups>${unstable-test-groups}</excludedGroups>
             </configuration>
@@ -2008,11 +2022,8 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
             <artifactId>maven-surefire-plugin</artifactId>
             <configuration>
               <includes>
-                <include>org.apache.hadoop.fs.ozone.**</include>
+                <include>org.apache.hadoop.fs.**</include>
               </includes>
-              <excludes>
-                <exclude>org.apache.hadoop.fs.ozone.contract.**</exclude>
-              </excludes>
               <excludedGroups>${unstable-test-groups}</excludedGroups>
             </configuration>
           </plugin>
@@ -2030,6 +2041,9 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
               <includes>
                 <include>org.apache.hadoop.hdds.**</include>
               </includes>
+              <excludes>
+                <exclude>org.apache.hadoop.hdds.scm.container.**</exclude>
+              </excludes>
               <excludedGroups>${unstable-test-groups}</excludedGroups>
             </configuration>
           </plugin>
@@ -2045,15 +2059,35 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
             <artifactId>maven-surefire-plugin</artifactId>
             <configuration>
               <includes>
+                <include>org.apache.ozone.**</include>
                 <include>org.apache.hadoop.ozone.**</include>
               </includes>
               <excludes>
                 <exclude>org.apache.hadoop.ozone.client.**</exclude>
+                <exclude>org.apache.hadoop.ozone.container.**</exclude>
                 <exclude>org.apache.hadoop.ozone.debug.**</exclude>
                 <exclude>org.apache.hadoop.ozone.freon.**</exclude>
                 <exclude>org.apache.hadoop.ozone.om.**</exclude>
+                <exclude>org.apache.hadoop.ozone.recon.**</exclude>
                 <exclude>org.apache.hadoop.ozone.shell.**</exclude>
               </excludes>
+              <excludedGroups>${unstable-test-groups}</excludedGroups>
+            </configuration>
+          </plugin>
+        </plugins>
+      </build>
+    </profile>
+    <profile>
+      <id>recon</id>
+      <build>
+        <plugins>
+          <plugin>
+            <groupId>org.apache.maven.plugins</groupId>
+            <artifactId>maven-surefire-plugin</artifactId>
+            <configuration>
+              <includes>
+                <include>org.apache.hadoop.ozone.recon.**</include>
+              </includes>
               <excludedGroups>${unstable-test-groups}</excludedGroups>
             </configuration>
           </plugin>
@@ -2102,7 +2136,7 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
             <artifactId>maven-surefire-plugin</artifactId>
             <configuration>
               <groups>flaky</groups>
-              <excludedGroups>slow | unhealthy</excludedGroups>
+              <excludedGroups>native | slow | unhealthy</excludedGroups>
             </configuration>
           </plugin>
         </plugins>
@@ -2117,6 +2151,7 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
             <artifactId>maven-surefire-plugin</artifactId>
             <configuration>
               <groups>native</groups>
+              <excludedGroups>slow | unhealthy</excludedGroups>
             </configuration>
           </plugin>
         </plugins>
