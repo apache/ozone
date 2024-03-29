@@ -46,7 +46,8 @@ if [[ "${OZONE_WITH_COVERAGE}" == "true" ]]; then
   cp /tmp/jacoco-combined.exec "$SCRIPT_DIR"/result
 fi
 
-generate_report "acceptance" "${ALL_RESULT_DIR}" "${XUNIT_RESULT_DIR}"
-
+if [[ "${OZONE_ACCEPTANCE_SUITE:-}" != "s3a" ]]; then
+  generate_report "acceptance" "${ALL_RESULT_DIR}" "${XUNIT_RESULT_DIR}"
+fi
 
 exit $RESULT

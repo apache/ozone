@@ -405,12 +405,12 @@ copy_results() {
     target_dir="${target_dir}/${test_script_name}"
   fi
 
-  if [[ -n "$(find "${result_dir}" -name "*.xml")" ]]; then
+  if command -v rebot > /dev/null 2>&1 && [[ -n "$(find "${result_dir}" -name "*.xml")" ]]; then
     rebot --nostatusrc -N "${test_name}" -l NONE -r NONE -o "${all_result_dir}/${test_name}.xml" "${result_dir}"/*.xml \
       && rm -fv "${result_dir}"/*.xml "${result_dir}"/log.html "${result_dir}"/report.html
   fi
 
-  mkdir -p "${target_dir}"
+  mkdir -pv "${target_dir}"
   mv -v "${result_dir}"/* "${target_dir}"/
 }
 
@@ -573,4 +573,36 @@ wait_for_root_certificate(){
   done
   echo "Timed out waiting on $count root certificates. Current timestamp " $(date +"%T")
   return 1
+}
+
+execute_s3a_tests() {
+  local bucket="$1"
+
+  if [[ -z ${bucket} ]]; then
+    echo "Required argument: the S3 bucket to be tested" >&2
+    return 1
+  fi
+
+  if [[ -z ${HADOOP_AWS_DIR} ]] || [[ ! -e ${HADOOP_AWS_DIR} ]] || [[ ! -d ${HADOOP_AWS_DIR}/src/test/resources ]]; then
+    echo "Set HADOOP_AWS_DIR to the directory with hadoop-aws sources" >&2
+    return 1
+  fi
+
+  if [[ -z ${OZONE_S3G_ADDRESS} ]]; then
+    echo "Set OZONE_S3G_ADDRESS to the address of S3 Gateway" >&2
+    return 1
+  fi
+
+  pushd ${HADOOP_AWS_DIR}
+  mvn -B -V --no-transfer-progress \
+    -Dtest.fs.s3a.endpoint="${OZONE_S3G_ADDRESS}" \
+    -Dtest.fs.s3a.name="s3a://${bucket}/" \
+    -Dtest='ITestS3AContract*, !ITestS3AContractDistCp, !ITestS3AContractEtag, !ITestS3AContractGetFileStatusV1List, !ITestS3AContractMkdir, !ITestS3AContractRename, !ITestS3AContractVectoredRead' \
+    clean test
+  rc=$?
+  mkdir -p ${RESULT_DIR}/junit/${bucket}/target
+  mv -iv target/surefire-reports ${RESULT_DIR}/junit/${bucket}/target/
+  popd
+
+  return $rc
 }
