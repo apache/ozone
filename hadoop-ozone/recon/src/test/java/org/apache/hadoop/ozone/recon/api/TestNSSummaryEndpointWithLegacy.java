@@ -74,15 +74,17 @@ import java.util.ArrayList;
 import java.util.Set;
 import java.util.HashSet;
 
+import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.getTestReconOmMetadataManager;
+import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.getMockOzoneManagerServiceProvider;
+import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.writeDirToOm;
+import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.writeKeyToOm;
+import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.setConfiguration;
+
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.apache.hadoop.hdds.protocol.MockDatanodeDetails.randomDatanodeDetails;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_DB_DIRS;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
-import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.writeKeyToOm;
-import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.writeDirToOm;
-import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.getMockOzoneManagerServiceProvider;
-import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.getTestReconOmMetadataManager;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -875,6 +877,7 @@ public class TestNSSummaryEndpointWithLegacy {
         omDbDir.getAbsolutePath());
     omConfiguration.set(OMConfigKeys
         .OZONE_OM_ENABLE_FILESYSTEM_PATHS, "true");
+    setConfiguration(omConfiguration);
     OMMetadataManager omMetadataManager = new OmMetadataManagerImpl(
         omConfiguration, null);
 

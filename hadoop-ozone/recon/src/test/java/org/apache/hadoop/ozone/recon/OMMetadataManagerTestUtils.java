@@ -65,6 +65,7 @@ import org.apache.hadoop.ozone.recon.spi.impl.OzoneManagerServiceProviderImpl;
  */
 public final class OMMetadataManagerTestUtils {
 
+  private static OzoneConfiguration configuration;
   private OMMetadataManagerTestUtils() {
   }
 
@@ -129,8 +130,9 @@ public final class OMMetadataManagerTestUtils {
     DBCheckpoint checkpoint = omMetadataManager.getStore()
         .getCheckpoint(true);
     assertNotNull(checkpoint.getCheckpointLocation());
-
-    OzoneConfiguration configuration = new OzoneConfiguration();
+    if (configuration == null) {
+      configuration = new OzoneConfiguration();
+    }
     configuration.set(OZONE_RECON_OM_SNAPSHOT_DB_DIR, reconOmDbDir
         .getAbsolutePath());
 
@@ -493,4 +495,14 @@ public final class OMMetadataManagerTestUtils {
   public static BucketLayout getBucketLayout() {
     return BucketLayout.DEFAULT;
   }
+
+  public static OzoneConfiguration getConfiguration() {
+    return configuration;
+  }
+
+  public static void setConfiguration(
+      OzoneConfiguration configuration) {
+    OMMetadataManagerTestUtils.configuration = configuration;
+  }
+
 }
