@@ -878,30 +878,30 @@ public class TestNSSummaryEndpointWithOBSAndLegacy {
   }
 
   @Test
-  public void testNormalizePathUptilBucket() {
+  public void testNormalizePathUptoBucket() {
     // Test null or empty path
-    assertEquals("/", OmUtils.normalizePathUptilBucket(null));
-    assertEquals("/", OmUtils.normalizePathUptilBucket(""));
+    assertEquals("/", OmUtils.normalizePathUptoBucket(null));
+    assertEquals("/", OmUtils.normalizePathUptoBucket(""));
 
     // Test path with leading slashes
     assertEquals("volume1/bucket1/key1/key2",
-        OmUtils.normalizePathUptilBucket("///volume1/bucket1/key1/key2"));
+        OmUtils.normalizePathUptoBucket("///volume1/bucket1/key1/key2"));
 
     // Test volume and bucket names
     assertEquals("volume1/bucket1",
-        OmUtils.normalizePathUptilBucket("volume1/bucket1"));
+        OmUtils.normalizePathUptoBucket("volume1/bucket1"));
 
     // Test with additional segments
     assertEquals("volume1/bucket1/key1/key2",
-        OmUtils.normalizePathUptilBucket("volume1/bucket1/key1/key2"));
+        OmUtils.normalizePathUptoBucket("volume1/bucket1/key1/key2"));
 
     // Test path with multiple slashes in key names.
     assertEquals("volume1/bucket1/key1//key2",
-        OmUtils.normalizePathUptilBucket("volume1/bucket1/key1//key2"));
+        OmUtils.normalizePathUptoBucket("volume1/bucket1/key1//key2"));
 
     // Test path with volume, bucket, and special characters in keys
     assertEquals("volume/bucket/key$%#1/./////////key$%#2",
-        OmUtils.normalizePathUptilBucket("volume/bucket/key$%#1/./////////key$%#2"));
+        OmUtils.normalizePathUptoBucket("volume/bucket/key$%#1/./////////key$%#2"));
   }
 
 

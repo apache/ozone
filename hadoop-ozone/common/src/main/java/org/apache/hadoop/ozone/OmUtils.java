@@ -755,15 +755,15 @@ public final class OmUtils {
    * @param path The path string to be normalized.
    * @return The normalized path string.
    */
-  public static String normalizePathUptilBucket(String path) {
+  public static String normalizePathUptoBucket(String path) {
     if (path == null || path.isEmpty()) {
-      return "/"; // Handle empty path
+      return OM_KEY_PREFIX; // Handle empty path
     }
 
     // Remove leading slashes
     path = path.replaceAll("^/*", "");
 
-    String[] segments = path.split("/", -1);
+    String[] segments = path.split(OM_KEY_PREFIX, -1);
 
     String volumeName = segments[0];
     String bucketName = segments.length > 1 ? segments[1] : "";
@@ -771,13 +771,14 @@ public final class OmUtils {
     // Combine volume and bucket.
     StringBuilder normalizedPath = new StringBuilder(volumeName);
     if (!bucketName.isEmpty()) {
-      normalizedPath.append("/").append(bucketName);
+      normalizedPath.append(OM_KEY_PREFIX).append(bucketName);
     }
 
     // Add remaining segments as the key
     if (segments.length > 2) {
-      normalizedPath.append("/").append(
-          String.join("/", Arrays.copyOfRange(segments, 2, segments.length)));
+      normalizedPath.append(OM_KEY_PREFIX).append(
+          String.join(OM_KEY_PREFIX,
+              Arrays.copyOfRange(segments, 2, segments.length)));
     }
 
     return normalizedPath.toString();

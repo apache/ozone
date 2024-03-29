@@ -160,7 +160,7 @@ public class NSSummaryTaskWithLegacy extends NSSummaryTaskDbEventHandler {
         break;
 
       default:
-        LOG.debug("Skipping DB update event fir Key: {}", action);
+        LOG.debug("Skipping DB update event for Key: {}", action);
       }
     } else {
       OmDirectoryInfo updatedDirectoryInfo = new OmDirectoryInfo.Builder()

@@ -312,7 +312,7 @@ public abstract class EntityHandler {
    *
    * This method adjusts the path according to the bucket layout.
    * For {OBJECT_STORE Layout}, it normalizes the path up to the bucket level
-   * using OmUtils.normalizePathUptilBucket. For other layouts, it
+   * using OmUtils.normalizePathUptoBucket. For other layouts, it
    * normalizes the entire path, including the key, using
    * OmUtils.normalizeKey, and does not preserve any trailing slashes.
    * The normalized path will always be prefixed with OM_KEY_PREFIX to ensure it
@@ -324,7 +324,7 @@ public abstract class EntityHandler {
    */
   private static String normalizePath(String path, BucketLayout bucketLayout) {
     if (bucketLayout == BucketLayout.OBJECT_STORE) {
-      return OM_KEY_PREFIX + OmUtils.normalizePathUptilBucket(path);
+      return OM_KEY_PREFIX + OmUtils.normalizePathUptoBucket(path);
     }
     return OM_KEY_PREFIX + OmUtils.normalizeKey(path, false);
   }
