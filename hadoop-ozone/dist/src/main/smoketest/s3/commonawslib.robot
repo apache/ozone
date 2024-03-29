@@ -23,6 +23,7 @@ ${ENDPOINT_URL}                http://s3g:9878
 ${OZONE_S3_HEADER_VERSION}     v4
 ${OZONE_S3_SET_CREDENTIALS}    true
 ${BUCKET}                      generated
+${BUCKET_LAYOUT}               OBJECT_STORE
 ${KEY_NAME}                    key1
 ${OZONE_S3_TESTS_SET_UP}       ${FALSE}
 ${OZONE_AWS_ACCESS_KEY_ID}     ${EMPTY}
@@ -127,16 +128,12 @@ Create bucket with name
     ${result} =          Execute AWSS3APICli  create-bucket --bucket ${bucket}
                          Should contain              ${result}         Location
                          Should contain              ${result}         ${bucket}
-Create legacy bucket
-    ${postfix} =         Generate Ozone String
-    ${legacy_bucket} =   Set Variable               legacy-bucket-${postfix}
-    ${result} =          Execute and checkrc        ozone sh bucket create -l LEGACY s3v/${legacy_bucket}   0
-    [Return]             ${legacy_bucket}
 
-Create obs bucket
+Create bucket with layout
+    [Arguments]          ${layout}
     ${postfix} =         Generate Ozone String
-    ${bucket} =   Set Variable               obs-bucket-${postfix}
-    ${result} =          Execute and checkrc        ozone sh bucket create -l OBJECT_STORE s3v/${bucket}   0
+    ${bucket} =          Set Variable    bucket-${postfix}
+    ${result} =          Execute         ozone sh bucket create --layout ${layout} s3v/${bucket}
     [Return]             ${bucket}
 
 Setup s3 tests
@@ -144,7 +141,7 @@ Setup s3 tests
     Run Keyword        Generate random prefix
     Run Keyword        Install aws cli
     Run Keyword if    '${OZONE_S3_SET_CREDENTIALS}' == 'true'    Setup v4 headers
-    Run Keyword if    '${BUCKET}' == 'generated'            Create generated bucket
+    Run Keyword if    '${BUCKET}' == 'generated'            Create generated bucket    ${BUCKET_LAYOUT}
     Run Keyword if    '${BUCKET}' == 'link'                 Setup links for S3 tests
     Run Keyword if    '${BUCKET}' == 'encrypted'            Create encrypted bucket
     Run Keyword if    '${BUCKET}' == 'erasure'              Create EC bucket
@@ -154,18 +151,19 @@ Setup links for S3 tests
     ${exists} =        Bucket Exists    o3://${OM_SERVICE_ID}/s3v/link
     Return From Keyword If    ${exists}
     Execute            ozone sh volume create o3://${OM_SERVICE_ID}/legacy
-    Execute            ozone sh bucket create o3://${OM_SERVICE_ID}/legacy/source-bucket
+    Execute            ozone sh bucket create --layout ${BUCKET_LAYOUT} o3://${OM_SERVICE_ID}/legacy/source-bucket
     Create link        link
 
 Create generated bucket
-    ${BUCKET} =          Create bucket
+    [Arguments]          ${layout}=OBJECT_STORE
+    ${BUCKET} =          Create bucket with layout    ${layout}
     Set Global Variable   ${BUCKET}
 
 Create encrypted bucket
     Return From Keyword if    '${SECURITY_ENABLED}' == 'false'
     ${exists} =        Bucket Exists    o3://${OM_SERVICE_ID}/s3v/encrypted
     Return From Keyword If    ${exists}
-    Execute            ozone sh bucket create -k ${KEY_NAME} o3://${OM_SERVICE_ID}/s3v/encrypted
+    Execute            ozone sh bucket create -k ${KEY_NAME} --layout ${BUCKET_LAYOUT} o3://${OM_SERVICE_ID}/s3v/encrypted
 
 Create link
     [arguments]       ${bucket}
@@ -175,7 +173,7 @@ Create link
 Create EC bucket
     ${exists} =        Bucket Exists    o3://${OM_SERVICE_ID}/s3v/erasure
     Return From Keyword If    ${exists}
-    Execute            ozone sh bucket create --replication rs-3-2-1024k --type EC o3://${OM_SERVICE_ID}/s3v/erasure
+    Execute            ozone sh bucket create --replication rs-3-2-1024k --type EC --layout ${BUCKET_LAYOUT} o3://${OM_SERVICE_ID}/s3v/erasure
 
 Generate random prefix
     ${random} =          Generate Ozone String
