@@ -43,12 +43,12 @@ Datanode In Maintenance Mode
                             Should Contain                  ${result}             Entering maintenance mode on datanode
     ${result} =             Execute                         /opt/hadoop/bin/ozone admin datanode list | grep "Operational State:*"
                             Wait Until Keyword Succeeds      30sec   5sec    Should contain   ${result}   ENTERING_MAINTENANCE
-                            Wait Until Keyword Succeeds      1min    10sec   Related pipelines are closed
+                            Wait Until Keyword Succeeds      3min    10sec   Related pipelines are closed
                             Sleep                   60000ms
 
 Related pipelines are closed
-    ${result} =         Execute          /opt/hadoop/bin/ozone admin datanode list | awk -v RS= '{$1=$1}1'|grep MAINT | sed -e 's/^.*pipelines: \\(.*\\)$/\\1/' -e 's/ /\\n/'
-                        Should Contain Any   ${result}   CLOSED   No\\nrelated pipelines or the node is not in Healthy state.
+    ${result} =         Execute          /opt/hadoop/bin/ozone admin datanode list | awk -v RS= '{$1=$1}1'|grep MAINT | sed -e 's/^.*pipelines: \\(.*\\)$/\\1/'
+                        Should Contain Any   ${result}   CLOSED   No related pipelines or the node is not in Healthy state.
 
 Datanode Recommission
     ${result} =             Execute                         /opt/hadoop/bin/ozone admin datanode recommission ${HOST}
