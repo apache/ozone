@@ -27,6 +27,7 @@ import java.util.List;
 import java.util.Map;
 
 import com.google.common.base.Preconditions;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -47,10 +48,10 @@ public class InnerNodeImpl extends NodeImpl implements InnerNode {
     }
   }
 
-  static final Factory FACTORY = new Factory();
+  public static final Factory FACTORY = new Factory();
   // a map of node's network name to Node for quick search and keep
   // the insert order
-  private final HashMap<String, Node> childrenMap =
+  private HashMap<String, Node> childrenMap =
       new LinkedHashMap<String, Node>();
   // number of descendant leaves under this node
   private int numOfLeaves;
@@ -66,6 +67,76 @@ public class InnerNodeImpl extends NodeImpl implements InnerNode {
     super(name, location, parent, level, cost);
   }
 
+  /**
+   * Construct an InnerNode from its name, network location, level, cost,
+   * childrenMap and number of leaves. This constructor is used as part of
+   * protobuf deserialization.
+   */
+  protected InnerNodeImpl(String name, String location, int level, int cost,
+                          HashMap<String, Node> childrenMap, int numOfLeaves) {
+    super(name, location, null, level, cost);
+    this.childrenMap = childrenMap;
+    this.numOfLeaves = numOfLeaves;
+  }
+
+  /**
+   * InnerNodeImpl Builder to help construct an InnerNodeImpl object from
+   * protobuf objects.
+   */
+  public static class Builder {
+    private String name;
+    private String location;
+    private int cost;
+    private int level;
+    private HashMap<String, Node> childrenMap = new LinkedHashMap<>();
+    private int numOfLeaves;
+
+    public Builder setName(String name) {
+      this.name = name;
+      return this;
+    }
+
+    public Builder setLocation(String location) {
+      this.location = location;
+      return this;
+    }
+
+    public Builder setCost(int cost) {
+      this.cost = cost;
+      return this;
+    }
+
+    public Builder setLevel(int level) {
+      this.level = level;
+      return this;
+    }
+
+    public Builder setChildrenMap(
+        List<HddsProtos.ChildrenMap> childrenMapList) {
+      HashMap<String, Node> newChildrenMap = new LinkedHashMap<>();
+      for (HddsProtos.ChildrenMap childrenMapProto :
+          childrenMapList) {
+        String networkName = childrenMapProto.hasNetworkName() ?
+            childrenMapProto.getNetworkName() : null;
+        Node node = childrenMapProto.hasNetworkNode() ?
+            Node.fromProtobuf(childrenMapProto.getNetworkNode()) : null;
+        newChildrenMap.put(networkName, node);
+      }
+      this.childrenMap = newChildrenMap;
+      return this;
+    }
+
+    public Builder setNumOfLeaves(int numOfLeaves) {
+      this.numOfLeaves = numOfLeaves;
+      return this;
+    }
+
+    public InnerNodeImpl build() {
+      return new InnerNodeImpl(name, location, level, cost, childrenMap,
+          numOfLeaves);
+    }
+  }
+
   /** @return the number of children this node has */
   private int getNumOfChildren() {
     return childrenMap.size();
@@ -75,6 +146,11 @@ public class InnerNodeImpl extends NodeImpl implements InnerNode {
   @Override
   public int getNumOfLeaves() {
     return numOfLeaves;
+  }
+
+  /** @return a map of node's network name to Node. */
+  public HashMap<String, Node> getChildrenMap() {
+    return childrenMap;
   }
 
   /**
@@ -390,14 +466,83 @@ public class InnerNodeImpl extends NodeImpl implements InnerNode {
   }
 
   @Override
-  public boolean equals(Object to) {
-    if (to == null) {
-      return false;
+  public HddsProtos.NetworkNode toProtobuf(
+      int clientVersion) {
+
+    HddsProtos.InnerNode.Builder innerNode =
+        HddsProtos.InnerNode.newBuilder()
+            .setNumOfLeaves(numOfLeaves)
+            .setNodeTopology(
+                NodeImpl.toProtobuf(getNetworkName(), getNetworkLocation(),
+                    getLevel(), getCost()));
+
+    if (childrenMap != null && !childrenMap.isEmpty()) {
+      for (Map.Entry<String, Node> entry : childrenMap.entrySet()) {
+        if (entry.getValue() != null) {
+          HddsProtos.ChildrenMap childrenMapProto =
+              HddsProtos.ChildrenMap.newBuilder()
+                  .setNetworkName(entry.getKey())
+                  .setNetworkNode(entry.getValue().toProtobuf(clientVersion))
+                  .build();
+          innerNode.addChildrenMap(childrenMapProto);
+        }
+      }
     }
-    if (this == to) {
+    innerNode.build();
+
+    HddsProtos.NetworkNode networkNode =
+        HddsProtos.NetworkNode.newBuilder()
+            .setInnerNode(innerNode).build();
+
+    return networkNode;
+  }
+
+  public static InnerNode fromProtobuf(HddsProtos.InnerNode innerNode) {
+    InnerNodeImpl.Builder builder = new InnerNodeImpl.Builder();
+
+    if (innerNode.hasNodeTopology()) {
+      HddsProtos.NodeTopology nodeTopology = innerNode.getNodeTopology();
+
+      if (nodeTopology.hasName()) {
+        builder.setName(nodeTopology.getName());
+      }
+      if (nodeTopology.hasLocation()) {
+        builder.setLocation(nodeTopology.getLocation());
+      }
+      if (nodeTopology.hasLevel()) {
+        builder.setLevel(nodeTopology.getLevel());
+      }
+      if (nodeTopology.hasCost()) {
+        builder.setCost(nodeTopology.getCost());
+      }
+    }
+
+    if (!innerNode.getChildrenMapList().isEmpty()) {
+      builder.setChildrenMap(innerNode.getChildrenMapList());
+    }
+    if (innerNode.hasNumOfLeaves()) {
+      builder.setNumOfLeaves(innerNode.getNumOfLeaves());
+    }
+
+    return builder.build();
+  }
+
+  @Override
+  public boolean equals(Object o) {
+    if (this == o) {
       return true;
     }
-    return this.toString().equals(to.toString());
+    if (o == null || getClass() != o.getClass()) {
+      return false;
+    }
+    InnerNodeImpl innerNode = (InnerNodeImpl) o;
+    return this.getNetworkName().equals(innerNode.getNetworkName()) &&
+        this.getNetworkLocation().equals(innerNode.getNetworkLocation()) &&
+        this.getLevel() == innerNode.getLevel() &&
+        this.getCost() == innerNode.getCost() &&
+        this.numOfLeaves == innerNode.numOfLeaves &&
+        this.childrenMap.size() == innerNode.childrenMap.size() &&
+        this.childrenMap.equals(innerNode.childrenMap);
   }
 
   @Override

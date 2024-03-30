@@ -152,7 +152,7 @@ public class TestDecommissionAndMaintenance {
     MiniOzoneCluster.Builder builder = MiniOzoneCluster.newBuilder(conf)
         .setNumDatanodes(DATANODE_COUNT);
 
-    clusterProvider = new MiniOzoneClusterProvider(conf, builder, 7);
+    clusterProvider = new MiniOzoneClusterProvider(builder, 7);
   }
 
   @AfterAll
