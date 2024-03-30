@@ -152,9 +152,15 @@ _install_spotbugs() {
 
 download_hadoop_aws() {
   local dir="$1"
-  if [[ -z ${dir} ]] || [[ ! -e ${dir} ]] || [[ ! -d ${dir}/src/test/resources ]]; then
-    mkdir -p ${dir}
-    [[ -f ${dir}.tar.gz ]] || curl -LSs -o ${dir}.tar.gz https://archive.apache.org/dist/hadoop/common/hadoop-${HADOOP_VERSION}/hadoop-${HADOOP_VERSION}-src.tar.gz
-    tar -x -z -C ${dir} --strip-components=3 -f ${dir}.tar.gz --wildcards 'hadoop-*-src/hadoop-tools/hadoop-aws' || exit 1
+
+  if [[ -z ${dir} ]]; then
+    echo "Required argument: target directory for Hadoop AWS sources" >&2
+    return 1
+  fi
+
+  if [[ ! -e "${dir}" ]] || [[ ! -d "${dir}"/src/test/resources ]]; then
+    mkdir -p "${dir}"
+    [[ -f "${dir}.tar.gz" ]] || curl -LSs -o "${dir}.tar.gz" https://archive.apache.org/dist/hadoop/common/hadoop-${HADOOP_VERSION}/hadoop-${HADOOP_VERSION}-src.tar.gz
+    tar -x -z -C "${dir}" --strip-components=3 -f "${dir}.tar.gz" --wildcards 'hadoop-*-src/hadoop-tools/hadoop-aws' || return 1
   fi
 }
