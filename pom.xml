@@ -184,7 +184,7 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
     <metainf-services.version>1.11</metainf-services.version>
     <picocli.version>4.7.5</picocli.version>
     <prometheus.version>0.16.0</prometheus.version>
-    <reflections.version>0.9.11</reflections.version>
+    <reflections.version>0.10.2</reflections.version>
 
     <!-- com.google.re2j version -->
     <re2j.version>1.7</re2j.version>
@@ -1129,6 +1129,12 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
         <groupId>org.reflections</groupId>
         <artifactId>reflections</artifactId>
         <version>${reflections.version}</version>
+        <exclusions>
+          <exclusion>
+            <groupId>com.google.code.findbugs</groupId>
+            <artifactId>jsr305</artifactId>
+          </exclusion>
+        </exclusions>
       </dependency>
       <dependency>
         <groupId>org.rocksdb</groupId>
