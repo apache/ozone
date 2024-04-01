@@ -38,6 +38,7 @@ import org.apache.hadoop.hdds.server.events.EventQueue;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.mockito.Mockito;
 
 import java.io.File;
 import java.io.IOException;
@@ -439,10 +440,26 @@ public class TestNodeDecommissionManager {
     error = decom.decommissionNodes(Arrays.asList(dns.get(1).getIpAddress(),
         dns.get(2).getIpAddress(), dns.get(3).getIpAddress(), dns.get(4).getIpAddress()), false);
     assertTrue(error.get(0).getHostname().contains("AllHosts"));
+    assertEquals(HddsProtos.NodeOperationalState.IN_SERVICE,
+        nodeManager.getNodeStatus(dns.get(1)).getOperationalState());
+    assertEquals(HddsProtos.NodeOperationalState.IN_SERVICE,
+        nodeManager.getNodeStatus(dns.get(2)).getOperationalState());
+    assertEquals(HddsProtos.NodeOperationalState.IN_SERVICE,
+        nodeManager.getNodeStatus(dns.get(3)).getOperationalState());
+    assertEquals(HddsProtos.NodeOperationalState.IN_SERVICE,
+        nodeManager.getNodeStatus(dns.get(4)).getOperationalState());
 
     error = decom.decommissionNodes(Arrays.asList(dns.get(1).getIpAddress(),
         dns.get(2).getIpAddress(), dns.get(3).getIpAddress(), dns.get(4).getIpAddress()), true);
-    assertTrue(error.size() == 0);
+    assertEquals(0, error.size());
+    assertEquals(HddsProtos.NodeOperationalState.DECOMMISSIONING,
+        nodeManager.getNodeStatus(dns.get(1)).getOperationalState());
+    assertEquals(HddsProtos.NodeOperationalState.DECOMMISSIONING,
+        nodeManager.getNodeStatus(dns.get(2)).getOperationalState());
+    assertEquals(HddsProtos.NodeOperationalState.DECOMMISSIONING,
+        nodeManager.getNodeStatus(dns.get(3)).getOperationalState());
+    assertEquals(HddsProtos.NodeOperationalState.DECOMMISSIONING,
+        nodeManager.getNodeStatus(dns.get(4)).getOperationalState());
   }
 
   @Test
@@ -472,8 +489,12 @@ public class TestNodeDecommissionManager {
 
     error = decom.decommissionNodes(Arrays.asList(dns.get(1).getIpAddress()), false);
     assertTrue(error.get(0).getHostname().contains("AllHosts"));
+    assertEquals(HddsProtos.NodeOperationalState.IN_SERVICE,
+        nodeManager.getNodeStatus(dns.get(1)).getOperationalState());
     error = decom.decommissionNodes(Arrays.asList(dns.get(1).getIpAddress()), true);
-    assertTrue(error.size() == 0);
+    assertEquals(0, error.size());
+    assertEquals(HddsProtos.NodeOperationalState.DECOMMISSIONING,
+        nodeManager.getNodeStatus(dns.get(1)).getOperationalState());
   }
 
   @Test
@@ -516,8 +537,12 @@ public class TestNodeDecommissionManager {
 
     error = decom.decommissionNodes(Arrays.asList(dns.get(1).getIpAddress()), false);
     assertTrue(error.get(0).getHostname().contains("AllHosts"));
+    assertEquals(HddsProtos.NodeOperationalState.IN_SERVICE,
+        nodeManager.getNodeStatus(dns.get(1)).getOperationalState());
     error = decom.decommissionNodes(Arrays.asList(dns.get(1).getIpAddress()), true);
-    assertTrue(error.size() == 0);
+    assertEquals(0, error.size());
+    assertEquals(HddsProtos.NodeOperationalState.DECOMMISSIONING,
+        nodeManager.getNodeStatus(dns.get(1)).getOperationalState());
   }
 
   @Test
@@ -549,11 +574,17 @@ public class TestNodeDecommissionManager {
 
     // decommission one node successfully
     error = decom.decommissionNodes(Arrays.asList(dns.get(0).getIpAddress()), false);
-    assertTrue(error.size() == 0);
+    assertEquals(0, error.size());
+    assertEquals(HddsProtos.NodeOperationalState.DECOMMISSIONING,
+        nodeManager.getNodeStatus(dns.get(0)).getOperationalState());
     // try to decommission 2 nodes, one in service and one in decommissioning state, should be successful.
     error = decom.decommissionNodes(Arrays.asList(dns.get(0).getIpAddress(),
         dns.get(1).getIpAddress()), false);
-    assertTrue(error.size() == 0);
+    assertEquals(0, error.size());
+    assertEquals(HddsProtos.NodeOperationalState.DECOMMISSIONING,
+        nodeManager.getNodeStatus(dns.get(0)).getOperationalState());
+    assertEquals(HddsProtos.NodeOperationalState.DECOMMISSIONING,
+        nodeManager.getNodeStatus(dns.get(1)).getOperationalState());
   }
 
   @Test
@@ -567,7 +598,7 @@ public class TestNodeDecommissionManager {
       dns.add(dn);
     }
     Set<ContainerID> idsRatis = new HashSet<>();
-    for (int i = 0; i < 5; i++) {
+    for (int i = 0; i < 3; i++) {
       ContainerInfo container = containerManager.allocateContainer(
           RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.THREE), "admin");
       idsRatis.add(container.containerID());
@@ -584,23 +615,32 @@ public class TestNodeDecommissionManager {
     when(nodeManager.getContainers(any())).thenReturn(idsRatis);
     when(nodeManager.getNodeCount(any())).thenReturn(5);
 
-    when(nodeManager.getNodeStatus(dns.get(0))).thenThrow(new NodeNotFoundException());
-    when(nodeManager.getNodeStatus(dns.get(1))).thenReturn(new NodeStatus(HddsProtos.NodeOperationalState.IN_SERVICE,
-        HddsProtos.NodeState.HEALTHY));
-    when(nodeManager.getNodeStatus(dns.get(2))).thenReturn(new NodeStatus(HddsProtos.NodeOperationalState.IN_SERVICE,
-        HddsProtos.NodeState.HEALTHY));
-    when(nodeManager.getNodeStatus(dns.get(3))).thenReturn(new NodeStatus(HddsProtos.NodeOperationalState.IN_SERVICE,
-        HddsProtos.NodeState.HEALTHY));
-    when(nodeManager.getNodeStatus(dns.get(4))).thenReturn(new NodeStatus(HddsProtos.NodeOperationalState.IN_SERVICE,
-        HddsProtos.NodeState.HEALTHY));
+    when(nodeManager.getNodeStatus(any())).thenAnswer(invocation ->
+        getNodeOpState((DatanodeDetails) invocation.getArguments()[0], dns));
+    Mockito.doAnswer(invocation -> {
+      setNodeOpState((DatanodeDetails)invocation.getArguments()[0],
+          (HddsProtos.NodeOperationalState)invocation.getArguments()[1], dns);
+      return null;
+    }).when(nodeManager).setNodeOperationalState(any(DatanodeDetails.class), any(
+        HddsProtos.NodeOperationalState.class));
 
     error = decom.decommissionNodes(Arrays.asList(dns.get(1).getIpAddress(),
-        dns.get(2).getIpAddress(), dns.get(3).getIpAddress(), dns.get(4).getIpAddress()), false);
+        dns.get(2).getIpAddress(), dns.get(3).getIpAddress()), false);
     assertTrue(error.get(0).getHostname().contains("AllHosts"));
+    assertEquals(HddsProtos.NodeOperationalState.IN_SERVICE,
+        nodeManager.getNodeStatus(dns.get(1)).getOperationalState());
+    assertEquals(HddsProtos.NodeOperationalState.IN_SERVICE,
+        nodeManager.getNodeStatus(dns.get(2)).getOperationalState());
+    assertEquals(HddsProtos.NodeOperationalState.IN_SERVICE,
+        nodeManager.getNodeStatus(dns.get(3)).getOperationalState());
 
-    error = decom.decommissionNodes(Arrays.asList(dns.get(1).getIpAddress(),
-        dns.get(2).getIpAddress(), dns.get(0).getIpAddress()), false);
+    error = decom.decommissionNodes(Arrays.asList(dns.get(0).getIpAddress(),
+        dns.get(1).getIpAddress(), dns.get(2).getIpAddress()), false);
     assertFalse(error.get(0).getHostname().contains("AllHosts"));
+    assertEquals(HddsProtos.NodeOperationalState.DECOMMISSIONING,
+        nodeManager.getNodeStatus(dns.get(1)).getOperationalState());
+    assertEquals(HddsProtos.NodeOperationalState.DECOMMISSIONING,
+        nodeManager.getNodeStatus(dns.get(2)).getOperationalState());
   }
 
   private List<DatanodeDetails> getDatanodeDetailsList(String ipaddress, List<DatanodeDetails> dns) {
@@ -612,6 +652,27 @@ public class TestNodeDecommissionManager {
       }
     }
     return datanodeDetails;
+  }
+
+  private void setNodeOpState(DatanodeDetails dn, HddsProtos.NodeOperationalState newState, List<DatanodeDetails> dns) {
+    for (DatanodeDetails datanode : dns) {
+      if (datanode.equals(dn)) {
+        datanode.setPersistedOpState(newState);
+        break;
+      }
+    }
+  }
+
+  private NodeStatus getNodeOpState(DatanodeDetails dn, List<DatanodeDetails> dns) throws NodeNotFoundException {
+    if (dn.equals(dns.get(0))) {
+      throw new NodeNotFoundException();
+    }
+    for (DatanodeDetails datanode : dns) {
+      if (datanode.equals(dn)) {
+        return new NodeStatus(datanode.getPersistedOpState(), HddsProtos.NodeState.HEALTHY);
+      }
+    }
+    return null;
   }
 
   /**
