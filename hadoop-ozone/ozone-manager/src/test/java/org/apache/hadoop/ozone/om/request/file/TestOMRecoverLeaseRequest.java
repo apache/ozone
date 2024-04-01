@@ -47,6 +47,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CommitK
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.AllocateBlockRequest;
 import jakarta.annotation.Nonnull;
+import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
@@ -61,6 +62,8 @@ import static org.apache.hadoop.ozone.om.protocolPB.OzoneManagerProtocolClientSi
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.Mockito.when;
 
 /**
  * Tests OMRecoverLeaseRequest.
@@ -354,6 +357,35 @@ public class TestOMRecoverLeaseRequest extends TestOMKeyRequest {
     recoverLeaseResponse = omResponse.getRecoverLeaseResponse();
     keyInfo = recoverLeaseResponse.getKeyInfo();
     assertNotNull(keyInfo);
+  }
+
+  @Test
+  public void testRecoverLeaseWhenOMNotRunning() throws Exception {
+    populateNamespace(true, true, true, true);
+
+    // enable security
+    ozoneManager.getConfiguration().setBoolean(OzoneConfigKeys.OZONE_SECURITY_ENABLED_KEY, true);
+
+    // set OM as Not Running and enable block token
+    when(ozoneManager.isRunning()).thenReturn(false);
+    when(ozoneManager.isGrpcBlockTokenEnabled()).thenReturn(true);
+
+    GenericTestUtils.LogCapturer logCapturer = GenericTestUtils.LogCapturer.captureLogs(OMRecoverLeaseRequest.LOG);
+
+    OMClientResponse omClientResponse = validateAndUpdateCache();
+    OMResponse omResponse = omClientResponse.getOMResponse();
+    assertEquals(OzoneManagerProtocolProtos.Status.OK, omResponse.getStatus());
+    RecoverLeaseResponse recoverLeaseResponse = omResponse.getRecoverLeaseResponse();
+    KeyInfo keyInfo = recoverLeaseResponse.getKeyInfo();
+    assertNotNull(keyInfo);
+    assertTrue(logCapturer.getOutput().contains("OzoneManager is not in RUNNING state, skip block token generation"));
+    OmKeyInfo omKeyInfo = OmKeyInfo.getFromProtobuf(keyInfo);
+
+    omClientResponse = validateAndUpdateCacheForCommit(getNewKeyArgs(omKeyInfo, 0));
+    omResponse = omClientResponse.getOMResponse();
+    assertEquals(OzoneManagerProtocolProtos.Status.OK, omResponse.getStatus());
+
+    verifyTables(true, false);
   }
 
   private KeyArgs getNewKeyArgs(OmKeyInfo omKeyInfo, long deltaLength) throws IOException {
