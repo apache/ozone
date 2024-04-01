@@ -252,8 +252,7 @@ public class NetworkTopologyImpl implements NetworkTopology {
     try {
       Node ancestor1 = node1.getAncestor(ancestorGen);
       Node ancestor2 = node2.getAncestor(ancestorGen);
-      return (ancestor1 != null && ancestor1.equals(ancestor2)) ||
-          (ancestor1 == null && ancestor2 == null);
+      return Objects.equals(ancestor1, ancestor2);
     } finally {
       netlock.readLock().unlock();
     }
