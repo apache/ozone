@@ -600,7 +600,7 @@ public class TestNodeDecommissionManager {
 
     error = decom.decommissionNodes(Arrays.asList(dns.get(1).getIpAddress(),
         dns.get(2).getIpAddress(), dns.get(0).getIpAddress()), false);
-    assertFalse(error.get(0).getHostname().contains("AllHosts"));;
+    assertFalse(error.get(0).getHostname().contains("AllHosts"));
   }
 
   private List<DatanodeDetails> getDatanodeDetailsList(String ipaddress, List<DatanodeDetails> dns) {
