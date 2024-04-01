@@ -226,13 +226,19 @@ public class BlockInputStream extends BlockExtendedInputStream {
       if (blockLocationInfo == null) {
         LOG.warn("No new block location info for block {}", blockID);
       } else {
-        OzoneBlockTokenIdentifier tokenId = new OzoneBlockTokenIdentifier();
-        tokenId.readFromByteArray(blockLocationInfo.getToken().getIdentifier());
         setPipeline(blockLocationInfo.getPipeline());
-        tokenRef.set(blockLocationInfo.getToken());
         LOG.info("New pipeline for block {}: {}", blockID,
             blockLocationInfo.getPipeline());
-        LOG.info("A new token is added. Expiry: {}", Instant.ofEpochMilli(tokenId.getExpiryDate()));
+
+        if (blockLocationInfo.getToken() != null) {
+          tokenRef.set(blockLocationInfo.getToken());
+          OzoneBlockTokenIdentifier tokenId = new OzoneBlockTokenIdentifier();
+          tokenId.readFromByteArray(tokenRef.get().getIdentifier());
+          LOG.info("A new token is added for block {}. Expiry: {}",
+              blockID, Instant.ofEpochMilli(tokenId.getExpiryDate()));
+        } else {
+          LOG.warn("Unable to add a new block token for block {}", blockID);
+        }
       }
     } else {
       throw cause;
