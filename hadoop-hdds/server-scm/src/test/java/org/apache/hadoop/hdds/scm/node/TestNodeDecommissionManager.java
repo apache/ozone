@@ -55,6 +55,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
@@ -553,6 +554,64 @@ public class TestNodeDecommissionManager {
     error = decom.decommissionNodes(Arrays.asList(dns.get(0).getIpAddress(),
         dns.get(1).getIpAddress()), false);
     assertTrue(error.size() == 0);
+  }
+
+  @Test
+  public void testInsufficientNodeDecommissionChecksForNNF() throws
+      NodeNotFoundException, IOException {
+    List<DatanodeAdminError> error;
+    List<DatanodeDetails> dns = new ArrayList<>();
+
+    for (int i = 0; i < 5; i++) {
+      DatanodeDetails dn = MockDatanodeDetails.randomDatanodeDetails();
+      dns.add(dn);
+    }
+    Set<ContainerID> idsRatis = new HashSet<>();
+    for (int i = 0; i < 5; i++) {
+      ContainerInfo container = containerManager.allocateContainer(
+          RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.THREE), "admin");
+      idsRatis.add(container.containerID());
+    }
+
+    nodeManager = mock(NodeManager.class);
+    decom = new NodeDecommissionManager(conf, nodeManager, containerManager,
+        SCMContext.emptyContext(), new EventQueue(), null);
+    when(containerManager.getContainer(any(ContainerID.class)))
+        .thenAnswer(invocation -> getMockContainer(RatisReplicationConfig
+            .getInstance(HddsProtos.ReplicationFactor.THREE), (ContainerID)invocation.getArguments()[0]));
+    when(nodeManager.getNodesByAddress(any())).thenAnswer(invocation ->
+        getDatanodeDetailsList((String)invocation.getArguments()[0], dns));
+    when(nodeManager.getContainers(any())).thenReturn(idsRatis);
+    when(nodeManager.getNodeCount(any())).thenReturn(5);
+
+    when(nodeManager.getNodeStatus(dns.get(0))).thenThrow(new NodeNotFoundException());
+    when(nodeManager.getNodeStatus(dns.get(1))).thenReturn(new NodeStatus(HddsProtos.NodeOperationalState.IN_SERVICE,
+        HddsProtos.NodeState.HEALTHY));
+    when(nodeManager.getNodeStatus(dns.get(2))).thenReturn(new NodeStatus(HddsProtos.NodeOperationalState.IN_SERVICE,
+        HddsProtos.NodeState.HEALTHY));
+    when(nodeManager.getNodeStatus(dns.get(3))).thenReturn(new NodeStatus(HddsProtos.NodeOperationalState.IN_SERVICE,
+        HddsProtos.NodeState.HEALTHY));
+    when(nodeManager.getNodeStatus(dns.get(4))).thenReturn(new NodeStatus(HddsProtos.NodeOperationalState.IN_SERVICE,
+        HddsProtos.NodeState.HEALTHY));
+
+    error = decom.decommissionNodes(Arrays.asList(dns.get(1).getIpAddress(),
+        dns.get(2).getIpAddress(), dns.get(3).getIpAddress(), dns.get(4).getIpAddress()), false);
+    assertTrue(error.get(0).getHostname().contains("AllHosts"));
+
+    error = decom.decommissionNodes(Arrays.asList(dns.get(1).getIpAddress(),
+        dns.get(2).getIpAddress(), dns.get(0).getIpAddress()), false);
+    assertFalse(error.get(0).getHostname().contains("AllHosts"));;
+  }
+
+  private List<DatanodeDetails> getDatanodeDetailsList(String ipaddress, List<DatanodeDetails> dns) {
+    List<DatanodeDetails> datanodeDetails = new ArrayList<>();
+    for (DatanodeDetails dn : dns) {
+      if (dn.getIpAddress().equals(ipaddress)) {
+        datanodeDetails.add(dn);
+        break;
+      }
+    }
+    return datanodeDetails;
   }
 
   /**
