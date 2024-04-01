@@ -224,21 +224,20 @@ public class TestS3InitiateMultipartUploadRequest
 
     List<OzoneAcl> parentDefaultAcl = bucketAcls.stream()
         .filter(acl -> acl.getAclScope() == OzoneAcl.AclScope.DEFAULT)
+        .map(acl -> acl.withScope(OzoneAcl.AclScope.ACCESS))
         .collect(Collectors.toList());
 
-    OzoneAcl parentAccessAcl = bucketAcls.stream()
+    List<OzoneAcl> parentAccessAcl = bucketAcls.stream()
         .filter(acl -> acl.getAclScope() == OzoneAcl.AclScope.ACCESS)
-        .findAny().orElse(null);
+        .collect(Collectors.toList());
 
     // Should inherit parent DEFAULT Acls
     // [user:newUser:rw[DEFAULT], group:newGroup:rwl[DEFAULT]]
-    assertEquals(parentDefaultAcl.stream()
-            .map(acl -> acl.setAclScope(OzoneAcl.AclScope.ACCESS))
-            .collect(Collectors.toList()), keyAcls,
+    assertEquals(parentDefaultAcl, keyAcls,
         "Failed to inherit parent DEFAULT acls!");
 
     // Should not inherit parent ACCESS Acls
-    assertThat(keyAcls).doesNotContain(parentAccessAcl);
+    assertThat(keyAcls).doesNotContainAnyElementsOf(parentAccessAcl);
   }
 
 }

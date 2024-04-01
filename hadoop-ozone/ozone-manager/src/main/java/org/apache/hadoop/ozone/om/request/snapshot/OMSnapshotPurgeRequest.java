@@ -102,7 +102,11 @@ public class OMSnapshotPurgeRequest extends OMClientRequest {
             trxnLogIndex, updatedSnapInfos);
         updateSnapshotChainAndCache(omMetadataManager, fromSnapshot,
             trxnLogIndex, updatedPathPreviousAndGlobalSnapshots);
+        // Remove and close snapshot's RocksDB instance from SnapshotCache.
         ozoneManager.getOmSnapshotManager().invalidateCacheEntry(fromSnapshot.getSnapshotId());
+        // Update SnapshotInfoTable cache.
+        ozoneManager.getMetadataManager().getSnapshotInfoTable()
+            .addCacheEntry(new CacheKey<>(fromSnapshot.getTableKey()), CacheValue.get(trxnLogIndex));
       }
 
       omClientResponse = new OMSnapshotPurgeResponse(omResponse.build(),

@@ -22,7 +22,6 @@
 package org.apache.hadoop.hdds.scm.server;
 
 import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Preconditions;
 import com.google.common.base.Strings;
 import com.google.common.collect.Maps;
 import com.google.protobuf.BlockingService;
@@ -100,6 +99,7 @@ import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -1047,67 +1047,130 @@ public class SCMClientProtocolServer implements
       Optional<Integer> maxDatanodesPercentageToInvolvePerIteration,
       Optional<Long> maxSizeToMovePerIterationInGB,
       Optional<Long> maxSizeEnteringTarget,
-      Optional<Long> maxSizeLeavingSource) throws IOException {
+      Optional<Long> maxSizeLeavingSource,
+      Optional<Integer> balancingInterval,
+      Optional<Integer> moveTimeout,
+      Optional<Integer> moveReplicationTimeout,
+      Optional<Boolean> networkTopologyEnable,
+      Optional<String> includeNodes,
+      Optional<String> excludeNodes) throws IOException {
     getScm().checkAdminAccess(getRemoteUser(), false);
     ContainerBalancerConfiguration cbc =
         scm.getConfiguration().getObject(ContainerBalancerConfiguration.class);
     Map<String, String> auditMap = Maps.newHashMap();
-    if (threshold.isPresent()) {
-      double tsd = threshold.get();
-      auditMap.put("threshold", String.valueOf(tsd));
-      Preconditions.checkState(tsd >= 0.0D && tsd < 100.0D,
-          "threshold should be specified in range [0.0, 100.0).");
-      cbc.setThreshold(tsd);
-    }
-    if (maxSizeToMovePerIterationInGB.isPresent()) {
-      long mstm = maxSizeToMovePerIterationInGB.get();
-      auditMap.put("maxSizeToMovePerIterationInGB", String.valueOf(mstm));
-      Preconditions.checkState(mstm > 0,
-          "maxSizeToMovePerIterationInGB must be positive.");
-      cbc.setMaxSizeToMovePerIteration(mstm * OzoneConsts.GB);
-    }
-    if (maxDatanodesPercentageToInvolvePerIteration.isPresent()) {
-      int mdti = maxDatanodesPercentageToInvolvePerIteration.get();
-      auditMap.put("maxDatanodesPercentageToInvolvePerIteration",
-          String.valueOf(mdti));
-      Preconditions.checkState(mdti >= 0,
-          "maxDatanodesPercentageToInvolvePerIteration must be " +
-              "greater than equal to zero.");
-      Preconditions.checkState(mdti <= 100,
-          "maxDatanodesPercentageToInvolvePerIteration must be " +
-              "lesser than or equal to 100.");
-      cbc.setMaxDatanodesPercentageToInvolvePerIteration(mdti);
-    }
-    if (iterations.isPresent()) {
-      int i = iterations.get();
-      auditMap.put("iterations", String.valueOf(i));
-      Preconditions.checkState(i > 0 || i == -1,
-          "number of iterations must be positive or" +
-              " -1 (for running container balancer infinitely).");
-      cbc.setIterations(i);
-    }
-
-    if (maxSizeEnteringTarget.isPresent()) {
-      long mset = maxSizeEnteringTarget.get();
-      auditMap.put("maxSizeEnteringTarget", String.valueOf(mset));
-      Preconditions.checkState(mset > 0,
-          "maxSizeEnteringTarget must be " +
-              "greater than zero.");
-      cbc.setMaxSizeEnteringTarget(mset * OzoneConsts.GB);
-    }
-
-    if (maxSizeLeavingSource.isPresent()) {
-      long msls = maxSizeLeavingSource.get();
-      auditMap.put("maxSizeLeavingSource", String.valueOf(msls));
-      Preconditions.checkState(msls > 0,
-          "maxSizeLeavingSource must be " +
-              "greater than zero.");
-      cbc.setMaxSizeLeavingSource(msls * OzoneConsts.GB);
-    }
-
-    ContainerBalancer containerBalancer = scm.getContainerBalancer();
     try {
+      if (threshold.isPresent()) {
+        double tsd = threshold.get();
+        auditMap.put("threshold", String.valueOf(tsd));
+        if (tsd < 0.0D || tsd >= 100.0D) {
+          throw new IOException("Threshold should be specified in the range [0.0, 100.0).");
+        }
+        cbc.setThreshold(tsd);
+      }
+
+      if (maxSizeToMovePerIterationInGB.isPresent()) {
+        long mstm = maxSizeToMovePerIterationInGB.get();
+        auditMap.put("maxSizeToMovePerIterationInGB", String.valueOf(mstm));
+        if (mstm <= 0) {
+          throw new IOException("Max Size To Move Per Iteration In GB must be positive.");
+        }
+        cbc.setMaxSizeToMovePerIteration(mstm * OzoneConsts.GB);
+      }
+
+      if (maxDatanodesPercentageToInvolvePerIteration.isPresent()) {
+        int mdti = maxDatanodesPercentageToInvolvePerIteration.get();
+        auditMap.put("maxDatanodesPercentageToInvolvePerIteration",
+            String.valueOf(mdti));
+        if (mdti < 0 || mdti > 100) {
+          throw new IOException("Max Datanodes Percentage To Involve Per Iteration" +
+                  "should be specified in the range [0, 100]");
+        }
+        cbc.setMaxDatanodesPercentageToInvolvePerIteration(mdti);
+      }
+
+      if (iterations.isPresent()) {
+        int i = iterations.get();
+        auditMap.put("iterations", String.valueOf(i));
+        if (i < -1 || i == 0) {
+          throw new IOException("Number of Iterations must be positive or" +
+              " -1 (for running container balancer infinitely).");
+        }
+        cbc.setIterations(i);
+      }
+
+      if (maxSizeEnteringTarget.isPresent()) {
+        long mset = maxSizeEnteringTarget.get();
+        auditMap.put("maxSizeEnteringTarget", String.valueOf(mset));
+        if (mset <= 0) {
+          throw new IOException("Max Size Entering Target must be " +
+              "greater than zero.");
+        }
+        cbc.setMaxSizeEnteringTarget(mset * OzoneConsts.GB);
+      }
+
+      if (maxSizeLeavingSource.isPresent()) {
+        long msls = maxSizeLeavingSource.get();
+        auditMap.put("maxSizeLeavingSource", String.valueOf(msls));
+        if (msls <= 0) {
+          throw new IOException("Max Size Leaving Source must be " +
+              "greater than zero.");
+        }
+        cbc.setMaxSizeLeavingSource(msls * OzoneConsts.GB);
+      }
+
+      if (balancingInterval.isPresent()) {
+        int bi = balancingInterval.get();
+        auditMap.put("balancingInterval", String.valueOf(bi));
+        if (bi <= 0) {
+          throw new IOException("Balancing Interval must be greater than zero.");
+        }
+        cbc.setBalancingInterval(Duration.ofMinutes(bi));
+      }
+
+      if (moveTimeout.isPresent()) {
+        int mt = moveTimeout.get();
+        auditMap.put("moveTimeout", String.valueOf(mt));
+        if (mt <= 0) {
+          throw new IOException("Move Timeout must be greater than zero.");
+        }
+        cbc.setMoveTimeout(Duration.ofMinutes(mt));
+      }
+
+      if (moveReplicationTimeout.isPresent()) {
+        int mrt = moveReplicationTimeout.get();
+        auditMap.put("moveReplicationTimeout", String.valueOf(mrt));
+        if (mrt <= 0) {
+          throw new IOException("Move Replication Timeout must be greater than zero.");
+        }
+        cbc.setMoveReplicationTimeout(Duration.ofMinutes(mrt));
+      }
+
+      if (networkTopologyEnable.isPresent()) {
+        Boolean nt = networkTopologyEnable.get();
+        auditMap.put("networkTopologyEnable", String.valueOf(nt));
+        cbc.setNetworkTopologyEnable(nt);
+      }
+
+      if (includeNodes.isPresent()) {
+        String in = includeNodes.get();
+        auditMap.put("includeNodes", (in));
+        cbc.setIncludeNodes(in);
+      }
+
+      if (excludeNodes.isPresent()) {
+        String ex = excludeNodes.get();
+        auditMap.put("excludeNodes", (ex));
+        cbc.setExcludeNodes(ex);
+      }
+
+      ContainerBalancer containerBalancer = scm.getContainerBalancer();
       containerBalancer.startBalancer(cbc);
+
+      AUDIT.logWriteSuccess(buildAuditMessageForSuccess(
+          SCMAction.START_CONTAINER_BALANCER, auditMap));
+      return StartContainerBalancerResponseProto.newBuilder()
+           .setStart(true)
+           .build();
     } catch (IllegalContainerBalancerStateException | IOException |
         InvalidContainerBalancerConfigurationException e) {
       AUDIT.logWriteFailure(buildAuditMessageForFailure(
@@ -1117,11 +1180,6 @@ public class SCMClientProtocolServer implements
           .setMessage(e.getMessage())
           .build();
     }
-    AUDIT.logWriteSuccess(buildAuditMessageForSuccess(
-        SCMAction.START_CONTAINER_BALANCER, auditMap));
-    return StartContainerBalancerResponseProto.newBuilder()
-        .setStart(true)
-        .build();
   }
 
   @Override

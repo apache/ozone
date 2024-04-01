@@ -291,6 +291,11 @@ public class ReconOmMetadataManagerImpl extends OmMetadataManagerImpl
         Integer.MAX_VALUE);
   }
 
+  @Override
+  public OzoneConfiguration getOzoneConfiguration() {
+    return ozoneConfiguration;
+  }
+
   private List<OmBucketInfo> listAllBuckets(final int maxNumberOfBuckets)
       throws IOException {
     List<OmBucketInfo> result = new ArrayList<>();

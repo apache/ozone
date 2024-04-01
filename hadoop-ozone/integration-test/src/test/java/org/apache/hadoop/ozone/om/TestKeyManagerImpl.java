@@ -24,7 +24,6 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.BitSet;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -87,7 +86,6 @@ import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
-import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLIdentityType;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
@@ -129,6 +127,8 @@ import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.junit.jupiter.params.provider.ValueSource;
 
+import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType.READ;
+import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType.WRITE;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
@@ -531,7 +531,7 @@ public class TestKeyManagerImpl {
         .build();
 
     OzoneAcl ozAcl1 = new OzoneAcl(ACLIdentityType.USER, "user1",
-        ACLType.READ, ACCESS);
+        ACCESS, ACLType.READ);
     writeClient.addAcl(ozPrefix1, ozAcl1);
 
     List<OzoneAcl> ozAclGet = writeClient.getAcl(ozPrefix1);
@@ -539,24 +539,13 @@ public class TestKeyManagerImpl {
     assertEquals(ozAcl1, ozAclGet.get(0));
 
     List<OzoneAcl> acls = new ArrayList<>();
-    OzoneAcl ozAcl2 = new OzoneAcl(ACLIdentityType.USER, "admin",
-        ACLType.ALL, ACCESS);
+    OzoneAcl ozAcl2 = new OzoneAcl(ACLIdentityType.USER, "admin", ACCESS, ACLType.ALL);
 
-    BitSet rwRights = new BitSet();
-    rwRights.set(IAccessAuthorizer.ACLType.WRITE.ordinal());
-    rwRights.set(IAccessAuthorizer.ACLType.READ.ordinal());
-    OzoneAcl ozAcl3 = new OzoneAcl(ACLIdentityType.GROUP, "dev",
-        rwRights, ACCESS);
+    OzoneAcl ozAcl3 = new OzoneAcl(ACLIdentityType.GROUP, "dev", ACCESS, READ, WRITE);
 
-    BitSet wRights = new BitSet();
-    wRights.set(IAccessAuthorizer.ACLType.WRITE.ordinal());
-    OzoneAcl ozAcl4 = new OzoneAcl(ACLIdentityType.GROUP, "dev",
-        wRights, ACCESS);
+    OzoneAcl ozAcl4 = new OzoneAcl(ACLIdentityType.GROUP, "dev", ACCESS, WRITE);
 
-    BitSet rRights = new BitSet();
-    rRights.set(IAccessAuthorizer.ACLType.READ.ordinal());
-    OzoneAcl ozAcl5 = new OzoneAcl(ACLIdentityType.GROUP, "dev",
-        rRights, ACCESS);
+    OzoneAcl ozAcl5 = new OzoneAcl(ACLIdentityType.GROUP, "dev", ACCESS, READ);
 
     acls.add(ozAcl2);
     acls.add(ozAcl3);
@@ -628,7 +617,7 @@ public class TestKeyManagerImpl {
     // Invalid prefix not ending with "/"
     String invalidPrefix = "invalid/pf";
     OzoneAcl ozAcl1 = new OzoneAcl(ACLIdentityType.USER, "user1",
-        ACLType.READ, ACCESS);
+        ACCESS, ACLType.READ);
 
     OzoneObj ozInvalidPrefix = new OzoneObjInfo.Builder()
         .setVolumeName(volumeName)
@@ -641,7 +630,7 @@ public class TestKeyManagerImpl {
     // add acl with invalid prefix name
     Exception ex = assertThrows(OMException.class,
         () -> writeClient.addAcl(ozInvalidPrefix, ozAcl1));
-    assertTrue(ex.getMessage().startsWith("Invalid prefix name"));
+    assertTrue(ex.getMessage().startsWith("Missing trailing slash"));
 
     OzoneObj ozPrefix1 = new OzoneObjInfo.Builder()
         .setVolumeName(volumeName)
@@ -659,7 +648,7 @@ public class TestKeyManagerImpl {
     // get acl with invalid prefix name
     ex = assertThrows(OMException.class,
         () -> writeClient.getAcl(ozInvalidPrefix));
-    assertTrue(ex.getMessage().startsWith("Invalid prefix name"));
+    assertTrue(ex.getMessage().startsWith("Missing trailing slash"));
 
     // set acl with invalid prefix name
     List<OzoneAcl> ozoneAcls = new ArrayList<OzoneAcl>();
@@ -667,12 +656,12 @@ public class TestKeyManagerImpl {
 
     ex = assertThrows(OMException.class,
         () -> writeClient.setAcl(ozInvalidPrefix, ozoneAcls));
-    assertTrue(ex.getMessage().startsWith("Invalid prefix name"));
+    assertTrue(ex.getMessage().startsWith("Missing trailing slash"));
 
     // remove acl with invalid prefix name
     ex = assertThrows(OMException.class,
         () -> writeClient.removeAcl(ozInvalidPrefix, ozAcl1));
-    assertTrue(ex.getMessage().startsWith("Invalid prefix name"));
+    assertTrue(ex.getMessage().startsWith("Missing trailing slash"));
   }
 
   @Test
@@ -692,7 +681,7 @@ public class TestKeyManagerImpl {
         .build();
 
     OzoneAcl ozAcl1 = new OzoneAcl(ACLIdentityType.USER, "user1",
-        ACLType.READ, ACCESS);
+        ACCESS, ACLType.READ);
     writeClient.addAcl(ozPrefix1, ozAcl1);
 
     OzoneObj ozFile1 = new OzoneObjInfo.Builder()
