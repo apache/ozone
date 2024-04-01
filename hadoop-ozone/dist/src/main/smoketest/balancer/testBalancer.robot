@@ -39,37 +39,37 @@ Prepare For Tests
 
 
 Datanode In Maintenance Mode
-    ${result} =             Execute                         /opt/hadoop/bin/ozone admin datanode maintenance ${HOST}
+    ${result} =             Execute                         ozone admin datanode maintenance ${HOST}
                             Should Contain                  ${result}             Entering maintenance mode on datanode
-    ${result} =             Execute                         /opt/hadoop/bin/ozone admin datanode list | grep "Operational State:*"
+    ${result} =             Execute                         ozone admin datanode list | grep "Operational State:*"
                             Wait Until Keyword Succeeds      30sec   5sec    Should contain   ${result}   ENTERING_MAINTENANCE
                             Wait Until Keyword Succeeds      3min    10sec   Related pipelines are closed
                             Sleep                   60000ms
 
 Related pipelines are closed
-    ${result} =         Execute          /opt/hadoop/bin/ozone admin datanode list | awk -v RS= '{$1=$1}1'|grep MAINT | sed -e 's/^.*pipelines: \\(.*\\)$/\\1/'
+    ${result} =         Execute          ozone admin datanode list | awk -v RS= '{$1=$1}1'|grep MAINT | sed -e 's/^.*pipelines: \\(.*\\)$/\\1/'
                         Should Contain Any   ${result}   CLOSED   No related pipelines or the node is not in Healthy state.
 
 Datanode Recommission
-    ${result} =             Execute                         /opt/hadoop/bin/ozone admin datanode recommission ${HOST}
+    ${result} =             Execute                         ozone admin datanode recommission ${HOST}
                             Should Contain                  ${result}             Started recommissioning datanode
                             Wait Until Keyword Succeeds      1min    10sec    Datanode Recommission is Finished
                             Sleep                   300000ms
 
 Datanode Recommission is Finished
-    ${result} =             Execute                         /opt/hadoop/bin/ozone admin datanode list | grep "Operational State:*"
+    ${result} =             Execute                         ozone admin datanode list | grep "Operational State:*"
                             Should Not Contain   ${result}   ENTERING_MAINTENANCE
 
-Container Balancer
-    ${result} =             Execute                         /opt/hadoop/bin/ozone admin containerbalancer start -t 1 -d 100 -i 1
+Run Container Balancer
+    ${result} =             Execute                         ozone admin containerbalancer start -t 1 -d 100 -i 1
                             Should Contain                  ${result}             Container Balancer started successfully.
-    ${result} =             Execute                         /opt/hadoop/bin/ozone admin containerbalancer status
+    ${result} =             Execute                         ozone admin containerbalancer status
                             Should Contain                  ${result}             ContainerBalancer is Running.
                             Wait Until Keyword Succeeds      3min    10sec    ContainerBalancer is Not Running
                             Sleep                   60000ms
 
 ContainerBalancer is Not Running
-    ${result} =         Execute          /opt/hadoop/bin/ozone admin containerbalancer status
+    ${result} =         Execute          ozone admin containerbalancer status
                         Should contain   ${result}   ContainerBalancer is Not Running.
 
 Create Multiple Keys
@@ -89,7 +89,7 @@ Datanode Usageinfo
                             Should Contain                  ${result}             Ozone Used
 
 Get Uuid
-    ${result} =             Execute          /opt/hadoop/bin/ozone admin datanode list | awk -v RS= '{$1=$1}1'| grep ${HOST} | sed -e 's/Datanode: //'|sed -e 's/ .*$//'
+    ${result} =             Execute          ozone admin datanode list | awk -v RS= '{$1=$1}1'| grep ${HOST} | sed -e 's/Datanode: //'|sed -e 's/ .*$//'
     [return]          ${result}
 
 Close All Containers
@@ -103,8 +103,14 @@ Close All Containers
     Wait until keyword succeeds    3min    10sec    All container is closed
 
 All container is closed
-    ${output} =         Execute          ozone admin container list
-                        Should Not Contain   ${output}   OPEN
+    ${output} =         Execute          ozone admin container list --state OPEN
+                        Should Be Empty   ${output}
+
+Get Datanode Ozone Used Bytes Info
+    [arguments]             ${uuid}
+    ${output} =    Execute    export DATANODES=$(ozone admin datanode list --json) && for datanode in $(echo "$\{DATANODES\}" | jq -r '.[].datanodeDetails.uuid'); do ozone admin datanode usageinfo --uuid=$\{datanode\} --json | jq '{(.[0].datanodeDetails.uuid) : .[0].ozoneUsed}'; done | jq -s add
+    ${result} =    Execute    echo '${output}' | jq '. | to_entries | .[] | select(.key == "${uuid}") | .value'
+    [return]          ${result}
 
 ** Test Cases ***
 Verify Container Balancer for RATIS containers
@@ -119,21 +125,17 @@ Verify Container Balancer for RATIS containers
 
     Close All Containers
 
-    ${output1} =    Execute    export DATANODES=$(ozone admin datanode list --json) && for datanode in $(echo "$\{DATANODES\}" | jq -r '.[].datanodeDetails.uuid'); do ozone admin datanode usageinfo --uuid=$\{datanode\} --json | jq '{(.[0].datanodeDetails.uuid) : .[0].ozoneUsed}'; done | jq -s add
-
-    ${datanodePreviousUsedBytes}    Execute    echo '${output1}' | jq '. | to_entries | .[] | select(.key == "${uuid}") | .value'
-    Should Be True    ${datanodePreviousUsedBytes} < ${SIZE}
+    ${datanodeOzoneUsedBytesInfo} =    Get Datanode Ozone Used Bytes Info          ${uuid}
+    Should Be True    ${datanodeOzoneUsedBytesInfo} < ${SIZE}
 
     Datanode Recommission
 
-    Container Balancer
+    Run Container Balancer
 
-    ${output2} =    Execute    export DATANODES=$(ozone admin datanode list --json) && for datanode in $(echo "$\{DATANODES\}" | jq -r '.[].datanodeDetails.uuid'); do ozone admin datanode usageinfo --uuid=$\{datanode\} --json | jq '{(.[0].datanodeDetails.uuid) : .[0].ozoneUsed}'; done | jq -s add
-
-    ${datanodeCurrentUsedBytes}     Execute    echo '${output2}' | jq '. | to_entries | .[] | select(.key == "${uuid}") | .value'
-    Should Not Be Equal As Integers     ${datanodePreviousUsedBytes}    ${datanodeCurrentUsedBytes}
-    Should Be True    ${datanodeCurrentUsedBytes} < ${SIZE} * 3.5
-    Should Be True    ${datanodeCurrentUsedBytes} > ${SIZE} * 3
+    ${datanodeOzoneUsedBytesInfoAfterContainerBalancing} =    Get Datanode Ozone Used Bytes Info          ${uuid}
+    Should Not Be Equal As Integers     ${datanodeOzoneUsedBytesInfo}    ${datanodeOzoneUsedBytesInfoAfterContainerBalancing}
+    Should Be True    ${datanodeOzoneUsedBytesInfoAfterContainerBalancing} < ${SIZE} * 3.5
+    Should Be True    ${datanodeOzoneUsedBytesInfoAfterContainerBalancing} > ${SIZE} * 3
 
 
 

@@ -30,8 +30,4 @@ source "$COMPOSE_DIR/../testlib.sh"
 # We need 4 dataNodes in this tests
 start_docker_env 4
 
-# Start OMs separately. In this test, the OMs will be stopped and restarted multiple times.
-# So we do not want the container to be tied to the OM process.
-#startOMs
-
 execute_robot_test ${OM} balancer/testBalancer.robot

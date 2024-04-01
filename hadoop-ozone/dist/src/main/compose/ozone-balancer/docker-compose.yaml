@@ -37,8 +37,7 @@ services:
          - 9882
       environment:
          <<: *replication
-         OZONE_OPTS: -agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=*:5005
-      command: ["/opt/hadoop/bin/ozone","datanode"]
+      command: ["ozone","datanode"]
       volumes:
          - tmpfs1:/data
          - ../..:/opt/hadoop
@@ -49,8 +48,7 @@ services:
          - 9882
       environment:
          <<: *replication
-         OZONE_OPTS: -agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=*:5005
-      command: [ "/opt/hadoop/bin/ozone","datanode" ]
+      command: [ "ozone","datanode" ]
       volumes:
          - tmpfs2:/data
          - ../..:/opt/hadoop
@@ -61,8 +59,7 @@ services:
          - 9882
       environment:
          <<: *replication
-         OZONE_OPTS: -agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=*:5005
-      command: [ "/opt/hadoop/bin/ozone","datanode" ]
+      command: [ "ozone","datanode" ]
       volumes:
          - tmpfs3:/data
          - ../..:/opt/hadoop
@@ -73,8 +70,7 @@ services:
          - 9882
       environment:
          <<: *replication
-         OZONE_OPTS: -agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=*:5005
-      command: [ "/opt/hadoop/bin/ozone","datanode" ]
+      command: [ "ozone","datanode" ]
       volumes:
          - tmpfs4:/data
          - ../..:/opt/hadoop
@@ -88,7 +84,7 @@ services:
          - 9874:9874
          - 9862
       hostname: om1
-      command: ["/opt/hadoop/bin/ozone","om"]
+      command: ["ozone","om"]
    om2:
       <<: *common-config
       environment:
@@ -99,7 +95,7 @@ services:
          - 9874
          - 9862
       hostname: om2
-      command: ["/opt/hadoop/bin/ozone","om"]
+      command: ["ozone","om"]
    om3:
       <<: *common-config
       environment:
@@ -110,7 +106,7 @@ services:
          - 9874
          - 9862
       hostname: om3
-      command: ["/opt/hadoop/bin/ozone","om"]
+      command: ["ozone","om"]
    scm1:
       <<: *common-config
       ports:
@@ -119,7 +115,7 @@ services:
          ENSURE_SCM_INITIALIZED: /data/metadata/scm/current/VERSION
          OZONE-SITE.XML_hdds.scm.safemode.min.datanode: ${OZONE_SAFEMODE_MIN_DATANODES:-1}
          <<: *replication
-      command: ["/opt/hadoop/bin/ozone","scm"]
+      command: ["ozone","scm"]
    scm2:
       <<: *common-config
       ports:
@@ -129,7 +125,7 @@ services:
          ENSURE_SCM_BOOTSTRAPPED: /data/metadata/scm/current/VERSION
          OZONE-SITE.XML_hdds.scm.safemode.min.datanode: ${OZONE_SAFEMODE_MIN_DATANODES:-1}
          <<: *replication
-      command: ["/opt/hadoop/bin/ozone","scm"]
+      command: ["ozone","scm"]
    scm3:
       <<: *common-config
       ports:
@@ -139,7 +135,7 @@ services:
          ENSURE_SCM_BOOTSTRAPPED: /data/metadata/scm/current/VERSION
          OZONE-SITE.XML_hdds.scm.safemode.min.datanode: ${OZONE_SAFEMODE_MIN_DATANODES:-1}
          <<: *replication
-      command: ["/opt/hadoop/bin/ozone","scm"]
+      command: ["ozone","scm"]
    httpfs:
       <<: *common-config
       environment:
@@ -147,7 +143,7 @@ services:
          <<: *replication
       ports:
          - 14000:14000
-      command: [ "/opt/hadoop/bin/ozone","httpfs" ]
+      command: [ "ozone","httpfs" ]
    s3g:
       <<: *common-config
       environment:
@@ -155,7 +151,7 @@ services:
          <<: *replication
       ports:
          - 9878:9878
-      command: ["/opt/hadoop/bin/ozone","s3g"]
+      command: ["ozone","s3g"]
 volumes:
    tmpfs1:
       driver: local
