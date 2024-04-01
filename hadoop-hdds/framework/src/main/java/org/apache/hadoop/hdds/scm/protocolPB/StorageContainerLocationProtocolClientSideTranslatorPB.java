@@ -902,7 +902,13 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
       Optional<Integer> maxDatanodesPercentageToInvolvePerIteration,
       Optional<Long> maxSizeToMovePerIterationInGB,
       Optional<Long> maxSizeEnteringTargetInGB,
-      Optional<Long> maxSizeLeavingSourceInGB) throws IOException {
+      Optional<Long> maxSizeLeavingSourceInGB,
+      Optional<Integer> balancingInterval,
+      Optional<Integer> moveTimeout,
+      Optional<Integer> moveReplicationTimeout,
+      Optional<Boolean> networkTopologyEnable,
+      Optional<String> includeNodes,
+      Optional<String> excludeNodes) throws IOException {
     StartContainerBalancerRequestProto.Builder builder =
         StartContainerBalancerRequestProto.newBuilder();
     builder.setTraceID(TracingUtil.exportCurrentSpan());
@@ -911,29 +917,29 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
     if (threshold.isPresent()) {
       double tsd = threshold.get();
       Preconditions.checkState(tsd >= 0.0D && tsd < 100D,
-          "threshold should be specified in range [0.0, 100.0).");
+          "Threshold should be specified in the range [0.0, 100.0).");
       builder.setThreshold(tsd);
     }
     if (maxSizeToMovePerIterationInGB.isPresent()) {
       long mstm = maxSizeToMovePerIterationInGB.get();
       Preconditions.checkState(mstm > 0,
-          "maxSizeToMovePerIterationInGB must be positive.");
+          "Max Size To Move Per Iteration In GB must be positive.");
       builder.setMaxSizeToMovePerIterationInGB(mstm);
     }
     if (maxDatanodesPercentageToInvolvePerIteration.isPresent()) {
       int mdti = maxDatanodesPercentageToInvolvePerIteration.get();
       Preconditions.checkState(mdti >= 0,
-          "maxDatanodesPercentageToInvolvePerIteration must be " +
+          "Max Datanodes Percentage To Involve Per Iteration must be " +
               "greater than equal to zero.");
       Preconditions.checkState(mdti <= 100,
-          "maxDatanodesPercentageToInvolvePerIteration must be " +
+          "Max Datanodes Percentage To Involve Per Iteration must be " +
               "lesser than equal to hundred.");
       builder.setMaxDatanodesPercentageToInvolvePerIteration(mdti);
     }
     if (iterations.isPresent()) {
       int i = iterations.get();
       Preconditions.checkState(i > 0 || i == -1,
-          "number of iterations must be positive or" +
+          "Number of Iterations must be positive or" +
               " -1 (for running container balancer infinitely).");
       builder.setIterations(i);
     }
@@ -941,15 +947,51 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
     if (maxSizeEnteringTargetInGB.isPresent()) {
       long mset = maxSizeEnteringTargetInGB.get();
       Preconditions.checkState(mset > 0,
-          "maxSizeEnteringTargetInGB must be positive.");
+          "Max Size Entering Target In GB must be positive.");
       builder.setMaxSizeEnteringTargetInGB(mset);
     }
 
     if (maxSizeLeavingSourceInGB.isPresent()) {
       long msls = maxSizeLeavingSourceInGB.get();
       Preconditions.checkState(msls > 0,
-          "maxSizeLeavingSourceInGB must be positive.");
+          "Max Size Leaving Source In GB must be positive.");
       builder.setMaxSizeLeavingSourceInGB(msls);
+    }
+
+    if (balancingInterval.isPresent()) {
+      int bi = balancingInterval.get();
+      Preconditions.checkState(bi > 0,
+              "Balancing Interval must be greater than zero.");
+      builder.setBalancingInterval(bi);
+    }
+
+    if (moveTimeout.isPresent()) {
+      int mt = moveTimeout.get();
+      Preconditions.checkState(mt > 0,
+              "Move Timeout must be greater than zero.");
+      builder.setMoveTimeout(mt);
+    }
+
+    if (moveReplicationTimeout.isPresent()) {
+      int mrt = moveReplicationTimeout.get();
+      Preconditions.checkState(mrt > 0,
+              "Move Replication Timeout must be greater than zero.");
+      builder.setMoveReplicationTimeout(mrt);
+    }
+
+    if (networkTopologyEnable.isPresent()) {
+      Boolean nt = networkTopologyEnable.get();
+      builder.setNetworkTopologyEnable(nt);
+    }
+
+    if (includeNodes.isPresent()) {
+      String in = includeNodes.get();
+      builder.setIncludeNodes(in);
+    }
+
+    if (excludeNodes.isPresent()) {
+      String ex = excludeNodes.get();
+      builder.setExcludeNodes(ex);
     }
 
     StartContainerBalancerRequestProto request = builder.build();
