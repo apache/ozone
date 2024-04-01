@@ -21,6 +21,7 @@ package org.apache.hadoop.hdds.scm.storage;
 import java.io.EOFException;
 import java.io.IOException;
 import java.io.InputStream;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -223,13 +224,15 @@ public class BlockInputStream extends BlockExtendedInputStream {
       LOG.debug("Re-fetching pipeline and block token for block {}", blockID);
       BlockLocationInfo blockLocationInfo = refreshFunction.apply(blockID);
       if (blockLocationInfo == null) {
-        LOG.debug("No new block location info for block {}", blockID);
+        LOG.warn("No new block location info for block {}", blockID);
       } else {
+        OzoneBlockTokenIdentifier tokenId = new OzoneBlockTokenIdentifier();
+        tokenId.readFromByteArray(blockLocationInfo.getToken().getIdentifier());
         setPipeline(blockLocationInfo.getPipeline());
         tokenRef.set(blockLocationInfo.getToken());
         LOG.info("New pipeline for block {}: {}", blockID,
             blockLocationInfo.getPipeline());
-        LOG.info("A new token is added {}", blockLocationInfo.getToken());
+        LOG.info("A new token is added. Expiry: {}", Instant.ofEpochMilli(tokenId.getExpiryDate()));
       }
     } else {
       throw cause;
