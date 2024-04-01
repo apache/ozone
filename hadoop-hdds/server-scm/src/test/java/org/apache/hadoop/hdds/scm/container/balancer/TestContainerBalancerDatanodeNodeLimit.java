@@ -73,6 +73,9 @@ public class TestContainerBalancerDatanodeNodeLimit {
   @MethodSource("createMockedSCMs")
   public void containerBalancerShouldObeyMaxDatanodesToInvolveLimit(@Nonnull MockedSCM mockedSCM) {
     ContainerBalancerConfiguration config = mockedSCM.getBalancerConfig();
+    if (mockedSCM.getCluster().getNodeCount() < DATANODE_COUNT_LIMIT_FOR_SMALL_CLUSTER) {
+      config.setMaxDatanodesPercentageToInvolvePerIteration(100);
+    }
     config.setMaxSizeToMovePerIteration(100 * STORAGE_UNIT);
     config.setThreshold(1);
     config.setIterations(1);
@@ -98,6 +101,9 @@ public class TestContainerBalancerDatanodeNodeLimit {
     ContainerBalancerConfiguration config = mockedSCM.getBalancerConfigByOzoneConfig(ozoneConfig);
     config.setThreshold(10);
     config.setMaxSizeToMovePerIteration(50 * STORAGE_UNIT);
+    if (mockedSCM.getCluster().getNodeCount() < DATANODE_COUNT_LIMIT_FOR_SMALL_CLUSTER) {
+      config.setMaxDatanodesPercentageToInvolvePerIteration(100);
+    }
 
     // No containers should be selected when the limit is just 2 MB.
     config.setMaxSizeEnteringTarget(2 * OzoneConsts.MB);
@@ -129,6 +135,9 @@ public class TestContainerBalancerDatanodeNodeLimit {
     ContainerBalancerConfiguration config = mockedSCM.getBalancerConfigByOzoneConfig(ozoneConfig);
     config.setThreshold(10);
     config.setMaxSizeToMovePerIteration(50 * STORAGE_UNIT);
+    if (mockedSCM.getCluster().getNodeCount() < DATANODE_COUNT_LIMIT_FOR_SMALL_CLUSTER) {
+      config.setMaxDatanodesPercentageToInvolvePerIteration(100);
+    }
 
     // No source containers should be selected when the limit is just 2 MB.
     config.setMaxSizeLeavingSource(2 * OzoneConsts.MB);
@@ -166,17 +175,14 @@ public class TestContainerBalancerDatanodeNodeLimit {
 
   public static @Nonnull MockedSCM getMockedSCM(int datanodeCount) {
     TestableCluster cluster = new TestableCluster(datanodeCount, STORAGE_UNIT);
-    return new MockedSCM(cluster, createBalancerConfig(datanodeCount));
+    return new MockedSCM(cluster, createBalancerConfig());
   }
 
-  private static @Nonnull ContainerBalancerConfiguration createBalancerConfig(int nodeCount) {
+  private static @Nonnull ContainerBalancerConfiguration createBalancerConfig() {
     ContainerBalancerConfiguration balancerCfg =
         new OzoneConfiguration().getObject(ContainerBalancerConfiguration.class);
     balancerCfg.setThreshold(10);
     balancerCfg.setIterations(1);
-    if (nodeCount < DATANODE_COUNT_LIMIT_FOR_SMALL_CLUSTER) {
-      balancerCfg.setMaxDatanodesPercentageToInvolvePerIteration(100);
-    }
     balancerCfg.setMaxSizeToMovePerIteration(50 * STORAGE_UNIT);
     balancerCfg.setMaxSizeEnteringTarget(50 * STORAGE_UNIT);
     return balancerCfg;
