@@ -79,7 +79,7 @@ public class BufferPool {
    * less than the capacity to be allocated, just allocate a buffer of size
    * chunk size.
    */
-  public ChunkBuffer allocateBuffer(int increment) {
+  public synchronized ChunkBuffer allocateBuffer(int increment) {
     final int nextBufferIndex = currentBufferIndex + 1;
 
     Preconditions.assertTrue(nextBufferIndex < capacity, () ->
@@ -96,7 +96,7 @@ public class BufferPool {
     }
   }
 
-  void releaseBuffer(ChunkBuffer chunkBuffer) {
+  synchronized void releaseBuffer(ChunkBuffer chunkBuffer) {
     Preconditions.assertTrue(!bufferList.isEmpty(), "empty buffer list");
     Preconditions.assertSame(bufferList.get(0), chunkBuffer,
         "only the first buffer can be released");
@@ -110,7 +110,7 @@ public class BufferPool {
     currentBufferIndex--;
   }
 
-  public void clearBufferPool() {
+  public synchronized void clearBufferPool() {
     bufferList.forEach(ChunkBuffer::close);
     bufferList.clear();
     currentBufferIndex = -1;
@@ -120,7 +120,7 @@ public class BufferPool {
     Preconditions.assertSame(0, computeBufferData(), "total buffer size");
   }
 
-  public long computeBufferData() {
+  public synchronized long computeBufferData() {
     long totalBufferSize = 0;
     for (ChunkBuffer buf : bufferList) {
       totalBufferSize += buf.position();
