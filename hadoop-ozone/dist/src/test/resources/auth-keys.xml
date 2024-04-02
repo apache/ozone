@@ -25,7 +25,12 @@
 
   <property>
     <name>fs.contract.test.fs.s3a</name>
-    <value>${test.fs.s3a.name}</value>
+    <value>${custom.fs.s3a.name}</value>
+  </property>
+
+  <property>
+    <name>test.fs.s3a.name</name>
+    <value>${custom.fs.s3a.name}</value>
   </property>
 
   <property>

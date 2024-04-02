@@ -596,8 +596,8 @@ execute_s3a_tests() {
   pushd ${HADOOP_AWS_DIR}
   mvn -B -V --no-transfer-progress \
     -Dtest.fs.s3a.endpoint="${OZONE_S3G_ADDRESS}" \
-    -Dtest.fs.s3a.name="s3a://${bucket}/" \
-    -Dtest='ITestS3AContract*, !ITestS3AContractDistCp, !ITestS3AContractEtag, !ITestS3AContractGetFileStatusV1List, !ITestS3AContractMkdir, !ITestS3AContractRename, !ITestS3AContractVectoredRead' \
+    -Dcustom.fs.s3a.name="s3a://${bucket}/" \
+    -Dtest='ITestS3AContract*, !ITestS3AContractDistCp, !ITestS3AContractEtag, !ITestS3AContractGetFileStatusV1List, !ITestS3AContractMkdir, !ITestS3AContractRename' \
     clean test
   rc=$?
   mkdir -p ${RESULT_DIR}/junit/${bucket}/target
