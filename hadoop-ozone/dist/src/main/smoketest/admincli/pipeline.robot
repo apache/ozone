@@ -28,25 +28,25 @@ ${SCM}       scm
 Create pipeline
     ${output} =         Execute          ozone admin pipeline create
                         Should contain   ${output}   is created.
-                        Should contain   ${output}   STANDALONE/ONE
+                        Should contain   ${output}   RATIS/ONE
     ${pipeline} =       Execute          echo "${output}" | grep 'is created' | cut -f1 -d' ' | cut -f2 -d'='
                         Set Suite Variable    ${PIPELINE}    ${pipeline}
 
 List pipelines
     ${output} =         Execute          ozone admin pipeline list
-                        Should contain   ${output}   STANDALONE/ONE
+                        Should contain   ${output}   RATIS/ONE
 
 List pipeline with json option
-    ${output} =         Execute          ozone admin pipeline list --json | jq 'map(.replicationConfig) | contains([{"replicationFactor": "ONE", "replicationType": "STANDALONE"}])'
+    ${output} =         Execute          ozone admin pipeline list --json | jq 'map(.replicationConfig) | contains([{"replicationFactor": "ONE", "replicationType": "RATIS"}])'
 
     Should be true      $output
 
 List pipelines with explicit host
     ${output} =         Execute          ozone admin pipeline list --scm ${SCM}
-                        Should contain   ${output}   STANDALONE/ONE
+                        Should contain   ${output}   RATIS/ONE
 
 List pipelines with explicit host and json option
-    ${output} =         Execute   ozone admin pipeline list --scm ${SCM} --json | jq 'map(.replicationConfig) | contains([{"replicationFactor": "ONE", "replicationType": "STANDALONE"}])'
+    ${output} =         Execute   ozone admin pipeline list --scm ${SCM} --json | jq 'map(.replicationConfig) | contains([{"replicationFactor": "ONE", "replicationType": "RATIS"}])'
 
     Should be true      $output
 

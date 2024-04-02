@@ -37,6 +37,14 @@ import java.io.IOException;
     versionProvider = HddsVersionProvider.class)
 public class CreatePipelineSubcommand extends ScmSubcommand {
 
+  @CommandLine.Option(
+      names = {"-t", "--replication-type", "--replicationType"},
+      description = "Replication type is RATIS. Full name" +
+          " --replicationType will be removed in later versions.",
+      defaultValue = "RATIS",
+      hidden = true
+  )
+  private HddsProtos.ReplicationType type;
 
   @CommandLine.Option(
       names = {"-f", "--replication-factor", "--replicationFactor"},
@@ -48,8 +56,20 @@ public class CreatePipelineSubcommand extends ScmSubcommand {
 
   @Override
   public void execute(ScmClient scmClient) throws IOException {
+    // Once we support creating EC containers/pipelines from the client, the
+    // client should check if SCM is able to fulfil the request, and
+    // understands an EcReplicationConfig. For that we also need to have SCM's
+    // version here from ScmInfo response.
+    // As I see there is no way to specify ECReplicationConfig properly here
+    // so failing the request if type is EC, seems to be safe.
+    if (type == HddsProtos.ReplicationType.CHAINED
+        || type == HddsProtos.ReplicationType.EC
+        || type == HddsProtos.ReplicationType.STAND_ALONE) {
+      throw new IllegalArgumentException(type.name()
+          + " is not supported yet.");
+    }
     Pipeline pipeline = scmClient.createReplicationPipeline(
-        HddsProtos.ReplicationType.RATIS,
+        type,
         factor,
         HddsProtos.NodePool.getDefaultInstance());
 
