@@ -902,7 +902,6 @@ public class ContainerBalancerTask implements Runnable {
             result == MoveManager.MoveResult.REPLICATION_FAIL_INFLIGHT_DELETION ||
             result == MoveManager.MoveResult.REPLICATION_FAIL_INFLIGHT_REPLICATION) {
           findSourceStrategy.addBackSourceDataNode(source);
-          selectionCriteria.addToExcludeDueToFailContainers(moveSelection.getContainerID());
         }
         return result == MoveManager.MoveResult.COMPLETED;
       }
@@ -1119,6 +1118,11 @@ public class ContainerBalancerTask implements Runnable {
   @VisibleForTesting
   Set<DatanodeDetails> getSelectedTargets() {
     return selectedTargets;
+  }
+
+  @VisibleForTesting
+  Set<DatanodeDetails> getSelectedSources() {
+    return selectedSources;
   }
 
   @VisibleForTesting

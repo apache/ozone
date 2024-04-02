@@ -48,8 +48,8 @@ public interface FindSourceStrategy {
   /**
    * add the specified data node to the candidate source
    * data nodes.
-   * Caller of this method must ensure that Datanode is
-   * not currently a candidate source
+   * This method does not check whether the specified Datanode is already present in the Collection.
+   * Callers must take the responsibility of checking and removing the Datanode before adding, if required.
    *
    * @param dn datanode to be added to potentialSources
    */

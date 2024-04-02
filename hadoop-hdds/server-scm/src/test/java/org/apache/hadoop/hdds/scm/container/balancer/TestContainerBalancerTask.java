@@ -1114,6 +1114,10 @@ public class TestContainerBalancerTask {
     }
   }
 
+  /**
+   * Tests if balancer is adding the polled source datanode back to potentialSources queue
+   * if a move has failed due to a container related failure, like REPLICATION_FAIL_NOT_EXIST_IN_SOURCE
+   */
   @Test
   public void testSourceDatanodeAddedBack()
       throws NodeNotFoundException, IOException, IllegalContainerBalancerStateException,
@@ -1140,6 +1144,10 @@ public class TestContainerBalancerTask {
     assertEquals(2, containerBalancerTask.getCountDatanodesInvolvedPerIteration());
     assertTrue(containerBalancerTask.getMetrics().getNumContainerMovesCompletedInLatestIteration() >= 1);
     assertThat(containerBalancerTask.getMetrics().getNumContainerMovesFailed()).isEqualTo(1);
+    assertTrue(containerBalancerTask.getSelectedTargets().contains(nodesInCluster.get(0)
+        .getDatanodeDetails()));
+    assertTrue(containerBalancerTask.getSelectedSources().contains(nodesInCluster.get(nodesInCluster.size() - 1)
+        .getDatanodeDetails()));
     stopBalancer();
   }
 
