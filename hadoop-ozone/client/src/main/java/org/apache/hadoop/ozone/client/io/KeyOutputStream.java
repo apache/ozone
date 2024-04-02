@@ -549,7 +549,7 @@ public class KeyOutputStream extends OutputStream
                 if (future != null) {
                   future.get();
                 } else {
-                  LOG.warn("null future from op {}", op);
+                  LOG.debug("null future from op {}", op);
                 }
               }
             } catch (IOException ioe) {
