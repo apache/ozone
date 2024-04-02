@@ -272,7 +272,7 @@ public final class OmSnapshotManager implements AutoCloseable {
     };
 
     // Init snapshot cache
-    this.snapshotCache = new SnapshotCache(loader, softCacheSize);
+    this.snapshotCache = new SnapshotCache(loader, softCacheSize, ozoneManager.getMetrics());
 
     this.snapshotDiffManager = new SnapshotDiffManager(snapshotDiffDb, differ,
         ozoneManager, snapDiffJobCf, snapDiffReportCf,
@@ -418,7 +418,6 @@ public final class OmSnapshotManager implements AutoCloseable {
   public void invalidateCache() {
     if (snapshotCache != null) {
       snapshotCache.invalidateAll();
-      updateSnapshotCacheSizeMetric();
     }
   }
 
@@ -430,7 +429,6 @@ public final class OmSnapshotManager implements AutoCloseable {
   public void invalidateCacheEntry(UUID key) throws IOException {
     if (snapshotCache != null) {
       snapshotCache.invalidate(key);
-      updateSnapshotCacheSizeMetric();
     }
   }
 
@@ -682,7 +680,6 @@ public final class OmSnapshotManager implements AutoCloseable {
 
     // retrieve the snapshot from the cache
     ReferenceCounted<OmSnapshot> snapshot = snapshotCache.get(snapshotInfo.getSnapshotId());
-    updateSnapshotCacheSizeMetric();
     return snapshot;
   }
 
@@ -980,12 +977,5 @@ public final class OmSnapshotManager implements AutoCloseable {
 
   public long getDiffCleanupServiceInterval() {
     return diffCleanupServiceInterval;
-  }
-
-  /**
-   * Updates the SnapshotCache size jmx metric.
-   */
-  public void updateSnapshotCacheSizeMetric() {
-    this.ozoneManager.getMetrics().setNumSnapshotCacheSize(getSnapshotCacheSize());
   }
 }

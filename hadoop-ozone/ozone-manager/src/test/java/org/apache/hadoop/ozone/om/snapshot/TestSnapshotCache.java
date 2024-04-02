@@ -18,6 +18,7 @@
 package org.apache.hadoop.ozone.om.snapshot;
 
 import com.google.common.cache.CacheLoader;
+import org.apache.hadoop.ozone.om.OMMetrics;
 import org.apache.hadoop.ozone.om.OmSnapshot;
 import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.AfterEach;
@@ -52,6 +53,8 @@ class TestSnapshotCache {
   private static CacheLoader<UUID, OmSnapshot> cacheLoader;
   private SnapshotCache snapshotCache;
 
+  private OMMetrics omMetrics;
+
   @BeforeAll
   static void beforeAll() throws Exception {
     cacheLoader = mock(CacheLoader.class);
@@ -74,7 +77,8 @@ class TestSnapshotCache {
   @BeforeEach
   void setUp() {
     // Reset cache for each test case
-    snapshotCache = new SnapshotCache(cacheLoader, CACHE_SIZE_LIMIT);
+    omMetrics = OMMetrics.create();
+    snapshotCache = new SnapshotCache(cacheLoader, CACHE_SIZE_LIMIT, omMetrics);
   }
 
   @AfterEach

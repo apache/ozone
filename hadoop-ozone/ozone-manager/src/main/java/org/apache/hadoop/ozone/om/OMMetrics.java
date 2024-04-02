@@ -521,11 +521,6 @@ public class OMMetrics implements OmMetadataReaderMetrics {
     numSnapshotDeleted.incr(-1);
   }
 
-  public void setNumSnapshotCacheSize(int num) {
-    int curVal = numSnapshotCacheSize.value();
-    numSnapshotCacheSize.incr(num - curVal);
-  }
-
   public void incNumSnapshotCacheSize() {
     numSnapshotCacheSize.incr();
   }
