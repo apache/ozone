@@ -682,6 +682,9 @@ public final class OzoneConfigKeys {
   public static final String
       OZONE_OM_NETWORK_TOPOLOGY_REFRESH_DURATION_DEFAULT = "1h";
 
+  public static final String
+      OZONE_COMPLIANCE_ALLOWED_HDDS_X509_SIGNATURE_ALGO = "ozone.compliance.allowed.hdds.x509.signature.algorithm";
+  public static final String OZONE_COMPLIANCE_ALLOWED_HDDS_X509_SIGNATURE_ALGO_DEFAULT = "*";
 
   /**
    * There is no need to instantiate this class.
