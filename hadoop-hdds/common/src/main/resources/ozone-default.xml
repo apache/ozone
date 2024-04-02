@@ -1953,13 +1953,22 @@
     <name>ozone.http.filter.initializers</name>
     <value/>
     <tag>OZONE, SECURITY, KERBEROS</tag>
-    <description>Set to org.apache.hadoop.security.AuthenticationFilterInitializer
+    <description>Set to
+      org.apache.hadoop.security.AuthenticationFilterInitializer
       to enable Kerberos authentication for Ozone HTTP web consoles
       is enabled using the SPNEGO protocol. When this property is
       set, ozone.security.http.kerberos.enabled should be set to true.
     </description>
   </property>
-
+  <property>
+    <name>ozone.security.compliance.mode</name>
+    <value>none</value>
+    <tag>OZONE, SECURITY, HDDS</tag>
+    <description>Based on this property the security compliance mode
+      is loaded and enables filtering cryptographic configuration options
+      according to the specified compliance mode.
+    </description>
+  </property>
 
   <property>
     <name>ozone.client.read.timeout</name>
