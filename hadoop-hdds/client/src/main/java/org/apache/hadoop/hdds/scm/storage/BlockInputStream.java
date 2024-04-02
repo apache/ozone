@@ -236,8 +236,6 @@ public class BlockInputStream extends BlockExtendedInputStream {
           tokenId.readFromByteArray(tokenRef.get().getIdentifier());
           LOG.info("A new token is added for block {}. Expiry: {}",
               blockID, Instant.ofEpochMilli(tokenId.getExpiryDate()));
-        } else {
-          LOG.warn("Unable to add a new block token for block {}", blockID);
         }
       }
     } else {
