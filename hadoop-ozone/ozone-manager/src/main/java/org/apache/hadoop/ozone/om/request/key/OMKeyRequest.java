@@ -785,6 +785,7 @@ public abstract class OMKeyRequest extends OMClientRequest {
       if (keyArgs.hasOverwriteUpdateID()) {
         dbKeyInfo.setOverwriteUpdateID(keyArgs.getOverwriteUpdateID());
       }
+      dbKeyInfo.setFileEncryptionInfo(encInfo);
       return dbKeyInfo;
     }
 

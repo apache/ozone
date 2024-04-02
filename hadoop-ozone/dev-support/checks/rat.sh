@@ -24,7 +24,7 @@ mkdir -p "$REPORT_DIR"
 
 REPORT_FILE="$REPORT_DIR/summary.txt"
 
-mvn -B --no-transfer-progress -fn org.apache.rat:apache-rat-plugin:0.13:check
+mvn -B --no-transfer-progress -fn org.apache.rat:apache-rat-plugin:check "$@"
 
 grep -r --include=rat.txt "!????" $dirs | tee "$REPORT_FILE"
 

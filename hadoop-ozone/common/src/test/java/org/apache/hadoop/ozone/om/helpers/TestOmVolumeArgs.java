@@ -46,7 +46,7 @@ public class TestOmVolumeArgs {
         .addMetadata("key1", "value1").addMetadata("key2", "value2")
         .addOzoneAcls(
             new OzoneAcl(IAccessAuthorizer.ACLIdentityType.USER, "user1",
-                IAccessAuthorizer.ACLType.READ, ACCESS)).build();
+                ACCESS, IAccessAuthorizer.ACLType.READ)).build();
 
     OmVolumeArgs cloneVolumeArgs = omVolumeArgs.copyObject();
 
@@ -55,7 +55,7 @@ public class TestOmVolumeArgs {
     // add user acl to write.
     omVolumeArgs.addAcl(new OzoneAcl(
         IAccessAuthorizer.ACLIdentityType.USER, "user1",
-        IAccessAuthorizer.ACLType.WRITE, ACCESS));
+        ACCESS, IAccessAuthorizer.ACLType.WRITE));
 
     // Now check clone acl
     assertNotEquals(cloneVolumeArgs.getAcls().get(0),
@@ -64,7 +64,7 @@ public class TestOmVolumeArgs {
     // Set user acl to Write_ACL.
     omVolumeArgs.setAcls(Collections.singletonList(new OzoneAcl(
         IAccessAuthorizer.ACLIdentityType.USER, "user1",
-        IAccessAuthorizer.ACLType.WRITE_ACL, ACCESS)));
+        ACCESS, IAccessAuthorizer.ACLType.WRITE_ACL)));
 
     assertNotEquals(cloneVolumeArgs.getAcls().get(0),
         omVolumeArgs.getAcls().get(0));
@@ -78,7 +78,7 @@ public class TestOmVolumeArgs {
 
     omVolumeArgs.removeAcl(new OzoneAcl(
         IAccessAuthorizer.ACLIdentityType.USER, "user1",
-        IAccessAuthorizer.ACLType.WRITE_ACL, ACCESS));
+        ACCESS, IAccessAuthorizer.ACLType.WRITE_ACL));
 
     // Removing acl, in original omVolumeArgs it should have no acls.
     assertEquals(0, omVolumeArgs.getAcls().size());
