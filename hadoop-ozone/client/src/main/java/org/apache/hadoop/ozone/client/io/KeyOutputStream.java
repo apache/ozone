@@ -463,7 +463,7 @@ public class KeyOutputStream extends OutputStream
   }
 
   @Override
-  public synchronized void flush() throws IOException {  // TODO: Remove synchronized
+  public void flush() throws IOException {
     checkNotClosed();
     try {
       CompletableFuture<Void> future = handleFlushOrClose(StreamAction.FLUSH);
