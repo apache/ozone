@@ -679,8 +679,7 @@ public final class OmSnapshotManager implements AutoCloseable {
     }
 
     // retrieve the snapshot from the cache
-    ReferenceCounted<OmSnapshot> snapshot = snapshotCache.get(snapshotInfo.getSnapshotId());
-    return snapshot;
+    return snapshotCache.get(snapshotInfo.getSnapshotId());
   }
 
   /**
