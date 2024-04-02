@@ -42,6 +42,7 @@ import java.net.URI;
 import java.net.URISyntaxException;
 import java.net.UnknownHostException;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Comparator;
 import java.util.LinkedList;
 import java.util.List;
@@ -480,9 +481,21 @@ public class NodeDecommissionManager {
   }
 
   public synchronized List<DatanodeAdminError> startMaintenanceNodes(
-      List<String> nodes, int endInHours) {
+      List<String> nodes, int endInHours, boolean force) {
     List<DatanodeAdminError> errors = new ArrayList<>();
     List<DatanodeDetails> dns = mapHostnamesToDatanodes(nodes, errors);
+    // add check for fail-early if force flag is not set
+    if (!force) {
+      LOG.info("Force flag = {}. Checking if maintenance is possible for dns: {}", force, dns);
+      boolean maintenancePossible = checkIfMaintenancePossible(dns, errors);
+      if (!maintenancePossible) {
+        LOG.error("Cannot put nodes to maintenance as sufficient node are not available.");
+        errors.add(new DatanodeAdminError("AllHosts", "Sufficient nodes are not available."));
+        return errors;
+      }
+    } else {
+      LOG.info("Force flag = {}. Skip checking if maintenance is possible for dns: {}", force, dns);
+    }
     for (DatanodeDetails dn : dns) {
       try {
         startMaintenance(dn, endInHours);
@@ -526,6 +539,63 @@ public class NodeDecommissionManager {
       throw new InvalidNodeStateException("Cannot start maintenance on node " +
           dn + " in state " + opState);
     }
+  }
+
+  private synchronized boolean checkIfMaintenancePossible(List<DatanodeDetails> dns, List<DatanodeAdminError> errors) {
+    int numDecom = dns.size();
+    List<DatanodeDetails> validDns = dns.stream().collect(Collectors.toList());
+    Collections.copy(validDns, dns);
+    int inServiceTotal = nodeManager.getNodeCount(NodeStatus.inServiceHealthy());
+    for (DatanodeDetails dn : dns) {
+      try {
+        NodeStatus nodeStatus = getNodeStatus(dn);
+        NodeOperationalState opState = nodeStatus.getOperationalState();
+        if (opState != NodeOperationalState.IN_SERVICE) {
+          numDecom--;
+          validDns.remove(dn);
+        }
+      } catch (NodeNotFoundException ex) {
+        numDecom--;
+        validDns.remove(dn);
+      }
+    }
+
+    for (DatanodeDetails dn : validDns) {
+      Set<ContainerID> containers;
+      try {
+        containers = nodeManager.getContainers(dn);
+      } catch (NodeNotFoundException ex) {
+        LOG.warn("The host {} was not found in SCM. Ignoring the request to " +
+            "decommission it", dn.getHostName());
+        errors.add(new DatanodeAdminError(dn.getHostName(),
+            "The host was not found in SCM"));
+        continue; // ignore the DN and continue to next one
+      }
+
+      for (ContainerID cid : containers) {
+        ContainerInfo cif;
+        try {
+          cif = containerManager.getContainer(cid);
+        } catch (ContainerNotFoundException ex) {
+          continue; // ignore the container and continue to next one
+        }
+        synchronized (cif) {
+          if (cif.getState().equals(HddsProtos.LifeCycleState.DELETED) ||
+              cif.getState().equals(HddsProtos.LifeCycleState.DELETING)) {
+            continue;
+          }
+          int reqNodes = cif.getReplicationConfig().getRequiredNodes();
+          if ((inServiceTotal - numDecom) < reqNodes) {
+            LOG.info("Cannot decommission nodes. Tried to decommission {} nodes of which valid nodes = {}. " +
+                    "Cluster state: In-service nodes = {}, nodes required for replication = {}. " +
+                    "Failing due to datanode : {}, container : {}",
+                dns.size(), numDecom, inServiceTotal, reqNodes, dn, cid);
+            return false;
+          }
+        }
+      }
+    }
+    return true;
   }
 
   /**
