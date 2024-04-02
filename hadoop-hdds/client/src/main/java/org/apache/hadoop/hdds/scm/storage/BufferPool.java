@@ -66,7 +66,7 @@ public class BufferPool {
     return byteStringConversion;
   }
 
-  ChunkBuffer getCurrentBuffer() {
+  synchronized ChunkBuffer getCurrentBuffer() {
     return currentBufferIndex == -1 ? null : bufferList.get(currentBufferIndex);
   }
 
