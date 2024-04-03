@@ -311,6 +311,30 @@ public class TestDecommissionAndMaintenance {
   }
 
   @Test
+  // Decommissioning few nodes which leave insufficient nodes for replication
+  // should not be allowed if the decommissioning is not forced.
+  public void testInsufficientNodesCannotBeDecommissioned()
+      throws Exception {
+    // Generate some data on the empty cluster to create some containers
+    generateData(20, "key", ratisRepConfig);
+
+    final List<DatanodeDetails> toDecommission = nm.getAllNodes();
+
+    // trying to decommission 5 nodes should leave the cluster with 2 nodes,
+    // which is not sufficient for RATIS.THREE replication. It should not be allowed.
+    scmClient.decommissionNodes(Arrays.asList(toDecommission.get(0).getIpAddress(),
+        toDecommission.get(1).getIpAddress(), toDecommission.get(2).getIpAddress(),
+        toDecommission.get(3).getIpAddress(), toDecommission.get(4).getIpAddress()), false);
+
+    // Ensure no nodes transitioned to DECOMMISSIONING
+    List<DatanodeDetails> decomNodes = nm.getNodes(
+        DECOMMISSIONED,
+        HEALTHY);
+    assertEquals(0, decomNodes.size());
+
+  }
+
+  @Test
   // When putting a single node into maintenance, its pipelines should be closed
   // but no new replicas should be create and the node should transition into
   // maintenance.
