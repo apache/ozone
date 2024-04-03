@@ -1391,6 +1391,7 @@ public class SCMClientProtocolServer implements
     auditMap.put("containerID", containerID.toString());
     auditMap.put("remoteUser", remoteUser.getUserName());
 
+    // TODO need to audit log failure if this happens
     ContainerInfo container = getContainer(longContainerID);
 
     SCMException exception = null;
