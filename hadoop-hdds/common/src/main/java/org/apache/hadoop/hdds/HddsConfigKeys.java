@@ -272,6 +272,9 @@ public final class HddsConfigKeys {
   public static final String HDDS_SECRET_KEY_ALGORITHM_DEFAULT =
       "HmacSHA256";
 
+  public static final String OZONE_COMPLIANCE_ALLOWED_HDDS_SECRET_KEY_ALGORITHM = "ozone.compliance.allowed.hdds.secret.key.algorithm";
+  public static final String OZONE_COMPLIANCE_ALLOWED_HDDS_SECRET_KEY_ALGORITHM_DEFAULT = "*";
+
   public static final String HDDS_SECRET_KEY_ROTATE_CHECK_DURATION =
       "hdds.secret.key.rotate.check.duration";
   public static final String HDDS_SECRET_KEY_ROTATE_CHECK_DURATION_DEFAULT

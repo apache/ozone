@@ -4349,6 +4349,14 @@
     </description>
   </property>
   <property>
+    <name>ozone.compliance.allowed.hdds.secret.key.algorithm</name>
+    <value>*</value>
+    <tag>SCM, SECURITY</tag>
+    <description>
+      Allowed algorithms that SCM can use to generate symmetric secret keys.
+    </description>
+  </property>
+  <property>
     <name>ozone.om.upgrade.quota.recalculate.enabled</name>
     <value>true</value>
     <tag>OZONE, OM</tag>
