@@ -17,6 +17,7 @@
  */
 package org.apache.hadoop.ozone.container.ozoneimpl;
 
+import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.datanode.proto
     .ContainerProtos.ContainerType;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos
@@ -38,6 +39,7 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.time.Instant;
 import java.util.Iterator;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
@@ -185,6 +187,15 @@ public class ContainerController {
     final Container container = containerSet.getContainer(containerId);
     if (container != null) {
       getHandler(container).deleteContainer(container, force);
+    }
+  }
+
+  public void reconcileContainer(long containerID, List<DatanodeDetails> peers) throws IOException {
+    Container<?> container = containerSet.getContainer(containerID);
+    if (container == null) {
+      LOG.warn("Container {} to reconcile not found on this datanode.", containerID);
+    } else {
+      getHandler(container).reconcileContainer(container, peers);
     }
   }
 

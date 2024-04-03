@@ -201,14 +201,14 @@ public final class ContainerUtils {
             HddsConfigKeys.
                     HDDS_CONTAINER_CHECKSUM_VERIFICATION_ENABLED_DEFAULT);
     if (enabled) {
-      String storedChecksum = containerData.getChecksum();
+      String storedChecksum = containerData.getContainerFileChecksum();
 
       Yaml yaml = ContainerDataYaml.getYamlForContainerType(
           containerData.getContainerType(),
           containerData instanceof KeyValueContainerData &&
               ((KeyValueContainerData)containerData).getReplicaIndex() > 0);
-      containerData.computeAndSetChecksum(yaml);
-      String computedChecksum = containerData.getChecksum();
+      containerData.computeAndSetContainerFileChecksum(yaml);
+      String computedChecksum = containerData.getContainerFileChecksum();
 
       if (storedChecksum == null || !storedChecksum.equals(computedChecksum)) {
         throw new StorageContainerException("Container checksum error for " +

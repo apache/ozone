@@ -152,8 +152,7 @@ class TestContainerImporter {
     KeyValueContainerData containerData = spy(new KeyValueContainerData(containerId,
         ContainerLayoutVersion.FILE_PER_BLOCK, 100, "test", "test"));
     // mock to return different checksum
-    when(containerData.getChecksum()).thenReturn("checksum1", "checksum2");
-    doNothing().when(containerData).setChecksumTo0ByteArray();
+    when(containerData.getContainerFileChecksum()).thenReturn("checksum1", "checksum2");
     // create containerImporter object
     ContainerController controllerMock = mock(ContainerController.class);
     ContainerSet containerSet = new ContainerSet(0);

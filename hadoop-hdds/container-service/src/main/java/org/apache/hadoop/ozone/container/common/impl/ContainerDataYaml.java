@@ -98,7 +98,7 @@ public final class ContainerDataYaml {
       // Create Yaml for given container type
       Yaml yaml = getYamlForContainerType(containerType, withReplicaIndex);
       // Compute Checksum and update ContainerData
-      containerData.computeAndSetChecksum(yaml);
+      containerData.computeAndSetContainerFileChecksum(yaml);
 
       // Write the ContainerData with checksum to Yaml file.
       out = new FileOutputStream(
@@ -312,7 +312,7 @@ public final class ContainerDataYaml {
         kvData.setChunksPath((String) nodes.get(OzoneConsts.CHUNKS_PATH));
         Map<String, String> meta = (Map) nodes.get(OzoneConsts.METADATA);
         kvData.setMetadata(meta);
-        kvData.setChecksum((String) nodes.get(OzoneConsts.CHECKSUM));
+        kvData.setContainerFileChecksum((String) nodes.get(OzoneConsts.CHECKSUM));
         Long timestamp = (Long) nodes.get(OzoneConsts.DATA_SCAN_TIMESTAMP);
         kvData.setDataScanTimestamp(timestamp);
         String state = (String) nodes.get(OzoneConsts.STATE);

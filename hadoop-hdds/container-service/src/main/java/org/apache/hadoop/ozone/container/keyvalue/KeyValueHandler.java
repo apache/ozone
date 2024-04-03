@@ -41,6 +41,7 @@ import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.StorageUnit;
+import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandRequestProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandResponseProto;
@@ -1148,6 +1149,15 @@ public class KeyValueHandler extends Handler {
   public void deleteContainer(Container container, boolean force)
       throws IOException {
     deleteInternal(container, force);
+  }
+
+  @Override
+  public void reconcileContainer(Container<?> container, List<DatanodeDetails> peers) throws IOException {
+    // TODO Just a deterministic placeholder hash for testing until actual implementation is finished.
+    ContainerData data = container.getContainerData();
+    String dataChecksum = ContainerUtils.getChecksum(Long.toString(data.getContainerID()));
+    data.setDataChecksum(dataChecksum);
+    sendICR(container);
   }
 
   /**

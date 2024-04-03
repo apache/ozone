@@ -885,7 +885,8 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
         .setDeleteTransactionId(containerData.getDeleteTransactionId())
         .setBlockCommitSequenceId(containerData.getBlockCommitSequenceId())
         .setOriginNodeId(containerData.getOriginNodeId())
-        .setIsEmpty(containerData.isEmpty());
+        .setIsEmpty(containerData.isEmpty())
+        .setDataChecksum(containerData.getDataChecksum());
     return ciBuilder.build();
   }
 
