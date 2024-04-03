@@ -41,6 +41,7 @@ import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.security.SecurityConfig;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.util.Time;
+import org.apache.ratis.client.RaftClient;
 import org.apache.ratis.conf.Parameters;
 import org.apache.ratis.conf.RaftProperties;
 import org.apache.ratis.grpc.GrpcTlsConfig;
@@ -80,6 +81,7 @@ public class SCMRatisServerImpl implements SCMRatisServer {
   private final GrpcTlsConfig grpcTlsConfig;
   private boolean isStopped;
   private final long requestTimeout;
+  private static final int UPDATE_PEER_PRIORITY_RETRY_COUNT = 20;
 
   // TODO: Refactor and remove ConfigurationSource and use only
   //  SCMHAConfiguration.
@@ -338,6 +340,49 @@ public class SCMRatisServerImpl implements SCMRatisServer {
       LOG.error("Failed to update Ratis configuration and add new peer. " +
           "Cannot add new SCM: {}.", scm.getScmId(), e);
       throw e;
+    }
+  }
+
+  public void updateRaftPeerPriority(String peerId) throws IOException {
+    List<RaftPeer> raftPeers =
+        new ArrayList<>(getDivision().getGroup().getPeers());
+    List<RaftPeer> oldPeers = new ArrayList<>(raftPeers);
+    RaftPeer peerToUpdate = raftPeers.stream()
+        .filter(peer -> peer.getId().toString().equals(peerId)).findFirst()
+        .get();
+    RaftPeer newPeer = RaftPeer.newBuilder(peerToUpdate).setPriority(1).build();
+    raftPeers.add(newPeer);
+    raftPeers.remove(peerToUpdate);
+    final SetConfigurationRequest configRequest =
+        new SetConfigurationRequest(clientId, division.getInfo().getLeaderId(),
+            division.getGroup().getGroupId(), nextCallId(), raftPeers);
+    RaftClient raftClient = null;
+    try {
+      RaftClient.Builder clientBuilder = RaftClient.newBuilder().setRaftGroup(
+              RaftGroup.valueOf(division.getGroup().getGroupId(), oldPeers))
+          .setProperties(new RaftProperties());
+      boolean success = false;
+      int retries = 0;
+      raftClient = clientBuilder.build();
+      while (!success && retries < UPDATE_PEER_PRIORITY_RETRY_COUNT) {
+        RaftClientReply raftClientReply =
+            raftClient.getClientRpc().sendRequest(configRequest);
+        success = raftClientReply.isSuccess();
+        retries++;
+      }
+      if (!success) {
+        throw new IOException(
+            "Failed to update Raft Peer Priority for " + "peer ID : " +
+                peerToUpdate.getId());
+      }
+    } catch (IOException exception) {
+      LOG.error("Failed to update Raft Peer Priority for peer ID : {}",
+          peerToUpdate.getId());
+      throw exception;
+    } finally {
+      if (raftClient != null) {
+        raftClient.close();
+      }
     }
   }
 

@@ -68,4 +68,6 @@ public interface SCMRatisServer {
 
   GrpcTlsConfig getGrpcTlsConfig();
 
+  void updateRaftPeerPriority(String peerId) throws IOException;
+
 }
