@@ -335,8 +335,7 @@ public class ReconNodeManager extends SCMNodeManager {
       nodeDB.delete(datanodeDetails.getUuid());
     } catch (IOException ioException) {
       LOG.error("Node {} deletion fails from Node DB.", datanodeDetails.getUuid());
-      // retry to delete the node from node db
-      nodeDB.delete(datanodeDetails.getUuid());
+      throw ioException;
     }
     datanodeHeartbeatMap.remove(datanodeDetails.getUuid());
     inMemDatanodeDetails.remove(datanodeDetails.getUuid());

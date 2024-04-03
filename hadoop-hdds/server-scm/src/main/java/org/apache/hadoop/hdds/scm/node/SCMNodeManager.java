@@ -1663,10 +1663,10 @@ public class SCMNodeManager implements NodeManager {
         if (clusterMap.contains(datanodeDetails)) {
           clusterMap.remove(datanodeDetails);
         }
+        scmNodeEventPublisher.fireEvent(SCMEvents.DEAD_NODE, datanodeDetails);
         nodeStateManager.removeNode(datanodeDetails);
         removeFromDnsToUuidMap(datanodeDetails.getUuid(), datanodeDetails.getIpAddress());
         commandQueue.removeCommand(datanodeDetails.getUuid());
-        scmNodeEventPublisher.fireEvent(SCMEvents.DEAD_NODE, datanodeDetails);
       }
     } finally {
       writeLock().unlock();

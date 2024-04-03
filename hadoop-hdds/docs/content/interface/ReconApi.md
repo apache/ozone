@@ -956,7 +956,7 @@ Returns the list of datanodes which are removed successfully and list of datanod
         "pipelines": null
       }
     ],
-    "message": "Successfully removed 1 datanodes !!!"
+    "message": "Success"
   }
 }     
 ```

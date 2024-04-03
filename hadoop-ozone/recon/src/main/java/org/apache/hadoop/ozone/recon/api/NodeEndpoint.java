@@ -178,10 +178,17 @@ public class NodeEndpoint {
     return new DatanodeStorageReport(capacity, used, remaining, committed);
   }
 
+  /**
+   * Removes datanodes from Recon's memory and nodes table in Recon DB.
+   * @param uuids the list of datanode uuid's
+   *
+   * @return JSON response with failed, not found and successfully removed datanodes list.
+   */
   @PUT
   @Path("/remove")
   @Consumes(MediaType.APPLICATION_JSON)
   public Response removeDatanodes(List<String> uuids) {
+    List<DatanodeMetadata> failedDatanodes = new ArrayList<>();
     List<DatanodeMetadata> notFoundDatanodes = new ArrayList<>();
     List<DatanodeMetadata> removedDatanodes = new ArrayList<>();
 
@@ -205,6 +212,12 @@ public class NodeEndpoint {
             Response.ResponseBuilder builder = Response.status(Response.Status.BAD_REQUEST);
             builder.entity("Invalid request: Node: " + uuid + " should be in either DECOMMISSIONED or " +
                 "IN_MAINTENANCE mode or DEAD.");
+            failedDatanodes.add(DatanodeMetadata.newBuilder()
+                .withHostname(nodeManager.getHostName(nodeByUuid))
+                .withUUid(uuid)
+                .withOperationalState(nodeByUuid.getPersistedOpState())
+                .withState(nodeManager.getNodeStatus(nodeByUuid).getHealth())
+                .build());
             // Build and return the response
             return builder.build();
           }
@@ -219,17 +232,27 @@ public class NodeEndpoint {
     }
 
     RemoveDataNodesResponseWrapper removeDataNodesResponseWrapper = new RemoveDataNodesResponseWrapper();
+
+    if (!failedDatanodes.isEmpty()) {
+      DatanodesResponse failedNodesResp =
+          new DatanodesResponse(failedDatanodes.size(), failedDatanodes);
+      failedNodesResp.setMessage("Invalid request: Nodes should be in either DECOMMISSIONED or " +
+          "IN_MAINTENANCE mode or in DEAD State.");
+      removeDataNodesResponseWrapper.getDatanodesResponseMap().put("failedDatanodes", failedNodesResp);
+    }
+
     if (!notFoundDatanodes.isEmpty()) {
       DatanodesResponse notFoundNodesResp =
           new DatanodesResponse(notFoundDatanodes.size(), notFoundDatanodes);
       notFoundNodesResp.setMessage("Invalid request: Selected nodes not found. Kindly send correct node " +
           "details to remove it !!!");
-      removeDataNodesResponseWrapper.setErrorDataNodes(notFoundNodesResp);
+      removeDataNodesResponseWrapper.getDatanodesResponseMap().put("notFoundDatanodes", notFoundNodesResp);
     }
+
     DatanodesResponse removedNodesResp =
         new DatanodesResponse(removedDatanodes.size(), removedDatanodes);
-    removedNodesResp.setMessage("Successfully removed " + removedDatanodes.size() + " datanodes !!!");
-    removeDataNodesResponseWrapper.setRemovedNodes(removedNodesResp);
+    removedNodesResp.setMessage("Success");
+    removeDataNodesResponseWrapper.getDatanodesResponseMap().put("removedDatanodes", removedNodesResp);
     return Response.ok(removeDataNodesResponseWrapper).build();
   }
 }

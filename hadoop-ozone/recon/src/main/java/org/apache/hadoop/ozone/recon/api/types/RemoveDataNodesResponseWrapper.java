@@ -20,33 +20,24 @@ package org.apache.hadoop.ozone.recon.api.types;
 import com.fasterxml.jackson.annotation.JsonInclude;
 
 import javax.xml.bind.annotation.XmlElement;
+import java.util.HashMap;
+import java.util.Map;
 
 /**
  * Class that represents the API Response structure of Datanodes.
  */
 public class RemoveDataNodesResponseWrapper {
 
-  @XmlElement(name = "errorNodes")
+  @XmlElement(name = "datanodesResponseMap")
   @JsonInclude(JsonInclude.Include.NON_NULL)
-  private DatanodesResponse errorDataNodes;
+  private Map<String, DatanodesResponse> datanodesResponseMap = new HashMap<>();
 
-  @XmlElement(name = "removedNodes")
-  @JsonInclude(JsonInclude.Include.NON_NULL)
-  private DatanodesResponse removedNodes;
-
-  public DatanodesResponse getErrorDataNodes() {
-    return errorDataNodes;
+  public Map<String, DatanodesResponse> getDatanodesResponseMap() {
+    return datanodesResponseMap;
   }
 
-  public void setErrorDataNodes(DatanodesResponse errorDataNodes) {
-    this.errorDataNodes = errorDataNodes;
-  }
-
-  public DatanodesResponse getRemovedNodes() {
-    return removedNodes;
-  }
-
-  public void setRemovedNodes(DatanodesResponse removedNodes) {
-    this.removedNodes = removedNodes;
+  public void setDatanodesResponseMap(
+      Map<String, DatanodesResponse> datanodesResponseMap) {
+    this.datanodesResponseMap = datanodesResponseMap;
   }
 }

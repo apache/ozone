@@ -1268,11 +1268,11 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
 
     RemoveDataNodesResponseWrapper removeDataNodesResponseWrapper =
         (RemoveDataNodesResponseWrapper) removedDNResponse.getEntity();
-    DatanodesResponse errorDataNodes = removeDataNodesResponseWrapper.getErrorDataNodes();
-    DatanodesResponse removedNodes = removeDataNodesResponseWrapper.getRemovedNodes();
+    DatanodesResponse errorDataNodes = removeDataNodesResponseWrapper.getDatanodesResponseMap().get("failedDatanodes");
+    DatanodesResponse removedNodes = removeDataNodesResponseWrapper.getDatanodesResponseMap().get("removedDatanodes");
     assertEquals(1, removedNodes.getTotalCount());
     assertNull(errorDataNodes);
-    assertEquals("Successfully removed 1 datanodes !!!", removedNodes.getMessage());
+    assertEquals("Success", removedNodes.getMessage());
     removedNodes.getDatanodes().forEach(datanodeMetadata -> {
       assertEquals("host3.datanode", datanodeMetadata.getHostname());
     });
