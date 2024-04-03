@@ -169,7 +169,7 @@ public class TestSecureContainerServer {
             hddsDispatcher, caClient), (dn, p) -> {  }, (p) -> { });
   }
 
-  private static HddsDispatcher createDispatcher(DatanodeDetails dd, UUID scmId,
+  private HddsDispatcher createDispatcher(DatanodeDetails dd, UUID scmId,
       OzoneConfiguration conf) throws IOException {
     ContainerSet containerSet = new ContainerSet(1000);
     conf.set(HDDS_DATANODE_DIR_KEY,
@@ -205,7 +205,7 @@ public class TestSecureContainerServer {
     runTestClientServerRatis(GRPC, 3);
   }
 
-  static XceiverServerRatis newXceiverServerRatis(
+  XceiverServerRatis newXceiverServerRatis(
       DatanodeDetails dn, OzoneConfiguration conf) throws IOException {
     conf.setInt(OzoneConfigKeys.HDDS_CONTAINER_RATIS_IPC_PORT,
         dn.getPort(DatanodeDetails.Port.Name.RATIS).getValue());
@@ -222,12 +222,12 @@ public class TestSecureContainerServer {
         caClient, null);
   }
 
-  private static void runTestClientServerRatis(RpcType rpc, int numNodes)
+  private void runTestClientServerRatis(RpcType rpc, int numNodes)
       throws Exception {
     runTestClientServer(numNodes,
         (pipeline, conf) -> RatisTestHelper.initRatisConf(rpc, conf),
         XceiverClientRatis::newXceiverClientRatis,
-        TestSecureContainerServer::newXceiverServerRatis,
+        this::newXceiverServerRatis,
         (dn, p) -> RatisTestHelper.initXceiverServerRatis(rpc, dn, p),
         (p) -> { });
   }

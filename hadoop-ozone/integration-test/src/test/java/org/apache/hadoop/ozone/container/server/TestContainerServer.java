@@ -20,7 +20,6 @@ package org.apache.hadoop.ozone.container.server;
 
 import java.io.File;
 import java.io.IOException;
-import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
@@ -72,6 +71,7 @@ import org.apache.ratis.util.function.CheckedBiFunction;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
 import static org.apache.hadoop.hdds.HddsConfigKeys.OZONE_METADATA_DIRS;
 import static org.apache.hadoop.hdds.protocol.MockDatanodeDetails.randomDatanodeDetails;
@@ -87,6 +87,8 @@ public class TestContainerServer {
       .getAbsolutePath() + File.separator;
   private static final OzoneConfiguration CONF = new OzoneConfiguration();
   private static CertificateClient caClient;
+  @TempDir
+  private Path tempDir;
 
   @BeforeAll
   public static void setup() {
@@ -185,7 +187,7 @@ public class TestContainerServer {
     }
   }
 
-  private static HddsDispatcher createDispatcher(DatanodeDetails dd, UUID scmId,
+  private HddsDispatcher createDispatcher(DatanodeDetails dd, UUID scmId,
                                                  OzoneConfiguration conf)
       throws IOException {
     ContainerSet containerSet = new ContainerSet(1000);
@@ -195,7 +197,6 @@ public class TestContainerServer {
     conf.set(OZONE_METADATA_DIRS, TEST_DIR);
     VolumeSet volumeSet = new MutableVolumeSet(dd.getUuidString(), conf, null,
         StorageVolume.VolumeType.DATA_VOLUME, null);
-    Path tempDir = Files.createTempDirectory("");
     StorageVolumeUtil.getHddsVolumesList(volumeSet.getVolumesList())
         .forEach(hddsVolume -> hddsVolume.setDbParentDir(tempDir.toFile()));
     StateContext context = ContainerTestUtils.getMockContext(dd, conf);
