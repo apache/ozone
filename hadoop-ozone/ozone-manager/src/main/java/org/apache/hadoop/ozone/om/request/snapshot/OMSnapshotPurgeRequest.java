@@ -111,7 +111,7 @@ public class OMSnapshotPurgeRequest extends OMClientRequest {
         // snapshotTableKey is nothing but /volumeName/bucketName/snapshotName.
         // Once all the locks are acquired, it performs the three steps mentioned above and
         // release all the locks after that.
-        Set<Triple<String, String, String>> lockSet = new HashSet<>(4);
+        Set<Triple<String, String, String>> lockSet = new HashSet<>(4, 1);
         try {
           if (omMetadataManager.getSnapshotInfoTable().get(snapTableKey) == null) {
             // Snapshot may have been purged in the previous iteration of SnapshotDeletingService.
