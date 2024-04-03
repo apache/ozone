@@ -49,6 +49,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
+import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status.INTERNAL_ERROR;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.mockito.Mockito.anyString;
@@ -141,6 +142,42 @@ public class TestOMSnapshotSetPropertyRequestAndResponse {
             .getExclusiveReplicatedSize());
       }
     }
+  }
+
+  /**
+   * This test is mainly to validate metrics and error code.
+   */
+  @Test
+  public void testValidateAndUpdateCacheFailure() throws IOException {
+    long initialSnapshotSetPropertyCount = omMetrics.getNumSnapshotSetProperties();
+    long initialSnapshotSetPropertyFailCount = omMetrics.getNumSnapshotSetPropertyFails();
+
+    createSnapshotDataForTest();
+    assertFalse(omMetadataManager.getSnapshotInfoTable().isEmpty());
+    List<OMRequest> snapshotUpdateSizeRequests = createSnapshotUpdateSizeRequest();
+
+    OmMetadataManagerImpl mockedMetadataManager = mock(OmMetadataManagerImpl.class);
+    Table<String, SnapshotInfo> mockedSnapshotInfoTable = mock(Table.class);
+
+    when(mockedSnapshotInfoTable.get(anyString())).thenThrow(new IOException("Injected fault error."));
+    when(mockedMetadataManager.getSnapshotInfoTable()).thenReturn(mockedSnapshotInfoTable);
+    when(ozoneManager.getMetadataManager()).thenReturn(mockedMetadataManager);
+
+    for (OMRequest omRequest: snapshotUpdateSizeRequests) {
+      OMSnapshotSetPropertyRequest omSnapshotSetPropertyRequest = new OMSnapshotSetPropertyRequest(omRequest);
+      OMRequest modifiedOmRequest = omSnapshotSetPropertyRequest.preExecute(ozoneManager);
+      omSnapshotSetPropertyRequest = new OMSnapshotSetPropertyRequest(modifiedOmRequest);
+
+      // Validate and Update Cache
+      OMSnapshotSetPropertyResponse omSnapshotSetPropertyResponse = (OMSnapshotSetPropertyResponse)
+          omSnapshotSetPropertyRequest.validateAndUpdateCache(ozoneManager, 200L);
+
+      assertEquals(INTERNAL_ERROR, omSnapshotSetPropertyResponse.getOMResponse().getStatus());
+    }
+
+    assertEquals(initialSnapshotSetPropertyCount, omMetrics.getNumSnapshotSetProperties());
+    assertEquals(initialSnapshotSetPropertyFailCount + snapshotUpdateSizeRequests.size(),
+        omMetrics.getNumSnapshotSetPropertyFails());
   }
 
   private void assertCacheValues(String dbKey) {
