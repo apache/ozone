@@ -336,7 +336,7 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
       final OMRequest request = context != null ? (OMRequest) context
           : OMRatisHelper.convertByteStringToOMRequest(
           trx.getStateMachineLogEntry().getLogData());
-      final TermIndex termIndex = TermIndex.valueOf(trx.getLogEntry());
+      final TermIndex termIndex = TermIndex.valueOf(trx.getLogEntryUnsafe());
       // In the current approach we have one single global thread executor.
       // with single thread. Right now this is being done for correctness, as
       // applyTransaction will be run on multiple OM's we want to execute the
