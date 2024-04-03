@@ -219,8 +219,8 @@ public class ContainerStateMachine extends BaseStateMachine {
     this.writeChunkFutureMap = new ConcurrentHashMap<>();
     applyTransactionCompletionMap = new ConcurrentHashMap<>();
     long pendingRequestsBytesLimit = (long)conf.getStorageSize(
-        OzoneConfigKeys.DFS_CONTAINER_RATIS_LEADER_PENDING_BYTES_LIMIT,
-        OzoneConfigKeys.DFS_CONTAINER_RATIS_LEADER_PENDING_BYTES_LIMIT_DEFAULT,
+        OzoneConfigKeys.HDDS_CONTAINER_RATIS_LEADER_PENDING_BYTES_LIMIT,
+        OzoneConfigKeys.HDDS_CONTAINER_RATIS_LEADER_PENDING_BYTES_LIMIT_DEFAULT,
         StorageUnit.BYTES);
     // cache with FIFO eviction, and if element not found, this needs
     // to be obtained from disk for slow follower
@@ -238,13 +238,13 @@ public class ContainerStateMachine extends BaseStateMachine {
     this.container2BCSIDMap = new ConcurrentHashMap<>();
 
     final int numContainerOpExecutors = conf.getInt(
-        OzoneConfigKeys.DFS_CONTAINER_RATIS_NUM_CONTAINER_OP_EXECUTORS_KEY,
-        OzoneConfigKeys.DFS_CONTAINER_RATIS_NUM_CONTAINER_OP_EXECUTORS_DEFAULT);
+        OzoneConfigKeys.HDDS_CONTAINER_RATIS_NUM_CONTAINER_OP_EXECUTORS_KEY,
+        OzoneConfigKeys.HDDS_CONTAINER_RATIS_NUM_CONTAINER_OP_EXECUTORS_DEFAULT);
     int maxPendingApplyTransactions = conf.getInt(
         ScmConfigKeys.
-            DFS_CONTAINER_RATIS_STATEMACHINE_MAX_PENDING_APPLY_TXNS,
+            HDDS_CONTAINER_RATIS_STATEMACHINE_MAX_PENDING_APPLY_TXNS,
         ScmConfigKeys.
-            DFS_CONTAINER_RATIS_STATEMACHINE_MAX_PENDING_APPLY_TXNS_DEFAULT);
+            HDDS_CONTAINER_RATIS_STATEMACHINE_MAX_PENDING_APPLY_TXNS_DEFAULT);
     applyTransactionSemaphore = new Semaphore(maxPendingApplyTransactions);
     stateMachineHealthy = new AtomicBoolean(true);
 

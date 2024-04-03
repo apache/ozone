@@ -96,8 +96,7 @@ public class TestOzoneTenantShell {
   private static final File AUDIT_LOG_FILE = new File("audit.log");
 
   private static OzoneConfiguration conf = null;
-  private static MiniOzoneCluster cluster = null;
-  private static MiniOzoneHAClusterImpl haCluster = null;
+  private static MiniOzoneHAClusterImpl cluster = null;
   private static OzoneShell ozoneSh = null;
   private static TenantShell tenantShell = null;
 
@@ -153,12 +152,11 @@ public class TestOzoneTenantShell {
     // Init cluster
     omServiceId = "om-service-test1";
     numOfOMs = 3;
-    cluster = MiniOzoneCluster.newOMHABuilder(conf)
-        .setOMServiceId(omServiceId)
+    MiniOzoneHAClusterImpl.Builder builder = MiniOzoneCluster.newHABuilder(conf);
+    builder.setOMServiceId(omServiceId)
         .setNumOfOzoneManagers(numOfOMs)
-        .withoutDatanodes()  // Remove this once we are actually writing data
-        .build();
-    haCluster = (MiniOzoneHAClusterImpl) cluster;
+        .withoutDatanodes();  // Remove this once we are actually writing data
+    cluster = builder.build();
     cluster.waitForClusterToBeReady();
   }
 
@@ -377,17 +375,17 @@ public class TestOzoneTenantShell {
       executeHA(tenantShell, new String[] {"--verbose", "user", "assign-admin",
           tenantName + "$" + userName, "--tenant=" + tenantName,
           "--delegated=true"});
-      checkOutput(out, "{\n" + "  \"accessId\": \"devaa$alice\",\n"
-          + "  \"tenantId\": \"devaa\",\n" + "  \"isAdmin\": true,\n"
-          + "  \"isDelegatedAdmin\": true\n" + "}\n", true, true);
+      checkOutput(out, "{\n" + "  \"accessId\" : \"devaa$alice\",\n"
+          + "  \"tenantId\" : \"devaa\",\n" + "  \"isAdmin\" : true,\n"
+          + "  \"isDelegatedAdmin\" : true\n" + "}\n", true, true);
       checkOutput(err, "", true);
 
       // Clean up
       executeHA(tenantShell, new String[] {"--verbose", "user", "revoke-admin",
           tenantName + "$" + userName, "--tenant=" + tenantName});
-      checkOutput(out, "{\n" + "  \"accessId\": \"devaa$alice\",\n"
-          + "  \"tenantId\": \"devaa\",\n" + "  \"isAdmin\": false,\n"
-          + "  \"isDelegatedAdmin\": false\n" + "}\n", true, true);
+      checkOutput(out, "{\n" + "  \"accessId\" : \"devaa$alice\",\n"
+          + "  \"tenantId\" : \"devaa\",\n" + "  \"isAdmin\" : false,\n"
+          + "  \"isDelegatedAdmin\" : false\n" + "}\n", true, true);
       checkOutput(err, "", true);
 
       executeHA(tenantShell, new String[] {
@@ -460,7 +458,7 @@ public class TestOzoneTenantShell {
 
     executeHA(tenantShell, new String[] {"list", "--json"});
     // Not checking the full output here
-    checkOutput(out, "\"tenantId\": \"dev\",", false);
+    checkOutput(out, "\"tenantId\" : \"dev\",", false);
     checkOutput(err, "", true);
 
     // Attempt user getsecret before assignment, should fail
@@ -529,16 +527,26 @@ public class TestOzoneTenantShell {
 
     executeHA(tenantShell, new String[] {
         "user", "info", "--json", "bob"});
-    checkOutput(out, "{\n" + "  \"user\": \"bob\",\n" + "  \"tenants\": [\n"
-        + "    {\n" + "      \"accessId\": \"research$bob\",\n"
-        + "      \"tenantId\": \"research\",\n" + "      \"isAdmin\": false,\n"
-        + "      \"isDelegatedAdmin\": false\n" + "    },\n" + "    {\n"
-        + "      \"accessId\": \"finance$bob\",\n"
-        + "      \"tenantId\": \"finance\",\n" + "      \"isAdmin\": false,\n"
-        + "      \"isDelegatedAdmin\": false\n" + "    },\n" + "    {\n"
-        + "      \"accessId\": \"dev$bob\",\n"
-        + "      \"tenantId\": \"dev\",\n" + "      \"isAdmin\": true,\n"
-        + "      \"isDelegatedAdmin\": true\n" + "    }\n" + "  ]\n" + "}\n",
+    checkOutput(out,
+        "{\n" +
+            "  \"user\" : \"bob\",\n" +
+            "  \"tenants\" : [ {\n" +
+            "    \"accessId\" : \"research$bob\",\n" +
+            "    \"tenantId\" : \"research\",\n" +
+            "    \"isAdmin\" : false,\n" +
+            "    \"isDelegatedAdmin\" : false\n" +
+            "  }, {\n" +
+            "    \"accessId\" : \"finance$bob\",\n" +
+            "    \"tenantId\" : \"finance\",\n" +
+            "    \"isAdmin\" : false,\n" +
+            "    \"isDelegatedAdmin\" : false\n" +
+            "  }, {\n" +
+            "    \"accessId\" : \"dev$bob\",\n" +
+            "    \"tenantId\" : \"dev\",\n" +
+            "    \"isAdmin\" : true,\n" +
+            "    \"isDelegatedAdmin\" : true\n" +
+            "  } ]\n" +
+            "}\n",
         true, true);
     checkOutput(err, "", true);
 
@@ -641,7 +649,7 @@ public class TestOzoneTenantShell {
     // Because InMemoryMultiTenantAccessController is used in OMs for this
     // integration test, we need to trigger BG sync on all OMs just
     // in case a leader changed right after the last operation.
-    haCluster.getOzoneManagersList().forEach(om -> om.getMultiTenantManager()
+    cluster.getOzoneManagersList().forEach(om -> om.getMultiTenantManager()
         .getOMRangerBGSyncService().triggerRangerSyncOnce());
 
     // Delete dev volume should fail because the volume reference count > 0L
@@ -664,8 +672,8 @@ public class TestOzoneTenantShell {
 
     // Then delete tenant, should succeed
     executeHA(tenantShell, new String[] {"--verbose", "delete", "dev"});
-    checkOutput(out, "{\n" + "  \"tenantId\": \"dev\",\n"
-        + "  \"volumeName\": \"dev\",\n" + "  \"volumeRefCount\": 0\n" + "}\n",
+    checkOutput(out, "{\n" + "  \"tenantId\" : \"dev\",\n"
+            + "  \"volumeName\" : \"dev\",\n" + "  \"volumeRefCount\" : 0\n" + "}\n",
         true, true);
     checkOutput(err, "Deleted tenant 'dev'.\n", false);
     deleteVolume("dev");
@@ -680,7 +688,7 @@ public class TestOzoneTenantShell {
   public void testListTenantUsers() throws IOException {
     executeHA(tenantShell, new String[] {"--verbose", "create", "tenant1"});
     checkOutput(out, "{\n" +
-        "  \"tenantId\": \"tenant1\"\n" + "}\n", true, true);
+        "  \"tenantId\" : \"tenant1\"\n" + "}\n", true, true);
     checkOutput(err, "", true);
 
     executeHA(tenantShell, new String[] {
@@ -704,10 +712,14 @@ public class TestOzoneTenantShell {
 
     executeHA(tenantShell, new String[] {
         "user", "list", "tenant1", "--json"});
-    checkOutput(out, "[\n" + "  {\n" + "    \"user\": \"bob\",\n"
-        + "    \"accessId\": \"tenant1$bob\"\n" + "  },\n" + "  {\n"
-        + "    \"user\": \"alice\",\n" + "    \"accessId\": \"tenant1$alice\"\n"
-        + "  }\n" + "]\n", true);
+    checkOutput(out,
+        "[ {\n" +
+            "  \"user\" : \"bob\",\n" +
+            "  \"accessId\" : \"tenant1$bob\"\n" +
+            "}, {\n" +
+            "  \"user\" : \"alice\",\n" +
+            "  \"accessId\" : \"tenant1$alice\"\n" +
+            "} ]\n", true);
     checkOutput(err, "", true);
 
     executeHA(tenantShell, new String[] {
@@ -718,8 +730,10 @@ public class TestOzoneTenantShell {
 
     executeHA(tenantShell, new String[] {
         "user", "list", "tenant1", "--prefix=b", "--json"});
-    checkOutput(out, "[\n" + "  {\n" + "    \"user\": \"bob\",\n"
-        + "    \"accessId\": \"tenant1$bob\"\n" + "  }\n" + "]\n", true);
+    checkOutput(out, "[ {\n" +
+        "  \"user\" : \"bob\",\n" +
+        "  \"accessId\" : \"tenant1$bob\"\n" +
+        "} ]\n", true);
     checkOutput(err, "", true);
 
     int exitCode = executeHA(tenantShell, new String[] {

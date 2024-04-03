@@ -19,8 +19,6 @@ package org.apache.hadoop.hdds.scm.cli;
 
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.scm.client.ScmClient;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import picocli.CommandLine.Command;
 
 import java.io.IOException;
@@ -35,14 +33,11 @@ import java.io.IOException;
     versionProvider = HddsVersionProvider.class)
 public class ReplicationManagerStopSubcommand extends ScmSubcommand {
 
-  private static final Logger LOG =
-      LoggerFactory.getLogger(ReplicationManagerStopSubcommand.class);
-
   @Override
   public void execute(ScmClient scmClient) throws IOException {
     scmClient.stopReplicationManager();
-    LOG.info("Stopping ReplicationManager...");
-    LOG.info("Requested SCM to stop ReplicationManager, " +
+    System.out.println("Stopping ReplicationManager...");
+    System.out.println("Requested SCM to stop ReplicationManager, " +
         "it might take sometime for the ReplicationManager to stop.");
   }
 }

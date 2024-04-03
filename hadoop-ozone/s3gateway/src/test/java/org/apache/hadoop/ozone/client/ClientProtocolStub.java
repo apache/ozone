@@ -482,7 +482,7 @@ public class ClientProtocolStub implements ClientProtocol {
   @Override
   public void createDirectory(String volumeName, String bucketName,
                               String keyName) throws IOException {
-
+    getBucket(volumeName, bucketName).createDirectory(keyName);
   }
 
   @Override
@@ -648,6 +648,13 @@ public class ClientProtocolStub implements ClientProtocol {
       String bucketName, String snapshotName)
       throws IOException {
     return "";
+  }
+
+  @Override
+  public void renameSnapshot(String volumeName, String bucketName,
+      String snapshotOldName, String snapshotNewName)
+      throws IOException {
+
   }
 
   @Override

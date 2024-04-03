@@ -107,39 +107,39 @@ public final class OzoneManagerSyncMetrics {
     averageNumUpdatesInDeltaRequest.set(avg);
   }
 
-  public MutableCounterLong getNumSnapshotRequests() {
-    return numSnapshotRequests;
+  public long getNumSnapshotRequests() {
+    return numSnapshotRequests.value();
   }
 
-  public MutableCounterLong getNumSnapshotRequestsFailed() {
-    return numSnapshotRequestsFailed;
+  public long getNumSnapshotRequestsFailed() {
+    return numSnapshotRequestsFailed.value();
   }
 
-  public MutableRate getSnapshotRequestLatency() {
+  MutableRate getSnapshotRequestLatency() {
     return snapshotRequestLatency;
   }
 
-  public MutableCounterLong getNumDeltaRequestsFailed() {
-    return numDeltaRequestsFailed;
+  public long getNumDeltaRequestsFailed() {
+    return numDeltaRequestsFailed.value();
   }
 
-  public MutableCounterLong getNumUpdatesInDeltaTotal() {
-    return numUpdatesInDeltaTotal;
+  public long getNumUpdatesInDeltaTotal() {
+    return numUpdatesInDeltaTotal.value();
   }
 
-  public MutableGaugeFloat getAverageNumUpdatesInDeltaRequest() {
-    return averageNumUpdatesInDeltaRequest;
+  public float getAverageNumUpdatesInDeltaRequest() {
+    return averageNumUpdatesInDeltaRequest.value();
   }
 
-  public MutableCounterLong getNumNonZeroDeltaRequests() {
-    return numNonZeroDeltaRequests;
+  public long getNumNonZeroDeltaRequests() {
+    return numNonZeroDeltaRequests.value();
   }
 
   public void setSequenceNumberLag(long lag) {
     sequenceNumberLag.set(lag);
   }
 
-  public MutableGaugeLong getSequenceNumberLag() {
-    return sequenceNumberLag;
+  public long getSequenceNumberLag() {
+    return sequenceNumberLag.value();
   }
 }

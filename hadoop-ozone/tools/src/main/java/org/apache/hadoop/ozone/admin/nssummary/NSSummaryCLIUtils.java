@@ -18,7 +18,6 @@
 
 package org.apache.hadoop.ozone.admin.nssummary;
 
-import com.google.gson.Gson;
 import org.apache.commons.io.IOUtils;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
@@ -31,7 +30,6 @@ import java.net.ConnectException;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
-import java.util.HashMap;
 
 import static java.net.HttpURLConnection.HTTP_CREATED;
 import static java.net.HttpURLConnection.HTTP_OK;
@@ -105,10 +103,6 @@ public final class NSSummaryCLIUtils {
           "have login or disable Ozone security settings.");
       return null;
     }
-  }
-
-  public static HashMap<String, Object> getResponseMap(String response) {
-    return new Gson().fromJson(response, HashMap.class);
   }
 
   public static void printNewLines(int cnt) {

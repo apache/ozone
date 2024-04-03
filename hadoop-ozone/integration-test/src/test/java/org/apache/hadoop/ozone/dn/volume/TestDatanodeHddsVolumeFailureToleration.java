@@ -24,6 +24,7 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.ozone.HddsDatanodeService;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
+import org.apache.hadoop.ozone.UniformDatanodesFactory;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
@@ -90,7 +91,9 @@ public class TestDatanodeHddsVolumeFailureToleration {
     ozoneConfig.setFromObject(dnConf);
     cluster = MiniOzoneCluster.newBuilder(ozoneConfig)
         .setNumDatanodes(1)
-        .setNumDataVolumes(3)
+        .setDatanodeFactory(UniformDatanodesFactory.newBuilder()
+            .setNumDataVolumes(3)
+            .build())
         .build();
     cluster.waitForClusterToBeReady();
     datanodes = cluster.getHddsDatanodes();

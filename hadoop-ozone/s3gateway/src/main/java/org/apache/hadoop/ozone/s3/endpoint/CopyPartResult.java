@@ -25,6 +25,7 @@ import javax.xml.bind.annotation.XmlRootElement;
 import javax.xml.bind.annotation.adapters.XmlJavaTypeAdapter;
 import java.time.Instant;
 
+import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.s3.commontypes.IsoDateAdapter;
 
 /**
@@ -39,7 +40,7 @@ public class CopyPartResult {
   @XmlElement(name = "LastModified")
   private Instant lastModified;
 
-  @XmlElement(name = "ETag")
+  @XmlElement(name = OzoneConsts.ETAG)
   private String eTag;
 
   public CopyPartResult() {

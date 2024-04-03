@@ -22,6 +22,7 @@ import javax.xml.bind.annotation.XmlAccessType;
 import javax.xml.bind.annotation.XmlAccessorType;
 import javax.xml.bind.annotation.XmlElement;
 import javax.xml.bind.annotation.XmlRootElement;
+import org.apache.hadoop.ozone.OzoneConsts;
 
 /**
  * Complete Multipart Upload request response.
@@ -41,7 +42,7 @@ public class CompleteMultipartUploadResponse {
   @XmlElement(name = "Key")
   private String key;
 
-  @XmlElement(name = "ETag")
+  @XmlElement(name = OzoneConsts.ETAG)
   private String eTag;
 
   public String getLocation() {

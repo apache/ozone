@@ -34,6 +34,9 @@ import org.jooq.Cursor;
 import org.jooq.DSLContext;
 import org.jooq.Record;
 import org.jooq.SelectQuery;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import java.util.List;
 
 /**
@@ -41,6 +44,8 @@ import java.util.List;
  */
 @Singleton
 public class ContainerHealthSchemaManager {
+  private static final Logger LOG =
+      LoggerFactory.getLogger(ContainerHealthSchemaManager.class);
 
   private final UnhealthyContainersDao unhealthyContainersDao;
   private final ContainerSchemaDefinition containerSchemaDefinition;
@@ -113,6 +118,12 @@ public class ContainerHealthSchemaManager {
   }
 
   public void insertUnhealthyContainerRecords(List<UnhealthyContainers> recs) {
+    if (LOG.isDebugEnabled()) {
+      recs.forEach(rec -> {
+        LOG.debug("rec.getContainerId() : {}, rec.getContainerState(): {} ", rec.getContainerId(),
+            rec.getContainerState());
+      });
+    }
     unhealthyContainersDao.insert(recs);
   }
 

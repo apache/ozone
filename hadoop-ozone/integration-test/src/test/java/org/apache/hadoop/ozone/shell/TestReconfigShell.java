@@ -67,7 +67,7 @@ public class TestReconfigShell {
   public static void setup() throws Exception {
     OzoneConfiguration conf = new OzoneConfiguration();
     String omServiceId = UUID.randomUUID().toString();
-    cluster = MiniOzoneCluster.newOMHABuilder(conf)
+    cluster = MiniOzoneCluster.newHABuilder(conf)
         .setOMServiceId(omServiceId)
         .setNumOfOzoneManagers(1)
         .setNumOfStorageContainerManagers(1)
@@ -95,7 +95,7 @@ public class TestReconfigShell {
         HddsDatanodeClientProtocolServer server =
             datanodeService.getClientProtocolServer();
         InetSocketAddress socket = server.getClientRpcAddress();
-        executeAndAssertProperties(datanodeService.getReconfigurationHandler(),
+        executeAndAssertProperties(datanodeService.getReconfigurationHandler(), "--service=DATANODE",
             socket, capture);
       }
     }
@@ -105,7 +105,7 @@ public class TestReconfigShell {
   public void testOzoneManagerGetReconfigurationProperties() throws Exception {
     try (SystemOutCapturer capture = new SystemOutCapturer()) {
       InetSocketAddress socket = ozoneManager.getOmRpcServerAddr();
-      executeAndAssertProperties(ozoneManager.getReconfigurationHandler(),
+      executeAndAssertProperties(ozoneManager.getReconfigurationHandler(), "--service=OM",
           socket, capture);
     }
   }
@@ -116,17 +116,17 @@ public class TestReconfigShell {
     try (SystemOutCapturer capture = new SystemOutCapturer()) {
       InetSocketAddress socket = storageContainerManager.getClientRpcAddress();
       executeAndAssertProperties(
-          storageContainerManager.getReconfigurationHandler(), socket, capture);
+          storageContainerManager.getReconfigurationHandler(), "--service=SCM", socket, capture);
     }
   }
 
   private void executeAndAssertProperties(
-      ReconfigurableBase reconfigurableBase,
+      ReconfigurableBase reconfigurableBase, String service,
       InetSocketAddress socket, SystemOutCapturer capture)
       throws UnsupportedEncodingException {
     String address = socket.getHostString() + ":" + socket.getPort();
     ozoneAdmin.execute(
-        new String[] {"reconfig", "--address", address, "properties"});
+        new String[] {"reconfig", service, "--address", address, "properties"});
     assertReconfigurablePropertiesOutput(
         reconfigurableBase.getReconfigurableProperties(), capture.getOutput());
   }
@@ -171,7 +171,7 @@ public class TestReconfigShell {
       throws Exception {
     try (SystemOutCapturer capture = new SystemOutCapturer()) {
       ozoneAdmin.execute(new String[] {
-          "reconfig",  "--in-service-datanodes", "properties"});
+          "reconfig", "--service=DATANODE", "--in-service-datanodes", "properties"});
       String output = capture.getOutput();
 
       assertThat(capture.getOutput()).contains(String.format("successfully %d", except));

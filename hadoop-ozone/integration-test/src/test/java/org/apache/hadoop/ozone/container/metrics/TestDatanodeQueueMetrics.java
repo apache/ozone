@@ -67,13 +67,13 @@ public class TestDatanodeQueueMetrics {
     conf.set(ScmConfigKeys.OZONE_SCM_PIPELINE_CREATION_INTERVAL, "10s");
     omServiceId = "om-service-test1";
     scmServiceId = "scm-service-test1";
-    cluster = (MiniOzoneHAClusterImpl) MiniOzoneCluster.newHABuilder(conf)
-        .setOMServiceId(omServiceId)
+    MiniOzoneHAClusterImpl.Builder builder = MiniOzoneCluster.newHABuilder(conf);
+    builder.setOMServiceId(omServiceId)
         .setSCMServiceId(scmServiceId)
         .setNumOfStorageContainerManagers(numOfSCMs)
         .setNumOfOzoneManagers(numOfOMs)
-        .setNumDatanodes(1)
-        .build();
+        .setNumDatanodes(1);
+    cluster = builder.build();
     cluster.waitForClusterToBeReady();
   }
   /**

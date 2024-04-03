@@ -45,13 +45,13 @@ public class TestScmAdminHA {
     // Init HA cluster
     omServiceId = "om-service-test1";
     numOfOMs = 3;
-    cluster = MiniOzoneCluster.newOMHABuilder(conf)
+    cluster = MiniOzoneCluster.newHABuilder(conf)
         .setOMServiceId(omServiceId)
         .setNumOfOzoneManagers(numOfOMs)
         .build();
     conf.setQuietMode(false);
     // enable ratis for Scm.
-    conf.setBoolean(ScmConfigKeys.DFS_CONTAINER_RATIS_ENABLED_KEY, true);
+    conf.setBoolean(ScmConfigKeys.HDDS_CONTAINER_RATIS_ENABLED_KEY, true);
     cluster.waitForClusterToBeReady();
   }
 

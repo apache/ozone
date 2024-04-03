@@ -19,7 +19,6 @@
 package org.apache.hadoop.ozone.om.snapshot;
 
 import org.apache.ozone.test.tag.Native;
-import org.apache.ozone.test.tag.Unhealthy;
 import org.junit.jupiter.api.Timeout;
 
 import static org.apache.hadoop.hdds.utils.NativeConstants.ROCKS_TOOLS_NATIVE_LIBRARY_NAME;
@@ -30,7 +29,6 @@ import static org.apache.hadoop.ozone.om.helpers.BucketLayout.FILE_SYSTEM_OPTIMI
  */
 @Native(ROCKS_TOOLS_NATIVE_LIBRARY_NAME)
 @Timeout(300)
-@Unhealthy("HDDS-10149")
 class TestOmSnapshotFsoWithNativeLib extends TestOmSnapshot {
   TestOmSnapshotFsoWithNativeLib() throws Exception {
     super(FILE_SYSTEM_OPTIMIZED, false, false, false);

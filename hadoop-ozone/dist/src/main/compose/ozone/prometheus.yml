@@ -14,8 +14,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 global:
-  scrape_interval:     15s # By default, scrape targets every 15 seconds.
-
+  scrape_interval: 15s # By default, scrape targets every 15 seconds.
 scrape_configs:
   - job_name: ozone
     metrics_path: /prom
@@ -32,7 +31,9 @@ scrape_configs:
         - "s3g:9878"
        labels:
          component: s3g
-     - targets:
+     - targets: # During compose bring up the number of datanodes can be specific, adding 10 nodes to account for that.
+        # Duplicate datanodes are specified here to account for compose v1 vs v2 differences.
+        # compose v1
         - "ozone_datanode_1:9882"
         - "ozone_datanode_2:9882"
         - "ozone_datanode_3:9882"
@@ -43,5 +44,20 @@ scrape_configs:
         - "ozone_datanode_8:9882"
         - "ozone_datanode_9:9882"
         - "ozone_datanode_10:9882"
+        # compose v2
+        - "ozone-datanode-1:9882"
+        - "ozone-datanode-2:9882"
+        - "ozone-datanode-3:9882"
+        - "ozone-datanode-4:9882"
+        - "ozone-datanode-5:9882"
+        - "ozone-datanode-6:9882"
+        - "ozone-datanode-7:9882"
+        - "ozone-datanode-8:9882"
+        - "ozone-datanode-9:9882"
+        - "ozone-datanode-10:9882"
        labels:
          component: datanode
+     - targets:
+         - "recon:9888"
+       labels:
+         component: recon

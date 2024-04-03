@@ -234,8 +234,8 @@ public final class RatisHelper {
 
   private static RpcType getRpcType(ConfigurationSource conf) {
     return SupportedRpcType.valueOfIgnoreCase(conf.get(
-        ScmConfigKeys.DFS_CONTAINER_RATIS_RPC_TYPE_KEY,
-        ScmConfigKeys.DFS_CONTAINER_RATIS_RPC_TYPE_DEFAULT));
+        ScmConfigKeys.HDDS_CONTAINER_RATIS_RPC_TYPE_KEY,
+        ScmConfigKeys.HDDS_CONTAINER_RATIS_RPC_TYPE_DEFAULT));
   }
 
   public static BiFunction<RaftPeer, GrpcTlsConfig, RaftClient> newRaftClient(

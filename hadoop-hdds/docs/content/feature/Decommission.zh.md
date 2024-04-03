@@ -50,6 +50,14 @@ ozone admin datanode decommission [-hV] [-id=<scmServiceId>]
 ```
 您可以输入多个主机，以便一起Decommission多个DataNode。
 
+查看 Decommission时datanode 的状态，可以执行下面的命令,
+
+```shell
+ozone admin datanode status decommission [-hV] [-id=<scmServiceId>] [--scm=<scm>] [--id=<uuid>] [--ip=<ipAddress>]
+```
+您可以指定一个 Datanode 的 IP address 或 UUID 以查看该 Datanode 相关的详细信息。
+
+
 **Note:** 要Recommission某台DataNode的时候，可在命令行执行以下命令,
 ```shell
 ozone admin datanode recommission [-hV] [-id=<scmServiceId>]

@@ -75,6 +75,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import static java.util.Collections.singletonList;
+import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.BLOCK_TOKEN_VERIFICATION_FAILED;
 
 /**
  * Implementation of all container protocol calls performed by Container
@@ -145,6 +146,14 @@ public final class ContainerProtocolCalls  {
       try {
         return op.apply(d);
       } catch (IOException e) {
+        if (e instanceof StorageContainerException) {
+          StorageContainerException sce = (StorageContainerException)e;
+          // Block token expired. There's no point retrying other DN.
+          // Throw the exception to request a new block token right away.
+          if (sce.getResult() == BLOCK_TOKEN_VERIFICATION_FAILED) {
+            throw e;
+          }
+        }
         excluded.add(d);
         if (excluded.size() < pipeline.size()) {
           LOG.warn(toErrorMessage.apply(d)

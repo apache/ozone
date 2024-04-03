@@ -190,8 +190,8 @@ public class BasicOzoneClientAdapterImpl implements OzoneClientAdapter {
     OzoneFSUtils.validateBucketLayout(bucket.getName(), resolvedBucketLayout);
 
     this.configuredDnPort = conf.getInt(
-        OzoneConfigKeys.DFS_CONTAINER_IPC_PORT,
-        OzoneConfigKeys.DFS_CONTAINER_IPC_PORT_DEFAULT);
+        OzoneConfigKeys.HDDS_CONTAINER_IPC_PORT,
+        OzoneConfigKeys.HDDS_CONTAINER_IPC_PORT_DEFAULT);
     this.config = conf;
   }
 
@@ -602,6 +602,16 @@ public class BasicOzoneClientAdapterImpl implements OzoneClientAdapter {
     return objectStore.createSnapshot(ofsPath.getVolumeName(),
         ofsPath.getBucketName(),
         snapshotName);
+  }
+
+  @Override
+  public void renameSnapshot(String pathStr, String snapshotOldName, String snapshotNewName)
+      throws IOException {
+    OFSPath ofsPath = new OFSPath(pathStr, config);
+    objectStore.renameSnapshot(ofsPath.getVolumeName(),
+        ofsPath.getBucketName(),
+        snapshotOldName,
+        snapshotNewName);
   }
 
   @Override

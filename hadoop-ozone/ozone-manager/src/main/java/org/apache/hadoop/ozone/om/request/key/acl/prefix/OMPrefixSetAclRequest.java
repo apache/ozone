@@ -45,15 +45,15 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRespo
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SetAclResponse;
 
 /**
- * Handle add Acl request for prefix.
+ * Handle set Acl request for prefix.
  */
 public class OMPrefixSetAclRequest extends OMPrefixAclRequest {
 
   private static final Logger LOG =
       LoggerFactory.getLogger(OMPrefixSetAclRequest.class);
 
-  private OzoneObj ozoneObj;
-  private List<OzoneAcl> ozoneAcls;
+  private final OzoneObj ozoneObj;
+  private final List<OzoneAcl> ozoneAcls;
 
   public OMPrefixSetAclRequest(OMRequest omRequest) {
     super(omRequest);
@@ -94,20 +94,19 @@ public class OMPrefixSetAclRequest extends OMPrefixAclRequest {
   }
 
   @Override
-  void onComplete(boolean operationResult, Exception exception,
-      OMMetrics omMetrics, Result result, long trxnLogIndex,
-      AuditLogger auditLogger, Map<String, String> auditMap) {
+  void onComplete(OzoneObj resolvedOzoneObj, boolean operationResult,
+      Exception exception, OMMetrics omMetrics, Result result,
+      long trxnLogIndex, AuditLogger auditLogger, Map<String, String> auditMap) {
     switch (result) {
     case SUCCESS:
       if (LOG.isDebugEnabled()) {
         LOG.debug("Set acl: {} to path: {} success!", ozoneAcls,
-            ozoneObj.getPath());
+            resolvedOzoneObj.getPath());
       }
       break;
     case FAILURE:
-      omMetrics.incNumBucketUpdateFails();
       LOG.error("Set acl {} to path {} failed!", ozoneAcls,
-          ozoneObj.getPath(), exception);
+          resolvedOzoneObj.getPath(), exception);
       break;
     default:
       LOG.error("Unrecognized Result for OMPrefixSetAclRequest: {}",
@@ -122,9 +121,9 @@ public class OMPrefixSetAclRequest extends OMPrefixAclRequest {
   }
 
   @Override
-  OMPrefixAclOpResult apply(PrefixManagerImpl prefixManager,
+  OMPrefixAclOpResult apply(OzoneObj resolvedOzoneObj, PrefixManagerImpl prefixManager,
       OmPrefixInfo omPrefixInfo, long trxnLogIndex) throws IOException {
-    return prefixManager.setAcl(ozoneObj, ozoneAcls, omPrefixInfo,
+    return prefixManager.setAcl(resolvedOzoneObj, ozoneAcls, omPrefixInfo,
         trxnLogIndex);
   }
 

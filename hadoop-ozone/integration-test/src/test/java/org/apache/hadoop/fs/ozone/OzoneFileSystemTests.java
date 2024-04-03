@@ -21,6 +21,7 @@ import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.RemoteIterator;
+import org.apache.hadoop.fs.contract.ContractTestUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 
 import java.io.IOException;
@@ -30,6 +31,8 @@ import java.util.Set;
 import java.util.TreeSet;
 
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_FS_LISTING_PAGE_SIZE;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_REPLICATION;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_REPLICATION_TYPE;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
@@ -94,5 +97,18 @@ final class OzoneFileSystemTests {
     }
 
     assertEquals(total, iCount);
+  }
+
+  static void createKeyWithECReplicationConfiguration(OzoneConfiguration inputConf, Path keyPath)
+      throws IOException {
+    OzoneConfiguration conf = new OzoneConfiguration(inputConf);
+    conf.set(OZONE_REPLICATION, "rs-3-2-1024k");
+    conf.set(OZONE_REPLICATION_TYPE, "EC");
+    URI uri = FileSystem.getDefaultUri(conf);
+    conf.setBoolean(
+        String.format("fs.%s.impl.disable.cache", uri.getScheme()), true);
+    try (FileSystem fileSystem = FileSystem.get(uri, conf)) {
+      ContractTestUtils.touch(fileSystem, keyPath);
+    }
   }
 }

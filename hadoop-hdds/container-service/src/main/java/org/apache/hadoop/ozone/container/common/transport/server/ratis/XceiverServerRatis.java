@@ -110,12 +110,12 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import static org.apache.hadoop.hdds.DatanodeVersion.SEPARATE_RATIS_PORTS_AVAILABLE;
-import static org.apache.hadoop.ozone.OzoneConfigKeys.DFS_CONTAINER_RATIS_LOG_APPENDER_QUEUE_BYTE_LIMIT;
-import static org.apache.hadoop.ozone.OzoneConfigKeys.DFS_CONTAINER_RATIS_LOG_APPENDER_QUEUE_BYTE_LIMIT_DEFAULT;
-import static org.apache.hadoop.ozone.OzoneConfigKeys.DFS_CONTAINER_RATIS_LOG_APPENDER_QUEUE_NUM_ELEMENTS;
-import static org.apache.hadoop.ozone.OzoneConfigKeys.DFS_CONTAINER_RATIS_LOG_APPENDER_QUEUE_NUM_ELEMENTS_DEFAULT;
-import static org.apache.hadoop.ozone.OzoneConfigKeys.DFS_CONTAINER_RATIS_SEGMENT_SIZE_DEFAULT;
-import static org.apache.hadoop.ozone.OzoneConfigKeys.DFS_CONTAINER_RATIS_SEGMENT_SIZE_KEY;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.HDDS_CONTAINER_RATIS_LOG_APPENDER_QUEUE_BYTE_LIMIT;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.HDDS_CONTAINER_RATIS_LOG_APPENDER_QUEUE_BYTE_LIMIT_DEFAULT;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.HDDS_CONTAINER_RATIS_LOG_APPENDER_QUEUE_NUM_ELEMENTS;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.HDDS_CONTAINER_RATIS_LOG_APPENDER_QUEUE_NUM_ELEMENTS_DEFAULT;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.HDDS_CONTAINER_RATIS_SEGMENT_SIZE_DEFAULT;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.HDDS_CONTAINER_RATIS_SEGMENT_SIZE_KEY;
 import static org.apache.ratis.util.Preconditions.assertTrue;
 
 /**
@@ -189,8 +189,8 @@ public final class XceiverServerRatis implements XceiverServerSpi {
     ratisServerConfig = conf.getObject(DatanodeRatisServerConfig.class);
     assignPorts();
     this.streamEnable = conf.getBoolean(
-        OzoneConfigKeys.DFS_CONTAINER_RATIS_DATASTREAM_ENABLED,
-        OzoneConfigKeys.DFS_CONTAINER_RATIS_DATASTREAM_ENABLED_DEFAULT);
+        OzoneConfigKeys.HDDS_CONTAINER_RATIS_DATASTREAM_ENABLED,
+        OzoneConfigKeys.HDDS_CONTAINER_RATIS_DATASTREAM_ENABLED_DEFAULT);
     RaftProperties serverProperties = newRaftProperties();
     this.context = context;
     this.dispatcher = dispatcher;
@@ -217,17 +217,17 @@ public final class XceiverServerRatis implements XceiverServerSpi {
 
   private void assignPorts() {
     clientPort = determinePort(
-        OzoneConfigKeys.DFS_CONTAINER_RATIS_IPC_PORT,
-        OzoneConfigKeys.DFS_CONTAINER_RATIS_IPC_PORT_DEFAULT);
+        OzoneConfigKeys.HDDS_CONTAINER_RATIS_IPC_PORT,
+        OzoneConfigKeys.HDDS_CONTAINER_RATIS_IPC_PORT_DEFAULT);
 
     if (DatanodeVersion.fromProtoValue(datanodeDetails.getInitialVersion())
         .compareTo(SEPARATE_RATIS_PORTS_AVAILABLE) >= 0) {
       adminPort = determinePort(
-          OzoneConfigKeys.DFS_CONTAINER_RATIS_ADMIN_PORT,
-          OzoneConfigKeys.DFS_CONTAINER_RATIS_ADMIN_PORT_DEFAULT);
+          OzoneConfigKeys.HDDS_CONTAINER_RATIS_ADMIN_PORT,
+          OzoneConfigKeys.HDDS_CONTAINER_RATIS_ADMIN_PORT_DEFAULT);
       serverPort = determinePort(
-          OzoneConfigKeys.DFS_CONTAINER_RATIS_SERVER_PORT,
-          OzoneConfigKeys.DFS_CONTAINER_RATIS_SERVER_PORT_DEFAULT);
+          OzoneConfigKeys.HDDS_CONTAINER_RATIS_SERVER_PORT,
+          OzoneConfigKeys.HDDS_CONTAINER_RATIS_SERVER_PORT_DEFAULT);
     } else {
       adminPort = clientPort;
       serverPort = clientPort;
@@ -236,8 +236,8 @@ public final class XceiverServerRatis implements XceiverServerSpi {
 
   private int determinePort(String key, int defaultValue) {
     boolean randomPort = conf.getBoolean(
-        OzoneConfigKeys.DFS_CONTAINER_RATIS_IPC_RANDOM_PORT,
-        OzoneConfigKeys.DFS_CONTAINER_RATIS_IPC_RANDOM_PORT_DEFAULT);
+        OzoneConfigKeys.HDDS_CONTAINER_RATIS_IPC_RANDOM_PORT,
+        OzoneConfigKeys.HDDS_CONTAINER_RATIS_IPC_RANDOM_PORT_DEFAULT);
     return randomPort ? 0 : conf.getInt(key, defaultValue);
   }
 
@@ -249,14 +249,14 @@ public final class XceiverServerRatis implements XceiverServerSpi {
   private void setUpRatisStream(RaftProperties properties) {
     // set the datastream config
     if (conf.getBoolean(
-        OzoneConfigKeys.DFS_CONTAINER_RATIS_DATASTREAM_RANDOM_PORT,
+        OzoneConfigKeys.HDDS_CONTAINER_RATIS_DATASTREAM_RANDOM_PORT,
         OzoneConfigKeys.
-            DFS_CONTAINER_RATIS_DATASTREAM_RANDOM_PORT_DEFAULT)) {
+            HDDS_CONTAINER_RATIS_DATASTREAM_RANDOM_PORT_DEFAULT)) {
       dataStreamPort = 0;
     } else {
       dataStreamPort = conf.getInt(
-          OzoneConfigKeys.DFS_CONTAINER_RATIS_DATASTREAM_PORT,
-          OzoneConfigKeys.DFS_CONTAINER_RATIS_DATASTREAM_PORT_DEFAULT);
+          OzoneConfigKeys.HDDS_CONTAINER_RATIS_DATASTREAM_PORT,
+          OzoneConfigKeys.HDDS_CONTAINER_RATIS_DATASTREAM_PORT_DEFAULT);
     }
     RatisHelper.enableNettyStreaming(properties);
     NettyConfigKeys.DataStream.setPort(properties, dataStreamPort);
@@ -327,8 +327,8 @@ public final class XceiverServerRatis implements XceiverServerSpi {
     }
 
     long snapshotThreshold =
-        conf.getLong(OzoneConfigKeys.DFS_RATIS_SNAPSHOT_THRESHOLD_KEY,
-            OzoneConfigKeys.DFS_RATIS_SNAPSHOT_THRESHOLD_DEFAULT);
+        conf.getLong(OzoneConfigKeys.HDDS_RATIS_SNAPSHOT_THRESHOLD_KEY,
+            OzoneConfigKeys.HDDS_RATIS_SNAPSHOT_THRESHOLD_DEFAULT);
     RaftServerConfigKeys.Snapshot.
       setAutoTriggerEnabled(properties, true);
     RaftServerConfigKeys.Snapshot.
@@ -338,11 +338,11 @@ public final class XceiverServerRatis implements XceiverServerSpi {
     setPendingRequestsLimits(properties);
 
     int logQueueNumElements =
-        conf.getInt(OzoneConfigKeys.DFS_CONTAINER_RATIS_LOG_QUEUE_NUM_ELEMENTS,
-            OzoneConfigKeys.DFS_CONTAINER_RATIS_LOG_QUEUE_NUM_ELEMENTS_DEFAULT);
+        conf.getInt(OzoneConfigKeys.HDDS_CONTAINER_RATIS_LOG_QUEUE_NUM_ELEMENTS,
+            OzoneConfigKeys.HDDS_CONTAINER_RATIS_LOG_QUEUE_NUM_ELEMENTS_DEFAULT);
     final long logQueueByteLimit = (long) conf.getStorageSize(
-        OzoneConfigKeys.DFS_CONTAINER_RATIS_LOG_QUEUE_BYTE_LIMIT,
-        OzoneConfigKeys.DFS_CONTAINER_RATIS_LOG_QUEUE_BYTE_LIMIT_DEFAULT,
+        OzoneConfigKeys.HDDS_CONTAINER_RATIS_LOG_QUEUE_BYTE_LIMIT,
+        OzoneConfigKeys.HDDS_CONTAINER_RATIS_LOG_QUEUE_BYTE_LIMIT_DEFAULT,
         StorageUnit.BYTES);
     RaftServerConfigKeys.Log.setQueueElementLimit(
         properties, logQueueNumElements);
@@ -353,8 +353,8 @@ public final class XceiverServerRatis implements XceiverServerSpi {
         false);
 
     int purgeGap = conf.getInt(
-        OzoneConfigKeys.DFS_CONTAINER_RATIS_LOG_PURGE_GAP,
-        OzoneConfigKeys.DFS_CONTAINER_RATIS_LOG_PURGE_GAP_DEFAULT);
+        OzoneConfigKeys.HDDS_CONTAINER_RATIS_LOG_PURGE_GAP,
+        OzoneConfigKeys.HDDS_CONTAINER_RATIS_LOG_PURGE_GAP_DEFAULT);
     RaftServerConfigKeys.Log.setPurgeGap(properties, purgeGap);
 
     //Set the number of Snapshots Retained.
@@ -375,12 +375,12 @@ public final class XceiverServerRatis implements XceiverServerSpi {
     long duration;
     TimeUnit leaderElectionMinTimeoutUnit =
         OzoneConfigKeys.
-            DFS_RATIS_LEADER_ELECTION_MINIMUM_TIMEOUT_DURATION_DEFAULT
+            HDDS_RATIS_LEADER_ELECTION_MINIMUM_TIMEOUT_DURATION_DEFAULT
             .getUnit();
     duration = conf.getTimeDuration(
-        OzoneConfigKeys.DFS_RATIS_LEADER_ELECTION_MINIMUM_TIMEOUT_DURATION_KEY,
+        OzoneConfigKeys.HDDS_RATIS_LEADER_ELECTION_MINIMUM_TIMEOUT_DURATION_KEY,
         OzoneConfigKeys.
-            DFS_RATIS_LEADER_ELECTION_MINIMUM_TIMEOUT_DURATION_DEFAULT
+            HDDS_RATIS_LEADER_ELECTION_MINIMUM_TIMEOUT_DURATION_DEFAULT
             .getDuration(), leaderElectionMinTimeoutUnit);
     final TimeDuration leaderElectionMinTimeout =
         TimeDuration.valueOf(duration, leaderElectionMinTimeoutUnit);
@@ -396,11 +396,11 @@ public final class XceiverServerRatis implements XceiverServerSpi {
     TimeUnit timeUnit;
     long duration;
     timeUnit =
-        OzoneConfigKeys.DFS_RATIS_SERVER_RETRY_CACHE_TIMEOUT_DURATION_DEFAULT
+        OzoneConfigKeys.HDDS_RATIS_SERVER_RETRY_CACHE_TIMEOUT_DURATION_DEFAULT
             .getUnit();
     duration = conf.getTimeDuration(
-        OzoneConfigKeys.DFS_RATIS_SERVER_RETRY_CACHE_TIMEOUT_DURATION_KEY,
-        OzoneConfigKeys.DFS_RATIS_SERVER_RETRY_CACHE_TIMEOUT_DURATION_DEFAULT
+        OzoneConfigKeys.HDDS_RATIS_SERVER_RETRY_CACHE_TIMEOUT_DURATION_KEY,
+        OzoneConfigKeys.HDDS_RATIS_SERVER_RETRY_CACHE_TIMEOUT_DURATION_DEFAULT
             .getDuration(), timeUnit);
     final TimeDuration retryCacheTimeout =
         TimeDuration.valueOf(duration, timeUnit);
@@ -410,8 +410,8 @@ public final class XceiverServerRatis implements XceiverServerSpi {
 
   private long setRaftSegmentPreallocatedSize(RaftProperties properties) {
     final long raftSegmentPreallocatedSize = (long) conf.getStorageSize(
-        OzoneConfigKeys.DFS_CONTAINER_RATIS_SEGMENT_PREALLOCATED_SIZE_KEY,
-        OzoneConfigKeys.DFS_CONTAINER_RATIS_SEGMENT_PREALLOCATED_SIZE_DEFAULT,
+        OzoneConfigKeys.HDDS_CONTAINER_RATIS_SEGMENT_PREALLOCATED_SIZE_KEY,
+        OzoneConfigKeys.HDDS_CONTAINER_RATIS_SEGMENT_PREALLOCATED_SIZE_DEFAULT,
         StorageUnit.BYTES);
     RaftServerConfigKeys.Log.setPreallocatedSize(properties,
         SizeInBytes.valueOf(raftSegmentPreallocatedSize));
@@ -420,23 +420,23 @@ public final class XceiverServerRatis implements XceiverServerSpi {
 
   private void setRaftSegmentAndWriteBufferSize(RaftProperties properties) {
     final int logAppenderQueueNumElements = conf.getInt(
-        DFS_CONTAINER_RATIS_LOG_APPENDER_QUEUE_NUM_ELEMENTS,
-        DFS_CONTAINER_RATIS_LOG_APPENDER_QUEUE_NUM_ELEMENTS_DEFAULT);
+        HDDS_CONTAINER_RATIS_LOG_APPENDER_QUEUE_NUM_ELEMENTS,
+        HDDS_CONTAINER_RATIS_LOG_APPENDER_QUEUE_NUM_ELEMENTS_DEFAULT);
     final int logAppenderQueueByteLimit = (int) conf.getStorageSize(
-        DFS_CONTAINER_RATIS_LOG_APPENDER_QUEUE_BYTE_LIMIT,
-        DFS_CONTAINER_RATIS_LOG_APPENDER_QUEUE_BYTE_LIMIT_DEFAULT,
+        HDDS_CONTAINER_RATIS_LOG_APPENDER_QUEUE_BYTE_LIMIT,
+        HDDS_CONTAINER_RATIS_LOG_APPENDER_QUEUE_BYTE_LIMIT_DEFAULT,
         StorageUnit.BYTES);
 
     final long raftSegmentSize = (long) conf.getStorageSize(
-        DFS_CONTAINER_RATIS_SEGMENT_SIZE_KEY,
-        DFS_CONTAINER_RATIS_SEGMENT_SIZE_DEFAULT,
+        HDDS_CONTAINER_RATIS_SEGMENT_SIZE_KEY,
+        HDDS_CONTAINER_RATIS_SEGMENT_SIZE_DEFAULT,
         StorageUnit.BYTES);
     final long raftSegmentBufferSize = logAppenderQueueByteLimit + 8;
 
     assertTrue(raftSegmentBufferSize <= raftSegmentSize,
-        () -> DFS_CONTAINER_RATIS_LOG_APPENDER_QUEUE_BYTE_LIMIT + " = "
+        () -> HDDS_CONTAINER_RATIS_LOG_APPENDER_QUEUE_BYTE_LIMIT + " = "
             + logAppenderQueueByteLimit
-            + " must be <= (" + DFS_CONTAINER_RATIS_SEGMENT_SIZE_KEY + " - 8"
+            + " must be <= (" + HDDS_CONTAINER_RATIS_SEGMENT_SIZE_KEY + " - 8"
             + " = " + (raftSegmentSize - 8) + ")");
 
     RaftServerConfigKeys.Log.Appender.setBufferElementLimit(properties,
@@ -454,11 +454,11 @@ public final class XceiverServerRatis implements XceiverServerSpi {
     RaftServerConfigKeys.Log.StateMachineData.setSync(properties, true);
 
     TimeUnit timeUnit = OzoneConfigKeys.
-        DFS_CONTAINER_RATIS_STATEMACHINEDATA_SYNC_TIMEOUT_DEFAULT.getUnit();
+        HDDS_CONTAINER_RATIS_STATEMACHINEDATA_SYNC_TIMEOUT_DEFAULT.getUnit();
     long duration = conf.getTimeDuration(
-        OzoneConfigKeys.DFS_CONTAINER_RATIS_STATEMACHINEDATA_SYNC_TIMEOUT,
+        OzoneConfigKeys.HDDS_CONTAINER_RATIS_STATEMACHINEDATA_SYNC_TIMEOUT,
         OzoneConfigKeys.
-            DFS_CONTAINER_RATIS_STATEMACHINEDATA_SYNC_TIMEOUT_DEFAULT
+            HDDS_CONTAINER_RATIS_STATEMACHINEDATA_SYNC_TIMEOUT_DEFAULT
             .getDuration(), timeUnit);
     final TimeDuration dataSyncTimeout =
         TimeDuration.valueOf(duration, timeUnit);
@@ -479,7 +479,7 @@ public final class XceiverServerRatis implements XceiverServerSpi {
     int syncTimeoutRetryDefault = (int) nodeFailureTimeoutMs /
         dataSyncTimeout.toIntExact(TimeUnit.MILLISECONDS);
     int numSyncRetries = conf.getInt(
-        OzoneConfigKeys.DFS_CONTAINER_RATIS_STATEMACHINEDATA_SYNC_RETRIES,
+        OzoneConfigKeys.HDDS_CONTAINER_RATIS_STATEMACHINEDATA_SYNC_RETRIES,
         syncTimeoutRetryDefault);
     RaftServerConfigKeys.Log.StateMachineData.setSyncTimeoutRetry(properties,
         numSyncRetries);
@@ -507,8 +507,8 @@ public final class XceiverServerRatis implements XceiverServerSpi {
 
   private RpcType setRpcType(RaftProperties properties) {
     final String rpcType = conf.get(
-        OzoneConfigKeys.DFS_CONTAINER_RATIS_RPC_TYPE_KEY,
-        OzoneConfigKeys.DFS_CONTAINER_RATIS_RPC_TYPE_DEFAULT);
+        OzoneConfigKeys.HDDS_CONTAINER_RATIS_RPC_TYPE_KEY,
+        OzoneConfigKeys.HDDS_CONTAINER_RATIS_RPC_TYPE_DEFAULT);
     final RpcType rpc = SupportedRpcType.valueOfIgnoreCase(rpcType);
     RatisHelper.setRpcType(properties, rpc);
     return rpc;
@@ -517,8 +517,8 @@ public final class XceiverServerRatis implements XceiverServerSpi {
   private void setPendingRequestsLimits(RaftProperties properties) {
 
     long pendingRequestsBytesLimit = (long) conf.getStorageSize(
-        OzoneConfigKeys.DFS_CONTAINER_RATIS_LEADER_PENDING_BYTES_LIMIT,
-        OzoneConfigKeys.DFS_CONTAINER_RATIS_LEADER_PENDING_BYTES_LIMIT_DEFAULT,
+        OzoneConfigKeys.HDDS_CONTAINER_RATIS_LEADER_PENDING_BYTES_LIMIT,
+        OzoneConfigKeys.HDDS_CONTAINER_RATIS_LEADER_PENDING_BYTES_LIMIT_DEFAULT,
         StorageUnit.BYTES);
     final int pendingRequestsMegaBytesLimit =
         HddsUtils.roundupMb(pendingRequestsBytesLimit);
@@ -990,9 +990,9 @@ public final class XceiverServerRatis implements XceiverServerSpi {
     // TODO create single pool with N threads if using non-incremental chunks
     final int threadCountPerDisk = conf.getInt(
         OzoneConfigKeys
-            .DFS_CONTAINER_RATIS_NUM_WRITE_CHUNK_THREADS_PER_VOLUME_KEY,
+            .HDDS_CONTAINER_RATIS_NUM_WRITE_CHUNK_THREADS_PER_VOLUME_KEY,
         OzoneConfigKeys
-            .DFS_CONTAINER_RATIS_NUM_WRITE_CHUNK_THREADS_PER_VOLUME_DEFAULT);
+            .HDDS_CONTAINER_RATIS_NUM_WRITE_CHUNK_THREADS_PER_VOLUME_DEFAULT);
 
     final int numberOfDisks =
         HddsServerUtil.getDatanodeStorageDirs(conf).size();

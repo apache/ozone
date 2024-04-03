@@ -84,8 +84,9 @@ public class OMSnapshotPurgeResponse extends OMClientResponse {
     updateSnapInfo(metadataManager, batchOperation,
         updatedPreviousAndGlobalSnapInfos);
     for (String dbKey: snapshotDbKeys) {
+      // Skip the cache here because snapshot is purged from cache in OMSnapshotPurgeRequest.
       SnapshotInfo snapshotInfo = omMetadataManager
-          .getSnapshotInfoTable().get(dbKey);
+          .getSnapshotInfoTable().getSkipCache(dbKey);
       // Even though snapshot existed when SnapshotDeletingService
       // was running. It might be deleted in the previous run and
       // the DB might not have been updated yet. So snapshotInfo
@@ -96,8 +97,7 @@ public class OMSnapshotPurgeResponse extends OMClientResponse {
 
       // Delete Snapshot checkpoint directory.
       deleteCheckpointDirectory(omMetadataManager, snapshotInfo);
-      omMetadataManager.getSnapshotInfoTable().deleteWithBatch(batchOperation,
-          dbKey);
+      omMetadataManager.getSnapshotInfoTable().deleteWithBatch(batchOperation, dbKey);
     }
   }
 

@@ -294,6 +294,7 @@ public class ReplicationManager implements SCMService {
     if (!isRunning()) {
       LOG.info("Starting Replication Monitor Thread.");
       running = true;
+      metrics = ReplicationManagerMetrics.create(this);
       if (rmConf.isLegacyEnabled()) {
         legacyReplicationManager.setMetrics(metrics);
       }

@@ -154,7 +154,7 @@ public class OzoneBucket extends WithMetadata {
   private String owner;
 
   protected OzoneBucket(Builder builder) {
-    this.metadata = builder.metadata;
+    super(builder);
     this.proxy = builder.proxy;
     this.volumeName = builder.volumeName;
     this.name = builder.name;  // bucket name
@@ -954,8 +954,7 @@ public class OzoneBucket extends WithMetadata {
   /**
    * Inner builder for OzoneBucket.
    */
-  public static class Builder {
-    private Map<String, String> metadata;
+  public static class Builder extends WithMetadata.Builder {
     private ConfigurationSource conf;
     private ClientProtocol proxy;
     private String volumeName;
@@ -983,8 +982,9 @@ public class OzoneBucket extends WithMetadata {
       this.proxy = proxy;
     }
 
+    @Override
     public Builder setMetadata(Map<String, String> metadata) {
-      this.metadata = metadata;
+      super.setMetadata(metadata);
       return this;
     }
 
@@ -1253,7 +1253,7 @@ public class OzoneBucket extends WithMetadata {
           proxy.listStatusLight(volumeName, name, delimiterKeyPrefix, false,
               startKey, listCacheSize, false);
 
-      if (addedKeyPrefix) {
+      if (addedKeyPrefix && statuses.size() > 0) {
         // previous round already include the startKey, so remove it
         statuses.remove(0);
       } else {

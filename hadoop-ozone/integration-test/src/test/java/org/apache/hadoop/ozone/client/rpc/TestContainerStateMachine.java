@@ -53,6 +53,7 @@ import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_BLOCK_TOKEN_ENABLED;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_COMMAND_STATUS_REPORT_INTERVAL;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_CONTAINER_REPORT_INTERVAL;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_HEARTBEAT_INTERVAL;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_STALENODE_INTERVAL;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -92,6 +93,7 @@ public class TestContainerStateMachine {
     baseDir.mkdirs();
 
     conf.setInt(ScmConfigKeys.OZONE_DATANODE_PIPELINE_LIMIT, 1);
+    conf.setTimeDuration(HDDS_HEARTBEAT_INTERVAL, 200, TimeUnit.MILLISECONDS);
     conf.setBoolean(HDDS_BLOCK_TOKEN_ENABLED, true);
     //  conf.setBoolean(OZONE_SECURITY_ENABLED_KEY, true);
     conf.setTimeDuration(HDDS_CONTAINER_REPORT_INTERVAL, 200,
@@ -101,7 +103,7 @@ public class TestContainerStateMachine {
     conf.setTimeDuration(OZONE_SCM_STALENODE_INTERVAL, 3, TimeUnit.SECONDS);
     conf.setQuietMode(false);
     OzoneManager.setTestSecureOmFlag(true);
-    conf.setLong(OzoneConfigKeys.DFS_RATIS_SNAPSHOT_THRESHOLD_KEY, 1);
+    conf.setLong(OzoneConfigKeys.HDDS_RATIS_SNAPSHOT_THRESHOLD_KEY, 1);
     conf.set(OzoneConfigKeys.OZONE_SCM_CLOSE_CONTAINER_WAIT_DURATION, "2s");
     conf.set(ScmConfigKeys.OZONE_SCM_PIPELINE_SCRUB_INTERVAL, "2s");
     conf.set(ScmConfigKeys.OZONE_SCM_PIPELINE_DESTROY_TIMEOUT, "5s");
@@ -113,7 +115,6 @@ public class TestContainerStateMachine {
     //  conf.set(HADOOP_SECURITY_AUTHENTICATION, KERBEROS.toString());
     cluster =
         MiniOzoneCluster.newBuilder(conf).setNumDatanodes(1)
-            .setHbInterval(200)
             .setCertificateClient(new CertificateClientTestImpl(conf))
             .setSecretKeyClient(new SecretKeyTestClient())
             .build();

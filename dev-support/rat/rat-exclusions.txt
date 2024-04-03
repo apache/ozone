@@ -1,0 +1,73 @@
+###### Licensed to the Apache Software Foundation (ASF) under one
+###### or more contributor license agreements.  See the NOTICE file
+###### distributed with this work for additional information
+###### regarding copyright ownership.  The ASF licenses this file
+###### to you under the Apache License, Version 2.0 (the
+###### "License"); you may not use this file except in compliance
+###### with the License.  You may obtain a copy of the License at
+######
+######   http://www.apache.org/licenses/LICENSE-2.0
+######
+###### Unless required by applicable law or agreed to in writing,
+###### software distributed under the License is distributed on an
+###### "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+###### KIND, either express or implied.  See the License for the
+###### specific language governing permissions and limitations
+###### under the License.
+
+**/*.json
+.gitattributes
+.github/*
+CONTRIBUTING.md
+README.md
+SECURITY.md
+
+# hadoop-hdds/interface-client
+src/main/resources/proto.lock
+
+# tools/fault-injection-service
+tools/fault-injection-service/README.md
+
+# hadoop-hdds/framework
+**/webapps/static/angular-1.8.0.min.js
+**/webapps/static/angular-nvd3-1.0.9.min.js
+**/webapps/static/angular-route-1.8.0.min.js
+**/webapps/static/bootstrap-3.4.1/**
+**/webapps/static/d3-3.5.17.min.js
+**/webapps/static/jquery-3.5.1.min.js
+**/webapps/static/nvd3-1.8.5.min.css
+**/webapps/static/nvd3-1.8.5.min.css.map
+**/webapps/static/nvd3-1.8.5.min.js
+**/webapps/static/nvd3-1.8.5.min.js.map
+
+# hadoop-hdds/container-service
+src/test/resources/123-dn-container.db/**
+src/test/resources/123.container
+src/test/resources/additionalfields.container
+src/test/resources/incorrect.checksum.container
+src/test/resources/incorrect.container
+src/test/resources/test.db.ini
+
+# hadoop-hdds/docs
+**/themes/ozonedoc/**
+static/slides/*
+
+# hadoop-ozone/dist
+**/.ssh/id_rsa*
+**/log.html
+**/output.xml
+**/report.html
+src/main/license/**
+
+# hadoop-ozone/integration-test
+src/test/resources/ssl/*
+
+# hadoop-ozone/recon
+**/pnpm-lock.yaml
+src/test/resources/prometheus-test-response.txt
+
+# hadoop-ozone/shaded
+**/dependency-reduced-pom.xml
+
+# hadoop-ozone/tools
+src/test/resources/*.log

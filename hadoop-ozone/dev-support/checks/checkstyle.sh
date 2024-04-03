@@ -42,7 +42,7 @@ cat "${REPORT_DIR}/output.log"
 find "." -name checkstyle-errors.xml -print0 \
   | xargs -0 sed '$!N; /<file.*\n<\/file/d;P;D' \
   | sed \
-      -e '/<\?xml.*>/d' \
+      -e '/<?xml.*>/d' \
       -e '/<checkstyle.*/d' \
       -e '/<\/.*/d' \
       -e 's/<file name="\([^"]*\)".*/\1/' \

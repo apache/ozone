@@ -40,6 +40,11 @@ public abstract class ByteBufferOutputStream extends OutputStream
   }
 
   @Override
+  public void write(@Nonnull byte[] byteArray, int off, int len) throws IOException {
+    write(ByteBuffer.wrap(byteArray), off, len);
+  }
+
+  @Override
   public void write(int b) throws IOException {
     write(new byte[]{(byte) b});
   }

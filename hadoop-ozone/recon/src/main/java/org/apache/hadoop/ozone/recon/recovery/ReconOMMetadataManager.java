@@ -22,6 +22,7 @@ import java.io.File;
 import java.io.IOException;
 import java.util.List;
 
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
@@ -105,4 +106,11 @@ public interface ReconOMMetadataManager extends OMMetadataManager {
    */
   List<OmBucketInfo> listBucketsUnderVolume(
       String volumeName) throws IOException;
+
+  /**
+   * Return the OzoneConfiguration instance used by Recon.
+   * @return
+   */
+  OzoneConfiguration getOzoneConfiguration();
+
 }

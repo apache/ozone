@@ -64,6 +64,7 @@ import org.apache.hadoop.util.Daemon;
 import static org.apache.hadoop.ozone.OzoneConsts.TRANSACTION_INFO_KEY;
 import static org.apache.hadoop.ozone.om.request.OMRequestTestUtils.newBucketInfoBuilder;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
@@ -111,7 +112,8 @@ public class TestOzoneManagerDoubleBufferWithOMResponse {
         .setOmMetadataManager(omMetadataManager)
         .setMaxUnFlushedTransactionCount(100000)
         .enableRatis(true)
-        .build();
+        .build()
+        .start();
   }
 
   @AfterEach
@@ -416,13 +418,9 @@ public class TestOzoneManagerDoubleBufferWithOMResponse {
   }
 
   private boolean assertRowCount(int expected, Table<String, ?> table) {
-    long count = 0L;
-    try {
-      count = omMetadataManager.countRowsInTable(table);
-    } catch (IOException ex) {
-      fail("testDoubleBuffer failed with: " + ex);
-    }
-    return count == expected;
+    AtomicLong count = new AtomicLong(0L);
+    assertDoesNotThrow(() -> count.set(omMetadataManager.countRowsInTable(table)));
+    return count.get() == expected;
   }
 
   /**

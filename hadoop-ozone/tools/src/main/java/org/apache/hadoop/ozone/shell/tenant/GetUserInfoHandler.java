@@ -17,11 +17,10 @@
  */
 package org.apache.hadoop.ozone.shell.tenant;
 
-import com.google.gson.Gson;
-import com.google.gson.GsonBuilder;
-import com.google.gson.JsonArray;
-import com.google.gson.JsonObject;
+import com.fasterxml.jackson.databind.node.ArrayNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import org.apache.hadoop.hdds.cli.GenericCli;
+import org.apache.hadoop.hdds.server.JsonUtils;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.om.helpers.TenantUserInfoValue;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ExtendedUserAccessIdInfo;
@@ -71,39 +70,32 @@ public class GetUserInfoHandler extends TenantHandler {
     if (!printJson) {
       out().println("User '" + userPrincipal + "' is assigned to:");
       accessIdInfoList.forEach(accessIdInfo -> {
-        // Get admin info
-        final String adminInfoString;
-        if (accessIdInfo.getIsAdmin()) {
-          adminInfoString = accessIdInfo.getIsDelegatedAdmin() ?
-              " delegated admin" : " admin";
-        } else {
-          adminInfoString = "";
-        }
+        final String adminInfoString = accessIdInfo.getIsAdmin() ?
+            (accessIdInfo.getIsDelegatedAdmin() ? " delegated admin" :
+                " admin") : "";
         out().format("- Tenant '%s'%s with accessId '%s'%n",
             accessIdInfo.getTenantId(),
             adminInfoString,
             accessIdInfo.getAccessId());
       });
     } else {
+      ObjectNode resObj = JsonUtils.createObjectNode(null);
+      resObj.put("user", userPrincipal);
 
-      final JsonObject resObj = new JsonObject();
-      resObj.addProperty("user", userPrincipal);
-
-      final JsonArray arr = new JsonArray();
+      ArrayNode arr = JsonUtils.createArrayNode();
       accessIdInfoList.forEach(accessIdInfo -> {
-        final JsonObject tenantObj = new JsonObject();
-        tenantObj.addProperty("accessId", accessIdInfo.getAccessId());
-        tenantObj.addProperty("tenantId", accessIdInfo.getTenantId());
-        tenantObj.addProperty("isAdmin", accessIdInfo.getIsAdmin());
-        tenantObj.addProperty("isDelegatedAdmin",
-            accessIdInfo.getIsDelegatedAdmin());
+        ObjectNode tenantObj = JsonUtils.createObjectNode(null);
+        tenantObj.put("accessId", accessIdInfo.getAccessId());
+        tenantObj.put("tenantId", accessIdInfo.getTenantId());
+        tenantObj.put("isAdmin", accessIdInfo.getIsAdmin());
+        tenantObj.put("isDelegatedAdmin", accessIdInfo.getIsDelegatedAdmin());
         arr.add(tenantObj);
       });
 
-      resObj.add("tenants", arr);
-
-      final Gson gson = new GsonBuilder().setPrettyPrinting().create();
-      out().println(gson.toJson(resObj));
+      resObj.set("tenants", arr);
+      String prettyJson =
+          JsonUtils.toJsonStringWithDefaultPrettyPrinter(resObj);
+      out().println(prettyJson);
     }
 
   }

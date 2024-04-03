@@ -24,6 +24,8 @@ import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.utils.TransactionInfo;
+import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.client.ObjectStore;
@@ -42,11 +44,13 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 
+import static org.apache.hadoop.ozone.OzoneConsts.TRANSACTION_INFO_KEY;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.ozone.OmUtils.EPOCH_ID_SHIFT;
 import static org.apache.hadoop.ozone.OmUtils.EPOCH_WHEN_RATIS_NOT_ENABLED;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_RATIS_ENABLE_KEY;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Tests OM epoch generation for when Ratis is not enabled.
@@ -143,6 +147,48 @@ public class TestOMEpochForNonRatis {
     // Key commit is a separate transaction. Hence, the last trxn index in DB
     // should be 1 more than KeyTrxnIndex
     assertEquals(4, om.getLastTrxnIndexForNonRatis());
+  }
+
+  @Test
+  public void testIncreaseTrxnIndexBasedOnExistingDB() throws Exception {
+    // Set transactionInfo.getTerm() not -1 to mock the DB migrated from ratis cluster.
+    // When OM is first started from the existing ratis DB, the transaction index for
+    // requests should not start from 0. It should incrementally increase from the last
+    // transaction index which was stored in DB transactionInfoTable before started.
+
+    String volumeName = "volume" + RandomStringUtils.randomNumeric(5);
+    String bucketName = "bucket" + RandomStringUtils.randomNumeric(5);
+    String keyName = "key" + RandomStringUtils.randomNumeric(5);
+
+    OzoneManager om = cluster.getOzoneManager();
+    ObjectStore objectStore = client.getObjectStore();
+
+    objectStore.createVolume(volumeName);
+    OzoneVolume ozoneVolume = objectStore.getVolume(volumeName);
+    ozoneVolume.createBucket(bucketName);
+
+    Table<String, TransactionInfo> transactionInfoTable = om.getMetadataManager().getTransactionInfoTable();
+    long initIndex = transactionInfoTable.get(TRANSACTION_INFO_KEY).getTransactionIndex();
+    // Set transactionInfo.getTerm() = 1 to mock the DB migrated from ratis cluster
+    transactionInfoTable.put(TRANSACTION_INFO_KEY, TransactionInfo.valueOf(1, initIndex));
+    TransactionInfo transactionInfo = transactionInfoTable.get(TRANSACTION_INFO_KEY);
+    // Verify transaction term != -1 and index > 1
+    assertEquals(1, transactionInfo.getTerm());
+    assertTrue(initIndex > 1);
+
+    // Restart the OM and create new object
+    cluster.restartOzoneManager();
+
+    String data = "random data";
+    OzoneOutputStream ozoneOutputStream = ozoneVolume.getBucket(bucketName).createKey(keyName, data.length());
+    ozoneOutputStream.write(data.getBytes(UTF_8), 0, data.length());
+    ozoneOutputStream.close();
+
+    // Transaction index after OM restart is incremented by 2 (create and commit op) from the last
+    // transaction index before OM restart rather than from 0.
+    // So, the transactionIndex should be (initIndex + 2) rather than (0 + 2)
+    assertEquals(initIndex + 2,
+        om.getMetadataManager().getTransactionInfoTable().get(TRANSACTION_INFO_KEY).getTransactionIndex());
   }
 
   @Test

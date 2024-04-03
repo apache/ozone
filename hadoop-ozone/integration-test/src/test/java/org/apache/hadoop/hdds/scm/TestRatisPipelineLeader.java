@@ -32,7 +32,7 @@ import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.container.common.transport.server.ratis.XceiverServerRatis;
 import org.apache.ozone.test.GenericTestUtils;
 
-import static org.apache.hadoop.ozone.OzoneConfigKeys.DFS_RATIS_LEADER_ELECTION_MINIMUM_TIMEOUT_DURATION_KEY;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.HDDS_RATIS_LEADER_ELECTION_MINIMUM_TIMEOUT_DURATION_KEY;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
@@ -132,7 +132,7 @@ public class TestRatisPipelineLeader {
     dnToStop.get().stop();
     // wait long enough based on leader election min timeout
     Thread.sleep(4000 * conf.getTimeDuration(
-        DFS_RATIS_LEADER_ELECTION_MINIMUM_TIMEOUT_DURATION_KEY,
+        HDDS_RATIS_LEADER_ELECTION_MINIMUM_TIMEOUT_DURATION_KEY,
         5, TimeUnit.SECONDS));
     GenericTestUtils.waitFor(() -> {
       try {

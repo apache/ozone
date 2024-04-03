@@ -45,8 +45,6 @@ import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineNotFoundException;
 import org.apache.hadoop.hdds.server.JsonUtils;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import picocli.CommandLine;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Model.CommandSpec;
@@ -62,9 +60,6 @@ import picocli.CommandLine.Spec;
     mixinStandardHelpOptions = true,
     versionProvider = HddsVersionProvider.class)
 public class InfoSubcommand extends ScmSubcommand {
-
-  private static final Logger LOG =
-      LoggerFactory.getLogger(InfoSubcommand.class);
 
   @Spec
   private CommandSpec spec;
@@ -126,13 +121,13 @@ public class InfoSubcommand extends ScmSubcommand {
 
   private void printHeader() {
     if (json && multiContainer) {
-      LOG.info("[");
+      System.out.println("[");
     }
   }
 
   private void printFooter() {
     if (json && multiContainer) {
-      LOG.info("]");
+      System.out.println("]");
     }
   }
 
@@ -142,9 +137,9 @@ public class InfoSubcommand extends ScmSubcommand {
 
   private void printBreak() {
     if (json) {
-      LOG.info(",");
+      System.out.println(",");
     } else {
-      LOG.info("");
+      System.out.println("");
     }
   }
 
@@ -175,47 +170,47 @@ public class InfoSubcommand extends ScmSubcommand {
             new ContainerWithPipelineAndReplicas(container.getContainerInfo(),
                 container.getPipeline(), replicas,
                 container.getContainerInfo().getPipelineID());
-        LOG.info(JsonUtils.toJsonStringWithDefaultPrettyPrinter(wrapper));
+        System.out.println(JsonUtils.toJsonStringWithDefaultPrettyPrinter(wrapper));
       } else {
         ContainerWithoutDatanodes wrapper =
             new ContainerWithoutDatanodes(container.getContainerInfo(),
                 container.getPipeline(), replicas,
                 container.getContainerInfo().getPipelineID());
-        LOG.info(JsonUtils.toJsonStringWithDefaultPrettyPrinter(wrapper));
+        System.out.println(JsonUtils.toJsonStringWithDefaultPrettyPrinter(wrapper));
       }
     } else {
       // Print container report info.
-      LOG.info("Container id: {}", containerID);
+      System.out.printf("Container id: %s%n", containerID);
       boolean verbose = spec != null
           && spec.root().userObject() instanceof GenericParentCommand
           && ((GenericParentCommand) spec.root().userObject()).isVerbose();
       if (verbose) {
-        LOG.info("Pipeline Info: {}", container.getPipeline());
+        System.out.printf("Pipeline Info: %s%n", container.getPipeline());
       } else {
-        LOG.info("Pipeline id: {}", container.getPipeline().getId().getId());
+        System.out.printf("Pipeline id: %s%n", container.getPipeline().getId().getId());
       }
-      LOG.info("Write PipelineId: {}",
+      System.out.printf("Write PipelineId: %s%n",
           container.getContainerInfo().getPipelineID().getId());
       try {
         String pipelineState = scmClient.getPipeline(
                 container.getContainerInfo().getPipelineID().getProtobuf())
             .getPipelineState().toString();
-        LOG.info("Write Pipeline State: {}", pipelineState);
+        System.out.printf("Write Pipeline State: %s%n", pipelineState);
       } catch (IOException ioe) {
         if (SCMHAUtils.unwrapException(
             ioe) instanceof PipelineNotFoundException) {
-          LOG.info("Write Pipeline State: CLOSED");
+          System.out.println("Write Pipeline State: CLOSED");
         } else {
           printError("Failed to retrieve pipeline info");
         }
       }
-      LOG.info("Container State: {}", container.getContainerInfo().getState());
+      System.out.printf("Container State: %s%n", container.getContainerInfo().getState());
 
       // Print pipeline of an existing container.
       String machinesStr = container.getPipeline().getNodes().stream().map(
               InfoSubcommand::buildDatanodeDetails)
           .collect(Collectors.joining(",\n"));
-      LOG.info("Datanodes: [{}]", machinesStr);
+      System.out.printf("Datanodes: [%s]%n", machinesStr);
 
       // Print the replica details if available
       if (replicas != null) {
@@ -223,7 +218,7 @@ public class InfoSubcommand extends ScmSubcommand {
             .sorted(Comparator.comparing(ContainerReplicaInfo::getReplicaIndex))
             .map(InfoSubcommand::buildReplicaDetails)
             .collect(Collectors.joining(",\n"));
-        LOG.info("Replicas: [{}]", replicaStr);
+        System.out.printf("Replicas: [%s]%n", replicaStr);
       }
     }
   }

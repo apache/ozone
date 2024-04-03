@@ -326,13 +326,12 @@ public final class TestSecretKeysApi {
   private void startCluster(int numSCMs)
       throws IOException, TimeoutException, InterruptedException {
     OzoneManager.setTestSecureOmFlag(true);
-    MiniOzoneCluster.Builder builder = MiniOzoneCluster.newHABuilder(conf)
+    MiniOzoneHAClusterImpl.Builder builder = MiniOzoneCluster.newHABuilder(conf)
         .setSCMServiceId("TestSecretKey")
-        .setNumDatanodes(3)
         .setNumOfStorageContainerManagers(numSCMs)
         .setNumOfOzoneManagers(1);
 
-    cluster = (MiniOzoneHAClusterImpl) builder.build();
+    cluster = builder.build();
     cluster.waitForClusterToBeReady();
   }
 

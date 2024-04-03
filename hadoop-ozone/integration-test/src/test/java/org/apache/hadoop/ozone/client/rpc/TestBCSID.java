@@ -49,6 +49,7 @@ import static org.apache.hadoop.hdds.HddsConfigKeys.
     HDDS_COMMAND_STATUS_REPORT_INTERVAL;
 import static org.apache.hadoop.hdds.HddsConfigKeys.
     HDDS_CONTAINER_REPORT_INTERVAL;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_HEARTBEAT_INTERVAL;
 import static org.apache.hadoop.hdds.HddsConfigKeys
     .HDDS_SCM_SAFEMODE_PIPELINE_CREATION;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_STALENODE_INTERVAL;
@@ -84,10 +85,11 @@ public class TestBCSID {
     conf.setTimeDuration(HDDS_COMMAND_STATUS_REPORT_INTERVAL, 200,
         TimeUnit.MILLISECONDS);
     conf.setTimeDuration(OZONE_SCM_STALENODE_INTERVAL, 3, TimeUnit.SECONDS);
+    conf.setTimeDuration(HDDS_HEARTBEAT_INTERVAL, 200, TimeUnit.MILLISECONDS);
     conf.setQuietMode(false);
     conf.setBoolean(HDDS_SCM_SAFEMODE_PIPELINE_CREATION, false);
     cluster =
-        MiniOzoneCluster.newBuilder(conf).setNumDatanodes(1).setHbInterval(200)
+        MiniOzoneCluster.newBuilder(conf).setNumDatanodes(1)
             .build();
     cluster.waitForClusterToBeReady();
     //the easiest way to create an open container is creating a key

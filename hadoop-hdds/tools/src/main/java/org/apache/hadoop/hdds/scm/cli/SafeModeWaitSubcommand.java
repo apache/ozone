@@ -23,8 +23,6 @@ import java.util.concurrent.TimeoutException;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.scm.client.ScmClient;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
 import picocli.CommandLine.Mixin;
@@ -38,9 +36,6 @@ import picocli.CommandLine.Mixin;
     mixinStandardHelpOptions = true,
     versionProvider = HddsVersionProvider.class)
 public class SafeModeWaitSubcommand implements Callable<Void> {
-
-  private static final Logger LOG =
-      LoggerFactory.getLogger(SafeModeWaitSubcommand.class);
 
   @Option(description =
       "Define timeout (in second) to wait until (exit code 1) "
@@ -62,26 +57,26 @@ public class SafeModeWaitSubcommand implements Callable<Void> {
         long remainingTime;
         do {
           if (!scmClient.inSafeMode()) {
-            LOG.info("SCM is out of safe mode.");
+            System.out.println("SCM is out of safe mode.");
             return null;
           }
 
           remainingTime = getRemainingTimeInSec();
 
           if (remainingTime > 0) {
-            LOG.info(
+            System.out.printf(
                 "SCM is in safe mode. Will retry in 1 sec. Remaining time "
-                    + "(sec): {}",
+                    + "(sec): %s%n",
                 remainingTime);
             Thread.sleep(1000);
           } else {
-            LOG.info("SCM is in safe mode. No more retries.");
+            System.out.println("SCM is in safe mode. No more retries.");
           }
         } while (remainingTime > 0);
       } catch (InterruptedException ex) {
-        LOG.info(
-            "SCM is not available (yet?). Error is {}. Will retry in 1 sec. "
-                + "Remaining time (sec): {}",
+        System.out.printf(
+            "SCM is not available (yet?). Error is %s. Will retry in 1 sec. "
+                + "Remaining time (sec): %s%n",
             ex.getMessage(), getRemainingTimeInSec());
         Thread.sleep(1000);
         Thread.currentThread().interrupt();

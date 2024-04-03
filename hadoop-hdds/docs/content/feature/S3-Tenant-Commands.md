@@ -432,7 +432,7 @@ bash-4.2$ aws s3api --endpoint-url http://s3g:9878 list-objects --bucket bucket-
         {
             "Key": "file1",
             "LastModified": "2022-02-16T00:10:00.000Z",
-            "ETag": "2022-02-16T00:10:00.000Z",
+            "ETag": "e99f93dedfe22e9a133dc3c634f14634",
             "Size": 3811,
             "StorageClass": "STANDARD"
         }

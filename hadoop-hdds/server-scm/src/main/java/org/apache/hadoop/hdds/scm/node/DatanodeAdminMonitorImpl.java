@@ -494,7 +494,8 @@ public class DatanodeAdminMonitorImpl implements DatanodeAdminMonitor {
     return underReplicated == 0 && unclosed == 0;
   }
 
-  public Map<String, List<ContainerID>> getContainersReplicatedOnNode(DatanodeDetails dn) {
+  @Override
+  public Map<String, List<ContainerID>> getContainersPendingReplication(DatanodeDetails dn) {
     Iterator<TrackedNode> iterator = trackedNodes.iterator();
     while (iterator.hasNext()) {
       TrackedNode trackedNode = iterator.next();

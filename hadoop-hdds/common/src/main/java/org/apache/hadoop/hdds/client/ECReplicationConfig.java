@@ -154,6 +154,14 @@ public class ECReplicationConfig implements ReplicationConfig {
         + chunkKB();
   }
 
+  /** Similar to {@link #getReplication()}, but applies to proto structure, without any validation. */
+  public static String toString(HddsProtos.ECReplicationConfig proto) {
+    return proto.getCodec() + EC_REPLICATION_PARAMS_DELIMITER
+        + proto.getData() + EC_REPLICATION_PARAMS_DELIMITER
+        + proto.getParity() + EC_REPLICATION_PARAMS_DELIMITER
+        + proto.getEcChunkSize();
+  }
+
   public HddsProtos.ECReplicationConfig toProto() {
     return HddsProtos.ECReplicationConfig.newBuilder()
         .setData(data)

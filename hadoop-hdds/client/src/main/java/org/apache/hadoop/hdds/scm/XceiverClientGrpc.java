@@ -166,8 +166,8 @@ public class XceiverClientGrpc extends XceiverClientSpi {
     // port.
     int port = dn.getPort(DatanodeDetails.Port.Name.STANDALONE).getValue();
     if (port == 0) {
-      port = config.getInt(OzoneConfigKeys.DFS_CONTAINER_IPC_PORT,
-          OzoneConfigKeys.DFS_CONTAINER_IPC_PORT_DEFAULT);
+      port = config.getInt(OzoneConfigKeys.HDDS_CONTAINER_IPC_PORT,
+          OzoneConfigKeys.HDDS_CONTAINER_IPC_PORT_DEFAULT);
     }
 
     // Add credential context to the client call

@@ -28,9 +28,6 @@ import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineNotFoundException;
-import org.apache.log4j.AppenderSkeleton;
-import org.apache.log4j.Logger;
-import org.apache.log4j.spi.LoggingEvent;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -44,6 +41,7 @@ import java.io.PrintStream;
 import java.io.UnsupportedEncodingException;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.UUID;
 import java.util.regex.Matcher;
@@ -52,6 +50,7 @@ import java.util.stream.Collectors;
 
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState.CLOSED;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.THREE;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -69,8 +68,6 @@ public class TestInfoSubCommand {
   private ScmClient scmClient;
   private InfoSubcommand cmd;
   private List<DatanodeDetails> datanodes;
-  private Logger logger;
-  private TestAppender appender;
 
   private final ByteArrayOutputStream outContent = new ByteArrayOutputStream();
   private final ByteArrayOutputStream errContent = new ByteArrayOutputStream();
@@ -88,18 +85,12 @@ public class TestInfoSubCommand {
     when(scmClient.getContainerWithPipeline(anyLong())).then(i -> getContainerWithPipeline(i.getArgument(0)));
     when(scmClient.getPipeline(any())).thenThrow(new PipelineNotFoundException("Pipeline not found."));
 
-    appender = new TestAppender();
-    logger = Logger.getLogger(
-        org.apache.hadoop.hdds.scm.cli.container.InfoSubcommand.class);
-    logger.addAppender(appender);
-
     System.setOut(new PrintStream(outContent, false, DEFAULT_ENCODING));
     System.setErr(new PrintStream(errContent, false, DEFAULT_ENCODING));
   }
 
   @AfterEach
   public void after() {
-    logger.removeAppender(appender);
     System.setOut(originalOut);
     System.setErr(originalErr);
     System.setIn(originalIn);
@@ -150,10 +141,8 @@ public class TestInfoSubCommand {
 
   private void validateMultiOutput() throws UnsupportedEncodingException {
     // Ensure we have a log line for each containerID
-    List<LoggingEvent> logs = appender.getLog();
-    List<LoggingEvent> replica = logs.stream()
-        .filter(m -> m.getRenderedMessage()
-            .matches("(?s)^Container id: (1|123|456|789).*"))
+    List<String> replica = Arrays.stream(outContent.toString(DEFAULT_ENCODING).split("\n"))
+        .filter(m -> m.matches("(?s)^Container id: (1|123|456|789).*"))
         .collect(Collectors.toList());
     assertEquals(4, replica.size());
 
@@ -191,10 +180,8 @@ public class TestInfoSubCommand {
 
   private void validateJsonMultiOutput() throws UnsupportedEncodingException {
     // Ensure we have a log line for each containerID
-    List<LoggingEvent> logs = appender.getLog();
-    List<LoggingEvent> replica = logs.stream()
-        .filter(m -> m.getRenderedMessage()
-            .matches("(?s)^.*\"containerInfo\".*"))
+    List<String> replica = Arrays.stream(outContent.toString(DEFAULT_ENCODING).split("\n"))
+        .filter(m -> m.matches("(?s)^.*\"containerInfo\".*"))
         .collect(Collectors.toList());
     assertEquals(4, replica.size());
 
@@ -213,34 +200,33 @@ public class TestInfoSubCommand {
     cmd.execute(scmClient);
 
     // Ensure we have a line for Replicas:
-    List<LoggingEvent> logs = appender.getLog();
-    List<LoggingEvent> replica = logs.stream()
-        .filter(m -> m.getRenderedMessage().matches("(?s)^Replicas:.*"))
-        .collect(Collectors.toList());
-    assertEquals(1, replica.size());
+    String output = outContent.toString(DEFAULT_ENCODING);
+    Pattern pattern = Pattern.compile("Replicas: \\[.*\\]", Pattern.DOTALL);
+    Matcher matcher = pattern.matcher(output);
+    assertTrue(matcher.find());
+    String replica = matcher.group();
 
     // Ensure each DN UUID is mentioned in the message:
     for (DatanodeDetails dn : datanodes) {
-      Pattern pattern = Pattern.compile(".*" + dn.getUuid().toString() + ".*",
+      Pattern uuidPattern = Pattern.compile(".*" + dn.getUuid().toString() + ".*",
           Pattern.DOTALL);
-      Matcher matcher = pattern.matcher(replica.get(0).getRenderedMessage());
-      assertTrue(matcher.matches());
+      assertThat(replica).matches(uuidPattern);
     }
     // Ensure the replicaIndex output is in order
     if (includeIndex) {
       List<Integer> indexList = new ArrayList<>();
       for (int i = 1; i < datanodes.size() + 1; i++) {
         String temp = "ReplicaIndex: " + i;
-        indexList.add(replica.get(0).getRenderedMessage().indexOf(temp));
+        indexList.add(replica.indexOf(temp));
       }
       assertEquals(datanodes.size(), indexList.size());
       assertTrue(inSort(indexList));
     }
     // Ensure ReplicaIndex is not mentioned as it was not passed in the proto:
-    Pattern pattern = Pattern.compile(".*ReplicaIndex.*",
-        Pattern.DOTALL);
-    Matcher matcher = pattern.matcher(replica.get(0).getRenderedMessage());
-    assertEquals(includeIndex, matcher.matches());
+    assertEquals(includeIndex,
+        Pattern.compile(".*ReplicaIndex.*", Pattern.DOTALL)
+            .matcher(replica)
+            .matches());
   }
 
   @Test
@@ -253,9 +239,8 @@ public class TestInfoSubCommand {
     cmd.execute(scmClient);
 
     // Ensure we have no lines for Replicas:
-    List<LoggingEvent> logs = appender.getLog();
-    List<LoggingEvent> replica = logs.stream()
-        .filter(m -> m.getRenderedMessage().matches("(?s)^Replicas:.*"))
+    List<String> replica = Arrays.stream(outContent.toString(DEFAULT_ENCODING).split("\n"))
+        .filter(m -> m.matches("(?s)^Replicas:.*"))
         .collect(Collectors.toList());
     assertEquals(0, replica.size());
 
@@ -274,9 +259,7 @@ public class TestInfoSubCommand {
     c.parseArgs("1", "--json");
     cmd.execute(scmClient);
 
-    List<LoggingEvent> logs = appender.getLog();
-    assertEquals(1, logs.size());
-    String json = logs.get(0).getRenderedMessage();
+    String json = outContent.toString(DEFAULT_ENCODING);
 
     assertFalse(json.matches("(?s).*replicas.*"));
   }
@@ -310,11 +293,8 @@ public class TestInfoSubCommand {
     c.parseArgs("1", "--json");
     cmd.execute(scmClient);
 
-    List<LoggingEvent> logs = appender.getLog();
-    assertEquals(1, logs.size());
-
     // Ensure each DN UUID is mentioned in the message after replicas:
-    String json = logs.get(0).getRenderedMessage();
+    String json = outContent.toString(DEFAULT_ENCODING);
     assertTrue(json.matches("(?s).*replicas.*"));
     for (DatanodeDetails dn : datanodes) {
       Pattern pattern = Pattern.compile(
@@ -409,25 +389,4 @@ public class TestInfoSubCommand {
     return dns;
   }
 
-  private static class TestAppender extends AppenderSkeleton {
-    private final List<LoggingEvent> log = new ArrayList<>();
-
-    @Override
-    public boolean requiresLayout() {
-      return false;
-    }
-
-    @Override
-    protected void append(final LoggingEvent loggingEvent) {
-      log.add(loggingEvent);
-    }
-
-    @Override
-    public void close() {
-    }
-
-    public List<LoggingEvent> getLog() {
-      return new ArrayList<>(log);
-    }
-  }
 }

@@ -151,10 +151,10 @@ public class TestEndPoint {
     try (EndpointStateMachine rpcEndPoint = createEndpoint(ozoneConf,
         serverAddress, 1000)) {
       ozoneConf.setBoolean(
-          OzoneConfigKeys.DFS_CONTAINER_RATIS_DATASTREAM_ENABLED,
+          OzoneConfigKeys.HDDS_CONTAINER_RATIS_DATASTREAM_ENABLED,
           true);
       ozoneConf.setBoolean(
-          OzoneConfigKeys.DFS_CONTAINER_RATIS_DATASTREAM_RANDOM_PORT, true);
+          OzoneConfigKeys.HDDS_CONTAINER_RATIS_DATASTREAM_RANDOM_PORT, true);
       OzoneContainer ozoneContainer = new OzoneContainer(dnDetails,
           ozoneConf, ContainerTestUtils.getMockContext(dnDetails, ozoneConf));
       rpcEndPoint.setState(EndpointStateMachine.EndPointStates.GETVERSION);
@@ -179,9 +179,9 @@ public class TestEndPoint {
    */
   @Test
   public void testDeletedContainersClearedOnStartup() throws Exception {
-    ozoneConf.setBoolean(OzoneConfigKeys.DFS_CONTAINER_IPC_RANDOM_PORT,
+    ozoneConf.setBoolean(OzoneConfigKeys.HDDS_CONTAINER_IPC_RANDOM_PORT,
         true);
-    ozoneConf.setBoolean(OzoneConfigKeys.DFS_CONTAINER_RATIS_IPC_RANDOM_PORT,
+    ozoneConf.setBoolean(OzoneConfigKeys.HDDS_CONTAINER_RATIS_IPC_RANDOM_PORT,
         true);
     ozoneConf.setFromObject(new ReplicationConfig().setPort(0));
     try (EndpointStateMachine rpcEndPoint = createEndpoint(ozoneConf,
@@ -217,12 +217,12 @@ public class TestEndPoint {
 
   @Test
   public void testCheckVersionResponse() throws Exception {
-    ozoneConf.setBoolean(OzoneConfigKeys.DFS_CONTAINER_IPC_RANDOM_PORT,
+    ozoneConf.setBoolean(OzoneConfigKeys.HDDS_CONTAINER_IPC_RANDOM_PORT,
         true);
-    ozoneConf.setBoolean(OzoneConfigKeys.DFS_CONTAINER_RATIS_IPC_RANDOM_PORT,
+    ozoneConf.setBoolean(OzoneConfigKeys.HDDS_CONTAINER_RATIS_IPC_RANDOM_PORT,
         true);
     ozoneConf.setBoolean(
-        OzoneConfigKeys.DFS_CONTAINER_RATIS_DATASTREAM_RANDOM_PORT, true);
+        OzoneConfigKeys.HDDS_CONTAINER_RATIS_DATASTREAM_RANDOM_PORT, true);
     ozoneConf.setFromObject(new ReplicationConfig().setPort(0));
     try (EndpointStateMachine rpcEndPoint = createEndpoint(ozoneConf,
         serverAddress, 1000)) {
@@ -267,7 +267,7 @@ public class TestEndPoint {
    */
   @Test
   public void testDnLayoutVersionFile() throws Exception {
-    ozoneConf.setBoolean(OzoneConfigKeys.DFS_CONTAINER_RATIS_IPC_RANDOM_PORT,
+    ozoneConf.setBoolean(OzoneConfigKeys.HDDS_CONTAINER_RATIS_IPC_RANDOM_PORT,
         true);
     try (EndpointStateMachine rpcEndPoint = createEndpoint(ozoneConf,
         serverAddress, 1000)) {
@@ -579,7 +579,7 @@ public class TestEndPoint {
     // Mini Ozone cluster will not come up if the port is not true, since
     // Ratis will exit if the server port cannot be bound. We can remove this
     // hard coding once we fix the Ratis default behaviour.
-    conf.setBoolean(OzoneConfigKeys.DFS_CONTAINER_RATIS_IPC_RANDOM_PORT, true);
+    conf.setBoolean(OzoneConfigKeys.HDDS_CONTAINER_RATIS_IPC_RANDOM_PORT, true);
 
     // Create a datanode state machine for stateConext used by endpoint task
     try (DatanodeStateMachine stateMachine = new DatanodeStateMachine(

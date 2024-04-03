@@ -56,8 +56,9 @@ public class OmMultipartUploadCompleteList {
    */
   public List<Part> getPartsList() {
     List<Part> partList = new ArrayList<>();
-    multipartMap.forEach((partNumber, partName) -> partList.add(Part
-        .newBuilder().setPartName(partName).setPartNumber(partNumber).build()));
+    multipartMap.forEach((partNumber, eTag) -> partList.add(Part
+        // set partName equal to eTag for back compatibility (partName is a required property)
+        .newBuilder().setPartName(eTag).setETag(eTag).setPartNumber(partNumber).build()));
     return partList;
   }
 }

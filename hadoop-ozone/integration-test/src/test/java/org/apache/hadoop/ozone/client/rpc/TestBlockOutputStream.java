@@ -115,7 +115,6 @@ class TestBlockOutputStream {
 
     MiniOzoneCluster cluster = MiniOzoneCluster.newBuilder(conf)
         .setNumDatanodes(5)
-        .setTotalPipelineNumLimit(3)
         .build();
     cluster.waitForClusterToBeReady();
 

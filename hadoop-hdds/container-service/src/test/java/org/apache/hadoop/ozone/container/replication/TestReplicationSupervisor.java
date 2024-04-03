@@ -79,8 +79,8 @@ import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalSt
 import static org.apache.hadoop.ozone.container.replication.AbstractReplicationTask.Status.DONE;
 import static org.apache.hadoop.ozone.protocol.commands.ReplicateContainerCommand.fromSources;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.fail;
 import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ReplicationCommandPriority.LOW;
 import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ReplicationCommandPriority.NORMAL;
 import static org.mockito.Mockito.any;
@@ -478,11 +478,8 @@ public class TestReplicationSupervisor {
     @Override
     public void runTask() {
       runningLatch.countDown();
-      try {
-        waitForCompleteLatch.await();
-      } catch (InterruptedException e) {
-        fail("Interrupted waiting for the completion latch to be released");
-      }
+      assertDoesNotThrow(() -> waitForCompleteLatch.await(),
+          "Interrupted waiting for the completion latch to be released");
       setStatus(DONE);
     }
   }
@@ -607,13 +604,10 @@ public class TestReplicationSupervisor {
               UUID.randomUUID().toString(), UUID.randomUUID().toString());
       KeyValueContainer kvc =
           new KeyValueContainer(kvcd, conf);
-
-      try {
+      assertDoesNotThrow(() -> {
         set.addContainer(kvc);
         task.setStatus(DONE);
-      } catch (Exception e) {
-        fail("Unexpected error: " + e.getMessage());
-      }
+      });
     }
   }
 

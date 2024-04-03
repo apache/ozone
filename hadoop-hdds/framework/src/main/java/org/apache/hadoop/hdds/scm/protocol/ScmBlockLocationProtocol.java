@@ -22,6 +22,7 @@ import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.scm.AddSCMRequest;
 import org.apache.hadoop.hdds.scm.ScmConfig;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
+import org.apache.hadoop.hdds.scm.net.InnerNode;
 import org.apache.hadoop.security.KerberosInfo;
 import org.apache.hadoop.hdds.scm.ScmInfo;
 import org.apache.hadoop.hdds.scm.container.common.helpers.AllocatedBlock;
@@ -138,4 +139,11 @@ public interface ScmBlockLocationProtocol extends Closeable {
    */
   List<DatanodeDetails> sortDatanodes(List<String> nodes,
       String clientMachine) throws IOException;
+
+  /**
+   * Retrieves the hierarchical cluster tree representing the network topology.
+   * @return the root node of the network topology cluster tree.
+   * @throws IOException
+   */
+  InnerNode getNetworkTopology() throws IOException;
 }

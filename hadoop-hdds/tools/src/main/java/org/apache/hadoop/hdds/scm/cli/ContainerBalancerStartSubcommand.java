@@ -38,41 +38,87 @@ public class ContainerBalancerStartSubcommand extends ScmSubcommand {
 
   @Option(names = {"-t", "--threshold"},
       description = "Percentage deviation from average utilization of " +
-          "the cluster after which a datanode will be rebalanced (for " +
-          "example, '10' for 10%%).")
+          "the cluster after which a datanode will be rebalanced. The value " +
+          "should be in the range [0.0, 100.0), with a default of 10 " +
+          "(specify '10' for 10%%).")
   private Optional<Double> threshold;
 
   @Option(names = {"-i", "--iterations"},
-      description = "Maximum consecutive iterations that" +
-          " balancer will run for.")
+      description = "Maximum consecutive iterations that " +
+          "balancer will run for. The value should be positive " +
+          "or -1, with a default of 10 (specify '10' for 10 iterations).")
   private Optional<Integer> iterations;
 
   @Option(names = {"-d", "--max-datanodes-percentage-to-involve-per-iteration",
       "--maxDatanodesPercentageToInvolvePerIteration"},
       description = "Max percentage of healthy, in service datanodes " +
-          "that can be involved in balancing in one iteration (for example, " +
+          "that can be involved in balancing in one iteration. The value " +
+          "should be in the range [0,100], with a default of 20 (specify " +
           "'20' for 20%%).")
   private Optional<Integer> maxDatanodesPercentageToInvolvePerIteration;
 
   @Option(names = {"-s", "--max-size-to-move-per-iteration-in-gb",
       "--maxSizeToMovePerIterationInGB"},
       description = "Maximum size that can be moved per iteration of " +
-          "balancing (for example, '500' for 500GB).")
+          "balancing. The value should be positive, with a default of 500 " +
+          "(specify '500' for 500GB).")
   private Optional<Long> maxSizeToMovePerIterationInGB;
 
   @Option(names = {"-e", "--max-size-entering-target-in-gb",
       "--maxSizeEnteringTargetInGB"},
       description = "Maximum size that can enter a target datanode while " +
-          "balancing. This is the sum of data from multiple sources (for " +
-          "example, '26' for 26GB).")
+          "balancing. This is the sum of data from multiple sources. The value " +
+          "should be positive, with a default of 26 (specify '26' for 26GB).")
   private Optional<Long> maxSizeEnteringTargetInGB;
 
   @Option(names = {"-l", "--max-size-leaving-source-in-gb",
       "--maxSizeLeavingSourceInGB"},
       description = "Maximum size that can leave a source datanode while " +
-          "balancing. This is the sum of data moving to multiple targets " +
-          "(for example, '26' for 26GB).")
+          "balancing. This is the sum of data moving to multiple targets. " +
+          "The value should be positive, with a default of 26 " +
+          "(specify '26' for 26GB).")
   private Optional<Long> maxSizeLeavingSourceInGB;
+
+  @Option(names = {"--balancing-iteration-interval-minutes"},
+      description = "The interval period in minutes between each iteration of Container Balancer. " +
+          "The value should be positive, with a default of 70 (specify '70' for 70 minutes).")
+  private Optional<Integer> balancingInterval;
+
+  @Option(names = {"--move-timeout-minutes"},
+      description = "The amount of time in minutes to allow a single container to move " +
+          "from source to target. The value should be positive, with a default of 65 " +
+          "(specify '65' for 65 minutes).")
+  private Optional<Integer> moveTimeout;
+
+  @Option(names = {"--move-replication-timeout-minutes"},
+      description = "The " +
+          "amount of time in minutes to allow a single container's replication from source " +
+          "to target as part of container move. The value should be positive, with " +
+          "a default of 50. For example, if \"hdds.container" +
+          ".balancer.move.timeout\" is 65 minutes, then out of those 65 minutes " +
+          "50 minutes will be the deadline for replication to complete (specify " +
+          "'50' for 50 minutes).")
+  private Optional<Integer> moveReplicationTimeout;
+
+  @Option(names = {"--move-network-topology-enable"},
+      description = "Whether to take network topology into account when " +
+          "selecting a target for a source. " +
+          "This configuration is false by default.")
+  private Optional<Boolean> networkTopologyEnable;
+
+  @Option(names = {"--include-datanodes"},
+      description = "A list of Datanode " +
+          "hostnames or ip addresses separated by commas. Only the Datanodes " +
+          "specified in this list are balanced. This configuration is empty by " +
+          "default and is applicable only if it is non-empty (specify \"hostname1,hostname2,hostname3\").")
+  private Optional<String> includeNodes;
+
+  @Option(names = {"--exclude-datanodes"},
+      description =  "A list of Datanode " +
+          "hostnames or ip addresses separated by commas. The Datanodes specified " +
+          "in this list are excluded from balancing. This configuration is empty " +
+          "by default (specify \"hostname1,hostname2,hostname3\").")
+  private Optional<String> excludeNodes;
 
   @Override
   public void execute(ScmClient scmClient) throws IOException {
@@ -80,7 +126,9 @@ public class ContainerBalancerStartSubcommand extends ScmSubcommand {
         startContainerBalancer(threshold, iterations,
         maxDatanodesPercentageToInvolvePerIteration,
         maxSizeToMovePerIterationInGB, maxSizeEnteringTargetInGB,
-        maxSizeLeavingSourceInGB);
+        maxSizeLeavingSourceInGB, balancingInterval, moveTimeout,
+        moveReplicationTimeout, networkTopologyEnable, includeNodes,
+        excludeNodes);
     if (response.getStart()) {
       System.out.println("Container Balancer started successfully.");
     } else {

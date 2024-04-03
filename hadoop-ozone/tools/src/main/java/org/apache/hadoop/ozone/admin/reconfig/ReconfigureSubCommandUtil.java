@@ -34,7 +34,7 @@ import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.function.Consumer;
+import java.util.function.BiConsumer;
 
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState;
 
@@ -47,23 +47,23 @@ final class ReconfigureSubCommandUtil {
   }
 
   public static ReconfigureProtocol getSingleNodeReconfigureProxy(
-      String address) throws IOException {
+      HddsProtos.NodeType nodeType, String address) throws IOException {
     OzoneConfiguration ozoneConf = new OzoneConfiguration();
     UserGroupInformation user = UserGroupInformation.getCurrentUser();
     InetSocketAddress nodeAddr = NetUtils.createSocketAddr(address);
-    return new ReconfigureProtocolClientSideTranslatorPB(
+    return new ReconfigureProtocolClientSideTranslatorPB(nodeType,
         nodeAddr, user, ozoneConf);
   }
 
   public static <T> void parallelExecute(ExecutorService executorService,
-      List<T> nodes, Consumer<T> operation) {
+      List<T> nodes, BiConsumer<HddsProtos.NodeType, T> operation) {
     AtomicInteger successCount = new AtomicInteger();
     AtomicInteger failCount = new AtomicInteger();
     if (nodes != null) {
       for (T node : nodes) {
         executorService.submit(() -> {
           try {
-            operation.accept(node);
+            operation.accept(HddsProtos.NodeType.DATANODE, node);
             successCount.incrementAndGet();
           } catch (Exception e) {
             failCount.incrementAndGet();

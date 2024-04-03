@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.client.io;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.scm.OzoneClientConfig;
 import org.apache.hadoop.hdds.scm.XceiverClientFactory;
 import org.apache.hadoop.hdds.scm.storage.BlockExtendedInputStream;
 import org.apache.hadoop.hdds.scm.storage.BlockLocationInfo;
@@ -51,7 +52,8 @@ public interface ECBlockInputStreamFactory {
    */
   BlockExtendedInputStream create(boolean missingLocations,
       List<DatanodeDetails> failedLocations, ReplicationConfig repConfig,
-      BlockLocationInfo blockInfo, boolean verifyChecksum,
+      BlockLocationInfo blockInfo,
       XceiverClientFactory xceiverFactory,
-      Function<BlockID, BlockLocationInfo> refreshFunction);
+      Function<BlockID, BlockLocationInfo> refreshFunction,
+      OzoneClientConfig config);
 }

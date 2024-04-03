@@ -103,13 +103,12 @@ public class TestMultipartObjectGet {
   private static void startCluster()
       throws IOException, TimeoutException, InterruptedException {
     OzoneManager.setTestSecureOmFlag(true);
-    MiniOzoneCluster.Builder builder = MiniOzoneCluster.newHABuilder(conf)
+    MiniOzoneHAClusterImpl.Builder builder = MiniOzoneCluster.newHABuilder(conf)
         .setSCMServiceId(scmServiceId)
         .setOMServiceId(omServiceId)
-        .setNumDatanodes(3)
         .setNumOfStorageContainerManagers(3)
         .setNumOfOzoneManagers(3);
-    cluster = (MiniOzoneHAClusterImpl) builder.build();
+    cluster = builder.build();
     cluster.waitForClusterToBeReady();
   }
 
@@ -141,11 +140,11 @@ public class TestMultipartObjectGet {
     Response response = REST.put(BUCKET, KEY, content.length(),
         partNumber, uploadID, body);
     assertEquals(200, response.getStatus());
-    assertNotNull(response.getHeaderString("ETag"));
+    assertNotNull(response.getHeaderString(OzoneConsts.ETAG));
 
     CompleteMultipartUploadRequest.Part
         part = new CompleteMultipartUploadRequest.Part();
-    part.seteTag(response.getHeaderString("ETag"));
+    part.setETag(response.getHeaderString(OzoneConsts.ETAG));
     part.setPartNumber(partNumber);
     return part;
   }

@@ -75,7 +75,7 @@ class TestSendContainerRequestHandler {
       return null;
     }).when(observer).onError(any());
     SendContainerRequestHandler sendContainerRequestHandler
-        = new SendContainerRequestHandler(containerImporter, observer);
+        = new SendContainerRequestHandler(containerImporter, observer, null);
     ByteString data = ByteString.copyFromUtf8("test");
     ContainerProtos.SendContainerRequest request
         = ContainerProtos.SendContainerRequest.newBuilder()

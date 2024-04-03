@@ -23,6 +23,8 @@ import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Iterator;
@@ -32,13 +34,13 @@ import java.util.TreeMap;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
+import javax.xml.bind.DatatypeConverter;
 import org.apache.commons.codec.digest.DigestUtils;
-import org.apache.hadoop.hdds.client.DefaultReplicationConfig;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
-import org.apache.hadoop.hdds.protocol.StorageType;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.storage.ByteBufferStreamOutput;
 import org.apache.hadoop.ozone.OzoneAcl;
@@ -52,13 +54,19 @@ import org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartUploadCompleteInfo;
 import org.apache.hadoop.util.Time;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
+import static org.apache.hadoop.ozone.OzoneConsts.ETAG;
+import static org.apache.hadoop.ozone.OzoneConsts.MD5_HASH;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
 
 /**
  * In-memory ozone bucket for testing.
  */
-public class OzoneBucketStub extends OzoneBucket {
+public final class OzoneBucketStub extends OzoneBucket {
+
+  private static final Logger LOG = LoggerFactory.getLogger(OzoneBucketStub.class);
 
   private Map<String, OzoneKeyDetails> keyDetails = new HashMap<>();
 
@@ -75,7 +83,7 @@ public class OzoneBucketStub extends OzoneBucket {
     return new Builder();
   }
 
-  public OzoneBucketStub(Builder b) {
+  private OzoneBucketStub(Builder b) {
     super(b);
     this.replicationConfig = super.getReplicationConfig();
   }
@@ -86,43 +94,6 @@ public class OzoneBucketStub extends OzoneBucket {
   public static final class Builder extends OzoneBucket.Builder {
 
     private Builder() {
-    }
-
-    @Override
-    public Builder setVolumeName(String volumeName) {
-      super.setVolumeName(volumeName);
-      return this;
-    }
-
-    @Override
-    public Builder setName(String name) {
-      super.setName(name);
-      return this;
-    }
-
-    @Override
-    public Builder setDefaultReplicationConfig(
-        DefaultReplicationConfig defaultReplicationConfig) {
-      super.setDefaultReplicationConfig(defaultReplicationConfig);
-      return this;
-    }
-
-    @Override
-    public Builder setStorageType(StorageType storageType) {
-      super.setStorageType(storageType);
-      return this;
-    }
-
-    @Override
-    public Builder setVersioning(Boolean versioning) {
-      super.setVersioning(versioning);
-      return this;
-    }
-
-    @Override
-    public Builder setCreationTime(long creationTime) {
-      super.setCreationTime(creationTime);
-      return this;
     }
 
     @Override
@@ -144,31 +115,16 @@ public class OzoneBucketStub extends OzoneBucket {
                                      ReplicationFactor factor,
                                      Map<String, String> metadata)
       throws IOException {
-    ByteArrayOutputStream byteArrayOutputStream =
-        new ByteArrayOutputStream((int) size) {
-          @Override
-          public void close() throws IOException {
-            keyContents.put(key, toByteArray());
-            keyDetails.put(key, new OzoneKeyDetails(
-                getVolumeName(),
-                getName(),
-                key,
-                size,
-                System.currentTimeMillis(),
-                System.currentTimeMillis(),
-                new ArrayList<>(), replicationConfig, metadata, null,
-                () -> readKey(key), true
-            ));
-            super.close();
-          }
-        };
-    return new OzoneOutputStream(byteArrayOutputStream, null);
+    ReplicationConfig replication = ReplicationConfig.fromTypeAndFactor(type, factor);
+    return createKey(key, size, replication, metadata);
   }
 
   @Override
   public OzoneOutputStream createKey(String key, long size,
       ReplicationConfig rConfig, Map<String, String> metadata)
       throws IOException {
+    assertDoesNotExist(key + "/");
+
     final ReplicationConfig repConfig;
     if (rConfig == null) {
       repConfig = getReplicationConfig();
@@ -203,8 +159,10 @@ public class OzoneBucketStub extends OzoneBucket {
                                                ReplicationConfig rConfig,
                                                Map<String, String> keyMetadata)
       throws IOException {
+    assertDoesNotExist(key + "/");
+
     ByteBufferStreamOutput byteBufferStreamOutput =
-        new ByteBufferStreamOutput() {
+        new KeyMetadataAwareByteBufferStreamOutput(keyMetadata) {
 
           private final ByteBuffer buffer = ByteBuffer.allocate((int) size);
 
@@ -267,7 +225,8 @@ public class OzoneBucketStub extends OzoneBucket {
               byte[] bytes = new byte[position];
               buffer.get(bytes);
 
-              Part part = new Part(key + size, bytes);
+              Part part = new Part(key + size, bytes,
+                  getMetadata().get(ETAG));
               if (partList.get(key) == null) {
                 Map<Integer, Part> parts = new TreeMap<>();
                 parts.put(partNumber, part);
@@ -425,7 +384,7 @@ public class OzoneBucketStub extends OzoneBucket {
             @Override
             public void close() throws IOException {
               Part part = new Part(key + size,
-                  toByteArray());
+                  toByteArray(), getMetadata().get(ETAG));
               if (partList.get(key) == null) {
                 Map<Integer, Part> parts = new TreeMap<>();
                 parts.put(partNumber, part);
@@ -463,7 +422,7 @@ public class OzoneBucketStub extends OzoneBucket {
       for (Map.Entry<Integer, String> part: partsMap.entrySet()) {
         Part recordedPart = partsList.get(part.getKey());
         if (recordedPart == null ||
-            !recordedPart.getPartName().equals(part.getValue())) {
+            !recordedPart.getETag().equals(part.getValue())) {
           throw new OMException(ResultCodes.INVALID_PART);
         } else {
           output.write(recordedPart.getContent());
@@ -506,13 +465,21 @@ public class OzoneBucketStub extends OzoneBucket {
       int count = 0;
       int nextPartNumberMarker = 0;
       boolean truncated = false;
+      MessageDigest eTagProvider;
+      try {
+        eTagProvider = MessageDigest.getInstance(MD5_HASH);
+      } catch (NoSuchAlgorithmException e) {
+        throw new RuntimeException(e);
+      }
       while (count < maxParts && partIterator.hasNext()) {
         Map.Entry<Integer, Part> partEntry = partIterator.next();
         nextPartNumberMarker = partEntry.getKey();
         if (partEntry.getKey() > partNumberMarker) {
           PartInfo partInfo = new PartInfo(partEntry.getKey(),
               partEntry.getValue().getPartName(),
-              Time.now(), partEntry.getValue().getContent().length);
+              Time.now(), partEntry.getValue().getContent().length,
+              DatatypeConverter.printHexBinary(eTagProvider.digest(partEntry
+                  .getValue().getContent())).toLowerCase());
           partInfoList.add(partInfo);
           count++;
         }
@@ -563,9 +530,12 @@ public class OzoneBucketStub extends OzoneBucket {
     private String partName;
     private byte[] content;
 
-    public Part(String name, byte[] data) {
+    private String eTag;
+
+    public Part(String name, byte[] data, String eTag) {
       this.partName = name;
       this.content = data.clone();
+      this.eTag = eTag;
     }
 
     public String getPartName() {
@@ -575,6 +545,11 @@ public class OzoneBucketStub extends OzoneBucket {
     public byte[] getContent() {
       return content.clone();
     }
+
+    public String getETag() {
+      return eTag;
+    }
+
   }
 
   @Override
@@ -589,6 +564,9 @@ public class OzoneBucketStub extends OzoneBucket {
 
   @Override
   public void createDirectory(String keyName) throws IOException {
+    assertDoesNotExist(StringUtils.stripEnd(keyName, "/"));
+
+    LOG.info("createDirectory({})", keyName);
     keyDetails.put(keyName, new OzoneKeyDetails(
         getVolumeName(),
         getName(),
@@ -598,6 +576,12 @@ public class OzoneBucketStub extends OzoneBucket {
         System.currentTimeMillis(),
         new ArrayList<>(), replicationConfig, new HashMap<>(), null,
         () -> readKey(keyName), false));
+  }
+
+  private void assertDoesNotExist(String keyName) throws OMException {
+    if (keyDetails.get(keyName) != null) {
+      throw new OMException("already exists", ResultCodes.FILE_ALREADY_EXISTS);
+    }
   }
 
   /**

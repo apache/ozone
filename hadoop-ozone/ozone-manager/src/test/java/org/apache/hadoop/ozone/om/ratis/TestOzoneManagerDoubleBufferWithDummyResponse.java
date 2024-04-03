@@ -37,7 +37,6 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
     .CreateBucketResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
     .OMResponse;
-import org.apache.hadoop.ozone.om.ratis.metrics.OzoneManagerDoubleBufferMetrics;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
@@ -79,7 +78,8 @@ public class TestOzoneManagerDoubleBufferWithDummyResponse {
         .setOmMetadataManager(omMetadataManager)
         .setMaxUnFlushedTransactionCount(10000)
         .enableRatis(true)
-        .build();
+        .build()
+        .start();
   }
 
   @AfterEach

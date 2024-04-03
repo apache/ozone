@@ -171,6 +171,21 @@ Source and target key have same ACLs
     Verify ACL          key    ${target}/link1/key1     GROUP   group2    READ
     Verify ACL          key    ${source}/bucket1/key1   GROUP   group2    READ
 
+Source and target prefix have same ACLs
+    Execute             ozone sh prefix addacl --acl user:user1:rwxy ${source}/bucket1/prefix1/
+    Verify ACL          prefix       ${target}/link1/prefix1/     USER    user1    READ WRITE READ_ACL WRITE_ACL
+    Verify ACL          prefix       ${source}/bucket1/prefix1/   USER    user1    READ WRITE READ_ACL WRITE_ACL
+    Execute             ozone sh prefix removeacl --acl user:user1:y ${target}/link1/prefix1/
+    Verify ACL          prefix       ${target}/link1/prefix1/     USER    user1    READ WRITE READ_ACL
+    Verify ACL          prefix       ${source}/bucket1/prefix1/   USER    user1    READ WRITE READ_ACL
+    Execute             ozone sh prefix setacl --acl user:user1:rw ${source}/bucket1/prefix1/
+    Verify ACL          prefix       ${target}/link1/prefix1/     USER    user1    READ WRITE
+    Verify ACL          prefix       ${source}/bucket1/prefix1/   USER    user1    READ WRITE
+
+    Execute             ozone sh prefix addacl --acl group:group2:r ${source}/bucket1/prefix1/
+    Verify ACL          prefix       ${target}/link1/prefix1/     GROUP   group2    READ
+    Verify ACL          prefix       ${source}/bucket1/prefix1/   GROUP   group2    READ
+
 Buckets and links share namespace
                         Execute                     ozone sh bucket link ${source}/bucket2 ${target}/link2
     ${result} =         Execute And Ignore Error    ozone sh bucket create ${target}/link2

@@ -99,3 +99,17 @@ List datanodes as JSON
                         Should contain   ${output}    datanodeDetails
                         Should contain   ${output}    healthState
                         Should contain   ${output}    opState
+
+Get usage info as JSON
+    ${output} =         Execute          ozone admin datanode usageinfo -m --json | jq -r '.'
+                        Should contain   ${output}  capacity
+                        Should contain   ${output}  committed
+                        Should contain   ${output}  containerCount
+                        Should contain   ${output}  datanodeDetails
+                        Should contain   ${output}  freeSpaceToSpare
+                        Should contain   ${output}  ozoneUsed
+                        Should contain   ${output}  ozoneUsedPercent
+                        Should contain   ${output}  remaining
+                        Should contain   ${output}  remainingPercent
+                        Should contain   ${output}  totalUsed
+                        Should contain   ${output}  totalUsedPercent

@@ -27,10 +27,12 @@ import java.util.function.Supplier;
 
 import org.apache.hadoop.hdds.scm.ByteStringConversion;
 
+import org.apache.hadoop.hdds.utils.db.CodecBuffer;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
+import org.apache.ratis.util.UncheckedAutoCloseable;
 
 /** Buffer for a block chunk. */
-public interface ChunkBuffer {
+public interface ChunkBuffer extends UncheckedAutoCloseable {
 
   /** Similar to {@link ByteBuffer#allocate(int)}. */
   static ChunkBuffer allocate(int capacity) {
@@ -49,7 +51,8 @@ public interface ChunkBuffer {
     if (increment > 0 && increment < capacity) {
       return new IncrementalChunkBuffer(capacity, increment, false);
     }
-    return new ChunkBufferImplWithByteBuffer(ByteBuffer.allocate(capacity));
+    CodecBuffer codecBuffer = CodecBuffer.allocateDirect(capacity);
+    return new ChunkBufferImplWithByteBuffer(codecBuffer.asWritableByteBuffer(), codecBuffer);
   }
 
   /** Wrap the given {@link ByteBuffer} as a {@link ChunkBuffer}. */
@@ -85,6 +88,9 @@ public interface ChunkBuffer {
 
   /** Similar to {@link ByteBuffer#clear()}. */
   ChunkBuffer clear();
+
+  default void close() {
+  }
 
   /** Similar to {@link ByteBuffer#put(ByteBuffer)}. */
   ChunkBuffer put(ByteBuffer b);

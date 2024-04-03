@@ -82,7 +82,7 @@ public class TestVolumeSet {
     volumes.add(volume1);
     volumes.add(volume2);
     conf.set(DFSConfigKeysLegacy.DFS_DATANODE_DATA_DIR_KEY, dataDirKey);
-    conf.set(OzoneConfigKeys.DFS_CONTAINER_RATIS_DATANODE_STORAGE_DIR,
+    conf.set(OzoneConfigKeys.HDDS_CONTAINER_RATIS_DATANODE_STORAGE_DIR,
         dataDirKey);
     initializeVolumeSet();
   }

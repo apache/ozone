@@ -59,7 +59,7 @@ public class TestPeriodicVolumeChecker {
   public void setup() throws IOException {
     conf = new OzoneConfiguration();
     conf.set(ScmConfigKeys.HDDS_DATANODE_DIR_KEY, folder.toString());
-    conf.set(OzoneConfigKeys.DFS_CONTAINER_RATIS_DATANODE_STORAGE_DIR,
+    conf.set(OzoneConfigKeys.HDDS_CONTAINER_RATIS_DATANODE_STORAGE_DIR,
         Files.createDirectory(folder.resolve("VolumeCheckerDir")).toString());
   }
 

@@ -21,6 +21,7 @@ import org.apache.hadoop.conf.ReconfigurationTaskStatus;
 import org.apache.hadoop.conf.ReconfigurationUtil;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.protocol.ReconfigureProtocol;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import picocli.CommandLine.Command;
 
 import java.io.IOException;
@@ -40,9 +41,9 @@ public class ReconfigureStatusSubcommand
     extends AbstractReconfigureSubCommand {
 
   @Override
-  protected void executeCommand(String address) {
+  protected void executeCommand(HddsProtos.NodeType nodeType, String address) {
     try (ReconfigureProtocol reconfigProxy = ReconfigureSubCommandUtil
-        .getSingleNodeReconfigureProxy(address)) {
+        .getSingleNodeReconfigureProxy(nodeType, address)) {
       String serverName = reconfigProxy.getServerName();
       ReconfigurationTaskStatus status = reconfigProxy.getReconfigureStatus();
       System.out.printf("%s: Reconfiguring status for node [%s]: ",

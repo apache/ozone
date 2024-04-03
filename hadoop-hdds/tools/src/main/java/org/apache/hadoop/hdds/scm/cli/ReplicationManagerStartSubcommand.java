@@ -19,8 +19,6 @@ package org.apache.hadoop.hdds.scm.cli;
 
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.scm.client.ScmClient;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import picocli.CommandLine.Command;
 
 import java.io.IOException;
@@ -35,12 +33,9 @@ import java.io.IOException;
     versionProvider = HddsVersionProvider.class)
 public class ReplicationManagerStartSubcommand extends ScmSubcommand {
 
-  private static final Logger LOG =
-      LoggerFactory.getLogger(ReplicationManagerStartSubcommand.class);
-
   @Override
   public void execute(ScmClient scmClient) throws IOException {
     scmClient.startReplicationManager();
-    LOG.info("Starting ReplicationManager...");
+    System.out.println("Starting ReplicationManager...");
   }
 }

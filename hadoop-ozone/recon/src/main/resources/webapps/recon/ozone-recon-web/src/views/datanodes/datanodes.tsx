@@ -17,7 +17,7 @@
  */
 
 import React from 'react';
-import {Table, Icon, Tooltip} from 'antd';
+import {Table, Icon, Tooltip, Popover} from 'antd';
 import {PaginationConfig} from 'antd/lib/pagination';
 import moment from 'moment';
 import {ReplicationIcon} from 'utils/themeIcons';
@@ -192,21 +192,36 @@ const COLUMNS = [
     key: 'pipelines',
     isVisible: true,
     render: (pipelines: IPipeline[], record: IDatanode) => {
+      let firstThreePipelinesIDs = [];
+      let remainingPipelinesIDs: any[] = [];
+      firstThreePipelinesIDs = pipelines && pipelines.filter((element, index) => index < 3);
+      remainingPipelinesIDs = pipelines && pipelines.slice(3, pipelines.length);
+
+      const RenderPipelineIds = ({ pipelinesIds }) => {
+        return pipelinesIds && pipelinesIds.map((pipeline: any, index: any) => (
+          <div key={index} className='pipeline-container'>
+            <ReplicationIcon
+              replicationFactor={pipeline.replicationFactor}
+              replicationType={pipeline.replicationType}
+              leaderNode={pipeline.leaderNode}
+              isLeader={pipeline.leaderNode === record.hostname} />
+            {pipeline.pipelineID}
+          </div >
+        ))
+      }
+
       return (
-        <div>
+        <>
           {
-            pipelines && pipelines.map((pipeline, index) => (
-              <div key={index} className='pipeline-container'>
-                <ReplicationIcon
-                  replicationFactor={pipeline.replicationFactor}
-                  replicationType={pipeline.replicationType}
-                  leaderNode={pipeline.leaderNode}
-                  isLeader={pipeline.leaderNode === record.hostname}/>
-                {pipeline.pipelineID}
-              </div>
-            ))
+            <RenderPipelineIds pipelinesIds={firstThreePipelinesIDs} />
           }
-        </div>
+          {
+            remainingPipelinesIDs.length > 0 &&
+            <Popover content={<RenderPipelineIds pipelinesIds={remainingPipelinesIDs} />} title="Remaining pipelines" placement="rightTop" trigger="hover">
+              {`... and ${remainingPipelinesIDs.length} more pipelines`}
+            </Popover>
+          }
+        </>
       );
     }
   },

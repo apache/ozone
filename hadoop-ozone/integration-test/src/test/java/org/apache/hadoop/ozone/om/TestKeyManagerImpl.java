@@ -24,7 +24,6 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.BitSet;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -37,6 +36,8 @@ import java.util.stream.Stream;
 
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.conf.StorageUnit;
+import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
+import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
@@ -85,7 +86,6 @@ import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
-import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLIdentityType;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
@@ -108,7 +108,9 @@ import static org.apache.hadoop.ozone.OzoneAcl.AclScope.ACCESS;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_KEY_PREALLOCATION_BLOCKS_MAX;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SCM_BLOCK_SIZE;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SCM_BLOCK_SIZE_DEFAULT;
+import static org.apache.hadoop.ozone.OzoneConsts.OZONE_OFS_URI_SCHEME;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ADDRESS_KEY;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.SCM_GET_PIPELINE_EXCEPTION;
 import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType.ALL;
 
@@ -116,13 +118,17 @@ import org.apache.ratis.util.ExitUtils;
 import jakarta.annotation.Nonnull;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
+import org.junit.jupiter.params.provider.ValueSource;
 
+import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType.READ;
+import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType.WRITE;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
@@ -162,7 +168,7 @@ public class TestKeyManagerImpl {
   private static final String KEY_NAME = "key1";
   private static final String BUCKET_NAME = "bucket1";
   private static final String BUCKET2_NAME = "bucket2";
-  private static final String VERSIONED_BUCKET_NAME = "versionedBucket1";
+  private static final String VERSIONED_BUCKET_NAME = "versionedbucket1";
   private static final String VOLUME_NAME = "vol1";
   private static OzoneManagerProtocol writeClient;
   private static OzoneManager om;
@@ -174,6 +180,9 @@ public class TestKeyManagerImpl {
     dir = GenericTestUtils.getRandomizedTestDir();
     conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, dir.toString());
     conf.set(OzoneConfigKeys.OZONE_NETWORK_TOPOLOGY_AWARE_READ_KEY, "true");
+    final String rootPath = String.format("%s://%s/", OZONE_OFS_URI_SCHEME,
+        conf.get(OZONE_OM_ADDRESS_KEY));
+    conf.set(CommonConfigurationKeysPublic.FS_DEFAULT_NAME_KEY, rootPath);
     mockScmBlockLocationProtocol = mock(ScmBlockLocationProtocol.class);
     nodeManager = new MockNodeManager(true, 10);
     NodeSchema[] schemas = new NodeSchema[]
@@ -222,9 +231,6 @@ public class TestKeyManagerImpl {
                 new SCMException("SafeModePrecheck failed for allocateBlock",
             ResultCodes.SAFE_MODE_EXCEPTION));
     createVolume(VOLUME_NAME);
-    createBucket(VOLUME_NAME, BUCKET_NAME, false);
-    createBucket(VOLUME_NAME, BUCKET2_NAME, false);
-    createBucket(VOLUME_NAME, VERSIONED_BUCKET_NAME, true);
   }
 
   @AfterAll
@@ -235,21 +241,21 @@ public class TestKeyManagerImpl {
     FileUtils.deleteDirectory(dir);
   }
 
+  @BeforeEach
+  public void init() throws Exception {
+    createBucket(VOLUME_NAME, BUCKET_NAME, false);
+    createBucket(VOLUME_NAME, BUCKET2_NAME, false);
+    createBucket(VOLUME_NAME, VERSIONED_BUCKET_NAME, true);
+  }
+
   @AfterEach
   public void cleanupTest() throws IOException {
     mockContainerClient();
-    List<OzoneFileStatus> fileStatuses = keyManager
-        .listStatus(createBuilder().setKeyName("").build(), true, "", 100000);
-    for (OzoneFileStatus fileStatus : fileStatuses) {
-      if (fileStatus.isFile()) {
-        writeClient.deleteKey(
-            createKeyArgs(fileStatus.getKeyInfo().getKeyName()));
-      } else {
-        writeClient.deleteKey(createKeyArgs(OzoneFSUtils
-            .addTrailingSlashIfNeeded(
-                fileStatus.getKeyInfo().getKeyName())));
-      }
-    }
+    org.apache.hadoop.fs.Path volumePath = new org.apache.hadoop.fs.Path(OZONE_URI_DELIMITER, VOLUME_NAME);
+    FileSystem fs = FileSystem.get(conf);
+    fs.delete(new org.apache.hadoop.fs.Path(volumePath, BUCKET_NAME), true);
+    fs.delete(new org.apache.hadoop.fs.Path(volumePath, BUCKET2_NAME), true);
+    fs.delete(new org.apache.hadoop.fs.Path(volumePath, VERSIONED_BUCKET_NAME), true);
   }
 
   private static void mockContainerClient() {
@@ -525,7 +531,7 @@ public class TestKeyManagerImpl {
         .build();
 
     OzoneAcl ozAcl1 = new OzoneAcl(ACLIdentityType.USER, "user1",
-        ACLType.READ, ACCESS);
+        ACCESS, ACLType.READ);
     writeClient.addAcl(ozPrefix1, ozAcl1);
 
     List<OzoneAcl> ozAclGet = writeClient.getAcl(ozPrefix1);
@@ -533,24 +539,13 @@ public class TestKeyManagerImpl {
     assertEquals(ozAcl1, ozAclGet.get(0));
 
     List<OzoneAcl> acls = new ArrayList<>();
-    OzoneAcl ozAcl2 = new OzoneAcl(ACLIdentityType.USER, "admin",
-        ACLType.ALL, ACCESS);
+    OzoneAcl ozAcl2 = new OzoneAcl(ACLIdentityType.USER, "admin", ACCESS, ACLType.ALL);
 
-    BitSet rwRights = new BitSet();
-    rwRights.set(IAccessAuthorizer.ACLType.WRITE.ordinal());
-    rwRights.set(IAccessAuthorizer.ACLType.READ.ordinal());
-    OzoneAcl ozAcl3 = new OzoneAcl(ACLIdentityType.GROUP, "dev",
-        rwRights, ACCESS);
+    OzoneAcl ozAcl3 = new OzoneAcl(ACLIdentityType.GROUP, "dev", ACCESS, READ, WRITE);
 
-    BitSet wRights = new BitSet();
-    wRights.set(IAccessAuthorizer.ACLType.WRITE.ordinal());
-    OzoneAcl ozAcl4 = new OzoneAcl(ACLIdentityType.GROUP, "dev",
-        wRights, ACCESS);
+    OzoneAcl ozAcl4 = new OzoneAcl(ACLIdentityType.GROUP, "dev", ACCESS, WRITE);
 
-    BitSet rRights = new BitSet();
-    rRights.set(IAccessAuthorizer.ACLType.READ.ordinal());
-    OzoneAcl ozAcl5 = new OzoneAcl(ACLIdentityType.GROUP, "dev",
-        rRights, ACCESS);
+    OzoneAcl ozAcl5 = new OzoneAcl(ACLIdentityType.GROUP, "dev", ACCESS, READ);
 
     acls.add(ozAcl2);
     acls.add(ozAcl3);
@@ -622,7 +617,7 @@ public class TestKeyManagerImpl {
     // Invalid prefix not ending with "/"
     String invalidPrefix = "invalid/pf";
     OzoneAcl ozAcl1 = new OzoneAcl(ACLIdentityType.USER, "user1",
-        ACLType.READ, ACCESS);
+        ACCESS, ACLType.READ);
 
     OzoneObj ozInvalidPrefix = new OzoneObjInfo.Builder()
         .setVolumeName(volumeName)
@@ -635,7 +630,7 @@ public class TestKeyManagerImpl {
     // add acl with invalid prefix name
     Exception ex = assertThrows(OMException.class,
         () -> writeClient.addAcl(ozInvalidPrefix, ozAcl1));
-    assertTrue(ex.getMessage().startsWith("Invalid prefix name"));
+    assertTrue(ex.getMessage().startsWith("Missing trailing slash"));
 
     OzoneObj ozPrefix1 = new OzoneObjInfo.Builder()
         .setVolumeName(volumeName)
@@ -653,7 +648,7 @@ public class TestKeyManagerImpl {
     // get acl with invalid prefix name
     ex = assertThrows(OMException.class,
         () -> writeClient.getAcl(ozInvalidPrefix));
-    assertTrue(ex.getMessage().startsWith("Invalid prefix name"));
+    assertTrue(ex.getMessage().startsWith("Missing trailing slash"));
 
     // set acl with invalid prefix name
     List<OzoneAcl> ozoneAcls = new ArrayList<OzoneAcl>();
@@ -661,12 +656,12 @@ public class TestKeyManagerImpl {
 
     ex = assertThrows(OMException.class,
         () -> writeClient.setAcl(ozInvalidPrefix, ozoneAcls));
-    assertTrue(ex.getMessage().startsWith("Invalid prefix name"));
+    assertTrue(ex.getMessage().startsWith("Missing trailing slash"));
 
     // remove acl with invalid prefix name
     ex = assertThrows(OMException.class,
         () -> writeClient.removeAcl(ozInvalidPrefix, ozAcl1));
-    assertTrue(ex.getMessage().startsWith("Invalid prefix name"));
+    assertTrue(ex.getMessage().startsWith("Missing trailing slash"));
   }
 
   @Test
@@ -686,7 +681,7 @@ public class TestKeyManagerImpl {
         .build();
 
     OzoneAcl ozAcl1 = new OzoneAcl(ACLIdentityType.USER, "user1",
-        ACLType.READ, ACCESS);
+        ACCESS, ACLType.READ);
     writeClient.addAcl(ozPrefix1, ozAcl1);
 
     OzoneObj ozFile1 = new OzoneObjInfo.Builder()
@@ -1009,8 +1004,10 @@ public class TestKeyManagerImpl {
     }
   }
 
-  @Test
-  public void testListStatusWithTableCacheRecursive() throws Exception {
+  @ParameterizedTest
+  @ValueSource(booleans = {true, false})
+  public void testListStatusWithTableCacheRecursive(boolean enablePath) throws Exception {
+    conf.setBoolean(OMConfigKeys.OZONE_OM_ENABLE_FILESYSTEM_PATHS, enablePath);
     String keyNameDir1 = "dir1";
     OmKeyArgs keyArgsDir1 =
         createBuilder().setKeyName(keyNameDir1).build();
@@ -1194,8 +1191,10 @@ public class TestKeyManagerImpl {
     assertTrue(existKeySet.isEmpty());
   }
 
-  @Test
-  public void testListStatus() throws IOException {
+  @ParameterizedTest
+  @ValueSource(booleans = {true, false})
+  public void testListStatus(boolean enablePath) throws IOException {
+    conf.setBoolean(OMConfigKeys.OZONE_OM_ENABLE_FILESYSTEM_PATHS, enablePath);
     String superDir = RandomStringUtils.randomAlphabetic(5);
 
     int numDirectories = 5;

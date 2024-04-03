@@ -55,6 +55,7 @@ import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
 import org.apache.hadoop.util.Lists;
 import org.apache.ozone.test.TestClock;
 import org.apache.ratis.protocol.exceptions.NotLeaderException;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -188,6 +189,13 @@ public class TestReplicationManager {
     when(scm.getContainerTokenGenerator()).thenReturn(ContainerTokenGenerator.DISABLED);
 
     when(scmContext.getScm()).thenReturn(scm);
+  }
+
+  @AfterEach
+  void cleanup() {
+    if (replicationManager.getMetrics() != null) {
+      replicationManager.getMetrics().unRegister();
+    }
   }
 
   private ReplicationManager createReplicationManager() throws IOException {

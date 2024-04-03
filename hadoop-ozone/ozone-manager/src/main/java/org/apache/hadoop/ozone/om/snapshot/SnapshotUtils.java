@@ -40,6 +40,7 @@ import java.util.Map;
 import java.util.UUID;
 
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INVALID_SNAPSHOT_ERROR;
 import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.DIRECTORY_TABLE;
 import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.FILE_TABLE;
 import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.KEY_TABLE;
@@ -148,6 +149,10 @@ public final class SnapshotUtils {
     // If the snapshot is deleted in the previous run, then the in-memory
     // SnapshotChainManager might throw NoSuchElementException as the snapshot
     // is removed in-memory but OMDoubleBuffer has not flushed yet.
+    if (snapInfo == null) {
+      throw new OMException("Snapshot Info is null. Cannot get the next snapshot", INVALID_SNAPSHOT_ERROR);
+    }
+
     try {
       while (chainManager.hasNextPathSnapshot(snapInfo.getSnapshotPath(),
           snapInfo.getSnapshotId())) {

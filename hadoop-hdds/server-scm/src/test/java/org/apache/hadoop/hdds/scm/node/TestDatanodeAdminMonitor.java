@@ -864,8 +864,8 @@ public class TestDatanodeAdminMonitor {
     assertEquals(1, monitor.getTrackedNodeCount());
     assertEquals(HddsProtos.NodeOperationalState.DECOMMISSIONING,
         nodeManager.getNodeStatus(dn1).getOperationalState());
-    assertEquals(monitor.getContainersReplicatedOnNode(dn1).get("UnderReplicated").size(), 2);
-    assertEquals(monitor.getContainersReplicatedOnNode(dn1).get("UnClosed").size(), 0);
+    assertEquals(monitor.getContainersPendingReplication(dn1).get("UnderReplicated").size(), 2);
+    assertEquals(monitor.getContainersPendingReplication(dn1).get("UnClosed").size(), 0);
 
     DatanodeAdminMonitorTestUtil
         .mockGetContainerReplicaCount(repManager,
@@ -877,8 +877,8 @@ public class TestDatanodeAdminMonitor {
     assertEquals(1, monitor.getTrackedNodeCount());
     assertEquals(HddsProtos.NodeOperationalState.DECOMMISSIONING,
         nodeManager.getNodeStatus(dn1).getOperationalState());
-    assertEquals(monitor.getContainersReplicatedOnNode(dn1).get("UnderReplicated").size(), 0);
-    assertEquals(monitor.getContainersReplicatedOnNode(dn1).get("UnClosed").size(), 2);
+    assertEquals(monitor.getContainersPendingReplication(dn1).get("UnderReplicated").size(), 0);
+    assertEquals(monitor.getContainersPendingReplication(dn1).get("UnClosed").size(), 2);
   }
 
   /**

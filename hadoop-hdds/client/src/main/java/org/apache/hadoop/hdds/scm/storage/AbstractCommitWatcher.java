@@ -73,7 +73,7 @@ abstract class AbstractCommitWatcher<BUFFER> {
     return commitIndexMap;
   }
 
-  void updateCommitInfoMap(long index, List<BUFFER> buffers) {
+  synchronized void updateCommitInfoMap(long index, List<BUFFER> buffers) {
     commitIndexMap.computeIfAbsent(index, k -> new LinkedList<>())
         .addAll(buffers);
   }

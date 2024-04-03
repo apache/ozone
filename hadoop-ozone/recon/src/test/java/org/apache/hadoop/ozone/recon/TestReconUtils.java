@@ -45,7 +45,11 @@ import java.net.URL;
 import org.apache.commons.lang3.RandomUtils;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
+import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.scm.container.ContainerInfo;
+import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdfs.web.URLConnectionFactory;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -53,6 +57,7 @@ import org.junit.jupiter.api.io.TempDir;
  * Test Recon Utility methods.
  */
 public class TestReconUtils {
+  private static PipelineID randomPipelineID = PipelineID.randomId();
 
   @TempDir
   private Path temporaryFolder;
@@ -233,5 +238,25 @@ public class TestReconUtils {
       index += 1;
     }
     return index;
+  }
+
+  private static ContainerInfo.Builder getDefaultContainerInfoBuilder(
+      final HddsProtos.LifeCycleState state) {
+    return new ContainerInfo.Builder()
+        .setContainerID(RandomUtils.nextLong())
+        .setReplicationConfig(
+            RatisReplicationConfig
+                .getInstance(HddsProtos.ReplicationFactor.THREE))
+        .setState(state)
+        .setSequenceId(10000L)
+        .setOwner("TEST");
+  }
+
+
+  public static ContainerInfo getContainer(
+      final HddsProtos.LifeCycleState state) {
+    return getDefaultContainerInfoBuilder(state)
+        .setPipelineID(randomPipelineID)
+        .build();
   }
 }

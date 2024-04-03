@@ -36,12 +36,11 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
-import java.io.IOException;
 import java.util.UUID;
 import java.nio.file.Path;
 
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertNull;
-import static org.junit.jupiter.api.Assertions.fail;
 
 /**
  * This class tests OMVolumeCreateResponse.
@@ -115,7 +114,7 @@ public class TestOMVolumeDeleteResponse {
   }
 
   @Test
-  public void testAddToDBBatchNoOp() throws Exception {
+  public void testAddToDBBatchNoOp() {
 
     OMResponse omResponse = OMResponse.newBuilder()
         .setCmdType(OzoneManagerProtocolProtos.Type.DeleteVolume)
@@ -126,15 +125,7 @@ public class TestOMVolumeDeleteResponse {
 
     OMVolumeDeleteResponse omVolumeDeleteResponse = new OMVolumeDeleteResponse(
         omResponse);
-
-    try {
-      omVolumeDeleteResponse.checkAndUpdateDB(omMetadataManager,
-          batchOperation);
-    } catch (IOException ex) {
-      fail("testAddToDBBatchFailure failed");
-    }
-
+    assertDoesNotThrow(() -> omVolumeDeleteResponse.checkAndUpdateDB(omMetadataManager, batchOperation));
   }
-
 
 }

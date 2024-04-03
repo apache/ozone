@@ -118,7 +118,7 @@ public enum ConfigType {
   SIZE {
     @Override
     Object parse(String value, Config config, Class<?> type, String key) {
-      StorageSize measure = StorageSize.parse(value);
+      StorageSize measure = StorageSize.parse(value, config.sizeUnit());
       long val = Math.round(measure.getUnit().toBytes(measure.getValue()));
       if (type == int.class) {
         return (int) val;
@@ -130,9 +130,9 @@ public enum ConfigType {
     void set(ConfigurationTarget target, String key, Object value,
         Config config) {
       if (value instanceof Long) {
-        target.setStorageSize(key, (long) value, StorageUnit.BYTES);
+        target.setStorageSize(key, (long) value, config.sizeUnit());
       } else if (value instanceof Integer) {
-        target.setStorageSize(key, (int) value, StorageUnit.BYTES);
+        target.setStorageSize(key, (int) value, config.sizeUnit());
       } else {
         throw new ConfigurationException("Unsupported type " + value.getClass()
             + " for " + key);

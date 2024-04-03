@@ -122,7 +122,6 @@ public interface OMMetadataManager extends DBStoreHAManager {
    * @param key    - key name
    * @return DB key as String.
    */
-
   String getOzoneKey(String volume, String bucket, String key);
 
   /**

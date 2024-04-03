@@ -95,7 +95,7 @@ public class TestAddRemoveOzoneManager {
   private void setupCluster(int numInitialOMs) throws Exception {
     conf = new OzoneConfiguration();
     conf.setInt(OzoneConfigKeys.OZONE_CLIENT_FAILOVER_MAX_ATTEMPTS_KEY, 5);
-    cluster = (MiniOzoneHAClusterImpl) MiniOzoneCluster.newHABuilder(conf)
+    cluster = MiniOzoneCluster.newHABuilder(conf)
         .setSCMServiceId(SCM_DUMMY_SERVICE_ID)
         .setOMServiceId(OM_SERVICE_ID)
         .setNumOfOzoneManagers(numInitialOMs)
@@ -303,7 +303,6 @@ public class TestAddRemoveOzoneManager {
     config.setInt(OMConfigKeys.OZONE_OM_ADMIN_PROTOCOL_MAX_RETRIES_KEY, 2);
     config.setInt(
         OMConfigKeys.OZONE_OM_ADMIN_PROTOCOL_WAIT_BETWEEN_RETRIES_KEY, 100);
-    cluster.setConf(config);
 
     GenericTestUtils.LogCapturer omLog =
         GenericTestUtils.LogCapturer.captureLogs(OzoneManager.LOG);

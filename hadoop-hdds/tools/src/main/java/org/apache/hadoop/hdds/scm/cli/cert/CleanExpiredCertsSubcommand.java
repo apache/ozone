@@ -19,8 +19,6 @@ package org.apache.hadoop.hdds.scm.cli.cert;
 
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.protocol.SCMSecurityProtocol;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import picocli.CommandLine;
 
 import java.io.IOException;
@@ -36,13 +34,10 @@ import java.util.List;
     versionProvider = HddsVersionProvider.class)
 public class CleanExpiredCertsSubcommand extends ScmCertSubcommand {
 
-  private static final Logger LOG =
-      LoggerFactory.getLogger(CleanExpiredCertsSubcommand.class);
-
   @Override
   protected void execute(SCMSecurityProtocol client) throws IOException {
     List<String> pemEncodedCerts = client.removeExpiredCertificates();
-    LOG.info("List of removed expired certificates:");
-    printCertList(LOG, pemEncodedCerts);
+    System.out.println("List of removed expired certificates:");
+    printCertList(pemEncodedCerts);
   }
 }

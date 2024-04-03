@@ -154,10 +154,10 @@ public class OMFileCreateRequest extends OMKeyRequest {
         .map(info -> info.getProtobuf(getOmRequest().getVersion()))
         .collect(Collectors.toList()));
 
+    generateRequiredEncryptionInfo(keyArgs, newKeyArgs, ozoneManager);
+
     KeyArgs resolvedArgs = resolveBucketAndCheckKeyAcls(newKeyArgs.build(),
         ozoneManager, IAccessAuthorizer.ACLType.CREATE);
-
-    generateRequiredEncryptionInfo(keyArgs, newKeyArgs, ozoneManager);
     CreateFileRequest.Builder newCreateFileRequest =
         createFileRequest.toBuilder().setKeyArgs(resolvedArgs)
             .setClientID(UniqueId.next());
@@ -255,6 +255,7 @@ public class OMFileCreateRequest extends OMKeyRequest {
           ozoneManager.getPrefixManager(), omBucketInfo, pathInfo, trxnLogIndex,
           ozoneManager.getObjectIdFromTxId(trxnLogIndex),
           ozoneManager.isRatisEnabled(), repConfig);
+      validateEncryptionKeyInfo(omBucketInfo, keyArgs);
 
       long openVersion = omKeyInfo.getLatestVersionLocations().getVersion();
       long clientID = createFileRequest.getClientID();

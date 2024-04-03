@@ -17,7 +17,6 @@
 
 package org.apache.hadoop.ozone.client.rpc;
 
-import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.DatanodeRatisServerConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.conf.StorageUnit;
@@ -85,8 +84,6 @@ public class Test2WayCommitInRatis {
     blockSize = 2 * maxFlushSize;
 
     // Make sure the pipeline does not get destroyed quickly
-    conf.setTimeDuration(HddsConfigKeys.HDDS_HEARTBEAT_INTERVAL,
-        60, TimeUnit.SECONDS);
     conf.setTimeDuration(OZONE_SCM_STALENODE_INTERVAL, 60000,
         TimeUnit.SECONDS);
     DatanodeRatisServerConfig ratisServerConfig =

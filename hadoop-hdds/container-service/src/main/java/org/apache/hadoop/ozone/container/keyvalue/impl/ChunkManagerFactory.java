@@ -51,8 +51,8 @@ public final class ChunkManagerFactory {
   public static ChunkManager createChunkManager(ConfigurationSource conf,
       BlockManager manager, VolumeSet volSet) {
     boolean sync =
-        conf.getBoolean(OzoneConfigKeys.DFS_CONTAINER_CHUNK_WRITE_SYNC_KEY,
-            OzoneConfigKeys.DFS_CONTAINER_CHUNK_WRITE_SYNC_DEFAULT);
+        conf.getBoolean(OzoneConfigKeys.HDDS_CONTAINER_CHUNK_WRITE_SYNC_KEY,
+            OzoneConfigKeys.HDDS_CONTAINER_CHUNK_WRITE_SYNC_DEFAULT);
 
     boolean persist = conf.getBoolean(HDDS_CONTAINER_PERSISTDATA,
         HDDS_CONTAINER_PERSISTDATA_DEFAULT);

@@ -155,8 +155,8 @@ public final class SCMTestUtils {
 
   private static boolean isUseRatis(ConfigurationSource c) {
     return c.getBoolean(
-        ScmConfigKeys.DFS_CONTAINER_RATIS_ENABLED_KEY,
-        ScmConfigKeys.DFS_CONTAINER_RATIS_ENABLED_DEFAULT);
+        ScmConfigKeys.HDDS_CONTAINER_RATIS_ENABLED_KEY,
+        ScmConfigKeys.HDDS_CONTAINER_RATIS_ENABLED_DEFAULT);
   }
 
 }

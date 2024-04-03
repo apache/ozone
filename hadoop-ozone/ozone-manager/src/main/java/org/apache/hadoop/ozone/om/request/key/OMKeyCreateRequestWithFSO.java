@@ -157,6 +157,8 @@ public class OMKeyCreateRequestWithFSO extends OMKeyCreateRequest {
               pathInfoFSO.getLeafNodeObjectId(),
               ozoneManager.isRatisEnabled(), repConfig);
 
+      validateEncryptionKeyInfo(bucketInfo, keyArgs);
+
       long openVersion = omFileInfo.getLatestVersionLocations().getVersion();
       long clientID = createKeyRequest.getClientID();
       String dbOpenFileName = omMetadataManager

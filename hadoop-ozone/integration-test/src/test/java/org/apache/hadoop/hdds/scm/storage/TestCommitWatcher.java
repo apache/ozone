@@ -144,7 +144,6 @@ public class TestCommitWatcher {
         StorageUnit.MB);
     cluster = MiniOzoneCluster.newBuilder(conf)
         .setNumDatanodes(5)
-        .setTotalPipelineNumLimit(3)
         .build();
     cluster.waitForClusterToBeReady();
     //the easiest way to create an open container is creating a key
@@ -210,7 +209,7 @@ public class TestCommitWatcher {
                 return v;
               });
           futures.add(future);
-          watcher.getFutureMap().put(length, future);
+          watcher.putFlushFuture(length, future);
           replies.add(reply);
         }
 
@@ -238,6 +237,8 @@ public class TestCommitWatcher {
         assertThat(watcher.getFutureMap()).isEmpty();
         assertThat(watcher.getCommitIndexMap()).isEmpty();
       }
+    } finally {
+      bufferPool.clearBufferPool();
     }
   }
 
@@ -281,7 +282,7 @@ public class TestCommitWatcher {
                 return v;
               });
           futures.add(future);
-          watcher.getFutureMap().put(length, future);
+          watcher.putFlushFuture(length, future);
           replies.add(reply);
         }
 
@@ -331,6 +332,8 @@ public class TestCommitWatcher {
           assertThat(watcher.getCommitIndexMap()).isEmpty();
         }
       }
+    } finally {
+      bufferPool.clearBufferPool();
     }
   }
 }

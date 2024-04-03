@@ -174,7 +174,9 @@ the configuration keys `ozone.server.default.replication.type` and `ozone.server
    <name>ozone.server.default.replication.type</name>
    <value>EC</value>
 </property>
+```
 
+```XML
 <property>
    <name>ozone.server.default.replication</name>
    <value>RS-6-3-1024k</value>
@@ -206,6 +208,22 @@ We can pass the EC Replication Config while creating the keys irrespective of bu
 
 ```shell
 ozone sh key put <Ozone Key Object Path> <Local File> --type EC --replication rs-6-3-1024k
+```
+
+When using ofs/o3fs, we can pass the EC Replication Config by setting the configuration keys `ozone.replication.type` and `ozone.replication`.
+
+```XML
+<property>
+   <name>ozone.replication.type</name>
+   <value>EC</value>
+</property>
+```
+
+```XML
+<property>
+   <name>ozone.replication</name>
+   <value>rs-3-2-1024k</value>
+</property>
 ```
 
 In the case bucket already has default EC Replication Config, there is no need of passing EC Replication Config while creating key.

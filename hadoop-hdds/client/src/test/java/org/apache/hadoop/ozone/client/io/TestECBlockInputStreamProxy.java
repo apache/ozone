@@ -20,7 +20,9 @@ package org.apache.hadoop.ozone.client.io;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.scm.OzoneClientConfig;
 import org.apache.hadoop.hdds.scm.XceiverClientFactory;
 import org.apache.hadoop.hdds.scm.storage.BlockExtendedInputStream;
 import org.apache.hadoop.hdds.scm.storage.BlockLocationInfo;
@@ -52,6 +54,7 @@ public class TestECBlockInputStreamProxy {
   private long randomSeed;
   private ThreadLocalRandom random = ThreadLocalRandom.current();
   private SplittableRandom dataGenerator;
+  private OzoneConfiguration conf = new OzoneConfiguration();
 
   @BeforeEach
   public void setup() {
@@ -342,8 +345,11 @@ public class TestECBlockInputStreamProxy {
 
   private ECBlockInputStreamProxy createBISProxy(ECReplicationConfig rConfig,
       BlockLocationInfo blockInfo) {
+    OzoneClientConfig clientConfig = conf.getObject(OzoneClientConfig.class);
+    clientConfig.setChecksumVerify(true);
     return new ECBlockInputStreamProxy(
-        rConfig, blockInfo, true, null, null, streamFactory);
+        rConfig, blockInfo, null, null, streamFactory,
+        clientConfig);
   }
 
   private static class TestECBlockInputStreamFactory
@@ -372,8 +378,9 @@ public class TestECBlockInputStreamProxy {
     public BlockExtendedInputStream create(boolean missingLocations,
         List<DatanodeDetails> failedDatanodes,
         ReplicationConfig repConfig, BlockLocationInfo blockInfo,
-        boolean verifyChecksum, XceiverClientFactory xceiverFactory,
-        Function<BlockID, BlockLocationInfo> refreshFunction) {
+        XceiverClientFactory xceiverFactory,
+        Function<BlockID, BlockLocationInfo> refreshFunction,
+        OzoneClientConfig config) {
       this.failedLocations = failedDatanodes;
       ByteBuffer wrappedBuffer =
           ByteBuffer.wrap(data.array(), 0, data.capacity());

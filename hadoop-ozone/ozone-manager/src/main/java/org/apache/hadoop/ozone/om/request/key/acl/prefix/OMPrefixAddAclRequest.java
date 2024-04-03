@@ -19,10 +19,8 @@
 package org.apache.hadoop.ozone.om.request.key.acl.prefix;
 
 import java.io.IOException;
-import java.util.List;
 import java.util.Map;
 
-import com.google.common.collect.Lists;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.audit.AuditLogger;
 import org.apache.hadoop.ozone.audit.OMAction;
@@ -55,8 +53,8 @@ public class OMPrefixAddAclRequest extends OMPrefixAclRequest {
   private static final Logger LOG =
       LoggerFactory.getLogger(OMPrefixAddAclRequest.class);
 
-  private OzoneObj ozoneObj;
-  private List<OzoneAcl> ozoneAcls;
+  private final OzoneObj ozoneObj;
+  private final OzoneAcl ozoneAcl;
 
   public OMPrefixAddAclRequest(OMRequest omRequest) {
     super(omRequest);
@@ -65,8 +63,7 @@ public class OMPrefixAddAclRequest extends OMPrefixAclRequest {
     // TODO: conversion of OzoneObj to protobuf can be avoided when we have
     //  single code path for HA and Non-HA
     ozoneObj = OzoneObjInfo.fromProtobuf(addAclRequest.getObj());
-    ozoneAcls = Lists.newArrayList(
-        OzoneAcl.fromProtobuf(addAclRequest.getAcl()));
+    ozoneAcl = OzoneAcl.fromProtobuf(addAclRequest.getAcl());
   }
 
   @Override
@@ -96,41 +93,41 @@ public class OMPrefixAddAclRequest extends OMPrefixAclRequest {
   }
 
   @Override
-  void onComplete(boolean operationResult, Exception exception,
+  void onComplete(OzoneObj resolvedOzoneObj, boolean operationResult, Exception exception,
       OMMetrics omMetrics, Result result, long trxnLogIndex,
       AuditLogger auditLogger, Map<String, String> auditMap) {
     switch (result) {
     case SUCCESS:
       if (LOG.isDebugEnabled()) {
         if (operationResult) {
-          LOG.debug("Add acl: {} to path: {} success!", ozoneAcls,
-              ozoneObj.getPath());
+          LOG.debug("Add acl: {} to path: {} success!", ozoneAcl,
+              resolvedOzoneObj.getPath());
         } else {
           LOG.debug("Acl {} already exists in path {}",
-              ozoneAcls, ozoneObj.getPath());
+              ozoneAcl, resolvedOzoneObj.getPath());
         }
       }
       break;
     case FAILURE:
-      LOG.error("Add acl {} to path {} failed!", ozoneAcls,
-          ozoneObj.getPath(), exception);
+      LOG.error("Add acl {} to path {} failed!", ozoneAcl,
+          resolvedOzoneObj.getPath(), exception);
       break;
     default:
       LOG.error("Unrecognized Result for OMPrefixAddAclRequest: {}",
           getOmRequest());
     }
 
-    if (ozoneAcls != null) {
-      auditMap.put(OzoneConsts.ACL, ozoneAcls.toString());
+    if (ozoneAcl != null) {
+      auditMap.put(OzoneConsts.ACL, ozoneAcl.toString());
     }
     auditLog(auditLogger, buildAuditMessage(OMAction.ADD_ACL, auditMap,
         exception, getOmRequest().getUserInfo()));
   }
 
   @Override
-  OMPrefixAclOpResult apply(PrefixManagerImpl prefixManager,
+  OMPrefixAclOpResult apply(OzoneObj resolvedOzoneObj, PrefixManagerImpl prefixManager,
       OmPrefixInfo omPrefixInfo, long trxnLogIndex) throws IOException {
-    return prefixManager.addAcl(ozoneObj, ozoneAcls.get(0), omPrefixInfo,
+    return prefixManager.addAcl(resolvedOzoneObj, ozoneAcl, omPrefixInfo,
         trxnLogIndex);
   }
 

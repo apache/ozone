@@ -156,10 +156,10 @@ public class GeneratorOm extends BaseGenerator implements
         .setQuotaInBytes(100L)
         .addOzoneAcls(
             new OzoneAcl(IAccessAuthorizer.ACLIdentityType.WORLD, "",
-                IAccessAuthorizer.ACLType.ALL, ACCESS))
+                ACCESS, IAccessAuthorizer.ACLType.ALL))
         .addOzoneAcls(
             new OzoneAcl(IAccessAuthorizer.ACLIdentityType.USER, getUserId(),
-                IAccessAuthorizer.ACLType.ALL, ACCESS)
+                ACCESS, IAccessAuthorizer.ACLType.ALL)
         ).build();
 
     volTable.put("/" + volumeName, omVolumeArgs);

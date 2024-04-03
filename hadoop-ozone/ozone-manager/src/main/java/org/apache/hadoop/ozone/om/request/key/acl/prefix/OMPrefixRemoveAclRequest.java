@@ -45,15 +45,15 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRespo
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.RemoveAclResponse;
 
 /**
- * Handle add Acl request for prefix.
+ * Handle remove Acl request for prefix.
  */
 public class OMPrefixRemoveAclRequest extends OMPrefixAclRequest {
 
   private static final Logger LOG =
       LoggerFactory.getLogger(OMPrefixRemoveAclRequest.class);
 
-  private OzoneObj ozoneObj;
-  private List<OzoneAcl> ozoneAcls;
+  private final OzoneObj ozoneObj;
+  private final List<OzoneAcl> ozoneAcls;
 
   public OMPrefixRemoveAclRequest(OMRequest omRequest) {
     super(omRequest);
@@ -93,25 +93,24 @@ public class OMPrefixRemoveAclRequest extends OMPrefixAclRequest {
   }
 
   @Override
-  void onComplete(boolean operationResult, Exception exception,
-      OMMetrics omMetrics, Result result, long trxnLogIndex,
+  void onComplete(OzoneObj resolvedOzoneObj, boolean operationResult,
+      Exception exception, OMMetrics omMetrics, Result result, long trxnLogIndex,
       AuditLogger auditLogger, Map<String, String> auditMap) {
     switch (result) {
     case SUCCESS:
       if (LOG.isDebugEnabled()) {
         if (operationResult) {
           LOG.debug("Remove acl: {} to path: {} success!", ozoneAcls,
-              ozoneObj.getPath());
+              resolvedOzoneObj.getPath());
         } else {
           LOG.debug("Acl {} not removed from path {} as it does not exist",
-              ozoneAcls, ozoneObj.getPath());
+              ozoneAcls, resolvedOzoneObj.getPath());
         }
       }
       break;
     case FAILURE:
-      omMetrics.incNumBucketUpdateFails();
       LOG.error("Remove acl {} to path {} failed!", ozoneAcls,
-          ozoneObj.getPath(), exception);
+          resolvedOzoneObj.getPath(), exception);
       break;
     default:
       LOG.error("Unrecognized Result for OMPrefixRemoveAclRequest: {}",
@@ -126,9 +125,9 @@ public class OMPrefixRemoveAclRequest extends OMPrefixAclRequest {
   }
 
   @Override
-  OMPrefixAclOpResult apply(PrefixManagerImpl prefixManager,
+  OMPrefixAclOpResult apply(OzoneObj resolvedOzoneObj, PrefixManagerImpl prefixManager,
       OmPrefixInfo omPrefixInfo, long trxnLogIndex) throws IOException {
-    return prefixManager.removeAcl(ozoneObj, ozoneAcls.get(0), omPrefixInfo);
+    return prefixManager.removeAcl(resolvedOzoneObj, ozoneAcls.get(0), omPrefixInfo);
   }
 
 }

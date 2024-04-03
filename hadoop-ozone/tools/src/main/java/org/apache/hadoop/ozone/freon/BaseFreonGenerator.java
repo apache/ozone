@@ -265,7 +265,7 @@ public class BaseFreonGenerator {
    */
   private void reportAnyFailure() {
     if (failureCounter.get() > 0) {
-      throw new RuntimeException("One ore more freon test is failed.");
+      throw new RuntimeException("One or more freon test is failed.");
     }
   }
 

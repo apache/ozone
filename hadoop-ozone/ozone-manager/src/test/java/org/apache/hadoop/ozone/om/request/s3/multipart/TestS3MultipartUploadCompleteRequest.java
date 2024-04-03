@@ -33,6 +33,7 @@ import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
+import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
@@ -133,9 +134,14 @@ public class TestS3MultipartUploadCompleteRequest
 
     List<Part> partList = new ArrayList<>();
 
-    String partName = getPartName(volumeName, bucketName, keyName,
-        multipartUploadID, 1);
-    partList.add(Part.newBuilder().setPartName(partName).setPartNumber(1)
+    String eTag = s3MultipartUploadCommitPartRequest.getOmRequest()
+        .getCommitMultiPartUploadRequest()
+        .getKeyArgs()
+        .getMetadataList()
+        .stream()
+        .filter(keyValue -> keyValue.getKey().equals(OzoneConsts.ETAG))
+        .findFirst().get().getValue();
+    partList.add(Part.newBuilder().setETag(eTag).setPartName(eTag).setPartNumber(1)
         .build());
 
     OMRequest completeMultipartRequest = doPreExecuteCompleteMPU(volumeName,
@@ -223,10 +229,10 @@ public class TestS3MultipartUploadCompleteRequest
     String partName = getPartName(volumeName, bucketName, keyName,
         multipartUploadID, 23);
 
-    partList.add(Part.newBuilder().setPartName(partName).setPartNumber(23).build());
+    partList.add(Part.newBuilder().setETag(partName).setPartName(partName).setPartNumber(23).build());
 
     partName = getPartName(volumeName, bucketName, keyName, multipartUploadID, 1);
-    partList.add(Part.newBuilder().setPartName(partName).setPartNumber(1).build());
+    partList.add(Part.newBuilder().setETag(partName).setPartName(partName).setPartNumber(1).build());
 
     OMRequest completeMultipartRequest = doPreExecuteCompleteMPU(volumeName,
         bucketName, keyName, multipartUploadID, partList);

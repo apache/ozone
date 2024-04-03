@@ -79,17 +79,17 @@ public class TestListParts {
     response = REST.put(OzoneConsts.S3_BUCKET, OzoneConsts.KEY,
         content.length(), 1, uploadID, body);
 
-    assertNotNull(response.getHeaderString("ETag"));
+    assertNotNull(response.getHeaderString(OzoneConsts.ETAG));
 
     response = REST.put(OzoneConsts.S3_BUCKET, OzoneConsts.KEY,
         content.length(), 2, uploadID, body);
 
-    assertNotNull(response.getHeaderString("ETag"));
+    assertNotNull(response.getHeaderString(OzoneConsts.ETAG));
 
     response = REST.put(OzoneConsts.S3_BUCKET, OzoneConsts.KEY,
         content.length(), 3, uploadID, body);
 
-    assertNotNull(response.getHeaderString("ETag"));
+    assertNotNull(response.getHeaderString(OzoneConsts.ETAG));
   }
 
   @Test

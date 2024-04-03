@@ -62,6 +62,10 @@ public enum S3StorageType {
   public static S3StorageType getDefault(ConfigurationSource config) {
     String replicationString = config.get(OzoneConfigKeys.OZONE_REPLICATION);
     ReplicationFactor configFactor;
+    if (replicationString == null) {
+      // if no config is set then let server take decision
+      return null;
+    }
     try {
       configFactor = ReplicationFactor.valueOf(
           Integer.parseInt(replicationString));

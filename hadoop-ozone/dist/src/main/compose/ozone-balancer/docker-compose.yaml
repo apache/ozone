@@ -1,0 +1,179 @@
+# Licensed to the Apache Software Foundation (ASF) under one
+# or more contributor license agreements.  See the NOTICE file
+# distributed with this work for additional information
+# regarding copyright ownership.  The ASF licenses this file
+# to you under the Apache License, Version 2.0 (the
+# "License"); you may not use this file except in compliance
+# with the License.  You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+version: "3.8"
+
+# reusable fragments (see https://docs.docker.com/compose/compose-file/#extension-fields)
+x-common-config:
+  &common-config
+   image: ${OZONE_RUNNER_IMAGE}:${OZONE_RUNNER_VERSION}
+   volumes:
+      - ../..:/opt/hadoop
+   env_file:
+      - docker-config
+
+x-replication:
+  &replication
+   OZONE-SITE.XML_ozone.server.default.replication: ${OZONE_REPLICATION_FACTOR:-3}
+
+services:
+   datanode1:
+      <<: *common-config
+      ports:
+         - 19864
+         - 9882
+      environment:
+         <<: *replication
+      command: ["ozone","datanode"]
+      volumes:
+         - tmpfs1:/data
+         - ../..:/opt/hadoop
+   datanode2:
+      <<: *common-config
+      ports:
+         - 19864
+         - 9882
+      environment:
+         <<: *replication
+      command: [ "ozone","datanode" ]
+      volumes:
+         - tmpfs2:/data
+         - ../..:/opt/hadoop
+   datanode3:
+      <<: *common-config
+      ports:
+         - 19864
+         - 9882
+      environment:
+         <<: *replication
+      command: [ "ozone","datanode" ]
+      volumes:
+         - tmpfs3:/data
+         - ../..:/opt/hadoop
+   datanode4:
+      <<: *common-config
+      ports:
+         - 19864
+         - 9882
+      environment:
+         <<: *replication
+      command: [ "ozone","datanode" ]
+      volumes:
+         - tmpfs4:/data
+         - ../..:/opt/hadoop
+   om1:
+      <<: *common-config
+      environment:
+         WAITFOR: scm3:9894
+         ENSURE_OM_INITIALIZED: /data/metadata/om/current/VERSION
+         <<: *replication
+      ports:
+         - 9874:9874
+         - 9862
+      hostname: om1
+      command: ["ozone","om"]
+   om2:
+      <<: *common-config
+      environment:
+         WAITFOR: scm3:9894
+         ENSURE_OM_INITIALIZED: /data/metadata/om/current/VERSION
+         <<: *replication
+      ports:
+         - 9874
+         - 9862
+      hostname: om2
+      command: ["ozone","om"]
+   om3:
+      <<: *common-config
+      environment:
+         WAITFOR: scm3:9894
+         ENSURE_OM_INITIALIZED: /data/metadata/om/current/VERSION
+         <<: *replication
+      ports:
+         - 9874
+         - 9862
+      hostname: om3
+      command: ["ozone","om"]
+   scm1:
+      <<: *common-config
+      ports:
+         - 9876:9876
+      environment:
+         ENSURE_SCM_INITIALIZED: /data/metadata/scm/current/VERSION
+         OZONE-SITE.XML_hdds.scm.safemode.min.datanode: ${OZONE_SAFEMODE_MIN_DATANODES:-1}
+         <<: *replication
+      command: ["ozone","scm"]
+   scm2:
+      <<: *common-config
+      ports:
+         - 9876
+      environment:
+         WAITFOR: scm1:9894
+         ENSURE_SCM_BOOTSTRAPPED: /data/metadata/scm/current/VERSION
+         OZONE-SITE.XML_hdds.scm.safemode.min.datanode: ${OZONE_SAFEMODE_MIN_DATANODES:-1}
+         <<: *replication
+      command: ["ozone","scm"]
+   scm3:
+      <<: *common-config
+      ports:
+         - 9876
+      environment:
+         WAITFOR: scm2:9894
+         ENSURE_SCM_BOOTSTRAPPED: /data/metadata/scm/current/VERSION
+         OZONE-SITE.XML_hdds.scm.safemode.min.datanode: ${OZONE_SAFEMODE_MIN_DATANODES:-1}
+         <<: *replication
+      command: ["ozone","scm"]
+   httpfs:
+      <<: *common-config
+      environment:
+         OZONE-SITE.XML_hdds.scm.safemode.min.datanode: ${OZONE_SAFEMODE_MIN_DATANODES:-1}
+         <<: *replication
+      ports:
+         - 14000:14000
+      command: [ "ozone","httpfs" ]
+   s3g:
+      <<: *common-config
+      environment:
+         OZONE_OPTS:
+         <<: *replication
+      ports:
+         - 9878:9878
+      command: ["ozone","s3g"]
+volumes:
+   tmpfs1:
+      driver: local
+      driver_opts:
+         o: "size=1g,uid=1000"
+         device: tmpfs
+         type: tmpfs
+   tmpfs2:
+      driver: local
+      driver_opts:
+         o: "size=1g,uid=2000"
+         device: tmpfs
+         type: tmpfs
+   tmpfs3:
+      driver: local
+      driver_opts:
+         o: "size=1g,uid=3000"
+         device: tmpfs
+         type: tmpfs
+   tmpfs4:
+      driver: local
+      driver_opts:
+         o: "size=1g,uid=4000"
+         device: tmpfs
+         type: tmpfs

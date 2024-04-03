@@ -35,6 +35,6 @@ public interface DatanodeAdminMonitor extends Runnable {
   void stopMonitoring(DatanodeDetails dn);
   Set<DatanodeAdminMonitorImpl.TrackedNode> getTrackedNodes();
   void setMetrics(NodeDecommissionMetrics metrics);
-  Map<String, List<ContainerID>> getContainersReplicatedOnNode(DatanodeDetails dn)
+  Map<String, List<ContainerID>> getContainersPendingReplication(DatanodeDetails dn)
       throws NodeNotFoundException;
 }

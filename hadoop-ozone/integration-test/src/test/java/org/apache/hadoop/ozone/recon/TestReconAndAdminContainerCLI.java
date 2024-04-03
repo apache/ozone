@@ -246,7 +246,7 @@ class TestReconAndAdminContainerCLI {
           TestNodeUtil.getDNHostAndPort(nodeToGoOffline1)), 0);
     } else {
       scmClient.decommissionNodes(Collections.singletonList(
-          TestNodeUtil.getDNHostAndPort(nodeToGoOffline1)));
+          TestNodeUtil.getDNHostAndPort(nodeToGoOffline1)), false);
     }
 
     TestNodeUtil.waitForDnToReachOpState(scmNodeManager,
@@ -273,7 +273,7 @@ class TestReconAndAdminContainerCLI {
           TestNodeUtil.getDNHostAndPort(nodeToGoOffline2)), 0);
     } else {
       scmClient.decommissionNodes(Collections.singletonList(
-          TestNodeUtil.getDNHostAndPort(nodeToGoOffline2)));
+          TestNodeUtil.getDNHostAndPort(nodeToGoOffline2)), false);
     }
 
     TestNodeUtil.waitForDnToReachOpState(scmNodeManager,

@@ -36,8 +36,6 @@ import org.apache.hadoop.hdds.protocol.SCMSecurityProtocol;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateCodec;
 import org.apache.hadoop.hdds.server.JsonUtils;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Help.Visibility;
 import picocli.CommandLine.Option;
@@ -53,9 +51,6 @@ import static java.lang.System.err;
     mixinStandardHelpOptions = true,
     versionProvider = HddsVersionProvider.class)
 public class ListSubcommand extends ScmCertSubcommand {
-
-  private static final Logger LOG =
-      LoggerFactory.getLogger(ListSubcommand.class);
 
   @Option(names = {"-s", "--start"},
       description = "Certificate serial id to start the iteration",
@@ -114,7 +109,7 @@ public class ListSubcommand extends ScmCertSubcommand {
               CertificateCodec.getX509Certificate(certPemStr);
           certList.add(new Certificate(cert));
         } catch (CertificateException ex) {
-          LOG.error("Failed to parse certificate.");
+          err.println("Failed to parse certificate.");
         }
       }
       System.out.println(
@@ -122,9 +117,9 @@ public class ListSubcommand extends ScmCertSubcommand {
       return;
     }
 
-    LOG.info("Certificate list:(Type={}, BatchSize={}, CertCount={})",
+    System.out.printf("Certificate list:(Type=%s, BatchSize=%s, CertCount=%s)%n",
         type.toUpperCase(), count, certPemList.size());
-    printCertList(LOG, certPemList);
+    printCertList(certPemList);
   }
 
   private static class BigIntJsonSerializer extends JsonSerializer<BigInteger> {

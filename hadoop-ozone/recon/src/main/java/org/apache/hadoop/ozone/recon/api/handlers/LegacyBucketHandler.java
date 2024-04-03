@@ -41,7 +41,7 @@ import java.util.Set;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 
 /**
- * Class for handling Legacy buckets.
+ * Class for handling Legacy buckets NameSpaceSummaries.
  */
 public class LegacyBucketHandler extends BucketHandler {
 

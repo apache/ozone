@@ -22,8 +22,6 @@ import java.io.IOException;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.scm.client.ScmClient;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import picocli.CommandLine.Command;
 
 /**
@@ -36,14 +34,11 @@ import picocli.CommandLine.Command;
     versionProvider = HddsVersionProvider.class)
 public class SafeModeExitSubcommand extends ScmSubcommand {
 
-  private static final Logger LOG =
-      LoggerFactory.getLogger(SafeModeExitSubcommand.class);
-
   @Override
   public void execute(ScmClient scmClient) throws IOException {
     boolean execReturn = scmClient.forceExitSafeMode();
     if (execReturn) {
-      LOG.info("SCM exit safe mode successfully.");
+      System.out.println("SCM exit safe mode successfully.");
     }
   }
 }

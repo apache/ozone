@@ -213,7 +213,7 @@ public final class SCMDatanodeHeartbeatDispatcher {
 
     private final DatanodeDetails datanodeDetails;
 
-    private final T report;
+    private T report;
 
     public ReportFromDatanode(DatanodeDetails datanodeDetails, T report) {
       this.datanodeDetails = datanodeDetails;
@@ -226,6 +226,10 @@ public final class SCMDatanodeHeartbeatDispatcher {
 
     public T getReport() {
       return report;
+    }
+
+    public void setReport(T report) {
+      this.report = report;
     }
   }
 
@@ -381,9 +385,11 @@ public final class SCMDatanodeHeartbeatDispatcher {
     @Override
     public void mergeReport(ContainerReport nextReport) {
       if (nextReport.getType() == ContainerReportType.ICR) {
-        getReport().getReportList().addAll(
-            ((ReportFromDatanode<IncrementalContainerReportProto>) nextReport)
-                .getReport().getReportList());
+        // To update existing report list , need to create a builder and then
+        // merge new reports to existing report list.
+        IncrementalContainerReportProto reportProto = getReport().toBuilder().addAllReport(
+            ((ReportFromDatanode<IncrementalContainerReportProto>) nextReport).getReport().getReportList()).build();
+        setReport(reportProto);
       }
     }
   }

@@ -144,8 +144,7 @@ public class ThrottledAsyncChecker<K, V> implements AsyncChecker<K, V> {
     final ListenableFuture<V> lf;
 
     if (diskCheckTimeout > 0) {
-      lf = TimeoutFuture
-          .create(lfWithoutTimeout, diskCheckTimeout, TimeUnit.MILLISECONDS,
+      lf = Futures.withTimeout(lfWithoutTimeout, diskCheckTimeout, TimeUnit.MILLISECONDS,
               scheduledExecutorService);
     } else {
       lf = lfWithoutTimeout;

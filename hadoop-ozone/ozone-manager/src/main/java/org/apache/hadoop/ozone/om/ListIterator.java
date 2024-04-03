@@ -342,7 +342,7 @@ public class ListIterator {
     }
 
     public void close() throws IOException {
-      iterators.forEach(IOUtils::closeQuietly);
+      IOUtils.closeQuietly(iterators);
     }
   }
 }

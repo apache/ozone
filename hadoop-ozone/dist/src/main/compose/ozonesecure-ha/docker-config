@@ -57,7 +57,7 @@ OZONE-SITE.XML_hdds.grpc.tls.enabled=true
 OZONE-SITE.XML_ozone.server.default.replication=3
 OZONE-SITE.XML_hdds.scmclient.max.retry.timeout=30s
 OZONE-SITE.XML_hdds.container.report.interval=60s
-OZONE-SITE.XML_dfs.container.ratis.datastream.enabled=true
+OZONE-SITE.XML_hdds.container.ratis.datastream.enabled=true
 
 OZONE-SITE.XML_ozone.recon.om.snapshot.task.interval.delay=1m
 OZONE-SITE.XML_ozone.recon.db.dir=/data/metadata/recon
@@ -138,6 +138,7 @@ HADOOP-POLICY.XML_hdds.security.client.datanode.container.protocol.acl=*
 HADOOP-POLICY.XML_hdds.security.client.scm.container.protocol.acl=*
 HADOOP-POLICY.XML_hdds.security.client.scm.block.protocol.acl=*
 HADOOP-POLICY.XML_hdds.security.client.scm.certificate.protocol.acl=*
+HADOOP-POLICY.XML_ozone.security.reconfigure.protocol.acl=*
 
 HDFS-SITE.XML_rpc.metrics.quantile.enable=true
 HDFS-SITE.XML_rpc.metrics.percentiles.intervals=60,300
@@ -156,7 +157,6 @@ KMS-SITE.XML_hadoop.kms.proxyuser.s3g.hosts=*
 #BYTEMAN_SCRIPT_URL=https://raw.githubusercontent.com/apache/hadoop/trunk/dev-support/byteman/hadooprpc.btm
 
 OZONE_DATANODE_SECURE_USER=root
-JAVA_HOME=/usr/lib/jvm/jre
 JSVC_HOME=/usr/bin
 
 OZONE_CONF_DIR=/etc/hadoop

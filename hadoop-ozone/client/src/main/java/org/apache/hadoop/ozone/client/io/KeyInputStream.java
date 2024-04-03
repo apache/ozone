@@ -25,6 +25,7 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 
 import org.apache.hadoop.hdds.client.BlockID;
+import org.apache.hadoop.hdds.scm.OzoneClientConfig;
 import org.apache.hadoop.hdds.scm.XceiverClientFactory;
 import org.apache.hadoop.hdds.scm.storage.BlockExtendedInputStream;
 import org.apache.hadoop.hdds.scm.storage.BlockLocationInfo;
@@ -58,9 +59,9 @@ public class KeyInputStream extends MultipartInputStream {
       OmKeyInfo keyInfo,
       List<OmKeyLocationInfo> blockInfos,
       XceiverClientFactory xceiverClientFactory,
-      boolean verifyChecksum,
       Function<OmKeyInfo, OmKeyInfo> retryFunction,
-      BlockInputStreamFactory blockStreamFactory) {
+      BlockInputStreamFactory blockStreamFactory,
+      OzoneClientConfig config) {
     List<BlockExtendedInputStream> partStreams = new ArrayList<>();
     for (OmKeyLocationInfo omKeyLocationInfo : blockInfos) {
       if (LOG.isDebugEnabled()) {
@@ -91,9 +92,9 @@ public class KeyInputStream extends MultipartInputStream {
               omKeyLocationInfo,
               omKeyLocationInfo.getPipeline(),
               omKeyLocationInfo.getToken(),
-              verifyChecksum,
               xceiverClientFactory,
-              retry);
+              retry,
+              config);
       partStreams.add(stream);
     }
     return partStreams;
@@ -117,13 +118,13 @@ public class KeyInputStream extends MultipartInputStream {
   private static LengthInputStream getFromOmKeyInfo(
       OmKeyInfo keyInfo,
       XceiverClientFactory xceiverClientFactory,
-      boolean verifyChecksum,
       Function<OmKeyInfo, OmKeyInfo> retryFunction,
       BlockInputStreamFactory blockStreamFactory,
-      List<OmKeyLocationInfo> locationInfos) {
+      List<OmKeyLocationInfo> locationInfos,
+      OzoneClientConfig config) {
     List<BlockExtendedInputStream> streams = createStreams(keyInfo,
-        locationInfos, xceiverClientFactory, verifyChecksum, retryFunction,
-        blockStreamFactory);
+        locationInfos, xceiverClientFactory, retryFunction,
+        blockStreamFactory, config);
     KeyInputStream keyInputStream =
         new KeyInputStream(keyInfo.getKeyName(), streams);
     return new LengthInputStream(keyInputStream, keyInputStream.getLength());
@@ -134,20 +135,22 @@ public class KeyInputStream extends MultipartInputStream {
    */
   public static LengthInputStream getFromOmKeyInfo(OmKeyInfo keyInfo,
       XceiverClientFactory xceiverClientFactory,
-      boolean verifyChecksum,  Function<OmKeyInfo, OmKeyInfo> retryFunction,
-      BlockInputStreamFactory blockStreamFactory) {
+      Function<OmKeyInfo, OmKeyInfo> retryFunction,
+      BlockInputStreamFactory blockStreamFactory,
+      OzoneClientConfig config) {
 
     List<OmKeyLocationInfo> keyLocationInfos = keyInfo
         .getLatestVersionLocations().getBlocksLatestVersionOnly();
 
-    return getFromOmKeyInfo(keyInfo, xceiverClientFactory, verifyChecksum,
-        retryFunction, blockStreamFactory, keyLocationInfos);
+    return getFromOmKeyInfo(keyInfo, xceiverClientFactory,
+        retryFunction, blockStreamFactory, keyLocationInfos, config);
   }
 
   public static List<LengthInputStream> getStreamsFromKeyInfo(OmKeyInfo keyInfo,
-      XceiverClientFactory xceiverClientFactory, boolean verifyChecksum,
+      XceiverClientFactory xceiverClientFactory,
       Function<OmKeyInfo, OmKeyInfo> retryFunction,
-      BlockInputStreamFactory blockStreamFactory) {
+      BlockInputStreamFactory blockStreamFactory,
+      OzoneClientConfig config) {
 
     List<OmKeyLocationInfo> keyLocationInfos = keyInfo
         .getLatestVersionLocations().getBlocksLatestVersionOnly();
@@ -162,7 +165,8 @@ public class KeyInputStream extends MultipartInputStream {
     // Create a KeyInputStream for each part.
     for (List<OmKeyLocationInfo> locationInfo : partsToBlocksMap.values()) {
       lengthInputStreams.add(getFromOmKeyInfo(keyInfo, xceiverClientFactory,
-          verifyChecksum, retryFunction, blockStreamFactory, locationInfo));
+          retryFunction, blockStreamFactory, locationInfo,
+          config));
     }
     return lengthInputStreams;
   }

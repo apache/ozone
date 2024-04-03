@@ -27,7 +27,6 @@ import org.apache.hadoop.ozone.om.request.file.OMFileRequest;
 import org.apache.hadoop.ozone.om.response.CleanupTableInfo;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 
-import javax.annotation.CheckForNull;
 import jakarta.annotation.Nonnull;
 import java.io.IOException;
 import java.util.List;
@@ -61,7 +60,7 @@ public class S3MultipartUploadCompleteResponseWithFSO
       @Nonnull OmKeyInfo omKeyInfo,
       @Nonnull List<OmKeyInfo> allKeyInfoToRemove,
       @Nonnull BucketLayout bucketLayout,
-      @CheckForNull OmBucketInfo omBucketInfo,
+      OmBucketInfo omBucketInfo,
       @Nonnull long volumeId, @Nonnull long bucketId) {
     super(omResponse, multipartKey, multipartOpenKey, omKeyInfo,
         allKeyInfoToRemove, bucketLayout, omBucketInfo);

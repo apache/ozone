@@ -955,6 +955,12 @@ public class BasicOzoneFileSystem extends FileSystem {
   }
 
   @Override
+  public void renameSnapshot(Path path, String snapshotOldName, String snapshotNewName)
+      throws IOException {
+    getAdapter().renameSnapshot(pathToKey(path), snapshotOldName, snapshotNewName);
+  }
+
+  @Override
   public void deleteSnapshot(Path path, String snapshotName)
       throws IOException {
     adapter.deleteSnapshot(pathToKey(path), snapshotName);

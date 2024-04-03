@@ -65,6 +65,7 @@ import org.apache.hadoop.ozone.recon.spi.impl.OzoneManagerServiceProviderImpl;
  */
 public final class OMMetadataManagerTestUtils {
 
+  private static OzoneConfiguration configuration;
   private OMMetadataManagerTestUtils() {
   }
 
@@ -129,8 +130,9 @@ public final class OMMetadataManagerTestUtils {
     DBCheckpoint checkpoint = omMetadataManager.getStore()
         .getCheckpoint(true);
     assertNotNull(checkpoint.getCheckpointLocation());
-
-    OzoneConfiguration configuration = new OzoneConfiguration();
+    if (configuration == null) {
+      configuration = new OzoneConfiguration();
+    }
     configuration.set(OZONE_RECON_OM_SNAPSHOT_DB_DIR, reconOmDbDir
         .getAbsolutePath());
 
@@ -397,23 +399,31 @@ public final class OMMetadataManagerTestUtils {
                     .build());
   }
 
+  @SuppressWarnings("parameternumber")
   public static void writeDeletedDirToOm(OMMetadataManager omMetadataManager,
                                          String bucketName,
                                          String volumeName,
                                          String dirName,
                                          long parentObjectId,
                                          long bucketObjectId,
-                                         long volumeObjectId)
+                                         long volumeObjectId,
+                                         long objectId)
       throws IOException {
-    // DB key in DeletedDirectoryTable => "volumeID/bucketID/parentId/dirName"
-    String omKey = omMetadataManager.getOzonePathKey(volumeObjectId,
-            bucketObjectId, parentObjectId, dirName);
+    // DB key in DeletedDirectoryTable =>
+    // "volumeID/bucketID/parentId/dirName/dirObjectId"
 
-    omMetadataManager.getDeletedDirTable().put(omKey,
+    String ozoneDbKey = omMetadataManager.getOzonePathKey(volumeObjectId,
+        bucketObjectId, parentObjectId, dirName);
+    String ozoneDeleteKey = omMetadataManager.getOzoneDeletePathKey(
+        objectId, ozoneDbKey);
+
+
+    omMetadataManager.getDeletedDirTable().put(ozoneDeleteKey,
         new OmKeyInfo.Builder()
             .setBucketName(bucketName)
             .setVolumeName(volumeName)
             .setKeyName(dirName)
+            .setObjectID(objectId)
             .setReplicationConfig(StandaloneReplicationConfig.getInstance(ONE))
             .build());
   }
@@ -493,4 +503,14 @@ public final class OMMetadataManagerTestUtils {
   public static BucketLayout getBucketLayout() {
     return BucketLayout.DEFAULT;
   }
+
+  public static OzoneConfiguration getConfiguration() {
+    return configuration;
+  }
+
+  public static void setConfiguration(
+      OzoneConfiguration configuration) {
+    OMMetadataManagerTestUtils.configuration = configuration;
+  }
+
 }

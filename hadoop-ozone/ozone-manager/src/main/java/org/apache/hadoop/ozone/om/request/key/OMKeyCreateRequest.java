@@ -281,6 +281,8 @@ public class OMKeyCreateRequest extends OMKeyRequest {
           ozoneManager.getObjectIdFromTxId(trxnLogIndex),
           ozoneManager.isRatisEnabled(), replicationConfig);
 
+      validateEncryptionKeyInfo(bucketInfo, keyArgs);
+
       long openVersion = omKeyInfo.getLatestVersionLocations().getVersion();
       long clientID = createKeyRequest.getClientID();
       String dbOpenKeyName = omMetadataManager.getOpenKey(volumeName,

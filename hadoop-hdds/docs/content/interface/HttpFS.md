@@ -84,7 +84,7 @@ Truncate a File                 | not implemented in Ozone
 Status of a File/Directory      | supported
 List a Directory                | supported
 List a File                     | supported
-Iteratively List a Directory    | supported
+Iteratively List a Directory    | unsupported
 
 
 ### Other File System Operations

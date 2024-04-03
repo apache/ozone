@@ -23,6 +23,8 @@ import javax.xml.bind.annotation.XmlAccessType;
 import javax.xml.bind.annotation.XmlAccessorType;
 import javax.xml.bind.annotation.XmlElement;
 import javax.xml.bind.annotation.XmlRootElement;
+import org.apache.hadoop.ozone.OzoneConsts;
+
 import java.util.ArrayList;
 import java.util.List;
 
@@ -55,7 +57,7 @@ public class CompleteMultipartUploadRequest {
     @XmlElement(name = "PartNumber")
     private int partNumber;
 
-    @XmlElement(name = "ETag")
+    @XmlElement(name = OzoneConsts.ETAG)
     private String eTag;
 
     public int getPartNumber() {
@@ -66,12 +68,12 @@ public class CompleteMultipartUploadRequest {
       this.partNumber = partNumber;
     }
 
-    public String geteTag() {
+    public String getETag() {
       return eTag;
     }
 
-    public void seteTag(String eTag) {
-      this.eTag = eTag;
+    public void setETag(String eTagHash) {
+      this.eTag = eTagHash;
     }
   }
 

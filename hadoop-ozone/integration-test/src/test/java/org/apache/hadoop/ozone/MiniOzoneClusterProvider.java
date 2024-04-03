@@ -17,14 +17,12 @@
  */
 package org.apache.hadoop.ozone;
 
-import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.util.HashSet;
 import java.util.Set;
-import java.util.UUID;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.TimeUnit;
@@ -49,10 +47,10 @@ import static java.util.concurrent.TimeUnit.SECONDS;
  * however shutting down the cluster in the background while the new cluster is
  * getting created will likely save about 10 seconds per test.
  *
- * To use this class, setup the Cluster Provider in a static method annotated
- * with @BeforeClass, eg:
- *
- *   @BeforeClass
+ * To use this class, set up the Cluster Provider in a static method annotated
+ * with {@code @BeforeAll}, eg:
+ * <pre>
+ *   &#64;BeforeAll
  *   public static void init() {
  *     OzoneConfiguration conf = new OzoneConfiguration();
  *     final int interval = 100;
@@ -71,29 +69,34 @@ import static java.util.concurrent.TimeUnit.SECONDS;
  *
  *     clusterProvider = new MiniOzoneClusterProvider(conf, builder, 5);
  *   }
+ * </pre>
  *
- * Ensure you shutdown the provider in a @AfterClass annotated method:
+ * Ensure you shut down the provider in an {@code @AfterAll} annotated method:
  *
- *   @AfterClass
+ * <pre>
+ *   &#64;AfterAll
  *   public static void shutdown() throws InterruptedException {
  *     if (clusterProvider != null) {
  *       clusterProvider.shutdown();
  *     }
  *   }
+ * </pre>
  *
- * Then in the @Before method, or in the test itself, obtain a cluster:
+ * Then in the {@code @BeforeEach} method, or in the test itself, obtain a cluster:
  *
- *   @Before
+ * <pre>
+ *   &#64;BeforeEach
  *   public void setUp() throws Exception {
  *     cluster = clusterProvider.provide();
  *   }
  *
- *   @After
+ *   &#64;AfterEach
  *   public void tearDown() throws InterruptedException, IOException {
  *     if (cluster != null) {
  *       clusterProvider.destroy(cluster);
  *     }
  *   }
+ * </pre>
  *
  *  This only works if the same config / builder object can be passed to each
  *  cluster in the test suite.
@@ -118,7 +121,6 @@ public class MiniOzoneClusterProvider {
   private final int clusterLimit;
   private int consumedClusterCount = 0;
 
-  private final OzoneConfiguration conf;
   private final MiniOzoneCluster.Builder builder;
   private final Thread createThread;
   private final Thread reapThread;
@@ -130,16 +132,13 @@ public class MiniOzoneClusterProvider {
       = new ArrayBlockingQueue<>(EXPIRED_LIMIT);
 
   /**
-   *
-   * @param conf The configuration to use when creating the cluster
    * @param builder A builder object with all cluster options set
    * @param clusterLimit The total number of clusters this provider should
    *                     create. If another is requested after this limit has
    *                     been reached, an exception will be thrown.
    */
-  public MiniOzoneClusterProvider(OzoneConfiguration conf,
+  public MiniOzoneClusterProvider(
       MiniOzoneCluster.Builder builder, int clusterLimit) {
-    this.conf = conf;
     this.builder = builder;
     this.clusterLimit = clusterLimit;
     createThread = createClusters();
@@ -214,9 +213,6 @@ public class MiniOzoneClusterProvider {
       while (!Thread.interrupted() && createdCount < clusterLimit) {
         MiniOzoneCluster cluster = null;
         try {
-          builder.setClusterId(UUID.randomUUID().toString());
-          builder.setConf(new OzoneConfiguration(conf));
-
           cluster = builder.build();
           cluster.waitForClusterToBeReady();
           createdCount++;

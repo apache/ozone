@@ -22,6 +22,7 @@ import org.apache.hadoop.hdds.scm.PlacementPolicy;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.cli.ContainerOperationClient;
 import org.apache.hadoop.hdds.scm.client.ScmClient;
+import org.apache.hadoop.hdds.scm.container.balancer.ContainerBalancerConfiguration;
 import org.apache.hadoop.hdds.scm.container.placement.algorithms.SCMContainerPlacementCapacity;
 
 import org.apache.ozone.test.tag.Unhealthy;
@@ -31,16 +32,16 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 
 import java.util.Optional;
-import java.util.concurrent.TimeUnit;
 
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
 /**
  * This class tests container balancer operations
  * from cblock clients.
  */
-@Timeout(value = 300, unit = TimeUnit.MILLISECONDS)
+@Timeout(value = 300)
 public class TestContainerBalancerOperations {
 
   private static ScmClient containerBalancerClient;
@@ -83,11 +84,18 @@ public class TestContainerBalancerOperations {
     Optional<Long> maxSizeToMovePerIterationInGB = Optional.of(1L);
     Optional<Long> maxSizeEnteringTargetInGB = Optional.of(1L);
     Optional<Long> maxSizeLeavingSourceInGB = Optional.of(1L);
-
+    Optional<Integer> balancingInterval = Optional.of(1);
+    Optional<Integer> moveTimeout = Optional.of(1);
+    Optional<Integer> moveReplicationTimeout = Optional.of(1);
+    Optional<Boolean> networkTopologyEnable = Optional.of(false);
+    Optional<String> includeNodes = Optional.of("");
+    Optional<String> excludeNodes = Optional.of("");
     containerBalancerClient.startContainerBalancer(threshold, iterations,
         maxDatanodesPercentageToInvolvePerIteration,
         maxSizeToMovePerIterationInGB, maxSizeEnteringTargetInGB,
-        maxSizeLeavingSourceInGB);
+        maxSizeLeavingSourceInGB, balancingInterval, moveTimeout,
+        moveReplicationTimeout, networkTopologyEnable, includeNodes,
+        excludeNodes);
     running = containerBalancerClient.getContainerBalancerStatus();
     assertTrue(running);
 
@@ -105,7 +113,9 @@ public class TestContainerBalancerOperations {
     containerBalancerClient.startContainerBalancer(threshold, iterations,
         maxDatanodesPercentageToInvolvePerIteration,
         maxSizeToMovePerIterationInGB, maxSizeEnteringTargetInGB,
-        maxSizeLeavingSourceInGB);
+        maxSizeLeavingSourceInGB, balancingInterval, moveTimeout,
+        moveReplicationTimeout, networkTopologyEnable, includeNodes,
+        excludeNodes);
     running = containerBalancerClient.getContainerBalancerStatus();
     assertTrue(running);
 
@@ -115,4 +125,61 @@ public class TestContainerBalancerOperations {
   }
 
   //TODO: add more acceptance after container balancer is fully completed
+
+  /**
+   * Test if Container Balancer CLI overrides default configs and
+   * options specified in the configs.
+   */
+  @Test
+  public void testIfCBCLIOverridesConfigs() throws Exception {
+    //Configurations added in ozone-site.xml
+    ozoneConf.setInt("hdds.container.balancer.iterations", 40);
+    ozoneConf.setInt("hdds.container.balancer.datanodes.involved.max.percentage.per.iteration", 30);
+
+    boolean running = containerBalancerClient.getContainerBalancerStatus();
+    assertFalse(running);
+
+    //CLI option for iterations and balancing interval is not passed
+    Optional<Integer> iterations = Optional.empty();
+    Optional<Integer> balancingInterval = Optional.empty();
+
+    //CLI options are passed
+    Optional<Double> threshold = Optional.of(0.1);
+    Optional<Integer> maxDatanodesPercentageToInvolvePerIteration =
+            Optional.of(100);
+    Optional<Long> maxSizeToMovePerIterationInGB = Optional.of(1L);
+    Optional<Long> maxSizeEnteringTargetInGB = Optional.of(6L);
+    Optional<Long> maxSizeLeavingSourceInGB = Optional.of(6L);
+    Optional<Integer> moveTimeout = Optional.of(65);
+    Optional<Integer> moveReplicationTimeout = Optional.of(55);
+    Optional<Boolean> networkTopologyEnable = Optional.of(true);
+    Optional<String> includeNodes = Optional.of("");
+    Optional<String> excludeNodes = Optional.of("");
+    containerBalancerClient.startContainerBalancer(threshold, iterations,
+            maxDatanodesPercentageToInvolvePerIteration,
+            maxSizeToMovePerIterationInGB, maxSizeEnteringTargetInGB,
+            maxSizeLeavingSourceInGB, balancingInterval, moveTimeout,
+            moveReplicationTimeout, networkTopologyEnable, includeNodes,
+            excludeNodes);
+    running = containerBalancerClient.getContainerBalancerStatus();
+    assertTrue(running);
+
+    ContainerBalancerConfiguration config = cluster.getStorageContainerManager().getContainerBalancer().getConfig();
+
+    //If config value is not added in ozone-site.xml and CLI option is not passed
+    //then it takes the default configuration
+    assertEquals(70, config.getBalancingInterval().toMinutes());
+
+    //If config value is added in ozone-site.xml and CLI option is not passed
+    //then it takes the value from ozone-site.xml
+    assertEquals(40, config.getIterations());
+
+    //If config value is added in ozone-site.xml and CLI option is passed
+    //then it takes the CLI option.
+    assertEquals(100, config.getMaxDatanodesPercentageToInvolvePerIteration());
+
+    containerBalancerClient.stopContainerBalancer();
+    running = containerBalancerClient.getContainerBalancerStatus();
+    assertFalse(running);
+  }
 }

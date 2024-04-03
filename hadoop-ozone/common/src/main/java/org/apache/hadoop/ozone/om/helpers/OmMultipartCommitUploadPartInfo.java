@@ -24,8 +24,15 @@ public class OmMultipartCommitUploadPartInfo {
 
   private final String partName;
 
-  public OmMultipartCommitUploadPartInfo(String name) {
-    this.partName = name;
+  private final String eTag;
+
+  public OmMultipartCommitUploadPartInfo(String partName, String eTag) {
+    this.partName = partName;
+    this.eTag = eTag;
+  }
+
+  public String getETag() {
+    return eTag;
   }
 
   public String getPartName() {

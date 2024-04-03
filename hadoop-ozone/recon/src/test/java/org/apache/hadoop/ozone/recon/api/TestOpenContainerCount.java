@@ -67,8 +67,8 @@ import static org.apache.hadoop.ozone.container.upgrade.UpgradeUtils.defaultLayo
 import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.getRandomPipeline;
 import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.getTestReconOmMetadataManager;
 import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.initializeNewOmMetadataManager;
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.fail;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.anyBoolean;
 import static org.mockito.Mockito.anyString;
@@ -329,16 +329,14 @@ public class TestOpenContainerCount {
                     .addStorageReport(storageReportProto1)
                     .addStorageReport(storageReportProto2).build();
 
-    try {
+    assertDoesNotThrow(() -> {
       reconScm.getDatanodeProtocolServer()
-              .register(extendedDatanodeDetailsProto, nodeReportProto,
-                      containerReportsProto, pipelineReportsProto,
-                  defaultLayoutVersionProto());
+          .register(extendedDatanodeDetailsProto, nodeReportProto,
+              containerReportsProto, pipelineReportsProto,
+              defaultLayoutVersionProto());
       // Process all events in the event queue
       reconScm.getEventQueue().processAll(1000);
-    } catch (Exception ex) {
-      fail(ex.getMessage());
-    }
+    });
   }
 
   @Test
@@ -421,16 +419,14 @@ public class TestOpenContainerCount {
                     .setOriginNodeId(datanodeId)
                     .build())
             .build();
-    try {
+    assertDoesNotThrow(() -> {
       reconScm.getDatanodeProtocolServer()
-              .register(extendedDatanodeDetailsProto, nodeReportProto,
-                      containerReportsProto, pipelineReportsProto,
-                  defaultLayoutVersionProto());
+          .register(extendedDatanodeDetailsProto, nodeReportProto,
+              containerReportsProto, pipelineReportsProto,
+              defaultLayoutVersionProto());
       // Process all events in the event queue
       reconScm.getEventQueue().processAll(1000);
-    } catch (Exception ex) {
-      fail(ex.getMessage());
-    }
+    });
   }
 
   private void waitAndCheckConditionAfterHeartbeat(Callable<Boolean> check)

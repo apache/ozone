@@ -50,10 +50,8 @@ if [[ -f hadoop-ozone/dist/src/shell/ozone/ozone-functions.sh ]]; then
   ozone_java_setup
 fi
 
-if [[ "${CHECK}" == "integration" ]] || [[ ${ITERATIONS} -gt 1 ]]; then
-  if [[ ${OZONE_REPO_CACHED} == "false" ]]; then
-    mvn ${MAVEN_OPTIONS} -DskipTests clean install
-  fi
+if [[ ${ITERATIONS} -gt 1 ]] && [[ ${OZONE_REPO_CACHED} == "false" ]]; then
+  mvn ${MAVEN_OPTIONS} -DskipTests clean install
 fi
 
 REPORT_DIR=${OUTPUT_DIR:-"$DIR/../../../target/${CHECK}"}

@@ -50,10 +50,7 @@ public class TestRocksObjectLeakDetector {
       TimeoutException {
     OzoneConfiguration conf = new OzoneConfiguration();
     conf.set(OZONE_METADATA_STORE_ROCKSDB_STATISTICS, "ALL");
-    String omServiceId = "omServiceId1";
     cluster = MiniOzoneCluster.newBuilder(conf)
-        .setOMServiceId(omServiceId)
-        .setNumOfOzoneManagers(1)
         .build();
     cluster.waitForClusterToBeReady();
   }

@@ -47,6 +47,7 @@ import org.apache.hadoop.ozone.protocol.commands.ReplicateContainerCommand;
 import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
 import org.apache.ratis.protocol.exceptions.NotLeaderException;
 import org.assertj.core.util.Lists;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -172,6 +173,13 @@ public class TestECUnderReplicationHandler {
     ecPlacementPolicy = mock(PlacementPolicy.class);
     when(ecPlacementPolicy.validateContainerPlacement(anyList(), anyInt()))
         .thenReturn(new ContainerPlacementStatusDefault(2, 2, 3));
+  }
+
+  @AfterEach
+  void cleanup() {
+    if (metrics != null) {
+      metrics.unRegister();
+    }
   }
 
   @ParameterizedTest

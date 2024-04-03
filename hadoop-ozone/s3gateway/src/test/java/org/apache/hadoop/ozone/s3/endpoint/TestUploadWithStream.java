@@ -81,7 +81,7 @@ public class TestUploadWithStream {
     REST.setClient(client);
 
     OzoneConfiguration conf = new OzoneConfiguration();
-    conf.setBoolean(OzoneConfigKeys.DFS_CONTAINER_RATIS_DATASTREAM_ENABLED,
+    conf.setBoolean(OzoneConfigKeys.HDDS_CONTAINER_RATIS_DATASTREAM_ENABLED,
         true);
     conf.setStorageSize(OZONE_FS_DATASTREAM_AUTO_THRESHOLD, 1,
         StorageUnit.BYTES);

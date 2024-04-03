@@ -166,7 +166,7 @@ public final class TestNSSummaryTask {
       reconNamespaceSummaryManager.getNSSummary(BUCKET_THREE_OBJECT_ID);
       assertNotNull(nsSummaryForBucket1);
       assertNotNull(nsSummaryForBucket2);
-      assertNull(nsSummaryForBucket3);
+      assertNotNull(nsSummaryForBucket3);
     }
 
     @Test
@@ -233,7 +233,7 @@ public final class TestNSSummaryTask {
       assertNotNull(nsSummaryForBucket2);
       nsSummaryForBucket3 =
           reconNamespaceSummaryManager.getNSSummary(BUCKET_THREE_OBJECT_ID);
-      assertNull(nsSummaryForBucket3);
+      assertNotNull(nsSummaryForBucket3);
     }
 
     private OMUpdateEventBatch processEventBatch() throws IOException {

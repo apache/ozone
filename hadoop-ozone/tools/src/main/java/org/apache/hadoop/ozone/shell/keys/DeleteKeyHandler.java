@@ -41,6 +41,8 @@ import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.FS_TRASH_INTERV
 import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.FS_TRASH_INTERVAL_KEY;
 import static org.apache.hadoop.fs.FileSystem.TRASH_PREFIX;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ENABLE_FILESYSTEM_PATHS;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ENABLE_FILESYSTEM_PATHS_DEFAULT;
 
 /**
  * Executes Delete Key.
@@ -65,6 +67,12 @@ public class DeleteKeyHandler extends KeyHandler {
       OmUtils.verifyKeyNameWithSnapshotReservedWordForDeletion(keyName);
     } catch (OMException omException) {
       out().printf("Operation not permitted: %s %n", omException.getMessage());
+      return;
+    }
+
+    if (bucket.getBucketLayout().isLegacy() && keyName.endsWith(OZONE_URI_DELIMITER)
+        && (getConf().getBoolean(OZONE_OM_ENABLE_FILESYSTEM_PATHS, OZONE_OM_ENABLE_FILESYSTEM_PATHS_DEFAULT))) {
+      out().printf("Use FS(ofs/o3fs) interface to delete legacy bucket directory %n");
       return;
     }
 

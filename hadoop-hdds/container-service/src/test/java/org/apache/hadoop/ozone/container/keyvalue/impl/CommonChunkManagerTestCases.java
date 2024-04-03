@@ -76,7 +76,7 @@ public abstract class CommonChunkManagerTestCases extends AbstractTestChunkManag
 
     // write chunk bypassing size limit
     File chunkFile = getStrategy().getLayout()
-        .getChunkFile(getKeyValueContainerData(), blockID, chunkInfo);
+        .getChunkFile(getKeyValueContainerData(), blockID, chunkInfo.getChunkName());
     FileUtils.writeByteArrayToFile(chunkFile, array);
 
     // WHEN+THEN

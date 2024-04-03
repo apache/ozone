@@ -23,6 +23,8 @@ import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyArgs;
+import org.apache.hadoop.ozone.security.acl.OzoneObj;
+import org.apache.hadoop.ozone.security.acl.OzoneObjInfo;
 
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -118,6 +120,15 @@ public class ResolvedBucket {
             .setBucketName(realBucket())
             .build()
         : args;
+  }
+
+  public OzoneObj update(OzoneObj ozoneObj) {
+    return isLink()
+        ? OzoneObjInfo.Builder.fromOzoneObj(ozoneObj)
+            .setVolumeName(realVolume())
+            .setBucketName(realBucket())
+            .build()
+        : ozoneObj;
   }
 
   public boolean isLink() {

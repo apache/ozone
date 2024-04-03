@@ -118,15 +118,16 @@ public final class TestSecretKeySnapshot {
     conf.set(HDDS_SECRET_KEY_ROTATE_DURATION, ROTATE_DURATION_MS + "ms");
     conf.set(HDDS_SECRET_KEY_EXPIRY_DURATION, EXPIRY_DURATION_MS + "ms");
 
-    MiniOzoneCluster.Builder builder = MiniOzoneCluster.newHABuilder(conf)
+    MiniOzoneHAClusterImpl.Builder builder = MiniOzoneCluster.newHABuilder(conf);
+    builder
         .setSCMServiceId("TestSecretKeySnapshot")
         .setSCMServiceId("SCMServiceId")
-        .setNumDatanodes(1)
         .setNumOfStorageContainerManagers(3)
         .setNumOfActiveSCMs(2)
-        .setNumOfOzoneManagers(1);
+        .setNumOfOzoneManagers(1)
+        .setNumDatanodes(1);
 
-    cluster = (MiniOzoneHAClusterImpl) builder.build();
+    cluster = builder.build();
     cluster.waitForClusterToBeReady();
   }
 

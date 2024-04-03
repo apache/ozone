@@ -152,7 +152,7 @@ public class TestDecommissionAndMaintenance {
     MiniOzoneCluster.Builder builder = MiniOzoneCluster.newBuilder(conf)
         .setNumDatanodes(DATANODE_COUNT);
 
-    clusterProvider = new MiniOzoneClusterProvider(conf, builder, 7);
+    clusterProvider = new MiniOzoneClusterProvider(builder, 7);
   }
 
   @AfterAll
@@ -211,7 +211,7 @@ public class TestDecommissionAndMaintenance {
     final DatanodeDetails toDecommission = nm.getNodeByUuid(dnID.toString());
 
     scmClient.decommissionNodes(Arrays.asList(
-        getDNHostAndPort(toDecommission)));
+        getDNHostAndPort(toDecommission)), false);
 
     waitForDnToReachOpState(nm, toDecommission, DECOMMISSIONED);
     // Ensure one node transitioned to DECOMMISSIONING
@@ -265,7 +265,7 @@ public class TestDecommissionAndMaintenance {
         waitForAndReturnContainer(ratisRepConfig, 3);
     final DatanodeDetails dn
         = getOneDNHostingReplica(getContainerReplicas(container));
-    scmClient.decommissionNodes(Arrays.asList(getDNHostAndPort(dn)));
+    scmClient.decommissionNodes(Arrays.asList(getDNHostAndPort(dn)), false);
 
     // Wait for the state to be persisted on the DN so it can report it on
     // restart of SCM.

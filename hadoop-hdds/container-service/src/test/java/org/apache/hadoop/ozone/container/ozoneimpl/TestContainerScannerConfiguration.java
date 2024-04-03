@@ -35,7 +35,7 @@ import static org.apache.hadoop.ozone.container.ozoneimpl.ContainerScannerConfig
 import static org.apache.hadoop.ozone.container.ozoneimpl.ContainerScannerConfiguration.ON_DEMAND_VOLUME_BYTES_PER_SECOND_KEY;
 import static org.apache.hadoop.ozone.container.ozoneimpl.ContainerScannerConfiguration.VOLUME_BYTES_PER_SECOND_KEY;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Test for {@link ContainerScannerConfiguration}.
@@ -103,7 +103,7 @@ public class TestContainerScannerConfiguration {
     ContainerScannerConfiguration csConf =
         conf.getObject(ContainerScannerConfiguration.class);
 
-    assertFalse(csConf.isEnabled());
+    assertTrue(csConf.isEnabled());
     assertEquals(METADATA_SCAN_INTERVAL_DEFAULT,
         csConf.getMetadataScanInterval());
     assertEquals(DATA_SCAN_INTERVAL_DEFAULT,

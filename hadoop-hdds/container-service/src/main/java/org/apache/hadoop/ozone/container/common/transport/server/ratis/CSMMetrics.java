@@ -17,7 +17,6 @@
  */
 package org.apache.hadoop.ozone.container.common.transport.server.ratis;
 
-import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.metrics2.MetricsSystem;
@@ -132,67 +131,55 @@ public class CSMMetrics {
     numApplyTransactionFails.incr();
   }
 
-  @VisibleForTesting
   public long getNumWriteStateMachineOps() {
     return numWriteStateMachineOps.value();
   }
 
-  @VisibleForTesting
   public long getNumQueryStateMachineOps() {
     return numQueryStateMachineOps.value();
   }
 
-  @VisibleForTesting
   public long getNumApplyTransactionsOps() {
     return numApplyTransactionOps.value();
   }
 
-  @VisibleForTesting
   public long getNumWriteStateMachineFails() {
     return numWriteStateMachineFails.value();
   }
 
-  @VisibleForTesting
   public long getNumWriteDataFails() {
     return numWriteDataFails.value();
   }
 
-  @VisibleForTesting
   public long getNumQueryStateMachineFails() {
     return numQueryStateMachineFails.value();
   }
 
-  @VisibleForTesting
   public long getNumApplyTransactionsFails() {
     return numApplyTransactionFails.value();
   }
 
-  @VisibleForTesting
   public long getNumReadStateMachineFails() {
     return numReadStateMachineFails.value();
   }
 
-  @VisibleForTesting
   public long getNumReadStateMachineMissCount() {
     return numReadStateMachineMissCount.value();
   }
 
-  @VisibleForTesting
   public long getNumReadStateMachineOps() {
     return numReadStateMachineOps.value();
   }
 
-  @VisibleForTesting
   public long getNumBytesWrittenCount() {
     return numBytesWrittenCount.value();
   }
 
-  @VisibleForTesting
   public long getNumBytesCommittedCount() {
     return numBytesCommittedCount.value();
   }
 
-  public MutableRate getApplyTransactionLatencyNs() {
+  MutableRate getApplyTransactionLatencyNs() {
     return applyTransactionNs;
   }
 

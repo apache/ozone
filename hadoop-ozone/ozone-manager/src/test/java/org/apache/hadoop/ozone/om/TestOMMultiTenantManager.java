@@ -156,7 +156,7 @@ public class TestOMMultiTenantManager {
 
     // Check that Multi-Tenancy read requests are blocked when not enabled
     final OzoneManagerRequestHandler ozoneManagerRequestHandler =
-        new OzoneManagerRequestHandler(ozoneManager, null);
+        new OzoneManagerRequestHandler(ozoneManager);
 
     expectReadRequestToFail(ozoneManagerRequestHandler,
         OMRequestTestUtils.listUsersInTenantRequest(tenantId));

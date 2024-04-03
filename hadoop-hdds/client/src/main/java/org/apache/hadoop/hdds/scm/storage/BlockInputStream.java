@@ -36,6 +36,7 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ChunkInfo;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.DatanodeBlockID;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.GetBlockResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.scm.OzoneClientConfig;
 import org.apache.hadoop.hdds.scm.XceiverClientFactory;
 import org.apache.hadoop.hdds.scm.XceiverClientSpi;
 import org.apache.hadoop.hdds.scm.XceiverClientSpi.Validator;
@@ -76,8 +77,8 @@ public class BlockInputStream extends BlockExtendedInputStream {
   private XceiverClientSpi xceiverClient;
   private boolean initialized = false;
   // TODO: do we need to change retrypolicy based on exception.
-  private final RetryPolicy retryPolicy =
-      HddsClientUtils.createRetryPolicy(3, TimeUnit.SECONDS.toMillis(1));
+  private final RetryPolicy retryPolicy;
+
   private int retries;
 
   // List of ChunkInputStreams, one for each chunk in the block
@@ -112,25 +113,29 @@ public class BlockInputStream extends BlockExtendedInputStream {
   private final Function<BlockID, BlockLocationInfo> refreshFunction;
 
   public BlockInputStream(BlockID blockId, long blockLen, Pipeline pipeline,
-      Token<OzoneBlockTokenIdentifier> token, boolean verifyChecksum,
+      Token<OzoneBlockTokenIdentifier> token,
       XceiverClientFactory xceiverClientFactory,
-      Function<BlockID, BlockLocationInfo> refreshFunction) {
+      Function<BlockID, BlockLocationInfo> refreshFunction,
+      OzoneClientConfig config) {
     this.blockID = blockId;
     this.length = blockLen;
     setPipeline(pipeline);
     tokenRef.set(token);
-    this.verifyChecksum = verifyChecksum;
+    this.verifyChecksum = config.isChecksumVerify();
     this.xceiverClientFactory = xceiverClientFactory;
     this.refreshFunction = refreshFunction;
+    this.retryPolicy =
+        HddsClientUtils.createRetryPolicy(config.getMaxReadRetryCount(),
+            TimeUnit.SECONDS.toMillis(config.getReadRetryInterval()));
   }
 
   public BlockInputStream(BlockID blockId, long blockLen, Pipeline pipeline,
                           Token<OzoneBlockTokenIdentifier> token,
-                          boolean verifyChecksum,
-                          XceiverClientFactory xceiverClientFactory
+                          XceiverClientFactory xceiverClientFactory,
+                          OzoneClientConfig config
   ) {
-    this(blockId, blockLen, pipeline, token, verifyChecksum,
-        xceiverClientFactory, null);
+    this(blockId, blockLen, pipeline, token,
+        xceiverClientFactory, null, config);
   }
   /**
    * Initialize the BlockInputStream. Get the BlockData (list of chunks) from

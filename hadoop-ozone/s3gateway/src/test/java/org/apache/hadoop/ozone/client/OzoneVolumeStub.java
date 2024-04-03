@@ -38,17 +38,17 @@ import org.apache.hadoop.util.Time;
 /**
  * Ozone volume with in-memory state for testing.
  */
-public class OzoneVolumeStub extends OzoneVolume {
+public final class OzoneVolumeStub extends OzoneVolume {
 
-  private Map<String, OzoneBucketStub> buckets = new HashMap<>();
+  private final Map<String, OzoneBucket> buckets = new HashMap<>();
 
-  private ArrayList<OzoneAcl> aclList = new ArrayList<>();
+  private final ArrayList<OzoneAcl> aclList = new ArrayList<>();
 
   public static Builder newBuilder() {
     return new Builder();
   }
 
-  public OzoneVolumeStub(Builder b) {
+  private OzoneVolumeStub(Builder b) {
     super(b);
   }
 
@@ -124,6 +124,7 @@ public class OzoneVolumeStub extends OzoneVolume {
         .setDefaultReplicationConfig(new DefaultReplicationConfig(
             RatisReplicationConfig.getInstance(
                 HddsProtos.ReplicationFactor.THREE)))
+        .setBucketLayout(bucketArgs.getBucketLayout())
         .setStorageType(bucketArgs.getStorageType())
         .setVersioning(bucketArgs.getVersioning())
         .setCreationTime(Time.now())
