@@ -290,6 +290,9 @@ public final class HddsConfigKeys {
   // Choose TLS provider the default is set to OPENSSL for better performance.
   public static final String HDDS_GRPC_TLS_PROVIDER = "hdds.grpc.tls.provider";
   public static final String HDDS_GRPC_TLS_PROVIDER_DEFAULT = "OPENSSL";
+  // Allowed TLS providers
+  public static final String OZONE_COMPLIANCE_ALLOWED_HDDS_GRPC_TLS_PROVIDER = "ozone.compliance.allowed.hdds.grpc.tls.provider";
+  public static final String OZONE_COMPLIANCE_ALLOWED_HDDS_GRPC_TLS_PROVIDER_DEFAULT = "*";
 
   // Test only settings for using test signed certificate, authority assume to
   // be localhost.
