@@ -19,6 +19,8 @@
 package org.apache.hadoop.hdds.scm.storage;
 import java.io.IOException;
 import java.io.OutputStream;
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
 import java.nio.BufferOverflowException;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
@@ -183,6 +185,8 @@ public class BlockOutputStream extends OutputStream {
       this.lastChunkBuffer =
           ByteBuffer.allocateDirect(config.getStreamBufferSize());
       this.lastChunkOffset = 0;
+    } else {
+      this.lastChunkBuffer = null;
     }
     this.xceiverClient = xceiverClientManager.acquireClient(pipeline);
     this.bufferPool = bufferPool;
@@ -211,6 +215,17 @@ public class BlockOutputStream extends OutputStream {
     this.clientMetrics = clientMetrics;
     this.pipeline = pipeline;
     this.streamBufferArgs = streamBufferArgs;
+  }
+
+  private void cleanDirectByteBuffer()
+      throws IllegalAccessException, InvocationTargetException, NoSuchMethodException {
+    Preconditions.checkArgument(lastChunkBuffer.isDirect(), "Not DirectByteBuffer");
+    Method bufferCleaner = lastChunkBuffer.getClass().getMethod("cleaner");
+    bufferCleaner.setAccessible(true);
+    Object cleaner = bufferCleaner.invoke(lastChunkBuffer);
+    Method bufferClean = cleaner.getClass().getMethod("clean");
+    bufferClean.setAccessible(true);
+    bufferClean.invoke(cleaner);
   }
 
   void refreshCurrentBuffer() {
@@ -670,7 +685,7 @@ public class BlockOutputStream extends OutputStream {
   void cleanup() {
   }
 
-  public void cleanup(boolean invalidateClient) {
+  public void cleanup(boolean invalidateClient) throws IOException {
     if (xceiverClientFactory != null) {
       xceiverClientFactory.releaseClient(xceiverClient, invalidateClient);
     }
@@ -678,10 +693,17 @@ public class BlockOutputStream extends OutputStream {
     xceiverClient = null;
     cleanup();
 
-    if (bufferList !=  null) {
+    if (bufferList != null) {
       bufferList.clear();
     }
     bufferList = null;
+    if (lastChunkBuffer != null) {
+      try {
+        cleanDirectByteBuffer();
+      } catch (Exception e) {
+        throw new IOException("Failed to delete DirectByteBuffer.");
+      }
+    }
   }
 
   /**
