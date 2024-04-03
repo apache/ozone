@@ -233,6 +233,8 @@ public class TestOMSnapshotPurgeRequestAndResponse {
 
   @Test
   public void testValidateAndUpdateCache() throws Exception {
+    long initialSnapshotPurgeCount = omMetrics.getNumSnapshotPurges();
+    long initialSnapshotPurgeFailCount = omMetrics.getNumSnapshotPurgeFails();
 
     List<String> snapshotDbKeysToPurge = createSnapshots(10);
     assertFalse(omMetadataManager.getSnapshotInfoTable().isEmpty());
@@ -260,6 +262,8 @@ public class TestOMSnapshotPurgeRequestAndResponse {
     for (Path checkpoint : checkpointPaths) {
       assertFalse(Files.exists(checkpoint));
     }
+    assertEquals(initialSnapshotPurgeCount + 1, omMetrics.getNumSnapshotPurges());
+    assertEquals(initialSnapshotPurgeFailCount, omMetrics.getNumSnapshotPurgeFails());
   }
 
   // TODO: clean up: Do we this test after

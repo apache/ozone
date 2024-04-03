@@ -17,6 +17,7 @@
  */
 package org.apache.hadoop.ozone.om.request.snapshot;
 
+import org.apache.hadoop.ozone.om.OMMetrics;
 import org.apache.ratis.server.protocol.TermIndex;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
@@ -52,6 +53,7 @@ public class OMSnapshotSetPropertyRequest extends OMClientRequest {
 
   @Override
   public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager, TermIndex termIndex) {
+    OMMetrics omMetrics = ozoneManager.getMetrics();
 
     OMClientResponse omClientResponse = null;
     OMMetadataManager metadataManager = ozoneManager.getMetadataManager();
@@ -117,9 +119,13 @@ public class OMSnapshotSetPropertyRequest extends OMClientRequest {
           CacheValue.get(termIndex.getIndex(), updatedSnapInfo));
       omClientResponse = new OMSnapshotSetPropertyResponse(
           omResponse.build(), updatedSnapInfo);
+      omMetrics.incNumSnapshotSetProperties();
+      LOG.info("Successfully executed snapshotSetPropertyRequest: {{}}.", setSnapshotPropertyRequest);
     } catch (IOException ex) {
       omClientResponse = new OMSnapshotSetPropertyResponse(
           createErrorOMResponse(omResponse, ex));
+      omMetrics.incNumSnapshotSetPropertyFails();
+      LOG.error("Failed to execute snapshotSetPropertyRequest: {{}}.", setSnapshotPropertyRequest, ex);
     } finally {
       if (acquiredSnapshotLock) {
         mergeOmLockDetails(metadataManager.getLock()
