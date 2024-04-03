@@ -79,7 +79,7 @@ public class TestResourceCache {
   @Test
   @Timeout(5)
   public void testClear() throws Exception {
-    testRemove(Cache::clear, 1, 2, 3);
+    testRemove(c -> c.clear(), 1, 2, 3);
   }
 
   private static void testRemove(Consumer<Cache<Integer, String>> op,
@@ -87,9 +87,7 @@ public class TestResourceCache {
 
     // GIVEN
     final int maxSize = 3;
-    Cache<Integer, String> resourceCache =
-        new ResourceCache<>(
-            (k, v) -> 1, maxSize, null);
+    Cache<Integer, String> resourceCache = new ResourceCache<>((k, v) -> 1, maxSize, null);
     for (int i = 1; i <= maxSize; ++i) {
       resourceCache.put(i, ANY_VALUE);
     }
