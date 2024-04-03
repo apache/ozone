@@ -74,7 +74,7 @@ import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.BUCKET_L
  * Perform actions for RecoverLease requests.
  */
 public class OMRecoverLeaseRequest extends OMKeyRequest {
-  public static final Logger LOG =
+  private static final Logger LOG =
       LoggerFactory.getLogger(OMRecoverLeaseRequest.class);
 
   private String volumeName;
@@ -261,8 +261,8 @@ public class OMRecoverLeaseRequest extends OMKeyRequest {
     } else if (keyLocationInfoList.size() > 0) {
       finalBlock = keyLocationInfoList.get(keyLocationInfoList.size() - 1);
     }
-    updateBlockInfo(ozoneManager, finalBlock, transactionLogIndex);
-    updateBlockInfo(ozoneManager, penultimateBlock, transactionLogIndex);
+    updateBlockInfo(ozoneManager, finalBlock);
+    updateBlockInfo(ozoneManager, penultimateBlock);
 
     RecoverLeaseResponse.Builder rb = RecoverLeaseResponse.newBuilder();
     rb.setKeyInfo(returnKeyInfo ? keyInfo.getNetworkProtobuf(getOmRequest().getVersion(), true) :
@@ -272,19 +272,14 @@ public class OMRecoverLeaseRequest extends OMKeyRequest {
     return rb.build();
   }
 
-  private void updateBlockInfo(OzoneManager ozoneManager, OmKeyLocationInfo blockInfo, long txId) throws IOException {
+  private void updateBlockInfo(OzoneManager ozoneManager, OmKeyLocationInfo blockInfo) throws IOException {
     if (blockInfo != null) {
       // set token to last block if enabled
       if (ozoneManager.isGrpcBlockTokenEnabled()) {
-        if (ozoneManager.isRunning()) {
-          String remoteUser = getRemoteUser().getShortUserName();
-          OzoneBlockTokenSecretManager secretManager = ozoneManager.getBlockTokenSecretManager();
-          blockInfo.setToken(secretManager.generateToken(remoteUser, blockInfo.getBlockID(),
-              EnumSet.of(READ, WRITE), blockInfo.getLength()));
-        } else {
-          // OzoneBlockTokenSecretManager is not ready to serve token generation request when OM is not in RUNNING state
-          LOG.info("OzoneManager is not in RUNNING state, skip block token generation on transaction {}", txId);
-        }
+        String remoteUser = getRemoteUser().getShortUserName();
+        OzoneBlockTokenSecretManager secretManager = ozoneManager.getBlockTokenSecretManager();
+        blockInfo.setToken(secretManager.generateToken(remoteUser, blockInfo.getBlockID(),
+            EnumSet.of(READ, WRITE), blockInfo.getLength()));
       }
       // refresh last block pipeline
       ContainerWithPipeline containerWithPipeline =
