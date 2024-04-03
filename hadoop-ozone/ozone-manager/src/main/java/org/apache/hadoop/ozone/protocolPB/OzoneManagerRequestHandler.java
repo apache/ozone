@@ -95,6 +95,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.GetKeyI
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PrintCompactionLogDagRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PrintCompactionLogDagResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.RefetchSecretKeyResponse;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.RefetchNetworkTopologyTreeResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.InfoBucketRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.InfoBucketResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.InfoVolumeRequest;
@@ -370,6 +371,10 @@ public class OzoneManagerRequestHandler implements RequestHandler {
         OzoneManagerProtocolProtos.SnapshotInfoResponse snapshotInfoResponse =
             getSnapshotInfo(request.getSnapshotInfoRequest());
         responseBuilder.setSnapshotInfoResponse(snapshotInfoResponse);
+        break;
+      case RefetchNetworkTopologyTree:
+        responseBuilder.setRefetchNetworkTopologyTreeResponse(
+            refetchNetworkTopologyTree());
         break;
       default:
         responseBuilder.setSuccess(false);
@@ -1475,6 +1480,15 @@ public class OzoneManagerRequestHandler implements RequestHandler {
     return SetSafeModeResponse.newBuilder()
         .setResponse(response)
         .build();
+  }
+
+  private RefetchNetworkTopologyTreeResponse refetchNetworkTopologyTree() {
+    boolean status = impl.refetchNetworkTopologyTree();
+    RefetchNetworkTopologyTreeResponse response =
+        RefetchNetworkTopologyTreeResponse.newBuilder()
+            .setStatus(status)
+            .build();
+    return response;
   }
 
   private SafeModeAction toSafeModeAction(

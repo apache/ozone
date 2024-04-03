@@ -1134,4 +1134,6 @@ public interface OzoneManagerProtocol
    */
   boolean setSafeMode(SafeModeAction action, boolean isChecked)
       throws IOException;
+
+  boolean refetchNetworkTopologyTree() throws IOException;
 }
