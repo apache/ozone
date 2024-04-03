@@ -18,7 +18,6 @@
 
 package org.apache.hadoop.ozone.om.snapshot;
 
-import org.apache.commons.lang3.tuple.Triple;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksDB;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
@@ -244,20 +243,5 @@ public final class SnapshotUtils {
     final long volumeId = metadataManager.getVolumeId(volumeName);
     final long bucketId = metadataManager.getBucketId(volumeName, bucketName);
     return OM_KEY_PREFIX + volumeId + OM_KEY_PREFIX + bucketId + OM_KEY_PREFIX;
-  }
-
-  /**
-   * Helper function which return a Triple of volumeName, bucketName and snapshotName from snapshotTableKey String.
-   */
-  public static Triple<String, String, String> getSnapshotTableKeyFromString(String snapshotKey) throws IOException {
-    if (snapshotKey == null) {
-      throw new IOException("Snapshot table key is null.");
-    }
-
-    String[] split = snapshotKey.split(OM_KEY_PREFIX);
-    if (split.length != 4) {
-      throw new IOException("Invalid snapshot table key: " + snapshotKey);
-    }
-    return Triple.of(split[1], split[2], split[3]);
   }
 }

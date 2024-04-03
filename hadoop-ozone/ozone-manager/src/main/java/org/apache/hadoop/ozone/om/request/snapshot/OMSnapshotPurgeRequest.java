@@ -21,6 +21,7 @@ package org.apache.hadoop.ozone.om.request.snapshot;
 
 import org.apache.commons.lang3.tuple.Triple;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
+import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.ratis.server.protocol.TermIndex;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
@@ -110,17 +111,17 @@ public class OMSnapshotPurgeRequest extends OMClientRequest {
         // snapshotTableKey is nothing but /volumeName/bucketName/snapshotName.
         // Once all the locks are acquired, it performs the three steps mentioned above and
         // release all the locks after that.
-        Set<String> lockSet = new HashSet<>();
+        Set<Triple<String, String, String>> lockSet = new HashSet<>(4);
         try {
-          acquireLock(lockSet, snapTableKey, omMetadataManager);
-          SnapshotInfo fromSnapshot = omMetadataManager.getSnapshotInfoTable().get(snapTableKey);
-
-          if (fromSnapshot == null) {
+          if (omMetadataManager.getSnapshotInfoTable().get(snapTableKey) == null) {
             // Snapshot may have been purged in the previous iteration of SnapshotDeletingService.
             LOG.warn("The snapshot {} is not longer in snapshot table, It maybe removed in the previous " +
                 "Snapshot purge request.", snapTableKey);
             continue;
           }
+
+          acquireLock(lockSet, snapTableKey, omMetadataManager);
+          SnapshotInfo fromSnapshot = omMetadataManager.getSnapshotInfoTable().get(snapTableKey);
 
           SnapshotInfo nextSnapshot =
               SnapshotUtils.getNextActiveSnapshot(fromSnapshot, snapshotChainManager, omSnapshotManager);
@@ -139,8 +140,9 @@ public class OMSnapshotPurgeRequest extends OMClientRequest {
           omMetadataManager.getSnapshotInfoTable()
               .addCacheEntry(new CacheKey<>(fromSnapshot.getTableKey()), CacheValue.get(trxnLogIndex));
         } finally {
-          for (String lockString: lockSet) {
-            releaseLock(lockString, omMetadataManager);
+          for (Triple<String, String, String> lockKey: lockSet) {
+            omMetadataManager.getLock()
+                .releaseWriteLock(SNAPSHOT_LOCK, lockKey.getLeft(), lockKey.getMiddle(), lockKey.getRight());
           }
         }
       }
@@ -156,21 +158,23 @@ public class OMSnapshotPurgeRequest extends OMClientRequest {
     return omClientResponse;
   }
 
-  private void acquireLock(Set<String> lockSet, String snapshotTableKey,
+  private void acquireLock(Set<Triple<String, String, String>> lockSet, String snapshotTableKey,
                            OMMetadataManager omMetadataManager) throws IOException {
-    if (!lockSet.contains(snapshotTableKey)) {
-      Triple<String, String, String> triple = SnapshotUtils.getSnapshotTableKeyFromString(snapshotTableKey);
-      mergeOmLockDetails(omMetadataManager.getLock()
-          .acquireWriteLock(SNAPSHOT_LOCK, triple.getLeft(), triple.getMiddle(), triple.getRight()));
-      lockSet.add(snapshotTableKey);
-    }
-  }
+    SnapshotInfo snapshotInfo = omMetadataManager.getSnapshotInfoTable().get(snapshotTableKey);
 
-  private void releaseLock(String snapshotTableKey,
-                           OMMetadataManager omMetadataManager) throws IOException {
-    Triple<String, String, String> triple = SnapshotUtils.getSnapshotTableKeyFromString(snapshotTableKey);
-    omMetadataManager.getLock()
-        .releaseWriteLock(SNAPSHOT_LOCK, triple.getLeft(), triple.getMiddle(), triple.getRight());
+    // It should not be the case that lock is required for non-existing snapshot.
+    if (snapshotInfo == null) {
+      LOG.error("Snapshot: '{}' doesn't not exist in snapshot table.", snapshotTableKey);
+      throw new OMException("Snapshot: '{" + snapshotTableKey + "}' doesn't not exist in snapshot table.",
+          OMException.ResultCodes.FILE_NOT_FOUND);
+    }
+    Triple<String, String, String> lockKey = Triple.of(snapshotInfo.getVolumeName(), snapshotInfo.getBucketName(),
+        snapshotInfo.getName());
+    if (!lockSet.contains(lockKey)) {
+      mergeOmLockDetails(omMetadataManager.getLock()
+          .acquireWriteLock(SNAPSHOT_LOCK, lockKey.getLeft(), lockKey.getMiddle(), lockKey.getRight()));
+      lockSet.add(lockKey);
+    }
   }
 
   private void updateSnapshotInfoAndCache(SnapshotInfo snapInfo,
@@ -199,7 +203,7 @@ public class OMSnapshotPurgeRequest extends OMClientRequest {
    * update in DB.
    */
   private void updateSnapshotChainAndCache(
-      Set<String> lockSet,
+      Set<Triple<String, String, String>> lockSet,
       OmMetadataManagerImpl metadataManager,
       SnapshotInfo snapInfo,
       long trxnLogIndex,
@@ -238,20 +242,20 @@ public class OMSnapshotPurgeRequest extends OMClientRequest {
       acquireLock(lockSet, nextPathSnapshotKey, metadataManager);
     }
 
-    String nestGlobalSnapshotKey = null;
+    String nextGlobalSnapshotKey = null;
     if (hasNextGlobalSnapshot) {
       UUID nextGlobalSnapshotId = snapshotChainManager.nextGlobalSnapshot(snapInfo.getSnapshotId());
-      nestGlobalSnapshotKey = snapshotChainManager.getTableKey(nextGlobalSnapshotId);
+      nextGlobalSnapshotKey = snapshotChainManager.getTableKey(nextGlobalSnapshotId);
 
       // Acquire lock from the snapshot
-      acquireLock(lockSet, nestGlobalSnapshotKey, metadataManager);
+      acquireLock(lockSet, nextGlobalSnapshotKey, metadataManager);
     }
 
     SnapshotInfo nextPathSnapInfo =
         nextPathSnapshotKey != null ? metadataManager.getSnapshotInfoTable().get(nextPathSnapshotKey) : null;
 
     SnapshotInfo nextGlobalSnapInfo =
-        nestGlobalSnapshotKey != null ? metadataManager.getSnapshotInfoTable().get(nestGlobalSnapshotKey) : null;
+        nextGlobalSnapshotKey != null ? metadataManager.getSnapshotInfoTable().get(nextGlobalSnapshotKey) : null;
 
     // Updates next path snapshot's previous snapshot ID
     if (nextPathSnapInfo != null) {

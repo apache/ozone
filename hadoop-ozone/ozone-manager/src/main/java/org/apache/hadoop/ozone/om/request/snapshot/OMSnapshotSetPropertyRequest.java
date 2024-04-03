@@ -17,8 +17,6 @@
  */
 package org.apache.hadoop.ozone.om.request.snapshot;
 
-import org.apache.commons.lang3.tuple.Triple;
-import org.apache.hadoop.ozone.om.snapshot.SnapshotUtils;
 import org.apache.ratis.server.protocol.TermIndex;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
@@ -38,7 +36,7 @@ import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 
-import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INVALID_SNAPSHOT_ERROR;
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.FILE_NOT_FOUND;
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.SNAPSHOT_LOCK;
 
 /**
@@ -72,10 +70,15 @@ public class OMSnapshotSetPropertyRequest extends OMClientRequest {
     String snapshotName = null;
 
     try {
-      Triple<String, String, String> triple = SnapshotUtils.getSnapshotTableKeyFromString(snapshotKey);
-      volumeName = triple.getLeft();
-      bucketName = triple.getMiddle();
-      snapshotName = triple.getRight();
+      SnapshotInfo snapshotInfo = metadataManager.getSnapshotInfoTable().get(snapshotKey);
+      if (snapshotInfo == null) {
+        LOG.error("Snapshot: '{}' doesn't not exist in snapshot table.", snapshotKey);
+        throw new OMException("Snapshot: '{" + snapshotKey + "}' doesn't not exist in snapshot table.", FILE_NOT_FOUND);
+      }
+
+      volumeName = snapshotInfo.getVolumeName();
+      bucketName = snapshotInfo.getBucketName();
+      snapshotName = snapshotInfo.getName();
 
       mergeOmLockDetails(metadataManager.getLock()
           .acquireWriteLock(SNAPSHOT_LOCK, volumeName, bucketName, snapshotName));
@@ -85,11 +88,6 @@ public class OMSnapshotSetPropertyRequest extends OMClientRequest {
       updatedSnapInfo = metadataManager.getSnapshotInfoTable()
           .get(snapshotKey);
 
-      if (updatedSnapInfo == null) {
-        LOG.error("SnapshotInfo for Snapshot: {} is not found", snapshotKey);
-        throw new OMException("SnapshotInfo for Snapshot: " + snapshotKey +
-            " is not found", INVALID_SNAPSHOT_ERROR);
-      }
 
       if (setSnapshotPropertyRequest.hasDeepCleanedDeletedDir()) {
         updatedSnapInfo.setDeepCleanedDeletedDir(setSnapshotPropertyRequest

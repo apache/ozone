@@ -148,8 +148,6 @@ public class TestOMSnapshotCreateRequest {
   @ValueSource(strings = {
       // ? is not allowed in snapshot name.
       "a?b",
-      // / is not allowed in snapshot name.
-      "a/b",
       // only numeric name not allowed.
       "1234",
       // less than 3 chars are not allowed.
