@@ -462,5 +462,5 @@ public interface ScmClient extends Closeable {
    * @param containerID The ID of the container to reconcile.
    * @throws IOException On error
    */
-  ReconcileContainerResponseProto reconcileContainer(long containerID) throws IOException;
+  void reconcileContainer(long containerID) throws IOException;
 }

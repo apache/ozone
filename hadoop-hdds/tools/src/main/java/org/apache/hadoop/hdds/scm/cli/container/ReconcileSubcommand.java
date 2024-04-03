@@ -42,21 +42,10 @@ public class ReconcileSubcommand extends ScmSubcommand {
 
   @Override
   public void execute(ScmClient scmClient) throws IOException {
-    ReconcileContainerResponseProto response = scmClient.reconcileContainer(containerId);
-    if (response.hasStatus()) {
-      switch (response.getStatus()) {
-      case OK:
-        System.out.println("Reconciliation has been triggered for container " + containerId);
-        System.out.println("Use \"ozone admin container info " + containerId + "\" to check the hashes of each " +
-            "container replica");
-        break;
-      case CONTAINER_STILL_OPEN:
-        System.err.println("Cannot reconcile an open container");
-      case UNSUPPORTED_CONTAINER_TYPE:
-        System.err.println("Reconciliation is currently only supported on Ratis containers");
-      default:
-        System.err.println("Reconciliation encountered an unknown error");
-      }
-    }
+    scmClient.reconcileContainer(containerId);
+    System.out.println("Reconciliation has been triggered for container " + containerId);
+    // TODO a better option to check status may be added later.
+    System.out.println("Use \"ozone admin container info " + containerId + "\" to check the hashes of each container" +
+        "replica");
   }
 }

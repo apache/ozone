@@ -40,10 +40,11 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ContainerInfoProto;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleEvent;
-import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ReconcileContainerResponseProto;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.metrics.SCMContainerManagerMetrics;
 import org.apache.hadoop.hdds.scm.container.replication.ContainerReplicaPendingOps;
+import org.apache.hadoop.hdds.scm.exceptions.SCMException.ResultCodes;
+import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.ha.SCMHAManager;
 import org.apache.hadoop.hdds.scm.ha.SequenceIdGenerator;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
@@ -423,21 +424,8 @@ public class ContainerManagerImpl implements ContainerManager {
   }
 
   @Override
-  public ReconcileContainerResponseProto.Status canReconcileContainer(ContainerID containerID)
-      throws ContainerNotFoundException {
-    // Reconcile is not allowed on open containers.
-    ContainerInfo container = getContainer(containerID);
-    final HddsProtos.LifeCycleState state = container.getState();
-    if (state.equals(HddsProtos.LifeCycleState.OPEN)) {
-      return ReconcileContainerResponseProto.Status.CONTAINER_STILL_OPEN;
-    }
-    // Reconcile on EC containers is not yet implemented.
-    final HddsProtos.ReplicationType repType = container.getReplicationType();
-    if (repType == HddsProtos.ReplicationType.EC) {
-      return ReconcileContainerResponseProto.Status.UNSUPPORTED_CONTAINER_TYPE;
-    }
-
-    return ReconcileContainerResponseProto.Status.OK;
+  public void reconcileContainer(ContainerID containerID) {
+    // TODO
   }
 
   @Override

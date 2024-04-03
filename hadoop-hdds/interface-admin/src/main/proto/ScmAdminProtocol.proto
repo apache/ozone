@@ -637,12 +637,6 @@ message ReconcileContainerRequestProto {
 }
 
 message ReconcileContainerResponseProto {
-  enum Status {
-    OK = 1;
-    CONTAINER_STILL_OPEN = 2;
-    UNSUPPORTED_CONTAINER_TYPE = 3;
-  }
-  optional Status status = 1;
 }
 
 /**

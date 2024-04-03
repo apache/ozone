@@ -570,7 +570,7 @@ public class ContainerOperationClient implements ScmClient {
   }
 
   @Override
-  public ReconcileContainerResponseProto reconcileContainer(long id) throws IOException {
-    return storageContainerLocationClient.reconcileContainer(id);
+  public void reconcileContainer(long id) throws IOException {
+    storageContainerLocationClient.reconcileContainer(id);
   }
 }

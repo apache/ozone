@@ -1158,11 +1158,11 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
   }
 
   @Override
-  public ReconcileContainerResponseProto reconcileContainer(long containerID) throws IOException {
+  public void reconcileContainer(long containerID) throws IOException {
     ReconcileContainerRequestProto request = ReconcileContainerRequestProto.newBuilder()
         .setContainerID(containerID)
         .build();
-    return submitRequest(Type.ReconcileContainer,
-        builder -> builder.setReconcileContainerRequest(request)).getReconcileContainerResponse();
+    // TODO check error handling.
+    submitRequest(Type.ReconcileContainer, builder -> builder.setReconcileContainerRequest(request));
   }
 }
