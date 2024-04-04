@@ -95,15 +95,16 @@ Get Uuid
 Close All Containers
     FOR     ${INDEX}    IN RANGE    15
         ${container} =      Execute          ozone admin container list --state OPEN | jq -r 'select(.replicationConfig.replicationFactor == "THREE") | .containerID' | head -1
-        EXIT FOR LOOP IF    "${container}" == ""
-                            Execute          ozone admin container close "${container}"
+        EXIT FOR LOOP IF    "${container}" == "${EMPTY}"
+                            ${message} =    Execute And Ignore Error    ozone admin container close "${container}"
+                            Run Keyword If    '${message}' != '${EMPTY}'      Should Contain   ${message}   is in closing state
         ${output} =         Execute          ozone admin container info "${container}"
                             Should contain   ${output}   CLOS
     END
     Wait until keyword succeeds    3min    10sec    All container is closed
 
 All container is closed
-    ${output} =         Execute          ozone admin container list --state OPEN
+    ${output} =         Execute           ozone admin container list --state OPEN
                         Should Be Empty   ${output}
 
 Get Datanode Ozone Used Bytes Info
