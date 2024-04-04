@@ -101,8 +101,7 @@ public class ECReconstructionCoordinator implements Closeable {
 
   private static final int EC_RECONSTRUCT_STRIPE_READ_POOL_MIN_SIZE = 3;
 
-  // TODO: Adjusts to the appropriate value when the ec-reconstruct-writer thread pool is used.
-  private static final int EC_RECONSTRUCT_STRIPE_WRITE_POOL_MIN_SIZE = 0;
+  private static final int EC_RECONSTRUCT_STRIPE_WRITE_POOL_MIN_SIZE = 5;
 
   private final ECContainerOperationClient containerOperationClient;
 
@@ -268,12 +267,15 @@ public class ECReconstructionCoordinator implements Closeable {
       return;
     }
 
+    OzoneClientConfig clientConfig = this.ozoneClientConfig;
+    clientConfig.setChecksumVerify(true);
     try (ECBlockReconstructedStripeInputStream sis
         = new ECBlockReconstructedStripeInputStream(
-        repConfig, blockLocationInfo, true,
+        repConfig, blockLocationInfo,
         this.containerOperationClient.getXceiverClientManager(), null,
         this.blockInputStreamFactory, byteBufferPool,
-        this.ecReconstructReadExecutor)) {
+        this.ecReconstructReadExecutor,
+        clientConfig)) {
 
       ECBlockOutputStream[] targetBlockStreams =
           new ECBlockOutputStream[toReconstructIndexes.size()];

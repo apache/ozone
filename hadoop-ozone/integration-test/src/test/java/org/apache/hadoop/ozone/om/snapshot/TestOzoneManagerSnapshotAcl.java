@@ -116,10 +116,6 @@ public class TestOzoneManagerSnapshotAcl {
         .build();
     cluster.waitForClusterToBeReady();
 
-    ozoneManager = cluster.getOzoneManager();
-    final OzoneConfiguration ozoneManagerConf = ozoneManager.getConfiguration();
-    cluster.setConf(ozoneManagerConf);
-
     final String hostPrefix = OZONE_OFS_URI_SCHEME + "://" + omServiceId;
     final OzoneConfiguration clientConf =
         new OzoneConfiguration(cluster.getConf());
@@ -128,12 +124,13 @@ public class TestOzoneManagerSnapshotAcl {
     client = cluster.newClient();
     objectStore = client.getObjectStore();
 
+    ozoneManager = cluster.getOzoneManager();
     final KeyManagerImpl keyManager = (KeyManagerImpl) HddsWhiteboxTestUtils
         .getInternalState(ozoneManager, "keyManager");
 
     // stop the deletion services so that keys can still be read
     keyManager.stop();
-    OMStorage.getOmDbDir(ozoneManagerConf);
+    OMStorage.getOmDbDir(cluster.getConf());
   }
 
   @AfterAll

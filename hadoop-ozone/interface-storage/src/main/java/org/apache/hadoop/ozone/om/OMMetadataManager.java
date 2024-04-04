@@ -122,7 +122,6 @@ public interface OMMetadataManager extends DBStoreHAManager {
    * @param key    - key name
    * @return DB key as String.
    */
-
   String getOzoneKey(String volume, String bucket, String key);
 
   /**
@@ -147,7 +146,21 @@ public interface OMMetadataManager extends DBStoreHAManager {
    * @param id - the id for this open
    * @return bytes of DB key.
    */
-  String getOpenKey(String volume, String bucket, String key, long id);
+  default String getOpenKey(String volume, String bucket, String key, long id) {
+    return getOpenKey(volume, bucket, key, String.valueOf(id));
+  }
+
+  /**
+   * Returns the DB key name of a open key in OM metadata store. Should be
+   * #open# prefix followed by actual key name.
+   *
+   * @param volume - volume name
+   * @param bucket - bucket name
+   * @param key - key name
+   * @param clientId - client Id String for this open key
+   * @return bytes of DB key.
+   */
+  String getOpenKey(String volume, String bucket, String key, String clientId);
 
   /**
    * Given a volume, check if it is empty, i.e there are no buckets inside it.
@@ -539,9 +552,22 @@ public interface OMMetadataManager extends DBStoreHAManager {
    * @param id             - client id for this open request
    * @return DB directory key as String.
    */
-  String getOpenFileName(long volumeId, long bucketId,
-                         long parentObjectId, String fileName, long id);
+  default String getOpenFileName(long volumeId, long bucketId, long parentObjectId, String fileName, long id) {
+    return getOpenFileName(volumeId, bucketId, parentObjectId, fileName, String.valueOf(id));
+  }
 
+  /**
+   * Returns DB key name of an open file in OM metadata store. Should be
+   * #open# prefix followed by actual leaf node name.
+   *
+   * @param volumeId       - ID of the volume
+   * @param bucketId       - ID of the bucket
+   * @param parentObjectId - parent object Id
+   * @param fileName       - file name
+   * @param clientId       - client id String for this open request
+   * @return DB directory key as String.
+   */
+  String getOpenFileName(long volumeId, long bucketId, long parentObjectId, String fileName, String clientId);
 
   /**
    * Given a volume, bucket and a objectID, return the DB key name in

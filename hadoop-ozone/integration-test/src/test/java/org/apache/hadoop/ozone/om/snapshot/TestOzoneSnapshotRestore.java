@@ -113,10 +113,9 @@ public class TestOzoneSnapshotRestore {
 
     leaderOzoneManager = cluster.getOMLeader();
     OzoneConfiguration leaderConfig = leaderOzoneManager.getConfiguration();
-    cluster.setConf(leaderConfig);
 
     String hostPrefix = OZONE_OFS_URI_SCHEME + "://" + serviceID;
-    clientConf = new OzoneConfiguration(cluster.getConf());
+    clientConf = new OzoneConfiguration(leaderConfig);
     clientConf.set(FS_DEFAULT_NAME_KEY, hostPrefix);
 
     client = cluster.newClient();

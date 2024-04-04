@@ -138,20 +138,20 @@ public class OMPerformanceMetrics {
     lookupLatencyNs.add(latencyInNs);
   }
 
-  public MutableRate getLookupRefreshLocationLatencyNs() {
+  MutableRate getLookupRefreshLocationLatencyNs() {
     return lookupRefreshLocationLatencyNs;
   }
 
 
-  public MutableRate getLookupGenerateBlockTokenLatencyNs() {
+  MutableRate getLookupGenerateBlockTokenLatencyNs() {
     return lookupGenerateBlockTokenLatencyNs;
   }
 
-  public MutableRate getLookupReadKeyInfoLatencyNs() {
+  MutableRate getLookupReadKeyInfoLatencyNs() {
     return lookupReadKeyInfoLatencyNs;
   }
 
-  public MutableRate getLookupAclCheckLatencyNs() {
+  MutableRate getLookupAclCheckLatencyNs() {
     return lookupAclCheckLatencyNs;
   }
 
@@ -159,7 +159,7 @@ public class OMPerformanceMetrics {
     s3VolumeContextLatencyNs.add(latencyInNs);
   }
 
-  public MutableRate getLookupResolveBucketLatencyNs() {
+  MutableRate getLookupResolveBucketLatencyNs() {
     return lookupResolveBucketLatencyNs;
   }
 
@@ -167,27 +167,27 @@ public class OMPerformanceMetrics {
     getKeyInfoLatencyNs.add(value);
   }
 
-  public MutableRate getGetKeyInfoAclCheckLatencyNs() {
+  MutableRate getGetKeyInfoAclCheckLatencyNs() {
     return getKeyInfoAclCheckLatencyNs;
   }
 
-  public MutableRate getGetKeyInfoGenerateBlockTokenLatencyNs() {
+  MutableRate getGetKeyInfoGenerateBlockTokenLatencyNs() {
     return getKeyInfoGenerateBlockTokenLatencyNs;
   }
 
-  public MutableRate getGetKeyInfoReadKeyInfoLatencyNs() {
+  MutableRate getGetKeyInfoReadKeyInfoLatencyNs() {
     return getKeyInfoReadKeyInfoLatencyNs;
   }
 
-  public MutableRate getGetKeyInfoRefreshLocationLatencyNs() {
+  MutableRate getGetKeyInfoRefreshLocationLatencyNs() {
     return getKeyInfoRefreshLocationLatencyNs;
   }
 
-  public MutableRate getGetKeyInfoResolveBucketLatencyNs() {
+  MutableRate getGetKeyInfoResolveBucketLatencyNs() {
     return getKeyInfoResolveBucketLatencyNs;
   }
 
-  public MutableRate getGetKeyInfoSortDatanodesLatencyNs() {
+  MutableRate getGetKeyInfoSortDatanodesLatencyNs() {
     return getKeyInfoSortDatanodesLatencyNs;
   }
 
@@ -231,11 +231,11 @@ public class OMPerformanceMetrics {
     return validateAndUpdateCacheLatencyNs;
   }
 
-  public MutableRate getListKeysAclCheckLatencyNs() {
+  MutableRate getListKeysAclCheckLatencyNs() {
     return listKeysAclCheckLatencyNs;
   }
 
-  public MutableRate getListKeysResolveBucketLatencyNs() {
+  MutableRate getListKeysResolveBucketLatencyNs() {
     return listKeysResolveBucketLatencyNs;
   }
 
