@@ -1829,6 +1829,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
         }
       }
     }
+
     metrics.setNumSnapshotActive(activeGauge);
     metrics.setNumSnapshotDeleted(deletedGauge);
   }

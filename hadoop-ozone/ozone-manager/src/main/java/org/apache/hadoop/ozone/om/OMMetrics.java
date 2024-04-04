@@ -521,6 +521,9 @@ public class OMMetrics implements OmMetadataReaderMetrics {
     numSnapshotDeleted.incr(-1);
   }
 
+  public int getNumSnapshotCacheSize() {
+    return numSnapshotCacheSize.value();
+  }
   public void incNumSnapshotCacheSize() {
     numSnapshotCacheSize.incr();
   }
