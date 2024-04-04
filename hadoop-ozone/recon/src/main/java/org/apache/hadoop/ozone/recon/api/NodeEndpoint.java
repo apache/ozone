@@ -240,7 +240,10 @@ public class NodeEndpoint {
           }
         } catch (NodeNotFoundException nnfe) {
           LOG.error("Selected node {} not found : {} ", uuid, nnfe);
-          notFoundDatanodes.add(DatanodeMetadata.newBuilder().withUUid(uuid).build());
+          notFoundDatanodes.add(DatanodeMetadata.newBuilder()
+                  .withHostname("")
+                  .withState(NodeState.DEAD)
+              .withUUid(uuid).build());
         }
       }
     } catch (Exception exp) {
@@ -266,16 +269,18 @@ public class NodeEndpoint {
       removeDataNodesResponseWrapper.getDatanodesResponseMap().put("notFoundDatanodes", notFoundNodesResp);
     }
 
-    DatanodesResponse removedNodesResp =
-        new DatanodesResponse(removedDatanodes.size(), removedDatanodes);
-    removedNodesResp.setMessage("Success");
-    removeDataNodesResponseWrapper.getDatanodesResponseMap().put("removedDatanodes", removedNodesResp);
+    if (!removedDatanodes.isEmpty()) {
+      DatanodesResponse removedNodesResp =
+          new DatanodesResponse(removedDatanodes.size(), removedDatanodes);
+      removedNodesResp.setMessage("Success");
+      removeDataNodesResponseWrapper.getDatanodesResponseMap().put("removedDatanodes", removedNodesResp);
+    }
     return Response.ok(removeDataNodesResponseWrapper).build();
   }
 
   private boolean preChecksSuccess(DatanodeDetails nodeByUuid) throws NodeNotFoundException {
     if (null == nodeByUuid) {
-      throw new NodeNotFoundException("Node " + nodeByUuid + " not found !!!");
+      throw new NodeNotFoundException("Node  not found !!!");
     }
     NodeStatus nodeStatus = null;
     AtomicBoolean isContainerOrPipeLineOpen = new AtomicBoolean(false);

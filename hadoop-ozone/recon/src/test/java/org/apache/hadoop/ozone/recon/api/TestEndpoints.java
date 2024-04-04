@@ -171,6 +171,7 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
   private DatanodeDetails datanodeDetails;
   private DatanodeDetails datanodeDetails2;
   private DatanodeDetails datanodeDetails3;
+  private DatanodeDetails datanodeDetails4;
   private long containerId = 1L;
   private ContainerReportsProto containerReportsProto;
   private ExtendedDatanodeDetailsProto extendedDatanodeDetailsProto;
@@ -182,9 +183,11 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
   private static final String HOST1 = "host1.datanode";
   private static final String HOST2 = "host2.datanode";
   private static final String HOST3 = "host3.datanode";
+  private static final String HOST4 = "host4.datanode";
   private static final String IP1 = "1.1.1.1";
   private static final String IP2 = "2.2.2.2";
   private static final String IP3 = "3.3.3.3";
+  private static final String IP4 = "4.4.4.4";
   private static final String PROMETHEUS_TEST_RESPONSE_FILE =
       "prometheus-test-response.txt";
   private ReconUtils reconUtilsMock;
@@ -206,12 +209,15 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
     datanodeDetails = randomDatanodeDetails();
     datanodeDetails2 = randomDatanodeDetails();
     datanodeDetails3 = randomDatanodeDetails();
+    datanodeDetails4 = randomDatanodeDetails();
     datanodeDetails.setHostName(HOST1);
     datanodeDetails.setIpAddress(IP1);
     datanodeDetails2.setHostName(HOST2);
     datanodeDetails2.setIpAddress(IP2);
     datanodeDetails3.setHostName(HOST3);
     datanodeDetails3.setIpAddress(IP3);
+    datanodeDetails4.setHostName(HOST4);
+    datanodeDetails4.setIpAddress(IP4);
     pipeline = getRandomPipeline(datanodeDetails);
     pipelineId = pipeline.getId().getId().toString();
 
@@ -1279,7 +1285,7 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
   }
 
   @Test
-  public void testExplicitRemovalOfHealthyNode() throws Exception {
+  public void testExplicitRemovalOfHealthyNode() {
     String dnUUID = datanodeDetails2.getUuid().toString();
     Response removedDNResponse = nodeEndpoint.removeDatanodes(Arrays.asList(dnUUID));
     String removedDNResponseEntity = (String) removedDNResponse.getEntity();
@@ -1302,5 +1308,17 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
         "    ]\n" +
         "}", removedDNResponseEntity);
     assertEquals(Response.Status.BAD_REQUEST.getStatusCode(), removedDNResponse.getStatus());
+  }
+
+  @Test
+  public void testExplicitRemovalOfNonExistingNode() {
+    String dnUUID = datanodeDetails4.getUuid().toString();
+    Response removedDNResponse = nodeEndpoint.removeDatanodes(Arrays.asList(dnUUID));
+    RemoveDataNodesResponseWrapper removeDataNodesResponseWrapper =
+        (RemoveDataNodesResponseWrapper) removedDNResponse.getEntity();
+    DatanodesResponse notFoundDatanodes = removeDataNodesResponseWrapper.getDatanodesResponseMap()
+        .get("notFoundDatanodes");
+    assertEquals("Invalid request: Selected nodes not found. Kindly send correct node details to " +
+        "remove it !!!", notFoundDatanodes.getMessage());
   }
 }
