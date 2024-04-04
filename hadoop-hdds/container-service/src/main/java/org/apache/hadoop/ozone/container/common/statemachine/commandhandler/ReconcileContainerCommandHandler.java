@@ -2,7 +2,6 @@ package org.apache.hadoop.ozone.container.common.statemachine.commandhandler;
 
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto;
-import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ReconcileContainerCommandProto;
 import org.apache.hadoop.ozone.container.common.statemachine.SCMConnectionManager;
 import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
 import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
@@ -16,10 +15,12 @@ import java.io.IOException;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 
+/**
+ * Handles commands from SCM to reconcile a container replica on this datanode with the replicas on its peers.
+ */
 public class ReconcileContainerCommandHandler implements CommandHandler {
   private static final Logger LOG =
       LoggerFactory.getLogger(ReconcileContainerCommandHandler.class);
@@ -46,9 +47,11 @@ public class ReconcileContainerCommandHandler implements CommandHandler {
       queuedCount.incrementAndGet();
       long startTime = Time.monotonicNow();
       ReconcileContainerCommand reconcileCommand = (ReconcileContainerCommand) command;
+      LOG.info("Processing reconcile container command for container {} with peers {}",
+          reconcileCommand.getContainerID(), reconcileCommand.getPeerDatanodes());
       try {
         container.getController().reconcileContainer(reconcileCommand.getContainerID(),
-            reconcileCommand.getSourceDatanodes());
+            reconcileCommand.getPeerDatanodes());
       } catch (IOException ex) {
         LOG.error("Failed to reconcile container {}.", reconcileCommand.getContainerID(), ex);
       } finally {
@@ -65,21 +68,24 @@ public class ReconcileContainerCommandHandler implements CommandHandler {
 
   @Override
   public int getInvocationCount() {
-    return 0;
+    return (int)invocationCount.get();
   }
 
   @Override
   public long getAverageRunTime() {
+    if (invocationCount.get() > 0) {
+      return totalTime / invocationCount.get();
+    }
     return 0;
   }
 
   @Override
   public long getTotalRunTime() {
-    return 0;
+    return totalTime;
   }
 
   @Override
   public int getQueuedCount() {
-    return 0;
+    return queuedCount.get();
   }
 }

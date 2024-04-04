@@ -206,8 +206,6 @@ public interface ContainerManager extends Closeable {
   void deleteContainer(ContainerID containerID)
       throws IOException;
 
-  void reconcileContainer(ContainerID containerID);
-
   /**
    * Returns containerStateManger.
    * @return containerStateManger

@@ -5,7 +5,6 @@ import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ReconcileContainerCommandProto;
-import org.apache.hadoop.hdds.scm.container.ContainerID;
 
 import java.util.List;
 import java.util.stream.Collectors;
@@ -17,12 +16,12 @@ import static java.util.Collections.emptyList;
  */
 public class ReconcileContainerCommand extends SCMCommand<ReconcileContainerCommandProto> {
 
-  private final List<DatanodeDetails> sourceDatanodes;
+  private final List<DatanodeDetails> peerDatanodes;
 
-  public ReconcileContainerCommand(long containerID, List<DatanodeDetails> sourceDatanodes) {
+  public ReconcileContainerCommand(long containerID, List<DatanodeDetails> peerDatanodes) {
     // Container ID serves as command ID, since only one reconciliation should be in progress at a time.
     super(containerID);
-    this.sourceDatanodes = sourceDatanodes;
+    this.peerDatanodes = peerDatanodes;
   }
 
 
@@ -35,14 +34,14 @@ public class ReconcileContainerCommand extends SCMCommand<ReconcileContainerComm
   public ReconcileContainerCommandProto getProto() {
     ReconcileContainerCommandProto.Builder builder = ReconcileContainerCommandProto.newBuilder()
         .setContainerID(getId());
-    for (DatanodeDetails dd : sourceDatanodes) {
-      builder.addSources(dd.getProtoBufMessage());
+    for (DatanodeDetails dd : peerDatanodes) {
+      builder.addPeers(dd.getProtoBufMessage());
     }
     return builder.build();
   }
 
-  public List<DatanodeDetails> getSourceDatanodes() {
-    return sourceDatanodes;
+  public List<DatanodeDetails> getPeerDatanodes() {
+    return peerDatanodes;
   }
 
   public long getContainerID() {
@@ -52,20 +51,20 @@ public class ReconcileContainerCommand extends SCMCommand<ReconcileContainerComm
   public static ReconcileContainerCommand getFromProtobuf(ReconcileContainerCommandProto protoMessage) {
     Preconditions.checkNotNull(protoMessage);
 
-    List<HddsProtos.DatanodeDetailsProto> sources = protoMessage.getSourcesList();
-    List<DatanodeDetails> sourceNodes = !sources.isEmpty()
-        ? sources.stream()
+    List<HddsProtos.DatanodeDetailsProto> peers = protoMessage.getPeersList();
+    List<DatanodeDetails> peerNodes = !peers.isEmpty()
+        ? peers.stream()
         .map(DatanodeDetails::getFromProtoBuf)
         .collect(Collectors.toList())
         : emptyList();
 
-    return new ReconcileContainerCommand(protoMessage.getContainerID(), sourceNodes);
+    return new ReconcileContainerCommand(protoMessage.getContainerID(), peerNodes);
   }
 
   @Override
   public String toString() {
     return getType() +
         ": containerId=" + getContainerID() +
-        ", sourceNodes=" + sourceDatanodes;
+        ", peerNodes=" + peerDatanodes;
   }
 }

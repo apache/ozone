@@ -24,6 +24,7 @@ import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.cli.OzoneAdmin;
 import org.apache.hadoop.hdds.cli.SubcommandWithParent;
 
+import org.apache.hadoop.ozone.protocol.commands.ReconcileContainerCommand;
 import org.kohsuke.MetaInfServices;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Model.CommandSpec;
@@ -43,7 +44,8 @@ import picocli.CommandLine.Spec;
         CreateSubcommand.class,
         CloseSubcommand.class,
         ReportSubcommand.class,
-        UpgradeSubcommand.class
+        UpgradeSubcommand.class,
+        ReconcileContainerCommand.class
     })
 @MetaInfServices(SubcommandWithParent.class)
 public class ContainerCommands implements Callable<Void>, SubcommandWithParent {

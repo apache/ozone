@@ -236,7 +236,7 @@ message ContainerReplicaProto {
   optional string originNodeId = 13;
   optional int32 replicaIndex = 14;
   optional bool isEmpty = 15 [default = false];
-  // TODO Should we create a Checksum type here like DatanodeClientProtocol has?
+  // TODO Leaving this as a string for now. We can define a checksum type like the client protocol has later.
   optional string dataChecksum = 16;
 }
 
@@ -504,12 +504,12 @@ message FinalizeNewLayoutVersionCommandProto {
 }
 
 /**
-This command asks the datanode to replicate a container from specific sources.
+This command asks the datanode to reconcile its copy of a container with its peer datanodes that also have a copy of
+the container.
 */
 message ReconcileContainerCommandProto {
   required int64 containerID = 1;
-  repeated DatanodeDetailsProto sources = 2;
-  required int64 cmdId = 3;
+  repeated DatanodeDetailsProto peers = 2;
 }
 
 /**

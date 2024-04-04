@@ -424,11 +424,6 @@ public class ContainerManagerImpl implements ContainerManager {
   }
 
   @Override
-  public void reconcileContainer(ContainerID containerID) {
-    // TODO
-  }
-
-  @Override
   public boolean containerExist(final ContainerID id) {
     return containerStateManager.contains(id);
   }

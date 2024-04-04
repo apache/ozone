@@ -54,13 +54,15 @@ public class ReconcileContainerEventHandler implements EventHandler<ContainerID>
       if (repType == HddsProtos.ReplicationType.EC) {
         LOG.error("Cannot reconcile container {} with replication type {}. Reconciliation is currently only supported" +
             " for Ratis containers.", containerID, repType);
+        return;
       }
 
-      // create SCMCommand
       Set<DatanodeDetails> replicas = containerManager.getContainerReplicas(containerID)
           .stream()
           .map(ContainerReplica::getDatanodeDetails)
           .collect(Collectors.toSet());
+
+      LOG.info("Reconcile container event triggered for container {} with peers {}", containerID, replicas);
 
       for (DatanodeDetails replica: replicas) {
         List<DatanodeDetails> otherReplicas = replicas.stream()

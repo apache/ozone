@@ -1391,29 +1391,28 @@ public class SCMClientProtocolServer implements
     auditMap.put("containerID", containerID.toString());
     auditMap.put("remoteUser", remoteUser.getUserName());
 
-    // TODO need to audit log failure if this happens
-    ContainerInfo container = getContainer(longContainerID);
+    try {
+      // May throw ContainerNotFoundException, which will be caught, audited, and returned to the user.
+      ContainerInfo container = getContainer(longContainerID);
 
-    SCMException exception = null;
-    // Reconcile is not allowed on open containers.
-    final HddsProtos.LifeCycleState state = container.getState();
-    if (state.equals(HddsProtos.LifeCycleState.OPEN)) {
-      exception = new SCMException("Cannot reconcile container in state " + state,
-          ResultCodes.UNEXPECTED_CONTAINER_STATE);
-    }
-    // Reconcile on EC containers is not yet implemented.
-    final HddsProtos.ReplicationType repType = container.getReplicationType();
-    if (repType == HddsProtos.ReplicationType.EC) {
-      exception = new SCMException("Reconciliation is currently only supported for Ratis containers",
-          ResultCodes.UNSUPPORTED_OPERATION);
-    }
+      // Reconcile is not allowed on open containers.
+      final HddsProtos.LifeCycleState state = container.getState();
+      if (state.equals(HddsProtos.LifeCycleState.OPEN)) {
+        throw new SCMException("Cannot reconcile container in state " + state,
+            ResultCodes.UNEXPECTED_CONTAINER_STATE);
+      }
+      // Reconcile on EC containers is not yet implemented.
+      final HddsProtos.ReplicationType repType = container.getReplicationType();
+      if (repType == HddsProtos.ReplicationType.EC) {
+        throw new SCMException("Reconciliation is currently only supported for Ratis containers",
+            ResultCodes.UNSUPPORTED_OPERATION);
+      }
 
-    if (exception == null) {
       scm.getEventQueue().fireEvent(SCMEvents.RECONCILE_CONTAINER, containerID);
       AUDIT.logWriteSuccess(buildAuditMessageForSuccess(SCMAction.RECONCILE_CONTAINER, auditMap));
-    } else {
-      AUDIT.logWriteFailure(buildAuditMessageForFailure(SCMAction.RECONCILE_CONTAINER, auditMap, exception));
-      throw exception;
+    } catch (SCMException ex) {
+      AUDIT.logWriteFailure(buildAuditMessageForFailure(SCMAction.RECONCILE_CONTAINER, auditMap, ex));
+      throw ex;
     }
   }
 }
