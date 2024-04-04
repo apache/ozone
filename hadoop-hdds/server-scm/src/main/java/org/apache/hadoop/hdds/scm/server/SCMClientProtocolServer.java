@@ -646,11 +646,11 @@ public class SCMClientProtocolServer implements
   }
 
   @Override
-  public List<DatanodeAdminError> decommissionNodes(List<String> nodes)
+  public List<DatanodeAdminError> decommissionNodes(List<String> nodes, boolean force)
       throws IOException {
     try {
       getScm().checkAdminAccess(getRemoteUser(), false);
-      return scm.getScmDecommissionManager().decommissionNodes(nodes);
+      return scm.getScmDecommissionManager().decommissionNodes(nodes, force);
     } catch (Exception ex) {
       LOG.error("Failed to decommission nodes", ex);
       throw ex;

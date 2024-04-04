@@ -1199,7 +1199,7 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
   public DecommissionNodesResponseProto decommissionNodes(
       DecommissionNodesRequestProto request) throws IOException {
     List<DatanodeAdminError> errors =
-        impl.decommissionNodes(request.getHostsList());
+        impl.decommissionNodes(request.getHostsList(), request.getForce());
     DecommissionNodesResponseProto.Builder response =
         DecommissionNodesResponseProto.newBuilder();
     for (DatanodeAdminError e : errors) {

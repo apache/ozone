@@ -245,7 +245,7 @@ public interface StorageContainerLocationProtocol extends Closeable {
 
   HddsProtos.Node queryNode(UUID uuid) throws IOException;
 
-  List<DatanodeAdminError> decommissionNodes(List<String> nodes)
+  List<DatanodeAdminError> decommissionNodes(List<String> nodes, boolean force)
       throws IOException;
 
   List<DatanodeAdminError> recommissionNodes(List<String> nodes)
