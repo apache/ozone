@@ -111,6 +111,20 @@ public final class OmVolumeArgs extends WithObjectID
     this.refCount = refCount;
   }
 
+  private OmVolumeArgs(Builder b) {
+    super(b);
+    this.adminName = b.adminName;
+    this.ownerName = b.ownerName;
+    this.volume = b.volume;
+    this.quotaInBytes = b.quotaInBytes;
+    this.quotaInNamespace = b.quotaInNamespace;
+    this.usedNamespace = b.usedNamespace;
+    this.acls = b.acls;
+    this.creationTime = b.creationTime;
+    this.modificationTime = b.modificationTime;
+    this.refCount = b.refCount;
+  }
+
   public long getRefCount() {
     Preconditions.checkState(refCount >= 0L, "refCount should not be negative");
     return refCount;
@@ -297,7 +311,7 @@ public final class OmVolumeArgs extends WithObjectID
   /**
    * Builder for OmVolumeArgs.
    */
-  public static class Builder {
+  public static class Builder extends WithObjectID.Builder {
     private String adminName;
     private String ownerName;
     private String volume;
@@ -306,30 +320,18 @@ public final class OmVolumeArgs extends WithObjectID
     private long quotaInBytes;
     private long quotaInNamespace;
     private long usedNamespace;
-    private Map<String, String> metadata;
     private List<OzoneAcl> acls;
-    private long objectID;
-    private long updateID;
     private long refCount;
 
-    /**
-     * Sets the Object ID for this Object.
-     * Object ID are unique and immutable identifier for each object in the
-     * System.
-     * @param id - long
-     */
+    @Override
     public Builder setObjectID(long id) {
-      this.objectID = id;
+      super.setObjectID(id);
       return this;
     }
 
-    /**
-     * Sets the update ID for this Object. Update IDs are monotonically
-     * increasing values which are updated each time there is an update.
-     * @param id - long
-     */
+    @Override
     public Builder setUpdateID(long id) {
-      this.updateID = id;
+      super.setUpdateID(id);
       return this;
     }
 
@@ -337,8 +339,7 @@ public final class OmVolumeArgs extends WithObjectID
      * Constructs a builder.
      */
     public Builder() {
-      metadata = new HashMap<>();
-      acls = new ArrayList();
+      acls = new ArrayList<>();
       quotaInBytes = OzoneConsts.QUOTA_RESET;
       quotaInNamespace = OzoneConsts.QUOTA_RESET;
     }
@@ -383,15 +384,15 @@ public final class OmVolumeArgs extends WithObjectID
       return this;
     }
 
+    @Override
     public Builder addMetadata(String key, String value) {
-      metadata.put(key, value); // overwrite if present.
+      super.addMetadata(key, value);
       return this;
     }
 
+    @Override
     public Builder addAllMetadata(Map<String, String> additionalMetaData) {
-      if (additionalMetaData != null) {
-        metadata.putAll(additionalMetaData);
-      }
+      super.addAllMetadata(additionalMetaData);
       return this;
     }
 
@@ -406,17 +407,11 @@ public final class OmVolumeArgs extends WithObjectID
       this.refCount = refCount;
     }
 
-    /**
-     * Constructs a CreateVolumeArgument.
-     * @return CreateVolumeArgs.
-     */
     public OmVolumeArgs build() {
       Preconditions.checkNotNull(adminName);
       Preconditions.checkNotNull(ownerName);
       Preconditions.checkNotNull(volume);
-      return new OmVolumeArgs(adminName, ownerName, volume, quotaInBytes,
-          quotaInNamespace, usedNamespace, metadata, acls, creationTime,
-          modificationTime, objectID, updateID, refCount);
+      return new OmVolumeArgs(this);
     }
 
   }

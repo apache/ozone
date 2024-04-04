@@ -15,37 +15,19 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-#suite:HA-unsecure
+#suite:balancer
 
 COMPOSE_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 export COMPOSE_DIR
-
-export SECURITY_ENABLED=false
-export OZONE_REPLICATION_FACTOR=3
+export OM_SERVICE_ID="om"
+export OM=om1
 export SCM=scm1
-export OM_SERVICE_ID=omservice
+export OZONE_REPLICATION_FACTOR=3
 
 # shellcheck source=/dev/null
 source "$COMPOSE_DIR/../testlib.sh"
 
-start_docker_env 5
+# We need 4 dataNodes in this tests
+start_docker_env 4
 
-execute_robot_test ${SCM} basic/ozone-shell-single.robot
-execute_robot_test ${SCM} basic/links.robot
-
-execute_robot_test ${SCM} -v SCHEME:ofs -v BUCKET_TYPE:link -N ozonefs-ofs-link ozonefs/ozonefs.robot
-
-## Exclude virtual-host tests. This is tested separately as it requires additional config.
-exclude="--exclude virtual-host"
-for bucket in generated; do
-  for layout in OBJECT_STORE LEGACY FILE_SYSTEM_OPTIMIZED; do
-    execute_robot_test ${SCM} -v BUCKET:${bucket} -v BUCKET_LAYOUT:${layout} -N s3-${layout}-${bucket} ${exclude} s3
-    # some tests are independent of the bucket type, only need to be run once
-    exclude="--exclude virtual-host --exclude no-bucket-type"
-  done
-done
-
-execute_robot_test ${SCM} freon
-execute_robot_test ${SCM} -v USERNAME:httpfs httpfs
-
-execute_robot_test ${SCM} omha/om-roles.robot
+execute_robot_test ${OM} balancer/testBalancer.robot
