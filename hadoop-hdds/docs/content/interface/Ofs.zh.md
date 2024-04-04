@@ -4,7 +4,7 @@ date: 2017-09-14
 weight: 1
 menu:
    main:
-      parent: "客户端接口"
+      parent: "编程接口"
 summary: Hadoop Compatible file system allows any application that expects an HDFS like interface to work against Ozone with zero changes. Frameworks like Apache Spark, YARN and Hive work against Ozone without needing any change. **Global level view.**
 ---
 <!---
@@ -71,7 +71,7 @@ ofs://omservice/tmp/key1
 
 这将使所有的卷和桶成为默认的 Hadoop 兼容文件系统，并注册 ofs 文件系统类型。
 
-您还需要将 ozone-filesystem-hadoop3.jar 文件添加到Classpath中：
+您还需要将 ozone-filesystem-hadoop3.jar 文件添加到 Classpath 中：
 
 {{< highlight bash >}}
 export HADOOP_CLASSPATH=/opt/ozone/share/ozone/lib/ozone-filesystem-hadoop3-*.jar:$HADOOP_CLASSPATH
@@ -93,7 +93,7 @@ hdfs dfs -mkdir /volume1
 hdfs dfs -mkdir /volume1/bucket1
 {{< /highlight >}}
 
-或者使用put命令向桶中写入一个文件
+或者使用 put 命令向桶中写入一个文件
 
 {{< highlight bash >}}
 hdfs dfs -put /etc/hosts /volume1/bucket1/test
@@ -116,7 +116,7 @@ touch: Cannot create file under root or volume.
 ### 简化 fs.defaultFS
 
 使用 OFS 时，fs.defaultFS（在 core-site.xml 中）不再需要像 o3fs 那样在其路径中具有特定的卷和桶。
-只需设置 OM 主机名或service ID（在 HA 的情况下）：
+只需设置 OM 主机名或 service ID（在 HA 的情况下）：
 
 
 ```xml
@@ -126,7 +126,7 @@ touch: Cannot create file under root or volume.
 </property>
 ```
 
-客户端将能够访问集群上的所有卷和桶，而无需指定主机名或service ID。
+客户端将能够访问集群上的所有卷和桶，而无需指定主机名或 service ID。
 
 ```bash
 $ ozone fs -mkdir -p /volume1/bucket1
@@ -155,7 +155,7 @@ mkdir: Bucket or Volume name has an unsupported character : _
 由一个挂载卷和一个用户特定的临时桶组成。第二种（通过 ozone-site.xml 配置）
 是一个类似粘滞位的临时目录，对所有用户共用，由一个挂载卷和一个共用的临时桶组成。
 
-重要提示：要使用它，首先，**管理员** 需要创建名为 tmp 的卷（卷名目前是硬编码的）并将其 ACL 设置为world ALL 访问权限。
+重要提示：要使用它，首先，**管理员** 需要创建名为 tmp 的卷（卷名目前是硬编码的）并将其 ACL 设置为 world ALL 访问权限。
 
 具体来说：
 
@@ -168,7 +168,7 @@ $ ozone sh volume setacl tmp -al world::a
 
 ### 对于每个用户的 /tmp 目录 (默认)
 
-**每个用户** 都需要先创建并初始化他们自己的temp桶一次
+**每个用户** 都需要先创建并初始化他们自己的 temp 桶一次
 
 ```bash
 $ ozone fs -mkdir /tmp
@@ -202,7 +202,7 @@ $ ozone sh volume setacl tmp -a user:anyuser:rwlc \
 
 在这里，anyuser 是管理员希望授予访问权限的用户名，而 adminuser 是管理员的用户名。
 
-然后用户可以访问tmp目录：
+然后用户可以访问 tmp 目录：
 
 ```bash
 $ ozone fs -put ./NOTICE.txt ofs://om/tmp/key1
