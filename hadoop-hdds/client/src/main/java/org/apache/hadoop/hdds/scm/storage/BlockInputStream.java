@@ -230,8 +230,8 @@ public class BlockInputStream extends BlockExtendedInputStream {
         LOG.info("New pipeline for block {}: {}", blockID,
             blockLocationInfo.getPipeline());
 
+        tokenRef.set(blockLocationInfo.getToken());
         if (blockLocationInfo.getToken() != null) {
-          tokenRef.set(blockLocationInfo.getToken());
           OzoneBlockTokenIdentifier tokenId = new OzoneBlockTokenIdentifier();
           tokenId.readFromByteArray(tokenRef.get().getIdentifier());
           LOG.info("A new token is added for block {}. Expiry: {}",
