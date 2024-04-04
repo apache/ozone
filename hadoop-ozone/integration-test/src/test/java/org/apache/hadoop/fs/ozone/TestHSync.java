@@ -578,7 +578,7 @@ public class TestHSync {
         try {
           out.write(data);
         } catch (IOException e) {
-          writerException.set(e);
+          writerException.set(new IOException(e));
           throw new RuntimeException(e);
         }
       }
@@ -588,8 +588,8 @@ public class TestHSync {
       while ((Time.monotonicNow() - start < 10000)) {
         try {
           out.hsync();
-        } catch (IOException e) {
-          syncerException.set(e);
+        } catch (Throwable e) {
+          syncerException.set(new IOException(e));
           throw new RuntimeException(e);
         }
       }

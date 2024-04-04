@@ -95,7 +95,7 @@ public class RatisBlockOutputStream extends BlockOutputStream
   }
 
   @Override
-  void releaseBuffersOnException() {
+  synchronized void releaseBuffersOnException() {
     commitWatcher.releaseBuffersOnException();
   }
 
