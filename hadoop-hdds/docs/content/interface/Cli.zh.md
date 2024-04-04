@@ -242,7 +242,7 @@ $ ozone sh key delete /vol1/bucket1/key1
 ```
 
 
-如果键是在 [FSO]({{< ref "feature/PrefixFSO.zh.md">}}) 桶中，当删除键时它会被移动到垃圾回收站，垃圾回收站的位置是:
+如果键是在 [FSO]({{< ref "feature/PrefixFSO.zh.md">}}) 桶中，当删除键时它会被移动到回收站，回收站的位置是:
 ```shell
 $ /<volume>/<bucket>/.Trash/<user>
 ```
