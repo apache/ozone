@@ -31,7 +31,7 @@ Ozone shell 是从命令行与 Ozone 交互的主要接口。在后台，它调�
 2. 管理内部 ACL
 3. 创建带有加密的键的桶
 
-所有这些命令都是一次性的管理任务。应用程序也可以使用其他接口，如 Hadoop 兼容文件系统（o3fs 或 ofs）或 S3 接口来实现相同功能而无需使用Ozone命令行接口。
+所有这些命令都是一次性的管理任务。应用程序也可以使用其他接口，如 Hadoop 兼容文件系统（o3fs 或 ofs）或 S3 接口来实现相同功能而无需使用 Ozone 命令行接口。
 
 
 Ozone shell 的帮助菜单可以在 _对象_ 级别 或者 _动作_ 级别被调出.
@@ -58,7 +58,7 @@ Ozone shell 命令采取以下形式:
 
 > _ozone sh object action url_
 
-**ozone** 脚本用于调用所有 Ozone 子命令。通过 ```sh``` 命令调用 ozone shell命令。
+**ozone** 脚本用于调用所有 Ozone 子命令。通过 ```sh``` 命令调用 ozone shell 命令。
 
 对象可以是卷、桶或键。动作可以是创建、列出、删除等。
 
@@ -71,7 +71,7 @@ _\[schema\]\[server:port\]/volume/bucket/key_
 
 1. **Schema** - 应为 `o3`，这是访问 Ozone API 的原生 RPC 协议。是否指定 schema 是可选的。
 
-2. **Server:Port** - 应为Ozone Manager的地址。如果不指定端口，则将使用 ozone-site.xml 中的默认端口。
+2. **Server:Port** - 应为 Ozone Manager 的地址。如果不指定端口，则将使用 ozone-site.xml 中的默认端口。
 
 请查看卷命令、桶命令和键命令部分了解更多详情。
 
@@ -154,7 +154,7 @@ Volume vol1 is deleted
 
 ## 桶操作
 
-桶是层次结构的第二层级，与AWS S3桶相似。如果用户有必要的权限，可以在卷中创建桶。
+桶是层次结构的第二层级，与 AWS S3 桶相似。如果用户有必要的权限，可以在卷中创建桶。
 
 示例命令：
 
@@ -254,7 +254,7 @@ Ozone命令行返回JSON响应。[jq](https://stedolan.github.io/jq/manual/) 是
 
 示例命令:
 
-* 列出不是链接的FSO桶。
+* 列出不是链接的 FSO 桶。
 ```shell
 $ ozone sh bucket list /s3v | jq '.[] | select(.link==false and .bucketLayout=="FILE_SYSTEM_OPTIMIZED")'
 {
