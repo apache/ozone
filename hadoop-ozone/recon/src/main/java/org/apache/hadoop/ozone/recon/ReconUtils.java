@@ -38,6 +38,8 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Collectors;
 
@@ -63,6 +65,7 @@ import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_EVENT_CONTAINER
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_EVENT_THREAD_POOL_SIZE_DEFAULT;
 import static org.apache.hadoop.hdds.server.ServerUtils.getDirectoryFromConfig;
 import static org.apache.hadoop.hdds.server.ServerUtils.getOzoneMetaDirPath;
+import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_COMMAND_PROCESS_TIME_OUT_DEFAULT;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_SCM_DB_DIR;
 import static org.jooq.impl.DSL.currentTimestamp;
 import static org.jooq.impl.DSL.select;
@@ -412,10 +415,14 @@ public class ReconUtils {
     try {
       SecurityUtil.doAsLoginUser((PrivilegedExceptionAction<Map<Integer, String>>) () -> {
         Process process = pb.start();
-        int exitCode = process.waitFor();
-        LOG.info("'{}' command : exitcode: {}", command, exitCode);
-        validateAndReadProcessOutput(processOutput, process, exitCode);
-        processOutputMap.put(exitCode, processOutput.get());
+        boolean isProcessExited = process.waitFor(OZONE_RECON_COMMAND_PROCESS_TIME_OUT_DEFAULT, TimeUnit.SECONDS);
+        if (!isProcessExited) {
+          throw new TimeoutException("Command " + command + " process failed to completed and exit before timeout of " +
+              OZONE_RECON_COMMAND_PROCESS_TIME_OUT_DEFAULT + " seconds.");
+        }
+        LOG.info("'{}' command : exitCode: {}", command, process.exitValue());
+        validateAndReadProcessOutput(processOutput, process, process.exitValue());
+        processOutputMap.put(process.exitValue(), processOutput.get());
         return processOutputMap;
       });
     } catch (IOException ioException) {
