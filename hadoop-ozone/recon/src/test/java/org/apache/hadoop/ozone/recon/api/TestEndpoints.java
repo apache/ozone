@@ -1284,10 +1284,12 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
     Response removedDNResponse = nodeEndpoint.removeDatanodes(Arrays.asList(dnUUID));
     String removedDNResponseEntity = (String) removedDNResponse.getEntity();
     assertEquals("{\n" +
-        "    \"Invalid request: Pre-checks failed for selected datanodes. DataNode should pass following pre-checks.\": [\n" +
+        "    \"Invalid request: Pre-checks failed for selected datanodes. DataNode should pass following " +
+        "pre-checks.\": [\n" +
         "        {\n" +
         "            \"title\": \"Incorrect State\",\n" +
-        "            \"description\": \"DataNode should be in either DECOMMISSIONED operational state or DEAD node state.\"\n" +
+        "            \"description\": \"DataNode should be in either DECOMMISSIONED operational state or DEAD " +
+        "node state.\"\n" +
         "        },\n" +
         "        {\n" +
         "            \"title\": \"Open Containers\",\n" +

@@ -273,7 +273,10 @@ public class NodeEndpoint {
     return Response.ok(removeDataNodesResponseWrapper).build();
   }
 
-  private boolean preChecksSuccess(DatanodeDetails nodeByUuid) {
+  private boolean preChecksSuccess(DatanodeDetails nodeByUuid) throws NodeNotFoundException {
+    if (null == nodeByUuid) {
+      throw new NodeNotFoundException("Node " + nodeByUuid + " not found !!!");
+    }
     NodeStatus nodeStatus = null;
     AtomicBoolean isContainerOrPipeLineOpen = new AtomicBoolean(false);
     try {
