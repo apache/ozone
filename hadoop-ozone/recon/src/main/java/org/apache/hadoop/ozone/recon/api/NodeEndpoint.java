@@ -20,8 +20,11 @@ package org.apache.hadoop.ozone.recon.api;
 
 import com.google.common.base.Preconditions;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState;
+import org.apache.hadoop.hdds.scm.container.ContainerInfo;
+import org.apache.hadoop.hdds.scm.container.ContainerNotFoundException;
 import org.apache.hadoop.hdds.scm.container.placement.metrics.SCMNodeStat;
 import org.apache.hadoop.hdds.scm.node.DatanodeInfo;
 import org.apache.hadoop.hdds.scm.node.NodeStatus;
@@ -52,6 +55,7 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import org.apache.hadoop.ozone.recon.scm.ReconPipelineManager;
@@ -198,10 +202,7 @@ public class NodeEndpoint {
       for (String uuid : uuids) {
         DatanodeDetails nodeByUuid = nodeManager.getNodeByUuid(uuid);
         try {
-          NodeStatus nodeStatus = nodeManager.getNodeStatus(nodeByUuid);
-          boolean isNodeDecommissioned = nodeByUuid.getPersistedOpState() == NodeOperationalState.DECOMMISSIONED;
-          boolean isNodeInMaintenance = nodeByUuid.getPersistedOpState() == NodeOperationalState.DECOMMISSIONED;
-          if (isNodeDecommissioned || isNodeInMaintenance || nodeStatus.isDead()) {
+          if (preChecksSuccess(nodeByUuid)) {
             removedDatanodes.add(DatanodeMetadata.newBuilder()
                 .withHostname(nodeManager.getHostName(nodeByUuid))
                 .withUUid(uuid)
@@ -210,8 +211,24 @@ public class NodeEndpoint {
             nodeManager.removeNode(nodeByUuid);
           } else {
             Response.ResponseBuilder builder = Response.status(Response.Status.BAD_REQUEST);
-            builder.entity("Invalid request: Node: " + uuid + " should be in either DECOMMISSIONED or " +
-                "IN_MAINTENANCE mode or DEAD.");
+            builder.entity("{\n" +
+                "    \"Invalid request: Pre-checks failed for selected datanodes. DataNode should pass following " +
+                "pre-checks.\": [\n" +
+                "        {\n" +
+                "            \"title\": \"Incorrect State\",\n" +
+                "            \"description\": \"DataNode should be in either DECOMMISSIONED operational state or " +
+                "DEAD node state.\"\n" +
+                "        },\n" +
+                "        {\n" +
+                "            \"title\": \"Open Containers\",\n" +
+                "            \"description\": \"Containers are open for few or all selected datanodes.\"\n" +
+                "        },\n" +
+                "        {\n" +
+                "            \"title\": \"Open Pipelines\",\n" +
+                "            \"description\": \"Pipelines are open for few or all selected datanodes.\"\n" +
+                "        }\n" +
+                "    ]\n" +
+                "}");
             failedDatanodes.add(DatanodeMetadata.newBuilder()
                 .withHostname(nodeManager.getHostName(nodeByUuid))
                 .withUUid(uuid)
@@ -254,5 +271,65 @@ public class NodeEndpoint {
     removedNodesResp.setMessage("Success");
     removeDataNodesResponseWrapper.getDatanodesResponseMap().put("removedDatanodes", removedNodesResp);
     return Response.ok(removeDataNodesResponseWrapper).build();
+  }
+
+  private boolean preChecksSuccess(DatanodeDetails nodeByUuid) {
+    NodeStatus nodeStatus = null;
+    AtomicBoolean isContainerOrPipeLineOpen = new AtomicBoolean(false);
+    try {
+      nodeStatus = nodeManager.getNodeStatus(nodeByUuid);
+      boolean isNodeDecommissioned = nodeByUuid.getPersistedOpState() == NodeOperationalState.DECOMMISSIONED;
+      if (isNodeDecommissioned || nodeStatus.isDead()) {
+        checkContainers(nodeByUuid, isContainerOrPipeLineOpen);
+        if (isContainerOrPipeLineOpen.get()) {
+          return false;
+        }
+        checkPipelines(nodeByUuid, isContainerOrPipeLineOpen);
+        if (isContainerOrPipeLineOpen.get()) {
+          return false;
+        }
+        return true;
+      }
+    } catch (NodeNotFoundException e) {
+      LOG.error("Node : {} not found", nodeByUuid);
+      return false;
+    }
+    return false;
+  }
+
+  private void checkPipelines(DatanodeDetails nodeByUuid, AtomicBoolean isContainerOrPipeLineOpen) {
+    nodeManager.getPipelines(nodeByUuid)
+        .forEach(id -> {
+          try {
+            final Pipeline pipeline = pipelineManager.getPipeline(id);
+            if (pipeline.isOpen()) {
+              LOG.warn("Pipeline : {} is still open for datanode: {}, pre-check failed, datanode not eligible " +
+                  "for remove.", id.getId(), nodeByUuid.getUuid());
+              isContainerOrPipeLineOpen.set(true);
+              return;
+            }
+          } catch (PipelineNotFoundException pipelineNotFoundException) {
+            LOG.warn("Pipeline {} is not managed by PipelineManager.", id, pipelineNotFoundException);
+          }
+        });
+  }
+
+  private void checkContainers(DatanodeDetails nodeByUuid, AtomicBoolean isContainerOrPipeLineOpen)
+      throws NodeNotFoundException {
+    nodeManager.getContainers(nodeByUuid)
+        .forEach(id -> {
+          try {
+            final ContainerInfo container = reconContainerManager.getContainer(id);
+            if (container.getState() == HddsProtos.LifeCycleState.OPEN) {
+              LOG.warn("Container : {} is still open for datanode: {}, pre-check failed, datanode not eligible " +
+                  "for remove.", container.getContainerID(), nodeByUuid.getUuid());
+              isContainerOrPipeLineOpen.set(true);
+              return;
+            }
+          } catch (ContainerNotFoundException cnfe) {
+            LOG.warn("Container {} is not managed by ContainerManager.",
+                id, cnfe);
+          }
+        });
   }
 }

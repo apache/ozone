@@ -332,6 +332,7 @@ public class ReconNodeManager extends SCMNodeManager {
   @Override
   public void removeNode(DatanodeDetails datanodeDetails) throws NodeNotFoundException, IOException {
     try {
+      super.removeNode(datanodeDetails);
       nodeDB.delete(datanodeDetails.getUuid());
     } catch (IOException ioException) {
       LOG.error("Node {} deletion fails from Node DB.", datanodeDetails.getUuid());
@@ -339,8 +340,8 @@ public class ReconNodeManager extends SCMNodeManager {
     }
     datanodeHeartbeatMap.remove(datanodeDetails.getUuid());
     inMemDatanodeDetails.remove(datanodeDetails.getUuid());
-    super.removeNode(datanodeDetails);
     LOG.info("Removed existing node {} from Node DB and NodeManager data structures in memory ",
         datanodeDetails.getUuid());
   }
+
 }

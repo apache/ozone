@@ -1283,8 +1283,22 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
     String dnUUID = datanodeDetails2.getUuid().toString();
     Response removedDNResponse = nodeEndpoint.removeDatanodes(Arrays.asList(dnUUID));
     String removedDNResponseEntity = (String) removedDNResponse.getEntity();
-    assertEquals("Invalid request: Node: " + dnUUID + " should be in either DECOMMISSIONED or " +
-        "IN_MAINTENANCE mode or DEAD.", removedDNResponseEntity);
+    assertEquals("{\n" +
+        "    \"Invalid request: Pre-checks failed for selected datanodes. DataNode should pass following pre-checks.\": [\n" +
+        "        {\n" +
+        "            \"title\": \"Incorrect State\",\n" +
+        "            \"description\": \"DataNode should be in either DECOMMISSIONED operational state or DEAD node state.\"\n" +
+        "        },\n" +
+        "        {\n" +
+        "            \"title\": \"Open Containers\",\n" +
+        "            \"description\": \"Containers are open for few or all selected datanodes.\"\n" +
+        "        },\n" +
+        "        {\n" +
+        "            \"title\": \"Open Pipelines\",\n" +
+        "            \"description\": \"Pipelines are open for few or all selected datanodes.\"\n" +
+        "        }\n" +
+        "    ]\n" +
+        "}", removedDNResponseEntity);
     assertEquals(Response.Status.BAD_REQUEST.getStatusCode(), removedDNResponse.getStatus());
   }
 }

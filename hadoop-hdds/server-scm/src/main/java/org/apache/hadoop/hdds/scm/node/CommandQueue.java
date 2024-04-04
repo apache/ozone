@@ -142,17 +142,6 @@ public class CommandQueue {
   }
 
   /**
-   * Removes all Commands from the SCM Queue for the datanode.
-   *
-   * @param datanodeUuid DatanodeDetails.Uuid
-   */
-  public void removeCommand(final UUID datanodeUuid) {
-    commandMap.remove(datanodeUuid);
-    int numCommmands = commandMap.get(datanodeUuid) != null ? commandMap.get(datanodeUuid).getCommands().size() : 0;
-    commandsInQueue -= numCommmands;
-  }
-
-  /**
    * Class that stores commands for a datanode.
    */
   private static class Commands {
