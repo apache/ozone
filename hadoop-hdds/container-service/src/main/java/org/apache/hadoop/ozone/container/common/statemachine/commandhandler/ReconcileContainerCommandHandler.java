@@ -41,7 +41,8 @@ public class ReconcileContainerCommandHandler implements CommandHandler {
   }
 
   @Override
-  public void handle(SCMCommand command, OzoneContainer container, StateContext context, SCMConnectionManager connectionManager) {
+  public void handle(SCMCommand command, OzoneContainer container, StateContext context,
+      SCMConnectionManager connectionManager) {
     queuedCount.incrementAndGet();
     CompletableFuture.runAsync(() -> {
       queuedCount.incrementAndGet();
