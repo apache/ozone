@@ -1,3 +1,27 @@
+---
+title: Overwriting an Ozone Key only if it has not changed.
+summary: A minimal design illustrating how to replace a key in Ozone only if it has not changes since it was read.
+date: 2024-04-05
+jira: HDDS-10657
+status: accepted
+author: Stephen ODonnell
+---
+
+<!--
+  Licensed under the Apache License, Version 2.0 (the "License");
+  you may not use this file except in compliance with the License.
+  You may obtain a copy of the License at
+
+   http://www.apache.org/licenses/LICENSE-2.0
+
+  Unless required by applicable law or agreed to in writing, software
+  distributed under the License is distributed on an "AS IS" BASIS,
+  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+  See the License for the specific language governing permissions and
+  limitations under the License. See accompanying LICENSE file.
+-->
+
+
 Ozone offers write semantics where the last writer to commit a key wins. Therefore multiple writers can concurrently write the same key, and which ever commits last will effectively overwrite all data that came before it.
 
 As an extension of this, there is no "locking" on a key which is being replaced.
