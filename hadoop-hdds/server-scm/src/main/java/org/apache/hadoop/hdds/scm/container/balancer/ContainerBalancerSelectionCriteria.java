@@ -54,7 +54,7 @@ public class ContainerBalancerSelectionCriteria {
   private ContainerManager containerManager;
   private Set<ContainerID> selectedContainers;
   private Set<ContainerID> excludeContainers;
-  private Set<ContainerID> excludeContainersDueToFailure;
+  private Map<DatanodeDetails, Set<ContainerID>> excludeContainersDueToFailure;
   private FindSourceStrategy findSourceStrategy;
   private Map<DatanodeDetails, NavigableSet<ContainerID>> setMap;
 
@@ -69,7 +69,7 @@ public class ContainerBalancerSelectionCriteria {
     this.replicationManager = replicationManager;
     this.containerManager = containerManager;
     selectedContainers = new HashSet<>();
-    excludeContainersDueToFailure = new HashSet<>();
+    excludeContainersDueToFailure = new HashMap<>();
     excludeContainers = balancerConfiguration.getExcludeContainers();
     this.findSourceStrategy = findSourceStrategy;
     this.setMap = new HashMap<>();
@@ -176,8 +176,12 @@ public class ContainerBalancerSelectionCriteria {
           "candidate container. Excluding it.", containerID);
       return true;
     }
-    return excludeContainers.contains(containerID) || excludeContainersDueToFailure.contains(containerID) ||
-        selectedContainers.contains(containerID) ||
+    Set<ContainerID> excludeContainersForSource = excludeContainersDueToFailure.get(node);
+    if (excludeContainersForSource == null) {
+      excludeContainersForSource = Collections.emptySet();
+    }
+    return excludeContainers.contains(containerID) || selectedContainers.contains(containerID) ||
+        excludeContainersForSource.contains(containerID) ||
         !isContainerClosed(container, node) || isECContainerAndLegacyRMEnabled(container) ||
         isContainerReplicatingOrDeleting(containerID) ||
         !findSourceStrategy.canSizeLeaveSource(node, container.getUsedBytes())
@@ -245,8 +249,13 @@ public class ContainerBalancerSelectionCriteria {
     this.selectedContainers = selectedContainers;
   }
 
-  public void addToExcludeDueToFailContainers(ContainerID container) {
-    this.excludeContainersDueToFailure.add(container);
+  public void addToExcludeDueToFailContainers(DatanodeDetails node, ContainerID container) {
+    Set<ContainerID> excludeContainersForSource = excludeContainersDueToFailure.get(node);
+    if (excludeContainersForSource == null) {
+      excludeContainersForSource = new HashSet<>();
+    }
+    excludeContainersForSource.add(container);
+    excludeContainersDueToFailure.put(node, excludeContainersForSource);
   }
 
 
@@ -258,8 +267,9 @@ public class ContainerBalancerSelectionCriteria {
       if (excludeContainers != null) {
         idSet.removeAll(excludeContainers);
       }
-      if (excludeContainersDueToFailure != null) {
-        idSet.removeAll(excludeContainersDueToFailure);
+      Set<ContainerID> excludeContainersForSource = excludeContainersDueToFailure.get(node);
+      if (excludeContainersForSource != null) {
+        idSet.removeAll(excludeContainersForSource);
       }
       if (selectedContainers != null) {
         idSet.removeAll(selectedContainers);

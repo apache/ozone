@@ -555,7 +555,7 @@ public class ContainerBalancerTask implements Runnable {
           containerToTargetMap.get(containerID));
       // add source back to queue as a different container can be selected in next run.
       findSourceStrategy.addBackSourceDataNode(source);
-      selectionCriteria.addToExcludeDueToFailContainers(moveSelection.getContainerID());
+      selectionCriteria.addToExcludeDueToFailContainers(source, moveSelection.getContainerID());
       return false;
     }
 
@@ -568,7 +568,7 @@ public class ContainerBalancerTask implements Runnable {
           "starting a container move", containerID, e);
       // add source back to queue as a different container can be selected in next run.
       findSourceStrategy.addBackSourceDataNode(source);
-      selectionCriteria.addToExcludeDueToFailContainers(moveSelection.getContainerID());
+      selectionCriteria.addToExcludeDueToFailContainers(source, moveSelection.getContainerID());
       return false;
     }
     LOG.info("ContainerBalancer is trying to move container {} with size " +
@@ -870,7 +870,7 @@ public class ContainerBalancerTask implements Runnable {
           containerID, e);
       // add source back to queue
       findSourceStrategy.addBackSourceDataNode(source);
-      selectionCriteria.addToExcludeDueToFailContainers(moveSelection.getContainerID());
+      selectionCriteria.addToExcludeDueToFailContainers(source, moveSelection.getContainerID());
       metrics.incrementNumContainerMovesFailedInLatestIteration(1);
       return false;
     } catch (NodeNotFoundException | TimeoutException e) {
@@ -882,7 +882,7 @@ public class ContainerBalancerTask implements Runnable {
       metrics.incrementNumContainerMovesFailedInLatestIteration(1);
       // add source back to queue for replica not found only
       findSourceStrategy.addBackSourceDataNode(source);
-      selectionCriteria.addToExcludeDueToFailContainers(moveSelection.getContainerID());
+      selectionCriteria.addToExcludeDueToFailContainers(source, moveSelection.getContainerID());
       return false;
     }
 
