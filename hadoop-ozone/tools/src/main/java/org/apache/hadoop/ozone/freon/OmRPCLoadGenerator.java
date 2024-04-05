@@ -19,13 +19,14 @@ package org.apache.hadoop.ozone.freon;
 
 import com.codahale.metrics.Timer;
 import com.google.common.base.Preconditions;
-import org.apache.commons.lang3.RandomUtils;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.om.protocolPB.OzoneManagerProtocolClientSideTranslatorPB;
 import java.util.concurrent.Callable;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
+
+import static org.apache.hadoop.ozone.common.PayloadUtils.generatePayloadBytes;
 
 /**
  * Utility to generate RPC request to OM with or without payload.
@@ -88,8 +89,7 @@ public class OmRPCLoadGenerator extends BaseFreonGenerator
     }
 
     init();
-    payloadReqBytes = RandomUtils.nextBytes(
-            calculateMaxPayloadSize(payloadReqSizeKB));
+    payloadReqBytes = generatePayloadBytes(payloadReqSizeKB);
     payloadRespSize = calculateMaxPayloadSize(payloadRespSizeKB);
     timer = getMetrics().timer("rpc-payload");
     try {

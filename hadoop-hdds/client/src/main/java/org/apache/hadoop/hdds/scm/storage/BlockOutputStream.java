@@ -55,6 +55,8 @@ import org.apache.hadoop.security.token.TokenIdentifier;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
+
+import static org.apache.hadoop.hdds.DatanodeVersion.COMBINED_PUTBLOCK_WRITECHUNK_RPC;
 import static org.apache.hadoop.hdds.scm.storage.ContainerProtocolCalls.putBlockAsync;
 import static org.apache.hadoop.hdds.scm.storage.ContainerProtocolCalls.writeChunkAsync;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
@@ -140,6 +142,7 @@ public class BlockOutputStream extends OutputStream {
   private int replicationIndex;
   private Pipeline pipeline;
   private final ContainerClientMetrics clientMetrics;
+  private boolean allowPutBlockPiggybacking;
 
   /**
    * Creates a new BlockOutputStream.
@@ -211,6 +214,20 @@ public class BlockOutputStream extends OutputStream {
     this.clientMetrics = clientMetrics;
     this.pipeline = pipeline;
     this.streamBufferArgs = streamBufferArgs;
+    this.allowPutBlockPiggybacking = config.getEnablePutblockPiggybacking() &&
+            allDataNodesSupportPiggybacking();
+  }
+
+  private boolean allDataNodesSupportPiggybacking() {
+    // return true only if all DataNodes in the pipeline are on a version
+    // that supports PutBlock piggybacking.
+    for (DatanodeDetails dn : pipeline.getNodes()) {
+      if (dn.getCurrentVersion() <
+              COMBINED_PUTBLOCK_WRITECHUNK_RPC.toProtoValue()) {
+        return false;
+      }
+    }
+    return true;
   }
 
   void refreshCurrentBuffer() {
@@ -512,22 +529,8 @@ public class BlockOutputStream extends OutputStream {
         }
         // if the ioException is not set, putBlock is successful
         if (getIoException() == null && !force) {
-          BlockID responseBlockID = BlockID.getFromProtobuf(
-              e.getPutBlock().getCommittedBlockLength().getBlockID());
-          Preconditions.checkState(blockID.get().getContainerBlockID()
-              .equals(responseBlockID.getContainerBlockID()));
-          // updates the bcsId of the block
-          blockID.set(responseBlockID);
-          if (LOG.isDebugEnabled()) {
-            LOG.debug(
-                "Adding index " + asyncReply.getLogIndex() + " flushLength "
-                    + flushPos + " numBuffers " + byteBufferList.size()
-                    + " blockID " + blockID + " bufferPool size" + bufferPool
-                    .getSize() + " currentBufferIndex " + bufferPool
-                    .getCurrentBufferIndex());
-          }
-          // for standalone protocol, logIndex will always be 0.
-          updateCommitInfo(asyncReply, byteBufferList);
+          handleSuccessfulPutBlock(e.getPutBlock().getCommittedBlockLength(),
+              asyncReply, flushPos, byteBufferList);
         }
         return e;
       }, responseExecutor).exceptionally(e -> {
@@ -564,7 +567,7 @@ public class BlockOutputStream extends OutputStream {
     }
   }
 
-  private void writeChunk(ChunkBuffer buffer)
+  private void writeChunkCommon(ChunkBuffer buffer)
       throws IOException {
     // This data in the buffer will be pushed to datanode and a reference will
     // be added to the bufferList. Once putBlock gets executed, this list will
@@ -575,7 +578,18 @@ public class BlockOutputStream extends OutputStream {
       bufferList = new ArrayList<>();
     }
     bufferList.add(buffer);
-    writeChunkToContainer(buffer.duplicate(0, buffer.position()));
+  }
+
+  private void writeChunk(ChunkBuffer buffer)
+      throws IOException {
+    writeChunkCommon(buffer);
+    writeChunkToContainer(buffer.duplicate(0, buffer.position()), false);
+  }
+
+  private void writeChunkAndPutBlock(ChunkBuffer buffer)
+      throws IOException {
+    writeChunkCommon(buffer);
+    writeChunkToContainer(buffer.duplicate(0, buffer.position()), true);
   }
 
   /**
@@ -607,14 +621,23 @@ public class BlockOutputStream extends OutputStream {
     if (totalDataFlushedLength < writtenDataLength) {
       refreshCurrentBuffer();
       Preconditions.checkArgument(currentBuffer.position() > 0);
-      if (currentBuffer.hasRemaining()) {
-        writeChunk(currentBuffer);
-      }
+
       // This can be a partially filled chunk. Since we are flushing the buffer
       // here, we just limit this buffer to the current position. So that next
       // write will happen in new buffer
-      updateFlushLength();
-      executePutBlock(close, false);
+      if (currentBuffer.hasRemaining()) {
+        if (allowPutBlockPiggybacking) {
+          updateFlushLength();
+          writeChunkAndPutBlock(currentBuffer);
+        } else {
+          writeChunk(currentBuffer);
+          updateFlushLength();
+          executePutBlock(close, false);
+        }
+      } else {
+        updateFlushLength();
+        executePutBlock(close, false);
+      }
     } else if (close) {
       // forcing an "empty" putBlock if stream is being closed without new
       // data since latest flush - we need to send the "EOF" flag
@@ -728,7 +751,7 @@ public class BlockOutputStream extends OutputStream {
    * @return
    */
   CompletableFuture<ContainerCommandResponseProto> writeChunkToContainer(
-      ChunkBuffer chunk) throws IOException {
+      ChunkBuffer chunk, boolean putBlockPiggybacking) throws IOException {
     int effectiveChunkSize = chunk.remaining();
     final long offset = chunkOffset.getAndAdd(effectiveChunkSize);
     final ByteString data = chunk.toByteString(
@@ -740,6 +763,8 @@ public class BlockOutputStream extends OutputStream {
         .setLen(effectiveChunkSize)
         .setChecksumData(checksumData.getProtoBufMessage())
         .build();
+
+    long flushPos = totalDataFlushedLength;
 
     if (LOG.isDebugEnabled()) {
       LOG.debug("Writing chunk {} length {} at offset {}",
@@ -758,42 +783,93 @@ public class BlockOutputStream extends OutputStream {
           + ", previous = " + previous);
     }
 
+    final List<ChunkBuffer> byteBufferList;
+    CompletableFuture<ContainerProtos.ContainerCommandResponseProto>
+        validateFuture = null;
     try {
-      XceiverClientReply asyncReply = writeChunkAsync(xceiverClient, chunkInfo,
-          blockID.get(), data, tokenString, replicationIndex);
-      CompletableFuture<ContainerProtos.ContainerCommandResponseProto>
-          respFuture = asyncReply.getResponse();
-      CompletableFuture<ContainerProtos.ContainerCommandResponseProto>
-          validateFuture = respFuture.thenApplyAsync(e -> {
-            try {
-              validateResponse(e);
-            } catch (IOException sce) {
-              respFuture.completeExceptionally(sce);
-            }
-            return e;
-          }, responseExecutor).exceptionally(e -> {
-            String msg = "Failed to write chunk " + chunkInfo.getChunkName() +
-                " into block " + blockID;
-            LOG.debug("{}, exception: {}", msg, e.getLocalizedMessage());
-            CompletionException ce = new CompletionException(msg, e);
-            setIoException(ce);
-            throw ce;
-          });
+      BlockData blockData = null;
+
       if (config.getIncrementalChunkList()) {
         updateBlockDataForWriteChunk(chunk);
       } else {
         containerBlockData.addChunks(chunkInfo);
       }
+      if (putBlockPiggybacking) {
+        Preconditions.checkNotNull(bufferList);
+        byteBufferList = bufferList;
+        bufferList = null;
+        Preconditions.checkNotNull(byteBufferList);
 
+        blockData = containerBlockData.build();
+        LOG.debug("piggyback chunk list {}", blockData);
+
+        if (config.getIncrementalChunkList()) {
+          // remove any chunks in the containerBlockData list.
+          // since they are sent.
+          containerBlockData.clearChunks();
+        }
+      } else {
+        byteBufferList = null;
+      }
+
+      XceiverClientReply asyncReply = writeChunkAsync(xceiverClient, chunkInfo,
+          blockID.get(), data, tokenString, replicationIndex, blockData);
+      CompletableFuture<ContainerProtos.ContainerCommandResponseProto>
+          respFuture = asyncReply.getResponse();
+      validateFuture = respFuture.thenApplyAsync(e -> {
+        try {
+          validateResponse(e);
+        } catch (IOException sce) {
+          respFuture.completeExceptionally(sce);
+        }
+        // if the ioException is not set, putBlock is successful
+        if (getIoException() == null && putBlockPiggybacking) {
+          handleSuccessfulPutBlock(e.getWriteChunk().getCommittedBlockLength(),
+              asyncReply, flushPos, byteBufferList);
+        }
+        return e;
+      }, responseExecutor).exceptionally(e -> {
+        String msg = "Failed to write chunk " + chunkInfo.getChunkName() +
+            " into block " + blockID;
+        LOG.debug("{}, exception: {}", msg, e.getLocalizedMessage());
+        CompletionException ce = new CompletionException(msg, e);
+        setIoException(ce);
+        throw ce;
+      });
       clientMetrics.recordWriteChunk(pipeline, chunkInfo.getLen());
-      return validateFuture;
+
     } catch (IOException | ExecutionException e) {
       throw new IOException(EXCEPTION_MSG + e.toString(), e);
     } catch (InterruptedException ex) {
       Thread.currentThread().interrupt();
       handleInterruptedException(ex, false);
     }
-    return null;
+    if (putBlockPiggybacking) {
+      putFlushFuture(flushPos, validateFuture);
+    }
+    return validateFuture;
+  }
+
+  private void handleSuccessfulPutBlock(
+      ContainerProtos.GetCommittedBlockLengthResponseProto e,
+      XceiverClientReply asyncReply, long flushPos,
+      List<ChunkBuffer> byteBufferList) {
+    BlockID responseBlockID = BlockID.getFromProtobuf(
+        e.getBlockID());
+    Preconditions.checkState(blockID.get().getContainerBlockID()
+        .equals(responseBlockID.getContainerBlockID()));
+    // updates the bcsId of the block
+    blockID.set(responseBlockID);
+    if (LOG.isDebugEnabled()) {
+      LOG.debug(
+          "Adding index " + asyncReply.getLogIndex() + " flushLength "
+              + flushPos + " numBuffers " + byteBufferList.size()
+              + " blockID " + blockID + " bufferPool size" + bufferPool
+              .getSize() + " currentBufferIndex " + bufferPool
+              .getCurrentBufferIndex());
+    }
+    // for standalone protocol, logIndex will always be 0.
+    updateCommitInfo(asyncReply, byteBufferList);
   }
 
   /**

@@ -103,6 +103,7 @@ import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Res
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.PUT_SMALL_FILE_ERROR;
 import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuilders.getBlockDataResponse;
 import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuilders.getBlockLengthResponse;
+import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuilders.getEchoResponse;
 import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuilders.getFinalizeBlockResponse;
 import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuilders.getGetSmallFileResponseSuccess;
 import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuilders.getListBlockResponse;
@@ -111,6 +112,7 @@ import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuil
 import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuilders.getReadContainerResponse;
 import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuilders.getSuccessResponse;
 import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuilders.getSuccessResponseBuilder;
+import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuilders.getWriteChunkResponseSuccess;
 import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuilders.malformedRequest;
 import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuilders.putBlockResponseSuccess;
 import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuilders.unsupportedRequest;
@@ -279,6 +281,8 @@ public class KeyValueHandler extends Handler {
       return handler.handleGetCommittedBlockLength(request, kvContainer);
     case FinalizeBlock:
       return handler.handleFinalizeBlock(request, kvContainer);
+    case Echo:
+      return handler.handleEcho(request, kvContainer);
     default:
       return null;
     }
@@ -611,6 +615,11 @@ public class KeyValueHandler extends Handler {
     return getFinalizeBlockResponse(request, responseData);
   }
 
+  ContainerCommandResponseProto handleEcho(
+      ContainerCommandRequestProto request, KeyValueContainer kvContainer) {
+    return getEchoResponse(request);
+  }
+
   /**
    * Handle Get Block operation. Calls BlockManager to process the request.
    */
@@ -772,11 +781,14 @@ public class KeyValueHandler extends Handler {
 
       data = chunkManager.readChunk(kvContainer, blockID, chunkInfo,
           dispatcherContext);
+      LOG.debug("read chunk from block {} chunk {}", blockID, chunkInfo);
       // Validate data only if the read chunk is issued by Ratis for its
       // internal logic.
       //  For client reads, the client is expected to validate.
       if (DispatcherContext.op(dispatcherContext).readFromTmpFile()) {
         validateChunkChecksumData(data, chunkInfo);
+        metrics.incBytesReadStateMachine(chunkInfo.getLen());
+        metrics.incNumReadStateMachine();
       }
       metrics.incContainerBytesStats(Type.ReadChunk, chunkInfo.getLen());
     } catch (StorageContainerException ex) {
@@ -831,6 +843,7 @@ public class KeyValueHandler extends Handler {
       return malformedRequest(request);
     }
 
+    ContainerProtos.BlockData blockDataProto = null;
     try {
       checkContainerOpen(kvContainer);
 
@@ -854,6 +867,28 @@ public class KeyValueHandler extends Handler {
       chunkManager
           .writeChunk(kvContainer, blockID, chunkInfo, data, dispatcherContext);
 
+      final boolean isCommit = dispatcherContext.getStage().isCommit();
+      if (isCommit && writeChunk.hasBlock()) {
+        metrics.incContainerOpsMetrics(Type.PutBlock);
+        BlockData blockData = BlockData.getFromProtoBuf(
+            writeChunk.getBlock().getBlockData());
+        // optimization for hsync when WriteChunk is in commit phase:
+        //
+        // block metadata is piggybacked in the same message.
+        // there will not be an additional PutBlock request.
+        //
+        // End of block will always be sent as a standalone PutBlock.
+        // the PutBlock piggybacked in WriteChunk is never end of block.
+        //
+        // do not do this in WRITE_DATA phase otherwise PutBlock will be out
+        // of order.
+        blockData.setBlockCommitSequenceId(dispatcherContext.getLogIndex());
+        blockManager.putBlock(kvContainer, blockData, false);
+        blockDataProto = blockData.getProtoBufMessage();
+        final long numBytes = blockDataProto.getSerializedSize();
+        metrics.incContainerBytesStats(Type.PutBlock, numBytes);
+      }
+
       // We should increment stats after writeChunk
       if (isWrite) {
         metrics.incContainerBytesStats(Type.WriteChunk, writeChunk
@@ -867,7 +902,7 @@ public class KeyValueHandler extends Handler {
           request);
     }
 
-    return getSuccessResponse(request);
+    return getWriteChunkResponseSuccess(request, blockDataProto);
   }
 
   /**

@@ -907,40 +907,6 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
   }
 
   /**
-   * Returns true if the firstArray startsWith the bytes of secondArray.
-   *
-   * @param firstArray - Byte array
-   * @param secondArray - Byte array
-   * @return true if the first array bytes match the bytes in the second array.
-   */
-  private boolean startsWith(byte[] firstArray, byte[] secondArray) {
-
-    if (firstArray == null) {
-      // if both are null, then the arrays match, else if first is null and
-      // second is not, then this function returns false.
-      return secondArray == null;
-    }
-
-
-    if (secondArray != null) {
-      // If the second array is longer then first array cannot be starting with
-      // the bytes of second array.
-      if (secondArray.length > firstArray.length) {
-        return false;
-      }
-
-      for (int ndx = 0; ndx < secondArray.length; ndx++) {
-        if (firstArray[ndx] != secondArray[ndx]) {
-          return false;
-        }
-      }
-      return true; //match, return true.
-    }
-    return false; // if first is not null and second is null, we define that
-    // array does not start with same chars.
-  }
-
-  /**
    * Given a volume, check if it is empty, i.e there are no buckets inside it.
    * We iterate in the bucket table and see if there is any key that starts with
    * the volume prefix. We actually look for /volume/, since if we don't have

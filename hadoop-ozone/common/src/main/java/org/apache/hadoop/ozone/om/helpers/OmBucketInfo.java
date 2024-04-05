@@ -19,7 +19,6 @@ package org.apache.hadoop.ozone.om.helpers;
 
 
 import java.util.ArrayList;
-import java.util.BitSet;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -27,6 +26,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.stream.Collectors;
 
+import com.google.common.collect.ImmutableList;
 import org.apache.hadoop.hdds.client.DefaultReplicationConfig;
 import org.apache.hadoop.hdds.protocol.StorageType;
 import org.apache.hadoop.hdds.utils.db.Codec;
@@ -153,7 +153,7 @@ public final class OmBucketInfo extends WithObjectID implements Auditable {
    * @return {@literal List<OzoneAcl>}
    */
   public List<OzoneAcl> getAcls() {
-    return acls;
+    return ImmutableList.copyOf(acls);
   }
 
   /**
@@ -329,6 +329,17 @@ public final class OmBucketInfo extends WithObjectID implements Auditable {
     auditMap.put(OzoneConsts.USED_BYTES, String.valueOf(this.usedBytes));
     auditMap.put(OzoneConsts.USED_NAMESPACE,
         String.valueOf(this.usedNamespace));
+    auditMap.put(OzoneConsts.OWNER, this.owner);
+    auditMap.put(OzoneConsts.REPLICATION_TYPE,
+        (this.defaultReplicationConfig != null) ?
+            String.valueOf(this.defaultReplicationConfig.getType()) : null);
+    auditMap.put(OzoneConsts.REPLICATION_CONFIG,
+        (this.defaultReplicationConfig != null) ?
+            this.defaultReplicationConfig.getReplicationConfig()
+                .getReplication() : null);
+    auditMap.put(OzoneConsts.QUOTA_IN_BYTES, String.valueOf(this.quotaInBytes));
+    auditMap.put(OzoneConsts.QUOTA_IN_NAMESPACE,
+        String.valueOf(this.quotaInNamespace));
     return auditMap;
   }
 
@@ -341,11 +352,6 @@ public final class OmBucketInfo extends WithObjectID implements Auditable {
     if (bekInfo != null) {
       builder.setBucketEncryptionKey(bekInfo.copy());
     }
-
-    builder.acls.clear();
-    acls.forEach(acl -> builder.addAcl(new OzoneAcl(acl.getType(),
-        acl.getName(), (BitSet) acl.getAclBitSet().clone(),
-        acl.getAclScope())));
 
     if (defaultReplicationConfig != null) {
       builder.setDefaultReplicationConfig(defaultReplicationConfig.copy());

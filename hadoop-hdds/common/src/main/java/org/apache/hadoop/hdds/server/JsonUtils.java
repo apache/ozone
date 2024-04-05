@@ -27,6 +27,7 @@ import com.fasterxml.jackson.databind.MappingIterator;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.ObjectReader;
 import com.fasterxml.jackson.databind.ObjectWriter;
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.SequenceWriter;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.databind.node.ArrayNode;
@@ -70,7 +71,14 @@ public final class JsonUtils {
   }
 
   public static ObjectNode createObjectNode(Object next) {
+    if (next == null) {
+      return MAPPER.createObjectNode();
+    }
     return MAPPER.valueToTree(next);
+  }
+
+  public static JsonNode readTree(String content) throws IOException {
+    return MAPPER.readTree(content);
   }
 
   /**

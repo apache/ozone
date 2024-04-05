@@ -275,7 +275,7 @@ public interface MiniOzoneCluster extends AutoCloseable {
     protected boolean includeRecon = false;
 
     protected int dnInitialVersion = DatanodeVersion.FUTURE_VERSION.toProtoValue();
-    protected int dnCurrentVersion = DatanodeVersion.FUTURE_VERSION.toProtoValue();
+    protected int dnCurrentVersion = DatanodeVersion.COMBINED_PUTBLOCK_WRITECHUNK_RPC.toProtoValue();
 
     protected int numOfDatanodes = 3;
     protected boolean  startDataNodes = true;
@@ -285,15 +285,17 @@ public interface MiniOzoneCluster extends AutoCloseable {
 
     protected Builder(OzoneConfiguration conf) {
       this.conf = conf;
-      setClusterId(UUID.randomUUID().toString());
+      setClusterId();
       // Use default SCM configurations if no override is provided.
       setSCMConfigurator(new SCMConfigurator());
       ExitUtils.disableSystemExit();
     }
 
-    public Builder setConf(OzoneConfiguration config) {
-      this.conf = config;
-      return this;
+    /** Prepare the builder for another call to {@link #build()}, avoiding conflict
+     * between the clusters created. */
+    protected void prepareForNextBuild() {
+      conf = new OzoneConfiguration(conf);
+      setClusterId();
     }
 
     public Builder setSCMConfigurator(SCMConfigurator configurator) {
@@ -301,13 +303,8 @@ public interface MiniOzoneCluster extends AutoCloseable {
       return this;
     }
 
-    /**
-     * Sets the cluster Id.
-     *
-     * @param id cluster Id
-     */
-    void setClusterId(String id) {
-      clusterId = id;
+    private void setClusterId() {
+      clusterId = UUID.randomUUID().toString();
       path = GenericTestUtils.getTempPath(
           MiniOzoneClusterImpl.class.getSimpleName() + "-" + clusterId);
     }
