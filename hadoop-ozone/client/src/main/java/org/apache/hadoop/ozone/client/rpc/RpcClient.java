@@ -201,6 +201,7 @@ public class RpcClient implements ClientProtocol {
   private final OzoneManagerClientProtocol ozoneManagerClient;
   private final XceiverClientFactory xceiverClientManager;
   private final UserGroupInformation ugi;
+  private UserGroupInformation s3gUgi;
   private final ACLType userRights;
   private final ACLType groupRights;
   private final ClientId clientId = ClientId.randomId();
@@ -232,6 +233,7 @@ public class RpcClient implements ClientProtocol {
     Preconditions.checkNotNull(conf);
     this.conf = conf;
     this.ugi = UserGroupInformation.getCurrentUser();
+    this.s3gUgi = UserGroupInformation.createRemoteUser(getThreadLocalS3Auth().getUserPrincipal());
     // Get default acl rights for user and group.
     OzoneAclConfig aclConfig = this.conf.getObject(OzoneAclConfig.class);
     replicationConfigValidator =
@@ -751,7 +753,7 @@ public class RpcClient implements ClientProtocol {
     // as S3G uses single RpcClient. So we should be checking thread-local
     // S3Auth and use it during proxy.
     if (ozoneManagerClient.getThreadLocalS3Auth() != null) {
-      return UserGroupInformation.createRemoteUser(getThreadLocalS3Auth().getUserPrincipal());
+      return s3gUgi;
     }
     return ugi;
   }
@@ -2506,6 +2508,7 @@ public class RpcClient implements ClientProtocol {
   public void setThreadLocalS3Auth(
       S3Auth ozoneSharedSecretAuth) {
     ozoneManagerClient.setThreadLocalS3Auth(ozoneSharedSecretAuth);
+    this.s3gUgi = UserGroupInformation.createRemoteUser(getThreadLocalS3Auth().getUserPrincipal());
   }
 
   @Override
