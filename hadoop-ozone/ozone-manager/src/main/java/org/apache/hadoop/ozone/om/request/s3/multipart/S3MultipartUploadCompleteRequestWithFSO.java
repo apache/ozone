@@ -81,8 +81,7 @@ public class S3MultipartUploadCompleteRequestWithFSO
   protected void addMissingParentsToTable(OmBucketInfo omBucketInfo,
       List<OmDirectoryInfo> missingParentInfos,
       OMMetadataManager omMetadataManager, String volumeName, String bucketName,
-      long transactionLogIndex
-      ) throws IOException {
+      long transactionLogIndex) throws IOException {
 
     if (null == missingParentInfos) {
       return;
@@ -101,8 +100,8 @@ public class S3MultipartUploadCompleteRequestWithFSO
         missingParentInfos, null);
 
     // Create missing parent directory entries.
-    try(BatchOperation batchOperation = omMetadataManager.getStore()
-        .initBatchOperation()){
+    try (BatchOperation batchOperation = omMetadataManager.getStore()
+        .initBatchOperation()) {
       for (OmDirectoryInfo parentDirInfo : missingParentInfos) {
         final String parentKey = omMetadataManager.getOzonePathKey(
             volumeId, bucketId, parentDirInfo.getParentObjectID(),
@@ -140,8 +139,8 @@ public class S3MultipartUploadCompleteRequestWithFSO
         transactionLogIndex);
 
     // Create missing parent directory entries.
-    try(BatchOperation batchOperation = omMetadataManager.getStore()
-        .initBatchOperation()){
+    try (BatchOperation batchOperation = omMetadataManager.getStore()
+        .initBatchOperation()) {
 
       OMFileRequest.addToOpenFileTableForMultipart(omMetadataManager,
           batchOperation,

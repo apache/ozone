@@ -520,16 +520,17 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
       OMMetadataManager omMetadataManager,
       String volumeName, String bucketName, long transactionLogIndex
   ) throws IOException {
-    return;
+    // FSO is disabled. Do nothing.
   }
 
+  @SuppressWarnings("checkstyle:ParameterNumber")
   protected void addPrefixDirstoOpenTable(
       OMMetadataManager omMetadataManager, String multipartOpenKey,
       OMFileRequest.OMPathInfoWithFSO pathInfoFSO, OmKeyInfo omKeyInfo,
       OmMultipartKeyInfo multipartKeyInfo, long transactionLogIndex,
       String volumeName, String bucketName
   ) throws IOException {
-    return;
+    // FSO is disabled. Do nothing.
   }
 
   protected OmKeyInfo getOmKeyInfoFromKeyTable(String dbOzoneKey,
