@@ -1116,7 +1116,7 @@ public class TestContainerBalancerTask {
 
   /**
    * Tests if balancer is adding the polled source datanode back to potentialSources queue
-   * if a move has failed due to a container related failure, like REPLICATION_FAIL_NOT_EXIST_IN_SOURCE
+   * if a move has failed due to a container related failure, like REPLICATION_FAIL_NOT_EXIST_IN_SOURCE.
    */
   @Test
   public void testSourceDatanodeAddedBack()
