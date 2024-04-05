@@ -272,7 +272,7 @@ public final class OmSnapshotManager implements AutoCloseable {
     };
 
     // Init snapshot cache
-    this.snapshotCache = new SnapshotCache(loader, softCacheSize);
+    this.snapshotCache = new SnapshotCache(loader, softCacheSize, ozoneManager.getMetrics());
 
     this.snapshotDiffManager = new SnapshotDiffManager(snapshotDiffDb, differ,
         ozoneManager, snapDiffJobCf, snapDiffReportCf,

@@ -377,7 +377,7 @@ public class TestSnapshotDiffManager {
 
     omSnapshotManager = mock(OmSnapshotManager.class);
     when(omSnapshotManager.isSnapshotStatus(any(), any())).thenReturn(true);
-    SnapshotCache snapshotCache = new SnapshotCache(mockCacheLoader(), 10);
+    SnapshotCache snapshotCache = new SnapshotCache(mockCacheLoader(), 10, omMetrics);
 
     when(omSnapshotManager.getActiveSnapshot(anyString(), anyString(), anyString()))
         .thenAnswer(invocationOnMock -> {
