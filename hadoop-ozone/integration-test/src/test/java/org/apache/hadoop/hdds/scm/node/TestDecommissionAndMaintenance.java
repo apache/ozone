@@ -152,7 +152,7 @@ public class TestDecommissionAndMaintenance {
     MiniOzoneCluster.Builder builder = MiniOzoneCluster.newBuilder(conf)
         .setNumDatanodes(DATANODE_COUNT);
 
-    clusterProvider = new MiniOzoneClusterProvider(builder, 7);
+    clusterProvider = new MiniOzoneClusterProvider(builder, 8);
   }
 
   @AfterAll
@@ -331,6 +331,19 @@ public class TestDecommissionAndMaintenance {
         DECOMMISSIONED,
         HEALTHY);
     assertEquals(0, decomNodes.size());
+
+    generateData(20, "eckey", ecRepConfig);
+    // trying to decommission 3 nodes should leave the cluster with 4 nodes,
+    // which is not sufficient for EC(3,2) replication. It should not be allowed.
+    scmClient.decommissionNodes(Arrays.asList(toDecommission.get(0).getIpAddress(),
+        toDecommission.get(1).getIpAddress(), toDecommission.get(2).getIpAddress()), false);
+
+    // Ensure no nodes transitioned to DECOMMISSIONING
+    decomNodes = nm.getNodes(
+        DECOMMISSIONED,
+        HEALTHY);
+    assertEquals(0, decomNodes.size());
+
 
   }
 
