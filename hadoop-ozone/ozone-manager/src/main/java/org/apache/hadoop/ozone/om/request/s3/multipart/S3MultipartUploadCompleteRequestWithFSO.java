@@ -18,12 +18,15 @@
 
 package org.apache.hadoop.ozone.om.request.s3.multipart;
 
+import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
+import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.OmMultipartKeyInfo;
 import org.apache.hadoop.ozone.om.request.file.OMFileRequest;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.om.response.s3.multipart.S3MultipartUploadCompleteResponse;
@@ -73,6 +76,82 @@ public class S3MultipartUploadCompleteRequestWithFSO
           NOT_A_FILE);
     }
   }
+
+  @Override
+  protected void addMissingParentsToTable(OmBucketInfo omBucketInfo,
+      List<OmDirectoryInfo> missingParentInfos,
+      OMMetadataManager omMetadataManager, String volumeName, String bucketName,
+      long transactionLogIndex
+      ) throws IOException {
+
+    if (null == missingParentInfos) {
+      return;
+    }
+    final long volumeId = omMetadataManager.getVolumeId(volumeName);
+    final long bucketId = omMetadataManager.getBucketId(volumeName,
+        bucketName);
+
+    // validate and update namespace for missing parent directory.
+    checkBucketQuotaInNamespace(omBucketInfo, missingParentInfos.size());
+    omBucketInfo.incrUsedNamespace(missingParentInfos.size());
+
+    // Add cache entries for the missing parent directories.
+    OMFileRequest.addDirectoryTableCacheEntries(omMetadataManager,
+        volumeId, bucketId, transactionLogIndex,
+        missingParentInfos, null);
+
+    // Create missing parent directory entries.
+    try(BatchOperation batchOperation = omMetadataManager.getStore()
+        .initBatchOperation()){
+      for (OmDirectoryInfo parentDirInfo : missingParentInfos) {
+        final String parentKey = omMetadataManager.getOzonePathKey(
+            volumeId, bucketId, parentDirInfo.getParentObjectID(),
+            parentDirInfo.getName());
+        omMetadataManager.getDirectoryTable().putWithBatch(batchOperation,
+            parentKey, parentDirInfo);
+      }
+
+      // namespace quota changes for parent directory
+      String bucketKey = omMetadataManager.getBucketKey(
+          omBucketInfo.getVolumeName(),
+          omBucketInfo.getBucketName());
+      omMetadataManager.getBucketTable().putWithBatch(batchOperation,
+          bucketKey, omBucketInfo);
+
+      omMetadataManager.getStore().commitBatchOperation(batchOperation);
+    }
+  }
+
+  @Override
+  protected void addPrefixDirstoOpenTable(
+      OMMetadataManager omMetadataManager, String multipartOpenKey,
+      OMFileRequest.OMPathInfoWithFSO pathInfoFSO, OmKeyInfo omKeyInfo,
+      OmMultipartKeyInfo multipartKeyInfo, long transactionLogIndex,
+      String volumeName, String bucketName
+  ) throws IOException {
+
+    final long volumeId = omMetadataManager.getVolumeId(volumeName);
+    final long bucketId = omMetadataManager.getBucketId(volumeName,
+        bucketName);
+
+    // Add to prefix directories to cache
+    OMFileRequest.addOpenFileTableCacheEntry(omMetadataManager,
+        multipartOpenKey, omKeyInfo, pathInfoFSO.getLeafNodeName(),
+        transactionLogIndex);
+
+    // Create missing parent directory entries.
+    try(BatchOperation batchOperation = omMetadataManager.getStore()
+        .initBatchOperation()){
+
+      OMFileRequest.addToOpenFileTableForMultipart(omMetadataManager,
+          batchOperation,
+          omKeyInfo, multipartKeyInfo.getUploadID(), volumeId,
+          bucketId);
+
+      omMetadataManager.getStore().commitBatchOperation(batchOperation);
+    }
+  }
+
 
   @Override
   protected OmKeyInfo getOmKeyInfoFromKeyTable(String dbOzoneFileKey,
