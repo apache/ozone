@@ -51,6 +51,7 @@ OZONE-SITE.XML_hdds.scm.replication.thread.interval=15s
 OZONE-SITE.XML_hdds.scm.replication.under.replicated.interval=5s
 OZONE-SITE.XML_hdds.scm.replication.over.replicated.interval=5s
 OZONE-SITE.XML_hdds.scm.wait.time.after.safemode.exit=30s
+OZONE-SITE.XML_ozone.scm.pipeline.creation.auto.factor.one=false
 
 OZONE-SITE.XML_hdds.container.ratis.datastream.enabled=true
 
