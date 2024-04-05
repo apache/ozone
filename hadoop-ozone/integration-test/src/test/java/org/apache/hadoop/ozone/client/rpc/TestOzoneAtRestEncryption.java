@@ -213,6 +213,14 @@ class TestOzoneAtRestEncryption {
     }
   }
 
+  static void reInitClient() throws IOException {
+    ozClient = OzoneClientFactory.getRpcClient(conf);
+    store = ozClient.getObjectStore();
+    TestOzoneRpcClient.setOzClient(ozClient);
+    TestOzoneRpcClient.setStore(store);
+  }
+
+
   @ParameterizedTest
   @EnumSource
   void testPutKeyWithEncryption(BucketLayout bucketLayout) throws Exception {
@@ -276,6 +284,17 @@ class TestOzoneAtRestEncryption {
       out.write(value.getBytes(StandardCharsets.UTF_8));
     }
     verifyKeyData(bucket, keyName, value, testStartTime);
+    OzoneKeyDetails key1 = bucket.getKey(keyName);
+
+    // Overwrite the key
+    try (OzoneOutputStream out = bucket.createKey(keyName,
+        value.getBytes(StandardCharsets.UTF_8).length,
+        ReplicationConfig.fromTypeAndFactor(RATIS, ONE),
+        new HashMap<>())) {
+      out.write(value.getBytes(StandardCharsets.UTF_8));
+    }
+    OzoneKeyDetails key2 = bucket.getKey(keyName);
+    assertNotEquals(key1.getFileEncryptionInfo().toString(), key2.getFileEncryptionInfo().toString());
   }
 
   static void createAndVerifyFileSystemData(
@@ -316,7 +335,6 @@ class TestOzoneAtRestEncryption {
       fileContent = new byte[value.getBytes(StandardCharsets.UTF_8).length];
       len = is.read(fileContent);
     }
-
 
     assertEquals(len, value.length());
     assertTrue(verifyRatisReplication(bucket.getVolumeName(),
@@ -770,9 +788,7 @@ class TestOzoneAtRestEncryption {
 
     KeyProvider kp3 = ozClient.getObjectStore().getKeyProvider();
     assertNotEquals(kp3, kpSpy);
-    // Restore ozClient and store
-    TestOzoneRpcClient.setOzClient(OzoneClientFactory.getRpcClient(conf));
-    TestOzoneRpcClient.setStore(ozClient.getObjectStore());
+    reInitClient();
   }
 
   private static RepeatedOmKeyInfo getMatchedKeyInfo(

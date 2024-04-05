@@ -426,7 +426,7 @@ public class TestOMKeyCreateRequest extends TestOMKeyRequest {
   @MethodSource("data")
   public void testValidateAndUpdateCacheWithInvalidPath(
       boolean setKeyPathLock, boolean setFileSystemPaths) throws Exception {
-    PrefixManager prefixManager = new PrefixManagerImpl(
+    PrefixManager prefixManager = new PrefixManagerImpl(ozoneManager,
         ozoneManager.getMetadataManager(), true);
     when(ozoneManager.getPrefixManager()).thenReturn(prefixManager);
     when(ozoneManager.getOzoneLockProvider()).thenReturn(
@@ -920,7 +920,7 @@ public class TestOMKeyCreateRequest extends TestOMKeyRequest {
 
     // Should inherit parent DEFAULT Acls
     assertEquals(parentDefaultAcl.stream()
-            .map(acl -> acl.setAclScope(OzoneAcl.AclScope.ACCESS))
+            .map(acl -> acl.withScope(OzoneAcl.AclScope.ACCESS))
             .collect(Collectors.toList()), keyAcls,
         "Failed to inherit parent DEFAULT acls!,");
 

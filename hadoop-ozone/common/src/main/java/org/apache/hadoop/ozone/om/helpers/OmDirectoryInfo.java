@@ -25,8 +25,6 @@ import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.DirectoryInfo;
 
-import java.util.BitSet;
-import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
@@ -56,12 +54,9 @@ public class OmDirectoryInfo extends WithParentObjectId
   private final List<OzoneAcl> acls;
 
   public OmDirectoryInfo(Builder builder) {
+    super(builder);
     this.name = builder.name;
     this.acls = builder.acls;
-    setMetadata(builder.metadata);
-    setObjectID(builder.objectID);
-    setUpdateID(builder.updateID);
-    setParentObjectID(builder.parentObjectID);
     this.creationTime = builder.creationTime;
     this.modificationTime = builder.modificationTime;
   }
@@ -78,38 +73,34 @@ public class OmDirectoryInfo extends WithParentObjectId
   /**
    * Builder for Directory Info.
    */
-  public static class Builder {
-    private long parentObjectID; // pointer to parent directory
-
-    private long objectID;
-    private long updateID;
-
+  public static class Builder extends WithParentObjectId.Builder {
     private String name;
 
     private long creationTime;
     private long modificationTime;
 
     private final List<OzoneAcl> acls;
-    private final Map<String, String> metadata;
 
     public Builder() {
       //Default values
       this.acls = new LinkedList<>();
-      this.metadata = new HashMap<>();
     }
 
+    @Override
     public Builder setParentObjectID(long parentObjectId) {
-      this.parentObjectID = parentObjectId;
+      super.setParentObjectID(parentObjectId);
       return this;
     }
 
+    @Override
     public Builder setObjectID(long objectId) {
-      this.objectID = objectId;
+      super.setObjectID(objectId);
       return this;
     }
 
+    @Override
     public Builder setUpdateID(long updateId) {
-      this.updateID = updateId;
+      super.setUpdateID(updateId);
       return this;
     }
 
@@ -142,15 +133,15 @@ public class OmDirectoryInfo extends WithParentObjectId
       return this;
     }
 
+    @Override
     public Builder addMetadata(String key, String value) {
-      metadata.put(key, value);
+      super.addMetadata(key, value);
       return this;
     }
 
+    @Override
     public Builder addAllMetadata(Map<String, String> additionalMetadata) {
-      if (additionalMetadata != null) {
-        metadata.putAll(additionalMetadata);
-      }
+      super.addAllMetadata(additionalMetadata);
       return this;
     }
 
@@ -262,13 +253,10 @@ public class OmDirectoryInfo extends WithParentObjectId
             .setName(name)
             .setCreationTime(creationTime)
             .setModificationTime(modificationTime)
+            .setAcls(acls)
             .setParentObjectID(getParentObjectID())
             .setObjectID(getObjectID())
             .setUpdateID(getUpdateID());
-
-    acls.forEach(acl -> builder.addAcl(new OzoneAcl(acl.getType(),
-            acl.getName(), (BitSet) acl.getAclBitSet().clone(),
-            acl.getAclScope())));
 
     if (getMetadata() != null) {
       builder.addAllMetadata(getMetadata());

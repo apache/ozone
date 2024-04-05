@@ -144,6 +144,23 @@ public class OzoneClientConfig {
       tags = ConfigTag.CLIENT)
   private int retryInterval = 0;
 
+  @Config(key = "read.max.retries",
+      defaultValue = "3",
+      description = "Maximum number of retries by Ozone Client on "
+          + "encountering connectivity exception when reading a key.",
+      tags = ConfigTag.CLIENT)
+  private int maxReadRetryCount = 3;
+
+  @Config(key = "read.retry.interval",
+      defaultValue = "1",
+      description =
+          "Indicates the time duration in seconds a client will wait "
+              + "before retrying a read key request on encountering "
+              + "a connectivity excepetion from Datanodes . "
+              + "By default the interval is 1 second",
+      tags = ConfigTag.CLIENT)
+  private int readRetryInterval = 1;
+
   @Config(key = "checksum.type",
       defaultValue = "CRC32",
       description = "The checksum type [NONE/ CRC32/ CRC32C/ SHA256/ MD5] "
@@ -324,6 +341,22 @@ public class OzoneClientConfig {
 
   public void setRetryInterval(int retryInterval) {
     this.retryInterval = retryInterval;
+  }
+
+  public int getMaxReadRetryCount() {
+    return maxReadRetryCount;
+  }
+
+  public void setMaxReadRetryCount(int maxReadRetryCount) {
+    this.maxReadRetryCount = maxReadRetryCount;
+  }
+
+  public int getReadRetryInterval() {
+    return readRetryInterval;
+  }
+
+  public void setReadRetryInterval(int readRetryInterval) {
+    this.readRetryInterval = readRetryInterval;
   }
 
   public ChecksumType getChecksumType() {
