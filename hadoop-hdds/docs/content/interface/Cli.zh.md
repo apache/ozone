@@ -275,7 +275,7 @@ $ ozone sh bucket list /s3v | jq '.[] | select(.link==false and .bucketLayout=="
 }
 ```
 
-* 列出EC桶以及它们的复制策略配置。
+* 列出 EC 桶以及它们的复制策略配置。
 ```shell
 $ ozone sh bucket list /vol1 | jq -r '.[] | select(.replicationConfig.replicationType == "EC") | {"name": .name, "replicationConfig": .replicationConfig}'
 {
