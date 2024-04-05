@@ -106,7 +106,6 @@ public final class ReplicationSupervisor {
     private Clock clock;
     private IntConsumer executorThreadUpdater = threadCount -> {
     };
-    private String threadNamePrefix;
 
     public Builder clock(Clock newClock) {
       clock = newClock;
@@ -138,11 +137,6 @@ public final class ReplicationSupervisor {
       return this;
     }
 
-    public Builder threadNamePrefix(String threadPrefix) {
-      this.threadNamePrefix = threadPrefix;
-      return this;
-    }
-
     public ReplicationSupervisor build() {
       if (replicationConfig == null || datanodeConfig == null) {
         ConfigurationSource conf = new OzoneConfiguration();
@@ -162,6 +156,7 @@ public final class ReplicationSupervisor {
       if (executor == null) {
         LOG.info("Initializing replication supervisor with thread count = {}",
             replicationConfig.getReplicationMaxStreams());
+        String threadNamePrefix = context != null ? context.getThreadNamePrefix() : "";
         ThreadFactory threadFactory = new ThreadFactoryBuilder()
             .setDaemon(true)
             .setNameFormat(threadNamePrefix + "ContainerReplicationThread-%d")

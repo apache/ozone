@@ -779,6 +779,8 @@ public abstract class OMKeyRequest extends OMClientRequest {
       dbKeyInfo.getMetadata().clear();
       dbKeyInfo.getMetadata().putAll(KeyValueUtil.getFromProtobuf(
           keyArgs.getMetadataList()));
+
+      dbKeyInfo.setFileEncryptionInfo(encInfo);
       return dbKeyInfo;
     }
 

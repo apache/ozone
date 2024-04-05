@@ -217,11 +217,12 @@ public interface ScmClient extends Closeable {
    * Allows a list of hosts to be decommissioned. The hosts are identified
    * by their hostname and optionally port in the format foo.com:port.
    * @param hosts A list of hostnames, optionally with port
+   * @param force true to forcefully decommission Datanodes
    * @throws IOException
    * @return A list of DatanodeAdminError for any hosts which failed to
    *         decommission
    */
-  List<DatanodeAdminError> decommissionNodes(List<String> hosts)
+  List<DatanodeAdminError> decommissionNodes(List<String> hosts, boolean force)
       throws IOException;
 
   /**
@@ -356,13 +357,20 @@ public interface ScmClient extends Closeable {
   /**
    * Start ContainerBalancer.
    */
+  @SuppressWarnings("checkstyle:parameternumber")
   StartContainerBalancerResponseProto startContainerBalancer(
       Optional<Double> threshold,
       Optional<Integer> iterations,
       Optional<Integer> maxDatanodesPercentageToInvolvePerIteration,
       Optional<Long> maxSizeToMovePerIterationInGB,
       Optional<Long> maxSizeEnteringTargetInGB,
-      Optional<Long> maxSizeLeavingSourceInGB) throws IOException;
+      Optional<Long> maxSizeLeavingSourceInGB,
+      Optional<Integer> balancingInterval,
+      Optional<Integer> moveTimeout,
+      Optional<Integer> moveReplicationTimeout,
+      Optional<Boolean> networkTopologyEnable,
+      Optional<String> includeNodes,
+      Optional<String> excludeNodes) throws IOException;
 
   /**
    * Stop ContainerBalancer.
