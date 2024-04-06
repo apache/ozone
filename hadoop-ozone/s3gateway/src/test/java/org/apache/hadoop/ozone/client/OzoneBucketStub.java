@@ -383,8 +383,8 @@ public final class OzoneBucketStub extends OzoneBucket {
   public OzoneOutputStream createMultipartKey(String key, long size,
                                               int partNumber, String uploadID)
       throws IOException {
-    String multipartUploadID = keyToMultipartUpload.get(key).getUploadId();
-    if (multipartUploadID == null || !multipartUploadID.equals(uploadID)) {
+    MultipartInfoStub multipartInfo = keyToMultipartUpload.get(key);
+    if (multipartInfo == null || !multipartInfo.getUploadId().equals(uploadID)) {
       throw new OMException(ResultCodes.NO_SUCH_MULTIPART_UPLOAD_ERROR);
     } else {
       ByteArrayOutputStream byteArrayOutputStream =
@@ -440,7 +440,7 @@ public final class OzoneBucketStub extends OzoneBucket {
           getVolumeName(),
           getName(),
           key,
-          keyContents.get(key).length,
+          keyContents.get(key) != null ? keyContents.get(key).length : 0,
           System.currentTimeMillis(),
           System.currentTimeMillis(),
           new ArrayList<>(), getReplicationConfig(),
