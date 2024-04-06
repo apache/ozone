@@ -185,7 +185,7 @@ Create file with user defined metadata with gdpr enabled value in request
 Create file with user defined metadata size larger than 2 KB
                                 Execute                    echo "Randomtext" > /tmp/testfile2
     ${custom_metadata_value} =  Execute                    printf 'v%.0s' {1..3000}
-    ${result} =                 Execute AWSS3APICli and checkrc       put-object --bucket ${BUCKET} --key ${PREFIX}/putobject/custom-metadata/key2 --body /tmp/testfile2 --metadata="custom-key1=${custom_metadata_value}" 255
+    ${result} =                 Execute AWSS3APICli and checkrc       put-object --bucket ${BUCKET} --key ${PREFIX}/putobject/custom-metadata/key2 --body /tmp/testfile2 --metadata="custom-key1=${custom_metadata_value}"    255
                                 Should contain                        ${result}   MetadataTooLarge
                                 Should not contain                    ${result}   custom-key1: ${custom_metadata_value}
 
