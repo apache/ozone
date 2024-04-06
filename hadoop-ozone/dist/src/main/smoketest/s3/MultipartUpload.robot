@@ -87,7 +87,7 @@ Test Multipart Upload
 
 
 Test Multipart Upload Complete
-    ${result} =         Execute AWSS3APICli     create-multipart-upload --bucket ${BUCKET} --key ${PREFIX}/multipartKey1
+    ${result} =         Execute AWSS3APICli     create-multipart-upload --bucket ${BUCKET} --key ${PREFIX}/multipartKey1 --metadata="custom-key1=custom-value1,custom-key2=custom-value2"
     ${uploadID} =       Execute and checkrc     echo '${result}' | jq -r '.UploadId'    0
                         Should contain          ${result}    ${BUCKET}
                         Should contain          ${result}    ${PREFIX}/multipartKey
@@ -116,6 +116,15 @@ Test Multipart Upload Complete
     ${expectedResultETag} =     Execute                       echo -n ${eTag1}${eTag2} | md5sum | awk '{print $1}'
                                 Should contain                ${result}    ETag
                                 Should Be Equal As Strings    ${resultETag}     "${expectedResultETag}-2"
+
+#check whether the user defined metadata can be retrieved
+    ${result} =                 Execute AWSS3ApiCli           head-object --bucket ${BUCKET} --key ${PREFIX}/multipartKey1
+                                Should contain                ${result}    \"custom-key1\": \"custom-value1\"
+                                Should contain                ${result}    \"custom-key2\": \"custom-value2\"
+
+    ${result} =                 Execute                       ozone sh key info /s3v/${BUCKET}/${PREFIX}/multipartKey1
+                                Should contain                ${result}    \"custom-key1\" : \"custom-value1\"
+                                Should contain                ${result}    \"custom-key2\" : \"custom-value2\"
 
 #read file and check the key
     ${result} =                 Execute AWSS3ApiCli        get-object --bucket ${BUCKET} --key ${PREFIX}/multipartKey1 /tmp/${PREFIX}-multipartKey1.result
