@@ -276,6 +276,7 @@ public final class OzoneBucketStub extends OzoneBucket {
           ozoneKeyDetails.getCreationTime().toEpochMilli(),
           ozoneKeyDetails.getModificationTime().toEpochMilli(),
           ozoneKeyDetails.getReplicationConfig(),
+          ozoneKeyDetails.getMetadata(),
           ozoneKeyDetails.isFile());
     } else {
       throw new OMException(ResultCodes.KEY_NOT_FOUND);
@@ -413,8 +414,6 @@ public final class OzoneBucketStub extends OzoneBucket {
       throw new OMException(ResultCodes.NO_SUCH_MULTIPART_UPLOAD_ERROR);
     } else {
       final Map<Integer, Part> partsList = partList.get(key);
-
-      int count = 1;
 
       ByteArrayOutputStream output = new ByteArrayOutputStream();
 
