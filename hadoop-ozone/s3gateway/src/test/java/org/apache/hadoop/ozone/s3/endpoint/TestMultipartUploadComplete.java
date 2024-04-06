@@ -60,7 +60,7 @@ import static org.mockito.Mockito.when;
 public class TestMultipartUploadComplete {
 
   private static final ObjectEndpoint REST = new ObjectEndpoint();
-  private static final HttpHeaders headers = mock(HttpHeaders.class);
+  private static final HttpHeaders HEADERS = mock(HttpHeaders.class);
   private static final OzoneClient CLIENT = new OzoneClientStub();
 
   @BeforeAll
@@ -68,10 +68,10 @@ public class TestMultipartUploadComplete {
 
     CLIENT.getObjectStore().createS3Bucket(OzoneConsts.S3_BUCKET);
 
-    when(headers.getHeaderString(STORAGE_CLASS_HEADER)).thenReturn(
+    when(HEADERS.getHeaderString(STORAGE_CLASS_HEADER)).thenReturn(
         "STANDARD");
 
-    REST.setHeaders(headers);
+    REST.setHeaders(HEADERS);
     REST.setClient(CLIENT);
     REST.setOzoneConfiguration(new OzoneConfiguration());
   }
@@ -90,7 +90,7 @@ public class TestMultipartUploadComplete {
           .add(entry.getValue());
     }
 
-    when(headers.getRequestHeaders()).thenReturn(metadataHeaders);
+    when(HEADERS.getRequestHeaders()).thenReturn(metadataHeaders);
 
     Response response = REST.initializeMultipartUpload(OzoneConsts.S3_BUCKET,
         key);
@@ -171,14 +171,14 @@ public class TestMultipartUploadComplete {
   }
 
   @Test
-  public void testMultipartWithMetadata() throws Exception {
+  public void testMultipartWithCustomMetadata() throws Exception {
     String key = UUID.randomUUID().toString();
 
-    Map<String, String> metadata = new HashMap<>();
-    metadata.put("custom-key1", "custom-value1");
-    metadata.put("custom-key2", "custom-value2");
+    Map<String, String> customMetadata = new HashMap<>();
+    customMetadata.put("custom-key1", "custom-value1");
+    customMetadata.put("custom-key2", "custom-value2");
 
-    String uploadID = initiateMultipartUpload(key, metadata);
+    String uploadID = initiateMultipartUpload(key, customMetadata);
 
     List<Part> partsList = new ArrayList<>();
 
