@@ -417,6 +417,7 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
           .setOmKeyLocationInfos(
               Collections.singletonList(keyLocationInfoGroup))
           .setAcls(dbOpenKeyInfo.getAcls())
+          .addAllMetadata(dbOpenKeyInfo.getMetadata())
           .addMetadata(OzoneConsts.ETAG,
               multipartUploadedKeyHash(partKeyInfoMap));
       // Check if db entry has ObjectID. This check is required because
