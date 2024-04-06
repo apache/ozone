@@ -137,6 +137,12 @@ Test Multipart Upload Complete
     ${result} =                 Execute AWSS3ApiCli        get-object --bucket ${BUCKET} --key ${PREFIX}/multipartKey1 --part-number 2 /tmp/${PREFIX}-multipartKey1-part2.result
     Compare files               /tmp/part2        /tmp/${PREFIX}-multipartKey1-part2.result
 
+Test Multipart Upload with user defined metadata size larger than 2 KB
+    ${custom_metadata_value} =  Execute                               printf 'v%.0s' {1..3000}
+    ${result} =                 Execute AWSS3APICli and checkrc       create-multipart-upload --bucket ${BUCKET} --key ${PREFIX}/mpuWithLargeMetadata --metadata="custom-key1=${custom_metadata_value}" 255
+                                Should contain                        ${result}   MetadataTooLarge
+                                Should not contain                    ${result}   custom-key1: ${custom_metadata_value}
+
 Test Multipart Upload Complete Entity too small
     ${result} =         Execute AWSS3APICli     create-multipart-upload --bucket ${BUCKET} --key ${PREFIX}/multipartKey2
     ${uploadID} =       Execute and checkrc     echo '${result}' | jq -r '.UploadId'    0
