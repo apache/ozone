@@ -31,6 +31,8 @@ import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
+import org.apache.hadoop.ozone.recon.api.types.NSSummary;
+import org.apache.hadoop.ozone.recon.ReconUtils;
 import org.apache.hadoop.ozone.recon.api.types.ContainerDiscrepancyInfo;
 import org.apache.hadoop.ozone.recon.api.types.ContainerKeyPrefix;
 import org.apache.hadoop.ozone.recon.api.types.ContainerMetadata;
@@ -76,6 +78,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.stream.Collectors;
 
+import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 import static org.apache.hadoop.ozone.recon.ReconConstants.DEFAULT_FILTER_FOR_MISSING_CONTAINERS;
 import static org.apache.hadoop.ozone.recon.ReconConstants.RECON_QUERY_FILTER;
 import static org.apache.hadoop.ozone.recon.ReconConstants.DEFAULT_BATCH_NUMBER;
@@ -144,8 +147,8 @@ public class ContainerEndpoint {
 
   @Inject
   public ContainerEndpoint(OzoneStorageContainerManager reconSCM,
-               ContainerHealthSchemaManager containerHealthSchemaManager,
-               ReconNamespaceSummaryManager reconNamespaceSummaryManager) {
+                           ContainerHealthSchemaManager containerHealthSchemaManager,
+                           ReconNamespaceSummaryManager reconNamespaceSummaryManager) {
     this.containerManager =
         (ReconContainerManager) reconSCM.getContainerManager();
     this.pipelineManager = reconSCM.getPipelineManager();
@@ -158,19 +161,20 @@ public class ContainerEndpoint {
    * Return @{@link org.apache.hadoop.hdds.scm.container}
    * for the containers starting from the given "prev-key" query param for the
    * given "limit". The given "prev-key" is skipped from the results returned.
+   *
    * @param prevKey the containerID after which results are returned.
    *                start containerID, >=0,
    *                start searching at the head if 0.
-   * @param limit max no. of containers to get.
-   *              count must be >= 0
-   *              Usually the count will be replace with a very big
-   *              value instead of being unlimited in case the db is very big.
+   * @param limit   max no. of containers to get.
+   *                count must be >= 0
+   *                Usually the count will be replace with a very big
+   *                value instead of being unlimited in case the db is very big.
    * @return {@link Response}
    */
   @GET
   public Response getContainers(
       @DefaultValue(DEFAULT_FETCH_COUNT) @QueryParam(RECON_QUERY_LIMIT)
-          int limit,
+      int limit,
       @DefaultValue(PREV_CONTAINER_ID_DEFAULT_VALUE)
       @QueryParam(RECON_QUERY_PREVKEY) long prevKey) {
     if (limit < 0 || prevKey < 0) {
@@ -212,8 +216,8 @@ public class ContainerEndpoint {
    * starting from the given "prev-key" query param for the given "limit".
    * The given prevKeyPrefix is skipped from the results returned.
    *
-   * @param containerID the given containerID.
-   * @param limit max no. of keys to get.
+   * @param containerID   the given containerID.
+   * @param limit         max no. of keys to get.
    * @param prevKeyPrefix the key prefix after which results are returned.
    * @return {@link Response}
    */
@@ -226,7 +230,12 @@ public class ContainerEndpoint {
       @DefaultValue(StringUtils.EMPTY) @QueryParam(RECON_QUERY_PREVKEY)
           String prevKeyPrefix) {
     Map<String, KeyMetadata> keyMetadataMap = new LinkedHashMap<>();
+
+    // Total count of keys in the container.
     long totalCount;
+    // Last key prefix to be used for pagination. It will be exposed in the response.
+    String lastKey = "";
+
     try {
       Map<ContainerKeyPrefix, Integer> containerKeyPrefixMap =
           reconContainerMetadataManager.getKeyPrefixesForContainer(containerID,
@@ -263,6 +272,7 @@ public class ContainerEndpoint {
               omKeyInfo.getVolumeName(),
               omKeyInfo.getBucketName(),
               omKeyInfo.getKeyName());
+          lastKey = ozoneKey;
           if (keyMetadataMap.containsKey(ozoneKey)) {
             keyMetadataMap.get(ozoneKey).getVersions()
                 .add(containerKeyPrefix.getKeyVersion());
@@ -278,6 +288,8 @@ public class ContainerEndpoint {
             keyMetadata.setBucket(omKeyInfo.getBucketName());
             keyMetadata.setVolume(omKeyInfo.getVolumeName());
             keyMetadata.setKey(omKeyInfo.getKeyName());
+            keyMetadata.setCompletePath(ReconUtils.constructFullPath(omKeyInfo,
+                reconNamespaceSummaryManager));
             keyMetadata.setCreationTime(
                 Instant.ofEpochMilli(omKeyInfo.getCreationTime()));
             keyMetadata.setModificationTime(
@@ -298,7 +310,7 @@ public class ContainerEndpoint {
           Response.Status.INTERNAL_SERVER_ERROR);
     }
     KeysResponse keysResponse =
-        new KeysResponse(totalCount, keyMetadataMap.values());
+        new KeysResponse(totalCount, keyMetadataMap.values(), lastKey);
     return Response.ok(keysResponse).build();
   }
 
@@ -334,7 +346,7 @@ public class ContainerEndpoint {
   ) {
     List<MissingContainerMetadata> missingContainers = new ArrayList<>();
     containerHealthSchemaManager.getUnhealthyContainers(
-        UnHealthyContainerStates.MISSING, 0, limit)
+            UnHealthyContainerStates.MISSING, 0, limit)
         .forEach(container -> {
           long containerID = container.getContainerId();
           try {
@@ -364,10 +376,10 @@ public class ContainerEndpoint {
    * {@link org.apache.hadoop.ozone.recon.api.types.UnhealthyContainerMetadata}
    * for all unhealthy containers.
    *
-   * @param state Return only containers matching the given unhealthy state,
-   *              eg UNDER_REPLICATED, MIS_REPLICATED, OVER_REPLICATED or
-   *              MISSING. Passing null returns all containers.
-   * @param limit The limit of unhealthy containers to return.
+   * @param state    Return only containers matching the given unhealthy state,
+   *                 eg UNDER_REPLICATED, MIS_REPLICATED, OVER_REPLICATED or
+   *                 MISSING. Passing null returns all containers.
+   * @param limit    The limit of unhealthy containers to return.
    * @param batchNum The batch number (like "page number") of results to return.
    *                 Passing 1, will return records 1 to limit. 2 will return
    *                 limit + 1 to 2 * limit, etc.
@@ -378,7 +390,7 @@ public class ContainerEndpoint {
   public Response getUnhealthyContainers(
       @PathParam("state") String state,
       @DefaultValue(DEFAULT_FETCH_COUNT) @QueryParam(RECON_QUERY_LIMIT)
-          int limit,
+      int limit,
       @DefaultValue(DEFAULT_BATCH_NUMBER)
       @QueryParam(RECON_QUERY_BATCH_PARAM) int batchNum) {
     int offset = Math.max(((batchNum - 1) * limit), 0);
@@ -399,7 +411,8 @@ public class ContainerEndpoint {
           .getUnhealthyContainers(internalState, offset, limit);
       List<UnhealthyContainers> emptyMissingFiltered = containers.stream()
           .filter(
-              container -> !container.getContainerState().equals(UnHealthyContainerStates.EMPTY_MISSING.toString()))
+              container -> !container.getContainerState()
+                  .equals(UnHealthyContainerStates.EMPTY_MISSING.toString()))
           .collect(
               Collectors.toList());
       for (UnhealthyContainers c : emptyMissingFiltered) {
@@ -433,8 +446,8 @@ public class ContainerEndpoint {
    * Return
    * {@link org.apache.hadoop.ozone.recon.api.types.UnhealthyContainerMetadata}
    * for all unhealthy containers.
-
-   * @param limit The limit of unhealthy containers to return.
+   *
+   * @param limit    The limit of unhealthy containers to return.
    * @param batchNum The batch number (like "page number") of results to return.
    *                 Passing 1, will return records 1 to limit. 2 will return
    *                 limit + 1 to 2 * limit, etc.
@@ -444,7 +457,7 @@ public class ContainerEndpoint {
   @Path("/unhealthy")
   public Response getUnhealthyContainers(
       @DefaultValue(DEFAULT_FETCH_COUNT) @QueryParam(RECON_QUERY_LIMIT)
-          int limit,
+      int limit,
       @DefaultValue(DEFAULT_BATCH_NUMBER)
       @QueryParam(RECON_QUERY_BATCH_PARAM) int batchNum) {
     return getUnhealthyContainers(null, limit, batchNum);
@@ -455,22 +468,23 @@ public class ContainerEndpoint {
    * {
    * containers: [
    * {
-   *  containerId: 1,
-   *  state: DELETED,
-   *  pipelineId: "a10ffab6-8ed5-414a-aaf5-79890ff3e8a1",
-   *  numOfKeys: 3,
-   *  inStateSince: <stateEnterTime>
+   * containerId: 1,
+   * state: DELETED,
+   * pipelineId: "a10ffab6-8ed5-414a-aaf5-79890ff3e8a1",
+   * numOfKeys: 3,
+   * inStateSince: <stateEnterTime>
    * },
    * {
-   *  containerId: 2,
-   *  state: DELETED,
-   *  pipelineId: "a10ffab6-8ed5-414a-aaf5-79890ff3e8a1",
-   *  numOfKeys: 6,
-   *  inStateSince: <stateEnterTime>
+   * containerId: 2,
+   * state: DELETED,
+   * pipelineId: "a10ffab6-8ed5-414a-aaf5-79890ff3e8a1",
+   * numOfKeys: 6,
+   * inStateSince: <stateEnterTime>
    * }
    * ]
    * }
-   * @param limit limits the number of deleted containers
+   *
+   * @param limit   limits the number of deleted containers
    * @param prevKey previous container Id to skip
    * @return Response of deleted containers.
    */
@@ -519,6 +533,7 @@ public class ContainerEndpoint {
   /**
    * Helper function to extract the blocks for a given container from a given
    * OM Key.
+   *
    * @param matchedKeys List of OM Key Info locations
    * @param containerID containerId.
    * @return List of blocks.
@@ -542,17 +557,17 @@ public class ContainerEndpoint {
 
   /**
    * Retrieves the container mismatch insights.
-   *
+   * <p>
    * This method returns a list of ContainerDiscrepancyInfo objects representing
    * the containers that are missing in either the Ozone Manager (OM) or the
    * Storage Container Manager (SCM), based on the provided filter parameter.
    * The returned list is paginated based on the provided limit and prevKey
    * parameters.
    *
-   * @param limit   The maximum number of container discrepancies to return.
-   * @param prevKey The container ID after which the results are returned.
-   * @param missingIn  The missing filter parameter to specify if it's
-   *                   "OM" or "SCM" missing containers to be returned.
+   * @param limit     The maximum number of container discrepancies to return.
+   * @param prevKey   The container ID after which the results are returned.
+   * @param missingIn The missing filter parameter to specify if it's
+   *                  "OM" or "SCM" missing containers to be returned.
    */
   @GET
   @Path("/mismatch")
@@ -703,19 +718,20 @@ public class ContainerEndpoint {
   }
 
 
-  /** This API retrieves set of deleted containers in SCM which are present
+  /**
+   * This API retrieves set of deleted containers in SCM which are present
    * in OM to find out list of keys mapped to such DELETED state containers.
-   *
+   * <p>
    * limit - limits the number of such SCM DELETED containers present in OM.
    * prevKey - Skip containers till it seeks correctly to the previous
    * containerId.
    * Sample API Response:
    * [
-   *   {
-   *     "containerId": 2,
-   *     "numberOfKeys": 2,
-   *     "pipelines": []
-   *   }
+   * {
+   * "containerId": 2,
+   * "numberOfKeys": 2,
+   * "pipelines": []
+   * }
    * ]
    */
   @GET

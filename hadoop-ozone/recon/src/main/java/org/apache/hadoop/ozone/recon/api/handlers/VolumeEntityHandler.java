@@ -132,7 +132,6 @@ public class VolumeEntityHandler extends EntityHandler {
     }
     duResponse.setSize(volDataSize);
     duResponse.setDuData(bucketDuData);
-    duResponse.setParentId(0L);
     return duResponse;
   }
 

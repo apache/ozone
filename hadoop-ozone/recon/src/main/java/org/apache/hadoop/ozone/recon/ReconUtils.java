@@ -54,12 +54,17 @@ import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_EVENT_CONTAINER
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_EVENT_THREAD_POOL_SIZE_DEFAULT;
 import static org.apache.hadoop.hdds.server.ServerUtils.getDirectoryFromConfig;
 import static org.apache.hadoop.hdds.server.ServerUtils.getOzoneMetaDirPath;
+import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_SCM_DB_DIR;
 import static org.jooq.impl.DSL.currentTimestamp;
 import static org.jooq.impl.DSL.select;
 import static org.jooq.impl.DSL.using;
 
+import org.apache.hadoop.ozone.OmUtils;
+import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
+import org.apache.hadoop.ozone.recon.api.types.NSSummary;
 import org.apache.hadoop.ozone.recon.scm.ReconContainerReportQueue;
+import org.apache.hadoop.ozone.recon.spi.ReconNamespaceSummaryManager;
 import org.apache.hadoop.security.authentication.client.AuthenticationException;
 import org.hadoop.ozone.recon.schema.tables.daos.GlobalStatsDao;
 import org.hadoop.ozone.recon.schema.tables.pojos.GlobalStats;
@@ -244,25 +249,69 @@ public class ReconUtils {
     }
   }
 
+
+  /**
+   * Constructs the full path of a key from its OmKeyInfo using a bottom-up approach, starting from the leaf node.
+   * <p>
+   * The method begins with the leaf node (the key itself) and recursively prepends parent directory names, fetched
+   * via NSSummary objects, until reaching the parent bucket (parentId is -1). It effectively builds the path from
+   * bottom to top, finally prepending the volume and bucket names to complete the full path.
+   *
+   * @param omKeyInfo The OmKeyInfo object for the key
+   * @return The constructed full path of the key as a String.
+   * @throws IOException
+   */
+  public static String constructFullPath(OmKeyInfo omKeyInfo,
+                                         ReconNamespaceSummaryManager reconNamespaceSummaryManager)
+      throws IOException {
+    StringBuilder fullPath = new StringBuilder(omKeyInfo.getKeyName());
+    long parentId = omKeyInfo.getParentObjectID();
+    boolean isDirectoryPresent = false;
+    while (parentId != -1) {
+      NSSummary nsSummary = reconNamespaceSummaryManager.getNSSummary(parentId);
+      if (nsSummary == null) {
+        break;
+      }
+      // Prepend the directory name to the path
+      fullPath.insert(0, nsSummary.getDirName() + OM_KEY_PREFIX);
+
+      // Move to the parent ID of the current directory
+      parentId = nsSummary.getParentId();
+      isDirectoryPresent = true;
+    }
+
+    // Prepend the volume and bucket to the constructed path
+    String volumeName = omKeyInfo.getVolumeName();
+    String bucketName = omKeyInfo.getBucketName();
+    fullPath.insert(0, volumeName + OM_KEY_PREFIX + bucketName + OM_KEY_PREFIX);
+    if (isDirectoryPresent) {
+      return OmUtils.normalizeKey(fullPath.toString(), true);
+    }
+    return fullPath.toString();
+  }
+
+
   /**
    * Make HTTP GET call on the URL and return HttpURLConnection instance.
+   *
    * @param connectionFactory URLConnectionFactory to use.
-   * @param url url to call
-   * @param isSpnego is SPNEGO enabled
+   * @param url               url to call
+   * @param isSpnego          is SPNEGO enabled
    * @return HttpURLConnection instance of the HTTP call.
    * @throws IOException, AuthenticationException While reading the response.
    */
   public HttpURLConnection makeHttpCall(URLConnectionFactory connectionFactory,
-                                  String url, boolean isSpnego)
+                                        String url, boolean isSpnego)
       throws IOException, AuthenticationException {
     HttpURLConnection urlConnection = (HttpURLConnection)
-          connectionFactory.openConnection(new URL(url), isSpnego);
+        connectionFactory.openConnection(new URL(url), isSpnego);
     urlConnection.connect();
     return urlConnection;
   }
 
   /**
    * Load last known DB in Recon.
+   *
    * @param reconDbDir
    * @param fileNamePrefix
    * @return

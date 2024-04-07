@@ -36,13 +36,10 @@ import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
-import org.apache.hadoop.ozone.om.helpers.BucketLayout;
-import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
-import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
-import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
-import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
+import org.apache.hadoop.ozone.om.helpers.*;
 import org.apache.hadoop.ozone.recon.ReconConstants;
 import org.apache.hadoop.ozone.recon.ReconTestInjector;
+import org.apache.hadoop.ozone.recon.ReconUtils;
 import org.apache.hadoop.ozone.recon.api.handlers.BucketHandler;
 import org.apache.hadoop.ozone.recon.api.handlers.EntityHandler;
 import org.apache.hadoop.ozone.recon.api.types.DUResponse;
@@ -58,6 +55,7 @@ import org.apache.hadoop.ozone.recon.spi.StorageContainerServiceProvider;
 import org.apache.hadoop.ozone.recon.spi.impl.OzoneManagerServiceProviderImpl;
 import org.apache.hadoop.ozone.recon.spi.impl.StorageContainerServiceProviderImpl;
 import org.apache.hadoop.ozone.recon.tasks.NSSummaryTaskWithLegacy;
+import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -115,6 +113,7 @@ public class TestNSSummaryEndpointWithLegacy {
   @TempDir
   private Path temporaryFolder;
 
+  ReconNamespaceSummaryManager reconNamespaceSummaryManager;
   private ReconOMMetadataManager reconOMMetadataManager;
   private NSSummaryEndpoint nsSummaryEndpoint;
   private OzoneConfiguration conf;
@@ -378,7 +377,7 @@ public class TestNSSummaryEndpointWithLegacy {
                 mock(StorageContainerServiceProviderImpl.class))
             .addBinding(NSSummaryEndpoint.class)
             .build();
-    ReconNamespaceSummaryManager reconNamespaceSummaryManager =
+    this.reconNamespaceSummaryManager =
         reconTestInjector.getInstance(ReconNamespaceSummaryManager.class);
     nsSummaryEndpoint = reconTestInjector.getInstance(NSSummaryEndpoint.class);
 
@@ -693,6 +692,48 @@ public class TestNSSummaryEndpointWithLegacy {
       assertEquals(0, fileSizeDist[i]);
     }
   }
+
+  @Test
+  public void testConstructFullPath() throws IOException {
+    // For Key Tables the parent object ID is not set hence it
+    // will by default be set as -1 when the NSSummary object is created
+    OmKeyInfo keyInfo = new OmKeyInfo.Builder()
+        .setKeyName("dir1/dir2/file2")
+        .setVolumeName(VOL)
+        .setBucketName(BUCKET_ONE)
+        .setObjectID(KEY_TWO_OBJECT_ID)
+        .build();
+    // Call constructFullPath and verify the result
+    String fullPath = ReconUtils.constructFullPath(keyInfo,
+        reconNamespaceSummaryManager);
+    String expectedPath = "vol/bucket1/dir1/dir2/file2";
+    Assertions.assertEquals(expectedPath, fullPath);
+
+    // Create key info for file 3
+    keyInfo = new OmKeyInfo.Builder()
+        .setKeyName("dir1/dir2/")
+        .setVolumeName(VOL)
+        .setBucketName(BUCKET_ONE)
+        .setObjectID(DIR_TWO_OBJECT_ID)
+        .build();
+    fullPath = ReconUtils.constructFullPath(keyInfo,
+        reconNamespaceSummaryManager);
+    expectedPath = "vol/bucket1/dir1/dir2/";
+    Assertions.assertEquals(expectedPath, fullPath);
+
+    // Create key info for file 6
+    keyInfo = new OmKeyInfo.Builder()
+        .setKeyName("dir1/dir4/file6")
+        .setVolumeName(VOL)
+        .setBucketName(BUCKET_ONE)
+        .setObjectID(KEY_SIX_OBJECT_ID)
+        .build();
+    fullPath = ReconUtils.constructFullPath(keyInfo,
+        reconNamespaceSummaryManager);
+    expectedPath = "vol/bucket1/dir1/dir4/file6";
+    Assertions.assertEquals(expectedPath, fullPath);
+  }
+
 
   /**
    * Write directories and keys info into OM DB.

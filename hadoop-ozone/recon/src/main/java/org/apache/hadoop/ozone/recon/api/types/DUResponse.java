@@ -122,17 +122,6 @@ public class DUResponse {
     this.keySize = keySize;
   }
 
-
-  // Existing getters and setters
-
-  public long getParentId() {
-    return parentId;
-  }
-
-  public void setParentId(long parentId) {
-    this.parentId = parentId;
-  }
-
   /**
    * DU info for a path (path name, data size).
    */
