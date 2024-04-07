@@ -69,7 +69,7 @@ Copy Object Happy Scenario
 
     ${result} =         Execute AWSS3ApiCli        list-objects --bucket ${DESTBUCKET} --prefix ${PREFIX}/copyobject/key=value/
                         Should contain             ${result}         f1
-    ${result} =         Execute AWSS3ApiCli        head-object --bucket ${BUCKET} --key ${PREFIX}/copyobject/key=value/f1
+    ${result} =         Execute AWSS3ApiCli        head-object --bucket ${DESTBUCKET} --key ${PREFIX}/copyobject/key=value/f1
                         Should contain             ${result}    \"custom-key3\": \"custom-value3\"
                         Should contain             ${result}    \"custom-key4\": \"custom-value4\"
                         # REPLACE directive uses the custom metadata specified in the request instead of the source key's custom metadata
@@ -93,8 +93,8 @@ Copy Object Where Key not available
     ${result} =         Execute AWSS3APICli and checkrc        copy-object --bucket ${DESTBUCKET} --key ${PREFIX}/copyobject/key=value/f1 --copy-source ${BUCKET}/nonnonexistentkey       255
                         Should contain             ${result}        NoSuchKey
 
-Copy Object Where using an invalid copy directive
-    ${result} =         Execute AWSS3ApiCli and checkrc        copy-object --bucket ${DESTBUCKET} --key ${PREFIX}/copyobject/key=value/f1 --copy-source ${BUCKET}/${PREFIX}/copyobject/key=value/f1  --metadata-directive INVALID       255
+Copy Object using an invalid copy directive
+    ${result} =         Execute AWSS3ApiCli and checkrc        copy-object --bucket ${DESTBUCKET} --key ${PREFIX}/copyobject/key=value/f1 --copy-source ${BUCKET}/${PREFIX}/copyobject/key=value/f1 --metadata-directive INVALID       255
                         Should contain             ${result}        InvalidArgument
 
 Copy Object with user defined metadata size larger than 2 KB
