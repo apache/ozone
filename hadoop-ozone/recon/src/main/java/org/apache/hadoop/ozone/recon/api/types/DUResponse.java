@@ -54,16 +54,12 @@ public class DUResponse {
   @JsonProperty("sizeDirectKey")
   private long keySize;
 
-  @JsonProperty("parentId")
-  private long parentId;
-
   public DUResponse() {
     this.status = ResponseStatus.OK;
     this.duData = new ArrayList<>();
     // by default, the replication feature is disabled
     this.sizeWithReplica = -1L;
     this.keySize = -1L;
-    this.parentId = -1L;
   }
 
   public ResponseStatus getStatus() {
