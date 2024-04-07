@@ -748,7 +748,6 @@ public class ObjectEndpoint extends EndpointBase {
 
       Map<String, String> customMetadata =
           getCustomMetadataFromHeaders(headers.getRequestHeaders());
-      replaceCustomETagMetadata(customMetadata);
 
       ReplicationConfig replicationConfig =
           getReplicationConfig(ozoneBucket, storageType);
