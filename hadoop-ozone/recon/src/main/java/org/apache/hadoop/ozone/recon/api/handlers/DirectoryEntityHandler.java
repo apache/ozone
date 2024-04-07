@@ -155,7 +155,7 @@ public class DirectoryEntityHandler extends EntityHandler {
     duResponse.setCount(subdirDUData.size());
     duResponse.setSize(dirDataSize);
     duResponse.setDuData(subdirDUData);
-
+    duResponse.setParentId(dirNSSummary.getParentId());
     return duResponse;
   }
 

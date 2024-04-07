@@ -143,6 +143,7 @@ public class BucketEntityHandler extends EntityHandler {
     duResponse.setCount(dirDUData.size());
     duResponse.setSize(bucketDataSize);
     duResponse.setDuData(dirDUData);
+    duResponse.setParentId(bucketNSSummary.getParentId());
     return duResponse;
   }
 
