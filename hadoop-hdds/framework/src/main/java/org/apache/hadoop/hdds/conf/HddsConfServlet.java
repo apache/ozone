@@ -28,13 +28,12 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Properties;
 
-import com.google.common.base.Strings;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.annotation.InterfaceStability;
+import org.apache.hadoop.hdds.server.JsonUtils;
 import org.apache.hadoop.hdds.server.http.HttpServer2;
 
 import com.google.common.annotations.VisibleForTesting;
-import com.google.gson.Gson;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -144,18 +143,18 @@ public class HddsConfServlet extends HttpServlet {
   }
 
   private void processConfigTagRequest(HttpServletRequest request, String cmd,
-      Writer out) throws IOException {
-    Gson gson = new Gson();
+                                       Writer out) throws IOException {
     OzoneConfiguration config = getOzoneConfig();
 
     switch (cmd) {
     case "getOzoneTags":
-      out.write(gson.toJson(OzoneConfiguration.TAGS));
+      out.write(JsonUtils.toJsonString(OzoneConfiguration.TAGS));
       break;
     case "getPropertyByTag":
       String tags = request.getParameter("tags");
-      if (Strings.isNullOrEmpty(tags)) {
-        throw new IllegalArgumentException("The tags parameter should be set" +
+      if (tags == null || tags.isEmpty()) {
+        throw new IllegalArgumentException(
+            "The tags parameter should be set " +
                 " when using the getPropertyByTag command.");
       }
       Map<String, Properties> propMap = new HashMap<>();
@@ -170,7 +169,7 @@ public class HddsConfServlet extends HttpServlet {
           }
         }
       }
-      out.write(gson.toJsonTree(propMap).toString());
+      out.write(JsonUtils.toJsonString(propMap));
       break;
     default:
       throw new IllegalArgumentException(cmd + " is not a valid command.");

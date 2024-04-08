@@ -26,16 +26,12 @@ import java.util.concurrent.atomic.AtomicLong;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
-import com.google.gson.ExclusionStrategy;
-import com.google.gson.FieldAttributes;
-import org.apache.hadoop.hdds.scm.net.NodeImpl;
+import org.apache.hadoop.hdds.server.JsonUtils;
 import org.apache.hadoop.util.StringUtils;
 import org.apache.hadoop.util.Time;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
-import com.google.gson.Gson;
-import com.google.gson.GsonBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -60,11 +56,6 @@ public class EventQueue implements EventPublisher, AutoCloseable {
   private final AtomicLong eventCount = new AtomicLong(0);
 
   private boolean isRunning = true;
-
-  private static final Gson TRACING_SERIALIZER = new GsonBuilder()
-          .setExclusionStrategies(new DatanodeDetailsGsonExclusionStrategy())
-          .create();
-
   private boolean isSilent = false;
   private final String threadNamePrefix;
 
@@ -79,17 +70,13 @@ public class EventQueue implements EventPublisher, AutoCloseable {
   // The field parent in DatanodeDetails class has the circular reference
   // which will result in Gson infinite recursive parsing. We need to exclude
   // this field when generating json string for DatanodeDetails object
-  static class DatanodeDetailsGsonExclusionStrategy
-          implements ExclusionStrategy {
-    @Override
-    public boolean shouldSkipField(FieldAttributes f) {
-      return f.getDeclaringClass() == NodeImpl.class
-              && f.getName().equals("parent");
-    }
-
-    @Override
-    public boolean shouldSkipClass(Class<?> aClass) {
-      return false;
+  public String serializeObject(Object obj) {
+    try {
+      return JsonUtils.toJsonString(obj);
+    } catch (Exception e) {
+      // Handle the exception, maybe log it
+      LOG.error("Error serializing object: ", e);
+      return null;
     }
   }
 
@@ -205,11 +192,14 @@ public class EventQueue implements EventPublisher, AutoCloseable {
         for (EventHandler handler : executorAndHandlers.getValue()) {
           queuedCount.incrementAndGet();
           if (LOG.isTraceEnabled()) {
-            LOG.trace(
-                "Delivering [event={}] to executor/handler {}: <json>{}</json>",
-                event.getName(),
-                executorAndHandlers.getKey().getName(),
-                TRACING_SERIALIZER.toJson(payload).replaceAll("\n", "\\\\n"));
+            String jsonPayload = serializeObject(payload);
+            if (jsonPayload != null) {
+              LOG.trace(
+                  "Delivering [event={}] to executor/handler {}: <json>{}</json>",
+                  event.getName(),
+                  executorAndHandlers.getKey().getName(),
+                  jsonPayload.replaceAll("\n", "\\\\n"));
+            }
           } else if (LOG.isDebugEnabled()) {
             LOG.debug("Delivering [event={}] to executor/handler {}: {}",
                 event.getName(),

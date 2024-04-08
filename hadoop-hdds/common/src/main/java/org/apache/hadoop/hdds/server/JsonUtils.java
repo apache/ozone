@@ -20,7 +20,9 @@ package org.apache.hadoop.hdds.server;
 
 import java.io.File;
 import java.io.IOException;
-import java.util.HashMap;
+import java.io.Reader;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
@@ -79,14 +81,18 @@ public final class JsonUtils {
     return MAPPER.valueToTree(next);
   }
 
+  public static JsonNode valueToJsonNode(Object value) {
+    return MAPPER.valueToTree(value);
+  }
+
   public static JsonNode readTree(String content) throws IOException {
     return MAPPER.readTree(content);
   }
 
-  public static List<HashMap<String, Object>> readTreeAsListOfMaps(String json)
+  public static ArrayList<LinkedHashMap<String, Object>> readTreeAsListOfMaps(String json)
       throws IOException {
     return MAPPER.readValue(json,
-        new TypeReference<List<HashMap<String, Object>>>() {
+        new TypeReference<ArrayList<LinkedHashMap<String, Object>>>() {
         });
   }
 
@@ -114,6 +120,28 @@ public final class JsonUtils {
     try (MappingIterator<T> mappingIterator = reader.readValues(file)) {
       return mappingIterator.readAll();
     }
+  }
+
+  /**
+   * Reads JSON content from a Reader and deserializes it into an array of the
+   * specified type.
+   */
+  public static <T> T[] readArrayFromReader(Reader reader, Class<T[]> valueType)
+      throws IOException {
+    return MAPPER.readValue(reader, valueType);
+  }
+
+  /**
+   * Converts a JsonNode into a Java object of the specified type.
+   * @param node The JsonNode to convert.
+   * @param valueType The target class of the Java object.
+   * @param <T> The type of the Java object.
+   * @return A Java object of type T, populated with data from the JsonNode.
+   * @throws IOException
+   */
+  public static <T> T treeToValue(JsonNode node, Class<T> valueType)
+      throws IOException {
+    return MAPPER.treeToValue(node, valueType);
   }
 
 }
