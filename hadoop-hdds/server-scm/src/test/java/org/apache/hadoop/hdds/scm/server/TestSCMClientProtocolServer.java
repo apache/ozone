@@ -163,7 +163,7 @@ public class TestSCMClientProtocolServer {
 
   private ContainerInfo newContainerInfoForTest() {
     return new ContainerInfo.Builder()
-        .setContainerID(1234)
+        .setContainerID(1)
         .setPipelineID(PipelineID.randomId())
         .setReplicationConfig(
             RatisReplicationConfig

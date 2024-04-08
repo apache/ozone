@@ -401,7 +401,8 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
         "Container ID cannot be negative.");
     if (count <= 0 && count != -1) {
       throw new IllegalStateException(
-        "Container count must be greater than 0, or equal to -1");
+        "Container count must be either greater than 0 " +
+        "or equal to -1 (list all containers)");
     }        
     SCMListContainerRequestProto.Builder builder = SCMListContainerRequestProto
         .newBuilder();
