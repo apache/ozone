@@ -50,10 +50,10 @@ public interface SCMMXBean extends ServiceRuntimeInfo {
 
 
   /**
-   * Returns if safe mode exit is forceful
+   * Returns if safe mode exit is forceful.
    * @return boolean
    */
-  public boolean isSafeModeExitForceful();
+  boolean isSafeModeExitForceful();
 
   /**
    * Returns live safe mode container threshold.

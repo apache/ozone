@@ -174,7 +174,7 @@ public class SCMSafeModeManager implements SafeModeManager {
     SafeModeStatus safeModeStatus =
         new SafeModeStatus(getInSafeMode(), getPreCheckComplete());
 
-    safeModeStatus.setForceExitSafeMode(getForceExitSafeMode());
+    safeModeStatus.setForceExitSafeMode(isSafeModeExitForceful());
 
     // update SCMContext
     scmContext.updateSafeModeStatus(safeModeStatus);
@@ -294,11 +294,6 @@ public class SCMSafeModeManager implements SafeModeManager {
     }
     return inSafeMode.get();
   }
-
-  public boolean isSafeModeExitForceful() {
-    return forceExitSafeMode.get();
-  }
-
   /**
    * Get the safe mode status of all rules.
    *
@@ -328,7 +323,7 @@ public class SCMSafeModeManager implements SafeModeManager {
     this.preCheckComplete.set(newState);
   }
 
-  public boolean getForceExitSafeMode() {
+  public boolean isSafeModeExitForceful() {
     return forceExitSafeMode.get();
   }
 
