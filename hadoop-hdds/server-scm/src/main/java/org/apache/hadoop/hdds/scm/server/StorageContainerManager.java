@@ -1979,6 +1979,11 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     return scmSafeModeManager.getInSafeMode();
   }
 
+  @Override
+  public boolean isSafeModeExitForceful() {
+    return scmSafeModeManager.isSafeModeExitForceful();
+  }
+
   /**
    * Returns EventPublisher.
    */
@@ -2011,7 +2016,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
    * Force SCM out of safe mode.
    */
   public boolean exitSafeMode() {
-    scmSafeModeManager.exitSafeMode(eventQueue);
+    scmSafeModeManager.exitSafeMode(eventQueue, true);
     return true;
   }
 
