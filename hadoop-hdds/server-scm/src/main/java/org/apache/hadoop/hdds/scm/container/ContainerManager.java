@@ -63,7 +63,7 @@ public interface ContainerManager extends Closeable {
    *
    * @param startID start containerID, >=0,
    * start searching at the head if 0.
-   * @param count count must be >= 0
+   * @param count count must be >= -1
    *              Usually the count will be replace with a very big
    *              value instead of being unlimited in case the db is very big.
    *
@@ -87,7 +87,7 @@ public interface ContainerManager extends Closeable {
    *
    * @param startID start containerID, >=0,
    * start searching at the head if 0.
-   * @param count count must be >= 0
+   * @param count count must be >= -1
    *              Usually the count will be replace with a very big
    *              value instead of being unlimited in case the db is very big.
    * @param state container state

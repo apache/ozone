@@ -451,7 +451,8 @@ public class ContainerManagerImpl implements ContainerManager {
   private static List<ContainerID> filterSortAndLimit(
       ContainerID startID, int count, Set<ContainerID> set) {
 
-    if (ContainerID.MIN.equals(startID) && count >= set.size()) {
+    if (ContainerID.MIN.equals(startID) &&
+          (count >= set.size() || count == -1)) {
       List<ContainerID> list = new ArrayList<>(set);
       Collections.sort(list);
       return list;

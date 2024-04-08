@@ -462,27 +462,36 @@ public class SCMClientProtocolServer implements
       final ContainerID containerId = ContainerID.valueOf(startContainerID);
       if (state != null) {
         if (factor != null) {
-          return scm.getContainerManager().getContainers(state).stream()
-              .filter(info -> info.containerID().getId() >= startContainerID)
-              //Filtering EC replication type as EC will not have factor.
-              .filter(info -> info
-                  .getReplicationType() != HddsProtos.ReplicationType.EC)
-              .filter(info -> (info.getReplicationFactor() == factor))
-              .sorted().limit(count).collect(Collectors.toList());
+          Stream<ContainerInfo> containerInfoStream =
+              scm.getContainerManager().getContainers(state).stream()
+                .filter(info -> info.containerID().getId() >= startContainerID)
+                //Filtering EC replication type as EC will not have factor.
+                .filter(info -> info
+                    .getReplicationType() != HddsProtos.ReplicationType.EC)
+                .filter(info -> (info.getReplicationFactor() == factor))
+                .sorted();
+          return count == -1 ? containerInfoStream.collect(Collectors.toList()) :
+              containerInfoStream.limit(count).collect(Collectors.toList());
         } else {
-          return scm.getContainerManager().getContainers(state).stream()
-              .filter(info -> info.containerID().getId() >= startContainerID)
-              .sorted().limit(count).collect(Collectors.toList());
+          Stream<ContainerInfo> containerInfoStream =
+              scm.getContainerManager().getContainers(state).stream()
+                  .filter(info -> info.containerID().getId() >= startContainerID)
+                  .sorted();
+          return count == -1 ? containerInfoStream.collect(Collectors.toList()) :
+              containerInfoStream.limit(count).collect(Collectors.toList());
         }
       } else {
         if (factor != null) {
-          return scm.getContainerManager().getContainers().stream()
-              .filter(info -> info.containerID().getId() >= startContainerID)
-              //Filtering EC replication type as EC will not have factor.
-              .filter(info -> info
-                  .getReplicationType() != HddsProtos.ReplicationType.EC)
-              .filter(info -> info.getReplicationFactor() == factor)
-              .sorted().limit(count).collect(Collectors.toList());
+          Stream<ContainerInfo> containerInfoStream =
+              scm.getContainerManager().getContainers().stream()
+                  .filter(info -> info.containerID().getId() >= startContainerID)
+                  //Filtering EC replication type as EC will not have factor.
+                  .filter(info -> info
+                      .getReplicationType() != HddsProtos.ReplicationType.EC)
+                  .filter(info -> info.getReplicationFactor() == factor)
+                  .sorted();
+          return count == -1 ? containerInfoStream.collect(Collectors.toList())
+              : containerInfoStream.limit(count).collect(Collectors.toList());
         } else {
           return scm.getContainerManager().getContainers(containerId, count);
         }
@@ -554,9 +563,9 @@ public class SCMClientProtocolServer implements
         containerStream = containerStream
             .filter(info -> info.getReplicationType() == replicationType);
       }
-      return containerStream.sorted()
-          .limit(count)
-          .collect(Collectors.toList());
+      Stream<ContainerInfo> containerInfoStream = containerStream.sorted();
+      return count == -1 ? containerInfoStream.collect(Collectors.toList()) :
+          containerInfoStream.limit(count).collect(Collectors.toList());
     } catch (Exception ex) {
       auditSuccess = false;
       AUDIT.logReadFailure(
