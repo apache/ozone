@@ -230,7 +230,7 @@ public class BlockOutputStream extends OutputStream {
     return true;
   }
 
-  synchronized private void refreshCurrentBuffer() {
+  private synchronized void refreshCurrentBuffer() {
     currentBuffer = bufferPool.getCurrentBuffer();
     currentBufferRemaining =
         currentBuffer != null ? currentBuffer.remaining() : 0;
@@ -369,14 +369,14 @@ public class BlockOutputStream extends OutputStream {
       // Data in the bufferPool can not exceed streamBufferMaxSize
       if (bufferPool.getNumberOfUsedBuffers() == bufferPool.getCapacity()) {
         //handleFullBuffer();
-        return waitForFlushAndCommit(true);
+        return waitForFlushAndCommit(true, null);
       }
     }
 
     return null;
   }
 
-  synchronized private void allocateNewBufferIfNeeded() {
+  private synchronized void allocateNewBufferIfNeeded() {
     if (currentBufferRemaining == 0) {
       // TODO: Remove debug print
       LOG.debug("allocateBuffer(increment = {})", config.getBufferIncrement());
@@ -440,16 +440,24 @@ public class BlockOutputStream extends OutputStream {
    */
   private void handleFullBuffer() throws IOException {
     try {
-      waitForFlushAndCommit(true).get();
+      waitForFlushAndCommit(true, null).get();
     } catch (InterruptedException | ExecutionException e) {
       // TODO: Handle exception
       LOG.error("Exception caught but ignored in this POC", e);
     }
   }
 
-  CompletableFuture<Void> waitForFlushAndCommit(boolean bufferFull) throws IOException {
+  CompletableFuture<Void> waitForFlushAndCommit(boolean bufferFull, CompletableFuture<Void> future) throws IOException {
     checkOpen();
-    CompletableFuture<Void> future = waitOnFlushFutures();
+    if (future == null) {
+      future = waitOnFlushFutures();
+    } else {
+      future.thenApplyAsync(r -> {
+        waitOnFlushFutures();
+        return r;
+      });
+    }
+
     // ExecutionException and InterruptedException are no longer handled at this level
     // since the future is being returned all the way up to KeyOutputStream
 
@@ -591,7 +599,12 @@ public class BlockOutputStream extends OutputStream {
         && (!streamBufferArgs.isStreamBufferFlushDelay() ||
             writtenDataLength - totalDataFlushedLength
                 >= streamBufferArgs.getStreamBufferSize())) {
-      handleFlush(false);
+      try {
+        handleFlush(false).get();
+      } catch (InterruptedException | ExecutionException e) {
+        // TODO: Handle exception
+        LOG.error("InterruptedException or ExecutionException caught but ignored in this POC", e);
+      }
     }
   }
 
@@ -623,9 +636,10 @@ public class BlockOutputStream extends OutputStream {
   /**
    * @param close whether the flush is happening as part of closing the stream
    */
-  protected void handleFlush(boolean close) throws IOException {
+  protected CompletableFuture<Void> handleFlush(boolean close) throws IOException {
+    CompletableFuture<Void> future = null;
     try {
-      handleFlushInternal(close);
+      future = handleFlushInternal(close);
     } catch (ExecutionException e) {
       handleExecutionException(e);
     } catch (InterruptedException ex) {
@@ -640,9 +654,10 @@ public class BlockOutputStream extends OutputStream {
         cleanup(false);
       }
     }
+    return future;
   }
 
-  private void handleFlushInternal(boolean close)
+  private CompletableFuture<Void> handleFlushInternal(boolean close)
       throws IOException, InterruptedException, ExecutionException {
     checkOpen();
     // flush the last chunk data residing on the currentBuffer
@@ -673,21 +688,37 @@ public class BlockOutputStream extends OutputStream {
         executePutBlock(true, true);
       }
     }
-    waitOnFlushFutures().get();
-    watchForCommit(false);
-    // just check again if the exception is hit while waiting for the
-    // futures to ensure flush has indeed succeeded
 
-    // irrespective of whether the commitIndex2flushedDataMap is empty
-    // or not, ensure there is no exception set
-    checkOpen();
+    final CompletableFuture<Void> d = new CompletableFuture<>();
+    return d.thenApplyAsync(r -> {
+      waitOnFlushFutures();
+      try {
+        watchForCommit(false);
+        // just check again if the exception is hit while waiting for the
+        // futures to ensure flush has indeed succeeded
+
+        // irrespective of whether the commitIndex2flushedDataMap is empty
+        // or not, ensure there is no exception set
+        checkOpen();
+      } catch (IOException e) {
+        // TODO: Handle exception
+        LOG.error("IOException caught but ignored in this POC", e);
+        throw new CompletionException(e);
+      }
+      return r;
+    });
   }
 
   @Override
   public void close() throws IOException {
     if (xceiverClientFactory != null && xceiverClient != null) {
       if (bufferPool != null && bufferPool.getSize() > 0) {
-        handleFlush(true);
+        try {
+          handleFlush(true).get();
+        } catch (InterruptedException | ExecutionException e) {
+          // TODO: Handle exception
+          LOG.error("InterruptedException or ExecutionException caught but ignored in this POC", e);
+        }
         // TODO: Turn the below buffer empty check on when Standalone pipeline
         // is removed in the write path in tests
         // Preconditions.checkArgument(buffer.position() == 0);
