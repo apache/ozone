@@ -38,7 +38,7 @@ public class FetchNetworkTopologyTreeSubCommand implements Callable<Void> {
   private OMAdmin parent;
 
   @CommandLine.Option(
-      names = {"-id", "--service-id"},
+      names = {"--service-id"},
       description = "Ozone Manager Service ID",
       required = false
   )
