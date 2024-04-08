@@ -21,9 +21,12 @@ package org.apache.hadoop.ozone.om.request.key;
 import java.io.IOException;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import org.apache.commons.lang3.tuple.Pair;
+import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.om.OMMetrics;
 import org.apache.ratis.server.protocol.TermIndex;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
@@ -38,8 +41,6 @@ import org.apache.hadoop.ozone.om.response.key.OMDirectoriesPurgeResponseWithFSO
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
-
-import java.util.List;
 
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.BUCKET_LOCK;
 
@@ -66,6 +67,7 @@ public class OMDirectoriesPurgeRequestWithFSO extends OMKeyRequest {
     Set<Pair<String, String>> lockSet = new HashSet<>();
     Map<Pair<String, String>, OmBucketInfo> volBucketInfoMap = new HashMap<>();
     OMMetadataManager omMetadataManager = ozoneManager.getMetadataManager();
+    List<String> openKeyList = new ArrayList<>();
 
     OMMetrics omMetrics = ozoneManager.getMetrics();
     try {
@@ -110,6 +112,17 @@ public class OMDirectoriesPurgeRequestWithFSO extends OMKeyRequest {
                 volumeName, bucketName);
             lockSet.add(volBucketPair);
           }
+
+          // If omKeyInfo has hsync metadata, delete its corresponding open key as well
+          String dbOpenKey;
+          String hsyncClientId = keyInfo.getMetadata().get(OzoneConsts.HSYNC_CLIENT_ID);
+          if (hsyncClientId != null) {
+            long parentId = keyInfo.getParentObjectID();
+            dbOpenKey = omMetadataManager.getOpenFileName(path.getVolumeId(), path.getBucketId(),
+                parentId, keyInfo.getFileName(), hsyncClientId);
+            openKeyList.add(dbOpenKey);
+          }
+
           omMetrics.decNumKeys();
           OmBucketInfo omBucketInfo = getBucketInfo(omMetadataManager,
               volumeName, bucketName);
@@ -142,7 +155,7 @@ public class OMDirectoriesPurgeRequestWithFSO extends OMKeyRequest {
         getOmRequest());
     OMClientResponse omClientResponse = new OMDirectoriesPurgeResponseWithFSO(
         omResponse.build(), purgeRequests, ozoneManager.isRatisEnabled(),
-            getBucketLayout(), volBucketInfoMap, fromSnapshotInfo);
+            getBucketLayout(), volBucketInfoMap, fromSnapshotInfo, openKeyList);
 
     return omClientResponse;
   }

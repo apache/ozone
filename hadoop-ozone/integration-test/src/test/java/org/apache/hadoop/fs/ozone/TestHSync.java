@@ -25,7 +25,9 @@ import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.security.GeneralSecurityException;
 import java.security.PrivilegedExceptionAction;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
@@ -113,6 +115,8 @@ import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_SCHEME;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_DEFAULT_BUCKET_LAYOUT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ADDRESS_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_RATIS_ENABLE_KEY;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_DIR_DELETING_SERVICE_INTERVAL;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -155,6 +159,7 @@ public class TestHSync {
     CONF.setInt(OZONE_SCM_RATIS_PIPELINE_LIMIT, 10);
     // Reduce KeyDeletingService interval
     CONF.setTimeDuration(OZONE_BLOCK_DELETING_SERVICE_INTERVAL, 100, TimeUnit.MILLISECONDS);
+    CONF.setTimeDuration(OZONE_DIR_DELETING_SERVICE_INTERVAL, 100, TimeUnit.MILLISECONDS);
     CONF.setBoolean("ozone.client.incremental.chunk.list", true);
     CONF.setBoolean(OZONE_CHUNK_LIST_INCREMENTAL, true);
     ClientConfigForTesting.newBuilder(StorageUnit.BYTES)
@@ -390,6 +395,54 @@ public class TestHSync {
         assertEquals(OMException.ResultCodes.KEY_NOT_FOUND, ex.getResult());
       }
     }
+  }
+
+  @Test
+  public void testHSyncOpenKeyDeletionWhileDeleteDirectory() throws Exception {
+    // Verify that when directory is deleted recursively hsync related openKeys should be deleted,
+
+    // Set the fs.defaultFS
+    final String rootPath = String.format("%s://%s/",
+        OZONE_OFS_URI_SCHEME, CONF.get(OZONE_OM_ADDRESS_KEY));
+    CONF.set(CommonConfigurationKeysPublic.FS_DEFAULT_NAME_KEY, rootPath);
+
+    final String dir = OZONE_ROOT + bucket.getVolumeName()
+        + OZONE_URI_DELIMITER + bucket.getName() + OZONE_URI_DELIMITER + "dir1/dir2";
+    final Path key1 = new Path(dir, "hsync-key");
+
+    try (FileSystem fs = FileSystem.get(CONF)) {
+      // Create key1
+      try (FSDataOutputStream os = fs.create(key1, true)) {
+        os.write(1);
+        os.hsync();
+        // There should be 1 key in openFileTable
+        assertThat(1 == getOpenKeyInfo(BucketLayout.FILE_SYSTEM_OPTIMIZED).size());
+        // Delete directory(bucket) recursively
+        fs.delete(new Path(OZONE_ROOT + bucket.getVolumeName() + OZONE_URI_DELIMITER +
+            bucket.getName()), true);
+
+        // Verify entry from openKey gets deleted eventually
+        GenericTestUtils.waitFor(() ->
+            0 == getOpenKeyInfo(BucketLayout.FILE_SYSTEM_OPTIMIZED).size(), 1000, 12000);
+      } catch (OMException ex) {
+        assertEquals(OMException.ResultCodes.BUCKET_NOT_FOUND, ex.getResult());
+      }
+    }
+  }
+
+  private List<OmKeyInfo> getOpenKeyInfo(BucketLayout bucketLayout) {
+    List<OmKeyInfo> omKeyInfo = new ArrayList<>();
+
+    Table<String, OmKeyInfo> openFileTable =
+        cluster.getOzoneManager().getMetadataManager().getOpenKeyTable(bucketLayout);
+    try (TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>>
+             iterator = openFileTable.iterator()) {
+      while (iterator.hasNext()) {
+        omKeyInfo.add(iterator.next().getValue());
+      }
+    } catch (Exception e) {
+    }
+    return omKeyInfo;
   }
 
   @Test
