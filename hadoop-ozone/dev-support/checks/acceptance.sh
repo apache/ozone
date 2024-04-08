@@ -24,6 +24,7 @@ OZONE_ROOT=$(pwd -P)
 : ${HADOOP_AWS_DIR:=""}
 : ${OZONE_ACCEPTANCE_SUITE:=""}
 : ${OZONE_TEST_SELECTOR:=""}
+: ${OZONE_ACCEPTANCE_TEST_TYPE:="robot"}
 : ${OZONE_WITH_COVERAGE:="false"}
 
 source "${DIR}/_lib.sh"
@@ -41,13 +42,17 @@ fi
 mkdir -p "$REPORT_DIR"
 
 if [[ "${OZONE_ACCEPTANCE_SUITE}" == "s3a" ]]; then
+  OZONE_ACCEPTANCE_TEST_TYPE="maven"
+
   if [[ -z "${HADOOP_AWS_DIR}" ]]; then
     HADOOP_VERSION=$(mvn help:evaluate -Dexpression=hadoop.version -q -DforceStdout)
     export HADOOP_AWS_DIR=${OZONE_ROOT}/target/hadoop-src
   fi
+
   download_hadoop_aws "${HADOOP_AWS_DIR}"
-  cp -fv ${OZONE_ROOT}/hadoop-ozone/dist/src/test/resources/auth-keys.xml "${HADOOP_AWS_DIR}"/src/test/resources/
-else
+fi
+
+if [[ "${OZONE_ACCEPTANCE_TEST_TYPE}" == "robot" ]]; then
   install_virtualenv
   install_robot
 fi
@@ -58,7 +63,7 @@ cd "$DIST_DIR/compose" || exit 1
 ./test-all.sh 2>&1 | tee "${REPORT_DIR}/output.log"
 RES=$?
 
-if [[ "${OZONE_ACCEPTANCE_SUITE}" == "s3a" ]]; then
+if [[ "${OZONE_ACCEPTANCE_TEST_TYPE}" == "maven" ]]; then
   pushd result
   source "${DIR}/_mvn_unit_report.sh"
   find . -name junit -print0 | xargs -r -0 rm -frv

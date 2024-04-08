@@ -27,6 +27,7 @@ rm "$ALL_RESULT_DIR"/* || true
 
 source "$SCRIPT_DIR"/testlib.sh
 
+: ${OZONE_ACCEPTANCE_TEST_TYPE:="robot"}
 : ${OZONE_WITH_COVERAGE:="false"}
 
 if [[ "${OZONE_WITH_COVERAGE}" == "true" ]]; then
@@ -46,7 +47,8 @@ if [[ "${OZONE_WITH_COVERAGE}" == "true" ]]; then
   cp /tmp/jacoco-combined.exec "$SCRIPT_DIR"/result
 fi
 
-if [[ "${OZONE_ACCEPTANCE_SUITE:-}" != "s3a" ]]; then
+if [[ "${OZONE_ACCEPTANCE_TEST_TYPE}" == "robot" ]]; then
+  # does not apply to JUnit tests run via Maven
   generate_report "acceptance" "${ALL_RESULT_DIR}" "${XUNIT_RESULT_DIR}"
 fi
 

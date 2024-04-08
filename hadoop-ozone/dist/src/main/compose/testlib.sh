@@ -574,35 +574,3 @@ wait_for_root_certificate(){
   echo "Timed out waiting on $count root certificates. Current timestamp " $(date +"%T")
   return 1
 }
-
-execute_s3a_tests() {
-  local bucket="$1"
-
-  if [[ -z ${bucket} ]]; then
-    echo "Required argument: the S3 bucket to be tested" >&2
-    return 1
-  fi
-
-  if [[ -z ${HADOOP_AWS_DIR} ]] || [[ ! -e ${HADOOP_AWS_DIR} ]] || [[ ! -d ${HADOOP_AWS_DIR}/src/test/resources ]]; then
-    echo "Set HADOOP_AWS_DIR to the directory with hadoop-aws sources" >&2
-    return 1
-  fi
-
-  if [[ -z ${OZONE_S3G_ADDRESS} ]]; then
-    echo "Set OZONE_S3G_ADDRESS to the address of S3 Gateway" >&2
-    return 1
-  fi
-
-  pushd ${HADOOP_AWS_DIR}
-  mvn -B -V --no-transfer-progress \
-    -Dtest.fs.s3a.endpoint="${OZONE_S3G_ADDRESS}" \
-    -Dcustom.fs.s3a.name="s3a://${bucket}/" \
-    -Dtest='ITestS3AContract*, !ITestS3AContractDistCp, !ITestS3AContractEtag, !ITestS3AContractGetFileStatusV1List, !ITestS3AContractMkdir, !ITestS3AContractRename' \
-    clean test
-  rc=$?
-  mkdir -p ${RESULT_DIR}/junit/${bucket}/target
-  mv -iv target/surefire-reports ${RESULT_DIR}/junit/${bucket}/target/
-  popd
-
-  return $rc
-}
