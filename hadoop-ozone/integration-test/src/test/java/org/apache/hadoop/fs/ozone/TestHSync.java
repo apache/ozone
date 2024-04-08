@@ -417,15 +417,15 @@ public class TestHSync {
         os.hsync();
         // There should be 1 key in openFileTable
         assertThat(1 == getOpenKeyInfo(BucketLayout.FILE_SYSTEM_OPTIMIZED).size());
-        // Delete directory(bucket) recursively
+        // Delete directory recursively
         fs.delete(new Path(OZONE_ROOT + bucket.getVolumeName() + OZONE_URI_DELIMITER +
-            bucket.getName()), true);
+            bucket.getName() + OZONE_URI_DELIMITER + "dir1/"), true);
 
         // Verify entry from openKey gets deleted eventually
         GenericTestUtils.waitFor(() ->
             0 == getOpenKeyInfo(BucketLayout.FILE_SYSTEM_OPTIMIZED).size(), 1000, 12000);
       } catch (OMException ex) {
-        assertEquals(OMException.ResultCodes.BUCKET_NOT_FOUND, ex.getResult());
+        assertEquals(OMException.ResultCodes.DIRECTORY_NOT_FOUND, ex.getResult());
       }
     }
   }
