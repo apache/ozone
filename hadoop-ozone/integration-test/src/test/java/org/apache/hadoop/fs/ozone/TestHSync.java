@@ -577,7 +577,7 @@ public class TestHSync {
       while ((Time.monotonicNow() - start < 10000)) {
         try {
           out.write(data);
-        } catch (IOException e) {
+        } catch (Throwable e) {
           writerException.set(new IOException(e));
           throw new RuntimeException(e);
         }
