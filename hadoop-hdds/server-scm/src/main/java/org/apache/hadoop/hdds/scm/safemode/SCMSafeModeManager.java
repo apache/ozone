@@ -241,6 +241,7 @@ public class SCMSafeModeManager implements SafeModeManager {
    * 3. Cleanup resources.
    * 4. Emit safe mode status.
    * @param eventQueue
+   * @param force
    */
   @VisibleForTesting
   public void exitSafeMode(EventPublisher eventQueue, boolean force) {
