@@ -219,7 +219,7 @@ public abstract class Handler {
     this.clusterId = clusterID;
   }
 
-  public abstract boolean streamDataReadOnly(
+  public abstract ContainerCommandResponseProto streamDataReadOnly(
       ContainerCommandRequestProto msg, KeyValueContainer container,
       DispatcherContext dispatcherContext,
       StreamObserver<ContainerCommandResponseProto> streamObserver);

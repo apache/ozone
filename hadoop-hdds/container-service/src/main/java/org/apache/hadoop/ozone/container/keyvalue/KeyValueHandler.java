@@ -1213,14 +1213,18 @@ public class KeyValueHandler extends Handler {
   }
 
   @Override
-  public boolean streamDataReadOnly(
+  public ContainerCommandResponseProto streamDataReadOnly(
       ContainerCommandRequestProto request, KeyValueContainer kvContainer,
       DispatcherContext dispatcherContext,
       StreamObserver<ContainerCommandResponseProto> streamObserver) {
-    boolean result = true;
+    ContainerCommandResponseProto responseProto = null;
     try {
       if (!request.hasReadBlock()) {
-        throw new Exception("MALFORMED_REQUEST");
+        if (LOG.isDebugEnabled()) {
+          LOG.debug("Malformed Read Block request. trace ID: {}",
+              request.getTraceID());
+        }
+        return malformedRequest(request);
       }
       ReadBlockRequestProto readBlock = request.getReadBlock();
       ChunkBuffer data;
@@ -1286,23 +1290,13 @@ public class KeyValueHandler extends Handler {
 
       metrics.incContainerBytesStats(Type.ReadBlock, readBlock.getLen());
     } catch (StorageContainerException ex) {
-      streamObserver.onNext(ContainerUtils.logAndReturnError(LOG, ex, request));
-      result = false;
+      responseProto = ContainerUtils.logAndReturnError(LOG, ex, request);
     } catch (IOException ioe) {
-      streamObserver.onNext(ContainerUtils.logAndReturnError(LOG,
+      responseProto = ContainerUtils.logAndReturnError(LOG,
           new StorageContainerException("Read Block failed", ioe, IO_EXCEPTION),
-          request));
-      result = false;
-    } catch (Exception ex) {
-      if (LOG.isDebugEnabled()) {
-        LOG.debug("Malformed Read Chunk request. trace ID: {}",
-            request.getTraceID());
-      }
-      streamObserver.onNext(malformedRequest(request));
-      result = false;
-    } finally {
-      return result;
+          request);
     }
+    return responseProto;
   }
 
   private String[] getFilesWithPrefix(String prefix, File chunkDir) {
