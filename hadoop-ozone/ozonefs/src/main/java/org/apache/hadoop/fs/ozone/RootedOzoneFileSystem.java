@@ -143,6 +143,7 @@ public class RootedOzoneFileSystem extends BasicRootedOzoneFileSystem
     return TracingUtil.executeInNewSpan("ofs isFileClosed",
         () -> isFileClosedTraced(f));
   }
+
   private boolean isFileClosedTraced(Path f) throws IOException {
     GlobalTracer.get().activeSpan().setTag("path", f.toString());
     statistics.incrementWriteOps(1);
