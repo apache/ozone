@@ -94,6 +94,10 @@ In terms of forward / backward compatibility both solutions are equivalent. Only
 
 If an upgraded server is rolled back, it will still be able to deal with an openKey entry containing overWriteUpdateID, but it will not process it atomically.
 
+### Scope
+
+The intention is to first implement this for OBS buckets. Then address FSO buckets.
+
 ## Changes Required
 
 In order to enable the above steps on Ozone, several small changes are needed.
@@ -154,6 +158,18 @@ try (OutputStream os = bucket.replaceKeyIfUnchanged(existingKey, newRepConfig) {
   os.write(bucket.readKey(keyName))
 }
 ```
+
+## Upgrade and Compatibility
+
+If a newer client is talking to an older server, it could call the new atomic API but the server will ignore it without error. This is the case for any API change.
+
+There are no changes to protobuf methods.
+
+A single extra field is added to the KeyArgs object, which is passed from the client to OM on key open and commit. This is a new field, so it will be null if not set, and the server will ignore it if it does not expect it.
+
+A single extra field is added to the OMKeyInfo object which is stored in the openKey table. This is a new field, so it will be null if not set, and the server will ignore it if it does not expect it.
+
+There should be not impact on upgrade / downgrade with the new field added in this way.
 
 ## Other Storage Systems
 
