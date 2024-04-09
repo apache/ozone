@@ -20,6 +20,7 @@
 
 package org.apache.hadoop.ozone.s3.endpoint;
 
+import org.apache.commons.io.IOUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.client.OzoneClient;
@@ -28,12 +29,16 @@ import org.apache.hadoop.ozone.client.OzoneMultipartUploadPartListParts;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+import org.mockito.MockedStatic;
 
 import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.Response;
 
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
+import java.security.MessageDigest;
 import java.util.UUID;
 
 import static java.net.HttpURLConnection.HTTP_NOT_FOUND;
@@ -44,7 +49,13 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.fail;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.mockStatic;
+import static org.mockito.Mockito.spy;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 /**
@@ -192,6 +203,53 @@ public class TestPartUpload {
     REST.put(OzoneConsts.S3_BUCKET, keyName,
         contentLength, 1, uploadID, body);
     assertContentLength(uploadID, keyName, content.length());
+  }
+
+  @Test
+  public void testPartUploadMessageDigestResetDuringException() throws IOException, OS3Exception {
+    OzoneClient clientStub = new OzoneClientStub();
+    clientStub.getObjectStore().createS3Bucket(OzoneConsts.S3_BUCKET);
+
+
+    HttpHeaders headers = mock(HttpHeaders.class);
+    when(headers.getHeaderString(STORAGE_CLASS_HEADER)).thenReturn(
+        "STANDARD");
+
+    ObjectEndpoint objectEndpoint = spy(new ObjectEndpoint());
+
+    objectEndpoint.setHeaders(headers);
+    objectEndpoint.setClient(clientStub);
+    objectEndpoint.setOzoneConfiguration(new OzoneConfiguration());
+
+    Response response = objectEndpoint.initializeMultipartUpload(OzoneConsts.S3_BUCKET,
+        OzoneConsts.KEY);
+    MultipartUploadInitiateResponse multipartUploadInitiateResponse =
+        (MultipartUploadInitiateResponse) response.getEntity();
+    assertNotNull(multipartUploadInitiateResponse.getUploadID());
+    String uploadID = multipartUploadInitiateResponse.getUploadID();
+
+    assertEquals(200, response.getStatus());
+
+    MessageDigest messageDigest = mock(MessageDigest.class);
+    try (MockedStatic<IOUtils> mocked = mockStatic(IOUtils.class)) {
+      // Add the mocked methods only during the copy request
+      when(objectEndpoint.getMessageDigestInstance()).thenReturn(messageDigest);
+      mocked.when(() -> IOUtils.copyLarge(any(InputStream.class), any(OutputStream.class)))
+          .thenThrow(IOException.class);
+
+      String content = "Multipart Upload";
+      ByteArrayInputStream body =
+          new ByteArrayInputStream(content.getBytes(UTF_8));
+      try {
+        objectEndpoint.put(OzoneConsts.S3_BUCKET, OzoneConsts.KEY,
+            content.length(), 1, uploadID, body);
+        fail("Should throw IOException");
+      } catch (IOException ignored) {
+        // Verify that the message digest is reset so that the instance can be reused for the
+        // next request in the same thread
+        verify(messageDigest, times(1)).reset();
+      }
+    }
   }
 
   private void assertContentLength(String uploadID, String key,
