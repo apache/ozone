@@ -92,10 +92,13 @@ import org.apache.hadoop.security.UserGroupInformation;
 
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.BlockTokenSecretProto.AccessModeProto.READ;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.BlockTokenSecretProto.AccessModeProto.WRITE;
+import static org.apache.hadoop.ozone.OzoneAcl.AclScope.ACCESS;
+import static org.apache.hadoop.ozone.OzoneAcl.AclScope.DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConsts.OBJECT_ID_RECLAIM_BLOCKS;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes
     .BUCKET_NOT_FOUND;
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INVALID_REQUEST;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes
     .VOLUME_NOT_FOUND;
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.BUCKET_LOCK;
@@ -343,7 +346,7 @@ public abstract class OMKeyRequest extends OMClientRequest {
         // Add all acls from direct parent to key.
         OmPrefixInfo prefixInfo = prefixList.get(prefixList.size() - 1);
         if (prefixInfo  != null) {
-          if (OzoneAclUtil.inheritDefaultAcls(acls, prefixInfo.getAcls())) {
+          if (OzoneAclUtil.inheritDefaultAcls(acls, prefixInfo.getAcls(), ACCESS)) {
             return acls;
           }
         }
@@ -353,7 +356,7 @@ public abstract class OMKeyRequest extends OMClientRequest {
     // Inherit DEFAULT acls from parent-dir only if DEFAULT acls for
     // prefix are not set
     if (omPathInfo != null) {
-      if (OzoneAclUtil.inheritDefaultAcls(acls, omPathInfo.getAcls())) {
+      if (OzoneAclUtil.inheritDefaultAcls(acls, omPathInfo.getAcls(), ACCESS)) {
         return acls;
       }
     }
@@ -361,7 +364,7 @@ public abstract class OMKeyRequest extends OMClientRequest {
     // Inherit DEFAULT acls from bucket only if DEFAULT acls for
     // parent-dir are not set.
     if (bucketInfo != null) {
-      if (OzoneAclUtil.inheritDefaultAcls(acls, bucketInfo.getAcls())) {
+      if (OzoneAclUtil.inheritDefaultAcls(acls, bucketInfo.getAcls(), ACCESS)) {
         return acls;
       }
     }
@@ -383,17 +386,13 @@ public abstract class OMKeyRequest extends OMClientRequest {
 
     // Inherit DEFAULT acls from parent-dir
     if (omPathInfo != null) {
-      if (OzoneAclUtil.inheritDefaultAcls(acls, omPathInfo.getAcls())) {
-        OzoneAclUtil.toDefaultScope(acls);
-      }
+      OzoneAclUtil.inheritDefaultAcls(acls, omPathInfo.getAcls(), DEFAULT);
     }
 
     // Inherit DEFAULT acls from bucket only if DEFAULT acls for
     // parent-dir are not set.
     if (acls.isEmpty() && bucketInfo != null) {
-      if (OzoneAclUtil.inheritDefaultAcls(acls, bucketInfo.getAcls())) {
-        OzoneAclUtil.toDefaultScope(acls);
-      }
+      OzoneAclUtil.inheritDefaultAcls(acls, bucketInfo.getAcls(), DEFAULT);
     }
 
     // add itself acls
@@ -591,9 +590,14 @@ public abstract class OMKeyRequest extends OMClientRequest {
             omMetadataManager.getOpenKeyTable(getBucketLayout())
                 .get(dbMultipartOpenKey);
 
-        if (omKeyInfo != null && omKeyInfo.getFileEncryptionInfo() != null) {
-          newKeyArgs.setFileEncryptionInfo(
-              OMPBHelper.convert(omKeyInfo.getFileEncryptionInfo()));
+        if (omKeyInfo != null) {
+          if (omKeyInfo.getFileEncryptionInfo() != null) {
+            newKeyArgs.setFileEncryptionInfo(
+                OMPBHelper.convert(omKeyInfo.getFileEncryptionInfo()));
+          }
+        } else {
+          LOG.warn("omKeyInfo not found. Key: " + dbMultipartOpenKey +
+              ". The upload id " + keyArgs.getMultipartUploadID() + " may be invalid.");
         }
       } finally {
         if (acquireLock) {
@@ -769,6 +773,14 @@ public abstract class OMKeyRequest extends OMClientRequest {
       dbKeyInfo.setModificationTime(keyArgs.getModificationTime());
       dbKeyInfo.setUpdateID(transactionLogIndex, isRatisEnabled);
       dbKeyInfo.setReplicationConfig(replicationConfig);
+
+      // Construct a new metadata map from KeyArgs.
+      // Clear the old one when the key is overwritten.
+      dbKeyInfo.getMetadata().clear();
+      dbKeyInfo.getMetadata().putAll(KeyValueUtil.getFromProtobuf(
+          keyArgs.getMetadataList()));
+
+      dbKeyInfo.setFileEncryptionInfo(encInfo);
       return dbKeyInfo;
     }
 
@@ -1050,5 +1062,12 @@ public abstract class OMKeyRequest extends OMClientRequest {
     // Intentional extra space for alignment
     LOG.debug("After block filtering,  keysToBeFiltered = {}",
         keysToBeFiltered);
+  }
+
+  protected void validateEncryptionKeyInfo(OmBucketInfo bucketInfo, KeyArgs keyArgs) throws OMException {
+    if (bucketInfo.getEncryptionKeyInfo() != null && !keyArgs.hasFileEncryptionInfo()) {
+      throw new OMException("Attempting to create unencrypted file " +
+          keyArgs.getKeyName() + " in encrypted bucket " + keyArgs.getBucketName(), INVALID_REQUEST);
+    }
   }
 }

@@ -360,7 +360,6 @@ Apache License 2.0
    org.apache.commons:commons-compress
    org.apache.commons:commons-configuration2
    org.apache.commons:commons-lang3
-   org.apache.commons:commons-pool2
    org.apache.commons:commons-text
    org.apache.curator:curator-client
    org.apache.curator:curator-framework
@@ -442,7 +441,6 @@ Apache License 2.0
    org.xerial.snappy:snappy-java
    org.xerial:sqlite-jdbc
    org.yaml:snakeyaml
-   software.amazon.ion:ion-java
 
 MIT
 =====================
@@ -500,8 +498,6 @@ Apache Software Foundation License 2.0
 nvd3-1.8.5.min.js.map
 nvd3-1.8.5.min.css.map
 nvd3-1.8.5.min.js
-AbstractFuture.java
-TimeoutFuture.java
 
 
 BSD 3-Clause

@@ -272,7 +272,7 @@ public final class OmSnapshotManager implements AutoCloseable {
     };
 
     // Init snapshot cache
-    this.snapshotCache = new SnapshotCache(loader, softCacheSize);
+    this.snapshotCache = new SnapshotCache(loader, softCacheSize, ozoneManager.getMetrics());
 
     this.snapshotDiffManager = new SnapshotDiffManager(snapshotDiffDb, differ,
         ozoneManager, snapDiffJobCf, snapDiffReportCf,
@@ -372,7 +372,7 @@ public final class OmSnapshotManager implements AutoCloseable {
         try {
           // create the other manager instances based on snapshot
           // metadataManager
-          PrefixManagerImpl pm = new PrefixManagerImpl(snapshotMetadataManager,
+          PrefixManagerImpl pm = new PrefixManagerImpl(ozoneManager, snapshotMetadataManager,
               false);
           KeyManagerImpl km = new KeyManagerImpl(ozoneManager,
               ozoneManager.getScmClient(), snapshotMetadataManager, conf,

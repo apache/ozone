@@ -17,6 +17,7 @@
  */
 package org.apache.hadoop.ozone.admin.reconfig;
 
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import picocli.CommandLine;
 
 import java.util.List;
@@ -44,10 +45,10 @@ public abstract class AbstractReconfigureSubCommand implements Callable<Void> {
             " --in-service-datanodes is not given.");
         return null;
       }
-      executeCommand(parent.getAddress());
+      executeCommand(parent.getService(), parent.getAddress());
     }
     return null;
   }
 
-  protected abstract void executeCommand(String address);
+  protected abstract void executeCommand(HddsProtos.NodeType nodeType, String address);
 }

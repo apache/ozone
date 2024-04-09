@@ -30,11 +30,13 @@ import org.apache.hadoop.hdds.scm.XceiverClientGrpc;
 import org.apache.hadoop.hdds.scm.XceiverClientSpi;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.ozone.container.common.ContainerTestUtils;
+import org.apache.hadoop.ozone.container.common.utils.StorageVolumeUtil;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.api.io.TempDir;
 
 import java.io.File;
+import java.nio.file.Path;
 import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
@@ -55,6 +57,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  */
 @Timeout(300)
 public class TestOzoneContainer {
+  @TempDir
+  private Path tempDir;
 
   @Test
   public void testCreateOzoneContainer(
@@ -68,13 +72,15 @@ public class TestOzoneContainer {
       Pipeline pipeline = MockPipeline.createSingleNodePipeline();
       conf.set(OZONE_METADATA_DIRS, ozoneMetaDir.getPath());
       conf.set(HDDS_DATANODE_DIR_KEY, hddsNodeDir.getPath());
-      conf.setInt(OzoneConfigKeys.DFS_CONTAINER_IPC_PORT,
+      conf.setInt(OzoneConfigKeys.HDDS_CONTAINER_IPC_PORT,
           pipeline.getFirstNode()
               .getPort(DatanodeDetails.Port.Name.STANDALONE).getValue());
 
       DatanodeDetails datanodeDetails = randomDatanodeDetails();
       container = ContainerTestUtils
           .getOzoneContainer(datanodeDetails, conf);
+      StorageVolumeUtil.getHddsVolumesList(container.getVolumeSet().getVolumesList())
+          .forEach(hddsVolume -> hddsVolume.setDbParentDir(tempDir.toFile()));
       //Set clusterId and manually start ozone container.
       container.start(UUID.randomUUID().toString());
 
@@ -99,7 +105,7 @@ public class TestOzoneContainer {
       Pipeline pipeline = MockPipeline.createSingleNodePipeline();
       conf.set(OZONE_METADATA_DIRS, ozoneMetaDir.getPath());
       conf.set(HDDS_DATANODE_DIR_KEY, hddsNodeDir.getPath());
-      conf.setInt(OzoneConfigKeys.DFS_CONTAINER_IPC_PORT,
+      conf.setInt(OzoneConfigKeys.HDDS_CONTAINER_IPC_PORT,
           pipeline.getFirstNode()
               .getPort(DatanodeDetails.Port.Name.STANDALONE).getValue());
 

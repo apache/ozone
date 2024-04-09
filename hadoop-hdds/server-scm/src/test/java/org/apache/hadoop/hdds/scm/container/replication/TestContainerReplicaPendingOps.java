@@ -24,6 +24,7 @@ import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.ozone.test.TestClock;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -72,6 +73,13 @@ public class TestContainerReplicaPendingOps {
     dn1 = MockDatanodeDetails.randomDatanodeDetails();
     dn2 = MockDatanodeDetails.randomDatanodeDetails();
     dn3 = MockDatanodeDetails.randomDatanodeDetails();
+  }
+
+  @AfterEach
+  void cleanup() {
+    if (metrics != null) {
+      metrics.unRegister();
+    }
   }
 
   @Test

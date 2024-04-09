@@ -17,10 +17,9 @@
  */
 package org.apache.hadoop.ozone.shell.tenant;
 
-import com.google.gson.Gson;
-import com.google.gson.GsonBuilder;
-import com.google.gson.JsonArray;
-import com.google.gson.JsonObject;
+import org.apache.hadoop.hdds.server.JsonUtils;
+import com.fasterxml.jackson.databind.node.ArrayNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.om.helpers.TenantStateList;
 import org.apache.hadoop.ozone.shell.OzoneAddress;
@@ -50,23 +49,21 @@ public class TenantListHandler extends TenantHandler {
       tenantStateList.getTenantStateList().forEach(tenantState ->
           out().println(tenantState.getTenantId()));
     } else {
-      final JsonArray resArray = new JsonArray();
+      ArrayNode resArray = JsonUtils.createArrayNode();
       tenantStateList.getTenantStateList().forEach(tenantState -> {
-        final JsonObject obj = new JsonObject();
-        obj.addProperty("tenantId", tenantState.getTenantId());
-        obj.addProperty("bucketNamespaceName",
-            tenantState.getBucketNamespaceName());
-        obj.addProperty("userRoleName", tenantState.getUserRoleName());
-        obj.addProperty("adminRoleName", tenantState.getAdminRoleName());
-        obj.addProperty("bucketNamespacePolicyName",
+        ObjectNode obj = JsonUtils.createObjectNode(null);
+        obj.put("tenantId", tenantState.getTenantId());
+        obj.put("bucketNamespaceName", tenantState.getBucketNamespaceName());
+        obj.put("userRoleName", tenantState.getUserRoleName());
+        obj.put("adminRoleName", tenantState.getAdminRoleName());
+        obj.put("bucketNamespacePolicyName",
             tenantState.getBucketNamespacePolicyName());
-        obj.addProperty("bucketPolicyName",
-            tenantState.getBucketPolicyName());
+        obj.put("bucketPolicyName", tenantState.getBucketPolicyName());
         resArray.add(obj);
       });
-      final Gson gson = new GsonBuilder().setPrettyPrinting().create();
-      out().println(gson.toJson(resArray));
+      // Serialize and print the JSON string with pretty printing
+      String jsonString = JsonUtils.toJsonStringWithDefaultPrettyPrinter(resArray);
+      out().println(jsonString);
     }
-
   }
 }

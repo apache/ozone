@@ -36,8 +36,6 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.ObjectWriter;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Help.Visibility;
 import picocli.CommandLine.Option;
@@ -51,9 +49,6 @@ import picocli.CommandLine.Option;
     mixinStandardHelpOptions = true,
     versionProvider = HddsVersionProvider.class)
 public class ListSubcommand extends ScmSubcommand {
-
-  private static final Logger LOG =
-      LoggerFactory.getLogger(ListSubcommand.class);
 
   @Option(names = {"-s", "--start"},
       description = "Container id to start the iteration")
@@ -94,7 +89,7 @@ public class ListSubcommand extends ScmSubcommand {
   private void outputContainerInfo(ContainerInfo containerInfo)
       throws IOException {
     // Print container report info.
-    LOG.info("{}", WRITER.writeValueAsString(containerInfo));
+    System.out.println(WRITER.writeValueAsString(containerInfo));
   }
 
   @Override

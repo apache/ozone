@@ -37,6 +37,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.function.Supplier;
 
 /**
  * An {@link OutputStream} used by the REST service in combination with the
@@ -65,8 +67,8 @@ public class RatisBlockOutputStream extends BlockOutputStream
   /**
    * Creates a new BlockOutputStream.
    *
-   * @param blockID              block ID
-   * @param bufferPool           pool of buffers
+   * @param blockID    block ID
+   * @param bufferPool pool of buffers
    */
   @SuppressWarnings("checkstyle:ParameterNumber")
   public RatisBlockOutputStream(
@@ -76,10 +78,11 @@ public class RatisBlockOutputStream extends BlockOutputStream
       BufferPool bufferPool,
       OzoneClientConfig config,
       Token<? extends TokenIdentifier> token,
-      ContainerClientMetrics clientMetrics, StreamBufferArgs streamBufferArgs
+      ContainerClientMetrics clientMetrics, StreamBufferArgs streamBufferArgs,
+      Supplier<ExecutorService> blockOutputStreamResourceProvider
   ) throws IOException {
     super(blockID, xceiverClientManager, pipeline,
-        bufferPool, config, token, clientMetrics, streamBufferArgs);
+        bufferPool, config, token, clientMetrics, streamBufferArgs, blockOutputStreamResourceProvider);
     this.commitWatcher = new CommitWatcher(bufferPool, getXceiverClient());
   }
 
@@ -110,16 +113,13 @@ public class RatisBlockOutputStream extends BlockOutputStream
   }
 
   @Override
-  void putFlushFuture(long flushPos,
-      CompletableFuture<ContainerCommandResponseProto> flushFuture) {
-    commitWatcher.getFutureMap().put(flushPos, flushFuture);
+  void putFlushFuture(long flushPos, CompletableFuture<ContainerCommandResponseProto> flushFuture) {
+    commitWatcher.putFlushFuture(flushPos, flushFuture);
   }
 
   @Override
   void waitOnFlushFutures() throws InterruptedException, ExecutionException {
-    // wait for all the transactions to complete
-    CompletableFuture.allOf(commitWatcher.getFutureMap().values().toArray(
-        new CompletableFuture[0])).get();
+    commitWatcher.waitOnFlushFutures();
   }
 
   @Override

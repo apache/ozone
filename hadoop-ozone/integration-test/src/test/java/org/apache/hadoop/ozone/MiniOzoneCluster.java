@@ -19,7 +19,6 @@ package org.apache.hadoop.ozone;
 
 import java.io.IOException;
 import java.util.List;
-import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.TimeoutException;
 
@@ -38,6 +37,7 @@ import org.apache.hadoop.ozone.recon.ReconServer;
 import org.apache.hadoop.security.authentication.client.AuthenticationException;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ratis.util.ExitUtils;
+import org.apache.ratis.util.function.CheckedFunction;
 
 /**
  * Interface used for MiniOzoneClusters.
@@ -62,11 +62,7 @@ public interface MiniOzoneCluster extends AutoCloseable {
    *
    * @return MiniOzoneCluster builder
    */
-  static Builder newOMHABuilder(OzoneConfiguration conf) {
-    return new MiniOzoneHAClusterImpl.Builder(conf);
-  }
-
-  static Builder newHABuilder(OzoneConfiguration conf) {
+  static MiniOzoneHAClusterImpl.Builder newHABuilder(OzoneConfiguration conf) {
     return new MiniOzoneHAClusterImpl.Builder(conf);
   }
 
@@ -76,11 +72,6 @@ public interface MiniOzoneCluster extends AutoCloseable {
    * @return Configuration
    */
   OzoneConfiguration getConf();
-
-  /**
-   * Set the configuration for the MiniOzoneCluster.
-   */
-  void setConf(OzoneConfiguration newConf);
 
   /**
    * Waits for the cluster to be ready, this call blocks till all the
@@ -275,40 +266,32 @@ public interface MiniOzoneCluster extends AutoCloseable {
     protected String path;
 
     protected String clusterId;
-    protected String omServiceId;
-    protected int numOfOMs;
-    protected int numOfActiveOMs = ACTIVE_OMS_NOT_SET;
-
-    protected String scmServiceId;
-    protected int numOfSCMs;
-    protected int numOfActiveSCMs = ACTIVE_SCMS_NOT_SET;
     protected SCMConfigurator scmConfigurator;
 
     protected String scmId = UUID.randomUUID().toString();
     protected String omId = UUID.randomUUID().toString();
     
-    protected Optional<String> datanodeReservedSpace = Optional.empty();
     protected boolean includeRecon = false;
 
-    protected Optional<Integer> dnLayoutVersion = Optional.empty();
-
     protected int numOfDatanodes = 3;
-    protected int numDataVolumes = 1;
     protected boolean  startDataNodes = true;
     protected CertificateClient certClient;
     protected SecretKeyClient secretKeyClient;
+    protected DatanodeFactory dnFactory = UniformDatanodesFactory.newBuilder().build();
 
     protected Builder(OzoneConfiguration conf) {
       this.conf = conf;
-      setClusterId(UUID.randomUUID().toString());
+      setClusterId();
       // Use default SCM configurations if no override is provided.
       setSCMConfigurator(new SCMConfigurator());
       ExitUtils.disableSystemExit();
     }
 
-    public Builder setConf(OzoneConfiguration config) {
-      this.conf = config;
-      return this;
+    /** Prepare the builder for another call to {@link #build()}, avoiding conflict
+     * between the clusters created. */
+    protected void prepareForNextBuild() {
+      conf = new OzoneConfiguration(conf);
+      setClusterId();
     }
 
     public Builder setSCMConfigurator(SCMConfigurator configurator) {
@@ -316,13 +299,8 @@ public interface MiniOzoneCluster extends AutoCloseable {
       return this;
     }
 
-    /**
-     * Sets the cluster Id.
-     *
-     * @param id cluster Id
-     */
-    void setClusterId(String id) {
-      clusterId = id;
+    private void setClusterId() {
+      clusterId = UUID.randomUUID().toString();
       path = GenericTestUtils.getTempPath(
           MiniOzoneClusterImpl.class.getSimpleName() + "-" + clusterId);
     }
@@ -366,73 +344,13 @@ public interface MiniOzoneCluster extends AutoCloseable {
       return this;
     }
 
-    /**
-     * Sets the number of data volumes per datanode.
-     *
-     * @param val number of volumes per datanode.
-     *
-     * @return MiniOzoneCluster.Builder
-     */
-    public Builder setNumDataVolumes(int val) {
-      numDataVolumes = val;
-      return this;
-    }
-
-    /**
-     * Sets the reserved space
-     * {@link org.apache.hadoop.hdds.scm.ScmConfigKeys}
-     * HDDS_DATANODE_DIR_DU_RESERVED
-     * for each volume in each datanode.
-     * @param reservedSpace String that contains the numeric size value and
-     *                      ends with a
-     *                      {@link org.apache.hadoop.hdds.conf.StorageUnit}
-     *                      suffix. For example, "50GB".
-     * @see org.apache.hadoop.ozone.container.common.volume.VolumeInfo
-     *
-     * @return {@link MiniOzoneCluster} Builder
-     */
-    public Builder setDatanodeReservedSpace(String reservedSpace) {
-      datanodeReservedSpace = Optional.of(reservedSpace);
-      return this;
-    }
-
-    public Builder setNumOfOzoneManagers(int numOMs) {
-      this.numOfOMs = numOMs;
-      return this;
-    }
-
-    public Builder setNumOfActiveOMs(int numActiveOMs) {
-      this.numOfActiveOMs = numActiveOMs;
-      return this;
-    }
-
-    public Builder setOMServiceId(String serviceId) {
-      this.omServiceId = serviceId;
+    public Builder setDatanodeFactory(DatanodeFactory factory) {
+      this.dnFactory = factory;
       return this;
     }
 
     public Builder includeRecon(boolean include) {
       this.includeRecon = include;
-      return this;
-    }
-
-    public Builder setNumOfStorageContainerManagers(int numSCMs) {
-      this.numOfSCMs = numSCMs;
-      return this;
-    }
-
-    public Builder setNumOfActiveSCMs(int numActiveSCMs) {
-      this.numOfActiveSCMs = numActiveSCMs;
-      return this;
-    }
-
-    public Builder setSCMServiceId(String serviceId) {
-      this.scmServiceId = serviceId;
-      return this;
-    }
-
-    public Builder setDnLayoutVersion(int layoutVersion) {
-      dnLayoutVersion = Optional.of(layoutVersion);
       return this;
     }
 
@@ -442,5 +360,12 @@ public interface MiniOzoneCluster extends AutoCloseable {
      * @return {@link MiniOzoneCluster}
      */
     public abstract MiniOzoneCluster build() throws IOException;
+  }
+
+  /**
+   * Factory to customize configuration of each datanode.
+   */
+  interface DatanodeFactory extends CheckedFunction<OzoneConfiguration, OzoneConfiguration, IOException> {
+    // marker
   }
 }

@@ -354,5 +354,4 @@ public class DatanodeInfo extends DatanodeDetails {
   public boolean equals(Object obj) {
     return super.equals(obj);
   }
-
 }

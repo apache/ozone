@@ -23,6 +23,7 @@ import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.PrintStream;
 import java.io.UnsupportedEncodingException;
+import java.net.URI;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashSet;
@@ -62,6 +63,7 @@ import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
+import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.hadoop.util.ToolRunner;
@@ -75,6 +77,7 @@ import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.FS_TRASH_INTERVAL_KEY;
 import static org.apache.hadoop.fs.FileSystem.FS_DEFAULT_NAME_KEY;
 import static org.apache.hadoop.fs.FileSystem.TRASH_PREFIX;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_FS_LISTING_PAGE_SIZE;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_OFS_URI_SCHEME;
 
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
@@ -127,7 +130,7 @@ public class TestOzoneShellHA {
   private static File baseDir;
   private static File testFile;
   private static String testFilePathString;
-  private static MiniOzoneCluster cluster = null;
+  private static MiniOzoneHAClusterImpl cluster = null;
   private static File testDir;
   private static MiniKMS miniKMS;
   private static OzoneClient client;
@@ -182,11 +185,12 @@ public class TestOzoneShellHA {
     final int numDNs = 5;
     conf.set(CommonConfigurationKeysPublic.HADOOP_SECURITY_KEY_PROVIDER_PATH,
         getKeyProviderURI(miniKMS));
-    cluster = MiniOzoneCluster.newOMHABuilder(conf)
-        .setOMServiceId(omServiceId)
+    conf.setBoolean(OMConfigKeys.OZONE_OM_ENABLE_FILESYSTEM_PATHS, true);
+    MiniOzoneHAClusterImpl.Builder builder = MiniOzoneCluster.newHABuilder(conf);
+    builder.setOMServiceId(omServiceId)
         .setNumOfOzoneManagers(numOfOMs)
-        .setNumDatanodes(numDNs)
-        .build();
+        .setNumDatanodes(numDNs);
+    cluster = builder.build();
     cluster.waitForClusterToBeReady();
     client = cluster.newClient();
   }
@@ -283,8 +287,7 @@ public class TestOzoneShellHA {
    * @return the leader OM's Node ID in the MiniOzoneHACluster.
    */
   private String getLeaderOMNodeId() {
-    MiniOzoneHAClusterImpl haCluster = (MiniOzoneHAClusterImpl) cluster;
-    OzoneManager omLeader = haCluster.getOMLeader();
+    OzoneManager omLeader = cluster.getOMLeader();
     assertNotNull(omLeader, "There should be a leader OM at this point.");
     return omLeader.getOMNodeId();
   }
@@ -747,6 +750,34 @@ public class TestOzoneShellHA {
       omExecution = assertThrows(OMException.class,
           () -> client.getObjectStore().getVolume("linkvol"));
       assertEquals(VOLUME_NOT_FOUND, omExecution.getResult());
+    } finally {
+      shell.close();
+    }
+  }
+
+  @Test
+  @Timeout(10)
+  public void testListBucket() throws Exception {
+    final String hostPrefix = OZONE_OFS_URI_SCHEME + "://" + omServiceId;
+    OzoneConfiguration clientConf =
+            getClientConfForOFS(hostPrefix, cluster.getConf());
+    int pageSize = 20;
+    clientConf.setInt(OZONE_FS_LISTING_PAGE_SIZE, pageSize);
+    URI uri = FileSystem.getDefaultUri(clientConf);
+    clientConf.setBoolean(String.format("fs.%s.impl.disable.cache", uri.getScheme()), true);
+    OzoneFsShell shell = new OzoneFsShell(clientConf);
+
+    String volName = "testlistbucket";
+    int numBuckets = pageSize;
+
+    try {
+      generateBuckets("/" + volName, numBuckets);
+      out.reset();
+      int res = ToolRunner.run(shell, new String[]{"-ls", "/" + volName});
+      assertEquals(0, res);
+      String r = out.toString(DEFAULT_ENCODING);
+      assertThat(r).matches("(?s)^Found " + numBuckets + " items.*");
+
     } finally {
       shell.close();
     }
@@ -1982,6 +2013,43 @@ public class TestOzoneShellHA {
     execute(ozoneShell,
         new String[]{"volume", "delete", "/volume1"});
     out.reset();
+  }
+
+  @Test
+  public void testKeyDeleteLegacyWithEnableFileSystemPath() throws IOException {
+    String volumeName = "vol5";
+    String bucketName = "legacybucket";
+    String[] args = new String[] {"volume", "create", "o3://" + omServiceId + OZONE_URI_DELIMITER + volumeName};
+    execute(ozoneShell, args);
+
+    args = new String[] {"bucket", "create", "o3://" + omServiceId + OZONE_URI_DELIMITER +
+          volumeName + OZONE_URI_DELIMITER + bucketName, "--layout", BucketLayout.LEGACY.toString()};
+    execute(ozoneShell, args);
+
+    String dirPath = OZONE_URI_DELIMITER + volumeName + OZONE_URI_DELIMITER +
+        bucketName + OZONE_URI_DELIMITER + "dir/";
+    String keyPath = dirPath + "key1";
+
+    // Create key, it will generate two keys, one with dirPath other with keyPath
+    args = new String[] {"key", "put", "o3://" + omServiceId + keyPath, testFile.getPath()};
+    execute(ozoneShell, args);
+
+    // Enable fileSystem path for client config
+    String fileSystemEnable = generateSetConfString(OMConfigKeys.OZONE_OM_ENABLE_FILESYSTEM_PATHS, "true");
+    // Delete dirPath key, it should fail
+    args = new String[] {fileSystemEnable, "key", "delete", dirPath};
+    execute(ozoneShell, args);
+
+    // Check number of keys
+    OzoneVolume volume = client.getObjectStore().getVolume(volumeName);
+    OzoneBucket bucket = volume.getBucket(bucketName);
+    List<OzoneFileStatus> files = bucket.listStatus("", true, "", 5);
+    // Two keys should still exist, dirPath and keyPath
+    assertEquals(2, files.size());
+
+    // cleanup
+    args = new String[] {"volume", "delete", volumeName, "-r", "--yes"};
+    execute(ozoneShell, args);
   }
 
   private static String getKeyProviderURI(MiniKMS kms) {

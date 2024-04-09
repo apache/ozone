@@ -27,7 +27,6 @@ import org.apache.hadoop.metrics2.lib.MutableCounterLong;
 import org.apache.hadoop.metrics2.lib.MutableGaugeLong;
 import org.apache.hadoop.ozone.container.replication.AbstractReplicationTask.Status;
 
-import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.util.Time;
 
 /**
@@ -98,38 +97,31 @@ public class MeasuredReplicator implements ContainerReplicator, AutoCloseable {
     DefaultMetricsSystem.instance().unregisterSource(metricsName());
   }
 
-  @VisibleForTesting
-  public MutableCounterLong getSuccess() {
+  MutableCounterLong getSuccess() {
     return success;
   }
 
-  @VisibleForTesting
-  public MutableGaugeLong getSuccessTime() {
+  MutableGaugeLong getSuccessTime() {
     return successTime;
   }
 
-  @VisibleForTesting
-  public MutableGaugeLong getFailureTime() {
+  MutableGaugeLong getFailureTime() {
     return failureTime;
   }
 
-  @VisibleForTesting
-  public MutableCounterLong getFailure() {
+  MutableCounterLong getFailure() {
     return failure;
   }
 
-  @VisibleForTesting
-  public MutableGaugeLong getQueueTime() {
+  MutableGaugeLong getQueueTime() {
     return queueTime;
   }
 
-  @VisibleForTesting
-  public MutableGaugeLong getTransferredBytes() {
+  MutableGaugeLong getTransferredBytes() {
     return transferredBytes;
   }
 
-  @VisibleForTesting
-  public MutableGaugeLong getFailureBytes() {
+  MutableGaugeLong getFailureBytes() {
     return failureBytes;
   }
 

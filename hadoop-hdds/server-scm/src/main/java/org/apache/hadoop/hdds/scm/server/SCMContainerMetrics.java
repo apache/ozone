@@ -63,7 +63,6 @@ public class SCMContainerMetrics implements MetricsSource {
   }
 
   @Override
-  @SuppressWarnings("SuspiciousMethodCalls")
   public void getMetrics(MetricsCollector collector, boolean all) {
     Map<String, Integer> stateCount = scmmxBean.getContainerStateCount();
 

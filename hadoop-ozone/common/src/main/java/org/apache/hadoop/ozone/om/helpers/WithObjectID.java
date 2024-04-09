@@ -22,34 +22,34 @@ import static org.apache.hadoop.ozone.OzoneConsts.OBJECT_ID_RECLAIM_BLOCKS;
 /**
  * Mixin class to handle ObjectID and UpdateID.
  */
-public class WithObjectID extends WithMetadata {
+public abstract class WithObjectID extends WithMetadata {
+
+  private long objectID;
+  private long updateID;
+
+  protected WithObjectID() {
+    super();
+  }
+
+  protected WithObjectID(Builder b) {
+    super(b);
+    objectID = b.objectID;
+    updateID = b.updateID;
+  }
 
   /**
    * ObjectIDs are unique and immutable identifier for each object in the
    * System.
    */
-  @SuppressWarnings("visibilitymodifier")
-  protected long objectID;
-  /**
-   * UpdateIDs are monotonically increasing values which are updated
-   * each time there is an update.
-   */
-  @SuppressWarnings("visibilitymodifier")
-  protected long updateID;
-
-  /**
-   * Returns objectID.
-   * @return long
-   */
-  public long getObjectID() {
+  public final long getObjectID() {
     return objectID;
   }
 
   /**
-   * Returns updateID.
-   * @return long
+   * UpdateIDs are monotonically increasing values which are updated
+   * each time there is an update.
    */
-  public long getUpdateID() {
+  public final long getUpdateID() {
     return updateID;
   }
 
@@ -62,7 +62,7 @@ public class WithObjectID extends WithMetadata {
    *
    * @param obId - long
    */
-  public void setObjectID(long obId) {
+  public final void setObjectID(long obId) {
     if (this.objectID != 0 && obId != OBJECT_ID_RECLAIM_BLOCKS) {
       throw new UnsupportedOperationException("Attempt to modify object ID " +
           "which is not zero. Current Object ID is " + this.objectID);
@@ -76,7 +76,7 @@ public class WithObjectID extends WithMetadata {
    * @param updateId  long
    * @param isRatisEnabled boolean
    */
-  public void setUpdateID(long updateId, boolean isRatisEnabled) {
+  public final void setUpdateID(long updateId, boolean isRatisEnabled) {
 
     // Because in non-HA, we have multiple rpc handler threads and
     // transactionID is generated in OzoneManagerServerSideTranslatorPB.
@@ -103,21 +103,65 @@ public class WithObjectID extends WithMetadata {
     // Main reason, in non-HA transaction Index after restart starts from 0.
     // And also because of this same reason we don't do replay checks in non-HA.
 
-    if (isRatisEnabled && updateId < this.updateID) {
+    if (isRatisEnabled && updateId < this.getUpdateID()) {
       throw new IllegalArgumentException(String.format(
           "Trying to set updateID to %d which is not greater than the " +
-              "current value of %d for %s", updateId, this.updateID,
+              "current value of %d for %s", updateId, this.getUpdateID(),
           getObjectInfo()));
     }
 
-    this.updateID = updateId;
+    this.setUpdateID(updateId);
   }
 
-  public boolean isUpdateIDset() {
-    return this.updateID > 0;
-  }
-
+  /** Hook method, customized in subclasses. */
   public String getObjectInfo() {
     return this.toString();
+  }
+
+  public final void setUpdateID(long updateID) {
+    this.updateID = updateID;
+  }
+
+  /** Builder for {@link WithObjectID}. */
+  public static class Builder extends WithMetadata.Builder {
+    private long objectID;
+    private long updateID;
+
+    protected Builder() {
+      super();
+    }
+
+    protected Builder(WithObjectID obj) {
+      super(obj);
+      objectID = obj.getObjectID();
+      updateID = obj.getUpdateID();
+    }
+
+    /**
+     * Sets the Object ID for this Object.
+     * Object ID are unique and immutable identifier for each object in the
+     * System.
+     */
+    public Builder setObjectID(long obId) {
+      this.objectID = obId;
+      return this;
+    }
+
+    /**
+     * Sets the update ID for this Object. Update IDs are monotonically
+     * increasing values which are updated each time there is an update.
+     */
+    public Builder setUpdateID(long id) {
+      this.updateID = id;
+      return this;
+    }
+
+    public long getObjectID() {
+      return objectID;
+    }
+
+    public long getUpdateID() {
+      return updateID;
+    }
   }
 }
