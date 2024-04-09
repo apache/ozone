@@ -1223,8 +1223,8 @@ public class ObjectEndpoint extends EndpointBase {
       } else {
         OS3Exception ex = newError(INVALID_ARGUMENT, metadataCopyDirective);
         ex.setErrorMessage("An error occurred (InvalidArgument) " +
-            "when calling the CopyObjet operation: " +
-            "The metadata directive specified is invalid. The valid values are COPY or REPLACE.");
+            "when calling the CopyObject operation: " +
+            "The metadata directive specified is invalid. Valid values are COPY or REPLACE.");
         throw ex;
       }
 

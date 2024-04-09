@@ -317,7 +317,7 @@ class TestObjectPut {
     assertThat(destKeyDetails.getMetadata().get("custom-key-2")).isEqualTo("custom-value-2");
     assertThat(destKeyDetails.getMetadata().containsKey("custom-key-3")).isFalse();
 
-    // Now use REPLACE metadata directive (default) and remove some custom metadata used in he source key
+    // Now use REPLACE metadata directive (default) and remove some custom metadata used in the source key
     when(headers.getHeaderString(CUSTOM_METADATA_COPY_DIRECTIVE_HEADER)).thenReturn("REPLACE");
     metadataHeaders.remove(CUSTOM_METADATA_HEADER_PREFIX + "custom-key-1");
     metadataHeaders.remove(CUSTOM_METADATA_HEADER_PREFIX + "custom-key-2");
