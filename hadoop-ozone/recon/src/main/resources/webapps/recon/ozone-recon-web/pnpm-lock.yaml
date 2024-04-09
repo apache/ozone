@@ -17,7 +17,7 @@ specifiers:
   ag-charts-community: ^7.3.0
   ag-charts-react: ^7.3.0
   antd: ^3.26.20
-  axios: ^0.27.2
+  axios: ^0.28.0
   babel-jest: ^24.9.0
   babel-plugin-import: ^1.13.8
   classnames: ^2.3.2
@@ -61,7 +61,7 @@ dependencies:
   ag-charts-community: 7.3.0
   ag-charts-react: 7.3.0_4uflhkpzmxcxyxkuqg2ofty3gq
   antd: 3.26.20_wcqkhtmu7mswc6yz4uyexck3ty
-  axios: 0.27.2
+  axios: 0.28.0
   babel-jest: 24.9.0_@babel+core@7.22.11
   babel-plugin-import: 1.13.8
   classnames: 2.3.2
@@ -3891,11 +3891,12 @@ packages:
   /aws4/1.12.0:
     resolution: {integrity: sha512-NmWvPnx0F1SfrQbYwOi7OeaNGokp9XhzNioJ/CSBs8Qa4vxug81mhJEAVZwxXuBmYB5KDRfMq/F3RR0BIU7sWg==}
 
-  /axios/0.27.2:
-    resolution: {integrity: sha512-t+yRIyySRTp/wua5xEr+z1q60QmLq8ABsS5O9Me1AsE5dfKqgnCFzwiCZZ/cGNd1lq4/7akDWMxdhVlucjmnOQ==}
+  /axios/0.28.0:
+    resolution: {integrity: sha512-Tu7NYoGY4Yoc7I+Npf9HhUMtEEpV7ZiLH9yndTCoNhcpBH0kwcvFbzYN9/u5QKI5A6uefjsNNWaz5olJVYS62Q==}
     dependencies:
       follow-redirects: 1.15.6
       form-data: 4.0.0
+      proxy-from-env: 1.1.0
     transitivePeerDependencies:
       - debug
     dev: false
@@ -13290,6 +13291,10 @@ packages:
     dependencies:
       forwarded: 0.2.0
       ipaddr.js: 1.9.1
+
+  /proxy-from-env/1.1.0:
+    resolution: {integrity: sha512-D+zkORCbA9f1tdWRK0RaCR3GPv50cMxcrz4X8k5LTSUD1Dkw47mKJEZQNunItRTkWwgtaUSo1RVFRIG9ZXiFYg==}
+    dev: false
 
   /prr/1.0.1:
     resolution: {integrity: sha512-yPw4Sng1gWghHQWj0B3ZggWUm4qVbPwPFcRG8KyxiU7J2OHFSoEHKS+EZ3fv5l1t9CyCiop6l/ZYeWbrgoQejw==}
