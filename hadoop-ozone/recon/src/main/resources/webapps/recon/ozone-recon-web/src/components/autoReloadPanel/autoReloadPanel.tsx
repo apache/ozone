@@ -83,11 +83,20 @@ class AutoReloadPanel extends React.Component<IAutoReloadPanelProps> {
      );
 
     return (
-      <div className='auto-reload-panel'>
+      <div className='auto-reload-panel' data-testid='autoreload-panel'>
         Auto Refresh
-        &nbsp;<Switch defaultChecked={autoReloadEnabled} size='small' className='toggle-switch' onChange={this.autoReloadToggleHandler}/>
+        &nbsp;<Switch defaultChecked={autoReloadEnabled}
+                      size='small'
+                      className='toggle-switch'
+                      onChange={this.autoReloadToggleHandler}
+                      data-testid='autoreload-panel-switch'/>
         &nbsp; | Refreshed at {lastRefreshedText}
-        &nbsp;<Button shape='circle' icon='reload' size='small' loading={isLoading} onClick={onReload}/>
+        &nbsp;<Button shape='circle'
+                      icon='reload'
+                      size='small'
+                      loading={isLoading}
+                      onClick={onReload}
+                      data-testid='autoreload-panel-refresh'/>
         {lastUpdatedDeltaFullText}
       </div>
     );
