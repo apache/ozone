@@ -190,9 +190,65 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
           .getAllMissingParentDirInfo(ozoneManager, keyArgs, omBucketInfo,
               pathInfoFSO, trxnLogIndex);
 
-      // add all missing parents to dir table
-      addMissingParentsToTable(omBucketInfo, missingParentInfos,
-          omMetadataManager, volumeName, bucketName, trxnLogIndex);
+      if (missingParentInfos != null) {
+        final long volumeId = omMetadataManager.getVolumeId(volumeName);
+        final long bucketId = omMetadataManager.getBucketId(volumeName,
+            bucketName);
+
+        // add all missing parents to directory table
+        addMissingParentsToTable(omBucketInfo, missingParentInfos,
+            omMetadataManager, volumeId, bucketId, trxnLogIndex);
+
+        String multipartOpenKey = omMetadataManager
+            .getMultipartKey(volumeId, bucketId,
+                pathInfoFSO.getLastKnownParentId(),
+                pathInfoFSO.getLeafNodeName(),
+                keyArgs.getMultipartUploadID());
+
+        if (getOmKeyInfoFromOpenKeyTable(multipartOpenKey,
+            keyName, omMetadataManager) == null) {
+
+          final ReplicationConfig replicationConfig = OzoneConfigUtil
+              .resolveReplicationConfigPreference(keyArgs.getType(),
+                  keyArgs.getFactor(), keyArgs.getEcReplicationConfig(),
+                  omBucketInfo != null ?
+                      omBucketInfo.getDefaultReplicationConfig() :
+                      null, ozoneManager);
+
+          OmMultipartKeyInfo multipartKeyInfoFromArgs =
+              new OmMultipartKeyInfo.Builder()
+                  .setUploadID(keyArgs.getMultipartUploadID())
+                  .setCreationTime(keyArgs.getModificationTime())
+                  .setReplicationConfig(replicationConfig)
+                  .setObjectID(pathInfoFSO.getLeafNodeObjectId())
+                  .setUpdateID(trxnLogIndex)
+                  .setParentID(pathInfoFSO.getLastKnownParentId())
+                  .build();
+
+          OmKeyInfo keyInfoFromArgs = new OmKeyInfo.Builder()
+              .setVolumeName(volumeName)
+              .setBucketName(bucketName)
+              .setKeyName(keyName)
+              .setCreationTime(keyArgs.getModificationTime())
+              .setModificationTime(keyArgs.getModificationTime())
+              .setReplicationConfig(replicationConfig)
+              .setOmKeyLocationInfos(Collections.singletonList(
+                  new OmKeyLocationInfoGroup(0, new ArrayList<>(), true)))
+              .setAcls(getAclsForKey(keyArgs, omBucketInfo, pathInfoFSO,
+                  ozoneManager.getPrefixManager()))
+              .setObjectID(pathInfoFSO.getLeafNodeObjectId())
+              .setUpdateID(trxnLogIndex)
+              .setFileEncryptionInfo(keyArgs.hasFileEncryptionInfo() ?
+                  OMPBHelper.convert(keyArgs.getFileEncryptionInfo()) : null)
+              .setParentObjectID(pathInfoFSO.getLastKnownParentId())
+              .build();
+
+          // Add missing multi part info to open key table
+          addMultiParttoOpenTable(omMetadataManager, multipartOpenKey,
+              multipartKeyInfoFromArgs, pathInfoFSO, keyInfoFromArgs,
+              volumeId, bucketId, trxnLogIndex);
+        }
+      }
 
       String dbMultipartOpenKey =
           getDBMultipartOpenKey(volumeName, bucketName, keyName, uploadID,
@@ -200,39 +256,6 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
 
       OmMultipartKeyInfo multipartKeyInfo = omMetadataManager
           .getMultipartInfoTable().get(multipartKey);
-
-      if (null != missingParentInfos) {
-
-        // Add prefix directories to cache and open table
-        final ReplicationConfig replicationConfig = OzoneConfigUtil
-            .resolveReplicationConfigPreference(keyArgs.getType(),
-                keyArgs.getFactor(), keyArgs.getEcReplicationConfig(),
-                omBucketInfo != null ?
-                    omBucketInfo.getDefaultReplicationConfig() :
-                    null, ozoneManager);
-
-        OmKeyInfo keyInfoFromArgs = new OmKeyInfo.Builder()
-            .setVolumeName(volumeName)
-            .setBucketName(bucketName)
-            .setKeyName(keyName)
-            .setCreationTime(keyArgs.getModificationTime())
-            .setModificationTime(keyArgs.getModificationTime())
-            .setReplicationConfig(replicationConfig)
-            .setOmKeyLocationInfos(Collections.singletonList(
-                new OmKeyLocationInfoGroup(0, new ArrayList<>(), true)))
-            .setAcls(getAclsForKey(keyArgs, omBucketInfo, pathInfoFSO,
-                ozoneManager.getPrefixManager()))
-            .setObjectID(pathInfoFSO.getLeafNodeObjectId())
-            .setUpdateID(trxnLogIndex)
-            .setFileEncryptionInfo(keyArgs.hasFileEncryptionInfo() ?
-                OMPBHelper.convert(keyArgs.getFileEncryptionInfo()) : null)
-            .setParentObjectID(pathInfoFSO.getLastKnownParentId())
-            .build();
-
-        addPrefixDirstoOpenTable(omMetadataManager, dbMultipartOpenKey,
-            pathInfoFSO, keyInfoFromArgs, multipartKeyInfo, trxnLogIndex,
-            volumeName, bucketName);
-      }
 
       String ozoneKey = omMetadataManager.getOzoneKey(
           volumeName, bucketName, keyName);
@@ -518,17 +541,17 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
   protected void addMissingParentsToTable(OmBucketInfo omBucketInfo,
       List<OmDirectoryInfo> missingParentInfos,
       OMMetadataManager omMetadataManager,
-      String volumeName, String bucketName, long transactionLogIndex
+      long volumeId, long bucketId, long transactionLogIndex
   ) throws IOException {
     // FSO is disabled. Do nothing.
   }
 
   @SuppressWarnings("checkstyle:ParameterNumber")
-  protected void addPrefixDirstoOpenTable(
+  protected void addMultiParttoOpenTable(
       OMMetadataManager omMetadataManager, String multipartOpenKey,
+      OmMultipartKeyInfo multipartKeyInfo,
       OMFileRequest.OMPathInfoWithFSO pathInfoFSO, OmKeyInfo omKeyInfo,
-      OmMultipartKeyInfo multipartKeyInfo, long transactionLogIndex,
-      String volumeName, String bucketName
+      long volumeId, long bucketId, long transactionLogIndex
   ) throws IOException {
     // FSO is disabled. Do nothing.
   }

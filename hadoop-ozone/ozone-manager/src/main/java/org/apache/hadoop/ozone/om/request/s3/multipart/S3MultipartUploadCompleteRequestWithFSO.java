@@ -80,15 +80,8 @@ public class S3MultipartUploadCompleteRequestWithFSO
   @Override
   protected void addMissingParentsToTable(OmBucketInfo omBucketInfo,
       List<OmDirectoryInfo> missingParentInfos,
-      OMMetadataManager omMetadataManager, String volumeName, String bucketName,
+      OMMetadataManager omMetadataManager, long volumeId, long bucketId,
       long transactionLogIndex) throws IOException {
-
-    if (null == missingParentInfos) {
-      return;
-    }
-    final long volumeId = omMetadataManager.getVolumeId(volumeName);
-    final long bucketId = omMetadataManager.getBucketId(volumeName,
-        bucketName);
 
     // validate and update namespace for missing parent directory.
     checkBucketQuotaInNamespace(omBucketInfo, missingParentInfos.size());
@@ -122,23 +115,19 @@ public class S3MultipartUploadCompleteRequestWithFSO
   }
 
   @Override
-  protected void addPrefixDirstoOpenTable(
+  protected void addMultiParttoOpenTable(
       OMMetadataManager omMetadataManager, String multipartOpenKey,
+      OmMultipartKeyInfo multipartKeyInfo,
       OMFileRequest.OMPathInfoWithFSO pathInfoFSO, OmKeyInfo omKeyInfo,
-      OmMultipartKeyInfo multipartKeyInfo, long transactionLogIndex,
-      String volumeName, String bucketName
+      long volumeId, long bucketId, long transactionLogIndex
   ) throws IOException {
 
-    final long volumeId = omMetadataManager.getVolumeId(volumeName);
-    final long bucketId = omMetadataManager.getBucketId(volumeName,
-        bucketName);
-
-    // Add to prefix directories to cache
+    // Add multi part to cache
     OMFileRequest.addOpenFileTableCacheEntry(omMetadataManager,
         multipartOpenKey, omKeyInfo, pathInfoFSO.getLeafNodeName(),
         transactionLogIndex);
 
-    // Create missing parent directory entries.
+    // Add multi part to open key table.
     try (BatchOperation batchOperation = omMetadataManager.getStore()
         .initBatchOperation()) {
 
