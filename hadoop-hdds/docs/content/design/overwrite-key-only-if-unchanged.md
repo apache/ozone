@@ -78,6 +78,22 @@ To do this:
 
 Note that any change to a key will change the updateID. This is existing behaviour, and committing an rewritten key will also modify the updateID. Note this also offers protection against concurrent rewrites. 
 
+### Alternative Proposal
+
+1. Pass the expected updateID to the rewrite API which passes it down to the relevant key stream, effectively saving it on the client
+2. Client attaches update ID to the commit request to indicate a rewrite instead of a put
+3. OM checks the update ID if present and returns the corresponding success/fail result
+
+The advantage of this alternative approach is that it does not require the overwriteUpdateID to be stored in the openKey table.
+
+However the client code required to implement this appears more complex due to having different key commit logic for Ratis and EC and the parameter needing to be passed through many method calls.
+
+The existing implementation for key creation stores various attributes (metadata, creation time, ACLs, ReplicationConfig) in the openKey table, so storing the overwriteExpectedUpdateID keeps with that convention, which is less confusing for future developers.
+
+In terms of forward / backward compatibility both solutions are equivalent. Only a new parameter is required within the KeyArgs passed to create and commit Key.
+
+If an upgraded server is rolled back, it will still be able to deal with an openKey entry containing overWriteUpdateID, but it will not process it atomically.
+
 ## Changes Required
 
 In order to enable the above steps on Ozone, several small changes are needed.
