@@ -35,7 +35,7 @@ execute_s3a_tests() {
   pushd "${HADOOP_AWS_DIR}"
 
   # S3A contract tests are enabled by presence of `auth-keys.xml`.
-  # https://hadoop.apache.org/docs/3.3.6/hadoop-aws/tools/hadoop-aws/testing.html#Setting_up_the_tests
+  # https://hadoop.apache.org/docs/r3.3.6/hadoop-aws/tools/hadoop-aws/testing.html#Setting_up_the_tests
   cat > src/test/resources/auth-keys.xml <<-EOF
   <configuration>
 
