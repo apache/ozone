@@ -31,7 +31,6 @@ import org.slf4j.event.Level;
 import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -72,8 +71,9 @@ public class TestContainerBalancerDatanodeNodeLimit {
   @ParameterizedTest(name = "MockedSCM #{index}: {0}")
   @MethodSource("createMockedSCMs")
   public void containerBalancerShouldObeyMaxDatanodesToInvolveLimit(@Nonnull MockedSCM mockedSCM) {
-    ContainerBalancerConfiguration config = mockedSCM.getBalancerConfig();
-    if (mockedSCM.getCluster().getNodeCount() < DATANODE_COUNT_LIMIT_FOR_SMALL_CLUSTER) {
+    ContainerBalancerConfiguration config = createBalancerConfig();
+    int nodeCount = mockedSCM.getCluster().getNodeCount();
+    if (nodeCount < DATANODE_COUNT_LIMIT_FOR_SMALL_CLUSTER) {
       config.setMaxDatanodesPercentageToInvolvePerIteration(100);
     }
     config.setMaxSizeToMovePerIteration(100 * STORAGE_UNIT);
@@ -83,10 +83,8 @@ public class TestContainerBalancerDatanodeNodeLimit {
     ContainerBalancerTask task = mockedSCM.startBalancerTask(config);
     ContainerBalancerMetrics metrics = task.getMetrics();
 
-    int maxDatanodePercentage = 40;
-    int nodeCount = mockedSCM.getCluster().getNodeCount();
-    int number =
-        (nodeCount < DATANODE_COUNT_LIMIT_FOR_SMALL_CLUSTER) ? nodeCount : maxDatanodePercentage * nodeCount / 100;
+    int maxDatanodePercentage = config.getMaxDatanodesPercentageToInvolvePerIteration();
+    int number = maxDatanodePercentage * nodeCount / 100;
     int datanodesInvolvedPerIteration = task.getCountDatanodesInvolvedPerIteration();
     assertThat(datanodesInvolvedPerIteration).isGreaterThan(0);
     assertThat(datanodesInvolvedPerIteration).isLessThanOrEqualTo(number);
@@ -96,43 +94,43 @@ public class TestContainerBalancerDatanodeNodeLimit {
   @ParameterizedTest(name = "MockedSCM #{index}: {0}")
   @MethodSource("createMockedSCMs")
   public void balancerShouldObeyMaxSizeEnteringTargetLimit(@Nonnull MockedSCM mockedSCM) {
-    OzoneConfiguration ozoneConfig = mockedSCM.getOzoneConfig();
+    OzoneConfiguration ozoneConfig = new OzoneConfiguration();
     ozoneConfig.set("ozone.scm.container.size", "1MB");
-    ContainerBalancerConfiguration config = mockedSCM.getBalancerConfigByOzoneConfig(ozoneConfig);
+    ContainerBalancerConfiguration config = balancerConfigByOzoneConfig(ozoneConfig);
     config.setThreshold(10);
     config.setMaxSizeToMovePerIteration(50 * STORAGE_UNIT);
     if (mockedSCM.getCluster().getNodeCount() < DATANODE_COUNT_LIMIT_FOR_SMALL_CLUSTER) {
       config.setMaxDatanodesPercentageToInvolvePerIteration(100);
     }
-
     // No containers should be selected when the limit is just 2 MB.
     config.setMaxSizeEnteringTarget(2 * OzoneConsts.MB);
-    ContainerBalancerTask task = mockedSCM.startBalancerTask(config);
 
+    ContainerBalancerTask task = mockedSCM.startBalancerTask(config);
+    // Container balancer still has unbalanced nodes due to MaxSizeEnteringTarget limit
     assertTrue(stillHaveUnbalancedNodes(task));
+    // ContainerToSourceMap is empty due to MaxSizeEnteringTarget limit
     assertTrue(task.getContainerToSourceMap().isEmpty());
 
     // Some containers should be selected when using default values.
-    ContainerBalancerConfiguration balancerConfig = mockedSCM.getBalancerConfigByOzoneConfig(new OzoneConfiguration());
+    ContainerBalancerConfiguration balancerConfig = balancerConfigByOzoneConfig(new OzoneConfiguration());
+    if (mockedSCM.getCluster().getNodeCount() < DATANODE_COUNT_LIMIT_FOR_SMALL_CLUSTER) {
+      balancerConfig.setMaxDatanodesPercentageToInvolvePerIteration(100);
+    }
     balancerConfig.setBalancingInterval(1);
 
     task = mockedSCM.startBalancerTask(balancerConfig);
 
     // Balancer should have identified unbalanced nodes.
     assertTrue(stillHaveUnbalancedNodes(task));
-    if (canNotBalanceAnyMore(task)) {
-      assertTrue(task.getContainerToSourceMap().isEmpty());
-    } else {
-      assertFalse(task.getContainerToSourceMap().isEmpty());
-    }
+    assertFalse(task.getContainerToSourceMap().isEmpty());
   }
 
   @ParameterizedTest(name = "MockedSCM #{index}: {0}")
   @MethodSource("createMockedSCMs")
   public void balancerShouldObeyMaxSizeLeavingSourceLimit(@Nonnull MockedSCM mockedSCM) {
-    OzoneConfiguration ozoneConfig = mockedSCM.getOzoneConfig();
+    OzoneConfiguration ozoneConfig = new OzoneConfiguration();
     ozoneConfig.set("ozone.scm.container.size", "1MB");
-    ContainerBalancerConfiguration config = mockedSCM.getBalancerConfigByOzoneConfig(ozoneConfig);
+    ContainerBalancerConfiguration config = balancerConfigByOzoneConfig(ozoneConfig);
     config.setThreshold(10);
     config.setMaxSizeToMovePerIteration(50 * STORAGE_UNIT);
     if (mockedSCM.getCluster().getNodeCount() < DATANODE_COUNT_LIMIT_FOR_SMALL_CLUSTER) {
@@ -147,8 +145,10 @@ public class TestContainerBalancerDatanodeNodeLimit {
     assertTrue(task.getContainerToSourceMap().isEmpty());
 
     // Some containers should be selected when using default values.
-    ContainerBalancerConfiguration newBalancerConfig =
-        mockedSCM.getBalancerConfigByOzoneConfig(new OzoneConfiguration());
+    ContainerBalancerConfiguration newBalancerConfig = balancerConfigByOzoneConfig(new OzoneConfiguration());
+    if (mockedSCM.getCluster().getNodeCount() < DATANODE_COUNT_LIMIT_FOR_SMALL_CLUSTER) {
+      newBalancerConfig.setMaxDatanodesPercentageToInvolvePerIteration(100);
+    }
     newBalancerConfig.setBalancingInterval(1);
 
     task = mockedSCM.startBalancerTask(newBalancerConfig);
@@ -156,17 +156,8 @@ public class TestContainerBalancerDatanodeNodeLimit {
     // Balancer should have identified unbalanced nodes.
     assertTrue(stillHaveUnbalancedNodes(task));
 
-    if (canNotBalanceAnyMore(task)) {
-      assertTrue(task.getContainerToSourceMap().isEmpty());
-      assertEquals(0, task.getSizeScheduledForMoveInLatestIteration());
-    } else {
-      assertFalse(task.getContainerToSourceMap().isEmpty());
-      assertNotEquals(0, task.getSizeScheduledForMoveInLatestIteration());
-    }
-  }
-
-  private static boolean canNotBalanceAnyMore(@Nonnull ContainerBalancerTask task) {
-    return task.getIterationResult() == ContainerBalancerTask.IterationResult.CAN_NOT_BALANCE_ANY_MORE;
+    assertFalse(task.getContainerToSourceMap().isEmpty());
+    assertNotEquals(0, task.getSizeScheduledForMoveInLatestIteration());
   }
 
   private static boolean stillHaveUnbalancedNodes(@Nonnull ContainerBalancerTask task) {
@@ -174,17 +165,21 @@ public class TestContainerBalancerDatanodeNodeLimit {
   }
 
   public static @Nonnull MockedSCM getMockedSCM(int datanodeCount) {
-    TestableCluster cluster = new TestableCluster(datanodeCount, STORAGE_UNIT);
-    return new MockedSCM(cluster, createBalancerConfig());
+    return new MockedSCM(new TestableCluster(datanodeCount, STORAGE_UNIT));
   }
 
   private static @Nonnull ContainerBalancerConfiguration createBalancerConfig() {
-    ContainerBalancerConfiguration balancerCfg =
-        new OzoneConfiguration().getObject(ContainerBalancerConfiguration.class);
-    balancerCfg.setThreshold(10);
-    balancerCfg.setIterations(1);
-    balancerCfg.setMaxSizeToMovePerIteration(50 * STORAGE_UNIT);
-    balancerCfg.setMaxSizeEnteringTarget(50 * STORAGE_UNIT);
-    return balancerCfg;
+    ContainerBalancerConfiguration cfg = new OzoneConfiguration().getObject(ContainerBalancerConfiguration.class);
+    cfg.setThreshold(10);
+    cfg.setIterations(1);
+    cfg.setMaxSizeToMovePerIteration(50 * STORAGE_UNIT);
+    cfg.setMaxSizeEnteringTarget(50 * STORAGE_UNIT);
+    return cfg;
+  }
+
+  private static @Nonnull ContainerBalancerConfiguration balancerConfigByOzoneConfig(
+      @Nonnull OzoneConfiguration config
+  ) {
+    return config.getObject(ContainerBalancerConfiguration.class);
   }
 }

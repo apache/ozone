@@ -6,9 +6,9 @@
  * to you under the Apache License, Version 2.0 (the
  * "License"); you may not use this file except in compliance
  * with the License.  You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
+ * <p>
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * <p>
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -65,8 +65,6 @@ import static org.mockito.Mockito.when;
 public final class MockedSCM {
   private final StorageContainerManager scm;
   private final TestableCluster cluster;
-  private final ContainerBalancerConfiguration balancerCfg;
-  private final OzoneConfiguration ozoneCfg;
   private final MockNodeManager mockNodeManager;
   private MockedReplicationManager mockedReplicaManager;
   private MoveManager moveManager;
@@ -74,17 +72,20 @@ public final class MockedSCM {
 
   private MockedPlacementPolicies mockedPlacementPolicies;
 
-  public MockedSCM(@Nonnull TestableCluster testableCluster, ContainerBalancerConfiguration balancerConfiguration) {
+  public MockedSCM(@Nonnull TestableCluster testableCluster) {
     scm = mock(StorageContainerManager.class);
-    ozoneCfg = new OzoneConfiguration();
     cluster = testableCluster;
     mockNodeManager = new MockNodeManager(cluster.getDatanodeToContainersMap());
+  }
 
-    // these configs will usually be specified in each test
-    balancerCfg = balancerConfiguration;
-    ozoneCfg.setFromObject(balancerCfg);
+  public void init(@Nonnull ContainerBalancerConfiguration balancerConfig) {
+    init(balancerConfig, new OzoneConfiguration());
+  }
+
+  public void init(@Nonnull ContainerBalancerConfiguration balancerConfig, @Nonnull OzoneConfiguration ozoneCfg) {
+    ozoneCfg.setFromObject(balancerConfig);
     try {
-      doMock();
+      doMock(balancerConfig, ozoneCfg);
     } catch (IOException | NodeNotFoundException | TimeoutException e) {
       throw new RuntimeException("Can't initialize TestOzoneHDDS: ", e);
     }
@@ -93,7 +94,8 @@ public final class MockedSCM {
   /**
    * Mock some instances that will be used for MockedStorageContainerManager.
    */
-  private void doMock() throws IOException, NodeNotFoundException, TimeoutException {
+  private void doMock(@Nonnull ContainerBalancerConfiguration cfg, @Nonnull OzoneConfiguration ozoneCfg)
+      throws IOException, NodeNotFoundException, TimeoutException {
     containerManager = mockContainerManager(cluster);
     mockedReplicaManager = MockedReplicationManager.doMock();
     moveManager = mockMoveManager();
@@ -103,7 +105,7 @@ public final class MockedSCM {
     mockedPlacementPolicies = MockedPlacementPolicies.doMock(ozoneCfg, mockNodeManager);
 
     when(scm.getConfiguration()).then(invocationOnMock -> {
-      ozoneCfg.setFromObject(balancerCfg);
+      ozoneCfg.setFromObject(cfg);
       return ozoneCfg;
     });
     when(scm.getMoveManager()).thenReturn(moveManager);
@@ -124,10 +126,6 @@ public final class MockedSCM {
     return cluster.toString();
   }
 
-  public @Nonnull ContainerBalancer createContainerBalancer() {
-    return new ContainerBalancer(scm);
-  }
-
   public @Nonnull ContainerBalancerTask startBalancerTask(
       @Nonnull ContainerBalancer containerBalancer,
       @Nonnull ContainerBalancerConfiguration config
@@ -139,6 +137,7 @@ public final class MockedSCM {
   }
 
   public @Nonnull ContainerBalancerTask startBalancerTask(@Nonnull ContainerBalancerConfiguration config) {
+    init(config);
     return startBalancerTask(new ContainerBalancer(scm), config);
   }
 
@@ -158,20 +157,8 @@ public final class MockedSCM {
     return mockedReplicaManager.manager;
   }
 
-  public @Nonnull ContainerBalancerConfiguration getBalancerConfig() {
-    return balancerCfg;
-  }
-
   public @Nonnull MockNodeManager getNodeManager() {
     return mockNodeManager;
-  }
-
-  public @Nonnull OzoneConfiguration getOzoneConfig() {
-    return ozoneCfg;
-  }
-
-  public @Nonnull ContainerBalancerConfiguration getBalancerConfigByOzoneConfig(@Nonnull OzoneConfiguration config) {
-    return config.getObject(ContainerBalancerConfiguration.class);
   }
 
   public @Nonnull StorageContainerManager getStorageContainerManager() {
@@ -310,7 +297,7 @@ public final class MockedSCM {
     private final PlacementPolicy ecPlacementPolicy;
     private final PlacementPolicyValidateProxy validateProxyPolicy;
 
-    private MockedPlacementPolicies(PlacementPolicy placementPolicy, PlacementPolicy ecPolicy) {
+    private MockedPlacementPolicies(@Nonnull PlacementPolicy placementPolicy, @Nonnull PlacementPolicy ecPolicy) {
       this.placementPolicy = placementPolicy;
       ecPlacementPolicy = ecPolicy;
       validateProxyPolicy = new PlacementPolicyValidateProxy(this.placementPolicy, ecPlacementPolicy);
