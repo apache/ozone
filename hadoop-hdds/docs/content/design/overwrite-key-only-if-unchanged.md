@@ -42,6 +42,13 @@ Writing a key in Ozone is a 3 step process:
 2. The client writes data to the data nodes
 3. The client commits the key to OM via a Commit Key call.
 
+Note, that as things stand, it is possible to lose metadata updates (eg ACL changes) when a key is overwritten.
+
+1. If the key exists, then a new copy of the key is open for writing.
+2. While the new copy is open, another process updates the ACLs for the key
+3. On commit, the new ACLs are not copied to the new key as the new key made a copy of the existing metadata at the time the key was opened.
+
+With the technique described in the next section, that problem is removed in this design, as the ACL update will change the updateID, and the key will not be committed.
 
 ## Atomic Key Replacement
 
