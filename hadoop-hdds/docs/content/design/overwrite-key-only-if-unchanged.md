@@ -128,6 +128,9 @@ No new locks are needed on OM. As part of the openKey and commitKey, there are e
 
  public OzoneOutputStream replaceKeyIfUnchanged(String volumeName, String bucketName, String keyName, long size, long expectedUpdateID, ReplicationConfig replicationConfigOfNewKey)
       throws IOException 
+      
+// Can also add an overloaded version of these methods to pass a metadata map, as with the existing
+// create key method.      
 
 	  
  ```
@@ -147,8 +150,6 @@ An alternative, is to create a new overloaded createKey:
       String volumeName, String bucketName, String keyName, long size,
       ReplicationConfig replicationConfig, long expectedUpdateID)
 ```
-
-Note the omission of the metaData map, as the intention of this API is to copy that from what already exisits on the server.
 
 The intended usage of this API, is that the existing key details are read, then used to open the new key, and then data is written, eg:
 
