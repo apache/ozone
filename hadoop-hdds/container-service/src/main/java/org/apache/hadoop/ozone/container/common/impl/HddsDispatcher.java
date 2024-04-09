@@ -836,12 +836,11 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
             ContainerProtos.Result.CONTAINER_INTERNAL_ERROR);
       }
       perf.appendPreOpLatencyMs(Time.monotonicNow() - startTime);
-      handler.streamDataReadOnly(
+      boolean success = handler.streamDataReadOnly(
           msg, (KeyValueContainer) container, dispatcherContext, streamObserver);
       long oPLatencyMS = Time.monotonicNow() - startTime;
       metrics.incContainerOpsLatencies(cmdType, oPLatencyMS);
-      Result result = responseProto.getResult();
-      if (result == Result.SUCCESS) {
+      if (success) {
         audit(action, eventType, params, AuditEventStatus.SUCCESS, null);
       } else {
         OnDemandContainerDataScanner.scanContainer(container);

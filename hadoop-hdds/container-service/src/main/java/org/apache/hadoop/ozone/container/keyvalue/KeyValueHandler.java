@@ -1213,10 +1213,11 @@ public class KeyValueHandler extends Handler {
   }
 
   @Override
-  public void streamDataReadOnly(
+  public boolean streamDataReadOnly(
       ContainerCommandRequestProto request, KeyValueContainer kvContainer,
       DispatcherContext dispatcherContext,
       StreamObserver<ContainerCommandResponseProto> streamObserver) {
+    boolean result = true;
     try {
       if (!request.hasReadBlock()) {
         throw new Exception("MALFORMED_REQUEST");
@@ -1286,16 +1287,21 @@ public class KeyValueHandler extends Handler {
       metrics.incContainerBytesStats(Type.ReadBlock, readBlock.getLen());
     } catch (StorageContainerException ex) {
       streamObserver.onNext(ContainerUtils.logAndReturnError(LOG, ex, request));
+      result = false;
     } catch (IOException ioe) {
       streamObserver.onNext(ContainerUtils.logAndReturnError(LOG,
           new StorageContainerException("Read Block failed", ioe, IO_EXCEPTION),
           request));
+      result = false;
     } catch (Exception ex) {
       if (LOG.isDebugEnabled()) {
         LOG.debug("Malformed Read Chunk request. trace ID: {}",
             request.getTraceID());
       }
       streamObserver.onNext(malformedRequest(request));
+      result = false;
+    } finally {
+      return result;
     }
   }
 
