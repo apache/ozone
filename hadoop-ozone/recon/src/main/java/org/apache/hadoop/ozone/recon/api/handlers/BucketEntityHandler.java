@@ -30,6 +30,8 @@ import org.apache.hadoop.ozone.recon.api.types.NSSummary;
 import org.apache.hadoop.ozone.recon.api.types.ResponseStatus;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 import org.apache.hadoop.ozone.recon.spi.ReconNamespaceSummaryManager;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -40,6 +42,7 @@ import java.util.Set;
  * Class for handling bucket entity type.
  */
 public class BucketEntityHandler extends EntityHandler {
+  private static final Logger LOG = LoggerFactory.getLogger(BucketEntityHandler.class);
   public BucketEntityHandler(
       ReconNamespaceSummaryManager reconNamespaceSummaryManager,
       ReconOMMetadataManager omMetadataManager,
@@ -87,7 +90,7 @@ public class BucketEntityHandler extends EntityHandler {
 
   @Override
   public DUResponse getDuResponse(
-          boolean listFile, boolean withReplica)
+      boolean listFile, boolean withReplica, boolean recursive)
           throws IOException {
     DUResponse duResponse = new DUResponse();
     duResponse.setPath(getNormalizedPath());
@@ -109,6 +112,7 @@ public class BucketEntityHandler extends EntityHandler {
     long bucketDataSize = duResponse.getKeySize();
     long bucketDataSizeWithReplica = 0L;
     for (long subdirObjectId: bucketSubdirs) {
+      List<DUResponse.DiskUsage> diskUsageList = new ArrayList<>();
       NSSummary subdirNSSummary = getReconNamespaceSummaryManager()
               .getNSSummary(subdirObjectId);
 
@@ -124,12 +128,13 @@ public class BucketEntityHandler extends EntityHandler {
 
       if (withReplica) {
         long dirDU = getBucketHandler()
-            .calculateDUUnderObject(subdirObjectId);
+            .calculateDUUnderObject(subdirObjectId, recursive, diskUsageList);
         diskUsage.setSizeWithReplica(dirDU);
         bucketDataSizeWithReplica += dirDU;
       }
       diskUsage.setSize(dataSize);
       dirDUData.add(diskUsage);
+      dirDUData.addAll(diskUsageList);
     }
     // Either listFile or withReplica is enabled, we need the directKeys info
     if (listFile || withReplica) {

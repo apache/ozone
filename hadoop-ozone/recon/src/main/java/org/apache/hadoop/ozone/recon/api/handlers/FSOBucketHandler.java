@@ -21,6 +21,7 @@ import com.google.common.base.Preconditions;
 import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
+import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
@@ -30,8 +31,6 @@ import org.apache.hadoop.ozone.recon.api.types.EntityType;
 import org.apache.hadoop.ozone.recon.api.types.NSSummary;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 import org.apache.hadoop.ozone.recon.spi.ReconNamespaceSummaryManager;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.nio.file.Paths;
@@ -45,11 +44,9 @@ import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
  * Class for handling FSO buckets NameSpaceSummaries.
  */
 public class FSOBucketHandler extends BucketHandler {
-  private static final Logger LOG =
-      LoggerFactory.getLogger(FSOBucketHandler.class);
   private final long volumeId;
   private final long bucketId;
-  
+
   public FSOBucketHandler(
       ReconNamespaceSummaryManager reconNamespaceSummaryManager,
       ReconOMMetadataManager omMetadataManager,
@@ -75,7 +72,7 @@ public class FSOBucketHandler extends BucketHandler {
    */
   @Override
   public EntityType determineKeyPath(String keyName)
-                                     throws IOException {
+      throws IOException {
     java.nio.file.Path keyPath = Paths.get(keyName);
     Iterator<java.nio.file.Path> elements = keyPath.iterator();
 
@@ -92,14 +89,14 @@ public class FSOBucketHandler extends BucketHandler {
       String dbNodeName = getOmMetadataManager().getOzonePathKey(volumeId,
           bucketId, lastKnownParentId, fileName);
       omDirInfo = getOmMetadataManager().getDirectoryTable()
-              .getSkipCache(dbNodeName);
+          .getSkipCache(dbNodeName);
 
       if (omDirInfo != null) {
         lastKnownParentId = omDirInfo.getObjectID();
       } else if (!elements.hasNext()) {
         // reached last path component. Check file exists for the given path.
         OmKeyInfo omKeyInfo = getOmMetadataManager().getFileTable()
-                .getSkipCache(dbNodeName);
+            .getSkipCache(dbNodeName);
         // The path exists as a file
         if (omKeyInfo != null) {
           omKeyInfo.setKeyName(keyName);
@@ -121,13 +118,13 @@ public class FSOBucketHandler extends BucketHandler {
   // FileTable's key is in the format of "volumeId/bucketId/parentId/fileName"
   // Make use of RocksDB's order to seek to the prefix and avoid full iteration
   @Override
-  public long calculateDUUnderObject(long parentId)
+  public long calculateDUUnderObject(long parentId, boolean recursive, List<DUResponse.DiskUsage> diskUsageList)
       throws IOException {
     Table<String, OmKeyInfo> keyTable = getOmMetadataManager().getFileTable();
 
     long totalDU = 0L;
     try (TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>>
-            iterator = keyTable.iterator()) {
+             iterator = keyTable.iterator()) {
 
       String seekPrefix = OM_KEY_PREFIX +
           volumeId +
@@ -146,6 +143,9 @@ public class FSOBucketHandler extends BucketHandler {
           break;
         }
         OmKeyInfo keyInfo = kv.getValue();
+        if (recursive) {
+          populateDiskUsage(keyInfo, diskUsageList);
+        }
         if (keyInfo != null) {
           totalDU += keyInfo.getReplicatedSize();
         }
@@ -154,7 +154,7 @@ public class FSOBucketHandler extends BucketHandler {
 
     // handle nested keys (DFS)
     NSSummary nsSummary = getReconNamespaceSummaryManager()
-            .getNSSummary(parentId);
+        .getNSSummary(parentId);
     // empty bucket
     if (nsSummary == null) {
       return 0;
@@ -162,9 +162,62 @@ public class FSOBucketHandler extends BucketHandler {
 
     Set<Long> subDirIds = nsSummary.getChildDir();
     for (long subDirId: subDirIds) {
-      totalDU += calculateDUUnderObject(subDirId);
+      totalDU += calculateDUUnderObject(subDirId, recursive, diskUsageList);
     }
     return totalDU;
+  }
+
+  private void populateDiskUsage(OmKeyInfo keyInfo, List<DUResponse.DiskUsage> diskUsageList) throws IOException {
+    DUResponse.DiskUsage diskUsage = new DUResponse.DiskUsage();
+    diskUsage.setKey(keyInfo.isFile());
+    diskUsage.setSubpath(constructFullPath(keyInfo, getReconNamespaceSummaryManager()));
+    diskUsage.setSize(keyInfo.getDataSize());
+    diskUsage.setSizeWithReplica(keyInfo.getReplicatedSize());
+    diskUsage.setReplicationType(keyInfo.getReplicationConfig().getReplicationType().name());
+    diskUsage.setCreationTime(keyInfo.getCreationTime());
+    diskUsage.setModificationTime(keyInfo.getModificationTime());
+
+    diskUsageList.add(diskUsage);
+  }
+
+  /**
+   * Constructs the full path of a key from its OmKeyInfo using a bottom-up approach, starting from the leaf node.
+   * <p>
+   * The method begins with the leaf node (the key itself) and recursively prepends parent directory names, fetched
+   * via NSSummary objects, until reaching the parent bucket (parentId is -1). It effectively builds the path from
+   * bottom to top, finally prepending the volume and bucket names to complete the full path.
+   *
+   * @param omKeyInfo The OmKeyInfo object for the key
+   * @return The constructed full path of the key as a String.
+   * @throws IOException
+   */
+  public static String constructFullPath(OmKeyInfo omKeyInfo,
+                                         ReconNamespaceSummaryManager reconNamespaceSummaryManager)
+      throws IOException {
+    StringBuilder fullPath = new StringBuilder(omKeyInfo.getKeyName());
+    long parentId = omKeyInfo.getParentObjectID();
+    boolean isDirectoryPresent = false;
+    while (parentId != -1) {
+      NSSummary nsSummary = reconNamespaceSummaryManager.getNSSummary(parentId);
+      if (nsSummary == null) {
+        break;
+      }
+      // Prepend the directory name to the path
+      fullPath.insert(0, nsSummary.getDirName() + OM_KEY_PREFIX);
+
+      // Move to the parent ID of the current directory
+      parentId = nsSummary.getParentId();
+      isDirectoryPresent = true;
+    }
+
+    // Prepend the volume and bucket to the constructed path
+    String volumeName = omKeyInfo.getVolumeName();
+    String bucketName = omKeyInfo.getBucketName();
+    fullPath.insert(0, volumeName + OM_KEY_PREFIX + bucketName + OM_KEY_PREFIX);
+    if (isDirectoryPresent) {
+      return OmUtils.normalizeKey(fullPath.toString(), true);
+    }
+    return fullPath.toString();
   }
 
   /**
@@ -188,7 +241,7 @@ public class FSOBucketHandler extends BucketHandler {
     long keyDataSizeWithReplica = 0L;
 
     try (TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>>
-            iterator = keyTable.iterator()) {
+             iterator = keyTable.iterator()) {
 
       String seekPrefix = OM_KEY_PREFIX +
           volumeId +
@@ -214,6 +267,9 @@ public class FSOBucketHandler extends BucketHandler {
           diskUsage.setSubpath(subpath);
           diskUsage.setKey(true);
           diskUsage.setSize(keyInfo.getDataSize());
+          diskUsage.setReplicationType(keyInfo.getReplicationConfig().getReplicationType().name());
+          diskUsage.setCreationTime(keyInfo.getCreationTime());
+          diskUsage.setModificationTime(keyInfo.getModificationTime());
 
           if (withReplica) {
             long keyDU = keyInfo.getReplicatedSize();
@@ -257,9 +313,9 @@ public class FSOBucketHandler extends BucketHandler {
     String dirKey;
     for (int i = 2; i < cutoff; ++i) {
       dirKey = getOmMetadataManager().getOzonePathKey(getVolumeObjectId(names),
-              getBucketObjectId(names), dirObjectId, names[i]);
+          getBucketObjectId(names), dirObjectId, names[i]);
       OmDirectoryInfo dirInfo =
-              getOmMetadataManager().getDirectoryTable().getSkipCache(dirKey);
+          getOmMetadataManager().getDirectoryTable().getSkipCache(dirKey);
       if (null != dirInfo) {
         dirObjectId = dirInfo.getObjectID();
       }
@@ -279,7 +335,7 @@ public class FSOBucketHandler extends BucketHandler {
     String fileName = names[names.length - 1];
     String ozoneKey =
         getOmMetadataManager().getOzonePathKey(volumeId, bucketId,
-        parentObjectId, fileName);
+            parentObjectId, fileName);
     return getOmMetadataManager().getFileTable().getSkipCache(ozoneKey);
   }
 

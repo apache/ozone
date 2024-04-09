@@ -138,6 +138,18 @@ public class DUResponse {
     @JsonProperty("isKey")
     private boolean isKey;
 
+    /** Indicate if the key replication type RATIS or EC. */
+    @JsonProperty("replicationType")
+    private String replicationType;
+
+    /** key creation time. */
+    @JsonProperty("creationTime")
+    private long creationTime;
+
+    /** key modification time. */
+    @JsonProperty("modificationTime")
+    private long modificationTime;
+
     public DiskUsage() {
       this.sizeWithReplica = -1L;
       this.isKey = false;
@@ -173,6 +185,30 @@ public class DUResponse {
 
     public boolean isKey() {
       return isKey;
+    }
+
+    public String getReplicationType() {
+      return replicationType;
+    }
+
+    public void setReplicationType(String replicationType) {
+      this.replicationType = replicationType;
+    }
+
+    public long getCreationTime() {
+      return creationTime;
+    }
+
+    public void setCreationTime(long creationTime) {
+      this.creationTime = creationTime;
+    }
+
+    public long getModificationTime() {
+      return modificationTime;
+    }
+
+    public void setModificationTime(long modificationTime) {
+      this.modificationTime = modificationTime;
     }
   }
 }

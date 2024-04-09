@@ -29,8 +29,13 @@ import java.net.URL;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.sql.Timestamp;
+import java.text.ParseException;
+import java.text.SimpleDateFormat;
+import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.List;
+import java.util.TimeZone;
 import java.util.concurrent.BlockingQueue;
 
 import com.google.common.base.Preconditions;
@@ -103,6 +108,30 @@ public class ReconUtils {
       queues.add(new ReconContainerReportQueue(queueSize));
     }
     return queues;
+  }
+
+  /**
+   * Converts string date in a provided format to server timezone's epoch milllioseconds.
+   *
+   * @param dateString
+   * @param dateFormat
+   * @param timeZone
+   * @return
+   * @throws ParseException
+   */
+  public static long convertToEpochMillis(String dateString, String dateFormat, TimeZone timeZone) {
+    try {
+      SimpleDateFormat sdf = new SimpleDateFormat(dateFormat);
+      sdf.setTimeZone(timeZone); // Set server's timezone
+      Date date = sdf.parse(dateString);
+      return date.getTime(); // Convert to epoch milliseconds
+    } catch (ParseException parseException) {
+      LOG.error("Date parse exception for date: {} in format: {} -> {}", dateString, dateFormat, parseException);
+      return Instant.now().toEpochMilli();
+    } catch (Exception exception) {
+      LOG.error("Unexpected error while parsing date: {} in format: {}", dateString, dateFormat);
+      return Instant.now().toEpochMilli();
+    }
   }
 
   /**

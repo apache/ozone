@@ -145,6 +145,9 @@ public class OBSBucketHandler extends BucketHandler {
           diskUsage.setSubpath(objectName);
           diskUsage.setKey(true);
           diskUsage.setSize(keyInfo.getDataSize());
+          diskUsage.setReplicationType(keyInfo.getReplicationConfig().getReplicationType().name());
+          diskUsage.setCreationTime(keyInfo.getCreationTime());
+          diskUsage.setModificationTime(keyInfo.getModificationTime());
 
           if (withReplica) {
             long keyDU = keyInfo.getReplicatedSize();
@@ -168,12 +171,15 @@ public class OBSBucketHandler extends BucketHandler {
    * Since OBS buckets operate on a flat hierarchy, this method iterates through
    * all the keys in the bucket without the need to traverse directories.
    *
-   * @param parentId The identifier for the parent bucket.
+   * @param parentId      The identifier for the parent bucket.
+   * @param recursive
+   * @param diskUsageList
    * @return The total disk usage of all keys within the specified OBS bucket.
    * @throws IOException
    */
   @Override
-  public long calculateDUUnderObject(long parentId) throws IOException {
+  public long calculateDUUnderObject(long parentId, boolean recursive, List<DUResponse.DiskUsage> diskUsageList)
+      throws IOException {
     // Initialize the total disk usage variable.
     long totalDU = 0L;
 

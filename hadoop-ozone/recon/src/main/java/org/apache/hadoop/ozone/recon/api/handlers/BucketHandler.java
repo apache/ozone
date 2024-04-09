@@ -77,16 +77,16 @@ public abstract class BucketHandler {
   public abstract EntityType determineKeyPath(String keyName)
       throws IOException;
 
-  public abstract long calculateDUUnderObject(long parentId)
-      throws IOException;
-
-  public abstract long handleDirectKeys(long parentId,
-                       boolean withReplica, boolean listFile,
-                       List<DUResponse.DiskUsage> duData,
-                       String normalizedPath) throws IOException;
+  public abstract long calculateDUUnderObject(long parentId, boolean recursive,
+                                              List<DUResponse.DiskUsage> diskUsageList) throws IOException;
 
   public abstract long getDirObjectId(String[] names)
           throws IOException;
+
+  public abstract long handleDirectKeys(long parentId,
+                                        boolean withReplica, boolean listFile,
+                                        List<DUResponse.DiskUsage> duData,
+                                        String normalizedPath) throws IOException;
 
   public abstract long getDirObjectId(String[] names, int cutoff)
           throws IOException;

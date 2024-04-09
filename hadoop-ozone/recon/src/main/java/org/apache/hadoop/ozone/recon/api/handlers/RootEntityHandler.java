@@ -88,7 +88,7 @@ public class RootEntityHandler extends EntityHandler {
 
   @Override
   public DUResponse getDuResponse(
-          boolean listFile, boolean withReplica)
+      boolean listFile, boolean withReplica, boolean recursive)
           throws IOException {
     DUResponse duResponse = new DUResponse();
     duResponse.setPath(getNormalizedPath());
@@ -100,6 +100,7 @@ public class RootEntityHandler extends EntityHandler {
     long totalDataSize = 0L;
     long totalDataSizeWithReplica = 0L;
     for (OmVolumeArgs volume: volumes) {
+      List<DUResponse.DiskUsage> diskUsageList = new ArrayList<>();
       String volumeName = volume.getVolume();
       String subpath = omMetadataManager.getVolumeKey(volumeName);
       DUResponse.DiskUsage diskUsage = new DUResponse.DiskUsage();
@@ -119,7 +120,7 @@ public class RootEntityHandler extends EntityHandler {
             BucketHandler.getBucketHandler(
               getReconNamespaceSummaryManager(),
               getOmMetadataManager(), getReconSCM(), bucket);
-          volumeDU += bucketHandler.calculateDUUnderObject(bucketObjectID);
+          volumeDU += bucketHandler.calculateDUUnderObject(bucketObjectID, recursive, diskUsageList);
         }
       }
       totalDataSize += dataSize;
@@ -132,6 +133,7 @@ public class RootEntityHandler extends EntityHandler {
       }
       diskUsage.setSize(dataSize);
       volumeDuData.add(diskUsage);
+      volumeDuData.addAll(diskUsageList);
     }
     if (withReplica) {
       duResponse.setSizeWithReplica(totalDataSizeWithReplica);
@@ -148,7 +150,7 @@ public class RootEntityHandler extends EntityHandler {
     QuotaUsageResponse quotaUsageResponse = new QuotaUsageResponse();
     SCMNodeStat stats = getReconSCM().getScmNodeManager().getStats();
     long quotaInBytes = stats.getCapacity().get();
-    long quotaUsedInBytes = getDuResponse(true, true).getSizeWithReplica();
+    long quotaUsedInBytes = getDuResponse(true, true, false).getSizeWithReplica();
     quotaUsageResponse.setQuota(quotaInBytes);
     quotaUsageResponse.setQuotaUsed(quotaUsedInBytes);
     return quotaUsageResponse;

@@ -79,8 +79,12 @@ public abstract class EntityHandler {
           throws IOException;
 
   public abstract DUResponse getDuResponse(
-          boolean listFile, boolean withReplica)
+      boolean listFile, boolean withReplica, boolean recursive)
           throws IOException;
+
+  public DUResponse getListKeysResponse(long count, boolean recursive) throws IOException {
+    return getDuResponse(true, true, recursive);
+  }
 
   public abstract QuotaUsageResponse getQuotaResponse()
           throws IOException;

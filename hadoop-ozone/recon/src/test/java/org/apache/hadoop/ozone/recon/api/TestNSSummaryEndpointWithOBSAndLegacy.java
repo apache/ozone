@@ -19,13 +19,17 @@
 package org.apache.hadoop.ozone.recon.api;
 
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.ONE;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.THREE;
 import static org.apache.hadoop.ozone.om.helpers.QuotaUtil.getReplicatedSize;
 
 import org.apache.hadoop.hdds.client.BlockID;
+import org.apache.hadoop.hdds.client.ECReplicationConfig;
+import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.StorageType;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
@@ -45,6 +49,7 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
 import org.apache.hadoop.ozone.recon.ReconConstants;
 import org.apache.hadoop.ozone.recon.ReconTestInjector;
+import org.apache.hadoop.ozone.recon.ReconUtils;
 import org.apache.hadoop.ozone.recon.api.handlers.BucketHandler;
 import org.apache.hadoop.ozone.recon.api.handlers.EntityHandler;
 import org.apache.hadoop.ozone.recon.api.types.BucketObjectDBInfo;
@@ -81,6 +86,7 @@ import java.util.List;
 import java.util.ArrayList;
 import java.util.Set;
 import java.util.HashSet;
+import java.util.TimeZone;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
@@ -146,11 +152,14 @@ public class TestNSSummaryEndpointWithOBSAndLegacy {
   private static final String BUCKET_TWO = "bucket2";
   private static final String BUCKET_THREE = "bucket3";
   private static final String BUCKET_FOUR = "bucket4";
+  private static final String BUCKET_FIVE = "bucket5";
   private static final String KEY_ONE = "file1";
   private static final String KEY_TWO = "////file2";
   private static final String KEY_THREE = "file3///";
   private static final String KEY_FOUR = "file4";
   private static final String KEY_FIVE = "_//////";
+  private static final String KEY_SIX = "file6";
+  private static final String KEY_SEVEN = "file7";
   private static final String KEY_EIGHT = "file8";
   private static final String KEY_NINE = "//////";
   private static final String KEY_TEN = "///__file10";
@@ -164,11 +173,14 @@ public class TestNSSummaryEndpointWithOBSAndLegacy {
   private static final long BUCKET_TWO_OBJECT_ID = 2L;
   private static final long BUCKET_THREE_OBJECT_ID = 15L;
   private static final long BUCKET_FOUR_OBJECT_ID = 16L;
+  private static final long BUCKET_FIVE_OBJECT_ID = 7L;
   private static final long KEY_ONE_OBJECT_ID = 3L;
   private static final long KEY_TWO_OBJECT_ID = 5L;
   private static final long KEY_THREE_OBJECT_ID = 8L;
   private static final long KEY_FOUR_OBJECT_ID = 6L;
   private static final long KEY_FIVE_OBJECT_ID = 9L;
+  private static final long KEY_SIX_OBJECT_ID = 10L;
+  private static final long KEY_SEVEN_OBJECT_ID = 11L;
   private static final long KEY_EIGHT_OBJECT_ID = 17L;
   private static final long KEY_NINE_OBJECT_ID = 19L;
   private static final long KEY_TEN_OBJECT_ID = 20L;
@@ -205,6 +217,8 @@ public class TestNSSummaryEndpointWithOBSAndLegacy {
   private static final long FILE_THREE_SIZE = 4 * OzoneConsts.KB + 1; // bin 3
   private static final long FILE_FOUR_SIZE = 2 * OzoneConsts.KB + 1; // bin 2
   private static final long FILE_FIVE_SIZE = 100L; // bin 0
+  private static final long FILE_SIX_SIZE = 100L; // bin 0
+  private static final long FILE_SEVEN_SIZE = 100L; // bin 0
   private static final long FILE_EIGHT_SIZE = OzoneConsts.KB + 1; // bin 1
   private static final long FILE_NINE_SIZE = 2 * OzoneConsts.KB + 1; // bin 2
   private static final long FILE_TEN_SIZE = 2 * OzoneConsts.KB + 1; // bin 2
@@ -225,6 +239,13 @@ public class TestNSSummaryEndpointWithOBSAndLegacy {
   private static final long FILE5_SIZE_WITH_REPLICA =
       getReplicatedSize(FILE_FIVE_SIZE,
           StandaloneReplicationConfig.getInstance(ONE));
+
+  private static final long FILE6_SIZE_WITH_REPLICA =
+      getReplicatedSize(FILE_SIX_SIZE,
+          StandaloneReplicationConfig.getInstance(THREE));
+  private static final long FILE7_SIZE_WITH_REPLICA =
+      getReplicatedSize(FILE_SEVEN_SIZE,
+          StandaloneReplicationConfig.getInstance(THREE));
 
   private static final long FILE8_SIZE_WITH_REPLICA =
       getReplicatedSize(FILE_EIGHT_SIZE,
@@ -286,6 +307,7 @@ public class TestNSSummaryEndpointWithOBSAndLegacy {
   private static final long BUCKET_TWO_QUOTA = OzoneConsts.MB;
   private static final long BUCKET_THREE_QUOTA = OzoneConsts.MB;
   private static final long BUCKET_FOUR_QUOTA = OzoneConsts.MB;
+  private static final long BUCKET_FIVE_QUOTA = OzoneConsts.MB;
 
   // mock client's path requests
   private static final String TEST_USER = "TestUser";
@@ -300,6 +322,8 @@ public class TestNSSummaryEndpointWithOBSAndLegacy {
       ROOT_PATH + VOL_TWO + ROOT_PATH + BUCKET_THREE;
   private static final String BUCKET_FOUR_PATH =
       ROOT_PATH + VOL_TWO + ROOT_PATH + BUCKET_FOUR;
+  private static final String BUCKET_FIVE_PATH =
+      ROOT_PATH + VOL + ROOT_PATH + BUCKET_FIVE;
   private static final String KEY_ONE_PATH =
       ROOT_PATH + VOL + ROOT_PATH + BUCKET_ONE + ROOT_PATH + KEY_ONE;
   private static final String KEY_TWO_PATH =
@@ -310,6 +334,10 @@ public class TestNSSummaryEndpointWithOBSAndLegacy {
       ROOT_PATH + VOL + ROOT_PATH + BUCKET_TWO + ROOT_PATH + KEY_FOUR;
   private static final String KEY_FIVE_PATH =
       ROOT_PATH + VOL + ROOT_PATH + BUCKET_TWO + ROOT_PATH + KEY_FIVE;
+  private static final String KEY_SIX_PATH =
+      ROOT_PATH + VOL + ROOT_PATH + BUCKET_FIVE + ROOT_PATH + KEY_SIX;
+  private static final String KEY_SEVEN_PATH =
+      ROOT_PATH + VOL + ROOT_PATH + BUCKET_FIVE + ROOT_PATH + KEY_SEVEN;
   private static final String KEY_EIGHT_PATH =
       ROOT_PATH + VOL_TWO + ROOT_PATH + BUCKET_THREE + ROOT_PATH + KEY_EIGHT;
   private static final String KEY_NINE_PATH =
@@ -342,11 +370,23 @@ public class TestNSSummaryEndpointWithOBSAndLegacy {
   private static final long BUCKET_TWO_DATA_SIZE =
       FILE_FOUR_SIZE + FILE_FIVE_SIZE;
 
+  private static final long BUCKET_FIVE_DATA_SIZE =
+      FILE_SIX_SIZE + FILE_SEVEN_SIZE;
+
   private static final long BUCKET_THREE_DATA_SIZE =
       FILE_EIGHT_SIZE + FILE_NINE_SIZE + FILE_TEN_SIZE;
 
   private static final long BUCKET_FOUR_DATA_SIZE = FILE_ELEVEN_SIZE;
 
+  private static int chunkSize = 1024 * 1024;
+
+  private ReplicationConfig ratisThree = ReplicationConfig.fromProtoTypeAndFactor(HddsProtos.ReplicationType.RATIS,
+      HddsProtos.ReplicationFactor.THREE);
+  private ReplicationConfig ecType = new ECReplicationConfig(3, 2, ECReplicationConfig.EcCodec.RS, chunkSize);
+  private long epochMillis1 =
+      ReconUtils.convertToEpochMillis("04-04-2024 12:30:00", "MM-dd-yyyy HH:mm:ss", TimeZone.getDefault());
+  private long epochMillis2 =
+      ReconUtils.convertToEpochMillis("04-05-2024 12:30:00", "MM-dd-yyyy HH:mm:ss", TimeZone.getDefault());
 
   @BeforeEach
   public void setUp() throws Exception {
@@ -573,7 +613,7 @@ public class TestNSSummaryEndpointWithOBSAndLegacy {
     Response volResponse = nsSummaryEndpoint.getDiskUsage(VOL_PATH,
         false, false);
     DUResponse duVolRes = (DUResponse) volResponse.getEntity();
-    assertEquals(2, duVolRes.getCount());
+    assertEquals(3, duVolRes.getCount());
     List<DUResponse.DiskUsage> duData = duVolRes.getDuData();
     // sort based on subpath
     Collections.sort(duData,
@@ -904,6 +944,84 @@ public class TestNSSummaryEndpointWithOBSAndLegacy {
         OmUtils.normalizePathUptoBucket("volume/bucket/key$%#1/./////////key$%#2"));
   }
 
+  @Test
+  public void testListKeysBucketFive() throws Exception {
+    // filter list keys under bucketFive based on RATIS ReplicationConfig and key creation date
+    // creationDate filter passed 1 minute above of KEY6 creation date, so listKeys API will return
+    // ZERO keys, as none of the RATIS keys got created after creationDate filter value.
+    Response bucketResponse = nsSummaryEndpoint.listKeysWithDu("RATIS",
+        "04-04-2024 12:31:00", 0, BUCKET_FIVE_PATH, 10, false);
+    DUResponse duBucketResponse = (DUResponse) bucketResponse.getEntity();
+    // There are no sub-paths under this OBS bucket.
+    assertEquals(0, duBucketResponse.getCount());
+
+    // creationDate filter and keySize filter both are empty, so listKeys API should return both KEY6 and KEY7 keys,
+    // but replication type RATIS filter will filter out KEY7 as only 1 RATIS key KEY6 got created.
+    bucketResponse = nsSummaryEndpoint.listKeysWithDu("RATIS",
+        null, 0, BUCKET_FIVE_PATH, 10, false);
+    duBucketResponse = (DUResponse) bucketResponse.getEntity();
+    // There are no sub-paths under this OBS bucket.
+    assertEquals(1, duBucketResponse.getCount());
+    assertEquals(KEY_SIX, duBucketResponse.getDuData().get(0).getSubpath());
+
+    // creationDate filter passed same as KEY6 creation date, so listKeys API will return
+    // KEY6 key only, as only 1 RATIS key KEY6 created at "04-04-2024 12:30:00".
+    bucketResponse = nsSummaryEndpoint.listKeysWithDu("RATIS",
+        "04-04-2024 12:30:00", 0, BUCKET_FIVE_PATH, 10, false);
+    duBucketResponse = (DUResponse) bucketResponse.getEntity();
+    // There are no sub-paths under this OBS bucket.
+    assertEquals(1, duBucketResponse.getCount());
+    assertEquals(KEY_SIX, duBucketResponse.getDuData().get(0).getSubpath());
+
+    // creationDate filter passed same as KEY6 and KEY7 creation date, but replicationType filter is EC,
+    // so listKeys API will return only KEY7, as only one EC key got created at or after creationDate filter value.
+    bucketResponse = nsSummaryEndpoint.listKeysWithDu("EC",
+        "04-04-2024 12:30:00", 0, BUCKET_FIVE_PATH, 10, false);
+    duBucketResponse = (DUResponse) bucketResponse.getEntity();
+    // There are no sub-paths under this OBS bucket.
+    assertEquals(1, duBucketResponse.getCount());
+    assertEquals(KEY_SEVEN, duBucketResponse.getDuData().get(0).getSubpath());
+
+    // creationDate filter passed same as KEY7 creation date, but replicationType filter is EC,
+    // so listKeys API will return only KEY7, as only one EC key got created at or after creationDate filter value.
+    bucketResponse = nsSummaryEndpoint.listKeysWithDu("EC",
+        "04-05-2024 12:30:00", 0, BUCKET_FIVE_PATH, 10, false);
+    duBucketResponse = (DUResponse) bucketResponse.getEntity();
+    // There are no sub-paths under this OBS bucket.
+    assertEquals(1, duBucketResponse.getCount());
+    assertEquals(KEY_SEVEN, duBucketResponse.getDuData().get(0).getSubpath());
+
+    // creationDate filter passed same as KEY7 creation date, but replicationType filter is RATIS,
+    // so listKeys API will return ZERO keys, as no RATIS key got created at or after creationDate filter value.
+    bucketResponse = nsSummaryEndpoint.listKeysWithDu("RATIS",
+        "04-05-2024 12:30:00", 0, BUCKET_FIVE_PATH, 10, false);
+    duBucketResponse = (DUResponse) bucketResponse.getEntity();
+    // There are no sub-paths under this OBS bucket.
+    assertEquals(0, duBucketResponse.getCount());
+
+    // creationDate filter passed same as KEY6 creation date, and replicationType filter is RATIS,
+    // so listKeys API will return only KEY6, as only one RATIS key got created at or after creationDate filter value,
+    // but since keySize filter value is 110 bytes and all RATIS keys created are of size 100 bytes, so KEY6 will be
+    // filtered out and API will return ZERO keys.
+    bucketResponse = nsSummaryEndpoint.listKeysWithDu("RATIS",
+        "04-04-2024 12:30:00", 110, BUCKET_FIVE_PATH, 10, false);
+    duBucketResponse = (DUResponse) bucketResponse.getEntity();
+    // There are no sub-paths under this OBS bucket.
+    assertEquals(0, duBucketResponse.getCount());
+
+    // creationDate filter passed same as KEY6 creation date, and replicationType filter is EC,
+    // so listKeys API will return only KEY7, as only one EC key got created at or after creationDate filter value,
+    // but since keySize filter value is 110 bytes and all EC keys created are of size 100 bytes, so KEY7 will be
+    // filtered out and API will return ZERO keys.
+    bucketResponse = nsSummaryEndpoint.listKeysWithDu("EC",
+        "04-04-2024 12:30:00", 110, BUCKET_FIVE_PATH, 10, false);
+    duBucketResponse = (DUResponse) bucketResponse.getEntity();
+    // There are no sub-paths under this OBS bucket.
+    assertEquals(0, duBucketResponse.getCount());
+
+    assertEquals(BUCKET_FIVE_DATA_SIZE, duBucketResponse.getSize());
+  }
+
 
   /**
    * Testing the following case.
@@ -929,7 +1047,6 @@ public class TestNSSummaryEndpointWithOBSAndLegacy {
    */
   @SuppressWarnings("checkstyle:MethodLength")
   private void populateOMDB() throws Exception {
-
     // write all keys
     writeKeyToOm(reconOMMetadataManager,
         KEY_ONE,
@@ -986,6 +1103,32 @@ public class TestNSSummaryEndpointWithOBSAndLegacy {
         VOL_OBJECT_ID,
         FILE_FIVE_SIZE,
         getOBSBucketLayout());
+    writeKeyToOm(reconOMMetadataManager,
+        KEY_SIX,
+        BUCKET_FIVE,
+        VOL,
+        KEY_SIX,
+        KEY_SIX_OBJECT_ID,
+        BUCKET_FIVE_OBJECT_ID,
+        BUCKET_FIVE_OBJECT_ID,
+        VOL_OBJECT_ID,
+        FILE_SIX_SIZE,
+        getOBSBucketLayout(),
+        ratisThree,
+        epochMillis1, true);
+    writeKeyToOm(reconOMMetadataManager,
+        KEY_SEVEN,
+        BUCKET_FIVE,
+        VOL,
+        KEY_SEVEN,
+        KEY_SEVEN_OBJECT_ID,
+        BUCKET_FIVE_OBJECT_ID,
+        BUCKET_FIVE_OBJECT_ID,
+        VOL_OBJECT_ID,
+        FILE_SEVEN_SIZE,
+        getOBSBucketLayout(),
+        ecType,
+        epochMillis2, true);
 
     writeKeyToOm(reconOMMetadataManager,
         KEY_EIGHT,
@@ -1104,6 +1247,14 @@ public class TestNSSummaryEndpointWithOBSAndLegacy {
         .setBucketLayout(getLegacyBucketLayout())
         .build();
 
+    OmBucketInfo bucketInfo5 = OmBucketInfo.newBuilder()
+        .setVolumeName(VOL)
+        .setBucketName(BUCKET_FIVE)
+        .setObjectID(BUCKET_FIVE_OBJECT_ID)
+        .setQuotaInBytes(BUCKET_FIVE_QUOTA)
+        .setBucketLayout(getLegacyBucketLayout())
+        .build();
+
     String bucketKey = omMetadataManager.getBucketKey(
         bucketInfo.getVolumeName(), bucketInfo.getBucketName());
     String bucketKey2 = omMetadataManager.getBucketKey(
@@ -1112,11 +1263,14 @@ public class TestNSSummaryEndpointWithOBSAndLegacy {
         bucketInfo3.getVolumeName(), bucketInfo3.getBucketName());
     String bucketKey4 = omMetadataManager.getBucketKey(
         bucketInfo4.getVolumeName(), bucketInfo4.getBucketName());
+    String bucketKey5 = omMetadataManager.getBucketKey(
+        bucketInfo5.getVolumeName(), bucketInfo5.getBucketName());
 
     omMetadataManager.getBucketTable().put(bucketKey, bucketInfo);
     omMetadataManager.getBucketTable().put(bucketKey2, bucketInfo2);
     omMetadataManager.getBucketTable().put(bucketKey3, bucketInfo3);
     omMetadataManager.getBucketTable().put(bucketKey4, bucketInfo4);
+    omMetadataManager.getBucketTable().put(bucketKey5, bucketInfo5);
 
     return omMetadataManager;
   }

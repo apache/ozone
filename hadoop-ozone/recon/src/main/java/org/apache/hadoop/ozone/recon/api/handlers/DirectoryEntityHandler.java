@@ -80,7 +80,7 @@ public class DirectoryEntityHandler extends EntityHandler {
 
   @Override
   public DUResponse getDuResponse(
-          boolean listFile, boolean withReplica)
+      boolean listFile, boolean withReplica, boolean recursive)
           throws IOException {
     DUResponse duResponse = new DUResponse();
     duResponse.setPath(getNormalizedPath());
@@ -103,6 +103,7 @@ public class DirectoryEntityHandler extends EntityHandler {
     List<DUResponse.DiskUsage> subdirDUData = new ArrayList<>();
     // iterate all subdirectories to get disk usage data
     for (long subdirObjectId: subdirs) {
+      List<DUResponse.DiskUsage> diskUsageList = new ArrayList<>();
       NSSummary subdirNSSummary =
               getReconNamespaceSummaryManager().getNSSummary(subdirObjectId);
       // for the subdirName we need the subdir filename, not the key name
@@ -133,13 +134,15 @@ public class DirectoryEntityHandler extends EntityHandler {
 
       if (withReplica) {
         long subdirDU = getBucketHandler()
-                .calculateDUUnderObject(subdirObjectId);
+                .calculateDUUnderObject(subdirObjectId, recursive, diskUsageList);
         diskUsage.setSizeWithReplica(subdirDU);
         dirDataSizeWithReplica += subdirDU;
       }
-
       diskUsage.setSize(dataSize);
       subdirDUData.add(diskUsage);
+      if (recursive) {
+        subdirDUData.addAll(diskUsageList);
+      }
     }
 
     // handle direct keys under directory

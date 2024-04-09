@@ -19,12 +19,16 @@
 package org.apache.hadoop.ozone.recon.api;
 
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.ONE;
+import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 import static org.apache.hadoop.ozone.om.helpers.QuotaUtil.getReplicatedSize;
 
 import org.apache.hadoop.hdds.client.BlockID;
+import org.apache.hadoop.hdds.client.ECReplicationConfig;
+import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto.State;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
@@ -42,6 +46,7 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
 import org.apache.hadoop.ozone.recon.ReconConstants;
 import org.apache.hadoop.ozone.recon.ReconTestInjector;
+import org.apache.hadoop.ozone.recon.ReconUtils;
 import org.apache.hadoop.ozone.recon.api.handlers.BucketHandler;
 import org.apache.hadoop.ozone.recon.api.handlers.EntityHandler;
 import org.apache.hadoop.ozone.recon.api.types.DUResponse;
@@ -73,6 +78,7 @@ import java.util.List;
 import java.util.ArrayList;
 import java.util.Set;
 import java.util.HashSet;
+import java.util.TimeZone;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
@@ -118,6 +124,16 @@ public class TestNSSummaryEndpointWithFSO {
   private OzoneConfiguration ozoneConfiguration;
   private CommonUtils commonUtils;
 
+  private static int chunkSize = 1024 * 1024;
+
+  private ReplicationConfig ratisThree = ReplicationConfig.fromProtoTypeAndFactor(HddsProtos.ReplicationType.RATIS,
+      HddsProtos.ReplicationFactor.THREE);
+  private ReplicationConfig ecType = new ECReplicationConfig(3, 2, ECReplicationConfig.EcCodec.RS, chunkSize);
+  private long epochMillis1 =
+      ReconUtils.convertToEpochMillis("04-04-2024 12:30:00", "MM-dd-yyyy HH:mm:ss", TimeZone.getDefault());
+  private long epochMillis2 =
+      ReconUtils.convertToEpochMillis("04-05-2024 12:30:00", "MM-dd-yyyy HH:mm:ss", TimeZone.getDefault());
+
   private static final String TEST_PATH_UTILITY =
           "/vol1/buck1/a/b/c/d/e/file1.txt";
   private static final String PARENT_DIR = "vol1/buck1/a/b/c/d/e";
@@ -132,6 +148,7 @@ public class TestNSSummaryEndpointWithFSO {
   private static final String BUCKET_TWO = "bucket2";
   private static final String BUCKET_THREE = "bucket3";
   private static final String BUCKET_FOUR = "bucket4";
+  private static final String BUCKET_FIVE = "bucket5";
   private static final String KEY_ONE = "file1";
   private static final String KEY_TWO = "dir1/dir2/file2";
   private static final String KEY_THREE = "dir1/dir3/file3";
@@ -143,6 +160,12 @@ public class TestNSSummaryEndpointWithFSO {
   private static final String KEY_NINE = "dir5/file9";
   private static final String KEY_TEN = "dir5/file10";
   private static final String KEY_ELEVEN = "file11";
+  private static final String KEY_TWELVE = "dir6/file12";
+  private static final String KEY_THIRTEEN = "dir6/file13";
+  private static final String KEY_FOURTEEN = "dir6/dir7/file14";
+  private static final String KEY_FIFTEEN = "dir6/dir7/file15";
+  private static final String KEY_SIXTEEN = "dir6/dir7/dir8/file16";
+  private static final String KEY_SEVENTEEN = "dir6/dir7/dir8/file17";
   private static final String MULTI_BLOCK_KEY = "dir1/file7";
   private static final String MULTI_BLOCK_FILE = "file7";
 
@@ -157,12 +180,21 @@ public class TestNSSummaryEndpointWithFSO {
   private static final String FILE_NINE = "file9";
   private static final String FILE_TEN = "file10";
   private static final String FILE_ELEVEN = "file11";
+  private static final String FILE_TWELVE = "file12";
+  private static final String FILE_THIRTEEN = "file13";
+  private static final String FILE_FOURTEEN = "file14";
+  private static final String FILE_FIFTEEN = "file15";
+  private static final String FILE_SIXTEEN = "file16";
+  private static final String FILE_SEVENTEEN = "file17";
 
   private static final String DIR_ONE = "dir1";
   private static final String DIR_TWO = "dir2";
   private static final String DIR_THREE = "dir3";
   private static final String DIR_FOUR = "dir4";
   private static final String DIR_FIVE = "dir5";
+  private static final String DIR_SIX = "dir6";
+  private static final String DIR_SEVEN = "dir7";
+  private static final String DIR_EIGHT = "dir8";
   // objects IDs
   private static final long VOL_OBJECT_ID = 0L;
   private static final long BUCKET_ONE_OBJECT_ID = 1L;
@@ -179,6 +211,7 @@ public class TestNSSummaryEndpointWithFSO {
   private static final long DIR_FOUR_OBJECT_ID = 12L;
   private static final long MULTI_BLOCK_KEY_OBJECT_ID = 13L;
   private static final long KEY_SEVEN_OBJECT_ID = 13L;
+
   private static final long VOL_TWO_OBJECT_ID = 14L;
   private static final long BUCKET_THREE_OBJECT_ID = 15L;
   private static final long BUCKET_FOUR_OBJECT_ID = 16L;
@@ -187,6 +220,17 @@ public class TestNSSummaryEndpointWithFSO {
   private static final long KEY_NINE_OBJECT_ID = 19L;
   private static final long KEY_TEN_OBJECT_ID = 20L;
   private static final long KEY_ELEVEN_OBJECT_ID = 21L;
+
+  private static final long BUCKET_FIVE_OBJECT_ID = 22L;
+  private static final long DIR_SIX_OBJECT_ID = 23L;
+  private static final long KEY_TWELVE_OBJECT_ID = 24L;
+  private static final long KEY_THIRTEEN_OBJECT_ID = 25L;
+  private static final long DIR_SEVEN_OBJECT_ID = 26L;
+  private static final long KEY_FOURTEEN_OBJECT_ID = 27L;
+  private static final long KEY_FIFTEEN_OBJECT_ID = 28L;
+  private static final long DIR_EIGHT_OBJECT_ID = 29L;
+  private static final long KEY_SIXTEEN_OBJECT_ID = 30L;
+  private static final long KEY_SEVENTEEN_OBJECT_ID = 31L;
 
   // container IDs
   private static final long CONTAINER_ONE_ID = 1L;
@@ -224,6 +268,13 @@ public class TestNSSummaryEndpointWithFSO {
   private static final long KEY_NINE_SIZE = 2 * OzoneConsts.KB + 1; // bin 2
   private static final long KEY_TEN_SIZE = 2 * OzoneConsts.KB + 1; // bin 2
   private static final long KEY_ELEVEN_SIZE = OzoneConsts.KB + 1; // bin 1
+
+  private static final long KEY_TWELVE_SIZE = 2 * OzoneConsts.KB + 1; // bin 2
+  private static final long KEY_THIRTEEN_SIZE = 2 * OzoneConsts.KB + 1; // bin 2
+  private static final long KEY_FOURTEEN_SIZE = OzoneConsts.KB + 1; // bin 1
+  private static final long KEY_FIFTEEN_SIZE = 2 * OzoneConsts.KB + 1; // bin 2
+  private static final long KEY_SIXTEEN_SIZE = 2 * OzoneConsts.KB + 1; // bin 2
+  private static final long KEY_SEVENTEEN_SIZE = OzoneConsts.KB + 1; // bin 1
 
   private static final long FILE1_SIZE_WITH_REPLICA =
       getReplicatedSize(KEY_ONE_SIZE,
@@ -315,6 +366,7 @@ public class TestNSSummaryEndpointWithFSO {
   private static final long BUCKET_TWO_QUOTA = OzoneConsts.MB;
   private static final long BUCKET_THREE_QUOTA = OzoneConsts.MB;
   private static final long BUCKET_FOUR_QUOTA = OzoneConsts.MB;
+  private static final long BUCKET_FIVE_QUOTA = OzoneConsts.MB;
 
   // mock client's path requests
   private static final String TEST_USER = "TestUser";
@@ -323,10 +375,14 @@ public class TestNSSummaryEndpointWithFSO {
   private static final String VOL_TWO_PATH = "/vol2";
   private static final String BUCKET_ONE_PATH = "/vol/bucket1";
   private static final String BUCKET_TWO_PATH = "/vol/bucket2";
+  private static final String BUCKET_FIVE_PATH = "/vol2/bucket5";
   private static final String DIR_ONE_PATH = "/vol/bucket1/dir1";
   private static final String DIR_TWO_PATH = "/vol/bucket1/dir1/dir2";
   private static final String DIR_THREE_PATH = "/vol/bucket1/dir1/dir3";
   private static final String DIR_FOUR_PATH = "/vol/bucket1/dir1/dir4";
+  private static final String DIR_SIX_PATH = "/vol2/bucket5/dir6";
+  private static final String DIR_SEVEN_PATH = "/vol2/bucket5/dir6/dir7";
+  private static final String DIR_EIGHT_PATH = "/vol2/bucket5/dir6/dir7/dir8";
   private static final String KEY_PATH = "/vol/bucket2/file4";
   private static final String MULTI_BLOCK_KEY_PATH = "/vol/bucket1/dir1/file7";
   private static final String INVALID_PATH = "/vol/path/not/found";
@@ -667,6 +723,17 @@ public class TestNSSummaryEndpointWithFSO {
             invalidResObj.getResponseCode());
   }
 
+  @Test
+  public void testListKeysBucketFive() throws Exception {
+    // bucket level DU
+    Response bucketResponse = nsSummaryEndpoint.listKeysWithDu("RATIS", "", 0, BUCKET_FIVE_PATH,
+        1000, true);
+    DUResponse duBucketResponse = (DUResponse) bucketResponse.getEntity();
+    assertEquals(3, duBucketResponse.getCount());
+    DUResponse.DiskUsage duDir1 = duBucketResponse.getDuData().get(0);
+    assertEquals(DIR_SIX_PATH.substring(1) + OM_KEY_PREFIX + FILE_TWELVE, duDir1.getSubpath());
+    assertEquals("RATIS", duDir1.getReplicationType());
+  }
 
   @Test
   public void testFileSizeDist() throws Exception {
@@ -695,6 +762,7 @@ public class TestNSSummaryEndpointWithFSO {
    * Write directories and keys info into OM DB.
    * @throws Exception
    */
+  @SuppressWarnings("checkstyle:methodlength")
   private void populateOMDB() throws Exception {
     // write all directories
     writeDirToOm(reconOMMetadataManager, DIR_ONE_OBJECT_ID,
@@ -712,6 +780,15 @@ public class TestNSSummaryEndpointWithFSO {
     writeDirToOm(reconOMMetadataManager, DIR_FIVE_OBJECT_ID,
             BUCKET_THREE_OBJECT_ID, BUCKET_THREE_OBJECT_ID,
             VOL_TWO_OBJECT_ID, DIR_FIVE);
+    writeDirToOm(reconOMMetadataManager, DIR_SIX_OBJECT_ID,
+        BUCKET_FIVE_OBJECT_ID, BUCKET_FIVE_OBJECT_ID,
+        VOL_TWO_OBJECT_ID, DIR_SIX);
+    writeDirToOm(reconOMMetadataManager, DIR_SEVEN_OBJECT_ID,
+        DIR_SIX_OBJECT_ID, BUCKET_FIVE_OBJECT_ID,
+        VOL_TWO_OBJECT_ID, DIR_SEVEN);
+    writeDirToOm(reconOMMetadataManager, DIR_EIGHT_OBJECT_ID,
+        DIR_SEVEN_OBJECT_ID, BUCKET_FIVE_OBJECT_ID,
+        VOL_TWO_OBJECT_ID, DIR_EIGHT);
 
     // write all keys
     writeKeyToOm(reconOMMetadataManager,
@@ -824,6 +901,87 @@ public class TestNSSummaryEndpointWithFSO {
           VOL_TWO_OBJECT_ID,
           KEY_ELEVEN_SIZE,
           getBucketLayout());
+
+    writeKeyToOm(reconOMMetadataManager,
+        FILE_TWELVE,
+        BUCKET_FIVE,
+        VOL_TWO,
+        FILE_TWELVE,
+        KEY_TWELVE_OBJECT_ID,
+        DIR_SIX_OBJECT_ID,
+        BUCKET_FIVE_OBJECT_ID,
+        VOL_TWO_OBJECT_ID,
+        KEY_TWELVE_SIZE,
+        getBucketLayout(),
+        ratisThree,
+        epochMillis1, true);
+    writeKeyToOm(reconOMMetadataManager,
+        FILE_THIRTEEN,
+        BUCKET_FIVE,
+        VOL_TWO,
+        FILE_THIRTEEN,
+        KEY_THIRTEEN_OBJECT_ID,
+        DIR_SIX_OBJECT_ID,
+        BUCKET_FIVE_OBJECT_ID,
+        VOL_TWO_OBJECT_ID,
+        KEY_THIRTEEN_SIZE,
+        getBucketLayout(),
+        ecType,
+        epochMillis2, true);
+
+    writeKeyToOm(reconOMMetadataManager,
+        FILE_FOURTEEN,
+        BUCKET_FIVE,
+        VOL_TWO,
+        FILE_FOURTEEN,
+        KEY_FOURTEEN_OBJECT_ID,
+        DIR_SEVEN_OBJECT_ID,
+        BUCKET_FIVE_OBJECT_ID,
+        VOL_TWO_OBJECT_ID,
+        KEY_FOURTEEN_SIZE,
+        getBucketLayout(),
+        ratisThree,
+        epochMillis1, true);
+    writeKeyToOm(reconOMMetadataManager,
+        FILE_FIFTEEN,
+        BUCKET_FIVE,
+        VOL_TWO,
+        FILE_FIFTEEN,
+        KEY_FIFTEEN_OBJECT_ID,
+        DIR_SEVEN_OBJECT_ID,
+        BUCKET_FIVE_OBJECT_ID,
+        VOL_TWO_OBJECT_ID,
+        KEY_FIFTEEN_SIZE,
+        getBucketLayout(),
+        ecType,
+        epochMillis2, true);
+
+    writeKeyToOm(reconOMMetadataManager,
+        FILE_SIXTEEN,
+        BUCKET_FIVE,
+        VOL_TWO,
+        FILE_SIXTEEN,
+        KEY_SIXTEEN_OBJECT_ID,
+        DIR_EIGHT_OBJECT_ID,
+        BUCKET_FIVE_OBJECT_ID,
+        VOL_TWO_OBJECT_ID,
+        KEY_SIXTEEN_SIZE,
+        getBucketLayout(),
+        ratisThree,
+        epochMillis1, true);
+    writeKeyToOm(reconOMMetadataManager,
+        FILE_SEVENTEEN,
+        BUCKET_FIVE,
+        VOL_TWO,
+        FILE_SEVENTEEN,
+        KEY_SEVENTEEN_OBJECT_ID,
+        DIR_EIGHT_OBJECT_ID,
+        BUCKET_FIVE_OBJECT_ID,
+        VOL_TWO_OBJECT_ID,
+        KEY_SEVENTEEN_SIZE,
+        getBucketLayout(),
+        ecType,
+        epochMillis2, true);
   }
 
   /**
@@ -895,6 +1053,14 @@ public class TestNSSummaryEndpointWithFSO {
         .setBucketLayout(getBucketLayout())
         .build();
 
+    OmBucketInfo bucketInfo5 = OmBucketInfo.newBuilder()
+        .setVolumeName(VOL_TWO)
+        .setBucketName(BUCKET_FIVE)
+        .setObjectID(BUCKET_FIVE_OBJECT_ID)
+        .setQuotaInBytes(BUCKET_FIVE_QUOTA)
+        .setBucketLayout(getBucketLayout())
+        .build();
+
     String bucketKey = omMetadataManager.getBucketKey(
             bucketInfo.getVolumeName(), bucketInfo.getBucketName());
     String bucketKey2 = omMetadataManager.getBucketKey(
@@ -903,11 +1069,14 @@ public class TestNSSummaryEndpointWithFSO {
         bucketInfo3.getVolumeName(), bucketInfo3.getBucketName());
     String bucketKey4 = omMetadataManager.getBucketKey(
         bucketInfo4.getVolumeName(), bucketInfo4.getBucketName());
+    String bucketKey5 = omMetadataManager.getBucketKey(
+        bucketInfo5.getVolumeName(), bucketInfo5.getBucketName());
 
     omMetadataManager.getBucketTable().put(bucketKey, bucketInfo);
     omMetadataManager.getBucketTable().put(bucketKey2, bucketInfo2);
     omMetadataManager.getBucketTable().put(bucketKey3, bucketInfo3);
     omMetadataManager.getBucketTable().put(bucketKey4, bucketInfo4);
+    omMetadataManager.getBucketTable().put(bucketKey5, bucketInfo5);
 
     return omMetadataManager;
   }

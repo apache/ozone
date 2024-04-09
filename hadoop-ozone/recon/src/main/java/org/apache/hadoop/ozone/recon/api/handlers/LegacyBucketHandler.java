@@ -110,12 +110,15 @@ public class LegacyBucketHandler extends BucketHandler {
    * Make use of RocksDB's order to seek to the prefix and avoid full iteration.
    * Calculating DU only for keys. Skipping any directories and
    * handling only direct keys.
+   *
    * @param parentId
+   * @param recursive
+   * @param diskUsageList
    * @return total DU of direct keys under object
    * @throws IOException
    */
   @Override
-  public long calculateDUUnderObject(long parentId)
+  public long calculateDUUnderObject(long parentId, boolean recursive, List<DUResponse.DiskUsage> diskUsageList)
       throws IOException {
     Table<String, OmKeyInfo> keyTable = getKeyTable();
 
@@ -174,7 +177,7 @@ public class LegacyBucketHandler extends BucketHandler {
     // handle nested keys (DFS)
     Set<Long> subDirIds = nsSummary.getChildDir();
     for (long subDirId: subDirIds) {
-      totalDU += calculateDUUnderObject(subDirId);
+      totalDU += calculateDUUnderObject(subDirId, recursive, diskUsageList);
     }
     return totalDU;
   }
@@ -250,6 +253,9 @@ public class LegacyBucketHandler extends BucketHandler {
           diskUsage.setSubpath(subpath);
           diskUsage.setKey(true);
           diskUsage.setSize(keyInfo.getDataSize());
+          diskUsage.setReplicationType(keyInfo.getReplicationConfig().getReplicationType().name());
+          diskUsage.setCreationTime(keyInfo.getCreationTime());
+          diskUsage.setModificationTime(keyInfo.getModificationTime());
 
           if (withReplica) {
             long keyDU = keyInfo.getReplicatedSize();

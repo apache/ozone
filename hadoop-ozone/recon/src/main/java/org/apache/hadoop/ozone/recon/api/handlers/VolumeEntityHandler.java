@@ -92,7 +92,7 @@ public class VolumeEntityHandler extends EntityHandler {
 
   @Override
   public DUResponse getDuResponse(
-          boolean listFile, boolean withReplica)
+      boolean listFile, boolean withReplica, boolean recursive)
           throws IOException {
     DUResponse duResponse = new DUResponse();
     duResponse.setPath(getNormalizedPath());
@@ -107,6 +107,7 @@ public class VolumeEntityHandler extends EntityHandler {
     long volDataSize = 0L;
     long volDataSizeWithReplica = 0L;
     for (OmBucketInfo bucket: buckets) {
+      List<DUResponse.DiskUsage> diskUsageList = new ArrayList<>();
       String bucketName = bucket.getBucketName();
       long bucketObjectID = bucket.getObjectID();
       String subpath = getOmMetadataManager().getBucketKey(volName, bucketName);
@@ -120,12 +121,13 @@ public class VolumeEntityHandler extends EntityHandler {
                   getReconNamespaceSummaryManager(),
                   getOmMetadataManager(), getReconSCM(), bucket);
         long bucketDU = bucketHandler
-              .calculateDUUnderObject(bucketObjectID);
+              .calculateDUUnderObject(bucketObjectID, recursive, diskUsageList);
         diskUsage.setSizeWithReplica(bucketDU);
         volDataSizeWithReplica += bucketDU;
       }
       diskUsage.setSize(dataSize);
       bucketDuData.add(diskUsage);
+      bucketDuData.addAll(diskUsageList);
     }
     if (withReplica) {
       duResponse.setSizeWithReplica(volDataSizeWithReplica);

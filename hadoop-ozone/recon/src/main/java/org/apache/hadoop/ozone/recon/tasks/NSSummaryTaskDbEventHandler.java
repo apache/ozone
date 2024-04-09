@@ -132,6 +132,10 @@ public class NSSummaryTaskDbEventHandler {
       curNSSummary = new NSSummary();
     }
     curNSSummary.setDirName(dirName);
+    // Set the parent directory ID
+    if (parentObjectId != -1) {
+      curNSSummary.setParentId(parentObjectId);
+    }
     nsSummaryMap.put(objectId, curNSSummary);
 
     // Write the child dir list to the parent directory
