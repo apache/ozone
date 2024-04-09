@@ -69,6 +69,8 @@ To do this:
 6. On commit key, the client does not need to send the overwriteExpectedUpdateID again, as the open key contains it.
 7. On OM, on commit key, it validates the key still exists with the given key name and its updateID is unchanged. If so the key is committed, otherwise an error is returned to the client.
 
+Note that any change to a key will change the updateID. This is existing behaviour, and committing an rewritten key will also modify the updateID. Note this also offers protection against concurrent rewrites. 
+
 ## Changes Required
 
 In order to enable the above steps on Ozone, several small changes are needed.
