@@ -20,6 +20,7 @@ package org.apache.hadoop.hdds.scm.storage;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
+import org.apache.commons.lang3.NotImplementedException;
 import org.apache.hadoop.fs.ByteBufferReadable;
 import org.apache.hadoop.fs.CanUnbuffer;
 import org.apache.hadoop.fs.Seekable;
@@ -29,6 +30,7 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandRequestProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ReadBlockRequestProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ReadBlockResponseProto;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.StreamDataResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.XceiverClientFactory;
 import org.apache.hadoop.hdds.scm.XceiverClientSpi;
@@ -49,7 +51,6 @@ import org.slf4j.LoggerFactory;
 
 import java.io.EOFException;
 import java.io.IOException;
-import java.io.InputStream;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -64,7 +65,7 @@ import static org.apache.hadoop.hdds.client.ReplicationConfig.getLegacyFactor;
  * An {@link java.io.InputStream} called from KeyInputStream to read a block from the
  * container.
  */
-public class NewBlockInputStream extends InputStream
+public class NewBlockInputStream extends BlockExtendedInputStream
     implements Seekable, CanUnbuffer, ByteBufferReadable {
   private static final Logger LOG =
       LoggerFactory.getLogger(NewBlockInputStream.class);
@@ -290,6 +291,11 @@ public class NewBlockInputStream extends InputStream
       return total;
 
     }
+  }
+
+  @Override
+  protected int readWithStrategy(ByteReaderStrategy strategy) throws IOException {
+    throw new NotImplementedException("readWithStrategy is not implemented.");
   }
 
   @Override
@@ -613,35 +619,57 @@ public class NewBlockInputStream extends InputStream
 
   private void validateBlock(
       ContainerProtos.ContainerCommandResponseProto response
-  ) throws OzoneChecksumException {
+  ) throws IOException {
 
-    ContainerProtos.ReadBlockResponseProto readBlock = response.getReadBlock();
-    List<ByteString> byteStrings;
-    boolean isV0 = false;
+    StreamDataResponseProto streamData = response.getStreamData();
+    for (ReadBlockResponseProto readBlock : streamData.getReadBlockList()) {
+      List<ByteString> byteStrings;
+      boolean isV0 = false;
 
-    if (readBlock.hasData()) {
-      ByteString byteString = readBlock.getData();
-      byteStrings = new ArrayList<>();
-      byteStrings.add(byteString);
-      isV0 = true;
-    } else {
-      byteStrings = readBlock.getDataBuffers().getBuffersList();
-    }
-    ContainerProtos.ChunkInfo chunkInfo =
-        readBlock.getChunkData();
-    if (verifyChecksum) {
-      ChecksumData checksumData = ChecksumData.getFromProtoBuf(
-          chunkInfo.getChecksumData());
+      ContainerProtos.ChunkInfo chunkInfo =
+          readBlock.getChunkData();
+      if (chunkInfo.getLen() <= 0) {
+        throw new IOException("Failed to get chunk: chunkName == "
+            + chunkInfo.getChunkName() + "len == " + chunkInfo.getLen());
+      }
+      if (readBlock.hasData()) {
+        ByteString byteString = readBlock.getData();
+        if (byteString.size() != chunkInfo.getLen()) {
+          // Bytes read from chunk should be equal to chunk size.
+          throw new OzoneChecksumException(String.format(
+              "Inconsistent read for chunk=%s len=%d bytesRead=%d",
+              chunkInfo.getChunkName(), chunkInfo.getLen(),
+              byteString.size()));
+        }
+        byteStrings = new ArrayList<>();
+        byteStrings.add(byteString);
+        isV0 = true;
+      } else {
+        byteStrings = readBlock.getDataBuffers().getBuffersList();
+        long buffersLen = BufferUtils.getBuffersLen(byteStrings);
+        if (buffersLen != chunkInfo.getLen()) {
+          // Bytes read from chunk should be equal to chunk size.
+          throw new OzoneChecksumException(String.format(
+              "Inconsistent read for chunk=%s len=%d bytesRead=%d",
+              chunkInfo.getChunkName(), chunkInfo.getLen(),
+              buffersLen));
+        }
+      }
 
-      // ChecksumData stores checksum for each 'numBytesPerChecksum'
-      // number of bytes in a list. Compute the index of the first
-      // checksum to match with the read data
+      if (verifyChecksum) {
+        ChecksumData checksumData = ChecksumData.getFromProtoBuf(
+            chunkInfo.getChecksumData());
 
-      long relativeOffset = chunkInfo.getOffset() - byteStrings.size();
-      int bytesPerChecksum = checksumData.getBytesPerChecksum();
-      int startIndex = (int) (relativeOffset / bytesPerChecksum);
-      Checksum.verifyChecksum(byteStrings, checksumData, startIndex,
-          isV0);
+        // ChecksumData stores checksum for each 'numBytesPerChecksum'
+        // number of bytes in a list. Compute the index of the first
+        // checksum to match with the read data
+
+        long relativeOffset = chunkInfo.getOffset() - byteStrings.size();
+        int bytesPerChecksum = checksumData.getBytesPerChecksum();
+        int startIndex = (int) (relativeOffset / bytesPerChecksum);
+        Checksum.verifyChecksum(byteStrings, checksumData, startIndex,
+            isV0);
+      }
     }
   }
 

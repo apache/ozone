@@ -24,8 +24,8 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.XceiverClientFactory;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.storage.BlockExtendedInputStream;
-import org.apache.hadoop.hdds.scm.storage.BlockInputStream;
 import org.apache.hadoop.hdds.scm.storage.BlockLocationInfo;
+import org.apache.hadoop.hdds.scm.storage.NewBlockInputStream;
 import org.apache.hadoop.hdds.security.token.OzoneBlockTokenIdentifier;
 import org.apache.hadoop.io.ByteBufferPool;
 import org.apache.hadoop.io.ElasticByteBufferPool;
@@ -84,7 +84,7 @@ public class BlockInputStreamFactoryImpl implements BlockInputStreamFactory {
           blockInfo, verifyChecksum, xceiverFactory, refreshFunction,
           ecBlockStreamFactory);
     } else {
-      return new BlockInputStream(blockInfo.getBlockID(), blockInfo.getLength(),
+      return new NewBlockInputStream(blockInfo.getBlockID(), blockInfo.getLength(),
           pipeline, token, verifyChecksum, xceiverFactory, refreshFunction);
     }
   }

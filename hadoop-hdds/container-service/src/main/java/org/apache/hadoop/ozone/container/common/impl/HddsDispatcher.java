@@ -21,6 +21,7 @@ package org.apache.hadoop.ozone.container.common.impl;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.protobuf.ServiceException;
+import io.opentracing.Span;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.client.BlockID;
@@ -41,6 +42,7 @@ import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerExcep
 import org.apache.hadoop.hdds.security.token.NoopTokenVerifier;
 import org.apache.hadoop.hdds.security.token.TokenVerifier;
 import org.apache.hadoop.hdds.server.OzoneProtocolMessageDispatcher;
+import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.hdds.utils.ProtocolMessageMetrics;
 import org.apache.hadoop.ozone.audit.AuditAction;
 import org.apache.hadoop.ozone.audit.AuditEventStatus;
@@ -60,12 +62,15 @@ import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
 import org.apache.hadoop.ozone.container.common.transport.server.ratis.DispatcherContext;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.common.volume.VolumeSet;
+import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainer;
 import org.apache.hadoop.ozone.container.ozoneimpl.OnDemandContainerDataScanner;
 import org.apache.hadoop.ozone.container.common.volume.VolumeUsage;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.util.Time;
 import org.apache.ratis.statemachine.StateMachine;
 import org.apache.ratis.thirdparty.com.google.protobuf.ProtocolMessageEnum;
+import org.apache.ratis.thirdparty.io.grpc.stub.StreamObserver;
+import org.apache.ratis.util.UncheckedAutoCloseable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -782,6 +787,81 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
       throw new StorageContainerException(
               "ContainerID " + containerID + " does not exist",
               ContainerProtos.Result.CONTAINER_NOT_FOUND);
+    }
+  }
+
+  @Override
+  public void streamDataReadOnly(ContainerCommandRequestProto msg,
+                                 StreamObserver<ContainerCommandResponseProto> streamObserver,
+                                 DispatcherContext dispatcherContext) {
+    Type cmdType = msg.getCmdType();
+    String traceID = msg.getTraceID();
+    Span span = TracingUtil.importAndCreateSpan(cmdType.toString(), traceID);
+    AuditAction action = getAuditAction(msg.getCmdType());
+    EventType eventType = getEventType(msg);
+    Map<String, String> params = getAuditParams(msg);
+
+    try (UncheckedAutoCloseable ignored = protocolMetrics.measure(cmdType)) {
+      Preconditions.checkNotNull(msg);
+      if (LOG.isTraceEnabled()) {
+        LOG.trace("Command {}, trace ID: {}.", msg.getCmdType(),
+            traceID);
+      }
+
+      PerformanceStringBuilder perf = new PerformanceStringBuilder();
+      ContainerCommandResponseProto responseProto = null;
+      long containerID = msg.getContainerID();
+      Container container = getContainer(containerID);
+      long startTime = Time.monotonicNow();
+
+      if (DispatcherContext.op(dispatcherContext).validateToken()) {
+        validateToken(msg);
+      }
+      if (getMissingContainerSet().contains(containerID)) {
+        throw new StorageContainerException(
+            "ContainerID " + containerID
+                + " has been lost and and cannot be recreated on this DataNode",
+            ContainerProtos.Result.CONTAINER_MISSING);
+      }
+      if (container == null) {
+        throw new StorageContainerException(
+            "ContainerID " + containerID + " does not exist",
+            ContainerProtos.Result.CONTAINER_NOT_FOUND);
+      }
+      ContainerType containerType = getContainerType(container);
+      Handler handler = getHandler(containerType);
+      if (handler == null) {
+        throw new StorageContainerException("Invalid " +
+            "ContainerType " + containerType,
+            ContainerProtos.Result.CONTAINER_INTERNAL_ERROR);
+      }
+      perf.appendPreOpLatencyMs(Time.monotonicNow() - startTime);
+      handler.streamDataReadOnly(
+          msg, (KeyValueContainer) container, dispatcherContext, streamObserver);
+      long oPLatencyMS = Time.monotonicNow() - startTime;
+      metrics.incContainerOpsLatencies(cmdType, oPLatencyMS);
+      Result result = responseProto.getResult();
+      if (result == Result.SUCCESS) {
+        audit(action, eventType, params, AuditEventStatus.SUCCESS, null);
+      } else {
+        OnDemandContainerDataScanner.scanContainer(container);
+        audit(action, eventType, params, AuditEventStatus.FAILURE,
+            new Exception(responseProto.getMessage()));
+      }
+      perf.appendOpLatencyMs(oPLatencyMS);
+      performanceAudit(action, params, perf, oPLatencyMS);
+
+    } catch (StorageContainerException sce) {
+      audit(action, eventType, params, AuditEventStatus.FAILURE, sce);
+      streamObserver.onNext(ContainerUtils.logAndReturnError(LOG, sce, msg));
+    } catch (IOException ioe) {
+      final String s = ContainerProtos.Result.BLOCK_TOKEN_VERIFICATION_FAILED
+          + " for " + dispatcherContext + ": " + ioe.getMessage();
+      final StorageContainerException sce = new StorageContainerException(
+          s, ioe, ContainerProtos.Result.BLOCK_TOKEN_VERIFICATION_FAILED);
+      streamObserver.onNext(ContainerUtils.logAndReturnError(LOG, sce, msg));
+    } finally {
+      span.finish();
     }
   }
 
