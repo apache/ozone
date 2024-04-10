@@ -119,8 +119,17 @@ public class BufferPool {
         () -> "current buffer: " + currentBufferIndex);
 
     // always remove from head of the list and append at last
-    final boolean res = bufferList.remove(chunkBuffer);
-    Preconditions.assertTrue(res, "unsuccessful buffer removal");
+//    boolean res = bufferList.remove(chunkBuffer);  // This does NOT work as intended
+    int i;
+    ChunkBuffer buffer = null;
+    for (i = 0; i < bufferList.size(); i++) {
+      // force comparison by object ID, overriding ByteBuffer's equals() method
+      if (chunkBuffer == bufferList.get(i)) {
+        buffer = bufferList.remove(i);
+        break;
+      }
+    }
+    Preconditions.assertSame(chunkBuffer, buffer, "Should be the same buffer");
     chunkBuffer.clear();
     bufferList.add(chunkBuffer);
     currentBufferIndex--;  //
