@@ -39,26 +39,42 @@ Copy Object Happy Scenario
                         Execute                    date > /tmp/copyfile
     ${file_checksum} =  Execute                    md5sum /tmp/copyfile | awk '{print $1}'
 
-    ${result} =         Execute AWSS3ApiCli        put-object --bucket ${BUCKET} --key ${PREFIX}/copyobject/key=value/f1 --body /tmp/copyfile
+    ${result} =         Execute AWSS3ApiCli        put-object --bucket ${BUCKET} --key ${PREFIX}/copyobject/key=value/f1 --body /tmp/copyfile --metadata="custom-key1=custom-value1,custom-key2=custom-value2,gdprEnabled=true"
     ${eTag} =           Execute and checkrc        echo '${result}' | jq -r '.ETag'  0
                         Should Be Equal            ${eTag}           \"${file_checksum}\"
 
     ${result} =         Execute AWSS3ApiCli        list-objects --bucket ${BUCKET} --prefix ${PREFIX}/copyobject/key=value/
                         Should contain             ${result}         f1
 
-    ${result} =         Execute AWSS3ApiCli        copy-object --bucket ${DESTBUCKET} --key ${PREFIX}/copyobject/key=value/f1 --copy-source ${BUCKET}/${PREFIX}/copyobject/key=value/f1
+    ${result} =         Execute AWSS3ApiCli        copy-object --bucket ${DESTBUCKET} --key ${PREFIX}/copyobject/key=value/f1 --copy-source ${BUCKET}/${PREFIX}/copyobject/key=value/f1 --metadata="custom-key3=custom-value3,custom-key4=custom-value4"
     ${eTag} =           Execute and checkrc        echo '${result}' | jq -r '.CopyObjectResult.ETag'  0
                         Should Be Equal            ${eTag}           \"${file_checksum}\"
 
     ${result} =         Execute AWSS3ApiCli        list-objects --bucket ${DESTBUCKET} --prefix ${PREFIX}/copyobject/key=value/
                         Should contain             ${result}         f1
+
+    #check that the custom metadata of the source key has been copied to the destination key (default copy directive is COPY)
+    ${result} =         Execute AWSS3ApiCli        head-object --bucket ${BUCKET} --key ${PREFIX}/copyobject/key=value/f1
+                        Should contain             ${result}    \"custom-key1\": \"custom-value1\"
+                        Should contain             ${result}    \"custom-key2\": \"custom-value2\"
+                        # COPY directive ignores any metadata specified in the copy object request
+                        Should Not contain         ${result}    \"custom-key3\": \"custom-value3\"
+                        Should Not contain         ${result}    \"custom-key4\": \"custom-value4\"
+
     #copying again will not throw error
-    ${result} =         Execute AWSS3ApiCli        copy-object --bucket ${DESTBUCKET} --key ${PREFIX}/copyobject/key=value/f1 --copy-source ${BUCKET}/${PREFIX}/copyobject/key=value/f1
+    #also uses the REPLACE copy directive
+    ${result} =         Execute AWSS3ApiCli        copy-object --bucket ${DESTBUCKET} --key ${PREFIX}/copyobject/key=value/f1 --copy-source ${BUCKET}/${PREFIX}/copyobject/key=value/f1 --metadata="custom-key3=custom-value3,custom-key4=custom-value4" --metadata-directive REPLACE
     ${eTag} =           Execute and checkrc        echo '${result}' | jq -r '.CopyObjectResult.ETag'  0
                         Should Be Equal            ${eTag}           \"${file_checksum}\"
 
     ${result} =         Execute AWSS3ApiCli        list-objects --bucket ${DESTBUCKET} --prefix ${PREFIX}/copyobject/key=value/
                         Should contain             ${result}         f1
+    ${result} =         Execute AWSS3ApiCli        head-object --bucket ${DESTBUCKET} --key ${PREFIX}/copyobject/key=value/f1
+                        Should contain             ${result}    \"custom-key3\": \"custom-value3\"
+                        Should contain             ${result}    \"custom-key4\": \"custom-value4\"
+                        # REPLACE directive uses the custom metadata specified in the request instead of the source key's custom metadata
+                        Should Not contain         ${result}    \"custom-key1\": \"custom-value1\"
+                        Should Not contain         ${result}    \"custom-key2\": \"custom-value2\"
 
 Copy Object Where Bucket is not available
     ${result} =         Execute AWSS3APICli and checkrc        copy-object --bucket dfdfdfdfdfnonexistent --key ${PREFIX}/copyobject/key=value/f1 --copy-source ${BUCKET}/${PREFIX}/copyobject/key=value/f1      255
@@ -76,3 +92,13 @@ Copy Object Where both source and dest are same with change to storageclass
 Copy Object Where Key not available
     ${result} =         Execute AWSS3APICli and checkrc        copy-object --bucket ${DESTBUCKET} --key ${PREFIX}/copyobject/key=value/f1 --copy-source ${BUCKET}/nonnonexistentkey       255
                         Should contain             ${result}        NoSuchKey
+
+Copy Object using an invalid copy directive
+    ${result} =         Execute AWSS3ApiCli and checkrc        copy-object --bucket ${DESTBUCKET} --key ${PREFIX}/copyobject/key=value/f1 --copy-source ${BUCKET}/${PREFIX}/copyobject/key=value/f1 --metadata-directive INVALID       255
+                        Should contain             ${result}        InvalidArgument
+
+Copy Object with user defined metadata size larger than 2 KB
+                                Execute                    echo "Randomtext" > /tmp/testfile2
+    ${custom_metadata_value} =  Execute                    printf 'v%.0s' {1..3000}
+    ${result} =                 Execute AWSS3ApiCli and checkrc       copy-object --bucket ${DESTBUCKET} --key ${PREFIX}/copyobject/key=value/f1 --copy-source ${BUCKET}/${PREFIX}/copyobject/key=value/f1 --metadata="custom-key1=${custom_metadata_value}" --metadata-directive REPLACE       255
+                                Should contain                        ${result}   MetadataTooLarge
