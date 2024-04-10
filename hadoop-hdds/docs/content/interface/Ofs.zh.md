@@ -57,7 +57,7 @@ ofs://omservice/tmp/key1
 
 ## 配置
 
-请向core-site.xml中添加下列配置。
+请在 `core-site.xml` 添加下列配置。
 
 {{< highlight xml >}}
 <property>
