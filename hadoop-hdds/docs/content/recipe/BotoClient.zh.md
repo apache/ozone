@@ -88,7 +88,7 @@ https://boto3.amazonaws.com/v1/documentation/api/latest/guide/credentials.html
     for bucket in response['Buckets']:
         print(f'  {bucket["Name"]}')
 
-这将列出Ozone `s3v` 卷中的所有桶
+这将列出 Ozone `s3v` 卷中的所有桶
 
 ### 查看桶信息
     response = s3_client.head_bucket(Bucket='bucket1')
