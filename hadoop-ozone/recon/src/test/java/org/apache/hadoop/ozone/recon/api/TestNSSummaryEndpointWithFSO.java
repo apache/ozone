@@ -23,7 +23,6 @@ import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 import static org.apache.hadoop.ozone.om.helpers.QuotaUtil.getReplicatedSize;
 
 import org.apache.hadoop.hdds.client.BlockID;
-import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -126,9 +125,8 @@ public class TestNSSummaryEndpointWithFSO {
 
   private static int chunkSize = 1024 * 1024;
 
-  private ReplicationConfig ratisThree = ReplicationConfig.fromProtoTypeAndFactor(HddsProtos.ReplicationType.RATIS,
-      HddsProtos.ReplicationFactor.THREE);
-  private ReplicationConfig ecType = new ECReplicationConfig(3, 2, ECReplicationConfig.EcCodec.RS, chunkSize);
+  private ReplicationConfig ratisOne = ReplicationConfig.fromProtoTypeAndFactor(HddsProtos.ReplicationType.RATIS,
+      HddsProtos.ReplicationFactor.ONE);
   private long epochMillis1 =
       ReconUtils.convertToEpochMillis("04-04-2024 12:30:00", "MM-dd-yyyy HH:mm:ss", TimeZone.getDefault());
   private long epochMillis2 =
@@ -160,12 +158,6 @@ public class TestNSSummaryEndpointWithFSO {
   private static final String KEY_NINE = "dir5/file9";
   private static final String KEY_TEN = "dir5/file10";
   private static final String KEY_ELEVEN = "file11";
-  private static final String KEY_TWELVE = "dir6/file12";
-  private static final String KEY_THIRTEEN = "dir6/file13";
-  private static final String KEY_FOURTEEN = "dir6/dir7/file14";
-  private static final String KEY_FIFTEEN = "dir6/dir7/file15";
-  private static final String KEY_SIXTEEN = "dir6/dir7/dir8/file16";
-  private static final String KEY_SEVENTEEN = "dir6/dir7/dir8/file17";
   private static final String MULTI_BLOCK_KEY = "dir1/file7";
   private static final String MULTI_BLOCK_FILE = "file7";
 
@@ -309,6 +301,24 @@ public class TestNSSummaryEndpointWithFSO {
   private static final long FILE11_SIZE_WITH_REPLICA =
       getReplicatedSize(KEY_ELEVEN_SIZE,
               StandaloneReplicationConfig.getInstance(ONE));
+  private static final long FILE12_SIZE_WITH_REPLICA =
+      getReplicatedSize(KEY_TWELVE_SIZE,
+          StandaloneReplicationConfig.getInstance(ONE));
+  private static final long FILE13_SIZE_WITH_REPLICA =
+      getReplicatedSize(KEY_THIRTEEN_SIZE,
+          StandaloneReplicationConfig.getInstance(ONE));
+  private static final long FILE14_SIZE_WITH_REPLICA =
+      getReplicatedSize(KEY_FOURTEEN_SIZE,
+          StandaloneReplicationConfig.getInstance(ONE));
+  private static final long FILE15_SIZE_WITH_REPLICA =
+      getReplicatedSize(KEY_FIFTEEN_SIZE,
+          StandaloneReplicationConfig.getInstance(ONE));
+  private static final long FILE16_SIZE_WITH_REPLICA =
+      getReplicatedSize(KEY_SIXTEEN_SIZE,
+          StandaloneReplicationConfig.getInstance(ONE));
+  private static final long FILE17_SIZE_WITH_REPLICA =
+      getReplicatedSize(KEY_SEVENTEEN_SIZE,
+          StandaloneReplicationConfig.getInstance(ONE));
   private static final long MULTI_BLOCK_KEY_SIZE_WITH_REPLICA
           = FILE7_SIZE_WITH_REPLICA;
   private static final long
@@ -323,7 +333,13 @@ public class TestNSSummaryEndpointWithFSO {
       + FILE8_SIZE_WITH_REPLICA
       + FILE9_SIZE_WITH_REPLICA
       + FILE10_SIZE_WITH_REPLICA
-      + FILE11_SIZE_WITH_REPLICA;
+      + FILE11_SIZE_WITH_REPLICA
+      + FILE12_SIZE_WITH_REPLICA
+      + FILE13_SIZE_WITH_REPLICA
+      + FILE14_SIZE_WITH_REPLICA
+      + FILE15_SIZE_WITH_REPLICA
+      + FILE16_SIZE_WITH_REPLICA
+      + FILE17_SIZE_WITH_REPLICA;
 
   private static final long
       MULTI_BLOCK_TOTAL_SIZE_WITH_REPLICA_UNDER_VOL
@@ -388,14 +404,16 @@ public class TestNSSummaryEndpointWithFSO {
   private static final String INVALID_PATH = "/vol/path/not/found";
 
   // some expected answers
-  private static final long ROOT_DATA_SIZE = KEY_ONE_SIZE + KEY_TWO_SIZE +
-      KEY_THREE_SIZE + KEY_FOUR_SIZE + KEY_FIVE_SIZE + KEY_SIX_SIZE +
-      KEY_EIGHT_SIZE + KEY_NINE_SIZE + KEY_TEN_SIZE + KEY_ELEVEN_SIZE;
+  private static final long ROOT_DATA_SIZE = KEY_ONE_SIZE + KEY_TWO_SIZE + KEY_THREE_SIZE + KEY_FOUR_SIZE +
+      KEY_FIVE_SIZE + KEY_SIX_SIZE + KEY_EIGHT_SIZE + KEY_NINE_SIZE + KEY_TEN_SIZE + KEY_ELEVEN_SIZE +
+      KEY_TWELVE_SIZE + KEY_THIRTEEN_SIZE + KEY_FOURTEEN_SIZE + KEY_FIFTEEN_SIZE + KEY_SIXTEEN_SIZE +
+      KEY_SEVENTEEN_SIZE;
   private static final long VOL_DATA_SIZE = KEY_ONE_SIZE + KEY_TWO_SIZE +
           KEY_THREE_SIZE + KEY_FOUR_SIZE + KEY_FIVE_SIZE + KEY_SIX_SIZE;
 
   private static final long VOL_TWO_DATA_SIZE =
-      KEY_EIGHT_SIZE + KEY_NINE_SIZE + KEY_TEN_SIZE + KEY_ELEVEN_SIZE;
+      KEY_EIGHT_SIZE + KEY_NINE_SIZE + KEY_TEN_SIZE + KEY_ELEVEN_SIZE + KEY_TWELVE_SIZE + KEY_THIRTEEN_SIZE +
+          KEY_FOURTEEN_SIZE + KEY_FIFTEEN_SIZE + KEY_SIXTEEN_SIZE + KEY_SEVENTEEN_SIZE;
 
   private static final long BUCKET_ONE_DATA_SIZE = KEY_ONE_SIZE + KEY_TWO_SIZE +
           KEY_THREE_SIZE + KEY_SIX_SIZE;
@@ -729,7 +747,7 @@ public class TestNSSummaryEndpointWithFSO {
     Response bucketResponse = nsSummaryEndpoint.listKeysWithDu("RATIS", "", 0, BUCKET_FIVE_PATH,
         1000, true);
     DUResponse duBucketResponse = (DUResponse) bucketResponse.getEntity();
-    assertEquals(3, duBucketResponse.getCount());
+    assertEquals(6, duBucketResponse.getCount());
     DUResponse.DiskUsage duDir1 = duBucketResponse.getDuData().get(0);
     assertEquals(DIR_SIX_PATH.substring(1) + OM_KEY_PREFIX + FILE_TWELVE, duDir1.getSubpath());
     assertEquals("RATIS", duDir1.getReplicationType());
@@ -737,7 +755,7 @@ public class TestNSSummaryEndpointWithFSO {
 
   @Test
   public void testFileSizeDist() throws Exception {
-    checkFileSizeDist(ROOT_PATH, 2, 3, 4, 1);
+    checkFileSizeDist(ROOT_PATH, 2, 5, 8, 1);
     checkFileSizeDist(VOL_PATH, 2, 1, 2, 1);
     checkFileSizeDist(BUCKET_ONE_PATH, 1, 1, 1, 1);
     checkFileSizeDist(DIR_ONE_PATH, 0, 1, 1, 1);
@@ -913,7 +931,7 @@ public class TestNSSummaryEndpointWithFSO {
         VOL_TWO_OBJECT_ID,
         KEY_TWELVE_SIZE,
         getBucketLayout(),
-        ratisThree,
+        ratisOne,
         epochMillis1, true);
     writeKeyToOm(reconOMMetadataManager,
         FILE_THIRTEEN,
@@ -926,7 +944,7 @@ public class TestNSSummaryEndpointWithFSO {
         VOL_TWO_OBJECT_ID,
         KEY_THIRTEEN_SIZE,
         getBucketLayout(),
-        ecType,
+        ratisOne,
         epochMillis2, true);
 
     writeKeyToOm(reconOMMetadataManager,
@@ -940,7 +958,7 @@ public class TestNSSummaryEndpointWithFSO {
         VOL_TWO_OBJECT_ID,
         KEY_FOURTEEN_SIZE,
         getBucketLayout(),
-        ratisThree,
+        ratisOne,
         epochMillis1, true);
     writeKeyToOm(reconOMMetadataManager,
         FILE_FIFTEEN,
@@ -953,7 +971,7 @@ public class TestNSSummaryEndpointWithFSO {
         VOL_TWO_OBJECT_ID,
         KEY_FIFTEEN_SIZE,
         getBucketLayout(),
-        ecType,
+        ratisOne,
         epochMillis2, true);
 
     writeKeyToOm(reconOMMetadataManager,
@@ -967,7 +985,7 @@ public class TestNSSummaryEndpointWithFSO {
         VOL_TWO_OBJECT_ID,
         KEY_SIXTEEN_SIZE,
         getBucketLayout(),
-        ratisThree,
+        ratisOne,
         epochMillis1, true);
     writeKeyToOm(reconOMMetadataManager,
         FILE_SEVENTEEN,
@@ -980,7 +998,7 @@ public class TestNSSummaryEndpointWithFSO {
         VOL_TWO_OBJECT_ID,
         KEY_SEVENTEEN_SIZE,
         getBucketLayout(),
-        ecType,
+        ratisOne,
         epochMillis2, true);
   }
 

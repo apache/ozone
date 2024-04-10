@@ -91,9 +91,9 @@ public class CommonUtils {
         (NamespaceSummaryResponse) rootResponse.getEntity();
     assertEquals(EntityType.ROOT, rootResponseObj.getEntityType());
     assertEquals(2, rootResponseObj.getCountStats().getNumVolume());
-    assertEquals(4, rootResponseObj.getCountStats().getNumBucket());
-    assertEquals(5, rootResponseObj.getCountStats().getNumTotalDir());
-    assertEquals(10, rootResponseObj.getCountStats().getNumTotalKey());
+    assertEquals(5, rootResponseObj.getCountStats().getNumBucket());
+    assertEquals(8, rootResponseObj.getCountStats().getNumTotalDir());
+    assertEquals(16, rootResponseObj.getCountStats().getNumTotalKey());
     assertEquals("USER",
         rootResponseObj.getObjectDBInfo().getAcls().get(0).getType());
     assertEquals("WRITE", rootResponseObj.getObjectDBInfo().getAcls().get(0)

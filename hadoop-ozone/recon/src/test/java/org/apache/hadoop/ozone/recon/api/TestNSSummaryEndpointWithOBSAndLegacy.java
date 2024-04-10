@@ -269,6 +269,8 @@ public class TestNSSummaryEndpointWithOBSAndLegacy {
       + FILE3_SIZE_WITH_REPLICA
       + FILE4_SIZE_WITH_REPLICA
       + FILE5_SIZE_WITH_REPLICA
+      + FILE6_SIZE_WITH_REPLICA
+      + FILE7_SIZE_WITH_REPLICA
       + FILE8_SIZE_WITH_REPLICA
       + FILE9_SIZE_WITH_REPLICA
       + FILE10_SIZE_WITH_REPLICA
@@ -280,7 +282,9 @@ public class TestNSSummaryEndpointWithOBSAndLegacy {
       + FILE2_SIZE_WITH_REPLICA
       + FILE3_SIZE_WITH_REPLICA
       + FILE4_SIZE_WITH_REPLICA
-      + FILE5_SIZE_WITH_REPLICA;
+      + FILE5_SIZE_WITH_REPLICA
+      + FILE6_SIZE_WITH_REPLICA
+      + FILE7_SIZE_WITH_REPLICA;
 
   private static final long
       MULTI_BLOCK_TOTAL_SIZE_WITH_REPLICA_UNDER_BUCKET1
@@ -354,11 +358,10 @@ public class TestNSSummaryEndpointWithOBSAndLegacy {
 
   // some expected answers
   private static final long ROOT_DATA_SIZE =
-      FILE_ONE_SIZE + FILE_TWO_SIZE + FILE_THREE_SIZE + FILE_FOUR_SIZE +
-          FILE_FIVE_SIZE + FILE_EIGHT_SIZE + FILE_NINE_SIZE + FILE_TEN_SIZE +
-          FILE_ELEVEN_SIZE;
+      FILE_ONE_SIZE + FILE_TWO_SIZE + FILE_THREE_SIZE + FILE_FOUR_SIZE + FILE_FIVE_SIZE + FILE_SIX_SIZE +
+          FILE_SEVEN_SIZE + FILE_EIGHT_SIZE + FILE_NINE_SIZE + FILE_TEN_SIZE + FILE_ELEVEN_SIZE;
   private static final long VOL_DATA_SIZE = FILE_ONE_SIZE + FILE_TWO_SIZE +
-      FILE_THREE_SIZE + FILE_FOUR_SIZE + FILE_FIVE_SIZE;
+      FILE_THREE_SIZE + FILE_FOUR_SIZE + FILE_FIVE_SIZE + FILE_SIX_SIZE + FILE_SEVEN_SIZE;
 
   private static final long VOL_TWO_DATA_SIZE =
       FILE_EIGHT_SIZE + FILE_NINE_SIZE + FILE_TEN_SIZE + FILE_ELEVEN_SIZE;
@@ -380,8 +383,7 @@ public class TestNSSummaryEndpointWithOBSAndLegacy {
 
   private static int chunkSize = 1024 * 1024;
 
-  private ReplicationConfig ratisThree = ReplicationConfig.fromProtoTypeAndFactor(HddsProtos.ReplicationType.RATIS,
-      HddsProtos.ReplicationFactor.THREE);
+  private ReplicationConfig ratisOne = ReplicationConfig.fromProtoTypeAndFactor(HddsProtos.ReplicationType.RATIS, ONE);
   private ReplicationConfig ecType = new ECReplicationConfig(3, 2, ECReplicationConfig.EcCodec.RS, chunkSize);
   private long epochMillis1 =
       ReconUtils.convertToEpochMillis("04-04-2024 12:30:00", "MM-dd-yyyy HH:mm:ss", TimeZone.getDefault());
@@ -449,8 +451,8 @@ public class TestNSSummaryEndpointWithOBSAndLegacy {
         (NamespaceSummaryResponse) rootResponse.getEntity();
     assertEquals(EntityType.ROOT, rootResponseObj.getEntityType());
     assertEquals(2, rootResponseObj.getCountStats().getNumVolume());
-    assertEquals(4, rootResponseObj.getCountStats().getNumBucket());
-    assertEquals(9, rootResponseObj.getCountStats().getNumTotalKey());
+    assertEquals(5, rootResponseObj.getCountStats().getNumBucket());
+    assertEquals(11, rootResponseObj.getCountStats().getNumTotalKey());
   }
 
   @Test
@@ -461,8 +463,8 @@ public class TestNSSummaryEndpointWithOBSAndLegacy {
         (NamespaceSummaryResponse) volResponse.getEntity();
     assertEquals(EntityType.VOLUME,
         volResponseObj.getEntityType());
-    assertEquals(2, volResponseObj.getCountStats().getNumBucket());
-    assertEquals(5, volResponseObj.getCountStats().getNumTotalKey());
+    assertEquals(3, volResponseObj.getCountStats().getNumBucket());
+    assertEquals(7, volResponseObj.getCountStats().getNumTotalKey());
     assertEquals(TEST_USER, ((VolumeObjectDBInfo) volResponseObj.
         getObjectDBInfo()).getAdmin());
     assertEquals(TEST_USER, ((VolumeObjectDBInfo) volResponseObj.
@@ -897,8 +899,8 @@ public class TestNSSummaryEndpointWithOBSAndLegacy {
 
   @Test
   public void testFileSizeDist() throws Exception {
-    checkFileSizeDist(ROOT_PATH, 2, 3, 3, 1);
-    checkFileSizeDist(VOL_PATH, 2, 1, 1, 1);
+    checkFileSizeDist(ROOT_PATH, 4, 3, 3, 1);
+    checkFileSizeDist(VOL_PATH, 4, 1, 1, 1);
     checkFileSizeDist(BUCKET_ONE_PATH, 1, 1, 0, 1);
   }
 
@@ -948,56 +950,45 @@ public class TestNSSummaryEndpointWithOBSAndLegacy {
   public void testListKeysBucketFive() throws Exception {
     // filter list keys under bucketFive based on RATIS ReplicationConfig and key creation date
     // creationDate filter passed 1 minute above of KEY6 creation date, so listKeys API will return
-    // ZERO keys, as none of the RATIS keys got created after creationDate filter value.
+    // ZERO keys, as one RATIS keys got created after creationDate filter value.
     Response bucketResponse = nsSummaryEndpoint.listKeysWithDu("RATIS",
         "04-04-2024 12:31:00", 0, BUCKET_FIVE_PATH, 10, false);
     DUResponse duBucketResponse = (DUResponse) bucketResponse.getEntity();
     // There are no sub-paths under this OBS bucket.
-    assertEquals(0, duBucketResponse.getCount());
+    assertEquals(1, duBucketResponse.getCount());
 
     // creationDate filter and keySize filter both are empty, so listKeys API should return both KEY6 and KEY7 keys,
-    // but replication type RATIS filter will filter out KEY7 as only 1 RATIS key KEY6 got created.
     bucketResponse = nsSummaryEndpoint.listKeysWithDu("RATIS",
         null, 0, BUCKET_FIVE_PATH, 10, false);
     duBucketResponse = (DUResponse) bucketResponse.getEntity();
     // There are no sub-paths under this OBS bucket.
-    assertEquals(1, duBucketResponse.getCount());
+    assertEquals(2, duBucketResponse.getCount());
     assertEquals(KEY_SIX, duBucketResponse.getDuData().get(0).getSubpath());
 
     // creationDate filter passed same as KEY6 creation date, so listKeys API will return
-    // KEY6 key only, as only 1 RATIS key KEY6 created at "04-04-2024 12:30:00".
+    // KEY6 and KEY7 keys, as only 2 RATIS keys created at "04-04-2024 12:30:00".
     bucketResponse = nsSummaryEndpoint.listKeysWithDu("RATIS",
         "04-04-2024 12:30:00", 0, BUCKET_FIVE_PATH, 10, false);
     duBucketResponse = (DUResponse) bucketResponse.getEntity();
     // There are no sub-paths under this OBS bucket.
-    assertEquals(1, duBucketResponse.getCount());
+    assertEquals(2, duBucketResponse.getCount());
     assertEquals(KEY_SIX, duBucketResponse.getDuData().get(0).getSubpath());
 
     // creationDate filter passed same as KEY6 and KEY7 creation date, but replicationType filter is EC,
-    // so listKeys API will return only KEY7, as only one EC key got created at or after creationDate filter value.
+    // so listKeys API will return zero keys, because no EC key got created at or after creationDate filter value.
     bucketResponse = nsSummaryEndpoint.listKeysWithDu("EC",
         "04-04-2024 12:30:00", 0, BUCKET_FIVE_PATH, 10, false);
     duBucketResponse = (DUResponse) bucketResponse.getEntity();
     // There are no sub-paths under this OBS bucket.
-    assertEquals(1, duBucketResponse.getCount());
-    assertEquals(KEY_SEVEN, duBucketResponse.getDuData().get(0).getSubpath());
-
-    // creationDate filter passed same as KEY7 creation date, but replicationType filter is EC,
-    // so listKeys API will return only KEY7, as only one EC key got created at or after creationDate filter value.
-    bucketResponse = nsSummaryEndpoint.listKeysWithDu("EC",
-        "04-05-2024 12:30:00", 0, BUCKET_FIVE_PATH, 10, false);
-    duBucketResponse = (DUResponse) bucketResponse.getEntity();
-    // There are no sub-paths under this OBS bucket.
-    assertEquals(1, duBucketResponse.getCount());
-    assertEquals(KEY_SEVEN, duBucketResponse.getDuData().get(0).getSubpath());
+    assertEquals(0, duBucketResponse.getCount());
 
     // creationDate filter passed same as KEY7 creation date, but replicationType filter is RATIS,
-    // so listKeys API will return ZERO keys, as no RATIS key got created at or after creationDate filter value.
+    // so listKeys API will return ZERO keys, as only 1 RATIS key got created at or after creationDate filter value.
     bucketResponse = nsSummaryEndpoint.listKeysWithDu("RATIS",
         "04-05-2024 12:30:00", 0, BUCKET_FIVE_PATH, 10, false);
     duBucketResponse = (DUResponse) bucketResponse.getEntity();
     // There are no sub-paths under this OBS bucket.
-    assertEquals(0, duBucketResponse.getCount());
+    assertEquals(1, duBucketResponse.getCount());
 
     // creationDate filter passed same as KEY6 creation date, and replicationType filter is RATIS,
     // so listKeys API will return only KEY6, as only one RATIS key got created at or after creationDate filter value,
@@ -1114,7 +1105,7 @@ public class TestNSSummaryEndpointWithOBSAndLegacy {
         VOL_OBJECT_ID,
         FILE_SIX_SIZE,
         getOBSBucketLayout(),
-        ratisThree,
+        ratisOne,
         epochMillis1, true);
     writeKeyToOm(reconOMMetadataManager,
         KEY_SEVEN,
@@ -1127,7 +1118,7 @@ public class TestNSSummaryEndpointWithOBSAndLegacy {
         VOL_OBJECT_ID,
         FILE_SEVEN_SIZE,
         getOBSBucketLayout(),
-        ecType,
+        ratisOne,
         epochMillis2, true);
 
     writeKeyToOm(reconOMMetadataManager,

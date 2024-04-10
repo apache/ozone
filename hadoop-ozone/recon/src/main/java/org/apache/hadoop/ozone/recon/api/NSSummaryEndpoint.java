@@ -190,7 +190,7 @@ public class NSSummaryEndpoint {
   @GET
   @Path("/listKeys")
   @SuppressWarnings("methodlength")
-  public Response listKeysWithDu(@DefaultValue("RATIS") @QueryParam("replicationType") String replicationType,
+  public Response listKeysWithDu(@QueryParam("replicationType") String replicationType,
                                  @QueryParam("creationDate") String creationDate,
                                  @DefaultValue(DEFAULT_KEY_SIZE) @QueryParam("keySize") long keySize,
                                  @DefaultValue(OM_KEY_PREFIX) @QueryParam("startPrefix") String startPrefix,
