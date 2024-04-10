@@ -452,10 +452,7 @@ public class BlockOutputStream extends OutputStream {
     if (future == null) {
       future = waitOnFlushFutures();
     } else {
-      future.thenApplyAsync(r -> {
-        waitOnFlushFutures();
-        return r;
-      });
+      future = future.thenCompose(r -> waitOnFlushFutures());
     }
 
     // ExecutionException and InterruptedException are no longer handled at this level
