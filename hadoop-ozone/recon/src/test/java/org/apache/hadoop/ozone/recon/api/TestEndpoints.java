@@ -143,6 +143,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Arrays;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
@@ -1306,6 +1307,10 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
         (RemoveDataNodesResponseWrapper) removedDNResponse.getEntity();
     DatanodesResponse notFoundDatanodes = removeDataNodesResponseWrapper.getDatanodesResponseMap()
         .get("notFoundDatanodes");
-    //assertEquals("Invalid request", notFoundDatanodes.getMessage());
+    assertEquals(1, notFoundDatanodes.getTotalCount());
+    Collection<DatanodeMetadata> datanodes = notFoundDatanodes.getDatanodes();
+    assertEquals(1, datanodes.size());
+    DatanodeMetadata datanodeMetadata = datanodes.stream().findFirst().get();
+    assertEquals(dnUUID, datanodeMetadata.getUuid());
   }
 }
