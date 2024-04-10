@@ -69,6 +69,7 @@ https://boto3.amazonaws.com/v1/documentation/api/latest/reference/core/session.h
         'endpoint_url' is pointing to Ozone s3 endpoint.
 
     In our code sample below, we're demonstrating the usage of both s3 and s3_client.
+
 如果您连接到一个安全的集群，有多种方式配置 Boto3 客户端凭证。在这些情况下，创建 Ozone s3 客户端时传递 `aws_access_key_id` 和 `aws_secret_access_key` 的上述步骤应该被跳过。
 
 请参考 Boto3 文档以获取详细信息，在此处：
