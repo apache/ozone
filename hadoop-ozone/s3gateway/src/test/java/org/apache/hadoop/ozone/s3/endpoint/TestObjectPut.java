@@ -27,6 +27,8 @@ import java.util.stream.Stream;
 import java.io.OutputStream;
 import java.security.MessageDigest;
 import javax.ws.rs.core.HttpHeaders;
+import javax.ws.rs.core.MultivaluedHashMap;
+import javax.ws.rs.core.MultivaluedMap;
 import javax.ws.rs.core.Response;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.RandomStringUtils;
@@ -56,6 +58,8 @@ import org.junit.jupiter.params.provider.MethodSource;
 import org.mockito.MockedStatic;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
+import static org.apache.hadoop.ozone.s3.util.S3Consts.CUSTOM_METADATA_COPY_DIRECTIVE_HEADER;
+import static org.apache.hadoop.ozone.s3.util.S3Consts.CUSTOM_METADATA_HEADER_PREFIX;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.DECODED_CONTENT_LENGTH_HEADER;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.COPY_SOURCE_HEADER;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.STORAGE_CLASS_HEADER;
@@ -254,6 +258,14 @@ class TestObjectPut {
     ByteArrayInputStream body =
         new ByteArrayInputStream(CONTENT.getBytes(UTF_8));
 
+    // Add some custom metadata
+    MultivaluedMap<String, String> metadataHeaders = new MultivaluedHashMap<>();
+    metadataHeaders.putSingle(CUSTOM_METADATA_HEADER_PREFIX + "custom-key-1", "custom-value-1");
+    metadataHeaders.putSingle(CUSTOM_METADATA_HEADER_PREFIX + "custom-key-2", "custom-value-2");
+    when(headers.getRequestHeaders()).thenReturn(metadataHeaders);
+    // Add COPY metadata directive (default)
+    when(headers.getHeaderString(CUSTOM_METADATA_COPY_DIRECTIVE_HEADER)).thenReturn("COPY");
+
     Response response = objectEndpoint.put(BUCKET_NAME, KEY_NAME,
         CONTENT.length(), 1, null, body);
 
@@ -268,8 +280,13 @@ class TestObjectPut {
     assertEquals(CONTENT, keyContent);
     assertNotNull(keyDetails.getMetadata());
     assertThat(keyDetails.getMetadata().get(OzoneConsts.ETAG)).isNotEmpty();
+    assertThat(keyDetails.getMetadata().get("custom-key-1")).isEqualTo("custom-value-1");
+    assertThat(keyDetails.getMetadata().get("custom-key-2")).isEqualTo("custom-value-2");
 
     String sourceETag = keyDetails.getMetadata().get(OzoneConsts.ETAG);
+
+    // This will be ignored since the copy directive is COPY
+    metadataHeaders.putSingle(CUSTOM_METADATA_HEADER_PREFIX + "custom-key-3", "custom-value-3");
 
     // Add copy header, and then call put
     when(headers.getHeaderString(COPY_SOURCE_HEADER)).thenReturn(
@@ -296,9 +313,53 @@ class TestObjectPut {
     // the same Etag since the key content is the same
     assertEquals(sourceETag, sourceKeyDetails.getMetadata().get(OzoneConsts.ETAG));
     assertEquals(sourceETag, destKeyDetails.getMetadata().get(OzoneConsts.ETAG));
+    assertThat(destKeyDetails.getMetadata().get("custom-key-1")).isEqualTo("custom-value-1");
+    assertThat(destKeyDetails.getMetadata().get("custom-key-2")).isEqualTo("custom-value-2");
+    assertThat(destKeyDetails.getMetadata().containsKey("custom-key-3")).isFalse();
+
+    // Now use REPLACE metadata directive (default) and remove some custom metadata used in the source key
+    when(headers.getHeaderString(CUSTOM_METADATA_COPY_DIRECTIVE_HEADER)).thenReturn("REPLACE");
+    metadataHeaders.remove(CUSTOM_METADATA_HEADER_PREFIX + "custom-key-1");
+    metadataHeaders.remove(CUSTOM_METADATA_HEADER_PREFIX + "custom-key-2");
+
+    response = objectEndpoint.put(DEST_BUCKET_NAME, DEST_KEY, CONTENT.length(), 1,
+        null, body);
+
+    ozoneInputStream = clientStub.getObjectStore().getS3Bucket(DEST_BUCKET_NAME)
+        .readKey(DEST_KEY);
+
+    keyContent = IOUtils.toString(ozoneInputStream, UTF_8);
+    sourceKeyDetails = clientStub.getObjectStore()
+        .getS3Bucket(BUCKET_NAME).getKey(KEY_NAME);
+    destKeyDetails = clientStub.getObjectStore()
+        .getS3Bucket(DEST_BUCKET_NAME).getKey(DEST_KEY);
+
+    assertEquals(200, response.getStatus());
+    assertEquals(CONTENT, keyContent);
+    assertNotNull(keyDetails.getMetadata());
+    assertThat(keyDetails.getMetadata().get(OzoneConsts.ETAG)).isNotEmpty();
+    // Source key eTag should remain unchanged and the dest key should have
+    // the same Etag since the key content is the same
+    assertEquals(sourceETag, sourceKeyDetails.getMetadata().get(OzoneConsts.ETAG));
+    assertEquals(sourceETag, destKeyDetails.getMetadata().get(OzoneConsts.ETAG));
+    assertThat(destKeyDetails.getMetadata().containsKey("custom-key-1")).isFalse();
+    assertThat(destKeyDetails.getMetadata().containsKey("custom-key-2")).isFalse();
+    assertThat(destKeyDetails.getMetadata().get("custom-key-3")).isEqualTo("custom-value-3");
+
+
+    // wrong copy metadata directive
+    when(headers.getHeaderString(CUSTOM_METADATA_COPY_DIRECTIVE_HEADER)).thenReturn("INVALID");
+    OS3Exception e = assertThrows(OS3Exception.class, () -> objectEndpoint.put(
+            DEST_BUCKET_NAME, DEST_KEY, CONTENT.length(), 1, null, body),
+        "test copy object failed");
+    assertThat(e.getHttpCode()).isEqualTo(400);
+    assertThat(e.getCode()).isEqualTo("InvalidArgument");
+    assertThat(e.getErrorMessage()).contains("The metadata directive specified is invalid");
+
+    when(headers.getHeaderString(CUSTOM_METADATA_COPY_DIRECTIVE_HEADER)).thenReturn("COPY");
 
     // source and dest same
-    OS3Exception e = assertThrows(OS3Exception.class, () -> objectEndpoint.put(
+    e = assertThrows(OS3Exception.class, () -> objectEndpoint.put(
             BUCKET_NAME, KEY_NAME, CONTENT.length(), 1, null, body),
         "test copy object failed");
     assertThat(e.getErrorMessage()).contains("This copy request is illegal");
