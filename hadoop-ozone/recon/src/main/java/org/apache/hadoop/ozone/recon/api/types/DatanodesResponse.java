@@ -21,6 +21,7 @@ import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Map;
 
 /**
  * Class that represents the API Response structure of Datanodes.
@@ -36,14 +37,15 @@ public class DatanodesResponse {
    * An array of datanodes.
    */
   @JsonProperty("datanodes")
+  @JsonInclude(JsonInclude.Include.NON_EMPTY)
   private Collection<DatanodeMetadata> datanodes;
 
   /**
    * An API response msg.
    */
-  @JsonProperty("message")
+  @JsonProperty("errors")
   @JsonInclude(JsonInclude.Include.NON_EMPTY)
-  private String message;
+  private Map<String, String> failedNodeErrorResponseMap;
 
 
   public DatanodesResponse() {
@@ -64,11 +66,11 @@ public class DatanodesResponse {
     return datanodes;
   }
 
-  public String getMessage() {
-    return message;
+  public Map<String, String> getFailedNodeErrorResponseMap() {
+    return failedNodeErrorResponseMap;
   }
 
-  public void setMessage(String message) {
-    this.message = message;
+  public void setFailedNodeErrorResponseMap(Map<String, String> failedNodeErrorResponseMap) {
+    this.failedNodeErrorResponseMap = failedNodeErrorResponseMap;
   }
 }

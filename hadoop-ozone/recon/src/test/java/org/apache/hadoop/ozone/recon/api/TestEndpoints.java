@@ -116,6 +116,7 @@ import static org.hadoop.ozone.recon.schema.tables.GlobalStatsTable.GLOBAL_STATS
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
@@ -144,6 +145,7 @@ import java.util.Arrays;
 import java.util.ArrayList;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.Callable;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -1274,36 +1276,26 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
     DatanodesResponse removedNodes = removeDataNodesResponseWrapper.getDatanodesResponseMap().get("removedDatanodes");
     assertEquals(1, removedNodes.getTotalCount());
     assertNull(errorDataNodes);
-    assertEquals("Success", removedNodes.getMessage());
     removedNodes.getDatanodes().forEach(datanodeMetadata -> {
       assertEquals("host3.datanode", datanodeMetadata.getHostname());
     });
   }
 
   @Test
-  public void testExplicitRemovalOfHealthyNode() {
+  public void testExplicitRemovalOfInvalidStateNode() {
     String dnUUID = datanodeDetails2.getUuid().toString();
     Response removedDNResponse = nodeEndpoint.removeDatanodes(Arrays.asList(dnUUID));
-    String removedDNResponseEntity = (String) removedDNResponse.getEntity();
-    assertEquals("{\n" +
-        "    \"Invalid request: Pre-checks failed for selected datanodes. DataNode should pass following " +
-        "pre-checks.\": [\n" +
-        "        {\n" +
-        "            \"title\": \"Incorrect State\",\n" +
-        "            \"description\": \"DataNode should be in either DECOMMISSIONED operational state or DEAD " +
-        "node state.\"\n" +
-        "        },\n" +
-        "        {\n" +
-        "            \"title\": \"Open Containers\",\n" +
-        "            \"description\": \"Containers are open for few or all selected datanodes.\"\n" +
-        "        },\n" +
-        "        {\n" +
-        "            \"title\": \"Open Pipelines\",\n" +
-        "            \"description\": \"Pipelines are open for few or all selected datanodes.\"\n" +
-        "        }\n" +
-        "    ]\n" +
-        "}", removedDNResponseEntity);
-    assertEquals(Response.Status.BAD_REQUEST.getStatusCode(), removedDNResponse.getStatus());
+    RemoveDataNodesResponseWrapper removeDataNodesResponseWrapper =
+        (RemoveDataNodesResponseWrapper) removedDNResponse.getEntity();
+    Map<String, DatanodesResponse> datanodesResponseMap = removeDataNodesResponseWrapper.getDatanodesResponseMap();
+    assertFalse(datanodesResponseMap.isEmpty());
+    DatanodesResponse failedDatanodes = datanodesResponseMap.get("failedDatanodes");
+    Map<String, String> failedNodeErrorResponseMap = failedDatanodes.getFailedNodeErrorResponseMap();
+    assertFalse(failedNodeErrorResponseMap.isEmpty());
+    String nodeError = failedNodeErrorResponseMap.get(dnUUID);
+    assertNotNull(nodeError);
+    assertEquals("DataNode should be in either DECOMMISSIONED operational state or DEAD node state.", nodeError);
+    assertEquals(Response.Status.OK.getStatusCode(), removedDNResponse.getStatus());
   }
 
   @Test
@@ -1314,7 +1306,6 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
         (RemoveDataNodesResponseWrapper) removedDNResponse.getEntity();
     DatanodesResponse notFoundDatanodes = removeDataNodesResponseWrapper.getDatanodesResponseMap()
         .get("notFoundDatanodes");
-    assertEquals("Invalid request: Selected nodes not found. Kindly send correct node details to " +
-        "remove it !!!", notFoundDatanodes.getMessage());
+    //assertEquals("Invalid request", notFoundDatanodes.getMessage());
   }
 }

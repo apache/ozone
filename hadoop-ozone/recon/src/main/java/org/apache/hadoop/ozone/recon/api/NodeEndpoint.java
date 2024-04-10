@@ -53,7 +53,10 @@ import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -195,6 +198,7 @@ public class NodeEndpoint {
     List<DatanodeMetadata> failedDatanodes = new ArrayList<>();
     List<DatanodeMetadata> notFoundDatanodes = new ArrayList<>();
     List<DatanodeMetadata> removedDatanodes = new ArrayList<>();
+    Map<String, String> failedNodeErrorResponseMap = new HashMap<>();
 
     Preconditions.checkNotNull(uuids, "Datanode list argument should not be null");
     Preconditions.checkArgument(!uuids.isEmpty(), "Datanode list argument should not be empty");
@@ -202,7 +206,7 @@ public class NodeEndpoint {
       for (String uuid : uuids) {
         DatanodeDetails nodeByUuid = nodeManager.getNodeByUuid(uuid);
         try {
-          if (preChecksSuccess(nodeByUuid)) {
+          if (preChecksSuccess(nodeByUuid, failedNodeErrorResponseMap)) {
             removedDatanodes.add(DatanodeMetadata.newBuilder()
                 .withHostname(nodeManager.getHostName(nodeByUuid))
                 .withUUid(uuid)
@@ -210,33 +214,12 @@ public class NodeEndpoint {
                 .build());
             nodeManager.removeNode(nodeByUuid);
           } else {
-            Response.ResponseBuilder builder = Response.status(Response.Status.BAD_REQUEST);
-            builder.entity("{\n" +
-                "    \"Invalid request: Pre-checks failed for selected datanodes. DataNode should pass following " +
-                "pre-checks.\": [\n" +
-                "        {\n" +
-                "            \"title\": \"Incorrect State\",\n" +
-                "            \"description\": \"DataNode should be in either DECOMMISSIONED operational state or " +
-                "DEAD node state.\"\n" +
-                "        },\n" +
-                "        {\n" +
-                "            \"title\": \"Open Containers\",\n" +
-                "            \"description\": \"Containers are open for few or all selected datanodes.\"\n" +
-                "        },\n" +
-                "        {\n" +
-                "            \"title\": \"Open Pipelines\",\n" +
-                "            \"description\": \"Pipelines are open for few or all selected datanodes.\"\n" +
-                "        }\n" +
-                "    ]\n" +
-                "}");
             failedDatanodes.add(DatanodeMetadata.newBuilder()
                 .withHostname(nodeManager.getHostName(nodeByUuid))
                 .withUUid(uuid)
                 .withOperationalState(nodeByUuid.getPersistedOpState())
                 .withState(nodeManager.getNodeStatus(nodeByUuid).getHealth())
                 .build());
-            // Build and return the response
-            return builder.build();
           }
         } catch (NodeNotFoundException nnfe) {
           LOG.error("Selected node {} not found : {} ", uuid, nnfe);
@@ -255,30 +238,27 @@ public class NodeEndpoint {
 
     if (!failedDatanodes.isEmpty()) {
       DatanodesResponse failedNodesResp =
-          new DatanodesResponse(failedDatanodes.size(), failedDatanodes);
-      failedNodesResp.setMessage("Invalid request: Nodes should be in either DECOMMISSIONED or " +
-          "IN_MAINTENANCE mode or in DEAD State.");
+          new DatanodesResponse(failedDatanodes.size(), Collections.emptyList());
+      failedNodesResp.setFailedNodeErrorResponseMap(failedNodeErrorResponseMap);
       removeDataNodesResponseWrapper.getDatanodesResponseMap().put("failedDatanodes", failedNodesResp);
     }
 
     if (!notFoundDatanodes.isEmpty()) {
       DatanodesResponse notFoundNodesResp =
           new DatanodesResponse(notFoundDatanodes.size(), notFoundDatanodes);
-      notFoundNodesResp.setMessage("Invalid request: Selected nodes not found. Kindly send correct node " +
-          "details to remove it !!!");
       removeDataNodesResponseWrapper.getDatanodesResponseMap().put("notFoundDatanodes", notFoundNodesResp);
     }
 
     if (!removedDatanodes.isEmpty()) {
       DatanodesResponse removedNodesResp =
           new DatanodesResponse(removedDatanodes.size(), removedDatanodes);
-      removedNodesResp.setMessage("Success");
       removeDataNodesResponseWrapper.getDatanodesResponseMap().put("removedDatanodes", removedNodesResp);
     }
     return Response.ok(removeDataNodesResponseWrapper).build();
   }
 
-  private boolean preChecksSuccess(DatanodeDetails nodeByUuid) throws NodeNotFoundException {
+  private boolean preChecksSuccess(DatanodeDetails nodeByUuid, Map<String, String> failedNodeErrorResponseMap)
+      throws NodeNotFoundException {
     if (null == nodeByUuid) {
       throw new NodeNotFoundException("Node  not found !!!");
     }
@@ -290,10 +270,12 @@ public class NodeEndpoint {
       if (isNodeDecommissioned || nodeStatus.isDead()) {
         checkContainers(nodeByUuid, isContainerOrPipeLineOpen);
         if (isContainerOrPipeLineOpen.get()) {
+          failedNodeErrorResponseMap.put(nodeByUuid.getUuidString(), "Open Containers/Pipelines");
           return false;
         }
         checkPipelines(nodeByUuid, isContainerOrPipeLineOpen);
         if (isContainerOrPipeLineOpen.get()) {
+          failedNodeErrorResponseMap.put(nodeByUuid.getUuidString(), "Open Containers/Pipelines");
           return false;
         }
         return true;
@@ -302,6 +284,8 @@ public class NodeEndpoint {
       LOG.error("Node : {} not found", nodeByUuid);
       return false;
     }
+    failedNodeErrorResponseMap.put(nodeByUuid.getUuidString(), "DataNode should be in either DECOMMISSIONED " +
+        "operational state or DEAD node state.");
     return false;
   }
 
