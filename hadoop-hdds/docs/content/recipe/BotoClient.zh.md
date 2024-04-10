@@ -35,7 +35,7 @@ summary: 如何使用 Boto3 客户端访问 Ozone 对象存储？
 
 ## 要求
 
-您将需要更高版本的 Python3 作为您的 Boto3 客户端，因为 Boto3 安装要求在此处指出:
+您将需要较高版本的 Python3 来运行 Boto3 客户端，请参考 Boto3 的安装需求:
 
 https://boto3.amazonaws.com/v1/documentation/api/latest/index.html
 
