@@ -162,12 +162,11 @@ public final class OmMultipartKeyInfo extends WithObjectID {
    * information for a key.
    */
   private OmMultipartKeyInfo(Builder b) {
+    super(b);
     this.uploadID = b.uploadID;
     this.creationTime = b.creationTime;
     this.replicationConfig = b.replicationConfig;
     this.partKeyInfoMap = new PartKeyInfoMap(b.partKeyInfoList);
-    setObjectID(b.objectID);
-    setUpdateID(b.updateID);
     this.parentID = b.parentID;
   }
 
@@ -225,13 +224,11 @@ public final class OmMultipartKeyInfo extends WithObjectID {
   /**
    * Builder of OmMultipartKeyInfo.
    */
-  public static class Builder {
+  public static class Builder extends WithObjectID.Builder {
     private String uploadID;
     private long creationTime;
     private ReplicationConfig replicationConfig;
     private final TreeMap<Integer, PartKeyInfo> partKeyInfoList;
-    private long objectID;
-    private long updateID;
     private long parentID;
 
     public Builder() {
@@ -268,12 +265,12 @@ public final class OmMultipartKeyInfo extends WithObjectID {
     }
 
     public Builder setObjectID(long obId) {
-      this.objectID = obId;
+      super.setObjectID(obId);
       return this;
     }
 
     public Builder setUpdateID(long id) {
-      this.updateID = id;
+      super.setUpdateID(id);
       return this;
     }
 

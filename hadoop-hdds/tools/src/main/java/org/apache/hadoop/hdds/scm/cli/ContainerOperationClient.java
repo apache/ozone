@@ -237,9 +237,9 @@ public class ContainerOperationClient implements ScmClient {
   }
 
   @Override
-  public List<DatanodeAdminError> decommissionNodes(List<String> hosts)
+  public List<DatanodeAdminError> decommissionNodes(List<String> hosts, boolean force)
       throws IOException {
-    return storageContainerLocationClient.decommissionNodes(hosts);
+    return storageContainerLocationClient.decommissionNodes(hosts, force);
   }
 
   @Override
@@ -483,12 +483,19 @@ public class ContainerOperationClient implements ScmClient {
       Optional<Integer> maxDatanodesPercentageToInvolvePerIteration,
       Optional<Long> maxSizeToMovePerIterationInGB,
       Optional<Long> maxSizeEnteringTargetInGB,
-      Optional<Long> maxSizeLeavingSourceInGB)
-      throws IOException {
+      Optional<Long> maxSizeLeavingSourceInGB,
+      Optional<Integer> balancingInterval,
+      Optional<Integer> moveTimeout,
+      Optional<Integer> moveReplicationTimeout,
+      Optional<Boolean> networkTopologyEnable,
+      Optional<String> includeNodes,
+      Optional<String> excludeNodes) throws IOException {
     return storageContainerLocationClient.startContainerBalancer(threshold,
         iterations, maxDatanodesPercentageToInvolvePerIteration,
         maxSizeToMovePerIterationInGB, maxSizeEnteringTargetInGB,
-        maxSizeLeavingSourceInGB);
+        maxSizeLeavingSourceInGB, balancingInterval, moveTimeout,
+        moveReplicationTimeout, networkTopologyEnable, includeNodes,
+        excludeNodes);
   }
 
   @Override

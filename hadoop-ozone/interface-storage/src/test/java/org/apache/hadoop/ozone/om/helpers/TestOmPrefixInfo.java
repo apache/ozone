@@ -27,7 +27,6 @@ import org.junit.jupiter.api.Test;
 
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.HashMap;
 
 import static org.apache.hadoop.ozone.OzoneAcl.AclScope.ACCESS;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -74,10 +73,14 @@ public class TestOmPrefixInfo {
       String identityString,
       IAccessAuthorizer.ACLType aclType,
       OzoneAcl.AclScope scope) {
-    return new OmPrefixInfo(path,
-        new ArrayList<>(Collections.singletonList(new OzoneAcl(
+    return OmPrefixInfo.newBuilder()
+        .setName(path)
+        .setAcls(new ArrayList<>(Collections.singletonList(new OzoneAcl(
             identityType, identityString,
-            scope, aclType))), new HashMap<>(), 10, 100);
+            scope, aclType))))
+        .setObjectID(10)
+        .setUpdateID(100)
+        .build();
   }
 
 

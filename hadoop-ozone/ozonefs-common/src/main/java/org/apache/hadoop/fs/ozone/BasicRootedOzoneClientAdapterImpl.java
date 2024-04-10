@@ -894,9 +894,9 @@ public class BasicRootedOzoneClientAdapterImpl
     }
     OFSPath ofsStartPath = new OFSPath(startPath, config);
     if (ofsPath.isVolume()) {
-      String startBucket = ofsStartPath.getBucketName();
+      String startBucketPath = ofsStartPath.getNonKeyPath();
       return listStatusVolume(ofsPath.getVolumeName(),
-          recursive, startBucket, numEntries, uri, workingDir, username);
+          recursive, startBucketPath, numEntries, uri, workingDir, username);
     }
 
     if (ofsPath.isSnapshotPath()) {

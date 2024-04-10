@@ -26,7 +26,6 @@ import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.storage.proto.OzoneManagerStorageProtos.PersistedPrefixInfo;
 
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
@@ -47,16 +46,13 @@ public final class OmPrefixInfo extends WithObjectID {
     return CODEC;
   }
 
-  private String name;
+  private final String name;
   private final List<OzoneAcl> acls;
 
-  public OmPrefixInfo(String name, List<OzoneAcl> acls,
-      Map<String, String> metadata, long objectId, long updateId) {
-    this.name = name;
-    this.acls = acls;
-    setMetadata(metadata);
-    setObjectID(objectId);
-    setUpdateID(updateId);
+  private OmPrefixInfo(Builder b) {
+    super(b);
+    name = b.name;
+    acls = new ArrayList<>(b.acls);
   }
 
   /**
@@ -99,17 +95,19 @@ public final class OmPrefixInfo extends WithObjectID {
   /**
    * Builder for OmPrefixInfo.
    */
-  public static class Builder {
+  public static class Builder extends WithObjectID.Builder {
     private String name;
-    private List<OzoneAcl> acls;
-    private Map<String, String> metadata;
-    private long objectID;
-    private long updateID;
+    private final List<OzoneAcl> acls;
 
     public Builder() {
       //Default values
       this.acls = new LinkedList<>();
-      this.metadata = new HashMap<>();
+    }
+
+    public Builder(OmPrefixInfo obj) {
+      super(obj);
+      setName(obj.name);
+      acls = new ArrayList<>(obj.getAcls());
     }
 
     public Builder setAcls(List<OzoneAcl> listOfAcls) {
@@ -124,26 +122,28 @@ public final class OmPrefixInfo extends WithObjectID {
       return this;
     }
 
+    @Override
     public OmPrefixInfo.Builder addMetadata(String key, String value) {
-      metadata.put(key, value);
+      super.addMetadata(key, value);
       return this;
     }
 
+    @Override
     public OmPrefixInfo.Builder addAllMetadata(
         Map<String, String> additionalMetadata) {
-      if (additionalMetadata != null) {
-        metadata.putAll(additionalMetadata);
-      }
+      super.addAllMetadata(additionalMetadata);
       return this;
     }
 
+    @Override
     public Builder setObjectID(long obId) {
-      this.objectID = obId;
+      super.setObjectID(obId);
       return this;
     }
 
+    @Override
     public Builder setUpdateID(long id) {
-      this.updateID = id;
+      super.setUpdateID(id);
       return this;
     }
 
@@ -153,7 +153,7 @@ public final class OmPrefixInfo extends WithObjectID {
      */
     public OmPrefixInfo build() {
       Preconditions.checkNotNull(name);
-      return new OmPrefixInfo(name, acls, metadata, objectID, updateID);
+      return new OmPrefixInfo(this);
     }
   }
 
@@ -234,11 +234,11 @@ public final class OmPrefixInfo extends WithObjectID {
    * Return a new copy of the object.
    */
   public OmPrefixInfo copyObject() {
-    Map<String, String> metadataList = new HashMap<>();
-    if (getMetadata() != null) {
-      metadataList.putAll(getMetadata());
-    }
-    return new OmPrefixInfo(name, new ArrayList<>(acls), metadataList, getObjectID(), getUpdateID());
+    return toBuilder().build();
+  }
+
+  public Builder toBuilder() {
+    return new Builder(this);
   }
 }
 
