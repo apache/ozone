@@ -98,16 +98,17 @@ public class BufferPool {
 
   synchronized void releaseBuffer(ChunkBuffer chunkBuffer) {
     Preconditions.assertTrue(!bufferList.isEmpty(), "empty buffer list");
-    Preconditions.assertSame(bufferList.get(0), chunkBuffer,
-        "only the first buffer can be released");
+//    Preconditions.assertSame(bufferList.get(0), chunkBuffer,
+//        "only the first buffer can be released");
     Preconditions.assertTrue(currentBufferIndex >= 0,
         () -> "current buffer: " + currentBufferIndex);
 
     // always remove from head of the list and append at last
-    final ChunkBuffer buffer = bufferList.remove(0);
-    buffer.clear();
-    bufferList.add(buffer);
-    currentBufferIndex--;
+    final boolean res = bufferList.remove(chunkBuffer);
+    Preconditions.assertTrue(res, "unsuccessful removal of buffer");
+    chunkBuffer.clear();
+    bufferList.add(chunkBuffer);
+    currentBufferIndex--; //
   }
 
   public synchronized void clearBufferPool() {

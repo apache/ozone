@@ -69,7 +69,7 @@ abstract class AbstractCommitWatcher<BUFFER> {
   }
 
   @VisibleForTesting
-  SortedMap<Long, List<BUFFER>> getCommitIndexMap() {
+  synchronized SortedMap<Long, List<BUFFER>> getCommitIndexMap() {
     return commitIndexMap;
   }
 
@@ -79,11 +79,11 @@ abstract class AbstractCommitWatcher<BUFFER> {
   }
 
   /** @return the total data which has been acknowledged. */
-  long getTotalAckDataLength() {
+  synchronized long getTotalAckDataLength() {
     return totalAckDataLength;
   }
 
-  long addAckDataLength(long acked) {
+  synchronized long addAckDataLength(long acked) {
     totalAckDataLength += acked;
     return totalAckDataLength;
   }
@@ -97,7 +97,7 @@ abstract class AbstractCommitWatcher<BUFFER> {
    * @return {@link XceiverClientReply} reply from raft client
    * @throws IOException in case watchForCommit fails
    */
-  XceiverClientReply watchOnFirstIndex() throws IOException {
+  synchronized XceiverClientReply watchOnFirstIndex() throws IOException {
     if (commitIndexMap.isEmpty()) {
       return null;
     }
@@ -113,7 +113,7 @@ abstract class AbstractCommitWatcher<BUFFER> {
    * @return {@link XceiverClientReply} reply from raft client
    * @throws IOException in case watchForCommit fails
    */
-  XceiverClientReply watchOnLastIndex() throws IOException {
+  synchronized XceiverClientReply watchOnLastIndex() throws IOException {
     if (commitIndexMap.isEmpty()) {
       return null;
     }
@@ -127,7 +127,7 @@ abstract class AbstractCommitWatcher<BUFFER> {
    * @return minimum commit index replicated to all nodes
    * @throws IOException IOException in case watch gets timed out
    */
-  XceiverClientReply watchForCommit(long commitIndex)
+  synchronized XceiverClientReply watchForCommit(long commitIndex)
       throws IOException {
     final MemoizedSupplier<CompletableFuture<XceiverClientReply>> supplier
         = JavaUtils.memoize(CompletableFuture::new);
@@ -157,7 +157,7 @@ abstract class AbstractCommitWatcher<BUFFER> {
     }
   }
 
-  List<BUFFER> remove(long i) {
+  synchronized List<BUFFER> remove(long i) {
     final List<BUFFER> buffers = commitIndexMap.remove(i);
     Objects.requireNonNull(buffers, () -> "commitIndexMap.remove(" + i + ")");
     return buffers;
@@ -166,17 +166,17 @@ abstract class AbstractCommitWatcher<BUFFER> {
   /** Release the buffers for the given index. */
   abstract void releaseBuffers(long index);
 
-  void adjustBuffers(long commitIndex) {
+  synchronized void adjustBuffers(long commitIndex) {
     commitIndexMap.keySet().stream()
         .filter(p -> p <= commitIndex)
         .forEach(this::releaseBuffers);
   }
 
-  void releaseBuffersOnException() {
+  synchronized void releaseBuffersOnException() {
     adjustBuffers(client.getReplicatedMinCommitIndex());
   }
 
-  IOException getIOExceptionForWatchForCommit(long commitIndex, Exception e) {
+  synchronized IOException getIOExceptionForWatchForCommit(long commitIndex, Exception e) {
     LOG.warn("watchForCommit failed for index {}", commitIndex, e);
     IOException ioException = new IOException(
         "Unexpected Storage Container Exception: " + e, e);
@@ -184,7 +184,7 @@ abstract class AbstractCommitWatcher<BUFFER> {
     return ioException;
   }
 
-  void cleanup() {
+  synchronized void cleanup() {
     commitIndexMap.clear();
     replies.clear();
   }
