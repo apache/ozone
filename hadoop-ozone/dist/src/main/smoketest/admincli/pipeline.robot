@@ -42,6 +42,22 @@ List pipelines with explicit host
 List pipelines with explicit host and json option
     ${output} =         Execute   ozone admin pipeline list --scm ${SCM} --json | jq 'map(.replicationConfig) | contains([{"replicationFactor": "ONE", "replicationType": "RATIS"}])'
 
+Deactivate pipeline
+                        Execute          ozone admin pipeline deactivate "${PIPELINE}"
+    ${output} =         Execute          ozone admin pipeline list | grep "${PIPELINE}"
+                        Should contain   ${output}   DORMANT
+
+Activate pipeline
+                        Execute          ozone admin pipeline activate "${PIPELINE}"
+    ${output} =         Execute          ozone admin pipeline list | grep "${PIPELINE}"
+                        Should contain   ${output}   OPEN
+
+Close pipeline
+                        Execute          ozone admin pipeline close "${PIPELINE}"
+    ${output} =         Execute          ozone admin pipeline list
+                        Pass Execution If     '${PIPELINE}' not in '''${output}'''    Pipeline already scrubbed
+                        Should Match Regexp   ${output}   ${PIPELINE}.*CLOSED
+
 Incomplete command
     ${output} =         Execute And Ignore Error     ozone admin pipeline
                         Should contain   ${output}   Incomplete command
