@@ -62,7 +62,7 @@ public class BufferPool {
     this.byteStringConversion = byteStringConversion;
   }
 
-  public Function<ByteBuffer, ByteString> byteStringConversion() {
+  public synchronized Function<ByteBuffer, ByteString> byteStringConversion() {
     return byteStringConversion;
   }
 
@@ -116,7 +116,7 @@ public class BufferPool {
     currentBufferIndex = -1;
   }
 
-  public void checkBufferPoolEmpty() {
+  public synchronized void checkBufferPoolEmpty() {
     Preconditions.assertSame(0, computeBufferData(), "total buffer size");
   }
 
@@ -128,27 +128,27 @@ public class BufferPool {
     return totalBufferSize;
   }
 
-  public int getSize() {
+  public synchronized int getSize() {
     return bufferList.size();
   }
 
-  public ChunkBuffer getBuffer(int index) {
+  public synchronized ChunkBuffer getBuffer(int index) {
     return bufferList.get(index);
   }
 
-  int getCurrentBufferIndex() {
+  synchronized int getCurrentBufferIndex() {
     return currentBufferIndex;
   }
 
-  public int getNumberOfUsedBuffers() {
+  public synchronized int getNumberOfUsedBuffers() {
     return currentBufferIndex + 1;
   }
 
-  public int getCapacity() {
+  public synchronized int getCapacity() {
     return capacity;
   }
 
-  public int getBufferSize() {
+  public synchronized int getBufferSize() {
     return bufferSize;
   }
 }
