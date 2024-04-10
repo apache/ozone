@@ -247,7 +247,7 @@ public interface StorageContainerLocationProtocol extends Closeable {
 
   HddsProtos.Node queryNode(UUID uuid) throws IOException;
 
-  List<DatanodeAdminError> decommissionNodes(List<String> nodes)
+  List<DatanodeAdminError> decommissionNodes(List<String> nodes, boolean force)
       throws IOException;
 
   List<DatanodeAdminError> recommissionNodes(List<String> nodes)
@@ -404,13 +404,20 @@ public interface StorageContainerLocationProtocol extends Closeable {
    * @return {@link StartContainerBalancerResponseProto} that contains the
    * start status and an optional message.
    */
+  @SuppressWarnings("checkstyle:parameternumber")
   StartContainerBalancerResponseProto startContainerBalancer(
       Optional<Double> threshold,
       Optional<Integer> iterations,
       Optional<Integer> maxDatanodesPercentageToInvolvePerIteration,
       Optional<Long> maxSizeToMovePerIterationInGB,
       Optional<Long> maxSizeEnteringTargetInGB,
-      Optional<Long> maxSizeLeavingSourceInGB) throws IOException;
+      Optional<Long> maxSizeLeavingSourceInGB,
+      Optional<Integer> balancingInterval,
+      Optional<Integer> moveTimeout,
+      Optional<Integer> moveReplicationTimeout,
+      Optional<Boolean> networkTopologyEnable,
+      Optional<String> includeNodes,
+      Optional<String> excludeNodes) throws IOException;
 
   /**
    * Stop ContainerBalancer.

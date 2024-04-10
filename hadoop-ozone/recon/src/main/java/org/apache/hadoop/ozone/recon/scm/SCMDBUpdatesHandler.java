@@ -146,17 +146,8 @@ public class SCMDBUpdatesHandler extends ManagedWriteBatch.Handler {
         }
       } else if (action.equals(DELETE)) {
         if (null == oldValue) {
-          String keyStr = (key instanceof String) ? key.toString() : "";
-          if (keyStr.isEmpty()) {
-            LOG.warn(
-                "Only DTOKEN_TABLE table uses OzoneTokenIdentifier as key " +
-                    "instead of String. Event on any other table in this " +
-                    "condition may need to be investigated. This DELETE " +
-                    "event is on {} table which is not useful for Recon to " +
-                    "capture.", tableName);
-          }
           LOG.warn("Old Value of Key: {} in table: {} should not be null " +
-              "for DELETE event ", keyStr, tableName);
+              "for DELETE event ", key.toString(), tableName);
           return;
         }
         if (!scmDBUpdateEventValidator.isValidEvent(tableName, oldValue, key,
@@ -170,8 +161,7 @@ public class SCMDBUpdatesHandler extends ManagedWriteBatch.Handler {
 
       RocksDBUpdateEvent event = builder.build();
       if (LOG.isDebugEnabled()) {
-        LOG.debug(String.format("Generated OM update Event for table : %s, " +
-                "action = %s", tableName, action));
+        LOG.debug(String.format("Generated SCM update Event for table : %s, action = %s", tableName, action));
       }
       scmDBUpdateEvents.add(event);
       scmDBLatestUpdateEventsMap.put(key, event);

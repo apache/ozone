@@ -364,7 +364,7 @@ public class TestSnapshotDiffManager {
     omSnapshotManager = mock(OmSnapshotManager.class);
     when(ozoneManager.getOmSnapshotManager()).thenReturn(omSnapshotManager);
     when(omSnapshotManager.isSnapshotStatus(any(), any())).thenReturn(true);
-    SnapshotCache snapshotCache = new SnapshotCache(mockCacheLoader(), 10);
+    SnapshotCache snapshotCache = new SnapshotCache(mockCacheLoader(), 10, omMetrics);
 
     when(omSnapshotManager.getActiveSnapshot(anyString(), anyString(), anyString()))
         .thenAnswer(invocationOnMock -> {
@@ -391,13 +391,8 @@ public class TestSnapshotDiffManager {
   @AfterEach
   public void tearDown() {
     IOUtils.closeQuietly(snapshotDiffManager);
-    if (columnFamilyHandles != null) {
-      columnFamilyHandles.forEach(IOUtils::closeQuietly);
-    }
-
-    IOUtils.closeQuietly(db);
-    IOUtils.closeQuietly(dbOptions);
-    IOUtils.closeQuietly(columnFamilyOptions);
+    IOUtils.closeQuietly(columnFamilyHandles);
+    IOUtils.closeQuietly(db, dbOptions, columnFamilyOptions);
   }
 
   private OmSnapshot getMockedOmSnapshot(UUID snapshotId) {

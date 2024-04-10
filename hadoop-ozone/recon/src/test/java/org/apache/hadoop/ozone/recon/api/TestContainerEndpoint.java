@@ -894,6 +894,7 @@ public class TestContainerEndpoint {
   public void testUnhealthyContainersFilteredResponse()
       throws IOException, TimeoutException {
     String missing = UnHealthyContainerStates.MISSING.toString();
+    String emptyMissing = UnHealthyContainerStates.EMPTY_MISSING.toString();
 
     Response response = containerEndpoint
         .getUnhealthyContainers(missing, 1000, 1);
@@ -913,6 +914,7 @@ public class TestContainerEndpoint {
     uuid3 = newDatanode("host3", "127.0.0.3");
     uuid4 = newDatanode("host4", "127.0.0.4");
     createUnhealthyRecords(5, 4, 3, 2);
+    createEmptyMissingUnhealthyRecords(2);
 
     response = containerEndpoint.getUnhealthyContainers(missing, 1000, 1);
 
@@ -935,6 +937,13 @@ public class TestContainerEndpoint {
     for (UnhealthyContainerMetadata r : records) {
       assertEquals(missing, r.getContainerState());
     }
+
+    Response filteredEmptyMissingResponse = containerEndpoint
+        .getUnhealthyContainers(emptyMissing, 1000, 1);
+    responseObject = (UnhealthyContainersResponse) filteredEmptyMissingResponse.getEntity();
+    records = responseObject.getContainers();
+    // Assert for zero empty missing containers.
+    assertEquals(0, records.size());
   }
 
   @Test
@@ -1033,6 +1042,14 @@ public class TestContainerEndpoint {
             .setIpAddress(ipAddress)
             .build());
     return uuid;
+  }
+
+  private void createEmptyMissingUnhealthyRecords(int emptyMissing) {
+    int cid = 0;
+    for (int i = 0; i < emptyMissing; i++) {
+      createUnhealthyRecord(++cid, UnHealthyContainerStates.EMPTY_MISSING.toString(),
+          3, 3, 0, null);
+    }
   }
 
   private void createUnhealthyRecords(int missing, int overRep, int underRep,
