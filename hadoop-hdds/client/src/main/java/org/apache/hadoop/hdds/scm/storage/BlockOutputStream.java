@@ -447,7 +447,8 @@ public class BlockOutputStream extends OutputStream {
     }
   }
 
-  synchronized CompletableFuture<Void> waitForFlushAndCommit(boolean bufferFull, CompletableFuture<Void> future) throws IOException {
+  synchronized CompletableFuture<Void> waitForFlushAndCommit(
+      boolean bufferFull, CompletableFuture<Void> future) throws IOException {
     checkOpen();
     if (future == null) {
       future = waitOnFlushFutures();
