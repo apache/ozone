@@ -167,6 +167,7 @@ import static org.mockito.Mockito.verify;
  */
 @Timeout(900)
 public class TestStorageContainerManager {
+  public static final String LOCALHOST_IP = "127.0.0.1";
   private static XceiverClientManager xceiverClientManager;
   private static final Logger LOG = LoggerFactory.getLogger(
       TestStorageContainerManager.class);
@@ -698,6 +699,9 @@ public class TestStorageContainerManager {
         StaticMapping.class, DNSToSwitchMapping.class);
     StaticMapping.addNodeToRack(NetUtils.normalizeHostName(HddsUtils.getHostName(conf)),
         "/rack1");
+    // In case of JDK17, the IP address is resolved to localhost mapped to 127.0.0.1 which is not in sync with JDK8
+    // and hence need to make following entry under HDDS-10132
+    StaticMapping.addNodeToRack(LOCALHOST_IP, "/rack1");
 
     final int datanodeNum = 3;
 
@@ -723,6 +727,7 @@ public class TestStorageContainerManager {
         assertThat(datanodeInfo.getLastHeartbeatTime()).isGreaterThan(start);
         assertEquals(datanodeInfo.getUuidString(),
             datanodeInfo.getNetworkName());
+        System.out.println("RRR datanodeInfo:"+datanodeInfo);
         assertEquals("/rack1", datanodeInfo.getNetworkLocation());
       }
     }
