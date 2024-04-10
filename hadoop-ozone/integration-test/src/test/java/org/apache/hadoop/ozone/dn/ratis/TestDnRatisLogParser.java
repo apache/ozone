@@ -35,6 +35,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_RATIS_PIPELINE_LIMIT;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
@@ -50,8 +51,9 @@ public class TestDnRatisLogParser {
   @BeforeEach
   public void setup() throws Exception {
     OzoneConfiguration conf = new OzoneConfiguration();
+    conf.setInt(OZONE_SCM_RATIS_PIPELINE_LIMIT, 2);
     cluster = MiniOzoneCluster.newBuilder(conf)
-        .setNumDatanodes(1).setTotalPipelineNumLimit(2).build();
+        .setNumDatanodes(1).build();
     cluster.waitForClusterToBeReady();
     System.setOut(new PrintStream(out, false, UTF_8.name()));
     System.setErr(new PrintStream(err, false, UTF_8.name()));
@@ -71,7 +73,7 @@ public class TestDnRatisLogParser {
   public void testRatisLogParsing() throws Exception {
     OzoneConfiguration conf = cluster.getHddsDatanodes().get(0).getConf();
     String path =
-        conf.get(OzoneConfigKeys.DFS_CONTAINER_RATIS_DATANODE_STORAGE_DIR);
+        conf.get(OzoneConfigKeys.HDDS_CONTAINER_RATIS_DATANODE_STORAGE_DIR);
     UUID pid = cluster.getStorageContainerManager().getPipelineManager()
         .getPipelines().get(0).getId().getId();
     File pipelineDir = new File(path, pid.toString());

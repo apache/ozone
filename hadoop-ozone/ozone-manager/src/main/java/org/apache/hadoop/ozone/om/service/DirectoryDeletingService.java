@@ -26,7 +26,6 @@ import org.apache.hadoop.hdds.utils.BackgroundTaskResult;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.Table.KeyValue;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
-import org.apache.hadoop.ozone.om.IOmMetadataReader;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
 import org.apache.hadoop.ozone.om.OmSnapshot;
@@ -35,7 +34,6 @@ import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.snapshot.ReferenceCounted;
-import org.apache.hadoop.ozone.om.snapshot.SnapshotCache;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PurgePathRequest;
 import org.apache.hadoop.util.Time;
 import org.apache.ratis.protocol.ClientId;
@@ -238,7 +236,7 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
       OmMetadataManagerImpl metadataManager = (OmMetadataManagerImpl)
           getOzoneManager().getMetadataManager();
 
-      try (ReferenceCounted<IOmMetadataReader, SnapshotCache> rcLatestSnapshot =
+      try (ReferenceCounted<OmSnapshot> rcLatestSnapshot =
           metadataManager.getLatestActiveSnapshot(
               deletedDirInfo.getVolumeName(),
               deletedDirInfo.getBucketName(),
@@ -249,11 +247,9 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
               .getRenameKey(deletedDirInfo.getVolumeName(),
                   deletedDirInfo.getBucketName(), deletedDirInfo.getObjectID());
           Table<String, OmDirectoryInfo> prevDirTable =
-              ((OmSnapshot) rcLatestSnapshot.get())
-                  .getMetadataManager().getDirectoryTable();
+              rcLatestSnapshot.get().getMetadataManager().getDirectoryTable();
           Table<String, OmKeyInfo> prevDeletedDirTable =
-              ((OmSnapshot) rcLatestSnapshot.get())
-                  .getMetadataManager().getDeletedDirTable();
+              rcLatestSnapshot.get().getMetadataManager().getDeletedDirTable();
           OmKeyInfo prevDeletedDirInfo = prevDeletedDirTable.get(key);
           if (prevDeletedDirInfo != null) {
             return true;

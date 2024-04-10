@@ -27,7 +27,6 @@ import org.apache.hadoop.hdds.utils.db.FixedLengthStringCodec;
 import org.apache.hadoop.hdds.utils.db.Proto2Codec;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedColumnFamilyOptions;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
-import org.apache.hadoop.ozone.container.common.helpers.ChunkInfoList;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
 import org.apache.hadoop.ozone.container.common.utils.db.DatanodeDBProfile;
 
@@ -74,15 +73,6 @@ public class DatanodeSchemaThreeDBDefinition
           Long.class,
           LongCodec.get());
 
-  public static final DBColumnFamilyDefinition<String, ChunkInfoList>
-      DELETED_BLOCKS =
-      new DBColumnFamilyDefinition<>(
-          "deleted_blocks",
-          String.class,
-          FixedLengthStringCodec.get(),
-          ChunkInfoList.class,
-          ChunkInfoList.getCodec());
-
   public static final DBColumnFamilyDefinition<String, DeletedBlocksTransaction>
       DELETE_TRANSACTION =
       new DBColumnFamilyDefinition<>(
@@ -116,7 +106,6 @@ public class DatanodeSchemaThreeDBDefinition
       COLUMN_FAMILIES = DBColumnFamilyDefinition.newUnmodifiableMap(
          BLOCK_DATA,
          METADATA,
-         DELETED_BLOCKS,
          DELETE_TRANSACTION,
          FINALIZE_BLOCKS,
          LAST_CHUNK_INFO);
@@ -140,7 +129,6 @@ public class DatanodeSchemaThreeDBDefinition
 
     BLOCK_DATA.setCfOptions(cfOptions);
     METADATA.setCfOptions(cfOptions);
-    DELETED_BLOCKS.setCfOptions(cfOptions);
     DELETE_TRANSACTION.setCfOptions(cfOptions);
     FINALIZE_BLOCKS.setCfOptions(cfOptions);
     LAST_CHUNK_INFO.setCfOptions(cfOptions);
@@ -160,12 +148,6 @@ public class DatanodeSchemaThreeDBDefinition
   @Override
   public DBColumnFamilyDefinition<String, Long> getMetadataColumnFamily() {
     return METADATA;
-  }
-
-  @Override
-  public DBColumnFamilyDefinition<String, ChunkInfoList>
-      getDeletedBlocksColumnFamily() {
-    return DELETED_BLOCKS;
   }
 
   @Override

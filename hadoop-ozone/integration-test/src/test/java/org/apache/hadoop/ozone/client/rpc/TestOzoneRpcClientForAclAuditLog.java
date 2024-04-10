@@ -83,10 +83,10 @@ public class TestOzoneRpcClientForAclAuditLog {
   private static UserGroupInformation ugi;
   private static final OzoneAcl USER_ACL =
       new OzoneAcl(IAccessAuthorizer.ACLIdentityType.USER,
-          "johndoe", IAccessAuthorizer.ACLType.ALL, ACCESS);
+          "johndoe", ACCESS, IAccessAuthorizer.ACLType.ALL);
   private static final OzoneAcl USER_ACL_2 =
       new OzoneAcl(IAccessAuthorizer.ACLIdentityType.USER,
-          "jane", IAccessAuthorizer.ACLType.ALL, ACCESS);
+          "jane", ACCESS, IAccessAuthorizer.ACLType.ALL);
   private static List<OzoneAcl> aclListToAdd = new ArrayList<>();
   private static MiniOzoneCluster cluster = null;
   private static OzoneClient ozClient = null;

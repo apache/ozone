@@ -45,6 +45,7 @@ import org.apache.hadoop.hdds.protocol.StorageType;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.hdfs.protocol.SnapshotDiffReport;
+import org.apache.hadoop.mapreduce.Job;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OFSPath;
 import org.apache.hadoop.ozone.OzoneAcl;
@@ -70,6 +71,9 @@ import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLIdentityType;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType;
 import org.apache.hadoop.ozone.security.acl.OzoneAclConfig;
 import org.apache.hadoop.security.UserGroupInformation;
+import org.apache.hadoop.tools.DistCp;
+import org.apache.hadoop.tools.DistCpOptions;
+import org.apache.hadoop.tools.mapred.CopyMapper;
 import org.apache.hadoop.util.ToolRunner;
 import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.AfterAll;
@@ -78,6 +82,8 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -88,9 +94,9 @@ import java.nio.file.Paths;
 import java.security.PrivilegedExceptionAction;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.BitSet;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.LinkedList;
@@ -122,7 +128,6 @@ import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.PERM
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.VOLUME_NOT_FOUND;
 import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType.READ;
 import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType.WRITE;
-import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType.DELETE;
 import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType.LIST;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
@@ -1183,21 +1188,15 @@ abstract class AbstractRootedOzoneFileSystemTest {
     ACLType userRights = aclConfig.getUserDefaultRights();
     // Construct ACL for world access
     // ACL admin owner, world read+write
-    BitSet aclRights = new BitSet();
-    aclRights.set(READ.ordinal());
-    aclRights.set(WRITE.ordinal());
-    List<OzoneAcl> objectAcls = new ArrayList<>();
-    objectAcls.add(new OzoneAcl(ACLIdentityType.WORLD, "",
-        aclRights, ACCESS));
-    objectAcls.add(new OzoneAcl(ACLIdentityType.USER, "admin", userRights,
-        ACCESS));
+    EnumSet<ACLType> aclRights = EnumSet.of(READ, WRITE);
     // volume acls have all access to admin and read+write access to world
 
     // Construct VolumeArgs
-    VolumeArgs volumeArgs = new VolumeArgs.Builder()
+    VolumeArgs volumeArgs = VolumeArgs.newBuilder()
         .setAdmin("admin")
         .setOwner("admin")
-        .setAcls(Collections.unmodifiableList(objectAcls))
+        .addAcl(new OzoneAcl(ACLIdentityType.WORLD, "", ACCESS, aclRights))
+        .addAcl(new OzoneAcl(ACLIdentityType.USER, "admin", ACCESS, userRights))
         .setQuotaInNamespace(1000)
         .setQuotaInBytes(Long.MAX_VALUE).build();
     // Sanity check
@@ -1228,20 +1227,11 @@ abstract class AbstractRootedOzoneFileSystemTest {
     }
 
     // set acls for shared tmp mount under the tmp volume
-    objectAcls.clear();
-    objectAcls.add(new OzoneAcl(ACLIdentityType.USER, "admin", userRights,
-        ACCESS));
-    aclRights.clear(DELETE.ordinal());
-    aclRights.set(LIST.ordinal());
-    objectAcls.add(new OzoneAcl(ACLIdentityType.WORLD, "",
-        aclRights, ACCESS));
-    objectAcls.add(new OzoneAcl(ACLIdentityType.USER, "admin", userRights,
-        ACCESS));
     // bucket acls have all access to admin and read+write+list access to world
-
     BucketArgs bucketArgs = new BucketArgs.Builder()
         .setOwner("admin")
-        .setAcls(Collections.unmodifiableList(objectAcls))
+        .addAcl(new OzoneAcl(ACLIdentityType.WORLD, "", ACCESS, READ, WRITE, LIST))
+        .addAcl(new OzoneAcl(ACLIdentityType.USER, "admin", ACCESS, userRights))
         .setQuotaInNamespace(1000)
         .setQuotaInBytes(Long.MAX_VALUE).build();
 
@@ -1301,10 +1291,10 @@ abstract class AbstractRootedOzoneFileSystemTest {
     ACLType userRights = aclConfig.getUserDefaultRights();
     // Construct ACL for world access
     OzoneAcl aclWorldAccess = new OzoneAcl(ACLIdentityType.WORLD, "",
-        userRights, ACCESS);
+        ACCESS, userRights);
     // Construct VolumeArgs
-    VolumeArgs volumeArgs = new VolumeArgs.Builder()
-        .setAcls(Collections.singletonList(aclWorldAccess))
+    VolumeArgs volumeArgs = VolumeArgs.newBuilder()
+        .addAcl(aclWorldAccess)
         .setQuotaInNamespace(1000).build();
     // Sanity check
     assertNull(volumeArgs.getOwner());
@@ -2302,10 +2292,10 @@ abstract class AbstractRootedOzoneFileSystemTest {
     ACLType userRights = aclConfig.getUserDefaultRights();
     // Construct ACL for world access
     OzoneAcl aclWorldAccess = new OzoneAcl(ACLIdentityType.WORLD, "",
-        userRights, ACCESS);
+        ACCESS, userRights);
     // Construct VolumeArgs, set ACL to world access
-    VolumeArgs volumeArgs = new VolumeArgs.Builder()
-        .setAcls(Collections.singletonList(aclWorldAccess))
+    VolumeArgs volumeArgs = VolumeArgs.newBuilder()
+        .addAcl(aclWorldAccess)
         .build();
     proxy.createVolume(volume, volumeArgs);
 
@@ -2334,6 +2324,20 @@ abstract class AbstractRootedOzoneFileSystemTest {
         .setSourceBucket(sourceBucket);
     OzoneVolume ozoneVolume = objectStore.getVolume(linkVolume);
     ozoneVolume.createBucket(linkBucket, builder.build());
+  }
+
+  private Path createAndGetBucketPath()
+      throws IOException {
+    BucketArgs.Builder builder = BucketArgs.newBuilder();
+    builder.setStorageType(StorageType.DISK);
+    builder.setBucketLayout(bucketLayout);
+    BucketArgs omBucketArgs = builder.build();
+    String vol = UUID.randomUUID().toString();
+    String buck = UUID.randomUUID().toString();
+    final OzoneBucket bucket =
+        TestDataUtil.createVolumeAndBucket(client, vol, buck, omBucketArgs);
+    Path volume = new Path(OZONE_URI_DELIMITER, bucket.getVolumeName());
+    return new Path(volume, bucket.getName());
   }
 
   @Test
@@ -2475,6 +2479,115 @@ abstract class AbstractRootedOzoneFileSystemTest {
     fileStatus = fs.getFileStatus(path);
     // verify that mtime is NOT updated as expected.
     assertEquals(mtime, fileStatus.getModificationTime());
+  }
+
+  @Test
+  public void testSetTimesForLinkedBucketPath() throws Exception {
+    // Create a file
+    OzoneBucket sourceBucket =
+        TestDataUtil.createVolumeAndBucket(client, bucketLayout);
+    Path volumePath1 =
+        new Path(OZONE_URI_DELIMITER, sourceBucket.getVolumeName());
+    Path sourceBucketPath = new Path(volumePath1, sourceBucket.getName());
+    Path path = new Path(sourceBucketPath, "key1");
+    try (FSDataOutputStream stream = fs.create(path)) {
+      stream.write(1);
+    }
+    OzoneVolume sourceVol = client.getObjectStore().getVolume(sourceBucket.getVolumeName());
+    String linkBucketName = UUID.randomUUID().toString();
+    createLinkBucket(sourceVol.getName(), linkBucketName,
+        sourceVol.getName(), sourceBucket.getName());
+
+    Path linkedBucketPath = new Path(volumePath1, linkBucketName);
+    Path keyInLinkedBucket = new Path(linkedBucketPath, "key1");
+
+    // test setTimes in linked bucket path
+    long mtime = 1000;
+    fs.setTimes(keyInLinkedBucket, mtime, 2000);
+
+    FileStatus fileStatus = fs.getFileStatus(path);
+    // verify that mtime is updated as expected.
+    assertEquals(mtime, fileStatus.getModificationTime());
+
+    long mtimeDontUpdate = -1;
+    fs.setTimes(keyInLinkedBucket, mtimeDontUpdate, 2000);
+
+    fileStatus = fs.getFileStatus(keyInLinkedBucket);
+    // verify that mtime is NOT updated as expected.
+    assertEquals(mtime, fileStatus.getModificationTime());
+  }
+
+  @ParameterizedTest(name = "Source Replication Factor = {0}")
+  @ValueSource(shorts = { 1, 3 })
+  public void testDistcp(short sourceRepFactor) throws Exception {
+    Path srcBucketPath = createAndGetBucketPath();
+    Path insideSrcBucket = new Path(srcBucketPath, "*");
+    Path dstBucketPath = createAndGetBucketPath();
+    // create 2 files on source
+    List<String> fileNames = createFiles(srcBucketPath, 2, sourceRepFactor);
+    // Create target directory/bucket
+    fs.mkdirs(dstBucketPath);
+
+    // perform distcp
+    DistCpOptions options =
+        new DistCpOptions.Builder(Collections.singletonList(insideSrcBucket),
+            dstBucketPath).build();
+    options.appendToConf(conf);
+    Job distcpJob = new DistCp(conf, options).execute();
+    verifyCopy(dstBucketPath, distcpJob, 2, 2);
+    FileStatus sourceFileStatus = fs.listStatus(srcBucketPath)[0];
+    FileStatus dstFileStatus = fs.listStatus(dstBucketPath)[0];
+    assertEquals(sourceRepFactor, sourceFileStatus.getReplication());
+    // without preserve distcp should create file with default replication
+    assertEquals(fs.getDefaultReplication(dstBucketPath),
+        dstFileStatus.getReplication());
+
+    deleteFiles(dstBucketPath, fileNames);
+
+    // test preserve option
+    options =
+        new DistCpOptions.Builder(Collections.singletonList(insideSrcBucket),
+            dstBucketPath).preserve(DistCpOptions.FileAttribute.REPLICATION)
+            .build();
+    options.appendToConf(conf);
+    distcpJob = new DistCp(conf, options).execute();
+    verifyCopy(dstBucketPath, distcpJob, 2, 2);
+    dstFileStatus = fs.listStatus(dstBucketPath)[0];
+    // src and dst should have same replication
+    assertEquals(sourceRepFactor, dstFileStatus.getReplication());
+
+    // test if copy is skipped due to matching checksums
+    assertFalse(options.shouldSkipCRC());
+    distcpJob = new DistCp(conf, options).execute();
+    verifyCopy(dstBucketPath, distcpJob, 0, 2);
+  }
+
+  private void verifyCopy(Path dstBucketPath, Job distcpJob,
+      long expectedFilesToBeCopied, long expectedTotalFilesInDest) throws IOException {
+    long filesCopied =
+        distcpJob.getCounters().findCounter(CopyMapper.Counter.COPY).getValue();
+    FileStatus[] destinationFileStatus = fs.listStatus(dstBucketPath);
+    assertEquals(expectedTotalFilesInDest, destinationFileStatus.length);
+    assertEquals(expectedFilesToBeCopied, filesCopied);
+  }
+
+  private List<String> createFiles(Path srcBucketPath, int fileCount, short factor) throws IOException {
+    List<String> createdFiles = new ArrayList<>();
+    for (int i = 1; i <= fileCount; i++) {
+      String keyName = "key" + RandomStringUtils.randomNumeric(5);
+      Path file = new Path(srcBucketPath, keyName);
+      try (FSDataOutputStream fsDataOutputStream = fs.create(file, factor)) {
+        fsDataOutputStream.writeBytes("Hello");
+      }
+      createdFiles.add(keyName);
+    }
+    return createdFiles;
+  }
+
+  private void deleteFiles(Path base, List<String> fileNames) throws IOException {
+    for (String key : fileNames) {
+      fs.delete(new Path(base, key));
+    }
   }
 
 }

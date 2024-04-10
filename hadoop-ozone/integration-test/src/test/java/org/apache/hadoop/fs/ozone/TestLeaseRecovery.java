@@ -59,8 +59,11 @@ import java.net.ConnectException;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeoutException;
 
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_RATIS_PIPELINE_LIMIT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_CLIENT_READ_TIMEOUT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_CLIENT_WAIT_BETWEEN_RETRIES_MILLIS_KEY;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SCM_BLOCK_SIZE;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SCM_BLOCK_SIZE_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConsts.FORCE_LEASE_RECOVERY_ENV;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_OFS_URI_SCHEME;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_ROOT;
@@ -116,9 +119,11 @@ public class TestLeaseRecovery {
     conf.setBoolean(OZONE_OM_RATIS_ENABLE_KEY, false);
     conf.setBoolean(OzoneConfigKeys.OZONE_FS_HSYNC_ENABLED, true);
     conf.set(OZONE_DEFAULT_BUCKET_LAYOUT, layout.name());
+    conf.setInt(OZONE_SCM_RATIS_PIPELINE_LIMIT, 10);
     conf.set(OzoneConfigKeys.OZONE_OM_LEASE_SOFT_LIMIT, "0s");
     // make sure flush will write data to DN
     conf.setBoolean("ozone.client.stream.buffer.flush.delay", false);
+
     ClientConfigForTesting.newBuilder(StorageUnit.BYTES)
         .setBlockSize(blockSize)
         .setChunkSize(chunkSize)
@@ -131,7 +136,6 @@ public class TestLeaseRecovery {
 
     cluster = MiniOzoneCluster.newBuilder(conf)
       .setNumDatanodes(3)
-      .setTotalPipelineNumLimit(10)
       .build();
     cluster.waitForClusterToBeReady();
     client = cluster.newClient();
@@ -188,6 +192,42 @@ public class TestLeaseRecovery {
 
     // open it again, make sure the data is correct
     verifyData(data, dataSize * 2, file, fs);
+  }
+
+  @Test
+  public void testRecoveryWithoutHsyncHflushOnLastBlock() throws Exception {
+    RootedOzoneFileSystem fs = (RootedOzoneFileSystem)FileSystem.get(conf);
+
+    int blockSize = (int) cluster.getOzoneManager().getConfiguration().getStorageSize(
+        OZONE_SCM_BLOCK_SIZE, OZONE_SCM_BLOCK_SIZE_DEFAULT, StorageUnit.BYTES);
+
+    final byte[] data = getData(blockSize / 2 + 1);
+
+    final FSDataOutputStream stream = fs.create(file, true);
+    try {
+      stream.write(data);
+      stream.hsync();
+      assertFalse(fs.isFileClosed(file));
+
+      // It will write into new block as well
+      // Don't do hsync/flush
+      stream.write(data);
+
+      int count = 0;
+      while (count++ < 15 && !fs.recoverLease(file)) {
+        Thread.sleep(1000);
+      }
+      // The lease should have been recovered.
+      assertTrue(fs.isFileClosed(file), "File should be closed");
+
+      // A second call to recoverLease should succeed too.
+      assertTrue(fs.recoverLease(file));
+    } finally {
+      closeIgnoringKeyNotFound(stream);
+    }
+
+    // open it again, make sure the data is correct
+    verifyData(data, blockSize / 2 + 1, file, fs);
   }
 
   @Test

@@ -45,7 +45,7 @@ import java.util.Optional;
  * ReconfigureProtocol.
  */
 public class ReconfigureProtocolServerSideTranslatorPB implements
-    ReconfigureProtocolPB {
+    ReconfigureProtocolPB, ReconfigureProtocolOmPB, ReconfigureProtocolDatanodePB {
 
   private final ReconfigureProtocol impl;
 

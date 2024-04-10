@@ -96,7 +96,7 @@ public class FilePerBlockStrategy implements ChunkManager {
   public String streamInit(Container container, BlockID blockID)
       throws StorageContainerException {
     checkLayoutVersion(container);
-    File chunkFile = getChunkFile(container, blockID, null);
+    final File chunkFile = getChunkFile(container, blockID);
     return chunkFile.getAbsolutePath();
   }
 
@@ -105,7 +105,7 @@ public class FilePerBlockStrategy implements ChunkManager {
           Container container, BlockID blockID, ContainerMetrics metrics)
           throws StorageContainerException {
     checkLayoutVersion(container);
-    File chunkFile = getChunkFile(container, blockID, null);
+    final File chunkFile = getChunkFile(container, blockID);
     return new KeyValueStreamDataChannel(chunkFile,
         container.getContainerData(), metrics);
   }
@@ -137,7 +137,7 @@ public class FilePerBlockStrategy implements ChunkManager {
     KeyValueContainerData containerData = (KeyValueContainerData) container
         .getContainerData();
 
-    File chunkFile = getChunkFile(container, blockID, info);
+    final File chunkFile = getChunkFile(container, blockID);
     long len = info.getLen();
     long offset = info.getOffset();
 
@@ -188,7 +188,7 @@ public class FilePerBlockStrategy implements ChunkManager {
 
     HddsVolume volume = containerData.getVolume();
 
-    File chunkFile = getChunkFile(container, blockID, info);
+    final File chunkFile = getChunkFile(container, blockID);
 
     final long len = info.getLen();
     long offset = info.getOffset();
@@ -213,7 +213,7 @@ public class FilePerBlockStrategy implements ChunkManager {
   @Override
   public void finishWriteChunks(KeyValueContainer container,
       BlockData blockData) throws IOException {
-    File chunkFile = getChunkFile(container, blockData.getBlockID(), null);
+    final File chunkFile = getChunkFile(container, blockData.getBlockID());
     try {
       files.close(chunkFile);
       verifyChunkFileExists(chunkFile);
@@ -227,7 +227,7 @@ public class FilePerBlockStrategy implements ChunkManager {
   public void finalizeWriteChunk(KeyValueContainer container,
       BlockID blockId) throws IOException {
     synchronized (container) {
-      File chunkFile = getChunkFile(container, blockId, null);
+      File chunkFile = getChunkFile(container, blockId);
       try {
         if (files.isOpen(chunkFile)) {
           files.close(chunkFile);
@@ -247,7 +247,7 @@ public class FilePerBlockStrategy implements ChunkManager {
 
     Preconditions.checkNotNull(blockID, "Block ID cannot be null.");
 
-    File file = getChunkFile(container, blockID, info);
+    final File file = getChunkFile(container, blockID);
 
     // if the chunk file does not exist, it might have already been deleted.
     // The call might be because of reapply of transactions on datanode
@@ -267,10 +267,8 @@ public class FilePerBlockStrategy implements ChunkManager {
     LOG.info("Deleted block file: {}", file);
   }
 
-  private File getChunkFile(Container container, BlockID blockID,
-      ChunkInfo info) throws StorageContainerException {
-    return FILE_PER_BLOCK.getChunkFile(container.getContainerData(), blockID,
-        info);
+  private static File getChunkFile(Container container, BlockID blockID) throws StorageContainerException {
+    return FILE_PER_BLOCK.getChunkFile(container.getContainerData(), blockID, null);
   }
 
   private static void checkFullDelete(ChunkInfo info, File chunkFile)

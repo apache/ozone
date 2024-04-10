@@ -50,6 +50,9 @@ import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.common.helpers.AllocatedBlock;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
+import org.apache.hadoop.hdds.scm.net.InnerNode;
+import org.apache.hadoop.hdds.scm.net.InnerNodeImpl;
+import org.apache.hadoop.hdds.scm.net.NetConstants;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.scm.protocol.ScmBlockLocationProtocol;
@@ -162,6 +165,9 @@ public class TestOmContainerLocationCache {
     mockScmBlockLocationProtocol = mock(ScmBlockLocationProtocol.class);
     mockScmContainerClient =
         mock(StorageContainerLocationProtocol.class);
+    InnerNode.Factory factory = InnerNodeImpl.FACTORY;
+    when(mockScmBlockLocationProtocol.getNetworkTopology()).thenReturn(
+        factory.newInnerNode("", "", null, NetConstants.ROOT_LEVEL, 1));
 
     OmTestManagers omTestManagers = new OmTestManagers(conf,
         mockScmBlockLocationProtocol, mockScmContainerClient);
@@ -247,10 +253,13 @@ public class TestOmContainerLocationCache {
   }
 
   @BeforeEach
-  public void beforeEach() {
+  public void beforeEach() throws IOException {
     CONTAINER_ID.getAndIncrement();
     reset(mockScmBlockLocationProtocol, mockScmContainerClient,
         mockDn1Protocol, mockDn2Protocol);
+    InnerNode.Factory factory = InnerNodeImpl.FACTORY;
+    when(mockScmBlockLocationProtocol.getNetworkTopology()).thenReturn(
+        factory.newInnerNode("", "", null, NetConstants.ROOT_LEVEL, 1));
     when(mockDn1Protocol.getPipeline()).thenReturn(createPipeline(DN1));
     when(mockDn2Protocol.getPipeline()).thenReturn(createPipeline(DN2));
   }
@@ -598,16 +607,38 @@ public class TestOmContainerLocationCache {
 
   private void mockWriteChunkResponse(XceiverClientSpi mockDnProtocol)
       throws IOException, ExecutionException, InterruptedException {
-    ContainerCommandResponseProto writeResponse =
-        ContainerCommandResponseProto.newBuilder()
-            .setWriteChunk(WriteChunkResponseProto.newBuilder().build())
-            .setResult(Result.SUCCESS)
-            .setCmdType(Type.WriteChunk)
-            .build();
     doAnswer(invocation ->
-        new XceiverClientReply(completedFuture(writeResponse)))
+        new XceiverClientReply(
+            completedFuture(
+                createWriteChunkResponse(
+                    (ContainerCommandRequestProto)invocation.getArgument(0)))))
         .when(mockDnProtocol)
         .sendCommandAsync(argThat(matchCmd(Type.WriteChunk)));
+  }
+
+  ContainerCommandResponseProto createWriteChunkResponse(
+      ContainerCommandRequestProto request) {
+    ContainerProtos.WriteChunkRequestProto writeChunk = request.getWriteChunk();
+
+    WriteChunkResponseProto.Builder builder =
+        WriteChunkResponseProto.newBuilder();
+    if (writeChunk.hasBlock()) {
+      ContainerProtos.BlockData
+          blockData = writeChunk.getBlock().getBlockData();
+
+      GetCommittedBlockLengthResponseProto response =
+          GetCommittedBlockLengthResponseProto.newBuilder()
+          .setBlockID(blockData.getBlockID())
+          .setBlockLength(blockData.getSize())
+          .build();
+
+      builder.setCommittedBlockLength(response);
+    }
+    return ContainerCommandResponseProto.newBuilder()
+        .setWriteChunk(builder.build())
+        .setResult(Result.SUCCESS)
+        .setCmdType(Type.WriteChunk)
+        .build();
   }
 
   private ArgumentMatcher<ContainerCommandRequestProto> matchCmd(Type type) {

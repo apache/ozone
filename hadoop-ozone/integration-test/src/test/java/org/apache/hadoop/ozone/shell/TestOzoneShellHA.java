@@ -63,6 +63,7 @@ import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
+import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.hadoop.util.ToolRunner;
@@ -85,6 +86,9 @@ import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.BUCK
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.BUCKET_NOT_FOUND;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.VOLUME_NOT_EMPTY;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.VOLUME_NOT_FOUND;
+import static org.apache.hadoop.ozone.om.helpers.BucketLayout.FILE_SYSTEM_OPTIMIZED;
+import static org.apache.hadoop.ozone.om.helpers.BucketLayout.LEGACY;
+import static org.apache.hadoop.ozone.om.helpers.BucketLayout.OBJECT_STORE;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -104,6 +108,8 @@ import org.junit.jupiter.api.Order;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestMethodOrder;
 import org.junit.jupiter.api.Timeout;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import picocli.CommandLine;
@@ -130,7 +136,7 @@ public class TestOzoneShellHA {
   private static File baseDir;
   private static File testFile;
   private static String testFilePathString;
-  private static MiniOzoneCluster cluster = null;
+  private static MiniOzoneHAClusterImpl cluster = null;
   private static File testDir;
   private static MiniKMS miniKMS;
   private static OzoneClient client;
@@ -186,11 +192,12 @@ public class TestOzoneShellHA {
     final int numDNs = 5;
     conf.set(CommonConfigurationKeysPublic.HADOOP_SECURITY_KEY_PROVIDER_PATH,
         getKeyProviderURI(miniKMS));
-    cluster = MiniOzoneCluster.newOMHABuilder(conf)
-        .setOMServiceId(omServiceId)
+    conf.setBoolean(OMConfigKeys.OZONE_OM_ENABLE_FILESYSTEM_PATHS, true);
+    MiniOzoneHAClusterImpl.Builder builder = MiniOzoneCluster.newHABuilder(conf);
+    builder.setOMServiceId(omServiceId)
         .setNumOfOzoneManagers(numOfOMs)
-        .setNumDatanodes(numDNs)
-        .build();
+        .setNumDatanodes(numDNs);
+    cluster = builder.build();
     cluster.waitForClusterToBeReady();
     client = cluster.newClient();
   }
@@ -287,8 +294,7 @@ public class TestOzoneShellHA {
    * @return the leader OM's Node ID in the MiniOzoneHACluster.
    */
   private String getLeaderOMNodeId() {
-    MiniOzoneHAClusterImpl haCluster = (MiniOzoneHAClusterImpl) cluster;
-    OzoneManager omLeader = haCluster.getOMLeader();
+    OzoneManager omLeader = cluster.getOMLeader();
     assertNotNull(omLeader, "There should be a leader OM at this point.");
     return omLeader.getOMNodeId();
   }
@@ -1975,9 +1981,10 @@ public class TestOzoneShellHA {
     OMException exception = (OMException) execution.getCause();
     assertEquals(VOLUME_NOT_FOUND, exception.getResult());
   }
-  
-  @Test
-  public void testRecursiveVolumeDelete()
+
+  @ParameterizedTest
+  @ValueSource(ints = {1, 5})
+  public void testRecursiveVolumeDelete(int threadCount)
       throws Exception {
     String volume1 = "volume10";
     String volume2 = "volume20";
@@ -1986,47 +1993,19 @@ public class TestOzoneShellHA {
     // Create bucket bucket1 with layout FILE_SYSTEM_OPTIMIZED
     // Insert some keys into it
     generateKeys(OZONE_URI_DELIMITER + volume1,
-        "/bucketfso",
+        "/fsobucket1",
         BucketLayout.FILE_SYSTEM_OPTIMIZED.toString());
 
-    // Create another volume  volume2 with bucket and some keys into it.
+    // Create another volume volume2 with bucket and some keys into it.
     generateKeys(OZONE_URI_DELIMITER + volume2,
         "/bucket2",
         BucketLayout.FILE_SYSTEM_OPTIMIZED.toString());
 
-    // Create OBS bucket in volume1
-    String[] args = new String[] {"bucket", "create", "--layout",
-        BucketLayout.OBJECT_STORE.toString(), volume1 + "/bucketobs"};
-    execute(ozoneShell, args);
-    out.reset();
-
-    // Insert few keys into OBS bucket
-    String keyName = OZONE_URI_DELIMITER + volume1 + "/bucketobs" +
-        OZONE_URI_DELIMITER + "key";
-    for (int i = 0; i < 5; i++) {
-      args = new String[] {
-          "key", "put", "o3://" + omServiceId + keyName + i,
-          testFile.getPath()};
-      execute(ozoneShell, args);
-    }
-    out.reset();
-
-    // Create Legacy bucket in volume1
-    args = new String[] {"bucket", "create", "--layout",
-        BucketLayout.LEGACY.toString(), volume1 + "/bucketlegacy"};
-    execute(ozoneShell, args);
-    out.reset();
-
-    // Insert few keys into legacy bucket
-    keyName = OZONE_URI_DELIMITER + volume1 + "/bucketlegacy" +
-        OZONE_URI_DELIMITER + "key";
-    for (int i = 0; i < 5; i++) {
-      args = new String[] {
-          "key", "put", "o3://" + omServiceId + keyName + i,
-          testFile.getPath()};
-      execute(ozoneShell, args);
-    }
-    out.reset();
+    createBucketAndGenerateKeys(volume1, FILE_SYSTEM_OPTIMIZED, "fsobucket2");
+    createBucketAndGenerateKeys(volume1, OBJECT_STORE, "obsbucket1");
+    createBucketAndGenerateKeys(volume1, OBJECT_STORE, "obsbucket2");
+    createBucketAndGenerateKeys(volume1, LEGACY, "legacybucket1");
+    createBucketAndGenerateKeys(volume1, LEGACY, "legacybucket2");
 
     // Try volume delete without recursive
     // It should fail as volume is not empty
@@ -2041,20 +2020,48 @@ public class TestOzoneShellHA {
     assertEquals(client.getObjectStore().getVolume(volume1)
         .getName(), volume1);
 
-    // Delete volume1(containing OBS, FSO and Legacy buckets) recursively
-    args =
-        new String[] {"volume", "delete", volume1, "-r", "--yes"};
+    // Delete volume1(containing OBS, FSO and Legacy buckets) recursively with thread count
+    String[] args = new String[] {"volume", "delete", volume1, "-r", "--yes", "-t", String.valueOf(threadCount)};
 
     execute(ozoneShell, args);
     out.reset();
-    // volume2 should still exist
-    assertEquals(client.getObjectStore().getVolume(volume2)
-        .getName(), volume2);
-
     // volume1 should not exist
     omExecution = assertThrows(OMException.class,
         () -> client.getObjectStore().getVolume(volume1));
     assertEquals(VOLUME_NOT_FOUND, omExecution.getResult());
+
+    // volume2 should still exist
+    assertEquals(client.getObjectStore().getVolume(volume2)
+        .getName(), volume2);
+
+    // Delete volume2 recursively
+    args = new String[] {"volume", "delete", volume2, "-r", "--yes"};
+    execute(ozoneShell, args);
+    out.reset();
+
+    // volume2 should not exist
+    omExecution = assertThrows(OMException.class,
+        () -> client.getObjectStore().getVolume(volume2));
+    assertEquals(VOLUME_NOT_FOUND, omExecution.getResult());
+  }
+
+  private void createBucketAndGenerateKeys(String volume, BucketLayout layout, String bucketName) {
+    // Create bucket
+    String[] args = new String[] {"bucket", "create", volume + "/" +  bucketName,
+        "--layout", layout.toString()};
+    execute(ozoneShell, args);
+    out.reset();
+
+    // Insert keys
+    String keyName = OZONE_URI_DELIMITER + volume + "/" + bucketName +
+        OZONE_URI_DELIMITER + "key";
+    for (int i = 0; i < 5; i++) {
+      args = new String[] {
+          "key", "put", "o3://" + omServiceId + keyName + i,
+          testFile.getPath()};
+      execute(ozoneShell, args);
+    }
+    out.reset();
   }
 
   @Test
@@ -2115,6 +2122,43 @@ public class TestOzoneShellHA {
     execute(ozoneShell,
         new String[]{"volume", "delete", "/volume1"});
     out.reset();
+  }
+
+  @Test
+  public void testKeyDeleteLegacyWithEnableFileSystemPath() throws IOException {
+    String volumeName = "vol5";
+    String bucketName = "legacybucket";
+    String[] args = new String[] {"volume", "create", "o3://" + omServiceId + OZONE_URI_DELIMITER + volumeName};
+    execute(ozoneShell, args);
+
+    args = new String[] {"bucket", "create", "o3://" + omServiceId + OZONE_URI_DELIMITER +
+          volumeName + OZONE_URI_DELIMITER + bucketName, "--layout", BucketLayout.LEGACY.toString()};
+    execute(ozoneShell, args);
+
+    String dirPath = OZONE_URI_DELIMITER + volumeName + OZONE_URI_DELIMITER +
+        bucketName + OZONE_URI_DELIMITER + "dir/";
+    String keyPath = dirPath + "key1";
+
+    // Create key, it will generate two keys, one with dirPath other with keyPath
+    args = new String[] {"key", "put", "o3://" + omServiceId + keyPath, testFile.getPath()};
+    execute(ozoneShell, args);
+
+    // Enable fileSystem path for client config
+    String fileSystemEnable = generateSetConfString(OMConfigKeys.OZONE_OM_ENABLE_FILESYSTEM_PATHS, "true");
+    // Delete dirPath key, it should fail
+    args = new String[] {fileSystemEnable, "key", "delete", dirPath};
+    execute(ozoneShell, args);
+
+    // Check number of keys
+    OzoneVolume volume = client.getObjectStore().getVolume(volumeName);
+    OzoneBucket bucket = volume.getBucket(bucketName);
+    List<OzoneFileStatus> files = bucket.listStatus("", true, "", 5);
+    // Two keys should still exist, dirPath and keyPath
+    assertEquals(2, files.size());
+
+    // cleanup
+    args = new String[] {"volume", "delete", volumeName, "-r", "--yes"};
+    execute(ozoneShell, args);
   }
 
   private static String getKeyProviderURI(MiniKMS kms) {

@@ -349,6 +349,14 @@ public class SnapshotChainManager {
   }
 
   /**
+   * Update snapshot chain when snapshot changes (e.g. renamed).
+   */
+  public synchronized void updateSnapshot(SnapshotInfo snapshotInfo) {
+    snapshotIdToTableKey.computeIfPresent(snapshotInfo.getSnapshotId(),
+        (snapshotId, dbTableKey) -> snapshotInfo.getTableKey());
+  }
+
+  /**
    * Delete snapshot from snapshot chain.
    */
   public synchronized boolean deleteSnapshot(SnapshotInfo snapshotInfo)

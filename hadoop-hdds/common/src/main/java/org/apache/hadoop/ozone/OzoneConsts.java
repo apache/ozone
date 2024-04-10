@@ -589,4 +589,9 @@ public final class OzoneConsts {
    */
   public static final String COMPACTION_LOG_TABLE =
       "compactionLogTable";
+
+  /**
+   * S3G multipart upload request's ETag header key.
+   */
+  public static final String ETAG = "ETag";
 }

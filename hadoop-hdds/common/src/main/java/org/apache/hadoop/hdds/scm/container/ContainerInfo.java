@@ -90,31 +90,19 @@ public final class ContainerInfo implements Comparable<ContainerInfo> {
   // container replica should have the same sequenceId.
   private long sequenceId;
 
-  @SuppressWarnings("parameternumber")
-  private ContainerInfo(
-      long containerID,
-      HddsProtos.LifeCycleState state,
-      PipelineID pipelineID,
-      long usedBytes,
-      long numberOfKeys,
-      long stateEnterTime,
-      String owner,
-      long deleteTransactionId,
-      long sequenceId,
-      ReplicationConfig repConfig,
-      Clock clock) {
-    this.containerID = ContainerID.valueOf(containerID);
-    this.pipelineID = pipelineID;
-    this.usedBytes = usedBytes;
-    this.numberOfKeys = numberOfKeys;
-    this.lastUsed = clock.instant();
-    this.state = state;
-    this.stateEnterTime = Instant.ofEpochMilli(stateEnterTime);
-    this.owner = owner;
-    this.deleteTransactionId = deleteTransactionId;
-    this.sequenceId = sequenceId;
-    this.replicationConfig = repConfig;
-    this.clock = clock;
+  private ContainerInfo(Builder b) {
+    containerID = ContainerID.valueOf(b.containerID);
+    pipelineID = b.pipelineID;
+    usedBytes = b.used;
+    numberOfKeys = b.keys;
+    lastUsed = b.clock.instant();
+    state = b.state;
+    stateEnterTime = Instant.ofEpochMilli(b.stateEnterTime);
+    owner = b.owner;
+    deleteTransactionId = b.deleteTransactionId;
+    sequenceId = b.sequenceId;
+    replicationConfig = b.replicationConfig;
+    clock = b.clock;
   }
 
   public static ContainerInfo fromProtobuf(HddsProtos.ContainerInfoProto info) {
@@ -445,9 +433,7 @@ public final class ContainerInfo implements Comparable<ContainerInfo> {
     }
 
     public ContainerInfo build() {
-      return new ContainerInfo(containerID, state, pipelineID,
-          used, keys, stateEnterTime, owner, deleteTransactionId,
-          sequenceId, replicationConfig, clock);
+      return new ContainerInfo(this);
     }
   }
 

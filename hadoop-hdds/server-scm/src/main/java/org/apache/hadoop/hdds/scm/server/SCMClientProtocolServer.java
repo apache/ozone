@@ -63,6 +63,7 @@ import org.apache.hadoop.hdds.scm.ha.SCMHAUtils;
 import org.apache.hadoop.hdds.scm.ha.SCMRatisServer;
 import org.apache.hadoop.hdds.scm.ha.SCMRatisServerImpl;
 import org.apache.hadoop.hdds.scm.node.DatanodeUsageInfo;
+import org.apache.hadoop.hdds.scm.FetchMetrics;
 import org.apache.hadoop.hdds.scm.node.NodeStatus;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
@@ -591,7 +592,7 @@ public class SCMClientProtocolServer implements
   @Override
   public Map<String, List<ContainerID>> getContainersOnDecomNode(DatanodeDetails dn) throws IOException {
     try {
-      return scm.getScmDecommissionManager().getContainersReplicatedOnNode(dn);
+      return scm.getScmDecommissionManager().getContainersPendingReplication(dn);
     } catch (NodeNotFoundException e) {
       throw new IOException("Failed to get containers list. Unable to find required node", e);
     }
@@ -1372,5 +1373,11 @@ public class SCMClientProtocolServer implements
           .setErrorMsg(ex.getMessage());
     }
     return decommissionScmResponseBuilder.build();
+  }
+
+  @Override
+  public String getMetrics(String query) throws IOException {
+    FetchMetrics fetchMetrics = new FetchMetrics();
+    return fetchMetrics.getMetrics(query);
   }
 }

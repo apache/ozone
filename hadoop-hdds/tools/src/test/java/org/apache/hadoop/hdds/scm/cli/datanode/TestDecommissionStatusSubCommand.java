@@ -60,6 +60,7 @@ public class TestDecommissionStatusSubCommand {
   private DecommissionStatusSubCommand cmd;
   private List<HddsProtos.Node> nodes = getNodeDetails(2);
   private Map<String, List<ContainerID>> containerOnDecom = getContainersOnDecomNodes();
+  private ArrayList<String> metrics = getMetrics();
 
   @BeforeEach
   public void setup() throws UnsupportedEncodingException {
@@ -80,6 +81,7 @@ public class TestDecommissionStatusSubCommand {
     when(scmClient.queryNode(any(), any(), any(), any()))
         .thenAnswer(invocation -> nodes); // 2 nodes decommissioning
     when(scmClient.getContainersOnDecomNode(any())).thenReturn(containerOnDecom);
+    when(scmClient.getMetrics(any())).thenReturn(metrics.get(1));
 
     cmd.execute(scmClient);
     Pattern p = Pattern.compile("Decommission\\sStatus:\\s" +
@@ -91,15 +93,17 @@ public class TestDecommissionStatusSubCommand {
     p = Pattern.compile("Datanode:\\s.*host0\\)");
     m = p.matcher(outContent.toString(DEFAULT_ENCODING));
     assertTrue(m.find());
-    p = Pattern.compile("host0.*[\r\n].*UnderReplicated.*UnClosed", Pattern.MULTILINE);
-    m = p.matcher(outContent.toString(DEFAULT_ENCODING));
-    assertTrue(m.find());
     p = Pattern.compile("Datanode:\\s.*host1\\)");
     m = p.matcher(outContent.toString(DEFAULT_ENCODING));
     assertTrue(m.find());
-    p = Pattern.compile("host1.*[\r\n].*UnderReplicated.*UnClosed", Pattern.MULTILINE);
+    p = Pattern.compile("No\\. of Unclosed Pipelines:");
     m = p.matcher(outContent.toString(DEFAULT_ENCODING));
     assertTrue(m.find());
+    assertTrue(m.find()); // metrics for both are shown
+    p = Pattern.compile("UnderReplicated=.* UnClosed=");
+    m = p.matcher(outContent.toString(DEFAULT_ENCODING));
+    assertTrue(m.find());
+    assertTrue(m.find()); // container lists for both are shown
   }
 
   @Test
@@ -109,6 +113,7 @@ public class TestDecommissionStatusSubCommand {
     when(scmClient.queryNode(any(), any(), any(), any()))
         .thenReturn(new ArrayList<>());
     when(scmClient.getContainersOnDecomNode(any())).thenReturn(new HashMap<>());
+    when(scmClient.getMetrics(any())).thenReturn(metrics.get(0));
     cmd.execute(scmClient);
 
     Pattern p = Pattern.compile("Decommission\\sStatus:\\s" +
@@ -117,10 +122,10 @@ public class TestDecommissionStatusSubCommand {
     assertTrue(m.find());
 
     // no host details are shown
-    p = Pattern.compile("Datanode:\\s.*host0\\)", Pattern.MULTILINE);
+    p = Pattern.compile("Datanode:\\s.*host0\\)");
     m = p.matcher(outContent.toString(DEFAULT_ENCODING));
     assertFalse(m.find());
-    p = Pattern.compile("Datanode:\\s.*host1.\\)", Pattern.MULTILINE);
+    p = Pattern.compile("Datanode:\\s.*host1.\\)");
     m = p.matcher(outContent.toString(DEFAULT_ENCODING));
     assertFalse(m.find());
   }
@@ -131,24 +136,22 @@ public class TestDecommissionStatusSubCommand {
     when(scmClient.queryNode(any(), any(), any(), any()))
         .thenAnswer(invocation -> nodes); // 2 nodes decommissioning
     when(scmClient.getContainersOnDecomNode(any())).thenReturn(containerOnDecom);
+    when(scmClient.getMetrics(any())).thenReturn(metrics.get(1));
 
     CommandLine c = new CommandLine(cmd);
     c.parseArgs("--id", nodes.get(0).getNodeID().getUuid());
     cmd.execute(scmClient); // check status of host0
 
-    Pattern p = Pattern.compile("Datanode:\\s.*host0\\)", Pattern.MULTILINE);
+    Pattern p = Pattern.compile("Datanode:\\s.*host0\\)");
     Matcher m = p.matcher(outContent.toString(DEFAULT_ENCODING));
     assertTrue(m.find());
-    p = Pattern.compile("host0.*[\r\n].*UnderReplicated.*UnClosed", Pattern.MULTILINE);
-    m = p.matcher(outContent.toString(DEFAULT_ENCODING));
-    assertTrue(m.find());
-
     // as uuid of only host0 is passed, host1 should NOT be displayed
-    p = Pattern.compile("Datanode:\\s.*host1.\\)", Pattern.MULTILINE);
+    p = Pattern.compile("Datanode:\\s.*host1.\\)");
     m = p.matcher(outContent.toString(DEFAULT_ENCODING));
     assertFalse(m.find());
-    p = Pattern.compile("host1.*[\r\n].*UnderReplicated.*UnClosed", Pattern.MULTILINE);
+    p = Pattern.compile("UnderReplicated=.*UnClosed=");
     m = p.matcher(outContent.toString(DEFAULT_ENCODING));
+    assertTrue(m.find());
     assertFalse(m.find());
   }
 
@@ -161,6 +164,7 @@ public class TestDecommissionStatusSubCommand {
         .thenReturn(containerOnDecom);
     when(scmClient.getContainersOnDecomNode(DatanodeDetails.getFromProtoBuf(nodes.get(1).getNodeID())))
         .thenReturn(new HashMap<>());
+    when(scmClient.getMetrics(any())).thenReturn(metrics.get(2));
 
     CommandLine c = new CommandLine(cmd);
     c.parseArgs("--id", nodes.get(1).getNodeID().getUuid());
@@ -172,10 +176,10 @@ public class TestDecommissionStatusSubCommand {
     assertTrue(m.find());
 
     // no host details are shown
-    p = Pattern.compile("Datanode:\\s.*host0\\)", Pattern.MULTILINE);
+    p = Pattern.compile("Datanode:\\s.*host0\\)");
     m = p.matcher(outContent.toString(DEFAULT_ENCODING));
     assertFalse(m.find());
-    p = Pattern.compile("Datanode:\\s.*host1\\)", Pattern.MULTILINE);
+    p = Pattern.compile("Datanode:\\s.*host1\\)");
     m = p.matcher(outContent.toString(DEFAULT_ENCODING));
     assertFalse(m.find());
   }
@@ -186,24 +190,22 @@ public class TestDecommissionStatusSubCommand {
     when(scmClient.queryNode(any(), any(), any(), any()))
         .thenAnswer(invocation -> nodes); // 2 nodes decommissioning
     when(scmClient.getContainersOnDecomNode(any())).thenReturn(containerOnDecom);
+    when(scmClient.getMetrics(any())).thenReturn(metrics.get(1));
 
     CommandLine c = new CommandLine(cmd);
     c.parseArgs("--ip", nodes.get(1).getNodeID().getIpAddress());
     cmd.execute(scmClient); // check status of host1
 
-    Pattern p = Pattern.compile("Datanode:\\s.*host1\\)", Pattern.MULTILINE);
+    Pattern p = Pattern.compile("Datanode:\\s.*host1\\)");
     Matcher m = p.matcher(outContent.toString(DEFAULT_ENCODING));
     assertTrue(m.find());
-    p = Pattern.compile("host1.*[\r\n].*UnderReplicated.*UnClosed", Pattern.MULTILINE);
-    m = p.matcher(outContent.toString(DEFAULT_ENCODING));
-    assertTrue(m.find());
-
     // as IpAddress of only host1 is passed, host0 should NOT be displayed
-    p = Pattern.compile("Datanode:\\s.*host0.\\)", Pattern.MULTILINE);
+    p = Pattern.compile("Datanode:\\s.*host0.\\)");
     m = p.matcher(outContent.toString(DEFAULT_ENCODING));
     assertFalse(m.find());
-    p = Pattern.compile("host0.*[\r\n].*UnderReplicated.*UnClosed", Pattern.MULTILINE);
+    p = Pattern.compile("UnderReplicated=.*UnClosed=");
     m = p.matcher(outContent.toString(DEFAULT_ENCODING));
+    assertTrue(m.find());
     assertFalse(m.find());
   }
 
@@ -216,6 +218,7 @@ public class TestDecommissionStatusSubCommand {
         .thenReturn(containerOnDecom);
     when(scmClient.getContainersOnDecomNode(DatanodeDetails.getFromProtoBuf(nodes.get(1).getNodeID())))
         .thenReturn(new HashMap<>());
+    when(scmClient.getMetrics(any())).thenReturn(metrics.get(2));
 
     CommandLine c = new CommandLine(cmd);
     c.parseArgs("--ip", nodes.get(1).getNodeID().getIpAddress());
@@ -226,11 +229,11 @@ public class TestDecommissionStatusSubCommand {
     Matcher m = p.matcher(errContent.toString(DEFAULT_ENCODING));
     assertTrue(m.find());
 
-    p = Pattern.compile("Datanode:\\s.*host0\\)", Pattern.MULTILINE);
+    p = Pattern.compile("Datanode:\\s.*host0\\)");
     m = p.matcher(outContent.toString(DEFAULT_ENCODING));
     assertFalse(m.find());
 
-    p = Pattern.compile("Datanode:\\s.*host1\\)", Pattern.MULTILINE);
+    p = Pattern.compile("Datanode:\\s.*host1\\)");
     m = p.matcher(outContent.toString(DEFAULT_ENCODING));
     assertFalse(m.find());
   }
@@ -275,4 +278,38 @@ public class TestDecommissionStatusSubCommand {
     return containerMap;
   }
 
+  private ArrayList<String> getMetrics() {
+    ArrayList<String> result = new ArrayList<>();
+    // no nodes decommissioning
+    result.add("{  \"beans\" : [ {    " +
+        "\"name\" : \"Hadoop:service=StorageContainerManager,name=NodeDecommissionMetrics\",    " +
+        "\"modelerType\" : \"NodeDecommissionMetrics\",    \"DecommissioningMaintenanceNodesTotal\" : 0,    " +
+        "\"RecommissionNodesTotal\" : 0,    \"PipelinesWaitingToCloseTotal\" : 0,    " +
+        "\"ContainersUnderReplicatedTotal\" : 0,    \"ContainersUnClosedTotal\" : 0,    " +
+        "\"ContainersSufficientlyReplicatedTotal\" : 0  } ]}");
+    // 2 nodes in decommisioning
+    result.add("{  \"beans\" : [ {    " +
+        "\"name\" : \"Hadoop:service=StorageContainerManager,name=NodeDecommissionMetrics\",    " +
+        "\"modelerType\" : \"NodeDecommissionMetrics\",    \"DecommissioningMaintenanceNodesTotal\" : 2,    " +
+        "\"RecommissionNodesTotal\" : 0,    \"PipelinesWaitingToCloseTotal\" : 2,    " +
+        "\"ContainersUnderReplicatedTotal\" : 6,    \"ContainersUnclosedTotal\" : 6,    " +
+        "\"ContainersSufficientlyReplicatedTotal\" : 10,   " +
+        "\"tag.datanode.1\" : \"host0\",    \"tag.Hostname.1\" : \"host0\",    " +
+        "\"PipelinesWaitingToCloseDN.1\" : 1,    \"UnderReplicatedDN.1\" : 3,    " +
+        "\"SufficientlyReplicatedDN.1\" : 0,    \"UnclosedContainersDN.1\" : 3,    \"StartTimeDN.1\" : 111211,    " +
+        "\"tag.datanode.2\" : \"host1\",    \"tag.Hostname.2\" : \"host1\",    " +
+        "\"PipelinesWaitingToCloseDN.2\" : 1,    \"UnderReplicatedDN.2\" : 3,    " +
+        "\"SufficientlyReplicatedDN.2\" : 0,    \"UnclosedContainersDN.2\" : 3,    \"StartTimeDN.2\" : 221221} ]}");
+    // only host 1 decommissioning
+    result.add("{  \"beans\" : [ {    " +
+        "\"name\" : \"Hadoop:service=StorageContainerManager,name=NodeDecommissionMetrics\",    " +
+        "\"modelerType\" : \"NodeDecommissionMetrics\",    \"DecommissioningMaintenanceNodesTotal\" : 1,    " +
+        "\"RecommissionNodesTotal\" : 0,    \"PipelinesWaitingToCloseTotal\" : 1,    " +
+        "\"ContainersUnderReplicatedTotal\" : 3,    \"ContainersUnclosedTotal\" : 3,    " +
+        "\"ContainersSufficientlyReplicatedTotal\" : 10,   " +
+        "\"tag.datanode.1\" : \"host0\",\n    \"tag.Hostname.1\" : \"host0\",\n    " +
+        "\"PipelinesWaitingToCloseDN.1\" : 1,\n    \"UnderReplicatedDN.1\" : 3,\n    " +
+        "\"SufficientlyReplicatedDN.1\" : 0,\n    \"UnclosedContainersDN.1\" : 3,    \"StartTimeDN.1\" : 221221} ]}");
+    return result;
+  }
 }

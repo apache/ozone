@@ -32,7 +32,6 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
     .OMResponse;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
 
-import javax.annotation.CheckForNull;
 import jakarta.annotation.Nonnull;
 
 import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.BUCKET_TABLE;
@@ -58,7 +57,6 @@ public class S3MultipartUploadCompleteResponse extends OmKeyResponse {
   private List<OmKeyInfo> allKeyInfoToRemove;
   private OmBucketInfo omBucketInfo;
 
-  @SuppressWarnings("checkstyle:ParameterNumber")
   public S3MultipartUploadCompleteResponse(
       @Nonnull OMResponse omResponse,
       @Nonnull String multipartKey,
@@ -66,7 +64,7 @@ public class S3MultipartUploadCompleteResponse extends OmKeyResponse {
       @Nonnull OmKeyInfo omKeyInfo,
       @Nonnull List<OmKeyInfo> allKeyInfoToRemove,
       @Nonnull BucketLayout bucketLayout,
-      @CheckForNull OmBucketInfo omBucketInfo) {
+      OmBucketInfo omBucketInfo) {
     super(omResponse, bucketLayout);
     this.allKeyInfoToRemove = allKeyInfoToRemove;
     this.multipartKey = multipartKey;

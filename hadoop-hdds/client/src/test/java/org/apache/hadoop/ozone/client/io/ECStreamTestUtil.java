@@ -22,6 +22,7 @@ import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
+import org.apache.hadoop.hdds.scm.OzoneClientConfig;
 import org.apache.hadoop.hdds.scm.XceiverClientFactory;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
@@ -258,9 +259,10 @@ public final class ECStreamTestUtil {
     public synchronized BlockExtendedInputStream create(
         ReplicationConfig repConfig,
         BlockLocationInfo blockInfo, Pipeline pipeline,
-        Token<OzoneBlockTokenIdentifier> token, boolean verifyChecksum,
+        Token<OzoneBlockTokenIdentifier> token,
         XceiverClientFactory xceiverFactory,
-        Function<BlockID, BlockLocationInfo> refreshFunction) {
+        Function<BlockID, BlockLocationInfo> refreshFunction,
+        OzoneClientConfig config) {
 
       int repInd = currentPipeline.getReplicaIndex(pipeline.getNodes().get(0));
       TestBlockInputStream stream = new TestBlockInputStream(

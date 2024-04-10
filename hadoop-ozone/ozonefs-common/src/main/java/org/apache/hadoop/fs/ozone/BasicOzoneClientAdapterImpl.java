@@ -67,6 +67,7 @@ import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.client.rpc.RpcClient;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
+import org.apache.hadoop.ozone.om.helpers.LeaseKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
@@ -201,8 +202,8 @@ public class BasicOzoneClientAdapterImpl implements OzoneClientAdapter {
     OzoneFSUtils.validateBucketLayout(bucket.getName(), resolvedBucketLayout);
 
     this.configuredDnPort = conf.getInt(
-        OzoneConfigKeys.DFS_CONTAINER_IPC_PORT,
-        OzoneConfigKeys.DFS_CONTAINER_IPC_PORT_DEFAULT);
+        OzoneConfigKeys.HDDS_CONTAINER_IPC_PORT,
+        OzoneConfigKeys.HDDS_CONTAINER_IPC_PORT_DEFAULT);
     this.config = conf;
   }
 
@@ -616,6 +617,16 @@ public class BasicOzoneClientAdapterImpl implements OzoneClientAdapter {
   }
 
   @Override
+  public void renameSnapshot(String pathStr, String snapshotOldName, String snapshotNewName)
+      throws IOException {
+    OFSPath ofsPath = new OFSPath(pathStr, config);
+    objectStore.renameSnapshot(ofsPath.getVolumeName(),
+        ofsPath.getBucketName(),
+        snapshotOldName,
+        snapshotNewName);
+  }
+
+  @Override
   public void deleteSnapshot(String pathStr, String snapshotName)
       throws IOException {
     OFSPath ofsPath = new OFSPath(pathStr, config);
@@ -691,7 +702,7 @@ public class BasicOzoneClientAdapterImpl implements OzoneClientAdapter {
   }
 
   @Override
-  public OmKeyInfo recoverFilePrepare(final String pathStr, boolean force) throws IOException {
+  public LeaseKeyInfo recoverFilePrepare(final String pathStr, boolean force) throws IOException {
     incrementCounter(Statistic.INVOCATION_RECOVER_FILE_PREPARE, 1);
 
     return ozoneClient.getProxy().getOzoneManagerClient().recoverLease(

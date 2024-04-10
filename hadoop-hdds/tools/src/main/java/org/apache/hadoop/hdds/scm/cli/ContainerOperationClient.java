@@ -98,8 +98,8 @@ public class ContainerOperationClient implements ScmClient {
     containerSizeB = (int) conf.getStorageSize(OZONE_SCM_CONTAINER_SIZE,
         OZONE_SCM_CONTAINER_SIZE_DEFAULT, StorageUnit.BYTES);
     boolean useRatis = conf.getBoolean(
-        ScmConfigKeys.DFS_CONTAINER_RATIS_ENABLED_KEY,
-        ScmConfigKeys.DFS_CONTAINER_RATIS_ENABLED_DEFAULT);
+        ScmConfigKeys.HDDS_CONTAINER_RATIS_ENABLED_KEY,
+        ScmConfigKeys.HDDS_CONTAINER_RATIS_ENABLED_DEFAULT);
     if (useRatis) {
       replicationFactor = HddsProtos.ReplicationFactor.THREE;
       replicationType = HddsProtos.ReplicationType.RATIS;
@@ -184,7 +184,7 @@ public class ContainerOperationClient implements ScmClient {
     }
   }
 
-  private String getEncodedContainerToken(long containerId) throws IOException {
+  public String getEncodedContainerToken(long containerId) throws IOException {
     if (!containerTokenEnabled) {
       return "";
     }
@@ -561,6 +561,11 @@ public class ContainerOperationClient implements ScmClient {
       String scmId)
       throws IOException {
     return storageContainerLocationClient.decommissionScm(scmId);
+  }
+
+  @Override
+  public String getMetrics(String query) throws IOException {
+    return storageContainerLocationClient.getMetrics(query);
   }
 
 }

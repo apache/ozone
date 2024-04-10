@@ -22,9 +22,11 @@ import com.google.common.primitives.Bytes;
 import org.apache.commons.lang3.RandomUtils;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.client.ContainerBlockID;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ChecksumType;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ChunkInfo;
+import org.apache.hadoop.hdds.scm.OzoneClientConfig;
 import org.apache.hadoop.hdds.scm.XceiverClientFactory;
 import org.apache.hadoop.hdds.scm.XceiverClientSpi;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
@@ -34,6 +36,7 @@ import org.apache.hadoop.hdds.security.exception.SCMSecurityException;
 import org.apache.hadoop.ozone.common.Checksum;
 
 import org.apache.hadoop.ozone.common.OzoneChecksumException;
+import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ratis.thirdparty.io.grpc.Status;
 import org.apache.ratis.thirdparty.io.grpc.StatusException;
 import org.junit.jupiter.api.BeforeEach;
@@ -42,6 +45,7 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.mockito.stubbing.OngoingStubbing;
+import org.slf4j.event.Level;
 
 import java.io.EOFException;
 import java.io.IOException;
@@ -58,6 +62,7 @@ import java.util.stream.Stream;
 
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.CONTAINER_NOT_FOUND;
 import static org.apache.hadoop.hdds.scm.storage.TestChunkInputStream.generateRandomData;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -86,6 +91,8 @@ public class TestBlockInputStream {
 
   private Function<BlockID, BlockLocationInfo> refreshFunction;
 
+  private OzoneConfiguration conf = new OzoneConfiguration();
+
   @BeforeEach
   @SuppressWarnings("unchecked")
   public void setup() throws Exception {
@@ -93,10 +100,12 @@ public class TestBlockInputStream {
     BlockID blockID = new BlockID(new ContainerBlockID(1, 1));
     checksum = new Checksum(ChecksumType.NONE, CHUNK_SIZE);
     createChunkList(5);
+    OzoneClientConfig clientConfig = conf.getObject(OzoneClientConfig.class);
+    clientConfig.setChecksumVerify(false);
 
     Pipeline pipeline = MockPipeline.createSingleNodePipeline();
     blockStream = new DummyBlockInputStream(blockID, blockSize, pipeline, null,
-        false, null, refreshFunction, chunks, chunkDataMap);
+        null, refreshFunction, chunks, chunkDataMap, clientConfig);
   }
 
   /**
@@ -257,18 +266,25 @@ public class TestBlockInputStream {
 
   @Test
   public void testRefreshPipelineFunction() throws Exception {
+    GenericTestUtils.LogCapturer logCapturer = GenericTestUtils.LogCapturer
+        .captureLogs(BlockInputStream.LOG);
+    GenericTestUtils.setLogLevel(BlockInputStream.LOG, Level.DEBUG);
     BlockID blockID = new BlockID(new ContainerBlockID(1, 1));
     AtomicBoolean isRefreshed = new AtomicBoolean();
     createChunkList(5);
+    OzoneClientConfig clientConfig = conf.getObject(OzoneClientConfig.class);
+    clientConfig.setChecksumVerify(false);
 
     try (BlockInputStream blockInputStreamWithRetry =
              new DummyBlockInputStreamWithRetry(blockID, blockSize,
                  MockPipeline.createSingleNodePipeline(), null,
-                 false, null, chunks, chunkDataMap, isRefreshed, null)) {
+                 null, chunks, chunkDataMap, isRefreshed, null,
+                 clientConfig)) {
       assertFalse(isRefreshed.get());
       seekAndVerify(50);
       byte[] b = new byte[200];
       blockInputStreamWithRetry.read(b, 0, 200);
+      assertThat(logCapturer.getOutput()).contains("Retry read after");
       assertTrue(isRefreshed.get());
     }
   }
@@ -348,8 +364,10 @@ public class TestBlockInputStream {
 
   private BlockInputStream createSubject(BlockID blockID, Pipeline pipeline,
       ChunkInputStream stream) {
-    return new DummyBlockInputStream(blockID, blockSize, pipeline, null, false,
-        null, refreshFunction, chunks, null) {
+    OzoneClientConfig clientConfig = conf.getObject(OzoneClientConfig.class);
+    clientConfig.setChecksumVerify(false);
+    return new DummyBlockInputStream(blockID, blockSize, pipeline, null,
+        null, refreshFunction, chunks, null, clientConfig) {
       @Override
       protected ChunkInputStream createChunkInputStream(ChunkInfo chunkInfo) {
         return stream;
@@ -401,9 +419,12 @@ public class TestBlockInputStream {
         .thenReturn(blockLocationInfo);
     when(blockLocationInfo.getPipeline()).thenReturn(newPipeline);
 
+    OzoneClientConfig clientConfig = conf.getObject(OzoneClientConfig.class);
+    clientConfig.setChecksumVerify(false);
     BlockInputStream subject = new BlockInputStream(
         new BlockLocationInfo(new BlockLocationInfo.Builder().setBlockID(blockID).setLength(blockSize)),
-        pipeline, null, false, clientFactory, refreshFunction) {
+        pipeline, null, clientFactory, refreshFunction,
+        clientConfig) {
       @Override
       protected ChunkInputStream createChunkInputStream(ChunkInfo chunkInfo) {
         return stream;

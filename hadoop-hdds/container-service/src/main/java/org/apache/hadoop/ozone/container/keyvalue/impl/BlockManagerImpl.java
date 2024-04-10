@@ -42,7 +42,6 @@ import com.google.common.base.Preconditions;
 
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.BCSID_MISMATCH;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.UNKNOWN_BCSID;
-import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.UNSUPPORTED_REQUEST;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_CHUNK_LIST_INCREMENTAL;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_CHUNK_LIST_INCREMENTAL_DEFAULT;
 
@@ -55,7 +54,8 @@ import org.slf4j.LoggerFactory;
  */
 public class BlockManagerImpl implements BlockManager {
 
-  static final Logger LOG = LoggerFactory.getLogger(BlockManagerImpl.class);
+  public static final Logger LOG =
+      LoggerFactory.getLogger(BlockManagerImpl.class);
 
   private ConfigurationSource config;
 
@@ -66,6 +66,7 @@ public class BlockManagerImpl implements BlockManager {
   // Default Read Buffer capacity when Checksum is not present
   private final int defaultReadBufferCapacity;
   private final int readMappedBufferThreshold;
+  private boolean incrementalEnabled;
 
   /**
    * Constructs a Block Manager.
@@ -81,6 +82,15 @@ public class BlockManagerImpl implements BlockManager {
     this.readMappedBufferThreshold = config.getBufferSize(
         ScmConfigKeys.OZONE_CHUNK_READ_MAPPED_BUFFER_THRESHOLD_KEY,
         ScmConfigKeys.OZONE_CHUNK_READ_MAPPED_BUFFER_THRESHOLD_DEFAULT);
+    incrementalEnabled =
+        config.getBoolean(OZONE_CHUNK_LIST_INCREMENTAL,
+            OZONE_CHUNK_LIST_INCREMENTAL_DEFAULT);
+    if (incrementalEnabled && !VersionedDatanodeFeatures.isFinalized(
+        HDDSLayoutFeature.HBASE_SUPPORT)) {
+      LOG.warn("DataNode has not finalized upgrading to a version that " +
+          "supports incremental chunk list. Fallback to full chunk list");
+      incrementalEnabled = false;
+    }
   }
 
   @Override
@@ -93,23 +103,12 @@ public class BlockManagerImpl implements BlockManager {
       boolean endOfBlock) throws IOException {
     return persistPutBlock(
         (KeyValueContainer) container,
-        data,
-        config,
-        endOfBlock);
+        data, endOfBlock);
   }
 
-  public static long persistPutBlock(KeyValueContainer container,
-      BlockData data, ConfigurationSource config, boolean endOfBlock)
+  public long persistPutBlock(KeyValueContainer container,
+      BlockData data, boolean endOfBlock)
       throws IOException {
-    boolean incrementalEnabled =
-            config.getBoolean(OZONE_CHUNK_LIST_INCREMENTAL,
-                    OZONE_CHUNK_LIST_INCREMENTAL_DEFAULT);
-    if (incrementalEnabled && !VersionedDatanodeFeatures.isFinalized(
-            HDDSLayoutFeature.HBASE_SUPPORT)) {
-      throw new StorageContainerException("DataNode has not finalized " +
-        "upgrading to a version that supports incremental chunk list.",
-        UNSUPPORTED_REQUEST);
-    }
     Preconditions.checkNotNull(data, "BlockData cannot be null for put " +
         "operation.");
     Preconditions.checkState(data.getContainerID() >= 0, "Container Id " +

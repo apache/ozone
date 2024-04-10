@@ -146,6 +146,7 @@ enum Type {
   SetSnapshotProperty = 128;
   ListStatusLight = 129;
   GetSnapshotInfo = 130;
+  RenameSnapshot = 131;
 
   ListOpenFiles = 132;
 }
@@ -283,8 +284,9 @@ message OMRequest {
   optional MultipartUploadsExpiredAbortRequest multipartUploadsExpiredAbortRequest = 126;
   optional SetSnapshotPropertyRequest       SetSnapshotPropertyRequest     = 127;
   optional SnapshotInfoRequest              SnapshotInfoRequest            = 128;
+  optional RenameSnapshotRequest            RenameSnapshotRequest          = 129;
 
-  optional ListOpenFilesRequest             ListOpenFilesRequest           = 132;
+  optional ListOpenFilesRequest             ListOpenFilesRequest           = 130;
 }
 
 message OMResponse {
@@ -407,8 +409,9 @@ message OMResponse {
   optional ListStatusLightResponse           listStatusLightResponse       = 129;
   optional SnapshotInfoResponse              SnapshotInfoResponse          = 130;
   optional OMLockDetailsProto                omLockDetails                 = 131;
+  optional RenameSnapshotResponse            RenameSnapshotResponse        = 132;
 
-  optional ListOpenFilesResponse             ListOpenFilesResponse         = 132;
+  optional ListOpenFilesResponse             ListOpenFilesResponse         = 133;
 }
 
 enum Status {
@@ -1614,8 +1617,9 @@ message MultipartCommitUploadPartRequest {
 }
 
 message MultipartCommitUploadPartResponse {
-    // This one is returned as Etag for S3.
     optional string partName = 1;
+    // This one is returned as Etag for S3.
+    optional string eTag = 2;
 }
 
 message MultipartUploadCompleteRequest {
@@ -1633,6 +1637,7 @@ message MultipartUploadCompleteResponse {
 message Part {
     required uint32 partNumber = 1;
     required string partName = 2;
+    optional string eTag = 3;
 }
 
 message MultipartUploadAbortRequest {
@@ -1705,6 +1710,7 @@ message PartInfo {
     required string partName = 2;
     required uint64 modificationTime = 3;
     required uint64 size = 4;
+    optional string eTag = 5;
 }
 
 /**
@@ -1855,6 +1861,14 @@ message CreateSnapshotRequest {
   optional string snapshotName = 3;
   optional hadoop.hdds.UUID snapshotId = 4;
   optional uint64 creationTime = 5;
+}
+
+message RenameSnapshotRequest {
+  optional string volumeName = 1;
+  optional string bucketName = 2;
+  optional string snapshotOldName = 3;
+  optional string snapshotNewName = 4;
+  optional uint64 renameTime = 5;
 }
 
 message ListSnapshotRequest {
@@ -2019,6 +2033,10 @@ message DeleteSnapshotResponse {
 
 }
 
+message RenameSnapshotResponse {
+  optional SnapshotInfo snapshotInfo = 1;
+}
+
 message SnapshotInfoResponse {
   optional SnapshotInfo snapshotInfo = 1;
 }
@@ -2117,6 +2135,7 @@ message RecoverLeaseRequest {
 message RecoverLeaseResponse {
   optional bool response = 1 [deprecated=true];
   optional KeyInfo keyInfo = 2;
+  optional bool isKeyInfo = 3 [default = true];
 }
 
 message SetTimesRequest {
