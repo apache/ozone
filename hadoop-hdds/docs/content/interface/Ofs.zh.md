@@ -24,7 +24,7 @@ summary: Hadoop Compatible file system allows any application that expects an HD
   limitations under the License.
 -->
 
-Hadoop 兼容文件系统接口允许像 Ozone 这样的存储后端轻松集成到 Hadoop 生态系统中。Ozone 文件系统是一个与 Hadoop 兼容的文件系统。
+兼容 Hadoop 的文件系统 (HCFS) 接口允许像 Ozone 这样的存储后端轻松集成到 Hadoop 生态系统中。Ozone 文件系统 (OFS) 是一个兼容 Hadoop 的文件系统。
 
 
 <div class="alert alert-warning" role="alert">
