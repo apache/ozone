@@ -25,6 +25,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import jakarta.annotation.Nullable;
+
+import java.io.UncheckedIOException;
 import java.time.Duration;
 import java.util.OptionalLong;
 import java.util.concurrent.Executors;
@@ -137,9 +139,24 @@ public class CachingSpaceUsageSource implements SpaceUsageSource {
     //only one `refresh` can be running at a certain moment
     if (isRefreshRunning.compareAndSet(false, true)) {
       try {
-        cachedValue.set(source.getUsedSpace());
+        long newUsedSpace = source.getUsedSpace();
+        // Check for negative value before setting it to the cache
+        if (newUsedSpace >= 0) {
+          cachedValue.set(newUsedSpace);
+        } else {
+          LOG.error(
+              "Received negative used space value: {}. Keeping the last known good value: {}.",
+              newUsedSpace, cachedValue.get());
+        }
+      } catch (UncheckedIOException e) {
+        // Log the error and do not update the cached value
+        LOG.error(
+            "Error refreshing space usage for {}. Keeping the last known good value: {}",
+            source, cachedValue.get(), e);
       } catch (RuntimeException e) {
-        LOG.warn("Error refreshing space usage for {}", source, e);
+        LOG.error(
+            "Error refreshing space usage for {}. Keeping the last known good value: {}",
+            source, cachedValue.get(), e);
       } finally {
         isRefreshRunning.set(false);
       }
