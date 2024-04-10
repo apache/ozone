@@ -72,7 +72,7 @@ ofs://omservice/tmp/key1
 
 这将使所有的卷和桶成为默认的 Hadoop 兼容文件系统，并注册 ofs 文件系统类型。
 
-您还需要将 ozone-filesystem-hadoop3.jar 文件添加到 Classpath 中：
+您还需要将 ozone-filesystem-hadoop3.jar 文件添加到 classpath 中：
 
 {{< highlight bash >}}
 export HADOOP_CLASSPATH=/opt/ozone/share/ozone/lib/ozone-filesystem-hadoop3-*.jar:$HADOOP_CLASSPATH
