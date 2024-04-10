@@ -727,7 +727,6 @@ public class TestStorageContainerManager {
         assertThat(datanodeInfo.getLastHeartbeatTime()).isGreaterThan(start);
         assertEquals(datanodeInfo.getUuidString(),
             datanodeInfo.getNetworkName());
-        System.out.println("RRR datanodeInfo:"+datanodeInfo);
         assertEquals("/rack1", datanodeInfo.getNetworkLocation());
       }
     }
