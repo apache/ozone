@@ -468,7 +468,7 @@ public class BlockOutputStream extends OutputStream {
         throw new CompletionException(e);
       }
       return r;
-    });
+    }, getResponseExecutor());
   }
 
   synchronized void releaseBuffersOnException() {
@@ -702,7 +702,7 @@ public class BlockOutputStream extends OutputStream {
         throw new CompletionException(e);
       }
       return r;
-    });
+    }, getResponseExecutor());
   }
 
   @Override
