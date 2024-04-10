@@ -215,12 +215,12 @@ $ ozone fs -put ./NOTICE.txt ofs://om/tmp/key1
 
 {{< highlight xml >}}
 <property>
-<name>fs.trash.interval</name>
-<value>10</value>
+  <name>fs.trash.interval</name>
+  <value>10</value>
 </property>
 <property>
-<name>fs.trash.classname</name>
-<value>org.apache.hadoop.ozone.om.TrashPolicyOzone</value>
+  <name>fs.trash.classname</name>
+  <value>org.apache.hadoop.ozone.om.TrashPolicyOzone</value>
 </property>
 {{< /highlight >}}
 
