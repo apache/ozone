@@ -233,10 +233,10 @@ public final class TestNSSummaryTaskWithLegacyOBSLayout {
     private NSSummary nsSummaryForBucket1;
     private NSSummary nsSummaryForBucket2;
 
-    private OMDBUpdateEvent keyEvent1;
-    private OMDBUpdateEvent keyEvent2;
-    private OMDBUpdateEvent keyEvent3;
-    private OMDBUpdateEvent keyEvent4;
+    private RocksDBUpdateEvent keyEvent1;
+    private RocksDBUpdateEvent keyEvent2;
+    private RocksDBUpdateEvent keyEvent3;
+    private RocksDBUpdateEvent keyEvent4;
 
     @BeforeEach
     public void setUp() throws IOException {
@@ -253,7 +253,7 @@ public final class TestNSSummaryTaskWithLegacyOBSLayout {
       assertNotNull(nsSummaryForBucket2);
     }
 
-    private OMUpdateEventBatch processEventBatch() throws IOException {
+    private RocksDBUpdateEventBatch processEventBatch() throws IOException {
       // Test PUT Event.
       // PUT Key6 in Bucket2.
       String omPutKey =
@@ -262,13 +262,13 @@ public final class TestNSSummaryTaskWithLegacyOBSLayout {
               OM_KEY_PREFIX + KEY_SIX;
       OmKeyInfo omPutKeyInfo = buildOmKeyInfo(VOL, BUCKET_TWO, KEY_SIX,
           KEY_SIX, KEY_SIX_OBJECT_ID, BUCKET_TWO_OBJECT_ID, KEY_SIX_SIZE);
-      keyEvent1 = new OMDBUpdateEvent.
-          OMUpdateEventBuilder<String, OmKeyInfo>()
+      keyEvent1 = new RocksDBUpdateEvent.
+          RocksDBUpdateEventBuilder<String, OmKeyInfo>()
           .setKey(omPutKey)
           .setValue(omPutKeyInfo)
           .setTable(omMetadataManager.getKeyTable(getBucketLayout())
               .getName())
-          .setAction(OMDBUpdateEvent.OMDBUpdateAction.PUT)
+          .setAction(RocksDBUpdateEvent.RocksDBUpdateAction.PUT)
           .build();
       // PUT Key7 in Bucket1.
       omPutKey =
@@ -277,13 +277,13 @@ public final class TestNSSummaryTaskWithLegacyOBSLayout {
               OM_KEY_PREFIX + KEY_SEVEN;
       omPutKeyInfo = buildOmKeyInfo(VOL, BUCKET_ONE, KEY_SEVEN,
           KEY_SEVEN, KEY_SEVEN_OBJECT_ID, BUCKET_ONE_OBJECT_ID, KEY_SEVEN_SIZE);
-      keyEvent2 = new OMDBUpdateEvent.
-          OMUpdateEventBuilder<String, OmKeyInfo>()
+      keyEvent2 = new RocksDBUpdateEvent.
+          RocksDBUpdateEventBuilder<String, OmKeyInfo>()
           .setKey(omPutKey)
           .setValue(omPutKeyInfo)
           .setTable(omMetadataManager.getKeyTable(getBucketLayout())
               .getName())
-          .setAction(OMDBUpdateEvent.OMDBUpdateAction.PUT)
+          .setAction(RocksDBUpdateEvent.RocksDBUpdateAction.PUT)
           .build();
 
       // Test DELETE Event.
@@ -294,13 +294,13 @@ public final class TestNSSummaryTaskWithLegacyOBSLayout {
               OM_KEY_PREFIX + KEY_ONE;
       OmKeyInfo omDeleteKeyInfo = buildOmKeyInfo(VOL, BUCKET_ONE, KEY_ONE,
           KEY_ONE, KEY_ONE_OBJECT_ID, BUCKET_ONE_OBJECT_ID, KEY_ONE_SIZE);
-      keyEvent3 = new OMDBUpdateEvent.
-          OMUpdateEventBuilder<String, OmKeyInfo>()
+      keyEvent3 = new RocksDBUpdateEvent.
+          RocksDBUpdateEventBuilder<String, OmKeyInfo>()
           .setKey(omDeleteKey)
           .setTable(omMetadataManager.getKeyTable(getBucketLayout())
               .getName())
           .setValue(omDeleteKeyInfo)
-          .setAction(OMDBUpdateEvent.OMDBUpdateAction.DELETE)
+          .setAction(RocksDBUpdateEvent.RocksDBUpdateAction.DELETE)
           .build();
 
       // Test UPDATE Event.
@@ -315,17 +315,17 @@ public final class TestNSSummaryTaskWithLegacyOBSLayout {
       OmKeyInfo newOmResizeKeyInfo =
           buildOmKeyInfo(VOL, BUCKET_ONE, KEY_TWO, KEY_TWO, KEY_TWO_OBJECT_ID,
               BUCKET_ONE_OBJECT_ID, KEY_TWO_OLD_SIZE + 100);
-      keyEvent4 = new OMDBUpdateEvent.
-          OMUpdateEventBuilder<String, OmKeyInfo>()
+      keyEvent4 = new RocksDBUpdateEvent.
+          RocksDBUpdateEventBuilder<String, OmKeyInfo>()
           .setKey(omResizeKey)
           .setOldValue(oldOmResizeKeyInfo)
           .setValue(newOmResizeKeyInfo)
           .setTable(omMetadataManager.getKeyTable(getBucketLayout())
               .getName())
-          .setAction(OMDBUpdateEvent.OMDBUpdateAction.UPDATE)
+          .setAction(RocksDBUpdateEvent.RocksDBUpdateAction.UPDATE)
           .build();
 
-      return new OMUpdateEventBatch(
+      return new RocksDBUpdateEventBatch(
           Arrays.asList(keyEvent1, keyEvent2, keyEvent3, keyEvent4));
     }
 
