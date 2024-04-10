@@ -656,6 +656,7 @@ public class BlockOutputStream extends OutputStream {
 
   private synchronized CompletableFuture<Void> handleFlushInternal(boolean close)
       throws IOException, InterruptedException, ExecutionException {
+    LOG.warn("handleFlushInternal(close = {})", close);
     checkOpen();
     // flush the last chunk data residing on the currentBuffer
     synchronized (this) {

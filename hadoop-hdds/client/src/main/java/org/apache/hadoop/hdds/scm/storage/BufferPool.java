@@ -28,6 +28,8 @@ import org.apache.hadoop.ozone.common.ChunkBuffer;
 
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 import org.apache.ratis.util.Preconditions;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import static java.util.Collections.emptyList;
 
@@ -35,6 +37,8 @@ import static java.util.Collections.emptyList;
  * This class creates and manages pool of n buffers.
  */
 public class BufferPool {
+
+  public static final Logger LOG = LoggerFactory.getLogger(BufferPool.class);
 
   private static final BufferPool EMPTY = new BufferPool(0, 0);
 
@@ -87,16 +91,27 @@ public class BufferPool {
 
     currentBufferIndex = nextBufferIndex;
 
+    LOG.warn("!! allocateBuffer(increment = {}): " +
+            "capacity = {}, currentBufferIndex = {}, nextBufferIndex = {}, bufferList.size() = {}",
+        increment,
+        capacity, currentBufferIndex, nextBufferIndex, bufferList.size());
+
     if (currentBufferIndex < bufferList.size()) {
       return getBuffer(currentBufferIndex);
     } else {
       final ChunkBuffer newBuffer = ChunkBuffer.allocate(bufferSize, increment);
+      LOG.warn("!! allocateBuffer(): ChunkBuffer allocated: {}", newBuffer);
       bufferList.add(newBuffer);
       return newBuffer;
     }
   }
 
   synchronized void releaseBuffer(ChunkBuffer chunkBuffer) {
+    LOG.warn("!! releaseBuffer(chunkBuffer = {}):" +
+            "currentBufferIndex = {}, bufferList.indexOf(chunkBuffer) = {}",
+        chunkBuffer,
+        currentBufferIndex, bufferList.indexOf(chunkBuffer));
+
     Preconditions.assertTrue(!bufferList.isEmpty(), "empty buffer list");
 //    Preconditions.assertSame(bufferList.get(0), chunkBuffer,
 //        "only the first buffer can be released");
@@ -105,10 +120,10 @@ public class BufferPool {
 
     // always remove from head of the list and append at last
     final boolean res = bufferList.remove(chunkBuffer);
-    Preconditions.assertTrue(res, "unsuccessful removal of buffer");
+    Preconditions.assertTrue(res, "unsuccessful buffer removal");
     chunkBuffer.clear();
     bufferList.add(chunkBuffer);
-    currentBufferIndex--; //
+    currentBufferIndex--;  //
   }
 
   public synchronized void clearBufferPool() {

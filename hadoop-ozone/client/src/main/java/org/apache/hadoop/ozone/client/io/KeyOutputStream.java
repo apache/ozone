@@ -568,6 +568,7 @@ public class KeyOutputStream extends OutputStream
    */
   @SuppressWarnings("squid:S1141")
   private CompletableFuture<Void> handleFlushOrClose(StreamAction op) throws IOException {
+    LOG.warn("!!! handleFlushOrClose(op = {})", op);
     CompletableFuture<Void> future = null;
     if (!blockOutputStreamEntryPool.isEmpty()) {
       while (true) {
