@@ -1960,7 +1960,7 @@
     </description>
   </property>
   <property>
-    <name>ozone.security.compliance.mode</name>
+    <name>ozone.security.crypto.compliance.mode</name>
     <value>none</value>
     <tag>OZONE, SECURITY, HDDS</tag>
     <description>Based on this property the security compliance mode

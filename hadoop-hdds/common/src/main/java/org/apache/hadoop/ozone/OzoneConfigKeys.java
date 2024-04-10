@@ -682,9 +682,9 @@ public final class OzoneConfigKeys {
   public static final String
       OZONE_OM_NETWORK_TOPOLOGY_REFRESH_DURATION_DEFAULT = "1h";
 
-  public static final String OZONE_SECURITY_COMPLIANCE_MODE =
-      "ozone.security.compliance.mode";
-  public static final String OZONE_SECURITY_COMPLIANCE_MODE_DEFAULT = "none";
+  public static final String OZONE_SECURITY_CRYPTO_COMPLIANCE_MODE =
+      "ozone.security.crypto.compliance.mode";
+  public static final String OZONE_SECURITY_CRYPTO_COMPLIANCE_MODE_UNRESTRICTED = "unrestricted";
 
 
   /**
