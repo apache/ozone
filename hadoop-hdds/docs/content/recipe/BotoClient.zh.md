@@ -113,7 +113,6 @@ https://boto3.amazonaws.com/v1/documentation/api/latest/guide/credentials.html
     print(response)
 
 这将从从 Ozone 卷 `s3v` 和桶 `bucket1` 中下载 `README.md` 并创建一个 `README.md` 文件到本地。
-This will download 'README.md' from Ozone volume 's3v' to local and create a file with name 'download.md'.
 
 ### 查看对象信息
     response = s3_client.head_object(Bucket='bucket1', Key='README.md')
