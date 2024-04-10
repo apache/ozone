@@ -35,6 +35,7 @@ public final class ContainerReplicaInfo {
   private long keyCount;
   private long bytesUsed;
   private int replicaIndex = -1;
+  private String dataChecksum;
 
   public static ContainerReplicaInfo fromProto(
       HddsProtos.SCMContainerReplicaProto proto) {
@@ -48,7 +49,8 @@ public final class ContainerReplicaInfo {
         .setKeyCount(proto.getKeyCount())
         .setBytesUsed(proto.getBytesUsed())
         .setReplicaIndex(
-            proto.hasReplicaIndex() ? (int)proto.getReplicaIndex() : -1);
+            proto.hasReplicaIndex() ? (int)proto.getReplicaIndex() : -1)
+        .setDataChecksum(proto.getDataChecksum());
     return builder.build();
   }
 
@@ -85,6 +87,10 @@ public final class ContainerReplicaInfo {
 
   public int getReplicaIndex() {
     return replicaIndex;
+  }
+
+  public String getDataChecksum() {
+    return dataChecksum;
   }
 
   /**
@@ -131,6 +137,11 @@ public final class ContainerReplicaInfo {
 
     public Builder setReplicaIndex(int replicaIndex) {
       subject.replicaIndex = replicaIndex;
+      return this;
+    }
+
+    public Builder setDataChecksum(String dataChecksum) {
+      subject.dataChecksum = dataChecksum;
       return this;
     }
 

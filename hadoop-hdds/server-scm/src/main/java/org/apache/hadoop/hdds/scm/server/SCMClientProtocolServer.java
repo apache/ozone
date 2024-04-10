@@ -336,7 +336,9 @@ public class SCMClientProtocolServer implements
               .setPlaceOfBirth(r.getOriginDatanodeId().toString())
               .setKeyCount(r.getKeyCount())
               .setSequenceID(r.getSequenceId())
-              .setReplicaIndex(r.getReplicaIndex()).build()
+              .setReplicaIndex(r.getReplicaIndex())
+              .setDataChecksum(r.getDataChecksum())
+              .build()
       );
     }
     return results;

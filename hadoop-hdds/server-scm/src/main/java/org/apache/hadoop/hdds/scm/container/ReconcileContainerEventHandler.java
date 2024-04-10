@@ -7,6 +7,7 @@ import org.apache.hadoop.hdds.server.events.EventHandler;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
 import org.apache.hadoop.ozone.protocol.commands.CommandForDatanode;
 import org.apache.hadoop.ozone.protocol.commands.ReconcileContainerCommand;
+import org.apache.ratis.protocol.exceptions.NotLeaderException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -64,15 +65,18 @@ public class ReconcileContainerEventHandler implements EventHandler<ContainerID>
 
       LOG.info("Reconcile container event triggered for container {} with peers {}", containerID, replicas);
 
-      for (DatanodeDetails replica: replicas) {
+      for (DatanodeDetails replica : replicas) {
         List<DatanodeDetails> otherReplicas = replicas.stream()
             .filter(other -> !other.equals(replica))
             .collect(Collectors.toList());
         ReconcileContainerCommand command = new ReconcileContainerCommand(containerID.getId(), otherReplicas);
+        command.setTerm(scmContext.getTermOfLeader());
         publisher.fireEvent(DATANODE_COMMAND, new CommandForDatanode<>(replica.getUuid(), command));
       }
     } catch (ContainerNotFoundException ex) {
       LOG.error("Failed to start reconciliation for container {}. Container not found.", containerID);
+    } catch (NotLeaderException nle) {
+      LOG.info("Skip reconciling container {} since current SCM is not leader.", containerID);
     }
   }
 }

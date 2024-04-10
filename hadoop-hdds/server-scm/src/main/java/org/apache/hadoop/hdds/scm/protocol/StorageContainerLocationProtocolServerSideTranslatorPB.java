@@ -30,6 +30,8 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos.TransferLeadershipReques
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.TransferLeadershipResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.UpgradeFinalizationStatus;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ReconcileContainerRequestProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ReconcileContainerResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ActivatePipelineRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ActivatePipelineResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ClosePipelineRequestProto;
@@ -722,6 +724,12 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
             .setStatus(Status.OK)
             .setGetMetricsResponse(getMetrics(request.getGetMetricsRequest()))
             .build();
+      case ReconcileContainer:
+        return ScmContainerLocationResponse.newBuilder()
+            .setCmdType(request.getCmdType())
+            .setStatus(Status.OK)
+            .setReconcileContainerResponse(reconcileContainer(request.getReconcileContainerRequest()))
+            .build();
       default:
         throw new IllegalArgumentException(
             "Unknown command type: " + request.getCmdType());
@@ -1298,5 +1306,10 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
 
   public GetMetricsResponseProto getMetrics(GetMetricsRequestProto request) throws IOException {
     return GetMetricsResponseProto.newBuilder().setMetricsJson(impl.getMetrics(request.getQuery())).build();
+  }
+
+  public ReconcileContainerResponseProto reconcileContainer(ReconcileContainerRequestProto request) throws IOException {
+    impl.reconcileContainer(request.getContainerID());
+    return ReconcileContainerResponseProto.getDefaultInstance();
   }
 }

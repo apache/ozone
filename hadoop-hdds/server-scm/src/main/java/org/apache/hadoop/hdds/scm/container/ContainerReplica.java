@@ -27,6 +27,7 @@ import com.google.common.base.Preconditions;
 import org.apache.commons.lang3.builder.CompareToBuilder;
 import org.apache.commons.lang3.builder.EqualsBuilder;
 import org.apache.commons.lang3.builder.HashCodeBuilder;
+import org.apache.hadoop.ozone.container.common.interfaces.Container;
 
 /**
  * In-memory state of a container replica.
@@ -43,6 +44,8 @@ public final class ContainerReplica implements Comparable<ContainerReplica> {
   private final long keyCount;
   private final long bytesUsed;
   private final boolean isEmpty;
+  // TODO Use a dedicated checksum class for this if required later.
+  private final String dataChecksum;
 
   private ContainerReplica(ContainerReplicaBuilder b) {
     containerID = b.containerID;
@@ -54,6 +57,7 @@ public final class ContainerReplica implements Comparable<ContainerReplica> {
     replicaIndex = b.replicaIndex;
     isEmpty = b.isEmpty;
     sequenceId = b.sequenceId;
+    dataChecksum = b.dataChecksum;
   }
 
   /**
@@ -112,6 +116,10 @@ public final class ContainerReplica implements Comparable<ContainerReplica> {
 
   public boolean isEmpty() {
     return isEmpty;
+  }
+
+  public String getDataChecksum() {
+    return dataChecksum;
   }
 
   @Override
@@ -201,6 +209,7 @@ public final class ContainerReplica implements Comparable<ContainerReplica> {
     private long keyCount;
     private int replicaIndex;
     private boolean isEmpty;
+    private String dataChecksum;
 
     /**
      * Set Container Id.
@@ -272,6 +281,11 @@ public final class ContainerReplica implements Comparable<ContainerReplica> {
 
     public ContainerReplicaBuilder setEmpty(boolean empty) {
       isEmpty = empty;
+      return this;
+    }
+
+    public ContainerReplicaBuilder setDataChecksum(String dataChecksum) {
+      this.dataChecksum = dataChecksum;
       return this;
     }
 
