@@ -1,7 +1,7 @@
 ---
 title: 使用 Boto3 客户端访问 Ozone 对象存储
 linktitle: Boto3
-summary: 如何使用 Boto3 客户端访问Ozone对象存储 ？
+summary: 如何使用 Boto3 客户端访问 Ozone 对象存储？
 ---
 <!---
   Licensed to the Apache Software Foundation (ASF) under one or more
