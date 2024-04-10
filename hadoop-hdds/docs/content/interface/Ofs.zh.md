@@ -61,12 +61,12 @@ ofs://omservice/tmp/key1
 
 {{< highlight xml >}}
 <property>
-<name>fs.ofs.impl</name>
-<value>org.apache.hadoop.fs.ozone.RootedOzoneFileSystem</value>
+  <name>fs.ofs.impl</name>
+  <value>org.apache.hadoop.fs.ozone.RootedOzoneFileSystem</value>
 </property>
 <property>
-<name>fs.defaultFS</name>
-<value>ofs://om-host.example.com/</value>
+  <name>fs.defaultFS</name>
+  <value>ofs://om-host.example.com/</value>
 </property>
 {{< /highlight >}}
 
