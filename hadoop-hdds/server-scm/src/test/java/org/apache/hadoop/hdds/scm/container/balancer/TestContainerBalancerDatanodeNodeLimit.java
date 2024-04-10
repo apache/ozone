@@ -77,10 +77,8 @@ public class TestContainerBalancerDatanodeNodeLimit {
     if (nodeCount < DATANODE_COUNT_LIMIT_FOR_SMALL_CLUSTER) {
       config.setMaxDatanodesPercentageToInvolvePerIteration(100);
     }
-    config.setThreshold(10);
     config.setIterations(1);
     config.setMaxSizeToMovePerIteration(50 * STORAGE_UNIT);
-    config.setMaxSizeEnteringTarget(50 * STORAGE_UNIT);
 
     ContainerBalancerTask task = mockedSCM.startBalancerTask(config);
     ContainerBalancerMetrics metrics = task.getMetrics();
@@ -101,11 +99,11 @@ public class TestContainerBalancerDatanodeNodeLimit {
     OzoneConfiguration ozoneConfig = new OzoneConfiguration();
     ozoneConfig.set("ozone.scm.container.size", "1MB");
     ContainerBalancerConfiguration config = balancerConfigByOzoneConfig(ozoneConfig);
-    config.setThreshold(10);
-    config.setMaxSizeToMovePerIteration(50 * STORAGE_UNIT);
     if (mockedSCM.getCluster().getNodeCount() < DATANODE_COUNT_LIMIT_FOR_SMALL_CLUSTER) {
       config.setMaxDatanodesPercentageToInvolvePerIteration(100);
     }
+    config.setIterations(1);
+    config.setMaxSizeToMovePerIteration(50 * STORAGE_UNIT);
     // No containers should be selected when the limit is just 2 MB.
     config.setMaxSizeEnteringTarget(2 * OzoneConsts.MB);
 
@@ -122,7 +120,7 @@ public class TestContainerBalancerDatanodeNodeLimit {
     if (mockedSCM.getCluster().getNodeCount() < DATANODE_COUNT_LIMIT_FOR_SMALL_CLUSTER) {
       balancerConfig.setMaxDatanodesPercentageToInvolvePerIteration(100);
     }
-    balancerConfig.setBalancingInterval(1);
+    balancerConfig.setIterations(1);
 
     task = mockedSCM.startBalancerTask(balancerConfig);
     // Balancer should have identified unbalanced nodes.
@@ -139,11 +137,12 @@ public class TestContainerBalancerDatanodeNodeLimit {
     OzoneConfiguration ozoneConfig = new OzoneConfiguration();
     ozoneConfig.set("ozone.scm.container.size", "1MB");
     ContainerBalancerConfiguration config = balancerConfigByOzoneConfig(ozoneConfig);
-    config.setThreshold(10);
-    config.setMaxSizeToMovePerIteration(50 * STORAGE_UNIT);
     if (mockedSCM.getCluster().getNodeCount() < DATANODE_COUNT_LIMIT_FOR_SMALL_CLUSTER) {
       config.setMaxDatanodesPercentageToInvolvePerIteration(100);
     }
+    config.setIterations(1);
+    config.setMaxSizeEnteringTarget(50 * STORAGE_UNIT);
+    config.setMaxSizeToMovePerIteration(50 * STORAGE_UNIT);
     // No source containers should be selected when the limit is just 2 MB.
     config.setMaxSizeLeavingSource(2 * OzoneConsts.MB);
 
@@ -160,7 +159,7 @@ public class TestContainerBalancerDatanodeNodeLimit {
     if (mockedSCM.getCluster().getNodeCount() < DATANODE_COUNT_LIMIT_FOR_SMALL_CLUSTER) {
       newBalancerConfig.setMaxDatanodesPercentageToInvolvePerIteration(100);
     }
-    newBalancerConfig.setBalancingInterval(1);
+    newBalancerConfig.setIterations(1);
 
     task = mockedSCM.startBalancerTask(newBalancerConfig);
     // Balancer should have identified unbalanced nodes.
