@@ -689,9 +689,8 @@ public class BlockOutputStream extends OutputStream {
       }
     }
 
-    final CompletableFuture<Void> d = new CompletableFuture<>();
+    final CompletableFuture<Void> d = waitOnFlushFutures();
     return d.thenApplyAsync(r -> {
-      waitOnFlushFutures();
       try {
         watchForCommit(false);
         // just check again if the exception is hit while waiting for the
