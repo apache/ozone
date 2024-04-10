@@ -149,7 +149,7 @@ mkdir: Bucket or Volume name has an unsupported character : _
 
 ## 挂载点和设置 /tmp
 
-为了与使用 /tmp/ 的传统 Hadoop 应用程序兼容，我们在 FS 的根目录有一个特殊的临时挂载点。
+为了与使用 /tmp/ 的传统 Hadoop 应用程序兼容，我们在 FS 的根目录有一个特殊的临时目录挂载点。
 这个功能将来可能会扩展，以支持自定义挂载路径。
 
 目前 Ozone 支持两种 /tmp 的配置。第一种（默认）是每个用户的临时目录，
