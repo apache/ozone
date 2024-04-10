@@ -137,7 +137,7 @@ This will download 'README.md' from Ozone volume 's3v' to local and create a fil
         },
     )
 
-这将从Ozone卷 `s3v` 和桶 `bucket1` 中删除多个对象 `README3.md` 和 `README4.md`
+这将从 Ozone 卷 `s3v` 和桶 `bucket1` 中删除多个对象 `README3.md` 和 `README4.md`
 
 ### 分片上传
     response = s3_client.create_multipart_upload(Bucket='bucket1', Key='key1')
