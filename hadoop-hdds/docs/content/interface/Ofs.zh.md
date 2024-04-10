@@ -1,5 +1,5 @@
 ---
-title: Ofs (Hadoop 兼容文件系统)
+title: Ofs (兼容 Hadoop 的文件系统)
 date: 2017-09-14
 weight: 1
 menu:
