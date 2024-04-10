@@ -106,7 +106,7 @@ https://boto3.amazonaws.com/v1/documentation/api/latest/guide/credentials.html
     response = s3.Bucket('bucket1').upload_file('./README.md','README.md')
     print(response)
 
-这将从向Ozone卷 `s3v` 和桶 `bucket1` 中上传一个 `README.md` 文件并创建一个 `README.md` 键。
+这将从向 Ozone 卷 `s3v` 和桶 `bucket1` 中上传 `README.md` 文件并创建一个 `README.md` 键。
 
 ### 下载文件
     response = s3.Bucket('bucket1').download_file('README.md', 'download.md')
