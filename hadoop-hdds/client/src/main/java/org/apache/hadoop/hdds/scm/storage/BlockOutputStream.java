@@ -359,7 +359,7 @@ public class BlockOutputStream extends OutputStream {
     writtenDataLength += writeLen;
   }
 
-  private CompletableFuture<Void>  doFlushOrWatchIfNeeded() throws IOException {
+  private synchronized CompletableFuture<Void> doFlushOrWatchIfNeeded() throws IOException {
   //private void doFlushOrWatchIfNeeded() throws IOException {
     if (currentBufferRemaining == 0) {
       if (bufferPool.getNumberOfUsedBuffers() % flushPeriod == 0) {
@@ -447,7 +447,7 @@ public class BlockOutputStream extends OutputStream {
     }
   }
 
-  CompletableFuture<Void> waitForFlushAndCommit(boolean bufferFull, CompletableFuture<Void> future) throws IOException {
+  synchronized CompletableFuture<Void> waitForFlushAndCommit(boolean bufferFull, CompletableFuture<Void> future) throws IOException {
     checkOpen();
     if (future == null) {
       future = waitOnFlushFutures();
@@ -633,7 +633,7 @@ public class BlockOutputStream extends OutputStream {
   /**
    * @param close whether the flush is happening as part of closing the stream
    */
-  protected CompletableFuture<Void> handleFlush(boolean close) throws IOException {
+  protected synchronized CompletableFuture<Void> handleFlush(boolean close) throws IOException {
     CompletableFuture<Void> future = null;
     try {
       future = handleFlushInternal(close);
@@ -654,7 +654,7 @@ public class BlockOutputStream extends OutputStream {
     return future;
   }
 
-  private CompletableFuture<Void> handleFlushInternal(boolean close)
+  private synchronized CompletableFuture<Void> handleFlushInternal(boolean close)
       throws IOException, InterruptedException, ExecutionException {
     checkOpen();
     // flush the last chunk data residing on the currentBuffer
@@ -726,7 +726,7 @@ public class BlockOutputStream extends OutputStream {
   }
 
   // TODO: Should rename this to getFlushFutures
-  CompletableFuture<Void> waitOnFlushFutures() {
+  synchronized CompletableFuture<Void> waitOnFlushFutures() {
     return null;
   }
 
