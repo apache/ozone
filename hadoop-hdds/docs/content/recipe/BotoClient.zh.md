@@ -119,7 +119,7 @@ This will download 'README.md' from Ozone volume 's3v' to local and create a fil
     response = s3_client.head_object(Bucket='bucket1', Key='README.md')
     print(response)
 
-这将查看一个位于Ozone 卷 `s3v` 和桶 `bucket1` 中的 `README.md` 文件的信息。
+这将查看一个位于 Ozone 卷 `s3v` 和桶 `bucket1` 中的 `README.md` 文件的信息。
 
 ### 删除多个对象
     response = s3_client.delete_objects(
