@@ -1,7 +1,9 @@
 package org.apache.hadoop.hdds.scm.container;
 
+import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.server.events.EventHandler;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
@@ -50,12 +52,19 @@ public class ReconcileContainerEventHandler implements EventHandler<ContainerID>
         return;
       }
 
-      // This restriction can be removed when reconciliation for EC containers is added.
-      final HddsProtos.ReplicationType repType = container.getReplicationType();
-      if (repType == HddsProtos.ReplicationType.EC) {
+      // Reconcile on EC containers is not yet implemented.
+      ReplicationConfig repConfig = container.getReplicationConfig();
+      HddsProtos.ReplicationType repType = repConfig.getReplicationType();
+      if (repConfig.getReplicationType() != HddsProtos.ReplicationType.RATIS) {
         LOG.error("Cannot reconcile container {} with replication type {}. Reconciliation is currently only supported" +
             " for Ratis containers.", containerID, repType);
-        return;
+      }
+
+      // Reconciliation requires multiple replicas to reconcile.
+      int requiredNodes = repConfig.getRequiredNodes();
+      if (requiredNodes <= 1) {
+        LOG.error("Cannot reconcile container {} with {} required nodes. Reconciliation is only supported for " +
+            "containers with more than 1 required node.", containerID, requiredNodes);
       }
 
       Set<DatanodeDetails> replicas = containerManager.getContainerReplicas(containerID)

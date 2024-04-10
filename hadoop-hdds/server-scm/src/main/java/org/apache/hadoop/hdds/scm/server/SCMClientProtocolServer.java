@@ -1394,18 +1394,25 @@ public class SCMClientProtocolServer implements
 
     try {
       // May throw ContainerNotFoundException, which will be caught, audited, and returned to the user.
-      ContainerInfo container = getContainer(longContainerID);
+      ContainerInfo container = getScm().getContainerManager().getContainer(containerID);
 
       // Reconcile is not allowed on open containers.
-      final HddsProtos.LifeCycleState state = container.getState();
+      HddsProtos.LifeCycleState state = container.getState();
       if (state.equals(HddsProtos.LifeCycleState.OPEN)) {
         throw new SCMException("Cannot reconcile container in state " + state,
             ResultCodes.UNEXPECTED_CONTAINER_STATE);
       }
+
       // Reconcile on EC containers is not yet implemented.
-      final HddsProtos.ReplicationType repType = container.getReplicationType();
-      if (repType == HddsProtos.ReplicationType.EC) {
+      ReplicationConfig repConfig = container.getReplicationConfig();
+      if (repConfig.getReplicationType() != HddsProtos.ReplicationType.RATIS) {
         throw new SCMException("Reconciliation is currently only supported for Ratis containers",
+            ResultCodes.UNSUPPORTED_OPERATION);
+      }
+
+      // Reconciliation requires multiple replicas to reconcile.
+      if (repConfig.getRequiredNodes() <= 1) {
+        throw new SCMException("Reconciliation is only supported for containers with more than one required node.",
             ResultCodes.UNSUPPORTED_OPERATION);
       }
 
