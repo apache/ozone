@@ -67,7 +67,7 @@ public class OMDirectoriesPurgeRequestWithFSO extends OMKeyRequest {
     Set<Pair<String, String>> lockSet = new HashSet<>();
     Map<Pair<String, String>, OmBucketInfo> volBucketInfoMap = new HashMap<>();
     OMMetadataManager omMetadataManager = ozoneManager.getMetadataManager();
-    List<String> openKeyList = new ArrayList<>();
+    List<String> openKeyRemovalList = new ArrayList<>();
 
     OMMetrics omMetrics = ozoneManager.getMetrics();
     try {
@@ -120,7 +120,7 @@ public class OMDirectoriesPurgeRequestWithFSO extends OMKeyRequest {
             long parentId = keyInfo.getParentObjectID();
             dbOpenKey = omMetadataManager.getOpenFileName(path.getVolumeId(), path.getBucketId(),
                 parentId, keyInfo.getFileName(), hsyncClientId);
-            openKeyList.add(dbOpenKey);
+            openKeyRemovalList.add(dbOpenKey);
           }
 
           omMetrics.decNumKeys();
@@ -155,7 +155,7 @@ public class OMDirectoriesPurgeRequestWithFSO extends OMKeyRequest {
         getOmRequest());
     OMClientResponse omClientResponse = new OMDirectoriesPurgeResponseWithFSO(
         omResponse.build(), purgeRequests, ozoneManager.isRatisEnabled(),
-            getBucketLayout(), volBucketInfoMap, fromSnapshotInfo, openKeyList);
+            getBucketLayout(), volBucketInfoMap, fromSnapshotInfo, openKeyRemovalList);
 
     return omClientResponse;
   }
