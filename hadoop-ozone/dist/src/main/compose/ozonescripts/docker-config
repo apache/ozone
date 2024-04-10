@@ -27,7 +27,6 @@ OZONE-SITE.XML_ozone.server.default.replication=1
 OZONE-SITE.XML_hdds.datanode.dir=/data/hdds
 OZONE-SITE.XML_hdds.datanode.volume.min.free.space=100MB
 OZONE-SITE.XML_hdds.scmclient.max.retry.timeout=30s
-OZONE-SITE.XML_ozone.scm.pipeline.creation.auto.factor.one=false
 
 OZONE_CONF_DIR=/etc/hadoop
 OZONE_LOG_DIR=/var/log/hadoop

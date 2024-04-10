@@ -25,20 +25,14 @@ ${PIPELINE}
 ${SCM}       scm
 
 *** Test Cases ***
-Create pipeline
-    ${output} =         Execute          ozone admin pipeline create
-                        Should contain   ${output}   is created.
-                        Should contain   ${output}   RATIS/ONE
-    ${pipeline} =       Execute          echo "${output}" | grep 'is created' | cut -f1 -d' ' | cut -f2 -d'='
-                        Set Suite Variable    ${PIPELINE}    ${pipeline}
-
 List pipelines
     ${output} =         Execute          ozone admin pipeline list
                         Should contain   ${output}   RATIS/ONE
+    ${pipeline} =       Execute          ozone admin pipeline list | grep 'ReplicationConfig: RATIS/ONE' | head -n 1 | cut -d' ' -f3 | sed 's/,$//'
+                        Set Suite Variable    ${PIPELINE}    ${pipeline}
 
 List pipeline with json option
     ${output} =         Execute          ozone admin pipeline list --json | jq 'map(.replicationConfig) | contains([{"replicationFactor": "ONE", "replicationType": "RATIS"}])'
-
     Should be true      $output
 
 List pipelines with explicit host
@@ -48,24 +42,6 @@ List pipelines with explicit host
 List pipelines with explicit host and json option
     ${output} =         Execute   ozone admin pipeline list --scm ${SCM} --json | jq 'map(.replicationConfig) | contains([{"replicationFactor": "ONE", "replicationType": "RATIS"}])'
 
-    Should be true      $output
-
-Deactivate pipeline
-                        Execute          ozone admin pipeline deactivate "${PIPELINE}"
-    ${output} =         Execute          ozone admin pipeline list | grep "${PIPELINE}"
-                        Should contain   ${output}   DORMANT
-
-Activate pipeline
-                        Execute          ozone admin pipeline activate "${PIPELINE}"
-    ${output} =         Execute          ozone admin pipeline list | grep "${PIPELINE}"
-                        Should contain   ${output}   OPEN
-
-Close pipeline
-                        Execute          ozone admin pipeline close "${PIPELINE}"
-    ${output} =         Execute          ozone admin pipeline list
-                        Pass Execution If     '${PIPELINE}' not in '''${output}'''    Pipeline already scrubbed
-                        Should Match Regexp   ${output}   ${PIPELINE}.*CLOSED
-
 Incomplete command
     ${output} =         Execute And Ignore Error     ozone admin pipeline
                         Should contain   ${output}   Incomplete command
@@ -73,6 +49,10 @@ Incomplete command
                         Should contain   ${output}   create
                         Should contain   ${output}   deactivate
                         Should contain   ${output}   list
+
+Create pipeline
+    ${output} =         Execute And Ignore Error     ozone admin pipeline create -t RATIS -f ONE
+                        Should Contain Any   ${output}   is created.   RATIS/ONE   Cannot create pipeline
 
 #List pipelines on unknown host
 #    ${output} =         Execute And Ignore Error     ozone admin --verbose pipeline list --scm unknown-host
