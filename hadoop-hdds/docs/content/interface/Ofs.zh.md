@@ -50,6 +50,7 @@ ofs://omservice/volume1/bucket1/dir1/key1
 ofs://omservice/tmp/
 ofs://omservice/tmp/key1
 ```
+
 在 OFS 文件系统中，卷和挂载点位于根目录级别。卷的下一级是桶。每个桶下面是键和目录。
 
 请注意，对于挂载点，目前仅支持临时挂载 /tmp。
