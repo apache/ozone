@@ -2356,14 +2356,8 @@
   <property>
     <name>hdds.x509.signature.algorithm</name>
     <value>SHA256withRSA</value>
-    <tag>OZONE, HDDS, SECURITY</tag>
+    <tag>OZONE, HDDS, SECURITY, CRYPTO_COMPLIANCE</tag>
     <description>X509 signature certificate.</description>
-  </property>
-  <property>
-    <name>ozone.compliance.allowed.hdds.x509.signature.algorithm</name>
-    <value>*</value>
-    <tag>OZONE, HDDS, SECURITY</tag>
-    <description>Allowed X509 signature certificate algorithms.</description>
   </property>
   <property>
     <name>hdds.container.replication.compression</name>

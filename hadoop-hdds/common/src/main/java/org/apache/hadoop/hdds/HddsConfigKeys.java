@@ -167,9 +167,6 @@ public final class HddsConfigKeys {
   public static final String HDDS_X509_SIGNATURE_ALGO =
       "hdds.x509.signature.algorithm";
   public static final String HDDS_X509_SIGNATURE_ALGO_DEFAULT = "SHA256withRSA";
-  public static final String
-      OZONE_COMPLIANCE_ALLOWED_HDDS_X509_SIGNATURE_ALGO = "ozone.compliance.allowed.hdds.x509.signature.algorithm";
-  public static final String OZONE_COMPLIANCE_ALLOWED_HDDS_X509_SIGNATURE_ALGO_DEFAULT = "*";
   public static final String HDDS_BLOCK_TOKEN_ENABLED =
       "hdds.block.token.enabled";
   public static final boolean HDDS_BLOCK_TOKEN_ENABLED_DEFAULT = false;
