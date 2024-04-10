@@ -19,21 +19,27 @@ package org.apache.hadoop.hdds.scm;
 
 import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
+import org.apache.hadoop.metrics2.MetricsCollector;
+import org.apache.hadoop.metrics2.MetricsRecordBuilder;
+import org.apache.hadoop.metrics2.MetricsSource;
 import org.apache.hadoop.metrics2.MetricsSystem;
 import org.apache.hadoop.metrics2.annotation.Metric;
 import org.apache.hadoop.metrics2.annotation.Metrics;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.metrics2.lib.MetricsRegistry;
 import org.apache.hadoop.metrics2.lib.MutableCounterLong;
-import org.apache.hadoop.metrics2.lib.MutableRate;
+import org.apache.hadoop.ozone.OzoneConfigKeys;
+import org.apache.hadoop.util.PerformanceMetrics;
+import org.apache.hadoop.util.PerformanceMetricsInitializer;
 
 /**
  * The client metrics for the Storage Container protocol.
  */
 @InterfaceAudience.Private
 @Metrics(about = "Storage Container Client Metrics", context = "dfs")
-public class XceiverClientMetrics {
+public class XceiverClientMetrics implements MetricsSource {
   public static final String SOURCE_NAME = XceiverClientMetrics.class
       .getSimpleName();
 
@@ -43,8 +49,11 @@ public class XceiverClientMetrics {
   private @Metric MutableCounterLong ecReconstructionFailsTotal;
   private MutableCounterLong[] pendingOpsArray;
   private MutableCounterLong[] opsArray;
-  private MutableRate[] containerOpsLatency;
+  private PerformanceMetrics[] containerOpsLatency;
   private MetricsRegistry registry;
+  private OzoneConfiguration conf = new OzoneConfiguration();
+  private int[] intervals = conf.getInts(OzoneConfigKeys
+      .OZONE_XCEIVER_CLIENT_METRICS_PERCENTILES_INTERVALS_SECONDS_KEY);
 
   public XceiverClientMetrics() {
     init();
@@ -56,7 +65,7 @@ public class XceiverClientMetrics {
 
     this.pendingOpsArray = new MutableCounterLong[numEnumEntries];
     this.opsArray = new MutableCounterLong[numEnumEntries];
-    this.containerOpsLatency = new MutableRate[numEnumEntries];
+    this.containerOpsLatency = new PerformanceMetrics[numEnumEntries];
     for (int i = 0; i < numEnumEntries; i++) {
       pendingOpsArray[i] = registry.newCounter(
           "numPending" + ContainerProtos.Type.forNumber(i + 1),
@@ -66,11 +75,11 @@ public class XceiverClientMetrics {
           .newCounter("opCount" + ContainerProtos.Type.forNumber(i + 1),
               "number of" + ContainerProtos.Type.forNumber(i + 1) + " ops",
               (long) 0);
-
-      containerOpsLatency[i] = registry.newRate(
-          ContainerProtos.Type.forNumber(i + 1) + "Latency",
-          "latency of " + ContainerProtos.Type.forNumber(i + 1)
-          + " ops");
+      containerOpsLatency[i] =
+          PerformanceMetricsInitializer.getMetrics(registry,
+              ContainerProtos.Type.forNumber(i + 1) + "Latency",
+              "latency of " + ContainerProtos.Type.forNumber(i + 1),
+              "Ops", "Time", intervals);
     }
   }
 
@@ -128,5 +137,22 @@ public class XceiverClientMetrics {
   public void unRegister() {
     MetricsSystem ms = DefaultMetricsSystem.instance();
     ms.unregisterSource(SOURCE_NAME);
+  }
+
+  @Override
+  public void getMetrics(MetricsCollector collector, boolean b) {
+    MetricsRecordBuilder recordBuilder = collector.addRecord(SOURCE_NAME);
+
+    pendingOps.snapshot(recordBuilder, true);
+    totalOps.snapshot(recordBuilder, true);
+    ecReconstructionTotal.snapshot(recordBuilder, true);
+    ecReconstructionFailsTotal.snapshot(recordBuilder, true);
+
+    int numEnumEntries = ContainerProtos.Type.values().length;
+    for (int i = 0; i < numEnumEntries; i++) {
+      pendingOpsArray[i].snapshot(recordBuilder, true);
+      opsArray[i].snapshot(recordBuilder, true);
+      containerOpsLatency[i].snapshot(recordBuilder, true);
+    }
   }
 }

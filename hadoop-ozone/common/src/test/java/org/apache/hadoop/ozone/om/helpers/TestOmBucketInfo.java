@@ -81,8 +81,7 @@ public class TestOmBucketInfo {
         .setAcls(Collections.singletonList(new OzoneAcl(
             IAccessAuthorizer.ACLIdentityType.USER,
             "defaultUser",
-            IAccessAuthorizer.ACLType.WRITE_ACL,
-            OzoneAcl.AclScope.ACCESS
+            OzoneAcl.AclScope.ACCESS, IAccessAuthorizer.ACLType.WRITE_ACL
         )))
         .build();
 
@@ -97,8 +96,7 @@ public class TestOmBucketInfo {
     omBucketInfo.setAcls(Collections.singletonList(new OzoneAcl(
         IAccessAuthorizer.ACLIdentityType.USER,
         "newUser",
-        IAccessAuthorizer.ACLType.WRITE_ACL,
-        OzoneAcl.AclScope.ACCESS
+        OzoneAcl.AclScope.ACCESS, IAccessAuthorizer.ACLType.WRITE_ACL
     )));
     assertNotEquals(
         omBucketInfo.getAcls().get(0),
@@ -115,8 +113,7 @@ public class TestOmBucketInfo {
     omBucketInfo.removeAcl(new OzoneAcl(
         IAccessAuthorizer.ACLIdentityType.USER,
         "newUser",
-        IAccessAuthorizer.ACLType.WRITE_ACL,
-        OzoneAcl.AclScope.ACCESS
+        OzoneAcl.AclScope.ACCESS, IAccessAuthorizer.ACLType.WRITE_ACL
     ));
     assertEquals(0, omBucketInfo.getAcls().size());
     assertEquals(1, cloneBucketInfo.getAcls().size());
@@ -131,8 +128,8 @@ public class TestOmBucketInfo {
             .setStorageType(StorageType.ARCHIVE).setAcls(Collections
                 .singletonList(new OzoneAcl(
                     IAccessAuthorizer.ACLIdentityType.USER,
-                    "defaultUser", IAccessAuthorizer.ACLType.WRITE_ACL,
-                    OzoneAcl.AclScope.ACCESS))).build();
+                    "defaultUser", OzoneAcl.AclScope.ACCESS, IAccessAuthorizer.ACLType.WRITE_ACL
+                ))).build();
     OzoneManagerProtocolProtos.BucketInfo protobuf = omBucketInfo.getProtobuf();
     // No EC Config
     assertFalse(protobuf.hasDefaultReplicationConfig());
@@ -150,8 +147,8 @@ public class TestOmBucketInfo {
         .setStorageType(StorageType.ARCHIVE)
         .setAcls(Collections.singletonList(new OzoneAcl(
             IAccessAuthorizer.ACLIdentityType.USER,
-            "defaultUser", IAccessAuthorizer.ACLType.WRITE_ACL,
-            OzoneAcl.AclScope.ACCESS)))
+            "defaultUser", OzoneAcl.AclScope.ACCESS, IAccessAuthorizer.ACLType.WRITE_ACL
+        )))
         .setDefaultReplicationConfig(
             new DefaultReplicationConfig(
                 new ECReplicationConfig(3, 2))).build();
