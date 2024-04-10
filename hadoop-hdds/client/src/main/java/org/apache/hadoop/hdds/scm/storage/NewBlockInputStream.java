@@ -32,6 +32,7 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ReadBlockR
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ReadBlockResponseProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.StreamDataResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.scm.OzoneClientConfig;
 import org.apache.hadoop.hdds.scm.XceiverClientFactory;
 import org.apache.hadoop.hdds.scm.XceiverClientSpi;
 import org.apache.hadoop.hdds.scm.client.HddsClientUtils;
@@ -87,7 +88,7 @@ public class NewBlockInputStream extends BlockExtendedInputStream
   private long buffersSize;
   private static final int EOF = -1;
   private final List<XceiverClientSpi.Validator> validators;
-  private final boolean verifyChecksum;
+  private final OzoneClientConfig config;
   private final Function<BlockID, BlockLocationInfo> refreshFunction;
   private final RetryPolicy retryPolicy =
       HddsClientUtils.createRetryPolicy(3, TimeUnit.SECONDS.toMillis(1));
@@ -96,9 +97,10 @@ public class NewBlockInputStream extends BlockExtendedInputStream
 
   public NewBlockInputStream(
       BlockID blockID, long length, Pipeline pipeline,
-      Token<OzoneBlockTokenIdentifier> token, boolean verifyChecksum,
+      Token<OzoneBlockTokenIdentifier> token,
       XceiverClientFactory xceiverClientFactory,
-      Function<BlockID, BlockLocationInfo> refreshFunction) {
+      Function<BlockID, BlockLocationInfo> refreshFunction,
+      OzoneClientConfig config) {
     this.blockID = blockID;
     this.length = length;
     setPipeline(pipeline);
@@ -106,7 +108,7 @@ public class NewBlockInputStream extends BlockExtendedInputStream
     this.xceiverClientFactory = xceiverClientFactory;
     this.validators = ContainerProtocolCalls.toValidatorList(
         (request, response) -> validateBlock(response));
-    this.verifyChecksum = verifyChecksum;
+    this.config = config;
     this.refreshFunction = refreshFunction;
 
   }

@@ -113,6 +113,7 @@ import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.writeDele
 import static org.apache.hadoop.ozone.recon.spi.impl.PrometheusServiceProviderImpl.PROMETHEUS_INSTANT_QUERY_API;
 import static org.hadoop.ozone.recon.schema.tables.GlobalStatsTable.GLOBAL_STATS;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -406,7 +407,7 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
             .addStorageReport(storageReportProto4).build();
     LayoutVersionProto layoutInfo = defaultLayoutVersionProto();
 
-    try {
+    assertDoesNotThrow(() -> {
       reconScm.getDatanodeProtocolServer()
           .register(extendedDatanodeDetailsProto, nodeReportProto,
               containerReportsProto, pipelineReportsProto, layoutInfo);
@@ -417,9 +418,7 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
               defaultLayoutVersionProto());
       // Process all events in the event queue
       reconScm.getEventQueue().processAll(1000);
-    } catch (Exception ex) {
-      fail(ex.getMessage());
-    }
+    });
     // Write Data to OM
     // A sample volume (sampleVol) and a bucket (bucketOne) is already created
     // in AbstractOMMetadataManagerTest.
@@ -436,14 +435,12 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
             .addOzoneAcls(new OzoneAcl(
                 IAccessAuthorizer.ACLIdentityType.USER,
                 "TestUser2",
-                IAccessAuthorizer.ACLType.WRITE,
-                OzoneAcl.AclScope.ACCESS
+                OzoneAcl.AclScope.ACCESS, IAccessAuthorizer.ACLType.WRITE
             ))
             .addOzoneAcls(new OzoneAcl(
                 IAccessAuthorizer.ACLIdentityType.USER,
                 "TestUser2",
-                IAccessAuthorizer.ACLType.READ,
-                OzoneAcl.AclScope.ACCESS
+                OzoneAcl.AclScope.ACCESS, IAccessAuthorizer.ACLType.READ
             ))
             .build();
     reconOMMetadataManager.getVolumeTable().put(volumeKey, args);
@@ -454,8 +451,7 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
         .addAcl(new OzoneAcl(
             IAccessAuthorizer.ACLIdentityType.GROUP,
             "TestGroup2",
-            IAccessAuthorizer.ACLType.WRITE,
-            OzoneAcl.AclScope.ACCESS
+            OzoneAcl.AclScope.ACCESS, IAccessAuthorizer.ACLType.WRITE
         ))
         .setQuotaInBytes(OzoneConsts.GB)
         .setUsedBytes(OzoneConsts.MB)
@@ -478,8 +474,7 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
         .addAcl(new OzoneAcl(
             IAccessAuthorizer.ACLIdentityType.GROUP,
             "TestGroup2",
-            IAccessAuthorizer.ACLType.READ,
-            OzoneAcl.AclScope.ACCESS
+            OzoneAcl.AclScope.ACCESS, IAccessAuthorizer.ACLType.READ
         ))
         .setQuotaInBytes(OzoneConsts.GB)
         .setUsedBytes(100 * OzoneConsts.MB)

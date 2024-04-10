@@ -15,18 +15,6 @@
    limitations under the License.
 -->
 <FindBugsFilter>
-  <Match>
-    <Class name="org.apache.hadoop.ozone.container.common.volume.AbstractFuture" />
-    <Bug pattern="DLS_DEAD_STORE_OF_CLASS_LITERAL" />
-  </Match>
-  <Match>
-    <Class name="org.apache.hadoop.ozone.container.common.volume.AbstractFuture" />
-    <Bug pattern="DLS_DEAD_LOCAL_STORE" />
-  </Match>
-  <Match>
-    <Class name="org.apache.hadoop.ozone.container.common.volume.AbstractFuture" />
-    <Bug pattern="NS_DANGEROUS_NON_SHORT_CIRCUIT" />
-  </Match>
 
   <!-- Test -->
   <Match>

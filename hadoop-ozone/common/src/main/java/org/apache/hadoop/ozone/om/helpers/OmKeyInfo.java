@@ -19,12 +19,12 @@ package org.apache.hadoop.ozone.om.helpers;
 
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.BitSet;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 
+import com.google.common.collect.ImmutableList;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.fs.FileChecksum;
@@ -98,47 +98,23 @@ public final class OmKeyInfo extends WithParentObjectId
   /**
    * ACL Information.
    */
-  private List<OzoneAcl> acls;
+  private final List<OzoneAcl> acls;
 
-  @SuppressWarnings("parameternumber")
-  OmKeyInfo(String volumeName, String bucketName, String keyName,
-      List<OmKeyLocationInfoGroup> versions, long dataSize,
-      long creationTime, long modificationTime,
-      ReplicationConfig replicationConfig,
-      Map<String, String> metadata,
-      FileEncryptionInfo encInfo, List<OzoneAcl> acls,
-      long objectID, long updateID, FileChecksum fileChecksum) {
-    this.volumeName = volumeName;
-    this.bucketName = bucketName;
-    this.keyName = keyName;
-    this.dataSize = dataSize;
-    this.keyLocationVersions = versions;
-    this.creationTime = creationTime;
-    this.modificationTime = modificationTime;
-    this.replicationConfig = replicationConfig;
-    setMetadata(metadata);
-    this.encInfo = encInfo;
-    this.acls = acls;
-    setObjectID(objectID);
-    setUpdateID(updateID);
-    this.fileChecksum = fileChecksum;
-  }
-
-  @SuppressWarnings("parameternumber")
-  OmKeyInfo(String volumeName, String bucketName, String keyName,
-            String fileName, List<OmKeyLocationInfoGroup> versions,
-            long dataSize, long creationTime, long modificationTime,
-            ReplicationConfig replicationConfig,
-            Map<String, String> metadata,
-            FileEncryptionInfo encInfo, List<OzoneAcl> acls,
-            long parentObjectID, long objectID, long updateID,
-            FileChecksum fileChecksum, boolean isFile) {
-    this(volumeName, bucketName, keyName, versions, dataSize,
-            creationTime, modificationTime, replicationConfig, metadata,
-            encInfo, acls, objectID, updateID, fileChecksum);
-    this.fileName = fileName;
-    setParentObjectID(parentObjectID);
-    this.isFile = isFile;
+  private OmKeyInfo(Builder b) {
+    super(b);
+    this.volumeName = b.volumeName;
+    this.bucketName = b.bucketName;
+    this.keyName = b.keyName;
+    this.dataSize = b.dataSize;
+    this.keyLocationVersions = b.omKeyLocationInfoGroups;
+    this.creationTime = b.creationTime;
+    this.modificationTime = b.modificationTime;
+    this.replicationConfig = b.replicationConfig;
+    this.encInfo = b.encInfo;
+    this.acls = b.acls;
+    this.fileChecksum = b.fileChecksum;
+    this.fileName = b.fileName;
+    this.isFile = b.isFile;
   }
 
   public String getVolumeName() {
@@ -193,10 +169,6 @@ public final class OmKeyInfo extends WithParentObjectId
   public void setKeyLocationVersions(
       List<OmKeyLocationInfoGroup> keyLocationVersions) {
     this.keyLocationVersions = keyLocationVersions;
-  }
-
-  public void updateModifcationTime() {
-    this.modificationTime = Time.monotonicNow();
   }
 
   public void setFile(boolean file) {
@@ -393,7 +365,7 @@ public final class OmKeyInfo extends WithParentObjectId
   }
 
   public List<OzoneAcl> getAcls() {
-    return acls;
+    return ImmutableList.copyOf(acls);
   }
 
   public boolean addAcl(OzoneAcl acl) {
@@ -438,32 +410,29 @@ public final class OmKeyInfo extends WithParentObjectId
   /**
    * Builder of OmKeyInfo.
    */
-  public static class Builder {
+  public static class Builder extends WithParentObjectId.Builder {
     private String volumeName;
     private String bucketName;
     private String keyName;
     private long dataSize;
-    private List<OmKeyLocationInfoGroup> omKeyLocationInfoGroups =
+    private final List<OmKeyLocationInfoGroup> omKeyLocationInfoGroups =
         new ArrayList<>();
     private long creationTime;
     private long modificationTime;
     private ReplicationConfig replicationConfig;
-    private Map<String, String> metadata;
     private FileEncryptionInfo encInfo;
-    private List<OzoneAcl> acls;
-    private long objectID;
-    private long updateID;
+    private final List<OzoneAcl> acls = new ArrayList<>();
     // not persisted to DB. FileName will be the last element in path keyName.
     private String fileName;
-    private long parentObjectID;
     private FileChecksum fileChecksum;
 
     private boolean isFile;
 
     public Builder() {
-      this.metadata = new HashMap<>();
-      omKeyLocationInfoGroups = new ArrayList<>();
-      acls = new ArrayList<>();
+    }
+
+    public Builder(OmKeyInfo obj) {
+      super(obj);
     }
 
     public Builder setVolumeName(String volume) {
@@ -517,13 +486,15 @@ public final class OmKeyInfo extends WithParentObjectId
       return this;
     }
 
+    @Override
     public Builder addMetadata(String key, String value) {
-      metadata.put(key, value);
+      super.addMetadata(key, value);
       return this;
     }
 
+    @Override
     public Builder addAllMetadata(Map<String, String> newMetadata) {
-      metadata.putAll(newMetadata);
+      super.addAllMetadata(newMetadata);
       return this;
     }
 
@@ -546,13 +517,15 @@ public final class OmKeyInfo extends WithParentObjectId
       return this;
     }
 
+    @Override
     public Builder setObjectID(long obId) {
-      this.objectID = obId;
+      super.setObjectID(obId);
       return this;
     }
 
+    @Override
     public Builder setUpdateID(long id) {
-      this.updateID = id;
+      super.setUpdateID(id);
       return this;
     }
 
@@ -561,8 +534,9 @@ public final class OmKeyInfo extends WithParentObjectId
       return this;
     }
 
+    @Override
     public Builder setParentObjectID(long parentID) {
-      this.parentObjectID = parentID;
+      super.setParentObjectID(parentID);
       return this;
     }
 
@@ -577,11 +551,7 @@ public final class OmKeyInfo extends WithParentObjectId
     }
 
     public OmKeyInfo build() {
-      return new OmKeyInfo(
-              volumeName, bucketName, keyName, fileName,
-              omKeyLocationInfoGroups, dataSize, creationTime,
-              modificationTime, replicationConfig, metadata, encInfo, acls,
-              parentObjectID, objectID, updateID, fileChecksum, isFile);
+      return new OmKeyInfo(this);
     }
   }
 
@@ -807,7 +777,7 @@ public final class OmKeyInfo extends WithParentObjectId
    */
   @Override
   public OmKeyInfo copyObject() {
-    OmKeyInfo.Builder builder = new OmKeyInfo.Builder()
+    OmKeyInfo.Builder builder = new OmKeyInfo.Builder(this)
         .setVolumeName(volumeName)
         .setBucketName(bucketName)
         .setKeyName(keyName)
@@ -816,9 +786,7 @@ public final class OmKeyInfo extends WithParentObjectId
         .setDataSize(dataSize)
         .setReplicationConfig(replicationConfig)
         .setFileEncryptionInfo(encInfo)
-        .setObjectID(getObjectID())
-        .setUpdateID(getUpdateID())
-        .setParentObjectID(getParentObjectID())
+        .setAcls(acls)
         .setFileName(fileName)
         .setFile(isFile);
 
@@ -827,10 +795,6 @@ public final class OmKeyInfo extends WithParentObjectId
             new OmKeyLocationInfoGroup(keyLocationVersion.getVersion(),
                 keyLocationVersion.getLocationList(),
                 keyLocationVersion.isMultipartKey())));
-
-    acls.forEach(acl -> builder.addAcl(new OzoneAcl(acl.getType(),
-            acl.getName(), (BitSet) acl.getAclBitSet().clone(),
-        acl.getAclScope())));
 
     if (getMetadata() != null) {
       getMetadata().forEach((k, v) -> builder.addMetadata(k, v));

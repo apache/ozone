@@ -155,37 +155,33 @@ public final class OmMultipartKeyInfo extends WithObjectID {
    *   multiKey1   |     1026     |     1025   |
    * ------------------------------------------|
    */
-  private long parentID;
+  private final long parentID;
 
   /**
    * Construct OmMultipartKeyInfo object which holds multipart upload
    * information for a key.
    */
-  @SuppressWarnings("parameternumber")
-  private OmMultipartKeyInfo(String id, long creationTime,
-      ReplicationConfig replicationConfig,
-      PartKeyInfoMap sortedMap, long objectID, long updateID,
-      long parentObjId) {
-    this.uploadID = id;
-    this.creationTime = creationTime;
-    this.replicationConfig = replicationConfig;
-    this.partKeyInfoMap = sortedMap;
-    setObjectID(objectID);
-    setUpdateID(updateID);
-    this.parentID = parentObjId;
+  private OmMultipartKeyInfo(Builder b) {
+    super(b);
+    this.uploadID = b.uploadID;
+    this.creationTime = b.creationTime;
+    this.replicationConfig = b.replicationConfig;
+    this.partKeyInfoMap = new PartKeyInfoMap(b.partKeyInfoList);
+    this.parentID = b.parentID;
   }
 
-  /**
-   * Construct OmMultipartKeyInfo object which holds multipart upload
-   * information for a key.
-   */
-  @SuppressWarnings("parameternumber")
-  private OmMultipartKeyInfo(String id, long creationTime,
-      ReplicationConfig replicationConfig,
-      SortedMap<Integer, PartKeyInfo> list, long objectID, long updateID,
-      long parentObjId) {
-    this(id, creationTime, replicationConfig, new PartKeyInfoMap(list),
-        objectID, updateID, parentObjId);
+  /** Copy constructor. */
+  private OmMultipartKeyInfo(OmMultipartKeyInfo b) {
+    this.uploadID = b.uploadID;
+    this.creationTime = b.creationTime;
+    this.replicationConfig = b.replicationConfig;
+    // PartKeyInfoMap is an immutable data structure. Whenever a PartKeyInfo
+    // is added, it returns a new shallow copy of the PartKeyInfoMap Object
+    // so here we can directly pass in partKeyInfoMap
+    this.partKeyInfoMap = b.partKeyInfoMap;
+    setObjectID(b.getObjectID());
+    setUpdateID(b.getUpdateID());
+    this.parentID = b.parentID;
   }
 
   /**
@@ -228,13 +224,11 @@ public final class OmMultipartKeyInfo extends WithObjectID {
   /**
    * Builder of OmMultipartKeyInfo.
    */
-  public static class Builder {
+  public static class Builder extends WithObjectID.Builder {
     private String uploadID;
     private long creationTime;
     private ReplicationConfig replicationConfig;
-    private TreeMap<Integer, PartKeyInfo> partKeyInfoList;
-    private long objectID;
-    private long updateID;
+    private final TreeMap<Integer, PartKeyInfo> partKeyInfoList;
     private long parentID;
 
     public Builder() {
@@ -271,12 +265,12 @@ public final class OmMultipartKeyInfo extends WithObjectID {
     }
 
     public Builder setObjectID(long obId) {
-      this.objectID = obId;
+      super.setObjectID(obId);
       return this;
     }
 
     public Builder setUpdateID(long id) {
-      this.updateID = id;
+      super.setUpdateID(id);
       return this;
     }
 
@@ -286,8 +280,7 @@ public final class OmMultipartKeyInfo extends WithObjectID {
     }
 
     public OmMultipartKeyInfo build() {
-      return new OmMultipartKeyInfo(uploadID, creationTime, replicationConfig,
-              partKeyInfoList, objectID, updateID, parentID);
+      return new OmMultipartKeyInfo(this);
     }
   }
 
@@ -308,10 +301,15 @@ public final class OmMultipartKeyInfo extends WithObjectID {
         multipartKeyInfo.getEcReplicationConfig()
     );
 
-    return new OmMultipartKeyInfo(multipartKeyInfo.getUploadID(),
-        multipartKeyInfo.getCreationTime(), replicationConfig,
-        list, multipartKeyInfo.getObjectID(),
-        multipartKeyInfo.getUpdateID(), multipartKeyInfo.getParentID());
+    return new Builder()
+        .setUploadID(multipartKeyInfo.getUploadID())
+        .setCreationTime(multipartKeyInfo.getCreationTime())
+        .setReplicationConfig(replicationConfig)
+        .setPartKeyInfoList(list)
+        .setObjectID(multipartKeyInfo.getObjectID())
+        .setUpdateID(multipartKeyInfo.getUpdateID())
+        .setParentID(multipartKeyInfo.getParentID())
+        .build();
   }
 
   /**
@@ -358,11 +356,7 @@ public final class OmMultipartKeyInfo extends WithObjectID {
   }
 
   public OmMultipartKeyInfo copyObject() {
-    // PartKeyInfoMap is an immutable data structure. Whenever a PartKeyInfo
-    // is added, it returns a new shallow copy of the PartKeyInfoMap Object
-    // so here we can directly pass in partKeyInfoMap
-    return new OmMultipartKeyInfo(uploadID, creationTime, replicationConfig,
-        partKeyInfoMap, getObjectID(), getUpdateID(), parentID);
+    return new OmMultipartKeyInfo(this);
   }
 
 }

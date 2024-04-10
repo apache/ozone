@@ -62,11 +62,7 @@ public interface MiniOzoneCluster extends AutoCloseable {
    *
    * @return MiniOzoneCluster builder
    */
-  static Builder newOMHABuilder(OzoneConfiguration conf) {
-    return new MiniOzoneHAClusterImpl.Builder(conf);
-  }
-
-  static Builder newHABuilder(OzoneConfiguration conf) {
+  static MiniOzoneHAClusterImpl.Builder newHABuilder(OzoneConfiguration conf) {
     return new MiniOzoneHAClusterImpl.Builder(conf);
   }
 
@@ -76,11 +72,6 @@ public interface MiniOzoneCluster extends AutoCloseable {
    * @return Configuration
    */
   OzoneConfiguration getConf();
-
-  /**
-   * Set the configuration for the MiniOzoneCluster.
-   */
-  void setConf(OzoneConfiguration newConf);
 
   /**
    * Waits for the cluster to be ready, this call blocks till all the
@@ -275,13 +266,6 @@ public interface MiniOzoneCluster extends AutoCloseable {
     protected String path;
 
     protected String clusterId;
-    protected String omServiceId;
-    protected int numOfOMs;
-    protected int numOfActiveOMs = ACTIVE_OMS_NOT_SET;
-
-    protected String scmServiceId;
-    protected int numOfSCMs;
-    protected int numOfActiveSCMs = ACTIVE_SCMS_NOT_SET;
     protected SCMConfigurator scmConfigurator;
 
     protected String scmId = UUID.randomUUID().toString();
@@ -297,15 +281,17 @@ public interface MiniOzoneCluster extends AutoCloseable {
 
     protected Builder(OzoneConfiguration conf) {
       this.conf = conf;
-      setClusterId(UUID.randomUUID().toString());
+      setClusterId();
       // Use default SCM configurations if no override is provided.
       setSCMConfigurator(new SCMConfigurator());
       ExitUtils.disableSystemExit();
     }
 
-    public Builder setConf(OzoneConfiguration config) {
-      this.conf = config;
-      return this;
+    /** Prepare the builder for another call to {@link #build()}, avoiding conflict
+     * between the clusters created. */
+    protected void prepareForNextBuild() {
+      conf = new OzoneConfiguration(conf);
+      setClusterId();
     }
 
     public Builder setSCMConfigurator(SCMConfigurator configurator) {
@@ -313,13 +299,8 @@ public interface MiniOzoneCluster extends AutoCloseable {
       return this;
     }
 
-    /**
-     * Sets the cluster Id.
-     *
-     * @param id cluster Id
-     */
-    void setClusterId(String id) {
-      clusterId = id;
+    private void setClusterId() {
+      clusterId = UUID.randomUUID().toString();
       path = GenericTestUtils.getTempPath(
           MiniOzoneClusterImpl.class.getSimpleName() + "-" + clusterId);
     }
@@ -368,38 +349,8 @@ public interface MiniOzoneCluster extends AutoCloseable {
       return this;
     }
 
-    public Builder setNumOfOzoneManagers(int numOMs) {
-      this.numOfOMs = numOMs;
-      return this;
-    }
-
-    public Builder setNumOfActiveOMs(int numActiveOMs) {
-      this.numOfActiveOMs = numActiveOMs;
-      return this;
-    }
-
-    public Builder setOMServiceId(String serviceId) {
-      this.omServiceId = serviceId;
-      return this;
-    }
-
     public Builder includeRecon(boolean include) {
       this.includeRecon = include;
-      return this;
-    }
-
-    public Builder setNumOfStorageContainerManagers(int numSCMs) {
-      this.numOfSCMs = numSCMs;
-      return this;
-    }
-
-    public Builder setNumOfActiveSCMs(int numActiveSCMs) {
-      this.numOfActiveSCMs = numActiveSCMs;
-      return this;
-    }
-
-    public Builder setSCMServiceId(String serviceId) {
-      this.scmServiceId = serviceId;
       return this;
     }
 

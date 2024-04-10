@@ -18,6 +18,7 @@
 package org.apache.hadoop.ozone.container.metrics;
 
 import java.io.File;
+import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -59,12 +60,15 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
+import org.junit.jupiter.api.io.TempDir;
 
 /**
  * Test for metrics published by storage containers.
  */
 @Timeout(300)
 public class TestContainerMetrics {
+  @TempDir
+  private Path tempDir;
 
   @Test
   public void testContainerMetrics() throws Exception {
@@ -78,7 +82,7 @@ public class TestContainerMetrics {
       Pipeline pipeline = MockPipeline
           .createSingleNodePipeline();
       OzoneConfiguration conf = new OzoneConfiguration();
-      conf.setInt(OzoneConfigKeys.DFS_CONTAINER_IPC_PORT,
+      conf.setInt(OzoneConfigKeys.HDDS_CONTAINER_IPC_PORT,
           pipeline.getFirstNode()
               .getPort(DatanodeDetails.Port.Name.STANDALONE).getValue());
       conf.setInt(DFSConfigKeysLegacy.DFS_METRICS_PERCENTILES_INTERVALS_KEY,
@@ -105,6 +109,8 @@ public class TestContainerMetrics {
       }
       HddsDispatcher dispatcher = new HddsDispatcher(conf, containerSet,
           volumeSet, handlers, context, metrics, null);
+      StorageVolumeUtil.getHddsVolumesList(volumeSet.getVolumesList())
+          .forEach(hddsVolume -> hddsVolume.setDbParentDir(tempDir.toFile()));
       dispatcher.setClusterId(UUID.randomUUID().toString());
 
       server = new XceiverServerGrpc(datanodeDetails, conf, dispatcher, null);

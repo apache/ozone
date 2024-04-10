@@ -73,12 +73,12 @@ public class TestReconWithOzoneManagerHA {
     dbConf.setSyncOption(true);
     conf.setFromObject(dbConf);
 
-    cluster = (MiniOzoneHAClusterImpl) MiniOzoneCluster.newOMHABuilder(conf)
-        .setOMServiceId(OM_SERVICE_ID)
-        .setNumDatanodes(1)
+    MiniOzoneHAClusterImpl.Builder builder = MiniOzoneCluster.newHABuilder(conf);
+    builder.setOMServiceId(OM_SERVICE_ID)
         .setNumOfOzoneManagers(3)
-        .includeRecon(true)
-        .build();
+        .setNumDatanodes(1)
+        .includeRecon(true);
+    cluster = builder.build();
     cluster.waitForClusterToBeReady();
     client = OzoneClientFactory.getRpcClient(OM_SERVICE_ID, conf);
     objectStore = client.getObjectStore();

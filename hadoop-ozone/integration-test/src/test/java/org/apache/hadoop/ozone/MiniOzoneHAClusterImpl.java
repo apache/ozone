@@ -344,6 +344,14 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
     private final List<StorageContainerManager> activeSCMs = new ArrayList<>();
     private final List<StorageContainerManager> inactiveSCMs = new ArrayList<>();
 
+    private String omServiceId;
+    private int numOfOMs;
+    private int numOfActiveOMs = ACTIVE_OMS_NOT_SET;
+
+    private String scmServiceId;
+    private int numOfSCMs;
+    private int numOfActiveSCMs = ACTIVE_SCMS_NOT_SET;
+
     /**
      * Creates a new Builder.
      *
@@ -353,8 +361,38 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
       super(conf);
     }
 
+    public Builder setNumOfOzoneManagers(int numOMs) {
+      this.numOfOMs = numOMs;
+      return this;
+    }
+
+    public Builder setNumOfActiveOMs(int numActiveOMs) {
+      this.numOfActiveOMs = numActiveOMs;
+      return this;
+    }
+
+    public Builder setOMServiceId(String serviceId) {
+      this.omServiceId = serviceId;
+      return this;
+    }
+
+    public Builder setNumOfStorageContainerManagers(int numSCMs) {
+      this.numOfSCMs = numSCMs;
+      return this;
+    }
+
+    public Builder setNumOfActiveSCMs(int numActiveSCMs) {
+      this.numOfActiveSCMs = numActiveSCMs;
+      return this;
+    }
+
+    public Builder setSCMServiceId(String serviceId) {
+      this.scmServiceId = serviceId;
+      return this;
+    }
+
     @Override
-    public MiniOzoneCluster build() throws IOException {
+    public MiniOzoneHAClusterImpl build() throws IOException {
       if (numOfActiveOMs > numOfOMs) {
         throw new IllegalArgumentException("Number of active OMs cannot be " +
             "more than the total number of OMs");
@@ -399,7 +437,12 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
       if (startDataNodes) {
         cluster.startHddsDatanodes();
       }
+      prepareForNextBuild();
       return cluster;
+    }
+
+    protected int numberOfOzoneManagers() {
+      return numOfOMs;
     }
 
     protected void initOMRatisConf() {
