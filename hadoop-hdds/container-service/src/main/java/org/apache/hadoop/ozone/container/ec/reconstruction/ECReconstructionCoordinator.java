@@ -342,6 +342,7 @@ public class ECReconstructionCoordinator implements Closeable {
           byteBufferPool.putBuffer(buf);
         }
         IOUtils.cleanupWithLogger(LOG, targetBlockStreams);
+        IOUtils.cleanupWithLogger(LOG, emptyBlockStreams);
       }
     }
   }
