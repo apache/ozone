@@ -384,7 +384,6 @@ public class TestNSSummaryEndpointWithOBSAndLegacy {
   private static int chunkSize = 1024 * 1024;
 
   private ReplicationConfig ratisOne = ReplicationConfig.fromProtoTypeAndFactor(HddsProtos.ReplicationType.RATIS, ONE);
-  private ReplicationConfig ecType = new ECReplicationConfig(3, 2, ECReplicationConfig.EcCodec.RS, chunkSize);
   private long epochMillis1 =
       ReconUtils.convertToEpochMillis("04-04-2024 12:30:00", "MM-dd-yyyy HH:mm:ss", TimeZone.getDefault());
   private long epochMillis2 =
