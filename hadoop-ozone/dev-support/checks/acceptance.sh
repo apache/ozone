@@ -57,7 +57,7 @@ if [[ "${OZONE_ACCEPTANCE_TEST_TYPE}" == "robot" ]]; then
   install_robot
 fi
 
-export OZONE_ACCEPTANCE_SUITE
+export OZONE_ACCEPTANCE_SUITE OZONE_ACCEPTANCE_TEST_TYPE
 
 cd "$DIST_DIR/compose" || exit 1
 ./test-all.sh 2>&1 | tee "${REPORT_DIR}/output.log"
