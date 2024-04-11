@@ -82,17 +82,14 @@ EOF
   # - ITestS3AContractEtag, ITestS3AContractRename: HDDS-10615
   # - ITestS3AContractGetFileStatusV1List: HDDS-10617
   # - ITestS3AContractMkdir: HDDS-10572
-  mvn -B -V --no-transfer-progress \
+  mvn -B -V --fail-never --no-transfer-progress \
     -Dtest='ITestS3AContract*, !ITestS3AContractDistCp, !ITestS3AContractEtag, !ITestS3AContractGetFileStatusV1List, !ITestS3AContractMkdir, !ITestS3AContractRename' \
     clean test
-  rc=$?
 
   local target="${RESULT_DIR}/junit/${bucket}/target"
   mkdir -p "${target}"
   mv -iv target/surefire-reports "${target}"/
   popd
-
-  return $rc
 }
 
 start_docker_env
