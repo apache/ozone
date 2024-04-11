@@ -78,7 +78,7 @@ public class S3MultipartUploadCompleteRequestWithFSO
   }
 
   @Override
-  protected void addMissingParentsToTable(OmBucketInfo omBucketInfo,
+  protected void addMissingParentsToCache(OmBucketInfo omBucketInfo,
       List<OmDirectoryInfo> missingParentInfos,
       OMMetadataManager omMetadataManager, long volumeId, long bucketId,
       long transactionLogIndex) throws IOException {
@@ -91,35 +91,13 @@ public class S3MultipartUploadCompleteRequestWithFSO
     OMFileRequest.addDirectoryTableCacheEntries(omMetadataManager,
         volumeId, bucketId, transactionLogIndex,
         missingParentInfos, null);
-
-    // Create missing parent directory entries.
-    try (BatchOperation batchOperation = omMetadataManager.getStore()
-        .initBatchOperation()) {
-      for (OmDirectoryInfo parentDirInfo : missingParentInfos) {
-        final String parentKey = omMetadataManager.getOzonePathKey(
-            volumeId, bucketId, parentDirInfo.getParentObjectID(),
-            parentDirInfo.getName());
-        omMetadataManager.getDirectoryTable().putWithBatch(batchOperation,
-            parentKey, parentDirInfo);
-      }
-
-      // namespace quota changes for parent directory
-      String bucketKey = omMetadataManager.getBucketKey(
-          omBucketInfo.getVolumeName(),
-          omBucketInfo.getBucketName());
-      omMetadataManager.getBucketTable().putWithBatch(batchOperation,
-          bucketKey, omBucketInfo);
-
-      omMetadataManager.getStore().commitBatchOperation(batchOperation);
-    }
   }
 
   @Override
-  protected void addMultiParttoOpenTable(
+  protected void addMultiPartToCache(
       OMMetadataManager omMetadataManager, String multipartOpenKey,
-      OmMultipartKeyInfo multipartKeyInfo,
       OMFileRequest.OMPathInfoWithFSO pathInfoFSO, OmKeyInfo omKeyInfo,
-      long volumeId, long bucketId, long transactionLogIndex
+      long transactionLogIndex
   ) throws IOException {
 
     // Add multi part to cache
@@ -127,17 +105,6 @@ public class S3MultipartUploadCompleteRequestWithFSO
         multipartOpenKey, omKeyInfo, pathInfoFSO.getLeafNodeName(),
         transactionLogIndex);
 
-    // Add multi part to open key table.
-    try (BatchOperation batchOperation = omMetadataManager.getStore()
-        .initBatchOperation()) {
-
-      OMFileRequest.addToOpenFileTableForMultipart(omMetadataManager,
-          batchOperation,
-          omKeyInfo, multipartKeyInfo.getUploadID(), volumeId,
-          bucketId);
-
-      omMetadataManager.getStore().commitBatchOperation(batchOperation);
-    }
   }
 
 
@@ -214,11 +181,13 @@ public class S3MultipartUploadCompleteRequestWithFSO
       OzoneManagerProtocolProtos.OMResponse.Builder omResponse,
       String dbMultipartOpenKey, OmKeyInfo omKeyInfo,
       List<OmKeyInfo> allKeyInfoToRemove, OmBucketInfo omBucketInfo,
-      long volumeId, long bucketId) {
+      long volumeId, long bucketId, List<OmDirectoryInfo> missingParentInfos,
+      OmMultipartKeyInfo multipartKeyInfo) {
 
     return new S3MultipartUploadCompleteResponseWithFSO(omResponse.build(),
         multipartKey, dbMultipartOpenKey, omKeyInfo, allKeyInfoToRemove,
-        getBucketLayout(), omBucketInfo, volumeId, bucketId);
+        getBucketLayout(), omBucketInfo, volumeId, bucketId,
+        missingParentInfos, multipartKeyInfo);
   }
 
   @Override

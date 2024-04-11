@@ -196,7 +196,7 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
             bucketName);
 
         // add all missing parents to directory table
-        addMissingParentsToTable(omBucketInfo, missingParentInfos,
+        addMissingParentsToCache(omBucketInfo, missingParentInfos,
             omMetadataManager, volumeId, bucketId, trxnLogIndex);
 
         String multipartOpenKey = omMetadataManager
@@ -244,9 +244,8 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
               .build();
 
           // Add missing multi part info to open key table
-          addMultiParttoOpenTable(omMetadataManager, multipartOpenKey,
-              multipartKeyInfoFromArgs, pathInfoFSO, keyInfoFromArgs,
-              volumeId, bucketId, trxnLogIndex);
+          addMultiPartToCache(omMetadataManager, multipartOpenKey,
+              pathInfoFSO, keyInfoFromArgs, trxnLogIndex);
         }
       }
 
@@ -358,7 +357,7 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
         omClientResponse =
             getOmClientResponse(multipartKey, omResponse, dbMultipartOpenKey,
                 omKeyInfo, allKeyInfoToRemove, omBucketInfo,
-                volumeId, bucketId);
+                volumeId, bucketId, missingParentInfos, multipartKeyInfo);
 
         result = Result.SUCCESS;
       } else {
@@ -399,7 +398,8 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
       OMResponse.Builder omResponse, String dbMultipartOpenKey,
       OmKeyInfo omKeyInfo,  List<OmKeyInfo> allKeyInfoToRemove,
       OmBucketInfo omBucketInfo,
-      long volumeId, long bucketId) {
+      long volumeId, long bucketId, List<OmDirectoryInfo> missingParentInfos,
+      OmMultipartKeyInfo multipartKeyInfo) {
 
     return new S3MultipartUploadCompleteResponse(omResponse.build(),
         multipartKey, dbMultipartOpenKey, omKeyInfo, allKeyInfoToRemove,
@@ -538,7 +538,7 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
     return omMetadataManager.getOzoneKey(volumeName, bucketName, keyName);
   }
 
-  protected void addMissingParentsToTable(OmBucketInfo omBucketInfo,
+  protected void addMissingParentsToCache(OmBucketInfo omBucketInfo,
       List<OmDirectoryInfo> missingParentInfos,
       OMMetadataManager omMetadataManager,
       long volumeId, long bucketId, long transactionLogIndex
@@ -546,12 +546,10 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
     // FSO is disabled. Do nothing.
   }
 
-  @SuppressWarnings("checkstyle:ParameterNumber")
-  protected void addMultiParttoOpenTable(
+  protected void addMultiPartToCache(
       OMMetadataManager omMetadataManager, String multipartOpenKey,
-      OmMultipartKeyInfo multipartKeyInfo,
       OMFileRequest.OMPathInfoWithFSO pathInfoFSO, OmKeyInfo omKeyInfo,
-      long volumeId, long bucketId, long transactionLogIndex
+      long transactionLogIndex
   ) throws IOException {
     // FSO is disabled. Do nothing.
   }
