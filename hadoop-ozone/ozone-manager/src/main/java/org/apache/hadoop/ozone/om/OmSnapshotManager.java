@@ -278,7 +278,7 @@ public final class OmSnapshotManager implements AutoCloseable {
         .getTimeDuration(OZONE_OM_SNAPSHOT_CACHE_CLEANUP_SERVICE_RUN_INTERVAL,
             OZONE_OM_SNAPSHOT_CACHE_CLEANUP_SERVICE_RUN_INTERVAL_DEFAULT,
             TimeUnit.MILLISECONDS);
-    this.snapshotCache = new SnapshotCache(loader, softCacheSize,
+    this.snapshotCache = new SnapshotCache(loader, softCacheSize, ozoneManager.getMetrics(),
         cacheCleanupServiceInterval);
 
     this.snapshotDiffManager = new SnapshotDiffManager(snapshotDiffDb, differ,
