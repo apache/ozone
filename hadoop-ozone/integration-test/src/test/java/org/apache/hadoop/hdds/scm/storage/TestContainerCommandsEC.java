@@ -614,8 +614,15 @@ public class TestContainerCommandsEC {
     testECReconstructionCoordinator(missingIndexes, 3);
   }
 
+  @ParameterizedTest
+  @MethodSource("recoverableMissingIndexes")
+  void testECReconstructionCoordinatorWithPartialStripe(List<Integer> missingIndexes)
+      throws Exception {
+    testECReconstructionCoordinator(missingIndexes, 1);
+  }
+
   @Test
-  void testECReconstructionWithPartialStripe()
+  void testECReconstructParityWithPartialStripe()
           throws Exception {
     testECReconstructionCoordinator(ImmutableList.of(4, 5), 1);
   }
@@ -895,18 +902,19 @@ public class TestContainerCommandsEC {
           reconstructedBlockData) {
 
     for (int i = 0; i < blockData.length; i++) {
+      assertEquals(blockData[i].getBlockID(), reconstructedBlockData[i].getBlockID());
+      assertEquals(blockData[i].getSize(), reconstructedBlockData[i].getSize());
+      assertEquals(blockData[i].getMetadata(), reconstructedBlockData[i].getMetadata());
       List<ContainerProtos.ChunkInfo> oldBlockDataChunks =
           blockData[i].getChunks();
       List<ContainerProtos.ChunkInfo> newBlockDataChunks =
           reconstructedBlockData[i].getChunks();
       for (int j = 0; j < oldBlockDataChunks.size(); j++) {
         ContainerProtos.ChunkInfo chunkInfo = oldBlockDataChunks.get(j);
-        if (chunkInfo.getLen() == 0) {
-          // let's ignore the empty chunks
-          continue;
-        }
         assertEquals(chunkInfo, newBlockDataChunks.get(j));
       }
+      // Ensure there are no extra chunks in the reconstructed block
+      assertEquals(oldBlockDataChunks.size(), newBlockDataChunks.size());
     }
   }
 
