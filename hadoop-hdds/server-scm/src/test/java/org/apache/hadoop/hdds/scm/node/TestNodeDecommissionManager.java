@@ -302,7 +302,7 @@ public class TestNodeDecommissionManager {
 
     // Put 2 valid nodes into maintenance
     decom.startMaintenanceNodes(Arrays.asList(dns.get(1).getIpAddress(),
-        dns.get(2).getIpAddress()), 100);
+        dns.get(2).getIpAddress()), 100, true);
     assertEquals(HddsProtos.NodeOperationalState.ENTERING_MAINTENANCE,
         nodeManager.getNodeStatus(dns.get(1)).getOperationalState());
     assertNotEquals(0, nodeManager.getNodeStatus(
@@ -315,14 +315,14 @@ public class TestNodeDecommissionManager {
     // Running the command again gives no error - nodes already decommissioning
     // are silently ignored.
     decom.startMaintenanceNodes(Arrays.asList(dns.get(1).getIpAddress(),
-        dns.get(2).getIpAddress()), 100);
+        dns.get(2).getIpAddress()), 100, true);
 
     // Attempt to decommission dn(10) which has multiple hosts on the same IP
     // and we hardcoded ports to 3456, 4567, 5678
     DatanodeDetails multiDn = dns.get(10);
     String multiAddr =
         multiDn.getIpAddress() + ":" + multiDn.getPorts().get(0).getValue();
-    decom.startMaintenanceNodes(singletonList(multiAddr), 100);
+    decom.startMaintenanceNodes(singletonList(multiAddr), 100, true);
     assertEquals(HddsProtos.NodeOperationalState.ENTERING_MAINTENANCE,
         nodeManager.getNodeStatus(multiDn).getOperationalState());
 
@@ -331,7 +331,7 @@ public class TestNodeDecommissionManager {
     nodeManager.processHeartbeat(dns.get(9));
     DatanodeDetails duplicatePorts = dns.get(9);
     decom.startMaintenanceNodes(singletonList(duplicatePorts.getIpAddress()),
-        100);
+        100, true);
     assertEquals(HddsProtos.NodeOperationalState.ENTERING_MAINTENANCE,
         nodeManager.getNodeStatus(duplicatePorts).getOperationalState());
 
@@ -372,7 +372,7 @@ public class TestNodeDecommissionManager {
     // Try to go from decom to maint:
     dn = new ArrayList<>();
     dn.add(dns.get(2).getIpAddress());
-    errors = decom.startMaintenanceNodes(dn, 100);
+    errors = decom.startMaintenanceNodes(dn, 100, true);
     assertEquals(1, errors.size());
     assertEquals(dns.get(2).getHostName(), errors.get(0).getHostname());
 

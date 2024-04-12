@@ -102,7 +102,7 @@ public class TestMaintenanceSubCommand {
 
   @Test
   public void testNoErrorsWhenEnteringMaintenance() throws IOException  {
-    when(scmClient.startMaintenanceNodes(anyList(), anyInt()))
+    when(scmClient.startMaintenanceNodes(anyList(), anyInt(), true))
         .thenAnswer(invocation -> new ArrayList<DatanodeAdminError>());
 
     CommandLine c = new CommandLine(cmd);
@@ -126,7 +126,7 @@ public class TestMaintenanceSubCommand {
 
   @Test
   public void testErrorsReportedWhenEnteringMaintenance() throws IOException  {
-    when(scmClient.startMaintenanceNodes(anyList(), anyInt()))
+    when(scmClient.startMaintenanceNodes(anyList(), anyInt(), true))
         .thenAnswer(invocation -> {
           ArrayList<DatanodeAdminError> e = new ArrayList<>();
           e.add(new DatanodeAdminError("host1", "host1 error"));

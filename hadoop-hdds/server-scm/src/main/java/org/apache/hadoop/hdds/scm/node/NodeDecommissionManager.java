@@ -19,6 +19,7 @@ package org.apache.hadoop.hdds.scm.node;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import org.apache.commons.lang3.tuple.Pair;
+import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
@@ -65,6 +66,8 @@ public class NodeDecommissionManager {
   private ContainerManager containerManager;
   private final SCMContext scmContext;
   private final boolean useHostnames;
+  private int maintenanceReplicaMinimum;
+  private int maintenanceRemainingRedundancy;
 
   // Decommissioning and Maintenance mode progress related metrics.
   private final NodeDecommissionMetrics metrics;
@@ -293,6 +296,8 @@ public class NodeDecommissionManager {
           ScmConfigKeys.OZONE_SCM_DATANODE_ADMIN_MONITOR_INTERVAL_DEFAULT,
           TimeUnit.SECONDS);
     }
+    maintenanceReplicaMinimum = config.getInt("hdds.scm.replication.maintenance.replica.minimum", 2);
+    maintenanceRemainingRedundancy = config.getInt("hdds.scm.replication.maintenance.remaining.redundancy", 1);
 
     monitor = new DatanodeAdminMonitorImpl(config, eventQueue, nodeManager,
         rm);
@@ -542,7 +547,7 @@ public class NodeDecommissionManager {
   }
 
   private synchronized boolean checkIfMaintenancePossible(List<DatanodeDetails> dns, List<DatanodeAdminError> errors) {
-    int numDecom = dns.size();
+    int numMaintenance = dns.size();
     List<DatanodeDetails> validDns = dns.stream().collect(Collectors.toList());
     Collections.copy(validDns, dns);
     int inServiceTotal = nodeManager.getNodeCount(NodeStatus.inServiceHealthy());
@@ -551,11 +556,11 @@ public class NodeDecommissionManager {
         NodeStatus nodeStatus = getNodeStatus(dn);
         NodeOperationalState opState = nodeStatus.getOperationalState();
         if (opState != NodeOperationalState.IN_SERVICE) {
-          numDecom--;
+          numMaintenance--;
           validDns.remove(dn);
         }
       } catch (NodeNotFoundException ex) {
-        numDecom--;
+        numMaintenance--;
         validDns.remove(dn);
       }
     }
@@ -566,7 +571,7 @@ public class NodeDecommissionManager {
         containers = nodeManager.getContainers(dn);
       } catch (NodeNotFoundException ex) {
         LOG.warn("The host {} was not found in SCM. Ignoring the request to " +
-            "decommission it", dn.getHostName());
+            "enter maintenance", dn.getHostName());
         errors.add(new DatanodeAdminError(dn.getHostName(),
             "The host was not found in SCM"));
         continue; // ignore the DN and continue to next one
@@ -584,12 +589,22 @@ public class NodeDecommissionManager {
               cif.getState().equals(HddsProtos.LifeCycleState.DELETING)) {
             continue;
           }
-          int reqNodes = cif.getReplicationConfig().getRequiredNodes();
-          if ((inServiceTotal - numDecom) < reqNodes) {
-            LOG.info("Cannot decommission nodes. Tried to decommission {} nodes of which valid nodes = {}. " +
+
+          int minInService;
+          HddsProtos.ReplicationType replicationType = cif.getReplicationType();
+          if (replicationType.equals(HddsProtos.ReplicationType.EC)) {
+            int reqNodes = cif.getReplicationConfig().getRequiredNodes();
+            int data = ((ECReplicationConfig)cif.getReplicationConfig()).getData();
+            minInService = Math.min((data + maintenanceRemainingRedundancy), reqNodes);
+          } else {
+            minInService = maintenanceReplicaMinimum;
+          }
+          if ((inServiceTotal - numMaintenance) < minInService) {
+            LOG.info("Cannot enter nodes into maintenance. Tried to start maintenance for {} nodes " +
+                    "of which valid nodes = {}. " +
                     "Cluster state: In-service nodes = {}, nodes required for replication = {}. " +
                     "Failing due to datanode : {}, container : {}",
-                dns.size(), numDecom, inServiceTotal, reqNodes, dn, cid);
+                dns.size(), numMaintenance, inServiceTotal, minInService, dn, cid);
             return false;
           }
         }
