@@ -66,8 +66,8 @@ public class NodeDecommissionManager {
   private ContainerManager containerManager;
   private final SCMContext scmContext;
   private final boolean useHostnames;
-  private int maintenanceReplicaMinimum;
-  private int maintenanceRemainingRedundancy;
+  private Integer maintenanceReplicaMinimum;
+  private Integer maintenanceRemainingRedundancy;
 
   // Decommissioning and Maintenance mode progress related metrics.
   private final NodeDecommissionMetrics metrics;
@@ -647,7 +647,11 @@ public class NodeDecommissionManager {
 
   @VisibleForTesting
   public void setMaintenanceConfigs(int replicaMinimum, int remainingRedundancy) {
-    maintenanceRemainingRedundancy = remainingRedundancy;
-    maintenanceReplicaMinimum = replicaMinimum;
+    synchronized (maintenanceReplicaMinimum) {
+      maintenanceRemainingRedundancy = remainingRedundancy;
+    }
+    synchronized (maintenanceRemainingRedundancy) {
+      maintenanceReplicaMinimum = replicaMinimum;
+    }
   }
 }

@@ -667,7 +667,7 @@ public class TestNodeDecommissionManager {
       nodeManager.setContainers(dn, idsRatis);
     }
 
-    decom.setMaintenanceConfigs(2,1); // default config
+    decom.setMaintenanceConfigs(2, 1); // default config
     // putting 4 DNs into maintenance leave the cluster with 1 DN,
     // it should not be allowed as maintenance.replica.minimum is 2
     error = decom.startMaintenanceNodes(Arrays.asList(dns.get(1).getIpAddress(),
@@ -698,7 +698,7 @@ public class TestNodeDecommissionManager {
     decom.getMonitor().run();
     assertEquals(5, nodeManager.getNodeCount(NodeStatus.inServiceHealthy()));
 
-    decom.setMaintenanceConfigs(3,1); // non-default config
+    decom.setMaintenanceConfigs(3, 1); // non-default config
     // putting 3 DNs into maintenance leave the cluster with 2 DN,
     // it should not be allowed as maintenance.replica.minimum is 3
     error = decom.startMaintenanceNodes(Arrays.asList(dns.get(1).getIpAddress(),
@@ -762,10 +762,11 @@ public class TestNodeDecommissionManager {
       nodeManager.setContainers(dn, idsEC);
     }
 
-    decom.setMaintenanceConfigs(2,1); // default config
+    decom.setMaintenanceConfigs(2, 1); // default config
     // putting 2 DNs into maintenance leave the cluster with 3 DN,
     // it should not be allowed as maintenance.remaining.redundancy is 1 => 3+1=4 DNs are required
-    error = decom.startMaintenanceNodes(Arrays.asList(dns.get(1).getIpAddress(), dns.get(2).getIpAddress()), 100, false);
+    error = decom.startMaintenanceNodes(Arrays.asList(dns.get(1).getIpAddress(), dns.get(2).getIpAddress()),
+        100, false);
     assertTrue(error.get(0).getHostname().contains("AllHosts"));
     assertEquals(HddsProtos.NodeOperationalState.IN_SERVICE,
         nodeManager.getNodeStatus(dns.get(1)).getOperationalState());
@@ -782,7 +783,7 @@ public class TestNodeDecommissionManager {
     decom.getMonitor().run();
     assertEquals(5, nodeManager.getNodeCount(NodeStatus.inServiceHealthy()));
 
-    decom.setMaintenanceConfigs(2,2); // non-default config
+    decom.setMaintenanceConfigs(2, 2); // non-default config
     // putting 1 DNs into maintenance leave the cluster with 4 DN,
     // it should not be allowed as maintenance.remaining.redundancy is 2 => 3+2=5 DNs are required
     error = decom.startMaintenanceNodes(Arrays.asList(dns.get(1).getIpAddress()), 100, false);
@@ -842,10 +843,11 @@ public class TestNodeDecommissionManager {
       nodeManager.setContainers(dn, idsEC);
     }
 
-    decom.setMaintenanceConfigs(2,1); // default config
+    decom.setMaintenanceConfigs(2, 1); // default config
     // putting 2 DNs into maintenance leave the cluster with 3 DN,
     // it should not be allowed as maintenance.remaining.redundancy is 1 => 3+1=4 DNs are required
-    error = decom.startMaintenanceNodes(Arrays.asList(dns.get(1).getIpAddress(), dns.get(2).getIpAddress()), 100, false);
+    error = decom.startMaintenanceNodes(Arrays.asList(dns.get(1).getIpAddress(), dns.get(2).getIpAddress()),
+        100, false);
     assertTrue(error.get(0).getHostname().contains("AllHosts"));
     assertEquals(HddsProtos.NodeOperationalState.IN_SERVICE,
         nodeManager.getNodeStatus(dns.get(1)).getOperationalState());
@@ -862,7 +864,7 @@ public class TestNodeDecommissionManager {
     decom.getMonitor().run();
     assertEquals(5, nodeManager.getNodeCount(NodeStatus.inServiceHealthy()));
 
-    decom.setMaintenanceConfigs(3,2); // non-default config
+    decom.setMaintenanceConfigs(3, 2); // non-default config
     // putting 1 DNs into maintenance leave the cluster with 4 DN,
     // it should not be allowed as for EC, maintenance.remaining.redundancy is 2 => 3+2=5 DNs are required
     error = decom.startMaintenanceNodes(Arrays.asList(dns.get(1).getIpAddress()), 100, false);
