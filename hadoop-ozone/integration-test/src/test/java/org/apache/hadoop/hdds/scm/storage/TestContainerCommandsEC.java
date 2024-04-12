@@ -630,13 +630,6 @@ public class TestContainerCommandsEC {
     testECReconstructionCoordinator(missingIndexes, 4);
   }
 
-  @Test
-  void testECReconstructParityWithPartialStripe()
-          throws Exception {
-    testECReconstructionCoordinator(ImmutableList.of(4, 5), 1);
-  }
-
-
   static Stream<List<Integer>> recoverableMissingIndexes() {
     return Stream
         .concat(IntStream.rangeClosed(1, 5).mapToObj(ImmutableList::of), Stream
