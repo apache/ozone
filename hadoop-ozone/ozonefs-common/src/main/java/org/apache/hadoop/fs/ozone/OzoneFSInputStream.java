@@ -24,6 +24,9 @@ import java.io.InputStream;
 import java.nio.ByteBuffer;
 import java.nio.ReadOnlyBufferException;
 
+import io.opentracing.Scope;
+import io.opentracing.Span;
+import io.opentracing.util.GlobalTracer;
 import org.apache.hadoop.fs.CanUnbuffer;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.annotation.InterfaceStability;
@@ -32,6 +35,7 @@ import org.apache.hadoop.fs.ByteBufferPositionedReadable;
 import org.apache.hadoop.fs.FSInputStream;
 import org.apache.hadoop.fs.FileSystem.Statistics;
 import org.apache.hadoop.fs.Seekable;
+import org.apache.hadoop.hdds.tracing.TracingUtil;
 
 /**
  * The input stream for Ozone file system.
@@ -54,25 +58,40 @@ public class OzoneFSInputStream extends FSInputStream
 
   @Override
   public int read() throws IOException {
-    int byteRead = inputStream.read();
-    if (statistics != null && byteRead >= 0) {
-      statistics.incrementBytesRead(1);
+    Span span = GlobalTracer.get()
+        .buildSpan("OzoneFSInputStream.read").start();
+    try (Scope scope = GlobalTracer.get().activateSpan(span)) {
+      int byteRead = inputStream.read();
+      if (statistics != null && byteRead >= 0) {
+        statistics.incrementBytesRead(1);
+      }
+      return byteRead;
+    } finally {
+      span.finish();
     }
-    return byteRead;
   }
 
   @Override
   public int read(byte[] b, int off, int len) throws IOException {
-    int bytesRead = inputStream.read(b, off, len);
-    if (statistics != null && bytesRead >= 0) {
-      statistics.incrementBytesRead(bytesRead);
+    Span span = GlobalTracer.get()
+        .buildSpan("OzoneFSInputStream.read").start();
+    try (Scope scope = GlobalTracer.get().activateSpan(span)) {
+      span.setTag("offset", off)
+          .setTag("length", len);
+      int bytesRead = inputStream.read(b, off, len);
+      if (statistics != null && bytesRead >= 0) {
+        statistics.incrementBytesRead(bytesRead);
+      }
+      return bytesRead;
+    } finally {
+      span.finish();
     }
-    return bytesRead;
   }
 
   @Override
   public synchronized void close() throws IOException {
-    inputStream.close();
+    TracingUtil.executeInNewSpan("OzoneFSInputStream.close",
+        inputStream::close);
   }
 
   @Override
@@ -103,6 +122,11 @@ public class OzoneFSInputStream extends FSInputStream
    */
   @Override
   public int read(ByteBuffer buf) throws IOException {
+    return TracingUtil.executeInNewSpan("OzoneFSInputStream.read(ByteBuffer)",
+        () -> readInTrace(buf));
+  }
+
+  private int readInTrace(ByteBuffer buf) throws IOException {
     if (buf.isReadOnly()) {
       throw new ReadOnlyBufferException();
     }
