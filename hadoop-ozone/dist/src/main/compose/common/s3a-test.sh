@@ -20,8 +20,8 @@
 # Requires HADOOP_AWS_DIR to point the directory containing hadoop-aws sources.
 
 if [[ -z ${HADOOP_AWS_DIR} ]] || [[ ! -e ${HADOOP_AWS_DIR} ]]; then
-  echo "Set HADOOP_AWS_DIR to the directory with hadoop-aws sources" >&2
-  exit 1
+  echo "Skipping S3A tests due to missing HADOOP_AWS_DIR (directory with hadoop-aws sources)" >&2
+  exit
 fi
 
 # shellcheck source=/dev/null
