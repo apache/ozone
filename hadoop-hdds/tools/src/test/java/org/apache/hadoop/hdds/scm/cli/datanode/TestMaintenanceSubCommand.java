@@ -37,6 +37,7 @@ import picocli.CommandLine;
 
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.Mockito.anyInt;
 import static org.mockito.Mockito.anyList;
 import static org.mockito.Mockito.mock;
@@ -72,7 +73,7 @@ public class TestMaintenanceSubCommand {
 
   @Test
   public void testMultipleHostnamesCanBeReadFromStdin() throws Exception {
-    when(scmClient.decommissionNodes(anyList()))
+    when(scmClient.decommissionNodes(anyList(), anyBoolean()))
             .thenAnswer(invocation -> new ArrayList<DatanodeAdminError>());
 
     String input = "host1\nhost2\nhost3\n";
