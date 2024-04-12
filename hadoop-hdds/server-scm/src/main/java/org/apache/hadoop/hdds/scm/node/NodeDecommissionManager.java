@@ -296,8 +296,8 @@ public class NodeDecommissionManager {
           ScmConfigKeys.OZONE_SCM_DATANODE_ADMIN_MONITOR_INTERVAL_DEFAULT,
           TimeUnit.SECONDS);
     }
-    maintenanceReplicaMinimum = config.getInt("hdds.scm.replication.maintenance.replica.minimum", 2);
-    maintenanceRemainingRedundancy = config.getInt("hdds.scm.replication.maintenance.remaining.redundancy", 1);
+    setMaintenanceConfigs(config.getInt("hdds.scm.replication.maintenance.replica.minimum", 2),
+        config.getInt("hdds.scm.replication.maintenance.remaining.redundancy", 1));
 
     monitor = new DatanodeAdminMonitorImpl(config, eventQueue, nodeManager,
         rm);
@@ -647,11 +647,7 @@ public class NodeDecommissionManager {
 
   @VisibleForTesting
   public void setMaintenanceConfigs(int replicaMinimum, int remainingRedundancy) {
-    synchronized (maintenanceReplicaMinimum) {
-      maintenanceRemainingRedundancy = remainingRedundancy;
-    }
-    synchronized (maintenanceRemainingRedundancy) {
-      maintenanceReplicaMinimum = replicaMinimum;
-    }
+    maintenanceRemainingRedundancy = remainingRedundancy;
+    maintenanceReplicaMinimum = replicaMinimum;
   }
 }
