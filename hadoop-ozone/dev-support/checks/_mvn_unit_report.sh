@@ -81,8 +81,8 @@ for failed_test in $(< ${REPORT_DIR}/summary.txt); do
       \( -name "${failed_test}.txt" -or -name "${failed_test}-output.txt" -or -name "TEST-${failed_test}.xml" \)); do
     dir=$(dirname "${file}")
     dest_dir=$(_realpath --relative-to="${PWD}" "${dir}/../..") || continue
-    mkdir -p "${REPORT_DIR}/${dest_dir}"
-    mv "${file}" "${REPORT_DIR}/${dest_dir}"/
+    mkdir -pv "${REPORT_DIR}/${dest_dir}"
+    mv -v "${file}" "${REPORT_DIR}/${dest_dir}"/
   done
 done
 
