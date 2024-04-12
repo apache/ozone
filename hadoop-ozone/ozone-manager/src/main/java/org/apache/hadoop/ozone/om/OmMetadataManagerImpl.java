@@ -1850,7 +1850,8 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
                 .setVolumeName(info.getVolumeName())
                 .setBucketName(info.getBucketName())
                 .setKeyName(info.getKeyName())
-                .setDataSize(info.getDataSize());
+                .setDataSize(info.getDataSize())
+                .setParentObjectId(info.getParentObjectID());
             java.util.Optional.ofNullable(info.getLatestVersionLocations())
                 .map(OmKeyLocationInfoGroup::getLocationList)
                 .map(Collection::stream)

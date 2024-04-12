@@ -63,6 +63,7 @@ public final class OmFSOFile {
     private String keyName;
     private OMMetadataManager omMetadataManager;
     private String errMsg;
+    private Long parentObjectId;
 
     public Builder() {
       this.errMsg = null;
@@ -83,6 +84,11 @@ public final class OmFSOFile {
       return this;
     }
 
+    public Builder setParentObjectId(Long parentObjectId) {
+      this.parentObjectId = parentObjectId;
+      return this;
+    }
+
     public Builder setOmMetadataManager(OMMetadataManager omMetadataManager) {
       this.omMetadataManager = omMetadataManager;
       return this;
@@ -97,7 +103,8 @@ public final class OmFSOFile {
       String fileName = OzoneFSUtils.getFileName(this.keyName);
       final long volumeId = omMetadataManager.getVolumeId(this.volumeName);
       final long bucketId = omMetadataManager.getBucketId(this.volumeName, this.bucketName);
-      long parentID = OMFileRequest
+
+      long parentID = (parentObjectId != null) ? parentObjectId : OMFileRequest
           .getParentID(volumeId, bucketId, this.keyName,
           this.omMetadataManager, this.errMsg);
 

@@ -85,6 +85,7 @@ public class OMKeyCommitRequestWithFSO extends OMKeyCommitRequest {
     String volumeName = commitKeyArgs.getVolumeName();
     String bucketName = commitKeyArgs.getBucketName();
     String keyName = commitKeyArgs.getKeyName();
+    Long parentObjectId = commitKeyArgs.hasParentObjectId() ? commitKeyArgs.getParentObjectId() : null;
 
     OMMetrics omMetrics = ozoneManager.getMetrics();
 
@@ -139,6 +140,7 @@ public class OMKeyCommitRequestWithFSO extends OMKeyCommitRequest {
           .setKeyName(keyName)
           .setOmMetadataManager(omMetadataManager)
           .setErrMsg(errMsg)
+          .setParentObjectId(parentObjectId)
           .build();
 
       String fileName = fsoFile.getFileName();
