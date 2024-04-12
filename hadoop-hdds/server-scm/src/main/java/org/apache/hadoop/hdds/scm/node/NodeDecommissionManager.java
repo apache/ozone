@@ -644,4 +644,10 @@ public class NodeDecommissionManager {
       }
     });
   }
+
+  @VisibleForTesting
+  public void setMaintenanceConfigs(int replicaMinimum, int remainingRedundancy) {
+    maintenanceRemainingRedundancy = remainingRedundancy;
+    maintenanceReplicaMinimum = replicaMinimum;
+  }
 }
