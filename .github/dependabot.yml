@@ -16,6 +16,9 @@ version: 2
 updates:
   - package-ecosystem: maven
     directory: "/"
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
     schedule:
       interval: "weekly"
       day: "saturday"
