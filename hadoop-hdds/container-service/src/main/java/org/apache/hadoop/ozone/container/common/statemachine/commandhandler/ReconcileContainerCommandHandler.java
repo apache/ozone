@@ -45,7 +45,7 @@ public class ReconcileContainerCommandHandler implements CommandHandler {
       SCMConnectionManager connectionManager) {
     queuedCount.incrementAndGet();
     CompletableFuture.runAsync(() -> {
-      queuedCount.incrementAndGet();
+      invocationCount.incrementAndGet();
       long startTime = Time.monotonicNow();
       ReconcileContainerCommand reconcileCommand = (ReconcileContainerCommand) command;
       LOG.info("Processing reconcile container command for container {} with peers {}",

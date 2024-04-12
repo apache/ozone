@@ -37,10 +37,13 @@ import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandRequestProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerType;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
+import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.security.token.TokenVerifier;
 import org.apache.hadoop.ozone.container.common.ContainerTestUtils;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerMetrics;
+import org.apache.hadoop.ozone.container.common.helpers.ContainerUtils;
 import org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion;
 import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
 import org.apache.hadoop.ozone.container.common.impl.HddsDispatcher;
@@ -56,7 +59,9 @@ import org.apache.ozone.test.GenericTestUtils;
 
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DATANODE_VOLUME_CHOOSING_POLICY;
 import static org.apache.hadoop.hdds.HddsConfigKeys.OZONE_METADATA_DIRS;
+import static org.apache.hadoop.hdds.protocol.MockDatanodeDetails.randomDatanodeDetails;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.HDDS_DATANODE_DIR_KEY;
+import static org.apache.hadoop.ozone.OzoneConsts.GB;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -64,6 +69,8 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.any;
 
+import org.checkerframework.checker.units.qual.A;
+import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
@@ -431,6 +438,39 @@ public class TestKeyValueHandler {
     } finally {
       FileUtils.deleteDirectory(new File(testDir));
     }
+  }
+
+  @ContainerLayoutTestInfo.ContainerTest
+  public void testReconcileContainer(ContainerLayoutVersion layoutVersion) throws Exception {
+    OzoneConfiguration conf = new OzoneConfiguration();
+
+    KeyValueContainerData data = new KeyValueContainerData(123L, layoutVersion, GB,
+        PipelineID.randomId().toString(), randomDatanodeDetails().getUuidString());
+
+    Container container = new KeyValueContainer(data, conf);
+    ContainerSet containerSet = new ContainerSet(1000);
+    containerSet.addContainer(container);
+
+    // Allows checking the invocation count of the lambda.
+    AtomicInteger icrCount = new AtomicInteger(0);
+    KeyValueHandler keyValueHandler = new KeyValueHandler(conf, randomDatanodeDetails().getUuidString(), containerSet,
+        mock(MutableVolumeSet.class), mock(ContainerMetrics.class), c -> {
+      // Check that the ICR contains expected info about the container.
+      ContainerReplicaProto report = c.getContainerReport();
+      long reportedID = report.getContainerID();
+      Assertions.assertEquals(container.getContainerData().getContainerID(), reportedID);
+
+      String reportDataChecksum = report.getDataChecksum();
+      String expectedDataChecksum = ContainerUtils.getChecksum(Long.toString(reportedID));
+      Assertions.assertEquals(expectedDataChecksum, reportDataChecksum,
+          "Checksum mismatch in report of container " + reportedID);
+      icrCount.incrementAndGet();
+    });
+
+    Assertions.assertEquals(0, icrCount.get());
+    // This should trigger container report validation in the ICR handler above.
+    keyValueHandler.reconcileContainer(container, Collections.emptyList());
+    Assertions.assertEquals(1, icrCount.get());
   }
 
   private static ContainerCommandRequestProto createContainerRequest(
