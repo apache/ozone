@@ -23,7 +23,9 @@ import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
+import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.OmMultipartKeyInfo;
 import org.apache.hadoop.ozone.om.request.file.OMFileRequest;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.om.response.s3.multipart.S3MultipartUploadCompleteResponse;
@@ -73,6 +75,37 @@ public class S3MultipartUploadCompleteRequestWithFSO
           NOT_A_FILE);
     }
   }
+
+  @Override
+  protected void addMissingParentsToCache(OmBucketInfo omBucketInfo,
+      List<OmDirectoryInfo> missingParentInfos,
+      OMMetadataManager omMetadataManager, long volumeId, long bucketId,
+      long transactionLogIndex) throws IOException {
+
+    // validate and update namespace for missing parent directory.
+    checkBucketQuotaInNamespace(omBucketInfo, missingParentInfos.size());
+    omBucketInfo.incrUsedNamespace(missingParentInfos.size());
+
+    // Add cache entries for the missing parent directories.
+    OMFileRequest.addDirectoryTableCacheEntries(omMetadataManager,
+        volumeId, bucketId, transactionLogIndex,
+        missingParentInfos, null);
+  }
+
+  @Override
+  protected void addMultiPartToCache(
+      OMMetadataManager omMetadataManager, String multipartOpenKey,
+      OMFileRequest.OMPathInfoWithFSO pathInfoFSO, OmKeyInfo omKeyInfo,
+      long transactionLogIndex
+  ) throws IOException {
+
+    // Add multi part to cache
+    OMFileRequest.addOpenFileTableCacheEntry(omMetadataManager,
+        multipartOpenKey, omKeyInfo, pathInfoFSO.getLeafNodeName(),
+        transactionLogIndex);
+
+  }
+
 
   @Override
   protected OmKeyInfo getOmKeyInfoFromKeyTable(String dbOzoneFileKey,
@@ -162,11 +195,13 @@ public class S3MultipartUploadCompleteRequestWithFSO
       OzoneManagerProtocolProtos.OMResponse.Builder omResponse,
       String dbMultipartOpenKey, OmKeyInfo omKeyInfo,
       List<OmKeyInfo> allKeyInfoToRemove, OmBucketInfo omBucketInfo,
-      long volumeId, long bucketId) {
+      long volumeId, long bucketId, List<OmDirectoryInfo> missingParentInfos,
+      OmMultipartKeyInfo multipartKeyInfo) {
 
     return new S3MultipartUploadCompleteResponseWithFSO(omResponse.build(),
         multipartKey, dbMultipartOpenKey, omKeyInfo, allKeyInfoToRemove,
-        getBucketLayout(), omBucketInfo, volumeId, bucketId);
+        getBucketLayout(), omBucketInfo, volumeId, bucketId,
+        missingParentInfos, multipartKeyInfo);
   }
 
   @Override
