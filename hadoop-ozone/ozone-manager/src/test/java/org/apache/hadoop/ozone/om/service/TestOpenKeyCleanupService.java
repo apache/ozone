@@ -281,13 +281,15 @@ class TestOpenKeyCleanupService {
     when(om.getScmClient().getContainerClient().getContainerWithPipeline(anyLong()))
         .thenReturn(new ContainerWithPipeline(Mockito.mock(ContainerInfo.class), pipeline));
 
+    // Create 5 keys with directories
     createOpenKeys(keyCount / 2, true, BucketLayout.FILE_SYSTEM_OPTIMIZED, false, true);
+    // Create 5 keys without directory
     createOpenKeys(keyCount / 2, true, BucketLayout.FILE_SYSTEM_OPTIMIZED, false, false);
 
     // wait for open keys to expire
     Thread.sleep(EXPIRE_THRESHOLD_MS);
 
-    // Only 10 keys should be returned after hard limit period, as 2 key is having recovery flag set
+    // 10 keys should be returned after hard limit period
     assertEquals(keyCount, getExpiredOpenKeys(true, BucketLayout.FILE_SYSTEM_OPTIMIZED));
     assertExpiredOpenKeys(false, true,
         BucketLayout.FILE_SYSTEM_OPTIMIZED);
