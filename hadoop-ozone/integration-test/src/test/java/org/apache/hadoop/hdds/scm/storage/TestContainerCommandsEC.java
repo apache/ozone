@@ -136,7 +136,9 @@ public class TestContainerCommandsEC {
   private static final int EC_CHUNK_SIZE = 1024 * 1024;
   private static final int STRIPE_DATA_SIZE = EC_DATA * EC_CHUNK_SIZE;
   private static final int NUM_DN = EC_DATA + EC_PARITY + 3;
-  private static byte[][] inputChunks = new byte[EC_DATA][EC_CHUNK_SIZE];
+  // Data slots are EC_DATA + 1 so we can generate enough data to have a full stripe
+  // plus one extra chunk.
+  private static byte[][] inputChunks = new byte[EC_DATA + 1][EC_CHUNK_SIZE];
 
   // Each key size will be in range [min, max), min inclusive, max exclusive
   private static final int[][] KEY_SIZE_RANGES =
@@ -621,12 +623,12 @@ public class TestContainerCommandsEC {
     testECReconstructionCoordinator(missingIndexes, 1);
   }
 
-  @Test
-  void testECReconstructParityWithPartialStripe()
-          throws Exception {
-    testECReconstructionCoordinator(ImmutableList.of(4, 5), 1);
+  @ParameterizedTest
+  @MethodSource("recoverableMissingIndexes")
+  void testECReconstructionCoordinatorWithFullAndPartialStripe(List<Integer> missingIndexes)
+      throws Exception {
+    testECReconstructionCoordinator(missingIndexes, 4);
   }
-
 
   static Stream<List<Integer>> recoverableMissingIndexes() {
     return Stream

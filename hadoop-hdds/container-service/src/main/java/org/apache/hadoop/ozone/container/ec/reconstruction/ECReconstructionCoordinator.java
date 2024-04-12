@@ -323,9 +323,13 @@ public class ECReconstructionCoordinator implements Closeable {
             }
             // TODO: can be submitted in parallel
             for (int i = 0; i < bufs.length; i++) {
-              CompletableFuture<ContainerProtos.ContainerCommandResponseProto>
-                  future = targetBlockStreams[i].write(bufs[i]);
-              checkFailures(targetBlockStreams[i], future);
+              if (bufs[i].remaining() != 0) {
+                // If the buffer is empty, we don't need to write it as it will cause
+                // an empty chunk to be added to the end of the block.
+                CompletableFuture<ContainerProtos.ContainerCommandResponseProto>
+                    future = targetBlockStreams[i].write(bufs[i]);
+                checkFailures(targetBlockStreams[i], future);
+              }
               bufs[i].clear();
             }
             length -= readLen;
