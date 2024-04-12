@@ -58,6 +58,7 @@ import java.io.Closeable;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
@@ -247,24 +248,15 @@ public class ECReconstructionCoordinator implements Closeable {
     int dataLocs = ECBlockInputStreamProxy
         .expectedDataLocations(repConfig, safeBlockGroupLength);
     List<Integer> toReconstructIndexes = new ArrayList<>();
+    List<Integer> notReconstructIndexes = new ArrayList<>();
     for (Integer index : missingContainerIndexes) {
       if (index <= dataLocs || index > repConfig.getData()) {
         toReconstructIndexes.add(index);
+      } else {
+        // Don't need to be reconstructed, but we do need a stream to write
+        // the block data to.
+        notReconstructIndexes.add(index);
       }
-      // else padded indexes.
-    }
-
-    // Looks like we don't need to reconstruct any missing blocks in this block
-    // group. The reason for this should be block group had only padding blocks
-    // in the missing locations.
-    if (toReconstructIndexes.size() == 0) {
-      if (LOG.isDebugEnabled()) {
-        LOG.debug("Skipping the reconstruction for the block: "
-            + blockLocationInfo.getBlockID() + ". In the missing locations: "
-            + missingContainerIndexes
-            + ", this block group has only padded blocks.");
-      }
-      return;
     }
 
     OzoneClientConfig clientConfig = this.ozoneClientConfig;
@@ -279,71 +271,78 @@ public class ECReconstructionCoordinator implements Closeable {
 
       ECBlockOutputStream[] targetBlockStreams =
           new ECBlockOutputStream[toReconstructIndexes.size()];
+      ECBlockOutputStream[] emptyBlockStreams =
+          new ECBlockOutputStream[notReconstructIndexes.size()];
       ByteBuffer[] bufs = new ByteBuffer[toReconstructIndexes.size()];
       try {
+        // Create streams and buffers for all indexes that need reconstructed
         for (int i = 0; i < toReconstructIndexes.size(); i++) {
           int replicaIndex = toReconstructIndexes.get(i);
-          DatanodeDetails datanodeDetails =
-              targetMap.get(replicaIndex);
-          targetBlockStreams[i] = getECBlockOutputStream(blockLocationInfo,
-              datanodeDetails, repConfig, replicaIndex
-          );
+          DatanodeDetails datanodeDetails = targetMap.get(replicaIndex);
+          targetBlockStreams[i] = getECBlockOutputStream(blockLocationInfo, datanodeDetails, repConfig, replicaIndex);
           bufs[i] = byteBufferPool.getBuffer(false, repConfig.getEcChunkSize());
-          // Make sure it's clean. Don't want to reuse the erroneously returned
-          // buffers from the pool.
           bufs[i].clear();
         }
-
-        sis.setRecoveryIndexes(toReconstructIndexes.stream().map(i -> (i - 1))
-            .collect(Collectors.toSet()));
-        long length = safeBlockGroupLength;
-        while (length > 0) {
-          int readLen;
-          try {
-            readLen = sis.recoverChunks(bufs);
-            Set<Integer> failedIndexes = sis.getFailedIndexes();
-            if (!failedIndexes.isEmpty()) {
-              // There was a problem reading some of the block indexes, but we
-              // did not get an exception as there must have been spare indexes
-              // to try and recover from. Therefore we should log out the block
-              // group details in the same way as for the exception case below.
-              logBlockGroupDetails(blockLocationInfo, repConfig,
-                  blockDataGroup);
-            }
-          } catch (IOException e) {
-            // When we see exceptions here, it could be due to some transient
-            // issue that causes the block read to fail when reconstructing it,
-            // but we have seen issues where the containers don't have the
-            // blocks they appear they should have, or the block chunks are the
-            // wrong length etc. In order to debug these sort of cases, if we
-            // get an error, we will log out the details about the block group
-            // length on each source, along with their chunk list and chunk
-            // lengths etc.
-            logBlockGroupDetails(blockLocationInfo, repConfig,
-                blockDataGroup);
-            throw e;
-          }
-          // TODO: can be submitted in parallel
-          for (int i = 0; i < bufs.length; i++) {
-            CompletableFuture<ContainerProtos.ContainerCommandResponseProto>
-                future = targetBlockStreams[i].write(bufs[i]);
-            checkFailures(targetBlockStreams[i], future);
-            bufs[i].clear();
-          }
-          length -= readLen;
+        // Then create a stream for all indexes that don't need reconstructed, but still need a stream to
+        // write the empty block data to.
+        for (int i = 0; i < notReconstructIndexes.size(); i++) {
+          int replicaIndex = notReconstructIndexes.get(i);
+          DatanodeDetails datanodeDetails = targetMap.get(replicaIndex);
+          emptyBlockStreams[i] = getECBlockOutputStream(blockLocationInfo, datanodeDetails, repConfig, replicaIndex);
         }
 
-        for (ECBlockOutputStream targetStream : targetBlockStreams) {
-          targetStream.executePutBlock(true, true,
-              blockLocationInfo.getLength(), blockDataGroup);
-          checkFailures(targetStream,
-              targetStream.getCurrentPutBlkResponseFuture());
+        if (toReconstructIndexes.size() > 0) {
+          sis.setRecoveryIndexes(toReconstructIndexes.stream().map(i -> (i - 1))
+              .collect(Collectors.toSet()));
+          long length = safeBlockGroupLength;
+          while (length > 0) {
+            int readLen;
+            try {
+              readLen = sis.recoverChunks(bufs);
+              Set<Integer> failedIndexes = sis.getFailedIndexes();
+              if (!failedIndexes.isEmpty()) {
+                // There was a problem reading some of the block indexes, but we
+                // did not get an exception as there must have been spare indexes
+                // to try and recover from. Therefore we should log out the block
+                // group details in the same way as for the exception case below.
+                logBlockGroupDetails(blockLocationInfo, repConfig,
+                    blockDataGroup);
+              }
+            } catch (IOException e) {
+              // When we see exceptions here, it could be due to some transient
+              // issue that causes the block read to fail when reconstructing it,
+              // but we have seen issues where the containers don't have the
+              // blocks they appear they should have, or the block chunks are the
+              // wrong length etc. In order to debug these sort of cases, if we
+              // get an error, we will log out the details about the block group
+              // length on each source, along with their chunk list and chunk
+              // lengths etc.
+              logBlockGroupDetails(blockLocationInfo, repConfig,
+                  blockDataGroup);
+              throw e;
+            }
+            // TODO: can be submitted in parallel
+            for (int i = 0; i < bufs.length; i++) {
+              CompletableFuture<ContainerProtos.ContainerCommandResponseProto>
+                  future = targetBlockStreams[i].write(bufs[i]);
+              checkFailures(targetBlockStreams[i], future);
+              bufs[i].clear();
+            }
+            length -= readLen;
+          }
+        }
+        List<ECBlockOutputStream> allStreams = new ArrayList<>(Arrays.asList(targetBlockStreams));
+        allStreams.addAll(Arrays.asList(emptyBlockStreams));
+        for (ECBlockOutputStream targetStream : allStreams) {
+          targetStream.executePutBlock(true, true, blockLocationInfo.getLength(), blockDataGroup);
+          checkFailures(targetStream, targetStream.getCurrentPutBlkResponseFuture());
         }
       } finally {
         for (ByteBuffer buf : bufs) {
           byteBufferPool.putBuffer(buf);
         }
         IOUtils.cleanupWithLogger(LOG, targetBlockStreams);
+        IOUtils.cleanupWithLogger(LOG, emptyBlockStreams);
       }
     }
   }
