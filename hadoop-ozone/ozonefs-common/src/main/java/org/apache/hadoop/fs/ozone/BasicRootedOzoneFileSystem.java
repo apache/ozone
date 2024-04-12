@@ -18,6 +18,8 @@
 package org.apache.hadoop.fs.ozone;
 
 import com.google.common.base.Preconditions;
+import io.opentracing.Span;
+import io.opentracing.util.GlobalTracer;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.BlockLocation;
 import org.apache.hadoop.fs.CreateFlag;
@@ -41,6 +43,7 @@ import org.apache.hadoop.hdds.annotation.InterfaceStability;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.conf.StorageUnit;
+import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.hdds.utils.LegacyHadoopConfigurationSource;
 import org.apache.hadoop.hdfs.protocol.SnapshotDiffReport;
 import org.apache.hadoop.ozone.OFSPath;
@@ -239,7 +242,12 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
     statistics.incrementReadOps(1);
     LOG.trace("open() path: {}", path);
     final String key = pathToKey(path);
-    return new FSDataInputStream(createFSInputStream(adapter.readFile(key)));
+    return TracingUtil.executeInNewSpan("ofs open",
+        () -> {
+          Span span = GlobalTracer.get().activeSpan();
+          span.setTag("path", key);
+          return new FSDataInputStream(createFSInputStream(adapter.readFile(key)));
+        });
   }
 
   protected InputStream createFSInputStream(InputStream inputStream) {
@@ -263,7 +271,8 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
     incrementCounter(Statistic.INVOCATION_CREATE, 1);
     statistics.incrementWriteOps(1);
     final String key = pathToKey(f);
-    return createOutputStream(key, replication, overwrite, true);
+    return TracingUtil.executeInNewSpan("ofs create",
+        () -> createOutputStream(key, replication, overwrite, true));
   }
 
   @Override
@@ -277,8 +286,10 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
     incrementCounter(Statistic.INVOCATION_CREATE_NON_RECURSIVE, 1);
     statistics.incrementWriteOps(1);
     final String key = pathToKey(path);
-    return createOutputStream(key,
-        replication, flags.contains(CreateFlag.OVERWRITE), false);
+    return TracingUtil.executeInNewSpan("ofs createNonRecursive",
+        () ->
+            createOutputStream(key,
+                replication, flags.contains(CreateFlag.OVERWRITE), false));
   }
 
   private OutputStream selectOutputStream(String key, short replication,
@@ -374,6 +385,14 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
    */
   @Override
   public boolean rename(Path src, Path dst) throws IOException {
+    return TracingUtil.executeInNewSpan("ofs rename",
+        () -> renameInSpan(src, dst));
+  }
+
+  private boolean renameInSpan(Path src, Path dst) throws IOException {
+    Span span = GlobalTracer.get().activeSpan();
+    span.setTag("src", src.toString())
+        .setTag("dst", dst.toString());
     incrementCounter(Statistic.INVOCATION_RENAME, 1);
     statistics.incrementWriteOps(1);
     if (src.equals(dst)) {
@@ -526,8 +545,8 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
   @Override
   public Path createSnapshot(Path path, String snapshotName)
           throws IOException {
-    String snapshot = getAdapter()
-        .createSnapshot(pathToKey(path), snapshotName);
+    String snapshot = TracingUtil.executeInNewSpan("ofs createSnapshot",
+        () -> getAdapter().createSnapshot(pathToKey(path), snapshotName));
     return new Path(OzoneFSUtils.trimPathToDepth(path, PATH_DEPTH_TO_BUCKET),
         OM_SNAPSHOT_INDICATOR + OZONE_URI_DELIMITER + snapshot);
   }
@@ -541,7 +560,8 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
   @Override
   public void deleteSnapshot(Path path, String snapshotName)
       throws IOException {
-    adapter.deleteSnapshot(pathToKey(path), snapshotName);
+    TracingUtil.executeInNewSpan("ofs deleteSnapshot",
+        () -> adapter.deleteSnapshot(pathToKey(path), snapshotName));
   }
 
   private class DeleteIterator extends OzoneListingIterator {
@@ -672,6 +692,11 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
    */
   @Override
   public boolean delete(Path f, boolean recursive) throws IOException {
+    return TracingUtil.executeInNewSpan("ofs delete",
+        () -> deleteInSpan(f, recursive));
+  }
+
+  private boolean deleteInSpan(Path f, boolean recursive) throws IOException {
     incrementCounter(Statistic.INVOCATION_DELETE, 1);
     statistics.incrementWriteOps(1);
     LOG.debug("Delete path {} - recursive {}", f, recursive);
@@ -889,7 +914,8 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
 
   @Override
   public FileStatus[] listStatus(Path f) throws IOException {
-    return convertFileStatusArr(listStatusAdapter(f));
+    return TracingUtil.executeInNewSpan("ofs listStatus",
+        () -> convertFileStatusArr(listStatusAdapter(f)));
   }
 
   private FileStatus[] convertFileStatusArr(
@@ -946,7 +972,8 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
 
   @Override
   public Token<?> getDelegationToken(String renewer) throws IOException {
-    return adapter.getDelegationToken(renewer);
+    return TracingUtil.executeInNewSpan("ofs getDelegationToken",
+        () -> adapter.getDelegationToken(renewer));
   }
 
   /**
@@ -1014,7 +1041,8 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
     if (isEmpty(key)) {
       return false;
     }
-    return mkdir(f);
+    return TracingUtil.executeInNewSpan("ofs mkdirs",
+        () -> mkdir(f));
   }
 
   @Override
@@ -1025,7 +1053,8 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
 
   @Override
   public FileStatus getFileStatus(Path f) throws IOException {    
-    return convertFileStatus(getFileStatusAdapter(f));
+    return TracingUtil.executeInNewSpan("ofs getFileStatus",
+        () -> convertFileStatus(getFileStatusAdapter(f)));
   }
 
   public FileStatusAdapter getFileStatusAdapter(Path f) throws IOException {
@@ -1096,7 +1125,8 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
   public FileChecksum getFileChecksum(Path f, long length) throws IOException {
     incrementCounter(Statistic.INVOCATION_GET_FILE_CHECKSUM);
     String key = pathToKey(f);
-    return adapter.getFileChecksum(key, length);
+    return TracingUtil.executeInNewSpan("ofs getFileChecksum",
+        () -> adapter.getFileChecksum(key, length));
   }
 
   @Override
@@ -1508,6 +1538,11 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
 
   @Override
   public ContentSummary getContentSummary(Path f) throws IOException {
+    return TracingUtil.executeInNewSpan("ofs getContentSummary",
+        () -> getContentSummaryInSpan(f));
+  }
+
+  private ContentSummary getContentSummaryInSpan(Path f) throws IOException {
     FileStatusAdapter status = getFileStatusAdapter(f);
 
     if (status.isFile()) {
@@ -1583,7 +1618,8 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
     if (key.equals("NONE")) {
       throw new FileNotFoundException("File not found. path /NONE.");
     }
-    adapter.setTimes(key, mtime, atime);
+    TracingUtil.executeInNewSpan("ofs setTimes",
+        () -> adapter.setTimes(key, mtime, atime));
   }
 
   protected boolean setSafeModeUtil(SafeModeAction action,
@@ -1595,6 +1631,7 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
       statistics.incrementWriteOps(1);
     }
     LOG.trace("setSafeMode() action:{}", action);
-    return getAdapter().setSafeMode(action, isChecked);
+    return TracingUtil.executeInNewSpan("ofs setSafeMode",
+        () -> getAdapter().setSafeMode(action, isChecked));
   }
 }
