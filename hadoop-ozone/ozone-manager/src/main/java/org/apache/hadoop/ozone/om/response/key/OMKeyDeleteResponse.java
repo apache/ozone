@@ -29,31 +29,31 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
 
 import java.io.IOException;
+import java.util.Map;
 import jakarta.annotation.Nonnull;
 
 import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.BUCKET_TABLE;
 import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.DELETED_TABLE;
 import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.KEY_TABLE;
-import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.OPEN_KEY_TABLE;
 
 /**
  * Response for DeleteKey request.
  */
-@CleanupTableInfo(cleanupTables = {KEY_TABLE, OPEN_KEY_TABLE, DELETED_TABLE, BUCKET_TABLE})
+@CleanupTableInfo(cleanupTables = {KEY_TABLE, DELETED_TABLE, BUCKET_TABLE})
 public class OMKeyDeleteResponse extends AbstractOMKeyDeleteResponse {
 
   private OmKeyInfo omKeyInfo;
   private OmBucketInfo omBucketInfo;
   // If not null, this key will be deleted from OpenKeyTable
-  private String dbOpenKey;
+  private Map<String, OmKeyInfo> openKeyInfoMap;
 
   public OMKeyDeleteResponse(@Nonnull OMResponse omResponse,
       @Nonnull OmKeyInfo omKeyInfo, boolean isRatisEnabled,
-      @Nonnull OmBucketInfo omBucketInfo, String dbOpenKey) {
+      @Nonnull OmBucketInfo omBucketInfo, Map<String, OmKeyInfo> openKeyInfoMap) {
     super(omResponse, isRatisEnabled, omBucketInfo.getBucketLayout());
     this.omKeyInfo = omKeyInfo;
     this.omBucketInfo = omBucketInfo;
-    this.dbOpenKey = dbOpenKey;
+    this.openKeyInfoMap = openKeyInfoMap;
   }
 
   /**
@@ -83,10 +83,13 @@ public class OMKeyDeleteResponse extends AbstractOMKeyDeleteResponse {
         omMetadataManager.getBucketKey(omBucketInfo.getVolumeName(),
             omBucketInfo.getBucketName()), omBucketInfo);
 
-    // Remove open key (necessary when the file is hsync'ed but not committed)
-    if (dbOpenKey != null) {
-      omMetadataManager.getOpenKeyTable(getBucketLayout()).deleteWithBatch(
-          batchOperation, dbOpenKey);
+    // necessary when the file is hsync'ed but not committed
+    // Update metadata which will be used to cleanup openKey in openKeyCleanupService
+    if (!openKeyInfoMap.isEmpty()) {
+      for (Map.Entry<String, OmKeyInfo> entry : openKeyInfoMap.entrySet()) {
+        omMetadataManager.getOpenKeyTable(getBucketLayout()).putWithBatch(
+            batchOperation, entry.getKey(), entry.getValue());
+      }
     }
   }
 
@@ -94,11 +97,12 @@ public class OMKeyDeleteResponse extends AbstractOMKeyDeleteResponse {
     return omKeyInfo;
   }
 
+  protected Map<String, OmKeyInfo> getOpenKeyInfoMap() {
+    return openKeyInfoMap;
+  }
+
   protected OmBucketInfo getOmBucketInfo() {
     return omBucketInfo;
   }
 
-  public String getDbOpenKey() {
-    return dbOpenKey;
-  }
 }

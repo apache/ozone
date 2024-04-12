@@ -62,19 +62,19 @@ public class OMDirectoriesPurgeResponseWithFSO extends OmKeyResponse {
   private boolean isRatisEnabled;
   private Map<Pair<String, String>, OmBucketInfo> volBucketInfoMap;
   private SnapshotInfo fromSnapshotInfo;
-  private List<String> openKeyRemovalList;
+  private Map<String, OmKeyInfo> openKeyInfoMap;
 
   public OMDirectoriesPurgeResponseWithFSO(@Nonnull OMResponse omResponse,
       @Nonnull List<OzoneManagerProtocolProtos.PurgePathRequest> paths,
       boolean isRatisEnabled, @Nonnull BucketLayout bucketLayout,
       Map<Pair<String, String>, OmBucketInfo> volBucketInfoMap,
-      SnapshotInfo fromSnapshotInfo, List<String> openKeyRemovalList) {
+      SnapshotInfo fromSnapshotInfo, Map<String, OmKeyInfo> openKeyInfoMap) {
     super(omResponse, bucketLayout);
     this.paths = paths;
     this.isRatisEnabled = isRatisEnabled;
     this.volBucketInfoMap = volBucketInfoMap;
     this.fromSnapshotInfo = fromSnapshotInfo;
-    this.openKeyRemovalList = openKeyRemovalList;
+    this.openKeyInfoMap = openKeyInfoMap;
   }
 
   @Override
@@ -167,10 +167,10 @@ public class OMDirectoriesPurgeResponseWithFSO extends OmKeyResponse {
             deletedKey, repeatedOmKeyInfo);
       }
 
-      if (!openKeyRemovalList.isEmpty()) {
-        for (String openKey : openKeyRemovalList) {
-          omMetadataManager.getOpenKeyTable(getBucketLayout()).deleteWithBatch(
-              batchOperation, openKey);
+      if (!openKeyInfoMap.isEmpty()) {
+        for (Map.Entry<String, OmKeyInfo> entry : openKeyInfoMap.entrySet()) {
+          omMetadataManager.getOpenKeyTable(getBucketLayout()).putWithBatch(
+              batchOperation, entry.getKey(), entry.getValue());
         }
       }
 

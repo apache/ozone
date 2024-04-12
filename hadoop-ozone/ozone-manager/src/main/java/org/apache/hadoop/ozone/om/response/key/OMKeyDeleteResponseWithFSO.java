@@ -29,18 +29,18 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRespo
 
 import jakarta.annotation.Nonnull;
 import java.io.IOException;
+import java.util.Map;
 
 import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.BUCKET_TABLE;
 import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.DELETED_DIR_TABLE;
 import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.DELETED_TABLE;
 import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.DIRECTORY_TABLE;
 import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.FILE_TABLE;
-import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.OPEN_FILE_TABLE;
 
 /**
  * Response for DeleteKey request.
  */
-@CleanupTableInfo(cleanupTables = {FILE_TABLE, OPEN_FILE_TABLE, DIRECTORY_TABLE,
+@CleanupTableInfo(cleanupTables = {FILE_TABLE, DIRECTORY_TABLE,
     DELETED_TABLE, DELETED_DIR_TABLE, BUCKET_TABLE})
 public class OMKeyDeleteResponseWithFSO extends OMKeyDeleteResponse {
 
@@ -52,8 +52,8 @@ public class OMKeyDeleteResponseWithFSO extends OMKeyDeleteResponse {
   public OMKeyDeleteResponseWithFSO(@Nonnull OMResponse omResponse,
       @Nonnull String keyName, @Nonnull OmKeyInfo omKeyInfo,
       boolean isRatisEnabled, @Nonnull OmBucketInfo omBucketInfo,
-      @Nonnull boolean isDeleteDirectory, @Nonnull long volumeId, String dbOpenKey) {
-    super(omResponse, omKeyInfo, isRatisEnabled, omBucketInfo, dbOpenKey);
+      @Nonnull boolean isDeleteDirectory, @Nonnull long volumeId, Map<String, OmKeyInfo> openKeyInfoMap) {
+    super(omResponse, omKeyInfo, isRatisEnabled, omBucketInfo, openKeyInfoMap);
     this.keyName = keyName;
     this.isDeleteDirectory = isDeleteDirectory;
     this.volumeId = volumeId;
@@ -110,9 +110,11 @@ public class OMKeyDeleteResponseWithFSO extends OMKeyDeleteResponse {
             omMetadataManager.getBucketKey(getOmBucketInfo().getVolumeName(),
                     getOmBucketInfo().getBucketName()), getOmBucketInfo());
 
-    if (getDbOpenKey() != null) {
-      omMetadataManager.getOpenKeyTable(getBucketLayout()).deleteWithBatch(
-          batchOperation, getDbOpenKey());
+    if (!getOpenKeyInfoMap().isEmpty()) {
+      for (Map.Entry<String, OmKeyInfo> entry : getOpenKeyInfoMap().entrySet()) {
+        omMetadataManager.getOpenKeyTable(getBucketLayout()).putWithBatch(
+            batchOperation, entry.getKey(), entry.getValue());
+      }
     }
   }
 

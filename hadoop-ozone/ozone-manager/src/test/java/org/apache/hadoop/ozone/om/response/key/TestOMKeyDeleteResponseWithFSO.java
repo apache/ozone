@@ -27,6 +27,8 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 
+import java.util.Collections;
+
 /**
  * Tests OMKeyDeleteResponse - prefix layout.
  */
@@ -37,7 +39,7 @@ public class TestOMKeyDeleteResponseWithFSO extends TestOMKeyDeleteResponse {
       OzoneManagerProtocolProtos.OMResponse omResponse) throws Exception {
     return new OMKeyDeleteResponseWithFSO(omResponse, omKeyInfo.getKeyName(),
         omKeyInfo, true, getOmBucketInfo(), false,
-        omMetadataManager.getVolumeId(volumeName), null);
+        omMetadataManager.getVolumeId(volumeName), Collections.emptyMap());
   }
 
   @Override

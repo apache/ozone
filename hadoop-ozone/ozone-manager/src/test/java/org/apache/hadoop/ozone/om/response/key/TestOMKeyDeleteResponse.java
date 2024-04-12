@@ -36,6 +36,7 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 
 /**
@@ -171,7 +172,7 @@ public class TestOMKeyDeleteResponse extends TestOMKeyResponse {
 
   protected OMKeyDeleteResponse getOmKeyDeleteResponse(OmKeyInfo omKeyInfo,
       OzoneManagerProtocolProtos.OMResponse omResponse) throws Exception {
-    return new OMKeyDeleteResponse(omResponse, omKeyInfo, true, omBucketInfo, null);
+    return new OMKeyDeleteResponse(omResponse, omKeyInfo, true, omBucketInfo, Collections.emptyMap());
   }
 
   protected OmBucketInfo getOmBucketInfo() {

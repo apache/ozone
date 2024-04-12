@@ -1838,8 +1838,10 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
               .filter(id -> id.equals(clientIdString))
               .isPresent();
 
-          if (!isHsync && openKeyInfo.getCreationTime() <= expiredCreationTimestamp) {
+          if ((!isHsync && openKeyInfo.getCreationTime() <= expiredCreationTimestamp) ||
+              (openKeyInfo.getMetadata().containsKey(OzoneConsts.DELETED_HSYNC_KEY))) {
             // add non-hsync'ed keys
+            // also add hsync keys which are already deleted from keyTable
             expiredKeys.addOpenKey(openKeyInfo, dbOpenKeyName);
             num++;
           } else if (isHsync && openKeyInfo.getModificationTime() <= expiredLeaseTimestamp &&

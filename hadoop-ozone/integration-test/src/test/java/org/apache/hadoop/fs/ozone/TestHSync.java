@@ -86,6 +86,7 @@ import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
+import org.apache.hadoop.ozone.om.service.OpenKeyCleanupService;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.util.Time;
 import org.apache.ozone.test.GenericTestUtils;
@@ -116,6 +117,9 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_DEFAULT_BUCKET_LAYOU
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ADDRESS_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_RATIS_ENABLE_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_DIR_DELETING_SERVICE_INTERVAL;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_OPEN_KEY_CLEANUP_SERVICE_INTERVAL;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_OPEN_KEY_EXPIRE_THRESHOLD;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_LEASE_HARD_LIMIT;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
@@ -148,6 +152,8 @@ public class TestHSync {
   private static final int FLUSH_SIZE = 2 * CHUNK_SIZE;
   private static final int MAX_FLUSH_SIZE = 2 * FLUSH_SIZE;
   private static final int BLOCK_SIZE = 2 * MAX_FLUSH_SIZE;
+  private static final int SERVICE_INTERVAL = 100;
+  private static final int EXPIRE_THRESHOLD_MS = 140;
 
   @BeforeAll
   public static void init() throws Exception {
@@ -163,6 +169,14 @@ public class TestHSync {
     CONF.setBoolean("ozone.client.incremental.chunk.list", true);
     CONF.setBoolean("ozone.client.stream.putblock.piggybacking", true);
     CONF.setBoolean(OZONE_CHUNK_LIST_INCREMENTAL, true);
+    CONF.setTimeDuration(OZONE_OM_OPEN_KEY_CLEANUP_SERVICE_INTERVAL,
+        SERVICE_INTERVAL, TimeUnit.MILLISECONDS);
+    CONF.setTimeDuration(OZONE_OM_OPEN_KEY_EXPIRE_THRESHOLD,
+        EXPIRE_THRESHOLD_MS, TimeUnit.MILLISECONDS);
+    CONF.setTimeDuration(OZONE_OM_LEASE_HARD_LIMIT,
+        EXPIRE_THRESHOLD_MS, TimeUnit.MILLISECONDS);
+    CONF.set(OzoneConfigKeys.OZONE_OM_LEASE_SOFT_LIMIT, "0s");
+
     ClientConfigForTesting.newBuilder(StorageUnit.BYTES)
         .setBlockSize(BLOCK_SIZE)
         .setChunkSize(CHUNK_SIZE)
@@ -402,6 +416,10 @@ public class TestHSync {
   public void testHSyncOpenKeyDeletionWhileDeleteDirectory() throws Exception {
     // Verify that when directory is deleted recursively hsync related openKeys should be deleted,
 
+    OpenKeyCleanupService openKeyCleanupService =
+        (OpenKeyCleanupService) cluster.getOzoneManager().getKeyManager().getOpenKeyCleanupService();
+    openKeyCleanupService.suspend();
+
     // Set the fs.defaultFS
     final String rootPath = String.format("%s://%s/",
         OZONE_OFS_URI_SCHEME, CONF.get(OZONE_OM_ADDRESS_KEY));
@@ -421,6 +439,15 @@ public class TestHSync {
         // Delete directory recursively
         fs.delete(new Path(OZONE_ROOT + bucket.getVolumeName() + OZONE_URI_DELIMITER +
             bucket.getName() + OZONE_URI_DELIMITER + "dir1/"), true);
+
+        // Verify if DELETED_HSYNC_KEY metadata is added to openKey
+        GenericTestUtils.waitFor(() -> {
+          List<OmKeyInfo> omKeyInfo = getOpenKeyInfo(BucketLayout.FILE_SYSTEM_OPTIMIZED);
+          return omKeyInfo.size() > 0 && omKeyInfo.get(0).getMetadata().containsKey(OzoneConsts.DELETED_HSYNC_KEY);
+        }, 1000, 12000);
+
+        // Resume openKeyCleanupService
+        openKeyCleanupService.resume();
 
         // Verify entry from openKey gets deleted eventually
         GenericTestUtils.waitFor(() ->

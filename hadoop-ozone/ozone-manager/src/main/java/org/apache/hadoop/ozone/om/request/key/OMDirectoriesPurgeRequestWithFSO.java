@@ -21,7 +21,6 @@ package org.apache.hadoop.ozone.om.request.key;
 import java.io.IOException;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -42,6 +41,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 
+import static org.apache.hadoop.ozone.OzoneConsts.DELETED_HSYNC_KEY;
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.BUCKET_LOCK;
 
 /**
@@ -67,7 +67,7 @@ public class OMDirectoriesPurgeRequestWithFSO extends OMKeyRequest {
     Set<Pair<String, String>> lockSet = new HashSet<>();
     Map<Pair<String, String>, OmBucketInfo> volBucketInfoMap = new HashMap<>();
     OMMetadataManager omMetadataManager = ozoneManager.getMetadataManager();
-    List<String> openKeyRemovalList = new ArrayList<>();
+    Map<String, OmKeyInfo> openKeyInfoMap = new HashMap<>();
 
     OMMetrics omMetrics = ozoneManager.getMetrics();
     try {
@@ -120,7 +120,11 @@ public class OMDirectoriesPurgeRequestWithFSO extends OMKeyRequest {
             long parentId = keyInfo.getParentObjectID();
             dbOpenKey = omMetadataManager.getOpenFileName(path.getVolumeId(), path.getBucketId(),
                 parentId, keyInfo.getFileName(), hsyncClientId);
-            openKeyRemovalList.add(dbOpenKey);
+            OmKeyInfo openKeyInfo = omMetadataManager.getOpenKeyTable(getBucketLayout()).get(dbOpenKey);
+            if (openKeyInfo != null) {
+              openKeyInfo.getMetadata().put(DELETED_HSYNC_KEY, "true");
+              openKeyInfoMap.put(dbOpenKey, openKeyInfo);
+            }
           }
 
           omMetrics.decNumKeys();
@@ -155,7 +159,7 @@ public class OMDirectoriesPurgeRequestWithFSO extends OMKeyRequest {
         getOmRequest());
     OMClientResponse omClientResponse = new OMDirectoriesPurgeResponseWithFSO(
         omResponse.build(), purgeRequests, ozoneManager.isRatisEnabled(),
-            getBucketLayout(), volBucketInfoMap, fromSnapshotInfo, openKeyRemovalList);
+            getBucketLayout(), volBucketInfoMap, fromSnapshotInfo, openKeyInfoMap);
 
     return omClientResponse;
   }
