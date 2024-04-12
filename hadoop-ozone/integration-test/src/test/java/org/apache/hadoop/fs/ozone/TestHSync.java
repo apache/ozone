@@ -155,6 +155,8 @@ public class TestHSync {
   private static final int SERVICE_INTERVAL = 100;
   private static final int EXPIRE_THRESHOLD_MS = 140;
 
+  private static OpenKeyCleanupService openKeyCleanupService;
+
   @BeforeAll
   public static void init() throws Exception {
     final BucketLayout layout = BUCKET_LAYOUT;
@@ -202,6 +204,10 @@ public class TestHSync {
     GenericTestUtils.setLogLevel(BlockOutputStream.LOG, Level.DEBUG);
     GenericTestUtils.setLogLevel(BlockInputStream.LOG, Level.DEBUG);
     GenericTestUtils.setLogLevel(KeyValueHandler.LOG, Level.DEBUG);
+
+    openKeyCleanupService =
+        (OpenKeyCleanupService) cluster.getOzoneManager().getKeyManager().getOpenKeyCleanupService();
+    openKeyCleanupService.suspend();
   }
 
   @AfterAll
@@ -416,10 +422,6 @@ public class TestHSync {
   public void testHSyncOpenKeyDeletionWhileDeleteDirectory() throws Exception {
     // Verify that when directory is deleted recursively hsync related openKeys should be deleted,
 
-    OpenKeyCleanupService openKeyCleanupService =
-        (OpenKeyCleanupService) cluster.getOzoneManager().getKeyManager().getOpenKeyCleanupService();
-    openKeyCleanupService.suspend();
-
     // Set the fs.defaultFS
     final String rootPath = String.format("%s://%s/",
         OZONE_OFS_URI_SCHEME, CONF.get(OZONE_OM_ADDRESS_KEY));
@@ -454,6 +456,8 @@ public class TestHSync {
             0 == getOpenKeyInfo(BucketLayout.FILE_SYSTEM_OPTIMIZED).size(), 1000, 12000);
       } catch (OMException ex) {
         assertEquals(OMException.ResultCodes.DIRECTORY_NOT_FOUND, ex.getResult());
+      } finally {
+        openKeyCleanupService.suspend();
       }
     }
   }
