@@ -88,7 +88,7 @@ public class NewBlockInputStream extends BlockExtendedInputStream
   private long buffersSize;
   private static final int EOF = -1;
   private final List<XceiverClientSpi.Validator> validators;
-  private final OzoneClientConfig config;
+  private final boolean verifyChecksum;
   private final Function<BlockID, BlockLocationInfo> refreshFunction;
   private final RetryPolicy retryPolicy =
       HddsClientUtils.createRetryPolicy(3, TimeUnit.SECONDS.toMillis(1));
@@ -108,7 +108,7 @@ public class NewBlockInputStream extends BlockExtendedInputStream
     this.xceiverClientFactory = xceiverClientFactory;
     this.validators = ContainerProtocolCalls.toValidatorList(
         (request, response) -> validateBlock(response));
-    this.config = config;
+    this.verifyChecksum = config.isChecksumVerify();
     this.refreshFunction = refreshFunction;
 
   }
@@ -671,7 +671,7 @@ public class NewBlockInputStream extends BlockExtendedInputStream
         }
       }
 
-      if (config.isChecksumVerify()) {
+      if (verifyChecksum) {
         ChecksumData checksumData = ChecksumData.getFromProtoBuf(
             chunkInfo.getChecksumData());
 
@@ -679,10 +679,7 @@ public class NewBlockInputStream extends BlockExtendedInputStream
         // number of bytes in a list. Compute the index of the first
         // checksum to match with the read data
 
-        long relativeOffset = chunkInfo.getOffset() - byteStrings.size();
-        int bytesPerChecksum = checksumData.getBytesPerChecksum();
-        int startIndex = (int) (relativeOffset / bytesPerChecksum);
-        Checksum.verifyChecksum(byteStrings, checksumData, startIndex,
+        Checksum.verifyChecksum(byteStrings, checksumData, readBlock.getStartIndex(),
             isV0);
       }
     }
@@ -707,7 +704,7 @@ public class NewBlockInputStream extends BlockExtendedInputStream
 
   @VisibleForTesting
   public boolean isVerifyChecksum() {
-    return config.isChecksumVerify();
+    return verifyChecksum;
   }
 
   private void refreshBlockInfo(IOException cause) throws IOException {

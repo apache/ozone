@@ -312,7 +312,8 @@ public final class ContainerCommandResponseBuilders {
   public static ContainerCommandResponseProto getReadBlockResponse(
       ContainerCommandRequestProto request, DatanodeBlockID blockID,
       ChunkInfo chunkInfo, boolean isReadChunkV0, ChunkBuffer data,
-      Function<ByteBuffer, ByteString> byteBufferToByteString) {
+      Function<ByteBuffer, ByteString> byteBufferToByteString,
+      int startIndex) {
 
     ReadBlockResponseProto.Builder response;
 
@@ -321,7 +322,8 @@ public final class ContainerCommandResponseBuilders {
       response = ReadBlockResponseProto.newBuilder()
           .setChunkData(chunkInfo)
           .setData(data.toByteString(byteBufferToByteString))
-          .setBlockID(blockID);
+          .setBlockID(blockID)
+          .setStartIndex(startIndex);
     } else {
       // V1 splits response data into a list of ByteBuffers
       response = ReadBlockResponseProto.newBuilder()
@@ -329,7 +331,8 @@ public final class ContainerCommandResponseBuilders {
           .setDataBuffers(DataBuffers.newBuilder()
               .addAllBuffers(data.toByteStringList(byteBufferToByteString))
               .build())
-          .setBlockID(blockID);
+          .setBlockID(blockID)
+          .setStartIndex(startIndex);
     }
 
     return getSuccessResponseBuilder(request)

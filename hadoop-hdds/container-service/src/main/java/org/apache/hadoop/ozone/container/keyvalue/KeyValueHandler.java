@@ -1265,6 +1265,7 @@ public class KeyValueHandler extends Handler {
       len += (offset - adjustedChunkOffset);
       while (len > 0) {
         ContainerProtos.ChunkInfo chunk = chunkInfos.get(chunkIndex);
+        int startIndex =  (int)(adjustedChunkOffset - chunk.getOffset()) / bytesPerChecksum;
         long chunkLen = Math.min(adjustedChunkLen, chunk.getLen());
         ChunkInfo chunkInfo = ChunkInfo.getFromProtoBuf(chunkInfos
             .get(chunkIndex)
@@ -1287,7 +1288,7 @@ public class KeyValueHandler extends Handler {
             getReadBlockResponse(request,
                 blockData.getProtoBufMessage().getBlockID(),
                 chunkInfo.getProtoBufMessage(), isReadChunkV0,
-                data, byteBufferToByteString));
+                data, byteBufferToByteString, startIndex));
         len -= chunkLen;
         adjustedChunkOffset += chunkLen;
         adjustedChunkLen = ((len - 1) / bytesPerChecksum + 1)
