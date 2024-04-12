@@ -39,7 +39,6 @@ import org.apache.hadoop.ozone.client.OzoneKeyDetails;
 import org.apache.hadoop.ozone.client.OzoneMultipartUploadList;
 import org.apache.hadoop.ozone.client.OzoneMultipartUploadPartListParts;
 import org.apache.hadoop.ozone.client.OzoneSnapshot;
-import org.apache.hadoop.ozone.client.OzoneSnapshotDiff;
 import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.client.TenantArgs;
 import org.apache.hadoop.ozone.client.VolumeArgs;
@@ -67,6 +66,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRoleI
 import org.apache.hadoop.ozone.security.OzoneTokenIdentifier;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
 import org.apache.hadoop.ozone.snapshot.CancelSnapshotDiffResponse;
+import org.apache.hadoop.ozone.snapshot.ListSnapshotDiffJobResponse;
 import org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse;
 import org.apache.hadoop.security.KerberosInfo;
 import org.apache.hadoop.security.token.Token;
@@ -1192,13 +1192,17 @@ public interface ClientProtocol {
    * @param bucketName Name of the bucket to which the snapshots belong
    * @param jobStatus JobStatus to be used to filter the snapshot diff jobs
    * @param listAll Option to specify whether to list all jobs or not
+   * @param prevSnapshotDiffJob list snapshot diff jobs after this snapshot diff job.
+   * @param maxListResult maximum entries to be returned from the startSnapshotDiffJob.
    * @return a list of SnapshotDiffJob objects
    * @throws IOException in case there is a failure while getting a response.
    */
-  List<OzoneSnapshotDiff> listSnapshotDiffJobs(String volumeName,
-                                               String bucketName,
-                                               String jobStatus,
-                                               boolean listAll)
+  ListSnapshotDiffJobResponse listSnapshotDiffJobs(String volumeName,
+                                                   String bucketName,
+                                                   String jobStatus,
+                                                   boolean listAll,
+                                                   String prevSnapshotDiffJob,
+                                                   int maxListResult)
       throws IOException;
 
   /**

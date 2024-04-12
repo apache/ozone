@@ -1397,19 +1397,26 @@ public class OzoneManagerRequestHandler implements RequestHandler {
   }
 
   private ListSnapshotDiffJobResponse listSnapshotDiffJobs(
-      ListSnapshotDiffJobRequest listSnapshotDiffJobRequest)
-      throws IOException {
-    List<SnapshotDiffJob> snapshotDiffJobs =
-        impl.listSnapshotDiffJobs(
-            listSnapshotDiffJobRequest.getVolumeName(),
-            listSnapshotDiffJobRequest.getBucketName(),
-            listSnapshotDiffJobRequest.getJobStatus(),
-            listSnapshotDiffJobRequest.getListAll());
-    ListSnapshotDiffJobResponse.Builder builder =
-        ListSnapshotDiffJobResponse.newBuilder();
-    for (SnapshotDiffJob diffJob : snapshotDiffJobs) {
+      ListSnapshotDiffJobRequest listSnapshotDiffJobRequest
+  ) throws IOException {
+    org.apache.hadoop.ozone.snapshot.ListSnapshotDiffJobResponse response = impl.listSnapshotDiffJobs(
+        listSnapshotDiffJobRequest.getVolumeName(),
+        listSnapshotDiffJobRequest.getBucketName(),
+        listSnapshotDiffJobRequest.getJobStatus(),
+        listSnapshotDiffJobRequest.getListAll(),
+        listSnapshotDiffJobRequest.getPrevSnapshotDiffJob(),
+        listSnapshotDiffJobRequest.getMaxListResult());
+
+    ListSnapshotDiffJobResponse.Builder builder = ListSnapshotDiffJobResponse.newBuilder();
+
+    for (SnapshotDiffJob diffJob : response.getSnapshotDiffJobs()) {
       builder.addSnapshotDiffJob(diffJob.toProtoBuf());
     }
+
+    if (StringUtils.isNotEmpty(response.getLastSnapshotDiffJob())) {
+      builder.setLastSnapshotDiffJob(response.getLastSnapshotDiffJob());
+    }
+
     return builder.build();
   }
 
