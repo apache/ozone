@@ -42,6 +42,8 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerC
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandResponseProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.DatanodeBlockID;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ReadBlockResponseProto;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Type;
 import org.apache.hadoop.hdds.protocol.datanode.proto.XceiverClientProtocolServiceGrpc;
 import org.apache.hadoop.hdds.protocol.datanode.proto.XceiverClientProtocolServiceGrpc.XceiverClientProtocolServiceStub;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
@@ -589,13 +591,25 @@ public class XceiverClientGrpc extends XceiverClientSpi {
 
               @Override
               public void onCompleted() {
-                semaphore.release();
-                future.complete(response.setStreamData(streamData).build());
+                if (streamData.getReadBlockCount() > 0) {
+                  future.complete(response.setStreamData(streamData)
+                      .setCmdType(Type.StreamRead).setResult(Result.SUCCESS).build());
+                }
+                if (!future.isDone()) {
+                  future.completeExceptionally(new IOException(
+                      "Stream completed but no reply for request " +
+                          processForDebug(request)));
+                }
               }
             });
     requestObserver.onNext(request);
     requestObserver.onCompleted();
-    return new XceiverClientReply(future);
+    try {
+      return new XceiverClientReply(future);
+    } finally {
+      semaphore.release();
+    }
+
   }
 
   private synchronized void checkOpen(DatanodeDetails dn)

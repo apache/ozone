@@ -30,8 +30,10 @@ import java.util.function.Function;
 import com.google.common.primitives.Bytes;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.client.ContainerBlockID;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ChecksumType;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ChunkInfo;
+import org.apache.hadoop.hdds.scm.OzoneClientConfig;
 import org.apache.hadoop.hdds.scm.pipeline.MockPipeline;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.ozone.common.Checksum;
@@ -63,10 +65,12 @@ public class TestNewBlockInputStream {
   private Function<BlockID, BlockLocationInfo> refreshFunction;
   private BlockID blockID;
   private static final String CHUNK_NAME = "chunk-";
+  private OzoneConfiguration conf = new OzoneConfiguration();
 
 
   @BeforeEach
   public void setup() throws Exception {
+    OzoneClientConfig clientConfig = conf.getObject(OzoneClientConfig.class);
     refreshFunction = mock(Function.class);
     blockID = new BlockID(new ContainerBlockID(1, 1));
     checksum = new Checksum(ChecksumType.CRC32, BYTES_PER_CHECKSUM);
@@ -74,7 +78,7 @@ public class TestNewBlockInputStream {
 
     Pipeline pipeline = MockPipeline.createSingleNodePipeline();
     blockStream = new DummyNewBlockInputStream(blockID, blockSize, pipeline,
-        null, true, null, refreshFunction, chunks, chunkDataMap);
+        null, null, refreshFunction, clientConfig, chunks, chunkDataMap);
   }
 
   /**

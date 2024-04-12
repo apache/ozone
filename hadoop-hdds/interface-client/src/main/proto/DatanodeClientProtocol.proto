@@ -104,6 +104,7 @@ enum Type {
 
   StreamInit = 19;
   StreamWrite = 20;
+  StreamRead = 22;
 }
 
 

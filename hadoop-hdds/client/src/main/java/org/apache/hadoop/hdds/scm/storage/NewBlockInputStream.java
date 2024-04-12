@@ -27,8 +27,7 @@ import org.apache.hadoop.fs.Seekable;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
-import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandRequestProto;
-import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ReadBlockRequestProto;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.DatanodeBlockID;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ReadBlockResponseProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.StreamDataResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
@@ -47,6 +46,7 @@ import org.apache.hadoop.ozone.common.OzoneChecksumException;
 import org.apache.hadoop.ozone.common.utils.BufferUtils;
 import org.apache.hadoop.security.token.Token;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
+import org.apache.ratis.thirdparty.io.grpc.Status;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -152,37 +152,43 @@ public class NewBlockInputStream extends BlockExtendedInputStream
   @Override
   public synchronized int read() throws IOException {
     checkOpen();
-    while (true) {
-      int dataout = EOF;
+
+    int dataout = EOF;
+    int len = 1;
+    int available;
+    while (len > 0) {
       try {
-
-
         acquireClient();
-        int available = prepareRead(1);
-
-
-        if (available == EOF) {
-          // There is no more data in the chunk stream. The buffers should have
-          // been released by now
-          Preconditions.checkState(buffers == null);
-        } else {
-          dataout = Byte.toUnsignedInt(buffers.get(bufferIndex).get());
-        }
-
-        if (bufferEOF()) {
-          releaseBuffers(bufferIndex);
-        }
+        available = prepareRead(1);
+        retries = 0;
       } catch (SCMSecurityException ex) {
         throw ex;
       } catch (StorageContainerException e) {
         if (shouldRetryRead(e)) {
           releaseClient();
+          refreshBlockInfo(e);
+          continue;
         } else {
           throw e;
         }
       }
-      return dataout;
+      if (available == EOF) {
+        // There is no more data in the chunk stream. The buffers should have
+        // been released by now
+        Preconditions.checkState(buffers == null);
+      } else {
+        dataout = Byte.toUnsignedInt(buffers.get(bufferIndex).get());
+      }
+
+      len -= available;
+      if (bufferEOF()) {
+        releaseBuffers(bufferIndex);
+      }
     }
+
+
+    return dataout;
+
 
   }
 
@@ -208,36 +214,39 @@ public class NewBlockInputStream extends BlockExtendedInputStream
       return 0;
     }
     int total = 0;
-    while (true) {
+    int available;
+    while (len > 0) {
       try {
         acquireClient();
-        while (len > 0) {
-          int available = prepareRead(len);
-          if (available == EOF) {
-            // There is no more data in the block stream. The buffers should have
-            // been released by now
-            Preconditions.checkState(buffers == null);
-            return total != 0 ? total : EOF;
-          }
-          buffers.get(bufferIndex).get(b, off + total, available);
-          len -= available;
-          total += available;
-
-          if (bufferEOF()) {
-            releaseBuffers(bufferIndex);
-          }
-        }
+        available = prepareRead(len);
+        retries = 0;
       } catch (SCMSecurityException ex) {
         throw ex;
       } catch (StorageContainerException e) {
         if (shouldRetryRead(e)) {
           releaseClient();
+          refreshBlockInfo(e);
+          continue;
         } else {
           throw e;
         }
       }
-      return total;
+      if (available == EOF) {
+        // There is no more data in the block stream. The buffers should have
+        // been released by now
+        Preconditions.checkState(buffers == null);
+        return total != 0 ? total : EOF;
+      }
+      buffers.get(bufferIndex).get(b, off + total, available);
+      len -= available;
+      total += available;
+
+      if (bufferEOF()) {
+        releaseBuffers(bufferIndex);
+      }
     }
+    return total;
+
   }
 
   @Override
@@ -257,42 +266,43 @@ public class NewBlockInputStream extends BlockExtendedInputStream
       return 0;
     }
     int total = 0;
-    while (true) {
+    int available;
+    while (len > 0) {
       try {
         acquireClient();
-        while (len > 0) {
-          int available = prepareRead(len);
-          if (available == EOF) {
-            // There is no more data in the block stream. The buffers should have
-            // been released by now
-            Preconditions.checkState(buffers == null);
-            return total != 0 ? total : EOF;
-          }
-          ByteBuffer readBuf = buffers.get(bufferIndex);
-          ByteBuffer tmpBuf = readBuf.duplicate();
-          tmpBuf.limit(tmpBuf.position() + available);
-          byteBuffer.put(tmpBuf);
-          readBuf.position(tmpBuf.position());
-
-          len -= available;
-          total += available;
-
-          if (bufferEOF()) {
-            releaseBuffers(bufferIndex);
-          }
-        }
+        available = prepareRead(len);
+        retries = 0;
       } catch (SCMSecurityException ex) {
         throw ex;
       } catch (StorageContainerException e) {
         if (shouldRetryRead(e)) {
           releaseClient();
+          refreshBlockInfo(e);
+          continue;
         } else {
           throw e;
         }
       }
-      return total;
+      if (available == EOF) {
+        // There is no more data in the block stream. The buffers should have
+        // been released by now
+        Preconditions.checkState(buffers == null);
+        return total != 0 ? total : EOF;
+      }
+      ByteBuffer readBuf = buffers.get(bufferIndex);
+      ByteBuffer tmpBuf = readBuf.duplicate();
+      tmpBuf.limit(tmpBuf.position() + available);
+      byteBuffer.put(tmpBuf);
+      readBuf.position(tmpBuf.position());
 
+      len -= available;
+      total += available;
+
+      if (bufferEOF()) {
+        releaseBuffers(bufferIndex);
+      }
     }
+    return total;
   }
 
   @Override
@@ -498,18 +508,21 @@ public class NewBlockInputStream extends BlockExtendedInputStream
   @VisibleForTesting
   protected long readData(long startByteIndex, long len)
       throws IOException {
+    Pipeline pipeline = xceiverClient.getPipeline();
     buffers = new ArrayList<>();
-    ReadBlockRequestProto.Builder readBlockRequest =
-        ReadBlockRequestProto.newBuilder()
-            .setBlockID(blockID.getDatanodeBlockIDProtobuf())
-            .setLen(startByteIndex)
-            .setOffset(len)
-            .setVersion(ContainerProtos.ReadChunkVersion.V1);
-    ContainerCommandRequestProto request = ContainerCommandRequestProto
-        .newBuilder().setReadBlock(readBlockRequest).build();
-    ContainerProtos.ContainerCommandResponseProto response =
-        xceiverClient.sendCommand(request, validators);
-    List<ReadBlockResponseProto> readBlocks = response.getStreamData().getReadBlockList();
+    DatanodeBlockID.Builder blockBuilder = DatanodeBlockID
+        .newBuilder().setContainerID(blockID.getContainerID())
+        .setLocalID(blockID.getLocalID())
+        .setBlockCommitSequenceId(blockID.getBlockCommitSequenceId());
+    int replicaIndex = pipeline.getReplicaIndex(pipeline.getClosestNode());
+    if (replicaIndex > 0) {
+      blockBuilder.setReplicaIndex(replicaIndex);
+    }
+    StreamDataResponseProto response =
+        ContainerProtocolCalls.readBlock(xceiverClient, startByteIndex,
+        len, blockBuilder.build(), validators, tokenRef.get());
+    List<ReadBlockResponseProto> readBlocks = response.getReadBlockList();
+
     for (ReadBlockResponseProto readBlock : readBlocks) {
       if (readBlock.hasData()) {
         buffers.add(readBlock.getData().asReadOnlyByteBuffer());
@@ -521,7 +534,7 @@ public class NewBlockInputStream extends BlockExtendedInputStream
             "from container. No data returned.");
       }
     }
-    return response.getStreamData().getReadBlock(0)
+    return response.getReadBlock(0)
         .getChunkData().getOffset();
   }
 
@@ -658,7 +671,7 @@ public class NewBlockInputStream extends BlockExtendedInputStream
         }
       }
 
-      if (verifyChecksum) {
+      if (config.isChecksumVerify()) {
         ChecksumData checksumData = ChecksumData.getFromProtoBuf(
             chunkInfo.getChecksumData());
 
@@ -694,6 +707,33 @@ public class NewBlockInputStream extends BlockExtendedInputStream
 
   @VisibleForTesting
   public boolean isVerifyChecksum() {
-    return verifyChecksum;
+    return config.isChecksumVerify();
   }
+
+  private void refreshBlockInfo(IOException cause) throws IOException {
+    LOG.info("Unable to read information for block {} from pipeline {}: {}",
+        blockID, pipelineRef.get().getId(), cause.getMessage());
+    if (refreshFunction != null) {
+      LOG.debug("Re-fetching pipeline and block token for block {}", blockID);
+      BlockLocationInfo blockLocationInfo = refreshFunction.apply(blockID);
+      if (blockLocationInfo == null) {
+        LOG.debug("No new block location info for block {}", blockID);
+      } else {
+        LOG.debug("New pipeline for block {}: {}", blockID,
+            blockLocationInfo.getPipeline());
+        setPipeline(blockLocationInfo.getPipeline());
+        tokenRef.set(blockLocationInfo.getToken());
+      }
+    } else {
+      throw cause;
+    }
+  }
+
+  /**
+   * Check if this exception is because datanodes are not reachable.
+   */
+  private boolean isConnectivityIssue(IOException ex) {
+    return Status.fromThrowable(ex).getCode() == Status.UNAVAILABLE.getCode();
+  }
+
 }

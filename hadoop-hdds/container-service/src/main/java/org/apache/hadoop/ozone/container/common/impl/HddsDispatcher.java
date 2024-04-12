@@ -855,6 +855,7 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
         OnDemandContainerDataScanner.scanContainer(container);
         audit(action, eventType, params, AuditEventStatus.FAILURE,
             new Exception(responseProto.getMessage()));
+        streamObserver.onNext(responseProto);
       }
       perf.appendOpLatencyMs(oPLatencyMS);
       performanceAudit(action, params, perf, oPLatencyMS);
@@ -894,6 +895,7 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
     case CloseContainer   : return DNAction.CLOSE_CONTAINER;
     case GetCommittedBlockLength : return DNAction.GET_COMMITTED_BLOCK_LENGTH;
     case StreamInit       : return DNAction.STREAM_INIT;
+    case ReadBlock        : return DNAction.READ_BLOCK;
     default :
       LOG.debug("Invalid command type - {}", cmdType);
       return null;

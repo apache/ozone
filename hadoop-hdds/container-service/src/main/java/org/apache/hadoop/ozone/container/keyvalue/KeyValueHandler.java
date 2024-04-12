@@ -106,6 +106,7 @@ import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuil
 import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuilders.getGetSmallFileResponseSuccess;
 import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuilders.getListBlockResponse;
 import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuilders.getPutFileResponseSuccess;
+import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuilders.getReadBlockResponse;
 import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuilders.getReadChunkResponse;
 import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuilders.getReadContainerResponse;
 import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuilders.getSuccessResponse;
@@ -1283,11 +1284,15 @@ public class KeyValueHandler extends Handler {
 
         Preconditions.checkNotNull(data, "Chunk data is null");
         streamObserver.onNext(
-            getReadChunkResponse(request, data, byteBufferToByteString));
+            getReadBlockResponse(request,
+                blockData.getProtoBufMessage().getBlockID(),
+                chunkInfo.getProtoBufMessage(), isReadChunkV0,
+                data, byteBufferToByteString));
         len -= chunkLen;
-        adjustedChunkOffset = 0;
+        adjustedChunkOffset += chunkLen;
         adjustedChunkLen = ((len - 1) / bytesPerChecksum + 1)
             * bytesPerChecksum;
+        chunkIndex++;
       }
 
       metrics.incContainerBytesStats(Type.ReadBlock, readBlock.getLen());

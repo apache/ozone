@@ -26,6 +26,7 @@ import java.util.function.Function;
 
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ChunkInfo;
+import org.apache.hadoop.hdds.scm.OzoneClientConfig;
 import org.apache.hadoop.hdds.scm.XceiverClientFactory;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.security.token.OzoneBlockTokenIdentifier;
@@ -50,13 +51,13 @@ class DummyNewBlockInputStream extends NewBlockInputStream {
       long blockLen,
       Pipeline pipeline,
       Token<OzoneBlockTokenIdentifier> token,
-      boolean verifyChecksum,
       XceiverClientFactory xceiverClientManager,
       Function<BlockID, BlockLocationInfo> refreshFunction,
+      OzoneClientConfig config,
       List<ChunkInfo> chunks,
       Map<String, byte[]> chunkDataMap) {
-    super(blockId, blockLen, pipeline, token, verifyChecksum,
-        xceiverClientManager, refreshFunction);
+    super(blockId, blockLen, pipeline, token, xceiverClientManager,
+        refreshFunction, config);
     this.chunks = chunks;
     this.chunkDataMap = chunkDataMap;
     chunkOffsets = new long[chunks.size()];
