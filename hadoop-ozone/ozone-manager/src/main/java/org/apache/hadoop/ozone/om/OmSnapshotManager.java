@@ -435,7 +435,7 @@ public final class OmSnapshotManager implements AutoCloseable {
    *
    * @param key SnapshotId.
    */
-  public void invalidateCacheEntry(UUID key) throws IOException {
+  public void invalidateCacheEntry(UUID key) {
     if (snapshotCache != null) {
       snapshotCache.invalidate(key);
     }

@@ -4282,7 +4282,7 @@
   </property>
 
   <property>
-    <name>ozone.om.snapshot.diff.cleanup.service.run.internal</name>
+    <name>ozone.om.snapshot.diff.cleanup.service.run.interval</name>
     <value>1m</value>
     <tag>OZONE, OM</tag>
     <description>
@@ -4302,7 +4302,7 @@
   </property>
 
   <property>
-    <name>ozone.om.snapshot.cache.cleanup.service.run.internal</name>
+    <name>ozone.om.snapshot.cache.cleanup.service.run.interval</name>
     <value>1m</value>
     <tag>OZONE, OM</tag>
     <description>
@@ -4311,6 +4311,7 @@
     </description>
   </property>
 
+  <property>
     <name>ozone.om.snapshot.load.native.lib</name>
     <value>true</value>
     <tag>OZONE, OM</tag>

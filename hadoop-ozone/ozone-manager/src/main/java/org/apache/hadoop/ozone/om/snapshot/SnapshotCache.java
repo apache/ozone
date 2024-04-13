@@ -27,8 +27,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
-import java.util.Iterator;
-import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
@@ -94,7 +92,7 @@ public class SnapshotCache implements ReferenceCountedCallback, AutoCloseable {
    * Immediately invalidate an entry.
    * @param key SnapshotId
    */
-  public void invalidate(UUID key) throws IOException {
+  public void invalidate(UUID key) {
     dbMap.compute(key, (k, v) -> {
       if (v == null) {
         LOG.warn("SnapshotId: '{}' does not exist in snapshot cache.", k);
@@ -114,19 +112,8 @@ public class SnapshotCache implements ReferenceCountedCallback, AutoCloseable {
    * Immediately invalidate all entries and close their DB instances in cache.
    */
   public void invalidateAll() {
-    Iterator<Map.Entry<UUID, ReferenceCounted<OmSnapshot>>> it = dbMap.entrySet().iterator();
-
-    while (it.hasNext()) {
-      Map.Entry<UUID, ReferenceCounted<OmSnapshot>> entry = it.next();
-      OmSnapshot omSnapshot = entry.getValue().get();
-      try {
-        // TODO: If wrapped with SoftReference<>, omSnapshot could be null?
-        omSnapshot.close();
-      } catch (IOException e) {
-        throw new IllegalStateException("Failed to close snapshot", e);
-      }
-      it.remove();
-      omMetrics.decNumSnapshotCacheSize();
+    for (UUID key : dbMap.keySet()) {
+      invalidate(key);
     }
   }
 
@@ -210,11 +197,13 @@ public class SnapshotCache implements ReferenceCountedCallback, AutoCloseable {
     val.decrementRefCount();
   }
 
+
   /**
    * If cache size exceeds soft limit, attempt to clean up and close the
      instances that has zero reference count.
    */
-  private void cleanup() {
+  @VisibleForTesting
+  void cleanup() {
     if (dbMap.size() > cacheSizeLimit) {
       for (UUID evictionKey : pendingEvictionQueue) {
         dbMap.compute(evictionKey, (k, v) -> {
