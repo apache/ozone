@@ -186,9 +186,7 @@ public class TestS3MultipartUploadCompleteRequest
     assertTrue(multipartKeyInfo.getLatestVersionLocations()
         .isMultipartKey());
     if (metadata != null) {
-      for (Map.Entry<String, String> entry : metadata.entrySet()) {
-        assertEquals(entry.getValue(), multipartKeyInfo.getMetadata().get(entry.getKey()));
-      }
+      assertThat(multipartKeyInfo.getMetadata()).containsAllEntriesOf(metadata);
     }
 
     OmBucketInfo omBucketInfo = omMetadataManager.getBucketTable()

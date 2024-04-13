@@ -54,7 +54,6 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Part;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -171,10 +170,7 @@ public class TestS3MultipartRequest {
           modifiedRequest.getInitiateMultiPartUploadRequest()
               .getKeyArgs().getMetadataList());
 
-      for (Map.Entry<String, String> entry : metadata.entrySet()) {
-        assertTrue(modifiedKeyMetadata.containsKey(entry.getKey()));
-        assertEquals(entry.getValue(), modifiedKeyMetadata.get(entry.getKey()));
-      }
+      assertThat(modifiedKeyMetadata).containsAllEntriesOf(metadata);
     }
 
     return modifiedRequest;
@@ -315,10 +311,7 @@ public class TestS3MultipartRequest {
           modifiedRequest.getInitiateMultiPartUploadRequest()
           .getKeyArgs().getMetadataList());
 
-      for (Map.Entry<String, String> entry : metadata.entrySet()) {
-        assertTrue(modifiedKeyMetadata.containsKey(entry.getKey()));
-        assertEquals(entry.getValue(), modifiedKeyMetadata.get(entry.getKey()));
-      }
+      assertThat(modifiedKeyMetadata).containsAllEntriesOf(metadata);
     }
 
     return modifiedRequest;

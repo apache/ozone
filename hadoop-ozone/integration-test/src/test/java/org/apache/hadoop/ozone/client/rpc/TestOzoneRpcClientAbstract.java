@@ -3692,10 +3692,7 @@ public abstract class TestOzoneRpcClientAbstract {
     Map<String, String> keyMetadata = omKeyInfo.getMetadata();
     assertNotNull(keyMetadata.get(ETAG));
     if (customMetadata != null) {
-      for (Map.Entry<String, String> customEntry : customMetadata.entrySet()) {
-        assertTrue(keyMetadata.containsKey(customEntry.getKey()));
-        assertEquals(customEntry.getValue(), keyMetadata.get(customEntry.getKey()));
-      }
+      assertThat(keyMetadata).containsAllEntriesOf(customMetadata);
     }
   }
 

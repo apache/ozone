@@ -42,10 +42,10 @@ import java.util.List;
 import java.util.Map;
 
 import static java.net.HttpURLConnection.HTTP_FORBIDDEN;
-import static org.mockito.ArgumentMatchers.anyMap;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.anyBoolean;
 import static org.mockito.Mockito.anyLong;
+import static org.mockito.Mockito.anyMap;
 import static org.mockito.Mockito.anyString;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.isNull;
