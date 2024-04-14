@@ -498,10 +498,8 @@ public class KeyOutputStream extends OutputStream
     checkNotClosed();
     try {
       CompletableFuture<Void> future = handleFlushOrClose(StreamAction.FLUSH);
-      if (future != null) {
-        future = combine(future);
-        future.get();
-      }
+      combine(future);
+      combinedFuture.get();
     } catch (InterruptedException | ExecutionException e) {
       // TODO: Handle this properly
       LOG.error("Exception caught but ignored in this POC", e);
