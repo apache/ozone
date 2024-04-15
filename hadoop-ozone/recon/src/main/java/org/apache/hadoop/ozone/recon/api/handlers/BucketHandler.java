@@ -29,6 +29,7 @@ import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.recon.api.types.DUResponse;
 import org.apache.hadoop.ozone.recon.api.types.EntityType;
+import org.apache.hadoop.ozone.recon.api.types.Stats;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 import org.apache.hadoop.ozone.recon.spi.ReconNamespaceSummaryManager;
 import org.slf4j.Logger;
@@ -78,7 +79,7 @@ public abstract class BucketHandler {
       throws IOException;
 
   public abstract long calculateDUUnderObject(long parentId, boolean recursive,
-                                              List<DUResponse.DiskUsage> diskUsageList) throws IOException;
+                                              List<DUResponse.DiskUsage> diskUsageList, Stats stats) throws IOException;
 
   public abstract long getDirObjectId(String[] names)
           throws IOException;
@@ -86,7 +87,7 @@ public abstract class BucketHandler {
   public abstract long handleDirectKeys(long parentId,
                                         boolean withReplica, boolean listFile,
                                         List<DUResponse.DiskUsage> duData,
-                                        String normalizedPath) throws IOException;
+                                        String normalizedPath, Stats stats) throws IOException;
 
   public abstract long getDirObjectId(String[] names, int cutoff)
           throws IOException;
@@ -231,5 +232,20 @@ public abstract class BucketHandler {
 
     return getBucketHandler(reconNamespaceSummaryManager,
         omMetadataManager, reconSCM, bucketInfo);
+  }
+
+  protected static void verifyStatsAndAddDURecord(List<DUResponse.DiskUsage> duData, Stats stats,
+                                                  Table.KeyValue<String, OmKeyInfo> kv,
+                                                  DUResponse.DiskUsage diskUsage) throws IOException {
+    if (stats.getLimit() == -1) {
+      duData.add(diskUsage);
+    } else {
+      if (stats.getCurrentCount() < stats.getLimit()) {
+        duData.add(diskUsage);
+        stats.setCurrentCount(stats.getCurrentCount() + 1);
+        stats.setLastKey(kv.getKey());
+      }
+    }
+    stats.setTotalCount(stats.getTotalCount() + 1);
   }
 }

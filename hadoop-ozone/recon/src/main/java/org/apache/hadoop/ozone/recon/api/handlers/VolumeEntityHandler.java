@@ -28,6 +28,7 @@ import org.apache.hadoop.ozone.recon.api.types.DUResponse;
 import org.apache.hadoop.ozone.recon.api.types.QuotaUsageResponse;
 import org.apache.hadoop.ozone.recon.api.types.FileSizeDistributionResponse;
 import org.apache.hadoop.ozone.recon.api.types.ResponseStatus;
+import org.apache.hadoop.ozone.recon.api.types.Stats;
 import org.apache.hadoop.ozone.recon.api.types.VolumeObjectDBInfo;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 import org.apache.hadoop.ozone.recon.spi.ReconNamespaceSummaryManager;
@@ -92,7 +93,7 @@ public class VolumeEntityHandler extends EntityHandler {
 
   @Override
   public DUResponse getDuResponse(
-      boolean listFile, boolean withReplica, boolean recursive)
+      boolean listFile, boolean withReplica, boolean recursive, Stats stats)
           throws IOException {
     DUResponse duResponse = new DUResponse();
     duResponse.setPath(getNormalizedPath());
@@ -121,7 +122,7 @@ public class VolumeEntityHandler extends EntityHandler {
                   getReconNamespaceSummaryManager(),
                   getOmMetadataManager(), getReconSCM(), bucket);
         long bucketDU = bucketHandler
-              .calculateDUUnderObject(bucketObjectID, recursive, diskUsageList);
+              .calculateDUUnderObject(bucketObjectID, recursive, diskUsageList, stats);
         diskUsage.setSizeWithReplica(bucketDU);
         volDataSizeWithReplica += bucketDU;
       }

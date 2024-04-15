@@ -29,6 +29,7 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.recon.api.types.DUResponse;
 import org.apache.hadoop.ozone.recon.api.types.EntityType;
 import org.apache.hadoop.ozone.recon.api.types.NSSummary;
+import org.apache.hadoop.ozone.recon.api.types.Stats;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 import org.apache.hadoop.ozone.recon.spi.ReconNamespaceSummaryManager;
 
@@ -118,7 +119,8 @@ public class FSOBucketHandler extends BucketHandler {
   // FileTable's key is in the format of "volumeId/bucketId/parentId/fileName"
   // Make use of RocksDB's order to seek to the prefix and avoid full iteration
   @Override
-  public long calculateDUUnderObject(long parentId, boolean recursive, List<DUResponse.DiskUsage> diskUsageList)
+  public long calculateDUUnderObject(long parentId, boolean recursive, List<DUResponse.DiskUsage> diskUsageList,
+                                     Stats stats)
       throws IOException {
     Table<String, OmKeyInfo> keyTable = getOmMetadataManager().getFileTable();
 
@@ -144,9 +146,18 @@ public class FSOBucketHandler extends BucketHandler {
         }
         OmKeyInfo keyInfo = kv.getValue();
         if (recursive) {
-          populateDiskUsage(keyInfo, diskUsageList);
+          if (stats.getLimit() == -1) {
+            populateDiskUsage(keyInfo, diskUsageList);
+          } else {
+            if (stats.getCurrentCount() < stats.getLimit()) {
+              populateDiskUsage(keyInfo, diskUsageList);
+              stats.setCurrentCount(stats.getCurrentCount() + 1);
+              stats.setLastKey(kv.getKey());
+            }
+          }
         }
         if (keyInfo != null) {
+          stats.setTotalCount(stats.getTotalCount() + 1);
           totalDU += keyInfo.getReplicatedSize();
         }
       }
@@ -162,7 +173,7 @@ public class FSOBucketHandler extends BucketHandler {
 
     Set<Long> subDirIds = nsSummary.getChildDir();
     for (long subDirId: subDirIds) {
-      totalDU += calculateDUUnderObject(subDirId, recursive, diskUsageList);
+      totalDU += calculateDUUnderObject(subDirId, recursive, diskUsageList, stats);
     }
     return totalDU;
   }
@@ -222,12 +233,14 @@ public class FSOBucketHandler extends BucketHandler {
 
   /**
    * This method handles disk usage of direct keys.
-   * @param parentId parent directory/bucket
-   * @param withReplica if withReplica is enabled, set sizeWithReplica
-   * for each direct key's DU
-   * @param listFile if listFile is enabled, append key DU as a subpath
-   * @param duData the current DU data
+   *
+   * @param parentId       parent directory/bucket
+   * @param withReplica    if withReplica is enabled, set sizeWithReplica
+   *                       for each direct key's DU
+   * @param listFile       if listFile is enabled, append key DU as a subpath
+   * @param duData         the current DU data
    * @param normalizedPath the normalized path request
+   * @param stats
    * @return the total DU of all direct keys
    * @throws IOException IOE
    */
@@ -235,7 +248,7 @@ public class FSOBucketHandler extends BucketHandler {
   public long handleDirectKeys(long parentId, boolean withReplica,
                                boolean listFile,
                                List<DUResponse.DiskUsage> duData,
-                               String normalizedPath) throws IOException {
+                               String normalizedPath, Stats stats) throws IOException {
 
     Table<String, OmKeyInfo> keyTable = getOmMetadataManager().getFileTable();
     long keyDataSizeWithReplica = 0L;
@@ -278,7 +291,7 @@ public class FSOBucketHandler extends BucketHandler {
           }
           // list the key as a subpath
           if (listFile) {
-            duData.add(diskUsage);
+            verifyStatsAndAddDURecord(duData, stats, kv, diskUsage);
           }
         }
       }

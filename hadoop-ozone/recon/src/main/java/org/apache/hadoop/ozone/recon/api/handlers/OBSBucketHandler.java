@@ -28,6 +28,7 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.recon.api.types.DUResponse;
 import org.apache.hadoop.ozone.recon.api.types.EntityType;
 import org.apache.hadoop.ozone.recon.api.types.NSSummary;
+import org.apache.hadoop.ozone.recon.api.types.Stats;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 import org.apache.hadoop.ozone.recon.spi.ReconNamespaceSummaryManager;
 
@@ -97,6 +98,7 @@ public class OBSBucketHandler extends BucketHandler {
    *                       keys
    * @param duData         the current DU data
    * @param normalizedPath the normalized path request
+   * @param stats
    * @return the total DU of all direct keys
    * @throws IOException IOE
    */
@@ -104,7 +106,7 @@ public class OBSBucketHandler extends BucketHandler {
   public long handleDirectKeys(long parentId, boolean withReplica,
                                boolean listFile,
                                List<DUResponse.DiskUsage> duData,
-                               String normalizedPath) throws IOException {
+                               String normalizedPath, Stats stats) throws IOException {
 
     NSSummary nsSummary = getReconNamespaceSummaryManager()
         .getNSSummary(parentId);
@@ -156,7 +158,7 @@ public class OBSBucketHandler extends BucketHandler {
           }
           // List all the keys for the OBS bucket if requested.
           if (listFile) {
-            duData.add(diskUsage);
+            verifyStatsAndAddDURecord(duData, stats, kv, diskUsage);
           }
         }
       }
@@ -172,13 +174,15 @@ public class OBSBucketHandler extends BucketHandler {
    * all the keys in the bucket without the need to traverse directories.
    *
    * @param parentId      The identifier for the parent bucket.
-   * @param recursive
-   * @param diskUsageList
+   * @param recursive     Whether to add keys recursively or just immediate du records.
+   * @param diskUsageList List to add du records.
+   * @param stats         Staistics related to DU records count and limit.
    * @return The total disk usage of all keys within the specified OBS bucket.
    * @throws IOException
    */
   @Override
-  public long calculateDUUnderObject(long parentId, boolean recursive, List<DUResponse.DiskUsage> diskUsageList)
+  public long calculateDUUnderObject(long parentId, boolean recursive, List<DUResponse.DiskUsage> diskUsageList,
+                                     Stats stats)
       throws IOException {
     // Initialize the total disk usage variable.
     long totalDU = 0L;
@@ -207,6 +211,7 @@ public class OBSBucketHandler extends BucketHandler {
         // Sum the size of each key to the total disk usage.
         OmKeyInfo keyInfo = kv.getValue();
         if (keyInfo != null) {
+          stats.setTotalCount(stats.getTotalCount() + 1);
           totalDU += keyInfo.getDataSize();
         }
       }

@@ -28,6 +28,7 @@ import org.apache.hadoop.ozone.recon.api.types.DUResponse;
 import org.apache.hadoop.ozone.recon.api.types.EntityMetaData;
 import org.apache.hadoop.ozone.recon.api.types.EntityReadAccessHeatMapResponse;
 import org.apache.hadoop.ozone.recon.api.types.ResponseStatus;
+import org.apache.hadoop.ozone.recon.api.types.Stats;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 import org.apache.hadoop.ozone.recon.spi.ReconNamespaceSummaryManager;
 import jakarta.annotation.Nonnull;
@@ -71,7 +72,7 @@ public class HeatMapUtil {
         EntityHandler.getEntityHandler(reconNamespaceSummaryManager,
             omMetadataManager, reconSCM, path);
     if (null != entityHandler) {
-      DUResponse duResponse = entityHandler.getDuResponse(false, false, false);
+      DUResponse duResponse = entityHandler.getDuResponse(false, false, false, new Stats(-1));
       if (null != duResponse && duResponse.getStatus() == ResponseStatus.OK) {
         return duResponse.getSize();
       }

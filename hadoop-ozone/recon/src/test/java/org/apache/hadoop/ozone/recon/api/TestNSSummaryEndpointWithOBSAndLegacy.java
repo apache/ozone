@@ -118,15 +118,21 @@ import static org.mockito.Mockito.when;
  *     │   ├── file2
  *     │   └── file3
  *     └── bucket2 (OBS)
- *         ├── file4
- *         └── file5
+ *     │   ├── file4
+ *     │   └── file5
+ *     └── bucket5 (OBS)
+ *         ├── file6
+ *         └── file7
  * └── vol2
  *     ├── bucket3 (Legacy)
  *     │   ├── file8
  *     │   ├── file9
  *     │   └── file10
  *     └── bucket4 (Legacy)
- *         └── file11
+ *     │   └── file11
+ *     └── bucket6 (Legacy)
+ *         └── file12
+ *         └── file13
  */
 public class TestNSSummaryEndpointWithOBSAndLegacy {
   @TempDir
@@ -152,6 +158,7 @@ public class TestNSSummaryEndpointWithOBSAndLegacy {
   private static final String BUCKET_THREE = "bucket3";
   private static final String BUCKET_FOUR = "bucket4";
   private static final String BUCKET_FIVE = "bucket5";
+  private static final String BUCKET_SIX = "bucket6";
   private static final String KEY_ONE = "file1";
   private static final String KEY_TWO = "////file2";
   private static final String KEY_THREE = "file3///";
@@ -164,6 +171,8 @@ public class TestNSSummaryEndpointWithOBSAndLegacy {
   private static final String KEY_TEN = "///__file10";
   private static final String KEY_ELEVEN = "////file11";
   private static final String MULTI_BLOCK_FILE = KEY_THREE;
+  private static final String KEY_TWELVE = "file12";
+  private static final String KEY_THIRTEEN = "file13";
 
   private static final long PARENT_OBJECT_ID_ZERO = 0L;
   private static final long VOL_OBJECT_ID = 0L;
@@ -173,6 +182,7 @@ public class TestNSSummaryEndpointWithOBSAndLegacy {
   private static final long BUCKET_THREE_OBJECT_ID = 15L;
   private static final long BUCKET_FOUR_OBJECT_ID = 16L;
   private static final long BUCKET_FIVE_OBJECT_ID = 7L;
+  private static final long BUCKET_SIX_OBJECT_ID = 12L;
   private static final long KEY_ONE_OBJECT_ID = 3L;
   private static final long KEY_TWO_OBJECT_ID = 5L;
   private static final long KEY_THREE_OBJECT_ID = 8L;
@@ -184,6 +194,8 @@ public class TestNSSummaryEndpointWithOBSAndLegacy {
   private static final long KEY_NINE_OBJECT_ID = 19L;
   private static final long KEY_TEN_OBJECT_ID = 20L;
   private static final long KEY_ELEVEN_OBJECT_ID = 21L;
+  private static final long KEY_TWELVE_OBJECT_ID = 22L;
+  private static final long KEY_THIRTEEN_OBJECT_ID = 23L;
   private static final long MULTI_BLOCK_KEY_OBJECT_ID = 13L;
 
   // container IDs
@@ -222,6 +234,8 @@ public class TestNSSummaryEndpointWithOBSAndLegacy {
   private static final long FILE_NINE_SIZE = 2 * OzoneConsts.KB + 1; // bin 2
   private static final long FILE_TEN_SIZE = 2 * OzoneConsts.KB + 1; // bin 2
   private static final long FILE_ELEVEN_SIZE = OzoneConsts.KB + 1; // bin 1
+  private static final long FILE_TWELVE_SIZE = 2 * OzoneConsts.KB + 1; // bin 2
+  private static final long FILE_THIRTEEN_SIZE = 2 * OzoneConsts.KB + 1; // bin 2
 
   private static final long FILE1_SIZE_WITH_REPLICA =
       getReplicatedSize(FILE_ONE_SIZE,
@@ -258,6 +272,12 @@ public class TestNSSummaryEndpointWithOBSAndLegacy {
   private static final long FILE11_SIZE_WITH_REPLICA =
       getReplicatedSize(FILE_ELEVEN_SIZE,
           StandaloneReplicationConfig.getInstance(ONE));
+  private static final long FILE12_SIZE_WITH_REPLICA =
+      getReplicatedSize(FILE_TWELVE_SIZE,
+          StandaloneReplicationConfig.getInstance(ONE));
+  private static final long FILE13_SIZE_WITH_REPLICA =
+      getReplicatedSize(FILE_THIRTEEN_SIZE,
+          StandaloneReplicationConfig.getInstance(ONE));
 
   private static final long MULTI_BLOCK_KEY_SIZE_WITH_REPLICA
       = FILE3_SIZE_WITH_REPLICA;
@@ -273,7 +293,9 @@ public class TestNSSummaryEndpointWithOBSAndLegacy {
       + FILE8_SIZE_WITH_REPLICA
       + FILE9_SIZE_WITH_REPLICA
       + FILE10_SIZE_WITH_REPLICA
-      + FILE11_SIZE_WITH_REPLICA;
+      + FILE11_SIZE_WITH_REPLICA
+      + FILE12_SIZE_WITH_REPLICA
+      + FILE13_SIZE_WITH_REPLICA;
 
   private static final long
       MULTI_BLOCK_TOTAL_SIZE_WITH_REPLICA_UNDER_VOL
@@ -311,6 +333,7 @@ public class TestNSSummaryEndpointWithOBSAndLegacy {
   private static final long BUCKET_THREE_QUOTA = OzoneConsts.MB;
   private static final long BUCKET_FOUR_QUOTA = OzoneConsts.MB;
   private static final long BUCKET_FIVE_QUOTA = OzoneConsts.MB;
+  private static final long BUCKET_SIX_QUOTA = OzoneConsts.MB;
 
   // mock client's path requests
   private static final String TEST_USER = "TestUser";
@@ -327,6 +350,8 @@ public class TestNSSummaryEndpointWithOBSAndLegacy {
       ROOT_PATH + VOL_TWO + ROOT_PATH + BUCKET_FOUR;
   private static final String BUCKET_FIVE_PATH =
       ROOT_PATH + VOL + ROOT_PATH + BUCKET_FIVE;
+  private static final String BUCKET_SIX_PATH =
+      ROOT_PATH + VOL_TWO + ROOT_PATH + BUCKET_SIX;
   private static final String KEY_ONE_PATH =
       ROOT_PATH + VOL + ROOT_PATH + BUCKET_ONE + ROOT_PATH + KEY_ONE;
   private static final String KEY_TWO_PATH =
@@ -349,6 +374,10 @@ public class TestNSSummaryEndpointWithOBSAndLegacy {
       ROOT_PATH + VOL_TWO + ROOT_PATH + BUCKET_THREE + ROOT_PATH + KEY_TEN;
   private static final String KEY_ELEVEN_PATH =
       ROOT_PATH + VOL_TWO + ROOT_PATH + BUCKET_FOUR + ROOT_PATH + KEY_ELEVEN;
+  private static final String KEY_TWELVE_PATH =
+      ROOT_PATH + VOL_TWO + ROOT_PATH + BUCKET_SIX + ROOT_PATH + KEY_TWELVE;
+  private static final String KEY_THIRTEEN_PATH =
+      ROOT_PATH + VOL_TWO + ROOT_PATH + BUCKET_SIX + ROOT_PATH + KEY_THIRTEEN;
   private static final String KEY4_PATH =
       ROOT_PATH + VOL + ROOT_PATH + BUCKET_TWO + ROOT_PATH + KEY_FOUR;
   private static final String MULTI_BLOCK_KEY_PATH =
@@ -358,12 +387,13 @@ public class TestNSSummaryEndpointWithOBSAndLegacy {
   // some expected answers
   private static final long ROOT_DATA_SIZE =
       FILE_ONE_SIZE + FILE_TWO_SIZE + FILE_THREE_SIZE + FILE_FOUR_SIZE + FILE_FIVE_SIZE + FILE_SIX_SIZE +
-          FILE_SEVEN_SIZE + FILE_EIGHT_SIZE + FILE_NINE_SIZE + FILE_TEN_SIZE + FILE_ELEVEN_SIZE;
+          FILE_SEVEN_SIZE + FILE_EIGHT_SIZE + FILE_NINE_SIZE + FILE_TEN_SIZE + FILE_ELEVEN_SIZE + FILE_TWELVE_SIZE +
+      FILE_THIRTEEN_SIZE;
   private static final long VOL_DATA_SIZE = FILE_ONE_SIZE + FILE_TWO_SIZE +
       FILE_THREE_SIZE + FILE_FOUR_SIZE + FILE_FIVE_SIZE + FILE_SIX_SIZE + FILE_SEVEN_SIZE;
 
   private static final long VOL_TWO_DATA_SIZE =
-      FILE_EIGHT_SIZE + FILE_NINE_SIZE + FILE_TEN_SIZE + FILE_ELEVEN_SIZE;
+      FILE_EIGHT_SIZE + FILE_NINE_SIZE + FILE_TEN_SIZE + FILE_ELEVEN_SIZE + FILE_TWELVE_SIZE + FILE_THIRTEEN_SIZE;
 
   private static final long BUCKET_ONE_DATA_SIZE = FILE_ONE_SIZE +
       FILE_TWO_SIZE +
@@ -449,8 +479,8 @@ public class TestNSSummaryEndpointWithOBSAndLegacy {
         (NamespaceSummaryResponse) rootResponse.getEntity();
     assertEquals(EntityType.ROOT, rootResponseObj.getEntityType());
     assertEquals(2, rootResponseObj.getCountStats().getNumVolume());
-    assertEquals(5, rootResponseObj.getCountStats().getNumBucket());
-    assertEquals(11, rootResponseObj.getCountStats().getNumTotalKey());
+    assertEquals(6, rootResponseObj.getCountStats().getNumBucket());
+    assertEquals(13, rootResponseObj.getCountStats().getNumTotalKey());
   }
 
   @Test
@@ -480,8 +510,8 @@ public class TestNSSummaryEndpointWithOBSAndLegacy {
         (NamespaceSummaryResponse) volTwoResponse.getEntity();
     assertEquals(EntityType.VOLUME,
         volTwoResponseObj.getEntityType());
-    assertEquals(2, volTwoResponseObj.getCountStats().getNumBucket());
-    assertEquals(4, volTwoResponseObj.getCountStats().getNumTotalKey());
+    assertEquals(3, volTwoResponseObj.getCountStats().getNumBucket());
+    assertEquals(6, volTwoResponseObj.getCountStats().getNumTotalKey());
     assertEquals(TEST_USER, ((VolumeObjectDBInfo) volTwoResponseObj.
         getObjectDBInfo()).getAdmin());
     assertEquals(TEST_USER, ((VolumeObjectDBInfo) volTwoResponseObj.
@@ -632,7 +662,7 @@ public class TestNSSummaryEndpointWithOBSAndLegacy {
     Response volResponse = nsSummaryEndpoint.getDiskUsage(VOL_TWO_PATH,
         false, false);
     DUResponse duVolRes = (DUResponse) volResponse.getEntity();
-    assertEquals(2, duVolRes.getCount());
+    assertEquals(3, duVolRes.getCount());
     List<DUResponse.DiskUsage> duData = duVolRes.getDuData();
     // sort based on subpath
     Collections.sort(duData,
@@ -897,7 +927,7 @@ public class TestNSSummaryEndpointWithOBSAndLegacy {
 
   @Test
   public void testFileSizeDist() throws Exception {
-    checkFileSizeDist(ROOT_PATH, 4, 3, 3, 1);
+    checkFileSizeDist(ROOT_PATH, 4, 3, 5, 1);
     checkFileSizeDist(VOL_PATH, 4, 1, 1, 1);
     checkFileSizeDist(BUCKET_ONE_PATH, 1, 1, 0, 1);
   }
@@ -1011,6 +1041,17 @@ public class TestNSSummaryEndpointWithOBSAndLegacy {
     assertEquals(BUCKET_FIVE_DATA_SIZE, duBucketResponse.getSize());
   }
 
+  @Test
+  public void testListKeysBucketSix() throws Exception {
+    // filter list keys under bucketSix based on RATIS ReplicationConfig and key creation date
+    // creationDate filter passed 1 minute above of KEY6 creation date, so listKeys API will return
+    // ZERO keys, as one RATIS keys got created after creationDate filter value.
+    Response bucketResponse = nsSummaryEndpoint.listKeysWithDu("RATIS",
+        "04-04-2024 12:20:00", 0, BUCKET_SIX_PATH, 10, false);
+    DUResponse duBucketResponse = (DUResponse) bucketResponse.getEntity();
+    // There are no sub-paths under this LEGACY bucket.
+    assertEquals(2, duBucketResponse.getCount());
+  }
 
   /**
    * Testing the following case.
@@ -1020,15 +1061,21 @@ public class TestNSSummaryEndpointWithOBSAndLegacy {
    *     │   ├── file2
    *     │   └── file3
    *     └── bucket2 (OBS)
-   *         ├── file4
-   *         └── file5
+   *     │   ├── file4
+   *     │   └── file5
+   *     └── bucket5 (OBS)
+   *         ├── file6
+   *         └── file7
    * └── vol2
    *     ├── bucket3 (Legacy)
    *     │   ├── file8
    *     │   ├── file9
    *     │   └── file10
    *     └── bucket4 (Legacy)
-   *         └── file11
+   *     │   └── file11
+   *     └── bucket6 (Legacy)
+   *         └── file12
+   *         └── file13
    *
    * Write these keys to OM and
    * replicate them.
@@ -1116,6 +1163,33 @@ public class TestNSSummaryEndpointWithOBSAndLegacy {
         VOL_OBJECT_ID,
         FILE_SEVEN_SIZE,
         getOBSBucketLayout(),
+        ratisOne,
+        epochMillis2, true);
+
+    writeKeyToOm(reconOMMetadataManager,
+        KEY_TWELVE,
+        BUCKET_SIX,
+        VOL_TWO,
+        KEY_TWELVE,
+        KEY_TWELVE_OBJECT_ID,
+        BUCKET_SIX_OBJECT_ID,
+        BUCKET_SIX_OBJECT_ID,
+        VOL_TWO_OBJECT_ID,
+        FILE_TWELVE_SIZE,
+        getLegacyBucketLayout(),
+        ratisOne,
+        epochMillis1, true);
+    writeKeyToOm(reconOMMetadataManager,
+        KEY_THIRTEEN,
+        BUCKET_SIX,
+        VOL_TWO,
+        KEY_THIRTEEN,
+        KEY_THIRTEEN_OBJECT_ID,
+        BUCKET_SIX_OBJECT_ID,
+        BUCKET_SIX_OBJECT_ID,
+        VOL_TWO_OBJECT_ID,
+        FILE_THIRTEEN_SIZE,
+        getLegacyBucketLayout(),
         ratisOne,
         epochMillis2, true);
 
@@ -1241,6 +1315,14 @@ public class TestNSSummaryEndpointWithOBSAndLegacy {
         .setBucketName(BUCKET_FIVE)
         .setObjectID(BUCKET_FIVE_OBJECT_ID)
         .setQuotaInBytes(BUCKET_FIVE_QUOTA)
+        .setBucketLayout(getOBSBucketLayout())
+        .build();
+
+    OmBucketInfo bucketInfo6 = OmBucketInfo.newBuilder()
+        .setVolumeName(VOL_TWO)
+        .setBucketName(BUCKET_SIX)
+        .setObjectID(BUCKET_SIX_OBJECT_ID)
+        .setQuotaInBytes(BUCKET_SIX_QUOTA)
         .setBucketLayout(getLegacyBucketLayout())
         .build();
 
@@ -1254,12 +1336,15 @@ public class TestNSSummaryEndpointWithOBSAndLegacy {
         bucketInfo4.getVolumeName(), bucketInfo4.getBucketName());
     String bucketKey5 = omMetadataManager.getBucketKey(
         bucketInfo5.getVolumeName(), bucketInfo5.getBucketName());
+    String bucketKey6 = omMetadataManager.getBucketKey(
+        bucketInfo6.getVolumeName(), bucketInfo6.getBucketName());
 
     omMetadataManager.getBucketTable().put(bucketKey, bucketInfo);
     omMetadataManager.getBucketTable().put(bucketKey2, bucketInfo2);
     omMetadataManager.getBucketTable().put(bucketKey3, bucketInfo3);
     omMetadataManager.getBucketTable().put(bucketKey4, bucketInfo4);
     omMetadataManager.getBucketTable().put(bucketKey5, bucketInfo5);
+    omMetadataManager.getBucketTable().put(bucketKey6, bucketInfo6);
 
     return omMetadataManager;
   }

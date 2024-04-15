@@ -29,6 +29,7 @@ import org.apache.hadoop.ozone.recon.api.types.NSSummary;
 import org.apache.hadoop.ozone.recon.api.types.QuotaUsageResponse;
 import org.apache.hadoop.ozone.recon.api.types.FileSizeDistributionResponse;
 
+import org.apache.hadoop.ozone.recon.api.types.Stats;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 import org.apache.hadoop.ozone.recon.spi.ReconNamespaceSummaryManager;
 
@@ -80,7 +81,7 @@ public class DirectoryEntityHandler extends EntityHandler {
 
   @Override
   public DUResponse getDuResponse(
-      boolean listFile, boolean withReplica, boolean recursive)
+      boolean listFile, boolean withReplica, boolean recursive, Stats stats)
           throws IOException {
     DUResponse duResponse = new DUResponse();
     duResponse.setPath(getNormalizedPath());
@@ -134,7 +135,7 @@ public class DirectoryEntityHandler extends EntityHandler {
 
       if (withReplica) {
         long subdirDU = getBucketHandler()
-                .calculateDUUnderObject(subdirObjectId, recursive, diskUsageList);
+                .calculateDUUnderObject(subdirObjectId, recursive, diskUsageList, stats);
         diskUsage.setSizeWithReplica(subdirDU);
         dirDataSizeWithReplica += subdirDU;
       }
@@ -149,7 +150,7 @@ public class DirectoryEntityHandler extends EntityHandler {
     if (listFile || withReplica) {
       dirDataSizeWithReplica += getBucketHandler()
               .handleDirectKeys(dirObjectId, withReplica,
-                  listFile, subdirDUData, getNormalizedPath());
+                  listFile, subdirDUData, getNormalizedPath(), stats);
     }
 
     if (withReplica) {
@@ -158,7 +159,8 @@ public class DirectoryEntityHandler extends EntityHandler {
     duResponse.setCount(subdirDUData.size());
     duResponse.setSize(dirDataSize);
     duResponse.setDuData(subdirDUData);
-
+    duResponse.setTotalCount(stats.getTotalCount());
+    duResponse.setLastKey(stats.getLastKey());
     return duResponse;
   }
 

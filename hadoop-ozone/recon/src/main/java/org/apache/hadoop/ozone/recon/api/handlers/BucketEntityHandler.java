@@ -28,6 +28,7 @@ import org.apache.hadoop.ozone.recon.api.types.QuotaUsageResponse;
 import org.apache.hadoop.ozone.recon.api.types.FileSizeDistributionResponse;
 import org.apache.hadoop.ozone.recon.api.types.NSSummary;
 import org.apache.hadoop.ozone.recon.api.types.ResponseStatus;
+import org.apache.hadoop.ozone.recon.api.types.Stats;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 import org.apache.hadoop.ozone.recon.spi.ReconNamespaceSummaryManager;
 import org.slf4j.Logger;
@@ -90,7 +91,7 @@ public class BucketEntityHandler extends EntityHandler {
 
   @Override
   public DUResponse getDuResponse(
-      boolean listFile, boolean withReplica, boolean recursive)
+      boolean listFile, boolean withReplica, boolean recursive, Stats stats)
           throws IOException {
     DUResponse duResponse = new DUResponse();
     duResponse.setPath(getNormalizedPath());
@@ -126,21 +127,25 @@ public class BucketEntityHandler extends EntityHandler {
       long dataSize = getTotalSize(subdirObjectId);
       bucketDataSize += dataSize;
 
+      stats.setCurrentCount(stats.getCurrentCount() + 1);
+
       if (withReplica) {
         long dirDU = getBucketHandler()
-            .calculateDUUnderObject(subdirObjectId, recursive, diskUsageList);
+            .calculateDUUnderObject(subdirObjectId, recursive, diskUsageList, stats);
         diskUsage.setSizeWithReplica(dirDU);
         bucketDataSizeWithReplica += dirDU;
       }
       diskUsage.setSize(dataSize);
       dirDUData.add(diskUsage);
-      dirDUData.addAll(diskUsageList);
+      if (diskUsageList.size() > 0) {
+        dirDUData.addAll(diskUsageList);
+      }
     }
     // Either listFile or withReplica is enabled, we need the directKeys info
     if (listFile || withReplica) {
       bucketDataSizeWithReplica += getBucketHandler()
               .handleDirectKeys(bucketObjectId, withReplica,
-                  listFile, dirDUData, getNormalizedPath());
+                  listFile, dirDUData, getNormalizedPath(), stats);
     }
     if (withReplica) {
       duResponse.setSizeWithReplica(bucketDataSizeWithReplica);
@@ -148,6 +153,8 @@ public class BucketEntityHandler extends EntityHandler {
     duResponse.setCount(dirDUData.size());
     duResponse.setSize(bucketDataSize);
     duResponse.setDuData(dirDUData);
+    duResponse.setTotalCount(stats.getTotalCount());
+    duResponse.setLastKey(stats.getLastKey());
     return duResponse;
   }
 

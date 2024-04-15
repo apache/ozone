@@ -29,6 +29,7 @@ import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
 import org.apache.hadoop.ozone.recon.api.types.DUResponse;
 import org.apache.hadoop.ozone.recon.api.types.EntityType;
 import org.apache.hadoop.ozone.recon.api.types.NSSummary;
+import org.apache.hadoop.ozone.recon.api.types.Stats;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 import org.apache.hadoop.ozone.recon.spi.ReconNamespaceSummaryManager;
 import org.slf4j.Logger;
@@ -112,13 +113,15 @@ public class LegacyBucketHandler extends BucketHandler {
    * handling only direct keys.
    *
    * @param parentId
-   * @param recursive
-   * @param diskUsageList
+   * @param recursive     Whether to add keys recursively or just immediate du records.
+   * @param diskUsageList List to add du records.
+   * @param stats         Staistics related to DU records count and limit.
    * @return total DU of direct keys under object
    * @throws IOException
    */
   @Override
-  public long calculateDUUnderObject(long parentId, boolean recursive, List<DUResponse.DiskUsage> diskUsageList)
+  public long calculateDUUnderObject(long parentId, boolean recursive, List<DUResponse.DiskUsage> diskUsageList,
+                                     Stats stats)
       throws IOException {
     Table<String, OmKeyInfo> keyTable = getKeyTable();
 
@@ -177,19 +180,21 @@ public class LegacyBucketHandler extends BucketHandler {
     // handle nested keys (DFS)
     Set<Long> subDirIds = nsSummary.getChildDir();
     for (long subDirId: subDirIds) {
-      totalDU += calculateDUUnderObject(subDirId, recursive, diskUsageList);
+      totalDU += calculateDUUnderObject(subDirId, recursive, diskUsageList, stats);
     }
     return totalDU;
   }
 
   /**
    * This method handles disk usage of direct keys.
-   * @param parentId parent directory/bucket
-   * @param withReplica if withReplica is enabled, set sizeWithReplica
-   * for each direct key's DU
-   * @param listFile if listFile is enabled, append key DU as a subpath
-   * @param duData the current DU data
+   *
+   * @param parentId       parent directory/bucket
+   * @param withReplica    if withReplica is enabled, set sizeWithReplica
+   *                       for each direct key's DU
+   * @param listFile       if listFile is enabled, append key DU as a subpath
+   * @param duData         the current DU data
    * @param normalizedPath the normalized path request
+   * @param stats
    * @return the total DU of all direct keys
    * @throws IOException IOE
    */
@@ -197,7 +202,7 @@ public class LegacyBucketHandler extends BucketHandler {
   public long handleDirectKeys(long parentId, boolean withReplica,
                                boolean listFile,
                                List<DUResponse.DiskUsage> duData,
-                               String normalizedPath) throws IOException {
+                               String normalizedPath, Stats stats) throws IOException {
 
     Table<String, OmKeyInfo> keyTable = getKeyTable();
     long keyDataSizeWithReplica = 0L;
@@ -264,7 +269,7 @@ public class LegacyBucketHandler extends BucketHandler {
           }
           // list the key as a subpath
           if (listFile) {
-            duData.add(diskUsage);
+            verifyStatsAndAddDURecord(duData, stats, kv, diskUsage);
           }
         }
       }

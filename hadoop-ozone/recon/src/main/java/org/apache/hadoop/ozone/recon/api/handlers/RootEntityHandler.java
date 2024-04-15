@@ -31,6 +31,7 @@ import org.apache.hadoop.ozone.recon.api.types.ObjectDBInfo;
 import org.apache.hadoop.ozone.recon.api.types.QuotaUsageResponse;
 import org.apache.hadoop.ozone.recon.api.types.FileSizeDistributionResponse;
 import org.apache.hadoop.ozone.recon.api.types.ResponseStatus;
+import org.apache.hadoop.ozone.recon.api.types.Stats;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 import org.apache.hadoop.ozone.recon.spi.ReconNamespaceSummaryManager;
 import org.apache.hadoop.hdds.scm.container.placement.metrics.SCMNodeStat;
@@ -88,7 +89,7 @@ public class RootEntityHandler extends EntityHandler {
 
   @Override
   public DUResponse getDuResponse(
-      boolean listFile, boolean withReplica, boolean recursive)
+      boolean listFile, boolean withReplica, boolean recursive, Stats stats)
           throws IOException {
     DUResponse duResponse = new DUResponse();
     duResponse.setPath(getNormalizedPath());
@@ -120,7 +121,7 @@ public class RootEntityHandler extends EntityHandler {
             BucketHandler.getBucketHandler(
               getReconNamespaceSummaryManager(),
               getOmMetadataManager(), getReconSCM(), bucket);
-          volumeDU += bucketHandler.calculateDUUnderObject(bucketObjectID, recursive, diskUsageList);
+          volumeDU += bucketHandler.calculateDUUnderObject(bucketObjectID, recursive, diskUsageList, stats);
         }
       }
       totalDataSize += dataSize;
@@ -140,7 +141,8 @@ public class RootEntityHandler extends EntityHandler {
     }
     duResponse.setSize(totalDataSize);
     duResponse.setDuData(volumeDuData);
-
+    duResponse.setTotalCount(stats.getTotalCount());
+    duResponse.setLastKey(stats.getLastKey());
     return duResponse;
   }
 
@@ -150,7 +152,7 @@ public class RootEntityHandler extends EntityHandler {
     QuotaUsageResponse quotaUsageResponse = new QuotaUsageResponse();
     SCMNodeStat stats = getReconSCM().getScmNodeManager().getStats();
     long quotaInBytes = stats.getCapacity().get();
-    long quotaUsedInBytes = getDuResponse(true, true, false).getSizeWithReplica();
+    long quotaUsedInBytes = getDuResponse(true, true, false, new Stats(-1)).getSizeWithReplica();
     quotaUsageResponse.setQuota(quotaInBytes);
     quotaUsageResponse.setQuotaUsed(quotaUsedInBytes);
     return quotaUsageResponse;

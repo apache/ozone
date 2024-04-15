@@ -29,6 +29,7 @@ import org.apache.hadoop.ozone.recon.api.types.QuotaUsageResponse;
 import org.apache.hadoop.ozone.recon.api.types.ResponseStatus;
 import org.apache.hadoop.ozone.recon.api.types.FileSizeDistributionResponse;
 import org.apache.hadoop.ozone.recon.api.types.EntityType;
+import org.apache.hadoop.ozone.recon.api.types.Stats;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 import org.apache.hadoop.ozone.recon.spi.ReconNamespaceSummaryManager;
 import org.slf4j.Logger;
@@ -142,7 +143,7 @@ public class NSSummaryEndpoint {
             omMetadataManager, reconSCM, path);
 
     duResponse = handler.getDuResponse(
-            listFile, withReplica, false);
+            listFile, withReplica, false, new Stats(-1));
 
     return Response.ok(duResponse).build();
   }
@@ -160,7 +161,7 @@ public class NSSummaryEndpoint {
    * @param creationDate Filter for keys created after creationDate in "MM-dd-yyyy HH:mm:ss" string format.
    * @param keySize Filter for Keys greater than keySize in bytes.
    * @param startPrefix Filter for startPrefix path.
-   * @param count Filter for limited count of keys.
+   * @param limit Filter for limited count of keys.
    * @return the list of keys in below structured format:
    * Response For OBS Bucket keys:
    * ********************************************************
@@ -194,7 +195,7 @@ public class NSSummaryEndpoint {
                                  @QueryParam("creationDate") String creationDate,
                                  @DefaultValue(DEFAULT_KEY_SIZE) @QueryParam("keySize") long keySize,
                                  @DefaultValue(OM_KEY_PREFIX) @QueryParam("startPrefix") String startPrefix,
-                                 @DefaultValue(DEFAULT_FETCH_COUNT) @QueryParam("count") long count,
+                                 @DefaultValue(DEFAULT_FETCH_COUNT) @QueryParam("count") long limit,
                                  @DefaultValue("false") @QueryParam("recursive") boolean recursive)
       throws IOException {
 
@@ -210,7 +211,9 @@ public class NSSummaryEndpoint {
         reconNamespaceSummaryManager,
         omMetadataManager, reconSCM, startPrefix);
 
-    duResponse = handler.getListKeysResponse(count, recursive);
+    Stats stats = new Stats(limit);
+
+    duResponse = handler.getListKeysResponse(stats, recursive);
 
     List<DUResponse.DiskUsage> keyListWithDu = duResponse.getDuData();
 
@@ -230,7 +233,6 @@ public class NSSummaryEndpoint {
 
     duResponse.setDuData(filteredKeyList);
     duResponse.setCount(filteredKeyList.size());
-
     return Response.ok(duResponse).build();
   }
 

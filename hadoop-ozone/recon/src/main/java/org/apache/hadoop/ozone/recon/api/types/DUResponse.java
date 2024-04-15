@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.ozone.recon.api.types;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
 
 import java.util.ArrayList;
@@ -46,6 +47,16 @@ public class DUResponse {
   /** The number of subpaths under the request path. */
   @JsonProperty("subPathCount")
   private int count;
+
+  /** Total number of subpaths/keys under the requested startPrefix path. */
+  @JsonProperty("totalCount")
+  @JsonInclude(JsonInclude.Include.NON_DEFAULT)
+  private long totalCount;
+
+  /** last key sent. */
+  @JsonProperty("lastKey")
+  @JsonInclude(JsonInclude.Include.NON_EMPTY)
+  private String lastKey;
 
   /** Encapsulates a DU instance for a subpath. */
   @JsonProperty("subPaths")
@@ -116,6 +127,22 @@ public class DUResponse {
 
   public void setKeySize(long keySize) {
     this.keySize = keySize;
+  }
+
+  public long getTotalCount() {
+    return totalCount;
+  }
+
+  public void setTotalCount(long totalCount) {
+    this.totalCount = totalCount;
+  }
+
+  public String getLastKey() {
+    return lastKey;
+  }
+
+  public void setLastKey(String lastKey) {
+    this.lastKey = lastKey;
   }
 
   /**

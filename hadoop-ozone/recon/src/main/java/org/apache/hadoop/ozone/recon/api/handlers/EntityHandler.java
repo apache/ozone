@@ -27,6 +27,7 @@ import org.apache.hadoop.ozone.recon.api.types.QuotaUsageResponse;
 import org.apache.hadoop.ozone.recon.api.types.FileSizeDistributionResponse;
 import org.apache.hadoop.ozone.recon.api.types.EntityType;
 import org.apache.hadoop.ozone.recon.api.types.NSSummary;
+import org.apache.hadoop.ozone.recon.api.types.Stats;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 import org.apache.hadoop.ozone.recon.spi.ReconNamespaceSummaryManager;
 
@@ -79,11 +80,11 @@ public abstract class EntityHandler {
           throws IOException;
 
   public abstract DUResponse getDuResponse(
-      boolean listFile, boolean withReplica, boolean recursive)
+      boolean listFile, boolean withReplica, boolean recursive, Stats stats)
           throws IOException;
 
-  public DUResponse getListKeysResponse(long count, boolean recursive) throws IOException {
-    return getDuResponse(true, true, recursive);
+  public DUResponse getListKeysResponse(Stats stats, boolean recursive) throws IOException {
+    return getDuResponse(true, true, recursive, stats);
   }
 
   public abstract QuotaUsageResponse getQuotaResponse()
