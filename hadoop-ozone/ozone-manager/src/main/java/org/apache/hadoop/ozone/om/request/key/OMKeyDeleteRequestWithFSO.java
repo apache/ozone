@@ -49,7 +49,6 @@ import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.nio.file.InvalidPathException;
-import java.util.HashMap;
 import java.util.Map;
 
 import static org.apache.hadoop.ozone.OzoneConsts.DELETED_HSYNC_KEY;
@@ -131,7 +130,7 @@ public class OMKeyDeleteRequestWithFSO extends OMKeyDeleteRequest {
       String ozonePathKey = omMetadataManager.getOzonePathKey(volumeId,
               bucketId, omKeyInfo.getParentObjectID(),
               omKeyInfo.getFileName());
-      Map<String, OmKeyInfo> openKeyInfoMap = new HashMap<>();
+      OmKeyInfo deletedOpenKeyInfo = null;
 
       if (keyStatus.isDirectory()) {
         // Check if there are any sub path exists under the user requested path
@@ -171,7 +170,7 @@ public class OMKeyDeleteRequestWithFSO extends OMKeyDeleteRequest {
           openKeyInfo.getMetadata().put(DELETED_HSYNC_KEY, "true");
           // Remove the open key by putting a tombstone entry
           openKeyTable.addCacheEntry(dbOpenKey, trxnLogIndex);
-          openKeyInfoMap.put(dbOpenKey, openKeyInfo);
+          deletedOpenKeyInfo = openKeyInfo;
         } else {
           LOG.warn("Potentially inconsistent DB state: open key not found with dbOpenKey '{}'", dbOpenKey);
         }
@@ -180,7 +179,7 @@ public class OMKeyDeleteRequestWithFSO extends OMKeyDeleteRequest {
       omClientResponse = new OMKeyDeleteResponseWithFSO(omResponse
           .setDeleteKeyResponse(DeleteKeyResponse.newBuilder()).build(),
           keyName, omKeyInfo, ozoneManager.isRatisEnabled(),
-          omBucketInfo.copyObject(), keyStatus.isDirectory(), volumeId, openKeyInfoMap);
+          omBucketInfo.copyObject(), keyStatus.isDirectory(), volumeId, deletedOpenKeyInfo);
 
       result = Result.SUCCESS;
     } catch (IOException | InvalidPathException ex) {

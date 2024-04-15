@@ -19,6 +19,7 @@
 package org.apache.hadoop.ozone.om.response.key;
 
 import org.apache.hadoop.hdds.utils.db.Table;
+import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
@@ -29,7 +30,6 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
 
 import java.io.IOException;
-import java.util.Map;
 import jakarta.annotation.Nonnull;
 
 import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.BUCKET_TABLE;
@@ -45,15 +45,15 @@ public class OMKeyDeleteResponse extends AbstractOMKeyDeleteResponse {
   private OmKeyInfo omKeyInfo;
   private OmBucketInfo omBucketInfo;
   // If not null, this key will be deleted from OpenKeyTable
-  private Map<String, OmKeyInfo> openKeyInfoMap;
+  private OmKeyInfo deletedOpenKeyInfo;
 
   public OMKeyDeleteResponse(@Nonnull OMResponse omResponse,
       @Nonnull OmKeyInfo omKeyInfo, boolean isRatisEnabled,
-      @Nonnull OmBucketInfo omBucketInfo, Map<String, OmKeyInfo> openKeyInfoMap) {
+      @Nonnull OmBucketInfo omBucketInfo, OmKeyInfo deletedOpenKeyInfo) {
     super(omResponse, isRatisEnabled, omBucketInfo.getBucketLayout());
     this.omKeyInfo = omKeyInfo;
     this.omBucketInfo = omBucketInfo;
-    this.openKeyInfoMap = openKeyInfoMap;
+    this.deletedOpenKeyInfo = deletedOpenKeyInfo;
   }
 
   /**
@@ -85,10 +85,13 @@ public class OMKeyDeleteResponse extends AbstractOMKeyDeleteResponse {
 
     // necessary when the file is hsync'ed but not committed
     // Update metadata which will be used to cleanup openKey in openKeyCleanupService
-    if (!openKeyInfoMap.isEmpty()) {
-      for (Map.Entry<String, OmKeyInfo> entry : openKeyInfoMap.entrySet()) {
+    if (deletedOpenKeyInfo != null) {
+      String hsyncClientId = deletedOpenKeyInfo.getMetadata().get(OzoneConsts.HSYNC_CLIENT_ID);
+      if (hsyncClientId != null) {
+        String dbOpenKey = omMetadataManager.getOpenKey(deletedOpenKeyInfo.getVolumeName(),
+            deletedOpenKeyInfo.getBucketName(), deletedOpenKeyInfo.getKeyName(), hsyncClientId);
         omMetadataManager.getOpenKeyTable(getBucketLayout()).putWithBatch(
-            batchOperation, entry.getKey(), entry.getValue());
+            batchOperation, dbOpenKey, deletedOpenKeyInfo);
       }
     }
   }
@@ -97,8 +100,8 @@ public class OMKeyDeleteResponse extends AbstractOMKeyDeleteResponse {
     return omKeyInfo;
   }
 
-  protected Map<String, OmKeyInfo> getOpenKeyInfoMap() {
-    return openKeyInfoMap;
+  protected OmKeyInfo getDeletedOpenKeyInfo() {
+    return deletedOpenKeyInfo;
   }
 
   protected OmBucketInfo getOmBucketInfo() {

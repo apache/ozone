@@ -20,7 +20,6 @@ package org.apache.hadoop.ozone.om.request.key;
 
 import java.io.IOException;
 import java.nio.file.InvalidPathException;
-import java.util.HashMap;
 import java.util.Map;
 
 import org.apache.hadoop.hdds.utils.db.Table;
@@ -163,7 +162,7 @@ public class OMKeyDeleteRequest extends OMKeyRequest {
       long quotaReleased = sumBlockLengths(omKeyInfo);
       omBucketInfo.incrUsedBytes(-quotaReleased);
       omBucketInfo.incrUsedNamespace(-1L);
-      Map<String, OmKeyInfo> openKeyInfoMap = new HashMap<>();
+      OmKeyInfo deletedOpenKeyInfo = null;
 
       // If omKeyInfo has hsync metadata, delete its corresponding open key as well
       String dbOpenKey = null;
@@ -176,7 +175,7 @@ public class OMKeyDeleteRequest extends OMKeyRequest {
           openKeyInfo.getMetadata().put(DELETED_HSYNC_KEY, "true");
           // Remove the open key by putting a tombstone entry
           openKeyTable.addCacheEntry(dbOpenKey, trxnLogIndex);
-          openKeyInfoMap.put(dbOpenKey, openKeyInfo);
+          deletedOpenKeyInfo = openKeyInfo;
         } else {
           LOG.warn("Potentially inconsistent DB state: open key not found with dbOpenKey '{}'", dbOpenKey);
         }
@@ -185,7 +184,7 @@ public class OMKeyDeleteRequest extends OMKeyRequest {
       omClientResponse = new OMKeyDeleteResponse(
           omResponse.setDeleteKeyResponse(DeleteKeyResponse.newBuilder())
               .build(), omKeyInfo, ozoneManager.isRatisEnabled(),
-          omBucketInfo.copyObject(), openKeyInfoMap);
+          omBucketInfo.copyObject(), deletedOpenKeyInfo);
 
       result = Result.SUCCESS;
     } catch (IOException | InvalidPathException ex) {
