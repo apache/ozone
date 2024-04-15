@@ -135,9 +135,9 @@ public class ECBlockOutputStream extends BlockOutputStream {
           break;
         } else {
           ChunkInfo chunk = chunks.get(0);
-          LOG.info("The first chunk in block with index {} does not have stripeChecksum. BlockID: {}, Block size: {}." +
-                  " Chunk length: {}, Chunk offset: {}, hasChecksumData: {}, chunks size: {}.", i, bd.getBlockID(),
-              bd.getSize(), chunk.getLen(), chunk.getOffset(), chunk.hasChecksumData(), chunks.size());
+          LOG.debug("The first chunk in block with index {} does not have stripeChecksum. BlockID: {}, Block " +
+                  "size: {}. Chunk length: {}, Chunk offset: {}, hasChecksumData: {}, chunks size: {}.", i,
+              bd.getBlockID(), bd.getSize(), chunk.getLen(), chunk.getOffset(), chunk.hasChecksumData(), chunks.size());
         }
 
         if (chunks.get(0).hasChecksumData()) {
@@ -181,9 +181,8 @@ public class ECBlockOutputStream extends BlockOutputStream {
       getContainerBlockData().clearChunks();
       getContainerBlockData().addAllChunks(newChunkList);
     } else {
-      throw new IOException("None of the block data have checksum " +
-          "which means " + parity + "(parity)+1 blocks are " +
-          "not present");
+      LOG.warn("Could not find checksum data in any index for blockData with BlockID {}, length {} and " +
+          "blockGroupLength {}.", blockID, blockData.length, blockGroupLength);
     }
 
     return executePutBlock(close, force, blockGroupLength);
