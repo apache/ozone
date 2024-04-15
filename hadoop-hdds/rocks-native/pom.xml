@@ -253,6 +253,8 @@
                 <configuration>
                   <target>
                     <mkdir dir="${project.build.directory}/native/rocksdb"/>
+                    <copy file="${project.build.directory}/rocksdbjni/${rocksdbLibName}"
+                          tofile="${project.build.directory}/native/rocksdb/${rocksdbLibName}" />
                     <exec executable="cmake" failonerror="true" dir="${project.build.directory}/native/rocksdb">
                       <env key="CFLAGS" value="-fPIC"/>
                       <env key="CXXFLAGS" value="-fPIC"/>
@@ -263,7 +265,7 @@
                       <arg line="-DCMAKE_STANDARDS=${cmake.standards}"/>
                       <arg line="-DROCKSDB_HEADERS=${project.build.directory}/rocksdb/rocksdb-${rocksdb.version}/include"/>
                       <arg line="-DROCKSDB_TOOLS_LIB=${project.build.directory}/rocksdb/rocksdb-${rocksdb.version}"/>
-                      <arg line="-DROCKSDB_LIB=${project.build.directory}/rocksdbjni/${rocksdbLibName}"/>
+                      <arg line="-DROCKSDB_LIB=${project.build.directory}/native/rocksdb/${rocksdbLibName}"/>
                     </exec>
                     <exec executable="make" dir="${project.build.directory}/native/rocksdb" failonerror="true"/>
                     <delete dir="${project.build.directory}/rocksdb/rocksdb-${rocksdb.version}"
