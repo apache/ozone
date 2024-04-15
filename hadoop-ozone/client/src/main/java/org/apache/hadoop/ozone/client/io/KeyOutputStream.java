@@ -576,9 +576,7 @@ public class KeyOutputStream extends OutputStream
           if (entry != null) {
             try {
               future = handleStreamAction(entry, op);
-              if (future != null) {
-                combine(future);
-              }
+
               // TODO: Revisit this workaround. This is a workaround as only HSYNC is returning a future, for now
               if (op == StreamAction.CLOSE || op == StreamAction.FULL || op == StreamAction.FLUSH) {
                 if (future != null) {
