@@ -64,6 +64,7 @@ import com.google.common.base.Preconditions;
 import io.opentracing.Scope;
 import io.opentracing.Span;
 import io.opentracing.util.GlobalTracer;
+import org.apache.hadoop.util.Time;
 import org.apache.ratis.thirdparty.io.grpc.ManagedChannel;
 import org.apache.ratis.thirdparty.io.grpc.Status;
 import org.apache.ratis.thirdparty.io.grpc.netty.GrpcSslContexts;
@@ -572,7 +573,11 @@ public class XceiverClientGrpc extends XceiverClientSpi {
         ContainerProtos.StreamDataResponseProto.newBuilder();
     checkOpen(dn);
     UUID dnID = dn.getUuid();
+    Type cmdType = request.getCmdType();
     semaphore.acquire();
+    long requestTime = System.currentTimeMillis();
+    metrics.incrPendingContainerOpsMetrics(cmdType);
+
     final StreamObserver<ContainerCommandRequestProto> requestObserver =
         asyncStubs.get(dnID).withDeadlineAfter(timeout, TimeUnit.SECONDS)
             .send(new StreamObserver<ContainerCommandResponseProto>() {
@@ -607,6 +612,8 @@ public class XceiverClientGrpc extends XceiverClientSpi {
     try {
       return new XceiverClientReply(future);
     } finally {
+      metrics.decrPendingContainerOpsMetrics(cmdType);
+      metrics.addContainerOpsLatency(cmdType, System.currentTimeMillis() - requestTime);
       semaphore.release();
     }
 

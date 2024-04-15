@@ -90,8 +90,7 @@ public class NewBlockInputStream extends BlockExtendedInputStream
   private final List<XceiverClientSpi.Validator> validators;
   private final boolean verifyChecksum;
   private final Function<BlockID, BlockLocationInfo> refreshFunction;
-  private final RetryPolicy retryPolicy =
-      HddsClientUtils.createRetryPolicy(3, TimeUnit.SECONDS.toMillis(1));
+  private final RetryPolicy retryPolicy;
   private int retries;
 
 
@@ -110,6 +109,9 @@ public class NewBlockInputStream extends BlockExtendedInputStream
         (request, response) -> validateBlock(response));
     this.verifyChecksum = config.isChecksumVerify();
     this.refreshFunction = refreshFunction;
+    this.retryPolicy =
+        HddsClientUtils.createRetryPolicy(config.getMaxReadRetryCount(),
+            TimeUnit.SECONDS.toMillis(config.getReadRetryInterval()));
 
   }
 

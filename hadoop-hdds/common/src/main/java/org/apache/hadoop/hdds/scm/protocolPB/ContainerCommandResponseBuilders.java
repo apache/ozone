@@ -322,8 +322,7 @@ public final class ContainerCommandResponseBuilders {
       response = ReadBlockResponseProto.newBuilder()
           .setChunkData(chunkInfo)
           .setData(data.toByteString(byteBufferToByteString))
-          .setBlockID(blockID)
-          .setStartIndex(startIndex);
+          .setBlockID(blockID);
     } else {
       // V1 splits response data into a list of ByteBuffers
       response = ReadBlockResponseProto.newBuilder()
@@ -331,10 +330,11 @@ public final class ContainerCommandResponseBuilders {
           .setDataBuffers(DataBuffers.newBuilder()
               .addAllBuffers(data.toByteStringList(byteBufferToByteString))
               .build())
-          .setBlockID(blockID)
-          .setStartIndex(startIndex);
+          .setBlockID(blockID);
     }
-
+    if (startIndex >= 0) {
+      response.setStartIndex(startIndex);
+    }
     return getSuccessResponseBuilder(request)
         .setReadBlock(response)
         .build();

@@ -1258,14 +1258,23 @@ public class KeyValueHandler extends Handler {
           .getChecksumData().getBytesPerChecksum();
       long offset = readBlock.getOffset();
       long len = readBlock.getLen();
-      long adjustedChunkOffset =
-          (offset / bytesPerChecksum) * bytesPerChecksum;
-      long adjustedChunkLen = ((len + offset - 1) / bytesPerChecksum + 1)
-          * bytesPerChecksum;
+      long adjustedChunkOffset, adjustedChunkLen;
+      if (validateChunkChecksumData) {
+        adjustedChunkOffset =
+            (offset / bytesPerChecksum) * bytesPerChecksum;
+        adjustedChunkLen = ((len + offset - 1) / bytesPerChecksum + 1)
+            * bytesPerChecksum;
+      } else {
+        adjustedChunkOffset = offset;
+        adjustedChunkLen = len;
+      }
+      int startIndex = -1;
       len += (offset - adjustedChunkOffset);
       while (len > 0) {
         ContainerProtos.ChunkInfo chunk = chunkInfos.get(chunkIndex);
-        int startIndex =  (int)(adjustedChunkOffset - chunk.getOffset()) / bytesPerChecksum;
+        if (validateChunkChecksumData) {
+          startIndex = (int)(adjustedChunkOffset - chunk.getOffset()) / bytesPerChecksum;
+        }
         long chunkLen = Math.min(adjustedChunkLen, chunk.getLen());
         ChunkInfo chunkInfo = ChunkInfo.getFromProtoBuf(chunkInfos
             .get(chunkIndex)
@@ -1291,8 +1300,10 @@ public class KeyValueHandler extends Handler {
                 data, byteBufferToByteString, startIndex));
         len -= chunkLen;
         adjustedChunkOffset += chunkLen;
-        adjustedChunkLen = ((len - 1) / bytesPerChecksum + 1)
-            * bytesPerChecksum;
+        if (validateChunkChecksumData) {
+          adjustedChunkLen = ((len - 1) / bytesPerChecksum + 1)
+              * bytesPerChecksum;
+        }
         chunkIndex++;
       }
 
