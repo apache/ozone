@@ -281,7 +281,7 @@ public abstract class AbstractKeyDeletingService extends BackgroundService
     // Parse volume and bucket name
     String[] split = objectKey.split(OM_KEY_PREFIX);
     Preconditions.assertTrue(split.length >= 3, "Volume and/or Bucket Name " +
-        "missing from Key Name.");
+        "missing from Key Name " + objectKey);
     if (split.length == 3) {
       LOG.warn("{} missing Key Name", objectKey);
     }
