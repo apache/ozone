@@ -380,19 +380,19 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
    * {@inheritDoc}
    */
   @Override
-  public List<ContainerInfo> listContainer(long startContainerID, int count)
+  public Pair<List<ContainerInfo>, Long> listContainer(long startContainerID, int count)
       throws IOException {
     return listContainer(startContainerID, count, null, null, null);
   }
 
   @Override
-  public List<ContainerInfo> listContainer(long startContainerID, int count,
+  public Pair<List<ContainerInfo>, Long> listContainer(long startContainerID, int count,
       HddsProtos.LifeCycleState state) throws IOException {
     return listContainer(startContainerID, count, state, null, null);
   }
 
   @Override
-  public List<ContainerInfo> listContainer(long startContainerID, int count,
+  public Pair<List<ContainerInfo>, Long> listContainer(long startContainerID, int count,
       HddsProtos.LifeCycleState state,
       HddsProtos.ReplicationType replicationType,
       ReplicationConfig replicationConfig)
@@ -437,12 +437,12 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
         .getContainersList()) {
       containerList.add(ContainerInfo.fromProtobuf(containerInfoProto));
     }
-    return containerList;
+    return Pair.of(containerList, response.getContainerCount());
   }
 
   @Deprecated
   @Override
-  public List<ContainerInfo> listContainer(long startContainerID, int count,
+  public Pair<List<ContainerInfo>, Long> listContainer(long startContainerID, int count,
       HddsProtos.LifeCycleState state, HddsProtos.ReplicationFactor factor)
       throws IOException {
     throw new UnsupportedOperationException("Should no longer be called from " +
@@ -1174,7 +1174,7 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
   public List<ContainerInfo> getListOfContainers(
       long startContainerID, int count, HddsProtos.LifeCycleState state)
       throws IOException {
-    return listContainer(startContainerID, count, state);
+    return listContainer(startContainerID, count, state).getLeft();
   }
 
   @Override

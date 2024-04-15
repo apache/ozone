@@ -135,12 +135,8 @@ public class TestSCMClientProtocolServer {
 
     assertEquals(10, scmServer.listContainer(1, 10,
         null, HddsProtos.ReplicationType.RATIS, null).size());
-    assertEquals(20, scmServer.listContainer(1, -1,
-        null, HddsProtos.ReplicationType.RATIS, null).size());
     // Test call from a legacy client, which uses a different method of listContainer
     assertEquals(10, scmServer.listContainer(1, 10, null,
-        HddsProtos.ReplicationFactor.THREE).size());
-    assertEquals(20, scmServer.listContainer(1, -1, null,
         HddsProtos.ReplicationFactor.THREE).size());
   }
 

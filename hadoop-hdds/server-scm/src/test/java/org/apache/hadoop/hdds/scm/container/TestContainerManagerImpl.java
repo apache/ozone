@@ -147,8 +147,6 @@ public class TestContainerManagerImpl {
         containerManager.getContainers(ContainerID.MIN, 10));
     assertIds(ids.subList(0, 5),
         containerManager.getContainers(ContainerID.MIN, 5));
-    assertIds(ids,
-        containerManager.getContainers(ContainerID.MIN, -1));
 
     assertIds(ids, containerManager.getContainers(ids.get(0), 10));
     assertIds(ids, containerManager.getContainers(ids.get(0), 100));
@@ -156,9 +154,6 @@ public class TestContainerManagerImpl {
         containerManager.getContainers(ids.get(5), 100));
     assertIds(emptyList(),
         containerManager.getContainers(ids.get(5), 100, LifeCycleState.CLOSED));
-    assertIds(ids,
-        containerManager.getContainers(ContainerID.MIN, -1,
-            LifeCycleState.OPEN));
 
     containerManager.updateContainerState(ids.get(0),
         HddsProtos.LifeCycleEvent.FINALIZE);

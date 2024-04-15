@@ -33,6 +33,7 @@ import java.util.UUID;
 import org.apache.hadoop.crypto.key.KeyProvider;
 import org.apache.hadoop.crypto.key.kms.KMSClientProvider;
 import org.apache.hadoop.crypto.key.kms.server.MiniKMS;
+import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
 import org.apache.hadoop.fs.FileChecksum;
@@ -145,6 +146,8 @@ public class TestOzoneShellHA {
   private static String omServiceId;
   private static int numOfOMs;
 
+  private static OzoneConfiguration ozoneConfiguration;
+
   /**
    * Create a MiniOzoneCluster for testing with using distributed Ozone
    * handler type.
@@ -186,6 +189,8 @@ public class TestOzoneShellHA {
     conf.set(CommonConfigurationKeysPublic.HADOOP_SECURITY_KEY_PROVIDER_PATH,
         getKeyProviderURI(miniKMS));
     conf.setBoolean(OMConfigKeys.OZONE_OM_ENABLE_FILESYSTEM_PATHS, true);
+    conf.setInt(ScmConfigKeys.HDDS_CONTAINER_LIST_MAX_COUNT, 1);
+    ozoneConfiguration = conf;
     MiniOzoneHAClusterImpl.Builder builder = MiniOzoneCluster.newHABuilder(conf);
     builder.setOMServiceId(omServiceId)
         .setNumOfOzoneManagers(numOfOMs)
@@ -221,7 +226,7 @@ public class TestOzoneShellHA {
   @BeforeEach
   public void setup() throws UnsupportedEncodingException {
     ozoneShell = new OzoneShell();
-    ozoneAdminShell = new OzoneAdmin();
+    ozoneAdminShell = new OzoneAdmin(ozoneConfiguration);
     System.setOut(new PrintStream(out, false, DEFAULT_ENCODING));
     System.setErr(new PrintStream(err, false, DEFAULT_ENCODING));
   }
@@ -570,6 +575,26 @@ public class TestOzoneShellHA {
         "localhost:" + cluster.getStorageContainerManager().getClientRpcPort(),
         factor, "--type=RATIS"};
     execute(ozoneAdminShell, args);
+  }
+
+  @Test
+  public void testOzoneAdminCmdListAllContainer()
+      throws UnsupportedEncodingException {
+    String[] args1 = new String[] {"container", "create", "--scm",
+        "localhost:" + cluster.getStorageContainerManager().getClientRpcPort()};
+    for (int i = 0; i < 2; i++) {
+      execute(ozoneAdminShell, args1);
+    }
+
+    String[] args = new String[] {"container", "list", "-a", "--scm",
+        "localhost:" + cluster.getStorageContainerManager().getClientRpcPort()};
+    execute(ozoneAdminShell, args);
+    assertEquals(1, getNumOfContainers());
+  }
+
+  private int getNumOfContainers()
+      throws UnsupportedEncodingException {
+    return out.toString(DEFAULT_ENCODING).split("\"containerID\" :").length - 1;
   }
 
   /**

@@ -21,11 +21,13 @@ import java.io.IOException;
 import java.util.List;
 
 import com.google.common.base.Strings;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.cli.ScmSubcommand;
 import org.apache.hadoop.hdds.scm.client.ScmClient;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
@@ -37,6 +39,7 @@ import com.fasterxml.jackson.databind.ObjectWriter;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import picocli.CommandLine.Command;
+import picocli.CommandLine.ParentCommand;
 import picocli.CommandLine.Help.Visibility;
 import picocli.CommandLine.Option;
 
@@ -60,6 +63,14 @@ public class ListSubcommand extends ScmSubcommand {
       defaultValue = "-1", showDefaultValue = Visibility.ALWAYS)
   private int count;
 
+  @Option(names = {"-a", "--all"},
+      description = "List all results. However the total number of containers might exceed " +
+          " the cluster's limit \"hdds.container.list.max.count\"." +
+          " The results will be capped at the " +
+          " maximum allowed count.",
+      defaultValue = "false")
+  private boolean all;
+
   @Option(names = {"--state"},
       description = "Container state(OPEN, CLOSING, QUASI_CLOSED, CLOSED, " +
           "DELETING, DELETED)")
@@ -75,6 +86,9 @@ public class ListSubcommand extends ScmSubcommand {
   private String replication;
 
   private static final ObjectWriter WRITER;
+
+  @ParentCommand
+  private ContainerCommands parent;
 
   static {
     ObjectMapper mapper = new ObjectMapper()
@@ -106,12 +120,31 @@ public class ListSubcommand extends ScmSubcommand {
           ReplicationType.fromProto(type),
           replication, new OzoneConfiguration());
     }
-    List<ContainerInfo> containerList =
+
+    if (all) {
+      System.out.printf("Attempting to list all containers." +
+          " The total number of container might exceed" +
+          " the cluster's current limit of %s. The results will be capped at the" +
+          " maximum allowed count.%n", ScmConfigKeys.HDDS_CONTAINER_LIST_MAX_COUNT_DEFAULT);
+      count = parent.getParent().getOzoneConf()
+          .getInt(ScmConfigKeys.HDDS_CONTAINER_LIST_MAX_COUNT,
+              ScmConfigKeys.HDDS_CONTAINER_LIST_MAX_COUNT_DEFAULT);
+    }
+
+    Pair<List<ContainerInfo>, Long> containerListAndTotalCount =
         scmClient.listContainer(startId, count, state, type, repConfig);
 
     // Output data list
-    for (ContainerInfo container : containerList) {
+    for (ContainerInfo container : containerListAndTotalCount.getLeft()) {
       outputContainerInfo(container);
+    }
+
+    if (containerListAndTotalCount.getRight() > count) {
+      System.out.printf("Container List is truncated since it's too long. " +
+              "List the first %d records of %d. " +
+              "User won't be able to view the full list of containers until " +
+              "pagination feature is supported.  %n",
+          count, containerListAndTotalCount.getRight());
     }
   }
 }

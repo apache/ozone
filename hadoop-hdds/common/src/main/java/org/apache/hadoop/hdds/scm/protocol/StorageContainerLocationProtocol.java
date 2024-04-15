@@ -148,7 +148,7 @@ public interface StorageContainerLocationProtocol extends Closeable {
    * @return a list of container.
    * @throws IOException
    */
-  List<ContainerInfo> listContainer(long startContainerID,
+  Pair<List<ContainerInfo>, Long> listContainer(long startContainerID,
       int count) throws IOException;
 
   /**
@@ -167,7 +167,7 @@ public interface StorageContainerLocationProtocol extends Closeable {
    * @return a list of container.
    * @throws IOException
    */
-  List<ContainerInfo> listContainer(long startContainerID,
+  Pair<List<ContainerInfo>, Long> listContainer(long startContainerID,
       int count, HddsProtos.LifeCycleState state) throws IOException;
 
   /**
@@ -186,7 +186,7 @@ public interface StorageContainerLocationProtocol extends Closeable {
    * @return a list of container.
    * @throws IOException
    */
-  List<ContainerInfo> listContainer(long startContainerID,
+  Pair<List<ContainerInfo>, Long> listContainer(long startContainerID,
       int count, HddsProtos.LifeCycleState state,
       HddsProtos.ReplicationFactor factor) throws IOException;
 
@@ -207,7 +207,7 @@ public interface StorageContainerLocationProtocol extends Closeable {
    * @return a list of container.
    * @throws IOException
    */
-  List<ContainerInfo> listContainer(long startContainerID,
+  Pair<List<ContainerInfo>, Long> listContainer(long startContainerID,
       int count, HddsProtos.LifeCycleState state,
       HddsProtos.ReplicationType replicationType,
       ReplicationConfig replicationConfig) throws IOException;
