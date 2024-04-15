@@ -36,6 +36,7 @@ import java.util.concurrent.locks.Lock;
 import java.util.function.Function;
 
 import com.google.common.util.concurrent.Striped;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.client.BlockID;
@@ -52,6 +53,7 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ReadBlockR
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Type;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.WriteChunkRequestProto;
 import org.apache.hadoop.hdds.scm.ByteStringConversion;
+import org.apache.hadoop.hdds.scm.OzoneClientConfig;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
 import org.apache.hadoop.hdds.utils.HddsServerUtil;
@@ -1254,34 +1256,30 @@ public class KeyValueHandler extends Handler {
       boolean isReadChunkV0 = readBlock.getVersion()
           .equals(ContainerProtos.ReadChunkVersion.V0);
 
-      int bytesPerChecksum = chunkInfos.get(chunkIndex)
-          .getChecksumData().getBytesPerChecksum();
       long offset = readBlock.getOffset();
-      long len = readBlock.getLen();
+      long len =  readBlock.getLen();
       long adjustedChunkOffset, adjustedChunkLen;
-      if (validateChunkChecksumData) {
-        adjustedChunkOffset =
-            (offset / bytesPerChecksum) * bytesPerChecksum;
-        adjustedChunkLen = ((len + offset - 1) / bytesPerChecksum + 1)
-            * bytesPerChecksum;
-      } else {
-        adjustedChunkOffset = offset;
-        adjustedChunkLen = len;
-      }
-      int startIndex = -1;
-      len += (offset - adjustedChunkOffset);
-      while (len > 0) {
+      do {
+        int startIndex = -1;
         ContainerProtos.ChunkInfo chunk = chunkInfos.get(chunkIndex);
-        if (validateChunkChecksumData) {
-          startIndex = (int)(adjustedChunkOffset - chunk.getOffset()) / bytesPerChecksum;
+        if (conf.getObject(OzoneClientConfig.class).isChecksumVerify()) {
+          Pair<Long, Long> adjustedOffsetAndLength =
+              computeChecksumBoundaries(chunk, offset, len);
+          adjustedChunkOffset = adjustedOffsetAndLength.getLeft();
+          adjustedChunkLen = adjustedOffsetAndLength.getRight();
+          startIndex = (int) adjustedChunkOffset /
+              chunk.getChecksumData().getBytesPerChecksum();
+          adjustedChunkOffset += chunk.getOffset();
+        } else {
+          adjustedChunkOffset = offset;
+          adjustedChunkLen = Math.min(
+              chunk.getLen() + chunk.getOffset() - offset, len);
         }
-        long chunkLen = Math.min(adjustedChunkLen, chunk.getLen());
-        ChunkInfo chunkInfo = ChunkInfo.getFromProtoBuf(chunkInfos
-            .get(chunkIndex)
-            .toBuilder()
-            .setOffset(adjustedChunkOffset)
-            .setLen(chunkLen)
-            .build());
+
+        ChunkInfo chunkInfo = ChunkInfo.getFromProtoBuf(
+            ContainerProtos.ChunkInfo.newBuilder(chunk)
+                .setOffset(adjustedChunkOffset)
+                .setLen(adjustedChunkLen).build());
         // For older clients, set ReadDataIntoSingleBuffer to true so that
         // all the data read from chunk file is returned as a single
         // ByteString. Older clients cannot process data returned as a list
@@ -1293,19 +1291,20 @@ public class KeyValueHandler extends Handler {
             kvContainer, blockID, chunkInfo, dispatcherContext);
 
         Preconditions.checkNotNull(data, "Chunk data is null");
+        if (DispatcherContext.op(dispatcherContext).readFromTmpFile()) {
+          validateChunkChecksumData(data, chunkInfo);
+          metrics.incBytesReadStateMachine(chunkInfo.getLen());
+          metrics.incNumReadStateMachine();
+        }
         streamObserver.onNext(
             getReadBlockResponse(request,
                 blockData.getProtoBufMessage().getBlockID(),
                 chunkInfo.getProtoBufMessage(), isReadChunkV0,
                 data, byteBufferToByteString, startIndex));
-        len -= chunkLen;
-        adjustedChunkOffset += chunkLen;
-        if (validateChunkChecksumData) {
-          adjustedChunkLen = ((len - 1) / bytesPerChecksum + 1)
-              * bytesPerChecksum;
-        }
+        len -= adjustedChunkLen + adjustedChunkOffset - offset;
+        offset = adjustedChunkOffset + adjustedChunkLen;
         chunkIndex++;
-      }
+      } while (len > 0);
 
       metrics.incContainerBytesStats(Type.ReadBlock, readBlock.getLen());
     } catch (StorageContainerException ex) {
@@ -1316,6 +1315,24 @@ public class KeyValueHandler extends Handler {
           request);
     }
     return responseProto;
+  }
+
+  private Pair<Long, Long> computeChecksumBoundaries(
+      ContainerProtos.ChunkInfo chunkInfo, long startByteIndex, long dataLen) {
+
+    int bytesPerChecksum = chunkInfo.getChecksumData().getBytesPerChecksum();
+    long chunkOffset = chunkInfo.getOffset();
+    startByteIndex = startByteIndex - chunkOffset;
+    // index of the last byte to be read from chunk, inclusively.
+    final long endByteIndex = startByteIndex + dataLen - 1;
+
+    long adjustedChunkOffset =  (startByteIndex / bytesPerChecksum)
+        * bytesPerChecksum; // inclusive
+    final long endIndex = ((endByteIndex / bytesPerChecksum) + 1)
+        * bytesPerChecksum; // exclusive
+    long adjustedChunkLen =
+        Math.min(endIndex, chunkInfo.getLen()) - adjustedChunkOffset;
+    return Pair.of(adjustedChunkOffset, adjustedChunkLen);
   }
 
   private String[] getFilesWithPrefix(String prefix, File chunkDir) {
