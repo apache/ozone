@@ -382,7 +382,8 @@ message ReadBlockRequestProto {
   required DatanodeBlockID blockID = 1;
   required uint64 offset = 2;
   required uint64 len = 3;
-  optional ReadChunkVersion version = 4;
+  required bool verifyChecksum = 4;
+  optional ReadChunkVersion version = 5;
 }
 
 message ReadBlockResponseProto {

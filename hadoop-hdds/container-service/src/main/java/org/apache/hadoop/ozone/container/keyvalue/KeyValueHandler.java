@@ -1262,7 +1262,7 @@ public class KeyValueHandler extends Handler {
       do {
         int startIndex = -1;
         ContainerProtos.ChunkInfo chunk = chunkInfos.get(chunkIndex);
-        if (conf.getObject(OzoneClientConfig.class).isChecksumVerify()) {
+        if (readBlock.getVerifyChecksum()) {
           Pair<Long, Long> adjustedOffsetAndLength =
               computeChecksumBoundaries(chunk, offset, len);
           adjustedChunkOffset = adjustedOffsetAndLength.getLeft();

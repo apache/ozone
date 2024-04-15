@@ -734,22 +734,24 @@ public final class ContainerProtocolCalls  {
   /**
    * Calls the container protocol to read a chunk.
    *
-   * @param xceiverClient client to perform call
-   * @param chunk information about chunk to read
-   * @param blockID ID of the block
-   * @param validators functions to validate the response
-   * @param token a token for this block (may be null)
+   * @param chunk          information about chunk to read
+   * @param xceiverClient  client to perform call
+   * @param blockID        ID of the block
+   * @param validators     functions to validate the response
+   * @param token          a token for this block (may be null)
+   * @param verifyChecksum
    * @return container protocol read chunk response
    * @throws IOException if there is an I/O error while performing the call
    */
   public static ContainerProtos.StreamDataResponseProto readBlock(
       XceiverClientSpi xceiverClient, long offset, long len, DatanodeBlockID blockID,
-      List<Validator> validators,
-      Token<? extends TokenIdentifier> token) throws IOException {
+      List<Validator> validators, Token<? extends TokenIdentifier> token,
+      boolean verifyChecksum) throws IOException {
     ReadBlockRequestProto.Builder readBlockRequest =
         ReadBlockRequestProto.newBuilder()
             .setBlockID(blockID)
             .setOffset(offset)
+            .setVerifyChecksum(verifyChecksum)
             .setLen(len)
             .setVersion(ContainerProtos.ReadChunkVersion.V1);
     ContainerCommandRequestProto.Builder builder =

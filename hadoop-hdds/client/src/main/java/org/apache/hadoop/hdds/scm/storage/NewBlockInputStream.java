@@ -522,7 +522,7 @@ public class NewBlockInputStream extends BlockExtendedInputStream
     }
     StreamDataResponseProto response =
         ContainerProtocolCalls.readBlock(xceiverClient, startByteIndex,
-        len, blockBuilder.build(), validators, tokenRef.get());
+        len, blockBuilder.build(), validators, tokenRef.get(), verifyChecksum);
     List<ReadBlockResponseProto> readBlocks = response.getReadBlockList();
 
     for (ReadBlockResponseProto readBlock : readBlocks) {
