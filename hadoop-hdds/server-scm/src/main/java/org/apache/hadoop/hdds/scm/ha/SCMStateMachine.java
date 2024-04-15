@@ -352,30 +352,31 @@ public class SCMStateMachine extends BaseStateMachine {
     if (transactionBuffer != null) {
       transactionBuffer.updateLatestTrxInfo(TransactionInfo.valueOf(term, index));
     }
+  }
 
-    if (currentLeaderTerm.get() == term) {
-      // On leader SCM once after it is ready, notify SCM services and also set
-      // leader ready  in SCMContext.
-      if (scm.getScmHAManager().getRatisServer().getDivision().getInfo()
-          .isLeaderReady()) {
-        scm.getScmContext().setLeaderReady();
-        scm.getSCMServiceManager().notifyStatusChanged();
-        scm.getFinalizationManager().onLeaderReady();
-      }
-
-      // Means all transactions before this term have been applied.
-      // This means after a restart, all pending transactions have been applied.
-      // Perform
-      // 1. Refresh Safemode rules state.
-      // 2. Start DN Rpc server.
-      if (!refreshedAfterLeaderReady.get()) {
-        scm.getScmSafeModeManager().refresh();
-        scm.getDatanodeProtocolServer().start();
-
-        refreshedAfterLeaderReady.set(true);
-      }
-      currentLeaderTerm.set(-1L);
+  @Override
+  public void notifyLeaderReady() {
+    // On leader SCM once after it is ready, notify SCM services and also set
+    // leader ready  in SCMContext.
+    if (scm.getScmHAManager().getRatisServer().getDivision().getInfo()
+        .isLeaderReady()) {
+      scm.getScmContext().setLeaderReady();
+      scm.getSCMServiceManager().notifyStatusChanged();
+      scm.getFinalizationManager().onLeaderReady();
     }
+
+    // Means all transactions before this term have been applied.
+    // This means after a restart, all pending transactions have been applied.
+    // Perform
+    // 1. Refresh Safemode rules state.
+    // 2. Start DN Rpc server.
+    if (!refreshedAfterLeaderReady.get()) {
+      scm.getScmSafeModeManager().refresh();
+      scm.getDatanodeProtocolServer().start();
+
+      refreshedAfterLeaderReady.set(true);
+    }
+    currentLeaderTerm.set(-1L);
   }
 
   @Override
