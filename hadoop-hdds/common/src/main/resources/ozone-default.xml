@@ -1484,40 +1484,12 @@
       to the OM.
     </description>
   </property>
-
-  <property>
-    <name>hdds.rest.rest-csrf.enabled</name>
-    <value>false</value>
-    <description>
-      If true, then enables Object Store REST server protection against
-      cross-site request forgery (CSRF).
-    </description>
-  </property>
-
   <property>
     <name>hdds.rest.http-address</name>
     <value>0.0.0.0:9880</value>
     <description>The http address of Object Store REST server inside the
       datanode.</description>
   </property>
-
-
-  <property>
-    <name>hdds.rest.netty.high.watermark</name>
-    <value>65535</value>
-    <description>
-      High watermark configuration to Netty for Object Store REST server.
-    </description>
-  </property>
-
-  <property>
-    <name>hdds.rest.netty.low.watermark</name>
-    <value>32768</value>
-    <description>
-      Low watermark configuration to Netty for Object Store REST server.
-    </description>
-  </property>
-
   <property>
     <name>hdds.datanode.plugins</name>
     <value/>
