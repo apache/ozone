@@ -399,11 +399,8 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
       throws IOException {
     Preconditions.checkState(startContainerID >= 0,
         "Container ID cannot be negative.");
-    if (count <= 0 && count != -1) {
-      throw new IllegalStateException(
-        "Container count must be either greater than 0 " +
-        "or equal to -1 (list all containers)");
-    }        
+    Preconditions.checkState(count > 0,
+        "Container count must be greater than 0.");
     SCMListContainerRequestProto.Builder builder = SCMListContainerRequestProto
         .newBuilder();
     builder.setStartContainerID(startContainerID);
