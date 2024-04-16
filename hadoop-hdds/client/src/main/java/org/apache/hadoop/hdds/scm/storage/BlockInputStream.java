@@ -294,7 +294,7 @@ public class BlockInputStream extends BlockExtendedInputStream {
       throw new IllegalArgumentException("Not GetBlock: response=" + response);
     }
     final GetBlockResponseProto b = response.getGetBlock();
-    long blockLength = b.getBlockData().getSize();
+    final long blockLength = b.getBlockData().getSize();
     final List<ChunkInfo> chunks = b.getBlockData().getChunksList();
     for (int i = 0; i < chunks.size(); i++) {
       final ChunkInfo c = chunks.get(i);
