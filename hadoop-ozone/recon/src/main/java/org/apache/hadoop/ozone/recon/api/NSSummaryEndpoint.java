@@ -151,7 +151,8 @@ public class NSSummaryEndpoint {
   /**
    * This API will list out limited 'count' number of keys after applying below filters in API parameters:
    * Default Values of API param filters:
-   *    -- replicationType - RATIS
+   *    -- replicationType - empty string and filter will not be applied, so list out all keys irrespective of
+   *       replication type.
    *    -- creationTime - empty string and filter will not be applied, so list out keys irrespective of age.
    *    -- keySize - 0 bytes, which means all keys greater than zero bytes will be listed, effectively all.
    *    -- startPrefix - /
@@ -162,6 +163,7 @@ public class NSSummaryEndpoint {
    * @param keySize Filter for Keys greater than keySize in bytes.
    * @param startPrefix Filter for startPrefix path.
    * @param limit Filter for limited count of keys.
+   * @param recursive listing out keys recursively for FSO buckets.
    * @return the list of keys in below structured format:
    * Response For OBS Bucket keys:
    * ********************************************************
@@ -171,7 +173,19 @@ public class NSSummaryEndpoint {
    *     "size": 73400320,
    *     "sizeWithReplica": 81788928,
    *     "subPathCount": 1,
+   *     "totalKeyCount": 7,
+   *     "lastKey": "/volume1/obs-bucket/key7",
    *     "subPaths": [
+   *         {
+   *             "key": true,
+   *             "path": "key1",
+   *             "size": 10485760,
+   *             "sizeWithReplica": 18874368,
+   *             "isKey": true,
+   *             "replicationType": "RATIS",
+   *             "creationTime": 1712321367060,
+   *             "modificationTime": 1712321368190
+   *         },
    *         {
    *             "key": true,
    *             "path": "key7",
@@ -179,8 +193,8 @@ public class NSSummaryEndpoint {
    *             "sizeWithReplica": 18874368,
    *             "isKey": true,
    *             "replicationType": "EC",
-   *             "creationTime": 1712321367060,
-   *             "modificationTime": 1712321368190
+   *             "creationTime": 1713261005555,
+   *             "modificationTime": 1713261006728
    *         }
    *     ],
    *     "sizeDirectKey": 73400320
@@ -225,10 +239,10 @@ public class NSSummaryEndpoint {
     Predicate<DUResponse.DiskUsage> keyFilter = keyData -> keyData.isKey();
 
     List<DUResponse.DiskUsage> filteredKeyList = keyListWithDu.stream()
-        .filter(keyData -> !StringUtils.isEmpty(creationDate) ? keyAgeFilter.test(keyData) : true)
-        .filter(keyData -> keyData.getReplicationType() != null ? keyReplicationFilter.test(keyData) : true)
-        .filter(keySizeFilter)
         .filter(keyFilter)
+        .filter(keyData -> !StringUtils.isEmpty(creationDate) ? keyAgeFilter.test(keyData) : true)
+        .filter(keyData -> !StringUtils.isEmpty(replicationType) ? keyReplicationFilter.test(keyData) : true)
+        .filter(keySizeFilter)
         .collect(Collectors.toList());
 
     duResponse.setDuData(filteredKeyList);

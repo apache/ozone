@@ -123,8 +123,6 @@ public class TestNSSummaryEndpointWithFSO {
   private OzoneConfiguration ozoneConfiguration;
   private CommonUtils commonUtils;
 
-  private static int chunkSize = 1024 * 1024;
-
   private ReplicationConfig ratisOne = ReplicationConfig.fromProtoTypeAndFactor(HddsProtos.ReplicationType.RATIS,
       HddsProtos.ReplicationFactor.ONE);
   private long epochMillis1 =

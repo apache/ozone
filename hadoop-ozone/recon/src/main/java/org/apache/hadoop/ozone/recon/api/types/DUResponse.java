@@ -49,7 +49,7 @@ public class DUResponse {
   private int count;
 
   /** Total number of subpaths/keys under the requested startPrefix path. */
-  @JsonProperty("totalCount")
+  @JsonProperty("totalKeyCount")
   @JsonInclude(JsonInclude.Include.NON_DEFAULT)
   private long totalCount;
 

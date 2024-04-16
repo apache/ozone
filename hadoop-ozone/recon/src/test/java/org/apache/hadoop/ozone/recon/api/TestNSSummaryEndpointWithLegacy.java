@@ -134,6 +134,7 @@ public class TestNSSummaryEndpointWithLegacy {
   private static final String BUCKET_TWO = "bucket2";
   private static final String BUCKET_THREE = "bucket3";
   private static final String BUCKET_FOUR = "bucket4";
+  private static final String BUCKET_FIVE = "bucket5";
   private static final String KEY_ONE = "file1";
   private static final String KEY_TWO = "dir1/dir2/file2";
   private static final String KEY_THREE = "dir1/dir3/file3";
@@ -145,6 +146,12 @@ public class TestNSSummaryEndpointWithLegacy {
   private static final String KEY_NINE = "dir5/file9";
   private static final String KEY_TEN = "dir5/file10";
   private static final String KEY_ELEVEN = "file11";
+  private static final String KEY_TWELVE = "file12";
+  private static final String KEY_THIRTEEN = "file13";
+  private static final String KEY_FOURTEEN = "file14";
+  private static final String KEY_FIFTEEN = "file15";
+  private static final String KEY_SIXTEEN = "file16";
+  private static final String KEY_SEVENTEEN = "file17";
   private static final String MULTI_BLOCK_KEY = "dir1/file7";
   private static final String MULTI_BLOCK_FILE = "file7";
 
@@ -159,12 +166,21 @@ public class TestNSSummaryEndpointWithLegacy {
   private static final String FILE_NINE = "file9";
   private static final String FILE_TEN = "file10";
   private static final String FILE_ELEVEN = "file11";
+  private static final String FILE_TWELVE = "file12";
+  private static final String FILE_THIRTEEN = "file13";
+  private static final String FILE_FOURTEEN = "file14";
+  private static final String FILE_FIFTEEN = "file15";
+  private static final String FILE_SIXTEEN = "file16";
+  private static final String FILE_SEVENTEEN = "file17";
 
   private static final String DIR_ONE = "dir1";
   private static final String DIR_TWO = "dir2";
   private static final String DIR_THREE = "dir3";
   private static final String DIR_FOUR = "dir4";
   private static final String DIR_FIVE = "dir5";
+  private static final String DIR_SIX = "dir6";
+  private static final String DIR_SEVEN = "dir7";
+  private static final String DIR_EIGHT = "dir8";
   // objects IDs
   private static final long PARENT_OBJECT_ID_ZERO = 0L;
   private static final long VOL_OBJECT_ID = 0L;
@@ -190,6 +206,16 @@ public class TestNSSummaryEndpointWithLegacy {
   private static final long KEY_NINE_OBJECT_ID = 19L;
   private static final long KEY_TEN_OBJECT_ID = 20L;
   private static final long KEY_ELEVEN_OBJECT_ID = 21L;
+  private static final long BUCKET_FIVE_OBJECT_ID = 22L;
+  private static final long DIR_SIX_OBJECT_ID = 23L;
+  private static final long KEY_TWELVE_OBJECT_ID = 24L;
+  private static final long KEY_THIRTEEN_OBJECT_ID = 25L;
+  private static final long DIR_SEVEN_OBJECT_ID = 26L;
+  private static final long KEY_FOURTEEN_OBJECT_ID = 27L;
+  private static final long KEY_FIFTEEN_OBJECT_ID = 28L;
+  private static final long DIR_EIGHT_OBJECT_ID = 29L;
+  private static final long KEY_SIXTEEN_OBJECT_ID = 30L;
+  private static final long KEY_SEVENTEEN_OBJECT_ID = 31L;
 
   // container IDs
   private static final long CONTAINER_ONE_ID = 1L;
@@ -228,6 +254,13 @@ public class TestNSSummaryEndpointWithLegacy {
   private static final long KEY_TEN_SIZE = 2 * OzoneConsts.KB + 1; // bin 2
   private static final long KEY_ELEVEN_SIZE = OzoneConsts.KB + 1; // bin 1
 
+  private static final long KEY_TWELVE_SIZE = 2 * OzoneConsts.KB + 1; // bin 2
+  private static final long KEY_THIRTEEN_SIZE = 2 * OzoneConsts.KB + 1; // bin 2
+  private static final long KEY_FOURTEEN_SIZE = OzoneConsts.KB + 1; // bin 1
+  private static final long KEY_FIFTEEN_SIZE = 2 * OzoneConsts.KB + 1; // bin 2
+  private static final long KEY_SIXTEEN_SIZE = 2 * OzoneConsts.KB + 1; // bin 2
+  private static final long KEY_SEVENTEEN_SIZE = OzoneConsts.KB + 1; // bin 1
+
   private static final long FILE1_SIZE_WITH_REPLICA =
       getReplicatedSize(KEY_ONE_SIZE,
               StandaloneReplicationConfig.getInstance(ONE));
@@ -261,6 +294,24 @@ public class TestNSSummaryEndpointWithLegacy {
   private static final long FILE11_SIZE_WITH_REPLICA =
       getReplicatedSize(KEY_ELEVEN_SIZE,
               StandaloneReplicationConfig.getInstance(ONE));
+  private static final long FILE12_SIZE_WITH_REPLICA =
+      getReplicatedSize(KEY_TWELVE_SIZE,
+          StandaloneReplicationConfig.getInstance(ONE));
+  private static final long FILE13_SIZE_WITH_REPLICA =
+      getReplicatedSize(KEY_THIRTEEN_SIZE,
+          StandaloneReplicationConfig.getInstance(ONE));
+  private static final long FILE14_SIZE_WITH_REPLICA =
+      getReplicatedSize(KEY_FOURTEEN_SIZE,
+          StandaloneReplicationConfig.getInstance(ONE));
+  private static final long FILE15_SIZE_WITH_REPLICA =
+      getReplicatedSize(KEY_FIFTEEN_SIZE,
+          StandaloneReplicationConfig.getInstance(ONE));
+  private static final long FILE16_SIZE_WITH_REPLICA =
+      getReplicatedSize(KEY_SIXTEEN_SIZE,
+          StandaloneReplicationConfig.getInstance(ONE));
+  private static final long FILE17_SIZE_WITH_REPLICA =
+      getReplicatedSize(KEY_SEVENTEEN_SIZE,
+          StandaloneReplicationConfig.getInstance(ONE));
 
   private static final long MULTI_BLOCK_KEY_SIZE_WITH_REPLICA
           = FILE7_SIZE_WITH_REPLICA;
@@ -276,7 +327,13 @@ public class TestNSSummaryEndpointWithLegacy {
       + FILE8_SIZE_WITH_REPLICA
       + FILE9_SIZE_WITH_REPLICA
       + FILE10_SIZE_WITH_REPLICA
-      + FILE11_SIZE_WITH_REPLICA;
+      + FILE11_SIZE_WITH_REPLICA
+      + FILE12_SIZE_WITH_REPLICA
+      + FILE13_SIZE_WITH_REPLICA
+      + FILE14_SIZE_WITH_REPLICA
+      + FILE15_SIZE_WITH_REPLICA
+      + FILE16_SIZE_WITH_REPLICA
+      + FILE17_SIZE_WITH_REPLICA;
 
   private static final long
       MULTI_BLOCK_TOTAL_SIZE_WITH_REPLICA_UNDER_VOL
@@ -319,6 +376,7 @@ public class TestNSSummaryEndpointWithLegacy {
   private static final long BUCKET_TWO_QUOTA = OzoneConsts.MB;
   private static final long BUCKET_THREE_QUOTA = OzoneConsts.MB;
   private static final long BUCKET_FOUR_QUOTA = OzoneConsts.MB;
+  private static final long BUCKET_FIVE_QUOTA = OzoneConsts.MB;
 
   // mock client's path requests
   private static final String TEST_USER = "TestUser";
@@ -337,13 +395,15 @@ public class TestNSSummaryEndpointWithLegacy {
 
   // some expected answers
   private static final long ROOT_DATA_SIZE = KEY_ONE_SIZE + KEY_TWO_SIZE +
-      KEY_THREE_SIZE + KEY_FOUR_SIZE + KEY_FIVE_SIZE + KEY_SIX_SIZE +
-      KEY_EIGHT_SIZE + KEY_NINE_SIZE + KEY_TEN_SIZE + KEY_ELEVEN_SIZE;
+      KEY_THREE_SIZE + KEY_FOUR_SIZE + KEY_FIVE_SIZE + KEY_SIX_SIZE + KEY_EIGHT_SIZE + KEY_NINE_SIZE + KEY_TEN_SIZE +
+      KEY_ELEVEN_SIZE + KEY_TWELVE_SIZE + KEY_THIRTEEN_SIZE + KEY_FOURTEEN_SIZE + KEY_FIFTEEN_SIZE + KEY_SIXTEEN_SIZE +
+      KEY_SEVENTEEN_SIZE;
   private static final long VOL_DATA_SIZE = KEY_ONE_SIZE + KEY_TWO_SIZE +
       KEY_THREE_SIZE + KEY_FOUR_SIZE + KEY_FIVE_SIZE + KEY_SIX_SIZE;
 
   private static final long VOL_TWO_DATA_SIZE =
-      KEY_EIGHT_SIZE + KEY_NINE_SIZE + KEY_TEN_SIZE + KEY_ELEVEN_SIZE;
+      KEY_EIGHT_SIZE + KEY_NINE_SIZE + KEY_TEN_SIZE + KEY_ELEVEN_SIZE + KEY_TWELVE_SIZE + KEY_THIRTEEN_SIZE +
+          KEY_FOURTEEN_SIZE + KEY_FIFTEEN_SIZE + KEY_SIXTEEN_SIZE + KEY_SEVENTEEN_SIZE;
 
   private static final long BUCKET_ONE_DATA_SIZE = KEY_ONE_SIZE + KEY_TWO_SIZE +
       KEY_THREE_SIZE + KEY_SIX_SIZE;
@@ -673,7 +733,7 @@ public class TestNSSummaryEndpointWithLegacy {
 
   @Test
   public void testFileSizeDist() throws Exception {
-    checkFileSizeDist(ROOT_PATH, 2, 3, 4, 1);
+    checkFileSizeDist(ROOT_PATH, 2, 5, 8, 1);
     checkFileSizeDist(VOL_PATH, 2, 1, 2, 1);
     checkFileSizeDist(BUCKET_ONE_PATH, 1, 1, 1, 1);
     checkFileSizeDist(DIR_ONE_PATH, 0, 1, 1, 1);
@@ -751,6 +811,36 @@ public class TestNSSummaryEndpointWithLegacy {
           BUCKET_THREE_OBJECT_ID,
           VOL_TWO_OBJECT_ID,
           getBucketLayout());
+    writeDirToOm(reconOMMetadataManager,
+        (DIR_SIX + OM_KEY_PREFIX),
+        BUCKET_FIVE,
+        VOL_TWO,
+        DIR_SIX,
+        DIR_SIX_OBJECT_ID,
+        PARENT_OBJECT_ID_ZERO,
+        BUCKET_FIVE_OBJECT_ID,
+        VOL_TWO_OBJECT_ID,
+        getBucketLayout());
+    writeDirToOm(reconOMMetadataManager,
+        (DIR_SIX + OM_KEY_PREFIX + DIR_SEVEN + OM_KEY_PREFIX),
+        BUCKET_FIVE,
+        VOL_TWO,
+        DIR_SEVEN,
+        DIR_SEVEN_OBJECT_ID,
+        PARENT_OBJECT_ID_ZERO,
+        BUCKET_FIVE_OBJECT_ID,
+        VOL_TWO_OBJECT_ID,
+        getBucketLayout());
+    writeDirToOm(reconOMMetadataManager,
+        (DIR_SIX + OM_KEY_PREFIX + DIR_SEVEN + OM_KEY_PREFIX + DIR_EIGHT + OM_KEY_PREFIX),
+        BUCKET_FIVE,
+        VOL_TWO,
+        DIR_EIGHT,
+        DIR_EIGHT_OBJECT_ID,
+        PARENT_OBJECT_ID_ZERO,
+        BUCKET_FIVE_OBJECT_ID,
+        VOL_TWO_OBJECT_ID,
+        getBucketLayout());
 
     // write all keys
     writeKeyToOm(reconOMMetadataManager,
@@ -863,6 +953,78 @@ public class TestNSSummaryEndpointWithLegacy {
           VOL_TWO_OBJECT_ID,
           KEY_ELEVEN_SIZE,
           getBucketLayout());
+
+    writeKeyToOm(reconOMMetadataManager,
+        KEY_TWELVE,
+        BUCKET_FIVE,
+        VOL_TWO,
+        FILE_TWELVE,
+        KEY_TWELVE_OBJECT_ID,
+        PARENT_OBJECT_ID_ZERO,
+        BUCKET_FIVE_OBJECT_ID,
+        VOL_TWO_OBJECT_ID,
+        KEY_TWELVE_SIZE,
+        getBucketLayout());
+
+    writeKeyToOm(reconOMMetadataManager,
+        KEY_THIRTEEN,
+        BUCKET_FIVE,
+        VOL_TWO,
+        FILE_THIRTEEN,
+        KEY_THIRTEEN_OBJECT_ID,
+        PARENT_OBJECT_ID_ZERO,
+        BUCKET_FIVE_OBJECT_ID,
+        VOL_TWO_OBJECT_ID,
+        KEY_THIRTEEN_SIZE,
+        getBucketLayout());
+
+    writeKeyToOm(reconOMMetadataManager,
+        KEY_FOURTEEN,
+        BUCKET_FIVE,
+        VOL_TWO,
+        FILE_FOURTEEN,
+        KEY_FOURTEEN_OBJECT_ID,
+        PARENT_OBJECT_ID_ZERO,
+        BUCKET_FIVE_OBJECT_ID,
+        VOL_TWO_OBJECT_ID,
+        KEY_FOURTEEN_SIZE,
+        getBucketLayout());
+
+    writeKeyToOm(reconOMMetadataManager,
+        KEY_FIFTEEN,
+        BUCKET_FIVE,
+        VOL_TWO,
+        FILE_FIFTEEN,
+        KEY_FIFTEEN_OBJECT_ID,
+        PARENT_OBJECT_ID_ZERO,
+        BUCKET_FIVE_OBJECT_ID,
+        VOL_TWO_OBJECT_ID,
+        KEY_FIFTEEN_SIZE,
+        getBucketLayout());
+
+    writeKeyToOm(reconOMMetadataManager,
+        KEY_SIXTEEN,
+        BUCKET_FIVE,
+        VOL_TWO,
+        FILE_SIXTEEN,
+        KEY_SIXTEEN_OBJECT_ID,
+        PARENT_OBJECT_ID_ZERO,
+        BUCKET_FIVE_OBJECT_ID,
+        VOL_TWO_OBJECT_ID,
+        KEY_SIXTEEN_SIZE,
+        getBucketLayout());
+
+    writeKeyToOm(reconOMMetadataManager,
+        KEY_SEVENTEEN,
+        BUCKET_FIVE,
+        VOL_TWO,
+        FILE_SEVENTEEN,
+        KEY_SEVENTEEN_OBJECT_ID,
+        PARENT_OBJECT_ID_ZERO,
+        BUCKET_FIVE_OBJECT_ID,
+        VOL_TWO_OBJECT_ID,
+        KEY_SEVENTEEN_SIZE,
+        getBucketLayout());
   }
 
   /**
@@ -936,6 +1098,14 @@ public class TestNSSummaryEndpointWithLegacy {
         .setBucketLayout(getBucketLayout())
         .build();
 
+    OmBucketInfo bucketInfo5 = OmBucketInfo.newBuilder()
+        .setVolumeName(VOL_TWO)
+        .setBucketName(BUCKET_FIVE)
+        .setObjectID(BUCKET_FIVE_OBJECT_ID)
+        .setQuotaInBytes(BUCKET_FIVE_QUOTA)
+        .setBucketLayout(getBucketLayout())
+        .build();
+
     String bucketKey = omMetadataManager.getBucketKey(
         bucketInfo.getVolumeName(), bucketInfo.getBucketName());
     String bucketKey2 = omMetadataManager.getBucketKey(
@@ -944,11 +1114,14 @@ public class TestNSSummaryEndpointWithLegacy {
         bucketInfo3.getVolumeName(), bucketInfo3.getBucketName());
     String bucketKey4 = omMetadataManager.getBucketKey(
         bucketInfo4.getVolumeName(), bucketInfo4.getBucketName());
+    String bucketKey5 = omMetadataManager.getBucketKey(
+        bucketInfo5.getVolumeName(), bucketInfo5.getBucketName());
 
     omMetadataManager.getBucketTable().put(bucketKey, bucketInfo);
     omMetadataManager.getBucketTable().put(bucketKey2, bucketInfo2);
     omMetadataManager.getBucketTable().put(bucketKey3, bucketInfo3);
     omMetadataManager.getBucketTable().put(bucketKey4, bucketInfo4);
+    omMetadataManager.getBucketTable().put(bucketKey5, bucketInfo5);
 
     return omMetadataManager;
   }
