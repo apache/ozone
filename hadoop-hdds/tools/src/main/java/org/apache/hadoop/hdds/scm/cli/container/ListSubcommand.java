@@ -58,9 +58,8 @@ public class ListSubcommand extends ScmSubcommand {
   private long startId;
 
   @Option(names = {"-c", "--count"},
-      description = "Maximum number of containers to list." +
-          "Make count=-1 default to list all containers",
-      defaultValue = "-1", showDefaultValue = Visibility.ALWAYS)
+      description = "Maximum number of containers to list.",
+      defaultValue = "20", showDefaultValue = Visibility.ALWAYS)
   private int count;
 
   @Option(names = {"-a", "--all"},
@@ -121,14 +120,22 @@ public class ListSubcommand extends ScmSubcommand {
           replication, new OzoneConfiguration());
     }
 
+    int maxCountAllowed = parent.getParent().getOzoneConf()
+        .getInt(ScmConfigKeys.HDDS_CONTAINER_LIST_MAX_COUNT,
+            ScmConfigKeys.HDDS_CONTAINER_LIST_MAX_COUNT_DEFAULT);
     if (all) {
       System.out.printf("Attempting to list all containers." +
           " The total number of container might exceed" +
           " the cluster's current limit of %s. The results will be capped at the" +
           " maximum allowed count.%n", ScmConfigKeys.HDDS_CONTAINER_LIST_MAX_COUNT_DEFAULT);
-      count = parent.getParent().getOzoneConf()
-          .getInt(ScmConfigKeys.HDDS_CONTAINER_LIST_MAX_COUNT,
-              ScmConfigKeys.HDDS_CONTAINER_LIST_MAX_COUNT_DEFAULT);
+      count = maxCountAllowed;
+    } else {
+      if (count > maxCountAllowed) {
+        System.out.printf("Attempting to list the first %d records of containers." +
+            " However it exceeds the cluster's current limit of %d. The results will be capped at the" +
+            " maximum allowed count.%n", count, ScmConfigKeys.HDDS_CONTAINER_LIST_MAX_COUNT_DEFAULT);
+        count = maxCountAllowed;
+      }
     }
 
     Pair<List<ContainerInfo>, Long> containerListAndTotalCount =
