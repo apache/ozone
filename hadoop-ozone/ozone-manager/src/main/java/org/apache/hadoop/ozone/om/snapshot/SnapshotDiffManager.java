@@ -48,6 +48,7 @@ import org.apache.hadoop.ozone.om.helpers.WithObjectID;
 import org.apache.hadoop.ozone.om.helpers.WithParentObjectId;
 import org.apache.hadoop.ozone.om.service.SnapshotDeletingService;
 import org.apache.hadoop.ozone.snapshot.CancelSnapshotDiffResponse;
+import org.apache.hadoop.ozone.snapshot.ListSnapshotDiffJobResponse;
 import org.apache.hadoop.ozone.snapshot.SnapshotDiffReportOzone;
 import org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse;
 import org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse.JobStatus;
@@ -423,30 +424,46 @@ public class SnapshotDiffManager implements AutoCloseable {
     return new CancelSnapshotDiffResponse(reason);
   }
 
-  public List<SnapshotDiffJob> getSnapshotDiffJobList(
-      String volumeName, String bucketName,
-      String jobStatus, boolean listAll) throws IOException {
-    List<SnapshotDiffJob> jobList = new ArrayList<>();
+  public ListSnapshotDiffJobResponse getSnapshotDiffJobList(String volumeName,
+                                                            String bucketName,
+                                                            String jobStatus,
+                                                            boolean listAll,
+                                                            String prevDiffJob,
+                                                            int maxEntries) throws IOException {
+    List<SnapshotDiffJob> jobs = new ArrayList<>();
+    String lastSnapshotDiffJob = null;
 
     try (ClosableIterator<Map.Entry<String, SnapshotDiffJob>> iterator =
-             snapDiffJobTable.iterator()) {
+             snapDiffJobTable.iterator(Optional.ofNullable(prevDiffJob), Optional.empty())) {
+      Map.Entry<String, SnapshotDiffJob> entry = null;
       while (iterator.hasNext()) {
-        SnapshotDiffJob snapshotDiffJob = iterator.next().getValue();
+        entry = iterator.next();
+        SnapshotDiffJob snapshotDiffJob = entry.getValue();
+        if (Objects.equals(prevDiffJob, entry.getKey())) {
+          continue;
+        }
+
         if (Objects.equals(snapshotDiffJob.getVolume(), volumeName) &&
             Objects.equals(snapshotDiffJob.getBucket(), bucketName)) {
           if (listAll) {
-            jobList.add(snapshotDiffJob);
-            continue;
-          }
-
-          if (Objects.equals(snapshotDiffJob.getStatus(),
-              getJobStatus(jobStatus))) {
-            jobList.add(snapshotDiffJob);
+            jobs.add(snapshotDiffJob);
+          } else if (Objects.equals(snapshotDiffJob.getStatus(), getJobStatus(jobStatus))) {
+            jobs.add(snapshotDiffJob);
           }
         }
+        if (jobs.size() == maxEntries) {
+          break;
+        }
+      }
+
+      // If maxEntries are populated and list still has more entries,
+      // set the continuation token for the next page request otherwise null.
+      if (jobs.size() == maxEntries && iterator.hasNext()) {
+        lastSnapshotDiffJob = entry.getKey();
       }
     }
-    return jobList;
+
+    return new ListSnapshotDiffJobResponse(jobs, lastSnapshotDiffJob);
   }
 
   private JobStatus getJobStatus(String jobStatus)
@@ -1588,9 +1605,9 @@ public class SnapshotDiffManager implements AutoCloseable {
     // the key Prefix would be volumeId/bucketId and
     // in case of non-fso - volumeName/bucketName
     if (tableName.equals(
-        OmMetadataManagerImpl.DIRECTORY_TABLE) || tableName.equals(
+        DIRECTORY_TABLE) || tableName.equals(
         OmMetadataManagerImpl.FILE_TABLE)) {
-      return tablePrefixes.get(OmMetadataManagerImpl.DIRECTORY_TABLE);
+      return tablePrefixes.get(DIRECTORY_TABLE);
     }
     return tablePrefixes.get(OmMetadataManagerImpl.KEY_TABLE);
   }

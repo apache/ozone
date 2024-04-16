@@ -53,6 +53,7 @@ import org.apache.hadoop.ozone.om.service.SnapshotDeletingService;
 import org.apache.hadoop.ozone.om.snapshot.SnapshotTestUtils.StubbedPersistentMap;
 import org.apache.hadoop.ozone.snapshot.CancelSnapshotDiffResponse;
 import org.apache.hadoop.ozone.snapshot.CancelSnapshotDiffResponse.CancelMessage;
+import org.apache.hadoop.ozone.snapshot.ListSnapshotDiffJobResponse;
 import org.apache.hadoop.ozone.snapshot.SnapshotDiffReportOzone;
 import org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse;
 import org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse.JobStatus;
@@ -1131,11 +1132,13 @@ public class TestSnapshotDiffManager {
     SnapshotDiffJob diffJob = snapDiffJobMap.get(diffJobKey);
     assertNull(diffJob);
 
+    ListSnapshotDiffJobResponse snapshotDiffJobList = snapshotDiffManager
+        .getSnapshotDiffJobList(volumeName, bucketName, jobStatus, listAll, null, 1000);
     // There are no jobs in the table, therefore
     // the response list should be empty.
-    List<SnapshotDiffJob> jobList = snapshotDiffManager
-        .getSnapshotDiffJobList(volumeName, bucketName, jobStatus, listAll);
+    List<SnapshotDiffJob> jobList = snapshotDiffJobList.getSnapshotDiffJobs();
     assertThat(jobList).isEmpty();
+    assertNull(snapshotDiffJobList.getLastSnapshotDiffJob());
 
     SnapshotDiffManager spy = spy(snapshotDiffManager);
     doNothing().when(spy).generateSnapshotDiffReport(eq(diffJobKey),
@@ -1155,8 +1158,9 @@ public class TestSnapshotDiffManager {
     assertEquals(SnapshotDiffResponse.JobStatus.IN_PROGRESS,
         diffJob.getStatus());
 
-    jobList = snapshotDiffManager
-        .getSnapshotDiffJobList(volumeName, bucketName, jobStatus, listAll);
+    snapshotDiffJobList = snapshotDiffManager
+        .getSnapshotDiffJobList(volumeName, bucketName, jobStatus, listAll, null, 1000);
+    jobList = snapshotDiffJobList.getSnapshotDiffJobs();
 
     // When listAll is true, jobStatus is ignored.
     // If the job is IN_PROGRESS or listAll is used,
@@ -1167,6 +1171,7 @@ public class TestSnapshotDiffManager {
     } else {
       assertThat(jobList).isEmpty();
     }
+    assertNull(snapshotDiffJobList.getLastSnapshotDiffJob());
   }
 
   @Test
@@ -1194,7 +1199,7 @@ public class TestSnapshotDiffManager {
 
     // Invalid status, without listAll true, results in an exception.
     assertThrows(IOException.class, () -> snapshotDiffManager
-        .getSnapshotDiffJobList(volumeName, bucketName, "invalid", false));
+        .getSnapshotDiffJobList(volumeName, bucketName, "invalid", false, null, 1000));
   }
 
   @Test

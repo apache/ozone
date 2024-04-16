@@ -64,6 +64,7 @@ import org.apache.hadoop.ozone.om.snapshot.SnapshotCache;
 import org.apache.hadoop.ozone.om.snapshot.SnapshotDiffManager;
 import org.apache.hadoop.ozone.om.snapshot.SnapshotUtils;
 import org.apache.hadoop.ozone.snapshot.CancelSnapshotDiffResponse;
+import org.apache.hadoop.ozone.snapshot.ListSnapshotDiffJobResponse;
 import org.apache.hadoop.ozone.snapshot.SnapshotDiffReportOzone;
 import org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse;
 import org.apache.ratis.util.function.CheckedFunction;
@@ -767,10 +768,12 @@ public final class OmSnapshotManager implements AutoCloseable {
     return snapshotDiffReport;
   }
 
-  public List<SnapshotDiffJob> getSnapshotDiffList(final String volumeName,
-                                                   final String bucketName,
-                                                   final String jobStatus,
-                                                   final boolean listAll)
+  public ListSnapshotDiffJobResponse getSnapshotDiffList(final String volumeName,
+                                                         final String bucketName,
+                                                         final String jobStatus,
+                                                         final boolean listAll,
+                                                         final String prevSnapshotDiffJob,
+                                                         int maxListResult)
       throws IOException {
     String volumeKey = ozoneManager.getMetadataManager()
         .getVolumeKey(volumeName);
@@ -778,7 +781,7 @@ public final class OmSnapshotManager implements AutoCloseable {
         .getBucketKey(volumeName, bucketName);
 
     if (!ozoneManager.getMetadataManager()
-            .getVolumeTable().isExist(volumeKey) ||
+        .getVolumeTable().isExist(volumeKey) ||
         !ozoneManager.getMetadataManager()
             .getBucketTable().isExist(bucketKey)) {
       throw new IOException("Provided volume name " + volumeName +
@@ -792,11 +795,15 @@ public final class OmSnapshotManager implements AutoCloseable {
     if (snapshotChainManager.getSnapshotChainPath(snapshotPath) == null) {
       // Return an empty ArrayList here to avoid
       // unnecessarily iterating the SnapshotDiffJob table.
-      return new ArrayList<>();
+      return new ListSnapshotDiffJobResponse(Collections.emptyList(), null);
     }
 
-    return snapshotDiffManager.getSnapshotDiffJobList(
-        volumeName, bucketName, jobStatus, listAll);
+    if (maxListResult < 0 || maxListResult > maxPageSize) {
+      maxListResult = maxPageSize;
+    }
+
+    return snapshotDiffManager.getSnapshotDiffJobList(volumeName, bucketName, jobStatus, listAll, prevSnapshotDiffJob,
+        maxListResult);
   }
 
   private void validateSnapshotsExistAndActive(final String volumeName,
