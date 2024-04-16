@@ -983,133 +983,151 @@ public class TestContainerReportHandler {
   }
 
   @Test
-  public void testContainerDataChecksumUpdated() throws Exception {
+  public void testWithNoContainerDataChecksum() throws Exception {
     final ContainerReportHandler reportHandler = new ContainerReportHandler(nodeManager, containerManager);
 
     // Create 3 datanodes for testing.
     final Iterator<DatanodeDetails> nodeIterator = nodeManager.getNodes(
         NodeStatus.inServiceHealthy()).iterator();
-    final DatanodeDetails datanodeOne = nodeIterator.next();
-    final DatanodeDetails datanodeTwo = nodeIterator.next();
-    final DatanodeDetails datanodeThree = nodeIterator.next();
+    final DatanodeDetails dn1 = nodeIterator.next();
+    final DatanodeDetails dn2 = nodeIterator.next();
+    final DatanodeDetails dn3 = nodeIterator.next();
 
-    // Create two containers, and put one replica of each container on each datanode.
-    final ContainerInfo containerOne = getContainer(LifeCycleState.CLOSED);
-    final ContainerInfo containerTwo = getContainer(LifeCycleState.CLOSED);
-    final Set<ContainerID> containerIDSet = Stream.of(
-            containerOne.containerID(), containerTwo.containerID())
-        .collect(Collectors.toSet());
+    // Create a container and put one replica on each datanode.
+    final ContainerInfo container = getContainer(LifeCycleState.CLOSED);
+    ContainerID contID = container.containerID();
+    final Set<ContainerID> containerIDSet = Stream.of(contID).collect(Collectors.toSet());
 
-    nodeManager.setContainers(datanodeOne, containerIDSet);
-    nodeManager.setContainers(datanodeTwo, containerIDSet);
-    nodeManager.setContainers(datanodeThree, containerIDSet);
+    nodeManager.setContainers(dn1, containerIDSet);
+    nodeManager.setContainers(dn2, containerIDSet);
+    nodeManager.setContainers(dn3, containerIDSet);
 
-    containerStateManager.addContainer(containerOne.getProtobuf());
-    containerStateManager.addContainer(containerTwo.getProtobuf());
+    containerStateManager.addContainer(container.getProtobuf());
 
-    getReplicas(containerOne.containerID(),
-        ContainerReplicaProto.State.CLOSED,
-        datanodeOne, datanodeTwo, datanodeThree)
-        .forEach(r -> containerStateManager.updateContainerReplica(
-            containerOne.containerID(), r));
-
-    getReplicas(containerTwo.containerID(),
-        ContainerReplicaProto.State.CLOSED,
-        datanodeOne, datanodeTwo, datanodeThree)
-        .forEach(r -> containerStateManager.updateContainerReplica(
-            containerTwo.containerID(), r));
+    getReplicas(contID, ContainerReplicaProto.State.CLOSED, dn1, dn2, dn3)
+        .forEach(r -> containerStateManager.updateContainerReplica(contID, r));
 
     // Container manager should now be aware of 3 replicas of each container.
-    assertEquals(3, containerManager.getContainerReplicas(
-        containerOne.containerID()).size());
-    assertEquals(3, containerManager.getContainerReplicas(
-        containerTwo.containerID()).size());
+    assertEquals(3, containerManager.getContainerReplicas(contID).size());
 
-    // Create a report from datanode one with a replica of container one and two.
-    final ContainerReportsProto dn1ReportProto = getContainerReportsProto(
-        containerOne.containerID(), ContainerReplicaProto.State.CLOSED,
-        datanodeOne.getUuidString()).toBuilder()
-        .addReports(getReplica(containerTwo)).build();
-    final ContainerReportFromDatanode dn1Report =
-        new ContainerReportFromDatanode(datanodeOne, dn1ReportProto);
-    // Create a report from datanode two with a replica of container one and two.
-    final ContainerReportsProto dn2ReportProto = getContainerReportsProto(
-        containerOne.containerID(), ContainerReplicaProto.State.CLOSED,
-        datanodeOne.getUuidString()).toBuilder()
-        .addReports(getReplica(containerTwo)).build();
-    final ContainerReportFromDatanode dn2Report =
-        new ContainerReportFromDatanode(datanodeOne, dn1ReportProto);
-
-    reportHandler.onMessage(dn1Report, publisher);
-    reportHandler.onMessage(dn2Report, publisher);
-
-    // A container hash has not been added to the replicas yet.
-    boolean contOneDataChecksumsEmpty = containerManager.getContainerReplicas(containerOne.containerID()).stream()
+    // All replicas should start with an empty data checksum in SCM.
+    boolean contOneDataChecksumsEmpty = containerManager.getContainerReplicas(contID).stream()
         .allMatch(r -> r.getDataChecksum().isEmpty());
     assertTrue(contOneDataChecksumsEmpty, "Replicas of container one should not yet have any data checksums.");
-    boolean contTwoDataChecksumsEmpty = containerManager.getContainerReplicas(containerTwo.containerID()).stream()
+
+    // Send a report to SCM from one datanode that still does not have a data checksum.
+    for (DatanodeDetails dn: Arrays.asList(dn1, dn2, dn3)) {
+      final ContainerReportsProto dnReportProto = getContainerReportsProto(
+          contID, ContainerReplicaProto.State.CLOSED, dn.getUuidString());
+      final ContainerReportFromDatanode dnReport = new ContainerReportFromDatanode(dn, dnReportProto);
+      reportHandler.onMessage(dnReport, publisher);
+    }
+
+    // Regardless of which datanode sent the report, none of them have checksums, so all replica's data checksums
+    // should remain empty.
+    boolean containerDataChecksumEmpty = containerManager.getContainerReplicas(contID).stream()
         .allMatch(r -> r.getDataChecksum().isEmpty());
-    assertTrue(contTwoDataChecksumsEmpty, "Replicas of container two should not yet have any data checksums.");
+    assertTrue(containerDataChecksumEmpty, "Replicas of the container should not have any data checksums.");
+  }
 
-    // TODO Add a container data checksum to the reports to simulate the datanodes' container scanner filling in this
-    //  value.
-    final ContainerReportsProto dnOneReport = getContainerReportsProto(
-        containerTwo.containerID(), ContainerReplicaProto.State.CLOSED,
-        datanodeOne.getUuidString());
-    final ContainerReportFromDatanode containerReportFromDatanode =
-        new ContainerReportFromDatanode(datanodeOne, dnOneReport);
-    reportHandler.onMessage(containerReportFromDatanode, publisher);
+  @Test
+  public void testWithContainerDataChecksum() throws Exception {
+    final ContainerReportHandler reportHandler = new ContainerReportHandler(nodeManager, containerManager);
 
-    // Check that all reports contain the expected data checksums, and that the values are unique across replicas
-    // since that is how they were initialized.
-    int numReportsChecked = 0;
-    for (ContainerID contID: containerIDSet) {
-      for (ContainerReplica replica : containerManager.getContainerReplicas(contID)) {
-        String expectedHash = createDifferentDataChecksumsForReplicas(contID,
-            replica.getDatanodeDetails().getUuidString());
-        assertEquals(expectedHash, replica.getDataChecksum(), "Incorrect replica data hash in container report.");
-        numReportsChecked++;
-      }
+    // Create 3 datanodes for testing.
+    final Iterator<DatanodeDetails> nodeIterator = nodeManager.getNodes(
+        NodeStatus.inServiceHealthy()).iterator();
+    final DatanodeDetails dn1 = nodeIterator.next();
+    final DatanodeDetails dn2 = nodeIterator.next();
+    final DatanodeDetails dn3 = nodeIterator.next();
+
+    // Create a container and put one replica on each datanode.
+    final ContainerInfo container = getContainer(LifeCycleState.CLOSED);
+    ContainerID contID = container.containerID();
+    final Set<ContainerID> containerIDSet = Stream.of(container.containerID()).collect(Collectors.toSet());
+
+    nodeManager.setContainers(dn1, containerIDSet);
+    nodeManager.setContainers(dn2, containerIDSet);
+    nodeManager.setContainers(dn3, containerIDSet);
+
+    containerStateManager.addContainer(container.getProtobuf());
+
+    getReplicas(contID, ContainerReplicaProto.State.CLOSED, dn1, dn2, dn3)
+        .forEach(r -> containerStateManager.updateContainerReplica(contID, r));
+
+    // Container manager should now be aware of 3 replicas of each container.
+    assertEquals(3, containerManager.getContainerReplicas(contID).size());
+
+    // All replicas should start with an empty data checksum in SCM.
+    boolean dataChecksumsEmpty = containerManager.getContainerReplicas(contID).stream()
+        .allMatch(r -> r.getDataChecksum().isEmpty());
+    assertTrue(dataChecksumsEmpty, "Replicas of container one should not yet have any data checksums.");
+
+    // For each datanode, send a container report with a mismatched checksum.
+    for (DatanodeDetails dn: Arrays.asList(dn1, dn2, dn3)) {
+      ContainerReportsProto dnReportProto = getContainerReportsProto(
+          contID, ContainerReplicaProto.State.CLOSED, dn.getUuidString());
+      ContainerReplicaProto replicaWithChecksum = dnReportProto.getReports(0).toBuilder()
+          .setDataChecksum(createUniqueDataChecksumForReplica(contID, dn.getUuidString()))
+          .build();
+      ContainerReportsProto reportWithChecksum = dnReportProto.toBuilder()
+          .clearReports()
+          .addReports(replicaWithChecksum)
+          .build();
+      final ContainerReportFromDatanode dnReport = new ContainerReportFromDatanode(dn, reportWithChecksum);
+      reportHandler.onMessage(dnReport, publisher);
     }
-    // Should have checked reports from 3 datanodes with 2 replicas each.
-    assertEquals(6, numReportsChecked);
 
-    // One the next round of container reports, datanodes will report that all hashes match. This simulates
-    // reconciliation running and finishing.
-    // TODO Add a container data checksum to the reports to simulate the datanodes' container scanner filling in this
-    //  value.
-    final ContainerReportsProto dnOneReport = getContainerReportsProto(
-        containerTwo.containerID(), ContainerReplicaProto.State.CLOSED,
-        datanodeOne.getUuidString());
-    final ContainerReportFromDatanode containerReportFromDatanode =
-        new ContainerReportFromDatanode(datanodeOne, dnOneReport);
-    reportHandler.onMessage(containerReportFromDatanode, publisher);
-
-    // Check that all reports contain the expected data checksums, and that the values are unique across replicas
-    // since that is how they were initialized.
-    numReportsChecked = 0;
-    for (ContainerID contID: containerIDSet) {
-      for (ContainerReplica replica : containerManager.getContainerReplicas(contID)) {
-        String expectedHash = createMatchingDataChecksumsForReplicas(contID);
-        assertEquals(expectedHash, replica.getDataChecksum(), "Incorrect replica data hash in container report.");
-        numReportsChecked++;
-      }
+    // All the replicas should have different checksums.
+    // Since the containers don't have any data in this test, different checksums are based on container ID and
+    // datanode ID.
+    int numReplicasChecked = 0;
+    for (ContainerReplica replica: containerManager.getContainerReplicas(contID)) {
+      String expectedChecksum = createUniqueDataChecksumForReplica(
+          contID, replica.getDatanodeDetails().getUuidString());
+      assertEquals(expectedChecksum, replica.getDataChecksum());
+      numReplicasChecked++;
     }
-    // Should have checked reports from 3 datanodes with 2 replicas each.
-    assertEquals(6, numReportsChecked);
+    assertEquals(3, numReplicasChecked);
+
+    // For each datanode, send a container report with a matching checksum.
+    // This simulates reconciliation running.
+    for (DatanodeDetails dn: Arrays.asList(dn1, dn2, dn3)) {
+      ContainerReportsProto dnReportProto = getContainerReportsProto(
+          contID, ContainerReplicaProto.State.CLOSED, dn.getUuidString());
+      ContainerReplicaProto replicaWithChecksum = dnReportProto.getReports(0).toBuilder()
+          .setDataChecksum(createMatchingDataChecksumForReplica(contID))
+          .build();
+      ContainerReportsProto reportWithChecksum = dnReportProto.toBuilder()
+          .clearReports()
+          .addReports(replicaWithChecksum)
+          .build();
+      final ContainerReportFromDatanode dnReport = new ContainerReportFromDatanode(dn, reportWithChecksum);
+      reportHandler.onMessage(dnReport, publisher);
+    }
+
+    // All the replicas should now have matching checksums.
+    // Since the containers don't have any data in this test, the matching checksums are based on container ID only.
+    numReplicasChecked = 0;
+    for (ContainerReplica replica: containerManager.getContainerReplicas(contID)) {
+      String expectedChecksum = createMatchingDataChecksumForReplica(contID);
+      assertEquals(expectedChecksum, replica.getDataChecksum());
+      numReplicasChecked++;
+    }
+    assertEquals(3, numReplicasChecked);
   }
 
   /**
    * Generates a placeholder data checksum for testing that is specific to a container replica.
    */
-  private static String createDifferentDataChecksumsForReplicas(ContainerID containerID, String datanodeID) {
+  private static String createUniqueDataChecksumForReplica(ContainerID containerID, String datanodeID) {
     return Integer.toString((datanodeID + containerID).hashCode());
   }
 
   /**
    * Generates a placeholder data checksum for testing that is specific to a container replica.
    */
-  private static String createMatchingDataChecksumsForReplicas(ContainerID containerID) {
+  private static String createMatchingDataChecksumForReplica(ContainerID containerID) {
     return Integer.toString(Objects.hashCode(containerID));
   }
 
@@ -1168,12 +1186,4 @@ public class TestContainerReportHandler {
             .build();
     return crBuilder.addReports(replicaProto).build();
   }
-
-  private ContainerReplicaProto getReplica(ContainerInfo cont) {
-    return ContainerReplicaProto.newBuilder()
-        .setContainerID(cont.containerID().getId())
-        .setState(ContainerReplicaProto.State.CLOSED)
-        .build();
-  }
-
 }

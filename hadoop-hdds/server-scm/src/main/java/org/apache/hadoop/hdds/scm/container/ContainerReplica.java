@@ -57,7 +57,7 @@ public final class ContainerReplica implements Comparable<ContainerReplica> {
     replicaIndex = b.replicaIndex;
     isEmpty = b.isEmpty;
     sequenceId = b.sequenceId;
-    dataChecksum = b.dataChecksum;
+    dataChecksum = Optional.ofNullable(b.dataChecksum).orElse("");
   }
 
   /**
