@@ -884,9 +884,8 @@ public class ContainerBalancerTask implements Runnable {
       LOG.warn("Container move failed for container {}", containerID, e);
       metrics.incrementNumContainerMovesFailedInLatestIteration(1);
       // add source back to queue for replica not found only
+      // the container is not excluded as it is a replica related failure
       findSourceStrategy.addBackSourceDataNode(source);
-      // exclude the container whose replica caused failure of move to avoid error in next run.
-      selectionCriteria.addToExcludeDueToFailContainers(moveSelection.getContainerID());
       return false;
     }
 
@@ -906,8 +905,8 @@ public class ContainerBalancerTask implements Runnable {
             result == MoveManager.MoveResult.REPLICATION_FAIL_INFLIGHT_DELETION ||
             result == MoveManager.MoveResult.REPLICATION_FAIL_INFLIGHT_REPLICATION) {
           // add source back to queue as a different container can be selected in next run.
-          // No need to exclude the container which caused failure of move
-          // as it is intermittent failure or replica related failures
+          // the container which caused failure of move is not excluded
+          // as it is an intermittent failure or a replica related failure
           findSourceStrategy.addBackSourceDataNode(source);
         }
         return result == MoveManager.MoveResult.COMPLETED;
