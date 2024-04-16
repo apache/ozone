@@ -210,8 +210,8 @@ public class TestSnapshotDeletingService {
     // verify the cache of purged snapshot
     // /vol1/bucket2/bucket2snap1 has been cleaned up from cache map
     assertEquals(2, om.getOmSnapshotManager().getSnapshotCacheSize());
-    //clean data
-    //    // cleaning up the data
+
+    // cleaning up the data
     client.getProxy().deleteSnapshot(VOLUME_NAME, BUCKET_NAME_ONE, "bucket1snap1");
     client.getProxy().deleteSnapshot(VOLUME_NAME, BUCKET_NAME_ONE, "bucket1snap3");
     client.getProxy().deleteBucket(VOLUME_NAME, BUCKET_NAME_TWO);
