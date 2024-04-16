@@ -115,7 +115,6 @@ public class ECBlockOutputStream extends BlockOutputStream {
     }
 
     BlockData checksumBlockData = null;
-    boolean foundStripeChecksum = false;
     BlockID blockID = null;
     //Reverse Traversal as all parity will have checksumBytes
     for (int i = blockData.length - 1; i >= 0; i--) {
@@ -131,7 +130,6 @@ public class ECBlockOutputStream extends BlockOutputStream {
       if (chunks != null && chunks.size() > 0) {
         if (chunks.get(0).hasStripeChecksum()) {
           checksumBlockData = bd;
-          foundStripeChecksum = true;
           break;
         } else {
           ChunkInfo chunk = chunks.get(0);
@@ -139,17 +137,7 @@ public class ECBlockOutputStream extends BlockOutputStream {
                   "size: {}. Chunk length: {}, Chunk offset: {}, hasChecksumData: {}, chunks size: {}.", i,
               bd.getBlockID(), bd.getSize(), chunk.getLen(), chunk.getOffset(), chunk.hasChecksumData(), chunks.size());
         }
-
-        if (chunks.get(0).hasChecksumData()) {
-          checksumBlockData = bd;
-          break;
-        }
       }
-    }
-
-    if (!foundStripeChecksum) {
-      LOG.warn("Could not find stripeChecksum in any index for blockData with BlockID {}, length {} and " +
-              "blockGroupLength {}.", blockID, blockData.length, blockGroupLength);
     }
 
     if (checksumBlockData != null) {
