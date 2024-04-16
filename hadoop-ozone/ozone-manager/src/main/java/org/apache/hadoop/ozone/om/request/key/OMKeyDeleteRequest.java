@@ -173,8 +173,6 @@ public class OMKeyDeleteRequest extends OMKeyRequest {
         OmKeyInfo openKeyInfo = openKeyTable.get(dbOpenKey);
         if (openKeyInfo != null) {
           openKeyInfo.getMetadata().put(DELETED_HSYNC_KEY, "true");
-          // Remove the open key by putting a tombstone entry
-          openKeyTable.addCacheEntry(dbOpenKey, trxnLogIndex);
           deletedOpenKeyInfo = openKeyInfo;
         } else {
           LOG.warn("Potentially inconsistent DB state: open key not found with dbOpenKey '{}'", dbOpenKey);
