@@ -348,14 +348,18 @@ public class TestKeyValueContainerMetadataInspector
 
     // Check aggregate metadata values.
     JsonNode jsonAggregates = inspectJson.get("aggregates");
-    assertEquals(createdBlocks, jsonAggregates.get("blockCount").asLong());
-    assertEquals(createdBytes, jsonAggregates.get("usedBytes").asLong());
-    assertEquals(createdPendingDeleteCount, jsonAggregates.get("pendingDeleteBlocks").asLong());
+    assertEquals(createdBlocks,
+        jsonAggregates.get("blockCount").asLong());
+    assertEquals(createdBytes,
+        jsonAggregates.get("usedBytes").asLong());
+    assertEquals(createdPendingDeleteCount,
+        jsonAggregates.get("pendingDeleteBlocks").asLong());
 
     // Check chunks directory.
     JsonNode jsonChunksDir = inspectJson.get("chunksDirectory");
     assertTrue(jsonChunksDir.get("present").asBoolean());
-    assertEquals(createdFiles, jsonChunksDir.get("fileCount").asLong());
+    assertEquals(createdFiles,
+        jsonChunksDir.get("fileCount").asLong());
 
     // Check errors.
     checkJsonErrorsReport(inspectJson, "dBMetadata.#BLOCKCOUNT",
@@ -385,17 +389,16 @@ public class TestKeyValueContainerMetadataInspector
    * the template passed in with the parameters.
    */
   private void checkJsonErrorsReport(JsonNode jsonReport,
-                                     String propertyValue,
-                                     JsonNode correctExpected,
-                                     JsonNode correctActual,
-                                     boolean correctRepair) {
+      String propertyValue, JsonNode correctExpected,
+      JsonNode correctActual, boolean correctRepair) {
 
     assertFalse(jsonReport.get("correct").asBoolean());
 
     JsonNode jsonErrors = jsonReport.get("errors");
     boolean matchFound = false;
     for (JsonNode jsonErrorElem : jsonErrors) {
-      String thisProperty = jsonErrorElem.get("property").asText();
+      String thisProperty =
+          jsonErrorElem.get("property").asText();
 
       if (thisProperty.equals(propertyValue)) {
         matchFound = true;

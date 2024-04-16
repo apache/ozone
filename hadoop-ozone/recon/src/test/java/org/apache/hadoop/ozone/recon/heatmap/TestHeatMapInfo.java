@@ -44,6 +44,7 @@ import java.util.stream.Collectors;
 import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.getTestReconOmMetadataManager;
 import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.initializeNewOmMetadataManager;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assumptions.assumeThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.mockito.Mockito.mock;
@@ -752,10 +753,10 @@ public class TestHeatMapInfo {
     // Deserialize the resources node directly if it's not missing
     HeatMapProviderDataResource auditLogFacetsResources = null;
 
-    if (!resourcesNode.isMissingNode()) {
-      auditLogFacetsResources = JsonUtils.treeToValue(resourcesNode,
-          HeatMapProviderDataResource.class);
-    }
+//    assumeThat(resourcesNode.isMissingNode()).isFalse();
+
+    auditLogFacetsResources = JsonUtils.treeToValue(resourcesNode,
+        HeatMapProviderDataResource.class);
 
     if (auditLogFacetsResources != null) {
       EntityMetaData[] entities = auditLogFacetsResources.getMetaDataList();
@@ -844,10 +845,10 @@ public class TestHeatMapInfo {
 
     // Deserialize the resources node directly if it's not missing
     HeatMapProviderDataResource auditLogFacetsResources = null;
-    if (!resourcesNode.isMissingNode()) {
-      auditLogFacetsResources = JsonUtils.treeToValue(resourcesNode,
-          HeatMapProviderDataResource.class);
-    }
+
+//    assumeThat(resourcesNode.isMissingNode()).isFalse();
+    auditLogFacetsResources = JsonUtils.treeToValue(resourcesNode,
+        HeatMapProviderDataResource.class);
 
     if (auditLogFacetsResources != null) {
       EntityMetaData[] entities = auditLogFacetsResources.getMetaDataList();
@@ -978,9 +979,9 @@ public class TestHeatMapInfo {
     JsonNode resourcesNode = facetsNode.path("resources");
     // Deserialize the resources node directly if it's not missing
     HeatMapProviderDataResource auditLogFacetsResources = null;
-    if (!resourcesNode.isMissingNode()) {
-      auditLogFacetsResources = JsonUtils.treeToValue(resourcesNode, HeatMapProviderDataResource.class);
-    }
+//    assumeThat(resourcesNode.isMissingNode()).isFalse();
+    auditLogFacetsResources =
+        JsonUtils.treeToValue(resourcesNode, HeatMapProviderDataResource.class);
 
     if (auditLogFacetsResources != null) {
       EntityMetaData[] entities = auditLogFacetsResources.getMetaDataList();

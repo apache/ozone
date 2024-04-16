@@ -67,14 +67,10 @@ public class EventQueue implements EventPublisher, AutoCloseable {
     this.threadNamePrefix = threadNamePrefix;
   }
 
-  // The field parent in DatanodeDetails class has the circular reference
-  // which will result in Gson infinite recursive parsing. We need to exclude
-  // this field when generating json string for DatanodeDetails object
   public String serializeObject(Object obj) {
     try {
       return JsonUtils.toJsonString(obj);
     } catch (Exception e) {
-      // Handle the exception, maybe log it
       LOG.error("Error serializing object: ", e);
       return null;
     }
@@ -191,15 +187,22 @@ public class EventQueue implements EventPublisher, AutoCloseable {
 
         for (EventHandler handler : executorAndHandlers.getValue()) {
           queuedCount.incrementAndGet();
-          if (LOG.isTraceEnabled()) {
-            String jsonPayload = serializeObject(payload);
-            if (jsonPayload != null) {
-              LOG.trace(
-                  "Delivering [event={}] to executor/handler {}: <json>{}</json>",
-                  event.getName(),
-                  executorAndHandlers.getKey().getName(),
-                  jsonPayload.replaceAll("\n", "\\\\n"));
-            }
+          String jsonPayload = null;
+
+          try {
+            jsonPayload = serializeObject(payload);
+          } catch (Exception e) {
+            // If serialization fails, log at debug level without payload
+            LOG.debug("Failed to serialize payload for [event={}]", event.getName(), e);
+          }
+
+          // Log with payload if serialization succeeded and trace is enabled
+          if (LOG.isTraceEnabled() && jsonPayload != null) {
+            LOG.trace(
+                "Delivering [event={}] to executor/handler {}: <json>{}</json>",
+                event.getName(),
+                executorAndHandlers.getKey().getName(),
+                jsonPayload.replaceAll("\n", "\\\\n"));
           } else if (LOG.isDebugEnabled()) {
             LOG.debug("Delivering [event={}] to executor/handler {}: {}",
                 event.getName(),
