@@ -611,7 +611,7 @@ public class ObjectEndpoint extends EndpointBase {
       // Should not return ETag header if the ETag is not set
       // doing so will result in "null" string being returned instead
       // which breaks some AWS SDK implementation
-      response.header(ETAG, "" + wrapInQuotes(key.getMetadata().get(ETAG)));
+      response.header(ETAG, wrapInQuotes(key.getMetadata().get(ETAG)));
     }
 
     addLastModifiedDate(response, key);
@@ -1356,7 +1356,7 @@ public class ObjectEndpoint extends EndpointBase {
     return datastreamEnabled;
   }
 
-  private String wrapInQuotes(String value) {
+  static String wrapInQuotes(String value) {
     return "\"" + value + "\"";
   }
 
