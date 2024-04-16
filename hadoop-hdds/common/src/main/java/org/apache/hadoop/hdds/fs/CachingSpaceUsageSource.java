@@ -96,7 +96,16 @@ public class CachingSpaceUsageSource implements SpaceUsageSource {
   }
 
   public void decrementUsedSpace(long reclaimedSpace) {
-    cachedValue.addAndGet(-1 * reclaimedSpace);
+    long current = cachedValue.get();
+    long newValue = current - reclaimedSpace;
+    if (newValue < 0) {
+      LOG.warn(
+          "Attempted to decrement used space to a negative value. Current: {}, Decrement: {}",
+          current, reclaimedSpace);
+      cachedValue.set(current); // Retain the previous value
+    } else {
+      cachedValue.set(newValue);
+    }
   }
 
   public void start() {
@@ -139,24 +148,9 @@ public class CachingSpaceUsageSource implements SpaceUsageSource {
     //only one `refresh` can be running at a certain moment
     if (isRefreshRunning.compareAndSet(false, true)) {
       try {
-        long newUsedSpace = source.getUsedSpace();
-        // Check for negative value before setting it to the cache
-        if (newUsedSpace >= 0) {
-          cachedValue.set(newUsedSpace);
-        } else {
-          LOG.error(
-              "Received negative used space value: {}. Keeping the last known good value: {}.",
-              newUsedSpace, cachedValue.get());
-        }
-      } catch (UncheckedIOException e) {
-        // Log the error and do not update the cached value
-        LOG.error(
-            "Error refreshing space usage for {}. Keeping the last known good value: {}",
-            source, cachedValue.get(), e);
+        cachedValue.set(source.getUsedSpace());
       } catch (RuntimeException e) {
-        LOG.error(
-            "Error refreshing space usage for {}. Keeping the last known good value: {}",
-            source, cachedValue.get(), e);
+        LOG.warn("Error refreshing space usage for {}", source, e);
       } finally {
         isRefreshRunning.set(false);
       }
