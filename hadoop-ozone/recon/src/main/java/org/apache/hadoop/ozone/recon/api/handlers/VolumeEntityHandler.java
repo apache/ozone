@@ -37,6 +37,10 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 
+
+import static org.apache.hadoop.ozone.recon.ReconConstants.DISK_USAGE_TOP_RECORDS_LIMIT;
+import static org.apache.hadoop.ozone.recon.ReconUtils.sortDiskUsageDescendingWithLimit;
+
 /**
  * Class for handling volume entity type.
  */
@@ -93,7 +97,7 @@ public class VolumeEntityHandler extends EntityHandler {
 
   @Override
   public DUResponse getDuResponse(
-      boolean listFile, boolean withReplica, boolean recursive, Stats stats)
+      boolean listFile, boolean withReplica, boolean sortSubPaths, boolean recursive, Stats stats)
           throws IOException {
     DUResponse duResponse = new DUResponse();
     duResponse.setPath(getNormalizedPath());
@@ -134,6 +138,13 @@ public class VolumeEntityHandler extends EntityHandler {
       duResponse.setSizeWithReplica(volDataSizeWithReplica);
     }
     duResponse.setSize(volDataSize);
+
+    if (sortSubPaths) {
+      // Parallel sort bucketDuData in descending order of size and returns the top N elements.
+      bucketDuData = sortDiskUsageDescendingWithLimit(bucketDuData,
+          DISK_USAGE_TOP_RECORDS_LIMIT);
+    }
+
     duResponse.setDuData(bucketDuData);
     return duResponse;
   }

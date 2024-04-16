@@ -52,7 +52,7 @@ public class UnknownEntityHandler extends EntityHandler {
 
   @Override
   public DUResponse getDuResponse(
-      boolean listFile, boolean withReplica, boolean recursive, Stats stats)
+      boolean listFile, boolean withReplica, boolean sort, boolean recursive, Stats stats)
           throws IOException {
     DUResponse duResponse = new DUResponse();
     duResponse.setStatus(ResponseStatus.PATH_NOT_FOUND);

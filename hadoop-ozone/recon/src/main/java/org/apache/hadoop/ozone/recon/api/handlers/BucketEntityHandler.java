@@ -31,19 +31,20 @@ import org.apache.hadoop.ozone.recon.api.types.ResponseStatus;
 import org.apache.hadoop.ozone.recon.api.types.Stats;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 import org.apache.hadoop.ozone.recon.spi.ReconNamespaceSummaryManager;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
 
+import static org.apache.hadoop.ozone.recon.ReconConstants.DISK_USAGE_TOP_RECORDS_LIMIT;
+import static org.apache.hadoop.ozone.recon.ReconUtils.sortDiskUsageDescendingWithLimit;
+
 /**
  * Class for handling bucket entity type.
  */
 public class BucketEntityHandler extends EntityHandler {
-  private static final Logger LOG = LoggerFactory.getLogger(BucketEntityHandler.class);
+
   public BucketEntityHandler(
       ReconNamespaceSummaryManager reconNamespaceSummaryManager,
       ReconOMMetadataManager omMetadataManager,
@@ -91,7 +92,7 @@ public class BucketEntityHandler extends EntityHandler {
 
   @Override
   public DUResponse getDuResponse(
-      boolean listFile, boolean withReplica, boolean recursive, Stats stats)
+      boolean listFile, boolean withReplica, boolean sortSubpaths, boolean recursive, Stats stats)
           throws IOException {
     DUResponse duResponse = new DUResponse();
     duResponse.setPath(getNormalizedPath());
@@ -152,6 +153,13 @@ public class BucketEntityHandler extends EntityHandler {
     }
     duResponse.setCount(dirDUData.size());
     duResponse.setSize(bucketDataSize);
+
+    if (sortSubpaths) {
+      // Parallel sort directory/files DU data in descending order of size and returns the top N elements.
+      dirDUData = sortDiskUsageDescendingWithLimit(dirDUData,
+          DISK_USAGE_TOP_RECORDS_LIMIT);
+    }
+
     duResponse.setDuData(dirDUData);
     duResponse.setTotalCount(stats.getTotalCount());
     duResponse.setLastKey(stats.getLastKey());

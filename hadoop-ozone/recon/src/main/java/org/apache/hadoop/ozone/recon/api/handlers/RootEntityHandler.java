@@ -40,6 +40,9 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 
+import static org.apache.hadoop.ozone.recon.ReconConstants.DISK_USAGE_TOP_RECORDS_LIMIT;
+import static org.apache.hadoop.ozone.recon.ReconUtils.sortDiskUsageDescendingWithLimit;
+
 /**
  * Class for handling root entity type.
  */
@@ -89,7 +92,7 @@ public class RootEntityHandler extends EntityHandler {
 
   @Override
   public DUResponse getDuResponse(
-      boolean listFile, boolean withReplica, boolean recursive, Stats stats)
+      boolean listFile, boolean withReplica, boolean sortSubPaths, boolean recursive, Stats stats)
           throws IOException {
     DUResponse duResponse = new DUResponse();
     duResponse.setPath(getNormalizedPath());
@@ -140,6 +143,13 @@ public class RootEntityHandler extends EntityHandler {
       duResponse.setSizeWithReplica(totalDataSizeWithReplica);
     }
     duResponse.setSize(totalDataSize);
+
+    if (sortSubPaths) {
+      // Parallel sort volumeDuData in descending order of size and returns the top N elements.
+      volumeDuData = sortDiskUsageDescendingWithLimit(volumeDuData,
+          DISK_USAGE_TOP_RECORDS_LIMIT);
+    }
+
     duResponse.setDuData(volumeDuData);
     duResponse.setTotalCount(stats.getTotalCount());
     duResponse.setLastKey(stats.getLastKey());
@@ -148,11 +158,12 @@ public class RootEntityHandler extends EntityHandler {
 
   @Override
   public QuotaUsageResponse getQuotaResponse()
-          throws IOException {
+      throws IOException {
     QuotaUsageResponse quotaUsageResponse = new QuotaUsageResponse();
     SCMNodeStat stats = getReconSCM().getScmNodeManager().getStats();
     long quotaInBytes = stats.getCapacity().get();
-    long quotaUsedInBytes = getDuResponse(true, true, false, new Stats(-1)).getSizeWithReplica();
+    long quotaUsedInBytes =
+        getDuResponse(true, true, false, false, new Stats(-1)).getSizeWithReplica();
     quotaUsageResponse.setQuota(quotaInBytes);
     quotaUsageResponse.setQuotaUsed(quotaUsedInBytes);
     return quotaUsageResponse;
