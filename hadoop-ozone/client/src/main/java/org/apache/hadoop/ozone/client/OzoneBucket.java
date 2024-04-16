@@ -62,6 +62,7 @@ import java.util.Stack;
 import java.util.NoSuchElementException;
 import java.util.stream.Collectors;
 
+import static org.apache.hadoop.ozone.OzoneConsts.ETAG;
 import static org.apache.hadoop.ozone.OzoneConsts.QUOTA_RESET;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.FILE_NOT_FOUND;
@@ -1276,23 +1277,31 @@ public class OzoneBucket extends WithMetadata {
     protected List<OzoneKey> buildKeysWithKeyPrefix(
         List<OzoneFileStatusLight> statuses) {
       return statuses.stream()
-          .map(status -> {
-            BasicOmKeyInfo keyInfo = status.getKeyInfo();
-            String keyName = keyInfo.getKeyName();
-            if (status.isDirectory()) {
-              // add trailing slash to represent directory
-              keyName = OzoneFSUtils.addTrailingSlashIfNeeded(keyName);
-            }
-            return new OzoneKey(keyInfo.getVolumeName(),
-                keyInfo.getBucketName(), keyName,
-                keyInfo.getDataSize(), keyInfo.getCreationTime(),
-                keyInfo.getModificationTime(),
-                keyInfo.getReplicationConfig(), keyInfo.isFile());
-          })
+          .map(OzoneBucket::toOzoneKey)
           .filter(key -> StringUtils.startsWith(key.getName(), getKeyPrefix()))
           .collect(Collectors.toList());
     }
 
+  }
+
+  private static OzoneKey toOzoneKey(OzoneFileStatusLight status) {
+    BasicOmKeyInfo keyInfo = status.getKeyInfo();
+    String keyName = keyInfo.getKeyName();
+    final Map<String, String> metadata;
+    if (status.isDirectory()) {
+      // add trailing slash to represent directory
+      keyName = OzoneFSUtils.addTrailingSlashIfNeeded(keyName);
+      metadata = Collections.emptyMap();
+    } else {
+      metadata = Collections.singletonMap(ETAG, keyInfo.getETag());
+    }
+    return new OzoneKey(keyInfo.getVolumeName(),
+        keyInfo.getBucketName(), keyName,
+        keyInfo.getDataSize(), keyInfo.getCreationTime(),
+        keyInfo.getModificationTime(),
+        keyInfo.getReplicationConfig(),
+        metadata,
+        keyInfo.isFile());
   }
 
 
@@ -1662,21 +1671,7 @@ public class OzoneBucket extends WithMetadata {
       for (int indx = 0; indx < statuses.size(); indx++) {
         OzoneFileStatusLight status = statuses.get(indx);
         BasicOmKeyInfo keyInfo = status.getKeyInfo();
-        String keyName = keyInfo.getKeyName();
-
-        OzoneKey ozoneKey;
-        // Add dir to the dirList
-        if (status.isDirectory()) {
-          // add trailing slash to represent directory
-          keyName = OzoneFSUtils.addTrailingSlashIfNeeded(keyName);
-        }
-        ozoneKey = new OzoneKey(keyInfo.getVolumeName(),
-            keyInfo.getBucketName(), keyName,
-            keyInfo.getDataSize(), keyInfo.getCreationTime(),
-            keyInfo.getModificationTime(),
-            keyInfo.getReplicationConfig(),
-            keyInfo.isFile());
-
+        OzoneKey ozoneKey = toOzoneKey(status);
         keysResultList.add(ozoneKey);
 
         if (status.isDirectory()) {

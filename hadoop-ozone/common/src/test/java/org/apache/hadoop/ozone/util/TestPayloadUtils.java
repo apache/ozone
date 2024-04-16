@@ -14,31 +14,21 @@
  * License for the specific language governing permissions and limitations under
  * the License.
  */
+package org.apache.hadoop.ozone.util;
 
-package org.apache.hadoop.ozone.common;
-
-import org.apache.commons.lang3.RandomUtils;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 /**
- * Utility class for payload operations.
+ * Tests {@link PayloadUtils}.
  */
-public final class PayloadUtils {
+public class TestPayloadUtils {
 
-  private static final int RPC_PAYLOAD_MULTIPLICATION_FACTOR = 1024;
-  private static final int MAX_SIZE_KB = 2097151;
-
-  private PayloadUtils() {
-  }
-
-  public static byte[] generatePayloadBytes(int payloadSize) {
-
-    byte[] payloadBytes = new byte[0];
-    int payloadRespSize =
-        Math.min(payloadSize * RPC_PAYLOAD_MULTIPLICATION_FACTOR, MAX_SIZE_KB);
-    if (payloadRespSize > 0) {
-      payloadBytes = RandomUtils.nextBytes(payloadRespSize);
-    }
-
-    return payloadBytes;
+  @ParameterizedTest
+  @ValueSource(ints = {0, 1, 1023, 1024, 1025, 2048})
+  public void testGeneratePayload(int payload) {
+    byte[] generated = PayloadUtils.generatePayload(payload);
+    Assertions.assertEquals(payload, generated.length);
   }
 }

@@ -302,7 +302,7 @@ public class TestNodeDecommissionManager {
 
     // Put 2 valid nodes into maintenance
     decom.startMaintenanceNodes(Arrays.asList(dns.get(1).getIpAddress(),
-        dns.get(2).getIpAddress()), 100);
+        dns.get(2).getIpAddress()), 100, true);
     assertEquals(HddsProtos.NodeOperationalState.ENTERING_MAINTENANCE,
         nodeManager.getNodeStatus(dns.get(1)).getOperationalState());
     assertNotEquals(0, nodeManager.getNodeStatus(
@@ -315,14 +315,14 @@ public class TestNodeDecommissionManager {
     // Running the command again gives no error - nodes already decommissioning
     // are silently ignored.
     decom.startMaintenanceNodes(Arrays.asList(dns.get(1).getIpAddress(),
-        dns.get(2).getIpAddress()), 100);
+        dns.get(2).getIpAddress()), 100, true);
 
     // Attempt to decommission dn(10) which has multiple hosts on the same IP
     // and we hardcoded ports to 3456, 4567, 5678
     DatanodeDetails multiDn = dns.get(10);
     String multiAddr =
         multiDn.getIpAddress() + ":" + multiDn.getPorts().get(0).getValue();
-    decom.startMaintenanceNodes(singletonList(multiAddr), 100);
+    decom.startMaintenanceNodes(singletonList(multiAddr), 100, true);
     assertEquals(HddsProtos.NodeOperationalState.ENTERING_MAINTENANCE,
         nodeManager.getNodeStatus(multiDn).getOperationalState());
 
@@ -331,7 +331,7 @@ public class TestNodeDecommissionManager {
     nodeManager.processHeartbeat(dns.get(9));
     DatanodeDetails duplicatePorts = dns.get(9);
     decom.startMaintenanceNodes(singletonList(duplicatePorts.getIpAddress()),
-        100);
+        100, true);
     assertEquals(HddsProtos.NodeOperationalState.ENTERING_MAINTENANCE,
         nodeManager.getNodeStatus(duplicatePorts).getOperationalState());
 
@@ -372,7 +372,7 @@ public class TestNodeDecommissionManager {
     // Try to go from decom to maint:
     dn = new ArrayList<>();
     dn.add(dns.get(2).getIpAddress());
-    errors = decom.startMaintenanceNodes(dn, 100);
+    errors = decom.startMaintenanceNodes(dn, 100, true);
     assertEquals(1, errors.size());
     assertEquals(dns.get(2).getHostName(), errors.get(0).getHostname());
 
@@ -641,6 +641,361 @@ public class TestNodeDecommissionManager {
         nodeManager.getNodeStatus(dns.get(1)).getOperationalState());
     assertEquals(HddsProtos.NodeOperationalState.DECOMMISSIONING,
         nodeManager.getNodeStatus(dns.get(2)).getOperationalState());
+  }
+
+  @Test
+  public void testInsufficientNodeMaintenanceThrowsExceptionForRatis() throws
+      NodeNotFoundException, IOException {
+    when(containerManager.getContainer(any(ContainerID.class)))
+        .thenAnswer(invocation -> getMockContainer(RatisReplicationConfig
+            .getInstance(HddsProtos.ReplicationFactor.THREE), (ContainerID)invocation.getArguments()[0]));
+    List<DatanodeAdminError> error;
+    List<DatanodeDetails> dns = new ArrayList<>();
+
+    for (int i = 0; i < 5; i++) {
+      DatanodeDetails dn = MockDatanodeDetails.randomDatanodeDetails();
+      dns.add(dn);
+      nodeManager.register(dn, null, null);
+    }
+    Set<ContainerID> idsRatis = new HashSet<>();
+    for (int i = 0; i < 5; i++) {
+      ContainerInfo container = containerManager.allocateContainer(
+          RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.THREE), "admin");
+      idsRatis.add(container.containerID());
+    }
+    for (DatanodeDetails dn  : nodeManager.getAllNodes().subList(0, 3)) {
+      nodeManager.setContainers(dn, idsRatis);
+    }
+
+    decom.setMaintenanceConfigs(2, 1); // default config
+    // putting 4 DNs into maintenance leave the cluster with 1 DN,
+    // it should not be allowed as maintenance.replica.minimum is 2
+    error = decom.startMaintenanceNodes(Arrays.asList(dns.get(1).getIpAddress(),
+        dns.get(2).getIpAddress(), dns.get(3).getIpAddress(), dns.get(4).getIpAddress()), 100, false);
+    assertTrue(error.get(0).getHostname().contains("AllHosts"));
+    assertEquals(HddsProtos.NodeOperationalState.IN_SERVICE,
+        nodeManager.getNodeStatus(dns.get(1)).getOperationalState());
+    assertEquals(HddsProtos.NodeOperationalState.IN_SERVICE,
+        nodeManager.getNodeStatus(dns.get(2)).getOperationalState());
+    assertEquals(HddsProtos.NodeOperationalState.IN_SERVICE,
+        nodeManager.getNodeStatus(dns.get(3)).getOperationalState());
+    assertEquals(HddsProtos.NodeOperationalState.IN_SERVICE,
+        nodeManager.getNodeStatus(dns.get(4)).getOperationalState());
+    // putting 3 DNs into maintenance leave the cluster with 2 DN,
+    // it should be allowed
+    error = decom.startMaintenanceNodes(Arrays.asList(dns.get(1).getIpAddress(),
+        dns.get(2).getIpAddress(), dns.get(3).getIpAddress()), 100, false);
+    assertEquals(0, error.size());
+    assertEquals(HddsProtos.NodeOperationalState.ENTERING_MAINTENANCE,
+        nodeManager.getNodeStatus(dns.get(1)).getOperationalState());
+    assertEquals(HddsProtos.NodeOperationalState.ENTERING_MAINTENANCE,
+        nodeManager.getNodeStatus(dns.get(2)).getOperationalState());
+    assertEquals(HddsProtos.NodeOperationalState.ENTERING_MAINTENANCE,
+        nodeManager.getNodeStatus(dns.get(3)).getOperationalState());
+
+    decom.recommissionNodes(Arrays.asList(dns.get(1).getIpAddress(),
+        dns.get(2).getIpAddress(), dns.get(3).getIpAddress(), dns.get(4).getIpAddress()));
+    decom.getMonitor().run();
+    assertEquals(5, nodeManager.getNodeCount(NodeStatus.inServiceHealthy()));
+
+    decom.setMaintenanceConfigs(3, 1); // non-default config
+    // putting 3 DNs into maintenance leave the cluster with 2 DN,
+    // it should not be allowed as maintenance.replica.minimum is 3
+    error = decom.startMaintenanceNodes(Arrays.asList(dns.get(1).getIpAddress(),
+        dns.get(2).getIpAddress(), dns.get(3).getIpAddress()), 100, false);
+    assertTrue(error.get(0).getHostname().contains("AllHosts"));
+    assertEquals(HddsProtos.NodeOperationalState.IN_SERVICE,
+        nodeManager.getNodeStatus(dns.get(1)).getOperationalState());
+    assertEquals(HddsProtos.NodeOperationalState.IN_SERVICE,
+        nodeManager.getNodeStatus(dns.get(2)).getOperationalState());
+    assertEquals(HddsProtos.NodeOperationalState.IN_SERVICE,
+        nodeManager.getNodeStatus(dns.get(3)).getOperationalState());
+    // putting 2 DNs into maintenance leave the cluster with 2 DN,
+    // it should be allowed
+    error = decom.startMaintenanceNodes(Arrays.asList(dns.get(1).getIpAddress(),
+        dns.get(2).getIpAddress()), 100, false);
+    assertEquals(0, error.size());
+    assertEquals(HddsProtos.NodeOperationalState.ENTERING_MAINTENANCE,
+        nodeManager.getNodeStatus(dns.get(1)).getOperationalState());
+    assertEquals(HddsProtos.NodeOperationalState.ENTERING_MAINTENANCE,
+        nodeManager.getNodeStatus(dns.get(2)).getOperationalState());
+
+    decom.recommissionNodes(Arrays.asList(dns.get(1).getIpAddress(),
+        dns.get(2).getIpAddress(), dns.get(3).getIpAddress(), dns.get(4).getIpAddress()));
+    decom.getMonitor().run();
+    assertEquals(5, nodeManager.getNodeCount(NodeStatus.inServiceHealthy()));
+
+    // forcing 4 DNs into maintenance should be allowed
+    error = decom.startMaintenanceNodes(Arrays.asList(dns.get(1).getIpAddress(),
+        dns.get(2).getIpAddress(), dns.get(3).getIpAddress(), dns.get(4).getIpAddress()), 100, true);
+    assertEquals(0, error.size());
+    assertEquals(HddsProtos.NodeOperationalState.ENTERING_MAINTENANCE,
+        nodeManager.getNodeStatus(dns.get(1)).getOperationalState());
+    assertEquals(HddsProtos.NodeOperationalState.ENTERING_MAINTENANCE,
+        nodeManager.getNodeStatus(dns.get(2)).getOperationalState());
+    assertEquals(HddsProtos.NodeOperationalState.ENTERING_MAINTENANCE,
+        nodeManager.getNodeStatus(dns.get(3)).getOperationalState());
+    assertEquals(HddsProtos.NodeOperationalState.ENTERING_MAINTENANCE,
+        nodeManager.getNodeStatus(dns.get(4)).getOperationalState());
+  }
+
+  @Test
+  public void testInsufficientNodeMaintenanceThrowsExceptionForEc() throws
+      NodeNotFoundException, IOException {
+    when(containerManager.getContainer(any(ContainerID.class)))
+        .thenAnswer(invocation -> getMockContainer(new ECReplicationConfig(3, 2),
+            (ContainerID)invocation.getArguments()[0]));
+    List<DatanodeAdminError> error;
+    List<DatanodeDetails> dns = new ArrayList<>();
+
+    for (int i = 0; i < 5; i++) {
+      DatanodeDetails dn = MockDatanodeDetails.randomDatanodeDetails();
+      dns.add(dn);
+      nodeManager.register(dn, null, null);
+    }
+    Set<ContainerID> idsEC = new HashSet<>();
+    for (int i = 0; i < 5; i++) {
+      ContainerInfo container = containerManager.allocateContainer(new ECReplicationConfig(3, 2), "admin");
+      idsEC.add(container.containerID());
+    }
+    for (DatanodeDetails dn  : nodeManager.getAllNodes()) {
+      nodeManager.setContainers(dn, idsEC);
+    }
+
+    decom.setMaintenanceConfigs(2, 1); // default config
+    // putting 2 DNs into maintenance leave the cluster with 3 DN,
+    // it should not be allowed as maintenance.remaining.redundancy is 1 => 3+1=4 DNs are required
+    error = decom.startMaintenanceNodes(Arrays.asList(dns.get(1).getIpAddress(), dns.get(2).getIpAddress()),
+        100, false);
+    assertTrue(error.get(0).getHostname().contains("AllHosts"));
+    assertEquals(HddsProtos.NodeOperationalState.IN_SERVICE,
+        nodeManager.getNodeStatus(dns.get(1)).getOperationalState());
+    assertEquals(HddsProtos.NodeOperationalState.IN_SERVICE,
+        nodeManager.getNodeStatus(dns.get(2)).getOperationalState());
+    // putting 1 DN into maintenance leave the cluster with 4 DN,
+    // it should be allowed
+    error = decom.startMaintenanceNodes(Arrays.asList(dns.get(1).getIpAddress()), 100, false);
+    assertEquals(0, error.size());
+    assertEquals(HddsProtos.NodeOperationalState.ENTERING_MAINTENANCE,
+        nodeManager.getNodeStatus(dns.get(1)).getOperationalState());
+
+    decom.recommissionNodes(Arrays.asList(dns.get(1).getIpAddress(), dns.get(2).getIpAddress()));
+    decom.getMonitor().run();
+    assertEquals(5, nodeManager.getNodeCount(NodeStatus.inServiceHealthy()));
+
+    decom.setMaintenanceConfigs(2, 2); // non-default config
+    // putting 1 DNs into maintenance leave the cluster with 4 DN,
+    // it should not be allowed as maintenance.remaining.redundancy is 2 => 3+2=5 DNs are required
+    error = decom.startMaintenanceNodes(Arrays.asList(dns.get(1).getIpAddress()), 100, false);
+    assertTrue(error.get(0).getHostname().contains("AllHosts"));
+    assertEquals(HddsProtos.NodeOperationalState.IN_SERVICE,
+        nodeManager.getNodeStatus(dns.get(1)).getOperationalState());
+
+    decom.recommissionNodes(Arrays.asList(dns.get(1).getIpAddress(), dns.get(2).getIpAddress()));
+    decom.getMonitor().run();
+    assertEquals(5, nodeManager.getNodeCount(NodeStatus.inServiceHealthy()));
+
+    // forcing 2 DNs into maintenance should be allowed
+    error = decom.startMaintenanceNodes(Arrays.asList(dns.get(1).getIpAddress(), dns.get(2).getIpAddress()), 100, true);
+    assertEquals(0, error.size());
+    assertEquals(HddsProtos.NodeOperationalState.ENTERING_MAINTENANCE,
+        nodeManager.getNodeStatus(dns.get(1)).getOperationalState());
+    assertEquals(HddsProtos.NodeOperationalState.ENTERING_MAINTENANCE,
+        nodeManager.getNodeStatus(dns.get(2)).getOperationalState());
+  }
+
+  @Test
+  public void testInsufficientNodeMaintenanceThrowsExceptionForRatisAndEc() throws
+      NodeNotFoundException, IOException {
+    when(containerManager.getContainer(any(ContainerID.class)))
+        .thenAnswer(invocation -> getMockContainer(new ECReplicationConfig(3, 2),
+            (ContainerID)invocation.getArguments()[0]));
+    List<DatanodeAdminError> error;
+    List<DatanodeDetails> dns = new ArrayList<>();
+
+    for (int i = 0; i < 5; i++) {
+      DatanodeDetails dn = MockDatanodeDetails.randomDatanodeDetails();
+      dns.add(dn);
+      nodeManager.register(dn, null, null);
+    }
+    Set<ContainerID> idsRatis = new HashSet<>();
+    ContainerInfo containerRatis = containerManager.allocateContainer(
+        RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.THREE), "admin");
+    idsRatis.add(containerRatis.containerID());
+    Set<ContainerID> idsEC = new HashSet<>();
+    ContainerInfo containerEC = containerManager.allocateContainer(new ECReplicationConfig(3, 2), "admin");
+    idsEC.add(containerEC.containerID());
+
+    when(containerManager.getContainer(any(ContainerID.class)))
+        .thenAnswer(invocation -> {
+          ContainerID containerID = (ContainerID)invocation.getArguments()[0];
+          if (idsEC.contains(containerID)) {
+            return getMockContainer(new ECReplicationConfig(3, 2),
+                (ContainerID)invocation.getArguments()[0]);
+          }
+          return getMockContainer(RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.THREE),
+              (ContainerID)invocation.getArguments()[0]);
+        });
+    for (DatanodeDetails dn  : nodeManager.getAllNodes().subList(0, 3)) {
+      nodeManager.setContainers(dn, idsRatis);
+    }
+    for (DatanodeDetails dn  : nodeManager.getAllNodes()) {
+      nodeManager.setContainers(dn, idsEC);
+    }
+
+    decom.setMaintenanceConfigs(2, 1); // default config
+    // putting 2 DNs into maintenance leave the cluster with 3 DN,
+    // it should not be allowed as maintenance.remaining.redundancy is 1 => 3+1=4 DNs are required
+    error = decom.startMaintenanceNodes(Arrays.asList(dns.get(1).getIpAddress(), dns.get(2).getIpAddress()),
+        100, false);
+    assertTrue(error.get(0).getHostname().contains("AllHosts"));
+    assertEquals(HddsProtos.NodeOperationalState.IN_SERVICE,
+        nodeManager.getNodeStatus(dns.get(1)).getOperationalState());
+    assertEquals(HddsProtos.NodeOperationalState.IN_SERVICE,
+        nodeManager.getNodeStatus(dns.get(2)).getOperationalState());
+    // putting 1 DN into maintenance leave the cluster with 4 DN,
+    // it should be allowed
+    error = decom.startMaintenanceNodes(Arrays.asList(dns.get(1).getIpAddress()), 100, false);
+    assertEquals(0, error.size());
+    assertEquals(HddsProtos.NodeOperationalState.ENTERING_MAINTENANCE,
+        nodeManager.getNodeStatus(dns.get(1)).getOperationalState());
+
+    decom.recommissionNodes(Arrays.asList(dns.get(1).getIpAddress(), dns.get(2).getIpAddress()));
+    decom.getMonitor().run();
+    assertEquals(5, nodeManager.getNodeCount(NodeStatus.inServiceHealthy()));
+
+    decom.setMaintenanceConfigs(3, 2); // non-default config
+    // putting 1 DNs into maintenance leave the cluster with 4 DN,
+    // it should not be allowed as for EC, maintenance.remaining.redundancy is 2 => 3+2=5 DNs are required
+    error = decom.startMaintenanceNodes(Arrays.asList(dns.get(1).getIpAddress()), 100, false);
+    assertTrue(error.get(0).getHostname().contains("AllHosts"));
+    assertEquals(HddsProtos.NodeOperationalState.IN_SERVICE,
+        nodeManager.getNodeStatus(dns.get(1)).getOperationalState());
+
+    decom.recommissionNodes(Arrays.asList(dns.get(1).getIpAddress(), dns.get(2).getIpAddress()));
+    decom.getMonitor().run();
+    assertEquals(5, nodeManager.getNodeCount(NodeStatus.inServiceHealthy()));
+
+    // forcing 2 DNs into maintenance should be allowed
+    error = decom.startMaintenanceNodes(Arrays.asList(dns.get(1).getIpAddress(), dns.get(2).getIpAddress()), 100, true);
+    assertEquals(0, error.size());
+    assertEquals(HddsProtos.NodeOperationalState.ENTERING_MAINTENANCE,
+        nodeManager.getNodeStatus(dns.get(1)).getOperationalState());
+    assertEquals(HddsProtos.NodeOperationalState.ENTERING_MAINTENANCE,
+        nodeManager.getNodeStatus(dns.get(2)).getOperationalState());
+  }
+
+  @Test
+  public void testInsufficientNodeMaintenanceChecksNotInService() throws
+      NodeNotFoundException, IOException {
+    when(containerManager.getContainer(any(ContainerID.class)))
+        .thenAnswer(invocation -> getMockContainer(RatisReplicationConfig
+            .getInstance(HddsProtos.ReplicationFactor.THREE), (ContainerID)invocation.getArguments()[0]));
+
+    List<DatanodeAdminError> error;
+    List<DatanodeDetails> dns = new ArrayList<>();
+    for (int i = 0; i < 5; i++) {
+      DatanodeDetails dn = MockDatanodeDetails.randomDatanodeDetails();
+      dns.add(dn);
+      nodeManager.register(dn, null, null);
+    }
+    Set<ContainerID> idsRatis = new HashSet<>();
+    for (int i = 0; i < 5; i++) {
+      ContainerInfo container = containerManager.allocateContainer(
+          RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.THREE), "admin");
+      idsRatis.add(container.containerID());
+    }
+    for (DatanodeDetails dn  : nodeManager.getAllNodes().subList(0, 3)) {
+      nodeManager.setContainers(dn, idsRatis);
+    }
+
+    // put 2 nodes into maintenance successfully
+    error = decom.startMaintenanceNodes(Arrays.asList(dns.get(0).getIpAddress(), dns.get(1).getIpAddress()),
+        100, false);
+    assertEquals(0, error.size());
+    assertEquals(HddsProtos.NodeOperationalState.ENTERING_MAINTENANCE,
+        nodeManager.getNodeStatus(dns.get(0)).getOperationalState());
+    assertEquals(HddsProtos.NodeOperationalState.ENTERING_MAINTENANCE,
+        nodeManager.getNodeStatus(dns.get(1)).getOperationalState());
+    // try to put 3 nodes into maintenance, 1 in service and 2 in ENTER_MAINTENANCE state, should be successful.
+    error = decom.startMaintenanceNodes(Arrays.asList(dns.get(0).getIpAddress(),
+        dns.get(1).getIpAddress(), dns.get(2).getIpAddress()), 100, false);
+    assertEquals(0, error.size());
+    assertEquals(HddsProtos.NodeOperationalState.ENTERING_MAINTENANCE,
+        nodeManager.getNodeStatus(dns.get(0)).getOperationalState());
+    assertEquals(HddsProtos.NodeOperationalState.ENTERING_MAINTENANCE,
+        nodeManager.getNodeStatus(dns.get(1)).getOperationalState());
+    assertEquals(HddsProtos.NodeOperationalState.ENTERING_MAINTENANCE,
+        nodeManager.getNodeStatus(dns.get(2)).getOperationalState());
+  }
+
+  @Test
+  public void testInsufficientNodeMaintenanceChecksForNNF() throws
+      NodeNotFoundException, IOException {
+    List<DatanodeAdminError> error;
+    List<DatanodeDetails> dns = new ArrayList<>();
+
+    for (int i = 0; i < 5; i++) {
+      DatanodeDetails dn = MockDatanodeDetails.randomDatanodeDetails();
+      dns.add(dn);
+    }
+    Set<ContainerID> idsRatis = new HashSet<>();
+    for (int i = 0; i < 3; i++) {
+      ContainerInfo container = containerManager.allocateContainer(
+          RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.THREE), "admin");
+      idsRatis.add(container.containerID());
+    }
+
+    nodeManager = mock(NodeManager.class);
+    decom = new NodeDecommissionManager(conf, nodeManager, containerManager,
+        SCMContext.emptyContext(), new EventQueue(), null);
+    when(containerManager.getContainer(any(ContainerID.class)))
+        .thenAnswer(invocation -> getMockContainer(RatisReplicationConfig
+            .getInstance(HddsProtos.ReplicationFactor.THREE), (ContainerID)invocation.getArguments()[0]));
+    when(nodeManager.getNodesByAddress(any())).thenAnswer(invocation ->
+        getDatanodeDetailsList((String)invocation.getArguments()[0], dns));
+    when(nodeManager.getContainers(any())).thenReturn(idsRatis);
+    when(nodeManager.getNodeCount(any())).thenReturn(5);
+    when(nodeManager.getNodeStatus(any())).thenAnswer(invocation ->
+        getNodeOpState((DatanodeDetails) invocation.getArguments()[0], dns));
+    Mockito.doAnswer(invocation -> {
+      setNodeOpState((DatanodeDetails)invocation.getArguments()[0],
+          (HddsProtos.NodeOperationalState)invocation.getArguments()[1], dns);
+      return null;
+    }).when(nodeManager).setNodeOperationalState(any(DatanodeDetails.class), any(
+        HddsProtos.NodeOperationalState.class));
+    Mockito.doAnswer(invocation -> {
+      setNodeOpState((DatanodeDetails)invocation.getArguments()[0],
+          (HddsProtos.NodeOperationalState)invocation.getArguments()[1], dns);
+      return null;
+    }).when(nodeManager).setNodeOperationalState(any(DatanodeDetails.class), any(
+        HddsProtos.NodeOperationalState.class), any(Long.class));
+
+    // trying to put 4 available DNs into maintenance,
+    // it should not be allowed as it leaves the cluster with 1 DN and maintenance.replica.minimum is 2
+    error = decom.startMaintenanceNodes(Arrays.asList(dns.get(1).getIpAddress(),
+        dns.get(2).getIpAddress(), dns.get(3).getIpAddress(), dns.get(4).getIpAddress()), 100, false);
+    assertTrue(error.get(0).getHostname().contains("AllHosts"));
+    assertEquals(HddsProtos.NodeOperationalState.IN_SERVICE,
+        nodeManager.getNodeStatus(dns.get(1)).getOperationalState());
+    assertEquals(HddsProtos.NodeOperationalState.IN_SERVICE,
+        nodeManager.getNodeStatus(dns.get(2)).getOperationalState());
+    assertEquals(HddsProtos.NodeOperationalState.IN_SERVICE,
+        nodeManager.getNodeStatus(dns.get(3)).getOperationalState());
+    assertEquals(HddsProtos.NodeOperationalState.IN_SERVICE,
+        nodeManager.getNodeStatus(dns.get(4)).getOperationalState());
+    // trying to put 4 DNs (3 available + 1 not found) into maintenance,
+    // it should be allowed as effectively, it tries to move 3 DNs to maintenance,
+    // leaving the cluster with 2 DNs
+    error = decom.startMaintenanceNodes(Arrays.asList(dns.get(0).getIpAddress(),
+        dns.get(1).getIpAddress(), dns.get(2).getIpAddress(), dns.get(3).getIpAddress()), 100, false);
+    assertEquals(0, error.size());
+    assertEquals(HddsProtos.NodeOperationalState.ENTERING_MAINTENANCE,
+        nodeManager.getNodeStatus(dns.get(1)).getOperationalState());
+    assertEquals(HddsProtos.NodeOperationalState.ENTERING_MAINTENANCE,
+        nodeManager.getNodeStatus(dns.get(2)).getOperationalState());
+    assertEquals(HddsProtos.NodeOperationalState.ENTERING_MAINTENANCE,
+        nodeManager.getNodeStatus(dns.get(3)).getOperationalState());
   }
 
   private List<DatanodeDetails> getDatanodeDetailsList(String ipaddress, List<DatanodeDetails> dns) {
