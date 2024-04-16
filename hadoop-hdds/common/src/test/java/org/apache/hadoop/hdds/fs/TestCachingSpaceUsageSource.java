@@ -31,6 +31,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 
 import static org.apache.hadoop.hdds.fs.MockSpaceUsageCheckParams.newBuilder;
+import static org.apache.ratis.util.Preconditions.assertTrue;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.anyLong;
@@ -140,6 +141,28 @@ public class TestCachingSpaceUsageSource {
         "no further updates from source expected");
     verify(future).cancel(true);
     verify(executor).shutdown();
+  }
+
+  @Test
+  public void testDecrementDoesNotGoNegative() {
+    CachingSpaceUsageSource subject;
+    SpaceUsageCheckParams params;
+    AtomicLong cachedValue;
+    cachedValue = new AtomicLong(50);
+    params = paramsBuilder(cachedValue)
+        .withRefresh(Duration.ZERO)
+        .build();
+    subject = new CachingSpaceUsageSource(params);
+    // Try to decrement more than the current value
+    subject.decrementUsedSpace(100);
+
+    // Check that the value has not gone negative
+    assertTrue(subject.getUsedSpace() >= 0,
+        "Cached used space should not be negative");
+
+    // Check that it has retained the previous value
+    assertEquals(50, subject.getUsedSpace(),
+        "Cached used space should remain at the initial value");
   }
 
   private static long missingInitialValue() {
