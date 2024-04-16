@@ -426,7 +426,6 @@ public final class OmSnapshotManager implements AutoCloseable {
   public void invalidateCache() {
     if (snapshotCache != null) {
       snapshotCache.invalidateAll();
-      snapshotCache.close();
     }
   }
 
@@ -959,6 +958,9 @@ public final class OmSnapshotManager implements AutoCloseable {
     }
 
     invalidateCache();
+    if (snapshotCache != null) {
+      snapshotCache.close();
+    }
 
     if (snapshotDiffCleanupService != null) {
       snapshotDiffCleanupService.shutdown();
