@@ -1396,37 +1396,137 @@
   "root": {
     "status": "OK",
     "path": "/",
-    "size": 100000,
+    "size": 50000,
     "sizeWithReplica": 300000,
-    "subPathCount": 5,
+    "subPathCount": 25,
     "subPaths": [
       {
         "path": "/vol1",
-        "size": 50000,
+        "size": 5000,
         "sizeWithReplica": 150000
       },
       {
         "path": "/vol2",
-        "size": 20000,
-        "sizeWithReplica": 60000
+        "size": 8000,
+        "sizeWithReplica": 260000
       },
       {
         "path": "/vol3",
-        "size": 10000,
-        "sizeWithReplica": 30000
+        "size": 9000,
+        "sizeWithReplica": 300000
       },
       {
         "path": "/vol4",
-        "size": 10000,
+        "size": 1000,
         "sizeWithReplica": 30000
       },
       {
         "path": "/vol5",
-        "size": 10000,
+        "size": 1000,
+        "sizeWithReplica": 30000
+      },
+      {
+        "path": "/vol6",
+        "size": 2000,
+        "sizeWithReplica": 60000
+      },
+      {
+        "path": "/vol7",
+        "size": 1000,
+        "sizeWithReplica": 30000
+      },
+      {
+        "path": "/vol8",
+        "size": 1000,
+        "sizeWithReplica": 30000
+      },
+      {
+        "path": "/vol9",
+        "size": 1000,
+        "sizeWithReplica": 30000
+      },
+      {
+        "path": "/vol10",
+        "size": 2000,
+        "sizeWithReplica": 60000
+      },
+      {
+        "path": "/vol11",
+        "size": 1000,
+        "sizeWithReplica": 30000
+      },
+      {
+        "path": "/vol12",
+        "size": 1000,
+        "sizeWithReplica": 30000
+      },
+      {
+        "path": "/vol13",
+        "size": 1000,
+        "sizeWithReplica": 30000
+      },
+      {
+        "path": "/vol14",
+        "size": 2000,
+        "sizeWithReplica": 60000
+      },
+      {
+        "path": "/vol15",
+        "size": 1000,
+        "sizeWithReplica": 30000
+      },
+      {
+        "path": "/vol16",
+        "size": 1000,
+        "sizeWithReplica": 30000
+      },
+      {
+        "path": "/vol17",
+        "size": 1000,
+        "sizeWithReplica": 30000
+      },
+      {
+        "path": "/vol18",
+        "size": 2000,
+        "sizeWithReplica": 60000
+      },
+      {
+        "path": "/vol19",
+        "size": 1000,
+        "sizeWithReplica": 30000
+      },
+      {
+        "path": "/vol20",
+        "size": 1000,
+        "sizeWithReplica": 30000
+      },
+      {
+        "path": "/vol21",
+        "size": 1000,
+        "sizeWithReplica": 30000
+      },
+      {
+        "path": "/vol22",
+        "size": 1000,
+        "sizeWithReplica": 30000
+      },
+      {
+        "path": "/vol23",
+        "size": 1000,
+        "sizeWithReplica": 30000
+      },
+      {
+        "path": "/vol24",
+        "size": 1000,
+        "sizeWithReplica": 30000
+      },
+      {
+        "path": "/vol25",
+        "size": 1000,
         "sizeWithReplica": 30000
       }
     ],
-    "sizeDirectKey": 0
+    "sizeDirectKey": 50000
   },
   "volume": {
     "status": "OK",
@@ -1517,37 +1617,41 @@
   },
   "dir": {
     "status": "OK",
-    "path": "/dummyVolume/dummyBucket/dummyDir",
-    "size": 200000,
+    "path": "/volumetest/buckettest/dir1",
+    "size": 111010000,
     "sizeWithReplica": -1,
-    "subPathCount": 5,
+    "subPathCount": 4,
     "subPaths": [
       {
-        "path": "/dummyVolume/dummyBucket/dummyDir/key1",
-        "size": 100000,
+        "key": true,
+        "path": "/volumetest/buckettest/dir1/key100MB",
+        "size": 100000000,
         "sizeWithReplica": -1,
         "isKey": true
       },
       {
-        "path": "/dummyVolume/dummyBucket/dummyDir/key2",
-        "size": 30000,
+        "key": true,
+        "path": "/volumetest/buckettest/dir1/key10mb",
+        "size": 10000000,
         "sizeWithReplica": -1,
         "isKey": true
       },
       {
-        "path": "/dummyVolume/dummyBucket/dummyDir/key3",
-        "size": 30000,
+        "key": true,
+        "path": "/volumetest/buckettest/dir1/key1MB",
+        "size": 1000000,
         "sizeWithReplica": -1,
         "isKey": true
       },
       {
-        "path": "/dummyVolume/dummyBucket/dummyDir/key4",
-        "size": 40000,
+        "key": true,
+        "path": "/volumetest/buckettest/dir1/key10kb",
+        "size": 10000,
         "sizeWithReplica": -1,
         "isKey": true
       }
     ],
-    "sizeDirectKey": 50000
+    "sizeDirectKey": 111010000
   },
   "empty": {
     "status": "OK",

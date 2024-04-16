@@ -265,7 +265,7 @@ export class DiskUsage extends React.Component<Record<string, object>, IDUState>
 
   updateDisplayLimit(e): void {
     let res = -1;
-    if (e.key === 'all') {
+    if (e.key === '30') {
       res = Number.MAX_VALUE;
     } else {
       res = Number.parseInt(e.key, 10);
@@ -517,8 +517,8 @@ export class DiskUsage extends React.Component<Record<string, object>, IDUState>
         <Menu.Item key='20'>
           20
         </Menu.Item>
-        <Menu.Item key='all'>
-          All
+        <Menu.Item key='30'>
+          30
         </Menu.Item>
       </Menu>
     );
@@ -549,7 +549,7 @@ export class DiskUsage extends React.Component<Record<string, object>, IDUState>
                   </div>
                   <div className='dropdown-button'>
                     <Dropdown overlay={menu} placement='bottomCenter'>
-                      <Button>Display Limit: {(displayLimit === Number.MAX_VALUE) ? 'All' : displayLimit}</Button>
+                      <Button>Display Limit: {(displayLimit === Number.MAX_VALUE) ? '30' : displayLimit}</Button>
                     </Dropdown>
                   </div>
                   <div className='metadata-button'>
@@ -569,7 +569,7 @@ export class DiskUsage extends React.Component<Record<string, object>, IDUState>
                       layout={
                         {
                           width: 1200,
-                          height: 750,
+                          height: 1000,
                           font: {
                             family: 'Roboto, sans-serif',
                             size: 15
