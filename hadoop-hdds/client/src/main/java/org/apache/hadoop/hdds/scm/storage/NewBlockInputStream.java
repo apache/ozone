@@ -729,7 +729,7 @@ public class NewBlockInputStream extends BlockExtendedInputStream
   }
 
   @VisibleForTesting
-  public ByteBuffer[] getCachedBuffers() {
+  public synchronized ByteBuffer[] getCachedBuffers() {
     return buffers == null ? null :
         BufferUtils.getReadOnlyByteBuffers(buffers.toArray(new ByteBuffer[0]));
   }
