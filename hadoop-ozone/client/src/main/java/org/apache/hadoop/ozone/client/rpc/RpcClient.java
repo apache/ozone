@@ -381,7 +381,7 @@ public class RpcClient implements ClientProtocol {
     if (OzoneSecurityUtil.isSecurityEnabled(conf)) {
       CACertificateProvider remoteCAProvider =
           () -> ozoneManagerClient.getServiceInfo().provideCACerts();
-      trustManager = new ClientTrustManager(remoteCAProvider, serviceInfo);
+      trustManager = new ClientTrustManager(conf, remoteCAProvider, serviceInfo);
     }
     return new XceiverClientManager(conf,
         conf.getObject(XceiverClientManager.ScmClientConfig.class),

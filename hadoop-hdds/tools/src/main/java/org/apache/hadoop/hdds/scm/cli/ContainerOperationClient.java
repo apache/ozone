@@ -118,7 +118,7 @@ public class ContainerOperationClient implements ScmClient {
       CACertificateProvider caCerts = () -> HAUtils.buildCAX509List(null, conf);
       manager = new XceiverClientManager(conf,
           conf.getObject(XceiverClientManager.ScmClientConfig.class),
-          new ClientTrustManager(caCerts, null));
+          new ClientTrustManager(conf, caCerts, null));
     } else {
       manager = new XceiverClientManager(conf);
     }
