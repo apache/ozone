@@ -1356,7 +1356,7 @@ public class ObjectEndpoint extends EndpointBase {
     return datastreamEnabled;
   }
 
-  private String wrapInQuotes(String value) {
+  static String wrapInQuotes(String value) {
     return "\"" + value + "\"";
   }
 

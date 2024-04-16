@@ -712,7 +712,7 @@ public class BucketEndpoint extends EndpointBase {
     keyMetadata.setSize(next.getDataSize());
     String eTag = next.getMetadata().get(ETAG);
     if (eTag != null) {
-      keyMetadata.setETag(eTag);
+      keyMetadata.setETag(ObjectEndpoint.wrapInQuotes(eTag));
     }
     if (next.getReplicationType().toString().equals(ReplicationType
         .STAND_ALONE.toString())) {
