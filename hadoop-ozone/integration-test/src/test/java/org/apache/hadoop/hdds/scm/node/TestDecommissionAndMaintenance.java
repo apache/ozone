@@ -415,7 +415,7 @@ public class TestDecommissionAndMaintenance {
     final DatanodeDetails dn = nm.getNodeByUuid(dnID.toString());
 
     scmClient.startMaintenanceNodes(Arrays.asList(
-        getDNHostAndPort(dn)), 0);
+        getDNHostAndPort(dn)), 0, true);
 
     waitForDnToReachOpState(nm, dn, IN_MAINTENANCE);
     waitForDnToReachPersistedOpState(dn, IN_MAINTENANCE);
@@ -486,7 +486,7 @@ public class TestDecommissionAndMaintenance {
 
     scmClient.startMaintenanceNodes(forMaintenance.stream()
         .map(TestNodeUtil::getDNHostAndPort)
-        .collect(Collectors.toList()), 0);
+        .collect(Collectors.toList()), 0, true);
 
     // Ensure all 3 DNs go to maintenance
     for (DatanodeDetails dn : forMaintenance) {
@@ -520,7 +520,7 @@ public class TestDecommissionAndMaintenance {
         .collect(Collectors.toList());
     scmClient.startMaintenanceNodes(ecMaintenance.stream()
         .map(TestNodeUtil::getDNHostAndPort)
-        .collect(Collectors.toList()), 0);
+        .collect(Collectors.toList()), 0, true);
     for (DatanodeDetails dn : ecMaintenance) {
       waitForDnToReachPersistedOpState(dn, IN_MAINTENANCE);
     }
@@ -554,7 +554,7 @@ public class TestDecommissionAndMaintenance {
 
     scmClient.startMaintenanceNodes(forMaintenance.stream()
         .map(TestNodeUtil::getDNHostAndPort)
-        .collect(Collectors.toList()), 0);
+        .collect(Collectors.toList()), 0, true);
 
     // Ensure all 3 DNs go to entering_maintenance
     for (DatanodeDetails dn : forMaintenance) {
@@ -592,7 +592,7 @@ public class TestDecommissionAndMaintenance {
     DatanodeDetails dn =
         getOneDNHostingReplica(getContainerReplicas(container));
 
-    scmClient.startMaintenanceNodes(Arrays.asList(getDNHostAndPort(dn)), 0);
+    scmClient.startMaintenanceNodes(Arrays.asList(getDNHostAndPort(dn)), 0, true);
     waitForDnToReachPersistedOpState(dn, IN_MAINTENANCE);
 
     long newEndTime = System.currentTimeMillis() / 1000 + 5;
@@ -605,7 +605,7 @@ public class TestDecommissionAndMaintenance {
 
     // Put the node back into maintenance and then stop it and wait for it to
     // go dead
-    scmClient.startMaintenanceNodes(Arrays.asList(getDNHostAndPort(dn)), 0);
+    scmClient.startMaintenanceNodes(Arrays.asList(getDNHostAndPort(dn)), 0, true);
     waitForDnToReachPersistedOpState(dn, IN_MAINTENANCE);
     cluster.shutdownHddsDatanode(dn);
     waitForDnToReachHealthState(nm, dn, DEAD);
@@ -634,7 +634,7 @@ public class TestDecommissionAndMaintenance {
     DatanodeDetails dn =
         getOneDNHostingReplica(getContainerReplicas(container));
 
-    scmClient.startMaintenanceNodes(Arrays.asList(getDNHostAndPort(dn)), 0);
+    scmClient.startMaintenanceNodes(Arrays.asList(getDNHostAndPort(dn)), 0, true);
     waitForDnToReachPersistedOpState(dn, IN_MAINTENANCE);
 
     cluster.restartStorageContainerManager(true);
