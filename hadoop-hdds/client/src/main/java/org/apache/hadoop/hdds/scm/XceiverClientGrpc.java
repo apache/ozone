@@ -608,14 +608,10 @@ public class XceiverClientGrpc extends XceiverClientSpi {
             });
     requestObserver.onNext(request);
     requestObserver.onCompleted();
-    try {
-      return new XceiverClientReply(future);
-    } finally {
-      metrics.decrPendingContainerOpsMetrics(cmdType);
-      metrics.addContainerOpsLatency(cmdType, System.currentTimeMillis() - requestTime);
-      semaphore.release();
-    }
-
+    metrics.decrPendingContainerOpsMetrics(cmdType);
+    metrics.addContainerOpsLatency(cmdType, System.currentTimeMillis() - requestTime);
+    semaphore.release();
+    return new XceiverClientReply(future);
   }
 
   private synchronized void checkOpen(DatanodeDetails dn)

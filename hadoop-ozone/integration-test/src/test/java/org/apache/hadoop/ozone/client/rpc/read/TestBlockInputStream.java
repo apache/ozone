@@ -20,8 +20,8 @@ package org.apache.hadoop.ozone.client.rpc.read;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 
-import org.apache.hadoop.hdds.scm.storage.BlockInputStream;
 import org.apache.hadoop.hdds.scm.storage.ChunkInputStream;
+import org.apache.hadoop.hdds.scm.storage.NewBlockInputStream;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.io.KeyInputStream;
@@ -36,7 +36,7 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 /**
  * Tests {@link ChunkInputStream}.
  */
-class TestChunkInputStream extends TestInputStreamBase {
+class TestBlockInputStream extends TestInputStreamBase {
 
   /**
    * Run the tests as a single test method to avoid needing a new mini-cluster
@@ -50,7 +50,7 @@ class TestChunkInputStream extends TestInputStreamBase {
       try (OzoneClient client = cluster.newClient()) {
         TestBucket bucket = TestBucket.newBuilder(client).build();
 
-        testChunkReadBuffers(bucket);
+        testBlockReadBuffers(bucket);
         testBufferRelease(bucket);
         testCloseReleasesBuffers(bucket);
       }
@@ -62,28 +62,25 @@ class TestChunkInputStream extends TestInputStreamBase {
    * Test to verify that data read from chunks is stored in a list of buffers
    * with max capacity equal to the bytes per checksum.
    */
-  private void testChunkReadBuffers(TestBucket bucket) throws Exception {
+  private void testBlockReadBuffers(TestBucket bucket) throws Exception {
     String keyName = getNewKeyName();
     int dataLength = (2 * BLOCK_SIZE) + (CHUNK_SIZE);
     byte[] inputData = bucket.writeRandomBytes(keyName, dataLength);
 
     try (KeyInputStream keyInputStream = bucket.getKeyInputStream(keyName)) {
 
-      BlockInputStream block0Stream =
-          (BlockInputStream)keyInputStream.getPartStreams().get(0);
-      block0Stream.initialize();
-
-      ChunkInputStream chunk0Stream = block0Stream.getChunkStreams().get(0);
+      NewBlockInputStream block0Stream =
+          (NewBlockInputStream)keyInputStream.getPartStreams().get(0);
 
       // To read 1 byte of chunk data, ChunkInputStream should get one full
       // checksum boundary worth of data from Container and store it in buffers.
-      chunk0Stream.read(new byte[1]);
-      checkBufferSizeAndCapacity(chunk0Stream.getCachedBuffers(), 1, 0,
+      block0Stream.read(new byte[1]);
+      checkBufferSizeAndCapacity(block0Stream.getCachedBuffers(), 1, 0,
           BYTES_PER_CHECKSUM);
 
       // Read > checksum boundary of data from chunk0
       int readDataLen = BYTES_PER_CHECKSUM + (BYTES_PER_CHECKSUM / 2);
-      byte[] readData = readDataFromChunk(chunk0Stream, 0, readDataLen);
+      byte[] readData = readDataFromChunk(block0Stream, 0, readDataLen);
       bucket.validateData(inputData, 0, readData);
 
       // The first checksum boundary size of data was already existing in the
@@ -91,7 +88,7 @@ class TestChunkInputStream extends TestInputStreamBase {
       // boundary size of data will be fetched again to read the remaining data.
       // Hence there should be 1 checksum boundary size of data stored in the
       // ChunkStreams buffers at the end of the read.
-      checkBufferSizeAndCapacity(chunk0Stream.getCachedBuffers(), 1, 0,
+      checkBufferSizeAndCapacity(block0Stream.getCachedBuffers(), 1, 0,
           BYTES_PER_CHECKSUM);
 
       // Seek to a position in the third checksum boundary (so that current
@@ -102,24 +99,24 @@ class TestChunkInputStream extends TestInputStreamBase {
       // and the second buffer should have BYTES_PER_CHECKSUM capacity.
       readDataLen = BYTES_PER_CHECKSUM + (BYTES_PER_CHECKSUM / 2);
       int offset = 2 * BYTES_PER_CHECKSUM + 1;
-      readData = readDataFromChunk(chunk0Stream, offset, readDataLen);
+      readData = readDataFromChunk(block0Stream, offset, readDataLen);
       bucket.validateData(inputData, offset, readData);
-      checkBufferSizeAndCapacity(chunk0Stream.getCachedBuffers(), 2, 1,
+      checkBufferSizeAndCapacity(block0Stream.getCachedBuffers(), 2, 1,
           BYTES_PER_CHECKSUM);
 
 
       // Read the full chunk data -1 and verify that all chunk data is read into
       // buffers. We read CHUNK_SIZE - 1 as otherwise all the buffers will be
       // released once all chunk data is read.
-      readData = readDataFromChunk(chunk0Stream, 0, CHUNK_SIZE - 1);
+      readData = readDataFromChunk(block0Stream, 0, CHUNK_SIZE - 1);
       bucket.validateData(inputData, 0, readData);
       int expectedNumBuffers = CHUNK_SIZE / BYTES_PER_CHECKSUM;
-      checkBufferSizeAndCapacity(chunk0Stream.getCachedBuffers(),
+      checkBufferSizeAndCapacity(block0Stream.getCachedBuffers(),
           expectedNumBuffers, expectedNumBuffers - 1, BYTES_PER_CHECKSUM);
 
       // Read the last byte of chunk and verify that the buffers are released.
-      chunk0Stream.read(new byte[1]);
-      assertNull(chunk0Stream.getCachedBuffers(),
+      block0Stream.read(new byte[1]);
+      assertNull(block0Stream.getCachedBuffers(),
           "ChunkInputStream did not release buffers after reaching EOF.");
     }
   }
@@ -129,17 +126,15 @@ class TestChunkInputStream extends TestInputStreamBase {
     bucket.writeRandomBytes(keyName, CHUNK_SIZE);
 
     try (KeyInputStream keyInputStream = bucket.getKeyInputStream(keyName)) {
-      BlockInputStream block0Stream =
-          (BlockInputStream) keyInputStream.getPartStreams().get(0);
-      block0Stream.initialize();
+      NewBlockInputStream block0Stream =
+          (NewBlockInputStream) keyInputStream.getPartStreams().get(0);
 
-      ChunkInputStream chunk0Stream = block0Stream.getChunkStreams().get(0);
-      readDataFromChunk(chunk0Stream, 0, 1);
-      assertNotNull(chunk0Stream.getCachedBuffers());
+      readDataFromChunk(block0Stream, 0, 1);
+      assertNotNull(block0Stream.getCachedBuffers());
 
-      chunk0Stream.close();
+      block0Stream.close();
 
-      assertNull(chunk0Stream.getCachedBuffers());
+      assertNull(block0Stream.getCachedBuffers());
     }
   }
 
@@ -153,70 +148,67 @@ class TestChunkInputStream extends TestInputStreamBase {
 
     try (KeyInputStream keyInputStream = bucket.getKeyInputStream(keyName)) {
 
-      BlockInputStream block0Stream =
-          (BlockInputStream)keyInputStream.getPartStreams().get(0);
-      block0Stream.initialize();
-
-      ChunkInputStream chunk0Stream = block0Stream.getChunkStreams().get(0);
+      NewBlockInputStream block0Stream =
+          (NewBlockInputStream)keyInputStream.getPartStreams().get(0);
 
       // Read checksum boundary - 1 bytes of data
       int readDataLen = BYTES_PER_CHECKSUM - 1;
-      byte[] readData = readDataFromChunk(chunk0Stream, 0, readDataLen);
+      byte[] readData = readDataFromChunk(block0Stream, 0, readDataLen);
       bucket.validateData(inputData, 0, readData);
 
       // There should be 1 byte of data remaining in the buffer which is not
       // yet read. Hence, the buffer should not be released.
-      checkBufferSizeAndCapacity(chunk0Stream.getCachedBuffers(),
+      checkBufferSizeAndCapacity(block0Stream.getCachedBuffers(),
           1, 0, BYTES_PER_CHECKSUM);
-      assertEquals(1, chunk0Stream.getCachedBuffers()[0].remaining());
+      assertEquals(1, block0Stream.getCachedBuffers()[0].remaining());
 
       // Reading the last byte in the buffer should result in all the buffers
       // being released.
-      readData = readDataFromChunk(chunk0Stream, 1);
+      readData = readDataFromChunk(block0Stream, 1);
       bucket.validateData(inputData, readDataLen, readData);
-      assertNull(chunk0Stream.getCachedBuffers(),
+      assertNull(block0Stream.getCachedBuffers(),
           "Chunk stream buffers not released after last byte is read");
 
       // Read more data to get the data till the next checksum boundary.
       readDataLen = BYTES_PER_CHECKSUM / 2;
-      readData = readDataFromChunk(chunk0Stream, readDataLen);
+      readData = readDataFromChunk(block0Stream, readDataLen);
       // There should be one buffer and the buffer should not be released as
       // there is data pending to be read from the buffer
-      checkBufferSizeAndCapacity(chunk0Stream.getCachedBuffers(), 1, 0,
+      checkBufferSizeAndCapacity(block0Stream.getCachedBuffers(), 1, 0,
           BYTES_PER_CHECKSUM);
-      ByteBuffer lastCachedBuffer = chunk0Stream.getCachedBuffers()[0];
+      ByteBuffer lastCachedBuffer = block0Stream.getCachedBuffers()[0];
       assertEquals(BYTES_PER_CHECKSUM - readDataLen,
           lastCachedBuffer.remaining());
 
       // Read more than the remaining data in buffer (but less than the next
       // checksum boundary).
-      int position = (int) chunk0Stream.getPos();
+      int position = (int) block0Stream.getPos();
       readDataLen = lastCachedBuffer.remaining() + BYTES_PER_CHECKSUM / 2;
-      readData = readDataFromChunk(chunk0Stream, readDataLen);
+      readData = readDataFromChunk(block0Stream, readDataLen);
       bucket.validateData(inputData, position, readData);
       // After reading the remaining data in the buffer, the buffer should be
       // released and next checksum size of data must be read into the buffers
-      checkBufferSizeAndCapacity(chunk0Stream.getCachedBuffers(), 1, 0,
+      checkBufferSizeAndCapacity(block0Stream.getCachedBuffers(), 1, 0,
           BYTES_PER_CHECKSUM);
       // Verify that the previously cached buffer is released by comparing it
       // with the current cached buffer
       assertNotEquals(lastCachedBuffer,
-          chunk0Stream.getCachedBuffers()[0]);
+          block0Stream.getCachedBuffers()[0]);
     }
   }
 
-  private byte[] readDataFromChunk(ChunkInputStream chunkInputStream,
+  private byte[] readDataFromChunk(NewBlockInputStream blockInputStream,
       int offset, int readDataLength) throws IOException {
     byte[] readData = new byte[readDataLength];
-    chunkInputStream.seek(offset);
-    chunkInputStream.read(readData, 0, readDataLength);
+    blockInputStream.seek(offset);
+    blockInputStream.read(readData, 0, readDataLength);
     return readData;
   }
 
-  private byte[] readDataFromChunk(ChunkInputStream chunkInputStream,
+  private byte[] readDataFromChunk(NewBlockInputStream blockInputStream,
       int readDataLength) throws IOException {
     byte[] readData = new byte[readDataLength];
-    chunkInputStream.read(readData, 0, readDataLength);
+    blockInputStream.read(readData, 0, readDataLength);
     return readData;
   }
 
@@ -232,18 +224,13 @@ class TestChunkInputStream extends TestInputStreamBase {
   private void checkBufferSizeAndCapacity(ByteBuffer[] buffers,
       int expectedNumBuffers, int numReleasedBuffers,
       long expectedBufferCapacity) {
-    assertEquals(expectedNumBuffers, buffers.length,
-        "ChunkInputStream does not have expected number of " +
+    assertEquals(expectedNumBuffers - numReleasedBuffers, buffers.length,
+        "BlockInputStream does not have expected number of " +
         "ByteBuffers");
     for (int i = 0; i < buffers.length; i++) {
-      if (i <= numReleasedBuffers - 1) {
-        // This buffer should have been released and hence null
-        assertNull(buffers[i],
-            "ChunkInputStream Buffer not released after being read");
-      } else {
-        assertEquals(expectedBufferCapacity, buffers[i].capacity(),
-            "ChunkInputStream ByteBuffer capacity is wrong");
-      }
+      assertEquals(expectedBufferCapacity, buffers[i].capacity(),
+          "BlockInputStream ByteBuffer capacity is wrong");
+
     }
   }
 }

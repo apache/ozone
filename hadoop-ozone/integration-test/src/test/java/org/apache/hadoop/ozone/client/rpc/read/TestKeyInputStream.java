@@ -29,11 +29,12 @@ import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Type;
 import org.apache.hadoop.hdds.scm.XceiverClientManager;
 import org.apache.hadoop.hdds.scm.XceiverClientMetrics;
 import org.apache.hadoop.hdds.scm.storage.BlockExtendedInputStream;
-import org.apache.hadoop.hdds.scm.storage.BlockInputStream;
 import org.apache.hadoop.hdds.scm.storage.ChunkInputStream;
+import org.apache.hadoop.hdds.scm.storage.NewBlockInputStream;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.io.KeyInputStream;
@@ -156,26 +157,10 @@ class TestKeyInputStream extends TestInputStreamBase {
 
     int readBlockLength = 0;
     for (BlockExtendedInputStream stream : blockStreams) {
-      BlockInputStream blockStream = (BlockInputStream) stream;
+      NewBlockInputStream blockStream = (NewBlockInputStream) stream;
       int blockStreamLength = Math.min(BLOCK_SIZE,
           dataLength - readBlockLength);
       assertEquals(blockStreamLength, blockStream.getLength());
-
-      int expectedNumChunkStreams =
-          BufferUtils.getNumberOfBins(blockStreamLength, CHUNK_SIZE);
-      blockStream.initialize();
-      List<ChunkInputStream> chunkStreams = blockStream.getChunkStreams();
-      assertEquals(expectedNumChunkStreams, chunkStreams.size());
-
-      int readChunkLength = 0;
-      for (ChunkInputStream chunkStream : chunkStreams) {
-        int chunkStreamLength = Math.min(CHUNK_SIZE,
-            blockStreamLength - readChunkLength);
-        assertEquals(chunkStreamLength, chunkStream.getRemaining());
-
-        readChunkLength += chunkStreamLength;
-      }
-
       readBlockLength += blockStreamLength;
     }
   }
@@ -248,7 +233,7 @@ class TestKeyInputStream extends TestInputStreamBase {
     long writeChunkCount = metrics.getContainerOpCountMetrics(
         ContainerProtos.Type.WriteChunk);
     long readChunkCount = metrics.getContainerOpCountMetrics(
-        ContainerProtos.Type.ReadChunk);
+        Type.ReadBlock);
 
     String keyName = getNewKeyName();
     // write data spanning 3 chunks
@@ -267,15 +252,15 @@ class TestKeyInputStream extends TestInputStreamBase {
 
     // Seek operation should not result in any readChunk operation.
     assertEquals(readChunkCount, metrics
-        .getContainerOpCountMetrics(ContainerProtos.Type.ReadChunk));
+        .getContainerOpCountMetrics(Type.ReadBlock));
 
     byte[] readData = new byte[CHUNK_SIZE];
     keyInputStream.read(readData, 0, CHUNK_SIZE);
 
     // Since we read data from index 150 to 250 and the chunk boundary is
     // 100 bytes, we need to read 2 chunks.
-    assertEquals(readChunkCount + 2,
-        metrics.getContainerOpCountMetrics(ContainerProtos.Type.ReadChunk));
+    assertEquals(readChunkCount + 1,
+        metrics.getContainerOpCountMetrics(Type.ReadBlock));
 
     keyInputStream.close();
 
@@ -360,15 +345,15 @@ class TestKeyInputStream extends TestInputStreamBase {
 
     // Skip operation should not result in any readChunk operation.
     assertEquals(readChunkCount, metrics
-        .getContainerOpCountMetrics(ContainerProtos.Type.ReadChunk));
+        .getContainerOpCountMetrics(Type.ReadBlock));
 
     byte[] readData = new byte[CHUNK_SIZE];
     keyInputStream.read(readData, 0, CHUNK_SIZE);
 
     // Since we reading data from index 150 to 250 and the chunk boundary is
     // 100 bytes, we need to read 2 chunks.
-    assertEquals(readChunkCount + 2,
-        metrics.getContainerOpCountMetrics(ContainerProtos.Type.ReadChunk));
+    assertEquals(readChunkCount + 1,
+        metrics.getContainerOpCountMetrics(Type.ReadBlock));
 
     keyInputStream.close();
 

@@ -46,7 +46,6 @@ import org.apache.hadoop.ozone.common.OzoneChecksumException;
 import org.apache.hadoop.ozone.common.utils.BufferUtils;
 import org.apache.hadoop.security.token.Token;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
-import org.apache.ratis.thirdparty.io.grpc.Status;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -439,7 +438,7 @@ public class NewBlockInputStream extends BlockExtendedInputStream
       bufferIndex = Collections.binarySearch(
           bufferoffsets.subList(0, bufferIndex), bufferPosition);
     } else if (bufferPosition >= bufferoffsets.get(bufferIndex) +
-        buffers.get(bufferIndex).limit()) {
+        buffers.get(bufferIndex).capacity()) {
       bufferIndex = Collections.binarySearch(bufferoffsets.subList(
           bufferIndex + 1, buffers.size()), bufferPosition);
     }
@@ -494,6 +493,7 @@ public class NewBlockInputStream extends BlockExtendedInputStream
     blockPosition = getPos();
     bufferOffsetWrtBlockDataData = readData(startByteIndex, len);
     long tempOffset = 0L;
+    buffersSize = 0L;
     bufferoffsets = new ArrayList<>(buffers.size());
     for (ByteBuffer buffer : buffers) {
       bufferoffsets.add(tempOffset);
@@ -728,11 +728,9 @@ public class NewBlockInputStream extends BlockExtendedInputStream
     }
   }
 
-  /**
-   * Check if this exception is because datanodes are not reachable.
-   */
-  private boolean isConnectivityIssue(IOException ex) {
-    return Status.fromThrowable(ex).getCode() == Status.UNAVAILABLE.getCode();
+  @VisibleForTesting
+  public ByteBuffer[] getCachedBuffers() {
+    return buffers == null ? null :
+        BufferUtils.getReadOnlyByteBuffers(buffers.toArray(new ByteBuffer[0]));
   }
-
 }
