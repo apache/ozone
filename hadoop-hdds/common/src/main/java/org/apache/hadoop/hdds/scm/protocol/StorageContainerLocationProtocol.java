@@ -145,7 +145,8 @@ public interface StorageContainerLocationProtocol extends Closeable {
    *              Usually the count will be replace with a very big
    *              value instead of being unlimited in case the db is very big)
    *
-   * @return a list of container.
+   * @return a list of containers capped by max count allowed
+   * in "hdds.container.list.max.count" and total number of containers.
    * @throws IOException
    */
   Pair<List<ContainerInfo>, Long> listContainer(long startContainerID,
@@ -164,7 +165,8 @@ public interface StorageContainerLocationProtocol extends Closeable {
    *              value instead of being unlimited in case the db is very big)
    * @param state Container with this state will be returned.
    *
-   * @return a list of container.
+   * @return a list of containers capped by max count allowed
+   * in "hdds.container.list.max.count" and total number of containers.
    * @throws IOException
    */
   Pair<List<ContainerInfo>, Long> listContainer(long startContainerID,
@@ -183,7 +185,8 @@ public interface StorageContainerLocationProtocol extends Closeable {
    *              value instead of being unlimited in case the db is very big)
    * @param state Container with this state will be returned.
    * @param factor Container factor
-   * @return a list of container.
+   * @return a list of containers capped by max count allowed
+   * in "hdds.container.list.max.count" and total number of containers.
    * @throws IOException
    */
   Pair<List<ContainerInfo>, Long> listContainer(long startContainerID,
@@ -204,7 +207,8 @@ public interface StorageContainerLocationProtocol extends Closeable {
    *              value instead of being unlimited in case the db is very big)
    * @param state Container with this state will be returned.
    * @param replicationConfig Replication config for the containers
-   * @return a list of container.
+   * @return a list of containers capped by max count allowed
+   * in "hdds.container.list.max.count" and total number of containers.
    * @throws IOException
    */
   Pair<List<ContainerInfo>, Long> listContainer(long startContainerID,

@@ -142,7 +142,7 @@ public class TestSCMClientProtocolServer {
 
   private StorageContainerManager mockStorageContainerManager() {
     List<ContainerInfo> infos = new ArrayList<>();
-    for (int i = 0; i < 20; i++) {
+    for (int i = 0; i < 10; i++) {
       infos.add(newContainerInfoForTest());
     }
     ContainerManagerImpl containerManager = mock(ContainerManagerImpl.class);

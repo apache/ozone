@@ -360,7 +360,7 @@ public class ContainerOperationClient implements ScmClient {
       HddsProtos.ReplicationType repType,
       ReplicationConfig replicationConfig) throws IOException {
     if (count > maxCountOfContainerList) {
-      LOG.error("Attempting to list {} containers. However, this exceeds" +
+      LOG.warn("Attempting to list {} containers. However, this exceeds" +
           " the cluster's current limit of {}. The results will be capped at the" +
           " maximum allowed count.", count, maxCountOfContainerList);
       count = maxCountOfContainerList;

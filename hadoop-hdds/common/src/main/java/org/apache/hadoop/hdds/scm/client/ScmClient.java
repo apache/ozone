@@ -121,7 +121,8 @@ public interface ScmClient extends Closeable {
    * @param startContainerID start containerID.
    * @param count count must be {@literal >} 0.
    *
-   * @return a list of pipeline.
+   * @return a list of containers capped by max count allowed
+   * in "hdds.container.list.max.count" and total number of containers.
    * @throws IOException
    */
   Pair<List<ContainerInfo>, Long> listContainer(long startContainerID,
@@ -134,7 +135,8 @@ public interface ScmClient extends Closeable {
    * @param count count must be {@literal >} 0.
    * @param state Container of this state will be returned.
    * @param replicationConfig container replication Config.
-   * @return a list of pipeline.
+   * @return a list of containers capped by max count allowed
+   * in "hdds.container.list.max.count" and total number of containers.
    * @throws IOException
    */
   Pair<List<ContainerInfo>, Long> listContainer(long startContainerID, int count,
