@@ -56,16 +56,19 @@ import java.io.IOException;
 import java.time.Clock;
 import java.time.ZoneId;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.TimeoutException;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import static org.apache.hadoop.hdds.protocol.MockDatanodeDetails.randomDatanodeDetails;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 import static org.mockito.Mockito.doAnswer;
@@ -979,6 +982,137 @@ public class TestContainerReportHandler {
         containerOne.containerID()).size());
   }
 
+  @Test
+  public void testContainerDataChecksumUpdated() throws Exception {
+    final ContainerReportHandler reportHandler = new ContainerReportHandler(nodeManager, containerManager);
+
+    // Create 3 datanodes for testing.
+    final Iterator<DatanodeDetails> nodeIterator = nodeManager.getNodes(
+        NodeStatus.inServiceHealthy()).iterator();
+    final DatanodeDetails datanodeOne = nodeIterator.next();
+    final DatanodeDetails datanodeTwo = nodeIterator.next();
+    final DatanodeDetails datanodeThree = nodeIterator.next();
+
+    // Create two containers, and put one replica of each container on each datanode.
+    final ContainerInfo containerOne = getContainer(LifeCycleState.CLOSED);
+    final ContainerInfo containerTwo = getContainer(LifeCycleState.CLOSED);
+    final Set<ContainerID> containerIDSet = Stream.of(
+            containerOne.containerID(), containerTwo.containerID())
+        .collect(Collectors.toSet());
+
+    nodeManager.setContainers(datanodeOne, containerIDSet);
+    nodeManager.setContainers(datanodeTwo, containerIDSet);
+    nodeManager.setContainers(datanodeThree, containerIDSet);
+
+    containerStateManager.addContainer(containerOne.getProtobuf());
+    containerStateManager.addContainer(containerTwo.getProtobuf());
+
+    getReplicas(containerOne.containerID(),
+        ContainerReplicaProto.State.CLOSED,
+        datanodeOne, datanodeTwo, datanodeThree)
+        .forEach(r -> containerStateManager.updateContainerReplica(
+            containerOne.containerID(), r));
+
+    getReplicas(containerTwo.containerID(),
+        ContainerReplicaProto.State.CLOSED,
+        datanodeOne, datanodeTwo, datanodeThree)
+        .forEach(r -> containerStateManager.updateContainerReplica(
+            containerTwo.containerID(), r));
+
+    // Container manager should now be aware of 3 replicas of each container.
+    assertEquals(3, containerManager.getContainerReplicas(
+        containerOne.containerID()).size());
+    assertEquals(3, containerManager.getContainerReplicas(
+        containerTwo.containerID()).size());
+
+    // Create a report from datanode one with a replica of container one and two.
+    final ContainerReportsProto dn1ReportProto = getContainerReportsProto(
+        containerOne.containerID(), ContainerReplicaProto.State.CLOSED,
+        datanodeOne.getUuidString()).toBuilder()
+        .addReports(getReplica(containerTwo)).build();
+    final ContainerReportFromDatanode dn1Report =
+        new ContainerReportFromDatanode(datanodeOne, dn1ReportProto);
+    // Create a report from datanode two with a replica of container one and two.
+    final ContainerReportsProto dn2ReportProto = getContainerReportsProto(
+        containerOne.containerID(), ContainerReplicaProto.State.CLOSED,
+        datanodeOne.getUuidString()).toBuilder()
+        .addReports(getReplica(containerTwo)).build();
+    final ContainerReportFromDatanode dn2Report =
+        new ContainerReportFromDatanode(datanodeOne, dn1ReportProto);
+
+    reportHandler.onMessage(dn1Report, publisher);
+    reportHandler.onMessage(dn2Report, publisher);
+
+    // A container hash has not been added to the replicas yet.
+    boolean contOneDataChecksumsEmpty = containerManager.getContainerReplicas(containerOne.containerID()).stream()
+        .allMatch(r -> r.getDataChecksum().isEmpty());
+    assertTrue(contOneDataChecksumsEmpty, "Replicas of container one should not yet have any data checksums.");
+    boolean contTwoDataChecksumsEmpty = containerManager.getContainerReplicas(containerTwo.containerID()).stream()
+        .allMatch(r -> r.getDataChecksum().isEmpty());
+    assertTrue(contTwoDataChecksumsEmpty, "Replicas of container two should not yet have any data checksums.");
+
+    // TODO Add a container data checksum to the reports to simulate the datanodes' container scanner filling in this
+    //  value.
+    final ContainerReportsProto dnOneReport = getContainerReportsProto(
+        containerTwo.containerID(), ContainerReplicaProto.State.CLOSED,
+        datanodeOne.getUuidString());
+    final ContainerReportFromDatanode containerReportFromDatanode =
+        new ContainerReportFromDatanode(datanodeOne, dnOneReport);
+    reportHandler.onMessage(containerReportFromDatanode, publisher);
+
+    // Check that all reports contain the expected data checksums, and that the values are unique across replicas
+    // since that is how they were initialized.
+    int numReportsChecked = 0;
+    for (ContainerID contID: containerIDSet) {
+      for (ContainerReplica replica : containerManager.getContainerReplicas(contID)) {
+        String expectedHash = createDifferentDataChecksumsForReplicas(contID,
+            replica.getDatanodeDetails().getUuidString());
+        assertEquals(expectedHash, replica.getDataChecksum(), "Incorrect replica data hash in container report.");
+        numReportsChecked++;
+      }
+    }
+    // Should have checked reports from 3 datanodes with 2 replicas each.
+    assertEquals(6, numReportsChecked);
+
+    // One the next round of container reports, datanodes will report that all hashes match. This simulates
+    // reconciliation running and finishing.
+    // TODO Add a container data checksum to the reports to simulate the datanodes' container scanner filling in this
+    //  value.
+    final ContainerReportsProto dnOneReport = getContainerReportsProto(
+        containerTwo.containerID(), ContainerReplicaProto.State.CLOSED,
+        datanodeOne.getUuidString());
+    final ContainerReportFromDatanode containerReportFromDatanode =
+        new ContainerReportFromDatanode(datanodeOne, dnOneReport);
+    reportHandler.onMessage(containerReportFromDatanode, publisher);
+
+    // Check that all reports contain the expected data checksums, and that the values are unique across replicas
+    // since that is how they were initialized.
+    numReportsChecked = 0;
+    for (ContainerID contID: containerIDSet) {
+      for (ContainerReplica replica : containerManager.getContainerReplicas(contID)) {
+        String expectedHash = createMatchingDataChecksumsForReplicas(contID);
+        assertEquals(expectedHash, replica.getDataChecksum(), "Incorrect replica data hash in container report.");
+        numReportsChecked++;
+      }
+    }
+    // Should have checked reports from 3 datanodes with 2 replicas each.
+    assertEquals(6, numReportsChecked);
+  }
+
+  /**
+   * Generates a placeholder data checksum for testing that is specific to a container replica.
+   */
+  private static String createDifferentDataChecksumsForReplicas(ContainerID containerID, String datanodeID) {
+    return Integer.toString((datanodeID + containerID).hashCode());
+  }
+
+  /**
+   * Generates a placeholder data checksum for testing that is specific to a container replica.
+   */
+  private static String createMatchingDataChecksumsForReplicas(ContainerID containerID) {
+    return Integer.toString(Objects.hashCode(containerID));
+  }
+
   private ContainerReportFromDatanode getContainerReportFromDatanode(
       ContainerID containerId, ContainerReplicaProto.State state,
       DatanodeDetails dn, long bytesUsed, long keyCount) {
@@ -1021,7 +1155,6 @@ public class TestContainerReportHandler {
             .setContainerID(containerId.getId())
             .setState(state)
             .setOriginNodeId(originNodeId)
-            .setFinalhash("e16cc9d6024365750ed8dbd194ea46d2")
             .setSize(5368709120L)
             .setUsed(usedBytes)
             .setKeyCount(keyCount)
@@ -1034,6 +1167,13 @@ public class TestContainerReportHandler {
             .setReplicaIndex(replicaIndex)
             .build();
     return crBuilder.addReports(replicaProto).build();
+  }
+
+  private ContainerReplicaProto getReplica(ContainerInfo cont) {
+    return ContainerReplicaProto.newBuilder()
+        .setContainerID(cont.containerID().getId())
+        .setState(ContainerReplicaProto.State.CLOSED)
+        .build();
   }
 
 }
