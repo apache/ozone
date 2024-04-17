@@ -34,6 +34,7 @@ import org.apache.hadoop.hdds.scm.XceiverClientFactory;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.storage.BlockOutputStream;
 import org.apache.hadoop.hdds.scm.storage.BufferPool;
+import org.apache.hadoop.hdds.scm.storage.DirectBufferPool;
 import org.apache.hadoop.hdds.scm.storage.RatisBlockOutputStream;
 import org.apache.hadoop.hdds.security.token.OzoneBlockTokenIdentifier;
 import org.apache.hadoop.security.token.Token;
@@ -64,6 +65,7 @@ public class BlockOutputStreamEntry extends OutputStream {
   private final Token<OzoneBlockTokenIdentifier> token;
 
   private final BufferPool bufferPool;
+  private final DirectBufferPool directBufferPool;
   private final ContainerClientMetrics clientMetrics;
   private final StreamBufferArgs streamBufferArgs;
   private final Supplier<ExecutorService> executorServiceSupplier;
@@ -79,6 +81,7 @@ public class BlockOutputStreamEntry extends OutputStream {
     this.length = b.length;
     this.currentPosition = 0;
     this.bufferPool = b.bufferPool;
+    this.directBufferPool = b.directBufferPool;
     this.clientMetrics = b.clientMetrics;
     this.streamBufferArgs = b.streamBufferArgs;
     this.executorServiceSupplier = b.executorServiceSupplier;
@@ -108,7 +111,7 @@ public class BlockOutputStreamEntry extends OutputStream {
    */
   void createOutputStream() throws IOException {
     outputStream = new RatisBlockOutputStream(blockID, xceiverClientManager,
-        pipeline, bufferPool, config, token, clientMetrics, streamBufferArgs,
+        pipeline, bufferPool, directBufferPool, config, token, clientMetrics, streamBufferArgs,
         executorServiceSupplier);
   }
 
@@ -351,6 +354,10 @@ public class BlockOutputStreamEntry extends OutputStream {
     return this.bufferPool;
   }
 
+  DirectBufferPool getDirectBufferPool() {
+    return this.directBufferPool;
+  }
+
   /**
    * Builder class for ChunkGroupOutputStreamEntry.
    * */
@@ -362,6 +369,7 @@ public class BlockOutputStreamEntry extends OutputStream {
     private Pipeline pipeline;
     private long length;
     private BufferPool bufferPool;
+    private DirectBufferPool directBufferPool;
     private Token<OzoneBlockTokenIdentifier> token;
     private OzoneClientConfig config;
     private ContainerClientMetrics clientMetrics;
@@ -404,6 +412,11 @@ public class BlockOutputStreamEntry extends OutputStream {
 
     public Builder setBufferPool(BufferPool pool) {
       this.bufferPool = pool;
+      return this;
+    }
+
+    public Builder setDirectBufferPool(DirectBufferPool pool) {
+      this.directBufferPool = pool;
       return this;
     }
 

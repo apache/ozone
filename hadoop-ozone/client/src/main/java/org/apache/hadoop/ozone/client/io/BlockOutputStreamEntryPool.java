@@ -37,6 +37,7 @@ import org.apache.hadoop.hdds.scm.XceiverClientFactory;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.scm.storage.BufferPool;
+import org.apache.hadoop.hdds.scm.storage.DirectBufferPool;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
@@ -81,6 +82,7 @@ public class BlockOutputStreamEntryPool implements KeyMetadataAware {
    * the entries in the pool.
    */
   private final BufferPool bufferPool;
+  private final DirectBufferPool directBufferPool;
   private OmMultipartCommitUploadPartInfo commitUploadPartInfo;
   private final long openID;
   private final ExcludeList excludeList;
@@ -114,6 +116,7 @@ public class BlockOutputStreamEntryPool implements KeyMetadataAware {
                 .getStreamBufferSize()),
             ByteStringConversion
                 .createByteBufferConversion(b.isUnsafeByteBufferConversionEnabled()));
+    this.directBufferPool = new DirectBufferPool();
     this.clientMetrics = b.getClientMetrics();
     this.executorServiceSupplier = b.getExecutorServiceSupplier();
   }
@@ -163,6 +166,7 @@ public class BlockOutputStreamEntryPool implements KeyMetadataAware {
             .setConfig(config)
             .setLength(subKeyInfo.getLength())
             .setBufferPool(bufferPool)
+            .setDirectBufferPool(directBufferPool)
             .setToken(subKeyInfo.getToken())
             .setClientMetrics(clientMetrics)
             .setStreamBufferArgs(streamBufferArgs)
@@ -223,6 +227,10 @@ public class BlockOutputStreamEntryPool implements KeyMetadataAware {
    */
   public BufferPool getBufferPool() {
     return this.bufferPool;
+  }
+
+  public DirectBufferPool getDirectBufferPool() {
+    return this.directBufferPool;
   }
 
   OzoneClientConfig getConfig() {

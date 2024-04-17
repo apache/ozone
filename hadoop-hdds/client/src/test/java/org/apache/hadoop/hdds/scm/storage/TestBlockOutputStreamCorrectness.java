@@ -107,6 +107,7 @@ class TestBlockOutputStreamCorrectness {
         xcm,
         pipeline,
         bufferPool,
+        null,
         config,
         null,
         ContainerClientMetrics.acquire(),

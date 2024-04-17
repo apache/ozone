@@ -76,13 +76,15 @@ public class RatisBlockOutputStream extends BlockOutputStream
       XceiverClientFactory xceiverClientManager,
       Pipeline pipeline,
       BufferPool bufferPool,
+      DirectBufferPool directBufferPool,
       OzoneClientConfig config,
       Token<? extends TokenIdentifier> token,
       ContainerClientMetrics clientMetrics, StreamBufferArgs streamBufferArgs,
       Supplier<ExecutorService> blockOutputStreamResourceProvider
   ) throws IOException {
     super(blockID, xceiverClientManager, pipeline,
-        bufferPool, config, token, clientMetrics, streamBufferArgs, blockOutputStreamResourceProvider);
+        bufferPool, directBufferPool, config, token, clientMetrics,
+        streamBufferArgs, blockOutputStreamResourceProvider);
     this.commitWatcher = new CommitWatcher(bufferPool, getXceiverClient());
   }
 
