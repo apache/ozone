@@ -48,17 +48,14 @@ public class PemFileBasedKeyStoresFactory implements KeyStoresFactory,
   private static final Logger LOG =
       LoggerFactory.getLogger(PemFileBasedKeyStoresFactory.class);
 
-  /**
-   * Default format of the keystore files.
-   */
-  public static final String DEFAULT_KEYSTORE_TYPE = "jks";
-
   private KeyManager[] keyManagers;
   private TrustManager[] trustManagers;
   private final CertificateClient caClient;
+  private final String keyStoreType;
 
-  public PemFileBasedKeyStoresFactory(CertificateClient client) {
+  public PemFileBasedKeyStoresFactory(CertificateClient client, String keyStoreTypeString) {
     this.caClient = client;
+    this.keyStoreType = keyStoreTypeString;
   }
 
   /**
@@ -68,7 +65,7 @@ public class PemFileBasedKeyStoresFactory implements KeyStoresFactory,
   private void createTrustManagers() throws
       GeneralSecurityException, IOException {
     ReloadingX509TrustManager trustManager = new ReloadingX509TrustManager(
-        DEFAULT_KEYSTORE_TYPE, caClient);
+        keyStoreType, caClient);
     trustManagers = new TrustManager[] {trustManager};
   }
 
@@ -79,7 +76,7 @@ public class PemFileBasedKeyStoresFactory implements KeyStoresFactory,
   private void createKeyManagers() throws
       GeneralSecurityException, IOException {
     ReloadingX509KeyManager keystoreManager =
-        new ReloadingX509KeyManager(DEFAULT_KEYSTORE_TYPE, caClient);
+        new ReloadingX509KeyManager(keyStoreType, caClient);
     keyManagers = new KeyManager[] {keystoreManager};
   }
 
@@ -101,7 +98,7 @@ public class PemFileBasedKeyStoresFactory implements KeyStoresFactory,
     if (requireClientAuth || mode == Mode.SERVER) {
       createKeyManagers();
     } else {
-      KeyStore keystore = KeyStore.getInstance(DEFAULT_KEYSTORE_TYPE);
+      KeyStore keystore = KeyStore.getInstance(keyStoreType);
       keystore.load(null, null);
       KeyManagerFactory keyMgrFactory = KeyManagerFactory
           .getInstance(KeyManagerFactory.getDefaultAlgorithm());

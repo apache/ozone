@@ -44,6 +44,8 @@ import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_CONTAINER_TOKEN_ENABLED
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DEFAULT_KEY_ALGORITHM;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DEFAULT_KEY_LEN;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DEFAULT_SECURITY_PROVIDER;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_KEYSTORE_TYPE;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_KEYSTORE_TYPE_DEFAULT;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_X509_CA_ROTATION_ACK_TIMEOUT;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_X509_CA_ROTATION_ACK_TIMEOUT_DEFAULT;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_X509_CA_ROTATION_CHECK_INTERNAL;
@@ -112,6 +114,7 @@ public class SecurityConfig {
   private final String providerString;
   private final String metadataDir;
   private final String keyDir;
+  private final String keyStoreType;
   private final String privateKeyFileName;
   private final String publicKeyFileName;
   private final Duration maxCertDuration;
@@ -153,6 +156,7 @@ public class SecurityConfig {
         HDDS_DEFAULT_KEY_ALGORITHM);
     this.providerString = configuration.get(HDDS_SECURITY_PROVIDER,
         HDDS_DEFAULT_SECURITY_PROVIDER);
+    this.keyStoreType = configuration.get(HDDS_KEYSTORE_TYPE, HDDS_KEYSTORE_TYPE_DEFAULT);
 
     // Please Note: To make it easy for our customers we will attempt to read
     // HDDS metadata dir and if that is not set, we will use Ozone directory.
@@ -394,6 +398,10 @@ public class SecurityConfig {
    */
   public Duration getRenewalGracePeriod() {
     return renewalGracePeriod;
+  }
+
+  public String getKeyStoreType() {
+    return keyStoreType;
   }
 
   /**
