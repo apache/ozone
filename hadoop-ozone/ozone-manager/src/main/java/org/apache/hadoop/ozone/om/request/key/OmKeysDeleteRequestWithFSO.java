@@ -116,6 +116,7 @@ public class OmKeysDeleteRequestWithFSO extends OMKeysDeleteRequest {
         OmKeyInfo openKeyInfo = openKeyTable.get(dbOpenKey);
         if (openKeyInfo != null) {
           openKeyInfo.getMetadata().put(DELETED_HSYNC_KEY, "true");
+          openKeyTable.addCacheEntry(dbOpenKey, openKeyInfo, trxnLogIndex);
           // Add to the map of open keys to be deleted.
           openKeyInfoMap.put(dbOpenKey, openKeyInfo);
         } else {
