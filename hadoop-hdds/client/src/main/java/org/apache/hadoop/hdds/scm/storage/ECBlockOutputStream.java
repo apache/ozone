@@ -133,7 +133,7 @@ public class ECBlockOutputStream extends BlockOutputStream {
           break;
         } else {
           ChunkInfo chunk = chunks.get(0);
-          LOG.debug("The first chunk in block with index {} does not have stripeChecksum. BlockID: {}, Block " +
+          LOG.info("The first chunk in block with index {} does not have stripeChecksum. BlockID: {}, Block " +
                   "size: {}. Chunk length: {}, Chunk offset: {}, hasChecksumData: {}, chunks size: {}.", i,
               bd.getBlockID(), bd.getSize(), chunk.getLen(), chunk.getOffset(), chunk.hasChecksumData(), chunks.size());
         }
