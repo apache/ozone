@@ -4205,7 +4205,7 @@
   </property>
 
   <property>
-    <name>ozone.om.snapshot.diff.cleanup.service.run.internal</name>
+    <name>ozone.om.snapshot.diff.cleanup.service.run.interval</name>
     <value>1m</value>
     <tag>OZONE, OM</tag>
     <description>
@@ -4220,6 +4220,16 @@
     <tag>OZONE, OM</tag>
     <description>
       Timeout for snapshot diff clean up service.
+      Uses millisecond by default when no time unit is specified.
+    </description>
+  </property>
+
+  <property>
+    <name>ozone.om.snapshot.cache.cleanup.service.run.interval</name>
+    <value>1m</value>
+    <tag>OZONE, OM</tag>
+    <description>
+      Interval at which snapshot cache clean up will run.
       Uses millisecond by default when no time unit is specified.
     </description>
   </property>
