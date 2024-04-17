@@ -852,7 +852,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
           pipelineManager, eventQueue, serviceManager, scmContext);
     }
 
-    scmDecommissionManager = new NodeDecommissionManager(conf, scmNodeManager,
+    scmDecommissionManager = new NodeDecommissionManager(conf, scmNodeManager, containerManager,
         scmContext, eventQueue, replicationManager);
 
     statefulServiceStateManager = StatefulServiceStateManagerImpl.newBuilder()
@@ -1803,6 +1803,10 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
   public void shutDown(String message) {
     stop();
     ExitUtils.terminate(0, message, LOG);
+  }
+
+  public boolean isStopped() {
+    return isStopped.get();
   }
 
   /**

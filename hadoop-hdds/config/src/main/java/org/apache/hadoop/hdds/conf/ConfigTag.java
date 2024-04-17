@@ -53,5 +53,6 @@ public enum ConfigTag {
   TOKEN,
   UPGRADE,
   X509,
-  DISKBALANCER
+  DISKBALANCER,
+  CRYPTO_COMPLIANCE
 }
