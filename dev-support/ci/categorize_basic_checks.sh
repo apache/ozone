@@ -26,38 +26,27 @@ ALL_BASIC_CHECKS="${ALL_BASIC_CHECKS[@]%\]}"
 # Replace commas with spaces to form a space-delimited list
 SPACE_DELIMITED_ALL_CHECKS=$(echo "$ALL_BASIC_CHECKS" | tr -d '"' | tr ',' ' ')
 
-BASIC_CHECKS=$(grep -lr '^#checks:basic' hadoop-ozone/dev-support/checks \
-                       | sort -u | xargs -n1 basename \
-                       | cut -f1 -d'.')
-
-UNIT_CHECKS=$(grep -lr '^#checks:unit' hadoop-ozone/dev-support/checks \
-                       | sort -u | xargs -n1 basename \
-                       | cut -f1 -d'.')
-
 if [[ -n "${SPACE_DELIMITED_ALL_CHECKS}" ]]; then
-    SPACE_DELIMITED_ALL_CHECKS=" ${SPACE_DELIMITED_ALL_CHECKS[*]} "     # add framing blanks
-    basic=()
-    for item in ${BASIC_CHECKS[@]}; do
-      if [[ $SPACE_DELIMITED_ALL_CHECKS =~ " $item " ]] ; then          # use $item as regexp
-        basic+=($item)
-      fi
-    done
-    if [[ -n "${basic[@]}" ]]; then
-        initialization::ga_output needs-basic-check "true"
-    fi
-    initialization::ga_output basic-checks \
-        "$(initialization::parameters_to_json ${basic[@]})"
+  # add framing blanks
+  SPACE_DELIMITED_ALL_CHECKS=" ${SPACE_DELIMITED_ALL_CHECKS[*]} "
 
-    unit=()
-    for item in ${UNIT_CHECKS[@]}; do
-      if [[ $SPACE_DELIMITED_ALL_CHECKS =~ " $item " ]] ; then    # use $item as regexp
-        unit+=($item)
+  for check in basic native; do
+    CHECKS=$(grep -lr "^#checks:${check}$" hadoop-ozone/dev-support/checks \
+      | sort -u \
+      | xargs -n1 basename \
+      | cut -f1 -d'.')
+
+    check_list=()
+    for item in ${CHECKS[@]}; do
+      # use $item as regex
+      if [[ $SPACE_DELIMITED_ALL_CHECKS =~ " $item " ]] ; then
+        check_list+=($item)
       fi
     done
-    if [[ -n "${unit[@]}" ]]; then
-        initialization::ga_output needs-unit-check "true"
+    if [[ -n "${check_list[@]}" ]]; then
+      initialization::ga_output "needs-${check}-check" "true"
     fi
-    initialization::ga_output unit-checks \
-        "$(initialization::parameters_to_json ${unit[@]})"
+    initialization::ga_output "${check}-checks" \
+      "$(initialization::parameters_to_json ${check_list[@]})"
+  done
 fi
-

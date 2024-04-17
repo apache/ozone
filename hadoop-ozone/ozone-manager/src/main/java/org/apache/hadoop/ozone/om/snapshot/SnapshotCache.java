@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone.om.snapshot;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.cache.CacheLoader;
+import org.apache.hadoop.ozone.om.OMMetrics;
 import org.apache.hadoop.ozone.om.OmSnapshot;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.slf4j.Logger;
@@ -51,10 +52,13 @@ public class SnapshotCache {
   // opened on the OM.
   private final int cacheSizeLimit;
 
-  public SnapshotCache(CacheLoader<UUID, OmSnapshot> cacheLoader, int cacheSizeLimit) {
+  private final OMMetrics omMetrics;
+
+  public SnapshotCache(CacheLoader<UUID, OmSnapshot> cacheLoader, int cacheSizeLimit, OMMetrics omMetrics) {
     this.dbMap = new ConcurrentHashMap<>();
     this.cacheLoader = cacheLoader;
     this.cacheSizeLimit = cacheSizeLimit;
+    this.omMetrics = omMetrics;
   }
 
   @VisibleForTesting
@@ -83,6 +87,7 @@ public class SnapshotCache {
         } catch (IOException e) {
           throw new IllegalStateException("Failed to close snapshotId: " + key, e);
         }
+        omMetrics.decNumSnapshotCacheSize();
       }
       return null;
     });
@@ -104,6 +109,7 @@ public class SnapshotCache {
         throw new IllegalStateException("Failed to close snapshot", e);
       }
       it.remove();
+      omMetrics.decNumSnapshotCacheSize();
     }
   }
 
@@ -150,6 +156,7 @@ public class SnapshotCache {
               // Unexpected and unknown exception thrown from CacheLoader#load
               throw new IllegalStateException(ex);
             }
+            omMetrics.incNumSnapshotCacheSize();
           }
           if (v != null) {
             // When RC OmSnapshot is successfully loaded
@@ -157,7 +164,6 @@ public class SnapshotCache {
           }
           return v;
         });
-
     if (rcOmSnapshot == null) {
       // The only exception that would fall through the loader logic above
       // is OMException with FILE_NOT_FOUND.
@@ -227,6 +233,7 @@ public class SnapshotCache {
           } catch (IOException ex) {
             throw new IllegalStateException("Error while closing snapshot DB.", ex);
           }
+          omMetrics.decNumSnapshotCacheSize();
           return null;
         }
       });

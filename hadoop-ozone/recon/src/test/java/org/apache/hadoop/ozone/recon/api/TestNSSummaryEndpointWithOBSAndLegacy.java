@@ -556,7 +556,7 @@ public class TestNSSummaryEndpointWithOBSAndLegacy {
   public void testDiskUsageRoot() throws Exception {
     // root level DU
     Response rootResponse = nsSummaryEndpoint.getDiskUsage(ROOT_PATH,
-        false, false);
+        false, false, false);
     DUResponse duRootRes = (DUResponse) rootResponse.getEntity();
     assertEquals(2, duRootRes.getCount());
     List<DUResponse.DiskUsage> duRootData = duRootRes.getDuData();
@@ -575,7 +575,7 @@ public class TestNSSummaryEndpointWithOBSAndLegacy {
   public void testDiskUsageVolume() throws Exception {
     // volume level DU
     Response volResponse = nsSummaryEndpoint.getDiskUsage(VOL_PATH,
-        false, false);
+        false, false, false);
     DUResponse duVolRes = (DUResponse) volResponse.getEntity();
     assertEquals(2, duVolRes.getCount());
     List<DUResponse.DiskUsage> duData = duVolRes.getDuData();
@@ -594,7 +594,7 @@ public class TestNSSummaryEndpointWithOBSAndLegacy {
   public void testDiskUsageVolTwo() throws Exception {
     // volume level DU
     Response volResponse = nsSummaryEndpoint.getDiskUsage(VOL_TWO_PATH,
-        false, false);
+        false, false, false);
     DUResponse duVolRes = (DUResponse) volResponse.getEntity();
     assertEquals(2, duVolRes.getCount());
     List<DUResponse.DiskUsage> duData = duVolRes.getDuData();
@@ -612,13 +612,13 @@ public class TestNSSummaryEndpointWithOBSAndLegacy {
   public void testDiskUsageBucketOne() throws Exception {
     // bucket level DU
     Response bucketResponse = nsSummaryEndpoint.getDiskUsage(BUCKET_ONE_PATH,
-        false, false);
+        false, false, false);
     DUResponse duBucketResponse = (DUResponse) bucketResponse.getEntity();
     // There are no sub-paths under this OBS bucket.
     assertEquals(0, duBucketResponse.getCount());
 
     Response bucketResponseWithSubpath = nsSummaryEndpoint.getDiskUsage(
-        BUCKET_ONE_PATH, true, false);
+        BUCKET_ONE_PATH, true, false, false);
     DUResponse duBucketResponseWithFiles =
         (DUResponse) bucketResponseWithSubpath.getEntity();
     assertEquals(3, duBucketResponseWithFiles.getCount());
@@ -630,13 +630,13 @@ public class TestNSSummaryEndpointWithOBSAndLegacy {
   public void testDiskUsageBucketTwo() throws Exception {
     // bucket level DU
     Response bucketResponse = nsSummaryEndpoint.getDiskUsage(BUCKET_TWO_PATH,
-        false, false);
+        false, false, false);
     DUResponse duBucketResponse = (DUResponse) bucketResponse.getEntity();
     // There are no sub-paths under this OBS bucket.
     assertEquals(0, duBucketResponse.getCount());
 
     Response bucketResponseWithSubpath = nsSummaryEndpoint.getDiskUsage(
-        BUCKET_TWO_PATH, true, false);
+        BUCKET_TWO_PATH, true, false, false);
     DUResponse duBucketResponseWithFiles =
         (DUResponse) bucketResponseWithSubpath.getEntity();
     assertEquals(2, duBucketResponseWithFiles.getCount());
@@ -648,13 +648,13 @@ public class TestNSSummaryEndpointWithOBSAndLegacy {
   public void testDiskUsageBucketThree() throws Exception {
     // bucket level DU
     Response bucketResponse = nsSummaryEndpoint.getDiskUsage(BUCKET_THREE_PATH,
-        false, false);
+        false, false, false);
     DUResponse duBucketResponse = (DUResponse) bucketResponse.getEntity();
     // There are no sub-paths under this Legacy bucket.
     assertEquals(0, duBucketResponse.getCount());
 
     Response bucketResponseWithSubpath = nsSummaryEndpoint.getDiskUsage(
-        BUCKET_THREE_PATH, true, false);
+        BUCKET_THREE_PATH, true, false, false);
     DUResponse duBucketResponseWithFiles =
         (DUResponse) bucketResponseWithSubpath.getEntity();
     assertEquals(3, duBucketResponseWithFiles.getCount());
@@ -666,7 +666,7 @@ public class TestNSSummaryEndpointWithOBSAndLegacy {
   public void testDiskUsageKey1() throws Exception {
     // key level DU
     Response keyResponse = nsSummaryEndpoint.getDiskUsage(KEY_ONE_PATH,
-        false, false);
+        false, false, false);
     DUResponse duKeyResponse = (DUResponse) keyResponse.getEntity();
     assertEquals(0, duKeyResponse.getCount());
     assertEquals(FILE_ONE_SIZE, duKeyResponse.getSize());
@@ -676,7 +676,7 @@ public class TestNSSummaryEndpointWithOBSAndLegacy {
   public void testDiskUsageKey2() throws Exception {
     // key level DU
     Response keyResponse = nsSummaryEndpoint.getDiskUsage(KEY_TWO_PATH,
-        false, false);
+        false, false, false);
     DUResponse duKeyResponse = (DUResponse) keyResponse.getEntity();
     assertEquals(0, duKeyResponse.getCount());
     assertEquals(FILE_TWO_SIZE, duKeyResponse.getSize());
@@ -686,7 +686,7 @@ public class TestNSSummaryEndpointWithOBSAndLegacy {
   public void testDiskUsageKey4() throws Exception {
     // key level DU
     Response keyResponse = nsSummaryEndpoint.getDiskUsage(KEY4_PATH,
-        true, false);
+        true, false, false);
     DUResponse duKeyResponse = (DUResponse) keyResponse.getEntity();
     assertEquals(0, duKeyResponse.getCount());
     assertEquals(FILE_FOUR_SIZE, duKeyResponse.getSize());
@@ -696,7 +696,7 @@ public class TestNSSummaryEndpointWithOBSAndLegacy {
   public void testDiskUsageKey5() throws Exception {
     // key level DU
     Response keyResponse = nsSummaryEndpoint.getDiskUsage(KEY_FIVE_PATH,
-        false, false);
+        false, false, false);
     DUResponse duKeyResponse = (DUResponse) keyResponse.getEntity();
     assertEquals(0, duKeyResponse.getCount());
     assertEquals(FILE_FIVE_SIZE, duKeyResponse.getSize());
@@ -706,7 +706,7 @@ public class TestNSSummaryEndpointWithOBSAndLegacy {
   public void testDiskUsageKey8() throws Exception {
     // key level DU
     Response keyResponse = nsSummaryEndpoint.getDiskUsage(KEY_EIGHT_PATH,
-        false, false);
+        false, false, false);
     DUResponse duKeyResponse = (DUResponse) keyResponse.getEntity();
     assertEquals(0, duKeyResponse.getCount());
     assertEquals(FILE_EIGHT_SIZE, duKeyResponse.getSize());
@@ -716,7 +716,7 @@ public class TestNSSummaryEndpointWithOBSAndLegacy {
   public void testDiskUsageKey11() throws Exception {
     // key level DU
     Response keyResponse = nsSummaryEndpoint.getDiskUsage(KEY_ELEVEN_PATH,
-        false, false);
+        false, false, false);
     DUResponse duKeyResponse = (DUResponse) keyResponse.getEntity();
     assertEquals(0, duKeyResponse.getCount());
     assertEquals(FILE_ELEVEN_SIZE, duKeyResponse.getSize());
@@ -726,7 +726,7 @@ public class TestNSSummaryEndpointWithOBSAndLegacy {
   public void testDiskUsageUnknown() throws Exception {
     // invalid path check
     Response invalidResponse = nsSummaryEndpoint.getDiskUsage(INVALID_PATH,
-        false, false);
+        false, false, false);
     DUResponse invalidObj = (DUResponse) invalidResponse.getEntity();
     assertEquals(ResponseStatus.PATH_NOT_FOUND,
         invalidObj.getStatus());
@@ -736,7 +736,7 @@ public class TestNSSummaryEndpointWithOBSAndLegacy {
   public void testDiskUsageWithReplication() throws Exception {
     setUpMultiBlockKey();
     Response keyResponse = nsSummaryEndpoint.getDiskUsage(MULTI_BLOCK_KEY_PATH,
-        false, true);
+        false, true, false);
     DUResponse replicaDUResponse = (DUResponse) keyResponse.getEntity();
     assertEquals(ResponseStatus.OK, replicaDUResponse.getStatus());
     assertEquals(MULTI_BLOCK_KEY_SIZE_WITH_REPLICA,
@@ -748,7 +748,7 @@ public class TestNSSummaryEndpointWithOBSAndLegacy {
     setUpMultiBlockReplicatedKeys();
     //   withReplica is true
     Response rootResponse = nsSummaryEndpoint.getDiskUsage(ROOT_PATH,
-        false, true);
+        false, true, false);
     DUResponse replicaDUResponse = (DUResponse) rootResponse.getEntity();
     assertEquals(ResponseStatus.OK, replicaDUResponse.getStatus());
     assertEquals(MULTI_BLOCK_TOTAL_SIZE_WITH_REPLICA_UNDER_ROOT,
@@ -762,7 +762,7 @@ public class TestNSSummaryEndpointWithOBSAndLegacy {
   public void testDataSizeUnderVolWithReplication() throws IOException {
     setUpMultiBlockReplicatedKeys();
     Response volResponse = nsSummaryEndpoint.getDiskUsage(VOL_PATH,
-        false, true);
+        false, true, false);
     DUResponse replicaDUResponse = (DUResponse) volResponse.getEntity();
     assertEquals(ResponseStatus.OK, replicaDUResponse.getStatus());
     assertEquals(MULTI_BLOCK_TOTAL_SIZE_WITH_REPLICA_UNDER_VOL,
@@ -775,7 +775,7 @@ public class TestNSSummaryEndpointWithOBSAndLegacy {
   public void testDataSizeUnderBucketOneWithReplication() throws IOException {
     setUpMultiBlockReplicatedKeys();
     Response bucketResponse = nsSummaryEndpoint.getDiskUsage(BUCKET_ONE_PATH,
-        false, true);
+        false, true, false);
     DUResponse replicaDUResponse = (DUResponse) bucketResponse.getEntity();
     assertEquals(ResponseStatus.OK, replicaDUResponse.getStatus());
     assertEquals(MULTI_BLOCK_TOTAL_SIZE_WITH_REPLICA_UNDER_BUCKET1,
@@ -786,7 +786,7 @@ public class TestNSSummaryEndpointWithOBSAndLegacy {
   public void testDataSizeUnderBucketThreeWithReplication() throws IOException {
     setUpMultiBlockReplicatedKeys();
     Response bucketResponse = nsSummaryEndpoint.getDiskUsage(BUCKET_THREE_PATH,
-        false, true);
+        false, true, false);
     DUResponse replicaDUResponse = (DUResponse) bucketResponse.getEntity();
     assertEquals(ResponseStatus.OK, replicaDUResponse.getStatus());
     assertEquals(MULTI_BLOCK_TOTAL_SIZE_WITH_REPLICA_UNDER_BUCKET3,
@@ -797,7 +797,7 @@ public class TestNSSummaryEndpointWithOBSAndLegacy {
   public void testDataSizeUnderKeyWithReplication() throws IOException {
     setUpMultiBlockReplicatedKeys();
     Response keyResponse = nsSummaryEndpoint.getDiskUsage(KEY4_PATH,
-        false, true);
+        false, true, false);
     DUResponse replicaDUResponse = (DUResponse) keyResponse.getEntity();
     assertEquals(ResponseStatus.OK, replicaDUResponse.getStatus());
     assertEquals(MULTI_BLOCK_TOTAL_SIZE_WITH_REPLICA_UNDER_KEY,
