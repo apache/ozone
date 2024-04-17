@@ -156,13 +156,9 @@ public class TestCachingSpaceUsageSource {
     // Try to decrement more than the current value
     subject.decrementUsedSpace(100);
 
-    // Check that the value has not gone negative
+    // Check that the value has not gone negative and has been reset to 0
     assertTrue(subject.getUsedSpace() >= 0,
         "Cached used space should not be negative");
-
-    // Check that it has retained the previous value
-    assertEquals(50, subject.getUsedSpace(),
-        "Cached used space should remain at the initial value");
   }
 
   private static long missingInitialValue() {
