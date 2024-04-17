@@ -231,17 +231,17 @@ message ContainerCommandResponseProto {
   optional   GetBlockResponseProto getBlock = 12;
   optional   DeleteBlockResponseProto deleteBlock = 13;
   optional   ListBlockResponseProto listBlock = 14;
-  optional   ReadBlockResponseProto readBlock = 15;
 
-  optional   WriteChunkResponseProto writeChunk = 16;
-  optional   ReadChunkResponseProto readChunk = 17;
-  optional   DeleteChunkResponseProto deleteChunk = 18;
-  optional   ListChunkResponseProto listChunk = 19;
+  optional   WriteChunkResponseProto writeChunk = 15;
+  optional   ReadChunkResponseProto readChunk = 16;
+  optional   DeleteChunkResponseProto deleteChunk = 17;
+  optional   ListChunkResponseProto listChunk = 18;
 
-  optional   PutSmallFileResponseProto putSmallFile = 20;
-  optional   GetSmallFileResponseProto getSmallFile = 21;
+  optional   PutSmallFileResponseProto putSmallFile = 19;
+  optional   GetSmallFileResponseProto getSmallFile = 20;
 
-  optional   GetCommittedBlockLengthResponseProto getCommittedBlockLength = 22;
+  optional   GetCommittedBlockLengthResponseProto getCommittedBlockLength = 21;
+  optional   ReadBlockResponseProto readBlock = 22;
   optional   StreamDataResponseProto streamData = 23;
 }
 
