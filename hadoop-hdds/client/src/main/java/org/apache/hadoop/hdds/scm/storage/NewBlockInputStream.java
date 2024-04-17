@@ -46,6 +46,7 @@ import org.apache.hadoop.ozone.common.OzoneChecksumException;
 import org.apache.hadoop.ozone.common.utils.BufferUtils;
 import org.apache.hadoop.security.token.Token;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
+import org.apache.ratis.thirdparty.io.grpc.Status;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -172,6 +173,18 @@ public class NewBlockInputStream extends BlockExtendedInputStream
         } else {
           throw e;
         }
+      } catch (IOException ioe) {
+        if (shouldRetryRead(ioe)) {
+          if (isConnectivityIssue(ioe)) {
+            releaseClient();
+            refreshBlockInfo(ioe);
+          } else {
+            releaseClient();
+          }
+          continue;
+        } else {
+          throw ioe;
+        }
       }
       if (available == EOF) {
         // There is no more data in the chunk stream. The buffers should have
@@ -231,6 +244,18 @@ public class NewBlockInputStream extends BlockExtendedInputStream
         } else {
           throw e;
         }
+      } catch (IOException ioe) {
+        if (shouldRetryRead(ioe)) {
+          if (isConnectivityIssue(ioe)) {
+            releaseClient();
+            refreshBlockInfo(ioe);
+          } else {
+            releaseClient();
+          }
+          continue;
+        } else {
+          throw ioe;
+        }
       }
       if (available == EOF) {
         // There is no more data in the block stream. The buffers should have
@@ -282,6 +307,18 @@ public class NewBlockInputStream extends BlockExtendedInputStream
           continue;
         } else {
           throw e;
+        }
+      } catch (IOException ioe) {
+        if (shouldRetryRead(ioe)) {
+          if (isConnectivityIssue(ioe)) {
+            releaseClient();
+            refreshBlockInfo(ioe);
+          } else {
+            releaseClient();
+          }
+          continue;
+        } else {
+          throw ioe;
         }
       }
       if (available == EOF) {
@@ -732,5 +769,12 @@ public class NewBlockInputStream extends BlockExtendedInputStream
   public synchronized ByteBuffer[] getCachedBuffers() {
     return buffers == null ? null :
         BufferUtils.getReadOnlyByteBuffers(buffers.toArray(new ByteBuffer[0]));
+  }
+
+  /**
+   * Check if this exception is because datanodes are not reachable.
+   */
+  private boolean isConnectivityIssue(IOException ex) {
+    return Status.fromThrowable(ex).getCode() == Status.UNAVAILABLE.getCode();
   }
 }

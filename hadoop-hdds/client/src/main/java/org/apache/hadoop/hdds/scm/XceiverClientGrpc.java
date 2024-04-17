@@ -585,12 +585,22 @@ public class XceiverClientGrpc extends XceiverClientSpi {
                   ContainerCommandResponseProto responseProto) {
                 ReadBlockResponseProto readBlock =
                     responseProto.getReadBlock();
-                streamData.addReadBlock(readBlock);
+                if (responseProto.getResult() == Result.SUCCESS) {
+                  streamData.addReadBlock(readBlock);
+                } else {
+                  future.complete(
+                      ContainerCommandResponseProto.newBuilder(responseProto)
+                          .setCmdType(Type.StreamRead).build());
+                }
               }
 
               @Override
               public void onError(Throwable t) {
                 future.completeExceptionally(t);
+                metrics.decrPendingContainerOpsMetrics(cmdType);
+                metrics.addContainerOpsLatency(
+                    cmdType, System.currentTimeMillis() - requestTime);
+
               }
 
               @Override
@@ -604,12 +614,13 @@ public class XceiverClientGrpc extends XceiverClientSpi {
                       "Stream completed but no reply for request " +
                           processForDebug(request)));
                 }
+                metrics.decrPendingContainerOpsMetrics(cmdType);
+                metrics.addContainerOpsLatency(
+                    cmdType, System.currentTimeMillis() - requestTime);
               }
             });
     requestObserver.onNext(request);
     requestObserver.onCompleted();
-    metrics.decrPendingContainerOpsMetrics(cmdType);
-    metrics.addContainerOpsLatency(cmdType, System.currentTimeMillis() - requestTime);
     semaphore.release();
     return new XceiverClientReply(future);
   }

@@ -88,7 +88,6 @@ enum Type {
   GetBlock = 7;
   DeleteBlock = 8;
   ListBlock = 9;
-  ReadBlock = 21;
 
   ReadChunk = 10;
   DeleteChunk = 11;
@@ -104,6 +103,7 @@ enum Type {
 
   StreamInit = 19;
   StreamWrite = 20;
+  ReadBlock = 21;
   StreamRead = 22;
 }
 
@@ -198,19 +198,19 @@ message ContainerCommandRequestProto {
   optional   GetBlockRequestProto getBlock = 13;
   optional   DeleteBlockRequestProto deleteBlock = 14 [deprecated = true];
   optional   ListBlockRequestProto listBlock = 15;
-  optional   ReadBlockRequestProto readBlock = 25;
+  optional   ReadBlockRequestProto readBlock = 16;
 
-  optional   ReadChunkRequestProto readChunk = 16;
-  optional   WriteChunkRequestProto writeChunk = 17;
-  optional   DeleteChunkRequestProto deleteChunk = 18 [deprecated = true];
-  optional   ListChunkRequestProto listChunk = 19;
+  optional   ReadChunkRequestProto readChunk = 17;
+  optional   WriteChunkRequestProto writeChunk = 18;
+  optional   DeleteChunkRequestProto deleteChunk = 19 [deprecated = true];
+  optional   ListChunkRequestProto listChunk = 20;
 
-  optional   PutSmallFileRequestProto putSmallFile = 20;
-  optional   GetSmallFileRequestProto getSmallFile = 21;
-  optional   GetCommittedBlockLengthRequestProto getCommittedBlockLength = 22;
+  optional   PutSmallFileRequestProto putSmallFile = 21;
+  optional   GetSmallFileRequestProto getSmallFile = 22;
+  optional   GetCommittedBlockLengthRequestProto getCommittedBlockLength = 23;
 
-  optional   string encodedToken = 23;
-  optional   uint32 version = 24;
+  optional   string encodedToken = 24;
+  optional   uint32 version = 25;
 }
 
 message ContainerCommandResponseProto {
@@ -231,18 +231,18 @@ message ContainerCommandResponseProto {
   optional   GetBlockResponseProto getBlock = 12;
   optional   DeleteBlockResponseProto deleteBlock = 13;
   optional   ListBlockResponseProto listBlock = 14;
-  optional   ReadBlockResponseProto readBlock = 22;
+  optional   ReadBlockResponseProto readBlock = 15;
+
+  optional   WriteChunkResponseProto writeChunk = 16;
+  optional   ReadChunkResponseProto readChunk = 17;
+  optional   DeleteChunkResponseProto deleteChunk = 18;
+  optional   ListChunkResponseProto listChunk = 19;
+
+  optional   PutSmallFileResponseProto putSmallFile = 20;
+  optional   GetSmallFileResponseProto getSmallFile = 21;
+
+  optional   GetCommittedBlockLengthResponseProto getCommittedBlockLength = 22;
   optional   StreamDataResponseProto streamData = 23;
-
-  optional   WriteChunkResponseProto writeChunk = 15;
-  optional   ReadChunkResponseProto readChunk = 16;
-  optional   DeleteChunkResponseProto deleteChunk = 17;
-  optional   ListChunkResponseProto listChunk = 18;
-
-  optional   PutSmallFileResponseProto putSmallFile = 19;
-  optional   GetSmallFileResponseProto getSmallFile = 20;
-
-  optional GetCommittedBlockLengthResponseProto getCommittedBlockLength = 21;
 }
 
 message ContainerDataProto {

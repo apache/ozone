@@ -418,6 +418,7 @@ public final class HddsUtils {
     switch (proto.getCmdType()) {
     case ReadContainer:
     case ReadChunk:
+    case ReadBlock:
     case ListBlock:
     case GetBlock:
     case GetSmallFile:
@@ -474,6 +475,7 @@ public final class HddsUtils {
     case PutBlock:
     case PutSmallFile:
     case ReadChunk:
+    case ReadBlock:
     case WriteChunk:
       return true;
     default:
@@ -549,6 +551,10 @@ public final class HddsUtils {
         blockID = msg.getReadChunk().getBlockID();
       }
       break;
+    case ReadBlock:
+      if (msg.hasReadBlock()) {
+        blockID = msg.getReadBlock().getBlockID();
+      }
     case WriteChunk:
       if (msg.hasWriteChunk()) {
         blockID = msg.getWriteChunk().getBlockID();
