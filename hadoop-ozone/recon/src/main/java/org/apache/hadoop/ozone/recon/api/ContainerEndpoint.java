@@ -27,6 +27,7 @@ import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineNotFoundException;
 import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
+import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
@@ -95,10 +96,7 @@ import static org.apache.hadoop.ozone.recon.ReconConstants.RECON_QUERY_PREVKEY;
 @AdminOnly
 public class ContainerEndpoint {
 
-  @Inject
   private ReconContainerMetadataManager reconContainerMetadataManager;
-
-  @Inject
   private ReconOMMetadataManager omMetadataManager;
 
   private final ReconContainerManager containerManager;
@@ -146,13 +144,17 @@ public class ContainerEndpoint {
   @Inject
   public ContainerEndpoint(OzoneStorageContainerManager reconSCM,
                            ContainerHealthSchemaManager containerHealthSchemaManager,
-                           ReconNamespaceSummaryManager reconNamespaceSummaryManager) {
+                           ReconNamespaceSummaryManager reconNamespaceSummaryManager,
+                           ReconContainerMetadataManager reconContainerMetadataManager,
+                           ReconOMMetadataManager omMetadataManager) {
     this.containerManager =
         (ReconContainerManager) reconSCM.getContainerManager();
     this.pipelineManager = reconSCM.getPipelineManager();
     this.containerHealthSchemaManager = containerHealthSchemaManager;
     this.reconNamespaceSummaryManager = reconNamespaceSummaryManager;
     this.reconSCM = reconSCM;
+    this.reconContainerMetadataManager = reconContainerMetadataManager;
+    this.omMetadataManager = omMetadataManager;
   }
 
   /**
