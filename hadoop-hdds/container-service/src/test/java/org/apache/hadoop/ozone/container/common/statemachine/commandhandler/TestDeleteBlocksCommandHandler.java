@@ -333,6 +333,38 @@ public class TestDeleteBlocksCommandHandler {
     }
   }
 
+  @ContainerTestVersionInfo.ContainerTest
+  public void testDuplicateDeleteBlocksCommand(
+      ContainerTestVersionInfo versionInfo) throws Exception {
+    prepareTest(versionInfo);
+    assertThat(containerSet.containerCount()).isGreaterThan(0);
+    Container<?> container = containerSet.getContainerIterator(volume1).next();
+    DeletedBlocksTransaction transaction = createDeletedBlocksTransaction(1,
+        container.getContainerData().getContainerID());
+
+    List<DeleteBlockTransactionResult> results1 =
+        handler.executeCmdWithRetry(Arrays.asList(transaction));
+    List<DeleteBlockTransactionResult> results2 =
+        handler.executeCmdWithRetry(Arrays.asList(transaction));
+
+    String schemaVersionOrDefault = ((KeyValueContainerData)
+        container.getContainerData()).getSupportedSchemaVersionOrDefault();
+    verify(handler.getSchemaHandlers().get(schemaVersionOrDefault),
+        times(2)).handle(any(), any());
+    // submitTasks will be executed twice
+    verify(handler, times(2)).submitTasks(any());
+
+    assertEquals(1, results1.size());
+    assertTrue(results1.get(0).getSuccess());
+    assertEquals(1, results2.size());
+    assertTrue(results2.get(0).getSuccess());
+    assertEquals(0,
+        blockDeleteMetrics.getTotalLockTimeoutTransactionCount());
+    // Duplicate cmd content will not be persisted.
+    assertEquals(1,
+        ((KeyValueContainerData) container.getContainerData()).getNumPendingDeletionBlocks());
+  }
+
   private DeletedBlocksTransaction createDeletedBlocksTransaction(long txID,
       long containerID) {
     return DeletedBlocksTransaction.newBuilder()
@@ -347,7 +379,11 @@ public class TestDeleteBlocksCommandHandler {
     @Override
     public void handle(KeyValueContainerData containerData,
         DeletedBlocksTransaction tx) throws IOException {
-      // doNoting just for Test
+      if (DeleteBlocksCommandHandler.isDuplicateTransaction(containerData.getContainerID(), containerData, tx, null)) {
+        return;
+      }
+      containerData.incrPendingDeletionBlocks(tx.getLocalIDCount());
+      containerData.updateDeleteTransactionId(tx.getTxID());
     }
   }
 }
