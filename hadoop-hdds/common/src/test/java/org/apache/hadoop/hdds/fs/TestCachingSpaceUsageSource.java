@@ -31,7 +31,6 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 
 import static org.apache.hadoop.hdds.fs.MockSpaceUsageCheckParams.newBuilder;
-import static org.apache.ratis.util.Preconditions.assertTrue;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.anyLong;
