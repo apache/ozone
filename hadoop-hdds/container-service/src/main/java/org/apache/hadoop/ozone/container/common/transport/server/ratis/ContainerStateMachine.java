@@ -432,11 +432,10 @@ public class ContainerStateMachine extends BaseStateMachine {
       if (!blockAlreadyFinalized) {
         // create the log entry proto
         final WriteChunkRequestProto commitWriteChunkProto =
-            WriteChunkRequestProto.newBuilder()
-                .setBlockID(write.getBlockID())
-                .setChunkData(write.getChunkData())
+            WriteChunkRequestProto.newBuilder(write)
                 // skipping the data field as it is
                 // already set in statemachine data proto
+                .clearData()
                 .build();
         ContainerCommandRequestProto commitContainerCommandProto =
             ContainerCommandRequestProto

@@ -55,6 +55,7 @@ import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.TestInfo;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.event.Level;
@@ -132,7 +133,7 @@ public class TestContainerBalancerTask {
    * Sets up configuration values and creates a mock cluster.
    */
   @BeforeEach
-  public void setup() throws IOException, NodeNotFoundException,
+  public void setup(TestInfo testInfo) throws IOException, NodeNotFoundException,
       TimeoutException {
     conf = new OzoneConfiguration();
     rmConf = new ReplicationManagerConfiguration();
@@ -164,7 +165,11 @@ public class TestContainerBalancerTask {
     conf.setFromObject(balancerConfiguration);
     GenericTestUtils.setLogLevel(ContainerBalancerTask.LOG, Level.DEBUG);
 
-    averageUtilization = createCluster();
+    int[] sizeArray = testInfo.getTestMethod()
+            .filter(method -> method.getName().equals("balancerShouldMoveOnlyPositiveSizeContainers"))
+            .map(method -> new int[]{0, 0, 0, 0, 0, 1, 2, 3, 4, 5})
+            .orElse(null);
+    averageUtilization = createCluster(sizeArray);
     mockNodeManager = new MockNodeManager(datanodeToContainersMap);
 
     NetworkTopology clusterMap = mockNodeManager.getClusterNetworkTopologyMap();
@@ -1115,6 +1120,34 @@ public class TestContainerBalancerTask {
   }
 
   /**
+   * Test to check if balancer picks up only positive size
+   * containers to move from source to destination.
+   */
+  @Test
+  public void balancerShouldMoveOnlyPositiveSizeContainers()
+      throws IllegalContainerBalancerStateException, IOException,
+      InvalidContainerBalancerConfigurationException, TimeoutException {
+
+    startBalancer(balancerConfiguration);
+    /*
+     Get all containers that were selected by balancer and assert none of
+     them is a zero or negative size container.
+     */
+    Map<ContainerID, DatanodeDetails> containerToSource =
+            containerBalancerTask.getContainerToSourceMap();
+    assertFalse(containerToSource.isEmpty());
+    boolean zeroOrNegSizeContainerMoved = false;
+    for (Map.Entry<ContainerID, DatanodeDetails> entry :
+            containerToSource.entrySet()) {
+      ContainerInfo containerInfo = cidToInfoMap.get(entry.getKey());
+      if (containerInfo.getUsedBytes() <= 0) {
+        zeroOrNegSizeContainerMoved = true;
+      }
+    }
+    assertFalse(zeroOrNegSizeContainerMoved);
+  }
+
+  /**
    * Determines unBalanced nodes, that is, over and under utilized nodes,
    * according to the generated utilization values for nodes and the threshold.
    *
@@ -1169,8 +1202,8 @@ public class TestContainerBalancerTask {
    * cluster have utilization values determined by generateUtilizations method.
    * @return average utilization (used space / capacity) of the cluster
    */
-  private double createCluster() {
-    generateData();
+  private double createCluster(int[] sizeArray) {
+    generateData(sizeArray);
     createReplicasForContainers();
     long clusterCapacity = 0, clusterUsedSpace = 0;
 
@@ -1204,7 +1237,7 @@ public class TestContainerBalancerTask {
   /**
    * Create some datanodes and containers for each node.
    */
-  private void generateData() {
+  private void generateData(int[] sizeArray) {
     this.numberOfNodes = 10;
     generateUtilizations(numberOfNodes);
     nodesInCluster = new ArrayList<>(nodeUtilizations.size());
@@ -1216,13 +1249,19 @@ public class TestContainerBalancerTask {
           new DatanodeUsageInfo(MockDatanodeDetails.randomDatanodeDetails(),
               new SCMNodeStat());
 
-      // create containers with varying used space
       int sizeMultiple = 0;
+      if (sizeArray == null) {
+        sizeArray = new int[10];
+        for (int j = 0; j < numberOfNodes; j++) {
+          sizeArray[j] = sizeMultiple;
+          sizeMultiple %= 5;
+          sizeMultiple++;
+        }
+      }
+      // create containers with varying used space
       for (int j = 0; j < i; j++) {
-        sizeMultiple %= 5;
-        sizeMultiple++;
         ContainerInfo container =
-            createContainer((long) i * i + j, sizeMultiple);
+            createContainer((long) i * i + j, sizeArray[j]);
 
         cidToInfoMap.put(container.containerID(), container);
         containerIDSet.add(container.containerID());

@@ -54,7 +54,8 @@ import org.slf4j.LoggerFactory;
  */
 public class BlockManagerImpl implements BlockManager {
 
-  static final Logger LOG = LoggerFactory.getLogger(BlockManagerImpl.class);
+  public static final Logger LOG =
+      LoggerFactory.getLogger(BlockManagerImpl.class);
 
   private ConfigurationSource config;
 

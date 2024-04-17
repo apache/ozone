@@ -284,6 +284,17 @@ class TestOzoneAtRestEncryption {
       out.write(value.getBytes(StandardCharsets.UTF_8));
     }
     verifyKeyData(bucket, keyName, value, testStartTime);
+    OzoneKeyDetails key1 = bucket.getKey(keyName);
+
+    // Overwrite the key
+    try (OzoneOutputStream out = bucket.createKey(keyName,
+        value.getBytes(StandardCharsets.UTF_8).length,
+        ReplicationConfig.fromTypeAndFactor(RATIS, ONE),
+        new HashMap<>())) {
+      out.write(value.getBytes(StandardCharsets.UTF_8));
+    }
+    OzoneKeyDetails key2 = bucket.getKey(keyName);
+    assertNotEquals(key1.getFileEncryptionInfo().toString(), key2.getFileEncryptionInfo().toString());
   }
 
   static void createAndVerifyFileSystemData(
@@ -324,7 +335,6 @@ class TestOzoneAtRestEncryption {
       fileContent = new byte[value.getBytes(StandardCharsets.UTF_8).length];
       len = is.read(fileContent);
     }
-
 
     assertEquals(len, value.length());
     assertTrue(verifyRatisReplication(bucket.getVolumeName(),

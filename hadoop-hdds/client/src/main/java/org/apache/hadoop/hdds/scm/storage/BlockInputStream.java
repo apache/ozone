@@ -21,6 +21,7 @@ package org.apache.hadoop.hdds.scm.storage;
 import java.io.EOFException;
 import java.io.IOException;
 import java.io.InputStream;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -224,18 +225,25 @@ public class BlockInputStream extends BlockExtendedInputStream {
   }
 
   private void refreshBlockInfo(IOException cause) throws IOException {
-    LOG.info("Unable to read information for block {} from pipeline {}: {}",
+    LOG.info("Attempting to update pipeline and block token for block {} from pipeline {}: {}",
         blockID, pipelineRef.get().getId(), cause.getMessage());
     if (refreshFunction != null) {
       LOG.debug("Re-fetching pipeline and block token for block {}", blockID);
       BlockLocationInfo blockLocationInfo = refreshFunction.apply(blockID);
       if (blockLocationInfo == null) {
-        LOG.debug("No new block location info for block {}", blockID);
+        LOG.warn("No new block location info for block {}", blockID);
       } else {
-        LOG.debug("New pipeline for block {}: {}", blockID,
-            blockLocationInfo.getPipeline());
         setPipeline(blockLocationInfo.getPipeline());
+        LOG.info("New pipeline for block {}: {}", blockID,
+            blockLocationInfo.getPipeline());
+
         tokenRef.set(blockLocationInfo.getToken());
+        if (blockLocationInfo.getToken() != null) {
+          OzoneBlockTokenIdentifier tokenId = new OzoneBlockTokenIdentifier();
+          tokenId.readFromByteArray(tokenRef.get().getIdentifier());
+          LOG.info("A new token is added for block {}. Expiry: {}",
+              blockID, Instant.ofEpochMilli(tokenId.getExpiryDate()));
+        }
       }
     } else {
       throw cause;

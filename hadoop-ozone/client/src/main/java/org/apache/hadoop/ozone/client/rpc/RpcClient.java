@@ -321,6 +321,8 @@ public class RpcClient implements ClientProtocol {
     this.blockInputStreamFactory = BlockInputStreamFactoryImpl
         .getInstance(byteBufferPool, ecReconstructExecutor);
     this.clientMetrics = ContainerClientMetrics.acquire();
+
+    TracingUtil.initTracing("client", conf);
   }
 
   public XceiverClientFactory getXceiverClientManager() {
@@ -2530,7 +2532,7 @@ public class RpcClient implements ClientProtocol {
        int corePoolSize, int maximumPoolSize, String threadNameFormat) {
     return new ThreadPoolExecutor(corePoolSize, maximumPoolSize,
             60, TimeUnit.SECONDS, new SynchronousQueue<>(),
-               new ThreadFactoryBuilder().setNameFormat(threadNameFormat).build(),
+               new ThreadFactoryBuilder().setNameFormat(threadNameFormat).setDaemon(true).build(),
                new ThreadPoolExecutor.CallerRunsPolicy());
   }
 }

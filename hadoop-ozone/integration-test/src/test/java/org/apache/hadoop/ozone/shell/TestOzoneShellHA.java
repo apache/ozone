@@ -23,6 +23,7 @@ import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.PrintStream;
 import java.io.UnsupportedEncodingException;
+import java.net.URI;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashSet;
@@ -78,9 +79,9 @@ import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.FS_TRASH_INTERV
 import static org.apache.hadoop.fs.FileSystem.FS_DEFAULT_NAME_KEY;
 import static org.apache.hadoop.fs.FileSystem.TRASH_PREFIX;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_FS_HSYNC_ENABLED;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_FS_LISTING_PAGE_SIZE;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_OFS_URI_SCHEME;
-
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.BUCKET_NOT_EMPTY;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.BUCKET_NOT_FOUND;
@@ -885,6 +886,34 @@ public class TestOzoneShellHA {
       omExecution = assertThrows(OMException.class,
           () -> client.getObjectStore().getVolume("linkvol"));
       assertEquals(VOLUME_NOT_FOUND, omExecution.getResult());
+    } finally {
+      shell.close();
+    }
+  }
+
+  @Test
+  @Timeout(10)
+  public void testListBucket() throws Exception {
+    final String hostPrefix = OZONE_OFS_URI_SCHEME + "://" + omServiceId;
+    OzoneConfiguration clientConf =
+            getClientConfForOFS(hostPrefix, cluster.getConf());
+    int pageSize = 20;
+    clientConf.setInt(OZONE_FS_LISTING_PAGE_SIZE, pageSize);
+    URI uri = FileSystem.getDefaultUri(clientConf);
+    clientConf.setBoolean(String.format("fs.%s.impl.disable.cache", uri.getScheme()), true);
+    OzoneFsShell shell = new OzoneFsShell(clientConf);
+
+    String volName = "testlistbucket";
+    int numBuckets = pageSize;
+
+    try {
+      generateBuckets("/" + volName, numBuckets);
+      out.reset();
+      int res = ToolRunner.run(shell, new String[]{"-ls", "/" + volName});
+      assertEquals(0, res);
+      String r = out.toString(DEFAULT_ENCODING);
+      assertThat(r).matches("(?s)^Found " + numBuckets + " items.*");
+
     } finally {
       shell.close();
     }

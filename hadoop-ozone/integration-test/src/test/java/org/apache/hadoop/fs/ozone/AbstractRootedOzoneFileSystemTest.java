@@ -115,6 +115,7 @@ import static org.apache.hadoop.fs.CommonPathCapabilities.FS_CHECKSUMS;
 import static org.apache.hadoop.fs.FileSystem.TRASH_PREFIX;
 import static org.apache.hadoop.fs.contract.ContractTestUtils.assertHasPathCapabilities;
 import static org.apache.hadoop.fs.ozone.Constants.LISTING_PAGE_SIZE;
+import static org.apache.hadoop.fs.ozone.OzoneFileSystemTests.createKeyWithECReplicationConfiguration;
 import static org.apache.hadoop.hdds.client.ECReplicationConfig.EcCodec.RS;
 import static org.apache.hadoop.ozone.OzoneAcl.AclScope.ACCESS;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_FS_ITERATE_BATCH_SIZE;
@@ -324,6 +325,19 @@ abstract class AbstractRootedOzoneFileSystemTest {
 
     // Cleanup
     fs.delete(grandparent, true);
+  }
+
+  @Test
+  public void testCreateKeyWithECReplicationConfig() throws Exception {
+    String testKeyName = "testKey";
+    Path testKeyPath = new Path(bucketPath, testKeyName);
+    createKeyWithECReplicationConfiguration(cluster.getConf(), testKeyPath);
+
+    OzoneKeyDetails key = getKey(testKeyPath, false);
+    assertEquals(HddsProtos.ReplicationType.EC,
+        key.getReplicationConfig().getReplicationType());
+    assertEquals("rs-3-2-1024k",
+        key.getReplicationConfig().getReplication());
   }
 
   @Test
