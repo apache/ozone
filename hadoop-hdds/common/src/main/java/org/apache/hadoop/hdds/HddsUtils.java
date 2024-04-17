@@ -555,6 +555,7 @@ public final class HddsUtils {
       if (msg.hasReadBlock()) {
         blockID = msg.getReadBlock().getBlockID();
       }
+      break;
     case WriteChunk:
       if (msg.hasWriteChunk()) {
         blockID = msg.getWriteChunk().getBlockID();
