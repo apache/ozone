@@ -60,8 +60,23 @@ execute_s3a_tests() {
     </property>
 
     <property>
+      <name>fs.s3a.access.key</name>
+      <value>${AWS_ACCESS_KEY_ID}</value>
+    </property>
+
+    <property>
+      <name>fs.s3a.secret.key</name>
+      <value>${AWS_SECRET_ACCESS_KEY}</value>
+    </property>
+
+    <property>
       <name>test.fs.s3a.sts.enabled</name>
       <value>false</value>
+    </property>
+
+    <property>
+      <name>fs.s3a.committer.staging.conflict-mode</name>
+      <value>replace</value>
     </property>
 
     <property>
@@ -82,7 +97,7 @@ EOF
   # - ITestS3AContractGetFileStatusV1List: HDDS-10617
   # - ITestS3AContractRename: HDDS-10665
   mvn -B -V --fail-never --no-transfer-progress \
-    -Dtest='ITestS3AContract*, !ITestS3AContractDistCp, !ITestS3AContractGetFileStatusV1List, !ITestS3AContractRename' \
+    -Dtest='ITestS3AContract*, ITestS3ACommitterMRJob, !ITestS3AContractDistCp, !ITestS3AContractGetFileStatusV1List, !ITestS3AContractRename' \
     clean test
 
   local target="${RESULT_DIR}/junit/${bucket}/target"
