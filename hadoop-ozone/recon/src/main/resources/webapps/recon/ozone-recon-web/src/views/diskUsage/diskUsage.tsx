@@ -569,7 +569,7 @@ export class DiskUsage extends React.Component<Record<string, object>, IDUState>
                       layout={
                         {
                           width: 1200,
-                          height: 1000,
+                          height: 900,
                           font: {
                             family: 'Roboto, sans-serif',
                             size: 15
