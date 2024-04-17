@@ -148,7 +148,6 @@ public class TestCachingSpaceUsageSource {
         .withRefresh(Duration.ZERO)
         .build();
     CachingSpaceUsageSource subject = new CachingSpaceUsageSource(params);
-    AtomicLong cachedValue = new AtomicLong(50);
 
     // Try to decrement more than the current value
     subject.decrementUsedSpace(100);
