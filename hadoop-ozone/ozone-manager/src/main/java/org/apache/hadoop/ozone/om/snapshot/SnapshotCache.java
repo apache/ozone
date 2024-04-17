@@ -119,6 +119,7 @@ public class SnapshotCache implements ReferenceCountedCallback, AutoCloseable {
 
   @Override
   public void close() {
+    invalidateAll();
     if (this.scheduler != null) {
       this.scheduler.close();
     }
