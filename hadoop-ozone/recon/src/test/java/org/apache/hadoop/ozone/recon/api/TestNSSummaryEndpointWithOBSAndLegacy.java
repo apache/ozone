@@ -755,7 +755,7 @@ public class TestNSSummaryEndpointWithOBSAndLegacy {
     Response keyResponse = nsSummaryEndpoint.getDiskUsage(KEY4_PATH,
         true, false, false);
     DUResponse duKeyResponse = (DUResponse) keyResponse.getEntity();
-    assertEquals(0, duKeyResponse.getCount());
+    assertEquals(1, duKeyResponse.getCount());
     assertEquals(FILE_FOUR_SIZE, duKeyResponse.getSize());
   }
 
