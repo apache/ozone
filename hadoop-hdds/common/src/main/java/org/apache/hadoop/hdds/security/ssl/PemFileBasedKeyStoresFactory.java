@@ -19,6 +19,7 @@ package org.apache.hadoop.hdds.security.ssl;
 
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.annotation.InterfaceStability;
+import org.apache.hadoop.hdds.security.SecurityConfig;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateNotification;
 import org.slf4j.Logger;
@@ -51,11 +52,11 @@ public class PemFileBasedKeyStoresFactory implements KeyStoresFactory,
   private KeyManager[] keyManagers;
   private TrustManager[] trustManagers;
   private final CertificateClient caClient;
-  private final String keyStoreType;
+  private final SecurityConfig conf;
 
-  public PemFileBasedKeyStoresFactory(CertificateClient client, String keyStoreTypeString) {
+  public PemFileBasedKeyStoresFactory(CertificateClient client, SecurityConfig config) {
     this.caClient = client;
-    this.keyStoreType = keyStoreTypeString;
+    this.conf = config;
   }
 
   /**
@@ -65,7 +66,7 @@ public class PemFileBasedKeyStoresFactory implements KeyStoresFactory,
   private void createTrustManagers() throws
       GeneralSecurityException, IOException {
     ReloadingX509TrustManager trustManager = new ReloadingX509TrustManager(
-        keyStoreType, caClient);
+        conf.getKeyStoreType(), caClient);
     trustManagers = new TrustManager[] {trustManager};
   }
 
@@ -76,7 +77,7 @@ public class PemFileBasedKeyStoresFactory implements KeyStoresFactory,
   private void createKeyManagers() throws
       GeneralSecurityException, IOException {
     ReloadingX509KeyManager keystoreManager =
-        new ReloadingX509KeyManager(keyStoreType, caClient);
+        new ReloadingX509KeyManager(conf.getKeyStoreType(), caClient);
     keyManagers = new KeyManager[] {keystoreManager};
   }
 
@@ -98,7 +99,7 @@ public class PemFileBasedKeyStoresFactory implements KeyStoresFactory,
     if (requireClientAuth || mode == Mode.SERVER) {
       createKeyManagers();
     } else {
-      KeyStore keystore = KeyStore.getInstance(keyStoreType);
+      KeyStore keystore = KeyStore.getInstance(conf.getKeyStoreType());
       keystore.load(null, null);
       KeyManagerFactory keyMgrFactory = KeyManagerFactory
           .getInstance(KeyManagerFactory.getDefaultAlgorithm());

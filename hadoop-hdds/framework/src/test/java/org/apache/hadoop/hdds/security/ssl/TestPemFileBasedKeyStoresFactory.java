@@ -74,7 +74,7 @@ public class TestPemFileBasedKeyStoresFactory {
   @ParameterizedTest
   public void testInit(boolean clientAuth) throws Exception {
     KeyStoresFactory keyStoresFactory = new PemFileBasedKeyStoresFactory(
-        caClient, secConf.getKeyStoreType());
+        caClient, secConf);
     try {
       keyStoresFactory.init(KeyStoresFactory.Mode.CLIENT, clientAuth);
       assertEquals(clientAuth, keyStoresFactory.getKeyManagers()[0]
@@ -101,13 +101,13 @@ public class TestPemFileBasedKeyStoresFactory {
     ManagedChannel channel = null;
     try {
       // create server
-      serverFactory = new PemFileBasedKeyStoresFactory(caClient, secConf.getKeyStoreType());
+      serverFactory = new PemFileBasedKeyStoresFactory(caClient, secConf);
       serverFactory.init(KeyStoresFactory.Mode.SERVER, true);
       server = setupServer(serverFactory);
       server.start();
 
       // create client
-      clientFactory = new PemFileBasedKeyStoresFactory(caClient, secConf.getKeyStoreType());
+      clientFactory = new PemFileBasedKeyStoresFactory(caClient, secConf);
       clientFactory.init(KeyStoresFactory.Mode.CLIENT, true);
       channel = setupClient(clientFactory, server.getPort());
       XceiverClientProtocolServiceStub asyncStub =

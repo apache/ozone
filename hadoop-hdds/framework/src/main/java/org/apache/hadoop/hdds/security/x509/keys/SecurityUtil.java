@@ -96,9 +96,9 @@ public final class SecurityUtil {
 
   public static KeyStoresFactory getServerKeyStoresFactory(
       CertificateClient client,
-      boolean requireClientAuth, String keyStoreType) throws CertificateException {
+      boolean requireClientAuth, SecurityConfig config) throws CertificateException {
     PemFileBasedKeyStoresFactory factory =
-        new PemFileBasedKeyStoresFactory(client, keyStoreType);
+        new PemFileBasedKeyStoresFactory(client, config);
     try {
       factory.init(KeyStoresFactory.Mode.SERVER, requireClientAuth);
     } catch (IOException | GeneralSecurityException e) {
@@ -110,9 +110,9 @@ public final class SecurityUtil {
 
   public static KeyStoresFactory getClientKeyStoresFactory(
       CertificateClient client,
-      boolean requireClientAuth, String keyStoreType) throws CertificateException {
+      boolean requireClientAuth, SecurityConfig config) throws CertificateException {
     PemFileBasedKeyStoresFactory factory =
-        new PemFileBasedKeyStoresFactory(client, keyStoreType);
+        new PemFileBasedKeyStoresFactory(client, config);
 
     try {
       factory.init(KeyStoresFactory.Mode.CLIENT, requireClientAuth);
