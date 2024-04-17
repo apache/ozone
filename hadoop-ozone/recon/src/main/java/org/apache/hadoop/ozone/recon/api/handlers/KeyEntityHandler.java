@@ -33,6 +33,7 @@ import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 import org.apache.hadoop.ozone.recon.spi.ReconNamespaceSummaryManager;
 
 import java.io.IOException;
+import java.util.ArrayList;
 
 /**
  * Class for handling key entity type.
@@ -76,14 +77,27 @@ public class KeyEntityHandler extends EntityHandler {
           throws IOException {
     DUResponse duResponse = new DUResponse();
     duResponse.setPath(getNormalizedPath());
-    // DU for key doesn't have subpaths
-    duResponse.setCount(0);
     OmKeyInfo keyInfo = getBucketHandler().getKeyInfo(getNames());
-
+    duResponse.setKeySize(keyInfo.getDataSize());
     duResponse.setSize(keyInfo.getDataSize());
     if (withReplica) {
       long keySizeWithReplica = keyInfo.getReplicatedSize();
       duResponse.setSizeWithReplica(keySizeWithReplica);
+    }
+    if (listFile) {
+      duResponse.setCount(1);
+      DUResponse.DiskUsage diskUsage = new DUResponse.DiskUsage();
+      diskUsage.setKey(true);
+      diskUsage.setSubpath(getNormalizedPath());
+      diskUsage.setSize(keyInfo.getDataSize());
+      diskUsage.setSizeWithReplica(duResponse.getSizeWithReplica());
+      diskUsage.setReplicationType(keyInfo.getReplicationConfig().getReplicationType().name());
+      diskUsage.setCreationTime(keyInfo.getCreationTime());
+      diskUsage.setModificationTime(keyInfo.getModificationTime());
+      ArrayList<DUResponse.DiskUsage> diskUsages = new ArrayList<>();
+      diskUsages.add(diskUsage);
+      duResponse.setTotalCount(diskUsages.size());
+      duResponse.setDuData(diskUsages);
     }
     return duResponse;
   }

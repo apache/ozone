@@ -94,6 +94,7 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_DB_DIRS;
 import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.writeKeyToOm;
 import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.getMockOzoneManagerServiceProvider;
 import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.getTestReconOmMetadataManager;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -1044,13 +1045,30 @@ public class TestNSSummaryEndpointWithOBSAndLegacy {
   @Test
   public void testListKeysBucketSix() throws Exception {
     // filter list keys under bucketSix based on RATIS ReplicationConfig and key creation date
-    // creationDate filter passed 1 minute above of KEY6 creation date, so listKeys API will return
-    // ZERO keys, as one RATIS keys got created after creationDate filter value.
     Response bucketResponse = nsSummaryEndpoint.listKeysWithDu("RATIS",
         "04-04-2024 12:20:00", 0, BUCKET_SIX_PATH, 10, false);
     DUResponse duBucketResponse = (DUResponse) bucketResponse.getEntity();
     // There are no sub-paths under this LEGACY bucket.
     assertEquals(2, duBucketResponse.getCount());
+  }
+
+  @Test
+  public void testListKeysOnPageTwoForBucketSix() throws Exception {
+    // filter list keys under bucketSix based on RATIS ReplicationConfig and key creation date
+    Response bucketResponse = nsSummaryEndpoint.listKeysWithDu("",
+        "04-04-2024 12:20:00", 0, BUCKET_SIX_PATH, 1, false);
+    DUResponse duBucketResponse = (DUResponse) bucketResponse.getEntity();
+    // First page of keys under this LEGACY bucket.
+    assertEquals(1, duBucketResponse.getCount());
+    assertEquals(2, duBucketResponse.getTotalCount());
+
+    // Second page of keys under this LEGACY bucket since lastKey
+    Response keyResponse = nsSummaryEndpoint.listKeysWithDu("",
+        "04-04-2024 12:20:00", 0, duBucketResponse.getLastKey(), 1, false);
+    DUResponse duKeyResponse = (DUResponse) keyResponse.getEntity();
+    assertEquals(1, duKeyResponse.getCount());
+    assertEquals(1, duKeyResponse.getTotalCount());
+    assertNull(duKeyResponse.getLastKey());
   }
 
   /**
