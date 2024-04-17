@@ -48,7 +48,6 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 /**
  * Test Ozone Repair shell.
  */
-
 public class TestOzoneRepairShell {
 
   private static MiniOzoneCluster cluster = null;
@@ -68,24 +67,15 @@ public class TestOzoneRepairShell {
             ReplicationManager.ReplicationManagerConfiguration.class);
     replicationConf.setInterval(Duration.ofSeconds(1));
     conf.setFromObject(replicationConf);
-    startCluster();
-  }
-
-  protected static void startCluster() throws Exception {
-    // Init HA cluster
-    final int numDNs = 3;
     cluster = MiniOzoneCluster.newBuilder(conf)
-        .setNumDatanodes(numDNs)
         .build();
     cluster.waitForClusterToBeReady();
   }
 
   @Test
   public void testUpdateTransactionInfoTable() throws Exception {
-    CommandLine cmd = new CommandLine(new RDBRepair())
-        .addSubcommand(new TransactionInfoRepair());
-    String dbPath = OMStorage.getOmDbDir(conf) +
-        OM_KEY_PREFIX + OM_DB_NAME;
+    CommandLine cmd = new CommandLine(new RDBRepair()).addSubcommand(new TransactionInfoRepair());
+    String dbPath = OMStorage.getOmDbDir(conf) + OM_KEY_PREFIX + OM_DB_NAME;
 
     cluster.getOzoneManager().stop();
 
@@ -97,9 +87,7 @@ public class TestOzoneRepairShell {
 
     StringWriter stdout = new StringWriter();
     PrintWriter pstdout = new PrintWriter(stdout);
-    CommandLine cmdDBScanner = new CommandLine(new RDBParser())
-        .addSubcommand(new DBScanner())
-        .setOut(pstdout);
+    CommandLine cmdDBScanner = new CommandLine(new RDBParser()).addSubcommand(new DBScanner()).setOut(pstdout);
     String[] argsDBScanner =
         new String[] {"--db=" + dbPath, "scan", "--column_family", "transactionInfoTable"};
     cmdDBScanner.execute(argsDBScanner);

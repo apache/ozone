@@ -35,9 +35,7 @@ import picocli.CommandLine;
 import picocli.CommandLine.Model.CommandSpec;
 
 import java.io.IOException;
-import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
@@ -91,7 +89,7 @@ public class SnapshotRepair implements Callable<Void>, SubcommandWithParent {
     List<ColumnFamilyDescriptor> cfDescList = RocksDBUtils.getColumnFamilyDescriptors(parent.getDbPath());
 
     try (ManagedRocksDB db = ManagedRocksDB.open(parent.getDbPath(), cfDescList, cfHandleList)) {
-      ColumnFamilyHandle snapshotInfoCfh = getSnapshotInfoCfh(cfHandleList);
+      ColumnFamilyHandle snapshotInfoCfh = RocksDBUtils.getColumnFamilyHandle(SNAPSHOT_INFO_TABLE, cfHandleList);
       if (snapshotInfoCfh == null) {
         System.err.println(SNAPSHOT_INFO_TABLE + " is not in a column family in DB for the given path.");
         return null;
@@ -100,7 +98,9 @@ public class SnapshotRepair implements Callable<Void>, SubcommandWithParent {
       String snapshotInfoTableKey = SnapshotInfo.getTableKey(bucketUri.getValue().getVolumeName(),
           bucketUri.getValue().getBucketName(), snapshotName);
 
-      SnapshotInfo snapshotInfo = getSnapshotInfo(db, snapshotInfoCfh, snapshotInfoTableKey);
+      SnapshotInfo snapshotInfo = RocksDBUtils.getColumnFamilyValue(db, snapshotInfoCfh, snapshotInfoTableKey,
+          SnapshotInfo.getCodec());
+
       if (snapshotInfo == null) {
         System.err.println(snapshotName + " does not exist for given bucketUri: " + OM_KEY_PREFIX +
             bucketUri.getValue().getVolumeName() + OM_KEY_PREFIX + bucketUri.getValue().getBucketName());
@@ -146,7 +146,7 @@ public class SnapshotRepair implements Callable<Void>, SubcommandWithParent {
             .put(snapshotInfoCfh, StringCodec.get().toPersistedFormat(snapshotInfoTableKey), snapshotInfoBytes);
 
         System.out.println("Snapshot Info is updated to : " +
-            getSnapshotInfo(db, snapshotInfoCfh, snapshotInfoTableKey));
+            RocksDBUtils.getColumnFamilyValue(db, snapshotInfoCfh, snapshotInfoTableKey, SnapshotInfo.getCodec()));
       }
     } catch (RocksDBException exception) {
       System.err.println("Failed to update the RocksDB for the given path: " + parent.getDbPath());
@@ -173,24 +173,6 @@ public class SnapshotRepair implements Callable<Void>, SubcommandWithParent {
       }
     }
     return snapshotIdSet;
-  }
-
-  private ColumnFamilyHandle getSnapshotInfoCfh(List<ColumnFamilyHandle> cfHandleList) throws RocksDBException {
-    byte[] nameBytes = SNAPSHOT_INFO_TABLE.getBytes(StandardCharsets.UTF_8);
-
-    for (ColumnFamilyHandle cf : cfHandleList) {
-      if (Arrays.equals(cf.getName(), nameBytes)) {
-        return cf;
-      }
-    }
-
-    return null;
-  }
-
-  private SnapshotInfo getSnapshotInfo(ManagedRocksDB db, ColumnFamilyHandle snapshotInfoCfh, String snapshotInfoLKey)
-      throws IOException, RocksDBException {
-    byte[] bytes = db.get().get(snapshotInfoCfh, StringCodec.get().toPersistedFormat(snapshotInfoLKey));
-    return bytes != null ? SnapshotInfo.getCodec().fromPersistedFormat(bytes) : null;
   }
 
   @Override

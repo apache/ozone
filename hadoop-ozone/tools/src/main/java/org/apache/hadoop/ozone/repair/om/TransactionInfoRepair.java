@@ -35,10 +35,7 @@ import org.rocksdb.ColumnFamilyHandle;
 import org.rocksdb.RocksDBException;
 import picocli.CommandLine;
 
-import java.io.IOException;
-import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.Callable;
 
@@ -68,28 +65,36 @@ public class TransactionInfoRepair
   @CommandLine.Option(names = {"--highest-transaction"},
       required = true,
       description = "highest termIndex of transactionInfoTable")
-  private String highestTransactionInfo;
+  private String highestTransactionTermIndex;
 
 
   @Override
   public Void call() throws Exception {
+
+    System.out.println("*****________ tir.c, " + System.getProperty("user.name"));
+
     List<ColumnFamilyHandle> cfHandleList = new ArrayList<>();
     List<ColumnFamilyDescriptor> cfDescList = RocksDBUtils.getColumnFamilyDescriptors(parent.getDbPath());
 
     try (ManagedRocksDB db = ManagedRocksDB.open(parent.getDbPath(), cfDescList, cfHandleList)) {
-      ColumnFamilyHandle transactionInfoCfh = getTransactionInfoCfh(cfHandleList);
+//      ColumnFamilyHandle transactionInfoCfh = getTransactionInfoCfh(cfHandleList);
+      ColumnFamilyHandle transactionInfoCfh = RocksDBUtils.getColumnFamilyHandle(TRANSACTION_INFO_TABLE, cfHandleList);
+
       if (transactionInfoCfh == null) {
         System.err.println(TRANSACTION_INFO_TABLE + " is not in a column family in DB for the given path.");
         return null;
       }
-      TransactionInfo transactionInfo = TransactionInfo.valueOf(highestTransactionInfo);
+      TransactionInfo transactionInfo = TransactionInfo.valueOf(
+          highestTransactionTermIndex);
 
       byte[] transactionInfoBytes = TransactionInfo.getCodec().toPersistedFormat(transactionInfo);
       db.get()
           .put(transactionInfoCfh, StringCodec.get().toPersistedFormat(TRANSACTION_INFO_KEY), transactionInfoBytes);
 
       System.out.println("Highest Transaction Info is updated to : " +
-          getTransactionInfo(db, transactionInfoCfh));
+            RocksDBUtils.getColumnFamilyValue(db, transactionInfoCfh,
+                TRANSACTION_INFO_KEY, TransactionInfo.getCodec()));
+
     } catch (RocksDBException exception) {
       System.err.println("Failed to update the RocksDB for the given path: " + parent.getDbPath());
       System.err.println(
@@ -100,27 +105,6 @@ public class TransactionInfoRepair
     }
 
     return null;
-  }
-
-
-  private ColumnFamilyHandle getTransactionInfoCfh(List<ColumnFamilyHandle> cfHandleList) throws RocksDBException {
-    byte[] nameBytes = TRANSACTION_INFO_TABLE.getBytes(StandardCharsets.UTF_8);
-
-    for (ColumnFamilyHandle cf : cfHandleList) {
-      if (Arrays.equals(cf.getName(), nameBytes)) {
-        return cf;
-      }
-    }
-
-    return null;
-  }
-
-  private TransactionInfo getTransactionInfo(ManagedRocksDB db,
-                                             ColumnFamilyHandle transactionInfoCfh)
-      throws IOException, RocksDBException {
-    byte[] bytes = db.get().get(transactionInfoCfh, StringCodec.get().toPersistedFormat(
-        TRANSACTION_INFO_KEY));
-    return bytes != null ? TransactionInfo.getCodec().fromPersistedFormat(bytes) : null;
   }
 
   @Override
