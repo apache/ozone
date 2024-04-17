@@ -18,6 +18,10 @@
 
 package org.apache.hadoop.ozone.client;
 
+import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
+
+import java.util.List;
+
 /**
  * One key can be stored in one or more containers as one or more blocks.
  * This class represents one such block instance.
@@ -90,4 +94,15 @@ public class OzoneKeyLocation {
     return keyOffset;
   }
 
+  public String toString() {
+    StringBuilder sb = new StringBuilder();
+    sb.append("conID ").append(containerID);
+    sb.append(" ");
+    sb.append("locID ").append(localID);
+    sb.append(" ");
+    sb.append("length ").append(length);
+    sb.append(" ");
+    sb.append("keyOffset ").append(keyOffset);
+    return sb.toString();
+  }
 }

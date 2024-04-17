@@ -28,10 +28,12 @@ import java.security.PrivilegedExceptionAction;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import org.apache.commons.lang3.RandomStringUtils;
@@ -961,5 +963,129 @@ public class TestHSync {
       }
     }
     bucket.deleteKey(keyName);
+  }
+
+  @Test
+  public void testHSyncKeyOverwrite() throws Exception {
+    // Set the fs.defaultFS
+    final String rootPath = String.format("%s://%s/",
+        OZONE_OFS_URI_SCHEME, CONF.get(OZONE_OM_ADDRESS_KEY));
+    CONF.set(CommonConfigurationKeysPublic.FS_DEFAULT_NAME_KEY, rootPath);
+
+    final String dir = OZONE_ROOT + bucket.getVolumeName()
+        + OZONE_URI_DELIMITER + bucket.getName();
+
+    // Expect empty OpenKeyTable before key creation
+    OzoneManager ozoneManager = cluster.getOzoneManager();
+    OMMetadataManager metadataManager = ozoneManager.getMetadataManager();
+    Table<String, OmKeyInfo> openKeyTable = metadataManager.getOpenKeyTable(BUCKET_LAYOUT);
+    Table<String, RepeatedOmKeyInfo> deletedTable = metadataManager.getDeletedTable();
+    assertTrue(openKeyTable.isEmpty());
+    assertTrue(deletedTable.isEmpty());
+    ozoneManager.getKeyManager().getDeletingService().suspend();
+
+    String data1 = "data for original file";
+    String data2 = "data for overwrite file";
+    int count = 10;
+    final Path file = new Path(dir, "hsync-file");
+    try (FileSystem fs = FileSystem.get(CONF)) {
+      FSDataOutputStream outputStream1 = null;
+      FSDataOutputStream outputStream2 = null;
+      try {
+        outputStream1 = fs.create(file, true);
+        for (int i = 0; i < count; i++) {
+          outputStream1.write(data1.getBytes(UTF_8), 0, data1.length());
+          //outputStream1.hsync();
+        }
+        Map<String, OmKeyInfo> openKeys = getAllOpenKeys(openKeyTable);
+        Map<String, RepeatedOmKeyInfo> deletedKeys = getAllDeletedKeys(deletedTable);
+        assertEquals(1, openKeys.size());
+        assertEquals(0, deletedKeys.size());
+//        OzoneKeyDetails keyInfo = bucket.getKey(file.getName());
+//        System.out.println("File " + file.getName() + ": " + keyInfo.getOzoneKeyLocations().get(0).toString() +
+//            ", dataSize " + keyInfo.getDataSize() + ", cTime " + keyInfo.getCreationTime() + " , mTime " + keyInfo.getModificationTime());
+
+        outputStream2 = fs.create(file, true);
+        openKeys = getAllOpenKeys(openKeyTable);
+        deletedKeys = getAllDeletedKeys(deletedTable);
+        assertEquals(2, openKeys.size());
+        assertEquals(0, deletedKeys.size());
+//        keyInfo = bucket.getKey(file.getName());
+//        System.out.println("File " + file.getName() + ": " + keyInfo.getOzoneKeyLocations().get(0).toString() +
+//            ", dataSize " + keyInfo.getDataSize() + ", cTime " + keyInfo.getCreationTime() + " , mTime " + keyInfo.getModificationTime());
+
+        outputStream2.write(data2.getBytes(UTF_8), 0, data2.length());
+        outputStream2.close();
+        openKeys = getAllOpenKeys(openKeyTable);
+        deletedKeys = getAllDeletedKeys(deletedTable);
+        assertEquals(1, openKeys.size());
+        assertEquals(0, deletedKeys.size());
+        for (Map.Entry<String, RepeatedOmKeyInfo> entry: deletedKeys.entrySet()) {
+          System.out.println("Deleted entry " + entry.getKey() + ", " + entry.getValue());
+        }
+        OzoneKeyDetails keyInfo = bucket.getKey(file.getName());
+        System.out.println("File " + file.getName() + ": " + keyInfo.getOzoneKeyLocations().get(0).toString() +
+            ", dataSize " + keyInfo.getDataSize() + ", cTime " + keyInfo.getCreationTime() + " , mTime " + keyInfo.getModificationTime());
+        // read file
+        try (OzoneInputStream is = bucket.readKey(file.getName())) {
+          ByteBuffer readBuffer = ByteBuffer.allocate((int)keyInfo.getDataSize());
+          int readLen = is.read(readBuffer);
+          assertEquals(keyInfo.getDataSize(), readLen);
+          assertArrayEquals(data2.getBytes(UTF_8), readBuffer.array());
+        }
+
+        outputStream1.close();
+        openKeys = getAllOpenKeys(openKeyTable);
+        deletedKeys = getAllDeletedKeys(deletedTable);
+        assertEquals(0, openKeys.size());
+        assertEquals(2, deletedKeys.size());
+        for (Map.Entry<String, RepeatedOmKeyInfo> entry: deletedKeys.entrySet()) {
+          System.out.println("Deleted entry " + entry.getKey() + ", " + entry.getValue());
+        }
+        keyInfo = bucket.getKey(file.getName());
+        System.out.println("File " + file.getName() + ": " + keyInfo.getOzoneKeyLocations().get(0).toString() +
+            ", dataSize " + keyInfo.getDataSize() + ", cTime " + keyInfo.getCreationTime() + " , mTime " + keyInfo.getModificationTime());
+        // read file
+        try (OzoneInputStream is = bucket.readKey(file.getName())) {
+          for (int i = 0; i < count; i++) {
+            ByteBuffer readBuffer = ByteBuffer.allocate(data1.length());
+            int readLen = is.read(readBuffer);
+            assertEquals(data1.length(), readLen);
+            assertArrayEquals(data1.getBytes(UTF_8), readBuffer.array());
+          }
+        }
+      } finally {
+        if (outputStream1 != null) {
+          outputStream1.close();
+        }
+        if (outputStream2 != null) {
+          outputStream2.close();
+        }
+      }
+    }
+  }
+
+  private Map<String, OmKeyInfo> getAllOpenKeys(Table<String, OmKeyInfo> table) throws IOException {
+    Map<String, OmKeyInfo> keys = new HashMap<String, OmKeyInfo>();
+    try (TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>> tableIter = table.iterator()) {
+      while (tableIter.hasNext()) {
+        Table.KeyValue<String, OmKeyInfo> kv = tableIter.next();
+        String key = kv.getKey();
+        keys.put(key, kv.getValue());
+      }
+    }
+    return keys;
+  }
+
+  private Map<String, RepeatedOmKeyInfo> getAllDeletedKeys(Table<String, RepeatedOmKeyInfo> table) throws IOException {
+    Map<String, RepeatedOmKeyInfo> keys = new HashMap<String, RepeatedOmKeyInfo>();
+    try (TableIterator<String, ? extends Table.KeyValue<String, RepeatedOmKeyInfo>> tableIter = table.iterator()) {
+      while (tableIter.hasNext()) {
+        Table.KeyValue<String, RepeatedOmKeyInfo> kv = tableIter.next();
+        String key = kv.getKey();
+        keys.put(key, kv.getValue());
+      }
+    }
+    return keys;
   }
 }
