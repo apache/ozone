@@ -100,7 +100,7 @@ public class CachingSpaceUsageSource implements SpaceUsageSource {
         if (current > 0) {
           LOG.warn("Attempted to decrement used space to a negative value. " +
                   "Current: {}, Decrement: {}, Source: {}",
-              current, reclaimedSpace, source.toString());
+              current, reclaimedSpace, source);
         }
         return 0;
       } else {
