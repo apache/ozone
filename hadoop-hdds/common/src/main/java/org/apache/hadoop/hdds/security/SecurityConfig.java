@@ -37,6 +37,8 @@ import org.bouncycastle.jce.provider.BouncyCastleProvider;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import javax.net.ssl.KeyManagerFactory;
+
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_BLOCK_TOKEN_ENABLED;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_BLOCK_TOKEN_ENABLED_DEFAULT;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_CONTAINER_TOKEN_ENABLED;
@@ -46,6 +48,8 @@ import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DEFAULT_KEY_LEN;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DEFAULT_SECURITY_PROVIDER;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_KEYSTORE_TYPE;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_KEYSTORE_TYPE_DEFAULT;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_KEY_MANAGER_FACTORY_ALGORITHM;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_KEY_MANAGER_FACTORY_ALGORITHM_DEFAULT;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_X509_CA_ROTATION_ACK_TIMEOUT;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_X509_CA_ROTATION_ACK_TIMEOUT_DEFAULT;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_X509_CA_ROTATION_CHECK_INTERNAL;
@@ -143,6 +147,7 @@ public class SecurityConfig {
   private final Duration rootCaCertificatePollingInterval;
   private final boolean autoCARotationEnabled;
   private final Duration expiredCertificateCheckInterval;
+  private final String keyManagerFactoryAlgorithm;
 
   /**
    * Constructs a SecurityConfig.
@@ -157,7 +162,8 @@ public class SecurityConfig {
     this.providerString = configuration.get(HDDS_SECURITY_PROVIDER,
         HDDS_DEFAULT_SECURITY_PROVIDER);
     this.keyStoreType = configuration.get(HDDS_KEYSTORE_TYPE, HDDS_KEYSTORE_TYPE_DEFAULT);
-
+    this.keyManagerFactoryAlgorithm = configuration.get(
+        HDDS_KEY_MANAGER_FACTORY_ALGORITHM, HDDS_KEY_MANAGER_FACTORY_ALGORITHM_DEFAULT);
     // Please Note: To make it easy for our customers we will attempt to read
     // HDDS metadata dir and if that is not set, we will use Ozone directory.
     this.metadataDir = configuration.get(HDDS_METADATA_DIR_NAME,
@@ -402,6 +408,10 @@ public class SecurityConfig {
 
   public String getKeyStoreType() {
     return keyStoreType;
+  }
+
+  public String getKeyManagerFactoryAlgorithm() {
+    return keyManagerFactoryAlgorithm;
   }
 
   /**

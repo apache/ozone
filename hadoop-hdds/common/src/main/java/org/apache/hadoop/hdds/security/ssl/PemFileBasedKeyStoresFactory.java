@@ -77,7 +77,7 @@ public class PemFileBasedKeyStoresFactory implements KeyStoresFactory,
   private void createKeyManagers() throws
       GeneralSecurityException, IOException {
     ReloadingX509KeyManager keystoreManager =
-        new ReloadingX509KeyManager(conf.getKeyStoreType(), caClient);
+        new ReloadingX509KeyManager(conf, caClient);
     keyManagers = new KeyManager[] {keystoreManager};
   }
 
@@ -102,7 +102,7 @@ public class PemFileBasedKeyStoresFactory implements KeyStoresFactory,
       KeyStore keystore = KeyStore.getInstance(conf.getKeyStoreType());
       keystore.load(null, null);
       KeyManagerFactory keyMgrFactory = KeyManagerFactory
-          .getInstance(KeyManagerFactory.getDefaultAlgorithm());
+          .getInstance(conf.getKeyManagerFactoryAlgorithm());
 
       keyMgrFactory.init(keystore, null);
       keyManagers = keyMgrFactory.getKeyManagers();

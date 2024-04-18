@@ -19,6 +19,7 @@ package org.apache.hadoop.hdds.security.ssl;
 
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.annotation.InterfaceStability;
+import org.apache.hadoop.hdds.security.SecurityConfig;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -55,6 +56,7 @@ public class ReloadingX509KeyManager extends X509ExtendedKeyManager {
       LoggerFactory.getLogger(ReloadingX509KeyManager.class);
 
   private final String type;
+  private final String factoryAlgorithm;
   /**
    * Default password. KeyStore and trustStore will not persist to disk, just in
    * memory.
@@ -73,14 +75,14 @@ public class ReloadingX509KeyManager extends X509ExtendedKeyManager {
   /**
    * Construct a <code>Reloading509KeystoreManager</code>.
    *
-   * @param type type of keystore file, typically 'jks'.
    * @param caClient client to get the private key and certificate materials.
    * @throws IOException
    * @throws GeneralSecurityException
    */
-  public ReloadingX509KeyManager(String type, CertificateClient caClient)
+  public ReloadingX509KeyManager(SecurityConfig config, CertificateClient caClient)
       throws GeneralSecurityException, IOException {
-    this.type = type;
+    this.type = config.getKeyStoreType();
+    factoryAlgorithm = config.getKeyManagerFactoryAlgorithm();
     keyManagerRef = new AtomicReference<>();
     keyManagerRef.set(loadKeyManager(caClient));
   }
@@ -224,8 +226,7 @@ public class ReloadingX509KeyManager extends X509ExtendedKeyManager {
       LOG.info(x509Certificate.toString());
     }
 
-    KeyManagerFactory keyMgrFactory = KeyManagerFactory.getInstance(
-        KeyManagerFactory.getDefaultAlgorithm());
+    KeyManagerFactory keyMgrFactory = KeyManagerFactory.getInstance(factoryAlgorithm);
     keyMgrFactory.init(keystore, EMPTY_PASSWORD);
     for (KeyManager candidate: keyMgrFactory.getKeyManagers()) {
       if (candidate instanceof X509ExtendedKeyManager) {

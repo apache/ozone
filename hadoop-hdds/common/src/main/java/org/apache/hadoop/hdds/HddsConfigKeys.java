@@ -16,6 +16,8 @@
  */
 package org.apache.hadoop.hdds;
 
+import javax.net.ssl.KeyManagerFactory;
+
 /**
  * This class contains constants for configuration keys and default values
  * used in hdds.
@@ -144,6 +146,8 @@ public final class HddsConfigKeys {
   public static final String HDDS_KEY_DIR_NAME_DEFAULT = "keys";
   public static final String HDDS_KEYSTORE_TYPE = "hdds.keystore.type";
   public static final String HDDS_KEYSTORE_TYPE_DEFAULT = "jks";
+  public static final String HDDS_KEY_MANAGER_FACTORY_ALGORITHM = "hdds.key.manager.factory.algorithm";
+  public static final String HDDS_KEY_MANAGER_FACTORY_ALGORITHM_DEFAULT = KeyManagerFactory.getDefaultAlgorithm();
 
   // TODO : Talk to StorageIO classes and see if they can return a secure
   // storage location for each node.
