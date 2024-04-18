@@ -1354,7 +1354,18 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
         .map(snapshotInfo -> SnapshotInfo.getFromProtobuf(snapshotInfo))
         .collect(Collectors.toList());
 
-    return new ListSnapshotResponse(snapshotInfos, response.hasLastSnapshot() ? response.getLastSnapshot() : null);
+    String lastSnapshot = null;
+
+    if (response.hasLastSnapshot()) {
+      lastSnapshot = response.getLastSnapshot();
+    } else if (snapshotInfos.size() == maxListResult) {
+      // This is to make sure that the change (HDDS-9983) is forward compatibility.
+      // Set lastSnapshot only when current list size is equal to maxListResult
+      // and there is possibility of more entries.
+      lastSnapshot = snapshotInfos.get(maxListResult - 1).getName();
+    }
+
+    return new ListSnapshotResponse(snapshotInfos, lastSnapshot);
   }
 
   /**
