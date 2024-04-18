@@ -97,10 +97,11 @@ public class CachingSpaceUsageSource implements SpaceUsageSource {
     cachedValue.updateAndGet(current -> {
       long newValue = current - reclaimedSpace;
       if (newValue < 0) {
-        LOG.warn(
-            "Attempted to decrement used space to a negative value. Current: {}, Decrement: {}",
-            current, reclaimedSpace);
-        return 0; // Reset to zero
+        if (current > 0) {
+          LOG.warn("Attempted to decrement used space to a negative value. " +
+              "Current: {}, Decrement: {}", current, reclaimedSpace);
+        }
+        return 0;
       } else {
         return newValue;
       }
