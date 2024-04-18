@@ -142,6 +142,20 @@ public class TestCachingSpaceUsageSource {
     verify(executor).shutdown();
   }
 
+  @Test
+  public void testDecrementDoesNotGoNegative() {
+    SpaceUsageCheckParams params = paramsBuilder(new AtomicLong(50))
+        .withRefresh(Duration.ZERO)
+        .build();
+    CachingSpaceUsageSource subject = new CachingSpaceUsageSource(params);
+
+    // Try to decrement more than the current value
+    subject.decrementUsedSpace(100);
+
+    // Check that the value has been set to 0
+    assertEquals(0, subject.getUsedSpace());
+  }
+
   private static long missingInitialValue() {
     return 0L;
   }
