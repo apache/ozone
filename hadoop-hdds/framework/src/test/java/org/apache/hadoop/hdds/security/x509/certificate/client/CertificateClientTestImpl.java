@@ -153,9 +153,9 @@ public class CertificateClientTestImpl implements CertificateClient {
 
     notificationReceivers = new HashSet<>();
     serverKeyStoresFactory = SecurityUtil.getServerKeyStoresFactory(
-        this, true);
+        this, true, securityConfig);
     clientKeyStoresFactory = SecurityUtil.getClientKeyStoresFactory(
-        this, true);
+        this, true, securityConfig);
 
     if (autoRenew) {
       Duration gracePeriod = securityConfig.getRenewalGracePeriod();

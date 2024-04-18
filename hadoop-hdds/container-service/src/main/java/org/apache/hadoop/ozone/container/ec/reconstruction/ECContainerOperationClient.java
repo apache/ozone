@@ -78,7 +78,7 @@ public class ECContainerOperationClient implements Closeable {
           () -> HAUtils.buildCAX509List(certificateClient, conf);
       CACertificateProvider remoteCacerts =
           () -> HAUtils.buildCAX509List(null, conf);
-      trustManager = new ClientTrustManager(remoteCacerts, localCaCerts);
+      trustManager = new ClientTrustManager(conf, remoteCacerts, localCaCerts);
     }
     return new XceiverClientManager(conf,
         new XceiverClientManager.XceiverClientManagerConfigBuilder()

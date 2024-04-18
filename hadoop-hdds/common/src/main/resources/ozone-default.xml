@@ -2252,6 +2252,14 @@
     </description>
   </property>
   <property>
+    <name>hdds.keystore.type</name>
+    <value>jks</value>
+    <tag>HDDS, SECURITY, CRYPTO_COMPLIANCE</tag>
+    <description>
+      Type of the keystore used in memory to load and reload pki keys.
+    </description>
+  </property>
+  <property>
     <name>hdds.key.dir.name</name>
     <value>keys</value>
     <tag>SCM, HDDS, X509, SECURITY</tag>
