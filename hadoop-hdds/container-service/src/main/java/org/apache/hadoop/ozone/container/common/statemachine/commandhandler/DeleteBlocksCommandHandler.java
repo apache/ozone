@@ -635,15 +635,16 @@ public class DeleteBlocksCommandHandler implements CommandHandler {
     boolean duplicate = false;
 
     if (delTX.getTxID() < containerData.getDeleteTransactionId()) {
-      metrics.incOutOfOrderDeleteBlockTransactionCount();
+      if (metrics != null) {
+        metrics.incOutOfOrderDeleteBlockTransactionCount();
+      }
       LOG.info(String.format("Delete blocks for containerId: %d"
               + " is received out of order, %d < %d", containerId, delTX.getTxID(),
           containerData.getDeleteTransactionId()));
     } else if (delTX.getTxID() == containerData.getDeleteTransactionId()) {
       duplicate = true;
-      LOG.info(String.format("Delete blocks with txID {} for containerId: %d"
-              + " is retried.", delTX.getTxID(), containerId,
-          containerData.getDeleteTransactionId()));
+      LOG.info(String.format("Delete blocks with txID %d for containerId: %d"
+              + " is retried.", delTX.getTxID(), containerId));
     } else {
       if (LOG.isDebugEnabled()) {
         LOG.debug("Processing Container : {}, DB path : {}, transaction {}",
