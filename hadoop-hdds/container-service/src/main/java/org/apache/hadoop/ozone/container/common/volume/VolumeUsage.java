@@ -213,17 +213,16 @@ public class VolumeUsage {
     }
 
     // 2. If hdds.datanode.dir.du.reserved not set and
-    // hdds.datanode.dir.du.reserved.percent is set, fall back to this config.
-    if (conf.isConfigured(HDDS_DATANODE_DIR_DU_RESERVED_PERCENT)) {
-      float percentage = conf.getFloat(HDDS_DATANODE_DIR_DU_RESERVED_PERCENT,
-          HDDS_DATANODE_DIR_DU_RESERVED_PERCENT_DEFAULT);
-      if (0 <= percentage && percentage <= 1) {
-        return (long) Math.ceil(capacity * percentage);
-      }
-      //If it comes here then the percentage is not between 0-1.
-      LOG.error("The value of {} should be between 0 to 1. Defaulting to 0.",
-          HDDS_DATANODE_DIR_DU_RESERVED_PERCENT);
+    // then fall back to hdds.datanode.dir.du.reserved.percent, using either its set value or default value if it has
+    // not been set.
+    float percentage = conf.getFloat(HDDS_DATANODE_DIR_DU_RESERVED_PERCENT,
+        HDDS_DATANODE_DIR_DU_RESERVED_PERCENT_DEFAULT);
+    if (0 <= percentage && percentage <= 1) {
+      return (long) Math.ceil(capacity * percentage);
     }
+    // If it comes here then the percentage is not between 0-1.
+    LOG.error("The value of {} should be between 0 to 1. Defaulting to 0.",
+        HDDS_DATANODE_DIR_DU_RESERVED_PERCENT);
 
     //Both configs are not set, return 0.
     return 0;

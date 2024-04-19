@@ -52,6 +52,28 @@ public class TestReservedVolumeSpace {
         .usageCheckFactory(MockSpaceUsageCheckFactory.NONE);
   }
 
+  @Test
+  public void testDefaultConfig() throws Exception {
+    OzoneConfiguration conf = new OzoneConfiguration();
+    HddsVolume hddsVolume = volumeBuilder.conf(conf).build();
+    float percentage = conf.getFloat(HDDS_DATANODE_DIR_DU_RESERVED_PERCENT,
+        HDDS_DATANODE_DIR_DU_RESERVED_PERCENT_DEFAULT);
+    assertEquals(percentage, HDDS_DATANODE_DIR_DU_RESERVED_PERCENT_DEFAULT);
+
+    // Gets the total capacity reported by Ozone, which may be limited to less than the volume's real capacity by the
+    // DU reserved configurations.
+    long volumeCapacity = hddsVolume.getCapacity();
+    VolumeUsage usage = hddsVolume.getVolumeInfo().get().getUsageForTesting();
+
+    // Gets the actual total capacity without accounting for DU reserved space configurations.
+    long totalCapacity = usage.realUsage().getCapacity();
+    long reservedCapacity = usage.getReservedBytes();
+    long expectedReservedCapacity = (long) Math.ceil(totalCapacity * percentage);
+
+    assertEquals(expectedReservedCapacity, reservedCapacity);
+    assertEquals(totalCapacity - reservedCapacity, volumeCapacity);
+  }
+
   /**
    * Test reserved capacity with respect to the percentage of actual capacity.
    * @throws Exception
