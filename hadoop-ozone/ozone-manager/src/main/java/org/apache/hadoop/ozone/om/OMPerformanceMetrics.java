@@ -247,15 +247,15 @@ public class OMPerformanceMetrics {
     deleteKeySuccessLatencyNs.add(latencyInNs);
   }
 
-  public void setDeleteKeysResolveBucketLatencyNs(long latencyInNs) {
-    deleteKeysResolveBucketLatencyNs.add(latencyInNs);
+  public MutableRate getDeleteKeysResolveBucketLatencyNs() {
+    return deleteKeysResolveBucketLatencyNs;
   }
 
-  public void setDeleteKeysAclCheckLatencyNs(long latencyInNs) {
-    deleteKeysAclCheckLatencyNs.add(latencyInNs);
+  public MutableRate getDeleteKeysAclCheckLatencyNs() {
+    return deleteKeysAclCheckLatencyNs;
   }
 
-  public void setDeleteKeyResolveBucketAndAclCheckLatencyNs(long latencyInNs) {
-    deleteKeyResolveBucketAndAclCheckLatencyNs.add(latencyInNs);
+ public MutableRate getDeleteKeyResolveBucketAndAclCheckLatencyNs() {
+    return deleteKeyResolveBucketAndAclCheckLatencyNs;
   }
 }

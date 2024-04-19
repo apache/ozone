@@ -71,6 +71,7 @@ import static org.apache.hadoop.ozone.audit.OMAction.DELETE_KEYS;
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.BUCKET_LOCK;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status.OK;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status.PARTIAL_DELETE;
+import static org.apache.hadoop.util.MetricUtil.captureLatencyNs;
 
 /**
  * Handles DeleteKey request.
@@ -127,12 +128,11 @@ public class OMKeysDeleteRequest extends OMKeyRequest {
 
     boolean deleteStatus = true;
     long startNanos = Time.monotonicNowNanos();
+    String finalVolumeName = volumeName;
+    String finalBucketName = bucketName;
     try {
-      long startNanosDeleteKeysResolveBucketLatency = Time.monotonicNowNanos();
-      ResolvedBucket bucket =
-          ozoneManager.resolveBucketLink(Pair.of(volumeName, bucketName), this);
-      perfMetrics.setDeleteKeysResolveBucketLatencyNs(
-          Time.monotonicNowNanos() - startNanosDeleteKeysResolveBucketLatency);
+      ResolvedBucket bucket = captureLatencyNs(perfMetrics.getDeleteKeysResolveBucketLatencyNs(), () ->
+          ozoneManager.resolveBucketLink(Pair.of(finalVolumeName, finalBucketName), this));
       bucket.audit(auditMap);
       volumeName = bucket.realVolume();
       bucketName = bucket.realBucket();
@@ -161,11 +161,9 @@ public class OMKeysDeleteRequest extends OMKeyRequest {
 
         try {
           // check Acl
-          long startNanosDeleteKeysAclCheckLatency = Time.monotonicNowNanos();
-          checkKeyAcls(ozoneManager, volumeName, bucketName, keyName,
-              IAccessAuthorizer.ACLType.DELETE, OzoneObj.ResourceType.KEY,
-              volumeOwner);
-          perfMetrics.setDeleteKeysAclCheckLatencyNs(Time.monotonicNowNanos() - startNanosDeleteKeysAclCheckLatency);
+          captureLatencyNs(perfMetrics.getDeleteKeysAclCheckLatencyNs(),
+                  () -> checkKeyAcls(ozoneManager, finalVolumeName, finalBucketName, keyName,
+              IAccessAuthorizer.ACLType.DELETE, OzoneObj.ResourceType.KEY, volumeOwner));
           OzoneFileStatus fileStatus = getOzoneKeyStatus(
               ozoneManager, omMetadataManager, volumeName, bucketName, keyName);
           addKeyToAppropriateList(omKeyInfoList, omKeyInfo, dirList,

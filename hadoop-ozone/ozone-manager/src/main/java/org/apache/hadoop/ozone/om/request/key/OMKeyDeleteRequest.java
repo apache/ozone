@@ -61,6 +61,7 @@ import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.KEY_NOT_FOUND;
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.BUCKET_LOCK;
+import static org.apache.hadoop.util.MetricUtil.captureLatencyNs;
 
 /**
  * Handles DeleteKey request.
@@ -91,22 +92,19 @@ public class OMKeyDeleteRequest extends OMKeyRequest {
     OzoneManagerProtocolProtos.KeyArgs.Builder newKeyArgs =
         keyArgs.toBuilder().setModificationTime(Time.now()).setKeyName(keyPath);
 
-    long startNanosDeleteKeyResolveBucketAndCheckAclsLatency = Time.monotonicNowNanos();
     KeyArgs resolvedArgs = resolveBucketAndCheckAcls(ozoneManager, newKeyArgs);
-    perfMetrics.setDeleteKeyResolveBucketAndAclCheckLatencyNs(
-        Time.monotonicNowNanos() - startNanosDeleteKeyResolveBucketAndCheckAclsLatency);
     return getOmRequest().toBuilder()
         .setDeleteKeyRequest(deleteKeyRequest.toBuilder()
             .setKeyArgs(resolvedArgs))
         .setUserInfo(getUserIfNotExists(ozoneManager)).build();
   }
 
-  protected KeyArgs resolveBucketAndCheckAcls(OzoneManager ozoneManager,
-      KeyArgs.Builder newKeyArgs) throws IOException {
-    return resolveBucketAndCheckKeyAcls(newKeyArgs.build(), ozoneManager,
-        ACLType.DELETE);
-  }
-
+protected KeyArgs resolveBucketAndCheckAcls(OzoneManager ozoneManager,
+                                            KeyArgs.Builder newKeyArgs) throws IOException {
+  return captureLatencyNs(
+          ozoneManager.getPerfMetrics().getDeleteKeyResolveBucketAndAclCheckLatencyNs(),
+          () -> resolveBucketAndCheckKeyAcls(newKeyArgs.build(), ozoneManager, ACLType.DELETE));
+}
   @Override
   @SuppressWarnings("methodlength")
   public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager, TermIndex termIndex) {
