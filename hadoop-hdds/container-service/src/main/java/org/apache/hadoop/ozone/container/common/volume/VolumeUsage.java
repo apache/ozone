@@ -212,9 +212,8 @@ public class VolumeUsage {
       }
     }
 
-    // 2. If hdds.datanode.dir.du.reserved not set and
-    // then fall back to hdds.datanode.dir.du.reserved.percent, using either its set value or default value if it has
-    // not been set.
+    // 2. If hdds.datanode.dir.du.reserved not set then fall back to hdds.datanode.dir.du.reserved.percent, using
+    // either its set value or default value if it has not been set.
     float percentage = conf.getFloat(HDDS_DATANODE_DIR_DU_RESERVED_PERCENT,
         HDDS_DATANODE_DIR_DU_RESERVED_PERCENT_DEFAULT);
     if (0 <= percentage && percentage <= 1) {
