@@ -1,6 +1,5 @@
-package org.apache.hadoop.hdds.scm.container;
+package org.apache.hadoop.hdds.scm.container.reconciliation;
 
-import org.apache.commons.lang3.stream.Streams;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
@@ -9,6 +8,14 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto.State;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ReconcileContainerCommandProto;
 import org.apache.hadoop.hdds.scm.HddsTestUtils;
+import org.apache.hadoop.hdds.scm.container.ContainerID;
+import org.apache.hadoop.hdds.scm.container.ContainerInfo;
+import org.apache.hadoop.hdds.scm.container.ContainerManager;
+import org.apache.hadoop.hdds.scm.container.ContainerNotFoundException;
+import org.apache.hadoop.hdds.scm.container.ContainerReplica;
+import org.apache.hadoop.hdds.scm.container.MockNodeManager;
+import org.apache.hadoop.hdds.scm.container.reconciliation.ReconciliationEligibilityHandler.EligibilityResult;
+import org.apache.hadoop.hdds.scm.container.reconciliation.ReconciliationEligibilityHandler.Result;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
 import org.apache.hadoop.ozone.protocol.commands.CommandForDatanode;
@@ -18,8 +25,6 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
 import org.mockito.ArgumentCaptor;
-import org.mockito.Captor;
-import org.mockito.MockitoAnnotations;
 
 import java.util.Arrays;
 import java.util.HashSet;
@@ -32,6 +37,7 @@ import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.THREE;
 import static org.apache.hadoop.hdds.scm.events.SCMEvents.DATANODE_COMMAND;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
@@ -54,13 +60,11 @@ public class TestReconcileContainerEventHandler {
   private static final ReplicationConfig RATIS_ONE_REP = RatisReplicationConfig.getInstance(ONE);
   private static final ReplicationConfig EC_REP = new ECReplicationConfig(3, 2);
 
-  @Captor
   private ArgumentCaptor<CommandForDatanode<ReconcileContainerCommandProto>> commandCaptor;
 
   @BeforeEach
   public void setup() throws Exception {
-    // TODO for command captor?
-    MockitoAnnotations.initMocks(this);
+    commandCaptor = ArgumentCaptor.forClass(CommandForDatanode.class);
     containerManager = mock(ContainerManager.class);
     scmContext = mock(SCMContext.class);
     when(scmContext.isLeader()).thenReturn(true);
@@ -74,8 +78,14 @@ public class TestReconcileContainerEventHandler {
    */
   @Test
   public void testReconcileECContainer() throws Exception {
-    addContainer(CONTAINER_ID, EC_REP, LifeCycleState.CLOSED);
-    addReplicasToContainer(CONTAINER_ID, 5);
+    addContainer(EC_REP, LifeCycleState.CLOSED);
+    addReplicasToContainer(5);
+
+    EligibilityResult result =
+        ReconciliationEligibilityHandler.isEligibleForReconciliation(CONTAINER_ID, containerManager);
+    assertFalse(result.isOk());
+    assertEquals(Result.INELIGIBLE_REPLICATION_TYPE, result.getResult());
+
     eventHandler.onMessage(CONTAINER_ID, eventPublisher);
     verify(eventPublisher, never()).fireEvent(eq(DATANODE_COMMAND), any());
   }
@@ -85,17 +95,30 @@ public class TestReconcileContainerEventHandler {
    */
   @Test
   public void testReconcileRatisOneContainer() throws Exception {
-    addContainer(CONTAINER_ID, RATIS_ONE_REP, LifeCycleState.CLOSED);
-    addReplicasToContainer(CONTAINER_ID, 1);
+    addContainer(RATIS_ONE_REP, LifeCycleState.CLOSED);
+    addReplicasToContainer(1);
+
+    EligibilityResult result =
+        ReconciliationEligibilityHandler.isEligibleForReconciliation(CONTAINER_ID, containerManager);
+    assertFalse(result.isOk());
+    assertEquals(Result.NOT_ENOUGH_REQUIRED_NODES, result.getResult());
+
     eventHandler.onMessage(CONTAINER_ID, eventPublisher);
     verify(eventPublisher, never()).fireEvent(eq(DATANODE_COMMAND), any());
   }
 
   @Test
   public void testReconcileWhenNotLeader() throws Exception {
-    addContainer(CONTAINER_ID, RATIS_THREE_REP, LifeCycleState.CLOSED);
-    addReplicasToContainer(CONTAINER_ID, 3);
+    addContainer(RATIS_THREE_REP, LifeCycleState.CLOSED);
+    addReplicasToContainer(3);
     when(scmContext.isLeader()).thenReturn(false);
+
+    // Container is eligible for reconciliation, but the request will not go through because this SCM is not the leader.
+    EligibilityResult result =
+        ReconciliationEligibilityHandler.isEligibleForReconciliation(CONTAINER_ID, containerManager);
+    assertTrue(result.isOk());
+    assertEquals(Result.OK, result.getResult());
+
     eventHandler.onMessage(CONTAINER_ID, eventPublisher);
     verify(eventPublisher, never()).fireEvent(eq(DATANODE_COMMAND), any());
   }
@@ -107,15 +130,27 @@ public class TestReconcileContainerEventHandler {
     // No exceptions should be thrown out of this test method when this happens. If they are, they will be propagated
     // and the test will fail.
     when(containerManager.getContainer(any())).thenThrow(new ContainerNotFoundException());
+
+    EligibilityResult result =
+        ReconciliationEligibilityHandler.isEligibleForReconciliation(CONTAINER_ID, containerManager);
+    assertFalse(result.isOk());
+    assertEquals(Result.CONTAINER_NOT_FOUND, result.getResult());
+
     eventHandler.onMessage(CONTAINER_ID, eventPublisher);
     verify(eventPublisher, never()).fireEvent(eq(DATANODE_COMMAND), any());
   }
 
   @Test
   public void testReconcileMissingContainer() throws Exception {
-    addContainer(CONTAINER_ID, RATIS_THREE_REP, LifeCycleState.CLOSED);
+    addContainer(RATIS_THREE_REP, LifeCycleState.CLOSED);
     assertTrue(containerManager.getContainerReplicas(CONTAINER_ID).isEmpty(),
         "Expected no replicas for this container");
+
+    EligibilityResult result =
+        ReconciliationEligibilityHandler.isEligibleForReconciliation(CONTAINER_ID, containerManager);
+    assertFalse(result.isOk());
+    assertEquals(Result.NO_REPLICAS_FOUND, result.getResult());
+
     eventHandler.onMessage(CONTAINER_ID, eventPublisher);
     verify(eventPublisher, never()).fireEvent(eq(DATANODE_COMMAND), any());
   }
@@ -123,8 +158,10 @@ public class TestReconcileContainerEventHandler {
   @ParameterizedTest
   @EnumSource(LifeCycleState.class)
   public void testReconcileWithContainerStates(LifeCycleState state) throws Exception {
-    addContainer(CONTAINER_ID, RATIS_THREE_REP, state);
-    addReplicasToContainer(CONTAINER_ID, 3);
+    addContainer(RATIS_THREE_REP, state);
+    addReplicasToContainer(3);
+    EligibilityResult result =
+        ReconciliationEligibilityHandler.isEligibleForReconciliation(CONTAINER_ID, containerManager);
     eventHandler.onMessage(CONTAINER_ID, eventPublisher);
     switch (state) {
     case OPEN:
@@ -132,28 +169,31 @@ public class TestReconcileContainerEventHandler {
     case DELETING:
     case DELETED:
     case RECOVERING:
+      assertFalse(result.isOk());
+      assertEquals(Result.INELIGIBLE_CONTAINER_STATE, result.getResult());
       verify(eventPublisher, never()).fireEvent(eq(DATANODE_COMMAND), commandCaptor.capture());
       break;
     default:
+      assertTrue(result.isOk());
+      assertEquals(Result.OK, result.getResult());
       verify(eventPublisher, times(3)).fireEvent(eq(DATANODE_COMMAND), commandCaptor.capture());
       break;
     }
-
-
-    if (state == LifeCycleState.OPEN || state == LifeCycleState.CLOSING) {
-      verify(eventPublisher, never()).fireEvent(eq(DATANODE_COMMAND), any());
-    } else {
-      verify(eventPublisher, any()).fireEvent(eq(DATANODE_COMMAND), any());
-    }
   }
 
+  // TODO HDDS-10714 will change which datanodes are eligible to participate in reconciliation.
   @Test
   public void testReconcileSentToAllPeers() throws Exception {
-    addContainer(CONTAINER_ID, RATIS_THREE_REP, LifeCycleState.CLOSED);
-    Set<ContainerReplica> replicas = addReplicasToContainer(CONTAINER_ID, 3);
+    addContainer(RATIS_THREE_REP, LifeCycleState.CLOSED);
+    Set<ContainerReplica> replicas = addReplicasToContainer(3);
     Set<UUID> allNodeIDs = replicas.stream()
         .map(r -> r.getDatanodeDetails().getUuid())
         .collect(Collectors.toSet());
+
+    EligibilityResult result =
+        ReconciliationEligibilityHandler.isEligibleForReconciliation(CONTAINER_ID, containerManager);
+    assertTrue(result.isOk());
+    assertEquals(Result.OK, result.getResult());
 
     eventHandler.onMessage(CONTAINER_ID, eventPublisher);
     assertEquals(3, replicas.size());
@@ -191,55 +231,61 @@ public class TestReconcileContainerEventHandler {
 
   @ParameterizedTest
   @EnumSource(State.class)
-  public void testReconcileFailsWithOpenReplicas(State replicaState) throws Exception {
+  public void testReconcileFailsWithIneligibleReplicas(State replicaState) throws Exception {
     // Overall container state is eligible for reconciliation, but some replicas may not be.
     // This means the container will not be considered eligible.
-    addContainer(CONTAINER_ID, RATIS_THREE_REP, LifeCycleState.CLOSED);
+    addContainer(RATIS_THREE_REP, LifeCycleState.CLOSED);
     // Only one replica is in a different state.
-    addReplicasToContainer(CONTAINER_ID, replicaState, State.CLOSED, State.CLOSED);
+    addReplicasToContainer(replicaState, State.CLOSED, State.CLOSED);
+
+    EligibilityResult result =
+        ReconciliationEligibilityHandler.isEligibleForReconciliation(CONTAINER_ID, containerManager);
+
     eventHandler.onMessage(CONTAINER_ID, eventPublisher);
     switch (replicaState) {
     case OPEN:
     case INVALID:
     case DELETED:
     case CLOSING:
+      assertFalse(result.isOk());
+      assertEquals(Result.INELIGIBLE_REPLICA_STATES, result.getResult());
       verify(eventPublisher, never()).fireEvent(eq(DATANODE_COMMAND), commandCaptor.capture());
       break;
     default:
+      assertTrue(result.isOk());
+      assertEquals(Result.OK, result.getResult());
       verify(eventPublisher, times(3)).fireEvent(eq(DATANODE_COMMAND), commandCaptor.capture());
       break;
     }
   }
 
-  private ContainerInfo addContainer(ContainerID id, ReplicationConfig repConfig, LifeCycleState state) throws Exception {
+  private ContainerInfo addContainer(ReplicationConfig repConfig, LifeCycleState state) throws Exception {
     ContainerInfo container = new ContainerInfo.Builder()
-        .setContainerID(id.getId())
-//        .setOwner("Ozone")
-//        .setPipelineID(pipelineID)
+        .setContainerID(CONTAINER_ID.getId())
         .setReplicationConfig(repConfig)
         .setState(state)
         .build();
-    when(containerManager.getContainer(id)).thenReturn(container);
+    when(containerManager.getContainer(CONTAINER_ID)).thenReturn(container);
     return container;
   }
 
-  private Set<ContainerReplica> addReplicasToContainer(ContainerID id, int count) throws Exception {
+  private Set<ContainerReplica> addReplicasToContainer(int count) throws Exception {
     State[] replicaStates = new State[count];
     Arrays.fill(replicaStates, State.CLOSED);
-    return addReplicasToContainer(id, replicaStates);
+    return addReplicasToContainer(replicaStates);
   }
 
-  private Set<ContainerReplica> addReplicasToContainer(ContainerID id, State... replicaStates) throws Exception {
+  private Set<ContainerReplica> addReplicasToContainer(State... replicaStates) throws Exception {
     // Add one container replica for each replica state specified.
     // If no states are specified, replica list will be empty.
     Set<ContainerReplica> replicas = new HashSet<>();
     try (MockNodeManager nodeManager = new MockNodeManager(true, replicaStates.length)) {
       List<DatanodeDetails> nodes = nodeManager.getAllNodes();
       for (int i = 0; i < replicaStates.length; i++) {
-        replicas.addAll(HddsTestUtils.getReplicas(id, replicaStates[i], nodes.get(i)));
+        replicas.addAll(HddsTestUtils.getReplicas(CONTAINER_ID, replicaStates[i], nodes.get(i)));
       }
     }
-    when(containerManager.getContainerReplicas(id)).thenReturn(replicas);
+    when(containerManager.getContainerReplicas(CONTAINER_ID)).thenReturn(replicas);
 
     return replicas;
   }

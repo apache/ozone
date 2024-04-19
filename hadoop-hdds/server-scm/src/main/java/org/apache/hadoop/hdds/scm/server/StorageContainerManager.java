@@ -49,7 +49,7 @@ import org.apache.hadoop.hdds.scm.ScmUtils;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.container.ContainerManagerImpl;
 import org.apache.hadoop.hdds.scm.PlacementPolicyValidateProxy;
-import org.apache.hadoop.hdds.scm.container.ReconcileContainerEventHandler;
+import org.apache.hadoop.hdds.scm.container.reconciliation.ReconcileContainerEventHandler;
 import org.apache.hadoop.hdds.scm.container.balancer.MoveManager;
 import org.apache.hadoop.hdds.scm.container.replication.ContainerReplicaPendingOps;
 import org.apache.hadoop.hdds.scm.container.replication.DatanodeCommandCountUpdatedHandler;

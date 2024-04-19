@@ -56,6 +56,8 @@ import org.apache.hadoop.hdds.scm.container.balancer.ContainerBalancerConfigurat
 import org.apache.hadoop.hdds.scm.container.balancer.IllegalContainerBalancerStateException;
 import org.apache.hadoop.hdds.scm.container.balancer.InvalidContainerBalancerConfigurationException;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
+import org.apache.hadoop.hdds.scm.container.reconciliation.ReconciliationEligibilityHandler;
+import org.apache.hadoop.hdds.scm.container.reconciliation.ReconciliationEligibilityHandler.EligibilityResult;
 import org.apache.hadoop.hdds.scm.events.SCMEvents;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException.ResultCodes;
@@ -1393,27 +1395,24 @@ public class SCMClientProtocolServer implements
     auditMap.put("remoteUser", remoteUser.getUserName());
 
     try {
-      // May throw ContainerNotFoundException, which will be caught, audited, and returned to the user.
-      ContainerInfo container = getScm().getContainerManager().getContainer(containerID);
-
-      // Reconcile is not allowed on open containers.
-      HddsProtos.LifeCycleState state = container.getState();
-      if (state.equals(HddsProtos.LifeCycleState.OPEN)) {
-        throw new SCMException("Cannot reconcile container in state " + state,
-            ResultCodes.UNEXPECTED_CONTAINER_STATE);
-      }
-
-      // Reconcile on EC containers is not yet implemented.
-      ReplicationConfig repConfig = container.getReplicationConfig();
-      if (repConfig.getReplicationType() != HddsProtos.ReplicationType.RATIS) {
-        throw new SCMException("Reconciliation is currently only supported for Ratis containers",
-            ResultCodes.UNSUPPORTED_OPERATION);
-      }
-
-      // Reconciliation requires multiple replicas to reconcile.
-      if (repConfig.getRequiredNodes() <= 1) {
-        throw new SCMException("Reconciliation is only supported for containers with more than one required node.",
-            ResultCodes.UNSUPPORTED_OPERATION);
+      EligibilityResult result = ReconciliationEligibilityHandler.isEligibleForReconciliation(containerID,
+          getScm().getContainerManager());
+      if (!result.isOk()) {
+        switch (result.getResult()) {
+        case OK:
+          break;
+        case CONTAINER_NOT_FOUND:
+          throw new ContainerNotFoundException(result.toString());
+        case INELIGIBLE_CONTAINER_STATE:
+          throw new SCMException(result.toString(), ResultCodes.UNEXPECTED_CONTAINER_STATE);
+        case INELIGIBLE_REPLICA_STATES:
+        case INELIGIBLE_REPLICATION_TYPE:
+        case NOT_ENOUGH_REQUIRED_NODES:
+        case NO_REPLICAS_FOUND:
+          throw new SCMException(result.toString(), ResultCodes.UNSUPPORTED_OPERATION);
+        default:
+          throw new SCMException("Unknown reconciliation eligibility result " + result, ResultCodes.INTERNAL_ERROR);
+        }
       }
 
       scm.getEventQueue().fireEvent(SCMEvents.RECONCILE_CONTAINER, containerID);
