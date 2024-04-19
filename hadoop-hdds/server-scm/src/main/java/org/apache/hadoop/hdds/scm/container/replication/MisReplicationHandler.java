@@ -26,6 +26,7 @@ import org.apache.hadoop.hdds.scm.PlacementPolicy;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
+import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
 import org.apache.hadoop.hdds.scm.pipeline.InsufficientDatanodesException;
 import org.apache.ratis.protocol.exceptions.NotLeaderException;
@@ -56,16 +57,19 @@ public abstract class MisReplicationHandler implements
   private final PlacementPolicy containerPlacement;
   private final long currentContainerSize;
   private final ReplicationManager replicationManager;
+  private final NodeManager nodeManager;
   private final ReplicationManagerMetrics metrics;
 
   public MisReplicationHandler(
       final PlacementPolicy containerPlacement,
-      final ConfigurationSource conf, ReplicationManager replicationManager) {
+      final ConfigurationSource conf, ReplicationManager replicationManager,
+      NodeManager nodeManager) {
     this.containerPlacement = containerPlacement;
     this.currentContainerSize = (long) conf.getStorageSize(
             ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE,
             ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE_DEFAULT, StorageUnit.BYTES);
     this.replicationManager = replicationManager;
+    this.nodeManager = nodeManager;
     this.metrics = replicationManager.getMetrics();
   }
 
@@ -150,7 +154,7 @@ public abstract class MisReplicationHandler implements
     ReplicationManagerUtil.ExcludedAndUsedNodes excludedAndUsedNodes
         = ReplicationManagerUtil.getExcludedAndUsedNodes(container,
             new ArrayList(replicas), replicasToBeReplicated,
-            Collections.emptyList(), replicationManager);
+            Collections.emptyList(), replicationManager, nodeManager);
 
     int requiredNodes = replicasToBeReplicated.size();
 

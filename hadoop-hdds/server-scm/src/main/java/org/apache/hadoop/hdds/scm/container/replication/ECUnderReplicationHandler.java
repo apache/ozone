@@ -33,6 +33,7 @@ import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
+import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.node.NodeStatus;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
 import org.apache.hadoop.hdds.scm.pipeline.InsufficientDatanodesException;
@@ -65,15 +66,18 @@ public class ECUnderReplicationHandler implements UnhealthyReplicationHandler {
   private final PlacementPolicy containerPlacement;
   private final long currentContainerSize;
   private final ReplicationManager replicationManager;
+  private final NodeManager nodeManager;
   private final ReplicationManagerMetrics metrics;
 
   ECUnderReplicationHandler(final PlacementPolicy containerPlacement,
-      final ConfigurationSource conf, ReplicationManager replicationManager) {
+      final ConfigurationSource conf, ReplicationManager replicationManager,
+      NodeManager nodeManager) {
     this.containerPlacement = containerPlacement;
     this.currentContainerSize = (long) conf
         .getStorageSize(ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE,
             ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE_DEFAULT, StorageUnit.BYTES);
     this.replicationManager = replicationManager;
+    this.nodeManager = nodeManager;
     this.metrics = replicationManager.getMetrics();
   }
 
@@ -130,7 +134,7 @@ public class ECUnderReplicationHandler implements UnhealthyReplicationHandler {
     ReplicationManagerUtil.ExcludedAndUsedNodes excludedAndUsedNodes =
         ReplicationManagerUtil.getExcludedAndUsedNodes(container,
             new ArrayList<>(replicas), Collections.emptySet(), pendingOps,
-            replicationManager);
+            replicationManager, nodeManager);
     List<DatanodeDetails> excludedNodes
         = excludedAndUsedNodes.getExcludedNodes();
     List<DatanodeDetails> usedNodes

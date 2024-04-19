@@ -24,6 +24,7 @@ import org.apache.hadoop.hdds.scm.PlacementPolicy;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
+import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.node.NodeStatus;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
 import org.slf4j.Logger;
@@ -114,6 +115,7 @@ public final class ReplicationManagerUtil {
    * @param toBeRemoved Set of nodes containing replicas that are to be removed
    * @param pendingReplicaOps List of pending replica operations
    * @param replicationManager ReplicationManager instance to get NodeStatus
+   * @param nodeManager NodeManager instance to get Nodes
    * @return ExcludedAndUsedNodes object containing the excluded and used lists
    */
   public static ExcludedAndUsedNodes getExcludedAndUsedNodes(
@@ -121,8 +123,9 @@ public final class ReplicationManagerUtil {
       List<ContainerReplica> replicas,
       Set<ContainerReplica> toBeRemoved,
       List<ContainerReplicaOp> pendingReplicaOps,
-      ReplicationManager replicationManager) {
-    List<DatanodeDetails> excludedNodes = new ArrayList<>();
+      ReplicationManager replicationManager,
+      NodeManager nodeManager) {
+    Set<DatanodeDetails> excludedNodes = new HashSet<>();
     List<DatanodeDetails> usedNodes = new ArrayList<>();
 
     List<ContainerReplica> nonUniqueUnhealthy = null;
@@ -196,7 +199,9 @@ public final class ReplicationManagerUtil {
         excludedNodes.add(pending.getTarget());
       }
     }
-    return new ExcludedAndUsedNodes(excludedNodes, usedNodes);
+    excludedNodes.addAll(nodeManager.getNodes(HddsProtos.NodeOperationalState.DECOMMISSIONING, null));
+    excludedNodes.addAll(nodeManager.getNodes(HddsProtos.NodeOperationalState.DECOMMISSIONED, null));
+    return new ExcludedAndUsedNodes(new ArrayList<>(excludedNodes), usedNodes);
   }
 
 

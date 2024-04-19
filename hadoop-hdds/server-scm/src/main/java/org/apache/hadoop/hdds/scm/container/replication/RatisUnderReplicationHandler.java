@@ -29,6 +29,7 @@ import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
+import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
 import org.apache.hadoop.hdds.scm.pipeline.InsufficientDatanodesException;
 import org.apache.hadoop.ozone.protocol.commands.ReplicateContainerCommand;
@@ -58,17 +59,20 @@ public class RatisUnderReplicationHandler
   private final PlacementPolicy placementPolicy;
   private final long currentContainerSize;
   private final ReplicationManager replicationManager;
+  private final NodeManager nodeManager;
   private final ReplicationManagerMetrics metrics;
 
   public RatisUnderReplicationHandler(final PlacementPolicy placementPolicy,
       final ConfigurationSource conf,
-      final ReplicationManager replicationManager) {
+      final ReplicationManager replicationManager,
+      final NodeManager nodeManager) {
     this.placementPolicy = placementPolicy;
     this.currentContainerSize = (long) conf
         .getStorageSize(ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE,
             ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE_DEFAULT, StorageUnit.BYTES);
     this.replicationManager = replicationManager;
     this.metrics = replicationManager.getMetrics();
+    this.nodeManager = nodeManager;
   }
 
   /**
@@ -225,7 +229,7 @@ public class RatisUnderReplicationHandler
     */
     ReplicationManagerUtil.ExcludedAndUsedNodes excludedAndUsedNodes =
         ReplicationManagerUtil.getExcludedAndUsedNodes(container, allReplicas, Collections.emptySet(), pendingOps,
-            replicationManager);
+            replicationManager, nodeManager);
 
     CommandTargetOverloadedException firstException = null;
     int numCommandsSent = 0;
@@ -446,7 +450,7 @@ public class RatisUnderReplicationHandler
     ReplicationManagerUtil.ExcludedAndUsedNodes excludedAndUsedNodes =
         ReplicationManagerUtil.getExcludedAndUsedNodes(replicaCount.getContainer(),
             replicaCount.getReplicas(), Collections.emptySet(), pendingOps,
-            replicationManager);
+            replicationManager, nodeManager);
 
     List<DatanodeDetails> excluded = excludedAndUsedNodes.getExcludedNodes();
     List<DatanodeDetails> used = excludedAndUsedNodes.getUsedNodes();
