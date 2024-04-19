@@ -80,7 +80,6 @@ public class OMKeyDeleteRequest extends OMKeyRequest {
     DeleteKeyRequest deleteKeyRequest = super.preExecute(ozoneManager)
         .getDeleteKeyRequest();
     Preconditions.checkNotNull(deleteKeyRequest);
-    OMPerformanceMetrics perfMetrics = ozoneManager.getPerfMetrics();
 
     OzoneManagerProtocolProtos.KeyArgs keyArgs = deleteKeyRequest.getKeyArgs();
     String keyPath = keyArgs.getKeyName();
@@ -99,12 +98,12 @@ public class OMKeyDeleteRequest extends OMKeyRequest {
         .setUserInfo(getUserIfNotExists(ozoneManager)).build();
   }
 
-protected KeyArgs resolveBucketAndCheckAcls(OzoneManager ozoneManager,
+  protected KeyArgs resolveBucketAndCheckAcls(OzoneManager ozoneManager,
                                             KeyArgs.Builder newKeyArgs) throws IOException {
-  return captureLatencyNs(
+    return captureLatencyNs(
           ozoneManager.getPerfMetrics().getDeleteKeyResolveBucketAndAclCheckLatencyNs(),
           () -> resolveBucketAndCheckKeyAcls(newKeyArgs.build(), ozoneManager, ACLType.DELETE));
-}
+  }
   @Override
   @SuppressWarnings("methodlength")
   public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager, TermIndex termIndex) {

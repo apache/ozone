@@ -255,7 +255,7 @@ public class OMPerformanceMetrics {
     return deleteKeysAclCheckLatencyNs;
   }
 
- public MutableRate getDeleteKeyResolveBucketAndAclCheckLatencyNs() {
+  public MutableRate getDeleteKeyResolveBucketAndAclCheckLatencyNs() {
     return deleteKeyResolveBucketAndAclCheckLatencyNs;
   }
 }
