@@ -51,7 +51,7 @@ public final class BasicOmKeyInfo {
     this.modificationTime = b.modificationTime;
     this.replicationConfig = b.replicationConfig;
     this.isFile = b.isFile;
-    this.eTag = b.eTag;
+    this.eTag = b.eTag != null && !b.eTag.isEmpty() ? b.eTag : null;
   }
 
   private BasicOmKeyInfo(OmKeyInfo b) {
