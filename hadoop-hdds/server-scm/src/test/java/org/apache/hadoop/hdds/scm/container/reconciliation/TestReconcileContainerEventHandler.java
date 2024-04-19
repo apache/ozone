@@ -47,6 +47,10 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+/**
+ * Tests that the ReconcileContainerEventHandler properly accepts and rejects reconciliation events based on
+ * container state, and dispatches commands to datanodes accordingly.
+ */
 public class TestReconcileContainerEventHandler {
   private ContainerManager containerManager;
   private EventPublisher eventPublisher;

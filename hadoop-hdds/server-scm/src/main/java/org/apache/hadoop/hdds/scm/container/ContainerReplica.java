@@ -27,7 +27,6 @@ import com.google.common.base.Preconditions;
 import org.apache.commons.lang3.builder.CompareToBuilder;
 import org.apache.commons.lang3.builder.EqualsBuilder;
 import org.apache.commons.lang3.builder.HashCodeBuilder;
-import org.apache.hadoop.ozone.container.common.interfaces.Container;
 
 /**
  * In-memory state of a container replica.

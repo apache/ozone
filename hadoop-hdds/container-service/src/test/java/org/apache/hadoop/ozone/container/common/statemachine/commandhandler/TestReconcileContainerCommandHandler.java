@@ -40,6 +40,9 @@ import static org.apache.hadoop.ozone.OzoneConsts.GB;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+/**
+ * Tests Datanode handling of reconcile container commands.
+ */
 public class TestReconcileContainerCommandHandler {
   public static final Logger LOG = LoggerFactory.getLogger(TestReconcileContainerCommandHandler.class);
 
@@ -156,11 +159,10 @@ public class TestReconcileContainerCommandHandler {
 
   private void waitForQueueCount(int expectedQueueCount) throws Exception {
     GenericTestUtils.waitFor(() -> {
-          int qCount = subject.getQueuedCount();
-          LOG.info("Waiting for queued command count to reach " + expectedQueueCount + ". Currently at " + qCount);
-          return qCount == expectedQueueCount;
-        },
-        500, 3000);
+      int qCount = subject.getQueuedCount();
+      LOG.info("Waiting for queued command count to reach " + expectedQueueCount + ". Currently at " + qCount);
+      return qCount == expectedQueueCount;
+    }, 500, 3000);
   }
 
   private void verifyContainerReportsSent() throws Exception {
