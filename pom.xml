@@ -146,7 +146,7 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
     <activation-api.version>1.2.2</activation-api.version>
     <jaxb-api.version>2.3.3</jaxb-api.version>
     <jaxb-runtime.version>2.3.9</jaxb-runtime.version>
-    <jsch.version>0.1.54</jsch.version>
+    <jsch.version>0.1.55</jsch.version>
     <cdi-api.version>2.0</cdi-api.version>
     <servlet-api.version>3.1.0</servlet-api.version>
     <glassfish-servlet.version>3.1</glassfish-servlet.version>
