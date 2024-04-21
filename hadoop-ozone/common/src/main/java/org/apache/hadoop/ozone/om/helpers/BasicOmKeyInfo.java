@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.om.helpers;
 import java.io.IOException;
 import java.util.Objects;
 
+import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.BasicKeyInfo;
@@ -51,7 +52,7 @@ public final class BasicOmKeyInfo {
     this.modificationTime = b.modificationTime;
     this.replicationConfig = b.replicationConfig;
     this.isFile = b.isFile;
-    this.eTag = b.eTag;
+    this.eTag = StringUtils.isNotEmpty(b.eTag) ? b.eTag : null;
   }
 
   private BasicOmKeyInfo(OmKeyInfo b) {
@@ -179,7 +180,7 @@ public final class BasicOmKeyInfo {
     } else {
       builder.setFactor(ReplicationConfig.getLegacyFactor(replicationConfig));
     }
-    if (eTag != null) {
+    if (StringUtils.isNotEmpty(eTag)) {
       builder.setETag(eTag);
     }
 
