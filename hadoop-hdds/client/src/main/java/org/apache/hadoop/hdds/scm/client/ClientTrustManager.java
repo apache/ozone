@@ -131,8 +131,9 @@ public class ClientTrustManager extends X509ExtendedTrustManager {
         ks.setCertificateEntry(serial, cert);
       }
 
-      TrustManagerFactory trustManagerFactory = TrustManagerFactory.getInstance(
-          TrustManagerFactory.getDefaultAlgorithm());
+      TrustManagerFactory trustManagerFactory =
+          TrustManagerFactory.getInstance(conf.get(HddsConfigKeys.HDDS_TRUST_MANAGER_FACTORY_ALGORITHM,
+              HddsConfigKeys.HDDS_TRUST_MANAGER_FACTORY_ALGORITHM_DEFAULT));
       trustManagerFactory.init(ks);
       trustManager = Arrays.stream(trustManagerFactory.getTrustManagers())
           .filter(tm -> tm instanceof X509ExtendedTrustManager)

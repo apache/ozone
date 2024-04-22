@@ -2268,6 +2268,14 @@
     </description>
   </property>
   <property>
+    <name>hdds.trust.manager.factory.algorithm</name>
+    <value></value>
+    <tag>HDDS, SECURITY, CRYPTO_COMPLIANCE</tag>
+    <description>
+      Cryptographic algorithm used for creating trust store factories.
+    </description>
+  </property>
+  <property>
     <name>hdds.key.dir.name</name>
     <value>keys</value>
     <tag>SCM, HDDS, X509, SECURITY</tag>

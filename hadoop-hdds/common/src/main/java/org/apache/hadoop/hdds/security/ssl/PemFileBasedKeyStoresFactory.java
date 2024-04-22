@@ -66,7 +66,7 @@ public class PemFileBasedKeyStoresFactory implements KeyStoresFactory,
   private void createTrustManagers() throws
       GeneralSecurityException, IOException {
     ReloadingX509TrustManager trustManager = new ReloadingX509TrustManager(
-        conf.getKeyStoreType(), caClient);
+        conf, caClient);
     trustManagers = new TrustManager[] {trustManager};
   }
 

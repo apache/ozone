@@ -19,6 +19,7 @@ package org.apache.hadoop.hdds.security.ssl;
 
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.annotation.InterfaceStability;
+import org.apache.hadoop.hdds.security.SecurityConfig;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -55,7 +56,7 @@ public final class ReloadingX509TrustManager implements X509TrustManager {
   static final String RELOAD_ERROR_MESSAGE =
       "Could not reload truststore (keep using existing one) : ";
 
-  private final String type;
+  private final SecurityConfig config;
   private final AtomicReference<X509TrustManager> trustManagerRef;
   /**
    * Current Root CA cert in trustManager, to detect if certificate is changed.
@@ -73,9 +74,9 @@ public final class ReloadingX509TrustManager implements X509TrustManager {
    * @throws GeneralSecurityException thrown if the truststore could not be
    * initialized due to a security error.
    */
-  public ReloadingX509TrustManager(String type, CertificateClient caClient)
+  public ReloadingX509TrustManager(SecurityConfig conf, CertificateClient caClient)
       throws GeneralSecurityException, IOException {
-    this.type = type;
+    this.config = conf;
     trustManagerRef = new AtomicReference<X509TrustManager>();
     trustManagerRef.set(loadTrustManager(caClient));
   }
@@ -163,12 +164,11 @@ public final class ReloadingX509TrustManager implements X509TrustManager {
     }
 
     X509TrustManager trustManager = null;
-    KeyStore ks = KeyStore.getInstance(type);
+    KeyStore ks = KeyStore.getInstance(config.getKeyStoreType());
     ks.load(null, null);
     insertCertsToKeystore(rootCACerts, ks);
 
-    TrustManagerFactory trustManagerFactory = TrustManagerFactory.getInstance(
-        TrustManagerFactory.getDefaultAlgorithm());
+    TrustManagerFactory trustManagerFactory = TrustManagerFactory.getInstance(config.getTrustManagerFactoryAlgorithm());
     trustManagerFactory.init(ks);
     TrustManager[] trustManagers = trustManagerFactory.getTrustManagers();
     for (TrustManager trustManager1 : trustManagers) {

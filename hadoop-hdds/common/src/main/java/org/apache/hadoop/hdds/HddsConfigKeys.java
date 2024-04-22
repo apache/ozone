@@ -16,6 +16,8 @@
  */
 package org.apache.hadoop.hdds;
 
+import javax.net.ssl.TrustManagerFactory;
+
 import javax.net.ssl.KeyManagerFactory;
 
 /**
@@ -148,6 +150,8 @@ public final class HddsConfigKeys {
   public static final String HDDS_KEYSTORE_TYPE_DEFAULT = "jks";
   public static final String HDDS_KEY_MANAGER_FACTORY_ALGORITHM = "hdds.key.manager.factory.algorithm";
   public static final String HDDS_KEY_MANAGER_FACTORY_ALGORITHM_DEFAULT = KeyManagerFactory.getDefaultAlgorithm();
+  public static final String HDDS_TRUST_MANAGER_FACTORY_ALGORITHM = "hdds.trust.manager.factory.algorithm";
+  public static final String HDDS_TRUST_MANAGER_FACTORY_ALGORITHM_DEFAULT = TrustManagerFactory.getDefaultAlgorithm();
 
   // TODO : Talk to StorageIO classes and see if they can return a secure
   // storage location for each node.
