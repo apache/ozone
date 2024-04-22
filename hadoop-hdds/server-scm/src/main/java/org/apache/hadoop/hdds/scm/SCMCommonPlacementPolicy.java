@@ -207,12 +207,23 @@ public abstract class SCMCommonPlacementPolicy implements
   object of DatanodeDetails(with Topology Information) while trying to get the
   random node from NetworkTopology should fix this. Check HDDS-7015
  */
-    List<DatanodeDetails> expandedExcludes = nodeManager.getNodes(NodeOperationalState.DECOMMISSIONING, null);
-    expandedExcludes.addAll(nodeManager.getNodes(NodeOperationalState.DECOMMISSIONED, null));
-    expandedExcludes.addAll(validateDatanodes(excludedNodes));
+    List<DatanodeDetails> expandedExcludes = expandExcludes(validateDatanodes(excludedNodes));
     return chooseDatanodesInternal(validateDatanodes(usedNodes),
             expandedExcludes, favoredNodes, nodesRequired,
             metadataSizeRequired, dataSizeRequired);
+  }
+
+  private List<DatanodeDetails> expandExcludes(List<DatanodeDetails> original) {
+    List<DatanodeDetails> expandedExcludes = new ArrayList<>(original);
+    List<DatanodeDetails> list1 = nodeManager.getNodes(NodeOperationalState.DECOMMISSIONING, null);
+    if (list1 != null && !list1.isEmpty()) {
+      expandedExcludes.addAll(list1);
+    }
+    List<DatanodeDetails> list2 = nodeManager.getNodes(NodeOperationalState.DECOMMISSIONED, null);
+    if (list2 != null && !list2.isEmpty()) {
+      expandedExcludes.addAll(list2);
+    }
+    return expandedExcludes;
   }
 
   /**
