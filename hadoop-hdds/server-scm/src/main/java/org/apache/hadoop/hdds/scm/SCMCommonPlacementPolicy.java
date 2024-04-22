@@ -214,7 +214,7 @@ public abstract class SCMCommonPlacementPolicy implements
   }
 
   private List<DatanodeDetails> expandExcludes(List<DatanodeDetails> original) {
-    List<DatanodeDetails> expandedExcludes = new ArrayList<>(original);
+    Set<DatanodeDetails> expandedExcludes = new HashSet<>(original);
     List<DatanodeDetails> list1 = nodeManager.getNodes(NodeOperationalState.DECOMMISSIONING, null);
     if (list1 != null && !list1.isEmpty()) {
       expandedExcludes.addAll(list1);
@@ -223,7 +223,7 @@ public abstract class SCMCommonPlacementPolicy implements
     if (list2 != null && !list2.isEmpty()) {
       expandedExcludes.addAll(list2);
     }
-    return expandedExcludes;
+    return new ArrayList<>(expandedExcludes);
   }
 
   /**
