@@ -2265,8 +2265,7 @@
     <value>keys</value>
     <tag>SCM, HDDS, X509, SECURITY</tag>
     <description>
-      Directory to store public/private key for SCM CA. This is relative to
-      ozone/hdds meteadata dir.
+      Directory to store public/private key for SCM CA. This is relative to ozone/hdds meteadata dir.
     </description>
   </property>
   <property>
