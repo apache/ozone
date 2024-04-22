@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.fs.contract;
 
+import org.apache.commons.lang3.RandomUtils;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
 import org.apache.hadoop.fs.FSDataInputStream;
@@ -25,13 +26,14 @@ import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.io.IOUtils;
 import org.assertj.core.api.Assertions;
-import org.junit.Test;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.EOFException;
 import java.io.IOException;
-import java.util.Random;
 
 import static org.apache.hadoop.fs.contract.ContractTestUtils.createFile;
 import static org.apache.hadoop.fs.contract.ContractTestUtils.dataset;
@@ -53,6 +55,7 @@ public abstract class AbstractContractSeekTest extends AbstractFSContractTestBas
   private Path zeroByteFile;
   private FSDataInputStream instream;
 
+  @BeforeEach
   @Override
   public void setup() throws Exception {
     super.setup();
@@ -74,6 +77,7 @@ public abstract class AbstractContractSeekTest extends AbstractFSContractTestBas
     return conf;
   }
 
+  @AfterEach
   @Override
   public void teardown() throws Exception {
     IOUtils.closeStream(instream);
@@ -341,15 +345,14 @@ public abstract class AbstractContractSeekTest extends AbstractFSContractTestBas
     byte[] buf = dataset(filesize, 0, 255);
     Path randomSeekFile = path("testrandomseeks.bin");
     createFile(getFileSystem(), randomSeekFile, true, buf);
-    Random r = new Random();
 
     // Record the sequence of seeks and reads which trigger a failure.
     int[] seeks = new int[10];
     int[] reads = new int[10];
     try (FSDataInputStream stm = getFileSystem().open(randomSeekFile)) {
       for (int i = 0; i < limit; i++) {
-        int seekOff = r.nextInt(buf.length);
-        int toRead = r.nextInt(Math.min(buf.length - seekOff, 32000));
+        int seekOff = RandomUtils.nextInt(0, buf.length);
+        int toRead = RandomUtils.nextInt(0, Math.min(buf.length - seekOff, 32000));
 
         seeks[i % seeks.length] = seekOff;
         reads[i % reads.length] = toRead;

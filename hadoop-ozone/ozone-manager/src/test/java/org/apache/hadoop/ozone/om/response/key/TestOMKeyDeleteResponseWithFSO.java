@@ -18,13 +18,14 @@
 
 package org.apache.hadoop.ozone.om.response.key;
 
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.ONE;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+
+import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
-import org.apache.hadoop.util.Time;
 
 /**
  * Tests OMKeyDeleteResponse - prefix layout.
@@ -36,7 +37,7 @@ public class TestOMKeyDeleteResponseWithFSO extends TestOMKeyDeleteResponse {
       OzoneManagerProtocolProtos.OMResponse omResponse) throws Exception {
     return new OMKeyDeleteResponseWithFSO(omResponse, omKeyInfo.getKeyName(),
         omKeyInfo, true, getOmBucketInfo(), false,
-        omMetadataManager.getVolumeId(volumeName));
+        omMetadataManager.getVolumeId(volumeName), null);
   }
 
   @Override
@@ -50,11 +51,11 @@ public class TestOMKeyDeleteResponseWithFSO extends TestOMKeyDeleteResponse {
             bucketName, "", omMetadataManager);
 
     OmKeyInfo omKeyInfo =
-            OMRequestTestUtils.createOmKeyInfo(volumeName, bucketName, keyName,
-                    HddsProtos.ReplicationType.RATIS,
-                    HddsProtos.ReplicationFactor.ONE,
-                    parentId + 1,
-                    parentId, 100, Time.now());
+        OMRequestTestUtils.createOmKeyInfo(volumeName, bucketName, keyName, RatisReplicationConfig.getInstance(ONE))
+            .setObjectID(parentId + 1)
+            .setParentObjectID(parentId)
+            .setUpdateID(100L)
+            .build();
     OMRequestTestUtils.addFileToKeyTable(false, false,
             keyName, omKeyInfo, -1, 50, omMetadataManager);
     return omMetadataManager.getOzonePathKey(
@@ -66,11 +67,12 @@ public class TestOMKeyDeleteResponseWithFSO extends TestOMKeyDeleteResponse {
   @Override
   protected OmKeyInfo getOmKeyInfo() {
     assertNotNull(getOmBucketInfo());
-    return OMRequestTestUtils.createOmKeyInfo(volumeName,
-            getOmBucketInfo().getBucketName(), keyName, replicationType,
-            replicationFactor,
-            getOmBucketInfo().getObjectID() + 1,
-            getOmBucketInfo().getObjectID(), 100, Time.now());
+    return OMRequestTestUtils.createOmKeyInfo(volumeName, omBucketInfo.getBucketName(), keyName,
+            replicationConfig)
+        .setObjectID(getOmBucketInfo().getObjectID() + 1)
+        .setParentObjectID(getOmBucketInfo().getObjectID())
+        .setUpdateID(100L)
+        .build();
   }
 
   @Override

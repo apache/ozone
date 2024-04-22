@@ -29,8 +29,8 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 import static org.mockito.Mockito.any;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.apache.hadoop.test.MetricsAsserts.getLongGauge;
-import static org.apache.hadoop.test.MetricsAsserts.getMetrics;
+import static org.apache.ozone.test.MetricsAsserts.getLongGauge;
+import static org.apache.ozone.test.MetricsAsserts.getMetrics;
 
 /**
  * Tests for the ReplicationManagerMetrics class.

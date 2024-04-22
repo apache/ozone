@@ -31,13 +31,13 @@ import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.container.common.transport.server.XceiverServerSpi;
 import org.junit.jupiter.api.AfterAll;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import picocli.CommandLine;
-
 import java.time.Duration;
 import java.util.concurrent.TimeUnit;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
 /**
  * Tests Freon with Pipeline destroy.
@@ -61,6 +61,8 @@ public class TestFreonWithPipelineDestroy {
             1, TimeUnit.SECONDS);
     conf.setTimeDuration(HddsConfigKeys.HDDS_PIPELINE_REPORT_INTERVAL,
             1, TimeUnit.SECONDS);
+    conf.setTimeDuration(ScmConfigKeys.OZONE_SCM_HEARTBEAT_PROCESS_INTERVAL, 1000, TimeUnit.MILLISECONDS);
+    conf.setInt(ScmConfigKeys.OZONE_SCM_RATIS_PIPELINE_LIMIT, 8);
     DatanodeRatisServerConfig ratisServerConfig =
         conf.getObject(DatanodeRatisServerConfig.class);
     ratisServerConfig.setRequestTimeOut(Duration.ofSeconds(3));
@@ -74,10 +76,7 @@ public class TestFreonWithPipelineDestroy {
     conf.setFromObject(raftClientConfig);
 
     cluster = MiniOzoneCluster.newBuilder(conf)
-      .setHbProcessorInterval(1000)
-      .setHbInterval(1000)
       .setNumDatanodes(3)
-      .setTotalPipelineNumLimit(8)
       .build();
     cluster.waitForClusterToBeReady();
   }
@@ -114,11 +113,10 @@ public class TestFreonWithPipelineDestroy {
         "--validate-writes"
     );
 
-    Assertions.assertEquals(1, randomKeyGenerator.getNumberOfVolumesCreated());
-    Assertions.assertEquals(1, randomKeyGenerator.getNumberOfBucketsCreated());
-    Assertions.assertEquals(1, randomKeyGenerator.getNumberOfKeysAdded());
-    Assertions.assertEquals(0,
-        randomKeyGenerator.getUnsuccessfulValidationCount());
+    assertEquals(1, randomKeyGenerator.getNumberOfVolumesCreated());
+    assertEquals(1, randomKeyGenerator.getNumberOfBucketsCreated());
+    assertEquals(1, randomKeyGenerator.getNumberOfKeysAdded());
+    assertEquals(0, randomKeyGenerator.getUnsuccessfulValidationCount());
   }
 
   private void destroyPipeline() throws Exception {

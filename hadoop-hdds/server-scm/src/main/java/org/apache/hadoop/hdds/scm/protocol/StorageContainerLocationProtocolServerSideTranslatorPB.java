@@ -24,6 +24,7 @@ import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
+import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.TransferLeadershipRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.TransferLeadershipResponseProto;
@@ -51,6 +52,9 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolPro
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ForceExitSafeModeResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetContainerReplicasRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetContainerReplicasResponseProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetContainersOnDecomNodeRequestProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ContainersOnDecomNodeProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetContainersOnDecomNodeResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetContainerRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetContainerResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetContainerTokenRequestProto;
@@ -68,6 +72,8 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolPro
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetPipelineResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetSafeModeRuleStatusesRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetSafeModeRuleStatusesResponseProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetMetricsRequestProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetMetricsResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.InSafeModeRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.InSafeModeResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ListPipelineRequestProto;
@@ -92,6 +98,8 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolPro
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ScmContainerLocationRequest;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ScmContainerLocationResponse;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ScmContainerLocationResponse.Status;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.SingleNodeQueryResponseProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.SingleNodeQueryRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.StartContainerBalancerRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.StartContainerBalancerResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.StartMaintenanceNodesRequestProto;
@@ -120,6 +128,7 @@ import org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature;
 import org.apache.hadoop.hdds.utils.ProtocolMessageMetrics;
 import org.apache.hadoop.ozone.ClientVersion;
 import org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.StatusAndMessages;
+import org.apache.hadoop.util.ProtobufUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -460,6 +469,13 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
             .setNodeQueryResponse(queryNode(request.getNodeQueryRequest(),
                 request.getVersion()))
             .build();
+      case SingleNodeQuery:
+        return ScmContainerLocationResponse.newBuilder()
+            .setCmdType(request.getCmdType())
+            .setStatus(Status.OK)
+            .setSingleNodeQueryResponse(querySingleNode(request
+                .getSingleNodeQueryRequest()))
+            .build();
       case CloseContainer:
         return ScmContainerLocationResponse.newBuilder()
             .setCmdType(request.getCmdType())
@@ -604,6 +620,12 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
             .setDecommissionNodesResponse(decommissionNodes(
                 request.getDecommissionNodesRequest()))
             .build();
+      case GetContainersOnDecomNode:
+        return ScmContainerLocationResponse.newBuilder()
+            .setCmdType(request.getCmdType())
+            .setStatus(Status.OK)
+            .setGetContainersOnDecomNodeResponse(getContainersOnDecomNode(request.getGetContainersOnDecomNodeRequest()))
+            .build();
       case RecommissionNodes:
         return ScmContainerLocationResponse.newBuilder()
             .setCmdType(request.getCmdType())
@@ -694,6 +716,12 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
               .setDecommissionScmResponse(decommissionScm(
                   request.getDecommissionScmRequest()))
               .build();
+      case GetMetrics:
+        return ScmContainerLocationResponse.newBuilder()
+            .setCmdType(request.getCmdType())
+            .setStatus(Status.OK)
+            .setGetMetricsResponse(getMetrics(request.getGetMetricsRequest()))
+            .build();
       default:
         throw new IllegalArgumentException(
             "Unknown command type: " + request.getCmdType());
@@ -863,6 +891,16 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
         request.getScope(), request.getPoolName(), clientVersion);
     return NodeQueryResponseProto.newBuilder()
         .addAllDatanodes(datanodes)
+        .build();
+  }
+
+  public SingleNodeQueryResponseProto querySingleNode(
+      SingleNodeQueryRequestProto request)
+      throws IOException {
+
+    HddsProtos.Node datanode = impl.queryNode(ProtobufUtils.fromProtobuf(request.getUuid()));
+    return SingleNodeQueryResponseProto.newBuilder()
+        .setDatanode(datanode)
         .build();
   }
 
@@ -1069,6 +1107,12 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
     Optional<Long> maxSizeToMovePerIterationInGB = Optional.empty();
     Optional<Long> maxSizeEnteringTargetInGB = Optional.empty();
     Optional<Long> maxSizeLeavingSourceInGB = Optional.empty();
+    Optional<Integer> balancingInterval = Optional.empty();
+    Optional<Integer> moveTimeout = Optional.empty();
+    Optional<Integer> moveReplicationTimeout = Optional.empty();
+    Optional<Boolean> networkTopologyEnable = Optional.empty();
+    Optional<String> includeNodes = Optional.empty();
+    Optional<String> excludeNodes = Optional.empty();
 
     if (request.hasThreshold()) {
       threshold = Optional.of(request.getThreshold());
@@ -1094,19 +1138,47 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
       maxSizeToMovePerIterationInGB =
           Optional.of(request.getMaxSizeToMovePerIterationInGB());
     }
+
     if (request.hasMaxSizeEnteringTargetInGB()) {
       maxSizeEnteringTargetInGB =
           Optional.of(request.getMaxSizeEnteringTargetInGB());
     }
+
     if (request.hasMaxSizeLeavingSourceInGB()) {
       maxSizeLeavingSourceInGB =
           Optional.of(request.getMaxSizeLeavingSourceInGB());
     }
 
+    if (request.hasBalancingInterval()) {
+      balancingInterval = Optional.of(request.getBalancingInterval());
+    }
+
+    if (request.hasMoveTimeout()) {
+      moveTimeout = Optional.of(request.getMoveTimeout());
+    }
+
+    if (request.hasMoveReplicationTimeout()) {
+      moveReplicationTimeout = Optional.of(request.getMoveReplicationTimeout());
+    }
+
+    if (request.hasNetworkTopologyEnable()) {
+      networkTopologyEnable = Optional.of(request.getNetworkTopologyEnable());
+    }
+
+    if (request.hasIncludeNodes()) {
+      includeNodes = Optional.of(request.getIncludeNodes());
+    }
+
+    if (request.hasExcludeNodes()) {
+      excludeNodes = Optional.of(request.getExcludeNodes());
+    }
+
     return impl.startContainerBalancer(threshold, iterations,
         maxDatanodesPercentageToInvolvePerIteration,
         maxSizeToMovePerIterationInGB, maxSizeEnteringTargetInGB,
-        maxSizeLeavingSourceInGB);
+        maxSizeLeavingSourceInGB, balancingInterval, moveTimeout,
+        moveReplicationTimeout, networkTopologyEnable, includeNodes,
+        excludeNodes);
   }
 
   public StopContainerBalancerResponseProto stopContainerBalancer(
@@ -1127,7 +1199,7 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
   public DecommissionNodesResponseProto decommissionNodes(
       DecommissionNodesRequestProto request) throws IOException {
     List<DatanodeAdminError> errors =
-        impl.decommissionNodes(request.getHostsList());
+        impl.decommissionNodes(request.getHostsList(), request.getForce());
     DecommissionNodesResponseProto.Builder response =
         DecommissionNodesResponseProto.newBuilder();
     for (DatanodeAdminError e : errors) {
@@ -1138,6 +1210,22 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
       response.addFailedHosts(error);
     }
     return response.build();
+  }
+
+  public GetContainersOnDecomNodeResponseProto getContainersOnDecomNode(GetContainersOnDecomNodeRequestProto request)
+      throws IOException {
+    Map<String, List<ContainerID>> containerMap = impl.getContainersOnDecomNode(
+        DatanodeDetails.getFromProtoBuf(request.getDatanodeDetails()));
+    List<ContainersOnDecomNodeProto> containersProtoList = new ArrayList<>();
+    for (Map.Entry<String, List<ContainerID>> containerList : containerMap.entrySet()) {
+      List<HddsProtos.ContainerID> containerIdsProto = new ArrayList<>();
+      for (ContainerID id : containerList.getValue()) {
+        containerIdsProto.add(id.getProtobuf());
+      }
+      containersProtoList.add(ContainersOnDecomNodeProto.newBuilder().setName(containerList.getKey())
+          .addAllId(containerIdsProto).build());
+    }
+    return GetContainersOnDecomNodeResponseProto.newBuilder().addAllContainersOnDecomNode(containersProtoList).build();
   }
 
   public RecommissionNodesResponseProto recommissionNodes(
@@ -1160,7 +1248,7 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
       StartMaintenanceNodesRequestProto request) throws IOException {
     List<DatanodeAdminError> errors =
         impl.startMaintenanceNodes(request.getHostsList(),
-        (int)request.getEndInHours());
+        (int)request.getEndInHours(), request.getForce());
     StartMaintenanceNodesResponseProto.Builder response =
         StartMaintenanceNodesResponseProto.newBuilder();
     for (DatanodeAdminError e : errors) {
@@ -1240,5 +1328,9 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
       DecommissionScmRequestProto request) throws IOException {
     return impl.decommissionScm(
         request.getScmId());
+  }
+
+  public GetMetricsResponseProto getMetrics(GetMetricsRequestProto request) throws IOException {
+    return GetMetricsResponseProto.newBuilder().setMetricsJson(impl.getMetrics(request.getQuery())).build();
   }
 }

@@ -566,6 +566,21 @@ public class ObjectStore {
   }
 
   /**
+   * Rename snapshot.
+   *
+   * @param volumeName vol to be used
+   * @param bucketName bucket to be used
+   * @param snapshotOldName Old name of the snapshot
+   * @param snapshotNewName New name of the snapshot
+   *
+   * @throws IOException
+   */
+  public void renameSnapshot(String volumeName,
+      String bucketName, String snapshotOldName, String snapshotNewName) throws IOException {
+    proxy.renameSnapshot(volumeName, bucketName, snapshotOldName, snapshotNewName);
+  }
+
+  /**
    * Delete snapshot.
    * @param volumeName vol to be used
    * @param bucketName bucket to be used

@@ -24,7 +24,8 @@ import org.apache.hadoop.hdds.scm.PlacementPolicyValidateProxy;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.node.DatanodeUsageInfo;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
-import org.jetbrains.annotations.NotNull;
+import jakarta.annotation.Nonnull;
+import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
@@ -37,12 +38,15 @@ import java.util.TreeSet;
  * target with the lowest space usage.
  */
 public class FindTargetGreedyByUsageInfo extends AbstractFindTargetGreedy {
+  public static final Logger LOG =
+      LoggerFactory.getLogger(FindTargetGreedyByUsageInfo.class);
+
   public FindTargetGreedyByUsageInfo(
       ContainerManager containerManager,
       PlacementPolicyValidateProxy placementPolicyValidateProxy,
       NodeManager nodeManager) {
     super(containerManager, placementPolicyValidateProxy, nodeManager);
-    setLogger(LoggerFactory.getLogger(FindTargetGreedyByUsageInfo.class));
+    setLogger(LOG);
     setPotentialTargets(new TreeSet<>((a, b) -> compareByUsage(a, b)));
   }
 
@@ -63,7 +67,7 @@ public class FindTargetGreedyByUsageInfo extends AbstractFindTargetGreedy {
    */
   @Override
   public void resetPotentialTargets(
-      @NotNull Collection<DatanodeDetails> targets) {
+      @Nonnull Collection<DatanodeDetails> targets) {
     // create DatanodeUsageInfo from DatanodeDetails
     List<DatanodeUsageInfo> usageInfos = new ArrayList<>(targets.size());
     targets.forEach(datanodeDetails -> usageInfos.add(

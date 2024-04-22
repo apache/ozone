@@ -103,8 +103,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.junit.jupiter.api.Assertions.fail;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -885,6 +885,7 @@ public class TestContainerEndpoint {
   public void testUnhealthyContainersFilteredResponse()
       throws IOException, TimeoutException {
     String missing = UnHealthyContainerStates.MISSING.toString();
+    String emptyMissing = UnHealthyContainerStates.EMPTY_MISSING.toString();
 
     Response response = containerEndpoint
         .getUnhealthyContainers(missing, 1000, 1);
@@ -904,6 +905,7 @@ public class TestContainerEndpoint {
     uuid3 = newDatanode("host3", "127.0.0.3");
     uuid4 = newDatanode("host4", "127.0.0.4");
     createUnhealthyRecords(5, 4, 3, 2);
+    createEmptyMissingUnhealthyRecords(2);
 
     response = containerEndpoint.getUnhealthyContainers(missing, 1000, 1);
 
@@ -926,16 +928,20 @@ public class TestContainerEndpoint {
     for (UnhealthyContainerMetadata r : records) {
       assertEquals(missing, r.getContainerState());
     }
+
+    Response filteredEmptyMissingResponse = containerEndpoint
+        .getUnhealthyContainers(emptyMissing, 1000, 1);
+    responseObject = (UnhealthyContainersResponse) filteredEmptyMissingResponse.getEntity();
+    records = responseObject.getContainers();
+    // Assert for zero empty missing containers.
+    assertEquals(0, records.size());
   }
 
   @Test
   public void testUnhealthyContainersInvalidState() {
-    try {
-      containerEndpoint.getUnhealthyContainers("invalid", 1000, 1);
-      fail("Expected exception to be raised");
-    } catch (WebApplicationException e) {
-      assertEquals("HTTP 400 Bad Request", e.getMessage());
-    }
+    WebApplicationException e = assertThrows(WebApplicationException.class,
+        () -> containerEndpoint.getUnhealthyContainers("invalid", 1000, 1));
+    assertEquals("HTTP 400 Bad Request", e.getMessage());
   }
 
   @Test
@@ -1027,6 +1033,14 @@ public class TestContainerEndpoint {
             .setIpAddress(ipAddress)
             .build());
     return uuid;
+  }
+
+  private void createEmptyMissingUnhealthyRecords(int emptyMissing) {
+    int cid = 0;
+    for (int i = 0; i < emptyMissing; i++) {
+      createUnhealthyRecord(++cid, UnHealthyContainerStates.EMPTY_MISSING.toString(),
+          3, 3, 0, null);
+    }
   }
 
   private void createUnhealthyRecords(int missing, int overRep, int underRep,

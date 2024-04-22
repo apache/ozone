@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.ozone.om.response.key;
 
+import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
@@ -28,10 +29,10 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRespo
 import org.junit.jupiter.api.Test;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.THREE;
-import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType.RATIS;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status.KEY_NOT_FOUND;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status.OK;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type.DeleteKeys;
@@ -63,7 +64,7 @@ public class TestOMKeysDeleteResponse extends TestOMKeyResponse {
     for (int i = 0; i < 10; i++) {
       keyName = parent.concat(key + i);
       OMRequestTestUtils.addKeyToTable(false, volumeName,
-          bucketName, keyName, 0L, RATIS, THREE, omMetadataManager);
+          bucketName, keyName, 0L, RatisReplicationConfig.getInstance(THREE), omMetadataManager);
       ozoneKey = omMetadataManager.getOzoneKey(volumeName, bucketName, keyName);
       omKeyInfoList
           .add(omMetadataManager.getKeyTable(getBucketLayout()).get(ozoneKey));
@@ -103,7 +104,7 @@ public class TestOMKeysDeleteResponse extends TestOMKeyResponse {
   protected OMClientResponse getOmKeysDeleteResponse(OMResponse omResponse,
       OmBucketInfo omBucketInfo) {
     return new OMKeysDeleteResponse(
-        omResponse, omKeyInfoList, true, omBucketInfo);
+        omResponse, omKeyInfoList, true, omBucketInfo, Collections.emptyList());
   }
 
   @Test

@@ -55,8 +55,9 @@ import org.apache.hadoop.tools.mapred.CopyMapper;
 import org.apache.hadoop.tools.util.DistCpTestUtils;
 import org.apache.hadoop.util.functional.RemoteIterators;
 
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -184,6 +185,7 @@ public abstract class AbstractContractDistCpTest
     remoteFS.delete(remoteDir, true);
   }
 
+  @AfterEach
   @Override
   public void teardown() throws Exception {
     // if remote FS supports IOStatistics log it.

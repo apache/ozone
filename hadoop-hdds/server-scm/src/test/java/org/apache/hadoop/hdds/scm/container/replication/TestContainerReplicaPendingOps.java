@@ -24,6 +24,7 @@ import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.ozone.test.TestClock;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -38,7 +39,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.times;
-import static org.mockito.Mockito.verifyZeroInteractions;
+import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.apache.hadoop.hdds.scm.container.replication.ContainerReplicaOp.PendingOpType.ADD;
 import static org.apache.hadoop.hdds.scm.container.replication.ContainerReplicaOp.PendingOpType.DELETE;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -72,6 +73,13 @@ public class TestContainerReplicaPendingOps {
     dn1 = MockDatanodeDetails.randomDatanodeDetails();
     dn2 = MockDatanodeDetails.randomDatanodeDetails();
     dn3 = MockDatanodeDetails.randomDatanodeDetails();
+  }
+
+  @AfterEach
+  void cleanup() {
+    if (metrics != null) {
+      metrics.unRegister();
+    }
   }
 
   @Test
@@ -387,6 +395,6 @@ public class TestContainerReplicaPendingOps {
     pendingOps.removeExpiredEntries();
     // no entries have expired, so there should be zero interactions with the
     // subscriber
-    verifyZeroInteractions(subscriber1);
+    verifyNoMoreInteractions(subscriber1);
   }
 }

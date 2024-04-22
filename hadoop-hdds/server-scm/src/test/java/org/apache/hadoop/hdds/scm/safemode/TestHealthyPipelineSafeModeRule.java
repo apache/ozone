@@ -23,9 +23,7 @@ import java.time.Clock;
 import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.UUID;
 
-import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -47,6 +45,7 @@ import org.apache.hadoop.hdds.scm.pipeline.PipelineManagerImpl;
 import org.apache.hadoop.hdds.server.events.EventQueue;
 import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 import org.slf4j.LoggerFactory;
 
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -56,6 +55,8 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
  * This class tests HealthyPipelineSafeMode rule.
  */
 public class TestHealthyPipelineSafeModeRule {
+  @TempDir
+  private File tempFile;
 
   @Test
   public void testHealthyPipelineSafeModeRuleWithNoPipelines()
@@ -66,12 +67,9 @@ public class TestHealthyPipelineSafeModeRule {
     List<ContainerInfo> containers =
             new ArrayList<>(HddsTestUtils.getContainerInfo(1));
 
-    String storageDir = GenericTestUtils.getTempPath(
-            TestHealthyPipelineSafeModeRule.class.getName() +
-                    UUID.randomUUID());
     OzoneConfiguration config = new OzoneConfiguration();
     MockNodeManager nodeManager = new MockNodeManager(true, 0);
-    config.set(HddsConfigKeys.OZONE_METADATA_DIRS, storageDir);
+    config.set(HddsConfigKeys.OZONE_METADATA_DIRS, tempFile.getPath());
     // enable pipeline check
     config.setBoolean(
             HddsConfigKeys.HDDS_SCM_SAFEMODE_PIPELINE_AVAILABILITY_CHECK, true);
@@ -106,14 +104,11 @@ public class TestHealthyPipelineSafeModeRule {
       assertTrue(healthyPipelineSafeModeRule.validate());
     } finally {
       scmMetadataStore.getStore().close();
-      FileUtil.fullyDelete(new File(storageDir));
     }
   }
 
   @Test
   public void testHealthyPipelineSafeModeRuleWithPipelines() throws Exception {
-    String storageDir = GenericTestUtils.getTempPath(
-        TestHealthyPipelineSafeModeRule.class.getName() + UUID.randomUUID());
 
     EventQueue eventQueue = new EventQueue();
     SCMServiceManager serviceManager = new SCMServiceManager();
@@ -126,7 +121,7 @@ public class TestHealthyPipelineSafeModeRule {
     // stale and last one is dead, and this repeats. So for a 12 node, 9
     // healthy, 2 stale and one dead.
     MockNodeManager nodeManager = new MockNodeManager(true, 12);
-    config.set(HddsConfigKeys.OZONE_METADATA_DIRS, storageDir);
+    config.set(HddsConfigKeys.OZONE_METADATA_DIRS, tempFile.getPath());
     // enable pipeline check
     config.setBoolean(
             HddsConfigKeys.HDDS_SCM_SAFEMODE_PIPELINE_AVAILABILITY_CHECK, true);
@@ -201,7 +196,6 @@ public class TestHealthyPipelineSafeModeRule {
           1000, 5000);
     } finally {
       scmMetadataStore.getStore().close();
-      FileUtil.fullyDelete(new File(storageDir));
     }
   }
 
@@ -209,10 +203,6 @@ public class TestHealthyPipelineSafeModeRule {
   @Test
   public void testHealthyPipelineSafeModeRuleWithMixedPipelines()
       throws Exception {
-
-    String storageDir = GenericTestUtils.getTempPath(
-        TestHealthyPipelineSafeModeRule.class.getName() + UUID.randomUUID());
-
     EventQueue eventQueue = new EventQueue();
     SCMServiceManager serviceManager = new SCMServiceManager();
     SCMContext scmContext = SCMContext.emptyContext();
@@ -225,7 +215,7 @@ public class TestHealthyPipelineSafeModeRule {
     // stale and last one is dead, and this repeats. So for a 12 node, 9
     // healthy, 2 stale and one dead.
     MockNodeManager nodeManager = new MockNodeManager(true, 12);
-    config.set(HddsConfigKeys.OZONE_METADATA_DIRS, storageDir);
+    config.set(HddsConfigKeys.OZONE_METADATA_DIRS, tempFile.getPath());
     // enable pipeline check
     config.setBoolean(
             HddsConfigKeys.HDDS_SCM_SAFEMODE_PIPELINE_AVAILABILITY_CHECK, true);
@@ -308,7 +298,6 @@ public class TestHealthyPipelineSafeModeRule {
 
     } finally {
       scmMetadataStore.getStore().close();
-      FileUtil.fullyDelete(new File(storageDir));
     }
 
   }

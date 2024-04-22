@@ -28,6 +28,7 @@ import java.util.Map;
 import java.util.Objects;
 
 import com.google.common.annotations.VisibleForTesting;
+import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.hdds.utils.MetadataKeyFilters;
 import org.apache.hadoop.hdds.utils.TableCacheMetrics;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
@@ -165,10 +166,17 @@ public class TypedTable<KEY, VALUE> implements Table<KEY, VALUE> {
   public void putWithBatch(BatchOperation batch, KEY key, VALUE value)
       throws IOException {
     if (supportCodecBuffer) {
-      // The buffers will be released after commit.
-      rawTable.putWithBatch(batch,
-          keyCodec.toDirectCodecBuffer(key),
-          valueCodec.toDirectCodecBuffer(value));
+      CodecBuffer keyBuffer = null;
+      CodecBuffer valueBuffer = null;
+      try {
+        keyBuffer = keyCodec.toDirectCodecBuffer(key);
+        valueBuffer = valueCodec.toDirectCodecBuffer(value);
+        // The buffers will be released after commit.
+        rawTable.putWithBatch(batch, keyBuffer, valueBuffer);
+      } catch (Exception e) {
+        IOUtils.closeQuietly(valueBuffer, keyBuffer);
+        throw e;
+      }
     } else {
       rawTable.putWithBatch(batch, encodeKey(key), encodeValue(value));
     }

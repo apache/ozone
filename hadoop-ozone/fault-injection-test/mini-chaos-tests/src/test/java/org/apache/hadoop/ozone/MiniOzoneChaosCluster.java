@@ -63,7 +63,7 @@ public class MiniOzoneChaosCluster extends MiniOzoneHAClusterImpl {
 
   private final FailureManager failureManager;
 
-  private final int waitForClusterToBeReadyTimeout = 120000; // 2 min
+  private static final int WAIT_FOR_CLUSTER_TO_BE_READY_TIMEOUT = 120000; // 2 min
 
   private final Set<OzoneManager> failedOmSet;
   private final Set<StorageContainerManager> failedScmSet;
@@ -158,7 +158,7 @@ public class MiniOzoneChaosCluster extends MiniOzoneHAClusterImpl {
         }
       }
       return true;
-    }, 1000, waitForClusterToBeReadyTimeout);
+    }, 1000, WAIT_FOR_CLUSTER_TO_BE_READY_TIMEOUT);
   }
 
   /**
@@ -232,7 +232,7 @@ public class MiniOzoneChaosCluster extends MiniOzoneHAClusterImpl {
     protected void initializeConfiguration() throws IOException {
       super.initializeConfiguration();
 
-      OzoneClientConfig clientConfig = new OzoneClientConfig();
+      OzoneClientConfig clientConfig = conf.getObject(OzoneClientConfig.class);
       clientConfig.setStreamBufferFlushSize(8 * 1024 * 1024);
       clientConfig.setStreamBufferMaxSize(16 * 1024 * 1024);
       clientConfig.setStreamBufferSize(4 * 1024);
@@ -261,10 +261,10 @@ public class MiniOzoneChaosCluster extends MiniOzoneHAClusterImpl {
           TimeUnit.SECONDS);
       conf.setInt(
           OzoneConfigKeys
-              .DFS_CONTAINER_RATIS_NUM_WRITE_CHUNK_THREADS_PER_VOLUME_KEY,
+              .HDDS_CONTAINER_RATIS_NUM_WRITE_CHUNK_THREADS_PER_VOLUME_KEY,
           4);
       conf.setInt(
-          OzoneConfigKeys.DFS_CONTAINER_RATIS_NUM_CONTAINER_OP_EXECUTORS_KEY,
+          OzoneConfigKeys.HDDS_CONTAINER_RATIS_NUM_CONTAINER_OP_EXECUTORS_KEY,
           2);
       conf.setInt(OzoneConfigKeys.OZONE_CONTAINER_CACHE_SIZE, 2);
       ReplicationManagerConfiguration replicationConf =
@@ -273,25 +273,12 @@ public class MiniOzoneChaosCluster extends MiniOzoneHAClusterImpl {
       replicationConf.setEventTimeout(Duration.ofSeconds(20));
       replicationConf.setDatanodeTimeoutOffset(0);
       conf.setFromObject(replicationConf);
-      conf.setInt(OzoneConfigKeys.DFS_RATIS_SNAPSHOT_THRESHOLD_KEY, 100);
-      conf.setInt(OzoneConfigKeys.DFS_CONTAINER_RATIS_LOG_PURGE_GAP, 100);
+      conf.setInt(OzoneConfigKeys.HDDS_RATIS_SNAPSHOT_THRESHOLD_KEY, 100);
+      conf.setInt(OzoneConfigKeys.HDDS_CONTAINER_RATIS_LOG_PURGE_GAP, 100);
       conf.setInt(OMConfigKeys.OZONE_OM_RATIS_LOG_PURGE_GAP, 100);
 
       conf.setInt(OMConfigKeys.
           OZONE_OM_RATIS_SNAPSHOT_AUTO_TRIGGER_THRESHOLD_KEY, 100);
-    }
-
-    /**
-     * Sets the number of data volumes per datanode.
-     *
-     * @param val number of volumes per datanode.
-     *
-     * @return MiniOzoneCluster.Builder
-     */
-    @Override
-    public Builder setNumDataVolumes(int val) {
-      numDataVolumes = val;
-      return this;
     }
 
     @Override
@@ -300,7 +287,7 @@ public class MiniOzoneChaosCluster extends MiniOzoneHAClusterImpl {
       DatanodeStoreCache.setMiniClusterMode();
 
       initializeConfiguration();
-      if (numOfOMs > 1) {
+      if (numberOfOzoneManagers() > 1) {
         initOMRatisConf();
       }
 
@@ -313,8 +300,7 @@ public class MiniOzoneChaosCluster extends MiniOzoneHAClusterImpl {
         throw new IOException("Unable to build MiniOzoneCluster. ", ex);
       }
 
-      final List<HddsDatanodeService> hddsDatanodes = createHddsDatanodes(
-          scmService.getActiveServices(), null);
+      final List<HddsDatanodeService> hddsDatanodes = createHddsDatanodes();
 
       MiniOzoneChaosCluster cluster =
           new MiniOzoneChaosCluster(conf, omService, scmService, hddsDatanodes,
@@ -323,6 +309,7 @@ public class MiniOzoneChaosCluster extends MiniOzoneHAClusterImpl {
       if (startDataNodes) {
         cluster.startHddsDatanodes();
       }
+      prepareForNextBuild();
       return cluster;
     }
   }

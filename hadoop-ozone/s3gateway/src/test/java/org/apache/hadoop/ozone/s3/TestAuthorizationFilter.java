@@ -131,11 +131,11 @@ public class TestAuthorizationFilter {
   @SuppressWarnings("checkstyle:ParameterNumber")
   @ParameterizedTest
   @MethodSource("testAuthFilterFailuresInput")
-  public void testAuthFilterFailures(
+  void testAuthFilterFailures(
       String method, String authHeader, String contentMd5,
       String host, String amzContentSha256, String date, String contentType,
       String path, String expectedErrorMsg
-  ) {
+  ) throws Exception {
     try {
       ContainerRequestContext context = setupContext(method, authHeader,
           contentMd5, host, amzContentSha256, date, contentType, path);
@@ -169,8 +169,6 @@ public class TestAuthorizationFilter {
 
       }
 
-    } catch (Exception ex) {
-      fail("Unexpected exception: " + ex);
     }
   }
 
@@ -238,58 +236,54 @@ public class TestAuthorizationFilter {
   @SuppressWarnings("checkstyle:ParameterNumber")
   @ParameterizedTest
   @MethodSource("testAuthFilterInput")
-  public void testAuthFilter(
+  void testAuthFilter(
       String method, String authHeader, String contentMd5,
       String host, String amzContentSha256, String date, String contentType,
       String path
-  ) {
-    try {
-      ContainerRequestContext context = setupContext(method, authHeader,
-          contentMd5, host, amzContentSha256, date, contentType, path);
+  ) throws Exception {
+    ContainerRequestContext context = setupContext(method, authHeader,
+        contentMd5, host, amzContentSha256, date, contentType, path);
 
-      AWSSignatureProcessor awsSignatureProcessor = new AWSSignatureProcessor();
-      awsSignatureProcessor.setContext(context);
+    AWSSignatureProcessor awsSignatureProcessor = new AWSSignatureProcessor();
+    awsSignatureProcessor.setContext(context);
 
-      SignatureInfo signatureInfo = new SignatureInfo();
+    SignatureInfo signatureInfo = new SignatureInfo();
 
-      authorizationFilter.setSignatureParser(awsSignatureProcessor);
-      authorizationFilter.setSignatureInfo(signatureInfo);
+    authorizationFilter.setSignatureParser(awsSignatureProcessor);
+    authorizationFilter.setSignatureInfo(signatureInfo);
 
-      authorizationFilter.filter(context);
+    authorizationFilter.filter(context);
 
-      if (path.startsWith("/secret")) {
-        assertNull(authorizationFilter.getSignatureInfo().getUnfilteredURI());
+    if (path.startsWith("/secret")) {
+      assertNull(authorizationFilter.getSignatureInfo().getUnfilteredURI());
 
-        assertNull(authorizationFilter.getSignatureInfo().getStringToSign());
-      } else {
-        String canonicalRequest = method + "\n"
-            + path + "\n"
-            + "\n"
-            + "host:" + host + "\nx-amz-content-sha256:" + amzContentSha256 +
-            "\n"
-            + "x-amz-date:" + DATETIME + "\n"
-            + "\n"
-            + "host;x-amz-content-sha256;x-amz-date\n"
-            + amzContentSha256;
+      assertNull(authorizationFilter.getSignatureInfo().getStringToSign());
+    } else {
+      String canonicalRequest = method + "\n"
+          + path + "\n"
+          + "\n"
+          + "host:" + host + "\nx-amz-content-sha256:" + amzContentSha256 +
+          "\n"
+          + "x-amz-date:" + DATETIME + "\n"
+          + "\n"
+          + "host;x-amz-content-sha256;x-amz-date\n"
+          + amzContentSha256;
 
-        MessageDigest md = MessageDigest.getInstance("SHA-256");
-        md.update(canonicalRequest.getBytes(StandardCharsets.UTF_8));
+      MessageDigest md = MessageDigest.getInstance("SHA-256");
+      md.update(canonicalRequest.getBytes(StandardCharsets.UTF_8));
 
-        String expectedStrToSign = "AWS4-HMAC-SHA256\n"
-            + DATETIME + "\n"
-            + CURDATE + "/us-east-1/s3/aws4_request\n"
-            + Hex.encode(md.digest()).toLowerCase();
+      String expectedStrToSign = "AWS4-HMAC-SHA256\n"
+          + DATETIME + "\n"
+          + CURDATE + "/us-east-1/s3/aws4_request\n"
+          + Hex.encode(md.digest()).toLowerCase();
 
-        assertEquals(path,
-            authorizationFilter.getSignatureInfo().getUnfilteredURI(),
-            "Unfiltered URI is not preserved");
+      assertEquals(path,
+          authorizationFilter.getSignatureInfo().getUnfilteredURI(),
+          "Unfiltered URI is not preserved");
 
-        assertEquals(expectedStrToSign,
-            authorizationFilter.getSignatureInfo().getStringToSign(),
-            "String to sign is invalid");
-      }
-    } catch (Exception ex) {
-      fail("Unexpected exception: " + ex);
+      assertEquals(expectedStrToSign,
+          authorizationFilter.getSignatureInfo().getStringToSign(),
+          "String to sign is invalid");
     }
   }
 

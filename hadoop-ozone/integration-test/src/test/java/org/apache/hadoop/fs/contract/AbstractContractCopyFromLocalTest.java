@@ -25,7 +25,8 @@ import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 
-import org.junit.Test;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.Test;
 
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
@@ -44,6 +45,7 @@ public abstract class AbstractContractCopyFromLocalTest extends
   private static final Charset ASCII = StandardCharsets.US_ASCII;
   private File file;
 
+  @AfterEach
   @Override
   public void teardown() throws Exception {
     super.teardown();

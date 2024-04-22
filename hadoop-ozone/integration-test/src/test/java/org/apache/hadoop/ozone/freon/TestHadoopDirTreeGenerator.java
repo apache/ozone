@@ -34,7 +34,6 @@ import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ratis.server.RaftServer;
 import org.apache.ratis.server.raftlog.RaftLog;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.slf4j.Logger;
@@ -46,6 +45,9 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.net.URI;
 import java.util.ArrayList;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
 /**
  * Test for HadoopDirTreeGenerator.
@@ -157,7 +159,7 @@ public class TestHadoopDirTreeGenerator {
       int actualDepth =
           traverseToLeaf(fileSystem, fileStatus.getPath(), 1, depth, span,
               fileCount, StorageSize.parse(perFileSize, StorageUnit.BYTES));
-      Assertions.assertEquals(depth, actualDepth, "Mismatch depth in a path");
+      assertEquals(depth, actualDepth, "Mismatch depth in a path");
     }
   }
 
@@ -179,16 +181,17 @@ public class TestHadoopDirTreeGenerator {
         return traverseToLeaf(fs, fileStatus.getPath(), depth, expectedDepth,
                 expectedSpanCnt, expectedFileCnt, perFileSize);
       } else {
-        Assertions.assertEquals(perFileSize.toBytes(), fileStatus.getLen(), "Mismatches file len");
+        assertEquals(perFileSize.toBytes(), fileStatus.getLen(), "Mismatches file len");
         String fName = fileStatus.getPath().getName();
-        Assertions.assertFalse(files.contains(fName), actualNumFiles + "actualNumFiles:" + fName +
-                ", fName:" + expectedFileCnt + ", expectedFileCnt:" + depth
-                + ", depth:");
+        assertThat(files)
+            .withFailMessage(actualNumFiles + "actualNumFiles:" + fName +
+                ", fName:" + expectedFileCnt + ", expectedFileCnt:" + depth + ", depth:")
+            .doesNotContain(fName);
         files.add(fName);
         actualNumFiles++;
       }
     }
-    Assertions.assertEquals(expectedFileCnt, actualNumFiles, "Mismatches files count in a directory");
+    assertEquals(expectedFileCnt, actualNumFiles, "Mismatches files count in a directory");
     return depth;
   }
 
@@ -200,7 +203,7 @@ public class TestHadoopDirTreeGenerator {
         ++actualSpan;
       }
     }
-    Assertions.assertEquals(expectedSpanCnt, actualSpan, "Mismatches subdirs count in a directory");
+    assertEquals(expectedSpanCnt, actualSpan, "Mismatches subdirs count in a directory");
     return actualSpan;
   }
 }

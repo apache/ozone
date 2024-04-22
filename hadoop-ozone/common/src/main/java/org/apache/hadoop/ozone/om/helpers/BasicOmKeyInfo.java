@@ -20,37 +20,51 @@ package org.apache.hadoop.ozone.om.helpers;
 import java.io.IOException;
 import java.util.Objects;
 
+import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.BasicKeyInfo;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ListKeysRequest;
 
+import static org.apache.hadoop.ozone.OzoneConsts.ETAG;
+
 /**
  * Lightweight OmKeyInfo class.
  */
-public class BasicOmKeyInfo {
+public final class BasicOmKeyInfo {
 
-  private String volumeName;
-  private String bucketName;
-  private String keyName;
-  private long dataSize;
-  private long creationTime;
-  private long modificationTime;
-  private ReplicationConfig replicationConfig;
-  private boolean isFile;
+  private final String volumeName;
+  private final String bucketName;
+  private final String keyName;
+  private final long dataSize;
+  private final long creationTime;
+  private final long modificationTime;
+  private final ReplicationConfig replicationConfig;
+  private final boolean isFile;
+  private final String eTag;
 
-  @SuppressWarnings("parameternumber")
-  public BasicOmKeyInfo(String volumeName, String bucketName, String keyName,
-                        long dataSize, long creationTime, long modificationTime,
-                        ReplicationConfig replicationConfig, boolean isFile) {
-    this.volumeName = volumeName;
-    this.bucketName = bucketName;
-    this.keyName = keyName;
-    this.dataSize = dataSize;
-    this.creationTime = creationTime;
-    this.modificationTime = modificationTime;
-    this.replicationConfig = replicationConfig;
-    this.isFile = isFile;
+  private BasicOmKeyInfo(Builder b) {
+    this.volumeName = b.volumeName;
+    this.bucketName = b.bucketName;
+    this.keyName = b.keyName;
+    this.dataSize = b.dataSize;
+    this.creationTime = b.creationTime;
+    this.modificationTime = b.modificationTime;
+    this.replicationConfig = b.replicationConfig;
+    this.isFile = b.isFile;
+    this.eTag = StringUtils.isNotEmpty(b.eTag) ? b.eTag : null;
+  }
+
+  private BasicOmKeyInfo(OmKeyInfo b) {
+    this.volumeName = b.getVolumeName();
+    this.bucketName = b.getBucketName();
+    this.keyName = b.getKeyName();
+    this.dataSize = b.getDataSize();
+    this.creationTime = b.getCreationTime();
+    this.modificationTime = b.getModificationTime();
+    this.replicationConfig = b.getReplicationConfig();
+    this.isFile = b.isFile();
+    this.eTag = b.getMetadata().get(ETAG);
   }
 
   public String getVolumeName() {
@@ -85,6 +99,10 @@ public class BasicOmKeyInfo {
     return isFile;
   }
 
+  public String getETag() {
+    return eTag;
+  }
+
   /**
    * Builder of BasicOmKeyInfo.
    */
@@ -97,6 +115,7 @@ public class BasicOmKeyInfo {
     private long modificationTime;
     private ReplicationConfig replicationConfig;
     private boolean isFile;
+    private String eTag;
 
     public Builder setVolumeName(String volumeName) {
       this.volumeName = volumeName;
@@ -138,9 +157,13 @@ public class BasicOmKeyInfo {
       return this;
     }
 
+    public Builder setETag(String etag) {
+      this.eTag = etag;
+      return this;
+    }
+
     public BasicOmKeyInfo build() {
-      return new BasicOmKeyInfo(volumeName, bucketName, keyName, dataSize,
-          creationTime, modificationTime, replicationConfig, isFile);
+      return new BasicOmKeyInfo(this);
     }
   }
 
@@ -156,6 +179,9 @@ public class BasicOmKeyInfo {
           ((ECReplicationConfig) replicationConfig).toProto());
     } else {
       builder.setFactor(ReplicationConfig.getLegacyFactor(replicationConfig));
+    }
+    if (StringUtils.isNotEmpty(eTag)) {
+      builder.setETag(eTag);
     }
 
     return builder.build();
@@ -181,6 +207,7 @@ public class BasicOmKeyInfo {
             basicKeyInfo.getType(),
             basicKeyInfo.getFactor(),
             basicKeyInfo.getEcReplicationConfig()))
+        .setETag(basicKeyInfo.getETag())
         .setIsFile(!keyName.endsWith("/"));
 
     return builder.build();
@@ -205,6 +232,7 @@ public class BasicOmKeyInfo {
             basicKeyInfo.getType(),
             basicKeyInfo.getFactor(),
             basicKeyInfo.getEcReplicationConfig()))
+        .setETag(basicKeyInfo.getETag())
         .setIsFile(!keyName.endsWith("/"));
 
     return builder.build();
@@ -225,6 +253,7 @@ public class BasicOmKeyInfo {
         creationTime == basicOmKeyInfo.creationTime &&
         modificationTime == basicOmKeyInfo.modificationTime &&
         replicationConfig.equals(basicOmKeyInfo.replicationConfig) &&
+        Objects.equals(eTag, basicOmKeyInfo.eTag) &&
         isFile == basicOmKeyInfo.isFile;
   }
 
@@ -233,14 +262,6 @@ public class BasicOmKeyInfo {
   }
 
   public static BasicOmKeyInfo fromOmKeyInfo(OmKeyInfo omKeyInfo) {
-    return new BasicOmKeyInfo(
-        omKeyInfo.getVolumeName(),
-        omKeyInfo.getBucketName(),
-        omKeyInfo.getKeyName(),
-        omKeyInfo.getDataSize(),
-        omKeyInfo.getCreationTime(),
-        omKeyInfo.getModificationTime(),
-        omKeyInfo.getReplicationConfig(),
-        omKeyInfo.isFile());
+    return new BasicOmKeyInfo(omKeyInfo);
   }
 }

@@ -25,7 +25,6 @@ import org.apache.hadoop.hdds.scm.client.ScmClient;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.mockito.Mockito;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -37,6 +36,7 @@ import java.util.regex.Pattern;
 
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 /**
  * Unit tests to validate the ContainerBalancerSubCommand class includes the
@@ -74,8 +74,7 @@ public class TestContainerBalancerSubCommand {
     ScmClient scmClient = mock(ScmClient.class);
 
     //test status is running
-    Mockito.when(scmClient.getContainerBalancerStatus())
-        .thenAnswer(invocation -> true);
+    when(scmClient.getContainerBalancerStatus()).thenAnswer(invocation -> true);
 
     statusCmd.execute(scmClient);
 
@@ -90,8 +89,7 @@ public class TestContainerBalancerSubCommand {
       throws IOException  {
     ScmClient scmClient = mock(ScmClient.class);
 
-    Mockito.when(scmClient.getContainerBalancerStatus())
-        .thenAnswer(invocation -> false);
+    when(scmClient.getContainerBalancerStatus()).thenAnswer(invocation -> false);
 
     statusCmd.execute(scmClient);
 
@@ -106,7 +104,10 @@ public class TestContainerBalancerSubCommand {
     ScmClient scmClient = mock(ScmClient.class);
     stopCmd.execute(scmClient);
 
-    Pattern p = Pattern.compile("^Stopping\\sContainerBalancer...");
+    Pattern p = Pattern.compile("^Sending\\sstop\\scommand." +
+            "\\sWaiting\\sfor\\sContainer\\sBalancer\\sto\\sstop...\\n" +
+            "Container\\sBalancer\\sstopped.");
+
     Matcher m = p.matcher(outContent.toString(DEFAULT_ENCODING));
     assertTrue(m.find());
   }
@@ -115,8 +116,8 @@ public class TestContainerBalancerSubCommand {
   public void testContainerBalancerStartSubcommandWhenBalancerIsNotRunning()
       throws IOException  {
     ScmClient scmClient = mock(ScmClient.class);
-    Mockito.when(scmClient.startContainerBalancer(
-            null, null, null, null, null, null))
+    when(scmClient.startContainerBalancer(
+            null, null, null, null, null, null, null, null, null, null, null, null))
         .thenReturn(
             StorageContainerLocationProtocolProtos
                 .StartContainerBalancerResponseProto.newBuilder()
@@ -134,8 +135,8 @@ public class TestContainerBalancerSubCommand {
   public void testContainerBalancerStartSubcommandWhenBalancerIsRunning()
       throws IOException  {
     ScmClient scmClient = mock(ScmClient.class);
-    Mockito.when(scmClient.startContainerBalancer(
-            null, null, null, null, null, null))
+    when(scmClient.startContainerBalancer(
+            null, null, null, null, null, null, null, null, null, null, null, null))
         .thenReturn(StorageContainerLocationProtocolProtos
             .StartContainerBalancerResponseProto.newBuilder()
             .setStart(false)

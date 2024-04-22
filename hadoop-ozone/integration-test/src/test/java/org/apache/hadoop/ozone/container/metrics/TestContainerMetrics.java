@@ -18,6 +18,7 @@
 package org.apache.hadoop.ozone.container.metrics;
 
 import java.io.File;
+import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -52,26 +53,22 @@ import org.apache.ozone.test.GenericTestUtils;
 
 import com.google.common.collect.Maps;
 import static org.apache.hadoop.hdds.protocol.MockDatanodeDetails.randomDatanodeDetails;
-import static org.apache.hadoop.test.MetricsAsserts.assertCounter;
-import static org.apache.hadoop.test.MetricsAsserts.assertQuantileGauges;
-import static org.apache.hadoop.test.MetricsAsserts.getMetrics;
-import org.junit.Assert;
-import org.junit.Rule;
-import org.junit.Test;
-import org.junit.rules.TestRule;
-import org.junit.rules.Timeout;
-import org.apache.ozone.test.JUnit5AwareTimeout;
+import static org.apache.ozone.test.MetricsAsserts.assertCounter;
+import static org.apache.ozone.test.MetricsAsserts.assertQuantileGauges;
+import static org.apache.ozone.test.MetricsAsserts.getMetrics;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
+import org.junit.jupiter.api.io.TempDir;
 
 /**
  * Test for metrics published by storage containers.
  */
+@Timeout(300)
 public class TestContainerMetrics {
-
-  /**
-    * Set a timeout for each test.
-    */
-  @Rule
-  public TestRule timeout = new JUnit5AwareTimeout(Timeout.seconds(300));
+  @TempDir
+  private Path tempDir;
 
   @Test
   public void testContainerMetrics() throws Exception {
@@ -85,7 +82,7 @@ public class TestContainerMetrics {
       Pipeline pipeline = MockPipeline
           .createSingleNodePipeline();
       OzoneConfiguration conf = new OzoneConfiguration();
-      conf.setInt(OzoneConfigKeys.DFS_CONTAINER_IPC_PORT,
+      conf.setInt(OzoneConfigKeys.HDDS_CONTAINER_IPC_PORT,
           pipeline.getFirstNode()
               .getPort(DatanodeDetails.Port.Name.STANDALONE).getValue());
       conf.setInt(DFSConfigKeysLegacy.DFS_METRICS_PERCENTILES_INTERVALS_KEY,
@@ -112,6 +109,8 @@ public class TestContainerMetrics {
       }
       HddsDispatcher dispatcher = new HddsDispatcher(conf, containerSet,
           volumeSet, handlers, context, metrics, null);
+      StorageVolumeUtil.getHddsVolumesList(volumeSet.getVolumesList())
+          .forEach(hddsVolume -> hddsVolume.setDbParentDir(tempDir.toFile()));
       dispatcher.setClusterId(UUID.randomUUID().toString());
 
       server = new XceiverServerGrpc(datanodeDetails, conf, dispatcher, null);
@@ -129,7 +128,7 @@ public class TestContainerMetrics {
               pipeline, blockID, 1024);
       ContainerCommandResponseProto response =
               client.sendCommand(writeChunkRequest);
-      Assert.assertEquals(ContainerProtos.Result.SUCCESS,
+      assertEquals(ContainerProtos.Result.SUCCESS,
           response.getResult());
 
       //Read Chunk
@@ -137,7 +136,7 @@ public class TestContainerMetrics {
           ContainerTestHelper.getReadChunkRequest(pipeline, writeChunkRequest
               .getWriteChunk());
       response = client.sendCommand(readChunkRequest);
-      Assert.assertEquals(ContainerProtos.Result.SUCCESS, response.getResult());
+      assertEquals(ContainerProtos.Result.SUCCESS, response.getResult());
 
       MetricsRecordBuilder containerMetrics = getMetrics(
           "StorageContainerMetrics");

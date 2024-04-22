@@ -27,9 +27,6 @@ import java.util.UUID;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.atomic.AtomicReference;
 
-import org.apache.hadoop.fs.FileAlreadyExistsException;
-import org.apache.hadoop.hdds.utils.IOUtils;
-import org.apache.hadoop.conf.StorageUnit;
 import org.apache.hadoop.crypto.CipherSuite;
 import org.apache.hadoop.crypto.CryptoCodec;
 import org.apache.hadoop.crypto.CryptoOutputStream;
@@ -37,15 +34,19 @@ import org.apache.hadoop.crypto.Encryptor;
 import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
 import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.fs.FSDataOutputStream;
+import org.apache.hadoop.fs.FileAlreadyExistsException;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.StreamCapabilities;
 import org.apache.hadoop.hdds.client.DefaultReplicationConfig;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.protocol.StorageType;
+import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
+import org.apache.hadoop.ozone.ClientConfigForTesting;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.OzoneConsts;
@@ -58,6 +59,7 @@ import org.apache.hadoop.ozone.client.io.KeyOutputStream;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OzoneManager;
+import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
@@ -76,6 +78,7 @@ import org.slf4j.LoggerFactory;
 import org.slf4j.event.Level;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_RATIS_PIPELINE_LIMIT;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_OFS_URI_SCHEME;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_ROOT;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
@@ -116,17 +119,19 @@ public class TestHSync {
     CONF.setBoolean(OZONE_OM_RATIS_ENABLE_KEY, false);
     CONF.set(OZONE_DEFAULT_BUCKET_LAYOUT, layout.name());
     CONF.setBoolean(OzoneConfigKeys.OZONE_FS_HSYNC_ENABLED, true);
-    cluster = MiniOzoneCluster.newBuilder(CONF)
-        .setNumDatanodes(5)
-        .setTotalPipelineNumLimit(10)
+    CONF.setInt(OZONE_SCM_RATIS_PIPELINE_LIMIT, 10);
+    ClientConfigForTesting.newBuilder(StorageUnit.BYTES)
         .setBlockSize(blockSize)
         .setChunkSize(chunkSize)
         .setStreamBufferFlushSize(flushSize)
         .setStreamBufferMaxSize(maxFlushSize)
-        .setDataStreamBufferFlushize(maxFlushSize)
-        .setStreamBufferSizeUnit(StorageUnit.BYTES)
+        .setDataStreamBufferFlushSize(maxFlushSize)
         .setDataStreamMinPacketSize(chunkSize)
-        .setDataStreamStreamWindowSize(5 * chunkSize)
+        .setDataStreamWindowSize(5 * chunkSize)
+        .applyTo(CONF);
+
+    cluster = MiniOzoneCluster.newBuilder(CONF)
+        .setNumDatanodes(5)
         .build();
     cluster.waitForClusterToBeReady();
     client = cluster.newClient();
@@ -222,6 +227,46 @@ public class TestHSync {
       for (int i = 0; i < 10; i++) {
         final Path file = new Path(dir, "file" + i);
         runTestHSync(fs, file, 1 << i);
+      }
+    }
+  }
+
+  @Test
+  public void testHSyncDeletedKey() throws Exception {
+    // Verify that a key can't be successfully hsync'ed again after it's deleted,
+    // and that key won't reappear after a failed hsync.
+
+    // Set the fs.defaultFS
+    final String rootPath = String.format("%s://%s/",
+        OZONE_OFS_URI_SCHEME, CONF.get(OZONE_OM_ADDRESS_KEY));
+    CONF.set(CommonConfigurationKeysPublic.FS_DEFAULT_NAME_KEY, rootPath);
+
+    final String dir = OZONE_ROOT + bucket.getVolumeName()
+        + OZONE_URI_DELIMITER + bucket.getName();
+    final Path key1 = new Path(dir, "key-hsync-del");
+
+    try (FileSystem fs = FileSystem.get(CONF)) {
+      // Create key1
+      try (FSDataOutputStream os = fs.create(key1, true)) {
+        os.write(1);
+        os.hsync();
+        fs.delete(key1, false);
+
+        // getFileStatus should throw FNFE because the key is deleted
+        assertThrows(FileNotFoundException.class,
+            () -> fs.getFileStatus(key1));
+        // hsync should throw because the open key is gone
+        try {
+          os.hsync();
+        } catch (OMException omEx) {
+          assertEquals(OMException.ResultCodes.KEY_NOT_FOUND, omEx.getResult());
+        }
+        // key1 should not reappear after failed hsync
+        assertThrows(FileNotFoundException.class,
+            () -> fs.getFileStatus(key1));
+      } catch (OMException ex) {
+        // os.close() throws OMException because the key is deleted
+        assertEquals(OMException.ResultCodes.KEY_NOT_FOUND, ex.getResult());
       }
     }
   }

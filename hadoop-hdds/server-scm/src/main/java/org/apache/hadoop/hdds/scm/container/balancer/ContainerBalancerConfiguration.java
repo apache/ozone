@@ -26,7 +26,7 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ContainerBalancerConfigurationProto;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.ozone.OzoneConsts;
-import org.jetbrains.annotations.NotNull;
+import jakarta.annotation.Nonnull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -338,6 +338,10 @@ public final class ContainerBalancerConfiguration {
     return Duration.ofMillis(moveReplicationTimeout);
   }
 
+  public void setMoveReplicationTimeout(Duration duration) {
+    this.moveReplicationTimeout = duration.toMillis();
+  }
+
   public void setMoveReplicationTimeout(long millis) {
     this.moveReplicationTimeout = millis;
   }
@@ -472,8 +476,8 @@ public final class ContainerBalancerConfiguration {
   }
 
   static ContainerBalancerConfiguration fromProtobuf(
-      @NotNull ContainerBalancerConfigurationProto proto,
-      @NotNull OzoneConfiguration ozoneConfiguration) {
+      @Nonnull ContainerBalancerConfigurationProto proto,
+      @Nonnull OzoneConfiguration ozoneConfiguration) {
     ContainerBalancerConfiguration config =
         ozoneConfiguration.getObject(ContainerBalancerConfiguration.class);
     if (proto.hasUtilizationThreshold()) {

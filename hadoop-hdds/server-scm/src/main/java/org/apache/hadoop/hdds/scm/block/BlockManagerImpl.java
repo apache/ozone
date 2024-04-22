@@ -97,12 +97,9 @@ public class BlockManagerImpl implements BlockManager, BlockmanagerMXBean {
 
     // SCM block deleting transaction log and deleting service.
     deletedBlockLog = new DeletedBlockLogImpl(conf,
+        scm,
         scm.getContainerManager(),
-        scm.getScmHAManager().getRatisServer(),
-        scm.getScmMetadataStore().getDeletedBlocksTXTable(),
         scm.getScmHAManager().getDBTransactionBuffer(),
-        scm.getScmContext(),
-        scm.getSequenceIdGen(),
         metrics);
 
 

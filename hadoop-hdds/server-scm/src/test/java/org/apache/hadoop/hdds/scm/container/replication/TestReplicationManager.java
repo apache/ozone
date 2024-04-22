@@ -28,6 +28,7 @@ import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto;
+import org.apache.hadoop.hdds.scm.HddsTestUtils;
 import org.apache.hadoop.hdds.scm.PlacementPolicy;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
@@ -43,6 +44,9 @@ import org.apache.hadoop.hdds.scm.ha.SCMServiceManager;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.node.NodeStatus;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
+import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
+import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
+import org.apache.hadoop.hdds.security.token.ContainerTokenGenerator;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
 import org.apache.hadoop.ozone.protocol.commands.DeleteContainerCommand;
 import org.apache.hadoop.ozone.protocol.commands.ReconstructECContainersCommand;
@@ -51,6 +55,7 @@ import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
 import org.apache.hadoop.util.Lists;
 import org.apache.ozone.test.TestClock;
 import org.apache.ratis.protocol.exceptions.NotLeaderException;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -174,6 +179,23 @@ public class TestReplicationManager {
     // Ensure that RM will run when asked.
     when(scmContext.isLeaderReady()).thenReturn(true);
     when(scmContext.isInSafeMode()).thenReturn(false);
+
+    PipelineManager pipelineManager = mock(PipelineManager.class);
+    when(pipelineManager.getPipeline(any()))
+        .thenReturn(HddsTestUtils.getRandomPipeline());
+
+    StorageContainerManager scm = mock(StorageContainerManager.class);
+    when(scm.getPipelineManager()).thenReturn(pipelineManager);
+    when(scm.getContainerTokenGenerator()).thenReturn(ContainerTokenGenerator.DISABLED);
+
+    when(scmContext.getScm()).thenReturn(scm);
+  }
+
+  @AfterEach
+  void cleanup() {
+    if (replicationManager.getMetrics() != null) {
+      replicationManager.getMetrics().unRegister();
+    }
   }
 
   private ReplicationManager createReplicationManager() throws IOException {
@@ -506,6 +528,67 @@ public class TestReplicationManager {
     Pair<UUID, SCMCommand<?>> command = commandsSent.iterator().next();
     assertEquals(SCMCommandProto.Type.replicateContainerCommand, command.getValue().getType());
     assertEquals(decommissioning.getDatanodeDetails().getUuid(), command.getKey());
+  }
+
+
+  /**
+   * There is a QUASI_CLOSED container with some UNHEALTHY replicas on unique origin nodes. If the datanode hosting
+   * one such replica is being taken offline, then the UNHEALTHY replica needs to be replicated to another node.
+   */
+  @Test
+  public void testQuasiClosedContainerWithUnhealthyReplicaOnDecommissioningNodeWithUniqueOrigin()
+      throws IOException, NodeNotFoundException {
+    RatisReplicationConfig ratisRepConfig =
+        RatisReplicationConfig.getInstance(THREE);
+    // create a QUASI_CLOSED container with 3 QUASI_CLOSED replicas on same origin, and 1 UNHEALTHY on unique origin
+    ContainerInfo container = createContainerInfo(ratisRepConfig, 1,
+        HddsProtos.LifeCycleState.QUASI_CLOSED);
+    Set<ContainerReplica> replicas =
+        createReplicasWithSameOrigin(container.containerID(),
+            ContainerReplicaProto.State.QUASI_CLOSED, 0, 0, 0);
+    ContainerReplica unhealthy =
+        createContainerReplica(container.containerID(), 0, DECOMMISSIONING,
+            ContainerReplicaProto.State.UNHEALTHY);
+    replicas.add(unhealthy);
+    storeContainerAndReplicas(container, replicas);
+    when(replicationManager.getNodeStatus(any(DatanodeDetails.class)))
+        .thenAnswer(invocation -> {
+          DatanodeDetails dn = invocation.getArgument(0);
+          if (dn.equals(unhealthy.getDatanodeDetails())) {
+            return new NodeStatus(DECOMMISSIONING, HddsProtos.NodeState.HEALTHY);
+          }
+
+          return NodeStatus.inServiceHealthy();
+        });
+
+    // the container should be under replicated and queued to under replication queue
+    replicationManager.processContainer(container, repQueue, repReport);
+    assertEquals(1, repReport.getStat(
+        ReplicationManagerReport.HealthState.UNDER_REPLICATED));
+    assertEquals(0, repReport.getStat(
+        ReplicationManagerReport.HealthState.OVER_REPLICATED));
+    assertEquals(1, repQueue.underReplicatedQueueSize());
+    assertEquals(0, repQueue.overReplicatedQueueSize());
+
+    // next, this test sets up some mocks to test if RatisUnderReplicationHandler will handle this container correctly
+    when(ratisPlacementPolicy.chooseDatanodes(anyList(), anyList(), eq(null), eq(1), anyLong(),
+        anyLong())).thenAnswer(invocation -> ImmutableList.of(MockDatanodeDetails.randomDatanodeDetails()));
+    when(nodeManager.getTotalDatanodeCommandCounts(any(DatanodeDetails.class), any(), any()))
+        .thenAnswer(invocation -> {
+          Map<SCMCommandProto.Type, Integer> map = new HashMap<>();
+          map.put(SCMCommandProto.Type.replicateContainerCommand, 0);
+          map.put(SCMCommandProto.Type.reconstructECContainersCommand, 0);
+          return map;
+        });
+    RatisUnderReplicationHandler handler =
+        new RatisUnderReplicationHandler(ratisPlacementPolicy, configuration, replicationManager);
+
+    handler.processAndSendCommands(replicas, Collections.emptyList(), repQueue.dequeueUnderReplicatedContainer(), 2);
+    assertEquals(1, commandsSent.size());
+    Pair<UUID, SCMCommand<?>> command = commandsSent.iterator().next();
+    // a replicate command should have been sent for the UNHEALTHY replica
+    assertEquals(SCMCommandProto.Type.replicateContainerCommand, command.getValue().getType());
+    assertEquals(unhealthy.getDatanodeDetails().getUuid(), command.getKey());
   }
 
   /**

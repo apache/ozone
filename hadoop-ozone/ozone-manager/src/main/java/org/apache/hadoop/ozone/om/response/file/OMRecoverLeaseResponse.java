@@ -27,7 +27,7 @@ import org.apache.hadoop.ozone.om.response.key.OmKeyResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
         .OMResponse;
 
-import javax.annotation.Nonnull;
+import jakarta.annotation.Nonnull;
 import java.io.IOException;
 
 import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.FILE_TABLE;

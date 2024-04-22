@@ -36,7 +36,7 @@ import org.apache.hadoop.util.Time;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import javax.annotation.Nullable;
+import jakarta.annotation.Nullable;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
@@ -454,11 +454,6 @@ public abstract class StorageVolume
   public long getAvailable() {
     return volumeInfo.map(VolumeInfo::getAvailable).orElse(0L);
 
-  }
-
-  public long getAvailable(SpaceUsageSource precomputedVolumeSpace) {
-    return volumeInfo.map(info -> info.getAvailable(precomputedVolumeSpace))
-        .orElse(0L);
   }
 
   public SpaceUsageSource getCurrentUsage() {

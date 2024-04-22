@@ -28,11 +28,11 @@ import org.apache.hadoop.hdds.annotation.InterfaceStability;
 import org.apache.hadoop.hdfs.server.datanode.checker.Checkable;
 import org.apache.hadoop.util.Timer;
 
-import org.checkerframework.checker.nullness.qual.Nullable;
+import jakarta.annotation.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import javax.annotation.Nonnull;
+import jakarta.annotation.Nonnull;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
@@ -144,8 +144,7 @@ public class ThrottledAsyncChecker<K, V> implements AsyncChecker<K, V> {
     final ListenableFuture<V> lf;
 
     if (diskCheckTimeout > 0) {
-      lf = TimeoutFuture
-          .create(lfWithoutTimeout, diskCheckTimeout, TimeUnit.MILLISECONDS,
+      lf = Futures.withTimeout(lfWithoutTimeout, diskCheckTimeout, TimeUnit.MILLISECONDS,
               scheduledExecutorService);
     } else {
       lf = lfWithoutTimeout;

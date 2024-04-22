@@ -18,11 +18,11 @@
 package org.apache.hadoop.ozone.om;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.junit.jupiter.api.Assertions.fail;
 import org.apache.hadoop.ozone.om.multitenant.AuthorizerLock;
 import org.apache.hadoop.ozone.om.multitenant.AuthorizerLockImpl;
 import org.apache.ozone.test.GenericTestUtils;
@@ -103,17 +103,14 @@ public class TestAuthorizerLockImpl {
   public void testLockInOneThreadUnlockInAnother() {
 
     final AuthorizerLock authorizerLock = new AuthorizerLockImpl();
-
-    try {
+    assertDoesNotThrow(() -> {
       authorizerLock.tryWriteLockInOMRequest();
 
       // Spawn another thread to release the lock.
       // Works as long as they share the same AuthorizerLockImpl instance.
       final Thread thread1 = new Thread(authorizerLock::unlockWriteInOMRequest);
       thread1.start();
-    } catch (IOException e) {
-      fail("Should not have thrown: " + e.getMessage());
-    }
+    });
   }
 
   @Test

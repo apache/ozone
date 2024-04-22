@@ -32,6 +32,7 @@ import java.sql.Timestamp;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.BlockingQueue;
+import java.util.stream.Collectors;
 
 import com.google.common.base.Preconditions;
 import com.google.inject.Singleton;
@@ -59,11 +60,12 @@ import static org.jooq.impl.DSL.currentTimestamp;
 import static org.jooq.impl.DSL.select;
 import static org.jooq.impl.DSL.using;
 
+import org.apache.hadoop.ozone.recon.api.types.DUResponse;
 import org.apache.hadoop.ozone.recon.scm.ReconContainerReportQueue;
 import org.apache.hadoop.security.authentication.client.AuthenticationException;
 import org.hadoop.ozone.recon.schema.tables.daos.GlobalStatsDao;
 import org.hadoop.ozone.recon.schema.tables.pojos.GlobalStats;
-import org.jetbrains.annotations.NotNull;
+import jakarta.annotation.Nonnull;
 import org.jooq.Configuration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -86,7 +88,7 @@ public class ReconUtils {
     return new ReconUtils().getReconDbDir(conf, OZONE_RECON_SCM_DB_DIR);
   }
 
-  @NotNull
+  @Nonnull
   public static List<BlockingQueue<SCMDatanodeHeartbeatDispatcher
       .ContainerReport>> initContainerReportQueue(
       OzoneConfiguration configuration) {
@@ -320,6 +322,33 @@ public class ReconUtils {
     } else {
       globalStatsDao.update(newRecord);
     }
+  }
+
+  /**
+   * Sorts a list of DiskUsage objects in descending order by size using parallel sorting and
+   * returns the top N records as specified by the limit.
+   *
+   * This method is optimized for large datasets and utilizes parallel processing to efficiently
+   * sort and retrieve the top N largest records by size. It's especially useful for reducing
+   * processing time and memory usage when only a subset of sorted records is needed.
+   *
+   * Advantages of this approach include:
+   * - Efficient handling of large datasets by leveraging multi-core processors.
+   * - Reduction in memory usage and improvement in processing time by limiting the
+   *   number of returned records.
+   * - Scalability and easy integration with existing systems.
+   *
+   * @param diskUsageList the list of DiskUsage objects to be sorted.
+   * @param limit the maximum number of DiskUsage objects to return.
+   * @return a list of the top N DiskUsage objects sorted in descending order by size,
+   *  where N is the specified limit.
+   */
+  public static List<DUResponse.DiskUsage> sortDiskUsageDescendingWithLimit(
+      List<DUResponse.DiskUsage> diskUsageList, int limit) {
+    return diskUsageList.parallelStream()
+        .sorted((du1, du2) -> Long.compare(du2.getSize(), du1.getSize()))
+        .limit(limit)
+        .collect(Collectors.toList());
   }
 
   public static long getFileSizeUpperBound(long fileSize) {

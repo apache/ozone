@@ -25,8 +25,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Test;
-import static org.junit.jupiter.api.Assertions.fail;
-import static org.junit.jupiter.api.Assertions.assertTrue;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import picocli.CommandLine;
@@ -44,7 +43,10 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static java.nio.charset.StandardCharsets.UTF_8;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 /**
  * Tests AuditParser.
@@ -128,8 +130,7 @@ public class TestAuditParser {
         exceptionHandler, args);
     try {
       String output = OUT.toString(DEFAULT_CODING);
-      assertTrue(output.contains(msg),
-          "Output:\n" + output + "\nshould contain:\n" + msg);
+      assertThat(output).contains(msg);
     } catch (UnsupportedEncodingException ignored) {
     }
   }
@@ -188,13 +189,10 @@ public class TestAuditParser {
   @Test
   public void testLoadCommand() {
     String[] args1 = new String[]{dbName, "load", LOGS1};
-    try {
-      execute(args1, "");
-      fail("No exception thrown.");
-    } catch (Exception e) {
-      assertTrue(e.getCause() instanceof ArrayIndexOutOfBoundsException);
-      assertTrue(e.getMessage().contains(": 5"));
-    }
+    Exception e =
+        assertThrows(Exception.class, () -> execute(args1, ""));
+    assertInstanceOf(ArrayIndexOutOfBoundsException.class, e.getCause());
+    assertThat(e.getMessage()).contains(" 5");
   }
 
   /**

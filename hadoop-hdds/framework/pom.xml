@@ -30,7 +30,6 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
   <packaging>jar</packaging>
 
   <properties>
-    <allow.junit4>false</allow.junit4>
   </properties>
 
   <dependencies>
@@ -84,8 +83,10 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
       <artifactId>log4j-core</artifactId>
     </dependency>
     <dependency>
+      <!-- required for async logging in Log4j2 -->
       <groupId>com.lmax</groupId>
       <artifactId>disruptor</artifactId>
+      <scope>runtime</scope>
     </dependency>
     <dependency>
       <groupId>org.eclipse.jetty</groupId>
@@ -113,7 +114,7 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
         </exclusion>
         <exclusion>
           <groupId>org.bouncycastle</groupId>
-          <artifactId>bcprov-jdk15on</artifactId>
+          <artifactId>bcprov-jdk18on</artifactId>
         </exclusion>
       </exclusions>
     </dependency>

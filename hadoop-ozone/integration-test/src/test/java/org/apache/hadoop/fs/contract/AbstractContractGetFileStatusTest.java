@@ -33,7 +33,8 @@ import org.apache.hadoop.fs.LocatedFileStatus;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.PathFilter;
 import org.apache.hadoop.fs.RemoteIterator;
-import org.junit.Test;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 
 import static org.apache.hadoop.fs.contract.ContractTestUtils.createSubdirs;
 import static org.apache.hadoop.fs.contract.ContractTestUtils.iteratorToList;
@@ -63,6 +64,7 @@ public abstract class AbstractContractGetFileStatusTest extends
   private static final int TREE_FILES = 4;
   private static final int TREE_FILESIZE = 512;
 
+  @BeforeEach
   @Override
   public void setup() throws Exception {
     super.setup();

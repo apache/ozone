@@ -20,22 +20,18 @@ package org.apache.hadoop.ozone.container.common.volume;
 
 import java.io.IOException;
 import org.apache.commons.io.FileUtils;
-import org.junit.jupiter.api.Timeout;
-import org.slf4j.LoggerFactory;
-import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.hdds.DFSConfigKeysLegacy;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.hdfs.MiniDFSCluster;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.container.common.utils.HddsVolumeUtil;
-import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.GenericTestUtils.LogCapturer;
 
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.HDDS_DATANODE_DIR_KEY;
 import static org.apache.hadoop.ozone.container.common.volume.HddsVolume
     .HDDS_VOLUME_DIR;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assumptions.assumeThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -44,9 +40,13 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
+import org.junit.jupiter.api.io.TempDir;
+import org.slf4j.LoggerFactory;
 
 import java.io.File;
 import java.lang.reflect.Method;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
@@ -59,12 +59,13 @@ public class TestVolumeSet {
 
   private OzoneConfiguration conf;
   private MutableVolumeSet volumeSet;
-  private final String baseDir = MiniDFSCluster.getBaseDirectory();
-  private final String volume1 = baseDir + "disk1";
-  private final String volume2 = baseDir + "disk2";
-  private final List<String> volumes = new ArrayList<>();
 
-  private static final String DUMMY_IP_ADDR = "0.0.0.0";
+  @TempDir
+  private Path baseDir;
+
+  private String volume1;
+  private String volume2;
+  private final List<String> volumes = new ArrayList<>();
 
   private void initializeVolumeSet() throws Exception {
     volumeSet = new MutableVolumeSet(UUID.randomUUID().toString(), conf,
@@ -74,11 +75,14 @@ public class TestVolumeSet {
   @BeforeEach
   public void setup() throws Exception {
     conf = new OzoneConfiguration();
+    volume1 = baseDir.resolve("disk1").toString();
+    volume2 = baseDir.resolve("disk2").toString();
+
     String dataDirKey = volume1 + "," + volume2;
     volumes.add(volume1);
     volumes.add(volume2);
     conf.set(DFSConfigKeysLegacy.DFS_DATANODE_DATA_DIR_KEY, dataDirKey);
-    conf.set(OzoneConfigKeys.DFS_CONTAINER_RATIS_DATANODE_STORAGE_DIR,
+    conf.set(OzoneConfigKeys.HDDS_CONTAINER_RATIS_DATANODE_STORAGE_DIR,
         dataDirKey);
     initializeVolumeSet();
   }
@@ -94,8 +98,6 @@ public class TestVolumeSet {
       FileUtils.deleteDirectory(volume.getStorageDir());
     }
     volumeSet.shutdown();
-
-    FileUtil.fullyDelete(new File(baseDir));
   }
 
   private boolean checkVolumeExistsInVolumeSet(String volumeRoot) {
@@ -115,11 +117,11 @@ public class TestVolumeSet {
 
     // VolumeSet initialization should add volume1 and volume2 to VolumeSet
     assertEquals(volumesList.size(), volumes.size(),
-        "VolumeSet intialization is incorrect");
+        "VolumeSet initialization is incorrect");
     assertTrue(checkVolumeExistsInVolumeSet(volume1),
-        "VolumeSet not initailized correctly");
+        "VolumeSet not initialized correctly");
     assertTrue(checkVolumeExistsInVolumeSet(volume2),
-        "VolumeSet not initailized correctly");
+        "VolumeSet not initialized correctly");
   }
 
   @Test
@@ -128,7 +130,7 @@ public class TestVolumeSet {
     assertEquals(2, volumeSet.getVolumesList().size());
 
     // Add a volume to VolumeSet
-    String volume3 = baseDir + "disk3";
+    String volume3 = baseDir.resolve("disk3").toString();
     boolean success = volumeSet.addVolume(volume3);
 
     assertTrue(success);
@@ -223,31 +225,21 @@ public class TestVolumeSet {
   }
 
   @Test
-  public void testFailVolumes() throws  Exception {
-    MutableVolumeSet volSet = null;
-    File readOnlyVolumePath = new File(baseDir);
+  void testFailVolumes(@TempDir File readOnlyVolumePath, @TempDir File volumePath) throws Exception {
     //Set to readonly, so that this volume will be failed
-    readOnlyVolumePath.setReadOnly();
-    File volumePath = GenericTestUtils.getRandomizedTestDir();
+    assumeThat(readOnlyVolumePath.setReadOnly()).isTrue();
     OzoneConfiguration ozoneConfig = new OzoneConfiguration();
     ozoneConfig.set(HDDS_DATANODE_DIR_KEY, readOnlyVolumePath.getAbsolutePath()
         + "," + volumePath.getAbsolutePath());
     ozoneConfig.set(HddsConfigKeys.OZONE_METADATA_DIRS,
         volumePath.getAbsolutePath());
-    volSet = new MutableVolumeSet(UUID.randomUUID().toString(), ozoneConfig,
+    MutableVolumeSet volSet = new MutableVolumeSet(UUID.randomUUID().toString(), ozoneConfig,
         null, StorageVolume.VolumeType.DATA_VOLUME, null);
     assertEquals(1, volSet.getFailedVolumesList().size());
     assertEquals(readOnlyVolumePath, volSet.getFailedVolumesList().get(0)
         .getStorageDir());
 
-    //Set back to writable
-    try {
-      readOnlyVolumePath.setWritable(true);
-      volSet.shutdown();
-    } finally {
-      FileUtil.fullyDelete(volumePath);
-    }
-
+    volSet.shutdown();
   }
 
   @Test

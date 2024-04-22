@@ -23,7 +23,7 @@ import java.net.URI;
 import java.util.List;
 import java.util.Map;
 
-import javax.annotation.Nonnull;
+import jakarta.annotation.Nonnull;
 import org.apache.hadoop.crypto.key.KeyProvider;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
@@ -327,7 +327,7 @@ public interface ClientProtocol {
    * @param bucketName Name of the Bucket
    * @param keyName Name of the Key
    * @param size Size of the data
-   * @param metadata custom key value metadata
+   * @param metadata Custom key value metadata
    * @return {@link OzoneOutputStream}
    *
    */
@@ -509,15 +509,30 @@ public interface ClientProtocol {
 
   /**
    * Initiate Multipart upload.
-   * @param volumeName
-   * @param bucketName
-   * @param keyName
-   * @param replicationConfig
+   * @param volumeName Name of the Volume
+   * @param bucketName Name of the Bucket
+   * @param keyName Name of the Key
+   * @param replicationConfig Replication Config
    * @return {@link OmMultipartInfo}
    * @throws IOException
    */
   OmMultipartInfo initiateMultipartUpload(String volumeName, String
       bucketName, String keyName, ReplicationConfig replicationConfig)
+      throws IOException;
+
+  /**
+   * Initiate Multipart upload.
+   * @param volumeName Name of the Volume
+   * @param bucketName Name of the Bucket
+   * @param keyName Name of the Key
+   * @param replicationConfig Replication config
+   * @param metadata Custom key value metadata
+   * @return {@link OmMultipartInfo}
+   * @throws IOException
+   */
+  OmMultipartInfo initiateMultipartUpload(String volumeName, String
+      bucketName, String keyName, ReplicationConfig replicationConfig,
+      Map<String, String> metadata)
       throws IOException;
 
   /**
@@ -998,6 +1013,24 @@ public interface ClientProtocol {
       ReplicationConfig replicationConfig) throws IOException;
 
   /**
+   * Set Bucket Encryption Key (BEK).
+   *
+   * @param volumeName
+   * @param bucketName
+   * @param bekName
+   * @throws IOException
+   * @deprecated This functionality is deprecated as it is not intended for
+   * users to reset bucket encryption under normal circumstances and may be
+   * removed in the future. Users are advised to exercise caution and consider
+   * alternative approaches for managing bucket encryption unless HDDS-7449 or
+   * HDDS-7526 is encountered. As a result, the setter methods for this
+   * functionality have been marked as deprecated.
+   */
+  @Deprecated
+  void setEncryptionKey(String volumeName, String bucketName,
+                        String bekName) throws IOException;
+
+  /**
    * Returns OzoneKey that contains the application generated/visible
    * metadata for an Ozone Object.
    *
@@ -1073,6 +1106,19 @@ public interface ClientProtocol {
    */
   String createSnapshot(String volumeName,
       String bucketName, String snapshotName) throws IOException;
+
+  /**
+   * Rename snapshot.
+   *
+   * @param volumeName Vol to be used
+   * @param bucketName Bucket to be used
+   * @param snapshotOldName Old name of the snapshot
+   * @param snapshotNewName New name of the snapshot
+   *
+   * @throws IOException
+   */
+  void renameSnapshot(String volumeName,
+      String bucketName, String snapshotOldName, String snapshotNewName) throws IOException;
 
   /**
    * Delete snapshot.

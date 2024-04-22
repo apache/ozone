@@ -274,7 +274,6 @@ class TestDatanodeHddsVolumeFailureDetection {
     ozoneConfig.setFromObject(dnConf);
     MiniOzoneCluster cluster = MiniOzoneCluster.newBuilder(ozoneConfig)
         .setNumDatanodes(1)
-        .setNumDataVolumes(1)
         .build();
     cluster.waitForClusterToBeReady();
     cluster.waitForPipelineTobeReady(ReplicationFactor.ONE, 30000);

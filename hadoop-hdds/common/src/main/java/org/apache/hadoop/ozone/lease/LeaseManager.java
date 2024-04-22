@@ -282,7 +282,7 @@ public class LeaseManager<T> {
 
         try {
           // ignore return value, just used for wait
-          boolean b = semaphore.tryAcquire(sleepTime, TimeUnit.MILLISECONDS);
+          boolean ignored = semaphore.tryAcquire(sleepTime, TimeUnit.MILLISECONDS);
         } catch (InterruptedException e) {
           LOG.warn("Lease manager is interrupted. Shutting down...", e);
           Thread.currentThread().interrupt();

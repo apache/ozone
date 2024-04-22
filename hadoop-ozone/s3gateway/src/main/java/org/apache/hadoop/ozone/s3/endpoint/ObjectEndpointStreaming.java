@@ -21,12 +21,11 @@ import javax.ws.rs.core.Response;
 import javax.xml.bind.DatatypeConverter;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
+import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.client.OzoneBucket;
-import org.apache.hadoop.ozone.client.io.KeyDataStreamOutput;
 import org.apache.hadoop.ozone.client.io.KeyMetadataAware;
 import org.apache.hadoop.ozone.client.io.OzoneDataStreamOutput;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
-import org.apache.hadoop.ozone.om.helpers.OmMultipartCommitUploadPartInfo;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
 import org.apache.hadoop.ozone.s3.exception.S3ErrorTable;
 import org.apache.hadoop.ozone.s3.metrics.S3GatewayMetrics;
@@ -52,6 +51,7 @@ final class ObjectEndpointStreaming {
 
   private static final Logger LOG =
       LoggerFactory.getLogger(ObjectEndpointStreaming.class);
+  private static final S3GatewayMetrics METRICS = S3GatewayMetrics.getMetrics();
 
   private ObjectEndpointStreaming() {
   }
@@ -99,18 +99,17 @@ final class ObjectEndpointStreaming {
       Map<String, String> keyMetadata,
       DigestInputStream body, PerformanceStringBuilder perf)
       throws IOException {
-    S3GatewayMetrics metrics = S3GatewayMetrics.create();
     long startNanos = Time.monotonicNowNanos();
     long writeLen;
     String eTag;
     try (OzoneDataStreamOutput streamOutput = bucket.createStreamKey(keyPath,
         length, replicationConfig, keyMetadata)) {
-      long metadataLatencyNs = metrics.updatePutKeyMetadataStats(startNanos);
+      long metadataLatencyNs = METRICS.updatePutKeyMetadataStats(startNanos);
       writeLen = writeToStreamOutput(streamOutput, body, bufferSize, length);
       eTag = DatatypeConverter.printHexBinary(body.getMessageDigest().digest())
           .toLowerCase();
       perf.appendMetaLatencyNanos(metadataLatencyNs);
-      ((KeyMetadataAware)streamOutput).getMetadata().put("ETag", eTag);
+      ((KeyMetadataAware)streamOutput).getMetadata().put(OzoneConsts.ETAG, eTag);
     }
     return Pair.of(eTag, writeLen);
   }
@@ -123,16 +122,18 @@ final class ObjectEndpointStreaming {
       int bufferSize,
       ReplicationConfig replicationConfig,
       Map<String, String> keyMetadata,
-      InputStream body, PerformanceStringBuilder perf, long startNanos)
+      DigestInputStream body, PerformanceStringBuilder perf, long startNanos)
       throws IOException {
-    long writeLen = 0;
-    S3GatewayMetrics metrics = S3GatewayMetrics.create();
+    long writeLen;
     try (OzoneDataStreamOutput streamOutput = bucket.createStreamKey(keyPath,
         length, replicationConfig, keyMetadata)) {
       long metadataLatencyNs =
-          metrics.updateCopyKeyMetadataStats(startNanos);
-      perf.appendMetaLatencyNanos(metadataLatencyNs);
+          METRICS.updateCopyKeyMetadataStats(startNanos);
       writeLen = writeToStreamOutput(streamOutput, body, bufferSize, length);
+      String eTag = DatatypeConverter.printHexBinary(body.getMessageDigest().digest())
+          .toLowerCase();
+      perf.appendMetaLatencyNanos(metadataLatencyNs);
+      ((KeyMetadataAware)streamOutput).getMetadata().put(OzoneConsts.ETAG, eTag);
     }
     return writeLen;
   }
@@ -162,25 +163,18 @@ final class ObjectEndpointStreaming {
       throws IOException, OS3Exception {
     long startNanos = Time.monotonicNowNanos();
     String eTag;
-    S3GatewayMetrics metrics = S3GatewayMetrics.create();
-    // OmMultipartCommitUploadPartInfo can only be gotten after the
-    // OzoneDataStreamOutput is closed, so we need to save the
-    // KeyDataStreamOutput in the OzoneDataStreamOutput and use it to get the
-    // OmMultipartCommitUploadPartInfo after OzoneDataStreamOutput is closed.
-    KeyDataStreamOutput keyDataStreamOutput = null;
     try {
       try (OzoneDataStreamOutput streamOutput = ozoneBucket
           .createMultipartStreamKey(key, length, partNumber, uploadID)) {
-        long metadataLatencyNs = metrics.updatePutKeyMetadataStats(startNanos);
+        long metadataLatencyNs = METRICS.updatePutKeyMetadataStats(startNanos);
         long putLength =
             writeToStreamOutput(streamOutput, body, chunkSize, length);
         eTag = DatatypeConverter.printHexBinary(
             body.getMessageDigest().digest()).toLowerCase();
-        ((KeyMetadataAware)streamOutput).getMetadata().put("ETag", eTag);
-        metrics.incPutKeySuccessLength(putLength);
+        ((KeyMetadataAware)streamOutput).getMetadata().put(OzoneConsts.ETAG, eTag);
+        METRICS.incPutKeySuccessLength(putLength);
         perf.appendMetaLatencyNanos(metadataLatencyNs);
         perf.appendSizeBytes(putLength);
-        keyDataStreamOutput = streamOutput.getKeyDataStreamOutput();
       }
     } catch (OMException ex) {
       if (ex.getResult() ==
@@ -192,13 +186,7 @@ final class ObjectEndpointStreaming {
             ozoneBucket.getName() + "/" + key);
       }
       throw ex;
-    } finally {
-      if (keyDataStreamOutput != null) {
-        OmMultipartCommitUploadPartInfo commitUploadPartInfo =
-            keyDataStreamOutput.getCommitUploadPartInfo();
-        eTag = commitUploadPartInfo.getPartName();
-      }
     }
-    return Response.ok().header("ETag", eTag).build();
+    return Response.ok().header(OzoneConsts.ETAG, eTag).build();
   }
 }

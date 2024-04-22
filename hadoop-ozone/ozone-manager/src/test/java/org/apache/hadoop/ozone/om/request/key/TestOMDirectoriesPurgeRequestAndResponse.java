@@ -40,7 +40,7 @@ import org.apache.hadoop.ozone.om.response.key.OMDirectoriesPurgeResponseWithFSO
 import org.apache.hadoop.ozone.om.response.key.OMKeyPurgeResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
-import org.jetbrains.annotations.NotNull;
+import jakarta.annotation.Nonnull;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -68,7 +68,7 @@ public class TestOMDirectoriesPurgeRequestAndResponse extends TestOMKeyRequest {
     for (int i = 1; i <= numKeys; i++) {
       String key = keyName + "-" + i;
       OMRequestTestUtils.addKeyToTable(false, false, volumeName, bucket,
-          key, clientID, replicationType, replicationFactor, trxnIndex++,
+          key, clientID, replicationConfig, trxnIndex++,
           omMetadataManager);
       String ozoneKey = omMetadataManager.getOzoneKey(
           volumeName, bucket, key);
@@ -273,7 +273,7 @@ public class TestOMDirectoriesPurgeRequestAndResponse extends TestOMKeyRequest {
     }
   }
 
-  @NotNull
+  @Nonnull
   private List<String> validateDeletedKeysTable(
       List<OmKeyInfo> deletedKeyInfos) throws IOException {
     List<String> deletedKeyNames = new ArrayList<>();

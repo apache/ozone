@@ -22,6 +22,7 @@ package org.apache.hadoop.ozone.om.request.snapshot;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.hdds.utils.db.RDBStore;
+import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.audit.AuditLogger;
 import org.apache.hadoop.ozone.om.IOmMetadataReader;
@@ -37,7 +38,6 @@ import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.ozone.om.response.snapshot.OMSnapshotCreateResponse;
 import org.apache.hadoop.ozone.om.response.snapshot.OMSnapshotPurgeResponse;
 import org.apache.hadoop.ozone.om.snapshot.ReferenceCounted;
-import org.apache.hadoop.ozone.om.snapshot.SnapshotCache;
 import org.apache.hadoop.ozone.om.upgrade.OMLayoutVersionManager;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SnapshotPurgeRequest;
@@ -64,13 +64,15 @@ import java.util.UUID;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
+import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status.INTERNAL_ERROR;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.any;
+import static org.mockito.Mockito.anyString;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -78,8 +80,6 @@ import static org.mockito.Mockito.when;
  * Tests OMSnapshotPurgeRequest class.
  */
 public class TestOMSnapshotPurgeRequestAndResponse {
-
-  private BatchOperation batchOperation;
   private List<Path> checkpointPaths = new ArrayList<>();
 
   private OzoneManager ozoneManager;
@@ -115,7 +115,7 @@ public class TestOMSnapshotPurgeRequestAndResponse {
     when(ozoneManager.isAdmin(any())).thenReturn(true);
     when(ozoneManager.isFilesystemSnapshotEnabled()).thenReturn(true);
 
-    ReferenceCounted<IOmMetadataReader, SnapshotCache> rcOmMetadataReader =
+    ReferenceCounted<IOmMetadataReader> rcOmMetadataReader =
         mock(ReferenceCounted.class);
     when(ozoneManager.getOmMetadataReader()).thenReturn(rcOmMetadataReader);
     omSnapshotManager = new OmSnapshotManager(ozoneManager);
@@ -178,7 +178,6 @@ public class TestOMSnapshotPurgeRequestAndResponse {
   private void createSnapshotCheckpoint(String volume,
                                         String bucket,
                                         String snapshotName) throws Exception {
-    batchOperation = omMetadataManager.getStore().initBatchOperation();
     OMRequest omRequest = OMRequestTestUtils
         .createSnapshotRequest(volume, bucket, snapshotName);
     // Pre-Execute OMSnapshotCreateRequest.
@@ -189,9 +188,10 @@ public class TestOMSnapshotPurgeRequestAndResponse {
     OMSnapshotCreateResponse omClientResponse = (OMSnapshotCreateResponse)
         omSnapshotCreateRequest.validateAndUpdateCache(ozoneManager, 1);
     // Add to batch and commit to DB.
-    omClientResponse.addToDBBatch(omMetadataManager, batchOperation);
-    omMetadataManager.getStore().commitBatchOperation(batchOperation);
-    batchOperation.close();
+    try (BatchOperation batchOperation = omMetadataManager.getStore().initBatchOperation()) {
+      omClientResponse.addToDBBatch(omMetadataManager, batchOperation);
+      omMetadataManager.getStore().commitBatchOperation(batchOperation);
+    }
 
     String key = SnapshotInfo.getTableKey(volume, bucket, snapshotName);
     SnapshotInfo snapshotInfo =
@@ -227,19 +227,35 @@ public class TestOMSnapshotPurgeRequestAndResponse {
         omSnapshotPurgeRequest.validateAndUpdateCache(ozoneManager, 200L);
 
     // Commit to DB.
-    batchOperation = omMetadataManager.getStore().initBatchOperation();
-    omSnapshotPurgeResponse.checkAndUpdateDB(omMetadataManager, batchOperation);
-    omMetadataManager.getStore().commitBatchOperation(batchOperation);
+    try (BatchOperation batchOperation = omMetadataManager.getStore().initBatchOperation()) {
+      omSnapshotPurgeResponse.checkAndUpdateDB(omMetadataManager, batchOperation);
+      omMetadataManager.getStore().commitBatchOperation(batchOperation);
+    }
   }
 
   @Test
   public void testValidateAndUpdateCache() throws Exception {
+    long initialSnapshotPurgeCount = omMetrics.getNumSnapshotPurges();
+    long initialSnapshotPurgeFailCount = omMetrics.getNumSnapshotPurgeFails();
 
     List<String> snapshotDbKeysToPurge = createSnapshots(10);
     assertFalse(omMetadataManager.getSnapshotInfoTable().isEmpty());
     OMRequest snapshotPurgeRequest = createPurgeKeysRequest(
         snapshotDbKeysToPurge);
-    purgeSnapshots(snapshotPurgeRequest);
+
+    OMSnapshotPurgeRequest omSnapshotPurgeRequest = preExecute(snapshotPurgeRequest);
+
+    OMSnapshotPurgeResponse omSnapshotPurgeResponse = (OMSnapshotPurgeResponse)
+        omSnapshotPurgeRequest.validateAndUpdateCache(ozoneManager, 200L);
+
+    for (String snapshotTableKey: snapshotDbKeysToPurge) {
+      assertNull(omMetadataManager.getSnapshotInfoTable().get(snapshotTableKey));
+    }
+
+    try (BatchOperation batchOperation = omMetadataManager.getStore().initBatchOperation()) {
+      omSnapshotPurgeResponse.checkAndUpdateDB(omMetadataManager, batchOperation);
+      omMetadataManager.getStore().commitBatchOperation(batchOperation);
+    }
 
     // Check if the entries are deleted.
     assertTrue(omMetadataManager.getSnapshotInfoTable().isEmpty());
@@ -248,6 +264,36 @@ public class TestOMSnapshotPurgeRequestAndResponse {
     for (Path checkpoint : checkpointPaths) {
       assertFalse(Files.exists(checkpoint));
     }
+    assertEquals(initialSnapshotPurgeCount + 1, omMetrics.getNumSnapshotPurges());
+    assertEquals(initialSnapshotPurgeFailCount, omMetrics.getNumSnapshotPurgeFails());
+  }
+
+  /**
+   * This test is mainly to validate metrics and error code.
+   */
+  @Test
+  public void testValidateAndUpdateCacheFailure() throws Exception {
+    long initialSnapshotPurgeCount = omMetrics.getNumSnapshotPurges();
+    long initialSnapshotPurgeFailCount = omMetrics.getNumSnapshotPurgeFails();
+
+    List<String> snapshotDbKeysToPurge = createSnapshots(10);
+
+    OmMetadataManagerImpl mockedMetadataManager = mock(OmMetadataManagerImpl.class);
+    Table<String, SnapshotInfo> mockedSnapshotInfoTable = mock(Table.class);
+
+    when(mockedSnapshotInfoTable.get(anyString())).thenThrow(new IOException("Injected fault error."));
+    when(mockedMetadataManager.getSnapshotInfoTable()).thenReturn(mockedSnapshotInfoTable);
+    when(ozoneManager.getMetadataManager()).thenReturn(mockedMetadataManager);
+
+    OMRequest snapshotPurgeRequest = createPurgeKeysRequest(snapshotDbKeysToPurge);
+    OMSnapshotPurgeRequest omSnapshotPurgeRequest = preExecute(snapshotPurgeRequest);
+
+    OMSnapshotPurgeResponse omSnapshotPurgeResponse = (OMSnapshotPurgeResponse)
+        omSnapshotPurgeRequest.validateAndUpdateCache(ozoneManager, 200L);
+
+    assertEquals(INTERNAL_ERROR, omSnapshotPurgeResponse.getOMResponse().getStatus());
+    assertEquals(initialSnapshotPurgeCount, omMetrics.getNumSnapshotPurges());
+    assertEquals(initialSnapshotPurgeFailCount + 1, omMetrics.getNumSnapshotPurgeFails());
   }
 
   // TODO: clean up: Do we this test after

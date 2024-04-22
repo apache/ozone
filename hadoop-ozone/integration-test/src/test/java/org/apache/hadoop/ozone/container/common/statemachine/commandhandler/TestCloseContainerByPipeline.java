@@ -58,6 +58,7 @@ import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.ONE;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.THREE;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_DATANODE_PIPELINE_LIMIT;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -84,10 +85,10 @@ public class TestCloseContainerByPipeline {
     conf = new OzoneConfiguration();
     conf.set(ScmConfigKeys.OZONE_SCM_PIPELINE_OWNER_CONTAINER_COUNT, "1");
     conf.setInt(OZONE_DATANODE_PIPELINE_LIMIT, 2);
+    conf.setInt(ScmConfigKeys.OZONE_SCM_RATIS_PIPELINE_LIMIT, 15);
 
     cluster = MiniOzoneCluster.newBuilder(conf)
         .setNumDatanodes(10)
-        .setTotalPipelineNumLimit(15)
         .build();
     cluster.waitForClusterToBeReady();
     //the easiest way to create an open container is creating a key
@@ -159,8 +160,7 @@ public class TestCloseContainerByPipeline {
         .waitFor(() -> isContainerClosed(cluster, containerID, datanodeDetails),
             500, 5 * 1000);
     // Make sure the closeContainerCommandHandler is Invoked
-    assertTrue(
-        closeContainerHandler.getInvocationCount() > lastInvocationCount);
+    assertThat(closeContainerHandler.getInvocationCount()).isGreaterThan(lastInvocationCount);
   }
 
   @Test

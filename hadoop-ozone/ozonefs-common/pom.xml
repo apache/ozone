@@ -28,7 +28,6 @@
   <properties>
     <file.encoding>UTF-8</file.encoding>
     <downloadSources>true</downloadSources>
-    <allow.junit4>false</allow.junit4>
   </properties>
 
   <build>

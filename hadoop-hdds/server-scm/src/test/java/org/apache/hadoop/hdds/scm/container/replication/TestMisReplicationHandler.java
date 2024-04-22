@@ -38,6 +38,7 @@ import org.apache.hadoop.ozone.protocol.commands.ReplicateContainerCommand;
 import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
 import org.apache.ratis.protocol.exceptions.NotLeaderException;
 
+import java.io.File;
 import java.io.IOException;
 import java.util.HashSet;
 import java.util.List;
@@ -56,15 +57,14 @@ import static org.apache.hadoop.hdds.scm.net.NetConstants.LEAF_SCHEMA;
 import static org.apache.hadoop.hdds.scm.net.NetConstants.RACK_SCHEMA;
 import static org.apache.hadoop.hdds.scm.net.NetConstants.ROOT_SCHEMA;
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.any;
+import static org.mockito.Mockito.anyInt;
+import static org.mockito.Mockito.anyList;
+import static org.mockito.Mockito.anyMap;
+import static org.mockito.Mockito.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 import static org.mockito.Mockito.anyLong;
-import static org.mockito.Mockito.any;
-import static org.mockito.ArgumentMatchers.anyInt;
-import static org.mockito.ArgumentMatchers.anyList;
-import static org.mockito.ArgumentMatchers.anyMap;
-import static org.mockito.ArgumentMatchers.eq;
 
 /**
  * Tests the MisReplicationHandling functionalities to test implementations.
@@ -79,10 +79,10 @@ public abstract class TestMisReplicationHandler {
       new AtomicBoolean(false);
   private ReplicationManagerMetrics metrics;
 
-  protected void setup(ReplicationConfig repConfig)
+  protected void setup(ReplicationConfig repConfig, File testDir)
       throws NodeNotFoundException, CommandTargetOverloadedException,
       NotLeaderException {
-    conf = SCMTestUtils.getConf();
+    conf = SCMTestUtils.getConf(testDir);
 
     replicationManager = mock(ReplicationManager.class);
     when(replicationManager.getNodeStatus(any(DatanodeDetails.class)))

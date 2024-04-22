@@ -51,6 +51,7 @@ import org.apache.ozone.test.GenericTestUtils;
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_COMMAND_STATUS_REPORT_INTERVAL;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_CONTAINER_REPORT_INTERVAL;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_HEARTBEAT_INTERVAL;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_PIPELINE_REPORT_INTERVAL;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_DATANODE_PIPELINE_LIMIT;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_PIPELINE_DESTROY_TIMEOUT;
@@ -94,6 +95,8 @@ public class TestContainerStateMachineFailureOnRead {
     conf.setTimeDuration(OZONE_SCM_PIPELINE_DESTROY_TIMEOUT, 1000,
         TimeUnit.SECONDS);
     conf.setInt(OZONE_DATANODE_PIPELINE_LIMIT, 1);
+    conf.setTimeDuration(HDDS_HEARTBEAT_INTERVAL, 200, TimeUnit.MILLISECONDS);
+
     DatanodeRatisServerConfig ratisServerConfig =
         conf.getObject(DatanodeRatisServerConfig.class);
     ratisServerConfig.setFollowerSlownessTimeout(Duration.ofSeconds(1000));
@@ -118,7 +121,6 @@ public class TestContainerStateMachineFailureOnRead {
     conf.setQuietMode(false);
     cluster = MiniOzoneCluster.newBuilder(conf)
         .setNumDatanodes(3)
-        .setHbInterval(200)
         .build();
     cluster.waitForClusterToBeReady();
     client = OzoneClientFactory.getRpcClient(conf);

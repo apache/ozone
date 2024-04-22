@@ -37,7 +37,6 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
     .CreateBucketResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
     .OMResponse;
-import org.apache.hadoop.ozone.om.ratis.metrics.OzoneManagerDoubleBufferMetrics;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
@@ -64,7 +63,6 @@ public class TestOzoneManagerDoubleBufferWithDummyResponse {
   private OMMetadataManager omMetadataManager;
   private OzoneManagerDoubleBuffer doubleBuffer;
   private final AtomicLong trxId = new AtomicLong(0);
-  private long lastAppliedIndex;
   private long term = 1L;
   @TempDir
   private Path folder;
@@ -76,15 +74,12 @@ public class TestOzoneManagerDoubleBufferWithDummyResponse {
         folder.toAbsolutePath().toString());
     omMetadataManager =
         new OmMetadataManagerImpl(configuration, null);
-    OzoneManagerRatisSnapshot ozoneManagerRatisSnapshot = index -> {
-      lastAppliedIndex = index.get(index.size() - 1);
-    };
-    doubleBuffer = new OzoneManagerDoubleBuffer.Builder()
+    doubleBuffer = OzoneManagerDoubleBuffer.newBuilder()
         .setOmMetadataManager(omMetadataManager)
-        .setOzoneManagerRatisSnapShot(ozoneManagerRatisSnapshot)
-        .setmaxUnFlushedTransactionCount(10000)
+        .setMaxUnFlushedTransactionCount(10000)
         .enableRatis(true)
-        .build();
+        .build()
+        .start();
   }
 
   @AfterEach
@@ -101,8 +96,7 @@ public class TestOzoneManagerDoubleBufferWithDummyResponse {
   public void testDoubleBufferWithDummyResponse() throws Exception {
     String volumeName = UUID.randomUUID().toString();
     int bucketCount = 100;
-    OzoneManagerDoubleBufferMetrics metrics =
-        doubleBuffer.getOzoneManagerDoubleBufferMetrics();
+    final OzoneManagerDoubleBufferMetrics metrics = doubleBuffer.getMetrics();
 
     // As we have not flushed/added any transactions, all metrics should have
     // value zero.
@@ -118,11 +112,11 @@ public class TestOzoneManagerDoubleBufferWithDummyResponse {
         100, 60000);
 
     assertThat(metrics.getTotalNumOfFlushOperations()).isGreaterThan(0);
-    assertEquals(bucketCount, doubleBuffer.getFlushedTransactionCount());
+    assertEquals(bucketCount, doubleBuffer.getFlushedTransactionCountForTesting());
     assertThat(metrics.getMaxNumberOfTransactionsFlushedInOneIteration()).isGreaterThan(0);
     assertEquals(bucketCount, omMetadataManager.countRowsInTable(
         omMetadataManager.getBucketTable()));
-    assertThat(doubleBuffer.getFlushIterations()).isGreaterThan(0);
+    assertThat(doubleBuffer.getFlushIterationsForTesting()).isGreaterThan(0);
     assertThat(metrics.getFlushTime().lastStat().numSamples()).isGreaterThan(0);
     assertThat(metrics.getAvgFlushTransactionsInOneIteration()).isGreaterThan(0);
     assertEquals(bucketCount, (long) metrics.getQueueSize().lastStat().total());
@@ -133,15 +127,11 @@ public class TestOzoneManagerDoubleBufferWithDummyResponse {
         OzoneManagerDoubleBufferMetrics.create();
     assertEquals(metrics, metricsCopy);
 
-    // Check lastAppliedIndex is updated correctly or not.
-    assertEquals(bucketCount, lastAppliedIndex);
-
-
     TransactionInfo transactionInfo =
         omMetadataManager.getTransactionInfoTable().get(TRANSACTION_INFO_KEY);
+    // Check lastAppliedIndex is updated correctly or not.
     assertNotNull(transactionInfo);
-
-    assertEquals(lastAppliedIndex, transactionInfo.getTransactionIndex());
+    assertEquals(bucketCount, transactionInfo.getTransactionIndex());
     assertEquals(term, transactionInfo.getTerm());
   }
 

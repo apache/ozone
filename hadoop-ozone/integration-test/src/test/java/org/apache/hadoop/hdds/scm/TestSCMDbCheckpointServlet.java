@@ -34,7 +34,6 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
-import java.util.UUID;
 import java.util.stream.Stream;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -59,15 +58,15 @@ import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_DB_CHECKPOINT_REQUEST_TO_EXCLUDE_SST;
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.params.provider.Arguments.arguments;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyBoolean;
-import static org.mockito.ArgumentMatchers.anyInt;
-import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.any;
+import static org.mockito.Mockito.anyBoolean;
+import static org.mockito.Mockito.anyInt;
+import static org.mockito.Mockito.anyString;
 import static org.mockito.Mockito.doCallRealMethod;
 import static org.mockito.Mockito.doNothing;
+import static org.mockito.Mockito.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -81,9 +80,6 @@ public class TestSCMDbCheckpointServlet {
   private StorageContainerManager scm;
   private SCMMetrics scmMetrics;
   private OzoneConfiguration conf;
-  private String clusterId;
-  private String scmId;
-  private String omId;
   private HttpServletRequest requestMock;
   private HttpServletResponse responseMock;
   private String method;
@@ -100,14 +96,8 @@ public class TestSCMDbCheckpointServlet {
   @BeforeEach
   public void init() throws Exception {
     conf = new OzoneConfiguration();
-    clusterId = UUID.randomUUID().toString();
-    scmId = UUID.randomUUID().toString();
-    omId = UUID.randomUUID().toString();
     conf.setBoolean(OZONE_ACL_ENABLED, true);
     cluster = MiniOzoneCluster.newBuilder(conf)
-        .setClusterId(clusterId)
-        .setScmId(scmId)
-        .setOmId(omId)
         .build();
     cluster.waitForClusterToBeReady();
     scm = cluster.getStorageContainerManager();
@@ -203,15 +193,13 @@ public class TestSCMDbCheckpointServlet {
 
     doEndpoint();
 
-    assertTrue(outputPath.toFile().length() > 0);
-    assertTrue(
-        scmMetrics.getDBCheckpointMetrics().
-            getLastCheckpointCreationTimeTaken() > 0);
-    assertTrue(
-        scmMetrics.getDBCheckpointMetrics().
-            getLastCheckpointStreamingTimeTaken() > 0);
-    assertTrue(scmMetrics.getDBCheckpointMetrics().
-        getNumCheckpoints() > initialCheckpointCount);
+    assertThat(outputPath.toFile().length()).isGreaterThan(0);
+    assertThat(scmMetrics.getDBCheckpointMetrics().getLastCheckpointCreationTimeTaken())
+        .isGreaterThan(0);
+    assertThat(scmMetrics.getDBCheckpointMetrics().getLastCheckpointStreamingTimeTaken())
+        .isGreaterThan(0);
+    assertThat(scmMetrics.getDBCheckpointMetrics().getNumCheckpoints())
+        .isGreaterThan(initialCheckpointCount);
 
     verify(scmDbCheckpointServletMock).writeDbDataToStream(any(),
         any(), any(), eq(toExcludeList), any(), any());

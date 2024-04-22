@@ -44,6 +44,18 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
       <version>${hadoop.version}</version>
       <exclusions>
         <exclusion>
+          <groupId>com.nimbusds</groupId>
+          <artifactId>nimbus-jose-jwt</artifactId>
+        </exclusion>
+        <exclusion>
+          <groupId>org.xerial.snappy</groupId>
+          <artifactId>snappy-java</artifactId>
+        </exclusion>
+        <exclusion>
+          <groupId>org.apache.hadoop.thirdparty</groupId>
+          <artifactId>hadoop-shaded-guava</artifactId>
+        </exclusion>
+        <exclusion>
           <groupId>org.apache.hadoop</groupId>
           <artifactId>hadoop-annotations</artifactId>
         </exclusion>
@@ -100,6 +112,10 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
           <artifactId>jersey-json</artifactId>
         </exclusion>
         <exclusion>
+          <groupId>com.google.code.findbugs</groupId>
+          <artifactId>jsr305</artifactId>
+        </exclusion>
+        <exclusion>
           <groupId>com.sun.jersey</groupId>
           <artifactId>jersey-core</artifactId>
         </exclusion>
@@ -134,10 +150,6 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
         <exclusion>
           <groupId>org.apache.commons</groupId>
           <artifactId>commons-lang3</artifactId>
-        </exclusion>
-        <exclusion>
-          <groupId>org.apache.commons</groupId>
-          <artifactId>commons-text</artifactId>
         </exclusion>
         <exclusion>
           <groupId>org.slf4j</groupId>
@@ -199,11 +211,23 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
 
     </dependency>
     <dependency>
+      <groupId>org.apache.hadoop.thirdparty</groupId>
+      <artifactId>hadoop-shaded-guava</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>com.nimbusds</groupId>
+      <artifactId>nimbus-jose-jwt</artifactId>
+    </dependency>
+    <dependency>
       <groupId>org.apache.hadoop</groupId>
       <artifactId>hadoop-hdfs</artifactId>
       <version>${hadoop.version}</version>
       <scope>compile</scope>
       <exclusions>
+        <exclusion>
+          <groupId>org.apache.hadoop.thirdparty</groupId>
+          <artifactId>hadoop-shaded-guava</artifactId>
+        </exclusion>
         <exclusion>
           <groupId>com.google.guava</groupId>
           <artifactId>guava</artifactId>
@@ -289,6 +313,10 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
           <artifactId>jackson-databind</artifactId>
         </exclusion>
       </exclusions>
+    </dependency>
+    <dependency>
+      <groupId>org.xerial.snappy</groupId>
+      <artifactId>snappy-java</artifactId>
     </dependency>
   </dependencies>
 </project>

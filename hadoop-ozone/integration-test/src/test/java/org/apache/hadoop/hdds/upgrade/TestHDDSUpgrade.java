@@ -20,12 +20,17 @@ package org.apache.hadoop.hdds.upgrade;
 
 import static java.lang.Thread.sleep;
 import static java.nio.charset.StandardCharsets.UTF_8;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_HEARTBEAT_INTERVAL;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_PIPELINE_REPORT_INTERVAL;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto.State.CLOSED;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState.HEALTHY;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState.HEALTHY_READONLY;
+import static org.apache.hadoop.hdds.scm.ScmConfig.ConfigStrings.HDDS_SCM_INIT_DEFAULT_LAYOUT_VERSION;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_DATANODE_PIPELINE_LIMIT;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HEARTBEAT_PROCESS_INTERVAL;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_RATIS_PIPELINE_LIMIT;
 import static org.apache.hadoop.hdds.scm.pipeline.Pipeline.PipelineState.OPEN;
+import static org.apache.hadoop.ozone.om.OmUpgradeConfig.ConfigStrings.OZONE_OM_INIT_DEFAULT_LAYOUT_VERSION;
 import static org.apache.hadoop.ozone.upgrade.InjectedUpgradeFinalizationExecutor.UpgradeTestInjectionPoints.AFTER_COMPLETE_FINALIZATION;
 import static org.apache.hadoop.ozone.upgrade.InjectedUpgradeFinalizationExecutor.UpgradeTestInjectionPoints.AFTER_POST_FINALIZE_UPGRADE;
 import static org.apache.hadoop.ozone.upgrade.InjectedUpgradeFinalizationExecutor.UpgradeTestInjectionPoints.AFTER_PRE_FINALIZE_UPGRADE;
@@ -71,6 +76,7 @@ import org.apache.hadoop.ozone.HddsDatanodeService;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.MiniOzoneClusterProvider;
 import org.apache.hadoop.ozone.MiniOzoneHAClusterImpl;
+import org.apache.hadoop.ozone.UniformDatanodesFactory;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientFactory;
@@ -115,7 +121,7 @@ public class TestHDDSUpgrade {
   private StorageContainerManager scm;
   private ContainerManager scmContainerManager;
   private PipelineManager scmPipelineManager;
-  private final int numContainersCreated = 1;
+  private static final int NUM_CONTAINERS_CREATED = 1;
   private HDDSLayoutVersionManager scmVersionManager;
   private AtomicBoolean testPassed = new AtomicBoolean(true);
   private static
@@ -148,30 +154,31 @@ public class TestHDDSUpgrade {
     OzoneConfiguration conf = new OzoneConfiguration();
     conf.setTimeDuration(HDDS_PIPELINE_REPORT_INTERVAL, 1000,
         TimeUnit.MILLISECONDS);
-    conf.set(OZONE_DATANODE_PIPELINE_LIMIT, "1");
+    conf.setInt(OZONE_DATANODE_PIPELINE_LIMIT, 1);
+    // allow only one FACTOR THREE pipeline.
+    conf.setInt(OZONE_SCM_RATIS_PIPELINE_LIMIT, NUM_DATA_NODES + 1);
+    conf.setInt(HDDS_SCM_INIT_DEFAULT_LAYOUT_VERSION, HDDSLayoutFeature.INITIAL_VERSION.layoutVersion());
+    conf.setInt(OZONE_OM_INIT_DEFAULT_LAYOUT_VERSION, OMLayoutFeature.INITIAL_VERSION.layoutVersion());
+    conf.setTimeDuration(HDDS_HEARTBEAT_INTERVAL, 500, TimeUnit.MILLISECONDS);
+    conf.setTimeDuration(OZONE_SCM_HEARTBEAT_PROCESS_INTERVAL, 500, TimeUnit.MILLISECONDS);
 
     scmFinalizationExecutor = new InjectedUpgradeFinalizationExecutor<>();
     SCMConfigurator scmConfigurator = new SCMConfigurator();
     scmConfigurator.setUpgradeFinalizationExecutor(scmFinalizationExecutor);
 
-    MiniOzoneCluster.Builder builder =
-        new MiniOzoneHAClusterImpl.Builder(conf)
-        .setNumDatanodes(NUM_DATA_NODES)
-        .setNumOfStorageContainerManagers(NUM_SCMS)
+    MiniOzoneHAClusterImpl.Builder builder = MiniOzoneCluster.newHABuilder(conf);
+    builder.setNumOfStorageContainerManagers(NUM_SCMS)
         .setSCMConfigurator(scmConfigurator)
-        // allow only one FACTOR THREE pipeline.
-        .setTotalPipelineNumLimit(NUM_DATA_NODES + 1)
-        .setHbInterval(500)
-        .setHbProcessorInterval(500)
-        .setOmLayoutVersion(OMLayoutFeature.INITIAL_VERSION.layoutVersion())
-        .setScmLayoutVersion(HDDSLayoutFeature.INITIAL_VERSION.layoutVersion())
-        .setDnLayoutVersion(HDDSLayoutFeature.INITIAL_VERSION.layoutVersion());
+        .setNumDatanodes(NUM_DATA_NODES)
+        .setDatanodeFactory(UniformDatanodesFactory.newBuilder()
+            .setLayoutVersion(HDDSLayoutFeature.INITIAL_VERSION.layoutVersion())
+            .build());
 
     // Setting the provider to a max of 100 clusters. Some of the tests here
     // use multiple clusters, so its hard to know exactly how many will be
     // needed. This means the provider will create 1 extra cluster than needed
     // but that will not greatly affect runtimes.
-    clusterProvider = new MiniOzoneClusterProvider(conf, builder, 100);
+    clusterProvider = new MiniOzoneClusterProvider(builder, 100);
   }
 
   @AfterAll
@@ -316,7 +323,7 @@ public class TestHDDSUpgrade {
     // Verify Post-Upgrade conditions on the SCM.
     TestHddsUpgradeUtils.testPostUpgradeConditionsSCM(
         cluster.getStorageContainerManagersList(),
-        numContainersCreated, NUM_DATA_NODES);
+            NUM_CONTAINERS_CREATED, NUM_DATA_NODES);
 
     // All datanodes on the SCM should have moved to HEALTHY-READONLY state.
     TestHddsUpgradeUtils.testDataNodesStateOnSCM(
@@ -327,7 +334,7 @@ public class TestHDDSUpgrade {
     // In the happy path case, no containers should have been quasi closed as
     // a result of the upgrade.
     TestHddsUpgradeUtils.testPostUpgradeConditionsDataNodes(
-        cluster.getHddsDatanodes(), numContainersCreated, CLOSED);
+        cluster.getHddsDatanodes(), NUM_CONTAINERS_CREATED, CLOSED);
 
     // Test that we can use a pipeline after upgrade.
     // Will fail with exception if there are no pipelines.
@@ -871,7 +878,7 @@ public class TestHDDSUpgrade {
     // Verify Post-Upgrade conditions on the SCM.
     // With failure injection
     TestHddsUpgradeUtils.testPostUpgradeConditionsSCM(
-        cluster.getStorageContainerManagersList(), numContainersCreated,
+        cluster.getStorageContainerManagersList(), NUM_CONTAINERS_CREATED,
         NUM_DATA_NODES);
 
     // All datanodes on the SCM should have moved to HEALTHY-READONLY state.
@@ -898,7 +905,7 @@ public class TestHDDSUpgrade {
 
     // Verify the SCM has driven all the DataNodes through Layout Upgrade.
     TestHddsUpgradeUtils.testPostUpgradeConditionsDataNodes(
-        cluster.getHddsDatanodes(), numContainersCreated);
+        cluster.getHddsDatanodes(), NUM_CONTAINERS_CREATED);
 
     // Verify that new pipeline can be created with upgraded datanodes.
     try {

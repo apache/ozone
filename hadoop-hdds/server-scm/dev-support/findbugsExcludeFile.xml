@@ -51,4 +51,9 @@
     <Class name="org.apache.hadoop.hdds.scm.metadata.TestSCMTransactionInfoCodec"/>
     <Bug pattern="NP_NULL_PARAM_DEREF_ALL_TARGETS_DANGEROUS" />
   </Match>
+  <Match>
+    <Class name="org.apache.hadoop.hdds.scm.container.replication.ReplicationManager"/>
+    <Field name="metrics" />
+    <Bug pattern="IS2_INCONSISTENT_SYNC" />
+  </Match>
 </FindBugsFilter>

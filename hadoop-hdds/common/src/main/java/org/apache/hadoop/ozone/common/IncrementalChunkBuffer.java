@@ -18,6 +18,7 @@
 package org.apache.hadoop.ozone.common;
 
 import com.google.common.base.Preconditions;
+import org.apache.hadoop.hdds.utils.db.CodecBuffer;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 
 import java.io.IOException;
@@ -47,6 +48,8 @@ final class IncrementalChunkBuffer implements ChunkBuffer {
   private final int limitIndex;
   /** Buffer list to be allocated incrementally. */
   private final List<ByteBuffer> buffers;
+  /** The underlying buffers. */
+  private final List<CodecBuffer> underlying;
   /** Is this a duplicated buffer? (for debug only) */
   private final boolean isDuplicated;
   /** The index of the first non-full buffer. */
@@ -58,9 +61,16 @@ final class IncrementalChunkBuffer implements ChunkBuffer {
     this.limit = limit;
     this.increment = increment;
     this.limitIndex = limit / increment;
-    this.buffers = new ArrayList<>(
-        limitIndex + (limit % increment == 0 ? 0 : 1));
+    int size = limitIndex + (limit % increment == 0 ? 0 : 1);
+    this.buffers = new ArrayList<>(size);
+    this.underlying = isDuplicated ? Collections.emptyList() : new ArrayList<>(size);
     this.isDuplicated = isDuplicated;
+  }
+
+  @Override
+  public void close() {
+    underlying.forEach(CodecBuffer::release);
+    underlying.clear();
   }
 
   /** @return the capacity for the buffer at the given index. */
@@ -99,6 +109,7 @@ final class IncrementalChunkBuffer implements ChunkBuffer {
 
   /** @return the i-th buffer. It may allocate buffers. */
   private ByteBuffer getAndAllocateAtIndex(int index) {
+    Preconditions.checkState(!isDuplicated, "Duplicated buffer is readonly.");
     Preconditions.checkArgument(index >= 0);
     // never allocate over limit
     if (limit % increment == 0) {
@@ -115,7 +126,9 @@ final class IncrementalChunkBuffer implements ChunkBuffer {
     // allocate upto the given index
     ByteBuffer b = null;
     for (; i <= index; i++) {
-      b = ByteBuffer.allocate(getBufferCapacityAtIndex(i));
+      final CodecBuffer c = CodecBuffer.allocateDirect(getBufferCapacityAtIndex(i));
+      underlying.add(c);
+      b = c.asWritableByteBuffer();
       buffers.add(b);
     }
     return b;

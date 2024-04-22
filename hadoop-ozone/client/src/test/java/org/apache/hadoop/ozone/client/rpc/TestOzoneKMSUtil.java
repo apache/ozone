@@ -25,7 +25,7 @@ import org.junit.jupiter.api.Test;
 import java.io.IOException;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.fail;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 /**
  * Test class for {@link OzoneKMSUtil}.
@@ -41,12 +41,8 @@ public class TestOzoneKMSUtil {
 
   @Test
   public void getKeyProvider() {
-    try {
-      OzoneKMSUtil.getKeyProvider(config, null);
-      fail("Expected IOException.");
-    } catch (IOException ioe) {
-      assertEquals(ioe.getMessage(), "KMS serverProviderUri is " +
-          "not configured.");
-    }
+    IOException ioe =
+        assertThrows(IOException.class, () -> OzoneKMSUtil.getKeyProvider(config, null));
+    assertEquals(ioe.getMessage(), "KMS serverProviderUri is " + "not configured.");
   }
 }

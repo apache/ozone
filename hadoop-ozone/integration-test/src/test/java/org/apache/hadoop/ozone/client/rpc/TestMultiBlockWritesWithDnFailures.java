@@ -105,14 +105,13 @@ public class TestMultiBlockWritesWithDnFailures {
     conf.setFromObject(ratisClientConfig);
 
     conf.setTimeDuration(
-        OzoneConfigKeys.DFS_RATIS_LEADER_ELECTION_MINIMUM_TIMEOUT_DURATION_KEY,
+        OzoneConfigKeys.HDDS_RATIS_LEADER_ELECTION_MINIMUM_TIMEOUT_DURATION_KEY,
         1, TimeUnit.SECONDS);
     conf.setInt(OZONE_DATANODE_PIPELINE_LIMIT, 2);
 
     conf.setQuietMode(false);
     cluster = MiniOzoneCluster.newBuilder(conf)
         .setNumDatanodes(datanodes)
-        .setTotalPipelineNumLimit(0)
         .build();
     cluster.waitForClusterToBeReady();
     //the easiest way to create an open container is creating a key

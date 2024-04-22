@@ -45,7 +45,6 @@ import org.apache.hadoop.ozone.container.common.utils.ContainerCache;
 import org.apache.hadoop.ozone.container.common.utils.DatanodeStoreCache;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.slf4j.Logger;
@@ -72,6 +71,8 @@ import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_PIPELINE_REPORT_INTERVA
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HEARTBEAT_PROCESS_INTERVAL;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ADMINISTRATORS;
 import static org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration.CONTAINER_SCHEMA_V3_ENABLED;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
 /**
  * Test Ozone Container upgrade shell.
@@ -79,9 +80,6 @@ import static org.apache.hadoop.ozone.container.common.statemachine.DatanodeConf
 public class TestOzoneContainerUpgradeShell {
   private static final Logger LOG =
       LoggerFactory.getLogger(TestOzoneContainerUpgradeShell.class);
-  private static String omServiceId;
-  private static String clusterId;
-  private static String scmId;
   private static MiniOzoneCluster cluster = null;
   private static OzoneClient client;
   private static OzoneConfiguration conf = null;
@@ -89,13 +87,7 @@ public class TestOzoneContainerUpgradeShell {
   private static final String BUCKET_NAME = UUID.randomUUID().toString();
 
   protected static void startCluster() throws Exception {
-    // Init HA cluster
-    omServiceId = "om-service-test-upgrade-container1";
-    clusterId = UUID.randomUUID().toString();
-    scmId = UUID.randomUUID().toString();
-    final int numDNs = 3;
-    cluster = MiniOzoneCluster.newBuilder(conf).setClusterId(clusterId)
-        .setScmId(scmId).setOMServiceId(omServiceId).setNumDatanodes(numDNs)
+    cluster = MiniOzoneCluster.newBuilder(conf)
         .build();
     cluster.waitForClusterToBeReady();
     client = cluster.newClient();
@@ -157,7 +149,7 @@ public class TestOzoneContainerUpgradeShell {
 
     String[] args = new String[]{"upgrade", "--yes"};
     int exitCode = commandLine.execute(args);
-    Assertions.assertEquals(0, exitCode);
+    assertEquals(0, exitCode);
 
     // datanode2 NodeOperationalState is IN_SERVICE upgrade fail.
     OzoneConfiguration datanode2Conf = datanodeConfigs.get(1);
@@ -169,9 +161,9 @@ public class TestOzoneContainerUpgradeShell {
     String[] args2 = new String[]{"upgrade", "--yes"};
     int exit2Code = commandLine2.execute(args2);
 
-    Assertions.assertEquals(0, exit2Code);
+    assertEquals(0, exit2Code);
     String cmdOut = stdout2.toString();
-    Assertions.assertTrue(cmdOut.contains("IN_MAINTENANCE"));
+    assertThat(cmdOut).contains("IN_MAINTENANCE");
   }
 
   private CommandLine upgradeCommand(PrintWriter pstdout) {

@@ -36,7 +36,6 @@ import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType.REA
 import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType.WRITE;
 import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType.WRITE_ACL;
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.junit.jupiter.api.Assertions.fail;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -122,14 +121,7 @@ class TestOzoneAcls {
       if (entry.getValue()) {
         OzoneAcl.parseAcl(entry.getKey());
       } else {
-        try {
-          OzoneAcl.parseAcl(entry.getKey());
-          // should never get here since parseAcl will throw
-          fail("An exception was expected but did not happen. Key: " +
-              entry.getKey());
-        } catch (IllegalArgumentException e) {
-          // nothing to do
-        }
+        assertThrows(IllegalArgumentException.class, () -> OzoneAcl.parseAcl(entry.getKey()));
       }
     }
   }
@@ -138,132 +130,132 @@ class TestOzoneAcls {
   void testAclValues() {
     OzoneAcl acl = OzoneAcl.parseAcl("user:bilbo:rw");
     assertEquals(acl.getName(), "bilbo");
-    assertTrue(acl.getAclBitSet().get(READ.ordinal()));
-    assertTrue(acl.getAclBitSet().get(WRITE.ordinal()));
-    assertFalse(acl.getAclBitSet().get(ALL.ordinal()));
-    assertFalse(acl.getAclBitSet().get(READ_ACL.ordinal()));
+    assertTrue(acl.isSet(READ));
+    assertTrue(acl.isSet(WRITE));
+    assertFalse(acl.isSet(ALL));
+    assertFalse(acl.isSet(READ_ACL));
     assertEquals(ACLIdentityType.USER, acl.getType());
 
     acl = OzoneAcl.parseAcl("user:bilbo:a");
     assertEquals("bilbo", acl.getName());
-    assertTrue(acl.getAclBitSet().get(ALL.ordinal()));
-    assertFalse(acl.getAclBitSet().get(WRITE.ordinal()));
+    assertTrue(acl.isSet(ALL));
+    assertFalse(acl.isSet(WRITE));
     assertEquals(ACLIdentityType.USER, acl.getType());
 
     acl = OzoneAcl.parseAcl("user:bilbo:r");
     assertEquals("bilbo", acl.getName());
-    assertTrue(acl.getAclBitSet().get(READ.ordinal()));
-    assertFalse(acl.getAclBitSet().get(ALL.ordinal()));
+    assertTrue(acl.isSet(READ));
+    assertFalse(acl.isSet(ALL));
     assertEquals(ACLIdentityType.USER, acl.getType());
 
     acl = OzoneAcl.parseAcl("user:bilbo:w");
     assertEquals("bilbo", acl.getName());
-    assertTrue(acl.getAclBitSet().get(WRITE.ordinal()));
-    assertFalse(acl.getAclBitSet().get(ALL.ordinal()));
+    assertTrue(acl.isSet(WRITE));
+    assertFalse(acl.isSet(ALL));
     assertEquals(ACLIdentityType.USER, acl.getType());
 
     acl = OzoneAcl.parseAcl("group:hobbit:a");
     assertEquals(acl.getName(), "hobbit");
-    assertTrue(acl.getAclBitSet().get(ALL.ordinal()));
-    assertFalse(acl.getAclBitSet().get(READ.ordinal()));
+    assertTrue(acl.isSet(ALL));
+    assertFalse(acl.isSet(READ));
     assertEquals(ACLIdentityType.GROUP, acl.getType());
 
     acl = OzoneAcl.parseAcl("world::a");
     assertEquals(acl.getName(), "WORLD");
-    assertTrue(acl.getAclBitSet().get(ALL.ordinal()));
-    assertFalse(acl.getAclBitSet().get(WRITE.ordinal()));
+    assertTrue(acl.isSet(ALL));
+    assertFalse(acl.isSet(WRITE));
     assertEquals(ACLIdentityType.WORLD, acl.getType());
 
     acl = OzoneAcl.parseAcl("user:bilbo:rwdlncxy");
     assertEquals(acl.getName(), "bilbo");
-    assertTrue(acl.getAclBitSet().get(READ.ordinal()));
-    assertTrue(acl.getAclBitSet().get(WRITE.ordinal()));
-    assertTrue(acl.getAclBitSet().get(DELETE.ordinal()));
-    assertTrue(acl.getAclBitSet().get(LIST.ordinal()));
-    assertTrue(acl.getAclBitSet().get(NONE.ordinal()));
-    assertTrue(acl.getAclBitSet().get(CREATE.ordinal()));
-    assertTrue(acl.getAclBitSet().get(READ_ACL.ordinal()));
-    assertTrue(acl.getAclBitSet().get(WRITE_ACL.ordinal()));
-    assertFalse(acl.getAclBitSet().get(ALL.ordinal()));
+    assertTrue(acl.isSet(READ));
+    assertTrue(acl.isSet(WRITE));
+    assertTrue(acl.isSet(DELETE));
+    assertTrue(acl.isSet(LIST));
+    assertTrue(acl.isSet(NONE));
+    assertTrue(acl.isSet(CREATE));
+    assertTrue(acl.isSet(READ_ACL));
+    assertTrue(acl.isSet(WRITE_ACL));
+    assertFalse(acl.isSet(ALL));
 
     acl = OzoneAcl.parseAcl("group:hadoop:rwdlncxy");
     assertEquals(acl.getName(), "hadoop");
-    assertTrue(acl.getAclBitSet().get(READ.ordinal()));
-    assertTrue(acl.getAclBitSet().get(WRITE.ordinal()));
-    assertTrue(acl.getAclBitSet().get(DELETE.ordinal()));
-    assertTrue(acl.getAclBitSet().get(LIST.ordinal()));
-    assertTrue(acl.getAclBitSet().get(NONE.ordinal()));
-    assertTrue(acl.getAclBitSet().get(CREATE.ordinal()));
-    assertTrue(acl.getAclBitSet().get(READ_ACL.ordinal()));
-    assertTrue(acl.getAclBitSet().get(WRITE_ACL.ordinal()));
-    assertFalse(acl.getAclBitSet().get(ALL.ordinal()));
+    assertTrue(acl.isSet(READ));
+    assertTrue(acl.isSet(WRITE));
+    assertTrue(acl.isSet(DELETE));
+    assertTrue(acl.isSet(LIST));
+    assertTrue(acl.isSet(NONE));
+    assertTrue(acl.isSet(CREATE));
+    assertTrue(acl.isSet(READ_ACL));
+    assertTrue(acl.isSet(WRITE_ACL));
+    assertFalse(acl.isSet(ALL));
     assertEquals(ACLIdentityType.GROUP, acl.getType());
 
     acl = OzoneAcl.parseAcl("world::rwdlncxy");
     assertEquals(acl.getName(), "WORLD");
-    assertTrue(acl.getAclBitSet().get(READ.ordinal()));
-    assertTrue(acl.getAclBitSet().get(WRITE.ordinal()));
-    assertTrue(acl.getAclBitSet().get(DELETE.ordinal()));
-    assertTrue(acl.getAclBitSet().get(LIST.ordinal()));
-    assertTrue(acl.getAclBitSet().get(NONE.ordinal()));
-    assertTrue(acl.getAclBitSet().get(CREATE.ordinal()));
-    assertTrue(acl.getAclBitSet().get(READ_ACL.ordinal()));
-    assertTrue(acl.getAclBitSet().get(WRITE_ACL.ordinal()));
-    assertFalse(acl.getAclBitSet().get(ALL.ordinal()));
+    assertTrue(acl.isSet(READ));
+    assertTrue(acl.isSet(WRITE));
+    assertTrue(acl.isSet(DELETE));
+    assertTrue(acl.isSet(LIST));
+    assertTrue(acl.isSet(NONE));
+    assertTrue(acl.isSet(CREATE));
+    assertTrue(acl.isSet(READ_ACL));
+    assertTrue(acl.isSet(WRITE_ACL));
+    assertFalse(acl.isSet(ALL));
     assertEquals(ACLIdentityType.WORLD, acl.getType());
 
     // Acls with scope info.
     acl = OzoneAcl.parseAcl("user:bilbo:rwdlncxy[DEFAULT]");
     assertEquals(acl.getName(), "bilbo");
-    assertTrue(acl.getAclBitSet().get(READ.ordinal()));
-    assertTrue(acl.getAclBitSet().get(WRITE.ordinal()));
-    assertTrue(acl.getAclBitSet().get(DELETE.ordinal()));
-    assertTrue(acl.getAclBitSet().get(LIST.ordinal()));
-    assertTrue(acl.getAclBitSet().get(NONE.ordinal()));
-    assertTrue(acl.getAclBitSet().get(CREATE.ordinal()));
-    assertTrue(acl.getAclBitSet().get(READ_ACL.ordinal()));
-    assertTrue(acl.getAclBitSet().get(WRITE_ACL.ordinal()));
-    assertFalse(acl.getAclBitSet().get(ALL.ordinal()));
+    assertTrue(acl.isSet(READ));
+    assertTrue(acl.isSet(WRITE));
+    assertTrue(acl.isSet(DELETE));
+    assertTrue(acl.isSet(LIST));
+    assertTrue(acl.isSet(NONE));
+    assertTrue(acl.isSet(CREATE));
+    assertTrue(acl.isSet(READ_ACL));
+    assertTrue(acl.isSet(WRITE_ACL));
+    assertFalse(acl.isSet(ALL));
     assertEquals(acl.getAclScope(), OzoneAcl.AclScope.DEFAULT);
 
     acl = OzoneAcl.parseAcl("user:bilbo:rwdlncxy[ACCESS]");
     assertEquals(acl.getName(), "bilbo");
-    assertTrue(acl.getAclBitSet().get(READ.ordinal()));
-    assertTrue(acl.getAclBitSet().get(WRITE.ordinal()));
-    assertTrue(acl.getAclBitSet().get(DELETE.ordinal()));
-    assertTrue(acl.getAclBitSet().get(LIST.ordinal()));
-    assertTrue(acl.getAclBitSet().get(NONE.ordinal()));
-    assertTrue(acl.getAclBitSet().get(CREATE.ordinal()));
-    assertTrue(acl.getAclBitSet().get(READ_ACL.ordinal()));
-    assertTrue(acl.getAclBitSet().get(WRITE_ACL.ordinal()));
-    assertFalse(acl.getAclBitSet().get(ALL.ordinal()));
+    assertTrue(acl.isSet(READ));
+    assertTrue(acl.isSet(WRITE));
+    assertTrue(acl.isSet(DELETE));
+    assertTrue(acl.isSet(LIST));
+    assertTrue(acl.isSet(NONE));
+    assertTrue(acl.isSet(CREATE));
+    assertTrue(acl.isSet(READ_ACL));
+    assertTrue(acl.isSet(WRITE_ACL));
+    assertFalse(acl.isSet(ALL));
     assertEquals(acl.getAclScope(), OzoneAcl.AclScope.ACCESS);
 
     acl = OzoneAcl.parseAcl("group:hadoop:rwdlncxy[ACCESS]");
     assertEquals(acl.getName(), "hadoop");
-    assertTrue(acl.getAclBitSet().get(READ.ordinal()));
-    assertTrue(acl.getAclBitSet().get(WRITE.ordinal()));
-    assertTrue(acl.getAclBitSet().get(DELETE.ordinal()));
-    assertTrue(acl.getAclBitSet().get(LIST.ordinal()));
-    assertTrue(acl.getAclBitSet().get(NONE.ordinal()));
-    assertTrue(acl.getAclBitSet().get(CREATE.ordinal()));
-    assertTrue(acl.getAclBitSet().get(READ_ACL.ordinal()));
-    assertTrue(acl.getAclBitSet().get(WRITE_ACL.ordinal()));
-    assertFalse(acl.getAclBitSet().get(ALL.ordinal()));
+    assertTrue(acl.isSet(READ));
+    assertTrue(acl.isSet(WRITE));
+    assertTrue(acl.isSet(DELETE));
+    assertTrue(acl.isSet(LIST));
+    assertTrue(acl.isSet(NONE));
+    assertTrue(acl.isSet(CREATE));
+    assertTrue(acl.isSet(READ_ACL));
+    assertTrue(acl.isSet(WRITE_ACL));
+    assertFalse(acl.isSet(ALL));
     assertEquals(ACLIdentityType.GROUP, acl.getType());
     assertEquals(acl.getAclScope(), OzoneAcl.AclScope.ACCESS);
 
     acl = OzoneAcl.parseAcl("world::rwdlncxy[DEFAULT]");
     assertEquals(acl.getName(), "WORLD");
-    assertTrue(acl.getAclBitSet().get(READ.ordinal()));
-    assertTrue(acl.getAclBitSet().get(WRITE.ordinal()));
-    assertTrue(acl.getAclBitSet().get(DELETE.ordinal()));
-    assertTrue(acl.getAclBitSet().get(LIST.ordinal()));
-    assertTrue(acl.getAclBitSet().get(NONE.ordinal()));
-    assertTrue(acl.getAclBitSet().get(CREATE.ordinal()));
-    assertTrue(acl.getAclBitSet().get(READ_ACL.ordinal()));
-    assertTrue(acl.getAclBitSet().get(WRITE_ACL.ordinal()));
-    assertFalse(acl.getAclBitSet().get(ALL.ordinal()));
+    assertTrue(acl.isSet(READ));
+    assertTrue(acl.isSet(WRITE));
+    assertTrue(acl.isSet(DELETE));
+    assertTrue(acl.isSet(LIST));
+    assertTrue(acl.isSet(NONE));
+    assertTrue(acl.isSet(CREATE));
+    assertTrue(acl.isSet(READ_ACL));
+    assertTrue(acl.isSet(WRITE_ACL));
+    assertFalse(acl.isSet(ALL));
     assertEquals(ACLIdentityType.WORLD, acl.getType());
     assertEquals(OzoneAcl.AclScope.DEFAULT, acl.getAclScope());
 

@@ -38,9 +38,8 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.junit.jupiter.api.Assertions.fail;
-import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentCaptor.forClass;
+import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.clearInvocations;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
@@ -296,13 +295,9 @@ public class TestRDBStoreByteArrayIterator {
     assertTrue(iter.hasNext());
     verify(rocksDBIteratorMock, times(1)).isValid();
     verify(rocksDBIteratorMock, times(1)).key();
-
-    try {
-      iter.seekToLast();
-      fail("Prefixed iterator does not support seekToLast");
-    } catch (Exception e) {
-      assertInstanceOf(UnsupportedOperationException.class, e);
-    }
+    Exception e =
+        assertThrows(Exception.class, () -> iter.seekToLast(), "Prefixed iterator does not support seekToLast");
+    assertInstanceOf(UnsupportedOperationException.class, e);
 
     iter.close();
   }

@@ -91,6 +91,7 @@
               <goal>shade</goal>
             </goals>
             <configuration>
+              <skip>${maven.shade.skip}</skip>
               <transformers>
                 <transformer
                         implementation="org.apache.maven.plugins.shade.resource.DontIncludeResourceTransformer">
@@ -128,7 +129,6 @@
                     <include>org.apache.commons.digester.**.*</include>
                     <include>org.apache.commons.io.**.*</include>
                     <include>org.apache.commons.logging.**.*</include>
-                    <include>org.apache.commons.pool2.**.*</include>
                     <include>org.apache.commons.validator.**.*</include>
                     <include>org.apache.commons.lang3.**.*</include>
                     <include>org.sqlite.**.*</include>

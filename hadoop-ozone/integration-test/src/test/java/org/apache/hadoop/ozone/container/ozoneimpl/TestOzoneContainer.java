@@ -30,11 +30,13 @@ import org.apache.hadoop.hdds.scm.XceiverClientGrpc;
 import org.apache.hadoop.hdds.scm.XceiverClientSpi;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.ozone.container.common.ContainerTestUtils;
+import org.apache.hadoop.ozone.container.common.utils.StorageVolumeUtil;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.api.io.TempDir;
 
 import java.io.File;
+import java.nio.file.Path;
 import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
@@ -48,7 +50,6 @@ import static org.apache.hadoop.hdds.scm.ScmConfigKeys.HDDS_DATANODE_DIR_KEY;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.fail;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
@@ -56,6 +57,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  */
 @Timeout(300)
 public class TestOzoneContainer {
+  @TempDir
+  private Path tempDir;
 
   @Test
   public void testCreateOzoneContainer(
@@ -69,13 +72,15 @@ public class TestOzoneContainer {
       Pipeline pipeline = MockPipeline.createSingleNodePipeline();
       conf.set(OZONE_METADATA_DIRS, ozoneMetaDir.getPath());
       conf.set(HDDS_DATANODE_DIR_KEY, hddsNodeDir.getPath());
-      conf.setInt(OzoneConfigKeys.DFS_CONTAINER_IPC_PORT,
+      conf.setInt(OzoneConfigKeys.HDDS_CONTAINER_IPC_PORT,
           pipeline.getFirstNode()
               .getPort(DatanodeDetails.Port.Name.STANDALONE).getValue());
 
       DatanodeDetails datanodeDetails = randomDatanodeDetails();
       container = ContainerTestUtils
           .getOzoneContainer(datanodeDetails, conf);
+      StorageVolumeUtil.getHddsVolumesList(container.getVolumeSet().getVolumesList())
+          .forEach(hddsVolume -> hddsVolume.setDbParentDir(tempDir.toFile()));
       //Set clusterId and manually start ozone container.
       container.start(UUID.randomUUID().toString());
 
@@ -91,7 +96,7 @@ public class TestOzoneContainer {
   }
 
   @Test
-  public void testOzoneContainerStart(
+  void testOzoneContainerStart(
       @TempDir File ozoneMetaDir, @TempDir File hddsNodeDir) throws Exception {
     OzoneConfiguration conf = newOzoneConfiguration();
     OzoneContainer container = null;
@@ -100,7 +105,7 @@ public class TestOzoneContainer {
       Pipeline pipeline = MockPipeline.createSingleNodePipeline();
       conf.set(OZONE_METADATA_DIRS, ozoneMetaDir.getPath());
       conf.set(HDDS_DATANODE_DIR_KEY, hddsNodeDir.getPath());
-      conf.setInt(OzoneConfigKeys.DFS_CONTAINER_IPC_PORT,
+      conf.setInt(OzoneConfigKeys.HDDS_CONTAINER_IPC_PORT,
           pipeline.getFirstNode()
               .getPort(DatanodeDetails.Port.Name.STANDALONE).getValue());
 
@@ -110,18 +115,12 @@ public class TestOzoneContainer {
 
       String clusterId = UUID.randomUUID().toString();
       container.start(clusterId);
-      try {
-        container.start(clusterId);
-      } catch (Exception e) {
-        fail();
-      }
+
+      container.start(clusterId);
 
       container.stop();
-      try {
-        container.stop();
-      } catch (Exception e) {
-        fail();
-      }
+
+      container.stop();
 
     } finally {
       if (container != null) {
@@ -199,7 +198,7 @@ public class TestOzoneContainer {
       response = client.sendCommand(request);
       int chunksCount = putBlockRequest.getPutBlock().getBlockData().
           getChunksCount();
-      ContainerTestHelper.verifyGetBlock(request, response, chunksCount);
+      ContainerTestHelper.verifyGetBlock(response, chunksCount);
 
       // Delete Block and Delete Chunk are handled by BlockDeletingService
       // ContainerCommandRequestProto DeleteBlock and DeleteChunk requests
@@ -367,7 +366,7 @@ public class TestOzoneContainer {
       response = client.sendCommand(request);
       int chunksCount = putBlockRequest.getPutBlock().getBlockData()
           .getChunksCount();
-      ContainerTestHelper.verifyGetBlock(request, response, chunksCount);
+      ContainerTestHelper.verifyGetBlock(response, chunksCount);
     } finally {
       if (client != null) {
         client.close();
