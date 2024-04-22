@@ -363,7 +363,7 @@ public class TestObjectPut {
     // wrong copy metadata directive
     when(headers.getHeaderString(CUSTOM_METADATA_COPY_DIRECTIVE_HEADER)).thenReturn("INVALID");
     OS3Exception e = assertThrows(OS3Exception.class, () -> objectEndpoint.put(
-        bucketName, keyName, CONTENT.length(), 1, null, body),
+        destBucket, destkey, CONTENT.length(), 1, null, body),
         "test copy object failed");
     assertEquals(400, e.getHttpCode());
     assertEquals("InvalidArgument", e.getCode());
