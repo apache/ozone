@@ -688,109 +688,109 @@ public class TestDecommissionAndMaintenance {
       throws Exception {
     // Generate some data on the empty cluster to create some containers
     generateData(20, "key", ratisRepConfig);
-    final List<DatanodeDetails> toDecommission = nm.getAllNodes();
+    final List<DatanodeDetails> toMaintenance = nm.getAllNodes();
 
     // trying to move 6 nodes to maintenance should leave the cluster with 1 node,
     // which is not sufficient for RATIS.THREE replication (3 - maintenanceReplicaMinimum = 2).
     // It should not be allowed.
-    scmClient.startMaintenanceNodes(Arrays.asList(getDNHostAndPort(toDecommission.get(0)),
-        getDNHostAndPort(toDecommission.get(1)), getDNHostAndPort(toDecommission.get(2)),
-        getDNHostAndPort(toDecommission.get(3)), getDNHostAndPort(toDecommission.get(4)),
-        getDNHostAndPort(toDecommission.get(5))), 0, false);
+    scmClient.startMaintenanceNodes(Arrays.asList(getDNHostAndPort(toMaintenance.get(0)),
+        getDNHostAndPort(toMaintenance.get(1)), getDNHostAndPort(toMaintenance.get(2)),
+        getDNHostAndPort(toMaintenance.get(3)), getDNHostAndPort(toMaintenance.get(4)),
+        getDNHostAndPort(toMaintenance.get(5))), 0, false);
 
     // Ensure no nodes transitioned to MAINTENANCE
-    List<DatanodeDetails> decomNodes = nm.getNodes(
+    List<DatanodeDetails> maintenanceNodes = nm.getNodes(
         ENTERING_MAINTENANCE,
         HEALTHY);
-    assertEquals(0, decomNodes.size());
-    decomNodes = nm.getNodes(
+    assertEquals(0, maintenanceNodes.size());
+    maintenanceNodes = nm.getNodes(
         IN_MAINTENANCE,
         HEALTHY);
-    assertEquals(0, decomNodes.size());
+    assertEquals(0, maintenanceNodes.size());
 
     // Put 1 node into maintenance successfully. Cluster is left with 6 IN_SERVICE nodes
-    scmClient.startMaintenanceNodes(Arrays.asList(getDNHostAndPort(toDecommission.get(6))), 0, false);
-    decomNodes = nm.getNodes(
+    scmClient.startMaintenanceNodes(Arrays.asList(getDNHostAndPort(toMaintenance.get(6))), 0, false);
+    maintenanceNodes = nm.getNodes(
         ENTERING_MAINTENANCE,
         HEALTHY);
-    assertEquals(1, decomNodes.size());
-    decomNodes = nm.getNodes(
+    assertEquals(1, maintenanceNodes.size());
+    maintenanceNodes = nm.getNodes(
         IN_MAINTENANCE,
         HEALTHY);
-    assertEquals(0, decomNodes.size());
-    waitForDnToReachOpState(nm, toDecommission.get(6), IN_MAINTENANCE);
-    waitForDnToReachPersistedOpState(toDecommission.get(6), IN_MAINTENANCE);
-    decomNodes = nm.getNodes(
+    assertEquals(0, maintenanceNodes.size());
+    waitForDnToReachOpState(nm, toMaintenance.get(6), IN_MAINTENANCE);
+    waitForDnToReachPersistedOpState(toMaintenance.get(6), IN_MAINTENANCE);
+    maintenanceNodes = nm.getNodes(
         ENTERING_MAINTENANCE,
         HEALTHY);
-    assertEquals(0, decomNodes.size());
-    decomNodes = nm.getNodes(
+    assertEquals(0, maintenanceNodes.size());
+    maintenanceNodes = nm.getNodes(
         IN_MAINTENANCE,
         HEALTHY);
-    assertEquals(1, decomNodes.size());
+    assertEquals(1, maintenanceNodes.size());
 
     generateData(20, "eckey", ecRepConfig);
     // trying to put 3 more nodes into maintenance should leave the cluster with 3 nodes,
     // which is not sufficient for EC(3,2) replication (3 + maintenanceRemainingRedundancy = 4 DNs required).
     // It should not be allowed.
-    scmClient.startMaintenanceNodes(Arrays.asList(getDNHostAndPort(toDecommission.get(5)),
-        getDNHostAndPort(toDecommission.get(4)), getDNHostAndPort(toDecommission.get(3))), 0, false);
-    decomNodes = nm.getNodes(
+    scmClient.startMaintenanceNodes(Arrays.asList(getDNHostAndPort(toMaintenance.get(5)),
+        getDNHostAndPort(toMaintenance.get(4)), getDNHostAndPort(toMaintenance.get(3))), 0, false);
+    maintenanceNodes = nm.getNodes(
         ENTERING_MAINTENANCE,
         HEALTHY);
-    assertEquals(0, decomNodes.size());
-    decomNodes = nm.getNodes(
+    assertEquals(0, maintenanceNodes.size());
+    maintenanceNodes = nm.getNodes(
         IN_MAINTENANCE,
         HEALTHY);
-    assertEquals(1, decomNodes.size());
+    assertEquals(1, maintenanceNodes.size());
 
     // Try to move 3 nodes of which 1 is already in maintenance to maintenance.
     // Should be successful as cluster will be left with (6 - 2) = 4)
-    scmClient.startMaintenanceNodes(Arrays.asList(getDNHostAndPort(toDecommission.get(6)),
-        getDNHostAndPort(toDecommission.get(5)), getDNHostAndPort(toDecommission.get(4))), 0, false);
-    decomNodes = nm.getNodes(
+    scmClient.startMaintenanceNodes(Arrays.asList(getDNHostAndPort(toMaintenance.get(6)),
+        getDNHostAndPort(toMaintenance.get(5)), getDNHostAndPort(toMaintenance.get(4))), 0, false);
+    maintenanceNodes = nm.getNodes(
         ENTERING_MAINTENANCE,
         HEALTHY);
-    assertEquals(2, decomNodes.size());
-    decomNodes = nm.getNodes(
+    assertEquals(2, maintenanceNodes.size());
+    maintenanceNodes = nm.getNodes(
         IN_MAINTENANCE,
         HEALTHY);
-    assertEquals(1, decomNodes.size());
-    waitForDnToReachOpState(nm, toDecommission.get(5), IN_MAINTENANCE);
-    waitForDnToReachPersistedOpState(toDecommission.get(5), IN_MAINTENANCE);
-    waitForDnToReachOpState(nm, toDecommission.get(4), IN_MAINTENANCE);
-    waitForDnToReachPersistedOpState(toDecommission.get(4), IN_MAINTENANCE);
-    decomNodes = nm.getNodes(
+    assertEquals(1, maintenanceNodes.size());
+    waitForDnToReachOpState(nm, toMaintenance.get(5), IN_MAINTENANCE);
+    waitForDnToReachPersistedOpState(toMaintenance.get(5), IN_MAINTENANCE);
+    waitForDnToReachOpState(nm, toMaintenance.get(4), IN_MAINTENANCE);
+    waitForDnToReachPersistedOpState(toMaintenance.get(4), IN_MAINTENANCE);
+    maintenanceNodes = nm.getNodes(
         ENTERING_MAINTENANCE,
         HEALTHY);
-    assertEquals(0, decomNodes.size());
-    decomNodes = nm.getNodes(
+    assertEquals(0, maintenanceNodes.size());
+    maintenanceNodes = nm.getNodes(
         IN_MAINTENANCE,
         HEALTHY);
-    assertEquals(3, decomNodes.size());
+    assertEquals(3, maintenanceNodes.size());
 
     // Cluster is left with 4 IN_SERVICE nodes, no nodes can be moved to maintenance
-    scmClient.startMaintenanceNodes(Arrays.asList(getDNHostAndPort(toDecommission.get(3))), 0, false);
-    decomNodes = nm.getNodes(
+    scmClient.startMaintenanceNodes(Arrays.asList(getDNHostAndPort(toMaintenance.get(3))), 0, false);
+    maintenanceNodes = nm.getNodes(
         ENTERING_MAINTENANCE,
         HEALTHY);
-    assertEquals(0, decomNodes.size());
-    decomNodes = nm.getNodes(
+    assertEquals(0, maintenanceNodes.size());
+    maintenanceNodes = nm.getNodes(
         IN_MAINTENANCE,
         HEALTHY);
-    assertEquals(3, decomNodes.size());
+    assertEquals(3, maintenanceNodes.size());
 
     // Trying maintenance with force flag set to true skips the checks.
     // So node should transition to ENTERING_MAINTENANCE
-    scmClient.startMaintenanceNodes(Arrays.asList(getDNHostAndPort(toDecommission.get(2))), 0, true);
-    decomNodes = nm.getNodes(
+    scmClient.startMaintenanceNodes(Arrays.asList(getDNHostAndPort(toMaintenance.get(2))), 0, true);
+    maintenanceNodes = nm.getNodes(
         ENTERING_MAINTENANCE,
         HEALTHY);
-    assertEquals(1, decomNodes.size());
-    decomNodes = nm.getNodes(
+    assertEquals(1, maintenanceNodes.size());
+    maintenanceNodes = nm.getNodes(
         IN_MAINTENANCE,
         HEALTHY);
-    assertEquals(3, decomNodes.size());
+    assertEquals(3, maintenanceNodes.size());
   }
 
   /**
