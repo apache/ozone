@@ -77,7 +77,6 @@ public class TransactionInfoRepair
     List<ColumnFamilyDescriptor> cfDescList = RocksDBUtils.getColumnFamilyDescriptors(parent.getDbPath());
 
     try (ManagedRocksDB db = ManagedRocksDB.open(parent.getDbPath(), cfDescList, cfHandleList)) {
-//      ColumnFamilyHandle transactionInfoCfh = getTransactionInfoCfh(cfHandleList);
       ColumnFamilyHandle transactionInfoCfh = RocksDBUtils.getColumnFamilyHandle(TRANSACTION_INFO_TABLE, cfHandleList);
 
       if (transactionInfoCfh == null) {
@@ -92,8 +91,7 @@ public class TransactionInfoRepair
           .put(transactionInfoCfh, StringCodec.get().toPersistedFormat(TRANSACTION_INFO_KEY), transactionInfoBytes);
 
       System.out.println("Highest Transaction Info is updated to : " +
-            RocksDBUtils.getColumnFamilyValue(db, transactionInfoCfh,
-                TRANSACTION_INFO_KEY, TransactionInfo.getCodec()));
+            RocksDBUtils.getValue(db, transactionInfoCfh, TRANSACTION_INFO_KEY, TransactionInfo.getCodec()));
 
     } catch (RocksDBException exception) {
       System.err.println("Failed to update the RocksDB for the given path: " + parent.getDbPath());

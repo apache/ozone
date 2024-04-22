@@ -98,7 +98,7 @@ public class SnapshotRepair implements Callable<Void>, SubcommandWithParent {
       String snapshotInfoTableKey = SnapshotInfo.getTableKey(bucketUri.getValue().getVolumeName(),
           bucketUri.getValue().getBucketName(), snapshotName);
 
-      SnapshotInfo snapshotInfo = RocksDBUtils.getColumnFamilyValue(db, snapshotInfoCfh, snapshotInfoTableKey,
+      SnapshotInfo snapshotInfo = RocksDBUtils.getValue(db, snapshotInfoCfh, snapshotInfoTableKey,
           SnapshotInfo.getCodec());
 
       if (snapshotInfo == null) {
@@ -146,7 +146,7 @@ public class SnapshotRepair implements Callable<Void>, SubcommandWithParent {
             .put(snapshotInfoCfh, StringCodec.get().toPersistedFormat(snapshotInfoTableKey), snapshotInfoBytes);
 
         System.out.println("Snapshot Info is updated to : " +
-            RocksDBUtils.getColumnFamilyValue(db, snapshotInfoCfh, snapshotInfoTableKey, SnapshotInfo.getCodec()));
+            RocksDBUtils.getValue(db, snapshotInfoCfh, snapshotInfoTableKey, SnapshotInfo.getCodec()));
       }
     } catch (RocksDBException exception) {
       System.err.println("Failed to update the RocksDB for the given path: " + parent.getDbPath());

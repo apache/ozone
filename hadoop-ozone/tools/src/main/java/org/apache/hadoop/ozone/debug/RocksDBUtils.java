@@ -66,9 +66,9 @@ public final class RocksDBUtils {
     return null;
   }
 
-  public static <T> T getColumnFamilyValue(ManagedRocksDB db,
-                                       ColumnFamilyHandle columnFamilyHandle, String key,
-                                       Codec<T> codec)
+  public static <T> T getValue(ManagedRocksDB db,
+                               ColumnFamilyHandle columnFamilyHandle, String key,
+                               Codec<T> codec)
       throws IOException, RocksDBException {
     byte[] bytes = db.get().get(columnFamilyHandle,
         StringCodec.get().toPersistedFormat(key));
