@@ -23,6 +23,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.io.File;
 import java.util.List;
+import java.util.stream.Collectors;
 
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -51,6 +52,8 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.DECOMMISSIONING;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.DECOMMISSIONED;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_DATANODE_RATIS_VOLUME_FREE_SPACE_MIN;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_PIPELINE_PLACEMENT_IMPL_KEY;
 import static org.apache.hadoop.hdds.scm.net.NetConstants.LEAF_SCHEMA;
@@ -59,6 +62,7 @@ import static org.apache.hadoop.hdds.scm.net.NetConstants.ROOT_SCHEMA;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertNotSame;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.mockito.Mockito.spy;
@@ -186,6 +190,29 @@ public class TestPipelinePlacementFactory {
         datanodeDetails.get(1)));
     assertFalse(cluster.isSameParent(datanodeDetails.get(1),
         datanodeDetails.get(2)));
+  }
+
+  // test default rack aware pipeline provider placement
+  // pipeline created with non-decommision datanodes
+  @Test
+  public void testDefaultPipelineProviderRackPlacementWithDecommission() throws Exception {
+    setupRacks(3, 3, false);
+    PlacementPolicy policy = PipelinePlacementPolicyFactory
+        .getPolicy(nodeManager, stateManager, conf);
+
+    datanodes.get(0).setPersistedOpState(DECOMMISSIONING);
+    datanodes.get(1).setPersistedOpState(DECOMMISSIONED);
+
+    when(nodeManager.getNodes(DECOMMISSIONING, null)).thenReturn(
+        datanodes.stream().filter(x -> x.getPersistedOpState() == DECOMMISSIONING).collect(
+            Collectors.toList()));
+    when(nodeManager.getNodes(DECOMMISSIONED, null)).thenReturn(
+        datanodes.stream().filter(x -> x.getPersistedOpState() == DECOMMISSIONED).collect(
+            Collectors.toList()));
+
+    int nodeNum = 3;
+    assertThrows(IOException.class, () -> policy.chooseDatanodes(null, null, nodeNum, 15, 15),
+        "Pipeline creation failed due to no sufficient healthy datanodes.");
   }
 
   // test rack scatter pipeline provider placement - 3 racks

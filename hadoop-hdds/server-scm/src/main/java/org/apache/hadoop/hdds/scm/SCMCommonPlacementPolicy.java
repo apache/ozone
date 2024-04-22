@@ -24,6 +24,7 @@ import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.MetadataStorageReportProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.StorageReportProto;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
@@ -206,8 +207,11 @@ public abstract class SCMCommonPlacementPolicy implements
   object of DatanodeDetails(with Topology Information) while trying to get the
   random node from NetworkTopology should fix this. Check HDDS-7015
  */
+    List<DatanodeDetails> expandedExcludes = nodeManager.getNodes(NodeOperationalState.DECOMMISSIONING, null);
+    expandedExcludes.addAll(nodeManager.getNodes(NodeOperationalState.DECOMMISSIONED, null));
+    expandedExcludes.addAll(validateDatanodes(excludedNodes));
     return chooseDatanodesInternal(validateDatanodes(usedNodes),
-            validateDatanodes(excludedNodes), favoredNodes, nodesRequired,
+            expandedExcludes, favoredNodes, nodesRequired,
             metadataSizeRequired, dataSizeRequired);
   }
 
