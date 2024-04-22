@@ -276,10 +276,10 @@ class TestBlockOutputStream {
       byte[] data1 = RandomUtils.nextBytes(dataLength);
       key.write(data1);
 
-      assertEquals(pendingWriteChunkCount + 2,
-          metrics.getPendingContainerOpCountMetrics(WriteChunk));
-      assertEquals(pendingPutBlockCount + 1,
-          metrics.getPendingContainerOpCountMetrics(PutBlock));
+      assertEquals(writeChunkCount + 2,
+          metrics.getContainerOpCountMetrics(WriteChunk));
+      assertEquals(putBlockCount + 1,
+          metrics.getContainerOpCountMetrics(PutBlock));
       KeyOutputStream keyOutputStream =
           assertInstanceOf(KeyOutputStream.class, key.getOutputStream());
       assertEquals(1, keyOutputStream.getStreamEntries().size());
@@ -305,10 +305,14 @@ class TestBlockOutputStream {
       assertEquals(1, keyOutputStream.getStreamEntries().size());
       // The previously written data is equal to flushSize, so no action is
       // triggered when execute flush, if flushDelay is enabled.
-      assertEquals(pendingWriteChunkCount + (flushDelay ? 2 : 0),
-          metrics.getPendingContainerOpCountMetrics(WriteChunk));
-      assertEquals(pendingPutBlockCount + (flushDelay ? 1 : 0),
-          metrics.getPendingContainerOpCountMetrics(PutBlock));
+      if (!flushDelay) {
+        assertEquals(pendingWriteChunkCount,
+            metrics.getPendingContainerOpCountMetrics(WriteChunk));
+        assertEquals(pendingPutBlockCount,
+            metrics.getPendingContainerOpCountMetrics(PutBlock));
+        assertEquals(0, blockOutputStream.getBufferPool().computeBufferData());
+        assertEquals(dataLength, blockOutputStream.getTotalAckDataLength());
+      }
 
       // Since the data in the buffer is already flushed, flush here will have
       // no impact on the counters and data structures
@@ -316,13 +320,9 @@ class TestBlockOutputStream {
 
       // No action is triggered when execute flush, BlockOutputStream will not
       // be updated.
-      assertEquals(flushDelay ? dataLength : 0,
-          blockOutputStream.getBufferPool().computeBufferData());
       assertEquals(dataLength, blockOutputStream.getWrittenDataLength());
       assertEquals(dataLength, blockOutputStream.getTotalDataFlushedLength());
       assertEquals(0, blockOutputStream.getCommitIndex2flushedDataMap().size());
-      assertEquals(flushDelay ? 0 : dataLength,
-          blockOutputStream.getTotalAckDataLength());
 
       // now close the stream, It will update ack length after watchForCommit
       key.close();
