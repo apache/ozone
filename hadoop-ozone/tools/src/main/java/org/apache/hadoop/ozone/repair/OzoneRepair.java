@@ -22,7 +22,10 @@ import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.hdds.cli.GenericCli;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.tracing.TracingUtil;
 import picocli.CommandLine;
+
+import static org.apache.hadoop.fs.ozone.Constants.OZONE_DEFAULT_USER;
 
 /**
  * Ozone Repair Command line tool.
@@ -32,6 +35,13 @@ import picocli.CommandLine;
     versionProvider = HddsVersionProvider.class,
     mixinStandardHelpOptions = true)
 public class OzoneRepair extends GenericCli {
+
+  public static final String WARNING_SYS_USER_MESSAGE =
+      "ATTENTION: You are currently logged in as user '%s'. Ozone typically runs as user '%s'." +
+          " If you proceed with this command, it may change the ownership of RocksDB files " +
+          " used by the Ozone Manager (OM). This ownership change could prevent OM from starting successfully." +
+          " Are you sure you want to continue (y/N)? ";
+
 
   private OzoneConfiguration ozoneConf;
 
@@ -61,4 +71,33 @@ public class OzoneRepair extends GenericCli {
   public static void main(String[] argv) throws Exception {
     new OzoneRepair().run(argv);
   }
+
+  @Override
+  public int execute(String[] argv) {
+    String currentUser = getSystemUserName();
+    boolean shouldProceed = true;
+    if (!currentUser.equals(OZONE_DEFAULT_USER)) {
+      String s = getConsoleReadLineWithFormat(currentUser, OZONE_DEFAULT_USER);
+      shouldProceed = Boolean.parseBoolean(s) || "y".equalsIgnoreCase(s);
+    }
+    if (!shouldProceed) {
+      System.out.println("Aborting command.");
+      return 1;
+    }
+    System.out.println("Run as user: " + currentUser);
+
+    TracingUtil.initTracing("shell", createOzoneConfiguration());
+    String spanName = "ozone repair " + String.join(" ", argv);
+    return TracingUtil.executeInNewSpan(spanName,
+        () -> super.execute(argv));
+  }
+
+  public  String getSystemUserName() {
+    return System.getProperty("user.name");
+  }
+
+  public  String getConsoleReadLineWithFormat(String currentUser, String defaultUser) {
+    return System.console().readLine(String.format(WARNING_SYS_USER_MESSAGE, currentUser, defaultUser));
+  }
+
 }
