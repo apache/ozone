@@ -211,8 +211,8 @@ public final class OzoneBucketStub extends OzoneBucket {
                                                         int partNumber,
                                                         String uploadID)
       throws IOException {
-    String multipartUploadID = keyToMultipartUpload.get(key).getUploadId();
-    if (multipartUploadID == null || !multipartUploadID.equals(uploadID)) {
+    MultipartInfoStub multipartInfo = keyToMultipartUpload.get(key);
+    if (multipartInfo == null || !multipartInfo.getUploadId().equals(uploadID)) {
       throw new OMException(ResultCodes.NO_SUCH_MULTIPART_UPLOAD_ERROR);
     } else {
       ByteBufferStreamOutput byteBufferStreamOutput =
