@@ -20,7 +20,9 @@ package org.apache.hadoop.ozone.om.request.s3.multipart;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
@@ -67,13 +69,21 @@ public class TestS3MultipartUploadCompleteRequest
     OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
         omMetadataManager, getBucketLayout());
 
+    Map<String, String> customMetadata = new HashMap<>();
+    customMetadata.put("custom-key1", "custom-value1");
+    customMetadata.put("custom-key2", "custom-value2");
+
     String uploadId = checkValidateAndUpdateCacheSuccess(
-        volumeName, bucketName, keyName);
+        volumeName, bucketName, keyName, customMetadata);
     checkDeleteTableCount(volumeName, bucketName, keyName, 0, uploadId);
+
+    customMetadata.remove("custom-key1");
+    customMetadata.remove("custom-key2");
+    customMetadata.put("custom-key3", "custom-value3");
 
     // Do it twice to test overwrite
     uploadId = checkValidateAndUpdateCacheSuccess(volumeName, bucketName,
-        keyName);
+        keyName, customMetadata);
     // After overwrite, one entry must be in delete table
     checkDeleteTableCount(volumeName, bucketName, keyName, 1, uploadId);
   }
@@ -101,10 +111,10 @@ public class TestS3MultipartUploadCompleteRequest
   }
 
   private String checkValidateAndUpdateCacheSuccess(String volumeName,
-      String bucketName, String keyName) throws Exception {
+      String bucketName, String keyName, Map<String, String> metadata) throws Exception {
 
     OMRequest initiateMPURequest = doPreExecuteInitiateMPU(volumeName,
-        bucketName, keyName);
+        bucketName, keyName, metadata);
 
     S3InitiateMultipartUploadRequest s3InitiateMultipartUploadRequest =
         getS3InitiateMultipartUploadReq(initiateMPURequest);
@@ -171,6 +181,11 @@ public class TestS3MultipartUploadCompleteRequest
     Assertions.assertNotNull(multipartKeyInfo.getLatestVersionLocations());
     Assertions.assertTrue(multipartKeyInfo.getLatestVersionLocations()
         .isMultipartKey());
+    if (metadata != null) {
+      for (Map.Entry<String, String> entry : metadata.entrySet()) {
+        Assertions.assertEquals(entry.getValue(), multipartKeyInfo.getMetadata().get(entry.getKey()));
+      }
+    }
 
     OmBucketInfo omBucketInfo = omMetadataManager.getBucketTable()
         .getCacheValue(new CacheKey<>(
