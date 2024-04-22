@@ -36,7 +36,9 @@ import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -62,11 +64,15 @@ public class TestS3InitiateMultipartUploadRequestWithFSO
     OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
         omMetadataManager, getBucketLayout());
 
+    Map<String, String> customMetadata = new HashMap<>();
+    customMetadata.put("custom-key1", "custom-value1");
+    customMetadata.put("custom-key2", "custom-value2");
+
     final long volumeId = omMetadataManager.getVolumeId(volumeName);
     final long bucketId = omMetadataManager.getBucketId(volumeName,
             bucketName);
     OMRequest modifiedRequest = doPreExecuteInitiateMPUWithFSO(volumeName,
-        bucketName, keyName);
+        bucketName, keyName, customMetadata);
 
     S3InitiateMultipartUploadRequest s3InitiateMultipartUploadReqFSO =
         getS3InitiateMultipartUploadReq(modifiedRequest);
@@ -102,6 +108,9 @@ public class TestS3InitiateMultipartUploadRequestWithFSO
         "FileName mismatches!");
     assertEquals(parentID, omKeyInfo.getParentObjectID(),
         "ParentId mismatches!");
+    assertNotNull(omKeyInfo.getMetadata());
+    assertEquals("custom-value1", omKeyInfo.getMetadata().get("custom-key1"));
+    assertEquals("custom-value2", omKeyInfo.getMetadata().get("custom-key2"));
 
     OmMultipartKeyInfo omMultipartKeyInfo = omMetadataManager
             .getMultipartInfoTable().get(multipartFileKey);
