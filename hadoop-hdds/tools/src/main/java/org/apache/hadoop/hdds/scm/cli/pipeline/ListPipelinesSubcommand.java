@@ -80,7 +80,7 @@ public class ListPipelinesSubcommand extends ScmSubcommand {
   @Override
   public void execute(ScmClient scmClient) throws IOException {
     Optional<Predicate<? super Pipeline>> replicationFilter =
-        getReplicationFilter();
+        getReplicationFilter(replication, factor, replicationType);
 
     Stream<Pipeline> stream = scmClient.listPipelines().stream();
     if (replicationFilter.isPresent()) {
@@ -100,7 +100,9 @@ public class ListPipelinesSubcommand extends ScmSubcommand {
     }
   }
 
-  private Optional<Predicate<? super Pipeline>> getReplicationFilter() {
+  static Optional<Predicate<? super Pipeline>> getReplicationFilter(
+      String replication, ReplicationFactor factor, String replicationType
+  ) {
     boolean hasReplication = !Strings.isNullOrEmpty(replication);
     boolean hasFactor = factor != null;
     boolean hasReplicationType = !Strings.isNullOrEmpty(replicationType);

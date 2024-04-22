@@ -42,7 +42,8 @@ import picocli.CommandLine.Spec;
         ActivatePipelineSubcommand.class,
         DeactivatePipelineSubcommand.class,
         CreatePipelineSubcommand.class,
-        ClosePipelineSubcommand.class
+        ClosePipelineSubcommand.class,
+        CloseAllPipelinesSubcommand.class
     })
 @MetaInfServices(SubcommandWithParent.class)
 public class PipelineCommands implements Callable<Void>, SubcommandWithParent {
