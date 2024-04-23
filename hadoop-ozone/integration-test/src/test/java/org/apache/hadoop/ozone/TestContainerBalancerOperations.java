@@ -20,29 +20,39 @@ package org.apache.hadoop.ozone;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.DECOMMISSIONING;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.IN_SERVICE;
 import org.apache.hadoop.hdds.scm.PlacementPolicy;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.cli.ContainerOperationClient;
 import org.apache.hadoop.hdds.scm.client.ScmClient;
+import org.apache.hadoop.hdds.scm.container.ContainerInfo;
+import org.apache.hadoop.hdds.scm.container.ContainerManager;
+import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.container.balancer.ContainerBalancerConfiguration;
 import org.apache.hadoop.hdds.scm.container.placement.algorithms.SCMContainerPlacementCapacity;
 
+import org.apache.hadoop.hdds.scm.node.NodeManager;
+import static org.apache.hadoop.hdds.scm.node.TestNodeUtil.getDNHostAndPort;
+import static org.apache.hadoop.hdds.scm.node.TestNodeUtil.waitForDnToReachPersistedOpState;
+import static org.junit.jupiter.api.Assertions.*;
+
+import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
+import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
+import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
-import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainer;
+import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.tag.Unhealthy;
-import org.junit.jupiter.api.AfterAll;
-import org.junit.jupiter.api.BeforeAll;
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.Timeout;
+import org.junit.jupiter.api.*;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
-import java.util.Optional;
-
-import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.junit.jupiter.api.Assertions.assertEquals;
+import java.util.*;
+import java.util.concurrent.TimeoutException;
 
 /**
  * This class tests container balancer operations
@@ -50,37 +60,63 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
  */
 @Timeout(value = 300)
 public class TestContainerBalancerOperations {
+  private static final Logger LOG =
+          LoggerFactory.getLogger(TestContainerBalancerOperations.class);
 
   private static ScmClient containerBalancerClient;
   private static MiniOzoneCluster cluster;
   private static OzoneConfiguration ozoneConf;
-  private static RatisReplicationConfig ratisRepConfig =
-          RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.THREE);
-  private static MiniOzoneClusterProvider clusterProvider;
-  private static OzoneClient client;
-
-  private static OzoneBucket bucket;
+  private static final int DATANODE_COUNT = 4;
   private static String bucketName = "bucket1";
   private static String volName = "vol1";
-  private static final long STORAGE_UNIT = OzoneConsts.GB;
+  private static RatisReplicationConfig ratisRepConfig =
+          RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.THREE);
+  private OzoneBucket bucket;
+  private NodeManager nm;
+  private ContainerManager cm;
+  private PipelineManager pm;
+  private StorageContainerManager scm;
 
+  private OzoneClient client;
+  private ContainerOperationClient scmClient;
+
+  private static MiniOzoneClusterProvider clusterProvider;
 
   @BeforeAll
-  public static void setup() throws Exception {
+  public static void init() throws Exception {
     ozoneConf = new OzoneConfiguration();
     ozoneConf.setClass(ScmConfigKeys.OZONE_SCM_CONTAINER_PLACEMENT_IMPL_KEY,
         SCMContainerPlacementCapacity.class, PlacementPolicy.class);
-
     MiniOzoneCluster.Builder builder = MiniOzoneCluster.newBuilder(ozoneConf)
-            .setNumDatanodes(3);
-
+            .setNumDatanodes(DATANODE_COUNT);
     clusterProvider = new MiniOzoneClusterProvider(builder, 7);
+    containerBalancerClient = new ContainerOperationClient(ozoneConf);
+    //cluster.waitForClusterToBeReady();
+  }
+
+  @AfterAll
+  public static void shutdown() throws InterruptedException {
+    if (clusterProvider != null) {
+      clusterProvider.shutdown();
+    }
+  }
+
+  @BeforeEach
+  public void setUp() throws Exception {
     cluster = clusterProvider.provide();
+    setManagers();
     client = cluster.newClient();
     bucket = TestDataUtil.createVolumeAndBucket(client, volName, bucketName);
-    cluster = MiniOzoneCluster.newBuilder(ozoneConf).setNumDatanodes(4).build();
-    containerBalancerClient = new ContainerOperationClient(ozoneConf);
-    cluster.waitForClusterToBeReady();
+    scmClient = new ContainerOperationClient(cluster.getConf());
+  }
+
+  @AfterEach
+  public void tearDown() throws InterruptedException, IOException {
+    IOUtils.close(LOG, client);
+    IOUtils.close(LOG, scmClient);
+    if (cluster != null) {
+      clusterProvider.destroy(cluster);
+    }
   }
 
   @AfterAll
@@ -95,15 +131,22 @@ public class TestContainerBalancerOperations {
    * @throws Exception
    */
   @Test
-//  @Unhealthy("Since the cluster doesn't have " +
-//      "unbalanced nodes, ContainerBalancer stops before the assertion checks " +
-//      "whether balancer is running.")
+  @Unhealthy("Since the cluster doesn't have " +
+      "unbalanced nodes, ContainerBalancer stops before the assertion checks " +
+      "whether balancer is running.")
   public void testContainerBalancerCLIOperations() throws Exception {
+    generateData(50, "key", ratisRepConfig);
+    ContainerInfo container = waitForAndReturnContainer(ratisRepConfig, 3);
+    DatanodeDetails dn
+            = getOneDNHostingReplica(getContainerReplicas(container));
+    scmClient.decommissionNodes(Arrays.asList(getDNHostAndPort(dn)), false);
+    waitForDnToReachPersistedOpState(dn, DECOMMISSIONING);
+
     // Generate some data on the empty cluster to create some containers
     generateData(50, "key", ratisRepConfig);
-    // Add a datanode to create imbalance in the utilization of the datanodes
-    cluster = MiniOzoneCluster.newBuilder(ozoneConf).setNumDatanodes(2).build();
 
+    scmClient.recommissionNodes(Arrays.asList(getDNHostAndPort(dn)));
+    waitForDnToReachPersistedOpState(dn, IN_SERVICE);
 
     // test normally start and stop
     boolean running = containerBalancerClient.getContainerBalancerStatus();
@@ -115,7 +158,7 @@ public class TestContainerBalancerOperations {
     Optional<Long> maxSizeToMovePerIterationInGB = Optional.of(1L);
     Optional<Long> maxSizeEnteringTargetInGB = Optional.of(6L);
     Optional<Long> maxSizeLeavingSourceInGB = Optional.of(6L);
-    Optional<Integer> balancingInterval = Optional.of(80);
+    Optional<Integer> balancingInterval = Optional.of(70);
     Optional<Integer> moveTimeout = Optional.of(65);
     Optional<Integer> moveReplicationTimeout = Optional.of(55);
     Optional<Boolean> networkTopologyEnable = Optional.of(false);
@@ -163,7 +206,18 @@ public class TestContainerBalancerOperations {
    */
   @Test
   public void testIfCBCLIOverridesConfigs() throws Exception {
+    ContainerInfo container = waitForAndReturnContainer(ratisRepConfig, 3);
+    DatanodeDetails dn
+            = getOneDNHostingReplica(getContainerReplicas(container));
+    scmClient.decommissionNodes(Arrays.asList(getDNHostAndPort(dn)), false);
+    waitForDnToReachPersistedOpState(dn, DECOMMISSIONING);
+
+    // Generate some data on the empty cluster to create some containers
     generateData(50, "key", ratisRepConfig);
+
+    scmClient.recommissionNodes(Arrays.asList(getDNHostAndPort(dn)));
+    waitForDnToReachPersistedOpState(dn, IN_SERVICE);
+
 
     //Configurations added in ozone-site.xml
     ozoneConf.setInt("hdds.container.balancer.iterations", 40);
@@ -171,8 +225,6 @@ public class TestContainerBalancerOperations {
 
     boolean running = containerBalancerClient.getContainerBalancerStatus();
     assertFalse(running);
-
-    cluster = MiniOzoneCluster.newBuilder(ozoneConf).setNumDatanodes(2).build();
 
     //CLI option for iterations and balancing interval is not passed
     Optional<Integer> iterations = Optional.empty();
@@ -207,7 +259,7 @@ public class TestContainerBalancerOperations {
 
     //If config value is added in ozone-site.xml and CLI option is not passed
     //then it takes the value from ozone-site.xml
-    //assertEquals(40, config.getIterations());
+    assertEquals(40, config.getIterations());
 
     //If config value is added in ozone-site.xml and CLI option is passed
     //then it takes the CLI option.
@@ -218,12 +270,81 @@ public class TestContainerBalancerOperations {
     assertFalse(running);
   }
 
+  /**
+   * Sets the instance variables to the values for the current MiniCluster.
+   */
+  private void  setManagers() {
+    scm = cluster.getStorageContainerManager();
+    nm = scm.getScmNodeManager();
+    cm = scm.getContainerManager();
+    pm = scm.getPipelineManager();
+  }
+
+  /**
+   * Generates some data on the cluster so the cluster has some containers.
+   * @param keyCount The number of keys to create
+   * @param keyPrefix The prefix to use for the key name.
+   * @param replicationConfig The replication config for the keys
+   * @throws IOException
+   */
   private void generateData(int keyCount, String keyPrefix,
                             ReplicationConfig replicationConfig) throws IOException {
     for (int i = 0; i < keyCount; i++) {
       TestDataUtil.createKey(bucket, keyPrefix + i, replicationConfig,
               "this is the content");
-      System.out.println(keyPrefix);
     }
+  }
+
+  /**
+   * Retrieves the containerReplica set for a given container or fails the test
+   * if the container cannot be found. This is a helper method to allow the
+   * container replica count to be checked in a lambda expression.
+   * @param c The container for which to retrieve replicas
+   * @return
+   */
+  private Set<ContainerReplica> getContainerReplicas(ContainerInfo c) {
+    return assertDoesNotThrow(() -> cm.getContainerReplicas(c.containerID()),
+            "Unexpected exception getting the container replicas");
+  }
+
+  /**
+   * Select any DN hosting a replica from the Replica Set.
+   * @param replicas The set of ContainerReplica
+   * @return Any datanode associated one of the replicas
+   */
+  private DatanodeDetails getOneDNHostingReplica(
+          Set<ContainerReplica> replicas) {
+    // Now Decommission a host with one of the replicas
+    Iterator<ContainerReplica> iter = replicas.iterator();
+    ContainerReplica c = iter.next();
+    return c.getDatanodeDetails();
+  }
+
+  /**
+   * Get any container present in the cluster and wait to ensure 3 replicas
+   * have been reported before returning the container.
+   * @return A single container present on the cluster
+   * @throws Exception
+   */
+  private ContainerInfo waitForAndReturnContainer(ReplicationConfig repConfig,
+                                                  int expectedReplicas) throws Exception {
+    List<ContainerInfo> containers = cm.getContainers();
+    ContainerInfo container = null;
+    for (ContainerInfo c : containers) {
+      if (c.getReplicationConfig().equals(repConfig)) {
+        container = c;
+        break;
+      }
+    }
+    // Ensure expected replicas of the container have been reported via ICR
+    waitForContainerReplicas(container, expectedReplicas);
+    return container;
+  }
+
+  private void waitForContainerReplicas(ContainerInfo container, int count)
+          throws TimeoutException, InterruptedException {
+    GenericTestUtils.waitFor(
+            () -> getContainerReplicas(container).size() == count,
+            200, 30000);
   }
 }
