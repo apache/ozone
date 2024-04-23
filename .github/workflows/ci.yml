@@ -27,9 +27,8 @@ jobs:
     outputs:
       acceptance-suites: ${{ steps.acceptance-suites.outputs.suites }}
       needs-basic-check: ${{ steps.categorize-basic-checks.outputs.needs-basic-check }}
-      needs-unit-check: ${{ steps.categorize-basic-checks.outputs.needs-unit-check }}
+      needs-native-check: ${{ steps.categorize-basic-checks.outputs.needs-native-check }}
       basic-checks: ${{ steps.categorize-basic-checks.outputs.basic-checks }}
-      unit-checks: ${{ steps.categorize-basic-checks.outputs.unit-checks }}
       needs-build: ${{ steps.selective-checks.outputs.needs-build }}
       needs-compile: ${{ steps.selective-checks.outputs.needs-compile }}
       needs-compose-tests: ${{ steps.selective-checks.outputs.needs-compose-tests }}
@@ -228,17 +227,13 @@ jobs:
           name: ${{ matrix.check }}
           path: target/${{ matrix.check }}
         continue-on-error: true
-  unit:
+  native:
     needs:
       - build-info
       - basic
     runs-on: ubuntu-20.04
     timeout-minutes: 150
-    if: needs.build-info.outputs.needs-unit-check == 'true'
-    strategy:
-      matrix:
-        check: ${{ fromJson(needs.build-info.outputs.unit-checks) }}
-      fail-fast: false
+    if: needs.build-info.outputs.needs-native-check == 'true'
     steps:
       - name: Checkout project
         uses: actions/checkout@v4
@@ -257,19 +252,19 @@ jobs:
           distribution: 'temurin'
           java-version: 8
       - name: Execute tests
-        run: hadoop-ozone/dev-support/checks/${{ matrix.check }}.sh
+        run: hadoop-ozone/dev-support/checks/${{ github.job }}.sh
         continue-on-error: true
         env:
           GRADLE_ENTERPRISE_ACCESS_KEY: ${{ secrets.GE_ACCESS_TOKEN }}
       - name: Summary of failures
-        run: hadoop-ozone/dev-support/checks/_summary.sh target/${{ matrix.check }}/summary.txt
+        run: hadoop-ozone/dev-support/checks/_summary.sh target/${{ github.job }}/summary.txt
         if: ${{ !cancelled() }}
       - name: Archive build results
         uses: actions/upload-artifact@v4
         if: ${{ !cancelled() }}
         with:
-          name: ${{ matrix.check }}
-          path: target/${{ matrix.check }}
+          name: ${{ github.job }}
+          path: target/${{ github.job }}
         continue-on-error: true
   dependency:
     needs:
@@ -499,9 +494,9 @@ jobs:
     timeout-minutes: 30
     if: github.repository == 'apache/ozone' && github.event_name != 'pull_request'
     needs:
-      - unit
       - acceptance
       - integration
+      - native
     steps:
       - name: Checkout project
         uses: actions/checkout@v4

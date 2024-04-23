@@ -132,7 +132,7 @@ load bats-assert/load.bash
 @test "script change including junit.sh" {
   run dev-support/ci/selective_ci_checks.sh 66093e52c6
 
-  assert_output -p 'basic-checks=["rat","bats","checkstyle","findbugs"]'
+  assert_output -p 'basic-checks=["rat","bats","checkstyle","findbugs","native"]'
   assert_output -p needs-build=true
   assert_output -p needs-compile=true
   assert_output -p needs-compose-tests=false
@@ -252,7 +252,7 @@ load bats-assert/load.bash
 @test "java and compose change" {
   run dev-support/ci/selective_ci_checks.sh d0f0f806e
 
-  assert_output -p 'basic-checks=["rat","author","checkstyle","findbugs"]'
+  assert_output -p 'basic-checks=["rat","author","checkstyle","findbugs","native"]'
   assert_output -p needs-build=true
   assert_output -p needs-compile=true
   assert_output -p needs-compose-tests=true
@@ -276,7 +276,7 @@ load bats-assert/load.bash
 @test "pom change" {
   run dev-support/ci/selective_ci_checks.sh 9129424a9
 
-  assert_output -p 'basic-checks=["rat","checkstyle","findbugs"]'
+  assert_output -p 'basic-checks=["rat","checkstyle","findbugs","native"]'
   assert_output -p needs-build=true
   assert_output -p needs-compile=true
   assert_output -p needs-compose-tests=true

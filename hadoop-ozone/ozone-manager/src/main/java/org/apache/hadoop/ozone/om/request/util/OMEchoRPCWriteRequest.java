@@ -20,7 +20,7 @@ package org.apache.hadoop.ozone.om.request.util;
 
 import com.google.protobuf.ByteString;
 import org.apache.ratis.server.protocol.TermIndex;
-import org.apache.hadoop.ozone.common.PayloadUtils;
+import org.apache.hadoop.ozone.util.PayloadUtils;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.request.OMClientRequest;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
@@ -45,7 +45,7 @@ public class OMEchoRPCWriteRequest extends OMClientRequest {
     EchoRPCRequest echoRPCRequest = getOmRequest().getEchoRPCRequest();
 
     byte[] payloadBytes =
-        PayloadUtils.generatePayloadBytes(echoRPCRequest.getPayloadSizeResp());
+        PayloadUtils.generatePayload(echoRPCRequest.getPayloadSizeResp());
 
     EchoRPCResponse echoRPCResponse = EchoRPCResponse.newBuilder()
         .setPayload(ByteString.copyFrom(payloadBytes))

@@ -19,6 +19,7 @@ package org.apache.hadoop.hdds.scm.node;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import org.apache.commons.lang3.tuple.Pair;
+import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
@@ -42,6 +43,7 @@ import java.net.URI;
 import java.net.URISyntaxException;
 import java.net.UnknownHostException;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Comparator;
 import java.util.LinkedList;
 import java.util.List;
@@ -64,6 +66,8 @@ public class NodeDecommissionManager {
   private ContainerManager containerManager;
   private final SCMContext scmContext;
   private final boolean useHostnames;
+  private Integer maintenanceReplicaMinimum;
+  private Integer maintenanceRemainingRedundancy;
 
   // Decommissioning and Maintenance mode progress related metrics.
   private final NodeDecommissionMetrics metrics;
@@ -292,6 +296,8 @@ public class NodeDecommissionManager {
           ScmConfigKeys.OZONE_SCM_DATANODE_ADMIN_MONITOR_INTERVAL_DEFAULT,
           TimeUnit.SECONDS);
     }
+    setMaintenanceConfigs(config.getInt("hdds.scm.replication.maintenance.replica.minimum", 2),
+        config.getInt("hdds.scm.replication.maintenance.remaining.redundancy", 1));
 
     monitor = new DatanodeAdminMonitorImpl(config, eventQueue, nodeManager,
         rm);
@@ -480,9 +486,21 @@ public class NodeDecommissionManager {
   }
 
   public synchronized List<DatanodeAdminError> startMaintenanceNodes(
-      List<String> nodes, int endInHours) {
+      List<String> nodes, int endInHours, boolean force) {
     List<DatanodeAdminError> errors = new ArrayList<>();
     List<DatanodeDetails> dns = mapHostnamesToDatanodes(nodes, errors);
+    // add check for fail-early if force flag is not set
+    if (!force) {
+      LOG.info("Force flag = {}. Checking if maintenance is possible for dns: {}", force, dns);
+      boolean maintenancePossible = checkIfMaintenancePossible(dns, errors);
+      if (!maintenancePossible) {
+        LOG.error("Cannot put nodes to maintenance as sufficient node are not available.");
+        errors.add(new DatanodeAdminError("AllHosts", "Sufficient nodes are not available."));
+        return errors;
+      }
+    } else {
+      LOG.info("Force flag = {}. Skip checking if maintenance is possible for dns: {}", force, dns);
+    }
     for (DatanodeDetails dn : dns) {
       try {
         startMaintenance(dn, endInHours);
@@ -528,6 +546,73 @@ public class NodeDecommissionManager {
     }
   }
 
+  private synchronized boolean checkIfMaintenancePossible(List<DatanodeDetails> dns, List<DatanodeAdminError> errors) {
+    int numMaintenance = dns.size();
+    List<DatanodeDetails> validDns = dns.stream().collect(Collectors.toList());
+    Collections.copy(validDns, dns);
+    int inServiceTotal = nodeManager.getNodeCount(NodeStatus.inServiceHealthy());
+    for (DatanodeDetails dn : dns) {
+      try {
+        NodeStatus nodeStatus = getNodeStatus(dn);
+        NodeOperationalState opState = nodeStatus.getOperationalState();
+        if (opState != NodeOperationalState.IN_SERVICE) {
+          numMaintenance--;
+          validDns.remove(dn);
+        }
+      } catch (NodeNotFoundException ex) {
+        numMaintenance--;
+        validDns.remove(dn);
+      }
+    }
+
+    for (DatanodeDetails dn : validDns) {
+      Set<ContainerID> containers;
+      try {
+        containers = nodeManager.getContainers(dn);
+      } catch (NodeNotFoundException ex) {
+        LOG.warn("The host {} was not found in SCM. Ignoring the request to " +
+            "enter maintenance", dn.getHostName());
+        errors.add(new DatanodeAdminError(dn.getHostName(),
+            "The host was not found in SCM"));
+        continue; // ignore the DN and continue to next one
+      }
+
+      for (ContainerID cid : containers) {
+        ContainerInfo cif;
+        try {
+          cif = containerManager.getContainer(cid);
+        } catch (ContainerNotFoundException ex) {
+          continue; // ignore the container and continue to next one
+        }
+        synchronized (cif) {
+          if (cif.getState().equals(HddsProtos.LifeCycleState.DELETED) ||
+              cif.getState().equals(HddsProtos.LifeCycleState.DELETING)) {
+            continue;
+          }
+
+          int minInService;
+          HddsProtos.ReplicationType replicationType = cif.getReplicationType();
+          if (replicationType.equals(HddsProtos.ReplicationType.EC)) {
+            int reqNodes = cif.getReplicationConfig().getRequiredNodes();
+            int data = ((ECReplicationConfig)cif.getReplicationConfig()).getData();
+            minInService = Math.min((data + maintenanceRemainingRedundancy), reqNodes);
+          } else {
+            minInService = maintenanceReplicaMinimum;
+          }
+          if ((inServiceTotal - numMaintenance) < minInService) {
+            LOG.info("Cannot enter nodes into maintenance. Tried to start maintenance for {} nodes " +
+                    "of which valid nodes = {}. " +
+                    "Cluster state: In-service nodes = {}, nodes required for replication = {}. " +
+                    "Failing due to datanode : {}, container : {}",
+                dns.size(), numMaintenance, inServiceTotal, minInService, dn, cid);
+            return false;
+          }
+        }
+      }
+    }
+    return true;
+  }
+
   /**
    *  Stops the decommission monitor from running when SCM is shutdown.
    */
@@ -558,5 +643,13 @@ public class NodeDecommissionManager {
             e);
       }
     });
+  }
+
+  @VisibleForTesting
+  public void setMaintenanceConfigs(int replicaMinimum, int remainingRedundancy) {
+    synchronized (this) {
+      maintenanceRemainingRedundancy = remainingRedundancy;
+      maintenanceReplicaMinimum = replicaMinimum;
+    }
   }
 }

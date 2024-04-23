@@ -192,7 +192,7 @@ public class TestAuditParser {
     Exception e =
         assertThrows(Exception.class, () -> execute(args1, ""));
     assertInstanceOf(ArrayIndexOutOfBoundsException.class, e.getCause());
-    assertThat(e.getMessage()).contains(": 5");
+    assertThat(e.getMessage()).contains(" 5");
   }
 
   /**

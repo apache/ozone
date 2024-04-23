@@ -301,7 +301,7 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
   }
 
   @Override
-  public void close() throws Exception {
+  public void close() {
     if (!closed) {
       synchronized (this) {
         if (!closed) {

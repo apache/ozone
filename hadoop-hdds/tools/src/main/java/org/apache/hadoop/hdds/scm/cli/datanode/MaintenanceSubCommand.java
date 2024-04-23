@@ -53,6 +53,12 @@ public class MaintenanceSubCommand extends ScmSubcommand {
           "By default, maintenance must be ended manually.")
   private int endInHours = 0;
 
+  @CommandLine.Option(names = { "--force" },
+      defaultValue = "false",
+      description = "Forcefully try to decommission the datanode(s)")
+  private boolean force;
+
+
   @Override
   public void execute(ScmClient scmClient) throws IOException {
     if (parameters.size() > 0) {
@@ -68,7 +74,7 @@ public class MaintenanceSubCommand extends ScmSubcommand {
         hosts = parameters;
       }
       List<DatanodeAdminError> errors =
-          scmClient.startMaintenanceNodes(hosts, endInHours);
+          scmClient.startMaintenanceNodes(hosts, endInHours, force);
       System.out.println("Entering maintenance mode on datanode(s):\n" +
           String.join("\n", hosts));
       if (errors.size() > 0) {

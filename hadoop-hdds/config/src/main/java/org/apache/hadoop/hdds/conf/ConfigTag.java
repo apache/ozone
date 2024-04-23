@@ -52,5 +52,6 @@ public enum ConfigTag {
   TLS,
   TOKEN,
   UPGRADE,
-  X509
+  X509,
+  CRYPTO_COMPLIANCE
 }

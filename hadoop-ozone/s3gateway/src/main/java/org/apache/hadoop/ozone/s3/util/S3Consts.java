@@ -62,10 +62,20 @@ public final class S3Consts {
   public static final String S3_XML_NAMESPACE = "http://s3.amazonaws" +
       ".com/doc/2006-03-01/";
 
+  // Constants related to custom metadata
   public static final String CUSTOM_METADATA_HEADER_PREFIX = "x-amz-meta-";
+  public static final String CUSTOM_METADATA_COPY_DIRECTIVE_HEADER = "x-amz-metadata-directive";
 
 
   public static final String DECODED_CONTENT_LENGTH_HEADER =
       "x-amz-decoded-content-length";
+
+  /**
+   * Copy directive for metadata and tags.
+   */
+  public enum CopyDirective {
+    COPY, // Default directive
+    REPLACE
+  }
 
 }

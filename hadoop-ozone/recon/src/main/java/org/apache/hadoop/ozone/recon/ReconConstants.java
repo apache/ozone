@@ -36,6 +36,11 @@ public final class ReconConstants {
   public static final String RECON_SCM_SNAPSHOT_DB = "scm.snapshot.db";
 
   // By default, limit the number of results returned
+
+  /**
+   * The maximum number of top disk usage records to return in a /du response.
+   */
+  public static final int DISK_USAGE_TOP_RECORDS_LIMIT = 30;
   public static final String DEFAULT_OPEN_KEY_INCLUDE_NON_FSO = "false";
   public static final String DEFAULT_OPEN_KEY_INCLUDE_FSO = "false";
   public static final String DEFAULT_FETCH_COUNT = "1000";

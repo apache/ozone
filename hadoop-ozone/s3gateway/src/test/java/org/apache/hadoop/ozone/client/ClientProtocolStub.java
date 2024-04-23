@@ -56,6 +56,7 @@ import org.apache.hadoop.security.token.Token;
 
 import java.io.IOException;
 import java.net.URI;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 
@@ -309,8 +310,16 @@ public class ClientProtocolStub implements ClientProtocol {
   public OmMultipartInfo initiateMultipartUpload(String volumeName,
          String bucketName, String keyName, ReplicationConfig replicationConfig)
       throws IOException {
+    return initiateMultipartUpload(volumeName, bucketName, keyName, replicationConfig, Collections.emptyMap());
+  }
+
+  @Override
+  public OmMultipartInfo initiateMultipartUpload(String volumeName,
+         String bucketName, String keyName, ReplicationConfig replicationConfig,
+         Map<String, String> metadata)
+      throws IOException {
     return getBucket(volumeName, bucketName)
-        .initiateMultipartUpload(keyName, replicationConfig);
+        .initiateMultipartUpload(keyName, replicationConfig, metadata);
   }
 
   @Override

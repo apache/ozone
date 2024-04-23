@@ -102,6 +102,7 @@ import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Res
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.PUT_SMALL_FILE_ERROR;
 import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuilders.getBlockDataResponse;
 import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuilders.getBlockLengthResponse;
+import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuilders.getEchoResponse;
 import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuilders.getGetSmallFileResponseSuccess;
 import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuilders.getListBlockResponse;
 import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuilders.getPutFileResponseSuccess;
@@ -274,6 +275,8 @@ public class KeyValueHandler extends Handler {
       return handler.handleGetSmallFile(request, kvContainer);
     case GetCommittedBlockLength:
       return handler.handleGetCommittedBlockLength(request, kvContainer);
+    case Echo:
+      return handler.handleEcho(request, kvContainer);
     default:
       return null;
     }
@@ -560,6 +563,11 @@ public class KeyValueHandler extends Handler {
     }
 
     return putBlockResponseSuccess(request, blockDataProto);
+  }
+
+  ContainerCommandResponseProto handleEcho(
+      ContainerCommandRequestProto request, KeyValueContainer kvContainer) {
+    return getEchoResponse(request);
   }
 
   /**

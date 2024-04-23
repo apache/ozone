@@ -28,6 +28,7 @@ import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 import javax.xml.bind.DatatypeConverter;
@@ -49,6 +50,7 @@ import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
+import org.apache.hadoop.ozone.om.helpers.KeyValueUtil;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
@@ -991,11 +993,28 @@ public final class OMRequestTestUtils {
    */
   public static OMRequest createInitiateMPURequest(String volumeName,
       String bucketName, String keyName) {
+    return createInitiateMPURequest(volumeName, bucketName, keyName, Collections.emptyMap());
+  }
+
+  /**
+   * Create OMRequest which encapsulates InitiateMultipartUpload request.
+   * @param volumeName
+   * @param bucketName
+   * @param keyName
+   * @param metadata
+   */
+  public static OMRequest createInitiateMPURequest(String volumeName,
+      String bucketName, String keyName, Map<String, String> metadata) {
     MultipartInfoInitiateRequest
         multipartInfoInitiateRequest =
         MultipartInfoInitiateRequest.newBuilder().setKeyArgs(
-            KeyArgs.newBuilder().setVolumeName(volumeName).setKeyName(keyName)
-                .setBucketName(bucketName)).build();
+            KeyArgs.newBuilder()
+                .setVolumeName(volumeName)
+                .setKeyName(keyName)
+                .setBucketName(bucketName)
+                .addAllMetadata(KeyValueUtil.toProtobuf(metadata))
+            )
+            .build();
 
     return OMRequest.newBuilder().setClientId(UUID.randomUUID().toString())
         .setCmdType(OzoneManagerProtocolProtos.Type.InitiateMultiPartUpload)

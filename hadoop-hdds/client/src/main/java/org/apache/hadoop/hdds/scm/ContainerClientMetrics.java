@@ -27,6 +27,7 @@ import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.metrics2.lib.Interns;
 import org.apache.hadoop.metrics2.lib.MetricsRegistry;
 import org.apache.hadoop.metrics2.lib.MutableCounterLong;
+import org.apache.hadoop.metrics2.lib.MutableQuantiles;
 import org.apache.hadoop.ozone.OzoneConsts;
 
 import java.util.Map;
@@ -51,6 +52,11 @@ public final class ContainerClientMetrics {
   private MutableCounterLong totalWriteChunkCalls;
   @Metric
   private MutableCounterLong totalWriteChunkBytes;
+  private MutableQuantiles[] listBlockLatency;
+  private MutableQuantiles[] getBlockLatency;
+  private MutableQuantiles[] getCommittedBlockLengthLatency;
+  private MutableQuantiles[] readChunkLatency;
+  private MutableQuantiles[] getSmallFileLatency;
   private final Map<PipelineID, MutableCounterLong> writeChunkCallsByPipeline;
   private final Map<PipelineID, MutableCounterLong> writeChunkBytesByPipeline;
   private final Map<UUID, MutableCounterLong> writeChunksCallsByLeaders;
@@ -84,6 +90,36 @@ public final class ContainerClientMetrics {
     writeChunkCallsByPipeline = new ConcurrentHashMap<>();
     writeChunkBytesByPipeline = new ConcurrentHashMap<>();
     writeChunksCallsByLeaders = new ConcurrentHashMap<>();
+
+    listBlockLatency = new MutableQuantiles[3];
+    getBlockLatency = new MutableQuantiles[3];
+    getCommittedBlockLengthLatency = new MutableQuantiles[3];
+    readChunkLatency = new MutableQuantiles[3];
+    getSmallFileLatency = new MutableQuantiles[3];
+    int[] intervals = {60, 300, 900};
+    for (int i = 0; i < intervals.length; i++) {
+      int interval = intervals[i];
+      listBlockLatency[i] = registry
+          .newQuantiles("listBlockLatency" + interval
+                  + "s", "ListBlock latency in microseconds", "ops",
+              "latency", interval);
+      getBlockLatency[i] = registry
+          .newQuantiles("getBlockLatency" + interval
+                  + "s", "GetBlock latency in microseconds", "ops",
+              "latency", interval);
+      getCommittedBlockLengthLatency[i] = registry
+          .newQuantiles("getCommittedBlockLengthLatency" + interval
+                  + "s", "GetCommittedBlockLength latency in microseconds",
+              "ops", "latency", interval);
+      readChunkLatency[i] = registry
+          .newQuantiles("readChunkLatency" + interval
+                  + "s", "ReadChunk latency in microseconds", "ops",
+              "latency", interval);
+      getSmallFileLatency[i] = registry
+          .newQuantiles("getSmallFileLatency" + interval
+                  + "s", "GetSmallFile latency in microseconds", "ops",
+              "latency", interval);
+    }
   }
 
   public void recordWriteChunk(Pipeline pipeline, long chunkSizeBytes) {
@@ -111,7 +147,48 @@ public final class ContainerClientMetrics {
     totalWriteChunkBytes.incr(chunkSizeBytes);
   }
 
-  MutableCounterLong getTotalWriteChunkBytes() {
+  public void addListBlockLatency(long latency) {
+    for (MutableQuantiles q : listBlockLatency) {
+      if (q != null) {
+        q.add(latency);
+      }
+    }
+  }
+
+  public void addGetBlockLatency(long latency) {
+    for (MutableQuantiles q : getBlockLatency) {
+      if (q != null) {
+        q.add(latency);
+      }
+    }
+  }
+
+  public void addGetCommittedBlockLengthLatency(long latency) {
+    for (MutableQuantiles q : getCommittedBlockLengthLatency) {
+      if (q != null) {
+        q.add(latency);
+      }
+    }
+  }
+
+  public void addReadChunkLatency(long latency) {
+    for (MutableQuantiles q : readChunkLatency) {
+      if (q != null) {
+        q.add(latency);
+      }
+    }
+  }
+
+  public void addGetSmallFileLatency(long latency) {
+    for (MutableQuantiles q : getSmallFileLatency) {
+      if (q != null) {
+        q.add(latency);
+      }
+    }
+  }
+
+  @VisibleForTesting
+  public MutableCounterLong getTotalWriteChunkBytes() {
     return totalWriteChunkBytes;
   }
 

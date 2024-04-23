@@ -671,11 +671,11 @@ public class SCMClientProtocolServer implements
 
   @Override
   public List<DatanodeAdminError> startMaintenanceNodes(List<String> nodes,
-      int endInHours) throws IOException {
+      int endInHours, boolean force) throws IOException {
     try {
       getScm().checkAdminAccess(getRemoteUser(), false);
       return scm.getScmDecommissionManager()
-          .startMaintenanceNodes(nodes, endInHours);
+          .startMaintenanceNodes(nodes, endInHours, force);
     } catch (Exception ex) {
       LOG.error("Failed to place nodes into maintenance mode", ex);
       throw ex;

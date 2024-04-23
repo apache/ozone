@@ -18,7 +18,10 @@
 
 package org.apache.hadoop.fs.ozone;
 
+import io.opentracing.Span;
+import io.opentracing.util.GlobalTracer;
 import org.apache.hadoop.fs.Syncable;
+import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 
 import java.io.IOException;
@@ -42,17 +45,24 @@ public class OzoneFSOutputStream extends OutputStream
 
   @Override
   public void write(int b) throws IOException {
-    outputStream.write(b);
+    TracingUtil.executeInNewSpan("OzoneFSOutputStream.write",
+        () -> outputStream.write(b));
   }
 
   @Override
   public void write(byte[] b, int off, int len) throws IOException {
-    outputStream.write(b, off, len);
+    TracingUtil.executeInNewSpan("OzoneFSOutputStream.write",
+        () -> {
+          Span span = GlobalTracer.get().activeSpan();
+          span.setTag("length", len);
+          outputStream.write(b, off, len);
+        });
   }
 
   @Override
   public synchronized void flush() throws IOException {
-    outputStream.flush();
+    TracingUtil.executeInNewSpan("OzoneFSOutputStream.flush",
+        outputStream::flush);
   }
 
   @Override
@@ -67,7 +77,8 @@ public class OzoneFSOutputStream extends OutputStream
 
   @Override
   public void hsync() throws IOException {
-    outputStream.hsync();
+    TracingUtil.executeInNewSpan("OzoneFSOutputStream.hsync",
+        outputStream::hsync);
   }
 
   protected OzoneOutputStream getWrappedOutputStream() {

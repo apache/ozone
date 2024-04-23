@@ -19,15 +19,20 @@ set -u -o pipefail
 DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 cd "$DIR/../../.." || exit 1
 
+OZONE_ROOT=$(pwd -P)
+
+: ${HADOOP_AWS_DIR:=""}
+: ${OZONE_ACCEPTANCE_SUITE:=""}
+: ${OZONE_TEST_SELECTOR:=""}
+: ${OZONE_ACCEPTANCE_TEST_TYPE:="robot"}
+: ${OZONE_WITH_COVERAGE:="false"}
+
 source "${DIR}/_lib.sh"
 
-install_virtualenv
-install_robot
-
-REPORT_DIR=${OUTPUT_DIR:-"$DIR/../../../target/acceptance"}
+REPORT_DIR=${OUTPUT_DIR:-"${OZONE_ROOT}/target/acceptance"}
 
 OZONE_VERSION=$(mvn help:evaluate -Dexpression=ozone.version -q -DforceStdout)
-DIST_DIR="$DIR/../../dist/target/ozone-$OZONE_VERSION"
+DIST_DIR="${OZONE_ROOT}/hadoop-ozone/dist/target/ozone-$OZONE_VERSION"
 
 if [ ! -d "$DIST_DIR" ]; then
     echo "Distribution dir is missing. Doing a full build"
@@ -36,15 +41,42 @@ fi
 
 mkdir -p "$REPORT_DIR"
 
-export OZONE_ACCEPTANCE_SUITE
+if [[ "${OZONE_ACCEPTANCE_SUITE}" == "s3a" ]]; then
+  OZONE_ACCEPTANCE_TEST_TYPE="maven"
+
+  if [[ -z "${HADOOP_AWS_DIR}" ]]; then
+    HADOOP_VERSION=$(mvn help:evaluate -Dexpression=hadoop.version -q -DforceStdout)
+    export HADOOP_AWS_DIR=${OZONE_ROOT}/target/hadoop-src
+  fi
+
+  download_hadoop_aws "${HADOOP_AWS_DIR}"
+fi
+
+if [[ "${OZONE_ACCEPTANCE_TEST_TYPE}" == "robot" ]]; then
+  install_virtualenv
+  install_robot
+fi
+
+export OZONE_ACCEPTANCE_SUITE OZONE_ACCEPTANCE_TEST_TYPE
 
 cd "$DIST_DIR/compose" || exit 1
 ./test-all.sh 2>&1 | tee "${REPORT_DIR}/output.log"
 RES=$?
-cp -rv result/* "$REPORT_DIR/"
-cp "$REPORT_DIR/log.html" "$REPORT_DIR/summary.html"
-find "$REPORT_DIR" -type f -empty -print0 | xargs -0 rm -v
 
-grep -A1 FAIL "${REPORT_DIR}/output.log" | grep -v '^Output' > "${REPORT_DIR}/summary.txt"
+if [[ "${OZONE_ACCEPTANCE_TEST_TYPE}" == "maven" ]]; then
+  pushd result
+  source "${DIR}/_mvn_unit_report.sh"
+  find . -name junit -print0 | xargs -r -0 rm -frv
+  cp -rv * "${REPORT_DIR}"/
+  popd
+else
+  cp -rv result/* "$REPORT_DIR/"
+  if [[ -f "${REPORT_DIR}/log.html" ]]; then
+    cp "$REPORT_DIR/log.html" "$REPORT_DIR/summary.html"
+  fi
+  grep -A1 FAIL "${REPORT_DIR}/output.log" | grep -v '^Output' > "${REPORT_DIR}/summary.txt"
+fi
+
+find "$REPORT_DIR" -type f -empty -not -name summary.txt -print0 | xargs -0 rm -v
 
 exit $RES

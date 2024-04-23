@@ -18,6 +18,8 @@
 
 package org.apache.hadoop.ozone.om.request.key;
 
+import org.apache.hadoop.hdds.utils.db.Table;
+import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.ratis.server.protocol.TermIndex;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
@@ -154,15 +156,26 @@ public class OMKeyDeleteRequestWithFSO extends OMKeyDeleteRequest {
       omBucketInfo.incrUsedBytes(-quotaReleased);
       omBucketInfo.incrUsedNamespace(-1L);
 
-      // No need to add cache entries to delete table. As delete table will
-      // be used by DeleteKeyService only, not used for any client response
-      // validation, so we don't need to add to cache.
-      // TODO: Revisit if we need it later.
+      // If omKeyInfo has hsync metadata, delete its corresponding open key as well
+      String dbOpenKey = null;
+      String hsyncClientId = omKeyInfo.getMetadata().get(OzoneConsts.HSYNC_CLIENT_ID);
+      if (hsyncClientId != null) {
+        Table<String, OmKeyInfo> openKeyTable = omMetadataManager.getOpenKeyTable(getBucketLayout());
+        long parentId = omKeyInfo.getParentObjectID();
+        dbOpenKey = omMetadataManager.getOpenFileName(volumeId, bucketId, parentId, fileName, hsyncClientId);
+        OmKeyInfo openKeyInfo = openKeyTable.get(dbOpenKey);
+        if (openKeyInfo != null) {
+          // Remove the open key by putting a tombstone entry
+          openKeyTable.addCacheEntry(dbOpenKey, trxnLogIndex);
+        } else {
+          LOG.warn("Potentially inconsistent DB state: open key not found with dbOpenKey '{}'", dbOpenKey);
+        }
+      }
 
       omClientResponse = new OMKeyDeleteResponseWithFSO(omResponse
           .setDeleteKeyResponse(DeleteKeyResponse.newBuilder()).build(),
           keyName, omKeyInfo, ozoneManager.isRatisEnabled(),
-          omBucketInfo.copyObject(), keyStatus.isDirectory(), volumeId);
+          omBucketInfo.copyObject(), keyStatus.isDirectory(), volumeId, dbOpenKey);
 
       result = Result.SUCCESS;
     } catch (IOException | InvalidPathException ex) {

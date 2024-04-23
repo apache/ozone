@@ -25,6 +25,7 @@ import java.security.PrivilegedExceptionAction;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
@@ -2960,6 +2961,26 @@ public abstract class TestOzoneRpcClientAbstract {
             keyName, sampleData.length(), 10001, uploadID));
   }
 
+  @ParameterizedTest
+  @MethodSource("replicationConfigs")
+  public void testMultipartUploadWithCustomMetadata(ReplicationConfig replication) throws Exception {
+    String volumeName = UUID.randomUUID().toString();
+    String bucketName = UUID.randomUUID().toString();
+    String keyName = UUID.randomUUID().toString();
+
+    store.createVolume(volumeName);
+    OzoneVolume volume = store.getVolume(volumeName);
+    volume.createBucket(bucketName);
+    OzoneBucket bucket = volume.getBucket(bucketName);
+
+    // Create custom metadata
+    Map<String, String> customMetadata = new HashMap<>();
+    customMetadata.put("custom-key1", "custom-value1");
+    customMetadata.put("custom-key2", "custom-value2");
+
+    doMultipartUpload(bucket, keyName, (byte) 98, replication, customMetadata);
+  }
+
   @Test
   public void testAbortUploadFail() throws Exception {
     String volumeName = UUID.randomUUID().toString();
@@ -3593,8 +3614,14 @@ public abstract class TestOzoneRpcClientAbstract {
   private void doMultipartUpload(OzoneBucket bucket, String keyName, byte val,
       ReplicationConfig replication)
       throws Exception {
+    doMultipartUpload(bucket, keyName, val, replication, Collections.emptyMap());
+  }
+
+  private void doMultipartUpload(OzoneBucket bucket, String keyName, byte val,
+      ReplicationConfig replication, Map<String, String> customMetadata)
+      throws Exception {
     // Initiate Multipart upload request
-    String uploadID = initiateMultipartUpload(bucket, keyName, replication);
+    String uploadID = initiateMultipartUpload(bucket, keyName, replication, customMetadata);
 
     // Upload parts
     Map<Integer, String> partsMap = new TreeMap<>();
@@ -3661,12 +3688,23 @@ public abstract class TestOzoneRpcClientAbstract {
     latestVersionLocations.getBlocksLatestVersionOnly()
         .forEach(omKeyLocationInfo ->
             assertNotEquals(-1, omKeyLocationInfo.getPartNumber()));
+
+    Map<String, String> keyMetadata = omKeyInfo.getMetadata();
+    assertNotNull(keyMetadata.get(ETAG));
+    if (customMetadata != null && !customMetadata.isEmpty()) {
+      assertThat(keyMetadata).containsAllEntriesOf(customMetadata);
+    }
   }
 
   private String initiateMultipartUpload(OzoneBucket bucket, String keyName,
       ReplicationConfig replicationConfig) throws Exception {
+    return initiateMultipartUpload(bucket, keyName, replicationConfig, Collections.emptyMap());
+  }
+
+  private String initiateMultipartUpload(OzoneBucket bucket, String keyName,
+      ReplicationConfig replicationConfig, Map<String, String> customMetadata) throws Exception {
     OmMultipartInfo multipartInfo = bucket.initiateMultipartUpload(keyName,
-        replicationConfig);
+        replicationConfig, customMetadata);
 
     String uploadID = multipartInfo.getUploadID();
     assertNotNull(uploadID);

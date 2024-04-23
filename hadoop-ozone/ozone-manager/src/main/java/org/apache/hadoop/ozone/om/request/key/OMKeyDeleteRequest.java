@@ -22,6 +22,8 @@ import java.io.IOException;
 import java.nio.file.InvalidPathException;
 import java.util.Map;
 
+import org.apache.hadoop.hdds.utils.db.Table;
+import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.ratis.server.protocol.TermIndex;
 import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
@@ -147,7 +149,7 @@ public class OMKeyDeleteRequest extends OMKeyRequest {
       // Set the UpdateID to current transactionLogIndex
       omKeyInfo.setUpdateID(trxnLogIndex, ozoneManager.isRatisEnabled());
 
-      // Update table cache.
+      // Update table cache. Put a tombstone entry
       omMetadataManager.getKeyTable(getBucketLayout()).addCacheEntry(
           new CacheKey<>(
               omMetadataManager.getOzoneKey(volumeName, bucketName, keyName)),
@@ -160,15 +162,25 @@ public class OMKeyDeleteRequest extends OMKeyRequest {
       omBucketInfo.incrUsedBytes(-quotaReleased);
       omBucketInfo.incrUsedNamespace(-1L);
 
-      // No need to add cache entries to delete table. As delete table will
-      // be used by DeleteKeyService only, not used for any client response
-      // validation, so we don't need to add to cache.
-      // TODO: Revisit if we need it later.
+      // If omKeyInfo has hsync metadata, delete its corresponding open key as well
+      String dbOpenKey = null;
+      String hsyncClientId = omKeyInfo.getMetadata().get(OzoneConsts.HSYNC_CLIENT_ID);
+      if (hsyncClientId != null) {
+        Table<String, OmKeyInfo> openKeyTable = omMetadataManager.getOpenKeyTable(getBucketLayout());
+        dbOpenKey = omMetadataManager.getOpenKey(volumeName, bucketName, keyName, hsyncClientId);
+        OmKeyInfo openKeyInfo = openKeyTable.get(dbOpenKey);
+        if (openKeyInfo != null) {
+          // Remove the open key by putting a tombstone entry
+          openKeyTable.addCacheEntry(dbOpenKey, trxnLogIndex);
+        } else {
+          LOG.warn("Potentially inconsistent DB state: open key not found with dbOpenKey '{}'", dbOpenKey);
+        }
+      }
 
       omClientResponse = new OMKeyDeleteResponse(
           omResponse.setDeleteKeyResponse(DeleteKeyResponse.newBuilder())
               .build(), omKeyInfo, ozoneManager.isRatisEnabled(),
-          omBucketInfo.copyObject());
+          omBucketInfo.copyObject(), dbOpenKey);
 
       result = Result.SUCCESS;
     } catch (IOException | InvalidPathException ex) {

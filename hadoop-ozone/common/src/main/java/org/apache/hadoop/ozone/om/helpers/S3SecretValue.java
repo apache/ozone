@@ -101,9 +101,7 @@ public final class S3SecretValue {
 
   @Override
   public String toString() {
-    return "awsAccessKey=" + kerberosID + "\nawsSecret=" + awsSecret +
-        "\nisDeleted=" + isDeleted + "\ntransactionLogIndex=" +
-        transactionLogIndex;
+    return "awsAccessKey=" + kerberosID + "\nawsSecret=" + awsSecret;
   }
 
   @Override

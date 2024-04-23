@@ -116,7 +116,10 @@ public abstract class AbstractKeyDeletingService extends BackgroundService
     }
     List<DeleteBlockGroupResult> blockDeletionResults =
         scmClient.deleteKeyBlocks(keyBlocksList);
+    LOG.info("{} BlockGroup deletion are acked by SCM in {} ms",
+        keyBlocksList.size(), Time.monotonicNow() - startTime);
     if (blockDeletionResults != null) {
+      startTime = Time.monotonicNow();
       if (isRatisEnabled()) {
         delCount = submitPurgeKeysRequest(blockDeletionResults,
             keysToModify, snapTableKey);
@@ -126,11 +129,8 @@ public abstract class AbstractKeyDeletingService extends BackgroundService
         //  OMRequest model.
         delCount = deleteAllKeys(blockDeletionResults, manager);
       }
-      if (LOG.isDebugEnabled()) {
-        LOG.debug("Blocks for {} (out of {}) keys are deleted in {} ms",
-            delCount, blockDeletionResults.size(),
-            Time.monotonicNow() - startTime);
-      }
+      LOG.info("Blocks for {} (out of {}) keys are deleted from DB in {} ms",
+          delCount, blockDeletionResults.size(), Time.monotonicNow() - startTime);
     }
     return delCount;
   }
@@ -277,12 +277,14 @@ public abstract class AbstractKeyDeletingService extends BackgroundService
    * Parse Volume and Bucket Name from ObjectKey and add it to given map of
    * keys to be purged per bucket.
    */
-  private void addToMap(Map<Pair<String, String>, List<String>> map,
-                        String objectKey) {
+  private void addToMap(Map<Pair<String, String>, List<String>> map, String objectKey) {
     // Parse volume and bucket name
     String[] split = objectKey.split(OM_KEY_PREFIX);
-    Preconditions.assertTrue(split.length > 3, "Volume and/or Bucket Name " +
-        "missing from Key Name.");
+    Preconditions.assertTrue(split.length >= 3, "Volume and/or Bucket Name " +
+        "missing from Key Name " + objectKey);
+    if (split.length == 3) {
+      LOG.warn("{} missing Key Name", objectKey);
+    }
     Pair<String, String> volumeBucketPair = Pair.of(split[1], split[2]);
     if (!map.containsKey(volumeBucketPair)) {
       map.put(volumeBucketPair, new ArrayList<>());

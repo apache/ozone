@@ -243,7 +243,7 @@ class TestReconAndAdminContainerCLI {
     // First node goes offline.
     if (isMaintenance) {
       scmClient.startMaintenanceNodes(Collections.singletonList(
-          TestNodeUtil.getDNHostAndPort(nodeToGoOffline1)), 0);
+          TestNodeUtil.getDNHostAndPort(nodeToGoOffline1)), 0, true);
     } else {
       scmClient.decommissionNodes(Collections.singletonList(
           TestNodeUtil.getDNHostAndPort(nodeToGoOffline1)), false);
@@ -270,7 +270,7 @@ class TestReconAndAdminContainerCLI {
     // Second node goes offline.
     if (isMaintenance) {
       scmClient.startMaintenanceNodes(Collections.singletonList(
-          TestNodeUtil.getDNHostAndPort(nodeToGoOffline2)), 0);
+          TestNodeUtil.getDNHostAndPort(nodeToGoOffline2)), 0, true);
     } else {
       scmClient.decommissionNodes(Collections.singletonList(
           TestNodeUtil.getDNHostAndPort(nodeToGoOffline2)), false);

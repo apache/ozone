@@ -38,6 +38,8 @@ import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.client.SecretKeyTestClient;
 import org.apache.hadoop.ozone.container.common.ContainerTestUtils;
+import org.apache.hadoop.ozone.container.common.utils.StorageVolumeUtil;
+import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.token.Token;
 import org.apache.ozone.test.GenericTestUtils;
@@ -137,6 +139,9 @@ class TestSecureOzoneContainer {
       DatanodeDetails dn = MockDatanodeDetails.randomDatanodeDetails();
       container = new OzoneContainer(dn, conf, ContainerTestUtils
           .getMockContext(dn, conf), caClient, secretKeyClient);
+      MutableVolumeSet volumeSet = container.getVolumeSet();
+      StorageVolumeUtil.getHddsVolumesList(volumeSet.getVolumesList())
+          .forEach(hddsVolume -> hddsVolume.setDbParentDir(tempFolder.toFile()));
       //Set scmId and manually start ozone container.
       container.start(UUID.randomUUID().toString());
 

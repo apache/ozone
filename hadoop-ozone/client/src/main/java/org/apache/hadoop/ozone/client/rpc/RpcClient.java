@@ -321,6 +321,8 @@ public class RpcClient implements ClientProtocol {
     this.blockInputStreamFactory = BlockInputStreamFactoryImpl
         .getInstance(byteBufferPool, ecReconstructExecutor);
     this.clientMetrics = ContainerClientMetrics.acquire();
+
+    TracingUtil.initTracing("client", conf);
   }
 
   public XceiverClientFactory getXceiverClientManager() {
@@ -1809,6 +1811,17 @@ public class RpcClient implements ClientProtocol {
       String keyName,
       ReplicationConfig replicationConfig)
       throws IOException {
+    return initiateMultipartUpload(volumeName, bucketName, keyName, replicationConfig,
+        Collections.emptyMap());
+  }
+
+  @Override
+  public OmMultipartInfo initiateMultipartUpload(String volumeName,
+      String bucketName,
+      String keyName,
+      ReplicationConfig replicationConfig,
+      Map<String, String> metadata)
+      throws IOException {
     verifyVolumeName(volumeName);
     verifyBucketName(bucketName);
     HddsClientUtils.checkNotNull(keyName);
@@ -1827,6 +1840,7 @@ public class RpcClient implements ClientProtocol {
         .setKeyName(keyName)
         .setReplicationConfig(replicationConfig)
         .setAcls(getAclList())
+        .addAllMetadataGdpr(metadata)
         .build();
     OmMultipartInfo multipartInfo = ozoneManagerClient
         .initiateMultipartUpload(keyArgs);

@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.container.server;
 
 import java.io.File;
 import java.io.IOException;
+import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.EnumSet;
@@ -65,6 +66,7 @@ import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
 import org.apache.hadoop.ozone.container.common.transport.server.XceiverServerGrpc;
 import org.apache.hadoop.ozone.container.common.transport.server.XceiverServerSpi;
 import org.apache.hadoop.ozone.container.common.transport.server.ratis.XceiverServerRatis;
+import org.apache.hadoop.ozone.container.common.utils.StorageVolumeUtil;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
 import org.apache.hadoop.ozone.container.common.volume.VolumeSet;
@@ -103,6 +105,7 @@ import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
 import static org.apache.ratis.rpc.SupportedRpcType.GRPC;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -115,6 +118,8 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
  * Test Container servers when security is enabled.
  */
 public class TestSecureContainerServer {
+  @TempDir
+  private Path tempDir;
   private static final String TEST_DIR
       = GenericTestUtils.getTestDir("dfs").getAbsolutePath() + File.separator;
   private static final OzoneConfiguration CONF = new OzoneConfiguration();
@@ -166,7 +171,7 @@ public class TestSecureContainerServer {
             hddsDispatcher, caClient), (dn, p) -> {  }, (p) -> { });
   }
 
-  private static HddsDispatcher createDispatcher(DatanodeDetails dd, UUID scmId,
+  private HddsDispatcher createDispatcher(DatanodeDetails dd, UUID scmId,
       OzoneConfiguration conf) throws IOException {
     ContainerSet containerSet = new ContainerSet(1000);
     conf.set(HDDS_DATANODE_DIR_KEY,
@@ -175,6 +180,8 @@ public class TestSecureContainerServer {
     conf.set(OZONE_METADATA_DIRS, TEST_DIR);
     VolumeSet volumeSet = new MutableVolumeSet(dd.getUuidString(), conf, null,
         StorageVolume.VolumeType.DATA_VOLUME, null);
+    StorageVolumeUtil.getHddsVolumesList(volumeSet.getVolumesList())
+        .forEach(hddsVolume -> hddsVolume.setDbParentDir(tempDir.toFile()));
     StateContext context = ContainerTestUtils.getMockContext(dd, conf);
     ContainerMetrics metrics = ContainerMetrics.create(conf);
     Map<ContainerProtos.ContainerType, Handler> handlers = Maps.newHashMap();
@@ -199,7 +206,7 @@ public class TestSecureContainerServer {
     runTestClientServerRatis(GRPC, 3);
   }
 
-  static XceiverServerRatis newXceiverServerRatis(
+  XceiverServerRatis newXceiverServerRatis(
       DatanodeDetails dn, OzoneConfiguration conf) throws IOException {
     conf.setInt(OzoneConfigKeys.HDDS_CONTAINER_RATIS_IPC_PORT,
         dn.getPort(DatanodeDetails.Port.Name.RATIS).getValue());
@@ -216,12 +223,12 @@ public class TestSecureContainerServer {
         caClient, null);
   }
 
-  private static void runTestClientServerRatis(RpcType rpc, int numNodes)
+  private void runTestClientServerRatis(RpcType rpc, int numNodes)
       throws Exception {
     runTestClientServer(numNodes,
         (pipeline, conf) -> RatisTestHelper.initRatisConf(rpc, conf),
         XceiverClientRatis::newXceiverClientRatis,
-        TestSecureContainerServer::newXceiverServerRatis,
+        this::newXceiverServerRatis,
         (dn, p) -> RatisTestHelper.initXceiverServerRatis(rpc, dn, p),
         (p) -> { });
   }

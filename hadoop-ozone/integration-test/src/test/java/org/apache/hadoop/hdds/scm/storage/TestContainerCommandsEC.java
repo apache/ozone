@@ -136,7 +136,9 @@ public class TestContainerCommandsEC {
   private static final int EC_CHUNK_SIZE = 1024 * 1024;
   private static final int STRIPE_DATA_SIZE = EC_DATA * EC_CHUNK_SIZE;
   private static final int NUM_DN = EC_DATA + EC_PARITY + 3;
-  private static byte[][] inputChunks = new byte[EC_DATA][EC_CHUNK_SIZE];
+  // Data slots are EC_DATA + 1 so we can generate enough data to have a full stripe
+  // plus one extra chunk.
+  private static byte[][] inputChunks = new byte[EC_DATA + 1][EC_CHUNK_SIZE];
 
   // Each key size will be in range [min, max), min inclusive, max exclusive
   private static final int[][] KEY_SIZE_RANGES =
@@ -614,12 +616,19 @@ public class TestContainerCommandsEC {
     testECReconstructionCoordinator(missingIndexes, 3);
   }
 
-  @Test
-  void testECReconstructionWithPartialStripe()
-          throws Exception {
-    testECReconstructionCoordinator(ImmutableList.of(4, 5), 1);
+  @ParameterizedTest
+  @MethodSource("recoverableMissingIndexes")
+  void testECReconstructionCoordinatorWithPartialStripe(List<Integer> missingIndexes)
+      throws Exception {
+    testECReconstructionCoordinator(missingIndexes, 1);
   }
 
+  @ParameterizedTest
+  @MethodSource("recoverableMissingIndexes")
+  void testECReconstructionCoordinatorWithFullAndPartialStripe(List<Integer> missingIndexes)
+      throws Exception {
+    testECReconstructionCoordinator(missingIndexes, 4);
+  }
 
   static Stream<List<Integer>> recoverableMissingIndexes() {
     return Stream
@@ -895,18 +904,19 @@ public class TestContainerCommandsEC {
           reconstructedBlockData) {
 
     for (int i = 0; i < blockData.length; i++) {
+      assertEquals(blockData[i].getBlockID(), reconstructedBlockData[i].getBlockID());
+      assertEquals(blockData[i].getSize(), reconstructedBlockData[i].getSize());
+      assertEquals(blockData[i].getMetadata(), reconstructedBlockData[i].getMetadata());
       List<ContainerProtos.ChunkInfo> oldBlockDataChunks =
           blockData[i].getChunks();
       List<ContainerProtos.ChunkInfo> newBlockDataChunks =
           reconstructedBlockData[i].getChunks();
       for (int j = 0; j < oldBlockDataChunks.size(); j++) {
         ContainerProtos.ChunkInfo chunkInfo = oldBlockDataChunks.get(j);
-        if (chunkInfo.getLen() == 0) {
-          // let's ignore the empty chunks
-          continue;
-        }
         assertEquals(chunkInfo, newBlockDataChunks.get(j));
       }
+      // Ensure there are no extra chunks in the reconstructed block
+      assertEquals(oldBlockDataChunks.size(), newBlockDataChunks.size());
     }
   }
 

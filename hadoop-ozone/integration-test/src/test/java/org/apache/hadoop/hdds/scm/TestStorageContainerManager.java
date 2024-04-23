@@ -167,6 +167,7 @@ import static org.mockito.Mockito.verify;
  */
 @Timeout(900)
 public class TestStorageContainerManager {
+  private static final String LOCALHOST_IP = "127.0.0.1";
   private static XceiverClientManager xceiverClientManager;
   private static final Logger LOG = LoggerFactory.getLogger(
       TestStorageContainerManager.class);
@@ -693,11 +694,15 @@ public class TestStorageContainerManager {
    */
   @Test
   public void testScmProcessDatanodeHeartbeat() throws Exception {
+    String rackName = "/rack1";
     OzoneConfiguration conf = new OzoneConfiguration();
     conf.setClass(NET_TOPOLOGY_NODE_SWITCH_MAPPING_IMPL_KEY,
         StaticMapping.class, DNSToSwitchMapping.class);
     StaticMapping.addNodeToRack(NetUtils.normalizeHostName(HddsUtils.getHostName(conf)),
-        "/rack1");
+        rackName);
+    // In case of JDK17, the IP address is resolved to localhost mapped to 127.0.0.1 which is not in sync with JDK8
+    // and hence need to make following entry under HDDS-10132
+    StaticMapping.addNodeToRack(LOCALHOST_IP, rackName);
 
     final int datanodeNum = 3;
 

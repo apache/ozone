@@ -81,6 +81,8 @@ jobs:
     steps:
       - name: Checkout project
         uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.ref }}
       - name: Cache for npm dependencies
         uses: actions/cache@v4
         with:

@@ -29,6 +29,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRespo
 import org.junit.jupiter.api.Test;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.THREE;
@@ -103,7 +104,7 @@ public class TestOMKeysDeleteResponse extends TestOMKeyResponse {
   protected OMClientResponse getOmKeysDeleteResponse(OMResponse omResponse,
       OmBucketInfo omBucketInfo) {
     return new OMKeysDeleteResponse(
-        omResponse, omKeyInfoList, true, omBucketInfo);
+        omResponse, omKeyInfoList, true, omBucketInfo, Collections.emptyList());
   }
 
   @Test

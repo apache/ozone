@@ -252,7 +252,7 @@ public interface ScmClient extends Closeable {
    * @throws IOException
    */
   List<DatanodeAdminError> startMaintenanceNodes(List<String> hosts,
-      int endHours) throws IOException;
+      int endHours, boolean force) throws IOException;
 
   /**
    * Creates a specified replication pipeline.

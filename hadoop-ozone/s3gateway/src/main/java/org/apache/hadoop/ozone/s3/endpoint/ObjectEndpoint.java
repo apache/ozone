@@ -126,6 +126,7 @@ import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.NO_SUCH_UPLOAD;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.PRECOND_FAILED;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.newError;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.ACCEPT_RANGE_HEADER;
+import static org.apache.hadoop.ozone.s3.util.S3Consts.CUSTOM_METADATA_COPY_DIRECTIVE_HEADER;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.DECODED_CONTENT_LENGTH_HEADER;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.CONTENT_RANGE_HEADER;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.COPY_SOURCE_HEADER;
@@ -135,6 +136,7 @@ import static org.apache.hadoop.ozone.s3.util.S3Consts.COPY_SOURCE_IF_UNMODIFIED
 import static org.apache.hadoop.ozone.s3.util.S3Consts.RANGE_HEADER;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.RANGE_HEADER_SUPPORTED_UNIT;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.STORAGE_CLASS_HEADER;
+import static org.apache.hadoop.ozone.s3.util.S3Consts.CopyDirective;
 import static org.apache.hadoop.ozone.s3.util.S3Utils.urlDecode;
 
 /**
@@ -289,14 +291,6 @@ public class ObjectEndpoint extends EndpointBase {
       // Normal put object
       Map<String, String> customMetadata =
           getCustomMetadataFromHeaders(headers.getRequestHeaders());
-      if (customMetadata.containsKey(ETAG)
-          || customMetadata.containsKey(ETAG.toLowerCase())) {
-        String customETag = customMetadata.get(ETAG) != null ?
-            customMetadata.get(ETAG) : customMetadata.get(ETAG.toLowerCase());
-        customMetadata.remove(ETAG);
-        customMetadata.remove(ETAG.toLowerCase());
-        customMetadata.put(ETAG_CUSTOM, customETag);
-      }
 
       if ("STREAMING-AWS4-HMAC-SHA256-PAYLOAD"
           .equals(headers.getHeaderString("x-amz-content-sha256"))) {
@@ -609,7 +603,7 @@ public class ObjectEndpoint extends EndpointBase {
       // Should not return ETag header if the ETag is not set
       // doing so will result in "null" string being returned instead
       // which breaks some AWS SDK implementation
-      response.header(ETAG, "" + wrapInQuotes(key.getMetadata().get(ETAG)));
+      response.header(ETAG, wrapInQuotes(key.getMetadata().get(ETAG)));
     }
 
     addLastModifiedDate(response, key);
@@ -754,11 +748,14 @@ public class ObjectEndpoint extends EndpointBase {
       OzoneBucket ozoneBucket = getBucket(bucket);
       String storageType = headers.getHeaderString(STORAGE_CLASS_HEADER);
 
+      Map<String, String> customMetadata =
+          getCustomMetadataFromHeaders(headers.getRequestHeaders());
+
       ReplicationConfig replicationConfig =
           getReplicationConfig(ozoneBucket, storageType);
 
       OmMultipartInfo multipartInfo =
-          ozoneBucket.initiateMultipartUpload(key, replicationConfig);
+          ozoneBucket.initiateMultipartUpload(key, replicationConfig, customMetadata);
 
       MultipartUploadInitiateResponse multipartUploadInitiateResponse = new
           MultipartUploadInitiateResponse();
@@ -1208,12 +1205,30 @@ public class ObjectEndpoint extends EndpointBase {
         }
       }
       long sourceKeyLen = sourceKeyDetails.getDataSize();
+
+      // Custom metadata in copyObject with metadata directive
+      Map<String, String> customMetadata;
+      String metadataCopyDirective = headers.getHeaderString(CUSTOM_METADATA_COPY_DIRECTIVE_HEADER);
+      if (StringUtils.isEmpty(metadataCopyDirective) || metadataCopyDirective.equals(CopyDirective.COPY.name())) {
+        // The custom metadata will be copied from the source key
+        customMetadata = sourceKeyDetails.getMetadata();
+      } else if (metadataCopyDirective.equals(CopyDirective.REPLACE.name())) {
+        // Replace the metadata with the metadata form the request headers
+        customMetadata = getCustomMetadataFromHeaders(headers.getRequestHeaders());
+      } else {
+        OS3Exception ex = newError(INVALID_ARGUMENT, metadataCopyDirective);
+        ex.setErrorMessage("An error occurred (InvalidArgument) " +
+            "when calling the CopyObject operation: " +
+            "The metadata directive specified is invalid. Valid values are COPY or REPLACE.");
+        throw ex;
+      }
+
       try (OzoneInputStream src = getClientProtocol().getKey(volume.getName(),
           sourceBucket, sourceKey)) {
         getMetrics().updateCopyKeyMetadataStats(startNanos);
         sourceDigestInputStream = new DigestInputStream(src, getMessageDigestInstance());
         copy(volume, sourceDigestInputStream, sourceKeyLen, destkey, destBucket, replicationConfig,
-                sourceKeyDetails.getMetadata(), perf, startNanos);
+                customMetadata, perf, startNanos);
       }
 
       final OzoneKeyDetails destKeyDetails = getClientProtocol().getKeyDetails(
@@ -1336,7 +1351,7 @@ public class ObjectEndpoint extends EndpointBase {
     return datastreamEnabled;
   }
 
-  private String wrapInQuotes(String value) {
+  static String wrapInQuotes(String value) {
     return "\"" + value + "\"";
   }
 

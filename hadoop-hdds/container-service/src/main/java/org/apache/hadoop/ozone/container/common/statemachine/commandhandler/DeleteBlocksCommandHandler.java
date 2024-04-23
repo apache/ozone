@@ -514,7 +514,9 @@ public class DeleteBlocksCommandHandler implements CommandHandler {
       throws IOException {
     int newDeletionBlocks = 0;
     long containerId = delTX.getContainerID();
-    logDeleteTransaction(containerId, containerData, delTX);
+    if (isDuplicateTransaction(containerId, containerData, delTX, blockDeleteMetrics)) {
+      return;
+    }
     try (DBHandle containerDB = BlockUtils.getDB(containerData, conf)) {
       DeleteTransactionStore<?> store =
           (DeleteTransactionStore<?>) containerDB.getStore();
@@ -536,7 +538,9 @@ public class DeleteBlocksCommandHandler implements CommandHandler {
       KeyValueContainerData containerData, DeletedBlocksTransaction delTX)
       throws IOException {
     long containerId = delTX.getContainerID();
-    logDeleteTransaction(containerId, containerData, delTX);
+    if (isDuplicateTransaction(containerId, containerData, delTX, blockDeleteMetrics)) {
+      return;
+    }
     int newDeletionBlocks = 0;
     try (DBHandle containerDB = BlockUtils.getDB(containerData, conf)) {
       Table<String, BlockData> blockDataTable =
@@ -626,20 +630,28 @@ public class DeleteBlocksCommandHandler implements CommandHandler {
     }
   }
 
-  private void logDeleteTransaction(long containerId,
-      KeyValueContainerData containerData, DeletedBlocksTransaction delTX) {
-    if (LOG.isDebugEnabled()) {
-      LOG.debug("Processing Container : {}, DB path : {}, transaction {}",
-          containerId, containerData.getMetadataPath(), delTX.getTxID());
-    }
+  public static boolean isDuplicateTransaction(long containerId, KeyValueContainerData containerData,
+      DeletedBlocksTransaction delTX, BlockDeletingServiceMetrics metrics) {
+    boolean duplicate = false;
 
-    if (delTX.getTxID() <= containerData.getDeleteTransactionId()) {
-      blockDeleteMetrics.incOutOfOrderDeleteBlockTransactionCount();
+    if (delTX.getTxID() < containerData.getDeleteTransactionId()) {
+      if (metrics != null) {
+        metrics.incOutOfOrderDeleteBlockTransactionCount();
+      }
       LOG.info(String.format("Delete blocks for containerId: %d"
-              + " is either received out of order or retried,"
-              + " %d <= %d", containerId, delTX.getTxID(),
+              + " is received out of order, %d < %d", containerId, delTX.getTxID(),
           containerData.getDeleteTransactionId()));
+    } else if (delTX.getTxID() == containerData.getDeleteTransactionId()) {
+      duplicate = true;
+      LOG.info(String.format("Delete blocks with txID %d for containerId: %d"
+              + " is retried.", delTX.getTxID(), containerId));
+    } else {
+      if (LOG.isDebugEnabled()) {
+        LOG.debug("Processing Container : {}, DB path : {}, transaction {}",
+            containerId, containerData.getMetadataPath(), delTX.getTxID());
+      }
     }
+    return duplicate;
   }
 
   @Override
