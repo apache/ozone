@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.client;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
+import net.jcip.annotations.Immutable;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.OzoneConsts;
 
@@ -33,6 +34,7 @@ import java.util.Map;
  * This class encapsulates the arguments that are
  * required for creating a volume.
  */
+@Immutable
 public final class VolumeArgs {
 
   private final String admin;
