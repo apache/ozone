@@ -262,7 +262,7 @@ class TestReconAndAdminContainerCLI {
     // For maintenance, there is no replica-copy in this case.
     if (!isMaintenance) {
       GenericTestUtils.waitFor(() -> TestHelper.countReplicas(containerIdR3, cluster) == 4,
-          1000, 60000);
+          1000, 50000);
     }
 
     compareRMReportToReconResponse(underReplicatedState);
@@ -291,7 +291,7 @@ class TestReconAndAdminContainerCLI {
     int expectedReplicaNum = isMaintenance ? 4 : 5;
     //TestHelper.waitForReplicaCount(containerIdR3, expectedReplicaNum, cluster);
     GenericTestUtils.waitFor(() -> TestHelper.countReplicas(containerIdR3, cluster) == expectedReplicaNum,
-        1000, 60000);
+        1000, 50000);
 
     compareRMReportToReconResponse(underReplicatedState);
     compareRMReportToReconResponse(overReplicatedState);
