@@ -100,6 +100,9 @@ Cannot create container without admin privilege
 Cannot reconcile container without admin privilege
     Requires admin privilege    ozone admin container reconcile "${CONTAINER}"
 
+Reset user
+    Run Keyword if      '${SECURITY_ENABLED}' == 'true'     Kinit test user     testuser     testuser.keytab
+
 Cannot reconcile open container
     ${output} =         Execute          ozone admin container create
                         Should contain   ${output}   is created
@@ -111,18 +114,15 @@ Reconcile closed container
     # Get a currently open container to use for this test.
     ${container} =      Execute          ozone admin container list --state OPEN | jq -r 'select(.replicationConfig.replicationFactor == "THREE") | .containerID' | head -n1
     # The container should not yet have any replica checksums.
-    ${data_checksum} =  Execute          ozone admin container info "${container}" --json | jq -r '.dataChecksum' | head -n1
+    ${data_checksum} =  Execute          ozone admin container info "${container}" --json | jq -r '.replicas[].dataChecksum' | head -n1
     Should be empty    ${data_checksum}
     # Close the container to it can be reconciled.
     Execute    ozone admin container close ${container}
     # Check info still does not show replica checksums
-    ${data_checksum} =  Execute          ozone admin container info "${container}" --json | jq -r '.dataChecksum' | head -n1
+    ${data_checksum} =  Execute          ozone admin container info "${container}" --json | jq -r '.replicas[].dataChecksum' | head -n1
     Should be empty    ${data_checksum}
     # Reconcile, and checksums should show up.
     Execute    ozone admin container reconcile ${container}
     # When reconciliation finishes, replica checksums should be shown.
-    ${data_checksum} =  Execute          ozone admin container info "${container}" --json | jq -r '.dataChecksum' | head -n1
+    ${data_checksum} =  Execute          ozone admin container info "${container}" --json | jq -r '.replicas[].dataChecksum' | head -n1
      Wait until keyword succeeds    1min    5sec    Should not be empty    ${data_checksum}
-
-Reset user
-    Run Keyword if      '${SECURITY_ENABLED}' == 'true'     Kinit test user     testuser     testuser.keytab
