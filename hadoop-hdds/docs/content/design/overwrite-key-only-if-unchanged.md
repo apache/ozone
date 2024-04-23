@@ -98,6 +98,8 @@ If an upgraded server is rolled back, it will still be able to deal with an open
 
 The intention is to first implement this for OBS buckets. Then address FSO buckets.
 
+Multi-part keys need more investigation and hence are also excluded in the initial version.
+
 ## Changes Required
 
 In order to enable the above steps on Ozone, several small changes are needed.
