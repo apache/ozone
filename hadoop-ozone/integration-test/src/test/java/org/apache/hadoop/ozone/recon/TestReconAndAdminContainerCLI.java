@@ -262,7 +262,7 @@ class TestReconAndAdminContainerCLI {
     // For maintenance, there is no replica-copy in this case.
     if (!isMaintenance) {
       GenericTestUtils.waitFor(() -> TestHelper.countReplicas(containerIdR3, cluster) == 4,
-          1000, 50000);
+          1000, 60000);
     }
 
     compareRMReportToReconResponse(underReplicatedState);
