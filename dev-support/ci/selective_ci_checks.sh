@@ -306,7 +306,6 @@ function check_needs_build() {
     start_end::group_start "Check if build is needed"
     local pattern_array=(
         "^hadoop-ozone/dev-support/checks/build.sh"
-        "^hadoop-ozone/dev-support/checks/native_check.sh"
         "src/main/java"
         "src/main/resources"
     )
@@ -443,6 +442,24 @@ function check_needs_native() {
 
     if [[ ${match_count} != "0" ]]; then
         add_basic_check native
+    else
+        local pattern_array=(
+            "^hadoop-ozone/dev-support/checks/junit.sh"
+            # dependencies
+            "^hadoop-hdds/annotations"
+            "^hadoop-hdds/common"
+            "^hadoop-hdds/config"
+            "^hadoop-hdds/hadoop-dependency-client"
+            "^hadoop-hdds/hadoop-dependency-test"
+            "^hadoop-hdds/managed-rocksdb"
+            "^hadoop-hdds/test-utils"
+            "^pom.xml"
+        )
+        filter_changed_files
+
+        if [[ ${match_count} != "0" ]]; then
+            add_basic_check native
+        fi
     fi
 
     start_end::group_end
