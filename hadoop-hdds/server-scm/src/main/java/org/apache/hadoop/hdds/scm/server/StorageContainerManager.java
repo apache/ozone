@@ -1981,7 +1981,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
 
   @Override
   public boolean isSafeModeExitForceful() {
-    return scmSafeModeManager.isSafeModeExitForceful();
+    return scmSafeModeManager.isForceExitSafeMode();
   }
 
   /**
