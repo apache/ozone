@@ -96,7 +96,7 @@ If an upgraded server is rolled back, it will still be able to deal with an open
 
 ### Scope
 
-The intention is to first implement this for OBS buckets. Then address FSO buckets.
+The intention is to first implement this for OBS buckets. Then address FSO buckets. FSO bucket handling will reuse the same fields, but the handlers on OM are different. We also need to decide on what should happen if a key is renamed or moved folders during the rewrite.
 
 Multi-part keys need more investigation and hence are also excluded in the initial version.
 
