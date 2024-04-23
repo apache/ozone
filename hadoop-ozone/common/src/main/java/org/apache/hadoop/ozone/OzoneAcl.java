@@ -221,7 +221,7 @@ public class OzoneAcl {
       throw new AssertionError("Expected at most 4 bytes but got " + bytes.length);
     }
     int aclRights = 0;
-    for(int i = 0; i < bytes.length; i++) {
+    for (int i = 0; i < bytes.length; i++) {
       aclRights |= (bytes[i] & 0xff) << (i * 8);
     }
     return new OzoneAcl(ACLIdentityType.valueOf(protoAcl.getType().name()), protoAcl.getName(),
@@ -294,7 +294,7 @@ public class OzoneAcl {
     // only first 9 bits are used currently
     final byte first = (byte) aclBits;
     final byte second = (byte) (aclBits >>> 8);
-    return second != 0? new byte[]{first, second} : new byte[]{first};
+    return second != 0 ? new byte[]{first, second} : new byte[]{first};
   }
 
   public List<String> getAclStringList() {
@@ -310,14 +310,13 @@ public class OzoneAcl {
       return Collections.emptyList();
     }
     final List<T> toReturn = new ArrayList<>(Integer.bitCount(aclBits));
-    for(int i = 0; i < ACLType.values().length; i++) {
+    for (int i = 0; i < ACLType.values().length; i++) {
       if ((toInt(i) & aclBits) != 0) {
         toReturn.add(converter.apply(ACLType.values()[i]));
       }
     }
     return Collections.unmodifiableList(toReturn);
   }
-
 
   /**
    * Returns Type.
