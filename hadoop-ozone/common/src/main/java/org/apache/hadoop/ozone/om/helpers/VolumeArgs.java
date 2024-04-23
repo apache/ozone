@@ -18,6 +18,7 @@
 package org.apache.hadoop.ozone.om.helpers;
 
 import com.google.common.base.Preconditions;
+import net.jcip.annotations.Immutable;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -25,6 +26,7 @@ import java.util.Map;
 /**
  * A class that encapsulates the createVolume Args.
  */
+@Immutable
 public final class VolumeArgs {
   private final String adminName;
   private final String ownerName;

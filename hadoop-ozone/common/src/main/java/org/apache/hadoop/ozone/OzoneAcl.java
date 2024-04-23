@@ -22,6 +22,7 @@ package org.apache.hadoop.ozone;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.protobuf.ByteString;
+import net.jcip.annotations.Immutable;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OzoneAclInfo;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OzoneAclInfo.OzoneAclScope;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OzoneAclInfo.OzoneAclType;
@@ -49,6 +50,7 @@ import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType.NON
  * <li>world::rw
  * </ul>
  */
+@Immutable
 public class OzoneAcl {
 
   private static final String ACL_SCOPE_REGEX = ".*\\[(ACCESS|DEFAULT)\\]";
