@@ -261,7 +261,8 @@ class TestReconAndAdminContainerCLI {
     // a new replica-copy is made to another node.
     // For maintenance, there is no replica-copy in this case.
     if (!isMaintenance) {
-      TestHelper.waitForReplicaCount(containerIdR3, 4, cluster);
+      GenericTestUtils.waitFor(() -> TestHelper.countReplicas(containerIdR3, cluster) == 4,
+          1000, 50000);
     }
 
     compareRMReportToReconResponse(underReplicatedState);
