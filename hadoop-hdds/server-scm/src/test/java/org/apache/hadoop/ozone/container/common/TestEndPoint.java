@@ -184,9 +184,9 @@ public class TestEndPoint {
     ozoneConf.setBoolean(OzoneConfigKeys.HDDS_CONTAINER_RATIS_IPC_RANDOM_PORT,
         true);
     ozoneConf.setFromObject(new ReplicationConfig().setPort(0));
+    OzoneContainer ozoneContainer = createVolume(ozoneConf);
     try (EndpointStateMachine rpcEndPoint = createEndpoint(ozoneConf,
         serverAddress, 1000)) {
-      OzoneContainer ozoneContainer = createVolume(ozoneConf);
       HddsVolume hddsVolume = (HddsVolume) ozoneContainer.getVolumeSet()
           .getVolumesList().get(0);
       KeyValueContainer kvContainer = addContainer(ozoneConf, hddsVolume);
@@ -212,6 +212,8 @@ public class TestEndPoint {
           hddsVolume.getDeletedContainerDir().listFiles();
       assertNotNull(leftoverContainers);
       assertEquals(0, leftoverContainers.length);
+    } finally {
+      ozoneContainer.stop();
     }
   }
 

@@ -79,7 +79,7 @@ public abstract class EntityHandler {
           throws IOException;
 
   public abstract DUResponse getDuResponse(
-          boolean listFile, boolean withReplica)
+      boolean listFile, boolean withReplica, boolean sort)
           throws IOException;
 
   public abstract QuotaUsageResponse getQuotaResponse()

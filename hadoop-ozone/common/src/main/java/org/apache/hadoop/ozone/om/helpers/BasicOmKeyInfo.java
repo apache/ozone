@@ -20,10 +20,13 @@ package org.apache.hadoop.ozone.om.helpers;
 import java.io.IOException;
 import java.util.Objects;
 
+import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.BasicKeyInfo;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ListKeysRequest;
+
+import static org.apache.hadoop.ozone.OzoneConsts.ETAG;
 
 /**
  * Lightweight OmKeyInfo class.
@@ -38,6 +41,7 @@ public final class BasicOmKeyInfo {
   private final long modificationTime;
   private final ReplicationConfig replicationConfig;
   private final boolean isFile;
+  private final String eTag;
   private String ownerName;
 
   private BasicOmKeyInfo(Builder b) {
@@ -49,6 +53,7 @@ public final class BasicOmKeyInfo {
     this.modificationTime = b.modificationTime;
     this.replicationConfig = b.replicationConfig;
     this.isFile = b.isFile;
+    this.eTag = StringUtils.isNotEmpty(b.eTag) ? b.eTag : null;
     this.ownerName = b.ownerName;
   }
 
@@ -61,6 +66,7 @@ public final class BasicOmKeyInfo {
     this.modificationTime = b.getModificationTime();
     this.replicationConfig = b.getReplicationConfig();
     this.isFile = b.isFile();
+    this.eTag = b.getMetadata().get(ETAG);
     this.ownerName = b.getOwnerName();
   }
 
@@ -96,6 +102,10 @@ public final class BasicOmKeyInfo {
     return isFile;
   }
 
+  public String getETag() {
+    return eTag;
+  }
+
   public String getOwnerName() {
     return ownerName;
   }
@@ -112,6 +122,7 @@ public final class BasicOmKeyInfo {
     private long modificationTime;
     private ReplicationConfig replicationConfig;
     private boolean isFile;
+    private String eTag;
     private String ownerName;
 
     public Builder setVolumeName(String volumeName) {
@@ -154,6 +165,11 @@ public final class BasicOmKeyInfo {
       return this;
     }
 
+    public Builder setETag(String etag) {
+      this.eTag = etag;
+      return this;
+    }
+
     public Builder setOwnerName(String ownerName) {
       this.ownerName = ownerName;
       return this;
@@ -180,6 +196,9 @@ public final class BasicOmKeyInfo {
     } else {
       builder.setFactor(ReplicationConfig.getLegacyFactor(replicationConfig));
     }
+    if (StringUtils.isNotEmpty(eTag)) {
+      builder.setETag(eTag);
+    }
 
     return builder.build();
   }
@@ -204,6 +223,7 @@ public final class BasicOmKeyInfo {
             basicKeyInfo.getType(),
             basicKeyInfo.getFactor(),
             basicKeyInfo.getEcReplicationConfig()))
+        .setETag(basicKeyInfo.getETag())
         .setIsFile(!keyName.endsWith("/"))
         .setOwnerName(basicKeyInfo.getOwnerName());
 
@@ -229,6 +249,7 @@ public final class BasicOmKeyInfo {
             basicKeyInfo.getType(),
             basicKeyInfo.getFactor(),
             basicKeyInfo.getEcReplicationConfig()))
+        .setETag(basicKeyInfo.getETag())
         .setIsFile(!keyName.endsWith("/"))
         .setOwnerName(basicKeyInfo.getOwnerName());
 
@@ -250,6 +271,7 @@ public final class BasicOmKeyInfo {
         creationTime == basicOmKeyInfo.creationTime &&
         modificationTime == basicOmKeyInfo.modificationTime &&
         replicationConfig.equals(basicOmKeyInfo.replicationConfig) &&
+        Objects.equals(eTag, basicOmKeyInfo.eTag) &&
         isFile == basicOmKeyInfo.isFile &&
         ownerName.equals(basicOmKeyInfo.ownerName);
   }
