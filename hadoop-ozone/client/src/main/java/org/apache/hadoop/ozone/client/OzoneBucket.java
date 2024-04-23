@@ -680,7 +680,16 @@ public class OzoneBucket extends WithMetadata {
   public OmMultipartInfo initiateMultipartUpload(String keyName,
       ReplicationConfig config)
       throws IOException {
-    return proxy.initiateMultipartUpload(volumeName, name, keyName, config);
+    return initiateMultipartUpload(keyName, config, Collections.emptyMap());
+  }
+
+  /**
+   * Initiate multipart upload for a specified key.
+   */
+  public OmMultipartInfo initiateMultipartUpload(String keyName,
+      ReplicationConfig config, Map<String, String> metadata)
+      throws IOException {
+    return proxy.initiateMultipartUpload(volumeName, name, keyName, config, metadata);
   }
 
   /**
