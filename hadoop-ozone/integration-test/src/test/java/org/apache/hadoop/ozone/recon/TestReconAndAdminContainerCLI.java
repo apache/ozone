@@ -289,7 +289,9 @@ class TestReconAndAdminContainerCLI {
     // There will be a replica copy for both maintenance and decommission.
     // maintenance 3 -> 4, decommission 4 -> 5.
     int expectedReplicaNum = isMaintenance ? 4 : 5;
-    TestHelper.waitForReplicaCount(containerIdR3, expectedReplicaNum, cluster);
+    //TestHelper.waitForReplicaCount(containerIdR3, expectedReplicaNum, cluster);
+    GenericTestUtils.waitFor(() -> TestHelper.countReplicas(containerIdR3, cluster) == expectedReplicaNum,
+        1000, 60000);
 
     compareRMReportToReconResponse(underReplicatedState);
     compareRMReportToReconResponse(overReplicatedState);
