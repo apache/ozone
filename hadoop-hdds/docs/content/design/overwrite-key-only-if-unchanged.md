@@ -68,31 +68,31 @@ In Ozone the same concept can be used to perform an atomic update of a key only 
 
 To do this:
 
-1. The client reads the key details as usual. The key details can be extended to include the existing updateID as it is currently not passed to the client.
-2. The client opens a new key for writing with the same key name as the original, passing the previously read updateID in a new field. Call this new field overwriteExpectedUpdateID.
-3. On OM, it receives the openKey request as usual and detects the presence of the overwriteExpectedUpdateID.
-4. On OM, it first ensures that a key is present with the given key name and having a updateID == overwriteExpectedUpdateID. If so, it opens the key and stored the details including the overwriteExpectedUpdateID in the openKeyTable. As things stand, the other existing key metadata copied from the original key is stored in the openKeyTable too.
+1. The client reads the key details as usual. The key details can be extended to include the existing updateID as it is currently not passed to the client. This field already exists, but when exposed to the client it will be referred to as the key generation.
+2. The client opens a new key for writing with the same key name as the original, passing the previously read generation in a new field. Call this new field expectedGeneration.
+3. On OM, it receives the openKey request as usual and detects the presence of the expectedGeneration field.
+4. On OM, it first ensures that a key is present with the given key name and having a updateID == expectedGeneration. If so, it opens the key and stored the details including the expectedGeneration in the openKeyTable. As things stand, the other existing key metadata copied from the original key is stored in the openKeyTable too.
 5. The client continues to write the data as usual.
-6. On commit key, the client does not need to send the overwriteExpectedUpdateID again, as the open key contains it.
-7. On OM, on commit key, it validates the key still exists with the given key name and its updateID is unchanged. If so the key is committed, otherwise an error is returned to the client.
+6. On commit key, the client does not need to send the expectedGeneration again, as the open key contains it.
+7. On OM, on commit key, it validates the key still exists with the given key name and its stored updateID is unchanged when compared with the expectedGeneration. If so the key is committed, otherwise an error is returned to the client.
 
-Note that any change to a key will change the updateID. This is existing behaviour, and committing an rewritten key will also modify the updateID. Note this also offers protection against concurrent rewrites. 
+Note that any change to a key will change the updateID. This is existing behaviour, and committing a rewritten key will also modify the updateID. Note this also offers protection against concurrent rewrites. 
 
 ### Alternative Proposal
 
-1. Pass the expected updateID to the rewrite API which passes it down to the relevant key stream, effectively saving it on the client
-2. Client attaches update ID to the commit request to indicate a rewrite instead of a put
-3. OM checks the update ID if present and returns the corresponding success/fail result
+1. Pass the expected expectedGeneration to the rewrite API which passes it down to the relevant key stream, effectively saving it on the client
+2. Client attaches the expectedGeneration to the commit request to indicate a rewrite instead of a put
+3. OM checks the passed generation against the stored update ID and returns the corresponding success/fail result
 
-The advantage of this alternative approach is that it does not require the overwriteUpdateID to be stored in the openKey table.
+The advantage of this alternative approach is that it does not require the expectedGeneration to be stored in the openKey table.
 
 However the client code required to implement this appears more complex due to having different key commit logic for Ratis and EC and the parameter needing to be passed through many method calls.
 
-The existing implementation for key creation stores various attributes (metadata, creation time, ACLs, ReplicationConfig) in the openKey table, so storing the overwriteExpectedUpdateID keeps with that convention, which is less confusing for future developers.
+The existing implementation for key creation stores various attributes (metadata, creation time, ACLs, ReplicationConfig) in the openKey table, so storing the expectedGeneration keeps with that convention, which is less confusing for future developers.
 
 In terms of forward / backward compatibility both solutions are equivalent. Only a new parameter is required within the KeyArgs passed to create and commit Key.
 
-If an upgraded server is rolled back, it will still be able to deal with an openKey entry containing overWriteUpdateID, but it will not process it atomically.
+If an upgraded server is rolled back, it will still be able to deal with an openKey entry containing expectedGeneration, but it will not process it atomically.
 
 ### Scope
 
@@ -106,29 +106,25 @@ In order to enable the above steps on Ozone, several small changes are needed.
 
 ### Wire Protocol
 
-1. The overwriteExpectedUpdateID needs to be added to the KeyInfo protobuf object so it can be stored in the openKey table.
-2. The overwriteExpectedUpdateID needs to be added to the keyArgs protobuf object, which is passed from the client to OM when creating a key.
+1. The expectedGeneration needs to be added to the KeyInfo protobuf object so it can be stored in the openKey table.
+2. The expectedGeneration needs to be added to the keyArgs protobuf object, which is passed from the client to OM when creating a key.
 
 No new messages need to be defined.
 
 ### On OM
 
-No new OM handlers are needed. The existing OpenKey and CommitKey handlers will receive the new overwriteExpectedUpdateID and perform the checked.
+No new OM handlers are needed. The existing OpenKey and CommitKey handlers will receive the new expectedGeneration and perform the checks.
 
 No new locks are needed on OM. As part of the openKey and commitKey, there are existing locks taken to ensure the key open / commit is atomic. The new checks are performed under those locks, and come down to a couple of long comparisons, so add negligible overhead.
 
 ### On The Client
 
- 1. We need to allow the updateID of an existing key to be accessible when an existing details are read, by adding it to OzoneKey and OzoneKeyDetails. There are internal object changes and do no impact any APIs.
- 2. To pass the overwriteExpectedUpdateID to OM on key open, it would be possible to overload the existing OzoneBucket.createKey() method, which already has several overloaded versions, or create a new explicit method on Ozone bucket called replaceKeyIfUnchanged, passing either the OzoneKeyDetails of the existing key (which includes the key name and existing updateID, or by passing the key name and updateID explicitly, eg:
+ 1. We need to allow the updateID (called generation on the client) of an existing key to be accessible when an existing details are read, by adding it to OzoneKey and OzoneKeyDetails. There are internal object changes and do no impact any APIs.
+ 2. To pass the expectedGeneration to OM on key open, it would be possible to overload the existing OzoneBucket.createKey() method, which already has several overloaded versions, or create a new explicit method on Ozone bucket called rewriteKey, passing the expectedGeneration, eg:
  
  ```
- public OzoneOutputStream replaceKeyIfUnchanged(OzoneKeyDetails keyToOverwrite, ReplicationConfig replicationConfigOfNewKey)
-      throws IOException 
-	  
-// Alternatively or additionally
 
- public OzoneOutputStream replaceKeyIfUnchanged(String volumeName, String bucketName, String keyName, long size, long expectedUpdateID, ReplicationConfig replicationConfigOfNewKey)
+ public OzoneOutputStream rewriteKey(String volumeName, String bucketName, String keyName, long size, long expectedGeneration, ReplicationConfig replicationConfigOfNewKey)
       throws IOException 
       
 // Can also add an overloaded version of these methods to pass a metadata map, as with the existing
@@ -145,7 +141,7 @@ This specification is roughly in line with the exiting createKey method:
       Map<String, String> metadata)
 ```
 
-An alternative, is to create a new overloaded createKey:
+An alternative, is to create a new overloaded createKey, but it is probably less confusing to have the new rewriteKey method:
 
 ```
   public OzoneOutputStream createKey(
@@ -157,7 +153,8 @@ The intended usage of this API, is that the existing key details are read, then 
 
 ```
 OzoneKeyDetails exisitingKey = bucket.getKey(keyName);
-try (OutputStream os = bucket.replaceKeyIfUnchanged(existingKey, newRepConfig) {
+try (OutputStream os = bucket.rewriteKey(existingKey.getBucket, existingKey.getVolume, 
+    existingKey.getKeyName, existingKey.getSize(), existingKey.getGeneration(), newRepConfig) {
   os.write(bucket.readKey(keyName))
 }
 ```
@@ -184,10 +181,10 @@ Google Cloud has a concept of a generationID which is used in various [API calls
 
 The intention of this initial design is to make as few changes to Ozone as possible to enable overwriting a key if it has not changed.
 
-It would be possible to have separate UpdateIDs for metadata changes and data changes to give a more fine grained approach.
+It would be possible to have separate generation IDs for metadata changes and data changes to give a more fine grained approach.
 
 It would also be possible to expose these IDs over the S3 interface as well as the Java interface.
 
 However both these options required more changes to Ozone and more API surface to test and support.
 
-The changes suggested here are small, and carry little risk to existing operations if the new field is not passed. They also do not rule out extending the idea to cover a separate metadata UpdateID if such a thing is desired by enough users.
+The changes suggested here are small, and carry little risk to existing operations if the new field is not passed. They also do not rule out extending the idea to cover a separate metadata generation if such a thing is desired by enough users.
