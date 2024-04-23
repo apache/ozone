@@ -101,6 +101,10 @@ if [[ ${rc} -ne 0 ]] && [[ ! -s "${REPORT_FILE}" ]]; then
   grep -m1 -F '[ERROR]' "${REPORT_DIR}/output.log" > "${REPORT_FILE}"
 fi
 
+if [[ ${ITERATIONS} -gt 1 ]]; then
+  grep -c "exit code: [^0]" "${REPORT_DIR}/summary.txt" > "${REPORT_DIR}/failures"
+fi
+
 if [[ "${OZONE_WITH_COVERAGE}" == "true" ]]; then
   #Archive combined jacoco records
   mvn -B -N jacoco:merge -Djacoco.destFile=$REPORT_DIR/jacoco-combined.exec
