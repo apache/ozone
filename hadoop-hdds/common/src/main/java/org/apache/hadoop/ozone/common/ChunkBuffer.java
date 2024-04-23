@@ -144,6 +144,12 @@ public interface ChunkBuffer extends UncheckedAutoCloseable {
   long writeTo(GatheringByteChannel channel) throws IOException;
 
   /**
+   * Write all the contents of the buffer from the current position to the limit
+   * to {@code channel}.
+   */
+  void writeFully(GatheringByteChannel channel) throws IOException;
+
+  /**
    * Convert this buffer to a {@link ByteString}.
    * The position and limit of this {@link ChunkBuffer} remains unchanged.
    * The given function must preserve the position and limit

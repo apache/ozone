@@ -19,7 +19,10 @@
 package org.apache.hadoop.ozone.common.utils;
 
 import com.google.common.base.Preconditions;
+
+import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.nio.channels.GatheringByteChannel;
 import java.util.ArrayList;
 import java.util.List;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
@@ -135,5 +138,19 @@ public final class BufferUtils {
           + ", maxElementsPerBin = " + maxElementsPerBin);
     }
     return Math.toIntExact(n);
+  }
+
+  /**
+   * Write all remaining bytes in buffer to the given channel.
+   * If the channel is selectable then it must be configured blocking.
+   */
+  public static void writeFully(GatheringByteChannel ch, ByteBuffer bb)
+      throws IOException
+  {
+    while (bb.remaining() > 0) {
+      int n = ch.write(bb);
+      if (n <= 0)
+        throw new IllegalStateException("no bytes written");
+    }
   }
 }

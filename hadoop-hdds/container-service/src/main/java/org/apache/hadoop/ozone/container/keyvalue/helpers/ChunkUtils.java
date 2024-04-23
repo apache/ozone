@@ -40,6 +40,7 @@ import java.util.EnumSet;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.Consumer;
 import java.util.function.Supplier;
 import java.util.function.ToLongFunction;
 
@@ -124,14 +125,13 @@ public final class ChunkUtils {
 
   private static void writeData(ChunkBuffer data, String filename,
       long offset, long len, HddsVolume volume,
-      ToLongFunction<ChunkBuffer> writer) throws StorageContainerException {
+      Consumer<ChunkBuffer> writer) throws StorageContainerException {
 
     validateBufferSize(len, data.remaining());
 
     final long startTime = Time.monotonicNow();
-    final long bytesWritten;
     try {
-      bytesWritten = writer.applyAsLong(data);
+      writer.accept(data);
     } catch (UncheckedIOException e) {
       if (!(e.getCause() instanceof InterruptedIOException)) {
         onFailure(volume);
@@ -144,13 +144,11 @@ public final class ChunkUtils {
     if (volume != null) {
       volume.getVolumeIOStats().incWriteTime(elapsed);
       volume.getVolumeIOStats().incWriteOpCount();
-      volume.getVolumeIOStats().incWriteBytes(bytesWritten);
+      volume.getVolumeIOStats().incWriteBytes(len);
     }
 
     LOG.debug("Written {} bytes at offset {} to {} in {} ms",
-        bytesWritten, offset, filename, elapsed);
-
-    validateWriteSize(len, bytesWritten);
+        len, offset, filename, elapsed);
   }
 
   private static long writeDataToFile(File file, ChunkBuffer data,
@@ -163,7 +161,9 @@ public final class ChunkUtils {
           channel = open(path, WRITE_OPTIONS, NO_ATTRIBUTES);
 
           try (FileLock ignored = channel.lock()) {
-            return writeDataToChannel(channel, data, offset);
+            int len = data.remaining();
+            writeDataToChannel(channel, data, offset);
+            return len;
           }
         } catch (IOException e) {
           throw new UncheckedIOException(e);
@@ -177,11 +177,10 @@ public final class ChunkUtils {
     }
   }
 
-  private static long writeDataToChannel(FileChannel channel, ChunkBuffer data,
-      long offset) {
+  private static void writeDataToChannel(FileChannel channel, ChunkBuffer data, long offset) {
     try {
       channel.position(offset);
-      return data.writeTo(channel);
+      data.writeFully(channel);
     } catch (IOException e) {
       throw new UncheckedIOException(e);
     }
