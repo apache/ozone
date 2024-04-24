@@ -161,6 +161,10 @@ public class TestContainerBalancerOperations {
     running = containerBalancerClient.getContainerBalancerStatus();
     assertTrue(running);
 
+    try {
+      Thread.sleep(200000);
+    } catch (InterruptedException e) { }
+
     ContainerBalancerConfiguration config = cluster.getStorageContainerManager().getContainerBalancer().getConfig();
 
     //If config value is not added in ozone-site.xml and CLI option is not passed
