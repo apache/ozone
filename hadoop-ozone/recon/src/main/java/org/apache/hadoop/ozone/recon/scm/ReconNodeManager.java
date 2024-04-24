@@ -38,11 +38,13 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolPro
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMVersionRequestProto;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.net.NetworkTopology;
+import org.apache.hadoop.hdds.scm.net.NetworkTopology.InvalidTopologyException;
 import org.apache.hadoop.hdds.scm.node.NodeStatus;
 import org.apache.hadoop.hdds.scm.node.SCMNodeManager;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
 import org.apache.hadoop.hdds.scm.server.SCMStorageConfig;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
+import org.apache.hadoop.hdds.server.events.EventQueue;
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager;
 import org.apache.hadoop.hdds.utils.HddsServerUtil;
 import org.apache.hadoop.hdds.utils.db.Table;
@@ -52,6 +54,7 @@ import org.apache.hadoop.ozone.protocol.commands.CommandForDatanode;
 import org.apache.hadoop.ozone.protocol.commands.RegisteredCommand;
 import org.apache.hadoop.ozone.protocol.commands.ReregisterCommand;
 import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
+import org.apache.hadoop.ozone.recon.ReconContext;
 import org.apache.hadoop.util.Time;
 
 import com.google.common.collect.ImmutableSet;
@@ -71,6 +74,7 @@ public class ReconNodeManager extends SCMNodeManager {
       .getLogger(ReconNodeManager.class);
 
   private Table<UUID, DatanodeDetails> nodeDB;
+  private ReconContext reconContext;
   private static final Set<Type> ALLOWED_COMMANDS =
       ImmutableSet.of(reregisterCommand);
 
@@ -99,6 +103,13 @@ public class ReconNodeManager extends SCMNodeManager {
         HddsServerUtil.getReconHeartbeatInterval(conf);
     this.nodeDB = nodeDB;
     loadExistingNodes();
+  }
+
+  public ReconNodeManager(OzoneConfiguration conf, SCMStorageConfig scmStorageConfig, EventQueue eventQueue,
+                          NetworkTopology clusterMap, Table<UUID, DatanodeDetails> table,
+                          HDDSLayoutVersionManager scmLayoutVersionManager, ReconContext reconContext) {
+    this(conf, scmStorageConfig, eventQueue, clusterMap, table, scmLayoutVersionManager);
+    this.reconContext = reconContext;
   }
 
   private void loadExistingNodes() {
@@ -276,8 +287,19 @@ public class ReconNodeManager extends SCMNodeManager {
             datanodeDetails.getUuid());
       }
     }
-    return super.register(datanodeDetails, nodeReport, pipelineReportsProto,
-        layoutInfo);
+    try {
+      return super.register(datanodeDetails, nodeReport, pipelineReportsProto,
+          layoutInfo);
+    } catch (InvalidTopologyException invalidTopologyException) {
+      LOG.error("InvalidTopologyException error occurred : {}", invalidTopologyException.getMessage());
+      reconContext.updateHealthStatus(false);
+      reconContext.getErrors().add(ReconContext.ErrorCode.INVALID_NETWORK_TOPOLOGY);
+    } catch (Exception ex) {
+      LOG.error("Unexpected runtime error occurred : {}", ex.getMessage());
+      reconContext.updateHealthStatus(false);
+      reconContext.getErrors().add(ReconContext.ErrorCode.INTERNAL_ERROR);
+    }
+    return null;
   }
 
   public void updateNodeOperationalStateFromScm(HddsProtos.Node scmNode,
@@ -320,5 +342,15 @@ public class ReconNodeManager extends SCMNodeManager {
       }
       return nodeCount;
     }
+  }
+
+  @VisibleForTesting
+  public ReconContext getReconContext() {
+    return reconContext;
+  }
+
+  @VisibleForTesting
+  public void setReconContext(ReconContext reconContext) {
+    this.reconContext = reconContext;
   }
 }

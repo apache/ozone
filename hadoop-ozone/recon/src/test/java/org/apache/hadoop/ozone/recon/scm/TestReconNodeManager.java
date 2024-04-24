@@ -23,8 +23,11 @@ import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalSt
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.IN_SERVICE;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_NAMES;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_METADATA_DIRS;
+import static org.apache.ratis.util.Preconditions.assertTrue;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.mockito.Mockito.eq;
@@ -48,9 +51,11 @@ import org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager;
 import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.utils.db.DBStoreBuilder;
 import org.apache.hadoop.hdds.utils.db.Table;
+import org.apache.hadoop.ozone.protocol.commands.RegisteredCommand;
 import org.apache.hadoop.ozone.protocol.commands.ReregisterCommand;
 import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
 import org.apache.hadoop.ozone.protocol.commands.SetNodeOperationalStateCommand;
+import org.apache.hadoop.ozone.recon.ReconContext;
 import org.apache.hadoop.ozone.recon.ReconUtils;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -84,6 +89,38 @@ public class TestReconNodeManager {
   @AfterEach
   public void tearDown() throws Exception {
     store.close();
+  }
+
+  @Test
+  public void testReconNodeManagerInitWithInvalidNetworkTopology() throws IOException {
+    ReconUtils reconUtils = new ReconUtils();
+    ReconStorageConfig scmStorageConfig =
+        new ReconStorageConfig(conf, reconUtils);
+    EventQueue eventQueue = new EventQueue();
+    NetworkTopology clusterMap = new NetworkTopologyImpl(conf);
+    Table<UUID, DatanodeDetails> nodeTable =
+        ReconSCMDBDefinition.NODES.getTable(store);
+    ReconNodeManager reconNodeManager = new ReconNodeManager(conf,
+        scmStorageConfig, eventQueue, clusterMap, nodeTable, versionManager);
+    reconNodeManager.setReconContext(new ReconContext(conf, reconUtils));
+    ReconNewNodeHandler reconNewNodeHandler =
+        new ReconNewNodeHandler(reconNodeManager);
+    assertThat(reconNodeManager.getAllNodes()).isEmpty();
+
+    DatanodeDetails datanodeDetails = randomDatanodeDetails();
+    // Updating the node's topology depth to make it invalid.
+    datanodeDetails.setNetworkLocation("/default-rack/xyz/");
+    String uuidString = datanodeDetails.getUuidString();
+
+    // Register a random datanode.
+    RegisteredCommand register = reconNodeManager.register(datanodeDetails, null, null);
+    assertNull(register);
+    ReconContext reconContext = reconNodeManager.getReconContext();
+    assertFalse(reconContext.isHealthy());
+    assertTrue(reconContext.getErrors().get(0).equals(ReconContext.ErrorCode.INVALID_NETWORK_TOPOLOGY));
+
+    assertEquals(0, reconNodeManager.getAllNodes().size());
+    assertNull(reconNodeManager.getNodeByUuid(uuidString));
   }
 
   @Test
