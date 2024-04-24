@@ -463,7 +463,7 @@ jobs:
         uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
-          java-version: 8
+          java-version: 17
       - name: Execute tests
         continue-on-error: true
         run: |

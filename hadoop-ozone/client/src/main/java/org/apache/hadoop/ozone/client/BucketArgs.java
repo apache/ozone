@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.client;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
+import net.jcip.annotations.Immutable;
 import org.apache.hadoop.hdds.client.DefaultReplicationConfig;
 import org.apache.hadoop.hdds.protocol.StorageType;
 import org.apache.hadoop.ozone.OzoneAcl;
@@ -35,6 +36,7 @@ import java.util.Map;
  * This class encapsulates the arguments that are
  * required for creating a bucket.
  */
+@Immutable
 public final class BucketArgs {
 
   /**
