@@ -97,10 +97,9 @@ public final class OmFSOFile {
       String fileName = OzoneFSUtils.getFileName(this.keyName);
       final long volumeId = omMetadataManager.getVolumeId(this.volumeName);
       final long bucketId = omMetadataManager.getBucketId(this.volumeName, this.bucketName);
-
       long parentID = OMFileRequest
           .getParentID(volumeId, bucketId, this.keyName,
-              this.omMetadataManager, this.errMsg);
+          this.omMetadataManager, this.errMsg);
 
       return new OmFSOFile(volumeName, bucketName, keyName, 
           omMetadataManager, fileName, volumeId, bucketId, parentID);
