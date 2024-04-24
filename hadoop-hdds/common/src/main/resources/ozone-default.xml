@@ -2252,11 +2252,20 @@
     </description>
   </property>
   <property>
+    <name>ssl.server.truststore.type</name>
+    <value>jks</value>
+    <tag>OZONE, SECURITY, CRYPTO_COMPLIANCE</tag>
+    <description>
+      The truststore type for HTTP Servers used in ozone.
+    </description>
+  </property>
+  <property>
     <name>hdds.key.len</name>
     <value>2048</value>
     <tag>SCM, HDDS, X509, SECURITY</tag>
     <description>
-      SCM CA key length.  This is an algorithm-specific metric, such as modulus length, specified in number of bits.
+      SCM CA key length. This is an algorithm-specific metric, such as modulus
+      length, specified in number of bits.
     </description>
   </property>
   <property>
