@@ -85,7 +85,6 @@ public class OMKeyCommitRequestWithFSO extends OMKeyCommitRequest {
     String volumeName = commitKeyArgs.getVolumeName();
     String bucketName = commitKeyArgs.getBucketName();
     String keyName = commitKeyArgs.getKeyName();
-    Long parentObjectId = commitKeyArgs.hasParentObjectId() ? commitKeyArgs.getParentObjectId() : null;
 
     OMMetrics omMetrics = ozoneManager.getMetrics();
 
@@ -140,7 +139,6 @@ public class OMKeyCommitRequestWithFSO extends OMKeyCommitRequest {
           .setKeyName(keyName)
           .setOmMetadataManager(omMetadataManager)
           .setErrMsg(errMsg)
-          .setParentObjectId(parentObjectId)
           .build();
 
       String fileName = fsoFile.getFileName();
@@ -276,7 +274,7 @@ public class OMKeyCommitRequestWithFSO extends OMKeyCommitRequest {
         // indicating the key is removed from OpenKeyTable.
         // So that this key can't be committed again.
         OMFileRequest.addOpenFileTableCacheEntry(omMetadataManager,
-            dbOpenFileKey, null, fileName, trxnLogIndex);
+            dbOpenFileKey, null, fileName, keyName, trxnLogIndex);
 
         // Prevent hsync metadata from getting committed to the final key
         omKeyInfo.getMetadata().remove(OzoneConsts.HSYNC_CLIENT_ID);
@@ -286,7 +284,7 @@ public class OMKeyCommitRequestWithFSO extends OMKeyCommitRequest {
       } else if (newOpenKeyInfo != null) {
         // isHSync is true and newOpenKeyInfo is set, update OpenKeyTable
         OMFileRequest.addOpenFileTableCacheEntry(omMetadataManager,
-            dbOpenFileKey, newOpenKeyInfo, fileName, trxnLogIndex);
+            dbOpenFileKey, newOpenKeyInfo, fileName, keyName, trxnLogIndex);
       }
 
       OMFileRequest.addFileTableCacheEntry(omMetadataManager, dbFileKey,

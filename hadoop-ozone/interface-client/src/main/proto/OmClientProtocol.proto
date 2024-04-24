@@ -1036,9 +1036,6 @@ message KeyArgs {
     optional hadoop.hdds.ECReplicationConfig ecReplicationConfig = 19;
     // Force OM to update container cache location from SCL
     optional bool forceUpdateContainerCacheFromSCM = 20;
-
-    // parentObjectId required during auto key commit for hsync keys
-    optional uint64 parentObjectId = 21;
 }
 
 message KeyLocation {

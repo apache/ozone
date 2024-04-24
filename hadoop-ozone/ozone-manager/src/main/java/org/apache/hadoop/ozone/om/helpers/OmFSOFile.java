@@ -63,7 +63,6 @@ public final class OmFSOFile {
     private String keyName;
     private OMMetadataManager omMetadataManager;
     private String errMsg;
-    private Long parentObjectId;
 
     public Builder() {
       this.errMsg = null;
@@ -84,11 +83,6 @@ public final class OmFSOFile {
       return this;
     }
 
-    public Builder setParentObjectId(Long parentObjectId) {
-      this.parentObjectId = parentObjectId;
-      return this;
-    }
-
     public Builder setOmMetadataManager(OMMetadataManager omMetadataManager) {
       this.omMetadataManager = omMetadataManager;
       return this;
@@ -104,9 +98,9 @@ public final class OmFSOFile {
       final long volumeId = omMetadataManager.getVolumeId(this.volumeName);
       final long bucketId = omMetadataManager.getBucketId(this.volumeName, this.bucketName);
 
-      long parentID = (parentObjectId != null) ? parentObjectId : OMFileRequest
+      long parentID = OMFileRequest
           .getParentID(volumeId, bucketId, this.keyName,
-          this.omMetadataManager, this.errMsg);
+              this.omMetadataManager, this.errMsg);
 
       return new OmFSOFile(volumeName, bucketName, keyName, 
           omMetadataManager, fileName, volumeId, bucketId, parentID);

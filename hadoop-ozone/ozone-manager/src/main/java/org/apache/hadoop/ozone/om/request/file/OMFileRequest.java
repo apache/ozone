@@ -472,15 +472,13 @@ public final class OMFileRequest {
    */
   public static void addOpenFileTableCacheEntry(
           OMMetadataManager omMetadataManager, String dbOpenFileName,
-          @Nullable OmKeyInfo omFileInfo, String fileName, long trxnLogIndex) {
+          @Nullable OmKeyInfo omFileInfo, String fileName, String keyName, long trxnLogIndex) {
 
     final Table<String, OmKeyInfo> table = omMetadataManager.getOpenKeyTable(
         BucketLayout.FILE_SYSTEM_OPTIMIZED);
     if (omFileInfo != null) {
-      // New key format for the openFileTable.
-      // For example, the user given key path is '/a/b/c/d/e/file1', then in DB
-      // keyName field stores only the leaf node name, which is 'file1'.
-      omFileInfo.setKeyName(fileName);
+      // Set keyName as fileName along with path
+      omFileInfo.setKeyName(keyName);
       omFileInfo.setFileName(fileName);
       table.addCacheEntry(dbOpenFileName, omFileInfo, trxnLogIndex);
     } else {

@@ -160,7 +160,7 @@ public class OMAllocateBlockRequestWithFSO extends OMAllocateBlockRequest {
       openKeyInfo.setUpdateID(trxnLogIndex, ozoneManager.isRatisEnabled());
 
       // Add to cache.
-      addOpenTableCacheEntry(trxnLogIndex, omMetadataManager, openKeyName,
+      addOpenTableCacheEntry(trxnLogIndex, omMetadataManager, openKeyName, keyName,
               openKeyInfo);
 
       omResponse.setAllocateBlockResponse(AllocateBlockResponse.newBuilder()
@@ -215,11 +215,11 @@ public class OMAllocateBlockRequestWithFSO extends OMAllocateBlockRequest {
   }
 
   private void addOpenTableCacheEntry(long trxnLogIndex,
-      OMMetadataManager omMetadataManager, String openKeyName,
+      OMMetadataManager omMetadataManager, String openKeyName, String keyName,
       OmKeyInfo openKeyInfo) {
     String fileName = openKeyInfo.getFileName();
     OMFileRequest.addOpenFileTableCacheEntry(omMetadataManager, openKeyName,
-            openKeyInfo, fileName, trxnLogIndex);
+            openKeyInfo, fileName, keyName, trxnLogIndex);
   }
 
   @Nonnull
