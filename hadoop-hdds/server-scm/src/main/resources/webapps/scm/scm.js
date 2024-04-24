@@ -82,16 +82,17 @@
                 });
             /*if option is 'All' display all records else display specified record on page*/
             $scope.UpdateRecordsToShow = () => {
-                if($scope.search){
+                // First, handle search filtering
+                if ($scope.search) {
                     $scope.nodeStatus = nodeStatusCopy.filter(item => item.hostname.includes($scope.search));
-                }else {
-                    if ($scope.RecordsToDisplay == 'All') {
-                        $scope.lastIndex = 1;
+                } else {
+                    // Then handle record display based on 'All' or a specific number
+                    if ($scope.RecordsToDisplay === 'All') {
                         $scope.nodeStatus = nodeStatusCopy;
                     } else {
-                        $scope.lastIndex = Math.ceil(nodeStatusCopy.length / $scope.RecordsToDisplay);
                         $scope.nodeStatus = nodeStatusCopy.slice(0, $scope.RecordsToDisplay);
                     }
+                    $scope.lastIndex = $scope.RecordsToDisplay === 'All' ? 1 : Math.ceil(nodeStatusCopy.length / $scope.RecordsToDisplay);
                 }
                 $scope.currentPage = 1;
             }
