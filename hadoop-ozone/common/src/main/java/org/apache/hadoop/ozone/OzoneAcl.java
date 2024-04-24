@@ -22,6 +22,7 @@ package org.apache.hadoop.ozone;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.protobuf.ByteString;
+import com.google.protobuf.Proto2Utils;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OzoneAclInfo;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OzoneAclInfo.OzoneAclScope;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OzoneAclInfo.OzoneAclType;
@@ -30,6 +31,7 @@ import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType;
 import org.apache.ratis.util.MemoizedSupplier;
 
 import java.util.ArrayList;
+import java.util.BitSet;
 import java.util.Collections;
 import java.util.EnumSet;
 import java.util.List;
@@ -78,13 +80,14 @@ public class OzoneAcl {
     this.aclBits = acls;
 
     this.toStringMethod = MemoizedSupplier.valueOf(() -> getType() + ":" + getName() + ":"
-        + ACLType.getACLString(getAclByteArray()) + "[" + getAclScope() + "]");
+        + ACLType.getACLString(BitSet.valueOf(getAclByteString().asReadOnlyByteBuffer())) + "[" + getAclScope() + "]");
     this.hashCodeMethod = MemoizedSupplier.valueOf(() -> Objects.hash(getName(),
-        ACLType.getACLBitSet(getAclByteArray()), getType().toString(), getAclScope()));
+        BitSet.valueOf(getAclByteString().asReadOnlyByteBuffer()), getType().toString(), getAclScope()));
   }
 
-  private static int toInt(int ordinal) {
-    return 1 << ordinal;
+
+  private static int toInt(int aclTypeOrdinal) {
+    return 1 << aclTypeOrdinal;
   }
 
   private static int toInt(ACLType acl) {
@@ -211,7 +214,7 @@ public class OzoneAcl {
         .setName(acl.getName())
         .setType(OzoneAclType.valueOf(acl.getType().name()))
         .setAclScope(OzoneAclScope.valueOf(acl.getAclScope().name()))
-        .setRights(ByteString.copyFrom(acl.getAclByteArray()));
+        .setRights(acl.getAclByteString());
     return builder.build();
   }
 
@@ -290,13 +293,15 @@ public class OzoneAcl {
   }
 
   @JsonIgnore
-  public byte[] getAclByteArray() {
+  public ByteString getAclByteString() {
     // only first 9 bits are used currently
     final byte first = (byte) aclBits;
     final byte second = (byte) (aclBits >>> 8);
-    return second != 0 ? new byte[]{first, second} : new byte[]{first};
+    final byte[] bytes = second != 0 ? new byte[]{first, second} : new byte[]{first};
+    return Proto2Utils.unsafeByteString(bytes);
   }
 
+  @JsonIgnore
   public List<String> getAclStringList() {
     return getAclList(aclBits, ACLType::name);
   }

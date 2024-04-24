@@ -121,14 +121,6 @@ public interface IAccessAuthorizer {
 
     }
 
-    public static BitSet getACLBitSet(byte[] acls) {
-      return BitSet.valueOf(acls);
-    }
-
-    public static String getACLString(byte[] acls) {
-      return getACLString(BitSet.valueOf(acls));
-    }
-
     /**
      * Returns String representation of ACL rights.
      *
