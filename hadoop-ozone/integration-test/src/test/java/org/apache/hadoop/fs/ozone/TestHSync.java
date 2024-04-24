@@ -25,7 +25,9 @@ import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.security.GeneralSecurityException;
 import java.security.PrivilegedExceptionAction;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
@@ -84,6 +86,7 @@ import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
+import org.apache.hadoop.ozone.om.service.OpenKeyCleanupService;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.util.Time;
 import org.apache.ozone.test.GenericTestUtils;
@@ -113,6 +116,11 @@ import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_SCHEME;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_DEFAULT_BUCKET_LAYOUT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ADDRESS_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_RATIS_ENABLE_KEY;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_DIR_DELETING_SERVICE_INTERVAL;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_OPEN_KEY_CLEANUP_SERVICE_INTERVAL;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_OPEN_KEY_EXPIRE_THRESHOLD;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_LEASE_HARD_LIMIT;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -144,6 +152,10 @@ public class TestHSync {
   private static final int FLUSH_SIZE = 2 * CHUNK_SIZE;
   private static final int MAX_FLUSH_SIZE = 2 * FLUSH_SIZE;
   private static final int BLOCK_SIZE = 2 * MAX_FLUSH_SIZE;
+  private static final int SERVICE_INTERVAL = 100;
+  private static final int EXPIRE_THRESHOLD_MS = 140;
+
+  private static OpenKeyCleanupService openKeyCleanupService;
 
   @BeforeAll
   public static void init() throws Exception {
@@ -155,9 +167,18 @@ public class TestHSync {
     CONF.setInt(OZONE_SCM_RATIS_PIPELINE_LIMIT, 10);
     // Reduce KeyDeletingService interval
     CONF.setTimeDuration(OZONE_BLOCK_DELETING_SERVICE_INTERVAL, 100, TimeUnit.MILLISECONDS);
+    CONF.setTimeDuration(OZONE_DIR_DELETING_SERVICE_INTERVAL, 100, TimeUnit.MILLISECONDS);
     CONF.setBoolean("ozone.client.incremental.chunk.list", true);
     CONF.setBoolean("ozone.client.stream.putblock.piggybacking", true);
     CONF.setBoolean(OZONE_CHUNK_LIST_INCREMENTAL, true);
+    CONF.setTimeDuration(OZONE_OM_OPEN_KEY_CLEANUP_SERVICE_INTERVAL,
+        SERVICE_INTERVAL, TimeUnit.MILLISECONDS);
+    CONF.setTimeDuration(OZONE_OM_OPEN_KEY_EXPIRE_THRESHOLD,
+        EXPIRE_THRESHOLD_MS, TimeUnit.MILLISECONDS);
+    CONF.setTimeDuration(OZONE_OM_LEASE_HARD_LIMIT,
+        EXPIRE_THRESHOLD_MS, TimeUnit.MILLISECONDS);
+    CONF.set(OzoneConfigKeys.OZONE_OM_LEASE_SOFT_LIMIT, "0s");
+
     ClientConfigForTesting.newBuilder(StorageUnit.BYTES)
         .setBlockSize(BLOCK_SIZE)
         .setChunkSize(CHUNK_SIZE)
@@ -183,6 +204,10 @@ public class TestHSync {
     GenericTestUtils.setLogLevel(BlockOutputStream.LOG, Level.DEBUG);
     GenericTestUtils.setLogLevel(BlockInputStream.LOG, Level.DEBUG);
     GenericTestUtils.setLogLevel(KeyValueHandler.LOG, Level.DEBUG);
+
+    openKeyCleanupService =
+        (OpenKeyCleanupService) cluster.getOzoneManager().getKeyManager().getOpenKeyCleanupService();
+    openKeyCleanupService.suspend();
   }
 
   @AfterAll
@@ -391,6 +416,65 @@ public class TestHSync {
         assertEquals(OMException.ResultCodes.KEY_NOT_FOUND, ex.getResult());
       }
     }
+  }
+
+  @Test
+  public void testHSyncOpenKeyDeletionWhileDeleteDirectory() throws Exception {
+    // Verify that when directory is deleted recursively hsync related openKeys should be deleted,
+
+    // Set the fs.defaultFS
+    final String rootPath = String.format("%s://%s/",
+        OZONE_OFS_URI_SCHEME, CONF.get(OZONE_OM_ADDRESS_KEY));
+    CONF.set(CommonConfigurationKeysPublic.FS_DEFAULT_NAME_KEY, rootPath);
+
+    final String dir = OZONE_ROOT + bucket.getVolumeName()
+        + OZONE_URI_DELIMITER + bucket.getName() + OZONE_URI_DELIMITER + "dir1/dir2";
+    final Path key1 = new Path(dir, "hsync-key");
+
+    try (FileSystem fs = FileSystem.get(CONF)) {
+      // Create key1
+      try (FSDataOutputStream os = fs.create(key1, true)) {
+        os.write(1);
+        os.hsync();
+        // There should be 1 key in openFileTable
+        assertThat(1 == getOpenKeyInfo(BucketLayout.FILE_SYSTEM_OPTIMIZED).size());
+        // Delete directory recursively
+        fs.delete(new Path(OZONE_ROOT + bucket.getVolumeName() + OZONE_URI_DELIMITER +
+            bucket.getName() + OZONE_URI_DELIMITER + "dir1/"), true);
+
+        // Verify if DELETED_HSYNC_KEY metadata is added to openKey
+        GenericTestUtils.waitFor(() -> {
+          List<OmKeyInfo> omKeyInfo = getOpenKeyInfo(BucketLayout.FILE_SYSTEM_OPTIMIZED);
+          return omKeyInfo.size() > 0 && omKeyInfo.get(0).getMetadata().containsKey(OzoneConsts.DELETED_HSYNC_KEY);
+        }, 1000, 12000);
+
+        // Resume openKeyCleanupService
+        openKeyCleanupService.resume();
+
+        // Verify entry from openKey gets deleted eventually
+        GenericTestUtils.waitFor(() ->
+            0 == getOpenKeyInfo(BucketLayout.FILE_SYSTEM_OPTIMIZED).size(), 1000, 12000);
+      } catch (OMException ex) {
+        assertEquals(OMException.ResultCodes.DIRECTORY_NOT_FOUND, ex.getResult());
+      } finally {
+        openKeyCleanupService.suspend();
+      }
+    }
+  }
+
+  private List<OmKeyInfo> getOpenKeyInfo(BucketLayout bucketLayout) {
+    List<OmKeyInfo> omKeyInfo = new ArrayList<>();
+
+    Table<String, OmKeyInfo> openFileTable =
+        cluster.getOzoneManager().getMetadataManager().getOpenKeyTable(bucketLayout);
+    try (TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>>
+             iterator = openFileTable.iterator()) {
+      while (iterator.hasNext()) {
+        omKeyInfo.add(iterator.next().getValue());
+      }
+    } catch (Exception e) {
+    }
+    return omKeyInfo;
   }
 
   @Test
