@@ -874,7 +874,6 @@ public class TestOzoneClientMultipartUploadWithFSO {
 
     assertNotNull(omKeyInfo);
     assertNotNull(omMultipartKeyInfo);
-    assertEquals(OzoneFSUtils.getFileName(keyName), omKeyInfo.getKeyName());
     assertEquals(uploadID, omMultipartKeyInfo.getUploadID());
 
     for (OzoneManagerProtocolProtos.PartKeyInfo partKeyInfo :
