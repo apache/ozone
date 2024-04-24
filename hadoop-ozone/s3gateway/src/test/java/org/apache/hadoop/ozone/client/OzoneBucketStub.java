@@ -449,7 +449,8 @@ public final class OzoneBucketStub extends OzoneBucket {
           System.currentTimeMillis(),
           new ArrayList<>(), getReplicationConfig(),
           keyToMultipartUpload.get(key).getMetadata(), null,
-          () -> readKey(key), true
+          () -> readKey(key), true,
+          UserGroupInformation.getCurrentUser().getShortUserName()
       ));
     }
 
