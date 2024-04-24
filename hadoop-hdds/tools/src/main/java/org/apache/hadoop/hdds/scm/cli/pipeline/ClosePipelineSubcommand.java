@@ -77,7 +77,6 @@ public class ClosePipelineSubcommand extends ScmSubcommand {
 
     @CommandLine.Option(
         names = {"--all"},
-        defaultValue = "true",
         description = "Close all pipelines")
     private boolean closeAll;
   }
