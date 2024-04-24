@@ -7,7 +7,7 @@
  * "License"); you may not use this file except in compliance
  * with the License.  You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ *     http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -15,18 +15,8 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
+/**
+ * Classes using the protobuf internal APIs.
+ */
 package com.google.protobuf;
-
-/** Utilities for protobuf v2. */
-public final class Proto2Utils {
-  /**
-   * Similar to {@link ByteString#copyFrom(byte[])} except that this method does not copy.
-   * This method is safe only if the content of the array remains unchanged.
-   * Otherwise, it violates the immutability of {@link ByteString}.
-   */
-  public static ByteString unsafeByteString(byte[] array) {
-    return new LiteralByteString(array);
-  }
-
-  private Proto2Utils() { }
-
