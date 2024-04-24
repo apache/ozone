@@ -117,8 +117,8 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
     <commons-compress.version>1.26.0</commons-compress.version>
     <commons-configuration2.version>2.10.1</commons-configuration2.version>
     <zstd-jni.version>1.5.6-2</zstd-jni.version>
-    <commons-daemon.version>1.0.13</commons-daemon.version>
-    <commons-io.version>2.16.0</commons-io.version>
+    <commons-daemon.version>1.3.4</commons-daemon.version>
+    <commons-io.version>2.16.1</commons-io.version>
     <commons-lang3.version>3.14.0</commons-lang3.version>
     <commons-logging.version>1.2</commons-logging.version>
     <commons-logging-api.version>1.1</commons-logging-api.version>
@@ -142,11 +142,11 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
     <codahale-metrics.version>3.0.2</codahale-metrics.version>
     <dropwizard-metrics.version>3.2.4</dropwizard-metrics.version>
     <jacoco.version>0.8.12</jacoco.version>
-    <javassist.version>3.21.0-GA</javassist.version>
+    <javassist.version>3.30.2-GA</javassist.version>
     <activation-api.version>1.2.2</activation-api.version>
     <jaxb-api.version>2.3.3</jaxb-api.version>
     <jaxb-runtime.version>2.3.9</jaxb-runtime.version>
-    <jsch.version>0.1.54</jsch.version>
+    <jsch.version>0.1.55</jsch.version>
     <cdi-api.version>2.0</cdi-api.version>
     <servlet-api.version>3.1.0</servlet-api.version>
     <glassfish-servlet.version>3.1</glassfish-servlet.version>

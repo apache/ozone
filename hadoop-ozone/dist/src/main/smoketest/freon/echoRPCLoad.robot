@@ -23,6 +23,27 @@ ${PREFIX}    ${EMPTY}
 ${n}    1
 
 *** Test Cases ***
+Get Container ID
+    ${result} =          Execute        ozone admin container create
+    ${containerID} =     Execute        ozone admin container list --count 1 --state=OPEN | grep -o '"containerID" *: *[^,}]*' | awk -F'[:,]' '{print $2}' | tr -d '" '
+    Set Suite Variable   ${containerID}
+
+[Read] Ozone DataNode Echo RPC Load Generator with request payload and response payload
+    ${result} =        Execute          ozone freon dne -t=1 -n=${n} --payload-req=1 --payload-resp=1 --container-id=${containerID}
+                       Should contain   ${result}   Successful executions: ${n}
+
+[Read] Ozone DataNode Echo RPC Load Generator with request payload and empty response payload
+    ${result} =        Execute          ozone freon dne -t=1 -n=${n} --payload-req=1 --container-id=${containerID}
+                       Should contain   ${result}   Successful executions: ${n}
+
+[Read] Ozone DataNode Echo RPC Load Generator with empty request payload and response payload
+    ${result} =        Execute          ozone freon dne -t=1 -n=${n} --payload-resp=1 --container-id=${containerID}
+                       Should contain   ${result}   Successful executions: ${n}
+
+[Read] Ozone DataNode Echo RPC Load Generator with empty request payload and empty response payload no sleep time one xceiver client
+    ${result} =        Execute          ozone freon dne -t=1 -n=${n} --sleep-time-ms=0 --clients=1 --container-id=${containerID}
+                       Should contain   ${result}   Successful executions: ${n}
+
 [Read] Ozone Echo RPC Load Generator with request payload and response payload
     ${result} =        Execute          ozone freon ome -t=1 -n=${n} --payload-req=1 --payload-resp=1
                        Should contain   ${result}   Successful executions: ${n}
