@@ -50,9 +50,7 @@ public class ClosePipelineSubcommand extends ScmSubcommand {
   public void execute(ScmClient scmClient) throws IOException {
     if (!Strings.isNullOrEmpty(closeOption.pipelineId)) {
       scmClient.closePipeline(HddsProtos.PipelineID.newBuilder().setId(closeOption.pipelineId).build());
-    }
-
-    if (closeOption.closeAll) {
+    } else if (closeOption.closeAll) {
       Optional<Predicate<? super Pipeline>> replicationFilter = filterOptions.getReplicationFilter();
 
       Stream<Pipeline> stream = scmClient.listPipelines()
@@ -74,16 +72,11 @@ public class ClosePipelineSubcommand extends ScmSubcommand {
   }
 
   private static class CloseOptionGroup {
-    @CommandLine.Option(
-        names = {"pipelineId"},
-        arity = "1",
-        defaultValue = "",
-        description = "ID of the pipeline to close")
+    @CommandLine.Parameters(description = "ID of the pipeline to close")
     private String pipelineId;
 
     @CommandLine.Option(
         names = {"--all"},
-        arity = "0",
         defaultValue = "true",
         description = "Close all pipelines")
     private boolean closeAll;
