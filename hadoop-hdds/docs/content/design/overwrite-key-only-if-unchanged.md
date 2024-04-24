@@ -161,15 +161,19 @@ try (OutputStream os = bucket.rewriteKey(existingKey.getBucket, existingKey.getV
 
 ## Upgrade and Compatibility
 
-If a newer client is talking to an older server, it could call the new atomic API but the server will ignore it without error. This is the case for any API change.
+### Client Server Protocol
 
-There are no changes to protobuf methods.
+If a newer client is talking to an older server, it could call the new atomic API but the server will ignore it without error. The client server versioning framework can be used to avoid this problem.
+
+No new protobuf messages are needed and hence no new Client to OM APIs as the existing APIs are used with an additional parameter.
 
 A single extra field is added to the KeyArgs object, which is passed from the client to OM on key open and commit. This is a new field, so it will be null if not set, and the server will ignore it if it does not expect it.
 
+### Disk Layout
+
 A single extra field is added to the OMKeyInfo object which is stored in the openKey table. This is a new field, so it will be null if not set, and the server will ignore it if it does not expect it.
 
-There should be not impact on upgrade / downgrade with the new field added in this way.
+There should be no impact on upgrade / downgrade with the new field added in this way.
 
 ## Other Storage Systems
 
