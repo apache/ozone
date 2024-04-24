@@ -103,8 +103,6 @@ public class TestReconNodeManager {
     ReconNodeManager reconNodeManager = new ReconNodeManager(conf,
         scmStorageConfig, eventQueue, clusterMap, nodeTable, versionManager);
     reconNodeManager.setReconContext(new ReconContext(conf, reconUtils));
-    ReconNewNodeHandler reconNewNodeHandler =
-        new ReconNewNodeHandler(reconNodeManager);
     assertThat(reconNodeManager.getAllNodes()).isEmpty();
 
     DatanodeDetails datanodeDetails = randomDatanodeDetails();
