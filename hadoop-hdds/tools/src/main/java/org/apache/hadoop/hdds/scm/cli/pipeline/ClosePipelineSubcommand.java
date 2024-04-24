@@ -18,13 +18,18 @@
 
 package org.apache.hadoop.hdds.scm.cli.pipeline;
 
+import com.google.common.base.Strings;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.cli.ScmSubcommand;
 import org.apache.hadoop.hdds.scm.client.ScmClient;
+import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import picocli.CommandLine;
 
 import java.io.IOException;
+import java.util.Optional;
+import java.util.function.Predicate;
+import java.util.stream.Stream;
 
 /**
  * Handler of close pipeline command.
@@ -35,13 +40,52 @@ import java.io.IOException;
     mixinStandardHelpOptions = true,
     versionProvider = HddsVersionProvider.class)
 public class ClosePipelineSubcommand extends ScmSubcommand {
+  @CommandLine.ArgGroup(multiplicity = "1")
+  private CloseOptionGroup closeOption;
 
-  @CommandLine.Parameters(description = "ID of the pipeline to close")
-  private String pipelineId;
+  @CommandLine.Mixin
+  private final FilterPipelineOptions filterOptions = new FilterPipelineOptions();
 
   @Override
   public void execute(ScmClient scmClient) throws IOException {
-    scmClient.closePipeline(
-        HddsProtos.PipelineID.newBuilder().setId(pipelineId).build());
+    if (!Strings.isNullOrEmpty(closeOption.pipelineId)) {
+      scmClient.closePipeline(HddsProtos.PipelineID.newBuilder().setId(closeOption.pipelineId).build());
+    }
+
+    if (closeOption.closeAll) {
+      Optional<Predicate<? super Pipeline>> replicationFilter = filterOptions.getReplicationFilter();
+
+      Stream<Pipeline> stream = scmClient.listPipelines()
+          .stream()
+          .filter(p -> p.getPipelineState() != Pipeline.PipelineState.CLOSED);
+      if (replicationFilter.isPresent()) {
+        stream = stream.filter(replicationFilter.get());
+      }
+
+      stream.forEach(pipeline -> {
+        try {
+          scmClient.closePipeline(
+              HddsProtos.PipelineID.newBuilder().setId(pipeline.getId().getId().toString()).build());
+        } catch (IOException e) {
+          System.err.println("Error closing pipeline: " + pipeline.getId() + ", cause: " + e.getMessage());
+        }
+      });
+    }
+  }
+
+  private static class CloseOptionGroup {
+    @CommandLine.Option(
+        names = {"pipelineId"},
+        arity = "1",
+        defaultValue = "",
+        description = "ID of the pipeline to close")
+    private String pipelineId;
+
+    @CommandLine.Option(
+        names = {"--all"},
+        arity = "0",
+        defaultValue = "true",
+        description = "Close all pipelines")
+    private boolean closeAll;
   }
 }
