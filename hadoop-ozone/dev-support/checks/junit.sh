@@ -77,7 +77,7 @@ for i in $(seq 1 ${ITERATIONS}); do
   fi
 
   if [[ ${ITERATIONS} -gt 1 ]]; then
-    if ! grep -q "Tests run: [^0]" "${REPORT_DIR}/output.log"; then
+    if ! grep -q "Running .*Test" "${REPORT_DIR}/output.log"; then
       echo "No tests were run" >> "${REPORT_DIR}/summary.txt"
       irc=1
       FAIL_FAST=true
@@ -99,10 +99,6 @@ done
 # check if Maven failed due to some error other than test failure
 if [[ ${rc} -ne 0 ]] && [[ ! -s "${REPORT_FILE}" ]]; then
   grep -m1 -F '[ERROR]' "${REPORT_DIR}/output.log" > "${REPORT_FILE}"
-fi
-
-if [[ ${ITERATIONS} -gt 1 ]]; then
-  grep -c "exit code: [^0]" "${REPORT_DIR}/summary.txt" > "${REPORT_DIR}/failures"
 fi
 
 if [[ "${OZONE_WITH_COVERAGE}" == "true" ]]; then
