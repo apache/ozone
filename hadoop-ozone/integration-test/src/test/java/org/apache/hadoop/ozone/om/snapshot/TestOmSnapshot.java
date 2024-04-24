@@ -2118,7 +2118,7 @@ public abstract class TestOmSnapshot {
     await(POLL_MAX_WAIT_MILLIS, POLL_INTERVAL_MILLIS,
         () -> cluster.getOzoneManager().isRunning());
 
-    while (nextToken == null || StringUtils.isNotEmpty(nextToken)) {
+    while (nextToken == null || !nextToken.isEmpty()) {
       diffReport = fetchReportPage(volumeName, bucketName, snapshot1,
           snapshot2, nextToken, pageSize);
       diffReportEntries.addAll(diffReport.getDiffList());
