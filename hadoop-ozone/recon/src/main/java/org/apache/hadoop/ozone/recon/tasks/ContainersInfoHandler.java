@@ -21,7 +21,7 @@ package org.apache.hadoop.ozone.recon.tasks;
 import jakarta.annotation.Nullable;
 import org.apache.commons.lang3.tuple.ImmutablePair;
 import org.apache.commons.lang3.tuple.Pair;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.utils.db.Table;
@@ -48,14 +48,14 @@ public class ContainersInfoHandler implements SCMMetaDataTableHandler {
 
   private ReconContainerMetadataManager reconContainerMetadataManager;
   private ReconScmMetadataManager scmMetadataManager;
-  private Map<HddsProtos.LifeCycleState, Long> containerCountMap;
+  private Map<LifeCycleState, Long> containerStateCountMap;
 
   public ContainersInfoHandler(ReconContainerMetadataManager reconContainerMetadataManager,
                                ReconScmMetadataManager scmMetadataManager,
-                               Map<HddsProtos.LifeCycleState, Long> containerCountMap) {
+                               Map<LifeCycleState, Long> containerStateCountMap) {
     this.reconContainerMetadataManager = reconContainerMetadataManager;
     this.scmMetadataManager = scmMetadataManager;
-    this.containerCountMap = containerCountMap;
+    this.containerStateCountMap = containerStateCountMap;
   }
 
   private void handleUpdateContainerEvent(ContainerInfo containerInfo) throws IOException {
@@ -66,13 +66,13 @@ public class ContainersInfoHandler implements SCMMetaDataTableHandler {
 
   private void handleDeleteContainerEvent(ContainerInfo containerInfo)
       throws IOException {
-    containerCountMap.compute(containerInfo.getState(), (k, v) -> (v != null ? v : 0L) - 1);
+    containerStateCountMap.compute(containerInfo.getState(), (k, v) -> (v != null ? v : 0L) - 1);
     scmMetadataManager.getOzoneStorageContainerManager().getContainerManager()
         .deleteContainer(ContainerID.valueOf(containerInfo.getContainerID()));
   }
 
   private void handlePutContainerEvent(ContainerInfo containerInfo) throws IOException {
-    containerCountMap.compute(containerInfo.getState(), (k, v) -> (v != null ? v : 0L) + 1);
+    containerStateCountMap.compute(containerInfo.getState(), (k, v) -> (v != null ? v : 0L) + 1);
     scmMetadataManager.getOzoneStorageContainerManager().getContainerManager().initialize(containerInfo);
 
   }
@@ -139,7 +139,7 @@ public class ContainersInfoHandler implements SCMMetaDataTableHandler {
   @Override
   public Pair<String, Boolean> reprocess(ReconScmMetadataManager reconScmMetadataManager) throws IOException {
     long containerCount = 0;
-    Map<HddsProtos.LifeCycleState, Long> containerStateCountMap = new HashMap<>();
+    Map<LifeCycleState, Long> containerStateCntMap = new HashMap<>();
     try {
       LOG.info("Starting a 'reprocess' run of {}", getHandlerName());
       Instant start = Instant.now();
@@ -153,10 +153,10 @@ public class ContainersInfoHandler implements SCMMetaDataTableHandler {
         while (containerTableIterator.hasNext()) {
           Table.KeyValue<ContainerID, ContainerInfo> keyValue = containerTableIterator.next();
           ContainerInfo containerInfo = keyValue.getValue();
-          handleContainerStatsReprocess(containerInfo, containerStateCountMap);
+          handleContainerStatsReprocess(containerInfo, containerStateCntMap);
           containerCount++;
         }
-        ImmutablePair<String, Boolean> result = saveContainerStats(containerStateCountMap);
+        ImmutablePair<String, Boolean> result = saveContainerStats(containerStateCntMap);
         if (result != null) {
           return result;
         }
@@ -176,9 +176,9 @@ public class ContainersInfoHandler implements SCMMetaDataTableHandler {
 
   @Nullable
   private ImmutablePair<String, Boolean> saveContainerStats(
-      Map<HddsProtos.LifeCycleState, Long> containerStateCountMap) {
-    if (!containerStateCountMap.isEmpty()) {
-      if (!reconContainerMetadataManager.storeContainerStatesStats(containerStateCountMap)) {
+      Map<LifeCycleState, Long> containerStateCntMap) {
+    if (!containerStateCntMap.isEmpty()) {
+      if (!reconContainerMetadataManager.storeContainerStatesStats(containerStateCntMap)) {
         LOG.error("Unable to store container stats information to the GlobalStats table.");
         return new ImmutablePair<>(getHandlerName(), false);
       }
@@ -187,8 +187,8 @@ public class ContainersInfoHandler implements SCMMetaDataTableHandler {
   }
 
   private void handleContainerStatsReprocess(ContainerInfo containerInfo,
-                                             Map<HddsProtos.LifeCycleState, Long> containerStateCountMap) {
-    containerStateCountMap.compute(containerInfo.getState(), (k, v) -> (v != null ? v : 0L) + 1);
+                                             Map<LifeCycleState, Long> containerStateCntMap) {
+    containerStateCntMap.compute(containerInfo.getState(), (k, v) -> (v != null ? v : 0L) + 1);
   }
 
   @Override
