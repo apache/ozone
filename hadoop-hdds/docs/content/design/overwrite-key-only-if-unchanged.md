@@ -77,7 +77,9 @@ To do this:
 1. On commit key, the client does not need to send the expectedGeneration again, as the open key contains it.
 1. On OM, on commit key, it validates the key still exists with the given key name and its stored updateID is unchanged when compared with the expectedGeneration. If so the key is committed, otherwise an error is returned to the client.
 
-Note that any change to a key will change the updateID. This is existing behaviour, and committing a rewritten key will also modify the updateID. Note this also offers protection against concurrent rewrites. 
+Note that any change to a key will change the updateID. This is existing behaviour, and committing a rewritten key will also modify the updateID. Note this also offers protection against concurrent rewrites.
+
+An optional enhancement for large keys, is that on each block allocation the expectedGeneration can be checked against the current key version to ensure it has not changed. This would allow the rewrite to fail early if a large multi block key is modified. 
 
 ### Alternative Proposal
 
