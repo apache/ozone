@@ -29,6 +29,7 @@ import com.google.common.collect.ImmutableList;
 import org.apache.hadoop.hdds.client.DefaultReplicationConfig;
 import org.apache.hadoop.hdds.protocol.StorageType;
 import org.apache.hadoop.hdds.utils.db.Codec;
+import org.apache.hadoop.hdds.utils.db.CopyObject;
 import org.apache.hadoop.hdds.utils.db.DelegatedCodec;
 import org.apache.hadoop.hdds.utils.db.Proto2Codec;
 import org.apache.hadoop.ozone.OzoneAcl;
@@ -42,7 +43,7 @@ import com.google.common.base.Preconditions;
 /**
  * A class that encapsulates Bucket Info.
  */
-public final class OmBucketInfo extends WithObjectID implements Auditable {
+public final class OmBucketInfo extends WithObjectID implements Auditable, CopyObject<OmBucketInfo> {
   private static final Codec<OmBucketInfo> CODEC = new DelegatedCodec<>(
       Proto2Codec.get(BucketInfo.getDefaultInstance()),
       OmBucketInfo::getFromProtobuf,
@@ -104,7 +105,7 @@ public final class OmBucketInfo extends WithObjectID implements Auditable {
   /**
    * Bucket Layout.
    */
-  private BucketLayout bucketLayout;
+  private final BucketLayout bucketLayout;
 
   private String owner;
 
@@ -340,9 +341,7 @@ public final class OmBucketInfo extends WithObjectID implements Auditable {
     return auditMap;
   }
 
-  /**
-   * Return a new copy of the object.
-   */
+  @Override
   public OmBucketInfo copyObject() {
     Builder builder = toBuilder();
 
