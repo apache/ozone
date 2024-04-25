@@ -2246,9 +2246,26 @@
   <property>
     <name>hdds.key.len</name>
     <value>2048</value>
-    <tag>SCM, HDDS, X509, SECURITY</tag>
+    <tag>SCM, HDDS, X509, SECURITY, CRYPTO_COMPLIANCE</tag>
     <description>
-      SCM CA key length.  This is an algorithm-specific metric, such as modulus length, specified in number of bits.
+      SCM CA key length. This is an algorithm-specific metric, such as modulus
+      length, specified in number of bits.
+    </description>
+  </property>
+  <property>
+    <name>hdds.key.algo</name>
+    <value>RSA</value>
+    <tag>SCM, HDDS, X509, SECURITY, CRYPTO_COMPLIANCE</tag>
+    <description>
+      SCM CA key algorithm.
+    </description>
+  </property>
+  <property>
+    <name>hdds.security.provider</name>
+    <value>BC</value>
+    <tag>OZONE, HDDS, X509, SECURITY, CRYPTO_COMPLIANCE</tag>
+    <description>
+      The main security provider used for various cryptographic algorithms.
     </description>
   </property>
   <property>
@@ -2292,7 +2309,7 @@
   <property>
     <name>hdds.grpc.tls.provider</name>
     <value>OPENSSL</value>
-    <tag>OZONE, HDDS, SECURITY, TLS</tag>
+    <tag>OZONE, HDDS, SECURITY, TLS, CRYPTO_COMPLIANCE</tag>
     <description>HDDS GRPC server TLS provider.</description>
   </property>
   <property>
@@ -2336,7 +2353,7 @@
   <property>
     <name>hdds.x509.signature.algorithm</name>
     <value>SHA256withRSA</value>
-    <tag>OZONE, HDDS, SECURITY</tag>
+    <tag>OZONE, HDDS, SECURITY, CRYPTO_COMPLIANCE</tag>
     <description>X509 signature certificate.</description>
   </property>
   <property>
@@ -4349,7 +4366,7 @@
   <property>
     <name>hdds.secret.key.algorithm</name>
     <value>HmacSHA256</value>
-    <tag>SCM, SECURITY</tag>
+    <tag>SCM, SECURITY, CRYPTO_COMPLIANCE</tag>
     <description>
       The algorithm that SCM uses to generate symmetric secret keys.
       A valid algorithm is the one supported by KeyGenerator, as described at
