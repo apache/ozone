@@ -64,7 +64,9 @@ public class OzoneAcl {
   private final int aclBits;
   private final AclScope aclScope;
 
+  @JsonIgnore
   private final Supplier<String> toStringMethod;
+  @JsonIgnore
   private final Supplier<Integer> hashCodeMethod;
 
   public OzoneAcl(ACLIdentityType type, String name, AclScope scope, ACLType... acls) {
