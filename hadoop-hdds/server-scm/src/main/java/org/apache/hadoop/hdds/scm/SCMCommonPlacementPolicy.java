@@ -41,6 +41,7 @@ import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -215,14 +216,11 @@ public abstract class SCMCommonPlacementPolicy implements
 
   private List<DatanodeDetails> expandExcludes(List<DatanodeDetails> original) {
     Set<DatanodeDetails> expandedExcludes = new HashSet<>(original);
-    List<DatanodeDetails> list1 = nodeManager.getNodes(NodeOperationalState.DECOMMISSIONING, null);
-    if (list1 != null && !list1.isEmpty()) {
-      expandedExcludes.addAll(list1);
-    }
-    List<DatanodeDetails> list2 = nodeManager.getNodes(NodeOperationalState.DECOMMISSIONED, null);
-    if (list2 != null && !list2.isEmpty()) {
-      expandedExcludes.addAll(list2);
-    }
+    // Exclude all nodes in maintenance and decommission state.
+    EnumSet<NodeOperationalState> states = EnumSet.range(
+        NodeOperationalState.ENTERING_MAINTENANCE,
+        NodeOperationalState.DECOMMISSIONED);
+    expandedExcludes.addAll(nodeManager.getNodes(states, null));
     return new ArrayList<>(expandedExcludes);
   }
 
