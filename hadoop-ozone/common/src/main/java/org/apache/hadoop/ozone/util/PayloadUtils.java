@@ -17,6 +17,9 @@
 
 package org.apache.hadoop.ozone.util;
 
+import com.google.protobuf.Proto2Utils;
+import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
+import org.apache.ratis.thirdparty.com.google.protobuf.UnsafeByteOperations;
 import org.apache.ratis.util.Preconditions;
 
 import java.util.Random;
@@ -35,6 +38,7 @@ public final class PayloadUtils {
   private PayloadUtils() {
   }
 
+  /** @return a new byte[] containing */
   public static byte[] generatePayload(int payloadSizeBytes) {
     byte[] result = new byte[Math.min(payloadSizeBytes, MAX_SIZE)];
 
@@ -50,5 +54,13 @@ public final class PayloadUtils {
     Preconditions.assertTrue(curIdx == result.length);
 
     return result;
+  }
+
+  public static com.google.protobuf.ByteString generatePayloadProto2(int payloadSizeBytes) {
+    return Proto2Utils.unsafeByteString(generatePayload(payloadSizeBytes));
+  }
+
+  public static ByteString generatePayloadProto3(int payloadSizeBytes) {
+    return UnsafeByteOperations.unsafeWrap(generatePayload(payloadSizeBytes));
   }
 }

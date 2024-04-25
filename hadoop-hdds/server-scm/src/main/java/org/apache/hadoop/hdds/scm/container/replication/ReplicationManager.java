@@ -19,6 +19,7 @@
 package org.apache.hadoop.hdds.scm.container.replication;
 
 import com.google.common.annotations.VisibleForTesting;
+import com.google.protobuf.ByteString;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
@@ -704,10 +705,10 @@ public class ReplicationManager implements SCMService {
     } else if (cmd.getType() == Type.reconstructECContainersCommand) {
       ReconstructECContainersCommand rcc = (ReconstructECContainersCommand) cmd;
       List<DatanodeDetails> targets = rcc.getTargetDatanodes();
-      byte[] targetIndexes = rcc.getMissingContainerIndexes();
-      for (int i = 0; i < targetIndexes.length; i++) {
+      final ByteString targetIndexes = rcc.getMissingContainerIndexes();
+      for (int i = 0; i < targetIndexes.size(); i++) {
         containerReplicaPendingOps.scheduleAddReplica(
-            containerInfo.containerID(), targets.get(i), targetIndexes[i],
+            containerInfo.containerID(), targets.get(i), targetIndexes.byteAt(i),
             scmDeadlineEpochMs);
       }
       getMetrics().incrEcReconstructionCmdsSentTotal();

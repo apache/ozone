@@ -25,7 +25,7 @@ public final class Proto2Utils {
    * Otherwise, it violates the immutability of {@link ByteString}.
    */
   public static ByteString unsafeByteString(byte[] array) {
-    return new LiteralByteString(array);
+    return array != null && array.length > 0 ? new LiteralByteString(array) : ByteString.EMPTY;
   }
 
   private Proto2Utils() { }
