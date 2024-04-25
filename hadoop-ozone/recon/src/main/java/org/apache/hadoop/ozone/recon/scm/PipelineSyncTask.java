@@ -107,7 +107,8 @@ public class PipelineSyncTask extends ReconScmTask {
    */
   private void syncOperationalStateOnDeadNodes()
       throws IOException, NodeNotFoundException {
-    List<DatanodeDetails> deadNodesOnRecon = nodeManager.getNodes(null, DEAD);
+    List<DatanodeDetails> deadNodesOnRecon = nodeManager.getNodes(
+        (HddsProtos.NodeOperationalState) null, DEAD);
 
     if (!deadNodesOnRecon.isEmpty()) {
       List<Node> scmNodes = scmClient.getNodes();
