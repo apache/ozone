@@ -261,8 +261,7 @@ class TestReconAndAdminContainerCLI {
     // a new replica-copy is made to another node.
     // For maintenance, there is no replica-copy in this case.
     if (!isMaintenance) {
-      GenericTestUtils.waitFor(() -> TestHelper.countReplicas(containerIdR3, cluster) == 4,
-          200, 30000);
+      TestHelper.waitForReplicaCount(containerIdR3, 4, cluster);
     }
 
     compareRMReportToReconResponse(underReplicatedState);
@@ -289,8 +288,7 @@ class TestReconAndAdminContainerCLI {
     // There will be a replica copy for both maintenance and decommission.
     // maintenance 3 -> 4, decommission 4 -> 5.
     int expectedReplicaNum = isMaintenance ? 4 : 5;
-    GenericTestUtils.waitFor(() -> TestHelper.countReplicas(containerIdR3, cluster) == expectedReplicaNum,
-        200, 30000);
+    TestHelper.waitForReplicaCount(containerIdR3, expectedReplicaNum, cluster);
 
     compareRMReportToReconResponse(underReplicatedState);
     compareRMReportToReconResponse(overReplicatedState);
