@@ -103,7 +103,7 @@ public class TestContainerBalancerOperations {
     // TODO: this is a temporary implementation for now
     // modify this after balancer is fully completed
     try {
-      Thread.sleep(25);
+      Thread.sleep(20000);
     } catch (InterruptedException e) { }
 
     running = containerBalancerClient.getContainerBalancerStatus();
