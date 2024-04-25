@@ -18,7 +18,6 @@
 package org.apache.hadoop.ozone.om.helpers;
 
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -60,7 +59,7 @@ public final class OmVolumeArgs extends WithObjectID
   private long quotaInBytes;
   private long quotaInNamespace;
   private long usedNamespace;
-  private List<OzoneAcl> acls;
+  private final List<OzoneAcl> acls;
   /**
    * Reference count on this Ozone volume.
    *
@@ -74,42 +73,6 @@ public final class OmVolumeArgs extends WithObjectID
    * will have reference count set to zero by default.
    */
   private long refCount;
-
-  /**
-   * Private constructor, constructed via builder.
-   * @param adminName  - Administrator's name.
-   * @param ownerName  - Volume owner's name
-   * @param volume - volume name
-   * @param quotaInBytes - Volume Quota in bytes.
-   * @param quotaInNamespace - Volume Quota in counts.
-   * @param usedNamespace - Volume Namespace Quota Usage in counts.
-   * @param metadata - metadata map for custom key/value data.
-   * @param acls - list of volume acls.
-   * @param creationTime - Volume creation time.
-   * @param objectID - ID of this object.
-   * @param updateID - A sequence number that denotes the last update on this
-   * object. This is a monotonically increasing number.
-   */
-  @SuppressWarnings({"checkstyle:ParameterNumber",
-      "This is invoked from a builder."})
-  private OmVolumeArgs(String adminName, String ownerName, String volume,
-      long quotaInBytes, long quotaInNamespace, long usedNamespace,
-      Map<String, String> metadata, List<OzoneAcl> acls, long creationTime,
-      long modificationTime, long objectID, long updateID, long refCount) {
-    this.adminName = adminName;
-    this.ownerName = ownerName;
-    this.volume = volume;
-    this.quotaInBytes = quotaInBytes;
-    this.quotaInNamespace = quotaInNamespace;
-    this.usedNamespace = usedNamespace;
-    setMetadata(metadata);
-    this.acls = acls;
-    this.creationTime = creationTime;
-    this.modificationTime = modificationTime;
-    setObjectID(objectID);
-    setUpdateID(updateID);
-    this.refCount = refCount;
-  }
 
   private OmVolumeArgs(Builder b) {
     super(b);
@@ -344,41 +307,65 @@ public final class OmVolumeArgs extends WithObjectID
       quotaInNamespace = OzoneConsts.QUOTA_RESET;
     }
 
+    /**
+     * @param admin Administrator's name.
+     */
     public Builder setAdminName(String admin) {
       this.adminName = admin;
       return this;
     }
 
+    /**
+     * @param owner  Volume owner's name
+     */
     public Builder setOwnerName(String owner) {
       this.ownerName = owner;
       return this;
     }
 
+    /**
+     * @param volumeName volume name
+     */
     public Builder setVolume(String volumeName) {
       this.volume = volumeName;
       return this;
     }
 
+    /**
+     * @param createdOn Volume creation time.
+     */
     public Builder setCreationTime(long createdOn) {
       this.creationTime = createdOn;
       return this;
     }
 
+    /**
+     * @param modifiedOn Time of the volume's last modification
+     */
     public Builder setModificationTime(long modifiedOn) {
       this.modificationTime = modifiedOn;
       return this;
     }
 
+    /**
+     * @param quotaBytes Volume Quota in bytes.
+     */
     public Builder setQuotaInBytes(long quotaBytes) {
       this.quotaInBytes = quotaBytes;
       return this;
     }
 
+    /**
+     * @param quotaNamespace Volume Quota in counts.
+     */
     public Builder setQuotaInNamespace(long quotaNamespace) {
       this.quotaInNamespace = quotaNamespace;
       return this;
     }
 
+    /**
+     * @param namespaceUsage Volume Namespace Quota Usage in counts.
+     */
     public Builder setUsedNamespace(long namespaceUsage) {
       this.usedNamespace = namespaceUsage;
       return this;
@@ -396,15 +383,26 @@ public final class OmVolumeArgs extends WithObjectID
       return this;
     }
 
+    /**
+     * @param listOfAcls list of volume ACLs
+     */
+    public Builder setAcls(List<OzoneAcl> listOfAcls) {
+      if (listOfAcls != null) {
+        this.acls.addAll(listOfAcls);
+      }
+      return this;
+    }
+
     public Builder addOzoneAcls(OzoneAcl acl) {
       OzoneAclUtil.addAcl(acls, acl);
       return this;
     }
 
-    public void setRefCount(long refCount) {
+    public Builder setRefCount(long refCount) {
       Preconditions.checkState(refCount >= 0L,
           "refCount should not be negative");
       this.refCount = refCount;
+      return this;
     }
 
     public OmVolumeArgs build() {
@@ -437,22 +435,21 @@ public final class OmVolumeArgs extends WithObjectID
   }
 
   public static OmVolumeArgs getFromProtobuf(VolumeInfo volInfo) {
-    List<OzoneAcl> acls = OzoneAclUtil.fromProtobuf(
-        volInfo.getVolumeAclsList());
-    return new OmVolumeArgs(
-        volInfo.getAdminName(),
-        volInfo.getOwnerName(),
-        volInfo.getVolume(),
-        volInfo.getQuotaInBytes(),
-        volInfo.getQuotaInNamespace(),
-        volInfo.getUsedNamespace(),
-        KeyValueUtil.getFromProtobuf(volInfo.getMetadataList()),
-        acls,
-        volInfo.getCreationTime(),
-        volInfo.getModificationTime(),
-        volInfo.getObjectID(),
-        volInfo.getUpdateID(),
-        volInfo.getRefCount());
+    return newBuilder()
+        .setAdminName(volInfo.getAdminName())
+        .setOwnerName(volInfo.getOwnerName())
+        .setVolume(volInfo.getVolume())
+        .setQuotaInBytes(volInfo.getQuotaInBytes())
+        .setQuotaInNamespace(volInfo.getQuotaInNamespace())
+        .setUsedNamespace(volInfo.getUsedNamespace())
+        .addAllMetadata(KeyValueUtil.getFromProtobuf(volInfo.getMetadataList()))
+        .setAcls(OzoneAclUtil.fromProtobuf(volInfo.getVolumeAclsList()))
+        .setCreationTime(volInfo.getCreationTime())
+        .setModificationTime(volInfo.getModificationTime())
+        .setObjectID(volInfo.getObjectID())
+        .setUpdateID(volInfo.getUpdateID())
+        .setRefCount(volInfo.getRefCount())
+        .build();
   }
 
   @Override
@@ -470,13 +467,23 @@ public final class OmVolumeArgs extends WithObjectID
 
   @Override
   public OmVolumeArgs copyObject() {
-    Map<String, String> cloneMetadata = new HashMap<>();
-    if (getMetadata() != null) {
-      cloneMetadata.putAll(getMetadata());
-    }
+    return toBuilder().build();
+  }
 
-    return new OmVolumeArgs(adminName, ownerName, volume, quotaInBytes,
-        quotaInNamespace, usedNamespace, cloneMetadata, new ArrayList<>(acls),
-        creationTime, modificationTime, getObjectID(), getUpdateID(), refCount);
+  public Builder toBuilder() {
+    return newBuilder()
+        .setAdminName(adminName)
+        .setOwnerName(ownerName)
+        .setVolume(volume)
+        .setQuotaInBytes(quotaInBytes)
+        .setQuotaInNamespace(quotaInNamespace)
+        .setUsedNamespace(usedNamespace)
+        .addAllMetadata(getMetadata())
+        .setAcls(acls)
+        .setCreationTime(creationTime)
+        .setModificationTime(modificationTime)
+        .setObjectID(getObjectID())
+        .setUpdateID(getUpdateID())
+        .setRefCount(refCount);
   }
 }
