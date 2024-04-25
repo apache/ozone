@@ -30,6 +30,7 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.concurrent.CopyOnWriteArrayList;
 
 /**
  * Wrapper class for Ozone prefix path info, currently mainly target for ACL but
@@ -47,12 +48,12 @@ public final class OmPrefixInfo extends WithObjectID {
   }
 
   private final String name;
-  private final List<OzoneAcl> acls;
+  private final CopyOnWriteArrayList<OzoneAcl> acls;
 
   private OmPrefixInfo(Builder b) {
     super(b);
     name = b.name;
-    acls = new ArrayList<>(b.acls);
+    acls = new CopyOnWriteArrayList<>(b.acls);
   }
 
   /**

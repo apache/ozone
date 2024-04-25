@@ -23,6 +23,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.stream.Collectors;
 
 import com.google.common.collect.ImmutableList;
@@ -63,7 +64,7 @@ public final class OmBucketInfo extends WithObjectID implements Auditable {
   /**
    * ACL Information (mutable).
    */
-  private final List<OzoneAcl> acls;
+  private final CopyOnWriteArrayList<OzoneAcl> acls;
   /**
    * Bucket Version flag.
    */
@@ -112,7 +113,7 @@ public final class OmBucketInfo extends WithObjectID implements Auditable {
     super(b);
     this.volumeName = b.volumeName;
     this.bucketName = b.bucketName;
-    this.acls = b.acls;
+    this.acls = new CopyOnWriteArrayList<>(b.acls);
     this.isVersionEnabled = b.isVersionEnabled;
     this.storageType = b.storageType;
     this.creationTime = b.creationTime;

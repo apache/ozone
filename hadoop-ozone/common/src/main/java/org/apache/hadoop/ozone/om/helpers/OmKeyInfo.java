@@ -23,6 +23,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.concurrent.CopyOnWriteArrayList;
 
 import com.google.common.collect.ImmutableList;
 import org.apache.commons.lang3.StringUtils;
@@ -98,7 +99,7 @@ public final class OmKeyInfo extends WithParentObjectId
   /**
    * ACL Information.
    */
-  private final List<OzoneAcl> acls;
+  private final CopyOnWriteArrayList<OzoneAcl> acls;
 
   private OmKeyInfo(Builder b) {
     super(b);
@@ -111,7 +112,7 @@ public final class OmKeyInfo extends WithParentObjectId
     this.modificationTime = b.modificationTime;
     this.replicationConfig = b.replicationConfig;
     this.encInfo = b.encInfo;
-    this.acls = b.acls;
+    this.acls = new CopyOnWriteArrayList<>(b.acls);
     this.fileChecksum = b.fileChecksum;
     this.fileName = b.fileName;
     this.isFile = b.isFile;
