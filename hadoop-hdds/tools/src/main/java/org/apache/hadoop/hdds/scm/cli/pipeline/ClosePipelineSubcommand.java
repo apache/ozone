@@ -27,9 +27,10 @@ import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import picocli.CommandLine;
 
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Optional;
 import java.util.function.Predicate;
-import java.util.stream.Stream;
 
 /**
  * Handler of close pipeline command.
@@ -49,18 +50,23 @@ public class ClosePipelineSubcommand extends ScmSubcommand {
   @Override
   public void execute(ScmClient scmClient) throws IOException {
     if (!Strings.isNullOrEmpty(closeOption.pipelineId)) {
+      if (filterOptions.getReplicationFilter().isPresent()) {
+        System.out.println("When close pipeline by ID filters are ignored.");
+      }
       scmClient.closePipeline(HddsProtos.PipelineID.newBuilder().setId(closeOption.pipelineId).build());
     } else if (closeOption.closeAll) {
       Optional<Predicate<? super Pipeline>> replicationFilter = filterOptions.getReplicationFilter();
 
-      Stream<Pipeline> stream = scmClient.listPipelines()
-          .stream()
-          .filter(p -> p.getPipelineState() != Pipeline.PipelineState.CLOSED);
-      if (replicationFilter.isPresent()) {
-        stream = stream.filter(replicationFilter.get());
+      List<Pipeline> pipelineList = new ArrayList<>();
+      Predicate<? super Pipeline> predicate = replicationFilter.orElse(null);
+      for (Pipeline pipeline : scmClient.listPipelines()) {
+        boolean filterPassed = (predicate != null) && predicate.test(pipeline);
+        if (pipeline.getPipelineState() != Pipeline.PipelineState.CLOSED && filterPassed) {
+          pipelineList.add(pipeline);
+        }
       }
-
-      stream.forEach(pipeline -> {
+      System.out.println("Sending close command for " + pipelineList.size() + " pipelines...");
+      pipelineList.forEach(pipeline -> {
         try {
           scmClient.closePipeline(
               HddsProtos.PipelineID.newBuilder().setId(pipeline.getId().getId().toString()).build());
