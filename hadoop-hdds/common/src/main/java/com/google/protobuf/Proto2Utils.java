@@ -29,4 +29,4 @@ public final class Proto2Utils {
   }
 
   private Proto2Utils() { }
-
+}
