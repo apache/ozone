@@ -32,6 +32,8 @@ import org.junit.jupiter.api.Timeout;
 
 import java.util.Optional;
 
+import static java.util.concurrent.TimeUnit.SECONDS;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_NODE_REPORT_INTERVAL;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -52,6 +54,7 @@ public class TestContainerBalancerOperations {
     ozoneConf = new OzoneConfiguration();
     ozoneConf.setClass(ScmConfigKeys.OZONE_SCM_CONTAINER_PLACEMENT_IMPL_KEY,
         SCMContainerPlacementCapacity.class, PlacementPolicy.class);
+    ozoneConf.setTimeDuration(HDDS_NODE_REPORT_INTERVAL, 5, SECONDS);
     ozoneConf.setBoolean("hdds.container.balancer.trigger.du.before.move.enable", true);
     cluster = MiniOzoneCluster.newBuilder(ozoneConf).setNumDatanodes(3).build();
     containerBalancerClient = new ContainerOperationClient(ozoneConf);
@@ -100,7 +103,7 @@ public class TestContainerBalancerOperations {
     // TODO: this is a temporary implementation for now
     // modify this after balancer is fully completed
     try {
-      Thread.sleep(200000);
+      Thread.sleep(15);
     } catch (InterruptedException e) { }
 
     running = containerBalancerClient.getContainerBalancerStatus();
