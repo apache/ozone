@@ -60,6 +60,7 @@ import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerNotOpenExcep
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
 import org.apache.hadoop.hdds.utils.Cache;
 import org.apache.hadoop.hdds.utils.ResourceCache;
+import org.apache.hadoop.ozone.HddsDatanodeService;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.common.utils.BufferUtils;
 import org.apache.hadoop.ozone.container.common.interfaces.ContainerDispatcher;
@@ -198,19 +199,22 @@ public class ContainerStateMachine extends BaseStateMachine {
 
   private final Semaphore applyTransactionSemaphore;
   private final boolean waitOnBothFollowers;
+  private final HddsDatanodeService datanodeService;
+
   /**
    * CSM metrics.
    */
   private final CSMMetrics metrics;
 
   @SuppressWarnings("parameternumber")
-  public ContainerStateMachine(RaftGroupId gid,
+  public ContainerStateMachine(HddsDatanodeService hddsDatanodeService, RaftGroupId gid,
       ContainerDispatcher dispatcher,
       ContainerController containerController,
       List<ThreadPoolExecutor> chunkExecutors,
       XceiverServerRatis ratisServer,
       ConfigurationSource conf,
       String threadNamePrefix) {
+    this.datanodeService = hddsDatanodeService;
     this.gid = gid;
     this.dispatcher = dispatcher;
     this.containerController = containerController;
@@ -1117,6 +1121,21 @@ public class ContainerStateMachine extends BaseStateMachine {
     evictStateMachineCache();
     executor.shutdown();
     metrics.unRegister();
+
+    // if datanodeService is stopped , it indicates this `close` originates
+    // from `HddsDatanodeService.stop()`, otherwise, it indicates this `close` originates
+    // from ratis.
+    if (datanodeService != null && !datanodeService.isStopped()) {
+      LOG.error("Container statemachine is closed by ratis, terminating HddsDatanodeService");
+      // wait a while for other pipeline's ContainerStateMachine.close() called.
+      try {
+        Thread.sleep(10000);
+      } catch (InterruptedException e) {
+      }
+      datanodeService.terminateDatanode();
+    } else {
+      LOG.info("Stopping ContainerStateMachine for {}.", getGroupId());
+    }
   }
 
   @Override
