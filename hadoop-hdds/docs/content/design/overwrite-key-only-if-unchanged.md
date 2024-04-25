@@ -69,12 +69,13 @@ In Ozone the same concept can be used to perform an atomic update of a key only 
 To do this:
 
 1. The client reads the key details as usual. The key details can be extended to include the existing updateID as it is currently not passed to the client. This field already exists, but when exposed to the client it will be referred to as the key generation.
-2. The client opens a new key for writing with the same key name as the original, passing the previously read generation in a new field. Call this new field expectedGeneration.
-3. On OM, it receives the openKey request as usual and detects the presence of the expectedGeneration field.
-4. On OM, it first ensures that a key is present with the given key name and having a updateID == expectedGeneration. If so, it opens the key and stored the details including the expectedGeneration in the openKeyTable. As things stand, the other existing key metadata copied from the original key is stored in the openKeyTable too.
-5. The client continues to write the data as usual.
-6. On commit key, the client does not need to send the expectedGeneration again, as the open key contains it.
-7. On OM, on commit key, it validates the key still exists with the given key name and its stored updateID is unchanged when compared with the expectedGeneration. If so the key is committed, otherwise an error is returned to the client.
+1. The client can inspect the read key details and decide if it wants to replace the key.
+1. The client opens a new key for writing with the same key name as the original, passing the previously read generation in a new field. Call this new field expectedGeneration.
+1. On OM, it receives the openKey request as usual and detects the presence of the expectedGeneration field.
+1. On OM, it first ensures that a key is present with the given key name and having a updateID == expectedGeneration. If so, it opens the key and stored the details including the expectedGeneration in the openKeyTable. As things stand, the other existing key metadata copied from the original key is stored in the openKeyTable too.
+1. The client continues to write the data as usual. This can be the same data in a different format (eg Ratis to EC conversion), or new data in the key depending on the application's needs.
+1. On commit key, the client does not need to send the expectedGeneration again, as the open key contains it.
+1. On OM, on commit key, it validates the key still exists with the given key name and its stored updateID is unchanged when compared with the expectedGeneration. If so the key is committed, otherwise an error is returned to the client.
 
 Note that any change to a key will change the updateID. This is existing behaviour, and committing a rewritten key will also modify the updateID. Note this also offers protection against concurrent rewrites. 
 
@@ -87,6 +88,8 @@ Note that any change to a key will change the updateID. This is existing behavio
 The advantage of this alternative approach is that it does not require the expectedGeneration to be stored in the openKey table.
 
 However the client code required to implement this appears more complex due to having different key commit logic for Ratis and EC and the parameter needing to be passed through many method calls.
+
+PR [#5524](https://github.com/apache/ozone/pull/5524) illustrates this approach for the atomicKeyCreation feature which was added to S3.
 
 The existing implementation for key creation stores various attributes (metadata, creation time, ACLs, ReplicationConfig) in the openKey table, so storing the expectedGeneration keeps with that convention, which is less confusing for future developers.
 
@@ -123,14 +126,11 @@ No new locks are needed on OM. As part of the openKey and commitKey, there are e
  2. To pass the expectedGeneration to OM on key open, it would be possible to overload the existing OzoneBucket.createKey() method, which already has several overloaded versions, or create a new explicit method on Ozone bucket called rewriteKey, passing the expectedGeneration, eg:
  
  ```
-
  public OzoneOutputStream rewriteKey(String volumeName, String bucketName, String keyName, long size, long expectedGeneration, ReplicationConfig replicationConfigOfNewKey)
       throws IOException 
       
 // Can also add an overloaded version of these methods to pass a metadata map, as with the existing
-// create key method.      
-
-	  
+// create key method.        
  ```
 This specification is roughly in line with the exiting createKey method:
 
@@ -149,11 +149,14 @@ An alternative, is to create a new overloaded createKey, but it is probably less
       ReplicationConfig replicationConfig, long expectedUpdateID)
 ```
 
-The intended usage of this API, is that the existing key details are read, then used to open the new key, and then data is written, eg:
+The intended usage of this API, is that the existing key details are read, perhaps inspected and then used to open the new key, and then data is written. In this example, the key is overwritten with the same data in a different replication format. Equally, the key could be rewritten with the original data modified in some application specific way. The atomic check guarantees against lost updates if another application thread is attempting to update the same key in a different way.
 
 ```
 OzoneKeyDetails exisitingKey = bucket.getKey(keyName);
-try (OutputStream os = bucket.rewriteKey(existingKey.getBucket, existingKey.getVolume, 
+// Insepect the key and decide if overwrite is desired:
+boolean shouldOverwrite = ...
+if (shouldOverwrite) {
+  try (OutputStream os = bucket.rewriteKey(existingKey.getBucket, existingKey.getVolume, 
     existingKey.getKeyName, existingKey.getSize(), existingKey.getGeneration(), newRepConfig) {
   os.write(bucket.readKey(keyName))
 }
