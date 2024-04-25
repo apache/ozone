@@ -18,8 +18,6 @@
 
 package org.apache.hadoop.hdds.scm.client;
 
-import org.apache.hadoop.hdds.HddsConfigKeys;
-import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CACertificateProvider;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -82,7 +80,6 @@ public class ClientTrustManager extends X509ExtendedTrustManager {
 
   private final CACertificateProvider remoteProvider;
   private X509ExtendedTrustManager trustManager;
-  private final ConfigurationSource conf;
 
   /**
    * Creates a ClientTrustManager instance based on an in-memory and a remote
@@ -104,14 +101,13 @@ public class ClientTrustManager extends X509ExtendedTrustManager {
    * @param inMemoryProvider the initial provider of the trusted certificates.
    * @throws IOException in case an IO operation fails.
    */
-  public ClientTrustManager(ConfigurationSource config, CACertificateProvider remoteProvider,
+  public ClientTrustManager(CACertificateProvider remoteProvider,
       CACertificateProvider inMemoryProvider)
       throws IOException {
     checkArgument(remoteProvider != null || inMemoryProvider != null,
         "Client trust configuration error, no mechanism present to find the" +
             " rootCA certificate of the cluster.");
     this.remoteProvider = remoteProvider;
-    this.conf = config;
     try {
       initialize(loadCerts(inMemoryProvider));
     } catch (CertificateException e) {
@@ -122,8 +118,7 @@ public class ClientTrustManager extends X509ExtendedTrustManager {
   private void initialize(List<X509Certificate> caCerts)
       throws CertificateException {
     try {
-      KeyStore ks = KeyStore.getInstance(conf.get(HddsConfigKeys.HDDS_KEYSTORE_TYPE,
-          HddsConfigKeys.HDDS_KEYSTORE_TYPE_DEFAULT));
+      KeyStore ks = KeyStore.getInstance(KeyStore.getDefaultType());
       ks.load(null);
 
       for (X509Certificate cert : caCerts) {

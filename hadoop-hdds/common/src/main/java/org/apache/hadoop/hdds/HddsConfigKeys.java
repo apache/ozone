@@ -142,9 +142,6 @@ public final class HddsConfigKeys {
   public static final String HDDS_DEFAULT_SECURITY_PROVIDER = "BC";
   public static final String HDDS_KEY_DIR_NAME = "hdds.key.dir.name";
   public static final String HDDS_KEY_DIR_NAME_DEFAULT = "keys";
-  public static final String HDDS_KEYSTORE_TYPE = "hdds.keystore.type";
-  public static final String HDDS_KEYSTORE_TYPE_DEFAULT = "jks";
-
   // TODO : Talk to StorageIO classes and see if they can return a secure
   // storage location for each node.
   public static final String HDDS_METADATA_DIR_NAME = "hdds.metadata.dir";

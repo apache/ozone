@@ -383,7 +383,7 @@ public class TestOzoneContainerWithTLS {
 
   private ClientTrustManager aClientTrustManager() throws IOException {
     X509Certificate firstCert = caClient.getCACertificate();
-    return new ClientTrustManager(conf,
+    return new ClientTrustManager(
         () -> singletonList(caClient.getCACertificate()),
         () -> singletonList(firstCert));
   }

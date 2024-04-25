@@ -1024,7 +1024,7 @@ public abstract class DefaultCertificateClient implements CertificateClient {
   public synchronized KeyStoresFactory getServerKeyStoresFactory()
       throws CertificateException {
     if (serverKeyStoresFactory == null) {
-      serverKeyStoresFactory = SecurityUtil.getServerKeyStoresFactory(this, true, securityConfig);
+      serverKeyStoresFactory = SecurityUtil.getServerKeyStoresFactory(this, true);
     }
     return serverKeyStoresFactory;
   }
@@ -1033,7 +1033,7 @@ public abstract class DefaultCertificateClient implements CertificateClient {
   public KeyStoresFactory getClientKeyStoresFactory()
       throws CertificateException {
     if (clientKeyStoresFactory == null) {
-      clientKeyStoresFactory = SecurityUtil.getClientKeyStoresFactory(this, true, securityConfig);
+      clientKeyStoresFactory = SecurityUtil.getClientKeyStoresFactory(this, true);
     }
     return clientKeyStoresFactory;
   }
