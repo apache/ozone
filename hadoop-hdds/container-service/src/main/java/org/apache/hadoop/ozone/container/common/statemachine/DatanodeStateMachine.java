@@ -139,6 +139,7 @@ public class DatanodeStateMachine implements Closeable {
    * @param certClient - Datanode Certificate client, required if security is
    *                     enabled
    */
+  @SuppressWarnings("checkstyle:ParameterNumber")
   public DatanodeStateMachine(HddsDatanodeService hddsDatanodeService,
                               DatanodeDetails datanodeDetails,
                               ConfigurationSource conf,
