@@ -1667,6 +1667,8 @@ public class SCMNodeManager implements NodeManager {
         removeFromDnsToUuidMap(datanodeDetails.getUuid(), datanodeDetails.getIpAddress());
         final List<SCMCommand> cmdList = getCommandQueue(datanodeDetails.getUuid());
         LOG.info("Clearing command queue of size {} for DN {}", cmdList.size(), datanodeDetails);
+      } else {
+        LOG.warn("Node not decommissioned or dead, cannot remove: {}", datanodeDetails);
       }
     } finally {
       writeLock().unlock();

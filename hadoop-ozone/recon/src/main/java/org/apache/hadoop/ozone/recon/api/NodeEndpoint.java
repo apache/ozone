@@ -213,6 +213,7 @@ public class NodeEndpoint {
                 .withState(nodeManager.getNodeStatus(nodeByUuid).getHealth())
                 .build());
             nodeManager.removeNode(nodeByUuid);
+            LOG.info("Node {} removed successfully !!!", uuid);
           } else {
             failedDatanodes.add(DatanodeMetadata.newBuilder()
                 .withHostname(nodeManager.getHostName(nodeByUuid))
