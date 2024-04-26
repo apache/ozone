@@ -162,9 +162,9 @@ Zero byte file
     ${result} =                 Execute AWSS3APICli and checkrc     get-object --bucket ${BUCKET} --key ${PREFIX}/putobject/key=value/zerobyte --range bytes=0-10000 /tmp/testfile2.result   255
                                 Should contain              ${result}       InvalidRange
 
-Create file with user defined metadata
+Create file with user defined metadata and tags
                                 Execute                   echo "Randomtext" > /tmp/testfile2
-                                Execute AWSS3ApiCli       put-object --bucket ${BUCKET} --key ${PREFIX}/putobject/custom-metadata/key1 --body /tmp/testfile2 --metadata="custom-key1=custom-value1,custom-key2=custom-value2"
+                                Execute AWSS3ApiCli       put-object --bucket ${BUCKET} --key ${PREFIX}/putobject/custom-metadata/key1 --body /tmp/testfile2 --metadata="custom-key1=custom-value1,custom-key2=custom-value2" --tagging="tag-key1=tag-value1&tag-key2=tag-value2"
 
     ${result} =                 Execute AWSS3APICli       head-object --bucket ${BUCKET} --key ${PREFIX}/putobject/custom-metadata/key1
                                 Should contain            ${result}    \"custom-key1\": \"custom-value1\"
@@ -173,6 +173,13 @@ Create file with user defined metadata
     ${result} =                 Execute                   ozone sh key info /s3v/${BUCKET}/${PREFIX}/putobject/custom-metadata/key1
                                 Should contain            ${result}   \"custom-key1\" : \"custom-value1\"
                                 Should contain            ${result}   \"custom-key2\" : \"custom-value2\"
+                                Should contain            ${result}   \"tag-key1\" : \"tag-value1\"
+                                Should contain            ${result}   \"tag-key2\" : \"tag-value2\"
+
+    ${result} =                 Execute AWSS3APICli       get-object --bucket ${BUCKET} --key ${PREFIX}/putobject/custom-metadata/key1 /tmp/testfile2.result
+                                Should contain            ${result}   TagCount
+    ${tagCount} =               Execute and checkrc       echo '${result}' | jq -r '.TagCount'    0
+                                Should Be Equal           ${tagCount}    2
 
 Create file with user defined metadata with gdpr enabled value in request
                                 Execute                    echo "Randomtext" > /tmp/testfile2
@@ -188,6 +195,16 @@ Create file with user defined metadata size larger than 2 KB
     ${result} =                 Execute AWSS3APICli and checkrc       put-object --bucket ${BUCKET} --key ${PREFIX}/putobject/custom-metadata/key2 --body /tmp/testfile2 --metadata="custom-key1=${custom_metadata_value}"    255
                                 Should contain                        ${result}   MetadataTooLarge
                                 Should not contain                    ${result}   custom-key1: ${custom_metadata_value}
+
+Create files invalid tags
+    ${result} =                 Execute AWSS3APICli and checkrc       put-object --bucket ${BUCKET} --key ${PREFIX}/putobject/custom-metadata/key2 --body /tmp/testfile2 --tagging="tag-key1=tag-value1&tag-key1=tag-value2"    255
+                                Should contain                        ${result}   InvalidTag
+    ${long_tag_key} =           Execute                               printf 'v%.0s' {1..129}
+    ${result} =                 Execute AWSS3APICli and checkrc       put-object --bucket ${BUCKET} --key ${PREFIX}/putobject/custom-metadata/key2 --body /tmp/testfile2 --tagging="${long_tag_key}=tag-value1"    255
+                                Should contain                        ${result}   InvalidTag
+    ${long_tag_value} =         Execute                               printf 'v%.0s' {1..257}
+    ${result} =                 Execute AWSS3APICli and checkrc       put-object --bucket ${BUCKET} --key ${PREFIX}/putobject/custom-metadata/key2 --body /tmp/testfile2 --tagging="tag-key1=${long_tag_value}"    255
+                                Should contain                        ${result}   InvalidTag
 
 Create small file and expect ETag (MD5) in a reponse header
                                 Execute                    head -c 1MB </dev/urandom > /tmp/small_file

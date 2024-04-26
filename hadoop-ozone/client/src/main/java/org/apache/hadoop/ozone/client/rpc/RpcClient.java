@@ -1387,6 +1387,15 @@ public class RpcClient implements ClientProtocol {
       ReplicationConfig replicationConfig,
       Map<String, String> metadata)
       throws IOException {
+    return createKey(volumeName, bucketName, keyName, size, replicationConfig,
+        metadata, Collections.emptyMap());
+  }
+
+  @Override
+  public OzoneOutputStream createKey(
+      String volumeName, String bucketName, String keyName, long size,
+      ReplicationConfig replicationConfig,
+      Map<String, String> metadata, Map<String, String> tags) throws IOException {
     verifyVolumeName(volumeName);
     verifyBucketName(bucketName);
     if (checkKeyNameEnabled) {
@@ -1416,6 +1425,7 @@ public class RpcClient implements ClientProtocol {
         .setDataSize(size)
         .setReplicationConfig(replicationConfig)
         .addAllMetadataGdpr(metadata)
+        .addAllTags(tags)
         .setAcls(getAclList())
         .setLatestVersionLocation(getLatestVersionLocation)
         .setOwnerName(ownerName);
@@ -1437,6 +1447,15 @@ public class RpcClient implements ClientProtocol {
       ReplicationConfig replicationConfig,
       Map<String, String> metadata)
       throws IOException {
+    return createStreamKey(volumeName, bucketName, keyName, size, replicationConfig,
+        metadata, Collections.emptyMap());
+  }
+
+  @Override
+  public OzoneDataStreamOutput createStreamKey(
+      String volumeName, String bucketName, String keyName, long size,
+      ReplicationConfig replicationConfig,
+      Map<String, String> metadata, Map<String, String> tags) throws IOException {
     verifyVolumeName(volumeName);
     verifyBucketName(bucketName);
     if (checkKeyNameEnabled) {
@@ -1452,6 +1471,7 @@ public class RpcClient implements ClientProtocol {
         .setDataSize(size)
         .setReplicationConfig(replicationConfig)
         .addAllMetadataGdpr(metadata)
+        .addAllTags(tags)
         .setSortDatanodesInPipeline(true)
         .setAcls(getAclList())
         .setOwnerName(ownerName);
@@ -1722,7 +1742,8 @@ public class RpcClient implements ClientProtocol {
         keyInfo.getModificationTime(), ozoneKeyLocations,
         keyInfo.getReplicationConfig(), keyInfo.getMetadata(),
         keyInfo.getFileEncryptionInfo(),
-        () -> getInputStreamWithRetryFunction(keyInfo), keyInfo.isFile(), keyInfo.getOwnerName());
+        () -> getInputStreamWithRetryFunction(keyInfo), keyInfo.isFile(), 
+        keyInfo.getOwnerName(), keyInfo.getTags());
   }
 
   @Override
@@ -1839,6 +1860,18 @@ public class RpcClient implements ClientProtocol {
       ReplicationConfig replicationConfig,
       Map<String, String> metadata)
       throws IOException {
+    return initiateMultipartUpload(volumeName, bucketName, keyName, replicationConfig,
+        metadata, Collections.emptyMap());
+  }
+
+  @Override
+  public OmMultipartInfo initiateMultipartUpload(String volumeName,
+      String bucketName,
+      String keyName,
+      ReplicationConfig replicationConfig,
+      Map<String, String> metadata,
+      Map<String, String> tags)
+      throws IOException {
     verifyVolumeName(volumeName);
     verifyBucketName(bucketName);
     HddsClientUtils.checkNotNull(keyName);
@@ -1860,6 +1893,7 @@ public class RpcClient implements ClientProtocol {
         .setAcls(getAclList())
         .addAllMetadataGdpr(metadata)
         .setOwnerName(ownerName)
+        .addAllTags(tags)
         .build();
     OmMultipartInfo multipartInfo = ozoneManagerClient
         .initiateMultipartUpload(keyArgs);

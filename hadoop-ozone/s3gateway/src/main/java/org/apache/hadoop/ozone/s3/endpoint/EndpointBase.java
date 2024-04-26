@@ -62,14 +62,22 @@ import org.apache.hadoop.ozone.s3.metrics.S3GatewayMetrics;
 import org.apache.hadoop.ozone.s3.signature.SignatureInfo;
 import org.apache.hadoop.ozone.s3.util.AuditUtils;
 import org.apache.hadoop.util.Time;
+import org.apache.http.NameValuePair;
+import org.apache.http.client.utils.URLEncodedUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.ozone.OzoneConsts.ETAG;
 import static org.apache.hadoop.ozone.OzoneConsts.KB;
+import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.INVALID_TAG;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.newError;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.CUSTOM_METADATA_HEADER_PREFIX;
+import static org.apache.hadoop.ozone.s3.util.S3Consts.TAG_HEADER;
+import static org.apache.hadoop.ozone.s3.util.S3Consts.TAG_KEY_LENGTH_LIMIT;
+import static org.apache.hadoop.ozone.s3.util.S3Consts.TAG_NUM_LIMIT;
+import static org.apache.hadoop.ozone.s3.util.S3Consts.TAG_REGEX_PATTERN;
+import static org.apache.hadoop.ozone.s3.util.S3Consts.TAG_VALUE_LENGTH_LIMIT;
 
 /**
  * Basic helpers for all the REST endpoints.
@@ -343,6 +351,82 @@ public abstract class EndpointBase implements Auditor {
           .header(CUSTOM_METADATA_HEADER_PREFIX + metadataKey,
               entry.getValue());
     }
+  }
+
+  protected Map<String, String> getTaggingFromHeaders(HttpHeaders httpHeaders)
+      throws OS3Exception {
+    String tagString = httpHeaders.getHeaderString(TAG_HEADER);
+
+    if (StringUtils.isEmpty(tagString)) {
+      return Collections.emptyMap();
+    }
+
+    List<NameValuePair> tagPairs = URLEncodedUtils.parse(tagString, UTF_8);
+
+    if (tagPairs.isEmpty()) {
+      return Collections.emptyMap();
+    }
+
+    Map<String, String> tags = new HashMap<>();
+    // Tag restrictions: https://docs.aws.amazon.com/AmazonS3/latest/API/API_control_S3Tag.html
+    for (NameValuePair tagPair: tagPairs) {
+      if (StringUtils.isEmpty(tagPair.getName())) {
+        OS3Exception ex = newError(INVALID_TAG, TAG_HEADER);
+        ex.setErrorMessage("Some tag keys are empty, please specify the non-empty tag keys");
+        throw ex;
+      }
+
+      if (tagPair.getValue() == null) {
+        // For example for query parameter with only value (e.g. "tag1")
+        OS3Exception ex = newError(INVALID_TAG, tagPair.getName());
+        ex.setErrorMessage("Some tag values are not specified, please specify the tag values");
+        throw ex;
+      }
+
+      if (tags.containsKey(tagPair.getName())) {
+        // Tags that are associated with an object must have unique tag keys
+        // Reject request if the same key is used twice on the same resource
+        OS3Exception ex = newError(INVALID_TAG, tagPair.getName());
+        ex.setErrorMessage("There are tags with duplicate tag keys, tag keys should be unique");
+        throw ex;
+      }
+
+      if (!TAG_REGEX_PATTERN.matcher(tagPair.getName()).matches()) {
+        OS3Exception ex = newError(INVALID_TAG, tagPair.getName());
+        ex.setErrorMessage("The tag key does not have a valid pattern");
+        throw ex;
+      }
+
+      if (!TAG_REGEX_PATTERN.matcher(tagPair.getValue()).matches()) {
+        OS3Exception ex = newError(INVALID_TAG, tagPair.getValue());
+        ex.setErrorMessage("The tag value does not have a valid pattern");
+        throw ex;
+      }
+
+      if (tagPair.getName().length() > TAG_KEY_LENGTH_LIMIT) {
+        OS3Exception ex = newError(INVALID_TAG, tagPair.getName());
+        ex.setErrorMessage("The tag key exceeds the maximum length of " + TAG_KEY_LENGTH_LIMIT);
+        throw ex;
+      }
+
+      if (tagPair.getValue().length() > TAG_VALUE_LENGTH_LIMIT) {
+        OS3Exception ex = newError(INVALID_TAG, tagPair.getValue());
+        ex.setErrorMessage("The tag value exceeds the maximum length of " + TAG_VALUE_LENGTH_LIMIT);
+        throw ex;
+      }
+
+      tags.put(tagPair.getName(), tagPair.getValue());
+    }
+
+    if (tags.size() > TAG_NUM_LIMIT) {
+      // You can associate up to 10 tags with an object.
+      OS3Exception ex = S3ErrorTable.newError(INVALID_TAG, TAG_HEADER);
+      ex.setErrorMessage("The number of tags " + tags.size() +
+          " exceeded the maximum number of tags of " + TAG_NUM_LIMIT);
+      throw ex;
+    }
+
+    return tags;
   }
 
   private AuditMessage.Builder auditMessageBaseBuilder(AuditAction op,

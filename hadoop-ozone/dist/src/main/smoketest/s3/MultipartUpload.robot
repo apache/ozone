@@ -87,7 +87,7 @@ Test Multipart Upload
 
 
 Test Multipart Upload Complete
-    ${result} =         Execute AWSS3APICli     create-multipart-upload --bucket ${BUCKET} --key ${PREFIX}/multipartKey1 --metadata="custom-key1=custom-value1,custom-key2=custom-value2,gdprEnabled=true"
+    ${result} =         Execute AWSS3APICli     create-multipart-upload --bucket ${BUCKET} --key ${PREFIX}/multipartKey1 --metadata="custom-key1=custom-value1,custom-key2=custom-value2,gdprEnabled=true" --tagging="tag-key1=tag-value1&tag-key2=tag-value2"
     ${uploadID} =       Execute and checkrc     echo '${result}' | jq -r '.UploadId'    0
                         Should contain          ${result}    ${BUCKET}
                         Should contain          ${result}    ${PREFIX}/multipartKey
@@ -126,14 +126,24 @@ Test Multipart Upload Complete
                                 Should contain                ${result}    \"custom-key1\" : \"custom-value1\"
                                 Should contain                ${result}    \"custom-key2\" : \"custom-value2\"
                                 Should not contain            ${result}    \"gdprEnabled\": \"true\"
+                                Should contain                ${result}    \"tag-key1\" : \"tag-value1\"
+                                Should contain                ${result}    \"tag-key2\" : \"tag-value2\"
 
-#read file and check the key
+#read file and check the key and tag count
     ${result} =                 Execute AWSS3ApiCli        get-object --bucket ${BUCKET} --key ${PREFIX}/multipartKey1 /tmp/${PREFIX}-multipartKey1.result
+                                Should contain             ${result}      TagCount
+
+    ${tagCount} =               Execute and checkrc        echo '${result}' | jq -r '.TagCount'    0
+                                Should Be Equal            ${tagCount}    2
+
                                 Execute                    cat /tmp/part1 /tmp/part2 > /tmp/${PREFIX}-multipartKey1
     Compare files               /tmp/${PREFIX}-multipartKey1         /tmp/${PREFIX}-multipartKey1.result
 
     ${result} =                 Execute AWSS3ApiCli        get-object --bucket ${BUCKET} --key ${PREFIX}/multipartKey1 --part-number 1 /tmp/${PREFIX}-multipartKey1-part1.result
     Compare files               /tmp/part1        /tmp/${PREFIX}-multipartKey1-part1.result
+
+    ${tagCount} =               Execute and checkrc        echo '${result}' | jq -r '.TagCount'    0
+                                Should Be Equal            ${tagCount}    2
 
     ${result} =                 Execute AWSS3ApiCli        get-object --bucket ${BUCKET} --key ${PREFIX}/multipartKey1 --part-number 2 /tmp/${PREFIX}-multipartKey1-part2.result
     Compare files               /tmp/part2        /tmp/${PREFIX}-multipartKey1-part2.result
