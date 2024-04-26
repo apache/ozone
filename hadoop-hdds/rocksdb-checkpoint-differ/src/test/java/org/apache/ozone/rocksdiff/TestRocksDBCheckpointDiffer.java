@@ -719,7 +719,9 @@ public class TestRocksDBCheckpointDiffer {
         LOG.debug("\tKey Range: {}", bytes2String(m.smallestKey()) + " <-> " + bytes2String(m.largestKey()));
         if (differ.debugEnabled(DEBUG_DAG_LIVE_NODES)) {
           printMutableGraphFromAGivenNode(
-              differ.getCompactionNodeMap(), m.fileName(), m.level(), differ.getForwardCompactionDAG());
+              differ.getCompactionNodeMap(),
+              m.fileName(), m.level(),
+              differ.getForwardCompactionDAG());
         }
       }
 
