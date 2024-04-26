@@ -22,7 +22,6 @@ status: draft
 ## Introduction
 I encountered the need for a retention solution within my cluster, specifically the ability to delete keys in specific paths after a certain time period.   
 This requirement closely resembled the functionality provided by AWS S3 Lifecycle configurations, particularly the Expiration part ([AWS S3 Lifecycle Configuration Examples](https://docs.aws.amazon.com/AmazonS3/latest/userguide/lifecycle-configuration-examples.html)).  
-After designing and implementing a solution, I am eager to contribute it back to the Apache Ozone community.
 
 ## Overview
 
@@ -38,6 +37,7 @@ After designing and implementing a solution, I am eager to contribute it back to
 
 - Lifecycle configurations (will be stored in DB) consists of volumeName, bucketName and a list of rules
     - A rule contains prefix (string), Expiration and an optional Filter.
+    - Object tagging integrations for bucket lifecycle configuration.
     - Expiration contains either days (integer) or Date (long)
     - Filter contains prefix (string).
 - S3G bucket endpoint needs few updates to accept ?/lifecycle 
@@ -56,10 +56,9 @@ After designing and implementing a solution, I am eager to contribute it back to
 
 ## Limitations
 - The current solution lacks certain features:
-  - Filter doesn't support `AND` operations.
   - Only expiration actions are supported.
   - Lack of CLI support for managing lifecycle configurations across all buckets (S3G is the only supported entry point).
-  - 
+  
 All these kind of features can be added in the future.
 
 ## Protobuf Definitions
