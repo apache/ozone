@@ -19,6 +19,7 @@
 package org.apache.hadoop.hdds.client;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
+import net.jcip.annotations.Immutable;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 
 import java.util.EnumSet;
@@ -30,6 +31,7 @@ import java.util.stream.Collectors;
 /**
  * Replication configuration for EC replication.
  */
+@Immutable
 public class ECReplicationConfig implements ReplicationConfig {
 
   public static final String EC_REPLICATION_PARAMS_DELIMITER = "-";
@@ -60,17 +62,16 @@ public class ECReplicationConfig implements ReplicationConfig {
   private static final Pattern STRING_FORMAT
       = Pattern.compile("([a-zA-Z]+)-(\\d+)-(\\d+)-(\\d+)([kK])?");
 
-  private int data;
+  private final int data;
 
-  private int parity;
+  private final int parity;
 
-  private int ecChunkSize = 1024 * 1024;
+  private final int ecChunkSize;
 
-  private EcCodec codec = EcCodec.RS;
+  private final EcCodec codec;
 
   public ECReplicationConfig(int data, int parity) {
-    this.data = data;
-    this.parity = parity;
+    this(data, parity, EcCodec.RS, 1024 * 1024);
   }
 
   public ECReplicationConfig(int data, int parity, EcCodec codec,
@@ -121,7 +122,7 @@ public class ECReplicationConfig implements ReplicationConfig {
           ") be greater than zero");
     }
     if (matcher.group(5) != null) {
-      // The "k" modifier is present, so multiple by 1024
+      // The "k" modifier is present, so multiply by 1024
       chunkSize = chunkSize * 1024;
     }
     ecChunkSize = chunkSize;

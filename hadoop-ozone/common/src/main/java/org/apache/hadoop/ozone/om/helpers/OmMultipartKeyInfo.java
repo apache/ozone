@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone.om.helpers;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.utils.db.Codec;
+import org.apache.hadoop.hdds.utils.db.CopyObject;
 import org.apache.hadoop.hdds.utils.db.DelegatedCodec;
 import org.apache.hadoop.hdds.utils.db.Proto2Codec;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.MultipartKeyInfo;
@@ -37,7 +38,7 @@ import java.util.TreeMap;
  * This class represents multipart upload information for a key, which holds
  * upload part information of the key.
  */
-public final class OmMultipartKeyInfo extends WithObjectID {
+public final class OmMultipartKeyInfo extends WithObjectID implements CopyObject<OmMultipartKeyInfo> {
   private static final Codec<OmMultipartKeyInfo> CODEC = new DelegatedCodec<>(
       Proto2Codec.get(MultipartKeyInfo.getDefaultInstance()),
       OmMultipartKeyInfo::getFromProto,
@@ -355,6 +356,7 @@ public final class OmMultipartKeyInfo extends WithObjectID {
     return uploadID.hashCode();
   }
 
+  @Override
   public OmMultipartKeyInfo copyObject() {
     return new OmMultipartKeyInfo(this);
   }

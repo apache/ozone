@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.om.helpers;
 
 import com.google.common.base.Preconditions;
 import org.apache.hadoop.hdds.utils.db.Codec;
+import org.apache.hadoop.hdds.utils.db.CopyObject;
 import org.apache.hadoop.hdds.utils.db.DelegatedCodec;
 import org.apache.hadoop.hdds.utils.db.Proto2Codec;
 import org.apache.hadoop.ozone.OzoneAcl;
@@ -36,7 +37,7 @@ import java.util.Objects;
  * can be extended for other OzFS optimizations in future.
  */
 // TODO: support Auditable interface
-public final class OmPrefixInfo extends WithObjectID {
+public final class OmPrefixInfo extends WithObjectID implements CopyObject<OmPrefixInfo> {
   private static final Codec<OmPrefixInfo> CODEC = new DelegatedCodec<>(
       Proto2Codec.get(PersistedPrefixInfo.getDefaultInstance()),
       OmPrefixInfo::getFromProtobuf,
@@ -230,9 +231,7 @@ public final class OmPrefixInfo extends WithObjectID {
         '}';
   }
 
-  /**
-   * Return a new copy of the object.
-   */
+  @Override
   public OmPrefixInfo copyObject() {
     return toBuilder().build();
   }
