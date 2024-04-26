@@ -312,11 +312,12 @@ class TestBlockOutputStream {
       // The previously written data is equal to flushSize, so no action is
       // triggered when execute flush, if flushDelay is enabled.
       // If flushDelay is disabled, it will call waitOnFlushFutures to wait all
-      // putBlocks finished.
+      // putBlocks finished. It was broken because WriteChunk and PutBlock
+      // can be complete regardless of whether the flush executed or not.
       if (flushDelay) {
         assertThat(metrics.getPendingContainerOpCountMetrics(WriteChunk))
             .isLessThanOrEqualTo(pendingWriteChunkCount + 2);
-        assertThat(metrics.getPendingContainerOpCountMetrics(GetBlock))
+        assertThat(metrics.getPendingContainerOpCountMetrics(PutBlock))
             .isLessThanOrEqualTo(pendingWriteChunkCount + 1);
       } else {
         assertEquals(pendingWriteChunkCount,
