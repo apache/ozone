@@ -242,11 +242,7 @@ public class FindMissingPadding extends Handler implements SubcommandWithParent 
             ContainerProtos.ListBlockResponseProto listBlockResponse = ContainerProtocolCalls.listBlock(
                 datanodeClient, containerID, null, Integer.MAX_VALUE, token);
             for (ContainerProtos.BlockData blockData : listBlockResponse.getBlockDataList()) {
-              final Long blockID = blockData.getBlockID().getLocalID();
-              if (!missingBlocks.remove(blockID)) {
-                LOG.debug("Orphan block {}/{} on replica {} at {}",
-                    containerID, blockID, replica.getReplicaIndex(), replica.getDatanodeDetails());
-              }
+              missingBlocks.remove(blockData.getBlockID().getLocalID());
             }
             if (missingBlocks.isEmpty()) {
               LOG.debug("All {} blocks in container {} found on replica {} at {}",
