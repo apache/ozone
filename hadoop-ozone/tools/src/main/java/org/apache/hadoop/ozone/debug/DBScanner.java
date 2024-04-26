@@ -53,6 +53,7 @@ import org.slf4j.LoggerFactory;
 import picocli.CommandLine;
 
 import java.io.BufferedWriter;
+import java.io.File;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.nio.file.Paths;
@@ -113,6 +114,8 @@ public class DBScanner implements Callable<Void>, SubcommandWithParent {
       description = "File to dump table scan data")
   private String fileName;
 
+  private int fileSuffix = 0;
+
   @CommandLine.Option(names = {"--startkey", "--sk", "-s"},
       description = "Key from which to iterate the DB")
   private String startKey;
@@ -147,6 +150,11 @@ public class DBScanner implements Callable<Void>, SubcommandWithParent {
       description = "Thread count for concurrent processing.",
       defaultValue = "10")
   private int threadCount;
+
+  @CommandLine.Option(names = {"--max-records-per-file"},
+      description = "The number of records to print per file.",
+      defaultValue = "0")
+  private long recordsPerFile;
 
   private static final String KEY_SEPARATOR_SCHEMA_V3 =
       new OzoneConfiguration().getObject(DatanodeConfiguration.class)
@@ -217,11 +225,26 @@ public class DBScanner implements Callable<Void>, SubcommandWithParent {
       return displayTable(iterator, dbColumnFamilyDef, out(), schemaV3);
     }
 
-    // Write to file output
-    try (PrintWriter out = new PrintWriter(new BufferedWriter(
-        new PrintWriter(fileName, UTF_8.name())))) {
-      return displayTable(iterator, dbColumnFamilyDef, out, schemaV3);
+    // If there are no parent directories, create them
+    File file = new File(fileName);
+    File parentFile = file.getParentFile();
+    if (!parentFile.exists()) {
+      parentFile.mkdirs();
     }
+
+    // Write to file output
+    while (iterator.get().isValid()) {
+      String fileNameTarget = recordsPerFile > 0 ? fileName + fileSuffix++ :
+          fileName;
+      try (PrintWriter out = new PrintWriter(new BufferedWriter(
+              new PrintWriter(fileNameTarget, UTF_8.name())))) {
+        if (!displayTable(iterator, dbColumnFamilyDef, out, schemaV3)) {
+          return false;
+        }
+      }
+    }
+
+    return true;
   }
 
   private boolean displayTable(ManagedRocksIterator iterator,
@@ -288,6 +311,9 @@ public class DBScanner implements Callable<Void>, SubcommandWithParent {
         batch = new ArrayList<>(batchSize);
         sequenceId++;
       }
+      if ((recordsPerFile > 0) && (count >= recordsPerFile)) {
+        break;
+      }
     }
     if (!batch.isEmpty()) {
       Future<Void> future = threadPool.submit(new Task(dbColumnFamilyDef,
@@ -305,7 +331,7 @@ public class DBScanner implements Callable<Void>, SubcommandWithParent {
   }
 
   private boolean withinLimit(long i) {
-    return limit == -1L || i < limit;
+    return recordsPerFile > 0 || limit == -1L || i < limit;
   }
 
   private ColumnFamilyHandle getColumnFamilyHandle(
