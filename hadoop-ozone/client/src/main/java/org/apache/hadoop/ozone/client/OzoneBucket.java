@@ -1310,7 +1310,8 @@ public class OzoneBucket extends WithMetadata {
         keyInfo.getModificationTime(),
         keyInfo.getReplicationConfig(),
         metadata,
-        keyInfo.isFile());
+        keyInfo.isFile(),
+        keyInfo.getOwnerName());
   }
 
 
@@ -1783,7 +1784,8 @@ public class OzoneBucket extends WithMetadata {
             keyInfo.getDataSize(), keyInfo.getCreationTime(),
             keyInfo.getModificationTime(),
             keyInfo.getReplicationConfig(),
-            keyInfo.isFile());
+            keyInfo.isFile(),
+            keyInfo.getOwnerName());
         keysResultList.add(ozoneKey);
       }
     }

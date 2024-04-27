@@ -95,6 +95,7 @@ public final class OmKeyInfo extends WithParentObjectId
    * keyName is "a/b/key1" then the fileName stores "key1".
    */
   private String fileName;
+  private String ownerName;
 
   /**
    * ACL Information.
@@ -116,6 +117,7 @@ public final class OmKeyInfo extends WithParentObjectId
     this.fileChecksum = b.fileChecksum;
     this.fileName = b.fileName;
     this.isFile = b.isFile;
+    this.ownerName = b.ownerName;
   }
 
   public String getVolumeName() {
@@ -156,6 +158,10 @@ public final class OmKeyInfo extends WithParentObjectId
 
   public String getFileName() {
     return fileName;
+  }
+
+  public String getOwnerName() {
+    return ownerName;
   }
 
   public synchronized OmKeyLocationInfoGroup getLatestVersionLocations() {
@@ -415,6 +421,7 @@ public final class OmKeyInfo extends WithParentObjectId
     private String volumeName;
     private String bucketName;
     private String keyName;
+    private String ownerName;
     private long dataSize;
     private final List<OmKeyLocationInfoGroup> omKeyLocationInfoGroups =
         new ArrayList<>();
@@ -448,6 +455,11 @@ public final class OmKeyInfo extends WithParentObjectId
 
     public Builder setKeyName(String key) {
       this.keyName = key;
+      return this;
+    }
+
+    public Builder setOwnerName(String owner) {
+      this.ownerName = owner;
       return this;
     }
 
@@ -655,6 +667,9 @@ public final class OmKeyInfo extends WithParentObjectId
       kb.setFileEncryptionInfo(OMPBHelper.convert(encInfo));
     }
     kb.setIsFile(isFile);
+    if (ownerName != null) {
+      kb.setOwnerName(ownerName);
+    }
     return kb.build();
   }
 
@@ -702,6 +717,9 @@ public final class OmKeyInfo extends WithParentObjectId
       builder.setFile(keyInfo.getIsFile());
     }
 
+    if (keyInfo.hasOwnerName()) {
+      builder.setOwnerName(keyInfo.getOwnerName());
+    }
     // not persisted to DB. FileName will be filtered out from keyName
     builder.setFileName(OzoneFSUtils.getFileName(keyInfo.getKeyName()));
     return builder.build();
@@ -713,6 +731,7 @@ public final class OmKeyInfo extends WithParentObjectId
         "volume='" + volumeName + '\'' +
         ", bucket='" + bucketName + '\'' +
         ", key='" + keyName + '\'' +
+        ", owner='" + ownerName + '\'' +
         ", dataSize='" + dataSize + '\'' +
         ", creationTime='" + creationTime + '\'' +
         ", objectID='" + getObjectID() + '\'' +
@@ -726,7 +745,8 @@ public final class OmKeyInfo extends WithParentObjectId
   public boolean isKeyInfoSame(OmKeyInfo omKeyInfo, boolean checkPath,
                                boolean checkKeyLocationVersions,
                                boolean checkModificationTime,
-                               boolean checkUpdateID) {
+                               boolean checkUpdateID,
+                               boolean checkOwnerName) {
     boolean isEqual = dataSize == omKeyInfo.dataSize &&
         creationTime == omKeyInfo.creationTime &&
         volumeName.equals(omKeyInfo.volumeName) &&
@@ -754,6 +774,11 @@ public final class OmKeyInfo extends WithParentObjectId
           .equals(keyLocationVersions, omKeyInfo.keyLocationVersions);
     }
 
+    if (isEqual && checkOwnerName) {
+      isEqual = Objects
+          .equals(ownerName, omKeyInfo.ownerName);
+    }
+
     return isEqual;
   }
 
@@ -765,7 +790,7 @@ public final class OmKeyInfo extends WithParentObjectId
     if (o == null || getClass() != o.getClass()) {
       return false;
     }
-    return isKeyInfoSame((OmKeyInfo) o, true, true, true, true);
+    return isKeyInfoSame((OmKeyInfo) o, true, true, true, true, true);
   }
 
   @Override
@@ -782,6 +807,7 @@ public final class OmKeyInfo extends WithParentObjectId
         .setVolumeName(volumeName)
         .setBucketName(bucketName)
         .setKeyName(keyName)
+        .setOwnerName(ownerName)
         .setCreationTime(creationTime)
         .setModificationTime(modificationTime)
         .setDataSize(dataSize)

@@ -213,6 +213,7 @@ public class S3InitiateMultipartUploadRequest extends OMKeyRequest {
           .setFileEncryptionInfo(keyArgs.hasFileEncryptionInfo() ?
               OMPBHelper.convert(keyArgs.getFileEncryptionInfo()) : null)
           .addAllMetadata(KeyValueUtil.getFromProtobuf(keyArgs.getMetadataList()))
+          .setOwnerName(keyArgs.getOwnerName())
           .build();
 
       // Add to cache

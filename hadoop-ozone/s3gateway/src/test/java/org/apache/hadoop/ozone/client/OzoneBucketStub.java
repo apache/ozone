@@ -54,6 +54,7 @@ import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartUploadCompleteInfo;
+import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.util.Time;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -146,7 +147,8 @@ public final class OzoneBucketStub extends OzoneBucket {
                 System.currentTimeMillis(),
                 System.currentTimeMillis(),
                 new ArrayList<>(), finalReplicationCon, metadata, null,
-                () -> readKey(key), true
+                () -> readKey(key), true,
+                UserGroupInformation.getCurrentUser().getShortUserName()
             ));
             super.close();
           }
@@ -185,7 +187,8 @@ public final class OzoneBucketStub extends OzoneBucket {
                 System.currentTimeMillis(),
                 System.currentTimeMillis(),
                 new ArrayList<>(), rConfig, objectMetadata, null,
-                null, false
+                null, false,
+                UserGroupInformation.getCurrentUser().getShortUserName()
             ));
           }
 
@@ -277,7 +280,8 @@ public final class OzoneBucketStub extends OzoneBucket {
           ozoneKeyDetails.getModificationTime().toEpochMilli(),
           ozoneKeyDetails.getReplicationConfig(),
           ozoneKeyDetails.getMetadata(),
-          ozoneKeyDetails.isFile());
+          ozoneKeyDetails.isFile(),
+          ozoneKeyDetails.getOwner());
     } else {
       throw new OMException(ResultCodes.KEY_NOT_FOUND);
     }
@@ -332,7 +336,7 @@ public final class OzoneBucketStub extends OzoneBucket {
               key.getDataSize(),
               key.getCreationTime().getEpochSecond() * 1000,
               key.getModificationTime().getEpochSecond() * 1000,
-              key.getReplicationConfig(), key.isFile());
+              key.getReplicationConfig(), key.isFile(), key.getOwner());
         }).collect(Collectors.toList());
 
     if (prevKey != null) {
@@ -360,7 +364,7 @@ public final class OzoneBucketStub extends OzoneBucket {
                                                  ReplicationType type,
                                                  ReplicationFactor factor)
       throws IOException {
-    return initiateMultipartUpload(keyName, ReplicationConfig.fromTypeAndFactor(type, factor), 
+    return initiateMultipartUpload(keyName, ReplicationConfig.fromTypeAndFactor(type, factor),
         Collections.emptyMap());
   }
 
@@ -435,7 +439,7 @@ public final class OzoneBucketStub extends OzoneBucket {
         }
         keyContents.put(key, output.toByteArray());
       }
-      
+
       keyDetails.put(key, new OzoneKeyDetails(
           getVolumeName(),
           getName(),
@@ -445,7 +449,8 @@ public final class OzoneBucketStub extends OzoneBucket {
           System.currentTimeMillis(),
           new ArrayList<>(), getReplicationConfig(),
           keyToMultipartUpload.get(key).getMetadata(), null,
-          () -> readKey(key), true
+          () -> readKey(key), true,
+          UserGroupInformation.getCurrentUser().getShortUserName()
       ));
     }
 
@@ -593,7 +598,8 @@ public final class OzoneBucketStub extends OzoneBucket {
         System.currentTimeMillis(),
         System.currentTimeMillis(),
         new ArrayList<>(), replicationConfig, new HashMap<>(), null,
-        () -> readKey(keyName), false));
+        () -> readKey(keyName), false,
+        UserGroupInformation.getCurrentUser().getShortUserName()));
   }
 
   private void assertDoesNotExist(String keyName) throws OMException {
@@ -664,7 +670,7 @@ public final class OzoneBucketStub extends OzoneBucket {
    * Multipart upload stub to store MPU related information.
    */
   private static class MultipartInfoStub {
-    
+
     private final String uploadId;
     private final Map<String, String> metadata;
 

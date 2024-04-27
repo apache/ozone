@@ -99,6 +99,7 @@ import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OmFailoverProxyUtil;
 import org.apache.hadoop.ozone.om.OzoneManager;
+import org.apache.hadoop.ozone.om.S3SecretManager;
 import org.apache.hadoop.ozone.om.ResolvedBucket;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes;
@@ -116,10 +117,13 @@ import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
 import org.apache.hadoop.ozone.om.helpers.QuotaUtil;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
+import org.apache.hadoop.ozone.om.helpers.S3SecretValue;
+import org.apache.hadoop.ozone.om.protocol.S3Auth;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType;
 import org.apache.hadoop.ozone.security.acl.OzoneAclConfig;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
 import org.apache.hadoop.ozone.security.acl.OzoneObjInfo;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.tag.Flaky;
@@ -356,6 +360,65 @@ public abstract class TestOzoneRpcClientAbstract {
     assertNotEquals(oldOwner, newOwner);
     store.getVolume(volumeName).deleteBucket(bucketName);
     store.deleteVolume(volumeName);
+  }
+
+  @Test void testKeyOwner() throws IOException {
+    // Save the old user, and switch to the old user after test
+    UserGroupInformation oldUser = UserGroupInformation.getCurrentUser();
+    try {
+      // user1 create a key key1
+      // user1 create a key key2
+      UserGroupInformation user1 = UserGroupInformation
+          .createUserForTesting("user1", new String[] {"user1"});
+      UserGroupInformation user2 = UserGroupInformation
+          .createUserForTesting("user2", new String[] {"user2"});
+      String key1 = "key1";
+      String key2 = "key2";
+      String content = "1234567890";
+      String volumeName = UUID.randomUUID().toString();
+      String bucketName = UUID.randomUUID().toString();
+      store.createVolume(volumeName);
+      store.getVolume(volumeName).createBucket(bucketName);
+      OzoneObj volumeObj = OzoneObjInfo.Builder.newBuilder()
+          .setVolumeName(volumeName).setStoreType(OzoneObj.StoreType.OZONE)
+          .setResType(OzoneObj.ResourceType.VOLUME).build();
+      OzoneObj bucketObj = OzoneObjInfo.Builder.newBuilder()
+          .setVolumeName(volumeName).setBucketName(bucketName)
+          .setStoreType(OzoneObj.StoreType.OZONE)
+          .setResType(OzoneObj.ResourceType.BUCKET).build();
+      store.addAcl(volumeObj, new OzoneAcl(USER, "user1", ACCESS, ACLType.ALL));
+      store.addAcl(volumeObj, new OzoneAcl(USER, "user2", ACCESS, ACLType.ALL));
+      store.addAcl(bucketObj, new OzoneAcl(USER, "user1", ACCESS, ACLType.ALL));
+      store.addAcl(bucketObj, new OzoneAcl(USER, "user2", ACCESS, ACLType.ALL));
+
+      createKeyForUser(volumeName, bucketName, key1, content, user1);
+      createKeyForUser(volumeName, bucketName, key2, content, user2);
+      UserGroupInformation.setLoginUser(oldUser);
+      setOzClient(OzoneClientFactory.getRpcClient(cluster.getConf()));
+      setStore(ozClient.getObjectStore());
+      OzoneBucket bucket = store.getVolume(volumeName).getBucket(bucketName);
+      assertNotNull(bucket.getKey(key1));
+      assertNotNull(bucket.getKey(key2));
+      assertEquals(user1.getShortUserName(),
+          bucket.getKey(key1).getOwner());
+      assertEquals(user2.getShortUserName(),
+          bucket.getKey(key2).getOwner());
+    } finally {
+      UserGroupInformation.setLoginUser(oldUser);
+      setOzClient(OzoneClientFactory.getRpcClient(cluster.getConf()));
+      setStore(ozClient.getObjectStore());
+    }
+
+  }
+
+  private void createKeyForUser(String volumeName, String bucketName,
+      String keyName, String keyContent, UserGroupInformation user)
+      throws IOException {
+    UserGroupInformation.setLoginUser(user);
+    setOzClient(OzoneClientFactory.getRpcClient(cluster.getConf()));
+    setStore(ozClient.getObjectStore());
+    OzoneBucket bucket = store.getVolume(volumeName).getBucket(bucketName);
+    createTestKey(bucket, keyName, keyContent);
   }
 
   @Test
@@ -2820,7 +2883,86 @@ public abstract class TestOzoneRpcClientAbstract {
     doMultipartUpload(bucket, keyName, (byte)97, replication);
 
   }
+  @Test
+  public void testMultipartUploadOwner() throws Exception {
+    // Save the old user, and switch to the old user after test
+    UserGroupInformation oldUser = UserGroupInformation.getCurrentUser();
+    try {
+      String volumeName = UUID.randomUUID().toString();
+      String bucketName = UUID.randomUUID().toString();
+      String keyName1 = UUID.randomUUID().toString();
+      String keyName2 = UUID.randomUUID().toString();
+      UserGroupInformation user1 = UserGroupInformation
+          .createUserForTesting("user1", new String[]{"user1"});
+      UserGroupInformation awsUser1 = UserGroupInformation
+          .createUserForTesting("awsUser1", new String[]{"awsUser1"});
+      ReplicationConfig replication = RatisReplicationConfig.getInstance(
+          HddsProtos.ReplicationFactor.THREE);
 
+      // create volume and bucket and add ACL
+      store.createVolume(volumeName);
+      store.getVolume(volumeName).createBucket(bucketName);
+      OzoneObj volumeObj = OzoneObjInfo.Builder.newBuilder()
+          .setVolumeName(volumeName).setStoreType(OzoneObj.StoreType.OZONE)
+          .setResType(OzoneObj.ResourceType.VOLUME).build();
+      OzoneObj bucketObj = OzoneObjInfo.Builder.newBuilder()
+          .setVolumeName(volumeName).setBucketName(bucketName)
+          .setStoreType(OzoneObj.StoreType.OZONE)
+          .setResType(OzoneObj.ResourceType.BUCKET).build();
+      store.addAcl(volumeObj, new OzoneAcl(USER, "user1", ACCESS, ACLType.ALL));
+      store.addAcl(volumeObj, new OzoneAcl(USER, "awsUser1", ACCESS, ACLType.ALL));
+      store.addAcl(bucketObj, new OzoneAcl(USER, "user1", ACCESS, ACLType.ALL));
+      store.addAcl(bucketObj, new OzoneAcl(USER, "awsUser1", ACCESS, ACLType.ALL));
+
+      // user1 MultipartUpload a key
+      UserGroupInformation.setLoginUser(user1);
+      setOzClient(OzoneClientFactory.getRpcClient(cluster.getConf()));
+      setStore(ozClient.getObjectStore());
+      OzoneBucket bucket = store.getVolume(volumeName).getBucket(bucketName);
+      doMultipartUpload(bucket, keyName1, (byte) 96, replication);
+
+      assertEquals(user1.getShortUserName(),
+          bucket.getKey(keyName1).getOwner());
+
+      // After HDDS-5881 the user will not be different,
+      // as S3G uses single RpcClient.
+      // * performing the operation. the real user is an AWS user
+      // form AWS client.
+      String strToSign = "AWS4-HMAC-SHA256\n" +
+          "20150830T123600Z\n" +
+          "20150830/us-east-1/iam/aws4_request\n" +
+          "f536975d06c0309214f805bb90ccff089219ecd68b2" +
+          "577efef23edd43b7e1a59";
+      String signature =  "5d672d79c15b13162d9279b0855cfba" +
+          "6789a8edb4c82c400e06b5924a6f2b5d7";
+      String secret = "wJalrXUtnFEMI/K7MDENG+bPxRfiCYEXAMPLEKEY";
+      S3Auth s3Auth = new S3Auth(strToSign, signature,
+          awsUser1.getShortUserName(), awsUser1.getShortUserName());
+      // Add secret to S3Secret table.
+      S3SecretManager s3SecretManager = cluster.getOzoneManager()
+          .getS3SecretManager();
+      s3SecretManager.storeSecret(awsUser1.getShortUserName(),
+          S3SecretValue.of(awsUser1.getShortUserName(), secret));
+      setOzClient(OzoneClientFactory.getRpcClient(cluster.getConf()));
+      setStore(ozClient.getObjectStore());
+
+      // set AWS user for RPCClient and OzoneManager
+      store.getClientProxy().setThreadLocalS3Auth(s3Auth);
+      OzoneManager.setS3Auth(OzoneManagerProtocolProtos.S3Authentication
+          .newBuilder().setAccessId(awsUser1.getUserName()).build());
+      // awsUser1 create a key
+      bucket = store.getVolume(volumeName).getBucket(bucketName);
+      doMultipartUpload(bucket, keyName2, (byte)96, replication);
+
+      assertEquals(awsUser1.getShortUserName(),
+          bucket.getKey(keyName2).getOwner());
+    } finally {
+      OzoneManager.setS3Auth(null);
+      UserGroupInformation.setLoginUser(oldUser);
+      setOzClient(OzoneClientFactory.getRpcClient(cluster.getConf()));
+      setStore(ozClient.getObjectStore());
+    }
+  }
 
   @Test
   public void testMultipartUploadWithPartsLessThanMinSize() throws Exception {
