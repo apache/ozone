@@ -24,6 +24,7 @@ import org.apache.hadoop.hdds.scm.client.ClientTrustManager;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CACertificateProvider;
 import org.apache.hadoop.hdds.utils.HAUtils;
 import org.apache.hadoop.ozone.OzoneSecurityUtil;
+import org.apache.hadoop.ozone.util.PayloadUtils;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -35,7 +36,6 @@ import org.apache.hadoop.hdds.scm.cli.ContainerOperationClient;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.storage.ContainerProtocolCalls;
-import org.apache.ratis.thirdparty.com.google.protobuf.UnsafeByteOperations;
 import picocli.CommandLine;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
@@ -43,8 +43,6 @@ import picocli.CommandLine.Option;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.Callable;
-
-import static org.apache.hadoop.ozone.util.PayloadUtils.generatePayload;
 
 /**
  * Utility to generate RPC request to DN.
@@ -139,7 +137,7 @@ public class DNRPCLoadGenerator extends BaseFreonGenerator
     }
 
     init();
-    payloadReqBytes = UnsafeByteOperations.unsafeWrap(generatePayload(payloadSizeInBytes(payloadReqSizeKB)));
+    payloadReqBytes = PayloadUtils.generatePayloadProto3(payloadSizeInBytes(payloadReqSizeKB));
     payloadRespSize = calculateMaxPayloadSize(payloadRespSizeKB);
     timer = getMetrics().timer("rpc-payload");
     try {
