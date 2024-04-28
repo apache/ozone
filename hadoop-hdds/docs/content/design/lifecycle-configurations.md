@@ -42,10 +42,13 @@ This requirement closely resembled the functionality provided by AWS S3 Lifecycl
     - Filter contains prefix (string).
 - S3G bucket endpoint needs few updates to accept ?/lifecycle 
 - ClientProtocol and all implementers provides (get, list, delete and create) lifecycle configuration
-- RetentionManager will be running periodically.
-   - Fetches a lifecycle configurations list with the help of OM
-   - Executes each lifecycle configuration on a specific bucket
-   - Lifecycle configurations will be running on parallel (each one against different bucket).
+- RetentionManager:
+   - Upon startup, the OzoneManager initializes the Retention Manager based on configuration parameters such as retention interval.
+   - A background retention service is responsible for scheduling and executing tasks at specified intervals.
+   - The Retention Manager retrieves lifecycle configurations associated with buckets.
+   - Then assigns each lifecycle configuration (attached to a bucket) to a threadpool (Configurable) for further processing. 
+   - Each task will iterate through keys of a specific bucket and issue deletion request for eligible keys.
+     
 
 
 ### Flow
