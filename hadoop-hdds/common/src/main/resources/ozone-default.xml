@@ -2097,7 +2097,7 @@
   </property>
 
   <property>
-    <name>ozone.om.ratis.server.leaderelection.pre-vote </name>
+    <name>ozone.om.ratis.server.leaderelection.pre-vote</name>
     <value>true</value>
     <tag>OZONE, OM, RATIS, MANAGEMENT</tag>
     <description>Enable/disable OM HA leader election pre-vote phase.
@@ -2111,6 +2111,15 @@
     <description>The timeout duration for ratis server failure detection,
       once the threshold has reached, the ratis state machine will be informed
       about the failure in the ratis ring.
+    </description>
+  </property>
+
+  <property>
+    <name>ozone.om.ratis.server.close.threshold</name>
+    <value>60s</value>
+    <tag>OZONE, OM, RATIS</tag>
+    <description>
+      Raft Server will close if JVM pause longer than the threshold.
     </description>
   </property>
 

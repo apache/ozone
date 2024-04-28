@@ -247,6 +247,10 @@ public final class OMConfigKeys {
   public static final boolean
       OZONE_OM_RATIS_SERVER_ELECTION_PRE_VOTE_DEFAULT = true;
 
+  public static final String OZONE_OM_RATIS_SERVER_CLOSE_THRESHOLD_KEY =
+      "ozone.om.ratis.server.close.threshold";
+  public static final TimeDuration OZONE_OM_RATIS_SERVER_CLOSE_THRESHOLD_DEFAULT =
+      TimeDuration.valueOf(60, TimeUnit.SECONDS);
 
   // OM SnapshotProvider configurations
   public static final String OZONE_OM_RATIS_SNAPSHOT_DIR =
