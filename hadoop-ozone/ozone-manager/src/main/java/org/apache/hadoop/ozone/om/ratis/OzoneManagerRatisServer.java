@@ -600,8 +600,6 @@ public final class OzoneManagerRatisServer {
     }
   }
 
-  //TODO simplify it to make it shorter
-  @SuppressWarnings("methodlength")
   public static RaftProperties newRaftProperties(ConfigurationSource conf,
       int port, String ratisStorageDir) {
     // Set RPC type
@@ -621,11 +619,39 @@ public final class OzoneManagerRatisServer {
     // Set Ratis storage directory
     RaftServerConfigKeys.setStorageDir(properties,
         Collections.singletonList(new File(ratisStorageDir)));
+
+    final int logAppenderQueueByteLimit = (int) conf.getStorageSize(
+        OMConfigKeys.OZONE_OM_RATIS_LOG_APPENDER_QUEUE_BYTE_LIMIT,
+        OMConfigKeys.OZONE_OM_RATIS_LOG_APPENDER_QUEUE_BYTE_LIMIT_DEFAULT, StorageUnit.BYTES);
+
+    // For grpc config
+    setGrpcConfig(properties, logAppenderQueueByteLimit);
+
+    setRaftLeaderElectionProperties(properties, conf);
+
+    setRaftLogProperties(properties, logAppenderQueueByteLimit, conf);
+
+    setRaftRpcProperties(properties, conf);
+
+    setRaftRetryCacheProperties(properties, conf);
+
+    setRaftSnapshotProperties(properties, conf);
+
+    setRaftCloseThreshold(properties, conf);
+
+    getOMHAConfigs(conf).forEach(properties::set);
+    return properties;
+  }
+
+  private static void setRaftLeaderElectionProperties(RaftProperties properties, ConfigurationSource conf) {
     // Disable/enable the pre vote feature in Ratis
     RaftServerConfigKeys.LeaderElection.setPreVote(properties,
         conf.getBoolean(OMConfigKeys.OZONE_OM_RATIS_SERVER_ELECTION_PRE_VOTE,
             OMConfigKeys.OZONE_OM_RATIS_SERVER_ELECTION_PRE_VOTE_DEFAULT));
+  }
 
+  private static void setRaftLogProperties(RaftProperties properties,
+      int logAppenderQueueByteLimit, ConfigurationSource conf) {
     // Set RAFT segment size
     final long raftSegmentSize = (long) conf.getStorageSize(
         OMConfigKeys.OZONE_OM_RATIS_SEGMENT_SIZE_KEY,
@@ -657,10 +683,6 @@ public final class OzoneManagerRatisServer {
     int logAppenderQueueNumElements = conf.getInt(
         OMConfigKeys.OZONE_OM_RATIS_LOG_APPENDER_QUEUE_NUM_ELEMENTS,
         OMConfigKeys.OZONE_OM_RATIS_LOG_APPENDER_QUEUE_NUM_ELEMENTS_DEFAULT);
-    final int logAppenderQueueByteLimit = (int) conf.getStorageSize(
-        OMConfigKeys.OZONE_OM_RATIS_LOG_APPENDER_QUEUE_BYTE_LIMIT,
-        OMConfigKeys.OZONE_OM_RATIS_LOG_APPENDER_QUEUE_BYTE_LIMIT_DEFAULT,
-        StorageUnit.BYTES);
     RaftServerConfigKeys.Log.Appender.setBufferElementLimit(properties,
         logAppenderQueueNumElements);
     RaftServerConfigKeys.Log.Appender.setBufferByteLimit(properties,
@@ -675,12 +697,18 @@ public final class OzoneManagerRatisServer {
         OMConfigKeys.OZONE_OM_RATIS_LOG_PURGE_GAP,
         OMConfigKeys.OZONE_OM_RATIS_LOG_PURGE_GAP_DEFAULT);
     RaftServerConfigKeys.Log.setPurgeGap(properties, logPurgeGap);
+    // Set the number of maximum cached segments
+    RaftServerConfigKeys.Log.setSegmentCacheNumMax(properties, 2);
+  }
 
+  private static void setGrpcConfig(RaftProperties properties, int logAppenderQueueByteLimit) {
     // For grpc set the maximum message size
     // TODO: calculate the optimal max message size
     GrpcConfigKeys.setMessageSizeMax(properties,
         SizeInBytes.valueOf(logAppenderQueueByteLimit));
+  }
 
+  private static void setRaftRpcProperties(RaftProperties properties, ConfigurationSource conf) {
     // Set the server request timeout
     TimeUnit serverRequestTimeoutUnit =
         OMConfigKeys.OZONE_OM_RATIS_SERVER_REQUEST_TIMEOUT_DEFAULT.getUnit();
@@ -692,18 +720,6 @@ public final class OzoneManagerRatisServer {
         serverRequestTimeoutDuration, serverRequestTimeoutUnit);
     RaftServerConfigKeys.Rpc.setRequestTimeout(properties,
         serverRequestTimeout);
-
-    // Set timeout for server retry cache entry
-    TimeUnit retryCacheTimeoutUnit = OMConfigKeys
-        .OZONE_OM_RATIS_SERVER_RETRY_CACHE_TIMEOUT_DEFAULT.getUnit();
-    long retryCacheTimeoutDuration = conf.getTimeDuration(
-        OMConfigKeys.OZONE_OM_RATIS_SERVER_RETRY_CACHE_TIMEOUT_KEY,
-        OMConfigKeys.OZONE_OM_RATIS_SERVER_RETRY_CACHE_TIMEOUT_DEFAULT
-            .getDuration(), retryCacheTimeoutUnit);
-    final TimeDuration retryCacheTimeout = TimeDuration.valueOf(
-        retryCacheTimeoutDuration, retryCacheTimeoutUnit);
-    RaftServerConfigKeys.RetryCache.setExpiryTime(properties,
-        retryCacheTimeout);
 
     // Set the server min and max timeout
     TimeUnit serverMinTimeoutUnit =
@@ -723,11 +739,7 @@ public final class OzoneManagerRatisServer {
     RaftServerConfigKeys.Rpc.setTimeoutMax(properties,
         serverMaxTimeout);
 
-    // Set the number of maximum cached segments
-    RaftServerConfigKeys.Log.setSegmentCacheNumMax(properties, 2);
-
-    // TODO: set max write buffer size
-
+    // Set the server Rpc slowness timeout and Notification noLeader timeout
     TimeUnit nodeFailureTimeoutUnit =
         OMConfigKeys.OZONE_OM_RATIS_SERVER_FAILURE_TIMEOUT_DURATION_DEFAULT
             .getUnit();
@@ -741,7 +753,23 @@ public final class OzoneManagerRatisServer {
         nodeFailureTimeout);
     RaftServerConfigKeys.Rpc.setSlownessTimeout(properties,
         nodeFailureTimeout);
+  }
 
+  private static void setRaftRetryCacheProperties(RaftProperties properties, ConfigurationSource conf) {
+    // Set timeout for server retry cache entry
+    TimeUnit retryCacheTimeoutUnit = OMConfigKeys
+        .OZONE_OM_RATIS_SERVER_RETRY_CACHE_TIMEOUT_DEFAULT.getUnit();
+    long retryCacheTimeoutDuration = conf.getTimeDuration(
+        OMConfigKeys.OZONE_OM_RATIS_SERVER_RETRY_CACHE_TIMEOUT_KEY,
+        OMConfigKeys.OZONE_OM_RATIS_SERVER_RETRY_CACHE_TIMEOUT_DEFAULT
+            .getDuration(), retryCacheTimeoutUnit);
+    final TimeDuration retryCacheTimeout = TimeDuration.valueOf(
+        retryCacheTimeoutDuration, retryCacheTimeoutUnit);
+    RaftServerConfigKeys.RetryCache.setExpiryTime(properties,
+        retryCacheTimeout);
+  }
+
+  private static void setRaftSnapshotProperties(RaftProperties properties, ConfigurationSource conf) {
     // Set auto trigger snapshot. We don't need to configure auto trigger
     // threshold in OM, as last applied index is flushed during double buffer
     // flush automatically. (But added this property internally, so that this
@@ -760,9 +788,17 @@ public final class OzoneManagerRatisServer {
 
     RaftServerConfigKeys.Snapshot.setAutoTriggerThreshold(properties,
         snapshotAutoTriggerThreshold);
+  }
 
-    getOMHAConfigs(conf).forEach(properties::set);
-    return properties;
+  private static void setRaftCloseThreshold(RaftProperties properties, ConfigurationSource conf) {
+    // Set RAFT server close threshold
+    TimeUnit closeThresholdUnit = OMConfigKeys.OZONE_OM_RATIS_SERVER_CLOSE_THRESHOLD_DEFAULT.getUnit();
+    final int closeThreshold = (int) TimeDuration.valueOf(conf.getTimeDuration(
+        OMConfigKeys.OZONE_OM_RATIS_SERVER_CLOSE_THRESHOLD_KEY,
+        OMConfigKeys.OZONE_OM_RATIS_SERVER_CLOSE_THRESHOLD_DEFAULT.getDuration(), closeThresholdUnit),
+        closeThresholdUnit).toLong(TimeUnit.SECONDS);
+    // TODO: update to new api setCloseThreshold(RaftProperties, TimeDuration) if available
+    RaftServerConfigKeys.setCloseThreshold(properties, closeThreshold);
   }
 
   private static Map<String, String> getOMHAConfigs(
