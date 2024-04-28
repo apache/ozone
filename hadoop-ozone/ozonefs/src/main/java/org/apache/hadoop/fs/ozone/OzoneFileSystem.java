@@ -26,6 +26,7 @@ import java.util.List;
 import com.google.common.base.Strings;
 import org.apache.hadoop.crypto.key.KeyProvider;
 import org.apache.hadoop.crypto.key.KeyProviderTokenIssuer;
+import org.apache.hadoop.fs.CommonPathCapabilities;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.LeaseRecoverable;
 import org.apache.hadoop.fs.Path;
@@ -42,6 +43,7 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.security.token.DelegationTokenIssuer;
 
+import static org.apache.hadoop.fs.impl.PathCapabilitiesSupport.validatePathCapabilityArgs;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.CONTAINER_NOT_FOUND;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.NO_SUCH_BLOCK;
 import static org.apache.hadoop.ozone.OzoneConsts.FORCE_LEASE_RECOVERY_ENV;
@@ -135,6 +137,14 @@ public class OzoneFileSystem extends BasicOzoneFileSystem
     if (cap) {
       return cap;
     }
+    // this switch is for features which are in the OFS client.
+    switch (validatePathCapabilityArgs(path, capability)) {
+    case CommonPathCapabilities.LEASE_RECOVERABLE:
+      return true;
+    default:
+      // fall through
+    }
+
     return super.hasPathCapability(p, capability);
   }
 

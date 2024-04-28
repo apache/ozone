@@ -21,6 +21,7 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.contract.AbstractContractCreateTest;
 import org.apache.hadoop.fs.contract.AbstractContractDeleteTest;
 import org.apache.hadoop.fs.contract.AbstractContractGetFileStatusTest;
+import org.apache.hadoop.fs.contract.AbstractContractLeaseRecoveryTest;
 import org.apache.hadoop.fs.contract.AbstractContractMkdirTest;
 import org.apache.hadoop.fs.contract.AbstractContractOpenTest;
 import org.apache.hadoop.fs.contract.AbstractContractRenameTest;
@@ -309,6 +310,20 @@ abstract class AbstractOzoneContractTest {
     @Override
     protected AbstractFSContract createContract(Configuration conf) {
       return createOzoneContract(conf);
+    }
+  }
+
+  @Nested
+  class TestContractLeaseRecovery extends AbstractContractLeaseRecoveryTest {
+
+    @Override
+    protected AbstractFSContract createContract(Configuration conf) {
+      return createOzoneContract(conf);
+    }
+
+    @Override
+    protected Configuration createConfiguration() {
+      return createOzoneConfig();
     }
   }
 
