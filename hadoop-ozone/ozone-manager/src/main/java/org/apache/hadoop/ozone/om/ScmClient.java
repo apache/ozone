@@ -113,11 +113,16 @@ public class ScmClient {
     for (DatanodeDetails node : pipeline.getNodes()) {
       DatanodeDetails datanodeDetails =
           datanodeDetailsCache.get(node.getUuid());
-      if (node.equals(datanodeDetails)) {
-        nodes.add(datanodeDetails);
-      } else {
+      if (datanodeDetails == null) {
         datanodeDetailsCache.put(node.getUuid(), node);
         nodes.add(node);
+      } else {
+        if (node.equals(datanodeDetails)) {
+          nodes.add(datanodeDetails);
+        } else {
+          datanodeDetailsCache.put(node.getUuid(), node);
+          nodes.add(node);
+        }
       }
     }
     builder.setNodes(nodes);
