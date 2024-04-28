@@ -22,7 +22,7 @@ import com.google.common.cache.CacheLoader;
 import com.google.common.cache.CacheLoader.InvalidCacheLoadException;
 import com.google.common.cache.LoadingCache;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
+import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.protocol.ScmBlockLocationProtocol;
 import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocol;
@@ -30,9 +30,12 @@ import org.apache.hadoop.util.CacheMetrics;
 import jakarta.annotation.Nonnull;
 
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
@@ -72,6 +75,9 @@ public class ScmClient {
     long ttl = configuration.getTimeDuration(
         OZONE_OM_CONTAINER_LOCATION_CACHE_TTL,
         OZONE_OM_CONTAINER_LOCATION_CACHE_TTL_DEFAULT.getDuration(), unit);
+
+    final Map<UUID, DatanodeDetails>
+        datanodeDetailsCache = new ConcurrentHashMap<>();
     return CacheBuilder.newBuilder()
         .maximumSize(maxSize)
         .expireAfterWrite(ttl, unit)
@@ -80,7 +86,9 @@ public class ScmClient {
           @Nonnull
           @Override
           public Pipeline load(@Nonnull Long key) throws Exception {
-            return containerClient.getContainerWithPipeline(key).getPipeline();
+            Pipeline pipeline =
+                containerClient.getContainerWithPipeline(key).getPipeline();
+            return newPipelineWithDNCache(pipeline, datanodeDetailsCache);
           }
 
           @Nonnull
@@ -91,10 +99,29 @@ public class ScmClient {
                 .stream()
                 .collect(Collectors.toMap(
                     x -> x.getContainerInfo().getContainerID(),
-                    ContainerWithPipeline::getPipeline
+                    x -> newPipelineWithDNCache(x.getPipeline(),
+                        datanodeDetailsCache)
                 ));
           }
         });
+  }
+
+  static Pipeline newPipelineWithDNCache(Pipeline pipeline,
+      Map<UUID, DatanodeDetails> datanodeDetailsCache) {
+    Pipeline.Builder builder = Pipeline.newBuilder(pipeline);
+    List<DatanodeDetails> nodes = new ArrayList<>();
+    for (DatanodeDetails node : pipeline.getNodes()) {
+      DatanodeDetails datanodeDetails =
+          datanodeDetailsCache.get(node.getUuid());
+      if (node.equals(datanodeDetails)) {
+        nodes.add(datanodeDetails);
+      } else {
+        datanodeDetailsCache.put(node.getUuid(), node);
+        nodes.add(node);
+      }
+    }
+    builder.setNodes(nodes);
+    return builder.build();
   }
 
   public ScmBlockLocationProtocol getBlockClient() {
