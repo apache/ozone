@@ -18,10 +18,6 @@
 
 package org.apache.hadoop.ozone.client;
 
-import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
-
-import java.util.List;
-
 /**
  * One key can be stored in one or more containers as one or more blocks.
  * This class represents one such block instance.
