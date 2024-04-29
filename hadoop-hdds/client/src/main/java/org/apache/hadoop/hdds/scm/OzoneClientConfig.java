@@ -166,7 +166,7 @@ public class OzoneClientConfig {
       description = "The checksum type [NONE/ CRC32/ CRC32C/ SHA256/ MD5] "
           + "determines which algorithm would be used to compute checksum for "
           + "chunk data. Default checksum type is CRC32.",
-      tags = ConfigTag.CLIENT)
+      tags = { ConfigTag.CLIENT, ConfigTag.CRYPTO_COMPLIANCE })
   private String checksumType = ChecksumType.CRC32.name();
 
   @Config(key = "bytes.per.checksum",
@@ -175,7 +175,7 @@ public class OzoneClientConfig {
       description = "Checksum will be computed for every bytes per checksum "
           + "number of bytes and stored sequentially. The minimum value for "
           + "this config is 16KB.",
-      tags = ConfigTag.CLIENT)
+      tags = { ConfigTag.CLIENT, ConfigTag.CRYPTO_COMPLIANCE })
   private int bytesPerChecksum = 1024 * 1024;
 
   @Config(key = "verify.checksum",
