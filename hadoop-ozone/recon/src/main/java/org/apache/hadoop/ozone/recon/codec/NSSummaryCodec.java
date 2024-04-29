@@ -113,8 +113,6 @@ public final class NSSummaryCodec implements Codec<NSSummary> {
 
     int strLen = in.readInt();
     if (strLen == 0) {
-      long parentId = in.readLong(); // Deserialize parentId
-      res.setParentId(parentId);
       return res;
     }
     byte[] buffer = new byte[strLen];
@@ -123,6 +121,12 @@ public final class NSSummaryCodec implements Codec<NSSummary> {
     String dirName = stringCodec.fromPersistedFormat(buffer);
     res.setDirName(dirName);
     long parentId = in.readLong();
+    if (parentId == 0) {
+      // Set the parent ID to -1 to indicate that it is old data from
+      // the cluster and the value has not yet been set.
+      res.setParentId(-1);
+      return res;
+    }
     res.setParentId(parentId);
     return res;
   }

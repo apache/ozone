@@ -277,9 +277,11 @@ public class ReconUtils {
       if (nsSummary == null) {
         break;
       }
-      if (!hasParentIdField(nsSummary)) {
-        // Call reprocess method if parentId is missing
+      if (nsSummary.getParentId() == -1) {
+        // Call reprocess method if parentId is negative, as it has not been set for this yet.
         reconNamespaceSummaryManager.rebuildNSSummaryTree(omMetadataManager);
+        return constructFullPath(omKeyInfo, reconNamespaceSummaryManager,
+            omMetadataManager);
       }
       fullPath.insert(0, nsSummary.getDirName() + OM_KEY_PREFIX);
 
@@ -297,20 +299,6 @@ public class ReconUtils {
     }
     return fullPath.toString();
   }
-
-  public static boolean hasParentIdField(NSSummary nsSummary) {
-    Field field;
-    try {
-      // This line attempts to get the Field object representing the parentId
-      // field from the NSSummary class. If the parentId field does not exist,
-      // a NoSuchFieldException will be thrown.
-      field = NSSummary.class.getDeclaredField("parentId");
-      return true;
-    } catch (NoSuchFieldException e) {
-      return false; // Field not present
-    }
-  }
-
 
   /**
    * Make HTTP GET call on the URL and return HttpURLConnection instance.

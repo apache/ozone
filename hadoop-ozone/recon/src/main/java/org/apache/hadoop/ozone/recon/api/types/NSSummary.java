@@ -36,11 +36,11 @@ public class NSSummary {
   private int[] fileSizeBucket;
   private Set<Long> childDir;
   private String dirName;
-  private long parentId = -1;
+  private long parentId = 0;
 
   public NSSummary() {
     this(0, 0L, new int[ReconConstants.NUM_OF_FILE_SIZE_BINS],
-        new HashSet<>(), "", -1); // -1 can be a default value indicating no parent
+        new HashSet<>(), "", 0);
   }
 
   public NSSummary(int numOfFiles,
