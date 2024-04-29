@@ -184,8 +184,9 @@ public class TestReconcileContainerCommandHandler {
   }
 
   private void verifyContainerReportsSent() throws Exception {
-    for (ContainerID id: containerReportsSent.keySet()) {
-      String sentDataChecksum = containerReportsSent.get(id).getDataChecksum();
+    for (Map.Entry<ContainerID, ContainerReplicaProto> entry: containerReportsSent.entrySet()) {
+      ContainerID id = entry.getKey();
+      String sentDataChecksum = entry.getValue().getDataChecksum();
       String expectedDataChecksum = ContainerUtils.getChecksum(Long.toString(id.getId()));
       Assertions.assertEquals(expectedDataChecksum, sentDataChecksum, "Checksum mismatch in report of container " + id);
     }
