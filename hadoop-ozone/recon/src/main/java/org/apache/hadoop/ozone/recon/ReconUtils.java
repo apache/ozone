@@ -24,6 +24,7 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.lang.reflect.Field;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.nio.file.Path;
@@ -290,6 +291,19 @@ public class ReconUtils {
       return OmUtils.normalizeKey(fullPath.toString(), true);
     }
     return fullPath.toString();
+  }
+
+  public static boolean hasParentIdField(NSSummary nsSummary) {
+    Field field;
+    try {
+      // This line attempts to get the Field object representing the parentId
+      // field from the NSSummary class. If the parentId field does not exist,
+      // a NoSuchFieldException will be thrown.
+      field = NSSummary.class.getDeclaredField("parentId");
+      return true;
+    } catch (NoSuchFieldException e) {
+      return false; // Field not present
+    }
   }
 
 

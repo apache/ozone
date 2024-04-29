@@ -30,10 +30,12 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.lang.reflect.Field;
 import java.util.Map;
 
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_NSSUMMARY_FLUSH_TO_DB_MAX_THRESHOLD;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_NSSUMMARY_FLUSH_TO_DB_MAX_THRESHOLD_DEFAULT;
+import static org.apache.hadoop.ozone.recon.ReconUtils.hasParentIdField;
 
 /**
  * Class for holding all NSSummaryTask methods
@@ -125,11 +127,15 @@ public class NSSummaryTaskDbEventHandler {
     if (curNSSummary == null) {
       // If we don't have it in this batch we try to get it from the DB
       curNSSummary = reconNamespaceSummaryManager.getNSSummary(objectId);
-    }
-    if (curNSSummary == null) {
-      // If we don't have it locally and in the DB we create a new instance
-      // as this is a new ID
-      curNSSummary = new NSSummary();
+      if (curNSSummary == null) {
+        // If we don't have it locally and in the DB we create a new instance
+        // as this is a new ID
+        curNSSummary = new NSSummary();
+      } else if (!hasParentIdField(curNSSummary)) {
+        // Call reprocess method if parentId is missing
+        reconNamespaceSummaryManager.rebuildNSSummaryTree(reconOMMetadataManager);
+        curNSSummary = reconNamespaceSummaryManager.getNSSummary(objectId);
+      }
     }
     curNSSummary.setDirName(dirName);
     // Set the parent directory ID
@@ -144,6 +150,11 @@ public class NSSummaryTaskDbEventHandler {
     if (nsSummary == null) {
       // If we don't have it in this batch we try to get it from the DB
       nsSummary = reconNamespaceSummaryManager.getNSSummary(parentObjectId);
+    }
+    if (nsSummary != null && !hasParentIdField(nsSummary)) {
+      // Call reprocess method if parentId is missing
+      reconNamespaceSummaryManager.rebuildNSSummaryTree(reconOMMetadataManager);
+      nsSummary = reconNamespaceSummaryManager.getNSSummary(objectId);
     }
     if (nsSummary == null) {
       // If we don't have it locally and in the DB we create a new instance
