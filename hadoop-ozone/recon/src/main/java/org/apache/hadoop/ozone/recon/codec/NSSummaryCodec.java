@@ -120,14 +120,15 @@ public final class NSSummaryCodec implements Codec<NSSummary> {
     assert (bytesRead == strLen);
     String dirName = stringCodec.fromPersistedFormat(buffer);
     res.setDirName(dirName);
-    long parentId = in.readLong();
-    if (parentId == 0) {
-      // Set the parent ID to -1 to indicate that it is old data from
-      // the cluster and the value has not yet been set.
+
+    // Check if there is enough data available to read the parentId
+    if (in.available() >= Long.BYTES) {
+      long parentId = in.readLong();
+      res.setParentId(parentId);
+    } else {
+      // Set default parentId to -1 indicating it's from old format
       res.setParentId(-1);
-      return res;
     }
-    res.setParentId(parentId);
     return res;
   }
 

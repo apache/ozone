@@ -33,6 +33,7 @@ import java.sql.Timestamp;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.Executors;
 import java.util.stream.Collectors;
 
 import com.google.common.base.Preconditions;
@@ -256,7 +257,7 @@ public class ReconUtils {
 
   /**
    * Constructs the full path of a key from its OmKeyInfo using a bottom-up approach, starting from the leaf node.
-   * <p>
+   *
    * The method begins with the leaf node (the key itself) and recursively prepends parent directory names, fetched
    * via NSSummary objects, until reaching the parent bucket (parentId is -1). It effectively builds the path from
    * bottom to top, finally prepending the volume and bucket names to complete the full path.
@@ -272,16 +273,17 @@ public class ReconUtils {
     StringBuilder fullPath = new StringBuilder(omKeyInfo.getKeyName());
     long parentId = omKeyInfo.getParentObjectID();
     boolean isDirectoryPresent = false;
-    while (parentId != -1) {
+    boolean rebuildTriggered = false;
+
+    while (parentId != 0) {
       NSSummary nsSummary = reconNamespaceSummaryManager.getNSSummary(parentId);
       if (nsSummary == null) {
         break;
       }
-      if (nsSummary.getParentId() == -1) {
-        // Call reprocess method if parentId is negative, as it has not been set for this yet.
-        reconNamespaceSummaryManager.rebuildNSSummaryTree(omMetadataManager);
-        return constructFullPath(omKeyInfo, reconNamespaceSummaryManager,
-            omMetadataManager);
+      if (nsSummary.getParentId() == -1 && !rebuildTriggered) {
+        // Trigger rebuild asynchronously and continue path construction
+        triggerRebuild(reconNamespaceSummaryManager, omMetadataManager);
+        rebuildTriggered = true; // Prevent multiple rebuild triggers
       }
       fullPath.insert(0, nsSummary.getDirName() + OM_KEY_PREFIX);
 
@@ -298,6 +300,14 @@ public class ReconUtils {
       return OmUtils.normalizeKey(fullPath.toString(), true);
     }
     return fullPath.toString();
+  }
+
+  private static void triggerRebuild(ReconNamespaceSummaryManager reconNamespaceSummaryManager,
+                                     ReconOMMetadataManager omMetadataManager) {
+    // Run this method in a separate thread
+    Executors.newSingleThreadExecutor().submit(() -> {
+      reconNamespaceSummaryManager.rebuildNSSummaryTree(omMetadataManager);
+    });
   }
 
   /**
