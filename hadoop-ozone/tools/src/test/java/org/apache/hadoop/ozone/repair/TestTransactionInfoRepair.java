@@ -121,7 +121,7 @@ public class TestTransactionInfoRepair {
       TransactionInfoRepair cmd = spy(TransactionInfoRepair.class);
       RDBRepair rdbRepair = mock(RDBRepair.class);
       when(rdbRepair.getDbPath()).thenReturn(DB_PATH);
-      doReturn(rdbRepair).when(cmd).getParent();
+      when(cmd.getParent()).thenReturn(rdbRepair);
       cmd.setHighestTransactionTermIndex(TEST_TERM + "#" + TEST_INDEX);
 
       cmd.call();
