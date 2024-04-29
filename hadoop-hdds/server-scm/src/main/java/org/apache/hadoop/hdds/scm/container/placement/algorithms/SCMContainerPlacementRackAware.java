@@ -19,6 +19,7 @@ package org.apache.hadoop.hdds.scm.container.placement.algorithms;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
+import org.apache.hadoop.hdds.JavaUtils;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.scm.SCMCommonPlacementPolicy;
@@ -36,6 +37,7 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 /**
@@ -124,11 +126,11 @@ public final class SCMContainerPlacementRackAware
     int datanodeCount = networkTopology.getNumOfLeafNode(NetConstants.ROOT);
     int excludedNodesCount = excludedNodes == null ? 0 : excludedNodes.size();
     int usedNodesCount = usedNodes == null ? 0 : usedNodes.size();
-    if (datanodeCount < nodesRequired + excludedNodesCount + usedNodesCount) {
-      throw new SCMException("No enough datanodes to choose. " +
-          "TotalNode = " + datanodeCount + " RequiredNode = " + nodesRequired +
-          " ExcludedNode = " + excludedNodesCount +
-          " UsedNode = " + usedNodesCount, null);
+    Set<DatanodeDetails> unavailableNodes = JavaUtils.unionOfCollections(usedNodes, excludedNodes);
+    if (datanodeCount < nodesRequired + unavailableNodes.size()) {
+      throw new SCMException("No enough datanodes to choose. TotalNode = " + datanodeCount +
+          " RequiredNode = " + nodesRequired + " UnavailableNodes = " + unavailableNodes.size() +
+          " (ExcludedNode = " + excludedNodesCount + " UsedNode = " + usedNodesCount + ")", null);
     }
     List<DatanodeDetails> mutableFavoredNodes = favoredNodes;
     // sanity check of favoredNodes

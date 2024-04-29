@@ -42,12 +42,15 @@ import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
 
 import jakarta.annotation.Nullable;
 import java.io.Closeable;
+import java.util.EnumSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 import java.util.Collection;
 import java.util.function.BiConsumer;
+import java.util.stream.Collectors;
 
 /**
  * A node manager supports a simple interface for managing a datanode.
@@ -118,6 +121,24 @@ public interface NodeManager extends StorageContainerNodeProtocol,
    */
   List<DatanodeDetails> getNodes(
       NodeOperationalState opState, NodeState health);
+
+  /**
+   * Gets all Live Datanodes that is currently communicating with SCM.
+   * The result is always not null.
+   * @param opStates - The operational states of the node
+   * @param health - The health of the node
+   * @return List of Datanodes that are Heartbeating SCM.
+   */
+  default List<DatanodeDetails> getNodes(
+      EnumSet<NodeOperationalState> opStates, NodeState health) {
+    return opStates.stream()
+        .map(state -> getNodes(state, health))
+        .filter(Objects::nonNull)
+        .filter(list -> !list.isEmpty())
+        .flatMap(List::stream)
+        .distinct()
+        .collect(Collectors.toList());
+  }
 
   /**
    * Returns the Number of Datanodes that are communicating with SCM with the

@@ -17,6 +17,11 @@
  */
 package org.apache.hadoop.hdds;
 
+import java.util.Collection;
+import java.util.Set;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
+
 /**
  * Various reusable utility methods related to Java.
  */
@@ -34,6 +39,24 @@ public final class JavaUtils {
    */
   public static boolean isJavaVersionAtLeast(int version) {
     return JAVA_SPEC_VER >= version;
+  }
+
+  /**
+   * Returns a collection containing the union of elements from two collections.
+   * The result ensures all elements are unique, similar to a set union.
+   * And it handles the null of inputs.
+   *
+   * @param collection1 the first collection
+   * @param collection2 the second collection
+   * @param <T> the type of elements in the collections
+   * @return a collection of unique elements from both collections
+   */
+  public static <T> Set<T> unionOfCollections(Collection<T> collection1, Collection<T> collection2) {
+    Stream<T> stream1 = (collection1 == null) ? Stream.empty() : collection1.stream();
+    Stream<T> stream2 = (collection2 == null) ? Stream.empty() : collection2.stream();
+
+    return Stream.concat(stream1, stream2)
+        .collect(Collectors.toSet());  // Still using toSet to ensure uniqueness
   }
 
   /**

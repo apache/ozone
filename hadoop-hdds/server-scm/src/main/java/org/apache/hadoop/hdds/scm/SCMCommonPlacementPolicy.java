@@ -24,6 +24,7 @@ import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.MetadataStorageReportProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.StorageReportProto;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
@@ -40,6 +41,7 @@ import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -206,9 +208,20 @@ public abstract class SCMCommonPlacementPolicy implements
   object of DatanodeDetails(with Topology Information) while trying to get the
   random node from NetworkTopology should fix this. Check HDDS-7015
  */
+    List<DatanodeDetails> expandedExcludes = expandExcludes(validateDatanodes(excludedNodes));
     return chooseDatanodesInternal(validateDatanodes(usedNodes),
-            validateDatanodes(excludedNodes), favoredNodes, nodesRequired,
+            expandedExcludes, favoredNodes, nodesRequired,
             metadataSizeRequired, dataSizeRequired);
+  }
+
+  private List<DatanodeDetails> expandExcludes(List<DatanodeDetails> original) {
+    Set<DatanodeDetails> expandedExcludes = new HashSet<>(original);
+    // Exclude all nodes in maintenance and decommission state.
+    EnumSet<NodeOperationalState> states = EnumSet.range(
+        NodeOperationalState.ENTERING_MAINTENANCE,
+        NodeOperationalState.DECOMMISSIONED);
+    expandedExcludes.addAll(nodeManager.getNodes(states, null));
+    return new ArrayList<>(expandedExcludes);
   }
 
   /**
