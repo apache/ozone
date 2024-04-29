@@ -1,3 +1,20 @@
+/**
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 package org.apache.hadoop.ozone.repair;
 
 import org.apache.hadoop.hdds.utils.TransactionInfo;
@@ -34,8 +51,8 @@ public class TestTransactionInfoRepair {
 
 
   private static final String DB_PATH = "testDBPath";
-  private final long testTerm = 1;
-  private final long testIndex = 1;
+  private static final long TEST_TERM = 1;
+  private static final long TEST_INDEX = 1;
 
   @Test
   public void testUpdateTransactionInfoTableSuccessful() throws Exception {
@@ -47,8 +64,10 @@ public class TestTransactionInfoRepair {
         } catch (UnsupportedEncodingException e) {
           throw new RuntimeException(e);
         }
-      }, new String[]{String.format("The original highest transaction Info was (t:%s, i:%s)", testTerm, testIndex),
-              String.format("The highest transaction info has been updated to: (t:%s, i:%s)", testTerm, testIndex)});
+      }, new String[]{String.format("The original highest transaction Info was (t:%s, i:%s)",
+          TEST_TERM, TEST_INDEX),
+              String.format("The highest transaction info has been updated to: (t:%s, i:%s)",
+                  TEST_TERM, TEST_INDEX)});
     }
   }
 
@@ -103,7 +122,7 @@ public class TestTransactionInfoRepair {
       RDBRepair rdbRepair = mock(RDBRepair.class);
       when(rdbRepair.getDbPath()).thenReturn(DB_PATH);
       doReturn(rdbRepair).when(cmd).getParent();
-      cmd.setHighestTransactionTermIndex(testTerm + "#" + testIndex);
+      cmd.setHighestTransactionTermIndex(TEST_TERM + "#" + TEST_INDEX);
 
       cmd.call();
       for (String message : messages) {
@@ -118,7 +137,7 @@ public class TestTransactionInfoRepair {
             any(Codec.class))).thenReturn(mock(TransactionInfo.class));
 
     TransactionInfo transactionInfo2 = mock(TransactionInfo.class);
-    doReturn(TermIndex.valueOf(testTerm, testIndex)).when(transactionInfo2).getTermIndex();
+    doReturn(TermIndex.valueOf(TEST_TERM, TEST_INDEX)).when(transactionInfo2).getTermIndex();
     mockUtil.when(() ->
         RocksDBUtils.getValue(any(ManagedRocksDB.class), any(ColumnFamilyHandle.class), anyString(),
             any(Codec.class))).thenReturn(transactionInfo2);

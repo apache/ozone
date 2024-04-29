@@ -79,13 +79,12 @@ public class TransactionInfoRepair
   @Override
   public Void call() throws Exception {
     List<ColumnFamilyHandle> cfHandleList = new ArrayList<>();
+    String dbPath = getParent().getDbPath();
     List<ColumnFamilyDescriptor> cfDescList = RocksDBUtils.getColumnFamilyDescriptors(
-        getParent().getDbPath());
+        dbPath);
 
-    try (ManagedRocksDB db = ManagedRocksDB.open(getParent().getDbPath(), cfDescList, cfHandleList)) {
-      ColumnFamilyHandle transactionInfoCfh = RocksDBUtils
-          .getColumnFamilyHandle(TRANSACTION_INFO_TABLE, cfHandleList);
-      ManagedRocksDB db2 = db;
+    try (ManagedRocksDB db = ManagedRocksDB.open(dbPath, cfDescList, cfHandleList)) {
+      ColumnFamilyHandle transactionInfoCfh = RocksDBUtils.getColumnFamilyHandle(TRANSACTION_INFO_TABLE, cfHandleList);
       if (transactionInfoCfh == null) {
         System.err.println(TRANSACTION_INFO_TABLE + " is not in a column family in DB for the given path.");
         return null;
@@ -106,7 +105,7 @@ public class TransactionInfoRepair
           RocksDBUtils.getValue(db, transactionInfoCfh, TRANSACTION_INFO_KEY,
               TransactionInfo.getCodec()).getTermIndex());
     } catch (RocksDBException exception) {
-      System.err.println("Failed to update the RocksDB for the given path: " + getParent().getDbPath());
+      System.err.println("Failed to update the RocksDB for the given path: " + dbPath);
       System.err.println(
           "Make sure that Ozone entity (OM, SCM or DN) is not running for the give database path and current host.");
       LOG.error(exception.toString());
@@ -124,11 +123,6 @@ public class TransactionInfoRepair
   @Override
   public Class<?> getParentType() {
     return RDBRepair.class;
-  }
-
-  protected ManagedRocksDB getManagedRocksDB(List<ColumnFamilyDescriptor> cfDescList,
-                                             List<ColumnFamilyHandle> cfHandleList) throws RocksDBException {
-    return ManagedRocksDB.open(getParent().getDbPath(), cfDescList, cfHandleList);
   }
 
 }
