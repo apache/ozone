@@ -127,15 +127,15 @@ public class NSSummaryTaskDbEventHandler {
     if (curNSSummary == null) {
       // If we don't have it in this batch we try to get it from the DB
       curNSSummary = reconNamespaceSummaryManager.getNSSummary(objectId);
-      if (curNSSummary == null) {
-        // If we don't have it locally and in the DB we create a new instance
-        // as this is a new ID
-        curNSSummary = new NSSummary();
-      } else if (!hasParentIdField(curNSSummary)) {
-        // Call reprocess method if parentId is missing
-        reconNamespaceSummaryManager.rebuildNSSummaryTree(reconOMMetadataManager);
-        curNSSummary = reconNamespaceSummaryManager.getNSSummary(objectId);
-      }
+    }
+    if (!hasParentIdField(curNSSummary)) {
+      reconNamespaceSummaryManager.rebuildNSSummaryTree(reconOMMetadataManager);
+      return;
+    }
+    if (curNSSummary == null) {
+      // If we don't have it locally and in the DB we create a new instance
+      // as this is a new ID
+      curNSSummary = new NSSummary();
     }
     curNSSummary.setDirName(dirName);
     // Set the parent directory ID
@@ -151,10 +151,9 @@ public class NSSummaryTaskDbEventHandler {
       // If we don't have it in this batch we try to get it from the DB
       nsSummary = reconNamespaceSummaryManager.getNSSummary(parentObjectId);
     }
-    if (nsSummary != null && !hasParentIdField(nsSummary)) {
-      // Call reprocess method if parentId is missing
+    if (!hasParentIdField(nsSummary)) {
       reconNamespaceSummaryManager.rebuildNSSummaryTree(reconOMMetadataManager);
-      nsSummary = reconNamespaceSummaryManager.getNSSummary(objectId);
+      return;
     }
     if (nsSummary == null) {
       // If we don't have it locally and in the DB we create a new instance

@@ -66,6 +66,7 @@ import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.recon.api.types.NSSummary;
 import org.apache.hadoop.ozone.recon.api.types.DUResponse;
+import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 import org.apache.hadoop.ozone.recon.scm.ReconContainerReportQueue;
 import org.apache.hadoop.ozone.recon.spi.ReconNamespaceSummaryManager;
 import org.apache.hadoop.security.authentication.client.AuthenticationException;
@@ -265,7 +266,8 @@ public class ReconUtils {
    * @throws IOException
    */
   public static String constructFullPath(OmKeyInfo omKeyInfo,
-                                         ReconNamespaceSummaryManager reconNamespaceSummaryManager)
+                                         ReconNamespaceSummaryManager reconNamespaceSummaryManager,
+                                         ReconOMMetadataManager omMetadataManager)
       throws IOException {
     StringBuilder fullPath = new StringBuilder(omKeyInfo.getKeyName());
     long parentId = omKeyInfo.getParentObjectID();
@@ -275,7 +277,10 @@ public class ReconUtils {
       if (nsSummary == null) {
         break;
       }
-      // Prepend the directory name to the path
+      if (!hasParentIdField(nsSummary)) {
+        // Call reprocess method if parentId is missing
+        reconNamespaceSummaryManager.rebuildNSSummaryTree(omMetadataManager);
+      }
       fullPath.insert(0, nsSummary.getDirName() + OM_KEY_PREFIX);
 
       // Move to the parent ID of the current directory

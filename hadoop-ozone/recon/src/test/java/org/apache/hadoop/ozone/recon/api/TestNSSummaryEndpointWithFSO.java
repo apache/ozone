@@ -711,7 +711,7 @@ public class TestNSSummaryEndpointWithFSO {
         .build();
     // Call constructFullPath and verify the result
     String fullPath = ReconUtils.constructFullPath(keyInfo,
-        reconNamespaceSummaryManager);
+        reconNamespaceSummaryManager, reconOMMetadataManager);
     String expectedPath = "vol/bucket1/dir1/dir2/file2";
     Assertions.assertEquals(expectedPath, fullPath);
 
@@ -724,7 +724,7 @@ public class TestNSSummaryEndpointWithFSO {
         .setParentObjectID(DIR_THREE_OBJECT_ID)
         .build();
     fullPath = ReconUtils.constructFullPath(keyInfo,
-        reconNamespaceSummaryManager);
+        reconNamespaceSummaryManager, reconOMMetadataManager);
     expectedPath = "vol/bucket1/dir1/dir3/file3";
     Assertions.assertEquals(expectedPath, fullPath);
 
@@ -737,7 +737,7 @@ public class TestNSSummaryEndpointWithFSO {
         .setParentObjectID(DIR_FOUR_OBJECT_ID)
         .build();
     fullPath = ReconUtils.constructFullPath(keyInfo,
-        reconNamespaceSummaryManager);
+        reconNamespaceSummaryManager, reconOMMetadataManager);
     expectedPath = "vol/bucket1/dir1/dir4/file6";
     Assertions.assertEquals(expectedPath, fullPath);
 
@@ -750,7 +750,7 @@ public class TestNSSummaryEndpointWithFSO {
         .setParentObjectID(BUCKET_ONE_OBJECT_ID)
         .build();
     fullPath = ReconUtils.constructFullPath(keyInfo,
-        reconNamespaceSummaryManager);
+        reconNamespaceSummaryManager, reconOMMetadataManager);
     expectedPath = "vol/bucket1/file1";
     Assertions.assertEquals(expectedPath, fullPath);
 
@@ -763,7 +763,7 @@ public class TestNSSummaryEndpointWithFSO {
         .setParentObjectID(DIR_FIVE_OBJECT_ID)
         .build();
     fullPath = ReconUtils.constructFullPath(keyInfo,
-        reconNamespaceSummaryManager);
+        reconNamespaceSummaryManager, reconOMMetadataManager);
     expectedPath = "vol2/bucket3/dir5/file9";
     Assertions.assertEquals(expectedPath, fullPath);
   }
