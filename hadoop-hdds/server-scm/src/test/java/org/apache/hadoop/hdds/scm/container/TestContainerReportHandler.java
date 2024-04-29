@@ -1122,7 +1122,7 @@ public class TestContainerReportHandler {
   }
 
   /**
-   * Generates a placeholder data checksum for testing that is specific to a container replica.
+   * Generates a placeholder data checksum for testing that is the same for all container replicas.
    */
   protected static String createMatchingDataChecksumForReplica(ContainerID containerID) {
     return Integer.toString(Objects.hashCode(containerID));
