@@ -24,11 +24,11 @@ import java.util.List;
 
 import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
-import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.hdds.StringUtils;
 import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
@@ -1949,13 +1949,13 @@ public abstract class TestOmSnapshot {
   private List<LiveFileMetaData> getKeyTableSstFiles()
       throws IOException {
     if (!bucketLayout.isFileSystemOptimized()) {
-      return getRdbStore().getDb().getSstFileList().stream().filter(
-          x -> new String(x.columnFamilyName(), UTF_8).equals(
-              OmMetadataManagerImpl.KEY_TABLE)).collect(Collectors.toList());
+      return getRdbStore().getDb().getSstFileList().stream()
+          .filter(x -> StringUtils.bytes2String(x.columnFamilyName()).equals(OmMetadataManagerImpl.KEY_TABLE))
+          .collect(Collectors.toList());
     }
-    return getRdbStore().getDb().getSstFileList().stream().filter(
-        x -> new String(x.columnFamilyName(), UTF_8).equals(
-            OmMetadataManagerImpl.FILE_TABLE)).collect(Collectors.toList());
+    return getRdbStore().getDb().getSstFileList().stream()
+        .filter(x -> StringUtils.bytes2String(x.columnFamilyName()).equals(OmMetadataManagerImpl.FILE_TABLE))
+        .collect(Collectors.toList());
   }
 
   private void flushKeyTable() throws IOException {
@@ -2118,7 +2118,7 @@ public abstract class TestOmSnapshot {
     await(POLL_MAX_WAIT_MILLIS, POLL_INTERVAL_MILLIS,
         () -> cluster.getOzoneManager().isRunning());
 
-    while (nextToken == null || StringUtils.isNotEmpty(nextToken)) {
+    while (nextToken == null || !nextToken.isEmpty()) {
       diffReport = fetchReportPage(volumeName, bucketName, snapshot1,
           snapshot2, nextToken, pageSize);
       diffReportEntries.addAll(diffReport.getDiffList());
