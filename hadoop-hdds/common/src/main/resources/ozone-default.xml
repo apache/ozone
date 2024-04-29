@@ -2253,6 +2253,22 @@
     </description>
   </property>
   <property>
+    <name>ssl.server.keystore.type</name>
+    <value>jks</value>
+    <tag>OZONE, SECURITY, CRYPTO_COMPLIANCE</tag>
+    <description>
+      The keystore type for HTTP Servers used in ozone.
+    </description>
+  </property>
+  <property>
+    <name>ssl.server.truststore.type</name>
+    <value>jks</value>
+    <tag>OZONE, SECURITY, CRYPTO_COMPLIANCE</tag>
+    <description>
+      The truststore type for HTTP Servers used in ozone.
+    </description>
+  </property>
+  <property>
     <name>hdds.key.len</name>
     <value>2048</value>
     <tag>SCM, HDDS, X509, SECURITY, CRYPTO_COMPLIANCE</tag>
