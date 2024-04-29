@@ -41,9 +41,16 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * Class to iterate over the SCM DB metadata events for containers, pipelines, nodes
- * and update recon's corresponding in-memory data using their respective manager
- * and state manager classes.
+ * The SCMDBMetaDataInitializationTask class is responsible for processing updates on
+ * the Storage Container Manager (SCM) database and applying them to the Recon
+ * component's in-memory data structures. As of now, this task focuses on three specific tables:
+ * CONTAINERS_TABLE, PIPELINES_TABLE, and SEQUENCE_ID_TABLE and can be extended in the future.
+ *
+ * By focusing on these three tables, the SCMDBMetaDataInitializationTask ensures
+ * that Recon's in-memory data structures for containers, pipelines, and sequence IDs
+ * are kept up-to-date with the latest changes in the SCM database. This task is
+ * crucial for maintaining data consistency and providing accurate information to
+ * other Recon components and clients.
  */
 public class SCMDBMetaDataInitializationTask implements ReconSCMMetadataProcessingTask {
 
