@@ -82,48 +82,36 @@ public class TransactionInfoRepair
     List<ColumnFamilyDescriptor> cfDescList = RocksDBUtils.getColumnFamilyDescriptors(
         getParent().getDbPath());
 
-    try {
-      ManagedRocksDB db = ManagedRocksDB.open(getParent().getDbPath(), cfDescList, cfHandleList);
-      try {
-//          (ManagedRocksDB db = getManagedRocksDB(cfDescList, cfHandleList))
-//      {
-        ColumnFamilyHandle transactionInfoCfh = RocksDBUtils
-            .getColumnFamilyHandle(TRANSACTION_INFO_TABLE, cfHandleList);
-        ManagedRocksDB db2 = db;
-        if (transactionInfoCfh == null) {
-          System.err.println(TRANSACTION_INFO_TABLE + " is not in a column family in DB for the given path.");
-          return null;
-        }
-        TransactionInfo originalTransactionInfo =
-            RocksDBUtils.getValue(db, transactionInfoCfh, TRANSACTION_INFO_KEY, TransactionInfo.getCodec());
-
-        System.out.println("The original highest transaction Info was " + originalTransactionInfo.getTermIndex());
-
-        TransactionInfo transactionInfo = TransactionInfo.valueOf(
-            highestTransactionTermIndex);
-
-        byte[] transactionInfoBytes = TransactionInfo.getCodec().toPersistedFormat(transactionInfo);
-        db.get()
-            .put(transactionInfoCfh, StringCodec.get().toPersistedFormat(TRANSACTION_INFO_KEY), transactionInfoBytes);
-
-        System.out.println("The highest transaction info has been updated to: " +
-            RocksDBUtils.getValue(db, transactionInfoCfh, TRANSACTION_INFO_KEY,
-                TransactionInfo.getCodec()).getTermIndex());
-//        LOG.error("******_________ pppppppppppp.....");
-
-
-      } catch (RocksDBException exception) {
-        System.err.println("Failed to update the RocksDB for the given path: " + getParent().getDbPath());
-        System.err.println(
-            "Make sure that Ozone entity (OM, SCM or DN) is not running for the give database path and current host.");
-        LOG.error(exception.toString());
-//        throw exception;
-      } finally {
-        IOUtils.closeQuietly(cfHandleList);
+    try (ManagedRocksDB db = ManagedRocksDB.open(getParent().getDbPath(), cfDescList, cfHandleList)) {
+      ColumnFamilyHandle transactionInfoCfh = RocksDBUtils
+          .getColumnFamilyHandle(TRANSACTION_INFO_TABLE, cfHandleList);
+      ManagedRocksDB db2 = db;
+      if (transactionInfoCfh == null) {
+        System.err.println(TRANSACTION_INFO_TABLE + " is not in a column family in DB for the given path.");
+        return null;
       }
+      TransactionInfo originalTransactionInfo =
+          RocksDBUtils.getValue(db, transactionInfoCfh, TRANSACTION_INFO_KEY, TransactionInfo.getCodec());
 
-    } catch (Exception e) {
-      throw e;
+      System.out.println("The original highest transaction Info was " + originalTransactionInfo.getTermIndex());
+
+      TransactionInfo transactionInfo = TransactionInfo.valueOf(
+          highestTransactionTermIndex);
+
+      byte[] transactionInfoBytes = TransactionInfo.getCodec().toPersistedFormat(transactionInfo);
+      db.get()
+          .put(transactionInfoCfh, StringCodec.get().toPersistedFormat(TRANSACTION_INFO_KEY), transactionInfoBytes);
+
+      System.out.println("The highest transaction info has been updated to: " +
+          RocksDBUtils.getValue(db, transactionInfoCfh, TRANSACTION_INFO_KEY,
+              TransactionInfo.getCodec()).getTermIndex());
+    } catch (RocksDBException exception) {
+      System.err.println("Failed to update the RocksDB for the given path: " + getParent().getDbPath());
+      System.err.println(
+          "Make sure that Ozone entity (OM, SCM or DN) is not running for the give database path and current host.");
+      LOG.error(exception.toString());
+    } finally {
+      IOUtils.closeQuietly(cfHandleList);
     }
 
     return null;

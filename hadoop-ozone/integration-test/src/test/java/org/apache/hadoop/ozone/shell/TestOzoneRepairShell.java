@@ -30,6 +30,8 @@ import picocli.CommandLine;
 
 import java.io.PrintWriter;
 import java.io.StringWriter;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import static org.apache.hadoop.ozone.OzoneConsts.OM_DB_NAME;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
@@ -43,6 +45,8 @@ public class TestOzoneRepairShell {
 
   private static MiniOzoneCluster cluster = null;
   private static OzoneConfiguration conf = null;
+
+  private static final String TRANSACTION_INFO_TABLE_TERM_INDEX_PATTERN = "([0-9]+#[0-9]+)";
 
   @BeforeAll
   public static void init() throws Exception {
@@ -58,23 +62,45 @@ public class TestOzoneRepairShell {
 
     cluster.getOzoneManager().stop();
 
-    String testTermIndex = "1111#1111";
+    String cmdOut = scanTransactionInfoTable(dbPath);
+    String originalHighestTermIndex = parseScanOutput(cmdOut);
+
+    String testTerm = "1111";
+    String testIndex = "1111";
     String[] args =
-        new String[] {"--db=" + dbPath, "transaction", "--highest-transaction", testTermIndex};
+        new String[] {"--db=" + dbPath, "transaction", "--highest-transaction", testTerm + "#" + testIndex};
     int exitCode = cmd.execute(args);
     assertEquals(0, exitCode);
 
+//    CommandLine cmdDBScanner = new CommandLine(new RDBParser()).addSubcommand(new DBScanner()).setOut(pstdout);
+//    String[] argsDBScanner =
+//        new String[] {"--db=" + dbPath, "scan", "--column_family", "transactionInfoTable"};
+//    cmdDBScanner.execute(argsDBScanner);
+    String cmdOut2 = scanTransactionInfoTable(dbPath);
+    assertThat(cmdOut2).contains("The original highest transaction Info was " + originalHighestTermIndex);
+    assertThat(cmdOut2).contains(String.format("The highest transaction info has been updated to: (t:%s, i:%s)",
+        testTerm, testIndex));
+    cluster.getOzoneManager().start();
+  }
+
+  private String scanTransactionInfoTable(String dbPath) {
     StringWriter stdout = new StringWriter();
     PrintWriter pstdout = new PrintWriter(stdout);
     CommandLine cmdDBScanner = new CommandLine(new RDBParser()).addSubcommand(new DBScanner()).setOut(pstdout);
     String[] argsDBScanner =
         new String[] {"--db=" + dbPath, "scan", "--column_family", "transactionInfoTable"};
     cmdDBScanner.execute(argsDBScanner);
-    String cmdOut = stdout.toString();
-    assertThat(cmdOut).contains(testTermIndex);
+    return stdout.toString();
+  }
 
-    cluster.getOzoneManager().start();
-
+  private String parseScanOutput(String output) {
+    Pattern pattern = Pattern.compile(TRANSACTION_INFO_TABLE_TERM_INDEX_PATTERN);
+    Matcher matcher = pattern.matcher(output);
+    if (matcher.find()) {
+      String[] termIndex = matcher.group(1).split("#");
+      return String.format("(t:%s, i:%s)", termIndex[0], termIndex[1]);
+    }
+    return "dummyTermIndex";
   }
 
 }

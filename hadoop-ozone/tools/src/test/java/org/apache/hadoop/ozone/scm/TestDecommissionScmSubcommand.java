@@ -73,7 +73,7 @@ public class TestDecommissionScmSubcommand {
     try (GenericTestUtils.SystemOutCapturer capture =
              new GenericTestUtils.SystemOutCapturer()) {
       cmd.execute(client);
-      assertThat(capture.getOutput()).contains(scmId + "____pppppp");
+      assertThat(capture.getOutput()).contains(scmId);
     }
   }
 
