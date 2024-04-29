@@ -257,7 +257,7 @@ class TestOpenKeyCleanupService {
     waitForOpenKeyCleanup(true, BucketLayout.FILE_SYSTEM_OPTIMIZED);
 
     // 2 keys should still remain in openKey table
-    assertEquals(2, getOpenKeyInfo(BucketLayout.FILE_SYSTEM_OPTIMIZED).size());
+    assertEquals(2, getKeyInfo(BucketLayout.FILE_SYSTEM_OPTIMIZED, true).size());
   }
 
   @Test
@@ -299,6 +299,9 @@ class TestOpenKeyCleanupService {
     // keys should be recovered and there should not be any expired key pending
     waitForOpenKeyCleanup(true, BucketLayout.FILE_SYSTEM_OPTIMIZED);
 
+    List<OmKeyInfo> lstKeyInfo = getKeyInfo(BucketLayout.FILE_SYSTEM_OPTIMIZED, false);
+    // Verify keyName and fileName is same after auto commit key.
+    lstKeyInfo.stream().forEach(key -> assertEquals(key.getKeyName(), key.getFileName()));
   }
 
   /**
@@ -449,17 +452,20 @@ class TestOpenKeyCleanupService {
     }
   }
 
-  private List<OmKeyInfo> getOpenKeyInfo(BucketLayout bucketLayout) {
+  private List<OmKeyInfo> getKeyInfo(BucketLayout bucketLayout, boolean openKey) {
     List<OmKeyInfo> omKeyInfo = new ArrayList<>();
 
-    Table<String, OmKeyInfo> openFileTable =
-        om.getMetadataManager().getOpenKeyTable(bucketLayout);
+    Table<String, OmKeyInfo> fileTable;
+    if (openKey) {
+      fileTable = om.getMetadataManager().getOpenKeyTable(bucketLayout);
+    } else {
+      fileTable = om.getMetadataManager().getKeyTable(bucketLayout);
+    }
     try (TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>>
-             iterator = openFileTable.iterator()) {
+             iterator = fileTable.iterator()) {
       while (iterator.hasNext()) {
         omKeyInfo.add(iterator.next().getValue());
       }
-
     } catch (Exception e) {
     }
     return omKeyInfo;
