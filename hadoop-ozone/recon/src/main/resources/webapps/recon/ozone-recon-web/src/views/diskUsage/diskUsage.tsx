@@ -148,16 +148,17 @@ export class DiskUsage extends React.Component<Record<string, object>, IDUState>
 
       // Only show top n blocks with the most DU,
       // other blocks are merged as a single block
-      if (subpaths.length > limit) {
+      if (subpaths.length > limit || (subpaths.length > 0 && limit === 30)) {
         subpaths = subpaths.slice(0, limit);
         let topSize = 0;
         for (let i = 0; i < limit; ++i) {
           topSize += subpaths[i].size;
         }
-
         const otherSize = dataSize - topSize;
-        const other: IDUSubpath = {path: OTHER_PATH_NAME, size: otherSize};
-        subpaths.push(other);
+        if (otherSize > 0) {
+          const other: IDUSubpath = {path: OTHER_PATH_NAME, size: otherSize};
+          subpaths.push(other);
+        }
       }
 
       let pathLabels, values, percentage, sizeStr, pieces, subpathName;
@@ -266,7 +267,7 @@ export class DiskUsage extends React.Component<Record<string, object>, IDUState>
   updateDisplayLimit(e): void {
     let res = -1;
     if (e.key === '30') {
-      res = Number.MAX_VALUE;
+      res = Number.parseInt(e.key, 10);
     } else {
       res = Number.parseInt(e.key, 10);
     }

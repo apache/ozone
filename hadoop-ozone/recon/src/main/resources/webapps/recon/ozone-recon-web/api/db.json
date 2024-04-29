@@ -1396,133 +1396,158 @@
   "root": {
     "status": "OK",
     "path": "/",
-    "size": 50000,
+    "size": 400,
     "sizeWithReplica": 300000,
-    "subPathCount": 25,
+    "subPathCount": 30,
     "subPaths": [
       {
         "path": "/vol1",
-        "size": 5000,
+        "size": 10,
         "sizeWithReplica": 150000
       },
       {
         "path": "/vol2",
-        "size": 8000,
+        "size": 10,
         "sizeWithReplica": 260000
       },
       {
         "path": "/vol3",
-        "size": 9000,
+        "size": 20,
         "sizeWithReplica": 300000
       },
       {
         "path": "/vol4",
-        "size": 1000,
+        "size": 30,
         "sizeWithReplica": 30000
       },
       {
         "path": "/vol5",
-        "size": 1000,
+        "size": 10,
         "sizeWithReplica": 30000
       },
       {
         "path": "/vol6",
-        "size": 2000,
+        "size": 20,
         "sizeWithReplica": 60000
       },
       {
         "path": "/vol7",
-        "size": 1000,
+        "size": 10,
         "sizeWithReplica": 30000
       },
       {
         "path": "/vol8",
-        "size": 1000,
+        "size": 10,
         "sizeWithReplica": 30000
       },
       {
         "path": "/vol9",
-        "size": 1000,
+        "size": 10,
         "sizeWithReplica": 30000
       },
       {
         "path": "/vol10",
-        "size": 2000,
+        "size": 20,
         "sizeWithReplica": 60000
       },
       {
         "path": "/vol11",
-        "size": 1000,
+        "size": 10,
         "sizeWithReplica": 30000
       },
       {
         "path": "/vol12",
-        "size": 1000,
+        "size": 10,
         "sizeWithReplica": 30000
       },
       {
         "path": "/vol13",
-        "size": 1000,
+        "size": 10,
         "sizeWithReplica": 30000
       },
       {
         "path": "/vol14",
-        "size": 2000,
+        "size": 20,
         "sizeWithReplica": 60000
       },
       {
         "path": "/vol15",
-        "size": 1000,
+        "size": 10,
         "sizeWithReplica": 30000
       },
       {
         "path": "/vol16",
-        "size": 1000,
+        "size": 10,
         "sizeWithReplica": 30000
       },
       {
         "path": "/vol17",
-        "size": 1000,
+        "size": 10,
         "sizeWithReplica": 30000
       },
       {
         "path": "/vol18",
-        "size": 2000,
+        "size": 20,
         "sizeWithReplica": 60000
       },
       {
         "path": "/vol19",
-        "size": 1000,
+        "size": 10,
         "sizeWithReplica": 30000
       },
       {
         "path": "/vol20",
-        "size": 1000,
+        "size": 10,
         "sizeWithReplica": 30000
       },
       {
         "path": "/vol21",
-        "size": 1000,
+        "size": 10,
         "sizeWithReplica": 30000
       },
       {
         "path": "/vol22",
-        "size": 1000,
+        "size": 10,
         "sizeWithReplica": 30000
       },
       {
         "path": "/vol23",
-        "size": 1000,
+        "size": 10,
         "sizeWithReplica": 30000
       },
       {
         "path": "/vol24",
-        "size": 1000,
+        "size": 10,
         "sizeWithReplica": 30000
       },
       {
         "path": "/vol25",
-        "size": 1000,
+        "size": 10,
+        "sizeWithReplica": 30000
+      },
+      {
+        "path": "/vol26",
+        "size": 10,
+        "sizeWithReplica": 30000
+      },
+      {
+        "path": "/vol27",
+        "size": 10,
+        "sizeWithReplica": 30000
+      },
+      {
+        "path": "/vol28",
+        "size": 10,
+        "sizeWithReplica": 30000
+      },
+      {
+        "path": "/vol29",
+        "size": 10,
+        "sizeWithReplica": 30000
+      },
+      {
+        "path": "/vol30",
+        "size": 10,
         "sizeWithReplica": 30000
       }
     ],
