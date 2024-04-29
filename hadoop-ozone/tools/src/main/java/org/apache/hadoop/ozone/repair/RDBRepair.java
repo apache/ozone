@@ -45,6 +45,11 @@ public class RDBRepair implements Callable<Void>, SubcommandWithParent {
     return dbPath;
   }
 
+//  public void setDbPath(String dbPath) {
+//    this.dbPath = dbPath;
+//  }
+
+
   @Override
   public Void call() {
     GenericCli.missingSubcommand(spec);

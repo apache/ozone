@@ -31,6 +31,8 @@ import org.kohsuke.MetaInfServices;
 import org.rocksdb.ColumnFamilyDescriptor;
 import org.rocksdb.ColumnFamilyHandle;
 import org.rocksdb.RocksDBException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import picocli.CommandLine;
 import picocli.CommandLine.Model.CommandSpec;
 
@@ -55,6 +57,8 @@ import static org.apache.hadoop.ozone.OzoneConsts.SNAPSHOT_INFO_TABLE;
 )
 @MetaInfServices(SubcommandWithParent.class)
 public class SnapshotRepair implements Callable<Void>, SubcommandWithParent {
+
+  protected static final Logger LOG = LoggerFactory.getLogger(SnapshotRepair.class);
 
   @CommandLine.Spec
   private static CommandSpec spec;
@@ -152,7 +156,7 @@ public class SnapshotRepair implements Callable<Void>, SubcommandWithParent {
       System.err.println("Failed to update the RocksDB for the given path: " + parent.getDbPath());
       System.err.println(
           "Make sure that Ozone entity (OM, SCM or DN) is not running for the give dbPath and current host.");
-      System.err.println(exception);
+      LOG.error(exception.toString());
     } finally {
       IOUtils.closeQuietly(cfHandleList);
     }

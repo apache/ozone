@@ -56,7 +56,7 @@ public class DecommissionScmSubcommand extends ScmSubcommand {
       // Throwing exception to create non-zero exit code in case of failure.
       throw new IOException(errorMsg);
     } else {
-      System.out.println("Decommissioned Scm " + nodeId);
+      System.out.println("****_______yyyyyyyyyy,,, Decommissioned Scm " + nodeId);
     }
   }
 }
