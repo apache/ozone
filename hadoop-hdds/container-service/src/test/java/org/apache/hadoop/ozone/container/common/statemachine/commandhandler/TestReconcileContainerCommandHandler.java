@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.ozone.container.common.statemachine.commandhandler;
 
+import org.apache.commons.lang3.stream.Streams;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
@@ -42,19 +43,22 @@ import org.apache.hadoop.ozone.container.ozoneimpl.ContainerController;
 import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
 import org.apache.hadoop.ozone.protocol.commands.ReconcileContainerCommand;
 import org.apache.ozone.test.GenericTestUtils;
-import org.junit.jupiter.api.Assertions;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
 
 import static java.util.Collections.singletonMap;
 import static org.apache.hadoop.hdds.protocol.MockDatanodeDetails.randomDatanodeDetails;
 import static org.apache.hadoop.ozone.OzoneConsts.GB;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -73,21 +77,16 @@ public class TestReconcileContainerCommandHandler {
   private ContainerController controller;
   private ContainerSet containerSet;
   private ReconcileContainerCommandHandler subject;
-  // Used to block ICR sending so that queue metrics can be checked before the reconcile task completes.
-  private CountDownLatch icrLatch;
 
   private ContainerLayoutVersion layoutVersion;
 
-  // As data hashes are calculated during the test, they are written back here.
-  private final Map<ContainerID, ContainerReplicaProto> containerReportsSent = new HashMap<>();
-
-  public void initLayoutVersion(ContainerLayoutVersion layout)
+  public void initLayoutVersion(ContainerLayoutVersion layout, IncrementalReportSender<Container> icrSender)
       throws Exception {
     this.layoutVersion = layout;
-    init();
+    init(icrSender);
   }
 
-  private void init() throws Exception {
+  private void init(IncrementalReportSender<Container> icrSender) throws Exception {
     OzoneConfiguration conf = new OzoneConfiguration();
     DatanodeDetails dnDetails = randomDatanodeDetails();
     subject = new ReconcileContainerCommandHandler("");
@@ -99,24 +98,6 @@ public class TestReconcileContainerCommandHandler {
     containerSet = new ContainerSet(1000);
     containerSet.addContainer(container);
 
-    icrLatch = new CountDownLatch(1);
-    IncrementalReportSender<Container> icrSender = c -> {
-      try {
-        containerReportsSent.put(ContainerID.valueOf(c.getContainerData().getContainerID()), c.getContainerReport());
-
-        // Block the caller until the latch is counted down.
-        // Caller can check queue metrics in the meantime.
-        LOG.info("ICR sender waiting for latch");
-        Assertions.assertTrue(icrLatch.await(30, TimeUnit.SECONDS));
-        LOG.info("ICR sender proceeding after latch");
-        // Reset the latch for the next iteration.
-        // This assumes requests are executed by a single thread reading the latch.
-        icrLatch = new CountDownLatch(1);
-      } catch (Exception ex) {
-        LOG.error("ICR sender failed", ex);
-      }
-    };
-
     containerHandler = new KeyValueHandler(new OzoneConfiguration(), dnDetails.getUuidString(), containerSet,
         mock(VolumeSet.class), mock(ContainerMetrics.class), icrSender);
     controller = new ContainerController(containerSet,
@@ -126,10 +107,45 @@ public class TestReconcileContainerCommandHandler {
     when(ozoneContainer.getContainerSet()).thenReturn(containerSet);
   }
 
+  @ContainerLayoutTestInfo.ContainerTest
+  public void testReconcileContainerCommandReports(ContainerLayoutVersion layout) throws Exception {
+    Map<ContainerID, ContainerReplicaProto> containerReportsSent = new HashMap<>();
+    IncrementalReportSender<Container> icrSender = c -> {
+      try {
+        containerReportsSent.put(ContainerID.valueOf(c.getContainerData().getContainerID()), c.getContainerReport());
+      } catch (Exception ex) {
+        LOG.error("ICR sender failed", ex);
+      }
+    };
+    initLayoutVersion(layout, icrSender);
+
+    ReconcileContainerCommand cmd = new ReconcileContainerCommand(CONTAINER_ID, Collections.emptyList());
+    subject.handle(cmd, ozoneContainer, context, null);
+
+    verifyContainerReportsSent(containerReportsSent, Collections.singleton(CONTAINER_ID));
+  }
+
   // TODO test is flaky on the second container layout run only.
   @ContainerLayoutTestInfo.ContainerTest
-  public void testReconcileContainerCommandHandled(ContainerLayoutVersion layout) throws Exception {
-    initLayoutVersion(layout);
+  public void testReconcileContainerCommandMetrics(ContainerLayoutVersion layout) throws Exception {
+    // Used to block ICR sending so that queue metrics can be checked before the reconcile task completes.
+    CountDownLatch icrLatch = new CountDownLatch(1);
+    Map<ContainerID, ContainerReplicaProto> containerReportsSent = new HashMap<>();
+    IncrementalReportSender<Container> icrSender = c -> {
+      try {
+        containerReportsSent.put(ContainerID.valueOf(c.getContainerData().getContainerID()), c.getContainerReport());
+
+        // Block the caller until the latch is counted down.
+        // Caller can check queue metrics in the meantime.
+        LOG.info("ICR sender waiting for latch");
+        assertTrue(icrLatch.await(30, TimeUnit.SECONDS));
+        LOG.info("ICR sender proceeding after latch");
+      } catch (Exception ex) {
+        LOG.error("ICR sender failed", ex);
+      }
+    };
+
+    initLayoutVersion(layout, icrSender);
 
     ReconcileContainerCommand cmd = new ReconcileContainerCommand(CONTAINER_ID, Collections.emptyList());
     // Queue two commands for processing.
@@ -139,10 +155,10 @@ public class TestReconcileContainerCommandHandler {
 
     // The first command was invoked when submitted, and is now blocked in the ICR sender.
     // Since neither command has finished, they both count towards queue count.
-    Assertions.assertEquals(1, subject.getInvocationCount());
-    Assertions.assertEquals(2, subject.getQueuedCount());
-    Assertions.assertEquals(0, subject.getTotalRunTime());
-    Assertions.assertEquals(0, subject.getAverageRunTime());
+    assertEquals(1, subject.getInvocationCount());
+    assertEquals(2, subject.getQueuedCount());
+    assertEquals(0, subject.getTotalRunTime());
+    assertEquals(0, subject.getAverageRunTime());
 
     // Wait this long before unblocking the ICR sender. This is the lower bound on simulated execution time.
     long minExecTimeMillis = 500;
@@ -152,10 +168,10 @@ public class TestReconcileContainerCommandHandler {
     // Decrementing queue count indicates the task completed.
     waitForQueueCount(1);
     // The other command is invoked but blocked in the ICR sender.
-    Assertions.assertEquals(2, subject.getInvocationCount());
+    assertEquals(2, subject.getInvocationCount());
     long firstTotalRunTime = subject.getTotalRunTime();
     long firstAvgRunTime = subject.getAverageRunTime();
-    Assertions.assertTrue(firstTotalRunTime >= minExecTimeMillis,
+    assertTrue(firstTotalRunTime >= minExecTimeMillis,
         "Total run time " + firstTotalRunTime + "ms was not larger than min exec time " + minExecTimeMillis + "ms");
 
     // Wait a little longer before firing the second command.
@@ -163,14 +179,14 @@ public class TestReconcileContainerCommandHandler {
     icrLatch.countDown();
     // Decrementing queue count indicates the task completed.
     waitForQueueCount(0);
-    Assertions.assertEquals(2, subject.getInvocationCount());
+    assertEquals(2, subject.getInvocationCount());
     long secondTotalRunTime = subject.getTotalRunTime();
     long secondAvgRunTime = subject.getAverageRunTime();
-    Assertions.assertTrue(secondTotalRunTime >= firstTotalRunTime + minExecTimeMillis);
-    Assertions.assertTrue(secondAvgRunTime >= minExecTimeMillis);
+    assertTrue(secondTotalRunTime >= firstTotalRunTime + minExecTimeMillis);
+    assertTrue(secondAvgRunTime >= minExecTimeMillis);
     // We slept the thread a little longer on the second invocation, which should have increased the average run time
     // from the first run.
-    Assertions.assertTrue(secondAvgRunTime >= firstAvgRunTime);
+    assertTrue(secondAvgRunTime >= firstAvgRunTime);
 
     verifyContainerReportsSent();
   }
@@ -183,12 +199,19 @@ public class TestReconcileContainerCommandHandler {
     }, 500, 3000);
   }
 
-  private void verifyContainerReportsSent() throws Exception {
-    for (Map.Entry<ContainerID, ContainerReplicaProto> entry: containerReportsSent.entrySet()) {
+  private void verifyContainerReportsSent(Map<ContainerID, ContainerReplicaProto> reportsSent,
+      Set<Long> expectedContainerIDs) throws Exception {
+
+    assertEquals(expectedContainerIDs.size(), reportsSent.size());
+
+    for (Map.Entry<ContainerID, ContainerReplicaProto> entry: reportsSent.entrySet()) {
       ContainerID id = entry.getKey();
+      assertTrue(expectedContainerIDs.contains(id.getId()));
+
       String sentDataChecksum = entry.getValue().getDataChecksum();
+      // Current implementation is incomplete, and uses this as a mocked checksum.
       String expectedDataChecksum = ContainerUtils.getChecksum(Long.toString(id.getId()));
-      Assertions.assertEquals(expectedDataChecksum, sentDataChecksum, "Checksum mismatch in report of container " + id);
+      assertEquals(expectedDataChecksum, sentDataChecksum, "Checksum mismatch in report of container " + id);
     }
   }
 }
