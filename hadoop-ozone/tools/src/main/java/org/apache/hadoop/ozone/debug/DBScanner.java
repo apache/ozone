@@ -229,7 +229,11 @@ public class DBScanner implements Callable<Void>, SubcommandWithParent {
     File file = new File(fileName);
     File parentFile = file.getParentFile();
     if (!parentFile.exists()) {
-      parentFile.mkdirs();
+      boolean flg = parentFile.mkdirs();
+      if (!flg) {
+        throw new IOException("An exception occurred while creating " +
+            "the directory. Directorys: " + parentFile.getAbsolutePath());
+      }
     }
 
     // Write to file output
