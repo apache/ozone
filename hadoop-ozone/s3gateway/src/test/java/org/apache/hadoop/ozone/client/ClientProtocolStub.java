@@ -227,10 +227,11 @@ public class ClientProtocolStub implements ClientProtocol {
   }
 
   @Override
-  public OzoneOutputStream overwriteKey(OzoneKeyDetails existingKey, ReplicationConfig replicationConfig)
-      throws IOException {
-    return getBucket(existingKey.getVolumeName(), existingKey.getBucketName())
-        .overwriteKey(existingKey, replicationConfig);
+  public OzoneOutputStream rewriteKey(String volumeName, String bucketName, String keyName,
+      long size, long existingKeyGeneration, ReplicationConfig replicationConfig,
+      Map<String, String> metadata) throws IOException {
+    return getBucket(volumeName, bucketName)
+        .rewriteKey(keyName, size, existingKeyGeneration, replicationConfig, metadata);
   }
 
   @Override

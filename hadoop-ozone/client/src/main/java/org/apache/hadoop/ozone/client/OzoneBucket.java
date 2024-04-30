@@ -470,27 +470,25 @@ public class OzoneBucket extends WithMetadata {
   }
 
   /**
-   * Overwrite an existing key using optimistic locking. The existingKey must exist in Ozone to allow
-   * the new key to be created with the same name. Additionally, the existing Key must not have been
-   * modified since the time it's details were read. This is controlled by the updateID
-   * field in the existing Key. If the key is replaced or updated the updateID will change. If the
-   * updateID has changed since the existing Key was read, either the initial key create will fail,
+   * This API allows to atomically update an existing key. The key read before invoking this API
+   * should remain unchanged for this key to be written. This is controlled by the generation
+   * field in the existing Key param. If the key is replaced or updated the generation will change. If the
+   * generation has changed since the existing Key was read, either the initial key create will fail,
    * or the key will fail to commit after the data has been written as the checks are carried out
-   * both a key open and commit time.
+   * both at key open and commit time.
    *
-   * For now this feature only works on Object Store Buckets. FSO support will be added a later.
-   *
-   * @param existingKey       Name of the key to be created.
-   * @param replicationConfig Replication configuration.
+   * @param keyName Existing key to overwrite. This must exist in the bucket.
+   * @param size The size of the new key
+   * @param existingKeyGeneration The generation of the existing key which is checked for changes at key create
+   *                              and commit time.
+   * @param replicationConfig The replication configuration for the key to be rewritten.
+   * @param metadata custom key value metadata
    * @return OzoneOutputStream to which the data has to be written.
    * @throws IOException
    */
-  public OzoneOutputStream overwriteKey(OzoneKeyDetails existingKey, ReplicationConfig replicationConfig)
-      throws IOException {
-    if (this.bucketLayout != BucketLayout.OBJECT_STORE) {
-      throw new IllegalArgumentException("Optimistic locking is only supported on Object Store Buckets");
-    }
-    return proxy.overwriteKey(existingKey, replicationConfig);
+  public OzoneOutputStream rewriteKey(String keyName, long size, long existingKeyGeneration,
+      ReplicationConfig replicationConfig, Map<String, String> metadata) throws IOException {
+    return proxy.rewriteKey(volumeName, name, keyName, size, existingKeyGeneration, replicationConfig, metadata);
   }
 
   /**

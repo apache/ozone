@@ -1058,8 +1058,9 @@ public abstract class TestOzoneRpcClientAbstract {
     }
     OzoneKeyDetails keyDetails = bucket.getKey(keyName);
 
-    try (OzoneOutputStream out = bucket.overwriteKey(
-        keyDetails, RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.ONE))) {
+    try (OzoneOutputStream out = bucket.rewriteKey(keyDetails.getName(), keyDetails.getDataSize(),
+        keyDetails.getGeneration(), RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.ONE),
+        keyDetails.getMetadata())) {
       out.write(overwriteValue.getBytes(UTF_8));
     }
 
@@ -1072,10 +1073,11 @@ public abstract class TestOzoneRpcClientAbstract {
     // Delete the key
     bucket.deleteKey(keyName);
 
-    // Now try the over write again, and it should fail as the originally read key is no longer there.
+    // Now try the overwrite again, and it should fail as the originally read key is no longer there.
     assertThrows(IOException.class, () -> {
-      try (OzoneOutputStream out = bucket.overwriteKey(
-          keyDetails, RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.ONE))) {
+      try (OzoneOutputStream out = bucket.rewriteKey(keyDetails.getName(), keyDetails.getDataSize(),
+          keyDetails.getGeneration(), RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.ONE),
+          keyDetails.getMetadata())) {
         out.write(overwriteValue.getBytes(UTF_8));
       }
     });

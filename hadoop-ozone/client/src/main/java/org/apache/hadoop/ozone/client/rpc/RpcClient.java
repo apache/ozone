@@ -1397,35 +1397,31 @@ public class RpcClient implements ClientProtocol {
     return createOutputStream(openKey);
   }
 
-  // STODO - rename this API and params.
   @Override
-  public OzoneOutputStream overwriteKey(OzoneKeyDetails keyToOverwrite, ReplicationConfig replicationConfig)
-      throws IOException {
-    if (keyToOverwrite == null) {
-      throw new IllegalArgumentException("KeyToOverwrite cannot be null");
+  public OzoneOutputStream rewriteKey(String volumeName, String bucketName, String keyName,
+      long size, long existingKeyGeneration, ReplicationConfig replicationConfig,
+      Map<String, String> metadata) throws IOException {
+    if (keyName == null) {
+      throw new IllegalArgumentException("Key cannot be null");
     }
-    if (keyToOverwrite.getGeneration() == null) {
-      throw new IllegalArgumentException("KeyToOverwrite generation cannot be null");
-    }
-    createKeyPreChecks(keyToOverwrite.getVolumeName(), keyToOverwrite.getBucketName(),
-        keyToOverwrite.getName(), replicationConfig);
+    createKeyPreChecks(volumeName, bucketName, keyName, replicationConfig);
 
     OmKeyArgs.Builder builder = new OmKeyArgs.Builder()
-        .setVolumeName(keyToOverwrite.getVolumeName())
-        .setBucketName(keyToOverwrite.getBucketName())
-        .setKeyName(keyToOverwrite.getName())
-        .setDataSize(keyToOverwrite.getDataSize())
+        .setVolumeName(volumeName)
+        .setBucketName(bucketName)
+        .setKeyName(keyName)
+        .setDataSize(size)
         .setReplicationConfig(replicationConfig)
-        .addAllMetadataGdpr(keyToOverwrite.getMetadata())
+        .addAllMetadataGdpr(metadata)
         .setLatestVersionLocation(getLatestVersionLocation)
-        .setOverwriteGeneration(keyToOverwrite.getGeneration());
+        .setOverwriteGeneration(existingKeyGeneration);
 
     OpenKeySession openKey = ozoneManagerClient.openKey(builder.build());
     // For bucket with layout OBJECT_STORE, when create an empty file (size=0),
     // OM will set DataSize to OzoneConfigKeys#OZONE_SCM_BLOCK_SIZE,
     // which will cause S3G's atomic write length check to fail,
     // so reset size to 0 here.
-    if (isS3GRequest.get() && keyToOverwrite.getDataSize() == 0) {
+    if (isS3GRequest.get() && size == 0) {
       openKey.getKeyInfo().setDataSize(0);
     }
     return createOutputStream(openKey);
