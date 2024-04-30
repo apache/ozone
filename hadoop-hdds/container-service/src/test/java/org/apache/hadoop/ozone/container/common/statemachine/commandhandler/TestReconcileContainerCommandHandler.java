@@ -51,7 +51,6 @@ import java.util.Map;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 
-import static java.util.Collections.min;
 import static java.util.Collections.singletonMap;
 import static org.apache.hadoop.hdds.protocol.MockDatanodeDetails.randomDatanodeDetails;
 import static org.apache.hadoop.ozone.OzoneConsts.GB;
@@ -69,7 +68,7 @@ public class TestReconcileContainerCommandHandler {
 
   private static final int NUM_CONTAINERS = 3;
 
-  ContainerSet containerSet;
+  private ContainerSet containerSet;
   private OzoneContainer ozoneContainer;
   private StateContext context;
   private ReconcileContainerCommandHandler subject;
