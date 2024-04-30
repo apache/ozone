@@ -113,30 +113,26 @@ public class BufferPool {
         currentBufferIndex, bufferList.indexOf(chunkBuffer));
 
     Preconditions.assertTrue(!bufferList.isEmpty(), "empty buffer list");
-//    if (bufferList.get(0) != chunkBuffer) {
-//      LOG.warn("only the first buffer can be released");
-//    }
-    Preconditions.assertSame(bufferList.get(0), chunkBuffer,
-        "only the first buffer can be released");
+//    Preconditions.assertSame(bufferList.get(0), chunkBuffer,
+//        "only the first buffer can be released");
     Preconditions.assertTrue(currentBufferIndex >= 0,
         () -> "current buffer: " + currentBufferIndex);
 
     // always remove from head of the list and append at last
 //    boolean res = bufferList.remove(chunkBuffer);  // This does NOT work as intended
-//    int i;
-//    ChunkBuffer buffer = null;
-//    for (i = 0; i < bufferList.size(); i++) {
-//      // force comparison by object ID, overriding ByteBuffer's equals() method
-//      if (chunkBuffer == bufferList.get(i)) {
-//        buffer = bufferList.remove(i);
-//        break;
-//      }
-//    }
-//    Preconditions.assertSame(chunkBuffer, buffer, "Should be the same buffer");
-    final ChunkBuffer buffer = bufferList.remove(0);
-    buffer.clear();
-    bufferList.add(buffer);
-    currentBufferIndex--;
+    int i;
+    ChunkBuffer buffer = null;
+    for (i = 0; i < bufferList.size(); i++) {
+      // force comparison by object ID, overriding ByteBuffer's equals() method
+      if (chunkBuffer == bufferList.get(i)) {
+        buffer = bufferList.remove(i);
+        break;
+      }
+    }
+    Preconditions.assertSame(chunkBuffer, buffer, "Should be the same buffer");
+    chunkBuffer.clear();
+    bufferList.add(chunkBuffer);
+    currentBufferIndex--;  //
   }
 
   public synchronized void clearBufferPool() {
