@@ -378,11 +378,18 @@ public class BlockOutputStream extends OutputStream {
 
   private synchronized void allocateNewBufferIfNeeded() {
     if (currentBufferRemaining == 0) {
-      // TODO: Remove debug print
-      LOG.debug("allocateBuffer(increment = {})", config.getBufferIncrement());
-      currentBuffer = bufferPool.allocateBuffer(config.getBufferIncrement());
-      currentBufferRemaining = currentBuffer.remaining();
+      allocateNewBuffer();
     }
+  }
+
+  /**
+   * Unconditionally allocate a new buffer as currentBuffer.
+   * Resets currentBufferRemaining.
+   */
+  private void allocateNewBuffer() {
+    LOG.warn("@@@@@@@ calling allocateBuffer(increment = {})", config.getBufferIncrement());
+    currentBuffer = bufferPool.allocateBuffer(config.getBufferIncrement());
+    currentBufferRemaining = currentBuffer.remaining();
   }
 
   private void updateFlushLength() {
@@ -621,15 +628,17 @@ public class BlockOutputStream extends OutputStream {
 
   private void writeChunk(ChunkBuffer buffer)
       throws IOException {
+    writeChunkCommon(buffer);
     final ChunkBuffer dupBuffer = buffer.duplicate(0, buffer.position());
-    writeChunkCommon(dupBuffer);
+    LOG.warn("@@@@@@ writeChunk(buffer = {}): dupBuffer = {}", buffer, dupBuffer);
     writeChunkToContainer(dupBuffer, false);
   }
 
   private void writeChunkAndPutBlock(ChunkBuffer buffer)
       throws IOException {
+    writeChunkCommon(buffer);
     final ChunkBuffer dupBuffer = buffer.duplicate(0, buffer.position());
-    writeChunkCommon(dupBuffer);
+    LOG.warn("@@@@@@ writeChunkAndPutBlock(buffer = {}): dupBuffer = {}", buffer, dupBuffer);
     writeChunkToContainer(dupBuffer, true);
   }
 
@@ -679,6 +688,11 @@ public class BlockOutputStream extends OutputStream {
             updateFlushLength();
             executePutBlock(close, false);
           }
+          // Unconditionally allocate a new buffer as currentBuffer.
+          // This is done to avoid buffer race between write() and hsync().
+          allocateNewBuffer();
+          // Note this can lead to waste of unused space in the buffer, increasing client (direct buffer) memory usage.
+          // TODO: Is there any trick to reuse the currentBuffer without major refactoring, even in this case?
         } else {
           updateFlushLength();
           executePutBlock(close, false);
