@@ -43,19 +43,7 @@ import static org.apache.hadoop.ozone.s3.util.S3Consts.S3_XML_NAMESPACE;
 public class CompleteMultipartUploadRequestUnmarshaller
     implements MessageBodyReader<CompleteMultipartUploadRequest> {
 
-  private final JAXBContext context;
-  private final XMLReader xmlReader;
-
   public CompleteMultipartUploadRequestUnmarshaller() {
-    try {
-      context = JAXBContext.newInstance(CompleteMultipartUploadRequest.class);
-      SAXParserFactory saxParserFactory = SAXParserFactory.newInstance();
-      saxParserFactory.setFeature(XMLConstants.FEATURE_SECURE_PROCESSING, true);
-      xmlReader = saxParserFactory.newSAXParser().getXMLReader();
-    } catch (Exception ex) {
-      throw new AssertionError("Can not instantiate " +
-          "CompleteMultipartUploadRequest parser", ex);
-    }
   }
   @Override
   public boolean isReadable(Class<?> aClass, Type type,
@@ -70,6 +58,10 @@ public class CompleteMultipartUploadRequestUnmarshaller
       MultivaluedMap<String, String> multivaluedMap,
       InputStream inputStream) throws IOException, WebApplicationException {
     try {
+      JAXBContext context = JAXBContext.newInstance(CompleteMultipartUploadRequest.class);
+      SAXParserFactory saxParserFactory = SAXParserFactory.newInstance();
+      saxParserFactory.setFeature(XMLConstants.FEATURE_SECURE_PROCESSING, true);
+      XMLReader xmlReader = saxParserFactory.newSAXParser().getXMLReader();
       UnmarshallerHandler unmarshallerHandler =
           context.createUnmarshaller().getUnmarshallerHandler();
       XmlNamespaceFilter filter =
