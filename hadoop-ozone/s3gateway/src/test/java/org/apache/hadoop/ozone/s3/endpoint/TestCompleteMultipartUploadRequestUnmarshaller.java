@@ -29,7 +29,7 @@ import org.junit.jupiter.api.Test;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 /**
  * Class tests Unmarshall logic of {@link CompleteMultipartUploadRequest}.
@@ -79,7 +79,7 @@ public class TestCompleteMultipartUploadRequestUnmarshaller {
   }
 
   private void checkContent(CompleteMultipartUploadRequest request) {
-    assertNotEquals(request, null);
+    assertNotNull(request);
     assertEquals(2, request.getPartList().size());
 
     List<CompleteMultipartUploadRequest.Part> parts =
