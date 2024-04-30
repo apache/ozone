@@ -72,17 +72,16 @@ public class OzoneKey {
    */
 
   /**
-   * The update ID of an existing key. This will be null if this OzoneKey
-   * object has not been created from an existing key read from OM, as OM allocates
-   * the update ID on commit of the key.
+   * The generation of an existing key. This can be used with atomic commits, to
+   * ensure the key has not changed since the key details were read.
    */
-  private final Long updateID;
+  private final Long generation;
 
   @SuppressWarnings("parameternumber")
   public OzoneKey(String volumeName, String bucketName,
       String keyName, long size, long creationTime,
       long modificationTime, ReplicationConfig replicationConfig,
-      boolean isFile, Long updateID) {
+      boolean isFile, Long generation) {
     this.volumeName = volumeName;
     this.bucketName = bucketName;
     this.name = keyName;
@@ -91,7 +90,7 @@ public class OzoneKey {
     this.modificationTime = Instant.ofEpochMilli(modificationTime);
     this.replicationConfig = replicationConfig;
     this.isFile = isFile;
-    this.updateID = updateID;
+    this.generation = generation;
   }
 
   @SuppressWarnings("parameternumber")
@@ -117,9 +116,9 @@ public class OzoneKey {
   public OzoneKey(String volumeName, String bucketName,
                   String keyName, long size, long creationTime,
                   long modificationTime, ReplicationConfig replicationConfig,
-                  Map<String, String> metadata, boolean isFile, Long updateID) {
+                  Map<String, String> metadata, boolean isFile, Long generation) {
     this(volumeName, bucketName, keyName, size, creationTime,
-        modificationTime, replicationConfig, isFile, updateID);
+        modificationTime, replicationConfig, isFile, generation);
     this.metadata.putAll(metadata);
   }
   /**
@@ -206,9 +205,8 @@ public class OzoneKey {
     return replicationConfig;
   }
 
-  @JsonIgnore
-  public Long getUpdateID() {
-    return updateID;
+  public Long getGeneration() {
+    return generation;
   }
 
   /**
@@ -223,7 +221,7 @@ public class OzoneKey {
     return new OzoneKey(keyInfo.getVolumeName(), keyInfo.getBucketName(),
         keyInfo.getKeyName(), keyInfo.getDataSize(), keyInfo.getCreationTime(),
         keyInfo.getModificationTime(), keyInfo.getReplicationConfig(),
-        keyInfo.getMetadata(), keyInfo.isFile(), keyInfo.getUpdateID());
+        keyInfo.getMetadata(), keyInfo.isFile(), keyInfo.getGeneration());
   }
 
 }

@@ -307,7 +307,7 @@ public final class OzoneBucketStub extends OzoneBucket {
           ozoneKeyDetails.getCreationTime().toEpochMilli(),
           ozoneKeyDetails.getModificationTime().toEpochMilli(),
           ozoneKeyDetails.getReplicationConfig(),
-          ozoneKeyDetails.isFile(), ozoneKeyDetails.getUpdateID());
+          ozoneKeyDetails.isFile(), ozoneKeyDetails.getGeneration());
     } else {
       throw new OMException(ResultCodes.KEY_NOT_FOUND);
     }
@@ -362,7 +362,7 @@ public final class OzoneBucketStub extends OzoneBucket {
               key.getDataSize(),
               key.getCreationTime().getEpochSecond() * 1000,
               key.getModificationTime().getEpochSecond() * 1000,
-              key.getReplicationConfig(), key.isFile(), key.getUpdateID());
+              key.getReplicationConfig(), key.isFile(), key.getGeneration());
         }).collect(Collectors.toList());
 
     if (prevKey != null) {

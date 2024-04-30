@@ -1404,8 +1404,8 @@ public class RpcClient implements ClientProtocol {
     if (keyToOverwrite == null) {
       throw new IllegalArgumentException("KeyToOverwrite cannot be null");
     }
-    if (keyToOverwrite.getUpdateID() == null) {
-      throw new IllegalArgumentException("KeyToOverwrite UpdateID cannot be null");
+    if (keyToOverwrite.getGeneration() == null) {
+      throw new IllegalArgumentException("KeyToOverwrite generation cannot be null");
     }
     createKeyPreChecks(keyToOverwrite.getVolumeName(), keyToOverwrite.getBucketName(),
         keyToOverwrite.getName(), replicationConfig);
@@ -1418,8 +1418,7 @@ public class RpcClient implements ClientProtocol {
         .setReplicationConfig(replicationConfig)
         .addAllMetadataGdpr(keyToOverwrite.getMetadata())
         .setLatestVersionLocation(getLatestVersionLocation)
-        // STODO - keyToOverwrite should have a getGeneration method rather than updateID
-        .setOverwriteGeneration(keyToOverwrite.getUpdateID());
+        .setOverwriteGeneration(keyToOverwrite.getGeneration());
 
     OpenKeySession openKey = ozoneManagerClient.openKey(builder.build());
     // For bucket with layout OBJECT_STORE, when create an empty file (size=0),
@@ -1693,7 +1692,7 @@ public class RpcClient implements ClientProtocol {
               key.getModificationTime(),
               key.getReplicationConfig(),
               key.isFile(),
-              key.getUpdateID()))
+              key.getGeneration()))
           .collect(Collectors.toList());
     }
   }
@@ -1744,7 +1743,7 @@ public class RpcClient implements ClientProtocol {
         keyInfo.getModificationTime(), ozoneKeyLocations,
         keyInfo.getReplicationConfig(), keyInfo.getMetadata(),
         keyInfo.getFileEncryptionInfo(),
-        () -> getInputStreamWithRetryFunction(keyInfo), keyInfo.isFile(), keyInfo.getUpdateID());
+        () -> getInputStreamWithRetryFunction(keyInfo), keyInfo.isFile(), keyInfo.getGeneration());
   }
 
   @Override

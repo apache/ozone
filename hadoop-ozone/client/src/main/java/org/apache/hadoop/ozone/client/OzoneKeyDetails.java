@@ -53,9 +53,9 @@ public class OzoneKeyDetails extends OzoneKey {
       Map<String, String> metadata,
       FileEncryptionInfo feInfo,
       CheckedSupplier<OzoneInputStream, IOException> contentSupplier,
-      boolean isFile, Long updateID) {
+      boolean isFile, Long generation) {
     super(volumeName, bucketName, keyName, size, creationTime,
-        modificationTime, replicationConfig, metadata, isFile, updateID);
+        modificationTime, replicationConfig, metadata, isFile, generation);
     this.ozoneKeyLocations = ozoneKeyLocations;
     this.feInfo = feInfo;
     this.contentSupplier = contentSupplier;
