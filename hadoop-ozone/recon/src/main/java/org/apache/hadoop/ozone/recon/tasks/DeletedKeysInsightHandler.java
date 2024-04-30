@@ -43,7 +43,7 @@ public class DeletedKeysInsightHandler implements OmTableHandler {
    * been backlogged in the backend for deletion.
    */
   @Override
-  public void handlePutEvent(OMDBUpdateEvent<String, Object> event,
+  public void handlePutEvent(RocksDBUpdateEvent<String, Object> event,
                              String tableName,
                              HashMap<String, Long> objectCountMap,
                              HashMap<String, Long> unReplicatedSizeMap,
@@ -75,7 +75,7 @@ public class DeletedKeysInsightHandler implements OmTableHandler {
    * been successfully deleted from the backend.
    */
   @Override
-  public void handleDeleteEvent(OMDBUpdateEvent<String, Object> event,
+  public void handleDeleteEvent(RocksDBUpdateEvent<String, Object> event,
                                 String tableName,
                                 HashMap<String, Long> objectCountMap,
                                 HashMap<String, Long> unReplicatedSizeMap,
@@ -107,7 +107,7 @@ public class DeletedKeysInsightHandler implements OmTableHandler {
    * pending to be deleted.
    */
   @Override
-  public void handleUpdateEvent(OMDBUpdateEvent<String, Object> event,
+  public void handleUpdateEvent(RocksDBUpdateEvent<String, Object> event,
                                 String tableName,
                                 HashMap<String, Long> objectCountMap,
                                 HashMap<String, Long> unReplicatedSizeMap,

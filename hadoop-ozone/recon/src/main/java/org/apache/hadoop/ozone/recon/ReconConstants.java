@@ -35,6 +35,8 @@ public final class ReconConstants {
 
   public static final String RECON_SCM_SNAPSHOT_DB = "scm.snapshot.db";
 
+  public static final String RECON_SCM_DB = "recon-scm.db";
+
   // By default, limit the number of results returned
 
   /**

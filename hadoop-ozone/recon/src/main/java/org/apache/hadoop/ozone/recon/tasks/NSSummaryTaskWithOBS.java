@@ -111,14 +111,14 @@ public class NSSummaryTaskWithOBS extends NSSummaryTaskDbEventHandler {
     return true;
   }
 
-  public boolean processWithOBS(OMUpdateEventBatch events) {
-    Iterator<OMDBUpdateEvent> eventIterator = events.getIterator();
+  public boolean processWithOBS(RocksDBUpdateEventBatch events) {
+    Iterator<RocksDBUpdateEvent> eventIterator = events.getIterator();
     Map<Long, NSSummary> nsSummaryMap = new HashMap<>();
 
     while (eventIterator.hasNext()) {
-      OMDBUpdateEvent<String, ? extends WithParentObjectId> omdbUpdateEvent =
+      RocksDBUpdateEvent<String, ? extends WithParentObjectId> omdbUpdateEvent =
           eventIterator.next();
-      OMDBUpdateEvent.OMDBUpdateAction action = omdbUpdateEvent.getAction();
+      RocksDBUpdateEvent.RocksDBUpdateAction action = omdbUpdateEvent.getAction();
 
       // We only process updates on OM's KeyTable
       String table = omdbUpdateEvent.getTable();
@@ -130,7 +130,7 @@ public class NSSummaryTaskWithOBS extends NSSummaryTaskDbEventHandler {
       String updatedKey = omdbUpdateEvent.getKey();
 
       try {
-        OMDBUpdateEvent<String, ?> keyTableUpdateEvent = omdbUpdateEvent;
+        RocksDBUpdateEvent<String, ?> keyTableUpdateEvent = omdbUpdateEvent;
         Object value = keyTableUpdateEvent.getValue();
         Object oldValue = keyTableUpdateEvent.getOldValue();
         if (value == null) {

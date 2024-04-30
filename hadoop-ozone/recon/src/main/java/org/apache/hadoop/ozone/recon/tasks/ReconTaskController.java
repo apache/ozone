@@ -22,6 +22,8 @@ import java.util.Map;
 
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
+import org.apache.hadoop.ozone.recon.scm.ReconSCMMetadataProcessingTask;
+import org.apache.hadoop.ozone.recon.scm.ReconScmMetadataManager;
 import org.hadoop.ozone.recon.schema.tables.daos.ReconTaskStatusDao;
 
 /**
@@ -40,7 +42,7 @@ public interface ReconTaskController {
    * @param events set of events
    * @throws InterruptedException InterruptedException
    */
-  void consumeOMEvents(OMUpdateEventBatch events,
+  void consumeOMEvents(RocksDBUpdateEventBatch events,
                        OMMetadataManager omMetadataManager)
       throws InterruptedException;
 
@@ -48,7 +50,7 @@ public interface ReconTaskController {
    * Pass on the handle to a new OM DB instance to the registered tasks.
    * @param omMetadataManager OM Metadata Manager instance
    */
-  void reInitializeTasks(ReconOMMetadataManager omMetadataManager)
+  void reInitializeOMTasks(ReconOMMetadataManager omMetadataManager)
       throws InterruptedException;
 
   /**
@@ -72,4 +74,25 @@ public interface ReconTaskController {
    * Stop the task scheduler.
    */
   void stop();
+
+  /**
+   * Register API used by SCM tasks to register themselves.
+   * @param task task instance
+   */
+  void registerSCMTask(ReconSCMMetadataProcessingTask task);
+
+  /**
+   * Pass on a set of SCM DB update events to the registered tasks.
+   * @param events set of events
+   * @throws InterruptedException InterruptedException
+   */
+  void consumeSCMEvents(RocksDBUpdateEventBatch events, ReconScmMetadataManager scmMetadataManager)
+      throws InterruptedException;
+
+  /**
+   * Pass on the handle to a new SCM DB instance to the registered tasks.
+   * @param reconScmMetadataManager Recon SCM Metadata Manager instance
+   */
+  void reInitializeSCMTasks(ReconScmMetadataManager reconScmMetadataManager)
+      throws InterruptedException;
 }

@@ -15,7 +15,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.hadoop.ozone.om.helpers;
+package org.apache.hadoop.ozone.common;
 
 import java.util.ArrayList;
 import java.util.List;

@@ -132,6 +132,25 @@ public class ContainerManagerImpl implements ContainerManager {
     }
   }
 
+  /**
+   * Initializes the ContainerStateManager with new container object.
+   *
+   * @param containerInfo
+   * @throws IOException
+   */
+  @Override
+  public void initialize(ContainerInfo containerInfo) throws IOException {
+    lock.lock();
+    try {
+      containerStateManager.initialize(containerInfo);
+    } catch (IOException ioe) {
+      LOG.error("Failed to reinitialize containerManager", ioe);
+      throw ioe;
+    } finally {
+      lock.unlock();
+    }
+  }
+
   @Override
   public ContainerInfo getContainer(final ContainerID id)
       throws ContainerNotFoundException {

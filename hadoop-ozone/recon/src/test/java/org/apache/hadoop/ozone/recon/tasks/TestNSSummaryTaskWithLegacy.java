@@ -284,13 +284,13 @@ public final class TestNSSummaryTaskWithLegacy {
     private NSSummary nsSummaryForBucket1;
     private NSSummary nsSummaryForBucket2;
 
-    private OMDBUpdateEvent keyEvent1;
-    private OMDBUpdateEvent keyEvent2;
-    private OMDBUpdateEvent keyEvent3;
-    private OMDBUpdateEvent keyEvent4;
-    private OMDBUpdateEvent keyEvent5;
-    private OMDBUpdateEvent keyEvent6;
-    private OMDBUpdateEvent keyEvent7;
+    private RocksDBUpdateEvent keyEvent1;
+    private RocksDBUpdateEvent keyEvent2;
+    private RocksDBUpdateEvent keyEvent3;
+    private RocksDBUpdateEvent keyEvent4;
+    private RocksDBUpdateEvent keyEvent5;
+    private RocksDBUpdateEvent keyEvent6;
+    private RocksDBUpdateEvent keyEvent7;
 
     @BeforeEach
     public void setUp() throws IOException {
@@ -305,7 +305,7 @@ public final class TestNSSummaryTaskWithLegacy {
       assertNotNull(nsSummaryForBucket2);
     }
 
-    private OMUpdateEventBatch processEventBatch() throws IOException {
+    private RocksDBUpdateEventBatch processEventBatch() throws IOException {
       // put file5 under bucket 2
       String omPutKey =
           OM_KEY_PREFIX + VOL +
@@ -313,13 +313,12 @@ public final class TestNSSummaryTaskWithLegacy {
               OM_KEY_PREFIX + FILE_FIVE;
       OmKeyInfo omPutKeyInfo = buildOmKeyInfo(VOL, BUCKET_TWO, KEY_FIVE,
           FILE_FIVE, KEY_FIVE_OBJECT_ID, BUCKET_TWO_OBJECT_ID, KEY_FIVE_SIZE);
-      keyEvent1 = new OMDBUpdateEvent.
-          OMUpdateEventBuilder<String, OmKeyInfo>()
+      keyEvent1 = new RocksDBUpdateEvent.RocksDBUpdateEventBuilder<String, OmKeyInfo>()
           .setKey(omPutKey)
           .setValue(omPutKeyInfo)
           .setTable(omMetadataManager.getKeyTable(getBucketLayout())
               .getName())
-          .setAction(OMDBUpdateEvent.OMDBUpdateAction.PUT)
+          .setAction(RocksDBUpdateEvent.RocksDBUpdateAction.PUT)
           .build();
 
       // delete file 1 under bucket 1
@@ -330,13 +329,12 @@ public final class TestNSSummaryTaskWithLegacy {
       OmKeyInfo omDeleteInfo = buildOmKeyInfo(
           VOL, BUCKET_ONE, KEY_ONE,
           FILE_ONE, KEY_ONE_OBJECT_ID, BUCKET_ONE_OBJECT_ID);
-      keyEvent2 = new OMDBUpdateEvent.
-          OMUpdateEventBuilder<String, OmKeyInfo>()
+      keyEvent2 = new RocksDBUpdateEvent.RocksDBUpdateEventBuilder<String, OmKeyInfo>()
           .setKey(omDeleteKey)
           .setValue(omDeleteInfo)
           .setTable(omMetadataManager.getKeyTable(getBucketLayout())
               .getName())
-          .setAction(OMDBUpdateEvent.OMDBUpdateAction.DELETE)
+          .setAction(RocksDBUpdateEvent.RocksDBUpdateAction.DELETE)
           .build();
 
       // update file 2's size under bucket 2
@@ -350,14 +348,13 @@ public final class TestNSSummaryTaskWithLegacy {
       OmKeyInfo omUpdateInfo = buildOmKeyInfo(
           VOL, BUCKET_TWO, KEY_TWO, FILE_TWO,
           KEY_TWO_OBJECT_ID, BUCKET_TWO_OBJECT_ID, KEY_TWO_UPDATE_SIZE);
-      keyEvent3 = new OMDBUpdateEvent.
-          OMUpdateEventBuilder<String, OmKeyInfo>()
+      keyEvent3 = new RocksDBUpdateEvent.RocksDBUpdateEventBuilder<String, OmKeyInfo>()
           .setKey(omUpdateKey)
           .setValue(omUpdateInfo)
           .setOldValue(omOldInfo)
           .setTable(omMetadataManager.getKeyTable(getBucketLayout())
               .getName())
-          .setAction(OMDBUpdateEvent.OMDBUpdateAction.UPDATE)
+          .setAction(RocksDBUpdateEvent.RocksDBUpdateAction.UPDATE)
           .build();
 
       // add dir 4 under bucket 1
@@ -368,11 +365,10 @@ public final class TestNSSummaryTaskWithLegacy {
       OmKeyInfo omDirPutValue1 = buildOmDirKeyInfo(VOL, BUCKET_ONE,
           (DIR_FOUR + OM_KEY_PREFIX), DIR_FOUR,
           DIR_FOUR_OBJECT_ID);
-      keyEvent4 = new OMDBUpdateEvent.
-          OMUpdateEventBuilder<String, OmKeyInfo>()
+      keyEvent4 = new RocksDBUpdateEvent.RocksDBUpdateEventBuilder<String, OmKeyInfo>()
           .setKey(omDirPutKey1)
           .setValue(omDirPutValue1)
-          .setAction(OMDBUpdateEvent.OMDBUpdateAction.PUT)
+          .setAction(RocksDBUpdateEvent.RocksDBUpdateAction.PUT)
           .setTable(omMetadataManager.getKeyTable(getBucketLayout()).getName())
           .build();
 
@@ -384,11 +380,10 @@ public final class TestNSSummaryTaskWithLegacy {
       OmKeyInfo omDirPutValue2 = buildOmDirKeyInfo(VOL, BUCKET_TWO,
           (DIR_FIVE + OM_KEY_PREFIX), DIR_FIVE,
           DIR_FIVE_OBJECT_ID);
-      keyEvent5 = new OMDBUpdateEvent.
-          OMUpdateEventBuilder<String, OmKeyInfo>()
+      keyEvent5 = new RocksDBUpdateEvent.RocksDBUpdateEventBuilder<String, OmKeyInfo>()
           .setKey(omDirPutKey2)
           .setValue(omDirPutValue2)
-          .setAction(OMDBUpdateEvent.OMDBUpdateAction.PUT)
+          .setAction(RocksDBUpdateEvent.RocksDBUpdateAction.PUT)
           .setTable(omMetadataManager.getKeyTable(getBucketLayout()).getName())
           .build();
 
@@ -401,11 +396,10 @@ public final class TestNSSummaryTaskWithLegacy {
       OmKeyInfo omDirDeleteValue = buildOmKeyInfo(VOL, BUCKET_ONE,
           (DIR_ONE + OM_KEY_PREFIX + DIR_THREE + OM_KEY_PREFIX),
           DIR_THREE, DIR_THREE_OBJECT_ID, DIR_ONE_OBJECT_ID);
-      keyEvent6 = new OMDBUpdateEvent.
-          OMUpdateEventBuilder<String, OmKeyInfo>()
+      keyEvent6 = new RocksDBUpdateEvent.RocksDBUpdateEventBuilder<String, OmKeyInfo>()
           .setKey(omDirDeleteKey)
           .setValue(omDirDeleteValue)
-          .setAction(OMDBUpdateEvent.OMDBUpdateAction.DELETE)
+          .setAction(RocksDBUpdateEvent.RocksDBUpdateAction.DELETE)
           .setTable(omMetadataManager.getKeyTable(getBucketLayout()).getName())
           .build();
 
@@ -420,16 +414,15 @@ public final class TestNSSummaryTaskWithLegacy {
       OmKeyInfo omDirUpdateValue = buildOmDirKeyInfo(VOL, BUCKET_ONE,
           (DIR_ONE_RENAME + OM_KEY_PREFIX), DIR_ONE_RENAME,
           DIR_ONE_OBJECT_ID);
-      keyEvent7 = new OMDBUpdateEvent.
-          OMUpdateEventBuilder<String, OmKeyInfo>()
+      keyEvent7 = new RocksDBUpdateEvent.RocksDBUpdateEventBuilder<String, OmKeyInfo>()
           .setKey(omDirUpdateKey)
           .setValue(omDirUpdateValue)
           .setOldValue(omDirOldValue)
-          .setAction(OMDBUpdateEvent.OMDBUpdateAction.UPDATE)
+          .setAction(RocksDBUpdateEvent.RocksDBUpdateAction.UPDATE)
           .setTable(omMetadataManager.getKeyTable(getBucketLayout()).getName())
           .build();
 
-      return new OMUpdateEventBatch(Arrays.asList(
+      return new RocksDBUpdateEventBatch(Arrays.asList(
           keyEvent1, keyEvent2, keyEvent3, keyEvent4, keyEvent5,
           keyEvent6, keyEvent7
       ));

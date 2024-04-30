@@ -113,7 +113,6 @@ public class RDBStore implements DBStore {
       } else {
         rocksDBCheckpointDiffer = null;
       }
-
       db = RocksDatabase.open(dbFile, dbOptions, writeOptions,
           families, readOnly);
 
@@ -180,7 +179,6 @@ public class RDBStore implements DBStore {
           e.getClass().getCanonicalName() + " " + e.getMessage() :
           e.getCause().getClass().getCanonicalName() + " " +
               e.getCause().getMessage());
-
       throw new IOException(msg, e);
     }
 

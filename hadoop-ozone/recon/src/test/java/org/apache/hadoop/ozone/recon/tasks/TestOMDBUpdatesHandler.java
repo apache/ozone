@@ -18,9 +18,9 @@
 
 package org.apache.hadoop.ozone.recon.tasks;
 
-import static org.apache.hadoop.ozone.recon.tasks.OMDBUpdateEvent.OMDBUpdateAction.PUT;
-import static org.apache.hadoop.ozone.recon.tasks.OMDBUpdateEvent.OMDBUpdateAction.UPDATE;
-import static org.apache.hadoop.ozone.recon.tasks.OMDBUpdateEvent.OMDBUpdateAction.DELETE;
+import static org.apache.hadoop.ozone.recon.tasks.RocksDBUpdateEvent.RocksDBUpdateAction.PUT;
+import static org.apache.hadoop.ozone.recon.tasks.RocksDBUpdateEvent.RocksDBUpdateAction.UPDATE;
+import static org.apache.hadoop.ozone.recon.tasks.RocksDBUpdateEvent.RocksDBUpdateAction.DELETE;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -124,21 +124,21 @@ public class TestOMDBUpdatesHandler {
     List<byte[]> writeBatches = getBytesFromOmMetaManager(0);
     OMDBUpdatesHandler omdbUpdatesHandler = captureEvents(writeBatches);
 
-    List<OMDBUpdateEvent> events = omdbUpdatesHandler.getEvents();
+    List<RocksDBUpdateEvent> events = omdbUpdatesHandler.getEvents();
     assertEquals(4, events.size());
 
-    OMDBUpdateEvent volEvent = events.get(0);
+    RocksDBUpdateEvent volEvent = events.get(0);
     assertEquals(PUT, volEvent.getAction());
     assertEquals(volumeKey, volEvent.getKey());
     assertEquals(args.getVolume(), ((OmVolumeArgs)volEvent.getValue())
         .getVolume());
 
-    OMDBUpdateEvent keyEvent = events.get(1);
+    RocksDBUpdateEvent keyEvent = events.get(1);
     assertEquals(PUT, keyEvent.getAction());
     assertEquals("/sampleVol/bucketOne/key_one", keyEvent.getKey());
     assertNull(keyEvent.getOldValue());
 
-    OMDBUpdateEvent updateEvent = events.get(2);
+    RocksDBUpdateEvent updateEvent = events.get(2);
     assertEquals(UPDATE, updateEvent.getAction());
     assertEquals("/sampleVol/bucketOne/key_two", updateEvent.getKey());
     assertNotNull(updateEvent.getOldValue());
@@ -178,18 +178,18 @@ public class TestOMDBUpdatesHandler {
     List<byte[]> writeBatches = getBytesFromOmMetaManager(3);
     OMDBUpdatesHandler omdbUpdatesHandler = captureEvents(writeBatches);
 
-    List<OMDBUpdateEvent> events = omdbUpdatesHandler.getEvents();
+    List<RocksDBUpdateEvent> events = omdbUpdatesHandler.getEvents();
 
     // Assert for non existent keys, no events will be captured and handled.
     assertEquals(2, events.size());
 
-    OMDBUpdateEvent keyEvent = events.get(0);
-    assertEquals(OMDBUpdateEvent.OMDBUpdateAction.DELETE, keyEvent.getAction());
+    RocksDBUpdateEvent keyEvent = events.get(0);
+    assertEquals(RocksDBUpdateEvent.RocksDBUpdateAction.DELETE, keyEvent.getAction());
     assertEquals("/sampleVol/bucketOne/key_one", keyEvent.getKey());
     assertEquals(omKeyInfo, keyEvent.getValue());
 
-    OMDBUpdateEvent volEvent = events.get(1);
-    assertEquals(OMDBUpdateEvent.OMDBUpdateAction.DELETE, volEvent.getAction());
+    RocksDBUpdateEvent volEvent = events.get(1);
+    assertEquals(RocksDBUpdateEvent.RocksDBUpdateAction.DELETE, volEvent.getAction());
     assertEquals(volumeKey, volEvent.getKey());
     assertNotNull(volEvent.getValue());
     OmVolumeArgs volumeInfo = (OmVolumeArgs) volEvent.getValue();
@@ -230,23 +230,23 @@ public class TestOMDBUpdatesHandler {
     List<byte[]> writeBatches = getBytesFromOmMetaManager(0);
     OMDBUpdatesHandler omdbUpdatesHandler = captureEvents(writeBatches);
 
-    List<OMDBUpdateEvent> events = omdbUpdatesHandler.getEvents();
+    List<RocksDBUpdateEvent> events = omdbUpdatesHandler.getEvents();
     assertEquals(7, events.size());
 
-    OMDBUpdateEvent volEvent = events.get(0);
+    RocksDBUpdateEvent volEvent = events.get(0);
     assertEquals(PUT, volEvent.getAction());
     assertEquals(volumeKey, volEvent.getKey());
     assertEquals(args.getVolume(), ((OmVolumeArgs)volEvent.getValue())
         .getVolume());
 
-    OMDBUpdateEvent keyPutEvent = events.get(1);
+    RocksDBUpdateEvent keyPutEvent = events.get(1);
     assertEquals(PUT, keyPutEvent.getAction());
     assertEquals("/sampleVol/bucketOne/key", keyPutEvent.getKey());
     assertEquals("key",
         ((OmKeyInfo)keyPutEvent.getValue()).getKeyName());
     assertNull(keyPutEvent.getOldValue());
 
-    OMDBUpdateEvent keyUpdateEvent = events.get(2);
+    RocksDBUpdateEvent keyUpdateEvent = events.get(2);
     assertEquals(UPDATE, keyUpdateEvent.getAction());
     assertEquals("/sampleVol/bucketOne/key", keyUpdateEvent.getKey());
     assertEquals("key_new",
@@ -255,7 +255,7 @@ public class TestOMDBUpdatesHandler {
     assertEquals("key",
         ((OmKeyInfo)keyUpdateEvent.getOldValue()).getKeyName());
 
-    OMDBUpdateEvent keyUpdateEvent2 = events.get(3);
+    RocksDBUpdateEvent keyUpdateEvent2 = events.get(3);
     assertEquals(UPDATE, keyUpdateEvent2.getAction());
     assertEquals("/sampleVol/bucketOne/key", keyUpdateEvent2.getKey());
     assertEquals("key_new2",
@@ -264,19 +264,19 @@ public class TestOMDBUpdatesHandler {
     assertEquals("key_new",
         ((OmKeyInfo)keyUpdateEvent2.getOldValue()).getKeyName());
 
-    OMDBUpdateEvent keyDeleteEvent = events.get(4);
+    RocksDBUpdateEvent keyDeleteEvent = events.get(4);
     assertEquals(DELETE, keyDeleteEvent.getAction());
     assertEquals("/sampleVol/bucketOne/key", keyDeleteEvent.getKey());
     assertEquals("key_new2",
         ((OmKeyInfo)keyDeleteEvent.getValue()).getKeyName());
 
-    OMDBUpdateEvent keyDeleteEvent2 = events.get(5);
+    RocksDBUpdateEvent keyDeleteEvent2 = events.get(5);
     assertEquals(DELETE, keyDeleteEvent2.getAction());
     assertEquals("/sampleVol/bucketOne/key", keyDeleteEvent2.getKey());
     assertEquals("key_new2",
         ((OmKeyInfo)keyDeleteEvent2.getValue()).getKeyName());
 
-    OMDBUpdateEvent keyPut2 = events.get(6);
+    RocksDBUpdateEvent keyPut2 = events.get(6);
     assertEquals(PUT, keyPut2.getAction());
     assertEquals("/sampleVol/bucketOne/key", keyPut2.getKey());
     assertEquals("key_new2",

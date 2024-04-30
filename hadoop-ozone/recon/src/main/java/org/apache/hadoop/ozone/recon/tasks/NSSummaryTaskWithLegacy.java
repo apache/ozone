@@ -68,27 +68,27 @@ public class NSSummaryTaskWithLegacy extends NSSummaryTaskDbEventHandler {
             OMConfigKeys.OZONE_OM_ENABLE_FILESYSTEM_PATHS_DEFAULT);
   }
 
-  public boolean processWithLegacy(OMUpdateEventBatch events) {
-    Iterator<OMDBUpdateEvent> eventIterator = events.getIterator();
+  public boolean processWithLegacy(RocksDBUpdateEventBatch events) {
+    Iterator<RocksDBUpdateEvent> eventIterator = events.getIterator();
     Map<Long, NSSummary> nsSummaryMap = new HashMap<>();
     ReconOMMetadataManager metadataManager = getReconOMMetadataManager();
 
     while (eventIterator.hasNext()) {
-      OMDBUpdateEvent<String, ? extends WithParentObjectId> omdbUpdateEvent =
-          eventIterator.next();
-      OMDBUpdateEvent.OMDBUpdateAction action = omdbUpdateEvent.getAction();
+      RocksDBUpdateEvent<String, ? extends
+                WithParentObjectId> rocksDBUpdateEvent = eventIterator.next();
+      RocksDBUpdateEvent.RocksDBUpdateAction action = rocksDBUpdateEvent.getAction();
 
       // we only process updates on OM's KeyTable
-      String table = omdbUpdateEvent.getTable();
+      String table = rocksDBUpdateEvent.getTable();
 
       if (!table.equals(KEY_TABLE)) {
         continue;
       }
 
-      String updatedKey = omdbUpdateEvent.getKey();
+      String updatedKey = rocksDBUpdateEvent.getKey();
 
       try {
-        OMDBUpdateEvent<String, ?> keyTableUpdateEvent = omdbUpdateEvent;
+        RocksDBUpdateEvent<String, ?> keyTableUpdateEvent = rocksDBUpdateEvent;
         Object value = keyTableUpdateEvent.getValue();
         Object oldValue = keyTableUpdateEvent.getOldValue();
 
@@ -133,7 +133,7 @@ public class NSSummaryTaskWithLegacy extends NSSummaryTaskDbEventHandler {
 
   private void processWithFileSystemLayout(OmKeyInfo updatedKeyInfo,
                                            OmKeyInfo oldKeyInfo,
-                                           OMDBUpdateEvent.OMDBUpdateAction action,
+                                           RocksDBUpdateEvent.RocksDBUpdateAction action,
                                            Map<Long, NSSummary> nsSummaryMap)
       throws IOException {
     setKeyParentID(updatedKeyInfo);
@@ -207,7 +207,7 @@ public class NSSummaryTaskWithLegacy extends NSSummaryTaskDbEventHandler {
 
   private void processWithObjectStoreLayout(OmKeyInfo updatedKeyInfo,
                                             OmKeyInfo oldKeyInfo,
-                                            OMDBUpdateEvent.OMDBUpdateAction action,
+                                            RocksDBUpdateEvent.RocksDBUpdateAction action,
                                             Map<Long, NSSummary> nsSummaryMap)
       throws IOException {
     setParentBucketId(updatedKeyInfo);

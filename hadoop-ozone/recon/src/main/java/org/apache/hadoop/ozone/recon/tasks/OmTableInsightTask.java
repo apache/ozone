@@ -155,8 +155,8 @@ public class OmTableInsightTask implements ReconOmTask {
    * @return Pair
    */
   @Override
-  public Pair<String, Boolean> process(OMUpdateEventBatch events) {
-    Iterator<OMDBUpdateEvent> eventIterator = events.getIterator();
+  public Pair<String, Boolean> process(RocksDBUpdateEventBatch events) {
+    Iterator<RocksDBUpdateEvent> eventIterator = events.getIterator();
     // Initialize maps to store count and size information
     HashMap<String, Long> objectCountMap = initializeCountMap();
     HashMap<String, Long> unReplicatedSizeMap = initializeSizeMap(false);
@@ -165,36 +165,36 @@ public class OmTableInsightTask implements ReconOmTask {
 
     // Process each update event
     while (eventIterator.hasNext()) {
-      OMDBUpdateEvent<String, Object> omdbUpdateEvent = eventIterator.next();
-      String tableName = omdbUpdateEvent.getTable();
+      RocksDBUpdateEvent<String, Object> rocksDBUpdateEvent = eventIterator.next();
+      String tableName = rocksDBUpdateEvent.getTable();
       if (!taskTables.contains(tableName)) {
         continue;
       }
       try {
-        switch (omdbUpdateEvent.getAction()) {
+        switch (rocksDBUpdateEvent.getAction()) {
         case PUT:
-          handlePutEvent(omdbUpdateEvent, tableName, objectCountMap,
+          handlePutEvent(rocksDBUpdateEvent, tableName, objectCountMap,
               unReplicatedSizeMap, replicatedSizeMap);
           break;
 
         case DELETE:
-          handleDeleteEvent(omdbUpdateEvent, tableName, objectCountMap,
+          handleDeleteEvent(rocksDBUpdateEvent, tableName, objectCountMap,
               unReplicatedSizeMap, replicatedSizeMap);
           break;
 
         case UPDATE:
-          handleUpdateEvent(omdbUpdateEvent, tableName, objectCountMap,
+          handleUpdateEvent(rocksDBUpdateEvent, tableName, objectCountMap,
               unReplicatedSizeMap, replicatedSizeMap);
           break;
 
         default:
           LOG.trace("Skipping DB update event : Table: {}, Action: {}",
-              tableName, omdbUpdateEvent.getAction());
+              tableName, rocksDBUpdateEvent.getAction());
         }
       } catch (Exception e) {
         LOG.error(
             "Unexpected exception while processing the table {}, Action: {}",
-            tableName, omdbUpdateEvent.getAction(), e);
+            tableName, rocksDBUpdateEvent.getAction(), e);
         return new ImmutablePair<>(getTaskName(), false);
       }
     }
@@ -212,7 +212,7 @@ public class OmTableInsightTask implements ReconOmTask {
     return new ImmutablePair<>(getTaskName(), true);
   }
 
-  private void handlePutEvent(OMDBUpdateEvent<String, Object> event,
+  private void handlePutEvent(RocksDBUpdateEvent<String, Object> event,
                               String tableName,
                               HashMap<String, Long> objectCountMap,
                               HashMap<String, Long> unReplicatedSizeMap,
@@ -231,7 +231,7 @@ public class OmTableInsightTask implements ReconOmTask {
   }
 
 
-  private void handleDeleteEvent(OMDBUpdateEvent<String, Object> event,
+  private void handleDeleteEvent(RocksDBUpdateEvent<String, Object> event,
                                  String tableName,
                                  HashMap<String, Long> objectCountMap,
                                  HashMap<String, Long> unReplicatedSizeMap,
@@ -251,7 +251,7 @@ public class OmTableInsightTask implements ReconOmTask {
   }
 
 
-  private void handleUpdateEvent(OMDBUpdateEvent<String, Object> event,
+  private void handleUpdateEvent(RocksDBUpdateEvent<String, Object> event,
                                  String tableName,
                                  HashMap<String, Long> objectCountMap,
                                  HashMap<String, Long> unReplicatedSizeMap,

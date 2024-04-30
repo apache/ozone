@@ -35,6 +35,8 @@ import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocol;
 import org.apache.hadoop.ozone.recon.ReconUtils;
+import org.apache.hadoop.ozone.recon.scm.ReconScmMetadataManager;
+import org.apache.hadoop.ozone.recon.scm.ReconScmMetadataManagerImpl;
 import org.apache.hadoop.ozone.recon.spi.StorageContainerServiceProvider;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -68,6 +70,7 @@ public class TestStorageContainerServiceProviderImpl {
               .thenReturn(mock(Pipeline.class));
           bind(StorageContainerLocationProtocol.class)
               .toInstance(mockScmClient);
+          bind(ReconScmMetadataManager.class).to(ReconScmMetadataManagerImpl.class);
           bind(StorageContainerServiceProvider.class)
               .to(StorageContainerServiceProviderImpl.class);
           bind(OzoneConfiguration.class).

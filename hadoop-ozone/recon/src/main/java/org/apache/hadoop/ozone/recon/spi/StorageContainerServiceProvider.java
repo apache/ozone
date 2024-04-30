@@ -21,10 +21,13 @@ import java.io.IOException;
 import java.util.List;
 
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
+import org.apache.hadoop.hdds.utils.db.DBStore;
+import org.apache.hadoop.ozone.common.DBUpdates;
 
 /**
  * Interface to access SCM endpoints.
@@ -99,4 +102,29 @@ public interface StorageContainerServiceProvider {
    * @return Total number of containers in SCM.
    */
   long getContainerCount(HddsProtos.LifeCycleState state) throws IOException;
+
+  /**
+   * Update Recon's Local SCM DB with new SCM DB snapshot as well as
+   * initializes the Recon and SCM managers.
+   *
+   * @return return true if updates successfully else false.
+   */
+  boolean updateReconSCMDBWithNewSnapshot();
+
+  /**
+   * Get DB updates since a specific sequence number.
+   *
+   * @param dbUpdatesRequest request that encapsulates a sequence number.
+   * @return DBUpdates in a wrapper object containing the updates.
+   * @throws IOException
+   */
+  DBUpdates getDBUpdates(StorageContainerLocationProtocolProtos.DBUpdatesRequestProto dbUpdatesRequest)
+      throws IOException;
+
+  /**
+   * Returns new SCM db store.
+   *
+   * @return
+   */
+  DBStore getStore();
 }

@@ -81,6 +81,8 @@ import org.apache.hadoop.ozone.recon.persistence.AbstractReconSqlDBTest;
 import org.apache.hadoop.ozone.recon.persistence.ContainerHealthSchemaManager;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 import org.apache.hadoop.ozone.recon.scm.ReconPipelineManager;
+import org.apache.hadoop.ozone.recon.scm.ReconScmMetadataManager;
+import org.apache.hadoop.ozone.recon.scm.ReconScmMetadataManagerImpl;
 import org.apache.hadoop.ozone.recon.scm.ReconStorageContainerManagerFacade;
 import org.apache.hadoop.ozone.recon.spi.StorageContainerServiceProvider;
 import org.apache.hadoop.ozone.recon.spi.impl.OzoneManagerServiceProviderImpl;
@@ -88,6 +90,8 @@ import org.apache.hadoop.ozone.recon.spi.impl.StorageContainerServiceProviderImp
 import org.apache.hadoop.ozone.recon.tasks.ContainerSizeCountTask;
 import org.apache.hadoop.ozone.recon.tasks.FileSizeCountTask;
 import org.apache.hadoop.ozone.recon.tasks.OmTableInsightTask;
+import org.apache.hadoop.ozone.recon.tasks.ReconTaskController;
+import org.apache.hadoop.ozone.recon.tasks.ReconTaskControllerImpl;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
 import org.apache.ozone.test.LambdaTestUtils;
 import org.hadoop.ozone.recon.schema.UtilizationSchemaDefinition;
@@ -253,6 +257,10 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
         new ReconTestInjector.Builder(temporaryFolder.toFile())
             .withReconSqlDb()
             .withReconOm(reconOMMetadataManager)
+            .addModule(new AbstractReconSqlDBTest.ReconOmTaskBindingModule())
+            .addModule(new AbstractReconSqlDBTest.ReconSCMMetadataTaskBindingModule())
+            .addBinding(ReconTaskController.class, ReconTaskControllerImpl.class)
+            .addBinding(ReconScmMetadataManager.class, ReconScmMetadataManagerImpl.class)
             .withOmServiceProvider(mock(OzoneManagerServiceProviderImpl.class))
             .addBinding(StorageContainerServiceProvider.class,
                 mockScmServiceProvider)
