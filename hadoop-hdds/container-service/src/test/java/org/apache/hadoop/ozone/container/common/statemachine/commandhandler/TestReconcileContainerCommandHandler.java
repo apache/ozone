@@ -18,7 +18,6 @@
 
 package org.apache.hadoop.ozone.container.common.statemachine.commandhandler;
 
-import org.apache.commons.lang3.stream.Streams;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
@@ -46,14 +45,17 @@ import org.apache.ozone.test.GenericTestUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
-import java.util.stream.Collectors;
+import java.util.concurrent.TimeoutException;
 
+import static java.util.Collections.min;
 import static java.util.Collections.singletonMap;
 import static org.apache.hadoop.hdds.protocol.MockDatanodeDetails.randomDatanodeDetails;
 import static org.apache.hadoop.ozone.OzoneConsts.GB;
@@ -80,13 +82,10 @@ public class TestReconcileContainerCommandHandler {
 
   private ContainerLayoutVersion layoutVersion;
 
-  public void initLayoutVersion(ContainerLayoutVersion layout, IncrementalReportSender<Container> icrSender)
+  public void init(ContainerLayoutVersion layout, IncrementalReportSender<Container> icrSender)
       throws Exception {
     this.layoutVersion = layout;
-    init(icrSender);
-  }
 
-  private void init(IncrementalReportSender<Container> icrSender) throws Exception {
     OzoneConfiguration conf = new OzoneConfiguration();
     DatanodeDetails dnDetails = randomDatanodeDetails();
     subject = new ReconcileContainerCommandHandler("");
@@ -112,17 +111,27 @@ public class TestReconcileContainerCommandHandler {
     Map<ContainerID, ContainerReplicaProto> containerReportsSent = new HashMap<>();
     IncrementalReportSender<Container> icrSender = c -> {
       try {
-        containerReportsSent.put(ContainerID.valueOf(c.getContainerData().getContainerID()), c.getContainerReport());
+        ContainerID id = ContainerID.valueOf(c.getContainerData().getContainerID());
+        containerReportsSent.put(id, c.getContainerReport());
+        LOG.info("Added container report for container {}", id);
       } catch (Exception ex) {
         LOG.error("ICR sender failed", ex);
       }
     };
-    initLayoutVersion(layout, icrSender);
+    init(layout, icrSender);
 
+    // These two commands are for a container existing in the datanode.
     ReconcileContainerCommand cmd = new ReconcileContainerCommand(CONTAINER_ID, Collections.emptyList());
     subject.handle(cmd, ozoneContainer, context, null);
+    subject.handle(cmd, ozoneContainer, context, null);
 
-    verifyContainerReportsSent(containerReportsSent, Collections.singleton(CONTAINER_ID));
+    // This container was
+    ReconcileContainerCommand cmd2 = new ReconcileContainerCommand(CONTAINER_ID + 1, Collections.emptyList());
+    subject.handle(cmd2, ozoneContainer, context, null);
+
+    waitForAllCommandsToFinish();
+
+    verifyContainerReportsSent(containerReportsSent, new HashSet<>(Arrays.asList(CONTAINER_ID, CONTAINER_ID + 1)));
   }
 
   // TODO test is flaky on the second container layout run only.
@@ -130,72 +139,64 @@ public class TestReconcileContainerCommandHandler {
   public void testReconcileContainerCommandMetrics(ContainerLayoutVersion layout) throws Exception {
     // Used to block ICR sending so that queue metrics can be checked before the reconcile task completes.
     CountDownLatch icrLatch = new CountDownLatch(1);
-    Map<ContainerID, ContainerReplicaProto> containerReportsSent = new HashMap<>();
+    // Wait this long before completing the task.
+    // This provides a lower bound on execution time.
+    final long minExecTimeMillis = 500;
+
     IncrementalReportSender<Container> icrSender = c -> {
       try {
-        containerReportsSent.put(ContainerID.valueOf(c.getContainerData().getContainerID()), c.getContainerReport());
-
         // Block the caller until the latch is counted down.
         // Caller can check queue metrics in the meantime.
         LOG.info("ICR sender waiting for latch");
         assertTrue(icrLatch.await(30, TimeUnit.SECONDS));
         LOG.info("ICR sender proceeding after latch");
+
+        Thread.sleep(minExecTimeMillis);
       } catch (Exception ex) {
         LOG.error("ICR sender failed", ex);
       }
     };
 
-    initLayoutVersion(layout, icrSender);
+    init(layout, icrSender);
 
     ReconcileContainerCommand cmd = new ReconcileContainerCommand(CONTAINER_ID, Collections.emptyList());
     // Queue two commands for processing.
-    // Handler is blocked until we count down the ICR latch.
+    // Both commands will be blocked until the latch is counted down.
     subject.handle(cmd, ozoneContainer, context, null);
     subject.handle(cmd, ozoneContainer, context, null);
 
     // The first command was invoked when submitted, and is now blocked in the ICR sender.
-    // Since neither command has finished, they both count towards queue count.
-    assertEquals(1, subject.getInvocationCount());
+    // The second command is blocked on the first since handling is single threaded in the current implementation.
+    // Since neither command has finished they both count towards queue count, which is incremented synchronously.
     assertEquals(2, subject.getQueuedCount());
     assertEquals(0, subject.getTotalRunTime());
     assertEquals(0, subject.getAverageRunTime());
 
-    // Wait this long before unblocking the ICR sender. This is the lower bound on simulated execution time.
-    long minExecTimeMillis = 500;
-    Thread.sleep(minExecTimeMillis);
+    // This will resume handling of the two tasks.
     icrLatch.countDown();
+    // Two tasks were fired, and each one should have taken at least minExecTime.
+    final long expectedTotalMinExecTimeMillis = minExecTimeMillis * 2;
 
-    // Decrementing queue count indicates the task completed.
-    waitForQueueCount(1);
-    // The other command is invoked but blocked in the ICR sender.
+    waitForAllCommandsToFinish();
+
     assertEquals(2, subject.getInvocationCount());
-    long firstTotalRunTime = subject.getTotalRunTime();
-    long firstAvgRunTime = subject.getAverageRunTime();
-    assertTrue(firstTotalRunTime >= minExecTimeMillis,
-        "Total run time " + firstTotalRunTime + "ms was not larger than min exec time " + minExecTimeMillis + "ms");
-
-    // Wait a little longer before firing the second command.
-    Thread.sleep(minExecTimeMillis + 100);
-    icrLatch.countDown();
-    // Decrementing queue count indicates the task completed.
-    waitForQueueCount(0);
-    assertEquals(2, subject.getInvocationCount());
-    long secondTotalRunTime = subject.getTotalRunTime();
-    long secondAvgRunTime = subject.getAverageRunTime();
-    assertTrue(secondTotalRunTime >= firstTotalRunTime + minExecTimeMillis);
-    assertTrue(secondAvgRunTime >= minExecTimeMillis);
-    // We slept the thread a little longer on the second invocation, which should have increased the average run time
-    // from the first run.
-    assertTrue(secondAvgRunTime >= firstAvgRunTime);
-
-    verifyContainerReportsSent();
+    long totalRunTime = subject.getTotalRunTime();
+    assertTrue(totalRunTime >= expectedTotalMinExecTimeMillis,
+        "Total run time " + totalRunTime + "ms was not larger than the minimum total exec time " +
+            expectedTotalMinExecTimeMillis + "ms");
+    long avgRunTime = subject.getAverageRunTime();
+    assertTrue(avgRunTime >= minExecTimeMillis,
+        "Average run time " + avgRunTime + "ms was not larger than the minimum per task exec time " +
+            minExecTimeMillis + "ms");
   }
 
-  private void waitForQueueCount(int expectedQueueCount) throws Exception {
+  private void waitForAllCommandsToFinish() throws Exception {
+    // Queue count should be decremented only after the task completes, so the other metrics should be consistent when
+    // it reaches zero.
     GenericTestUtils.waitFor(() -> {
       int qCount = subject.getQueuedCount();
-      LOG.info("Waiting for queued command count to reach " + expectedQueueCount + ". Currently at " + qCount);
-      return qCount == expectedQueueCount;
+      LOG.info("Waiting for queued command count to reach 0. Currently at " + qCount);
+      return qCount == 0;
     }, 500, 3000);
   }
 
