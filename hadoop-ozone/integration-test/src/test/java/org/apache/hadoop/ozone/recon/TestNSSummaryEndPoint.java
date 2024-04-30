@@ -141,6 +141,36 @@ class TestNSSummaryEndPoint {
 
   /**
    * Verify listKeys at different levels.
+   * .
+   * └── volume
+   *     └── bucket
+   *         └── a1
+   *             ├── b1
+   *             │   ├── c1111.tx
+   *             │   ├── c1222.tx
+   *             │   ├── c1333.tx
+   *             │   ├── c1444.tx
+   *             │   ├── c1555.tx
+   *             │   ├── c1
+   *             │   │   └── c1.tx
+   *             │   └── c12
+   *             │       ├── c2.tx
+   *             │       └── c3.tx
+   *             ├── b2
+   *             │   ├── d1
+   *             │   │   └── d11.tx
+   *             │   ├── d2
+   *             │   │   ├── d21.tx
+   *             │   │   └── d22.tx
+   *             │   └── d3
+   *             │       └── d31.tx
+   *             └── b3
+   *                 ├── e1
+   *                 │   └── e11.tx
+   *                 ├── e2
+   *                 │   └── e21.tx
+   *                 └── e3
+   *                     └── e31.tx
    */
   private static void buildNameSpaceTree(OzoneBucket ozoneBucket)
       throws Exception {
