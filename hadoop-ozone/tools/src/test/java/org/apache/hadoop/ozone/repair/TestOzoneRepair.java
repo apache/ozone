@@ -17,6 +17,7 @@
  */
 package org.apache.hadoop.ozone.repair;
 
+import org.jooq.meta.derby.sys.Sys;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -25,7 +26,6 @@ import java.io.ByteArrayOutputStream;
 import java.io.PrintStream;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
-import static org.apache.hadoop.fs.ozone.Constants.OZONE_DEFAULT_USER;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -43,10 +43,14 @@ public class TestOzoneRepair {
   private static final PrintStream OLD_ERR = System.err;
   private static final String DEFAULT_ENCODING = UTF_8.name();
 
+  private static final String OZONE_USER = "ozone";
+  private static final String OLD_USER = System.getProperty("user.name");
+
   @BeforeEach
   public void setup() throws Exception {
     System.setOut(new PrintStream(out, false, DEFAULT_ENCODING));
     System.setErr(new PrintStream(err, false, DEFAULT_ENCODING));
+    System.setProperty("user.name", OZONE_USER);
   }
 
   @AfterEach
@@ -58,22 +62,13 @@ public class TestOzoneRepair {
     // restore system streams
     System.setOut(OLD_OUT);
     System.setErr(OLD_ERR);
+    System.setProperty("user.name", OLD_USER);
   }
 
   @Test
-  void testOzoneRepairWhenUserIsOzoneDefaultUser() throws Exception {
+  void testOzoneRepairWhenUserIsRemindedSystemUserAndDeclinesToProceed() throws Exception {
     OzoneRepair ozoneRepair = spy(new OzoneRepair());
-    doReturn(OZONE_DEFAULT_USER).when(ozoneRepair).getSystemUserName();
-
-    ozoneRepair.execute(new String[]{});
-    assertThat(out.toString(DEFAULT_ENCODING)).contains("Run as user: " + OZONE_DEFAULT_USER);
-  }
-
-  @Test
-  void testOzoneRepairWhenUserIsNotOzoneDefaultUserAndDeclinesToProceed() throws Exception {
-    OzoneRepair ozoneRepair = spy(new OzoneRepair());
-    doReturn("non-ozone").when(ozoneRepair).getSystemUserName();
-    doReturn("N").when(ozoneRepair).getConsoleReadLineWithFormat(anyString(), anyString());
+    doReturn("N").when(ozoneRepair).getConsoleReadLineWithFormat(anyString());
 
     int res = ozoneRepair.execute(new String[]{});
     assertEquals(1, res);
@@ -81,14 +76,12 @@ public class TestOzoneRepair {
   }
 
   @Test
-  void testOzoneRepairWhenUserIsNotOzoneDefaultUserAndAgreesToProceed() throws Exception {
+  void testOzoneRepairWhenUserIsRemindedSystemUserAndAgreesToProceed() throws Exception {
     OzoneRepair ozoneRepair = spy(new OzoneRepair());
-    String currentUser = "non-ozone";
-    doReturn(currentUser).when(ozoneRepair).getSystemUserName();
-    doReturn("y").when(ozoneRepair).getConsoleReadLineWithFormat(anyString(), anyString());
+    doReturn("y").when(ozoneRepair).getConsoleReadLineWithFormat(anyString());
 
     ozoneRepair.execute(new String[]{});
-    assertThat(out.toString(DEFAULT_ENCODING)).contains("Run as user: " + currentUser);
+    assertThat(out.toString(DEFAULT_ENCODING)).contains("Run as user: " + OZONE_USER);
   }
 
 }
