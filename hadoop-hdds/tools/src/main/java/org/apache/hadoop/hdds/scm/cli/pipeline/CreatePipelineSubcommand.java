@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.hdds.scm.cli.pipeline;
 
+import com.google.common.base.Strings;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.cli.ScmSubcommand;
@@ -26,6 +27,12 @@ import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import picocli.CommandLine;
 
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+import java.util.Set;
+import java.util.TreeSet;
+import java.util.UUID;
 
 /**
  * Handler of createPipeline command.
@@ -54,6 +61,12 @@ public class CreatePipelineSubcommand extends ScmSubcommand {
   )
   private HddsProtos.ReplicationFactor factor;
 
+  @CommandLine.Option(names = {"-n", "--nodes"},
+      description = "Create pipeline on specified datanode." +
+          "Multiple datanode uuids are split using commas.",
+      defaultValue = "")
+  private String nodes;
+
   @Override
   public void execute(ScmClient scmClient) throws IOException {
     // Once we support creating EC containers/pipelines from the client, the
@@ -68,10 +81,34 @@ public class CreatePipelineSubcommand extends ScmSubcommand {
       throw new IllegalArgumentException(type.name()
           + " is not supported yet.");
     }
+
+    HddsProtos.NodePool nodePool = null;
+    if (!Strings.isNullOrEmpty(nodes)) {
+      Set<String> nodeList = new TreeSet<>();
+      Collections.addAll(nodeList, nodes.split(","));
+      if (factor.getNumber() == nodeList.size()) {
+        List<HddsProtos.Node> hddsNodes = new ArrayList<>();
+        for (String dnId : nodeList) {
+          HddsProtos.Node node = scmClient.queryNode(UUID.fromString(dnId));
+          if (nodeList.contains(node.getNodeID().getUuid())) {
+            hddsNodes.add(node);
+          }
+        }
+        if (factor.getNumber() == hddsNodes.size()) {
+          nodePool =
+              HddsProtos.NodePool.newBuilder().addAllNodes(hddsNodes).build();
+        }
+      }
+    }
+
+    if (nodePool == null) {
+      nodePool = HddsProtos.NodePool.getDefaultInstance();
+    }
+
     Pipeline pipeline = scmClient.createReplicationPipeline(
         type,
         factor,
-        HddsProtos.NodePool.getDefaultInstance());
+        nodePool);
 
     if (pipeline != null) {
       System.out.println(pipeline.getId().toString() +
