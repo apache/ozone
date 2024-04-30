@@ -51,13 +51,16 @@ public class TestOzoneRepairShell {
   @BeforeAll
   public static void init() throws Exception {
     conf = new OzoneConfiguration();
-    cluster = MiniOzoneCluster.newBuilder(conf).withoutDatanodes().build();
+    cluster = MiniOzoneCluster.newBuilder(conf).build();
     cluster.waitForClusterToBeReady();
   }
 
   @Test
   public void testUpdateTransactionInfoTable() throws Exception {
-    CommandLine cmd = new CommandLine(new RDBRepair()).addSubcommand(new TransactionInfoRepair());
+    StringWriter stdout = new StringWriter();
+    PrintWriter pstdout = new PrintWriter(stdout);
+    CommandLine cmd = new CommandLine(new RDBRepair()).addSubcommand(new TransactionInfoRepair())
+        .setOut(pstdout);
     String dbPath = OMStorage.getOmDbDir(conf) + OM_KEY_PREFIX + OM_DB_NAME;
 
     cluster.getOzoneManager().stop();
@@ -71,16 +74,14 @@ public class TestOzoneRepairShell {
         new String[] {"--db=" + dbPath, "transaction", "--highest-transaction", testTerm + "#" + testIndex};
     int exitCode = cmd.execute(args);
     assertEquals(0, exitCode);
-
-//    CommandLine cmdDBScanner = new CommandLine(new RDBParser()).addSubcommand(new DBScanner()).setOut(pstdout);
-//    String[] argsDBScanner =
-//        new String[] {"--db=" + dbPath, "scan", "--column_family", "transactionInfoTable"};
-//    cmdDBScanner.execute(argsDBScanner);
-    String cmdOut2 = scanTransactionInfoTable(dbPath);
-    assertThat(cmdOut2).contains("The original highest transaction Info was " + originalHighestTermIndex);
-    assertThat(cmdOut2).contains(String.format("The highest transaction info has been updated to: (t:%s, i:%s)",
+    assertThat(stdout.toString()).contains("The original highest transaction Info was " + originalHighestTermIndex);
+    assertThat(stdout.toString()).contains(
+        String.format("The highest transaction info has been updated to: (t:%s, i:%s)",
         testTerm, testIndex));
-    cluster.getOzoneManager().start();
+
+    String cmdOut2 = scanTransactionInfoTable(dbPath);
+    assertThat(cmdOut2).contains(testTerm + "#" + testIndex);
+    cluster.getOzoneManager().restart();
   }
 
   private String scanTransactionInfoTable(String dbPath) {
