@@ -90,15 +90,4 @@ public class OzoneKeyLocation {
     return keyOffset;
   }
 
-  public String toString() {
-    StringBuilder sb = new StringBuilder();
-    sb.append("conID ").append(containerID);
-    sb.append(" ");
-    sb.append("locID ").append(localID);
-    sb.append(" ");
-    sb.append("length ").append(length);
-    sb.append(" ");
-    sb.append("keyOffset ").append(keyOffset);
-    return sb.toString();
-  }
 }

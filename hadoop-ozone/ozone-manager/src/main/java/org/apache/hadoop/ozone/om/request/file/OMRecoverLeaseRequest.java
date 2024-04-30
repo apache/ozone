@@ -221,9 +221,8 @@ public class OMRecoverLeaseRequest extends OMKeyRequest {
       throw new OMException("Open Key " + dbOpenFileKey + " not found in openKeyTable", KEY_NOT_FOUND);
     }
 
-    if (openKeyInfo.getMetadata().containsKey(OzoneConsts.DELETED_HSYNC_KEY) ||
-        openKeyInfo.getMetadata().containsKey(OzoneConsts.OVERWRITTEN_HSYNC_KEY)) {
-      throw new OMException("Open Key " + keyName + " is already deleted/overwritten",
+    if (openKeyInfo.getMetadata().containsKey(OzoneConsts.DELETED_HSYNC_KEY)) {
+      throw new OMException("Open Key " + keyName + " is already deleted",
           KEY_NOT_FOUND);
     }
 

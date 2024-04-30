@@ -998,44 +998,34 @@ public class TestHSync {
     String data2 = "data for hsynced file";
     final Path file = new Path(dir, "file-normal-overwrite-hsync");
     try (FileSystem fs = FileSystem.get(CONF)) {
-      FSDataOutputStream outputStream1 = null;
-      FSDataOutputStream outputStream2 = null;
-
       // create hsync key
-      outputStream1 = fs.create(file, true);
+      FSDataOutputStream outputStream1 = fs.create(file, true);
       outputStream1.write(data2.getBytes(UTF_8), 0, data2.length());
       outputStream1.hsync();
+      // write more data
+      String s = RandomStringUtils.randomAlphabetic(BLOCK_SIZE);
+      byte[] newData = s.getBytes(StandardCharsets.UTF_8);
+      outputStream1.write(newData);
 
       // create normal key and commit
-      outputStream2 = fs.create(file, true);
+      FSDataOutputStream outputStream2 = fs.create(file, true);
       outputStream2.write(data1.getBytes(UTF_8), 0, data1.length());
       outputStream2.close();
       assertEquals(data1.length(), metrics.getDataCommittedBytes());
 
+      // hsync call for overwritten hsync key, should fail
+      OMException omException = assertThrows(OMException.class, () -> outputStream1.hsync());
+      assertTrue(omException.getResult() == OMException.ResultCodes.KEY_NOT_FOUND);
+      assertTrue(omException.getMessage().contains("already deleted/overwritten"));
+
       // allocate new block for overwritten hsync key, should fail
-      String s = RandomStringUtils.randomAlphabetic(BLOCK_SIZE);
-      byte[] newData = s.getBytes(StandardCharsets.UTF_8);
-      try {
-        outputStream1.write(newData);
-      } catch (IOException e) {
-        assertTrue(e.getCause() instanceof OMException);
-        assertTrue(((OMException)e.getCause()).getResult() == OMException.ResultCodes.KEY_NOT_FOUND);
-        assertTrue(e.getMessage().contains("already deleted/overwritten"));
-      }
-      // commit overwritten hsync key, should fail
-      try {
-        outputStream1.close();
-      } catch (OMException e) {
-        assertTrue(e.getResult() == OMException.ResultCodes.KEY_NOT_FOUND);
-        assertTrue(e.getMessage().contains("already deleted/overwritten"));
-      }
-      // recover overwritten hsync key, should fail
-      try {
-        ((RootedOzoneFileSystem)fs).recoverLease(file);
-      } catch (OMException e) {
-        assertTrue(e.getResult() == OMException.ResultCodes.KEY_NOT_FOUND);
-        assertTrue(e.getMessage().contains("already deleted/overwritten"));
-      }
+      IOException ioException = assertThrows(IOException.class, () -> outputStream1.write(newData));
+      assertTrue(ioException.getCause() instanceof OMException);
+      assertTrue(((OMException)ioException.getCause()).getResult() == OMException.ResultCodes.KEY_NOT_FOUND);
+      assertTrue(ioException.getMessage().contains("already deleted/overwritten"));
+
+      // recover key will success since key is already committed by outputStream2
+      ((RootedOzoneFileSystem)fs).recoverLease(file);
 
       Map<String, OmKeyInfo> openKeys = getAllOpenKeys(openKeyTable);
       Map<String, RepeatedOmKeyInfo> deletedKeys = getAllDeletedKeys(deletedTable);
@@ -1107,17 +1097,14 @@ public class TestHSync {
     String data2 = "data for hsynced file";
     final Path file = new Path(dir, "file-hsync-overwrite-normal");
     try (FileSystem fs = FileSystem.get(CONF)) {
-      FSDataOutputStream outputStream1 = null;
-      FSDataOutputStream outputStream2 = null;
-
       // create and commit normal key
-      outputStream1 = fs.create(file, true);
+      FSDataOutputStream outputStream1 = fs.create(file, true);
       outputStream1.write(data1.getBytes(UTF_8), 0, data1.length());
       outputStream1.close();
       assertEquals(data1.length(), metrics.getDataCommittedBytes());
 
       // create hsync key and commit
-      outputStream2 = fs.create(file, true);
+      FSDataOutputStream outputStream2 = fs.create(file, true);
       outputStream2.write(data2.getBytes(UTF_8), 0, data2.length());
       outputStream2.hsync();
       outputStream2.close();
@@ -1181,34 +1168,22 @@ public class TestHSync {
     String data2 = "data for second hsynced file";
     final Path file = new Path(dir, "file-hsync-overwrite-hsync");
     try (FileSystem fs = FileSystem.get(CONF)) {
-      FSDataOutputStream outputStream1 = null;
-      FSDataOutputStream outputStream2 = null;
-
       // create first hsync key and call hsync
-      outputStream1 = fs.create(file, true);
+      FSDataOutputStream outputStream1 = fs.create(file, true);
       outputStream1.write(data1.getBytes(UTF_8), 0, data1.length());
       outputStream1.hsync();
 
       // create second hync key and call hsync
-      outputStream2 = fs.create(file, true);
+      FSDataOutputStream outputStream2 = fs.create(file, true);
       outputStream2.write(data2.getBytes(UTF_8), 0, data2.length());
       outputStream2.hsync();
 
-      // hsync/close first overwritten hsync key should fail
-      try {
-        outputStream1.hsync();
-      } catch (OMException e) {
-        assertTrue(e.getResult() == OMException.ResultCodes.KEY_NOT_FOUND);
-        assertTrue(e.getMessage().contains("already deletec/overwritten"));
-      }
-      try {
-        outputStream1.close();
-      } catch (OMException e) {
-        assertTrue(e.getResult() == OMException.ResultCodes.KEY_NOT_FOUND);
-        assertTrue(e.getMessage().contains("already deleted/overwritten"));
-      }
+      // close first hsync key should fail
+      OMException omException = assertThrows(OMException.class, () -> outputStream1.close());
+      assertTrue(omException.getResult() == OMException.ResultCodes.KEY_NOT_FOUND);
+      assertTrue(omException.getMessage().contains("already deleted/overwritten"));
 
-      // hsync/close second hsync key should fail
+      // hsync/close second hsync key should success
       outputStream2.hsync();
       outputStream2.close();
 
