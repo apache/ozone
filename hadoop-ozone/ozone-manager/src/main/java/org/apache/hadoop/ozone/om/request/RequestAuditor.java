@@ -32,6 +32,8 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
     .UserInfo;
 
+import static org.apache.hadoop.ozone.OzoneConsts.ETAG;
+
 /**
  * Interface for OM Requests to convert to audit objects.
  */
@@ -83,6 +85,11 @@ public interface RequestAuditor {
       if (keyArgs.hasOverwriteGeneration()) {
         auditMap.put(OzoneConsts.OVERWRITE_GENERATION,
             String.valueOf(keyArgs.getOverwriteGeneration()));
+      }
+      for (HddsProtos.KeyValue item : keyArgs.getMetadataList()) {
+        if (ETAG.equals(item.getKey())) {
+          auditMap.put(ETAG, item.getValue());
+        }
       }
       return auditMap;
     }

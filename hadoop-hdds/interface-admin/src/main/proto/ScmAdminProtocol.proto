@@ -392,6 +392,7 @@ message RecommissionNodesResponseProto {
 message StartMaintenanceNodesRequestProto {
   repeated string hosts = 1;
   optional int64 endInHours = 2;
+  optional bool force = 3;
 }
 
 message StartMaintenanceNodesResponseProto {

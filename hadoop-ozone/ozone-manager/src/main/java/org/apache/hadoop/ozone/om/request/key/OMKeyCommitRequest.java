@@ -238,7 +238,7 @@ public class OMKeyCommitRequest extends OMKeyRequest {
           action = "hsync";
         }
         throw new OMException("Failed to " + action + " key, as " + dbOpenKey +
-            "entry is not found in the OpenKey table", KEY_NOT_FOUND);
+            " entry is not found in the OpenKey table", KEY_NOT_FOUND);
       }
 
       validateAtomicOverwrite(keyToDelete, omKeyInfo, auditMap);

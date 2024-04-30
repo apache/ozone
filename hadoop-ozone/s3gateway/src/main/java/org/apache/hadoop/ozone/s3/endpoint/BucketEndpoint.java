@@ -69,6 +69,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Set;
 
+import static org.apache.hadoop.ozone.OzoneConsts.ETAG;
 import static org.apache.hadoop.ozone.audit.AuditLogger.PerformanceStringBuilder;
 import static org.apache.hadoop.ozone.OzoneAcl.AclScope.ACCESS;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
@@ -709,7 +710,10 @@ public class BucketEndpoint extends EndpointBase {
     keyMetadata.setKey(EncodingTypeObject.createNullable(next.getName(),
         response.getEncodingType()));
     keyMetadata.setSize(next.getDataSize());
-    keyMetadata.setETag("" + next.getModificationTime());
+    String eTag = next.getMetadata().get(ETAG);
+    if (eTag != null) {
+      keyMetadata.setETag(ObjectEndpoint.wrapInQuotes(eTag));
+    }
     if (next.getReplicationType().toString().equals(ReplicationType
         .STAND_ALONE.toString())) {
       keyMetadata.setStorageClass(S3StorageType.REDUCED_REDUNDANCY.toString());
@@ -717,6 +721,10 @@ public class BucketEndpoint extends EndpointBase {
       keyMetadata.setStorageClass(S3StorageType.STANDARD.toString());
     }
     keyMetadata.setLastModified(next.getModificationTime());
+    String ownerName = next.getOwner();
+    String displayName = ownerName;
+    // Use ownerName to fill displayName
+    keyMetadata.setOwner(new S3Owner(ownerName, displayName));
     response.addKey(keyMetadata);
   }
 

@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with this
  * work for additional information regarding copyright ownership.  The ASF
@@ -63,6 +63,13 @@ public interface IAccessAuthorizer {
     ALL,
     NONE;
     private static int length = ACLType.values().length;
+    static {
+      if (length > 16) {
+        // must update getAclBytes(..) and other code
+        throw new AssertionError("BUG: Length = " + length
+            + " > 16, check the commit of this change and update the code.");
+      }
+    }
     private static ACLType[] vals = ACLType.values();
 
     public static int getNoOfAcls() {

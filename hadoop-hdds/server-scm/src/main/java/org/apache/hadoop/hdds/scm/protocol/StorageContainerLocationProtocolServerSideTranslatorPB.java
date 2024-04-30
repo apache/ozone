@@ -1248,7 +1248,7 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
       StartMaintenanceNodesRequestProto request) throws IOException {
     List<DatanodeAdminError> errors =
         impl.startMaintenanceNodes(request.getHostsList(),
-        (int)request.getEndInHours());
+        (int)request.getEndInHours(), request.getForce());
     StartMaintenanceNodesResponseProto.Builder response =
         StartMaintenanceNodesResponseProto.newBuilder();
     for (DatanodeAdminError e : errors) {
