@@ -70,7 +70,7 @@ import org.slf4j.LoggerFactory;
  * that first container succeeded but later ones failed, the succeeded writes
  * are not rolled back.
  *
- * TODO : currently not support multi-thread access.
+ * Thread-safe.
  */
 public class KeyOutputStream extends OutputStream
     implements Syncable, KeyMetadataAware {

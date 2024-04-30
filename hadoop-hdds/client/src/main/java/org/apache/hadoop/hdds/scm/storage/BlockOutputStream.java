@@ -621,14 +621,16 @@ public class BlockOutputStream extends OutputStream {
 
   private void writeChunk(ChunkBuffer buffer)
       throws IOException {
-    writeChunkCommon(buffer);
-    writeChunkToContainer(buffer.duplicate(0, buffer.position()), false);
+    final ChunkBuffer dupBuffer = buffer.duplicate(0, buffer.position());
+    writeChunkCommon(dupBuffer);
+    writeChunkToContainer(dupBuffer, false);
   }
 
   private void writeChunkAndPutBlock(ChunkBuffer buffer)
       throws IOException {
-    writeChunkCommon(buffer);
-    writeChunkToContainer(buffer.duplicate(0, buffer.position()), true);
+    final ChunkBuffer dupBuffer = buffer.duplicate(0, buffer.position());
+    writeChunkCommon(dupBuffer);
+    writeChunkToContainer(dupBuffer, true);
   }
 
   /**
