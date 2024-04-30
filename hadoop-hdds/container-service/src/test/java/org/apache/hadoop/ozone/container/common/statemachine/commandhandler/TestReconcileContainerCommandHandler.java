@@ -45,21 +45,18 @@ import org.apache.ozone.test.GenericTestUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.Map;
-import java.util.Set;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
 
 import static java.util.Collections.min;
 import static java.util.Collections.singletonMap;
 import static org.apache.hadoop.hdds.protocol.MockDatanodeDetails.randomDatanodeDetails;
 import static org.apache.hadoop.ozone.OzoneConsts.GB;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -70,36 +67,33 @@ import static org.mockito.Mockito.when;
 public class TestReconcileContainerCommandHandler {
   public static final Logger LOG = LoggerFactory.getLogger(TestReconcileContainerCommandHandler.class);
 
-  private static final long CONTAINER_ID = 123L;
+  private static final int NUM_CONTAINERS = 3;
 
+  ContainerSet containerSet;
   private OzoneContainer ozoneContainer;
   private StateContext context;
-  private Container container;
-  private Handler containerHandler;
-  private ContainerController controller;
-  private ContainerSet containerSet;
   private ReconcileContainerCommandHandler subject;
-
-  private ContainerLayoutVersion layoutVersion;
 
   public void init(ContainerLayoutVersion layout, IncrementalReportSender<Container> icrSender)
       throws Exception {
-    this.layoutVersion = layout;
 
     OzoneConfiguration conf = new OzoneConfiguration();
     DatanodeDetails dnDetails = randomDatanodeDetails();
     subject = new ReconcileContainerCommandHandler("");
     context = ContainerTestUtils.getMockContext(dnDetails, conf);
 
-    KeyValueContainerData data = new KeyValueContainerData(CONTAINER_ID, layoutVersion, GB,
-        PipelineID.randomId().toString(), randomDatanodeDetails().getUuidString());
-    container = new KeyValueContainer(data, conf);
     containerSet = new ContainerSet(1000);
-    containerSet.addContainer(container);
+    for (int id = 1; id <= NUM_CONTAINERS; id++) {
+      KeyValueContainerData data = new KeyValueContainerData(id, layout, GB,
+          PipelineID.randomId().toString(), randomDatanodeDetails().getUuidString());
+      containerSet.addContainer(new KeyValueContainer(data, conf));
+    }
 
-    containerHandler = new KeyValueHandler(new OzoneConfiguration(), dnDetails.getUuidString(), containerSet,
+    assertEquals(NUM_CONTAINERS, containerSet.containerCount());
+
+    Handler containerHandler = new KeyValueHandler(new OzoneConfiguration(), dnDetails.getUuidString(), containerSet,
         mock(VolumeSet.class), mock(ContainerMetrics.class), icrSender);
-    controller = new ContainerController(containerSet,
+    ContainerController controller = new ContainerController(containerSet,
         singletonMap(ContainerProtos.ContainerType.KeyValueContainer, containerHandler));
     ozoneContainer = mock(OzoneContainer.class);
     when(ozoneContainer.getController()).thenReturn(controller);
@@ -120,21 +114,20 @@ public class TestReconcileContainerCommandHandler {
     };
     init(layout, icrSender);
 
-    // These two commands are for a container existing in the datanode.
-    ReconcileContainerCommand cmd = new ReconcileContainerCommand(CONTAINER_ID, Collections.emptyList());
-    subject.handle(cmd, ozoneContainer, context, null);
-    subject.handle(cmd, ozoneContainer, context, null);
+    for (int id = 1; id <= NUM_CONTAINERS; id++) {
+      ReconcileContainerCommand cmd = new ReconcileContainerCommand(id, Collections.emptyList());
+      subject.handle(cmd, ozoneContainer, context, null);
+    }
 
-    // This container was
-    ReconcileContainerCommand cmd2 = new ReconcileContainerCommand(CONTAINER_ID + 1, Collections.emptyList());
-    subject.handle(cmd2, ozoneContainer, context, null);
+    // An unknown container should not trigger a container report being sent.
+    ReconcileContainerCommand unknownContainerCmd = new ReconcileContainerCommand(NUM_CONTAINERS + 1,
+        Collections.emptyList());
+    subject.handle(unknownContainerCmd, ozoneContainer, context, null);
 
     waitForAllCommandsToFinish();
-
-    verifyContainerReportsSent(containerReportsSent, new HashSet<>(Arrays.asList(CONTAINER_ID, CONTAINER_ID + 1)));
+    verifyAllContainerReports(containerReportsSent);
   }
 
-  // TODO test is flaky on the second container layout run only.
   @ContainerLayoutTestInfo.ContainerTest
   public void testReconcileContainerCommandMetrics(ContainerLayoutVersion layout) throws Exception {
     // Used to block ICR sending so that queue metrics can be checked before the reconcile task completes.
@@ -142,6 +135,8 @@ public class TestReconcileContainerCommandHandler {
     // Wait this long before completing the task.
     // This provides a lower bound on execution time.
     final long minExecTimeMillis = 500;
+    // This is the lower bound on execution time of all the commands combined.
+    final long expectedTotalMinExecTimeMillis = minExecTimeMillis * NUM_CONTAINERS;
 
     IncrementalReportSender<Container> icrSender = c -> {
       try {
@@ -159,27 +154,20 @@ public class TestReconcileContainerCommandHandler {
 
     init(layout, icrSender);
 
-    ReconcileContainerCommand cmd = new ReconcileContainerCommand(CONTAINER_ID, Collections.emptyList());
-    // Queue two commands for processing.
-    // Both commands will be blocked until the latch is counted down.
-    subject.handle(cmd, ozoneContainer, context, null);
-    subject.handle(cmd, ozoneContainer, context, null);
-
-    // The first command was invoked when submitted, and is now blocked in the ICR sender.
-    // The second command is blocked on the first since handling is single threaded in the current implementation.
-    // Since neither command has finished they both count towards queue count, which is incremented synchronously.
-    assertEquals(2, subject.getQueuedCount());
+    // All commands submitted will be blocked until the latch is counted down.
+    for (int id = 1; id <= NUM_CONTAINERS; id++) {
+      ReconcileContainerCommand cmd = new ReconcileContainerCommand(id, Collections.emptyList());
+      subject.handle(cmd, ozoneContainer, context, null);
+    }
+    assertEquals(NUM_CONTAINERS, subject.getQueuedCount());
     assertEquals(0, subject.getTotalRunTime());
     assertEquals(0, subject.getAverageRunTime());
 
-    // This will resume handling of the two tasks.
+    // This will resume handling of the tasks.
     icrLatch.countDown();
-    // Two tasks were fired, and each one should have taken at least minExecTime.
-    final long expectedTotalMinExecTimeMillis = minExecTimeMillis * 2;
-
     waitForAllCommandsToFinish();
 
-    assertEquals(2, subject.getInvocationCount());
+    assertEquals(NUM_CONTAINERS, subject.getInvocationCount());
     long totalRunTime = subject.getTotalRunTime();
     assertTrue(totalRunTime >= expectedTotalMinExecTimeMillis,
         "Total run time " + totalRunTime + "ms was not larger than the minimum total exec time " +
@@ -200,14 +188,12 @@ public class TestReconcileContainerCommandHandler {
     }, 500, 3000);
   }
 
-  private void verifyContainerReportsSent(Map<ContainerID, ContainerReplicaProto> reportsSent,
-      Set<Long> expectedContainerIDs) throws Exception {
-
-    assertEquals(expectedContainerIDs.size(), reportsSent.size());
+  private void verifyAllContainerReports(Map<ContainerID, ContainerReplicaProto> reportsSent) throws Exception {
+    assertEquals(NUM_CONTAINERS, reportsSent.size());
 
     for (Map.Entry<ContainerID, ContainerReplicaProto> entry: reportsSent.entrySet()) {
       ContainerID id = entry.getKey();
-      assertTrue(expectedContainerIDs.contains(id.getId()));
+      assertNotNull(containerSet.getContainer(id.getId()));
 
       String sentDataChecksum = entry.getValue().getDataChecksum();
       // Current implementation is incomplete, and uses this as a mocked checksum.
