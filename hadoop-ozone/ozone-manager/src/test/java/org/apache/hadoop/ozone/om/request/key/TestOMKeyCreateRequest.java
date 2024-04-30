@@ -706,7 +706,7 @@ public class TestOMKeyCreateRequest extends TestOMKeyRequest {
 
   private OMRequest createKeyRequest(
       boolean isMultipartKey, int partNumber, long keyLength,
-      ReplicationConfig repConfig, Long overwriteUpdateID) {
+      ReplicationConfig repConfig, Long overwriteGeneration) {
 
     KeyArgs.Builder keyArgs = KeyArgs.newBuilder()
         .setVolumeName(volumeName).setBucketName(bucketName)
@@ -725,8 +725,8 @@ public class TestOMKeyCreateRequest extends TestOMKeyRequest {
     if (isMultipartKey) {
       keyArgs.setMultipartNumber(partNumber);
     }
-    if (overwriteUpdateID != null) {
-      keyArgs.setOverwriteUpdateID(overwriteUpdateID);
+    if (overwriteGeneration != null) {
+      keyArgs.setOverwriteGeneration(overwriteGeneration);
     }
 
     OzoneManagerProtocolProtos.CreateKeyRequest createKeyRequest =
@@ -949,7 +949,7 @@ public class TestOMKeyCreateRequest extends TestOMKeyRequest {
     List<OzoneAcl> existingAcls = existingKeyInfo.getAcls();
     assertEquals(acls, existingAcls);
 
-    // Create a request with an update ID which doesn't match the current key
+    // Create a request with an generation which doesn't match the current key
     omRequest = createKeyRequest(false, 0, 100,
         RatisReplicationConfig.getInstance(THREE), existingKeyInfo.getUpdateID() + 1);
     omRequest = doPreExecute(omRequest);
@@ -958,7 +958,7 @@ public class TestOMKeyCreateRequest extends TestOMKeyRequest {
     // Still fails, as the matching key is not present.
     assertEquals(KEY_NOT_FOUND, response.getOMResponse().getStatus());
 
-    // Now create the key with the correct overwrite IDs
+    // Now create the key with the correct overwrite generation
     omRequest = createKeyRequest(false, 0, 100,
         RatisReplicationConfig.getInstance(THREE), existingKeyInfo.getUpdateID());
     omRequest = doPreExecute(omRequest);
@@ -966,12 +966,12 @@ public class TestOMKeyCreateRequest extends TestOMKeyRequest {
     response = omKeyCreateRequest.validateAndUpdateCache(ozoneManager, 105L);
     assertEquals(OK, response.getOMResponse().getStatus());
 
-    // Ensure the updateID is persisted in the open key table
+    // Ensure the overwriteGeneration is persisted in the open key table
     String openKey = omMetadataManager.getOpenKey(volumeName, bucketName,
         keyName, omRequest.getCreateKeyRequest().getClientID());
     OmKeyInfo openKeyInfo = omMetadataManager.getOpenKeyTable(omKeyCreateRequest.getBucketLayout()).get(openKey);
 
-    assertEquals(existingKeyInfo.getUpdateID(), openKeyInfo.getOverwriteUpdateID());
+    assertEquals(existingKeyInfo.getUpdateID(), openKeyInfo.getOverwriteGeneration());
     // Creation time should remain the same on overwrite.
     assertEquals(existingKeyInfo.getCreationTime(), openKeyInfo.getCreationTime());
     // Update ID should change

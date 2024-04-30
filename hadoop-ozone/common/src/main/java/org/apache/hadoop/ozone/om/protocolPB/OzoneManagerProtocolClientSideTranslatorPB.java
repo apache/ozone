@@ -734,8 +734,8 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
 
     keyArgs.setSortDatanodes(args.getSortDatanodes());
 
-    if (args.getOverwriteUpdateID() != null) {
-      keyArgs.setOverwriteUpdateID(args.getOverwriteUpdateID());
+    if (args.getOverwriteGeneration() != null) {
+      keyArgs.setOverwriteGeneration(args.getOverwriteGeneration());
     }
 
     req.setKeyArgs(keyArgs.build());

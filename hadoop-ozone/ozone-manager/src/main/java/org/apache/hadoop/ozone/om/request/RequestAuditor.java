@@ -80,9 +80,9 @@ public interface RequestAuditor {
         auditMap.put(OzoneConsts.REPLICATION_CONFIG,
             ECReplicationConfig.toString(keyArgs.getEcReplicationConfig()));
       }
-      if (keyArgs.hasOverwriteUpdateID()) {
-        auditMap.put(OzoneConsts.OVERWRITE_UPDATE_ID,
-            String.valueOf(keyArgs.getOverwriteUpdateID()));
+      if (keyArgs.hasOverwriteGeneration()) {
+        auditMap.put(OzoneConsts.OVERWRITE_GENERATION,
+            String.valueOf(keyArgs.getOverwriteGeneration()));
       }
       return auditMap;
     }

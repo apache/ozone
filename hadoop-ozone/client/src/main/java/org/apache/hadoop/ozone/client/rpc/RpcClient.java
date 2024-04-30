@@ -1397,6 +1397,7 @@ public class RpcClient implements ClientProtocol {
     return createOutputStream(openKey);
   }
 
+  // STODO - rename this API and params.
   @Override
   public OzoneOutputStream overwriteKey(OzoneKeyDetails keyToOverwrite, ReplicationConfig replicationConfig)
       throws IOException {
@@ -1417,7 +1418,8 @@ public class RpcClient implements ClientProtocol {
         .setReplicationConfig(replicationConfig)
         .addAllMetadataGdpr(keyToOverwrite.getMetadata())
         .setLatestVersionLocation(getLatestVersionLocation)
-        .setOverwriteUpdateID(keyToOverwrite.getUpdateID());
+        // STODO - keyToOverwrite should have a getGeneration method rather than updateID
+        .setOverwriteGeneration(keyToOverwrite.getUpdateID());
 
     OpenKeySession openKey = ozoneManagerClient.openKey(builder.build());
     // For bucket with layout OBJECT_STORE, when create an empty file (size=0),

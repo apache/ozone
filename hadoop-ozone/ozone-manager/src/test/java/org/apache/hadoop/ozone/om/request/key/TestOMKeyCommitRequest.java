@@ -249,7 +249,7 @@ public class TestOMKeyCommitRequest extends TestOMKeyRequest {
 
     OmKeyInfo.Builder omKeyInfoBuilder = OMRequestTestUtils.createOmKeyInfo(
         volumeName, bucketName, keyName, replicationConfig, new OmKeyLocationInfoGroup(version, new ArrayList<>()));
-    omKeyInfoBuilder.setOverwriteUpdateID(1L);
+    omKeyInfoBuilder.setOverwriteGeneration(1L);
     OmKeyInfo omKeyInfo = omKeyInfoBuilder.build();
     omKeyInfo.appendNewBlocks(allocatedLocationList, false);
     List<OzoneAcl> acls = Collections.singletonList(OzoneAcl.parseAcl("user:foo:rw"));
@@ -261,18 +261,18 @@ public class TestOMKeyCommitRequest extends TestOMKeyRequest {
     OmKeyInfo openKeyInfo = openKeyTable.get(openKey);
     assertNotNull(openKeyInfo);
     assertEquals(acls, openKeyInfo.getAcls());
-    // At this stage, we have an openKey, with overwrite update ID of 1.
+    // At this stage, we have an openKey, with overwrite generation of 1.
     // However there is no closed key entry, so the commit should fail.
     OMClientResponse omClientResponse =
         omKeyCommitRequest.validateAndUpdateCache(ozoneManager, 100L);
     assertEquals(KEY_NOT_FOUND, omClientResponse.getOMResponse().getStatus());
 
-    // Now add the key to the key table, and try again, but with different update_ID
-    omKeyInfoBuilder.setOverwriteUpdateID(null);
+    // Now add the key to the key table, and try again, but with different generation
+    omKeyInfoBuilder.setOverwriteGeneration(null);
     omKeyInfoBuilder.setUpdateID(0L);
     OmKeyInfo invalidKeyInfo = omKeyInfoBuilder.build();
     closedKeyTable.put(getOzonePathKey(), invalidKeyInfo);
-    // This should fail as the IDs are zero and the open key has overwrite IDs of 1.
+    // This should fail as the updateID ia zero and the open key has overwrite generation of 1.
     omClientResponse = omKeyCommitRequest.validateAndUpdateCache(ozoneManager, 100L);
     assertEquals(KEY_NOT_FOUND, omClientResponse.getOMResponse().getStatus());
 
@@ -282,12 +282,12 @@ public class TestOMKeyCommitRequest extends TestOMKeyRequest {
     closedKeyTable.delete(getOzonePathKey());
     closedKeyTable.put(getOzonePathKey(), closedKeyInfo);
 
-    // Now the key should commit as the IDs match.
+    // Now the key should commit as the updateID and overwriteGeneration match.
     omClientResponse = omKeyCommitRequest.validateAndUpdateCache(ozoneManager, 100L);
     assertEquals(OK, omClientResponse.getOMResponse().getStatus());
 
     OmKeyInfo committedKey = closedKeyTable.get(getOzonePathKey());
-    assertNull(committedKey.getOverwriteUpdateID());
+    assertNull(committedKey.getOverwriteGeneration());
     // Update ID should be changed
     assertNotEquals(closedKeyInfo.getUpdateID(), committedKey.getUpdateID());
     assertEquals(acls, committedKey.getAcls());

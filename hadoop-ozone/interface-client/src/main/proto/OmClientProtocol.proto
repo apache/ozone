@@ -1025,12 +1025,13 @@ message KeyArgs {
     optional hadoop.hdds.ECReplicationConfig ecReplicationConfig = 19;
     // Force OM to update container cache location from SCL
     optional bool forceUpdateContainerCacheFromSCM = 20;
-    // Overwrite updateID when used in key creation indicates that a
-    // key with the same keyName should exist with the given updateID.
-    // Upon commit, the updateID of that existing key should be unchanged.
-    // This is a form of optimistic locking, to ensure the key is not modified between
-    // the time the key is read and the time the key is written.
-    optional uint64 overwriteUpdateID = 21;
+    // overwriteGeneration, when used in key creation indicates that a
+    // key with the same keyName should exist with the given generation.
+    // For a key commit to succeed, the original key should still be present with the
+    // generation unchanged.
+    // This allows a key to be created an committed atomically if the original has not
+    // been modified.
+    optional uint64 overwriteGeneration = 21;
 }
 
 message KeyLocation {
@@ -1113,12 +1114,13 @@ message KeyInfo {
     optional hadoop.hdds.ECReplicationConfig ecReplicationConfig = 17;
     optional FileChecksumProto fileChecksum = 18;
     optional bool isFile = 19;
-  // Overwrite updateID when used in key creation indicates that a
-  // key with the same keyName should exist with the given updateID.
-  // Upon commit, the updateID of that existing key should be unchanged.
-  // This is a form of optimistic locking, to ensure the key is not modified between
-  // the time the key is read and the time the key is written.
-    optional uint64 overwriteUpdateID = 20;
+  // overwriteGeneration, when used in key creation indicates that a
+  // key with the same keyName should exist with the given generation.
+  // For a key commit to succeed, the original key should still be present with the
+  // generation unchanged.
+  // This allows a key to be created an committed atomically if the original has not
+  // been modified.
+    optional uint64 overwriteGeneration = 20;
 }
 
 message BasicKeyInfo {

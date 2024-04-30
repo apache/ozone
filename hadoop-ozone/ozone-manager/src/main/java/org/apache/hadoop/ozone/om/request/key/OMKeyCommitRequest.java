@@ -241,10 +241,10 @@ public class OMKeyCommitRequest extends OMKeyRequest {
             "entry is not found in the OpenKey table", KEY_NOT_FOUND);
       }
 
-      validateOptimisticLockingOverwrite(keyToDelete, omKeyInfo, auditMap);
+      validateAtomicOverwrite(keyToDelete, omKeyInfo, auditMap);
       // Optimistic locking validation has passed. Now set the overwrite fields to null so they are
       // not persisted in the key table.
-      omKeyInfo.setOverwriteUpdateID(null);
+      omKeyInfo.setOverwriteGeneration(null);
 
       omKeyInfo.getMetadata().putAll(KeyValueUtil.getFromProtobuf(
           commitKeyArgs.getMetadataList()));
@@ -504,18 +504,19 @@ public class OMKeyCommitRequest extends OMKeyRequest {
     return req;
   }
 
-  private void validateOptimisticLockingOverwrite(OmKeyInfo existing, OmKeyInfo toCommit, Map<String, String> auditMap)
+  private void validateAtomicOverwrite(OmKeyInfo existing, OmKeyInfo toCommit, Map<String, String> auditMap)
       throws OMException {
-    if (toCommit.getOverwriteUpdateID() != null) {
-      // These values are no passed in the request keyArgs, so add them into the auditMap if they are present
+    if (toCommit.getOverwriteGeneration() != null) {
+      // These values are not passed in the request keyArgs, so add them into the auditMap if they are present
       // in the open key entry.
-      auditMap.put(OzoneConsts.OVERWRITE_UPDATE_ID, String.valueOf(toCommit.getOverwriteUpdateID()));
+      auditMap.put(OzoneConsts.OVERWRITE_GENERATION, String.valueOf(toCommit.getOverwriteGeneration()));
       if (existing == null) {
-        throw new OMException("Overwrite with optimistic locking is not allowed for a new key", KEY_NOT_FOUND);
+        throw new OMException("Atomic overwrite is not allowed for a new key", KEY_NOT_FOUND);
       }
-      if (!toCommit.getOverwriteUpdateID().equals(existing.getUpdateID())) {
-        throw new OMException("Cannot commit as current updateID (" + existing.getUpdateID() +
-            ") does not match with the overwrite updateID (" + toCommit.getOverwriteUpdateID() + ")", KEY_NOT_FOUND);
+      if (!toCommit.getOverwriteGeneration().equals(existing.getUpdateID())) {
+        throw new OMException("Cannot commit as current generation (" + existing.getUpdateID() +
+            ") does not match with the overwrite generation (" + toCommit.getOverwriteGeneration() + ")",
+            KEY_NOT_FOUND);
       }
     }
   }

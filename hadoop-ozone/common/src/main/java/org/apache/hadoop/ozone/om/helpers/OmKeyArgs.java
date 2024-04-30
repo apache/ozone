@@ -52,12 +52,13 @@ public final class OmKeyArgs implements Auditable {
   private final boolean recursive;
   private final boolean headOp;
   private final boolean forceUpdateContainerCacheFromSCM;
-  // Overwrite updateID when used in key creation indicates that a
-  // key with the same keyName should exist with the given update ID.
-  // Upon commit, the updateID of that existing key should be unchanged.
-  // This is a form of optimistic locking, to ensure the key is not modified between
-  // the time the key is read and the time the key is written.
-  private Long overwriteUpdateID = null;
+  // OverwriteGeneration, when used in key creation indicates that a
+  // key with the same keyName should exist with the given generation.
+  // For a key commit to succeed, the original key should still be present with the
+  // generation unchanged.
+  // This allows a key to be created an committed atomically if the original has not
+  // been modified.
+  private Long overwriteGeneration = null;
 
   private OmKeyArgs(Builder b) {
     this.volumeName = b.volumeName;
@@ -76,7 +77,7 @@ public final class OmKeyArgs implements Auditable {
     this.recursive = b.recursive;
     this.headOp = b.headOp;
     this.forceUpdateContainerCacheFromSCM = b.forceUpdateContainerCacheFromSCM;
-    this.overwriteUpdateID = b.overwriteUpdateID;
+    this.overwriteGeneration = b.overwriteGeneration;
   }
 
   public boolean getIsMultipartKey() {
@@ -151,8 +152,8 @@ public final class OmKeyArgs implements Auditable {
     return forceUpdateContainerCacheFromSCM;
   }
 
-  public Long getOverwriteUpdateID() {
-    return overwriteUpdateID;
+  public Long getOverwriteGeneration() {
+    return overwriteGeneration;
   }
 
   @Override
@@ -194,8 +195,8 @@ public final class OmKeyArgs implements Auditable {
         .setAcls(acls)
         .setForceUpdateContainerCacheFromSCM(forceUpdateContainerCacheFromSCM);
 
-    if (overwriteUpdateID != null) {
-      builder.setOverwriteUpdateID(overwriteUpdateID);
+    if (overwriteGeneration != null) {
+      builder.setOverwriteGeneration(overwriteGeneration);
     }
     return builder;
   }
@@ -212,8 +213,8 @@ public final class OmKeyArgs implements Auditable {
         .setHeadOp(isHeadOp())
         .setForceUpdateContainerCacheFromSCM(
             isForceUpdateContainerCacheFromSCM());
-    if (overwriteUpdateID != null) {
-      builder.setOverwriteUpdateID(overwriteUpdateID);
+    if (overwriteGeneration != null) {
+      builder.setOverwriteGeneration(overwriteGeneration);
     }
     return builder.build();
   }
@@ -238,7 +239,7 @@ public final class OmKeyArgs implements Auditable {
     private boolean recursive;
     private boolean headOp;
     private boolean forceUpdateContainerCacheFromSCM;
-    private Long overwriteUpdateID = null;
+    private Long overwriteGeneration = null;
 
     public Builder setVolumeName(String volume) {
       this.volumeName = volume;
@@ -333,8 +334,8 @@ public final class OmKeyArgs implements Auditable {
       return this;
     }
 
-    public Builder setOverwriteUpdateID(long overwriteUpdateID) {
-      this.overwriteUpdateID = overwriteUpdateID;
+    public Builder setOverwriteGeneration(long generation) {
+      this.overwriteGeneration = generation;
       return this;
     }
 
