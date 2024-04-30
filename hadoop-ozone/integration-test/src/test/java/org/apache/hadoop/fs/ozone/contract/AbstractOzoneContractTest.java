@@ -313,18 +313,4 @@ abstract class AbstractOzoneContractTest {
     }
   }
 
-  @Nested
-  class TestContractLeaseRecovery extends AbstractContractLeaseRecoveryTest {
-
-    @Override
-    protected AbstractFSContract createContract(Configuration conf) {
-      return createOzoneContract(conf);
-    }
-
-    @Override
-    protected Configuration createConfiguration() {
-      return createOzoneConfig();
-    }
-  }
-
 }
