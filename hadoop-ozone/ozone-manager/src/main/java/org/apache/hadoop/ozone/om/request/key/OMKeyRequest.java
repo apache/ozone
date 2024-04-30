@@ -775,13 +775,10 @@ public abstract class OMKeyRequest extends OMClientRequest {
       dbKeyInfo.setReplicationConfig(replicationConfig);
 
       // Construct a new metadata map from KeyArgs.
-      // Clear the old one when the key is overwritten unless it is a key overwrite
-      // using atomic overwrite.
-      if (!keyArgs.hasOverwriteGeneration()) {
-        dbKeyInfo.getMetadata().clear();
-        dbKeyInfo.getMetadata().putAll(KeyValueUtil.getFromProtobuf(
-            keyArgs.getMetadataList()));
-      }
+      dbKeyInfo.getMetadata().clear();
+      dbKeyInfo.getMetadata().putAll(KeyValueUtil.getFromProtobuf(
+          keyArgs.getMetadataList()));
+
       if (keyArgs.hasOverwriteGeneration()) {
         dbKeyInfo.setOverwriteGeneration(keyArgs.getOverwriteGeneration());
       }

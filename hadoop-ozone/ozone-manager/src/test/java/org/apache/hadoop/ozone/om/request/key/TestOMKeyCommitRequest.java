@@ -225,7 +225,7 @@ public class TestOMKeyCommitRequest extends TestOMKeyRequest {
   }
 
   @Test
-  public void testCommitWithOptimisticLocking() throws Exception {
+  public void testAtomicRewrite() throws Exception {
     if (getBucketLayout() == BucketLayout.FILE_SYSTEM_OPTIMIZED) {
      // TODO - does not work with in FSO for now
       return;
@@ -288,8 +288,8 @@ public class TestOMKeyCommitRequest extends TestOMKeyRequest {
 
     OmKeyInfo committedKey = closedKeyTable.get(getOzonePathKey());
     assertNull(committedKey.getOverwriteGeneration());
-    // Update ID should be changed
-    assertNotEquals(closedKeyInfo.getUpdateID(), committedKey.getUpdateID());
+    // Generation should be changed
+    assertNotEquals(closedKeyInfo.getGeneration(), committedKey.getGeneration());
     assertEquals(acls, committedKey.getAcls());
   }
 

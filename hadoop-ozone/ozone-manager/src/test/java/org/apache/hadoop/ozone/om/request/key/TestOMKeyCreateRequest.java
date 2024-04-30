@@ -707,6 +707,13 @@ public class TestOMKeyCreateRequest extends TestOMKeyRequest {
   private OMRequest createKeyRequest(
       boolean isMultipartKey, int partNumber, long keyLength,
       ReplicationConfig repConfig, Long overwriteGeneration) {
+    return createKeyRequest(isMultipartKey, partNumber, keyLength, repConfig,
+        overwriteGeneration, null);
+  }
+
+  private OMRequest createKeyRequest(
+      boolean isMultipartKey, int partNumber, long keyLength,
+      ReplicationConfig repConfig, Long overwriteGeneration, Map<String, String> metaData) {
 
     KeyArgs.Builder keyArgs = KeyArgs.newBuilder()
         .setVolumeName(volumeName).setBucketName(bucketName)
@@ -727,6 +734,12 @@ public class TestOMKeyCreateRequest extends TestOMKeyRequest {
     }
     if (overwriteGeneration != null) {
       keyArgs.setOverwriteGeneration(overwriteGeneration);
+    }
+    if (metaData != null) {
+      metaData.forEach((key, value) -> keyArgs.addMetadata(KeyValue.newBuilder()
+          .setKey(key)
+          .setValue(value)
+          .build()));
     }
 
     OzoneManagerProtocolProtos.CreateKeyRequest createKeyRequest =
@@ -913,7 +926,7 @@ public class TestOMKeyCreateRequest extends TestOMKeyRequest {
 
   @ParameterizedTest
   @MethodSource("data")
-  public void testOptimisticOverwrite(
+  public void testAtomicRewrite(
       boolean setKeyPathLock, boolean setFileSystemPaths) throws Exception {
     when(ozoneManager.getOzoneLockProvider()).thenReturn(
         new OzoneLockProvider(setKeyPathLock, setFileSystemPaths));
@@ -938,6 +951,8 @@ public class TestOMKeyCreateRequest extends TestOMKeyRequest {
 
     // Now pre-create the key in the system so we can overwrite it.
     Map<String, String> metadata = Collections.singletonMap("metakey", "metavalue");
+    Map<String, String> reWriteMetadata = Collections.singletonMap("metakey", "rewriteMetavalue");
+
     List<OzoneAcl> acls = Collections.singletonList(OzoneAcl.parseAcl("user:foo:rw"));
     OmKeyInfo createdKeyInfo = createAndCheck(keyName, metadata, acls);
     // Commit openKey entry.
@@ -951,7 +966,7 @@ public class TestOMKeyCreateRequest extends TestOMKeyRequest {
 
     // Create a request with an generation which doesn't match the current key
     omRequest = createKeyRequest(false, 0, 100,
-        RatisReplicationConfig.getInstance(THREE), existingKeyInfo.getUpdateID() + 1);
+        RatisReplicationConfig.getInstance(THREE), existingKeyInfo.getGeneration() + 1, reWriteMetadata);
     omRequest = doPreExecute(omRequest);
     omKeyCreateRequest = getOMKeyCreateRequest(omRequest);
     response = omKeyCreateRequest.validateAndUpdateCache(ozoneManager, 105L);
@@ -960,7 +975,7 @@ public class TestOMKeyCreateRequest extends TestOMKeyRequest {
 
     // Now create the key with the correct overwrite generation
     omRequest = createKeyRequest(false, 0, 100,
-        RatisReplicationConfig.getInstance(THREE), existingKeyInfo.getUpdateID());
+        RatisReplicationConfig.getInstance(THREE), existingKeyInfo.getGeneration(), reWriteMetadata);
     omRequest = doPreExecute(omRequest);
     omKeyCreateRequest = getOMKeyCreateRequest(omRequest);
     response = omKeyCreateRequest.validateAndUpdateCache(ozoneManager, 105L);
@@ -971,14 +986,14 @@ public class TestOMKeyCreateRequest extends TestOMKeyRequest {
         keyName, omRequest.getCreateKeyRequest().getClientID());
     OmKeyInfo openKeyInfo = omMetadataManager.getOpenKeyTable(omKeyCreateRequest.getBucketLayout()).get(openKey);
 
-    assertEquals(existingKeyInfo.getUpdateID(), openKeyInfo.getOverwriteGeneration());
+    assertEquals(existingKeyInfo.getGeneration(), openKeyInfo.getOverwriteGeneration());
     // Creation time should remain the same on overwrite.
     assertEquals(existingKeyInfo.getCreationTime(), openKeyInfo.getCreationTime());
     // Update ID should change
-    assertNotEquals(existingKeyInfo.getUpdateID(), openKeyInfo.getUpdateID());
-    // The metadata should be copied over from the existing key.
+    assertNotEquals(existingKeyInfo.getGeneration(), openKeyInfo.getGeneration());
     assertEquals(metadata, existingKeyInfo.getMetadata());
-    assertEquals(metadata, openKeyInfo.getMetadata());
+    // The metadata should not be copied from the existing key. It should be passed in the request.
+    assertEquals(reWriteMetadata, openKeyInfo.getMetadata());
     // Ensure the ACLS are copied over from the existing key.
     assertEquals(existingAcls, openKeyInfo.getAcls());
   }
