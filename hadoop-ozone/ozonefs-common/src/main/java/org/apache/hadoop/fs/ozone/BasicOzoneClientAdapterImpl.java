@@ -706,8 +706,7 @@ public class BasicOzoneClientAdapterImpl implements OzoneClientAdapter {
   @Override
   public boolean isFileClosed(String pathStr) throws IOException {
     incrementCounter(Statistic.INVOCATION_IS_FILE_CLOSED, 1);
-    OFSPath ofsPath = new OFSPath(pathStr, config);
-    if (!ofsPath.isKey()) {
+    if (StringUtils.isEmpty(pathStr)) {
       throw new IOException("not a file");
     }
     OzoneFileStatus status = bucket.getFileStatus(pathStr);
