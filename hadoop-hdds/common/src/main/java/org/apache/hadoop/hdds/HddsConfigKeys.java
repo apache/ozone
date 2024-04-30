@@ -152,6 +152,11 @@ public final class HddsConfigKeys {
       + ".name";
   public static final String HDDS_PUBLIC_KEY_FILE_NAME_DEFAULT = "public.pem";
 
+  public static final String HDDS_HTTP_SERVER_KEYSTORE_TYPE = "ssl.server.keystore.type";
+  public static final String HDDS_HTTP_SERVER_KEYSTORE_TYPE_DEFAULT = "jks";
+  public static final String HDDS_HTTP_SERVER_TRUSTSTORE_TYPE = "ssl.server.truststore.type";
+  public static final String HDDS_HTTP_SERVER_TRUSTSTORE_TYPE_DEFAULT = "jks";
+
   public static final String HDDS_BLOCK_TOKEN_EXPIRY_TIME =
       "hdds.block.token.expiry.time";
   public static final String HDDS_BLOCK_TOKEN_EXPIRY_TIME_DEFAULT = "1d";
@@ -337,6 +342,9 @@ public final class HddsConfigKeys {
   public static final String
       HDDS_SECURITY_CLIENT_SCM_SECRET_KEY_DATANODE_PROTOCOL_ACL =
       "hdds.security.client.scm.secretkey.datanode.protocol.acl";
+
+  public static final String OZONE_SECURITY_RECONFIGURE_PROTOCOL_ACL =
+      "ozone.security.reconfigure.protocol.acl";
 
   // Determines if the Container Chunk Manager will write user data to disk
   // Set to false only for specific performance tests

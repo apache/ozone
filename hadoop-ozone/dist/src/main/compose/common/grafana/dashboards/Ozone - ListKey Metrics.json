@@ -121,7 +121,7 @@
           "fullMetaSearch": false,
           "includeNullMetadata": true,
           "instant": false,
-          "legendFormat": "{{hostname}}, {{__name__}}",
+          "legendFormat": "{{hostname}}",
           "range": true,
           "refId": "A",
           "useBackend": false
@@ -136,7 +136,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 0
+        "y": 9
       },
       "id": 14,
       "panels": [],
@@ -198,37 +198,13 @@
             ]
           }
         },
-        "overrides": [
-          {
-            "__systemRef": "hideSeriesFrom",
-            "matcher": {
-              "id": "byNames",
-              "options": {
-                "mode": "exclude",
-                "names": [
-                ],
-                "prefix": "All except:",
-                "readOnly": true
-              }
-            },
-            "properties": [
-              {
-                "id": "custom.hideFrom",
-                "value": {
-                  "legend": false,
-                  "tooltip": false,
-                  "viz": true
-                }
-              }
-            ]
-          }
-        ]
+        "overrides": []
       },
       "gridPos": {
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 1
+        "y": 10
       },
       "id": 13,
       "options": {
@@ -260,7 +236,7 @@
           "useBackend": false
         }
       ],
-      "title": "s3_gateway_metrics_list_key_count",
+      "title": "List Keys Count",
       "type": "timeseries"
     },
     {
@@ -269,7 +245,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 9
+        "y": 18
       },
       "id": 12,
       "panels": [],
@@ -334,10 +310,10 @@
         "overrides": []
       },
       "gridPos": {
-        "h": 10,
-        "w": 24,
+        "h": 8,
+        "w": 12,
         "x": 0,
-        "y": 10
+        "y": 19
       },
       "id": 15,
       "options": {
@@ -385,7 +361,7 @@
           "useBackend": false
         }
       ],
-      "title": "Acl check and Resolve Bucket latency Avg. Time (ns)",
+      "title": "ACL Check and Resolve Bucket Latency Avg. Time (ns)",
       "type": "timeseries"
     },
     {
@@ -449,8 +425,8 @@
       "gridPos": {
         "h": 8,
         "w": 12,
-        "x": 0,
-        "y": 20
+        "x": 12,
+        "y": 19
       },
       "id": 16,
       "options": {
@@ -482,7 +458,7 @@
           "useBackend": false
         }
       ],
-      "title": "Read from RocksDb ",
+      "title": "Read from RocksDB Avg. Time (ns)",
       "type": "timeseries"
     },
     {
@@ -540,37 +516,13 @@
             ]
           }
         },
-        "overrides": [
-          {
-            "__systemRef": "hideSeriesFrom",
-            "matcher": {
-              "id": "byNames",
-              "options": {
-                "mode": "exclude",
-                "names": [
-                ],
-                "prefix": "All except:",
-                "readOnly": true
-              }
-            },
-            "properties": [
-              {
-                "id": "custom.hideFrom",
-                "value": {
-                  "legend": false,
-                  "tooltip": false,
-                  "viz": true
-                }
-              }
-            ]
-          }
-        ]
+        "overrides": []
       },
       "gridPos": {
         "h": 8,
         "w": 12,
-        "x": 12,
-        "y": 20
+        "x": 0,
+        "y": 27
       },
       "id": 8,
       "options": {
@@ -602,7 +554,7 @@
           "useBackend": false
         }
       ],
-      "title": "Ops Per Sec",
+      "title": "List Keys Num Ops Per Sec",
       "type": "timeseries"
     },
     {
@@ -660,37 +612,13 @@
             ]
           }
         },
-        "overrides": [
-          {
-            "__systemRef": "hideSeriesFrom",
-            "matcher": {
-              "id": "byNames",
-              "options": {
-                "mode": "exclude",
-                "names": [
-                ],
-                "prefix": "All except:",
-                "readOnly": true
-              }
-            },
-            "properties": [
-              {
-                "id": "custom.hideFrom",
-                "value": {
-                  "legend": false,
-                  "tooltip": false,
-                  "viz": true
-                }
-              }
-            ]
-          }
-        ]
+        "overrides": []
       },
       "gridPos": {
         "h": 8,
         "w": 12,
-        "x": 0,
-        "y": 28
+        "x": 12,
+        "y": 27
       },
       "id": 7,
       "options": {

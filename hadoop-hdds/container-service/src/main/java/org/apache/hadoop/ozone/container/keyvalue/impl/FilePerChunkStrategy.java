@@ -342,8 +342,7 @@ public class FilePerChunkStrategy implements ChunkManager {
 
   private static File getChunkFile(KeyValueContainer container, BlockID blockID,
       ChunkInfo info) throws StorageContainerException {
-    return FILE_PER_CHUNK.getChunkFile(container.getContainerData(), blockID,
-        info);
+    return FILE_PER_CHUNK.getChunkFile(container.getContainerData(), blockID, info.getChunkName());
   }
 
   /**

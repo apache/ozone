@@ -22,6 +22,16 @@ package org.apache.hadoop.ozone.om.helpers;
  * Object ID with additional parent ID field.
  */
 public class WithParentObjectId extends WithObjectID {
+  private long parentObjectID;
+
+  public WithParentObjectId() {
+  }
+
+  public WithParentObjectId(Builder builder) {
+    super(builder);
+    parentObjectID = builder.getParentObjectID();
+  }
+
   /**
    * Object ID with additional parent ID field.
    *
@@ -45,11 +55,34 @@ public class WithParentObjectId extends WithObjectID {
    *     key1      |     1026     |     1025   |
    * ------------------------------------------|
    */
-  @SuppressWarnings("visibilitymodifier")
-  protected long parentObjectID;
-
-  public long getParentObjectID() {
+  public final long getParentObjectID() {
     return parentObjectID;
   }
 
+  public final void setParentObjectID(long parentObjectID) {
+    this.parentObjectID = parentObjectID;
+  }
+
+  /** Builder for {@link WithParentObjectId}. */
+  public static class Builder extends WithObjectID.Builder {
+    private long parentObjectID;
+
+    protected Builder() {
+      super();
+    }
+
+    protected Builder(WithParentObjectId obj) {
+      super(obj);
+      parentObjectID = obj.getParentObjectID();
+    }
+
+    public Builder setParentObjectID(long parentObjectId) {
+      this.parentObjectID = parentObjectId;
+      return this;
+    }
+
+    protected long getParentObjectID() {
+      return parentObjectID;
+    }
+  }
 }

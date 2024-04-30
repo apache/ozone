@@ -146,6 +146,7 @@ enum Type {
   SetSnapshotProperty = 128;
   ListStatusLight = 129;
   GetSnapshotInfo = 130;
+  RenameSnapshot = 131;
 }
 
 enum SafeMode {
@@ -281,6 +282,7 @@ message OMRequest {
   optional MultipartUploadsExpiredAbortRequest multipartUploadsExpiredAbortRequest = 126;
   optional SetSnapshotPropertyRequest       SetSnapshotPropertyRequest     = 127;
   optional SnapshotInfoRequest              SnapshotInfoRequest            = 128;
+  optional RenameSnapshotRequest            RenameSnapshotRequest          = 129;
 }
 
 message OMResponse {
@@ -403,6 +405,7 @@ message OMResponse {
   optional ListStatusLightResponse           listStatusLightResponse       = 129;
   optional SnapshotInfoResponse              SnapshotInfoResponse          = 130;
   optional OMLockDetailsProto                omLockDetails                 = 131;
+  optional RenameSnapshotResponse            RenameSnapshotResponse        = 132;
 }
 
 enum Status {
@@ -1022,6 +1025,7 @@ message KeyArgs {
     optional hadoop.hdds.ECReplicationConfig ecReplicationConfig = 19;
     // Force OM to update container cache location from SCL
     optional bool forceUpdateContainerCacheFromSCM = 20;
+    optional string ownerName = 21;
 }
 
 message KeyLocation {
@@ -1104,6 +1108,7 @@ message KeyInfo {
     optional hadoop.hdds.ECReplicationConfig ecReplicationConfig = 17;
     optional FileChecksumProto fileChecksum = 18;
     optional bool isFile = 19;
+    optional string ownerName = 20;
 }
 
 message BasicKeyInfo {
@@ -1114,6 +1119,8 @@ message BasicKeyInfo {
     optional hadoop.hdds.ReplicationType type = 5;
     optional hadoop.hdds.ReplicationFactor factor = 6;
     optional hadoop.hdds.ECReplicationConfig ecReplicationConfig = 7;
+    optional string eTag = 8;
+    optional string ownerName = 9;
 }
 
 message DirectoryInfo {
@@ -1125,6 +1132,7 @@ message DirectoryInfo {
     required uint64 objectID = 6;
     required uint64 updateID = 7;
     required uint64 parentID = 8;
+    optional string ownerName = 9;
 }
 
 message RepeatedKeyInfo {
@@ -1830,6 +1838,14 @@ message CreateSnapshotRequest {
   optional uint64 creationTime = 5;
 }
 
+message RenameSnapshotRequest {
+  optional string volumeName = 1;
+  optional string bucketName = 2;
+  optional string snapshotOldName = 3;
+  optional string snapshotNewName = 4;
+  optional uint64 renameTime = 5;
+}
+
 message ListSnapshotRequest {
   optional string volumeName = 1;
   optional string bucketName = 2;
@@ -1990,6 +2006,10 @@ message ListSnapshotDiffJobResponse {
 
 message DeleteSnapshotResponse {
 
+}
+
+message RenameSnapshotResponse {
+  optional SnapshotInfo snapshotInfo = 1;
 }
 
 message SnapshotInfoResponse {

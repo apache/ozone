@@ -268,7 +268,8 @@ public class OMDBInsightSearchEndpoint {
   public String convertToObjectPath(String prevKeyPrefix)
       throws IOException, IllegalArgumentException {
 
-      String[] names = parseRequestPath(normalizePath(prevKeyPrefix));
+    String[] names = parseRequestPath(
+        normalizePath(prevKeyPrefix, BucketLayout.FILE_SYSTEM_OPTIMIZED));
 
       // Root-Level :- Return the original path
       if (names.length == 0) {

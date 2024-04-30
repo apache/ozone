@@ -123,7 +123,7 @@ public class TestContainerStateMachineStream {
         .setStreamBufferMaxSize(MAX_FLUSH_SIZE)
         .applyTo(conf);
 
-    conf.setLong(OzoneConfigKeys.DFS_RATIS_SNAPSHOT_THRESHOLD_KEY, 1);
+    conf.setLong(OzoneConfigKeys.HDDS_RATIS_SNAPSHOT_THRESHOLD_KEY, 1);
     conf.setQuietMode(false);
     cluster = MiniOzoneCluster.newBuilder(conf)
         .setNumDatanodes(3)

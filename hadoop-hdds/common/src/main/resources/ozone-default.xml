@@ -46,26 +46,26 @@
     </description>
   </property>
   <property>
-    <name>dfs.container.ipc</name>
+    <name>hdds.container.ipc.port</name>
     <value>9859</value>
     <tag>OZONE, CONTAINER, MANAGEMENT</tag>
     <description>The ipc port number of container.</description>
   </property>
 
   <property>
-    <name>dfs.container.ratis.datastream.enabled</name>
+    <name>hdds.container.ratis.datastream.enabled</name>
     <value>false</value>
     <tag>OZONE, CONTAINER, RATIS, DATASTREAM</tag>
     <description>It specifies whether to enable data stream of container.</description>
   </property>
   <property>
-    <name>dfs.container.ratis.datastream.port</name>
+    <name>hdds.container.ratis.datastream.port</name>
     <value>9855</value>
     <tag>OZONE, CONTAINER, RATIS, DATASTREAM</tag>
     <description>The datastream port number of container.</description>
   </property>
   <property>
-    <name>dfs.container.ratis.datastream.random.port</name>
+    <name>hdds.container.ratis.datastream.random.port</name>
     <value>false</value>
     <tag>OZONE, CONTAINER, RATIS, DATASTREAM</tag>
     <description>Allocates a random free port for ozone container datastream.
@@ -73,7 +73,7 @@
     </description>
   </property>
   <property>
-    <name>dfs.container.ipc.random.port</name>
+    <name>hdds.container.ipc.random.port</name>
     <value>false</value>
     <tag>OZONE, DEBUG, CONTAINER</tag>
     <description>Allocates a random free port for ozone container. This is used
@@ -82,7 +82,7 @@
     </description>
   </property>
   <property>
-    <name>dfs.container.chunk.write.sync</name>
+    <name>hdds.container.chunk.write.sync</name>
     <value>false</value>
     <tag>OZONE, CONTAINER, MANAGEMENT</tag>
     <description>Determines whether the chunk writes in the container happen as
@@ -90,19 +90,19 @@
     </description>
   </property>
   <property>
-    <name>dfs.container.ratis.statemachinedata.sync.timeout</name>
+    <name>hdds.container.ratis.statemachinedata.sync.timeout</name>
     <value>10s</value>
     <tag>OZONE, DEBUG, CONTAINER, RATIS</tag>
     <description>Timeout for StateMachine data writes by Ratis.
     </description>
   </property>
   <property>
-    <name>dfs.container.ratis.statemachinedata.sync.retries</name>
+    <name>hdds.container.ratis.statemachinedata.sync.retries</name>
     <value/>
     <tag>OZONE, DEBUG, CONTAINER, RATIS</tag>
     <description>Number of times the WriteStateMachineData op will be tried
       before failing. If the value is not configured, it will default
-      to (hdds.ratis.rpc.slowness.timeout / dfs.container.ratis.statemachinedata.sync.timeout),
+      to (hdds.ratis.rpc.slowness.timeout / hdds.container.ratis.statemachinedata.sync.timeout),
       which means that the WriteStatMachineData will be retried for every sync timeout until
       the configured slowness timeout is hit, after which the StateMachine will close down the pipeline.
 
@@ -112,21 +112,22 @@
     </description>
   </property>
   <property>
-    <name>dfs.container.ratis.log.queue.num-elements</name>
+    <name>hdds.container.ratis.log.queue.num-elements</name>
     <value>1024</value>
     <tag>OZONE, DEBUG, CONTAINER, RATIS</tag>
     <description>Limit for the number of operations in Ratis Log Worker.
     </description>
   </property>
   <property>
-    <name>dfs.container.ratis.log.queue.byte-limit</name>
+    <name>hdds.container.ratis.log.queue.byte-limit</name>
     <value>4GB</value>
     <tag>OZONE, DEBUG, CONTAINER, RATIS</tag>
     <description>Byte limit for Ratis Log Worker queue.
     </description>
   </property>
   <property>
-    <name>dfs.container.ratis.log.appender.queue.num-elements</name>
+    <name>hdds.container.ratis.log.appender.queue.num-elements
+</name>
     <value>1</value>
     <tag>OZONE, DEBUG, CONTAINER, RATIS</tag>
     <description>Limit for number of append entries in ratis leader's
@@ -134,14 +135,16 @@
     </description>
   </property>
   <property>
-    <name>dfs.container.ratis.log.appender.queue.byte-limit</name>
+    <name>hdds.container.ratis.log.appender.queue.byte-limit
+</name>
     <value>32MB</value>
     <tag>OZONE, DEBUG, CONTAINER, RATIS</tag>
     <description>Byte limit for ratis leader's log appender queue.
     </description>
   </property>
   <property>
-    <name>dfs.container.ratis.log.purge.gap</name>
+    <name>hdds.container.ratis.log.purge.gap
+</name>
     <value>1000000</value>
     <tag>OZONE, DEBUG, CONTAINER, RATIS</tag>
     <description>Purge gap between the last purged commit index
@@ -149,7 +152,7 @@
     </description>
   </property>
   <property>
-    <name>dfs.container.ratis.datanode.storage.dir</name>
+    <name>hdds.container.ratis.datanode.storage.dir</name>
     <value/>
     <tag>OZONE, CONTAINER, STORAGE, MANAGEMENT, RATIS</tag>
     <description>This directory is used for storing Ratis metadata like logs. If
@@ -223,7 +226,7 @@
     </description>
   </property>
   <property>
-    <name>dfs.container.ratis.enabled</name>
+    <name>hdds.container.ratis.enabled</name>
     <value>false</value>
     <tag>OZONE, MANAGEMENT, PIPELINE, RATIS</tag>
     <description>Ozone supports different kinds of replication pipelines. Ratis
@@ -232,25 +235,26 @@
     </description>
   </property>
   <property>
-    <name>dfs.container.ratis.ipc</name>
+    <name>hdds.container.ratis.ipc.port</name>
     <value>9858</value>
     <tag>OZONE, CONTAINER, PIPELINE, RATIS</tag>
     <description>The ipc port number of container for clients.</description>
   </property>
   <property>
-    <name>dfs.container.ratis.admin.port</name>
+    <name>hdds.container.ratis.admin.port</name>
     <value>9857</value>
     <tag>OZONE, CONTAINER, PIPELINE, RATIS, MANAGEMENT</tag>
     <description>The ipc port number of container for admin requests.</description>
   </property>
   <property>
-    <name>dfs.container.ratis.server.port</name>
+    <name>hdds.container.ratis.server.port</name>
     <value>9856</value>
     <tag>OZONE, CONTAINER, PIPELINE, RATIS, MANAGEMENT</tag>
     <description>The ipc port number of container for server-server communication.</description>
   </property>
   <property>
-    <name>dfs.container.ratis.ipc.random.port</name>
+    <name>hdds.container.ratis.ipc.random.port
+</name>
     <value>false</value>
     <tag>OZONE,DEBUG</tag>
     <description>Allocates a random free port for ozone ratis port for the
@@ -259,7 +263,7 @@
     </description>
   </property>
   <property>
-    <name>dfs.container.ratis.rpc.type</name>
+    <name>hdds.container.ratis.rpc.type</name>
     <value>GRPC</value>
     <tag>OZONE, RATIS, MANAGEMENT</tag>
     <description>Ratis supports different kinds of transports like netty, GRPC,
@@ -268,7 +272,7 @@
     </description>
   </property>
   <property>
-    <name>dfs.ratis.snapshot.threshold</name>
+    <name>hdds.ratis.snapshot.threshold</name>
     <value>10000</value>
     <tag>OZONE, RATIS</tag>
     <description>Number of transactions after which a ratis snapshot should be
@@ -276,16 +280,16 @@
     </description>
   </property>
   <property>
-    <name>dfs.container.ratis.statemachine.max.pending.apply-transactions</name>
+    <name>hdds.container.ratis.statemachine.max.pending.apply-transactions</name>
     <value>10000</value>
     <tag>OZONE, RATIS</tag>
     <description>Maximum number of pending apply transactions in a data
       pipeline. The default value is kept same as default snapshot threshold
-      dfs.ratis.snapshot.threshold.
+      hdds.ratis.snapshot.threshold.
     </description>
   </property>
   <property>
-    <name>dfs.container.ratis.num.write.chunk.threads.per.volume</name>
+    <name>hdds.container.ratis.num.write.chunk.threads.per.volume</name>
     <value>10</value>
     <tag>OZONE, RATIS, PERFORMANCE</tag>
     <description>Maximum number of threads in the thread pool that Datanode
@@ -295,7 +299,8 @@
     </description>
   </property>
   <property>
-    <name>dfs.container.ratis.leader.pending.bytes.limit</name>
+    <name>hdds.container.ratis.leader.pending.bytes.limit
+</name>
     <value>1GB</value>
     <tag>OZONE, RATIS, PERFORMANCE</tag>
     <description>Limit on the total bytes of pending requests after which
@@ -303,7 +308,7 @@
     </description>
   </property>
   <property>
-    <name>dfs.container.ratis.replication.level</name>
+    <name>hdds.container.ratis.replication.level</name>
     <value>MAJORITY</value>
     <tag>OZONE, RATIS</tag>
     <description>Replication level to be used by datanode for submitting a
@@ -312,7 +317,7 @@
     </description>
   </property>
   <property>
-    <name>dfs.container.ratis.num.container.op.executors</name>
+    <name>hdds.container.ratis.num.container.op.executors</name>
     <value>10</value>
     <tag>OZONE, RATIS, PERFORMANCE</tag>
     <description>Number of executors that will be used by Ratis to execute
@@ -320,7 +325,7 @@
     </description>
   </property>
   <property>
-    <name>dfs.container.ratis.segment.size</name>
+    <name>hdds.container.ratis.segment.size</name>
     <value>64MB</value>
     <tag>OZONE, RATIS, PERFORMANCE</tag>
     <description>The size of the raft segment file used
@@ -328,7 +333,7 @@
     </description>
   </property>
   <property>
-    <name>dfs.container.ratis.segment.preallocated.size</name>
+    <name>hdds.container.ratis.segment.preallocated.size</name>
     <value>4MB</value>
     <tag>OZONE, RATIS, PERFORMANCE</tag>
     <description>The pre-allocated file size for raft segment used
@@ -336,13 +341,13 @@
     </description>
   </property>
   <property>
-    <name>dfs.ratis.server.retry-cache.timeout.duration</name>
+    <name>hdds.ratis.server.retry-cache.timeout.duration</name>
     <value>600000ms</value>
     <tag>OZONE, RATIS, MANAGEMENT</tag>
     <description>Retry Cache entry timeout for ratis server.</description>
   </property>
   <property>
-    <name>dfs.ratis.leader.election.minimum.timeout.duration</name>
+    <name>hdds.ratis.leader.election.minimum.timeout.duration</name>
     <value>5s</value>
     <tag>OZONE, RATIS, MANAGEMENT</tag>
     <description>The minimum timeout duration for ratis leader election.
@@ -707,7 +712,7 @@
 
       For production clusters or any time you care about performance, it is
       recommended that ozone.om.db.dirs, ozone.scm.db.dirs and
-      dfs.container.ratis.datanode.storage.dir be configured separately.
+      hdds.container.ratis.datanode.storage.dir be configured separately.
     </description>
   </property>
   <property>
@@ -1479,40 +1484,12 @@
       to the OM.
     </description>
   </property>
-
-  <property>
-    <name>hdds.rest.rest-csrf.enabled</name>
-    <value>false</value>
-    <description>
-      If true, then enables Object Store REST server protection against
-      cross-site request forgery (CSRF).
-    </description>
-  </property>
-
   <property>
     <name>hdds.rest.http-address</name>
     <value>0.0.0.0:9880</value>
     <description>The http address of Object Store REST server inside the
       datanode.</description>
   </property>
-
-
-  <property>
-    <name>hdds.rest.netty.high.watermark</name>
-    <value>65535</value>
-    <description>
-      High watermark configuration to Netty for Object Store REST server.
-    </description>
-  </property>
-
-  <property>
-    <name>hdds.rest.netty.low.watermark</name>
-    <value>32768</value>
-    <description>
-      Low watermark configuration to Netty for Object Store REST server.
-    </description>
-  </property>
-
   <property>
     <name>hdds.datanode.plugins</name>
     <value/>
@@ -1909,7 +1886,14 @@
       Setting this interval equal to the metrics sampling time ensures more detailed metrics.
     </description>
   </property>
-
+  <property>
+    <name>ozone.xceiver.client.metrics.percentiles.intervals.seconds</name>
+    <value>60</value>
+    <tag>XCEIVER, PERFORMANCE</tag>
+    <description>Specifies the interval in seconds for the rollover of XceiverClient MutableQuantiles metrics.
+      Setting this interval equal to the metrics sampling time ensures more detailed metrics.
+    </description>
+  </property>
   <property>
     <name>ozone.om.save.metrics.interval</name>
     <value>5m</value>
@@ -1947,7 +1931,15 @@
       set, ozone.security.http.kerberos.enabled should be set to true.
     </description>
   </property>
-
+  <property>
+    <name>ozone.security.crypto.compliance.mode</name>
+    <value>none</value>
+    <tag>OZONE, SECURITY, HDDS, CRYPTO_COMPLIANCE</tag>
+    <description>Based on this property the security compliance mode
+      is loaded and enables filtering cryptographic configuration options
+      according to the specified compliance mode.
+    </description>
+  </property>
 
   <property>
     <name>ozone.client.read.timeout</name>
@@ -2125,7 +2117,7 @@
   </property>
 
   <property>
-    <name>ozone.om.ratis.server.leaderelection.pre-vote </name>
+    <name>ozone.om.ratis.server.leaderelection.pre-vote</name>
     <value>true</value>
     <tag>OZONE, OM, RATIS, MANAGEMENT</tag>
     <description>Enable/disable OM HA leader election pre-vote phase.
@@ -2139,6 +2131,15 @@
     <description>The timeout duration for ratis server failure detection,
       once the threshold has reached, the ratis state machine will be informed
       about the failure in the ratis ring.
+    </description>
+  </property>
+
+  <property>
+    <name>ozone.om.ratis.server.close.threshold</name>
+    <value>60s</value>
+    <tag>OZONE, OM, RATIS</tag>
+    <description>
+      Raft Server will close if JVM pause longer than the threshold.
     </description>
   </property>
 
@@ -2252,11 +2253,44 @@
     </description>
   </property>
   <property>
+    <name>ssl.server.keystore.type</name>
+    <value>jks</value>
+    <tag>OZONE, SECURITY, CRYPTO_COMPLIANCE</tag>
+    <description>
+      The keystore type for HTTP Servers used in ozone.
+    </description>
+  </property>
+  <property>
+    <name>ssl.server.truststore.type</name>
+    <value>jks</value>
+    <tag>OZONE, SECURITY, CRYPTO_COMPLIANCE</tag>
+    <description>
+      The truststore type for HTTP Servers used in ozone.
+    </description>
+  </property>
+  <property>
     <name>hdds.key.len</name>
     <value>2048</value>
-    <tag>SCM, HDDS, X509, SECURITY</tag>
+    <tag>SCM, HDDS, X509, SECURITY, CRYPTO_COMPLIANCE</tag>
     <description>
-      SCM CA key length.  This is an algorithm-specific metric, such as modulus length, specified in number of bits.
+      SCM CA key length. This is an algorithm-specific metric, such as modulus
+      length, specified in number of bits.
+    </description>
+  </property>
+  <property>
+    <name>hdds.key.algo</name>
+    <value>RSA</value>
+    <tag>SCM, HDDS, X509, SECURITY, CRYPTO_COMPLIANCE</tag>
+    <description>
+      SCM CA key algorithm.
+    </description>
+  </property>
+  <property>
+    <name>hdds.security.provider</name>
+    <value>BC</value>
+    <tag>OZONE, HDDS, X509, SECURITY, CRYPTO_COMPLIANCE</tag>
+    <description>
+      The main security provider used for various cryptographic algorithms.
     </description>
   </property>
   <property>
@@ -2300,7 +2334,7 @@
   <property>
     <name>hdds.grpc.tls.provider</name>
     <value>OPENSSL</value>
-    <tag>OZONE, HDDS, SECURITY, TLS</tag>
+    <tag>OZONE, HDDS, SECURITY, TLS, CRYPTO_COMPLIANCE</tag>
     <description>HDDS GRPC server TLS provider.</description>
   </property>
   <property>
@@ -2344,7 +2378,7 @@
   <property>
     <name>hdds.x509.signature.algorithm</name>
     <value>SHA256withRSA</value>
-    <tag>OZONE, HDDS, SECURITY</tag>
+    <tag>OZONE, HDDS, SECURITY, CRYPTO_COMPLIANCE</tag>
     <description>X509 signature certificate.</description>
   </property>
   <property>
@@ -2780,6 +2814,14 @@
     <description>
       Comma separated list of users and groups allowed to access ozone
       manager admin protocol.
+    </description>
+  </property>
+  <property>
+    <name>ozone.security.reconfigure.protocol.acl</name>
+    <value>*</value>
+    <tag>SECURITY</tag>
+    <description>
+      Comma separated list of users and groups allowed to access reconfigure protocol.
     </description>
   </property>
 
@@ -3779,6 +3821,14 @@
       is send to DN.</description>
   </property>
   <property>
+    <name>ozone.om.network.topology.refresh.duration</name>
+    <value>1h</value>
+    <tag>SCM, OZONE, OM</tag>
+    <description>The duration at which we periodically fetch the updated network
+      topology cluster tree from SCM.
+    </description>
+  </property>
+  <property>
     <name>ozone.scm.ha.ratis.server.snapshot.creation.gap</name>
     <value>1024</value>
     <tag>SCM, OZONE</tag>
@@ -4254,7 +4304,7 @@
   </property>
 
   <property>
-    <name>ozone.om.snapshot.diff.cleanup.service.run.internal</name>
+    <name>ozone.om.snapshot.diff.cleanup.service.run.interval</name>
     <value>1m</value>
     <tag>OZONE, OM</tag>
     <description>
@@ -4274,11 +4324,12 @@
   </property>
 
   <property>
-    <name>ozone.om.snapshot.sst_dumptool.pool.size</name>
-    <value>1</value>
+    <name>ozone.om.snapshot.cache.cleanup.service.run.interval</name>
+    <value>1m</value>
     <tag>OZONE, OM</tag>
     <description>
-      Threadpool size for SST Dumptool which would be used for computing snapdiff when native library is enabled.
+      Interval at which snapshot cache clean up will run.
+      Uses millisecond by default when no time unit is specified.
     </description>
   </property>
 
@@ -4288,15 +4339,6 @@
     <tag>OZONE, OM</tag>
     <description>
       Load native library for performing optimized snapshot diff.
-    </description>
-  </property>
-
-  <property>
-    <name>ozone.om.snapshot.sst_dumptool.buffer.size</name>
-    <value>8KB</value>
-    <tag>OZONE, OM</tag>
-    <description>
-      Buffer size for SST Dumptool Pipe which would be used for computing snapdiff when native library is enabled.
     </description>
   </property>
 
@@ -4349,7 +4391,7 @@
   <property>
     <name>hdds.secret.key.algorithm</name>
     <value>HmacSHA256</value>
-    <tag>SCM, SECURITY</tag>
+    <tag>SCM, SECURITY, CRYPTO_COMPLIANCE</tag>
     <description>
       The algorithm that SCM uses to generate symmetric secret keys.
       A valid algorithm is the one supported by KeyGenerator, as described at

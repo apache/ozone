@@ -144,12 +144,29 @@ public class OzoneClientConfig {
       tags = ConfigTag.CLIENT)
   private int retryInterval = 0;
 
+  @Config(key = "read.max.retries",
+      defaultValue = "3",
+      description = "Maximum number of retries by Ozone Client on "
+          + "encountering connectivity exception when reading a key.",
+      tags = ConfigTag.CLIENT)
+  private int maxReadRetryCount = 3;
+
+  @Config(key = "read.retry.interval",
+      defaultValue = "1",
+      description =
+          "Indicates the time duration in seconds a client will wait "
+              + "before retrying a read key request on encountering "
+              + "a connectivity excepetion from Datanodes . "
+              + "By default the interval is 1 second",
+      tags = ConfigTag.CLIENT)
+  private int readRetryInterval = 1;
+
   @Config(key = "checksum.type",
       defaultValue = "CRC32",
       description = "The checksum type [NONE/ CRC32/ CRC32C/ SHA256/ MD5] "
           + "determines which algorithm would be used to compute checksum for "
           + "chunk data. Default checksum type is CRC32.",
-      tags = ConfigTag.CLIENT)
+      tags = { ConfigTag.CLIENT, ConfigTag.CRYPTO_COMPLIANCE })
   private String checksumType = ChecksumType.CRC32.name();
 
   @Config(key = "bytes.per.checksum",
@@ -158,7 +175,7 @@ public class OzoneClientConfig {
       description = "Checksum will be computed for every bytes per checksum "
           + "number of bytes and stored sequentially. The minimum value for "
           + "this config is 16KB.",
-      tags = ConfigTag.CLIENT)
+      tags = { ConfigTag.CLIENT, ConfigTag.CRYPTO_COMPLIANCE })
   private int bytesPerChecksum = 1024 * 1024;
 
   @Config(key = "verify.checksum",
@@ -201,6 +218,13 @@ public class OzoneClientConfig {
   // 3 concurrent stripe read should be enough.
   private int ecReconstructStripeReadPoolLimit = 10 * 3;
 
+  @Config(key = "ec.reconstruct.stripe.write.pool.limit",
+      defaultValue = "30",
+      description = "Thread pool max size for parallelly write" +
+          " available ec chunks to reconstruct the whole stripe.",
+      tags = ConfigTag.CLIENT)
+  private int ecReconstructStripeWritePoolLimit = 10 * 3;
+
   @Config(key = "checksum.combine.mode",
       defaultValue = "COMPOSITE_CRC",
       description = "The combined checksum type [MD5MD5CRC / COMPOSITE_CRC] "
@@ -224,7 +248,7 @@ public class OzoneClientConfig {
   private String fsDefaultBucketLayout = "FILE_SYSTEM_OPTIMIZED";
 
   @PostConstruct
-  private void validate() {
+  public void validate() {
     Preconditions.checkState(streamBufferSize > 0);
     Preconditions.checkState(streamBufferFlushSize > 0);
     Preconditions.checkState(streamBufferMaxSize > 0);
@@ -319,6 +343,22 @@ public class OzoneClientConfig {
     this.retryInterval = retryInterval;
   }
 
+  public int getMaxReadRetryCount() {
+    return maxReadRetryCount;
+  }
+
+  public void setMaxReadRetryCount(int maxReadRetryCount) {
+    this.maxReadRetryCount = maxReadRetryCount;
+  }
+
+  public int getReadRetryInterval() {
+    return readRetryInterval;
+  }
+
+  public void setReadRetryInterval(int readRetryInterval) {
+    this.readRetryInterval = readRetryInterval;
+  }
+
   public ChecksumType getChecksumType() {
     return ChecksumType.valueOf(checksumType);
   }
@@ -385,6 +425,14 @@ public class OzoneClientConfig {
 
   public int getEcReconstructStripeReadPoolLimit() {
     return ecReconstructStripeReadPoolLimit;
+  }
+
+  public void setEcReconstructStripeWritePoolLimit(int poolLimit) {
+    this.ecReconstructStripeWritePoolLimit = poolLimit;
+  }
+
+  public int getEcReconstructStripeWritePoolLimit() {
+    return ecReconstructStripeWritePoolLimit;
   }
 
   public void setFsDefaultBucketLayout(String bucketLayout) {

@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone.container.common.utils;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
+import org.apache.hadoop.hdfs.server.datanode.checker.VolumeCheckResult;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.container.common.ContainerTestUtils;
 import org.apache.hadoop.ozone.container.common.volume.DbVolume;
@@ -43,7 +44,13 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrowsExactly;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.Mockito.mockStatic;
+
+import org.mockito.MockedStatic;
+import org.mockito.Mockito;
+
 
 /**
  * Test for {@link HddsVolumeUtil}.
@@ -93,6 +100,34 @@ public class TestHddsVolumeUtil {
   public void teardown() {
     hddsVolumeSet.shutdown();
     dbVolumeSet.shutdown();
+  }
+
+  @Test
+  public void testLoadHDDVolumeWithInitDBException()
+      throws Exception {
+    // Create db instances for all HDDsVolumes.
+    for (HddsVolume hddsVolume : StorageVolumeUtil.getHddsVolumesList(
+        hddsVolumeSet.getVolumesList())) {
+      hddsVolume.format(clusterId);
+      hddsVolume.createWorkingDir(clusterId, null);
+    }
+
+    try (MockedStatic<HddsVolumeUtil> mocked = mockStatic(HddsVolumeUtil.class, Mockito.CALLS_REAL_METHODS)) {
+      // Simulating the init DB Exception
+      mocked.when(() -> HddsVolumeUtil.initPerDiskDBStore(Mockito.anyString(), Mockito.any(), Mockito.anyBoolean()))
+          .thenThrow(new IOException("Mocked Exception"));
+
+      reinitVolumes();
+      for (HddsVolume hddsVolume : StorageVolumeUtil.getHddsVolumesList(
+          hddsVolumeSet.getVolumesList())) {
+        assertThrowsExactly(IOException.class, () -> hddsVolume.loadDbStore(true));
+        // If the Volume init DB is abnormal, the Volume should be recognized as a failed Volume
+        assertEquals(VolumeCheckResult.FAILED, hddsVolume.check(false));
+        assertTrue(hddsVolume.isDbLoadFailure());
+        assertFalse(hddsVolume.isDbLoaded());
+      }
+    }
+
   }
 
   @Test

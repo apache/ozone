@@ -96,7 +96,7 @@ public final class OMLayoutVersionManager
         .forPackages(packageName)
         .setScanners(new TypeAnnotationsScanner(), new SubTypesScanner())
         .setExpandSuperTypes(false)
-        .useParallelExecutor());
+        .setParallel(true));
     Set<Class<?>> typesAnnotatedWith =
         reflections.getTypesAnnotatedWith(UpgradeActionOm.class);
     typesAnnotatedWith.forEach(actionClass -> {
@@ -132,7 +132,7 @@ public final class OMLayoutVersionManager
         .setUrls(ClasspathHelper.forPackage(packageName))
         .setScanners(new SubTypesScanner())
         .setExpandSuperTypes(false)
-        .useParallelExecutor());
+        .setParallel(true));
     Set<Class<? extends OMClientRequest>> validRequests = new HashSet<>();
 
     Set<Class<? extends OMClientRequest>> subTypes =

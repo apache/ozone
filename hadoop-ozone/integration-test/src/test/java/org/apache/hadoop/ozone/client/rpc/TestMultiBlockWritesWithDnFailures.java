@@ -105,7 +105,7 @@ public class TestMultiBlockWritesWithDnFailures {
     conf.setFromObject(ratisClientConfig);
 
     conf.setTimeDuration(
-        OzoneConfigKeys.DFS_RATIS_LEADER_ELECTION_MINIMUM_TIMEOUT_DURATION_KEY,
+        OzoneConfigKeys.HDDS_RATIS_LEADER_ELECTION_MINIMUM_TIMEOUT_DURATION_KEY,
         1, TimeUnit.SECONDS);
     conf.setInt(OZONE_DATANODE_PIPELINE_LIMIT, 2);
 

@@ -31,8 +31,10 @@ import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
 
 import com.google.common.collect.ImmutableMap;
+import org.apache.commons.lang.RandomStringUtils;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
@@ -81,10 +83,10 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_SERVI
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SNAPSHOT_DELETING_SERVICE_INTERVAL;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_SNAPSHOT_SST_FILTERING_SERVICE_INTERVAL;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.fail;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
@@ -626,15 +628,13 @@ class TestKeyDeletingService extends OzoneTestBase {
   private static boolean assertTableRowCount(long expectedCount,
                                       Table<String, ?> table,
                                       OMMetadataManager metadataManager) {
-    long count = 0L;
-    try {
-      count = metadataManager.countRowsInTable(table);
+    AtomicLong count = new AtomicLong(0L);
+    assertDoesNotThrow(() -> {
+      count.set(metadataManager.countRowsInTable(table));
       LOG.info("{} actual row count={}, expectedCount={}", table.getName(),
-          count, expectedCount);
-    } catch (IOException ex) {
-      fail("testDoubleBuffer failed with: " + ex);
-    }
-    return count == expectedCount;
+          count.get(), expectedCount);
+    });
+    return count.get() == expectedCount;
   }
 
   private void createVolumeAndBucket(String volumeName,
@@ -707,6 +707,7 @@ class TestKeyDeletingService extends OzoneTestBase {
             .setReplicationConfig(RatisReplicationConfig.getInstance(THREE))
             .setDataSize(1000L)
             .setLocationInfoList(new ArrayList<>())
+            .setOwnerName("user" + RandomStringUtils.randomNumeric(5))
             .build();
     //Open and Commit the Key in the Key Manager.
     OpenKeySession session = writeClient.openKey(keyArg);

@@ -44,11 +44,11 @@ public interface RatisTestHelper {
   Logger LOG = LoggerFactory.getLogger(RatisTestHelper.class);
 
   static void initRatisConf(RpcType rpc, OzoneConfiguration conf) {
-    conf.setBoolean(OzoneConfigKeys.DFS_CONTAINER_RATIS_ENABLED_KEY, true);
-    conf.set(OzoneConfigKeys.DFS_CONTAINER_RATIS_RPC_TYPE_KEY, rpc.name());
+    conf.setBoolean(OzoneConfigKeys.HDDS_CONTAINER_RATIS_ENABLED_KEY, true);
+    conf.set(OzoneConfigKeys.HDDS_CONTAINER_RATIS_RPC_TYPE_KEY, rpc.name());
     conf.setTimeDuration(HDDS_CONTAINER_REPORT_INTERVAL, 1, TimeUnit.SECONDS);
     conf.setTimeDuration(OZONE_SCM_STALENODE_INTERVAL, 30, TimeUnit.SECONDS);
-    LOG.info("{} = {}", OzoneConfigKeys.DFS_CONTAINER_RATIS_RPC_TYPE_KEY,
+    LOG.info("{} = {}", OzoneConfigKeys.HDDS_CONTAINER_RATIS_RPC_TYPE_KEY,
             rpc.name());
   }
 

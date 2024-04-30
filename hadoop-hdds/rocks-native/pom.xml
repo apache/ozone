@@ -45,18 +45,11 @@
       <artifactId>hdds-test-utils</artifactId>
       <scope>test</scope>
     </dependency>
-    <dependency>
-      <groupId>org.mockito</groupId>
-      <artifactId>mockito-inline</artifactId>
-      <scope>test</scope>
-    </dependency>
   </dependencies>
   <properties>
 
     <maven.compiler.source>8</maven.compiler.source>
     <maven.compiler.target>8</maven.compiler.target>
-    <bzip2.url>https://sourceware.org/pub/bzip2/bzip2-${bzip2.version}.tar.gz</bzip2.url>
-    <zlib.url>https://zlib.net/fossils/zlib-${zlib.version}.tar.gz</zlib.url>
   </properties>
 
   <build>
@@ -113,6 +106,67 @@
       <build>
         <plugins>
           <plugin>
+            <groupId>org.codehaus.mojo</groupId>
+            <artifactId>exec-maven-plugin</artifactId>
+            <executions>
+              <execution>
+                <id>set-property</id>
+                <phase>initialize</phase>
+                <goals>
+                  <goal>java</goal>
+                </goals>
+                <configuration>
+                  <mainClass>org.apache.hadoop.hdds.utils.db.managed.JniLibNamePropertyWriter</mainClass>
+                  <arguments>
+                    <argument>${project.build.directory}/propertyFile.txt</argument>
+                  </arguments>
+                </configuration>
+              </execution>
+            </executions>
+          </plugin>
+          <plugin>
+            <groupId>org.codehaus.mojo</groupId>
+            <artifactId>properties-maven-plugin</artifactId>
+            <executions>
+              <execution>
+                <id>read-property-from-file</id>
+                <phase>initialize</phase>
+                <goals>
+                  <goal>read-project-properties</goal>
+                </goals>
+                <configuration>
+                  <files>
+                    <file>${project.build.directory}/propertyFile.txt</file>
+                  </files>
+                </configuration>
+              </execution>
+            </executions>
+          </plugin>
+          <plugin>
+            <groupId>org.apache.maven.plugins</groupId>
+            <artifactId>maven-dependency-plugin</artifactId>
+            <executions>
+              <execution>
+                <id>unpack-dependency</id>
+                <phase>initialize</phase>
+                <goals>
+                  <goal>unpack</goal>
+                </goals>
+                <configuration>
+                  <artifactItems>
+                    <artifactItem>
+                      <groupId>org.rocksdb</groupId>
+                      <artifactId>rocksdbjni</artifactId>
+                      <type>jar</type>
+                      <overWrite>false</overWrite>
+                      <outputDirectory>${project.build.directory}/rocksdbjni</outputDirectory>
+                    </artifactItem>
+                  </artifactItems>
+                </configuration>
+              </execution>
+            </executions>
+          </plugin>
+          <plugin>
             <groupId>com.googlecode.maven-download-plugin</groupId>
             <artifactId>download-maven-plugin</artifactId>
             <executions>
@@ -126,66 +180,6 @@
                   <url>https://github.com/facebook/rocksdb/archive/refs/tags/v${rocksdb.version}.tar.gz</url>
                   <outputFileName>rocksdb-v${rocksdb.version}.tar.gz</outputFileName>
                   <outputDirectory>${project.build.directory}/rocksdb</outputDirectory>
-                </configuration>
-              </execution>
-              <execution>
-                <id>zlib source download</id>
-                <phase>generate-sources</phase>
-                <goals>
-                  <goal>wget</goal>
-                </goals>
-                <configuration>
-                  <url>${zlib.url}</url>
-                  <outputFileName>zlib-${zlib.version}.tar.gz</outputFileName>
-                  <outputDirectory>${project.build.directory}/zlib</outputDirectory>
-                </configuration>
-              </execution>
-              <execution>
-                <id>bzip2 source download</id>
-                <phase>generate-sources</phase>
-                <goals>
-                  <goal>wget</goal>
-                </goals>
-                <configuration>
-                  <url>${bzip2.url}</url>
-                  <outputFileName>bzip2-v${bzip2.version}.tar.gz</outputFileName>
-                  <outputDirectory>${project.build.directory}/bzip2</outputDirectory>
-                </configuration>
-              </execution>
-              <execution>
-                <id>lz4 source download</id>
-                <phase>generate-sources</phase>
-                <goals>
-                  <goal>wget</goal>
-                </goals>
-                <configuration>
-                  <url>https://github.com/lz4/lz4/archive/refs/tags/v${lz4.version}.tar.gz</url>
-                  <outputFileName>lz4-v${lz4.version}.tar.gz</outputFileName>
-                  <outputDirectory>${project.build.directory}/lz4</outputDirectory>
-                </configuration>
-              </execution>
-              <execution>
-                <id>snappy source download</id>
-                <phase>generate-sources</phase>
-                <goals>
-                  <goal>wget</goal>
-                </goals>
-                <configuration>
-                  <url>https://github.com/google/snappy/archive/refs/tags/${snappy.version}.tar.gz</url>
-                  <outputFileName>snappy-v${snappy.version}.tar.gz</outputFileName>
-                  <outputDirectory>${project.build.directory}/snappy</outputDirectory>
-                </configuration>
-              </execution>
-              <execution>
-                <id>zstd source download</id>
-                <phase>generate-sources</phase>
-                <goals>
-                  <goal>wget</goal>
-                </goals>
-                <configuration>
-                  <url>https://github.com/facebook/zstd/archive/refs/tags/v${zstd.version}.tar.gz</url>
-                  <outputFileName>zstd-v${zstd.version}.tar.gz</outputFileName>
-                  <outputDirectory>${project.build.directory}/zstd</outputDirectory>
                 </configuration>
               </execution>
             </executions>
@@ -219,89 +213,6 @@
                 <configuration>
                   <target>
                     <untar src="${project.build.directory}/rocksdb/rocksdb-v${rocksdb.version}.tar.gz" compression="gzip" dest="${project.build.directory}/rocksdb/" />
-                    <untar src="${project.build.directory}/zlib/zlib-${zlib.version}.tar.gz" compression="gzip" dest="${project.build.directory}/zlib/" />
-                    <untar src="${project.build.directory}/bzip2/bzip2-v${bzip2.version}.tar.gz" compression="gzip" dest="${project.build.directory}/bzip2/" />
-                    <move file="${project.build.directory}/bzip2/bzip2-bzip2-${bzip2.version}" tofile="${project.build.directory}/bzip2/bzip2-${bzip2.version}" failonerror="false" />
-                    <untar src="${project.build.directory}/lz4/lz4-v${lz4.version}.tar.gz" compression="gzip" dest="${project.build.directory}/lz4/" />
-                    <untar src="${project.build.directory}/snappy/snappy-v${snappy.version}.tar.gz" compression="gzip" dest="${project.build.directory}/snappy/" />
-                    <untar src="${project.build.directory}/zstd/zstd-v${zstd.version}.tar.gz" compression="gzip" dest="${project.build.directory}/zstd/" />
-                  </target>
-                </configuration>
-                <goals>
-                  <goal>run</goal>
-                </goals>
-              </execution>
-              <execution>
-                <id>build-zlib</id>
-                <phase>process-sources</phase>
-                <configuration>
-                  <target>
-                    <chmod file="${project.build.directory}/zlib/zlib-${zlib.version}/configure" perm="775" />
-                    <exec executable="./configure" dir="${project.build.directory}/zlib/zlib-${zlib.version}" failonerror="true">
-                      <arg line="--static"/>
-                      <env key="CFLAGS" value="-fPIC"/>
-                    </exec>
-                    <exec executable="make" dir="${project.build.directory}/zlib/zlib-${zlib.version}" failonerror="true"/>
-                  </target>
-                </configuration>
-                <goals>
-                  <goal>run</goal>
-                </goals>
-              </execution>
-              <execution>
-                <id>build-bzip2</id>
-                <phase>process-sources</phase>
-                <configuration>
-                  <target>
-                    <exec executable="make" dir="${project.build.directory}/bzip2/bzip2-${bzip2.version}" failonerror="true">
-                      <arg line="CFLAGS='-fPIC'"/>
-                    </exec>
-                  </target>
-                </configuration>
-                <goals>
-                  <goal>run</goal>
-                </goals>
-              </execution>
-              <execution>
-                <id>build-lz4</id>
-                <phase>process-sources</phase>
-                <configuration>
-                  <target>
-                    <exec executable="make" dir="${project.build.directory}/lz4/lz4-${lz4.version}" failonerror="true">
-                      <arg line="CFLAGS='-fPIC'"/>
-                    </exec>
-                  </target>
-                </configuration>
-                <goals>
-                  <goal>run</goal>
-                </goals>
-              </execution>
-              <execution>
-                <id>build-zstd</id>
-                <phase>process-sources</phase>
-                <configuration>
-                  <target>
-                    <exec executable="make" dir="${project.build.directory}/zstd/zstd-${zstd.version}" failonerror="true">
-                      <arg line="CFLAGS='-fPIC'"/>
-                    </exec>
-                  </target>
-                </configuration>
-                <goals>
-                  <goal>run</goal>
-                </goals>
-              </execution>
-              <execution>
-                <id>build-snappy</id>
-                <phase>process-sources</phase>
-                <configuration>
-                  <target>
-                    <mkdir dir="${project.build.directory}/snappy/lib"/>
-                    <exec executable="cmake" failonerror="true" dir="${project.build.directory}/snappy/lib">
-                      <arg line="${project.build.directory}/snappy/snappy-${snappy.version}"/>
-                      <env key="CFLAGS" value="-fPIC"/>
-                      <env key="CXXFLAGS" value="-fPIC"/>
-                    </exec>
-                    <exec executable="make" dir="${project.build.directory}/snappy/lib" failonerror="true"/>
                   </target>
                 </configuration>
                 <goals>
@@ -319,11 +230,11 @@
                       <arg line="${project.build.directory}/rocksdb/rocksdb-${rocksdb.version}"/>
                     </exec>
                     <exec executable="make" dir="${project.build.directory}/rocksdb/rocksdb-${rocksdb.version}" failonerror="true">
+                      <arg line="PORTABLE=1"/>
                       <arg line="DEBUG_LEVEL=0"/>
-                      <arg line="EXTRA_CXXFLAGS='-fPIC -I${project.build.directory}/snappy/lib -I${project.build.directory}/snappy/snappy-${snappy.version} -I${project.build.directory}/lz4/lz4-${lz4.version}/lib -I${project.build.directory}/zstd/zstd-${zstd.version}/lib -I${project.build.directory}/zstd/zstd-${zstd.version}/lib/dictBuilder -I${project.build.directory}/bzip2/bzip2-${bzip2.version} -I${project.build.directory}/zlib/zlib-${zlib.version}'"/>
-                      <arg line="EXTRA_LDFLAGS='-L${project.build.directory}/snappy/lib -L${project.build.directory}/lz4/lz4-${lz4.version}/lib -L${project.build.directory}/zstd/zstd-${zstd.version}/lib -L${project.build.directory}/bzip2/bzip2-${bzip2.version} -L${project.build.directory}/zlib/zlib-${zlib.version}'"/>
+                      <arg line="EXTRA_CXXFLAGS='-fPIC -D_GLIBCXX_USE_CXX11_ABI=0'"/>
                       <arg line="-j${system.numCores}"/>
-                      <arg line="tools"/>
+                      <arg line="tools_lib"/>
                     </exec>
                   </target>
                 </configuration>
@@ -337,6 +248,8 @@
                 <configuration>
                   <target>
                     <mkdir dir="${project.build.directory}/native/rocksdb"/>
+                    <copy file="${project.build.directory}/rocksdbjni/${rocksdbLibName}"
+                          tofile="${project.build.directory}/native/rocksdb/${rocksdbLibName}" />
                     <exec executable="cmake" failonerror="true" dir="${project.build.directory}/native/rocksdb">
                       <env key="CFLAGS" value="-fPIC"/>
                       <env key="CXXFLAGS" value="-fPIC"/>
@@ -346,14 +259,12 @@
                       <arg line="-DSST_DUMP_INCLUDE=${sstDump.include}"/>
                       <arg line="-DCMAKE_STANDARDS=${cmake.standards}"/>
                       <arg line="-DROCKSDB_HEADERS=${project.build.directory}/rocksdb/rocksdb-${rocksdb.version}/include"/>
-                      <arg line="-DROCKSDB_LIB=${project.build.directory}/rocksdb/rocksdb-${rocksdb.version}"/>
-                      <arg line="-DZLIB_LIB=${project.build.directory}/zlib/zlib-${zlib.version}"/>
-                      <arg line="-DBZIP2_LIB=${project.build.directory}/bzip2/bzip2-${bzip2.version}"/>
-                      <arg line="-DLZ4_LIB=${project.build.directory}/lz4/lz4-${lz4.version}/lib"/>
-                      <arg line="-DSNAPPY_LIB=${project.build.directory}/snappy/lib"/>
-                      <arg line="-DZSTD_LIB=${project.build.directory}/zstd/zstd-${zstd.version}/lib"/>
+                      <arg line="-DROCKSDB_TOOLS_LIB=${project.build.directory}/rocksdb/rocksdb-${rocksdb.version}"/>
+                      <arg line="-DROCKSDB_LIB=${project.build.directory}/native/rocksdb/${rocksdbLibName}"/>
                     </exec>
                     <exec executable="make" dir="${project.build.directory}/native/rocksdb" failonerror="true"/>
+                    <delete dir="${project.build.directory}/rocksdb/rocksdb-${rocksdb.version}"
+                            includeemptydirs="true"/>
                   </target>
                 </configuration>
                 <goals>
@@ -423,8 +334,8 @@
                 <configuration>
                   <javahPath>${env.JAVA_HOME}/bin/javah</javahPath>
                   <javahClassNames>
-                    <javahClassName>org.apache.hadoop.hdds.utils.db.managed.ManagedSSTDumpTool</javahClassName>
-                    <javahClassName>org.apache.hadoop.hdds.utils.db.managed.PipeInputStream</javahClassName>
+                    <javahClassName>org.apache.hadoop.hdds.utils.db.managed.ManagedRawSSTFileReader</javahClassName>
+                    <javahClassName>org.apache.hadoop.hdds.utils.db.managed.ManagedRawSSTFileIterator</javahClassName>
                   </javahClassNames>
                   <javahOutputDirectory>${project.build.directory}/native/javah</javahOutputDirectory>
                 </configuration>
@@ -479,8 +390,8 @@
                     <argument>${project.build.outputDirectory}:${project.build.directory}/dependency/*</argument>
                     <argument>-h</argument>
                     <argument>${project.build.directory}/native/javah</argument>
-                    <argument>${project.basedir}/src/main/java/org/apache/hadoop/hdds/utils/db/managed/ManagedSSTDumpTool.java</argument>
-                    <argument>${project.basedir}/src/main/java/org/apache/hadoop/hdds/utils/db/managed/PipeInputStream.java</argument>
+                    <argument>${project.basedir}/src/main/java/org/apache/hadoop/hdds/utils/db/managed/ManagedRawSSTFileReader.java</argument>
+                    <argument>${project.basedir}/src/main/java/org/apache/hadoop/hdds/utils/db/managed/ManagedRawSSTFileIterator.java</argument>
                   </arguments>
                 </configuration>
               </execution>

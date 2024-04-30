@@ -21,6 +21,7 @@ package org.apache.hadoop.ozone.container.common.volume;
 import java.io.File;
 import java.io.IOException;
 import java.net.InetSocketAddress;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
@@ -45,6 +46,7 @@ import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine;
 import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
+import org.apache.hadoop.ozone.container.common.utils.StorageVolumeUtil;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainer;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
@@ -76,6 +78,9 @@ import static org.mockito.Mockito.when;
  */
 @Timeout(30)
 public class TestVolumeSetDiskChecks {
+  @TempDir
+  private Path tempDir;
+
   public static final Logger LOG = LoggerFactory.getLogger(
       TestVolumeSetDiskChecks.class);
   @TempDir
@@ -228,7 +233,7 @@ public class TestVolumeSetDiskChecks {
     for (int i = 0; i < numDirs; ++i) {
       metaDirs.add(new File(dir, randomAlphanumeric(10)).toString());
     }
-    ozoneConf.set(OzoneConfigKeys.DFS_CONTAINER_RATIS_DATANODE_STORAGE_DIR,
+    ozoneConf.set(OzoneConfigKeys.HDDS_CONTAINER_RATIS_DATANODE_STORAGE_DIR,
         String.join(",", metaDirs));
 
     final List<String> dbDirs = new ArrayList<>();
@@ -302,11 +307,15 @@ public class TestVolumeSetDiskChecks {
         dummyChecker);
 
     KeyValueContainer container = new KeyValueContainer(data, conf);
+    StorageVolumeUtil.getHddsVolumesList(volumeSet.getVolumesList())
+        .forEach(hddsVolume -> hddsVolume.setDbParentDir(tempDir.toFile()));
     container.create(volumeSet,
         new RoundRobinVolumeChoosingPolicy(), UUID.randomUUID().toString());
     conSet.addContainer(container);
 
     KeyValueContainer container1 = new KeyValueContainer(data1, conf);
+    StorageVolumeUtil.getHddsVolumesList(volumeSet1.getVolumesList())
+        .forEach(hddsVolume -> hddsVolume.setDbParentDir(tempDir.toFile()));
     container1.create(volumeSet1,
         new RoundRobinVolumeChoosingPolicy(), UUID.randomUUID().toString());
     conSet.addContainer(container1);

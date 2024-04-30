@@ -41,8 +41,7 @@ public final class RdbUtil {
       final ManagedRocksDB rocksDB, List<String> cfs) {
     final Set<String> cfSet = Sets.newHashSet(cfs);
     return rocksDB.get().getLiveFilesMetaData().stream()
-        .filter(lfm -> cfSet.contains(
-            StringUtils.bytes2String(lfm.columnFamilyName())))
+        .filter(lfm -> cfSet.contains(StringUtils.bytes2String(lfm.columnFamilyName())))
         .collect(Collectors.toList());
   }
 

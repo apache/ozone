@@ -95,7 +95,7 @@ public class TestStorageContainerManagerHA {
     conf.set(ScmConfigKeys.OZONE_SCM_HA_RATIS_SNAPSHOT_GAP, "1");
     omServiceId = "om-service-test1";
     scmServiceId = "scm-service-test1";
-    cluster = (MiniOzoneHAClusterImpl) MiniOzoneCluster.newHABuilder(conf)
+    cluster = MiniOzoneCluster.newHABuilder(conf)
         .setOMServiceId(omServiceId)
         .setSCMServiceId(scmServiceId)
         .setNumOfStorageContainerManagers(numOfSCMs)

@@ -17,29 +17,71 @@
  */
 package org.apache.hadoop.ozone.om.helpers;
 
-import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Mixin class to handle custom metadata.
  */
-public class WithMetadata {
+public abstract class WithMetadata {
 
-  @SuppressWarnings("visibilitymodifier")
-  protected Map<String, String> metadata = new HashMap<>();
+  private Map<String, String> metadata;
+
+  protected WithMetadata() {
+    metadata = new ConcurrentHashMap<>();
+  }
+
+  protected WithMetadata(Builder b) {
+    metadata = b.metadata;
+  }
 
   /**
    * Custom key value metadata.
    */
-  public Map<String, String> getMetadata() {
+  public final Map<String, String> getMetadata() {
     return metadata;
   }
 
   /**
    * Set custom key value metadata.
    */
-  public void setMetadata(Map<String, String> metadata) {
+  public final void setMetadata(Map<String, String> metadata) {
     this.metadata = metadata;
+  }
+
+  /** Builder for {@link WithMetadata}. */
+  public static class Builder {
+    private final Map<String, String> metadata;
+
+    protected Builder() {
+      metadata = new ConcurrentHashMap<>();
+    }
+
+    protected Builder(WithObjectID obj) {
+      metadata = new ConcurrentHashMap<>(obj.getMetadata());
+    }
+
+    public Builder addMetadata(String key, String value) {
+      metadata.put(key, value);
+      return this;
+    }
+
+    public Builder addAllMetadata(Map<String, String> additionalMetadata) {
+      if (additionalMetadata != null) {
+        metadata.putAll(additionalMetadata);
+      }
+      return this;
+    }
+
+    public Builder setMetadata(Map<String, String> map) {
+      metadata.clear();
+      addAllMetadata(map);
+      return this;
+    }
+
+    protected Map<String, String> getMetadata() {
+      return metadata;
+    }
   }
 
 }

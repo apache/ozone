@@ -20,7 +20,9 @@ package org.apache.hadoop.hdds.scm;
 
 import java.io.IOException;
 import java.io.InterruptedIOException;
+import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -42,6 +44,7 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.DatanodeBl
 import org.apache.hadoop.hdds.protocol.datanode.proto.XceiverClientProtocolServiceGrpc;
 import org.apache.hadoop.hdds.protocol.datanode.proto.XceiverClientProtocolServiceGrpc.XceiverClientProtocolServiceStub;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState;
 import org.apache.hadoop.hdds.scm.client.ClientTrustManager;
 import org.apache.hadoop.hdds.scm.client.HddsClientUtils;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
@@ -166,8 +169,8 @@ public class XceiverClientGrpc extends XceiverClientSpi {
     // port.
     int port = dn.getPort(DatanodeDetails.Port.Name.STANDALONE).getValue();
     if (port == 0) {
-      port = config.getInt(OzoneConfigKeys.DFS_CONTAINER_IPC_PORT,
-          OzoneConfigKeys.DFS_CONTAINER_IPC_PORT_DEFAULT);
+      port = config.getInt(OzoneConfigKeys.HDDS_CONTAINER_IPC_PORT,
+          OzoneConfigKeys.HDDS_CONTAINER_IPC_PORT_DEFAULT);
     }
 
     // Add credential context to the client call
@@ -384,6 +387,12 @@ public class XceiverClientGrpc extends XceiverClientSpi {
       }
     }
 
+    boolean allInService = datanodeList.stream()
+        .allMatch(dn -> dn.getPersistedOpState() == NodeOperationalState.IN_SERVICE);
+    if (!allInService) {
+      datanodeList = sortDatanodeByOperationalState(datanodeList);
+    }
+
     for (DatanodeDetails dn : datanodeList) {
       try {
         if (LOG.isDebugEnabled()) {
@@ -445,6 +454,30 @@ public class XceiverClientGrpc extends XceiverClientSpi {
       }
       throw ioException;
     }
+  }
+
+  private static List<DatanodeDetails> sortDatanodeByOperationalState(
+      List<DatanodeDetails> datanodeList) {
+    List<DatanodeDetails> sortedDatanodeList = new ArrayList<>(datanodeList);
+    // Make IN_SERVICE's Datanode precede all other State's Datanodes.
+    // This is a stable sort that does not change the order of the
+    // IN_SERVICE's Datanode.
+    Comparator<DatanodeDetails> byOpStateStable = (first, second) -> {
+      boolean firstInService = first.getPersistedOpState() ==
+          NodeOperationalState.IN_SERVICE;
+      boolean secondInService = second.getPersistedOpState() ==
+          NodeOperationalState.IN_SERVICE;
+
+      if (firstInService == secondInService) {
+        return 0;
+      } else if (firstInService) {
+        return -1;
+      } else {
+        return 1;
+      }
+    };
+    sortedDatanodeList.sort(byOpStateStable);
+    return sortedDatanodeList;
   }
 
   @Override

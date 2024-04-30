@@ -76,6 +76,7 @@ import org.apache.hadoop.ozone.HddsDatanodeService;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.MiniOzoneClusterProvider;
 import org.apache.hadoop.ozone.MiniOzoneHAClusterImpl;
+import org.apache.hadoop.ozone.UniformDatanodesFactory;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientFactory;
@@ -165,18 +166,19 @@ public class TestHDDSUpgrade {
     SCMConfigurator scmConfigurator = new SCMConfigurator();
     scmConfigurator.setUpgradeFinalizationExecutor(scmFinalizationExecutor);
 
-    MiniOzoneCluster.Builder builder =
-        new MiniOzoneHAClusterImpl.Builder(conf)
-        .setNumDatanodes(NUM_DATA_NODES)
-        .setNumOfStorageContainerManagers(NUM_SCMS)
+    MiniOzoneHAClusterImpl.Builder builder = MiniOzoneCluster.newHABuilder(conf);
+    builder.setNumOfStorageContainerManagers(NUM_SCMS)
         .setSCMConfigurator(scmConfigurator)
-        .setDnLayoutVersion(HDDSLayoutFeature.INITIAL_VERSION.layoutVersion());
+        .setNumDatanodes(NUM_DATA_NODES)
+        .setDatanodeFactory(UniformDatanodesFactory.newBuilder()
+            .setLayoutVersion(HDDSLayoutFeature.INITIAL_VERSION.layoutVersion())
+            .build());
 
     // Setting the provider to a max of 100 clusters. Some of the tests here
     // use multiple clusters, so its hard to know exactly how many will be
     // needed. This means the provider will create 1 extra cluster than needed
     // but that will not greatly affect runtimes.
-    clusterProvider = new MiniOzoneClusterProvider(conf, builder, 100);
+    clusterProvider = new MiniOzoneClusterProvider(builder, 100);
   }
 
   @AfterAll

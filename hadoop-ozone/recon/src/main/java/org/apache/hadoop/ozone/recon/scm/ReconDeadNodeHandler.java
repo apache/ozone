@@ -85,7 +85,6 @@ public class ReconDeadNodeHandler extends DeadNodeHandler {
       }
       containerHealthTask.triggerContainerHealthCheck();
       pipelineSyncTask.triggerPipelineSyncTask();
-      containerSizeCountTask.process(containerManager.getContainers());
     } catch (Exception ioEx) {
       LOG.error("Error trying to verify Node operational state from SCM.",
           ioEx);
