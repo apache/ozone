@@ -299,9 +299,9 @@ class TestOpenKeyCleanupService {
     // keys should be recovered and there should not be any expired key pending
     waitForOpenKeyCleanup(true, BucketLayout.FILE_SYSTEM_OPTIMIZED);
 
-    List<OmKeyInfo> lstKeyInfo = getKeyInfo(BucketLayout.FILE_SYSTEM_OPTIMIZED, false);
+    List<OmKeyInfo> listKeyInfo = getKeyInfo(BucketLayout.FILE_SYSTEM_OPTIMIZED, false);
     // Verify keyName and fileName is same after auto commit key.
-    lstKeyInfo.stream().forEach(key -> assertEquals(key.getKeyName(), key.getFileName()));
+    listKeyInfo.stream().forEach(key -> assertEquals(key.getKeyName(), key.getFileName()));
   }
 
   /**
