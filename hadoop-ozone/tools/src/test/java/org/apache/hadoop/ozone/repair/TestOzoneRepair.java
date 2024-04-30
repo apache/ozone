@@ -17,7 +17,6 @@
  */
 package org.apache.hadoop.ozone.repair;
 
-import org.jooq.meta.derby.sys.Sys;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
