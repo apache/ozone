@@ -820,6 +820,7 @@ public class TestObjectStoreWithFSO {
     } else {
       OmKeyInfo omKeyInfo = openFileTable.get(dbOpenFileKey);
       assertNotNull(omKeyInfo, "Table is empty!");
+      assertEquals(omKeyInfo.getFileName(), fileName, "Invalid file name: " + omKeyInfo.getObjectInfo());
       assertEquals(parentID, omKeyInfo.getParentObjectID(), "Invalid Key");
     }
   }

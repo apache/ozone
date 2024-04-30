@@ -98,6 +98,7 @@ public class TestS3InitiateMultipartUploadRequestWithFSO
     assertTrue(
         omKeyInfo.getLatestVersionLocations().isMultipartKey(),
         "isMultipartKey is false!");
+    assertEquals(fileName, omKeyInfo.getFileName(), "FileName mismatches!");
     assertEquals(parentID, omKeyInfo.getParentObjectID(),
         "ParentId mismatches!");
 

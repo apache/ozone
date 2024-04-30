@@ -50,6 +50,7 @@ import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
+import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartCommitUploadPartInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartInfo;
@@ -873,6 +874,7 @@ public class TestOzoneClientMultipartUploadWithFSO {
 
     assertNotNull(omKeyInfo);
     assertNotNull(omMultipartKeyInfo);
+    assertEquals(OzoneFSUtils.getFileName(keyName), omKeyInfo.getFileName());
     assertEquals(uploadID, omMultipartKeyInfo.getUploadID());
 
     for (OzoneManagerProtocolProtos.PartKeyInfo partKeyInfo :
