@@ -73,6 +73,9 @@ import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
@@ -121,7 +124,7 @@ public class OzoneContainer {
   private final ReplicationServer replicationServer;
   private DatanodeDetails datanodeDetails;
   private StateContext context;
-
+  private ScheduledExecutorService compactExecutor;
 
   private final ContainerMetrics metrics;
 
@@ -157,9 +160,22 @@ public class OzoneContainer {
     dbVolumeSet = HddsServerUtil.getDatanodeDbDirs(conf).isEmpty() ? null :
         new MutableVolumeSet(datanodeDetails.getUuidString(), conf,
             context, VolumeType.DB_VOLUME, volumeChecker);
+    final DatanodeConfiguration dnConf =
+        conf.getObject(DatanodeConfiguration.class);
     if (SchemaV3.isFinalizedAndEnabled(config)) {
       HddsVolumeUtil.loadAllHddsVolumeDbStore(
           volumeSet, dbVolumeSet, false, LOG);
+      if (dnConf.autoCompactionSmallSstFile()) {
+        this.compactExecutor = Executors.newScheduledThreadPool(
+            dbVolumeSet != null ? 1 :
+                dnConf.getAutoCompactionSmallSstFileExecutors(),
+            new ThreadFactoryBuilder().setNameFormat(
+                "RocksDB Compact Thread-%d").build());
+        this.compactExecutor.scheduleWithFixedDelay(this::compactDb,
+            dnConf.getAutoCompactionSmallSstFileIntervalMinutes(),
+            dnConf.getAutoCompactionSmallSstFileIntervalMinutes(),
+            TimeUnit.MINUTES);
+      }
     }
 
     long recoveringContainerTimeout = config.getTimeDuration(
@@ -220,8 +236,7 @@ public class OzoneContainer {
 
     readChannel = new XceiverServerGrpc(
         datanodeDetails, config, hddsDispatcher, certClient);
-    Duration blockDeletingSvcInterval = conf.getObject(
-        DatanodeConfiguration.class).getBlockDeletionInterval();
+    Duration blockDeletingSvcInterval = dnConf.getBlockDeletionInterval();
 
     long blockDeletingServiceTimeout = config
         .getTimeDuration(OZONE_BLOCK_DELETING_SERVICE_TIMEOUT,
@@ -238,8 +253,8 @@ public class OzoneContainer {
             datanodeDetails.threadNamePrefix(),
             context.getParent().getReconfigurationHandler());
 
-    Duration recoveringContainerScrubbingSvcInterval = conf.getObject(
-        DatanodeConfiguration.class).getRecoveringContainerScrubInterval();
+    Duration recoveringContainerScrubbingSvcInterval =
+        dnConf.getRecoveringContainerScrubInterval();
 
     long recoveringContainerScrubbingServiceTimeout = config
         .getTimeDuration(OZONE_RECOVERING_CONTAINER_SCRUBBING_SERVICE_TIMEOUT,
@@ -491,6 +506,7 @@ public class OzoneContainer {
     if (dbVolumeSet != null) {
       dbVolumeSet.shutdown();
     }
+    compactExecutor.shutdown();
     blockDeletingService.shutdown();
     recoveringContainerScrubbingService.shutdown();
     ContainerMetrics.remove();
@@ -588,6 +604,17 @@ public class OzoneContainer {
 
   public ReplicationServer getReplicationServer() {
     return replicationServer;
+  }
+
+  public void compactDb() {
+    for (StorageVolume volume : volumeSet.getVolumesList()) {
+      HddsVolume hddsVolume = (HddsVolume) volume;
+      CompletableFuture.runAsync(hddsVolume::compactDb, compactExecutor);
+      // If set dbVolumeSet only need to execute the compact db once
+      if (dbVolumeSet != null) {
+        break;
+      }
+    }
   }
 
 }

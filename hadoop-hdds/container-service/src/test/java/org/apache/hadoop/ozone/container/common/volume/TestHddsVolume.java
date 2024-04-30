@@ -50,6 +50,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import org.apache.hadoop.ozone.container.common.ContainerTestUtils;
 import org.apache.hadoop.ozone.container.common.helpers.DatanodeVersionFile;
+import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
 import org.apache.hadoop.ozone.container.common.utils.DatanodeStoreCache;
 import org.apache.hadoop.ozone.container.common.utils.StorageVolumeUtil;
 import org.junit.jupiter.api.BeforeEach;
@@ -495,6 +496,37 @@ public class TestHddsVolume {
 
     // The db should be removed from cache
     assertEquals(0, DatanodeStoreCache.getInstance().size());
+  }
+
+  @Test
+  public void testDbStoreCompact() throws IOException {
+    ContainerTestUtils.enableSchemaV3(CONF);
+
+    DatanodeConfiguration dc = CONF.getObject(DatanodeConfiguration.class);
+    dc.setAutoCompactionSmallSstFile(true);
+    dc.setAutoCompactionSmallSstFileSize(1);
+    dc.setAutoCompactionSmallSstFileNum(1);
+    CONF.setFromObject(dc);
+
+    HddsVolume volume = volumeBuilder.build();
+    volume.format(CLUSTER_ID);
+    volume.createWorkingDir(CLUSTER_ID, null);
+
+    // No DbVolume chosen and use the HddsVolume itself to hold
+    // a db instance.
+    assertNull(volume.getDbVolume());
+    File storageIdDir = new File(new File(volume.getStorageDir(),
+        CLUSTER_ID), volume.getStorageID());
+    assertEquals(volume.getDbParentDir(), storageIdDir);
+
+    // The db directory should exist
+    File containerDBFile = new File(volume.getDbParentDir(),
+        CONTAINER_DB_NAME);
+    assertTrue(containerDBFile.exists());
+
+    assertTrue(volume.compactDb());
+
+    volume.shutdown();
   }
 
   @Test

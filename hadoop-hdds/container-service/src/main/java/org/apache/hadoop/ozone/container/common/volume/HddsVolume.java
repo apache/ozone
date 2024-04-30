@@ -276,15 +276,6 @@ public class HddsVolume extends StorageVolume {
       return VolumeCheckResult.FAILED;
     }
 
-    // TODO HDDS-8784 trigger compaction outside of volume check. Then the
-    //  exception can be removed.
-    if (df.autoCompactionSmallSstFile()) {
-      // Calculate number of files per level and size per level
-      RawDB rawDB = DatanodeStoreCache.getInstance().getDB(
-          dbFile.getAbsolutePath(), getConf());
-      rawDB.getStore().compactionIfNeeded();
-    }
-
     return VolumeCheckResult.HEALTHY;
   }
 
@@ -469,5 +460,23 @@ public class HddsVolume extends StorageVolume {
     dbLoadFailure.set(false);
     LOG.info("SchemaV3 db is stopped at {} for volume {}", containerDBPath,
         getStorageID());
+  }
+
+  public boolean compactDb() {
+    File dbDir = getDbParentDir();
+    File dbFile = new File(dbDir, CONTAINER_DB_NAME);
+    if (dbFile.exists() && dbFile.canRead()) {
+      String dbFilePath = dbFile.getAbsolutePath();
+      try {
+        // Calculate number of files per level and size per level
+        RawDB rawDB =
+            DatanodeStoreCache.getInstance().getDB(dbFilePath, getConf());
+        rawDB.getStore().compactionIfNeeded();
+        return true;
+      } catch (Exception e) {
+        LOG.warn("compact rocksdb error in {}", dbFilePath, e);
+      }
+    }
+    return false;
   }
 }
