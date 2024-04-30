@@ -23,15 +23,18 @@ import org.apache.commons.io.IOUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.server.http.HttpConfig;
 import org.apache.hadoop.hdfs.web.URLConnectionFactory;
+import org.apache.hadoop.ozone.recon.api.types.DUResponse;
 import org.apache.hadoop.ozone.recon.api.types.UnhealthyContainersResponse;
 import org.hadoop.ozone.recon.schema.ContainerSchemaDefinition;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.InputStream;
+import java.io.UnsupportedEncodingException;
 import java.net.ConnectException;
 import java.net.HttpURLConnection;
 import java.net.URL;
+import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 
 import static java.net.HttpURLConnection.HTTP_CREATED;
@@ -57,6 +60,7 @@ public final class TestReconEndpointUtil {
 
   private static final String CONTAINER_ENDPOINT = "/api/v1/containers";
   private static final String OM_DB_SYNC_ENDPOINT = "/api/v1/triggerdbsync/om";
+  private static final String LISTKEYS_ENDPOINT = "/api/v1/namespace/listKeys";
 
   private TestReconEndpointUtil() {
   }
@@ -100,6 +104,27 @@ public final class TestReconEndpointUtil {
 
     return objectMapper.readValue(containersResponse,
         UnhealthyContainersResponse.class);
+  }
+
+  public static DUResponse listKeysFromRecon(OzoneConfiguration conf, String startPrefix, boolean recursive)
+      throws JsonProcessingException, UnsupportedEncodingException {
+    String encodedStartPrefix = URLEncoder.encode(startPrefix, "UTF-8");
+    String query = "?startPrefix=" + encodedStartPrefix + "&recursive=" + recursive;
+
+    StringBuilder urlBuilder = new StringBuilder();
+    urlBuilder.append(getReconWebAddress(conf))
+        .append(LISTKEYS_ENDPOINT)
+        .append(query);
+
+    String listKeysResponse = "";
+    try {
+      listKeysResponse = makeHttpCall(conf, urlBuilder);
+    } catch (Exception e) {
+      LOG.error("Error getting list keys response from Recon");
+    }
+
+    final ObjectMapper objectMapper = new ObjectMapper();
+    return objectMapper.readValue(listKeysResponse, DUResponse.class);
   }
 
   public static String makeHttpCall(OzoneConfiguration conf, StringBuilder url)

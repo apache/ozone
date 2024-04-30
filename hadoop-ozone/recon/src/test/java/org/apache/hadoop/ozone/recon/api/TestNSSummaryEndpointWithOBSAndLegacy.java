@@ -1048,7 +1048,7 @@ public class TestNSSummaryEndpointWithOBSAndLegacy {
     Response bucketResponse = nsSummaryEndpoint.listKeysWithDu("RATIS",
         "04-04-2024 12:20:00", 0, BUCKET_SIX_PATH, 10, false);
     DUResponse duBucketResponse = (DUResponse) bucketResponse.getEntity();
-    // There are no sub-paths under this LEGACY bucket.
+    // There will be two keys (sub-paths) under this LEGACY bucket.
     assertEquals(2, duBucketResponse.getCount());
   }
 
