@@ -171,8 +171,8 @@ class TestOpenKeyCleanupService {
     long numOpenKeysCleaned = metrics.getNumOpenKeysCleaned();
     long numOpenKeysHSyncCleaned = metrics.getNumOpenKeysHSyncCleaned();
     final int keyCount = numDEFKeys + numFSOKeys;
-    createOpenKeys(numDEFKeys, false, BucketLayout.DEFAULT, false);
-    createOpenKeys(numFSOKeys, hsync, BucketLayout.FILE_SYSTEM_OPTIMIZED, false);
+    createOpenKeys(numDEFKeys, false, BucketLayout.DEFAULT, false, false);
+    createOpenKeys(numFSOKeys, hsync, BucketLayout.FILE_SYSTEM_OPTIMIZED, false, false);
 
     // wait for open keys to expire
     Thread.sleep(EXPIRE_THRESHOLD_MS);
@@ -239,9 +239,9 @@ class TestOpenKeyCleanupService {
     when(om.getScmClient().getContainerClient().getContainerWithPipeline(anyLong()))
         .thenReturn(new ContainerWithPipeline(Mockito.mock(ContainerInfo.class), pipeline));
 
-    createOpenKeys(keyCount, true, BucketLayout.FILE_SYSTEM_OPTIMIZED, false);
+    createOpenKeys(keyCount, true, BucketLayout.FILE_SYSTEM_OPTIMIZED, false, false);
     // create 2 more key and mark recovery flag set
-    createOpenKeys(2, true, BucketLayout.FILE_SYSTEM_OPTIMIZED, true);
+    createOpenKeys(2, true, BucketLayout.FILE_SYSTEM_OPTIMIZED, true, false);
 
     // wait for open keys to expire
     Thread.sleep(EXPIRE_THRESHOLD_MS);
@@ -257,7 +257,51 @@ class TestOpenKeyCleanupService {
     waitForOpenKeyCleanup(true, BucketLayout.FILE_SYSTEM_OPTIMIZED);
 
     // 2 keys should still remain in openKey table
-    assertEquals(2, getOpenKeyInfo(BucketLayout.FILE_SYSTEM_OPTIMIZED).size());
+    assertEquals(2, getKeyInfo(BucketLayout.FILE_SYSTEM_OPTIMIZED, true).size());
+  }
+
+  @Test
+  public void testCommitExpiredHsyncKeys() throws Exception {
+    OpenKeyCleanupService openKeyCleanupService =
+        (OpenKeyCleanupService) keyManager.getOpenKeyCleanupService();
+
+    openKeyCleanupService.suspend();
+    // wait for submitted tasks to complete
+    Thread.sleep(SERVICE_INTERVAL);
+
+    int keyCount = 10;
+    Pipeline pipeline = Pipeline.newBuilder()
+        .setState(Pipeline.PipelineState.OPEN)
+        .setId(PipelineID.randomId())
+        .setReplicationConfig(
+            StandaloneReplicationConfig.getInstance(HddsProtos.ReplicationFactor.ONE))
+        .setNodes(new ArrayList<>())
+        .build();
+
+    when(om.getScmClient().getContainerClient().getContainerWithPipeline(anyLong()))
+        .thenReturn(new ContainerWithPipeline(Mockito.mock(ContainerInfo.class), pipeline));
+
+    // Create 5 keys with directories
+    createOpenKeys(keyCount / 2, true, BucketLayout.FILE_SYSTEM_OPTIMIZED, false, true);
+    // Create 5 keys without directory
+    createOpenKeys(keyCount / 2, true, BucketLayout.FILE_SYSTEM_OPTIMIZED, false, false);
+
+    // wait for open keys to expire
+    Thread.sleep(EXPIRE_THRESHOLD_MS);
+
+    // 10 keys should be returned after hard limit period
+    assertEquals(keyCount, getExpiredOpenKeys(true, BucketLayout.FILE_SYSTEM_OPTIMIZED));
+    assertExpiredOpenKeys(false, true,
+        BucketLayout.FILE_SYSTEM_OPTIMIZED);
+
+    openKeyCleanupService.resume();
+
+    // keys should be recovered and there should not be any expired key pending
+    waitForOpenKeyCleanup(true, BucketLayout.FILE_SYSTEM_OPTIMIZED);
+
+    List<OmKeyInfo> listKeyInfo = getKeyInfo(BucketLayout.FILE_SYSTEM_OPTIMIZED, false);
+    // Verify keyName and fileName is same after auto commit key.
+    listKeyInfo.stream().forEach(key -> assertEquals(key.getKeyName(), key.getFileName()));
   }
 
   /**
@@ -408,17 +452,20 @@ class TestOpenKeyCleanupService {
     }
   }
 
-  private List<OmKeyInfo> getOpenKeyInfo(BucketLayout bucketLayout) {
+  private List<OmKeyInfo> getKeyInfo(BucketLayout bucketLayout, boolean openKey) {
     List<OmKeyInfo> omKeyInfo = new ArrayList<>();
 
-    Table<String, OmKeyInfo> openFileTable =
-        om.getMetadataManager().getOpenKeyTable(bucketLayout);
+    Table<String, OmKeyInfo> fileTable;
+    if (openKey) {
+      fileTable = om.getMetadataManager().getOpenKeyTable(bucketLayout);
+    } else {
+      fileTable = om.getMetadataManager().getKeyTable(bucketLayout);
+    }
     try (TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>>
-             iterator = openFileTable.iterator()) {
+             iterator = fileTable.iterator()) {
       while (iterator.hasNext()) {
         omKeyInfo.add(iterator.next().getValue());
       }
-
     } catch (Exception e) {
     }
     return omKeyInfo;
@@ -432,7 +479,7 @@ class TestOpenKeyCleanupService {
   }
 
   private void createOpenKeys(int keyCount, boolean hsync,
-      BucketLayout bucketLayout, boolean recovery) throws IOException {
+      BucketLayout bucketLayout, boolean recovery, boolean withDir) throws IOException {
     String volume = UUID.randomUUID().toString();
     String bucket = UUID.randomUUID().toString();
     for (int x = 0; x < keyCount; x++) {
@@ -442,7 +489,7 @@ class TestOpenKeyCleanupService {
           volume = UUID.randomUUID().toString();
         }
       }
-      String key = UUID.randomUUID().toString();
+      String key = withDir ? "dir1/dir2/" + UUID.randomUUID() : UUID.randomUUID().toString();
       createVolumeAndBucket(volume, bucket, bucketLayout);
 
       final int numBlocks = RandomUtils.nextInt(1, 3);

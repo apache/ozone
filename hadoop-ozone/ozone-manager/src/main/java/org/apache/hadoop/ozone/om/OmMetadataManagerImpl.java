@@ -1848,10 +1848,13 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
               !openKeyInfo.getMetadata().containsKey(OzoneConsts.LEASE_RECOVERY)) {
             // add hsync'ed keys
             final OmKeyInfo info = kt.get(dbKeyName);
+            // Set keyName from openFileTable which contains keyName with full path like(/a/b/c/d/e/file1),
+            // which is required in commit key request.
+            // Whereas fileTable contains only leaf in keyName(like file1) and so cannot be used in commit request.
             final KeyArgs.Builder keyArgs = KeyArgs.newBuilder()
                 .setVolumeName(info.getVolumeName())
                 .setBucketName(info.getBucketName())
-                .setKeyName(info.getKeyName())
+                .setKeyName(openKeyInfo.getKeyName())
                 .setDataSize(info.getDataSize());
             java.util.Optional.ofNullable(info.getLatestVersionLocations())
                 .map(OmKeyLocationInfoGroup::getLocationList)
