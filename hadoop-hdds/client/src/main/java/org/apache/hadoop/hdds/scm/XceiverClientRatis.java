@@ -223,7 +223,7 @@ public final class XceiverClientRatis extends XceiverClientSpi {
   private CompletableFuture<RaftClientReply> sendRequestAsync(
       ContainerCommandRequestProto request) {
     return TracingUtil.executeInNewSpan(
-        "XceiverClientRatis." + request.getCmdType().name(),
+        "XceiverClientRatis." + request.getCmdType().name() + "-async",
         () -> {
           final ContainerCommandRequestMessage message
               = ContainerCommandRequestMessage.toMessage(
@@ -326,7 +326,7 @@ public final class XceiverClientRatis extends XceiverClientSpi {
     long requestTime = System.currentTimeMillis();
 
     Span span = GlobalTracer.get()
-        .buildSpan("XceiverClientReply." + request.getCmdType() + "-complete").start();
+        .buildSpan("XceiverClientReply." + request.getCmdType()).start();
 
     CompletableFuture<RaftClientReply> raftClientReply =
         sendRequestAsync(request);

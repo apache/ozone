@@ -43,6 +43,8 @@ import java.util.function.Consumer;
 import java.util.stream.Collectors;
 
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
+import io.opentracing.Scope;
+import io.opentracing.util.GlobalTracer;
 import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.StorageUnit;
@@ -408,7 +410,7 @@ public class ContainerStateMachine extends BaseStateMachine {
     final ContainerCommandRequestProto proto =
         message2ContainerCommandRequestProto(request.getMessage());
     Span span = TracingUtil.importAndCreateSpan("startTransaction", proto.getTraceID());
-    try {
+    try (Scope ignored = GlobalTracer.get().activateSpan(span)) {
       return startTransactionTraced(request, proto);
     } finally {
       span.finish();
@@ -548,7 +550,7 @@ public class ContainerStateMachine extends BaseStateMachine {
     CompletableFuture<ContainerCommandResponseProto> writeChunkFuture =
         CompletableFuture.supplyAsync(() -> {
           Span span = TracingUtil.importAndCreateSpan("writeStateMachineData", requestProto.getTraceID());
-          try {
+          try (Scope ignored = GlobalTracer.get().activateSpan(span)) {
             return dispatchCommand(requestProto, context);
           } catch (Exception e) {
             LOG.error("{}: writeChunk writeStateMachineData failed: blockId" +
@@ -767,7 +769,7 @@ public class ContainerStateMachine extends BaseStateMachine {
     // read the chunk
     Span span = TracingUtil.importAndCreateSpan("readStateMachineData", requestProto.getTraceID());
     ContainerCommandResponseProto response;
-    try {
+    try (Scope ignored = GlobalTracer.get().activateSpan(span)) {
       response = dispatchCommand(dataContainerCommandProto, context);
     } finally {
       span.finish();
@@ -919,7 +921,7 @@ public class ContainerStateMachine extends BaseStateMachine {
     final CheckedSupplier<ContainerCommandResponseProto, Exception> task
         = () -> {
           Span span = TracingUtil.importAndCreateSpan("applyTransaction", request.getTraceID());
-          try {
+          try (Scope ignored = GlobalTracer.get().activateSpan(span)) {
             return dispatchCommand(request, context);
           } catch (Exception e) {
             exceptionHandler.accept(e);

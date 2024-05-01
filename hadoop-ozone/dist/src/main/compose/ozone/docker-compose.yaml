@@ -29,6 +29,11 @@ x-replication:
   &replication
   OZONE-SITE.XML_ozone.server.default.replication: ${OZONE_REPLICATION_FACTOR:-1}
 
+# add a reusable environment variable JAEGER_AGENT_HOST and JAEGER_SAMPLER_TYPE and JAEGER_SAMPLER_PARAM
+  JAEGER_AGENT_HOST: jaeger
+  JAGER_SAMPLER_TYPE: const
+  JAGER_SAMPLER_PARAM: 1
+
 services:
   datanode:
     <<: *common-config
