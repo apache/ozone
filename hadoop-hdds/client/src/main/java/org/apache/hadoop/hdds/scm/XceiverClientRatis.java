@@ -222,12 +222,13 @@ public final class XceiverClientRatis extends XceiverClientSpi {
 
   private CompletableFuture<RaftClientReply> sendRequestAsync(
       ContainerCommandRequestProto request) {
+    String fullSpanID = TracingUtil.exportCurrentSpan();
     return TracingUtil.executeInNewSpan(
         "XceiverClientRatis." + request.getCmdType().name() + "-async",
         () -> {
           final ContainerCommandRequestMessage message
               = ContainerCommandRequestMessage.toMessage(
-              request, TracingUtil.exportCurrentSpan());
+              request, fullSpanID);
           if (HddsUtils.isReadOnly(request)) {
             if (LOG.isDebugEnabled()) {
               LOG.debug("sendCommandAsync ReadOnly {}", message);
