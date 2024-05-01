@@ -699,6 +699,8 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
   private boolean deleteInSpan(Path f, boolean recursive) throws IOException {
     incrementCounter(Statistic.INVOCATION_DELETE, 1);
     statistics.incrementWriteOps(1);
+    Span span = GlobalTracer.get().activeSpan();
+    span.setTag("path", f.toString());
     LOG.debug("Delete path {} - recursive {}", f, recursive);
 
     String key = pathToKey(f);
