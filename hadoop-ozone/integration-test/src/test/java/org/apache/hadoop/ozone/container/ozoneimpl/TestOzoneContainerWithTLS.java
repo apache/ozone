@@ -38,6 +38,8 @@ import org.apache.hadoop.hdds.scm.XceiverClientSpi;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.ozone.container.common.ContainerTestUtils;
 import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
+import org.apache.hadoop.ozone.container.common.utils.StorageVolumeUtil;
+import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.ozone.container.replication.SimpleContainerDownloader;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.token.Token;
@@ -303,6 +305,9 @@ public class TestOzoneContainerWithTLS {
       StateContext stateContext = ContainerTestUtils.getMockContext(dn, conf);
       container = new OzoneContainer(
           dn, conf, stateContext, caClient, keyClient);
+      MutableVolumeSet volumeSet = container.getVolumeSet();
+      StorageVolumeUtil.getHddsVolumesList(volumeSet.getVolumesList())
+          .forEach(hddsVolume -> hddsVolume.setDbParentDir(tempFolder.toFile()));
       container.start(clusterID);
     } catch (Throwable e) {
       if (container != null) {

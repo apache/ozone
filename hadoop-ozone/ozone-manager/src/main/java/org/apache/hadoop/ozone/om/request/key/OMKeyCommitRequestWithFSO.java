@@ -274,7 +274,7 @@ public class OMKeyCommitRequestWithFSO extends OMKeyCommitRequest {
         // indicating the key is removed from OpenKeyTable.
         // So that this key can't be committed again.
         OMFileRequest.addOpenFileTableCacheEntry(omMetadataManager,
-            dbOpenFileKey, null, fileName, trxnLogIndex);
+            dbOpenFileKey, null, fileName, keyName, trxnLogIndex);
 
         // Prevent hsync metadata from getting committed to the final key
         omKeyInfo.getMetadata().remove(OzoneConsts.HSYNC_CLIENT_ID);
@@ -284,7 +284,7 @@ public class OMKeyCommitRequestWithFSO extends OMKeyCommitRequest {
       } else if (newOpenKeyInfo != null) {
         // isHSync is true and newOpenKeyInfo is set, update OpenKeyTable
         OMFileRequest.addOpenFileTableCacheEntry(omMetadataManager,
-            dbOpenFileKey, newOpenKeyInfo, fileName, trxnLogIndex);
+            dbOpenFileKey, newOpenKeyInfo, fileName, keyName, trxnLogIndex);
       }
 
       OMFileRequest.addFileTableCacheEntry(omMetadataManager, dbFileKey,

@@ -744,6 +744,47 @@ public final class OmUtils {
     return keyName;
   }
 
+  /**
+   * Normalizes a given path up to the bucket level.
+   *
+   * This method takes a path as input and normalises uptil the bucket level.
+   * It handles empty, removes leading slashes, and splits the path into
+   * segments. It then extracts the volume and bucket names, forming a
+   * normalized path with a single slash. Finally, any remaining segments are
+   * joined as the key name, returning the complete standardized path.
+   *
+   * @param path The path string to be normalized.
+   * @return The normalized path string.
+   */
+  public static String normalizePathUptoBucket(String path) {
+    if (path == null || path.isEmpty()) {
+      return OM_KEY_PREFIX; // Handle empty path
+    }
+
+    // Remove leading slashes
+    path = path.replaceAll("^/*", "");
+
+    String[] segments = path.split(OM_KEY_PREFIX, -1);
+
+    String volumeName = segments[0];
+    String bucketName = segments.length > 1 ? segments[1] : "";
+
+    // Combine volume and bucket.
+    StringBuilder normalizedPath = new StringBuilder(volumeName);
+    if (!bucketName.isEmpty()) {
+      normalizedPath.append(OM_KEY_PREFIX).append(bucketName);
+    }
+
+    // Add remaining segments as the key
+    if (segments.length > 2) {
+      normalizedPath.append(OM_KEY_PREFIX).append(
+          String.join(OM_KEY_PREFIX,
+              Arrays.copyOfRange(segments, 2, segments.length)));
+    }
+
+    return normalizedPath.toString();
+  }
+
 
   /**
    * For a given service ID, return list of configured OM hosts.

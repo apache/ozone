@@ -1838,18 +1838,23 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
               .filter(id -> id.equals(clientIdString))
               .isPresent();
 
-          if (!isHsync && openKeyInfo.getCreationTime() <= expiredCreationTimestamp) {
+          if ((!isHsync && openKeyInfo.getCreationTime() <= expiredCreationTimestamp) ||
+              (openKeyInfo.getMetadata().containsKey(OzoneConsts.DELETED_HSYNC_KEY))) {
             // add non-hsync'ed keys
+            // also add hsync keys which are already deleted from keyTable
             expiredKeys.addOpenKey(openKeyInfo, dbOpenKeyName);
             num++;
           } else if (isHsync && openKeyInfo.getModificationTime() <= expiredLeaseTimestamp &&
               !openKeyInfo.getMetadata().containsKey(OzoneConsts.LEASE_RECOVERY)) {
             // add hsync'ed keys
             final OmKeyInfo info = kt.get(dbKeyName);
+            // Set keyName from openFileTable which contains keyName with full path like(/a/b/c/d/e/file1),
+            // which is required in commit key request.
+            // Whereas fileTable contains only leaf in keyName(like file1) and so cannot be used in commit request.
             final KeyArgs.Builder keyArgs = KeyArgs.newBuilder()
                 .setVolumeName(info.getVolumeName())
                 .setBucketName(info.getBucketName())
-                .setKeyName(info.getKeyName())
+                .setKeyName(openKeyInfo.getKeyName())
                 .setDataSize(info.getDataSize());
             java.util.Optional.ofNullable(info.getLatestVersionLocations())
                 .map(OmKeyLocationInfoGroup::getLocationList)

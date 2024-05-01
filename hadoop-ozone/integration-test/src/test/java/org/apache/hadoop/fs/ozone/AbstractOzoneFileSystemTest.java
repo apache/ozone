@@ -110,6 +110,7 @@ import static org.apache.hadoop.fs.StorageStatistics.CommonStatisticNames.OP_OPE
 import static org.apache.hadoop.fs.contract.ContractTestUtils.assertHasPathCapabilities;
 import static org.apache.hadoop.fs.ozone.Constants.LISTING_PAGE_SIZE;
 import static org.apache.hadoop.fs.ozone.Constants.OZONE_DEFAULT_USER;
+import static org.apache.hadoop.fs.ozone.OzoneFileSystemTests.createKeyWithECReplicationConfiguration;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.ONE;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ACL_ENABLED;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_FS_ITERATE_BATCH_SIZE;
@@ -425,6 +426,19 @@ abstract class AbstractOzoneFileSystemTest {
     // List status on the parent should show the child file
     assertEquals(1L, fs.listStatus(parent).length, "List status of parent should include the 1 child file");
     assertTrue(fs.getFileStatus(parent).isDirectory(), "Parent directory does not appear to be a directory");
+  }
+
+  @Test
+  public void testCreateKeyWithECReplicationConfig() throws Exception {
+    Path root = new Path("/" + volumeName + "/" + bucketName);
+    Path testKeyPath = new Path(root, "testKey");
+    createKeyWithECReplicationConfiguration(cluster.getConf(), testKeyPath);
+
+    OzoneKeyDetails key = getKey(testKeyPath, false);
+    assertEquals(HddsProtos.ReplicationType.EC,
+        key.getReplicationConfig().getReplicationType());
+    assertEquals("rs-3-2-1024k",
+        key.getReplicationConfig().getReplication());
   }
 
   @Test

@@ -338,6 +338,10 @@ public final class ContainerBalancerConfiguration {
     return Duration.ofMillis(moveReplicationTimeout);
   }
 
+  public void setMoveReplicationTimeout(Duration duration) {
+    this.moveReplicationTimeout = duration.toMillis();
+  }
+
   public void setMoveReplicationTimeout(long millis) {
     this.moveReplicationTimeout = millis;
   }

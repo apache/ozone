@@ -253,6 +253,10 @@ public class OMKeyCommitRequest extends OMKeyRequest {
         throw new OMException("Failed to " + action + " key, as " + dbOpenKey +
             " entry is not found in the OpenKey table", KEY_NOT_FOUND);
       }
+      if (omKeyInfo.getMetadata().containsKey(OzoneConsts.DELETED_HSYNC_KEY)) {
+        throw new OMException("Open Key " + keyName + " is already deleted",
+            KEY_NOT_FOUND);
+      }
       if (omKeyInfo.getMetadata().containsKey(OzoneConsts.LEASE_RECOVERY) &&
           omKeyInfo.getMetadata().containsKey(OzoneConsts.HSYNC_CLIENT_ID)) {
         if (!isRecovery) {

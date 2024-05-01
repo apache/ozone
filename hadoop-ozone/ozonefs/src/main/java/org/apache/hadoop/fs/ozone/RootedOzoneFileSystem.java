@@ -19,18 +19,20 @@
 package org.apache.hadoop.fs.ozone;
 
 import com.google.common.base.Strings;
+import io.opentracing.util.GlobalTracer;
+import org.apache.hadoop.crypto.key.KeyProvider;
+import org.apache.hadoop.crypto.key.KeyProviderTokenIssuer;
+import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.LeaseRecoverable;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.SafeMode;
 import org.apache.hadoop.fs.SafeModeAction;
+import org.apache.hadoop.fs.StorageStatistics;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.annotation.InterfaceStability;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
-import org.apache.hadoop.crypto.key.KeyProvider;
-import org.apache.hadoop.crypto.key.KeyProviderTokenIssuer;
-import org.apache.hadoop.fs.FileSystem;
-import org.apache.hadoop.fs.StorageStatistics;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
+import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.LeaseKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
@@ -138,6 +140,11 @@ public class RootedOzoneFileSystem extends BasicRootedOzoneFileSystem
 
   @Override
   public boolean recoverLease(final Path f) throws IOException {
+    return TracingUtil.executeInNewSpan("ofs recoverLease",
+        () -> recoverLeaseTraced(f));
+  }
+  private boolean recoverLeaseTraced(final Path f) throws IOException {
+    GlobalTracer.get().activeSpan().setTag("path", f.toString());
     statistics.incrementWriteOps(1);
     LOG.trace("recoverLease() path:{}", f);
     Path qualifiedPath = makeQualified(f);
@@ -197,6 +204,12 @@ public class RootedOzoneFileSystem extends BasicRootedOzoneFileSystem
 
   @Override
   public boolean isFileClosed(Path f) throws IOException {
+    return TracingUtil.executeInNewSpan("ofs isFileClosed",
+        () -> isFileClosedTraced(f));
+  }
+
+  private boolean isFileClosedTraced(Path f) throws IOException {
+    GlobalTracer.get().activeSpan().setTag("path", f.toString());
     statistics.incrementWriteOps(1);
     LOG.trace("isFileClosed() path:{}", f);
     Path qualifiedPath = makeQualified(f);

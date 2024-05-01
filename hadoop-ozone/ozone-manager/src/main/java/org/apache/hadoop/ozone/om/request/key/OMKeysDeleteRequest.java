@@ -57,11 +57,13 @@ import org.slf4j.LoggerFactory;
 import java.io.IOException;
 import java.nio.file.InvalidPathException;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
 import static org.apache.hadoop.ozone.OzoneConsts.BUCKET;
+import static org.apache.hadoop.ozone.OzoneConsts.DELETED_HSYNC_KEY;
 import static org.apache.hadoop.ozone.OzoneConsts.DELETED_KEYS_LIST;
 import static org.apache.hadoop.ozone.OzoneConsts.UNDELETED_KEYS_LIST;
 import static org.apache.hadoop.ozone.OzoneConsts.VOLUME;
@@ -174,18 +176,18 @@ public class OMKeysDeleteRequest extends OMKeyRequest {
       OmBucketInfo omBucketInfo =
           getBucketInfo(omMetadataManager, volumeName, bucketName);
 
-      List<String> dbOpenKeys = new ArrayList<>();
+      Map<String, OmKeyInfo> openKeyInfoMap = new HashMap<>();
       // Mark all keys which can be deleted, in cache as deleted.
       quotaReleased =
           markKeysAsDeletedInCache(ozoneManager, trxnLogIndex, omKeyInfoList,
-              dirList, omMetadataManager, quotaReleased, dbOpenKeys);
+              dirList, omMetadataManager, quotaReleased, openKeyInfoMap);
       omBucketInfo.incrUsedBytes(-quotaReleased);
       omBucketInfo.incrUsedNamespace(-1L * omKeyInfoList.size());
 
       final long volumeId = omMetadataManager.getVolumeId(volumeName);
       omClientResponse =
           getOmClientResponse(ozoneManager, omKeyInfoList, dirList, omResponse,
-              unDeletedKeys, deleteStatus, omBucketInfo, volumeId, dbOpenKeys);
+              unDeletedKeys, deleteStatus, omBucketInfo, volumeId, openKeyInfoMap);
 
       result = Result.SUCCESS;
 
@@ -260,7 +262,7 @@ public class OMKeysDeleteRequest extends OMKeyRequest {
       List<OmKeyInfo> omKeyInfoList, List<OmKeyInfo> dirList,
       OMResponse.Builder omResponse,
       OzoneManagerProtocolProtos.DeleteKeyArgs.Builder unDeletedKeys,
-      boolean deleteStatus, OmBucketInfo omBucketInfo, long volumeId, List<String> dbOpenKeys) {
+      boolean deleteStatus, OmBucketInfo omBucketInfo, long volumeId, Map<String, OmKeyInfo> openKeyInfoMap) {
     OMClientResponse omClientResponse;
     omClientResponse = new OMKeysDeleteResponse(omResponse
         .setDeleteKeysResponse(
@@ -268,13 +270,13 @@ public class OMKeysDeleteRequest extends OMKeyRequest {
                 .setUnDeletedKeys(unDeletedKeys))
         .setStatus(deleteStatus ? OK : PARTIAL_DELETE).setSuccess(deleteStatus)
         .build(), omKeyInfoList, ozoneManager.isRatisEnabled(),
-        omBucketInfo.copyObject(), dbOpenKeys);
+        omBucketInfo.copyObject(), openKeyInfoMap);
     return omClientResponse;
   }
 
   protected long markKeysAsDeletedInCache(OzoneManager ozoneManager,
       long trxnLogIndex, List<OmKeyInfo> omKeyInfoList, List<OmKeyInfo> dirList,
-      OMMetadataManager omMetadataManager, long quotaReleased, List<String> dbOpenKeys)
+      OMMetadataManager omMetadataManager, long quotaReleased, Map<String, OmKeyInfo> openKeyInfoMap)
           throws IOException {
     for (OmKeyInfo omKeyInfo : omKeyInfoList) {
       String volumeName = omKeyInfo.getVolumeName();
@@ -294,10 +296,10 @@ public class OMKeysDeleteRequest extends OMKeyRequest {
         String dbOpenKey = omMetadataManager.getOpenKey(volumeName, bucketName, keyName, hsyncClientId);
         OmKeyInfo openKeyInfo = openKeyTable.get(dbOpenKey);
         if (openKeyInfo != null) {
-          // Remove the open key by putting a tombstone entry
-          openKeyTable.addCacheEntry(dbOpenKey, trxnLogIndex);
-          // Append to the list of open keys to be deleted. The list is not expected to be large.
-          dbOpenKeys.add(dbOpenKey);
+          openKeyInfo.getMetadata().put(DELETED_HSYNC_KEY, "true");
+          openKeyTable.addCacheEntry(dbOpenKey, openKeyInfo, trxnLogIndex);
+          // Add to the map of open keys to be deleted.
+          openKeyInfoMap.put(dbOpenKey, openKeyInfo);
         } else {
           LOG.warn("Potentially inconsistent DB state: open key not found with dbOpenKey '{}'", dbOpenKey);
         }
