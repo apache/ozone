@@ -137,6 +137,13 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
   @Override
   public void initialize(URI name, Configuration conf) throws IOException {
     super.initialize(name, conf);
+    TracingUtil.executeInNewSpan("ofs initialize",
+        () -> initializeWithTrace(name, conf));
+  }
+
+  private void initializeWithTrace(URI name, Configuration conf) throws IOException {
+    GlobalTracer.get().activeSpan()
+        .setTag("name", name.toString());
     listingPageSize = conf.getInt(
         OZONE_FS_LISTING_PAGE_SIZE,
         OZONE_FS_LISTING_PAGE_SIZE_DEFAULT);
@@ -220,7 +227,10 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
   @Override
   public void close() throws IOException {
     try {
-      adapter.close();
+      TracingUtil.executeInNewSpan("ofs close",
+          () -> {
+            adapter.close();
+          });
     } finally {
       super.close();
     }
