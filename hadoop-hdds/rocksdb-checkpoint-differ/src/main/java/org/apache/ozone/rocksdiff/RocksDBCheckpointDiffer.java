@@ -1579,14 +1579,15 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
       fileReader.open(sstFile);
       String columnFamily = StringUtils.bytes2String(
           fileReader.getTableProperties().getColumnFamilyName());
-      SstFileReaderIterator iterator = fileReader.newIterator(readOptions);
-      iterator.seekToFirst();
-      String startKey = StringUtils.bytes2String(iterator.key());
-      iterator.seekToLast();
-      String endKey = StringUtils.bytes2String(iterator.key());
-      fileInfoBuilder.setStartRange(startKey)
-          .setEndRange(endKey)
-          .setColumnFamily(columnFamily);
+      try (SstFileReaderIterator iterator = fileReader.newIterator(readOptions)) {
+        iterator.seekToFirst();
+        String startKey = StringUtils.bytes2String(iterator.key());
+        iterator.seekToLast();
+        String endKey = StringUtils.bytes2String(iterator.key());
+        fileInfoBuilder.setStartRange(startKey)
+            .setEndRange(endKey)
+            .setColumnFamily(columnFamily);
+      }
     } catch (RocksDBException rocksDBException) {
       // Ideally it should not happen. If it does just log the exception.
       // And let the compaction complete without the exception.
