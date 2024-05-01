@@ -87,28 +87,45 @@ Test Multipart Upload
 
 
 Test Multipart Upload Complete
-    ${result} =         Execute AWSS3APICli     create-multipart-upload --bucket ${BUCKET} --key ${PREFIX}/multipartKey1
+    ${result} =         Execute AWSS3APICli     create-multipart-upload --bucket ${BUCKET} --key ${PREFIX}/multipartKey1 --metadata="custom-key1=custom-value1,custom-key2=custom-value2,gdprEnabled=true"
     ${uploadID} =       Execute and checkrc     echo '${result}' | jq -r '.UploadId'    0
                         Should contain          ${result}    ${BUCKET}
                         Should contain          ${result}    ${PREFIX}/multipartKey
                         Should contain          ${result}    UploadId
 
 #upload parts
-    Run Keyword         Create Random file      5
-    ${result} =         Execute AWSS3APICli     upload-part --bucket ${BUCKET} --key ${PREFIX}/multipartKey1 --part-number 1 --body /tmp/part1 --upload-id ${uploadID}
-    ${eTag1} =          Execute and checkrc     echo '${result}' | jq -r '.ETag'   0
-                        Should contain          ${result}    ETag
+    Run Keyword         Create Random file            5
+    ${result} =         Execute AWSS3APICli           upload-part --bucket ${BUCKET} --key ${PREFIX}/multipartKey1 --part-number 1 --body /tmp/part1 --upload-id ${uploadID}
+    ${eTag1} =          Execute and checkrc           echo '${result}' | jq -r '.ETag'   0
+                        Should contain                ${result}    ETag
+    ${part1Md5Sum} =    Execute                       md5sum /tmp/part1 | awk '{print $1}'
+                        Should Be Equal As Strings    ${eTag1}  ${part1Md5Sum}
 
-                        Execute                 echo "Part2" > /tmp/part2
-    ${result} =         Execute AWSS3APICli     upload-part --bucket ${BUCKET} --key ${PREFIX}/multipartKey1 --part-number 2 --body /tmp/part2 --upload-id ${uploadID}
-    ${eTag2} =          Execute and checkrc     echo '${result}' | jq -r '.ETag'   0
-                        Should contain          ${result}    ETag
+                        Execute                       echo "Part2" > /tmp/part2
+    ${result} =         Execute AWSS3APICli           upload-part --bucket ${BUCKET} --key ${PREFIX}/multipartKey1 --part-number 2 --body /tmp/part2 --upload-id ${uploadID}
+    ${eTag2} =          Execute and checkrc           echo '${result}' | jq -r '.ETag'   0
+                        Should contain                ${result}    ETag
+    ${part2Md5Sum} =    Execute                       md5sum /tmp/part2 | awk '{print $1}'
+                        Should Be Equal As Strings    ${eTag2}  ${part2Md5Sum}
 
 #complete multipart upload
-    ${result} =         Execute AWSS3APICli     complete-multipart-upload --upload-id ${uploadID} --bucket ${BUCKET} --key ${PREFIX}/multipartKey1 --multipart-upload 'Parts=[{ETag=${eTag1},PartNumber=1},{ETag=${eTag2},PartNumber=2}]'
-                        Should contain          ${result}    ${BUCKET}
-                        Should contain          ${result}    ${PREFIX}/multipartKey1
-                        Should contain          ${result}    ETag
+    ${result} =                 Execute AWSS3APICli           complete-multipart-upload --upload-id ${uploadID} --bucket ${BUCKET} --key ${PREFIX}/multipartKey1 --multipart-upload 'Parts=[{ETag=${eTag1},PartNumber=1},{ETag=${eTag2},PartNumber=2}]'
+                                Should contain                ${result}    ${BUCKET}
+                                Should contain                ${result}    ${PREFIX}/multipartKey1
+    ${resultETag} =             Execute and checkrc           echo '${result}' | jq -r '.ETag'   0
+    ${expectedResultETag} =     Execute                       echo -n ${eTag1}${eTag2} | md5sum | awk '{print $1}'
+                                Should contain                ${result}    ETag
+                                Should Be Equal As Strings    ${resultETag}     "${expectedResultETag}-2"
+
+#check whether the user defined metadata can be retrieved
+    ${result} =                 Execute AWSS3ApiCli           head-object --bucket ${BUCKET} --key ${PREFIX}/multipartKey1
+                                Should contain                ${result}    \"custom-key1\": \"custom-value1\"
+                                Should contain                ${result}    \"custom-key2\": \"custom-value2\"
+
+    ${result} =                 Execute                       ozone sh key info /s3v/${BUCKET}/${PREFIX}/multipartKey1
+                                Should contain                ${result}    \"custom-key1\" : \"custom-value1\"
+                                Should contain                ${result}    \"custom-key2\" : \"custom-value2\"
+                                Should not contain            ${result}    \"gdprEnabled\": \"true\"
 
 #read file and check the key
     ${result} =                 Execute AWSS3ApiCli        get-object --bucket ${BUCKET} --key ${PREFIX}/multipartKey1 /tmp/${PREFIX}-multipartKey1.result
@@ -120,6 +137,12 @@ Test Multipart Upload Complete
 
     ${result} =                 Execute AWSS3ApiCli        get-object --bucket ${BUCKET} --key ${PREFIX}/multipartKey1 --part-number 2 /tmp/${PREFIX}-multipartKey1-part2.result
     Compare files               /tmp/part2        /tmp/${PREFIX}-multipartKey1-part2.result
+
+Test Multipart Upload with user defined metadata size larger than 2 KB
+    ${custom_metadata_value} =  Execute                               printf 'v%.0s' {1..3000}
+    ${result} =                 Execute AWSS3APICli and checkrc       create-multipart-upload --bucket ${BUCKET} --key ${PREFIX}/mpuWithLargeMetadata --metadata="custom-key1=${custom_metadata_value}"    255
+                                Should contain                        ${result}   MetadataTooLarge
+                                Should not contain                    ${result}   custom-key1: ${custom_metadata_value}
 
 Test Multipart Upload Complete Entity too small
     ${result} =         Execute AWSS3APICli     create-multipart-upload --bucket ${BUCKET} --key ${PREFIX}/multipartKey2

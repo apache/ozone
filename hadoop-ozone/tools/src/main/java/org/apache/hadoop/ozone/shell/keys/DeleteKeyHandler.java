@@ -19,11 +19,13 @@
 package org.apache.hadoop.ozone.shell.keys;
 
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientException;
 import org.apache.hadoop.ozone.client.OzoneKeyDetails;
 import org.apache.hadoop.ozone.client.OzoneVolume;
+import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
 import org.apache.hadoop.ozone.shell.OzoneAddress;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
@@ -39,6 +41,8 @@ import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.FS_TRASH_INTERV
 import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.FS_TRASH_INTERVAL_KEY;
 import static org.apache.hadoop.fs.FileSystem.TRASH_PREFIX;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ENABLE_FILESYSTEM_PATHS;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ENABLE_FILESYSTEM_PATHS_DEFAULT;
 
 /**
  * Executes Delete Key.
@@ -58,6 +62,19 @@ public class DeleteKeyHandler extends KeyHandler {
     OzoneVolume vol = client.getObjectStore().getVolume(volumeName);
     OzoneBucket bucket = vol.getBucket(bucketName);
     String keyName = address.getKeyName();
+
+    try {
+      OmUtils.verifyKeyNameWithSnapshotReservedWordForDeletion(keyName);
+    } catch (OMException omException) {
+      out().printf("Operation not permitted: %s %n", omException.getMessage());
+      return;
+    }
+
+    if (bucket.getBucketLayout().isLegacy() && keyName.endsWith(OZONE_URI_DELIMITER)
+        && (getConf().getBoolean(OZONE_OM_ENABLE_FILESYSTEM_PATHS, OZONE_OM_ENABLE_FILESYSTEM_PATHS_DEFAULT))) {
+      out().printf("Use FS(ofs/o3fs) interface to delete legacy bucket directory %n");
+      return;
+    }
 
     if (bucket.getBucketLayout().isFileSystemOptimized()) {
       // Handle FSO delete key which supports trash also

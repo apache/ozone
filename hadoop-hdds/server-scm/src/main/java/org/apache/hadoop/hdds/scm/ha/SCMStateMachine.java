@@ -168,10 +168,7 @@ public class SCMStateMachine extends BaseStateMachine {
       if (scm.isInSafeMode() && refreshedAfterLeaderReady.get()) {
         scm.getScmSafeModeManager().refreshAndValidate();
       }
-      transactionBuffer.updateLatestTrxInfo(TransactionInfo.builder()
-          .setCurrentTerm(trx.getLogEntry().getTerm())
-          .setTransactionIndex(trx.getLogEntry().getIndex())
-          .build());
+      transactionBuffer.updateLatestTrxInfo(TransactionInfo.valueOf(TermIndex.valueOf(trx.getLogEntry())));
     } catch (Exception ex) {
       applyTransactionFuture.completeExceptionally(ex);
       ExitUtils.terminate(1, ex.getMessage(), ex, StateMachine.LOG);
@@ -320,8 +317,7 @@ public class SCMStateMachine extends BaseStateMachine {
     long startTime = Time.monotonicNow();
 
     TransactionInfo latestTrxInfo = transactionBuffer.getLatestTrxInfo();
-    TransactionInfo lastAppliedTrxInfo =
-        TransactionInfo.fromTermIndex(lastTermIndex);
+    final TransactionInfo lastAppliedTrxInfo = TransactionInfo.valueOf(lastTermIndex);
 
     if (latestTrxInfo.compareTo(lastAppliedTrxInfo) < 0) {
       transactionBuffer.updateLatestTrxInfo(lastAppliedTrxInfo);
@@ -354,21 +350,10 @@ public class SCMStateMachine extends BaseStateMachine {
     }
 
     if (transactionBuffer != null) {
-      transactionBuffer.updateLatestTrxInfo(
-          TransactionInfo.builder().setCurrentTerm(term)
-              .setTransactionIndex(index).build());
+      transactionBuffer.updateLatestTrxInfo(TransactionInfo.valueOf(term, index));
     }
 
     if (currentLeaderTerm.get() == term) {
-      // On leader SCM once after it is ready, notify SCM services and also set
-      // leader ready  in SCMContext.
-      if (scm.getScmHAManager().getRatisServer().getDivision().getInfo()
-          .isLeaderReady()) {
-        scm.getScmContext().setLeaderReady();
-        scm.getSCMServiceManager().notifyStatusChanged();
-        scm.getFinalizationManager().onLeaderReady();
-      }
-
       // Means all transactions before this term have been applied.
       // This means after a restart, all pending transactions have been applied.
       // Perform
@@ -382,6 +367,18 @@ public class SCMStateMachine extends BaseStateMachine {
       }
       currentLeaderTerm.set(-1L);
     }
+  }
+
+  @Override
+  public void notifyLeaderReady() {
+    if (!isInitialized) {
+      return;
+    }
+    // On leader SCM once after it is ready, notify SCM services and also set
+    // leader ready  in SCMContext.
+    scm.getScmContext().setLeaderReady();
+    scm.getSCMServiceManager().notifyStatusChanged();
+    scm.getFinalizationManager().onLeaderReady();
   }
 
   @Override
@@ -446,7 +443,7 @@ public class SCMStateMachine extends BaseStateMachine {
       transactionBuffer.close();
       HadoopExecutors.
           shutdown(installSnapshotExecutor, LOG, 5, TimeUnit.SECONDS);
-    } else {
+    } else if (!scm.isStopped()) {
       scm.shutDown("scm statemachine is closed by ratis, terminate SCM");
     }
   }

@@ -17,7 +17,7 @@
 package org.apache.hadoop.ozone.om.ratis;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.ozone.common.ha.ratis.RatisSnapshotInfo;
+import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
@@ -36,18 +36,21 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.UserInf
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.ratis.proto.RaftProtos;
 import org.apache.ratis.protocol.exceptions.StateMachineException;
+import org.apache.ratis.server.protocol.TermIndex;
 import org.apache.ratis.statemachine.TransactionContext;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
-import org.mockito.Mockito;
 
 import java.nio.file.Path;
-import java.util.ArrayList;
-import java.util.List;
 
-import static org.mockito.ArgumentMatchers.any;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
+import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.Mockito.any;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 /**
@@ -64,8 +67,8 @@ public class TestOzoneManagerStateMachine {
   @BeforeEach
   public void setup() throws Exception {
     OzoneManagerRatisServer ozoneManagerRatisServer =
-        Mockito.mock(OzoneManagerRatisServer.class);
-    OzoneManager ozoneManager = Mockito.mock(OzoneManager.class);
+        mock(OzoneManagerRatisServer.class);
+    OzoneManager ozoneManager = mock(OzoneManager.class);
     // Allow testing of prepare pre-append gate.
     when(ozoneManager.isAdmin(any(UserGroupInformation.class)))
         .thenReturn(true);
@@ -83,179 +86,47 @@ public class TestOzoneManagerStateMachine {
     when(ozoneManager.getPrepareState()).thenReturn(prepareState);
 
     when(ozoneManagerRatisServer.getOzoneManager()).thenReturn(ozoneManager);
-    when(ozoneManager.getSnapshotInfo()).thenReturn(
-        Mockito.mock(RatisSnapshotInfo.class));
+    when(ozoneManager.getTransactionInfo()).thenReturn(mock(TransactionInfo.class));
     when(ozoneManager.getConfiguration()).thenReturn(conf);
     ozoneManagerStateMachine =
         new OzoneManagerStateMachine(ozoneManagerRatisServer, false);
-    ozoneManagerStateMachine.notifyTermIndexUpdated(0, 0);
+  }
+
+  static void assertTermIndex(long expectedTerm, long expectedIndex, TermIndex computed) {
+    assertEquals(expectedTerm, computed.getTerm());
+    assertEquals(expectedIndex, computed.getIndex());
   }
 
   @Test
   public void testLastAppliedIndex() {
-
-    // Happy scenario.
+    ozoneManagerStateMachine.notifyTermIndexUpdated(0, 0);
+    assertTermIndex(0, 0, ozoneManagerStateMachine.getLastAppliedTermIndex());
+    assertTermIndex(0, 0, ozoneManagerStateMachine.getLastNotifiedTermIndex());
 
     // Conf/metadata transaction.
     ozoneManagerStateMachine.notifyTermIndexUpdated(0, 1);
-    Assertions.assertEquals(0,
-        ozoneManagerStateMachine.getLastAppliedTermIndex().getTerm());
-    Assertions.assertEquals(1,
-        ozoneManagerStateMachine.getLastAppliedTermIndex().getIndex());
-
-    List<Long> flushedEpochs = new ArrayList<>();
-
-    // Add some apply transactions.
-    ozoneManagerStateMachine.addApplyTransactionTermIndex(0, 2);
-    ozoneManagerStateMachine.addApplyTransactionTermIndex(0, 3);
-
-    flushedEpochs.add(2L);
-    flushedEpochs.add(3L);
+    assertTermIndex(0, 1, ozoneManagerStateMachine.getLastAppliedTermIndex());
+    assertTermIndex(0, 1, ozoneManagerStateMachine.getLastNotifiedTermIndex());
 
     // call update last applied index
-    ozoneManagerStateMachine.updateLastAppliedIndex(flushedEpochs);
+    ozoneManagerStateMachine.updateLastAppliedTermIndex(TermIndex.valueOf(0, 2));
+    ozoneManagerStateMachine.updateLastAppliedTermIndex(TermIndex.valueOf(0, 3));
 
-    Assertions.assertEquals(0,
-        ozoneManagerStateMachine.getLastAppliedTermIndex().getTerm());
-    Assertions.assertEquals(3,
-        ozoneManagerStateMachine.getLastAppliedTermIndex().getIndex());
+    assertTermIndex(0, 3, ozoneManagerStateMachine.getLastAppliedTermIndex());
+    assertTermIndex(0, 1, ozoneManagerStateMachine.getLastNotifiedTermIndex());
 
     // Conf/metadata transaction.
-    ozoneManagerStateMachine.notifyTermIndexUpdated(0L, 4L);
+    ozoneManagerStateMachine.notifyTermIndexUpdated(1L, 4L);
 
-    Assertions.assertEquals(0L,
-        ozoneManagerStateMachine.getLastAppliedTermIndex().getTerm());
-    Assertions.assertEquals(4L,
-        ozoneManagerStateMachine.getLastAppliedTermIndex().getIndex());
+    assertTermIndex(1, 4, ozoneManagerStateMachine.getLastAppliedTermIndex());
+    assertTermIndex(1, 4, ozoneManagerStateMachine.getLastNotifiedTermIndex());
 
     // Add some apply transactions.
-    ozoneManagerStateMachine.addApplyTransactionTermIndex(0L, 5L);
-    ozoneManagerStateMachine.addApplyTransactionTermIndex(0L, 6L);
+    ozoneManagerStateMachine.updateLastAppliedTermIndex(TermIndex.valueOf(1L, 5L));
+    ozoneManagerStateMachine.updateLastAppliedTermIndex(TermIndex.valueOf(1L, 6L));
 
-    flushedEpochs.clear();
-    flushedEpochs.add(5L);
-    flushedEpochs.add(6L);
-    ozoneManagerStateMachine.updateLastAppliedIndex(flushedEpochs);
-
-    Assertions.assertEquals(0L,
-        ozoneManagerStateMachine.getLastAppliedTermIndex().getTerm());
-    Assertions.assertEquals(6L,
-        ozoneManagerStateMachine.getLastAppliedTermIndex().getIndex());
-
-
-  }
-
-
-  @Test
-  public void testApplyTransactionsUpdateLastAppliedIndexCalledLate() {
-    // Now try a scenario where 1,2,3 transactions are in applyTransactionMap
-    // and updateLastAppliedIndex is not called for them, and before that
-    // notifyTermIndexUpdated is called with transaction 4. And see now at the
-    // end when updateLastAppliedIndex is called with epochs we have
-    // lastAppliedIndex as 4 or not.
-
-    // Conf/metadata transaction.
-    ozoneManagerStateMachine.notifyTermIndexUpdated(0, 1);
-    Assertions.assertEquals(0,
-        ozoneManagerStateMachine.getLastAppliedTermIndex().getTerm());
-    Assertions.assertEquals(1,
-        ozoneManagerStateMachine.getLastAppliedTermIndex().getIndex());
-
-
-
-    ozoneManagerStateMachine.addApplyTransactionTermIndex(0L, 2L);
-    ozoneManagerStateMachine.addApplyTransactionTermIndex(0L, 3L);
-    ozoneManagerStateMachine.addApplyTransactionTermIndex(0L, 4L);
-
-
-
-    // Conf/metadata transaction.
-    ozoneManagerStateMachine.notifyTermIndexUpdated(0L, 5L);
-
-  // Still it should be zero, as for 2,3,4 updateLastAppliedIndex is not yet
-    // called so the lastAppliedIndex will be at older value.
-    Assertions.assertEquals(0L,
-        ozoneManagerStateMachine.getLastAppliedTermIndex().getTerm());
-    Assertions.assertEquals(1L,
-        ozoneManagerStateMachine.getLastAppliedTermIndex().getIndex());
-
-    List<Long> flushedEpochs = new ArrayList<>();
-
-
-    flushedEpochs.add(2L);
-    flushedEpochs.add(3L);
-    flushedEpochs.add(4L);
-
-    ozoneManagerStateMachine.updateLastAppliedIndex(flushedEpochs);
-
-    Assertions.assertEquals(0L,
-        ozoneManagerStateMachine.getLastAppliedTermIndex().getTerm());
-    Assertions.assertEquals(5L,
-        ozoneManagerStateMachine.getLastAppliedTermIndex().getIndex());
-
-  }
-
-
-  @Test
-  public void testLastAppliedIndexWithMultipleExecutors() {
-
-    // first flush batch
-    ozoneManagerStateMachine.addApplyTransactionTermIndex(0L, 1L);
-    ozoneManagerStateMachine.addApplyTransactionTermIndex(0L, 2L);
-    ozoneManagerStateMachine.addApplyTransactionTermIndex(0L, 4L);
-
-    List<Long> flushedEpochs = new ArrayList<>();
-
-
-    flushedEpochs.add(1L);
-    flushedEpochs.add(2L);
-    flushedEpochs.add(4L);
-
-    ozoneManagerStateMachine.updateLastAppliedIndex(flushedEpochs);
-
-    Assertions.assertEquals(0L,
-        ozoneManagerStateMachine.getLastAppliedTermIndex().getTerm());
-    Assertions.assertEquals(2L,
-        ozoneManagerStateMachine.getLastAppliedTermIndex().getIndex());
-
-
-
-
-    // 2nd flush batch
-    ozoneManagerStateMachine.addApplyTransactionTermIndex(0L, 3L);
-    ozoneManagerStateMachine.addApplyTransactionTermIndex(0L, 5L);
-    ozoneManagerStateMachine.addApplyTransactionTermIndex(0L, 6L);
-
-    flushedEpochs.clear();
-    flushedEpochs.add(3L);
-    flushedEpochs.add(5L);
-    flushedEpochs.add(6L);
-
-    ozoneManagerStateMachine.updateLastAppliedIndex(flushedEpochs);
-
-    Assertions.assertEquals(0L,
-        ozoneManagerStateMachine.getLastAppliedTermIndex().getTerm());
-    Assertions.assertEquals(6L,
-        ozoneManagerStateMachine.getLastAppliedTermIndex().getIndex());
-
-    // 3rd flush batch
-    ozoneManagerStateMachine.addApplyTransactionTermIndex(0L, 7L);
-    ozoneManagerStateMachine.addApplyTransactionTermIndex(0L, 8L);
-    ozoneManagerStateMachine.addApplyTransactionTermIndex(0L, 9L);
-    ozoneManagerStateMachine.addApplyTransactionTermIndex(0L, 10L);
-
-    flushedEpochs.clear();
-    flushedEpochs.add(7L);
-    flushedEpochs.add(8L);
-    flushedEpochs.add(9L);
-    flushedEpochs.add(10L);
-
-    ozoneManagerStateMachine.updateLastAppliedIndex(flushedEpochs);
-
-    Assertions.assertEquals(0L,
-        ozoneManagerStateMachine.getLastAppliedTermIndex().getTerm());
-    Assertions.assertEquals(10L,
-        ozoneManagerStateMachine.getLastAppliedTermIndex().getIndex());
+    assertTermIndex(1, 6, ozoneManagerStateMachine.getLastAppliedTermIndex());
+    assertTermIndex(1, 4, ozoneManagerStateMachine.getLastNotifiedTermIndex());
   }
 
   @Test
@@ -281,10 +152,9 @@ public class TestOzoneManagerStateMachine {
     TransactionContext submittedTrx = mockTransactionContext(createKeyRequest);
     TransactionContext returnedTrx =
         ozoneManagerStateMachine.preAppendTransaction(submittedTrx);
-    Assertions.assertSame(submittedTrx, returnedTrx);
+    assertSame(submittedTrx, returnedTrx);
 
-    Assertions.assertEquals(PrepareStatus.NOT_PREPARED,
-        prepareState.getState().getStatus());
+    assertEquals(PrepareStatus.NOT_PREPARED, prepareState.getState().getStatus());
 
     // Submit prepare request.
     OMRequest prepareRequest = OMRequest.newBuilder()
@@ -302,34 +172,29 @@ public class TestOzoneManagerStateMachine {
 
     submittedTrx = mockTransactionContext(prepareRequest);
     returnedTrx = ozoneManagerStateMachine.preAppendTransaction(submittedTrx);
-    Assertions.assertSame(submittedTrx, returnedTrx);
+    assertSame(submittedTrx, returnedTrx);
 
     // Prepare should be started.
-    Assertions.assertEquals(PrepareStatus.PREPARE_GATE_ENABLED,
+    assertEquals(PrepareStatus.PREPARE_GATE_ENABLED,
         prepareState.getState().getStatus());
 
     // Submitting a write request should now fail.
-    try {
-      ozoneManagerStateMachine.preAppendTransaction(
-          mockTransactionContext(createKeyRequest));
-      Assertions.fail("Expected StateMachineException to be thrown when " +
-          "submitting write request while prepared.");
-    } catch (StateMachineException smEx) {
-      Assertions.assertFalse(smEx.leaderShouldStepDown());
+    StateMachineException smEx =
+        assertThrows(StateMachineException.class,
+            () -> ozoneManagerStateMachine.preAppendTransaction(mockTransactionContext(createKeyRequest)),
+            "Expected StateMachineException to be thrown when submitting write request while prepared.");
+    assertFalse(smEx.leaderShouldStepDown());
 
-      Throwable cause = smEx.getCause();
-      Assertions.assertTrue(cause instanceof OMException);
-      Assertions.assertEquals(((OMException) cause).getResult(),
-          OMException.ResultCodes.NOT_SUPPORTED_OPERATION_WHEN_PREPARED);
-    }
+    Throwable cause = smEx.getCause();
+    OMException omException = assertInstanceOf(OMException.class, cause);
+    assertEquals(omException.getResult(), OMException.ResultCodes.NOT_SUPPORTED_OPERATION_WHEN_PREPARED);
 
     // Should be able to prepare again without issue.
     submittedTrx = mockTransactionContext(prepareRequest);
     returnedTrx = ozoneManagerStateMachine.preAppendTransaction(submittedTrx);
-    Assertions.assertSame(submittedTrx, returnedTrx);
+    assertSame(submittedTrx, returnedTrx);
 
-    Assertions.assertEquals(PrepareStatus.PREPARE_GATE_ENABLED,
-        prepareState.getState().getStatus());
+    assertEquals(PrepareStatus.PREPARE_GATE_ENABLED, prepareState.getState().getStatus());
 
     // Cancel prepare is handled in the cancel request apply txn step, not
     // the pre-append state machine step, so it is tested in other classes.
@@ -341,7 +206,7 @@ public class TestOzoneManagerStateMachine {
             .setLogData(OMRatisHelper.convertRequestToByteString(request))
             .build();
 
-    TransactionContext mockTrx = Mockito.mock(TransactionContext.class);
+    TransactionContext mockTrx = mock(TransactionContext.class);
     when(mockTrx.getStateMachineLogEntry()).thenReturn(logEntry);
     when(mockTrx.getStateMachineContext()).thenReturn(request);
 

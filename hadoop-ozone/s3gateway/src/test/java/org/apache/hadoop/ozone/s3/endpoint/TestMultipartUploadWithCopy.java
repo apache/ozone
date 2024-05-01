@@ -32,6 +32,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Scanner;
 
+import org.apache.commons.codec.digest.DigestUtils;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
@@ -47,7 +48,6 @@ import org.apache.hadoop.ozone.s3.exception.S3ErrorTable;
 import org.apache.hadoop.ozone.web.utils.OzoneUtils;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
-import org.mockito.Mockito;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.COPY_SOURCE_HEADER;
@@ -55,6 +55,7 @@ import static org.apache.hadoop.ozone.s3.util.S3Consts.COPY_SOURCE_HEADER_RANGE;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.COPY_SOURCE_IF_MODIFIED_SINCE;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.COPY_SOURCE_IF_UNMODIFIED_SINCE;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.STORAGE_CLASS_HEADER;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.fail;
@@ -91,7 +92,11 @@ public class TestMultipartUploadWithCopy {
     try (OutputStream stream = bucket
         .createKey(EXISTING_KEY, keyContent.length,
             ReplicationConfig.fromTypeAndFactor(ReplicationType.RATIS,
-            ReplicationFactor.THREE), new HashMap<>())) {
+            ReplicationFactor.THREE),
+            new HashMap<String, String>() {{
+              put(OzoneConsts.ETAG, DigestUtils.md5Hex(EXISTING_KEY_CONTENT));
+            }}
+        )) {
       stream.write(keyContent);
     }
 
@@ -115,7 +120,7 @@ public class TestMultipartUploadWithCopy {
     if (sleepMs > 0) {
       Thread.sleep(sleepMs);
     }
-    HttpHeaders headers = Mockito.mock(HttpHeaders.class);
+    HttpHeaders headers = mock(HttpHeaders.class);
     when(headers.getHeaderString(STORAGE_CLASS_HEADER)).thenReturn(
         "STANDARD");
 
@@ -327,9 +332,9 @@ public class TestMultipartUploadWithCopy {
     Response response = REST.put(OzoneConsts.S3_BUCKET, key, content.length(),
         partNumber, uploadID, body);
     assertEquals(200, response.getStatus());
-    assertNotNull(response.getHeaderString("ETag"));
+    assertNotNull(response.getHeaderString(OzoneConsts.ETAG));
     Part part = new Part();
-    part.seteTag(response.getHeaderString("ETag"));
+    part.setETag(response.getHeaderString(OzoneConsts.ETAG));
     part.setPartNumber(partNumber);
 
     return part;
@@ -377,7 +382,7 @@ public class TestMultipartUploadWithCopy {
     assertNotNull(result.getETag());
     assertNotNull(result.getLastModified());
     Part part = new Part();
-    part.seteTag(result.getETag());
+    part.setETag(result.getETag());
     part.setPartNumber(partNumber);
 
     return part;
@@ -426,7 +431,7 @@ public class TestMultipartUploadWithCopy {
   }
 
   private void setHeaders(Map<String, String> additionalHeaders) {
-    HttpHeaders headers = Mockito.mock(HttpHeaders.class);
+    HttpHeaders headers = mock(HttpHeaders.class);
     when(headers.getHeaderString(STORAGE_CLASS_HEADER)).thenReturn(
         "STANDARD");
 

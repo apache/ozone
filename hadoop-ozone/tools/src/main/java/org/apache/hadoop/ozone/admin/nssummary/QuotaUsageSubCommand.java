@@ -17,14 +17,14 @@
  */
 package org.apache.hadoop.ozone.admin.nssummary;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
+import org.apache.hadoop.hdds.server.JsonUtils;
 import picocli.CommandLine;
 
-import java.util.HashMap;
 import java.util.concurrent.Callable;
 
-import static org.apache.hadoop.ozone.admin.nssummary.NSSummaryCLIUtils.getResponseMap;
 import static org.apache.hadoop.ozone.admin.nssummary.NSSummaryCLIUtils.makeHttpCall;
 import static org.apache.hadoop.ozone.admin.nssummary.NSSummaryCLIUtils.printEmptyPathRequest;
 import static org.apache.hadoop.ozone.admin.nssummary.NSSummaryCLIUtils.printBucketReminder;
@@ -73,21 +73,22 @@ public class QuotaUsageSubCommand implements Callable {
       return null;
     }
 
-    HashMap<String, Object> quotaResponse = getResponseMap(response);
+    JsonNode quotaResponse = JsonUtils.readTree(response);
 
-    if (quotaResponse.get("status").equals("PATH_NOT_FOUND")) {
+    if ("PATH_NOT_FOUND".equals(quotaResponse.path("status").asText())) {
       printPathNotFound();
-    } else if (quotaResponse.get("status").equals("TYPE_NOT_APPLICABLE")) {
+    } else if ("TYPE_NOT_APPLICABLE".equals(quotaResponse.path("status").asText())) {
       printTypeNA("Quota");
     } else {
-      if (parent.isObjectStoreBucket(path) ||
-          !parent.bucketIsPresentInThePath(path)) {
+      if (parent.isNotValidBucketOrOBSBucket(path)) {
         printBucketReminder();
       }
 
       printWithUnderline("Quota", true);
-      long quotaAllowed = (long)(double)quotaResponse.get("allowed");
-      long quotaUsed = (long)(double)quotaResponse.get("used");
+
+      long quotaAllowed = quotaResponse.get("allowed").asLong();
+      long quotaUsed = quotaResponse.get("used").asLong();
+
       printSpaces(2);
       System.out.print("Allowed");
       printKVSeparator();

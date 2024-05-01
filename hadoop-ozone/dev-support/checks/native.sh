@@ -14,11 +14,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-#checks:unit
+#checks:native
 
 DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 CHECK=native
 
-source "${DIR}/junit.sh" -Pnative -Drocks_tools_native \
-  -DexcludedGroups="unhealthy | org.apache.ozone.test.UnhealthyTest" \
+source "${DIR}/junit.sh" -Pnative -Drocks_tools_native -DexcludedGroups="unhealthy" \
   "$@"

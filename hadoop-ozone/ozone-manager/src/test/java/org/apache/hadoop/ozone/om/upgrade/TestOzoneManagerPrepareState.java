@@ -17,6 +17,9 @@
  */
 package org.apache.hadoop.ozone.om.upgrade;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PrepareStatusResponse.PrepareStatus;
@@ -25,7 +28,6 @@ import org.apache.hadoop.ozone.om.OzoneManagerPrepareState;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
 import org.apache.ozone.test.LambdaTestUtils;
 import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -224,31 +226,31 @@ public class TestOzoneManagerPrepareState {
 
   private void assertPrepareNotStarted() {
     OzoneManagerPrepareState.State state = prepareState.getState();
-    Assertions.assertEquals(PrepareStatus.NOT_PREPARED, state.getStatus());
-    Assertions.assertEquals(OzoneManagerPrepareState.NO_PREPARE_INDEX,
+    assertEquals(PrepareStatus.NOT_PREPARED, state.getStatus());
+    assertEquals(OzoneManagerPrepareState.NO_PREPARE_INDEX,
         state.getIndex());
-    Assertions.assertFalse(prepareState.getPrepareMarkerFile().exists());
+    assertFalse(prepareState.getPrepareMarkerFile().exists());
 
     assertPrepareGateDown();
   }
 
   private void assertPrepareInProgress() {
     OzoneManagerPrepareState.State state = prepareState.getState();
-    Assertions.assertEquals(PrepareStatus.PREPARE_GATE_ENABLED,
+    assertEquals(PrepareStatus.PREPARE_GATE_ENABLED,
         state.getStatus());
-    Assertions.assertEquals(OzoneManagerPrepareState.NO_PREPARE_INDEX,
+    assertEquals(OzoneManagerPrepareState.NO_PREPARE_INDEX,
         state.getIndex());
-    Assertions.assertFalse(prepareState.getPrepareMarkerFile().exists());
+    assertFalse(prepareState.getPrepareMarkerFile().exists());
 
     assertPrepareGateUp();
   }
 
   private void assertPrepareCompleted(long index) throws Exception {
     OzoneManagerPrepareState.State state = prepareState.getState();
-    Assertions.assertEquals(PrepareStatus.PREPARE_COMPLETED,
+    assertEquals(PrepareStatus.PREPARE_COMPLETED,
         state.getStatus());
-    Assertions.assertEquals(index, state.getIndex());
-    Assertions.assertEquals(index, readPrepareMarkerFile());
+    assertEquals(index, state.getIndex());
+    assertEquals(index, readPrepareMarkerFile());
 
     assertPrepareGateUp();
   }
@@ -258,16 +260,16 @@ public class TestOzoneManagerPrepareState {
     // allowed.
     for (Type cmdType: Type.values()) {
       if (cmdType == Type.Prepare || cmdType == Type.CancelPrepare) {
-        Assertions.assertTrue(prepareState.requestAllowed(cmdType));
+        assertTrue(prepareState.requestAllowed(cmdType));
       } else {
-        Assertions.assertFalse(prepareState.requestAllowed(cmdType));
+        assertFalse(prepareState.requestAllowed(cmdType));
       }
     }
   }
 
   private void assertPrepareGateDown() {
     for (Type cmdType: Type.values()) {
-      Assertions.assertTrue(prepareState.requestAllowed(cmdType));
+      assertTrue(prepareState.requestAllowed(cmdType));
     }
   }
 

@@ -16,6 +16,7 @@
  */
 package org.apache.hadoop.ozone.om;
 
+import org.apache.commons.codec.digest.DigestUtils;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
@@ -24,6 +25,7 @@ import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.hdfs.LogVerificationAppender;
 import org.apache.hadoop.ozone.MiniOzoneHAClusterImpl;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
+import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneMultipartUploadPartListParts;
@@ -44,7 +46,6 @@ import org.apache.ratis.conf.RaftProperties;
 import org.apache.ratis.server.RaftServerConfigKeys;
 import org.apache.ratis.util.TimeDuration;
 import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.MethodOrderer;
 import org.junit.jupiter.api.Order;
@@ -63,10 +64,13 @@ import java.util.UUID;
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.ozone.MiniOzoneHAClusterImpl.NODE_FAILURE_TIMEOUT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_CLIENT_WAIT_BETWEEN_RETRIES_MILLIS_DEFAULT;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.fail;
 
 /**
  * Ozone Manager HA tests that stop/restart one or more OM nodes.
@@ -174,7 +178,7 @@ public class TestOzoneManagerHAWithStoppedNodes extends TestOzoneManagerHA {
             ReplicationFactor.ONE);
 
     String uploadID = omMultipartInfo.getUploadID();
-    Assertions.assertNotNull(uploadID);
+    assertNotNull(uploadID);
     return uploadID;
   }
 
@@ -185,16 +189,17 @@ public class TestOzoneManagerHAWithStoppedNodes extends TestOzoneManagerHA {
     OzoneOutputStream ozoneOutputStream = ozoneBucket.createMultipartKey(
         keyName, value.length(), 1, uploadID);
     ozoneOutputStream.write(value.getBytes(UTF_8), 0, value.length());
+    ozoneOutputStream.getMetadata().put(OzoneConsts.ETAG, DigestUtils.md5Hex(value));
     ozoneOutputStream.close();
 
 
     Map<Integer, String> partsMap = new HashMap<>();
-    partsMap.put(1, ozoneOutputStream.getCommitUploadPartInfo().getPartName());
+    partsMap.put(1, ozoneOutputStream.getCommitUploadPartInfo().getETag());
     OmMultipartUploadCompleteInfo omMultipartUploadCompleteInfo =
         ozoneBucket.completeMultipartUpload(keyName, uploadID, partsMap);
 
-    Assertions.assertNotNull(omMultipartUploadCompleteInfo);
-    Assertions.assertNotNull(omMultipartUploadCompleteInfo.getHash());
+    assertNotNull(omMultipartUploadCompleteInfo);
+    assertNotNull(omMultipartUploadCompleteInfo.getHash());
 
 
     try (OzoneInputStream ozoneInputStream = ozoneBucket.readKey(keyName)) {
@@ -298,7 +303,7 @@ public class TestOzoneManagerHAWithStoppedNodes extends TestOzoneManagerHA {
     final long leaderOMSnaphsotIndex = leaderOM.getRatisSnapshotIndex();
 
     // The stopped OM should be lagging behind the leader OM.
-    assertTrue(followerOM1LastAppliedIndex < leaderOMSnaphsotIndex);
+    assertThat(followerOM1LastAppliedIndex).isLessThan(leaderOMSnaphsotIndex);
 
     // Restart the stopped OM.
     followerOM1.restart();
@@ -317,8 +322,7 @@ public class TestOzoneManagerHAWithStoppedNodes extends TestOzoneManagerHA {
 
     final long followerOM1LastAppliedIndexNew =
         followerOM1.getOmRatisServer().getLastAppliedTermIndex().getIndex();
-    assertTrue(
-        followerOM1LastAppliedIndexNew > leaderOMSnaphsotIndex);
+    assertThat(followerOM1LastAppliedIndexNew).isGreaterThan(leaderOMSnaphsotIndex);
   }
 
   @Test
@@ -361,11 +365,11 @@ public class TestOzoneManagerHAWithStoppedNodes extends TestOzoneManagerHA {
 
     for (int i = 0; i < partsMap.size(); i++) {
       assertEquals(partsMap.get(partInfoList.get(i).getPartNumber()),
-          partInfoList.get(i).getPartName());
+          partInfoList.get(i).getETag());
 
     }
 
-    Assertions.assertFalse(ozoneMultipartUploadPartListParts.isTruncated());
+    assertFalse(ozoneMultipartUploadPartListParts.isTruncated());
   }
 
   /**
@@ -378,9 +382,10 @@ public class TestOzoneManagerHAWithStoppedNodes extends TestOzoneManagerHA {
     OzoneOutputStream ozoneOutputStream = ozoneBucket.createMultipartKey(
         keyName, value.length(), partNumber, uploadID);
     ozoneOutputStream.write(value.getBytes(UTF_8), 0, value.length());
+    ozoneOutputStream.getMetadata().put(OzoneConsts.ETAG, DigestUtils.md5Hex(value));
     ozoneOutputStream.close();
 
-    return ozoneOutputStream.getCommitUploadPartInfo().getPartName();
+    return ozoneOutputStream.getCommitUploadPartInfo().getETag();
   }
 
   @Test
@@ -388,7 +393,8 @@ public class TestOzoneManagerHAWithStoppedNodes extends TestOzoneManagerHA {
     final RaftProperties p = getCluster()
         .getOzoneManager()
         .getOmRatisServer()
-        .getServer()
+        .getServerDivision()
+        .getRaftServer()
         .getProperties();
     final TimeDuration t = RaftServerConfigKeys.Log.Appender.waitTimeMin(p);
     assertEquals(TimeDuration.ZERO, t,
@@ -441,7 +447,7 @@ public class TestOzoneManagerHAWithStoppedNodes extends TestOzoneManagerHA {
         },
             10000, 120000);
       } catch (Exception ex) {
-        Assertions.fail("TestOzoneManagerHAKeyDeletion failed");
+        fail("TestOzoneManagerHAKeyDeletion failed");
       }
     });
   }
@@ -590,7 +596,7 @@ public class TestOzoneManagerHAWithStoppedNodes extends TestOzoneManagerHA {
 
     while (volumeIterator.hasNext()) {
       OzoneVolume next = volumeIterator.next();
-      assertTrue(expectedVolumes.contains(next.getName()));
+      assertThat(expectedVolumes).contains(next.getName());
       expectedCount++;
     }
 

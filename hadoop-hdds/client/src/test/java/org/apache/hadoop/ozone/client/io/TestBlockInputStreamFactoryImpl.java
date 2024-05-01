@@ -21,25 +21,31 @@ import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.scm.OzoneClientConfig;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.scm.storage.BlockExtendedInputStream;
 import org.apache.hadoop.hdds.scm.storage.BlockInputStream;
 import org.apache.hadoop.hdds.scm.storage.BlockLocationInfo;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.Assertions;
 
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Map;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
+
 /**
  * Tests for BlockInputStreamFactoryImpl.
  */
 public class TestBlockInputStreamFactoryImpl {
+
+  private OzoneConfiguration conf = new OzoneConfiguration();
 
   @Test
   public void testNonECGivesBlockInputStream() {
@@ -50,12 +56,15 @@ public class TestBlockInputStreamFactoryImpl {
     BlockLocationInfo blockInfo = createKeyLocationInfo(repConfig, 3,
         1024 * 1024 * 10);
 
+    OzoneClientConfig clientConfig = conf.getObject(OzoneClientConfig.class);
+    clientConfig.setChecksumVerify(true);
     BlockExtendedInputStream stream =
         factory.create(repConfig, blockInfo, blockInfo.getPipeline(),
-            blockInfo.getToken(), true, null, null);
-    Assertions.assertTrue(stream instanceof BlockInputStream);
-    Assertions.assertEquals(stream.getBlockID(), blockInfo.getBlockID());
-    Assertions.assertEquals(stream.getLength(), blockInfo.getLength());
+            blockInfo.getToken(), null, null,
+            clientConfig);
+    assertInstanceOf(BlockInputStream.class, stream);
+    assertEquals(stream.getBlockID(), blockInfo.getBlockID());
+    assertEquals(stream.getLength(), blockInfo.getLength());
   }
 
   @Test
@@ -67,12 +76,15 @@ public class TestBlockInputStreamFactoryImpl {
     BlockLocationInfo blockInfo =
         createKeyLocationInfo(repConfig, 5, 1024 * 1024 * 10);
 
+    OzoneClientConfig clientConfig = conf.getObject(OzoneClientConfig.class);
+    clientConfig.setChecksumVerify(true);
     BlockExtendedInputStream stream =
         factory.create(repConfig, blockInfo, blockInfo.getPipeline(),
-            blockInfo.getToken(), true, null, null);
-    Assertions.assertTrue(stream instanceof ECBlockInputStreamProxy);
-    Assertions.assertEquals(stream.getBlockID(), blockInfo.getBlockID());
-    Assertions.assertEquals(stream.getLength(), blockInfo.getLength());
+            blockInfo.getToken(), null, null,
+            clientConfig);
+    assertInstanceOf(ECBlockInputStreamProxy.class, stream);
+    assertEquals(stream.getBlockID(), blockInfo.getBlockID());
+    assertEquals(stream.getLength(), blockInfo.getLength());
   }
 
   private BlockLocationInfo createKeyLocationInfo(ReplicationConfig repConf,

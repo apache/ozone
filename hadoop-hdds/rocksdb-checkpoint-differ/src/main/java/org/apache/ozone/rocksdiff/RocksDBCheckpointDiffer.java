@@ -172,7 +172,7 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
 
   private ColumnFamilyHandle snapshotInfoTableCFHandle;
   private final AtomicInteger tarballRequestCount;
-  private final String dagPruningServiceName = "CompactionDagPruningService";
+  private static final String DAG_PRUNING_SERVICE_NAME = "CompactionDagPruningService";
   private AtomicBoolean suspended;
 
   private ColumnFamilyHandle compactionLogTableCFHandle;
@@ -230,7 +230,7 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
             TimeUnit.MILLISECONDS);
 
     if (pruneCompactionDagDaemonRunIntervalInMs > 0) {
-      this.scheduler = new Scheduler(dagPruningServiceName,
+      this.scheduler = new Scheduler(DAG_PRUNING_SERVICE_NAME,
           true, 1);
 
       this.scheduler.scheduleWithFixedDelay(
@@ -301,13 +301,13 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
   }
 
   @Override
-  public void close() throws Exception {
+  public void close() {
     if (!closed) {
       synchronized (this) {
         if (!closed) {
           closed = true;
           if (scheduler != null) {
-            LOG.info("Shutting down {}.", dagPruningServiceName);
+            LOG.info("Shutting down {}.", DAG_PRUNING_SERVICE_NAME);
             scheduler.close();
           }
         }
@@ -629,16 +629,18 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
       filename += SST_FILE_EXTENSION;
     }
 
-    Options option = new Options();
-    SstFileReader reader = new SstFileReader(option);
+    try (
+        ManagedOptions option = new ManagedOptions();
+        SstFileReader reader = new SstFileReader(option)) {
 
-    reader.open(getAbsoluteSstFilePath(filename));
+      reader.open(getAbsoluteSstFilePath(filename));
 
-    TableProperties properties = reader.getTableProperties();
-    if (LOG.isDebugEnabled()) {
-      LOG.debug("{} has {} keys", filename, properties.getNumEntries());
+      TableProperties properties = reader.getTableProperties();
+      if (LOG.isDebugEnabled()) {
+        LOG.debug("{} has {} keys", filename, properties.getNumEntries());
+      }
+      return properties.getNumEntries();
     }
-    return properties.getNumEntries();
   }
 
   private String getAbsoluteSstFilePath(String filename)
@@ -1419,16 +1421,21 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
    * those are not needed to generate snapshot diff. These files are basically
    * non-leaf nodes of the DAG.
    */
-  public synchronized void pruneSstFiles() {
+  public void pruneSstFiles() {
     if (!shouldRun()) {
       return;
     }
 
     Set<String> nonLeafSstFiles;
-    nonLeafSstFiles = forwardCompactionDAG.nodes().stream()
-        .filter(node -> !forwardCompactionDAG.successors(node).isEmpty())
-        .map(node -> node.getFileName())
-        .collect(Collectors.toSet());
+    // This is synchronized because compaction thread can update the compactionDAG and can be in situation
+    // when nodes are added to the graph, but arcs are still in progress.
+    // Hence, the lock is taken.
+    synchronized (this) {
+      nonLeafSstFiles = forwardCompactionDAG.nodes().stream()
+          .filter(node -> !forwardCompactionDAG.successors(node).isEmpty())
+          .map(node -> node.getFileName())
+          .collect(Collectors.toSet());
+    }
 
     if (CollectionUtils.isNotEmpty(nonLeafSstFiles)) {
       LOG.info("Removing SST files: {} as part of SST file pruning.",
@@ -1446,8 +1453,13 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
     tarballRequestCount.incrementAndGet();
   }
 
-  public void decrementTarballRequestCount() {
-    tarballRequestCount.decrementAndGet();
+  public void decrementTarballRequestCountAndNotify() {
+    // Synchronized block is used to ensure that lock is on the same instance notifyAll is being called.
+    synchronized (this) {
+      tarballRequestCount.decrementAndGet();
+      // Notify compaction threads to continue.
+      notifyAll();
+    }
   }
 
   public boolean shouldRun() {
@@ -1515,8 +1527,7 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
      *                for cache.
      */
     public static void invalidateCacheEntry(String cacheKey) {
-      IOUtils.closeQuietly(INSTANCE_MAP.get(cacheKey));
-      INSTANCE_MAP.remove(cacheKey);
+      IOUtils.close(LOG, INSTANCE_MAP.remove(cacheKey));
     }
   }
 

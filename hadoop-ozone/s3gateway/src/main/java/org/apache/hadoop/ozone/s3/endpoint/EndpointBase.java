@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone.s3.endpoint;
 
 import javax.annotation.PostConstruct;
 import javax.inject.Inject;
+import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.MultivaluedMap;
 import javax.ws.rs.core.Response;
 import javax.ws.rs.container.ContainerRequestContext;
@@ -65,6 +66,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
+import static org.apache.hadoop.ozone.OzoneConsts.ETAG;
 import static org.apache.hadoop.ozone.OzoneConsts.KB;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.newError;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.CUSTOM_METADATA_HEADER_PREFIX;
@@ -73,8 +75,6 @@ import static org.apache.hadoop.ozone.s3.util.S3Consts.CUSTOM_METADATA_HEADER_PR
  * Basic helpers for all the REST endpoints.
  */
 public abstract class EndpointBase implements Auditor {
-
-  protected static final String ETAG = "ETag";
 
   protected static final String ETAG_CUSTOM = "etag-custom";
 
@@ -309,6 +309,20 @@ public abstract class EndpointBase implements Auditor {
         customMetadata.put(mapKey, value);
       }
     }
+
+    // If the request contains a custom metadata header "x-amz-meta-ETag",
+    // replace the metadata key to "etag-custom" to prevent key metadata collision with
+    // the ETag calculated by hashing the object when storing the key in OM table.
+    // The custom ETag metadata header will be rebuilt during the headObject operation.
+    if (customMetadata.containsKey(HttpHeaders.ETAG)
+        || customMetadata.containsKey(HttpHeaders.ETAG.toLowerCase())) {
+      String customETag = customMetadata.get(HttpHeaders.ETAG) != null ?
+          customMetadata.get(HttpHeaders.ETAG) : customMetadata.get(HttpHeaders.ETAG.toLowerCase());
+      customMetadata.remove(HttpHeaders.ETAG);
+      customMetadata.remove(HttpHeaders.ETAG.toLowerCase());
+      customMetadata.put(ETAG_CUSTOM, customETag);
+    }
+
     return customMetadata;
   }
 
@@ -322,6 +336,7 @@ public abstract class EndpointBase implements Auditor {
       }
       String metadataKey = entry.getKey();
       if (metadataKey.equals(ETAG_CUSTOM)) {
+        // Rebuild the ETag custom metadata header
         metadataKey = ETAG.toLowerCase();
       }
       responseBuilder
@@ -387,7 +402,7 @@ public abstract class EndpointBase implements Auditor {
 
   @VisibleForTesting
   public S3GatewayMetrics getMetrics() {
-    return S3GatewayMetrics.create();
+    return S3GatewayMetrics.getMetrics();
   }
 
   protected Map<String, String> getAuditParameters() {

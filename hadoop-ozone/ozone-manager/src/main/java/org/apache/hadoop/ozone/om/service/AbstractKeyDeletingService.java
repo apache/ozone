@@ -116,7 +116,10 @@ public abstract class AbstractKeyDeletingService extends BackgroundService
     }
     List<DeleteBlockGroupResult> blockDeletionResults =
         scmClient.deleteKeyBlocks(keyBlocksList);
+    LOG.info("{} BlockGroup deletion are acked by SCM in {} ms",
+        keyBlocksList.size(), Time.monotonicNow() - startTime);
     if (blockDeletionResults != null) {
+      startTime = Time.monotonicNow();
       if (isRatisEnabled()) {
         delCount = submitPurgeKeysRequest(blockDeletionResults,
             keysToModify, snapTableKey);
@@ -126,11 +129,8 @@ public abstract class AbstractKeyDeletingService extends BackgroundService
         //  OMRequest model.
         delCount = deleteAllKeys(blockDeletionResults, manager);
       }
-      if (LOG.isDebugEnabled()) {
-        LOG.debug("Blocks for {} (out of {}) keys are deleted in {} ms",
-            delCount, blockDeletionResults.size(),
-            Time.monotonicNow() - startTime);
-      }
+      LOG.info("Blocks for {} (out of {}) keys are deleted from DB in {} ms",
+          delCount, blockDeletionResults.size(), Time.monotonicNow() - startTime);
     }
     return delCount;
   }
@@ -277,12 +277,14 @@ public abstract class AbstractKeyDeletingService extends BackgroundService
    * Parse Volume and Bucket Name from ObjectKey and add it to given map of
    * keys to be purged per bucket.
    */
-  private void addToMap(Map<Pair<String, String>, List<String>> map,
-                        String objectKey) {
+  private void addToMap(Map<Pair<String, String>, List<String>> map, String objectKey) {
     // Parse volume and bucket name
     String[] split = objectKey.split(OM_KEY_PREFIX);
-    Preconditions.assertTrue(split.length > 3, "Volume and/or Bucket Name " +
-        "missing from Key Name.");
+    Preconditions.assertTrue(split.length >= 3, "Volume and/or Bucket Name " +
+        "missing from Key Name " + objectKey);
+    if (split.length == 3) {
+      LOG.warn("{} missing Key Name", objectKey);
+    }
     Pair<String, String> volumeBucketPair = Pair.of(split[1], split[2]);
     if (!map.containsKey(volumeBucketPair)) {
       map.put(volumeBucketPair, new ArrayList<>());
@@ -467,6 +469,106 @@ public abstract class AbstractKeyDeletingService extends BackgroundService
           Time.monotonicNow() - startTime, getRunCount());
     }
     return remainNum;
+  }
+
+  /**
+   * To calculate Exclusive Size for current snapshot, Check
+   * the next snapshot deletedTable if the deleted key is
+   * referenced in current snapshot and not referenced in the
+   * previous snapshot then that key is exclusive to the current
+   * snapshot. Here since we are only iterating through
+   * deletedTable we can check the previous and previous to
+   * previous snapshot to achieve the same.
+   * previousSnapshot - Snapshot for which exclusive size is
+   *                    getting calculating.
+   * currSnapshot - Snapshot's deletedTable is used to calculate
+   *                previousSnapshot snapshot's exclusive size.
+   * previousToPrevSnapshot - Snapshot which is used to check
+   *                 if key is exclusive to previousSnapshot.
+   */
+  @SuppressWarnings("checkstyle:ParameterNumber")
+  public void calculateExclusiveSize(
+      SnapshotInfo previousSnapshot,
+      SnapshotInfo previousToPrevSnapshot,
+      OmKeyInfo keyInfo,
+      OmBucketInfo bucketInfo, long volumeId,
+      Table<String, String> snapRenamedTable,
+      Table<String, OmKeyInfo> previousKeyTable,
+      Table<String, String> prevRenamedTable,
+      Table<String, OmKeyInfo> previousToPrevKeyTable,
+      Map<String, Long> exclusiveSizeMap,
+      Map<String, Long> exclusiveReplicatedSizeMap) throws IOException {
+    String prevSnapKey = previousSnapshot.getTableKey();
+    long exclusiveReplicatedSize =
+        exclusiveReplicatedSizeMap.getOrDefault(
+            prevSnapKey, 0L) + keyInfo.getReplicatedSize();
+    long exclusiveSize = exclusiveSizeMap.getOrDefault(
+        prevSnapKey, 0L) + keyInfo.getDataSize();
+
+    // If there is no previous to previous snapshot, then
+    // the previous snapshot is the first snapshot.
+    if (previousToPrevSnapshot == null) {
+      exclusiveSizeMap.put(prevSnapKey, exclusiveSize);
+      exclusiveReplicatedSizeMap.put(prevSnapKey,
+          exclusiveReplicatedSize);
+    } else {
+      OmKeyInfo keyInfoPrevSnapshot = getPreviousSnapshotKeyName(
+          keyInfo, bucketInfo, volumeId,
+          snapRenamedTable, previousKeyTable);
+      OmKeyInfo keyInfoPrevToPrevSnapshot = getPreviousSnapshotKeyName(
+          keyInfoPrevSnapshot, bucketInfo, volumeId,
+          prevRenamedTable, previousToPrevKeyTable);
+      // If the previous to previous snapshot doesn't
+      // have the key, then it is exclusive size for the
+      // previous snapshot.
+      if (keyInfoPrevToPrevSnapshot == null) {
+        exclusiveSizeMap.put(prevSnapKey, exclusiveSize);
+        exclusiveReplicatedSizeMap.put(prevSnapKey,
+            exclusiveReplicatedSize);
+      }
+    }
+  }
+
+  private OmKeyInfo getPreviousSnapshotKeyName(
+      OmKeyInfo keyInfo, OmBucketInfo bucketInfo, long volumeId,
+      Table<String, String> snapRenamedTable,
+      Table<String, OmKeyInfo> previousKeyTable) throws IOException {
+
+    if (keyInfo == null) {
+      return null;
+    }
+
+    String dbKeyPrevSnap;
+    if (bucketInfo.getBucketLayout().isFileSystemOptimized()) {
+      dbKeyPrevSnap = getOzoneManager().getMetadataManager().getOzonePathKey(
+          volumeId,
+          bucketInfo.getObjectID(),
+          keyInfo.getParentObjectID(),
+          keyInfo.getFileName());
+    } else {
+      dbKeyPrevSnap = getOzoneManager().getMetadataManager().getOzoneKey(
+          keyInfo.getVolumeName(),
+          keyInfo.getBucketName(),
+          keyInfo.getKeyName());
+    }
+
+    String dbRenameKey = getOzoneManager().getMetadataManager().getRenameKey(
+        keyInfo.getVolumeName(),
+        keyInfo.getBucketName(),
+        keyInfo.getObjectID());
+
+    String renamedKey = snapRenamedTable.getIfExist(dbRenameKey);
+    OmKeyInfo prevKeyInfo = renamedKey != null ?
+        previousKeyTable.get(renamedKey) :
+        previousKeyTable.get(dbKeyPrevSnap);
+
+    if (prevKeyInfo == null ||
+        prevKeyInfo.getObjectID() != keyInfo.getObjectID()) {
+      return null;
+    }
+
+    return isBlockLocationInfoSame(prevKeyInfo, keyInfo) ?
+        prevKeyInfo : null;
   }
 
   protected boolean isBufferLimitCrossed(

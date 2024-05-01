@@ -25,19 +25,16 @@ import org.apache.commons.io.file.PathUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.StringUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.utils.NativeLibraryNotLoadedException;
 import org.apache.hadoop.hdds.utils.db.CodecRegistry;
 import org.apache.hadoop.hdds.utils.db.RDBStore;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedColumnFamilyOptions;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedRawSSTFileReader;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksDB;
-import org.apache.hadoop.hdds.utils.db.managed.ManagedSSTDumpTool;
 import org.apache.hadoop.hdfs.protocol.SnapshotDiffReport.DiffReportEntry;
 import org.apache.hadoop.ozone.OFSPath;
 import org.apache.hadoop.ozone.OzoneConsts;
-import org.apache.hadoop.ozone.om.IOmMetadataReader;
-import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
 import org.apache.hadoop.ozone.om.OmSnapshot;
@@ -56,12 +53,12 @@ import org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse;
 import org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse.JobStatus;
 import org.apache.hadoop.util.ClosableIterator;
 import org.apache.logging.log4j.util.Strings;
-import org.apache.ozone.rocksdb.util.ManagedSstFileReader;
+import org.apache.ozone.rocksdb.util.SstFileSetReader;
 import org.apache.ozone.rocksdb.util.RdbUtil;
 import org.apache.ozone.rocksdiff.DifferSnapshotInfo;
 import org.apache.ozone.rocksdiff.RocksDBCheckpointDiffer;
 import org.apache.ozone.rocksdiff.RocksDiffUtils;
-import org.jetbrains.annotations.NotNull;
+import jakarta.annotation.Nonnull;
 import org.rocksdb.ColumnFamilyDescriptor;
 import org.rocksdb.ColumnFamilyHandle;
 import org.rocksdb.RocksDBException;
@@ -89,7 +86,6 @@ import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.RejectedExecutionException;
-import java.util.concurrent.SynchronousQueue;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.function.BiFunction;
@@ -112,9 +108,10 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_FORCE_FU
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_FORCE_FULL_DIFF_DEFAULT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_DIFF_DISABLE_NATIVE_LIBS;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_DIFF_DISABLE_NATIVE_LIBS_DEFAULT;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_LOAD_NATIVE_LIB;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_LOAD_NATIVE_LIB_DEFAULT;
 import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.DIRECTORY_TABLE;
 import static org.apache.hadoop.ozone.om.OmSnapshotManager.DELIMITER;
-import static org.apache.hadoop.ozone.om.helpers.SnapshotInfo.getTableKey;
 import static org.apache.hadoop.ozone.om.snapshot.SnapshotUtils.checkSnapshotActive;
 import static org.apache.hadoop.ozone.om.snapshot.SnapshotUtils.dropColumnFamilyHandle;
 import static org.apache.hadoop.ozone.om.snapshot.SnapshotUtils.getColumnFamilyToKeyPrefixMap;
@@ -150,7 +147,6 @@ public class SnapshotDiffManager implements AutoCloseable {
   private final ManagedRocksDB db;
   private final RocksDBCheckpointDiffer differ;
   private final OzoneManager ozoneManager;
-  private final SnapshotCache snapshotCache;
   private final CodecRegistry codecRegistry;
   private final ManagedColumnFamilyOptions familyOptions;
   // TODO: [SNAPSHOT] Use different wait time based of job status.
@@ -185,9 +181,7 @@ public class SnapshotDiffManager implements AutoCloseable {
 
   private final boolean diffDisableNativeLibs;
 
-  private final Optional<ManagedSSTDumpTool> sstDumpTool;
-
-  private Optional<ExecutorService> sstDumpToolExecService;
+  private final boolean isNativeLibsLoaded;
 
   private final BiFunction<SnapshotInfo, SnapshotInfo, String>
       generateSnapDiffJobKey =
@@ -199,7 +193,6 @@ public class SnapshotDiffManager implements AutoCloseable {
   public SnapshotDiffManager(ManagedRocksDB db,
                              RocksDBCheckpointDiffer differ,
                              OzoneManager ozoneManager,
-                             SnapshotCache snapshotCache,
                              ColumnFamilyHandle snapDiffJobCfh,
                              ColumnFamilyHandle snapDiffReportCfh,
                              ManagedColumnFamilyOptions familyOptions,
@@ -207,7 +200,6 @@ public class SnapshotDiffManager implements AutoCloseable {
     this.db = db;
     this.differ = differ;
     this.ozoneManager = ozoneManager;
-    this.snapshotCache = snapshotCache;
     this.familyOptions = familyOptions;
     this.codecRegistry = codecRegistry;
     this.defaultWaitTime = ozoneManager.getConfiguration().getTimeDuration(
@@ -264,7 +256,7 @@ public class SnapshotDiffManager implements AutoCloseable {
     createEmptySnapDiffDir(path);
     this.sstBackupDirForSnapDiffJobs = path.toString();
 
-    this.sstDumpTool = initSSTDumpTool(ozoneManager.getConfiguration());
+    this.isNativeLibsLoaded = initNativeLibraryForEfficientDiff(ozoneManager.getConfiguration());
 
     // Ideally, loadJobsOnStartUp should run only on OM node, since SnapDiff
     // is not HA currently and running this on all the nodes would be
@@ -287,32 +279,16 @@ public class SnapshotDiffManager implements AutoCloseable {
     return snapDiffJobTable;
   }
 
-  private Optional<ManagedSSTDumpTool> initSSTDumpTool(
-      final OzoneConfiguration conf) {
-    try {
-      int threadPoolSize = conf.getInt(
-              OMConfigKeys.OZONE_OM_SNAPSHOT_SST_DUMPTOOL_EXECUTOR_POOL_SIZE,
-              OMConfigKeys
-                  .OZONE_OM_SNAPSHOT_SST_DUMPTOOL_EXECUTOR_POOL_SIZE_DEFAULT);
-      int bufferSize = (int) conf.getStorageSize(
-          OMConfigKeys.OZONE_OM_SNAPSHOT_SST_DUMPTOOL_EXECUTOR_BUFFER_SIZE,
-          OMConfigKeys
-              .OZONE_OM_SNAPSHOT_SST_DUMPTOOL_EXECUTOR_BUFFER_SIZE_DEFAULT,
-              StorageUnit.BYTES);
-      this.sstDumpToolExecService = Optional.of(new ThreadPoolExecutor(0,
-              threadPoolSize, 60, TimeUnit.SECONDS,
-              new SynchronousQueue<>(), new ThreadFactoryBuilder()
-          .setNameFormat(ozoneManager.getThreadNamePrefix() +
-              "snapshot-diff-manager-sst-dump-tool-TID-%d")
-              .build(),
-              new ThreadPoolExecutor.DiscardPolicy()));
-      return Optional.of(new ManagedSSTDumpTool(sstDumpToolExecService.get(),
-          bufferSize));
-    } catch (NativeLibraryNotLoadedException e) {
-      this.sstDumpToolExecService.ifPresent(exec ->
-          closeExecutorService(exec, "SstDumpToolExecutor"));
+  private boolean initNativeLibraryForEfficientDiff(final OzoneConfiguration conf) {
+    if (conf.getBoolean(OZONE_OM_SNAPSHOT_LOAD_NATIVE_LIB, OZONE_OM_SNAPSHOT_LOAD_NATIVE_LIB_DEFAULT)) {
+      try {
+        return ManagedRawSSTFileReader.loadLibrary();
+      } catch (NativeLibraryNotLoadedException e) {
+        LOG.error("Native Library for raw sst file reading loading failed.", e);
+        return false;
+      }
     }
-    return Optional.empty();
+    return false;
   }
 
   /**
@@ -552,7 +528,7 @@ public class SnapshotDiffManager implements AutoCloseable {
     }
   }
 
-  @NotNull
+  @Nonnull
   public static OFSPath getSnapshotRootPath(String volume, String bucket) {
     org.apache.hadoop.fs.Path bucketPath = new org.apache.hadoop.fs.Path(
         OZONE_URI_DELIMITER + volume + OZONE_URI_DELIMITER + bucket);
@@ -829,8 +805,8 @@ public class SnapshotDiffManager implements AutoCloseable {
     // job by RocksDBCheckpointDiffer#pruneOlderSnapshotsWithCompactionHistory.
     Path path = Paths.get(sstBackupDirForSnapDiffJobs + "/" + jobId);
 
-    ReferenceCounted<IOmMetadataReader, SnapshotCache> rcFromSnapshot = null;
-    ReferenceCounted<IOmMetadataReader, SnapshotCache> rcToSnapshot = null;
+    ReferenceCounted<OmSnapshot> rcFromSnapshot = null;
+    ReferenceCounted<OmSnapshot> rcToSnapshot = null;
 
     try {
       if (!areDiffJobAndSnapshotsActive(volumeName, bucketName,
@@ -838,14 +814,15 @@ public class SnapshotDiffManager implements AutoCloseable {
         return;
       }
 
-      String fsKey = getTableKey(volumeName, bucketName, fromSnapshotName);
-      String tsKey = getTableKey(volumeName, bucketName, toSnapshotName);
+      rcFromSnapshot =
+          ozoneManager.getOmSnapshotManager()
+              .getActiveSnapshot(volumeName, bucketName, fromSnapshotName);
+      rcToSnapshot =
+          ozoneManager.getOmSnapshotManager()
+              .getActiveSnapshot(volumeName, bucketName, toSnapshotName);
 
-      rcFromSnapshot = snapshotCache.get(fsKey);
-      rcToSnapshot = snapshotCache.get(tsKey);
-
-      OmSnapshot fromSnapshot = (OmSnapshot) rcFromSnapshot.get();
-      OmSnapshot toSnapshot = (OmSnapshot) rcToSnapshot.get();
+      OmSnapshot fromSnapshot = rcFromSnapshot.get();
+      OmSnapshot toSnapshot = rcToSnapshot.get();
       SnapshotInfo fsInfo = getSnapshotInfo(ozoneManager,
           volumeName, bucketName, fromSnapshotName);
       SnapshotInfo tsInfo = getSnapshotInfo(ozoneManager,
@@ -1053,44 +1030,14 @@ public class SnapshotDiffManager implements AutoCloseable {
     // Workaround to handle deletes if native rocksDb tool for reading
     // tombstone is not loaded.
     // TODO: [SNAPSHOT] Update Rocksdb SSTFileIterator to read tombstone
-    if (skipNativeDiff || !sstDumpTool.isPresent()) {
+    if (skipNativeDiff || !isNativeLibsLoaded) {
       deltaFiles.addAll(getSSTFileListForSnapshot(fromSnapshot,
           tablesToLookUp));
     }
-
-    try {
-      addToObjectIdMap(fsTable,
-          tsTable,
-          deltaFiles,
-          !skipNativeDiff && sstDumpTool.isPresent(),
-          oldObjIdToKeyMap,
-          newObjIdToKeyMap,
-          objectIdToIsDirMap,
-          oldParentIds,
-          newParentIds,
-          tablePrefixes);
-    } catch (NativeLibraryNotLoadedException e) {
-      LOG.warn("SSTDumpTool load failure, retrying without it.", e);
-      try {
-        // Workaround to handle deletes if use of native rockDB for reading
-        // tombstone fails.
-        // TODO: [SNAPSHOT] Update Rocksdb SSTFileIterator to read tombstone
-        deltaFiles.addAll(getSSTFileListForSnapshot(
-            fromSnapshot, tablesToLookUp));
-        addToObjectIdMap(fsTable,
-            tsTable,
-            deltaFiles,
-            false,
-            oldObjIdToKeyMap,
-            newObjIdToKeyMap,
-            objectIdToIsDirMap,
-            oldParentIds,
-            newParentIds,
-            tablePrefixes);
-      } catch (NativeLibraryNotLoadedException ex) {
-        throw new IllegalStateException(ex);
-      }
-    }
+    addToObjectIdMap(fsTable, tsTable, deltaFiles,
+        !skipNativeDiff && isNativeLibsLoaded,
+        oldObjIdToKeyMap, newObjIdToKeyMap, objectIdToIsDirMap, oldParentIds,
+        newParentIds, tablePrefixes);
   }
 
   @VisibleForTesting
@@ -1103,15 +1050,14 @@ public class SnapshotDiffManager implements AutoCloseable {
       PersistentMap<byte[], Boolean> objectIdToIsDirMap,
       Optional<Set<Long>> oldParentIds,
       Optional<Set<Long>> newParentIds,
-      Map<String, String> tablePrefixes) throws IOException,
-      NativeLibraryNotLoadedException, RocksDBException {
+      Map<String, String> tablePrefixes) throws IOException, RocksDBException {
     if (deltaFiles.isEmpty()) {
       return;
     }
     String tablePrefix = getTablePrefix(tablePrefixes, fsTable.getName());
     boolean isDirectoryTable =
         fsTable.getName().equals(DIRECTORY_TABLE);
-    ManagedSstFileReader sstFileReader = new ManagedSstFileReader(deltaFiles);
+    SstFileSetReader sstFileReader = new SstFileSetReader(deltaFiles);
     validateEstimatedKeyChangesAreInLimits(sstFileReader);
     String sstFileReaderLowerBound = tablePrefix;
     String sstFileReaderUpperBound = null;
@@ -1120,12 +1066,9 @@ public class SnapshotDiffManager implements AutoCloseable {
       upperBoundCharArray[upperBoundCharArray.length - 1] += 1;
       sstFileReaderUpperBound = String.valueOf(upperBoundCharArray);
     }
-    try (Stream<String> keysToCheck =
-             nativeRocksToolsLoaded && sstDumpTool.isPresent()
-                 ? sstFileReader.getKeyStreamWithTombstone(sstDumpTool.get(),
-                 sstFileReaderLowerBound, sstFileReaderUpperBound)
-                 : sstFileReader.getKeyStream(sstFileReaderLowerBound,
-                 sstFileReaderUpperBound)) {
+    try (Stream<String> keysToCheck = nativeRocksToolsLoaded ?
+        sstFileReader.getKeyStreamWithTombstone(sstFileReaderLowerBound, sstFileReaderUpperBound)
+        : sstFileReader.getKeyStream(sstFileReaderLowerBound, sstFileReaderUpperBound)) {
       keysToCheck.forEach(key -> {
         try {
           final WithParentObjectId fromObjectId = fsTable.get(key);
@@ -1232,7 +1175,7 @@ public class SnapshotDiffManager implements AutoCloseable {
   }
 
   private void validateEstimatedKeyChangesAreInLimits(
-      ManagedSstFileReader sstFileReader
+      SstFileSetReader sstFileReader
   ) throws RocksDBException, IOException {
     if (sstFileReader.getEstimatedTotalKeys() >
         maxAllowedKeyChangesForASnapDiff) {
@@ -1472,7 +1415,7 @@ public class SnapshotDiffManager implements AutoCloseable {
    */
   private boolean isKeyModified(OmKeyInfo fromKey, OmKeyInfo toKey) {
     return !fromKey.isKeyInfoSame(toKey,
-        false, false, false, false)
+        false, false, false, false, true)
         || !SnapshotDeletingService.isBlockLocationInfoSame(
         fromKey, toKey);
   }
@@ -1706,8 +1649,6 @@ public class SnapshotDiffManager implements AutoCloseable {
     if (snapDiffExecutor != null) {
       closeExecutorService(snapDiffExecutor, "SnapDiffExecutor");
     }
-    this.sstDumpToolExecService.ifPresent(exec ->
-        closeExecutorService(exec, "SstDumpToolExecutor"));
   }
 
   private void closeExecutorService(ExecutorService executorService,

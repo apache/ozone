@@ -442,12 +442,20 @@ public class MutableVolumeSet implements VolumeSet {
   public boolean hasEnoughVolumes() {
     // Max number of bad volumes allowed, should have at least
     // 1 good volume
+    boolean hasEnoughVolumes;
     if (maxVolumeFailuresTolerated ==
         StorageVolumeChecker.MAX_VOLUME_FAILURE_TOLERATED_LIMIT) {
-      return getVolumesList().size() >= 1;
+      hasEnoughVolumes = getVolumesList().size() >= 1;
     } else {
-      return getFailedVolumesList().size() <= maxVolumeFailuresTolerated;
+      hasEnoughVolumes = getFailedVolumesList().size() <= maxVolumeFailuresTolerated;
     }
+    if (!hasEnoughVolumes) {
+      LOG.error("Not enough volumes in MutableVolumeSet. DatanodeUUID: {}, VolumeType: {}, " +
+              "MaxVolumeFailuresTolerated: {}, ActiveVolumes: {}, FailedVolumes: {}",
+          datanodeUuid, volumeType, maxVolumeFailuresTolerated,
+          getVolumesList().size(), getFailedVolumesList().size());
+    }
+    return hasEnoughVolumes;
   }
 
   public StorageLocationReport[] getStorageReport() {
@@ -464,6 +472,7 @@ public class MutableVolumeSet implements VolumeSet {
         long scmUsed = 0;
         long remaining = 0;
         long capacity = 0;
+        long committed = 0;
         String rootDir = "";
         failed = true;
         if (volumeInfo.isPresent()) {
@@ -472,6 +481,8 @@ public class MutableVolumeSet implements VolumeSet {
             scmUsed = volumeInfo.get().getScmUsed();
             remaining = volumeInfo.get().getAvailable();
             capacity = volumeInfo.get().getCapacity();
+            committed = (volume instanceof HddsVolume) ?
+                ((HddsVolume) volume).getCommittedBytes() : 0;
             failed = false;
           } catch (UncheckedIOException ex) {
             LOG.warn("Failed to get scmUsed and remaining for container " +
@@ -491,6 +502,7 @@ public class MutableVolumeSet implements VolumeSet {
             .setCapacity(capacity)
             .setRemaining(remaining)
             .setScmUsed(scmUsed)
+            .setCommitted(committed)
             .setStorageType(volume.getStorageType());
         StorageLocationReport r = builder.build();
         reports[counter++] = r;

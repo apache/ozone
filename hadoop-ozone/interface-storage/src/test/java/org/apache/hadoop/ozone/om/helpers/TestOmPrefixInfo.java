@@ -23,14 +23,14 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.storage.proto.OzoneManagerStorageProtos;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
+import java.util.ArrayList;
 import java.util.Collections;
-import java.util.HashMap;
-
 
 import static org.apache.hadoop.ozone.OzoneAcl.AclScope.ACCESS;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 
 /**
  * Class to test OmPrefixInfo.
@@ -40,7 +40,7 @@ public class TestOmPrefixInfo {
   private static OzoneManagerStorageProtos.OzoneAclInfo buildTestOzoneAclInfo(
       String aclString) {
     OzoneAcl oacl = OzoneAcl.parseAcl(aclString);
-    ByteString rights = ByteString.copyFrom(oacl.getAclBitSet().toByteArray());
+    final ByteString rights = oacl.getAclByteString();
     return OzoneManagerStorageProtos.OzoneAclInfo.newBuilder()
         .setType(OzoneManagerStorageProtos.OzoneAclInfo.OzoneAclType.USER)
         .setName(oacl.getName())
@@ -73,10 +73,14 @@ public class TestOmPrefixInfo {
       String identityString,
       IAccessAuthorizer.ACLType aclType,
       OzoneAcl.AclScope scope) {
-    return new OmPrefixInfo(path,
-        Collections.singletonList(new OzoneAcl(
+    return OmPrefixInfo.newBuilder()
+        .setName(path)
+        .setAcls(new ArrayList<>(Collections.singletonList(new OzoneAcl(
             identityType, identityString,
-            aclType, scope)), new HashMap<>(), 10, 100);
+            scope, aclType))))
+        .setObjectID(10)
+        .setUpdateID(100)
+        .build();
   }
 
 
@@ -91,15 +95,15 @@ public class TestOmPrefixInfo {
         ACCESS);
     OmPrefixInfo clonePrefixInfo = omPrefixInfo.copyObject();
 
-    Assertions.assertEquals(omPrefixInfo, clonePrefixInfo);
+    assertEquals(omPrefixInfo, clonePrefixInfo);
 
 
     // Change acls and check.
     omPrefixInfo.addAcl(new OzoneAcl(
         IAccessAuthorizer.ACLIdentityType.USER, username,
-        IAccessAuthorizer.ACLType.READ, ACCESS));
+        ACCESS, IAccessAuthorizer.ACLType.READ));
 
-    Assertions.assertNotEquals(omPrefixInfo, clonePrefixInfo);
+    assertNotEquals(omPrefixInfo, clonePrefixInfo);
 
   }
 
@@ -116,10 +120,10 @@ public class TestOmPrefixInfo {
 
     OmPrefixInfo ompri = OmPrefixInfo.getFromProtobuf(prefixInfo);
 
-    Assertions.assertEquals(prefixInfoPath, ompri.getName());
-    Assertions.assertEquals(1, ompri.getMetadata().size());
-    Assertions.assertEquals(metaval, ompri.getMetadata().get(metakey));
-    Assertions.assertEquals(1, ompri.getAcls().size());
+    assertEquals(prefixInfoPath, ompri.getName());
+    assertEquals(1, ompri.getMetadata().size());
+    assertEquals(metaval, ompri.getMetadata().get(metakey));
+    assertEquals(1, ompri.getAcls().size());
   }
 
   @Test
@@ -133,8 +137,8 @@ public class TestOmPrefixInfo {
     omPrefixInfo.getMetadata().put("key", "value");
     OzoneManagerStorageProtos.PersistedPrefixInfo pi =
         omPrefixInfo.getProtobuf();
-    Assertions.assertEquals(testPath, pi.getName());
-    Assertions.assertEquals(1, pi.getAclsCount());
-    Assertions.assertEquals(1, pi.getMetadataCount());
+    assertEquals(testPath, pi.getName());
+    assertEquals(1, pi.getAclsCount());
+    assertEquals(1, pi.getMetadataCount());
   }
 }

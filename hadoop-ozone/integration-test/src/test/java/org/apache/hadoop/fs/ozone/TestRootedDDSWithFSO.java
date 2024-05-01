@@ -38,19 +38,18 @@ import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.ozone.test.GenericTestUtils;
-import org.junit.AfterClass;
-import org.junit.After;
-import org.junit.Assert;
-import org.junit.BeforeClass;
-import org.junit.Test;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.FileNotFoundException;
-import java.io.IOException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicLong;
 
 import static org.apache.hadoop.fs.ozone.TestDirectoryDeletingServiceWithFSO.assertSubPathsCount;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ACL_ENABLED;
@@ -58,7 +57,11 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_SERVI
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_FS_ITERATE_BATCH_SIZE;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ADDRESS_KEY;
-import static org.junit.Assert.fail;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 /**
  * Directory deletion service test cases using rooted ozone filesystem
@@ -78,7 +81,7 @@ public class TestRootedDDSWithFSO {
   private static Path bucketPath;
   private static OzoneClient client;
 
-  @BeforeClass
+  @BeforeAll
   public static void init() throws Exception {
     OzoneConfiguration conf = new OzoneConfiguration();
     conf.setInt(OMConfigKeys.OZONE_DIR_DELETING_SERVICE_INTERVAL, 1);
@@ -114,7 +117,7 @@ public class TestRootedDDSWithFSO {
     fs = FileSystem.get(conf);
   }
 
-  @AfterClass
+  @AfterAll
   public static void teardown() {
     IOUtils.closeQuietly(client);
     if (cluster != null) {
@@ -123,17 +126,15 @@ public class TestRootedDDSWithFSO {
     IOUtils.closeQuietly(fs);
   }
 
-  @After
+  @AfterEach
   public void cleanup() {
-    try {
+    assertDoesNotThrow(() -> {
       Path root = new Path("/");
       FileStatus[] fileStatuses = fs.listStatus(root);
       for (FileStatus fileStatus : fileStatuses) {
         fs.delete(fileStatus.getPath(), false);
       }
-    } catch (IOException ex) {
-      fail("Failed to cleanup files.");
-    }
+    });
   }
 
   @Test
@@ -191,10 +192,10 @@ public class TestRootedDDSWithFSO {
 
     OMMetrics omMetrics = cluster.getOzoneManager().getMetrics();
     long prevDeletes = omMetrics.getNumKeyDeletes();
-    Assert.assertTrue(fs.delete(bucketPath, true));
-    Assert.assertTrue(fs.delete(volumePath, false));
+    assertTrue(fs.delete(bucketPath, true));
+    assertTrue(fs.delete(volumePath, false));
     long deletes = omMetrics.getNumKeyDeletes();
-    Assert.assertEquals(prevDeletes + 1, deletes);
+    assertEquals(prevDeletes + 1, deletes);
 
     // After Delete
     checkPath(volumePath);
@@ -211,13 +212,9 @@ public class TestRootedDDSWithFSO {
   }
 
   private void checkPath(Path path) {
-    try {
-      fs.getFileStatus(path);
-      fail("testRecursiveDelete failed");
-    } catch (IOException ex) {
-      Assert.assertTrue(ex instanceof FileNotFoundException);
-      Assert.assertTrue(ex.getMessage().contains("File not found"));
-    }
+    FileNotFoundException ex = assertThrows(FileNotFoundException.class, () ->
+        fs.getFileStatus(path), "testRecursiveDelete failed");
+    assertThat(ex.getMessage()).contains("File not found");
   }
 
   private void assertTableRowCount(Table<String, ?> table, int count)
@@ -228,16 +225,13 @@ public class TestRootedDDSWithFSO {
 
   private boolean assertTableRowCount(int expectedCount,
       Table<String, ?> table) {
-    long count = 0L;
-    try {
-      count = cluster.getOzoneManager().getMetadataManager()
-          .countRowsInTable(table);
+    AtomicLong count = new AtomicLong(0L);
+    assertDoesNotThrow(() -> {
+      count.set(cluster.getOzoneManager().getMetadataManager().countRowsInTable(table));
       LOG.info("{} actual row count={}, expectedCount={}", table.getName(),
-          count, expectedCount);
-    } catch (IOException ex) {
-      fail("testDoubleBuffer failed with: " + ex);
-    }
-    return count == expectedCount;
+          count.get(), expectedCount);
+    });
+    return count.get() == expectedCount;
   }
 
   private static BucketLayout getFSOBucketLayout() {

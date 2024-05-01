@@ -29,7 +29,8 @@
         "storageReport": {
           "capacity": 62725623808,
           "used": 488288256,
-          "remaining": 21005319168
+          "remaining": 21005319168,
+          "committed": 10240000
         },
         "pipelines": [
           {
@@ -40,6 +41,42 @@
           },
           {
             "pipelineID": "09d3a478-ff01-4ce6-ad75-f3ec79bcc71a",
+            "replicationType": "RATIS",
+            "replicationFactor": 1,
+            "leaderNode": "localhost1.storage.enterprise.com"
+          },
+          {
+            "pipelineID": "02e3d908-ff01-4ce6-ad75-f3ec79bcc710",
+            "replicationType": "RATIS",
+            "replicationFactor": 3,
+            "leaderNode": "localhost1.storage.enterprise.com"
+          },
+          {
+            "pipelineID": "09d3a478-ff01-4ce6-ad75-f3ec79bcc711",
+            "replicationType": "RATIS",
+            "replicationFactor": 1,
+            "leaderNode": "localhost1.storage.enterprise.com"
+          },
+          {
+            "pipelineID": "02e3d908-ff01-4ce6-ad75-f3ec79bcc712",
+            "replicationType": "RATIS",
+            "replicationFactor": 3,
+            "leaderNode": "localhost1.storage.enterprise.com"
+          },
+          {
+            "pipelineID": "09d3a478-ff01-4ce6-ad75-f3ec79bcc713",
+            "replicationType": "RATIS",
+            "replicationFactor": 1,
+            "leaderNode": "localhost1.storage.enterprise.com"
+          },
+          {
+            "pipelineID": "02e3d908-ff01-4ce6-ad75-f3ec79bcc714",
+            "replicationType": "RATIS",
+            "replicationFactor": 3,
+            "leaderNode": "localhost1.storage.enterprise.com"
+          },
+          {
+            "pipelineID": "09d3a478-ff01-4ce6-ad75-f3ec79bcc715",
             "replicationType": "RATIS",
             "replicationFactor": 1,
             "leaderNode": "localhost1.storage.enterprise.com"
@@ -62,7 +99,8 @@
         "storageReport": {
           "capacity": 549755813888,
           "used": 450971566080,
-          "remaining": 95784247808
+          "remaining": 95784247808,
+          "committed": 34563456
         },
         "pipelines": [
           {
@@ -95,7 +133,8 @@
         "storageReport": {
           "capacity": 549755813888,
           "used": 450971566080,
-          "remaining": 95784247808
+          "remaining": 95784247808,
+          "committed": 34562
         },
         "pipelines": [
           {
@@ -128,7 +167,8 @@
         "storageReport": {
           "capacity": 549755813888,
           "used": 450971566080,
-          "remaining": 95784247808
+          "remaining": 95784247808,
+          "committed": 4576435
         },
         "pipelines": [
           {
@@ -161,7 +201,8 @@
         "storageReport": {
           "capacity": 549755813888,
           "used": 450971566080,
-          "remaining": 95784247808
+          "remaining": 95784247808,
+          "committed": 3453121
         },
         "pipelines": [
           {
@@ -194,7 +235,8 @@
         "storageReport": {
           "capacity": 140737488355328,
           "used": 43980465111040,
-          "remaining": 86757023244288
+          "remaining": 86757023244288,
+          "committed": 3457623435
         },
         "pipelines": [
           {
@@ -233,7 +275,8 @@
         "storageReport": {
           "capacity": 140737488355328,
           "used": 43980465111040,
-          "remaining": 86757023244288
+          "remaining": 86757023244288,
+          "committed": 345624
         },
         "pipelines": [
           {
@@ -272,7 +315,8 @@
         "storageReport": {
           "capacity": 140737488355328,
           "used": 43980465111040,
-          "remaining": 86757023244288
+          "remaining": 86757023244288,
+          "committed": 123464574
         },
         "pipelines": [
           {
@@ -311,7 +355,8 @@
         "storageReport": {
           "capacity": 140737488355328,
           "used": 43980465111040,
-          "remaining": 86757023244288
+          "remaining": 86757023244288,
+          "committed": 556721345
         },
         "pipelines": [
           {
@@ -350,7 +395,8 @@
         "storageReport": {
           "capacity": 140737488355328,
           "used": 43980465111040,
-          "remaining": 86757023244288
+          "remaining": 86757023244288,
+          "committed": 45671235234
         },
         "pipelines": [
           {
@@ -389,7 +435,8 @@
         "storageReport": {
           "capacity": 140737488355328,
           "used": 0,
-          "remaining": 110737488355328
+          "remaining": 110737488355328,
+          "committed": 0
         },
         "pipelines": [],
         "containers": 0,
@@ -409,7 +456,8 @@
         "storageReport": {
           "capacity": 805306368000,
           "used": 644245094400,
-          "remaining": 121061273600
+          "remaining": 121061273600,
+          "committed": 4572345234
         },
         "pipelines": [
           {
@@ -442,7 +490,8 @@
         "storageReport": {
           "capacity": 140737488355328,
           "used": 43980465111040,
-          "remaining": 92757023244288
+          "remaining": 92757023244288,
+          "committed": 34563453
         },
         "pipelines": [
           {
@@ -475,7 +524,8 @@
         "storageReport": {
           "capacity": 549755813888,
           "used": 450971566080,
-          "remaining": 94784247808
+          "remaining": 94784247808,
+          "committed": 7234234
         },
         "pipelines": [
           {
@@ -514,7 +564,8 @@
         "storageReport": {
           "capacity": 140737488355328,
           "used": 43980465111040,
-          "remaining": 92757023244288
+          "remaining": 92757023244288,
+          "committed": 34562346
         },
         "pipelines": [
           {
@@ -547,7 +598,8 @@
         "storageReport": {
           "capacity": 140737488355328,
           "used": 43980465111040,
-          "remaining": 76757023244288
+          "remaining": 76757023244288,
+          "committed": 834324523
         },
         "pipelines": [
           {
@@ -580,7 +632,8 @@
         "storageReport": {
           "capacity": 140737488355328,
           "used": 43980465111040,
-          "remaining": 66757023244288
+          "remaining": 66757023244288,
+          "committed": 346467345
         },
         "pipelines": [
           {
@@ -619,7 +672,8 @@
         "storageReport": {
           "capacity": 140737488355328,
           "used": 43980465111040,
-          "remaining": 96157023244288
+          "remaining": 96157023244288,
+          "committed": 45245456
         },
         "pipelines": [
           {
@@ -652,7 +706,8 @@
         "storageReport": {
           "capacity": 140737488355328,
           "used": 43980465111040,
-          "remaining": 94757023244288
+          "remaining": 94757023244288,
+          "committed": 45673234
         },
         "pipelines": [
           {
@@ -981,7 +1036,7 @@
     ]
   },
   "keys": {
-    "totalCount": 534,
+    "totalCount": 15,
     "keys": [
       {
         "Volume": "vol-0-20448",
@@ -1043,7 +1098,7 @@
       {
         "Volume": "vol-0-20448",
         "Bucket": "bucket-0-12811",
-        "Key": "key-0-77505",
+        "Key": "key-0-77506",
         "DataSize": 10240,
         "Versions": [
           0
@@ -1062,7 +1117,7 @@
       {
         "Volume": "vol-0-20448",
         "Bucket": "bucket-0-12811",
-        "Key": "key-21-64511",
+        "Key": "key-21-64512",
         "DataSize": 5692407,
         "Versions": [
           0
@@ -1081,7 +1136,7 @@
       {
         "Volume": "vol-0-20448",
         "Bucket": "bucket-0-12811",
-        "Key": "key-22-69104",
+        "Key": "key-22-69105",
         "DataSize": 189407,
         "Versions": [
           0
@@ -1100,7 +1155,7 @@
       {
         "Volume": "vol-0-20448",
         "Bucket": "bucket-0-12811",
-        "Key": "key-0-77505",
+        "Key": "key-0-77507",
         "DataSize": 10240,
         "Versions": [
           0
@@ -1119,7 +1174,7 @@
       {
         "Volume": "vol-0-20448",
         "Bucket": "bucket-0-12811",
-        "Key": "key-21-64511",
+        "Key": "key-21-64513",
         "DataSize": 5692407,
         "Versions": [
           0
@@ -1138,7 +1193,7 @@
       {
         "Volume": "vol-0-20448",
         "Bucket": "bucket-0-12811",
-        "Key": "key-22-69104",
+        "Key": "key-22-69106",
         "DataSize": 189407,
         "Versions": [
           0
@@ -1157,7 +1212,7 @@
       {
         "Volume": "vol-0-20448",
         "Bucket": "bucket-0-12811",
-        "Key": "key-0-77505",
+        "Key": "key-0-77508",
         "DataSize": 10240,
         "Versions": [
           0
@@ -1176,7 +1231,7 @@
       {
         "Volume": "vol-0-20448",
         "Bucket": "bucket-0-12811",
-        "Key": "key-21-64511",
+        "Key": "key-21-64514",
         "DataSize": 5692407,
         "Versions": [
           0
@@ -1195,7 +1250,7 @@
       {
         "Volume": "vol-0-20448",
         "Bucket": "bucket-0-12811",
-        "Key": "key-22-69104",
+        "Key": "key-22-69107",
         "DataSize": 189407,
         "Versions": [
           0
@@ -1214,7 +1269,7 @@
       {
         "Volume": "vol-0-20448",
         "Bucket": "bucket-0-12811",
-        "Key": "key-0-77505",
+        "Key": "key-0-77509",
         "DataSize": 10240,
         "Versions": [
           0
@@ -1233,7 +1288,7 @@
       {
         "Volume": "vol-0-20448",
         "Bucket": "bucket-0-12811",
-        "Key": "key-21-64511",
+        "Key": "key-21-64515",
         "DataSize": 5692407,
         "Versions": [
           0
@@ -1252,7 +1307,7 @@
       {
         "Volume": "vol-0-20448",
         "Bucket": "bucket-0-12811",
-        "Key": "key-22-69104",
+        "Key": "key-22-69109",
         "DataSize": 189407,
         "Versions": [
           0
@@ -3710,7 +3765,6 @@
       "totalDeletedKeys": 3
   },
   "omMismatch":{
-    "lastKey":11,
     "containerDiscrepancyInfo": [
       {
         "containerId": 1,
@@ -3905,12 +3959,7 @@
           }
         ],
         "existsAt": "SCM"
-      }
-    ]
-  },
-  "omMismatch1":{
-    "lastKey":21,
-    "containerDiscrepancyInfo": [
+      },
       {
         "containerId": 11,
         "numberOfKeys": 1,
@@ -4143,12 +4192,7 @@
       }
     ]
   },
-  "omMismatch2":{
-    "lastKey": null,
-    "containerDiscrepancyInfo": []
-  },
   "scmMismatch":{
-    "lastKey":11,
     "containerDiscrepancyInfo": [
       {
         "containerId": 1,
@@ -4343,12 +4387,7 @@
           }
         ],
         "existsAt": "OM"
-      }
-    ]
-  },
-  "scmMismatch1":{
-    "lastKey":21,
-    "containerDiscrepancyInfo": [
+      },
       {
         "containerId": 11,
         "numberOfKeys": 1,
@@ -4542,12 +4581,7 @@
           }
         ],
         "existsAt": "OM"
-      }
-    ]
-  },
-  "scmMismatch2":{
-    "lastKey":31,
-    "containerDiscrepancyInfo": [
+      },
       {
         "containerId": 21,
         "numberOfKeys": 1,
@@ -4741,12 +4775,7 @@
           }
         ],
         "existsAt": "OM"
-      }
-    ]
-  },
-  "scmMismatch3":{
-    "lastKey":41,
-    "containerDiscrepancyInfo": [
+      },
       {
         "containerId": 31,
         "numberOfKeys": 1,
@@ -4940,12 +4969,7 @@
           }
         ],
         "existsAt": "OM"
-      }
-    ]
-  },
-  "scmMismatch4":{
-    "lastKey":51,
-    "containerDiscrepancyInfo": [
+      },
       {
         "containerId": 41,
         "numberOfKeys": 1,
@@ -5142,12 +5166,7 @@
       }
     ]
   },
-  "scmMismatch5":{
-    "lastKey": null,
-    "containerDiscrepancyInfo": []
-  },
   "nonFSO": {
-    "lastKey": "11",
     "keysSummary": {
         "totalUnreplicatedDataSize": 10485760,
         "totalReplicatedDataSize": 31457280,
@@ -5177,13 +5196,7 @@
           "requiredNodes": 1,
           "replicationType": "RATIS"
         }
-      }
-    ],
-    "status": "OK"
-  },
-  "nonFSO1": {
-    "lastKey": "21",
-    "nonFSO": [
+      },
       {
         "key": "/-9223372036854775552/-9223372036854775040/-9223372036852420095/2440/110569623850191713",
         "path": "nonfso 11",
@@ -5207,13 +5220,7 @@
           "requiredNodes": 1,
           "replicationType": "RATIS"
         }
-      }
-    ],
-    "status": "OK"
-  },
-  "nonFSO2": {
-    "lastKey": "31",
-    "nonFSO": [
+      },
       {
         "key": "/-9223372036854775552/-9223372036854775040/-9223372036852420095/2440/110569623850191713",
         "path": "nonfso 21",
@@ -5241,19 +5248,7 @@
     ],
     "status": "OK"
   },
-  "nonFSO3": {
-    "keysSummary": {
-        "totalUnreplicatedDataSize": 10485760,
-        "totalReplicatedDataSize": 31457280,
-        "totalOpenKeys": 10
-    },
-    "lastKey": "",
-    "replicatedDataSize": 0,
-    "unreplicatedDataSize": 0,
-    "status": "OK"
-  },
   "fso": {
-    "lastKey": "11",
     "fso": [
       {
         "key": "/-9223372036854775552/-9223372036854775040/-9223372036852420095/2401/110569623850191713",
@@ -5381,14 +5376,7 @@
           "requiredNodes": 1,
           "replicationType": "RATIS"
         }
-
-      }
-    ],
-    "status": "OK"
-  },
-  "fso1": {
-    "lastKey": "21",
-    "fso": [
+      },
       {
         "key": "/-9223372036854775552/-9223372036854775040/-9223372036852420095/2411/110569623850191713",
         "path": "11",
@@ -5496,13 +5484,7 @@
           "requiredNodes": 1,
           "replicationType": "RATIS"
         }
-      }
-    ],
-    "status": "OK"
-  },
-  "fso2": {
-    "lastKey": "31",
-    "fso": [
+      },
       {
         "key": "/-9223372036854775552/-9223372036854775040/-9223372036852420095/2411/110569623850191713",
         "path": "21",
@@ -5626,19 +5608,7 @@
     ],
     "status": "OK"
   },
-  "fso3": {
-    "keysSummary": {
-      "totalUnreplicatedDataSize": 10485760,
-      "totalReplicatedDataSize": 31457280,
-      "totalOpenKeys": 10
-   },
-    "lastKey": "",
-    "replicatedDataSize": 0,
-    "unreplicatedDataSize": 0,
-    "status": "OK"
-  },
   "keydeletePending":{
-    "lastKey": "/volume/bucket1/rcmeevblsf/106/-9223372036843950335",
     "keysSummary": {
       "totalUnreplicatedDataSize": 29291,
       "totalReplicatedDataSize": 87873,
@@ -5996,16 +5966,7 @@
             "updateIDset": true
           }
         ]
-      }
-    ],
-    "status": "OK"
-  },
-
-  "keydeletePending1": {
-    "lastKey":"/-9223372036854775552/-9223372036854775040/-9223372036852420095/2421/110569623850191",
-    "replicatedTotal": -1530804718628866300,
-    "unreplicatedTotal": -1530804718628866300,
-    "deletedKeyInfo": [
+      },
       {
         "omKeyInfoList": [
           {
@@ -6062,15 +6023,7 @@
             "updateIDset": false
           }
         ]
-      }
-    ],
-    "status": "OK"
-  },
-  "keydeletePending2": {
-    "lastKey":"31",
-    "replicatedTotal": -1530804718628866300,
-    "unreplicatedTotal": -1530804718628866300,
-    "deletedKeyInfo": [
+      },
       {
         "omKeyInfoList": [
           {
@@ -6186,12 +6139,7 @@
     ],
     "status": "OK"
   },
-  "keydeletePending3": {
-    "lastKey":"",
-    "deletedKeyInfo": []
-  },
   "deleted": {
-    "lastKey": "11",
     "containers": [
       {
         "containerId": 1,
@@ -6362,12 +6310,7 @@
             "healthy": true
           }
         ]
-      }
-    ]
-  },
-  "deleted1": {
-    "lastKey": "21",
-    "containers": [
+      },
       {
         "containerId": 11,
         "numberOfKeys": 2,
@@ -6537,12 +6480,7 @@
             "healthy": true
           }
         ]
-      }
-    ]
-  },
-  "deleted2": {
-    "lastKey": "31",
-    "containers": [
+      },
       {
         "containerId": 21,
         "numberOfKeys": 2,
@@ -6712,12 +6650,7 @@
             "healthy": true
           }
         ]
-      }
-    ]
-  },
-  "deleted3": {
-    "lastKey": "41",
-    "containers": [
+      },
       {
         "containerId": 31,
         "numberOfKeys": 2,
@@ -6754,8 +6687,71 @@
       }
     ]
   },
-  "deleted4": {
-    "lastKey": null,
-    "containers": []
+  "dirdeletePending": {
+    "replicatedDataSize": 0,
+    "unreplicatedDataSize": 0,
+    "deletedDirInfo": [
+      {
+        "key": "/-4611686018427388160/-9223372036854775552/-9223372036854764286/231010153900/-9223372036854760111",
+        "path": ".Trash/hadoop/231010153900",
+        "inStateSince": 1696952297266,
+        "size": 17289,
+        "replicatedSize": 100,
+        "replicationInfo": {
+          "replicationFactor": "THREE",
+          "requiredNodes": 3,
+          "replicationType": "RATIS"
+        }
+      },
+      {
+        "key": "/-4611686018427388160/-9223372036854775552/-9223372036854775552/dir3/-9223372036854774015",
+        "path": "dir1",
+        "inStateSince": 1696954980154,
+        "size": 1200,
+        "replicatedSize": 0,
+        "replicationInfo": {
+          "replicationFactor": "THREE",
+          "requiredNodes": 3,
+          "replicationType": "RATIS"
+        }
+      },
+      {
+        "key": "/-4611686018427388160/-9223372036854775552/-9223372036854764286/231010153900/-9223372036854760191",
+        "path": ".Trash/hadoop/231010153900",
+        "inStateSince": 1696952297266,
+        "size": 17289,
+        "replicatedSize": 0,
+        "replicationInfo": {
+          "replicationFactor": "THREE",
+          "requiredNodes": 3,
+          "replicationType": "RATIS"
+        }
+      },
+      {
+        "key": "/-4611686018427388160/-9223372036854775552/-9223372036854775552/dir3/-9223372036854774112",
+        "path": "dir21",
+        "inStateSince": 1696954980154,
+        "size": 17289,
+        "replicatedSize": 0,
+        "replicationInfo": {
+          "replicationFactor": "THREE",
+          "requiredNodes": 3,
+          "replicationType": "RATIS"
+        }
+      },
+      {
+        "key": "/-4611686018427388160/-9223372036854775552/-9223372036854775552/dir3/-922337203685477303",
+        "path": "dir22",
+        "inStateSince": 1696954980900,
+        "size": 20289,
+        "replicatedSize": 0,
+        "replicationInfo": {
+          "replicationFactor": "THREE",
+          "requiredNodes": 3,
+          "replicationType": "RATIS"
+        }
+      }
+    ],
+    "status": "OK"
   }
 }

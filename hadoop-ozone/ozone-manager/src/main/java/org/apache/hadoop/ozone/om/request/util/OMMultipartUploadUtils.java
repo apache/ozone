@@ -23,13 +23,8 @@ import org.apache.hadoop.hdds.utils.UniqueId;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
-import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
-import org.apache.hadoop.ozone.om.request.file.OMFileRequest;
 
 import java.io.IOException;
-import java.nio.file.Path;
-import java.nio.file.Paths;
-import java.util.Iterator;
 import java.util.UUID;
 
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
@@ -96,36 +91,10 @@ public final class OMMultipartUploadUtils {
        OMMetadataManager omMetadataManager, BucketLayout bucketLayout)
       throws IOException {
     if (bucketLayout == BucketLayout.FILE_SYSTEM_OPTIMIZED) {
-      return getMultipartOpenKeyFSO(volumeName, bucketName,
-          keyName, multipartUploadId, omMetadataManager);
+      return omMetadataManager.getMultipartKeyFSO(volumeName, bucketName, keyName, multipartUploadId);
     } else {
-      return getMultipartOpenKey(volumeName, bucketName,
-          keyName, multipartUploadId, omMetadataManager);
+      return omMetadataManager.getMultipartKey(volumeName, bucketName, keyName, multipartUploadId);
     }
-  }
-
-  public static String getMultipartOpenKey(String volumeName,
-       String bucketName, String keyName, String multipartUploadId,
-       OMMetadataManager omMetadataManager) {
-    return omMetadataManager.getMultipartKey(
-        volumeName, bucketName, keyName, multipartUploadId);
-  }
-
-  public static String getMultipartOpenKeyFSO(String volumeName,
-        String bucketName, String keyName, String uploadID,
-        OMMetadataManager metaMgr) throws IOException {
-    String fileName = OzoneFSUtils.getFileName(keyName);
-    Iterator<Path> pathComponents = Paths.get(keyName).iterator();
-    final long volumeId = metaMgr.getVolumeId(volumeName);
-    final long bucketId = metaMgr.getBucketId(volumeName, bucketName);
-    long parentID =
-        OMFileRequest.getParentID(volumeId, bucketId, pathComponents,
-            keyName, metaMgr);
-
-    String multipartKey = metaMgr.getMultipartKey(volumeId, bucketId,
-        parentID, fileName, uploadID);
-
-    return multipartKey;
   }
 
 

@@ -18,7 +18,11 @@
 package org.apache.hadoop.hdds.scm.node;
 
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.scm.container.ContainerID;
+import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
 
+import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 /**
@@ -29,6 +33,8 @@ public interface DatanodeAdminMonitor extends Runnable {
 
   void startMonitoring(DatanodeDetails dn);
   void stopMonitoring(DatanodeDetails dn);
-  Set<DatanodeDetails> getTrackedNodes();
+  Set<DatanodeAdminMonitorImpl.TrackedNode> getTrackedNodes();
   void setMetrics(NodeDecommissionMetrics metrics);
+  Map<String, List<ContainerID>> getContainersPendingReplication(DatanodeDetails dn)
+      throws NodeNotFoundException;
 }

@@ -558,7 +558,15 @@ public class LegacyReplicationManager {
          * match the container's Sequence ID.
          */
         List<ContainerReplica> vulnerableUnhealthy =
-            replicaSet.getVulnerableUnhealthyReplicas(nodeManager);
+            replicaSet.getVulnerableUnhealthyReplicas(dn -> {
+              try {
+                return nodeManager.getNodeStatus(dn);
+              } catch (NodeNotFoundException e) {
+                LOG.warn("Exception for datanode {} while getting vulnerable replicas for container {}, with all " +
+                    "replicas {}.", dn, container, replicas, e);
+                return null;
+              }
+            });
         if (!vulnerableUnhealthy.isEmpty()) {
           report.incrementAndSample(HealthState.UNDER_REPLICATED,
               container.containerID());

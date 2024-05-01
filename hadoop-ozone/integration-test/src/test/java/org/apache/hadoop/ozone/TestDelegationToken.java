@@ -31,6 +31,7 @@ import java.util.UUID;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.HddsTestUtils;
 import org.apache.hadoop.hdds.scm.ScmConfig;
+import org.apache.hadoop.hdds.scm.client.ScmTopologyClient;
 import org.apache.hadoop.hdds.scm.ha.HASecurityUtils;
 import org.apache.hadoop.hdds.scm.server.SCMHTTPServerConfig;
 import org.apache.hadoop.hdds.scm.server.SCMStorageConfig;
@@ -46,6 +47,7 @@ import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.minikdc.MiniKdc;
 import org.apache.hadoop.ozone.om.OMStorage;
 import org.apache.hadoop.ozone.om.OzoneManager;
+import org.apache.hadoop.ozone.om.ScmBlockLocationTestingClient;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.protocolPB.OmTransportFactory;
 import org.apache.hadoop.ozone.om.protocolPB.OzoneManagerProtocolClientSideTranslatorPB;
@@ -56,9 +58,10 @@ import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.token.Token;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.GenericTestUtils.LogCapturer;
-
+import org.apache.ratis.util.ExitUtils;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.RandomStringUtils;
+
 import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.HADOOP_SECURITY_AUTHENTICATION;
 import static org.apache.hadoop.hdds.HddsConfigKeys.OZONE_METADATA_DIRS;
 import static org.apache.hadoop.hdds.scm.ScmConfig.ConfigStrings.HDDS_SCM_KERBEROS_KEYTAB_FILE_KEY;
@@ -85,13 +88,13 @@ import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INVA
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.TOKEN_ERROR_OTHER;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.VOLUME_NOT_FOUND;
 import static org.apache.hadoop.security.UserGroupInformation.AuthenticationMethod.KERBEROS;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 
-import org.apache.ratis.util.ExitUtils;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.assertThrows;
-import static org.junit.Assert.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.slf4j.event.Level.INFO;
+
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
@@ -101,7 +104,6 @@ import org.junit.jupiter.params.provider.MethodSource;
 import org.junit.jupiter.api.Timeout;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import static org.slf4j.event.Level.INFO;
 
 /**
  * Test class to for security enabled Ozone cluster.
@@ -312,6 +314,8 @@ public final class TestDelegationToken {
     try {
       // Start OM
       om.setCertClient(new CertificateClientTestImpl(conf));
+      om.setScmTopologyClient(new ScmTopologyClient(
+          new ScmBlockLocationTestingClient(null, null, 0)));
       om.start();
       UserGroupInformation ugi = UserGroupInformation.getCurrentUser();
       String username = ugi.getUserName();
@@ -323,8 +327,8 @@ public final class TestDelegationToken {
           RandomStringUtils.randomAscii(5));
 
       // Assert if auth was successful via Kerberos
-      assertFalse(logs.getOutput().contains(
-          "Auth successful for " + username + " (auth:KERBEROS)"));
+      assertThat(logs.getOutput()).doesNotContain(
+          "Auth successful for " + username + " (auth:KERBEROS)");
 
       // Case 1: Test successful delegation token.
       Token<OzoneTokenIdentifier> token = omClient
@@ -332,7 +336,7 @@ public final class TestDelegationToken {
 
       // Case 2: Test successful token renewal.
       long renewalTime = omClient.renewDelegationToken(token);
-      assertTrue(renewalTime > 0);
+      assertThat(renewalTime).isGreaterThan(0);
 
       // Check if token is of right kind and renewer is running om instance
       assertNotNull(token);
@@ -358,14 +362,12 @@ public final class TestDelegationToken {
       });
 
       // Case 3: Test Client can authenticate using token.
-      assertFalse(logs.getOutput().contains(
-          "Auth successful for " + username + " (auth:TOKEN)"));
+      assertThat(logs.getOutput()).doesNotContain(
+          "Auth successful for " + username + " (auth:TOKEN)");
       OzoneTestUtils.expectOmException(VOLUME_NOT_FOUND,
           () -> omClient.deleteVolume("vol1"));
-      assertTrue(
-          "Log file doesn't contain successful auth for user " + username,
-          logs.getOutput().contains("Auth successful for "
-              + username + " (auth:TOKEN)"));
+      assertThat(logs.getOutput())
+          .contains("Auth successful for " + username + " (auth:TOKEN)");
 
       // Case 4: Test failure of token renewal.
       // Call to renewDelegationToken will fail but it will confirm that
@@ -375,8 +377,8 @@ public final class TestDelegationToken {
       OMException ex = assertThrows(OMException.class,
           () -> omClient.renewDelegationToken(token));
       assertEquals(INVALID_AUTH_METHOD, ex.getResult());
-      assertTrue(logs.getOutput().contains(
-          "Auth successful for " + username + " (auth:TOKEN)"));
+      assertThat(logs.getOutput()).contains(
+          "Auth successful for " + username + " (auth:TOKEN)");
       omLogs.clearOutput();
       //testUser.setAuthenticationMethod(AuthMethod.KERBEROS);
       omClient.close();
@@ -392,7 +394,7 @@ public final class TestDelegationToken {
       // Wait for client to timeout
       Thread.sleep(CLIENT_TIMEOUT);
 
-      assertFalse(logs.getOutput().contains("Auth failed for"));
+      assertThat(logs.getOutput()).doesNotContain("Auth failed for");
 
       // Case 6: Test failure of token cancellation.
       // Get Om client, this time authentication using Token will fail as
@@ -403,8 +405,8 @@ public final class TestDelegationToken {
       ex = assertThrows(OMException.class,
           () -> omClient.cancelDelegationToken(token));
       assertEquals(TOKEN_ERROR_OTHER, ex.getResult());
-      assertTrue(ex.getMessage().contains("Cancel delegation token failed"));
-      assertTrue(logs.getOutput().contains("Auth failed for"));
+      assertThat(ex.getMessage()).contains("Cancel delegation token failed");
+      assertThat(logs.getOutput()).contains("Auth failed for");
     } finally {
       om.stop();
       om.join();

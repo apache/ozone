@@ -19,14 +19,15 @@ package org.apache.hadoop.hdds.scm.container;
 import static org.apache.hadoop.hdds.scm.HddsTestUtils.getContainer;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.eq;
+import static org.mockito.Mockito.any;
 
 import java.io.File;
 import java.io.IOException;
 import java.util.Iterator;
-import java.util.UUID;
 
-import org.apache.hadoop.fs.FileUtil;
-import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState;
@@ -51,11 +52,10 @@ import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.utils.db.DBStoreBuilder;
 import org.apache.hadoop.ozone.container.common.SCMTestUtils;
 import org.apache.hadoop.ozone.protocol.commands.CommandForDatanode;
-import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.mockito.Mockito;
+import org.junit.jupiter.api.io.TempDir;
 
 /**
  * Test container deletion behaviour of unknown containers
@@ -68,18 +68,16 @@ public class TestUnknownContainerReport {
   private ContainerStateManager containerStateManager;
   private EventPublisher publisher;
   private PipelineManager pipelineManager;
+  @TempDir
   private File testDir;
   private DBStore dbStore;
   private SCMHAManager scmhaManager;
 
   @BeforeEach
   public void setup() throws IOException {
-    final OzoneConfiguration conf = SCMTestUtils.getConf();
+    final OzoneConfiguration conf = SCMTestUtils.getConf(testDir);
     this.nodeManager = new MockNodeManager(true, 10);
-    this.containerManager = Mockito.mock(ContainerManager.class);
-    testDir = GenericTestUtils.getTestDir(
-        TestUnknownContainerReport.class.getSimpleName() + UUID.randomUUID());
-    conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, testDir.getAbsolutePath());
+    this.containerManager = mock(ContainerManager.class);
     dbStore = DBStoreBuilder.createDBStore(
         conf, new SCMDBDefinition());
     scmhaManager = SCMHAManagerStub.getInstance(true);
@@ -92,9 +90,9 @@ public class TestUnknownContainerReport {
         .setContainerStore(SCMDBDefinition.CONTAINERS.getTable(dbStore))
         .setSCMDBTransactionBuffer(scmhaManager.getDBTransactionBuffer())
         .build();
-    this.publisher = Mockito.mock(EventPublisher.class);
+    this.publisher = mock(EventPublisher.class);
 
-    Mockito.when(containerManager.getContainer(Mockito.any(ContainerID.class)))
+    when(containerManager.getContainer(any(ContainerID.class)))
         .thenThrow(new ContainerNotFoundException());
   }
 
@@ -104,8 +102,6 @@ public class TestUnknownContainerReport {
     if (dbStore != null) {
       dbStore.close();
     }
-
-    FileUtil.fullyDelete(testDir);
   }
 
   @Test
@@ -115,8 +111,7 @@ public class TestUnknownContainerReport {
 
     // By default, unknown containers won't be taken delete action by SCM
     verify(publisher, times(0)).fireEvent(
-        Mockito.eq(SCMEvents.DATANODE_COMMAND),
-        Mockito.any(CommandForDatanode.class));
+        eq(SCMEvents.DATANODE_COMMAND), any(CommandForDatanode.class));
   }
 
   @Test
@@ -128,8 +123,7 @@ public class TestUnknownContainerReport {
 
     sendContainerReport(conf);
     verify(publisher, times(1)).fireEvent(
-        Mockito.eq(SCMEvents.DATANODE_COMMAND),
-        Mockito.any(CommandForDatanode.class));
+        eq(SCMEvents.DATANODE_COMMAND), any(CommandForDatanode.class));
   }
 
   /**

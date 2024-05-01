@@ -152,6 +152,11 @@ public final class HddsConfigKeys {
       + ".name";
   public static final String HDDS_PUBLIC_KEY_FILE_NAME_DEFAULT = "public.pem";
 
+  public static final String HDDS_HTTP_SERVER_KEYSTORE_TYPE = "ssl.server.keystore.type";
+  public static final String HDDS_HTTP_SERVER_KEYSTORE_TYPE_DEFAULT = "jks";
+  public static final String HDDS_HTTP_SERVER_TRUSTSTORE_TYPE = "ssl.server.truststore.type";
+  public static final String HDDS_HTTP_SERVER_TRUSTSTORE_TYPE_DEFAULT = "jks";
+
   public static final String HDDS_BLOCK_TOKEN_EXPIRY_TIME =
       "hdds.block.token.expiry.time";
   public static final String HDDS_BLOCK_TOKEN_EXPIRY_TIME_DEFAULT = "1d";
@@ -338,6 +343,9 @@ public final class HddsConfigKeys {
       HDDS_SECURITY_CLIENT_SCM_SECRET_KEY_DATANODE_PROTOCOL_ACL =
       "hdds.security.client.scm.secretkey.datanode.protocol.acl";
 
+  public static final String OZONE_SECURITY_RECONFIGURE_PROTOCOL_ACL =
+      "ozone.security.reconfigure.protocol.acl";
+
   // Determines if the Container Chunk Manager will write user data to disk
   // Set to false only for specific performance tests
   public static final String HDDS_CONTAINER_PERSISTDATA =
@@ -392,4 +400,9 @@ public final class HddsConfigKeys {
 
   public static final String OZONE_AUDIT_LOG_DEBUG_CMD_LIST_DNAUDIT =
       "ozone.audit.log.debug.cmd.list.dnaudit";
+
+  public static final String HDDS_DATANODE_SLOW_OP_WARNING_THRESHOLD_KEY =
+      "hdds.datanode.slow.op.warning.threshold";
+  public static final String HDDS_DATANODE_SLOW_OP_WARNING_THRESHOLD_DEFAULT =
+      "500ms";
 }

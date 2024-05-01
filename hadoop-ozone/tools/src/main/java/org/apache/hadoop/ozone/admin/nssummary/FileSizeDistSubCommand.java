@@ -17,15 +17,14 @@
  */
 package org.apache.hadoop.ozone.admin.nssummary;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
+import org.apache.hadoop.hdds.server.JsonUtils;
 import picocli.CommandLine;
 
-import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.concurrent.Callable;
 
-import static org.apache.hadoop.ozone.admin.nssummary.NSSummaryCLIUtils.getResponseMap;
 import static org.apache.hadoop.ozone.admin.nssummary.NSSummaryCLIUtils.makeHttpCall;
 import static org.apache.hadoop.ozone.admin.nssummary.NSSummaryCLIUtils.printEmptyPathRequest;
 import static org.apache.hadoop.ozone.admin.nssummary.NSSummaryCLIUtils.printBucketReminder;
@@ -73,24 +72,23 @@ public class FileSizeDistSubCommand implements Callable {
       printNewLines(1);
       return null;
     }
-    HashMap<String, Object> distResponse = getResponseMap(response);
+    JsonNode distResponse = JsonUtils.readTree(response);
 
-    if (distResponse.get("status").equals("PATH_NOT_FOUND")) {
+    if ("PATH_NOT_FOUND".equals(distResponse.path("status").asText())) {
       printPathNotFound();
-    } else if (distResponse.get("status").equals("TYPE_NOT_APPLICABLE")) {
+    } else if ("TYPE_NOT_APPLICABLE".equals(distResponse.path("status").asText())) {
       printTypeNA("File Size Distribution");
     } else {
-      if (parent.isObjectStoreBucket(path) ||
-          !parent.bucketIsPresentInThePath(path)) {
+      if (parent.isNotValidBucketOrOBSBucket(path)) {
         printBucketReminder();
       }
 
       printWithUnderline("File Size Distribution", true);
-      ArrayList fileSizeDist = (ArrayList) distResponse.get("dist");
+      JsonNode fileSizeDist = distResponse.path("dist");
       double sum = 0;
 
       for (int i = 0; i < fileSizeDist.size(); ++i) {
-        sum += (double) fileSizeDist.get(i);
+        sum += fileSizeDist.get(i).asDouble();
       }
       if (sum == 0) {
         printSpaces(2);
@@ -101,11 +99,11 @@ public class FileSizeDistSubCommand implements Callable {
       }
 
       for (int i = 0; i < fileSizeDist.size(); ++i) {
-        if ((double)fileSizeDist.get(i) == 0) {
+        if (fileSizeDist.get(i).asDouble() == 0) {
           continue;
         }
         String label = convertBinIndexToReadableRange(i);
-        printDistRow(label, (double) fileSizeDist.get(i), sum);
+        printDistRow(label, fileSizeDist.get(i).asDouble(), sum);
       }
     }
     printNewLines(1);

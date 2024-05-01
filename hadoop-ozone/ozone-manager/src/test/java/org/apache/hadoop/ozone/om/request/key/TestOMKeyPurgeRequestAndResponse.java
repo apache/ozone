@@ -23,7 +23,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
-import org.apache.hadoop.ozone.om.IOmMetadataReader;
 import org.apache.hadoop.ozone.om.OmSnapshot;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
@@ -31,8 +30,6 @@ import org.apache.hadoop.ozone.om.request.snapshot.OMSnapshotCreateRequest;
 import org.apache.hadoop.ozone.om.request.snapshot.TestOMSnapshotCreateRequest;
 import org.apache.hadoop.ozone.om.response.snapshot.OMSnapshotCreateResponse;
 import org.apache.hadoop.ozone.om.snapshot.ReferenceCounted;
-import org.apache.hadoop.ozone.om.snapshot.SnapshotCache;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
 import org.apache.hadoop.ozone.om.response.key.OMKeyPurgeResponse;
@@ -45,8 +42,11 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
 
-import static org.apache.hadoop.ozone.om.OmSnapshotManager.getSnapshotPrefix;
-import static org.mockito.ArgumentMatchers.any;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.when;
 
 /**
@@ -73,7 +73,7 @@ public class TestOMKeyPurgeRequestAndResponse extends TestOMKeyRequest {
     for (int i = 1; i <= numKeys; i++) {
       String key = keyName + "-" + i;
       OMRequestTestUtils.addKeyToTable(false, false, volumeName, bucket,
-          key, clientID, replicationType, replicationFactor, trxnIndex++,
+          key, clientID, replicationConfig, trxnIndex++,
           omMetadataManager);
       ozoneKeyNames.add(omMetadataManager.getOzoneKey(
           volumeName, bucket, key));
@@ -130,8 +130,7 @@ public class TestOMKeyPurgeRequestAndResponse extends TestOMKeyRequest {
 
     // validateAndUpdateCache OMSnapshotCreateResponse.
     OMSnapshotCreateResponse omClientResponse = (OMSnapshotCreateResponse)
-        omSnapshotCreateRequest.validateAndUpdateCache(ozoneManager, 1L,
-            ozoneManagerDoubleBufferHelper);
+        omSnapshotCreateRequest.validateAndUpdateCache(ozoneManager, 1L);
     // Add to batch and commit to DB.
     omClientResponse.addToDBBatch(omMetadataManager, batchOperation);
     omMetadataManager.getStore().commitBatchOperation(batchOperation);
@@ -141,7 +140,7 @@ public class TestOMKeyPurgeRequestAndResponse extends TestOMKeyRequest {
         bucketName, snapshotName);
     SnapshotInfo snapshotInfo =
         omMetadataManager.getSnapshotInfoTable().get(key);
-    Assertions.assertNotNull(snapshotInfo);
+    assertNotNull(snapshotInfo);
     return snapshotInfo;
   }
 
@@ -152,7 +151,7 @@ public class TestOMKeyPurgeRequestAndResponse extends TestOMKeyRequest {
     OMRequest modifiedOmRequest = omKeyPurgeRequest.preExecute(ozoneManager);
 
     // Will not be equal, as UserInfo will be set.
-    Assertions.assertNotEquals(originalOmRequest, modifiedOmRequest);
+    assertNotEquals(originalOmRequest, modifiedOmRequest);
 
     return modifiedOmRequest;
   }
@@ -164,7 +163,7 @@ public class TestOMKeyPurgeRequestAndResponse extends TestOMKeyRequest {
 
     // The keys should be present in the DeletedKeys table before purging
     for (String deletedKey : deletedKeyNames) {
-      Assertions.assertTrue(omMetadataManager.getDeletedTable().isExist(
+      assertTrue(omMetadataManager.getDeletedTable().isExist(
           deletedKey));
     }
 
@@ -175,8 +174,7 @@ public class TestOMKeyPurgeRequestAndResponse extends TestOMKeyRequest {
     OMKeyPurgeRequest omKeyPurgeRequest =
         new OMKeyPurgeRequest(preExecutedRequest);
 
-    omKeyPurgeRequest.validateAndUpdateCache(ozoneManager, 100L,
-        ozoneManagerDoubleBufferHelper);
+    omKeyPurgeRequest.validateAndUpdateCache(ozoneManager, 100L);
 
     OMResponse omResponse = OMResponse.newBuilder()
         .setPurgeKeysResponse(PurgeKeysResponse.getDefaultInstance())
@@ -197,8 +195,7 @@ public class TestOMKeyPurgeRequestAndResponse extends TestOMKeyRequest {
 
     // The keys should not exist in the DeletedKeys table
     for (String deletedKey : deletedKeyNames) {
-      Assertions.assertFalse(omMetadataManager.getDeletedTable().isExist(
-          deletedKey));
+      assertFalse(omMetadataManager.getDeletedTable().isExist(deletedKey));
     }
   }
 
@@ -210,8 +207,7 @@ public class TestOMKeyPurgeRequestAndResponse extends TestOMKeyRequest {
     SnapshotInfo snapInfo = createSnapshot("snap1");
     // The keys should be not present in the active Db's deletedTable
     for (String deletedKey : deletedKeyNames) {
-      Assertions.assertFalse(omMetadataManager.getDeletedTable().isExist(
-          deletedKey));
+      assertFalse(omMetadataManager.getDeletedTable().isExist(deletedKey));
     }
 
     SnapshotInfo fromSnapshotInfo = new SnapshotInfo.Builder()
@@ -220,17 +216,16 @@ public class TestOMKeyPurgeRequestAndResponse extends TestOMKeyRequest {
         .setName("snap1")
         .build();
 
-    ReferenceCounted<IOmMetadataReader, SnapshotCache> rcOmSnapshot =
-        ozoneManager.getOmSnapshotManager().checkForSnapshot(
+    ReferenceCounted<OmSnapshot> rcOmSnapshot =
+        ozoneManager.getOmSnapshotManager().getSnapshot(
             fromSnapshotInfo.getVolumeName(),
             fromSnapshotInfo.getBucketName(),
-            getSnapshotPrefix(fromSnapshotInfo.getName()),
-            true);
-    OmSnapshot omSnapshot = (OmSnapshot) rcOmSnapshot.get();
+            fromSnapshotInfo.getName());
+    OmSnapshot omSnapshot = rcOmSnapshot.get();
 
     // The keys should be present in the snapshot's deletedTable
     for (String deletedKey : deletedKeyNames) {
-      Assertions.assertTrue(omSnapshot.getMetadataManager()
+      assertTrue(omSnapshot.getMetadataManager()
           .getDeletedTable().isExist(deletedKey));
     }
 
@@ -242,8 +237,7 @@ public class TestOMKeyPurgeRequestAndResponse extends TestOMKeyRequest {
     OMKeyPurgeRequest omKeyPurgeRequest =
         new OMKeyPurgeRequest(preExecutedRequest);
 
-    omKeyPurgeRequest.validateAndUpdateCache(ozoneManager, 100L,
-        ozoneManagerDoubleBufferHelper);
+    omKeyPurgeRequest.validateAndUpdateCache(ozoneManager, 100L);
 
     OMResponse omResponse = OMResponse.newBuilder()
         .setPurgeKeysResponse(PurgeKeysResponse.getDefaultInstance())
@@ -264,7 +258,7 @@ public class TestOMKeyPurgeRequestAndResponse extends TestOMKeyRequest {
 
     // The keys should not exist in the DeletedKeys table
     for (String deletedKey : deletedKeyNames) {
-      Assertions.assertFalse(omSnapshot.getMetadataManager()
+      assertFalse(omSnapshot.getMetadataManager()
           .getDeletedTable().isExist(deletedKey));
     }
 

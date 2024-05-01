@@ -19,43 +19,42 @@ package org.apache.hadoop.ozone.recon;
 
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
+import org.apache.hadoop.hdds.scm.node.NodeStatus;
+import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.recon.scm.ReconNodeManager;
 import org.apache.hadoop.ozone.recon.scm.ReconStorageContainerManagerFacade;
 import org.apache.ozone.test.GenericTestUtils;
-import org.junit.After;
-import org.junit.Before;
-import org.junit.Rule;
-import org.junit.Test;
-import org.junit.rules.TestRule;
-import org.junit.rules.Timeout;
-import org.apache.ozone.test.JUnit5AwareTimeout;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Timeout;
 import org.slf4j.LoggerFactory;
 
 import java.util.List;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.fail;
 
 /**
  * Test Recon SCM Snapshot Download implementation.
  */
+@Timeout(100)
 public class TestReconScmSnapshot {
-  /**
-   * Set a timeout for each test.
-   */
-  @Rule
-  public TestRule timeout = new JUnit5AwareTimeout(Timeout.seconds(100));
   private OzoneConfiguration conf;
   private MiniOzoneCluster ozoneCluster = null;
 
-  @Before
+  @BeforeEach
   public void setup() throws Exception {
     conf = new OzoneConfiguration();
+    conf.set("ozone.scm.stale.node.interval", "6s");
+    conf.set("ozone.scm.dead.node.interval", "8s");
     conf.setBoolean(
         ReconServerConfigKeys.OZONE_RECON_SCM_SNAPSHOT_ENABLED, true);
     conf.setInt(ReconServerConfigKeys.OZONE_RECON_SCM_CONTAINER_THRESHOLD, 0);
@@ -126,7 +125,51 @@ public class TestReconScmSnapshot {
     assertEquals(keyCountAfter, keyCountBefore);
   }
 
-  @After
+  @Test
+  public void testExplicitRemovalOfNode() throws Exception {
+    ReconNodeManager nodeManager = (ReconNodeManager) ozoneCluster.getReconServer()
+        .getReconStorageContainerManager().getScmNodeManager();
+    long nodeDBCountBefore = nodeManager.getNodeDBKeyCount();
+    List<DatanodeDetails> allNodes = nodeManager.getAllNodes();
+    assertEquals(nodeDBCountBefore, allNodes.size());
+
+    DatanodeDetails datanodeDetails = allNodes.get(3);
+    ozoneCluster.shutdownHddsDatanode(datanodeDetails);
+
+    GenericTestUtils.waitFor(() -> {
+      try {
+        return nodeManager.getNodeStatus(datanodeDetails).isDead();
+      } catch (NodeNotFoundException e) {
+        fail("getNodeStatus() Failed for " + datanodeDetails.getUuid(), e);
+        throw new RuntimeException(e);
+      }
+    }, 2000, 10000);
+
+    // Even after one node is DEAD, node manager is still keep tracking the DEAD node.
+    long nodeDBCountAfter = nodeManager.getNodeDBKeyCount();
+    assertEquals(nodeDBCountAfter, 4);
+
+    final NodeStatus nStatus = nodeManager.getNodeStatus(datanodeDetails);
+
+    final HddsProtos.NodeOperationalState backupOpState =
+        datanodeDetails.getPersistedOpState();
+    final long backupOpStateExpiry =
+        datanodeDetails.getPersistedOpStateExpiryEpochSec();
+    assertEquals(backupOpState, nStatus.getOperationalState());
+    assertEquals(backupOpStateExpiry, nStatus.getOpStateExpiryEpochSeconds());
+
+    // Now removing the DEAD node from both node DB and node manager memory.
+    nodeManager.removeNode(datanodeDetails);
+
+    // Now check the count of datanodes node DB has and node manager is tracking in memory
+    nodeDBCountAfter = nodeManager.getNodeDBKeyCount();
+    assertEquals(nodeDBCountAfter, 3);
+
+    allNodes = nodeManager.getAllNodes();
+    assertEquals(nodeDBCountAfter, allNodes.size());
+  }
+
+  @AfterEach
   public void shutdown() throws Exception {
     if (ozoneCluster != null) {
       ozoneCluster.shutdown();

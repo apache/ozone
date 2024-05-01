@@ -41,16 +41,15 @@ import org.junit.jupiter.api.Timeout;
 
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.UUID;
 
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ACL_AUTHORIZER_CLASS;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ACL_ENABLED;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ADMINISTRATORS;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ADMINISTRATORS_WILDCARD;
 import static org.apache.hadoop.ozone.audit.AuditLogTestUtils.verifyAuditLog;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Test for Ozone Manager ACLs.
@@ -78,17 +77,11 @@ public class TestOmAcls {
   @BeforeAll
   public static void init() throws Exception {
     OzoneConfiguration conf = new OzoneConfiguration();
-    String clusterId = UUID.randomUUID().toString();
-    String scmId = UUID.randomUUID().toString();
-    String omId = UUID.randomUUID().toString();
     conf.setBoolean(OZONE_ACL_ENABLED, true);
     conf.setClass(OZONE_ACL_AUTHORIZER_CLASS, OzoneAccessAuthorizerTest.class,
         IAccessAuthorizer.class);
     conf.setStrings(OZONE_ADMINISTRATORS, OZONE_ADMINISTRATORS_WILDCARD);
     cluster = MiniOzoneCluster.newBuilder(conf)
-        .setClusterId(clusterId)
-        .setScmId(scmId)
-        .setOmId(omId)
         .build();
     cluster.waitForClusterToBeReady();
     client = cluster.newClient();
@@ -124,8 +117,8 @@ public class TestOmAcls {
             () -> TestDataUtil.createVolumeAndBucket(client));
     assertEquals(ResultCodes.PERMISSION_DENIED, exception.getResult());
 
-    assertTrue(logCapturer.getOutput()
-            .contains("doesn't have CREATE permission to access volume"));
+    assertThat(logCapturer.getOutput())
+            .contains("doesn't have CREATE permission to access volume");
     verifyAuditLog(OMAction.CREATE_VOLUME, AuditEventStatus.FAILURE);
   }
 
@@ -138,8 +131,8 @@ public class TestOmAcls {
             objectStore.getVolume(bucket.getVolumeName()));
     assertEquals(ResultCodes.PERMISSION_DENIED, exception.getResult());
 
-    assertTrue(logCapturer.getOutput()
-            .contains("doesn't have READ permission to access volume"));
+    assertThat(logCapturer.getOutput())
+            .contains("doesn't have READ permission to access volume");
     verifyAuditLog(OMAction.READ_VOLUME, AuditEventStatus.FAILURE);
   }
 
@@ -151,8 +144,8 @@ public class TestOmAcls {
             () -> TestDataUtil.createVolumeAndBucket(client));
     assertEquals(ResultCodes.PERMISSION_DENIED, exception.getResult());
 
-    assertTrue(logCapturer.getOutput()
-            .contains("doesn't have CREATE permission to access bucket"));
+    assertThat(logCapturer.getOutput())
+            .contains("doesn't have CREATE permission to access bucket");
     verifyAuditLog(OMAction.CREATE_BUCKET, AuditEventStatus.FAILURE);
   }
 
@@ -167,8 +160,8 @@ public class TestOmAcls {
     );
 
     assertEquals(ResultCodes.PERMISSION_DENIED, exception.getResult());
-    assertTrue(logCapturer.getOutput()
-            .contains("doesn't have READ permission to access bucket"));
+    assertThat(logCapturer.getOutput())
+            .contains("doesn't have READ permission to access bucket");
     verifyAuditLog(OMAction.READ_BUCKET, AuditEventStatus.FAILURE);
   }
 
@@ -181,8 +174,8 @@ public class TestOmAcls {
     OMException exception = assertThrows(OMException.class,
             () -> TestDataUtil.createKey(bucket, "testKey", "testcontent"));
     assertEquals(ResultCodes.PERMISSION_DENIED, exception.getResult());
-    assertTrue(logCapturer.getOutput().contains("doesn't have CREATE " +
-            "permission to access key"));
+    assertThat(logCapturer.getOutput()).contains("doesn't have CREATE " +
+            "permission to access key");
   }
 
   @Test
@@ -195,8 +188,8 @@ public class TestOmAcls {
             () -> TestDataUtil.getKey(bucket, "testKey"));
 
     assertEquals(ResultCodes.PERMISSION_DENIED, exception.getResult());
-    assertTrue(logCapturer.getOutput().contains("doesn't have READ " +
-            "permission to access key"));
+    assertThat(logCapturer.getOutput()).contains("doesn't have READ " +
+            "permission to access key");
     verifyAuditLog(OMAction.READ_KEY, AuditEventStatus.FAILURE);
   }
 
@@ -209,8 +202,8 @@ public class TestOmAcls {
     OMException exception = assertThrows(OMException.class,
             () -> bucket.setAcl(new ArrayList<>()));
     assertEquals(ResultCodes.PERMISSION_DENIED, exception.getResult());
-    assertTrue(logCapturer.getOutput()
-        .contains("doesn't have WRITE_ACL permission to access bucket"));
+    assertThat(logCapturer.getOutput())
+        .contains("doesn't have WRITE_ACL permission to access bucket");
     verifyAuditLog(OMAction.SET_ACL, AuditEventStatus.FAILURE);
   }
 

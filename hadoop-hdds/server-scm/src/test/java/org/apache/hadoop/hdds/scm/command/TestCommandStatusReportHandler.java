@@ -43,8 +43,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
-import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.assertj.core.api.Assertions.assertThat;
 
 /**
  * Unit test for command status report handler.
@@ -68,15 +67,15 @@ public class TestCommandStatusReportHandler implements EventPublisher {
     CommandStatusReportFromDatanode report = this.getStatusReport(Collections
         .emptyList());
     cmdStatusReportHandler.onMessage(report, this);
-    assertFalse(logCapturer.getOutput().contains("Delete_Block_Status"));
-    assertFalse(logCapturer.getOutput().contains("Replicate_Command_Status"));
+    assertThat(logCapturer.getOutput()).doesNotContain("Delete_Block_Status");
+    assertThat(logCapturer.getOutput()).doesNotContain("Replicate_Command_Status");
 
     report = this.getStatusReport(this.getCommandStatusList());
     cmdStatusReportHandler.onMessage(report, this);
-    assertTrue(logCapturer.getOutput().contains("firing event of type " +
-        "Delete_Block_Status"));
-    assertTrue(logCapturer.getOutput().contains("type: " +
-        "deleteBlocksCommand"));
+    assertThat(logCapturer.getOutput()).contains("firing event of type " +
+        "Delete_Block_Status");
+    assertThat(logCapturer.getOutput()).contains("type: " +
+        "deleteBlocksCommand");
 
   }
 

@@ -19,7 +19,6 @@ package org.apache.hadoop.ozone.container.common;
 
 
 import com.google.common.collect.Lists;
-import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.client.BlockID;
@@ -71,17 +70,12 @@ import org.apache.hadoop.ozone.container.metadata.DatanodeStoreSchemaTwoImpl;
 import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.GenericTestUtils.LogCapturer;
-import org.junit.After;
-import org.junit.Assert;
-import org.junit.Assume;
-import org.junit.Before;
-import org.junit.Rule;
-import org.junit.Test;
-import org.junit.rules.TestRule;
-import org.junit.rules.Timeout;
-import org.apache.ozone.test.JUnit5AwareTimeout;
-import org.junit.runner.RunWith;
-import org.junit.runners.Parameterized;
+import org.apache.ozone.test.tag.Unhealthy;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.Assumptions;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Timeout;
+import org.junit.jupiter.api.io.TempDir;
 import org.slf4j.LoggerFactory;
 
 import java.io.File;
@@ -113,49 +107,34 @@ import static org.apache.hadoop.ozone.container.common.ContainerTestUtils.create
 import static org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion.FILE_PER_BLOCK;
 import static org.apache.hadoop.ozone.container.common.states.endpoint.VersionEndpointTask.LOG;
 import static org.apache.hadoop.ozone.container.keyvalue.helpers.KeyValueContainerUtil.isSameSchemaVersion;
-import static org.mockito.ArgumentMatchers.any;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 /**
  * Tests to test block deleting service.
  */
-@RunWith(Parameterized.class)
+@Timeout(30)
 public class TestBlockDeletingService {
 
-  @Rule
-  public TestRule testTimeout = new JUnit5AwareTimeout(Timeout.seconds(30));
-
+  @TempDir
   private File testRoot;
   private String scmId;
   private String datanodeUuid;
   private final OzoneConfiguration conf = new OzoneConfiguration();
 
-  private final ContainerLayoutVersion layout;
-  private final String schemaVersion;
+  private ContainerLayoutVersion layout;
+  private String schemaVersion;
   private int blockLimitPerInterval;
   private MutableVolumeSet volumeSet;
 
-  public TestBlockDeletingService(ContainerTestVersionInfo versionInfo) {
-    this.layout = versionInfo.getLayout();
-    this.schemaVersion = versionInfo.getSchemaVersion();
-    ContainerTestVersionInfo.setTestSchemaVersion(schemaVersion, conf);
-  }
-
-  @Parameterized.Parameters
-  public static Iterable<Object[]> parameters() {
-    return ContainerTestVersionInfo.versionParameters();
-  }
-
-  @Before
+  @BeforeEach
   public void init() throws IOException {
     CodecBuffer.enableLeakDetection();
-
-    testRoot = GenericTestUtils
-        .getTestDir(TestBlockDeletingService.class.getSimpleName());
-    if (testRoot.exists()) {
-      FileUtils.cleanDirectory(testRoot);
-    }
     scmId = UUID.randomUUID().toString();
     conf.set(ScmConfigKeys.HDDS_DATANODE_DIR_KEY, testRoot.getAbsolutePath());
     conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, testRoot.getAbsolutePath());
@@ -165,10 +144,9 @@ public class TestBlockDeletingService {
     createDbInstancesForTestIfNeeded(volumeSet, scmId, scmId, conf);
   }
 
-  @After
+  @AfterEach
   public void cleanup() throws IOException {
     BlockUtils.shutdownCache(conf);
-    FileUtils.deleteDirectory(testRoot);
     CodecBuffer.assertNoLeaks();
   }
 
@@ -437,8 +415,10 @@ public class TestBlockDeletingService {
    * there are no delete transactions in the DB, this metadata counter should
    * be reset to zero.
    */
-  @Test
-  public void testPendingDeleteBlockReset() throws Exception {
+  @ContainerTestVersionInfo.ContainerTest
+  public void testPendingDeleteBlockReset(ContainerTestVersionInfo versionInfo)
+      throws Exception {
+    setLayoutAndSchemaForTest(versionInfo);
     // This test is not relevant for schema V1.
     if (isSameSchemaVersion(schemaVersion, SCHEMA_V1)) {
       return;
@@ -459,11 +439,11 @@ public class TestBlockDeletingService {
         0, 1);
     try (DBHandle db = BlockUtils.getDB(incorrectData, conf)) {
       // Check pre-create state.
-      Assert.assertEquals(0, getUnderDeletionBlocksCount(db,
+      assertEquals(0, getUnderDeletionBlocksCount(db,
           incorrectData));
-      Assert.assertEquals(0, db.getStore().getMetadataTable()
+      assertEquals(0, db.getStore().getMetadataTable()
           .get(incorrectData.getPendingDeleteBlockCountKey()).longValue());
-      Assert.assertEquals(0,
+      assertEquals(0,
           incorrectData.getNumPendingDeletionBlocks());
 
       // Alter the pending delete value in memory and the DB.
@@ -478,12 +458,12 @@ public class TestBlockDeletingService {
     KeyValueContainerData correctData = createToDeleteBlocks(containerSet,
         correctNumBlocksToDelete, 1);
     // Check its metadata was set up correctly.
-    Assert.assertEquals(correctNumBlocksToDelete,
+    assertEquals(correctNumBlocksToDelete,
         correctData.getNumPendingDeletionBlocks());
     try (DBHandle db = BlockUtils.getDB(correctData, conf)) {
-      Assert.assertEquals(correctNumBlocksToDelete,
+      assertEquals(correctNumBlocksToDelete,
           getUnderDeletionBlocksCount(db, correctData));
-      Assert.assertEquals(correctNumBlocksToDelete,
+      assertEquals(correctNumBlocksToDelete,
           db.getStore().getMetadataTable()
               .get(correctData.getPendingDeleteBlockCountKey()).longValue());
     }
@@ -507,20 +487,20 @@ public class TestBlockDeletingService {
 
     // Pending delete block count in the incorrect container should be fixed
     // and reset to 0.
-    Assert.assertEquals(0, incorrectData.getNumPendingDeletionBlocks());
+    assertEquals(0, incorrectData.getNumPendingDeletionBlocks());
     try (DBHandle db = BlockUtils.getDB(incorrectData, conf)) {
-      Assert.assertEquals(0, getUnderDeletionBlocksCount(db,
+      assertEquals(0, getUnderDeletionBlocksCount(db,
           incorrectData));
-      Assert.assertEquals(0, db.getStore().getMetadataTable()
+      assertEquals(0, db.getStore().getMetadataTable()
           .get(incorrectData.getPendingDeleteBlockCountKey()).longValue());
     }
     // Correct container should not have been processed.
-    Assert.assertEquals(correctNumBlocksToDelete,
+    assertEquals(correctNumBlocksToDelete,
         correctData.getNumPendingDeletionBlocks());
     try (DBHandle db = BlockUtils.getDB(correctData, conf)) {
-      Assert.assertEquals(correctNumBlocksToDelete,
+      assertEquals(correctNumBlocksToDelete,
           getUnderDeletionBlocksCount(db, correctData));
-      Assert.assertEquals(correctNumBlocksToDelete,
+      assertEquals(correctNumBlocksToDelete,
           db.getStore().getMetadataTable()
               .get(correctData.getPendingDeleteBlockCountKey()).longValue());
     }
@@ -531,27 +511,28 @@ public class TestBlockDeletingService {
 
     // The incorrect container should remain in the same state after being
     // fixed.
-    Assert.assertEquals(0, incorrectData.getNumPendingDeletionBlocks());
+    assertEquals(0, incorrectData.getNumPendingDeletionBlocks());
     try (DBHandle db = BlockUtils.getDB(incorrectData, conf)) {
-      Assert.assertEquals(0, getUnderDeletionBlocksCount(db,
+      assertEquals(0, getUnderDeletionBlocksCount(db,
           incorrectData));
-      Assert.assertEquals(0, db.getStore().getMetadataTable()
+      assertEquals(0, db.getStore().getMetadataTable()
           .get(incorrectData.getPendingDeleteBlockCountKey()).longValue());
     }
     // The correct container should have been processed this run and had its
     // blocks deleted.
-    Assert.assertEquals(0, correctData.getNumPendingDeletionBlocks());
+    assertEquals(0, correctData.getNumPendingDeletionBlocks());
     try (DBHandle db = BlockUtils.getDB(correctData, conf)) {
-      Assert.assertEquals(0, getUnderDeletionBlocksCount(db,
+      assertEquals(0, getUnderDeletionBlocksCount(db,
           correctData));
-      Assert.assertEquals(0, db.getStore().getMetadataTable()
+      assertEquals(0, db.getStore().getMetadataTable()
           .get(correctData.getPendingDeleteBlockCountKey()).longValue());
     }
   }
 
-
-  @Test
-  public void testBlockDeletion() throws Exception {
+  @ContainerTestVersionInfo.ContainerTest
+  public void testBlockDeletion(ContainerTestVersionInfo versionInfo)
+      throws Exception {
+    setLayoutAndSchemaForTest(versionInfo);
     DatanodeConfiguration dnConf = conf.getObject(DatanodeConfiguration.class);
     dnConf.setBlockDeletionLimit(2);
     this.blockLimitPerInterval = dnConf.getBlockDeletionLimit();
@@ -572,7 +553,7 @@ public class TestBlockDeletingService {
     // Ensure 1 container was created
     List<ContainerData> containerData = Lists.newArrayList();
     containerSet.listContainer(0L, 1, containerData);
-    Assert.assertEquals(1, containerData.size());
+    assertEquals(1, containerData.size());
     KeyValueContainerData data = (KeyValueContainerData) containerData.get(0);
     KeyPrefixFilter filter = isSameSchemaVersion(schemaVersion, SCHEMA_V1) ?
         data.getDeletingBlockKeyFilter() : data.getUnprefixedKeyFilter();
@@ -596,40 +577,40 @@ public class TestBlockDeletingService {
           deletingServiceMetrics.getTotalBlockChosenCount();
       long totalContainerChosenCount =
           deletingServiceMetrics.getTotalContainerChosenCount();
-      Assert.assertEquals(0, transactionId);
+      assertEquals(0, transactionId);
 
       // Ensure there are 3 blocks under deletion and 0 deleted blocks
-      Assert.assertEquals(3, getUnderDeletionBlocksCount(meta, data));
-      Assert.assertEquals(3, meta.getStore().getMetadataTable()
+      assertEquals(3, getUnderDeletionBlocksCount(meta, data));
+      assertEquals(3, meta.getStore().getMetadataTable()
           .get(data.getPendingDeleteBlockCountKey()).longValue());
 
       // Container contains 3 blocks. So, space used by the container
       // should be greater than zero.
-      Assert.assertTrue(containerSpace > 0);
+      assertThat(containerSpace).isGreaterThan(0);
 
       // An interval will delete 1 * 2 blocks
       deleteAndWait(svc, 1);
 
       GenericTestUtils.waitFor(() ->
-              containerData.get(0).getBytesUsed() == containerSpace /
-                      3, 100, 3000);
+          containerData.get(0).getBytesUsed() == containerSpace /
+              3, 100, 3000);
       // After first interval 2 blocks will be deleted. Hence, current space
       // used by the container should be less than the space used by the
       // container initially(before running deletion services).
-      Assert.assertTrue(containerData.get(0).getBytesUsed() < containerSpace);
-      Assert.assertEquals(2,
+      assertThat(containerData.get(0).getBytesUsed()).isLessThan(containerSpace);
+      assertEquals(2,
           deletingServiceMetrics.getSuccessCount()
               - deleteSuccessCount);
-      Assert.assertEquals(2,
+      assertEquals(2,
           deletingServiceMetrics.getTotalBlockChosenCount()
               - totalBlockChosenCount);
-      Assert.assertEquals(1,
+      assertEquals(1,
           deletingServiceMetrics.getTotalContainerChosenCount()
               - totalContainerChosenCount);
       // The value of the getTotalPendingBlockCount Metrics is obtained
       // before the deletion is processing
       // So the Pending Block count will be 3
-      Assert.assertEquals(3,
+      assertEquals(3,
           deletingServiceMetrics.getTotalPendingBlockCount());
 
       deleteAndWait(svc, 2);
@@ -641,18 +622,18 @@ public class TestBlockDeletingService {
 
       // Check finally DB counters.
       // Not checking bytes used, as handler is a mock call.
-      Assert.assertEquals(0, meta.getStore().getMetadataTable()
+      assertEquals(0, meta.getStore().getMetadataTable()
           .get(data.getPendingDeleteBlockCountKey()).longValue());
-      Assert.assertEquals(0,
+      assertEquals(0,
           meta.getStore().getMetadataTable().get(data.getBlockCountKey())
               .longValue());
-      Assert.assertEquals(3,
+      assertEquals(3,
           deletingServiceMetrics.getSuccessCount()
               - deleteSuccessCount);
-      Assert.assertEquals(3,
+      assertEquals(3,
           deletingServiceMetrics.getTotalBlockChosenCount()
               - totalBlockChosenCount);
-      Assert.assertEquals(2,
+      assertEquals(2,
           deletingServiceMetrics.getTotalContainerChosenCount()
               - totalContainerChosenCount);
 
@@ -661,17 +642,19 @@ public class TestBlockDeletingService {
       // The value of the getTotalPendingBlockCount Metrics is obtained
       // before the deletion is processing
       // So the Pending Block count will be 1
-      Assert.assertEquals(1,
+      assertEquals(1,
           deletingServiceMetrics.getTotalPendingBlockCount());
     }
     svc.shutdown();
   }
 
-  @Test
-  public void testWithUnrecordedBlocks() throws Exception {
+  @ContainerTestVersionInfo.ContainerTest
+  public void testWithUnrecordedBlocks(ContainerTestVersionInfo versionInfo)
+      throws Exception {
+    setLayoutAndSchemaForTest(versionInfo);
     // Skip schemaV1, when markBlocksForDeletionSchemaV1, the unrecorded blocks
     // from received TNXs will be deleted, not in BlockDeletingService
-    Assume.assumeFalse(isSameSchemaVersion(schemaVersion, SCHEMA_V1));
+    Assumptions.assumeFalse(isSameSchemaVersion(schemaVersion, SCHEMA_V1));
 
     int numOfContainers = 2;
     int numOfChunksPerBlock = 1;
@@ -698,7 +681,7 @@ public class TestBlockDeletingService {
     // Ensure 2 container was created
     List<ContainerData> containerData = Lists.newArrayList();
     containerSet.listContainer(0L, 2, containerData);
-    Assert.assertEquals(2, containerData.size());
+    assertEquals(2, containerData.size());
     KeyValueContainerData ctr1 = (KeyValueContainerData) containerData.get(0);
     KeyValueContainerData ctr2 = (KeyValueContainerData) containerData.get(1);
     KeyPrefixFilter filter = isSameSchemaVersion(schemaVersion, SCHEMA_V1) ?
@@ -736,7 +719,7 @@ public class TestBlockDeletingService {
       for (int m = 0; m < numExistingOnDiskUnrecordedBlocks; m++) {
         File chunk = iter.next();
         createRandomContentFile(chunk.getName(), chunkDir, 100);
-        Assert.assertTrue(chunk.exists());
+        assertTrue(chunk.exists());
       }
 
       createTxn(ctr1, unrecordedBlockIds, 100, ctr1.getContainerID());
@@ -745,12 +728,12 @@ public class TestBlockDeletingService {
       updateMetaData(ctr1, (KeyValueContainer) containerSet.getContainer(
           ctr1.getContainerID()), 3, 1);
       // Ensure there are 3 + 4 = 7 blocks under deletion
-      Assert.assertEquals(7, getUnderDeletionBlocksCount(meta, ctr1));
+      assertEquals(7, getUnderDeletionBlocksCount(meta, ctr1));
     }
 
     assertBlockDataTableRecordCount(3, ctr1, filter);
     assertBlockDataTableRecordCount(3, ctr2, filter);
-    Assert.assertEquals(3, ctr2.getNumPendingDeletionBlocks());
+    assertEquals(3, ctr2.getNumPendingDeletionBlocks());
 
     // Totally 2 container * 3 blocks + 4 unrecorded block = 10 blocks
     // So we shall experience 5 rounds to delete all blocks
@@ -764,26 +747,27 @@ public class TestBlockDeletingService {
         200, 2000);
 
     // To make sure the container stat calculation is right
-    Assert.assertEquals(0, ctr1.getBlockCount());
-    Assert.assertEquals(0, ctr1.getBytesUsed());
-    Assert.assertEquals(0, ctr2.getBlockCount());
-    Assert.assertEquals(0, ctr2.getBytesUsed());
+    assertEquals(0, ctr1.getBlockCount());
+    assertEquals(0, ctr1.getBytesUsed());
+    assertEquals(0, ctr2.getBlockCount());
+    assertEquals(0, ctr2.getBytesUsed());
 
     // check if blockData get deleted
     assertBlockDataTableRecordCount(0, ctr1, filter);
     assertBlockDataTableRecordCount(0, ctr2, filter);
 
     // check if all the unreferenced chunks get deleted
-    for (File f: unrecordedChunks) {
-      Assert.assertFalse(f.exists());
+    for (File f : unrecordedChunks) {
+      assertFalse(f.exists());
     }
 
     svc.shutdown();
   }
 
-  @Test
-  @SuppressWarnings("java:S2699") // waitFor => assertion with timeout
-  public void testShutdownService() throws Exception {
+  @ContainerTestVersionInfo.ContainerTest
+  public void testShutdownService(ContainerTestVersionInfo versionInfo)
+      throws Exception {
+    setLayoutAndSchemaForTest(versionInfo);
     conf.setTimeDuration(OZONE_BLOCK_DELETING_SERVICE_INTERVAL, 500,
         TimeUnit.MILLISECONDS);
     conf.setInt(OZONE_BLOCK_DELETING_CONTAINER_LIMIT_PER_INTERVAL, 10);
@@ -811,8 +795,10 @@ public class TestBlockDeletingService {
     GenericTestUtils.waitFor(() -> service.getThreadCount() == 0, 100, 1000);
   }
 
-  @Test
-  public void testBlockDeletionTimeout() throws Exception {
+  @ContainerTestVersionInfo.ContainerTest
+  public void testBlockDeletionTimeout(ContainerTestVersionInfo versionInfo)
+      throws Exception {
+    setLayoutAndSchemaForTest(versionInfo);
     DatanodeConfiguration dnConf = conf.getObject(DatanodeConfiguration.class);
     dnConf.setBlockDeletionLimit(3);
     blockLimitPerInterval = dnConf.getBlockDeletionLimit();
@@ -873,8 +859,8 @@ public class TestBlockDeletingService {
 
       // The block deleting successfully and shouldn't catch timed
       // out warning log.
-      Assert.assertFalse(newLog.getOutput().contains(
-          "Background task executes timed out, retrying in next interval"));
+      assertThat(newLog.getOutput())
+          .doesNotContain("Background task executes timed out, retrying in next interval");
     }
     svc.shutdown();
   }
@@ -898,9 +884,11 @@ public class TestBlockDeletingService {
     return ozoneContainer;
   }
 
-  @Test
-  @org.junit.Ignore
-  public void testContainerThrottle() throws Exception {
+  @Unhealthy
+  @ContainerTestVersionInfo.ContainerTest
+  public void testContainerThrottle(ContainerTestVersionInfo versionInfo)
+      throws Exception {
+    setLayoutAndSchemaForTest(versionInfo);
     // Properties :
     //  - Number of containers : 2
     //  - Number of blocks per container : 1
@@ -948,7 +936,7 @@ public class TestBlockDeletingService {
                       containerData.get(1).getBytesUsed() == 0),
               100, 3000);
 
-      Assert.assertFalse((containerData.get(0).getBytesUsed() == 0) && (
+      assertFalse((containerData.get(0).getBytesUsed() == 0) && (
           containerData.get(1).getBytesUsed() == 0));
 
       // Deleting the second container. Hence, space used by both the
@@ -957,15 +945,17 @@ public class TestBlockDeletingService {
 
       GenericTestUtils.waitFor(() ->
               (containerData.get(0).getBytesUsed() ==
-                      0 && containerData.get(1).getBytesUsed() == 0),
-              100, 3000);
+                  0 && containerData.get(1).getBytesUsed() == 0),
+          100, 3000);
     } finally {
       service.shutdown();
     }
   }
 
-  @Test
-  public void testContainerMaxLockHoldingTime() throws Exception {
+  @ContainerTestVersionInfo.ContainerTest
+  public void testContainerMaxLockHoldingTime(
+      ContainerTestVersionInfo versionInfo) throws Exception {
+    setLayoutAndSchemaForTest(versionInfo);
     GenericTestUtils.LogCapturer log =
         GenericTestUtils.LogCapturer.captureLogs(
             LoggerFactory.getLogger(BlockDeletingTask.class));
@@ -1005,7 +995,7 @@ public class TestBlockDeletingService {
         // a timeout except the last one, where a "deletion transaction"
         // will be created for each Block, so it will start
         // blocksPerContainer - 1 timeout.
-        Assert.assertEquals(blocksPerContainer - 1,
+        assertEquals(blocksPerContainer - 1,
             StringUtils.countMatches(log.getOutput(), "Max lock hold time"));
       }
     } finally {
@@ -1022,8 +1012,10 @@ public class TestBlockDeletingService {
     return totalSpaceUsed;
   }
 
-  @Test
-  public void testBlockThrottle() throws Exception {
+  @ContainerTestVersionInfo.ContainerTest
+  public void testBlockThrottle(ContainerTestVersionInfo versionInfo)
+      throws Exception {
+    setLayoutAndSchemaForTest(versionInfo);
     // Properties :
     //  - Number of containers : 5
     //  - Number of blocks per container : 3
@@ -1135,9 +1127,9 @@ public class TestBlockDeletingService {
         count += 1;
       }
     }
-    Assert.assertEquals("Excepted: " + expectedCount
+    assertEquals(expectedCount, count, "Excepted: " + expectedCount
         + ", but actual: " + count + " in the blockData table of container: "
-        + containerID + ".", expectedCount, count);
+        + containerID + ".");
   }
 
   /**
@@ -1155,5 +1147,11 @@ public class TestBlockDeletingService {
         "rw")) {
       randomAccessFile.setLength(sizeInBytes);
     }
+  }
+
+  private void setLayoutAndSchemaForTest(ContainerTestVersionInfo versionInfo) {
+    this.layout = versionInfo.getLayout();
+    this.schemaVersion = versionInfo.getSchemaVersion();
+    ContainerTestVersionInfo.setTestSchemaVersion(schemaVersion, conf);
   }
 }

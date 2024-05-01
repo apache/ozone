@@ -19,6 +19,7 @@
 package org.apache.hadoop.hdds.scm.container.replication;
 
 import com.google.common.annotations.VisibleForTesting;
+import com.google.protobuf.ByteString;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
@@ -54,12 +55,14 @@ import org.apache.hadoop.hdds.scm.container.replication.health.OpenContainerHand
 import org.apache.hadoop.hdds.scm.container.replication.health.QuasiClosedContainerHandler;
 import org.apache.hadoop.hdds.scm.container.replication.health.RatisReplicationCheckHandler;
 import org.apache.hadoop.hdds.scm.container.replication.health.RatisUnhealthyReplicationCheckHandler;
+import org.apache.hadoop.hdds.scm.container.replication.health.VulnerableUnhealthyReplicasHandler;
 import org.apache.hadoop.hdds.scm.events.SCMEvents;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.ha.SCMService;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.node.NodeStatus;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
+import org.apache.hadoop.hdds.scm.pipeline.PipelineNotFoundException;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
 import org.apache.hadoop.ozone.common.statemachine.InvalidStateTransitionException;
@@ -279,7 +282,8 @@ public class ReplicationManager implements SCMService {
         .addNext(ratisReplicationCheckHandler)
         .addNext(new ClosedWithUnhealthyReplicasHandler(this))
         .addNext(ecMisReplicationCheckHandler)
-        .addNext(new RatisUnhealthyReplicationCheckHandler());
+        .addNext(new RatisUnhealthyReplicationCheckHandler())
+        .addNext(new VulnerableUnhealthyReplicasHandler(this));
     start();
   }
 
@@ -291,6 +295,7 @@ public class ReplicationManager implements SCMService {
     if (!isRunning()) {
       LOG.info("Starting Replication Monitor Thread.");
       running = true;
+      metrics = ReplicationManagerMetrics.create(this);
       if (rmConf.isLegacyEnabled()) {
         legacyReplicationManager.setMetrics(metrics);
       }
@@ -700,10 +705,10 @@ public class ReplicationManager implements SCMService {
     } else if (cmd.getType() == Type.reconstructECContainersCommand) {
       ReconstructECContainersCommand rcc = (ReconstructECContainersCommand) cmd;
       List<DatanodeDetails> targets = rcc.getTargetDatanodes();
-      byte[] targetIndexes = rcc.getMissingContainerIndexes();
-      for (int i = 0; i < targetIndexes.length; i++) {
+      final ByteString targetIndexes = rcc.getMissingContainerIndexes();
+      for (int i = 0; i < targetIndexes.size(); i++) {
         containerReplicaPendingOps.scheduleAddReplica(
-            containerInfo.containerID(), targets.get(i), targetIndexes[i],
+            containerInfo.containerID(), targets.get(i), targetIndexes.byteAt(i),
             scmDeadlineEpochMs);
       }
       getMetrics().incrEcReconstructionCmdsSentTotal();
@@ -1542,6 +1547,15 @@ public class ReplicationManager implements SCMService {
 
   private static boolean isEC(ReplicationConfig replicationConfig) {
     return replicationConfig.getReplicationType() == EC;
+  }
+
+  public boolean hasHealthyPipeline(ContainerInfo container) {
+    try {
+      return scmContext.getScm().getPipelineManager()
+          .getPipeline(container.getPipelineID()) != null;
+    } catch (PipelineNotFoundException e) {
+      return false;
+    }
   }
 }
 

@@ -18,7 +18,14 @@
 
 package org.apache.hadoop.ozone.om.request.key;
 
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.ONE;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
+import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.ozone.om.OzonePrefixPathImpl;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
@@ -27,9 +34,9 @@ import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.security.acl.OzonePrefixPath;
-import org.apache.hadoop.util.Time;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 import java.io.IOException;
 import java.util.Iterator;
@@ -65,11 +72,11 @@ public class TestOMKeyDeleteRequestWithFSO extends TestOMKeyDeleteRequest {
             bucketName, PARENT_DIR, omMetadataManager);
 
     OmKeyInfo omKeyInfo =
-            OMRequestTestUtils.createOmKeyInfo(volumeName, bucketName, FILE_KEY,
-                    HddsProtos.ReplicationType.RATIS,
-                    HddsProtos.ReplicationFactor.ONE,
-                    parentId + 1,
-                    parentId, 100, Time.now());
+        OMRequestTestUtils.createOmKeyInfo(volumeName, bucketName, FILE_KEY, RatisReplicationConfig.getInstance(ONE))
+            .setObjectID(parentId + 1L)
+            .setParentObjectID(parentId)
+            .setUpdateID(100L)
+            .build();
     omKeyInfo.setKeyName(FILE_NAME);
     OMRequestTestUtils.addFileToKeyTable(false, false,
         FILE_NAME, omKeyInfo, -1, 50, omMetadataManager);
@@ -89,13 +96,25 @@ public class TestOMKeyDeleteRequestWithFSO extends TestOMKeyDeleteRequest {
         bucketName, key, omMetadataManager);
 
     OmKeyInfo omKeyInfo =
-        OMRequestTestUtils.createOmKeyInfo(volumeName, bucketName, key,
-            HddsProtos.ReplicationType.RATIS,
-            HddsProtos.ReplicationFactor.ONE,
-            parentId + 1,
-            parentId, 100, Time.now());
+        OMRequestTestUtils.createOmKeyInfo(volumeName, bucketName, key, RatisReplicationConfig.getInstance(ONE))
+            .setObjectID(parentId + 1L)
+            .setParentObjectID(parentId)
+            .setUpdateID(100L)
+            .build();
     omKeyInfo.setKeyName(key);
     return omKeyInfo.getPath();
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"keyName"})
+  @Override
+  public void testPreExecute(String testKeyName) throws Exception {
+    OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName, omMetadataManager, getBucketLayout());
+    String ozoneKey = addKeyToTable();
+    OmKeyInfo omKeyInfo = omMetadataManager.getKeyTable(getBucketLayout()).get(ozoneKey);
+    assertNotNull(omKeyInfo);
+
+    doPreExecute(createDeleteKeyRequest());
   }
 
   @Test
@@ -110,36 +129,31 @@ public class TestOMKeyDeleteRequestWithFSO extends TestOMKeyDeleteRequest {
         omMetadataManager.getKeyTable(getBucketLayout()).get(ozoneKey);
 
     // As we added manually to key table.
-    Assertions.assertNotNull(omKeyInfo);
+    assertNotNull(omKeyInfo);
 
     // OzonePrefixPathImpl on a directory
     OzonePrefixPathImpl ozonePrefixPath = new OzonePrefixPathImpl(volumeName,
         bucketName, "c", keyManager);
     OzoneFileStatus status = ozonePrefixPath.getOzoneFileStatus();
-    Assertions.assertNotNull(status);
-    Assertions.assertEquals("c", status.getTrimmedName());
-    Assertions.assertTrue(status.isDirectory());
+    assertNotNull(status);
+    assertEquals("c", status.getTrimmedName());
+    assertTrue(status.isDirectory());
     verifyPath(ozonePrefixPath, "c", "c/d");
     verifyPath(ozonePrefixPath, "c/d", "c/d/e");
     verifyPath(ozonePrefixPath, "c/d/e", "c/d/e/file1");
 
-    try {
-      ozonePrefixPath.getChildren("c/d/e/file1");
-      Assertions.fail("Should throw INVALID_KEY_NAME as the given " +
-          "path is a file.");
-    } catch (OMException ome) {
-      Assertions.assertEquals(OMException.ResultCodes.INVALID_KEY_NAME,
-          ome.getResult());
-    }
+    OMException ome = assertThrows(OMException.class, () -> ozonePrefixPath.getChildren("c/d/e/file1"),
+        "Should throw INVALID_KEY_NAME as the given path is a file.");
+    assertEquals(OMException.ResultCodes.INVALID_KEY_NAME, ome.getResult());
 
     // OzonePrefixPathImpl on a file
-    ozonePrefixPath = new OzonePrefixPathImpl(volumeName,
+    OzonePrefixPathImpl ozonePrefixPathFile1 = new OzonePrefixPathImpl(volumeName,
         bucketName, "c/d/e/file1", keyManager);
-    status = ozonePrefixPath.getOzoneFileStatus();
-    Assertions.assertNotNull(status);
-    Assertions.assertEquals("c/d/e/file1", status.getTrimmedName());
-    Assertions.assertEquals("c/d/e/file1", status.getKeyInfo().getKeyName());
-    Assertions.assertTrue(status.isFile());
+    status = ozonePrefixPathFile1.getOzoneFileStatus();
+    assertNotNull(status);
+    assertEquals("c/d/e/file1", status.getTrimmedName());
+    assertEquals("c/d/e/file1", status.getKeyInfo().getKeyName());
+    assertTrue(status.isFile());
   }
 
   private void verifyPath(OzonePrefixPath ozonePrefixPath, String pathName,
@@ -147,14 +161,9 @@ public class TestOMKeyDeleteRequestWithFSO extends TestOMKeyDeleteRequest {
       throws IOException {
     Iterator<? extends OzoneFileStatus> pathItr = ozonePrefixPath.getChildren(
         pathName);
-    Assertions.assertTrue(pathItr.hasNext(), "Failed to list keyPaths");
-    Assertions.assertEquals(expectedPath, pathItr.next().getTrimmedName());
-    try {
-      pathItr.next();
-      Assertions.fail("Reached end of the list!");
-    } catch (NoSuchElementException nse) {
-      // expected
-    }
+    assertTrue(pathItr.hasNext(), "Failed to list keyPaths");
+    assertEquals(expectedPath, pathItr.next().getTrimmedName());
+    assertThrows(NoSuchElementException.class, () -> pathItr.next(), "Reached end of the list!");
   }
 
   @Test
@@ -175,7 +184,7 @@ public class TestOMKeyDeleteRequestWithFSO extends TestOMKeyDeleteRequest {
 
     // 'x/y/z' has no sub-directories or sub files - recursive access check
     // should not be enabled for this case.
-    Assertions.assertFalse(pathViewer.isCheckRecursiveAccess());
+    assertFalse(pathViewer.isCheckRecursiveAccess());
 
     // Instantiate PrefixPath for parent key.
     pathViewer = new OzonePrefixPathImpl(volumeName,
@@ -183,7 +192,7 @@ public class TestOMKeyDeleteRequestWithFSO extends TestOMKeyDeleteRequest {
 
     // 'x/y/' has a sub-directory 'z', hence, we should be performing recursive
     // access check.
-    Assertions.assertTrue(pathViewer.isCheckRecursiveAccess());
+    assertTrue(pathViewer.isCheckRecursiveAccess());
 
     // Case 2:
     // We create a directory structure with a file as the leaf node.
@@ -194,7 +203,7 @@ public class TestOMKeyDeleteRequestWithFSO extends TestOMKeyDeleteRequest {
         omMetadataManager.getKeyTable(getBucketLayout()).get(ozoneKey);
 
     // As we added manually to key table.
-    Assertions.assertNotNull(omKeyInfo);
+    assertNotNull(omKeyInfo);
 
     // Instantiate PrefixPath for parent key 'c/d/'.
     pathViewer = new OzonePrefixPathImpl(volumeName,
@@ -202,7 +211,7 @@ public class TestOMKeyDeleteRequestWithFSO extends TestOMKeyDeleteRequest {
 
     // 'c/d' has a sub-directory 'e', hence, we should be performing recursive
     // access check.
-    Assertions.assertTrue(pathViewer.isCheckRecursiveAccess());
+    assertTrue(pathViewer.isCheckRecursiveAccess());
 
     // Instantiate PrefixPath for complete directory structure (without file).
     pathViewer = new OzonePrefixPathImpl(volumeName,
@@ -210,7 +219,7 @@ public class TestOMKeyDeleteRequestWithFSO extends TestOMKeyDeleteRequest {
 
     // 'c/d/e/' has a 'file1' under it, hence, we should be performing recursive
     // access check.
-    Assertions.assertTrue(pathViewer.isCheckRecursiveAccess());
+    assertTrue(pathViewer.isCheckRecursiveAccess());
 
     // Instantiate PrefixPath for complete file1.
     pathViewer = new OzonePrefixPathImpl(volumeName,
@@ -218,6 +227,6 @@ public class TestOMKeyDeleteRequestWithFSO extends TestOMKeyDeleteRequest {
 
     // Recursive access check is only enabled for directories, hence should be
     // false for file1.
-    Assertions.assertFalse(pathViewer.isCheckRecursiveAccess());
+    assertFalse(pathViewer.isCheckRecursiveAccess());
   }
 }

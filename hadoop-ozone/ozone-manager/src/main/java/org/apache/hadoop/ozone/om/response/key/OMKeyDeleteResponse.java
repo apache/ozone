@@ -29,27 +29,31 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
 
 import java.io.IOException;
-import javax.annotation.Nonnull;
+import jakarta.annotation.Nonnull;
 
 import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.BUCKET_TABLE;
 import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.DELETED_TABLE;
 import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.KEY_TABLE;
+import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.OPEN_KEY_TABLE;
 
 /**
  * Response for DeleteKey request.
  */
-@CleanupTableInfo(cleanupTables = {KEY_TABLE, DELETED_TABLE, BUCKET_TABLE})
+@CleanupTableInfo(cleanupTables = {KEY_TABLE, OPEN_KEY_TABLE, DELETED_TABLE, BUCKET_TABLE})
 public class OMKeyDeleteResponse extends AbstractOMKeyDeleteResponse {
 
   private OmKeyInfo omKeyInfo;
   private OmBucketInfo omBucketInfo;
+  // If not null, this key will be deleted from OpenKeyTable
+  private String dbOpenKey;
 
   public OMKeyDeleteResponse(@Nonnull OMResponse omResponse,
       @Nonnull OmKeyInfo omKeyInfo, boolean isRatisEnabled,
-      @Nonnull OmBucketInfo omBucketInfo) {
+      @Nonnull OmBucketInfo omBucketInfo, String dbOpenKey) {
     super(omResponse, isRatisEnabled, omBucketInfo.getBucketLayout());
     this.omKeyInfo = omKeyInfo;
     this.omBucketInfo = omBucketInfo;
+    this.dbOpenKey = dbOpenKey;
   }
 
   /**
@@ -78,6 +82,12 @@ public class OMKeyDeleteResponse extends AbstractOMKeyDeleteResponse {
     omMetadataManager.getBucketTable().putWithBatch(batchOperation,
         omMetadataManager.getBucketKey(omBucketInfo.getVolumeName(),
             omBucketInfo.getBucketName()), omBucketInfo);
+
+    // Remove open key (necessary when the file is hsync'ed but not committed)
+    if (dbOpenKey != null) {
+      omMetadataManager.getOpenKeyTable(getBucketLayout()).deleteWithBatch(
+          batchOperation, dbOpenKey);
+    }
   }
 
   protected OmKeyInfo getOmKeyInfo() {
@@ -86,5 +96,9 @@ public class OMKeyDeleteResponse extends AbstractOMKeyDeleteResponse {
 
   protected OmBucketInfo getOmBucketInfo() {
     return omBucketInfo;
+  }
+
+  public String getDbOpenKey() {
+    return dbOpenKey;
   }
 }

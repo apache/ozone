@@ -73,7 +73,8 @@ import static org.apache.hadoop.hdds.server.http.HttpServer2.setHttpBaseDir;
         OzoneClientKeyReadWriteListOps.class,
         RangeKeysGenerator.class,
         DatanodeSimulator.class,
-        OmMetadataGenerator.class
+        OmMetadataGenerator.class,
+        DNRPCLoadGenerator.class
     },
     versionProvider = HddsVersionProvider.class,
     mixinStandardHelpOptions = true)

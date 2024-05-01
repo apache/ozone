@@ -19,6 +19,8 @@ package org.apache.hadoop.hdds.scm.container.replication;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
+import com.google.protobuf.ByteString;
+import com.google.protobuf.Proto2Utils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
@@ -128,7 +130,7 @@ public class ECUnderReplicationHandler implements UnhealthyReplicationHandler {
         container.containerID(), replicas);
 
     ReplicationManagerUtil.ExcludedAndUsedNodes excludedAndUsedNodes =
-        ReplicationManagerUtil.getExcludedAndUsedNodes(
+        ReplicationManagerUtil.getExcludedAndUsedNodes(container,
             new ArrayList<>(replicas), Collections.emptySet(), pendingOps,
             replicationManager);
     List<DatanodeDetails> excludedNodes
@@ -365,7 +367,7 @@ public class ECUnderReplicationHandler implements UnhealthyReplicationHandler {
         final ReconstructECContainersCommand reconstructionCommand =
             new ReconstructECContainersCommand(container.getContainerID(),
                 sourceDatanodesWithIndex, selectedDatanodes,
-                int2byte(missingIndexes),
+                integers2ByteString(missingIndexes),
                 repConfig);
         // This can throw a CommandTargetOverloadedException, but there is no
         // point in retrying here. The sources we picked already have the
@@ -623,13 +625,13 @@ public class ECUnderReplicationHandler implements UnhealthyReplicationHandler {
         Long.MAX_VALUE));
   }
 
-  private static byte[] int2byte(List<Integer> src) {
+  static ByteString integers2ByteString(List<Integer> src) {
     byte[] dst = new byte[src.size()];
 
     for (int i = 0; i < src.size(); i++) {
       dst[i] = src.get(i).byteValue();
     }
-    return dst;
+    return Proto2Utils.unsafeByteString(dst);
   }
 
   /**

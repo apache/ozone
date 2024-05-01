@@ -19,7 +19,7 @@
  */
 package org.apache.hadoop.ozone.client;
 
-import javax.annotation.Nonnull;
+import jakarta.annotation.Nonnull;
 import org.apache.hadoop.crypto.key.KeyProvider;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
@@ -56,6 +56,7 @@ import org.apache.hadoop.security.token.Token;
 
 import java.io.IOException;
 import java.net.URI;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 
@@ -309,8 +310,16 @@ public class ClientProtocolStub implements ClientProtocol {
   public OmMultipartInfo initiateMultipartUpload(String volumeName,
          String bucketName, String keyName, ReplicationConfig replicationConfig)
       throws IOException {
+    return initiateMultipartUpload(volumeName, bucketName, keyName, replicationConfig, Collections.emptyMap());
+  }
+
+  @Override
+  public OmMultipartInfo initiateMultipartUpload(String volumeName,
+         String bucketName, String keyName, ReplicationConfig replicationConfig,
+         Map<String, String> metadata)
+      throws IOException {
     return getBucket(volumeName, bucketName)
-        .initiateMultipartUpload(keyName, replicationConfig);
+        .initiateMultipartUpload(keyName, replicationConfig, metadata);
   }
 
   @Override
@@ -379,7 +388,7 @@ public class ClientProtocolStub implements ClientProtocol {
   @Override
   @Nonnull
   public S3SecretValue getS3Secret(String kerberosID) throws IOException {
-    return new S3SecretValue(STUB_KERBEROS_ID, STUB_SECRET);
+    return S3SecretValue.of(STUB_KERBEROS_ID, STUB_SECRET);
   }
 
   @Override
@@ -482,7 +491,7 @@ public class ClientProtocolStub implements ClientProtocol {
   @Override
   public void createDirectory(String volumeName, String bucketName,
                               String keyName) throws IOException {
-
+    getBucket(volumeName, bucketName).createDirectory(keyName);
   }
 
   @Override
@@ -573,6 +582,14 @@ public class ClientProtocolStub implements ClientProtocol {
 
   }
 
+  @Deprecated
+  @Override
+  public void setEncryptionKey(String volumeName, String bucketName,
+                               String bekName)
+      throws IOException {
+
+  }
+
   @Override
   public OzoneKey headObject(String volumeName, String bucketName,
                              String keyName) throws IOException {
@@ -640,6 +657,13 @@ public class ClientProtocolStub implements ClientProtocol {
       String bucketName, String snapshotName)
       throws IOException {
     return "";
+  }
+
+  @Override
+  public void renameSnapshot(String volumeName, String bucketName,
+      String snapshotOldName, String snapshotNewName)
+      throws IOException {
+
   }
 
   @Override

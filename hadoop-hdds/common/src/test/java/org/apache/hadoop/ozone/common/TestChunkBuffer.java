@@ -29,10 +29,18 @@ import java.util.concurrent.ThreadLocalRandom;
 
 import org.apache.hadoop.hdds.utils.MockGatheringChannel;
 
+import org.apache.hadoop.hdds.utils.db.CodecBuffer;
+import org.apache.hadoop.hdds.utils.db.CodecTestUtil;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
-import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
+
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 
 /**
  * Test {@link ChunkBuffer} implementations.
@@ -42,9 +50,19 @@ public class TestChunkBuffer {
     return ThreadLocalRandom.current().nextInt(n);
   }
 
+  @BeforeAll
+  public static void beforeAll() {
+    CodecBuffer.enableLeakDetection();
+  }
+
+  @AfterEach
+  public void after() throws Exception {
+    CodecTestUtil.gc();
+  }
+
   @Test
   @Timeout(1)
-  public void testImplWithByteBuffer() {
+  void testImplWithByteBuffer() throws IOException {
     runTestImplWithByteBuffer(1);
     runTestImplWithByteBuffer(1 << 10);
     for (int i = 0; i < 10; i++) {
@@ -52,15 +70,17 @@ public class TestChunkBuffer {
     }
   }
 
-  private static void runTestImplWithByteBuffer(int n) {
+  private static void runTestImplWithByteBuffer(int n) throws IOException {
     final byte[] expected = new byte[n];
     ThreadLocalRandom.current().nextBytes(expected);
-    runTestImpl(expected, 0, ChunkBuffer.allocate(n));
+    try (ChunkBuffer c = ChunkBuffer.allocate(n)) {
+      runTestImpl(expected, 0, c);
+    }
   }
 
   @Test
   @Timeout(1)
-  public void testIncrementalChunkBuffer() {
+  void testIncrementalChunkBuffer() throws IOException {
     runTestIncrementalChunkBuffer(1, 1);
     runTestIncrementalChunkBuffer(4, 8);
     runTestIncrementalChunkBuffer(16, 1 << 10);
@@ -71,16 +91,17 @@ public class TestChunkBuffer {
     }
   }
 
-  private static void runTestIncrementalChunkBuffer(int increment, int n) {
+  private static void runTestIncrementalChunkBuffer(int increment, int n) throws IOException {
     final byte[] expected = new byte[n];
     ThreadLocalRandom.current().nextBytes(expected);
-    runTestImpl(expected, increment,
-        new IncrementalChunkBuffer(n, increment, false));
+    try (IncrementalChunkBuffer c = new IncrementalChunkBuffer(n, increment, false)) {
+      runTestImpl(expected, increment, c);
+    }
   }
 
   @Test
   @Timeout(1)
-  public void testImplWithList() {
+  void testImplWithList() throws IOException {
     runTestImplWithList(4, 8);
     runTestImplWithList(16, 1 << 10);
     for (int i = 0; i < 10; i++) {
@@ -90,7 +111,7 @@ public class TestChunkBuffer {
     }
   }
 
-  private static void runTestImplWithList(int count, int n) {
+  private static void runTestImplWithList(int count, int n) throws IOException {
     final byte[] expected = new byte[n];
     ThreadLocalRandom.current().nextBytes(expected);
 
@@ -112,19 +133,19 @@ public class TestChunkBuffer {
     runTestImpl(expected, -1, impl);
   }
 
-  private static void runTestImpl(byte[] expected, int bpc, ChunkBuffer impl) {
+  private static void runTestImpl(byte[] expected, int bpc, ChunkBuffer impl) throws IOException {
     final int n = expected.length;
     System.out.println("n=" + n + ", impl=" + impl);
 
     // check position, remaining
-    Assertions.assertEquals(0, impl.position());
-    Assertions.assertEquals(n, impl.remaining());
-    Assertions.assertEquals(n, impl.limit());
+    assertEquals(0, impl.position());
+    assertEquals(n, impl.remaining());
+    assertEquals(n, impl.limit());
 
     impl.put(expected);
-    Assertions.assertEquals(n, impl.position());
-    Assertions.assertEquals(0, impl.remaining());
-    Assertions.assertEquals(n, impl.limit());
+    assertEquals(n, impl.position());
+    assertEquals(0, impl.remaining());
+    assertEquals(n, impl.limit());
 
     // duplicate
     assertDuplicate(expected, impl);
@@ -162,8 +183,8 @@ public class TestChunkBuffer {
       byte[] expected, ChunkBuffer impl, int bpc) {
     final int n = expected.length;
     final ChunkBuffer duplicated = impl.duplicate(0, n);
-    Assertions.assertEquals(0, duplicated.position());
-    Assertions.assertEquals(n, duplicated.remaining());
+    assertEquals(0, duplicated.position());
+    assertEquals(n, duplicated.remaining());
 
     final int numChecksums = (n + bpc - 1) / bpc;
     final Iterator<ByteBuffer> i = duplicated.iterate(bpc).iterator();
@@ -172,71 +193,43 @@ public class TestChunkBuffer {
       final ByteBuffer b = i.next();
       final int expectedRemaining = j < numChecksums - 1 ?
           bpc : n - bpc * (numChecksums - 1);
-      Assertions.assertEquals(expectedRemaining, b.remaining());
+      assertEquals(expectedRemaining, b.remaining());
 
       final int offset = j * bpc;
       for (int k = 0; k < expectedRemaining; k++) {
-        Assertions.assertEquals(expected[offset + k], b.get());
+        assertEquals(expected[offset + k], b.get());
         count++;
       }
     }
-    Assertions.assertEquals(n, count);
-    Assertions.assertFalse(i.hasNext());
-    Assertions.assertThrows(NoSuchElementException.class, i::next);
+    assertEquals(n, count);
+    assertFalse(i.hasNext());
+    assertThrows(NoSuchElementException.class, i::next);
   }
 
   private static void assertToByteString(
       byte[] expected, int offset, int length, ChunkBuffer impl) {
     final ChunkBuffer duplicated = impl.duplicate(offset, offset + length);
-    Assertions.assertEquals(offset, duplicated.position());
-    Assertions.assertEquals(length, duplicated.remaining());
+    assertEquals(offset, duplicated.position());
+    assertEquals(length, duplicated.remaining());
     final ByteString computed = duplicated.toByteString(buffer -> {
       buffer.mark();
       final ByteString string = ByteString.copyFrom(buffer);
       buffer.reset();
       return string;
     });
-    Assertions.assertEquals(offset, duplicated.position());
-    Assertions.assertEquals(length, duplicated.remaining());
-    assertEquals("offset=" + offset + ", length=" + length,
-        ByteString.copyFrom(expected, offset, length), computed);
+    assertEquals(offset, duplicated.position());
+    assertEquals(length, duplicated.remaining());
+    assertEquals(ByteString.copyFrom(expected, offset, length), computed,
+        "offset=" + offset + ", length=" + length);
   }
 
-  private static void assertWrite(byte[] expected, ChunkBuffer impl) {
+  private static void assertWrite(byte[] expected, ChunkBuffer impl) throws IOException {
     impl.rewind();
-    Assertions.assertEquals(0, impl.position());
+    assertEquals(0, impl.position());
 
     ByteArrayOutputStream output = new ByteArrayOutputStream(expected.length);
-
-    try {
-      impl.writeTo(new MockGatheringChannel(Channels.newChannel(output)));
-    } catch (IOException e) {
-      Assertions.fail("Unexpected error: " + e);
-    }
-
-    Assertions.assertArrayEquals(expected, output.toByteArray());
-    Assertions.assertFalse(impl.hasRemaining());
-  }
-
-  private static void assertEquals(String message,
-      ByteString expected, ByteString actual) {
-    Assertions.assertEquals(
-        toString(expected.toByteArray()),
-        toString(actual.toByteArray()),
-        message);
-  }
-
-  private static String toString(byte[] arr) {
-    if (arr == null || arr.length == 0) {
-      return "";
-    }
-
-    StringBuilder sb = new StringBuilder();
-    for (byte b : arr) {
-      sb.append(Character.forDigit((b >> 4) & 0xF, 16))
-          .append(Character.forDigit((b & 0xF), 16))
-          .append(" ");
-    }
-    return sb.deleteCharAt(sb.length() - 1).toString();
+    impl.writeTo(new MockGatheringChannel(Channels.newChannel(output)));
+    assertArrayEquals(expected, output.toByteArray());
+    assertFalse(impl.hasRemaining());
   }
 }

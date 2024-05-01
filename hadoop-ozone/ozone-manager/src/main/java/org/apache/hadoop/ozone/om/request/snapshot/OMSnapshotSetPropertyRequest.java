@@ -17,26 +17,28 @@
  */
 package org.apache.hadoop.ozone.om.request.snapshot;
 
+import org.apache.hadoop.ozone.om.OMMetrics;
+import org.apache.ratis.server.protocol.TermIndex;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
-import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
 import org.apache.hadoop.ozone.om.request.OMClientRequest;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.om.response.snapshot.OMSnapshotSetPropertyResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SnapshotProperty;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SnapshotSize;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 
-import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INVALID_SNAPSHOT_ERROR;
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.FILE_NOT_FOUND;
+import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.SNAPSHOT_LOCK;
 
 /**
  * Updates the exclusive size of the snapshot.
@@ -50,8 +52,8 @@ public class OMSnapshotSetPropertyRequest extends OMClientRequest {
   }
 
   @Override
-  public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager,
-      long trxnLogIndex, OzoneManagerDoubleBufferHelper omDoubleBufferHelper) {
+  public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager, TermIndex termIndex) {
+    OMMetrics omMetrics = ozoneManager.getMetrics();
 
     OMClientResponse omClientResponse = null;
     OMMetadataManager metadataManager = ozoneManager.getMetadataManager();
@@ -61,41 +63,79 @@ public class OMSnapshotSetPropertyRequest extends OMClientRequest {
     OzoneManagerProtocolProtos.SetSnapshotPropertyRequest
         setSnapshotPropertyRequest = getOmRequest()
         .getSetSnapshotPropertyRequest();
-
-    SnapshotProperty snapshotProperty = setSnapshotPropertyRequest
-        .getSnapshotProperty();
     SnapshotInfo updatedSnapInfo = null;
 
+    String snapshotKey = setSnapshotPropertyRequest.getSnapshotKey();
+    boolean acquiredSnapshotLock = false;
+    String volumeName = null;
+    String bucketName = null;
+    String snapshotName = null;
+
     try {
-      String snapshotKey = snapshotProperty.getSnapshotKey();
-      long exclusiveSize = snapshotProperty.getExclusiveSize();
-      long exclusiveReplicatedSize = snapshotProperty
-          .getExclusiveReplicatedSize();
+      SnapshotInfo snapshotInfo = metadataManager.getSnapshotInfoTable().get(snapshotKey);
+      if (snapshotInfo == null) {
+        LOG.error("Snapshot: '{}' doesn't not exist in snapshot table.", snapshotKey);
+        throw new OMException("Snapshot: '{" + snapshotKey + "}' doesn't not exist in snapshot table.", FILE_NOT_FOUND);
+      }
+
+      volumeName = snapshotInfo.getVolumeName();
+      bucketName = snapshotInfo.getBucketName();
+      snapshotName = snapshotInfo.getName();
+
+      mergeOmLockDetails(metadataManager.getLock()
+          .acquireWriteLock(SNAPSHOT_LOCK, volumeName, bucketName, snapshotName));
+
+      acquiredSnapshotLock = getOmLockDetails().isLockAcquired();
+
       updatedSnapInfo = metadataManager.getSnapshotInfoTable()
           .get(snapshotKey);
 
-      if (updatedSnapInfo == null) {
-        LOG.error("SnapshotInfo for Snapshot: {} is not found", snapshotKey);
-        throw new OMException("SnapshotInfo for Snapshot: " + snapshotKey +
-            " is not found", INVALID_SNAPSHOT_ERROR);
+
+      if (setSnapshotPropertyRequest.hasDeepCleanedDeletedDir()) {
+        updatedSnapInfo.setDeepCleanedDeletedDir(setSnapshotPropertyRequest
+            .getDeepCleanedDeletedDir());
       }
 
-      // Set Exclusive size.
-      updatedSnapInfo.setExclusiveSize(exclusiveSize);
-      updatedSnapInfo.setExclusiveReplicatedSize(exclusiveReplicatedSize);
+      if (setSnapshotPropertyRequest.hasDeepCleanedDeletedKey()) {
+        updatedSnapInfo.setDeepClean(setSnapshotPropertyRequest
+            .getDeepCleanedDeletedKey());
+      }
+
+      if (setSnapshotPropertyRequest.hasSnapshotSize()) {
+        SnapshotSize snapshotSize = setSnapshotPropertyRequest
+            .getSnapshotSize();
+        long exclusiveSize = updatedSnapInfo.getExclusiveSize() +
+            snapshotSize.getExclusiveSize();
+        long exclusiveReplicatedSize = updatedSnapInfo
+            .getExclusiveReplicatedSize() + snapshotSize
+            .getExclusiveReplicatedSize();
+        // Set Exclusive size.
+        updatedSnapInfo.setExclusiveSize(exclusiveSize);
+        updatedSnapInfo.setExclusiveReplicatedSize(exclusiveReplicatedSize);
+      }
       // Update Table Cache
       metadataManager.getSnapshotInfoTable().addCacheEntry(
           new CacheKey<>(snapshotKey),
-          CacheValue.get(trxnLogIndex, updatedSnapInfo));
+          CacheValue.get(termIndex.getIndex(), updatedSnapInfo));
       omClientResponse = new OMSnapshotSetPropertyResponse(
           omResponse.build(), updatedSnapInfo);
+      omMetrics.incNumSnapshotSetProperties();
+      LOG.info("Successfully executed snapshotSetPropertyRequest: {{}}.", setSnapshotPropertyRequest);
     } catch (IOException ex) {
       omClientResponse = new OMSnapshotSetPropertyResponse(
           createErrorOMResponse(omResponse, ex));
+      omMetrics.incNumSnapshotSetPropertyFails();
+      LOG.error("Failed to execute snapshotSetPropertyRequest: {{}}.", setSnapshotPropertyRequest, ex);
     } finally {
-      addResponseToDoubleBuffer(trxnLogIndex, omClientResponse,
-          omDoubleBufferHelper);
+      if (acquiredSnapshotLock) {
+        mergeOmLockDetails(metadataManager.getLock()
+            .releaseWriteLock(SNAPSHOT_LOCK, volumeName, bucketName, snapshotName));
+      }
+      if (omClientResponse != null) {
+        omClientResponse.setOmLockDetails(getOmLockDetails());
+      }
     }
+
     return omClientResponse;
   }
 }

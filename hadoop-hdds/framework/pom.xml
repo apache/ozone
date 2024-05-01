@@ -20,17 +20,16 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
   <parent>
     <groupId>org.apache.ozone</groupId>
     <artifactId>hdds</artifactId>
-    <version>1.4.0-SNAPSHOT</version>
+    <version>1.5.0-SNAPSHOT</version>
   </parent>
   <artifactId>hdds-server-framework</artifactId>
-  <version>1.4.0-SNAPSHOT</version>
+  <version>1.5.0-SNAPSHOT</version>
   <description>Apache Ozone Distributed Data Store Server Framework
   </description>
   <name>Apache Ozone HDDS Server Framework</name>
   <packaging>jar</packaging>
 
   <properties>
-    <allow.junit4>false</allow.junit4>
   </properties>
 
   <dependencies>
@@ -41,11 +40,6 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
     <dependency>
       <groupId>org.apache.ozone</groupId>
       <artifactId>hdds-interface-admin</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>org.apache.ozone</groupId>
-      <artifactId>hdds-test-utils</artifactId>
-      <scope>test</scope>
     </dependency>
     <dependency>
       <groupId>org.apache.ozone</groupId>
@@ -89,8 +83,10 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
       <artifactId>log4j-core</artifactId>
     </dependency>
     <dependency>
+      <!-- required for async logging in Log4j2 -->
       <groupId>com.lmax</groupId>
       <artifactId>disruptor</artifactId>
+      <scope>runtime</scope>
     </dependency>
     <dependency>
       <groupId>org.eclipse.jetty</groupId>
@@ -118,7 +114,7 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
         </exclusion>
         <exclusion>
           <groupId>org.bouncycastle</groupId>
-          <artifactId>bcprov-jdk15on</artifactId>
+          <artifactId>bcprov-jdk18on</artifactId>
         </exclusion>
       </exclusions>
     </dependency>
@@ -145,16 +141,6 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
       <artifactId>jackson-datatype-jsr310</artifactId>
     </dependency>
     <dependency>
-      <groupId>org.mockito</groupId>
-      <artifactId>mockito-core</artifactId>
-      <scope>test</scope>
-    </dependency>
-    <dependency>
-      <groupId>org.apache.ozone</groupId>
-      <artifactId>hdds-hadoop-dependency-test</artifactId>
-      <scope>test</scope>
-    </dependency>
-    <dependency>
       <groupId>org.apache.hadoop</groupId>
       <artifactId>hadoop-hdfs-client</artifactId>
       <exclusions>
@@ -164,6 +150,14 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
         </exclusion>
       </exclusions>
     </dependency>
+
+    <dependency>
+      <groupId>org.apache.ozone</groupId>
+      <artifactId>rocksdb-checkpoint-differ</artifactId>
+      <version>${hdds.version}</version>
+    </dependency>
+
+    <!-- Test dependencies -->
     <dependency>
       <groupId>org.apache.ozone</groupId>
       <artifactId>hdds-common</artifactId>
@@ -171,18 +165,14 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
       <scope>test</scope>
     </dependency>
     <dependency>
-      <groupId>org.junit.jupiter</groupId>
-      <artifactId>junit-jupiter-params</artifactId>
+      <groupId>org.apache.ozone</groupId>
+      <artifactId>hdds-hadoop-dependency-test</artifactId>
+      <scope>test</scope>
     </dependency>
-
     <dependency>
       <groupId>org.apache.ozone</groupId>
-      <artifactId>rocksdb-checkpoint-differ</artifactId>
-      <version>${hdds.version}</version>
-    </dependency>
-    <dependency>
-      <groupId>org.awaitility</groupId>
-      <artifactId>awaitility</artifactId>
+      <artifactId>hdds-test-utils</artifactId>
+      <scope>test</scope>
     </dependency>
   </dependencies>
 

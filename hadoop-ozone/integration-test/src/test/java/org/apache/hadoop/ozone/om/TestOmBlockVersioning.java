@@ -39,7 +39,6 @@ import org.apache.commons.lang3.RandomStringUtils;
 
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.ONE;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
@@ -105,6 +104,7 @@ public class TestOmBlockVersioning {
         .setDataSize(1000)
         .setAcls(new ArrayList<>())
         .setReplicationConfig(StandaloneReplicationConfig.getInstance(ONE))
+        .setOwnerName("user" + RandomStringUtils.randomNumeric(5))
         .build();
 
     // 1st update, version 0
@@ -144,7 +144,7 @@ public class TestOmBlockVersioning {
     List<OmKeyLocationInfo> locationInfoList =
         openKey.getKeyInfo().getLatestVersionLocations()
             .getBlocksLatestVersionOnly();
-    assertTrue(locationInfoList.size() == 1);
+    assertEquals(1, locationInfoList.size());
     locationInfoList.add(locationInfo);
     keyArgs.setLocationInfoList(locationInfoList);
     writeClient.commitKey(keyArgs, openKey.getId());

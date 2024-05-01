@@ -135,12 +135,22 @@ public class DeleteBlocksCommandHandler implements CommandHandler {
           SCMCommandProto.Type.deleteBlocksCommand, command.getType());
       return;
     }
-
+    DeleteCmdInfo cmd = new DeleteCmdInfo((DeleteBlocksCommand) command,
+        container, context, connectionManager);
     try {
-      DeleteCmdInfo cmd = new DeleteCmdInfo((DeleteBlocksCommand) command,
-          container, context, connectionManager);
       deleteCommandQueues.add(cmd);
     } catch (IllegalStateException e) {
+      String dnId = context.getParent().getDatanodeDetails().getUuidString();
+      Consumer<CommandStatus> updateFailure = (cmdStatus) -> {
+        cmdStatus.markAsFailed();
+        ContainerBlocksDeletionACKProto emptyACK =
+            ContainerBlocksDeletionACKProto
+                .newBuilder()
+                .setDnId(dnId)
+                .build();
+        ((DeleteBlockCommandStatus)cmdStatus).setBlocksDeletionAck(emptyACK);
+      };
+      updateCommandStatus(cmd.getContext(), cmd.getCmd(), updateFailure, LOG);
       LOG.warn("Command is discarded because of the command queue is full");
     }
   }
@@ -382,9 +392,13 @@ public class DeleteBlocksCommandHandler implements CommandHandler {
     } finally {
       final ContainerBlocksDeletionACKProto deleteAck =
           blockDeletionACK;
-      final boolean status = cmdExecuted;
+      final boolean executedStatus = cmdExecuted;
       Consumer<CommandStatus> statusUpdater = (cmdStatus) -> {
-        cmdStatus.setStatus(status);
+        if (executedStatus) {
+          cmdStatus.markAsExecuted();
+        } else {
+          cmdStatus.markAsFailed();
+        }
         ((DeleteBlockCommandStatus)cmdStatus).setBlocksDeletionAck(deleteAck);
       };
       updateCommandStatus(cmd.getContext(), cmd.getCmd(), statusUpdater, LOG);
@@ -500,7 +514,9 @@ public class DeleteBlocksCommandHandler implements CommandHandler {
       throws IOException {
     int newDeletionBlocks = 0;
     long containerId = delTX.getContainerID();
-    logDeleteTransaction(containerId, containerData, delTX);
+    if (isDuplicateTransaction(containerId, containerData, delTX, blockDeleteMetrics)) {
+      return;
+    }
     try (DBHandle containerDB = BlockUtils.getDB(containerData, conf)) {
       DeleteTransactionStore<?> store =
           (DeleteTransactionStore<?>) containerDB.getStore();
@@ -522,7 +538,9 @@ public class DeleteBlocksCommandHandler implements CommandHandler {
       KeyValueContainerData containerData, DeletedBlocksTransaction delTX)
       throws IOException {
     long containerId = delTX.getContainerID();
-    logDeleteTransaction(containerId, containerData, delTX);
+    if (isDuplicateTransaction(containerId, containerData, delTX, blockDeleteMetrics)) {
+      return;
+    }
     int newDeletionBlocks = 0;
     try (DBHandle containerDB = BlockUtils.getDB(containerData, conf)) {
       Table<String, BlockData> blockDataTable =
@@ -612,20 +630,28 @@ public class DeleteBlocksCommandHandler implements CommandHandler {
     }
   }
 
-  private void logDeleteTransaction(long containerId,
-      KeyValueContainerData containerData, DeletedBlocksTransaction delTX) {
-    if (LOG.isDebugEnabled()) {
-      LOG.debug("Processing Container : {}, DB path : {}, transaction {}",
-          containerId, containerData.getMetadataPath(), delTX.getTxID());
-    }
+  public static boolean isDuplicateTransaction(long containerId, KeyValueContainerData containerData,
+      DeletedBlocksTransaction delTX, BlockDeletingServiceMetrics metrics) {
+    boolean duplicate = false;
 
-    if (delTX.getTxID() <= containerData.getDeleteTransactionId()) {
-      blockDeleteMetrics.incOutOfOrderDeleteBlockTransactionCount();
+    if (delTX.getTxID() < containerData.getDeleteTransactionId()) {
+      if (metrics != null) {
+        metrics.incOutOfOrderDeleteBlockTransactionCount();
+      }
       LOG.info(String.format("Delete blocks for containerId: %d"
-              + " is either received out of order or retried,"
-              + " %d <= %d", containerId, delTX.getTxID(),
+              + " is received out of order, %d < %d", containerId, delTX.getTxID(),
           containerData.getDeleteTransactionId()));
+    } else if (delTX.getTxID() == containerData.getDeleteTransactionId()) {
+      duplicate = true;
+      LOG.info(String.format("Delete blocks with txID %d for containerId: %d"
+              + " is retried.", delTX.getTxID(), containerId));
+    } else {
+      if (LOG.isDebugEnabled()) {
+        LOG.debug("Processing Container : {}, DB path : {}, transaction {}",
+            containerId, containerData.getMetadataPath(), delTX.getTxID());
+      }
     }
+    return duplicate;
   }
 
   @Override

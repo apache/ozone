@@ -46,14 +46,16 @@ import org.rocksdb.StatsLevel;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.junit.jupiter.api.Assertions.fail;
 
 /**
  * Tests for RocksDBTable Store.
@@ -94,11 +96,7 @@ public class TestRDBTableStore {
 
   private static boolean consume(Table.KeyValue keyValue)  {
     count++;
-    try {
-      assertNotNull(keyValue.getKey());
-    } catch (IOException ex) {
-      fail("Unexpected Exception " + ex);
-    }
+    assertNotNull(assertDoesNotThrow(keyValue::getKey));
     return true;
   }
 
@@ -472,7 +470,7 @@ public class TestRDBTableStore {
       }
       long keyCount = testTable.getEstimatedKeyCount();
       // The result should be larger than zero but not exceed(?) numKeys
-      assertTrue(keyCount > 0 && keyCount <= numKeys);
+      assertThat(keyCount).isGreaterThan(0).isLessThanOrEqualTo(numKeys);
     }
   }
 
@@ -562,8 +560,7 @@ public class TestRDBTableStore {
         int keyCount = 0;
         while (iter.hasNext()) {
           // iterator should only meet keys with samplePrefix
-          assertArrayEquals(
-              Arrays.copyOf(iter.next().getKey(), PREFIX_LENGTH), samplePrefix);
+          assertArrayEquals(samplePrefix, Arrays.copyOf(iter.next().getKey(), PREFIX_LENGTH));
           keyCount++;
         }
 
@@ -573,8 +570,7 @@ public class TestRDBTableStore {
         // iterator should be able to seekToFirst
         iter.seekToFirst();
         assertTrue(iter.hasNext());
-        assertArrayEquals(Arrays.copyOf(iter.next().getKey(), PREFIX_LENGTH),
-            samplePrefix);
+        assertArrayEquals(samplePrefix, Arrays.copyOf(iter.next().getKey(), PREFIX_LENGTH));
       }
     }
   }
@@ -694,7 +690,7 @@ public class TestRDBTableStore {
 
       // check dump file exist
       assertTrue(dumpFile.exists());
-      assertTrue(dumpFile.length() != 0);
+      assertNotEquals(0, dumpFile.length());
     }
 
     // load dump file into another table
@@ -708,9 +704,7 @@ public class TestRDBTableStore {
         int keyCount = 0;
         while (iter.hasNext()) {
           // check prefix
-          assertTrue(Arrays.equals(
-              Arrays.copyOf(iter.next().getKey(), PREFIX_LENGTH),
-              samplePrefix));
+          assertArrayEquals(Arrays.copyOf(iter.next().getKey(), PREFIX_LENGTH), samplePrefix);
           keyCount++;
         }
 
@@ -751,9 +745,7 @@ public class TestRDBTableStore {
         int keyCount = 0;
         while (iter.hasNext()) {
           // check prefix
-          assertTrue(Arrays.equals(
-              Arrays.copyOf(iter.next().getKey(), PREFIX_LENGTH),
-              samplePrefix));
+          assertArrayEquals(Arrays.copyOf(iter.next().getKey(), PREFIX_LENGTH), samplePrefix);
           keyCount++;
         }
 

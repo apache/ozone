@@ -36,10 +36,9 @@ import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.Optional;
+import java.util.HashMap;
 import java.util.concurrent.TimeUnit;
 
 import org.apache.hadoop.hdds.client.BlockID;
@@ -48,6 +47,7 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.HddsTestUtils;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
+import org.apache.hadoop.hdds.server.JsonUtils;
 import org.apache.hadoop.hdds.utils.db.RDBStore;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
@@ -67,8 +67,6 @@ import org.apache.http.impl.client.CloseableHttpClient;
 import org.apache.http.impl.client.HttpClientBuilder;
 import org.apache.http.util.EntityUtils;
 
-import com.google.gson.Gson;
-import com.google.gson.internal.LinkedTreeMap;
 import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
@@ -191,7 +189,7 @@ public class TestReconWithOzoneManager {
         cluster.getReconServer().getOzoneManagerServiceProvider();
     impl.syncDataFromOM();
     OzoneManagerSyncMetrics metrics = impl.getMetrics();
-    
+
     // HTTP call to /api/task/status
     long omLatestSeqNumber = ((RDBStore) metadataManager.getStore())
         .getDb().getLatestSequenceNumber();
@@ -204,7 +202,7 @@ public class TestReconWithOzoneManager {
 
     // verify sequence number after full snapshot
     assertEquals(omLatestSeqNumber, reconLatestSeqNumber);
-    assertEquals(0, metrics.getSequenceNumberLag().value());
+    assertEquals(0, metrics.getSequenceNumberLag());
 
     //add 4 keys to check for delta updates
     addKeys(1, 5);
@@ -222,7 +220,7 @@ public class TestReconWithOzoneManager {
 
     //verify sequence number after Delta Updates
     assertEquals(omLatestSeqNumber, reconLatestSeqNumber);
-    assertEquals(0, metrics.getSequenceNumberLag().value());
+    assertEquals(0, metrics.getSequenceNumberLag());
 
     long beforeRestartSnapShotTimeStamp = getReconTaskAttributeFromJson(
         taskStatusResponse,
@@ -262,7 +260,7 @@ public class TestReconWithOzoneManager {
 
     //verify sequence number after Delta Updates
     assertEquals(omLatestSeqNumber, reconLatestSeqNumber);
-    assertEquals(0, metrics.getSequenceNumberLag().value());
+    assertEquals(0, metrics.getSequenceNumberLag());
   }
 
   // This test simulates the mis-match in sequence number between Recon OM
@@ -307,19 +305,16 @@ public class TestReconWithOzoneManager {
     long omLatestSeqNumber = ((RDBStore) metadataManager.getStore())
         .getDb().getLatestSequenceNumber();
 
-    String taskStatusResponse = makeHttpCall(taskStatusURL);
-    long reconLatestSeqNumber = getReconTaskAttributeFromJson(
-        taskStatusResponse,
-        OmDeltaRequest.name(),
-        "lastUpdatedSeqNumber");
-
-    // verify sequence number after incremental delta snapshot
-    assertEquals(omLatestSeqNumber, reconLatestSeqNumber);
-    assertEquals(0, metrics.getSequenceNumberLag().value());
-
     OMMetadataManager reconMetadataManagerInstance =
         cluster.getReconServer().getOzoneManagerServiceProvider()
             .getOMMetadataManagerInstance();
+    long reconLatestSeqNumber =
+        ((RDBStore) reconMetadataManagerInstance.getStore()).getDb()
+            .getLatestSequenceNumber();
+
+    // verify sequence number after incremental delta snapshot
+    assertEquals(omLatestSeqNumber, reconLatestSeqNumber);
+    assertEquals(0, metrics.getSequenceNumberLag());
 
     String volume = "vol15";
     String bucket = "bucket15";
@@ -361,15 +356,12 @@ public class TestReconWithOzoneManager {
     reconLatestSeqNumber =
         ((RDBStore) reconMetadataManagerInstance.getStore()).getDb()
             .getLatestSequenceNumber();
-    assertEquals(0, metrics.getSequenceNumberLag().value());
+    assertEquals(0, metrics.getSequenceNumberLag());
     assertEquals(omLatestSeqNumber, reconLatestSeqNumber);
-    reconLatestSeqNumber = getReconTaskAttributeFromJson(
-        taskStatusResponse,
-        OmDeltaRequest.name(),
-        "lastUpdatedSeqNumber");
+    reconLatestSeqNumber =
+        ((RDBStore) reconMetadataManagerInstance.getStore()).getDb()
+            .getLatestSequenceNumber();
     assertEquals(omLatestSeqNumber, reconLatestSeqNumber);
-    assertEquals(17, omLatestSeqNumber);
-    assertEquals(17, reconLatestSeqNumber);
     impl.syncDataFromOM();
     assertTrue(omServiceProviderImplLogs.getOutput()
         .contains("isDBUpdateSuccess: true"));
@@ -388,30 +380,24 @@ public class TestReconWithOzoneManager {
   }
 
   private long getReconTaskAttributeFromJson(String taskStatusResponse,
-       String taskName, String entityAttribute) {
-    ArrayList<LinkedTreeMap> taskStatusList = new Gson()
-        .fromJson(taskStatusResponse, ArrayList.class);
-    Optional<LinkedTreeMap> taskEntity =
-        taskStatusList
-            .stream()
-            .filter(task -> task.get("taskName").equals(taskName))
-            .findFirst();
-    assertTrue(taskEntity.isPresent());
-    return (long)(double) taskEntity.get().get(entityAttribute);
-  }
+                                             String taskName,
+                                             String entityAttribute)
+      throws IOException {
+    List<HashMap<String, Object>> taskStatusList =
+        JsonUtils.readTreeAsListOfMaps(taskStatusResponse);
 
-  private long getReconContainerCount(String containerResponse) {
-    Map map = new Gson().fromJson(containerResponse, HashMap.class);
-    LinkedTreeMap linkedTreeMap = (LinkedTreeMap) map.get("data");
-    return (long)(double) linkedTreeMap.get("totalCount");
-  }
+    // Stream through the list to find the task entity matching the taskName
+    Optional<HashMap<String, Object>> taskEntity = taskStatusList.stream()
+        .filter(task -> taskName.equals(task.get("taskName")))
+        .findFirst();
 
-  private LinkedTreeMap getContainerResponseMap(String containerResponse,
-      int expectedContainerID) {
-    Map map = new Gson().fromJson(containerResponse, HashMap.class);
-    LinkedTreeMap linkedTreeMap = (LinkedTreeMap) map.get("data");
-    ArrayList containers = (ArrayList) linkedTreeMap.get("containers");
-    return (LinkedTreeMap)containers.get(expectedContainerID);
+    if (taskEntity.isPresent()) {
+      Number number = (Number) taskEntity.get().get(entityAttribute);
+      return number.longValue();
+    } else {
+      throw new IOException(
+          "Task entity for task name " + taskName + " not found");
+    }
   }
 
   /**
@@ -444,7 +430,7 @@ public class TestReconWithOzoneManager {
   }
 
   private static OmKeyLocationInfo getOmKeyLocationInfo(BlockID blockID,
-      Pipeline pipeline) {
+                                                        Pipeline pipeline) {
     return new OmKeyLocationInfo.Builder()
         .setBlockID(blockID)
         .setPipeline(pipeline)
@@ -452,8 +438,8 @@ public class TestReconWithOzoneManager {
   }
 
   private static void writeDataToOm(String key, String bucket, String volume,
-      List<OmKeyLocationInfoGroup>
-          omKeyLocationInfoGroupList)
+                                    List<OmKeyLocationInfoGroup>
+                                        omKeyLocationInfoGroupList)
       throws IOException {
 
     String omKey = metadataManager.getOzoneKey(volume,

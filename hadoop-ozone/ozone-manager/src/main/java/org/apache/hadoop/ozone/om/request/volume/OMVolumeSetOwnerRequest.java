@@ -19,6 +19,7 @@
 package org.apache.hadoop.ozone.om.request.volume;
 
 import com.google.common.base.Preconditions;
+import org.apache.ratis.server.protocol.TermIndex;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.OzoneConsts;
@@ -28,7 +29,6 @@ import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OMMetrics;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
-import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.om.response.volume.OMVolumeSetOwnerResponse;
@@ -76,9 +76,8 @@ public class OMVolumeSetOwnerRequest extends OMVolumeRequest {
   }
 
   @Override
-  public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager,
-      long transactionLogIndex,
-      OzoneManagerDoubleBufferHelper ozoneManagerDoubleBufferHelper) {
+  public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager, TermIndex termIndex) {
+    final long transactionLogIndex = termIndex.getIndex();
     SetVolumePropertyRequest setVolumePropertyRequest =
         getOmRequest().getSetVolumePropertyRequest();
     Preconditions.checkNotNull(setVolumePropertyRequest);
@@ -139,7 +138,6 @@ public class OMVolumeSetOwnerRequest extends OMVolumeRequest {
         omResponse.setSetVolumePropertyResponse(
             SetVolumePropertyResponse.newBuilder().setResponse(false).build());
         omClientResponse = new OMVolumeSetOwnerResponse(omResponse.build());
-        // Note: addResponseToDoubleBuffer would be executed in finally block.
         return omClientResponse;
       }
 
@@ -183,8 +181,6 @@ public class OMVolumeSetOwnerRequest extends OMVolumeRequest {
       omClientResponse = new OMVolumeSetOwnerResponse(
           createErrorOMResponse(omResponse, exception));
     } finally {
-      addResponseToDoubleBuffer(transactionLogIndex, omClientResponse,
-          ozoneManagerDoubleBufferHelper);
       if (acquiredUserLocks) {
         omMetadataManager.getLock().releaseMultiUserLock(newOwner, oldOwner);
       }

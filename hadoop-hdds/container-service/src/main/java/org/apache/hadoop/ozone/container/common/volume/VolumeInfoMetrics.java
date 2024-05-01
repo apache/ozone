@@ -32,15 +32,13 @@ import org.apache.hadoop.ozone.OzoneConsts;
 public class VolumeInfoMetrics {
 
   private String metricsSourceName = VolumeInfoMetrics.class.getSimpleName();
-  private String volumeRootStr;
-  private HddsVolume volume;
+  private final HddsVolume volume;
 
   /**
-   * @param identifier Typically, path to volume root. e.g. /data/hdds
+   * @param identifier Typically, path to volume root. E.g. /data/hdds
    */
   public VolumeInfoMetrics(String identifier, HddsVolume ref) {
     this.metricsSourceName += '-' + identifier;
-    this.volumeRootStr = identifier;
     this.volume = ref;
     init();
   }
@@ -140,6 +138,11 @@ public class VolumeInfoMetrics {
   @Metric("Returns the Total Capacity of the Volume")
   public long getTotalCapacity() {
     return (getUsed() + getAvailable() + getReserved());
+  }
+
+  @Metric("Returns the Committed bytes of the Volume")
+  public long getCommitted() {
+    return volume.getCommittedBytes();
   }
 
 }

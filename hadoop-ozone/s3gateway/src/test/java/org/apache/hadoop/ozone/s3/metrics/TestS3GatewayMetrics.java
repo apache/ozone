@@ -36,7 +36,6 @@ import org.apache.hadoop.ozone.s3.exception.S3ErrorTable;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.mockito.Mockito;
 
 import javax.ws.rs.container.ContainerRequestContext;
 import javax.ws.rs.core.HttpHeaders;
@@ -56,11 +55,11 @@ import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.BUCKET_ALREADY_E
 import static org.apache.hadoop.ozone.s3.util.S3Consts.COPY_SOURCE_HEADER;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.STORAGE_CLASS_HEADER;
 import static org.apache.hadoop.ozone.s3.util.S3Utils.urlEncode;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.junit.jupiter.api.Assertions.fail;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 /**
@@ -98,15 +97,15 @@ public class TestS3GatewayMetrics {
     keyEndpoint.setClient(clientStub);
     keyEndpoint.setOzoneConfiguration(new OzoneConfiguration());
 
-    headers = Mockito.mock(HttpHeaders.class);
+    headers = mock(HttpHeaders.class);
     when(headers.getHeaderString(STORAGE_CLASS_HEADER)).thenReturn(
         "STANDARD");
     keyEndpoint.setHeaders(headers);
     metrics = bucketEndpoint.getMetrics();
 
-    context = Mockito.mock(ContainerRequestContext.class);
-    Mockito.when(context.getUriInfo()).thenReturn(Mockito.mock(UriInfo.class));
-    Mockito.when(context.getUriInfo().getQueryParameters())
+    context = mock(ContainerRequestContext.class);
+    when(context.getUriInfo()).thenReturn(mock(UriInfo.class));
+    when(context.getUriInfo().getQueryParameters())
         .thenReturn(new MultivaluedHashMap<>());
     keyEndpoint.setContext(context);
   }
@@ -265,12 +264,9 @@ public class TestS3GatewayMetrics {
 
     InputStream inputBody = TestBucketAcl.class.getClassLoader()
         .getResourceAsStream("userAccessControlList.xml");
-
     try {
-      bucketEndpoint.put("unknown_bucket", ACL_MARKER, headers,
-          inputBody);
-      fail();
-    } catch (OS3Exception ex) {
+      assertThrows(OS3Exception.class, () -> bucketEndpoint.put("unknown_bucket", ACL_MARKER, headers,
+          inputBody));
     } finally {
       inputBody.close();
     }
@@ -544,7 +540,7 @@ public class TestS3GatewayMetrics {
     OS3Exception e = assertThrows(OS3Exception.class, () -> keyEndpoint.put(
         bucketName, keyName, CONTENT.length(), 1, null, body),
         "Test for CopyObjectMetric failed");
-    assertTrue(e.getErrorMessage().contains("This copy request is illegal"));
+    assertThat(e.getErrorMessage()).contains("This copy request is illegal");
     curMetric = metrics.getCopyObjectFailure();
     assertEquals(1L, curMetric - oriMetric);
   }

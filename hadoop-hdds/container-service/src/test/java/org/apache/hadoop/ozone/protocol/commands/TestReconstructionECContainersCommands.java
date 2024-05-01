@@ -17,17 +17,21 @@
  */
 package org.apache.hadoop.ozone.protocol.commands;
 
+import com.google.protobuf.ByteString;
+import com.google.protobuf.Proto2Utils;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.stream.Collectors;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 /**
  * Test ECReconstructionContainersCommand.
@@ -37,19 +41,19 @@ public class TestReconstructionECContainersCommands {
   @Test
   public void testExceptionIfSourceAndMissingNotSameLength() {
     ECReplicationConfig ecReplicationConfig = new ECReplicationConfig(3, 2);
-    byte[] missingContainerIndexes = {1, 2};
+    final ByteString missingContainerIndexes = Proto2Utils.unsafeByteString(new byte[]{1, 2});
 
     List<DatanodeDetails> targetDns = new ArrayList<>();
     targetDns.add(MockDatanodeDetails.randomDatanodeDetails());
 
-    Assertions.assertThrows(IllegalArgumentException.class,
+    assertThrows(IllegalArgumentException.class,
         () -> new ReconstructECContainersCommand(1L, Collections.emptyList(),
         targetDns, missingContainerIndexes, ecReplicationConfig));
   }
 
   @Test
   public void protobufConversion() {
-    byte[] missingContainerIndexes = {1, 2};
+    final ByteString missingContainerIndexes = Proto2Utils.unsafeByteString(new byte[]{1, 2});
     List<Long> srcNodesIndexes = new ArrayList<>();
     for (int i = 0; i < srcNodesIndexes.size(); i++) {
       srcNodesIndexes.add(i + 1L);
@@ -76,27 +80,25 @@ public class TestReconstructionECContainersCommands {
     List<DatanodeDetails> targetDnsFromProto = proto.getTargetsList().stream()
         .map(a -> DatanodeDetails.getFromProtoBuf(a))
         .collect(Collectors.toList());
-    Assertions.assertEquals(1L, proto.getContainerID());
-    Assertions.assertEquals(sources, srcDnsFromProto);
-    Assertions.assertEquals(targets, targetDnsFromProto);
-    Assertions.assertArrayEquals(missingContainerIndexes,
-        proto.getMissingContainerIndexes().toByteArray());
-    Assertions.assertEquals(ecReplicationConfig,
+    assertEquals(1L, proto.getContainerID());
+    assertEquals(sources, srcDnsFromProto);
+    assertEquals(targets, targetDnsFromProto);
+    assertEquals(missingContainerIndexes, proto.getMissingContainerIndexes());
+    assertEquals(ecReplicationConfig,
         new ECReplicationConfig(proto.getEcReplicationConfig()));
 
     ReconstructECContainersCommand fromProtobuf =
         ReconstructECContainersCommand.getFromProtobuf(proto);
 
-    Assertions.assertEquals(reconstructECContainersCommand.getContainerID(),
+    assertEquals(reconstructECContainersCommand.getContainerID(),
         fromProtobuf.getContainerID());
-    Assertions.assertEquals(reconstructECContainersCommand.getSources(),
+    assertEquals(reconstructECContainersCommand.getSources(),
         fromProtobuf.getSources());
-    Assertions.assertEquals(reconstructECContainersCommand.getTargetDatanodes(),
+    assertEquals(reconstructECContainersCommand.getTargetDatanodes(),
         fromProtobuf.getTargetDatanodes());
-    Assertions.assertArrayEquals(
-        reconstructECContainersCommand.getMissingContainerIndexes(),
+    assertEquals(reconstructECContainersCommand.getMissingContainerIndexes(),
         fromProtobuf.getMissingContainerIndexes());
-    Assertions.assertEquals(
+    assertEquals(
         reconstructECContainersCommand.getEcReplicationConfig(),
         fromProtobuf.getEcReplicationConfig());
   }

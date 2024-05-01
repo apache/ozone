@@ -22,8 +22,10 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.nio.ByteBuffer;
 import java.util.HashMap;
+import java.util.Map;
 import java.util.Scanner;
 
+import com.google.common.collect.Maps;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
@@ -38,8 +40,12 @@ import org.apache.hadoop.ozone.client.VolumeArgs;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
+import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
+import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_DEFAULT_BUCKET_LAYOUT;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_DEFAULT_BUCKET_LAYOUT_DEFAULT;
 
 /**
  * Utility to help to generate test data.
@@ -51,8 +57,7 @@ public final class TestDataUtil {
 
   public static OzoneBucket createVolumeAndBucket(OzoneClient client,
       String volumeName, String bucketName) throws IOException {
-    return createVolumeAndBucket(client, volumeName, bucketName,
-        BucketLayout.LEGACY);
+    return createVolumeAndBucket(client, volumeName, bucketName, getDefaultBucketLayout(client));
   }
 
   public static OzoneBucket createVolumeAndBucket(OzoneClient client,
@@ -141,7 +146,13 @@ public final class TestDataUtil {
 
   public static OzoneBucket createVolumeAndBucket(OzoneClient client)
       throws IOException {
-    return createVolumeAndBucket(client, BucketLayout.LEGACY);
+    return createVolumeAndBucket(client, getDefaultBucketLayout(client));
+  }
+
+  private static BucketLayout getDefaultBucketLayout(OzoneClient client) {
+    return BucketLayout.fromString(client
+        .getConfiguration()
+        .get(OZONE_DEFAULT_BUCKET_LAYOUT, OZONE_DEFAULT_BUCKET_LAYOUT_DEFAULT));
   }
 
   public static OzoneBucket createBucket(OzoneClient client,
@@ -172,5 +183,30 @@ public final class TestDataUtil {
     throw new IllegalStateException(
         "Could not create unique volume/bucket " + "in " + attempts
             + " attempts");
+  }
+
+  public static Map<String, OmKeyInfo> createKeys(MiniOzoneCluster cluster, int numOfKeys)
+      throws Exception {
+    Map<String, OmKeyInfo> keyLocationMap = Maps.newHashMap();
+
+    try (OzoneClient client = cluster.newClient()) {
+      OzoneBucket bucket = createVolumeAndBucket(client);
+      for (int i = 0; i < numOfKeys; i++) {
+        String keyName = RandomStringUtils.randomAlphabetic(5) + i;
+        createKey(bucket, keyName, RandomStringUtils.randomAlphabetic(5));
+        keyLocationMap.put(keyName, lookupOmKeyInfo(cluster, bucket, keyName));
+      }
+    }
+    return keyLocationMap;
+  }
+
+  private static OmKeyInfo lookupOmKeyInfo(MiniOzoneCluster cluster,
+      OzoneBucket bucket, String key) throws IOException {
+    OmKeyArgs arg = new OmKeyArgs.Builder()
+        .setVolumeName(bucket.getVolumeName())
+        .setBucketName(bucket.getName())
+        .setKeyName(key)
+        .build();
+    return cluster.getOzoneManager().lookupKey(arg);
   }
 }

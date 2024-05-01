@@ -21,6 +21,8 @@ import com.google.common.base.Preconditions;
 import java.nio.ByteBuffer;
 import java.util.List;
 import java.util.function.Function;
+
+import org.apache.commons.lang3.RandomUtils;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.BlockData;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ChunkInfo;
@@ -42,6 +44,7 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Type;
 import org.apache.hadoop.ozone.common.ChunkBuffer;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
+import org.apache.ratis.thirdparty.com.google.protobuf.UnsafeByteOperations;
 
 import static org.apache.hadoop.hdds.scm.utils.ClientCommandsUtils.getReadChunkVersion;
 
@@ -142,17 +145,6 @@ public final class ContainerCommandResponseBuilders {
     return getSuccessResponseBuilder(msg)
         .setPutBlock(putBlock)
         .build();
-  }
-
-  /**
-   * Returns successful blockResponse.
-   * @param msg - Request.
-   * @return Response.
-   */
-  public static ContainerCommandResponseProto getBlockResponseSuccess(
-      ContainerCommandRequestProto msg) {
-
-    return getSuccessResponse(msg);
   }
 
   public static ContainerCommandResponseProto getBlockDataResponse(
@@ -315,6 +307,31 @@ public final class ContainerCommandResponseBuilders {
 
     return getSuccessResponseBuilder(request)
         .setReadChunk(response)
+        .build();
+  }
+
+  public static ContainerCommandResponseProto getEchoResponse(
+      ContainerCommandRequestProto msg) {
+
+    ContainerProtos.EchoRequestProto echoRequest = msg.getEcho();
+    int responsePayload = echoRequest.getPayloadSizeResp();
+
+    int sleepTimeMs = echoRequest.getSleepTimeMs();
+    try {
+      if (sleepTimeMs > 0) {
+        Thread.sleep(sleepTimeMs);
+      }
+    } catch (InterruptedException e) {
+      throw new RuntimeException(e);
+    }
+
+    ContainerProtos.EchoResponseProto.Builder echo =
+        ContainerProtos.EchoResponseProto
+            .newBuilder()
+            .setPayload(UnsafeByteOperations.unsafeWrap(RandomUtils.nextBytes(responsePayload)));
+
+    return getSuccessResponseBuilder(msg)
+        .setEcho(echo)
         .build();
   }
 

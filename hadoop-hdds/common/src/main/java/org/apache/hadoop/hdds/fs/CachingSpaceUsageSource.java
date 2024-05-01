@@ -24,7 +24,7 @@ import org.apache.hadoop.hdds.annotation.InterfaceStability;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import javax.annotation.Nullable;
+import jakarta.annotation.Nullable;
 import java.time.Duration;
 import java.util.OptionalLong;
 import java.util.concurrent.Executors;
@@ -94,7 +94,19 @@ public class CachingSpaceUsageSource implements SpaceUsageSource {
   }
 
   public void decrementUsedSpace(long reclaimedSpace) {
-    cachedValue.addAndGet(-1 * reclaimedSpace);
+    cachedValue.updateAndGet(current -> {
+      long newValue = current - reclaimedSpace;
+      if (newValue < 0) {
+        if (current > 0) {
+          LOG.warn("Attempted to decrement used space to a negative value. " +
+                  "Current: {}, Decrement: {}, Source: {}",
+              current, reclaimedSpace, source);
+        }
+        return 0;
+      } else {
+        return newValue;
+      }
+    });
   }
 
   public void start() {

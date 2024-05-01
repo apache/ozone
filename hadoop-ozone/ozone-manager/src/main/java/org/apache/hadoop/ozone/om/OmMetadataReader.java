@@ -325,8 +325,10 @@ public class OmMetadataReader implements IOmMetadataReader, Auditor {
   public ListKeysResult listKeys(String volumeName, String bucketName,
       String startKey, String keyPrefix, int maxKeys) throws IOException {
     long startNanos = Time.monotonicNowNanos();
-    ResolvedBucket bucket = ozoneManager.resolveBucketLink(
-        Pair.of(volumeName, bucketName));
+    ResolvedBucket bucket = captureLatencyNs(
+        perfMetrics.getListKeysResolveBucketLatencyNs(),
+        () -> ozoneManager.resolveBucketLink(
+            Pair.of(volumeName, bucketName)));
 
     boolean auditSuccess = true;
     Map<String, String> auditMap = bucket.audit();
@@ -336,8 +338,10 @@ public class OmMetadataReader implements IOmMetadataReader, Auditor {
 
     try {
       if (isAclEnabled) {
-        checkAcls(ResourceType.BUCKET, StoreType.OZONE, ACLType.LIST,
-            bucket.realVolume(), bucket.realBucket(), keyPrefix);
+        captureLatencyNs(perfMetrics.getListKeysAclCheckLatencyNs(), () ->
+            checkAcls(ResourceType.BUCKET, StoreType.OZONE, ACLType.LIST,
+            bucket.realVolume(), bucket.realBucket(), keyPrefix)
+        );
       }
       metrics.incNumKeyLists();
       return keyManager.listKeys(bucket.realVolume(), bucket.realBucket(),
@@ -383,7 +387,7 @@ public class OmMetadataReader implements IOmMetadataReader, Auditor {
     String volumeName = obj.getVolumeName();
     String bucketName = obj.getBucketName();
     String keyName = obj.getKeyName();
-    if (obj.getResourceType() == ResourceType.KEY) {
+    if (obj.getResourceType() == ResourceType.KEY || obj.getResourceType() == ResourceType.PREFIX) {
       ResolvedBucket resolvedBucket = ozoneManager.resolveBucketLink(
           Pair.of(volumeName, bucketName));
       volumeName = resolvedBucket.realVolume();

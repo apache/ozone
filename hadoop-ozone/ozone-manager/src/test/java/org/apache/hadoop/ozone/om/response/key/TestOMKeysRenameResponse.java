@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.ozone.om.response.key;
 
+import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.ozone.om.helpers.OmRenameKeys;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
@@ -26,14 +27,14 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.RenameK
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
 
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
 import java.util.HashMap;
 import java.util.Map;
 
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.THREE;
-import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType.RATIS;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Tests OMKeyRenameResponse.
@@ -69,10 +70,8 @@ public class TestOMKeysRenameResponse extends TestOMKeyResponse {
       String toKey = parentDir.concat("/newKey" + i);
       key = omMetadataManager.getOzoneKey(volumeName, bucketName, key);
       toKey = omMetadataManager.getOzoneKey(volumeName, bucketName, toKey);
-      Assertions.assertFalse(
-          omMetadataManager.getKeyTable(getBucketLayout()).isExist(key));
-      Assertions.assertTrue(
-          omMetadataManager.getKeyTable(getBucketLayout()).isExist(toKey));
+      assertFalse(omMetadataManager.getKeyTable(getBucketLayout()).isExist(key));
+      assertTrue(omMetadataManager.getKeyTable(getBucketLayout()).isExist(toKey));
     }
   }
 
@@ -101,10 +100,8 @@ public class TestOMKeysRenameResponse extends TestOMKeyResponse {
       key = omMetadataManager.getOzoneKey(volumeName, bucketName, key);
       toKey = omMetadataManager.getOzoneKey(volumeName, bucketName, toKey);
       // As omResponse has error, it is a no-op. So, no changes should happen.
-      Assertions.assertTrue(
-          omMetadataManager.getKeyTable(getBucketLayout()).isExist(key));
-      Assertions.assertFalse(
-          omMetadataManager.getKeyTable(getBucketLayout()).isExist(toKey));
+      assertTrue(omMetadataManager.getKeyTable(getBucketLayout()).isExist(key));
+      assertFalse(omMetadataManager.getKeyTable(getBucketLayout()).isExist(toKey));
     }
 
   }
@@ -120,7 +117,8 @@ public class TestOMKeysRenameResponse extends TestOMKeyResponse {
       String key = parentDir.concat("/key" + i);
       String toKey = parentDir.concat("/newKey" + i);
       OMRequestTestUtils.addKeyToTable(false, volumeName,
-          bucketName, parentDir.concat("/key" + i), 0L, RATIS, THREE,
+          bucketName, parentDir.concat("/key" + i), 0L,
+          RatisReplicationConfig.getInstance(THREE),
           omMetadataManager);
 
       OmKeyInfo omKeyInfo = omMetadataManager.getKeyTable(getBucketLayout())

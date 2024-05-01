@@ -19,12 +19,12 @@
   <parent>
     <groupId>org.apache.ozone</groupId>
     <artifactId>ozone</artifactId>
-    <version>1.4.0-SNAPSHOT</version>
+    <version>1.5.0-SNAPSHOT</version>
   </parent>
   <artifactId>ozone-filesystem-shaded</artifactId>
   <name>Apache Ozone FileSystem Shaded</name>
   <packaging>jar</packaging>
-  <version>1.4.0-SNAPSHOT</version>
+  <version>1.5.0-SNAPSHOT</version>
 
   <properties>
     <maven.test.skip>true</maven.test.skip> <!-- no tests in this module so far -->
@@ -91,6 +91,7 @@
               <goal>shade</goal>
             </goals>
             <configuration>
+              <skip>${maven.shade.skip}</skip>
               <transformers>
                 <transformer
                         implementation="org.apache.maven.plugins.shade.resource.DontIncludeResourceTransformer">
@@ -128,7 +129,6 @@
                     <include>org.apache.commons.digester.**.*</include>
                     <include>org.apache.commons.io.**.*</include>
                     <include>org.apache.commons.logging.**.*</include>
-                    <include>org.apache.commons.pool2.**.*</include>
                     <include>org.apache.commons.validator.**.*</include>
                     <include>org.apache.commons.lang3.**.*</include>
                     <include>org.sqlite.**.*</include>

@@ -69,7 +69,9 @@ import org.slf4j.LoggerFactory;
 
 import javax.management.ObjectName;
 import java.io.IOException;
+import java.math.RoundingMode;
 import java.net.InetAddress;
+import java.text.DecimalFormat;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -83,7 +85,9 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ScheduledFuture;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
+import java.util.function.BiConsumer;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -128,14 +132,19 @@ public class SCMNodeManager implements NodeManager {
   private final HDDSLayoutVersionManager scmLayoutVersionManager;
   private final EventPublisher scmNodeEventPublisher;
   private final SCMContext scmContext;
+  private final Map<SCMCommandProto.Type,
+      BiConsumer<DatanodeDetails, SCMCommand<?>>> sendCommandNotifyMap;
 
   /**
    * Lock used to synchronize some operation in Node manager to ensure a
    * consistent view of the node state.
    */
   private final ReentrantReadWriteLock lock = new ReentrantReadWriteLock();
-  private final String opeState = "OPSTATE";
-  private final String comState = "COMSTATE";
+  private static final String OPESTATE = "OPSTATE";
+  private static final String COMSTATE = "COMSTATE";
+  private static final String LASTHEARTBEAT = "LASTHEARTBEAT";
+  private static final String USEDSPACEPERCENT = "USEDSPACEPERCENT";
+  private static final String TOTALCAPACITY = "CAPACITY";
   /**
    * Constructs SCM machine Manager.
    */
@@ -179,6 +188,13 @@ public class SCMNodeManager implements NodeManager {
     String dnLimit = conf.get(ScmConfigKeys.OZONE_DATANODE_PIPELINE_LIMIT);
     this.heavyNodeCriteria = dnLimit == null ? 0 : Integer.parseInt(dnLimit);
     this.scmContext = scmContext;
+    this.sendCommandNotifyMap = new HashMap<>();
+  }
+
+  @Override
+  public void registerSendCommandNotify(SCMCommandProto.Type type,
+      BiConsumer<DatanodeDetails, SCMCommand<?>> scmCommand) {
+    this.sendCommandNotifyMap.put(type, scmCommand);
   }
 
   private void registerMXBean() {
@@ -256,7 +272,7 @@ public class SCMNodeManager implements NodeManager {
    * Returns the Number of Datanodes by State they are in. Passing null for
    * either of the states acts like a wildcard for that state.
    *
-   * @parem nodeOpState - The Operational State of the node
+   * @param nodeOpState - The Operational State of the node
    * @param health - The health of the node
    * @return count
    */
@@ -495,19 +511,15 @@ public class SCMNodeManager implements NodeManager {
    * Send heartbeat to indicate the datanode is alive and doing well.
    *
    * @param datanodeDetails - DatanodeDetailsProto.
-   * @param layoutInfo - Layout Version Proto.
    * @return SCMheartbeat response.
    */
   @Override
   public List<SCMCommand> processHeartbeat(DatanodeDetails datanodeDetails,
-                                           LayoutVersionProto layoutInfo,
-      CommandQueueReportProto queueReport) {
+                                           CommandQueueReportProto queueReport) {
     Preconditions.checkNotNull(datanodeDetails, "Heartbeat is missing " +
         "DatanodeDetails.");
     try {
       nodeStateManager.updateLastHeartbeatTime(datanodeDetails);
-      nodeStateManager.updateLastKnownLayoutVersion(datanodeDetails,
-          layoutInfo);
       metrics.incNumHBProcessed();
       updateDatanodeOpState(datanodeDetails);
     } catch (NodeNotFoundException e) {
@@ -521,6 +533,15 @@ public class SCMNodeManager implements NodeManager {
           commandQueue.getDatanodeCommandSummary(datanodeDetails.getUuid());
       List<SCMCommand> commands =
           commandQueue.getCommand(datanodeDetails.getUuid());
+
+      // Update the SCMCommand of deleteBlocksCommand Status
+      for (SCMCommand<?> command : commands) {
+        if (sendCommandNotifyMap.get(command.getType()) != null) {
+          sendCommandNotifyMap.get(command.getType())
+              .accept(datanodeDetails, command);
+        }
+      }
+
       if (queueReport != null) {
         processNodeCommandQueueReport(datanodeDetails, queueReport, summary);
       }
@@ -659,6 +680,15 @@ public class SCMNodeManager implements NodeManager {
       LOG.trace("HB is received from [datanode={}]: <json>{}</json>",
           datanodeDetails.getHostName(),
           layoutVersionReport.toString().replaceAll("\n", "\\\\n"));
+    }
+
+    try {
+      nodeStateManager.updateLastKnownLayoutVersion(datanodeDetails,
+          layoutVersionReport);
+    } catch (NodeNotFoundException e) {
+      LOG.error("SCM trying to process Layout Version from an " +
+          "unregistered node {}.", datanodeDetails);
+      return;
     }
 
     // Software layout version is hardcoded to the SCM.
@@ -855,13 +885,18 @@ public class SCMNodeManager implements NodeManager {
     long capacity = 0L;
     long used = 0L;
     long remaining = 0L;
+    long committed = 0L;
+    long freeSpaceToSpare = 0L;
 
     for (SCMNodeStat stat : getNodeStats().values()) {
       capacity += stat.getCapacity().get();
       used += stat.getScmUsed().get();
       remaining += stat.getRemaining().get();
+      committed += stat.getCommitted().get();
+      freeSpaceToSpare += stat.getFreeSpaceToSpare().get();
     }
-    return new SCMNodeStat(capacity, used, remaining);
+    return new SCMNodeStat(capacity, used, remaining, committed,
+        freeSpaceToSpare);
   }
 
   /**
@@ -966,6 +1001,8 @@ public class SCMNodeManager implements NodeManager {
       long capacity = 0L;
       long used = 0L;
       long remaining = 0L;
+      long committed = 0L;
+      long freeSpaceToSpare = 0L;
 
       final DatanodeInfo datanodeInfo = nodeStateManager
           .getNode(datanodeDetails);
@@ -975,8 +1012,11 @@ public class SCMNodeManager implements NodeManager {
         capacity += reportProto.getCapacity();
         used += reportProto.getScmUsed();
         remaining += reportProto.getRemaining();
+        committed += reportProto.getCommitted();
+        freeSpaceToSpare += reportProto.getFreeSpaceToSpare();
       }
-      return new SCMNodeStat(capacity, used, remaining);
+      return new SCMNodeStat(capacity, used, remaining, committed,
+          freeSpaceToSpare);
     } catch (NodeNotFoundException e) {
       LOG.warn("Cannot generate NodeStat, datanode {} not found.",
           datanodeDetails.getUuidString());
@@ -1013,6 +1053,8 @@ public class SCMNodeManager implements NodeManager {
         nodeInfo.put(s.label + stat.name(), 0L);
       }
     }
+    nodeInfo.put("TotalCapacity", 0L);
+    nodeInfo.put("TotalUsed", 0L);
 
     for (DatanodeInfo node : nodeStateManager.getAllNodes()) {
       String keyPrefix = "";
@@ -1047,6 +1089,8 @@ public class SCMNodeManager implements NodeManager {
           nodeInfo.compute(keyPrefix + UsageMetrics.SSDUsed.name(),
               (k, v) -> v + reportProto.getScmUsed());
         }
+        nodeInfo.compute("TotalCapacity", (k, v) -> v + reportProto.getCapacity());
+        nodeInfo.compute("TotalUsed", (k, v) -> v + reportProto.getScmUsed());
       }
     }
     return nodeInfo;
@@ -1061,13 +1105,16 @@ public class SCMNodeManager implements NodeManager {
       DatanodeDetails.Port httpsPort = dni.getPort(HTTPS);
       String opstate = "";
       String healthState = "";
+      String heartbeatTimeDiff = "";
       if (dni.getNodeStatus() != null) {
         opstate = dni.getNodeStatus().getOperationalState().toString();
         healthState = dni.getNodeStatus().getHealth().toString();
+        heartbeatTimeDiff = getLastHeartbeatTimeDiff(dni.getLastHeartbeatTime());
       }
       Map<String, String> map = new HashMap<>();
-      map.put(opeState, opstate);
-      map.put(comState, healthState);
+      map.put(OPESTATE, opstate);
+      map.put(COMSTATE, healthState);
+      map.put(LASTHEARTBEAT, heartbeatTimeDiff);
       if (httpPort != null) {
         map.put(httpPort.getName().toString(), httpPort.getValue().toString());
       }
@@ -1075,9 +1122,137 @@ public class SCMNodeManager implements NodeManager {
         map.put(httpsPort.getName().toString(),
                   httpsPort.getValue().toString());
       }
+      String capacity = calculateStorageCapacity(dni.getStorageReports());
+      map.put(TOTALCAPACITY, capacity);
+      String[] storagePercentage = calculateStoragePercentage(
+          dni.getStorageReports());
+      String scmUsedPerc = storagePercentage[0];
+      String nonScmUsedPerc = storagePercentage[1];
+      map.put(USEDSPACEPERCENT,
+          "Ozone: " + scmUsedPerc + "%, other: " + nonScmUsedPerc + "%");
       nodes.put(hostName, map);
     }
     return nodes;
+  }
+
+  /**
+   * Calculate the storage capacity of the DataNode node.
+   * @param storageReports Calculate the storage capacity corresponding
+   *                       to the storage collection.
+   * @return
+   */
+  public static String calculateStorageCapacity(
+      List<StorageReportProto> storageReports) {
+    long capacityByte = 0;
+    if (storageReports != null && !storageReports.isEmpty()) {
+      for (StorageReportProto storageReport : storageReports) {
+        capacityByte += storageReport.getCapacity();
+      }
+    }
+
+    double ua = capacityByte;
+    StringBuilder unit = new StringBuilder("B");
+    if (ua > 1024) {
+      ua = ua / 1024;
+      unit.replace(0, 1, "KB");
+    }
+    if (ua > 1024) {
+      ua = ua / 1024;
+      unit.replace(0, 2, "MB");
+    }
+    if (ua > 1024) {
+      ua = ua / 1024;
+      unit.replace(0, 2, "GB");
+    }
+    if (ua > 1024) {
+      ua = ua / 1024;
+      unit.replace(0, 2, "TB");
+    }
+
+    DecimalFormat decimalFormat = new DecimalFormat("#0.0");
+    decimalFormat.setRoundingMode(RoundingMode.HALF_UP);
+    String capacity = decimalFormat.format(ua);
+    return capacity + unit.toString();
+  }
+
+  /**
+   * Calculate the storage usage percentage of a DataNode node.
+   * @param storageReports Calculate the storage percentage corresponding
+   *                       to the storage collection.
+   * @return
+   */
+  public static String[] calculateStoragePercentage(
+      List<StorageReportProto> storageReports) {
+    String[] storagePercentage = new String[2];
+    String usedPercentage = "N/A";
+    String nonUsedPercentage = "N/A";
+    if (storageReports != null && !storageReports.isEmpty()) {
+      long capacity = 0;
+      long scmUsed = 0;
+      long remaining = 0;
+      for (StorageReportProto storageReport : storageReports) {
+        capacity += storageReport.getCapacity();
+        scmUsed += storageReport.getScmUsed();
+        remaining += storageReport.getRemaining();
+      }
+      long scmNonUsed = capacity - scmUsed - remaining;
+
+      DecimalFormat decimalFormat = new DecimalFormat("#0.00");
+      decimalFormat.setRoundingMode(RoundingMode.HALF_UP);
+
+      double usedPerc = ((double) scmUsed / capacity) * 100;
+      usedPerc = usedPerc > 100.0 ? 100.0 : usedPerc;
+      double nonUsedPerc = ((double) scmNonUsed / capacity) * 100;
+      nonUsedPerc = nonUsedPerc > 100.0 ? 100.0 : nonUsedPerc;
+      usedPercentage = decimalFormat.format(usedPerc);
+      nonUsedPercentage = decimalFormat.format(nonUsedPerc);
+    }
+
+    storagePercentage[0] = usedPercentage;
+    storagePercentage[1] = nonUsedPercentage;
+    return storagePercentage;
+  }
+
+  /**
+   * Based on the current time and the last heartbeat, calculate the time difference
+   * and get a string of the relative value. E.g. "2s ago", "1m 2s ago", etc.
+   *
+   * @return string with the relative value of the time diff.
+   */
+  public String getLastHeartbeatTimeDiff(long lastHeartbeatTime) {
+    long currentTime = Time.monotonicNow();
+    long timeDiff = currentTime - lastHeartbeatTime;
+
+    // Time is in ms. Calculate total time in seconds.
+    long seconds = TimeUnit.MILLISECONDS.toSeconds(timeDiff);
+    // Calculate days, convert the number back to seconds and subtract it from seconds.
+    long days = TimeUnit.SECONDS.toDays(seconds);
+    seconds -= TimeUnit.DAYS.toSeconds(days);
+    // Calculate hours, convert the number back to seconds and subtract it from seconds.
+    long hours = TimeUnit.SECONDS.toHours(seconds);
+    seconds -= TimeUnit.HOURS.toSeconds(hours);
+    // Calculate minutes, convert the number back to seconds and subtract it from seconds.
+    long minutes = TimeUnit.SECONDS.toMinutes(seconds);
+    seconds -= TimeUnit.MINUTES.toSeconds(minutes);
+
+    StringBuilder stringBuilder = new StringBuilder();
+    if (days > 0) {
+      stringBuilder.append(days).append("d ");
+    }
+    if (hours > 0) {
+      stringBuilder.append(hours).append("h ");
+    }
+    if (minutes > 0) {
+      stringBuilder.append(minutes).append("m ");
+    }
+    if (seconds > 0) {
+      stringBuilder.append(seconds).append("s ");
+    }
+    String str = stringBuilder.length() == 0 ? "Just now" : "ago";
+
+    stringBuilder.append(str);
+
+    return stringBuilder.toString();
   }
 
   private enum UsageMetrics {
@@ -1466,5 +1641,37 @@ public class SCMNodeManager implements NodeManager {
 
   private ReentrantReadWriteLock.ReadLock readLock() {
     return lock.readLock();
+  }
+
+  /**
+   * This API allows removal of only DECOMMISSIONED and DEAD nodes from NodeManager data structures and cleanup memory.
+   * This API call is having a pre-condition before removal of node like following resources to be removed:
+   *   --- all pipelines for datanode should be closed.
+   *   --- all containers for datanode should be closed.
+   *   --- remove all containers replicas maintained by datanode.
+   *   --- clears all SCM DeletedBlockLog transaction records associated with datanode.
+   *
+   * @param datanodeDetails
+   * @throws NodeNotFoundException
+   */
+  @Override
+  public void removeNode(DatanodeDetails datanodeDetails) throws NodeNotFoundException, IOException {
+    writeLock().lock();
+    try {
+      NodeStatus nodeStatus = this.getNodeStatus(datanodeDetails);
+      if (datanodeDetails.isDecommissioned() || nodeStatus.isDead()) {
+        if (clusterMap.contains(datanodeDetails)) {
+          clusterMap.remove(datanodeDetails);
+        }
+        nodeStateManager.removeNode(datanodeDetails);
+        removeFromDnsToUuidMap(datanodeDetails.getUuid(), datanodeDetails.getIpAddress());
+        final List<SCMCommand> cmdList = getCommandQueue(datanodeDetails.getUuid());
+        LOG.info("Clearing command queue of size {} for DN {}", cmdList.size(), datanodeDetails);
+      } else {
+        LOG.warn("Node not decommissioned or dead, cannot remove: {}", datanodeDetails);
+      }
+    } finally {
+      writeLock().unlock();
+    }
   }
 }

@@ -63,10 +63,10 @@ public class TestECBlockOutputStreamEntry {
     try (XceiverClientManager manager =
         new XceiverClientManager(new OzoneConfiguration())) {
       HashSet<XceiverClientSpi> clients = new HashSet<>();
-      ECBlockOutputStreamEntry entry = new ECBlockOutputStreamEntry.Builder()
-          .setXceiverClientManager(manager)
-          .setPipeline(anECPipeline)
-          .build();
+      final ECBlockOutputStreamEntry.Builder b = new ECBlockOutputStreamEntry.Builder();
+      b.setXceiverClientManager(manager)
+          .setPipeline(anECPipeline);
+      final ECBlockOutputStreamEntry entry = b.build();
       for (int i = 0; i < nodes.size(); i++) {
         clients.add(
             manager.acquireClient(
@@ -101,10 +101,10 @@ public class TestECBlockOutputStreamEntry {
     try (XceiverClientManager manager =
         new XceiverClientManager(new OzoneConfiguration())) {
       HashSet<XceiverClientSpi> clients = new HashSet<>();
-      ECBlockOutputStreamEntry entry = new ECBlockOutputStreamEntry.Builder()
-          .setXceiverClientManager(manager)
-          .setPipeline(anECPipeline)
-          .build();
+      final ECBlockOutputStreamEntry.Builder b = new ECBlockOutputStreamEntry.Builder();
+      b.setXceiverClientManager(manager)
+          .setPipeline(anECPipeline);
+      final ECBlockOutputStreamEntry entry = b.build();
       for (int i = 0; i < nodes.size(); i++) {
         clients.add(
             manager.acquireClient(

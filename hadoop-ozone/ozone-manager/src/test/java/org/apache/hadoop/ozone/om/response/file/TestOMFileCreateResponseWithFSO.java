@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.ozone.om.response.file;
 
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
@@ -25,9 +26,7 @@ import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.ozone.om.response.key.OMKeyCreateResponse;
 import org.apache.hadoop.ozone.om.response.key.TestOMKeyCreateResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
-import org.apache.hadoop.util.Time;
-import org.jetbrains.annotations.NotNull;
-import org.junit.jupiter.api.Assertions;
+import jakarta.annotation.Nonnull;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -37,21 +36,21 @@ import java.util.ArrayList;
  */
 public class TestOMFileCreateResponseWithFSO extends TestOMKeyCreateResponse {
 
-  @NotNull
+  @Nonnull
   @Override
   protected OmKeyInfo getOmKeyInfo() {
-    Assertions.assertNotNull(omBucketInfo);
-    return OMRequestTestUtils.createOmKeyInfo(volumeName,
-            omBucketInfo.getBucketName(), keyName, replicationType,
-            replicationFactor,
-            omBucketInfo.getObjectID() + 1,
-            omBucketInfo.getObjectID(), 100, Time.now());
+    assertNotNull(omBucketInfo);
+    return OMRequestTestUtils.createOmKeyInfo(volumeName, omBucketInfo.getBucketName(), keyName, replicationConfig)
+        .setObjectID(omBucketInfo.getObjectID() + 1)
+        .setParentObjectID(omBucketInfo.getObjectID())
+        .setUpdateID(100L)
+        .build();
   }
 
-  @NotNull
+  @Nonnull
   @Override
   protected String getOpenKeyName() throws IOException {
-    Assertions.assertNotNull(omBucketInfo);
+    assertNotNull(omBucketInfo);
     final long volumeId = omMetadataManager.getVolumeId(volumeName);
     final long bucketId = omMetadataManager.getBucketId(volumeName,
             bucketName);
@@ -59,7 +58,7 @@ public class TestOMFileCreateResponseWithFSO extends TestOMKeyCreateResponse {
             omBucketInfo.getObjectID(), keyName, clientID);
   }
 
-  @NotNull
+  @Nonnull
   @Override
   protected OMKeyCreateResponse getOmKeyCreateResponse(OmKeyInfo keyInfo,
       OmBucketInfo bucketInfo, OMResponse response) throws IOException {

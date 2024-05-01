@@ -20,7 +20,7 @@ package org.apache.hadoop.hdds.ratis;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
-import java.security.cert.X509Certificate;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -28,6 +28,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.function.BiFunction;
+import java.util.function.BooleanSupplier;
 import java.util.stream.Collectors;
 
 import com.google.common.annotations.VisibleForTesting;
@@ -65,9 +66,16 @@ import org.apache.ratis.rpc.RpcType;
 import org.apache.ratis.rpc.SupportedRpcType;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 import org.apache.ratis.thirdparty.io.netty.buffer.ByteBuf;
+import org.apache.ratis.util.JavaUtils;
 import org.apache.ratis.util.JvmPauseMonitor;
+import org.apache.ratis.util.TimeDuration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import javax.net.ssl.TrustManager;
+
+import static java.util.concurrent.TimeUnit.MILLISECONDS;
+import static org.apache.ratis.util.Preconditions.assertTrue;
 
 /**
  * Ratis helper methods.
@@ -203,21 +211,31 @@ public final class RatisHelper {
         toRaftPeers(pipeline));
   }
 
+  /**
+   * Create a Raft client used primarily for Ozone client communications with
+   * the Ratis pipeline.
+   * @param rpcType rpc type
+   * @param pipeline pipeline
+   * @param retryPolicy retry policy
+   * @param tlsConfig tls config
+   * @param ozoneConfiguration configuration
+   * @return Raft client
+   * @throws IOException IOException
+   */
   public static RaftClient newRaftClient(RpcType rpcType, Pipeline pipeline,
       RetryPolicy retryPolicy, GrpcTlsConfig tlsConfig,
       ConfigurationSource ozoneConfiguration) throws IOException {
     return newRaftClient(rpcType,
         toRaftPeerId(pipeline.getLeaderNode()),
-        // TODO (HDDS-9392): Update this to getClosestNode
-        toRaftPeer(pipeline.getFirstNode()),
+        toRaftPeer(pipeline.getClosestNode()),
         newRaftGroup(RaftGroupId.valueOf(pipeline.getId().getId()),
             pipeline.getNodes()), retryPolicy, tlsConfig, ozoneConfiguration);
   }
 
   private static RpcType getRpcType(ConfigurationSource conf) {
     return SupportedRpcType.valueOfIgnoreCase(conf.get(
-        ScmConfigKeys.DFS_CONTAINER_RATIS_RPC_TYPE_KEY,
-        ScmConfigKeys.DFS_CONTAINER_RATIS_RPC_TYPE_DEFAULT));
+        ScmConfigKeys.HDDS_CONTAINER_RATIS_RPC_TYPE_KEY,
+        ScmConfigKeys.HDDS_CONTAINER_RATIS_RPC_TYPE_DEFAULT));
   }
 
   public static BiFunction<RaftPeer, GrpcTlsConfig, RaftClient> newRaftClient(
@@ -396,11 +414,10 @@ public final class RatisHelper {
   // For External gRPC client to server with gRPC TLS.
   // No mTLS for external client as SCM CA does not issued certificates for them
   public static GrpcTlsConfig createTlsClientConfig(SecurityConfig conf,
-      List<X509Certificate> caCerts) {
+      TrustManager trustManager) {
     GrpcTlsConfig tlsConfig = null;
     if (conf.isSecurityEnabled() && conf.isGrpcTlsEnabled()) {
-      tlsConfig = new GrpcTlsConfig(null, null,
-          caCerts, false);
+      tlsConfig = new GrpcTlsConfig(null, trustManager, false);
     }
     return tlsConfig;
   }
@@ -448,14 +465,14 @@ public final class RatisHelper {
     RaftPeerId primaryId = null;
     List<RaftPeerId> raftPeers = new ArrayList<>();
 
-    for (DatanodeDetails dn : pipeline.getNodes()) {
+    for (DatanodeDetails dn : pipeline.getNodesInOrder()) {
       final RaftPeerId raftPeerId = RaftPeerId.valueOf(dn.getUuidString());
       try {
-        if (dn == pipeline.getFirstNode()) {
+        if (dn == pipeline.getClosestNode()) {
           primaryId = raftPeerId;
         }
       } catch (IOException e) {
-        LOG.error("Can not get FirstNode from the pipeline: {} with " +
+        LOG.error("Can not get primary node from the pipeline: {} with " +
             "exception: {}", pipeline, e.getLocalizedMessage());
         return null;
       }
@@ -593,4 +610,32 @@ public final class RatisHelper {
       // Not re-thrown in order to keep the main exception, if there is any.
     }
   }
+
+  /**
+   * Similar to {@link JavaUtils#attemptUntilTrue(BooleanSupplier, int, TimeDuration, String, Logger)},
+   * but:
+   * <li>takes max. {@link Duration} instead of number of attempts</li>
+   * <li>accepts {@link Duration} instead of {@link TimeDuration} for sleep time</li>
+   *
+   * @return true if attempt was successful,
+   * false if wait for condition to become true timed out or was interrupted
+   */
+  public static boolean attemptUntilTrue(BooleanSupplier condition, Duration pollInterval, Duration timeout) {
+    try {
+      final int attempts = calculateAttempts(pollInterval, timeout);
+      final TimeDuration sleepTime = TimeDuration.valueOf(pollInterval.toMillis(), MILLISECONDS);
+      JavaUtils.attemptUntilTrue(condition, attempts, sleepTime, null, null);
+      return true;
+    } catch (InterruptedException | IllegalStateException exception) {
+      return false;
+    }
+  }
+
+  public static int calculateAttempts(Duration pollInterval, Duration maxDuration) {
+    final long max = maxDuration.toMillis();
+    final long interval = pollInterval.toMillis();
+    assertTrue(max >= interval, () -> "max: " + maxDuration + " < interval:" + pollInterval);
+    return (int) (max / interval);
+  }
+
 }

@@ -29,12 +29,13 @@ import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.apache.hadoop.ozone.container.ozoneimpl.ContainerController;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 import org.apache.ratis.thirdparty.io.grpc.stub.StreamObserver;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import static org.apache.hadoop.ozone.container.replication.CopyContainerCompression.NO_COMPRESSION;
-import static org.mockito.ArgumentMatchers.any;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
+import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
 
@@ -68,13 +69,13 @@ class TestSendContainerRequestHandler {
     StreamObserver observer = mock(StreamObserver.class);
     doAnswer(invocation -> {
       Object arg = invocation.getArgument(0);
-      Assertions.assertTrue(arg instanceof StorageContainerException);
-      Assertions.assertEquals(ContainerProtos.Result.CONTAINER_EXISTS,
+      assertInstanceOf(StorageContainerException.class, arg);
+      assertEquals(ContainerProtos.Result.CONTAINER_EXISTS,
           ((StorageContainerException) arg).getResult());
       return null;
     }).when(observer).onError(any());
     SendContainerRequestHandler sendContainerRequestHandler
-        = new SendContainerRequestHandler(containerImporter, observer);
+        = new SendContainerRequestHandler(containerImporter, observer, null);
     ByteString data = ByteString.copyFromUtf8("test");
     ContainerProtos.SendContainerRequest request
         = ContainerProtos.SendContainerRequest.newBuilder()

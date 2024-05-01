@@ -26,7 +26,6 @@ import org.apache.hadoop.ozone.container.common.ContainerTestUtils;
 import org.apache.ratis.conf.RaftProperties;
 import org.apache.ratis.server.RaftServerConfigKeys;
 import org.apache.ratis.util.TimeDuration;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
 import java.util.concurrent.TimeUnit;
@@ -179,11 +178,11 @@ public class TestDatanodeConfiguration {
   public void testConf() throws Exception {
     final OzoneConfiguration conf = new OzoneConfiguration();
     final String dir = "dummy/dir";
-    conf.set(OzoneConfigKeys.DFS_CONTAINER_RATIS_DATANODE_STORAGE_DIR, dir);
+    conf.set(OzoneConfigKeys.HDDS_CONTAINER_RATIS_DATANODE_STORAGE_DIR, dir);
 
     final DatanodeRatisServerConfig ratisConf = conf.getObject(
         DatanodeRatisServerConfig.class);
-    Assertions.assertEquals(0, ratisConf.getLogAppenderWaitTimeMin(),
+    assertEquals(0, ratisConf.getLogAppenderWaitTimeMin(),
         "getLogAppenderWaitTimeMin");
 
     assertWaitTimeMin(TimeDuration.ZERO, conf);
@@ -198,7 +197,7 @@ public class TestDatanodeConfiguration {
     final RaftProperties p = ContainerTestUtils.newXceiverServerRatis(dn, conf)
         .newRaftProperties();
     final TimeDuration t = RaftServerConfigKeys.Log.Appender.waitTimeMin(p);
-    Assertions.assertEquals(expected, t,
+    assertEquals(expected, t,
         RaftServerConfigKeys.Log.Appender.WAIT_TIME_MIN_KEY);
   }
 }

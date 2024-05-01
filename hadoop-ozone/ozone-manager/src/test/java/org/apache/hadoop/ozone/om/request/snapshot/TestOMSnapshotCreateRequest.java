@@ -18,8 +18,8 @@
 
 package org.apache.hadoop.ozone.om.request.snapshot;
 
+import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.audit.AuditLogger;
@@ -33,7 +33,6 @@ import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
-import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.om.response.key.OMKeyRenameResponse;
@@ -48,12 +47,12 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
-import org.mockito.Mockito;
 
 import java.io.File;
 import java.io.IOException;
 import java.util.UUID;
 
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.THREE;
 import static org.apache.hadoop.ozone.om.helpers.SnapshotInfo.getFromProtobuf;
 import static org.apache.hadoop.ozone.om.helpers.SnapshotInfo.getTableKey;
 import static org.apache.hadoop.ozone.om.request.OMRequestTestUtils.createSnapshotRequest;
@@ -64,8 +63,10 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.any;
+import static org.mockito.Mockito.anyString;
+import static org.mockito.Mockito.doNothing;
+import static org.mockito.Mockito.framework;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -85,10 +86,6 @@ public class TestOMSnapshotCreateRequest {
   private String bucketName;
   private String snapshotName1;
   private String snapshotName2;
-
-  // No-op ozoneManagerDoubleBuffer for testing.
-  private final OzoneManagerDoubleBufferHelper ozoneManagerDoubleBufferHelper =
-      ((response, transactionIndex) -> null);
 
   @BeforeEach
   public void setup() throws Exception {
@@ -112,7 +109,7 @@ public class TestOMSnapshotCreateRequest {
     when(ozoneManager.getVersionManager()).thenReturn(lvm);
     AuditLogger auditLogger = mock(AuditLogger.class);
     when(ozoneManager.getAuditLogger()).thenReturn(auditLogger);
-    Mockito.doNothing().when(auditLogger).logWrite(any(AuditMessage.class));
+    doNothing().when(auditLogger).logWrite(any(AuditMessage.class));
     batchOperation = omMetadataManager.getStore().initBatchOperation();
 
     volumeName = UUID.randomUUID().toString();
@@ -126,7 +123,7 @@ public class TestOMSnapshotCreateRequest {
   @AfterEach
   public void stop() {
     omMetrics.unRegister();
-    Mockito.framework().clearInlineMocks();
+    framework().clearInlineMocks();
     if (batchOperation != null) {
       batchOperation.close();
     }
@@ -205,8 +202,7 @@ public class TestOMSnapshotCreateRequest {
 
     // Run validateAndUpdateCache.
     OMClientResponse omClientResponse =
-        omSnapshotCreateRequest.validateAndUpdateCache(ozoneManager, 1,
-            ozoneManagerDoubleBufferHelper);
+        omSnapshotCreateRequest.validateAndUpdateCache(ozoneManager, 1);
 
     assertNotNull(omClientResponse.getOMResponse());
 
@@ -282,8 +278,7 @@ public class TestOMSnapshotCreateRequest {
     OMSnapshotCreateRequest omSnapshotCreateRequest = doPreExecute(omRequest);
 
     assertNull(omMetadataManager.getSnapshotInfoTable().get(key));
-    omSnapshotCreateRequest.validateAndUpdateCache(ozoneManager, 1,
-        ozoneManagerDoubleBufferHelper);
+    omSnapshotCreateRequest.validateAndUpdateCache(ozoneManager, 1);
 
     assertNotNull(omMetadataManager.getSnapshotInfoTable().get(key));
 
@@ -291,8 +286,7 @@ public class TestOMSnapshotCreateRequest {
     omRequest = createSnapshotRequest(volumeName, bucketName, snapshotName1);
     omSnapshotCreateRequest = doPreExecute(omRequest);
     OMClientResponse omClientResponse =
-        omSnapshotCreateRequest.validateAndUpdateCache(ozoneManager, 2,
-            ozoneManagerDoubleBufferHelper);
+        omSnapshotCreateRequest.validateAndUpdateCache(ozoneManager, 2);
 
     OMResponse omResponse = omClientResponse.getOMResponse();
     assertNotNull(omResponse.getCreateSnapshotResponse());
@@ -328,8 +322,9 @@ public class TestOMSnapshotCreateRequest {
       throws Exception {
     String fromKeyParentName = UUID.randomUUID().toString();
     OmKeyInfo fromKeyParent = OMRequestTestUtils.createOmKeyInfo(volumeName,
-        bucketName, fromKeyParentName, HddsProtos.ReplicationType.RATIS,
-        HddsProtos.ReplicationFactor.THREE, 100L);
+            bucketName, fromKeyParentName, RatisReplicationConfig.getInstance(THREE))
+        .setObjectID(100L)
+        .build();
 
     OmKeyInfo toKeyInfo = addKey(toKey, offset + 4L);
     OmKeyInfo fromKeyInfo = addKey(fromKey, offset + 5L);
@@ -363,8 +358,7 @@ public class TestOMSnapshotCreateRequest {
     OMSnapshotCreateRequest omSnapshotCreateRequest = doPreExecute(omRequest);
     //create entry
     OMClientResponse omClientResponse =
-        omSnapshotCreateRequest.validateAndUpdateCache(ozoneManager, 1,
-            ozoneManagerDoubleBufferHelper);
+        omSnapshotCreateRequest.validateAndUpdateCache(ozoneManager, 1);
     omClientResponse.checkAndUpdateDB(omMetadataManager, batchOperation);
     omMetadataManager.getStore().commitBatchOperation(batchOperation);
   }
@@ -389,8 +383,8 @@ public class TestOMSnapshotCreateRequest {
 
   private OmKeyInfo addKey(String keyName, long objectId) {
     return OMRequestTestUtils.createOmKeyInfo(volumeName, bucketName, keyName,
-        HddsProtos.ReplicationType.RATIS, HddsProtos.ReplicationFactor.THREE,
-        objectId);
+            RatisReplicationConfig.getInstance(THREE)).setObjectID(objectId)
+        .build();
   }
 
   protected String addKeyToTable(OmKeyInfo keyInfo) throws Exception {

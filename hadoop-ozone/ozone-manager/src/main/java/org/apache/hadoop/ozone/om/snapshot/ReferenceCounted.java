@@ -25,7 +25,7 @@ import java.util.concurrent.atomic.AtomicLong;
 /**
  * Add reference counter to an object instance.
  */
-public class ReferenceCounted<T, U extends ReferenceCountedCallback>
+public class ReferenceCounted<T>
     implements AutoCloseable {
 
   /**
@@ -51,10 +51,10 @@ public class ReferenceCounted<T, U extends ReferenceCountedCallback>
   /**
    * Parent instance whose callback will be triggered upon this RC closure.
    */
-  private final U parentWithCallback;
+  private final ReferenceCountedCallback parentWithCallback;
 
   public ReferenceCounted(T obj, boolean disableCounter,
-      U parentWithCallback) {
+      ReferenceCountedCallback parentWithCallback) {
     // A param to allow disabling ref counting to reduce active DB
     //  access penalties due to AtomicLong operations.
     this.obj = obj;
@@ -95,12 +95,6 @@ public class ReferenceCounted<T, U extends ReferenceCountedCallback>
       long newValTotal = refCount.incrementAndGet();
       Preconditions.checkState(newValTotal > 0L,
           "Total reference count overflown");
-
-      if (refCount.get() == 1L) {
-        // ref count increased to one (from zero), remove from
-        // pendingEvictionList if added
-        parentWithCallback.callback(this);
-      }
     }
 
     return refCount.get();
@@ -131,13 +125,10 @@ public class ReferenceCounted<T, U extends ReferenceCountedCallback>
       long newValTotal = refCount.decrementAndGet();
       Preconditions.checkState(newValTotal >= 0L,
           "Total reference count underflow");
-
-      if (refCount.get() == 0L) {
-        // ref count decreased to zero, add to pendingEvictionList
-        parentWithCallback.callback(this);
-      }
     }
-
+    if (refCount.get() == 0) {
+      this.parentWithCallback.callback(this);
+    }
     return refCount.get();
   }
 

@@ -53,13 +53,11 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.api.io.TempDir;
-import org.mockito.Mockito;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.event.Level;
 
 import java.io.IOException;
-import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
@@ -77,11 +75,12 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_RANGER_HTTPS_ADDRESS
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_RANGER_SERVICE;
 import static org.apache.hadoop.ozone.om.OMMultiTenantManager.OZONE_TENANT_RANGER_ROLE_DESCRIPTION;
 import static org.apache.hadoop.security.authentication.util.KerberosName.DEFAULT_MECHANISM;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.junit.jupiter.api.Assertions.fail;
-import static org.mockito.ArgumentMatchers.any;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.framework;
@@ -188,7 +187,7 @@ public class TestRangerBGSyncService {
 
     omMetrics = OMMetrics.create();
     conf.set(OMConfigKeys.OZONE_OM_DB_DIRS,
-        Files.createTempDirectory(folder.toAbsolutePath(), "om").toString());
+        folder.resolve("om").toAbsolutePath().toString());
     // No need to conf.set(OzoneConfigKeys.OZONE_ADMINISTRATORS, ...) here
     //  as we did the trick earlier with mockito.
     omMetadataManager = new OmMetadataManagerImpl(conf, ozoneManager);
@@ -234,7 +233,7 @@ public class TestRangerBGSyncService {
         ozoneManager.getMetadataManager().getMetaTable().put(
             OzoneConsts.RANGER_OZONE_SERVICE_VERSION_KEY, String.valueOf(v));
         return null;
-      }).when(omRatisServer).submitRequest(Mockito.any(), Mockito.any());
+      }).when(omRatisServer).submitRequest(any(), any());
     } catch (ServiceException e) {
       throw new RuntimeException(e);
     }
@@ -279,7 +278,7 @@ public class TestRangerBGSyncService {
     rolesCreated.add(0, role.getName());
   }
 
-  private void createRolesAndPoliciesInRanger(boolean populateDB) {
+  private void createRolesAndPoliciesInRanger(boolean populateDB) throws IOException {
 
     policiesCreated.clear();
     rolesCreated.clear();
@@ -301,102 +300,75 @@ public class TestRangerBGSyncService {
     // Add tenant entry in OM DB
     if (populateDB) {
       LOG.info("Creating OM DB tenant entries");
-      try {
-        // Tenant State entry
-        omMetadataManager.getTenantStateTable().put(tenantId,
-            new OmDBTenantState(
-                tenantId, volumeName, userRoleName, adminRoleName,
-                bucketNamespacePolicyName, bucketPolicyName));
-        // Access ID entry for alice
-        final String aliceAccessId = OMMultiTenantManager.getDefaultAccessId(
-            tenantId, USER_ALICE_SHORT);
-        omMetadataManager.getTenantAccessIdTable().put(aliceAccessId,
-            new OmDBAccessIdInfo.Builder()
-                .setTenantId(tenantId)
-                .setUserPrincipal(USER_ALICE_SHORT)
-                .setIsAdmin(false)
-                .setIsDelegatedAdmin(false)
-                .build());
-        // Access ID entry for bob
-        final String bobAccessId = OMMultiTenantManager.getDefaultAccessId(
-            tenantId, USER_BOB_SHORT);
-        omMetadataManager.getTenantAccessIdTable().put(bobAccessId,
-            new OmDBAccessIdInfo.Builder()
-                .setTenantId(tenantId)
-                .setUserPrincipal(USER_BOB_SHORT)
-                .setIsAdmin(false)
-                .setIsDelegatedAdmin(false)
-                .build());
-      } catch (IOException e) {
-        fail(e.getMessage());
-      }
+      // Tenant State entry
+      omMetadataManager.getTenantStateTable().put(tenantId,
+          new OmDBTenantState(
+              tenantId, volumeName, userRoleName, adminRoleName,
+              bucketNamespacePolicyName, bucketPolicyName));
+      // Access ID entry for alice
+      final String aliceAccessId = OMMultiTenantManager.getDefaultAccessId(
+          tenantId, USER_ALICE_SHORT);
+      omMetadataManager.getTenantAccessIdTable().put(aliceAccessId,
+          new OmDBAccessIdInfo.Builder()
+              .setTenantId(tenantId)
+              .setUserPrincipal(USER_ALICE_SHORT)
+              .setIsAdmin(false)
+              .setIsDelegatedAdmin(false)
+              .build());
+      // Access ID entry for bob
+      final String bobAccessId = OMMultiTenantManager.getDefaultAccessId(
+          tenantId, USER_BOB_SHORT);
+      omMetadataManager.getTenantAccessIdTable().put(bobAccessId,
+          new OmDBAccessIdInfo.Builder()
+              .setTenantId(tenantId)
+              .setUserPrincipal(USER_BOB_SHORT)
+              .setIsAdmin(false)
+              .setIsDelegatedAdmin(false)
+              .build());
     }
 
-    try {
-      LOG.info("Creating user in Ranger: {}", USER_ALICE_SHORT);
-      rangerUserRequest.createUser(USER_ALICE_SHORT, "Password12");
-      usersCreated.add(USER_ALICE_SHORT);
-    } catch (IOException e) {
-      fail(e.getMessage());
-    }
 
-    try {
-      LOG.info("Creating user in Ranger: {}", USER_BOB_SHORT);
-      rangerUserRequest.createUser(USER_BOB_SHORT, "Password12");
-      usersCreated.add(USER_BOB_SHORT);
-    } catch (IOException e) {
-      fail(e.getMessage());
-    }
+    LOG.info("Creating user in Ranger: {}", USER_ALICE_SHORT);
+    rangerUserRequest.createUser(USER_ALICE_SHORT, "Password12");
+    usersCreated.add(USER_ALICE_SHORT);
 
-    try {
-      LOG.info("Creating admin role in Ranger: {}", adminRoleName);
-      // Create empty admin role first
-      Role adminRole = new Role.Builder()
-          .setName(adminRoleName)
-          .setDescription(OZONE_TENANT_RANGER_ROLE_DESCRIPTION)
-          .build();
-      createRoleHelper(adminRole);
-    } catch (IOException e) {
-      fail(e.getMessage());
-    }
+    LOG.info("Creating user in Ranger: {}", USER_BOB_SHORT);
+    rangerUserRequest.createUser(USER_BOB_SHORT, "Password12");
+    usersCreated.add(USER_BOB_SHORT);
 
-    try {
-      LOG.info("Creating user role in Ranger: {}", userRoleName);
-      Role userRole = new Role.Builder()
-          .setName(userRoleName)
-          .setDescription(OZONE_TENANT_RANGER_ROLE_DESCRIPTION)
-          .addRole(adminRoleName, true)
-          // Add alice and bob to the user role
-          .addUsers(Arrays.asList(USER_ALICE_SHORT, USER_BOB_SHORT))
-          .build();
-      createRoleHelper(userRole);
-    } catch (IOException e) {
-      fail(e.getMessage());
-    }
+    LOG.info("Creating admin role in Ranger: {}", adminRoleName);
+    // Create empty admin role first
+    Role adminRole = new Role.Builder()
+        .setName(adminRoleName)
+        .setDescription(OZONE_TENANT_RANGER_ROLE_DESCRIPTION)
+        .build();
+    createRoleHelper(adminRole);
 
-    try {
-      Policy tenant1VolumeAccessPolicy =
-          OMMultiTenantManager.getDefaultVolumeAccessPolicy(
-              tenantId, volumeName, userRoleName, adminRoleName);
-      LOG.info("Creating VolumeAccess policy in Ranger: {}",
-          tenant1VolumeAccessPolicy.getName());
-      accessController.createPolicy(tenant1VolumeAccessPolicy);
-      policiesCreated.add(tenant1VolumeAccessPolicy.getName());
-    } catch (IOException e) {
-      fail(e.getMessage());
-    }
+    LOG.info("Creating user role in Ranger: {}", userRoleName);
+    Role userRole = new Role.Builder()
+        .setName(userRoleName)
+        .setDescription(OZONE_TENANT_RANGER_ROLE_DESCRIPTION)
+        .addRole(adminRoleName, true)
+        // Add alice and bob to the user role
+        .addUsers(Arrays.asList(USER_ALICE_SHORT, USER_BOB_SHORT))
+        .build();
+    createRoleHelper(userRole);
 
-    try {
-      Policy tenant1BucketCreatePolicy =
-          OMMultiTenantManager.getDefaultBucketAccessPolicy(
-              tenantId, volumeName, userRoleName);
-      LOG.info("Creating BucketAccess policy in Ranger: {}",
-          tenant1BucketCreatePolicy.getName());
-      accessController.createPolicy(tenant1BucketCreatePolicy);
-      policiesCreated.add(tenant1BucketCreatePolicy.getName());
-    } catch (IOException e) {
-      fail(e.getMessage());
-    }
+    Policy tenant1VolumeAccessPolicy =
+        OMMultiTenantManager.getDefaultVolumeAccessPolicy(
+            tenantId, volumeName, userRoleName, adminRoleName);
+    LOG.info("Creating VolumeAccess policy in Ranger: {}",
+        tenant1VolumeAccessPolicy.getName());
+    accessController.createPolicy(tenant1VolumeAccessPolicy);
+    policiesCreated.add(tenant1VolumeAccessPolicy.getName());
+
+    Policy tenant1BucketCreatePolicy =
+        OMMultiTenantManager.getDefaultBucketAccessPolicy(
+            tenantId, volumeName, userRoleName);
+    LOG.info("Creating BucketAccess policy in Ranger: {}",
+        tenant1BucketCreatePolicy.getName());
+    accessController.createPolicy(tenant1BucketCreatePolicy);
+    policiesCreated.add(tenant1BucketCreatePolicy.getName());
   }
 
   public void cleanupPolicies() {
@@ -468,7 +440,7 @@ public class TestRangerBGSyncService {
 
     final long rangerSvcVersionBefore =
         bgSync.getRangerOzoneServicePolicyVersion();
-    assertTrue(rangerSvcVersionBefore >= startingRangerVersion);
+    assertThat(rangerSvcVersionBefore).isGreaterThanOrEqualTo(startingRangerVersion);
 
     // Note: DB Service Version will be -1 if the test starts with an empty DB
     final long dbSvcVersionBefore = bgSync.getOMDBRangerServiceVersion();
@@ -482,38 +454,22 @@ public class TestRangerBGSyncService {
     final long rangerSvcVersionAfter =
         bgSync.getRangerOzoneServicePolicyVersion();
     assertEquals(rangerSvcVersionAfter, dbSvcVersionAfter);
-    assertTrue(dbSvcVersionAfter > dbSvcVersionBefore);
-    assertTrue(rangerSvcVersionAfter > rangerSvcVersionBefore);
+    assertThat(dbSvcVersionAfter).isGreaterThan(dbSvcVersionBefore);
+    assertThat(rangerSvcVersionAfter).isGreaterThan(rangerSvcVersionBefore);
 
     // Verify that the Ranger policies and roles not backed up
     // by OzoneManager Multi-Tenancy tables are cleaned up by sync thread
 
     for (String policy : policiesCreated) {
-      try {
-        final Policy policyRead = accessController.getPolicy(policy);
-        fail("The policy should have been deleted: " + policyRead);
-      } catch (IOException ex) {
-        if (!(ex.getCause() instanceof RangerServiceException)) {
-          fail("Expected RangerServiceException, got " +
-              ex.getCause().getClass().getSimpleName());
-        }
-        RangerServiceException rse = (RangerServiceException) ex.getCause();
-        assertEquals(404, rse.getStatus().getStatusCode());
-      }
+      IOException ex = assertThrows(IOException.class, () -> accessController.getPolicy(policy));
+      RangerServiceException rse = assertInstanceOf(RangerServiceException.class, ex.getCause());
+      assertEquals(404, rse.getStatus().getStatusCode());
     }
 
     for (String roleName : rolesCreated) {
-      try {
-        final Role role = accessController.getRole(roleName);
-        fail("This role should have been deleted from Ranger: " + role);
-      } catch (IOException ex) {
-        if (!(ex.getCause() instanceof RangerServiceException)) {
-          fail("Expected RangerServiceException, got " +
-              ex.getCause().getClass().getSimpleName());
-        }
-        RangerServiceException rse = (RangerServiceException) ex.getCause();
-        assertEquals(400, rse.getStatus().getStatusCode());
-      }
+      IOException ex = assertThrows(IOException.class, () -> accessController.getRole(roleName));
+      RangerServiceException rse = assertInstanceOf(RangerServiceException.class, ex.getCause());
+      assertEquals(400, rse.getStatus().getStatusCode());
     }
   }
 
@@ -523,7 +479,7 @@ public class TestRangerBGSyncService {
    * Expect sync service to check Ranger state but write nothing to Ranger.
    */
   @Test
-  public void testConsistentState() throws Exception {
+  void testConsistentState() throws Exception {
     long startingRangerVersion = initBGSync();
 
     // Create roles and policies in ranger that are
@@ -531,7 +487,7 @@ public class TestRangerBGSyncService {
     createRolesAndPoliciesInRanger(true);
 
     long rangerSvcVersionBefore = bgSync.getRangerOzoneServicePolicyVersion();
-    assertTrue(rangerSvcVersionBefore >= startingRangerVersion);
+    assertThat(rangerSvcVersionBefore).isGreaterThanOrEqualTo(startingRangerVersion);
 
     // Note: DB Service Version will be -1 if the test starts with an empty DB
     final long dbSvcVersionBefore = bgSync.getOMDBRangerServiceVersion();
@@ -551,23 +507,13 @@ public class TestRangerBGSyncService {
     }
 
     for (String policyName : policiesCreated) {
-      try {
-        final Policy policyRead = accessController.getPolicy(policyName);
-        assertEquals(policyName, policyRead.getName());
-      } catch (Exception e) {
-        e.printStackTrace();
-        fail(e.getMessage());
-      }
+      final Policy policyRead = accessController.getPolicy(policyName);
+      assertEquals(policyName, policyRead.getName());
     }
 
     for (String roleName : rolesCreated) {
-      try {
-        final Role roleResponse = accessController.getRole(roleName);
-        assertEquals(roleName, roleResponse.getName());
-      } catch (Exception e) {
-        e.printStackTrace();
-        fail(e.getMessage());
-      }
+      final Role roleResponse = accessController.getRole(roleName);
+      assertEquals(roleName, roleResponse.getName());
     }
   }
 
@@ -584,7 +530,7 @@ public class TestRangerBGSyncService {
 
     long rangerVersionAfterCreation =
         bgSync.getRangerOzoneServicePolicyVersion();
-    assertTrue(rangerVersionAfterCreation >= startingRangerVersion);
+    assertThat(rangerVersionAfterCreation).isGreaterThanOrEqualTo(startingRangerVersion);
 
     // Delete user bob from user role, expect Ranger sync thread to update it
     String userRoleName = rolesCreated.get(0);
@@ -618,8 +564,8 @@ public class TestRangerBGSyncService {
     final long rangerSvcVersionAfter =
         bgSync.getRangerOzoneServicePolicyVersion();
     assertEquals(rangerSvcVersionAfter, dbSvcVersionAfter);
-    assertTrue(dbSvcVersionAfter > dbSvcVersionBefore);
-    assertTrue(rangerSvcVersionAfter > rangerSvcVersionBefore);
+    assertThat(dbSvcVersionAfter).isGreaterThan(dbSvcVersionBefore);
+    assertThat(rangerSvcVersionAfter).isGreaterThan(rangerSvcVersionBefore);
 
     for (String policyName : policiesCreated) {
       final Policy policy = accessController.getPolicy(policyName);
@@ -643,7 +589,7 @@ public class TestRangerBGSyncService {
    * Expect sync service to recover both policies to their default states.
    */
   @Test
-  public void testRecreateDeletedRangerPolicy() throws Exception {
+  void testRecreateDeletedRangerPolicy() throws Exception {
     long startingRangerVersion = initBGSync();
 
     // Create roles and policies in ranger that are
@@ -652,7 +598,7 @@ public class TestRangerBGSyncService {
 
     long rangerVersionAfterCreation =
         bgSync.getRangerOzoneServicePolicyVersion();
-    assertTrue(rangerVersionAfterCreation >= startingRangerVersion);
+    assertThat(rangerVersionAfterCreation).isGreaterThanOrEqualTo(startingRangerVersion);
 
     // Delete both policies, expect Ranger sync thread to recover both
     accessController.deletePolicy(
@@ -674,27 +620,17 @@ public class TestRangerBGSyncService {
     final long rangerSvcVersionAfter =
         bgSync.getRangerOzoneServicePolicyVersion();
     assertEquals(rangerSvcVersionAfter, dbSvcVersionAfter);
-    assertTrue(dbSvcVersionAfter > dbSvcVersionBefore);
-    assertTrue(rangerSvcVersionAfter > rangerSvcVersionBefore);
+    assertThat(dbSvcVersionAfter).isGreaterThan(dbSvcVersionBefore);
+    assertThat(rangerSvcVersionAfter).isGreaterThan(rangerSvcVersionBefore);
 
     for (String policyName : policiesCreated) {
-      try {
-        final Policy policyRead = accessController.getPolicy(policyName);
-        assertEquals(policyName, policyRead.getName());
-      } catch (Exception e) {
-        e.printStackTrace();
-        fail(e.getMessage());
-      }
+      final Policy policyRead = accessController.getPolicy(policyName);
+      assertEquals(policyName, policyRead.getName());
     }
 
     for (String roleName : rolesCreated) {
-      try {
-        final Role roleRead = accessController.getRole(roleName);
-        assertEquals(roleName, roleRead.getName());
-      } catch (Exception e) {
-        e.printStackTrace();
-        fail(e.getMessage());
-      }
+      final Role roleRead = accessController.getRole(roleName);
+      assertEquals(roleName, roleRead.getName());
     }
   }
 

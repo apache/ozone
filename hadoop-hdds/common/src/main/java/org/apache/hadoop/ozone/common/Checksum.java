@@ -33,8 +33,6 @@ import com.google.common.primitives.Ints;
 import org.apache.hadoop.ozone.common.utils.BufferUtils;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 import org.apache.ratis.thirdparty.com.google.protobuf.UnsafeByteOperations;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * Class to compute and verify checksums for chunks.
@@ -42,8 +40,6 @@ import org.slf4j.LoggerFactory;
  * This class is not thread safe.
  */
 public class Checksum {
-  public static final Logger LOG = LoggerFactory.getLogger(Checksum.class);
-
   private static Function<ByteBuffer, ByteString> newMessageDigestFunction(
       String algorithm) {
     final MessageDigest md;

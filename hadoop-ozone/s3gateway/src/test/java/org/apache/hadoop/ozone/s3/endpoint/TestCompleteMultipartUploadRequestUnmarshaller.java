@@ -80,8 +80,8 @@ public class TestCompleteMultipartUploadRequestUnmarshaller {
     List<CompleteMultipartUploadRequest.Part> parts =
         request.getPartList();
 
-    assertEquals(part1, parts.get(0).geteTag());
-    assertEquals(part2, parts.get(1).geteTag());
+    assertEquals(part1, parts.get(0).getETag());
+    assertEquals(part2, parts.get(1).getETag());
   }
 
   private CompleteMultipartUploadRequest unmarshall(

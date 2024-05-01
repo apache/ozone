@@ -18,8 +18,8 @@
 
 package org.apache.hadoop.ozone.om.request.key;
 
-import javax.annotation.Nonnull;
-import javax.annotation.Nullable;
+import jakarta.annotation.Nonnull;
+import jakarta.annotation.Nullable;
 import java.io.IOException;
 import java.security.GeneralSecurityException;
 import java.security.PrivilegedExceptionAction;
@@ -30,10 +30,10 @@ import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.stream.Collectors;
 
 import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Optional;
 import com.google.common.base.Preconditions;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.client.ContainerBlockID;
@@ -92,10 +92,13 @@ import org.apache.hadoop.security.UserGroupInformation;
 
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.BlockTokenSecretProto.AccessModeProto.READ;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.BlockTokenSecretProto.AccessModeProto.WRITE;
+import static org.apache.hadoop.ozone.OzoneAcl.AclScope.ACCESS;
+import static org.apache.hadoop.ozone.OzoneAcl.AclScope.DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConsts.OBJECT_ID_RECLAIM_BLOCKS;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes
     .BUCKET_NOT_FOUND;
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INVALID_REQUEST;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes
     .VOLUME_NOT_FOUND;
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.BUCKET_LOCK;
@@ -131,6 +134,46 @@ public abstract class OMKeyRequest extends OMClientRequest {
     keyArgs = bucket.update(keyArgs);
     bucket.audit(auditMap);
     return keyArgs;
+  }
+
+  protected KeyArgs resolveBucketLink(
+      OzoneManager ozoneManager, KeyArgs keyArgs) throws IOException {
+    ResolvedBucket bucket = ozoneManager.resolveBucketLink(keyArgs, this);
+    keyArgs = bucket.update(keyArgs);
+    return keyArgs;
+  }
+
+  protected KeyArgs resolveBucketAndCheckKeyAcls(KeyArgs keyArgs,
+      OzoneManager ozoneManager, IAccessAuthorizer.ACLType aclType)
+      throws IOException {
+    KeyArgs resolvedArgs = resolveBucketLink(ozoneManager, keyArgs);
+    // check Acl
+    checkKeyAcls(ozoneManager, resolvedArgs.getVolumeName(),
+        resolvedArgs.getBucketName(), keyArgs.getKeyName(),
+        aclType, OzoneObj.ResourceType.KEY);
+    return resolvedArgs;
+  }
+
+  protected KeyArgs resolveBucketAndCheckKeyAclsWithFSO(KeyArgs keyArgs,
+      OzoneManager ozoneManager, IAccessAuthorizer.ACLType aclType)
+      throws IOException {
+    KeyArgs resolvedArgs = resolveBucketLink(ozoneManager, keyArgs);
+    // check Acl
+    checkACLsWithFSO(ozoneManager, resolvedArgs.getVolumeName(),
+        resolvedArgs.getBucketName(), keyArgs.getKeyName(), aclType);
+    return resolvedArgs;
+  }
+
+  protected KeyArgs resolveBucketAndCheckOpenKeyAcls(KeyArgs keyArgs,
+      OzoneManager ozoneManager, IAccessAuthorizer.ACLType aclType,
+      long clientId)
+      throws IOException {
+    KeyArgs resolvedArgs = resolveBucketLink(ozoneManager, keyArgs);
+    // check Acl
+    checkKeyAclsInOpenKeyTable(ozoneManager, resolvedArgs.getVolumeName(),
+        resolvedArgs.getBucketName(), keyArgs.getKeyName(),
+        aclType, clientId);
+    return resolvedArgs;
   }
 
   /**
@@ -244,7 +287,7 @@ public abstract class OMKeyRequest extends OMClientRequest {
 
   protected static Optional<FileEncryptionInfo> getFileEncryptionInfo(
       OzoneManager ozoneManager, OmBucketInfo bucketInfo) throws IOException {
-    Optional<FileEncryptionInfo> encInfo = Optional.absent();
+    Optional<FileEncryptionInfo> encInfo = Optional.empty();
     BucketEncryptionKeyInfo ezInfo = bucketInfo.getEncryptionKeyInfo();
     if (ezInfo != null) {
       final String ezKeyName = ezInfo.getKeyName();
@@ -303,7 +346,7 @@ public abstract class OMKeyRequest extends OMClientRequest {
         // Add all acls from direct parent to key.
         OmPrefixInfo prefixInfo = prefixList.get(prefixList.size() - 1);
         if (prefixInfo  != null) {
-          if (OzoneAclUtil.inheritDefaultAcls(acls, prefixInfo.getAcls())) {
+          if (OzoneAclUtil.inheritDefaultAcls(acls, prefixInfo.getAcls(), ACCESS)) {
             return acls;
           }
         }
@@ -313,7 +356,7 @@ public abstract class OMKeyRequest extends OMClientRequest {
     // Inherit DEFAULT acls from parent-dir only if DEFAULT acls for
     // prefix are not set
     if (omPathInfo != null) {
-      if (OzoneAclUtil.inheritDefaultAcls(acls, omPathInfo.getAcls())) {
+      if (OzoneAclUtil.inheritDefaultAcls(acls, omPathInfo.getAcls(), ACCESS)) {
         return acls;
       }
     }
@@ -321,7 +364,7 @@ public abstract class OMKeyRequest extends OMClientRequest {
     // Inherit DEFAULT acls from bucket only if DEFAULT acls for
     // parent-dir are not set.
     if (bucketInfo != null) {
-      if (OzoneAclUtil.inheritDefaultAcls(acls, bucketInfo.getAcls())) {
+      if (OzoneAclUtil.inheritDefaultAcls(acls, bucketInfo.getAcls(), ACCESS)) {
         return acls;
       }
     }
@@ -343,17 +386,13 @@ public abstract class OMKeyRequest extends OMClientRequest {
 
     // Inherit DEFAULT acls from parent-dir
     if (omPathInfo != null) {
-      if (OzoneAclUtil.inheritDefaultAcls(acls, omPathInfo.getAcls())) {
-        OzoneAclUtil.toDefaultScope(acls);
-      }
+      OzoneAclUtil.inheritDefaultAcls(acls, omPathInfo.getAcls(), DEFAULT);
     }
 
     // Inherit DEFAULT acls from bucket only if DEFAULT acls for
     // parent-dir are not set.
     if (acls.isEmpty() && bucketInfo != null) {
-      if (OzoneAclUtil.inheritDefaultAcls(acls, bucketInfo.getAcls())) {
-        OzoneAclUtil.toDefaultScope(acls);
-      }
+      OzoneAclUtil.inheritDefaultAcls(acls, bucketInfo.getAcls(), DEFAULT);
     }
 
     // add itself acls
@@ -551,9 +590,14 @@ public abstract class OMKeyRequest extends OMClientRequest {
             omMetadataManager.getOpenKeyTable(getBucketLayout())
                 .get(dbMultipartOpenKey);
 
-        if (omKeyInfo != null && omKeyInfo.getFileEncryptionInfo() != null) {
-          newKeyArgs.setFileEncryptionInfo(
-              OMPBHelper.convert(omKeyInfo.getFileEncryptionInfo()));
+        if (omKeyInfo != null) {
+          if (omKeyInfo.getFileEncryptionInfo() != null) {
+            newKeyArgs.setFileEncryptionInfo(
+                OMPBHelper.convert(omKeyInfo.getFileEncryptionInfo()));
+          }
+        } else {
+          LOG.warn("omKeyInfo not found. Key: " + dbMultipartOpenKey +
+              ". The upload id " + keyArgs.getMultipartUploadID() + " may be invalid.");
         }
       } finally {
         if (acquireLock) {
@@ -729,6 +773,14 @@ public abstract class OMKeyRequest extends OMClientRequest {
       dbKeyInfo.setModificationTime(keyArgs.getModificationTime());
       dbKeyInfo.setUpdateID(transactionLogIndex, isRatisEnabled);
       dbKeyInfo.setReplicationConfig(replicationConfig);
+
+      // Construct a new metadata map from KeyArgs.
+      // Clear the old one when the key is overwritten.
+      dbKeyInfo.getMetadata().clear();
+      dbKeyInfo.getMetadata().putAll(KeyValueUtil.getFromProtobuf(
+          keyArgs.getMetadataList()));
+
+      dbKeyInfo.setFileEncryptionInfo(encInfo);
       return dbKeyInfo;
     }
 
@@ -770,6 +822,7 @@ public abstract class OMKeyRequest extends OMClientRequest {
             .addAllMetadata(KeyValueUtil.getFromProtobuf(
                     keyArgs.getMetadataList()))
             .setUpdateID(transactionLogIndex)
+            .setOwnerName(keyArgs.getOwnerName())
             .setFile(true);
     if (omPathInfo instanceof OMFileRequest.OMPathInfoWithFSO) {
       // FileTable metadata format
@@ -1010,5 +1063,12 @@ public abstract class OMKeyRequest extends OMClientRequest {
     // Intentional extra space for alignment
     LOG.debug("After block filtering,  keysToBeFiltered = {}",
         keysToBeFiltered);
+  }
+
+  protected void validateEncryptionKeyInfo(OmBucketInfo bucketInfo, KeyArgs keyArgs) throws OMException {
+    if (bucketInfo.getEncryptionKeyInfo() != null && !keyArgs.hasFileEncryptionInfo()) {
+      throw new OMException("Attempting to create unencrypted file " +
+          keyArgs.getKeyName() + " in encrypted bucket " + keyArgs.getBucketName(), INVALID_REQUEST);
+    }
   }
 }

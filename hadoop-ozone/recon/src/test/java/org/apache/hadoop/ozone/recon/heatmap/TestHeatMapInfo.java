@@ -35,7 +35,6 @@ import org.apache.hadoop.ozone.recon.spi.impl.StorageContainerServiceProviderImp
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
-import org.junit.jupiter.api.Assertions;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -46,6 +45,9 @@ import java.util.stream.Collectors;
 
 import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.getTestReconOmMetadataManager;
 import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.initializeNewOmMetadataManager;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.mockito.Mockito.mock;
 
 /**
@@ -759,24 +761,17 @@ public class TestHeatMapInfo {
         Arrays.stream(entities).collect(Collectors.toList());
     EntityReadAccessHeatMapResponse entityReadAccessHeatMapResponse =
         heatMapUtil.generateHeatMap(entityMetaDataList);
-    Assertions.assertTrue(
-        entityReadAccessHeatMapResponse.getChildren().size() > 0);
-    Assertions.assertEquals(12,
-        entityReadAccessHeatMapResponse.getChildren().size());
-    Assertions.assertEquals(25600, entityReadAccessHeatMapResponse.
-        getSize());
-    Assertions.assertEquals(2924, entityReadAccessHeatMapResponse.
-        getMinAccessCount());
-    Assertions.assertEquals(155074, entityReadAccessHeatMapResponse.
-        getMaxAccessCount());
-    Assertions.assertEquals("root", entityReadAccessHeatMapResponse.
-        getLabel());
-    Assertions.assertEquals(0.0,
-        entityReadAccessHeatMapResponse.getChildren().get(0).getColor());
-    Assertions.assertEquals(0.442,
+    assertThat(entityReadAccessHeatMapResponse.getChildren().size()).isGreaterThan(0);
+    assertEquals(12, entityReadAccessHeatMapResponse.getChildren().size());
+    assertEquals(25600, entityReadAccessHeatMapResponse.getSize());
+    assertEquals(2924, entityReadAccessHeatMapResponse.getMinAccessCount());
+    assertEquals(155074, entityReadAccessHeatMapResponse.getMaxAccessCount());
+    assertEquals("root", entityReadAccessHeatMapResponse.getLabel());
+    assertEquals(0.0, entityReadAccessHeatMapResponse.getChildren().get(0).getColor());
+    assertEquals(0.442,
         entityReadAccessHeatMapResponse.getChildren().get(0).getChildren()
             .get(0).getChildren().get(1).getColor());
-    Assertions.assertEquals(0.058,
+    assertEquals(0.058,
         entityReadAccessHeatMapResponse.getChildren().get(0).getChildren()
             .get(1).getChildren().get(3).getColor());
   }
@@ -875,22 +870,15 @@ public class TestHeatMapInfo {
       //}
       EntityReadAccessHeatMapResponse entityReadAccessHeatMapResponse =
           heatMapUtil.generateHeatMap(entityMetaDataList);
-      Assertions.assertTrue(
-          entityReadAccessHeatMapResponse.getChildren().size() > 0);
-      Assertions.assertEquals(2,
-          entityReadAccessHeatMapResponse.getChildren().size());
-      Assertions.assertEquals(512, entityReadAccessHeatMapResponse.
-          getSize());
-      Assertions.assertEquals(8590, entityReadAccessHeatMapResponse.
-          getMinAccessCount());
-      Assertions.assertEquals(19263, entityReadAccessHeatMapResponse.
-          getMaxAccessCount());
-      Assertions.assertEquals(1.0,
-          entityReadAccessHeatMapResponse.getChildren().get(0).getColor());
-      Assertions.assertEquals("root", entityReadAccessHeatMapResponse.
-          getLabel());
+      assertThat(entityReadAccessHeatMapResponse.getChildren().size()).isGreaterThan(0);
+      assertEquals(2, entityReadAccessHeatMapResponse.getChildren().size());
+      assertEquals(512, entityReadAccessHeatMapResponse.getSize());
+      assertEquals(8590, entityReadAccessHeatMapResponse.getMinAccessCount());
+      assertEquals(19263, entityReadAccessHeatMapResponse.getMaxAccessCount());
+      assertEquals(1.0, entityReadAccessHeatMapResponse.getChildren().get(0).getColor());
+      assertEquals("root", entityReadAccessHeatMapResponse.getLabel());
     } else {
-      Assertions.assertNull(entities);
+      assertNull(entities);
     }
   }
 
@@ -1110,18 +1098,17 @@ public class TestHeatMapInfo {
       //}
       EntityReadAccessHeatMapResponse entityReadAccessHeatMapResponse =
           heatMapUtil.generateHeatMap(entityMetaDataList);
-      Assertions.assertTrue(
-          entityReadAccessHeatMapResponse.getChildren().size() > 0);
-      Assertions.assertEquals(2,
+      assertThat(entityReadAccessHeatMapResponse.getChildren().size()).isGreaterThan(0);
+      assertEquals(2,
           entityReadAccessHeatMapResponse.getChildren().size());
-      Assertions.assertEquals(0.0,
+      assertEquals(0.0,
           entityReadAccessHeatMapResponse.getChildren().get(0).getColor());
       String path =
           entityReadAccessHeatMapResponse.getChildren().get(1).getChildren()
               .get(0).getPath();
-      Assertions.assertEquals("/testnewvol2/fsobuck11", path);
+      assertEquals("/testnewvol2/fsobuck11", path);
     } else {
-      Assertions.assertNull(entities);
+      assertNull(entities);
     }
   }
 }

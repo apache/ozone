@@ -530,6 +530,21 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/responses/DatanodesSummary'
+
+  /datanodes/remove:
+    get:
+      tags:
+        - Datanodes
+      summary: Removes datanodes from Recon's memory and nodes table in Recon DB.
+      operationId: removeDatanodes
+      responses:
+        '200':
+          description: Successful Operation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/responses/RemovedDatanodesResponse'
+
   /pipelines:
     get:
       tags:
@@ -1433,6 +1448,9 @@ components:
             remaining:
               type: number
               example: 1080410456064
+            committed:
+              type: number
+              example: 1080410456
         containers:
           type: integer
           example: 26
@@ -1480,6 +1498,9 @@ components:
                   remaining:
                     type: number
                     example: 270071111680
+                  committed:
+                    type: number
+                    example: 27007111
               pipelines:
                 type: array
                 items:
@@ -1508,6 +1529,8 @@ components:
               leaderCount:
                 type: integer
                 example: 1
+    RemovedDatanodesResponse:
+      type: object
     PipelinesSummary:
       type: object
       properties:

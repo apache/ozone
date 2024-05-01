@@ -21,7 +21,7 @@ package org.apache.hadoop.hdds.scm.container.balancer;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.scm.node.DatanodeUsageInfo;
 
-import javax.annotation.Nonnull;
+import jakarta.annotation.Nonnull;
 import java.util.Collection;
 import java.util.List;
 
@@ -44,6 +44,16 @@ public interface FindSourceStrategy {
    * data nodes.
    */
   void removeCandidateSourceDataNode(DatanodeDetails dui);
+
+  /**
+   * add the specified data node to the candidate source
+   * data nodes.
+   * This method does not check whether the specified Datanode is already present in the Collection.
+   * Callers must take the responsibility of checking and removing the Datanode before adding, if required.
+   *
+   * @param dn datanode to be added to potentialSources
+   */
+  void addBackSourceDataNode(DatanodeDetails dn);
 
   /**
    * increase the Leaving size of a candidate source data node.

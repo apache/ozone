@@ -21,6 +21,8 @@ package org.apache.hadoop.ozone.om.request;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.hadoop.hdds.utils.TransactionInfo;
+import org.apache.ratis.server.protocol.TermIndex;
 import org.apache.hadoop.ipc.ProtobufRpcEngine;
 import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.OzoneConsts;
@@ -37,11 +39,9 @@ import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.lock.OMLockDetails;
 import org.apache.hadoop.ozone.om.protocolPB.grpc.GrpcClientConstants;
-import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.om.snapshot.ReferenceCounted;
-import org.apache.hadoop.ozone.om.snapshot.SnapshotCache;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.LayoutVersion;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
@@ -55,7 +55,7 @@ import org.apache.hadoop.security.authentication.client.AuthenticationException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import javax.annotation.Nonnull;
+import jakarta.annotation.Nonnull;
 import java.io.IOException;
 import java.net.InetAddress;
 import java.nio.file.InvalidPathException;
@@ -78,8 +78,7 @@ public abstract class OMClientRequest implements RequestAuditor {
 
   private UserGroupInformation userGroupInformation;
   private InetAddress inetAddress;
-  private final ThreadLocal<OMLockDetails> omLockDetails =
-      ThreadLocal.withInitial(OMLockDetails::new);
+  private final OMLockDetails omLockDetails = new OMLockDetails();
 
   /**
    * Stores the result of request execution in
@@ -94,7 +93,7 @@ public abstract class OMClientRequest implements RequestAuditor {
   public OMClientRequest(OMRequest omRequest) {
     Preconditions.checkNotNull(omRequest);
     this.omRequest = omRequest;
-    this.omLockDetails.get().clear();
+    this.omLockDetails.clear();
   }
   /**
    * Perform pre-execute steps on a OMRequest.
@@ -136,9 +135,13 @@ public abstract class OMClientRequest implements RequestAuditor {
    *
    * @return the response that will be returned to the client.
    */
-  public abstract OMClientResponse validateAndUpdateCache(
-      OzoneManager ozoneManager, long transactionLogIndex,
-      OzoneManagerDoubleBufferHelper ozoneManagerDoubleBufferHelper);
+  public abstract OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager, TermIndex termIndex);
+
+  /** For testing only. */
+  @VisibleForTesting
+  public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager, long transactionLogIndex) {
+    return validateAndUpdateCache(ozoneManager, TransactionInfo.getTermIndex(transactionLogIndex));
+  }
 
   @VisibleForTesting
   public OMRequest getOmRequest() {
@@ -291,7 +294,7 @@ public abstract class OMClientRequest implements RequestAuditor {
         contextBuilder.setOwnerName(bucketOwner);
       }
 
-      try (ReferenceCounted<IOmMetadataReader, SnapshotCache> rcMetadataReader =
+      try (ReferenceCounted<IOmMetadataReader> rcMetadataReader =
           ozoneManager.getOmMetadataReader()) {
         OmMetadataReader omMetadataReader =
             (OmMetadataReader) rcMetadataReader.get();
@@ -357,7 +360,7 @@ public abstract class OMClientRequest implements RequestAuditor {
       String bucketOwner)
       throws IOException {
 
-    try (ReferenceCounted<IOmMetadataReader, SnapshotCache> rcMetadataReader =
+    try (ReferenceCounted<IOmMetadataReader> rcMetadataReader =
         ozoneManager.getOmMetadataReader()) {
       OzoneAclUtils.checkAllAcls((OmMetadataReader) rcMetadataReader.get(),
           resType, storeType, aclType,
@@ -457,21 +460,6 @@ public abstract class OMClientRequest implements RequestAuditor {
     }
     omResponse.setStatus(OzoneManagerRatisUtils.exceptionToResponseStatus(ex));
     return omResponse.build();
-  }
-
-  /**
-   * Add the client response to double buffer and set the flush future.
-   * @param trxIndex
-   * @param omClientResponse
-   * @param omDoubleBufferHelper
-   */
-  protected void addResponseToDoubleBuffer(long trxIndex,
-      OMClientResponse omClientResponse,
-      OzoneManagerDoubleBufferHelper omDoubleBufferHelper) {
-    if (omClientResponse != null) {
-      omClientResponse.setFlushFuture(
-          omDoubleBufferHelper.add(omClientResponse, trxIndex));
-    }
   }
 
   private String exceptionErrorMessage(Exception ex) {
@@ -586,10 +574,10 @@ public abstract class OMClientRequest implements RequestAuditor {
   }
 
   public OMLockDetails getOmLockDetails() {
-    return omLockDetails.get();
+    return omLockDetails;
   }
 
   public void mergeOmLockDetails(OMLockDetails details) {
-    omLockDetails.get().merge(details);
+    omLockDetails.merge(details);
   }
 }

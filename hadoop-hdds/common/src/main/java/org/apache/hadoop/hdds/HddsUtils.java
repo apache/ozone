@@ -20,8 +20,8 @@ package org.apache.hadoop.hdds;
 
 import com.google.protobuf.ServiceException;
 
-import javax.annotation.Nonnull;
-import javax.annotation.Nullable;
+import jakarta.annotation.Nonnull;
+import jakarta.annotation.Nullable;
 import javax.management.ObjectName;
 import java.io.File;
 import java.io.IOException;
@@ -104,17 +104,6 @@ public final class HddsUtils {
 
 
   private static final Logger LOG = LoggerFactory.getLogger(HddsUtils.class);
-
-  /**
-   * The service ID of the solitary Ozone SCM service.
-   */
-  public static final String OZONE_SCM_SERVICE_ID = "OzoneScmService";
-  public static final String OZONE_SCM_SERVICE_INSTANCE_ID =
-      "OzoneScmServiceInstance";
-
-  private static final String MULTIPLE_SCM_NOT_YET_SUPPORTED =
-      ScmConfigKeys.OZONE_SCM_NAMES + " must contain a single hostname."
-          + " Multiple SCM hosts are currently unsupported";
 
   public static final ByteString REDACTED =
       ByteString.copyFromUtf8("<redacted>");
@@ -435,6 +424,7 @@ public final class HddsUtils {
     case ListContainer:
     case ListChunk:
     case GetCommittedBlockLength:
+    case Echo:
       return true;
     case CloseContainer:
     case WriteChunk:
@@ -645,30 +635,6 @@ public final class HddsUtils {
       throw new IllegalArgumentException("Unable to create path: " + dirFile);
     }
     return dirFile;
-  }
-
-  /**
-   * Leverages the Configuration.getPassword method to attempt to get
-   * passwords from the CredentialProvider API before falling back to
-   * clear text in config - if falling back is allowed.
-   * @param conf Configuration instance
-   * @param alias name of the credential to retrieve
-   * @return String credential value or null
-   */
-  static String getPassword(ConfigurationSource conf, String alias) {
-    String password = null;
-    try {
-      char[] passchars = conf.getPassword(alias);
-      if (passchars != null) {
-        password = new String(passchars);
-      }
-    } catch (IOException ioe) {
-      LOG.warn("Setting password to null since IOException is caught"
-          + " when getting password", ioe);
-
-      password = null;
-    }
-    return password;
   }
 
   /**

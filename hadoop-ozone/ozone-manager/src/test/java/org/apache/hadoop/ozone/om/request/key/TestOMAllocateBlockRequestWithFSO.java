@@ -20,8 +20,12 @@
 package org.apache.hadoop.ozone.om.request.key;
 
 
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.ONE;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.fail;
+
+import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
@@ -29,9 +33,7 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.util.StringUtils;
-import org.apache.hadoop.util.Time;
-import org.jetbrains.annotations.NotNull;
-import org.junit.jupiter.api.Assertions;
+import jakarta.annotation.Nonnull;
 
 /**
  * Tests OMAllocateBlockRequest class prefix layout.
@@ -39,7 +41,7 @@ import org.junit.jupiter.api.Assertions;
 public class TestOMAllocateBlockRequestWithFSO
     extends TestOMAllocateBlockRequest {
 
-  @NotNull
+  @Nonnull
   @Override
   protected OzoneConfiguration getOzoneConfiguration() {
     OzoneConfiguration config = super.getOzoneConfiguration();
@@ -64,10 +66,11 @@ public class TestOMAllocateBlockRequestWithFSO
     long objectId = parentID + 1;
 
     OmKeyInfo omKeyInfoFSO =
-            OMRequestTestUtils.createOmKeyInfo(volumeName, bucketName, keyName,
-                    HddsProtos.ReplicationType.RATIS,
-                    HddsProtos.ReplicationFactor.ONE, objectId, parentID, txnId,
-                    Time.now());
+        OMRequestTestUtils.createOmKeyInfo(volumeName, bucketName, keyName, RatisReplicationConfig.getInstance(ONE))
+            .setObjectID(objectId)
+            .setParentObjectID(parentID)
+            .setUpdateID(txnId)
+            .build();
 
     // add key to openFileTable
     OMRequestTestUtils.addFileToKeyTable(true, false,
@@ -80,7 +83,7 @@ public class TestOMAllocateBlockRequestWithFSO
             parentID, fileName);
   }
 
-  @NotNull
+  @Nonnull
   @Override
   protected OMAllocateBlockRequest getOmAllocateBlockRequest(
       OzoneManagerProtocolProtos.OMRequest modifiedOmRequest) {
@@ -111,7 +114,7 @@ public class TestOMAllocateBlockRequestWithFSO
             omMetadataManager.getOpenKeyTable(getBucketLayout())
                 .get(dbOpenFileName);
         if (doAssert) {
-          Assertions.assertNotNull(omKeyInfo, "Invalid key!");
+          assertNotNull(omKeyInfo, "Invalid key!");
         }
         return omKeyInfo;
       } else {
@@ -124,7 +127,7 @@ public class TestOMAllocateBlockRequestWithFSO
       }
     }
     if (doAssert) {
-      Assertions.fail("Invalid key!");
+      fail("Invalid key!");
     }
     return  null;
   }

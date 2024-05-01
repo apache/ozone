@@ -17,20 +17,22 @@
  */
 package org.apache.hadoop.hdds.conf;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.junit.jupiter.api.Assertions.fail;
+import static org.mockito.Mockito.eq;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+
+import com.google.common.base.Strings;
 import com.google.gson.Gson;
-import org.apache.hadoop.http.HttpServer2;
-import org.apache.hadoop.thirdparty.com.google.common.base.Strings;
+import org.apache.hadoop.hdds.server.http.HttpServer2;
 import org.apache.hadoop.util.XMLUtils;
 import org.eclipse.jetty.util.ajax.JSON;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.BeforeAll;
-import org.mockito.Mockito;
 import org.w3c.dom.Document;
 import org.w3c.dom.Element;
 import org.w3c.dom.Node;
@@ -75,10 +77,10 @@ public class TestHddsConfServlet {
     verifyMap.put("application/xml", HddsConfServlet.FORMAT_XML);
     verifyMap.put("application/json", HddsConfServlet.FORMAT_JSON);
 
-    HttpServletRequest request = Mockito.mock(HttpServletRequest.class);
+    HttpServletRequest request = mock(HttpServletRequest.class);
     for (Map.Entry<String, String> entry : verifyMap.entrySet()) {
       String contenTypeActual = entry.getValue();
-      Mockito.when(request.getHeader(HttpHeaders.ACCEPT))
+      when(request.getHeader(HttpHeaders.ACCEPT))
           .thenReturn(entry.getKey());
       assertEquals(contenTypeActual,
           HddsConfServlet.parseAcceptHeader(request));
@@ -112,7 +114,7 @@ public class TestHddsConfServlet {
     assertEquals(result, tags);
     // cmd is getPropertyByTag
     result = getResultWithCmd(conf, "getPropertyByTag");
-    assertTrue(result.contains("ozone.test.test.key"));
+    assertThat(result).contains("ozone.test.test.key");
     // cmd is illegal
     getResultWithCmd(conf, "illegal");
   }
@@ -168,12 +170,8 @@ public class TestHddsConfServlet {
   @Test
   public void testBadFormat() throws Exception {
     StringWriter sw = new StringWriter();
-    try {
-      HddsConfServlet.writeResponse(getTestConf(), sw, "not a format", null);
-      fail("writeResponse with bad format didn't throw!");
-    } catch (HddsConfServlet.BadFormatException bfe) {
-      // expected
-    }
+    assertThrows(HddsConfServlet.BadFormatException.class,
+        () -> HddsConfServlet.writeResponse(getTestConf(), sw, "not a format", null));
     assertEquals("", sw.toString());
   }
 
@@ -202,10 +200,9 @@ public class TestHddsConfServlet {
       // response request
       service.doGet(request, response);
       if (cmd.equals("illegal")) {
-        Mockito.verify(response)
-            .sendError(
-                Mockito.eq(HttpServletResponse.SC_NOT_FOUND),
-                Mockito.eq("illegal is not a valid command."));
+        verify(response).sendError(
+            eq(HttpServletResponse.SC_NOT_FOUND),
+            eq("illegal is not a valid command."));
       }
       String result = sw.toString().trim();
       return result;
@@ -254,25 +251,24 @@ public class TestHddsConfServlet {
       // in the response
       if (Strings.isNullOrEmpty(propertyName)) {
         for (Map.Entry<String, String> entry : TEST_PROPERTIES.entrySet()) {
-          assertTrue(result.contains(entry.getKey()) &&
-                  result.contains(entry.getValue()));
+          assertThat(result).contains(entry.getKey(), entry.getValue());
         }
       } else {
         if (conf.get(propertyName) != null) {
           // if property name is not empty and property is found
-          assertTrue(result.contains(propertyName));
+          assertThat(result).contains(propertyName);
           for (Map.Entry<String, String> entry : TEST_PROPERTIES.entrySet()) {
             if (!entry.getKey().equals(propertyName)) {
-              assertFalse(result.contains(entry.getKey()));
+              assertThat(result).doesNotContain(entry.getKey());
             }
           }
         } else {
           // if property name is not empty, and it's not in configuration
           // expect proper error code and error message is set to the response
-          Mockito.verify(response)
+          verify(response)
               .sendError(
-                  Mockito.eq(HttpServletResponse.SC_NOT_FOUND),
-                  Mockito.eq("Property " + propertyName + " not found"));
+                  eq(HttpServletResponse.SC_NOT_FOUND),
+                  eq("Property " + propertyName + " not found"));
         }
       }
     } finally {

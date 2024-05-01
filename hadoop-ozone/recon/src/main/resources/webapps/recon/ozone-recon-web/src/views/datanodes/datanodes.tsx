@@ -17,7 +17,7 @@
  */
 
 import React from 'react';
-import {Table, Icon, Tooltip} from 'antd';
+import {Table, Icon, Tooltip, Popover} from 'antd';
 import {PaginationConfig} from 'antd/lib/pagination';
 import moment from 'moment';
 import {ReplicationIcon} from 'utils/themeIcons';
@@ -42,7 +42,7 @@ interface IDatanodeResponse {
   hostname: string;
   state: DatanodeState;
   opState: DatanodeOpState;
-  lastHeartbeat: number;
+  lastHeartbeat: string;
   storageReport: IStorageReport;
   pipelines: IPipeline[];
   containers: number;
@@ -69,6 +69,7 @@ interface IDatanode {
   storageUsed: number;
   storageTotal: number;
   storageRemaining: number;
+  storageCommitted: number;
   pipelines: IPipeline[];
   containers: number;
   openContainers: number;
@@ -173,7 +174,7 @@ const COLUMNS = [
     render: (text: string, record: IDatanode) => (
       <StorageBar
         total={record.storageTotal} used={record.storageUsed}
-        remaining={record.storageRemaining}/>
+        remaining={record.storageRemaining} committed={record.storageCommitted}/>
     )},
   {
     title: 'Last Heartbeat',
@@ -182,7 +183,7 @@ const COLUMNS = [
     isVisible: true,
     sorter: (a: IDatanode, b: IDatanode) => a.lastHeartbeat - b.lastHeartbeat,
     render: (heartbeat: number) => {
-      return heartbeat > 0 ? moment(heartbeat).format('ll LTS') : 'NA';
+      return heartbeat > 0 ? getTimeDiffFromTimestamp(heartbeat) : 'NA';
     }
   },
   {
@@ -191,21 +192,36 @@ const COLUMNS = [
     key: 'pipelines',
     isVisible: true,
     render: (pipelines: IPipeline[], record: IDatanode) => {
+      let firstThreePipelinesIDs = [];
+      let remainingPipelinesIDs: any[] = [];
+      firstThreePipelinesIDs = pipelines && pipelines.filter((element, index) => index < 3);
+      remainingPipelinesIDs = pipelines && pipelines.slice(3, pipelines.length);
+
+      const RenderPipelineIds = ({ pipelinesIds }) => {
+        return pipelinesIds && pipelinesIds.map((pipeline: any, index: any) => (
+          <div key={index} className='pipeline-container'>
+            <ReplicationIcon
+              replicationFactor={pipeline.replicationFactor}
+              replicationType={pipeline.replicationType}
+              leaderNode={pipeline.leaderNode}
+              isLeader={pipeline.leaderNode === record.hostname} />
+            {pipeline.pipelineID}
+          </div >
+        ))
+      }
+
       return (
-        <div>
+        <>
           {
-            pipelines && pipelines.map((pipeline, index) => (
-              <div key={index} className='pipeline-container'>
-                <ReplicationIcon
-                  replicationFactor={pipeline.replicationFactor}
-                  replicationType={pipeline.replicationType}
-                  leaderNode={pipeline.leaderNode}
-                  isLeader={pipeline.leaderNode === record.hostname}/>
-                {pipeline.pipelineID}
-              </div>
-            ))
+            <RenderPipelineIds pipelinesIds={firstThreePipelinesIDs} />
           }
-        </div>
+          {
+            remainingPipelinesIDs.length > 0 &&
+            <Popover content={<RenderPipelineIds pipelinesIds={remainingPipelinesIDs} />} title="Remaining pipelines" placement="rightTop" trigger="hover">
+              {`... and ${remainingPipelinesIDs.length} more pipelines`}
+            </Popover>
+          }
+        </>
       );
     }
   },
@@ -303,6 +319,26 @@ const defaultColumns: IOption[] = COLUMNS.map(column => ({
   value: column.key
 }));
 
+const getTimeDiffFromTimestamp = (timestamp: number): string => {
+  const timestampDate = new Date(timestamp);
+  const currentDate = new Date();
+
+  let elapsedTime = "";
+  let duration: moment.Duration = moment.duration(
+    moment(currentDate).diff(moment(timestampDate))
+  )
+
+  const durationKeys = ["seconds", "minutes", "hours", "days", "months", "years"]
+  durationKeys.forEach((k) => {
+    let time = duration["_data"][k]
+    if (time !== 0){
+      elapsedTime = time + `${k.substring(0, 1)} ` + elapsedTime
+    }
+  })
+
+  return elapsedTime.trim().length === 0 ? "Just now" : elapsedTime.trim() + " ago";
+}
+
 let cancelSignal: AbortController;
 
 export class Datanodes extends React.Component<Record<string, object>, IDatanodesState> {
@@ -358,6 +394,7 @@ export class Datanodes extends React.Component<Record<string, object>, IDatanode
           storageUsed: datanode.storageReport.used,
           storageTotal: datanode.storageReport.capacity,
           storageRemaining: datanode.storageReport.remaining,
+          storageCommitted: datanode.storageReport.committed,
           pipelines: datanode.pipelines,
           containers: datanode.containers,
           openContainers: datanode.openContainers,

@@ -17,14 +17,15 @@
  */
 package org.apache.hadoop.fs.ozone;
 
-import org.apache.hadoop.conf.StorageUnit;
 import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
 import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.utils.IOUtils;
+import org.apache.hadoop.ozone.ClientConfigForTesting;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.TestDataUtil;
@@ -32,37 +33,34 @@ import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
-import org.junit.After;
-import org.junit.Before;
-import org.junit.Rule;
-import org.junit.Test;
-import org.junit.rules.TestRule;
-import org.junit.rules.Timeout;
-import org.apache.ozone.test.JUnit5AwareTimeout;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
 
 import java.io.IOException;
 import java.io.OutputStream;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeoutException;
 
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_RATIS_PIPELINE_LIMIT;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_OFS_URI_SCHEME;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_ROOT;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_DEFAULT_BUCKET_LAYOUT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ADDRESS_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_RATIS_ENABLE_KEY;
-import static org.junit.Assert.assertArrayEquals;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertThrows;
-import static org.junit.Assert.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Test cases for recoverLease() API.
  */
+@Timeout(300)
 public class TestLeaseRecovery {
-  @Rule
-  public TestRule timeout = new JUnit5AwareTimeout(Timeout.seconds(300));
 
   private MiniOzoneCluster cluster;
   private OzoneBucket bucket;
@@ -83,7 +81,7 @@ public class TestLeaseRecovery {
     }
   }
 
-  @Before
+  @BeforeEach
   public void init() throws IOException, InterruptedException,
       TimeoutException {
     final int chunkSize = 16 << 10;
@@ -95,17 +93,20 @@ public class TestLeaseRecovery {
     conf.setBoolean(OZONE_OM_RATIS_ENABLE_KEY, false);
     conf.setBoolean(OzoneConfigKeys.OZONE_FS_HSYNC_ENABLED, true);
     conf.set(OZONE_DEFAULT_BUCKET_LAYOUT, layout.name());
+    conf.setInt(OZONE_SCM_RATIS_PIPELINE_LIMIT, 10);
+
+    ClientConfigForTesting.newBuilder(StorageUnit.BYTES)
+        .setBlockSize(blockSize)
+        .setChunkSize(chunkSize)
+        .setStreamBufferFlushSize(flushSize)
+        .setStreamBufferMaxSize(maxFlushSize)
+        .setDataStreamBufferFlushSize(maxFlushSize)
+        .setDataStreamMinPacketSize(chunkSize)
+        .setDataStreamWindowSize(5 * chunkSize)
+        .applyTo(conf);
+
     cluster = MiniOzoneCluster.newBuilder(conf)
       .setNumDatanodes(5)
-      .setTotalPipelineNumLimit(10)
-      .setBlockSize(blockSize)
-      .setChunkSize(chunkSize)
-      .setStreamBufferFlushSize(flushSize)
-      .setStreamBufferMaxSize(maxFlushSize)
-      .setDataStreamBufferFlushize(maxFlushSize)
-      .setStreamBufferSizeUnit(StorageUnit.BYTES)
-      .setDataStreamMinPacketSize(chunkSize)
-      .setDataStreamStreamWindowSize(5 * chunkSize)
       .build();
     cluster.waitForClusterToBeReady();
     client = cluster.newClient();
@@ -114,7 +115,7 @@ public class TestLeaseRecovery {
     bucket = TestDataUtil.createVolumeAndBucket(client, layout);
   }
 
-  @After
+  @AfterEach
   public void tearDown() {
     IOUtils.closeQuietly(client);
     if (cluster != null) {
@@ -149,7 +150,7 @@ public class TestLeaseRecovery {
         Thread.sleep(1000);
       }
       // The lease should have been recovered.
-      assertTrue("File should be closed", fs.recoverLease(file));
+      assertTrue(fs.recoverLease(file), "File should be closed");
       assertTrue(fs.isFileClosed(file));
     } finally {
       closeIgnoringKeyNotFound(stream);

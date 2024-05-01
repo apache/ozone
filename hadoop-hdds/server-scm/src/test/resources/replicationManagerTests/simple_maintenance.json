@@ -1,0 +1,46 @@
+[
+
+  { "description": "Ratis Simple Maintenance", "containerState": "CLOSED", "replicationConfig": "RATIS:THREE", "sequenceId": 12,
+    "ratisMaintenanceMinimum": 1,
+    "replicas": [
+      { "state": "CLOSED", "index": 0, "datanode": "d1", "sequenceId": 0, "isEmpty": false, "origin": "o1", "operationalState": "ENTERING_MAINTENANCE" },
+      { "state": "CLOSED", "index": 0, "datanode": "d2", "sequenceId": 0, "isEmpty": false, "origin": "o2", "operationalState": "ENTERING_MAINTENANCE" },
+      { "state": "CLOSED", "index": 0, "datanode": "d3", "sequenceId": 0, "isEmpty": false, "origin": "o3"}
+    ]
+  },
+
+  { "description": "EC Simple Maintenance", "containerState": "CLOSED", "replicationConfig": "EC:RS-3-2-1024k",
+    "ecMaintenanceRedundancy": 0,
+    "replicas": [
+      { "state": "CLOSED", "index": 1, "datanode": "d1", "sequenceId": 0, "isEmpty": false, "origin": "o1", "operationalState": "ENTERING_MAINTENANCE" },
+      { "state": "CLOSED", "index": 2, "datanode": "d2", "sequenceId": 0, "isEmpty": false, "origin": "o2", "operationalState": "ENTERING_MAINTENANCE" },
+      { "state": "CLOSED", "index": 3, "datanode": "d3", "sequenceId": 0, "isEmpty": false, "origin": "o3"},
+      { "state": "CLOSED", "index": 4, "datanode": "d4", "sequenceId": 0, "isEmpty": false, "origin": "o4"},
+      { "state": "CLOSED", "index": 5, "datanode": "d5", "sequenceId": 0, "isEmpty": false, "origin": "o5"}
+    ]
+  },
+
+  { "description": "Ratis Simple Maintenance Requires Replication", "containerState": "CLOSED", "replicationConfig": "RATIS:THREE", "sequenceId": 12,
+    "ratisMaintenanceMinimum": 2,
+    "replicas": [
+      { "state": "CLOSED", "index": 0, "datanode": "d1", "sequenceId": 0, "isEmpty": false, "origin": "o1", "operationalState": "ENTERING_MAINTENANCE" },
+      { "state": "CLOSED", "index": 0, "datanode": "d2", "sequenceId": 0, "isEmpty": false, "origin": "o2", "operationalState": "ENTERING_MAINTENANCE" },
+      { "state": "CLOSED", "index": 0, "datanode": "d3", "sequenceId": 0, "isEmpty": false, "origin": "o3"}
+    ],
+    "expectation": { "underReplicated": 1, "underReplicatedQueue": 1 },
+    "commands": [ { "type": "replicateContainerCommand"} ]
+  },
+
+  { "description": "EC Simple Maintenance requires replication", "containerState": "CLOSED", "replicationConfig": "EC:RS-3-2-1024k",
+    "ecMaintenanceRedundancy": 2,
+    "replicas": [
+      { "state": "CLOSED", "index": 1, "datanode": "d1", "sequenceId": 0, "isEmpty": false, "origin": "o1", "operationalState": "ENTERING_MAINTENANCE" },
+      { "state": "CLOSED", "index": 2, "datanode": "d2", "sequenceId": 0, "isEmpty": false, "origin": "o2", "operationalState": "ENTERING_MAINTENANCE" },
+      { "state": "CLOSED", "index": 3, "datanode": "d3", "sequenceId": 0, "isEmpty": false, "origin": "o3"},
+      { "state": "CLOSED", "index": 4, "datanode": "d4", "sequenceId": 0, "isEmpty": false, "origin": "o4"},
+      { "state": "CLOSED", "index": 5, "datanode": "d5", "sequenceId": 0, "isEmpty": false, "origin": "o5"}
+    ],
+    "expectation": { "underReplicated": 1, "underReplicatedQueue": 1 },
+    "commands": [ { "type": "replicateContainerCommand"}, { "type": "replicateContainerCommand"} ]
+  }
+]

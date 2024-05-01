@@ -57,6 +57,11 @@ SnapshotDiff CLI/API is asynchronous. The first time the API is invoked, OM star
 ozone sh snapshot listDiff [-ahV] [-s=<jobStatus>] <bucket>
 ```
 
+* Snapshot Info: Returns information about an existing snapshot
+```shell
+ozone sh snapshot info [-hV] <bucket> <snapshotName>
+```
+
 ## Architecture
 
 Ozone Snapshot architecture leverages the fact that data blocks once written, remain immutable for their lifetime. These data blocks are reclaimed only when the object key metadata that references them, is deleted from the Ozone namespace. All of this Ozone metadata is stored on the OM nodes in the Ozone cluster. When a user takes a snapshot of an Ozone bucket, internally the system takes snapshot of the Ozone metadata in OM nodes. Since Ozone doesn't allow updates to datanode blocks, integrity of data blocks referenced by Ozone metadata snapshot in OM nodes remains intact. Ozone key deletion service is also aware of Ozone snapshots.  Key deletion service does not reclaim any key as long as it is referenced by the active object store bucket or any of its snapshot. When the snapshots are deleted, a background garbage collection service reclaims any key that will not be part of any snapshot or active object store.
@@ -68,5 +73,5 @@ Ozone also provides SnapshotDiff API. Whenever a user issues a SnapshotDiff betw
 
 Snapshot feature places additional demands on the cluster in terms of CPU, memory and storage. Cluster nodes running Ozone Managers and Ozone Datanodes should be configured with extra storage capacity depending on the number of active snapshots that the user wants to keep. Ozone Snapshots consume incremental amount of space per snapshot. e.g. if the active object store has 100 GB data (before replication) and a snapshot is taken, then the 100 GB of space will be locked in that snapshot. If the active object store consumes another 10 GB of space (before replication) subsequently then overall space requirement would be 100 GB + 10 GB = 110 GB in total (before replication). This is because common keys between Ozone snapshots and the active object store will share the storage space.
 
-Similarly, nodes running Ozone Manager should be configured with extra memory depending on how many snapshots are concurrently read from. This also depepnds on how many concurrent SnapshotDiff jobs are expected in the cluster. By default, an Ozone Manager allows 10 concurrent SnapshotDiff jobs at a time, which can be increased in config.
+Similarly, nodes running Ozone Manager should be configured with extra memory depending on how many snapshots are concurrently read from. This also depends on how many concurrent SnapshotDiff jobs are expected in the cluster. By default, an Ozone Manager allows 10 concurrent SnapshotDiff jobs at a time, which can be increased in config.
 

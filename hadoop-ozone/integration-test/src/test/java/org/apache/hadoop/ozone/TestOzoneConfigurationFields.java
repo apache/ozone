@@ -22,7 +22,7 @@ import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.recon.ReconConfigKeys;
 import org.apache.hadoop.hdds.scm.ScmConfig;
 import org.apache.hadoop.hdds.scm.server.SCMHTTPServerConfig;
-import org.apache.hadoop.http.HttpServer2;
+import org.apache.hadoop.hdds.server.http.HttpServer2;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.ozone.recon.ReconServerConfigKeys;
@@ -31,21 +31,11 @@ import org.apache.hadoop.ozone.s3.S3GatewayConfigKeys;
 import java.util.Arrays;
 
 import org.apache.hadoop.ozone.s3secret.S3SecretConfigKeys;
-import org.junit.Rule;
-import org.junit.rules.TestRule;
-import org.junit.rules.Timeout;
-import org.apache.ozone.test.JUnit5AwareTimeout;
 
 /**
  * Tests if configuration constants documented in ozone-defaults.xml.
  */
 public class TestOzoneConfigurationFields extends TestConfigurationFieldsBase {
-
-  /**
-    * Set a timeout for each test.
-    */
-  @Rule
-  public TestRule timeout = new JUnit5AwareTimeout(Timeout.seconds(300));
 
   @Override
   public void initializeMemberVariables() {
@@ -94,8 +84,6 @@ public class TestOzoneConfigurationFields extends TestConfigurationFieldsBase {
     configurationPropsToSkipCompare.addAll(Arrays.asList(
         HddsConfigKeys.HDDS_CONTAINER_PERSISTDATA,
         HddsConfigKeys.HDDS_GRPC_TLS_TEST_CERT,
-        HddsConfigKeys.HDDS_KEY_ALGORITHM,
-        HddsConfigKeys.HDDS_SECURITY_PROVIDER,
         HddsConfigKeys.HDDS_X509_CRL_NAME, // HDDS-2873
         HddsConfigKeys.HDDS_X509_GRACE_DURATION_TOKEN_CHECKS_ENABLED,
         OMConfigKeys.OZONE_OM_NODES_KEY,
@@ -141,7 +129,10 @@ public class TestOzoneConfigurationFields extends TestConfigurationFieldsBase {
         ScmConfigKeys.OZONE_SCM_PIPELINE_PLACEMENT_IMPL_KEY,
         ScmConfigKeys.OZONE_SCM_HA_PREFIX,
         S3GatewayConfigKeys.OZONE_S3G_FSO_DIRECTORY_CREATION_ENABLED,
-        HddsConfigKeys.HDDS_DATANODE_VOLUME_MIN_FREE_SPACE_PERCENT
+        HddsConfigKeys.HDDS_DATANODE_VOLUME_MIN_FREE_SPACE_PERCENT,
+        OzoneConfigKeys.HDDS_SCM_CLIENT_RPC_TIME_OUT,
+        OzoneConfigKeys.HDDS_SCM_CLIENT_MAX_RETRY_TIMEOUT,
+        OzoneConfigKeys.HDDS_SCM_CLIENT_FAILOVER_MAX_RETRY
     ));
   }
 }

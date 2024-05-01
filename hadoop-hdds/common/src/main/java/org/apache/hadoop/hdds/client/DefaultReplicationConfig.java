@@ -17,6 +17,7 @@
  */
 package org.apache.hadoop.hdds.client;
 
+import net.jcip.annotations.Immutable;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 
 import java.util.Objects;
@@ -24,6 +25,7 @@ import java.util.Objects;
 /**
  * Replication configuration for EC replication.
  */
+@Immutable
 public class DefaultReplicationConfig {
 
   private final ECReplicationConfig ecReplicationConfig;

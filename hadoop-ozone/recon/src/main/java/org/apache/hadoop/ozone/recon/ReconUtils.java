@@ -29,6 +29,10 @@ import java.net.URL;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.sql.Timestamp;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.concurrent.BlockingQueue;
+import java.util.stream.Collectors;
 
 import com.google.common.base.Preconditions;
 import com.google.inject.Singleton;
@@ -36,7 +40,9 @@ import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.scm.ScmUtils;
 import org.apache.hadoop.hdds.scm.ha.SCMNodeDetails;
+import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher;
 import org.apache.hadoop.hdds.utils.HddsServerUtil;
 import org.apache.hadoop.hdfs.web.URLConnectionFactory;
 import org.apache.hadoop.io.IOUtils;
@@ -44,6 +50,9 @@ import org.apache.hadoop.io.IOUtils;
 import org.apache.commons.compress.archivers.tar.TarArchiveEntry;
 import org.apache.commons.compress.archivers.tar.TarArchiveInputStream;
 import org.apache.commons.compress.archivers.tar.TarArchiveOutputStream;
+
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_EVENT_CONTAINER_REPORT_QUEUE_SIZE_DEFAULT;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_EVENT_THREAD_POOL_SIZE_DEFAULT;
 import static org.apache.hadoop.hdds.server.ServerUtils.getDirectoryFromConfig;
 import static org.apache.hadoop.hdds.server.ServerUtils.getOzoneMetaDirPath;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_SCM_DB_DIR;
@@ -51,9 +60,12 @@ import static org.jooq.impl.DSL.currentTimestamp;
 import static org.jooq.impl.DSL.select;
 import static org.jooq.impl.DSL.using;
 
+import org.apache.hadoop.ozone.recon.api.types.DUResponse;
+import org.apache.hadoop.ozone.recon.scm.ReconContainerReportQueue;
 import org.apache.hadoop.security.authentication.client.AuthenticationException;
 import org.hadoop.ozone.recon.schema.tables.daos.GlobalStatsDao;
 import org.hadoop.ozone.recon.schema.tables.pojos.GlobalStats;
+import jakarta.annotation.Nonnull;
 import org.jooq.Configuration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -74,6 +86,25 @@ public class ReconUtils {
 
   public static File getReconScmDbDir(ConfigurationSource conf) {
     return new ReconUtils().getReconDbDir(conf, OZONE_RECON_SCM_DB_DIR);
+  }
+
+  @Nonnull
+  public static List<BlockingQueue<SCMDatanodeHeartbeatDispatcher
+      .ContainerReport>> initContainerReportQueue(
+      OzoneConfiguration configuration) {
+    int threadPoolSize =
+        configuration.getInt(ScmUtils.getContainerReportConfPrefix()
+                + ".thread.pool.size",
+            OZONE_SCM_EVENT_THREAD_POOL_SIZE_DEFAULT);
+    int queueSize = configuration.getInt(
+        ScmUtils.getContainerReportConfPrefix() + ".queue.size",
+        OZONE_SCM_EVENT_CONTAINER_REPORT_QUEUE_SIZE_DEFAULT);
+    List<BlockingQueue<SCMDatanodeHeartbeatDispatcher.ContainerReport>> queues =
+        new ArrayList<>();
+    for (int i = 0; i < threadPoolSize; ++i) {
+      queues.add(new ReconContainerReportQueue(queueSize));
+    }
+    return queues;
   }
 
   /**
@@ -291,6 +322,33 @@ public class ReconUtils {
     } else {
       globalStatsDao.update(newRecord);
     }
+  }
+
+  /**
+   * Sorts a list of DiskUsage objects in descending order by size using parallel sorting and
+   * returns the top N records as specified by the limit.
+   *
+   * This method is optimized for large datasets and utilizes parallel processing to efficiently
+   * sort and retrieve the top N largest records by size. It's especially useful for reducing
+   * processing time and memory usage when only a subset of sorted records is needed.
+   *
+   * Advantages of this approach include:
+   * - Efficient handling of large datasets by leveraging multi-core processors.
+   * - Reduction in memory usage and improvement in processing time by limiting the
+   *   number of returned records.
+   * - Scalability and easy integration with existing systems.
+   *
+   * @param diskUsageList the list of DiskUsage objects to be sorted.
+   * @param limit the maximum number of DiskUsage objects to return.
+   * @return a list of the top N DiskUsage objects sorted in descending order by size,
+   *  where N is the specified limit.
+   */
+  public static List<DUResponse.DiskUsage> sortDiskUsageDescendingWithLimit(
+      List<DUResponse.DiskUsage> diskUsageList, int limit) {
+    return diskUsageList.parallelStream()
+        .sorted((du1, du2) -> Long.compare(du2.getSize(), du1.getSize()))
+        .limit(limit)
+        .collect(Collectors.toList());
   }
 
   public static long getFileSizeUpperBound(long fileSize) {

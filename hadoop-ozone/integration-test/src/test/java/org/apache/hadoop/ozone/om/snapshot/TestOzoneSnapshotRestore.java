@@ -43,7 +43,6 @@ import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.util.ToolRunner;
 import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.AfterAll;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.TestInstance;
 import org.junit.jupiter.api.Timeout;
@@ -54,7 +53,6 @@ import org.junit.jupiter.params.provider.MethodSource;
 import java.io.File;
 import java.io.IOException;
 import java.util.Iterator;
-import java.util.UUID;
 import java.util.concurrent.TimeoutException;
 import java.util.stream.Stream;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -64,6 +62,7 @@ import static org.apache.hadoop.fs.FileSystem.FS_DEFAULT_NAME_KEY;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_OFS_URI_SCHEME;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.params.provider.Arguments.arguments;
 
 /**
@@ -73,7 +72,7 @@ import static org.junit.jupiter.params.provider.Arguments.arguments;
 @Timeout(value = 300)
 public class TestOzoneSnapshotRestore {
   private static final String OM_SERVICE_ID = "om-service-test-1";
-  private MiniOzoneCluster cluster;
+  private MiniOzoneHAClusterImpl cluster;
   private ObjectStore store;
   private OzoneManager leaderOzoneManager;
   private OzoneConfiguration clientConf;
@@ -104,24 +103,19 @@ public class TestOzoneSnapshotRestore {
     // Enable filesystem snapshot feature for the test regardless of the default
     conf.setBoolean(OMConfigKeys.OZONE_FILESYSTEM_SNAPSHOT_ENABLED_KEY, true);
 
-    String clusterId = UUID.randomUUID().toString();
-    String scmId = UUID.randomUUID().toString();
     String serviceID = OM_SERVICE_ID + RandomStringUtils.randomNumeric(5);
 
-    cluster = MiniOzoneCluster.newOMHABuilder(conf)
-            .setClusterId(clusterId)
-            .setScmId(scmId)
+    cluster = MiniOzoneCluster.newHABuilder(conf)
             .setOMServiceId(serviceID)
             .setNumOfOzoneManagers(3)
             .build();
     cluster.waitForClusterToBeReady();
 
-    leaderOzoneManager = ((MiniOzoneHAClusterImpl) cluster).getOMLeader();
+    leaderOzoneManager = cluster.getOMLeader();
     OzoneConfiguration leaderConfig = leaderOzoneManager.getConfiguration();
-    cluster.setConf(leaderConfig);
 
     String hostPrefix = OZONE_OFS_URI_SCHEME + "://" + serviceID;
-    clientConf = new OzoneConfiguration(cluster.getConf());
+    clientConf = new OzoneConfiguration(leaderConfig);
     clientConf.set(FS_DEFAULT_NAME_KEY, hostPrefix);
 
     client = cluster.newClient();
@@ -196,7 +190,7 @@ public class TestOzoneSnapshotRestore {
       // Copy key from source to destination path
       int res = ToolRunner.run(shell,
               new String[]{"-cp", sourcePath, destPath});
-      Assertions.assertEquals(0, res);
+      assertEquals(0, res);
     } finally {
       shell.close();
     }

@@ -31,6 +31,7 @@ import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.hdds.server.OzoneProtocolMessageDispatcher;
 import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.hdds.utils.ProtocolMessageMetrics;
+import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.hadoop.ipc.ProcessingDetails.Timing;
 import org.apache.hadoop.ipc.Server;
 import org.apache.hadoop.ozone.OmUtils;
@@ -38,7 +39,6 @@ import org.apache.hadoop.ozone.om.OMPerformanceMetrics;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.exceptions.OMLeaderNotReadyException;
-import org.apache.hadoop.ozone.om.exceptions.OMNotLeaderException;
 import org.apache.hadoop.ozone.om.protocolPB.OzoneManagerProtocolPB;
 import org.apache.hadoop.ozone.om.ratis.OzoneManagerDoubleBuffer;
 import org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServer;
@@ -56,28 +56,27 @@ import com.google.protobuf.ProtocolMessageEnum;
 import com.google.protobuf.RpcController;
 import com.google.protobuf.ServiceException;
 import org.apache.hadoop.ozone.security.S3SecurityUtil;
-import org.apache.ratis.protocol.RaftPeer;
 import org.apache.ratis.protocol.RaftPeerId;
+import org.apache.ratis.server.protocol.TermIndex;
 import org.apache.ratis.util.ExitUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * This class is the server-side translator that forwards requests received on
- * {@link OzoneManagerProtocolPB}
- * to the OzoneManagerService server implementation.
+ * This is the server-side translator that forwards requests received
+ * from {@link OzoneManagerProtocolPB} to {@link OzoneManager}.
  */
-public class OzoneManagerProtocolServerSideTranslatorPB implements
-    OzoneManagerProtocolPB {
-  private static final Logger LOG = LoggerFactory
-      .getLogger(OzoneManagerProtocolServerSideTranslatorPB.class);
-  private static final String OM_REQUESTS_PACKAGE = 
-      "org.apache.hadoop.ozone";
+public class OzoneManagerProtocolServerSideTranslatorPB implements OzoneManagerProtocolPB {
+  private static final Logger LOG = LoggerFactory .getLogger(OzoneManagerProtocolServerSideTranslatorPB.class);
+  private static final String OM_REQUESTS_PACKAGE = "org.apache.hadoop.ozone";
 
   private final OzoneManagerRatisServer omRatisServer;
   private final RequestHandler handler;
-  private final boolean isRatisEnabled;
   private final OzoneManager ozoneManager;
+  /**
+   * Only used to handle write requests when ratis is disabled.
+   * When ratis is enabled, write requests are handled by the state machine.
+   */
   private final OzoneManagerDoubleBuffer ozoneManagerDoubleBuffer;
   private final AtomicLong transactionIndex;
   private final OzoneProtocolMessageDispatcher<OMRequest, OMResponse,
@@ -87,6 +86,9 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements
 
   // always true, only used in tests
   private boolean shouldFlushCache = true;
+
+  private OMRequest lastRequestToSubmit;
+
 
   /**
    * Constructs an instance of the server handler.
@@ -101,44 +103,32 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements
       long lastTransactionIndexForNonRatis) {
     this.ozoneManager = impl;
     this.perfMetrics = impl.getPerfMetrics();
-    this.isRatisEnabled = enableRatis;
     // Update the transactionIndex with the last TransactionIndex read from DB.
     // New requests should have transactionIndex incremented from this index
     // onwards to ensure unique objectIDs.
     this.transactionIndex = new AtomicLong(lastTransactionIndexForNonRatis);
 
-    if (isRatisEnabled) {
-      // In case of ratis is enabled, handler in ServerSideTransaltorPB is used
-      // only for read requests and read requests does not require
-      // double-buffer to be initialized.
-      this.ozoneManagerDoubleBuffer = null;
-      handler = new OzoneManagerRequestHandler(impl, null);
-    } else {
-      this.ozoneManagerDoubleBuffer = new OzoneManagerDoubleBuffer.Builder()
+    // When ratis is enabled, the handler does not require a double-buffer since it only handle read requests.
+    this.ozoneManagerDoubleBuffer = enableRatis ? null
+        : OzoneManagerDoubleBuffer.newBuilder()
           .setOmMetadataManager(ozoneManager.getMetadataManager())
-          // Do nothing.
-          // For OM NON-HA code, there is no need to save transaction index.
-          // As we wait until the double buffer flushes DB to disk.
-          .setOzoneManagerRatisSnapShot((i) -> {
-          })
-          .enableRatis(isRatisEnabled)
-          .enableTracing(TracingUtil.isTracingEnabled(
-              ozoneManager.getConfiguration()))
-          .build();
-      handler = new OzoneManagerRequestHandler(impl, ozoneManagerDoubleBuffer);
-    }
+          .enableTracing(TracingUtil.isTracingEnabled(ozoneManager.getConfiguration()))
+          .build()
+          .start();
+    this.handler = new OzoneManagerRequestHandler(impl);
     this.omRatisServer = ratisServer;
     dispatcher = new OzoneProtocolMessageDispatcher<>("OzoneProtocol",
         metrics, LOG, OMPBHelper::processForDebug, OMPBHelper::processForDebug);
-    // TODO: make this injectable for testing...
-    requestValidations =
-        new RequestValidations()
-            .fromPackage(OM_REQUESTS_PACKAGE)
-            .withinContext(
-                ValidationContext.of(ozoneManager.getVersionManager(),
-                    ozoneManager.getMetadataManager()))
-            .load();
 
+    // TODO: make this injectable for testing...
+    this.requestValidations = new RequestValidations()
+        .fromPackage(OM_REQUESTS_PACKAGE)
+        .withinContext(ValidationContext.of(ozoneManager.getVersionManager(), ozoneManager.getMetadataManager()))
+        .load();
+  }
+
+  private boolean isRatisEnabled() {
+    return ozoneManagerDoubleBuffer == null;
   }
 
   /**
@@ -203,7 +193,7 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements
         }
       }
 
-      if (!isRatisEnabled) {
+      if (!isRatisEnabled()) {
         return submitRequestDirectlyToOM(request);
       }
 
@@ -225,6 +215,7 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements
         assert (omClientRequest != null);
         OMClientRequest finalOmClientRequest = omClientRequest;
         requestToSubmit = preExecute(finalOmClientRequest);
+        this.lastRequestToSubmit = requestToSubmit;
       } catch (IOException ex) {
         if (omClientRequest != null) {
           omClientRequest.handleRequestFailure(ozoneManager);
@@ -246,6 +237,11 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements
       throws IOException {
     return captureLatencyNs(perfMetrics.getPreExecuteLatencyNs(),
         () -> finalOmClientRequest.preExecute(ozoneManager));
+  }
+
+  @VisibleForTesting
+  public OMRequest getLastRequestToSubmit() {
+    return lastRequestToSubmit;
   }
 
   /**
@@ -271,30 +267,10 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements
   private ServiceException createLeaderErrorException(
       RaftServerStatus raftServerStatus) {
     if (raftServerStatus == NOT_LEADER) {
-      return createNotLeaderException();
+      return new ServiceException(omRatisServer.newOMNotLeaderException());
     } else {
       return createLeaderNotReadyException();
     }
-  }
-
-  private ServiceException createNotLeaderException() {
-    RaftPeerId raftPeerId = omRatisServer.getRaftPeerId();
-    RaftPeerId raftLeaderId = null;
-    String raftLeaderAddress = null;
-    RaftPeer leader = omRatisServer.getLeader();
-    if (null != leader) {
-      raftLeaderId = leader.getId();
-      raftLeaderAddress = omRatisServer.getRaftLeaderAddress(leader);
-    }
-
-    OMNotLeaderException notLeaderException =
-        raftLeaderId == null ? new OMNotLeaderException(raftPeerId) :
-            new OMNotLeaderException(raftPeerId, raftLeaderId,
-                raftLeaderAddress);
-
-    LOG.debug(notLeaderException.getMessage());
-
-    return new ServiceException(notLeaderException);
   }
 
   private ServiceException createLeaderNotReadyException() {
@@ -313,7 +289,7 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements
    * Submits request directly to OM.
    */
   private OMResponse submitRequestDirectlyToOM(OMRequest request) {
-    OMClientResponse omClientResponse;
+    final OMClientResponse omClientResponse;
     try {
       if (OmUtils.isReadOnly(request)) {
         return handler.handleReadRequest(request);
@@ -321,8 +297,8 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements
         OMClientRequest omClientRequest =
             createClientRequest(request, ozoneManager);
         request = omClientRequest.preExecute(ozoneManager);
-        long index = transactionIndex.incrementAndGet();
-        omClientResponse = handler.handleWriteRequest(request, index);
+        final TermIndex termIndex = TransactionInfo.getTermIndex(transactionIndex.incrementAndGet());
+        omClientResponse = handler.handleWriteRequest(request, termIndex, ozoneManagerDoubleBuffer);
       }
     } catch (IOException ex) {
       // As some preExecute returns error. So handle here.
@@ -346,13 +322,7 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements
     return omClientResponse.getOMResponse();
   }
 
-  /**
-   * Create OMResponse from the specified OMRequest and exception.
-   *
-   * @param omRequest
-   * @param exception
-   * @return OMResponse
-   */
+  /** @return an {@link OMResponse} from the given {@link OMRequest} and the given exception. */
   private OMResponse createErrorResponse(
       OMRequest omRequest, IOException exception) {
     // Added all write command types here, because in future if any of the
@@ -370,7 +340,7 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements
   }
 
   public void stop() {
-    if (!isRatisEnabled) {
+    if (ozoneManagerDoubleBuffer != null) {
       ozoneManagerDoubleBuffer.stop();
     }
   }
@@ -389,12 +359,10 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements
   }
 
   @VisibleForTesting
-  public OzoneManagerDoubleBuffer getOzoneManagerDoubleBuffer() {
-    return ozoneManagerDoubleBuffer;
-  }
-
-  @VisibleForTesting
   public void setShouldFlushCache(boolean shouldFlushCache) {
+    if (ozoneManagerDoubleBuffer != null) {
+      ozoneManagerDoubleBuffer.stopDaemon();
+    }
     this.shouldFlushCache = shouldFlushCache;
   }
 }

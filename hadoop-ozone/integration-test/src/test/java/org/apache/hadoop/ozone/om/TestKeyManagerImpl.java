@@ -24,7 +24,6 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.BitSet;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -37,6 +36,8 @@ import java.util.stream.Stream;
 
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.conf.StorageUnit;
+import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
+import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
@@ -44,9 +45,7 @@ import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType;
 import org.apache.hadoop.hdds.scm.HddsWhiteboxTestUtils;
 import org.apache.hadoop.hdds.scm.HddsTestUtils;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
@@ -87,7 +86,6 @@ import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
-import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLIdentityType;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
@@ -110,32 +108,39 @@ import static org.apache.hadoop.ozone.OzoneAcl.AclScope.ACCESS;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_KEY_PREALLOCATION_BLOCKS_MAX;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SCM_BLOCK_SIZE;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SCM_BLOCK_SIZE_DEFAULT;
+import static org.apache.hadoop.ozone.OzoneConsts.OZONE_OFS_URI_SCHEME;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ADDRESS_KEY;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.SCM_GET_PIPELINE_EXCEPTION;
 import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType.ALL;
 
 import org.apache.ratis.util.ExitUtils;
-import org.jetbrains.annotations.NotNull;
+import jakarta.annotation.Nonnull;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
+import org.junit.jupiter.params.provider.ValueSource;
 
-import org.mockito.Mockito;
-
+import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType.READ;
+import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType.WRITE;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.junit.jupiter.api.Assertions.fail;
 import static org.junit.jupiter.api.Assumptions.assumeFalse;
-import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.any;
+import static org.mockito.Mockito.anyInt;
+import static org.mockito.Mockito.anyLong;
+import static org.mockito.Mockito.anyString;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -163,7 +168,7 @@ public class TestKeyManagerImpl {
   private static final String KEY_NAME = "key1";
   private static final String BUCKET_NAME = "bucket1";
   private static final String BUCKET2_NAME = "bucket2";
-  private static final String VERSIONED_BUCKET_NAME = "versionedBucket1";
+  private static final String VERSIONED_BUCKET_NAME = "versionedbucket1";
   private static final String VOLUME_NAME = "vol1";
   private static OzoneManagerProtocol writeClient;
   private static OzoneManager om;
@@ -175,6 +180,9 @@ public class TestKeyManagerImpl {
     dir = GenericTestUtils.getRandomizedTestDir();
     conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, dir.toString());
     conf.set(OzoneConfigKeys.OZONE_NETWORK_TOPOLOGY_AWARE_READ_KEY, "true");
+    final String rootPath = String.format("%s://%s/", OZONE_OFS_URI_SCHEME,
+        conf.get(OZONE_OM_ADDRESS_KEY));
+    conf.set(CommonConfigurationKeysPublic.FS_DEFAULT_NAME_KEY, rootPath);
     mockScmBlockLocationProtocol = mock(ScmBlockLocationProtocol.class);
     nodeManager = new MockNodeManager(true, 10);
     NodeSchema[] schemas = new NodeSchema[]
@@ -201,7 +209,7 @@ public class TestKeyManagerImpl {
     conf.setLong(OZONE_KEY_PREALLOCATION_BLOCKS_MAX, 10);
 
     mockScmContainerClient =
-        Mockito.mock(StorageContainerLocationProtocol.class);
+        mock(StorageContainerLocationProtocol.class);
     
     OmTestManagers omTestManagers
         = new OmTestManagers(conf, scm.getBlockProtocolServer(),
@@ -214,18 +222,15 @@ public class TestKeyManagerImpl {
 
     mockContainerClient();
 
-    Mockito.when(mockScmBlockLocationProtocol
-        .allocateBlock(Mockito.anyLong(), Mockito.anyInt(),
+    when(mockScmBlockLocationProtocol
+        .allocateBlock(anyLong(), anyInt(),
             any(ReplicationConfig.class),
-            Mockito.anyString(),
+            anyString(),
             any(ExcludeList.class),
-            Mockito.anyString())).thenThrow(
+            anyString())).thenThrow(
                 new SCMException("SafeModePrecheck failed for allocateBlock",
             ResultCodes.SAFE_MODE_EXCEPTION));
     createVolume(VOLUME_NAME);
-    createBucket(VOLUME_NAME, BUCKET_NAME, false);
-    createBucket(VOLUME_NAME, BUCKET2_NAME, false);
-    createBucket(VOLUME_NAME, VERSIONED_BUCKET_NAME, true);
   }
 
   @AfterAll
@@ -236,21 +241,21 @@ public class TestKeyManagerImpl {
     FileUtils.deleteDirectory(dir);
   }
 
+  @BeforeEach
+  public void init() throws Exception {
+    createBucket(VOLUME_NAME, BUCKET_NAME, false);
+    createBucket(VOLUME_NAME, BUCKET2_NAME, false);
+    createBucket(VOLUME_NAME, VERSIONED_BUCKET_NAME, true);
+  }
+
   @AfterEach
   public void cleanupTest() throws IOException {
     mockContainerClient();
-    List<OzoneFileStatus> fileStatuses = keyManager
-        .listStatus(createBuilder().setKeyName("").build(), true, "", 100000);
-    for (OzoneFileStatus fileStatus : fileStatuses) {
-      if (fileStatus.isFile()) {
-        writeClient.deleteKey(
-            createKeyArgs(fileStatus.getKeyInfo().getKeyName()));
-      } else {
-        writeClient.deleteKey(createKeyArgs(OzoneFSUtils
-            .addTrailingSlashIfNeeded(
-                fileStatus.getKeyInfo().getKeyName())));
-      }
-    }
+    org.apache.hadoop.fs.Path volumePath = new org.apache.hadoop.fs.Path(OZONE_URI_DELIMITER, VOLUME_NAME);
+    FileSystem fs = FileSystem.get(conf);
+    fs.delete(new org.apache.hadoop.fs.Path(volumePath, BUCKET_NAME), true);
+    fs.delete(new org.apache.hadoop.fs.Path(volumePath, BUCKET2_NAME), true);
+    fs.delete(new org.apache.hadoop.fs.Path(volumePath, VERSIONED_BUCKET_NAME), true);
   }
 
   private static void mockContainerClient() {
@@ -317,8 +322,8 @@ public class TestKeyManagerImpl {
     OMException omException = assertThrows(OMException.class,
          () ->
              writeClient.allocateBlock(keyArgs, 1L, new ExcludeList()));
-    assertTrue(omException.getMessage()
-        .contains("SafeModePrecheck failed for allocateBlock"));
+    assertThat(omException.getMessage())
+        .contains("SafeModePrecheck failed for allocateBlock");
   }
 
   @Test
@@ -334,8 +339,8 @@ public class TestKeyManagerImpl {
         .build();
     OMException omException = assertThrows(OMException.class,
         () -> writeClient.openKey(keyArgs));
-    assertTrue(omException.getMessage()
-        .contains("SafeModePrecheck failed for allocateBlock"));
+    assertThat(omException.getMessage())
+        .contains("SafeModePrecheck failed for allocateBlock");
   }
 
   @Test
@@ -379,13 +384,11 @@ public class TestKeyManagerImpl {
     keyArgs.setLocationInfoList(
         keySession.getKeyInfo().getLatestVersionLocations().getLocationList());
     writeClient.commitKey(keyArgs, keySession.getId());
-    try {
-      writeClient.createDirectory(keyArgs);
-      fail("Creation should fail for directory.");
-    } catch (OMException e) {
-      assertEquals(e.getResult(),
-          OMException.ResultCodes.FILE_ALREADY_EXISTS);
-    }
+    OmKeyArgs finalKeyArgs = keyArgs;
+    OMException e =
+        assertThrows(OMException.class, () -> writeClient.createDirectory(finalKeyArgs),
+            "Creation should fail for directory.");
+    assertEquals(e.getResult(), OMException.ResultCodes.FILE_ALREADY_EXISTS);
 
     // create directory where parent is root
     keyName = RandomStringUtils.randomAlphabetic(5);
@@ -412,13 +415,12 @@ public class TestKeyManagerImpl {
     writeClient.commitKey(keyArgs, keySession.getId());
 
     // try to open created key with overWrite flag set to false
-    try {
-      writeClient.createFile(keyArgs, false, false);
-      fail("Open key should fail for non overwrite create");
-    } catch (OMException ex) {
-      if (ex.getResult() != OMException.ResultCodes.FILE_ALREADY_EXISTS) {
-        throw ex;
-      }
+    OmKeyArgs finalKeyArgs = keyArgs;
+    OMException ex =
+        assertThrows(OMException.class, () -> writeClient.createFile(finalKeyArgs, false, false),
+            "Open key should fail for non overwrite create");
+    if (ex.getResult() != OMException.ResultCodes.FILE_ALREADY_EXISTS) {
+      throw ex;
     }
 
     // create file should pass with overwrite flag set to true
@@ -435,13 +437,12 @@ public class TestKeyManagerImpl {
     keyArgs = createBuilder()
         .setKeyName(keyName)
         .build();
-    try {
-      writeClient.createFile(keyArgs, false, false);
-      fail("Open file should fail for non recursive write");
-    } catch (OMException ex) {
-      if (ex.getResult() != OMException.ResultCodes.DIRECTORY_NOT_FOUND) {
-        throw ex;
-      }
+    OmKeyArgs finalKeyArgs1 = keyArgs;
+    ex =
+        assertThrows(OMException.class, () -> writeClient.createFile(finalKeyArgs1, false, false),
+            "Open file should fail for non recursive write");
+    if (ex.getResult() != OMException.ResultCodes.DIRECTORY_NOT_FOUND) {
+      throw ex;
     }
 
     // file create should pass when recursive flag is set to true
@@ -456,13 +457,11 @@ public class TestKeyManagerImpl {
     keyArgs = createBuilder()
         .setKeyName("")
         .build();
-    try {
-      writeClient.createFile(keyArgs, true, true);
-      fail("Open file should fail for non recursive write");
-    } catch (OMException ex) {
-      if (ex.getResult() != OMException.ResultCodes.NOT_A_FILE) {
-        throw ex;
-      }
+    OmKeyArgs finalKeyArgs2 = keyArgs;
+    ex = assertThrows(OMException.class, () -> writeClient.createFile(finalKeyArgs2, true, true),
+        "Open file should fail for non recursive write");
+    if (ex.getResult() != OMException.ResultCodes.NOT_A_FILE) {
+      throw ex;
     }
   }
 
@@ -532,7 +531,7 @@ public class TestKeyManagerImpl {
         .build();
 
     OzoneAcl ozAcl1 = new OzoneAcl(ACLIdentityType.USER, "user1",
-        ACLType.READ, ACCESS);
+        ACCESS, ACLType.READ);
     writeClient.addAcl(ozPrefix1, ozAcl1);
 
     List<OzoneAcl> ozAclGet = writeClient.getAcl(ozPrefix1);
@@ -540,24 +539,13 @@ public class TestKeyManagerImpl {
     assertEquals(ozAcl1, ozAclGet.get(0));
 
     List<OzoneAcl> acls = new ArrayList<>();
-    OzoneAcl ozAcl2 = new OzoneAcl(ACLIdentityType.USER, "admin",
-        ACLType.ALL, ACCESS);
+    OzoneAcl ozAcl2 = new OzoneAcl(ACLIdentityType.USER, "admin", ACCESS, ACLType.ALL);
 
-    BitSet rwRights = new BitSet();
-    rwRights.set(IAccessAuthorizer.ACLType.WRITE.ordinal());
-    rwRights.set(IAccessAuthorizer.ACLType.READ.ordinal());
-    OzoneAcl ozAcl3 = new OzoneAcl(ACLIdentityType.GROUP, "dev",
-        rwRights, ACCESS);
+    OzoneAcl ozAcl3 = new OzoneAcl(ACLIdentityType.GROUP, "dev", ACCESS, READ, WRITE);
 
-    BitSet wRights = new BitSet();
-    wRights.set(IAccessAuthorizer.ACLType.WRITE.ordinal());
-    OzoneAcl ozAcl4 = new OzoneAcl(ACLIdentityType.GROUP, "dev",
-        wRights, ACCESS);
+    OzoneAcl ozAcl4 = new OzoneAcl(ACLIdentityType.GROUP, "dev", ACCESS, WRITE);
 
-    BitSet rRights = new BitSet();
-    rRights.set(IAccessAuthorizer.ACLType.READ.ordinal());
-    OzoneAcl ozAcl5 = new OzoneAcl(ACLIdentityType.GROUP, "dev",
-        rRights, ACCESS);
+    OzoneAcl ozAcl5 = new OzoneAcl(ACLIdentityType.GROUP, "dev", ACCESS, READ);
 
     acls.add(ozAcl2);
     acls.add(ozAcl3);
@@ -580,13 +568,13 @@ public class TestKeyManagerImpl {
     assertEquals(2, matchEntries);
 
     boolean result = writeClient.removeAcl(ozPrefix1, ozAcl4);
-    assertEquals(true, result);
+    assertTrue(result);
 
     ozAclGet = writeClient.getAcl(ozPrefix1);
     assertEquals(2, ozAclGet.size());
 
     result = writeClient.removeAcl(ozPrefix1, ozAcl3);
-    assertEquals(true, result);
+    assertTrue(result);
     ozAclGet = writeClient.getAcl(ozPrefix1);
     assertEquals(1, ozAclGet.size());
 
@@ -629,7 +617,7 @@ public class TestKeyManagerImpl {
     // Invalid prefix not ending with "/"
     String invalidPrefix = "invalid/pf";
     OzoneAcl ozAcl1 = new OzoneAcl(ACLIdentityType.USER, "user1",
-        ACLType.READ, ACCESS);
+        ACCESS, ACLType.READ);
 
     OzoneObj ozInvalidPrefix = new OzoneObjInfo.Builder()
         .setVolumeName(volumeName)
@@ -640,7 +628,9 @@ public class TestKeyManagerImpl {
         .build();
 
     // add acl with invalid prefix name
-    writeClient.addAcl(ozInvalidPrefix, ozAcl1);
+    Exception ex = assertThrows(OMException.class,
+        () -> writeClient.addAcl(ozInvalidPrefix, ozAcl1));
+    assertTrue(ex.getMessage().startsWith("Missing trailing slash"));
 
     OzoneObj ozPrefix1 = new OzoneObjInfo.Builder()
         .setVolumeName(volumeName)
@@ -656,17 +646,22 @@ public class TestKeyManagerImpl {
     assertEquals(ozAcl1, ozAclGet.get(0));
 
     // get acl with invalid prefix name
-    Exception ex = assertThrows(OMException.class,
+    ex = assertThrows(OMException.class,
         () -> writeClient.getAcl(ozInvalidPrefix));
-    assertTrue(ex.getMessage().startsWith("Invalid prefix name"));
+    assertTrue(ex.getMessage().startsWith("Missing trailing slash"));
 
     // set acl with invalid prefix name
     List<OzoneAcl> ozoneAcls = new ArrayList<OzoneAcl>();
     ozoneAcls.add(ozAcl1);
-    writeClient.setAcl(ozInvalidPrefix, ozoneAcls);
+
+    ex = assertThrows(OMException.class,
+        () -> writeClient.setAcl(ozInvalidPrefix, ozoneAcls));
+    assertTrue(ex.getMessage().startsWith("Missing trailing slash"));
 
     // remove acl with invalid prefix name
-    writeClient.removeAcl(ozInvalidPrefix, ozAcl1);
+    ex = assertThrows(OMException.class,
+        () -> writeClient.removeAcl(ozInvalidPrefix, ozAcl1));
+    assertTrue(ex.getMessage().startsWith("Missing trailing slash"));
   }
 
   @Test
@@ -686,7 +681,7 @@ public class TestKeyManagerImpl {
         .build();
 
     OzoneAcl ozAcl1 = new OzoneAcl(ACLIdentityType.USER, "user1",
-        ACLType.READ, ACCESS);
+        ACCESS, ACLType.READ);
     writeClient.addAcl(ozPrefix1, ozAcl1);
 
     OzoneObj ozFile1 = new OzoneObjInfo.Builder()
@@ -716,7 +711,7 @@ public class TestKeyManagerImpl {
     assertEquals(ozAcl1, prefixInfos.get(6).getAcls().get(0));
     // All other nodes don't have acl value associate with it
     for (int i = 0; i < 6; i++) {
-      assertEquals(null, prefixInfos.get(i));
+      assertNull(prefixInfos.get(i));
     }
     // cleanup
     writeClient.removeAcl(ozPrefix1, ozAcl1);
@@ -730,13 +725,12 @@ public class TestKeyManagerImpl {
         .build();
 
     // lookup for a non-existent file
-    try {
-      keyManager.lookupFile(keyArgs, null);
-      fail("Lookup file should fail for non existent file");
-    } catch (OMException ex) {
-      if (ex.getResult() != OMException.ResultCodes.FILE_NOT_FOUND) {
-        throw ex;
-      }
+    OmKeyArgs finalKeyArgs = keyArgs;
+    OMException ex =
+        assertThrows(OMException.class, () -> keyManager.lookupFile(finalKeyArgs, null),
+            "Lookup file should fail for non existent file");
+    if (ex.getResult() != OMException.ResultCodes.FILE_NOT_FOUND) {
+      throw ex;
     }
 
     // create a file
@@ -751,13 +745,11 @@ public class TestKeyManagerImpl {
     keyArgs = createBuilder()
         .setKeyName("")
         .build();
-    try {
-      keyManager.lookupFile(keyArgs, null);
-      fail("Lookup file should fail for a directory");
-    } catch (OMException ex) {
-      if (ex.getResult() != OMException.ResultCodes.NOT_A_FILE) {
-        throw ex;
-      }
+    OmKeyArgs finalKeyArgs1 = keyArgs;
+    ex = assertThrows(OMException.class, () -> keyManager.lookupFile(finalKeyArgs1, null),
+        "Lookup file should fail for a directory");
+    if (ex.getResult() != OMException.ResultCodes.NOT_A_FILE) {
+      throw ex;
     }
   }
 
@@ -773,13 +765,11 @@ public class TestKeyManagerImpl {
         .setSortDatanodesInPipeline(true)
         .build();
     // lookup for a non-existent key
-    try {
-      keyManager.lookupKey(keyArgs, resolvedBucket(), null);
-      fail("Lookup key should fail for non existent key");
-    } catch (OMException ex) {
-      if (ex.getResult() != OMException.ResultCodes.KEY_NOT_FOUND) {
-        throw ex;
-      }
+    OMException ex =
+        assertThrows(OMException.class, () -> keyManager.lookupKey(keyArgs, resolvedBucket(), null),
+            "Lookup key should fail for non existent key");
+    if (ex.getResult() != OMException.ResultCodes.KEY_NOT_FOUND) {
+      throw ex;
     }
 
     // create a key
@@ -847,12 +837,12 @@ public class TestKeyManagerImpl {
     // lookup key, random node as client
     OmKeyInfo key4 = keyManager.lookupKey(keyArgs, resolvedBucket(),
         "/d=default-drack/127.0.0.1");
-    assertTrue(
-        keyPipeline.getNodes().containsAll(key4.getLatestVersionLocations()
-            .getLocationList().get(0).getPipeline().getNodesInOrder()));
+    assertThat(keyPipeline.getNodes())
+        .containsAll(key4.getLatestVersionLocations()
+            .getLocationList().get(0).getPipeline().getNodesInOrder());
   }
 
-  @NotNull
+  @Nonnull
   private ResolvedBucket resolvedBucket() {
     ResolvedBucket bucket = new ResolvedBucket(VOLUME_NAME, BUCKET_NAME,
         VOLUME_NAME, BUCKET_NAME, "", BucketLayout.DEFAULT);
@@ -868,13 +858,12 @@ public class TestKeyManagerImpl {
         .build();
 
     // lookup for a non-existent key
-    try {
-      keyManager.lookupKey(keyArgs, resolvedBucket(), null);
-      fail("Lookup key should fail for non existent key");
-    } catch (OMException ex) {
-      if (ex.getResult() != OMException.ResultCodes.KEY_NOT_FOUND) {
-        throw ex;
-      }
+    OmKeyArgs finalKeyArgs = keyArgs;
+    OMException ex =
+        assertThrows(OMException.class, () -> keyManager.lookupKey(finalKeyArgs, resolvedBucket(), null),
+            "Lookup key should fail for non existent key");
+    if (ex.getResult() != OMException.ResultCodes.KEY_NOT_FOUND) {
+      throw ex;
     }
 
     // create a key
@@ -980,12 +969,11 @@ public class TestKeyManagerImpl {
       if (i % 2 == 0) {  // Add to DB
         OMRequestTestUtils.addKeyToTable(false,
             VOLUME_NAME, BUCKET_NAME, prefixKeyInDB + i,
-            1000L, HddsProtos.ReplicationType.RATIS,
-            ONE, metadataManager);
+            1000L, RatisReplicationConfig.getInstance(ONE), metadataManager);
       } else {  // Add to TableCache
         OMRequestTestUtils.addKeyToTableCache(
             VOLUME_NAME, BUCKET_NAME, prefixKeyInCache + i,
-            HddsProtos.ReplicationType.RATIS, ONE,
+            RatisReplicationConfig.getInstance(ONE),
             metadataManager);
       }
     }
@@ -1016,8 +1004,10 @@ public class TestKeyManagerImpl {
     }
   }
 
-  @Test
-  public void testListStatusWithTableCacheRecursive() throws Exception {
+  @ParameterizedTest
+  @ValueSource(booleans = {true, false})
+  public void testListStatusWithTableCacheRecursive(boolean enablePath) throws Exception {
+    conf.setBoolean(OMConfigKeys.OZONE_OM_ENABLE_FILESYSTEM_PATHS, enablePath);
     String keyNameDir1 = "dir1";
     OmKeyArgs keyArgsDir1 =
         createBuilder().setKeyName(keyNameDir1).build();
@@ -1052,13 +1042,12 @@ public class TestKeyManagerImpl {
         OMRequestTestUtils.addKeyToTable(false,
             VOLUME_NAME, BUCKET_NAME,
             keyNameDir1Subdir1 + OZONE_URI_DELIMITER + prefixKeyInDB + i,
-            1000L, HddsProtos.ReplicationType.RATIS,
-            ONE, metadataManager);
+            1000L, RatisReplicationConfig.getInstance(ONE), metadataManager);
       } else {  // Add to TableCache
         OMRequestTestUtils.addKeyToTableCache(
             VOLUME_NAME, BUCKET_NAME,
             keyNameDir1Subdir1 + OZONE_URI_DELIMITER + prefixKeyInCache + i,
-            HddsProtos.ReplicationType.RATIS, ONE,
+            RatisReplicationConfig.getInstance(ONE),
             metadataManager);
       }
     }
@@ -1096,13 +1085,12 @@ public class TestKeyManagerImpl {
       if (i % 2 == 0) {
         OMRequestTestUtils.addKeyToTable(false,
             VOLUME_NAME, BUCKET_NAME, prefixKey + i,
-            1000L, HddsProtos.ReplicationType.RATIS,
-            ONE, metadataManager);
+            1000L, RatisReplicationConfig.getInstance(ONE), metadataManager);
         existKeySet.add(prefixKey + i);
       } else {
         OMRequestTestUtils.addKeyToTableCache(
             VOLUME_NAME, BUCKET_NAME, prefixKey + i,
-            HddsProtos.ReplicationType.RATIS, ONE,
+            RatisReplicationConfig.getInstance(ONE),
             metadataManager);
 
         String key = metadataManager.getOzoneKey(
@@ -1203,8 +1191,10 @@ public class TestKeyManagerImpl {
     assertTrue(existKeySet.isEmpty());
   }
 
-  @Test
-  public void testListStatus() throws IOException {
+  @ParameterizedTest
+  @ValueSource(booleans = {true, false})
+  public void testListStatus(boolean enablePath) throws IOException {
+    conf.setBoolean(OMConfigKeys.OZONE_OM_ENABLE_FILESYSTEM_PATHS, enablePath);
     String superDir = RandomStringUtils.randomAlphabetic(5);
 
     int numDirectories = 5;
@@ -1450,8 +1440,7 @@ public class TestKeyManagerImpl {
     when(scmClientMock.getContainerClient()).thenReturn(sclProtocolMock);
 
     OmKeyInfo omKeyInfo = OMRequestTestUtils.createOmKeyInfo("v1",
-        "b1", "k1", ReplicationType.RATIS,
-        ReplicationFactor.THREE);
+        "b1", "k1", RatisReplicationConfig.getInstance(THREE)).build();
 
     // Add block to key.
     List<OmKeyLocationInfo> omKeyLocationInfoList = new ArrayList<>();
@@ -1505,8 +1494,7 @@ public class TestKeyManagerImpl {
     OMPerformanceMetrics metrics = mock(OMPerformanceMetrics.class);
 
     OmKeyInfo omKeyInfo = OMRequestTestUtils.createOmKeyInfo("v1",
-        "b1", "k1", ReplicationType.RATIS,
-        ReplicationFactor.THREE);
+        "b1", "k1", RatisReplicationConfig.getInstance(THREE)).build();
 
     // Add block to key.
     List<OmKeyLocationInfo> omKeyLocationInfoList = new ArrayList<>();
@@ -1522,13 +1510,10 @@ public class TestKeyManagerImpl {
     KeyManagerImpl keyManagerImpl =
         new KeyManagerImpl(ozoneManager, scmClientMock, conf, metrics);
 
-    try {
-      keyManagerImpl.refresh(omKeyInfo);
-      fail();
-    } catch (OMException omEx) {
-      assertEquals(SCM_GET_PIPELINE_EXCEPTION, omEx.getResult());
-      assertTrue(omEx.getMessage().equals(errorMessage));
-    }
+    OMException omEx = assertThrows(OMException.class,
+        () -> keyManagerImpl.refresh(omKeyInfo));
+    assertEquals(SCM_GET_PIPELINE_EXCEPTION, omEx.getResult());
+    assertEquals(errorMessage, omEx.getMessage());
   }
 
   /**
@@ -1592,11 +1577,11 @@ public class TestKeyManagerImpl {
       }
       // verify filestatus is present in directory or file set accordingly
       if (fileStatus.isDirectory()) {
-        assertTrue(directorySet.contains(normalizedKeyName),
-            directorySet + " doesn't contain " + normalizedKeyName);
+        assertThat(directorySet).withFailMessage(directorySet +
+            " doesn't contain " + normalizedKeyName).contains(normalizedKeyName);
       } else {
-        assertTrue(fileSet.contains(normalizedKeyName),
-            fileSet + " doesn't contain " + normalizedKeyName);
+        assertThat(fileSet).withFailMessage(fileSet + " doesn't contain " + normalizedKeyName)
+            .contains(normalizedKeyName);
       }
     }
 
@@ -1709,7 +1694,8 @@ public class TestKeyManagerImpl {
             StandaloneReplicationConfig.getInstance(ONE))
         .setAcls(OzoneAclUtil.getAclList(ugi.getUserName(), ugi.getGroupNames(),
             ALL, ALL))
-        .setVolumeName(VOLUME_NAME);
+        .setVolumeName(VOLUME_NAME)
+        .setOwnerName(ugi.getShortUserName());
   }
 
   private RequestContext currentUserReads() throws IOException {
