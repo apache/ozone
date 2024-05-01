@@ -236,7 +236,6 @@ public class KeyOutputStream extends OutputStream
     }
 
 
-    final CompletableFuture<Void> future;
     synchronized (this) {
       // Was considering Supplier<CompletableFuture<Void>> but exception catching is a mess
       handleWrite(b, off, len, false);
@@ -245,8 +244,13 @@ public class KeyOutputStream extends OutputStream
 
     try {
       LOG.warn("--- write(byte[], int, int) calling future.get(), thread = {}", Thread.currentThread().getId());
-      // ideally this should only wait until the current write is done
-      combinedFuture.get();
+      final CompletableFuture<Void> future;
+      // make findbugs happy
+      synchronized (this) {
+        future = combinedFuture;
+      }
+      // ideally this should wait up to the point the current write is done
+      future.get();
     } catch (InterruptedException | ExecutionException e) {
       // TODO: Handle this properly
       LOG.error("Exception caught but ignored in this POC", e);
