@@ -17,7 +17,6 @@
  */
 package org.apache.hadoop.hdds.scm.net;
 
-import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.google.common.base.Preconditions;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 
@@ -37,7 +36,6 @@ public class NodeImpl implements Node {
   // which level of the tree the node resides, start from 1 for root
   private int level;
   // node's parent
-  @JsonIgnore
   private InnerNode parent;
   // the cost to go through this node
   private final int cost;
