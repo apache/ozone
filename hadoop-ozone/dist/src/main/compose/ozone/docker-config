@@ -54,8 +54,6 @@ OZONE-SITE.XML_hdds.scm.wait.time.after.safemode.exit=30s
 
 OZONE-SITE.XML_hdds.container.ratis.datastream.enabled=true
 
-OZONE-SITE.XML_hdds.tracing.enabled=true
-
 OZONE_CONF_DIR=/etc/hadoop
 OZONE_LOG_DIR=/var/log/hadoop
 
