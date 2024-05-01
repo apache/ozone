@@ -243,17 +243,14 @@ public class KeyOutputStream extends OutputStream
       writeOffset += len;
     }
 
-//    if (future != null) {
-      try {
-        LOG.warn("--- write(byte[], int, int) calling future.get(), thread = {}", Thread.currentThread().getId());
-        // ideally this should only wait until the current write is done
-        combinedFuture.get();
-      } catch (InterruptedException | ExecutionException e) {
-        // TODO: Handle this properly
-        LOG.error("Exception caught but ignored in this POC", e);
-//        throw new RuntimeException(e);
-      }
-//    }
+    try {
+      LOG.warn("--- write(byte[], int, int) calling future.get(), thread = {}", Thread.currentThread().getId());
+      // ideally this should only wait until the current write is done
+      combinedFuture.get();
+    } catch (InterruptedException | ExecutionException e) {
+      // TODO: Handle this properly
+      LOG.error("Exception caught but ignored in this POC", e);
+    }
     LOG.warn("--- write(byte[], int, int) finished, thread = {}", Thread.currentThread().getId());
   }
 
