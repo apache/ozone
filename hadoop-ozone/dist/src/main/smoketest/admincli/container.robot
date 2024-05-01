@@ -71,13 +71,6 @@ Verbose container info
     ${output} =         Execute          ozone admin --verbose container info "${CONTAINER}"
                         Should contain   ${output}   Pipeline Info
 
-Close container
-    ${container} =      Execute          ozone admin container list --state OPEN | jq -r 'select(.replicationConfig.replicationFactor == "THREE") | .containerID' | head -1
-                        Execute          ozone admin container close "${container}"
-    ${output} =         Execute          ozone admin container info "${container}"
-                        Should contain   ${output}   CLOS
-    Wait until keyword succeeds    1min    10sec    Container is closed    ${container}
-
 Incomplete command
     ${output} =         Execute And Ignore Error     ozone admin container
                         Should contain   ${output}   Incomplete command
@@ -104,25 +97,28 @@ Reset user
     Run Keyword if      '${SECURITY_ENABLED}' == 'true'     Kinit test user     testuser     testuser.keytab
 
 Cannot reconcile open container
-    ${output} =         Execute          ozone admin container create
-                        Should contain   ${output}   is created
-    # The newly created container should still be open.
+    # At this point we should have an open Ratis Three container.
     ${container} =      Execute          ozone admin container list --state OPEN | jq -r 'select(.replicationConfig.replicationFactor == "THREE") | .containerID' | head -n1
     Execute and check rc    ozone admin container reconcile "${container}"    255
+    # The container should not yet have any replica checksums.
+    # TODO When the scanner is computing checksums automatically, this test may need to be updated.
+    ${data_checksum} =  Execute          ozone admin container info "${container}" --json | jq -r '.replicas[].dataChecksum' | head -n1
+    Should be empty    ${data_checksum}
+
+Close container
+    ${container} =      Execute          ozone admin container list --state OPEN | jq -r 'select(.replicationConfig.replicationFactor == "THREE") | .containerID' | head -1
+                        Execute          ozone admin container close "${container}"
+    ${output} =         Execute          ozone admin container info "${container}"
+                        Should contain   ${output}   CLOS
+    Wait until keyword succeeds    1min    10sec    Container is closed    ${container}
 
 Reconcile closed container
-    # Get a currently open container to use for this test.
-    ${container} =      Execute          ozone admin container list --state OPEN | jq -r 'select(.replicationConfig.replicationFactor == "THREE") | .containerID' | head -n1
-    # The container should not yet have any replica checksums.
+    # Check info does not show replica checksums, since manual reconciliation has not yet been triggered.
+    # TODO When the scanner is computing checksums automatically, this test may need to be updated.
+    ${container} =      Execute          ozone admin container list --state CLOSED | jq -r 'select(.replicationConfig.replicationFactor == "THREE") | .containerID' | head -1
     ${data_checksum} =  Execute          ozone admin container info "${container}" --json | jq -r '.replicas[].dataChecksum' | head -n1
     Should be empty    ${data_checksum}
-    # Close the container to it can be reconciled.
-    Execute    ozone admin container close ${container}
-    # Check info still does not show replica checksums
-    ${data_checksum} =  Execute          ozone admin container info "${container}" --json | jq -r '.replicas[].dataChecksum' | head -n1
-    Should be empty    ${data_checksum}
-    # Reconcile, and checksums should show up.
-    Execute    ozone admin container reconcile ${container}
     # When reconciliation finishes, replica checksums should be shown.
+    Execute    ozone admin container reconcile ${container}
     ${data_checksum} =  Execute          ozone admin container info "${container}" --json | jq -r '.replicas[].dataChecksum' | head -n1
-     Wait until keyword succeeds    1min    5sec    Should not be empty    ${data_checksum}
+    Wait until keyword succeeds    1min    5sec    Should not be empty    ${data_checksum}
