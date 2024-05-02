@@ -326,8 +326,12 @@ public class TestDecommissionAndMaintenance {
         toDecommission.get(1).getIpAddress(), toDecommission.get(2).getIpAddress(),
         toDecommission.get(3).getIpAddress(), toDecommission.get(4).getIpAddress()), false);
 
-    // Ensure no nodes transitioned to DECOMMISSIONING
+    // Ensure no nodes transitioned to DECOMMISSIONING or DECOMMISSIONED
     List<DatanodeDetails> decomNodes = nm.getNodes(
+        DECOMMISSIONING,
+        HEALTHY);
+    assertEquals(0, decomNodes.size());
+    decomNodes = nm.getNodes(
         DECOMMISSIONED,
         HEALTHY);
     assertEquals(0, decomNodes.size());
@@ -340,6 +344,10 @@ public class TestDecommissionAndMaintenance {
         DECOMMISSIONED,
         HEALTHY);
     assertEquals(1, decomNodes.size());
+    decomNodes = nm.getNodes(
+        DECOMMISSIONING,
+        HEALTHY);
+    assertEquals(0, decomNodes.size());
 
     generateData(20, "eckey", ecRepConfig);
     // trying to decommission 2 node should leave the cluster with 4 nodes,
@@ -350,6 +358,10 @@ public class TestDecommissionAndMaintenance {
         DECOMMISSIONED,
         HEALTHY);
     assertEquals(1, decomNodes.size());
+    decomNodes = nm.getNodes(
+        DECOMMISSIONING,
+        HEALTHY);
+    assertEquals(0, decomNodes.size());
 
     // Try to decommission 2 nodes of which 1 has already been decommissioning. Should be successful
     // as cluster will be left with (6 - 1) = 5)
@@ -361,6 +373,10 @@ public class TestDecommissionAndMaintenance {
         DECOMMISSIONED,
         HEALTHY);
     assertEquals(2, decomNodes.size());
+    decomNodes = nm.getNodes(
+        DECOMMISSIONING,
+        HEALTHY);
+    assertEquals(0, decomNodes.size());
 
     // Cluster is left with 5 IN_SERVICE nodes, no decommissioning should be allowed
     scmClient.decommissionNodes(Arrays.asList(getDNHostAndPort(toDecommission.get(4))), false);
@@ -368,6 +384,10 @@ public class TestDecommissionAndMaintenance {
         DECOMMISSIONED,
         HEALTHY);
     assertEquals(2, decomNodes.size());
+    decomNodes = nm.getNodes(
+        DECOMMISSIONING,
+        HEALTHY);
+    assertEquals(0, decomNodes.size());
 
     // Decommissioning with force flag set to true skips the checks. So node should transition to DECOMMISSIONING
     scmClient.decommissionNodes(Arrays.asList(getDNHostAndPort(toDecommission.get(4))), true);
