@@ -53,19 +53,19 @@ jobs:
       thirdparty-version: ${{ steps.versions.outputs.thirdparty }}
     steps:
       - name: Checkout project
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           repository: ${{ inputs.repo }}
           ref: ${{ inputs.ref }}
       - name: Cache for maven dependencies
-        uses: actions/cache@v3
+        uses: actions/cache@v4
         with:
           path: |
             ~/.m2/repository
             !~/.m2/repository/org/apache/ratis
           key: ratis-dependencies-${{ hashFiles('**/pom.xml') }}
       - name: Setup java
-        uses: actions/setup-java@v3
+        uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
           java-version: 8
@@ -83,7 +83,7 @@ jobs:
           mvn versions:set -DnewVersion=${{ steps.versions.outputs.ratis }}
           dev-support/checks/build.sh
       - name: Store Maven repo for tests
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: ratis-jars
           path: |
@@ -100,7 +100,7 @@ jobs:
       protobuf-version: ${{ steps.versions.outputs.protobuf }}
     steps:
       - name: Checkout project
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           repository: apache/ratis-thirdparty
           ref: ${{ needs.ratis.outputs.thirdparty-version }}
