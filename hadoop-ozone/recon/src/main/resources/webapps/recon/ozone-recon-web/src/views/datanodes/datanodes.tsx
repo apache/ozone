@@ -537,7 +537,7 @@ export class Datanodes extends React.Component<Record<string, object>, IDatanode
                   <Icon type="info-circle"/>
                 </Tooltip>
                 &nbsp;&nbsp;
-                <Button type="primary" shape="round" icon="stop" size="large" disabled={!hasSelected} loading={loading}>
+                <Button type="primary" shape="round" icon="delete"  disabled={!hasSelected} loading={loading}> Remove
                 </Button>
               </Popconfirm>
             </div>
