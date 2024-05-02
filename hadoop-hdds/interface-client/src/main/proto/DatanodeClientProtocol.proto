@@ -103,8 +103,9 @@ enum Type {
 
   StreamInit = 19;
   StreamWrite = 20;
-  ReadBlock = 21;
-  StreamRead = 22;
+  Echo = 21;
+  ReadBlock = 22;
+  StreamRead = 23;
 }
 
 
@@ -210,6 +211,7 @@ message ContainerCommandRequestProto {
 
   optional   string encodedToken = 23;
   optional   uint32 version = 24;
+  optional   EchoRequestProto echo = 25;
   optional   ReadBlockRequestProto readBlock = 25;
 }
 
@@ -240,9 +242,10 @@ message ContainerCommandResponseProto {
   optional   PutSmallFileResponseProto putSmallFile = 19;
   optional   GetSmallFileResponseProto getSmallFile = 20;
 
-  optional   GetCommittedBlockLengthResponseProto getCommittedBlockLength = 21;
-  optional   ReadBlockResponseProto readBlock = 22;
-  optional   StreamDataResponseProto streamData = 23;
+  optional GetCommittedBlockLengthResponseProto getCommittedBlockLength = 21;
+  optional   EchoResponseProto echo = 22;
+  optional   ReadBlockResponseProto readBlock = 23;
+  optional   StreamDataResponseProto streamData = 24;
 }
 
 message ContainerDataProto {
@@ -399,6 +402,16 @@ message ReadBlockResponseProto {
 
 message StreamDataResponseProto {
   repeated ReadBlockResponseProto readBlock = 1;
+}
+
+message  EchoRequestProto {
+  optional bytes payload = 1;
+  optional int32 payloadSizeResp = 2;
+  optional int32 sleepTimeMs = 3;
+}
+
+message  EchoResponseProto {
+  optional bytes payload = 1;
 }
 
 // Chunk Operations

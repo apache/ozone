@@ -25,7 +25,9 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -62,8 +64,12 @@ public class TestS3InitiateMultipartUploadRequest
     OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
         omMetadataManager, getBucketLayout());
 
+    Map<String, String> customMetadata = new HashMap<>();
+    customMetadata.put("custom-key1", "custom-value1");
+    customMetadata.put("custom-key2", "custom-value2");
+
     OMRequest modifiedRequest = doPreExecuteInitiateMPU(volumeName,
-        bucketName, keyName);
+        bucketName, keyName, customMetadata);
 
     S3InitiateMultipartUploadRequest s3InitiateMultipartUploadRequest =
         getS3InitiateMultipartUploadReq(modifiedRequest);
@@ -84,6 +90,10 @@ public class TestS3InitiateMultipartUploadRequest
     assertNotNull(openMPUKeyInfo);
     assertNotNull(openMPUKeyInfo.getLatestVersionLocations());
     assertTrue(openMPUKeyInfo.getLatestVersionLocations().isMultipartKey());
+    assertNotNull(openMPUKeyInfo.getMetadata());
+    assertEquals("custom-value1", openMPUKeyInfo.getMetadata().get("custom-key1"));
+    assertEquals("custom-value2", openMPUKeyInfo.getMetadata().get("custom-key2"));
+
     assertNotNull(omMetadataManager.getMultipartInfoTable().get(multipartKey));
 
     assertEquals(modifiedRequest.getInitiateMultiPartUploadRequest()

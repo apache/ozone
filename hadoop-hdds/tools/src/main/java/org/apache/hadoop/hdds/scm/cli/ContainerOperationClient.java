@@ -184,7 +184,7 @@ public class ContainerOperationClient implements ScmClient {
     }
   }
 
-  private String getEncodedContainerToken(long containerId) throws IOException {
+  public String getEncodedContainerToken(long containerId) throws IOException {
     if (!containerTokenEnabled) {
       return "";
     }

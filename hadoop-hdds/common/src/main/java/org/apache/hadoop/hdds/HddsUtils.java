@@ -425,6 +425,7 @@ public final class HddsUtils {
     case ListContainer:
     case ListChunk:
     case GetCommittedBlockLength:
+    case Echo:
       return true;
     case CloseContainer:
     case WriteChunk:

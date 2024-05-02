@@ -680,7 +680,16 @@ public class OzoneBucket extends WithMetadata {
   public OmMultipartInfo initiateMultipartUpload(String keyName,
       ReplicationConfig config)
       throws IOException {
-    return proxy.initiateMultipartUpload(volumeName, name, keyName, config);
+    return initiateMultipartUpload(keyName, config, Collections.emptyMap());
+  }
+
+  /**
+   * Initiate multipart upload for a specified key.
+   */
+  public OmMultipartInfo initiateMultipartUpload(String keyName,
+      ReplicationConfig config, Map<String, String> metadata)
+      throws IOException {
+    return proxy.initiateMultipartUpload(volumeName, name, keyName, config, metadata);
   }
 
   /**
@@ -1301,7 +1310,8 @@ public class OzoneBucket extends WithMetadata {
         keyInfo.getModificationTime(),
         keyInfo.getReplicationConfig(),
         metadata,
-        keyInfo.isFile());
+        keyInfo.isFile(),
+        keyInfo.getOwnerName());
   }
 
 
@@ -1774,7 +1784,8 @@ public class OzoneBucket extends WithMetadata {
             keyInfo.getDataSize(), keyInfo.getCreationTime(),
             keyInfo.getModificationTime(),
             keyInfo.getReplicationConfig(),
-            keyInfo.isFile());
+            keyInfo.isFile(),
+            keyInfo.getOwnerName());
         keysResultList.add(ozoneKey);
       }
     }

@@ -86,6 +86,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.event.Level;
 
+import static org.apache.hadoop.hdds.StringUtils.bytes2String;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_OM_SNAPSHOT_COMPACTION_DAG_MAX_TIME_ALLOWED;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_OM_SNAPSHOT_COMPACTION_DAG_MAX_TIME_ALLOWED_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_OM_SNAPSHOT_COMPACTION_DAG_PRUNE_DAEMON_RUN_INTERVAL;
@@ -714,9 +715,8 @@ public class TestRocksDBCheckpointDiffer {
       for (LiveFileMetaData m : liveFileMetaDataList) {
         LOG.debug("SST File: {}. ", m.fileName());
         LOG.debug("\tLevel: {}", m.level());
-        LOG.debug("\tTable: {}", toStr(m.columnFamilyName()));
-        LOG.debug("\tKey Range: {}", toStr(m.smallestKey())
-            + " <-> " + toStr(m.largestKey()));
+        LOG.debug("\tTable: {}", bytes2String(m.columnFamilyName()));
+        LOG.debug("\tKey Range: {}", bytes2String(m.smallestKey()) + " <-> " + bytes2String(m.largestKey()));
         if (differ.debugEnabled(DEBUG_DAG_LIVE_NODES)) {
           printMutableGraphFromAGivenNode(
               differ.getCompactionNodeMap(),
@@ -728,11 +728,9 @@ public class TestRocksDBCheckpointDiffer {
       if (differ.debugEnabled(DEBUG_READ_ALL_DB_KEYS)) {
         RocksIterator iter = rocksDB.newIterator();
         for (iter.seekToFirst(); iter.isValid(); iter.next()) {
-          LOG.debug("Iterator key:" + toStr(iter.key()) + ", " +
-              "iter value:" + toStr(iter.value()));
+          LOG.debug("Iterator key:" + bytes2String(iter.key()) + ", iter value:" + bytes2String(iter.value()));
           if (file != null) {
-            file.write("iterator key:" + toStr(iter.key()) + ", iter " +
-                "value:" + toStr(iter.value()));
+            file.write("iterator key:" + bytes2String(iter.key()) + ", iter value:" + bytes2String(iter.value()));
             file.write("\n");
           }
         }
@@ -744,13 +742,6 @@ public class TestRocksDBCheckpointDiffer {
         rocksDB.close();
       }
     }
-  }
-
-  /**
-   * Return String object encoded in UTF-8 from a byte array.
-   */
-  private String toStr(byte[] bytes) {
-    return new String(bytes, UTF_8);
   }
 
   /**
@@ -1888,8 +1879,7 @@ public class TestRocksDBCheckpointDiffer {
       pathStream.forEach(path -> {
         try (SstFileReader fileReader = new SstFileReader(options)) {
           fileReader.open(path.toAbsolutePath().toString());
-          String columnFamily = StringUtils.bytes2String(
-              fileReader.getTableProperties().getColumnFamilyName());
+          String columnFamily = bytes2String(fileReader.getTableProperties().getColumnFamilyName());
           assertThat(COLUMN_FAMILIES_TO_TRACK_IN_DAG).contains(columnFamily);
         } catch (RocksDBException rocksDBException) {
           fail("Failed to read file: " + path.toAbsolutePath());

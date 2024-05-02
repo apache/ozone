@@ -17,8 +17,8 @@
  */
 package org.apache.hadoop.ozone.om.helpers;
 
-import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Mixin class to handle custom metadata.
@@ -28,7 +28,7 @@ public abstract class WithMetadata {
   private Map<String, String> metadata;
 
   protected WithMetadata() {
-    metadata = new HashMap<>();
+    metadata = new ConcurrentHashMap<>();
   }
 
   protected WithMetadata(Builder b) {
@@ -54,11 +54,11 @@ public abstract class WithMetadata {
     private final Map<String, String> metadata;
 
     protected Builder() {
-      metadata = new HashMap<>();
+      metadata = new ConcurrentHashMap<>();
     }
 
     protected Builder(WithObjectID obj) {
-      metadata = new HashMap<>(obj.getMetadata());
+      metadata = new ConcurrentHashMap<>(obj.getMetadata());
     }
 
     public Builder addMetadata(String key, String value) {

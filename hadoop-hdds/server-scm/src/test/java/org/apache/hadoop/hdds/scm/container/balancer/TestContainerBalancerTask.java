@@ -77,7 +77,6 @@ import java.util.concurrent.TimeoutException;
 import java.util.stream.Collectors;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotSame;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -333,32 +332,6 @@ public class TestContainerBalancerTask {
     assertEquals(0, metrics.getNumDatanodesUnbalanced());
   }
 
-  /**
-   * ContainerBalancer should not involve more datanodes than the
-   * maxDatanodesRatioToInvolvePerIteration limit.
-   */
-  @Test
-  public void containerBalancerShouldObeyMaxDatanodesToInvolveLimit()
-      throws IllegalContainerBalancerStateException, IOException,
-      InvalidContainerBalancerConfigurationException, TimeoutException {
-    int percent = 40;
-    balancerConfiguration.setMaxDatanodesPercentageToInvolvePerIteration(
-        percent);
-    balancerConfiguration.setMaxSizeToMovePerIteration(100 * STORAGE_UNIT);
-    balancerConfiguration.setThreshold(1);
-    balancerConfiguration.setIterations(1);
-    startBalancer(balancerConfiguration);
-
-    int number = percent * numberOfNodes / 100;
-    ContainerBalancerMetrics metrics = containerBalancerTask.getMetrics();
-    assertThat(containerBalancerTask.getCountDatanodesInvolvedPerIteration())
-        .isLessThanOrEqualTo(number);
-    assertThat(metrics.getNumDatanodesInvolvedInLatestIteration()).isGreaterThan(0);
-    assertThat(metrics.getNumDatanodesInvolvedInLatestIteration())
-        .isLessThanOrEqualTo(number);
-    stopBalancer();
-  }
-
   @Test
   public void containerBalancerShouldSelectOnlyClosedContainers()
       throws IllegalContainerBalancerStateException, IOException,
@@ -612,86 +585,6 @@ public class TestContainerBalancerTask {
         containerBalancerTask.getContainerToSourceMap().keySet()) {
       assertThat(excludeContainers).doesNotContain(container);
     }
-  }
-
-  @Test
-  public void balancerShouldObeyMaxSizeEnteringTargetLimit()
-      throws IllegalContainerBalancerStateException, IOException,
-      InvalidContainerBalancerConfigurationException, TimeoutException {
-    conf.set("ozone.scm.container.size", "1MB");
-    balancerConfiguration =
-        conf.getObject(ContainerBalancerConfiguration.class);
-    balancerConfiguration.setThreshold(10);
-    balancerConfiguration.setMaxDatanodesPercentageToInvolvePerIteration(100);
-    balancerConfiguration.setMaxSizeToMovePerIteration(50 * STORAGE_UNIT);
-
-    // no containers should be selected when the limit is just 2 MB
-    balancerConfiguration.setMaxSizeEnteringTarget(2 * OzoneConsts.MB);
-    startBalancer(balancerConfiguration);
-
-    assertFalse(containerBalancerTask.getUnBalancedNodes()
-        .isEmpty());
-    assertTrue(containerBalancerTask.getContainerToSourceMap()
-        .isEmpty());
-    stopBalancer();
-
-    // some containers should be selected when using default values
-    OzoneConfiguration ozoneConfiguration = new OzoneConfiguration();
-    ContainerBalancerConfiguration cbc = ozoneConfiguration.
-        getObject(ContainerBalancerConfiguration.class);
-    cbc.setBalancingInterval(1);
-    ContainerBalancer sb = new ContainerBalancer(scm);
-    containerBalancerTask = new ContainerBalancerTask(scm, 0, sb,
-        sb.getMetrics(), cbc, false);
-    containerBalancerTask.run();
-
-    stopBalancer();
-    // balancer should have identified unbalanced nodes
-    assertFalse(containerBalancerTask.getUnBalancedNodes()
-        .isEmpty());
-    assertFalse(containerBalancerTask.getContainerToSourceMap()
-        .isEmpty());
-  }
-
-  @Test
-  public void balancerShouldObeyMaxSizeLeavingSourceLimit()
-      throws IllegalContainerBalancerStateException, IOException,
-      InvalidContainerBalancerConfigurationException, TimeoutException {
-    conf.set("ozone.scm.container.size", "1MB");
-    balancerConfiguration =
-        conf.getObject(ContainerBalancerConfiguration.class);
-    balancerConfiguration.setThreshold(10);
-    balancerConfiguration.setMaxDatanodesPercentageToInvolvePerIteration(100);
-    balancerConfiguration.setMaxSizeToMovePerIteration(50 * STORAGE_UNIT);
-
-    // no source containers should be selected when the limit is just 2 MB
-    balancerConfiguration.setMaxSizeLeavingSource(2 * OzoneConsts.MB);
-    startBalancer(balancerConfiguration);
-
-    assertFalse(containerBalancerTask.getUnBalancedNodes()
-        .isEmpty());
-    assertTrue(containerBalancerTask.getContainerToSourceMap()
-        .isEmpty());
-    stopBalancer();
-
-    // some containers should be selected when using default values
-    OzoneConfiguration ozoneConfiguration = new OzoneConfiguration();
-    ContainerBalancerConfiguration cbc = ozoneConfiguration.
-        getObject(ContainerBalancerConfiguration.class);
-    cbc.setBalancingInterval(1);
-    ContainerBalancer sb = new ContainerBalancer(scm);
-    containerBalancerTask = new ContainerBalancerTask(scm, 0, sb,
-        sb.getMetrics(), cbc, false);
-    containerBalancerTask.run();
-
-    stopBalancer();
-    // balancer should have identified unbalanced nodes
-    assertFalse(containerBalancerTask.getUnBalancedNodes()
-        .isEmpty());
-    assertFalse(containerBalancerTask.getContainerToSourceMap()
-        .isEmpty());
-    assertNotEquals(0,
-        containerBalancerTask.getSizeScheduledForMoveInLatestIteration());
   }
 
   @Test

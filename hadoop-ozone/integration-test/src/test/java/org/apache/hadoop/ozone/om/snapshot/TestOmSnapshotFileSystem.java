@@ -50,6 +50,7 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OpenKeySession;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
+import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
@@ -626,6 +627,7 @@ public abstract class TestOmSnapshotFileSystem {
         .setBucketName(bucketName).setKeyName(keyName)
         .setAcls(Collections.emptyList())
         .setReplicationConfig(StandaloneReplicationConfig.getInstance(ONE))
+        .setOwnerName(UserGroupInformation.getCurrentUser().getShortUserName())
         .setLocationInfoList(new ArrayList<>()).build();
 
     OpenKeySession session = writeClient.openKey(keyArgs);
