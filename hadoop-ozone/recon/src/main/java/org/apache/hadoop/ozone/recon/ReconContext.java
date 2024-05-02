@@ -121,7 +121,6 @@ public final class ReconContext {
   public void updateErrors(ErrorCode errorCode) {
     lock.writeLock().lock();
     try {
-      LOG.info("Added error of Recon {}.", errorCode);
       errors.add(errorCode);
     } finally {
       lock.writeLock().unlock();

@@ -294,10 +294,6 @@ public class ReconNodeManager extends SCMNodeManager {
       LOG.error("InvalidTopologyException error occurred : {}", invalidTopologyException.getMessage());
       reconContext.updateHealthStatus(false);
       reconContext.getErrors().add(ReconContext.ErrorCode.INVALID_NETWORK_TOPOLOGY);
-    } catch (Exception ex) {
-      LOG.error("Unexpected runtime error occurred : {}", ex.getMessage());
-      reconContext.updateHealthStatus(false);
-      reconContext.getErrors().add(ReconContext.ErrorCode.INTERNAL_ERROR);
     }
     return null;
   }
