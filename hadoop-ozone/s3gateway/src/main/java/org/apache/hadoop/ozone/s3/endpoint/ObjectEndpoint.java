@@ -999,12 +999,10 @@ public class ObjectEndpoint extends EndpointBase {
           metadataLatencyNs =
               getMetrics().updatePutKeyMetadataStats(startNanos);
           putLength = IOUtils.copyLarge(digestInputStream, ozoneOutputStream);
-          ozoneOutputStream
-              .getMetadata().put(ETAG, DatatypeConverter.printHexBinary(
-                      digestInputStream.getMessageDigest().digest())
-                  .toLowerCase());
-          keyOutputStream
-              = ozoneOutputStream.getKeyOutputStream();
+          byte[] digest = digestInputStream.getMessageDigest().digest();
+          ozoneOutputStream.getMetadata()
+              .put(ETAG, DatatypeConverter.printHexBinary(digest).toLowerCase());
+          keyOutputStream = ozoneOutputStream.getKeyOutputStream();
         }
         getMetrics().incPutKeySuccessLength(putLength);
         perf.appendSizeBytes(putLength);
