@@ -130,7 +130,7 @@ public class RatisOverReplicationHandler
     // get number of excess replicas
     int excess = replicaCount.getExcessRedundancy(true);
 
-    return createCommands(containerInfo, eligibleReplicas, excess);
+    return createCommands(containerInfo, replicas, eligibleReplicas, excess);
   }
 
   private boolean verifyOverReplication(
@@ -241,8 +241,9 @@ public class RatisOverReplicationHandler
   }
 
   private int createCommands(
-      ContainerInfo containerInfo, List<ContainerReplica> replicas,
-      int excess) throws NotLeaderException, CommandTargetOverloadedException {
+      ContainerInfo containerInfo, Set<ContainerReplica> originalReplicas,
+      List<ContainerReplica> replicas, int excess)
+      throws NotLeaderException, CommandTargetOverloadedException {
 
     /*
     Being in the over replication queue means we have enough replicas that
@@ -286,7 +287,8 @@ public class RatisOverReplicationHandler
     If the container was already mis replicated, then remove replicas if that
     does not change the placement count.
      */
-    Set<ContainerReplica> replicaSet = new HashSet<>(replicas);
+    Set<ContainerReplica> replicaSet = new HashSet<>(originalReplicas);
+    replicasRemoved.forEach(replicaSet::remove);
     // iterate through replicas in deterministic order
     for (ContainerReplica replica : replicas) {
       if (excess == 0) {
