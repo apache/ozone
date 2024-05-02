@@ -68,7 +68,7 @@ public class OzoneFSOutputStream extends OutputStream
   @Override
   public synchronized void close() throws IOException {
     TracingUtil.executeInNewSpan("OzoneFSOutputStream.close",
-    outputStream::close);
+        outputStream::close);
   }
 
   @Override
