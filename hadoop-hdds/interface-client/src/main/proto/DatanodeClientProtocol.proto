@@ -212,7 +212,7 @@ message ContainerCommandRequestProto {
   optional   string encodedToken = 23;
   optional   uint32 version = 24;
   optional   EchoRequestProto echo = 25;
-  optional   ReadBlockRequestProto readBlock = 25;
+  optional   ReadBlockRequestProto readBlock = 26;
 }
 
 message ContainerCommandResponseProto {
