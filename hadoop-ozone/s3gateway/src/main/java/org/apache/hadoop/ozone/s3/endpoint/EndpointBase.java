@@ -391,18 +391,6 @@ public abstract class EndpointBase implements Auditor {
         throw ex;
       }
 
-      if (!TAG_REGEX_PATTERN.matcher(tagPair.getName()).matches()) {
-        OS3Exception ex = newError(INVALID_TAG, tagPair.getName());
-        ex.setErrorMessage("The tag key does not have a valid pattern");
-        throw ex;
-      }
-
-      if (!TAG_REGEX_PATTERN.matcher(tagPair.getValue()).matches()) {
-        OS3Exception ex = newError(INVALID_TAG, tagPair.getValue());
-        ex.setErrorMessage("The tag value does not have a valid pattern");
-        throw ex;
-      }
-
       if (tagPair.getName().length() > TAG_KEY_LENGTH_LIMIT) {
         OS3Exception ex = newError(INVALID_TAG, tagPair.getName());
         ex.setErrorMessage("The tag key exceeds the maximum length of " + TAG_KEY_LENGTH_LIMIT);
@@ -412,6 +400,18 @@ public abstract class EndpointBase implements Auditor {
       if (tagPair.getValue().length() > TAG_VALUE_LENGTH_LIMIT) {
         OS3Exception ex = newError(INVALID_TAG, tagPair.getValue());
         ex.setErrorMessage("The tag value exceeds the maximum length of " + TAG_VALUE_LENGTH_LIMIT);
+        throw ex;
+      }
+
+      if (!TAG_REGEX_PATTERN.matcher(tagPair.getName()).matches()) {
+        OS3Exception ex = newError(INVALID_TAG, tagPair.getName());
+        ex.setErrorMessage("The tag key does not have a valid pattern");
+        throw ex;
+      }
+
+      if (!TAG_REGEX_PATTERN.matcher(tagPair.getValue()).matches()) {
+        OS3Exception ex = newError(INVALID_TAG, tagPair.getValue());
+        ex.setErrorMessage("The tag value does not have a valid pattern");
         throw ex;
       }
 
