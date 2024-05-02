@@ -58,7 +58,6 @@ import org.apache.hadoop.ozone.client.OzoneKey;
 import org.apache.hadoop.ozone.client.OzoneKeyDetails;
 import org.apache.hadoop.ozone.client.OzoneMultipartUploadPartListParts;
 import org.apache.hadoop.ozone.client.OzoneVolume;
-import org.apache.hadoop.ozone.client.io.KeyMetadataAware;
 import org.apache.hadoop.ozone.client.io.KeyOutputStream;
 import org.apache.hadoop.ozone.client.io.OzoneInputStream;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
@@ -1000,7 +999,7 @@ public class ObjectEndpoint extends EndpointBase {
           metadataLatencyNs =
               getMetrics().updatePutKeyMetadataStats(startNanos);
           putLength = IOUtils.copyLarge(digestInputStream, ozoneOutputStream);
-          ((KeyMetadataAware)ozoneOutputStream.getOutputStream())
+          ozoneOutputStream
               .getMetadata().put(ETAG, DatatypeConverter.printHexBinary(
                       digestInputStream.getMessageDigest().digest())
                   .toLowerCase());
