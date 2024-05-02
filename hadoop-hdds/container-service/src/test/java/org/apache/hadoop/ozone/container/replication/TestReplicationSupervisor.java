@@ -38,6 +38,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Function;
 
+import com.google.protobuf.Proto2Utils;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -570,7 +571,7 @@ public class TestReplicationSupervisor {
         new ReconstructECContainersCommand(containerId,
             sources,
             target,
-            missingIndexes,
+            Proto2Utils.unsafeByteString(missingIndexes),
             new ECReplicationConfig(3, 2));
 
     return new ECReconstructionCommandInfo(cmd);

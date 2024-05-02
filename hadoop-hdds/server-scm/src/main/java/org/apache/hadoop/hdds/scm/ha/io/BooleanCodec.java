@@ -19,19 +19,20 @@ package org.apache.hadoop.hdds.scm.ha.io;
 
 import com.google.protobuf.ByteString;
 
-import static java.nio.charset.StandardCharsets.UTF_8;
-
 /**
  * {@link Codec} for {@code Boolean} objects.
  */
 public class BooleanCodec implements Codec {
+  static final ByteString TRUE = ByteString.copyFromUtf8(Boolean.TRUE.toString());
+  static final ByteString FALSE = ByteString.copyFromUtf8(Boolean.FALSE.toString());
+
   @Override
   public ByteString serialize(Object object) {
-    return ByteString.copyFrom(((Boolean) object).toString().getBytes(UTF_8));
+    return ((Boolean) object) ? TRUE : FALSE;
   }
 
   @Override
-  public Object deserialize(Class<?> type, ByteString value) {
-    return Boolean.parseBoolean(new String(value.toByteArray(), UTF_8));
+  public Boolean deserialize(Class<?> type, ByteString value) {
+    return value.equals(TRUE) ? Boolean.TRUE : Boolean.FALSE;
   }
 }
