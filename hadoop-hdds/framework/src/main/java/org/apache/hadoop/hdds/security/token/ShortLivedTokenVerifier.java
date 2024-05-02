@@ -64,7 +64,7 @@ public abstract class
   }
 
   @Override
-  public void verify(String user, Token<?> token,
+  public void verify(Token<?> token,
       ContainerCommandRequestProtoOrBuilder cmd) throws SCMSecurityException {
 
     if (!isTokenRequired(cmd.getCmdType())) {
