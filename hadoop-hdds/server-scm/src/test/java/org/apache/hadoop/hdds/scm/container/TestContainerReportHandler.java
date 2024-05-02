@@ -1008,7 +1008,7 @@ public class TestContainerReportHandler {
 
     // All replicas should start with an empty data checksum in SCM.
     boolean contOneDataChecksumsEmpty = containerManager.getContainerReplicas(contID).stream()
-        .allMatch(r -> r.getDataChecksum().isEmpty());
+        .allMatch(r -> r.getDataChecksum() == 0);
     assertTrue(contOneDataChecksumsEmpty, "Replicas of container one should not yet have any data checksums.");
 
     // Send a report to SCM from one datanode that still does not have a data checksum.
@@ -1025,7 +1025,7 @@ public class TestContainerReportHandler {
     // Regardless of which datanode sent the report, none of them have checksums, so all replica's data checksums
     // should remain empty.
     boolean containerDataChecksumEmpty = containerManager.getContainerReplicas(contID).stream()
-        .allMatch(r -> r.getDataChecksum().isEmpty());
+        .allMatch(r -> r.getDataChecksum() == 0);
     assertTrue(containerDataChecksumEmpty, "Replicas of the container should not have any data checksums.");
   }
 
@@ -1057,7 +1057,7 @@ public class TestContainerReportHandler {
 
     // All replicas should start with an empty data checksum in SCM.
     boolean dataChecksumsEmpty = containerManager.getContainerReplicas(contID).stream()
-        .allMatch(r -> r.getDataChecksum().isEmpty());
+        .allMatch(r -> r.getDataChecksum() == 0);
     assertTrue(dataChecksumsEmpty, "Replicas of container one should not yet have any data checksums.");
 
     // For each datanode, send a container report with a mismatched checksum.
@@ -1080,8 +1080,7 @@ public class TestContainerReportHandler {
     // datanode ID.
     int numReplicasChecked = 0;
     for (ContainerReplica replica: containerManager.getContainerReplicas(contID)) {
-      String expectedChecksum = createUniqueDataChecksumForReplica(
-          contID, replica.getDatanodeDetails().getUuidString());
+      long expectedChecksum = createUniqueDataChecksumForReplica(contID, replica.getDatanodeDetails().getUuidString());
       assertEquals(expectedChecksum, replica.getDataChecksum());
       numReplicasChecked++;
     }
@@ -1107,7 +1106,7 @@ public class TestContainerReportHandler {
     // Since the containers don't have any data in this test, the matching checksums are based on container ID only.
     numReplicasChecked = 0;
     for (ContainerReplica replica: containerManager.getContainerReplicas(contID)) {
-      String expectedChecksum = createMatchingDataChecksumForReplica(contID);
+      long expectedChecksum = createMatchingDataChecksumForReplica(contID);
       assertEquals(expectedChecksum, replica.getDataChecksum());
       numReplicasChecked++;
     }
@@ -1117,15 +1116,15 @@ public class TestContainerReportHandler {
   /**
    * Generates a placeholder data checksum for testing that is specific to a container replica.
    */
-  protected static String createUniqueDataChecksumForReplica(ContainerID containerID, String datanodeID) {
-    return Integer.toString((datanodeID + containerID).hashCode());
+  protected static long createUniqueDataChecksumForReplica(ContainerID containerID, String datanodeID) {
+    return (datanodeID + containerID).hashCode();
   }
 
   /**
    * Generates a placeholder data checksum for testing that is the same for all container replicas.
    */
-  protected static String createMatchingDataChecksumForReplica(ContainerID containerID) {
-    return Integer.toString(Objects.hashCode(containerID));
+  protected static long createMatchingDataChecksumForReplica(ContainerID containerID) {
+    return Objects.hashCode(containerID);
   }
 
   private ContainerReportFromDatanode getContainerReportFromDatanode(

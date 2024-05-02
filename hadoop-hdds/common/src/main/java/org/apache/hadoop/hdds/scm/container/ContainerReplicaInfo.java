@@ -35,7 +35,7 @@ public final class ContainerReplicaInfo {
   private long keyCount;
   private long bytesUsed;
   private int replicaIndex = -1;
-  private String dataChecksum;
+  private long dataChecksum;
 
   public static ContainerReplicaInfo fromProto(
       HddsProtos.SCMContainerReplicaProto proto) {
@@ -89,7 +89,7 @@ public final class ContainerReplicaInfo {
     return replicaIndex;
   }
 
-  public String getDataChecksum() {
+  public long getDataChecksum() {
     return dataChecksum;
   }
 
@@ -140,7 +140,7 @@ public final class ContainerReplicaInfo {
       return this;
     }
 
-    public Builder setDataChecksum(String dataChecksum) {
+    public Builder setDataChecksum(long dataChecksum) {
       subject.dataChecksum = dataChecksum;
       return this;
     }

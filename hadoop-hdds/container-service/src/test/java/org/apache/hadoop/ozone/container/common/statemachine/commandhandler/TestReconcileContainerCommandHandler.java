@@ -55,6 +55,7 @@ import static java.util.Collections.singletonMap;
 import static org.apache.hadoop.hdds.protocol.MockDatanodeDetails.randomDatanodeDetails;
 import static org.apache.hadoop.ozone.OzoneConsts.GB;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
@@ -194,10 +195,10 @@ public class TestReconcileContainerCommandHandler {
       ContainerID id = entry.getKey();
       assertNotNull(containerSet.getContainer(id.getId()));
 
-      String sentDataChecksum = entry.getValue().getDataChecksum();
-      // Current implementation is incomplete, and uses this as a mocked checksum.
-      String expectedDataChecksum = ContainerUtils.getChecksum(Long.toString(id.getId()));
-      assertEquals(expectedDataChecksum, sentDataChecksum, "Checksum mismatch in report of container " + id);
+      long sentDataChecksum = entry.getValue().getDataChecksum();
+      // Current implementation is incomplete, and uses a mocked checksum.
+      assertNotEquals(0, sentDataChecksum, "Report of container " + id +
+          " should have a non-zero checksum");
     }
   }
 }

@@ -43,8 +43,7 @@ public final class ContainerReplica implements Comparable<ContainerReplica> {
   private final long keyCount;
   private final long bytesUsed;
   private final boolean isEmpty;
-  // TODO Use a dedicated checksum class for this if required later.
-  private final String dataChecksum;
+  private final long dataChecksum;
 
   private ContainerReplica(ContainerReplicaBuilder b) {
     containerID = b.containerID;
@@ -56,7 +55,7 @@ public final class ContainerReplica implements Comparable<ContainerReplica> {
     replicaIndex = b.replicaIndex;
     isEmpty = b.isEmpty;
     sequenceId = b.sequenceId;
-    dataChecksum = Optional.ofNullable(b.dataChecksum).orElse("");
+    dataChecksum = b.dataChecksum;
   }
 
   /**
@@ -117,7 +116,7 @@ public final class ContainerReplica implements Comparable<ContainerReplica> {
     return isEmpty;
   }
 
-  public String getDataChecksum() {
+  public long getDataChecksum() {
     return dataChecksum;
   }
 
@@ -208,7 +207,7 @@ public final class ContainerReplica implements Comparable<ContainerReplica> {
     private long keyCount;
     private int replicaIndex;
     private boolean isEmpty;
-    private String dataChecksum;
+    private long dataChecksum;
 
     /**
      * Set Container Id.
@@ -283,7 +282,7 @@ public final class ContainerReplica implements Comparable<ContainerReplica> {
       return this;
     }
 
-    public ContainerReplicaBuilder setDataChecksum(String dataChecksum) {
+    public ContainerReplicaBuilder setDataChecksum(long dataChecksum) {
       this.dataChecksum = dataChecksum;
       return this;
     }

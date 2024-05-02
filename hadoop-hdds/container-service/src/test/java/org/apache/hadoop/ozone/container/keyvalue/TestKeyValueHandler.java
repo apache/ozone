@@ -459,10 +459,9 @@ public class TestKeyValueHandler {
       long reportedID = report.getContainerID();
       Assertions.assertEquals(container.getContainerData().getContainerID(), reportedID);
 
-      String reportDataChecksum = report.getDataChecksum();
-      String expectedDataChecksum = ContainerUtils.getChecksum(Long.toString(reportedID));
-      Assertions.assertEquals(expectedDataChecksum, reportDataChecksum,
-          "Checksum mismatch in report of container " + reportedID);
+      long reportDataChecksum = report.getDataChecksum();
+      Assertions.assertNotEquals(0, reportDataChecksum,
+          "Container report should have populated the checksum field with a non-zero value.");
       icrCount.incrementAndGet();
     });
 

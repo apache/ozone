@@ -57,6 +57,8 @@ import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerExcep
 import org.apache.hadoop.hdds.utils.HddsServerUtil;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.common.Checksum;
+import org.apache.hadoop.ozone.common.ChecksumByteBuffer;
+import org.apache.hadoop.ozone.common.ChecksumByteBufferFactory;
 import org.apache.hadoop.ozone.common.ChunkBuffer;
 import org.apache.hadoop.ozone.common.OzoneChecksumException;
 import org.apache.hadoop.ozone.common.utils.BufferUtils;
@@ -1155,8 +1157,11 @@ public class KeyValueHandler extends Handler {
   public void reconcileContainer(Container<?> container, List<DatanodeDetails> peers) throws IOException {
     // TODO Just a deterministic placeholder hash for testing until actual implementation is finished.
     ContainerData data = container.getContainerData();
-    String dataChecksum = ContainerUtils.getChecksum(Long.toString(data.getContainerID()));
-    data.setDataChecksum(dataChecksum);
+    long id = data.getContainerID();
+    ByteBuffer byteBuffer = ByteBuffer.allocate(Long.BYTES);
+    ChecksumByteBuffer checksumImpl = ChecksumByteBufferFactory.crc32Impl();
+    checksumImpl.update(byteBuffer.putLong(id));
+    data.setDataChecksum(checksumImpl.getValue());
     sendICR(container);
   }
 
