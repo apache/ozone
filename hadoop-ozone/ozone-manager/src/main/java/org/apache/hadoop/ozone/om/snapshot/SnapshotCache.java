@@ -20,23 +20,24 @@ package org.apache.hadoop.ozone.om.snapshot;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.cache.CacheLoader;
 import org.apache.hadoop.ozone.om.OMMetrics;
+import org.apache.hadoop.hdds.utils.Scheduler;
 import org.apache.hadoop.ozone.om.OmSnapshot;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
-import java.util.Iterator;
-import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.TimeUnit;
 
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.FILE_NOT_FOUND;
 
 /**
  * Thread-safe custom unbounded LRU cache to manage open snapshot DB instances.
  */
-public class SnapshotCache {
+public class SnapshotCache implements ReferenceCountedCallback, AutoCloseable {
 
   static final Logger LOG = LoggerFactory.getLogger(SnapshotCache.class);
 
@@ -51,14 +52,28 @@ public class SnapshotCache {
   // Soft-limit of the total number of snapshot DB instances allowed to be
   // opened on the OM.
   private final int cacheSizeLimit;
+  private final Set<UUID> pendingEvictionQueue;
+  private final Scheduler scheduler;
+  private static final String SNAPSHOT_CACHE_CLEANUP_SERVICE =
+      "SnapshotCacheCleanupService";
 
   private final OMMetrics omMetrics;
 
-  public SnapshotCache(CacheLoader<UUID, OmSnapshot> cacheLoader, int cacheSizeLimit, OMMetrics omMetrics) {
+  public SnapshotCache(CacheLoader<UUID, OmSnapshot> cacheLoader, int cacheSizeLimit, OMMetrics omMetrics,
+                       long cleanupInterval) {
     this.dbMap = new ConcurrentHashMap<>();
     this.cacheLoader = cacheLoader;
     this.cacheSizeLimit = cacheSizeLimit;
     this.omMetrics = omMetrics;
+    this.pendingEvictionQueue = ConcurrentHashMap.newKeySet();
+    if (cleanupInterval > 0) {
+      this.scheduler = new Scheduler(SNAPSHOT_CACHE_CLEANUP_SERVICE,
+          true, 1);
+      this.scheduler.scheduleWithFixedDelay(this::cleanup, cleanupInterval,
+          cleanupInterval, TimeUnit.MILLISECONDS);
+    } else {
+      this.scheduler = null;
+    }
   }
 
   @VisibleForTesting
@@ -77,7 +92,7 @@ public class SnapshotCache {
    * Immediately invalidate an entry.
    * @param key SnapshotId
    */
-  public void invalidate(UUID key) throws IOException {
+  public void invalidate(UUID key) {
     dbMap.compute(key, (k, v) -> {
       if (v == null) {
         LOG.warn("SnapshotId: '{}' does not exist in snapshot cache.", k);
@@ -97,19 +112,16 @@ public class SnapshotCache {
    * Immediately invalidate all entries and close their DB instances in cache.
    */
   public void invalidateAll() {
-    Iterator<Map.Entry<UUID, ReferenceCounted<OmSnapshot>>> it = dbMap.entrySet().iterator();
+    for (UUID key : dbMap.keySet()) {
+      invalidate(key);
+    }
+  }
 
-    while (it.hasNext()) {
-      Map.Entry<UUID, ReferenceCounted<OmSnapshot>> entry = it.next();
-      OmSnapshot omSnapshot = entry.getValue().get();
-      try {
-        // TODO: If wrapped with SoftReference<>, omSnapshot could be null?
-        omSnapshot.close();
-      } catch (IOException e) {
-        throw new IllegalStateException("Failed to close snapshot", e);
-      }
-      it.remove();
-      omMetrics.decNumSnapshotCacheSize();
+  @Override
+  public void close() {
+    invalidateAll();
+    if (this.scheduler != null) {
+      this.scheduler.close();
     }
   }
 
@@ -170,13 +182,6 @@ public class SnapshotCache {
       throw new OMException("SnapshotId: '" + key + "' not found, or the snapshot is no longer active.",
           OMException.ResultCodes.FILE_NOT_FOUND);
     }
-
-    // Check if any entries can be cleaned up.
-    // At this point, cache size might temporarily exceed cacheSizeLimit
-    // even if there are entries that can be evicted, which is fine since it
-    // is a soft limit.
-    cleanup();
-
     return rcOmSnapshot;
   }
 
@@ -185,58 +190,60 @@ public class SnapshotCache {
    * @param key SnapshotId
    */
   public void release(UUID key) {
-    dbMap.compute(key, (k, v) -> {
-      if (v == null) {
-        throw new IllegalArgumentException("SnapshotId '" + key + "' does not exist in cache.");
-      } else {
-        v.decrementRefCount();
-      }
-      return v;
-    });
-
-    // The cache size might have already exceeded the soft limit
-    // Thus triggering cleanup() to check and evict if applicable
-    cleanup();
+    ReferenceCounted<OmSnapshot> val = dbMap.get(key);
+    if (val == null) {
+      throw new IllegalArgumentException("Key '" + key + "' does not " +
+          "exist in cache.");
+    }
+    val.decrementRefCount();
   }
 
+
   /**
-   * Wrapper for cleanupInternal() that is synchronized to prevent multiple
-   * threads from interleaving into the cleanup method.
+   * If cache size exceeds soft limit, attempt to clean up and close the
+     instances that has zero reference count.
    */
-  private synchronized void cleanup() {
+  @VisibleForTesting
+  void cleanup() {
     if (dbMap.size() > cacheSizeLimit) {
-      cleanupInternal();
+      for (UUID evictionKey : pendingEvictionQueue) {
+        dbMap.compute(evictionKey, (k, v) -> {
+          pendingEvictionQueue.remove(k);
+          if (v == null) {
+            throw new IllegalStateException("SnapshotId '" + k + "' does not exist in cache. The RocksDB " +
+                "instance of the Snapshot may not be closed properly.");
+          }
+
+          if (v.getTotalRefCount() > 0) {
+            LOG.debug("SnapshotId {} is still being referenced ({}), skipping its clean up.", k, v.getTotalRefCount());
+            return v;
+          } else {
+            LOG.debug("Closing SnapshotId {}. It is not being referenced anymore.", k);
+            // Close the instance, which also closes its DB handle.
+            try {
+              v.get().close();
+            } catch (IOException ex) {
+              throw new IllegalStateException("Error while closing snapshot DB.", ex);
+            }
+            omMetrics.decNumSnapshotCacheSize();
+            return null;
+          }
+        });
+      }
     }
   }
 
   /**
-   * If cache size exceeds soft limit, attempt to clean up and close the
-   * instances that has zero reference count.
-   * TODO: [SNAPSHOT] Add new ozone debug CLI command to trigger this directly.
+   * Callback method used to enqueue or dequeue ReferenceCounted from
+   * pendingEvictionList.
+   * @param referenceCounted ReferenceCounted object
    */
-  private void cleanupInternal() {
-    for (Map.Entry<UUID, ReferenceCounted<OmSnapshot>> entry : dbMap.entrySet()) {
-      dbMap.compute(entry.getKey(), (k, v) -> {
-        if (v == null) {
-          throw new IllegalStateException("SnapshotId '" + k + "' does not exist in cache. The RocksDB " +
-              "instance of the Snapshot may not be closed properly.");
-        }
-
-        if (v.getTotalRefCount() > 0) {
-          LOG.debug("SnapshotId {} is still being referenced ({}), skipping its clean up.", k, v.getTotalRefCount());
-          return v;
-        } else {
-          LOG.debug("Closing SnapshotId {}. It is not being referenced anymore.", k);
-          // Close the instance, which also closes its DB handle.
-          try {
-            v.get().close();
-          } catch (IOException ex) {
-            throw new IllegalStateException("Error while closing snapshot DB.", ex);
-          }
-          omMetrics.decNumSnapshotCacheSize();
-          return null;
-        }
-      });
+  @Override
+  public void callback(ReferenceCounted referenceCounted) {
+    if (referenceCounted.getTotalRefCount() == 0L) {
+      // Reference count reaches zero, add to pendingEvictionList
+      pendingEvictionQueue.add(((OmSnapshot) referenceCounted.get())
+          .getSnapshotID());
     }
   }
 }

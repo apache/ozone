@@ -1430,9 +1430,8 @@ public class OzoneManagerRequestHandler implements RequestHandler {
 
   private EchoRPCResponse echoRPC(EchoRPCRequest req) {
     EchoRPCResponse.Builder builder = EchoRPCResponse.newBuilder();
-    byte[] payloadBytes =
-        PayloadUtils.generatePayload(req.getPayloadSizeResp());
-    builder.setPayload(ByteString.copyFrom(payloadBytes));
+    final ByteString payloadBytes = PayloadUtils.generatePayloadProto2(req.getPayloadSizeResp());
+    builder.setPayload(payloadBytes);
     return builder.build();
   }
 

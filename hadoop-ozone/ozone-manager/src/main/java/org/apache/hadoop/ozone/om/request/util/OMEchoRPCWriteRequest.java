@@ -44,11 +44,9 @@ public class OMEchoRPCWriteRequest extends OMClientRequest {
 
     EchoRPCRequest echoRPCRequest = getOmRequest().getEchoRPCRequest();
 
-    byte[] payloadBytes =
-        PayloadUtils.generatePayload(echoRPCRequest.getPayloadSizeResp());
-
+    final ByteString payloadBytes = PayloadUtils.generatePayloadProto2(echoRPCRequest.getPayloadSizeResp());
     EchoRPCResponse echoRPCResponse = EchoRPCResponse.newBuilder()
-        .setPayload(ByteString.copyFrom(payloadBytes))
+        .setPayload(payloadBytes)
         .build();
 
     OMResponse.Builder omResponse =
