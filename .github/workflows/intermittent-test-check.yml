@@ -100,13 +100,30 @@ jobs:
           key: maven-repo-${{ hashFiles('**/pom.xml') }}
           restore-keys: |
             maven-repo-
+      - name: Download Ratis repo
+        if: ${{ github.event.inputs.ratis-ref != '' }}
+        uses: actions/download-artifact@v4
+        with:
+          name: ratis-jars
+          path: |
+            ~/.m2/repository/org/apache/ratis
       - name: Setup java
         uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
           java-version: 8
       - name: Build (most) of Ozone
-        run: hadoop-ozone/dev-support/checks/build.sh -Dskip.npx -Dskip.installnpx -DskipShade
+        run: |
+          args="-Dskip.npx -Dskip.installnpx -DskipShade"
+          if [[ "${{ github.event.inputs.ratis-ref }}" != "" ]]; then
+            args="$args -Dratis.version=${{ needs.ratis.outputs.ratis-version }}"
+            args="$args -Dratis.thirdparty.version=${{ needs.ratis.outputs.thirdparty-version }}"
+            args="$args -Dio.grpc.version=${{ needs.ratis.outputs.grpc-version }}"
+            args="$args -Dnetty.version=${{ needs.ratis.outputs.netty-version }}"
+            args="$args -Dgrpc.protobuf-compile.version=${{ needs.ratis.outputs.protobuf-version }}"
+          fi
+
+          hadoop-ozone/dev-support/checks/build.sh $args
       - name: Store Maven repo for tests
         uses: actions/upload-artifact@v4
         with:
@@ -164,6 +181,7 @@ jobs:
             export OZONE_REPO_CACHED=true
           fi
 
+          args="-DexcludedGroups=native|slow|unhealthy"
           if [[ "${{ github.event.inputs.ratis-ref }}" != "" ]]; then
             args="$args -Dratis.version=${{ needs.ratis.outputs.ratis-version }}"
             args="$args -Dratis.thirdparty.version=${{ needs.ratis.outputs.thirdparty-version }}"
@@ -172,7 +190,6 @@ jobs:
             args="$args -Dgrpc.protobuf-compile.version=${{ needs.ratis.outputs.protobuf-version }}"
           fi
 
-          args="-DexcludedGroups=native|slow|unhealthy"
           if [ "$TEST_METHOD" = "ALL" ]; then
             echo "Running all tests from $TEST_CLASS"
             set -x
