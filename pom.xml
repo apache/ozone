@@ -1440,6 +1440,7 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
                       <allowedImport>org.rocksdb.OptionsUtil</allowedImport>
                       <allowedImport>org.rocksdb.RocksDBException</allowedImport>
                       <allowedImport>org.rocksdb.StatsLevel</allowedImport>
+                      <allowedImport>org.rocksdb.TableProperties</allowedImport>
                       <allowedImport>org.rocksdb.TransactionLogIterator.BatchResult</allowedImport>
                       <allowedImport>org.rocksdb.TickerType</allowedImport>
                       <allowedImport>org.rocksdb.LiveFileMetaData</allowedImport>
@@ -1452,7 +1453,10 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
                       <!-- Allow RocksDB constants and static methods to be used. -->
                       <allowedImport>org.rocksdb.RocksDB.*</allowedImport>
                     </allowedImports>
-                    <exclusion>org.apache.hadoop.hdds.utils.db.managed.*</exclusion>
+                    <exclusions>
+                      <exclusion>org.apache.hadoop.hdds.utils.db.managed.*</exclusion>
+                      <exclusion>org.apache.ozone.rocksdiff.RocksDBCheckpointDiffer</exclusion>
+                    </exclusions>
                   </RestrictImports>
                 </rules>
               </configuration>
