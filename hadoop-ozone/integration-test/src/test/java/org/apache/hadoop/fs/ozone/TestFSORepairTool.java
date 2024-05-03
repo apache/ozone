@@ -34,13 +34,14 @@ import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientFactory;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
-import org.apache.hadoop.ozone.debug.FSORepairTool;
+import org.apache.hadoop.ozone.common.FSOBaseTool;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
+import org.apache.hadoop.ozone.repair.om.FSORepairTool;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
@@ -128,9 +129,9 @@ public class TestFSORepairTool {
     FSORepairTool.Report expectedReport = buildConnectedTree("vol1", "bucket1");
 
     // Test the connected tree in debug mode.
-    FSORepairTool repair = new FSORepairTool(getOmDB(),
+    FSOBaseTool fsoTool = new FSOBaseTool(getOmDB(),
         getOmDBLocation(), true);
-    FSORepairTool.Report debugReport = repair.run();
+    FSOBaseTool.Report debugReport = fsoTool.run();
 
     Assertions.assertEquals(expectedReport, debugReport);
     assertConnectedTreeReadable("vol1", "bucket1");
@@ -138,9 +139,9 @@ public class TestFSORepairTool {
 
     // Running again in repair mode should give same results since the tree
     // is connected.
-    repair = new FSORepairTool(getOmDB(),
+    fsoTool = new FSORepairTool(getOmDB(),
         getOmDBLocation(), false);
-    FSORepairTool.Report repairReport = repair.run();
+    FSORepairTool.Report repairReport = fsoTool.run();
 
     Assertions.assertEquals(expectedReport, repairReport);
     assertConnectedTreeReadable("vol1", "bucket1");
