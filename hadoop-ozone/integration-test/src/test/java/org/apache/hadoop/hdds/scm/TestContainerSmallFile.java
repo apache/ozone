@@ -203,7 +203,7 @@ public class TestContainerSmallFile {
         container.getContainerInfo().getContainerID(), null);
     ByteString byteString = UnsafeByteOperations.unsafeWrap(new byte[0]);
     ContainerProtos.EchoResponseProto response =
-        ContainerProtocolCalls.echo(client, "", container.getContainerInfo().getContainerID(), byteString, 1, 0);
+        ContainerProtocolCalls.echo(client, "", container.getContainerInfo().getContainerID(), byteString, 1, 0, true);
     assertEquals(1, response.getPayload().size());
     xceiverClientManager.releaseClient(client, false);
   }

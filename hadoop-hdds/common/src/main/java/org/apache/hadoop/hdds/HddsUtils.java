@@ -424,7 +424,6 @@ public final class HddsUtils {
     case ListContainer:
     case ListChunk:
     case GetCommittedBlockLength:
-    case Echo:
       return true;
     case CloseContainer:
     case WriteChunk:
@@ -438,6 +437,9 @@ public final class HddsUtils {
     case PutSmallFile:
     case StreamInit:
     case StreamWrite:
+      return false;
+    case Echo:
+      return proto.getEcho().hasReadOnly() && proto.getEcho().getReadOnly();
     default:
       return false;
     }
