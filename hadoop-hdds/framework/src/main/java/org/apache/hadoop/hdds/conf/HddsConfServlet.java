@@ -143,7 +143,7 @@ public class HddsConfServlet extends HttpServlet {
   }
 
   private void processConfigTagRequest(HttpServletRequest request, String cmd,
-                                       Writer out) throws IOException {
+      Writer out) throws IOException {
     OzoneConfiguration config = getOzoneConfig();
 
     switch (cmd) {

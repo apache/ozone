@@ -18,8 +18,8 @@
 package org.apache.hadoop.ozone.container.keyvalue;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import org.apache.hadoop.hdds.JsonTestUtils;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.DeletedBlocksTransaction;
-import org.apache.hadoop.hdds.server.JsonUtils;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.OzoneConsts;
@@ -377,8 +377,8 @@ public class TestKeyValueContainerMetadataInspector
     if (correctExpected == correctActual) {
       return;
     }
-    JsonNode correctExpectedNode = JsonUtils.valueToJsonNode(correctExpected);
-    JsonNode correctActualNode = JsonUtils.valueToJsonNode(correctActual);
+    JsonNode correctExpectedNode = JsonTestUtils.valueToJsonNode(correctExpected);
+    JsonNode correctActualNode = JsonTestUtils.valueToJsonNode(correctActual);
 
     checkJsonErrorsReport(jsonReport, propertyValue, correctExpectedNode,
         correctActualNode, correctRepair);
@@ -516,7 +516,7 @@ public class TestKeyValueContainerMetadataInspector
     if (output.trim().isEmpty()) {
       return null;
     }
-    return JsonUtils.readTree(output);
+    return JsonTestUtils.readTree(output);
   }
 
   private KeyValueContainer createClosedContainer(int normalBlocks)

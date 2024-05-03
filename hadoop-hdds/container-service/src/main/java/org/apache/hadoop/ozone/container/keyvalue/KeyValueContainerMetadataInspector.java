@@ -183,8 +183,7 @@ public class KeyValueContainerMetadataInspector implements ContainerInspector {
     }
 
     ObjectNode containerJson = inspectContainer(kvData, store);
-    boolean correct = checkAndRepair(containerJson, kvData,
-        store);
+    boolean correct = checkAndRepair(containerJson, kvData, store);
 
     ObjectMapper objectMapper = new ObjectMapper();
     objectMapper.enable(
