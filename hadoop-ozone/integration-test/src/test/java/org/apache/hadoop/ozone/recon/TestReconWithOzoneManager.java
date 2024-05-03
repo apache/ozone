@@ -34,11 +34,11 @@ import static org.slf4j.event.Level.INFO;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
-import java.util.LinkedHashMap;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
+import java.util.HashMap;
 import java.util.concurrent.TimeUnit;
 
 import org.apache.hadoop.hdds.client.BlockID;
@@ -383,11 +383,11 @@ public class TestReconWithOzoneManager {
                                              String taskName,
                                              String entityAttribute)
       throws IOException {
-    List<LinkedHashMap<String, Object>> taskStatusList =
+    List<HashMap<String, Object>> taskStatusList =
         JsonUtils.readTreeAsListOfMaps(taskStatusResponse);
 
     // Stream through the list to find the task entity matching the taskName
-    Optional<LinkedHashMap<String, Object>> taskEntity = taskStatusList.stream()
+    Optional<HashMap<String, Object>> taskEntity = taskStatusList.stream()
         .filter(task -> taskName.equals(task.get("taskName")))
         .findFirst();
 

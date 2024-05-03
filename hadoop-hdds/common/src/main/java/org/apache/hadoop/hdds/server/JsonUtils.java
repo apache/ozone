@@ -21,8 +21,7 @@ package org.apache.hadoop.hdds.server;
 import java.io.File;
 import java.io.IOException;
 import java.io.Reader;
-import java.util.ArrayList;
-import java.util.LinkedHashMap;
+import java.util.HashMap;
 import java.util.List;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
@@ -89,10 +88,10 @@ public final class JsonUtils {
     return MAPPER.readTree(content);
   }
 
-  public static ArrayList<LinkedHashMap<String, Object>> readTreeAsListOfMaps(String json)
+  public static List<HashMap<String, Object>> readTreeAsListOfMaps(String json)
       throws IOException {
     return MAPPER.readValue(json,
-        new TypeReference<ArrayList<LinkedHashMap<String, Object>>>() {
+        new TypeReference<List<HashMap<String, Object>>>() {
         });
   }
 
