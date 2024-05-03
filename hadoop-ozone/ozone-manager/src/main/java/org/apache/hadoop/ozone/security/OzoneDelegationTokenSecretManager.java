@@ -441,10 +441,12 @@ public class OzoneDelegationTokenSecretManager
       signerCert = getCertClient().getCertificate(
           identifier.getOmCertSerialId());
     } catch (CertificateException e) {
+      LOG.error("getCertificate with identifier {} failed", identifier, e);
       return false;
     }
 
     if (signerCert == null) {
+      LOG.error("signerCert is null");
       return false;
     }
 
