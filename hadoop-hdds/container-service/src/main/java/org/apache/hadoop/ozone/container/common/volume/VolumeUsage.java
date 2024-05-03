@@ -29,6 +29,8 @@ import org.apache.ratis.util.Preconditions;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.File;
+import java.io.IOException;
 import java.util.Collection;
 
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DATANODE_VOLUME_MIN_FREE_SPACE;
@@ -196,37 +198,34 @@ public class VolumeUsage {
     for (String reserve : reserveList) {
       String[] words = reserve.split(":");
       if (words.length < 2) {
-        LOG.error("Reserved space should config in pair, but current is {}",
+        LOG.error("Reserved space should be configured in a pair, but current value is {}",
             reserve);
         continue;
       }
 
-      if (words[0].trim().equals(rootDir)) {
-        try {
+      try {
+        String path = new File(words[0]).getCanonicalPath();
+        if (path.equals(rootDir)) {
           StorageSize size = StorageSize.parse(words[1].trim());
           return (long) size.getUnit().toBytes(size.getValue());
-        } catch (Exception e) {
-          LOG.error("Failed to parse StorageSize: {}", words[1].trim(), e);
-          break;
         }
+      } catch (IllegalArgumentException e) {
+        LOG.error("Failed to parse StorageSize {} from config {}", words[1].trim(), HDDS_DATANODE_DIR_DU_RESERVED, e);
+      } catch (IOException e) {
+        LOG.error("Failed to read storage path {} from config {}", words[1].trim(), HDDS_DATANODE_DIR_DU_RESERVED, e);
       }
     }
 
-    // 2. If hdds.datanode.dir.du.reserved not set and
-    // hdds.datanode.dir.du.reserved.percent is set, fall back to this config.
-    if (conf.isConfigured(HDDS_DATANODE_DIR_DU_RESERVED_PERCENT)) {
-      float percentage = conf.getFloat(HDDS_DATANODE_DIR_DU_RESERVED_PERCENT,
-          HDDS_DATANODE_DIR_DU_RESERVED_PERCENT_DEFAULT);
-      if (0 <= percentage && percentage <= 1) {
-        return (long) Math.ceil(capacity * percentage);
-      }
-      //If it comes here then the percentage is not between 0-1.
-      LOG.error("The value of {} should be between 0 to 1. Defaulting to 0.",
-          HDDS_DATANODE_DIR_DU_RESERVED_PERCENT);
+    // 2. If hdds.datanode.dir.du.reserved not set then fall back to hdds.datanode.dir.du.reserved.percent, using
+    // either its set value or default value if it has not been set.
+    float percentage = conf.getFloat(HDDS_DATANODE_DIR_DU_RESERVED_PERCENT,
+        HDDS_DATANODE_DIR_DU_RESERVED_PERCENT_DEFAULT);
+    if (percentage < 0 || percentage > 1) {
+      LOG.error("The value of {} should be between 0 to 1. Falling back to default value {}",
+          HDDS_DATANODE_DIR_DU_RESERVED_PERCENT, HDDS_DATANODE_DIR_DU_RESERVED_PERCENT_DEFAULT);
+      percentage = HDDS_DATANODE_DIR_DU_RESERVED_PERCENT_DEFAULT;
     }
 
-    //Both configs are not set, return 0.
-    return 0;
+    return (long) Math.ceil(capacity * percentage);
   }
-
 }
