@@ -19,36 +19,23 @@
 package org.apache.hadoop.ozone.debug;
 
 import org.apache.hadoop.hdds.cli.SubcommandWithParent;
+import org.apache.hadoop.ozone.common.FSOBaseCLI;
+import org.apache.hadoop.ozone.common.FSOBaseTool;
 import org.kohsuke.MetaInfServices;
 import picocli.CommandLine;
-
-import java.util.concurrent.Callable;
 
 /**
  * Parser for scm.db file.
  */
 @CommandLine.Command(
-    name = "fso-repair",
+    name = "fso-tree",
     description = "Identify a disconnected FSO tree, and optionally mark " +
         "unreachable entries for deletion. OM should be " +
         "stopped while this tool is run. Information will be logged at " +
         "INFO and DEBUG levels."
 )
 @MetaInfServices(SubcommandWithParent.class)
-public class FSORepairCLI implements Callable<Void>, SubcommandWithParent {
-
-  @CommandLine.Option(names = {"--db"},
-      required = true,
-      description = "Path to OM RocksDB")
-  private String dbPath;
-
-  @CommandLine.Option(names = {"--read-mode-only", "-r"},
-      required = true,
-      description =
-          "Mode to run the tool in. Read-mode will just log information about unreachable files or directories;" +
-              "otherwise the tool will move those files and directories to the deleted tables.",
-      defaultValue = "true")
-  private boolean readModeOnly;
+public class FSODebugCLI extends FSOBaseCLI {
 
   @CommandLine.ParentCommand
   private OzoneDebug parent;
@@ -58,14 +45,16 @@ public class FSORepairCLI implements Callable<Void>, SubcommandWithParent {
 
     try {
       // TODO case insensitive enum options.
-      FSORepairTool repairTool = new FSORepairTool(dbPath, readModeOnly);
-      repairTool.run();
+      FSOBaseTool
+          baseTool = new FSOBaseTool(getDbPath(), true);
+      baseTool.run();
     } catch (Exception ex) {
-      throw new IllegalArgumentException("FSO repair failed: " + ex.getMessage());
+      throw new IllegalArgumentException("FSO inspection failed: " + ex.getMessage());
     }
 
-    System.out.printf("FSO %s finished. See client logs for results.%n",
-        readModeOnly ? "read-mode" : "repair-mode");
+    if (getVerbose()) {
+      System.out.println("FSO inspection finished. See client logs for results.");
+    }
 
     return null;
   }

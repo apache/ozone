@@ -15,8 +15,8 @@
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
  */
+package org.apache.hadoop.ozone.common;
 
-package org.apache.hadoop.ozone.debug;
 
 import com.google.common.annotations.VisibleForTesting;
 import org.apache.commons.io.FileUtils;
@@ -25,24 +25,24 @@ import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedOptions;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksDB;
 import org.apache.hadoop.ozone.OmUtils;
+import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
+import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
-import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.WithObjectID;
-import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
 import org.apache.hadoop.ozone.om.request.file.OMFileRequest;
+import org.apache.hadoop.ozone.repair.om.FSORepairTool;
 import org.apache.ratis.util.Preconditions;
 import org.rocksdb.ColumnFamilyDescriptor;
 import org.rocksdb.ColumnFamilyHandle;
 import org.rocksdb.Holder;
-import org.rocksdb.Options;
-import org.rocksdb.RocksDB;
 import org.rocksdb.RocksDBException;
-
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -59,11 +59,9 @@ import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 
 /**
- * Tool to identify and repair disconnected FSO trees in all buckets.
- * The tool can be run in debug mode, where it will just log information
- * about unreachable files or directories, or in repair mode to additionally
- * move those files and directories to the deleted tables. If deletes are
- * still in progress (the deleted directory table is not empty), the tool may
+ * Base Tool to identify disconnected FSO trees in all buckets.
+ * The tool will log information about unreachable files or directories.
+ * If deletes are still in progress (the deleted directory table is not empty), the tool may
  * report that the tree is disconnected, even though pending deletes would
  * fix the issue.
  *
@@ -82,7 +80,7 @@ import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
  * when the tool finishes, in case users want to manually inspect it. It can
  * be safely deleted once the tool finishes.
  */
-public class FSORepairTool {
+public class FSOBaseTool {
   public static final Logger LOG =
       LoggerFactory.getLogger(FSORepairTool.class);
 
@@ -102,9 +100,7 @@ public class FSORepairTool {
   private static final byte[] REACHABLE_TABLE =
       "reachable".getBytes(StandardCharsets.UTF_8);
   private ColumnFamilyHandle reachableCF;
-  private RocksDB reachableDB;
-
-  private boolean readModeOnly;
+  private ManagedRocksDB reachableDB;
 
   private long reachableBytes;
   private long reachableFiles;
@@ -112,10 +108,10 @@ public class FSORepairTool {
   private long unreachableBytes;
   private long unreachableFiles;
   private long unreachableDirs;
+  private boolean dryRun;
 
-
-  public FSORepairTool(String dbPath, boolean readModeOnly) throws IOException {
-    this(getStoreFromPath(dbPath), dbPath, readModeOnly);
+  public FSOBaseTool(String dbPath, boolean dryRun) throws IOException {
+    this(getStoreFromPath(dbPath), dbPath, dryRun);
   }
 
   /**
@@ -123,8 +119,8 @@ public class FSORepairTool {
    * class for testing.
    */
   @VisibleForTesting
-  public FSORepairTool(DBStore dbStore, String dbPath, boolean readModeOnly) throws IOException {
-    this.readModeOnly = readModeOnly;
+  public FSOBaseTool(DBStore dbStore, String dbPath, boolean isDryRun) throws IOException {
+    dryRun = isDryRun;
     // Counters to track as we walk the tree.
     reachableBytes = 0;
     reachableFiles = 0;
@@ -157,7 +153,7 @@ public class FSORepairTool {
         RepeatedOmKeyInfo.class);
   }
 
-  private static DBStore getStoreFromPath(String dbPath) throws IOException {
+  protected static DBStore getStoreFromPath(String dbPath) throws IOException {
     File omDBFile = new File(dbPath);
     if (!omDBFile.exists() || !omDBFile.isDirectory()) {
       throw new IOException(String.format("Specified OM DB instance %s does " +
@@ -168,10 +164,10 @@ public class FSORepairTool {
         new File(dbPath).getParentFile());
   }
 
-  public Report run() throws IOException {
+  public FSORepairTool.Report run() throws IOException {
     // Iterate all volumes.
     try (TableIterator<String, ? extends Table.KeyValue<String, OmVolumeArgs>>
-            volumeIterator = volumeTable.iterator()) {
+             volumeIterator = volumeTable.iterator()) {
       openReachableDB();
 
       while (volumeIterator.hasNext()) {
@@ -218,8 +214,8 @@ public class FSORepairTool {
     return buildReportAndLog();
   }
 
-  private Report buildReportAndLog() {
-    Report report = new Report.Builder()
+  private FSORepairTool.Report buildReportAndLog() {
+    FSORepairTool.Report report = new FSORepairTool.Report.Builder()
         .setReachableDirs(reachableDirs)
         .setReachableFiles(reachableFiles)
         .setReachableBytes(reachableBytes)
@@ -290,7 +286,7 @@ public class FSORepairTool {
           LOG.debug("Found unreachable directory: {}", dirKey);
           unreachableDirs++;
 
-          if (!readModeOnly) {
+          if (dryRun) {
             LOG.debug("Marking unreachable directory {} for deletion.", dirKey);
             OmDirectoryInfo dirInfo = dirEntry.getValue();
             markDirectoryForDeletion(volume.getVolume(), bucket.getBucketName(),
@@ -318,7 +314,7 @@ public class FSORepairTool {
           unreachableBytes += fileInfo.getDataSize();
           unreachableFiles++;
 
-          if (!readModeOnly) {
+          if (dryRun) {
             LOG.debug("Marking unreachable file {} for deletion.",
                 fileKey);
             markFileForDeletion(fileKey, fileInfo);
@@ -334,7 +330,7 @@ public class FSORepairTool {
     }
   }
 
-  private void markFileForDeletion(String fileKey, OmKeyInfo fileInfo) throws IOException {
+  protected void markFileForDeletion(String fileKey, OmKeyInfo fileInfo) throws IOException {
     try (BatchOperation batch = store.initBatchOperation()) {
       fileTable.deleteWithBatch(batch, fileKey);
 
@@ -355,7 +351,7 @@ public class FSORepairTool {
     }
   }
 
-  private void markDirectoryForDeletion(String volumeName, String bucketName,
+  protected void markDirectoryForDeletion(String volumeName, String bucketName,
                                         String dirKeyName, OmDirectoryInfo dirInfo) throws IOException {
     try (BatchOperation batch = store.initBatchOperation()) {
       directoryTable.deleteWithBatch(batch, dirKeyName);
@@ -379,7 +375,7 @@ public class FSORepairTool {
     Collection<String> childDirs = new ArrayList<>();
 
     try (TableIterator<String, ? extends Table.KeyValue<String, OmDirectoryInfo>>
-            dirIterator = directoryTable.iterator()) {
+             dirIterator = directoryTable.iterator()) {
       String dirPrefix = buildReachableKey(volume, bucket, currentDir);
       // Start searching the directory table at the current directory's
       // prefix to get its immediate children.
@@ -438,7 +434,7 @@ public class FSORepairTool {
    * @param fileOrDirKey The key of a file or directory in RocksDB.
    * @return true if the entry's parent is in the reachable table.
    */
-  private boolean isReachable(String fileOrDirKey) throws IOException {
+  protected boolean isReachable(String fileOrDirKey) throws IOException {
     byte[] reachableParentKey =
         buildReachableParentKey(fileOrDirKey).getBytes(StandardCharsets.UTF_8);
     try {
@@ -485,7 +481,7 @@ public class FSORepairTool {
         FileUtils.deleteDirectory(reachableDBFile);
       }
       reachableDBPath = reachableDBFile.toString();
-      reachableDB = RocksDB.open(reachableDBPath);
+      reachableDB = ManagedRocksDB.open(reachableDBPath);
     } catch (RocksDBException ex) {
       if (reachableDB != null) {
         reachableDB.close();
@@ -502,7 +498,8 @@ public class FSORepairTool {
 
   private void dropReachableTableIfExists() throws IOException {
     try {
-      List<byte[]> availableCFs = RocksDB.listColumnFamilies(new Options(),
+      List<byte[]>
+          availableCFs = ManagedRocksDB.listColumnFamilies(new ManagedOptions(),
           reachableDBPath);
       boolean cfFound = false;
       for (byte[] cfNameBytes: availableCFs) {
@@ -550,7 +547,7 @@ public class FSORepairTool {
     /**
      * Builds one report that is the aggregate of multiple others.
      */
-    public Report(Report... reports) {
+    public Report(FSORepairTool.Report... reports) {
       reachableBytes = 0;
       reachableFiles = 0;
       reachableDirs = 0;
@@ -558,7 +555,7 @@ public class FSORepairTool {
       unreachableFiles = 0;
       unreachableDirs = 0;
 
-      for (Report report: reports) {
+      for (FSORepairTool.Report report: reports) {
         reachableBytes += report.reachableBytes;
         reachableFiles += report.reachableFiles;
         reachableDirs += report.reachableDirs;
@@ -568,7 +565,7 @@ public class FSORepairTool {
       }
     }
 
-    private Report(Builder builder) {
+    private Report(FSORepairTool.Report.Builder builder) {
       reachableBytes = builder.reachableBytes;
       reachableFiles = builder.reachableFiles;
       reachableDirs = builder.reachableDirs;
@@ -621,7 +618,7 @@ public class FSORepairTool {
       if (other == null || getClass() != other.getClass()) {
         return false;
       }
-      Report report = (Report) other;
+      FSORepairTool.Report report = (FSORepairTool.Report) other;
 
       // Useful for testing.
       LOG.debug("Comparing reports\nExpect:\n{}\nActual:\n{}", this, report);
@@ -658,38 +655,44 @@ public class FSORepairTool {
       public Builder() {
       }
 
-      public Builder setReachableBytes(long reachableBytes) {
+      @SuppressWarnings("checkstyle:hiddenfield")
+      public FSOBaseTool.Report.Builder setReachableBytes(long reachableBytes) {
         this.reachableBytes = reachableBytes;
         return this;
       }
 
-      public Builder setReachableFiles(long reachableFiles) {
+      @SuppressWarnings("checkstyle:hiddenfield")
+      public FSOBaseTool.Report.Builder setReachableFiles(long reachableFiles) {
         this.reachableFiles = reachableFiles;
         return this;
       }
 
-      public Builder setReachableDirs(long reachableDirs) {
+      @SuppressWarnings("checkstyle:hiddenfield")
+      public FSOBaseTool.Report.Builder setReachableDirs(long reachableDirs) {
         this.reachableDirs = reachableDirs;
         return this;
       }
 
-      public Builder setUnreachableBytes(long unreachableBytes) {
+      @SuppressWarnings("checkstyle:hiddenfield")
+      public FSOBaseTool.Report.Builder setUnreachableBytes(long unreachableBytes) {
         this.unreachableBytes = unreachableBytes;
         return this;
       }
 
-      public Builder setUnreachableFiles(long unreachableFiles) {
+      @SuppressWarnings("checkstyle:hiddenfield")
+      public FSOBaseTool.Report.Builder setUnreachableFiles(long unreachableFiles) {
         this.unreachableFiles = unreachableFiles;
         return this;
       }
 
-      public Builder setUnreachableDirs(long unreachableDirs) {
+      @SuppressWarnings("checkstyle:hiddenfield")
+      public FSOBaseTool.Report.Builder setUnreachableDirs(long unreachableDirs) {
         this.unreachableDirs = unreachableDirs;
         return this;
       }
 
-      public Report build() {
-        return new Report(this);
+      public FSOBaseTool.Report build() {
+        return new FSOBaseTool.Report(this);
       }
     }
   }

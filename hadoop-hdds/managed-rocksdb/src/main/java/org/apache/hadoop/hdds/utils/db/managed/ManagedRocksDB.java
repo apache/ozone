@@ -21,7 +21,9 @@ package org.apache.hadoop.hdds.utils.db.managed;
 import org.rocksdb.ColumnFamilyDescriptor;
 import org.rocksdb.ColumnFamilyHandle;
 import org.rocksdb.DBOptions;
+import org.rocksdb.Holder;
 import org.rocksdb.LiveFileMetaData;
+import org.rocksdb.Options;
 import org.rocksdb.RocksDB;
 import org.rocksdb.RocksDBException;
 import org.slf4j.Logger;
@@ -87,6 +89,11 @@ public class ManagedRocksDB extends ManagedObject<RocksDB> {
     );
   }
 
+  public static ManagedRocksDB open(final String path) throws RocksDBException {
+    return new ManagedRocksDB(RocksDB.open(path));
+  }
+
+
   /**
    * Delete liveMetaDataFile from rocks db using RocksDB#deleteFile Api.
    * This function makes the RocksDB#deleteFile Api synchronized by waiting
@@ -102,4 +109,39 @@ public class ManagedRocksDB extends ManagedObject<RocksDB> {
     File file = new File(fileToBeDeleted.path(), fileToBeDeleted.fileName());
     ManagedRocksObjectUtils.waitForFileDelete(file, Duration.ofSeconds(60));
   }
+
+  public void put(ColumnFamilyHandle columnFamilyHandle,
+                  byte[] key, byte[] value) throws RocksDBException {
+    this.get().put(columnFamilyHandle, key, value);
+  }
+
+  public byte[] get(ColumnFamilyHandle columnFamilyHandle,
+                    byte[] key) throws RocksDBException {
+    return this.get().get(columnFamilyHandle, key);
+  }
+
+  public ColumnFamilyHandle createColumnFamily(
+      ColumnFamilyDescriptor columnFamilyDescriptor)
+      throws RocksDBException {
+    return this.get().createColumnFamily(columnFamilyDescriptor);
+  }
+
+  public void dropColumnFamily(ColumnFamilyHandle columnFamilyHandle)
+      throws RocksDBException {
+    this.get().dropColumnFamily(columnFamilyHandle);
+  }
+
+  public boolean keyMayExist(ColumnFamilyHandle columnFamilyHandle, byte[] key, Holder<byte[]> valueHolder) {
+    return this.get().keyMayExist(columnFamilyHandle, key, valueHolder);
+  }
+
+  public void close() {
+    this.get().close();
+  }
+
+  public static List<byte[]> listColumnFamilies(Options options,
+                                                String path) throws RocksDBException {
+    return RocksDB.listColumnFamilies(options, path);
+  }
+
 }
