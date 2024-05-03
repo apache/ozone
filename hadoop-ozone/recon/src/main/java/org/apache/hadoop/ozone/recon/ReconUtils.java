@@ -91,6 +91,8 @@ public class ReconUtils {
 
   private static final Logger LOG = LoggerFactory.getLogger(
       ReconUtils.class);
+  private static volatile boolean rebuildTriggered = false;
+  private static volatile boolean isRebuilding = false;
 
   public static File getReconScmDbDir(ConfigurationSource conf) {
     return new ReconUtils().getReconDbDir(conf, OZONE_RECON_SCM_DB_DIR);
@@ -260,20 +262,29 @@ public class ReconUtils {
    *
    * The method begins with the leaf node (the key itself) and recursively prepends parent directory names, fetched
    * via NSSummary objects, until reaching the parent bucket (parentId is -1). It effectively builds the path from
-   * bottom to top, finally prepending the volume and bucket names to complete the full path.
+   * bottom to top, finally prepending the volume and bucket names to complete the full path. If the directory structure
+   * is currently being rebuilt (indicated by the isRebuilding flag), this method returns an empty string to signify
+   * that path construction is temporarily unavailable.
    *
    * @param omKeyInfo The OmKeyInfo object for the key
-   * @return The constructed full path of the key as a String.
+   * @return The constructed full path of the key as a String, or an empty string if a rebuild is in progress and
+   *         the path cannot be constructed at this time.
    * @throws IOException
    */
+
   public static String constructFullPath(OmKeyInfo omKeyInfo,
                                          ReconNamespaceSummaryManager reconNamespaceSummaryManager,
                                          ReconOMMetadataManager omMetadataManager)
       throws IOException {
+
+    // Return empty string to signify that path construction is temporarily unavailable
+    if (isRebuilding) {
+      return "";
+    }
+
     StringBuilder fullPath = new StringBuilder(omKeyInfo.getKeyName());
     long parentId = omKeyInfo.getParentObjectID();
     boolean isDirectoryPresent = false;
-    boolean rebuildTriggered = false;
 
     while (parentId != 0) {
       NSSummary nsSummary = reconNamespaceSummaryManager.getNSSummary(parentId);
@@ -281,9 +292,12 @@ public class ReconUtils {
         break;
       }
       if (nsSummary.getParentId() == -1 && !rebuildTriggered) {
-        // Trigger rebuild asynchronously and continue path construction
-        triggerRebuild(reconNamespaceSummaryManager, omMetadataManager);
-        rebuildTriggered = true; // Prevent multiple rebuild triggers
+        synchronized (ReconUtils.class) {
+          if (!rebuildTriggered) {
+            triggerRebuild(reconNamespaceSummaryManager, omMetadataManager);
+            rebuildTriggered = true;  // Set the flag to true inside a synchronized block
+          }
+        }
       }
       fullPath.insert(0, nsSummary.getDirName() + OM_KEY_PREFIX);
 
@@ -304,10 +318,20 @@ public class ReconUtils {
 
   private static void triggerRebuild(ReconNamespaceSummaryManager reconNamespaceSummaryManager,
                                      ReconOMMetadataManager omMetadataManager) {
-    // Run this method in a separate thread
-    Executors.newSingleThreadExecutor().submit(() -> {
-      reconNamespaceSummaryManager.rebuildNSSummaryTree(omMetadataManager);
-    });
+    synchronized (ReconUtils.class) {
+      if (!isRebuilding) {
+        isRebuilding = true;
+        Executors.newSingleThreadExecutor().submit(() -> {
+          try {
+            reconNamespaceSummaryManager.rebuildNSSummaryTree(
+                omMetadataManager);
+          } finally {
+            isRebuilding = false;
+            rebuildTriggered = false;
+          }
+        });
+      }
+    }
   }
 
   /**
