@@ -83,6 +83,10 @@ import org.apache.hadoop.security.token.Token;
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.DIRECTORY_NOT_FOUND;
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.FILE_NOT_FOUND;
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.KEY_NOT_FOUND;
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.NOT_A_FILE;
 import static org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse.JobStatus.DONE;
 
 import org.slf4j.Logger;
@@ -705,8 +709,18 @@ public class BasicOzoneClientAdapterImpl implements OzoneClientAdapter {
   public LeaseKeyInfo recoverFilePrepare(final String pathStr, boolean force) throws IOException {
     incrementCounter(Statistic.INVOCATION_RECOVER_FILE_PREPARE, 1);
 
-    return ozoneClient.getProxy().getOzoneManagerClient().recoverLease(
-        volume.getName(), bucket.getName(), pathStr, force);
+    try {
+      return ozoneClient.getProxy().getOzoneManagerClient().recoverLease(
+          volume.getName(), bucket.getName(), pathStr, force);
+    } catch (OMException ome) {
+      if (ome.getResult() == NOT_A_FILE) {
+        throw new FileNotFoundException("Path is not a file. " + ome.getMessage());
+      } else if (ome.getResult() == KEY_NOT_FOUND ||
+          ome.getResult() == DIRECTORY_NOT_FOUND) {
+        throw new FileNotFoundException("File does not exist. " + ome.getMessage());
+      }
+      throw ome;
+    }
   }
 
   @Override
@@ -771,15 +785,18 @@ public class BasicOzoneClientAdapterImpl implements OzoneClientAdapter {
   @Override
   public boolean isFileClosed(String pathStr) throws IOException {
     incrementCounter(Statistic.INVOCATION_IS_FILE_CLOSED, 1);
-    OFSPath ofsPath = new OFSPath(pathStr, config);
-    if (!ofsPath.isKey()) {
-      throw new IOException("not a file");
+    try {
+      OzoneFileStatus status = bucket.getFileStatus(pathStr);
+      if (!status.isFile()) {
+        throw new FileNotFoundException("Path is not a file.");
+      }
+      return !status.getKeyInfo().isHsync();
+    } catch (OMException ome) {
+      if (ome.getResult() == FILE_NOT_FOUND) {
+        throw new FileNotFoundException("File does not exist. " + ome.getMessage());
+      }
+      throw ome;
     }
-    OzoneFileStatus status = bucket.getFileStatus(pathStr);
-    if (!status.isFile()) {
-      throw new IOException("not a file");
-    }
-    return !status.getKeyInfo().isHsync();
   }
 
   @Override

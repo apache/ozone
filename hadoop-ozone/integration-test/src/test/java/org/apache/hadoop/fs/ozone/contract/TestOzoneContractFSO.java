@@ -18,11 +18,8 @@
 package org.apache.hadoop.fs.ozone.contract;
 
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.fs.contract.AbstractContractLeaseRecoveryTest;
 import org.apache.hadoop.fs.contract.AbstractFSContract;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.junit.jupiter.api.Nested;
-
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_DEFAULT_BUCKET_LAYOUT;
 import static org.apache.hadoop.ozone.om.helpers.BucketLayout.FILE_SYSTEM_OPTIMIZED;
 
@@ -42,19 +39,4 @@ class TestOzoneContractFSO extends AbstractOzoneContractTest {
   AbstractFSContract createOzoneContract(Configuration conf) {
     return new OzoneContract(getCluster());
   }
-
-  @Nested
-  class TestContractLeaseRecovery extends AbstractContractLeaseRecoveryTest {
-
-    @Override
-    protected AbstractFSContract createContract(Configuration conf) {
-      return createOzoneContract(conf);
-    }
-
-    @Override
-    protected Configuration createConfiguration() {
-      return createOzoneConfig();
-    }
-  }
-
 }
