@@ -135,6 +135,7 @@ jobs:
     if: ${{ always() }}
     needs:
       - prepare-job
+      - ratis
       - build
     name: Run-Split
     runs-on: ubuntu-20.04
