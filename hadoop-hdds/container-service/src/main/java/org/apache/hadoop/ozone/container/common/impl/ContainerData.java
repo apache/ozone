@@ -99,8 +99,10 @@ public abstract class ContainerData {
 
   private HddsVolume volume;
 
-  private String containerFileChecksum;
+  // Checksum of just the container file.
+  private String checksum;
 
+  // Checksum of the data within the container.
   private long dataChecksum;
 
   private boolean isEmpty;
@@ -161,7 +163,7 @@ public abstract class ContainerData {
     this.originPipelineId = originPipelineId;
     this.originNodeId = originNodeId;
     this.isEmpty = false;
-    this.containerFileChecksum = ZERO_CHECKSUM;
+    this.checksum = ZERO_CHECKSUM;
     this.dataChecksum = 0;
   }
 
@@ -575,11 +577,11 @@ public abstract class ContainerData {
   }
 
   public void setContainerFileChecksum(String checkSum) {
-    this.containerFileChecksum = checkSum;
+    this.checksum = checkSum;
   }
 
   public String getContainerFileChecksum() {
-    return this.containerFileChecksum;
+    return this.checksum;
   }
 
   /**
@@ -628,7 +630,7 @@ public abstract class ContainerData {
    * on ContainerType) and set the checksum.
    *
    * Checksum of ContainerData is calculated by setting the
-   * {@link ContainerData#containerFileChecksum} field to a 64-byte array with all 0's -
+   * {@link ContainerData#checksum} field to a 64-byte array with all 0's -
    * {@link ContainerData#ZERO_CHECKSUM}. After the checksum is calculated,
    * the checksum field is updated with this value.
    *
@@ -638,12 +640,12 @@ public abstract class ContainerData {
   public void computeAndSetContainerFileChecksum(Yaml yaml) throws IOException {
     // Set checksum to dummy value - 0 byte array, to calculate the checksum
     // of rest of the data.
-    this.containerFileChecksum = ZERO_CHECKSUM;
+    this.checksum = ZERO_CHECKSUM;
 
     // Dump yaml data into a string to compute its checksum
     String containerDataYamlStr = yaml.dump(this);
 
-    this.containerFileChecksum = ContainerUtils.getChecksum(containerDataYamlStr);
+    this.checksum = ContainerUtils.getChecksum(containerDataYamlStr);
   }
 
   public void setDataChecksum(long checksum) {
