@@ -16,12 +16,13 @@
  */
 package org.apache.hadoop.ozone.admin.scm;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
+import com.google.gson.Gson;
+import com.google.gson.JsonIOException;
+import com.google.gson.JsonSyntaxException;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.scm.cli.ScmSubcommand;
 import org.apache.hadoop.hdds.scm.client.ScmClient;
 import org.apache.hadoop.hdds.scm.container.common.helpers.DeletedBlocksTransactionInfoWrapper;
-import org.apache.hadoop.hdds.server.JsonUtils;
 import picocli.CommandLine;
 
 import java.io.FileInputStream;
@@ -73,11 +74,12 @@ public class ResetDeletedBlockRetryCountSubcommand extends ScmSubcommand {
     if (group.resetAll) {
       count = client.resetDeletedBlockRetryCount(new ArrayList<>());
     } else if (group.fileName != null) {
+      Gson gson = new Gson();
       List<Long> txIDs;
       try (InputStream in = new FileInputStream(group.fileName);
            Reader fileReader = new InputStreamReader(in,
                StandardCharsets.UTF_8)) {
-        DeletedBlocksTransactionInfoWrapper[] txns = JsonUtils.readArrayFromReader(fileReader,
+        DeletedBlocksTransactionInfoWrapper[] txns = gson.fromJson(fileReader,
             DeletedBlocksTransactionInfoWrapper[].class);
         txIDs = Arrays.stream(txns)
             .map(DeletedBlocksTransactionInfoWrapper::getTxID)
@@ -90,12 +92,9 @@ public class ResetDeletedBlockRetryCountSubcommand extends ScmSubcommand {
           System.out.println("The last loaded txID: " +
               txIDs.get(txIDs.size() - 1));
         }
-      } catch (JsonProcessingException ex) {
-        System.out.println("Error parsing JSON: " + ex.getMessage());
+      } catch (JsonIOException | JsonSyntaxException | IOException ex) {
+        System.out.println("Cannot parse the file " + group.fileName);
         throw new IOException(ex);
-      } catch (IOException ex) {
-        System.out.println("Error reading file: " + ex.getMessage());
-        throw ex;
       }
       count = client.resetDeletedBlockRetryCount(txIDs);
     } else {
