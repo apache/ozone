@@ -39,10 +39,10 @@ public class GenericCli implements Callable<Void>, GenericParentCommand {
 
   public static final int EXECUTION_ERROR_EXIT_CODE = -1;
 
-`  @Option(names = {"--verbose"},
+  @Option(names = {"--verbose"},
       description = "More verbose output. Show the stack trace of the errors.")
   private boolean verbose;
-`
+
   @Option(names = {"-D", "--set"})
   private Map<String, String> configurationOverrides = new HashMap<>();
 
