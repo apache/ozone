@@ -18,8 +18,6 @@
 package org.apache.hadoop.ozone.container.keyvalue;
 
 import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 import com.fasterxml.jackson.databind.node.ObjectNode;
@@ -185,21 +183,14 @@ public class KeyValueContainerMetadataInspector implements ContainerInspector {
     ObjectNode containerJson = inspectContainer(kvData, store);
     boolean correct = checkAndRepair(containerJson, kvData, store);
 
-    ObjectMapper objectMapper = new ObjectMapper();
-    objectMapper.enable(
-        SerializationFeature.INDENT_OUTPUT);
     String jsonReport = null;
-    try {
-      jsonReport = objectMapper.writeValueAsString(containerJson);
-      if (log != null) {
-        if (correct) {
-          log.trace(jsonReport);
-        } else {
-          log.error(jsonReport);
-        }
+    jsonReport = JsonUtils.toJsonStringWIthIndent(containerJson);
+    if (log != null) {
+      if (correct) {
+        log.trace(jsonReport);
+      } else {
+        log.error(jsonReport);
       }
-    } catch (Exception e) {
-      LOG.error("Error serializing container JSON", e);
     }
 
     return jsonReport;

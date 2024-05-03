@@ -20,11 +20,11 @@ package org.apache.hadoop.hdds.server;
 
 import java.io.File;
 import java.io.IOException;
-import java.io.Reader;
 import java.util.HashMap;
 import java.util.List;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.MappingIterator;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -36,6 +36,8 @@ import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * JSON Utility functions used in ozone.
@@ -47,6 +49,8 @@ public final class JsonUtils {
   // before use.
   private static final ObjectMapper MAPPER;
   private static final ObjectWriter WRITER;
+  private static final ObjectMapper INDENT_OUTPUT_MAPPER; // New mapper instance
+  public static final Logger LOG = LoggerFactory.getLogger(JsonUtils.class);
 
   static {
     MAPPER = new ObjectMapper()
@@ -54,6 +58,12 @@ public final class JsonUtils {
         .registerModule(new JavaTimeModule())
         .configure(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS, false);
     WRITER = MAPPER.writerWithDefaultPrettyPrinter();
+
+    INDENT_OUTPUT_MAPPER = new ObjectMapper()
+        .setSerializationInclusion(JsonInclude.Include.NON_NULL)
+        .registerModule(new JavaTimeModule())
+        .configure(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS, false)
+        .enable(SerializationFeature.INDENT_OUTPUT);
   }
 
   private JsonUtils() {
@@ -69,6 +79,15 @@ public final class JsonUtils {
     return MAPPER.writeValueAsString(obj);
   }
 
+  public static String toJsonStringWIthIndent(Object obj)  {
+    try {
+      return INDENT_OUTPUT_MAPPER.writeValueAsString(obj);
+    } catch (JsonProcessingException e) {
+      LOG.error("Error in JSON serialization", e);
+      return "{}";
+    }
+  }
+
   public static ArrayNode createArrayNode() {
     return MAPPER.createArrayNode();
   }
@@ -78,10 +97,6 @@ public final class JsonUtils {
       return MAPPER.createObjectNode();
     }
     return MAPPER.valueToTree(next);
-  }
-
-  public static JsonNode valueToJsonNode(Object value) {
-    return MAPPER.valueToTree(value);
   }
 
   public static JsonNode readTree(String content) throws IOException {
@@ -119,28 +134,6 @@ public final class JsonUtils {
     try (MappingIterator<T> mappingIterator = reader.readValues(file)) {
       return mappingIterator.readAll();
     }
-  }
-
-  /**
-   * Reads JSON content from a Reader and deserializes it into an array of the
-   * specified type.
-   */
-  public static <T> T[] readArrayFromReader(Reader reader, Class<T[]> valueType)
-      throws IOException {
-    return MAPPER.readValue(reader, valueType);
-  }
-
-  /**
-   * Converts a JsonNode into a Java object of the specified type.
-   * @param node The JsonNode to convert.
-   * @param valueType The target class of the Java object.
-   * @param <T> The type of the Java object.
-   * @return A Java object of type T, populated with data from the JsonNode.
-   * @throws IOException
-   */
-  public static <T> T treeToValue(JsonNode node, Class<T> valueType)
-      throws IOException {
-    return MAPPER.treeToValue(node, valueType);
   }
 
 }
