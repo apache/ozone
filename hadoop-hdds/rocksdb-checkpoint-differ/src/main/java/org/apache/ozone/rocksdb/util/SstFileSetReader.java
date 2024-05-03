@@ -21,15 +21,14 @@ package org.apache.ozone.rocksdb.util;
 import org.apache.hadoop.hdds.StringUtils;
 import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedSlice;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedSstFileReader;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedSstFileReaderIterator;
 import org.apache.hadoop.util.ClosableIterator;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedOptions;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedReadOptions;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedSSTDumpIterator;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedSSTDumpTool;
-import org.rocksdb.ReadOptions;
 import org.rocksdb.RocksDBException;
-import org.rocksdb.SstFileReader;
-import org.rocksdb.SstFileReaderIterator;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;
@@ -78,7 +77,7 @@ public class SstFileSetReader {
 
       try (ManagedOptions options = new ManagedOptions()) {
         for (String sstFile : sstFiles) {
-          try (SstFileReader fileReader = new SstFileReader(options)) {
+          try (ManagedSstFileReader fileReader = new ManagedSstFileReader(options)) {
             fileReader.open(sstFile);
             estimatedSize += fileReader.getTableProperties().getNumEntries();
           }
@@ -96,7 +95,7 @@ public class SstFileSetReader {
     final MultipleSstFileIterator<String> itr =
         new MultipleSstFileIterator<String>(sstFiles) {
           private ManagedOptions options;
-          private ReadOptions readOptions;
+          private ManagedReadOptions readOptions;
 
           private ManagedSlice lowerBoundSLice;
 
@@ -125,8 +124,8 @@ public class SstFileSetReader {
             return new ManagedSstFileIterator(file, options, readOptions) {
               @Override
               protected String getIteratorValue(
-                  SstFileReaderIterator iterator) {
-                return new String(iterator.key(), UTF_8);
+                  ManagedSstFileReaderIterator iterator) {
+                return new String(iterator.get().key(), UTF_8);
               }
             };
           }
@@ -188,18 +187,17 @@ public class SstFileSetReader {
     return getStreamFromIterator(itr);
   }
 
-  private abstract static class ManagedSstFileIterator implements
-      ClosableIterator<String> {
-    private SstFileReader fileReader;
-    private SstFileReaderIterator fileReaderIterator;
+  private abstract static class ManagedSstFileIterator implements ClosableIterator<String> {
+    private final ManagedSstFileReader fileReader;
+    private final ManagedSstFileReaderIterator fileReaderIterator;
 
     ManagedSstFileIterator(String path, ManagedOptions options,
-                           ReadOptions readOptions)
+                           ManagedReadOptions readOptions)
         throws RocksDBException {
-      this.fileReader = new SstFileReader(options);
+      this.fileReader = new ManagedSstFileReader(options);
       this.fileReader.open(path);
-      this.fileReaderIterator = fileReader.newIterator(readOptions);
-      fileReaderIterator.seekToFirst();
+      this.fileReaderIterator = ManagedSstFileReaderIterator.managed(fileReader.newIterator(readOptions));
+      fileReaderIterator.get().seekToFirst();
     }
 
     @Override
@@ -210,15 +208,15 @@ public class SstFileSetReader {
 
     @Override
     public boolean hasNext() {
-      return fileReaderIterator.isValid();
+      return fileReaderIterator.get().isValid();
     }
 
-    protected abstract String getIteratorValue(SstFileReaderIterator iterator);
+    protected abstract String getIteratorValue(ManagedSstFileReaderIterator iterator);
 
     @Override
     public String next() {
       String value = getIteratorValue(fileReaderIterator);
-      fileReaderIterator.next();
+      fileReaderIterator.get().next();
       return value;
     }
   }
