@@ -179,6 +179,7 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
     <disruptor.version>3.4.4</disruptor.version>
     <reload4j.version>1.2.25</reload4j.version>
 
+    <kerby.version>1.0.1</kerby.version>
     <kotlin.version>1.9.22</kotlin.version>
     <metainf-services.version>1.11</metainf-services.version>
     <picocli.version>4.7.5</picocli.version>
@@ -450,6 +451,16 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
         <groupId>org.apache.httpcomponents</groupId>
         <artifactId>httpcore-nio</artifactId>
         <version>${httpcore.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.kerby</groupId>
+        <artifactId>kerb-core</artifactId>
+        <version>${kerby.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.kerby</groupId>
+        <artifactId>kerb-util</artifactId>
+        <version>${kerby.version}</version>
       </dependency>
       <dependency>
         <groupId>commons-codec</groupId>
