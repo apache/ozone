@@ -132,7 +132,7 @@ public class ListOpenFilesSubCommand implements Callable<Void> {
     if (startItem != null && !startItem.isEmpty()) {
       msg += "\nafter continuation token:\n  " + startItem;
     }
-    msg += "\n\nClient ID\t\tCreation time\tHsync'ed\tOpen File Path";
+    msg += "\n\nClient ID\t\tCreation time\tHsync'ed\tDeleted\t\tOpen File Path";
     System.out.println(msg);
 
     for (OpenKeySession e : openFileList) {
@@ -151,8 +151,14 @@ public class ListOpenFilesSubCommand implements Callable<Void> {
           // initially opens the file (!)
           line += "Yes w/ cid " + hsyncClientIdStr + "\t";
         }
+
+        if (omKeyInfo.getMetadata().containsKey(OzoneConsts.DELETED_HSYNC_KEY)) {
+          line += "Yes\t\t";
+        } else {
+          line += "No\t\t";
+        }
       } else {
-        line += "No\t\t";
+        line += "No\t\tNo\t\t";
       }
 
       line += getFullPathFromKeyInfo(omKeyInfo);

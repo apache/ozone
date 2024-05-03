@@ -109,10 +109,10 @@ $ ozone admin om lof --service-id=om-service-test1 --length=3 --prefix=/volumelo
 5 total open files (est.). Showing 3 open files (limit 3) under path prefix:
   /volume-lof/buck1
 
-Client ID		Creation time	Hsync'ed	Open File Path
-111726338148007937	1704808626523	No		/volume-lof/buck1/-9223372036854774527/key0
-111726338151415810	1704808626578	No		/volume-lof/buck1/-9223372036854774527/key1
-111726338152071171	1704808626588	No		/volume-lof/buck1/-9223372036854774527/key2
+Client ID		Creation time	Hsync'ed   Deleted   Open File Path
+111726338148007937	1704808626523	No	   No        /volume-lof/buck1/-9223372036854774527/key0
+111726338151415810	1704808626578	No	   No        /volume-lof/buck1/-9223372036854774527/key1
+111726338152071171	1704808626588	No	   No        /volume-lof/buck1/-9223372036854774527/key2
 
 To get the next batch of open keys, run:
   ozone admin om lof -id=om-service-test1 --length=3 --prefix=/volume-lof/buck1 --start=/-9223372036854775552/-9223372036854775040/-9223372036854774527/key2/111726338152071171
