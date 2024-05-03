@@ -312,7 +312,7 @@ public class KeyValueContainerMetadataInspector implements ContainerInspector {
           countPendingDeletesSchemaV3(schemaThreeStore, containerData);
     } else {
       throw new IOException("Failed to process deleted blocks for unknown " +
-          "container schema " + schemaVersion);
+              "container schema " + schemaVersion);
     }
 
     aggregates.put("blockCount", blockCountTotal);

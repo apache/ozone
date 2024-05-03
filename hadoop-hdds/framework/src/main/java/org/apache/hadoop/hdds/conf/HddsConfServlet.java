@@ -153,8 +153,7 @@ public class HddsConfServlet extends HttpServlet {
     case "getPropertyByTag":
       String tags = request.getParameter("tags");
       if (tags == null || tags.isEmpty()) {
-        throw new IllegalArgumentException(
-            "The tags parameter should be set " +
+        throw new IllegalArgumentException("The tags parameter should be set" +
                 " when using the getPropertyByTag command.");
       }
       Map<String, Properties> propMap = new HashMap<>();
