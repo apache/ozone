@@ -506,41 +506,6 @@ public class TestFSORepairTool {
     Assertions.assertEquals(numWrites, pendingDeleteFileCounts.get("file3"));
   }
 
-//  @Test
-//  public void testOnSavedDB() throws Exception {
-//    /*
-//    Path dir1 = new Path("/vol1/bucket1/dir1");
-//    Path file1 = new Path(dir1, "file1");
-//    Path file2 = new Path(dir1, "file2");
-//
-//    Path dir2 = new Path("/vol1/bucket1/dir1/dir2");
-//    Path file3 = new Path(dir2, "file3");
-//
-//    Path dir3 = new Path("/vol1/bucket1/dir3");
-//    Path file4 = new Path("/vol1/bucket1/file4");
-//
-//    ContractTestUtils.touch(fs, file1);
-//    ContractTestUtils.touch(fs, file2);
-//    ContractTestUtils.touch(fs, file3);
-//    ContractTestUtils.touch(fs, file4);
-//    fs.mkdirs(dir3);
-//     */
-//    FsoRepair repair = new FsoRepair("/Users/erose/Temp/omNode-1/om.db",
-//        FsoRepair.Mode.DEBUG);
-//    repair.run();
-//
-//    /*
-//    Original:
-//      Expected:
-//          3 reachable dirs, 4 reachable files.
-//
-//    After remove dir1:
-//        3 unreachable files, 1 unreachable dir.
-//        1 reachable file, 1 reachable dir.
-//
-//    */
-//  }
-
   private void assertDeleteTablesEmpty() throws IOException {
     OzoneManager leader = cluster.getOMLeader();
     Assertions.assertTrue(leader.getMetadataManager().getDeletedDirTable().isEmpty());
