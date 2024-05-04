@@ -47,7 +47,6 @@ import java.time.Duration;
 
 import static org.apache.hadoop.fs.contract.ContractTestUtils.cleanup;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_FS_HSYNC_ENABLED;
-import static org.apache.hadoop.ozone.OzoneConsts.BUCKET_LAYOUT;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_OFS_URI_SCHEME;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_DEFAULT_BUCKET_LAYOUT;
 import static org.assertj.core.api.Assumptions.assumeThat;
