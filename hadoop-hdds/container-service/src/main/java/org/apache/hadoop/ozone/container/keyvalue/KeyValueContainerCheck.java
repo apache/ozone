@@ -177,7 +177,7 @@ public class KeyValueContainerCheck {
         .checkState(onDiskContainerData != null, "Container File not loaded");
 
     try {
-      ContainerUtils.verifyChecksum(onDiskContainerData, checkConfig);
+      ContainerUtils.verifyContainerFileChecksum(onDiskContainerData, checkConfig);
     } catch (IOException ex) {
       return ScanResult.unhealthy(ScanResult.FailureType.CORRUPT_CONTAINER_FILE,
           containerFile, ex);

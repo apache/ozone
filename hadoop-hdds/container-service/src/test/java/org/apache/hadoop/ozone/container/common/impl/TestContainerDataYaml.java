@@ -218,7 +218,7 @@ public class TestContainerDataYaml {
     File file = new File(classLoader.getResource(containerFile).getFile());
     KeyValueContainerData kvData = (KeyValueContainerData) ContainerDataYaml
         .readContainerFile(file);
-    ContainerUtils.verifyChecksum(kvData, conf);
+    ContainerUtils.verifyContainerFileChecksum(kvData, conf);
 
     //Checking the Container file data is consistent or not
     assertEquals(ContainerProtos.ContainerDataProto.State.CLOSED, kvData
@@ -236,7 +236,7 @@ public class TestContainerDataYaml {
   }
 
   /**
-   * Test to verify {@link ContainerUtils#verifyChecksum(ContainerData,ConfigurationSource)}.
+   * Test to verify {@link ContainerUtils#verifyContainerFileChecksum(ContainerData,ConfigurationSource)}.
    */
   @ContainerLayoutTestInfo.ContainerTest
   public void testChecksumInContainerFile(ContainerLayoutVersion layout) throws IOException {
@@ -247,13 +247,13 @@ public class TestContainerDataYaml {
 
     // Read from .container file, and verify data.
     KeyValueContainerData kvData = (KeyValueContainerData) ContainerDataYaml.readContainerFile(containerFile);
-    ContainerUtils.verifyChecksum(kvData, conf);
+    ContainerUtils.verifyContainerFileChecksum(kvData, conf);
 
     cleanup();
   }
 
   /**
-   * Test to verify {@link ContainerUtils#verifyChecksum(ContainerData,ConfigurationSource)}.
+   * Test to verify {@link ContainerUtils#verifyContainerFileChecksum(ContainerData,ConfigurationSource)}.
    */
   @ContainerLayoutTestInfo.ContainerTest
   public void testChecksumInContainerFileWithReplicaIndex(
@@ -266,7 +266,7 @@ public class TestContainerDataYaml {
     // Read from .container file, and verify data.
     KeyValueContainerData kvData = (KeyValueContainerData) ContainerDataYaml
         .readContainerFile(containerFile);
-    ContainerUtils.verifyChecksum(kvData, conf);
+    ContainerUtils.verifyContainerFileChecksum(kvData, conf);
 
     cleanup();
   }
@@ -287,7 +287,7 @@ public class TestContainerDataYaml {
     setLayoutVersion(layout);
     Exception ex = assertThrows(Exception.class, () -> {
       KeyValueContainerData kvData = getKeyValueContainerData();
-      ContainerUtils.verifyChecksum(kvData, conf);
+      ContainerUtils.verifyContainerFileChecksum(kvData, conf);
     });
 
     assertThat(ex).hasMessageStartingWith("Container checksum error for ContainerID:");
@@ -303,6 +303,6 @@ public class TestContainerDataYaml {
     KeyValueContainerData kvData = getKeyValueContainerData();
     conf.setBoolean(HddsConfigKeys.
         HDDS_CONTAINER_CHECKSUM_VERIFICATION_ENABLED, false);
-    ContainerUtils.verifyChecksum(kvData, conf);
+    ContainerUtils.verifyContainerFileChecksum(kvData, conf);
   }
 }

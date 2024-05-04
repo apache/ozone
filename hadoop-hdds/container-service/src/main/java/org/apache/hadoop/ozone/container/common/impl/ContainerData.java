@@ -645,7 +645,7 @@ public abstract class ContainerData {
     // Dump yaml data into a string to compute its checksum
     String containerDataYamlStr = yaml.dump(this);
 
-    this.checksum = ContainerUtils.getChecksum(containerDataYamlStr);
+    this.checksum = ContainerUtils.getContainerFileChecksum(containerDataYamlStr);
   }
 
   public void setDataChecksum(long dataChecksum) {

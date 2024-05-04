@@ -194,7 +194,7 @@ public final class ContainerUtils {
    * Verify that the checksum stored in containerData is equal to the
    * computed checksum.
    */
-  public static void verifyChecksum(ContainerData containerData,
+  public static void verifyContainerFileChecksum(ContainerData containerData,
       ConfigurationSource conf) throws IOException {
     boolean enabled = conf.getBoolean(
             HddsConfigKeys.HDDS_CONTAINER_CHECKSUM_VERIFICATION_ENABLED,
@@ -225,7 +225,7 @@ public final class ContainerUtils {
    * @param containerDataYamlStr ContainerData as a Yaml String
    * @return Checksum of the container data
    */
-  public static String getChecksum(String containerDataYamlStr)
+  public static String getContainerFileChecksum(String containerDataYamlStr)
       throws StorageContainerException {
     MessageDigest sha;
     try {
