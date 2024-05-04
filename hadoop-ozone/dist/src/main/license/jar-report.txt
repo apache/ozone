@@ -163,7 +163,10 @@ share/ozone/lib/jsp-api.jar
 share/ozone/lib/jsr305.jar
 share/ozone/lib/jsr311-api.jar
 share/ozone/lib/kerb-core.jar
+share/ozone/lib/kerb-crypto.jar
+share/ozone/lib/kerb-util.jar
 share/ozone/lib/kerby-asn1.jar
+share/ozone/lib/kerby-config.jar
 share/ozone/lib/kerby-pkix.jar
 share/ozone/lib/kerby-util.jar
 share/ozone/lib/kotlin-stdlib-common.jar
