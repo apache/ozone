@@ -141,7 +141,7 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
     <assertj.version>3.12.2</assertj.version>
     <asm.version>5.0.4</asm.version>
     <bonecp.version>0.8.0.RELEASE</bonecp.version>
-    <bouncycastle.version>1.77</bouncycastle.version>
+    <bouncycastle.version>1.78.1</bouncycastle.version>
     <cglib.version>3.2.0</cglib.version>
     <derby.version>10.14.2.0</derby.version>
     <codahale-metrics.version>3.0.2</codahale-metrics.version>
