@@ -23,9 +23,14 @@ import java.util.EnumSet;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.ExecutionException;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.google.common.cache.CacheBuilder;
+import com.google.common.cache.Cache;
+import com.google.common.cache.RemovalListener;
 import com.google.common.collect.ImmutableSet;
+import com.google.protobuf.ByteString;
 import org.apache.hadoop.hdds.DatanodeVersion;
 import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
@@ -75,6 +80,29 @@ public class DatanodeDetails extends NodeImpl implements
 
   public static Codec<DatanodeDetails> getCodec() {
     return CODEC;
+  }
+
+  /**
+   * Provides caching for fixed strings such as hostname, ip, etc. Normally, the number
+   * of these strings is fixed, not too many, so cache deprecation shouldn't happen in general.
+   */
+  private static final Cache<String, ByteString> FIXED_BYTE_STRING_CACHE = CacheBuilder.newBuilder()
+      .maximumSize(50000)
+      .removalListener((RemovalListener<String, ByteString>) notification -> {
+        if (notification.wasEvicted()) {
+          LOG.info("Removal cause: " + notification.getCause() + " for key: " + notification.getKey()
+              + ". The number of cached keys is too many, exceeding the expected number");
+        }
+      })
+      .build();
+
+  public static ByteString getFixedByteString(String key) {
+    try {
+      return FIXED_BYTE_STRING_CACHE.get(key, () -> ByteString.copyFromUtf8(key));
+    } catch (ExecutionException e) {
+      LOG.debug("Failed to retrieve or generate ByteString for key '{}'. Exception: {}", key, e.getMessage(), e);
+      return ByteString.copyFromUtf8(key);
+    }
   }
 
   /**
@@ -426,22 +454,22 @@ public class DatanodeDetails extends NodeImpl implements
         HddsProtos.DatanodeDetailsProto.newBuilder()
             .setUuid128(uuid128);
 
-    builder.setUuid(getUuidString());
+    builder.setUuidBytes(getFixedByteString(getUuidString()));
 
     if (ipAddress != null) {
-      builder.setIpAddress(ipAddress);
+      builder.setIpAddressBytes(getFixedByteString(ipAddress));
     }
     if (hostName != null) {
-      builder.setHostName(hostName);
+      builder.setHostNameBytes(getFixedByteString(hostName));
     }
     if (certSerialId != null) {
       builder.setCertSerialId(certSerialId);
     }
     if (!Strings.isNullOrEmpty(getNetworkName())) {
-      builder.setNetworkName(getNetworkName());
+      builder.setNetworkNameBytes(getFixedByteString(getNetworkName()));
     }
     if (!Strings.isNullOrEmpty(getNetworkLocation())) {
-      builder.setNetworkLocation(getNetworkLocation());
+      builder.setNetworkLocationBytes(getFixedByteString(getNetworkLocation()));
     }
     if (getLevel() > 0) {
       builder.setLevel(getLevel());
