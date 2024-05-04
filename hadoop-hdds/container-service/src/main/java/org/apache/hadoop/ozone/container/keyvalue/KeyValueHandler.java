@@ -1161,7 +1161,9 @@ public class KeyValueHandler extends Handler {
     ByteBuffer byteBuffer = ByteBuffer.allocate(Long.BYTES);
     ChecksumByteBuffer checksumImpl = ChecksumByteBufferFactory.crc32Impl();
     checksumImpl.update(byteBuffer.putLong(id));
-    data.setDataChecksum(checksumImpl.getValue());
+    long dataChecksum = checksumImpl.getValue();
+    LOG.info("Generated data checksum of container {} for testing: {}", id, dataChecksum);
+    data.setDataChecksum(dataChecksum);
     sendICR(container);
   }
 
