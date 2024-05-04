@@ -195,7 +195,7 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
     <hadoop-thirdparty.version>1.1.1</hadoop-thirdparty.version>
 
     <spotbugs.version>3.1.12.2</spotbugs.version>
-    <dnsjava.version>2.1.7</dnsjava.version>
+    <dnsjava.version>2.1.9</dnsjava.version>
     <okhttp3.version>4.12.0</okhttp3.version>
     <stax2.version>4.2.2</stax2.version>
     <jakarta.inject.version>2.6.1</jakarta.inject.version>
