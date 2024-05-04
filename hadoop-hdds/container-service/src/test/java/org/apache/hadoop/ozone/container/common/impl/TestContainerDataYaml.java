@@ -87,6 +87,7 @@ public class TestContainerDataYaml {
     keyValueContainerData.setSchemaVersion(
         VersionedDatanodeFeatures.SchemaV2.chooseSchemaVersion());
     keyValueContainerData.setReplicaIndex(replicaIndex);
+    keyValueContainerData.setDataChecksum(12345);
 
     File containerFile = new File(testRoot, containerPath);
 
@@ -248,6 +249,25 @@ public class TestContainerDataYaml {
     // Read from .container file, and verify data.
     KeyValueContainerData kvData = (KeyValueContainerData) ContainerDataYaml.readContainerFile(containerFile);
     ContainerUtils.verifyContainerFileChecksum(kvData, conf);
+
+    cleanup();
+  }
+
+  /**
+   * The container's data checksum is stored in a separate file with its Merkle hash tree. It should not be persisted
+   * to the .container file.
+   */
+  @ContainerLayoutTestInfo.ContainerTest
+  public void testDataChecksumNotInContainerFile(ContainerLayoutVersion layout) throws IOException {
+    setLayoutVersion(layout);
+    long containerID = testContainerID++;
+
+    File containerFile = createContainerFile(containerID, 0);
+
+    // Read from .container file. The kvData object should not have a data hash because it was not persisted in this
+    // file.
+    KeyValueContainerData kvData = (KeyValueContainerData) ContainerDataYaml.readContainerFile(containerFile);
+    assertEquals(0, kvData.getDataChecksum());
 
     cleanup();
   }
