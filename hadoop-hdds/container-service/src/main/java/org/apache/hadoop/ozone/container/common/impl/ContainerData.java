@@ -648,8 +648,8 @@ public abstract class ContainerData {
     this.checksum = ContainerUtils.getChecksum(containerDataYamlStr);
   }
 
-  public void setDataChecksum(long checksum) {
-    dataChecksum = checksum;
+  public void setDataChecksum(long dataChecksum) {
+    this.dataChecksum = dataChecksum;
   }
 
   public long getDataChecksum() {
