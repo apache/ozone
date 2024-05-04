@@ -17,9 +17,16 @@
  */
 package org.apache.hadoop.hdds.scm.container;
 
+import com.fasterxml.jackson.core.JsonGenerator;
+import com.fasterxml.jackson.databind.JsonSerializer;
+import com.fasterxml.jackson.databind.SerializerProvider;
+import com.fasterxml.jackson.databind.annotation.JsonSerialize;
+import com.fasterxml.jackson.databind.ser.std.StdKeySerializer;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 
+import java.io.IOException;
+import java.math.BigInteger;
 import java.util.UUID;
 
 /**
@@ -35,6 +42,7 @@ public final class ContainerReplicaInfo {
   private long keyCount;
   private long bytesUsed;
   private int replicaIndex = -1;
+  @JsonSerialize(using = LongToHexJsonSerializer.class)
   private long dataChecksum;
 
   public static ContainerReplicaInfo fromProto(
@@ -91,6 +99,13 @@ public final class ContainerReplicaInfo {
 
   public long getDataChecksum() {
     return dataChecksum;
+  }
+
+  private static class LongToHexJsonSerializer extends JsonSerializer<Long> {
+    @Override
+    public void serialize(Long value, JsonGenerator gen, SerializerProvider provider) throws IOException {
+      gen.writeString(Long.toHexString(value));
+    }
   }
 
   /**
