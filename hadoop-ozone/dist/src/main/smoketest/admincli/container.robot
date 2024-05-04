@@ -34,6 +34,12 @@ Container is closed
     ${output} =         Execute          ozone admin container info "${container}"
                         Should contain   ${output}   CLOSED
 
+Reconciliation complete
+    [arguments]    ${container}
+    ${data_checksum} =  Execute          ozone admin container info "${container}" --json | jq -r '.replicas[].dataChecksum' | head -n1
+                        Should not be empty    ${data_checksum}
+                        Should not be equal as strings    0    ${data_checksum}
+
 *** Test Cases ***
 Create container
     ${output} =         Execute          ozone admin container create
@@ -103,7 +109,8 @@ Cannot reconcile open container
     # The container should not yet have any replica checksums.
     # TODO When the scanner is computing checksums automatically, this test may need to be updated.
     ${data_checksum} =  Execute          ozone admin container info "${container}" --json | jq -r '.replicas[].dataChecksum' | head -n1
-    Should be empty    ${data_checksum}
+    # 0 is the hex value of an empty checksum.
+    Should Be Equal As Strings    0    ${data_checksum}
 
 Close container
     ${container} =      Execute          ozone admin container list --state OPEN | jq -r 'select(.replicationConfig.replicationFactor == "THREE") | .containerID' | head -1
@@ -113,12 +120,12 @@ Close container
     Wait until keyword succeeds    1min    10sec    Container is closed    ${container}
 
 Reconcile closed container
-    # Check info does not show replica checksums, since manual reconciliation has not yet been triggered.
+    # Check that info does not show replica checksums, since manual reconciliation has not yet been triggered.
     # TODO When the scanner is computing checksums automatically, this test may need to be updated.
     ${container} =      Execute          ozone admin container list --state CLOSED | jq -r 'select(.replicationConfig.replicationFactor == "THREE") | .containerID' | head -1
     ${data_checksum} =  Execute          ozone admin container info "${container}" --json | jq -r '.replicas[].dataChecksum' | head -n1
-    Should be empty    ${data_checksum}
+    # 0 is the hex value of an empty checksum.
+    Should Be Equal As Strings    0    ${data_checksum}
     # When reconciliation finishes, replica checksums should be shown.
     Execute    ozone admin container reconcile ${container}
-    ${data_checksum} =  Execute          ozone admin container info "${container}" --json | jq -r '.replicas[].dataChecksum' | head -n1
-    Wait until keyword succeeds    1min    5sec    Should not be empty    ${data_checksum}
+    Wait until keyword succeeds    1min    5sec    Reconciliation complete    ${container}
