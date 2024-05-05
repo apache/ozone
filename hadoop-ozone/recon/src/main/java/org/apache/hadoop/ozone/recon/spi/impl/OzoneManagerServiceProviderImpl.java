@@ -23,9 +23,13 @@ import javax.inject.Singleton;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.nio.file.attribute.PosixFilePermission;
+import java.nio.file.attribute.PosixFilePermissions;
 import java.util.List;
+import java.util.Set;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ThreadFactory;
@@ -33,6 +37,8 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
+import org.apache.hadoop.hdds.recon.ReconConfigKeys;
+import org.apache.hadoop.hdds.server.ServerUtils;
 import org.apache.hadoop.hdds.utils.db.RocksDatabase;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedWriteBatch;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedWriteOptions;
@@ -264,10 +270,12 @@ public class OzoneManagerServiceProviderImpl
     LOG.debug("Started the OM DB sync scheduler.");
     scheduler.scheduleWithFixedDelay(() -> {
       try {
+        LOG.info("Last known sequence number before sync: {}", getCurrentOMDBSequenceNumber());
         boolean isSuccess = syncDataFromOM();
         if (!isSuccess) {
           LOG.debug("OM DB sync is already running.");
         }
+        LOG.info("Sequence number after sync: {}", getCurrentOMDBSequenceNumber());
       } catch (Throwable t) {
         LOG.error("Unexpected exception while syncing data from OM.", t);
       }
@@ -366,6 +374,14 @@ public class OzoneManagerServiceProviderImpl
       reconUtils.untarCheckpointFile(targetFile, untarredDbDir);
       FileUtils.deleteQuietly(targetFile);
 
+      // Validate the presence of required SST files
+      File[] sstFiles = untarredDbDir.toFile().listFiles((dir, name) -> name.endsWith(".sst"));
+      if (sstFiles == null || sstFiles.length == 0) {
+        LOG.warn("No SST files found in the OM snapshot directory: {}", untarredDbDir);
+        return null;
+      }
+      LOG.info("Valid OM snapshot with SST files found at: {}", untarredDbDir);
+
       // Currently, OM DB type is not configurable. Hence, defaulting to
       // RocksDB.
       return new RocksDBCheckpoint(untarredDbDir);
@@ -381,25 +397,36 @@ public class OzoneManagerServiceProviderImpl
    */
   @VisibleForTesting
   boolean updateReconOmDBWithNewSnapshot() throws IOException {
+    // Check permissions of the Recon DB directory
+    checkAndValidateReconDbPermissions();
     // Obtain the current DB snapshot from OM and
     // update the in house OM metadata managed DB instance.
     long startTime = Time.monotonicNow();
     DBCheckpoint dbSnapshot = getOzoneManagerDBSnapshot();
     metrics.updateSnapshotRequestLatency(Time.monotonicNow() - startTime);
-    if (dbSnapshot != null && dbSnapshot.getCheckpointLocation() != null) {
-      LOG.info("Got new checkpoint from OM : " +
-          dbSnapshot.getCheckpointLocation());
-      try {
-        omMetadataManager.updateOmDB(
-            dbSnapshot.getCheckpointLocation().toFile());
-        return true;
-      } catch (IOException e) {
-        LOG.error("Unable to refresh Recon OM DB Snapshot. ", e);
-      }
-    } else {
-      LOG.error("Null snapshot location got from OM.");
+
+    if (dbSnapshot == null) {
+      LOG.error("Failed to obtain a valid DB snapshot from Ozone Manager. This could be due to " +
+          "missing SST files or other fetch issues.");
+      return false;
     }
-    return false;
+
+    if (dbSnapshot.getCheckpointLocation() == null) {
+      LOG.error("Snapshot checkpoint location is null, indicating a failure to properly fetch or " +
+          "store the snapshot.");
+      return false;
+    }
+
+    LOG.info("Attempting to update Recon OM DB with new snapshot located at: {}",
+        dbSnapshot.getCheckpointLocation());
+    try {
+      omMetadataManager.updateOmDB(dbSnapshot.getCheckpointLocation().toFile());
+      LOG.info("Successfully updated Recon OM DB with new snapshot.");
+      return true;
+    } catch (IOException e) {
+      LOG.error("Unable to refresh Recon OM DB Snapshot.", e);
+      return false;
+    }
   }
 
   /**
@@ -565,6 +592,41 @@ public class OzoneManagerServiceProviderImpl
       return false;
     }
     return true;
+  }
+
+  private void checkAndValidateReconDbPermissions() {
+    File dbDir = new File(omSnapshotDBParentDir.getPath());
+    if (!dbDir.exists()) {
+      LOG.error("Recon DB directory does not exist: {}", dbDir.getAbsolutePath());
+      return;
+    }
+
+    try {
+      // Fetch expected permissions from configuration
+      String expectedPermissions =
+          ServerUtils.getPermissions(ReconConfigKeys.OZONE_RECON_DB_DIR, configuration);
+      String expectedPermissionsSymbolic =
+          ReconUtils.convertNumericToSymbolic(expectedPermissions);
+
+      // Get actual permissions
+      Set<PosixFilePermission> actualPermissions =
+          Files.getPosixFilePermissions(dbDir.toPath());
+      String actualPermissionsStr =
+          PosixFilePermissions.toString(actualPermissions);
+
+      if (!expectedPermissionsSymbolic.equals(actualPermissionsStr)) {
+        LOG.warn("Permissions for Recon DB directory '{}' are set to '{}', but expected '{}'",
+            dbDir.getAbsolutePath(), actualPermissionsStr, expectedPermissionsSymbolic);
+      } else {
+        LOG.info("Permissions for Recon DB directory '{}' are correctly set to '{}'",
+            dbDir.getAbsolutePath(), actualPermissionsStr);
+      }
+    } catch (IOException e) {
+      LOG.error("Failed to retrieve permissions for Recon DB directory: {}",
+          dbDir.getAbsolutePath(), e);
+    } catch (IllegalArgumentException e) {
+      LOG.error("Configuration issue: {}", e.getMessage());
+    }
   }
 
   /**
