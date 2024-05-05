@@ -374,7 +374,7 @@ public class KeyValueContainerMetadataInspector implements ContainerInspector {
     // If used bytes is absent from the DB, it is only an error if there is
     // a non-zero aggregate of used bytes among the block keys.
     long usedBytesDBLong = 0;
-    if (!usedBytesDB.isMissingNode()) {
+    if (!usedBytesDB.isNull()) {
       usedBytesDBLong = usedBytesDB.asLong();
     }
 
