@@ -183,8 +183,7 @@ public class KeyValueContainerMetadataInspector implements ContainerInspector {
     ObjectNode containerJson = inspectContainer(kvData, store);
     boolean correct = checkAndRepair(containerJson, kvData, store);
 
-    String jsonReport = null;
-    jsonReport = JsonUtils.toJsonStringWIthIndent(containerJson);
+    String jsonReport = JsonUtils.toJsonStringWIthIndent(containerJson);
     if (log != null) {
       if (correct) {
         log.trace(jsonReport);
@@ -213,19 +212,16 @@ public class KeyValueContainerMetadataInspector implements ContainerInspector {
 
       // Build DB metadata values.
       // Assuming getDBMetadataJson and getAggregateValues methods return ObjectNode and are refactored to use Jackson
-      ObjectNode dBMetadata =
-          getDBMetadataJson(store.getMetadataTable(), containerData);
+      ObjectNode dBMetadata = getDBMetadataJson(store.getMetadataTable(), containerData);
       containerJson.set("dBMetadata", dBMetadata);
 
       // Build aggregate values.
-      ObjectNode aggregates =
-          getAggregateValues(store, containerData, schemaVersion);
+      ObjectNode aggregates = getAggregateValues(store, containerData, schemaVersion);
       containerJson.set("aggregates", aggregates);
 
       // Build info about chunks directory.
       // Assuming getChunksDirectoryJson method returns ObjectNode and is refactored to use Jackson
-      ObjectNode chunksDirectory =
-          getChunksDirectoryJson(new File(containerData.getChunksPath()));
+      ObjectNode chunksDirectory = getChunksDirectoryJson(new File(containerData.getChunksPath()));
       containerJson.set("chunksDirectory", chunksDirectory);
     } catch (IOException ex) {
       LOG.error("Inspecting container {} failed",
@@ -372,8 +368,7 @@ public class KeyValueContainerMetadataInspector implements ContainerInspector {
     }
 
     // Check and repair used bytes.
-    JsonNode usedBytesDB = parent.path("dBMetadata")
-        .path(OzoneConsts.CONTAINER_BYTES_USED);
+    JsonNode usedBytesDB = parent.path("dBMetadata").path(OzoneConsts.CONTAINER_BYTES_USED);
     JsonNode usedBytesAggregate = parent.path("aggregates").path("usedBytes");
 
     // If used bytes is absent from the DB, it is only an error if there is
@@ -400,8 +395,7 @@ public class KeyValueContainerMetadataInspector implements ContainerInspector {
       };
 
       ObjectNode usedBytesError = buildErrorAndRepair("dBMetadata." +
-              OzoneConsts.CONTAINER_BYTES_USED, usedBytesAggregate, usedBytesDB,
-          keyRepairAction);
+              OzoneConsts.CONTAINER_BYTES_USED, usedBytesAggregate, usedBytesDB, keyRepairAction);
       errors.add(usedBytesError);
     }
 
@@ -409,8 +403,7 @@ public class KeyValueContainerMetadataInspector implements ContainerInspector {
     JsonNode pendingDeleteCountDB = dBMetadata.path(
         OzoneConsts.PENDING_DELETE_BLOCK_COUNT);
     final long dbDeleteCount = jsonToLong(pendingDeleteCountDB);
-    final JsonNode pendingDeleteCountAggregate
-        = aggregates.path(PendingDelete.COUNT);
+    final JsonNode pendingDeleteCountAggregate = aggregates.path(PendingDelete.COUNT);
     final long deleteTransactionCount = jsonToLong(pendingDeleteCountAggregate);
     if (dbDeleteCount != deleteTransactionCount) {
       passed = false;
@@ -430,8 +423,7 @@ public class KeyValueContainerMetadataInspector implements ContainerInspector {
 
       final ObjectNode deleteCountError = buildErrorAndRepair(
           "dBMetadata." + OzoneConsts.PENDING_DELETE_BLOCK_COUNT,
-          pendingDeleteCountAggregate, pendingDeleteCountDB,
-          deleteCountRepairAction);
+          pendingDeleteCountAggregate, pendingDeleteCountDB, deleteCountRepairAction);
       errors.add(deleteCountError);
     }
 
@@ -453,10 +445,8 @@ public class KeyValueContainerMetadataInspector implements ContainerInspector {
         return repaired;
       };
 
-      ObjectNode chunksDirError =
-          buildErrorAndRepair("chunksDirectory.present",
-              JsonNodeFactory.instance.booleanNode(true), chunksDirPresent,
-              dirRepairAction);
+      ObjectNode chunksDirError = buildErrorAndRepair("chunksDirectory.present",
+          JsonNodeFactory.instance.booleanNode(true), chunksDirPresent, dirRepairAction);
       errors.add(chunksDirError);
     }
 
