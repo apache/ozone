@@ -26,9 +26,14 @@ import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
+import org.apache.hadoop.ozone.recon.ReconUtils;
+import org.apache.hadoop.ozone.recon.api.handlers.EntityHandler;
+import org.apache.hadoop.ozone.recon.api.types.DUResponse;
 import org.apache.hadoop.ozone.recon.api.types.KeyEntityInfo;
 import org.apache.hadoop.ozone.recon.api.types.KeyInsightInfoResponse;
 import org.apache.hadoop.ozone.recon.api.types.NSSummary;
+import org.apache.hadoop.ozone.recon.api.types.ResponseStatus;
+import org.apache.hadoop.ozone.recon.api.types.Stats;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 import org.apache.hadoop.ozone.recon.scm.ReconContainerManager;
 import org.apache.hadoop.ozone.recon.spi.ReconContainerMetadataManager;
@@ -53,6 +58,9 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.TimeZone;
+import java.util.function.Predicate;
+import java.util.stream.Collectors;
 
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.OPEN_FILE_TABLE;
@@ -60,6 +68,7 @@ import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.OPEN_KEY_TABLE;
 import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.DELETED_TABLE;
 import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.DELETED_DIR_TABLE;
 import static org.apache.hadoop.ozone.recon.ReconConstants.DEFAULT_FETCH_COUNT;
+import static org.apache.hadoop.ozone.recon.ReconConstants.DEFAULT_KEY_SIZE;
 import static org.apache.hadoop.ozone.recon.ReconConstants.RECON_QUERY_LIMIT;
 import static org.apache.hadoop.ozone.recon.ReconConstants.RECON_QUERY_PREVKEY;
 import static org.apache.hadoop.ozone.recon.ReconConstants.DEFAULT_OPEN_KEY_INCLUDE_FSO;
@@ -699,6 +708,108 @@ public class OMDBInsightEndpoint {
   private String createPath(OmKeyInfo omKeyInfo) {
     return omKeyInfo.getVolumeName() + OM_KEY_PREFIX +
         omKeyInfo.getBucketName() + OM_KEY_PREFIX + omKeyInfo.getKeyName();
+  }
+
+  /**
+   * This API will list out limited 'count' number of keys after applying below filters in API parameters:
+   * Default Values of API param filters:
+   *    -- replicationType - empty string and filter will not be applied, so list out all keys irrespective of
+   *       replication type.
+   *    -- creationTime - empty string and filter will not be applied, so list out keys irrespective of age.
+   *    -- keySize - 0 bytes, which means all keys greater than zero bytes will be listed, effectively all.
+   *    -- startPrefix - /
+   *    -- count - 1000
+   *
+   * @param replicationType Filter for RATIS or EC replication keys
+   * @param creationDate Filter for keys created after creationDate in "MM-dd-yyyy HH:mm:ss" string format.
+   * @param keySize Filter for Keys greater than keySize in bytes.
+   * @param startPrefix Filter for startPrefix path.
+   * @param limit Filter for limited count of keys.
+   * @param recursive listing out keys recursively for FSO buckets.
+   * @return the list of keys in below structured format:
+   * Response For OBS Bucket keys:
+   * ********************************************************
+   * {
+   *     "status": "OK",
+   *     "path": "/volume1/obs-bucket/",
+   *     "size": 73400320,
+   *     "sizeWithReplica": 81788928,
+   *     "subPathCount": 1,
+   *     "totalKeyCount": 7,
+   *     "lastKey": "/volume1/obs-bucket/key7",
+   *     "subPaths": [
+   *         {
+   *             "key": true,
+   *             "path": "key1",
+   *             "size": 10485760,
+   *             "sizeWithReplica": 18874368,
+   *             "isKey": true,
+   *             "replicationType": "RATIS",
+   *             "creationTime": 1712321367060,
+   *             "modificationTime": 1712321368190
+   *         },
+   *         {
+   *             "key": true,
+   *             "path": "key7",
+   *             "size": 10485760,
+   *             "sizeWithReplica": 18874368,
+   *             "isKey": true,
+   *             "replicationType": "EC",
+   *             "creationTime": 1713261005555,
+   *             "modificationTime": 1713261006728
+   *         }
+   *     ],
+   *     "sizeDirectKey": 73400320
+   * }
+   * ********************************************************
+   * @throws IOException
+   */
+  @GET
+  @Path("/listKeys")
+  @SuppressWarnings("methodlength")
+  public Response listKeysWithDu(@QueryParam("replicationType") String replicationType,
+                                 @QueryParam("creationDate") String creationDate,
+                                 @DefaultValue(DEFAULT_KEY_SIZE) @QueryParam("keySize") long keySize,
+                                 @DefaultValue(OM_KEY_PREFIX) @QueryParam("startPrefix") String startPrefix,
+                                 @DefaultValue(DEFAULT_FETCH_COUNT) @QueryParam("count") long limit,
+                                 @DefaultValue("false") @QueryParam("recursive") boolean recursive)
+      throws IOException {
+
+    if (startPrefix == null || startPrefix.length() == 0) {
+      return Response.status(Response.Status.BAD_REQUEST).build();
+    }
+    DUResponse duResponse = new DUResponse();
+    if (!isInitializationComplete()) {
+      duResponse.setStatus(ResponseStatus.INITIALIZING);
+      return Response.ok(duResponse).build();
+    }
+    EntityHandler handler = EntityHandler.getEntityHandler(
+        reconNamespaceSummaryManager,
+        omMetadataManager, reconSCM, startPrefix);
+
+    Stats stats = new Stats(limit);
+
+    duResponse = handler.getListKeysResponse(stats, recursive);
+
+    List<DUResponse.DiskUsage> keyListWithDu = duResponse.getDuData();
+
+    long epochMillis = ReconUtils.convertToEpochMillis(creationDate, "MM-dd-yyyy HH:mm:ss", TimeZone.getDefault());
+    Predicate<DUResponse.DiskUsage> keyAgeFilter = keyData -> keyData.getCreationTime() >= epochMillis;
+    Predicate<DUResponse.DiskUsage> keyReplicationFilter =
+        keyData -> keyData.getReplicationType().equals(replicationType);
+    Predicate<DUResponse.DiskUsage> keySizeFilter = keyData -> keyData.getSize() > keySize;
+    Predicate<DUResponse.DiskUsage> keyFilter = keyData -> keyData.isKey();
+
+    List<DUResponse.DiskUsage> filteredKeyList = keyListWithDu.stream()
+        .filter(keyFilter)
+        .filter(keyData -> !StringUtils.isEmpty(creationDate) ? keyAgeFilter.test(keyData) : true)
+        .filter(keyData -> !StringUtils.isEmpty(replicationType) ? keyReplicationFilter.test(keyData) : true)
+        .filter(keySizeFilter)
+        .collect(Collectors.toList());
+
+    duResponse.setDuData(filteredKeyList);
+    duResponse.setCount(filteredKeyList.size());
+    return Response.ok(duResponse).build();
   }
 
 

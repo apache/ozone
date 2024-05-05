@@ -146,6 +146,8 @@ public class VolumeEntityHandler extends EntityHandler {
     }
 
     duResponse.setDuData(bucketDuData);
+    duResponse.setTotalCount(stats.getTotalCount());
+    duResponse.setLastKey(stats.getLastKey());
     return duResponse;
   }
 
