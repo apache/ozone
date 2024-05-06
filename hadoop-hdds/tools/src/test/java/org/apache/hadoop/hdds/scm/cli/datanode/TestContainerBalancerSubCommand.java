@@ -104,7 +104,10 @@ public class TestContainerBalancerSubCommand {
     ScmClient scmClient = mock(ScmClient.class);
     stopCmd.execute(scmClient);
 
-    Pattern p = Pattern.compile("^Stopping\\sContainerBalancer...");
+    Pattern p = Pattern.compile("^Sending\\sstop\\scommand." +
+            "\\sWaiting\\sfor\\sContainer\\sBalancer\\sto\\sstop...\\n" +
+            "Container\\sBalancer\\sstopped.");
+
     Matcher m = p.matcher(outContent.toString(DEFAULT_ENCODING));
     assertTrue(m.find());
   }
@@ -114,7 +117,7 @@ public class TestContainerBalancerSubCommand {
       throws IOException  {
     ScmClient scmClient = mock(ScmClient.class);
     when(scmClient.startContainerBalancer(
-            null, null, null, null, null, null))
+            null, null, null, null, null, null, null, null, null, null, null, null))
         .thenReturn(
             StorageContainerLocationProtocolProtos
                 .StartContainerBalancerResponseProto.newBuilder()
@@ -133,7 +136,7 @@ public class TestContainerBalancerSubCommand {
       throws IOException  {
     ScmClient scmClient = mock(ScmClient.class);
     when(scmClient.startContainerBalancer(
-            null, null, null, null, null, null))
+            null, null, null, null, null, null, null, null, null, null, null, null))
         .thenReturn(StorageContainerLocationProtocolProtos
             .StartContainerBalancerResponseProto.newBuilder()
             .setStart(false)

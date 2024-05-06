@@ -372,10 +372,12 @@ public abstract class BaseHttpServer {
         .keyPassword(getPassword(sslConf, OZONE_SERVER_HTTPS_KEYPASSWORD_KEY))
         .keyStore(sslConf.get("ssl.server.keystore.location"),
             getPassword(sslConf, OZONE_SERVER_HTTPS_KEYSTORE_PASSWORD_KEY),
-            sslConf.get("ssl.server.keystore.type", "jks"))
+            sslConf.get(HddsConfigKeys.HDDS_HTTP_SERVER_KEYSTORE_TYPE,
+                HddsConfigKeys.HDDS_HTTP_SERVER_KEYSTORE_TYPE_DEFAULT))
         .trustStore(sslConf.get("ssl.server.truststore.location"),
             getPassword(sslConf, OZONE_SERVER_HTTPS_TRUSTSTORE_PASSWORD_KEY),
-            sslConf.get("ssl.server.truststore.type", "jks"))
+            sslConf.get(HddsConfigKeys.HDDS_HTTP_SERVER_TRUSTSTORE_TYPE,
+                HddsConfigKeys.HDDS_HTTP_SERVER_TRUSTSTORE_TYPE_DEFAULT))
         .excludeCiphers(
             sslConf.get("ssl.server.exclude.cipher.list"));
   }

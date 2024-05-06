@@ -20,6 +20,7 @@ package org.apache.hadoop.hdds.scm.ha.io;
 import com.google.common.primitives.Ints;
 import com.google.protobuf.ByteString;
 import com.google.protobuf.InvalidProtocolBufferException;
+import com.google.protobuf.Proto2Utils;
 import com.google.protobuf.ProtocolMessageEnum;
 import org.apache.hadoop.hdds.scm.ha.ReflectionUtil;
 
@@ -33,7 +34,8 @@ public class EnumCodec implements Codec {
   @Override
   public ByteString serialize(Object object)
       throws InvalidProtocolBufferException {
-    return ByteString.copyFrom(Ints.toByteArray(
+    // toByteArray returns a new array
+    return Proto2Utils.unsafeByteString(Ints.toByteArray(
         ((ProtocolMessageEnum) object).getNumber()));
   }
 

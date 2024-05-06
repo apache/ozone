@@ -106,7 +106,7 @@ public class OzoneVolume extends WithMetadata {
   private long refCount;
 
   protected OzoneVolume(Builder builder) {
-    setMetadata(builder.metadata);
+    super(builder);
     this.proxy = builder.proxy;
     this.name = builder.name;
     this.admin = builder.admin;
@@ -409,8 +409,7 @@ public class OzoneVolume extends WithMetadata {
   /**
    * Inner builder for OzoneVolume.
    */
-  public static class Builder {
-    private Map<String, String> metadata;
+  public static class Builder extends WithMetadata.Builder {
     private ConfigurationSource conf;
     private ClientProtocol proxy;
     private String name;
@@ -482,8 +481,9 @@ public class OzoneVolume extends WithMetadata {
       return this;
     }
 
+    @Override
     public Builder setMetadata(Map<String, String> metadata) {
-      this.metadata = metadata;
+      super.setMetadata(metadata);
       return this;
     }
 

@@ -18,6 +18,7 @@
 package org.apache.hadoop.hdds.scm.container.replication;
 
 import com.google.common.collect.ImmutableList;
+import com.google.protobuf.Proto2Utils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
@@ -1281,7 +1282,7 @@ public class TestReplicationManager {
 
     ReconstructECContainersCommand command = new ReconstructECContainersCommand(
         containerInfo.getContainerID(), sourceNodes, targetNodes,
-        missingIndexes, ecRepConfig);
+        Proto2Utils.unsafeByteString(missingIndexes), ecRepConfig);
 
     replicationManager.sendDatanodeCommand(command, containerInfo, target4);
 
@@ -1608,7 +1609,7 @@ public class TestReplicationManager {
     byte[] missingIndexes = new byte[]{4, 5};
     return new ReconstructECContainersCommand(
         containerInfo.getContainerID(), sources,
-        new ArrayList<>(Arrays.asList(targets)), missingIndexes,
+        Arrays.asList(targets), Proto2Utils.unsafeByteString(missingIndexes),
         (ECReplicationConfig) repConfig);
   }
 

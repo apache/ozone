@@ -143,6 +143,7 @@ import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_SCM_SAFEMODE_PIPELINE_C
 import static org.apache.hadoop.hdds.scm.HddsTestUtils.mockRemoteUser;
 import static org.apache.hadoop.hdds.scm.HddsWhiteboxTestUtils.setInternalState;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_SERVICE_INTERVAL;
+import static org.apache.ozone.test.GenericTestUtils.PortAllocator.getFreePort;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -166,6 +167,7 @@ import static org.mockito.Mockito.verify;
  */
 @Timeout(900)
 public class TestStorageContainerManager {
+  private static final String LOCALHOST_IP = "127.0.0.1";
   private static XceiverClientManager xceiverClientManager;
   private static final Logger LOG = LoggerFactory.getLogger(
       TestStorageContainerManager.class);
@@ -692,11 +694,15 @@ public class TestStorageContainerManager {
    */
   @Test
   public void testScmProcessDatanodeHeartbeat() throws Exception {
+    String rackName = "/rack1";
     OzoneConfiguration conf = new OzoneConfiguration();
     conf.setClass(NET_TOPOLOGY_NODE_SWITCH_MAPPING_IMPL_KEY,
         StaticMapping.class, DNSToSwitchMapping.class);
     StaticMapping.addNodeToRack(NetUtils.normalizeHostName(HddsUtils.getHostName(conf)),
-        "/rack1");
+        rackName);
+    // In case of JDK17, the IP address is resolved to localhost mapped to 127.0.0.1 which is not in sync with JDK8
+    // and hence need to make following entry under HDDS-10132
+    StaticMapping.addNodeToRack(LOCALHOST_IP, rackName);
 
     final int datanodeNum = 3;
 
@@ -979,6 +985,8 @@ public class TestStorageContainerManager {
       DefaultConfigManager.clearDefaultConfigs();
       conf.setBoolean(ScmConfigKeys.OZONE_SCM_HA_ENABLE_KEY, true);
       StorageContainerManager.scmInit(conf, cluster.getClusterId());
+      conf.setInt(ScmConfigKeys.OZONE_SCM_DATANODE_PORT_KEY, getFreePort());
+      conf.unset(ScmConfigKeys.OZONE_SCM_DATANODE_ADDRESS_KEY);
       cluster.restartStorageContainerManager(false);
 
       final StorageContainerManager ratisSCM = cluster

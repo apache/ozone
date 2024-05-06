@@ -223,10 +223,10 @@ public class TestParentAcl {
         .setAclRights(childAclType).build();
 
     OzoneAcl childAcl = new OzoneAcl(USER,
-        testUgi1.getUserName(), childAclType, ACCESS);
+        testUgi1.getUserName(), ACCESS, childAclType);
 
     OzoneAcl parentAcl = new OzoneAcl(USER,
-        testUgi1.getUserName(), parentAclType, ACCESS);
+        testUgi1.getUserName(), ACCESS, parentAclType);
 
     assertFalse(nativeAuthorizer.checkAccess(child, requestContext));
     if (child.getResourceType() == BUCKET) {
@@ -254,7 +254,7 @@ public class TestParentAcl {
 
       // add the volume acl (grand-parent), now key access is allowed.
       OzoneAcl parentVolumeAcl = new OzoneAcl(USER,
-          testUgi1.getUserName(), READ, ACCESS);
+          testUgi1.getUserName(), ACCESS, READ);
       addVolumeAcl(child.getVolumeName(), parentVolumeAcl);
       assertTrue(nativeAuthorizer.checkAccess(
           child, requestContext));
@@ -346,6 +346,7 @@ public class TestParentAcl {
         // here we give test ugi full access
         .setAcls(OzoneAclUtil.getAclList(testUgi.getUserName(),
             testUgi.getGroupNames(), ALL, ALL))
+        .setOwnerName(UserGroupInformation.getCurrentUser().getShortUserName())
         .build();
 
 

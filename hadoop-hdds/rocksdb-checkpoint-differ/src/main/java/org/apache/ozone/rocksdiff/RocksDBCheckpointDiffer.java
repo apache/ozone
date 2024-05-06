@@ -41,10 +41,13 @@ import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.CompactionLogEntryProto;
 import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.hdds.utils.Scheduler;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedDBOptions;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedOptions;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedReadOptions;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksIterator;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksDB;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedSstFileReader;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedSstFileReaderIterator;
 import org.apache.ozone.compaction.log.CompactionFileInfo;
 import org.apache.ozone.compaction.log.CompactionLogEntry;
 import org.apache.ozone.rocksdb.util.RdbUtil;
@@ -53,13 +56,9 @@ import org.apache.ozone.graph.PrintableGraph.GraphType;
 import org.rocksdb.AbstractEventListener;
 import org.rocksdb.ColumnFamilyHandle;
 import org.rocksdb.CompactionJobInfo;
-import org.rocksdb.DBOptions;
 import org.rocksdb.LiveFileMetaData;
-import org.rocksdb.Options;
 import org.rocksdb.RocksDB;
 import org.rocksdb.RocksDBException;
-import org.rocksdb.SstFileReader;
-import org.rocksdb.SstFileReaderIterator;
 import org.rocksdb.TableProperties;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -176,7 +175,7 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
   private AtomicBoolean suspended;
 
   private ColumnFamilyHandle compactionLogTableCFHandle;
-  private RocksDB activeRocksDB;
+  private ManagedRocksDB activeRocksDB;
 
   /**
    * For snapshot diff calculation we only need to track following column
@@ -301,7 +300,7 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
   }
 
   @Override
-  public void close() throws Exception {
+  public void close() {
     if (!closed) {
       synchronized (this) {
         if (!closed) {
@@ -348,32 +347,11 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
     DEBUG_LEVEL.add(level);
   }
 
-  /**
-   * Takes {@link org.rocksdb.Options}.
-   */
-  public void setRocksDBForCompactionTracking(Options rocksOptions,
-      List<AbstractEventListener> list) {
-    list.add(newCompactionBeginListener());
-    list.add(newCompactionCompletedListener());
-    rocksOptions.setListeners(list);
-  }
-
-  public void setRocksDBForCompactionTracking(Options rocksOptions) {
-    setRocksDBForCompactionTracking(rocksOptions, new ArrayList<>());
-  }
-
-  /**
-   * Takes {@link org.rocksdb.DBOptions}.
-   */
-  public void setRocksDBForCompactionTracking(DBOptions rocksOptions,
-      List<AbstractEventListener> list) {
-    list.add(newCompactionBeginListener());
-    list.add(newCompactionCompletedListener());
-    rocksOptions.setListeners(list);
-  }
-
-  public void setRocksDBForCompactionTracking(DBOptions rocksOptions) {
-    setRocksDBForCompactionTracking(rocksOptions, new ArrayList<>());
+  public void setRocksDBForCompactionTracking(ManagedDBOptions rocksOptions) {
+    List<AbstractEventListener> events = new ArrayList<>();
+    events.add(newCompactionBeginListener());
+    events.add(newCompactionCompletedListener());
+    rocksOptions.setListeners(events);
   }
 
   /**
@@ -402,7 +380,7 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
    * Set activeRocksDB to access CompactionLogTable.
    * @param activeRocksDB RocksDB
    */
-  public synchronized void setActiveRocksDB(RocksDB activeRocksDB) {
+  public synchronized void setActiveRocksDB(ManagedRocksDB activeRocksDB) {
     Preconditions.checkNotNull(activeRocksDB, "RocksDB should not be null.");
     this.activeRocksDB = activeRocksDB;
   }
@@ -435,8 +413,7 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
     // Note the goal of compaction DAG is to track all compactions that happened
     // _after_ a DB checkpoint is taken.
 
-    try (ManagedRocksIterator it = ManagedRocksIterator.managed(
-        db.newIterator(snapshotInfoTableCFHandle))) {
+    try (ManagedRocksIterator it = ManagedRocksIterator.managed(db.newIterator(snapshotInfoTableCFHandle))) {
       it.get().seekToFirst();
       return !it.get().isValid();
     }
@@ -497,7 +474,6 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
       }
     };
   }
-
 
   private AbstractEventListener newCompactionCompletedListener() {
     return new AbstractEventListener() {
@@ -576,7 +552,7 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
     byte[] key = keyString.getBytes(UTF_8);
     byte[] value = compactionLogEntry.getProtobuf().toByteArray();
     try {
-      activeRocksDB.put(compactionLogTableCFHandle, key, value);
+      activeRocksDB.get().put(compactionLogTableCFHandle, key, value);
     } catch (RocksDBException exception) {
       // TODO: Revisit exception handling before merging the PR.
       throw new RuntimeException(exception);
@@ -629,9 +605,8 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
       filename += SST_FILE_EXTENSION;
     }
 
-    try (
-        ManagedOptions option = new ManagedOptions();
-        SstFileReader reader = new SstFileReader(option)) {
+    try (ManagedOptions option = new ManagedOptions();
+         ManagedSstFileReader reader = new ManagedSstFileReader(option)) {
 
       reader.open(getAbsoluteSstFilePath(filename));
 
@@ -801,7 +776,7 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
       preconditionChecksForLoadAllCompactionLogs();
       addEntriesFromLogFilesToDagAndCompactionLogTable();
       try (ManagedRocksIterator managedRocksIterator = new ManagedRocksIterator(
-          activeRocksDB.newIterator(compactionLogTableCFHandle))) {
+          activeRocksDB.get().newIterator(compactionLogTableCFHandle))) {
         managedRocksIterator.get().seekToFirst();
         while (managedRocksIterator.get().isValid()) {
           byte[] value = managedRocksIterator.get().value();
@@ -1252,7 +1227,7 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
     List<byte[]> keysToRemove = new ArrayList<>();
 
     try (ManagedRocksIterator managedRocksIterator = new ManagedRocksIterator(
-        activeRocksDB.newIterator(compactionLogTableCFHandle))) {
+        activeRocksDB.get().newIterator(compactionLogTableCFHandle))) {
       managedRocksIterator.get().seekToFirst();
       while (managedRocksIterator.get().isValid()) {
         CompactionLogEntry compactionLogEntry = CompactionLogEntry
@@ -1282,7 +1257,7 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
       List<byte[]> keysToRemove) {
     try {
       for (byte[] key: keysToRemove) {
-        activeRocksDB.delete(compactionLogTableCFHandle, key);
+        activeRocksDB.get().delete(compactionLogTableCFHandle, key);
       }
     } catch (RocksDBException exception) {
       // TODO Handle exception properly before merging the PR.
@@ -1575,18 +1550,19 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
     CompactionFileInfo.Builder fileInfoBuilder =
         new CompactionFileInfo.Builder(fileName);
 
-    try (SstFileReader fileReader = new SstFileReader(options)) {
+    try (ManagedSstFileReader fileReader = new ManagedSstFileReader(options)) {
       fileReader.open(sstFile);
-      String columnFamily = StringUtils.bytes2String(
-          fileReader.getTableProperties().getColumnFamilyName());
-      SstFileReaderIterator iterator = fileReader.newIterator(readOptions);
-      iterator.seekToFirst();
-      String startKey = StringUtils.bytes2String(iterator.key());
-      iterator.seekToLast();
-      String endKey = StringUtils.bytes2String(iterator.key());
-      fileInfoBuilder.setStartRange(startKey)
-          .setEndRange(endKey)
-          .setColumnFamily(columnFamily);
+      String columnFamily = StringUtils.bytes2String(fileReader.getTableProperties().getColumnFamilyName());
+      try (ManagedSstFileReaderIterator iterator =
+               ManagedSstFileReaderIterator.managed(fileReader.newIterator(readOptions))) {
+        iterator.get().seekToFirst();
+        String startKey = StringUtils.bytes2String(iterator.get().key());
+        iterator.get().seekToLast();
+        String endKey = StringUtils.bytes2String(iterator.get().key());
+        fileInfoBuilder.setStartRange(startKey)
+            .setEndRange(endKey)
+            .setColumnFamily(columnFamily);
+      }
     } catch (RocksDBException rocksDBException) {
       // Ideally it should not happen. If it does just log the exception.
       // And let the compaction complete without the exception.

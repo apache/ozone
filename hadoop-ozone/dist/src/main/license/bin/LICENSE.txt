@@ -498,8 +498,6 @@ Apache Software Foundation License 2.0
 nvd3-1.8.5.min.js.map
 nvd3-1.8.5.min.css.map
 nvd3-1.8.5.min.js
-AbstractFuture.java
-TimeoutFuture.java
 
 
 BSD 3-Clause

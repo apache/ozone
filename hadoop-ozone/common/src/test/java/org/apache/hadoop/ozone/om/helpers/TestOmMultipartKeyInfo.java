@@ -42,7 +42,7 @@ import static org.junit.jupiter.api.Assertions.assertNotSame;
 public class TestOmMultipartKeyInfo {
 
   @Test
-  public void copyObject() {
+  public void testCopyObject() {
     for (ReplicationConfig param : replicationConfigs().collect(toList())) {
       testCopyObject(param);
     }

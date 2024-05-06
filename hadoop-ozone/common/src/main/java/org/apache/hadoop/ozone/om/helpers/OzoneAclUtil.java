@@ -60,11 +60,11 @@ public final class OzoneAclUtil {
     List<OzoneAcl> listOfAcls = new ArrayList<>();
 
     // User ACL.
-    listOfAcls.add(new OzoneAcl(USER, userName, userRights, ACCESS));
+    listOfAcls.add(new OzoneAcl(USER, userName, ACCESS, userRights));
     if (userGroups != null) {
       // Group ACLs of the User.
       Arrays.asList(userGroups).forEach((group) -> listOfAcls.add(
-          new OzoneAcl(GROUP, group, groupRights, ACCESS)));
+          new OzoneAcl(GROUP, group, ACCESS, groupRights)));
     }
     return listOfAcls;
   }

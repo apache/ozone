@@ -37,7 +37,6 @@ import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.ratis.proto.RaftProtos;
 import org.apache.ratis.protocol.exceptions.StateMachineException;
 import org.apache.ratis.server.protocol.TermIndex;
-import org.apache.ratis.server.raftlog.RaftLog;
 import org.apache.ratis.statemachine.TransactionContext;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -101,12 +100,12 @@ public class TestOzoneManagerStateMachine {
   @Test
   public void testLastAppliedIndex() {
     ozoneManagerStateMachine.notifyTermIndexUpdated(0, 0);
-    assertTermIndex(0, RaftLog.INVALID_LOG_INDEX, ozoneManagerStateMachine.getLastAppliedTermIndex());
+    assertTermIndex(0, 0, ozoneManagerStateMachine.getLastAppliedTermIndex());
     assertTermIndex(0, 0, ozoneManagerStateMachine.getLastNotifiedTermIndex());
 
     // Conf/metadata transaction.
     ozoneManagerStateMachine.notifyTermIndexUpdated(0, 1);
-    assertTermIndex(0, RaftLog.INVALID_LOG_INDEX, ozoneManagerStateMachine.getLastAppliedTermIndex());
+    assertTermIndex(0, 1, ozoneManagerStateMachine.getLastAppliedTermIndex());
     assertTermIndex(0, 1, ozoneManagerStateMachine.getLastNotifiedTermIndex());
 
     // call update last applied index
@@ -119,7 +118,7 @@ public class TestOzoneManagerStateMachine {
     // Conf/metadata transaction.
     ozoneManagerStateMachine.notifyTermIndexUpdated(1L, 4L);
 
-    assertTermIndex(0, 3, ozoneManagerStateMachine.getLastAppliedTermIndex());
+    assertTermIndex(1, 4, ozoneManagerStateMachine.getLastAppliedTermIndex());
     assertTermIndex(1, 4, ozoneManagerStateMachine.getLastNotifiedTermIndex());
 
     // Add some apply transactions.
@@ -128,6 +127,26 @@ public class TestOzoneManagerStateMachine {
 
     assertTermIndex(1, 6, ozoneManagerStateMachine.getLastAppliedTermIndex());
     assertTermIndex(1, 4, ozoneManagerStateMachine.getLastNotifiedTermIndex());
+  }
+
+  @Test
+  public void testNotifyTermIndexPendingBufferUpdateIndex() {
+    ozoneManagerStateMachine.notifyTermIndexUpdated(0, 0);
+    assertTermIndex(0, 0, ozoneManagerStateMachine.getLastAppliedTermIndex());
+    assertTermIndex(0, 0, ozoneManagerStateMachine.getLastNotifiedTermIndex());
+
+    // notifyTermIndex with skipping one of transaction which is from applyTransaction
+    ozoneManagerStateMachine.notifyTermIndexUpdated(0, 2);
+    ozoneManagerStateMachine.notifyTermIndexUpdated(0, 3);
+    assertTermIndex(0, 0, ozoneManagerStateMachine.getLastAppliedTermIndex());
+    assertTermIndex(0, 3, ozoneManagerStateMachine.getLastNotifiedTermIndex());
+
+    // applyTransaction update with missing transaction as above
+    ozoneManagerStateMachine.updateLastAppliedTermIndex(TermIndex.valueOf(0, 1));
+    assertTermIndex(0, 3, ozoneManagerStateMachine.getLastAppliedTermIndex());
+
+    assertTermIndex(0, 3, ozoneManagerStateMachine.getLastAppliedTermIndex());
+    assertTermIndex(0, 3, ozoneManagerStateMachine.getLastNotifiedTermIndex());
   }
 
   @Test

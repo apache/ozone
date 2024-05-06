@@ -50,10 +50,8 @@ if [[ -f hadoop-ozone/dist/src/shell/ozone/ozone-functions.sh ]]; then
   ozone_java_setup
 fi
 
-if [[ "${CHECK}" == "integration" ]] || [[ ${ITERATIONS} -gt 1 ]]; then
-  if [[ ${OZONE_REPO_CACHED} == "false" ]]; then
-    mvn ${MAVEN_OPTIONS} -DskipTests clean install
-  fi
+if [[ ${ITERATIONS} -gt 1 ]] && [[ ${OZONE_REPO_CACHED} == "false" ]]; then
+  mvn ${MAVEN_OPTIONS} -DskipTests clean install
 fi
 
 REPORT_DIR=${OUTPUT_DIR:-"$DIR/../../../target/${CHECK}"}
@@ -79,7 +77,7 @@ for i in $(seq 1 ${ITERATIONS}); do
   fi
 
   if [[ ${ITERATIONS} -gt 1 ]]; then
-    if ! grep -q "Tests run: [^0]" "${REPORT_DIR}/output.log"; then
+    if ! grep -q "Running .*Test" "${REPORT_DIR}/output.log"; then
       echo "No tests were run" >> "${REPORT_DIR}/summary.txt"
       irc=1
       FAIL_FAST=true
