@@ -1393,9 +1393,9 @@ public class BasicRootedOzoneClientAdapterImpl
   public LeaseKeyInfo recoverFilePrepare(final String pathStr, boolean force) throws IOException {
     incrementCounter(Statistic.INVOCATION_RECOVER_FILE_PREPARE, 1);
     OFSPath ofsPath = new OFSPath(pathStr, config);
+
     try {
       OzoneBucket bucket = getBucket(ofsPath, false);
-
       return ozoneClient.getProxy().getOzoneManagerClient().recoverLease(
           bucket.getVolumeName(), bucket.getName(), ofsPath.getKeyName(), force);
     } catch (OMException ome) {
