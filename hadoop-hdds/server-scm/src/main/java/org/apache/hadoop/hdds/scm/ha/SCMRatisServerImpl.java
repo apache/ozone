@@ -335,8 +335,11 @@ public class SCMRatisServerImpl implements SCMRatisServer {
       }
       return raftClientReply.isSuccess();
     } catch (IOException e) {
-      LOG.error("Failed to update Ratis configuration and add new peer. " +
-          "Cannot add new SCM: {}.", scm.getScmId(), e);
+      LOG.warn("Failed to update Ratis configuration and add new peer. " +
+          "Cannot add new SCM: {}. {}", scm.getScmId(), e.getMessage());
+      if (LOG.isDebugEnabled()) {
+        LOG.info("Cannot add new SCM: {}. {}", scm.getScmId(), e);
+      }
       throw e;
     }
   }
