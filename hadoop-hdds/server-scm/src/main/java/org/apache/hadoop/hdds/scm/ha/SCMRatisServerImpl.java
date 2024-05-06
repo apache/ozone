@@ -230,9 +230,7 @@ public class SCMRatisServerImpl implements SCMRatisServer {
     final RaftClientReply raftClientReply =
         server.submitClientRequestAsync(raftClientRequest)
             .get(requestTimeout, TimeUnit.MILLISECONDS);
-    if (LOG.isDebugEnabled()) {
-      LOG.info("request {} Reply {}", raftClientRequest, raftClientReply);
-    }
+    LOG.debug("request {} Reply {}", raftClientRequest, raftClientReply);
     return SCMRatisResponse.decode(raftClientReply);
   }
 
@@ -337,9 +335,7 @@ public class SCMRatisServerImpl implements SCMRatisServer {
     } catch (IOException e) {
       LOG.warn("Failed to update Ratis configuration and add new peer. " +
           "Cannot add new SCM: {}. {}", scm.getScmId(), e.getMessage());
-      if (LOG.isDebugEnabled()) {
-        LOG.info("Cannot add new SCM: {}. {}", scm.getScmId(), e);
-      }
+      LOG.debug(String.valueOf(e));
       throw e;
     }
   }
