@@ -52,6 +52,7 @@ import org.apache.hadoop.fs.ozone.OzoneFsShell;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.MiniOzoneHAClusterImpl;
+import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
@@ -752,15 +753,21 @@ public class TestOzoneShellHA {
       streams[numKeys - 1].hsync();
       // Wait for flush
       cluster.getOzoneManager().awaitDoubleBufferFlush();
-      final String[] args = new String[] {"om", "lof",
-          "--service-id", omServiceId,
-          "-p", pathToBucket};
+      final String[] args = new String[] {"om", "lof", "--service-id", omServiceId, "-p", pathToBucket};
 
       execute(ozoneAdminShell, args);
       String cmdRes = getStdOut();
 
       // Verify that key is hsync'ed and not deleted
       assertTrue(cmdRes.contains("\tYes\t\tNo"), "key should be hsync'ed and not deleted");
+
+      // Verify json output
+      String[] args1 = new String[] {"om", "lof", "--service-id", omServiceId, "--json", "-p", pathToBucket};
+      execute(ozoneAdminShell, args1);
+      cmdRes = getStdOut();
+
+      assertTrue(!cmdRes.contains(OzoneConsts.DELETED_HSYNC_KEY),
+          "key should not have deletedHsyncKey metadata");
 
       // Suspend open key cleanup service so that key remains in openKeyTable for verification
       OpenKeyCleanupService openKeyCleanupService =
@@ -782,6 +789,28 @@ public class TestOzoneShellHA {
           return false;
         }
       }, 1000, 10000);
+
+      // Now check json output
+      execute(ozoneAdminShell, args1);
+      cmdRes = getStdOut();
+      assertTrue(cmdRes.contains(OzoneConsts.DELETED_HSYNC_KEY),
+          "key should have deletedHsyncKey metadata");
+
+      // Verify --hide-deleted, result should not have deleted hsync keys
+      String[] args2 = new String[] {"om", "lof", "--service-id", omServiceId, "--hide-deleted", "-p", pathToBucket};
+      execute(ozoneAdminShell, args2);
+      cmdRes = getStdOut();
+      // Verify that deletedHsyncKey is not in the result
+      assertTrue(!cmdRes.contains("\tYes\t\tYes"), "key should be hsync'ed and not deleted");
+
+      // Verify --hide-deleted with json result
+      args2 = new String[] {"om", "lof", "--service-id", omServiceId, "--hide-deleted", "--json", "-p", pathToBucket};
+      execute(ozoneAdminShell, args2);
+      cmdRes = getStdOut();
+      // Verify that deletedHsyncKey is not in the result
+      assertTrue(!cmdRes.contains(OzoneConsts.DELETED_HSYNC_KEY),
+          "key should not have deletedHsyncKey metadata");
+
     }  finally {
       // Cleanup
       IOUtils.closeQuietly(streams);

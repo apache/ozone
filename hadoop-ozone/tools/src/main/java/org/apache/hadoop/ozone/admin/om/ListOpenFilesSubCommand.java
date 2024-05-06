@@ -66,6 +66,11 @@ public class ListOpenFilesSubCommand implements Callable<Void> {
       description = "Format output as JSON")
   private boolean json;
 
+  @CommandLine.Option(names = { "--hide-deleted" },
+      defaultValue = "false",
+      description = "Whether to hide deleted open keys")
+  private boolean hideDeleted;
+
   // Conforms to ListOptions, but not all in ListOptions applies here thus
   // not using that directly
   @CommandLine.Option(
@@ -105,6 +110,9 @@ public class ListOpenFilesSubCommand implements Callable<Void> {
     ListOpenFilesResult res =
         ozoneManagerClient.listOpenFiles(pathPrefix, limit, startItem);
 
+    if (hideDeleted) {
+      res.getOpenKeys().removeIf(o -> o.getKeyInfo().getMetadata().containsKey(OzoneConsts.DELETED_HSYNC_KEY));
+    }
     if (json) {
       // Print detailed JSON
       printOpenKeysListAsJson(res);
