@@ -441,7 +441,7 @@ public class OzoneDelegationTokenSecretManager
       signerCert = getCertClient().getCertificate(
           identifier.getOmCertSerialId());
     } catch (CertificateException e) {
-      LOG.error("getCertificate with identifier {} failed", identifier, e);
+      LOG.error("getCertificate failed for serialId {}", identifier.getOmCertSerialId(), e);
       return false;
     }
 
