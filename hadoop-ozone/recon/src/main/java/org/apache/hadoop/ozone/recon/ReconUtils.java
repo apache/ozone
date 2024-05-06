@@ -322,16 +322,14 @@ public class ReconUtils {
     synchronized (ReconUtils.class) {
       if (!isRebuilding) {
         isRebuilding = true;
-        ExecutorService executor = Executors.newSingleThreadExecutor();
+        ExecutorService executor = Executors.newSingleThreadExecutor(); // Create the executor
         executor.submit(() -> {
           try {
             reconNamespaceSummaryManager.rebuildNSSummaryTree(omMetadataManager);
           } finally {
-            synchronized (ReconUtils.class) {
-              isRebuilding = false;
-              rebuildTriggered = false;
-            }
-            executor.shutdown();
+            isRebuilding = false;
+            rebuildTriggered = false;
+            executor.shutdown(); // Shutdown the executor here
           }
         });
       }
