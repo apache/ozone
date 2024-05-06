@@ -50,7 +50,7 @@ public final class ReconConstants {
   public static final String RECON_QUERY_PREVKEY = "prevKey";
   public static final String RECON_OPEN_KEY_INCLUDE_NON_FSO = "includeNonFso";
   public static final String RECON_OPEN_KEY_INCLUDE_FSO = "includeFso";
-  public static final String RECON_OPEN_KEY_DEFAULT_SEARCH_LIMIT = "30";
+  public static final String RECON_OPEN_KEY_DEFAULT_SEARCH_LIMIT = "1000";
   public static final String RECON_QUERY_FILTER = "missingIn";
   public static final String PREV_CONTAINER_ID_DEFAULT_VALUE = "0";
   public static final String PREV_DELETED_BLOCKS_TRANSACTION_ID_DEFAULT_VALUE =

@@ -234,15 +234,14 @@ public class OMDBInsightSearchEndpoint {
     if (parentSummary == null) {
       return;
     }
-
+    long volumeID = Long.parseLong(names[0]);
+    long bucketID = Long.parseLong(names[1]);
     Set<Long> childDirIds = parentSummary.getChildDir();
     for (Long childId : childDirIds) {
       // Fetch the NSSummary for each child directory
       NSSummary childSummary =
           reconNamespaceSummaryManager.getNSSummary(childId);
       if (childSummary != null) {
-        long volumeID = Long.parseLong(names[0]);
-        long bucketID = Long.parseLong(names[1]);
         String subPath =
             constructObjectPathWithPrefix(volumeID, bucketID, childId);
         // Add to subPaths
