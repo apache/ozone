@@ -137,14 +137,6 @@ public class RootedOzoneFileSystem extends BasicRootedOzoneFileSystem
     if (cap) {
       return cap;
     }
-    // this switch is for features which are in the OFS client.
-    switch (validatePathCapabilityArgs(path, capability)) {
-    case CommonPathCapabilities.LEASE_RECOVERABLE:
-      return true;
-    default:
-      // fall through
-    }
-
     return super.hasPathCapability(p, capability);
   }
 
