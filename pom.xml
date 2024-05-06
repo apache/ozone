@@ -292,7 +292,7 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
     <restrict-imports.enforcer.version>2.5.0</restrict-imports.enforcer.version>
     <jgrapht.version>1.4.0</jgrapht.version>
 
-    <spring.version>5.3.27</spring.version>
+    <spring.version>5.3.34</spring.version>
     <jooq.version>3.11.10</jooq.version>
 
     <vault.driver.version>5.1.0</vault.driver.version>
