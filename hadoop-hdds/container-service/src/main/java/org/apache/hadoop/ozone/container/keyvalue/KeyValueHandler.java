@@ -1158,9 +1158,12 @@ public class KeyValueHandler extends Handler {
     // TODO Just a deterministic placeholder hash for testing until actual implementation is finished.
     ContainerData data = container.getContainerData();
     long id = data.getContainerID();
-    ByteBuffer byteBuffer = ByteBuffer.allocate(Long.BYTES);
+    ByteBuffer byteBuffer = ByteBuffer.allocate(Long.BYTES)
+        .putLong(id)
+        .asReadOnlyBuffer();
+    byteBuffer.rewind();
     ChecksumByteBuffer checksumImpl = ChecksumByteBufferFactory.crc32Impl();
-    checksumImpl.update(byteBuffer.putLong(id));
+    checksumImpl.update(byteBuffer);
     long dataChecksum = checksumImpl.getValue();
     LOG.info("Generated data checksum of container {} for testing: {}", id, dataChecksum);
     data.setDataChecksum(dataChecksum);
