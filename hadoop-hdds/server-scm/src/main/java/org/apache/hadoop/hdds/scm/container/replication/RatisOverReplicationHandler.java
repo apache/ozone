@@ -119,9 +119,9 @@ public class RatisOverReplicationHandler
         replicaCount.getReplicationFactor());
 
     // get replicas that can be deleted, in sorted order
-    List<ContainerReplica> eligibleReplicas =
-        getEligibleReplicas(replicaCount, pendingOps);
-    if (eligibleReplicas.size() == 0) {
+    EligibleAndReserveReplicas eligibleAndReserveReplicas =
+        getEligibleAndReserveReplicas(replicaCount, pendingOps);
+    if (eligibleAndReserveReplicas.getEligibleReplicas().isEmpty()) {
       LOG.info("Did not find any replicas that are eligible to be deleted for" +
           " container {}.", containerInfo);
       return 0;
@@ -130,7 +130,7 @@ public class RatisOverReplicationHandler
     // get number of excess replicas
     int excess = replicaCount.getExcessRedundancy(true);
 
-    return createCommands(containerInfo, replicas, eligibleReplicas, excess);
+    return createCommands(containerInfo, eligibleAndReserveReplicas, excess);
   }
 
   private boolean verifyOverReplication(
@@ -153,9 +153,10 @@ public class RatisOverReplicationHandler
    * @return List of ContainerReplica sorted using
    * {@link RatisOverReplicationHandler#sortReplicas(Collection, boolean)}
    */
-  private List<ContainerReplica> getEligibleReplicas(
+  private EligibleAndReserveReplicas getEligibleAndReserveReplicas(
       RatisContainerReplicaCount replicaCount,
       List<ContainerReplicaOp> pendingOps) {
+    List<ContainerReplica> reserveReplicas = new ArrayList<>();
     // sort replicas so that they can be selected in a deterministic way
     List<ContainerReplica> eligibleReplicas =
         sortReplicas(replicaCount.getReplicas(),
@@ -180,11 +181,11 @@ public class RatisOverReplicationHandler
     // closed
     if (replicaCount.getContainer().getState() !=
         HddsProtos.LifeCycleState.CLOSED) {
-      saveReplicasWithUniqueOrigins(replicaCount.getContainer(),
-          eligibleReplicas);
+      reserveReplicas.addAll(saveReplicasWithUniqueOrigins(replicaCount.getContainer(),
+          eligibleReplicas));
     }
 
-    return eligibleReplicas;
+    return new EligibleAndReserveReplicas(eligibleReplicas, reserveReplicas);
   }
 
   /**
@@ -195,8 +196,9 @@ public class RatisOverReplicationHandler
    * list.
    * @param eligibleReplicas List of replicas that are eligible to be deleted
    * and from which replicas with unique origin node ID need to be saved
+   * @return return the replicas need to be reserved.
    */
-  private void saveReplicasWithUniqueOrigins(ContainerInfo container,
+  private List<ContainerReplica> saveReplicasWithUniqueOrigins(ContainerInfo container,
       List<ContainerReplica> eligibleReplicas) {
     List<ContainerReplica> nonUniqueDeleteCandidates =
         ReplicationManagerUtil.findNonUniqueDeleteCandidates(
@@ -216,6 +218,7 @@ public class RatisOverReplicationHandler
     // note that this preserves order of the List
     eligibleReplicas.removeIf(
         replica -> !nonUniqueDeleteCandidates.contains(replica));
+    return nonUniqueDeleteCandidates;
   }
 
   /**
@@ -241,8 +244,8 @@ public class RatisOverReplicationHandler
   }
 
   private int createCommands(
-      ContainerInfo containerInfo, Set<ContainerReplica> originalReplicas,
-      List<ContainerReplica> replicas, int excess)
+      ContainerInfo containerInfo, EligibleAndReserveReplicas eligibleAndReserveReplicas,
+      int excess)
       throws NotLeaderException, CommandTargetOverloadedException {
 
     /*
@@ -254,7 +257,7 @@ public class RatisOverReplicationHandler
     int initialExcess = excess;
     CommandTargetOverloadedException firstOverloadedException = null;
     List<ContainerReplica> replicasRemoved = new ArrayList<>();
-    for (ContainerReplica replica : replicas) {
+    for (ContainerReplica replica : eligibleAndReserveReplicas.getEligibleReplicas()) {
       if (excess == 0) {
         break;
       }
@@ -280,17 +283,16 @@ public class RatisOverReplicationHandler
         excess--;
       }
     }
-    replicas.removeAll(replicasRemoved);
+    eligibleAndReserveReplicas.removeFromEligible(replicasRemoved);
 
     /*
     Remove excess replicas if that does not make the container mis replicated.
     If the container was already mis replicated, then remove replicas if that
     does not change the placement count.
      */
-    Set<ContainerReplica> replicaSet = new HashSet<>(originalReplicas);
-    replicasRemoved.forEach(replicaSet::remove);
+    Set<ContainerReplica> replicaSet = eligibleAndReserveReplicas.getReplicaSet();
     // iterate through replicas in deterministic order
-    for (ContainerReplica replica : replicas) {
+    for (ContainerReplica replica : eligibleAndReserveReplicas.getEligibleReplicas()) {
       if (excess == 0) {
         break;
       }
@@ -323,4 +325,43 @@ public class RatisOverReplicationHandler
     return commandsSent;
   }
 
+  class EligibleAndReserveReplicas {
+    private List<ContainerReplica> eligibleReplicas;
+    private List<ContainerReplica> reserveReplicas;
+
+    EligibleAndReserveReplicas(List<ContainerReplica> eligibleReplicas,
+        List<ContainerReplica> reserveReplicas) {
+      this.eligibleReplicas = eligibleReplicas;
+      this.reserveReplicas = reserveReplicas;
+    }
+
+    void removeFromEligible(List<ContainerReplica> toRemove) {
+      eligibleReplicas.removeAll(toRemove);
+    }
+
+    Set<ContainerReplica> getReplicaSet() {
+      Set<ContainerReplica> set = new HashSet<>();
+      set.addAll(reserveReplicas);
+      set.addAll(eligibleReplicas);
+      return set;
+    }
+
+    public List<ContainerReplica> getEligibleReplicas() {
+      return eligibleReplicas;
+    }
+
+    public void setEligibleReplicas(
+        List<ContainerReplica> eligibleReplicas) {
+      this.eligibleReplicas = eligibleReplicas;
+    }
+
+    public List<ContainerReplica> getReserveReplicas() {
+      return reserveReplicas;
+    }
+
+    public void setReserveReplicas(
+        List<ContainerReplica> reserveReplicas) {
+      this.reserveReplicas = reserveReplicas;
+    }
+  }
 }
