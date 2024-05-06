@@ -446,7 +446,7 @@ public class OzoneDelegationTokenSecretManager
     }
 
     if (signerCert == null) {
-      LOG.error("signerCert is null");
+      LOG.error("signerCert is null for serialId {}", identifier.getOmCertSerialId());
       return false;
     }
 
