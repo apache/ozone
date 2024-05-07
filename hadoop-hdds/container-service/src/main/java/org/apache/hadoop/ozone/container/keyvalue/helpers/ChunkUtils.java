@@ -42,7 +42,6 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
-import java.util.function.ToLongFunction;
 
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
@@ -430,11 +429,6 @@ public final class ChunkUtils {
   private static void validateReadSize(long expected, long actual)
       throws StorageContainerException {
     checkSize("read", expected, actual, CONTAINER_INTERNAL_ERROR);
-  }
-
-  private static void validateWriteSize(long expected, long actual)
-      throws StorageContainerException {
-    checkSize("write", expected, actual, INVALID_WRITE_SIZE);
   }
 
   public static void validateBufferSize(long expected, long actual)
