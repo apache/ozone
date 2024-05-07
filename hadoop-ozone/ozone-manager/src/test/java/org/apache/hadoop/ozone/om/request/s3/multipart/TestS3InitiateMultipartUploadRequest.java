@@ -20,7 +20,9 @@
 package org.apache.hadoop.ozone.om.request.s3.multipart;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -58,8 +60,12 @@ public class TestS3InitiateMultipartUploadRequest
     OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
         omMetadataManager, getBucketLayout());
 
+    Map<String, String> customMetadata = new HashMap<>();
+    customMetadata.put("custom-key1", "custom-value1");
+    customMetadata.put("custom-key2", "custom-value2");
+
     OMRequest modifiedRequest = doPreExecuteInitiateMPU(volumeName,
-        bucketName, keyName);
+        bucketName, keyName, customMetadata);
 
     S3InitiateMultipartUploadRequest s3InitiateMultipartUploadRequest =
         getS3InitiateMultipartUploadReq(modifiedRequest);
@@ -83,6 +89,11 @@ public class TestS3InitiateMultipartUploadRequest
         .isMultipartKey());
     Assertions.assertNotNull(omMetadataManager.getMultipartInfoTable()
         .get(multipartKey));
+    Assertions.assertNotNull(openMPUKeyInfo.getMetadata());
+    Assertions.assertEquals("custom-value1", openMPUKeyInfo.getMetadata().get("custom-key1"));
+    Assertions.assertEquals("custom-value2", openMPUKeyInfo.getMetadata().get("custom-key2"));
+
+    Assertions.assertNotNull(omMetadataManager.getMultipartInfoTable().get(multipartKey));
 
     Assertions.assertEquals(modifiedRequest.getInitiateMultiPartUploadRequest()
             .getKeyArgs().getMultipartUploadID(),

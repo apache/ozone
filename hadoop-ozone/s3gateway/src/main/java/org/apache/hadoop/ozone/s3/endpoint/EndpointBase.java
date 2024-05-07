@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone.s3.endpoint;
 
 import javax.annotation.PostConstruct;
 import javax.inject.Inject;
+import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.MultivaluedMap;
 import javax.ws.rs.core.Response;
 import javax.ws.rs.container.ContainerRequestContext;
@@ -308,6 +309,20 @@ public abstract class EndpointBase implements Auditor {
         customMetadata.put(mapKey, value);
       }
     }
+
+    // If the request contains a custom metadata header "x-amz-meta-ETag",
+    // replace the metadata key to "etag-custom" to prevent key metadata collision with
+    // the ETag calculated by hashing the object when storing the key in OM table.
+    // The custom ETag metadata header will be rebuilt during the headObject operation.
+    if (customMetadata.containsKey(HttpHeaders.ETAG)
+        || customMetadata.containsKey(HttpHeaders.ETAG.toLowerCase())) {
+      String customETag = customMetadata.get(HttpHeaders.ETAG) != null ?
+          customMetadata.get(HttpHeaders.ETAG) : customMetadata.get(HttpHeaders.ETAG.toLowerCase());
+      customMetadata.remove(HttpHeaders.ETAG);
+      customMetadata.remove(HttpHeaders.ETAG.toLowerCase());
+      customMetadata.put(ETAG_CUSTOM, customETag);
+    }
+
     return customMetadata;
   }
 
@@ -321,6 +336,7 @@ public abstract class EndpointBase implements Auditor {
       }
       String metadataKey = entry.getKey();
       if (metadataKey.equals(ETAG_CUSTOM)) {
+        // Rebuild the ETag custom metadata header
         metadataKey = ETAG.toLowerCase();
       }
       responseBuilder
