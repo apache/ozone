@@ -224,11 +224,16 @@ class TestObjectPut {
     assertEquals(2, tags.size());
     assertEquals("value1", tags.get("tag1"));
     assertEquals("value2", tags.get("tag2"));
+  }
 
-    HttpHeaders headerWithOnlyTagValue = Mockito.mock(HttpHeaders.class);
+  @Test
+  public void testPutObjectWithOnlyTagKey() throws Exception {
+    ByteArrayInputStream body =
+        new ByteArrayInputStream(CONTENT.getBytes(UTF_8));
+    HttpHeaders headerWithOnlyTagKey = Mockito.mock(HttpHeaders.class);
     // Try to send with only the key (no value)
-    when(headerWithOnlyTagValue.getHeaderString(TAG_HEADER)).thenReturn("tag1");
-    objectEndpoint.setHeaders(headerWithOnlyTagValue);
+    when(headerWithOnlyTagKey.getHeaderString(TAG_HEADER)).thenReturn("tag1");
+    objectEndpoint.setHeaders(headerWithOnlyTagKey);
 
     try {
       objectEndpoint.put(BUCKET_NAME, KEY_NAME, CONTENT.length(),
@@ -236,9 +241,15 @@ class TestObjectPut {
       fail("request with invalid query param should fail");
     } catch (OS3Exception ex) {
       assertEquals(INVALID_TAG.getCode(), ex.getCode());
+      assertThat(ex.getErrorMessage()).contains("Some tag values are not specified");
       assertEquals(INVALID_TAG.getHttpCode(), ex.getHttpCode());
     }
+  }
 
+  @Test
+  public void testPutObjectWithDuplicateTagKey() throws Exception {
+    ByteArrayInputStream body =
+        new ByteArrayInputStream(CONTENT.getBytes(UTF_8));
     HttpHeaders headersWithDuplicateTagKey = Mockito.mock(HttpHeaders.class);
     when(headersWithDuplicateTagKey.getHeaderString(TAG_HEADER)).thenReturn("tag1=value1&tag1=value2");
     objectEndpoint.setHeaders(headersWithDuplicateTagKey);
@@ -248,9 +259,15 @@ class TestObjectPut {
       fail("request with duplicate tag key should fail");
     } catch (OS3Exception ex) {
       assertEquals(INVALID_TAG.getCode(), ex.getCode());
+      assertThat(ex.getErrorMessage()).contains("There are tags with duplicate tag keys");
       assertEquals(INVALID_TAG.getHttpCode(), ex.getHttpCode());
     }
+  }
 
+  @Test
+  public void testPutObjectWithLongTagKey() throws Exception {
+    ByteArrayInputStream body =
+        new ByteArrayInputStream(CONTENT.getBytes(UTF_8));
     HttpHeaders headersWithLongTagKey = Mockito.mock(HttpHeaders.class);
     String longTagKey = StringUtils.repeat('k', TAG_KEY_LENGTH_LIMIT + 1);
     when(headersWithLongTagKey.getHeaderString(TAG_HEADER)).thenReturn(longTagKey + "=value1");
@@ -261,9 +278,15 @@ class TestObjectPut {
       fail("request with tag key exceeding the length limit should fail");
     } catch (OS3Exception ex) {
       assertEquals(INVALID_TAG.getCode(), ex.getCode());
+      assertThat(ex.getErrorMessage()).contains("The tag key exceeds the maximum length");
       assertEquals(INVALID_TAG.getHttpCode(), ex.getHttpCode());
     }
+  }
 
+  @Test
+  public void testPutObjectWithLongTagValue() throws Exception {
+    ByteArrayInputStream body =
+        new ByteArrayInputStream(CONTENT.getBytes(UTF_8));
     HttpHeaders headersWithLongTagValue = Mockito.mock(HttpHeaders.class);
     objectEndpoint.setHeaders(headersWithLongTagValue);
     String longTagValue = StringUtils.repeat('v', TAG_VALUE_LENGTH_LIMIT + 1);
@@ -274,9 +297,15 @@ class TestObjectPut {
       fail("request with tag value exceeding the length limit should fail");
     } catch (OS3Exception ex) {
       assertEquals(INVALID_TAG.getCode(), ex.getCode());
+      assertThat(ex.getErrorMessage()).contains("The tag value exceeds the maximum length");
       assertEquals(INVALID_TAG.getHttpCode(), ex.getHttpCode());
     }
+  }
 
+  @Test
+  public void testPutObjectWithTooManyTags() throws Exception {
+    ByteArrayInputStream body =
+        new ByteArrayInputStream(CONTENT.getBytes(UTF_8));
     HttpHeaders headersWithTooManyTags = Mockito.mock(HttpHeaders.class);
     StringBuilder sb = new StringBuilder();
     for (int i = 0; i < TAG_NUM_LIMIT + 1; i++) {
@@ -293,6 +322,7 @@ class TestObjectPut {
       fail("request with number of tags exceeding limit should fail");
     } catch (OS3Exception ex) {
       assertEquals(INVALID_TAG.getCode(), ex.getCode());
+      assertThat(ex.getErrorMessage()).contains("exceeded the maximum number of tags");
       assertEquals(INVALID_TAG.getHttpCode(), ex.getHttpCode());
     }
   }
@@ -617,13 +647,20 @@ class TestObjectPut {
     assertEquals(1, destKeyTags.size());
     assertEquals("value3", destKeyTags.get("tag3"));
     assertThat(destKeyTags).doesNotContainKeys("tag1", "tag2");
+  }
 
+  @Test
+  public void testCopyObjectWithInvalidTagCopyDirective() throws Exception {
+    ByteArrayInputStream body =
+        new ByteArrayInputStream(CONTENT.getBytes(UTF_8));
     // Copy object with invalid x-amz-tagging-directive
+    HttpHeaders headersForCopy = Mockito.mock(HttpHeaders.class);
     when(headersForCopy.getHeaderString(TAG_DIRECTIVE_HEADER)).thenReturn("INVALID");
     try {
-      objectEndpoint.put(DEST_BUCKET_NAME, destKey, CONTENT.length(), 1, null, body);
+      objectEndpoint.put(DEST_BUCKET_NAME, "somekey", CONTENT.length(), 1, null, body);
     } catch (OS3Exception ex) {
       assertEquals(INVALID_ARGUMENT.getCode(), ex.getCode());
+      assertThat(ex.getErrorMessage()).contains("The tagging copy directive specified is invalid");
       assertEquals(INVALID_ARGUMENT.getHttpCode(), ex.getHttpCode());
     }
   }
