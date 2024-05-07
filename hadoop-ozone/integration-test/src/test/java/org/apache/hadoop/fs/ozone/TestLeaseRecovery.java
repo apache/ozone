@@ -53,6 +53,7 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.slf4j.event.Level;
 
+import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.net.ConnectException;
@@ -478,7 +479,7 @@ public class TestLeaseRecovery {
       stream.hsync();
       assertFalse(fs.isFileClosed(file));
 
-      assertThrows(OMException.class, () -> fs.recoverLease(notExistFile));
+      assertThrows(FileNotFoundException.class, () -> fs.recoverLease(notExistFile));
     } finally {
       closeIgnoringKeyNotFound(stream);
     }
