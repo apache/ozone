@@ -41,13 +41,13 @@ import java.util.Optional;
 import java.util.HashMap;
 import java.util.concurrent.TimeUnit;
 
+import org.apache.hadoop.hdds.JsonTestUtils;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.HddsTestUtils;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
-import org.apache.hadoop.hdds.server.JsonUtils;
 import org.apache.hadoop.hdds.utils.db.RDBStore;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
@@ -384,7 +384,7 @@ public class TestReconWithOzoneManager {
                                              String entityAttribute)
       throws IOException {
     List<HashMap<String, Object>> taskStatusList =
-        JsonUtils.readTreeAsListOfMaps(taskStatusResponse);
+        JsonTestUtils.readTreeAsListOfMaps(taskStatusResponse);
 
     // Stream through the list to find the task entity matching the taskName
     Optional<HashMap<String, Object>> taskEntity = taskStatusList.stream()

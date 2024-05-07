@@ -83,31 +83,6 @@ public final class JsonTestUtils {
   }
 
   /**
-   * Utility to sequentially write a large collection of items to a file.
-   */
-  public static <T> void writeToFile(Iterable<T> items, File file)
-      throws IOException {
-    ObjectWriter writer = MAPPER.writer();
-    try (SequenceWriter sequenceWriter = writer.writeValues(file)) {
-      sequenceWriter.init(true);
-      for (T item : items) {
-        sequenceWriter.write(item);
-      }
-    }
-  }
-
-  /**
-   * Utility to sequentially read a large collection of items from a file.
-   */
-  public static <T> List<T> readFromFile(File file, Class<T> itemType)
-      throws IOException {
-    ObjectReader reader = MAPPER.readerFor(itemType);
-    try (MappingIterator<T> mappingIterator = reader.readValues(file)) {
-      return mappingIterator.readAll();
-    }
-  }
-
-  /**
    * Converts a JsonNode into a Java object of the specified type.
    * @param node The JsonNode to convert.
    * @param valueType The target class of the Java object.

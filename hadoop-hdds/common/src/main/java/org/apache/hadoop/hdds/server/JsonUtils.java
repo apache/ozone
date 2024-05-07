@@ -104,13 +104,6 @@ public final class JsonUtils {
     return MAPPER.readTree(content);
   }
 
-  public static List<HashMap<String, Object>> readTreeAsListOfMaps(String json)
-      throws IOException {
-    return MAPPER.readValue(json,
-        new TypeReference<List<HashMap<String, Object>>>() {
-        });
-  }
-
   /**
    * Reads JSON content from a Reader and deserializes it into an array of the
    * specified type.
