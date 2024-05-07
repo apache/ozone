@@ -96,7 +96,6 @@ public class TestContainerBalancerDatanodeNodeLimit {
     }
     config.setIterations(1);
     config.setMaxSizeToMovePerIteration(50 * STORAGE_UNIT);
-    mockedSCM.init(config);
 
     ContainerBalancerTask task = mockedSCM.startBalancerTask(config);
     ContainerBalancerMetrics metrics = task.getMetrics();
@@ -124,7 +123,6 @@ public class TestContainerBalancerDatanodeNodeLimit {
     config.setMaxSizeToMovePerIteration(50 * STORAGE_UNIT);
     // No containers should be selected when the limit is just 2 MB.
     config.setMaxSizeEnteringTarget(2 * OzoneConsts.MB);
-    mockedSCM.init(config);
 
     ContainerBalancerTask task = mockedSCM.startBalancerTask(config);
     // Container balancer still has unbalanced nodes due to MaxSizeEnteringTarget limit
@@ -140,7 +138,6 @@ public class TestContainerBalancerDatanodeNodeLimit {
       balancerConfig.setMaxDatanodesPercentageToInvolvePerIteration(100);
     }
     balancerConfig.setIterations(1);
-    mockedSCM.init(balancerConfig);
 
     task = mockedSCM.startBalancerTask(balancerConfig);
     // Balancer should have identified unbalanced nodes.
@@ -165,7 +162,6 @@ public class TestContainerBalancerDatanodeNodeLimit {
     config.setMaxSizeToMovePerIteration(50 * STORAGE_UNIT);
     // No source containers should be selected when the limit is just 2 MB.
     config.setMaxSizeLeavingSource(2 * OzoneConsts.MB);
-    mockedSCM.init(config);
 
     ContainerBalancerTask task = mockedSCM.startBalancerTask(config);
     // Container balancer still has unbalanced nodes due to MaxSizeLeavingSource limit
@@ -181,7 +177,6 @@ public class TestContainerBalancerDatanodeNodeLimit {
       newBalancerConfig.setMaxDatanodesPercentageToInvolvePerIteration(100);
     }
     newBalancerConfig.setIterations(1);
-    mockedSCM.init(newBalancerConfig);
 
     task = mockedSCM.startBalancerTask(newBalancerConfig);
     // Balancer should have identified unbalanced nodes.
@@ -208,7 +203,6 @@ public class TestContainerBalancerDatanodeNodeLimit {
     config.setIterations(1);
     config.setMaxSizeToMovePerIteration(50 * STORAGE_UNIT);
     config.setMaxSizeEnteringTarget(50 * STORAGE_UNIT);
-    mockedSCM.init(config);
 
     // check for random threshold values
     for (int i = 0; i < 50; i++) {
@@ -257,7 +251,6 @@ public class TestContainerBalancerDatanodeNodeLimit {
     config.setIterations(1);
     config.setMaxSizeToMovePerIteration(50 * STORAGE_UNIT);
     config.setMaxSizeEnteringTarget(50 * STORAGE_UNIT);
-    mockedSCM.init(config);
 
     mockedSCM.disableLegacyReplicationManager();
     mockedSCM.startBalancerTask(config);
@@ -285,7 +278,6 @@ public class TestContainerBalancerDatanodeNodeLimit {
     config.setMaxSizeToMovePerIteration(50 * STORAGE_UNIT);
     config.setMaxSizeEnteringTarget(50 * STORAGE_UNIT);
     config.setThreshold(99.99);
-    mockedSCM.init(config);
 
     ContainerBalancerTask task = mockedSCM.startBalancerTask(config);
     ContainerBalancerMetrics metrics = task.getMetrics();
@@ -309,13 +301,10 @@ public class TestContainerBalancerDatanodeNodeLimit {
     config.setMaxSizeEnteringTarget(6 * STORAGE_UNIT);
     // deliberately set max size per iteration to a low value, 6 GB
     config.setMaxSizeToMovePerIteration(6 * STORAGE_UNIT);
-    mockedSCM.init(config);
 
     when(mockedSCM.getMoveManager().move(any(), any(), any()))
-        .thenReturn(CompletableFuture.completedFuture(
-            MoveManager.MoveResult.REPLICATION_FAIL_NODE_UNHEALTHY))
-        .thenReturn(CompletableFuture.completedFuture(
-            MoveManager.MoveResult.COMPLETED));
+        .thenReturn(CompletableFuture.completedFuture(MoveManager.MoveResult.REPLICATION_FAIL_NODE_UNHEALTHY))
+        .thenReturn(CompletableFuture.completedFuture(MoveManager.MoveResult.COMPLETED));
     ContainerBalancerTask task = mockedSCM.startBalancerTask(config);
 
     ContainerBalancerMetrics metrics = task.getMetrics();
