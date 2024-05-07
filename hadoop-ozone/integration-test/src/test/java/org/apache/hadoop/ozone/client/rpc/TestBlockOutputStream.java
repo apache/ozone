@@ -281,6 +281,7 @@ class TestBlockOutputStream {
           metrics.getContainerOpCountMetrics(WriteChunk));
       assertEquals(putBlockCount + 1,
           metrics.getContainerOpCountMetrics(PutBlock));
+      // The WriteChunk and PutBlock can be completed soon.
       assertThat(metrics.getPendingContainerOpCountMetrics(WriteChunk))
           .isLessThanOrEqualTo(pendingWriteChunkCount + 2);
       assertThat(metrics.getPendingContainerOpCountMetrics(PutBlock))
@@ -523,7 +524,7 @@ class TestBlockOutputStream {
           metrics.getPendingContainerOpCountMetrics(PutBlock));
       assertEquals(writeChunkCount + 3,
           metrics.getContainerOpCountMetrics(WriteChunk));
-      // If the flushDelay was enabled,
+      // If the flushDelay was disabled, it sends PutBlock with the data in the buffer.
       assertEquals(putBlockCount + (flushDelay ? 2 : 3),
           metrics.getContainerOpCountMetrics(PutBlock));
       assertEquals(totalOpCount + (flushDelay ? 5 : 6), metrics.getTotalOpCount());
