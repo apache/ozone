@@ -206,6 +206,17 @@ Create files invalid tags
     ${result} =                 Execute AWSS3APICli and checkrc       put-object --bucket ${BUCKET} --key ${PREFIX}/putobject/custom-metadata/key2 --body /tmp/testfile2 --tagging="tag-key1=${long_tag_value}"    255
                                 Should contain                        ${result}   InvalidTag
 
+Create files with too many tags
+                                Execute                    echo "Randomtext" > /tmp/testfile2
+    @{tags_list} =              Create List
+    FOR    ${i}    IN RANGE     11
+        Append To List    ${tags_list}    tag-key-${i}=tag-value-${i}
+    END
+
+    ${tags_over_limit} =        Catenate    SEPARATOR=&    @{tags_list}
+    ${result} =                 Execute AWSS3APICli and checkrc       put-object --bucket ${BUCKET} --key ${PREFIX}/putobject/custom-metadata/key2 --body /tmp/testfile2 --tagging="${tags_over_limit}"    255
+                                Should contain                        ${result}   InvalidTag
+
 Create small file and expect ETag (MD5) in a reponse header
                                 Execute                    head -c 1MB </dev/urandom > /tmp/small_file
     ${file_md5_checksum} =      Execute                    md5sum /tmp/small_file | awk '{print $1}'
