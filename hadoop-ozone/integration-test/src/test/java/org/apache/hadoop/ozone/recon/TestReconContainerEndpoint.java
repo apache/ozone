@@ -45,8 +45,12 @@ import javax.ws.rs.core.Response;
 import java.io.IOException;
 import java.util.Collection;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
+/**
+ * Integration test fo recon container endpoint.
+ */
 public class TestReconContainerEndpoint {
 
   private static OzoneClient client;

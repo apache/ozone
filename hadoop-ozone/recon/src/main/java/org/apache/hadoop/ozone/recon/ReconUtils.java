@@ -24,7 +24,6 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
-import java.lang.reflect.Field;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.nio.file.Path;
@@ -290,7 +289,7 @@ public class ReconUtils {
         return "";
       }
       if (nsSummary.getParentId() == -1) {
-        if (rebuildTriggered.compareAndSet(false, true)){
+        if (rebuildTriggered.compareAndSet(false, true)) {
           triggerRebuild(reconNamespaceSummaryManager, omMetadataManager);
         }
         LOG.warn("NSSummary tree is currently being rebuilt, returning empty string for path construction.");
@@ -315,11 +314,11 @@ public class ReconUtils {
 
   private static void triggerRebuild(ReconNamespaceSummaryManager reconNamespaceSummaryManager,
                                      ReconOMMetadataManager omMetadataManager) {
-      ExecutorService executor = Executors.newSingleThreadExecutor(r -> {
-        Thread t = new Thread(r);
-        t.setName("RebuildNSSummaryThread");
-        return t;
-      });
+    ExecutorService executor = Executors.newSingleThreadExecutor(r -> {
+      Thread t = new Thread(r);
+      t.setName("RebuildNSSummaryThread");
+      return t;
+    });
 
     executor.submit(() -> {
       long startTime = System.currentTimeMillis();
