@@ -28,6 +28,7 @@ import { AxiosGetHelper, cancelRequests } from 'utils/axiosRequestHelper';
 
 const DEFAULT_DISPLAY_LIMIT = 10;
 const OTHER_PATH_NAME = 'Other Objects';
+const MAX_DISPLAY_LIMIT = 30;
 
 interface IDUSubpath {
   path: string;
@@ -129,7 +130,7 @@ export class DiskUsage extends React.Component<Record<string, object>, IDUState>
     this.setState({
       isLoading: true
     });
-    const duEndpoint = `/api/v1/namespace/du?path=${path}&files=true`;
+    const duEndpoint = `/api/v1/namespace/du?path=${path}&files=true&sortSubPaths=true`;
     const { request, controller } = AxiosGetHelper(duEndpoint, cancelPieSignal)
     cancelPieSignal = controller;
     request.then(response => {
@@ -144,14 +145,12 @@ export class DiskUsage extends React.Component<Record<string, object>, IDUState>
       const dataSize = duResponse.size;
       let subpaths: IDUSubpath[] = duResponse.subPaths;
 
-      subpaths.sort((a, b) => (a.size < b.size) ? 1 : -1);
-
       // Only show top n blocks with the most DU,
       // other blocks are merged as a single block
-      if (subpaths.length > limit || (subpaths.length > 0 && limit === 30)) {
+      if (subpaths.length > limit || (subpaths.length > 0 && limit === MAX_DISPLAY_LIMIT)) {
         subpaths = subpaths.slice(0, limit);
         let topSize = 0;
-        for (let i = 0; i < limit; ++i) {
+        for (let i = 0; limit === MAX_DISPLAY_LIMIT ? i < subpaths.length : i < limit; ++i) {
           topSize += subpaths[i].size;
         }
         const otherSize = dataSize - topSize;
@@ -550,7 +549,7 @@ export class DiskUsage extends React.Component<Record<string, object>, IDUState>
                   </div>
                   <div className='dropdown-button'>
                     <Dropdown overlay={menu} placement='bottomCenter'>
-                      <Button>Display Limit: {(displayLimit === Number.MAX_VALUE) ? '30' : displayLimit}</Button>
+                      <Button>Display Limit: {(displayLimit === Number.MAX_VALUE) ? MAX_DISPLAY_LIMIT : displayLimit}</Button>
                     </Dropdown>
                   </div>
                   <div className='metadata-button'>

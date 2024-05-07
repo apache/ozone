@@ -1396,162 +1396,222 @@
   "root": {
     "status": "OK",
     "path": "/",
-    "size": 400,
-    "sizeWithReplica": 300000,
+    "size": 1709108,
+    "sizeWithReplica": -1,
     "subPathCount": 30,
     "subPaths": [
       {
+        "key": false,
+        "path": "/vol-0-30461",
+        "size": 33096,
+        "sizeWithReplica": -1,
+        "isKey": false
+      },
+      {
+        "key": false,
+        "path": "/vol-1-82078",
+        "size": 33096,
+        "sizeWithReplica": -1,
+        "isKey": false
+      },
+      {
+        "key": false,
+        "path": "/vol-2-96509",
+        "size": 330496,
+        "sizeWithReplica": -1,
+        "isKey": false
+      },
+      {
+        "key": false,
+        "path": "/vol-3-75124",
+        "size": 330496,
+        "sizeWithReplica": -1,
+        "isKey": false
+      },
+      {
+        "key": false,
+        "path": "/vol-4-53147",
+        "size": 330240,
+        "sizeWithReplica": -1,
+        "isKey": false
+      },
+      {
+        "key": false,
         "path": "/vol1",
-        "size": 10,
-        "sizeWithReplica": 150000
+        "size": 12204,
+        "sizeWithReplica": -1,
+        "isKey": false
       },
       {
-        "path": "/vol2",
-        "size": 10,
-        "sizeWithReplica": 260000
-      },
-      {
-        "path": "/vol3",
-        "size": 20,
-        "sizeWithReplica": 300000
-      },
-      {
-        "path": "/vol4",
-        "size": 30,
-        "sizeWithReplica": 30000
-      },
-      {
-        "path": "/vol5",
-        "size": 10,
-        "sizeWithReplica": 30000
-      },
-      {
-        "path": "/vol6",
-        "size": 20,
-        "sizeWithReplica": 60000
-      },
-      {
-        "path": "/vol7",
-        "size": 10,
-        "sizeWithReplica": 30000
-      },
-      {
-        "path": "/vol8",
-        "size": 10,
-        "sizeWithReplica": 30000
-      },
-      {
-        "path": "/vol9",
-        "size": 10,
-        "sizeWithReplica": 30000
-      },
-      {
-        "path": "/vol10",
-        "size": 20,
-        "sizeWithReplica": 60000
-      },
-      {
-        "path": "/vol11",
-        "size": 10,
-        "sizeWithReplica": 30000
-      },
-      {
-        "path": "/vol12",
-        "size": 10,
-        "sizeWithReplica": 30000
-      },
-      {
-        "path": "/vol13",
-        "size": 10,
-        "sizeWithReplica": 30000
-      },
-      {
-        "path": "/vol14",
-        "size": 20,
-        "sizeWithReplica": 60000
-      },
-      {
-        "path": "/vol15",
-        "size": 10,
-        "sizeWithReplica": 30000
-      },
-      {
-        "path": "/vol16",
-        "size": 10,
-        "sizeWithReplica": 30000
-      },
-      {
+        "key": false,
         "path": "/vol17",
-        "size": 10,
-        "sizeWithReplica": 30000
+        "size": 8136,
+        "sizeWithReplica": -1,
+        "isKey": false
       },
       {
-        "path": "/vol18",
-        "size": 20,
-        "sizeWithReplica": 60000
-      },
-      {
-        "path": "/vol19",
-        "size": 10,
-        "sizeWithReplica": 30000
-      },
-      {
-        "path": "/vol20",
-        "size": 10,
-        "sizeWithReplica": 30000
-      },
-      {
+        "key": false,
         "path": "/vol21",
-        "size": 10,
-        "sizeWithReplica": 30000
+        "size": 8136,
+        "sizeWithReplica": -1,
+        "isKey": false
       },
       {
+        "key": false,
         "path": "/vol22",
-        "size": 10,
-        "sizeWithReplica": 30000
+        "size": 8136,
+        "sizeWithReplica": -1,
+        "isKey": false
       },
       {
-        "path": "/vol23",
-        "size": 10,
-        "sizeWithReplica": 30000
+        "key": false,
+        "path": "/vol4",
+        "size": 8136,
+        "sizeWithReplica": -1,
+        "isKey": false
       },
       {
-        "path": "/vol24",
-        "size": 10,
-        "sizeWithReplica": 30000
+        "key": false,
+        "path": "/vol18",
+        "size": 4068,
+        "sizeWithReplica": -1,
+        "isKey": false
       },
       {
-        "path": "/vol25",
-        "size": 10,
-        "sizeWithReplica": 30000
+        "key": false,
+        "path": "/vol19",
+        "size": 4068,
+        "sizeWithReplica": -1,
+        "isKey": false
       },
       {
-        "path": "/vol26",
-        "size": 10,
-        "sizeWithReplica": 30000
+        "key": false,
+        "path": "/s3v",
+        "size": 0,
+        "sizeWithReplica": -1,
+        "isKey": false
       },
       {
-        "path": "/vol27",
-        "size": 10,
-        "sizeWithReplica": 30000
+        "key": false,
+        "path": "/vol10",
+        "size": 0,
+        "sizeWithReplica": -1,
+        "isKey": false
       },
       {
-        "path": "/vol28",
-        "size": 10,
-        "sizeWithReplica": 30000
+        "key": false,
+        "path": "/vol11",
+        "size": 0,
+        "sizeWithReplica": -1,
+        "isKey": false
       },
       {
-        "path": "/vol29",
-        "size": 10,
-        "sizeWithReplica": 30000
+        "key": false,
+        "path": "/vol12",
+        "size": 0,
+        "sizeWithReplica": -1,
+        "isKey": false
       },
       {
-        "path": "/vol30",
+        "key": false,
+        "path": "/vol13",
+        "size": 0,
+        "sizeWithReplica": -1,
+        "isKey": false
+      },
+      {
+        "key": false,
+        "path": "/vol14",
+        "size": 0,
+        "sizeWithReplica": -1,
+        "isKey": false
+      },
+      {
+        "key": false,
+        "path": "/vol15",
+        "size": 0,
+        "sizeWithReplica": -1,
+        "isKey": false
+      },
+      {
+        "key": false,
+        "path": "/vol16",
+        "size": 0,
+        "sizeWithReplica": -1,
+        "isKey": false
+      },
+      {
+        "key": false,
+        "path": "/vol2",
+        "size": 0,
+        "sizeWithReplica": -1,
+        "isKey": false
+      },
+      {
+        "key": false,
+        "path": "/vol20",
+        "size": 0,
+        "sizeWithReplica": -1,
+        "isKey": false
+      },
+      {
+        "key": false,
+        "path": "/vol3",
+        "size": 0,
+        "sizeWithReplica": -1,
+        "isKey": false
+      },
+      {
+        "key": false,
+        "path": "/vol5",
+        "size": 0,
+        "sizeWithReplica": -1,
+        "isKey": false
+      },
+      {
+        "key": false,
+        "path": "/vol6",
+        "size": 0,
+        "sizeWithReplica": -1,
+        "isKey": false
+      },
+      {
+        "key": false,
+        "path": "/vol7",
+        "size": 0,
+        "sizeWithReplica": -1,
+        "isKey": false
+      },
+      {
+        "key": false,
+        "path": "/vol8",
+        "size": 0,
+        "sizeWithReplica": -1,
+        "isKey": false
+      },
+      {
+        "key": false,
+        "path": "/vol9",
+        "size": 0,
+        "sizeWithReplica": -1,
+        "isKey": false
+      },
+      {
+        "key": false,
+        "path": "/vol10",
         "size": 10,
-        "sizeWithReplica": 30000
+        "sizeWithReplica": -1,
+        "isKey": false
+      },
+      {
+        "key": false,
+        "path": "/vol11",
+        "size": 20,
+        "sizeWithReplica": -1,
+        "isKey": false
       }
     ],
-    "sizeDirectKey": 50000
+    "sizeDirectKey": -1
   },
   "volume": {
     "status": "OK",
