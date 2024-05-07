@@ -274,16 +274,10 @@ public class ReconUtils {
    *         the path cannot be constructed at this time.
    * @throws IOException
    */
-
   public static String constructFullPath(OmKeyInfo omKeyInfo,
                                          ReconNamespaceSummaryManager reconNamespaceSummaryManager,
                                          ReconOMMetadataManager omMetadataManager)
       throws IOException {
-
-    // Return empty string if rebuild is triggered or still in progress
-    if (isRebuilding.get() || rebuildTriggered.get()) {
-      return "";
-    }
 
     StringBuilder fullPath = new StringBuilder(omKeyInfo.getKeyName());
     long parentId = omKeyInfo.getParentObjectID();
@@ -292,10 +286,15 @@ public class ReconUtils {
     while (parentId != 0) {
       NSSummary nsSummary = reconNamespaceSummaryManager.getNSSummary(parentId);
       if (nsSummary == null) {
-        break;
+        LOG.warn("NSSummary tree is currently being rebuilt, returning empty string for path construction.");
+        return "";
       }
-      if (nsSummary.getParentId() == -1 && rebuildTriggered.compareAndSet(false, true)) {
-        triggerRebuild(reconNamespaceSummaryManager, omMetadataManager);
+      if (nsSummary.getParentId() == -1) {
+        if (rebuildTriggered.compareAndSet(false, true)){
+          triggerRebuild(reconNamespaceSummaryManager, omMetadataManager);
+        }
+        LOG.warn("NSSummary tree is currently being rebuilt, returning empty string for path construction.");
+        return "";
       }
       fullPath.insert(0, nsSummary.getDirName() + OM_KEY_PREFIX);
 
@@ -316,22 +315,23 @@ public class ReconUtils {
 
   private static void triggerRebuild(ReconNamespaceSummaryManager reconNamespaceSummaryManager,
                                      ReconOMMetadataManager omMetadataManager) {
-    if (!isRebuilding.getAndSet(true)) {
       ExecutorService executor = Executors.newSingleThreadExecutor(r -> {
         Thread t = new Thread(r);
-        t.setName("RebuildNSSummaryThread");  // Setting a descriptive name for the thread
+        t.setName("RebuildNSSummaryThread");
         return t;
       });
 
-      executor.submit(() -> {
-        try {
-          reconNamespaceSummaryManager.rebuildNSSummaryTree(omMetadataManager);
-        } finally {
-          isRebuilding.set(false);
-        }
-      });
-      executor.shutdown();
-    }
+    executor.submit(() -> {
+      long startTime = System.currentTimeMillis();
+      LOG.info("Rebuilding NSSummary tree...");
+      try {
+        reconNamespaceSummaryManager.rebuildNSSummaryTree(omMetadataManager);
+      } finally {
+        long endTime = System.currentTimeMillis();
+        LOG.info("NSSummary tree rebuild completed in {} ms.", endTime - startTime);
+      }
+    });
+    executor.shutdown();
   }
 
   /**
