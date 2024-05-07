@@ -35,6 +35,7 @@ import java.util.List;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Collectors;
 
 import com.google.common.base.Preconditions;
@@ -92,8 +93,9 @@ public class ReconUtils {
 
   private static final Logger LOG = LoggerFactory.getLogger(
       ReconUtils.class);
-  private static volatile boolean rebuildTriggered = false;
-  private static volatile boolean isRebuilding = false;
+
+  private static AtomicBoolean rebuildTriggered = new AtomicBoolean(false);
+  private static AtomicBoolean isRebuilding = new AtomicBoolean(false);
 
   public static File getReconScmDbDir(ConfigurationSource conf) {
     return new ReconUtils().getReconDbDir(conf, OZONE_RECON_SCM_DB_DIR);
@@ -278,8 +280,8 @@ public class ReconUtils {
                                          ReconOMMetadataManager omMetadataManager)
       throws IOException {
 
-    // Return empty string to signify that path construction is temporarily unavailable
-    if (isRebuilding) {
+    // Return empty string if rebuild is triggered or still in progress
+    if (isRebuilding.get() || rebuildTriggered.get()) {
       return "";
     }
 
@@ -292,13 +294,8 @@ public class ReconUtils {
       if (nsSummary == null) {
         break;
       }
-      if (nsSummary.getParentId() == -1 && !rebuildTriggered) {
-        synchronized (ReconUtils.class) {
-          if (!rebuildTriggered) {
-            triggerRebuild(reconNamespaceSummaryManager, omMetadataManager);
-            rebuildTriggered = true;  // Set the flag to true inside a synchronized block
-          }
-        }
+      if (nsSummary.getParentId() == -1 && rebuildTriggered.compareAndSet(false, true)) {
+        triggerRebuild(reconNamespaceSummaryManager, omMetadataManager);
       }
       fullPath.insert(0, nsSummary.getDirName() + OM_KEY_PREFIX);
 
@@ -319,20 +316,21 @@ public class ReconUtils {
 
   private static void triggerRebuild(ReconNamespaceSummaryManager reconNamespaceSummaryManager,
                                      ReconOMMetadataManager omMetadataManager) {
-    synchronized (ReconUtils.class) {
-      if (!isRebuilding) {
-        isRebuilding = true;
-        ExecutorService executor = Executors.newSingleThreadExecutor(); // Create the executor
-        executor.submit(() -> {
-          try {
-            reconNamespaceSummaryManager.rebuildNSSummaryTree(omMetadataManager);
-          } finally {
-            isRebuilding = false;
-            rebuildTriggered = false;
-            executor.shutdown(); // Shutdown the executor here
-          }
-        });
-      }
+    if (!isRebuilding.getAndSet(true)) {
+      ExecutorService executor = Executors.newSingleThreadExecutor(r -> {
+        Thread t = new Thread(r);
+        t.setName("RebuildNSSummaryThread");  // Setting a descriptive name for the thread
+        return t;
+      });
+
+      executor.submit(() -> {
+        try {
+          reconNamespaceSummaryManager.rebuildNSSummaryTree(omMetadataManager);
+        } finally {
+          isRebuilding.set(false);
+        }
+      });
+      executor.shutdown();
     }
   }
 
