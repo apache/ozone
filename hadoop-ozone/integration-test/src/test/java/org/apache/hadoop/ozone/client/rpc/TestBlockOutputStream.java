@@ -473,7 +473,6 @@ class TestBlockOutputStream {
       int dataLength = FLUSH_SIZE + 50;
       byte[] data1 = RandomUtils.nextBytes(dataLength);
       key.write(data1);
-
       assertEquals(totalOpCount + 3, metrics.getTotalOpCount());
       KeyOutputStream keyOutputStream =
           assertInstanceOf(KeyOutputStream.class, key.getOutputStream());
@@ -493,13 +492,28 @@ class TestBlockOutputStream {
       assertEquals(FLUSH_SIZE, blockOutputStream.getTotalDataFlushedLength());
       assertEquals(0, blockOutputStream.getTotalAckDataLength());
 
-      assertEquals(0, blockOutputStream.getCommitIndex2flushedDataMap().size());
+      // Before flush, if there was no pending PutBlock which means it is complete.
+      // It put a commit index into commitIndexMap.
+      assertEquals((metrics.getPendingContainerOpCountMetrics(PutBlock) == pendingPutBlockCount) ? 1 : 0,
+          blockOutputStream.getCommitIndex2flushedDataMap().size());
 
-      assertEquals(FLUSH_SIZE, blockOutputStream.getTotalDataFlushedLength());
-      assertEquals(0, blockOutputStream.getCommitIndex2flushedDataMap().size());
+      key.flush();
+      if (flushDelay) {
+        // If the flushDelay feature is enabled, nothing happens.
+        // The assertions will be as same as those before flush.
+        assertEquals(FLUSH_SIZE, blockOutputStream.getTotalDataFlushedLength());
+        assertEquals((metrics.getPendingContainerOpCountMetrics(PutBlock) == pendingPutBlockCount) ? 1 : 0, blockOutputStream.getCommitIndex2flushedDataMap().size());
 
-      assertEquals(0, blockOutputStream.getTotalAckDataLength());
-      assertEquals(1, keyOutputStream.getStreamEntries().size());
+        assertEquals(0, blockOutputStream.getTotalAckDataLength());
+        assertEquals(1, keyOutputStream.getStreamEntries().size());
+      } else {
+        assertEquals(dataLength, blockOutputStream.getTotalDataFlushedLength());
+        assertEquals(0, blockOutputStream.getCommitIndex2flushedDataMap().size());
+
+        assertEquals(dataLength, blockOutputStream.getTotalAckDataLength());
+        assertEquals(1, keyOutputStream.getStreamEntries().size());
+      }
+
 
       key.close();
 
@@ -509,9 +523,10 @@ class TestBlockOutputStream {
           metrics.getPendingContainerOpCountMetrics(PutBlock));
       assertEquals(writeChunkCount + 3,
           metrics.getContainerOpCountMetrics(WriteChunk));
-      assertEquals(putBlockCount + 2,
+      // If the flushDelay was enabled,
+      assertEquals(putBlockCount + (flushDelay ? 2 : 3),
           metrics.getContainerOpCountMetrics(PutBlock));
-      assertEquals(totalOpCount + 5, metrics.getTotalOpCount());
+      assertEquals(totalOpCount + (flushDelay ? 5 : 6), metrics.getTotalOpCount());
       assertEquals(dataLength, blockOutputStream.getTotalAckDataLength());
       // make sure the bufferPool is empty
       assertEquals(0, blockOutputStream.getBufferPool().computeBufferData());
