@@ -39,6 +39,13 @@ public class DeletedBlocksTransactionInfoWrapper {
     this.count = count;
   }
 
+  DeletedBlocksTransactionInfoWrapper() {
+    this.txID = 0;
+    this.containerID = 0;
+    this.localIdList = null;
+    this.count = 0;
+  }
+
   public static DeletedBlocksTransactionInfoWrapper fromProtobuf(
       DeletedBlocksTransactionInfo txn) {
     if (txn.hasTxID() && txn.hasContainerID() && txn.hasCount()) {
