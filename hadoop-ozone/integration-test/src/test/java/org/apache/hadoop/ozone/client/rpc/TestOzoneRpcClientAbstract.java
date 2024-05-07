@@ -2580,8 +2580,9 @@ public abstract class TestOzoneRpcClientAbstract {
     }
   }
 
-  @Test
-  public void testCreateKeyWithMetadataAndTags() throws Exception {
+  @ParameterizedTest
+  @MethodSource("bucketLayouts")
+  public void testCreateKeyWithMetadataAndTags(BucketLayout bucketLayout) throws Exception {
     String volumeName = UUID.randomUUID().toString();
     String bucketName = UUID.randomUUID().toString();
     String keyName = UUID.randomUUID().toString();
@@ -2590,7 +2591,9 @@ public abstract class TestOzoneRpcClientAbstract {
     store.createVolume(volumeName);
 
     volume = store.getVolume(volumeName);
-    volume.createBucket(bucketName);
+    BucketArgs bucketArgs =
+            BucketArgs.newBuilder().setBucketLayout(bucketLayout).build();
+    volume.createBucket(bucketName, bucketArgs);
 
     OzoneBucket ozoneBucket = volume.getBucket(bucketName);
 
