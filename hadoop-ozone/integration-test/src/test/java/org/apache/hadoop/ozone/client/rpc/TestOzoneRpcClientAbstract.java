@@ -3173,8 +3173,8 @@ public abstract class TestOzoneRpcClientAbstract {
   }
 
   @ParameterizedTest
-  @MethodSource("replicationConfigs")
-  public void testMultipartUploadWithTags(ReplicationConfig replication) throws Exception {
+  @MethodSource({"replicationConfigs", "bucketLayouts"})
+  public void testMultipartUploadWithTags(ReplicationConfig replication, BucketLayout bucketLayout) throws Exception {
     String volumeName = UUID.randomUUID().toString();
     String bucketName = UUID.randomUUID().toString();
     String keyName = UUID.randomUUID().toString();
@@ -3182,7 +3182,9 @@ public abstract class TestOzoneRpcClientAbstract {
     store.createVolume(volumeName);
     OzoneVolume volume = store.getVolume(volumeName);
 
-    volume.createBucket(bucketName);
+    BucketArgs bucketArgs =
+        BucketArgs.newBuilder().setBucketLayout(bucketLayout).build();
+    volume.createBucket(bucketName, bucketArgs);
     OzoneBucket bucket = volume.getBucket(bucketName);
 
     // Create tags
