@@ -54,7 +54,6 @@ import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 
-import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Type.GetBlock;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Type.PutBlock;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Type.WriteChunk;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_DATANODE_PIPELINE_LIMIT;
@@ -512,7 +511,8 @@ class TestBlockOutputStream {
         // If the flushDelay feature is enabled, nothing happens.
         // The assertions will be as same as those before flush.
         assertEquals(FLUSH_SIZE, blockOutputStream.getTotalDataFlushedLength());
-        assertEquals((metrics.getPendingContainerOpCountMetrics(PutBlock) == pendingPutBlockCount) ? 1 : 0, blockOutputStream.getCommitIndex2flushedDataMap().size());
+        assertEquals((metrics.getPendingContainerOpCountMetrics(PutBlock) == pendingPutBlockCount) ? 1 : 0,
+            blockOutputStream.getCommitIndex2flushedDataMap().size());
 
         assertEquals(0, blockOutputStream.getTotalAckDataLength());
         assertEquals(1, keyOutputStream.getStreamEntries().size());
