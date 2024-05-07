@@ -325,7 +325,7 @@ public class RatisOverReplicationHandler
     return commandsSent;
   }
 
-  class EligibleAndReserveReplicas {
+  static class EligibleAndReserveReplicas {
     private List<ContainerReplica> eligibleReplicas;
     private List<ContainerReplica> reserveReplicas;
 
