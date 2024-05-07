@@ -207,7 +207,7 @@ public class OMKeyCommitRequestWithFSO extends OMKeyCommitRequest {
         openKeyToDelete.setModificationTime(Time.now());
         openKeyToDelete.setUpdateID(trxnLogIndex, ozoneManager.isRatisEnabled());
         OMFileRequest.addOpenFileTableCacheEntry(omMetadataManager,
-            dbOpenKeyToDeleteKey, openKeyToDelete, fileName, trxnLogIndex);
+            dbOpenKeyToDeleteKey, openKeyToDelete, keyName, fileName, trxnLogIndex);
       }
 
       omKeyInfo.setModificationTime(commitKeyArgs.getModificationTime());
