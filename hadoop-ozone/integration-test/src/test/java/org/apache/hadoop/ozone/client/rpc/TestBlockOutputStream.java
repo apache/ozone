@@ -482,6 +482,7 @@ class TestBlockOutputStream {
       int dataLength = FLUSH_SIZE + 50;
       byte[] data1 = RandomUtils.nextBytes(dataLength);
       key.write(data1);
+
       assertEquals(totalOpCount + 3, metrics.getTotalOpCount());
       KeyOutputStream keyOutputStream =
           assertInstanceOf(KeyOutputStream.class, key.getOutputStream());
