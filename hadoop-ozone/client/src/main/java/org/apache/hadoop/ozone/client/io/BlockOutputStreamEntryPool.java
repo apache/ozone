@@ -116,7 +116,7 @@ public class BlockOutputStreamEntryPool implements KeyMetadataAware {
                 .getStreamBufferSize()),
             ByteStringConversion
                 .createByteBufferConversion(b.isUnsafeByteBufferConversionEnabled()));
-    this.directBufferPool = new DirectBufferPool();
+    this.directBufferPool = config.getIncrementalChunkList() ? new DirectBufferPool() : null;
     this.clientMetrics = b.getClientMetrics();
     this.executorServiceSupplier = b.getExecutorServiceSupplier();
   }

@@ -184,7 +184,7 @@ public class BlockOutputStream extends OutputStream {
     this.containerBlockData = BlockData.newBuilder().setBlockID(
         blkIDBuilder.build()).addMetadata(keyValue);
     // tell DataNode I will send incremental chunk list
-    if (config.getIncrementalChunkList() && directBufferPool != null) {
+    if (config.getIncrementalChunkList()) {
       this.containerBlockData.addMetadata(INCREMENTAL_CHUNK_LIST_KV);
       this.lastChunkBuffer = this.directBufferPool.allocateBuffer(config.getStreamBufferSize());
       this.lastChunkOffset = 0;
@@ -503,7 +503,7 @@ public class BlockOutputStream extends OutputStream {
       BlockData blockData = containerBlockData.build();
       LOG.debug("sending PutBlock {}", blockData);
 
-      if (config.getIncrementalChunkList() && lastChunkBuffer != null) {
+      if (config.getIncrementalChunkList()) {
         // remove any chunks in the containerBlockData list.
         // since they are sent.
         containerBlockData.clearChunks();
@@ -782,7 +782,7 @@ public class BlockOutputStream extends OutputStream {
     try {
       BlockData blockData = null;
 
-      if (config.getIncrementalChunkList() && lastChunkBuffer != null) {
+      if (config.getIncrementalChunkList()) {
         updateBlockDataForWriteChunk(chunk);
       } else {
         containerBlockData.addChunks(chunkInfo);
