@@ -335,7 +335,7 @@ public class SCMRatisServerImpl implements SCMRatisServer {
     } catch (IOException e) {
       LOG.warn("Failed to update Ratis configuration and add new peer. " +
           "Cannot add new SCM: {}. {}", scm.getScmId(), e.getMessage());
-      LOG.debug("addSCM call failed due to: " + e);
+      LOG.debug("addSCM call failed due to: ", e);
       throw e;
     }
   }
