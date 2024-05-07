@@ -3173,8 +3173,19 @@ public abstract class TestOzoneRpcClientAbstract {
   }
 
   @ParameterizedTest
-  @MethodSource({"replicationConfigs", "bucketLayouts"})
-  public void testMultipartUploadWithTags(ReplicationConfig replication, BucketLayout bucketLayout) throws Exception {
+  @MethodSource({"replicationConfigs"})
+  public void testMultipartUploadWithTags(ReplicationConfig replication) throws Exception {
+    testMultipartUploadWithTags(replication, BucketLayout.OBJECT_STORE);
+  }
+
+  @ParameterizedTest
+  @MethodSource({"bucketLayouts"})
+  public void testMultipartUploadWithTags(BucketLayout bucketLayout) throws Exception {
+    testMultipartUploadWithTags(RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.THREE), bucketLayout);
+  }
+
+  private void testMultipartUploadWithTags(ReplicationConfig replication, BucketLayout bucketLayout)
+      throws Exception {
     String volumeName = UUID.randomUUID().toString();
     String bucketName = UUID.randomUUID().toString();
     String keyName = UUID.randomUUID().toString();
