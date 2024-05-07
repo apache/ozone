@@ -68,7 +68,7 @@ public class ListOpenFilesSubCommand implements Callable<Void> {
 
   @CommandLine.Option(names = { "--show-deleted" },
       defaultValue = "false",
-      description = "Whether to hide deleted open keys")
+      description = "Whether to show deleted open keys")
   private boolean showDeleted;
 
   // Conforms to ListOptions, but not all in ListOptions applies here thus
