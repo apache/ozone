@@ -158,9 +158,6 @@ public class OMKeyCommitRequestWithFSO extends OMKeyCommitRequest {
             String.valueOf(commitKeyRequest.getClientID()));
       }
 
-      omKeyInfo.getTags().putAll(KeyValueUtil.getFromProtobuf(
-          commitKeyArgs.getTagsList()));
-
       omKeyInfo.setDataSize(commitKeyArgs.getDataSize());
 
       omKeyInfo.setModificationTime(commitKeyArgs.getModificationTime());
