@@ -141,6 +141,7 @@ public class DNRPCLoadGenerator extends BaseFreonGenerator
     if (!ratis) {
       if (!readOnly) {
         LOG.warn("Read only is not set to true for GRPC, setting it to true");
+        readOnly = true;
       }
       pipeline = Pipeline.newBuilder(pipeline)
           .setReplicationConfig(StandaloneReplicationConfig.getInstance(
