@@ -24,7 +24,7 @@ import java.io.IOException;
 import java.io.PrintStream;
 import java.io.UnsupportedEncodingException;
 import java.net.URI;
-import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
@@ -68,10 +68,9 @@ import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.hadoop.util.ToolRunner;
 import org.apache.hadoop.ozone.om.TrashPolicyOzone;
+import org.apache.hadoop.hdds.JsonTestUtils;
 
 import com.google.common.base.Strings;
-import com.google.gson.Gson;
-import com.google.gson.internal.LinkedTreeMap;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.FS_TRASH_INTERVAL_KEY;
@@ -409,12 +408,12 @@ public class TestOzoneShellHA {
   }
 
   /**
-   * Parse output into ArrayList with Gson.
+   * Parse output into ArrayList with Jackson.
    * @return ArrayList
    */
-  private ArrayList<LinkedTreeMap<String, String>> parseOutputIntoArrayList()
-      throws UnsupportedEncodingException {
-    return new Gson().fromJson(out.toString(DEFAULT_ENCODING), ArrayList.class);
+  private List<HashMap<String, Object>> parseOutputIntoArrayList() throws IOException {
+    String jsonInput = out.toString(DEFAULT_ENCODING);
+    return JsonTestUtils.readTreeAsListOfMaps(jsonInput);
   }
 
   @Test
@@ -488,7 +487,7 @@ public class TestOzoneShellHA {
    * Test ozone shell list command.
    */
   @Test
-  public void testOzoneShCmdList() throws UnsupportedEncodingException {
+  public void testOzoneShCmdList() throws IOException {
     // Part of listing keys test.
     generateKeys("/volume4", "/bucket", "");
     final String destinationBucket = "o3://" + omServiceId + "/volume4/bucket";
@@ -1671,7 +1670,7 @@ public class TestOzoneShellHA {
   }
 
   public void testListVolumeBucketKeyShouldPrintValidJsonArray()
-      throws UnsupportedEncodingException {
+      throws IOException {
 
     final List<String> testVolumes =
         Arrays.asList("jsontest-vol1", "jsontest-vol2", "jsontest-vol3");
@@ -1696,7 +1695,7 @@ public class TestOzoneShellHA {
     execute(ozoneShell, new String[] {"volume", "list"});
 
     // Expect valid JSON array
-    final ArrayList<LinkedTreeMap<String, String>> volumeListOut =
+    final List<HashMap<String, Object>> volumeListOut =
         parseOutputIntoArrayList();
     // Can include s3v and volumes from other test cases that aren't cleaned up,
     //  hence >= instead of equals.
@@ -1711,7 +1710,7 @@ public class TestOzoneShellHA {
     execute(ozoneShell, new String[] {"bucket", "list", firstVolumePrefix});
 
     // Expect valid JSON array as well
-    final ArrayList<LinkedTreeMap<String, String>> bucketListOut =
+    final List<HashMap<String, Object>> bucketListOut =
         parseOutputIntoArrayList();
     assertEquals(testBuckets.size(), bucketListOut.size());
     final HashSet<String> bucketSet = new HashSet<>(testBuckets);
@@ -1724,7 +1723,7 @@ public class TestOzoneShellHA {
     execute(ozoneShell, new String[] {"key", "list", keyPathPrefix});
 
     // Expect valid JSON array as well
-    final ArrayList<LinkedTreeMap<String, String>> keyListOut =
+    final List<HashMap<String, Object>> keyListOut =
         parseOutputIntoArrayList();
     assertEquals(testKeys.size(), keyListOut.size());
     final HashSet<String> keySet = new HashSet<>(testKeys);
@@ -1977,7 +1976,7 @@ public class TestOzoneShellHA {
     execute(ozoneShell, new String[] {"bucket", "list", "/volume1"});
 
     // Expect valid JSON array
-    final ArrayList<LinkedTreeMap<String, String>> bucketListOut =
+    final List<HashMap<String, Object>> bucketListOut =
         parseOutputIntoArrayList();
 
     assertEquals(1, bucketListOut.size());
@@ -1996,7 +1995,7 @@ public class TestOzoneShellHA {
     execute(ozoneShell, new String[] {"bucket", "list", "/volume1"});
 
     // Expect valid JSON array
-    final ArrayList<LinkedTreeMap<String, String>> bucketListLinked =
+    final List<HashMap<String, Object>> bucketListLinked =
         parseOutputIntoArrayList();
 
     assertEquals(2, bucketListLinked.size());

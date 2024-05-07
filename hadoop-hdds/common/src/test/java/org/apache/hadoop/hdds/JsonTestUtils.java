@@ -20,13 +20,20 @@ package org.apache.hadoop.hdds;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
 
+import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.ObjectWriter;
+import com.fasterxml.jackson.databind.ObjectReader;
+import com.fasterxml.jackson.databind.SequenceWriter;
+import com.fasterxml.jackson.databind.MappingIterator;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 
+import java.io.File;
 import java.io.IOException;
+import java.util.HashMap;
+import java.util.List;
 
 /**
  * JSON Utility functions used in ozone for Test classes.
@@ -67,4 +74,50 @@ public final class JsonTestUtils {
   public static JsonNode readTree(String content) throws IOException {
     return MAPPER.readTree(content);
   }
+
+  public static List<HashMap<String, Object>> readTreeAsListOfMaps(String json)
+      throws IOException {
+    return MAPPER.readValue(json,
+        new TypeReference<List<HashMap<String, Object>>>() {
+        });
+  }
+
+  /**
+   * Utility to sequentially write a large collection of items to a file.
+   */
+  public static <T> void writeToFile(Iterable<T> items, File file)
+      throws IOException {
+    ObjectWriter writer = MAPPER.writer();
+    try (SequenceWriter sequenceWriter = writer.writeValues(file)) {
+      sequenceWriter.init(true);
+      for (T item : items) {
+        sequenceWriter.write(item);
+      }
+    }
+  }
+
+  /**
+   * Utility to sequentially read a large collection of items from a file.
+   */
+  public static <T> List<T> readFromFile(File file, Class<T> itemType)
+      throws IOException {
+    ObjectReader reader = MAPPER.readerFor(itemType);
+    try (MappingIterator<T> mappingIterator = reader.readValues(file)) {
+      return mappingIterator.readAll();
+    }
+  }
+
+  /**
+   * Converts a JsonNode into a Java object of the specified type.
+   * @param node The JsonNode to convert.
+   * @param valueType The target class of the Java object.
+   * @param <T> The type of the Java object.
+   * @return A Java object of type T, populated with data from the JsonNode.
+   * @throws IOException
+   */
+  public static <T> T treeToValue(JsonNode node, Class<T> valueType)
+      throws IOException {
+    return MAPPER.treeToValue(node, valueType);
+  }
+
 }

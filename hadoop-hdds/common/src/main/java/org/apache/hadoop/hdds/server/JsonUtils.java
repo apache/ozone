@@ -20,6 +20,7 @@ package org.apache.hadoop.hdds.server;
 
 import java.io.File;
 import java.io.IOException;
+import java.io.Reader;
 import java.util.HashMap;
 import java.util.List;
 
@@ -110,6 +111,14 @@ public final class JsonUtils {
         });
   }
 
+  /**
+   * Reads JSON content from a Reader and deserializes it into an array of the
+   * specified type.
+   */
+  public static <T> T[] readArrayFromReader(Reader reader, Class<T[]> valueType)
+      throws IOException {
+    return MAPPER.readValue(reader, valueType);
+  }
 
   /**
    * Utility to sequentially write a large collection of items to a file.
