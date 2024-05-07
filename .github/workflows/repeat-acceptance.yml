@@ -93,9 +93,11 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-pnpm-
       - name: Cache for maven dependencies
-        uses: actions/cache@v4
+        uses: actions/cache/restore@v4
         with:
-          path: ~/.m2/repository
+          path: |
+            ~/.m2/repository/*/*/*
+            !~/.m2/repository/org/apache/ozone
           key: maven-repo-${{ hashFiles('**/pom.xml') }}-${{ env.JAVA_VERSION }}
           restore-keys: |
             maven-repo-${{ hashFiles('**/pom.xml') }}
@@ -117,12 +119,6 @@ jobs:
             hadoop-ozone/dist/target/ozone-*.tar.gz
             !hadoop-ozone/dist/target/ozone-*-src.tar.gz
           retention-days: 1
-      - name: Delete temporary build artifacts before caching
-        run: |
-          #Never cache local artifacts
-          rm -rf ~/.m2/repository/org/apache/ozone/hdds*
-          rm -rf ~/.m2/repository/org/apache/ozone/ozone*
-        if: always()
   acceptance:
     needs:
       - prepare-job
