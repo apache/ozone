@@ -1416,9 +1416,6 @@ public class RpcClient implements ClientProtocol {
   public OzoneOutputStream rewriteKey(String volumeName, String bucketName, String keyName,
       long size, long existingKeyGeneration, ReplicationConfig replicationConfig,
       Map<String, String> metadata) throws IOException {
-    if (keyName == null) {
-      throw new IllegalArgumentException("Key cannot be null");
-    }
     createKeyPreChecks(volumeName, bucketName, keyName, replicationConfig);
     String ownerName = getRealUserInfo().getShortUserName();
 
@@ -1708,8 +1705,7 @@ public class RpcClient implements ClientProtocol {
               key.getModificationTime(),
               key.getReplicationConfig(),
               key.isFile(),
-              key.getOwnerName(),
-              key.getGeneration()))
+              key.getOwnerName()))
           .collect(Collectors.toList());
     }
   }

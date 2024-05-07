@@ -71,11 +71,6 @@ public class OzoneKey {
   private final boolean isFile;
 
   /**
-   * Constructs OzoneKey from OmKeyInfo.
-   *
-   */
-
-  /**
    * The generation of an existing key. This can be used with atomic commits, to
    * ensure the key has not changed since the key details were read.
    */
@@ -231,6 +226,10 @@ public class OzoneKey {
     return isFile;
   }
 
+  /**
+   * Constructs OzoneKey from OmKeyInfo.
+   *
+   */
   public static OzoneKey fromKeyInfo(OmKeyInfo keyInfo) {
     return new OzoneKey(keyInfo.getVolumeName(), keyInfo.getBucketName(),
         keyInfo.getKeyName(), keyInfo.getDataSize(), keyInfo.getCreationTime(),
