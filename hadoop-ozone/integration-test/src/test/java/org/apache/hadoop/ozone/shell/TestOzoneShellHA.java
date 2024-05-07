@@ -753,16 +753,18 @@ public class TestOzoneShellHA {
       streams[numKeys - 1].hsync();
       // Wait for flush
       cluster.getOzoneManager().awaitDoubleBufferFlush();
-      final String[] args = new String[] {"om", "lof", "--service-id", omServiceId, "-p", pathToBucket};
+      final String[] args = new String[] {"om", "lof", "--service-id",
+          omServiceId, "--show-deleted", "-p", pathToBucket};
 
       execute(ozoneAdminShell, args);
       String cmdRes = getStdOut();
 
-      // Verify that key is hsync'ed and not deleted
+      // Verify that key is hsync'ed
       assertTrue(cmdRes.contains("\tYes\t\tNo"), "key should be hsync'ed and not deleted");
 
       // Verify json output
-      String[] args1 = new String[] {"om", "lof", "--service-id", omServiceId, "--json", "-p", pathToBucket};
+      String[] args1 = new String[] {"om", "lof", "--service-id", omServiceId, "--show-deleted",
+          "--json", "-p", pathToBucket};
       execute(ozoneAdminShell, args1);
       cmdRes = getStdOut();
 
@@ -796,15 +798,15 @@ public class TestOzoneShellHA {
       assertTrue(cmdRes.contains(OzoneConsts.DELETED_HSYNC_KEY),
           "key should have deletedHsyncKey metadata");
 
-      // Verify --hide-deleted, result should not have deleted hsync keys
-      String[] args2 = new String[] {"om", "lof", "--service-id", omServiceId, "--hide-deleted", "-p", pathToBucket};
+      // Verify result should not have deleted hsync keys when --show-deleted is not in the command argument
+      String[] args2 = new String[] {"om", "lof", "--service-id", omServiceId, "-p", pathToBucket};
       execute(ozoneAdminShell, args2);
       cmdRes = getStdOut();
       // Verify that deletedHsyncKey is not in the result
       assertTrue(!cmdRes.contains("\tYes\t\tYes"), "key should be hsync'ed and not deleted");
 
-      // Verify --hide-deleted with json result
-      args2 = new String[] {"om", "lof", "--service-id", omServiceId, "--hide-deleted", "--json", "-p", pathToBucket};
+      // Verify with json result
+      args2 = new String[] {"om", "lof", "--service-id", omServiceId, "--json", "-p", pathToBucket};
       execute(ozoneAdminShell, args2);
       cmdRes = getStdOut();
       // Verify that deletedHsyncKey is not in the result

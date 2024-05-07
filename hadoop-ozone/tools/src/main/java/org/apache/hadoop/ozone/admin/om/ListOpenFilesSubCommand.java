@@ -66,10 +66,10 @@ public class ListOpenFilesSubCommand implements Callable<Void> {
       description = "Format output as JSON")
   private boolean json;
 
-  @CommandLine.Option(names = { "--hide-deleted" },
+  @CommandLine.Option(names = { "--show-deleted" },
       defaultValue = "false",
       description = "Whether to hide deleted open keys")
-  private boolean hideDeleted;
+  private boolean showDeleted;
 
   // Conforms to ListOptions, but not all in ListOptions applies here thus
   // not using that directly
@@ -110,7 +110,7 @@ public class ListOpenFilesSubCommand implements Callable<Void> {
     ListOpenFilesResult res =
         ozoneManagerClient.listOpenFiles(pathPrefix, limit, startItem);
 
-    if (hideDeleted) {
+    if (!showDeleted) {
       res.getOpenKeys().removeIf(o -> o.getKeyInfo().getMetadata().containsKey(OzoneConsts.DELETED_HSYNC_KEY));
     }
     if (json) {
@@ -140,7 +140,8 @@ public class ListOpenFilesSubCommand implements Callable<Void> {
     if (startItem != null && !startItem.isEmpty()) {
       msg += "\nafter continuation token:\n  " + startItem;
     }
-    msg += "\n\nClient ID\t\tCreation time\tHsync'ed\tDeleted\t\tOpen File Path";
+    msg += showDeleted ? "\n\nClient ID\t\tCreation time\tHsync'ed\tDeleted\t\tOpen File Path" :
+        "\n\nClient ID\t\tCreation time\tHsync'ed\tOpen File Path";
     System.out.println(msg);
 
     for (OpenKeySession e : openFileList) {
@@ -160,13 +161,15 @@ public class ListOpenFilesSubCommand implements Callable<Void> {
           line += "Yes w/ cid " + hsyncClientIdStr + "\t";
         }
 
-        if (omKeyInfo.getMetadata().containsKey(OzoneConsts.DELETED_HSYNC_KEY)) {
-          line += "Yes\t\t";
-        } else {
-          line += "No\t\t";
+        if (showDeleted) {
+          if (omKeyInfo.getMetadata().containsKey(OzoneConsts.DELETED_HSYNC_KEY)) {
+            line += "Yes\t\t";
+          } else {
+            line += "No\t\t";
+          }
         }
       } else {
-        line += "No\t\tNo\t\t";
+        line += showDeleted ? "No\t\tNo\t\t" : "No\t\t";
       }
 
       line += getFullPathFromKeyInfo(omKeyInfo);
