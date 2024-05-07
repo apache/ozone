@@ -307,20 +307,8 @@ public class TestCommitWatcher {
         // just watch for a higher index so as to ensure, it does an actual
         // call to Ratis. Otherwise, it may just return in case the
         // commitInfoMap is updated to the latest index in putBlock response.
-        IOException ioe =
-            assertThrows(IOException.class, () -> watcher.watchForCommit(replies.get(1).getLogIndex() + 100));
-        Throwable t = HddsClientUtils.checkForException(ioe);
-        // with retry count set to noRetry and a lower watch request
-        // timeout, watch request will eventually
-        // fail with TimeoutIOException from ratis client or the client
-        // can itself get AlreadyClosedException from the Ratis Server
-        // and the write may fail with RaftRetryFailureException
-        assertTrue(
-            t instanceof RaftRetryFailureException ||
-                t instanceof TimeoutIOException ||
-                t instanceof AlreadyClosedException ||
-                t instanceof NotReplicatedException,
-            "Unexpected exception: " + t.getClass());
+        // Note watchForCommit no longer throws IOException after HDDS-10108, but it does release buffer nonetheless
+        watcher.watchForCommit(replies.get(1).getLogIndex() + 100);
         if (ratisClient.getReplicatedMinCommitIndex() < replies.get(1)
             .getLogIndex()) {
           assertEquals(chunkSize, watcher.getTotalAckDataLength());
