@@ -91,7 +91,7 @@ public class ReconUtils {
   public ReconUtils() {
   }
 
-  private static Logger LOG = LoggerFactory.getLogger(
+  private static Logger log = LoggerFactory.getLogger(
       ReconUtils.class);
 
   private static AtomicBoolean rebuildTriggered = new AtomicBoolean(false);
@@ -136,7 +136,7 @@ public class ReconUtils {
       return metadataDir;
     }
 
-    LOG.warn("{} is not configured. We recommend adding this setting. " +
+    log.warn("{} is not configured. We recommend adding this setting. " +
             "Falling back to {} instead.",
         dirConfigKey, HddsConfigKeys.OZONE_METADATA_DIRS);
     return getOzoneMetaDirPath(conf);
@@ -171,7 +171,7 @@ public class ReconUtils {
         org.apache.hadoop.io.IOUtils.closeStream(tarOs);
         org.apache.hadoop.io.IOUtils.closeStream(fileOutputStream);
       } catch (Exception e) {
-        LOG.error("Exception encountered when closing " +
+        log.error("Exception encountered when closing " +
             "TAR file output stream: " + e);
       }
     }
@@ -236,7 +236,7 @@ public class ReconUtils {
           if (entry.isDirectory()) {
             boolean success = f.mkdirs();
             if (!success) {
-              LOG.error("Unable to create directory found in tar.");
+              log.error("Unable to create directory found in tar.");
             }
           } else {
             //Write contents of file in archive to a new file.
@@ -286,14 +286,14 @@ public class ReconUtils {
     while (parentId != 0) {
       NSSummary nsSummary = reconNamespaceSummaryManager.getNSSummary(parentId);
       if (nsSummary == null) {
-        LOG.warn("NSSummary tree is currently being rebuilt, returning empty string for path construction.");
+        log.warn("NSSummary tree is currently being rebuilt, returning empty string for path construction.");
         return "";
       }
       if (nsSummary.getParentId() == -1) {
         if (rebuildTriggered.compareAndSet(false, true)) {
           triggerRebuild(reconNamespaceSummaryManager, omMetadataManager);
         }
-        LOG.warn("NSSummary tree is currently being rebuilt, returning empty string for path construction.");
+        log.warn("NSSummary tree is currently being rebuilt, returning empty string for path construction.");
         return "";
       }
       fullPath.insert(0, nsSummary.getDirName() + OM_KEY_PREFIX);
@@ -323,12 +323,12 @@ public class ReconUtils {
 
     executor.submit(() -> {
       long startTime = System.currentTimeMillis();
-      LOG.info("Rebuilding NSSummary tree...");
+      log.info("Rebuilding NSSummary tree...");
       try {
         reconNamespaceSummaryManager.rebuildNSSummaryTree(omMetadataManager);
       } finally {
         long endTime = System.currentTimeMillis();
-        LOG.info("NSSummary tree rebuild completed in {} ms.", endTime - startTime);
+        log.info("NSSummary tree rebuild completed in {} ms.", endTime - startTime);
       }
     });
     executor.shutdown();
@@ -379,7 +379,7 @@ public class ReconUtils {
               lastKnownSnapshotFileName = fileName;
             }
           } catch (NumberFormatException nfEx) {
-            LOG.warn("Unknown file found in Recon DB dir : {}", fileName);
+            log.warn("Unknown file found in Recon DB dir : {}", fileName);
           }
         }
       }
@@ -507,6 +507,6 @@ public class ReconUtils {
 
   @TestOnly
   public static void setLogger(Logger logger) {
-    LOG = logger;
+    log = logger;
   }
 }
