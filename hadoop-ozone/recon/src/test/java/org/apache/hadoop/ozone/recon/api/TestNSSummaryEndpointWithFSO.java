@@ -46,10 +46,7 @@ import org.apache.hadoop.ozone.recon.ReconTestInjector;
 import org.apache.hadoop.ozone.recon.ReconUtils;
 import org.apache.hadoop.ozone.recon.api.handlers.BucketHandler;
 import org.apache.hadoop.ozone.recon.api.handlers.EntityHandler;
-import org.apache.hadoop.ozone.recon.api.types.DUResponse;
-import org.apache.hadoop.ozone.recon.api.types.FileSizeDistributionResponse;
-import org.apache.hadoop.ozone.recon.api.types.ResponseStatus;
-import org.apache.hadoop.ozone.recon.api.types.QuotaUsageResponse;
+import org.apache.hadoop.ozone.recon.api.types.*;
 import org.apache.hadoop.ozone.recon.common.CommonUtils;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 import org.apache.hadoop.ozone.recon.scm.ReconNodeManager;
@@ -63,6 +60,8 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.mockito.ArgumentCaptor;
+import org.slf4j.Logger;
 
 import javax.ws.rs.core.Response;
 
@@ -77,8 +76,6 @@ import java.util.ArrayList;
 import java.util.Set;
 import java.util.HashSet;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.apache.hadoop.hdds.protocol.MockDatanodeDetails.randomDatanodeDetails;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_DB_DIRS;
 import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.writeDirToOm;
@@ -86,8 +83,8 @@ import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.writeKeyT
 import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.getTestReconOmMetadataManager;
 import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.getMockOzoneManagerServiceProviderWithFSO;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_NSSUMMARY_FLUSH_TO_DB_MAX_THRESHOLD;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.when;
+import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.Mockito.*;
 
 /**
  * Test for NSSummary REST APIs with FSO.
@@ -766,7 +763,84 @@ public class TestNSSummaryEndpointWithFSO {
         reconNamespaceSummaryManager, reconOMMetadataManager);
     expectedPath = "vol2/bucket3/dir5/file9";
     Assertions.assertEquals(expectedPath, fullPath);
+
+    // Check for when we encounter a NSSUmamry with parentId -1
+    // Fetch NSSummary for dir1 and immediately update its parentId.
+    NSSummary dir1Summary = reconNamespaceSummaryManager.getNSSummary(DIR_ONE_OBJECT_ID);
+    dir1Summary.setParentId(-1);  // Update parentId to -1
+
+    reconNamespaceSummaryManager.deleteNSSummary(DIR_ONE_OBJECT_ID);
+    reconNamespaceSummaryManager.storeNSSummary(DIR_ONE_OBJECT_ID, dir1Summary);
+
+    NSSummary changedDir1Summary = reconNamespaceSummaryManager.getNSSummary(DIR_ONE_OBJECT_ID);
+    Assertions.assertEquals(-1, changedDir1Summary.getParentId(), "The parentId should be updated to -1");
+
+    keyInfo = new OmKeyInfo.Builder()
+        .setKeyName("file2")
+        .setVolumeName(VOL)
+        .setBucketName(BUCKET_ONE)
+        .setObjectID(KEY_TWO_OBJECT_ID)
+        .setParentObjectID(DIR_TWO_OBJECT_ID)
+        .build();
+    // Call constructFullPath and verify the result
+    fullPath = ReconUtils.constructFullPath(keyInfo,
+        reconNamespaceSummaryManager, reconOMMetadataManager);
   }
+
+  @Test
+  public void testConstructFullPathWithNegativeParentIdTriggersRebuild() throws IOException {
+    // Setup
+    long dirOneObjectId = 1L; // Sample object ID for the directory
+    ReconNamespaceSummaryManager mockSummaryManager = mock(ReconNamespaceSummaryManager.class);
+    ReconOMMetadataManager mockMetadataManager = mock(ReconOMMetadataManager.class);
+    NSSummary dir1Summary = new NSSummary();
+    dir1Summary.setParentId(-1); // Simulate directory at the top of the tree
+    when(mockSummaryManager.getNSSummary(dirOneObjectId)).thenReturn(dir1Summary);
+
+    OmKeyInfo keyInfo = new OmKeyInfo.Builder()
+        .setKeyName("file2")
+        .setVolumeName("vol")
+        .setBucketName("bucket1")
+        .setObjectID(2L)
+        .setParentObjectID(dirOneObjectId)
+        .build();
+
+    String result = ReconUtils.constructFullPath(keyInfo, mockSummaryManager, mockMetadataManager);
+    assertEquals("", result, "Expected an empty string return due to rebuild trigger");
+  }
+
+  @Test
+  public void testLoggingWhenParentIdIsNegative() throws IOException {
+    ReconNamespaceSummaryManager mockManager =
+        mock(ReconNamespaceSummaryManager.class);
+    Logger mockLogger = mock(Logger.class);
+    ReconUtils.setLogger(mockLogger);
+
+    NSSummary mockSummary = new NSSummary();
+    mockSummary.setParentId(-1);
+    when(mockManager.getNSSummary(anyLong())).thenReturn(mockSummary);
+
+    OmKeyInfo keyInfo = new OmKeyInfo.Builder()
+        .setKeyName("testKey")
+        .setVolumeName("vol")
+        .setBucketName("bucket")
+        .setObjectID(1L)
+        .setParentObjectID(1L)
+        .build();
+
+    ReconUtils.constructFullPath(keyInfo, mockManager, null);
+
+    // Assert
+    ArgumentCaptor<String> logCaptor = ArgumentCaptor.forClass(String.class);
+    verify(mockLogger).warn(logCaptor.capture());
+    String loggedMessage = logCaptor.getValue();
+
+    // Here we can assert the exact message we expect to see in the logs.
+    assertEquals(
+        "NSSummary tree is currently being rebuilt, returning empty string " +
+            "for path construction.", loggedMessage);
+  }
+
 
   /**
    * Write directories and keys info into OM DB.
@@ -1324,7 +1398,7 @@ public class TestNSSummaryEndpointWithFSO {
   }
 
   private static SCMNodeStat getMockSCMRootStat() {
-    return new SCMNodeStat(ROOT_QUOTA, ROOT_DATA_SIZE, 
+    return new SCMNodeStat(ROOT_QUOTA, ROOT_DATA_SIZE,
         ROOT_QUOTA - ROOT_DATA_SIZE, 0, ROOT_QUOTA - ROOT_DATA_SIZE - 1);
   }
 }

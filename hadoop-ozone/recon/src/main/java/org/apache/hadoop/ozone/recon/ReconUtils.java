@@ -75,6 +75,7 @@ import org.apache.hadoop.security.authentication.client.AuthenticationException;
 import org.hadoop.ozone.recon.schema.tables.daos.GlobalStatsDao;
 import org.hadoop.ozone.recon.schema.tables.pojos.GlobalStats;
 import jakarta.annotation.Nonnull;
+import org.jetbrains.annotations.TestOnly;
 import org.jooq.Configuration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -90,7 +91,7 @@ public class ReconUtils {
   public ReconUtils() {
   }
 
-  private static final Logger LOG = LoggerFactory.getLogger(
+  private static Logger LOG = LoggerFactory.getLogger(
       ReconUtils.class);
 
   private static AtomicBoolean rebuildTriggered = new AtomicBoolean(false);
@@ -502,5 +503,10 @@ public class ReconUtils {
     builder.setDatanodeProtocolServerAddress(
         HddsServerUtil.getReconDataNodeBindAddress(conf));
     return builder.build();
+  }
+
+  @TestOnly
+  public static void setLogger(Logger logger) {
+    LOG = logger;
   }
 }
