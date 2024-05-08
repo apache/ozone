@@ -37,9 +37,7 @@ import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 import org.apache.hadoop.ozone.recon.scm.ReconContainerManager;
 import java.nio.charset.StandardCharsets;
 import org.apache.hadoop.ozone.recon.spi.impl.OzoneManagerServiceProviderImpl;
-import org.junit.jupiter.api.AfterAll;
-import org.junit.jupiter.api.BeforeAll;
-import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.*;
 
 import javax.ws.rs.core.Response;
 import java.io.IOException;
@@ -58,8 +56,8 @@ public class TestReconContainerEndpoint {
   private static OzoneConfiguration conf;
   private static ObjectStore store;
 
-  @BeforeAll
-  public static void init() throws Exception {
+  @BeforeEach
+  public void init() throws Exception {
     conf = new OzoneConfiguration();
     conf.set(OMConfigKeys.OZONE_DEFAULT_BUCKET_LAYOUT,
         OMConfigKeys.OZONE_BUCKET_LAYOUT_FILE_SYSTEM_OPTIMIZED);
@@ -72,8 +70,8 @@ public class TestReconContainerEndpoint {
     store = client.getObjectStore();
   }
 
-  @AfterAll
-  public static void shutdown() throws IOException {
+  @AfterEach
+  public void shutdown() throws IOException {
     if (client != null) {
       client.close();
     }
@@ -108,10 +106,7 @@ public class TestReconContainerEndpoint {
     impl.syncDataFromOM();
 
     //Search for the bucket from the bucket table and verify its FSO
-    String buckKey = "/" + volName + "/" + bucketName;
-    OmBucketInfo bucketInfo =
-        cluster.getReconServer().getOzoneManagerServiceProvider()
-            .getOMMetadataManagerInstance().getBucketTable().get(buckKey);
+    OmBucketInfo bucketInfo = cluster.getOzoneManager().getBucketInfo(volName, bucketName);
     assertNotNull(bucketInfo);
     assertEquals(BucketLayout.FILE_SYSTEM_OPTIMIZED,
         bucketInfo.getBucketLayout());
@@ -135,8 +130,7 @@ public class TestReconContainerEndpoint {
     // Assert the file name and the complete path.
     KeyMetadata keyMetadata = keyMetadataList.iterator().next();
     assertEquals("file1", keyMetadata.getKey());
-    assertEquals("testvol/testbucket/dir1/dir2/dir3/file1",
-        keyMetadata.getCompletePath());
+    assertEquals("testvol/fsobucket/dir1/dir2/dir3/file1", keyMetadata.getCompletePath());
 
     testContainerID = 2L;
     response = getContainerEndpointResponse(testContainerID);
@@ -148,12 +142,12 @@ public class TestReconContainerEndpoint {
     // Assert the file name and the complete path.
     keyMetadata = keyMetadataList.iterator().next();
     assertEquals("file1", keyMetadata.getKey());
-    assertEquals("testvol/testbucket/file1", keyMetadata.getCompletePath());
+    assertEquals("testvol/fsobucket/file1", keyMetadata.getCompletePath());
   }
 
   @Test
   public void testContainerEndpointForOBSBucket() throws Exception {
-    String volumeName = "testvol";
+    String volumeName = "testvol2";
     String obsBucketName = "obsbucket";
     String obsSingleFileKey = "file1";
 
@@ -173,10 +167,7 @@ public class TestReconContainerEndpoint {
     impl.syncDataFromOM();
 
     // Search for the bucket from the bucket table and verify its OBS
-    String bucketKey = "/" + volumeName + "/" + obsBucketName;
-    OmBucketInfo bucketInfo =
-        cluster.getReconServer().getOzoneManagerServiceProvider()
-            .getOMMetadataManagerInstance().getBucketTable().get(bucketKey);
+    OmBucketInfo bucketInfo = cluster.getOzoneManager().getBucketInfo(volumeName, obsBucketName);
     assertNotNull(bucketInfo);
     assertEquals(BucketLayout.OBJECT_STORE, bucketInfo.getBucketLayout());
 
@@ -195,7 +186,7 @@ public class TestReconContainerEndpoint {
 
     KeyMetadata keyMetadata = keyMetadataList.iterator().next();
     assertEquals("file1", keyMetadata.getKey());
-    assertEquals("testvol/obsbucket/file1", keyMetadata.getCompletePath());
+    assertEquals("testvol2/obsbucket/file1", keyMetadata.getCompletePath());
   }
 
   private Response getContainerEndpointResponse(long containerId) {
