@@ -75,7 +75,7 @@ import org.apache.hadoop.security.authentication.client.AuthenticationException;
 import org.hadoop.ozone.recon.schema.tables.daos.GlobalStatsDao;
 import org.hadoop.ozone.recon.schema.tables.pojos.GlobalStats;
 import jakarta.annotation.Nonnull;
-import org.jetbrains.annotations.TestOnly;
+import com.google.common.annotations.VisibleForTesting;
 import org.jooq.Configuration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -95,7 +95,6 @@ public class ReconUtils {
       ReconUtils.class);
 
   private static AtomicBoolean rebuildTriggered = new AtomicBoolean(false);
-  private static AtomicBoolean isRebuilding = new AtomicBoolean(false);
 
   public static File getReconScmDbDir(ConfigurationSource conf) {
     return new ReconUtils().getReconDbDir(conf, OZONE_RECON_SCM_DB_DIR);
@@ -286,7 +285,8 @@ public class ReconUtils {
     while (parentId != 0) {
       NSSummary nsSummary = reconNamespaceSummaryManager.getNSSummary(parentId);
       if (nsSummary == null) {
-        log.warn("NSSummary tree is currently being rebuilt, returning empty string for path construction.");
+        log.warn("NSSummary tree is currently being rebuilt or the directory could be in the progress of " +
+            "deletion, returning empty string for path construction.");
         return "";
       }
       if (nsSummary.getParentId() == -1) {
@@ -505,7 +505,7 @@ public class ReconUtils {
     return builder.build();
   }
 
-  @TestOnly
+  @VisibleForTesting
   public static void setLogger(Logger logger) {
     log = logger;
   }
