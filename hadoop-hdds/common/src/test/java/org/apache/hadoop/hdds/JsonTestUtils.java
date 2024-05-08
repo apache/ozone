@@ -28,8 +28,8 @@ import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 
 import java.io.IOException;
-import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 /**
  * JSON Utility functions used in ozone for Test classes.
@@ -71,10 +71,10 @@ public final class JsonTestUtils {
     return MAPPER.readTree(content);
   }
 
-  public static List<HashMap<String, Object>> readTreeAsListOfMaps(String json)
+  public static List<Map<String, Object>> readTreeAsListOfMaps(String json)
       throws IOException {
     return MAPPER.readValue(json,
-        new TypeReference<List<HashMap<String, Object>>>() {
+        new TypeReference<List<Map<String, Object>>>() {
         });
   }
 

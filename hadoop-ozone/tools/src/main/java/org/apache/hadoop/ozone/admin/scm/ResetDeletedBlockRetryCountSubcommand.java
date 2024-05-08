@@ -77,7 +77,7 @@ public class ResetDeletedBlockRetryCountSubcommand extends ScmSubcommand {
       try (InputStream in = new FileInputStream(group.fileName);
            Reader fileReader = new InputStreamReader(in,
                StandardCharsets.UTF_8)) {
-        DeletedBlocksTransactionInfoWrapper[] txns = JsonUtils.readArrayFromReader(fileReader,
+        DeletedBlocksTransactionInfoWrapper[] txns = JsonUtils.readFromReader(fileReader,
             DeletedBlocksTransactionInfoWrapper[].class);
         txIDs = Arrays.stream(txns)
             .map(DeletedBlocksTransactionInfoWrapper::getTxID)

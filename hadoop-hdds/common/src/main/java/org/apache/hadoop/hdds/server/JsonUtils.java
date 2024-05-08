@@ -103,11 +103,9 @@ public final class JsonUtils {
   }
 
   /**
-   * Reads JSON content from a Reader and deserializes it into an array of the
-   * specified type.
+   * Reads JSON content from a Reader and deserializes it into a Java object.
    */
-  public static <T> T[] readArrayFromReader(Reader reader, Class<T[]> valueType)
-      throws IOException {
+  public static <T> T readFromReader(Reader reader, Class<T> valueType) throws IOException {
     return MAPPER.readValue(reader, valueType);
   }
 

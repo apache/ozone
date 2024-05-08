@@ -24,7 +24,7 @@ import java.io.IOException;
 import java.io.PrintStream;
 import java.io.UnsupportedEncodingException;
 import java.net.URI;
-import java.util.HashMap;
+import java.util.Map;
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
@@ -411,7 +411,7 @@ public class TestOzoneShellHA {
    * Parse output into ArrayList with Jackson.
    * @return ArrayList
    */
-  private List<HashMap<String, Object>> parseOutputIntoArrayList() throws IOException {
+  private List<Map<String, Object>> parseOutputIntoArrayList() throws IOException {
     String jsonInput = out.toString(DEFAULT_ENCODING);
     return JsonTestUtils.readTreeAsListOfMaps(jsonInput);
   }
@@ -1695,7 +1695,7 @@ public class TestOzoneShellHA {
     execute(ozoneShell, new String[] {"volume", "list"});
 
     // Expect valid JSON array
-    final List<HashMap<String, Object>> volumeListOut =
+    final List<Map<String, Object>> volumeListOut =
         parseOutputIntoArrayList();
     // Can include s3v and volumes from other test cases that aren't cleaned up,
     //  hence >= instead of equals.
@@ -1710,7 +1710,7 @@ public class TestOzoneShellHA {
     execute(ozoneShell, new String[] {"bucket", "list", firstVolumePrefix});
 
     // Expect valid JSON array as well
-    final List<HashMap<String, Object>> bucketListOut =
+    final List<Map<String, Object>> bucketListOut =
         parseOutputIntoArrayList();
     assertEquals(testBuckets.size(), bucketListOut.size());
     final HashSet<String> bucketSet = new HashSet<>(testBuckets);
@@ -1723,7 +1723,7 @@ public class TestOzoneShellHA {
     execute(ozoneShell, new String[] {"key", "list", keyPathPrefix});
 
     // Expect valid JSON array as well
-    final List<HashMap<String, Object>> keyListOut =
+    final List<Map<String, Object>> keyListOut =
         parseOutputIntoArrayList();
     assertEquals(testKeys.size(), keyListOut.size());
     final HashSet<String> keySet = new HashSet<>(testKeys);
@@ -1976,7 +1976,7 @@ public class TestOzoneShellHA {
     execute(ozoneShell, new String[] {"bucket", "list", "/volume1"});
 
     // Expect valid JSON array
-    final List<HashMap<String, Object>> bucketListOut =
+    final List<Map<String, Object>> bucketListOut =
         parseOutputIntoArrayList();
 
     assertEquals(1, bucketListOut.size());
@@ -1995,7 +1995,7 @@ public class TestOzoneShellHA {
     execute(ozoneShell, new String[] {"bucket", "list", "/volume1"});
 
     // Expect valid JSON array
-    final List<HashMap<String, Object>> bucketListLinked =
+    final List<Map<String, Object>> bucketListLinked =
         parseOutputIntoArrayList();
 
     assertEquals(2, bucketListLinked.size());
