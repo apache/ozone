@@ -42,7 +42,18 @@ import org.xml.sax.XMLReader;
 public class MultiDeleteRequestUnmarshaller
     implements MessageBodyReader<MultiDeleteRequest> {
 
+  private final JAXBContext context;
+  private final SAXParserFactory saxParserFactory;
+
   public MultiDeleteRequestUnmarshaller() {
+    try {
+      context = JAXBContext.newInstance(MultiDeleteRequest.class);
+      saxParserFactory = SAXParserFactory.newInstance();
+      saxParserFactory.setFeature(XMLConstants.FEATURE_SECURE_PROCESSING, true);
+    } catch (Exception ex) {
+      throw new AssertionError("Can't instantiate MultiDeleteRequest parser",
+          ex);
+    }
   }
 
   @Override
@@ -56,9 +67,6 @@ public class MultiDeleteRequestUnmarshaller
       Type genericType, Annotation[] annotations, MediaType mediaType,
       MultivaluedMap<String, String> httpHeaders, InputStream entityStream) {
     try {
-      JAXBContext context = JAXBContext.newInstance(MultiDeleteRequest.class);
-      SAXParserFactory saxParserFactory = SAXParserFactory.newInstance();
-      saxParserFactory.setFeature(XMLConstants.FEATURE_SECURE_PROCESSING, true);
       XMLReader xmlReader = saxParserFactory.newSAXParser().getXMLReader();
       UnmarshallerHandler unmarshallerHandler =
           context.createUnmarshaller().getUnmarshallerHandler();
