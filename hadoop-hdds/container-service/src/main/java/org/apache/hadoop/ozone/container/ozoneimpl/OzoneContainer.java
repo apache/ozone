@@ -506,7 +506,9 @@ public class OzoneContainer {
     if (dbVolumeSet != null) {
       dbVolumeSet.shutdown();
     }
-    compactExecutor.shutdown();
+    if (compactExecutor != null) {
+      compactExecutor.shutdown();
+    }
     blockDeletingService.shutdown();
     recoveringContainerScrubbingService.shutdown();
     ContainerMetrics.remove();
