@@ -53,10 +53,10 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
  */
 public class TestReconContainerEndpoint {
 
-  private static OzoneClient client;
-  private static MiniOzoneCluster cluster = null;
-  private static OzoneConfiguration conf;
-  private static ObjectStore store;
+  private OzoneConfiguration conf;
+  private MiniOzoneCluster cluster;
+  private OzoneClient client;
+  private ObjectStore store;
 
   @BeforeEach
   public void init() throws Exception {
