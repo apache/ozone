@@ -265,7 +265,7 @@ public class ReconUtils {
    * The method begins with the leaf node (the key itself) and recursively prepends parent directory names, fetched
    * via NSSummary objects, until reaching the parent bucket (parentId is -1). It effectively builds the path from
    * bottom to top, finally prepending the volume and bucket names to complete the full path. If the directory structure
-   * is currently being rebuilt (indicated by the isRebuilding flag), this method returns an empty string to signify
+   * is currently being rebuilt (indicated by the rebuildTriggered flag), this method returns an empty string to signify
    * that path construction is temporarily unavailable.
    *
    * @param omKeyInfo The OmKeyInfo object for the key
