@@ -27,6 +27,7 @@ import org.apache.hadoop.hdds.recon.ReconConfig;
 import org.apache.hadoop.hdds.utils.DBCheckpointServlet;
 import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
 import org.apache.hadoop.hdds.utils.db.RDBCheckpointUtils;
+import org.apache.hadoop.hdds.utils.db.RDBStore;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.ozone.OzoneConsts;
@@ -317,8 +318,7 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
 
     // Get the snapshot files.
     Set<Path> snapshotPaths = waitForSnapshotDirs(checkpoint);
-    Path snapshotDir = Paths.get(OMStorage.getOmDbDir(getConf()).toString(),
-        OM_SNAPSHOT_DIR);
+    Path snapshotDir = Paths.get(getSnapshotsParentDir()).getParent();
     if (!processDir(snapshotDir, copyFiles, hardLinkFiles, sstFilesToExclude,
         snapshotPaths, excluded, copySize, null)) {
       return false;
@@ -633,6 +633,12 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
     return ((OzoneManager) getServletContext()
         .getAttribute(OzoneConsts.OM_CONTEXT_ATTRIBUTE))
         .getConfiguration();
+  }
+
+  private String getSnapshotsParentDir() {
+    OzoneManager om = (OzoneManager) getServletContext().getAttribute(OzoneConsts.OM_CONTEXT_ATTRIBUTE);
+    RDBStore store = (RDBStore) om.getMetadataManager().getStore();
+    return store.getSnapshotsParentDir();
   }
 
   @Override
