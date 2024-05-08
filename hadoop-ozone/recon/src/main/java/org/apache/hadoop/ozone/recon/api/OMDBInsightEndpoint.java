@@ -757,11 +757,16 @@ public class OMDBInsightEndpoint {
                            @DefaultValue(StringUtils.EMPTY) @QueryParam(RECON_QUERY_PREVKEY) String prevKey,
                            @DefaultValue(DEFAULT_FETCH_COUNT) @QueryParam("limit") int limit) {
 
-    String[] names = startPrefix.split(OM_KEY_PREFIX);
+
     // This API supports startPrefix from bucket level.
-    if (startPrefix == null || startPrefix.length() == 0 || names.length < 3) {
+    if (startPrefix == null || startPrefix.length() == 0) {
       return Response.status(Response.Status.BAD_REQUEST).build();
     }
+    String[] names = startPrefix.split(OM_KEY_PREFIX);
+    if (names.length < 3) {
+      return Response.status(Response.Status.BAD_REQUEST).build();
+    }
+
     ListKeysResponse listKeysResponse = new ListKeysResponse();
     if (!ReconUtils.isInitializationComplete(omMetadataManager)) {
       listKeysResponse.setStatus(ResponseStatus.INITIALIZING);
@@ -792,7 +797,7 @@ public class OMDBInsightEndpoint {
       boolean keysFound = false; // Flag to track if any keys are found
 
       // Search keys from non-FSO layout.
-      Map<String, OmKeyInfo> obsKeys = new LinkedHashMap<>();
+      Map<String, OmKeyInfo> obsKeys;
       Table<String, OmKeyInfo> keyTable =
           omMetadataManager.getKeyTable(BucketLayout.LEGACY);
       obsKeys = retrieveKeysFromTable(keyTable, paramInfo);
@@ -1038,7 +1043,7 @@ public class OMDBInsightEndpoint {
 
   private boolean applyFilters(Table.KeyValue<String, OmKeyInfo> entry, ParamInfo paramInfo) throws IOException {
 
-    LOG.error("Applying filters on : {}", entry.getKey());
+    LOG.debug("Applying filters on : {}", entry.getKey());
 
     long epochMillis =
         ReconUtils.convertToEpochMillis(paramInfo.getCreationDate(), "MM-dd-yyyy HH:mm:ss", TimeZone.getDefault());
@@ -1073,14 +1078,7 @@ public class OMDBInsightEndpoint {
         .filter(keySizeFilter)
         .collect(Collectors.toList());
 
-    LOG.error("After filtering listKeys:");
-    filteredKeyList.forEach(keyInfo -> {
-      try {
-        LOG.error("Key name - {}", keyInfo.getValue().getKeyName());
-      } catch (IOException e) {
-        throw new RuntimeException(e);
-      }
-    });
+    LOG.debug("After applying filter on : {}, filtered list size: {}", entry.getKey(), filteredKeyList.size());
 
     return (filteredKeyList.size() > 0);
   }
