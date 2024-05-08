@@ -19,20 +19,27 @@
 package org.apache.hadoop.ozone.recon.api;
 
 import org.apache.hadoop.hdds.client.BlockID;
+import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
 import org.apache.hadoop.hdds.utils.db.Table;
+import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
+import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
+import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.recon.ReconTestInjector;
+import org.apache.hadoop.ozone.recon.ReconUtils;
+import org.apache.hadoop.ozone.recon.api.types.KeyEntityInfo;
 import org.apache.hadoop.ozone.recon.api.types.KeyInsightInfoResponse;
+import org.apache.hadoop.ozone.recon.api.types.ListKeysResponse;
 import org.apache.hadoop.ozone.recon.api.types.NSSummary;
 import org.apache.hadoop.ozone.recon.persistence.AbstractReconSqlDBTest;
 import org.apache.hadoop.ozone.recon.persistence.ContainerHealthSchemaManager;
@@ -59,16 +66,21 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Map;
 import java.util.Random;
+import java.util.TimeZone;
 import java.util.stream.Collectors;
 import java.util.Set;
 import java.util.HashSet;
 
+import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
+import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.TEST_USER;
 import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.getBucketLayout;
 import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.getOmKeyLocationInfo;
 import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.getRandomPipeline;
 import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.getTestReconOmMetadataManager;
 import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.initializeNewOmMetadataManager;
 import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.writeDataToOm;
+import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.writeDirToOm;
+import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.writeKeyToOm;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -91,6 +103,77 @@ public class TestOmDBInsightEndPoint extends AbstractReconSqlDBTest {
   private Random random = new Random();
   private OzoneConfiguration ozoneConfiguration;
   private Set<Long> generatedIds = new HashSet<>();
+
+  private static final String ROOT_PATH = "/";
+
+  private static int chunkSize = 1024 * 1024;
+
+  private static final String VOLUME_ONE = "volume1";
+
+  private static final String OBS_BUCKET = "obs-bucket";
+  private static final String FSO_BUCKET = "fso-bucket";
+
+  private static final String DIR_ONE = "dir1";
+  private static final String DIR_TWO = "dir2";
+  private static final String DIR_THREE = "dir3";
+
+  private static final String TEST_FILE = "testfile";
+  private static final String FILE_ONE = "file1";
+
+  private static final String KEY_ONE = "key1";
+  private static final String KEY_TWO = "key1/key2";
+  private static final String KEY_THREE = "key1/key2/key3";
+  private static final String KEY_FOUR = "key4";
+  private static final String KEY_FIVE = "key5";
+  private static final String KEY_SIX = "key6";
+
+  private static final long VOLUME_ONE_OBJECT_ID = 1L;
+
+  private static final long OBS_BUCKET_OBJECT_ID = 2L;
+  private static final long KEY_ONE_OBJECT_ID = 3L;
+  private static final long KEY_TWO_OBJECT_ID = 4L;
+  private static final long KEY_THREE_OBJECT_ID = 5L;
+  private static final long KEY_FOUR_OBJECT_ID = 6L;
+  private static final long KEY_FIVE_OBJECT_ID = 7L;
+  private static final long KEY_SIX_OBJECT_ID = 8L;
+
+  private static final long FSO_BUCKET_OBJECT_ID = 10L;
+  private static final long DIR_ONE_OBJECT_ID = 11L;
+  private static final long DIR_TWO_OBJECT_ID = 12L;
+  private static final long DIR_THREE_OBJECT_ID = 13L;
+  private static final long KEY_SEVEN_OBJECT_ID = 14L;
+  private static final long KEY_EIGHT_OBJECT_ID = 15L;
+  private static final long KEY_NINE_OBJECT_ID = 16L;
+  private static final long KEY_TEN_OBJECT_ID = 17L;
+  private static final long KEY_ELEVEN_OBJECT_ID = 18L;
+  private static final long KEY_TWELVE_OBJECT_ID = 19L;
+
+  private static final long KEY_ONE_SIZE = 2 * OzoneConsts.KB + 1; // bin 2
+  private static final long KEY_TWO_SIZE = 2 * OzoneConsts.KB + 1; // bin 2
+  private static final long KEY_THREE_SIZE = OzoneConsts.KB + 1; // bin 1
+  private static final long KEY_FOUR_SIZE = OzoneConsts.KB + 1; // bin 1
+  private static final long KEY_FIVE_SIZE = 2 * OzoneConsts.KB + 1; // bin 2
+  private static final long KEY_SIX_SIZE = 2 * OzoneConsts.KB + 1; // bin 2
+  private static final long KEY_SEVEN_SIZE = OzoneConsts.KB + 1; // bin 1
+  private static final long KEY_EIGHT_SIZE = 2 * OzoneConsts.KB + 1; // bin 2
+  private static final long KEY_NINE_SIZE = OzoneConsts.KB + 1; // bin 1
+  private static final long KEY_TEN_SIZE = 2 * OzoneConsts.KB + 1; // bin 2
+  private static final long KEY_ELEVEN_SIZE = OzoneConsts.KB + 1; // bin 1
+  private static final long KEY_TWELVE_SIZE = 2 * OzoneConsts.KB + 1; // bin 2
+
+  private static final String OBS_BUCKET_PATH = "/volume1/obs-bucket";
+  private static final String FSO_BUCKET_PATH = "/volume1/fso-bucket";
+
+  private static final long VOLUME_ONE_QUOTA = 2 * OzoneConsts.MB;
+  private static final long OBS_BUCKET_QUOTA = OzoneConsts.MB;
+  private static final long FSO_BUCKET_QUOTA = OzoneConsts.MB;
+
+  private ReplicationConfig ratisOne = ReplicationConfig.fromProtoTypeAndFactor(HddsProtos.ReplicationType.RATIS,
+      HddsProtos.ReplicationFactor.ONE);
+  private long epochMillis1 =
+      ReconUtils.convertToEpochMillis("04-04-2024 12:30:00", "MM-dd-yyyy HH:mm:ss", TimeZone.getDefault());
+  private long epochMillis2 =
+      ReconUtils.convertToEpochMillis("04-05-2024 12:30:00", "MM-dd-yyyy HH:mm:ss", TimeZone.getDefault());
 
   public TestOmDBInsightEndPoint() {
     super();
@@ -143,6 +226,7 @@ public class TestOmDBInsightEndPoint extends AbstractReconSqlDBTest {
     setUpOmData();
   }
 
+  @SuppressWarnings("methodlength")
   private void setUpOmData() throws Exception {
     List<OmKeyLocationInfo> omKeyLocationInfoList = new ArrayList<>();
     BlockID blockID1 = new BlockID(1, 101);
@@ -215,6 +299,217 @@ public class TestOmDBInsightEndPoint extends AbstractReconSqlDBTest {
         new ContainerKeyMapperTask(reconContainerMetadataManager,
             ozoneConfiguration);
     containerKeyMapperTask.reprocess(reconOMMetadataManager);
+
+    String volumeOneKey = reconOMMetadataManager.getVolumeKey(VOLUME_ONE);
+    OmVolumeArgs volumeOneArgs =
+        OmVolumeArgs.newBuilder()
+            .setObjectID(VOLUME_ONE_OBJECT_ID)
+            .setVolume(VOLUME_ONE)
+            .setAdminName(TEST_USER)
+            .setOwnerName(TEST_USER)
+            .setQuotaInBytes(VOLUME_ONE_QUOTA)
+            .build();
+
+    reconOMMetadataManager.getVolumeTable().put(volumeOneKey, volumeOneArgs);
+
+    OmBucketInfo obsBucketInfo = OmBucketInfo.newBuilder()
+        .setVolumeName(VOLUME_ONE)
+        .setBucketName(OBS_BUCKET)
+        .setObjectID(OBS_BUCKET_OBJECT_ID)
+        .setQuotaInBytes(OBS_BUCKET_QUOTA)
+        .setBucketLayout(BucketLayout.OBJECT_STORE)
+        .build();
+    String obsBucketKey = reconOMMetadataManager.getBucketKey(
+        obsBucketInfo.getVolumeName(), obsBucketInfo.getBucketName());
+
+    reconOMMetadataManager.getBucketTable().put(obsBucketKey, obsBucketInfo);
+
+    OmBucketInfo fsoBucketInfo = OmBucketInfo.newBuilder()
+        .setVolumeName(VOLUME_ONE)
+        .setBucketName(FSO_BUCKET)
+        .setObjectID(FSO_BUCKET_OBJECT_ID)
+        .setQuotaInBytes(FSO_BUCKET_QUOTA)
+        .setBucketLayout(BucketLayout.FILE_SYSTEM_OPTIMIZED)
+        .build();
+    String fsoBucketKey = reconOMMetadataManager.getBucketKey(
+        fsoBucketInfo.getVolumeName(), fsoBucketInfo.getBucketName());
+
+    reconOMMetadataManager.getBucketTable().put(fsoBucketKey, fsoBucketInfo);
+
+    // Write FSO keys data - Start
+    writeDirToOm(reconOMMetadataManager, DIR_ONE_OBJECT_ID,
+        FSO_BUCKET_OBJECT_ID, FSO_BUCKET_OBJECT_ID,
+        VOLUME_ONE_OBJECT_ID, DIR_ONE);
+    writeDirToOm(reconOMMetadataManager, DIR_TWO_OBJECT_ID,
+        DIR_ONE_OBJECT_ID, FSO_BUCKET_OBJECT_ID,
+        VOLUME_ONE_OBJECT_ID, DIR_TWO);
+    writeDirToOm(reconOMMetadataManager, DIR_THREE_OBJECT_ID,
+        DIR_TWO_OBJECT_ID, FSO_BUCKET_OBJECT_ID,
+        VOLUME_ONE_OBJECT_ID, DIR_THREE);
+
+    writeKeyToOm(reconOMMetadataManager,
+        TEST_FILE,
+        FSO_BUCKET,
+        VOLUME_ONE,
+        TEST_FILE,
+        KEY_SEVEN_OBJECT_ID,
+        DIR_ONE_OBJECT_ID,
+        FSO_BUCKET_OBJECT_ID,
+        VOLUME_ONE_OBJECT_ID,
+        KEY_SEVEN_SIZE,
+        BucketLayout.FILE_SYSTEM_OPTIMIZED,
+        ratisOne,
+        epochMillis1, true);
+
+    writeKeyToOm(reconOMMetadataManager,
+        FILE_ONE,
+        FSO_BUCKET,
+        VOLUME_ONE,
+        FILE_ONE,
+        KEY_EIGHT_OBJECT_ID,
+        DIR_ONE_OBJECT_ID,
+        FSO_BUCKET_OBJECT_ID,
+        VOLUME_ONE_OBJECT_ID,
+        KEY_EIGHT_SIZE,
+        BucketLayout.FILE_SYSTEM_OPTIMIZED,
+        ratisOne,
+        epochMillis2, true);
+
+    writeKeyToOm(reconOMMetadataManager,
+        TEST_FILE,
+        FSO_BUCKET,
+        VOLUME_ONE,
+        TEST_FILE,
+        KEY_NINE_OBJECT_ID,
+        DIR_TWO_OBJECT_ID,
+        FSO_BUCKET_OBJECT_ID,
+        VOLUME_ONE_OBJECT_ID,
+        KEY_NINE_SIZE,
+        BucketLayout.FILE_SYSTEM_OPTIMIZED,
+        ratisOne,
+        epochMillis1, true);
+    writeKeyToOm(reconOMMetadataManager,
+        FILE_ONE,
+        FSO_BUCKET,
+        VOLUME_ONE,
+        FILE_ONE,
+        KEY_TEN_OBJECT_ID,
+        DIR_TWO_OBJECT_ID,
+        FSO_BUCKET_OBJECT_ID,
+        VOLUME_ONE_OBJECT_ID,
+        KEY_TEN_SIZE,
+        BucketLayout.FILE_SYSTEM_OPTIMIZED,
+        ratisOne,
+        epochMillis2, true);
+
+    writeKeyToOm(reconOMMetadataManager,
+        TEST_FILE,
+        FSO_BUCKET,
+        VOLUME_ONE,
+        TEST_FILE,
+        KEY_ELEVEN_OBJECT_ID,
+        DIR_THREE_OBJECT_ID,
+        FSO_BUCKET_OBJECT_ID,
+        VOLUME_ONE_OBJECT_ID,
+        KEY_ELEVEN_SIZE,
+        BucketLayout.FILE_SYSTEM_OPTIMIZED,
+        ratisOne,
+        epochMillis1, true);
+    writeKeyToOm(reconOMMetadataManager,
+        FILE_ONE,
+        FSO_BUCKET,
+        VOLUME_ONE,
+        FILE_ONE,
+        KEY_TWELVE_OBJECT_ID,
+        DIR_THREE_OBJECT_ID,
+        FSO_BUCKET_OBJECT_ID,
+        VOLUME_ONE_OBJECT_ID,
+        KEY_TWELVE_SIZE,
+        BucketLayout.FILE_SYSTEM_OPTIMIZED,
+        ratisOne,
+        epochMillis2, true);
+    // Write FSO Keys data - End
+
+    // Write OBS Keys data - Start
+    writeKeyToOm(reconOMMetadataManager,
+        KEY_ONE,
+        OBS_BUCKET,
+        VOLUME_ONE,
+        KEY_ONE,
+        KEY_ONE_OBJECT_ID,
+        OBS_BUCKET_OBJECT_ID,
+        OBS_BUCKET_OBJECT_ID,
+        VOLUME_ONE_OBJECT_ID,
+        KEY_ONE_SIZE,
+        BucketLayout.OBJECT_STORE,
+        ratisOne,
+        epochMillis1, true);
+    writeKeyToOm(reconOMMetadataManager,
+        KEY_TWO,
+        OBS_BUCKET,
+        VOLUME_ONE,
+        KEY_TWO,
+        KEY_TWO_OBJECT_ID,
+        OBS_BUCKET_OBJECT_ID,
+        OBS_BUCKET_OBJECT_ID,
+        VOLUME_ONE_OBJECT_ID,
+        KEY_TWO_SIZE,
+        BucketLayout.OBJECT_STORE,
+        ratisOne,
+        epochMillis2, true);
+    writeKeyToOm(reconOMMetadataManager,
+        KEY_THREE,
+        OBS_BUCKET,
+        VOLUME_ONE,
+        KEY_THREE,
+        KEY_THREE_OBJECT_ID,
+        OBS_BUCKET_OBJECT_ID,
+        OBS_BUCKET_OBJECT_ID,
+        VOLUME_ONE_OBJECT_ID,
+        KEY_THREE_SIZE,
+        BucketLayout.OBJECT_STORE,
+        ratisOne,
+        epochMillis2, true);
+    writeKeyToOm(reconOMMetadataManager,
+        KEY_FOUR,
+        OBS_BUCKET,
+        VOLUME_ONE,
+        KEY_FOUR,
+        KEY_FOUR_OBJECT_ID,
+        OBS_BUCKET_OBJECT_ID,
+        OBS_BUCKET_OBJECT_ID,
+        VOLUME_ONE_OBJECT_ID,
+        KEY_FOUR_SIZE,
+        BucketLayout.OBJECT_STORE,
+        ratisOne,
+        epochMillis2, true);
+    writeKeyToOm(reconOMMetadataManager,
+        KEY_FIVE,
+        OBS_BUCKET,
+        VOLUME_ONE,
+        KEY_FIVE,
+        KEY_FIVE_OBJECT_ID,
+        OBS_BUCKET_OBJECT_ID,
+        OBS_BUCKET_OBJECT_ID,
+        VOLUME_ONE_OBJECT_ID,
+        KEY_FIVE_SIZE,
+        BucketLayout.OBJECT_STORE,
+        ratisOne,
+        epochMillis2, true);
+    writeKeyToOm(reconOMMetadataManager,
+        KEY_SIX,
+        OBS_BUCKET,
+        VOLUME_ONE,
+        KEY_SIX,
+        KEY_SIX_OBJECT_ID,
+        OBS_BUCKET_OBJECT_ID,
+        OBS_BUCKET_OBJECT_ID,
+        VOLUME_ONE_OBJECT_ID,
+        KEY_SIX_SIZE,
+        BucketLayout.OBJECT_STORE,
+        ratisOne,
+        epochMillis2, true);
+    // Write OBS Keys data - End
   }
 
   @Test
@@ -785,10 +1080,167 @@ public class TestOmDBInsightEndPoint extends AbstractReconSqlDBTest {
     assertEquals(18L, keyInsightInfoResp.getUnreplicatedDataSize());
   }
 
+  @Test
+  public void testListKeysFSOBucket() {
+    // bucket level DU
+    Response bucketResponse = omdbInsightEndpoint.listKeys("RATIS", "", 0, FSO_BUCKET_PATH,
+        "", 1000);
+    ListKeysResponse listKeysResponse = (ListKeysResponse) bucketResponse.getEntity();
+    assertEquals(6, listKeysResponse.getCount());
+    KeyEntityInfo keyEntityInfo = listKeysResponse.getKeys().get(0);
+    assertEquals(keyEntityInfo.getPath(), "file1");
+    assertEquals("/1/10/13/testfile", listKeysResponse.getLastKey());
+    assertEquals("RATIS", keyEntityInfo.getReplicationConfig().getReplicationType().toString());
+  }
+
+  @Test
+  public void testListKeysFSOBucketWithLimitAndPagination() {
+    // bucket level keyList
+    // Total 3 pages , each page 2 records. If each page we will retrieve 2 items, as total 6 FSO keys,
+    // so till we get empty last key, we'll continue to fetch and empty last key signifies the last page.
+    // First Page
+    Response bucketResponse = omdbInsightEndpoint.listKeys("RATIS", "", 0, FSO_BUCKET_PATH,
+        "", 2);
+    ListKeysResponse listKeysResponse = (ListKeysResponse) bucketResponse.getEntity();
+    assertEquals(2, listKeysResponse.getCount());
+    KeyEntityInfo keyEntityInfo = listKeysResponse.getKeys().get(0);
+    assertEquals(keyEntityInfo.getPath(), "file1");
+    assertEquals("/1/10/11/testfile", listKeysResponse.getLastKey());
+    assertEquals("RATIS", keyEntityInfo.getReplicationConfig().getReplicationType().toString());
+
+    // Second page
+    bucketResponse = omdbInsightEndpoint.listKeys("RATIS", "", 0,
+        FSO_BUCKET_PATH, listKeysResponse.getLastKey(), 2);
+    listKeysResponse = (ListKeysResponse) bucketResponse.getEntity();
+    assertEquals(2, listKeysResponse.getCount());
+    keyEntityInfo = listKeysResponse.getKeys().get(0);
+    assertEquals(keyEntityInfo.getPath(), "file1");
+    assertEquals("/1/10/12/testfile", listKeysResponse.getLastKey());
+
+    // Third and last page. And last page will have empty
+    bucketResponse = omdbInsightEndpoint.listKeys("RATIS", "", 0,
+        FSO_BUCKET_PATH, listKeysResponse.getLastKey(), 2);
+    listKeysResponse = (ListKeysResponse) bucketResponse.getEntity();
+    assertEquals(2, listKeysResponse.getCount());
+    keyEntityInfo = listKeysResponse.getKeys().get(0);
+    assertEquals(keyEntityInfo.getPath(), "file1");
+    assertEquals("/1/10/13/testfile", listKeysResponse.getLastKey());
+
+    // Try again if fourth page is available. Ideally there should not be any further records
+    // and lastKey should be empty as per design.
+    bucketResponse = omdbInsightEndpoint.listKeys("RATIS", "", 0,
+        FSO_BUCKET_PATH, listKeysResponse.getLastKey(), 2);
+    listKeysResponse = (ListKeysResponse) bucketResponse.getEntity();
+    assertEquals(0, listKeysResponse.getCount());
+    assertEquals("", listKeysResponse.getLastKey());
+  }
+
+  @Test
+  public void testListKeysOBSBucket() throws Exception {
+    // List keys under obs-bucket based on RATIS ReplicationConfig
+    // creationDate filter and keySize filter both are empty, so only RATIS replication type filter
+    // will be applied to return all RATIS keys under obs-bucket.
+    Response bucketResponse = omdbInsightEndpoint.listKeys("RATIS", "", 0, OBS_BUCKET_PATH,
+        "", 1000);
+    ListKeysResponse listKeysResponse = (ListKeysResponse) bucketResponse.getEntity();
+    // There are total 6 RATIS keys under this OBS bucket.
+    assertEquals(6, listKeysResponse.getCount());
+    assertEquals(OBS_BUCKET_PATH + OM_KEY_PREFIX + KEY_SIX, listKeysResponse.getLastKey());
+
+    // Filter listKeys based on key creation date
+    // creationDate filter passed 1 minute above of KEY1 creation date, so listKeys API will return
+    // only 5 keys excluding Key1, as 5 RATIS keys got created after creationDate filter value.
+    bucketResponse = omdbInsightEndpoint.listKeys("RATIS", "04-04-2024 12:31:00", 0,
+        OBS_BUCKET_PATH, "", 1000);
+    listKeysResponse = (ListKeysResponse) bucketResponse.getEntity();
+    // There are total 5 RATIS keys under this OBS bucket which were created after "04-04-2024 12:31:00".
+    assertEquals(5, listKeysResponse.getCount());
+    assertEquals(OBS_BUCKET_PATH + OM_KEY_PREFIX + KEY_SIX, listKeysResponse.getLastKey());
+
+    // creationDate filter passed same as KEY6 creation date, so listKeys API will return all 6 keys
+    bucketResponse = omdbInsightEndpoint.listKeys("RATIS", "04-04-2024 12:30:00", 0,
+        OBS_BUCKET_PATH, "", 1000);
+    listKeysResponse = (ListKeysResponse) bucketResponse.getEntity();
+    // There are total 6 RATIS keys under this OBS bucket which were created on or after "04-04-2024 12:30:00".
+    assertEquals(6, listKeysResponse.getCount());
+    assertEquals(OBS_BUCKET_PATH + OM_KEY_PREFIX + KEY_SIX, listKeysResponse.getLastKey());
+
+    // creationDate filter passed as "04-04-2024 12:30:00", but replicationType filter is EC,
+    // so listKeys API will return zero keys, because no EC key got created at or after creationDate filter value.
+    bucketResponse = omdbInsightEndpoint.listKeys("EC", "04-04-2024 12:30:00", 0,
+        OBS_BUCKET_PATH, "", 1000);
+    listKeysResponse = (ListKeysResponse) bucketResponse.getEntity();
+    // There are ZERO EC keys created under this OBS bucket which were created on or after "04-04-2024 12:30:00".
+    assertEquals(0, listKeysResponse.getCount());
+    assertEquals("", listKeysResponse.getLastKey());
+
+    // creationDate filter passed as "04-05-2024 12:30:00", and replicationType filter is RATIS,
+    // so listKeys API will return 5 keys, as only 5 RATIS key got created at or after creationDate filter value.
+    bucketResponse = omdbInsightEndpoint.listKeys("RATIS", "04-05-2024 12:30:00", 0,
+        OBS_BUCKET_PATH, "", 1000);
+    listKeysResponse = (ListKeysResponse) bucketResponse.getEntity();
+    assertEquals(5, listKeysResponse.getCount());
+    assertEquals(OBS_BUCKET_PATH + OM_KEY_PREFIX + KEY_SIX, listKeysResponse.getLastKey());
+
+    // creationDate filter passed as "04-05-2024 12:30:00", and replicationType filter is RATIS,
+    // so listKeys API should return 5 keys, as only 1 RATIS key got created on or after creationDate filter value.
+    // but since keySize filter value is 1026 bytes and 3 RATIS keys created are of size 2025 bytes, and
+    // other 3 keys created are of size 1025, so 3 keys will be filtered out of 5 keys, as 1 key will be filtered
+    // out due to creationDate filter.
+    bucketResponse = omdbInsightEndpoint.listKeys("RATIS", "04-05-2024 12:30:00", 1026,
+        OBS_BUCKET_PATH, "", 1000);
+    listKeysResponse = (ListKeysResponse) bucketResponse.getEntity();
+    assertEquals(3, listKeysResponse.getCount());
+    assertEquals(OBS_BUCKET_PATH + OM_KEY_PREFIX + KEY_SIX, listKeysResponse.getLastKey());
+  }
+
+  @Test
+  public void testListKeysOBSBucketWithLimitAndPagination() throws Exception {
+    // As per design, client should not change filter values between pages.
+    // Below test will fetch multiple pages for same filters in query.
+
+    // Total 3 pages , each page 2 records. If each page we will retrieve 2 items, as total 6 FSO keys,
+    // so till we get empty last key, we'll continue to fetch and empty last key signifies the last page.
+    // First Page
+    Response bucketResponse = omdbInsightEndpoint.listKeys("RATIS", "", 0, OBS_BUCKET_PATH,
+        "", 2);
+    ListKeysResponse listKeysResponse = (ListKeysResponse) bucketResponse.getEntity();
+    assertEquals(2, listKeysResponse.getCount());
+    KeyEntityInfo keyEntityInfo = listKeysResponse.getKeys().get(0);
+    assertEquals(keyEntityInfo.getPath(), "key1");
+    assertEquals("/volume1/obs-bucket/key1/key2", listKeysResponse.getLastKey());
+    assertEquals("RATIS", keyEntityInfo.getReplicationConfig().getReplicationType().toString());
+
+    // Second page
+    bucketResponse = omdbInsightEndpoint.listKeys("RATIS", "", 0,
+        OBS_BUCKET_PATH, listKeysResponse.getLastKey(), 2);
+    listKeysResponse = (ListKeysResponse) bucketResponse.getEntity();
+    assertEquals(2, listKeysResponse.getCount());
+    keyEntityInfo = listKeysResponse.getKeys().get(0);
+    assertEquals(keyEntityInfo.getPath(), "key1/key2/key3");
+    assertEquals("/volume1/obs-bucket/key4", listKeysResponse.getLastKey());
+
+    // Third and last page. And last page will have empty
+    bucketResponse = omdbInsightEndpoint.listKeys("RATIS", "", 0,
+        OBS_BUCKET_PATH, listKeysResponse.getLastKey(), 2);
+    listKeysResponse = (ListKeysResponse) bucketResponse.getEntity();
+    assertEquals(2, listKeysResponse.getCount());
+    keyEntityInfo = listKeysResponse.getKeys().get(0);
+    assertEquals(keyEntityInfo.getPath(), "key5");
+    assertEquals("/volume1/obs-bucket/key6", listKeysResponse.getLastKey());
+
+    // Try again if fourth page is available. Ideally there should not be any further records
+    // and lastKey should be empty as per design.
+    bucketResponse = omdbInsightEndpoint.listKeys("RATIS", "", 0,
+        OBS_BUCKET_PATH, listKeysResponse.getLastKey(), 2);
+    listKeysResponse = (ListKeysResponse) bucketResponse.getEntity();
+    assertEquals(0, listKeysResponse.getCount());
+    assertEquals("", listKeysResponse.getLastKey());
+  }
+
   private NSSummary getNsSummary(long size) {
     NSSummary summary = new NSSummary();
     summary.setSizeOfFiles(size);
     return summary;
   }
-
 }

@@ -29,13 +29,19 @@ import java.net.URL;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.sql.Timestamp;
+import java.text.ParseException;
+import java.text.SimpleDateFormat;
+import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.List;
+import java.util.TimeZone;
 import java.util.concurrent.BlockingQueue;
 import java.util.stream.Collectors;
 
 import com.google.common.base.Preconditions;
 import com.google.inject.Singleton;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
@@ -60,7 +66,9 @@ import static org.jooq.impl.DSL.currentTimestamp;
 import static org.jooq.impl.DSL.select;
 import static org.jooq.impl.DSL.using;
 
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.recon.api.types.DUResponse;
+import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 import org.apache.hadoop.ozone.recon.scm.ReconContainerReportQueue;
 import org.apache.hadoop.security.authentication.client.AuthenticationException;
 import org.hadoop.ozone.recon.schema.tables.daos.GlobalStatsDao;
@@ -413,5 +421,47 @@ public class ReconUtils {
     builder.setDatanodeProtocolServerAddress(
         HddsServerUtil.getReconDataNodeBindAddress(conf));
     return builder.build();
+  }
+
+  /**
+   * Return if all OMDB tables that will be used are initialized.
+   * @return if tables are initialized
+   */
+  public static boolean isInitializationComplete(ReconOMMetadataManager omMetadataManager) {
+    if (omMetadataManager == null) {
+      return false;
+    }
+    return omMetadataManager.getVolumeTable() != null
+        && omMetadataManager.getBucketTable() != null
+        && omMetadataManager.getDirectoryTable() != null
+        && omMetadataManager.getFileTable() != null
+        && omMetadataManager.getKeyTable(BucketLayout.LEGACY) != null;
+  }
+
+  /**
+   * Converts string date in a provided format to server timezone's epoch milllioseconds.
+   *
+   * @param dateString
+   * @param dateFormat
+   * @param timeZone
+   * @return
+   * @throws ParseException
+   */
+  public static long convertToEpochMillis(String dateString, String dateFormat, TimeZone timeZone) {
+    try {
+      if (StringUtils.isEmpty(dateString)) {
+        return Instant.now().toEpochMilli();
+      }
+      SimpleDateFormat sdf = new SimpleDateFormat(dateFormat);
+      sdf.setTimeZone(timeZone); // Set server's timezone
+      Date date = sdf.parse(dateString);
+      return date.getTime(); // Convert to epoch milliseconds
+    } catch (ParseException parseException) {
+      LOG.error("Date parse exception for date: {} in format: {} -> {}", dateString, dateFormat, parseException);
+      return Instant.now().toEpochMilli();
+    } catch (Exception exception) {
+      LOG.error("Unexpected error while parsing date: {} in format: {}", dateString, dateFormat);
+      return Instant.now().toEpochMilli();
+    }
   }
 }

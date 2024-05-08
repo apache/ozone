@@ -49,6 +49,18 @@ public class KeyEntityInfo {
   @JsonProperty("replicationInfo")
   private ReplicationConfig replicationConfig;
 
+  /** key creation time. */
+  @JsonProperty("creationTime")
+  private long creationTime;
+
+  /** key modification time. */
+  @JsonProperty("modificationTime")
+  private long modificationTime;
+
+  /** Indicate if the path is a key for Web UI. */
+  @JsonProperty("isKey")
+  private boolean isKey;
+
   public KeyEntityInfo() {
     key = "";
     path = "";
@@ -56,6 +68,9 @@ public class KeyEntityInfo {
     size = 0L;
     replicatedSize = 0L;
     replicationConfig = null;
+    creationTime = Instant.now().toEpochMilli();
+    modificationTime = Instant.now().toEpochMilli();
+    isKey = true;
   }
 
   public String getKey() {
@@ -105,5 +120,29 @@ public class KeyEntityInfo {
   public void setReplicationConfig(
       ReplicationConfig replicationConfig) {
     this.replicationConfig = replicationConfig;
+  }
+
+  public long getCreationTime() {
+    return creationTime;
+  }
+
+  public void setCreationTime(long creationTime) {
+    this.creationTime = creationTime;
+  }
+
+  public long getModificationTime() {
+    return modificationTime;
+  }
+
+  public void setModificationTime(long modificationTime) {
+    this.modificationTime = modificationTime;
+  }
+
+  public boolean isKey() {
+    return isKey;
+  }
+
+  public void setKey(boolean key) {
+    isKey = key;
   }
 }
