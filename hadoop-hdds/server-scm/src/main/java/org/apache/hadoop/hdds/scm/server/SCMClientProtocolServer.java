@@ -728,16 +728,21 @@ public class SCMClientProtocolServer implements
     if (factor != null) {
       auditMap.put("replicationFactor", factor.toString());
     }
+    List<DatanodeDetails> favoredNodes = new ArrayList<>();
     if (nodePool != null && !nodePool.getNodesList().isEmpty()) {
       List<String> nodeIpAddresses = new ArrayList<>();
       for (HddsProtos.Node node : nodePool.getNodesList()) {
         nodeIpAddresses.add(node.getNodeID().getIpAddress());
+        DatanodeDetails datanodeDetails =
+            scm.getScmNodeManager().getNodeByUuid(node.getNodeID().getUuid());
+        favoredNodes.add(datanodeDetails);
       }
       auditMap.put("nodePool", String.join(", ", nodeIpAddresses));
     }
     try {
       Pipeline result = scm.getPipelineManager().createPipeline(
-          ReplicationConfig.fromProtoTypeAndFactor(type, factor));
+          ReplicationConfig.fromProtoTypeAndFactor(type, factor),
+          Collections.emptyList(), favoredNodes);
       AUDIT.logWriteSuccess(buildAuditMessageForSuccess(
           SCMAction.CREATE_PIPELINE, auditMap));
       return result;
