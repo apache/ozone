@@ -70,17 +70,11 @@ public class OzoneKey {
    */
   private final boolean isFile;
 
-  /**
-   * The generation of an existing key. This can be used with atomic commits, to
-   * ensure the key has not changed since the key details were read.
-   */
-  private final Long generation;
-
   @SuppressWarnings("parameternumber")
   public OzoneKey(String volumeName, String bucketName,
       String keyName, long size, long creationTime,
       long modificationTime, ReplicationConfig replicationConfig,
-      boolean isFile, String owner, Long generation) {
+      boolean isFile, String owner) {
     this.volumeName = volumeName;
     this.bucketName = bucketName;
     this.name = keyName;
@@ -90,16 +84,6 @@ public class OzoneKey {
     this.replicationConfig = replicationConfig;
     this.isFile = isFile;
     this.owner = owner;
-    this.generation = generation;
-  }
-
-  @SuppressWarnings("parameternumber")
-  public OzoneKey(String volumeName, String bucketName,
-                  String keyName, long size, long creationTime,
-                  long modificationTime, ReplicationConfig replicationConfig,
-                  boolean isFile, String owner) {
-    this(volumeName, bucketName, keyName, size, creationTime, modificationTime, replicationConfig,
-        isFile, owner, null);
   }
 
   @SuppressWarnings("parameternumber")
@@ -108,19 +92,10 @@ public class OzoneKey {
                   long modificationTime, ReplicationConfig replicationConfig,
                   Map<String, String> metadata, boolean isFile, String owner) {
     this(volumeName, bucketName, keyName, size, creationTime,
-        modificationTime, replicationConfig, isFile, owner, null);
+        modificationTime, replicationConfig, isFile, owner);
     this.metadata.putAll(metadata);
   }
 
-  @SuppressWarnings("parameternumber")
-  public OzoneKey(String volumeName, String bucketName,
-                  String keyName, long size, long creationTime,
-                  long modificationTime, ReplicationConfig replicationConfig,
-                  Map<String, String> metadata, boolean isFile, String owner, Long generation) {
-    this(volumeName, bucketName, keyName, size, creationTime,
-        modificationTime, replicationConfig, isFile, owner, generation);
-    this.metadata.putAll(metadata);
-  }
   /**
    * Returns Volume Name associated with the Key.
    *
@@ -214,10 +189,6 @@ public class OzoneKey {
     return replicationConfig;
   }
 
-  public Long getGeneration() {
-    return generation;
-  }
-
   /**
    * Returns indicator if key is a file.
    * @return file
@@ -234,7 +205,7 @@ public class OzoneKey {
     return new OzoneKey(keyInfo.getVolumeName(), keyInfo.getBucketName(),
         keyInfo.getKeyName(), keyInfo.getDataSize(), keyInfo.getCreationTime(),
         keyInfo.getModificationTime(), keyInfo.getReplicationConfig(),
-        keyInfo.getMetadata(), keyInfo.isFile(), keyInfo.getOwnerName(), keyInfo.getGeneration());
+        keyInfo.getMetadata(), keyInfo.isFile(), keyInfo.getOwnerName());
   }
 
 }

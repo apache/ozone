@@ -43,6 +43,12 @@ public class OzoneKeyDetails extends OzoneKey {
   private final CheckedSupplier<OzoneInputStream, IOException> contentSupplier;
 
   /**
+   * The generation of an existing key. This can be used with atomic commits, to
+   * ensure the key has not changed since the key details were read.
+   */
+  private final Long generation;
+
+  /**
    * Constructs OzoneKeyDetails from OmKeyInfo.
    */
   @SuppressWarnings("parameternumber")
@@ -55,10 +61,11 @@ public class OzoneKeyDetails extends OzoneKey {
       CheckedSupplier<OzoneInputStream, IOException> contentSupplier,
       boolean isFile, String owner, Long generation) {
     super(volumeName, bucketName, keyName, size, creationTime,
-        modificationTime, replicationConfig, metadata, isFile, owner, generation);
+        modificationTime, replicationConfig, metadata, isFile, owner);
     this.ozoneKeyLocations = ozoneKeyLocations;
     this.feInfo = feInfo;
     this.contentSupplier = contentSupplier;
+    this.generation = generation;
   }
 
   /**
@@ -87,6 +94,10 @@ public class OzoneKeyDetails extends OzoneKey {
 
   public FileEncryptionInfo getFileEncryptionInfo() {
     return feInfo;
+  }
+
+  public Long getGeneration() {
+    return generation;
   }
 
   /**
