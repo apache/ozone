@@ -115,7 +115,7 @@ OZONE-SITE.XML_ozone.s3g.http.auth.kerberos.keytab=/etc/security/keytabs/s3g.key
 OZONE-SITE.XML_ozone.s3g.http.auth.kerberos.principal=HTTP/s3g@EXAMPLE.COM
 OZONE-SITE.XML_ozone.httpfs.http.auth.kerberos.keytab=/etc/security/keytabs/httpfs.keytab
 OZONE-SITE.XML_ozone.httpfs.http.auth.kerberos.principal=HTTP/httpfs@EXAMPLE.COM
-OZONE-SITE.XML_ozone.recon.http.auth.kerberos.principal=HTTP/recon@EXAMPLE.COM
+OZONE-SITE.XML_ozone.recon.http.auth.kerberos.principal=*
 OZONE-SITE.XML_ozone.recon.http.auth.kerberos.keytab=/etc/security/keytabs/recon.keytab
 
 CORE-SITE.XML_hadoop.http.authentication.simple.anonymous.allowed=false
