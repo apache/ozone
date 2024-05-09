@@ -47,9 +47,7 @@ import org.apache.hadoop.hdds.scm.node.NodeStatus;
  * this class.
  * <p>
  * Concurrency consideration:
- *   - assumes thread-safe usage
- *   - all public WRITE methods are protected by WRITE_LOCK
- *   - all public READ methods are protected by READ_LOCK
+ *   - thread-safe
  */
 public class NodeStateMap {
   /**
@@ -196,8 +194,7 @@ public class NodeStateMap {
   public DatanodeInfo getNodeInfo(UUID uuid) throws NodeNotFoundException {
     lock.readLock().lock();
     try {
-      checkIfNodeExist(uuid);
-      return nodeMap.get(uuid);
+      return getNodeInfoUnsafe(uuid);
     } finally {
       lock.readLock().unlock();
     }
