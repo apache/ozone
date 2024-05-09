@@ -1026,13 +1026,13 @@ message KeyArgs {
     // Force OM to update container cache location from SCL
     optional bool forceUpdateContainerCacheFromSCM = 20;
     optional string ownerName = 21;
-    // overwriteGeneration, when used in key creation indicates that a
+    // rewriteGeneration, when used in key creation indicates that a
     // key with the same keyName should exist with the given generation.
     // For a key commit to succeed, the original key should still be present with the
     // generation unchanged.
     // This allows a key to be created an committed atomically if the original has not
     // been modified.
-    optional uint64 overwriteGeneration = 22;
+    optional uint64 rewriteGeneration = 22;
 }
 
 message KeyLocation {
@@ -1116,13 +1116,13 @@ message KeyInfo {
     optional FileChecksumProto fileChecksum = 18;
     optional bool isFile = 19;
     optional string ownerName = 20;
-  // overwriteGeneration, when used in key creation indicates that a
+  // rewriteGeneration, when used in key creation indicates that a
   // key with the same keyName should exist with the given generation.
   // For a key commit to succeed, the original key should still be present with the
   // generation unchanged.
   // This allows a key to be created an committed atomically if the original has not
   // been modified.
-    optional uint64 overwriteGeneration = 21;
+    optional uint64 rewriteGeneration = 21;
 }
 
 message BasicKeyInfo {

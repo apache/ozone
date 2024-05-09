@@ -241,10 +241,10 @@ public class OMKeyCommitRequest extends OMKeyRequest {
             " entry is not found in the OpenKey table", KEY_NOT_FOUND);
       }
 
-      validateAtomicOverwrite(keyToDelete, omKeyInfo, auditMap);
-      // Optimistic locking validation has passed. Now set the overwrite fields to null so they are
+      validateAtomicRewrite(keyToDelete, omKeyInfo, auditMap);
+      // Optimistic locking validation has passed. Now set the rewrite fields to null so they are
       // not persisted in the key table.
-      omKeyInfo.setOverwriteGeneration(null);
+      omKeyInfo.setRewriteGeneration(null);
 
       omKeyInfo.getMetadata().putAll(KeyValueUtil.getFromProtobuf(
           commitKeyArgs.getMetadataList()));
@@ -504,18 +504,18 @@ public class OMKeyCommitRequest extends OMKeyRequest {
     return req;
   }
 
-  private void validateAtomicOverwrite(OmKeyInfo existing, OmKeyInfo toCommit, Map<String, String> auditMap)
+  private void validateAtomicRewrite(OmKeyInfo existing, OmKeyInfo toCommit, Map<String, String> auditMap)
       throws OMException {
-    if (toCommit.getOverwriteGeneration() != null) {
+    if (toCommit.getRewriteGeneration() != null) {
       // These values are not passed in the request keyArgs, so add them into the auditMap if they are present
       // in the open key entry.
-      auditMap.put(OzoneConsts.OVERWRITE_GENERATION, String.valueOf(toCommit.getOverwriteGeneration()));
+      auditMap.put(OzoneConsts.REWRITE_GENERATION, String.valueOf(toCommit.getRewriteGeneration()));
       if (existing == null) {
-        throw new OMException("Atomic overwrite is not allowed for a new key", KEY_NOT_FOUND);
+        throw new OMException("Atomic rewrite is not allowed for a new key", KEY_NOT_FOUND);
       }
-      if (!toCommit.getOverwriteGeneration().equals(existing.getUpdateID())) {
+      if (!toCommit.getRewriteGeneration().equals(existing.getUpdateID())) {
         throw new OMException("Cannot commit as current generation (" + existing.getUpdateID() +
-            ") does not match with the overwrite generation (" + toCommit.getOverwriteGeneration() + ")",
+            ") does not match with the rewrite generation (" + toCommit.getRewriteGeneration() + ")",
             KEY_NOT_FOUND);
       }
     }

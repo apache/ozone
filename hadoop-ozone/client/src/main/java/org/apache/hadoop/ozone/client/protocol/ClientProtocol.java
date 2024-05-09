@@ -363,7 +363,7 @@ public interface ClientProtocol {
    *
    * @param volumeName Name of the Volume
    * @param bucketName Name of the Bucket
-   * @param keyName Existing key to overwrite. This must exist in the bucket.
+   * @param keyName Existing key to rewrite. This must exist in the bucket.
    * @param size The size of the new key
    * @param existingKeyGeneration The generation of the existing key which is checked for changes at key create
    *                              and commit time.

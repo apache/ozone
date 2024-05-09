@@ -231,7 +231,7 @@ public class OMKeyCreateRequest extends OMKeyRequest {
           keyName);
       OmKeyInfo dbKeyInfo = omMetadataManager.getKeyTable(getBucketLayout())
           .getIfExist(dbKeyName);
-      validateAtomicOverwrite(dbKeyInfo, keyArgs);
+      validateAtomicRewrite(dbKeyInfo, keyArgs);
 
       OmBucketInfo bucketInfo =
           getBucketInfo(omMetadataManager, volumeName, bucketName);
@@ -442,15 +442,15 @@ public class OMKeyCreateRequest extends OMKeyRequest {
     return req;
   }
 
-  private void validateAtomicOverwrite(OmKeyInfo dbKeyInfo, KeyArgs keyArgs)
+  private void validateAtomicRewrite(OmKeyInfo dbKeyInfo, KeyArgs keyArgs)
       throws OMException {
-    if (keyArgs.hasOverwriteGeneration()) {
+    if (keyArgs.hasRewriteGeneration()) {
       // If a key does not exist, or if it exists but the updateID do not match, then fail this request.
       if (dbKeyInfo == null) {
-        throw new OMException("Key not found during expected overwrite", OMException.ResultCodes.KEY_NOT_FOUND);
+        throw new OMException("Key not found during expected rewrite", OMException.ResultCodes.KEY_NOT_FOUND);
       }
-      if (dbKeyInfo.getUpdateID() != keyArgs.getOverwriteGeneration()) {
-        throw new OMException("Generation mismatch during expected overwrite", OMException.ResultCodes.KEY_NOT_FOUND);
+      if (dbKeyInfo.getUpdateID() != keyArgs.getRewriteGeneration()) {
+        throw new OMException("Generation mismatch during expected rewrite", OMException.ResultCodes.KEY_NOT_FOUND);
       }
     }
   }

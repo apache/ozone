@@ -779,8 +779,8 @@ public abstract class OMKeyRequest extends OMClientRequest {
       dbKeyInfo.getMetadata().putAll(KeyValueUtil.getFromProtobuf(
           keyArgs.getMetadataList()));
 
-      if (keyArgs.hasOverwriteGeneration()) {
-        dbKeyInfo.setOverwriteGeneration(keyArgs.getOverwriteGeneration());
+      if (keyArgs.hasRewriteGeneration()) {
+        dbKeyInfo.setRewriteGeneration(keyArgs.getRewriteGeneration());
       }
       dbKeyInfo.setFileEncryptionInfo(encInfo);
       return dbKeyInfo;

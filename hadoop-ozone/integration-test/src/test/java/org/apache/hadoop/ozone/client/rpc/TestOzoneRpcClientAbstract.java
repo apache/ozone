@@ -1098,12 +1098,12 @@ public abstract class TestOzoneRpcClientAbstract {
   }
 
   @Test
-  public void testOverwriteKey() throws IOException {
+  public void testRewriteKey() throws IOException {
     String volumeName = UUID.randomUUID().toString();
     String bucketName = UUID.randomUUID().toString();
 
     String value = "sample value";
-    String overwriteValue = "overwrite value";
+    String rewriteValue = "rewrite value";
     store.createVolume(volumeName);
     OzoneVolume volume = store.getVolume(volumeName);
 
@@ -1125,24 +1125,24 @@ public abstract class TestOzoneRpcClientAbstract {
     try (OzoneOutputStream out = bucket.rewriteKey(keyDetails.getName(), keyDetails.getDataSize(),
         keyDetails.getGeneration(), RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.ONE),
         keyDetails.getMetadata())) {
-      out.write(overwriteValue.getBytes(UTF_8));
+      out.write(rewriteValue.getBytes(UTF_8));
     }
 
     try (OzoneInputStream is = bucket.readKey(keyName)) {
-      byte[] fileContent = new byte[overwriteValue.getBytes(UTF_8).length];
+      byte[] fileContent = new byte[rewriteValue.getBytes(UTF_8).length];
       is.read(fileContent);
-      assertEquals(overwriteValue, new String(fileContent, UTF_8));
+      assertEquals(rewriteValue, new String(fileContent, UTF_8));
     }
 
     // Delete the key
     bucket.deleteKey(keyName);
 
-    // Now try the overwrite again, and it should fail as the originally read key is no longer there.
+    // Now try the rewrite again, and it should fail as the originally read key is no longer there.
     assertThrows(IOException.class, () -> {
       try (OzoneOutputStream out = bucket.rewriteKey(keyDetails.getName(), keyDetails.getDataSize(),
           keyDetails.getGeneration(), RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.ONE),
           keyDetails.getMetadata())) {
-        out.write(overwriteValue.getBytes(UTF_8));
+        out.write(rewriteValue.getBytes(UTF_8));
       }
     });
   }

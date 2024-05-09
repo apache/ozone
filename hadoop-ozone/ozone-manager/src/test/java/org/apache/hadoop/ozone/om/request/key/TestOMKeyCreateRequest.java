@@ -706,14 +706,14 @@ public class TestOMKeyCreateRequest extends TestOMKeyRequest {
 
   private OMRequest createKeyRequest(
       boolean isMultipartKey, int partNumber, long keyLength,
-      ReplicationConfig repConfig, Long overwriteGeneration) {
+      ReplicationConfig repConfig, Long rewriteGeneration) {
     return createKeyRequest(isMultipartKey, partNumber, keyLength, repConfig,
-        overwriteGeneration, null);
+        rewriteGeneration, null);
   }
 
   private OMRequest createKeyRequest(
       boolean isMultipartKey, int partNumber, long keyLength,
-      ReplicationConfig repConfig, Long overwriteGeneration, Map<String, String> metaData) {
+      ReplicationConfig repConfig, Long rewriteGeneration, Map<String, String> metaData) {
 
     KeyArgs.Builder keyArgs = KeyArgs.newBuilder()
         .setVolumeName(volumeName).setBucketName(bucketName)
@@ -732,8 +732,8 @@ public class TestOMKeyCreateRequest extends TestOMKeyRequest {
     if (isMultipartKey) {
       keyArgs.setMultipartNumber(partNumber);
     }
-    if (overwriteGeneration != null) {
-      keyArgs.setOverwriteGeneration(overwriteGeneration);
+    if (rewriteGeneration != null) {
+      keyArgs.setRewriteGeneration(rewriteGeneration);
     }
     if (metaData != null) {
       metaData.forEach((key, value) -> keyArgs.addMetadata(KeyValue.newBuilder()
@@ -742,7 +742,7 @@ public class TestOMKeyCreateRequest extends TestOMKeyRequest {
           .build()));
     }
 
-    OzoneManagerProtocolProtos.CreateKeyRequest createKeyRequest =
+    CreateKeyRequest createKeyRequest =
         CreateKeyRequest.newBuilder().setKeyArgs(keyArgs).build();
 
     return OMRequest.newBuilder()
@@ -941,7 +941,7 @@ public class TestOMKeyCreateRequest extends TestOMKeyRequest {
             .setBucketName(bucketName)
             .setBucketLayout(getBucketLayout()));
 
-    // First, create a key with the overwrite ID - this should fail as no key exists
+    // First, create a key with the rewrite ID - this should fail as no key exists
     OMRequest omRequest = createKeyRequest(false, 0, 100,
         RatisReplicationConfig.getInstance(THREE), 1L);
     omRequest = doPreExecute(omRequest);
@@ -949,7 +949,7 @@ public class TestOMKeyCreateRequest extends TestOMKeyRequest {
     OMClientResponse response = omKeyCreateRequest.validateAndUpdateCache(ozoneManager, 105L);
     assertEquals(KEY_NOT_FOUND, response.getOMResponse().getStatus());
 
-    // Now pre-create the key in the system so we can overwrite it.
+    // Now pre-create the key in the system so we can rewrite it.
     Map<String, String> metadata = Collections.singletonMap("metakey", "metavalue");
     Map<String, String> reWriteMetadata = Collections.singletonMap("metakey", "rewriteMetavalue");
 
@@ -964,7 +964,7 @@ public class TestOMKeyCreateRequest extends TestOMKeyRequest {
     List<OzoneAcl> existingAcls = existingKeyInfo.getAcls();
     assertEquals(acls, existingAcls);
 
-    // Create a request with an generation which doesn't match the current key
+    // Create a request with a generation which doesn't match the current key
     omRequest = createKeyRequest(false, 0, 100,
         RatisReplicationConfig.getInstance(THREE), existingKeyInfo.getGeneration() + 1, reWriteMetadata);
     omRequest = doPreExecute(omRequest);
@@ -973,7 +973,7 @@ public class TestOMKeyCreateRequest extends TestOMKeyRequest {
     // Still fails, as the matching key is not present.
     assertEquals(KEY_NOT_FOUND, response.getOMResponse().getStatus());
 
-    // Now create the key with the correct overwrite generation
+    // Now create the key with the correct rewrite generation
     omRequest = createKeyRequest(false, 0, 100,
         RatisReplicationConfig.getInstance(THREE), existingKeyInfo.getGeneration(), reWriteMetadata);
     omRequest = doPreExecute(omRequest);
@@ -981,13 +981,13 @@ public class TestOMKeyCreateRequest extends TestOMKeyRequest {
     response = omKeyCreateRequest.validateAndUpdateCache(ozoneManager, 105L);
     assertEquals(OK, response.getOMResponse().getStatus());
 
-    // Ensure the overwriteGeneration is persisted in the open key table
+    // Ensure the rewriteGeneration is persisted in the open key table
     String openKey = omMetadataManager.getOpenKey(volumeName, bucketName,
         keyName, omRequest.getCreateKeyRequest().getClientID());
     OmKeyInfo openKeyInfo = omMetadataManager.getOpenKeyTable(omKeyCreateRequest.getBucketLayout()).get(openKey);
 
-    assertEquals(existingKeyInfo.getGeneration(), openKeyInfo.getOverwriteGeneration());
-    // Creation time should remain the same on overwrite.
+    assertEquals(existingKeyInfo.getGeneration(), openKeyInfo.getRewriteGeneration());
+    // Creation time should remain the same on rewrite.
     assertEquals(existingKeyInfo.getCreationTime(), openKeyInfo.getCreationTime());
     // Update ID should change
     assertNotEquals(existingKeyInfo.getGeneration(), openKeyInfo.getGeneration());

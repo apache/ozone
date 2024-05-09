@@ -478,7 +478,7 @@ public class OzoneBucket extends WithMetadata {
    * or the key will fail to commit after the data has been written as the checks are carried out
    * both at key open and commit time.
    *
-   * @param keyName Existing key to overwrite. This must exist in the bucket.
+   * @param keyName Existing key to rewrite. This must exist in the bucket.
    * @param size The size of the new key
    * @param existingKeyGeneration The generation of the existing key which is checked for changes at key create
    *                              and commit time.
