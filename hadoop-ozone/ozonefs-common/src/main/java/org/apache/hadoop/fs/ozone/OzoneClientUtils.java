@@ -269,7 +269,7 @@ public final class OzoneClientUtils {
   }
 
   public static void deleteSnapshot(ObjectStore objectStore,
-                                    String snapshot, String volumeName, String bucketName) {
+      String snapshot, String volumeName, String bucketName) {
     try {
       objectStore.deleteSnapshot(volumeName,
           bucketName, snapshot);
