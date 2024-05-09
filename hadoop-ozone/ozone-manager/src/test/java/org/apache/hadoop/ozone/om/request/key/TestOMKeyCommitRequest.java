@@ -231,8 +231,8 @@ public class TestOMKeyCommitRequest extends TestOMKeyRequest {
       return;
     }
 
-    Table<String, OmKeyInfo> openKeyTable = omMetadataManager.getOpenKeyTable(BucketLayout.DEFAULT);
-    Table<String, OmKeyInfo> closedKeyTable = omMetadataManager.getKeyTable(BucketLayout.DEFAULT);
+    Table<String, OmKeyInfo> openKeyTable = omMetadataManager.getOpenKeyTable(getBucketLayout());
+    Table<String, OmKeyInfo> closedKeyTable = omMetadataManager.getKeyTable(getBucketLayout());
 
     OMRequest modifiedOmRequest = doPreExecute(createCommitKeyRequest());
     OMKeyCommitRequest omKeyCommitRequest = getOmKeyCommitRequest(modifiedOmRequest);
