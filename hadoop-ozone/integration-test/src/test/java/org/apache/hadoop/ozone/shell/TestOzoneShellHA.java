@@ -876,13 +876,13 @@ public class TestOzoneShellHA {
       String cmdRes = getStdOut();
 
       // Verify that key is hsync'ed
-      assertTrue(cmdRes.contains("\tYes\t\tNo\t\t\tNo"), "key should be hsync'ed and not deleted, not overwritten");
+      assertTrue(cmdRes.contains("\tYes\t\tNo\t\tNo"), "key should be hsync'ed and not deleted, not overwritten");
 
       execute(ozoneAdminShell, new String[] {"om", "lof", "--service-id",
           omServiceId, "--show-overwritten", "-p", pathToBucket});
       cmdRes = getStdOut();
       // Verify that key is hsync'ed
-      assertTrue(cmdRes.contains("\tYes\t\t\tNo"), "key should be hsync'ed and not overwritten");
+      assertTrue(cmdRes.contains("\tYes\t\tNo"), "key should be hsync'ed and not overwritten");
 
       // Verify json output
       String[] args1 = new String[] {"om", "lof", "--service-id", omServiceId, "--show-deleted", "--show-overwritten",
@@ -911,7 +911,7 @@ public class TestOzoneShellHA {
           String cmdRes1 = getStdOut();
           // When hsync file is overwritten, it should add OVERWRITTEN_HSYNC_KEY metadata in hsync openKey
           // And list open key should show as overwritten
-          return cmdRes1.contains("\tYes\t\tNo\t\t\tYes");
+          return cmdRes1.contains("\tYes\t\tNo\t\tYes");
         } catch (Throwable t) {
           LOG.warn("Failed to list open key", t);
           return false;

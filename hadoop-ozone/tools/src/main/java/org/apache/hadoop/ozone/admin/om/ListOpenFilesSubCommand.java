@@ -106,7 +106,7 @@ public class ListOpenFilesSubCommand implements Callable<Void> {
   public Void call() throws Exception {
 
     if (StringUtils.isEmpty(omServiceId) && StringUtils.isEmpty(omHost)) {
-      System.err.println("Error: Please specify -id or -host");
+      System.err.println("Error: Please specify --service-id or --service-host");
       return null;
     }
 
@@ -149,9 +149,9 @@ public class ListOpenFilesSubCommand implements Callable<Void> {
     if (startItem != null && !startItem.isEmpty()) {
       msg += "\nafter continuation token:\n  " + startItem;
     }
-    msg += "\n\nClient ID\t\t\tCreation time\t\t\tHsync'ed\t";
+    msg += "\n\nClient ID\t\t\tCreation time\t\tHsync'ed\t";
     msg += showDeleted ? "Deleted\t" : "";
-    msg += showOverwritten? "Overwritten\t" : "";
+    msg += showOverwritten ? "Overwritten\t" : "";
     msg += "Open File Path";
     System.out.println(msg);
 
@@ -181,14 +181,14 @@ public class ListOpenFilesSubCommand implements Callable<Void> {
         }
         if (showOverwritten) {
           if (omKeyInfo.getMetadata().containsKey(OzoneConsts.OVERWRITTEN_HSYNC_KEY)) {
-            line += "\tYes\t\t";
+            line += "Yes\t";
           } else {
-            line += "\tNo\t\t";
+            line += "No\t";
           }
         }
       } else {
         line += showDeleted ? "No\t\tNo\t\t" : "No\t\t";
-        line += showOverwritten ? "\tNo\t\t" : "";
+        line += showOverwritten ? "No\t" : "";
       }
 
       line += getFullPathFromKeyInfo(omKeyInfo);
