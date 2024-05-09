@@ -52,6 +52,7 @@ import org.apache.hadoop.ozone.common.ChunkBuffer;
 import org.apache.hadoop.ozone.common.OzoneChecksumException;
 import org.apache.hadoop.security.token.Token;
 import org.apache.hadoop.security.token.TokenIdentifier;
+import org.apache.hadoop.util.DirectBufferPool;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
@@ -186,7 +187,7 @@ public class BlockOutputStream extends OutputStream {
     // tell DataNode I will send incremental chunk list
     if (config.getIncrementalChunkList()) {
       this.containerBlockData.addMetadata(INCREMENTAL_CHUNK_LIST_KV);
-      this.lastChunkBuffer = this.directBufferPool.allocateBuffer(config.getStreamBufferSize());
+      this.lastChunkBuffer = this.directBufferPool.getBuffer(config.getStreamBufferSize());
       this.lastChunkOffset = 0;
     } else {
       this.lastChunkBuffer = null;
@@ -711,7 +712,7 @@ public class BlockOutputStream extends OutputStream {
     }
     bufferList = null;
     if (lastChunkBuffer != null) {
-      directBufferPool.releaseBuffer(lastChunkBuffer);
+      directBufferPool.returnBuffer(lastChunkBuffer);
     }
   }
 
