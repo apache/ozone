@@ -32,6 +32,9 @@ import java.sql.Timestamp;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Collectors;
 
 import com.google.common.base.Preconditions;
@@ -55,17 +58,24 @@ import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_EVENT_CONTAINER
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_EVENT_THREAD_POOL_SIZE_DEFAULT;
 import static org.apache.hadoop.hdds.server.ServerUtils.getDirectoryFromConfig;
 import static org.apache.hadoop.hdds.server.ServerUtils.getOzoneMetaDirPath;
+import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_SCM_DB_DIR;
 import static org.jooq.impl.DSL.currentTimestamp;
 import static org.jooq.impl.DSL.select;
 import static org.jooq.impl.DSL.using;
 
+import org.apache.hadoop.ozone.OmUtils;
+import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
+import org.apache.hadoop.ozone.recon.api.types.NSSummary;
 import org.apache.hadoop.ozone.recon.api.types.DUResponse;
+import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 import org.apache.hadoop.ozone.recon.scm.ReconContainerReportQueue;
+import org.apache.hadoop.ozone.recon.spi.ReconNamespaceSummaryManager;
 import org.apache.hadoop.security.authentication.client.AuthenticationException;
 import org.hadoop.ozone.recon.schema.tables.daos.GlobalStatsDao;
 import org.hadoop.ozone.recon.schema.tables.pojos.GlobalStats;
 import jakarta.annotation.Nonnull;
+import com.google.common.annotations.VisibleForTesting;
 import org.jooq.Configuration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -81,8 +91,10 @@ public class ReconUtils {
   public ReconUtils() {
   }
 
-  private static final Logger LOG = LoggerFactory.getLogger(
+  private static Logger log = LoggerFactory.getLogger(
       ReconUtils.class);
+
+  private static AtomicBoolean rebuildTriggered = new AtomicBoolean(false);
 
   public static File getReconScmDbDir(ConfigurationSource conf) {
     return new ReconUtils().getReconDbDir(conf, OZONE_RECON_SCM_DB_DIR);
@@ -123,7 +135,7 @@ public class ReconUtils {
       return metadataDir;
     }
 
-    LOG.warn("{} is not configured. We recommend adding this setting. " +
+    log.warn("{} is not configured. We recommend adding this setting. " +
             "Falling back to {} instead.",
         dirConfigKey, HddsConfigKeys.OZONE_METADATA_DIRS);
     return getOzoneMetaDirPath(conf);
@@ -158,7 +170,7 @@ public class ReconUtils {
         org.apache.hadoop.io.IOUtils.closeStream(tarOs);
         org.apache.hadoop.io.IOUtils.closeStream(fileOutputStream);
       } catch (Exception e) {
-        LOG.error("Exception encountered when closing " +
+        log.error("Exception encountered when closing " +
             "TAR file output stream: " + e);
       }
     }
@@ -223,7 +235,7 @@ public class ReconUtils {
           if (entry.isDirectory()) {
             boolean success = f.mkdirs();
             if (!success) {
-              LOG.error("Unable to create directory found in tar.");
+              log.error("Unable to create directory found in tar.");
             }
           } else {
             //Write contents of file in archive to a new file.
@@ -246,25 +258,103 @@ public class ReconUtils {
     }
   }
 
+
+  /**
+   * Constructs the full path of a key from its OmKeyInfo using a bottom-up approach, starting from the leaf node.
+   *
+   * The method begins with the leaf node (the key itself) and recursively prepends parent directory names, fetched
+   * via NSSummary objects, until reaching the parent bucket (parentId is -1). It effectively builds the path from
+   * bottom to top, finally prepending the volume and bucket names to complete the full path. If the directory structure
+   * is currently being rebuilt (indicated by the rebuildTriggered flag), this method returns an empty string to signify
+   * that path construction is temporarily unavailable.
+   *
+   * @param omKeyInfo The OmKeyInfo object for the key
+   * @return The constructed full path of the key as a String, or an empty string if a rebuild is in progress and
+   *         the path cannot be constructed at this time.
+   * @throws IOException
+   */
+  public static String constructFullPath(OmKeyInfo omKeyInfo,
+                                         ReconNamespaceSummaryManager reconNamespaceSummaryManager,
+                                         ReconOMMetadataManager omMetadataManager)
+      throws IOException {
+
+    StringBuilder fullPath = new StringBuilder(omKeyInfo.getKeyName());
+    long parentId = omKeyInfo.getParentObjectID();
+    boolean isDirectoryPresent = false;
+
+    while (parentId != 0) {
+      NSSummary nsSummary = reconNamespaceSummaryManager.getNSSummary(parentId);
+      if (nsSummary == null) {
+        log.warn("NSSummary tree is currently being rebuilt or the directory could be in the progress of " +
+            "deletion, returning empty string for path construction.");
+        return "";
+      }
+      if (nsSummary.getParentId() == -1) {
+        if (rebuildTriggered.compareAndSet(false, true)) {
+          triggerRebuild(reconNamespaceSummaryManager, omMetadataManager);
+        }
+        log.warn("NSSummary tree is currently being rebuilt, returning empty string for path construction.");
+        return "";
+      }
+      fullPath.insert(0, nsSummary.getDirName() + OM_KEY_PREFIX);
+
+      // Move to the parent ID of the current directory
+      parentId = nsSummary.getParentId();
+      isDirectoryPresent = true;
+    }
+
+    // Prepend the volume and bucket to the constructed path
+    String volumeName = omKeyInfo.getVolumeName();
+    String bucketName = omKeyInfo.getBucketName();
+    fullPath.insert(0, volumeName + OM_KEY_PREFIX + bucketName + OM_KEY_PREFIX);
+    if (isDirectoryPresent) {
+      return OmUtils.normalizeKey(fullPath.toString(), true);
+    }
+    return fullPath.toString();
+  }
+
+  private static void triggerRebuild(ReconNamespaceSummaryManager reconNamespaceSummaryManager,
+                                     ReconOMMetadataManager omMetadataManager) {
+    ExecutorService executor = Executors.newSingleThreadExecutor(r -> {
+      Thread t = new Thread(r);
+      t.setName("RebuildNSSummaryThread");
+      return t;
+    });
+
+    executor.submit(() -> {
+      long startTime = System.currentTimeMillis();
+      log.info("Rebuilding NSSummary tree...");
+      try {
+        reconNamespaceSummaryManager.rebuildNSSummaryTree(omMetadataManager);
+      } finally {
+        long endTime = System.currentTimeMillis();
+        log.info("NSSummary tree rebuild completed in {} ms.", endTime - startTime);
+      }
+    });
+    executor.shutdown();
+  }
+
   /**
    * Make HTTP GET call on the URL and return HttpURLConnection instance.
+   *
    * @param connectionFactory URLConnectionFactory to use.
-   * @param url url to call
-   * @param isSpnego is SPNEGO enabled
+   * @param url               url to call
+   * @param isSpnego          is SPNEGO enabled
    * @return HttpURLConnection instance of the HTTP call.
    * @throws IOException, AuthenticationException While reading the response.
    */
   public HttpURLConnection makeHttpCall(URLConnectionFactory connectionFactory,
-                                  String url, boolean isSpnego)
+                                        String url, boolean isSpnego)
       throws IOException, AuthenticationException {
     HttpURLConnection urlConnection = (HttpURLConnection)
-          connectionFactory.openConnection(new URL(url), isSpnego);
+        connectionFactory.openConnection(new URL(url), isSpnego);
     urlConnection.connect();
     return urlConnection;
   }
 
   /**
    * Load last known DB in Recon.
+   *
    * @param reconDbDir
    * @param fileNamePrefix
    * @return
@@ -289,7 +379,7 @@ public class ReconUtils {
               lastKnownSnapshotFileName = fileName;
             }
           } catch (NumberFormatException nfEx) {
-            LOG.warn("Unknown file found in Recon DB dir : {}", fileName);
+            log.warn("Unknown file found in Recon DB dir : {}", fileName);
           }
         }
       }
@@ -413,5 +503,10 @@ public class ReconUtils {
     builder.setDatanodeProtocolServerAddress(
         HddsServerUtil.getReconDataNodeBindAddress(conf));
     return builder.build();
+  }
+
+  @VisibleForTesting
+  public static void setLogger(Logger logger) {
+    log = logger;
   }
 }
