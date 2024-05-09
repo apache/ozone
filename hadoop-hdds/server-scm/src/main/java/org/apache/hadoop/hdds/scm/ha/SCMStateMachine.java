@@ -354,15 +354,6 @@ public class SCMStateMachine extends BaseStateMachine {
     }
 
     if (currentLeaderTerm.get() == term) {
-      // On leader SCM once after it is ready, notify SCM services and also set
-      // leader ready  in SCMContext.
-      if (scm.getScmHAManager().getRatisServer().getDivision().getInfo()
-          .isLeaderReady()) {
-        scm.getScmContext().setLeaderReady();
-        scm.getSCMServiceManager().notifyStatusChanged();
-        scm.getFinalizationManager().onLeaderReady();
-      }
-
       // Means all transactions before this term have been applied.
       // This means after a restart, all pending transactions have been applied.
       // Perform
@@ -376,6 +367,18 @@ public class SCMStateMachine extends BaseStateMachine {
       }
       currentLeaderTerm.set(-1L);
     }
+  }
+
+  @Override
+  public void notifyLeaderReady() {
+    if (!isInitialized) {
+      return;
+    }
+    // On leader SCM once after it is ready, notify SCM services and also set
+    // leader ready  in SCMContext.
+    scm.getScmContext().setLeaderReady();
+    scm.getSCMServiceManager().notifyStatusChanged();
+    scm.getFinalizationManager().onLeaderReady();
   }
 
   @Override

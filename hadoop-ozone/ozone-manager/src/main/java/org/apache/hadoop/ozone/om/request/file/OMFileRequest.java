@@ -692,7 +692,7 @@ public final class OMFileRequest {
 
       if (omDirInfo != null) {
         lastKnownParentId = omDirInfo.getObjectID();
-      } else if (!elements.hasNext() && 
+      } else if (!elements.hasNext() &&
           (!keyName.endsWith(PATH_SEPARATOR_STR))) {
         // If the requested keyName contains "/" at the end then we need to
         // just check the directory table.
@@ -753,6 +753,7 @@ public final class OMFileRequest {
             .getInstance(HddsProtos.ReplicationFactor.ONE))
         .setOmKeyLocationInfos(Collections.singletonList(
             new OmKeyLocationInfoGroup(0, new ArrayList<>())))
+        .setOwnerName(dirInfo.getOwner())
         .build();
   }
 

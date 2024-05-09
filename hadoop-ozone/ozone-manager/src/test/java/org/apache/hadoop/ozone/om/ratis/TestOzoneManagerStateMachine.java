@@ -130,6 +130,26 @@ public class TestOzoneManagerStateMachine {
   }
 
   @Test
+  public void testNotifyTermIndexPendingBufferUpdateIndex() {
+    ozoneManagerStateMachine.notifyTermIndexUpdated(0, 0);
+    assertTermIndex(0, 0, ozoneManagerStateMachine.getLastAppliedTermIndex());
+    assertTermIndex(0, 0, ozoneManagerStateMachine.getLastNotifiedTermIndex());
+
+    // notifyTermIndex with skipping one of transaction which is from applyTransaction
+    ozoneManagerStateMachine.notifyTermIndexUpdated(0, 2);
+    ozoneManagerStateMachine.notifyTermIndexUpdated(0, 3);
+    assertTermIndex(0, 0, ozoneManagerStateMachine.getLastAppliedTermIndex());
+    assertTermIndex(0, 3, ozoneManagerStateMachine.getLastNotifiedTermIndex());
+
+    // applyTransaction update with missing transaction as above
+    ozoneManagerStateMachine.updateLastAppliedTermIndex(TermIndex.valueOf(0, 1));
+    assertTermIndex(0, 3, ozoneManagerStateMachine.getLastAppliedTermIndex());
+
+    assertTermIndex(0, 3, ozoneManagerStateMachine.getLastAppliedTermIndex());
+    assertTermIndex(0, 3, ozoneManagerStateMachine.getLastNotifiedTermIndex());
+  }
+
+  @Test
   public void testPreAppendTransaction() throws Exception {
     // Submit write request.
     KeyArgs args = KeyArgs

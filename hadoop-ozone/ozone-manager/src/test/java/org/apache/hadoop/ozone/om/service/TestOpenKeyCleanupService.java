@@ -51,6 +51,7 @@ import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.helpers.OpenKeySession;
 import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
+import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ratis.util.ExitUtils;
 import org.junit.jupiter.api.AfterAll;
@@ -528,6 +529,8 @@ class TestOpenKeyCleanupService {
             .setReplicationConfig(RatisReplicationConfig.getInstance(
                 HddsProtos.ReplicationFactor.ONE))
             .setLocationInfoList(new ArrayList<>())
+            .setOwnerName(UserGroupInformation.getCurrentUser()
+                .getShortUserName())
             .build();
 
     // Open and write the key without commit it.
@@ -584,6 +587,7 @@ class TestOpenKeyCleanupService {
             .setReplicationConfig(RatisReplicationConfig.getInstance(
                 HddsProtos.ReplicationFactor.ONE))
             .setLocationInfoList(new ArrayList<>())
+            .setOwnerName(UserGroupInformation.getCurrentUser().getShortUserName())
             .build();
 
     OmMultipartInfo omMultipartInfo = writeClient.
@@ -602,6 +606,7 @@ class TestOpenKeyCleanupService {
               .setAcls(Collections.emptyList())
               .setReplicationConfig(RatisReplicationConfig.getInstance(
                   HddsProtos.ReplicationFactor.ONE))
+              .setOwnerName(UserGroupInformation.getCurrentUser().getShortUserName())
               .build();
 
       OpenKeySession openKey = writeClient.openKey(partKeyArgs);

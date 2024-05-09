@@ -252,6 +252,10 @@ public final class OMConfigKeys {
   public static final boolean
       OZONE_OM_RATIS_SERVER_ELECTION_PRE_VOTE_DEFAULT = true;
 
+  public static final String OZONE_OM_RATIS_SERVER_CLOSE_THRESHOLD_KEY =
+      "ozone.om.ratis.server.close.threshold";
+  public static final TimeDuration OZONE_OM_RATIS_SERVER_CLOSE_THRESHOLD_DEFAULT =
+      TimeDuration.valueOf(60, TimeUnit.SECONDS);
 
   // OM SnapshotProvider configurations
   public static final String OZONE_OM_RATIS_SNAPSHOT_DIR =
@@ -574,13 +578,20 @@ public final class OMConfigKeys {
       = TimeUnit.DAYS.toMillis(7);
 
   public static final String OZONE_OM_SNAPSHOT_DIFF_CLEANUP_SERVICE_RUN_INTERVAL
-      = "ozone.om.snapshot.diff.cleanup.service.run.internal";
+      = "ozone.om.snapshot.diff.cleanup.service.run.interval";
+  public static final String
+      OZONE_OM_SNAPSHOT_CACHE_CLEANUP_SERVICE_RUN_INTERVAL
+      = "ozone.om.snapshot.cache.cleanup.service.run.interval";
   public static final long
       OZONE_OM_SNAPSHOT_DIFF_CLEANUP_SERVICE_RUN_INTERVAL_DEFAULT
+      = TimeUnit.MINUTES.toMillis(1);
+  public static final long
+      OZONE_OM_SNAPSHOT_CACHE_CLEANUP_SERVICE_RUN_INTERVAL_DEFAULT
       = TimeUnit.MINUTES.toMillis(1);
 
   public static final String OZONE_OM_SNAPSHOT_DIFF_CLEANUP_SERVICE_TIMEOUT
       = "ozone.om.snapshot.diff.cleanup.service.timeout";
+
   public static final long
       OZONE_OM_SNAPSHOT_DIFF_CLEANUP_SERVICE_TIMEOUT_DEFAULT
       = TimeUnit.MINUTES.toMillis(5);

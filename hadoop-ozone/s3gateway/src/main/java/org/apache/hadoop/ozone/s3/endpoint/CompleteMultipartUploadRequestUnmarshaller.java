@@ -44,14 +44,13 @@ public class CompleteMultipartUploadRequestUnmarshaller
     implements MessageBodyReader<CompleteMultipartUploadRequest> {
 
   private final JAXBContext context;
-  private final XMLReader xmlReader;
+  private final SAXParserFactory saxParserFactory;
 
   public CompleteMultipartUploadRequestUnmarshaller() {
     try {
       context = JAXBContext.newInstance(CompleteMultipartUploadRequest.class);
-      SAXParserFactory saxParserFactory = SAXParserFactory.newInstance();
+      saxParserFactory = SAXParserFactory.newInstance();
       saxParserFactory.setFeature(XMLConstants.FEATURE_SECURE_PROCESSING, true);
-      xmlReader = saxParserFactory.newSAXParser().getXMLReader();
     } catch (Exception ex) {
       throw new AssertionError("Can not instantiate " +
           "CompleteMultipartUploadRequest parser", ex);
@@ -70,6 +69,7 @@ public class CompleteMultipartUploadRequestUnmarshaller
       MultivaluedMap<String, String> multivaluedMap,
       InputStream inputStream) throws IOException, WebApplicationException {
     try {
+      XMLReader xmlReader = saxParserFactory.newSAXParser().getXMLReader();
       UnmarshallerHandler unmarshallerHandler =
           context.createUnmarshaller().getUnmarshallerHandler();
       XmlNamespaceFilter filter =

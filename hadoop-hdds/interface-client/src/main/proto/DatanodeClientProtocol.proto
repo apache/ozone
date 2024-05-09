@@ -397,6 +397,7 @@ message  EchoRequestProto {
   optional bytes payload = 1;
   optional int32 payloadSizeResp = 2;
   optional int32 sleepTimeMs = 3;
+  optional bool readOnly = 4;
 }
 
 message  EchoResponseProto {

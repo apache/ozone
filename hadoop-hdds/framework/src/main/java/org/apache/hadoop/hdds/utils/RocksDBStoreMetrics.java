@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.hdds.utils;
 
+import org.apache.hadoop.hdds.StringUtils;
 import org.apache.hadoop.hdds.utils.db.RocksDatabase;
 import org.apache.hadoop.metrics2.MetricsCollector;
 import org.apache.hadoop.metrics2.MetricsRecordBuilder;
@@ -25,7 +26,6 @@ import org.apache.hadoop.metrics2.MetricsSource;
 import org.apache.hadoop.metrics2.MetricsSystem;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.metrics2.lib.Interns;
-import org.bouncycastle.util.Strings;
 import org.rocksdb.HistogramData;
 import org.rocksdb.HistogramType;
 import org.rocksdb.LiveFileMetaData;
@@ -257,7 +257,7 @@ public class RocksDBStoreMetrics implements MetricsSource {
     Map<String, Long> sizeStat;
     for (LiveFileMetaData file : liveFileMetaDataList) {
       numStat = numStatPerCF.get(file.level());
-      String cf = Strings.fromByteArray(file.columnFamilyName());
+      String cf = StringUtils.bytes2String(file.columnFamilyName());
       if (numStat != null) {
         Long value = numStat.get(cf);
         numStat.put(cf, value == null ? 1L : value + 1);

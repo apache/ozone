@@ -586,12 +586,13 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
    */
   @Override
   public List<DatanodeAdminError> startMaintenanceNodes(
-      List<String> nodes, int endInHours) throws IOException {
+      List<String> nodes, int endInHours, boolean force) throws IOException {
     Preconditions.checkNotNull(nodes);
     StartMaintenanceNodesRequestProto request =
         StartMaintenanceNodesRequestProto.newBuilder()
             .addAllHosts(nodes)
             .setEndInHours(endInHours)
+            .setForce(force)
             .build();
     StartMaintenanceNodesResponseProto response =
         submitRequest(Type.StartMaintenanceNodes,

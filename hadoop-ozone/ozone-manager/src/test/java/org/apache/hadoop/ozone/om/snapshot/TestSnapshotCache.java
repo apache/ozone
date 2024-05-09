@@ -33,6 +33,7 @@ import org.slf4j.event.Level;
 
 import java.io.IOException;
 import java.util.UUID;
+import java.util.concurrent.TimeoutException;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
@@ -65,6 +66,7 @@ class TestSnapshotCache {
           // Mock the snapshotTable return value for the lookup inside release()
           final UUID snapshotID = (UUID) invocation.getArguments()[0];
           when(omSnapshot.getSnapshotTableKey()).thenReturn(snapshotID.toString());
+          when(omSnapshot.getSnapshotID()).thenReturn(snapshotID);
 
           return omSnapshot;
         }
@@ -78,7 +80,7 @@ class TestSnapshotCache {
   void setUp() {
     // Reset cache for each test case
     omMetrics = OMMetrics.create();
-    snapshotCache = new SnapshotCache(cacheLoader, CACHE_SIZE_LIMIT, omMetrics);
+    snapshotCache = new SnapshotCache(cacheLoader, CACHE_SIZE_LIMIT, omMetrics, 50);
   }
 
   @AfterEach
@@ -205,7 +207,7 @@ class TestSnapshotCache {
 
   @Test
   @DisplayName("Basic cache eviction")
-  void testEviction1() throws IOException {
+  void testEviction1() throws IOException, InterruptedException, TimeoutException {
 
     final UUID dbKey1 = UUID.randomUUID();
     snapshotCache.get(dbKey1);
@@ -233,8 +235,9 @@ class TestSnapshotCache {
 
     final UUID dbKey4 = UUID.randomUUID();
     snapshotCache.get(dbKey4);
-    // dbKey1, dbKey2 and dbKey3 would have been evicted by the end of the last get() because
-    // those were release()d.
+    // dbKey1, dbKey2 and dbKey3 would have been evicted by the end of the last scheduled cleanup() because
+    // those were released.
+    GenericTestUtils.waitFor(() -> snapshotCache.size() == 1, 50, 3000);
     assertEquals(1, snapshotCache.size());
     assertEquals(1, omMetrics.getNumSnapshotCacheSize());
     assertEntryExistence(dbKey1, false);
@@ -242,7 +245,7 @@ class TestSnapshotCache {
 
   @Test
   @DisplayName("Cache eviction while exceeding soft limit")
-  void testEviction2() throws IOException {
+  void testEviction2() throws IOException, InterruptedException, TimeoutException {
 
     final UUID dbKey1 = UUID.randomUUID();
     snapshotCache.get(dbKey1);
@@ -269,6 +272,7 @@ class TestSnapshotCache {
     // Releasing dbKey2 at this point should immediately trigger its eviction
     // because the cache size exceeded the soft limit
     snapshotCache.release(dbKey2);
+    GenericTestUtils.waitFor(() -> snapshotCache.size() == 3, 50, 3000);
     assertEquals(3, snapshotCache.size());
     assertEquals(3, omMetrics.getNumSnapshotCacheSize());
     assertEntryExistence(dbKey2, false);
@@ -277,7 +281,7 @@ class TestSnapshotCache {
 
   @Test
   @DisplayName("Cache eviction with try-with-resources")
-  void testEviction3WithClose() throws IOException {
+  void testEviction3WithClose() throws IOException, InterruptedException, TimeoutException {
 
     final UUID dbKey1 = UUID.randomUUID();
     try (ReferenceCounted<OmSnapshot> rcOmSnapshot = snapshotCache.get(dbKey1)) {
@@ -321,6 +325,7 @@ class TestSnapshotCache {
 
     final UUID dbKey4 = UUID.randomUUID();
     try (ReferenceCounted<OmSnapshot> rcOmSnapshot = snapshotCache.get(dbKey4)) {
+      GenericTestUtils.waitFor(() -> snapshotCache.size() == 1, 50, 3000);
       assertEquals(1L, rcOmSnapshot.getTotalRefCount());
       assertEquals(1, snapshotCache.size());
       assertEquals(1, omMetrics.getNumSnapshotCacheSize());

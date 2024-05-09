@@ -65,7 +65,6 @@ import java.util.function.Supplier;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
-import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.hdds.utils.db.managed.ManagedColumnFamilyOptions.closeDeeply;
 import static org.apache.hadoop.hdds.utils.db.managed.ManagedRocksIterator.managed;
 import static org.apache.hadoop.hdds.utils.db.managed.ManagedTransactionLogIterator.managed;
@@ -848,8 +847,7 @@ public final class RocksDatabase implements Closeable {
       throws IOException, RocksDBException {
     try (UncheckedAutoCloseable ignored = acquire()) {
       for (LiveFileMetaData liveFileMetaData : getSstFileList()) {
-        String sstFileColumnFamily =
-            new String(liveFileMetaData.columnFamilyName(), UTF_8);
+        String sstFileColumnFamily = StringUtils.bytes2String(liveFileMetaData.columnFamilyName());
         int lastLevel = getLastLevel();
 
         if (!prefixPairs.containsKey(sstFileColumnFamily)) {
@@ -867,8 +865,8 @@ public final class RocksDatabase implements Closeable {
         }
 
         String prefixForColumnFamily = prefixPairs.get(sstFileColumnFamily);
-        String firstDbKey = new String(liveFileMetaData.smallestKey(), UTF_8);
-        String lastDbKey = new String(liveFileMetaData.largestKey(), UTF_8);
+        String firstDbKey = StringUtils.bytes2String(liveFileMetaData.smallestKey());
+        String lastDbKey = StringUtils.bytes2String(liveFileMetaData.largestKey());
         boolean isKeyWithPrefixPresent = RocksDiffUtils.isKeyWithPrefixPresent(
             prefixForColumnFamily, firstDbKey, lastDbKey);
         if (!isKeyWithPrefixPresent) {

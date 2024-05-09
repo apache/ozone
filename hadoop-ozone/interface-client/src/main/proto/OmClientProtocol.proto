@@ -1036,6 +1036,7 @@ message KeyArgs {
     optional hadoop.hdds.ECReplicationConfig ecReplicationConfig = 19;
     // Force OM to update container cache location from SCL
     optional bool forceUpdateContainerCacheFromSCM = 20;
+    optional string ownerName = 21;
 }
 
 message KeyLocation {
@@ -1118,6 +1119,7 @@ message KeyInfo {
     optional hadoop.hdds.ECReplicationConfig ecReplicationConfig = 17;
     optional FileChecksumProto fileChecksum = 18;
     optional bool isFile = 19;
+    optional string ownerName = 20;
 }
 
 message BasicKeyInfo {
@@ -1128,6 +1130,8 @@ message BasicKeyInfo {
     optional hadoop.hdds.ReplicationType type = 5;
     optional hadoop.hdds.ReplicationFactor factor = 6;
     optional hadoop.hdds.ECReplicationConfig ecReplicationConfig = 7;
+    optional string eTag = 8;
+    optional string ownerName = 9;
 }
 
 message DirectoryInfo {
@@ -1139,6 +1143,7 @@ message DirectoryInfo {
     required uint64 objectID = 6;
     required uint64 updateID = 7;
     required uint64 parentID = 8;
+    optional string ownerName = 9;
 }
 
 message RepeatedKeyInfo {

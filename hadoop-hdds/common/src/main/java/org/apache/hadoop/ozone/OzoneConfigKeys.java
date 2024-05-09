@@ -463,7 +463,7 @@ public final class OzoneConfigKeys {
       "hdds.datanode.replication.work.dir";
 
 
-  public static final int OZONE_CLIENT_BYTES_PER_CHECKSUM_MIN_SIZE = 16 * 1024;
+  public static final int OZONE_CLIENT_BYTES_PER_CHECKSUM_MIN_SIZE = 8 * 1024;
 
   public static final String OZONE_CLIENT_READ_TIMEOUT
           = "ozone.client.read.timeout";
@@ -689,6 +689,10 @@ public final class OzoneConfigKeys {
       "ozone.om.network.topology.refresh.duration";
   public static final String
       OZONE_OM_NETWORK_TOPOLOGY_REFRESH_DURATION_DEFAULT = "1h";
+
+  public static final String OZONE_SECURITY_CRYPTO_COMPLIANCE_MODE =
+      "ozone.security.crypto.compliance.mode";
+  public static final String OZONE_SECURITY_CRYPTO_COMPLIANCE_MODE_UNRESTRICTED = "unrestricted";
 
 
   /**

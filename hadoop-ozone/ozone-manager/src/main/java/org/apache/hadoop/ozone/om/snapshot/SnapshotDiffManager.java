@@ -1415,7 +1415,7 @@ public class SnapshotDiffManager implements AutoCloseable {
    */
   private boolean isKeyModified(OmKeyInfo fromKey, OmKeyInfo toKey) {
     return !fromKey.isKeyInfoSame(toKey,
-        false, false, false, false)
+        false, false, false, false, true)
         || !SnapshotDeletingService.isBlockLocationInfoSame(
         fromKey, toKey);
   }

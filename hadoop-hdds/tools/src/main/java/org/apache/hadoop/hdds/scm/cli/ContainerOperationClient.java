@@ -250,9 +250,9 @@ public class ContainerOperationClient implements ScmClient {
 
   @Override
   public List<DatanodeAdminError> startMaintenanceNodes(List<String> hosts,
-      int endHours) throws IOException {
+      int endHours, boolean force) throws IOException {
     return storageContainerLocationClient.startMaintenanceNodes(
-        hosts, endHours);
+        hosts, endHours, force);
   }
 
   @Override
