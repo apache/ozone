@@ -16,7 +16,6 @@
  */
 package org.apache.hadoop.ozone.admin.scm;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.scm.cli.ScmSubcommand;
 import org.apache.hadoop.hdds.scm.client.ScmClient;
@@ -90,14 +89,12 @@ public class ResetDeletedBlockRetryCountSubcommand extends ScmSubcommand {
           System.out.println("The last loaded txID: " +
               txIDs.get(txIDs.size() - 1));
         }
-      } catch (JsonProcessingException ex) {
-        final String message = "Failed to parse the file " + group.fileName;
+      } catch (IOException ex) {
+        final String message = "Failed to parse the file " + group.fileName + ": " + ex.getMessage();
         System.out.println(message);
         throw new IOException(message, ex);
-      } catch (IOException ex) {
-        System.out.println("Error reading file: " + ex.getMessage());
-        throw ex;
       }
+
       count = client.resetDeletedBlockRetryCount(txIDs);
     } else {
       if (group.txList == null || group.txList.isEmpty()) {
