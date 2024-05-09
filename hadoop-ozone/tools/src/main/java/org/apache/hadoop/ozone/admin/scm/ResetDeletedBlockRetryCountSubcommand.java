@@ -91,8 +91,9 @@ public class ResetDeletedBlockRetryCountSubcommand extends ScmSubcommand {
               txIDs.get(txIDs.size() - 1));
         }
       } catch (JsonProcessingException ex) {
-        System.out.println("Error parsing JSON: " + ex.getMessage());
-        throw new IOException(ex);
+        final String message = "Failed to parse the file " + group.fileName;
+        System.out.println(message);
+        throw new IOException(message, ex);
       } catch (IOException ex) {
         System.out.println("Error reading file: " + ex.getMessage());
         throw ex;
