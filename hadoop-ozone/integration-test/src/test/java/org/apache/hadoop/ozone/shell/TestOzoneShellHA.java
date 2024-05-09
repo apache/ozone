@@ -819,6 +819,134 @@ public class TestOzoneShellHA {
     }
   }
 
+  @Test
+  public void testAdminCmdListOpenFilesWithOverwrittenKeys()
+      throws Exception {
+
+    OzoneConfiguration conf = cluster.getConf();
+    final String hostPrefix = OZONE_OFS_URI_SCHEME + "://" + omServiceId;
+
+    OzoneConfiguration clientConf = getClientConfForOFS(hostPrefix, conf);
+    clientConf.setBoolean(OZONE_FS_HSYNC_ENABLED, true);
+    FileSystem fs = FileSystem.get(clientConf);
+
+    assertNotEquals(fs.getConf().get(OZONE_FS_HSYNC_ENABLED),
+        "false", OZONE_FS_HSYNC_ENABLED + " is set to false " +
+            "by external force. Must be true to allow hsync to function");
+
+    final String volumeName = "volume-list-del";
+    final String bucketName = "buck1";
+
+    String dir1 = hostPrefix +
+        OM_KEY_PREFIX + volumeName +
+        OM_KEY_PREFIX + bucketName +
+        OM_KEY_PREFIX + "dir1";
+    // Create volume, bucket, dir
+    assertTrue(fs.mkdirs(new Path(dir1)));
+    String keyPrefix = OM_KEY_PREFIX + "key";
+
+    final int numKeys = 5;
+    String[] keys = new String[numKeys];
+
+    for (int i = 0; i < numKeys; i++) {
+      keys[i] = dir1 + keyPrefix + i;
+    }
+
+    String pathToBucket = "/" +  volumeName + "/" + bucketName;
+    FSDataOutputStream[] streams = new FSDataOutputStream[numKeys];
+
+    try {
+      // Create multiple keys and hold them open
+      for (int i = 0; i < numKeys; i++) {
+        streams[i] = fs.create(new Path(keys[i]));
+        streams[i].write(1);
+      }
+
+      // Wait for DB flush
+      cluster.getOzoneManager().awaitDoubleBufferFlush();
+
+      // hsync last key
+      streams[numKeys - 1].hsync();
+      // Wait for flush
+      cluster.getOzoneManager().awaitDoubleBufferFlush();
+      final String[] args = new String[] {"om", "lof", "--service-id",
+          omServiceId, "--show-deleted", "--show-overwritten", "-p", pathToBucket};
+
+      execute(ozoneAdminShell, args);
+      String cmdRes = getStdOut();
+
+      // Verify that key is hsync'ed
+      assertTrue(cmdRes.contains("\tYes\t\tNo\t\t\tNo"), "key should be hsync'ed and not deleted, not overwritten");
+
+      execute(ozoneAdminShell, new String[] {"om", "lof", "--service-id",
+          omServiceId, "--show-overwritten", "-p", pathToBucket});
+      cmdRes = getStdOut();
+      // Verify that key is hsync'ed
+      assertTrue(cmdRes.contains("\tYes\t\t\tNo"), "key should be hsync'ed and not overwritten");
+
+      // Verify json output
+      String[] args1 = new String[] {"om", "lof", "--service-id", omServiceId, "--show-deleted", "--show-overwritten",
+          "--json", "-p", pathToBucket};
+      execute(ozoneAdminShell, args1);
+      cmdRes = getStdOut();
+
+      assertTrue(!cmdRes.contains(OzoneConsts.DELETED_HSYNC_KEY),
+          "key should not have deletedHsyncKey metadata");
+      assertTrue(!cmdRes.contains(OzoneConsts.OVERWRITTEN_HSYNC_KEY),
+          "key should not have overwrittenHsyncKey metadata");
+
+      // Suspend open key cleanup service so that key remains in openKeyTable for verification
+      OpenKeyCleanupService openKeyCleanupService =
+          (OpenKeyCleanupService) cluster.getOzoneManager().getKeyManager().getOpenKeyCleanupService();
+      openKeyCleanupService.suspend();
+      OzoneFsShell shell = new OzoneFsShell(clientConf);
+      // overwrite last key
+      try (FSDataOutputStream os = fs.create(new Path(keys[numKeys - 1]))) {
+        os.write(2);
+      }
+
+      GenericTestUtils.waitFor(() -> {
+        try {
+          execute(ozoneAdminShell, args);
+          String cmdRes1 = getStdOut();
+          // When hsync file is overwritten, it should add OVERWRITTEN_HSYNC_KEY metadata in hsync openKey
+          // And list open key should show as overwritten
+          return cmdRes1.contains("\tYes\t\tNo\t\t\tYes");
+        } catch (Throwable t) {
+          LOG.warn("Failed to list open key", t);
+          return false;
+        }
+      }, 1000, 10000);
+
+      // Now check json output
+      execute(ozoneAdminShell, args1);
+      cmdRes = getStdOut();
+      assertTrue(!cmdRes.contains(OzoneConsts.DELETED_HSYNC_KEY),
+          "key should not have deletedHsyncKey metadata");
+      assertTrue(cmdRes.contains(OzoneConsts.OVERWRITTEN_HSYNC_KEY),
+          "key should have overwrittenHsyncKey metadata");
+
+      // Verify result should not have overwritten hsync keys when --show-overwritten is not in the command argument
+      String[] args2 = new String[] {"om", "lof", "--service-id", omServiceId, "-p", pathToBucket};
+      execute(ozoneAdminShell, args2);
+      cmdRes = getStdOut();
+      // Verify that overwrittenHsyncKey is not in the result
+      assertTrue(!cmdRes.contains("\tYes\t\tYes"), "key should be hsync'ed and not overwritten");
+
+      // Verify with json result
+      args2 = new String[] {"om", "lof", "--service-id", omServiceId, "--json", "-p", pathToBucket};
+      execute(ozoneAdminShell, args2);
+      cmdRes = getStdOut();
+      // Verify that overwrittenHsyncKey is not in the result
+      assertTrue(!cmdRes.contains(OzoneConsts.OVERWRITTEN_HSYNC_KEY),
+          "key should not have overwrittenHsyncKey metadata");
+
+    }  finally {
+      // Cleanup
+      IOUtils.closeQuietly(streams);
+    }
+  }
+
   /**
    * Return stdout as a String, then clears existing output.
    */
