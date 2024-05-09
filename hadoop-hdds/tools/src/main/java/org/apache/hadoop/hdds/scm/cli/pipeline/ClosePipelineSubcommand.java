@@ -51,7 +51,7 @@ public class ClosePipelineSubcommand extends ScmSubcommand {
   public void execute(ScmClient scmClient) throws IOException {
     if (!Strings.isNullOrEmpty(closeOption.pipelineId)) {
       if (filterOptions.getReplicationFilter().isPresent()) {
-        System.err.println("Replication filters can only be used with --all");
+        throw new IllegalArgumentException("Replication filters can only be used with --all");
       }
       scmClient.closePipeline(HddsProtos.PipelineID.newBuilder().setId(closeOption.pipelineId).build());
     } else if (closeOption.closeAll) {
