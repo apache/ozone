@@ -54,13 +54,6 @@ public abstract class WithObjectID extends WithMetadata {
   }
 
   /**
-   * Returns the generation of the object. Note this is currently the same as updateID.
-   * @return long
-   */
-  public final long getGeneration() {
-    return getUpdateID();
-  }
-  /**
    * Set the Object ID.
    * There is a reason why we cannot use the final here. The object
    * ({@link OmVolumeArgs}/ {@link OmBucketInfo}/ {@link OmKeyInfo}) is

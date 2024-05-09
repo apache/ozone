@@ -181,6 +181,14 @@ public final class OmKeyInfo extends WithParentObjectId
     return ownerName;
   }
 
+  /**
+   * Returns the generation of the object. Note this is currently the same as updateID for a key.
+   * @return long
+   */
+  public long getGeneration() {
+    return getUpdateID();
+  }
+
   public synchronized OmKeyLocationInfoGroup getLatestVersionLocations() {
     return keyLocationVersions.size() == 0 ? null :
         keyLocationVersions.get(keyLocationVersions.size() - 1);
