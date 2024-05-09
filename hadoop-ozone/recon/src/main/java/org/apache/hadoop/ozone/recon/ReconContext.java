@@ -25,11 +25,11 @@ import javax.inject.Inject;
 import javax.inject.Singleton;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.locks.ReadWriteLock;
-import java.util.concurrent.locks.ReentrantReadWriteLock;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  * ReconContext is the single source of truth for some key information shared
@@ -45,14 +45,14 @@ public final class ReconContext {
   private static final Logger LOG = LoggerFactory.getLogger(ReconContext.class);
 
   private final String threadNamePrefix;
+  private String clusterId;
   private OzoneConfiguration ozoneConfiguration;
   private ReconUtils reconUtils;
-  private boolean isHealthy = true;
+  private AtomicBoolean isHealthy = new AtomicBoolean(true);
 
   private Map<ErrorCode, String> errCodeMsgMap = new HashMap<>();
   private Map<ErrorCode, List<String>> errCodeImpactMap = new HashMap<>();
-  private List<ErrorCode> errors = new ArrayList<>();
-  private final ReadWriteLock lock = new ReentrantReadWriteLock();
+  private List<ErrorCode> errors = Collections.synchronizedList(new ArrayList<>());
 
   @Inject
   public ReconContext(OzoneConfiguration configuration, ReconUtils reconUtils) {
@@ -63,43 +63,22 @@ public final class ReconContext {
   }
 
   private void initializeErrCodeMetaData() {
-    // This maps the error code to error message.
-    errCodeMsgMap.put(ErrorCode.OK, "Recon is healthy !!!");
-    errCodeMsgMap.put(ErrorCode.INVALID_NETWORK_TOPOLOGY,
-        "Invalid network topology of datanodes. Failed to register and load datanodes. Pipelines may not be " +
-            "healthy !!!");
-    errCodeMsgMap.put(ErrorCode.CERTIFICATE_INIT_FAILED, "Error during initializing Recon certificate !!!");
-    errCodeMsgMap.put(ErrorCode.INTERNAL_ERROR,
-        "Unexpected internal error. Kindly refer ozone-recon.log file for details !!!");
-    errCodeMsgMap.put(ErrorCode.GET_OM_DB_SNAPSHOT_FAILED, "OM DB Snapshot sync failed !!!");
-
-    // This maps the error codes to impacted areas of Recon.
-    errCodeImpactMap.put(ErrorCode.INVALID_NETWORK_TOPOLOGY, Arrays.asList("Datanodes", "Pipelines"));
-    errCodeImpactMap.put(ErrorCode.CERTIFICATE_INIT_FAILED, Arrays.asList("Initializing secure Recon"));
-    errCodeImpactMap.put(ErrorCode.INTERNAL_ERROR, Arrays.asList("Recon health"));
-    errCodeImpactMap.put(ErrorCode.GET_OM_DB_SNAPSHOT_FAILED, Arrays.asList("Overview (OM Data)", "OM DB Insights"));
+    for (ErrorCode errorCode : ErrorCode.values()) {
+      errCodeMsgMap.put(errorCode, errorCode.getMessage());
+      errCodeImpactMap.put(errorCode, errorCode.getImpacts());
+    }
   }
 
   /**
    * @param healthStatus : update Health Status of Recon.
    */
-  public void updateHealthStatus(boolean healthStatus) {
-    lock.writeLock().lock();
-    try {
-      LOG.info("Update healthStatus of Recon from {} to {}.", isHealthy, healthStatus);
-      this.isHealthy = healthStatus;
-    } finally {
-      lock.writeLock().unlock();
-    }
+  public void updateHealthStatus(AtomicBoolean healthStatus) {
+    boolean oldHealthStatus = isHealthy.getAndSet(healthStatus.get());
+    LOG.info("Update healthStatus of Recon from {} to {}.", oldHealthStatus, isHealthy.get());
   }
 
-  public boolean isHealthy() {
-    lock.readLock().lock();
-    try {
-      return this.isHealthy;
-    } finally {
-      lock.readLock().unlock();
-    }
+  public AtomicBoolean isHealthy() {
+    return isHealthy;
   }
 
   public String threadNamePrefix() {
@@ -119,22 +98,49 @@ public final class ReconContext {
   }
 
   public void updateErrors(ErrorCode errorCode) {
-    lock.writeLock().lock();
-    try {
-      errors.add(errorCode);
-    } finally {
-      lock.writeLock().unlock();
-    }
+    errors.add(errorCode);
+  }
+
+  public void setClusterId(String clusterId) {
+    this.clusterId = clusterId;
+  }
+
+  public String getClusterId() {
+    return clusterId;
   }
 
   /**
    * Error codes to make it easy to decode these errors in Recon.
    */
   public enum ErrorCode {
-    OK,
-    INVALID_NETWORK_TOPOLOGY,
-    CERTIFICATE_INIT_FAILED,
-    INTERNAL_ERROR,
-    GET_OM_DB_SNAPSHOT_FAILED
+    OK("Recon is healthy !!!", Collections.emptyList()),
+    INVALID_NETWORK_TOPOLOGY(
+        "Invalid network topology of datanodes. Failed to register and load datanodes. Pipelines may not be " +
+            "healthy !!!", Arrays.asList("Datanodes", "Pipelines")),
+    CERTIFICATE_INIT_FAILED(
+        "Error during initializing Recon certificate !!!",
+        Arrays.asList("Initializing secure Recon")),
+    INTERNAL_ERROR(
+        "Unexpected internal error. Kindly refer ozone-recon.log file for details !!!",
+        Arrays.asList("Recon health")),
+    GET_OM_DB_SNAPSHOT_FAILED(
+        "OM DB Snapshot sync failed !!!",
+        Arrays.asList("Overview (OM Data)", "OM DB Insights"));
+
+    private final String message;
+    private final List<String> impacts;
+
+    ErrorCode(String message, List<String> impacts) {
+      this.message = message;
+      this.impacts = impacts;
+    }
+
+    public String getMessage() {
+      return message;
+    }
+
+    public List<String> getImpacts() {
+      return impacts;
+    }
   }
 }

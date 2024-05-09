@@ -114,7 +114,7 @@ public class TestReconNodeManager {
     RegisteredCommand register = reconNodeManager.register(datanodeDetails, null, null);
     assertNull(register);
     ReconContext reconContext = reconNodeManager.getReconContext();
-    assertFalse(reconContext.isHealthy());
+    assertFalse(reconContext.isHealthy().get());
     assertTrue(reconContext.getErrors().get(0).equals(ReconContext.ErrorCode.INVALID_NETWORK_TOPOLOGY));
 
     assertEquals(0, reconNodeManager.getAllNodes().size());

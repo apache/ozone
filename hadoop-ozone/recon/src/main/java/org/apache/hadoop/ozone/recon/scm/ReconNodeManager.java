@@ -25,10 +25,12 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.CommandQueueReportProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.LayoutVersionProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.NodeReportProto;
@@ -288,14 +290,22 @@ public class ReconNodeManager extends SCMNodeManager {
       }
     }
     try {
-      return super.register(datanodeDetails, nodeReport, pipelineReportsProto,
+      RegisteredCommand registeredCommand = super.register(datanodeDetails, nodeReport, pipelineReportsProto,
           layoutInfo);
+      reconContext.updateHealthStatus(new AtomicBoolean(true));
+      reconContext.getErrors().remove(ReconContext.ErrorCode.INVALID_NETWORK_TOPOLOGY);
+      return registeredCommand;
     } catch (InvalidTopologyException invalidTopologyException) {
       LOG.error("InvalidTopologyException error occurred : {}", invalidTopologyException.getMessage());
-      reconContext.updateHealthStatus(false);
+      reconContext.updateHealthStatus(new AtomicBoolean(false));
       reconContext.getErrors().add(ReconContext.ErrorCode.INVALID_NETWORK_TOPOLOGY);
+      return RegisteredCommand.newBuilder()
+          .setErrorCode(
+              StorageContainerDatanodeProtocolProtos.SCMRegisteredResponseProto.ErrorCode.errorNodeNotPermitted)
+          .setDatanode(datanodeDetails)
+          .setClusterID(reconContext.getClusterId())
+          .build();
     }
-    return null;
   }
 
   public void updateNodeOperationalStateFromScm(HddsProtos.Node scmNode,
