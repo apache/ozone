@@ -848,7 +848,7 @@ public class DatanodeDetails extends NodeImpl implements
           EnumSet.of(STANDALONE, RATIS, REST));
 
       public static final Set<Name> IO_PORTS = ImmutableSet.copyOf(
-          EnumSet.of(STANDALONE, RATIS, REST));
+          EnumSet.of(STANDALONE, RATIS, RATIS_DATASTREAM));
     }
 
     private final Name name;
