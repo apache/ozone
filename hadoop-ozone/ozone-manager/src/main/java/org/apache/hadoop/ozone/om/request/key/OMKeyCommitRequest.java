@@ -221,11 +221,27 @@ public class OMKeyCommitRequest extends OMKeyRequest {
       // creation and key commit, old versions will be just overwritten and
       // not kept. Bucket versioning will be effective from the first key
       // creation after the knob turned on.
-      boolean isPreviousCommitHsync = false;
-      Map<String, RepeatedOmKeyInfo> oldKeyVersionsToDeleteMap = null;
       OmKeyInfo keyToDelete =
           omMetadataManager.getKeyTable(getBucketLayout()).get(dbOzoneKey);
       long writerClientId = commitKeyRequest.getClientID();
+      boolean isSameHsyncKey = false;
+      boolean isOverwrittenHsyncKey = false;
+      final String clientIdString = String.valueOf(writerClientId);
+      if (null != keyToDelete) {
+        isSameHsyncKey = java.util.Optional.of(keyToDelete)
+            .map(WithMetadata::getMetadata)
+            .map(meta -> meta.get(OzoneConsts.HSYNC_CLIENT_ID))
+            .filter(id -> id.equals(clientIdString))
+            .isPresent();
+        if (!isSameHsyncKey) {
+          isOverwrittenHsyncKey = java.util.Optional.of(keyToDelete)
+              .map(WithMetadata::getMetadata)
+              .map(meta -> meta.get(OzoneConsts.HSYNC_CLIENT_ID))
+              .filter(id -> !id.equals(clientIdString))
+              .isPresent() && !isRecovery;
+        }
+      }
+
       if (isRecovery && keyToDelete != null) {
         String clientId = keyToDelete.getMetadata().get(OzoneConsts.HSYNC_CLIENT_ID);
         if (clientId == null) {
@@ -234,16 +250,6 @@ public class OMKeyCommitRequest extends OMKeyRequest {
         }
         writerClientId = Long.parseLong(clientId);
       }
-
-      final String clientIdString = String.valueOf(writerClientId);
-      if (null != keyToDelete) {
-        isPreviousCommitHsync = java.util.Optional.of(keyToDelete)
-            .map(WithMetadata::getMetadata)
-            .map(meta -> meta.get(OzoneConsts.HSYNC_CLIENT_ID))
-            .filter(id -> id.equals(clientIdString))
-            .isPresent();
-      }
-
       String dbOpenKey = omMetadataManager.getOpenKey(volumeName, bucketName,
           keyName, writerClientId);
       omKeyInfo =
@@ -252,11 +258,12 @@ public class OMKeyCommitRequest extends OMKeyRequest {
         String action = isRecovery ? "recovery" : isHSync ? "hsync" : "commit";
         throw new OMException("Failed to " + action + " key, as " + dbOpenKey +
             " entry is not found in the OpenKey table", KEY_NOT_FOUND);
-      }
-      if (omKeyInfo.getMetadata().containsKey(OzoneConsts.DELETED_HSYNC_KEY)) {
-        throw new OMException("Open Key " + keyName + " is already deleted",
+      } else if (omKeyInfo.getMetadata().containsKey(OzoneConsts.DELETED_HSYNC_KEY) ||
+          omKeyInfo.getMetadata().containsKey(OzoneConsts.OVERWRITTEN_HSYNC_KEY)) {
+        throw new OMException("Open Key " + keyName + " is already deleted/overwritten",
             KEY_NOT_FOUND);
       }
+
       if (omKeyInfo.getMetadata().containsKey(OzoneConsts.LEASE_RECOVERY) &&
           omKeyInfo.getMetadata().containsKey(OzoneConsts.HSYNC_CLIENT_ID)) {
         if (!isRecovery) {
@@ -265,8 +272,21 @@ public class OMKeyCommitRequest extends OMKeyRequest {
         }
       }
 
-      omKeyInfo.setModificationTime(commitKeyArgs.getModificationTime());
+      OmKeyInfo openKeyToDelete = null;
+      String dbOpenKeyToDeleteKey = null;
+      if (isOverwrittenHsyncKey) {
+        // find the overwritten openKey and add OVERWRITTEN_HSYNC_KEY to it.
+        dbOpenKeyToDeleteKey = omMetadataManager.getOpenKey(volumeName, bucketName,
+            keyName, Long.parseLong(keyToDelete.getMetadata().get(OzoneConsts.HSYNC_CLIENT_ID)));
+        openKeyToDelete = omMetadataManager.getOpenKeyTable(getBucketLayout()).get(dbOpenKeyToDeleteKey);
+        openKeyToDelete.getMetadata().put(OzoneConsts.OVERWRITTEN_HSYNC_KEY, "true");
+        openKeyToDelete.setModificationTime(Time.now());
+        openKeyToDelete.setUpdateID(trxnLogIndex, ozoneManager.isRatisEnabled());
+        omMetadataManager.getOpenKeyTable(getBucketLayout()).addCacheEntry(
+            dbOpenKeyToDeleteKey, openKeyToDelete, trxnLogIndex);
+      }
 
+      omKeyInfo.setModificationTime(commitKeyArgs.getModificationTime());
       // non-null indicates it is necessary to update the open key
       OmKeyInfo newOpenKeyInfo = null;
 
@@ -290,10 +310,11 @@ public class OMKeyCommitRequest extends OMKeyRequest {
       // Set the UpdateID to current transactionLogIndex
       omKeyInfo.setUpdateID(trxnLogIndex, ozoneManager.isRatisEnabled());
 
+      Map<String, RepeatedOmKeyInfo> oldKeyVersionsToDeleteMap = null;
       long correctedSpace = omKeyInfo.getReplicatedSize();
       // if keyToDelete isn't null, usedNamespace needn't check and
       // increase.
-      if (keyToDelete != null && (isHSync || isPreviousCommitHsync)) {
+      if (keyToDelete != null && (isSameHsyncKey)) {
         correctedSpace -= keyToDelete.getReplicatedSize();
         checkBucketQuotaInBytes(omMetadataManager, omBucketInfo,
             correctedSpace);
@@ -369,7 +390,7 @@ public class OMKeyCommitRequest extends OMKeyRequest {
 
       omClientResponse = new OMKeyCommitResponse(omResponse.build(),
           omKeyInfo, dbOzoneKey, dbOpenKey, omBucketInfo.copyObject(),
-          oldKeyVersionsToDeleteMap, isHSync, newOpenKeyInfo);
+          oldKeyVersionsToDeleteMap, isHSync, newOpenKeyInfo, dbOpenKeyToDeleteKey, openKeyToDelete);
 
       result = Result.SUCCESS;
     } catch (IOException | InvalidPathException ex) {

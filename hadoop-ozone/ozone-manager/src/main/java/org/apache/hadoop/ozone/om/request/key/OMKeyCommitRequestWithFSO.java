@@ -22,7 +22,9 @@ import java.nio.file.InvalidPathException;
 import java.util.HashMap;
 
 import com.google.common.annotations.VisibleForTesting;
+import org.apache.hadoop.ozone.om.helpers.WithMetadata;
 import org.apache.hadoop.ozone.om.request.util.OmKeyHSyncUtil;
+import org.apache.hadoop.util.Time;
 import org.apache.ratis.server.protocol.TermIndex;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.audit.AuditLogger;
@@ -38,7 +40,6 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmFSOFile;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
-import org.apache.hadoop.ozone.om.helpers.WithMetadata;
 import org.apache.hadoop.ozone.om.request.file.OMFileRequest;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
@@ -147,6 +148,24 @@ public class OMKeyCommitRequestWithFSO extends OMKeyCommitRequest {
       OmKeyInfo keyToDelete =
           omMetadataManager.getKeyTable(getBucketLayout()).get(dbFileKey);
       long writerClientId = commitKeyRequest.getClientID();
+      boolean isSameHsyncKey = false;
+      boolean isOverwrittenHsyncKey = false;
+      final String clientIdString = String.valueOf(writerClientId);
+      if (null != keyToDelete) {
+        isSameHsyncKey = java.util.Optional.of(keyToDelete)
+            .map(WithMetadata::getMetadata)
+            .map(meta -> meta.get(OzoneConsts.HSYNC_CLIENT_ID))
+            .filter(id -> id.equals(clientIdString))
+            .isPresent();
+        if (!isSameHsyncKey) {
+          isOverwrittenHsyncKey = java.util.Optional.of(keyToDelete)
+              .map(WithMetadata::getMetadata)
+              .map(meta -> meta.get(OzoneConsts.HSYNC_CLIENT_ID))
+              .filter(id -> !id.equals(clientIdString))
+              .isPresent() && !isRecovery;
+        }
+      }
+
       if (isRecovery && keyToDelete != null) {
         String clientId = keyToDelete.getMetadata().get(OzoneConsts.HSYNC_CLIENT_ID);
         if (clientId == null) {
@@ -162,6 +181,10 @@ public class OMKeyCommitRequestWithFSO extends OMKeyCommitRequest {
         String action = isRecovery ? "recovery" : isHSync ? "hsync" : "commit";
         throw new OMException("Failed to " + action + " key, as " +
             dbOpenFileKey + " entry is not found in the OpenKey table", KEY_NOT_FOUND);
+      } else if (omKeyInfo.getMetadata().containsKey(OzoneConsts.DELETED_HSYNC_KEY) ||
+          omKeyInfo.getMetadata().containsKey(OzoneConsts.OVERWRITTEN_HSYNC_KEY)) {
+        throw new OMException("Open Key " + keyName + " is already deleted/overwritten",
+            KEY_NOT_FOUND);
       }
 
       if (omKeyInfo.getMetadata().containsKey(OzoneConsts.LEASE_RECOVERY) &&
@@ -172,9 +195,22 @@ public class OMKeyCommitRequestWithFSO extends OMKeyCommitRequest {
         }
       }
 
-      omKeyInfo.setModificationTime(commitKeyArgs.getModificationTime());
+      OmKeyInfo openKeyToDelete = null;
+      String dbOpenKeyToDeleteKey = null;
+      if (isOverwrittenHsyncKey) {
+        // find the overwritten openKey and add OVERWRITTEN_HSYNC_KEY to it.
+        dbOpenKeyToDeleteKey = fsoFile.getOpenFileName(
+            Long.parseLong(keyToDelete.getMetadata().get(OzoneConsts.HSYNC_CLIENT_ID)));
+        openKeyToDelete = OMFileRequest.getOmKeyInfoFromFileTable(true,
+            omMetadataManager, dbOpenKeyToDeleteKey, keyName);
+        openKeyToDelete.getMetadata().put(OzoneConsts.OVERWRITTEN_HSYNC_KEY, "true");
+        openKeyToDelete.setModificationTime(Time.now());
+        openKeyToDelete.setUpdateID(trxnLogIndex, ozoneManager.isRatisEnabled());
+        OMFileRequest.addOpenFileTableCacheEntry(omMetadataManager,
+            dbOpenKeyToDeleteKey, openKeyToDelete, keyName, fileName, trxnLogIndex);
+      }
 
-      final String clientIdString = String.valueOf(writerClientId);
+      omKeyInfo.setModificationTime(commitKeyArgs.getModificationTime());
       // non-null indicates it is necessary to update the open key
       OmKeyInfo newOpenKeyInfo = null;
 
@@ -200,21 +236,10 @@ public class OMKeyCommitRequestWithFSO extends OMKeyCommitRequest {
       // creation and key commit, old versions will be just overwritten and
       // not kept. Bucket versioning will be effective from the first key
       // creation after the knob turned on.
-      boolean isPreviousCommitHsync = false;
       Map<String, RepeatedOmKeyInfo> oldKeyVersionsToDeleteMap = null;
-      if (null != keyToDelete) {
-        isPreviousCommitHsync = java.util.Optional.of(keyToDelete)
-            .map(WithMetadata::getMetadata)
-            .map(meta -> meta.get(OzoneConsts.HSYNC_CLIENT_ID))
-            .filter(id -> id.equals(clientIdString))
-            .isPresent();
-      }
-
       long correctedSpace = omKeyInfo.getReplicatedSize();
-
-      // if keyToDelete isn't null, usedNamespace shouldn't check and
-      // increase.
-      if (keyToDelete != null && (isHSync || isPreviousCommitHsync)) {
+      // if keyToDelete isn't null, usedNamespace shouldn't check and increase.
+      if (keyToDelete != null && isSameHsyncKey) {
         correctedSpace -= keyToDelete.getReplicatedSize();
         checkBucketQuotaInBytes(omMetadataManager, omBucketInfo,
             correctedSpace);
@@ -294,7 +319,7 @@ public class OMKeyCommitRequestWithFSO extends OMKeyCommitRequest {
 
       omClientResponse = new OMKeyCommitResponseWithFSO(omResponse.build(),
           omKeyInfo, dbFileKey, dbOpenFileKey, omBucketInfo.copyObject(),
-          oldKeyVersionsToDeleteMap, volumeId, isHSync, newOpenKeyInfo);
+          oldKeyVersionsToDeleteMap, volumeId, isHSync, newOpenKeyInfo, dbOpenKeyToDeleteKey, openKeyToDelete);
 
       result = Result.SUCCESS;
     } catch (IOException | InvalidPathException ex) {

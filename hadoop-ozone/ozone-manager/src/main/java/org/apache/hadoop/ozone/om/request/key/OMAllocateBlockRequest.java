@@ -208,8 +208,9 @@ public class OMAllocateBlockRequest extends OMKeyRequest {
         throw new OMException("Open Key " + openKeyName + " is under lease recovery",
             KEY_UNDER_LEASE_RECOVERY);
       }
-      if (openKeyInfo.getMetadata().containsKey(OzoneConsts.DELETED_HSYNC_KEY)) {
-        throw new OMException("Open Key " + openKeyName + " is already deleted",
+      if (openKeyInfo.getMetadata().containsKey(OzoneConsts.DELETED_HSYNC_KEY) ||
+          openKeyInfo.getMetadata().containsKey(OzoneConsts.OVERWRITTEN_HSYNC_KEY)) {
+        throw new OMException("Open Key " + openKeyName + " is already deleted/overwritten",
             KEY_NOT_FOUND);
       }
       List<OmKeyLocationInfo> newLocationList = Collections.singletonList(

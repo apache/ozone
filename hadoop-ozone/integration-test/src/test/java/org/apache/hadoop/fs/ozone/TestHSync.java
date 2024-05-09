@@ -28,6 +28,7 @@ import java.security.PrivilegedExceptionAction;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
@@ -71,6 +72,7 @@ import org.apache.hadoop.ozone.client.BucketArgs;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneKeyDetails;
+import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.client.io.ECKeyOutputStream;
 import org.apache.hadoop.ozone.client.io.KeyOutputStream;
 import org.apache.hadoop.ozone.client.io.OzoneInputStream;
@@ -113,6 +115,8 @@ import static org.apache.hadoop.ozone.OzoneConsts.OZONE_OFS_URI_SCHEME;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_ROOT;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_SCHEME;
+import static org.apache.hadoop.ozone.TestDataUtil.cleanupDeletedTable;
+import static org.apache.hadoop.ozone.TestDataUtil.cleanupOpenKeyTable;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_DEFAULT_BUCKET_LAYOUT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ADDRESS_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_RATIS_ENABLE_KEY;
@@ -437,14 +441,14 @@ public class TestHSync {
         os.write(1);
         os.hsync();
         // There should be 1 key in openFileTable
-        assertThat(1 == getOpenKeyInfo(BucketLayout.FILE_SYSTEM_OPTIMIZED).size());
+        assertThat(1 == getOpenKeyInfo(BUCKET_LAYOUT).size());
         // Delete directory recursively
         fs.delete(new Path(OZONE_ROOT + bucket.getVolumeName() + OZONE_URI_DELIMITER +
             bucket.getName() + OZONE_URI_DELIMITER + "dir1/"), true);
 
         // Verify if DELETED_HSYNC_KEY metadata is added to openKey
         GenericTestUtils.waitFor(() -> {
-          List<OmKeyInfo> omKeyInfo = getOpenKeyInfo(BucketLayout.FILE_SYSTEM_OPTIMIZED);
+          List<OmKeyInfo> omKeyInfo = getOpenKeyInfo(BUCKET_LAYOUT);
           return omKeyInfo.size() > 0 && omKeyInfo.get(0).getMetadata().containsKey(OzoneConsts.DELETED_HSYNC_KEY);
         }, 1000, 12000);
 
@@ -453,7 +457,7 @@ public class TestHSync {
 
         // Verify entry from openKey gets deleted eventually
         GenericTestUtils.waitFor(() ->
-            0 == getOpenKeyInfo(BucketLayout.FILE_SYSTEM_OPTIMIZED).size(), 1000, 12000);
+            0 == getOpenKeyInfo(BUCKET_LAYOUT).size(), 1000, 12000);
       } catch (OMException ex) {
         assertEquals(OMException.ResultCodes.DIRECTORY_NOT_FOUND, ex.getResult());
       } finally {
@@ -491,7 +495,7 @@ public class TestHSync {
     ThreadLocalRandom.current().nextBytes(data);
 
     try (FileSystem fs = FileSystem.get(CONF)) {
-      final Path file = new Path(dir, "file");
+      final Path file = new Path(dir, "file-hsync-uncommitted-blocks");
       try (FSDataOutputStream outputStream = fs.create(file, true)) {
         outputStream.hsync();
         outputStream.write(data);
@@ -545,7 +549,7 @@ public class TestHSync {
     final byte[] data = new byte[128];
     ThreadLocalRandom.current().nextBytes(data);
 
-    final Path file = new Path(dir, "file-hsync-then-close");
+    final Path file = new Path(dir, "file-hsync");
     try (FileSystem fs = FileSystem.get(CONF)) {
       long fileSize = 0;
       try (FSDataOutputStream outputStream = fs.create(file, true)) {
@@ -961,5 +965,276 @@ public class TestHSync {
       }
     }
     bucket.deleteKey(keyName);
+  }
+
+  @Test
+  public void testNormalKeyOverwriteHSyncKey() throws Exception {
+    // Set the fs.defaultFS
+    final String rootPath = String.format("%s://%s/",
+        OZONE_OFS_URI_SCHEME, CONF.get(OZONE_OM_ADDRESS_KEY));
+    CONF.set(CommonConfigurationKeysPublic.FS_DEFAULT_NAME_KEY, rootPath);
+
+    final String dir = OZONE_ROOT + bucket.getVolumeName()
+        + OZONE_URI_DELIMITER + bucket.getName();
+
+    // Expect empty OpenKeyTable before key creation
+    OzoneManager ozoneManager = cluster.getOzoneManager();
+    cleanupDeletedTable(ozoneManager);
+    cleanupOpenKeyTable(ozoneManager, BUCKET_LAYOUT);
+    OMMetadataManager metadataManager = ozoneManager.getMetadataManager();
+    Table<String, OmKeyInfo> openKeyTable = metadataManager.getOpenKeyTable(BUCKET_LAYOUT);
+    Table<String, RepeatedOmKeyInfo> deletedTable = metadataManager.getDeletedTable();
+    assertTrue(openKeyTable.isEmpty());
+    assertTrue(deletedTable.isEmpty());
+    ozoneManager.getKeyManager().getDeletingService().suspend();
+    OMMetrics metrics = ozoneManager.getMetrics();
+    metrics.incDataCommittedBytes(-metrics.getDataCommittedBytes());
+    assertEquals(0, metrics.getDataCommittedBytes());
+    OzoneVolume volume = client.getObjectStore().getVolume(bucket.getVolumeName());
+    OzoneBucket ozoneBucket = volume.getBucket(bucket.getName());
+    long usedBytes = ozoneBucket.getUsedBytes();
+
+    String data1 = "data for normal file";
+    String data2 = "data for hsynced file";
+    final Path file = new Path(dir, "file-normal-overwrite-hsync");
+    try (FileSystem fs = FileSystem.get(CONF)) {
+      // create hsync key
+      FSDataOutputStream outputStream1 = fs.create(file, true);
+      outputStream1.write(data2.getBytes(UTF_8), 0, data2.length());
+      outputStream1.hsync();
+      // write more data
+      String s = RandomStringUtils.randomAlphabetic(BLOCK_SIZE);
+      byte[] newData = s.getBytes(StandardCharsets.UTF_8);
+      outputStream1.write(newData);
+
+      // create normal key and commit
+      FSDataOutputStream outputStream2 = fs.create(file, true);
+      outputStream2.write(data1.getBytes(UTF_8), 0, data1.length());
+      outputStream2.close();
+      assertEquals(data1.length(), metrics.getDataCommittedBytes());
+
+      // hsync call for overwritten hsync key, should fail
+      OMException omException = assertThrows(OMException.class, () -> outputStream1.hsync());
+      assertTrue(omException.getResult() == OMException.ResultCodes.KEY_NOT_FOUND);
+      assertTrue(omException.getMessage().contains("already deleted/overwritten"));
+
+      // allocate new block for overwritten hsync key, should fail
+      IOException ioException = assertThrows(IOException.class, () -> outputStream1.write(newData));
+      assertTrue(ioException.getCause() instanceof OMException);
+      assertTrue(((OMException)ioException.getCause()).getResult() == OMException.ResultCodes.KEY_NOT_FOUND);
+      assertTrue(ioException.getMessage().contains("already deleted/overwritten"));
+
+      // recover key will success since key is already committed by outputStream2
+      ((RootedOzoneFileSystem)fs).recoverLease(file);
+
+      Map<String, OmKeyInfo> openKeys = getAllOpenKeys(openKeyTable);
+      Map<String, RepeatedOmKeyInfo> deletedKeys = getAllDeletedKeys(deletedTable);
+      // outputStream1's has one openKey left in openKeyTable. It will be cleaned up by OpenKeyCleanupService later.
+      assertEquals(1, openKeys.size());
+      // outputStream1's has one delete key record in deletedTable
+      assertEquals(1, deletedKeys.size());
+
+      // final file will have data1 content
+      OzoneKeyDetails keyInfo = bucket.getKey(file.getName());
+      try (OzoneInputStream is = bucket.readKey(file.getName())) {
+        ByteBuffer readBuffer = ByteBuffer.allocate((int) keyInfo.getDataSize());
+        int readLen = is.read(readBuffer);
+        assertEquals(keyInfo.getDataSize(), readLen);
+        assertArrayEquals(data1.getBytes(UTF_8), readBuffer.array());
+      }
+
+      // verify bucket info
+      ozoneBucket = volume.getBucket(bucket.getName());
+      assertEquals(keyInfo.getDataSize() * keyInfo.getReplicationConfig().getRequiredNodes() + usedBytes,
+          ozoneBucket.getUsedBytes());
+
+      // Resume openKeyCleanupService
+      openKeyCleanupService.resume();
+      // Verify entry from openKey gets deleted eventually
+      GenericTestUtils.waitFor(() -> {
+        try {
+          return getAllOpenKeys(openKeyTable).size() == 0 && getAllDeletedKeys(deletedTable).size() == 2;
+        } catch (IOException e) {
+          throw new RuntimeException(e);
+        }
+      }, 100, 5000);
+    } finally {
+      cleanupDeletedTable(ozoneManager);
+      cleanupOpenKeyTable(ozoneManager, BUCKET_LAYOUT);
+      ozoneManager.getKeyManager().getDeletingService().resume();
+      openKeyCleanupService.suspend();
+    }
+  }
+
+  @Test
+  public void testHSyncKeyOverwriteNormalKey() throws Exception {
+    // Set the fs.defaultFS
+    final String rootPath = String.format("%s://%s/",
+        OZONE_OFS_URI_SCHEME, CONF.get(OZONE_OM_ADDRESS_KEY));
+    CONF.set(CommonConfigurationKeysPublic.FS_DEFAULT_NAME_KEY, rootPath);
+
+    final String dir = OZONE_ROOT + bucket.getVolumeName()
+        + OZONE_URI_DELIMITER + bucket.getName();
+
+    // Expect empty OpenKeyTable before key creation
+    OzoneManager ozoneManager = cluster.getOzoneManager();
+    cleanupDeletedTable(ozoneManager);
+    cleanupOpenKeyTable(ozoneManager, BUCKET_LAYOUT);
+    OMMetadataManager metadataManager = ozoneManager.getMetadataManager();
+    Table<String, OmKeyInfo> openKeyTable = metadataManager.getOpenKeyTable(BUCKET_LAYOUT);
+    Table<String, RepeatedOmKeyInfo> deletedTable = metadataManager.getDeletedTable();
+    assertTrue(openKeyTable.isEmpty());
+    assertTrue(deletedTable.isEmpty());
+    ozoneManager.getKeyManager().getDeletingService().suspend();
+    OMMetrics metrics = ozoneManager.getMetrics();
+    metrics.incDataCommittedBytes(-metrics.getDataCommittedBytes());
+    assertEquals(0, metrics.getDataCommittedBytes());
+    OzoneVolume volume = client.getObjectStore().getVolume(bucket.getVolumeName());
+    OzoneBucket ozoneBucket = volume.getBucket(bucket.getName());
+    long usedBytes = ozoneBucket.getUsedBytes();
+
+    String data1 = "data for normal file";
+    String data2 = "data for hsynced file";
+    final Path file = new Path(dir, "file-hsync-overwrite-normal");
+    try (FileSystem fs = FileSystem.get(CONF)) {
+      // create and commit normal key
+      FSDataOutputStream outputStream1 = fs.create(file, true);
+      outputStream1.write(data1.getBytes(UTF_8), 0, data1.length());
+      outputStream1.close();
+      assertEquals(data1.length(), metrics.getDataCommittedBytes());
+
+      // create hsync key and commit
+      FSDataOutputStream outputStream2 = fs.create(file, true);
+      outputStream2.write(data2.getBytes(UTF_8), 0, data2.length());
+      outputStream2.hsync();
+      outputStream2.close();
+      assertEquals(data1.length() + data2.length(), metrics.getDataCommittedBytes());
+
+      Map<String, OmKeyInfo> openKeys = getAllOpenKeys(openKeyTable);
+      Map<String, RepeatedOmKeyInfo> deletedKeys = getAllDeletedKeys(deletedTable);
+      // There should be no key in openKeyTable
+      assertEquals(0, openKeys.size());
+      // There should be one key in delete table
+      assertEquals(1, deletedKeys.size());
+
+      // final file will have data2 content
+      OzoneKeyDetails keyInfo = bucket.getKey(file.getName());
+      try (OzoneInputStream is = bucket.readKey(file.getName())) {
+        ByteBuffer readBuffer = ByteBuffer.allocate((int) keyInfo.getDataSize());
+        int readLen = is.read(readBuffer);
+        assertEquals(keyInfo.getDataSize(), readLen);
+        assertArrayEquals(data2.getBytes(UTF_8), readBuffer.array());
+      }
+
+      // verify bucket info
+      ozoneBucket = volume.getBucket(bucket.getName());
+      assertEquals(keyInfo.getDataSize() * keyInfo.getReplicationConfig().getRequiredNodes() + usedBytes,
+          ozoneBucket.getUsedBytes());
+    } finally {
+      cleanupDeletedTable(ozoneManager);
+      cleanupOpenKeyTable(ozoneManager, BUCKET_LAYOUT);
+      ozoneManager.getKeyManager().getDeletingService().resume();
+    }
+  }
+
+  @Test
+  public void testHSyncKeyOverwriteHSyncKey() throws Exception {
+    // Set the fs.defaultFS
+    final String rootPath = String.format("%s://%s/",
+        OZONE_OFS_URI_SCHEME, CONF.get(OZONE_OM_ADDRESS_KEY));
+    CONF.set(CommonConfigurationKeysPublic.FS_DEFAULT_NAME_KEY, rootPath);
+
+    final String dir = OZONE_ROOT + bucket.getVolumeName()
+        + OZONE_URI_DELIMITER + bucket.getName();
+
+    // Expect empty OpenKeyTable before key creation
+    OzoneManager ozoneManager = cluster.getOzoneManager();
+    cleanupDeletedTable(ozoneManager);
+    cleanupOpenKeyTable(ozoneManager, BUCKET_LAYOUT);
+    OMMetadataManager metadataManager = ozoneManager.getMetadataManager();
+    Table<String, OmKeyInfo> openKeyTable = metadataManager.getOpenKeyTable(BUCKET_LAYOUT);
+    Table<String, RepeatedOmKeyInfo> deletedTable = metadataManager.getDeletedTable();
+    assertTrue(openKeyTable.isEmpty());
+    assertTrue(deletedTable.isEmpty());
+    ozoneManager.getKeyManager().getDeletingService().suspend();
+    OMMetrics metrics = ozoneManager.getMetrics();
+    metrics.incDataCommittedBytes(-metrics.getDataCommittedBytes());
+    assertEquals(0, metrics.getDataCommittedBytes());
+    OzoneVolume volume = client.getObjectStore().getVolume(bucket.getVolumeName());
+    OzoneBucket ozoneBucket = volume.getBucket(bucket.getName());
+    long usedBytes = ozoneBucket.getUsedBytes();
+
+    String data1 = "data for first hsynced file";
+    String data2 = "data for second hsynced file";
+    final Path file = new Path(dir, "file-hsync-overwrite-hsync");
+    try (FileSystem fs = FileSystem.get(CONF)) {
+      // create first hsync key and call hsync
+      FSDataOutputStream outputStream1 = fs.create(file, true);
+      outputStream1.write(data1.getBytes(UTF_8), 0, data1.length());
+      outputStream1.hsync();
+
+      // create second hync key and call hsync
+      FSDataOutputStream outputStream2 = fs.create(file, true);
+      outputStream2.write(data2.getBytes(UTF_8), 0, data2.length());
+      outputStream2.hsync();
+
+      // close first hsync key should fail
+      OMException omException = assertThrows(OMException.class, () -> outputStream1.close());
+      assertTrue(omException.getResult() == OMException.ResultCodes.KEY_NOT_FOUND);
+      assertTrue(omException.getMessage().contains("already deleted/overwritten"));
+
+      // hsync/close second hsync key should success
+      outputStream2.hsync();
+      outputStream2.close();
+
+      Map<String, OmKeyInfo> openKeys = getAllOpenKeys(openKeyTable);
+      Map<String, RepeatedOmKeyInfo> deletedKeys = getAllDeletedKeys(deletedTable);
+      // outputStream1's has one openKey left in openKeyTable. It will be cleaned up by OpenKeyCleanupService later.
+      assertEquals(1, openKeys.size());
+      // outputStream1's has one delete key record in deletedTable
+      assertEquals(1, deletedKeys.size());
+
+      // final file will have data2 content
+      OzoneKeyDetails keyInfo = bucket.getKey(file.getName());
+      try (OzoneInputStream is = bucket.readKey(file.getName())) {
+        ByteBuffer readBuffer = ByteBuffer.allocate((int) keyInfo.getDataSize());
+        int readLen = is.read(readBuffer);
+        assertEquals(keyInfo.getDataSize(), readLen);
+        assertArrayEquals(data2.getBytes(UTF_8), readBuffer.array());
+      }
+
+      // verify bucket info
+      ozoneBucket = volume.getBucket(bucket.getName());
+      assertEquals(keyInfo.getDataSize() * keyInfo.getReplicationConfig().getRequiredNodes() + usedBytes,
+          ozoneBucket.getUsedBytes());
+    } finally {
+      cleanupDeletedTable(ozoneManager);
+      cleanupOpenKeyTable(ozoneManager, BUCKET_LAYOUT);
+      ozoneManager.getKeyManager().getDeletingService().resume();
+    }
+  }
+
+  private Map<String, OmKeyInfo> getAllOpenKeys(Table<String, OmKeyInfo> table) throws IOException {
+    Map<String, OmKeyInfo> keys = new HashMap<String, OmKeyInfo>();
+    try (TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>> tableIter = table.iterator()) {
+      while (tableIter.hasNext()) {
+        Table.KeyValue<String, OmKeyInfo> kv = tableIter.next();
+        String key = kv.getKey();
+        keys.put(key, kv.getValue());
+      }
+    }
+    return keys;
+  }
+
+  private Map<String, RepeatedOmKeyInfo> getAllDeletedKeys(Table<String, RepeatedOmKeyInfo> table) throws IOException {
+    Map<String, RepeatedOmKeyInfo> keys = new HashMap<String, RepeatedOmKeyInfo>();
+    try (TableIterator<String, ? extends Table.KeyValue<String, RepeatedOmKeyInfo>> tableIter = table.iterator()) {
+      while (tableIter.hasNext()) {
+        Table.KeyValue<String, RepeatedOmKeyInfo> kv = tableIter.next();
+        String key = kv.getKey();
+        keys.put(key, kv.getValue());
+      }
+    }
+    return keys;
   }
 }
