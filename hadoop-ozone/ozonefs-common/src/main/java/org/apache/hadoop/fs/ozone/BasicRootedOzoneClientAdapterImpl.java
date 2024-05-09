@@ -1301,10 +1301,10 @@ public class BasicRootedOzoneClientAdapterImpl
     } finally {
       // delete the temp snapshot
       if (takeTemporaryToSnapshot) {
-        OzoneClientUtils.deleteSnapshot(objectStore, toSnapshot, ofsPath);
+        OzoneClientUtils.deleteSnapshot(objectStore, toSnapshot, volume, bucket);
       }
       if (takeTemporaryFromSnapshot) {
-        OzoneClientUtils.deleteSnapshot(objectStore, fromSnapshot, ofsPath);
+        OzoneClientUtils.deleteSnapshot(objectStore, fromSnapshot, volume, bucket);
       }
     }
   }
