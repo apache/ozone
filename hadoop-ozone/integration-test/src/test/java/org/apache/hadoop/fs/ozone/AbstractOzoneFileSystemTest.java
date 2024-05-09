@@ -2251,4 +2251,26 @@ abstract class AbstractOzoneFileSystemTest {
     assertEquals(value, statistics.getLong(key).longValue());
   }
 
+  @Test
+  void testSnapshotRead() throws Exception {
+    // Init data
+    Path snapPath1 = fs.createSnapshot(new Path("/"), "snap1");
+
+    Path file1 = new Path("/key1");
+    Path file2 = new Path("/key2");
+    ContractTestUtils.touch(fs, file1);
+    ContractTestUtils.touch(fs, file2);
+    Path snapPath2 = fs.createSnapshot(new Path("/"), "snap2");
+
+    Path file3 = new Path("/key3");
+    ContractTestUtils.touch(fs, file3);
+    Path snapPath3 = fs.createSnapshot(new Path("/"), "snap3");
+
+    FileStatus[] f1 = fs.listStatus(snapPath1);
+    FileStatus[] f2 = fs.listStatus(snapPath2);
+    FileStatus[] f3 = fs.listStatus(snapPath3);
+    assertEquals(0, f1.length);
+    assertEquals(2, f2.length);
+    assertEquals(3, f3.length);
+  }
 }
