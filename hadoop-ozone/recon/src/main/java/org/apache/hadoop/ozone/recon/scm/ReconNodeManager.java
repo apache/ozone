@@ -104,7 +104,6 @@ public class ReconNodeManager extends SCMNodeManager {
     this.reconDatanodeOutdatedTime = reconStaleDatanodeMultiplier *
         HddsServerUtil.getReconHeartbeatInterval(conf);
     this.nodeDB = nodeDB;
-    loadExistingNodes();
   }
 
   public ReconNodeManager(OzoneConfiguration conf, SCMStorageConfig scmStorageConfig, EventQueue eventQueue,
@@ -112,6 +111,7 @@ public class ReconNodeManager extends SCMNodeManager {
                           HDDSLayoutVersionManager scmLayoutVersionManager, ReconContext reconContext) {
     this(conf, scmStorageConfig, eventQueue, clusterMap, table, scmLayoutVersionManager);
     this.reconContext = reconContext;
+    loadExistingNodes();
   }
 
   private void loadExistingNodes() {
@@ -375,11 +375,6 @@ public class ReconNodeManager extends SCMNodeManager {
   @VisibleForTesting
   public ReconContext getReconContext() {
     return reconContext;
-  }
-
-  @VisibleForTesting
-  public void setReconContext(ReconContext reconContext) {
-    this.reconContext = reconContext;
   }
 
 }

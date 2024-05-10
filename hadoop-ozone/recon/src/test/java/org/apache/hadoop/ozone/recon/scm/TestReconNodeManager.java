@@ -42,6 +42,7 @@ import java.util.UUID;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto;
 import org.apache.hadoop.hdds.scm.net.NetworkTopology;
 import org.apache.hadoop.hdds.scm.net.NetworkTopologyImpl;
@@ -74,16 +75,19 @@ public class TestReconNodeManager {
   private DBStore store;
   private ReconStorageConfig reconStorageConfig;
   private HDDSLayoutVersionManager versionManager;
+  private ReconContext reconContext;
 
   @BeforeEach
   public void setUp() throws Exception {
     conf = new OzoneConfiguration();
     conf.set(OZONE_METADATA_DIRS, temporaryFolder.toAbsolutePath().toString());
     conf.set(OZONE_SCM_NAMES, "localhost");
-    reconStorageConfig = new ReconStorageConfig(conf, new ReconUtils());
+    ReconUtils reconUtils = new ReconUtils();
+    reconStorageConfig = new ReconStorageConfig(conf, reconUtils);
     versionManager = new HDDSLayoutVersionManager(
         reconStorageConfig.getLayoutVersion());
     store = DBStoreBuilder.createDBStore(conf, new ReconSCMDBDefinition());
+    reconContext = new ReconContext(conf, reconUtils);
   }
 
   @AfterEach
@@ -101,8 +105,7 @@ public class TestReconNodeManager {
     Table<UUID, DatanodeDetails> nodeTable =
         ReconSCMDBDefinition.NODES.getTable(store);
     ReconNodeManager reconNodeManager = new ReconNodeManager(conf,
-        scmStorageConfig, eventQueue, clusterMap, nodeTable, versionManager);
-    reconNodeManager.setReconContext(new ReconContext(conf, reconUtils));
+        scmStorageConfig, eventQueue, clusterMap, nodeTable, versionManager, reconContext);
     assertThat(reconNodeManager.getAllNodes()).isEmpty();
 
     DatanodeDetails datanodeDetails = randomDatanodeDetails();
@@ -112,8 +115,10 @@ public class TestReconNodeManager {
 
     // Register a random datanode.
     RegisteredCommand register = reconNodeManager.register(datanodeDetails, null, null);
-    assertNull(register);
-    ReconContext reconContext = reconNodeManager.getReconContext();
+    assertNotNull(register);
+    assertEquals(StorageContainerDatanodeProtocolProtos.SCMRegisteredResponseProto.ErrorCode.errorNodeNotPermitted,
+        register.getError());
+    assertEquals(reconContext.getClusterId(), register.getClusterID());
     assertFalse(reconContext.isHealthy().get());
     assertTrue(reconContext.getErrors().get(0).equals(ReconContext.ErrorCode.INVALID_NETWORK_TOPOLOGY));
 
@@ -130,7 +135,7 @@ public class TestReconNodeManager {
     Table<UUID, DatanodeDetails> nodeTable =
         ReconSCMDBDefinition.NODES.getTable(store);
     ReconNodeManager reconNodeManager = new ReconNodeManager(conf,
-        scmStorageConfig, eventQueue, clusterMap, nodeTable, versionManager);
+        scmStorageConfig, eventQueue, clusterMap, nodeTable, versionManager, reconContext);
     ReconNewNodeHandler reconNewNodeHandler =
         new ReconNewNodeHandler(reconNodeManager);
     assertThat(reconNodeManager.getAllNodes()).isEmpty();
@@ -197,7 +202,7 @@ public class TestReconNodeManager {
     eventQueue.close();
     reconNodeManager.close();
     reconNodeManager = new ReconNodeManager(conf, scmStorageConfig, eventQueue,
-        clusterMap, nodeTable, versionManager);
+        clusterMap, nodeTable, versionManager, reconContext);
 
     // Verify that the node information was persisted and loaded back.
     assertEquals(1, reconNodeManager.getAllNodes().size());
@@ -214,7 +219,7 @@ public class TestReconNodeManager {
     Table<UUID, DatanodeDetails> nodeTable =
         ReconSCMDBDefinition.NODES.getTable(store);
     ReconNodeManager reconNodeManager = new ReconNodeManager(conf,
-        scmStorageConfig, eventQueue, clusterMap, nodeTable, versionManager);
+        scmStorageConfig, eventQueue, clusterMap, nodeTable, versionManager, reconContext);
 
 
     DatanodeDetails datanodeDetails = randomDatanodeDetails();
@@ -248,7 +253,7 @@ public class TestReconNodeManager {
     Table<UUID, DatanodeDetails> nodeTable =
         ReconSCMDBDefinition.NODES.getTable(store);
     ReconNodeManager reconNodeManager = new ReconNodeManager(conf,
-        scmStorageConfig, eventQueue, clusterMap, nodeTable, versionManager);
+        scmStorageConfig, eventQueue, clusterMap, nodeTable, versionManager, reconContext);
     ReconNewNodeHandler reconNewNodeHandler =
         new ReconNewNodeHandler(reconNodeManager);
     assertThat(reconNodeManager.getAllNodes()).isEmpty();

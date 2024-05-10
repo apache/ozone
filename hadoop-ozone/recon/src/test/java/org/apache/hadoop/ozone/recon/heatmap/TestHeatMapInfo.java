@@ -23,6 +23,7 @@ import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
+import org.apache.hadoop.ozone.recon.ReconContext;
 import org.apache.hadoop.ozone.recon.ReconTestInjector;
 import org.apache.hadoop.ozone.recon.api.types.EntityMetaData;
 import org.apache.hadoop.ozone.recon.api.types.EntityReadAccessHeatMapResponse;
@@ -63,6 +64,7 @@ public class TestHeatMapInfo {
   private ReconOMMetadataManager reconOMMetadataManager;
   private String auditRespStr;
   private HeatMapUtil heatMapUtil;
+  private ReconContext reconContext;
 
   @SuppressWarnings("checkstyle:methodlength")
   private void initializeInjector() throws Exception {
