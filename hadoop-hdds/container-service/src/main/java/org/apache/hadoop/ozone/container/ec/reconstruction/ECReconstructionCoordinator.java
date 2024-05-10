@@ -116,6 +116,7 @@ public class ECReconstructionCoordinator implements Closeable {
   private final ECReconstructionMetrics metrics;
   private final StateContext context;
   private final OzoneClientConfig ozoneClientConfig;
+  private static final DirectBufferPool DIRECT_BUFFER_POOL = new DirectBufferPool();
 
   public ECReconstructionCoordinator(
       ConfigurationSource conf, CertificateClient certificateClient,
@@ -227,13 +228,12 @@ public class ECReconstructionCoordinator implements Closeable {
       ECReplicationConfig repConfig, int replicaIndex) throws IOException {
     StreamBufferArgs streamBufferArgs =
         StreamBufferArgs.getDefaultStreamBufferArgs(repConfig, ozoneClientConfig);
-    DirectBufferPool directBufferPool = ozoneClientConfig.getIncrementalChunkList() ? new DirectBufferPool() : null;
     return new ECBlockOutputStream(
         blockLocationInfo.getBlockID(),
         containerOperationClient.getXceiverClientManager(),
         containerOperationClient.singleNodePipeline(datanodeDetails,
             repConfig, replicaIndex),
-        BufferPool.empty(), directBufferPool, ozoneClientConfig,
+        BufferPool.empty(), DIRECT_BUFFER_POOL, ozoneClientConfig,
         blockLocationInfo.getToken(), clientMetrics, streamBufferArgs, ecReconstructWriteExecutor);
   }
 

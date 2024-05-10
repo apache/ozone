@@ -82,7 +82,7 @@ public class BlockOutputStreamEntryPool implements KeyMetadataAware {
    * the entries in the pool.
    */
   private final BufferPool bufferPool;
-  private final DirectBufferPool directBufferPool;
+  private static final DirectBufferPool DIRECT_BUFFER_POOL = new DirectBufferPool();
   private OmMultipartCommitUploadPartInfo commitUploadPartInfo;
   private final long openID;
   private final ExcludeList excludeList;
@@ -116,7 +116,6 @@ public class BlockOutputStreamEntryPool implements KeyMetadataAware {
                 .getStreamBufferSize()),
             ByteStringConversion
                 .createByteBufferConversion(b.isUnsafeByteBufferConversionEnabled()));
-    this.directBufferPool = config.getIncrementalChunkList() ? new DirectBufferPool() : null;
     this.clientMetrics = b.getClientMetrics();
     this.executorServiceSupplier = b.getExecutorServiceSupplier();
   }
@@ -166,7 +165,7 @@ public class BlockOutputStreamEntryPool implements KeyMetadataAware {
             .setConfig(config)
             .setLength(subKeyInfo.getLength())
             .setBufferPool(bufferPool)
-            .setDirectBufferPool(directBufferPool)
+            .setDirectBufferPool(DIRECT_BUFFER_POOL)
             .setToken(subKeyInfo.getToken())
             .setClientMetrics(clientMetrics)
             .setStreamBufferArgs(streamBufferArgs)
@@ -230,7 +229,7 @@ public class BlockOutputStreamEntryPool implements KeyMetadataAware {
   }
 
   public DirectBufferPool getDirectBufferPool() {
-    return this.directBufferPool;
+    return this.DIRECT_BUFFER_POOL;
   }
 
   OzoneClientConfig getConfig() {
