@@ -102,10 +102,10 @@ public class TestOmDBInsightEndPoint extends AbstractReconSqlDBTest {
   private OMMetadataManager omMetadataManager;
   private ReconPipelineManager reconPipelineManager;
   private ReconOMMetadataManager reconOMMetadataManager;
-  private static ReconNamespaceSummaryManager reconNamespaceSummaryManager;
-  private static NSSummaryTaskWithLegacy nSSummaryTaskWithLegacy;
-  private static NSSummaryTaskWithOBS nsSummaryTaskWithOBS;
-  private static NSSummaryTaskWithFSO nsSummaryTaskWithFSO;
+  private ReconNamespaceSummaryManager reconNamespaceSummaryManager;
+  private NSSummaryTaskWithLegacy nSSummaryTaskWithLegacy;
+  private NSSummaryTaskWithOBS nsSummaryTaskWithOBS;
+  private NSSummaryTaskWithFSO nsSummaryTaskWithFSO;
   private OMDBInsightEndpoint omdbInsightEndpoint;
   private Pipeline pipeline;
   private Random random = new Random();
