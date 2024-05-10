@@ -899,7 +899,6 @@ public class TestOzoneShellHA {
       OpenKeyCleanupService openKeyCleanupService =
           (OpenKeyCleanupService) cluster.getOzoneManager().getKeyManager().getOpenKeyCleanupService();
       openKeyCleanupService.suspend();
-      OzoneFsShell shell = new OzoneFsShell(clientConf);
       // overwrite last key
       try (FSDataOutputStream os = fs.create(new Path(keys[numKeys - 1]))) {
         os.write(2);
