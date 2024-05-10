@@ -412,8 +412,7 @@ public class TestOzoneShellHA {
    * @return ArrayList
    */
   private List<Map<String, Object>> parseOutputIntoArrayList() throws IOException {
-    String jsonInput = out.toString(DEFAULT_ENCODING);
-    return JsonTestUtils.readTreeAsListOfMaps(jsonInput);
+    return JsonTestUtils.readTreeAsListOfMaps(out.toString(DEFAULT_ENCODING));
   }
 
   @Test

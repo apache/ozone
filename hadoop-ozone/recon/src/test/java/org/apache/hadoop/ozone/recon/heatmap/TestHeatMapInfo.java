@@ -751,12 +751,8 @@ public class TestHeatMapInfo {
     JsonNode resourcesNode = facetsNode.path("resources");
 
     // Deserialize the resources node directly if it's not missing
-    HeatMapProviderDataResource auditLogFacetsResources = null;
-
-//    assumeThat(resourcesNode.isMissingNode()).isFalse();
-
-    auditLogFacetsResources = JsonTestUtils.treeToValue(resourcesNode,
-        HeatMapProviderDataResource.class);
+    HeatMapProviderDataResource auditLogFacetsResources =
+        JsonTestUtils.treeToValue(resourcesNode, HeatMapProviderDataResource.class);
 
     if (auditLogFacetsResources != null) {
       EntityMetaData[] entities = auditLogFacetsResources.getMetaDataList();
@@ -844,11 +840,8 @@ public class TestHeatMapInfo {
     JsonNode resourcesNode = facetsNode.path("resources");
 
     // Deserialize the resources node directly if it's not missing
-    HeatMapProviderDataResource auditLogFacetsResources = null;
-
-//    assumeThat(resourcesNode.isMissingNode()).isFalse();
-    auditLogFacetsResources = JsonTestUtils.treeToValue(resourcesNode,
-        HeatMapProviderDataResource.class);
+    HeatMapProviderDataResource auditLogFacetsResources =
+        JsonTestUtils.treeToValue(resourcesNode, HeatMapProviderDataResource.class);
 
     if (auditLogFacetsResources != null) {
       EntityMetaData[] entities = auditLogFacetsResources.getMetaDataList();
@@ -979,7 +972,6 @@ public class TestHeatMapInfo {
     JsonNode resourcesNode = facetsNode.path("resources");
     // Deserialize the resources node directly if it's not missing
     HeatMapProviderDataResource auditLogFacetsResources = null;
-//    assumeThat(resourcesNode.isMissingNode()).isFalse();
     auditLogFacetsResources =
         JsonTestUtils.treeToValue(resourcesNode, HeatMapProviderDataResource.class);
 
@@ -1103,7 +1095,9 @@ public class TestHeatMapInfo {
         //}
         EntityReadAccessHeatMapResponse entityReadAccessHeatMapResponse =
             heatMapUtil.generateHeatMap(entityMetaDataList);
-        assertThat(entityReadAccessHeatMapResponse.getChildren().size()).isGreaterThan(0);
+        assertThat(
+            entityReadAccessHeatMapResponse.getChildren().size()).isGreaterThan(
+            0);
         assertEquals(2,
             entityReadAccessHeatMapResponse.getChildren().size());
         assertEquals(0.0,
