@@ -409,7 +409,7 @@ public class TestOMRatisSnapshots {
 
     // Do some transactions so that the log index increases
     List<String> firstKeys = writeKeysToIncreaseLogIndex(leaderRatisServer,
-        80);
+        100);
 
     SnapshotInfo snapshotInfo2 = createOzoneSnapshot(leaderOM, "snap80");
     followerOM.getConfiguration().setInt(
@@ -618,7 +618,7 @@ public class TestOMRatisSnapshots {
 
     // Do some transactions so that the log index increases
     List<String> firstKeys = writeKeysToIncreaseLogIndex(leaderRatisServer,
-        80);
+        100);
 
     // Start the inactive OM. Checkpoint installation will happen spontaneously.
     cluster.startInactiveOM(followerNodeId);
