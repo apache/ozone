@@ -73,7 +73,7 @@ public class OzoneRepair extends GenericCli {
   @Override
   public int execute(String[] argv) {
     String currentUser = getSystemUserName();
-    if (!( "y".equalsIgnoreCase(getConsoleReadLineWithFormat(currentUser)))) {
+    if (!("y".equalsIgnoreCase(getConsoleReadLineWithFormat(currentUser)))) {
       System.out.println("Aborting command.");
       return 1;
     }
