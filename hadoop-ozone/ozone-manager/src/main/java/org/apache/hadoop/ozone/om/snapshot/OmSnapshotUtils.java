@@ -24,9 +24,11 @@ import org.apache.hadoop.ozone.om.OmSnapshotManager;
 import java.io.File;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.FileStore;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.nio.file.StandardCopyOption;
 import java.nio.file.attribute.BasicFileAttributes;
 import java.util.List;
 import java.util.Map;
@@ -106,7 +108,7 @@ public final class OmSnapshotUtils {
    *
    * @param dbPath Path to db to have links created.
    */
-  public static void createHardLinks(Path dbPath) throws IOException {
+  public static void createHardLinksOrCopyFromHardlinkFile(Path dbPath) throws IOException {
     File hardLinkFile =
         new File(dbPath.toString(), OmSnapshotManager.OM_HARDLINK_FILE);
     if (hardLinkFile.exists()) {
@@ -128,7 +130,7 @@ public final class OmSnapshotUtils {
                   "Failed to create directory: " + parent.toString());
             }
           }
-          Files.createLink(fullToPath, fullFromPath);
+          createHardLinksOrCopy(fullFromPath, fullToPath);
         }
         if (!hardLinkFile.delete()) {
           throw new IOException("Failed to delete: " + hardLinkFile);
@@ -137,13 +139,31 @@ public final class OmSnapshotUtils {
     }
   }
 
+  private static void createHardLinksOrCopy(Path fullFromPath, Path fullToPath) throws IOException {
+    if (isSamePartition(fullFromPath.getParent(), fullToPath.getParent())) {
+      Files.createLink(fullToPath, fullFromPath);
+    } else {
+      Files.copy(fullFromPath, fullToPath, StandardCopyOption.REPLACE_EXISTING);
+    }
+  }
+
+  private static boolean isSamePartition(Path fromPathParent, Path toPathParent) throws IOException {
+    if (fromPathParent == null || toPathParent == null) {
+      throw new IOException("From path: " + fromPathParent + " or To path: " + toPathParent + " is null");
+    }
+    FileStore fromPathStore = Files.getFileStore(fromPathParent);
+    FileStore toPathStore = Files.getFileStore(toPathParent);
+    return fromPathStore.equals(toPathStore);
+  }
+
   /**
-   * Link each of the files in oldDir to newDir.
+   * Link each of the files in oldDir to newDir if they are in the same partition
+   * else copy the files in oldDir to newDir.
    *
    * @param oldDir The dir to create links from.
    * @param newDir The dir to create links to.
    */
-  public static void linkFiles(File oldDir, File newDir) throws IOException {
+  public static void linkFilesOrCopy(File oldDir, File newDir) throws IOException {
     int truncateLength = oldDir.toString().length() + 1;
     List<String> oldDirList;
     try (Stream<Path> files = Files.walk(oldDir.toPath())) {
@@ -169,7 +189,7 @@ public final class OmSnapshotUtils {
           throw new IOException("Directory create fails: " + newFile);
         }
       } else {
-        Files.createLink(newFile.toPath(), oldFile.toPath());
+        createHardLinksOrCopy(oldFile.toPath(), newFile.toPath());
       }
     }
   }

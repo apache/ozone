@@ -3749,7 +3749,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     TermIndex termIndex = null;
     try {
       // Install hard links.
-      OmSnapshotUtils.createHardLinks(omDBCheckpoint.getCheckpointLocation());
+      OmSnapshotUtils.createHardLinksOrCopyFromHardlinkFile(omDBCheckpoint.getCheckpointLocation());
       termIndex = installCheckpoint(leaderId, omDBCheckpoint);
     } catch (Exception ex) {
       LOG.error("Failed to install snapshot from Leader OM.", ex);
@@ -3984,7 +3984,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       // Link each of the candidate DB files to real DB directory.  This
       // preserves the links that already exist between files in the
       // candidate db.
-      OmSnapshotUtils.linkFiles(checkpointPath.toFile(),
+      OmSnapshotUtils.linkFilesOrCopy(checkpointPath.toFile(),
           oldDB);
       moveOmSnapshotData(oldDB.toPath(), dbSnapshotsDir.toPath());
       Files.deleteIfExists(markerFile);
