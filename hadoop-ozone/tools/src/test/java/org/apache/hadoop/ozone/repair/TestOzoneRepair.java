@@ -21,6 +21,7 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
+import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.PrintStream;
 
@@ -66,21 +67,25 @@ public class TestOzoneRepair {
 
   @Test
   void testOzoneRepairWhenUserIsRemindedSystemUserAndDeclinesToProceed() throws Exception {
-    OzoneRepair ozoneRepair = spy(new OzoneRepair());
-    doReturn("N").when(ozoneRepair).getConsoleReadLineWithFormat(anyString());
+    OzoneRepair ozoneRepair = new OzoneRepair();
+    System.setIn(new ByteArrayInputStream("N".getBytes(DEFAULT_ENCODING)));
 
     int res = ozoneRepair.execute(new String[]{});
     assertEquals(1, res);
     assertThat(out.toString(DEFAULT_ENCODING)).contains("Aborting command.");
+    // prompt should contain the current user name as well
+    assertThat(err.toString(DEFAULT_ENCODING)).contains("ATTENTION: Running as user " + OZONE_USER);
   }
 
   @Test
   void testOzoneRepairWhenUserIsRemindedSystemUserAndAgreesToProceed() throws Exception {
-    OzoneRepair ozoneRepair = spy(new OzoneRepair());
-    doReturn("y").when(ozoneRepair).getConsoleReadLineWithFormat(anyString());
+    OzoneRepair ozoneRepair = new OzoneRepair();
+    System.setIn(new ByteArrayInputStream("y".getBytes(DEFAULT_ENCODING)));
 
     ozoneRepair.execute(new String[]{});
     assertThat(out.toString(DEFAULT_ENCODING)).contains("Run as user: " + OZONE_USER);
+    // prompt should contain the current user name as well
+    assertThat(err.toString(DEFAULT_ENCODING)).contains("ATTENTION: Running as user " + OZONE_USER);
   }
 
 }
