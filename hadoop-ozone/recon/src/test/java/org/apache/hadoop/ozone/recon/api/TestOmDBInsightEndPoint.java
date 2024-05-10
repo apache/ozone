@@ -47,10 +47,14 @@ import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 import org.apache.hadoop.ozone.recon.scm.ReconPipelineManager;
 import org.apache.hadoop.ozone.recon.scm.ReconStorageContainerManagerFacade;
 import org.apache.hadoop.ozone.recon.spi.ReconContainerMetadataManager;
+import org.apache.hadoop.ozone.recon.spi.ReconNamespaceSummaryManager;
 import org.apache.hadoop.ozone.recon.spi.StorageContainerServiceProvider;
 import org.apache.hadoop.ozone.recon.spi.impl.OzoneManagerServiceProviderImpl;
 import org.apache.hadoop.ozone.recon.spi.impl.StorageContainerServiceProviderImpl;
 import org.apache.hadoop.ozone.recon.tasks.ContainerKeyMapperTask;
+import org.apache.hadoop.ozone.recon.tasks.NSSummaryTaskWithFSO;
+import org.apache.hadoop.ozone.recon.tasks.NSSummaryTaskWithLegacy;
+import org.apache.hadoop.ozone.recon.tasks.NSSummaryTaskWithOBS;
 import org.hadoop.ozone.recon.schema.tables.daos.GlobalStatsDao;
 import org.hadoop.ozone.recon.schema.tables.pojos.GlobalStats;
 import org.junit.jupiter.api.BeforeEach;
@@ -98,15 +102,15 @@ public class TestOmDBInsightEndPoint extends AbstractReconSqlDBTest {
   private OMMetadataManager omMetadataManager;
   private ReconPipelineManager reconPipelineManager;
   private ReconOMMetadataManager reconOMMetadataManager;
+  private static ReconNamespaceSummaryManager reconNamespaceSummaryManager;
+  private static NSSummaryTaskWithLegacy nSSummaryTaskWithLegacy;
+  private static NSSummaryTaskWithOBS nsSummaryTaskWithOBS;
+  private static NSSummaryTaskWithFSO nsSummaryTaskWithFSO;
   private OMDBInsightEndpoint omdbInsightEndpoint;
   private Pipeline pipeline;
   private Random random = new Random();
   private OzoneConfiguration ozoneConfiguration;
   private Set<Long> generatedIds = new HashSet<>();
-
-  private static final String ROOT_PATH = "/";
-
-  private static int chunkSize = 1024 * 1024;
 
   private static final String VOLUME_ONE = "volume1";
 
@@ -223,7 +227,22 @@ public class TestOmDBInsightEndPoint extends AbstractReconSqlDBTest {
     pipeline = getRandomPipeline();
     reconPipelineManager.addPipeline(pipeline);
     ozoneConfiguration = new OzoneConfiguration();
+    reconNamespaceSummaryManager =
+        reconTestInjector.getInstance(ReconNamespaceSummaryManager.class);
     setUpOmData();
+    nSSummaryTaskWithLegacy = new NSSummaryTaskWithLegacy(
+        reconNamespaceSummaryManager,
+        reconOMMetadataManager, ozoneConfiguration);
+    nsSummaryTaskWithOBS  = new NSSummaryTaskWithOBS(
+        reconNamespaceSummaryManager,
+        reconOMMetadataManager, ozoneConfiguration);
+    nsSummaryTaskWithFSO  = new NSSummaryTaskWithFSO(
+        reconNamespaceSummaryManager,
+        reconOMMetadataManager, ozoneConfiguration);
+    reconNamespaceSummaryManager.clearNSSummaryTable();
+    nSSummaryTaskWithLegacy.reprocessWithLegacy(reconOMMetadataManager);
+    nsSummaryTaskWithOBS.reprocessWithOBS(reconOMMetadataManager);
+    nsSummaryTaskWithFSO.reprocessWithFSO(reconOMMetadataManager);
   }
 
   @SuppressWarnings("methodlength")
@@ -1088,7 +1107,7 @@ public class TestOmDBInsightEndPoint extends AbstractReconSqlDBTest {
     ListKeysResponse listKeysResponse = (ListKeysResponse) bucketResponse.getEntity();
     assertEquals(6, listKeysResponse.getCount());
     KeyEntityInfo keyEntityInfo = listKeysResponse.getKeys().get(0);
-    assertEquals(keyEntityInfo.getPath(), "file1");
+    assertEquals("volume1/fso-bucket/dir1/file1", keyEntityInfo.getPath());
     assertEquals("/1/10/13/testfile", listKeysResponse.getLastKey());
     assertEquals("RATIS", keyEntityInfo.getReplicationConfig().getReplicationType().toString());
   }
@@ -1104,7 +1123,7 @@ public class TestOmDBInsightEndPoint extends AbstractReconSqlDBTest {
     ListKeysResponse listKeysResponse = (ListKeysResponse) bucketResponse.getEntity();
     assertEquals(2, listKeysResponse.getCount());
     KeyEntityInfo keyEntityInfo = listKeysResponse.getKeys().get(0);
-    assertEquals(keyEntityInfo.getPath(), "file1");
+    assertEquals("volume1/fso-bucket/dir1/file1", keyEntityInfo.getPath());
     assertEquals("/1/10/11/testfile", listKeysResponse.getLastKey());
     assertEquals("RATIS", keyEntityInfo.getReplicationConfig().getReplicationType().toString());
 
@@ -1114,7 +1133,7 @@ public class TestOmDBInsightEndPoint extends AbstractReconSqlDBTest {
     listKeysResponse = (ListKeysResponse) bucketResponse.getEntity();
     assertEquals(2, listKeysResponse.getCount());
     keyEntityInfo = listKeysResponse.getKeys().get(0);
-    assertEquals(keyEntityInfo.getPath(), "file1");
+    assertEquals("volume1/fso-bucket/dir1/dir2/file1", keyEntityInfo.getPath());
     assertEquals("/1/10/12/testfile", listKeysResponse.getLastKey());
 
     // Third and last page. And last page will have empty
@@ -1123,7 +1142,7 @@ public class TestOmDBInsightEndPoint extends AbstractReconSqlDBTest {
     listKeysResponse = (ListKeysResponse) bucketResponse.getEntity();
     assertEquals(2, listKeysResponse.getCount());
     keyEntityInfo = listKeysResponse.getKeys().get(0);
-    assertEquals(keyEntityInfo.getPath(), "file1");
+    assertEquals("volume1/fso-bucket/dir1/dir2/dir3/file1", keyEntityInfo.getPath());
     assertEquals("/1/10/13/testfile", listKeysResponse.getLastKey());
 
     // Try again if fourth page is available. Ideally there should not be any further records
@@ -1207,7 +1226,7 @@ public class TestOmDBInsightEndPoint extends AbstractReconSqlDBTest {
     ListKeysResponse listKeysResponse = (ListKeysResponse) bucketResponse.getEntity();
     assertEquals(2, listKeysResponse.getCount());
     KeyEntityInfo keyEntityInfo = listKeysResponse.getKeys().get(0);
-    assertEquals(keyEntityInfo.getPath(), "key1");
+    assertEquals("volume1/obs-bucket/key1", keyEntityInfo.getPath());
     assertEquals("/volume1/obs-bucket/key1/key2", listKeysResponse.getLastKey());
     assertEquals("RATIS", keyEntityInfo.getReplicationConfig().getReplicationType().toString());
 
@@ -1217,7 +1236,7 @@ public class TestOmDBInsightEndPoint extends AbstractReconSqlDBTest {
     listKeysResponse = (ListKeysResponse) bucketResponse.getEntity();
     assertEquals(2, listKeysResponse.getCount());
     keyEntityInfo = listKeysResponse.getKeys().get(0);
-    assertEquals(keyEntityInfo.getPath(), "key1/key2/key3");
+    assertEquals("volume1/obs-bucket/key1/key2/key3", keyEntityInfo.getPath());
     assertEquals("/volume1/obs-bucket/key4", listKeysResponse.getLastKey());
 
     // Third and last page. And last page will have empty
@@ -1226,7 +1245,7 @@ public class TestOmDBInsightEndPoint extends AbstractReconSqlDBTest {
     listKeysResponse = (ListKeysResponse) bucketResponse.getEntity();
     assertEquals(2, listKeysResponse.getCount());
     keyEntityInfo = listKeysResponse.getKeys().get(0);
-    assertEquals(keyEntityInfo.getPath(), "key5");
+    assertEquals("volume1/obs-bucket/key5", keyEntityInfo.getPath());
     assertEquals("/volume1/obs-bucket/key6", listKeysResponse.getLastKey());
 
     // Try again if fourth page is available. Ideally there should not be any further records

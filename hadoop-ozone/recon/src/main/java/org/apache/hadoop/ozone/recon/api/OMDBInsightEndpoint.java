@@ -37,8 +37,6 @@ import org.apache.hadoop.ozone.recon.api.types.NSSummary;
 import org.apache.hadoop.ozone.recon.api.types.ParamInfo;
 import org.apache.hadoop.ozone.recon.api.types.ResponseStatus;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
-import org.apache.hadoop.ozone.recon.scm.ReconContainerManager;
-import org.apache.hadoop.ozone.recon.spi.ReconContainerMetadataManager;
 import org.apache.hadoop.ozone.recon.spi.impl.ReconNamespaceSummaryManagerImpl;
 import org.apache.hadoop.ozone.recon.tasks.OmTableInsightTask;
 import org.hadoop.ozone.recon.schema.tables.daos.GlobalStatsDao;
@@ -101,12 +99,7 @@ import static org.apache.hadoop.ozone.recon.api.handlers.EntityHandler.parseRequ
 @AdminOnly
 public class OMDBInsightEndpoint {
 
-  @Inject
-  private ContainerEndpoint containerEndpoint;
-  @Inject
-  private ReconContainerMetadataManager reconContainerMetadataManager;
   private final ReconOMMetadataManager omMetadataManager;
-  private final ReconContainerManager containerManager;
   private static final Logger LOG =
       LoggerFactory.getLogger(OMDBInsightEndpoint.class);
   private final GlobalStatsDao globalStatsDao;
@@ -120,8 +113,6 @@ public class OMDBInsightEndpoint {
                              GlobalStatsDao globalStatsDao,
                              ReconNamespaceSummaryManagerImpl
                                  reconNamespaceSummaryManager) {
-    this.containerManager =
-        (ReconContainerManager) reconSCM.getContainerManager();
     this.omMetadataManager = omMetadataManager;
     this.globalStatsDao = globalStatsDao;
     this.reconNamespaceSummaryManager = reconNamespaceSummaryManager;
@@ -702,47 +693,179 @@ public class OMDBInsightEndpoint {
    *    -- creationTime - empty string and filter will not be applied, so list out keys irrespective of age.
    *    -- keySize - 0 bytes, which means all keys greater than zero bytes will be listed, effectively all.
    *    -- startPrefix - /
-   *    -- count - 1000
+   *    -- prevKey - ""
+   *    -- limit - 1000
    *
    * @param replicationType Filter for RATIS or EC replication keys
    * @param creationDate Filter for keys created after creationDate in "MM-dd-yyyy HH:mm:ss" string format.
    * @param keySize Filter for Keys greater than keySize in bytes.
    * @param startPrefix Filter for startPrefix path.
+   * @param prevKey rocksDB last key of page requested.
    * @param limit Filter for limited count of keys.
-   * @return the list of keys in below structured format:
-   * Response For OBS Bucket keys:
-   * ********************************************************
+   *
+   * @return the list of keys in JSON structured format as per respective bucket layout.
+   *
+   * Now lets consider, we have following OBS, LEGACY and FSO bucket key/files namespace tree structure
+   *
+   * For OBS Bucket
+   *
+   * /volume1/obs-bucket/key1
+   * /volume1/obs-bucket/key1/key2
+   * /volume1/obs-bucket/key1/key2/key3
+   * /volume1/obs-bucket/key4
+   * /volume1/obs-bucket/key5
+   * /volume1/obs-bucket/key6
+   * For LEGACY Bucket
+   *
+   * /volume1/legacy-bucket/key
+   * /volume1/legacy-bucket/key1/key2
+   * /volume1/legacy-bucket/key1/key2/key3
+   * /volume1/legacy-bucket/key4
+   * /volume1/legacy-bucket/key5
+   * /volume1/legacy-bucket/key6
+   * For FSO Bucket
+   *
+   * /volume1/fso-bucket/dir1/dir2/dir3
+   * /volume1/fso-bucket/dir1/testfile
+   * /volume1/fso-bucket/dir1/file1
+   * /volume1/fso-bucket/dir1/dir2/testfile
+   * /volume1/fso-bucket/dir1/dir2/file1
+   * /volume1/fso-bucket/dir1/dir2/dir3/testfile
+   * /volume1/fso-bucket/dir1/dir2/dir3/file1
+   * Input Request for OBS bucket:
+   *
+   *    `api/v1/keys/listKeys?startPrefix=/volume1/obs-bucket&limit=2&replicationType=RATIS`
+   * Output Response:
+   *
+   * {
+   *    "status": "OK",
+   *    "path": "/volume1/obs-bucket",
+   *    "replicatedDataSize": 20971520,
+   *    "unReplicatedDataSize": 20971520,
+   *    "keyCount": 2,
+   *    "lastKey": "/volume1/obs-bucket/key1/key2",
+   *    "keys": [
+   *        {
+   *            "key": "/volume1/obs-bucket/key1",
+   *            "path": "key1",
+   *            "inStateSince": 1715174266126,
+   *            "size": 10485760,
+   *            "replicatedSize": 10485760,
+   *            "replicationInfo": {
+   *                "replicationFactor": "ONE",
+   *                "requiredNodes": 1,
+   *                "replicationType": "RATIS"
+   *            },
+   *            "creationTime": 1715174266126,
+   *            "modificationTime": 1715174267480,
+   *            "isKey": true
+   *        },
+   *        {
+   *            "key": "/volume1/obs-bucket/key1/key2",
+   *            "path": "key1/key2",
+   *            "inStateSince": 1715174269510,
+   *            "size": 10485760,
+   *            "replicatedSize": 10485760,
+   *            "replicationInfo": {
+   *                "replicationFactor": "ONE",
+   *                "requiredNodes": 1,
+   *                "replicationType": "RATIS"
+   *            },
+   *            "creationTime": 1715174269510,
+   *            "modificationTime": 1715174270410,
+   *            "isKey": true
+   *        }
+   *    ]
+   * }
+   * Input Request for FSO bucket:
+   *
+   *        `api/v1/keys/listKeys?startPrefix=/volume1/fso-bucket&limit=2&replicationType=RATIS`
+   * Output Response:
+   *
    * {
    *     "status": "OK",
-   *     "path": "/volume1/obs-bucket/",
-   *     "size": 73400320,
-   *     "sizeWithReplica": 81788928,
-   *     "subPathCount": 1,
-   *     "totalKeyCount": 7,
-   *     "lastKey": "/volume1/obs-bucket/key7",
-   *     "subPaths": [
+   *     "path": "/volume1/fso-bucket",
+   *     "replicatedDataSize": 62914560,
+   *     "unReplicatedDataSize": 20971520,
+   *     "keyCount": 2,
+   *     "lastKey": "/-9223372036854775552/-9223372036854775040/-9223372036854774525/testfile",
+   *     "keys": [
    *         {
-   *             "key": true,
-   *             "path": "key1",
+   *             "key": "/-9223372036854775552/-9223372036854775040/-9223372036854774525/file1",
+   *             "path": "file1",
+   *             "inStateSince": 1715174237440,
    *             "size": 10485760,
-   *             "sizeWithReplica": 18874368,
-   *             "isKey": true,
-   *             "replicationType": "RATIS",
-   *             "creationTime": 1712321367060,
-   *             "modificationTime": 1712321368190
+   *             "replicatedSize": 31457280,
+   *             "replicationInfo": {
+   *                 "replicationFactor": "THREE",
+   *                 "requiredNodes": 3,
+   *                 "replicationType": "RATIS"
+   *             },
+   *             "creationTime": 1715174237440,
+   *             "modificationTime": 1715174238161,
+   *             "isKey": true
    *         },
    *         {
-   *             "key": true,
-   *             "path": "key7",
+   *             "key": "/-9223372036854775552/-9223372036854775040/-9223372036854774525/testfile",
+   *             "path": "testfile",
+   *             "inStateSince": 1715174234840,
    *             "size": 10485760,
-   *             "sizeWithReplica": 18874368,
-   *             "isKey": true,
-   *             "replicationType": "EC",
-   *             "creationTime": 1713261005555,
-   *             "modificationTime": 1713261006728
+   *             "replicatedSize": 31457280,
+   *             "replicationInfo": {
+   *                 "replicationFactor": "THREE",
+   *                 "requiredNodes": 3,
+   *                 "replicationType": "RATIS"
+   *             },
+   *             "creationTime": 1715174234840,
+   *             "modificationTime": 1715174235562,
+   *             "isKey": true
    *         }
-   *     ],
-   *     "sizeDirectKey": 73400320
+   *     ]
+   * }
+   * Input Request for Legacy bucket:
+   *
+   *        `api/v1/keys/listKeys?startPrefix=/volume1/legacy-bucket&limit=2&replicationType=RATIS`
+   * Output Response:
+   *
+   * {
+   *     "status": "OK",
+   *     "path": "/volume1/legacy-bucket",
+   *     "replicatedDataSize": 52428800,
+   *     "unReplicatedDataSize": 52428800,
+   *     "keyCount": 2,
+   *     "lastKey": "/volume1/legacy-bucket/key1/key2",
+   *     "keys": [
+   *         {
+   *             "key": "/volume1/legacy-bucket/key1",
+   *             "path": "key1",
+   *             "inStateSince": 1715174303702,
+   *             "size": 10485760,
+   *             "replicatedSize": 10485760,
+   *             "replicationInfo": {
+   *                 "replicationFactor": "ONE",
+   *                 "requiredNodes": 1,
+   *                 "replicationType": "RATIS"
+   *             },
+   *             "creationTime": 1715174303702,
+   *             "modificationTime": 1715174304619,
+   *             "isKey": true
+   *         },
+   *         {
+   *             "key": "/volume1/legacy-bucket/key1/key2",
+   *             "path": "key1/key2",
+   *             "inStateSince": 1715174306641,
+   *             "size": 41943040,
+   *             "replicatedSize": 41943040,
+   *             "replicationInfo": {
+   *                 "replicationFactor": "ONE",
+   *                 "requiredNodes": 1,
+   *                 "replicationType": "RATIS"
+   *             },
+   *             "creationTime": 1715174306641,
+   *             "modificationTime": 1715174307994,
+   *             "isKey": true
+   *         }
+   *     ]
    * }
    * ********************************************************
    * @throws IOException
@@ -766,7 +889,6 @@ public class OMDBInsightEndpoint {
     if (names.length < 3) {
       return Response.status(Response.Status.BAD_REQUEST).build();
     }
-
     ListKeysResponse listKeysResponse = new ListKeysResponse();
     if (!ReconUtils.isInitializationComplete(omMetadataManager)) {
       listKeysResponse.setStatus(ResponseStatus.INITIALIZING);
@@ -1091,10 +1213,11 @@ public class OMDBInsightEndpoint {
    * @return The KeyEntityInfo object created from the OmKeyInfo object and the key.
    */
   private KeyEntityInfo createKeyEntityInfoFromOmKeyInfo(String dbKey,
-                                                         OmKeyInfo keyInfo) {
+                                                         OmKeyInfo keyInfo) throws IOException {
     KeyEntityInfo keyEntityInfo = new KeyEntityInfo();
     keyEntityInfo.setKey(dbKey); // Set the DB key
-    keyEntityInfo.setPath(keyInfo.getKeyName()); // Assuming path is the same as key name
+    keyEntityInfo.setPath(ReconUtils.constructFullPath(keyInfo, reconNamespaceSummaryManager,
+        omMetadataManager));
     keyEntityInfo.setInStateSince(keyInfo.getCreationTime());
     keyEntityInfo.setSize(keyInfo.getDataSize());
     keyEntityInfo.setCreationTime(keyInfo.getCreationTime());
