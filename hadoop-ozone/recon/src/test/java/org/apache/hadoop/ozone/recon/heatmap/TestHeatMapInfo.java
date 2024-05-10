@@ -64,7 +64,6 @@ public class TestHeatMapInfo {
   private ReconOMMetadataManager reconOMMetadataManager;
   private String auditRespStr;
   private HeatMapUtil heatMapUtil;
-  private ReconContext reconContext;
 
   @SuppressWarnings("checkstyle:methodlength")
   private void initializeInjector() throws Exception {
