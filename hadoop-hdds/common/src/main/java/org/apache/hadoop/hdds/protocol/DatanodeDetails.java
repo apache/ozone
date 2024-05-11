@@ -850,7 +850,7 @@ public class DatanodeDetails extends NodeImpl implements
      */
     public DatanodeDetails build() {
       Preconditions.checkNotNull(id);
-      if (networkLocation == null) {
+      if (networkLocation == null || networkLocation.toString().isEmpty()) {
         networkLocation = NetConstants.BYTE_STRING_DEFAULT_RACK;
       }
       return new DatanodeDetails(this);
