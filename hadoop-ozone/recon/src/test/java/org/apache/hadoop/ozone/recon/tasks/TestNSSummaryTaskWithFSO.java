@@ -52,8 +52,8 @@ import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.writeDirT
 import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.writeKeyToOm;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_NSSUMMARY_FLUSH_TO_DB_MAX_THRESHOLD;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 
 /**
  * Test for NSSummaryTaskWithFSO.
@@ -270,6 +270,37 @@ public final class TestNSSummaryTaskWithFSO {
       assertEquals(DIR_ONE, nsSummaryInDir1.getDirName());
       assertEquals(DIR_TWO, nsSummaryInDir2.getDirName());
     }
+
+    @Test
+    public void testDirectoryParentIdAssignment() throws Exception {
+      // Trigger reprocess to simulate reading from OM DB and processing into NSSummary.
+      nSSummaryTaskWithFso.reprocessWithFSO(reconOMMetadataManager);
+
+      // Fetch NSSummary for DIR_ONE and verify its parent ID matches BUCKET_ONE_OBJECT_ID.
+      NSSummary nsSummaryDirOne =
+          reconNamespaceSummaryManager.getNSSummary(DIR_ONE_OBJECT_ID);
+      assertNotNull(nsSummaryDirOne,
+          "NSSummary for DIR_ONE should not be null.");
+      assertEquals(BUCKET_ONE_OBJECT_ID, nsSummaryDirOne.getParentId(),
+          "DIR_ONE's parent ID should match BUCKET_ONE_OBJECT_ID.");
+
+      // Fetch NSSummary for DIR_TWO and verify its parent ID matches DIR_ONE_OBJECT_ID.
+      NSSummary nsSummaryDirTwo =
+          reconNamespaceSummaryManager.getNSSummary(DIR_TWO_OBJECT_ID);
+      assertNotNull(nsSummaryDirTwo,
+          "NSSummary for DIR_TWO should not be null.");
+      assertEquals(DIR_ONE_OBJECT_ID, nsSummaryDirTwo.getParentId(),
+          "DIR_TWO's parent ID should match DIR_ONE_OBJECT_ID.");
+
+      // Fetch NSSummary for DIR_THREE and verify its parent ID matches DIR_ONE_OBJECT_ID.
+      NSSummary nsSummaryDirThree =
+          reconNamespaceSummaryManager.getNSSummary(DIR_THREE_OBJECT_ID);
+      assertNotNull(nsSummaryDirThree,
+          "NSSummary for DIR_THREE should not be null.");
+      assertEquals(DIR_ONE_OBJECT_ID, nsSummaryDirThree.getParentId(),
+          "DIR_THREE's parent ID should match DIR_ONE_OBJECT_ID.");
+    }
+
   }
 
   /**
@@ -462,6 +493,27 @@ public final class TestNSSummaryTaskWithFSO {
       // after renaming dir1, check its new name
       assertEquals(DIR_ONE_RENAME, nsSummaryForDir1.getDirName());
     }
+
+    @Test
+    public void testParentIdAfterProcessEventBatch() throws IOException {
+
+      // Verify the parent ID of DIR_FOUR after it's added under BUCKET_ONE.
+      NSSummary nsSummaryDirFour =
+          reconNamespaceSummaryManager.getNSSummary(DIR_FOUR_OBJECT_ID);
+      assertNotNull(nsSummaryDirFour,
+          "NSSummary for DIR_FOUR should not be null.");
+      assertEquals(BUCKET_ONE_OBJECT_ID, nsSummaryDirFour.getParentId(),
+          "DIR_FOUR's parent ID should match BUCKET_ONE_OBJECT_ID.");
+
+      // Verify the parent ID of DIR_FIVE after it's added under BUCKET_TWO.
+      NSSummary nsSummaryDirFive =
+          reconNamespaceSummaryManager.getNSSummary(DIR_FIVE_OBJECT_ID);
+      assertNotNull(nsSummaryDirFive,
+          "NSSummary for DIR_FIVE should not be null.");
+      assertEquals(BUCKET_TWO_OBJECT_ID, nsSummaryDirFive.getParentId(),
+          "DIR_FIVE's parent ID should match BUCKET_TWO_OBJECT_ID.");
+    }
+
   }
 
   /**

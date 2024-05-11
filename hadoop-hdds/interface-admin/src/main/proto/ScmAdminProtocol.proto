@@ -362,6 +362,7 @@ message DatanodeUsageInfoResponseProto {
 */
 message DecommissionNodesRequestProto {
   repeated string hosts = 1;
+  optional bool force = 2;
 }
 
 
@@ -391,6 +392,7 @@ message RecommissionNodesResponseProto {
 message StartMaintenanceNodesRequestProto {
   repeated string hosts = 1;
   optional int64 endInHours = 2;
+  optional bool force = 3;
 }
 
 message StartMaintenanceNodesResponseProto {
@@ -577,6 +579,12 @@ message StartContainerBalancerRequestProto {
   optional int64 maxSizeLeavingSourceInGB = 7;
   optional int32 maxDatanodesPercentageToInvolvePerIteration = 8;
   optional int32 iterations = 9;
+  optional int32 balancingInterval = 10;
+  optional int32 moveTimeout = 11;
+  optional int32 moveReplicationTimeout = 12;
+  optional bool networkTopologyEnable = 13;
+  optional string includeNodes = 14;
+  optional string excludeNodes = 15;
 }
 
 message StartContainerBalancerResponseProto {

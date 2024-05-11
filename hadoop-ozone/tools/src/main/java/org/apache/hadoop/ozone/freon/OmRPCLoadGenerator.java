@@ -23,10 +23,10 @@ import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.om.protocolPB.OzoneManagerProtocolClientSideTranslatorPB;
 import java.util.concurrent.Callable;
+
+import org.apache.hadoop.ozone.util.PayloadUtils;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
-
-import static org.apache.hadoop.ozone.common.PayloadUtils.generatePayloadBytes;
 
 /**
  * Utility to generate RPC request to OM with or without payload.
@@ -43,8 +43,6 @@ import static org.apache.hadoop.ozone.common.PayloadUtils.generatePayloadBytes;
 public class OmRPCLoadGenerator extends BaseFreonGenerator
         implements Callable<Void> {
 
-  private static final int RPC_PAYLOAD_MULTIPLICATION_FACTOR = 1024;
-  private static final int MAX_SIZE_KB = 2097151;
   private Timer timer;
   private OzoneConfiguration configuration;
   private OzoneManagerProtocolClientSideTranslatorPB[] clients;
@@ -89,8 +87,8 @@ public class OmRPCLoadGenerator extends BaseFreonGenerator
     }
 
     init();
-    payloadReqBytes = generatePayloadBytes(payloadReqSizeKB);
-    payloadRespSize = calculateMaxPayloadSize(payloadRespSizeKB);
+    payloadReqBytes = PayloadUtils.generatePayload(payloadSizeInBytes(payloadReqSizeKB));
+    payloadRespSize = payloadSizeInBytes(payloadRespSizeKB);
     timer = getMetrics().timer("rpc-payload");
     try {
       runTests(this::sendRPCReq);
@@ -104,14 +102,8 @@ public class OmRPCLoadGenerator extends BaseFreonGenerator
     return null;
   }
 
-  private int calculateMaxPayloadSize(int payloadSizeKB) {
-    if (payloadSizeKB > 0) {
-      return Math.min(
-              Math.toIntExact((long)payloadSizeKB *
-                      RPC_PAYLOAD_MULTIPLICATION_FACTOR),
-              MAX_SIZE_KB);
-    }
-    return 0;
+  private int payloadSizeInBytes(int payloadSizeKB) {
+    return payloadSizeKB > 0 ? payloadSizeKB * 1024 : 0;
   }
 
   private void sendRPCReq(long l) throws Exception {

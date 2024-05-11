@@ -37,6 +37,7 @@ import java.util.Map;
 import java.util.OptionalLong;
 import java.util.UUID;
 
+import com.google.protobuf.Proto2Utils;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -79,7 +80,8 @@ public class TestHeartbeatEndpointTask {
     targetDns.add(MockDatanodeDetails.randomDatanodeDetails());
     targetDns.add(MockDatanodeDetails.randomDatanodeDetails());
     ReconstructECContainersCommand cmd = new ReconstructECContainersCommand(
-        1, emptyList(), targetDns, new byte[]{2, 5},
+        1, emptyList(), targetDns,
+        Proto2Utils.unsafeByteString(new byte[]{2, 5}),
         new ECReplicationConfig(3, 2));
 
     when(scm.sendHeartbeat(any()))

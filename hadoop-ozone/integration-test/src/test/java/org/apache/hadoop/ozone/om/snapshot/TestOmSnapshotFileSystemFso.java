@@ -16,16 +16,16 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.ozone.om;
+package org.apache.hadoop.ozone.om.snapshot;
 
 import org.junit.jupiter.api.Timeout;
 
 /**
- * OmSnapshot file system tests for Legacy.
+ * OmSnapshot file system tests for FSO.
  */
 @Timeout(120)
-public class TestOmSnapshotFileSystemLegacy extends TestOmSnapshotFileSystem {
-  TestOmSnapshotFileSystemLegacy() {
-    super(BUCKET_NAME_LEGACY);
+public class TestOmSnapshotFileSystemFso extends TestOmSnapshotFileSystem {
+  TestOmSnapshotFileSystemFso() {
+    super(BUCKET_NAME_FSO);
   }
 }

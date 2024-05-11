@@ -1642,4 +1642,36 @@ public class SCMNodeManager implements NodeManager {
   private ReentrantReadWriteLock.ReadLock readLock() {
     return lock.readLock();
   }
+
+  /**
+   * This API allows removal of only DECOMMISSIONED and DEAD nodes from NodeManager data structures and cleanup memory.
+   * This API call is having a pre-condition before removal of node like following resources to be removed:
+   *   --- all pipelines for datanode should be closed.
+   *   --- all containers for datanode should be closed.
+   *   --- remove all containers replicas maintained by datanode.
+   *   --- clears all SCM DeletedBlockLog transaction records associated with datanode.
+   *
+   * @param datanodeDetails
+   * @throws NodeNotFoundException
+   */
+  @Override
+  public void removeNode(DatanodeDetails datanodeDetails) throws NodeNotFoundException, IOException {
+    writeLock().lock();
+    try {
+      NodeStatus nodeStatus = this.getNodeStatus(datanodeDetails);
+      if (datanodeDetails.isDecommissioned() || nodeStatus.isDead()) {
+        if (clusterMap.contains(datanodeDetails)) {
+          clusterMap.remove(datanodeDetails);
+        }
+        nodeStateManager.removeNode(datanodeDetails);
+        removeFromDnsToUuidMap(datanodeDetails.getUuid(), datanodeDetails.getIpAddress());
+        final List<SCMCommand> cmdList = getCommandQueue(datanodeDetails.getUuid());
+        LOG.info("Clearing command queue of size {} for DN {}", cmdList.size(), datanodeDetails);
+      } else {
+        LOG.warn("Node not decommissioned or dead, cannot remove: {}", datanodeDetails);
+      }
+    } finally {
+      writeLock().unlock();
+    }
+  }
 }

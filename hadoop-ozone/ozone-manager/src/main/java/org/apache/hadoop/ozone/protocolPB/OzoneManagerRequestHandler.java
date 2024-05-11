@@ -41,7 +41,7 @@ import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.scm.protocolPB.OzonePBHelper;
 import org.apache.hadoop.hdds.utils.FaultInjector;
 import org.apache.hadoop.ozone.OzoneAcl;
-import org.apache.hadoop.ozone.common.PayloadUtils;
+import org.apache.hadoop.ozone.util.PayloadUtils;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.OzoneManagerPrepareState;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
@@ -1464,9 +1464,8 @@ public class OzoneManagerRequestHandler implements RequestHandler {
 
   private EchoRPCResponse echoRPC(EchoRPCRequest req) {
     EchoRPCResponse.Builder builder = EchoRPCResponse.newBuilder();
-    byte[] payloadBytes =
-        PayloadUtils.generatePayloadBytes(req.getPayloadSizeResp());
-    builder.setPayload(ByteString.copyFrom(payloadBytes));
+    final ByteString payloadBytes = PayloadUtils.generatePayloadProto2(req.getPayloadSizeResp());
+    builder.setPayload(payloadBytes);
     return builder.build();
   }
 

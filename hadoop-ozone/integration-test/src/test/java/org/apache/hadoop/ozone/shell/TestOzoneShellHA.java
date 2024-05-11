@@ -23,11 +23,13 @@ import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.PrintStream;
 import java.io.UnsupportedEncodingException;
+import java.net.URI;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
 import java.util.UUID;
+import java.util.concurrent.TimeoutException;
 
 import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.crypto.key.KeyProvider;
@@ -50,6 +52,7 @@ import org.apache.hadoop.fs.ozone.OzoneFsShell;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.MiniOzoneHAClusterImpl;
+import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
@@ -64,6 +67,7 @@ import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
+import org.apache.hadoop.ozone.om.service.OpenKeyCleanupService;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.hadoop.util.ToolRunner;
@@ -78,9 +82,9 @@ import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.FS_TRASH_INTERV
 import static org.apache.hadoop.fs.FileSystem.FS_DEFAULT_NAME_KEY;
 import static org.apache.hadoop.fs.FileSystem.TRASH_PREFIX;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_FS_HSYNC_ENABLED;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_FS_LISTING_PAGE_SIZE;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_OFS_URI_SCHEME;
-
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.BUCKET_NOT_EMPTY;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.BUCKET_NOT_FOUND;
@@ -192,6 +196,7 @@ public class TestOzoneShellHA {
     final int numDNs = 5;
     conf.set(CommonConfigurationKeysPublic.HADOOP_SECURITY_KEY_PROVIDER_PATH,
         getKeyProviderURI(miniKMS));
+    conf.setInt(OMConfigKeys.OZONE_DIR_DELETING_SERVICE_INTERVAL, 10);
     conf.setBoolean(OMConfigKeys.OZONE_OM_ENABLE_FILESYSTEM_PATHS, true);
     MiniOzoneHAClusterImpl.Builder builder = MiniOzoneCluster.newHABuilder(conf);
     builder.setOMServiceId(omServiceId)
@@ -581,7 +586,7 @@ public class TestOzoneShellHA {
 
   @Test
   public void testAdminCmdListOpenFiles()
-      throws IOException, InterruptedException {
+      throws IOException, InterruptedException, TimeoutException {
 
     OzoneConfiguration conf = cluster.getConf();
     final String hostPrefix = OZONE_OFS_URI_SCHEME + "://" + omServiceId;
@@ -696,6 +701,122 @@ public class TestOzoneShellHA {
       IOUtils.closeQuietly(streams);
     }
 
+  }
+
+  @Test
+  public void testAdminCmdListOpenFilesWithDeletedKeys()
+      throws Exception {
+
+    OzoneConfiguration conf = cluster.getConf();
+    final String hostPrefix = OZONE_OFS_URI_SCHEME + "://" + omServiceId;
+
+    OzoneConfiguration clientConf = getClientConfForOFS(hostPrefix, conf);
+    clientConf.setBoolean(OZONE_FS_HSYNC_ENABLED, true);
+    FileSystem fs = FileSystem.get(clientConf);
+
+    assertNotEquals(fs.getConf().get(OZONE_FS_HSYNC_ENABLED),
+        "false", OZONE_FS_HSYNC_ENABLED + " is set to false " +
+            "by external force. Must be true to allow hsync to function");
+
+    final String volumeName = "volume-list-del";
+    final String bucketName = "buck1";
+
+    String dir1 = hostPrefix +
+        OM_KEY_PREFIX + volumeName +
+        OM_KEY_PREFIX + bucketName +
+        OM_KEY_PREFIX + "dir1";
+    // Create volume, bucket, dir
+    assertTrue(fs.mkdirs(new Path(dir1)));
+    String keyPrefix = OM_KEY_PREFIX + "key";
+
+    final int numKeys = 5;
+    String[] keys = new String[numKeys];
+
+    for (int i = 0; i < numKeys; i++) {
+      keys[i] = dir1 + keyPrefix + i;
+    }
+
+    String pathToBucket = "/" +  volumeName + "/" + bucketName;
+    FSDataOutputStream[] streams = new FSDataOutputStream[numKeys];
+
+    try {
+      // Create multiple keys and hold them open
+      for (int i = 0; i < numKeys; i++) {
+        streams[i] = fs.create(new Path(keys[i]));
+        streams[i].write(1);
+      }
+
+      // Wait for DB flush
+      cluster.getOzoneManager().awaitDoubleBufferFlush();
+
+      // hsync last key
+      streams[numKeys - 1].hsync();
+      // Wait for flush
+      cluster.getOzoneManager().awaitDoubleBufferFlush();
+      final String[] args = new String[] {"om", "lof", "--service-id",
+          omServiceId, "--show-deleted", "-p", pathToBucket};
+
+      execute(ozoneAdminShell, args);
+      String cmdRes = getStdOut();
+
+      // Verify that key is hsync'ed
+      assertTrue(cmdRes.contains("\tYes\t\tNo"), "key should be hsync'ed and not deleted");
+
+      // Verify json output
+      String[] args1 = new String[] {"om", "lof", "--service-id", omServiceId, "--show-deleted",
+          "--json", "-p", pathToBucket};
+      execute(ozoneAdminShell, args1);
+      cmdRes = getStdOut();
+
+      assertTrue(!cmdRes.contains(OzoneConsts.DELETED_HSYNC_KEY),
+          "key should not have deletedHsyncKey metadata");
+
+      // Suspend open key cleanup service so that key remains in openKeyTable for verification
+      OpenKeyCleanupService openKeyCleanupService =
+          (OpenKeyCleanupService) cluster.getOzoneManager().getKeyManager().getOpenKeyCleanupService();
+      openKeyCleanupService.suspend();
+      OzoneFsShell shell = new OzoneFsShell(clientConf);
+      // Delete directory dir1
+      ToolRunner.run(shell, new String[]{"-rm", "-R", "-skipTrash", dir1});
+
+      GenericTestUtils.waitFor(() -> {
+        try {
+          execute(ozoneAdminShell, args);
+          String cmdRes1 = getStdOut();
+          // When directory purge request is triggered it should add DELETED_HSYNC_KEY metadata in hsync openKey
+          // And list open key should show as deleted
+          return cmdRes1.contains("\tYes\t\tYes");
+        } catch (Throwable t) {
+          LOG.warn("Failed to list open key", t);
+          return false;
+        }
+      }, 1000, 10000);
+
+      // Now check json output
+      execute(ozoneAdminShell, args1);
+      cmdRes = getStdOut();
+      assertTrue(cmdRes.contains(OzoneConsts.DELETED_HSYNC_KEY),
+          "key should have deletedHsyncKey metadata");
+
+      // Verify result should not have deleted hsync keys when --show-deleted is not in the command argument
+      String[] args2 = new String[] {"om", "lof", "--service-id", omServiceId, "-p", pathToBucket};
+      execute(ozoneAdminShell, args2);
+      cmdRes = getStdOut();
+      // Verify that deletedHsyncKey is not in the result
+      assertTrue(!cmdRes.contains("\tYes\t\tYes"), "key should be hsync'ed and not deleted");
+
+      // Verify with json result
+      args2 = new String[] {"om", "lof", "--service-id", omServiceId, "--json", "-p", pathToBucket};
+      execute(ozoneAdminShell, args2);
+      cmdRes = getStdOut();
+      // Verify that deletedHsyncKey is not in the result
+      assertTrue(!cmdRes.contains(OzoneConsts.DELETED_HSYNC_KEY),
+          "key should not have deletedHsyncKey metadata");
+
+    }  finally {
+      // Cleanup
+      IOUtils.closeQuietly(streams);
+    }
   }
 
   /**
@@ -885,6 +1006,34 @@ public class TestOzoneShellHA {
       omExecution = assertThrows(OMException.class,
           () -> client.getObjectStore().getVolume("linkvol"));
       assertEquals(VOLUME_NOT_FOUND, omExecution.getResult());
+    } finally {
+      shell.close();
+    }
+  }
+
+  @Test
+  @Timeout(10)
+  public void testListBucket() throws Exception {
+    final String hostPrefix = OZONE_OFS_URI_SCHEME + "://" + omServiceId;
+    OzoneConfiguration clientConf =
+            getClientConfForOFS(hostPrefix, cluster.getConf());
+    int pageSize = 20;
+    clientConf.setInt(OZONE_FS_LISTING_PAGE_SIZE, pageSize);
+    URI uri = FileSystem.getDefaultUri(clientConf);
+    clientConf.setBoolean(String.format("fs.%s.impl.disable.cache", uri.getScheme()), true);
+    OzoneFsShell shell = new OzoneFsShell(clientConf);
+
+    String volName = "testlistbucket";
+    int numBuckets = pageSize;
+
+    try {
+      generateBuckets("/" + volName, numBuckets);
+      out.reset();
+      int res = ToolRunner.run(shell, new String[]{"-ls", "/" + volName});
+      assertEquals(0, res);
+      String r = out.toString(DEFAULT_ENCODING);
+      assertThat(r).matches("(?s)^Found " + numBuckets + " items.*");
+
     } finally {
       shell.close();
     }

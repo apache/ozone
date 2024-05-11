@@ -683,7 +683,7 @@ public class KeyOutputStream extends OutputStream
     }
   }
 
-  public OmMultipartCommitUploadPartInfo
+  synchronized OmMultipartCommitUploadPartInfo
       getCommitUploadPartInfo() {
     return blockOutputStreamEntryPool.getCommitUploadPartInfo();
   }

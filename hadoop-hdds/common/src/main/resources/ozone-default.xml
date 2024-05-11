@@ -1506,40 +1506,12 @@
       to the OM.
     </description>
   </property>
-
-  <property>
-    <name>hdds.rest.rest-csrf.enabled</name>
-    <value>false</value>
-    <description>
-      If true, then enables Object Store REST server protection against
-      cross-site request forgery (CSRF).
-    </description>
-  </property>
-
   <property>
     <name>hdds.rest.http-address</name>
     <value>0.0.0.0:9880</value>
     <description>The http address of Object Store REST server inside the
       datanode.</description>
   </property>
-
-
-  <property>
-    <name>hdds.rest.netty.high.watermark</name>
-    <value>65535</value>
-    <description>
-      High watermark configuration to Netty for Object Store REST server.
-    </description>
-  </property>
-
-  <property>
-    <name>hdds.rest.netty.low.watermark</name>
-    <value>32768</value>
-    <description>
-      Low watermark configuration to Netty for Object Store REST server.
-    </description>
-  </property>
-
   <property>
     <name>hdds.datanode.plugins</name>
     <value/>
@@ -1981,7 +1953,15 @@
       set, ozone.security.http.kerberos.enabled should be set to true.
     </description>
   </property>
-
+  <property>
+    <name>ozone.security.crypto.compliance.mode</name>
+    <value>none</value>
+    <tag>OZONE, SECURITY, HDDS, CRYPTO_COMPLIANCE</tag>
+    <description>Based on this property the security compliance mode
+      is loaded and enables filtering cryptographic configuration options
+      according to the specified compliance mode.
+    </description>
+  </property>
 
   <property>
     <name>ozone.client.read.timeout</name>
@@ -2159,7 +2139,7 @@
   </property>
 
   <property>
-    <name>ozone.om.ratis.server.leaderelection.pre-vote </name>
+    <name>ozone.om.ratis.server.leaderelection.pre-vote</name>
     <value>true</value>
     <tag>OZONE, OM, RATIS, MANAGEMENT</tag>
     <description>Enable/disable OM HA leader election pre-vote phase.
@@ -2173,6 +2153,15 @@
     <description>The timeout duration for ratis server failure detection,
       once the threshold has reached, the ratis state machine will be informed
       about the failure in the ratis ring.
+    </description>
+  </property>
+
+  <property>
+    <name>ozone.om.ratis.server.close.threshold</name>
+    <value>60s</value>
+    <tag>OZONE, OM, RATIS</tag>
+    <description>
+      Raft Server will close if JVM pause longer than the threshold.
     </description>
   </property>
 
@@ -2286,11 +2275,44 @@
     </description>
   </property>
   <property>
+    <name>ssl.server.keystore.type</name>
+    <value>jks</value>
+    <tag>OZONE, SECURITY, CRYPTO_COMPLIANCE</tag>
+    <description>
+      The keystore type for HTTP Servers used in ozone.
+    </description>
+  </property>
+  <property>
+    <name>ssl.server.truststore.type</name>
+    <value>jks</value>
+    <tag>OZONE, SECURITY, CRYPTO_COMPLIANCE</tag>
+    <description>
+      The truststore type for HTTP Servers used in ozone.
+    </description>
+  </property>
+  <property>
     <name>hdds.key.len</name>
     <value>2048</value>
-    <tag>SCM, HDDS, X509, SECURITY</tag>
+    <tag>SCM, HDDS, X509, SECURITY, CRYPTO_COMPLIANCE</tag>
     <description>
-      SCM CA key length.  This is an algorithm-specific metric, such as modulus length, specified in number of bits.
+      SCM CA key length. This is an algorithm-specific metric, such as modulus
+      length, specified in number of bits.
+    </description>
+  </property>
+  <property>
+    <name>hdds.key.algo</name>
+    <value>RSA</value>
+    <tag>SCM, HDDS, X509, SECURITY, CRYPTO_COMPLIANCE</tag>
+    <description>
+      SCM CA key algorithm.
+    </description>
+  </property>
+  <property>
+    <name>hdds.security.provider</name>
+    <value>BC</value>
+    <tag>OZONE, HDDS, X509, SECURITY, CRYPTO_COMPLIANCE</tag>
+    <description>
+      The main security provider used for various cryptographic algorithms.
     </description>
   </property>
   <property>
@@ -2334,7 +2356,7 @@
   <property>
     <name>hdds.grpc.tls.provider</name>
     <value>OPENSSL</value>
-    <tag>OZONE, HDDS, SECURITY, TLS</tag>
+    <tag>OZONE, HDDS, SECURITY, TLS, CRYPTO_COMPLIANCE</tag>
     <description>HDDS GRPC server TLS provider.</description>
   </property>
   <property>
@@ -2378,7 +2400,7 @@
   <property>
     <name>hdds.x509.signature.algorithm</name>
     <value>SHA256withRSA</value>
-    <tag>OZONE, HDDS, SECURITY</tag>
+    <tag>OZONE, HDDS, SECURITY, CRYPTO_COMPLIANCE</tag>
     <description>X509 signature certificate.</description>
   </property>
   <property>
@@ -4312,7 +4334,7 @@
   </property>
 
   <property>
-    <name>ozone.om.snapshot.diff.cleanup.service.run.internal</name>
+    <name>ozone.om.snapshot.diff.cleanup.service.run.interval</name>
     <value>1m</value>
     <tag>OZONE, OM</tag>
     <description>
@@ -4327,6 +4349,16 @@
     <tag>OZONE, OM</tag>
     <description>
       Timeout for snapshot diff clean up service.
+      Uses millisecond by default when no time unit is specified.
+    </description>
+  </property>
+
+  <property>
+    <name>ozone.om.snapshot.cache.cleanup.service.run.interval</name>
+    <value>1m</value>
+    <tag>OZONE, OM</tag>
+    <description>
+      Interval at which snapshot cache clean up will run.
       Uses millisecond by default when no time unit is specified.
     </description>
   </property>
@@ -4389,7 +4421,7 @@
   <property>
     <name>hdds.secret.key.algorithm</name>
     <value>HmacSHA256</value>
-    <tag>SCM, SECURITY</tag>
+    <tag>SCM, SECURITY, CRYPTO_COMPLIANCE</tag>
     <description>
       The algorithm that SCM uses to generate symmetric secret keys.
       A valid algorithm is the one supported by KeyGenerator, as described at

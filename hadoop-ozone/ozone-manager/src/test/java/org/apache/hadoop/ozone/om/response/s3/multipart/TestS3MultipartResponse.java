@@ -306,6 +306,8 @@ public class TestS3MultipartResponse {
 
     String multipartKey = omMetadataManager
         .getMultipartKey(volumeName, bucketName, keyName, multipartUploadID);
+    OmMultipartKeyInfo multipartKeyInfo = omMetadataManager
+        .getMultipartInfoTable().get(multipartKey);
 
     final long volumeId = omMetadataManager.getVolumeId(volumeName);
     final long bucketId = omMetadataManager.getBucketId(volumeName,
@@ -324,7 +326,8 @@ public class TestS3MultipartResponse {
 
     return new S3MultipartUploadCompleteResponseWithFSO(omResponse,
         multipartKey, multipartOpenKey, omKeyInfo,  allKeyInfoToRemove,
-        getBucketLayout(), omBucketInfo, volumeId, bucketId);
+        getBucketLayout(), omBucketInfo, volumeId, bucketId, null,
+        multipartKeyInfo);
   }
 
   protected S3InitiateMultipartUploadResponse getS3InitiateMultipartUploadResp(

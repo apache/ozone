@@ -21,6 +21,7 @@ package org.apache.hadoop.hdds.scm.storage;
 import java.io.EOFException;
 import java.io.IOException;
 import java.io.InputStream;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -224,18 +225,25 @@ public class BlockInputStream extends BlockExtendedInputStream {
   }
 
   private void refreshBlockInfo(IOException cause) throws IOException {
-    LOG.info("Unable to read information for block {} from pipeline {}: {}",
+    LOG.info("Attempting to update pipeline and block token for block {} from pipeline {}: {}",
         blockID, pipelineRef.get().getId(), cause.getMessage());
     if (refreshFunction != null) {
       LOG.debug("Re-fetching pipeline and block token for block {}", blockID);
       BlockLocationInfo blockLocationInfo = refreshFunction.apply(blockID);
       if (blockLocationInfo == null) {
-        LOG.debug("No new block location info for block {}", blockID);
+        LOG.warn("No new block location info for block {}", blockID);
       } else {
-        LOG.debug("New pipeline for block {}: {}", blockID,
-            blockLocationInfo.getPipeline());
         setPipeline(blockLocationInfo.getPipeline());
+        LOG.info("New pipeline for block {}: {}", blockID,
+            blockLocationInfo.getPipeline());
+
         tokenRef.set(blockLocationInfo.getToken());
+        if (blockLocationInfo.getToken() != null) {
+          OzoneBlockTokenIdentifier tokenId = new OzoneBlockTokenIdentifier();
+          tokenId.readFromByteArray(tokenRef.get().getIdentifier());
+          LOG.info("A new token is added for block {}. Expiry: {}",
+              blockID, Instant.ofEpochMilli(tokenId.getExpiryDate()));
+        }
       }
     } else {
       throw cause;
@@ -309,10 +317,18 @@ public class BlockInputStream extends BlockExtendedInputStream {
       throw new IllegalArgumentException("Not GetBlock: response=" + response);
     }
     final GetBlockResponseProto b = response.getGetBlock();
+    final long blockLength = b.getBlockData().getSize();
     final List<ChunkInfo> chunks = b.getBlockData().getChunksList();
     for (int i = 0; i < chunks.size(); i++) {
       final ChunkInfo c = chunks.get(i);
-      if (c.getLen() <= 0) {
+      // HDDS-10682 caused an empty chunk to get written to the end of some EC blocks. Due to this
+      // validation, these blocks will not be readable. In the EC case, the empty chunk is always
+      // the last chunk and the offset is the block length. We can safely ignore this case and not fail.
+      if (c.getLen() <= 0 && i == chunks.size() - 1 && c.getOffset() == blockLength) {
+        DatanodeBlockID blockID = b.getBlockData().getBlockID();
+        LOG.warn("The last chunk is empty for container/block {}/{} with an offset of the block length. " +
+            "Likely due to HDDS-10682. This is safe to ignore.", blockID.getContainerID(), blockID.getLocalID());
+      } else if (c.getLen() <= 0) {
         throw new IOException("Failed to get chunkInfo["
             + i + "]: len == " + c.getLen());
       }

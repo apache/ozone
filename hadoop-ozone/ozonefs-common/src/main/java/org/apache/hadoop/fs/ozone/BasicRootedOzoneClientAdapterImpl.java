@@ -101,8 +101,14 @@ import static org.apache.hadoop.ozone.OzoneConsts.OM_SNAPSHOT_INDICATOR;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes
     .BUCKET_ALREADY_EXISTS;
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.BUCKET_NOT_FOUND;
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.DIRECTORY_NOT_FOUND;
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.FILE_NOT_FOUND;
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.KEY_NOT_FOUND;
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.NOT_A_FILE;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes
     .VOLUME_ALREADY_EXISTS;
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.VOLUME_NOT_FOUND;
 import static org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse.JobStatus.DONE;
 
 /**
@@ -894,9 +900,9 @@ public class BasicRootedOzoneClientAdapterImpl
     }
     OFSPath ofsStartPath = new OFSPath(startPath, config);
     if (ofsPath.isVolume()) {
-      String startBucket = ofsStartPath.getBucketName();
+      String startBucketPath = ofsStartPath.getNonKeyPath();
       return listStatusVolume(ofsPath.getVolumeName(),
-          recursive, startBucket, numEntries, uri, workingDir, username);
+          recursive, startBucketPath, numEntries, uri, workingDir, username);
     }
 
     if (ofsPath.isSnapshotPath()) {
@@ -1016,7 +1022,7 @@ public class BasicRootedOzoneClientAdapterImpl
         keyInfo.getModificationTime(),
         keyInfo.getModificationTime(),
         status.isDirectory() ? (short) 00777 : (short) 00666,
-        owner,
+        StringUtils.defaultIfEmpty(keyInfo.getOwnerName(), owner),
         owner,
         null,
         getBlockLocations(status),
@@ -1359,17 +1365,26 @@ public class BasicRootedOzoneClientAdapterImpl
     OFSPath ofsPath = new OFSPath(pathStr, config);
     String key = ofsPath.getKeyName();
     if (ofsPath.isRoot() || ofsPath.isVolume()) {
-      throw new IOException("not a file");
+      throw new FileNotFoundException("Path is not a file.");
     } else {
-      OzoneBucket bucket = getBucket(ofsPath, false);
-      if (ofsPath.isSnapshotPath()) {
-        throw new IOException("file is in a snapshot.");
-      } else {
-        OzoneFileStatus status = bucket.getFileStatus(key);
-        if (!status.isFile()) {
-          throw new IOException("not a file");
+      try {
+        OzoneBucket bucket = getBucket(ofsPath, false);
+        if (ofsPath.isSnapshotPath()) {
+          throw new IOException("file is in a snapshot.");
+        } else {
+          OzoneFileStatus status = bucket.getFileStatus(key);
+          if (!status.isFile()) {
+            throw new FileNotFoundException("Path is not a file.");
+          }
+          return !status.getKeyInfo().isHsync();
         }
-        return !status.getKeyInfo().isHsync();
+      } catch (OMException ome) {
+        if (ome.getResult() == FILE_NOT_FOUND ||
+            ome.getResult() == VOLUME_NOT_FOUND ||
+            ome.getResult() == BUCKET_NOT_FOUND) {
+          throw new FileNotFoundException("File does not exist. " + ome.getMessage());
+        }
+        throw ome;
       }
     }
   }
@@ -1379,10 +1394,21 @@ public class BasicRootedOzoneClientAdapterImpl
     incrementCounter(Statistic.INVOCATION_RECOVER_FILE_PREPARE, 1);
     OFSPath ofsPath = new OFSPath(pathStr, config);
 
-    OzoneVolume volume = objectStore.getVolume(ofsPath.getVolumeName());
-    OzoneBucket bucket = getBucket(ofsPath, false);
-    return ozoneClient.getProxy().getOzoneManagerClient().recoverLease(
-        volume.getName(), bucket.getName(), ofsPath.getKeyName(), force);
+    try {
+      OzoneBucket bucket = getBucket(ofsPath, false);
+      return ozoneClient.getProxy().getOzoneManagerClient().recoverLease(
+          bucket.getVolumeName(), bucket.getName(), ofsPath.getKeyName(), force);
+    } catch (OMException ome) {
+      if (ome.getResult() == NOT_A_FILE) {
+        throw new FileNotFoundException("Path is not a file. " + ome.getMessage());
+      } else if (ome.getResult() == KEY_NOT_FOUND ||
+          ome.getResult() == DIRECTORY_NOT_FOUND ||
+          ome.getResult() == VOLUME_NOT_FOUND ||
+          ome.getResult() == BUCKET_NOT_FOUND) {
+        throw new FileNotFoundException("File does not exist. " + ome.getMessage());
+      }
+      throw ome;
+    }
   }
 
   @Override

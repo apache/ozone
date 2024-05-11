@@ -201,7 +201,7 @@ public class OMFileCreateRequestWithFSO extends OMFileCreateRequest {
       // Even if bucket gets deleted, when commitKey we shall identify if
       // bucket gets deleted.
       OMFileRequest.addOpenFileTableCacheEntry(omMetadataManager,
-              dbOpenFileName, omFileInfo, pathInfoFSO.getLeafNodeName(),
+              dbOpenFileName, omFileInfo, pathInfoFSO.getLeafNodeName(), keyName,
               trxnLogIndex);
 
       // Add cache entries for the prefix directories.

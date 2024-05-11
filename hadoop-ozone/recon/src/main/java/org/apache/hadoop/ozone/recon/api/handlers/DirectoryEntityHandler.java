@@ -39,6 +39,9 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
 
+import static org.apache.hadoop.ozone.recon.ReconConstants.DISK_USAGE_TOP_RECORDS_LIMIT;
+import static org.apache.hadoop.ozone.recon.ReconUtils.sortDiskUsageDescendingWithLimit;
+
 /**
  * Class for handling directory entity type.
  */
@@ -80,7 +83,7 @@ public class DirectoryEntityHandler extends EntityHandler {
 
   @Override
   public DUResponse getDuResponse(
-          boolean listFile, boolean withReplica)
+      boolean listFile, boolean withReplica, boolean sortSubPaths)
           throws IOException {
     DUResponse duResponse = new DUResponse();
     duResponse.setPath(getNormalizedPath());
@@ -154,8 +157,14 @@ public class DirectoryEntityHandler extends EntityHandler {
     }
     duResponse.setCount(subdirDUData.size());
     duResponse.setSize(dirDataSize);
-    duResponse.setDuData(subdirDUData);
 
+    if (sortSubPaths) {
+      // Parallel sort subdirDUData in descending order of size and returns the top N elements.
+      subdirDUData = sortDiskUsageDescendingWithLimit(subdirDUData,
+          DISK_USAGE_TOP_RECORDS_LIMIT);
+    }
+
+    duResponse.setDuData(subdirDUData);
     return duResponse;
   }
 
