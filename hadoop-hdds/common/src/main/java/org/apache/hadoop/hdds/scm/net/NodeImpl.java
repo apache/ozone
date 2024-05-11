@@ -19,8 +19,9 @@ package org.apache.hadoop.hdds.scm.net;
 
 import com.google.common.base.Preconditions;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.util.StringWithByteString;
 
-import static org.apache.hadoop.hdds.scm.net.NetConstants.ROOT;
+import static org.apache.hadoop.hdds.scm.net.NetConstants.BYTE_STRING_ROOT;
 import static org.apache.hadoop.hdds.scm.net.NetConstants.PATH_SEPARATOR_STR;
 
 /**
@@ -28,9 +29,9 @@ import static org.apache.hadoop.hdds.scm.net.NetConstants.PATH_SEPARATOR_STR;
  */
 public class NodeImpl implements Node {
   // host:port#
-  private String name;
+  private StringWithByteString name;
   // string representation of this node's location, such as /dc1/rack1
-  private String location;
+  private StringWithByteString location;
   // location + "/" + name
   private String path;
   // which level of the tree the node resides, start from 1 for root
@@ -46,16 +47,20 @@ public class NodeImpl implements Node {
    * {@link NetConstants#PATH_SEPARATOR})
    * @param location this node's location
    */
-  public NodeImpl(String name, String location, int cost) {
-    if (name != null && name.contains(PATH_SEPARATOR_STR)) {
+  public NodeImpl(StringWithByteString name, StringWithByteString location, int cost) {
+    if (name != null && name.toString() != null && name.toString().contains(PATH_SEPARATOR_STR)) {
       throw new IllegalArgumentException(
           "Network location name:" + name + " should not contain " +
               PATH_SEPARATOR_STR);
     }
-    this.name = (name == null) ? ROOT : name;
-    this.location = NetUtils.normalize(location);
+    this.name = (name == null || name.toString() == null) ? BYTE_STRING_ROOT : name;
+    this.location = location;
     this.path = getPath();
     this.cost = cost;
+  }
+
+  public NodeImpl(String name, String location, int cost) {
+    this(new StringWithByteString(name), new StringWithByteString(NetUtils.normalize(location)), cost);
   }
 
   /**
@@ -75,11 +80,25 @@ public class NodeImpl implements Node {
     this.level = level;
   }
 
+  public NodeImpl(StringWithByteString name, StringWithByteString location, InnerNode parent, int level,
+      int cost) {
+    this(name, location, cost);
+    this.parent = parent;
+    this.level = level;
+  }
+
   /**
    * @return this node's name
    */
   @Override
   public String getNetworkName() {
+    return name.toString();
+  }
+
+  /**
+   * @return this node's name
+   */
+  public StringWithByteString getNetworkNameAsByteString() {
     return name;
   }
 
@@ -89,6 +108,15 @@ public class NodeImpl implements Node {
    */
   @Override
   public void setNetworkName(String networkName) {
+    this.name = new StringWithByteString(networkName);
+    this.path = getPath();
+  }
+
+  /**
+   * Set this node's name, can be hostname or Ipaddress.
+   * @param networkName it's network name
+   */
+  public void setNetworkName(StringWithByteString networkName) {
     this.name = networkName;
     this.path = getPath();
   }
@@ -98,6 +126,13 @@ public class NodeImpl implements Node {
    */
   @Override
   public String getNetworkLocation() {
+    return location.toString();
+  }
+
+  /**
+   * @return this node's network location
+   */
+  public StringWithByteString getNetworkLocationAsByteString() {
     return location;
   }
 
@@ -107,7 +142,7 @@ public class NodeImpl implements Node {
    */
   @Override
   public void setNetworkLocation(String networkLocation) {
-    this.location = networkLocation;
+    this.location = new StringWithByteString(networkLocation);
     this.path = getPath();
   }
 
@@ -269,8 +304,8 @@ public class NodeImpl implements Node {
   }
 
   private String getPath() {
-    return this.location.equals(PATH_SEPARATOR_STR) ?
-        this.location + this.name :
-        this.location + PATH_SEPARATOR_STR + this.name;
+    return this.location.toString().equals(PATH_SEPARATOR_STR) ?
+        this.location + this.name.toString() :
+        this.location + PATH_SEPARATOR_STR + this.name.toString();
   }
 }
