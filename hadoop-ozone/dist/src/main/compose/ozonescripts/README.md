@@ -12,9 +12,9 @@
   limitations under the License. See accompanying LICENSE file.
 -->
 
-# start-ozone environment
+# ozonescripts environment
 
-This is an example environment to use/test `./sbin/start-ozone.sh` and `./sbin/stop-ozone.sh` scripts.
+This is an example environment to use/test `./sbin/start-ozone.sh` and `./sbin/stop-ozone.sh` scripts.  It requires Docker Compose v2.
 
 There are ssh connections between the containers and the start/stop scripts could handle the start/stop process
 similar to a real cluster.
@@ -22,7 +22,7 @@ similar to a real cluster.
 To use it, first start the cluster:
 
 ```
-docker-compose up -d
+docker compose up -d
 ```
 
 After a successful startup (which starts only the ssh daemons) you can start ozone:
