@@ -271,4 +271,8 @@ public class OzoneClientKeyReadWriteListOps extends BaseFreonGenerator
     }
     return keyNameSb.toString();
   }
+
+  public boolean randomPrefix() {
+    return false;
+  }
 }

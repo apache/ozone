@@ -461,4 +461,7 @@ public class OmMetadataGenerator extends BaseFreonGenerator
     }
   }
 
+  public boolean randomPrefix() {
+    return false;
+  }
 }

@@ -285,7 +285,7 @@ public class BaseFreonGenerator {
     attemptCounter = new AtomicLong(0);
 
     if (prefix.length() == 0) {
-      prefix = RandomStringUtils.randomAlphanumeric(10).toLowerCase();
+      prefix = randomPrefix() ? RandomStringUtils.randomAlphanumeric(10).toLowerCase() : "";
     } else {
       //replace environment variables to support multi-node execution
       prefix = resolvePrefix(prefix);
@@ -306,8 +306,8 @@ public class BaseFreonGenerator {
               "Invalid command, "
                       + "the testNo must be a positive integer");
     }
-    LOG.info("Executing test with prefix {} " +
-        "and number-of-tests {}", prefix, testNo);
+    LOG.info("Executing test with prefix {} and number-of-tests {}",
+        prefix.isEmpty() ? "''" : prefix, testNo);
 
     pathSchema = new PathSchema(prefix);
 
@@ -539,6 +539,13 @@ public class BaseFreonGenerator {
     DigestUtils dig = new DigestUtils(DIGEST_ALGORITHM);
     dig.getMessageDigest().reset();
     return dig.digest(stream);
+  }
+
+  /**
+   * Whether using a random prefix when the prefix is empty.
+   */
+  public boolean randomPrefix() {
+    return true;
   }
 
   public String getPrefix() {
