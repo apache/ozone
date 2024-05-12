@@ -285,7 +285,7 @@ public class BaseFreonGenerator {
     attemptCounter = new AtomicLong(0);
 
     if (prefix.length() == 0) {
-      prefix = randomPrefix() ? RandomStringUtils.randomAlphanumeric(10).toLowerCase() : "";
+      prefix = !allowEmptyPrefix() ? RandomStringUtils.randomAlphanumeric(10).toLowerCase() : "";
     } else {
       //replace environment variables to support multi-node execution
       prefix = resolvePrefix(prefix);
@@ -542,10 +542,12 @@ public class BaseFreonGenerator {
   }
 
   /**
-   * Whether using a random prefix when the prefix is empty.
+   * When no prefix is specified,
+   * if allowEmptyPrefix is false, a random prefix will be used;
+   * if allowEmptyPrefix is true, an empty prefix will be used.
    */
-  public boolean randomPrefix() {
-    return true;
+  public boolean allowEmptyPrefix() {
+    return false;
   }
 
   public String getPrefix() {
