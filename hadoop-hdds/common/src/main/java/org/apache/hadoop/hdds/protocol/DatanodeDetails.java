@@ -102,7 +102,7 @@ public class DatanodeDetails extends NodeImpl implements
   private DatanodeDetails(Builder b) {
     super(b.hostName, b.networkLocation, NetConstants.NODE_COST_DEFAULT);
     uuid = b.id;
-    uuidString = new StringWithByteString(uuid.toString());
+    uuidString = StringWithByteString.valueOf(uuid.toString());
     threadNamePrefix = HddsUtils.threadNamePrefix(uuidString);
     ipAddress = b.ipAddress;
     hostName = b.hostName;
@@ -129,7 +129,7 @@ public class DatanodeDetails extends NodeImpl implements
         datanodeDetails.getParent(), datanodeDetails.getLevel(),
         datanodeDetails.getCost());
     this.uuid = datanodeDetails.uuid;
-    this.uuidString = new StringWithByteString(uuid.toString());
+    this.uuidString = datanodeDetails.uuidString;
     threadNamePrefix = HddsUtils.threadNamePrefix(uuidString);
     this.ipAddress = datanodeDetails.ipAddress;
     this.hostName = datanodeDetails.hostName;
@@ -163,7 +163,7 @@ public class DatanodeDetails extends NodeImpl implements
    * @return UUID of DataNode
    */
   public String getUuidString() {
-    return uuidString.toString();
+    return uuidString.getString();
   }
 
   /**
@@ -172,7 +172,7 @@ public class DatanodeDetails extends NodeImpl implements
    * @param ip IP Address
    */
   public void setIpAddress(String ip) {
-    this.ipAddress = new StringWithByteString(ip);
+    this.ipAddress = StringWithByteString.valueOf(ip);
   }
 
   /**
@@ -181,7 +181,7 @@ public class DatanodeDetails extends NodeImpl implements
    * @return IP address
    */
   public String getIpAddress() {
-    return ipAddress.toString();
+    return ipAddress.getString();
   }
 
   /**
@@ -199,7 +199,7 @@ public class DatanodeDetails extends NodeImpl implements
    * @param host hostname
    */
   public void setHostName(String host) {
-    this.hostName = new StringWithByteString(host);
+    this.hostName = StringWithByteString.valueOf(host);
   }
 
   /**
@@ -208,7 +208,7 @@ public class DatanodeDetails extends NodeImpl implements
    * @return Hostname
    */
   public String getHostName() {
-    return hostName.toString();
+    return hostName.getString();
   }
 
   /**
@@ -363,10 +363,12 @@ public class DatanodeDetails extends NodeImpl implements
       }
     }
     if (datanodeDetailsProto.hasNetworkName()) {
-      builder.setNetworkName(datanodeDetailsProto.getNetworkName(), datanodeDetailsProto.getNetworkNameBytes());
+      builder.setNetworkName(
+          datanodeDetailsProto.getNetworkName(), datanodeDetailsProto.getNetworkNameBytes());
     }
     if (datanodeDetailsProto.hasNetworkLocation()) {
-      builder.setNetworkLocation(datanodeDetailsProto.getNetworkLocation());
+      builder.setNetworkLocation(
+          datanodeDetailsProto.getNetworkLocation(), datanodeDetailsProto.getNetworkLocationBytes());
     }
     if (datanodeDetailsProto.hasLevel()) {
       builder.setLevel(datanodeDetailsProto.getLevel());
@@ -658,7 +660,7 @@ public class DatanodeDetails extends NodeImpl implements
      * @return DatanodeDetails.Builder
      */
     public Builder setIpAddress(String ip) {
-      this.ipAddress = new StringWithByteString(ip);
+      this.ipAddress = StringWithByteString.valueOf(ip);
       return this;
     }
 
@@ -681,7 +683,7 @@ public class DatanodeDetails extends NodeImpl implements
      * @return DatanodeDetails.Builder
      */
     public Builder setHostName(String host) {
-      this.hostName = new StringWithByteString(host);
+      this.hostName = StringWithByteString.valueOf(host);
       return this;
     }
 
@@ -694,17 +696,6 @@ public class DatanodeDetails extends NodeImpl implements
      */
     public Builder setHostName(String host, ByteString hostBytes) {
       this.hostName = new StringWithByteString(host, hostBytes);
-      return this;
-    }
-
-    /**
-     * Sets the network name of DataNode.
-     *
-     * @param name network name
-     * @return DatanodeDetails.Builder
-     */
-    public Builder setNetworkName(String name) {
-      this.networkName = new StringWithByteString(name);
       return this;
     }
 
@@ -727,7 +718,14 @@ public class DatanodeDetails extends NodeImpl implements
      * @return DatanodeDetails.Builder
      */
     public Builder setNetworkLocation(String loc) {
-      this.networkLocation = new StringWithByteString(NetUtils.normalize(loc));
+      return setNetworkLocation(loc, null);
+    }
+
+    public Builder setNetworkLocation(String loc, ByteString locBytes) {
+      final String normalized = NetUtils.normalize(loc);
+      this.networkLocation = normalized.equals(loc) && locBytes != null
+          ? new StringWithByteString(normalized, locBytes)
+          : StringWithByteString.valueOf(normalized);
       return this;
     }
 
@@ -850,7 +848,7 @@ public class DatanodeDetails extends NodeImpl implements
      */
     public DatanodeDetails build() {
       Preconditions.checkNotNull(id);
-      if (networkLocation == null || networkLocation.toString().isEmpty()) {
+      if (networkLocation == null || networkLocation.getString().isEmpty()) {
         networkLocation = NetConstants.BYTE_STRING_DEFAULT_RACK;
       }
       return new DatanodeDetails(this);

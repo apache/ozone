@@ -20,29 +20,35 @@ package org.apache.hadoop.util;
 import com.google.protobuf.ByteString;
 import net.jcip.annotations.Immutable;
 
+import java.util.Objects;
+
 /**
  * Class to encapsulate and cache the conversion of a Java String to a ByteString.
  */
 @Immutable
 public final class StringWithByteString {
+  public static StringWithByteString valueOf(String string) {
+    return string != null ? new StringWithByteString(string, ByteString.copyFromUtf8(string)) : null;
+  }
+
   private final String string;
   private final ByteString bytes;
 
-  public StringWithByteString(String string) {
-    this(string, ByteString.copyFromUtf8(string));
-  }
-
   public StringWithByteString(String string, ByteString bytes) {
-    this.string = string;
-    this.bytes = bytes;
+    this.string = Objects.requireNonNull(string, "string == null");
+    this.bytes = Objects.requireNonNull(bytes, "bytes == null");
   }
 
-  @Override
-  public String toString() {
+  public String getString() {
     return string;
   }
 
   public ByteString getBytes() {
     return bytes;
+  }
+
+  @Override
+  public String toString() {
+    return getString();
   }
 }

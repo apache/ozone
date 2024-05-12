@@ -48,19 +48,19 @@ public class NodeImpl implements Node {
    * @param location this node's location
    */
   public NodeImpl(StringWithByteString name, StringWithByteString location, int cost) {
-    if (name != null && name.toString() != null && name.toString().contains(PATH_SEPARATOR_STR)) {
+    if (name != null && name.getString().contains(PATH_SEPARATOR_STR)) {
       throw new IllegalArgumentException(
           "Network location name:" + name + " should not contain " +
               PATH_SEPARATOR_STR);
     }
-    this.name = (name == null || name.toString() == null) ? BYTE_STRING_ROOT : name;
+    this.name = name == null ? BYTE_STRING_ROOT : name;
     this.location = location;
     this.path = getPath();
     this.cost = cost;
   }
 
   public NodeImpl(String name, String location, int cost) {
-    this(new StringWithByteString(name), new StringWithByteString(NetUtils.normalize(location)), cost);
+    this(StringWithByteString.valueOf(name), StringWithByteString.valueOf(NetUtils.normalize(location)), cost);
   }
 
   /**
@@ -92,7 +92,7 @@ public class NodeImpl implements Node {
    */
   @Override
   public String getNetworkName() {
-    return name.toString();
+    return name.getString();
   }
 
   /**
@@ -108,7 +108,7 @@ public class NodeImpl implements Node {
    */
   @Override
   public void setNetworkName(String networkName) {
-    this.name = new StringWithByteString(networkName);
+    this.name = StringWithByteString.valueOf(networkName);
     this.path = getPath();
   }
 
@@ -126,7 +126,7 @@ public class NodeImpl implements Node {
    */
   @Override
   public String getNetworkLocation() {
-    return location.toString();
+    return location.getString();
   }
 
   /**
@@ -142,7 +142,7 @@ public class NodeImpl implements Node {
    */
   @Override
   public void setNetworkLocation(String networkLocation) {
-    this.location = new StringWithByteString(networkLocation);
+    this.location = StringWithByteString.valueOf(networkLocation);
     this.path = getPath();
   }
 
@@ -304,8 +304,8 @@ public class NodeImpl implements Node {
   }
 
   private String getPath() {
-    return this.location.toString().equals(PATH_SEPARATOR_STR) ?
-        this.location + this.name.toString() :
-        this.location + PATH_SEPARATOR_STR + this.name.toString();
+    return this.location.getString().equals(PATH_SEPARATOR_STR) ?
+        this.location + this.name.getString() :
+        this.location + PATH_SEPARATOR_STR + this.name;
   }
 }
