@@ -12,6 +12,18 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+
+# This workflow can be called by other workflows to build Ratis.
+#
+# Inputs:
+# - Ratis repo
+# - the commit to build
+# Outputs:
+# - various version numbers that need to be provided to the Ozone build process.
+# - Ratis repository is uploaded as an artifact named `ratis-jars`
+#
+# See `intermittent-test-check.yml` as an example use of this workflow.
+
 name: build-ratis
 on:
   workflow_call:
