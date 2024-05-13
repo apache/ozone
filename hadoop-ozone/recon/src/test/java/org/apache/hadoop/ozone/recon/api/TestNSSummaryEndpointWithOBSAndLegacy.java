@@ -38,13 +38,15 @@ import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
-import org.apache.hadoop.ozone.om.helpers.BucketLayout;
-import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
+import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
+import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.recon.ReconConstants;
 import org.apache.hadoop.ozone.recon.ReconTestInjector;
+import org.apache.hadoop.ozone.recon.ReconUtils;
 import org.apache.hadoop.ozone.recon.api.handlers.BucketHandler;
 import org.apache.hadoop.ozone.recon.api.handlers.EntityHandler;
 import org.apache.hadoop.ozone.recon.api.types.BucketObjectDBInfo;
@@ -65,6 +67,7 @@ import org.apache.hadoop.ozone.recon.spi.impl.OzoneManagerServiceProviderImpl;
 import org.apache.hadoop.ozone.recon.spi.impl.StorageContainerServiceProviderImpl;
 import org.apache.hadoop.ozone.recon.tasks.NSSummaryTaskWithLegacy;
 import org.apache.hadoop.ozone.recon.tasks.NSSummaryTaskWithOBS;
+import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -109,25 +112,26 @@ import static org.mockito.Mockito.when;
  * .
  * └── vol
  *     ├── bucket1 (OBS)
- *     │   ├── file1
- *     │   ├── file2
- *     │   └── file3
+ *     │   ├── KEY_ONE
+ *     │   ├── KEY_TWO
+ *     │   └── KEY_THREE
  *     └── bucket2 (OBS)
- *         ├── file4
- *         └── file5
+ *         ├── KEY_FOUR
+ *         └── KEY_FIVE
  * └── vol2
  *     ├── bucket3 (Legacy)
- *     │   ├── file8
- *     │   ├── file9
- *     │   └── file10
+ *     │   ├── KEY_EIGHT
+ *     │   ├── KEY_NINE
+ *     │   └── KEY_TEN
  *     └── bucket4 (Legacy)
- *         └── file11
+ *         └── KEY_ELEVEN
  */
 public class TestNSSummaryEndpointWithOBSAndLegacy {
   @TempDir
   private Path temporaryFolder;
 
   private ReconOMMetadataManager reconOMMetadataManager;
+  private ReconNamespaceSummaryManager reconNamespaceSummaryManager;
   private NSSummaryEndpoint nsSummaryEndpoint;
   private OzoneConfiguration conf;
   private CommonUtils commonUtils;
@@ -374,7 +378,7 @@ public class TestNSSummaryEndpointWithOBSAndLegacy {
                 mock(StorageContainerServiceProviderImpl.class))
             .addBinding(NSSummaryEndpoint.class)
             .build();
-    ReconNamespaceSummaryManager reconNamespaceSummaryManager =
+    reconNamespaceSummaryManager =
         reconTestInjector.getInstance(ReconNamespaceSummaryManager.class);
     nsSummaryEndpoint = reconTestInjector.getInstance(NSSummaryEndpoint.class);
 
@@ -902,6 +906,54 @@ public class TestNSSummaryEndpointWithOBSAndLegacy {
     // Test path with volume, bucket, and special characters in keys
     assertEquals("volume/bucket/key$%#1/./////////key$%#2",
         OmUtils.normalizePathUptoBucket("volume/bucket/key$%#1/./////////key$%#2"));
+  }
+
+  @Test
+  public void testConstructFullPath() throws IOException {
+    OmKeyInfo keyInfo = new OmKeyInfo.Builder()
+        .setKeyName(KEY_TWO)
+        .setVolumeName(VOL)
+        .setBucketName(BUCKET_ONE)
+        .setObjectID(KEY_TWO_OBJECT_ID)
+        .build();
+    String fullPath = ReconUtils.constructFullPath(keyInfo,
+        reconNamespaceSummaryManager, reconOMMetadataManager);
+    String expectedPath = "vol/bucket1/" + KEY_TWO;
+    Assertions.assertEquals(expectedPath, fullPath);
+
+    keyInfo = new OmKeyInfo.Builder()
+        .setKeyName(KEY_FIVE)
+        .setVolumeName(VOL)
+        .setBucketName(BUCKET_TWO)
+        .setObjectID(KEY_FIVE_OBJECT_ID)
+        .build();
+    fullPath = ReconUtils.constructFullPath(keyInfo,
+        reconNamespaceSummaryManager, reconOMMetadataManager);
+    expectedPath = "vol/bucket2/" + KEY_FIVE;
+    Assertions.assertEquals(expectedPath, fullPath);
+
+    keyInfo = new OmKeyInfo.Builder()
+        .setKeyName(KEY_EIGHT)
+        .setVolumeName(VOL_TWO)
+        .setBucketName(BUCKET_THREE)
+        .setObjectID(KEY_EIGHT_OBJECT_ID)
+        .build();
+    fullPath = ReconUtils.constructFullPath(keyInfo,
+        reconNamespaceSummaryManager, reconOMMetadataManager);
+    expectedPath = "vol2/bucket3/" + KEY_EIGHT;
+    Assertions.assertEquals(expectedPath, fullPath);
+
+
+    keyInfo = new OmKeyInfo.Builder()
+        .setKeyName(KEY_ELEVEN)
+        .setVolumeName(VOL_TWO)
+        .setBucketName(BUCKET_FOUR)
+        .setObjectID(KEY_ELEVEN_OBJECT_ID)
+        .build();
+    fullPath = ReconUtils.constructFullPath(keyInfo,
+        reconNamespaceSummaryManager, reconOMMetadataManager);
+    expectedPath = "vol2/bucket4/" + KEY_ELEVEN;
+    Assertions.assertEquals(expectedPath, fullPath);
   }
 
 

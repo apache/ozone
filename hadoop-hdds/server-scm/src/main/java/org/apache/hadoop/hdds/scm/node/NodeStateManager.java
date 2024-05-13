@@ -738,7 +738,7 @@ public class NodeStateManager implements Runnable, Closeable {
    */
   public synchronized void forceNodesToHealthyReadOnly() {
     try {
-      List<DatanodeInfo> nodes = nodeStateMap.filterNodes(null, HEALTHY);
+      List<DatanodeInfo> nodes = nodeStateMap.getDatanodeInfos(null, HEALTHY);
       for (DatanodeInfo node : nodes) {
         nodeStateMap.updateNodeHealthState(node.getUuid(),
             HEALTHY_READONLY);
