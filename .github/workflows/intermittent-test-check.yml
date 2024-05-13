@@ -83,6 +83,7 @@ jobs:
       repo: ${{ github.event.inputs.ratis-repo || format('{0}/ratis', github.repository_owner) }}
       ref: ${{ github.event.inputs.ratis-ref }}
   build:
+    if: ${{ always() }}
     needs:
       - prepare-job
       - ratis
