@@ -35,7 +35,7 @@ find "." -not -path '*/iteration*' -name 'TEST*.xml' -print0 \
     > "${tempfile}"
 
 if [[ "${CHECK:-unit}" == "integration" ]]; then
-  find "." -not -path '*/iteration*' -name '*-output.txt' -print0 \
+  find hadoop-ozone/integration-test -not -path '*/iteration*' -name '*-output.txt' -print0 \
       | xargs -n1 -0 "grep" -l -E "not closed properly|was not shutdown properly" \
       | awk -F/ '{sub("-output.txt",""); print $NF}' \
       >> "${tempfile}"
@@ -81,8 +81,8 @@ for failed_test in $(< ${REPORT_DIR}/summary.txt); do
       \( -name "${failed_test}.txt" -or -name "${failed_test}-output.txt" -or -name "TEST-${failed_test}.xml" \)); do
     dir=$(dirname "${file}")
     dest_dir=$(_realpath --relative-to="${PWD}" "${dir}/../..") || continue
-    mkdir -p "${REPORT_DIR}/${dest_dir}"
-    mv "${file}" "${REPORT_DIR}/${dest_dir}"/
+    mkdir -pv "${REPORT_DIR}/${dest_dir}"
+    mv -v "${file}" "${REPORT_DIR}/${dest_dir}"/
   done
 done
 

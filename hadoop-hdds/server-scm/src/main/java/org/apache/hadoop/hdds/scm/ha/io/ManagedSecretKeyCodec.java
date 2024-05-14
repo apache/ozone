@@ -31,7 +31,7 @@ public class ManagedSecretKeyCodec implements Codec {
   public ByteString serialize(Object object)
       throws InvalidProtocolBufferException {
     ManagedSecretKey secretKey = (ManagedSecretKey) object;
-    return ByteString.copyFrom(secretKey.toProtobuf().toByteArray());
+    return secretKey.toProtobuf().toByteString();
   }
 
   @Override

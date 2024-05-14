@@ -152,7 +152,7 @@ public class TestOzoneBlockTokenSecretManager {
         .build();
 
     // THEN
-    tokenVerifier.verify("testUser", token, putBlockCommand);
+    tokenVerifier.verify(token, putBlockCommand);
   }
 
   @Test
@@ -172,7 +172,7 @@ public class TestOzoneBlockTokenSecretManager {
 
     // THEN
     BlockTokenException e = assertThrows(BlockTokenException.class,
-        () -> tokenVerifier.verify("testUser", token, writeChunkRequest));
+        () -> tokenVerifier.verify(token, writeChunkRequest));
 
     assertThat(e.getMessage()).contains("Token for ID: " +
         OzoneBlockTokenIdentifier.getTokenService(blockID) +
@@ -200,12 +200,12 @@ public class TestOzoneBlockTokenSecretManager {
         pipeline, putBlockCommand.getPutBlock());
 
     BlockTokenException e = assertThrows(BlockTokenException.class,
-        () -> tokenVerifier.verify(testUser1, token, putBlockCommand));
+        () -> tokenVerifier.verify(token, putBlockCommand));
 
     assertThat(e.getMessage())
         .contains("doesn't have WRITE permission");
 
-    tokenVerifier.verify(testUser1, token, getBlockCommand);
+    tokenVerifier.verify(token, getBlockCommand);
   }
 
   @Test
@@ -223,10 +223,10 @@ public class TestOzoneBlockTokenSecretManager {
     ContainerCommandRequestProto readChunkRequest =
         getReadChunkRequest(pipeline, writeChunkRequest.getWriteChunk());
 
-    tokenVerifier.verify(testUser2, token, writeChunkRequest);
+    tokenVerifier.verify(token, writeChunkRequest);
 
     BlockTokenException e = assertThrows(BlockTokenException.class,
-        () -> tokenVerifier.verify(testUser2, token, readChunkRequest));
+        () -> tokenVerifier.verify(token, readChunkRequest));
     assertThat(e.getMessage())
         .contains("doesn't have READ permission");
   }
@@ -243,14 +243,14 @@ public class TestOzoneBlockTokenSecretManager {
         .setEncodedToken(token.encodeToUrlString())
         .build();
 
-    tokenVerifier.verify("testUser", token, writeChunkRequest);
+    tokenVerifier.verify(token, writeChunkRequest);
 
     // Mock client with an expired cert
     ManagedSecretKey expiredSecretKey = generateExpiredSecretKey();
     when(secretKeyClient.getSecretKey(any())).thenReturn(expiredSecretKey);
 
     BlockTokenException e = assertThrows(BlockTokenException.class,
-        () -> tokenVerifier.verify(user, token, writeChunkRequest));
+        () -> tokenVerifier.verify(token, writeChunkRequest));
     assertThat(e.getMessage())
         .contains("Token can't be verified due to expired secret key");
   }

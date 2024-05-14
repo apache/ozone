@@ -124,21 +124,16 @@ import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_X509_RENEW_GRACE_DURATI
 import static org.apache.hadoop.hdds.HddsConfigKeys.OZONE_METADATA_DIRS;
 import static org.apache.hadoop.hdds.scm.ScmConfig.ConfigStrings.HDDS_SCM_KERBEROS_KEYTAB_FILE_KEY;
 import static org.apache.hadoop.hdds.scm.ScmConfig.ConfigStrings.HDDS_SCM_KERBEROS_PRINCIPAL_KEY;
-import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_BLOCK_CLIENT_PORT_DEFAULT;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_BLOCK_CLIENT_PORT_KEY;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CLIENT_ADDRESS_KEY;
-import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CLIENT_PORT_DEFAULT;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CLIENT_PORT_KEY;
-import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_DATANODE_PORT_DEFAULT;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_DATANODE_PORT_KEY;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_GRPC_PORT_KEY;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_RATIS_PORT_KEY;
-import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_SECURITY_SERVICE_PORT_DEFAULT;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_SECURITY_SERVICE_PORT_KEY;
 import static org.apache.hadoop.hdds.scm.server.SCMHTTPServerConfig.ConfigStrings.HDDS_SCM_HTTP_KERBEROS_KEYTAB_FILE_KEY;
 import static org.apache.hadoop.hdds.scm.server.SCMHTTPServerConfig.ConfigStrings.HDDS_SCM_HTTP_KERBEROS_PRINCIPAL_KEY;
 import static org.apache.hadoop.hdds.utils.HddsServerUtil.getScmSecurityClient;
-import static org.apache.hadoop.net.ServerSocketUtil.getPort;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ADMINISTRATORS;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_CLIENT_FAILOVER_MAX_ATTEMPTS_KEY;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SECURITY_ENABLED_KEY;
@@ -173,6 +168,7 @@ import org.junit.jupiter.api.io.TempDir;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import static org.apache.ozone.test.GenericTestUtils.PortAllocator.getFreePort;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -230,19 +226,14 @@ final class TestSecureOzoneCluster {
       conf = new OzoneConfiguration();
       conf.set(OZONE_SCM_CLIENT_ADDRESS_KEY, "localhost");
 
-      conf.setInt(OZONE_SCM_CLIENT_PORT_KEY,
-          getPort(OZONE_SCM_CLIENT_PORT_DEFAULT, 100));
-      conf.setInt(OZONE_SCM_DATANODE_PORT_KEY,
-          getPort(OZONE_SCM_DATANODE_PORT_DEFAULT, 100));
-      conf.setInt(OZONE_SCM_BLOCK_CLIENT_PORT_KEY,
-          getPort(OZONE_SCM_BLOCK_CLIENT_PORT_DEFAULT, 100));
-      conf.setInt(OZONE_SCM_SECURITY_SERVICE_PORT_KEY,
-          getPort(OZONE_SCM_SECURITY_SERVICE_PORT_DEFAULT, 100));
-      // use the same base ports as MiniOzoneHACluster
-      conf.setInt(OZONE_SCM_RATIS_PORT_KEY, getPort(1200, 100));
-      conf.setInt(OZONE_SCM_GRPC_PORT_KEY, getPort(1201, 100));
+      conf.setInt(OZONE_SCM_CLIENT_PORT_KEY, getFreePort());
+      conf.setInt(OZONE_SCM_DATANODE_PORT_KEY, getFreePort());
+      conf.setInt(OZONE_SCM_BLOCK_CLIENT_PORT_KEY, getFreePort());
+      conf.setInt(OZONE_SCM_SECURITY_SERVICE_PORT_KEY, getFreePort());
+      conf.setInt(OZONE_SCM_RATIS_PORT_KEY, getFreePort());
+      conf.setInt(OZONE_SCM_GRPC_PORT_KEY, getFreePort());
       conf.set(OZONE_OM_ADDRESS_KEY,
-          InetAddress.getLocalHost().getCanonicalHostName() + ":1202");
+          InetAddress.getLocalHost().getCanonicalHostName() + ":" + getFreePort());
       conf.setBoolean(ScmConfigKeys.OZONE_SCM_HA_ENABLE_KEY, false);
 
       DefaultMetricsSystem.setMiniClusterMode(true);
@@ -281,7 +272,7 @@ final class TestSecureOzoneCluster {
   }
 
   @AfterEach
-  void stop() {
+  void stop() throws Exception {
     try {
       stopMiniKdc();
       if (scm != null) {
@@ -882,11 +873,16 @@ final class TestSecureOzoneCluster {
       assertThat(logOutput)
           .doesNotContain("Successfully stored SCM signed certificate");
 
+      if (om.stop()) {
+        om.join();
+      }
+
       conf.setBoolean(OZONE_SECURITY_ENABLED_KEY, true);
       conf.setBoolean(OZONE_OM_S3_GPRC_SERVER_ENABLED, true);
+      conf.set(OZONE_OM_ADDRESS_KEY,
+          InetAddress.getLocalHost().getCanonicalHostName() + ":" + getFreePort());
 
       OzoneManager.omInit(conf);
-      om.stop();
       om = OzoneManager.createOm(conf);
 
       assertNotNull(om.getCertificateClient());

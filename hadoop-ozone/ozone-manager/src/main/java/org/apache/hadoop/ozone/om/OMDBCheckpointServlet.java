@@ -27,6 +27,7 @@ import org.apache.hadoop.hdds.recon.ReconConfig;
 import org.apache.hadoop.hdds.utils.DBCheckpointServlet;
 import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
 import org.apache.hadoop.hdds.utils.db.RDBCheckpointUtils;
+import org.apache.hadoop.hdds.utils.db.RDBStore;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.ozone.OzoneConsts;
@@ -221,43 +222,24 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
   }
 
   /**
-   * Pauses rocksdb compaction threads while creating copies of
-   * compaction logs and hard links of sst backups.
+   * Copies compaction logs and hard links of sst backups to tmpDir.
    * @param  tmpdir - Place to create copies/links
    * @param  flush -  Whether to flush the db or not.
    * @return Checkpoint containing snapshot entries expected.
    */
   @Override
-  public DBCheckpoint getCheckpoint(Path tmpdir, boolean flush)
-      throws IOException {
-    DBCheckpoint checkpoint;
-
+  public DBCheckpoint getCheckpoint(Path tmpdir, boolean flush) throws IOException {
     // make tmp directories to contain the copies
     RocksDBCheckpointDiffer differ = getDbStore().getRocksDBCheckpointDiffer();
-    DirectoryData sstBackupDir = new DirectoryData(tmpdir,
-        differ.getSSTBackupDir());
-    DirectoryData compactionLogDir = new DirectoryData(tmpdir,
-        differ.getCompactionLogDir());
+    DirectoryData sstBackupDir = new DirectoryData(tmpdir, differ.getSSTBackupDir());
+    DirectoryData compactionLogDir = new DirectoryData(tmpdir, differ.getCompactionLogDir());
 
-    long startTime = System.currentTimeMillis();
-    long pauseCounter = PAUSE_COUNTER.incrementAndGet();
+    // Create checkpoint and then copy the files so that it has all the compaction entries and files.
+    DBCheckpoint dbCheckpoint = getDbStore().getCheckpoint(flush);
+    FileUtils.copyDirectory(compactionLogDir.getOriginalDir(), compactionLogDir.getTmpDir());
+    OmSnapshotUtils.linkFiles(sstBackupDir.getOriginalDir(), sstBackupDir.getTmpDir());
 
-    try {
-      LOG.info("Compaction pausing {} started.", pauseCounter);
-      // Pause compactions, Copy/link files and get checkpoint.
-      differ.incrementTarballRequestCount();
-      FileUtils.copyDirectory(compactionLogDir.getOriginalDir(),
-          compactionLogDir.getTmpDir());
-      OmSnapshotUtils.linkFiles(sstBackupDir.getOriginalDir(),
-          sstBackupDir.getTmpDir());
-      checkpoint = getDbStore().getCheckpoint(flush);
-    } finally {
-      // Unpause the compaction threads.
-      differ.decrementTarballRequestCountAndNotify();
-      long elapsedTime = System.currentTimeMillis() - startTime;
-      LOG.info("Compaction pausing {} ended. Elapsed ms: {}", pauseCounter, elapsedTime);
-    }
-    return checkpoint;
+    return dbCheckpoint;
   }
 
 
@@ -317,8 +299,7 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
 
     // Get the snapshot files.
     Set<Path> snapshotPaths = waitForSnapshotDirs(checkpoint);
-    Path snapshotDir = Paths.get(OMStorage.getOmDbDir(getConf()).toString(),
-        OM_SNAPSHOT_DIR);
+    Path snapshotDir = getSnapshotDir();
     if (!processDir(snapshotDir, copyFiles, hardLinkFiles, sstFilesToExclude,
         snapshotPaths, excluded, copySize, null)) {
       return false;
@@ -633,6 +614,15 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
     return ((OzoneManager) getServletContext()
         .getAttribute(OzoneConsts.OM_CONTEXT_ATTRIBUTE))
         .getConfiguration();
+  }
+
+  private Path getSnapshotDir() {
+    OzoneManager om = (OzoneManager) getServletContext().getAttribute(OzoneConsts.OM_CONTEXT_ATTRIBUTE);
+    RDBStore store = (RDBStore) om.getMetadataManager().getStore();
+    // store.getSnapshotsParentDir() returns path to checkpointState (e.g. <om-data-dir>/db.snapshots/checkpointState)
+    // But we need to return path till db.snapshots which contains checkpointState and diffState.
+    // So that whole snapshots and compaction information can be transferred to follower.
+    return Paths.get(store.getSnapshotsParentDir()).getParent();
   }
 
   @Override

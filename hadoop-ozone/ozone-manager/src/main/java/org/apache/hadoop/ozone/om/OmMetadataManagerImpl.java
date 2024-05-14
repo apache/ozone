@@ -850,9 +850,9 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
 
   @Override
   public String getOpenKey(String volume, String bucket,
-                           String key, long id) {
+                           String key, String clientId) {
     String openKey = OM_KEY_PREFIX + volume + OM_KEY_PREFIX + bucket +
-        OM_KEY_PREFIX + key + OM_KEY_PREFIX + id;
+        OM_KEY_PREFIX + key + OM_KEY_PREFIX + clientId;
     return openKey;
   }
 
@@ -890,40 +890,6 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
   @Override
   public long getOmEpoch() {
     return omEpoch;
-  }
-
-  /**
-   * Returns true if the firstArray startsWith the bytes of secondArray.
-   *
-   * @param firstArray - Byte array
-   * @param secondArray - Byte array
-   * @return true if the first array bytes match the bytes in the second array.
-   */
-  private boolean startsWith(byte[] firstArray, byte[] secondArray) {
-
-    if (firstArray == null) {
-      // if both are null, then the arrays match, else if first is null and
-      // second is not, then this function returns false.
-      return secondArray == null;
-    }
-
-
-    if (secondArray != null) {
-      // If the second array is longer then first array cannot be starting with
-      // the bytes of second array.
-      if (secondArray.length > firstArray.length) {
-        return false;
-      }
-
-      for (int ndx = 0; ndx < secondArray.length; ndx++) {
-        if (firstArray[ndx] != secondArray[ndx]) {
-          return false;
-        }
-      }
-      return true; //match, return true.
-    }
-    return false; // if first is not null and second is null, we define that
-    // array does not start with same chars.
   }
 
   /**
@@ -2064,13 +2030,13 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
   @Override
   public String getOpenFileName(long volumeId, long bucketId,
                                 long parentID, String fileName,
-                                long id) {
+                                String clientId) {
     StringBuilder openKey = new StringBuilder();
     openKey.append(OM_KEY_PREFIX).append(volumeId);
     openKey.append(OM_KEY_PREFIX).append(bucketId);
     openKey.append(OM_KEY_PREFIX).append(parentID);
     openKey.append(OM_KEY_PREFIX).append(fileName);
-    openKey.append(OM_KEY_PREFIX).append(id);
+    openKey.append(OM_KEY_PREFIX).append(clientId);
     return openKey.toString();
   }
 

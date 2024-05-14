@@ -17,9 +17,11 @@
  */
 package org.apache.hadoop.ozone.recon.api.handlers;
 
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
 import org.apache.hadoop.hdds.utils.db.Table;
+import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
@@ -163,6 +165,8 @@ public abstract class BucketHandler {
                 ReconOMMetadataManager omMetadataManager,
                 OzoneStorageContainerManager reconSCM,
                 OmBucketInfo bucketInfo) throws IOException {
+    // Check if enableFileSystemPaths flag is set to true.
+    boolean enableFileSystemPaths = isEnableFileSystemPaths(omMetadataManager);
 
     // If bucketInfo is null then entity type is UNKNOWN
     if (Objects.isNull(bucketInfo)) {
@@ -172,10 +176,17 @@ public abstract class BucketHandler {
           .equals(BucketLayout.FILE_SYSTEM_OPTIMIZED)) {
         return new FSOBucketHandler(reconNamespaceSummaryManager,
             omMetadataManager, reconSCM, bucketInfo);
-      } else if (bucketInfo.getBucketLayout()
-          .equals(BucketLayout.LEGACY)) {
-        return new LegacyBucketHandler(reconNamespaceSummaryManager,
-            omMetadataManager, reconSCM, bucketInfo);
+      } else if (bucketInfo.getBucketLayout().equals(BucketLayout.LEGACY)) {
+        // Choose handler based on enableFileSystemPaths flag for legacy layout.
+        // If enableFileSystemPaths is false, then the legacy bucket is treated
+        // as an OBS bucket.
+        if (enableFileSystemPaths) {
+          return new LegacyBucketHandler(reconNamespaceSummaryManager,
+              omMetadataManager, reconSCM, bucketInfo);
+        } else {
+          return new OBSBucketHandler(reconNamespaceSummaryManager,
+              omMetadataManager, reconSCM, bucketInfo);
+        }
       } else if (bucketInfo.getBucketLayout()
           .equals(BucketLayout.OBJECT_STORE)) {
         return new OBSBucketHandler(reconNamespaceSummaryManager,
@@ -186,6 +197,22 @@ public abstract class BucketHandler {
         return null;
       }
     }
+  }
+
+  /**
+   * Determines whether FileSystemPaths are enabled for Legacy Buckets
+   * based on the Ozone configuration.
+   *
+   * @param ReconOMMetadataManager Instance
+   * @return True if FileSystemPaths are enabled, false otherwise.
+   */
+  private static boolean isEnableFileSystemPaths(ReconOMMetadataManager omMetadataManager) {
+    OzoneConfiguration configuration = omMetadataManager.getOzoneConfiguration();
+    if (configuration == null) {
+      configuration = new OzoneConfiguration();
+    }
+    return configuration.getBoolean(OMConfigKeys.OZONE_OM_ENABLE_FILESYSTEM_PATHS,
+        OMConfigKeys.OZONE_OM_ENABLE_FILESYSTEM_PATHS_DEFAULT);
   }
 
   public static BucketHandler getBucketHandler(

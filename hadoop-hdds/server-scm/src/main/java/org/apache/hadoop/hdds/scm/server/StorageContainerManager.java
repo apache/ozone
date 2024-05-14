@@ -845,7 +845,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
           pipelineManager, eventQueue, serviceManager, scmContext);
     }
 
-    scmDecommissionManager = new NodeDecommissionManager(conf, scmNodeManager,
+    scmDecommissionManager = new NodeDecommissionManager(conf, scmNodeManager, containerManager,
         scmContext, eventQueue, replicationManager);
 
     statefulServiceStateManager = StatefulServiceStateManagerImpl.newBuilder()
@@ -1796,6 +1796,10 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     ExitUtils.terminate(0, message, LOG);
   }
 
+  public boolean isStopped() {
+    return isStopped.get();
+  }
+
   /**
    * Wait until service has completed shutdown.
    */
@@ -1979,6 +1983,11 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     return scmSafeModeManager.getInSafeMode();
   }
 
+  @Override
+  public boolean isSafeModeExitForceful() {
+    return scmSafeModeManager.isForceExitSafeMode();
+  }
+
   /**
    * Returns EventPublisher.
    */
@@ -2011,7 +2020,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
    * Force SCM out of safe mode.
    */
   public boolean exitSafeMode() {
-    scmSafeModeManager.exitSafeMode(eventQueue);
+    scmSafeModeManager.exitSafeMode(eventQueue, true);
     return true;
   }
 

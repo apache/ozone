@@ -18,6 +18,7 @@
 package org.apache.hadoop.hdds.scm.ha.io;
 
 import com.google.protobuf.ByteString;
+import com.google.protobuf.Proto2Utils;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 
@@ -27,7 +28,8 @@ import static java.nio.charset.StandardCharsets.UTF_8;
 public class StringCodec implements Codec {
   @Override
   public ByteString serialize(Object object) {
-    return ByteString.copyFrom(((String) object).getBytes(UTF_8));
+    // getBytes returns a new array
+    return Proto2Utils.unsafeByteString(((String) object).getBytes(UTF_8));
   }
 
   @Override

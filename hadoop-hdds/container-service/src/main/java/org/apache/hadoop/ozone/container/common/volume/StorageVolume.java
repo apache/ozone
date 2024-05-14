@@ -456,11 +456,6 @@ public abstract class StorageVolume
 
   }
 
-  public long getAvailable(SpaceUsageSource precomputedVolumeSpace) {
-    return volumeInfo.map(info -> info.getAvailable(precomputedVolumeSpace))
-        .orElse(0L);
-  }
-
   public SpaceUsageSource getCurrentUsage() {
     return volumeInfo.map(VolumeInfo::getCurrentUsage)
         .orElse(SpaceUsageSource.UNKNOWN);

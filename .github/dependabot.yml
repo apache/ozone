@@ -14,28 +14,11 @@
 # limitations under the License.
 version: 2
 updates:
-  # Maintain dependencies for GitHub Actions
-  - package-ecosystem: "npm"
-    directory: "hadoop-ozone/recon/src/main/resources/webapps/recon/ozone-recon-web/"
-    schedule:
-      interval: "weekly"
-    commit-message:
-      prefix: "[Recon] Dependabot Package Upgrade: "
-    groups:
-      minor-updates:
-        patterns:
-          - "*"
-        update-types:
-          - "minor"
-          - "patch"
+  - package-ecosystem: maven
+    directory: "/"
     ignore:
       - dependency-name: "*"
         update-types: ["version-update:semver-major"]
-    pull-request-branch-name:
-      separator: "-"
-
-  - package-ecosystem: maven
-    directory: "/"
     schedule:
       interval: "weekly"
       day: "saturday"

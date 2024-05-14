@@ -221,7 +221,7 @@ public class BlockManagerImpl implements BlockManager {
     long containerBCSId = containerData.getBlockCommitSequenceId();
     if (containerBCSId < bcsId) {
       throw new StorageContainerException(
-          "Unable to find the block with bcsID " + bcsId + " .Container "
+          "Unable to find the block with bcsID " + bcsId + ". Container "
               + containerData.getContainerID() + " bcsId is "
               + containerBCSId + ".", UNKNOWN_BCSID);
     }

@@ -21,8 +21,6 @@
 CONTRIBUTING.md
 README.md
 SECURITY.md
-dev-support/ci/bats-assert/**
-dev-support/ci/bats-support/**
 
 # hadoop-hdds/interface-client
 src/main/resources/proto.lock
