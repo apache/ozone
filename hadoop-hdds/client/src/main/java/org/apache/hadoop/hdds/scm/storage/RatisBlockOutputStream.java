@@ -30,7 +30,6 @@ import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.ozone.common.ChunkBuffer;
 import org.apache.hadoop.security.token.Token;
 import org.apache.hadoop.security.token.TokenIdentifier;
-import org.apache.hadoop.util.DirectBufferPool;
 
 import java.io.IOException;
 import java.io.OutputStream;
@@ -77,14 +76,13 @@ public class RatisBlockOutputStream extends BlockOutputStream
       XceiverClientFactory xceiverClientManager,
       Pipeline pipeline,
       BufferPool bufferPool,
-      DirectBufferPool directBufferPool,
       OzoneClientConfig config,
       Token<? extends TokenIdentifier> token,
       ContainerClientMetrics clientMetrics, StreamBufferArgs streamBufferArgs,
       Supplier<ExecutorService> blockOutputStreamResourceProvider
   ) throws IOException {
     super(blockID, xceiverClientManager, pipeline,
-        bufferPool, directBufferPool, config, token, clientMetrics,
+        bufferPool, config, token, clientMetrics,
         streamBufferArgs, blockOutputStreamResourceProvider);
     this.commitWatcher = new CommitWatcher(bufferPool, getXceiverClient());
   }

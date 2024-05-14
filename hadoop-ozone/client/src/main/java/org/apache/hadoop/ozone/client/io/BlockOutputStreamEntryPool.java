@@ -46,7 +46,6 @@ import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
-import org.apache.hadoop.util.DirectBufferPool;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -82,7 +81,6 @@ public class BlockOutputStreamEntryPool implements KeyMetadataAware {
    * the entries in the pool.
    */
   private final BufferPool bufferPool;
-  private static final DirectBufferPool DIRECT_BUFFER_POOL = new DirectBufferPool();
   private OmMultipartCommitUploadPartInfo commitUploadPartInfo;
   private final long openID;
   private final ExcludeList excludeList;
@@ -165,7 +163,6 @@ public class BlockOutputStreamEntryPool implements KeyMetadataAware {
             .setConfig(config)
             .setLength(subKeyInfo.getLength())
             .setBufferPool(bufferPool)
-            .setDirectBufferPool(DIRECT_BUFFER_POOL)
             .setToken(subKeyInfo.getToken())
             .setClientMetrics(clientMetrics)
             .setStreamBufferArgs(streamBufferArgs)
@@ -226,10 +223,6 @@ public class BlockOutputStreamEntryPool implements KeyMetadataAware {
    */
   public BufferPool getBufferPool() {
     return this.bufferPool;
-  }
-
-  public DirectBufferPool getDirectBufferPool() {
-    return this.DIRECT_BUFFER_POOL;
   }
 
   OzoneClientConfig getConfig() {

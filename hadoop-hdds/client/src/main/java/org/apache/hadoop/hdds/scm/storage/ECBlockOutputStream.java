@@ -34,7 +34,6 @@ import org.apache.hadoop.ozone.common.ChunkBuffer;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.security.token.Token;
 import org.apache.hadoop.security.token.TokenIdentifier;
-import org.apache.hadoop.util.DirectBufferPool;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 
 import java.io.IOException;
@@ -76,14 +75,13 @@ public class ECBlockOutputStream extends BlockOutputStream {
       XceiverClientFactory xceiverClientManager,
       Pipeline pipeline,
       BufferPool bufferPool,
-      DirectBufferPool directBufferPool,
       OzoneClientConfig config,
       Token<? extends TokenIdentifier> token,
       ContainerClientMetrics clientMetrics, StreamBufferArgs streamBufferArgs,
       Supplier<ExecutorService> executorServiceSupplier
   ) throws IOException {
-    super(blockID, xceiverClientManager, pipeline, bufferPool, directBufferPool,
-        config, token, clientMetrics, streamBufferArgs, executorServiceSupplier);
+    super(blockID, xceiverClientManager,
+        pipeline, bufferPool, config, token, clientMetrics, streamBufferArgs, executorServiceSupplier);
     // In EC stream, there will be only one node in pipeline.
     this.datanodeDetails = pipeline.getClosestNode();
   }

@@ -50,7 +50,6 @@ import org.apache.hadoop.ozone.client.io.ECBlockReconstructedStripeInputStream;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
 import org.apache.hadoop.security.token.Token;
-import org.apache.hadoop.util.DirectBufferPool;
 import org.apache.ratis.util.MemoizedSupplier;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -116,7 +115,6 @@ public class ECReconstructionCoordinator implements Closeable {
   private final ECReconstructionMetrics metrics;
   private final StateContext context;
   private final OzoneClientConfig ozoneClientConfig;
-  private static final DirectBufferPool DIRECT_BUFFER_POOL = new DirectBufferPool();
 
   public ECReconstructionCoordinator(
       ConfigurationSource conf, CertificateClient certificateClient,
@@ -233,7 +231,7 @@ public class ECReconstructionCoordinator implements Closeable {
         containerOperationClient.getXceiverClientManager(),
         containerOperationClient.singleNodePipeline(datanodeDetails,
             repConfig, replicaIndex),
-        BufferPool.empty(), DIRECT_BUFFER_POOL, ozoneClientConfig,
+        BufferPool.empty(), ozoneClientConfig,
         blockLocationInfo.getToken(), clientMetrics, streamBufferArgs, ecReconstructWriteExecutor);
   }
 

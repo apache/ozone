@@ -105,7 +105,7 @@ public class BlockOutputStream extends OutputStream {
   private int chunkIndex;
   private final AtomicLong chunkOffset = new AtomicLong();
   private final BufferPool bufferPool;
-  private final DirectBufferPool directBufferPool;
+  private static final DirectBufferPool DIRECT_BUFFER_POOL = new DirectBufferPool();
   // The IOException will be set by response handling thread in case there is an
   // exception received in the response. If the exception is set, the next
   // request will fail upfront.
@@ -160,7 +160,6 @@ public class BlockOutputStream extends OutputStream {
       XceiverClientFactory xceiverClientManager,
       Pipeline pipeline,
       BufferPool bufferPool,
-      DirectBufferPool directBufferPool,
       OzoneClientConfig config,
       Token<? extends TokenIdentifier> token,
       ContainerClientMetrics clientMetrics, StreamBufferArgs streamBufferArgs,
@@ -181,13 +180,12 @@ public class BlockOutputStream extends OutputStream {
     if (replicationIndex > 0) {
       blkIDBuilder.setReplicaIndex(replicationIndex);
     }
-    this.directBufferPool = directBufferPool;
     this.containerBlockData = BlockData.newBuilder().setBlockID(
         blkIDBuilder.build()).addMetadata(keyValue);
     // tell DataNode I will send incremental chunk list
     if (config.getIncrementalChunkList()) {
       this.containerBlockData.addMetadata(INCREMENTAL_CHUNK_LIST_KV);
-      this.lastChunkBuffer = this.directBufferPool.getBuffer(config.getStreamBufferSize());
+      this.lastChunkBuffer = DIRECT_BUFFER_POOL.getBuffer(config.getStreamBufferSize());
       this.lastChunkOffset = 0;
     } else {
       this.lastChunkBuffer = null;
@@ -712,7 +710,7 @@ public class BlockOutputStream extends OutputStream {
     }
     bufferList = null;
     if (lastChunkBuffer != null) {
-      directBufferPool.returnBuffer(lastChunkBuffer);
+      DIRECT_BUFFER_POOL.returnBuffer(lastChunkBuffer);
     }
   }
 

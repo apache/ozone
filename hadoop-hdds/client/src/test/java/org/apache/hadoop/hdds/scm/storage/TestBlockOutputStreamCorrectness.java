@@ -43,7 +43,6 @@ import org.apache.hadoop.hdds.scm.XceiverClientSpi;
 import org.apache.hadoop.hdds.scm.pipeline.MockPipeline;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.ozone.OzoneConsts;
-import org.apache.hadoop.util.DirectBufferPool;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
@@ -102,13 +101,11 @@ class TestBlockOutputStreamCorrectness {
     config.setBytesPerChecksum(256 * 1024);
     StreamBufferArgs streamBufferArgs =
         StreamBufferArgs.getDefaultStreamBufferArgs(pipeline.getReplicationConfig(), config);
-    DirectBufferPool directBufferPool = config.getIncrementalChunkList() ? new DirectBufferPool() : null;
     return new RatisBlockOutputStream(
         new BlockID(1L, 1L),
         xcm,
         pipeline,
         bufferPool,
-        directBufferPool,
         config,
         null,
         ContainerClientMetrics.acquire(),
