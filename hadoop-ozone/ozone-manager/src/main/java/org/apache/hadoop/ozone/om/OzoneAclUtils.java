@@ -83,8 +83,6 @@ public final class OzoneAclUtils {
       String bucketOwner, UserGroupInformation user, InetAddress remoteAddress,
       String hostName) throws IOException {
 
-    boolean isVolOwner = isOwner(user, volOwner);
-
     switch (resType) {
     //For Volume level access we only need to check {OWNER} equal
     // to Volume Owner.
@@ -100,7 +98,7 @@ public final class OzoneAclUtils {
     // volume owner if current ugi user is volume owner else we need check
     //{OWNER} equals bucket owner for bucket/key/prefix.
     case PREFIX:
-      if (isVolOwner) {
+      if (isOwner(user, volOwner)) {
         omMetadataReader.checkAcls(resType, storeType,
             aclType, vol, bucket, key,
             user, remoteAddress, hostName, true,
@@ -184,12 +182,6 @@ public final class OzoneAclUtils {
 
   private static boolean isOwner(UserGroupInformation callerUgi,
       String ownerName) {
-    if (ownerName == null) {
-      return false;
-    }
-    if (callerUgi.getShortUserName().equals(ownerName)) {
-      return true;
-    }
-    return false;
+    return ownerName != null && ownerName.equals(callerUgi.getShortUserName());
   }
 }
