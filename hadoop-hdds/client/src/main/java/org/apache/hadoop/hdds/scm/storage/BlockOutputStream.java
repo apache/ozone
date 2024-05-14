@@ -232,7 +232,7 @@ public class BlockOutputStream extends OutputStream {
     }
     return true;
   }
-  
+
   void refreshCurrentBuffer() {
     currentBuffer = bufferPool.getCurrentBuffer();
     currentBufferRemaining =
@@ -696,7 +696,7 @@ public class BlockOutputStream extends OutputStream {
   void cleanup() {
   }
 
-  public void cleanup(boolean invalidateClient) throws IOException {
+  public void cleanup(boolean invalidateClient) {
     if (xceiverClientFactory != null) {
       xceiverClientFactory.releaseClient(xceiverClient, invalidateClient);
     }
