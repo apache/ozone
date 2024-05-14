@@ -232,8 +232,7 @@ public class BlockOutputStream extends OutputStream {
     }
     return true;
   }
-
-
+  
   void refreshCurrentBuffer() {
     currentBuffer = bufferPool.getCurrentBuffer();
     currentBufferRemaining =

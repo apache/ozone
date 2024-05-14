@@ -82,8 +82,7 @@ public class RatisBlockOutputStream extends BlockOutputStream
       Supplier<ExecutorService> blockOutputStreamResourceProvider
   ) throws IOException {
     super(blockID, xceiverClientManager, pipeline,
-        bufferPool, config, token, clientMetrics,
-        streamBufferArgs, blockOutputStreamResourceProvider);
+        bufferPool, config, token, clientMetrics, streamBufferArgs, blockOutputStreamResourceProvider);
     this.commitWatcher = new CommitWatcher(bufferPool, getXceiverClient());
   }
 

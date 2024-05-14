@@ -101,6 +101,7 @@ class TestBlockOutputStreamCorrectness {
     config.setBytesPerChecksum(256 * 1024);
     StreamBufferArgs streamBufferArgs =
         StreamBufferArgs.getDefaultStreamBufferArgs(pipeline.getReplicationConfig(), config);
+
     return new RatisBlockOutputStream(
         new BlockID(1L, 1L),
         xcm,
