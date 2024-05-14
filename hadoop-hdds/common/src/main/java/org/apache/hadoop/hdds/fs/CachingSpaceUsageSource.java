@@ -21,6 +21,8 @@ import com.google.common.base.Preconditions;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.annotation.InterfaceStability;
+import org.apache.ratis.util.AutoCloseableLock;
+import org.apache.ratis.util.AutoCloseableReadWriteLock;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -31,7 +33,6 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.atomic.AtomicLong;
 
 import static java.util.concurrent.TimeUnit.MILLISECONDS;
 
@@ -46,9 +47,10 @@ public class CachingSpaceUsageSource implements SpaceUsageSource {
       LoggerFactory.getLogger(CachingSpaceUsageSource.class);
 
   private final ScheduledExecutorService executor;
-  private final AtomicLong cachedUsedSpace = new AtomicLong();
-  private final AtomicLong cachedAvailable = new AtomicLong();
-  private final AtomicLong cachedCapacity = new AtomicLong();
+  private final AutoCloseableReadWriteLock lock;
+  private long cachedUsedSpace;
+  private long cachedAvailable;
+  private long cachedCapacity;
   private final Duration refresh;
   private final SpaceUsageSource source;
   private final SpaceUsagePersistence persistence;
@@ -66,6 +68,7 @@ public class CachingSpaceUsageSource implements SpaceUsageSource {
 
     refresh = params.getRefresh();
     source = params.getSource();
+    lock = new AutoCloseableReadWriteLock(source.toString());
     persistence = params.getPersistence();
     this.executor = executor;
     isRefreshRunning = new AtomicBoolean();
@@ -78,45 +81,65 @@ public class CachingSpaceUsageSource implements SpaceUsageSource {
 
   @Override
   public long getCapacity() {
-    return cachedCapacity.get();
+    try (AutoCloseableLock ignored = lock.readLock(null, null)) {
+      return cachedCapacity;
+    }
   }
 
   @Override
   public long getAvailable() {
-    return cachedAvailable.get();
+    try (AutoCloseableLock ignored = lock.readLock(null, null)) {
+      return cachedAvailable;
+    }
   }
 
   @Override
   public long getUsedSpace() {
-    return cachedUsedSpace.get();
+    try (AutoCloseableLock ignored = lock.readLock(null, null)) {
+      return cachedUsedSpace;
+    }
+  }
+
+  @Override
+  public SpaceUsageSource snapshot() {
+    try (AutoCloseableLock ignored = lock.readLock(null, null)) {
+      return new Fixed(cachedCapacity, cachedAvailable, cachedUsedSpace);
+    }
   }
 
   public void incrementUsedSpace(long usedSpace) {
-    cachedUsedSpace.addAndGet(usedSpace);
-    cachedAvailable.addAndGet(-usedSpace);
+    final long current, change;
+    try (AutoCloseableLock ignored = lock.writeLock(null, null)) {
+      current = cachedAvailable;
+      change = Math.min(current, usedSpace);
+      cachedAvailable -= change;
+      cachedUsedSpace += change;
+    }
+
+    if (change != usedSpace) {
+      LOG.warn("Attempted to decrement available space to a negative value. Current: {}, Decrement: {}, Source: {}",
+          current, usedSpace, source);
+    }
   }
 
   public void decrementUsedSpace(long reclaimedSpace) {
-    cachedUsedSpace.updateAndGet(current -> {
-      long newValue = current - reclaimedSpace;
-      if (newValue < 0) {
-        if (current > 0) {
-          LOG.warn("Attempted to decrement used space to a negative value. " +
-                  "Current: {}, Decrement: {}, Source: {}",
-              current, reclaimedSpace, source);
-        }
-        return 0;
-      } else {
-        return newValue;
-      }
-    });
-    // FIXME check for negative
-    cachedAvailable.addAndGet(reclaimedSpace);
+    final long current, change;
+    try (AutoCloseableLock ignored = lock.writeLock(null, null)) {
+      current = cachedUsedSpace;
+      change = Math.min(current, reclaimedSpace);
+      cachedUsedSpace -= change;
+      cachedAvailable += change;
+    }
+
+    if (change != reclaimedSpace) {
+      LOG.warn("Attempted to decrement used space to a negative value. Current: {}, Decrement: {}, Source: {}",
+          current, reclaimedSpace, source);
+    }
   }
 
   public void start() {
     if (executor != null) {
-      long initialDelay = cachedUsedSpace.get() > 0 ? refresh.toMillis() : 0;
+      long initialDelay = getUsedSpace() > 0 ? refresh.toMillis() : 0;
       if (!running) {
         scheduledFuture = executor.scheduleWithFixedDelay(
             this::refresh, initialDelay, refresh.toMillis(), MILLISECONDS);
@@ -147,21 +170,25 @@ public class CachingSpaceUsageSource implements SpaceUsageSource {
 
   private void loadInitialValue() {
     final OptionalLong initialValue = persistence.load();
-    initialValue.ifPresent(cachedUsedSpace::set);
-    updateAvailableSpace();
+    updateCachedValues(initialValue.orElse(0));
   }
 
-  private void updateAvailableSpace() {
-    cachedCapacity.set(source.getCapacity());
-    cachedAvailable.set(source.getAvailable());
+  private void updateCachedValues(long used) {
+    final long capacity = source.getCapacity();
+    final long available = source.getAvailable();
+
+    try (AutoCloseableLock ignored = lock.writeLock(null, null)) {
+      cachedAvailable = available;
+      cachedCapacity = capacity;
+      cachedUsedSpace = used;
+    }
   }
 
   private void refresh() {
     //only one `refresh` can be running at a certain moment
     if (isRefreshRunning.compareAndSet(false, true)) {
       try {
-        updateAvailableSpace();
-        cachedUsedSpace.set(source.getUsedSpace());
+        updateCachedValues(source.getUsedSpace());
       } catch (RuntimeException e) {
         LOG.warn("Error refreshing space usage for {}", source, e);
       } finally {
