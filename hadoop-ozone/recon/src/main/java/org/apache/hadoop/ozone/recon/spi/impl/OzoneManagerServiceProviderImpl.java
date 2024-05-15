@@ -28,6 +28,7 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.attribute.PosixFilePermission;
 import java.nio.file.attribute.PosixFilePermissions;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.Executors;
@@ -35,6 +36,7 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.stream.Collectors;
 
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import org.apache.hadoop.hdds.recon.ReconConfigKeys;
@@ -69,6 +71,8 @@ import org.apache.hadoop.util.Time;
 
 import com.google.common.annotations.VisibleForTesting;
 import org.apache.commons.io.FileUtils;
+
+import static org.apache.hadoop.hdds.recon.ReconConfigKeys.OZONE_RECON_DB_DIRS_PERMISSIONS_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_DB_CHECKPOINT_REQUEST_FLUSH;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_DB_CHECKPOINT_HTTP_ENDPOINT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_HTTP_AUTH_TYPE;
@@ -87,6 +91,7 @@ import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.RECON_OM_DELTA
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.RECON_OM_DELTA_UPDATE_LIMIT_DEFUALT;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.RECON_OM_DELTA_UPDATE_LOOP_LIMIT;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.RECON_OM_DELTA_UPDATE_LOOP_LIMIT_DEFUALT;
+import static org.apache.hadoop.ozone.recon.ReconUtils.convertNumericToSymbolic;
 import static org.apache.ratis.proto.RaftProtos.RaftPeerRole.LEADER;
 
 import org.hadoop.ozone.recon.schema.tables.daos.ReconTaskStatusDao;
@@ -369,8 +374,7 @@ public class OzoneManagerServiceProviderImpl
         return null;
       });
       // Untar the checkpoint file.
-      Path untarredDbDir = Paths.get(omSnapshotDBParentDir.getAbsolutePath(),
-          snapshotFileName);
+      Path untarredDbDir = Paths.get(omSnapshotDBParentDir.getAbsolutePath(), snapshotFileName);
       reconUtils.untarCheckpointFile(targetFile, untarredDbDir);
       FileUtils.deleteQuietly(targetFile);
 
@@ -380,7 +384,11 @@ public class OzoneManagerServiceProviderImpl
         LOG.warn("No SST files found in the OM snapshot directory: {}", untarredDbDir);
         return null;
       }
-      LOG.info("Valid OM snapshot with SST files found at: {}", untarredDbDir);
+
+      List<String> sstFileNames = Arrays.stream(sstFiles)
+          .map(File::getName)
+          .collect(Collectors.toList());
+      LOG.debug("Valid SST files found: {}", sstFileNames);
 
       // Currently, OM DB type is not configurable. Hence, defaulting to
       // RocksDB.
@@ -594,36 +602,34 @@ public class OzoneManagerServiceProviderImpl
     return true;
   }
 
-  private void checkAndValidateReconDbPermissions() {
-    File dbDir = new File(omSnapshotDBParentDir.getPath());
+  public void checkAndValidateReconDbPermissions() {
+    File dbDir = new File(configuration.get(omSnapshotDBParentDir.getPath()));
     if (!dbDir.exists()) {
       LOG.error("Recon DB directory does not exist: {}", dbDir.getAbsolutePath());
       return;
     }
 
     try {
-      // Fetch expected permissions from configuration
+      // Fetch expected minimum permissions from configuration
       String expectedPermissions =
-          ServerUtils.getPermissions(ReconConfigKeys.OZONE_RECON_DB_DIR, configuration);
-      String expectedPermissionsSymbolic =
-          ReconUtils.convertNumericToSymbolic(expectedPermissions);
+          configuration.get(ReconConfigKeys.OZONE_RECON_DB_DIRS_PERMISSIONS, OZONE_RECON_DB_DIRS_PERMISSIONS_DEFAULT);
+      Set<PosixFilePermission> expectedPosixPermissions =
+          PosixFilePermissions.fromString(convertNumericToSymbolic(expectedPermissions));
 
       // Get actual permissions
-      Set<PosixFilePermission> actualPermissions =
-          Files.getPosixFilePermissions(dbDir.toPath());
-      String actualPermissionsStr =
-          PosixFilePermissions.toString(actualPermissions);
+      Set<PosixFilePermission> actualPermissions = Files.getPosixFilePermissions(dbDir.toPath());
+      String actualPermissionsStr = PosixFilePermissions.toString(actualPermissions);
 
-      if (!expectedPermissionsSymbolic.equals(actualPermissionsStr)) {
-        LOG.warn("Permissions for Recon DB directory '{}' are set to '{}', but expected '{}'",
-            dbDir.getAbsolutePath(), actualPermissionsStr, expectedPermissionsSymbolic);
+      // Check if actual permissions meet the minimum required permissions
+      if (actualPermissions.containsAll(expectedPosixPermissions)) {
+        LOG.info("Permissions for Recon DB directory '{}' meet the minimum required permissions '{}'",
+            dbDir.getAbsolutePath(), expectedPermissions);
       } else {
-        LOG.info("Permissions for Recon DB directory '{}' are correctly set to '{}'",
-            dbDir.getAbsolutePath(), actualPermissionsStr);
+        LOG.warn("Permissions for Recon DB directory '{}' are '{}', which do not meet the minimum required permissions '{}'",
+            dbDir.getAbsolutePath(), actualPermissionsStr, expectedPermissions);
       }
     } catch (IOException e) {
-      LOG.error("Failed to retrieve permissions for Recon DB directory: {}",
-          dbDir.getAbsolutePath(), e);
+      LOG.error("Failed to retrieve permissions for Recon DB directory: {}", dbDir.getAbsolutePath(), e);
     } catch (IllegalArgumentException e) {
       LOG.error("Configuration issue: {}", e.getMessage());
     }

@@ -36,7 +36,8 @@ public final class ReconConfigKeys {
 
   public static final String OZONE_RECON_DB_DIRS_PERMISSIONS =
       "ozone.recon.db.dirs.permissions";
-
+  public static final String OZONE_RECON_DB_DIRS_PERMISSIONS_DEFAULT =
+      "750";
   public static final String OZONE_RECON_DATANODE_ADDRESS_KEY =
       "ozone.recon.datanode.address";
   public static final String OZONE_RECON_ADDRESS_KEY =
