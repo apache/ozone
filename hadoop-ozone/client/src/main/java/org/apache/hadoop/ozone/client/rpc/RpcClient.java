@@ -1387,26 +1387,7 @@ public class RpcClient implements ClientProtocol {
       ReplicationConfig replicationConfig,
       Map<String, String> metadata)
       throws IOException {
-    verifyVolumeName(volumeName);
-    verifyBucketName(bucketName);
-    if (checkKeyNameEnabled) {
-      HddsClientUtils.verifyKeyName(keyName);
-    }
-    HddsClientUtils.checkNotNull(keyName);
-    if (omVersion
-        .compareTo(OzoneManagerVersion.ERASURE_CODED_STORAGE_SUPPORT) < 0) {
-      if (replicationConfig != null &&
-          replicationConfig.getReplicationType()
-              == HddsProtos.ReplicationType.EC) {
-        throw new IOException("Can not set the replication of the key to"
-            + " Erasure Coded replication, as OzoneManager does not support"
-            + " Erasure Coded replication.");
-      }
-    }
-
-    if (replicationConfig != null) {
-      replicationConfigValidator.validate(replicationConfig);
-    }
+    createKeyPreChecks(volumeName, bucketName, keyName, replicationConfig);
     String ownerName = getRealUserInfo().getShortUserName();
 
     OmKeyArgs.Builder builder = new OmKeyArgs.Builder()
@@ -1429,6 +1410,59 @@ public class RpcClient implements ClientProtocol {
       openKey.getKeyInfo().setDataSize(size);
     }
     return createOutputStream(openKey);
+  }
+
+  @Override
+  public OzoneOutputStream rewriteKey(String volumeName, String bucketName, String keyName,
+      long size, long existingKeyGeneration, ReplicationConfig replicationConfig,
+      Map<String, String> metadata) throws IOException {
+    createKeyPreChecks(volumeName, bucketName, keyName, replicationConfig);
+    String ownerName = getRealUserInfo().getShortUserName();
+
+    OmKeyArgs.Builder builder = new OmKeyArgs.Builder()
+        .setVolumeName(volumeName)
+        .setBucketName(bucketName)
+        .setKeyName(keyName)
+        .setDataSize(size)
+        .setReplicationConfig(replicationConfig)
+        .addAllMetadataGdpr(metadata)
+        .setLatestVersionLocation(getLatestVersionLocation)
+        .setOwnerName(ownerName)
+        .setRewriteGeneration(existingKeyGeneration);
+
+    OpenKeySession openKey = ozoneManagerClient.openKey(builder.build());
+    // For bucket with layout OBJECT_STORE, when create an empty file (size=0),
+    // OM will set DataSize to OzoneConfigKeys#OZONE_SCM_BLOCK_SIZE,
+    // which will cause S3G's atomic write length check to fail,
+    // so reset size to 0 here.
+    if (isS3GRequest.get() && size == 0) {
+      openKey.getKeyInfo().setDataSize(0);
+    }
+    return createOutputStream(openKey);
+  }
+
+  private void createKeyPreChecks(String volumeName, String bucketName, String keyName,
+      ReplicationConfig replicationConfig) throws IOException {
+    verifyVolumeName(volumeName);
+    verifyBucketName(bucketName);
+    if (checkKeyNameEnabled) {
+      HddsClientUtils.verifyKeyName(keyName);
+    }
+    HddsClientUtils.checkNotNull(keyName);
+    if (omVersion
+        .compareTo(OzoneManagerVersion.ERASURE_CODED_STORAGE_SUPPORT) < 0) {
+      if (replicationConfig != null &&
+          replicationConfig.getReplicationType()
+              == HddsProtos.ReplicationType.EC) {
+        throw new IOException("Can not set the replication of the key to"
+            + " Erasure Coded replication, as OzoneManager does not support"
+            + " Erasure Coded replication.");
+      }
+    }
+
+    if (replicationConfig != null) {
+      replicationConfigValidator.validate(replicationConfig);
+    }
   }
 
   @Override
@@ -1722,7 +1756,8 @@ public class RpcClient implements ClientProtocol {
         keyInfo.getModificationTime(), ozoneKeyLocations,
         keyInfo.getReplicationConfig(), keyInfo.getMetadata(),
         keyInfo.getFileEncryptionInfo(),
-        () -> getInputStreamWithRetryFunction(keyInfo), keyInfo.isFile(), keyInfo.getOwnerName());
+        () -> getInputStreamWithRetryFunction(keyInfo), keyInfo.isFile(), keyInfo.getOwnerName(),
+        keyInfo.getGeneration());
   }
 
   @Override

@@ -775,11 +775,13 @@ public abstract class OMKeyRequest extends OMClientRequest {
       dbKeyInfo.setReplicationConfig(replicationConfig);
 
       // Construct a new metadata map from KeyArgs.
-      // Clear the old one when the key is overwritten.
       dbKeyInfo.getMetadata().clear();
       dbKeyInfo.getMetadata().putAll(KeyValueUtil.getFromProtobuf(
           keyArgs.getMetadataList()));
 
+      if (keyArgs.hasRewriteGeneration()) {
+        dbKeyInfo.setRewriteGeneration(keyArgs.getRewriteGeneration());
+      }
       dbKeyInfo.setFileEncryptionInfo(encInfo);
       return dbKeyInfo;
     }

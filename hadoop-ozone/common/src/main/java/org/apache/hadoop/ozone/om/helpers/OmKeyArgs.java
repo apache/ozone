@@ -53,6 +53,13 @@ public final class OmKeyArgs implements Auditable {
   private final boolean recursive;
   private final boolean headOp;
   private final boolean forceUpdateContainerCacheFromSCM;
+  // RewriteGeneration, when used in key creation indicates that a
+  // key with the same keyName should exist with the given generation.
+  // For a key commit to succeed, the original key should still be present with the
+  // generation unchanged.
+  // This allows a key to be created an committed atomically if the original has not
+  // been modified.
+  private Long rewriteGeneration = null;
 
   private OmKeyArgs(Builder b) {
     this.volumeName = b.volumeName;
@@ -72,6 +79,7 @@ public final class OmKeyArgs implements Auditable {
     this.headOp = b.headOp;
     this.forceUpdateContainerCacheFromSCM = b.forceUpdateContainerCacheFromSCM;
     this.ownerName = b.ownerName;
+    this.rewriteGeneration = b.rewriteGeneration;
   }
 
   public boolean getIsMultipartKey() {
@@ -150,6 +158,10 @@ public final class OmKeyArgs implements Auditable {
     return forceUpdateContainerCacheFromSCM;
   }
 
+  public Long getRewriteGeneration() {
+    return rewriteGeneration;
+  }
+
   @Override
   public Map<String, String> toAuditMap() {
     Map<String, String> auditMap = new LinkedHashMap<>();
@@ -173,7 +185,7 @@ public final class OmKeyArgs implements Auditable {
   }
 
   public OmKeyArgs.Builder toBuilder() {
-    return new OmKeyArgs.Builder()
+    OmKeyArgs.Builder builder = new OmKeyArgs.Builder()
         .setVolumeName(volumeName)
         .setBucketName(bucketName)
         .setKeyName(keyName)
@@ -190,11 +202,16 @@ public final class OmKeyArgs implements Auditable {
         .setLatestVersionLocation(latestVersionLocation)
         .setAcls(acls)
         .setForceUpdateContainerCacheFromSCM(forceUpdateContainerCacheFromSCM);
+
+    if (rewriteGeneration != null) {
+      builder.setRewriteGeneration(rewriteGeneration);
+    }
+    return builder;
   }
 
   @Nonnull
   public KeyArgs toProtobuf() {
-    return KeyArgs.newBuilder()
+    KeyArgs.Builder builder = KeyArgs.newBuilder()
         .setVolumeName(getVolumeName())
         .setBucketName(getBucketName())
         .setKeyName(getKeyName())
@@ -203,8 +220,11 @@ public final class OmKeyArgs implements Auditable {
         .setLatestVersionLocation(getLatestVersionLocation())
         .setHeadOp(isHeadOp())
         .setForceUpdateContainerCacheFromSCM(
-            isForceUpdateContainerCacheFromSCM())
-        .build();
+            isForceUpdateContainerCacheFromSCM());
+    if (rewriteGeneration != null) {
+      builder.setRewriteGeneration(rewriteGeneration);
+    }
+    return builder.build();
   }
 
   /**
@@ -228,6 +248,7 @@ public final class OmKeyArgs implements Auditable {
     private boolean recursive;
     private boolean headOp;
     private boolean forceUpdateContainerCacheFromSCM;
+    private Long rewriteGeneration = null;
 
     public Builder setVolumeName(String volume) {
       this.volumeName = volume;
@@ -324,6 +345,11 @@ public final class OmKeyArgs implements Auditable {
 
     public Builder setForceUpdateContainerCacheFromSCM(boolean value) {
       this.forceUpdateContainerCacheFromSCM = value;
+      return this;
+    }
+
+    public Builder setRewriteGeneration(long generation) {
+      this.rewriteGeneration = generation;
       return this;
     }
 

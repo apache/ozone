@@ -117,7 +117,7 @@ public class TestOMKeyCreateRequestWithFSO extends TestOMKeyCreateRequest {
   }
 
   @Override
-  protected void checkCreatedPaths(OMKeyCreateRequest omKeyCreateRequest,
+  protected OmKeyInfo checkCreatedPaths(OMKeyCreateRequest omKeyCreateRequest,
       OMRequest omRequest, String keyName) throws Exception {
     keyName = omKeyCreateRequest.validateAndNormalizeKey(true, keyName,
         BucketLayout.FILE_SYSTEM_OPTIMIZED);
@@ -139,6 +139,7 @@ public class TestOMKeyCreateRequestWithFSO extends TestOMKeyCreateRequest {
         omMetadataManager.getOpenKeyTable(omKeyCreateRequest.getBucketLayout())
             .get(openKey);
     assertNotNull(omKeyInfo);
+    return omKeyInfo;
   }
 
   @Override
