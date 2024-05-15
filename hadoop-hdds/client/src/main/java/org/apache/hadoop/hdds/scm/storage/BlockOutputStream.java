@@ -710,6 +710,7 @@ public class BlockOutputStream extends OutputStream {
     bufferList = null;
     if (lastChunkBuffer != null) {
       DIRECT_BUFFER_POOL.returnBuffer(lastChunkBuffer);
+      lastChunkBuffer = null;
     }
   }
 
