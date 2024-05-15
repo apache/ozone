@@ -44,10 +44,6 @@ public class ListKeysResponse {
   @JsonProperty("unReplicatedDataSize")
   private long unReplicatedDataSize;
 
-  /** The number of keys based on limit under the request path. */
-  @JsonProperty("keyCount")
-  private int count;
-
   /** last key sent. */
   @JsonProperty("lastKey")
   @JsonInclude(JsonInclude.Include.NON_EMPTY)
@@ -64,7 +60,6 @@ public class ListKeysResponse {
     this.keys = new ArrayList<>();
     this.replicatedDataSize = -1L;
     this.unReplicatedDataSize = -1L;
-    this.count = 0;
     this.lastKey = "";
   }
 
@@ -98,14 +93,6 @@ public class ListKeysResponse {
 
   public void setPath(String path) {
     this.path = path;
-  }
-
-  public int getCount() {
-    return count;
-  }
-
-  public void setCount(int count) {
-    this.count = count;
   }
 
   public List<KeyEntityInfo> getKeys() {

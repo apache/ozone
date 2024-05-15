@@ -168,6 +168,10 @@ public class TestOmDBInsightEndPoint extends AbstractReconSqlDBTest {
   private static final String OBS_BUCKET_PATH = "/volume1/obs-bucket";
   private static final String FSO_BUCKET_PATH = "/volume1/fso-bucket";
 
+  private static final String DIR_ONE_PATH = "/volume1/fso-bucket/dir1";
+  private static final String DIR_TWO_PATH = "/volume1/fso-bucket/dir1/dir2";
+  private static final String DIR_THREE_PATH = "/volume1/fso-bucket/dir1/dir2/dir3";
+
   private static final long VOLUME_ONE_QUOTA = 2 * OzoneConsts.MB;
   private static final long OBS_BUCKET_QUOTA = OzoneConsts.MB;
   private static final long FSO_BUCKET_QUOTA = OzoneConsts.MB;
@@ -1105,11 +1109,27 @@ public class TestOmDBInsightEndPoint extends AbstractReconSqlDBTest {
     Response bucketResponse = omdbInsightEndpoint.listKeys("RATIS", "", 0, FSO_BUCKET_PATH,
         "", 1000);
     ListKeysResponse listKeysResponse = (ListKeysResponse) bucketResponse.getEntity();
-    assertEquals(6, listKeysResponse.getCount());
+    assertEquals(6, listKeysResponse.getKeys().size());
     KeyEntityInfo keyEntityInfo = listKeysResponse.getKeys().get(0);
     assertEquals("volume1/fso-bucket/dir1/file1", keyEntityInfo.getPath());
+    assertEquals("/1/10/11/file1", keyEntityInfo.getKey());
     assertEquals("/1/10/13/testfile", listKeysResponse.getLastKey());
     assertEquals("RATIS", keyEntityInfo.getReplicationConfig().getReplicationType().toString());
+
+    bucketResponse = omdbInsightEndpoint.listKeys("RATIS", "", 0, DIR_ONE_PATH,
+        "", 1000);
+    listKeysResponse = (ListKeysResponse) bucketResponse.getEntity();
+    assertEquals(6, listKeysResponse.getKeys().size());
+
+    bucketResponse = omdbInsightEndpoint.listKeys("RATIS", "", 0, DIR_TWO_PATH,
+        "", 1000);
+    listKeysResponse = (ListKeysResponse) bucketResponse.getEntity();
+    assertEquals(4, listKeysResponse.getKeys().size());
+
+    bucketResponse = omdbInsightEndpoint.listKeys("RATIS", "", 0, DIR_THREE_PATH,
+        "", 1000);
+    listKeysResponse = (ListKeysResponse) bucketResponse.getEntity();
+    assertEquals(2, listKeysResponse.getKeys().size());
   }
 
   @Test
@@ -1121,7 +1141,7 @@ public class TestOmDBInsightEndPoint extends AbstractReconSqlDBTest {
     Response bucketResponse = omdbInsightEndpoint.listKeys("RATIS", "", 0, FSO_BUCKET_PATH,
         "", 2);
     ListKeysResponse listKeysResponse = (ListKeysResponse) bucketResponse.getEntity();
-    assertEquals(2, listKeysResponse.getCount());
+    assertEquals(2, listKeysResponse.getKeys().size());
     KeyEntityInfo keyEntityInfo = listKeysResponse.getKeys().get(0);
     assertEquals("volume1/fso-bucket/dir1/file1", keyEntityInfo.getPath());
     assertEquals("/1/10/11/testfile", listKeysResponse.getLastKey());
@@ -1131,7 +1151,7 @@ public class TestOmDBInsightEndPoint extends AbstractReconSqlDBTest {
     bucketResponse = omdbInsightEndpoint.listKeys("RATIS", "", 0,
         FSO_BUCKET_PATH, listKeysResponse.getLastKey(), 2);
     listKeysResponse = (ListKeysResponse) bucketResponse.getEntity();
-    assertEquals(2, listKeysResponse.getCount());
+    assertEquals(2, listKeysResponse.getKeys().size());
     keyEntityInfo = listKeysResponse.getKeys().get(0);
     assertEquals("volume1/fso-bucket/dir1/dir2/file1", keyEntityInfo.getPath());
     assertEquals("/1/10/12/testfile", listKeysResponse.getLastKey());
@@ -1140,7 +1160,7 @@ public class TestOmDBInsightEndPoint extends AbstractReconSqlDBTest {
     bucketResponse = omdbInsightEndpoint.listKeys("RATIS", "", 0,
         FSO_BUCKET_PATH, listKeysResponse.getLastKey(), 2);
     listKeysResponse = (ListKeysResponse) bucketResponse.getEntity();
-    assertEquals(2, listKeysResponse.getCount());
+    assertEquals(2, listKeysResponse.getKeys().size());
     keyEntityInfo = listKeysResponse.getKeys().get(0);
     assertEquals("volume1/fso-bucket/dir1/dir2/dir3/file1", keyEntityInfo.getPath());
     assertEquals("/1/10/13/testfile", listKeysResponse.getLastKey());
@@ -1150,7 +1170,106 @@ public class TestOmDBInsightEndPoint extends AbstractReconSqlDBTest {
     bucketResponse = omdbInsightEndpoint.listKeys("RATIS", "", 0,
         FSO_BUCKET_PATH, listKeysResponse.getLastKey(), 2);
     listKeysResponse = (ListKeysResponse) bucketResponse.getEntity();
-    assertEquals(0, listKeysResponse.getCount());
+    assertEquals(0, listKeysResponse.getKeys().size());
+    assertEquals("", listKeysResponse.getLastKey());
+  }
+
+  @Test
+  public void testListKeysFSOBucketDirOnePathWithLimitAndPagination() {
+    // bucket level keyList
+    // Total 3 pages , each page 2 records. If each page we will retrieve 2 items, as total 6 FSO keys,
+    // so till we get empty last key, we'll continue to fetch and empty last key signifies the last page.
+    // First Page
+    Response bucketResponse = omdbInsightEndpoint.listKeys("RATIS", "", 0, DIR_ONE_PATH,
+        "", 2);
+    ListKeysResponse listKeysResponse = (ListKeysResponse) bucketResponse.getEntity();
+    assertEquals(2, listKeysResponse.getKeys().size());
+    KeyEntityInfo keyEntityInfo = listKeysResponse.getKeys().get(0);
+    assertEquals("volume1/fso-bucket/dir1/file1", keyEntityInfo.getPath());
+    assertEquals("/1/10/11/testfile", listKeysResponse.getLastKey());
+    assertEquals("RATIS", keyEntityInfo.getReplicationConfig().getReplicationType().toString());
+
+    // Second page
+    bucketResponse = omdbInsightEndpoint.listKeys("RATIS", "", 0,
+        DIR_ONE_PATH, listKeysResponse.getLastKey(), 2);
+    listKeysResponse = (ListKeysResponse) bucketResponse.getEntity();
+    assertEquals(2, listKeysResponse.getKeys().size());
+    keyEntityInfo = listKeysResponse.getKeys().get(0);
+    assertEquals("volume1/fso-bucket/dir1/dir2/file1", keyEntityInfo.getPath());
+    assertEquals("/1/10/12/testfile", listKeysResponse.getLastKey());
+
+    // Third and last page. And last page will have empty
+    bucketResponse = omdbInsightEndpoint.listKeys("RATIS", "", 0,
+        DIR_ONE_PATH, listKeysResponse.getLastKey(), 2);
+    listKeysResponse = (ListKeysResponse) bucketResponse.getEntity();
+    assertEquals(2, listKeysResponse.getKeys().size());
+    keyEntityInfo = listKeysResponse.getKeys().get(0);
+    assertEquals("volume1/fso-bucket/dir1/dir2/dir3/file1", keyEntityInfo.getPath());
+    assertEquals("/1/10/13/testfile", listKeysResponse.getLastKey());
+
+    // Try again if fourth page is available. Ideally there should not be any further records
+    // and lastKey should be empty as per design.
+    bucketResponse = omdbInsightEndpoint.listKeys("RATIS", "", 0,
+        DIR_ONE_PATH, listKeysResponse.getLastKey(), 2);
+    listKeysResponse = (ListKeysResponse) bucketResponse.getEntity();
+    assertEquals(0, listKeysResponse.getKeys().size());
+    assertEquals("", listKeysResponse.getLastKey());
+  }
+
+  @Test
+  public void testListKeysFSOBucketDirTwoPathWithLimitAndPagination() {
+    // bucket level keyList
+    // Total 2 pages , each page 2 records. If each page we will retrieve 2 items, as total 4 FSO keys,
+    // so till we get empty last key, we'll continue to fetch and empty last key signifies the last page.
+    // First Page
+    Response bucketResponse = omdbInsightEndpoint.listKeys("RATIS", "", 0, DIR_TWO_PATH,
+        "", 2);
+    ListKeysResponse listKeysResponse = (ListKeysResponse) bucketResponse.getEntity();
+    assertEquals(2, listKeysResponse.getKeys().size());
+    KeyEntityInfo keyEntityInfo = listKeysResponse.getKeys().get(0);
+    assertEquals("volume1/fso-bucket/dir1/dir2/file1", keyEntityInfo.getPath());
+    assertEquals("/1/10/12/testfile", listKeysResponse.getLastKey());
+    assertEquals("RATIS", keyEntityInfo.getReplicationConfig().getReplicationType().toString());
+
+    // Second page
+    bucketResponse = omdbInsightEndpoint.listKeys("RATIS", "", 0,
+        DIR_TWO_PATH, listKeysResponse.getLastKey(), 2);
+    listKeysResponse = (ListKeysResponse) bucketResponse.getEntity();
+    assertEquals(2, listKeysResponse.getKeys().size());
+    keyEntityInfo = listKeysResponse.getKeys().get(0);
+    assertEquals("volume1/fso-bucket/dir1/dir2/dir3/file1", keyEntityInfo.getPath());
+    assertEquals("/1/10/13/testfile", listKeysResponse.getLastKey());
+
+    // Try again if third page is available. Ideally there should not be any further records
+    // and lastKey should be empty as per design.
+    bucketResponse = omdbInsightEndpoint.listKeys("RATIS", "", 0,
+        DIR_TWO_PATH, listKeysResponse.getLastKey(), 2);
+    listKeysResponse = (ListKeysResponse) bucketResponse.getEntity();
+    assertEquals(0, listKeysResponse.getKeys().size());
+    assertEquals("", listKeysResponse.getLastKey());
+  }
+
+  @Test
+  public void testListKeysFSOBucketDirThreePathWithLimitAndPagination() {
+    // bucket level keyList
+    // Just 1 page , page will have just 2 records. Total 2 keys
+    // so till we get empty last key, we'll continue to fetch and empty last key signifies the last page.
+    // First Page
+    Response bucketResponse = omdbInsightEndpoint.listKeys("RATIS", "", 0, DIR_THREE_PATH,
+        "", 2);
+    ListKeysResponse listKeysResponse = (ListKeysResponse) bucketResponse.getEntity();
+    assertEquals(2, listKeysResponse.getKeys().size());
+    KeyEntityInfo keyEntityInfo = listKeysResponse.getKeys().get(0);
+    assertEquals("volume1/fso-bucket/dir1/dir2/dir3/file1", keyEntityInfo.getPath());
+    assertEquals("/1/10/13/testfile", listKeysResponse.getLastKey());
+    assertEquals("RATIS", keyEntityInfo.getReplicationConfig().getReplicationType().toString());
+
+    // Try again if second page is available. Ideally there should not be any further records
+    // and lastKey should be empty as per design.
+    bucketResponse = omdbInsightEndpoint.listKeys("RATIS", "", 0,
+        DIR_THREE_PATH, listKeysResponse.getLastKey(), 2);
+    listKeysResponse = (ListKeysResponse) bucketResponse.getEntity();
+    assertEquals(0, listKeysResponse.getKeys().size());
     assertEquals("", listKeysResponse.getLastKey());
   }
 
@@ -1163,7 +1282,9 @@ public class TestOmDBInsightEndPoint extends AbstractReconSqlDBTest {
         "", 1000);
     ListKeysResponse listKeysResponse = (ListKeysResponse) bucketResponse.getEntity();
     // There are total 6 RATIS keys under this OBS bucket.
-    assertEquals(6, listKeysResponse.getCount());
+    assertEquals(6, listKeysResponse.getKeys().size());
+    assertEquals("volume1/obs-bucket/key1", listKeysResponse.getKeys().get(0).getPath());
+    assertEquals("/volume1/obs-bucket/key1", listKeysResponse.getKeys().get(0).getKey());
     assertEquals(OBS_BUCKET_PATH + OM_KEY_PREFIX + KEY_SIX, listKeysResponse.getLastKey());
 
     // Filter listKeys based on key creation date
@@ -1173,7 +1294,7 @@ public class TestOmDBInsightEndPoint extends AbstractReconSqlDBTest {
         OBS_BUCKET_PATH, "", 1000);
     listKeysResponse = (ListKeysResponse) bucketResponse.getEntity();
     // There are total 5 RATIS keys under this OBS bucket which were created after "04-04-2024 12:31:00".
-    assertEquals(5, listKeysResponse.getCount());
+    assertEquals(5, listKeysResponse.getKeys().size());
     assertEquals(OBS_BUCKET_PATH + OM_KEY_PREFIX + KEY_SIX, listKeysResponse.getLastKey());
 
     // creationDate filter passed same as KEY6 creation date, so listKeys API will return all 6 keys
@@ -1181,7 +1302,7 @@ public class TestOmDBInsightEndPoint extends AbstractReconSqlDBTest {
         OBS_BUCKET_PATH, "", 1000);
     listKeysResponse = (ListKeysResponse) bucketResponse.getEntity();
     // There are total 6 RATIS keys under this OBS bucket which were created on or after "04-04-2024 12:30:00".
-    assertEquals(6, listKeysResponse.getCount());
+    assertEquals(6, listKeysResponse.getKeys().size());
     assertEquals(OBS_BUCKET_PATH + OM_KEY_PREFIX + KEY_SIX, listKeysResponse.getLastKey());
 
     // creationDate filter passed as "04-04-2024 12:30:00", but replicationType filter is EC,
@@ -1190,7 +1311,7 @@ public class TestOmDBInsightEndPoint extends AbstractReconSqlDBTest {
         OBS_BUCKET_PATH, "", 1000);
     listKeysResponse = (ListKeysResponse) bucketResponse.getEntity();
     // There are ZERO EC keys created under this OBS bucket which were created on or after "04-04-2024 12:30:00".
-    assertEquals(0, listKeysResponse.getCount());
+    assertEquals(0, listKeysResponse.getKeys().size());
     assertEquals("", listKeysResponse.getLastKey());
 
     // creationDate filter passed as "04-05-2024 12:30:00", and replicationType filter is RATIS,
@@ -1198,7 +1319,7 @@ public class TestOmDBInsightEndPoint extends AbstractReconSqlDBTest {
     bucketResponse = omdbInsightEndpoint.listKeys("RATIS", "04-05-2024 12:30:00", 0,
         OBS_BUCKET_PATH, "", 1000);
     listKeysResponse = (ListKeysResponse) bucketResponse.getEntity();
-    assertEquals(5, listKeysResponse.getCount());
+    assertEquals(5, listKeysResponse.getKeys().size());
     assertEquals(OBS_BUCKET_PATH + OM_KEY_PREFIX + KEY_SIX, listKeysResponse.getLastKey());
 
     // creationDate filter passed as "04-05-2024 12:30:00", and replicationType filter is RATIS,
@@ -1209,7 +1330,7 @@ public class TestOmDBInsightEndPoint extends AbstractReconSqlDBTest {
     bucketResponse = omdbInsightEndpoint.listKeys("RATIS", "04-05-2024 12:30:00", 1026,
         OBS_BUCKET_PATH, "", 1000);
     listKeysResponse = (ListKeysResponse) bucketResponse.getEntity();
-    assertEquals(3, listKeysResponse.getCount());
+    assertEquals(3, listKeysResponse.getKeys().size());
     assertEquals(OBS_BUCKET_PATH + OM_KEY_PREFIX + KEY_SIX, listKeysResponse.getLastKey());
   }
 
@@ -1224,7 +1345,7 @@ public class TestOmDBInsightEndPoint extends AbstractReconSqlDBTest {
     Response bucketResponse = omdbInsightEndpoint.listKeys("RATIS", "", 0, OBS_BUCKET_PATH,
         "", 2);
     ListKeysResponse listKeysResponse = (ListKeysResponse) bucketResponse.getEntity();
-    assertEquals(2, listKeysResponse.getCount());
+    assertEquals(2, listKeysResponse.getKeys().size());
     KeyEntityInfo keyEntityInfo = listKeysResponse.getKeys().get(0);
     assertEquals("volume1/obs-bucket/key1", keyEntityInfo.getPath());
     assertEquals("/volume1/obs-bucket/key1/key2", listKeysResponse.getLastKey());
@@ -1234,7 +1355,7 @@ public class TestOmDBInsightEndPoint extends AbstractReconSqlDBTest {
     bucketResponse = omdbInsightEndpoint.listKeys("RATIS", "", 0,
         OBS_BUCKET_PATH, listKeysResponse.getLastKey(), 2);
     listKeysResponse = (ListKeysResponse) bucketResponse.getEntity();
-    assertEquals(2, listKeysResponse.getCount());
+    assertEquals(2, listKeysResponse.getKeys().size());
     keyEntityInfo = listKeysResponse.getKeys().get(0);
     assertEquals("volume1/obs-bucket/key1/key2/key3", keyEntityInfo.getPath());
     assertEquals("/volume1/obs-bucket/key4", listKeysResponse.getLastKey());
@@ -1243,7 +1364,7 @@ public class TestOmDBInsightEndPoint extends AbstractReconSqlDBTest {
     bucketResponse = omdbInsightEndpoint.listKeys("RATIS", "", 0,
         OBS_BUCKET_PATH, listKeysResponse.getLastKey(), 2);
     listKeysResponse = (ListKeysResponse) bucketResponse.getEntity();
-    assertEquals(2, listKeysResponse.getCount());
+    assertEquals(2, listKeysResponse.getKeys().size());
     keyEntityInfo = listKeysResponse.getKeys().get(0);
     assertEquals("volume1/obs-bucket/key5", keyEntityInfo.getPath());
     assertEquals("/volume1/obs-bucket/key6", listKeysResponse.getLastKey());
@@ -1253,7 +1374,7 @@ public class TestOmDBInsightEndPoint extends AbstractReconSqlDBTest {
     bucketResponse = omdbInsightEndpoint.listKeys("RATIS", "", 0,
         OBS_BUCKET_PATH, listKeysResponse.getLastKey(), 2);
     listKeysResponse = (ListKeysResponse) bucketResponse.getEntity();
-    assertEquals(0, listKeysResponse.getCount());
+    assertEquals(0, listKeysResponse.getKeys().size());
     assertEquals("", listKeysResponse.getLastKey());
   }
 

@@ -692,7 +692,7 @@ public class OMDBInsightEndpoint {
    *       replication type.
    *    -- creationTime - empty string and filter will not be applied, so list out keys irrespective of age.
    *    -- keySize - 0 bytes, which means all keys greater than zero bytes will be listed, effectively all.
-   *    -- startPrefix - /
+   *    -- startPrefix - /, API assumes that startPrefix path always starts with /. E.g. /volume/bucket
    *    -- prevKey - ""
    *    -- limit - 1000
    *
@@ -738,44 +738,97 @@ public class OMDBInsightEndpoint {
    * Output Response:
    *
    * {
-   *    "status": "OK",
-   *    "path": "/volume1/obs-bucket",
-   *    "replicatedDataSize": 20971520,
-   *    "unReplicatedDataSize": 20971520,
-   *    "keyCount": 2,
-   *    "lastKey": "/volume1/obs-bucket/key1/key2",
-   *    "keys": [
-   *        {
-   *            "key": "/volume1/obs-bucket/key1",
-   *            "path": "key1",
-   *            "inStateSince": 1715174266126,
-   *            "size": 10485760,
-   *            "replicatedSize": 10485760,
-   *            "replicationInfo": {
-   *                "replicationFactor": "ONE",
-   *                "requiredNodes": 1,
-   *                "replicationType": "RATIS"
-   *            },
-   *            "creationTime": 1715174266126,
-   *            "modificationTime": 1715174267480,
-   *            "isKey": true
-   *        },
-   *        {
-   *            "key": "/volume1/obs-bucket/key1/key2",
-   *            "path": "key1/key2",
-   *            "inStateSince": 1715174269510,
-   *            "size": 10485760,
-   *            "replicatedSize": 10485760,
-   *            "replicationInfo": {
-   *                "replicationFactor": "ONE",
-   *                "requiredNodes": 1,
-   *                "replicationType": "RATIS"
-   *            },
-   *            "creationTime": 1715174269510,
-   *            "modificationTime": 1715174270410,
-   *            "isKey": true
-   *        }
-   *    ]
+   *     "status": "OK",
+   *     "path": "/volume1/obs-bucket",
+   *     "replicatedDataSize": 62914560,
+   *     "unReplicatedDataSize": 62914560,
+   *     "lastKey": "/volume1/obs-bucket/key6",
+   *     "keys": [
+   *         {
+   *             "key": "/volume1/obs-bucket/key1",
+   *             "path": "volume1/obs-bucket/key1",
+   *             "size": 10485760,
+   *             "replicatedSize": 10485760,
+   *             "replicationInfo": {
+   *                 "replicationFactor": "ONE",
+   *                 "requiredNodes": 1,
+   *                 "replicationType": "RATIS"
+   *             },
+   *             "creationTime": 1715781418742,
+   *             "modificationTime": 1715781419762,
+   *             "isKey": true
+   *         },
+   *         {
+   *             "key": "/volume1/obs-bucket/key1/key2",
+   *             "path": "volume1/obs-bucket/key1/key2",
+   *             "size": 10485760,
+   *             "replicatedSize": 10485760,
+   *             "replicationInfo": {
+   *                 "replicationFactor": "ONE",
+   *                 "requiredNodes": 1,
+   *                 "replicationType": "RATIS"
+   *             },
+   *             "creationTime": 1715781421716,
+   *             "modificationTime": 1715781422723,
+   *             "isKey": true
+   *         },
+   *         {
+   *             "key": "/volume1/obs-bucket/key1/key2/key3",
+   *             "path": "volume1/obs-bucket/key1/key2/key3",
+   *             "size": 10485760,
+   *             "replicatedSize": 10485760,
+   *             "replicationInfo": {
+   *                 "replicationFactor": "ONE",
+   *                 "requiredNodes": 1,
+   *                 "replicationType": "RATIS"
+   *             },
+   *             "creationTime": 1715781424718,
+   *             "modificationTime": 1715781425598,
+   *             "isKey": true
+   *         },
+   *         {
+   *             "key": "/volume1/obs-bucket/key4",
+   *             "path": "volume1/obs-bucket/key4",
+   *             "size": 10485760,
+   *             "replicatedSize": 10485760,
+   *             "replicationInfo": {
+   *                 "replicationFactor": "ONE",
+   *                 "requiredNodes": 1,
+   *                 "replicationType": "RATIS"
+   *             },
+   *             "creationTime": 1715781427561,
+   *             "modificationTime": 1715781428407,
+   *             "isKey": true
+   *         },
+   *         {
+   *             "key": "/volume1/obs-bucket/key5",
+   *             "path": "volume1/obs-bucket/key5",
+   *             "size": 10485760,
+   *             "replicatedSize": 10485760,
+   *             "replicationInfo": {
+   *                 "replicationFactor": "ONE",
+   *                 "requiredNodes": 1,
+   *                 "replicationType": "RATIS"
+   *             },
+   *             "creationTime": 1715781430347,
+   *             "modificationTime": 1715781431185,
+   *             "isKey": true
+   *         },
+   *         {
+   *             "key": "/volume1/obs-bucket/key6",
+   *             "path": "volume1/obs-bucket/key6",
+   *             "size": 10485760,
+   *             "replicatedSize": 10485760,
+   *             "replicationInfo": {
+   *                 "replicationFactor": "ONE",
+   *                 "requiredNodes": 1,
+   *                 "replicationType": "RATIS"
+   *             },
+   *             "creationTime": 1715781433154,
+   *             "modificationTime": 1715781433962,
+   *             "isKey": true
+   *         }
+   *     ]
    * }
    * Input Request for FSO bucket:
    *
@@ -785,15 +838,13 @@ public class OMDBInsightEndpoint {
    * {
    *     "status": "OK",
    *     "path": "/volume1/fso-bucket",
-   *     "replicatedDataSize": 62914560,
-   *     "unReplicatedDataSize": 20971520,
-   *     "keyCount": 2,
-   *     "lastKey": "/-9223372036854775552/-9223372036854775040/-9223372036854774525/testfile",
+   *     "replicatedDataSize": 188743680,
+   *     "unReplicatedDataSize": 62914560,
+   *     "lastKey": "/-9223372036854775552/-9223372036854774016/-9223372036854773503/testfile",
    *     "keys": [
    *         {
-   *             "key": "/-9223372036854775552/-9223372036854775040/-9223372036854774525/file1",
-   *             "path": "file1",
-   *             "inStateSince": 1715174237440,
+   *             "key": "/-9223372036854775552/-9223372036854774016/-9223372036854773501/file1",
+   *             "path": "volume1/fso-bucket/dir1/dir2/dir3/file1",
    *             "size": 10485760,
    *             "replicatedSize": 31457280,
    *             "replicationInfo": {
@@ -801,14 +852,13 @@ public class OMDBInsightEndpoint {
    *                 "requiredNodes": 3,
    *                 "replicationType": "RATIS"
    *             },
-   *             "creationTime": 1715174237440,
-   *             "modificationTime": 1715174238161,
+   *             "creationTime": 1715781411785,
+   *             "modificationTime": 1715781415119,
    *             "isKey": true
    *         },
    *         {
-   *             "key": "/-9223372036854775552/-9223372036854775040/-9223372036854774525/testfile",
-   *             "path": "testfile",
-   *             "inStateSince": 1715174234840,
+   *             "key": "/-9223372036854775552/-9223372036854774016/-9223372036854773501/testfile",
+   *             "path": "volume1/fso-bucket/dir1/dir2/dir3/testfile",
    *             "size": 10485760,
    *             "replicatedSize": 31457280,
    *             "replicationInfo": {
@@ -816,12 +866,69 @@ public class OMDBInsightEndpoint {
    *                 "requiredNodes": 3,
    *                 "replicationType": "RATIS"
    *             },
-   *             "creationTime": 1715174234840,
-   *             "modificationTime": 1715174235562,
+   *             "creationTime": 1715781409146,
+   *             "modificationTime": 1715781409882,
+   *             "isKey": true
+   *         },
+   *         {
+   *             "key": "/-9223372036854775552/-9223372036854774016/-9223372036854773502/file1",
+   *             "path": "volume1/fso-bucket/dir1/dir2/file1",
+   *             "size": 10485760,
+   *             "replicatedSize": 31457280,
+   *             "replicationInfo": {
+   *                 "replicationFactor": "THREE",
+   *                 "requiredNodes": 3,
+   *                 "replicationType": "RATIS"
+   *             },
+   *             "creationTime": 1715781406333,
+   *             "modificationTime": 1715781407140,
+   *             "isKey": true
+   *         },
+   *         {
+   *             "key": "/-9223372036854775552/-9223372036854774016/-9223372036854773502/testfile",
+   *             "path": "volume1/fso-bucket/dir1/dir2/testfile",
+   *             "size": 10485760,
+   *             "replicatedSize": 31457280,
+   *             "replicationInfo": {
+   *                 "replicationFactor": "THREE",
+   *                 "requiredNodes": 3,
+   *                 "replicationType": "RATIS"
+   *             },
+   *             "creationTime": 1715781403655,
+   *             "modificationTime": 1715781404460,
+   *             "isKey": true
+   *         },
+   *         {
+   *             "key": "/-9223372036854775552/-9223372036854774016/-9223372036854773503/file1",
+   *             "path": "volume1/fso-bucket/dir1/file1",
+   *             "size": 10485760,
+   *             "replicatedSize": 31457280,
+   *             "replicationInfo": {
+   *                 "replicationFactor": "THREE",
+   *                 "requiredNodes": 3,
+   *                 "replicationType": "RATIS"
+   *             },
+   *             "creationTime": 1715781400980,
+   *             "modificationTime": 1715781401768,
+   *             "isKey": true
+   *         },
+   *         {
+   *             "key": "/-9223372036854775552/-9223372036854774016/-9223372036854773503/testfile",
+   *             "path": "volume1/fso-bucket/dir1/testfile",
+   *             "size": 10485760,
+   *             "replicatedSize": 31457280,
+   *             "replicationInfo": {
+   *                 "replicationFactor": "THREE",
+   *                 "requiredNodes": 3,
+   *                 "replicationType": "RATIS"
+   *             },
+   *             "creationTime": 1715781397636,
+   *             "modificationTime": 1715781398919,
    *             "isKey": true
    *         }
    *     ]
    * }
+   *
    * Input Request for Legacy bucket:
    *
    *        `api/v1/keys/listKeys?startPrefix=/volume1/legacy-bucket&limit=2&replicationType=RATIS`
@@ -830,15 +937,13 @@ public class OMDBInsightEndpoint {
    * {
    *     "status": "OK",
    *     "path": "/volume1/legacy-bucket",
-   *     "replicatedDataSize": 52428800,
-   *     "unReplicatedDataSize": 52428800,
-   *     "keyCount": 2,
-   *     "lastKey": "/volume1/legacy-bucket/key1/key2",
+   *     "replicatedDataSize": 157286400,
+   *     "unReplicatedDataSize": 157286400,
+   *     "lastKey": "/volume1/legacy-bucket/key6",
    *     "keys": [
    *         {
    *             "key": "/volume1/legacy-bucket/key1",
-   *             "path": "key1",
-   *             "inStateSince": 1715174303702,
+   *             "path": "volume1/legacy-bucket/key1",
    *             "size": 10485760,
    *             "replicatedSize": 10485760,
    *             "replicationInfo": {
@@ -846,14 +951,13 @@ public class OMDBInsightEndpoint {
    *                 "requiredNodes": 1,
    *                 "replicationType": "RATIS"
    *             },
-   *             "creationTime": 1715174303702,
-   *             "modificationTime": 1715174304619,
+   *             "creationTime": 1715781440620,
+   *             "modificationTime": 1715781441448,
    *             "isKey": true
    *         },
    *         {
    *             "key": "/volume1/legacy-bucket/key1/key2",
-   *             "path": "key1/key2",
-   *             "inStateSince": 1715174306641,
+   *             "path": "volume1/legacy-bucket/key1/key2",
    *             "size": 41943040,
    *             "replicatedSize": 41943040,
    *             "replicationInfo": {
@@ -861,8 +965,64 @@ public class OMDBInsightEndpoint {
    *                 "requiredNodes": 1,
    *                 "replicationType": "RATIS"
    *             },
-   *             "creationTime": 1715174306641,
-   *             "modificationTime": 1715174307994,
+   *             "creationTime": 1715781443431,
+   *             "modificationTime": 1715781444680,
+   *             "isKey": true
+   *         },
+   *         {
+   *             "key": "/volume1/legacy-bucket/key1/key2/key3",
+   *             "path": "volume1/legacy-bucket/key1/key2/key3",
+   *             "size": 10485760,
+   *             "replicatedSize": 10485760,
+   *             "replicationInfo": {
+   *                 "replicationFactor": "ONE",
+   *                 "requiredNodes": 1,
+   *                 "replicationType": "RATIS"
+   *             },
+   *             "creationTime": 1715781446657,
+   *             "modificationTime": 1715781447476,
+   *             "isKey": true
+   *         },
+   *         {
+   *             "key": "/volume1/legacy-bucket/key4",
+   *             "path": "volume1/legacy-bucket/key4",
+   *             "size": 41943040,
+   *             "replicatedSize": 41943040,
+   *             "replicationInfo": {
+   *                 "replicationFactor": "ONE",
+   *                 "requiredNodes": 1,
+   *                 "replicationType": "RATIS"
+   *             },
+   *             "creationTime": 1715781449445,
+   *             "modificationTime": 1715781450464,
+   *             "isKey": true
+   *         },
+   *         {
+   *             "key": "/volume1/legacy-bucket/key5",
+   *             "path": "volume1/legacy-bucket/key5",
+   *             "size": 10485760,
+   *             "replicatedSize": 10485760,
+   *             "replicationInfo": {
+   *                 "replicationFactor": "ONE",
+   *                 "requiredNodes": 1,
+   *                 "replicationType": "RATIS"
+   *             },
+   *             "creationTime": 1715781452476,
+   *             "modificationTime": 1715781453335,
+   *             "isKey": true
+   *         },
+   *         {
+   *             "key": "/volume1/legacy-bucket/key6",
+   *             "path": "volume1/legacy-bucket/key6",
+   *             "size": 41943040,
+   *             "replicatedSize": 41943040,
+   *             "replicationInfo": {
+   *                 "replicationFactor": "ONE",
+   *                 "requiredNodes": 1,
+   *                 "replicationType": "RATIS"
+   *             },
+   *             "creationTime": 1715781477894,
+   *             "modificationTime": 1715781479351,
    *             "isKey": true
    *         }
    *     ]
@@ -905,7 +1065,6 @@ public class OMDBInsightEndpoint {
     if (!keyInfoList.isEmpty()) {
       listKeysResponse.setLastKey(keyInfoList.get(keyInfoList.size() - 1).getKey());
     }
-    listKeysResponse.setCount(keyInfoList.size());
     return Response.ok(listKeysResponse).build();
   }
 
@@ -969,7 +1128,7 @@ public class OMDBInsightEndpoint {
     int originalLimit = paramInfo.getLimit();
     Map<String, OmKeyInfo> matchedKeys = new LinkedHashMap<>();
     // Convert the search prefix to an object path for FSO buckets
-    String startPrefixObjectPath = convertToObjectPath(paramInfo.getStartPrefix());
+    String startPrefixObjectPath = convertStartPrefixPathToObjectIdPath(paramInfo.getStartPrefix());
     String[] names = parseRequestPath(startPrefixObjectPath);
     Table<String, OmKeyInfo> fileTable =
         omMetadataManager.getKeyTable(BucketLayout.FILE_SYSTEM_OPTIMIZED);
@@ -1058,25 +1217,25 @@ public class OMDBInsightEndpoint {
 
 
   /**
-   * Converts a key prefix into an object path for FSO buckets, using IDs.
+   * Converts a startPrefix path into an objectId path for FSO buckets, using IDs.
    * <p>
    * This method transforms a user-provided path (e.g., "volume/bucket/dir1") into
    * a database-friendly format ("/volumeID/bucketID/ParentId/") by replacing names
    * with their corresponding IDs. It simplifies database queries for FSO bucket operations.
    *
-   * @param prevKeyPrefix The path to be converted, not including key or directory names/IDs.
-   * @return The object path as "/volumeID/bucketID/ParentId/".
+   * @param startPrefixPath The path to be converted.
+   * @return The objectId path as "/volumeID/bucketID/ParentId/".
    * @throws IOException If database access fails.
    */
-  public String convertToObjectPath(String prevKeyPrefix)
+  public String convertStartPrefixPathToObjectIdPath(String startPrefixPath)
       throws IOException, IllegalArgumentException {
 
     String[] names = parseRequestPath(
-        normalizePath(prevKeyPrefix, BucketLayout.FILE_SYSTEM_OPTIMIZED));
+        normalizePath(startPrefixPath, BucketLayout.FILE_SYSTEM_OPTIMIZED));
 
     // Root-Level :- Return the original path
     if (names.length == 0) {
-      return prevKeyPrefix;
+      return startPrefixPath;
     }
 
     // Volume-Level :- Fetch the volumeID
@@ -1217,7 +1376,6 @@ public class OMDBInsightEndpoint {
                                                          OmKeyInfo keyInfo) throws IOException {
     KeyEntityInfo keyEntityInfo = new KeyEntityInfo();
     setKeyNameAndFullPath(dbKey, keyInfo, keyEntityInfo);
-    keyEntityInfo.setInStateSince(keyInfo.getCreationTime());
     keyEntityInfo.setSize(keyInfo.getDataSize());
     keyEntityInfo.setCreationTime(keyInfo.getCreationTime());
     keyEntityInfo.setModificationTime(keyInfo.getModificationTime());
@@ -1234,9 +1392,9 @@ public class OMDBInsightEndpoint {
       keyEntityInfo.setPath(ReconUtils.constructFullPath(keyInfo, reconNamespaceSummaryManager,
           omMetadataManager));
     } else {
-      keyEntityInfo.setKey(ReconUtils.constructFullPath(keyInfo, reconNamespaceSummaryManager,
-          omMetadataManager)); // Set the DB key
-      keyEntityInfo.setPath(dbKey);
+      keyEntityInfo.setKey(dbKey);
+      keyEntityInfo.setPath(ReconUtils.constructFullPath(keyInfo, reconNamespaceSummaryManager,
+          omMetadataManager));
     }
   }
 

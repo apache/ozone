@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.ozone.recon.api.types;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 
@@ -38,6 +39,7 @@ public class KeyEntityInfo {
   private String path;
 
   @JsonProperty("inStateSince")
+  @JsonInclude(JsonInclude.Include.NON_DEFAULT)
   private long inStateSince;
 
   @JsonProperty("size")
