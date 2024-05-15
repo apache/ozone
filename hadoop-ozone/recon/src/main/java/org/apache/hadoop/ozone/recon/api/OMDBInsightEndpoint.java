@@ -1215,9 +1215,7 @@ public class OMDBInsightEndpoint {
   private KeyEntityInfo createKeyEntityInfoFromOmKeyInfo(String dbKey,
                                                          OmKeyInfo keyInfo) throws IOException {
     KeyEntityInfo keyEntityInfo = new KeyEntityInfo();
-    keyEntityInfo.setKey(dbKey); // Set the DB key
-    keyEntityInfo.setPath(ReconUtils.constructFullPath(keyInfo, reconNamespaceSummaryManager,
-        omMetadataManager));
+    setKeyNameAndFullPath(dbKey, keyInfo, keyEntityInfo);
     keyEntityInfo.setInStateSince(keyInfo.getCreationTime());
     keyEntityInfo.setSize(keyInfo.getDataSize());
     keyEntityInfo.setCreationTime(keyInfo.getCreationTime());
@@ -1225,6 +1223,20 @@ public class OMDBInsightEndpoint {
     keyEntityInfo.setReplicatedSize(keyInfo.getReplicatedSize());
     keyEntityInfo.setReplicationConfig(keyInfo.getReplicationConfig());
     return keyEntityInfo;
+  }
+
+  private void setKeyNameAndFullPath(String dbKey, OmKeyInfo keyInfo, KeyEntityInfo keyEntityInfo) throws IOException {
+    String bucketKey = omMetadataManager.getBucketKey(keyInfo.getVolumeName(), keyInfo.getBucketName());
+    OmBucketInfo omBucketInfo = omMetadataManager.getBucketTable().getSkipCache(bucketKey);
+    if (omBucketInfo.getBucketLayout() == BucketLayout.FILE_SYSTEM_OPTIMIZED) {
+      keyEntityInfo.setKey(dbKey); // Set the DB key
+      keyEntityInfo.setPath(ReconUtils.constructFullPath(keyInfo, reconNamespaceSummaryManager,
+          omMetadataManager));
+    } else {
+      keyEntityInfo.setKey(ReconUtils.constructFullPath(keyInfo, reconNamespaceSummaryManager,
+          omMetadataManager)); // Set the DB key
+      keyEntityInfo.setPath(dbKey);
+    }
   }
 
   /**
