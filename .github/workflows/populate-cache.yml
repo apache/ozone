@@ -28,6 +28,7 @@ on:
       - '.github/workflows/populate-cache.yml'
   schedule:
     - cron: '20 3 * * *'
+  workflow_dispatch:
 
 jobs:
   build:
@@ -45,27 +46,40 @@ jobs:
             !~/.m2/repository/org/apache/ozone
           key: maven-repo-${{ hashFiles('**/pom.xml') }}
 
+      - name: Check for partial cache
+        id: verify-cache
+        run: |
+          cache_ok='true'
+          if [[ '${{ steps.restore-cache.outputs.cache-hit }}' != 'true' ]]; then
+            cache_ok='false'
+          elif [[ -e ~/.m2/repository/.cache/org-apache-ozone/partial-cache ]]; then
+            cache_ok='false'
+          fi
+          echo "cache-ok=$cache_ok" >> $GITHUB_OUTPUT
+
       - name: Setup Java
-        if: steps.restore-cache.outputs.cache-hit != 'true'
+        if: steps.verify-cache.outputs.cache-ok != 'true'
         uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
           java-version: 8
 
       - name: Fetch dependencies
-        if: steps.restore-cache.outputs.cache-hit != 'true'
-        run: mvn --batch-mode --fail-never --no-transfer-progress --show-version dependency:go-offline
+        if: steps.verify-cache.outputs.cache-ok != 'true'
+        run: |
+          mkdir -p ~/.m2/repository
+          dev-support/ci/populate-cache.sh
+        continue-on-error: true
 
       - name: Delete Ozone jars from repo
-        if: steps.restore-cache.outputs.cache-hit != 'true'
+        if: steps.verify-cache.outputs.cache-ok != 'true'
         run: rm -fr ~/.m2/repository/org/apache/ozone
 
       - name: List repo contents
-        if: steps.restore-cache.outputs.cache-hit != 'true'
         run: find ~/.m2/repository -type f | sort | xargs ls -lh
 
       - name: Save cache for Maven dependencies
-        if: steps.restore-cache.outputs.cache-hit != 'true'
+        if: steps.verify-cache.outputs.cache-ok != 'true'
         uses: actions/cache/save@v4
         with:
           path: |

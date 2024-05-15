@@ -191,7 +191,6 @@ public final class XceiverServerRatis implements XceiverServerSpi {
     this.streamEnable = conf.getBoolean(
         OzoneConfigKeys.HDDS_CONTAINER_RATIS_DATASTREAM_ENABLED,
         OzoneConfigKeys.HDDS_CONTAINER_RATIS_DATASTREAM_ENABLED_DEFAULT);
-    RaftProperties serverProperties = newRaftProperties();
     this.context = context;
     this.dispatcher = dispatcher;
     this.containerController = containerController;
@@ -202,6 +201,7 @@ public final class XceiverServerRatis implements XceiverServerSpi {
     shouldDeleteRatisLogDirectory =
         ratisServerConfig.shouldDeleteRatisLogDirectory();
 
+    RaftProperties serverProperties = newRaftProperties();
     this.server =
         RaftServer.newBuilder().setServerId(raftPeerId)
             .setProperties(serverProperties)

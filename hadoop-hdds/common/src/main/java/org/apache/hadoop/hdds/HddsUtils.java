@@ -18,6 +18,11 @@
 
 package org.apache.hadoop.hdds;
 
+import com.fasterxml.jackson.core.JsonFactory;
+import com.fasterxml.jackson.core.JsonParser;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.google.common.base.Strings;
 import com.google.protobuf.ServiceException;
 
 import jakarta.annotation.Nonnull;
@@ -30,8 +35,11 @@ import java.lang.reflect.Method;
 import java.net.InetSocketAddress;
 import java.net.UnknownHostException;
 import java.nio.file.Path;
+import java.text.DateFormat;
+import java.text.SimpleDateFormat;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.Date;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -40,6 +48,8 @@ import java.util.Optional;
 import java.util.OptionalInt;
 import java.util.TreeMap;
 import java.util.UUID;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import org.apache.hadoop.conf.ConfigRedactor;
 import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
@@ -49,6 +59,7 @@ import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.conf.ConfigurationException;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandRequestProtoOrBuilder;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto.State;
@@ -437,6 +448,9 @@ public final class HddsUtils {
     case PutSmallFile:
     case StreamInit:
     case StreamWrite:
+      return false;
+    case Echo:
+      return proto.getEcho().hasReadOnly() && proto.getEcho().getReadOnly();
     default:
       return false;
     }
@@ -800,7 +814,7 @@ public final class HddsUtils {
   }
 
   @Nonnull
-  public static String threadNamePrefix(@Nullable String id) {
+  public static String threadNamePrefix(@Nullable Object id) {
     return id != null && !"".equals(id)
         ? id + "-"
         : "";
@@ -866,5 +880,69 @@ public final class HddsUtils {
     return logger.isDebugEnabled()
         ? Thread.currentThread().getStackTrace()
         : null;
+  }
+
+
+
+  public static List<HddsProtos.Node> getDecommissioningNodesList(Stream<HddsProtos.Node> allNodes,
+                                                                  String uuid,
+                                                                  String ipAddress) {
+    List<HddsProtos.Node> decommissioningNodes;
+    if (!Strings.isNullOrEmpty(uuid)) {
+      decommissioningNodes = allNodes.filter(p -> p.getNodeID().getUuid()
+          .equals(uuid)).collect(Collectors.toList());
+    } else if (!Strings.isNullOrEmpty(ipAddress)) {
+      decommissioningNodes = allNodes.filter(p -> p.getNodeID().getIpAddress()
+          .compareToIgnoreCase(ipAddress) == 0).collect(Collectors.toList());
+    } else {
+      decommissioningNodes = allNodes.collect(Collectors.toList());
+    }
+    return decommissioningNodes;
+  }
+
+  public static JsonNode getBeansJsonNode(String metricsJson) throws IOException {
+    JsonNode jsonNode;
+    ObjectMapper objectMapper = new ObjectMapper();
+    JsonFactory factory = objectMapper.getFactory();
+    JsonParser parser = factory.createParser(metricsJson);
+    jsonNode = (JsonNode) objectMapper.readTree(parser).get("beans").get(0);
+    return jsonNode;
+  }
+
+  public static int getNumDecomNodes(JsonNode jsonNode) {
+    int numDecomNodes;
+    JsonNode totalDecom = jsonNode.get("DecommissioningMaintenanceNodesTotal");
+    numDecomNodes = (totalDecom == null ? -1 : Integer.parseInt(totalDecom.toString()));
+    return numDecomNodes;
+  }
+
+  @Nullable
+  public static Map<String, Object> getCountsMap(DatanodeDetails datanode, JsonNode counts, int numDecomNodes,
+                                                 Map<String, Object> countsMap, String errMsg)
+      throws IOException {
+    for (int i = 1; i <= numDecomNodes; i++) {
+      if (datanode.getHostName().equals(counts.get("tag.datanode." + i).asText())) {
+        JsonNode pipelinesDN = counts.get("PipelinesWaitingToCloseDN." + i);
+        JsonNode underReplicatedDN = counts.get("UnderReplicatedDN." + i);
+        JsonNode unclosedDN = counts.get("UnclosedContainersDN." + i);
+        JsonNode startTimeDN = counts.get("StartTimeDN." + i);
+        if (pipelinesDN == null || underReplicatedDN == null || unclosedDN == null || startTimeDN == null) {
+          throw new IOException(errMsg);
+        }
+
+        int pipelines = Integer.parseInt(pipelinesDN.toString());
+        double underReplicated = Double.parseDouble(underReplicatedDN.toString());
+        double unclosed = Double.parseDouble(unclosedDN.toString());
+        long startTime = Long.parseLong(startTimeDN.toString());
+        Date date = new Date(startTime);
+        DateFormat formatter = new SimpleDateFormat("dd/MM/yyyy hh:mm:ss z");
+        countsMap.put("decommissionStartTime", formatter.format(date));
+        countsMap.put("numOfUnclosedPipelines", pipelines);
+        countsMap.put("numOfUnderReplicatedContainers", underReplicated);
+        countsMap.put("numOfUnclosedContainers", unclosed);
+        return countsMap;
+      }
+    }
+    return null;
   }
 }

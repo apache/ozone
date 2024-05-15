@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone.om.helpers;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.utils.db.Codec;
+import org.apache.hadoop.hdds.utils.db.CopyObject;
 import org.apache.hadoop.hdds.utils.db.DelegatedCodec;
 import org.apache.hadoop.hdds.utils.db.Proto2Codec;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.MultipartKeyInfo;
@@ -37,7 +38,7 @@ import java.util.TreeMap;
  * This class represents multipart upload information for a key, which holds
  * upload part information of the key.
  */
-public final class OmMultipartKeyInfo extends WithObjectID {
+public final class OmMultipartKeyInfo extends WithObjectID implements CopyObject<OmMultipartKeyInfo> {
   private static final Codec<OmMultipartKeyInfo> CODEC = new DelegatedCodec<>(
       Proto2Codec.get(MultipartKeyInfo.getDefaultInstance()),
       OmMultipartKeyInfo::getFromProto,
@@ -162,12 +163,11 @@ public final class OmMultipartKeyInfo extends WithObjectID {
    * information for a key.
    */
   private OmMultipartKeyInfo(Builder b) {
+    super(b);
     this.uploadID = b.uploadID;
     this.creationTime = b.creationTime;
     this.replicationConfig = b.replicationConfig;
     this.partKeyInfoMap = new PartKeyInfoMap(b.partKeyInfoList);
-    setObjectID(b.objectID);
-    setUpdateID(b.updateID);
     this.parentID = b.parentID;
   }
 
@@ -225,13 +225,11 @@ public final class OmMultipartKeyInfo extends WithObjectID {
   /**
    * Builder of OmMultipartKeyInfo.
    */
-  public static class Builder {
+  public static class Builder extends WithObjectID.Builder {
     private String uploadID;
     private long creationTime;
     private ReplicationConfig replicationConfig;
     private final TreeMap<Integer, PartKeyInfo> partKeyInfoList;
-    private long objectID;
-    private long updateID;
     private long parentID;
 
     public Builder() {
@@ -268,12 +266,12 @@ public final class OmMultipartKeyInfo extends WithObjectID {
     }
 
     public Builder setObjectID(long obId) {
-      this.objectID = obId;
+      super.setObjectID(obId);
       return this;
     }
 
     public Builder setUpdateID(long id) {
-      this.updateID = id;
+      super.setUpdateID(id);
       return this;
     }
 
@@ -358,6 +356,7 @@ public final class OmMultipartKeyInfo extends WithObjectID {
     return uploadID.hashCode();
   }
 
+  @Override
   public OmMultipartKeyInfo copyObject() {
     return new OmMultipartKeyInfo(this);
   }

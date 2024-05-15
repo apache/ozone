@@ -144,22 +144,39 @@ public class OzoneClientConfig {
       tags = ConfigTag.CLIENT)
   private int retryInterval = 0;
 
+  @Config(key = "read.max.retries",
+      defaultValue = "3",
+      description = "Maximum number of retries by Ozone Client on "
+          + "encountering connectivity exception when reading a key.",
+      tags = ConfigTag.CLIENT)
+  private int maxReadRetryCount = 3;
+
+  @Config(key = "read.retry.interval",
+      defaultValue = "1",
+      description =
+          "Indicates the time duration in seconds a client will wait "
+              + "before retrying a read key request on encountering "
+              + "a connectivity excepetion from Datanodes . "
+              + "By default the interval is 1 second",
+      tags = ConfigTag.CLIENT)
+  private int readRetryInterval = 1;
+
   @Config(key = "checksum.type",
       defaultValue = "CRC32",
       description = "The checksum type [NONE/ CRC32/ CRC32C/ SHA256/ MD5] "
           + "determines which algorithm would be used to compute checksum for "
           + "chunk data. Default checksum type is CRC32.",
-      tags = ConfigTag.CLIENT)
+      tags = { ConfigTag.CLIENT, ConfigTag.CRYPTO_COMPLIANCE })
   private String checksumType = ChecksumType.CRC32.name();
 
   @Config(key = "bytes.per.checksum",
-      defaultValue = "1MB",
+      defaultValue = "16KB",
       type = ConfigType.SIZE,
       description = "Checksum will be computed for every bytes per checksum "
           + "number of bytes and stored sequentially. The minimum value for "
-          + "this config is 16KB.",
-      tags = ConfigTag.CLIENT)
-  private int bytesPerChecksum = 1024 * 1024;
+          + "this config is 8KB.",
+      tags = { ConfigTag.CLIENT, ConfigTag.CRYPTO_COMPLIANCE })
+  private int bytesPerChecksum = 16 * 1024;
 
   @Config(key = "verify.checksum",
       defaultValue = "true",
@@ -324,6 +341,22 @@ public class OzoneClientConfig {
 
   public void setRetryInterval(int retryInterval) {
     this.retryInterval = retryInterval;
+  }
+
+  public int getMaxReadRetryCount() {
+    return maxReadRetryCount;
+  }
+
+  public void setMaxReadRetryCount(int maxReadRetryCount) {
+    this.maxReadRetryCount = maxReadRetryCount;
+  }
+
+  public int getReadRetryInterval() {
+    return readRetryInterval;
+  }
+
+  public void setReadRetryInterval(int readRetryInterval) {
+    this.readRetryInterval = readRetryInterval;
   }
 
   public ChecksumType getChecksumType() {

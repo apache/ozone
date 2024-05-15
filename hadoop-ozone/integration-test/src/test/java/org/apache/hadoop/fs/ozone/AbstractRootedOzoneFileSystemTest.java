@@ -94,9 +94,9 @@ import java.nio.file.Paths;
 import java.security.PrivilegedExceptionAction;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.BitSet;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.LinkedList;
@@ -115,6 +115,7 @@ import static org.apache.hadoop.fs.CommonPathCapabilities.FS_CHECKSUMS;
 import static org.apache.hadoop.fs.FileSystem.TRASH_PREFIX;
 import static org.apache.hadoop.fs.contract.ContractTestUtils.assertHasPathCapabilities;
 import static org.apache.hadoop.fs.ozone.Constants.LISTING_PAGE_SIZE;
+import static org.apache.hadoop.fs.ozone.OzoneFileSystemTests.createKeyWithECReplicationConfiguration;
 import static org.apache.hadoop.hdds.client.ECReplicationConfig.EcCodec.RS;
 import static org.apache.hadoop.ozone.OzoneAcl.AclScope.ACCESS;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_FS_ITERATE_BATCH_SIZE;
@@ -323,6 +324,19 @@ abstract class AbstractRootedOzoneFileSystemTest {
 
     // Cleanup
     fs.delete(grandparent, true);
+  }
+
+  @Test
+  public void testCreateKeyWithECReplicationConfig() throws Exception {
+    String testKeyName = "testKey";
+    Path testKeyPath = new Path(bucketPath, testKeyName);
+    createKeyWithECReplicationConfiguration(cluster.getConf(), testKeyPath);
+
+    OzoneKeyDetails key = getKey(testKeyPath, false);
+    assertEquals(HddsProtos.ReplicationType.EC,
+        key.getReplicationConfig().getReplicationType());
+    assertEquals("rs-3-2-1024k",
+        key.getReplicationConfig().getReplication());
   }
 
   @Test
@@ -1187,17 +1201,15 @@ abstract class AbstractRootedOzoneFileSystemTest {
     ACLType userRights = aclConfig.getUserDefaultRights();
     // Construct ACL for world access
     // ACL admin owner, world read+write
-    BitSet aclRights = new BitSet();
-    aclRights.set(READ.ordinal());
-    aclRights.set(WRITE.ordinal());
+    EnumSet<ACLType> aclRights = EnumSet.of(READ, WRITE);
     // volume acls have all access to admin and read+write access to world
 
     // Construct VolumeArgs
     VolumeArgs volumeArgs = VolumeArgs.newBuilder()
         .setAdmin("admin")
         .setOwner("admin")
-        .addAcl(new OzoneAcl(ACLIdentityType.WORLD, "", aclRights, ACCESS))
-        .addAcl(new OzoneAcl(ACLIdentityType.USER, "admin", userRights, ACCESS))
+        .addAcl(new OzoneAcl(ACLIdentityType.WORLD, "", ACCESS, aclRights))
+        .addAcl(new OzoneAcl(ACLIdentityType.USER, "admin", ACCESS, userRights))
         .setQuotaInNamespace(1000)
         .setQuotaInBytes(Long.MAX_VALUE).build();
     // Sanity check
@@ -1232,7 +1244,7 @@ abstract class AbstractRootedOzoneFileSystemTest {
     BucketArgs bucketArgs = new BucketArgs.Builder()
         .setOwner("admin")
         .addAcl(new OzoneAcl(ACLIdentityType.WORLD, "", ACCESS, READ, WRITE, LIST))
-        .addAcl(new OzoneAcl(ACLIdentityType.USER, "admin", userRights, ACCESS))
+        .addAcl(new OzoneAcl(ACLIdentityType.USER, "admin", ACCESS, userRights))
         .setQuotaInNamespace(1000)
         .setQuotaInBytes(Long.MAX_VALUE).build();
 
@@ -1292,7 +1304,7 @@ abstract class AbstractRootedOzoneFileSystemTest {
     ACLType userRights = aclConfig.getUserDefaultRights();
     // Construct ACL for world access
     OzoneAcl aclWorldAccess = new OzoneAcl(ACLIdentityType.WORLD, "",
-        userRights, ACCESS);
+        ACCESS, userRights);
     // Construct VolumeArgs
     VolumeArgs volumeArgs = VolumeArgs.newBuilder()
         .addAcl(aclWorldAccess)
@@ -2293,7 +2305,7 @@ abstract class AbstractRootedOzoneFileSystemTest {
     ACLType userRights = aclConfig.getUserDefaultRights();
     // Construct ACL for world access
     OzoneAcl aclWorldAccess = new OzoneAcl(ACLIdentityType.WORLD, "",
-        userRights, ACCESS);
+        ACCESS, userRights);
     // Construct VolumeArgs, set ACL to world access
     VolumeArgs volumeArgs = VolumeArgs.newBuilder()
         .addAcl(aclWorldAccess)

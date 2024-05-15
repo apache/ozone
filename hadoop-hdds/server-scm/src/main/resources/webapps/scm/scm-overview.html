@@ -124,6 +124,10 @@
         <td>Node Manager: Safe mode status</td>
         <td>{{$ctrl.overview.jmx.InSafeMode}}</td>
     </tr>
+    <tr ng-hide="!$ctrl.overview.jmx.SafeModeExitForceful">
+        <td> Force Exit Safe Mode </td>
+        <td>{{$ctrl.overview.jmx.SafeModeExitForceful}}</td>
+    </tr>
     <tr>
         <td> SCM Roles (HA) </td>
         <td>{{$ctrl.overview.jmx.ScmRatisRoles}}</td>

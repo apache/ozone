@@ -105,16 +105,6 @@ Get quota usage of directory
     ${usage} =      Execute curl command    ${volume}          GETQUOTAUSAGE      ${EMPTY}
     Should contain  ${usage.stdout}    QuotaUsage          "fileAndDirectoryCount":3
 
-Get home directory
-    ${home} =       Execute curl command    ${EMPTY}          GETHOMEDIRECTORY      ${EMPTY}
-    ${user} =       Set Variable If     '${SECURITY_ENABLED}'=='true'   testuser    ${USERNAME}
-    Should contain  ${home.stdout}     "Path":"\\/user\\/${user}"
-
-Get trash root
-    ${trash} =      Execute curl command    ${volume}/buck1/testfile          GETTRASHROOT      ${EMPTY}
-    ${user} =       Set Variable If     '${SECURITY_ENABLED}'=='true'   testuser    ${USERNAME}
-    Should contain  ${trash.stdout}    "Path":"\\/${volume}\\/buck1\\/.Trash\\/${user}"
-
 # Missing functionality, not working yet.
 # Set permission of bucket
     # ${status} =     Execute curl command    vol1/buck1          GETFILESTATUS      ${EMPTY}

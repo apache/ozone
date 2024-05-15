@@ -83,7 +83,6 @@ import static org.apache.hadoop.hdds.scm.container.replication.ReplicationTestUt
 import static org.apache.hadoop.hdds.scm.net.NetConstants.LEAF_SCHEMA;
 import static org.apache.hadoop.hdds.scm.net.NetConstants.RACK_SCHEMA;
 import static org.apache.hadoop.hdds.scm.net.NetConstants.ROOT_SCHEMA;
-import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
@@ -1171,10 +1170,6 @@ public class TestECUnderReplicationHandler {
         result, remainingMaintenanceRedundancy);
     int replicateCommand = 0;
     int reconstructCommand = 0;
-    byte[] missingIndexesByteArr = new byte[missingIndexes.size()];
-    for (int i = 0; i < missingIndexes.size(); i++) {
-      missingIndexesByteArr[i] = missingIndexes.get(i).byteValue();
-    }
     boolean shouldReconstructCommandExist =
         missingIndexes.size() > 0 && missingIndexes.size() <= repConfig
             .getParity();
@@ -1184,7 +1179,7 @@ public class TestECUnderReplicationHandler {
       } else if (dnCommand
           .getValue() instanceof ReconstructECContainersCommand) {
         if (shouldReconstructCommandExist) {
-          assertArrayEquals(missingIndexesByteArr,
+          assertEquals(ECUnderReplicationHandler.integers2ByteString(missingIndexes),
               ((ReconstructECContainersCommand) dnCommand.getValue())
               .getMissingContainerIndexes());
         }

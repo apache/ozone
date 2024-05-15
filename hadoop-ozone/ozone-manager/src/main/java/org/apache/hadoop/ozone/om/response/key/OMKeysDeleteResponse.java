@@ -34,23 +34,27 @@ import java.util.List;
 import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.BUCKET_TABLE;
 import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.DELETED_TABLE;
 import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.KEY_TABLE;
+import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.OPEN_KEY_TABLE;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status.OK;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status.PARTIAL_DELETE;
 
 /**
  * Response for DeleteKey request.
  */
-@CleanupTableInfo(cleanupTables = {KEY_TABLE, DELETED_TABLE, BUCKET_TABLE})
+@CleanupTableInfo(cleanupTables = {KEY_TABLE, OPEN_KEY_TABLE, DELETED_TABLE, BUCKET_TABLE})
 public class OMKeysDeleteResponse extends AbstractOMKeyDeleteResponse {
   private List<OmKeyInfo> omKeyInfoList;
   private OmBucketInfo omBucketInfo;
+  private List<String> dbOpenKeys;
 
   public OMKeysDeleteResponse(@Nonnull OMResponse omResponse,
       @Nonnull List<OmKeyInfo> keyDeleteList,
-      boolean isRatisEnabled, @Nonnull OmBucketInfo omBucketInfo) {
+      boolean isRatisEnabled, @Nonnull OmBucketInfo omBucketInfo,
+      @Nonnull List<String> dbOpenKeys) {
     super(omResponse, isRatisEnabled);
     this.omKeyInfoList = keyDeleteList;
     this.omBucketInfo = omBucketInfo;
+    this.dbOpenKeys = dbOpenKeys;
   }
 
   /**
@@ -95,6 +99,11 @@ public class OMKeysDeleteResponse extends AbstractOMKeyDeleteResponse {
     omMetadataManager.getBucketTable().putWithBatch(batchOperation,
         omMetadataManager.getBucketKey(omBucketInfo.getVolumeName(),
             omBucketInfo.getBucketName()), omBucketInfo);
+
+    for (String dbOpenKey : dbOpenKeys) {
+      omMetadataManager.getOpenKeyTable(getBucketLayout()).deleteWithBatch(
+          batchOperation, dbOpenKey);
+    }
   }
 
   public List<OmKeyInfo> getOmKeyInfoList() {
@@ -103,5 +112,9 @@ public class OMKeysDeleteResponse extends AbstractOMKeyDeleteResponse {
 
   public OmBucketInfo getOmBucketInfo() {
     return omBucketInfo;
+  }
+
+  public List<String> getDbOpenKeys() {
+    return dbOpenKeys;
   }
 }

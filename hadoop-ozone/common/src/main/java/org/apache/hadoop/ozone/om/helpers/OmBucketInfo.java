@@ -19,17 +19,18 @@ package org.apache.hadoop.ozone.om.helpers;
 
 
 import java.util.ArrayList;
-import java.util.BitSet;
-import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.stream.Collectors;
 
+import com.google.common.collect.ImmutableList;
 import org.apache.hadoop.hdds.client.DefaultReplicationConfig;
 import org.apache.hadoop.hdds.protocol.StorageType;
 import org.apache.hadoop.hdds.utils.db.Codec;
+import org.apache.hadoop.hdds.utils.db.CopyObject;
 import org.apache.hadoop.hdds.utils.db.DelegatedCodec;
 import org.apache.hadoop.hdds.utils.db.Proto2Codec;
 import org.apache.hadoop.ozone.OzoneAcl;
@@ -43,7 +44,7 @@ import com.google.common.base.Preconditions;
 /**
  * A class that encapsulates Bucket Info.
  */
-public final class OmBucketInfo extends WithObjectID implements Auditable {
+public final class OmBucketInfo extends WithObjectID implements Auditable, CopyObject<OmBucketInfo> {
   private static final Codec<OmBucketInfo> CODEC = new DelegatedCodec<>(
       Proto2Codec.get(BucketInfo.getDefaultInstance()),
       OmBucketInfo::getFromProtobuf,
@@ -64,7 +65,7 @@ public final class OmBucketInfo extends WithObjectID implements Auditable {
   /**
    * ACL Information (mutable).
    */
-  private final List<OzoneAcl> acls;
+  private final CopyOnWriteArrayList<OzoneAcl> acls;
   /**
    * Bucket Version flag.
    */
@@ -105,17 +106,15 @@ public final class OmBucketInfo extends WithObjectID implements Auditable {
   /**
    * Bucket Layout.
    */
-  private BucketLayout bucketLayout;
+  private final BucketLayout bucketLayout;
 
   private String owner;
 
   private OmBucketInfo(Builder b) {
-    setMetadata(b.metadata);
-    setObjectID(b.objectID);
-    setUpdateID(b.updateID);
+    super(b);
     this.volumeName = b.volumeName;
     this.bucketName = b.bucketName;
-    this.acls = b.acls;
+    this.acls = new CopyOnWriteArrayList<>(b.acls);
     this.isVersionEnabled = b.isVersionEnabled;
     this.storageType = b.storageType;
     this.creationTime = b.creationTime;
@@ -153,7 +152,7 @@ public final class OmBucketInfo extends WithObjectID implements Auditable {
    * @return {@literal List<OzoneAcl>}
    */
   public List<OzoneAcl> getAcls() {
-    return acls;
+    return ImmutableList.copyOf(acls);
   }
 
   /**
@@ -329,23 +328,27 @@ public final class OmBucketInfo extends WithObjectID implements Auditable {
     auditMap.put(OzoneConsts.USED_BYTES, String.valueOf(this.usedBytes));
     auditMap.put(OzoneConsts.USED_NAMESPACE,
         String.valueOf(this.usedNamespace));
+    auditMap.put(OzoneConsts.OWNER, this.owner);
+    auditMap.put(OzoneConsts.REPLICATION_TYPE,
+        (this.defaultReplicationConfig != null) ?
+            String.valueOf(this.defaultReplicationConfig.getType()) : null);
+    auditMap.put(OzoneConsts.REPLICATION_CONFIG,
+        (this.defaultReplicationConfig != null) ?
+            this.defaultReplicationConfig.getReplicationConfig()
+                .getReplication() : null);
+    auditMap.put(OzoneConsts.QUOTA_IN_BYTES, String.valueOf(this.quotaInBytes));
+    auditMap.put(OzoneConsts.QUOTA_IN_NAMESPACE,
+        String.valueOf(this.quotaInNamespace));
     return auditMap;
   }
 
-  /**
-   * Return a new copy of the object.
-   */
+  @Override
   public OmBucketInfo copyObject() {
     Builder builder = toBuilder();
 
     if (bekInfo != null) {
       builder.setBucketEncryptionKey(bekInfo.copy());
     }
-
-    builder.acls.clear();
-    acls.forEach(acl -> builder.addAcl(new OzoneAcl(acl.getType(),
-        acl.getName(), (BitSet) acl.getAclBitSet().clone(),
-        acl.getAclScope())));
 
     if (defaultReplicationConfig != null) {
       builder.setDefaultReplicationConfig(defaultReplicationConfig.copy());
@@ -355,20 +358,17 @@ public final class OmBucketInfo extends WithObjectID implements Auditable {
   }
 
   public Builder toBuilder() {
-    return new Builder()
+    return new Builder(this)
         .setVolumeName(volumeName)
         .setBucketName(bucketName)
         .setStorageType(storageType)
         .setIsVersionEnabled(isVersionEnabled)
         .setCreationTime(creationTime)
         .setModificationTime(modificationTime)
-        .setObjectID(getObjectID())
-        .setUpdateID(getUpdateID())
         .setBucketEncryptionKey(bekInfo)
         .setSourceVolume(sourceVolume)
         .setSourceBucket(sourceBucket)
         .setAcls(acls)
-        .addAllMetadata(getMetadata())
         .setUsedBytes(usedBytes)
         .setUsedNamespace(usedNamespace)
         .setQuotaInBytes(quotaInBytes)
@@ -381,37 +381,30 @@ public final class OmBucketInfo extends WithObjectID implements Auditable {
   /**
    * Builder for OmBucketInfo.
    */
-  public static class Builder {
+  public static class Builder extends WithObjectID.Builder {
     private String volumeName;
     private String bucketName;
-    private List<OzoneAcl> acls;
-    private Boolean isVersionEnabled;
-    private StorageType storageType;
+    private final List<OzoneAcl> acls = new ArrayList<>();
+    private boolean isVersionEnabled;
+    private StorageType storageType = StorageType.DISK;
     private long creationTime;
     private long modificationTime;
-    private long objectID;
-    private long updateID;
-    private Map<String, String> metadata;
     private BucketEncryptionKeyInfo bekInfo;
     private String sourceVolume;
     private String sourceBucket;
     private long usedBytes;
     private long usedNamespace;
-    private long quotaInBytes;
-    private long quotaInNamespace;
-    private BucketLayout bucketLayout;
+    private long quotaInBytes = OzoneConsts.QUOTA_RESET;
+    private long quotaInNamespace = OzoneConsts.QUOTA_RESET;
+    private BucketLayout bucketLayout = BucketLayout.DEFAULT;
     private String owner;
     private DefaultReplicationConfig defaultReplicationConfig;
 
     public Builder() {
-      //Default values
-      this.acls = new ArrayList<>();
-      this.isVersionEnabled = false;
-      this.storageType = StorageType.DISK;
-      this.metadata = new HashMap<>();
-      this.quotaInBytes = OzoneConsts.QUOTA_RESET;
-      this.quotaInNamespace = OzoneConsts.QUOTA_RESET;
-      this.bucketLayout = BucketLayout.DEFAULT;
+    }
+
+    private Builder(OmBucketInfo obj) {
+      super(obj);
     }
 
     public Builder setVolumeName(String volume) {
@@ -442,7 +435,7 @@ public final class OmBucketInfo extends WithObjectID implements Auditable {
       return this;
     }
 
-    public Builder setIsVersionEnabled(Boolean versionFlag) {
+    public Builder setIsVersionEnabled(boolean versionFlag) {
       this.isVersionEnabled = versionFlag;
       return this;
     }
@@ -462,25 +455,27 @@ public final class OmBucketInfo extends WithObjectID implements Auditable {
       return this;
     }
 
+    @Override
     public Builder setObjectID(long obId) {
-      this.objectID = obId;
+      super.setObjectID(obId);
       return this;
     }
 
+    @Override
     public Builder setUpdateID(long id) {
-      this.updateID = id;
+      super.setUpdateID(id);
       return this;
     }
 
+    @Override
     public Builder addMetadata(String key, String value) {
-      metadata.put(key, value);
+      super.addMetadata(key, value);
       return this;
     }
 
+    @Override
     public Builder addAllMetadata(Map<String, String> additionalMetadata) {
-      if (additionalMetadata != null) {
-        metadata.putAll(additionalMetadata);
-      }
+      super.addAllMetadata(additionalMetadata);
       return this;
     }
 
@@ -550,7 +545,6 @@ public final class OmBucketInfo extends WithObjectID implements Auditable {
       Preconditions.checkNotNull(volumeName);
       Preconditions.checkNotNull(bucketName);
       Preconditions.checkNotNull(acls);
-      Preconditions.checkNotNull(isVersionEnabled);
       Preconditions.checkNotNull(storageType);
       return new OmBucketInfo(this);
     }
