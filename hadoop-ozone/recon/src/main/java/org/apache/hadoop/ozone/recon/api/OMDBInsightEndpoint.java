@@ -966,6 +966,7 @@ public class OMDBInsightEndpoint {
 
   public Map<String, OmKeyInfo> searchKeysInFSO(ParamInfo paramInfo)
       throws IOException, IllegalArgumentException {
+    int originalLimit = paramInfo.getLimit();
     Map<String, OmKeyInfo> matchedKeys = new LinkedHashMap<>();
     // Convert the search prefix to an object path for FSO buckets
     String startPrefixObjectPath = convertToObjectPath(paramInfo.getStartPrefix());
@@ -995,10 +996,10 @@ public class OMDBInsightEndpoint {
       // Iterate over the subpaths and retrieve the files
       for (String subPath : subPaths) {
         paramInfo.setStartPrefix(subPath);
-        paramInfo.setLimit(paramInfo.getLimit() - matchedKeys.size());
         matchedKeys.putAll(
             retrieveKeysFromTable(fileTable, paramInfo));
-        if (matchedKeys.size() >= paramInfo.getLimit()) {
+        paramInfo.setLimit(originalLimit - matchedKeys.size());
+        if (matchedKeys.size() >= originalLimit) {
           break;
         }
       }
