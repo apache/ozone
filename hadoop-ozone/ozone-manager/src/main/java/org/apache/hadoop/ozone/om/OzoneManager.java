@@ -47,6 +47,7 @@ import java.util.Set;
 import java.util.Timer;
 import java.util.TimerTask;
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
@@ -1669,21 +1670,27 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     }
 
     // Set metrics and start metrics back ground thread
-    metrics.setNumVolumes(metadataManager.countRowsInTable(metadataManager
-        .getVolumeTable()));
-    metrics.setNumBuckets(metadataManager.countRowsInTable(metadataManager
-        .getBucketTable()));
+    CompletableFuture.runAsync(() -> {
+      try {
+        metrics.setNumVolumes(
+            metadataManager.countRowsInTable(metadataManager.getVolumeTable()));
+        metrics.setNumBuckets(
+            metadataManager.countRowsInTable(metadataManager.getBucketTable()));
 
-    if (getMetricsStorageFile().exists()) {
-      OmMetricsInfo metricsInfo = READER.readValue(getMetricsStorageFile());
-      metrics.setNumKeys(metricsInfo.getNumKeys());
-    }
+        if (getMetricsStorageFile().exists()) {
+          OmMetricsInfo metricsInfo = READER.readValue(getMetricsStorageFile());
+          metrics.setNumKeys(metricsInfo.getNumKeys());
+        }
 
-    // FSO(FILE_SYSTEM_OPTIMIZED)
-    metrics.setNumDirs(metadataManager
-        .countEstimatedRowsInTable(metadataManager.getDirectoryTable()));
-    metrics.setNumFiles(metadataManager
-        .countEstimatedRowsInTable(metadataManager.getFileTable()));
+        // FSO(FILE_SYSTEM_OPTIMIZED)
+        metrics.setNumDirs(metadataManager.countEstimatedRowsInTable(
+            metadataManager.getDirectoryTable()));
+        metrics.setNumFiles(metadataManager.countEstimatedRowsInTable(
+            metadataManager.getFileTable()));
+      } catch (IOException e) {
+        LOG.warn("Async set om metrics fail.", e);
+      }
+    });
 
     // Schedule save metrics
     long period = configuration.getTimeDuration(OZONE_OM_METRICS_SAVE_INTERVAL,
