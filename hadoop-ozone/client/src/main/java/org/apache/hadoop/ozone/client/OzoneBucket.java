@@ -62,6 +62,7 @@ import java.util.Stack;
 import java.util.NoSuchElementException;
 import java.util.stream.Collectors;
 
+import static org.apache.hadoop.ozone.OzoneConsts.ETAG;
 import static org.apache.hadoop.ozone.OzoneConsts.QUOTA_RESET;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.FILE_NOT_FOUND;
@@ -679,7 +680,16 @@ public class OzoneBucket extends WithMetadata {
   public OmMultipartInfo initiateMultipartUpload(String keyName,
       ReplicationConfig config)
       throws IOException {
-    return proxy.initiateMultipartUpload(volumeName, name, keyName, config);
+    return initiateMultipartUpload(keyName, config, Collections.emptyMap());
+  }
+
+  /**
+   * Initiate multipart upload for a specified key.
+   */
+  public OmMultipartInfo initiateMultipartUpload(String keyName,
+      ReplicationConfig config, Map<String, String> metadata)
+      throws IOException {
+    return proxy.initiateMultipartUpload(volumeName, name, keyName, config, metadata);
   }
 
   /**
@@ -1276,23 +1286,32 @@ public class OzoneBucket extends WithMetadata {
     protected List<OzoneKey> buildKeysWithKeyPrefix(
         List<OzoneFileStatusLight> statuses) {
       return statuses.stream()
-          .map(status -> {
-            BasicOmKeyInfo keyInfo = status.getKeyInfo();
-            String keyName = keyInfo.getKeyName();
-            if (status.isDirectory()) {
-              // add trailing slash to represent directory
-              keyName = OzoneFSUtils.addTrailingSlashIfNeeded(keyName);
-            }
-            return new OzoneKey(keyInfo.getVolumeName(),
-                keyInfo.getBucketName(), keyName,
-                keyInfo.getDataSize(), keyInfo.getCreationTime(),
-                keyInfo.getModificationTime(),
-                keyInfo.getReplicationConfig(), keyInfo.isFile());
-          })
+          .map(OzoneBucket::toOzoneKey)
           .filter(key -> StringUtils.startsWith(key.getName(), getKeyPrefix()))
           .collect(Collectors.toList());
     }
 
+  }
+
+  private static OzoneKey toOzoneKey(OzoneFileStatusLight status) {
+    BasicOmKeyInfo keyInfo = status.getKeyInfo();
+    String keyName = keyInfo.getKeyName();
+    final Map<String, String> metadata;
+    if (status.isDirectory()) {
+      // add trailing slash to represent directory
+      keyName = OzoneFSUtils.addTrailingSlashIfNeeded(keyName);
+      metadata = Collections.emptyMap();
+    } else {
+      metadata = Collections.singletonMap(ETAG, keyInfo.getETag());
+    }
+    return new OzoneKey(keyInfo.getVolumeName(),
+        keyInfo.getBucketName(), keyName,
+        keyInfo.getDataSize(), keyInfo.getCreationTime(),
+        keyInfo.getModificationTime(),
+        keyInfo.getReplicationConfig(),
+        metadata,
+        keyInfo.isFile(),
+        keyInfo.getOwnerName());
   }
 
 
@@ -1662,21 +1681,7 @@ public class OzoneBucket extends WithMetadata {
       for (int indx = 0; indx < statuses.size(); indx++) {
         OzoneFileStatusLight status = statuses.get(indx);
         BasicOmKeyInfo keyInfo = status.getKeyInfo();
-        String keyName = keyInfo.getKeyName();
-
-        OzoneKey ozoneKey;
-        // Add dir to the dirList
-        if (status.isDirectory()) {
-          // add trailing slash to represent directory
-          keyName = OzoneFSUtils.addTrailingSlashIfNeeded(keyName);
-        }
-        ozoneKey = new OzoneKey(keyInfo.getVolumeName(),
-            keyInfo.getBucketName(), keyName,
-            keyInfo.getDataSize(), keyInfo.getCreationTime(),
-            keyInfo.getModificationTime(),
-            keyInfo.getReplicationConfig(),
-            keyInfo.isFile());
-
+        OzoneKey ozoneKey = toOzoneKey(status);
         keysResultList.add(ozoneKey);
 
         if (status.isDirectory()) {
@@ -1779,7 +1784,8 @@ public class OzoneBucket extends WithMetadata {
             keyInfo.getDataSize(), keyInfo.getCreationTime(),
             keyInfo.getModificationTime(),
             keyInfo.getReplicationConfig(),
-            keyInfo.isFile());
+            keyInfo.isFile(),
+            keyInfo.getOwnerName());
         keysResultList.add(ozoneKey);
       }
     }

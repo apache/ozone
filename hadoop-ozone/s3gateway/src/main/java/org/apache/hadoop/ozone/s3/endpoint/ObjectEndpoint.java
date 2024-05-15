@@ -58,8 +58,6 @@ import org.apache.hadoop.ozone.client.OzoneKey;
 import org.apache.hadoop.ozone.client.OzoneKeyDetails;
 import org.apache.hadoop.ozone.client.OzoneMultipartUploadPartListParts;
 import org.apache.hadoop.ozone.client.OzoneVolume;
-import org.apache.hadoop.ozone.client.io.KeyMetadataAware;
-import org.apache.hadoop.ozone.client.io.KeyOutputStream;
 import org.apache.hadoop.ozone.client.io.OzoneInputStream;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
@@ -291,14 +289,6 @@ public class ObjectEndpoint extends EndpointBase {
       // Normal put object
       Map<String, String> customMetadata =
           getCustomMetadataFromHeaders(headers.getRequestHeaders());
-      if (customMetadata.containsKey(ETAG)
-          || customMetadata.containsKey(ETAG.toLowerCase())) {
-        String customETag = customMetadata.get(ETAG) != null ?
-            customMetadata.get(ETAG) : customMetadata.get(ETAG.toLowerCase());
-        customMetadata.remove(ETAG);
-        customMetadata.remove(ETAG.toLowerCase());
-        customMetadata.put(ETAG_CUSTOM, customETag);
-      }
 
       if ("STREAMING-AWS4-HMAC-SHA256-PAYLOAD"
           .equals(headers.getHeaderString("x-amz-content-sha256"))) {
@@ -611,7 +601,7 @@ public class ObjectEndpoint extends EndpointBase {
       // Should not return ETag header if the ETag is not set
       // doing so will result in "null" string being returned instead
       // which breaks some AWS SDK implementation
-      response.header(ETAG, "" + wrapInQuotes(key.getMetadata().get(ETAG)));
+      response.header(ETAG, wrapInQuotes(key.getMetadata().get(ETAG)));
     }
 
     addLastModifiedDate(response, key);
@@ -756,11 +746,14 @@ public class ObjectEndpoint extends EndpointBase {
       OzoneBucket ozoneBucket = getBucket(bucket);
       String storageType = headers.getHeaderString(STORAGE_CLASS_HEADER);
 
+      Map<String, String> customMetadata =
+          getCustomMetadataFromHeaders(headers.getRequestHeaders());
+
       ReplicationConfig replicationConfig =
           getReplicationConfig(ozoneBucket, storageType);
 
       OmMultipartInfo multipartInfo =
-          ozoneBucket.initiateMultipartUpload(key, replicationConfig);
+          ozoneBucket.initiateMultipartUpload(key, replicationConfig, customMetadata);
 
       MultipartUploadInitiateResponse multipartUploadInitiateResponse = new
           MultipartUploadInitiateResponse();
@@ -926,10 +919,8 @@ public class ObjectEndpoint extends EndpointBase {
                 uploadID, chunkSize, digestInputStream, perf);
       }
       // OmMultipartCommitUploadPartInfo can only be gotten after the
-      // OzoneOutputStream is closed, so we need to save the KeyOutputStream
-      // in the OzoneOutputStream and use it to get the
-      // OmMultipartCommitUploadPartInfo after OzoneOutputStream is closed.
-      KeyOutputStream keyOutputStream = null;
+      // OzoneOutputStream is closed, so we need to save the OzoneOutputStream
+      final OzoneOutputStream outputStream;
       long metadataLatencyNs;
       if (copyHeader != null) {
         Pair<String, String> result = parseSourceHeader(copyHeader);
@@ -980,7 +971,7 @@ public class ObjectEndpoint extends EndpointBase {
                   sourceObject, ozoneOutputStream, 0, length);
               ozoneOutputStream.getMetadata()
                   .putAll(sourceKeyDetails.getMetadata());
-              keyOutputStream = ozoneOutputStream.getKeyOutputStream();
+              outputStream = ozoneOutputStream;
             }
           } else {
             try (OzoneOutputStream ozoneOutputStream = getClientProtocol()
@@ -991,7 +982,7 @@ public class ObjectEndpoint extends EndpointBase {
               copyLength = IOUtils.copyLarge(sourceObject, ozoneOutputStream);
               ozoneOutputStream.getMetadata()
                   .putAll(sourceKeyDetails.getMetadata());
-              keyOutputStream = ozoneOutputStream.getKeyOutputStream();
+              outputStream = ozoneOutputStream;
             }
           }
           getMetrics().incCopyObjectSuccessLength(copyLength);
@@ -1005,21 +996,18 @@ public class ObjectEndpoint extends EndpointBase {
           metadataLatencyNs =
               getMetrics().updatePutKeyMetadataStats(startNanos);
           putLength = IOUtils.copyLarge(digestInputStream, ozoneOutputStream);
-          ((KeyMetadataAware)ozoneOutputStream.getOutputStream())
-              .getMetadata().put(ETAG, DatatypeConverter.printHexBinary(
-                      digestInputStream.getMessageDigest().digest())
-                  .toLowerCase());
-          keyOutputStream
-              = ozoneOutputStream.getKeyOutputStream();
+          byte[] digest = digestInputStream.getMessageDigest().digest();
+          ozoneOutputStream.getMetadata()
+              .put(ETAG, DatatypeConverter.printHexBinary(digest).toLowerCase());
+          outputStream = ozoneOutputStream;
         }
         getMetrics().incPutKeySuccessLength(putLength);
         perf.appendSizeBytes(putLength);
       }
       perf.appendMetaLatencyNanos(metadataLatencyNs);
 
-      assert keyOutputStream != null;
       OmMultipartCommitUploadPartInfo omMultipartCommitUploadPartInfo =
-          keyOutputStream.getCommitUploadPartInfo();
+          outputStream.getCommitUploadPartInfo();
       String eTag = omMultipartCommitUploadPartInfo.getETag();
       // If the OmMultipartCommitUploadPartInfo does not contain eTag,
       // fall back to MPU part name for compatibility in case the (old) OM
@@ -1356,7 +1344,7 @@ public class ObjectEndpoint extends EndpointBase {
     return datastreamEnabled;
   }
 
-  private String wrapInQuotes(String value) {
+  static String wrapInQuotes(String value) {
     return "\"" + value + "\"";
   }
 

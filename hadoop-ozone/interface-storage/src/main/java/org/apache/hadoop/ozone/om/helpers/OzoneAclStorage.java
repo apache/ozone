@@ -17,8 +17,6 @@
  */
 package org.apache.hadoop.ozone.om.helpers;
 
-import com.google.protobuf.ByteString;
-
 import java.util.BitSet;
 import java.util.EnumSet;
 import java.util.List;
@@ -55,7 +53,7 @@ final class OzoneAclStorage {
         .setName(acl.getName())
         .setType(OzoneAclType.valueOf(acl.getType().name()))
         .setAclScope(OzoneAclScope.valueOf(acl.getAclScope().name()))
-        .setRights(ByteString.copyFrom(acl.getAclByteArray()));
+        .setRights(acl.getAclByteString());
     return builder.build();
   }
 

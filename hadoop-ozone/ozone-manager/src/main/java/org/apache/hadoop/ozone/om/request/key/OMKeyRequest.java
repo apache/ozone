@@ -822,6 +822,7 @@ public abstract class OMKeyRequest extends OMClientRequest {
             .addAllMetadata(KeyValueUtil.getFromProtobuf(
                     keyArgs.getMetadataList()))
             .setUpdateID(transactionLogIndex)
+            .setOwnerName(keyArgs.getOwnerName())
             .setFile(true);
     if (omPathInfo instanceof OMFileRequest.OMPathInfoWithFSO) {
       // FileTable metadata format

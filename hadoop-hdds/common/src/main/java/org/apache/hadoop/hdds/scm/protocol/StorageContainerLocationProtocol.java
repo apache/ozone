@@ -252,7 +252,7 @@ public interface StorageContainerLocationProtocol extends Closeable {
       throws IOException;
 
   List<DatanodeAdminError> startMaintenanceNodes(List<String> nodes,
-      int endInHours) throws IOException;
+      int endInHours, boolean force) throws IOException;
 
   /**
    * Close a container.

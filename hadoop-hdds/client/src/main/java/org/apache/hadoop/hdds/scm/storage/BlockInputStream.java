@@ -317,10 +317,18 @@ public class BlockInputStream extends BlockExtendedInputStream {
       throw new IllegalArgumentException("Not GetBlock: response=" + response);
     }
     final GetBlockResponseProto b = response.getGetBlock();
+    final long blockLength = b.getBlockData().getSize();
     final List<ChunkInfo> chunks = b.getBlockData().getChunksList();
     for (int i = 0; i < chunks.size(); i++) {
       final ChunkInfo c = chunks.get(i);
-      if (c.getLen() <= 0) {
+      // HDDS-10682 caused an empty chunk to get written to the end of some EC blocks. Due to this
+      // validation, these blocks will not be readable. In the EC case, the empty chunk is always
+      // the last chunk and the offset is the block length. We can safely ignore this case and not fail.
+      if (c.getLen() <= 0 && i == chunks.size() - 1 && c.getOffset() == blockLength) {
+        DatanodeBlockID blockID = b.getBlockData().getBlockID();
+        LOG.warn("The last chunk is empty for container/block {}/{} with an offset of the block length. " +
+            "Likely due to HDDS-10682. This is safe to ignore.", blockID.getContainerID(), blockID.getLocalID());
+      } else if (c.getLen() <= 0) {
         throw new IOException("Failed to get chunkInfo["
             + i + "]: len == " + c.getLen());
       }

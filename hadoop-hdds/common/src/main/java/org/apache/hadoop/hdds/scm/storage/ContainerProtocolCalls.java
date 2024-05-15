@@ -731,13 +731,15 @@ public final class ContainerProtocolCalls  {
    * @return EchoResponseProto
    */
   public static EchoResponseProto echo(XceiverClientSpi client, String encodedContainerID,
-      long containerID, ByteString payloadReqBytes, int payloadRespSizeKB, int sleepTimeMs) throws IOException {
+      long containerID, ByteString payloadReqBytes, int payloadRespSizeKB, int sleepTimeMs, boolean readOnly)
+      throws IOException {
     ContainerProtos.EchoRequestProto getEcho =
         EchoRequestProto
             .newBuilder()
             .setPayload(payloadReqBytes)
             .setPayloadSizeResp(payloadRespSizeKB)
             .setSleepTimeMs(sleepTimeMs)
+            .setReadOnly(readOnly)
             .build();
     String id = client.getPipeline().getClosestNode().getUuidString();
 

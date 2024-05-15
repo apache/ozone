@@ -38,6 +38,7 @@ import picocli.CommandLine;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.anyBoolean;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.anyInt;
 import static org.mockito.Mockito.anyList;
 import static org.mockito.Mockito.mock;
@@ -102,7 +103,7 @@ public class TestMaintenanceSubCommand {
 
   @Test
   public void testNoErrorsWhenEnteringMaintenance() throws IOException  {
-    when(scmClient.startMaintenanceNodes(anyList(), anyInt()))
+    when(scmClient.startMaintenanceNodes(anyList(), anyInt(), eq(true)))
         .thenAnswer(invocation -> new ArrayList<DatanodeAdminError>());
 
     CommandLine c = new CommandLine(cmd);
@@ -126,7 +127,7 @@ public class TestMaintenanceSubCommand {
 
   @Test
   public void testErrorsReportedWhenEnteringMaintenance() throws IOException  {
-    when(scmClient.startMaintenanceNodes(anyList(), anyInt()))
+    when(scmClient.startMaintenanceNodes(anyList(), anyInt(), anyBoolean()))
         .thenAnswer(invocation -> {
           ArrayList<DatanodeAdminError> e = new ArrayList<>();
           e.add(new DatanodeAdminError("host1", "host1 error"));

@@ -81,9 +81,7 @@ import org.junit.jupiter.params.provider.ValueSource;
 import java.io.File;
 import java.io.IOException;
 import java.time.Instant;
-import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.ThreadLocalRandom;
 
@@ -93,6 +91,7 @@ import static org.apache.hadoop.ozone.OzoneConsts.FORCE_LEASE_RECOVERY_ENV;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_OFS_URI_SCHEME;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_ROOT;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
+import static org.apache.hadoop.ozone.TestDataUtil.cleanupDeletedTable;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ADDRESS_KEY;
 import static org.apache.hadoop.ozone.om.helpers.BucketLayout.FILE_SYSTEM_OPTIMIZED;
 import static org.apache.ozone.test.GenericTestUtils.getTestStartTime;
@@ -299,7 +298,7 @@ public class TestSecureOzoneRpcClient extends TestOzoneRpcClient {
   @ParameterizedTest
   @ValueSource(ints = {1 << 24, (1 << 24) + 1, (1 << 24) - 1})
   public void testPreallocateFileRecovery(long dataSize) throws Exception {
-    cleanupDeletedTable();
+    cleanupDeletedTable(ozoneManager);
     String volumeName = UUID.randomUUID().toString();
     String bucketName = UUID.randomUUID().toString();
 
@@ -368,25 +367,6 @@ public class TestSecureOzoneRpcClient extends TestOzoneRpcClient {
         assertThrows(OMException.class, out::close);
       }
     }
-  }
-
-  private void cleanupDeletedTable() throws IOException {
-    Table<String, RepeatedOmKeyInfo> deletedTable = ozoneManager.getMetadataManager().getDeletedTable();
-    List<String> nameList = new ArrayList<>();
-    try (TableIterator<String, ? extends Table.KeyValue<String, RepeatedOmKeyInfo>>
-             keyIter = deletedTable.iterator()) {
-      while (keyIter.hasNext()) {
-        Table.KeyValue<String, RepeatedOmKeyInfo> kv = keyIter.next();
-        nameList.add(kv.getKey());
-      }
-    }
-    nameList.forEach(k -> {
-      try {
-        deletedTable.delete(k);
-      } catch (IOException e) {
-        // do nothing
-      }
-    });
   }
 
   private void assertTokenIsNull(OmKeyInfo value) {

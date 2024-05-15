@@ -158,6 +158,6 @@ public class TestOMKeyCommitResponse extends TestOMKeyResponse {
           new RepeatedOmKeyInfo(e)));
     }
     return new OMKeyCommitResponse(omResponse, omKeyInfo, ozoneKey, openKey,
-        omBucketInfo, deleteKeyMap, isHSync, newOpenKeyInfo);
+        omBucketInfo, deleteKeyMap, isHSync, newOpenKeyInfo, null, null);
   }
 }

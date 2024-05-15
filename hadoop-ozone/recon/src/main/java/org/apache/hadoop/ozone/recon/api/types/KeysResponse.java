@@ -36,9 +36,13 @@ public class KeysResponse {
   @JsonProperty("keys")
   private Collection<KeyMetadata> keys;
 
-  public KeysResponse(long totalCount, Collection<KeyMetadata> keys) {
+  @JsonProperty("lastKey")
+  private String lastKey;
+
+  public KeysResponse(long totalCount, Collection<KeyMetadata> keys, String lastKey) {
     this.totalCount = totalCount;
     this.keys = keys;
+    this.lastKey = lastKey;
   }
 
   public long getTotalCount() {
@@ -47,5 +51,8 @@ public class KeysResponse {
 
   public Collection<KeyMetadata> getKeys() {
     return keys;
+  }
+  public String getLastKey() {
+    return lastKey;
   }
 }

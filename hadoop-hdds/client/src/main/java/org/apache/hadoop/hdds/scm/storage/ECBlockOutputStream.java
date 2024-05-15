@@ -116,17 +116,28 @@ public class ECBlockOutputStream extends BlockOutputStream {
     }
 
     BlockData checksumBlockData = null;
+    BlockID blockID = null;
     //Reverse Traversal as all parity will have checksumBytes
     for (int i = blockData.length - 1; i >= 0; i--) {
       BlockData bd = blockData[i];
       if (bd == null) {
         continue;
       }
+      if (blockID == null) {
+        // store the BlockID for logging
+        blockID = bd.getBlockID();
+      }
       List<ChunkInfo> chunks = bd.getChunks();
-      if (chunks != null && chunks.size() > 0 && chunks.get(0)
-          .hasStripeChecksum()) {
-        checksumBlockData = bd;
-        break;
+      if (chunks != null && chunks.size() > 0) {
+        if (chunks.get(0).hasStripeChecksum()) {
+          checksumBlockData = bd;
+          break;
+        } else {
+          ChunkInfo chunk = chunks.get(0);
+          LOG.debug("The first chunk in block with index {} does not have stripeChecksum. BlockID: {}, Block " +
+                  "size: {}. Chunk length: {}, Chunk offset: {}, hasChecksumData: {}, chunks size: {}.", i,
+              bd.getBlockID(), bd.getSize(), chunk.getLen(), chunk.getOffset(), chunk.hasChecksumData(), chunks.size());
+        }
       }
     }
 
@@ -159,9 +170,8 @@ public class ECBlockOutputStream extends BlockOutputStream {
       getContainerBlockData().clearChunks();
       getContainerBlockData().addAllChunks(newChunkList);
     } else {
-      throw new IOException("None of the block data have checksum " +
-          "which means " + parity + "(parity)+1 blocks are " +
-          "not present");
+      LOG.warn("Could not find checksum data in any index for blockData with BlockID {}, length {} and " +
+          "blockGroupLength {}.", blockID, blockData.length, blockGroupLength);
     }
 
     return executePutBlock(close, force, blockGroupLength);
