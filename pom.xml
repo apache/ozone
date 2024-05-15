@@ -112,7 +112,7 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
 
     <commons-beanutils.version>1.9.4</commons-beanutils.version>
     <commons-cli.version>1.6.0</commons-cli.version>
-    <commons-codec.version>1.15</commons-codec.version>
+    <commons-codec.version>1.17.0</commons-codec.version>
     <commons-collections.version>3.2.2</commons-collections.version>
     <commons-compress.version>1.26.0</commons-compress.version>
     <commons-configuration2.version>2.10.1</commons-configuration2.version>
@@ -174,13 +174,13 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
     <httpcore.version>4.4.16</httpcore.version>
 
     <!-- SLF4J/LOG4J version -->
-    <slf4j.version>2.0.12</slf4j.version>
+    <slf4j.version>2.0.13</slf4j.version>
     <log4j2.version>2.17.1</log4j2.version>
     <disruptor.version>3.4.4</disruptor.version>
     <reload4j.version>1.2.25</reload4j.version>
 
     <kerby.version>1.0.1</kerby.version>
-    <kotlin.version>1.9.22</kotlin.version>
+    <kotlin.version>1.9.24</kotlin.version>
     <metainf-services.version>1.11</metainf-services.version>
     <picocli.version>4.7.5</picocli.version>
     <prometheus.version>0.16.0</prometheus.version>
@@ -255,7 +255,7 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
     <maven-shade-plugin.version>3.5.2</maven-shade-plugin.version>
     <maven-jar-plugin.version>3.4.1</maven-jar-plugin.version>
     <maven-war-plugin.version>3.4.0</maven-war-plugin.version>
-    <maven-source-plugin.version>3.3.0</maven-source-plugin.version>
+    <maven-source-plugin.version>3.3.1</maven-source-plugin.version>
     <maven-pdf-plugin.version>1.6.1</maven-pdf-plugin.version>
     <maven-remote-resources-plugin.version>1.7.0</maven-remote-resources-plugin.version>
     <maven-enforcer-plugin.version>3.4.1</maven-enforcer-plugin.version>
@@ -292,7 +292,7 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
     <restrict-imports.enforcer.version>2.5.0</restrict-imports.enforcer.version>
     <jgrapht.version>1.4.0</jgrapht.version>
 
-    <spring.version>5.3.27</spring.version>
+    <spring.version>5.3.34</spring.version>
     <jooq.version>3.11.10</jooq.version>
 
     <vault.driver.version>5.1.0</vault.driver.version>

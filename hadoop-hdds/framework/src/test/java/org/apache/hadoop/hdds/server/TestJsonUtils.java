@@ -19,6 +19,7 @@ package org.apache.hadoop.hdds.server;
 
 import java.io.IOException;
 
+import org.apache.hadoop.hdds.JsonTestUtils;
 import org.apache.hadoop.hdds.client.OzoneQuota;
 
 import org.junit.jupiter.api.Test;
@@ -35,13 +36,13 @@ public class TestJsonUtils {
     OzoneQuota spaceQuota = OzoneQuota.parseSpaceQuota("123MB");
 
     String spaceStr =
-        JsonUtils.toJsonStringWithDefaultPrettyPrinter(spaceQuota);
+        JsonTestUtils.toJsonStringWithDefaultPrettyPrinter(spaceQuota);
     assertContains(spaceStr, "\"rawSize\" : 123");
     assertContains(spaceStr, "\"unit\" : \"MB\"");
 
     OzoneQuota nameSpace = OzoneQuota.parseNameSpaceQuota("1000");
     String nameSpaceStr =
-        JsonUtils.toJsonStringWithDefaultPrettyPrinter(nameSpace);
+        JsonTestUtils.toJsonStringWithDefaultPrettyPrinter(nameSpace);
     assertContains(nameSpaceStr, "\"quotaInNamespace\" : 1000");
   }
 

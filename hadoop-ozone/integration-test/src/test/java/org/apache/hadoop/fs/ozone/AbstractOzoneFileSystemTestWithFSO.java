@@ -497,7 +497,7 @@ abstract class AbstractOzoneFileSystemTestWithFSO extends AbstractOzoneFileSyste
   @Test
   public void testLeaseRecoverable() throws Exception {
     // Create a file
-    Path parent = new Path("/d1/d2/");
+    Path parent = new Path("/d1");
     Path source = new Path(parent, "file1");
 
     LeaseRecoverable fs = (LeaseRecoverable)getFs();
