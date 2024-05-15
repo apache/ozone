@@ -28,13 +28,7 @@ if [[ -n "${OM_SERVICE_ID}" ]] && [[ "${OM_SERVICE_ID}" != "om" ]]; then
   OM_HA_PARAM="--om-service-id=${OM_SERVICE_ID}"
 fi
 
-# use Docker Compose v2 if available
-if docker compose version > /dev/null 2>&1; then
-  echo "Using Docker Compose v2"
-  docker-compose() {
-    docker compose --progress quiet "$@"
-  }
-fi
+source ${_testlib_dir}/compose_v2_compatibility.sh
 
 : ${SCM:=scm}
 
