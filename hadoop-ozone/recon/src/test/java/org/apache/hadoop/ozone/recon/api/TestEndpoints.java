@@ -102,6 +102,7 @@ import org.jooq.DSLContext;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.mockito.Mockito;
 
 import static org.apache.hadoop.hdds.protocol.MockDatanodeDetails.randomDatanodeDetails;
 import static org.apache.hadoop.ozone.container.upgrade.UpgradeUtils.defaultLayoutVersionProto;
@@ -242,7 +243,7 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
         new ContainerWithPipeline(containerInfo, pipeline);
 
     mockScmClient = mock(
-        StorageContainerLocationProtocol.class);
+        StorageContainerLocationProtocol.class, Mockito.RETURNS_DEEP_STUBS);
     StorageContainerServiceProvider mockScmServiceProvider = mock(
         StorageContainerServiceProviderImpl.class);
     when(mockScmServiceProvider.getPipeline(
@@ -1321,14 +1322,71 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
 
   @Test
   public void testSuccessWhenDecommissionStatus() throws IOException {
-    when(mockScmClient.queryNode(any(), any(), any(), any(), any()))
-        .thenAnswer(invocation -> nodes); // 2 nodes decommissioning
+    when(mockScmClient.queryNode(any(), any(), any(), any(), any(Integer.class))).thenReturn(
+        nodes); // 2 nodes decommissioning
     when(mockScmClient.getContainersOnDecomNode(any())).thenReturn(containerOnDecom);
     when(mockScmClient.getMetrics(any())).thenReturn(metrics.get(1));
     Response datanodesDecommissionInfo = nodeEndpoint.getDatanodesDecommissionInfo();
-    List<Map<String, Object>> dnDecommissionInfo = (List<Map<String, Object>>) datanodesDecommissionInfo.getEntity();
+    Map<String, Object> responseMap = (Map<String, Object>) datanodesDecommissionInfo.getEntity();
+    List<Map<String, Object>> dnDecommissionInfo =
+        (List<Map<String, Object>>) responseMap.get("DatanodesDecommissionInfo");
     DatanodeDetails datanode = (DatanodeDetails) dnDecommissionInfo.get(0).get("datanodeDetails");
+    Map<String, Object> dnMetrics = (Map<String, Object>) dnDecommissionInfo.get(0).get("metrics");
+    Map<String, Object> containers = (Map<String, Object>) dnDecommissionInfo.get(0).get("containers");
     assertNotNull(datanode);
+    assertNotNull(dnMetrics);
+    assertNotNull(containers);
+    assertFalse(datanode.getUuidString().isEmpty());
+    assertFalse(((String) dnMetrics.get("decommissionStartTime")).isEmpty());
+    assertEquals(1, dnMetrics.get("numOfUnclosedPipelines"));
+    assertEquals(3.0, dnMetrics.get("numOfUnderReplicatedContainers"));
+    assertEquals(3.0, dnMetrics.get("numOfUnclosedContainers"));
+
+    assertEquals(3, ((List<String>) containers.get("UnderReplicated")).size());
+    assertEquals(3, ((List<String>) containers.get("UnClosed")).size());
+  }
+
+  @Test
+  public void testSuccessWhenDecommissionStatusWithUUID() throws IOException {
+    when(mockScmClient.queryNode(any(), any(), any(), any(), any(Integer.class))).thenReturn(
+        getNodeDetailsForUuid("654c4b89-04ef-4015-8a3b-50d0fb0e1684")); // 1 nodes decommissioning
+    when(mockScmClient.getContainersOnDecomNode(any())).thenReturn(containerOnDecom);
+    Response datanodesDecommissionInfo =
+        nodeEndpoint.getDecommissionInfoForDatanode("654c4b89-04ef-4015-8a3b-50d0fb0e1684", "");
+    Map<String, Object> responseMap = (Map<String, Object>) datanodesDecommissionInfo.getEntity();
+    List<Map<String, Object>> dnDecommissionInfo =
+        (List<Map<String, Object>>) responseMap.get("DatanodesDecommissionInfo");
+    DatanodeDetails datanode = (DatanodeDetails) dnDecommissionInfo.get(0).get("datanodeDetails");
+    Map<String, Object> containers = (Map<String, Object>) dnDecommissionInfo.get(0).get("containers");
+    assertNotNull(datanode);
+    assertNotNull(containers);
+    assertFalse(datanode.getUuidString().isEmpty());
+    assertEquals("654c4b89-04ef-4015-8a3b-50d0fb0e1684", datanode.getUuidString());
+
+    assertEquals(3, ((List<String>) containers.get("UnderReplicated")).size());
+    assertEquals(3, ((List<String>) containers.get("UnClosed")).size());
+  }
+
+  private List<HddsProtos.Node> getNodeDetailsForUuid(String uuid) {
+    List<HddsProtos.Node> nodesList = new ArrayList<>();
+
+    HddsProtos.DatanodeDetailsProto.Builder dnd =
+        HddsProtos.DatanodeDetailsProto.newBuilder();
+    dnd.setHostName("hostName");
+    dnd.setIpAddress("1.2.3.5");
+    dnd.setNetworkLocation("/default");
+    dnd.setNetworkName("hostName");
+    dnd.addPorts(HddsProtos.Port.newBuilder()
+        .setName("ratis").setValue(5678).build());
+    dnd.setUuid(uuid);
+
+    HddsProtos.Node.Builder builder = HddsProtos.Node.newBuilder();
+    builder.addNodeOperationalStates(
+        HddsProtos.NodeOperationalState.DECOMMISSIONING);
+    builder.addNodeStates(HddsProtos.NodeState.HEALTHY);
+    builder.setNodeID(dnd.build());
+    nodesList.add(builder.build());
+    return nodesList;
   }
 
   private List<HddsProtos.Node> getNodeDetails(int n) {
