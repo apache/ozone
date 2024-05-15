@@ -107,7 +107,7 @@ public final class DecommissionUtils {
   }
 
   /**
-   * Returns the counts of following info attributes:
+   * Returns the counts of following info attributes.
    *  - decommissionStartTime
    *  - numOfUnclosedPipelines
    *  - numOfUnderReplicatedContainers
