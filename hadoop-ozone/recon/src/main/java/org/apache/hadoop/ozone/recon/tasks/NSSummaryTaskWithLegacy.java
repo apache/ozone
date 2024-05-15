@@ -136,7 +136,15 @@ public class NSSummaryTaskWithLegacy extends NSSummaryTaskDbEventHandler {
                                            OMDBUpdateEvent.OMDBUpdateAction action,
                                            Map<Long, NSSummary> nsSummaryMap)
       throws IOException {
-    setKeyParentID(updatedKeyInfo);
+
+    try {
+      setKeyParentID(updatedKeyInfo);
+    } catch (IOException e) {
+      LOG.warn(
+          "Skipping NSSummary creation for key: {} due to missing parent key info. Exception: {}",
+          updatedKeyInfo.getKeyName(), e.getMessage());
+      return;
+    }
 
     if (!updatedKeyInfo.getKeyName().endsWith(OM_KEY_PREFIX)) {
       switch (action) {
@@ -150,7 +158,6 @@ public class NSSummaryTaskWithLegacy extends NSSummaryTaskDbEventHandler {
 
       case UPDATE:
         if (oldKeyInfo != null) {
-          setKeyParentID(oldKeyInfo);
           handleDeleteKeyEvent(oldKeyInfo, nsSummaryMap);
         } else {
           LOG.warn("Update event does not have the old keyInfo for {}.",
@@ -210,7 +217,13 @@ public class NSSummaryTaskWithLegacy extends NSSummaryTaskDbEventHandler {
                                             OMDBUpdateEvent.OMDBUpdateAction action,
                                             Map<Long, NSSummary> nsSummaryMap)
       throws IOException {
-    setParentBucketId(updatedKeyInfo);
+    try {
+      setParentBucketId(updatedKeyInfo);
+    } catch (IOException e) {
+      LOG.warn("Skipping NSSummary creation for key: {} due to missing parent bucket info. Exception: {}",
+          updatedKeyInfo.getKeyName(), e.getMessage());
+      return;
+    }
 
     switch (action) {
     case PUT:
@@ -223,7 +236,6 @@ public class NSSummaryTaskWithLegacy extends NSSummaryTaskDbEventHandler {
 
     case UPDATE:
       if (oldKeyInfo != null) {
-        setParentBucketId(oldKeyInfo);
         handleDeleteKeyEvent(oldKeyInfo, nsSummaryMap);
       } else {
         LOG.warn("Update event does not have the old keyInfo for {}.",
@@ -326,8 +338,9 @@ public class NSSummaryTaskWithLegacy extends NSSummaryTaskDbEventHandler {
       if (parentKeyInfo != null) {
         keyInfo.setParentObjectID(parentKeyInfo.getObjectID());
       } else {
-        throw new IOException("ParentKeyInfo for " +
-            "NSSummaryTaskWithLegacy is null");
+        LOG.warn("ParentKeyInfo for {} is null. Skipping NSSummary creation for key: {}",
+            fullParentKeyName, keyInfo.getKeyName());
+        throw new IOException("ParentKeyInfo for " + fullParentKeyName + " is null.");
       }
     } else {
       setParentBucketId(keyInfo);
@@ -349,8 +362,9 @@ public class NSSummaryTaskWithLegacy extends NSSummaryTaskDbEventHandler {
     if (parentBucketInfo != null) {
       keyInfo.setParentObjectID(parentBucketInfo.getObjectID());
     } else {
-      throw new IOException("ParentKeyInfo for " +
-          "NSSummaryTaskWithLegacy is null");
+      LOG.warn("ParentKeyInfo for bucket {} is null. Skipping NSSummary creation for key: {}",
+          bucketKey, keyInfo.getKeyName());
+      throw new IOException("ParentKeyInfo for bucket " + bucketKey + " is null.");
     }
   }
 
