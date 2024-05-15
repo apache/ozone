@@ -19,8 +19,8 @@ package org.apache.hadoop.hdds.scm.cli.datanode;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.google.common.base.Strings;
-import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
+import org.apache.hadoop.hdds.client.DecommissionUtils;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.cli.ScmSubcommand;
@@ -69,7 +69,8 @@ public class DecommissionStatusSubCommand extends ScmSubcommand {
   public void execute(ScmClient scmClient) throws IOException {
     Stream<HddsProtos.Node> allNodes = scmClient.queryNode(DECOMMISSIONING,
         null, HddsProtos.QueryScope.CLUSTER, "").stream();
-    List<HddsProtos.Node> decommissioningNodes = HddsUtils.getDecommissioningNodesList(allNodes, uuid, ipAddress);
+    List<HddsProtos.Node> decommissioningNodes =
+        DecommissionUtils.getDecommissioningNodesList(allNodes, uuid, ipAddress);
     if (!Strings.isNullOrEmpty(uuid)) {
       if (decommissioningNodes.isEmpty()) {
         System.err.println("Datanode: " + uuid + " is not in DECOMMISSIONING");
@@ -84,7 +85,7 @@ public class DecommissionStatusSubCommand extends ScmSubcommand {
     } else {
       if (!json) {
         System.out.println("\nDecommission Status: DECOMMISSIONING - " +
-                decommissioningNodes.size() + " node(s)");
+            decommissioningNodes.size() + " node(s)");
       }
     }
 
@@ -92,8 +93,8 @@ public class DecommissionStatusSubCommand extends ScmSubcommand {
     int numDecomNodes = -1;
     JsonNode jsonNode = null;
     if (metricsJson != null) {
-      jsonNode = HddsUtils.getBeansJsonNode(metricsJson);
-      numDecomNodes = HddsUtils.getNumDecomNodes(jsonNode);
+      jsonNode = DecommissionUtils.getBeansJsonNode(metricsJson);
+      numDecomNodes = DecommissionUtils.getNumDecomNodes(jsonNode);
     }
 
     if (json) {
@@ -150,7 +151,7 @@ public class DecommissionStatusSubCommand extends ScmSubcommand {
     Map<String, Object> countsMap = new LinkedHashMap<>();
     String errMsg = getErrorMessage() + datanode.getHostName();
     try {
-      countsMap = HddsUtils.getCountsMap(datanode, counts, numDecomNodes, countsMap, errMsg);
+      countsMap = DecommissionUtils.getCountsMap(datanode, counts, numDecomNodes, countsMap, errMsg);
       if (countsMap != null) {
         return countsMap;
       }

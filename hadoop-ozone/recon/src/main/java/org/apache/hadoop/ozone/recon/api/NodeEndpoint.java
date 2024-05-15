@@ -21,7 +21,7 @@ package org.apache.hadoop.ozone.recon.api;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.google.common.base.Preconditions;
 import org.apache.commons.lang3.StringUtils;
-import org.apache.hadoop.hdds.HddsUtils;
+import org.apache.hadoop.hdds.client.DecommissionUtils;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState;
@@ -381,13 +381,14 @@ public class NodeEndpoint {
     Map<String, Object> responseMap = new HashMap<>();
     Stream<HddsProtos.Node> allNodes = scmClient.queryNode(DECOMMISSIONING,
         null, HddsProtos.QueryScope.CLUSTER, "", ClientVersion.CURRENT_VERSION).stream();
-    List<HddsProtos.Node> decommissioningNodes = HddsUtils.getDecommissioningNodesList(allNodes, uuid, ipAddress);
+    List<HddsProtos.Node> decommissioningNodes =
+        DecommissionUtils.getDecommissioningNodesList(allNodes, uuid, ipAddress);
     String metricsJson = scmClient.getMetrics("Hadoop:service=StorageContainerManager,name=NodeDecommissionMetrics");
     int numDecomNodes = -1;
     JsonNode jsonNode = null;
     if (metricsJson != null) {
-      jsonNode = HddsUtils.getBeansJsonNode(metricsJson);
-      numDecomNodes = HddsUtils.getNumDecomNodes(jsonNode);
+      jsonNode = DecommissionUtils.getBeansJsonNode(metricsJson);
+      numDecomNodes = DecommissionUtils.getNumDecomNodes(jsonNode);
     }
     List<Map<String, Object>> dnDecommissionInfo =
         getDecommissioningNodesDetails(decommissioningNodes, jsonNode, numDecomNodes);
@@ -422,7 +423,7 @@ public class NodeEndpoint {
     Map<String, Object> countsMap = new LinkedHashMap<>();
     String errMsg = getErrorMessage() + datanode.getHostName();
     try {
-      countsMap = HddsUtils.getCountsMap(datanode, counts, numDecomNodes, countsMap, errMsg);
+      countsMap = DecommissionUtils.getCountsMap(datanode, counts, numDecomNodes, countsMap, errMsg);
       if (countsMap != null) {
         return countsMap;
       }
