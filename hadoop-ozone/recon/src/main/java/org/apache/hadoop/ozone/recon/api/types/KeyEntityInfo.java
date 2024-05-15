@@ -66,7 +66,6 @@ public class KeyEntityInfo {
   public KeyEntityInfo() {
     key = "";
     path = "";
-    inStateSince = Instant.now().toEpochMilli();
     size = 0L;
     replicatedSize = 0L;
     replicationConfig = null;
