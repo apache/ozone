@@ -145,7 +145,7 @@ public class ClientTrustManager extends X509ExtendedTrustManager {
   private List<X509Certificate> loadCerts(CACertificateProvider caCertsProvider)
       throws CertificateException {
     try {
-      LOG.info("Loading certificates for client.");
+      LOG.debug("Loading certificates for client.");
       if (caCertsProvider == null) {
         return remoteProvider.provideCACerts();
       }
