@@ -323,7 +323,7 @@ public class TestOzoneDelegationTokenSecretManager {
             () -> secretManager.renewToken(token, TEST_USER.toString()));
     String errorMessage = ioException.getMessage();
     assertTrue(errorMessage.contains("is expired") || errorMessage.contains("can't be found in cache"),
-        "\nExpecting:\n"+errorMessage+"\n to contain \"is expired\" or \"can't be found in cache\"");
+        "\nExpecting:\n" + errorMessage + "\n to contain \"is expired\" or \"can't be found in cache\"");
   }
 
   @Test
