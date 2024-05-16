@@ -20,7 +20,6 @@
 # test group.  For each set of matches, a flag is set to let github
 # actions know to run that test group.
 
-# Populates local Maven repository (similar to go-offline, but using actual build).
 # Downloads Node.js for multiple platforms (Linux, Mac)
 
 set -u -o pipefail
@@ -29,42 +28,36 @@ DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 cd "${DIR}/../.." || exit 1
 
 : ${REPO_DIR:="${HOME}/.m2/repository"}
-: ${MARKER_FILE:="${REPO_DIR}/.cache/org-apache-ozone/partial-cache"}
 
-declare -i rc=0
+mkdir -p "${REPO_DIR}"
 
-if [[ ! -d "${REPO_DIR}" ]]; then
-  echo "Error: repository dir ${REPO_DIR} does not exist"
-  exit 1
+declare -i rc=1
+
+if [[ -z "${NODEJS_VERSION:-}" ]]; then
+  NODEJS_VERSION=$(mvn help:evaluate -Dexpression=nodejs.version -q -DforceStdout)
 fi
 
-# Download Node.js manually
-NODEJS_VERSION=$(mvn help:evaluate -Dexpression=nodejs.version -q -DforceStdout)
 if [[ -n "${NODEJS_VERSION}" ]]; then
+  rc=0
   for platform in darwin-x64 linux-x64; do
-    output="${REPO_DIR}/com/github/eirslett/node/${NODEJS_VERSION}/node-${NODEJS_VERSION}-${platform}.tar.gz"
     url="https://nodejs.org/dist/v${NODEJS_VERSION}/node-v${NODEJS_VERSION}-${platform}.tar.gz"
+    output="${REPO_DIR}/com/github/eirslett/node/${NODEJS_VERSION}/node-${NODEJS_VERSION}-${platform}.tar.gz"
     mkdir -pv "$(dirname "${output}")"
-    curl --retry 3 --location --continue-at - -o "${output}" "${url}"
-    irc=$?
+
+    irc=1
+    for i in 1 2 3; do
+      echo "Downloading ${url}, attempt ${i}"
+      if curl --location --continue-at - -o "${output}" "${url}"; then
+        irc=0
+        break
+      fi
+      sleep 2
+    done
 
     if [[ ${rc} -eq 0 ]]; then
       rc=${irc}
     fi
   done
-fi
-
-MAVEN_OPTIONS="--batch-mode --fail-at-end --no-transfer-progress --show-version -Pgo-offline -Pdist"
-if ! mvn ${MAVEN_OPTIONS} clean verify; then
-  rc=1
-fi
-
-if [[ ${rc} -eq 0 ]]; then
-  rm -fv "${MARKER_FILE}"
-else
-  # Create Marker file if build fails to indicate cache is partial, needs to be rebuilt next time
-  mkdir -pv "$(dirname "${MARKER_FILE}")"
-  touch "${MARKER_FILE}"
 fi
 
 exit ${rc}

@@ -46,40 +46,46 @@ jobs:
             !~/.m2/repository/org/apache/ozone
           key: maven-repo-${{ hashFiles('**/pom.xml') }}
 
-      - name: Check for partial cache
-        id: verify-cache
-        run: |
-          cache_ok='true'
-          if [[ '${{ steps.restore-cache.outputs.cache-hit }}' != 'true' ]]; then
-            cache_ok='false'
-          elif [[ -e ~/.m2/repository/.cache/org-apache-ozone/partial-cache ]]; then
-            cache_ok='false'
-          fi
-          echo "cache-ok=$cache_ok" >> $GITHUB_OUTPUT
-
       - name: Setup Java
-        if: steps.verify-cache.outputs.cache-ok != 'true'
+        if: steps.restore-cache.outputs.cache-hit != 'true'
         uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
           java-version: 8
 
+      - name: Get NodeJS version
+        id: nodejs-version
+        if: steps.restore-cache.outputs.cache-hit != 'true'
+        run: nodejs-version=$(mvn help:evaluate -Dexpression=nodejs.version -q -DforceStdout) >> $GITHUB_OUTPUT
+
+      - name: Restore NodeJS tarballs
+        id: restore-nodejs
+        if: steps.restore-cache.outputs.cache-hit != 'true'
+        uses: actions/cache@v4
+        with:
+          path: ~/.m2/repository/com/github/eirslett/node
+          key: nodejs-${{ steps.nodejs-version.outputs.nodejs-version }}
+
+      - name: Download NodeJS
+        if: steps.restore-cache.outputs.cache-hit != 'true' && steps.restore-nodejs.outputs.cache-hit != 'true'
+        run: dev-support/ci/download-nodejs.sh
+        env:
+          NODEJS_VERSION: ${{ steps.nodejs-version.outputs.nodejs-version }}
+
       - name: Fetch dependencies
-        if: steps.verify-cache.outputs.cache-ok != 'true'
-        run: |
-          mkdir -p ~/.m2/repository
-          dev-support/ci/populate-cache.sh
-        continue-on-error: true
+        if: steps.restore-cache.outputs.cache-hit != 'true'
+        run: mvn --batch-mode --no-transfer-progress --show-version -Pgo-offline -Pdist clean verify
 
       - name: Delete Ozone jars from repo
-        if: steps.verify-cache.outputs.cache-ok != 'true'
+        if: steps.restore-cache.outputs.cache-hit != 'true'
         run: rm -fr ~/.m2/repository/org/apache/ozone
 
       - name: List repo contents
+        if: always()
         run: find ~/.m2/repository -type f | sort | xargs ls -lh
 
       - name: Save cache for Maven dependencies
-        if: steps.verify-cache.outputs.cache-ok != 'true'
+        if: steps.restore-cache.outputs.cache-hit != 'true'
         uses: actions/cache/save@v4
         with:
           path: |
