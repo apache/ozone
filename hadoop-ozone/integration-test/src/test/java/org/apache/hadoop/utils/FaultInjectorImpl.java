@@ -18,6 +18,7 @@
 package org.apache.hadoop.utils;
 
 import com.google.common.annotations.VisibleForTesting;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.utils.FaultInjector;
 import org.assertj.core.api.Fail;
 import org.junit.jupiter.api.Assertions;
@@ -32,6 +33,7 @@ public class FaultInjectorImpl extends FaultInjector {
   private CountDownLatch ready;
   private CountDownLatch wait;
   private Throwable ex;
+  private ContainerProtos.Type type = null;
 
   public FaultInjectorImpl() {
     init();
@@ -78,6 +80,16 @@ public class FaultInjectorImpl extends FaultInjector {
   @VisibleForTesting
   public Throwable getException() {
     return ex;
+  }
+
+  @VisibleForTesting
+  public void setType(ContainerProtos.Type type) {
+    this.type = type;
+  }
+
+  @VisibleForTesting
+  public ContainerProtos.Type getType() {
+    return type;
   }
 }
 
