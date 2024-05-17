@@ -1472,8 +1472,9 @@ public class KeyValueHandler extends Handler {
     if (injector != null && (request.getCmdType().equals(injector.getType()) || injector.getType() == null)) {
       synchronized (injector) {
         Throwable ex = injector.getException();
+        ContainerProtos.Type type = injector.getType();
         if (ex != null) {
-          if (injector.getType() == null) {
+          if (type == null) {
             injector = null;
           }
           return ContainerUtils.logAndReturnError(LOG, (StorageContainerException) ex, request);
