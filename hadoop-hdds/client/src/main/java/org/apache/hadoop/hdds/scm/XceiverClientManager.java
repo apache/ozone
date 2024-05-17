@@ -19,7 +19,6 @@
 package org.apache.hadoop.hdds.scm;
 
 import java.io.IOException;
-import java.util.concurrent.Callable;
 import java.util.concurrent.TimeUnit;
 
 import org.apache.hadoop.hdds.conf.Config;
