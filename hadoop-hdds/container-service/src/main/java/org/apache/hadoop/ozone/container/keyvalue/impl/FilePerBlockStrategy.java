@@ -54,6 +54,7 @@ import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
 import java.time.Duration;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Semaphore;
 
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.UNSUPPORTED_REQUEST;
 import static org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion.FILE_PER_BLOCK;
@@ -75,6 +76,8 @@ public class FilePerBlockStrategy implements ChunkManager {
   private final OpenFiles files = new OpenFiles();
   private final int defaultReadBufferCapacity;
   private final int readMappedBufferThreshold;
+  private final int readMappedBufferMaxCount;
+  private final Semaphore semaphore;
   private final VolumeSet volumeSet;
 
   public FilePerBlockStrategy(boolean sync, BlockManager manager,
@@ -84,7 +87,15 @@ public class FilePerBlockStrategy implements ChunkManager {
         manager.getDefaultReadBufferCapacity();
     this.readMappedBufferThreshold = manager == null ? 0
         : manager.getReadMappedBufferThreshold();
+    this.readMappedBufferMaxCount = manager == null ? null
+        : manager.getReadMappedBufferMaxCount();
+    LOG.info("ozone.chunk.read.mapped.buffer.max.count is load with {}", readMappedBufferMaxCount);
     this.volumeSet = volSet;
+    if (this.readMappedBufferMaxCount > 0) {
+      semaphore = new Semaphore(this.readMappedBufferMaxCount);
+    } else {
+      semaphore = null;
+    }
   }
 
   private static void checkLayoutVersion(Container container) {
@@ -192,10 +203,10 @@ public class FilePerBlockStrategy implements ChunkManager {
 
     final long len = info.getLen();
     long offset = info.getOffset();
-    int bufferCapacity =  ChunkManager.getBufferCapacityForChunkRead(info,
+    int bufferCapacity = ChunkManager.getBufferCapacityForChunkRead(info,
         defaultReadBufferCapacity);
     return ChunkUtils.readData(len, bufferCapacity, chunkFile, offset, volume,
-        readMappedBufferThreshold);
+        readMappedBufferThreshold, readMappedBufferMaxCount > 0, semaphore);
   }
 
   @Override

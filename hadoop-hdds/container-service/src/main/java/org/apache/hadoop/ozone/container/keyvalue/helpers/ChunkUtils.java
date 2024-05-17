@@ -40,6 +40,7 @@ import java.util.EnumSet;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.Semaphore;
 import java.util.function.Supplier;
 import java.util.function.ToLongFunction;
 
@@ -188,10 +189,10 @@ public final class ChunkUtils {
   }
 
   public static ChunkBuffer readData(long len, int bufferCapacity,
-      File file, long off, HddsVolume volume, int readMappedBufferThreshold)
-      throws StorageContainerException {
-    if (len > readMappedBufferThreshold) {
-      return readData(file, bufferCapacity, off, len, volume);
+      File file, long off, HddsVolume volume, int readMappedBufferThreshold, boolean mmapEnabled,
+      Semaphore semaphore) throws StorageContainerException {
+    if (mmapEnabled && len > readMappedBufferThreshold && bufferCapacity > readMappedBufferThreshold) {
+      return readData(file, bufferCapacity, off, len, volume, semaphore);
     } else if (len == 0) {
       return ChunkBuffer.wrap(Collections.emptyList());
     }
@@ -252,25 +253,39 @@ public final class ChunkUtils {
    * @return a list of {@link MappedByteBuffer} containing the data.
    */
   private static ChunkBuffer readData(File file, int chunkSize,
-      long offset, long length, HddsVolume volume)
+      long offset, long length, HddsVolume volume, Semaphore semaphore)
       throws StorageContainerException {
 
-    final List<ByteBuffer> buffers = new ArrayList<>(
-        Math.toIntExact((length - 1) / chunkSize) + 1);
-    readData(file, offset, length, channel -> {
-      long readLen = 0;
-      while (readLen < length) {
-        final int n = Math.toIntExact(Math.min(length - readLen, chunkSize));
-        final ByteBuffer mapped = channel.map(
-            FileChannel.MapMode.READ_ONLY, offset + readLen, n);
-        LOG.debug("mapped: offset={}, readLen={}, n={}, {}",
-            offset, readLen, n, mapped.getClass());
-        readLen += mapped.remaining();
-        buffers.add(mapped);
-      }
-      return readLen;
-    }, volume);
-    return ChunkBuffer.wrap(buffers);
+    final int bufferNum = Math.toIntExact((length - 1) / chunkSize) + 1;
+    if (!semaphore.tryAcquire(bufferNum)) {
+      // proceed with normal buffer
+      final ByteBuffer[] buffers = BufferUtils.assignByteBuffers(length,
+          chunkSize);
+      readData(file, offset, length, c -> c.position(offset).read(buffers), volume);
+      Arrays.stream(buffers).forEach(ByteBuffer::flip);
+      return ChunkBuffer.wrap(Arrays.asList(buffers));
+    } else {
+      // proceed with mapped buffer
+      LOG.debug("mapped buffer permits decreased by {} to total {}", bufferNum, semaphore.availablePermits());
+      final List<ByteBuffer> buffers = new ArrayList<>(bufferNum);
+      readData(file, offset, length, channel -> {
+        long readLen = 0;
+        while (readLen < length) {
+          final int n = Math.toIntExact(Math.min(length - readLen, chunkSize));
+          final ByteBuffer mapped = channel.map(
+              FileChannel.MapMode.READ_ONLY, offset + readLen, n);
+          LOG.debug("mapped: offset={}, readLen={}, n={}, {}",
+              offset, readLen, n, mapped.getClass());
+          readLen += mapped.remaining();
+          buffers.add(mapped);
+        }
+        return readLen;
+      }, volume);
+      return ChunkBuffer.wrap(buffers, permits -> {
+        semaphore.release(permits);
+        LOG.debug("mapped buffer permits increased by {} to total {}", permits, semaphore.availablePermits());
+      });
+    }
   }
 
   /**

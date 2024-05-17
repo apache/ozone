@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.common;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
 
+import java.nio.MappedByteBuffer;
 import java.util.Collections;
 import java.util.Iterator;
 import java.util.NoSuchElementException;
@@ -32,6 +33,7 @@ import java.nio.channels.GatheringByteChannel;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
+import java.util.function.Consumer;
 import java.util.function.Function;
 
 /**
@@ -46,6 +48,7 @@ public class ChunkBufferImplWithByteBufferList implements ChunkBuffer {
   /** Buffer list backing the ChunkBuffer. */
   private final List<ByteBuffer> buffers;
   private final int limit;
+  private final Consumer<Integer> releaseCallback;
 
   private int limitPrecedingCurrent;
   private int currentIndex;
@@ -55,7 +58,16 @@ public class ChunkBufferImplWithByteBufferList implements ChunkBuffer {
     this.buffers = !buffers.isEmpty() ? ImmutableList.copyOf(buffers) :
         EMPTY_BUFFER;
     this.limit = buffers.stream().mapToInt(ByteBuffer::limit).sum();
+    this.releaseCallback = null;
+    findCurrent();
+  }
 
+  ChunkBufferImplWithByteBufferList(List<ByteBuffer> buffers, Consumer<Integer> releaseFunction) {
+    Objects.requireNonNull(buffers, "buffers == null");
+    this.buffers = !buffers.isEmpty() ? ImmutableList.copyOf(buffers) :
+        EMPTY_BUFFER;
+    this.limit = buffers.stream().mapToInt(ByteBuffer::limit).sum();
+    this.releaseCallback = releaseFunction;
     findCurrent();
   }
 
@@ -243,6 +255,15 @@ public class ChunkBufferImplWithByteBufferList implements ChunkBuffer {
         + ":n=" + buffers.size()
         + ":p=" + position()
         + ":l=" + limit();
+  }
+
+  @Override
+  protected void finalize() throws Throwable {
+    // The assumption here is all the buffers in buffers list are of same buffer type, so only check the first buffer
+    if (releaseCallback != null && !buffers.isEmpty() && buffers.get(0) instanceof MappedByteBuffer) {
+      releaseCallback.accept(buffers.size());
+    }
+    super.finalize();
   }
 
   private static int relativeToRange(int value, int min, int max) {

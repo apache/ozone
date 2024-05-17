@@ -19,12 +19,14 @@ package org.apache.hadoop.ozone.common;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.nio.MappedByteBuffer;
 import java.nio.channels.GatheringByteChannel;
 import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
 import java.util.NoSuchElementException;
 import java.util.Objects;
+import java.util.function.Consumer;
 import java.util.function.Function;
 
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
@@ -34,14 +36,24 @@ import org.apache.ratis.util.UncheckedAutoCloseable;
 final class ChunkBufferImplWithByteBuffer implements ChunkBuffer {
   private final ByteBuffer buffer;
   private final UncheckedAutoCloseable underlying;
+  private final Consumer<Integer> releaseCallback;
 
   ChunkBufferImplWithByteBuffer(ByteBuffer buffer) {
-    this(buffer, null);
+    this.buffer = Objects.requireNonNull(buffer, "buffer == null");
+    this.releaseCallback = null;
+    this.underlying = null;
+  }
+
+  ChunkBufferImplWithByteBuffer(ByteBuffer buffer, Consumer<Integer> releaseFunction) {
+    this.buffer = Objects.requireNonNull(buffer, "buffer == null");
+    this.releaseCallback = releaseFunction;
+    this.underlying = null;
   }
 
   ChunkBufferImplWithByteBuffer(ByteBuffer buffer, UncheckedAutoCloseable underlying) {
     this.buffer = Objects.requireNonNull(buffer, "buffer == null");
     this.underlying = underlying;
+    this.releaseCallback = null;
   }
 
   @Override
@@ -162,5 +174,13 @@ final class ChunkBufferImplWithByteBuffer implements ChunkBuffer {
   public String toString() {
     return getClass().getSimpleName() + ":limit=" + buffer.limit()
         + "@" + Integer.toHexString(hashCode());
+  }
+
+  @Override
+  protected void finalize() throws Throwable {
+    if (releaseCallback != null && buffer instanceof MappedByteBuffer) {
+      releaseCallback.accept(1);
+    }
+    super.finalize();
   }
 }
