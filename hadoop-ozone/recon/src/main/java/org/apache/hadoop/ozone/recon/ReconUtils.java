@@ -71,6 +71,7 @@ import static org.jooq.impl.DSL.select;
 import static org.jooq.impl.DSL.using;
 
 import org.apache.hadoop.ozone.OmUtils;
+import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.recon.api.types.NSSummary;
@@ -86,6 +87,8 @@ import com.google.common.annotations.VisibleForTesting;
 import org.jooq.Configuration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import javax.ws.rs.core.Response;
 
 /**
  * Recon Utility class.
@@ -538,24 +541,66 @@ public class ReconUtils {
    * @param dateString
    * @param dateFormat
    * @param timeZone
-   * @return
+   * @return the epoch milliseconds representation of the date.
    * @throws ParseException
    */
   public static long convertToEpochMillis(String dateString, String dateFormat, TimeZone timeZone) {
+    String localDateFormat = dateFormat;
     try {
       if (StringUtils.isEmpty(dateString)) {
         return Instant.now().toEpochMilli();
       }
-      SimpleDateFormat sdf = new SimpleDateFormat(dateFormat);
+      if (StringUtils.isEmpty(dateFormat)) {
+        localDateFormat = "MM-dd-yyyy HH:mm:ss";
+      }
+      if (null == timeZone) {
+        timeZone = TimeZone.getDefault();
+      }
+      SimpleDateFormat sdf = new SimpleDateFormat(localDateFormat);
       sdf.setTimeZone(timeZone); // Set server's timezone
       Date date = sdf.parse(dateString);
       return date.getTime(); // Convert to epoch milliseconds
     } catch (ParseException parseException) {
-      log.error("Date parse exception for date: {} in format: {} -> {}", dateString, dateFormat, parseException);
+      log.error("Date parse exception for date: {} in format: {} -> {}", dateString, localDateFormat, parseException);
       return Instant.now().toEpochMilli();
     } catch (Exception exception) {
-      log.error("Unexpected error while parsing date: {} in format: {}", dateString, dateFormat);
+      log.error("Unexpected error while parsing date: {} in format: {} -> {}", dateString, localDateFormat, exception);
       return Instant.now().toEpochMilli();
     }
+  }
+
+  /**
+   * Validates volume or bucket names according to specific rules.
+   *
+   * @param resName The name to validate (volume or bucket).
+   * @return A Response object if validation fails, or null if the name is valid.
+   */
+  public static Response validateNames(String resName)
+      throws IllegalArgumentException {
+    if (resName.length() < OzoneConsts.OZONE_MIN_BUCKET_NAME_LENGTH ||
+        resName.length() > OzoneConsts.OZONE_MAX_BUCKET_NAME_LENGTH) {
+      throw new IllegalArgumentException(
+          "Bucket or Volume name length should be between " +
+              OzoneConsts.OZONE_MIN_BUCKET_NAME_LENGTH + " and " +
+              OzoneConsts.OZONE_MAX_BUCKET_NAME_LENGTH);
+    }
+
+    if (resName.charAt(0) == '.' || resName.charAt(0) == '-' ||
+        resName.charAt(resName.length() - 1) == '.' ||
+        resName.charAt(resName.length() - 1) == '-') {
+      throw new IllegalArgumentException(
+          "Bucket or Volume name cannot start or end with " +
+              "hyphen or period");
+    }
+
+    // Regex to check for lowercase letters, numbers, hyphens, underscores, and periods only.
+    if (!resName.matches("^[a-z0-9._-]+$")) {
+      throw new IllegalArgumentException(
+          "Bucket or Volume name can only contain lowercase " +
+              "letters, numbers, hyphens, underscores, and periods");
+    }
+
+    // If all checks pass, the name is valid
+    return null;
   }
 }

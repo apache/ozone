@@ -23,11 +23,11 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
-import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
+import org.apache.hadoop.ozone.recon.ReconResponseUtils;
 import org.apache.hadoop.ozone.recon.ReconUtils;
 import org.apache.hadoop.ozone.recon.api.handlers.BucketHandler;
 import org.apache.hadoop.ozone.recon.api.types.KeyEntityInfo;
@@ -1106,7 +1106,7 @@ public class OMDBInsightEndpoint {
 
       // If no keys were found, return a response indicating that no keys matched
       if (!keysFound) {
-        return noMatchedKeysResponse(paramInfo.getStartPrefix());
+        return ReconResponseUtils.noMatchedKeysResponse(paramInfo.getStartPrefix());
       }
 
       // Set the aggregated totals in the response
@@ -1115,11 +1115,10 @@ public class OMDBInsightEndpoint {
 
       return Response.ok(listKeysResponse).build();
     } catch (IOException e) {
-      return createInternalServerErrorResponse(
+      return ReconResponseUtils.createInternalServerErrorResponse(
           "Error searching keys in OM DB: " + e.getMessage());
     } catch (IllegalArgumentException e) {
-      return createBadRequestResponse(
-          "Invalid startPrefix: " + e.getMessage());
+      return ReconResponseUtils.createBadRequestResponse("Invalid startPrefix: " + e.getMessage());
     }
   }
 
@@ -1240,7 +1239,7 @@ public class OMDBInsightEndpoint {
 
     // Volume-Level :- Fetch the volumeID
     String volumeName = names[0];
-    validateNames(volumeName);
+    ReconUtils.validateNames(volumeName);
     String volumeKey = omMetadataManager.getVolumeKey(volumeName);
     long volumeId = omMetadataManager.getVolumeTable().getSkipCache(volumeKey)
         .getObjectID();
@@ -1250,7 +1249,7 @@ public class OMDBInsightEndpoint {
 
     // Bucket-Level :- Fetch the bucketID
     String bucketName = names[1];
-    validateNames(bucketName);
+    ReconUtils.validateNames(bucketName);
     String bucketKey = omMetadataManager.getBucketKey(volumeName, bucketName);
     OmBucketInfo bucketInfo =
         omMetadataManager.getBucketTable().getSkipCache(bucketKey);
@@ -1398,89 +1397,6 @@ public class OMDBInsightEndpoint {
       pathBuilder.append(OM_KEY_PREFIX).append(id);
     }
     return pathBuilder.toString();
-  }
-
-  /**
-   * Validates volume or bucket names according to specific rules.
-   *
-   * @param resName The name to validate (volume or bucket).
-   * @return A Response object if validation fails, or null if the name is valid.
-   */
-  public Response validateNames(String resName)
-      throws IllegalArgumentException {
-    if (resName.length() < OzoneConsts.OZONE_MIN_BUCKET_NAME_LENGTH ||
-        resName.length() > OzoneConsts.OZONE_MAX_BUCKET_NAME_LENGTH) {
-      throw new IllegalArgumentException(
-          "Bucket or Volume name length should be between " +
-              OzoneConsts.OZONE_MIN_BUCKET_NAME_LENGTH + " and " +
-              OzoneConsts.OZONE_MAX_BUCKET_NAME_LENGTH);
-    }
-
-    if (resName.charAt(0) == '.' || resName.charAt(0) == '-' ||
-        resName.charAt(resName.length() - 1) == '.' ||
-        resName.charAt(resName.length() - 1) == '-') {
-      throw new IllegalArgumentException(
-          "Bucket or Volume name cannot start or end with " +
-              "hyphen or period");
-    }
-
-    // Regex to check for lowercase letters, numbers, hyphens, underscores, and periods only.
-    if (!resName.matches("^[a-z0-9._-]+$")) {
-      throw new IllegalArgumentException(
-          "Bucket or Volume name can only contain lowercase " +
-              "letters, numbers, hyphens, underscores, and periods");
-    }
-
-    // If all checks pass, the name is valid
-    return null;
-  }
-
-  /**
-   * Returns a response indicating that no keys matched the search prefix.
-   *
-   * @param startPrefix The search prefix that was used.
-   * @return The response indicating that no keys matched the search prefix.
-   */
-  private Response noMatchedKeysResponse(String startPrefix) {
-    String jsonResponse = String.format(
-        "{\"message\": \"No keys matched the search prefix: '%s'.\"}",
-        startPrefix);
-    return Response.status(Response.Status.NOT_FOUND)
-        .entity(jsonResponse)
-        .type(MediaType.APPLICATION_JSON)
-        .build();
-  }
-
-  /**
-   * Utility method to create a bad request response with a custom message.
-   * Which means the request sent by the client to the server is incorrect
-   * or malformed and cannot be processed by the server.
-   *
-   * @param message The message to include in the response body.
-   * @return A Response object configured with the provided message.
-   */
-  private Response createBadRequestResponse(String message) {
-    String jsonResponse = String.format("{\"message\": \"%s\"}", message);
-    return Response.status(Response.Status.BAD_REQUEST)
-        .entity(jsonResponse)
-        .type(MediaType.APPLICATION_JSON)
-        .build();
-  }
-
-  /**
-   * Utility method to create an internal server error response with a custom message.
-   * Which means the server encountered an unexpected condition that prevented it
-   * from fulfilling the request.
-   *
-   * @param message The message to include in the response body.
-   * @return A Response object configured with the provided message.
-   */
-  private Response createInternalServerErrorResponse(String message) {
-    String jsonResponse = String.format("{\"message\": \"%s\"}", message);
-    return Response.status(Response.Status.INTERNAL_SERVER_ERROR)
-        .entity(jsonResponse)
-        .type(MediaType.APPLICATION_JSON)
-        .build();
   }
 
   private void createSummaryForDeletedDirectories(
