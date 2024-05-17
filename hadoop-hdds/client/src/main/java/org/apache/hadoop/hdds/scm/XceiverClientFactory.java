@@ -42,4 +42,6 @@ public interface XceiverClientFactory extends AutoCloseable {
   void releaseClient(XceiverClientSpi xceiverClient, boolean invalidateClient,
                      boolean topologyAware);
 
+  XceiverClientSpi acquireClientUncached(Pipeline pipeline, boolean topologyAware)
+      throws Exception;
 }
