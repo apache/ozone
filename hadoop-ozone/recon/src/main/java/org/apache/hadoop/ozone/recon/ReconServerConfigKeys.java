@@ -186,9 +186,6 @@ public final class  ReconServerConfigKeys {
   public static final int
       OZONE_RECON_SCM_CLIENT_FAILOVER_MAX_RETRY_DEFAULT = 3;
 
-  public static final long
-      OZONE_RECON_COMMAND_PROCESS_TIME_OUT_DEFAULT = 60L;
-
   /**
    * Private constructor for utility class.
    */
