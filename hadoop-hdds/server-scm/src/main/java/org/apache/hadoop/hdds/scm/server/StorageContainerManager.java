@@ -369,6 +369,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     scmHANodeDetails = SCMHANodeDetails.loadSCMHAConfig(conf, scmStorageConfig);
     configuration = conf;
     initMetrics();
+    initPerfMetrics();
 
     boolean ratisEnabled = SCMHAUtils.isSCMHAEnabled(conf);
     if (scmStorageConfig.getState() != StorageState.INITIALIZED) {
@@ -1431,7 +1432,15 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
   public static SCMMetrics getMetrics() {
     return metrics == null ? SCMMetrics.create() : metrics;
   }
-
+  /**
+   * Initialize SCMPerformance metrics.
+   */
+  public static void initPerfMetrics() {
+    perfMetrics = SCMPerformanceMetrics.create();
+  }
+  /**
+   * Return SCMPerformance metrics instance.
+   */
   public static SCMPerformanceMetrics getPerfMetrics() {
     return perfMetrics == null ? SCMPerformanceMetrics.create() : perfMetrics;
   }
@@ -1722,6 +1731,10 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
 
     if (metrics != null) {
       metrics.unRegister();
+    }
+
+    if (perfMetrics != null) {
+      perfMetrics.unRegister();
     }
 
     unregisterMXBean();

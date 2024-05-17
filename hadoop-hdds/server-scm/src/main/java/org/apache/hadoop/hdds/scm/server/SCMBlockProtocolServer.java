@@ -76,6 +76,7 @@ import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_BLOCK_HANDLER_C
 import static org.apache.hadoop.hdds.scm.exceptions.SCMException.ResultCodes.IO_EXCEPTION;
 import static org.apache.hadoop.hdds.scm.net.NetConstants.NODE_COST_DEFAULT;
 import static org.apache.hadoop.hdds.scm.net.NetConstants.ROOT;
+import static org.apache.hadoop.hdds.scm.server.StorageContainerManager.getPerfMetrics;
 import static org.apache.hadoop.hdds.scm.server.StorageContainerManager.startRpcServer;
 import static org.apache.hadoop.hdds.server.ServerUtils.getRemoteUserName;
 import static org.apache.hadoop.hdds.server.ServerUtils.updateRPCListenAddress;
@@ -103,7 +104,7 @@ public class SCMBlockProtocolServer implements
   private final InetSocketAddress blockRpcAddress;
   private final ProtocolMessageMetrics<ProtocolMessageEnum>
       protocolMessageMetrics;
-  private SCMPerformanceMetrics perfMetrics;
+  private final SCMPerformanceMetrics perfMetrics;
 
   /**
    * The RPC server that listens to requests from block service clients.
@@ -112,6 +113,7 @@ public class SCMBlockProtocolServer implements
       StorageContainerManager scm) throws IOException {
     this.scm = scm;
     this.conf = conf;
+    this.perfMetrics = getPerfMetrics();
     final int handlerCount = conf.getInt(OZONE_SCM_BLOCK_HANDLER_COUNT_KEY,
         OZONE_SCM_HANDLER_COUNT_KEY, OZONE_SCM_HANDLER_COUNT_DEFAULT,
             LOG::info);
@@ -264,7 +266,6 @@ public class SCMBlockProtocolServer implements
     List<DeleteBlockGroupResult> results = new ArrayList<>();
     Map<String, String> auditMap = Maps.newHashMap();
     ScmBlockLocationProtocolProtos.DeleteScmBlockResult.Result resultCode;
-    perfMetrics = scm.getPerfMetrics();
     Exception e = null;
     long startNanos = Time.monotonicNowNanos();
     try {
@@ -279,18 +280,15 @@ public class SCMBlockProtocolServer implements
       switch (ioe instanceof SCMException ? ((SCMException) ioe).getResult() :
           IO_EXCEPTION) {
       case SAFE_MODE_EXCEPTION:
-        perfMetrics.updateDeleteKeyFailureStats(startNanos);
         resultCode =
             ScmBlockLocationProtocolProtos.DeleteScmBlockResult.Result.safeMode;
         break;
       case FAILED_TO_FIND_BLOCK:
-        perfMetrics.updateDeleteKeyFailureStats(startNanos);
         resultCode =
             ScmBlockLocationProtocolProtos.DeleteScmBlockResult.Result.
                 errorNotFound;
         break;
       default:
-        perfMetrics.updateDeleteKeyFailureStats(startNanos);
         resultCode =
             ScmBlockLocationProtocolProtos.DeleteScmBlockResult.Result.
                 unknownFailure;
