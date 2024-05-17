@@ -80,7 +80,7 @@ public class FilePerChunkStrategy implements ChunkManager {
         manager.getDefaultReadBufferCapacity();
     this.readMappedBufferThreshold = manager == null ? 0
         : manager.getReadMappedBufferThreshold();
-    this.readMappedBufferMaxCount = manager == null ? null
+    this.readMappedBufferMaxCount = manager == null ? 0
         : manager.getReadMappedBufferMaxCount();
     LOG.info("ozone.chunk.read.mapped.buffer.max.count is load with {}", readMappedBufferMaxCount);
     this.volumeSet = volSet;
