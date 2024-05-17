@@ -451,14 +451,6 @@ jobs:
           key: maven-repo-${{ hashFiles('**/pom.xml') }}
           restore-keys: |
             maven-repo-
-      - name: Download Ozone repo
-        id: download-ozone-repo
-        uses: actions/download-artifact@v4
-        with:
-          name: ozone-repo
-          path: |
-            ~/.m2/repository/org/apache/ozone
-        continue-on-error: true
       - name: Setup java
         uses: actions/setup-java@v4
         with:
@@ -467,10 +459,6 @@ jobs:
       - name: Execute tests
         continue-on-error: true
         run: |
-          if [[ -e "${{ steps.download-ozone-repo.outputs.download-path }}" ]]; then
-            export OZONE_REPO_CACHED=true
-          fi
-
           args=
           if [[ "${{ matrix.profile }}" == "flaky" ]]; then
             args="-Dsurefire.rerunFailingTestsCount=5 -Dsurefire.fork.timeout=3600"

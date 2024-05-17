@@ -165,7 +165,6 @@ public class DirectoryEntityHandler extends EntityHandler {
     }
 
     duResponse.setDuData(subdirDUData);
-
     return duResponse;
   }
 

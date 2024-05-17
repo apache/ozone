@@ -369,8 +369,10 @@ public class ReplicationManager implements SCMService {
    */
   public synchronized void processAll() {
     if (!shouldRun()) {
-      LOG.info("Replication Manager is not ready to run until {}ms after " +
-          "safemode exit", waitTimeInMillis);
+      if (scmContext.isLeader()) {
+        LOG.info("Replication Manager is not ready to run until {}ms after " +
+            "safemode exit", waitTimeInMillis);
+      }
       return;
     }
     final long start = clock.millis();

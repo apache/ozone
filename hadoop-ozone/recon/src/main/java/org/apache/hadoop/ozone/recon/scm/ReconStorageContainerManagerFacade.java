@@ -89,6 +89,7 @@ import org.apache.hadoop.hdds.utils.db.DBStoreBuilder;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.Table.KeyValue;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
+import org.apache.hadoop.ozone.recon.ReconContext;
 import org.apache.hadoop.ozone.recon.ReconServerConfigKeys;
 import org.apache.hadoop.ozone.recon.ReconUtils;
 import org.apache.hadoop.ozone.recon.fsck.ContainerHealthTask;
@@ -147,6 +148,9 @@ public class ReconStorageContainerManagerFacade
   private final ReconDatanodeProtocolServer datanodeProtocolServer;
   private final EventQueue eventQueue;
   private final SCMContext scmContext;
+  // This will hold the recon related information like health status and errors in initialization of modules if any,
+  // which can later be used for alerts integration or displaying some meaningful info to user on Recon UI.
+  private final ReconContext reconContext;
   private final SCMStorageConfig scmStorageConfig;
   private final SCMNodeDetails reconNodeDetails;
   private final SCMHAManager scmhaManager;
@@ -175,18 +179,20 @@ public class ReconStorageContainerManagerFacade
   @Inject
   @SuppressWarnings({"checkstyle:ParameterNumber", "checkstyle:MethodLength"})
   public ReconStorageContainerManagerFacade(OzoneConfiguration conf,
-      StorageContainerServiceProvider scmServiceProvider,
-      ReconTaskStatusDao reconTaskStatusDao,
-      ContainerCountBySizeDao containerCountBySizeDao,
-      UtilizationSchemaDefinition utilizationSchemaDefinition,
-      ContainerHealthSchemaManager containerHealthSchemaManager,
-      ReconContainerMetadataManager reconContainerMetadataManager,
-      ReconUtils reconUtils,
-      ReconSafeModeManager safeModeManager) throws IOException {
+                                            StorageContainerServiceProvider scmServiceProvider,
+                                            ReconTaskStatusDao reconTaskStatusDao,
+                                            ContainerCountBySizeDao containerCountBySizeDao,
+                                            UtilizationSchemaDefinition utilizationSchemaDefinition,
+                                            ContainerHealthSchemaManager containerHealthSchemaManager,
+                                            ReconContainerMetadataManager reconContainerMetadataManager,
+                                            ReconUtils reconUtils,
+                                            ReconSafeModeManager safeModeManager,
+                                            ReconContext reconContext) throws IOException {
     reconNodeDetails = reconUtils.getReconNodeDetails(conf);
     this.threadNamePrefix = reconNodeDetails.threadNamePrefix();
     this.eventQueue = new EventQueue(threadNamePrefix);
     eventQueue.setSilent(true);
+    this.reconContext = reconContext;
     this.scmContext = new SCMContext.Builder()
         .setIsPreCheckComplete(true)
         .setSCM(this)
@@ -220,10 +226,11 @@ public class ReconStorageContainerManagerFacade
         true, new SCMDBTransactionBufferImpl());
     this.sequenceIdGen = new SequenceIdGenerator(
         conf, scmhaManager, ReconSCMDBDefinition.SEQUENCE_ID.getTable(dbStore));
+    reconContext.setClusterId(scmStorageConfig.getClusterID());
     this.nodeManager =
         new ReconNodeManager(conf, scmStorageConfig, eventQueue, clusterMap,
             ReconSCMDBDefinition.NODES.getTable(dbStore),
-            this.scmLayoutVersionManager);
+            this.scmLayoutVersionManager, reconContext);
     placementMetrics = SCMContainerPlacementMetrics.create();
     this.containerPlacementPolicy =
         ContainerPlacementPolicyFactory.getPolicy(conf, nodeManager,
