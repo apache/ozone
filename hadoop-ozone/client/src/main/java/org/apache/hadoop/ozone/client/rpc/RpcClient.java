@@ -1432,7 +1432,7 @@ public class RpcClient implements ClientProtocol {
         .addAllMetadataGdpr(metadata)
         .setLatestVersionLocation(getLatestVersionLocation)
         .setOwnerName(ownerName)
-        .setRewriteGeneration(existingKeyGeneration);
+        .setExpectedDataGeneration(existingKeyGeneration);
 
     OpenKeySession openKey = ozoneManagerClient.openKey(builder.build());
     // For bucket with layout OBJECT_STORE, when create an empty file (size=0),

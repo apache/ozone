@@ -444,12 +444,12 @@ public class OMKeyCreateRequest extends OMKeyRequest {
 
   private void validateAtomicRewrite(OmKeyInfo dbKeyInfo, KeyArgs keyArgs)
       throws OMException {
-    if (keyArgs.hasRewriteGeneration()) {
+    if (keyArgs.hasExpectedDataGeneration()) {
       // If a key does not exist, or if it exists but the updateID do not match, then fail this request.
       if (dbKeyInfo == null) {
         throw new OMException("Key not found during expected rewrite", OMException.ResultCodes.KEY_NOT_FOUND);
       }
-      if (dbKeyInfo.getUpdateID() != keyArgs.getRewriteGeneration()) {
+      if (dbKeyInfo.getUpdateID() != keyArgs.getExpectedDataGeneration()) {
         throw new OMException("Generation mismatch during expected rewrite", OMException.ResultCodes.KEY_NOT_FOUND);
       }
     }

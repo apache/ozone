@@ -102,13 +102,13 @@ public final class OmKeyInfo extends WithParentObjectId
    */
   private final CopyOnWriteArrayList<OzoneAcl> acls;
 
-  // rewriteGeneration, when used in key creation indicates that a
+  // expectedDataGeneration, when used in key creation indicates that a
   // key with the same keyName should exist with the given generation.
   // For a key commit to succeed, the original key should still be present with the
   // generation unchanged.
   // This allows a key to be created an committed atomically if the original has not
   // been modified.
-  private Long rewriteGeneration = null;
+  private Long expectedDataGeneration = null;
 
   private OmKeyInfo(Builder b) {
     super(b);
@@ -126,7 +126,7 @@ public final class OmKeyInfo extends WithParentObjectId
     this.fileName = b.fileName;
     this.isFile = b.isFile;
     this.ownerName = b.ownerName;
-    this.rewriteGeneration = b.rewriteGeneration;
+    this.expectedDataGeneration = b.expectedDataGeneration;
   }
 
   public String getVolumeName() {
@@ -169,12 +169,12 @@ public final class OmKeyInfo extends WithParentObjectId
     return fileName;
   }
 
-  public void setRewriteGeneration(Long generation) {
-    this.rewriteGeneration = generation;
+  public void setExpectedDataGeneration(Long generation) {
+    this.expectedDataGeneration = generation;
   }
 
-  public Long getRewriteGeneration() {
-    return rewriteGeneration;
+  public Long getExpectedDataGeneration() {
+    return expectedDataGeneration;
   }
 
   public String getOwnerName() {
@@ -460,7 +460,7 @@ public final class OmKeyInfo extends WithParentObjectId
     private FileChecksum fileChecksum;
 
     private boolean isFile;
-    private Long rewriteGeneration = null;
+    private Long expectedDataGeneration = null;
 
     public Builder() {
     }
@@ -589,8 +589,8 @@ public final class OmKeyInfo extends WithParentObjectId
       return this;
     }
 
-    public Builder setRewriteGeneration(Long existingGeneration) {
-      this.rewriteGeneration = existingGeneration;
+    public Builder setExpectedDataGeneration(Long existingGeneration) {
+      this.expectedDataGeneration = existingGeneration;
       return this;
     }
 
@@ -698,8 +698,8 @@ public final class OmKeyInfo extends WithParentObjectId
       kb.setFileEncryptionInfo(OMPBHelper.convert(encInfo));
     }
     kb.setIsFile(isFile);
-    if (rewriteGeneration != null) {
-      kb.setRewriteGeneration(rewriteGeneration);
+    if (expectedDataGeneration != null) {
+      kb.setExpectedDataGeneration(expectedDataGeneration);
     }
     if (ownerName != null) {
       kb.setOwnerName(ownerName);
@@ -750,8 +750,8 @@ public final class OmKeyInfo extends WithParentObjectId
     if (keyInfo.hasIsFile()) {
       builder.setFile(keyInfo.getIsFile());
     }
-    if (keyInfo.hasRewriteGeneration()) {
-      builder.setRewriteGeneration(keyInfo.getRewriteGeneration());
+    if (keyInfo.hasExpectedDataGeneration()) {
+      builder.setExpectedDataGeneration(keyInfo.getExpectedDataGeneration());
     }
 
     if (keyInfo.hasOwnerName()) {
@@ -867,8 +867,8 @@ public final class OmKeyInfo extends WithParentObjectId
     if (fileChecksum != null) {
       builder.setFileChecksum(fileChecksum);
     }
-    if (rewriteGeneration != null) {
-      builder.setRewriteGeneration(rewriteGeneration);
+    if (expectedDataGeneration != null) {
+      builder.setExpectedDataGeneration(expectedDataGeneration);
     }
 
     return builder.build();

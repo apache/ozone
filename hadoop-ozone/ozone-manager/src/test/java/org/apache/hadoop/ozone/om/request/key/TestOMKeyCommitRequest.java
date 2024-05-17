@@ -249,7 +249,7 @@ public class TestOMKeyCommitRequest extends TestOMKeyRequest {
 
     OmKeyInfo.Builder omKeyInfoBuilder = OMRequestTestUtils.createOmKeyInfo(
         volumeName, bucketName, keyName, replicationConfig, new OmKeyLocationInfoGroup(version, new ArrayList<>()));
-    omKeyInfoBuilder.setRewriteGeneration(1L);
+    omKeyInfoBuilder.setExpectedDataGeneration(1L);
     OmKeyInfo omKeyInfo = omKeyInfoBuilder.build();
     omKeyInfo.appendNewBlocks(allocatedLocationList, false);
     List<OzoneAcl> acls = Collections.singletonList(OzoneAcl.parseAcl("user:foo:rw"));
@@ -268,7 +268,7 @@ public class TestOMKeyCommitRequest extends TestOMKeyRequest {
     assertEquals(KEY_NOT_FOUND, omClientResponse.getOMResponse().getStatus());
 
     // Now add the key to the key table, and try again, but with different generation
-    omKeyInfoBuilder.setRewriteGeneration(null);
+    omKeyInfoBuilder.setExpectedDataGeneration(null);
     omKeyInfoBuilder.setUpdateID(0L);
     OmKeyInfo invalidKeyInfo = omKeyInfoBuilder.build();
     closedKeyTable.put(getOzonePathKey(), invalidKeyInfo);
@@ -287,7 +287,7 @@ public class TestOMKeyCommitRequest extends TestOMKeyRequest {
     assertEquals(OK, omClientResponse.getOMResponse().getStatus());
 
     OmKeyInfo committedKey = closedKeyTable.get(getOzonePathKey());
-    assertNull(committedKey.getRewriteGeneration());
+    assertNull(committedKey.getExpectedDataGeneration());
     // Generation should be changed
     assertNotEquals(closedKeyInfo.getGeneration(), committedKey.getGeneration());
     assertEquals(acls, committedKey.getAcls());
