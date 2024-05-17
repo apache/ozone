@@ -1416,6 +1416,10 @@ public class RpcClient implements ClientProtocol {
   public OzoneOutputStream rewriteKey(String volumeName, String bucketName, String keyName,
       long size, long existingKeyGeneration, ReplicationConfig replicationConfig,
       Map<String, String> metadata) throws IOException {
+    if (omVersion.compareTo(OzoneManagerVersion.ATOMIC_REWRITE_KEY) < 0) {
+      throw new IOException("OzoneManager does not support atomic key rewrite.");
+    }
+
     createKeyPreChecks(volumeName, bucketName, keyName, replicationConfig);
     String ownerName = getRealUserInfo().getShortUserName();
 
