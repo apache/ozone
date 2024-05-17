@@ -69,7 +69,7 @@ class TestChunkUtils {
   private static final int BUFFER_CAPACITY = 1 << 20;
   private static final int MAPPED_BUFFER_THRESHOLD = 32 << 10;
   private static final Random RANDOM = new Random();
-  private static final Semaphore semaphore = new Semaphore(100);
+  private static final Semaphore SEMAPHORE = new Semaphore(100);
 
   @TempDir
   private File tempDir;
@@ -78,7 +78,7 @@ class TestChunkUtils {
       throws StorageContainerException {
     LOG.info("off={}, len={}", off, len);
     return ChunkUtils.readData(len, BUFFER_CAPACITY, file, off, null,
-        MAPPED_BUFFER_THRESHOLD, true, semaphore);
+        MAPPED_BUFFER_THRESHOLD, true, SEMAPHORE);
   }
 
   @Test

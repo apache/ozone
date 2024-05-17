@@ -188,6 +188,7 @@ public final class ChunkUtils {
     }
   }
 
+  @SuppressWarnings("checkstyle:parameternumber")
   public static ChunkBuffer readData(long len, int bufferCapacity,
       File file, long off, HddsVolume volume, int readMappedBufferThreshold, boolean mmapEnabled,
       Semaphore semaphore) throws StorageContainerException {
