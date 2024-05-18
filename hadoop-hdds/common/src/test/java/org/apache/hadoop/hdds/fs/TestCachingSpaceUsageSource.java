@@ -222,8 +222,15 @@ class TestCachingSpaceUsageSource {
       ScheduledExecutorService executor, long expectedInitialDelay,
       Duration refresh) {
 
+    // refresh usedSpace
     verify(executor).scheduleWithFixedDelay(any(), eq(expectedInitialDelay),
         eq(refresh.toMillis()), eq(TimeUnit.MILLISECONDS));
+
+    // update available/capacity
+    final long oneMinute = Duration.ofMinutes(1).toMillis();
+    final long delay = Math.min(refresh.toMillis(), oneMinute);
+    verify(executor).scheduleWithFixedDelay(any(), eq(delay),
+        eq(delay), eq(TimeUnit.MILLISECONDS));
   }
 
   private static void assertAvailableWasUpdated(SpaceUsageSource source,
