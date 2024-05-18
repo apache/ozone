@@ -15,6 +15,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-source ../compose_v2_compatibility.sh
-
-docker-compose exec -T scm /opt/hadoop/sbin/stop-ozone.sh
+# use Docker Compose v2 if available
+if docker compose version > /dev/null 2>&1; then
+  echo "Using Docker Compose v2"
+  docker-compose() {
+    docker compose --progress quiet "$@"
+  }
+fi

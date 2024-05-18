@@ -36,6 +36,7 @@ import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.anyLong;
 import static org.mockito.Mockito.eq;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -140,7 +141,7 @@ class TestCachingSpaceUsageSource {
         "value should have been saved to file");
     assertEquals(usedSpace, subject.getUsedSpace(),
         "no further updates from source expected");
-    verify(future).cancel(true);
+    verify(future, times(2)).cancel(true);
     verify(executor).shutdown();
   }
 
