@@ -105,27 +105,42 @@ public class ClosePipelineCommandHandler implements CommandHandler {
       try {
         XceiverServerSpi server = ozoneContainer.getWriteChannel();
         if (server.isExist(pipelineIdProto)) {
-          server.removeGroup(pipelineIdProto);
           if (server instanceof XceiverServerRatis) {
             // TODO: Refactor Ratis logic to XceiverServerRatis
             // Propagate the group remove to the other Raft peers in the pipeline
             XceiverServerRatis ratisServer = (XceiverServerRatis) server;
             final RaftGroupId raftGroupId = RaftGroupId.valueOf(pipelineID.getId());
-            final Collection<RaftPeer> peers = ratisServer.getRaftPeersInPipeline(pipelineID);
             final boolean shouldDeleteRatisLogDirectory = ratisServer.getShouldDeleteRatisLogDirectory();
-            peers.stream()
-                .filter(peer -> !peer.getId().equals(ratisServer.getServer().getId()))
-                .forEach(peer -> {
-                  try (RaftClient client = newRaftClient.apply(peer, ozoneContainer.getTlsClientConfig())) {
-                    client.getGroupManagementApi(peer.getId())
-                        .remove(raftGroupId, shouldDeleteRatisLogDirectory, !shouldDeleteRatisLogDirectory);
-                  } catch (GroupMismatchException ae) {
-                    // ignore silently since this means that the group has been closed by earlier close pipeline
-                    // command in another datanode
-                  } catch (IOException ioe) {
-                    LOG.warn("Failed to remove group {} for peer {}", raftGroupId, peer.getId(), ioe);
-                  }
-                });
+            try {
+              // This might throw GroupMismatchException if the Ratis group has been closed by other datanodes
+              final Collection<RaftPeer> peers = ratisServer.getRaftPeersInPipeline(pipelineID);
+              // Try to send remove group for the other datanodes first, ignoring GroupMismatchException
+              // if the Ratis group has been closed in the other datanodes
+              peers.stream()
+                  .filter(peer -> !peer.getId().equals(ratisServer.getServer().getId()))
+                  .forEach(peer -> {
+                    try (RaftClient client = newRaftClient.apply(peer, ozoneContainer.getTlsClientConfig())) {
+                      client.getGroupManagementApi(peer.getId())
+                          .remove(raftGroupId, shouldDeleteRatisLogDirectory, !shouldDeleteRatisLogDirectory);
+                    } catch (GroupMismatchException ae) {
+                      // ignore silently since this means that the group has been closed by earlier close pipeline
+                      // command in another datanode
+                    } catch (IOException ioe) {
+                      LOG.warn("Failed to remove group {} for peer {}", raftGroupId, peer.getId(), ioe);
+                    }
+                  });
+              // Remove the Ratis group from the current datanode pipeline, might throw GroupMismatchException as
+              // well
+              server.removeGroup(pipelineIdProto);
+            } catch (GroupMismatchException gme) {
+              // ignore silently since this means that the group has been closed by earlier close pipeline
+              // command in another datanode
+              LOG.debug("The Ratis group for the pipeline has been removed by earlier close pipeline command from " +
+                  "other datanodes, ignoring");
+            }
+          } else {
+            // Although the default implementation is a no-op operation, calls it anyway
+            server.removeGroup(pipelineIdProto);
           }
           LOG.info("Close Pipeline {} command on datanode {}.", pipelineID,
               dn.getUuidString());
