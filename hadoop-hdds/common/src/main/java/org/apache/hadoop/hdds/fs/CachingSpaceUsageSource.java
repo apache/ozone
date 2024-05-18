@@ -55,7 +55,8 @@ public class CachingSpaceUsageSource implements SpaceUsageSource {
   private final SpaceUsageSource source;
   private final SpaceUsagePersistence persistence;
   private boolean running;
-  private ScheduledFuture<?> scheduledFuture;
+  private ScheduledFuture<?> updateUsedSpaceFuture;
+  private ScheduledFuture<?> updateAvailableFuture;
   private final AtomicBoolean isRefreshRunning;
 
   public CachingSpaceUsageSource(SpaceUsageCheckParams params) {
@@ -141,8 +142,13 @@ public class CachingSpaceUsageSource implements SpaceUsageSource {
     if (executor != null) {
       long initialDelay = getUsedSpace() > 0 ? refresh.toMillis() : 0;
       if (!running) {
-        scheduledFuture = executor.scheduleWithFixedDelay(
+        updateUsedSpaceFuture = executor.scheduleWithFixedDelay(
             this::refresh, initialDelay, refresh.toMillis(), MILLISECONDS);
+
+        long availableUpdateDelay = Math.min(refresh.toMillis(), Duration.ofMinutes(1).toMillis());
+        updateAvailableFuture = executor.scheduleWithFixedDelay(
+            this::updateAvailable, availableUpdateDelay, availableUpdateDelay, MILLISECONDS);
+
         running = true;
       }
     } else {
@@ -154,8 +160,13 @@ public class CachingSpaceUsageSource implements SpaceUsageSource {
     persistence.save(this); // save cached value
 
     if (executor != null) {
-      if (running && scheduledFuture != null) {
-        scheduledFuture.cancel(true);
+      if (running) {
+        if (updateUsedSpaceFuture != null) {
+          updateUsedSpaceFuture.cancel(true);
+        }
+        if (updateAvailableFuture != null) {
+          updateAvailableFuture.cancel(true);
+        }
       }
       running = false;
 
@@ -163,16 +174,31 @@ public class CachingSpaceUsageSource implements SpaceUsageSource {
     }
   }
 
+  /** Schedule immediate refresh. */
   public void refreshNow() {
-    //refresh immediately
     executor.schedule(this::refresh, 0, MILLISECONDS);
   }
 
+  /** Loads {@code usedSpace} value from persistent source, if present.
+   * Also updates {@code available} and {@code capacity} from the {@code source}. */
   private void loadInitialValue() {
     final OptionalLong initialValue = persistence.load();
     updateCachedValues(initialValue.orElse(0));
   }
 
+  /** Updates {@code available} and {@code capacity} from the {@code source}. */
+  private void updateAvailable() {
+    final long capacity = source.getCapacity();
+    final long available = source.getAvailable();
+
+    try (AutoCloseableLock ignored = lock.writeLock(null, null)) {
+      cachedAvailable = available;
+      cachedCapacity = capacity;
+    }
+  }
+
+  /** Updates {@code available} and {@code capacity} from the {@code source},
+   * sets {@code usedSpace} to the specified {@code used} value. */
   private void updateCachedValues(long used) {
     final long capacity = source.getCapacity();
     final long available = source.getAvailable();
@@ -184,6 +210,7 @@ public class CachingSpaceUsageSource implements SpaceUsageSource {
     }
   }
 
+  /** Refreshes all 3 values. */
   private void refresh() {
     //only one `refresh` can be running at a certain moment
     if (isRefreshRunning.compareAndSet(false, true)) {
