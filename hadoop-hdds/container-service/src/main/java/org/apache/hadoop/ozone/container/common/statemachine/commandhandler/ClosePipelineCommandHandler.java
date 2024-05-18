@@ -135,8 +135,8 @@ public class ClosePipelineCommandHandler implements CommandHandler {
             } catch (GroupMismatchException gme) {
               // ignore silently since this means that the group has been closed by earlier close pipeline
               // command in another datanode
-              LOG.debug("The Ratis group for the pipeline has been removed by earlier close pipeline command from " +
-                  "other datanodes, ignoring");
+              LOG.debug("The Ratis group for the pipeline {} has been removed by earlier close pipeline command from " +
+                  "other datanodes", pipelineID.getId());
             }
           } else {
             // Although the default implementation is a no-op operation, calls it anyway
