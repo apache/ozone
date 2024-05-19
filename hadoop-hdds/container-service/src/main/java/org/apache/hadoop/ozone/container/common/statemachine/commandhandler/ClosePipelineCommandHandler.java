@@ -69,7 +69,7 @@ public class ClosePipelineCommandHandler implements CommandHandler {
    */
   public ClosePipelineCommandHandler(ConfigurationSource conf,
                                      Executor executor) {
-    this(RatisHelper.newRaftClient(conf), executor);
+    this(RatisHelper.newRaftClientNoRetry(conf), executor);
   }
 
   /**
