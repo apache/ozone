@@ -17,12 +17,10 @@
  */
 package org.apache.hadoop.hdds.scm.cli.datanode;
 
-import com.fasterxml.jackson.core.JsonFactory;
-import com.fasterxml.jackson.core.JsonParser;
 import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.base.Strings;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
+import org.apache.hadoop.hdds.client.DecommissionUtils;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.cli.ScmSubcommand;
@@ -32,11 +30,8 @@ import org.apache.hadoop.hdds.server.JsonUtils;
 import picocli.CommandLine;
 
 import java.io.IOException;
-import java.text.DateFormat;
-import java.text.SimpleDateFormat;
 import java.util.LinkedHashMap;
 import java.util.ArrayList;
-import java.util.Date;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -72,29 +67,25 @@ public class DecommissionStatusSubCommand extends ScmSubcommand {
 
   @Override
   public void execute(ScmClient scmClient) throws IOException {
-    List<HddsProtos.Node> decommissioningNodes;
     Stream<HddsProtos.Node> allNodes = scmClient.queryNode(DECOMMISSIONING,
         null, HddsProtos.QueryScope.CLUSTER, "").stream();
+    List<HddsProtos.Node> decommissioningNodes =
+        DecommissionUtils.getDecommissioningNodesList(allNodes, uuid, ipAddress);
     if (!Strings.isNullOrEmpty(uuid)) {
-      decommissioningNodes = allNodes.filter(p -> p.getNodeID().getUuid()
-          .equals(uuid)).collect(Collectors.toList());
       if (decommissioningNodes.isEmpty()) {
         System.err.println("Datanode: " + uuid + " is not in DECOMMISSIONING");
         return;
       }
     } else if (!Strings.isNullOrEmpty(ipAddress)) {
-      decommissioningNodes = allNodes.filter(p -> p.getNodeID().getIpAddress()
-          .compareToIgnoreCase(ipAddress) == 0).collect(Collectors.toList());
       if (decommissioningNodes.isEmpty()) {
         System.err.println("Datanode: " + ipAddress + " is not in " +
             "DECOMMISSIONING");
         return;
       }
     } else {
-      decommissioningNodes = allNodes.collect(Collectors.toList());
       if (!json) {
         System.out.println("\nDecommission Status: DECOMMISSIONING - " +
-                decommissioningNodes.size() + " node(s)");
+            decommissioningNodes.size() + " node(s)");
       }
     }
 
@@ -102,12 +93,8 @@ public class DecommissionStatusSubCommand extends ScmSubcommand {
     int numDecomNodes = -1;
     JsonNode jsonNode = null;
     if (metricsJson != null) {
-      ObjectMapper objectMapper = new ObjectMapper();
-      JsonFactory factory = objectMapper.getFactory();
-      JsonParser parser = factory.createParser(metricsJson);
-      jsonNode = (JsonNode) objectMapper.readTree(parser).get("beans").get(0);
-      JsonNode totalDecom = jsonNode.get("DecommissioningMaintenanceNodesTotal");
-      numDecomNodes = (totalDecom == null ? -1 : Integer.parseInt(totalDecom.toString()));
+      jsonNode = DecommissionUtils.getBeansJsonNode(metricsJson);
+      numDecomNodes = DecommissionUtils.getNumDecomNodes(jsonNode);
     }
 
     if (json) {
@@ -164,28 +151,9 @@ public class DecommissionStatusSubCommand extends ScmSubcommand {
     Map<String, Object> countsMap = new LinkedHashMap<>();
     String errMsg = getErrorMessage() + datanode.getHostName();
     try {
-      for (int i = 1; i <= numDecomNodes; i++) {
-        if (datanode.getHostName().equals(counts.get("tag.datanode." + i).asText())) {
-          JsonNode pipelinesDN = counts.get("PipelinesWaitingToCloseDN." + i);
-          JsonNode underReplicatedDN = counts.get("UnderReplicatedDN." + i);
-          JsonNode unclosedDN = counts.get("UnclosedContainersDN." + i);
-          JsonNode startTimeDN = counts.get("StartTimeDN." + i);
-          if (pipelinesDN == null || underReplicatedDN == null || unclosedDN == null || startTimeDN == null) {
-            throw new IOException(errMsg);
-          }
-
-          int pipelines = Integer.parseInt(pipelinesDN.toString());
-          double underReplicated = Double.parseDouble(underReplicatedDN.toString());
-          double unclosed = Double.parseDouble(unclosedDN.toString());
-          long startTime = Long.parseLong(startTimeDN.toString());
-          Date date = new Date(startTime);
-          DateFormat formatter = new SimpleDateFormat("dd/MM/yyyy hh:mm:ss z");
-          countsMap.put("decommissionStartTime", formatter.format(date));
-          countsMap.put("numOfUnclosedPipelines", pipelines);
-          countsMap.put("numOfUnderReplicatedContainers", underReplicated);
-          countsMap.put("numOfUnclosedContainers", unclosed);
-          return countsMap;
-        }
+      countsMap = DecommissionUtils.getCountsMap(datanode, counts, numDecomNodes, countsMap, errMsg);
+      if (countsMap != null) {
+        return countsMap;
       }
       System.err.println(errMsg);
     } catch (IOException e) {
