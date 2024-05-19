@@ -103,6 +103,7 @@ public class ReconControllerModule extends AbstractModule {
     bind(OzoneManagerServiceProvider.class)
         .to(OzoneManagerServiceProviderImpl.class).in(Singleton.class);
     bind(ReconUtils.class).in(Singleton.class);
+    bind(ReconContext.class).in(Singleton.class);
     // Persistence - inject configuration provider
     install(new JooqPersistenceModule(
         getProvider(DataSourceConfiguration.class)));

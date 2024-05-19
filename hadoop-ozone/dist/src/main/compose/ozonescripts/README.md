@@ -12,7 +12,7 @@
   limitations under the License. See accompanying LICENSE file.
 -->
 
-# start-ozone environment
+# ozonescripts environment
 
 This is an example environment to use/test `./sbin/start-ozone.sh` and `./sbin/stop-ozone.sh` scripts.
 
