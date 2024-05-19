@@ -55,11 +55,13 @@ import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_EVENT_CONTAINER
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_EVENT_THREAD_POOL_SIZE_DEFAULT;
 import static org.apache.hadoop.hdds.server.ServerUtils.getDirectoryFromConfig;
 import static org.apache.hadoop.hdds.server.ServerUtils.getOzoneMetaDirPath;
+import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_SCM_DB_DIR;
 import static org.jooq.impl.DSL.currentTimestamp;
 import static org.jooq.impl.DSL.select;
 import static org.jooq.impl.DSL.using;
 
+import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.recon.api.types.DUResponse;
 import org.apache.hadoop.ozone.recon.scm.ReconContainerReportQueue;
 import org.apache.hadoop.security.authentication.client.AuthenticationException;
@@ -69,6 +71,8 @@ import jakarta.annotation.Nonnull;
 import org.jooq.Configuration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import javax.ws.rs.core.Response;
 
 /**
  * Recon Utility class.
@@ -323,6 +327,56 @@ public class ReconUtils {
       globalStatsDao.update(newRecord);
     }
   }
+
+  /**
+   * Validates volume or bucket names according to specific rules.
+   *
+   * @param resName The name to validate (volume or bucket).
+   * @return A Response object if validation fails, or null if the name is valid.
+   */
+  public static Response validateNames(String resName)
+      throws IllegalArgumentException {
+    if (resName.length() < OzoneConsts.OZONE_MIN_BUCKET_NAME_LENGTH ||
+        resName.length() > OzoneConsts.OZONE_MAX_BUCKET_NAME_LENGTH) {
+      throw new IllegalArgumentException(
+          "Bucket or Volume name length should be between " +
+              OzoneConsts.OZONE_MIN_BUCKET_NAME_LENGTH + " and " +
+              OzoneConsts.OZONE_MAX_BUCKET_NAME_LENGTH);
+    }
+
+    if (resName.charAt(0) == '.' || resName.charAt(0) == '-' ||
+        resName.charAt(resName.length() - 1) == '.' ||
+        resName.charAt(resName.length() - 1) == '-') {
+      throw new IllegalArgumentException(
+          "Bucket or Volume name cannot start or end with " +
+              "hyphen or period");
+    }
+
+    // Regex to check for lowercase letters, numbers, hyphens, underscores, and periods only.
+    if (!resName.matches("^[a-z0-9._-]+$")) {
+      throw new IllegalArgumentException(
+          "Bucket or Volume name can only contain lowercase " +
+              "letters, numbers, hyphens, underscores, and periods");
+    }
+
+    // If all checks pass, the name is valid
+    return null;
+  }
+
+  /**
+   * Constructs an object path with the given IDs.
+   *
+   * @param ids The IDs to construct the object path with.
+   * @return The constructed object path.
+   */
+  public static String constructObjectPathWithPrefix(long... ids) {
+    StringBuilder pathBuilder = new StringBuilder();
+    for (long id : ids) {
+      pathBuilder.append(OM_KEY_PREFIX).append(id);
+    }
+    return pathBuilder.toString();
+  }
+
 
   /**
    * Sorts a list of DiskUsage objects in descending order by size using parallel sorting and
