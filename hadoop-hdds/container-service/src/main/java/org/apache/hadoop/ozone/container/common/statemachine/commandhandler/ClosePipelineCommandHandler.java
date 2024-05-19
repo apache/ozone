@@ -124,8 +124,12 @@ public class ClosePipelineCommandHandler implements CommandHandler {
                   } catch (GroupMismatchException ae) {
                     // ignore silently since this means that the group has been closed by earlier close pipeline
                     // command in another datanode
+                    LOG.debug("Failed to remove group {} for pipeline {} on peer {} since the group has " +
+                        "been removed by earlier close pipeline command handled in another datanode", raftGroupId,
+                        pipelineID, peer.getId());
                   } catch (IOException ioe) {
-                    LOG.warn("Failed to remove group {} for peer {}", raftGroupId, peer.getId(), ioe);
+                    LOG.warn("Failed to remove group {} of pipeline {} on peer {}",
+                        raftGroupId, pipelineID, peer.getId(), ioe);
                   }
                 });
           }
@@ -135,14 +139,14 @@ public class ClosePipelineCommandHandler implements CommandHandler {
           LOG.info("Close Pipeline {} command on datanode {}.", pipelineID,
               dn.getUuidString());
         } else {
-          LOG.debug("Ignoring close pipeline command for pipeline {} " +
-              "as it does not exist", pipelineID);
+          LOG.debug("Ignoring close pipeline command for pipeline {} on datanode {} " +
+              "as it does not exist", pipelineID, dn.getUuidString());
         }
       } catch (GroupMismatchException gme) {
         // ignore silently since this means that the group has been closed by earlier close pipeline
         // command in another datanode
-        LOG.debug("The Ratis group for the pipeline {} has been removed by earlier close pipeline command from " +
-            "other datanodes", pipelineID.getId());
+        LOG.debug("The group for pipeline {} on datanode {} has been removed by earlier close " +
+            "pipeline command handled in another datanode", pipelineID, dn.getUuidString());
       } catch (IOException e) {
         LOG.error("Can't close pipeline {}", pipelineID, e);
       } finally {
