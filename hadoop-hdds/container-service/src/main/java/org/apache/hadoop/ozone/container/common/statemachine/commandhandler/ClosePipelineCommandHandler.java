@@ -16,12 +16,14 @@
  */
 package org.apache.hadoop.ozone.container.common.statemachine.commandhandler;
 
+import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.
     StorageContainerDatanodeProtocolProtos.SCMCommandProto;
 import org.apache.hadoop.hdds.ratis.RatisHelper;
+import org.apache.hadoop.hdds.scm.client.HddsClientUtils;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.ozone.container.common.statemachine
     .SCMConnectionManager;
@@ -148,7 +150,13 @@ public class ClosePipelineCommandHandler implements CommandHandler {
         LOG.debug("The group for pipeline {} on datanode {} has been removed by earlier close " +
             "pipeline command handled in another datanode", pipelineID, dn.getUuidString());
       } catch (IOException e) {
-        LOG.error("Can't close pipeline {}", pipelineID, e);
+        Throwable gme = HddsClientUtils.containsException(e, GroupMismatchException.class);
+        if (gme != null) {
+          LOG.debug("The group for pipeline {} on datanode {} has been removed by earlier close " +
+              "pipeline command handled in another datanode", pipelineID, dn.getUuidString());
+        } else {
+          LOG.error("Can't close pipeline {}", pipelineID, e);
+        }
       } finally {
         long endTime = Time.monotonicNow();
         totalTime += endTime - startTime;
