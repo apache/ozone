@@ -142,36 +142,36 @@ public class TestOMDBInsightSearchEndpoint extends AbstractReconSqlDBTest {
   }
 
   @Test
-  public void testRootLevelSearch() throws IOException {
+  public void testVolumeLevelSearch() throws IOException {
+    String volumePath = "/vola";
     Response response =
-        omdbInsightSearchEndpoint.searchOpenKeys(ROOT_PATH, 20);
+        omdbInsightSearchEndpoint.searchOpenKeys(volumePath, 20);
     assertEquals(200, response.getStatus());
     KeyInsightInfoResponse result =
         (KeyInsightInfoResponse) response.getEntity();
     assertEquals(10, result.getFsoKeyInfoList().size());
-    assertEquals(5, result.getNonFSOKeyInfoList().size());
+    assertEquals(0, result.getNonFSOKeyInfoList().size());
     // Assert Total Size
-    assertEquals(15000, result.getUnreplicatedDataSize());
-    assertEquals(15000 * 3, result.getReplicatedDataSize());
+    assertEquals(10000, result.getUnreplicatedDataSize());
+    assertEquals(10000 * 3, result.getReplicatedDataSize());
 
-    // Switch of the include Fso flag
-    response =
-        omdbInsightSearchEndpoint.searchOpenKeys(ROOT_PATH, 20);
+    // Test the same for volumeB.
+    volumePath = "/volb";
+    response = omdbInsightSearchEndpoint.searchOpenKeys(volumePath, 20);
+    assertEquals(200, response.getStatus());
     result = (KeyInsightInfoResponse) response.getEntity();
     assertEquals(0, result.getFsoKeyInfoList().size());
     assertEquals(5, result.getNonFSOKeyInfoList().size());
-
-    // Switch of the include Non Fso flag
-    response =
-        omdbInsightSearchEndpoint.searchOpenKeys(ROOT_PATH, 20);
-    result = (KeyInsightInfoResponse) response.getEntity();
-    assertEquals(10, result.getFsoKeyInfoList().size());
+    // Assert Total Size
+    assertEquals(5000, result.getUnreplicatedDataSize());
+    assertEquals(5000 * 3, result.getReplicatedDataSize());
   }
+
 
   @Test
   public void testBucketLevelSearch() throws IOException {
     Response response =
-        omdbInsightSearchEndpoint.searchOpenKeys("/volA/bucketA1",20);
+        omdbInsightSearchEndpoint.searchOpenKeys("/vola/bucketa1",20);
     assertEquals(200, response.getStatus());
     KeyInsightInfoResponse result =
         (KeyInsightInfoResponse) response.getEntity();
@@ -182,7 +182,7 @@ public class TestOMDBInsightSearchEndpoint extends AbstractReconSqlDBTest {
     assertEquals(5000 * 3, result.getReplicatedDataSize());
 
     response =
-        omdbInsightSearchEndpoint.searchOpenKeys("/volB/bucketB1", 20);
+        omdbInsightSearchEndpoint.searchOpenKeys("/volb/bucketb1", 20);
     assertEquals(200, response.getStatus());
     result =
         (KeyInsightInfoResponse) response.getEntity();
@@ -196,7 +196,7 @@ public class TestOMDBInsightSearchEndpoint extends AbstractReconSqlDBTest {
   @Test
   public void testDirectoryLevelSearch() throws IOException {
     Response response =
-        omdbInsightSearchEndpoint.searchOpenKeys("/volA/bucketA1/dirA1", 20);
+        omdbInsightSearchEndpoint.searchOpenKeys("/vola/bucketa1/dira1", 20);
     assertEquals(200, response.getStatus());
     KeyInsightInfoResponse result =
         (KeyInsightInfoResponse) response.getEntity();
@@ -207,7 +207,7 @@ public class TestOMDBInsightSearchEndpoint extends AbstractReconSqlDBTest {
     assertEquals(1000 * 3, result.getReplicatedDataSize());
 
     response =
-        omdbInsightSearchEndpoint.searchOpenKeys("/volA/bucketA1/dirA2", 20);
+        omdbInsightSearchEndpoint.searchOpenKeys("/vola/bucketa1/dira2", 20);
     assertEquals(200, response.getStatus());
     result =
         (KeyInsightInfoResponse) response.getEntity();
@@ -218,7 +218,7 @@ public class TestOMDBInsightSearchEndpoint extends AbstractReconSqlDBTest {
     assertEquals(1000 * 3, result.getReplicatedDataSize());
 
     response =
-        omdbInsightSearchEndpoint.searchOpenKeys("/volA/bucketA1/dirA3", 20);
+        omdbInsightSearchEndpoint.searchOpenKeys("/vola/bucketa1/dira3", 20);
     assertEquals(200, response.getStatus());
     result =
         (KeyInsightInfoResponse) response.getEntity();
@@ -232,18 +232,18 @@ public class TestOMDBInsightSearchEndpoint extends AbstractReconSqlDBTest {
   @Test
   public void testLimitSearch() throws IOException {
     Response response =
-        omdbInsightSearchEndpoint.searchOpenKeys(ROOT_PATH, 5);
+        omdbInsightSearchEndpoint.searchOpenKeys("/vola", 5);
     assertEquals(200, response.getStatus());
     KeyInsightInfoResponse result =
         (KeyInsightInfoResponse) response.getEntity();
     assertEquals(5, result.getFsoKeyInfoList().size());
-    assertEquals(5, result.getNonFSOKeyInfoList().size());
+    assertEquals(0, result.getNonFSOKeyInfoList().size());
   }
 
   @Test
   public void testSearchOpenKeysWithNoMatchFound() throws IOException {
     // Given a search prefix that matches no keys
-    String searchPrefix = "nonexistentKeyPrefix";
+    String searchPrefix = "incorrectprefix";
 
     Response response =
         omdbInsightSearchEndpoint.searchOpenKeys(searchPrefix, 10);
@@ -261,16 +261,16 @@ public class TestOMDBInsightSearchEndpoint extends AbstractReconSqlDBTest {
   public void testSearchOpenKeysWithBadRequest() throws IOException {
     // Give a negative limit
     int negativeLimit = -1;
-    Response response =
-        omdbInsightSearchEndpoint.searchOpenKeys("searchPrefix", negativeLimit);
+    Response response = omdbInsightSearchEndpoint.searchOpenKeys("@323232", negativeLimit);
 
     // Then the response should indicate that the request was bad
     assertEquals(Response.Status.BAD_REQUEST.getStatusCode(),
         response.getStatus(), "Expected a 400 BAD REQUEST status");
 
     String entity = (String) response.getEntity();
-    assertTrue(entity.contains("Limit cannot be negative."),
-        "Expected a message indicating the limit was negative");
+    assertTrue(entity.contains("Invalid startPrefix: Bucket or Volume name can " +
+            "only contain lowercase letters, numbers, hyphens, underscores, and periods"),
+        "Expected a message indicating Invalid startPrefix");
   }
 
 
@@ -279,101 +279,101 @@ public class TestOMDBInsightSearchEndpoint extends AbstractReconSqlDBTest {
    * The test setup mimics the following filesystem structure with specified sizes:
    *
    * root   (Total Size: 15000KB)
-   * ├── volA   (Total Size: 10000KB)
-   * │   ├── bucketA1   (FSO) Total Size: 5000KB
-   * │   │   ├── fileA1 (Size: 1000KB)
-   * │   │   ├── fileA2 (Size: 1000KB)
-   * │   │   ├── dirA1 (Total Size: 1000KB)
-   * │   │   ├── dirA2 (Total Size: 1000KB)
-   * │   │   └── dirA3 (Total Size: 1000KB)
-   * │   ├── bucketA2   (FSO) Total Size: 5000KB
-   * │   │   ├── fileA3 (Size: 1000KB)
-   * │   │   ├── fileA4 (Size: 1000KB)
-   * │   │   ├── dirA4 (Total Size: 1000KB)
-   * │   │   ├── dirA5 (Total Size: 1000KB)
-   * │   │   └── dirA6 (Total Size: 1000KB)
-   * └── volB   (Total Size: 5000KB)
-   *     └── bucketB1   (OBS) Total Size: 5000KB
-   *         ├── fileB1 (Size: 1000KB)
-   *         ├── fileB2 (Size: 1000KB)
-   *         ├── fileB3 (Size: 1000KB)
-   *         ├── fileB4 (Size: 1000KB)
-   *         └── fileB5 (Size: 1000KB)
+   * ├── vola   (Total Size: 10000KB)
+   * │   ├── bucketa1   (FSO) Total Size: 5000KB
+   * │   │   ├── filea1 (Size: 1000KB)
+   * │   │   ├── filea2 (Size: 1000KB)
+   * │   │   ├── dira1 (Total Size: 1000KB)
+   * │   │   ├── dira2 (Total Size: 1000KB)
+   * │   │   └── dira3 (Total Size: 1000KB)
+   * │   ├── bucketa2   (FSO) Total Size: 5000KB
+   * │   │   ├── filea3 (Size: 1000KB)
+   * │   │   ├── filea4 (Size: 1000KB)
+   * │   │   ├── dira4 (Total Size: 1000KB)
+   * │   │   ├── dira5 (Total Size: 1000KB)
+   * │   │   └── dira6 (Total Size: 1000KB)
+   * └── volb   (Total Size: 5000KB)
+   *     └── bucketb1   (OBS) Total Size: 5000KB
+   *         ├── fileb1 (Size: 1000KB)
+   *         ├── fileb2 (Size: 1000KB)
+   *         ├── fileb3 (Size: 1000KB)
+   *         ├── fileb4 (Size: 1000KB)
+   *         └── fileb5 (Size: 1000KB)
    *
    * @throws Exception
    */
   private void populateOMDB() throws Exception {
     // Create Volumes
-    long volAObjectId = createVolume("volA");
-    long volBObjectId = createVolume("volB");
+    long volaObjectId = createVolume("vola");
+    long volbObjectId = createVolume("volb");
 
-    // Create Buckets in volA
-    long bucketA1ObjectId =
-        createBucket("volA", "bucketA1", 1000 + 1000 + 1000 + 1000 + 1000,
+    // Create Buckets in vola
+    long bucketa1ObjectId =
+        createBucket("vola", "bucketa1", 1000 + 1000 + 1000 + 1000 + 1000,
             getFSOBucketLayout());
-    long bucketA2ObjectId =
-        createBucket("volA", "bucketA2", 1000 + 1000 + 1000 + 1000 + 1000,
+    long bucketa2ObjectId =
+        createBucket("vola", "bucketa2", 1000 + 1000 + 1000 + 1000 + 1000,
             getFSOBucketLayout());
 
-    // Create Bucket in volB
-    long bucketB1ObjectId =
-        createBucket("volB", "bucketB1", 1000 + 1000 + 1000 + 1000 + 1000,
+    // Create Bucket in volb
+    long bucketb1ObjectId =
+        createBucket("volb", "bucketb1", 1000 + 1000 + 1000 + 1000 + 1000,
             getOBSBucketLayout());
 
-    // Create Directories and Files under bucketA1
-    long dirA1ObjectId =
-        createDirectory(bucketA1ObjectId, bucketA1ObjectId, volAObjectId,
-            "dirA1");
-    long dirA2ObjectId =
-        createDirectory(bucketA1ObjectId, bucketA1ObjectId, volAObjectId,
-            "dirA2");
-    long dirA3ObjectId =
-        createDirectory(bucketA1ObjectId, bucketA1ObjectId, volAObjectId,
-            "dirA3");
+    // Create Directories and Files under bucketa1
+    long dira1ObjectId =
+        createDirectory(bucketa1ObjectId, bucketa1ObjectId, volaObjectId,
+            "dira1");
+    long dira2ObjectId =
+        createDirectory(bucketa1ObjectId, bucketa1ObjectId, volaObjectId,
+            "dira2");
+    long dira3ObjectId =
+        createDirectory(bucketa1ObjectId, bucketa1ObjectId, volaObjectId,
+            "dira3");
 
-    // Files directly under bucketA1
-    createOpenFile("fileA1", "bucketA1", "volA", "fileA1", bucketA1ObjectId,
-        bucketA1ObjectId, volAObjectId, 1000);
-    createOpenFile("fileA2", "bucketA1", "volA", "fileA2", bucketA1ObjectId,
-        bucketA1ObjectId, volAObjectId, 1000);
+    // Files directly under bucketa1
+    createOpenFile("filea1", "bucketa1", "vola", "filea1", bucketa1ObjectId,
+        bucketa1ObjectId, volaObjectId, 1000);
+    createOpenFile("filea2", "bucketa1", "vola", "filea2", bucketa1ObjectId,
+        bucketa1ObjectId, volaObjectId, 1000);
 
-    // Create Directories and Files under bucketA2
-    long dirA4ObjectId =
-        createDirectory(bucketA2ObjectId, bucketA2ObjectId, volAObjectId,
-            "dirA4");
-    long dirA5ObjectId =
-        createDirectory(bucketA2ObjectId, bucketA2ObjectId, volAObjectId,
-            "dirA5");
-    long dirA6ObjectId =
-        createDirectory(bucketA2ObjectId, bucketA2ObjectId, volAObjectId,
-            "dirA6");
+    // Create Directories and Files under bucketa2
+    long dira4ObjectId =
+        createDirectory(bucketa2ObjectId, bucketa2ObjectId, volaObjectId,
+            "dira4");
+    long dira5ObjectId =
+        createDirectory(bucketa2ObjectId, bucketa2ObjectId, volaObjectId,
+            "dira5");
+    long dira6ObjectId =
+        createDirectory(bucketa2ObjectId, bucketa2ObjectId, volaObjectId,
+            "dira6");
 
-    // Files directly under bucketA2
-    createOpenFile("fileA3", "bucketA2", "volA", "fileA3", bucketA2ObjectId,
-        bucketA2ObjectId, volAObjectId, 1000);
-    createOpenFile("fileA4", "bucketA2", "volA", "fileA4", bucketA2ObjectId,
-        bucketA2ObjectId, volAObjectId, 1000);
+    // Files directly under bucketa2
+    createOpenFile("filea3", "bucketa2", "vola", "filea3", bucketa2ObjectId,
+        bucketa2ObjectId, volaObjectId, 1000);
+    createOpenFile("filea4", "bucketa2", "vola", "filea4", bucketa2ObjectId,
+        bucketa2ObjectId, volaObjectId, 1000);
 
-    // Files directly under bucketB1
-    createOpenKey("fileB1", "bucketB1", "volB", 1000);
-    createOpenKey("fileB2", "bucketB1", "volB", 1000);
-    createOpenKey("fileB3", "bucketB1", "volB", 1000);
-    createOpenKey("fileB4", "bucketB1", "volB", 1000);
-    createOpenKey("fileB5", "bucketB1", "volB", 1000);
+    // Files directly under bucketb1
+    createOpenKey("fileb1", "bucketb1", "volb", 1000);
+    createOpenKey("fileb2", "bucketb1", "volb", 1000);
+    createOpenKey("fileb3", "bucketb1", "volb", 1000);
+    createOpenKey("fileb4", "bucketb1", "volb", 1000);
+    createOpenKey("fileb5", "bucketb1", "volb", 1000);
 
     // Create Inner files under directories
-    createOpenFile("dirA1/innerFile", "bucketA1", "volA", "innerFile",
-        dirA1ObjectId, bucketA1ObjectId, volAObjectId, 1000);
-    createOpenFile("dirA2/innerFile", "bucketA1", "volA", "innerFile",
-        dirA2ObjectId, bucketA1ObjectId, volAObjectId, 1000);
-    createOpenFile("dirA3/innerFile", "bucketA1", "volA", "innerFile",
-        dirA3ObjectId, bucketA1ObjectId, volAObjectId, 1000);
-    createOpenFile("dirA4/innerFile", "bucketA2", "volA", "innerFile",
-        dirA4ObjectId, bucketA2ObjectId, volAObjectId, 1000);
-    createOpenFile("dirA5/innerFile", "bucketA2", "volA", "innerFile",
-        dirA5ObjectId, bucketA2ObjectId, volAObjectId, 1000);
-    createOpenFile("dirA6/innerFile", "bucketA2", "volA", "innerFile",
-        dirA6ObjectId, bucketA2ObjectId, volAObjectId, 1000);
+    createOpenFile("dira1/innerfile", "bucketa1", "vola", "innerfile",
+        dira1ObjectId, bucketa1ObjectId, volaObjectId, 1000);
+    createOpenFile("dira2/innerfile", "bucketa1", "vola", "innerfile",
+        dira2ObjectId, bucketa1ObjectId, volaObjectId, 1000);
+    createOpenFile("dira3/innerfile", "bucketa1", "vola", "innerfile",
+        dira3ObjectId, bucketa1ObjectId, volaObjectId, 1000);
+    createOpenFile("dira4/innerfile", "bucketa2", "vola", "innerfile",
+        dira4ObjectId, bucketa2ObjectId, volaObjectId, 1000);
+    createOpenFile("dira5/innerfile", "bucketa2", "vola", "innerfile",
+        dira5ObjectId, bucketa2ObjectId, volaObjectId, 1000);
+    createOpenFile("dira6/innerfile", "bucketa2", "vola", "innerfile",
+        dira6ObjectId, bucketa2ObjectId, volaObjectId, 1000);
   }
 
   /**

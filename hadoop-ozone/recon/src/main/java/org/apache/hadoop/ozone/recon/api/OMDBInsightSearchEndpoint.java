@@ -261,14 +261,12 @@ public class OMDBInsightSearchEndpoint {
    * with their corresponding IDs. It simplifies database queries for FSO bucket operations.
    *
    * @param prevKeyPrefix The path to be converted, not including key or directory names/IDs.
-   * @return The object path as "/volumeID/bucketID/ParentId/".
+   * @return The object path as "/volumeID/bucketID/ParentId/" or an empty string if an error occurs.
    * @throws IOException If database access fails.
    */
-  public String convertToObjectPath(String prevKeyPrefix)
-      throws IOException, IllegalArgumentException {
-
-    String[] names = parseRequestPath(
-        normalizePath(prevKeyPrefix, BucketLayout.FILE_SYSTEM_OPTIMIZED));
+  public String convertToObjectPath(String prevKeyPrefix) throws IOException, IllegalArgumentException {
+    try {
+      String[] names = parseRequestPath(normalizePath(prevKeyPrefix, BucketLayout.FILE_SYSTEM_OPTIMIZED));
 
       // Root-Level :- Return the original path
       if (names.length == 0) {
@@ -279,8 +277,7 @@ public class OMDBInsightSearchEndpoint {
       String volumeName = names[0];
       validateNames(volumeName);
       String volumeKey = omMetadataManager.getVolumeKey(volumeName);
-      long volumeId = omMetadataManager.getVolumeTable().getSkipCache(volumeKey)
-          .getObjectID();
+      long volumeId = omMetadataManager.getVolumeTable().getSkipCache(volumeKey).getObjectID();
       if (names.length == 1) {
         return constructObjectPathWithPrefix(volumeId);
       }
@@ -289,19 +286,19 @@ public class OMDBInsightSearchEndpoint {
       String bucketName = names[1];
       validateNames(bucketName);
       String bucketKey = omMetadataManager.getBucketKey(volumeName, bucketName);
-      OmBucketInfo bucketInfo =
-          omMetadataManager.getBucketTable().getSkipCache(bucketKey);
+      OmBucketInfo bucketInfo = omMetadataManager.getBucketTable().getSkipCache(bucketKey);
       long bucketId = bucketInfo.getObjectID();
       if (names.length == 2) {
         return constructObjectPathWithPrefix(volumeId, bucketId);
       }
 
       // Fetch the immediate parentID which could be a directory or the bucket itself
-      BucketHandler handler =
-          getBucketHandler(reconNamespaceSummaryManager, omMetadataManager,
-              reconSCM, bucketInfo);
+      BucketHandler handler = getBucketHandler(reconNamespaceSummaryManager, omMetadataManager, reconSCM, bucketInfo);
       long dirObjectId = handler.getDirInfo(names).getObjectID();
       return constructObjectPathWithPrefix(volumeId, bucketId, dirObjectId);
+    } catch (NullPointerException e) {
+      return prevKeyPrefix;
+    }
   }
 
   /**
