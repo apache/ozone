@@ -24,13 +24,13 @@ import org.apache.hadoop.security.token.Token;
 public class NoopTokenVerifier implements TokenVerifier {
 
   @Override
-  public void verify(String user, Token<?> token,
+  public void verify(Token<?> token,
       ContainerCommandRequestProtoOrBuilder cmd) {
     // no-op
   }
 
   @Override // to avoid "failed to find token"
-  public void verify(ContainerCommandRequestProtoOrBuilder cmd, String user,
+  public void verify(ContainerCommandRequestProtoOrBuilder cmd,
       String encodedToken) {
     // no-op
   }

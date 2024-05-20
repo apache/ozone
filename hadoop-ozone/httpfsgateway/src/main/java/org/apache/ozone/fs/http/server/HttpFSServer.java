@@ -282,8 +282,10 @@ public class HttpFSServer {
       response = handleListStatus(path, params, user);
       break;
     case GETHOMEDIRECTORY:
-      response = handleGetHomeDir(path, op, user);
-      break;
+      throw new UnsupportedOperationException(getClass().getSimpleName()
+          + " doesn't support GETHOMEDIRECTORY");
+      //response = handleGetHomeDir(path, op, user);
+      //break;
     case INSTRUMENTATION:
       response = handleInstrumentation(path, op, user);
       break;
@@ -316,8 +318,10 @@ public class HttpFSServer {
       //response = handleListStatusBatch(path, params, user);
       //break;
     case GETTRASHROOT:
-      response = handleGetTrashRoot(path, user);
-      break;
+      throw new UnsupportedOperationException(getClass().getSimpleName()
+          + " doesn't support GETTRASHROOT");
+      //response = handleGetTrashRoot(path, user);
+      //break;
     case GETALLSTORAGEPOLICY:
       response = handleGetAllStoragePolicy(path, user);
       break;

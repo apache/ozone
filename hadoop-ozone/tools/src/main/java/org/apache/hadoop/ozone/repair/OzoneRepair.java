@@ -24,6 +24,9 @@ import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import picocli.CommandLine;
 
+import java.nio.charset.StandardCharsets;
+import java.util.Scanner;
+
 /**
  * Ozone Repair Command line tool.
  */
@@ -32,6 +35,11 @@ import picocli.CommandLine;
     versionProvider = HddsVersionProvider.class,
     mixinStandardHelpOptions = true)
 public class OzoneRepair extends GenericCli {
+
+  public static final String WARNING_SYS_USER_MESSAGE =
+      "ATTENTION: Running as user %s. Make sure this is the same user used to run the Ozone process." +
+          " Are you sure you want to continue (y/N)? ";
+
 
   private OzoneConfiguration ozoneConf;
 
@@ -61,4 +69,26 @@ public class OzoneRepair extends GenericCli {
   public static void main(String[] argv) throws Exception {
     new OzoneRepair().run(argv);
   }
+
+  @Override
+  public int execute(String[] argv) {
+    String currentUser = getSystemUserName();
+    if (!("y".equalsIgnoreCase(getConsoleReadLineWithFormat(currentUser)))) {
+      System.out.println("Aborting command.");
+      return 1;
+    }
+    System.out.println("Run as user: " + currentUser);
+
+    return super.execute(argv);
+  }
+
+  public  String getSystemUserName() {
+    return System.getProperty("user.name");
+  }
+
+  public  String getConsoleReadLineWithFormat(String currentUser) {
+    System.err.printf(WARNING_SYS_USER_MESSAGE, currentUser);
+    return (new Scanner(System.in, StandardCharsets.UTF_8.name())).nextLine().trim();
+  }
+
 }

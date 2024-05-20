@@ -22,10 +22,12 @@ import java.io.IOException;
 
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.MutableConfigurationSource;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientException;
 import org.apache.hadoop.hdds.conf.InMemoryConfiguration;
 
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_INTERNAL_SERVICE_ID;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SERVICE_IDS_KEY;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -66,6 +68,34 @@ public class TestOzoneAddressClientCreation {
     assertThrows(OzoneClientException.class, () ->
         address.createClient(new InMemoryConfiguration(OZONE_OM_SERVICE_IDS_KEY,
             "service1,service2")));
+  }
+
+  @Test
+  public void implicitHaMultipleServiceIdWithDefaultServiceId()
+      throws OzoneClientException, IOException {
+    TestableOzoneAddress address =
+        new TestableOzoneAddress("/vol1/bucket1/key1");
+    InMemoryConfiguration conf = new InMemoryConfiguration(OZONE_OM_SERVICE_IDS_KEY,
+        "service1,service2");
+    conf.set(OZONE_OM_INTERNAL_SERVICE_ID, "service2");
+
+    address.createClient(conf);
+    assertFalse(address.simpleCreation);
+    assertEquals("service2", address.serviceId);
+  }
+
+  @Test
+  public void implicitHaMultipleServiceIdWithDefaultServiceIdForS3()
+      throws OzoneClientException, IOException {
+    TestableOzoneAddress address =
+        new TestableOzoneAddress("/vol1/bucket1/key1");
+    OzoneConfiguration conf = new OzoneConfiguration();
+    conf.set(OZONE_OM_SERVICE_IDS_KEY, "service1,service2");
+    conf.set(OZONE_OM_INTERNAL_SERVICE_ID, "service2");
+
+    address.createClientForS3Commands(conf, null);
+    assertFalse(address.simpleCreation);
+    assertEquals("service2", address.serviceId);
   }
 
   @Test
