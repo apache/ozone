@@ -1421,7 +1421,6 @@ public class RpcClient implements ClientProtocol {
     }
 
     createKeyPreChecks(volumeName, bucketName, keyName, replicationConfig);
-    String ownerName = getRealUserInfo().getShortUserName();
 
     OmKeyArgs.Builder builder = new OmKeyArgs.Builder()
         .setVolumeName(volumeName)
@@ -1431,7 +1430,6 @@ public class RpcClient implements ClientProtocol {
         .setReplicationConfig(replicationConfig)
         .addAllMetadataGdpr(metadata)
         .setLatestVersionLocation(getLatestVersionLocation)
-        .setOwnerName(ownerName)
         .setExpectedDataGeneration(existingKeyGeneration);
 
     OpenKeySession openKey = ozoneManagerClient.openKey(builder.build());
