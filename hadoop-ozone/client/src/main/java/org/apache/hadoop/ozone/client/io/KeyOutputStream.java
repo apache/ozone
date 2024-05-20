@@ -168,12 +168,12 @@ public class KeyOutputStream extends OutputStream
    * @param version the set of blocks that are pre-allocated.
    * @param openVersion the version corresponding to the pre-allocation.
    */
-  public synchronized void addPreallocateBlocks(OmKeyLocationInfoGroup version, long openVersion) {
+  public void addPreallocateBlocks(OmKeyLocationInfoGroup version, long openVersion) {
     blockOutputStreamEntryPool.addPreallocateBlocks(version, openVersion);
   }
 
   @Override
-  public synchronized void write(int b) throws IOException {
+  public void write(int b) throws IOException {
     byte[] buf = new byte[1];
     buf[0] = (byte) b;
     write(buf, 0, 1);
@@ -192,7 +192,7 @@ public class KeyOutputStream extends OutputStream
    * @throws IOException
    */
   @Override
-  public synchronized void write(byte[] b, int off, int len)
+  public void write(byte[] b, int off, int len)
       throws IOException {
     checkNotClosed();
     if (b == null) {
@@ -432,7 +432,7 @@ public class KeyOutputStream extends OutputStream
   }
 
   @Override
-  public synchronized void flush() throws IOException {
+  public void flush() throws IOException {
     checkNotClosed();
     handleFlushOrClose(StreamAction.FLUSH);
   }
@@ -443,7 +443,7 @@ public class KeyOutputStream extends OutputStream
   }
 
   @Override
-  public synchronized void hsync() throws IOException {
+  public void hsync() throws IOException {
     if (replication.getReplicationType() != ReplicationType.RATIS) {
       throw new UnsupportedOperationException(
           "Replication type is not " + ReplicationType.RATIS);
@@ -534,7 +534,7 @@ public class KeyOutputStream extends OutputStream
    * @throws IOException
    */
   @Override
-  public synchronized void close() throws IOException {
+  public void close() throws IOException {
     if (closed) {
       return;
     }
@@ -556,7 +556,7 @@ public class KeyOutputStream extends OutputStream
     }
   }
 
-  synchronized OmMultipartCommitUploadPartInfo
+  OmMultipartCommitUploadPartInfo
       getCommitUploadPartInfo() {
     return blockOutputStreamEntryPool.getCommitUploadPartInfo();
   }
