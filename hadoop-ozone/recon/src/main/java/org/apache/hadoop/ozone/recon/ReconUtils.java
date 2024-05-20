@@ -603,4 +603,18 @@ public class ReconUtils {
     // If all checks pass, the name is valid
     return null;
   }
+
+  /**
+   * Constructs an object path with the given IDs.
+   *
+   * @param ids The IDs to construct the object path with.
+   * @return The constructed object path.
+   */
+  public static String constructObjectPathWithPrefix(long... ids) {
+    StringBuilder pathBuilder = new StringBuilder();
+    for (long id : ids) {
+      pathBuilder.append(OM_KEY_PREFIX).append(id);
+    }
+    return pathBuilder.toString();
+  }
 }

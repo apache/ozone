@@ -929,104 +929,6 @@ public class OMDBInsightEndpoint {
    *     ]
    * }
    *
-   * Input Request for Legacy bucket:
-   *
-   *        `api/v1/keys/listKeys?startPrefix=/volume1/legacy-bucket&limit=2&replicationType=RATIS`
-   * Output Response:
-   *
-   * {
-   *     "status": "OK",
-   *     "path": "/volume1/legacy-bucket",
-   *     "replicatedDataSize": 157286400,
-   *     "unReplicatedDataSize": 157286400,
-   *     "lastKey": "/volume1/legacy-bucket/key6",
-   *     "keys": [
-   *         {
-   *             "key": "/volume1/legacy-bucket/key1",
-   *             "path": "volume1/legacy-bucket/key1",
-   *             "size": 10485760,
-   *             "replicatedSize": 10485760,
-   *             "replicationInfo": {
-   *                 "replicationFactor": "ONE",
-   *                 "requiredNodes": 1,
-   *                 "replicationType": "RATIS"
-   *             },
-   *             "creationTime": 1715781440620,
-   *             "modificationTime": 1715781441448,
-   *             "isKey": true
-   *         },
-   *         {
-   *             "key": "/volume1/legacy-bucket/key1/key2",
-   *             "path": "volume1/legacy-bucket/key1/key2",
-   *             "size": 41943040,
-   *             "replicatedSize": 41943040,
-   *             "replicationInfo": {
-   *                 "replicationFactor": "ONE",
-   *                 "requiredNodes": 1,
-   *                 "replicationType": "RATIS"
-   *             },
-   *             "creationTime": 1715781443431,
-   *             "modificationTime": 1715781444680,
-   *             "isKey": true
-   *         },
-   *         {
-   *             "key": "/volume1/legacy-bucket/key1/key2/key3",
-   *             "path": "volume1/legacy-bucket/key1/key2/key3",
-   *             "size": 10485760,
-   *             "replicatedSize": 10485760,
-   *             "replicationInfo": {
-   *                 "replicationFactor": "ONE",
-   *                 "requiredNodes": 1,
-   *                 "replicationType": "RATIS"
-   *             },
-   *             "creationTime": 1715781446657,
-   *             "modificationTime": 1715781447476,
-   *             "isKey": true
-   *         },
-   *         {
-   *             "key": "/volume1/legacy-bucket/key4",
-   *             "path": "volume1/legacy-bucket/key4",
-   *             "size": 41943040,
-   *             "replicatedSize": 41943040,
-   *             "replicationInfo": {
-   *                 "replicationFactor": "ONE",
-   *                 "requiredNodes": 1,
-   *                 "replicationType": "RATIS"
-   *             },
-   *             "creationTime": 1715781449445,
-   *             "modificationTime": 1715781450464,
-   *             "isKey": true
-   *         },
-   *         {
-   *             "key": "/volume1/legacy-bucket/key5",
-   *             "path": "volume1/legacy-bucket/key5",
-   *             "size": 10485760,
-   *             "replicatedSize": 10485760,
-   *             "replicationInfo": {
-   *                 "replicationFactor": "ONE",
-   *                 "requiredNodes": 1,
-   *                 "replicationType": "RATIS"
-   *             },
-   *             "creationTime": 1715781452476,
-   *             "modificationTime": 1715781453335,
-   *             "isKey": true
-   *         },
-   *         {
-   *             "key": "/volume1/legacy-bucket/key6",
-   *             "path": "volume1/legacy-bucket/key6",
-   *             "size": 41943040,
-   *             "replicatedSize": 41943040,
-   *             "replicationInfo": {
-   *                 "replicationFactor": "ONE",
-   *                 "requiredNodes": 1,
-   *                 "replicationType": "RATIS"
-   *             },
-   *             "creationTime": 1715781477894,
-   *             "modificationTime": 1715781479351,
-   *             "isKey": true
-   *         }
-   *     ]
-   * }
    * ********************************************************
    * @throws IOException
    */
@@ -1205,7 +1107,7 @@ public class OMDBInsightEndpoint {
           reconNamespaceSummaryManager.getNSSummary(childId);
       if (childSummary != null) {
         String subPath =
-            constructObjectPathWithPrefix(volumeID, bucketID, childId);
+            ReconUtils.constructObjectPathWithPrefix(volumeID, bucketID, childId);
         // Add to subPaths
         subPaths.add(subPath);
         // Recurse into this child directory
@@ -1244,7 +1146,7 @@ public class OMDBInsightEndpoint {
     long volumeId = omMetadataManager.getVolumeTable().getSkipCache(volumeKey)
         .getObjectID();
     if (names.length == 1) {
-      return constructObjectPathWithPrefix(volumeId);
+      return ReconUtils.constructObjectPathWithPrefix(volumeId);
     }
 
     // Bucket-Level :- Fetch the bucketID
@@ -1255,15 +1157,20 @@ public class OMDBInsightEndpoint {
         omMetadataManager.getBucketTable().getSkipCache(bucketKey);
     long bucketId = bucketInfo.getObjectID();
     if (names.length == 2) {
-      return constructObjectPathWithPrefix(volumeId, bucketId);
+      return ReconUtils.constructObjectPathWithPrefix(volumeId, bucketId);
     }
 
     // Fetch the immediate parentID which could be a directory or the bucket itself
     BucketHandler handler =
         getBucketHandler(reconNamespaceSummaryManager, omMetadataManager,
             reconSCM, bucketInfo);
-    long dirObjectId = handler.getDirInfo(names).getObjectID();
-    return constructObjectPathWithPrefix(volumeId, bucketId, dirObjectId);
+    long dirObjectId = -1;
+    try {
+      dirObjectId = handler.getDirInfo(names).getObjectID();
+    } catch (Exception ioe) {
+      LOG.error("Not valid directory :{}", ioe);
+    }
+    return ReconUtils.constructObjectPathWithPrefix(volumeId, bucketId, dirObjectId);
   }
 
   /**
@@ -1383,20 +1290,6 @@ public class OMDBInsightEndpoint {
     keyEntityInfo.setReplicatedSize(keyInfo.getReplicatedSize());
     keyEntityInfo.setReplicationConfig(keyInfo.getReplicationConfig());
     return keyEntityInfo;
-  }
-
-  /**
-   * Constructs an object path with the given IDs.
-   *
-   * @param ids The IDs to construct the object path with.
-   * @return The constructed object path.
-   */
-  private String constructObjectPathWithPrefix(long... ids) {
-    StringBuilder pathBuilder = new StringBuilder();
-    for (long id : ids) {
-      pathBuilder.append(OM_KEY_PREFIX).append(id);
-    }
-    return pathBuilder.toString();
   }
 
   private void createSummaryForDeletedDirectories(

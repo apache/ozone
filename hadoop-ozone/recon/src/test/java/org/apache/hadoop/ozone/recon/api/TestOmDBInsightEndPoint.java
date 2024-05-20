@@ -116,6 +116,8 @@ public class TestOmDBInsightEndPoint extends AbstractReconSqlDBTest {
 
   private static final String OBS_BUCKET = "obs-bucket";
   private static final String FSO_BUCKET = "fso-bucket";
+  private static final String EMPTY_OBS_BUCKET = "empty-obs-bucket";
+  private static final String EMPTY_FSO_BUCKET = "empty-fso-bucket";
 
   private static final String DIR_ONE = "dir1";
   private static final String DIR_TWO = "dir2";
@@ -130,6 +132,7 @@ public class TestOmDBInsightEndPoint extends AbstractReconSqlDBTest {
   private static final String KEY_FOUR = "key4";
   private static final String KEY_FIVE = "key5";
   private static final String KEY_SIX = "key6";
+  private static final String NON_EXISTENT_KEY_SEVEN = "key7";
 
   private static final long VOLUME_ONE_OBJECT_ID = 1L;
 
@@ -152,6 +155,9 @@ public class TestOmDBInsightEndPoint extends AbstractReconSqlDBTest {
   private static final long KEY_ELEVEN_OBJECT_ID = 18L;
   private static final long KEY_TWELVE_OBJECT_ID = 19L;
 
+  private static final long EMPTY_OBS_BUCKET_OBJECT_ID = 30L;
+  private static final long EMPTY_FSO_BUCKET_OBJECT_ID = 40L;
+
   private static final long KEY_ONE_SIZE = 2 * OzoneConsts.KB + 1; // bin 2
   private static final long KEY_TWO_SIZE = 2 * OzoneConsts.KB + 1; // bin 2
   private static final long KEY_THREE_SIZE = OzoneConsts.KB + 1; // bin 1
@@ -167,10 +173,13 @@ public class TestOmDBInsightEndPoint extends AbstractReconSqlDBTest {
 
   private static final String OBS_BUCKET_PATH = "/volume1/obs-bucket";
   private static final String FSO_BUCKET_PATH = "/volume1/fso-bucket";
+  private static final String EMPTY_OBS_BUCKET_PATH = "/volume1/empty-obs-bucket";
+  private static final String EMPTY_FSO_BUCKET_PATH = "/volume1/empty-fso-bucket";
 
   private static final String DIR_ONE_PATH = "/volume1/fso-bucket/dir1";
   private static final String DIR_TWO_PATH = "/volume1/fso-bucket/dir1/dir2";
   private static final String DIR_THREE_PATH = "/volume1/fso-bucket/dir1/dir2/dir3";
+  private static final String NON_EXISTENT_DIR_FOUR_PATH = "/volume1/fso-bucket/dir1/dir2/dir3/dir4";
 
   private static final long VOLUME_ONE_QUOTA = 2 * OzoneConsts.MB;
   private static final long OBS_BUCKET_QUOTA = OzoneConsts.MB;
@@ -358,6 +367,30 @@ public class TestOmDBInsightEndPoint extends AbstractReconSqlDBTest {
         fsoBucketInfo.getVolumeName(), fsoBucketInfo.getBucketName());
 
     reconOMMetadataManager.getBucketTable().put(fsoBucketKey, fsoBucketInfo);
+
+    OmBucketInfo emptyOBSBucketInfo = OmBucketInfo.newBuilder()
+        .setVolumeName(VOLUME_ONE)
+        .setBucketName(EMPTY_OBS_BUCKET)
+        .setObjectID(EMPTY_OBS_BUCKET_OBJECT_ID)
+        .setQuotaInBytes(OzoneConsts.MB)
+        .setBucketLayout(BucketLayout.OBJECT_STORE)
+        .build();
+    String emptyOBSBucketKey = reconOMMetadataManager.getBucketKey(
+        emptyOBSBucketInfo.getVolumeName(), emptyOBSBucketInfo.getBucketName());
+
+    reconOMMetadataManager.getBucketTable().put(emptyOBSBucketKey, emptyOBSBucketInfo);
+
+    OmBucketInfo emptyFSOBucketInfo = OmBucketInfo.newBuilder()
+        .setVolumeName(VOLUME_ONE)
+        .setBucketName(EMPTY_FSO_BUCKET)
+        .setObjectID(EMPTY_FSO_BUCKET_OBJECT_ID)
+        .setQuotaInBytes(OzoneConsts.MB)
+        .setBucketLayout(BucketLayout.FILE_SYSTEM_OPTIMIZED)
+        .build();
+    String emptyFSOBucketKey = reconOMMetadataManager.getBucketKey(
+        emptyFSOBucketInfo.getVolumeName(), emptyFSOBucketInfo.getBucketName());
+
+    reconOMMetadataManager.getBucketTable().put(emptyFSOBucketKey, emptyFSOBucketInfo);
 
     // Write FSO keys data - Start
     writeDirToOm(reconOMMetadataManager, DIR_ONE_OBJECT_ID,
@@ -1374,6 +1407,45 @@ public class TestOmDBInsightEndPoint extends AbstractReconSqlDBTest {
     bucketResponse = omdbInsightEndpoint.listKeys("RATIS", "", 0,
         OBS_BUCKET_PATH, listKeysResponse.getLastKey(), 2);
     listKeysResponse = (ListKeysResponse) bucketResponse.getEntity();
+    assertEquals(0, listKeysResponse.getKeys().size());
+    assertEquals("", listKeysResponse.getLastKey());
+  }
+
+  @Test
+  public void testListKeysForEmptyOBSBucket() {
+    Response bucketResponse = omdbInsightEndpoint.listKeys("RATIS", "", 0, EMPTY_OBS_BUCKET_PATH,
+        "", 1000);
+    ListKeysResponse listKeysResponse = (ListKeysResponse) bucketResponse.getEntity();
+    // Since key7 doesn't exists in OM namespace, list keys on this will return zero keys.
+    assertEquals(0, listKeysResponse.getKeys().size());
+    assertEquals("", listKeysResponse.getLastKey());
+  }
+
+  @Test
+  public void testListKeysForEmptyFSOBucket() {
+    Response bucketResponse = omdbInsightEndpoint.listKeys("RATIS", "", 0, EMPTY_FSO_BUCKET_PATH,
+        "", 1000);
+    ListKeysResponse listKeysResponse = (ListKeysResponse) bucketResponse.getEntity();
+    assertEquals(0, listKeysResponse.getKeys().size());
+    assertEquals("", listKeysResponse.getLastKey());
+  }
+
+  @Test
+  public void testListKeysForNonExistentOBSPaths() {
+    Response bucketResponse = omdbInsightEndpoint.listKeys("RATIS", "", 0, OBS_BUCKET_PATH +
+            OM_KEY_PREFIX + NON_EXISTENT_KEY_SEVEN,
+        "", 2);
+    ListKeysResponse listKeysResponse = (ListKeysResponse) bucketResponse.getEntity();
+    // Since key7 doesn't exists in OM namespace, list keys on this will return zero keys.
+    assertEquals(0, listKeysResponse.getKeys().size());
+    assertEquals("", listKeysResponse.getLastKey());
+  }
+
+  @Test
+  public void testListKeysForNonExistentFSOPaths() {
+    Response bucketResponse = omdbInsightEndpoint.listKeys("RATIS", "", 0, NON_EXISTENT_DIR_FOUR_PATH,
+        "", 2);
+    ListKeysResponse listKeysResponse = (ListKeysResponse) bucketResponse.getEntity();
     assertEquals(0, listKeysResponse.getKeys().size());
     assertEquals("", listKeysResponse.getLastKey());
   }
