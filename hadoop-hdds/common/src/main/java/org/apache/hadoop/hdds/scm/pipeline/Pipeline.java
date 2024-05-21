@@ -599,7 +599,7 @@ public final class Pipeline {
 
     public Builder setNodeOrder(List<Integer> orders) {
       // for build from ProtoBuf
-      this.nodeOrder = orders == null ? ImmutableList.of() : ImmutableList.copyOf(orders);
+      this.nodeOrder = Collections.unmodifiableList(orders);
       return this;
     }
 
