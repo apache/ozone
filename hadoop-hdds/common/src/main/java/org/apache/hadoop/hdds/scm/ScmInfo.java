@@ -81,7 +81,7 @@ public final class ScmInfo {
   private ScmInfo(String clusterId, String scmId, List<String> peerRoles) {
     this.clusterId = clusterId;
     this.scmId = scmId;
-    this.peerRoles = peerRoles;
+    this.peerRoles = Collections.unmodifiableList(peerRoles);
   }
 
   /**
@@ -105,6 +105,6 @@ public final class ScmInfo {
    * @return List of peer address
    */
   public List<String> getRatisPeerRoles() {
-    return Collections.unmodifiableList(peerRoles);
+    return peerRoles;
   }
 }
