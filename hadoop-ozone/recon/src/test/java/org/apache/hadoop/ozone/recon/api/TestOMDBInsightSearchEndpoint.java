@@ -32,27 +32,22 @@ import org.apache.hadoop.ozone.recon.spi.StorageContainerServiceProvider;
 import org.apache.hadoop.ozone.recon.spi.impl.OzoneManagerServiceProviderImpl;
 import org.apache.hadoop.ozone.recon.spi.impl.StorageContainerServiceProviderImpl;
 import org.apache.hadoop.ozone.recon.tasks.NSSummaryTaskWithFSO;
-import org.glassfish.jersey.internal.Errors;
 import org.junit.jupiter.api.BeforeEach;
 
-import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.*;
+import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.getTestReconOmMetadataManager;
+import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.getMockOzoneManagerServiceProviderWithFSO;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_NSSUMMARY_FLUSH_TO_DB_MAX_THRESHOLD;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
 
-import org.apache.hadoop.hdds.scm.container.ContainerManager;
-import org.apache.hadoop.hdds.scm.container.ContainerNotFoundException;
 import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
 import org.apache.hadoop.ozone.recon.ReconTestInjector;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
-import org.apache.hadoop.ozone.recon.scm.ReconNodeManager;
 import org.apache.hadoop.ozone.recon.scm.ReconStorageContainerManagerFacade;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
-import org.junit.platform.commons.logging.Logger;
-import org.junit.platform.commons.logging.LoggerFactory;
 
 import javax.ws.rs.core.Response;
 
@@ -60,11 +55,9 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.*;
+import java.util.UUID;
 
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_DB_DIRS;
-import static org.mockito.Mockito.when;
-
 
 /**
  * Test for OMDBInsightSearchEndpoint.
@@ -73,9 +66,6 @@ public class TestOMDBInsightSearchEndpoint extends AbstractReconSqlDBTest {
 
   @TempDir
   private Path temporaryFolder;
-
-  Logger LOG = LoggerFactory.getLogger(TestOMDBInsightSearchEndpoint.class);
-
   private ReconOMMetadataManager reconOMMetadataManager;
   private OMDBInsightSearchEndpoint omdbInsightSearchEndpoint;
   private OzoneConfiguration ozoneConfiguration;
@@ -142,36 +132,47 @@ public class TestOMDBInsightSearchEndpoint extends AbstractReconSqlDBTest {
   }
 
   @Test
-  public void testVolumeLevelSearch() throws IOException {
-    String volumePath = "/";
-    Response response =
-        omdbInsightSearchEndpoint.searchOpenKeys(volumePath, 20);
-    assertEquals(200, response.getStatus());
-    KeyInsightInfoResponse result =
-        (KeyInsightInfoResponse) response.getEntity();
-    assertEquals(10, result.getFsoKeyInfoList().size());
-    assertEquals(0, result.getNonFSOKeyInfoList().size());
-    // Assert Total Size
-    assertEquals(10000, result.getUnreplicatedDataSize());
-    assertEquals(10000 * 3, result.getReplicatedDataSize());
+  public void testVolumeLevelSearchRestriction() throws IOException {
+    // Test with volume level path
+    String volumePath = "/vola";
+    Response response = omdbInsightSearchEndpoint.searchOpenKeys(volumePath, 20);
+    assertEquals(Response.Status.BAD_REQUEST.getStatusCode(), response.getStatus());
+    String entity = (String) response.getEntity();
+    assertTrue(entity.contains("Invalid startPrefix: Path must be at the bucket level or deeper"),
+        "Expected a message indicating the path must be at the bucket level or deeper");
 
-    // Test the same for volumeB.
+    // Test with another volume level path
     volumePath = "/volb";
     response = omdbInsightSearchEndpoint.searchOpenKeys(volumePath, 20);
-    assertEquals(200, response.getStatus());
-    result = (KeyInsightInfoResponse) response.getEntity();
-    assertEquals(0, result.getFsoKeyInfoList().size());
-    assertEquals(5, result.getNonFSOKeyInfoList().size());
-    // Assert Total Size
-    assertEquals(5000, result.getUnreplicatedDataSize());
-    assertEquals(5000 * 3, result.getReplicatedDataSize());
+    assertEquals(Response.Status.BAD_REQUEST.getStatusCode(), response.getStatus());
+    entity = (String) response.getEntity();
+    assertTrue(entity.contains("Invalid startPrefix: Path must be at the bucket level or deeper"),
+        "Expected a message indicating the path must be at the bucket level or deeper");
   }
 
+  @Test
+  public void testRootLevelSearchRestriction() throws IOException {
+    // Test with root level path
+    String rootPath = "/";
+    Response response = omdbInsightSearchEndpoint.searchOpenKeys(rootPath, 20);
+    assertEquals(Response.Status.BAD_REQUEST.getStatusCode(), response.getStatus());
+    String entity = (String) response.getEntity();
+    assertTrue(entity.contains("Invalid startPrefix: Path must be at the bucket level or deeper"),
+        "Expected a message indicating the path must be at the bucket level or deeper");
+
+    // Test with root level path without trailing slash
+    rootPath = "";
+    response = omdbInsightSearchEndpoint.searchOpenKeys(rootPath, 20);
+    assertEquals(Response.Status.BAD_REQUEST.getStatusCode(), response.getStatus());
+    entity = (String) response.getEntity();
+    assertTrue(entity.contains("Invalid startPrefix: Path must be at the bucket level or deeper"),
+        "Expected a message indicating the path must be at the bucket level or deeper");
+  }
 
   @Test
   public void testBucketLevelSearch() throws IOException {
     Response response =
-        omdbInsightSearchEndpoint.searchOpenKeys("/vola/bucketa1",20);
+        omdbInsightSearchEndpoint.searchOpenKeys("/vola/bucketa1", 20);
     assertEquals(200, response.getStatus());
     KeyInsightInfoResponse result =
         (KeyInsightInfoResponse) response.getEntity();
@@ -232,18 +233,18 @@ public class TestOMDBInsightSearchEndpoint extends AbstractReconSqlDBTest {
   @Test
   public void testLimitSearch() throws IOException {
     Response response =
-        omdbInsightSearchEndpoint.searchOpenKeys("/vola", 5);
+        omdbInsightSearchEndpoint.searchOpenKeys("/vola/bucketa1", 2);
     assertEquals(200, response.getStatus());
     KeyInsightInfoResponse result =
         (KeyInsightInfoResponse) response.getEntity();
-    assertEquals(5, result.getFsoKeyInfoList().size());
+    assertEquals(2, result.getFsoKeyInfoList().size());
     assertEquals(0, result.getNonFSOKeyInfoList().size());
   }
 
   @Test
   public void testSearchOpenKeysWithNoMatchFound() throws IOException {
     // Given a search prefix that matches no keys
-    String searchPrefix = "incorrectprefix";
+    String searchPrefix = "unknown-volume/unknown-bucket/";
 
     Response response =
         omdbInsightSearchEndpoint.searchOpenKeys(searchPrefix, 10);
@@ -268,9 +269,8 @@ public class TestOMDBInsightSearchEndpoint extends AbstractReconSqlDBTest {
         response.getStatus(), "Expected a 400 BAD REQUEST status");
 
     String entity = (String) response.getEntity();
-    assertTrue(entity.contains("Invalid startPrefix: Bucket or Volume name can " +
-            "only contain lowercase letters, numbers, hyphens, underscores, and periods"),
-        "Expected a message indicating Invalid startPrefix");
+    assertTrue(entity.contains("Invalid startPrefix: Path must be at the bucket level or deeper"),
+        "Expected a message indicating the path must be at the bucket level or deeper");
   }
 
 
@@ -374,6 +374,23 @@ public class TestOMDBInsightSearchEndpoint extends AbstractReconSqlDBTest {
         dira5ObjectId, bucketa2ObjectId, volaObjectId, 1000);
     createOpenFile("dira6/innerfile", "bucketa2", "vola", "innerfile",
         dira6ObjectId, bucketa2ObjectId, volaObjectId, 1000);
+  }
+
+  @Test
+  public void testLastKeyInResponse() throws IOException {
+    Response response =
+        omdbInsightSearchEndpoint.searchOpenKeys("/volb/bucketb1", 20);
+    assertEquals(200, response.getStatus());
+    KeyInsightInfoResponse result =
+        (KeyInsightInfoResponse) response.getEntity();
+    assertEquals(0, result.getFsoKeyInfoList().size());
+    assertEquals(5, result.getNonFSOKeyInfoList().size());
+    // Assert Total Size
+    assertEquals(5000, result.getUnreplicatedDataSize());
+    assertEquals(5000 * 3, result.getReplicatedDataSize());
+    // Assert Last Key
+    assertEquals(ROOT_PATH + "volb/bucketb1/fileb5", result.getLastKey(),
+        "Expected last key to be 'fileb5'");
   }
 
   /**

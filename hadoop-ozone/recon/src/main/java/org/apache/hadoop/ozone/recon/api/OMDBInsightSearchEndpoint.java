@@ -21,12 +21,9 @@ package org.apache.hadoop.ozone.recon.api;
 import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
-import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
-import org.apache.hadoop.ozone.recon.ReconResponseUtils;
-import org.apache.hadoop.ozone.recon.ReconUtils;
 import org.apache.hadoop.ozone.recon.api.handlers.BucketHandler;
 import org.apache.hadoop.ozone.recon.api.types.KeyEntityInfo;
 import org.apache.hadoop.ozone.recon.api.types.KeyInsightInfoResponse;
@@ -51,9 +48,11 @@ import java.util.List;
 import java.util.ArrayList;
 import java.util.Set;
 
-import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
-import static org.apache.hadoop.ozone.recon.ReconConstants.*;
-import static org.apache.hadoop.ozone.recon.ReconResponseUtils.*;
+import static org.apache.hadoop.ozone.recon.ReconConstants.DEFAULT_START_PREFIX;
+import static org.apache.hadoop.ozone.recon.ReconConstants.RECON_OPEN_KEY_DEFAULT_SEARCH_LIMIT;
+import static org.apache.hadoop.ozone.recon.ReconResponseUtils.noMatchedKeysResponse;
+import static org.apache.hadoop.ozone.recon.ReconResponseUtils.createBadRequestResponse;
+import static org.apache.hadoop.ozone.recon.ReconResponseUtils.createInternalServerErrorResponse;
 import static org.apache.hadoop.ozone.recon.ReconUtils.constructObjectPathWithPrefix;
 import static org.apache.hadoop.ozone.recon.ReconUtils.validateNames;
 import static org.apache.hadoop.ozone.recon.api.handlers.BucketHandler.getBucketHandler;
@@ -98,7 +97,7 @@ public class OMDBInsightSearchEndpoint {
    * 1. A startPrefix of "/volA/bucketA/" retrieves every key under bucket 'bucketA' in volume 'volA'.
    * 2. Specifying "/volA/bucketA/dir1" focuses the search within 'dir1' inside 'bucketA' of 'volA'.
    *
-   * @param startPrefix The prefix for searching keys, starting from the bucket level ('/volumeName/bucketName/') or any specific path.
+   * @param startPrefix The prefix for searching keys, starting from the bucket level or any specific path.
    * @param limit       Limits the number of returned keys.
    * @return A KeyInsightInfoResponse, containing matching keys and their data sizes.
    * @throws IOException On failure to access the OM database or process the operation.
