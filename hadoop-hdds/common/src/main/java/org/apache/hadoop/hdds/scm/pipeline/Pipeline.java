@@ -555,14 +555,14 @@ public final class Pipeline {
       this.creationTimestamp = pipeline.getCreationTimestamp();
       this.suggestedLeaderId = pipeline.getSuggestedLeaderId();
       if (nodeStatus != null) {
-        Map<DatanodeDetails, Integer> indexes = new HashMap<>();
+        final ImmutableMap.Builder<DatanodeDetails, Integer> b = ImmutableMap.builder();
         for (DatanodeDetails dn : nodeStatus.keySet()) {
           int index = pipeline.getReplicaIndex(dn);
           if (index > 0) {
-            indexes.put(dn, index);
+            b.put(dn, index);
           }
         }
-        replicaIndexes = ImmutableMap.copyOf(indexes);
+        replicaIndexes = b.build();
       }
     }
 
