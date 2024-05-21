@@ -25,6 +25,7 @@ Suite Setup         Setup s3 tests
 *** Variables ***
 ${ENDPOINT_URL}       http://s3g:9878
 ${BUCKET}             generated
+${BUCKET1}            generated
 ${DESTBUCKET}         generated1
 
 *** Keywords ***
@@ -34,6 +35,7 @@ Create Dest Bucket
     Execute AWSS3APICli  create-bucket --bucket ${DESTBUCKET}
 
 Copy Object Happy Scenario
+    [Arguments]         ${BUCKET}
     Run Keyword if    '${DESTBUCKET}' == 'generated1'    Create Dest Bucket
                         Execute                    date > /tmp/copyfile
     ${file_checksum} =  Execute                    md5sum /tmp/copyfile | awk '{print $1}'
@@ -76,12 +78,14 @@ Copy Object Happy Scenario
                         Should Not contain         ${result}    \"custom-key2\": \"custom-value2\"
 
 Copy Object Where Bucket is not available
+    [Arguments]         ${BUCKET}
     ${result} =         Execute AWSS3APICli and checkrc        copy-object --bucket dfdfdfdfdfnonexistent --key ${PREFIX}/copyobject/key=value/f1 --copy-source ${BUCKET}/${PREFIX}/copyobject/key=value/f1      255
                         Should contain             ${result}        NoSuchBucket
     ${result} =         Execute AWSS3APICli and checkrc        copy-object --bucket ${DESTBUCKET} --key ${PREFIX}/copyobject/key=value/f1 --copy-source dfdfdfdfdfnonexistent/${PREFIX}/copyobject/key=value/f1  255
                         Should contain             ${result}        NoSuchBucket
 
 Copy Object Where both source and dest are same with change to storageclass
+    [Arguments]         ${BUCKET}
      ${file_checksum} =  Execute                    md5sum /tmp/copyfile | awk '{print $1}'
      ${result} =         Execute AWSS3APICli        copy-object --storage-class REDUCED_REDUNDANCY --bucket ${DESTBUCKET} --key ${PREFIX}/copyobject/key=value/f1 --copy-source ${DESTBUCKET}/${PREFIX}/copyobject/key=value/f1
                          Should contain             ${result}        ETag
@@ -89,18 +93,49 @@ Copy Object Where both source and dest are same with change to storageclass
                          Should Be Equal            ${eTag}           \"${file_checksum}\"
 
 Copy Object Where Key not available
+    [Arguments]         ${BUCKET}
     ${result} =         Execute AWSS3APICli and checkrc        copy-object --bucket ${DESTBUCKET} --key ${PREFIX}/copyobject/key=value/f1 --copy-source ${BUCKET}/nonnonexistentkey       255
                         Should contain             ${result}        NoSuchKey
 
 Copy Object using an invalid copy directive
+    [Arguments]         ${BUCKET}
     ${result} =         Execute AWSS3ApiCli and checkrc        copy-object --bucket ${DESTBUCKET} --key ${PREFIX}/copyobject/key=value/f1 --copy-source ${BUCKET}/${PREFIX}/copyobject/key=value/f1 --metadata-directive INVALID       255
                         Should contain             ${result}        InvalidArgument
 
 Copy Object with user defined metadata size larger than 2 KB
+    [Arguments]         ${BUCKET}
                                 Execute                    echo "Randomtext" > /tmp/testfile2
     ${custom_metadata_value} =  Execute                    printf 'v%.0s' {1..3000}
     ${result} =                 Execute AWSS3ApiCli and checkrc       copy-object --bucket ${DESTBUCKET} --key ${PREFIX}/copyobject/key=value/f1 --copy-source ${BUCKET}/${PREFIX}/copyobject/key=value/f1 --metadata="custom-key1=${custom_metadata_value}" --metadata-directive REPLACE       255
                                 Should contain                        ${result}   MetadataTooLarge
 
-
 *** Test Cases ***
+Copy Object Happy Scenario with OBS
+    Copy Object Happy Scenario    ${BUCKET}
+Copy Object Happy Scenario with FSO
+    Copy Object Happy Scenario    ${BUCKET1}
+
+Copy Object Where Bucket is not available with OBS
+    Copy Object Where Bucket is not available        ${BUCKET}
+Copy Object Where Bucket is not available with FSO
+    Copy Object Where Bucket is not available    ${BUCKET1}
+
+Copy Object Where both source and dest are same with change to storageclass with OBS
+    Copy Object Where both source and dest are same with change to storageclass    ${BUCKET}
+Copy Object Where both source and dest are same with change to storageclass with FSO
+    Copy Object Where both source and dest are same with change to storageclass    ${BUCKET1}
+
+Copy Object Where Key not available with OBS
+    Copy Object Where Key not available    ${BUCKET}
+Copy Object Where Key not available with FSO
+    Copy Object Where Key not available    ${BUCKET1}
+
+Copy Object using an invalid copy directive with OBS
+    Copy Object using an invalid copy directive    ${BUCKET}
+Copy Object using an invalid copy directive with FSO
+    Copy Object using an invalid copy directive    ${BUCKET1}
+
+Copy Object with user defined metadata size larger than 2 KB with OBS
+    Copy Object with user defined metadata size larger than 2 KB    ${BUCKET}
+Copy Object with user defined metadata size larger than 2 KB with FSO
+    Copy Object with user defined metadata size larger than 2 KB    ${BUCKET1}
