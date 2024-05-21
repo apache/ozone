@@ -171,7 +171,6 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 import static org.slf4j.event.Level.DEBUG;
 
-import org.apache.ozone.test.tag.Unhealthy;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.MethodOrderer;
 import org.junit.jupiter.api.Test;
@@ -4200,7 +4199,6 @@ public abstract class TestOzoneRpcClientAbstract {
   }
 
   @Test
-  @Unhealthy("HDDS-8752")
   public void testOverWriteKeyWithAndWithOutVersioning() throws Exception {
     String volumeName = UUID.randomUUID().toString();
     String bucketName = UUID.randomUUID().toString();
