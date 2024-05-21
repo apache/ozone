@@ -244,12 +244,7 @@ public class NodeDecommissionManager {
    * @return True if port is used by the datanode. False otherwise.
    */
   private boolean validateDNPortMatch(int port, DatanodeDetails dn) {
-    for (DatanodeDetails.Port p : dn.getPorts()) {
-      if (p.getValue() == port) {
-        return true;
-      }
-    }
-    return false;
+    return dn.hasPort(port);
   }
 
   public NodeDecommissionManager(OzoneConfiguration config, NodeManager nm,

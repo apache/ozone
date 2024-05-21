@@ -225,6 +225,15 @@ public class DatanodeDetails extends NodeImpl implements
     return new ArrayList<>(ports);
   }
 
+  public synchronized boolean hasPort(int port) {
+    for (Port p : ports) {
+      if (p.getValue() == port) {
+        return true;
+      }
+    }
+    return false;
+  }
+
   /**
    * Return the persistedOpState. If the stored value is null, return the
    * default value of IN_SERVICE.
