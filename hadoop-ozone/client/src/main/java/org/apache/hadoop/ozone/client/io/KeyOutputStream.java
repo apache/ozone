@@ -83,7 +83,7 @@ public class KeyOutputStream extends OutputStream
   public static final Logger LOG =
       LoggerFactory.getLogger(KeyOutputStream.class);
 
-  private boolean closed;
+  private volatile boolean closed;
   private final Map<Class<? extends Throwable>, RetryPolicy> retryPolicyMap;
   private int retryCount;
   // how much of data is actually written yet to underlying stream
@@ -168,7 +168,7 @@ public class KeyOutputStream extends OutputStream
    * @param version the set of blocks that are pre-allocated.
    * @param openVersion the version corresponding to the pre-allocation.
    */
-  public void addPreallocateBlocks(OmKeyLocationInfoGroup version, long openVersion) {
+  public synchronized void addPreallocateBlocks(OmKeyLocationInfoGroup version, long openVersion) {
     blockOutputStreamEntryPool.addPreallocateBlocks(version, openVersion);
   }
 
@@ -205,8 +205,10 @@ public class KeyOutputStream extends OutputStream
     if (len == 0) {
       return;
     }
-    handleWrite(b, off, len, false);
-    writeOffset += len;
+    synchronized (this) {
+      handleWrite(b, off, len, false);
+      writeOffset += len;
+    }
   }
 
   private void handleWrite(byte[] b, int off, long len, boolean retry)
@@ -434,7 +436,9 @@ public class KeyOutputStream extends OutputStream
   @Override
   public void flush() throws IOException {
     checkNotClosed();
-    handleFlushOrClose(StreamAction.FLUSH);
+    synchronized (this) {
+      handleFlushOrClose(StreamAction.FLUSH);
+    }
   }
 
   @Override
@@ -453,11 +457,13 @@ public class KeyOutputStream extends OutputStream
           + replication.getRequiredNodes() + " <= 1");
     }
     checkNotClosed();
-    final long hsyncPos = writeOffset;
-    handleFlushOrClose(StreamAction.HSYNC);
-    Preconditions.checkState(offset >= hsyncPos,
-        "offset = %s < hsyncPos = %s", offset, hsyncPos);
-    blockOutputStreamEntryPool.hsyncKey(hsyncPos);
+    synchronized (this) {
+      final long hsyncPos = writeOffset;
+      handleFlushOrClose(StreamAction.HSYNC);
+      Preconditions.checkState(offset >= hsyncPos,
+          "offset = %s < hsyncPos = %s", offset, hsyncPos);
+      blockOutputStreamEntryPool.hsyncKey(hsyncPos);
+    }
   }
 
   /**
@@ -539,24 +545,26 @@ public class KeyOutputStream extends OutputStream
       return;
     }
     closed = true;
-    try {
-      handleFlushOrClose(StreamAction.CLOSE);
-      if (!isException) {
-        Preconditions.checkArgument(writeOffset == offset);
+    synchronized (this) {
+      try {
+        handleFlushOrClose(StreamAction.CLOSE);
+        if (!isException) {
+          Preconditions.checkArgument(writeOffset == offset);
+        }
+        if (atomicKeyCreation) {
+          long expectedSize = blockOutputStreamEntryPool.getDataSize();
+          Preconditions.checkState(expectedSize == offset,
+              String.format("Expected: %d and actual %d write sizes do not match",
+                  expectedSize, offset));
+        }
+        blockOutputStreamEntryPool.commitKey(offset);
+      } finally {
+        blockOutputStreamEntryPool.cleanup();
       }
-      if (atomicKeyCreation) {
-        long expectedSize = blockOutputStreamEntryPool.getDataSize();
-        Preconditions.checkState(expectedSize == offset,
-            String.format("Expected: %d and actual %d write sizes do not match",
-                expectedSize, offset));
-      }
-      blockOutputStreamEntryPool.commitKey(offset);
-    } finally {
-      blockOutputStreamEntryPool.cleanup();
     }
   }
 
-  OmMultipartCommitUploadPartInfo
+  synchronized OmMultipartCommitUploadPartInfo
       getCommitUploadPartInfo() {
     return blockOutputStreamEntryPool.getCommitUploadPartInfo();
   }
