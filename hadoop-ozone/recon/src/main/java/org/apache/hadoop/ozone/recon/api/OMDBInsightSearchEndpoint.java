@@ -139,10 +139,10 @@ public class OMDBInsightSearchEndpoint {
       String lastKey = null;
 
       // Search for non-fso keys in KeyTable
-      Map<String, OmKeyInfo> obsKeys = new LinkedHashMap<>();
       Table<String, OmKeyInfo> openKeyTable =
           omMetadataManager.getOpenKeyTable(BucketLayout.LEGACY);
-      obsKeys = retrieveKeysFromTable(openKeyTable, startPrefix, limit, prevKey);
+      Map<String, OmKeyInfo> obsKeys =
+          retrieveKeysFromTable(openKeyTable, startPrefix, limit, prevKey);
       for (Map.Entry<String, OmKeyInfo> entry : obsKeys.entrySet()) {
         keysFound = true;
         KeyEntityInfo keyEntityInfo =
@@ -345,8 +345,9 @@ public class OMDBInsightSearchEndpoint {
       // If a previous key is provided, seek to the previous key and skip it.
       if (!prevKey.isEmpty()) {
         keyIter.seek(prevKey);
-        if (keyIter.hasNext() && keyIter.next().getKey().equals(prevKey)) {
+        if (keyIter.hasNext()) {
           // Skip the previous key
+          keyIter.next();
         }
       } else {
         // If no previous key is provided, start from the search prefix.

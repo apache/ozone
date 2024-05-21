@@ -40,7 +40,9 @@ import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.writeDirT
 import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.writeOpenFileToOm;
 import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.writeOpenKeyToOm;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_NSSUMMARY_FLUSH_TO_DB_MAX_THRESHOLD;
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.mockito.Mockito.mock;
 
 import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
@@ -85,8 +87,6 @@ public class TestOMDBInsightSearchEndpoint extends AbstractReconSqlDBTest {
     omMetadataManager = initializeNewOmMetadataManager(
         Files.createDirectory(temporaryFolder.resolve("JunitOmDBDir"))
             .toFile());
-    OzoneManagerServiceProviderImpl ozoneManagerServiceProvider =
-        getMockOzoneManagerServiceProviderWithFSO();
     reconOMMetadataManager = getTestReconOmMetadataManager(omMetadataManager,
         Files.createDirectory(temporaryFolder.resolve("OmMetataDir")).toFile());
 
@@ -361,7 +361,7 @@ public class TestOMDBInsightSearchEndpoint extends AbstractReconSqlDBTest {
   private void populateOMDB() throws Exception {
     // Create Volumes
     long volaObjectId = createVolume("vola");
-    long volbObjectId = createVolume("volb");
+    createVolume("volb");
 
     // Create Buckets in vola
     long bucketa1ObjectId =
@@ -372,8 +372,7 @@ public class TestOMDBInsightSearchEndpoint extends AbstractReconSqlDBTest {
             getFSOBucketLayout());
 
     // Create Bucket in volb
-    long bucketb1ObjectId =
-        createBucket("volb", "bucketb1", 1000 + 1000 + 1000 + 1000 + 1000,
+    createBucket("volb", "bucketb1", 1000 + 1000 + 1000 + 1000 + 1000,
             getOBSBucketLayout());
 
     // Create Directories and Files under bucketa1
