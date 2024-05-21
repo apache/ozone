@@ -31,6 +31,7 @@ import org.bouncycastle.asn1.x509.Extensions;
 import org.bouncycastle.asn1.x509.SubjectPublicKeyInfo;
 import org.bouncycastle.cert.X509CertificateHolder;
 import org.bouncycastle.cert.X509v3CertificateBuilder;
+import org.bouncycastle.cert.jcajce.JcaX509CertificateConverter;
 import org.bouncycastle.crypto.params.AsymmetricKeyParameter;
 import org.bouncycastle.crypto.params.RSAKeyParameters;
 import org.bouncycastle.crypto.util.PrivateKeyFactory;
@@ -47,9 +48,10 @@ import org.slf4j.LoggerFactory;
 import java.io.IOException;
 import java.math.BigInteger;
 import java.security.PrivateKey;
+import java.security.cert.CertificateException;
+import java.security.cert.X509Certificate;
 import java.util.Arrays;
 import java.util.Date;
-import java.util.concurrent.CompletableFuture;
 import java.util.stream.Collectors;
 
 import static org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateSignRequest.getDistinguishedNameWithSN;
@@ -90,17 +92,17 @@ public class DefaultApprover extends BaseApprover {
    */
   @SuppressWarnings("ParameterNumber")
   @Override
-  public X509CertificateHolder sign(
+  public X509Certificate sign(
       SecurityConfig config,
       PrivateKey caPrivate,
-      X509CertificateHolder caCertificate,
+      X509Certificate caCertificate,
       Date validFrom,
       Date validTill,
       PKCS10CertificationRequest certificationRequest,
       String scmId,
       String clusterId,
       String certSerialId) throws IOException,
-      OperatorCreationException {
+      OperatorCreationException, CertificateException {
 
     AlgorithmIdentifier sigAlgId = new
         DefaultSignatureAlgorithmIdentifierFinder().find(
@@ -147,7 +149,7 @@ public class DefaultApprover extends BaseApprover {
     }
     X509v3CertificateBuilder certificateGenerator =
         new X509v3CertificateBuilder(
-            caCertificate.getSubject(),
+            new X509CertificateHolder(caCertificate.getEncoded()).getSubject(),
             new BigInteger(certSerialId),
             validFrom,
             validTill,
@@ -172,19 +174,8 @@ public class DefaultApprover extends BaseApprover {
     ContentSigner sigGen = new BcRSAContentSignerBuilder(sigAlgId, digAlgId)
         .build(asymmetricKP);
 
-    return certificateGenerator.build(sigGen);
+    return new JcaX509CertificateConverter().getCertificate(certificateGenerator.build(sigGen));
 
   }
 
-  @Override
-  public CompletableFuture<X509CertificateHolder> inspectCSR(String csr)
-      throws IOException {
-    return super.inspectCSR(csr);
-  }
-
-  @Override
-  public CompletableFuture<X509CertificateHolder>
-      inspectCSR(PKCS10CertificationRequest csr) {
-    return super.inspectCSR(csr);
-  }
 }

@@ -58,6 +58,7 @@ import org.apache.hadoop.hdds.scm.proxy.SCMClientConfig;
 import org.apache.hadoop.hdds.scm.proxy.SecretKeyProtocolFailoverProxyProvider;
 import org.apache.hadoop.hdds.scm.proxy.SCMSecurityProtocolFailoverProxyProvider;
 import org.apache.hadoop.hdds.scm.proxy.SingleSecretKeyProtocolProxyProvider;
+import org.apache.hadoop.hdds.security.SecurityConfig;
 import org.apache.hadoop.hdds.server.ServerUtils;
 import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
@@ -451,6 +452,7 @@ public final class HddsServerUtil {
    */
   public static SCMSecurityProtocolClientSideTranslatorPB getScmSecurityClient(
       ConfigurationSource conf) throws IOException {
+    new SecurityConfig(conf);
     return new SCMSecurityProtocolClientSideTranslatorPB(
         new SCMSecurityProtocolFailoverProxyProvider(conf,
             UserGroupInformation.getCurrentUser()));
@@ -463,6 +465,7 @@ public final class HddsServerUtil {
     // for ever. In this way DN start up is resilient to SCM service running
     // status.
     OzoneConfiguration configuration = new OzoneConfiguration(conf);
+    new SecurityConfig(configuration);
     SCMClientConfig scmClientConfig =
         conf.getObject(SCMClientConfig.class);
     int retryCount = Integer.MAX_VALUE;
@@ -482,6 +485,7 @@ public final class HddsServerUtil {
    */
   public static SCMSecurityProtocolClientSideTranslatorPB getScmSecurityClient(
       OzoneConfiguration conf, UserGroupInformation ugi) throws IOException {
+    new SecurityConfig(conf);
     SCMSecurityProtocolClientSideTranslatorPB scmSecurityClient =
         new SCMSecurityProtocolClientSideTranslatorPB(
             new SCMSecurityProtocolFailoverProxyProvider(conf, ugi));

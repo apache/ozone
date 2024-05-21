@@ -25,7 +25,6 @@ import org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateCodec;
 import org.apache.hadoop.hdds.security.x509.certificate.utils.SelfSignedCertificate;
 import org.apache.hadoop.security.ssl.KeyStoreTestUtil;
 import org.apache.ozone.test.GenericTestUtils;
-import org.bouncycastle.cert.jcajce.JcaX509CertificateConverter;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.BeforeEach;
 import org.mockito.Mock;
@@ -181,10 +180,14 @@ public class TestRootCaRotationPoller {
     KeyPair keyPair = KeyStoreTestUtil.generateKeyPair("RSA");
     LocalDateTime start = startDate == null ? LocalDateTime.now() : startDate;
     LocalDateTime end = start.plus(certLifetime);
-    return new JcaX509CertificateConverter().getCertificate(
-        SelfSignedCertificate.newBuilder().setBeginDate(start)
-            .setEndDate(end).setClusterID("cluster").setKey(keyPair)
-            .setSubject("localhost").setConfiguration(secConf).setScmID("test")
-            .build());
+    return SelfSignedCertificate.newBuilder()
+        .setBeginDate(start)
+        .setEndDate(end)
+        .setClusterID("cluster")
+        .setKey(keyPair)
+        .setSubject("localhost")
+        .setConfiguration(secConf)
+        .setScmID("test")
+        .build();
   }
 }
