@@ -143,14 +143,11 @@ public class ClosePipelineCommandHandler implements CommandHandler {
           LOG.debug("Ignoring close pipeline command for pipeline {} on datanode {} " +
               "as it does not exist", pipelineID, dn.getUuidString());
         }
-      } catch (GroupMismatchException gme) {
-        // ignore silently since this means that the group has been closed by earlier close pipeline
-        // command in another datanode
-        LOG.debug("The group for pipeline {} on datanode {} has been removed by earlier close " +
-            "pipeline command handled in another datanode", pipelineID, dn.getUuidString());
       } catch (IOException e) {
         Throwable gme = HddsClientUtils.containsException(e, GroupMismatchException.class);
         if (gme != null) {
+          // ignore silently since this means that the group has been closed by earlier close pipeline
+          // command in another datanode
           LOG.debug("The group for pipeline {} on datanode {} has been removed by earlier close " +
               "pipeline command handled in another datanode", pipelineID, dn.getUuidString());
         } else {
