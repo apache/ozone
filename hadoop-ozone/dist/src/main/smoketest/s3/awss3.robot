@@ -25,10 +25,11 @@ Suite Setup         Setup s3 tests
 *** Variables ***
 ${ENDPOINT_URL}       http://s3g:9878
 ${BUCKET}             generated
+${BUCKET1}            generated
 
-*** Test Cases ***
-
+*** Keywords ***
 File upload and directory list
+    [Arguments]         ${BUCKET}
                         Execute                   date > /tmp/testfile
     ${result} =         Execute AWSS3Cli          cp /tmp/testfile s3://${BUCKET}
                         Should contain            ${result}         upload
@@ -48,9 +49,21 @@ File upload and directory list
                         Should contain            ${result}         file
 
 File upload with special chars
+    [Arguments]         ${BUCKET}
                         Execute                   date > /tmp/testfile
     ${result} =         Execute AWSS3Cli          cp /tmp/testfile s3://${BUCKET}/specialchars/a+b
                         Should contain            ${result}         upload
     ${result} =         Execute AWSS3Cli          ls s3://${BUCKET}/specialchars/
                         Should not contain        ${result}         'a b'
                         Should contain            ${result}         a+b
+
+*** Test Cases ***
+File upload and directory list with OBS
+    File upload and directory list    ${BUCKET}
+File upload and directory list with FSO
+    File upload and directory list    ${BUCKET1}
+
+File upload with special chars with OBS
+    File upload with special chars    ${BUCKET}
+File upload with special chars with FSO
+    File upload with special chars    ${BUCKET1}

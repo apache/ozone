@@ -25,11 +25,19 @@ Suite Setup         Setup s3 tests
 *** Variables ***
 ${ENDPOINT_URL}       http://s3g:9878
 ${BUCKET}             generated
+${BUCKET1}            generated
 
-*** Test Cases ***
+*** Keywords ***
 
 Head Bucket
+    [Arguments]         ${BUCKET}
     ${result} =         Execute AWSS3APICli     head-bucket --bucket ${BUCKET}
+
+*** Test Cases ***
+Head Bucket with OBS
+    Head Bucket    ${BUCKET}
+Head Bucket with FSO
+    Head Bucket    ${BUCKET}
 
 Head Bucket not existent
     [tags]    no-bucket-type
@@ -37,4 +45,3 @@ Head Bucket not existent
     ${result} =         Execute AWSS3APICli and checkrc      head-bucket --bucket ozonenosuchbucketqqweqwe-${randStr}  255
                         Should contain          ${result}    404
                         Should contain          ${result}    Not Found
-

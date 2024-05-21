@@ -48,17 +48,13 @@ Wait Til Date Past
     ${sleepSeconds} =   Subtract Date From Date  ${date}  ${latestDate}
     Run Keyword If      ${sleepSeconds} > 0      Sleep  ${sleepSeconds}
 
-*** Variables ***
-${ENDPOINT_URL}       http://s3g:9878
-${BUCKET}             generated
-
-*** Test Cases ***
-
 Test Multipart Upload With Adjusted Length
+    [Arguments]         ${BUCKET}
     Perform Multipart Upload    ${BUCKET}    multipart/adjusted_length_${PREFIX}    /tmp/part1    /tmp/part2
     Verify Multipart Upload     ${BUCKET}    multipart/adjusted_length_${PREFIX}    /tmp/part1    /tmp/part2
 
 Test Multipart Upload
+    [Arguments]         ${BUCKET}
     ${result} =         Execute AWSS3APICli     create-multipart-upload --bucket ${BUCKET} --key ${PREFIX}/multipartKey
     ${uploadID} =       Execute and checkrc     echo '${result}' | jq -r '.UploadId'    0
                         Should contain          ${result}    ${BUCKET}
@@ -87,6 +83,7 @@ Test Multipart Upload
 
 
 Test Multipart Upload Complete
+    [Arguments]         ${BUCKET}
     ${result} =         Execute AWSS3APICli     create-multipart-upload --bucket ${BUCKET} --key ${PREFIX}/multipartKey1 --metadata="custom-key1=custom-value1,custom-key2=custom-value2,gdprEnabled=true"
     ${uploadID} =       Execute and checkrc     echo '${result}' | jq -r '.UploadId'    0
                         Should contain          ${result}    ${BUCKET}
@@ -139,12 +136,14 @@ Test Multipart Upload Complete
     Compare files               /tmp/part2        /tmp/${PREFIX}-multipartKey1-part2.result
 
 Test Multipart Upload with user defined metadata size larger than 2 KB
+    [Arguments]         ${BUCKET}
     ${custom_metadata_value} =  Execute                               printf 'v%.0s' {1..3000}
     ${result} =                 Execute AWSS3APICli and checkrc       create-multipart-upload --bucket ${BUCKET} --key ${PREFIX}/mpuWithLargeMetadata --metadata="custom-key1=${custom_metadata_value}"    255
                                 Should contain                        ${result}   MetadataTooLarge
                                 Should not contain                    ${result}   custom-key1: ${custom_metadata_value}
 
 Test Multipart Upload Complete Entity too small
+    [Arguments]         ${BUCKET}
     ${result} =         Execute AWSS3APICli     create-multipart-upload --bucket ${BUCKET} --key ${PREFIX}/multipartKey2
     ${uploadID} =       Execute and checkrc     echo '${result}' | jq -r '.UploadId'    0
                         Should contain          ${result}    ${BUCKET}
@@ -168,6 +167,7 @@ Test Multipart Upload Complete Entity too small
 
 
 Test Multipart Upload Complete Invalid part errors and complete mpu with few parts
+    [Arguments]         ${BUCKET}
     ${result} =         Execute AWSS3APICli     create-multipart-upload --bucket ${BUCKET} --key ${PREFIX}/multipartKey3
     ${uploadID} =       Execute and checkrc     echo '${result}' | jq -r '.UploadId'    0
                         Should contain          ${result}    ${BUCKET}
@@ -219,6 +219,7 @@ Test Multipart Upload Complete Invalid part errors and complete mpu with few par
     Compare files       /tmp/part3         /tmp/${PREFIX}-multipartKey3-part3.result
 
 Test abort Multipart upload
+    [Arguments]         ${BUCKET}
     ${result} =         Execute AWSS3APICli     create-multipart-upload --bucket ${BUCKET} --key ${PREFIX}/multipartKey4 --storage-class REDUCED_REDUNDANCY
     ${uploadID} =       Execute and checkrc     echo '${result}' | jq -r '.UploadId'    0
                         Should contain          ${result}    ${BUCKET}
@@ -228,15 +229,18 @@ Test abort Multipart upload
     ${result} =         Execute AWSS3APICli and checkrc    abort-multipart-upload --bucket ${BUCKET} --key ${PREFIX}/multipartKey4 --upload-id ${uploadID}    0
 
 Test abort Multipart upload with invalid uploadId
+    [Arguments]         ${BUCKET}
     ${result} =         Execute AWSS3APICli and checkrc    abort-multipart-upload --bucket ${BUCKET} --key ${PREFIX}/multipartKey5 --upload-id "random"    255
 
 Upload part with Incorrect uploadID
+    [Arguments]         ${BUCKET}
         ${result} =     Execute AWSS3APICli     create-multipart-upload --bucket ${BUCKET} --key ${PREFIX}/multipartKey
                         Execute                 echo "Multipart upload" > /tmp/testfile
         ${result} =     Execute AWSS3APICli and checkrc     upload-part --bucket ${BUCKET} --key ${PREFIX}/multipartKey --part-number 1 --body /tmp/testfile --upload-id "random"  255
                         Should contain          ${result}    NoSuchUpload
 
 Test list parts
+    [Arguments]         ${BUCKET}
 #initiate multipart upload
     ${result} =         Execute AWSS3APICli     create-multipart-upload --bucket ${BUCKET} --key ${PREFIX}/multipartKey5
     ${uploadID} =       Execute and checkrc     echo '${result}' | jq -r '.UploadId'    0
@@ -279,6 +283,7 @@ Test list parts
     ${result} =         Execute AWSS3APICli and checkrc    abort-multipart-upload --bucket ${BUCKET} --key ${PREFIX}/multipartKey5 --upload-id ${uploadID}    0
 
 Test Multipart Upload with the simplified aws s3 cp API
+    [Arguments]         ${BUCKET}
                         Create Random file      22
                         Execute AWSS3Cli        cp /tmp/part1 s3://${BUCKET}/mpyawscli
                         Execute AWSS3Cli        cp s3://${BUCKET}/mpyawscli /tmp/part1.result
@@ -286,6 +291,7 @@ Test Multipart Upload with the simplified aws s3 cp API
                         Compare files           /tmp/part1        /tmp/part1.result
 
 Test Multipart Upload Put With Copy
+    [Arguments]         ${BUCKET}
     Run Keyword         Create Random file      5
     ${result} =         Execute AWSS3APICli     put-object --bucket ${BUCKET} --key ${PREFIX}/copytest/source --body /tmp/part1
 
@@ -308,6 +314,7 @@ Test Multipart Upload Put With Copy
                         Compare files           /tmp/part1        /tmp/part-result
 
 Test Multipart Upload Put With Copy and range
+    [Arguments]         ${BUCKET}
     Run Keyword         Create Random file      10
     ${result} =         Execute AWSS3APICli     put-object --bucket ${BUCKET} --key ${PREFIX}/copyrange/source --body /tmp/part1
 
@@ -335,6 +342,7 @@ Test Multipart Upload Put With Copy and range
                         Compare files           /tmp/part1        /tmp/part-result
 
 Test Multipart Upload Put With Copy and range with IfModifiedSince
+    [Arguments]         ${BUCKET}
     Run Keyword         Create Random file      10
     ${curDate} =        Get Current Date
     ${beforeCreate} =   Subtract Time From Date     ${curDate}  1 day
@@ -388,6 +396,7 @@ Test Multipart Upload Put With Copy and range with IfModifiedSince
                         Compare files           /tmp/part1        /tmp/part-result
 
 Test Multipart Upload list
+    [Arguments]         ${BUCKET}
     ${result} =         Execute AWSS3APICli     create-multipart-upload --bucket ${BUCKET} --key ${PREFIX}/listtest/key1
     ${uploadID1} =      Execute and checkrc     echo '${result}' | jq -r '.UploadId'    0
                         Should contain          ${result}    ${BUCKET}
@@ -406,3 +415,84 @@ Test Multipart Upload list
 
     ${count} =          Execute and checkrc      echo '${result}' | jq -r '.Uploads | length'  0
                         Should Be Equal          ${count}     2
+
+*** Variables ***
+${ENDPOINT_URL}       http://s3g:9878
+${BUCKET}             generated
+${BUCKET1}            generated
+
+*** Test Cases ***
+Test Multipart Upload With Adjusted Length with OBS
+    Test Multipart Upload With Adjusted Length    ${BUCKET}
+Test Multipart Upload With Adjusted Length with FSO
+    Test Multipart Upload With Adjusted Length    ${BUCKET1}
+
+Test Multipart Upload with OBS
+    Test Multipart Upload    ${BUCKET}
+Test Multipart Upload with FSO
+    Test Multipart Upload    ${BUCKET1}
+
+Test Multipart Upload Complete with OBS
+    Test Multipart Upload Complete    ${BUCKET}
+Test Multipart Upload Complete with FSO
+    Test Multipart Upload Complete    ${BUCKET1}
+
+Test Multipart Upload with user defined metadata size larger than 2 KB with OBS
+    Test Multipart Upload with user defined metadata size larger than 2 KB    ${BUCKET}
+Test Multipart Upload with user defined metadata size larger than 2 KB with FSO
+    Test Multipart Upload with user defined metadata size larger than 2 KB    ${BUCKET1}
+
+Test Multipart Upload Complete Entity too small with OBS
+    Test Multipart Upload Complete Entity too small    ${BUCKET}
+Test Multipart Upload Complete Entity too small with FSO
+    Test Multipart Upload Complete Entity too small    ${BUCKET1}
+
+Test Multipart Upload Complete Invalid part errors and complete mpu with few parts with OBS
+    Test Multipart Upload Complete Invalid part errors and complete mpu with few parts    ${BUCKET}
+Test Multipart Upload Complete Invalid part errors and complete mpu with few parts with FSO
+    Test Multipart Upload Complete Invalid part errors and complete mpu with few parts    ${BUCKET1}
+
+Test abort Multipart upload with OBS
+    Test abort Multipart upload    ${BUCKET}
+Test abort Multipart upload with FSO
+    Test abort Multipart upload    ${BUCKET1}
+
+Test abort Multipart upload with invalid uploadId with OBS
+    Test abort Multipart upload with invalid uploadId    ${BUCKET}
+Test abort Multipart upload with invalid uploadId with FSO
+    Test abort Multipart upload with invalid uploadId    ${BUCKET1}
+
+Upload part with Incorrect uploadID with OBS
+    Upload part with Incorrect uploadID    ${BUCKET}
+Upload part with Incorrect uploadID with FSO
+    Upload part with Incorrect uploadID    ${BUCKET1}
+
+Test list parts with OBS
+    Test list parts    ${BUCKET}
+Test list parts with FSO
+    Test list parts    ${BUCKET1}
+
+Test Multipart Upload with the simplified aws s3 cp API with OBS
+    Test Multipart Upload with the simplified aws s3 cp API    ${BUCKET}
+Test Multipart Upload with the simplified aws s3 cp API with FSO
+    Test Multipart Upload with the simplified aws s3 cp API    ${BUCKET1}
+
+Test Multipart Upload Put With Copy with OBS
+    Test Multipart Upload Put With Copy    ${BUCKET}
+Test Multipart Upload Put With Copy with FSO
+    Test Multipart Upload Put With Copy    ${BUCKET1}
+
+Test Multipart Upload Put With Copy and range with OBS
+    Test Multipart Upload Put With Copy and range    ${BUCKET}
+Test Multipart Upload Put With Copy and range with FSO
+    Test Multipart Upload Put With Copy and range    ${BUCKET1}
+
+Test Multipart Upload Put With Copy and range with IfModifiedSince with OBS
+    Test Multipart Upload Put With Copy and range with IfModifiedSince    ${BUCKET}
+Test Multipart Upload Put With Copy and range with IfModifiedSince with FSO
+    Test Multipart Upload Put With Copy and range with IfModifiedSince    ${BUCKET1}
+
+Test Multipart Upload list with OBS
+    Test Multipart Upload list    ${BUCKET}
+Test Multipart Upload list with FSO
+    Test Multipart Upload list    ${BUCKET1}

@@ -25,10 +25,11 @@ Suite Setup         Setup s3 tests
 *** Variables ***
 ${ENDPOINT_URL}       http://s3g:9878
 ${BUCKET}             generated
+${BUCKET1}            generated
 
-*** Test Cases ***
-
+*** Keywords ***
 Delete file with multi delete
+    [Arguments]         ${BUCKET}
                         Execute                    date > /tmp/testfile
     ${result} =         Execute AWSS3ApiCli        put-object --bucket ${BUCKET} --key ${PREFIX}/multidelete/key=value/f1 --body /tmp/testfile
     ${result} =         Execute AWSS3ApiCli        put-object --bucket ${BUCKET} --key ${PREFIX}/multidelete/key=value/f2 --body /tmp/testfile
@@ -47,3 +48,11 @@ Delete file with multi delete
                         Should contain             ${result}         ${PREFIX}/multidelete/key=value/f3
                         Should contain             ${result}         STANDARD
                         Should not contain         ${result}         REDUCED_REDUNDANCY
+
+*** Test Cases ***
+
+Delete file with multi delete with OBS
+    Delete file with multi delete    ${BUCKET}
+
+Delete file with multi delete with FSO
+    Delete file with multi delete    ${BUCKET1}

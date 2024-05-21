@@ -25,6 +25,7 @@ Default Tags        no-bucket-type
 *** Variables ***
 ${ENDPOINT_URL}         http://s3g:9878
 ${BUCKET}               generated
+${BUCKET1}              generated
 
 *** Keywords ***
 #   Export access key and secret to the environment
@@ -40,6 +41,10 @@ Freon S3BG
                        Should contain   ${result}       Successful executions: ${n}
 
 *** Test Cases ***
-Run Freon S3BG
+Run Freon S3BG with OBS
     [Setup]    Setup aws credentials
     Freon S3BG   s3bg-${BUCKET}
+
+Run Freon S3BG with FSO
+    [Setup]    Setup aws credentials
+    Freon S3BG   s3bg-${BUCKET1}

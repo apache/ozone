@@ -25,9 +25,11 @@ Suite Setup         Setup s3 tests
 *** Variables ***
 ${ENDPOINT_URL}       http://s3g:9878
 ${BUCKET}             generated
+${BUCKET1}            generated
 
-*** Test Cases ***
+*** Keywords ***
 Delete file with s3api
+    [Arguments]         ${BUCKET}
                         Execute                    date > /tmp/testfile
     ${result} =         Execute AWSS3ApiCli        put-object --bucket ${BUCKET} --key ${PREFIX}/deletetestapi/key=value/f1 --body /tmp/testfile
     ${result} =         Execute AWSS3ApiCli        list-objects --bucket ${BUCKET} --prefix ${PREFIX}/deletetestapi/key=value/
@@ -37,6 +39,7 @@ Delete file with s3api
                         Should not contain         ${result}         "${PREFIX}/deletetestapi/key=value/f1"
 
 Delete file with s3api, file doesn't exist
+    [Arguments]         ${BUCKET}
     ${result} =         Execute AWSS3Cli           ls s3://${BUCKET}/
                         Should not contain         ${result}         thereisnosuchfile
     ${result} =         Execute AWSS3APICli        delete-object --bucket ${BUCKET} --key thereisnosuchfile
@@ -44,6 +47,7 @@ Delete file with s3api, file doesn't exist
                         Should not contain         ${result}         thereisnosuchfile
 
 Delete dir with s3api
+    [Arguments]         ${BUCKET}
                         Execute                    date > /tmp/testfile
     ${result} =         Execute AWSS3Cli           cp /tmp/testfile s3://${BUCKET}/${PREFIX}/deletetestapidir/key=value/f1
     ${result} =         Execute AWSS3Cli           ls s3://${BUCKET}/${PREFIX}/deletetestapidir/key=value/
@@ -55,6 +59,7 @@ Delete dir with s3api
 
 
 Delete file with s3api, file doesn't exist, prefix of a real file
+    [Arguments]         ${BUCKET}
                         Execute                    date > /tmp/testfile
     ${result} =         Execute AWSS3Cli           cp /tmp/testfile s3://${BUCKET}/${PREFIX}/deletetestapiprefix/key=value/filefile
     ${result} =         Execute AWSS3Cli           ls s3://${BUCKET}/${PREFIX}/deletetestapiprefix/key=value/
@@ -67,5 +72,33 @@ Delete file with s3api, file doesn't exist, prefix of a real file
 
 
 Delete file with s3api, bucket doesn't exist
+    [Arguments]         ${BUCKET}
     ${result} =         Execute AWSS3APICli and checkrc   delete-object --bucket ${BUCKET}-nosuchbucket --key f1      255
                         Should contain                    ${result}         NoSuchBucket
+
+*** Test Cases ***
+Delete file with s3api with OBS
+    Delete file with s3api    ${BUCKET}
+Delete file with s3api with FSO
+    Delete file with s3api    ${BUCKET1}
+
+Delete file with s3api, file doesn't exist with OBS
+    Delete file with s3api, file doesn't exist    ${BUCKET}
+Delete file with s3api, file doesn't exist with FSO
+    Delete file with s3api, file doesn't exist    ${BUCKET1}
+
+Delete dir with s3api with OBS
+    Delete dir with s3api    ${BUCKET}
+Delete dir with s3api with FSO
+    Delete dir with s3api    ${BUCKET1}
+
+Delete file with s3api, file doesn't exist, prefix of a real file with OBS
+    Delete file with s3api, file doesn't exist, prefix of a real file    ${BUCKET}
+
+Delete file with s3api, file doesn't exist, prefix of a real file with FSO
+    Delete file with s3api, file doesn't exist, prefix of a real file    ${BUCKET1}
+
+Delete file with s3api, bucket doesn't exist with OBS
+    Delete file with s3api, bucket doesn't exist    ${BUCKET}
+Delete file with s3api, bucket doesn't exist with FSO
+    Delete file with s3api, bucket doesn't exist    ${BUCKET1}

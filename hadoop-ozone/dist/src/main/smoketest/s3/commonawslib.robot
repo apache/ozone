@@ -23,7 +23,9 @@ ${ENDPOINT_URL}                http://s3g:9878
 ${OZONE_S3_HEADER_VERSION}     v4
 ${OZONE_S3_SET_CREDENTIALS}    true
 ${BUCKET}                      generated
+${BUCKET1}                     generated
 ${BUCKET_LAYOUT}               OBJECT_STORE
+${BUCKET_LAYOUT1}              FILE_SYSTEM_OPTIMIZED
 ${KEY_NAME}                    key1
 ${OZONE_S3_TESTS_SET_UP}       ${FALSE}
 ${OZONE_AWS_ACCESS_KEY_ID}     ${EMPTY}
@@ -141,7 +143,8 @@ Setup s3 tests
     Run Keyword        Generate random prefix
     Run Keyword        Install aws cli
     Run Keyword if    '${OZONE_S3_SET_CREDENTIALS}' == 'true'    Setup v4 headers
-    Run Keyword if    '${BUCKET}' == 'generated'            Create generated bucket    ${BUCKET_LAYOUT}
+    Run Keyword if    '${BUCKET}' == 'generated'            Create generated bucket with OBS   ${BUCKET_LAYOUT}
+    Run Keyword if    '${BUCKET1}' == 'generated'           Create generated bucket with FSO   ${BUCKET_LAYOUT1}
     Run Keyword if    '${BUCKET}' == 'link'                 Setup links for S3 tests
     Run Keyword if    '${BUCKET}' == 'encrypted'            Create encrypted bucket
     Run Keyword if    '${BUCKET}' == 'erasure'              Create EC bucket
@@ -154,10 +157,15 @@ Setup links for S3 tests
     Execute            ozone sh bucket create --layout ${BUCKET_LAYOUT} o3://${OM_SERVICE_ID}/legacy/source-bucket
     Create link        link
 
-Create generated bucket
+Create generated bucket with OBS
     [Arguments]          ${layout}=OBJECT_STORE
     ${BUCKET} =          Create bucket with layout    ${layout}
     Set Global Variable   ${BUCKET}
+
+Create generated bucket with FSO
+    [Arguments]          ${layout}=FILE_SYSTEM_OPTIMIZED
+    ${BUCKET1} =         Create bucket with layout    ${layout}
+    Set Global Variable   ${BUCKET1}
 
 Create encrypted bucket
     Return From Keyword if    '${SECURITY_ENABLED}' == 'false'

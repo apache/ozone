@@ -26,10 +26,12 @@ Suite Setup         Setup s3 tests
 ${ENDPOINT_URL}       http://s3g:9878
 ${OZONE_TEST}         true
 ${BUCKET}             generated
+${BUCKET1}            generated
 
-*** Test Cases ***
+*** Keywords ***
 
 Head existing object
+    [Arguments]         ${BUCKET}
                         Execute                            echo "Randomtext" > /tmp/testfile
     ${result} =         Execute AWSS3APICli and checkrc    put-object --bucket ${BUCKET} --key ${PREFIX}/headobject/key=value/f1 --body /tmp/testfile   0
 
@@ -37,9 +39,28 @@ Head existing object
     ${result} =         Execute AWSS3APICli and checkrc    delete-object --bucket ${BUCKET} --key ${PREFIX}/headobject/key=value/f1   0
 
 Head object in non existing bucket
+    [Arguments]         ${BUCKET}
     ${result} =         Execute AWSS3APICli and checkrc    head-object --bucket ${BUCKET}-non-existent --key ${PREFIX}/headobject/key=value/f1   255
                         Should contain          ${result}    404
                         Should contain          ${result}    Not Found
+
+Head non existing key
+    [Arguments]         ${BUCKET}
+    ${result} =         Execute AWSS3APICli and checkrc    head-object --bucket ${BUCKET} --key ${PREFIX}/non-existent   255
+                        Should contain          ${result}    404
+                        Should contain          ${result}    Not Found
+
+*** Test Cases ***
+
+Head existing object with OBS
+    Head existing object    ${BUCKET}
+Head existing object with FSO
+    Head existing object    ${BUCKET1}
+
+Head object in non existing bucket with OBS
+    Head object in non existing bucket    ${BUCKET}
+Head object in non existing bucket with FSO
+    Head object in non existing bucket    ${BUCKET1}
 
 Head object where path is a directory
     Pass Execution If   '${BUCKET_LAYOUT}' == 'FILE_SYSTEM_OPTIMIZED'    does not apply to FSO buckets
@@ -56,7 +77,7 @@ Head directory objects
                         Should contain          ${result}    Not Found
     ${result} =         Execute AWSS3APICli and checkrc    head-object --bucket ${BUCKET} --key ${PREFIX}/mydir/   0
 
-Head non existing key
-    ${result} =         Execute AWSS3APICli and checkrc    head-object --bucket ${BUCKET} --key ${PREFIX}/non-existent   255
-                        Should contain          ${result}    404
-                        Should contain          ${result}    Not Found
+Head non existing key with OBS
+    Head non existing key    ${BUCKET}
+Head non existing key with FSO
+    Head non existing key    ${BUCKET1}

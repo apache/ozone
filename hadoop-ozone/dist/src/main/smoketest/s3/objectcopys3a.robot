@@ -25,9 +25,11 @@ Suite Setup         Setup s3 tests
 *** Variables ***
 ${ENDPOINT_URL}       http://s3g:9878
 ${BUCKET}             generated
+${BUCKET1}            generated
 
-*** Test Cases ***
+*** Keywords ***
 Put object s3a simulation
+    [Arguments]         ${BUCKET}
                         Execute                    echo "Randomtext" > /tmp/testfile
     ${result} =         Execute AWSS3APICli and checkrc    head-object --bucket ${BUCKET} --key ${PREFIX}/word.txt    255
     ${result} =         Execute AWSS3ApiCli        list-objects --bucket ${BUCKET} --prefix ${PREFIX}/word.txt/
@@ -47,3 +49,10 @@ Put object s3a simulation
                         Execute AWSS3APICli and checkrc    head-object --bucket ${BUCKET} --key ${PREFIX}/word.txt    0
                         Execute AWSS3APICli        delete-object --bucket ${BUCKET} --key ${PREFIX}/word.txt._COPYING_
                         Execute AWSS3APICli and checkrc    head-object --bucket ${BUCKET} --key ${PREFIX}/word.txt._COPYING_    255
+
+*** Test Cases ***
+Put object s3a simulation with OBS
+    Put object s3a simulation    ${BUCKET}
+
+Put object s3a simulation with FSO
+    Put object s3a simulation    ${BUCKET1}

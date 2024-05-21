@@ -25,20 +25,35 @@ Suite Setup         Setup s3 tests
 *** Variables ***
 ${ENDPOINT_URL}       http://s3g:9878
 ${BUCKET}             generated
+${BUCKET1}            generated
 
-*** Test Cases ***
+*** Keywords ***
 
 List buckets
+    [Arguments]         ${BUCKET}
     ${result} =         Execute AWSS3APICli     list-buckets | jq -r '.Buckets[].Name'
                         Should contain          ${result}    ${BUCKET}
 
 Get bucket info with Ozone Shell to check the owner field
+    [Arguments]         ${BUCKET}
     Pass Execution If   '${SECURITY_ENABLED}' == 'false'    Skipping this check as security is not enabled
     ${result} =         Execute             ozone sh bucket info /s3v/${BUCKET} | jq -r '.owner'
                         Should Be Equal     ${result}       testuser
                         # In ozonesecure(-ha) docker-config, hadoop.security.auth_to_local is set
                         # in the way that getShortUserName() converts the accessId to "testuser".
                         # Also see "Setup dummy credentials for S3" in commonawslib.robot
+
+*** Test Cases ***
+
+List buckets with OBS
+    List buckets    ${BUCKET}
+List buckets with FSO
+    List buckets    ${BUCKET1}
+
+Get bucket info with Ozone Shell to check the owner field with OBS
+    Get bucket info with Ozone Shell to check the owner field    ${BUCKET}
+Get bucket info with Ozone Shell to check the owner field with FSO
+    Get bucket info with Ozone Shell to check the owner field    ${BUCKET1}
 
 List buckets with empty access id
     [setup]             Save AWS access key

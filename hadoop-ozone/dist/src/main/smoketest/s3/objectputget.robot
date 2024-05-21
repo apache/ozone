@@ -26,10 +26,11 @@ Suite Setup         Setup s3 tests
 ${ENDPOINT_URL}       http://s3g:9878
 ${OZONE_TEST}         true
 ${BUCKET}             generated
+${BUCKET1}            generated
 
-*** Test Cases ***
-
+*** Keywords ***
 Put object to s3
+    [Arguments]         ${BUCKET}
                         Execute                    echo "Randomtext" > /tmp/testfile
     ${result} =         Execute AWSS3ApiCli        put-object --bucket ${BUCKET} --key ${PREFIX}/putobject/key=value/f1 --body /tmp/testfile
     ${result} =         Execute AWSS3ApiCli        list-objects --bucket ${BUCKET} --prefix ${PREFIX}/putobject/key=value/
@@ -42,6 +43,7 @@ Put object to s3
 
 #This test depends on the previous test case. Can't be executes alone
 Get object from s3
+    [Arguments]         ${BUCKET}
     ${result} =                 Execute AWSS3ApiCli        get-object --bucket ${BUCKET} --key ${PREFIX}/putobject/key=value/f1 /tmp/testfile.result
     Compare files               /tmp/testfile              /tmp/testfile.result
     ${result} =                 Execute AWSS3ApiCli        get-object --bucket ${BUCKET} --key ${PREFIX}/putobject/key=value/zerobyte /tmp/zerobyte.result
@@ -49,11 +51,13 @@ Get object from s3
 
 #This test depends on the previous test case. Can't be executed alone
 Get object with wrong signature
+    [Arguments]         ${BUCKET}
     Pass Execution If          '${SECURITY_ENABLED}' == 'false'    Skip in unsecure cluster
     ${result} =                 Execute and Ignore Error   curl -i -H 'Authorization: AWS scm/scm@EXAMPLE.COM:asdfqwerty' ${ENDPOINT_URL}/${BUCKET}/${PREFIX}/putobject/key=value/f1
                                 Should contain             ${result}        403 Forbidden
 
 Get Partial object from s3 with both start and endoffset
+    [Arguments]         ${BUCKET}
     ${result} =                 Execute AWSS3ApiCli        get-object --bucket ${BUCKET} --key ${PREFIX}/putobject/key=value/f1 --range bytes=0-4 /tmp/testfile1.result
                                 Should contain             ${result}        ContentRange
                                 Should contain             ${result}        bytes 0-4/11
@@ -80,11 +84,13 @@ Get Partial object from s3 with both start and endoffset
                                 Should Be Equal            ${expectedData}            ${actualData}
 
 Get Partial object from s3 with both start and endoffset(start offset and endoffset is greater than file size)
+    [Arguments]         ${BUCKET}
     ${result} =                 Execute AWSS3APICli and checkrc        get-object --bucket ${BUCKET} --key ${PREFIX}/putobject/key=value/f1 --range bytes=10000-10000 /tmp/testfile2.result   255
                                 Should contain             ${result}        InvalidRange
 
 
 Get Partial object from s3 with both start and endoffset(end offset is greater than file size)
+    [Arguments]         ${BUCKET}
     ${result} =                 Execute AWSS3ApiCli        get-object --bucket ${BUCKET} --key ${PREFIX}/putobject/key=value/f1 --range bytes=0-10000 /tmp/testfile2.result
                                 Should contain             ${result}        ContentRange
                                 Should contain             ${result}        bytes 0-10/11
@@ -94,6 +100,7 @@ Get Partial object from s3 with both start and endoffset(end offset is greater t
                                 Should Be Equal            ${expectedData}            ${actualData}
 
 Get Partial object from s3 with only start offset
+    [Arguments]         ${BUCKET}
     ${result} =                 Execute AWSS3ApiCli        get-object --bucket ${BUCKET} --key ${PREFIX}/putobject/key=value/f1 --range bytes=0- /tmp/testfile3.result
                                 Should contain             ${result}        ContentRange
                                 Should contain             ${result}        bytes 0-10/11
@@ -103,6 +110,7 @@ Get Partial object from s3 with only start offset
                                 Should Be Equal            ${expectedData}            ${actualData}
 
 Get Partial object from s3 with both start and endoffset which are equal
+    [Arguments]         ${BUCKET}
     ${result} =                 Execute AWSS3ApiCli        get-object --bucket ${BUCKET} --key ${PREFIX}/putobject/key=value/f1 --range bytes=0-0 /tmp/testfile4.result
                                 Should contain             ${result}        ContentRange
                                 Should contain             ${result}        bytes 0-0/11
@@ -120,6 +128,7 @@ Get Partial object from s3 with both start and endoffset which are equal
                                 Should Be Equal            ${expectedData}            ${actualData}
 
 Get Partial object from s3 to get last n bytes
+    [Arguments]         ${BUCKET}
     ${result} =                 Execute AWSS3ApiCli        get-object --bucket ${BUCKET} --key ${PREFIX}/putobject/key=value/f1 --range bytes=-4 /tmp/testfile6.result
                                 Should contain             ${result}        ContentRange
                                 Should contain             ${result}        bytes 7-10/11
@@ -138,6 +147,7 @@ Get Partial object from s3 to get last n bytes
                                 Should Be Equal            ${expectedData}            ${actualData}
 
 Incorrect values for end and start offset
+    [Arguments]         ${BUCKET}
     ${result} =                 Execute AWSS3ApiCli        get-object --bucket ${BUCKET} --key ${PREFIX}/putobject/key=value/f1 --range bytes=-11-10000 /tmp/testfile8.result
                                 Should not contain         ${result}        ContentRange
                                 Should contain             ${result}        AcceptRanges
@@ -153,6 +163,7 @@ Incorrect values for end and start offset
                                 Should Be Equal            ${expectedData}            ${actualData}
 
 Zero byte file
+    [Arguments]         ${BUCKET}
     ${result} =                 Execute AWSS3APICli and checkrc     get-object --bucket ${BUCKET} --key ${PREFIX}/putobject/key=value/zerobyte --range bytes=0-0 /tmp/testfile2.result   255
                                 Should contain              ${result}       InvalidRange
 
@@ -163,6 +174,7 @@ Zero byte file
                                 Should contain              ${result}       InvalidRange
 
 Create file with user defined metadata
+    [Arguments]         ${BUCKET}
                                 Execute                   echo "Randomtext" > /tmp/testfile2
                                 Execute AWSS3ApiCli       put-object --bucket ${BUCKET} --key ${PREFIX}/putobject/custom-metadata/key1 --body /tmp/testfile2 --metadata="custom-key1=custom-value1,custom-key2=custom-value2"
 
@@ -175,6 +187,7 @@ Create file with user defined metadata
                                 Should contain            ${result}   \"custom-key2\" : \"custom-value2\"
 
 Create file with user defined metadata with gdpr enabled value in request
+    [Arguments]         ${BUCKET}
                                 Execute                    echo "Randomtext" > /tmp/testfile2
                                 Execute AWSS3ApiCli        put-object --bucket ${BUCKET} --key ${PREFIX}/putobject/custom-metadata/key2 --body /tmp/testfile2 --metadata="gdprEnabled=true,custom-key2=custom-value2"
     ${result} =                 Execute AWSS3ApiCli        head-object --bucket ${BUCKET} --key ${PREFIX}/putobject/custom-metadata/key2
@@ -183,6 +196,7 @@ Create file with user defined metadata with gdpr enabled value in request
 
 
 Create file with user defined metadata size larger than 2 KB
+    [Arguments]         ${BUCKET}
                                 Execute                    echo "Randomtext" > /tmp/testfile2
     ${custom_metadata_value} =  Execute                    printf 'v%.0s' {1..3000}
     ${result} =                 Execute AWSS3APICli and checkrc       put-object --bucket ${BUCKET} --key ${PREFIX}/putobject/custom-metadata/key2 --body /tmp/testfile2 --metadata="custom-key1=${custom_metadata_value}"    255
@@ -190,6 +204,7 @@ Create file with user defined metadata size larger than 2 KB
                                 Should not contain                    ${result}   custom-key1: ${custom_metadata_value}
 
 Create small file and expect ETag (MD5) in a reponse header
+    [Arguments]         ${BUCKET}
                                 Execute                    head -c 1MB </dev/urandom > /tmp/small_file
     ${file_md5_checksum} =      Execute                    md5sum /tmp/small_file | awk '{print $1}'
     ${result} =                 Execute AWSS3CliDebug      cp /tmp/small_file s3://${BUCKET}
@@ -197,6 +212,7 @@ Create small file and expect ETag (MD5) in a reponse header
 
 # The next two test cases depends on the previous one
 Download small file end expect ETag (MD5) in a response header
+    [Arguments]         ${BUCKET}
     ${file_md5_checksum} =      Execute                    md5sum /tmp/small_file | awk '{print $1}'
     ${result} =                 Execute AWSS3CliDebug      cp s3://${BUCKET}/small_file /tmp/small_file_downloaded
                                 Should Match Regexp        ${result}    (?is)HEAD /${BUCKET}/small_file.*?Response headers.*?ETag': '"${file_md5_checksum}"'
@@ -206,6 +222,7 @@ Download small file end expect ETag (MD5) in a response header
                                 Execute                    rm /tmp/small_file_downloaded
 
 Create key with custom etag metadata and expect it won't conflict with ETag response header of HEAD request
+    [Arguments]         ${BUCKET}
     ${file_md5_checksum}                    Execute                             md5sum /tmp/small_file | awk '{print $1}'
                                             Execute AWSS3CliDebug               cp --metadata "ETag=custom-etag-value" /tmp/small_file s3://${BUCKET}/test_file
     ${result}                               Execute AWSS3CliDebug               cp s3://${BUCKET}/test_file /tmp/test_file_downloaded
@@ -219,6 +236,7 @@ Create key with custom etag metadata and expect it won't conflict with ETag resp
                                             Execute                             rm -rf /tmp/test_file_downloaded
 
 Create&Download big file by multipart upload and expect ETag in a file download response
+    [Arguments]         ${BUCKET}
                                 Execute                    head -c 10MB </dev/urandom > /tmp/big_file
     ${result}                   Execute AWSS3CliDebug      cp /tmp/big_file s3://${BUCKET}/
     ${match}    ${etag1}        Should Match Regexp        ${result}    (?is)POST /${BUCKET}/big_file\\?uploadId=.*?Response body.*?ETag>"(.*?-2)"
@@ -230,6 +248,7 @@ Create&Download big file by multipart upload and expect ETag in a file download 
                                 Execute                    rm -rf /tmp/big_file
 
 Create key twice with different content and expect different ETags
+    [Arguments]         ${BUCKET}
                                 Execute                    head -c 1MiB </dev/urandom > /tmp/file1
                                 Execute                    head -c 1MiB </dev/urandom > /tmp/file2
     ${file1UploadResult}        Execute AWSS3CliDebug      cp /tmp/file1 s3://${BUCKET}/test_key_to_check_etag_differences
@@ -241,3 +260,98 @@ Create key twice with different content and expect different ETags
                                 Execute AWSS3Cli           rm s3://${BUCKET}/test_key_to_check_etag_differences
                                 Execute                    rm -rf /tmp/file1
                                 Execute                    rm -rf /tmp/file2
+
+*** Test Cases ***
+Put object to s3 with OBS
+    Put object to s3    ${BUCKET}
+Put object to s3 with FSO
+    Put object to s3    ${BUCKET1}
+
+Get object from s3 with OBS
+    Get object from s3    ${BUCKET}
+Get object from s3 with FSO
+    Get object from s3    ${BUCKET1}
+
+Get object with wrong signature with OBS
+    Get object with wrong signature    ${BUCKET}
+Get object with wrong signature with FSO
+    Get object with wrong signature    ${BUCKET1}
+
+Get Partial object from s3 with both start and endoffset with OBS
+    Get Partial object from s3 with both start and endoffset    ${BUCKET}
+Get Partial object from s3 with both start and endoffset with FSO
+    Get Partial object from s3 with both start and endoffset    ${BUCKET1}
+
+Get Partial object from s3 with both start and endoffset(start offset and endoffset is greater than file size) with OBS
+    Get Partial object from s3 with both start and endoffset(start offset and endoffset is greater than file size)    ${BUCKET}
+Get Partial object from s3 with both start and endoffset(start offset and endoffset is greater than file size) with FSO
+    Get Partial object from s3 with both start and endoffset(start offset and endoffset is greater than file size)    ${BUCKET1}
+
+Get Partial object from s3 with both start and endoffset(end offset is greater than file size) with OBS
+    Get Partial object from s3 with both start and endoffset(end offset is greater than file size)    ${BUCKET}
+Get Partial object from s3 with both start and endoffset(end offset is greater than file size) with FSO
+    Get Partial object from s3 with both start and endoffset(end offset is greater than file size)    ${BUCKET1}
+
+Get Partial object from s3 with only start offset with OBS
+    Get Partial object from s3 with only start offset    ${BUCKET}
+Get Partial object from s3 with only start offset with FSO
+    Get Partial object from s3 with only start offset    ${BUCKET1}
+
+Get Partial object from s3 with both start and endoffset which are equal with OBS
+    Get Partial object from s3 with both start and endoffset which are equal    ${BUCKET}
+Get Partial object from s3 with both start and endoffset which are equal with FSO
+    Get Partial object from s3 with both start and endoffset which are equal    ${BUCKET1}
+
+Get Partial object from s3 to get last n bytes with OBS
+    Get Partial object from s3 to get last n bytes    ${BUCKET}
+Get Partial object from s3 to get last n bytes with FSO
+    Get Partial object from s3 to get last n bytes    ${BUCKET1}
+
+Incorrect values for end and start offset with OBS
+    Incorrect values for end and start offset    ${BUCKET}
+Incorrect values for end and start offset with FSO
+    Incorrect values for end and start offset    ${BUCKET1}
+
+Zero byte file with OBS
+    Zero byte file    ${BUCKET}
+Zero byte file with FSO
+    Zero byte file    ${BUCKET1}
+
+Create file with user defined metadata with OBS
+    Create file with user defined metadata    ${BUCKET}
+Create file with user defined metadata with FSO
+    Create file with user defined metadata    ${BUCKET1}
+
+Create file with user defined metadata with gdpr enabled value in request with OBS
+    Create file with user defined metadata with gdpr enabled value in request    ${BUCKET}
+Create file with user defined metadata with gdpr enabled value in request with FSO
+    Create file with user defined metadata with gdpr enabled value in request    ${BUCKET1}
+
+Create file with user defined metadata size larger than 2 KB with OBS
+    Create file with user defined metadata size larger than 2 KB    ${BUCKET}
+Create file with user defined metadata size larger than 2 KB with FSO
+    Create file with user defined metadata size larger than 2 KB    ${BUCKET1}
+
+Create small file and expect ETag (MD5) in a reponse header with OBS
+    Create small file and expect ETag (MD5) in a reponse header    ${BUCKET}
+Download small file end expect ETag (MD5) in a response header with OBS
+    Download small file end expect ETag (MD5) in a response header    ${BUCKET}
+Create key with custom etag metadata and expect it won't conflict with ETag response header of HEAD request with OBS
+    Create key with custom etag metadata and expect it won't conflict with ETag response header of HEAD request    ${BUCKET}
+
+Create small file and expect ETag (MD5) in a reponse header with FSO
+    Create small file and expect ETag (MD5) in a reponse header    ${BUCKET1}
+Download small file end expect ETag (MD5) in a response header with FSO
+    Download small file end expect ETag (MD5) in a response header    ${BUCKET1}
+Create key with custom etag metadata and expect it won't conflict with ETag response header of HEAD request with FSO
+    Create key with custom etag metadata and expect it won't conflict with ETag response header of HEAD request    ${BUCKET1}
+
+Create&Download big file by multipart upload and expect ETag in a file download response with OBS
+    Create&Download big file by multipart upload and expect ETag in a file download response    ${BUCKET}
+Create&Download big file by multipart upload and expect ETag in a file download response with FSO
+    Create&Download big file by multipart upload and expect ETag in a file download response    ${BUCKET1}
+
+Create key twice with different content and expect different ETags with OBS
+    Create key twice with different content and expect different ETags    ${BUCKET}
+Create key twice with different content and expect different ETags with FSO
+    Create key twice with different content and expect different ETags    ${BUCKET1}
