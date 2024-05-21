@@ -726,8 +726,8 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
 
     keyArgs.setSortDatanodes(args.getSortDatanodes());
 
-    if (args.getRewriteGeneration() != null) {
-      keyArgs.setRewriteGeneration(args.getRewriteGeneration());
+    if (args.getExpectedDataGeneration() != null) {
+      keyArgs.setExpectedDataGeneration(args.getExpectedDataGeneration());
     }
 
     req.setKeyArgs(keyArgs.build());

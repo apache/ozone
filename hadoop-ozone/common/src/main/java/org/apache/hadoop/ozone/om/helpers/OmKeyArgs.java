@@ -53,13 +53,13 @@ public final class OmKeyArgs implements Auditable {
   private final boolean recursive;
   private final boolean headOp;
   private final boolean forceUpdateContainerCacheFromSCM;
-  // RewriteGeneration, when used in key creation indicates that a
+  // expectedDataGeneration, when used in key creation indicates that a
   // key with the same keyName should exist with the given generation.
   // For a key commit to succeed, the original key should still be present with the
   // generation unchanged.
   // This allows a key to be created an committed atomically if the original has not
   // been modified.
-  private Long rewriteGeneration = null;
+  private Long expectedDataGeneration = null;
 
   private OmKeyArgs(Builder b) {
     this.volumeName = b.volumeName;
@@ -79,7 +79,7 @@ public final class OmKeyArgs implements Auditable {
     this.headOp = b.headOp;
     this.forceUpdateContainerCacheFromSCM = b.forceUpdateContainerCacheFromSCM;
     this.ownerName = b.ownerName;
-    this.rewriteGeneration = b.rewriteGeneration;
+    this.expectedDataGeneration = b.expectedDataGeneration;
   }
 
   public boolean getIsMultipartKey() {
@@ -158,8 +158,8 @@ public final class OmKeyArgs implements Auditable {
     return forceUpdateContainerCacheFromSCM;
   }
 
-  public Long getRewriteGeneration() {
-    return rewriteGeneration;
+  public Long getExpectedDataGeneration() {
+    return expectedDataGeneration;
   }
 
   @Override
@@ -203,8 +203,8 @@ public final class OmKeyArgs implements Auditable {
         .setAcls(acls)
         .setForceUpdateContainerCacheFromSCM(forceUpdateContainerCacheFromSCM);
 
-    if (rewriteGeneration != null) {
-      builder.setRewriteGeneration(rewriteGeneration);
+    if (expectedDataGeneration != null) {
+      builder.setExpectedDataGeneration(expectedDataGeneration);
     }
     return builder;
   }
@@ -221,8 +221,8 @@ public final class OmKeyArgs implements Auditable {
         .setHeadOp(isHeadOp())
         .setForceUpdateContainerCacheFromSCM(
             isForceUpdateContainerCacheFromSCM());
-    if (rewriteGeneration != null) {
-      builder.setRewriteGeneration(rewriteGeneration);
+    if (expectedDataGeneration != null) {
+      builder.setExpectedDataGeneration(expectedDataGeneration);
     }
     return builder.build();
   }
@@ -248,7 +248,7 @@ public final class OmKeyArgs implements Auditable {
     private boolean recursive;
     private boolean headOp;
     private boolean forceUpdateContainerCacheFromSCM;
-    private Long rewriteGeneration = null;
+    private Long expectedDataGeneration = null;
 
     public Builder setVolumeName(String volume) {
       this.volumeName = volume;
@@ -348,8 +348,8 @@ public final class OmKeyArgs implements Auditable {
       return this;
     }
 
-    public Builder setRewriteGeneration(long generation) {
-      this.rewriteGeneration = generation;
+    public Builder setExpectedDataGeneration(long generation) {
+      this.expectedDataGeneration = generation;
       return this;
     }
 

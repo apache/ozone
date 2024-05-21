@@ -706,14 +706,14 @@ public class TestOMKeyCreateRequest extends TestOMKeyRequest {
 
   private OMRequest createKeyRequest(
       boolean isMultipartKey, int partNumber, long keyLength,
-      ReplicationConfig repConfig, Long rewriteGeneration) {
+      ReplicationConfig repConfig, Long expectedDataGeneration) {
     return createKeyRequest(isMultipartKey, partNumber, keyLength, repConfig,
-        rewriteGeneration, null);
+        expectedDataGeneration, null);
   }
 
   private OMRequest createKeyRequest(
       boolean isMultipartKey, int partNumber, long keyLength,
-      ReplicationConfig repConfig, Long rewriteGeneration, Map<String, String> metaData) {
+      ReplicationConfig repConfig, Long expectedDataGeneration, Map<String, String> metaData) {
 
     KeyArgs.Builder keyArgs = KeyArgs.newBuilder()
         .setVolumeName(volumeName).setBucketName(bucketName)
@@ -732,8 +732,8 @@ public class TestOMKeyCreateRequest extends TestOMKeyRequest {
     if (isMultipartKey) {
       keyArgs.setMultipartNumber(partNumber);
     }
-    if (rewriteGeneration != null) {
-      keyArgs.setRewriteGeneration(rewriteGeneration);
+    if (expectedDataGeneration != null) {
+      keyArgs.setExpectedDataGeneration(expectedDataGeneration);
     }
     if (metaData != null) {
       metaData.forEach((key, value) -> keyArgs.addMetadata(KeyValue.newBuilder()
@@ -981,12 +981,12 @@ public class TestOMKeyCreateRequest extends TestOMKeyRequest {
     response = omKeyCreateRequest.validateAndUpdateCache(ozoneManager, 105L);
     assertEquals(OK, response.getOMResponse().getStatus());
 
-    // Ensure the rewriteGeneration is persisted in the open key table
+    // Ensure the expectedDataGeneration is persisted in the open key table
     String openKey = omMetadataManager.getOpenKey(volumeName, bucketName,
         keyName, omRequest.getCreateKeyRequest().getClientID());
     OmKeyInfo openKeyInfo = omMetadataManager.getOpenKeyTable(omKeyCreateRequest.getBucketLayout()).get(openKey);
 
-    assertEquals(existingKeyInfo.getGeneration(), openKeyInfo.getRewriteGeneration());
+    assertEquals(existingKeyInfo.getGeneration(), openKeyInfo.getExpectedDataGeneration());
     // Creation time should remain the same on rewrite.
     assertEquals(existingKeyInfo.getCreationTime(), openKeyInfo.getCreationTime());
     // Update ID should change
