@@ -90,16 +90,15 @@ public class OMDBInsightSearchEndpoint {
    * This endpoint searches across both File System Optimized (FSO) and Object Store (non-FSO) layouts,
    * compiling a list of keys that match the given prefix along with their data sizes.
    * <p>
-   * The search prefix may range from the root level ('/') to any specific directory
-   * or key level (e.g., '/volA/' for everything under 'volA'). The search operation matches
-   * the prefix against the start of keys' names within the OM DB.
+   * The search prefix must start from the bucket level ('/volumeName/bucketName/') or any specific directory
+   * or key level (e.g., '/volA/bucketA/dir1' for everything under 'dir1' inside 'bucketA' of 'volA').
+   * The search operation matches the prefix against the start of keys' names within the OM DB.
    * <p>
    * Example Usage:
-   * 1. A startPrefix of "/" will return all keys in the database.
-   * 2. A startPrefix of "/volA/" retrieves every key under volume 'volA'.
-   * 3. Specifying "/volA/bucketA/dir1" focuses the search within 'dir1' inside 'bucketA' of 'volA'.
+   * 1. A startPrefix of "/volA/bucketA/" retrieves every key under bucket 'bucketA' in volume 'volA'.
+   * 2. Specifying "/volA/bucketA/dir1" focuses the search within 'dir1' inside 'bucketA' of 'volA'.
    *
-   * @param startPrefix The prefix for searching keys, starting from the root ('/') or any specific path.
+   * @param startPrefix The prefix for searching keys, starting from the bucket level ('/volumeName/bucketName/') or any specific path.
    * @param limit       Limits the number of returned keys.
    * @return A KeyInsightInfoResponse, containing matching keys and their data sizes.
    * @throws IOException On failure to access the OM database or process the operation.
@@ -111,14 +110,33 @@ public class OMDBInsightSearchEndpoint {
       String startPrefix,
       @DefaultValue(RECON_OPEN_KEY_DEFAULT_SEARCH_LIMIT) @QueryParam("limit")
       int limit) throws IOException {
+
     try {
-      limit = Math.max(0, limit); // Ensure limit is non-negative
+      // Ensure startPrefix is not null or empty and starts with '/'
+      if (startPrefix == null || startPrefix.length() == 0) {
+        return createBadRequestResponse(
+            "Invalid startPrefix: Path must be at the bucket level or deeper.");
+      }
+      startPrefix = startPrefix.startsWith("/") ? startPrefix : "/" + startPrefix;
+
+      // Split the path to ensure it's at least at the bucket level
+      String[] pathComponents = startPrefix.split("/");
+      if (pathComponents.length < 3 || pathComponents[2].isEmpty()) {
+        return createBadRequestResponse(
+            "Invalid startPrefix: Path must be at the bucket level or deeper.");
+      }
+
+      // Ensure the limit is non-negative
+      limit = Math.max(0, limit);
+
+      // Initialize response object
       KeyInsightInfoResponse insightResponse = new KeyInsightInfoResponse();
       long replicatedTotal = 0;
       long unreplicatedTotal = 0;
       boolean keysFound = false; // Flag to track if any keys are found
+      String lastKey = null;
 
-      // Search keys from non-FSO layout.
+      // Search for non-fso keys in KeyTable
       Map<String, OmKeyInfo> obsKeys = new LinkedHashMap<>();
       Table<String, OmKeyInfo> openKeyTable =
           omMetadataManager.getOpenKeyTable(BucketLayout.LEGACY);
@@ -131,9 +149,10 @@ public class OMDBInsightSearchEndpoint {
             .add(keyEntityInfo); // Add to non-FSO list
         replicatedTotal += entry.getValue().getReplicatedSize();
         unreplicatedTotal += entry.getValue().getDataSize();
+        lastKey = entry.getKey(); // Update lastKey
       }
 
-      // Search keys from FSO layout.
+      // Search for fso keys in FileTable
       Map<String, OmKeyInfo> fsoKeys = searchOpenKeysInFSO(startPrefix, limit);
       for (Map.Entry<String, OmKeyInfo> entry : fsoKeys.entrySet()) {
         keysFound = true;
@@ -143,6 +162,7 @@ public class OMDBInsightSearchEndpoint {
             .add(keyEntityInfo); // Add to FSO list
         replicatedTotal += entry.getValue().getReplicatedSize();
         unreplicatedTotal += entry.getValue().getDataSize();
+        lastKey = entry.getKey(); // Update lastKey
       }
 
       // If no keys were found, return a response indicating that no keys matched
@@ -153,12 +173,16 @@ public class OMDBInsightSearchEndpoint {
       // Set the aggregated totals in the response
       insightResponse.setReplicatedDataSize(replicatedTotal);
       insightResponse.setUnreplicatedDataSize(unreplicatedTotal);
+      insightResponse.setLastKey(lastKey);
 
+      // Return the response with the matched keys and their data sizes
       return Response.ok(insightResponse).build();
     } catch (IOException e) {
+      // Handle IO exceptions and return an internal server error response
       return createInternalServerErrorResponse(
           "Error searching open keys in OM DB: " + e.getMessage());
     } catch (IllegalArgumentException e) {
+      // Handle illegal argument exceptions and return a bad request response
       return createBadRequestResponse(
           "Invalid startPrefix: " + e.getMessage());
     }
@@ -174,7 +198,7 @@ public class OMDBInsightSearchEndpoint {
     Table<String, OmKeyInfo> openFileTable =
         omMetadataManager.getOpenKeyTable(BucketLayout.FILE_SYSTEM_OPTIMIZED);
 
-    // If names.length > 2, then the search prefix is at the volume or bucket level hence
+    // If names.length <= 2, then the search prefix is at the volume or bucket level hence
     // no need to find parent or extract id's or find subpaths as the openFileTable is
     // suitable for volume and bucket level search
     if (names.length > 2) {

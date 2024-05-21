@@ -143,7 +143,7 @@ public class TestOMDBInsightSearchEndpoint extends AbstractReconSqlDBTest {
 
   @Test
   public void testVolumeLevelSearch() throws IOException {
-    String volumePath = "/vola";
+    String volumePath = "/";
     Response response =
         omdbInsightSearchEndpoint.searchOpenKeys(volumePath, 20);
     assertEquals(200, response.getStatus());
