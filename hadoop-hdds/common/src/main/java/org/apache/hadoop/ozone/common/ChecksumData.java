@@ -22,7 +22,6 @@ import com.google.common.base.Preconditions;
 import java.util.Collections;
 import java.util.List;
 
-import com.google.common.collect.ImmutableList;
 import org.apache.commons.lang3.builder.HashCodeBuilder;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos
@@ -39,7 +38,7 @@ public class ChecksumData {
   // Checksum will be computed for every bytesPerChecksum number of bytes and
   // stored sequentially in checksumList
   private final int bytesPerChecksum;
-  private final ImmutableList<ByteString> checksums;
+  private final List<ByteString> checksums;
 
   public ChecksumData(ChecksumType checksumType, int bytesPerChecksum) {
     this(checksumType, bytesPerChecksum, Collections.emptyList());
@@ -49,7 +48,7 @@ public class ChecksumData {
                       List<ByteString> checksums) {
     this.type = checksumType;
     this.bytesPerChecksum = bytesPerChecksum;
-    this.checksums = checksums == null ? ImmutableList.of() : ImmutableList.copyOf(checksums);
+    this.checksums = Collections.unmodifiableList(checksums);
   }
 
   /**
