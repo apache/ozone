@@ -1133,6 +1133,8 @@ public abstract class TestOzoneRpcClientAbstract {
       is.read(fileContent);
       assertEquals(rewriteValue, new String(fileContent, UTF_8));
     }
+    OzoneKeyDetails rewrittenKeyDetails = bucket.getKey(keyName);
+    assertEquals(keyDetails.getOwner(), rewrittenKeyDetails.getOwner());
 
     // Delete the key
     bucket.deleteKey(keyName);
