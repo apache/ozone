@@ -50,6 +50,7 @@ import java.util.Set;
 
 import static org.apache.hadoop.ozone.recon.ReconConstants.DEFAULT_START_PREFIX;
 import static org.apache.hadoop.ozone.recon.ReconConstants.RECON_OPEN_KEY_DEFAULT_SEARCH_LIMIT;
+import static org.apache.hadoop.ozone.recon.ReconConstants.RECON_OPEN_KEY_SEARCH_DEFAULT_PREV_KEY;
 import static org.apache.hadoop.ozone.recon.ReconResponseUtils.noMatchedKeysResponse;
 import static org.apache.hadoop.ozone.recon.ReconResponseUtils.createBadRequestResponse;
 import static org.apache.hadoop.ozone.recon.ReconResponseUtils.createInternalServerErrorResponse;
@@ -99,6 +100,7 @@ public class OMDBInsightSearchEndpoint {
    *
    * @param startPrefix The prefix for searching keys, starting from the bucket level or any specific path.
    * @param limit       Limits the number of returned keys.
+   * @param prevKey     The key to start after for the next set of records.
    * @return A KeyInsightInfoResponse, containing matching keys and their data sizes.
    * @throws IOException On failure to access the OM database or process the operation.
    */
@@ -108,7 +110,8 @@ public class OMDBInsightSearchEndpoint {
       @DefaultValue(DEFAULT_START_PREFIX) @QueryParam("startPrefix")
       String startPrefix,
       @DefaultValue(RECON_OPEN_KEY_DEFAULT_SEARCH_LIMIT) @QueryParam("limit")
-      int limit) throws IOException {
+      int limit,
+      @DefaultValue(RECON_OPEN_KEY_SEARCH_DEFAULT_PREV_KEY) @QueryParam("prevKey") String prevKey) throws IOException {
 
     try {
       // Ensure startPrefix is not null or empty and starts with '/'
@@ -139,7 +142,7 @@ public class OMDBInsightSearchEndpoint {
       Map<String, OmKeyInfo> obsKeys = new LinkedHashMap<>();
       Table<String, OmKeyInfo> openKeyTable =
           omMetadataManager.getOpenKeyTable(BucketLayout.LEGACY);
-      obsKeys = retrieveKeysFromTable(openKeyTable, startPrefix, limit);
+      obsKeys = retrieveKeysFromTable(openKeyTable, startPrefix, limit, prevKey);
       for (Map.Entry<String, OmKeyInfo> entry : obsKeys.entrySet()) {
         keysFound = true;
         KeyEntityInfo keyEntityInfo =
@@ -152,7 +155,7 @@ public class OMDBInsightSearchEndpoint {
       }
 
       // Search for fso keys in FileTable
-      Map<String, OmKeyInfo> fsoKeys = searchOpenKeysInFSO(startPrefix, limit);
+      Map<String, OmKeyInfo> fsoKeys = searchOpenKeysInFSO(startPrefix, limit, prevKey);
       for (Map.Entry<String, OmKeyInfo> entry : fsoKeys.entrySet()) {
         keysFound = true;
         KeyEntityInfo keyEntityInfo =
@@ -188,7 +191,7 @@ public class OMDBInsightSearchEndpoint {
   }
 
   public Map<String, OmKeyInfo> searchOpenKeysInFSO(String startPrefix,
-                                                    int limit)
+                                                    int limit, String prevKey)
       throws IOException, IllegalArgumentException {
     Map<String, OmKeyInfo> matchedKeys = new LinkedHashMap<>();
     // Convert the search prefix to an object path for FSO buckets
@@ -220,9 +223,8 @@ public class OMDBInsightSearchEndpoint {
 
       // Iterate over the subpaths and retrieve the open files
       for (String subPath : subPaths) {
-        matchedKeys.putAll(
-            retrieveKeysFromTable(openFileTable, subPath,
-                limit - matchedKeys.size()));
+        matchedKeys.putAll(retrieveKeysFromTable(openFileTable, subPath,
+            limit - matchedKeys.size(), prevKey));
         if (matchedKeys.size() >= limit) {
           break;
         }
@@ -231,7 +233,7 @@ public class OMDBInsightSearchEndpoint {
     }
 
     // Iterate over for bucket and volume level search
-    matchedKeys.putAll(retrieveKeysFromTable(openFileTable, startPrefixObjectPath, limit));
+    matchedKeys.putAll(retrieveKeysFromTable(openFileTable, startPrefixObjectPath, limit, prevKey));
     return matchedKeys;
   }
 
@@ -239,7 +241,7 @@ public class OMDBInsightSearchEndpoint {
    * Finds all subdirectories under a parent directory in an FSO bucket. It builds
    * a list of paths for these subdirectories. These sub-directories are then used
    * to search for open files in the openFileTable.
-   * <p>
+   *
    * How it works:
    * - Starts from a parent directory identified by parentId.
    * - Looks through all child directories of this parent.
@@ -256,8 +258,7 @@ public class OMDBInsightSearchEndpoint {
   private void gatherSubPaths(long parentId, List<String> subPaths,
                               String[] names) throws IOException {
     // Fetch the NSSummary object for parentId
-    NSSummary parentSummary =
-        reconNamespaceSummaryManager.getNSSummary(parentId);
+    NSSummary parentSummary = reconNamespaceSummaryManager.getNSSummary(parentId);
     if (parentSummary == null) {
       return;
     }
@@ -266,11 +267,9 @@ public class OMDBInsightSearchEndpoint {
     Set<Long> childDirIds = parentSummary.getChildDir();
     for (Long childId : childDirIds) {
       // Fetch the NSSummary for each child directory
-      NSSummary childSummary =
-          reconNamespaceSummaryManager.getNSSummary(childId);
+      NSSummary childSummary = reconNamespaceSummaryManager.getNSSummary(childId);
       if (childSummary != null) {
-        String subPath =
-            constructObjectPathWithPrefix(volumeID, bucketID, childId);
+        String subPath = constructObjectPathWithPrefix(volumeID, bucketID, childId);
         // Add to subPaths
         subPaths.add(subPath);
         // Recurse into this child directory
@@ -334,16 +333,25 @@ public class OMDBInsightSearchEndpoint {
    * @param table       The table to retrieve keys from.
    * @param startPrefix The search prefix to match keys against.
    * @param limit       The maximum number of keys to retrieve.
+   * @param prevKey     The key to start after for the next set of records.
    * @return A map of keys and their corresponding OmKeyInfo objects.
    * @throws IOException If there are problems accessing the table.
    */
   private Map<String, OmKeyInfo> retrieveKeysFromTable(
-      Table<String, OmKeyInfo> table, String startPrefix, int limit)
+      Table<String, OmKeyInfo> table, String startPrefix, int limit, String prevKey)
       throws IOException {
     Map<String, OmKeyInfo> matchedKeys = new LinkedHashMap<>();
-    try (
-        TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>> keyIter = table.iterator()) {
-      keyIter.seek(startPrefix);
+    try (TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>> keyIter = table.iterator()) {
+      // If a previous key is provided, seek to the previous key and skip it.
+      if (!prevKey.isEmpty()) {
+        keyIter.seek(prevKey);
+        if (keyIter.hasNext() && keyIter.next().getKey().equals(prevKey)) {
+          // Skip the previous key
+        }
+      } else {
+        // If no previous key is provided, start from the search prefix.
+        keyIter.seek(startPrefix);
+      }
       while (keyIter.hasNext() && matchedKeys.size() < limit) {
         Table.KeyValue<String, OmKeyInfo> entry = keyIter.next();
         String dbKey = entry.getKey();
@@ -353,8 +361,7 @@ public class OMDBInsightSearchEndpoint {
         matchedKeys.put(dbKey, entry.getValue());
       }
     } catch (IOException exception) {
-      LOG.error("Error retrieving keys from table for path: {}", startPrefix,
-          exception);
+      LOG.error("Error retrieving keys from table for path: {}", startPrefix, exception);
       throw exception;
     }
     return matchedKeys;
@@ -371,8 +378,7 @@ public class OMDBInsightSearchEndpoint {
                                                          OmKeyInfo keyInfo) {
     KeyEntityInfo keyEntityInfo = new KeyEntityInfo();
     keyEntityInfo.setKey(dbKey); // Set the DB key
-    keyEntityInfo.setPath(
-        keyInfo.getKeyName()); // Assuming path is the same as key name
+    keyEntityInfo.setPath(keyInfo.getKeyName()); // Assuming path is the same as key name
     keyEntityInfo.setInStateSince(keyInfo.getCreationTime());
     keyEntityInfo.setSize(keyInfo.getDataSize());
     keyEntityInfo.setReplicatedSize(keyInfo.getReplicatedSize());
