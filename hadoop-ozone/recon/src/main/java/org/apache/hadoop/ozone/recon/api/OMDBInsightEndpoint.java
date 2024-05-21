@@ -1021,6 +1021,9 @@ public class OMDBInsightEndpoint {
           "Error searching keys in OM DB: " + e.getMessage());
     } catch (IllegalArgumentException e) {
       return ReconResponseUtils.createBadRequestResponse("Invalid startPrefix: " + e.getMessage());
+    } catch (RuntimeException e) {
+      return ReconResponseUtils.createInternalServerErrorResponse(
+          "Unexpected runtime error while searching keys in OM DB: " + e.getMessage());
     }
   }
 
@@ -1218,7 +1221,10 @@ public class OMDBInsightEndpoint {
           paramInfo.setSkipPrevKeyDone(true);
           continue;
         }
-        if (applyFilters(entry, paramInfo) && matchedKeys.size() < paramInfo.getLimit()) {
+        if (applyFilters(entry, paramInfo)) {
+          if (matchedKeys.size() >= paramInfo.getLimit()) {
+            break;
+          }
           matchedKeys.put(dbKey, entry.getValue());
         }
       }
@@ -1248,12 +1254,16 @@ public class OMDBInsightEndpoint {
             return keyData.getValue().getReplicationConfig().getReplicationType().name()
                 .equals(paramInfo.getReplicationType());
           } catch (IOException e) {
-            throw new RuntimeException(e);
+            try {
+              throw new IOException(e);
+            } catch (IOException ex) {
+              throw new RuntimeException(ex);
+            }
           }
         };
     Predicate<Table.KeyValue<String, OmKeyInfo>> keySizeFilter = keyData -> {
       try {
-        return keyData.getValue().getDataSize() > paramInfo.getKeySize();
+        return keyData.getValue().getDataSize() >= paramInfo.getKeySize();
       } catch (IOException e) {
         throw new RuntimeException(e);
       }

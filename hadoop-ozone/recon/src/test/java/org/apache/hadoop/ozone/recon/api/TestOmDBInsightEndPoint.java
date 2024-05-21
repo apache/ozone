@@ -118,10 +118,16 @@ public class TestOmDBInsightEndPoint extends AbstractReconSqlDBTest {
   private static final String FSO_BUCKET = "fso-bucket";
   private static final String EMPTY_OBS_BUCKET = "empty-obs-bucket";
   private static final String EMPTY_FSO_BUCKET = "empty-fso-bucket";
+  private static final String LEGACY_BUCKET = "legacy-bucket";
 
   private static final String DIR_ONE = "dir1";
   private static final String DIR_TWO = "dir2";
   private static final String DIR_THREE = "dir3";
+
+  private static final String DIR_FOUR = "dir4";
+  private static final String DIR_FIVE = "dir5";
+  private static final String DIR_SIX = "dir6";
+  private static final String DIR_SEVEN = "dir7";
 
   private static final String TEST_FILE = "testfile";
   private static final String FILE_ONE = "file1";
@@ -134,6 +140,21 @@ public class TestOmDBInsightEndPoint extends AbstractReconSqlDBTest {
   private static final String KEY_SIX = "key6";
   private static final String NON_EXISTENT_KEY_SEVEN = "key7";
 
+  private static final String KEY_EIGHT = "key8";
+  private static final String KEY_NINE = "dir4/dir5/key9";
+  private static final String KEY_TEN = "dir4/dir6/key10";
+  private static final String KEY_ELEVEN = "key11";
+  private static final String KEY_TWELVE = "key12";
+  private static final String KEY_THIRTEEN = "dir4/dir7/key13";
+
+  private static final String FILE_EIGHT = "key8";
+  private static final String FILE_NINE = "key9";
+  private static final String FILE_TEN = "key10";
+  private static final String FILE_ELEVEN = "key11";
+  private static final String FILE_TWELVE = "key12";
+  private static final String FILE_THIRTEEN = "key13";
+
+  private static final long PARENT_OBJECT_ID_ZERO = 0L;
   private static final long VOLUME_ONE_OBJECT_ID = 1L;
 
   private static final long OBS_BUCKET_OBJECT_ID = 2L;
@@ -155,8 +176,19 @@ public class TestOmDBInsightEndPoint extends AbstractReconSqlDBTest {
   private static final long KEY_ELEVEN_OBJECT_ID = 18L;
   private static final long KEY_TWELVE_OBJECT_ID = 19L;
 
-  private static final long EMPTY_OBS_BUCKET_OBJECT_ID = 30L;
-  private static final long EMPTY_FSO_BUCKET_OBJECT_ID = 40L;
+  private static final long LEGACY_BUCKET_OBJECT_ID = 20L;
+  private static final long DIR_FOUR_OBJECT_ID = 21L;
+  private static final long DIR_FIVE_OBJECT_ID = 22L;
+  private static final long DIR_SIX_OBJECT_ID = 23L;
+  private static final long KEY_THIRTEEN_OBJECT_ID = 24L;
+  private static final long KEY_FOURTEEN_OBJECT_ID = 25L;
+  private static final long KEY_FIFTEEN_OBJECT_ID = 26L;
+  private static final long KEY_SIXTEEN_OBJECT_ID = 27L;
+  private static final long KEY_SEVENTEEN_OBJECT_ID = 28L;
+  private static final long KEY_EIGHTEEN_OBJECT_ID = 29L;
+
+  private static final long EMPTY_OBS_BUCKET_OBJECT_ID = 34L;
+  private static final long EMPTY_FSO_BUCKET_OBJECT_ID = 35L;
 
   private static final long KEY_ONE_SIZE = 2 * OzoneConsts.KB + 1; // bin 2
   private static final long KEY_TWO_SIZE = 2 * OzoneConsts.KB + 1; // bin 2
@@ -171,8 +203,11 @@ public class TestOmDBInsightEndPoint extends AbstractReconSqlDBTest {
   private static final long KEY_ELEVEN_SIZE = OzoneConsts.KB + 1; // bin 1
   private static final long KEY_TWELVE_SIZE = 2 * OzoneConsts.KB + 1; // bin 2
 
+  private static final long KEY_THIRTEEN_SIZE = 2 * OzoneConsts.KB + 1; // bin 2
+
   private static final String OBS_BUCKET_PATH = "/volume1/obs-bucket";
   private static final String FSO_BUCKET_PATH = "/volume1/fso-bucket";
+  private static final String LEGACY_BUCKET_PATH = "/volume1/legacy-bucket";
   private static final String EMPTY_OBS_BUCKET_PATH = "/volume1/empty-obs-bucket";
   private static final String EMPTY_FSO_BUCKET_PATH = "/volume1/empty-fso-bucket";
 
@@ -180,6 +215,12 @@ public class TestOmDBInsightEndPoint extends AbstractReconSqlDBTest {
   private static final String DIR_TWO_PATH = "/volume1/fso-bucket/dir1/dir2";
   private static final String DIR_THREE_PATH = "/volume1/fso-bucket/dir1/dir2/dir3";
   private static final String NON_EXISTENT_DIR_FOUR_PATH = "/volume1/fso-bucket/dir1/dir2/dir3/dir4";
+
+  private static final String DIR_FOUR_PATH = "/volume1/legacy-bucket/dir4";
+  private static final String DIR_FIVE_PATH = "/volume1/legacy-bucket/dir4";
+  private static final String DIR_SIX_PATH = "/volume1/legacy-bucket/dir4";
+  private static final String DIR_SEVEN_PATH = "/volume1/legacy-bucket/dir4";
+
 
   private static final long VOLUME_ONE_QUOTA = 2 * OzoneConsts.MB;
   private static final long OBS_BUCKET_QUOTA = OzoneConsts.MB;
@@ -392,6 +433,18 @@ public class TestOmDBInsightEndPoint extends AbstractReconSqlDBTest {
 
     reconOMMetadataManager.getBucketTable().put(emptyFSOBucketKey, emptyFSOBucketInfo);
 
+    OmBucketInfo legacyBucketInfo = OmBucketInfo.newBuilder()
+        .setVolumeName(VOLUME_ONE)
+        .setBucketName(LEGACY_BUCKET)
+        .setObjectID(LEGACY_BUCKET_OBJECT_ID)
+        .setQuotaInBytes(OzoneConsts.MB)
+        .setBucketLayout(BucketLayout.LEGACY)
+        .build();
+    String legacyBucketKey = reconOMMetadataManager.getBucketKey(
+        legacyBucketInfo.getVolumeName(), legacyBucketInfo.getBucketName());
+
+    reconOMMetadataManager.getBucketTable().put(legacyBucketKey, legacyBucketInfo);
+
     // Write FSO keys data - Start
     writeDirToOm(reconOMMetadataManager, DIR_ONE_OBJECT_ID,
         FSO_BUCKET_OBJECT_ID, FSO_BUCKET_OBJECT_ID,
@@ -566,6 +619,129 @@ public class TestOmDBInsightEndPoint extends AbstractReconSqlDBTest {
         ratisOne,
         epochMillis2, true);
     // Write OBS Keys data - End
+
+    // Write LEGACY keys data - Start
+    writeDirToOm(reconOMMetadataManager,
+        (DIR_FOUR + OM_KEY_PREFIX),
+        LEGACY_BUCKET,
+        VOLUME_ONE,
+        DIR_FOUR,
+        DIR_FOUR_OBJECT_ID,
+        PARENT_OBJECT_ID_ZERO,
+        LEGACY_BUCKET_OBJECT_ID,
+        VOLUME_ONE_OBJECT_ID,
+        getBucketLayout());
+    writeDirToOm(reconOMMetadataManager,
+        (DIR_FOUR + OM_KEY_PREFIX + DIR_FIVE + OM_KEY_PREFIX),
+        LEGACY_BUCKET,
+        VOLUME_ONE,
+        DIR_FIVE,
+        DIR_FIVE_OBJECT_ID,
+        PARENT_OBJECT_ID_ZERO,
+        LEGACY_BUCKET_OBJECT_ID,
+        VOLUME_ONE_OBJECT_ID,
+        getBucketLayout());
+    writeDirToOm(reconOMMetadataManager,
+        (DIR_FOUR + OM_KEY_PREFIX + DIR_SIX + OM_KEY_PREFIX),
+        LEGACY_BUCKET,
+        VOLUME_ONE,
+        DIR_SIX,
+        DIR_SIX_OBJECT_ID,
+        PARENT_OBJECT_ID_ZERO,
+        LEGACY_BUCKET_OBJECT_ID,
+        VOLUME_ONE_OBJECT_ID,
+        getBucketLayout());
+    writeDirToOm(reconOMMetadataManager,
+        (DIR_FOUR + OM_KEY_PREFIX + DIR_SEVEN + OM_KEY_PREFIX),
+        LEGACY_BUCKET,
+        VOLUME_ONE,
+        DIR_FOUR,
+        DIR_FOUR_OBJECT_ID,
+        PARENT_OBJECT_ID_ZERO,
+        LEGACY_BUCKET_OBJECT_ID,
+        VOLUME_ONE_OBJECT_ID,
+        getBucketLayout());
+
+    // write all legacy bucket keys
+    writeKeyToOm(reconOMMetadataManager,
+        KEY_EIGHT,
+        LEGACY_BUCKET,
+        VOLUME_ONE,
+        FILE_EIGHT,
+        KEY_THIRTEEN_OBJECT_ID,
+        PARENT_OBJECT_ID_ZERO,
+        LEGACY_BUCKET_OBJECT_ID,
+        VOLUME_ONE_OBJECT_ID,
+        KEY_EIGHT_SIZE,
+        getBucketLayout(),
+        ratisOne,
+        epochMillis1, true);
+    writeKeyToOm(reconOMMetadataManager,
+        KEY_NINE,
+        LEGACY_BUCKET,
+        VOLUME_ONE,
+        FILE_NINE,
+        KEY_FOURTEEN_OBJECT_ID,
+        PARENT_OBJECT_ID_ZERO,
+        LEGACY_BUCKET_OBJECT_ID,
+        VOLUME_ONE_OBJECT_ID,
+        KEY_NINE_SIZE,
+        getBucketLayout(),
+        ratisOne,
+        epochMillis2, true);
+    writeKeyToOm(reconOMMetadataManager,
+        KEY_TEN,
+        LEGACY_BUCKET,
+        VOLUME_ONE,
+        FILE_TEN,
+        KEY_FIFTEEN_OBJECT_ID,
+        PARENT_OBJECT_ID_ZERO,
+        LEGACY_BUCKET_OBJECT_ID,
+        VOLUME_ONE_OBJECT_ID,
+        KEY_TEN_SIZE,
+        getBucketLayout(),
+        ratisOne,
+        epochMillis1, true);
+    writeKeyToOm(reconOMMetadataManager,
+        KEY_ELEVEN,
+        LEGACY_BUCKET,
+        VOLUME_ONE,
+        FILE_ELEVEN,
+        KEY_SIXTEEN_OBJECT_ID,
+        PARENT_OBJECT_ID_ZERO,
+        LEGACY_BUCKET_OBJECT_ID,
+        VOLUME_ONE_OBJECT_ID,
+        KEY_ELEVEN_SIZE,
+        getBucketLayout(),
+        ratisOne,
+        epochMillis2, true);
+    writeKeyToOm(reconOMMetadataManager,
+        KEY_TWELVE,
+        LEGACY_BUCKET,
+        VOLUME_ONE,
+        FILE_TWELVE,
+        KEY_SEVENTEEN_OBJECT_ID,
+        PARENT_OBJECT_ID_ZERO,
+        LEGACY_BUCKET_OBJECT_ID,
+        VOLUME_ONE_OBJECT_ID,
+        KEY_TWELVE_SIZE,
+        getBucketLayout(),
+        ratisOne,
+        epochMillis1, true);
+    writeKeyToOm(reconOMMetadataManager,
+        KEY_THIRTEEN,
+        LEGACY_BUCKET,
+        VOLUME_ONE,
+        FILE_THIRTEEN,
+        KEY_EIGHTEEN_OBJECT_ID,
+        PARENT_OBJECT_ID_ZERO,
+        LEGACY_BUCKET_OBJECT_ID,
+        VOLUME_ONE_OBJECT_ID,
+        KEY_THIRTEEN_SIZE,
+        getBucketLayout(),
+        ratisOne,
+        epochMillis1, true);
+    // Write LEGACY keys data - End
   }
 
   @Test
@@ -1446,6 +1622,46 @@ public class TestOmDBInsightEndPoint extends AbstractReconSqlDBTest {
     Response bucketResponse = omdbInsightEndpoint.listKeys("RATIS", "", 0, NON_EXISTENT_DIR_FOUR_PATH,
         "", 2);
     ListKeysResponse listKeysResponse = (ListKeysResponse) bucketResponse.getEntity();
+    assertEquals(0, listKeysResponse.getKeys().size());
+    assertEquals("", listKeysResponse.getLastKey());
+  }
+
+  @Test
+  public void testListKeysLegacyBucketWithFSEnabled() {
+    Response bucketResponse = omdbInsightEndpoint.listKeys("RATIS", "", 0, LEGACY_BUCKET_PATH,
+        "", 1000);
+    ListKeysResponse listKeysResponse = (ListKeysResponse) bucketResponse.getEntity();
+    assertEquals(6, listKeysResponse.getKeys().size());
+    assertEquals("/volume1/legacy-bucket/key8", listKeysResponse.getLastKey());
+  }
+
+  @Test
+  public void testListKeysLegacyBucketWithFSEnabledAndPagination() {
+    Response bucketResponse = omdbInsightEndpoint.listKeys("RATIS", "", 0, LEGACY_BUCKET_PATH,
+        "", 2);
+    ListKeysResponse listKeysResponse = (ListKeysResponse) bucketResponse.getEntity();
+    assertEquals(2, listKeysResponse.getKeys().size());
+    assertEquals("/volume1/legacy-bucket/dir4/dir6/key10", listKeysResponse.getLastKey());
+
+    // Second page
+    bucketResponse = omdbInsightEndpoint.listKeys("RATIS", "", 0, LEGACY_BUCKET_PATH,
+        listKeysResponse.getLastKey(), 2);
+    listKeysResponse = (ListKeysResponse) bucketResponse.getEntity();
+    assertEquals(2, listKeysResponse.getKeys().size());
+    assertEquals("/volume1/legacy-bucket/key11", listKeysResponse.getLastKey());
+
+    // Third page
+    bucketResponse = omdbInsightEndpoint.listKeys("RATIS", "", 0, LEGACY_BUCKET_PATH,
+        listKeysResponse.getLastKey(), 2);
+    listKeysResponse = (ListKeysResponse) bucketResponse.getEntity();
+    assertEquals(2, listKeysResponse.getKeys().size());
+    assertEquals("/volume1/legacy-bucket/key8", listKeysResponse.getLastKey());
+
+    // Fourth page should not have any keys left as we have iterated
+    // all 6 keys in 3 pages with each page returns 2 keys.
+    bucketResponse = omdbInsightEndpoint.listKeys("RATIS", "", 0, LEGACY_BUCKET_PATH,
+        listKeysResponse.getLastKey(), 2);
+    listKeysResponse = (ListKeysResponse) bucketResponse.getEntity();
     assertEquals(0, listKeysResponse.getKeys().size());
     assertEquals("", listKeysResponse.getLastKey());
   }

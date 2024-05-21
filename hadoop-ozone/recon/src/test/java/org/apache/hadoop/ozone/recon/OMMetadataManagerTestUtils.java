@@ -46,6 +46,7 @@ import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.utils.db.Table;
+import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
@@ -81,6 +82,8 @@ public final class OMMetadataManagerTestUtils {
     OzoneConfiguration omConfiguration = new OzoneConfiguration();
     omConfiguration.set(OZONE_OM_DB_DIRS,
         omDbDir.getAbsolutePath());
+    omConfiguration.set(OMConfigKeys
+        .OZONE_OM_ENABLE_FILESYSTEM_PATHS, "true");
     OMMetadataManager omMetadataManager = new OmMetadataManagerImpl(
         omConfiguration, null);
 
