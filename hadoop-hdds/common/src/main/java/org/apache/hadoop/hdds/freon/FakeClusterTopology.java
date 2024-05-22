@@ -18,7 +18,6 @@
 package org.apache.hadoop.hdds.freon;
 
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 import java.util.Random;
 import java.util.UUID;
@@ -44,13 +43,15 @@ public final class FakeClusterTopology {
 
   public static final FakeClusterTopology INSTANCE = new FakeClusterTopology();
 
-  private final List<DatanodeDetailsProto> datanodes = new ArrayList<>();
+  private final List<DatanodeDetailsProto> datanodes;
 
   private final List<Pipeline> pipelines = new ArrayList<>();
 
   private final Random random = new Random();
 
-  private FakeClusterTopology() {
+  private FakeClusterTopology newFakeClusterTopology() {
+    final List<DatanodeDetailsProto> datanodes = new ArrayList<>();
+    final List<Pipeline> pipelines = new ArrayList<>();
     try {
       for (int i = 0; i < 9; i++) {
         datanodes.add(createDatanode());
@@ -59,15 +60,16 @@ public final class FakeClusterTopology {
               .setId(PipelineID.randomId().getProtobuf())
               .setFactor(ReplicationFactor.THREE)
               .setType(ReplicationType.RATIS)
-              .addMembers(getDatanode(i - 2))
-              .addMembers(getDatanode(i - 1))
-              .addMembers(getDatanode(i))
+              .addMembers(datanodes.get(i - 2))
+              .addMembers(datanodes.get(i - 1))
+              .addMembers(datanodes.get(i))
               .build());
         }
       }
     } catch (Exception ex) {
       LOGGER.error("Can't initialize FakeClusterTopology", ex);
     }
+
   }
 
   private DatanodeDetailsProto createDatanode() {
@@ -80,15 +82,11 @@ public final class FakeClusterTopology {
         .build();
   }
 
-  public DatanodeDetailsProto getDatanode(int i) {
-    return datanodes.get(i);
-  }
-
   public Pipeline getRandomPipeline() {
     return pipelines.get(random.nextInt(pipelines.size()));
   }
 
   public Iterable<DatanodeDetailsProto> getAllDatanodes() {
-    return Collections.unmodifiableList(datanodes);
+    return datanodes;
   }
 }
