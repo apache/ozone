@@ -68,7 +68,6 @@ import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
-import java.util.HashMap;
 import java.util.Set;
 
 import static org.apache.hadoop.ozone.OzoneConsts.ETAG;
@@ -280,7 +279,6 @@ public class BucketEndpoint extends EndpointBase {
     getMetrics().incListKeyCount(keyCount);
     perf.appendCount(keyCount);
     perf.appendOpLatencyNanos(opLatencyNs);
-    LOG.info("tej S3G get op: " + response.getKeyCount() + " " + bucketName + " -" + prefix + "- " + startAfter + "--");
     AUDIT.logReadSuccess(buildAuditMessageForSuccess(s3GAction,
         getAuditParameters(), perf));
     response.setKeyCount(keyCount);
@@ -448,7 +446,7 @@ public class BucketEndpoint extends EndpointBase {
 
     OzoneBucket bucket = getBucket(bucketName);
     MultiDeleteResponse result = new MultiDeleteResponse();
-    Map<String, String> undeletedKeyResultMap = new HashMap<>();
+    Map<String, String> undeletedKeyResultMap;
 
     if (request.getObjects() != null) {
       List<String> deleteKeys = new ArrayList<>();
@@ -459,8 +457,8 @@ public class BucketEndpoint extends EndpointBase {
       try {
         undeletedKeyResultMap = bucket.deleteKeysQuiet(deleteKeys, true);
         for (DeleteObject d : request.getObjects()) {
-          if (!(undeletedKeyResultMap.containsKey(d.getKey())) ||
-              undeletedKeyResultMap.get(d.getKey()).equals("Key not found")) {
+          if (!request.isQuiet() && (!(undeletedKeyResultMap.containsKey(d.getKey())) ||
+              undeletedKeyResultMap.get(d.getKey()).equals("Key not found"))) {
             result.addDeleted(new DeletedObject(d.getKey()));
           } else {
             String error = undeletedKeyResultMap.get(d.getKey());
@@ -469,7 +467,7 @@ public class BucketEndpoint extends EndpointBase {
         }
         getMetrics().updateDeleteKeySuccessStats(startNanos);
       } catch (IOException ex) {
-        LOG.error("tej delete key failed: {}", ex.getMessage());
+        LOG.error("Delete key failed: {}", ex.getMessage());
         getMetrics().updateDeleteKeyFailureStats(startNanos);
         result.addError(
             new Error("ALL", "InternalError",
