@@ -268,10 +268,9 @@ public class LeaseManager<T> {
             long remainingTime = lease.getRemainingTime();
             if (remainingTime <= 0) {
               //Lease has timed out
-              List<Callable<Void>> leaseCallbacks = lease.getCallbacks();
               release(resource);
               executorService.execute(
-                  new LeaseCallbackExecutor<>(resource, leaseCallbacks));
+                  new LeaseCallbackExecutor<>(resource, lease.getCallback()));
             } else {
               sleepTime = Math.min(remainingTime, sleepTime);
             }
