@@ -51,7 +51,7 @@ public final class OzoneQuota {
 
     private static List<RawQuotaInBytes> createCache(Units unit) {
       final List<RawQuotaInBytes> quotas = new ArrayList<>(1024);
-      for(int i = 0; i < 1024; i++) {
+      for (int i = 0; i < 1024; i++) {
         quotas.add(new RawQuotaInBytes(unit, i));
       }
       return Collections.unmodifiableList(quotas);
@@ -61,9 +61,9 @@ public final class OzoneQuota {
       return size;
     }
 
-    RawQuotaInBytes getRawQuotaInBytes(long size) {
-      return size < cache.size()? cache.get(Math.toIntExact(size))
-          : new RawQuotaInBytes(this, size);
+    RawQuotaInBytes getRawQuotaInBytes(long b) {
+      return b < cache.size() ? cache.get(Math.toIntExact(b))
+          : new RawQuotaInBytes(this, b);
     }
   }
 
@@ -80,7 +80,7 @@ public final class OzoneQuota {
     static RawQuotaInBytes valueOf(long quotaInBytes) {
       final int i = Long.numberOfTrailingZeros(quotaInBytes) / 10;
       final Units unit = Units.values()[i];
-      final RawQuotaInBytes b = unit.getRawQuotaInBytes(quotaInBytes >> (i *10));
+      final RawQuotaInBytes b = unit.getRawQuotaInBytes(quotaInBytes >> (i * 10));
       Preconditions.assertSame(quotaInBytes, b.sizeInBytes(), "sizeInBytes");
       return b;
     }
