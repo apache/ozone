@@ -21,26 +21,12 @@ import org.apache.hadoop.hdds.cli.GenericCli;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.cli.OzoneAdmin;
 import org.apache.hadoop.hdds.cli.SubcommandWithParent;
-import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.ipc.ProtobufRpcEngine;
-import org.apache.hadoop.ipc.RPC;
-import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.admin.ratis.group.GroupCommand;
-import org.apache.hadoop.ozone.client.OzoneClientException;
-import org.apache.hadoop.ozone.om.protocolPB.Hadoop3OmTransportFactory;
-import org.apache.hadoop.ozone.om.protocolPB.OmTransport;
-import org.apache.hadoop.ozone.om.protocolPB.OzoneManagerProtocolClientSideTranslatorPB;
-import org.apache.hadoop.ozone.om.protocolPB.OzoneManagerProtocolPB;
-import org.apache.ratis.protocol.ClientId;
 import org.kohsuke.MetaInfServices;
 import picocli.CommandLine;
 import picocli.CommandLine.Model.CommandSpec;
 import picocli.CommandLine.Spec;
 
-import java.util.Collection;
-
-import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ADDRESS_KEY;
-import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SERVICE_IDS_KEY;
 
 /**
  * Subcommand for ratis operations.
