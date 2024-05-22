@@ -19,10 +19,7 @@ package org.apache.hadoop.ozone.om.protocolPB;
 
 import java.io.IOException;
 import java.time.Instant;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
-import java.util.UUID;
+import java.util.*;
 import java.util.stream.Collectors;
 
 import com.google.protobuf.Proto2Utils;
@@ -949,6 +946,18 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
    */
   @Override
   public void deleteKeys(OmDeleteKeys deleteKeys) throws IOException {
+    deleteKeysQuiet(deleteKeys, false);
+  }
+
+  /**
+   * Deletes existing key/keys. This interface supports delete
+   * multiple keys and a single key.
+   *
+   * @param deleteKeys
+   * @throws IOException
+   */
+  @Override
+  public Map<String, String> deleteKeysQuiet(OmDeleteKeys deleteKeys, Boolean isQuiet) throws IOException {
     DeleteKeysRequest.Builder req = DeleteKeysRequest.newBuilder();
     DeleteKeyArgs deletedKeys = DeleteKeyArgs.newBuilder()
         .setBucketName(deleteKeys.getBucket())
@@ -958,9 +967,18 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
     OMRequest omRequest = createOMRequest(Type.DeleteKeys)
         .setDeleteKeysRequest(req)
         .build();
+    OMResponse omResponse = submitRequest(omRequest);
 
-    handleError(submitRequest(omRequest));
-
+    if (!isQuiet) {
+      handleError(omResponse);
+    }
+    List<OzoneManagerProtocolProtos.DeleteKeyErrors> deleteKeyErrors =
+        omResponse.getDeleteKeysResponse().getDeleteKeyErrorsList();
+    Map<String, String> keyToErrors = new HashMap<>();
+    for (OzoneManagerProtocolProtos.DeleteKeyErrors deleteKeyError : deleteKeyErrors) {
+      keyToErrors.put(deleteKeyError.getKey(), deleteKeyError.getError());
+    }
+    return keyToErrors;
   }
 
   /**

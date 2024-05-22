@@ -57,6 +57,7 @@ import org.apache.hadoop.security.token.Token;
 import java.io.IOException;
 import java.net.URI;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -248,6 +249,12 @@ public class ClientProtocolStub implements ClientProtocol {
   public void deleteKeys(String volumeName, String bucketName,
                          List<String> keyNameList) throws IOException {
 
+  }
+
+  @Override
+  public Map<String, String> deleteKeysQuiet(String volumeName, String bucketName,
+                         List<String> keyNameList, Boolean isQuiet) throws IOException {
+    return new HashMap<>();
   }
 
   @Override

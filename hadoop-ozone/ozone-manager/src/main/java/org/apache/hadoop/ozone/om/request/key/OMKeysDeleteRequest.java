@@ -57,6 +57,7 @@ import org.slf4j.LoggerFactory;
 import java.io.IOException;
 import java.nio.file.InvalidPathException;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -95,6 +96,7 @@ public class OMKeysDeleteRequest extends OMKeyRequest {
     Exception exception = null;
     OMClientResponse omClientResponse = null;
     Result result = null;
+    Map<String, String> keyToError = new HashMap<>();
 
     OMMetrics omMetrics = ozoneManager.getMetrics();
     omMetrics.incNumKeyDeletes();
@@ -150,6 +152,7 @@ public class OMKeysDeleteRequest extends OMKeyRequest {
               objectKey);
           deleteKeys.remove(keyName);
           unDeletedKeys.addKeys(keyName);
+          keyToError.put(keyName, "Key not found");
           continue;
         }
 
@@ -167,6 +170,7 @@ public class OMKeysDeleteRequest extends OMKeyRequest {
           LOG.error("Acl check failed for Key: {}", objectKey, ex);
           deleteKeys.remove(keyName);
           unDeletedKeys.addKeys(keyName);
+          keyToError.put(keyName, "Access denied");
         }
       }
 
@@ -185,7 +189,7 @@ public class OMKeysDeleteRequest extends OMKeyRequest {
       final long volumeId = omMetadataManager.getVolumeId(volumeName);
       omClientResponse =
           getOmClientResponse(ozoneManager, omKeyInfoList, dirList, omResponse,
-              unDeletedKeys, deleteStatus, omBucketInfo, volumeId, dbOpenKeys);
+              unDeletedKeys, keyToError, deleteStatus, omBucketInfo, volumeId, dbOpenKeys);
 
       result = Result.SUCCESS;
 
@@ -199,6 +203,7 @@ public class OMKeysDeleteRequest extends OMKeyRequest {
       // Add all keys which are failed due to any other exception .
       for (int i = indexFailed; i < length; i++) {
         unDeletedKeys.addKeys(deleteKeyArgs.getKeys(i));
+        keyToError.put(deleteKeyArgs.getKeys(i), "Internal error");
       }
 
       omResponse.setDeleteKeysResponse(
@@ -260,12 +265,18 @@ public class OMKeysDeleteRequest extends OMKeyRequest {
       List<OmKeyInfo> omKeyInfoList, List<OmKeyInfo> dirList,
       OMResponse.Builder omResponse,
       OzoneManagerProtocolProtos.DeleteKeyArgs.Builder unDeletedKeys,
+      Map<String, String> keyToErrors,
       boolean deleteStatus, OmBucketInfo omBucketInfo, long volumeId, List<String> dbOpenKeys) {
     OMClientResponse omClientResponse;
+    List<OzoneManagerProtocolProtos.DeleteKeyErrors> deleteKeyErrors = new ArrayList<>();
+    for (Map.Entry<String, String>  key : keyToErrors.entrySet()) {
+      deleteKeyErrors.add(OzoneManagerProtocolProtos.DeleteKeyErrors.newBuilder()
+          .setKey(key.getKey()).setError(key.getValue()).build());
+    }
     omClientResponse = new OMKeysDeleteResponse(omResponse
         .setDeleteKeysResponse(
             DeleteKeysResponse.newBuilder().setStatus(deleteStatus)
-                .setUnDeletedKeys(unDeletedKeys))
+                .setUnDeletedKeys(unDeletedKeys).addAllDeleteKeyErrors(deleteKeyErrors))
         .setStatus(deleteStatus ? OK : PARTIAL_DELETE).setSuccess(deleteStatus)
         .build(), omKeyInfoList, ozoneManager.isRatisEnabled(),
         omBucketInfo.copyObject(), dbOpenKeys);

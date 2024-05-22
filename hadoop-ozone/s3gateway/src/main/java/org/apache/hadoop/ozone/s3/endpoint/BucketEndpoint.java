@@ -67,6 +67,8 @@ import java.util.EnumSet;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Map;
+import java.util.HashMap;
 import java.util.Set;
 
 import static org.apache.hadoop.ozone.OzoneConsts.ETAG;
@@ -278,6 +280,7 @@ public class BucketEndpoint extends EndpointBase {
     getMetrics().incListKeyCount(keyCount);
     perf.appendCount(keyCount);
     perf.appendOpLatencyNanos(opLatencyNs);
+    LOG.info("tej S3G get op: " + response.getKeyCount() + " " + bucketName + " -" + prefix + "- " + startAfter + "--");
     AUDIT.logReadSuccess(buildAuditMessageForSuccess(s3GAction,
         getAuditParameters(), perf));
     response.setKeyCount(keyCount);
@@ -445,47 +448,47 @@ public class BucketEndpoint extends EndpointBase {
 
     OzoneBucket bucket = getBucket(bucketName);
     MultiDeleteResponse result = new MultiDeleteResponse();
-    if (request.getObjects() != null) {
-      for (DeleteObject keyToDelete : request.getObjects()) {
-        long startNanos = Time.monotonicNowNanos();
-        try {
-          bucket.deleteKey(keyToDelete.getKey());
-          getMetrics().updateDeleteKeySuccessStats(startNanos);
+    Map<String, String> undeletedKeyResultMap = new HashMap<>();
 
-          if (!request.isQuiet()) {
-            result.addDeleted(new DeletedObject(keyToDelete.getKey()));
-          }
-        } catch (OMException ex) {
-          if (isAccessDenied(ex)) {
-            getMetrics().updateDeleteKeyFailureStats(startNanos);
-            result.addError(
-                new Error(keyToDelete.getKey(), "PermissionDenied",
-                    ex.getMessage()));
-          } else if (ex.getResult() != ResultCodes.KEY_NOT_FOUND) {
-            getMetrics().updateDeleteKeyFailureStats(startNanos);
-            result.addError(
-                new Error(keyToDelete.getKey(), "InternalError",
-                    ex.getMessage()));
+    if (request.getObjects() != null) {
+      List<String> deleteKeys = new ArrayList<>();
+      for (DeleteObject keyToDelete : request.getObjects()) {
+        deleteKeys.add(keyToDelete.getKey());
+      }
+      long startNanos = Time.monotonicNowNanos();
+      try {
+        undeletedKeyResultMap = bucket.deleteKeysQuiet(deleteKeys, true);
+        for (DeleteObject d : request.getObjects()) {
+          if (!(undeletedKeyResultMap.containsKey(d.getKey())) ||
+              undeletedKeyResultMap.get(d.getKey()).equals("Key not found")) {
+            result.addDeleted(new DeletedObject(d.getKey()));
           } else {
-            if (!request.isQuiet()) {
-              result.addDeleted(new DeletedObject(keyToDelete.getKey()));
-            }
-            getMetrics().updateDeleteKeySuccessStats(startNanos);
+            String error = undeletedKeyResultMap.get(d.getKey());
+            result.addError(new Error(d.getKey(), error, error));
           }
-        } catch (Exception ex) {
-          getMetrics().updateDeleteKeyFailureStats(startNanos);
-          result.addError(
-              new Error(keyToDelete.getKey(), "InternalError",
-                  ex.getMessage()));
         }
+        getMetrics().updateDeleteKeySuccessStats(startNanos);
+      } catch (IOException ex) {
+        LOG.error("tej delete key failed: {}", ex.getMessage());
+        getMetrics().updateDeleteKeyFailureStats(startNanos);
+        result.addError(
+            new Error("ALL", "InternalError",
+                ex.getMessage()));
       }
     }
+
+    Map<String, String> auditMap = getAuditParameters();
+    List<String> keys = new ArrayList<>();
+    for (DeleteObject d : request.getObjects()) {
+      keys.add(d.getKey());
+    }
+    auditMap.put("Keys", keys.toString());
     if (result.getErrors().size() != 0) {
       AUDIT.logWriteFailure(buildAuditMessageForFailure(s3GAction,
-          getAuditParameters(), new Exception("MultiDelete Exception")));
+          auditMap, new Exception("MultiDelete Exception")));
     } else {
       AUDIT.logWriteSuccess(
-          buildAuditMessageForSuccess(s3GAction, getAuditParameters()));
+          buildAuditMessageForSuccess(s3GAction, auditMap));
     }
     return result;
   }

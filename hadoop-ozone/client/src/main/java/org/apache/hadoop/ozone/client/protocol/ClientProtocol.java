@@ -405,6 +405,18 @@ public interface ClientProtocol {
       throws IOException;
 
   /**
+   * Deletes keys through the list.
+   * @param volumeName Name of the Volume
+   * @param bucketName Name of the Bucket
+   * @param keyNameList List of the Key
+   * @param isQuiet flag to not throw exception if delete fails
+   * @throws IOException
+   */
+  Map<String, String> deleteKeysQuiet(String volumeName, String bucketName,
+                  List<String> keyNameList, Boolean isQuiet)
+      throws IOException;
+
+  /**
    * Renames an existing key within a bucket.
    * @param volumeName Name of the Volume
    * @param bucketName Name of the Bucket

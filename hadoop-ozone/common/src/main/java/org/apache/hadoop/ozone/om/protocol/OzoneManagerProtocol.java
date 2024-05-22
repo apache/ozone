@@ -21,6 +21,7 @@ package org.apache.hadoop.ozone.om.protocol;
 import java.io.Closeable;
 import java.io.IOException;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 import jakarta.annotation.Nonnull;
@@ -355,6 +356,20 @@ public interface OzoneManagerProtocol
    * @throws IOException
    */
   default void deleteKeys(OmDeleteKeys deleteKeys) throws IOException {
+    throw new UnsupportedOperationException("OzoneManager does not require " +
+        "this to be implemented, as write requests use a new approach.");
+  }
+
+  /**
+   * Deletes existing key/keys. This interface supports delete
+   * multiple keys and a single key. Used by deleting files
+   * through OzoneFileSystem.
+   *
+   * @param deleteKeys
+   * @param isQuiet - flag to not throw exception if delete fails
+   * @throws IOException
+   */
+  default Map<String, String> deleteKeysQuiet(OmDeleteKeys deleteKeys, Boolean isQuiet) throws IOException {
     throw new UnsupportedOperationException("OzoneManager does not require " +
         "this to be implemented, as write requests use a new approach.");
   }

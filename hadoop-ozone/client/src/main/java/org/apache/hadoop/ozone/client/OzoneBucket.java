@@ -636,6 +636,16 @@ public class OzoneBucket extends WithMetadata {
   }
 
   /**
+   * Deletes the given list of keys from the bucket.
+   * @param keyList List of the key name to be deleted.
+   * @param isQuiet flag to not throw exception if delete fails
+   * @throws IOException
+   */
+  public Map<String, String> deleteKeysQuiet(List<String> keyList, Boolean isQuiet) throws IOException {
+    return proxy.deleteKeysQuiet(volumeName, name, keyList, isQuiet);
+  }
+
+  /**
    * Rename the keyname from fromKeyName to toKeyName.
    * @param fromKeyName The original key name.
    * @param toKeyName New key name.

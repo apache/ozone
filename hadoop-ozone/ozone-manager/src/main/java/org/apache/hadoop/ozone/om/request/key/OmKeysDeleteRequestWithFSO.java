@@ -36,7 +36,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status.OK;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status.PARTIAL_DELETE;
@@ -146,12 +148,18 @@ public class OmKeysDeleteRequestWithFSO extends OMKeysDeleteRequest {
       List<OmKeyInfo> omKeyInfoList, List<OmKeyInfo> dirList,
       OzoneManagerProtocolProtos.OMResponse.Builder omResponse,
       OzoneManagerProtocolProtos.DeleteKeyArgs.Builder unDeletedKeys,
+      Map<String, String> keyToErrors,
       boolean deleteStatus, OmBucketInfo omBucketInfo, long volumeId, List<String> dbOpenKeys) {
     OMClientResponse omClientResponse;
+    List<OzoneManagerProtocolProtos.DeleteKeyErrors> deleteKeyErrors = new ArrayList<>();
+    for (Map.Entry<String, String>  key : keyToErrors.entrySet()) {
+      deleteKeyErrors.add(OzoneManagerProtocolProtos.DeleteKeyErrors.newBuilder()
+          .setKey(key.getKey()).setError(key.getValue()).build());
+    }
     omClientResponse = new OMKeysDeleteResponseWithFSO(omResponse
         .setDeleteKeysResponse(
             OzoneManagerProtocolProtos.DeleteKeysResponse.newBuilder()
-                .setStatus(deleteStatus).setUnDeletedKeys(unDeletedKeys))
+                .setStatus(deleteStatus).setUnDeletedKeys(unDeletedKeys).addAllDeleteKeyErrors(deleteKeyErrors))
         .setStatus(deleteStatus ? OK : PARTIAL_DELETE).setSuccess(deleteStatus)
         .build(), omKeyInfoList, dirList, ozoneManager.isRatisEnabled(),
         omBucketInfo.copyObject(), volumeId, dbOpenKeys);
