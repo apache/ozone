@@ -32,6 +32,7 @@ import org.apache.hadoop.metrics2.lib.MetricsRegistry;
 import org.apache.hadoop.metrics2.lib.MutableCounterLong;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.util.PerformanceMetrics;
+import org.apache.hadoop.util.PerformanceMetricsInitializer;
 
 /**
  * The client metrics for the Storage Container protocol.
@@ -75,7 +76,7 @@ public class XceiverClientMetrics implements MetricsSource {
               "number of" + ContainerProtos.Type.forNumber(i + 1) + " ops",
               (long) 0);
       containerOpsLatency[i] =
-          new PerformanceMetrics(registry,
+          PerformanceMetricsInitializer.getMetrics(registry,
               ContainerProtos.Type.forNumber(i + 1) + "Latency",
               "latency of " + ContainerProtos.Type.forNumber(i + 1),
               "Ops", "Time", intervals);
