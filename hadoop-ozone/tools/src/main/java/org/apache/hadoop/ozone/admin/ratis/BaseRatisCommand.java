@@ -49,7 +49,9 @@ import static org.apache.ratis.shell.cli.RaftUtils.buildRaftPeersFromStr;
 import static org.apache.ratis.shell.cli.RaftUtils.retrieveGroupInfoByGroupId;
 import static org.apache.ratis.shell.cli.RaftUtils.retrieveRemoteGroupId;
 
-
+/**
+ * The base class for all the ratis command.
+ */
 public class BaseRatisCommand {
   private RaftGroup raftGroup;
   private GroupInfoReply groupInfoReply;

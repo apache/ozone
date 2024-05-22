@@ -8,7 +8,7 @@ import org.kohsuke.MetaInfServices;
 import picocli.CommandLine;
 
 /**
- * Subcommand for admin operations related to OM.
+ * Subcommand for ratis.
  */
 @CommandLine.Command(
     name = "group",
