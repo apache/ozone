@@ -50,6 +50,7 @@ import org.apache.hadoop.hdds.scm.StreamBufferArgs;
 import org.apache.hadoop.hdds.scm.XceiverClientFactory;
 import org.apache.hadoop.hdds.scm.XceiverClientManager;
 import org.apache.hadoop.hdds.scm.client.ClientTrustManager;
+import org.apache.hadoop.hdds.scm.storage.ByteBufferStreamOutput;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CACertificateProvider;
 import org.apache.hadoop.hdds.scm.client.HddsClientUtils;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
@@ -1834,11 +1835,16 @@ public class RpcClient implements ClientProtocol {
       long size, int partNumber, String uploadID) throws IOException {
     final OpenKeySession openKey = newMultipartOpenKey(
         volumeName, bucketName, keyName, size, partNumber, uploadID, false);
+    return createMultipartOutputStream(openKey, uploadID, partNumber);
+  }
+
+  private OzoneOutputStream createMultipartOutputStream(
+      OpenKeySession openKey, String uploadID, int partNumber
+  ) throws IOException {
     KeyOutputStream keyOutputStream = createKeyOutputStream(openKey)
         .setMultipartNumber(partNumber)
         .setMultipartUploadID(uploadID)
         .setIsMultipartKey(true)
-        .setAtomicKeyCreation(isS3GRequest.get())
         .build();
     return createOutputStream(openKey, keyOutputStream);
   }
@@ -1854,29 +1860,25 @@ public class RpcClient implements ClientProtocol {
       throws IOException {
     final OpenKeySession openKey = newMultipartOpenKey(
         volumeName, bucketName, keyName, size, partNumber, uploadID, true);
-    // Amazon S3 never adds partial objects, So for S3 requests we need to
-    // set atomicKeyCreation to true
-    // refer: https://docs.aws.amazon.com/AmazonS3/latest/API/API_PutObject.html
-    KeyDataStreamOutput keyOutputStream =
-        new KeyDataStreamOutput.Builder()
-            .setHandler(openKey)
-            .setXceiverClientManager(xceiverClientManager)
-            .setOmClient(ozoneManagerClient)
-            .setReplicationConfig(openKey.getKeyInfo().getReplicationConfig())
-            .setMultipartNumber(partNumber)
-            .setMultipartUploadID(uploadID)
-            .setIsMultipartKey(true)
-            .enableUnsafeByteBufferConversion(unsafeByteBufferConversion)
-            .setConfig(clientConfig)
-            .setAtomicKeyCreation(isS3GRequest.get())
-            .build();
-    keyOutputStream
-        .addPreallocateBlocks(
-            openKey.getKeyInfo().getLatestVersionLocations(),
-            openKey.getOpenVersion());
-    final OzoneOutputStream out = createSecureOutputStream(
-        openKey, keyOutputStream, null);
-    return new OzoneDataStreamOutput(out != null ? out : keyOutputStream);
+    final ByteBufferStreamOutput out;
+    ReplicationConfig replicationConfig = openKey.getKeyInfo().getReplicationConfig();
+    if (replicationConfig.getReplicationType() == HddsProtos.ReplicationType.RATIS) {
+      KeyDataStreamOutput keyOutputStream = newKeyOutputStreamBuilder()
+          .setHandler(openKey)
+          .setReplicationConfig(replicationConfig)
+          .setMultipartNumber(partNumber)
+          .setMultipartUploadID(uploadID)
+          .setIsMultipartKey(true)
+          .build();
+      keyOutputStream.addPreallocateBlocks(
+          openKey.getKeyInfo().getLatestVersionLocations(),
+          openKey.getOpenVersion());
+      final OzoneOutputStream secureOut = createSecureOutputStream(openKey, keyOutputStream, null);
+      out = secureOut != null ? secureOut : keyOutputStream;
+    } else {
+      out = createMultipartOutputStream(openKey, uploadID, partNumber);
+    }
+    return new OzoneDataStreamOutput(out);
   }
 
   @Override
@@ -2270,25 +2272,33 @@ public class RpcClient implements ClientProtocol {
       throws IOException {
     final ReplicationConfig replicationConfig
         = openKey.getKeyInfo().getReplicationConfig();
+    final ByteBufferStreamOutput out;
+    if (replicationConfig.getReplicationType() == HddsProtos.ReplicationType.RATIS) {
+      KeyDataStreamOutput keyOutputStream = newKeyOutputStreamBuilder()
+          .setHandler(openKey)
+          .setReplicationConfig(replicationConfig)
+          .build();
+      keyOutputStream.addPreallocateBlocks(
+          openKey.getKeyInfo().getLatestVersionLocations(),
+          openKey.getOpenVersion());
+      final OzoneOutputStream secureOut = createSecureOutputStream(openKey, keyOutputStream, null);
+      out = secureOut != null ? secureOut : keyOutputStream;
+    } else {
+      out = createOutputStream(openKey);
+    }
+    return new OzoneDataStreamOutput(out);
+  }
+
+  private KeyDataStreamOutput.Builder newKeyOutputStreamBuilder() {
     // Amazon S3 never adds partial objects, So for S3 requests we need to
     // set atomicKeyCreation to true
     // refer: https://docs.aws.amazon.com/AmazonS3/latest/API/API_PutObject.html
-    KeyDataStreamOutput keyOutputStream =
-        new KeyDataStreamOutput.Builder()
-            .setHandler(openKey)
-            .setXceiverClientManager(xceiverClientManager)
-            .setOmClient(ozoneManagerClient)
-            .setReplicationConfig(replicationConfig)
-            .enableUnsafeByteBufferConversion(unsafeByteBufferConversion)
-            .setConfig(clientConfig)
-            .setAtomicKeyCreation(isS3GRequest.get())
-            .build();
-    keyOutputStream
-        .addPreallocateBlocks(openKey.getKeyInfo().getLatestVersionLocations(),
-            openKey.getOpenVersion());
-    final OzoneOutputStream out = createSecureOutputStream(
-        openKey, keyOutputStream, null);
-    return new OzoneDataStreamOutput(out != null ? out : keyOutputStream);
+    return new KeyDataStreamOutput.Builder()
+        .setXceiverClientManager(xceiverClientManager)
+        .setOmClient(ozoneManagerClient)
+        .enableUnsafeByteBufferConversion(unsafeByteBufferConversion)
+        .setConfig(clientConfig)
+        .setAtomicKeyCreation(isS3GRequest.get());
   }
 
   private OzoneOutputStream createOutputStream(OpenKeySession openKey)

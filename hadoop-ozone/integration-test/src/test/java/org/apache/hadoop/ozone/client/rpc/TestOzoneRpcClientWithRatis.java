@@ -28,6 +28,7 @@ import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.Locale;
 import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ThreadLocalRandom;
@@ -65,6 +66,8 @@ import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.MethodSource;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.hdds.client.ReplicationFactor.ONE;
@@ -183,12 +186,13 @@ public class TestOzoneRpcClientWithRatis extends TestOzoneRpcClientAbstract {
     }
   }
 
-  @Test
-  public void testMultiPartUploadWithStream()
+  @ParameterizedTest
+  @MethodSource("replicationConfigs")
+  void testMultiPartUploadWithStream(ReplicationConfig replicationConfig)
       throws IOException, NoSuchAlgorithmException {
     String volumeName = UUID.randomUUID().toString();
-    String bucketName = UUID.randomUUID().toString();
-    String keyName = UUID.randomUUID().toString();
+    String bucketName = replicationConfig.getReplicationType().name().toLowerCase(Locale.ROOT) + "-bucket";
+    String keyName = replicationConfig.getReplication();
 
     byte[] sampleData = new byte[1024 * 8];
 
@@ -198,11 +202,6 @@ public class TestOzoneRpcClientWithRatis extends TestOzoneRpcClientAbstract {
     OzoneVolume volume = getStore().getVolume(volumeName);
     volume.createBucket(bucketName);
     OzoneBucket bucket = volume.getBucket(bucketName);
-
-    ReplicationConfig replicationConfig =
-        ReplicationConfig.fromTypeAndFactor(
-            ReplicationType.RATIS,
-            THREE);
 
     OmMultipartInfo multipartInfo = bucket.initiateMultipartUpload(keyName,
         replicationConfig);
@@ -226,7 +225,7 @@ public class TestOzoneRpcClientWithRatis extends TestOzoneRpcClientAbstract {
     OzoneMultipartUploadPartListParts parts =
         bucket.listParts(keyName, uploadID, 0, 1);
 
-    Assert.assertEquals(parts.getPartInfoList().size(), 1);
+    Assert.assertEquals(1, parts.getPartInfoList().size());
 
     OzoneMultipartUploadPartListParts.PartInfo partInfo =
         parts.getPartInfoList().get(0);
