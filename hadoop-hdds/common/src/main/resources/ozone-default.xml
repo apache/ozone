@@ -126,9 +126,8 @@
     </description>
   </property>
   <property>
-    <name>hdds.container.ratis.log.appender.queue.num-elements
-</name>
-    <value>1</value>
+    <name>hdds.container.ratis.log.appender.queue.num-elements</name>
+    <value>1024</value>
     <tag>OZONE, DEBUG, CONTAINER, RATIS</tag>
     <description>Limit for number of append entries in ratis leader's
       log appender queue.
