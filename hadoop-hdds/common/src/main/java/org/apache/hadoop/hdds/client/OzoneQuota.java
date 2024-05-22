@@ -40,7 +40,9 @@ public final class OzoneQuota {
     KB(OzoneConsts.KB),
     MB(OzoneConsts.MB),
     GB(OzoneConsts.GB),
-    TB(OzoneConsts.TB);
+    TB(OzoneConsts.TB),
+    PB(OzoneConsts.PB),
+    EB(OzoneConsts.EB);
 
     private final long size;
     private final List<RawQuotaInBytes> cache;
@@ -86,6 +88,7 @@ public final class OzoneQuota {
    */
   private static class RawQuotaInBytes {
     static RawQuotaInBytes valueOf(long quotaInBytes) {
+      Preconditions.assertTrue(quotaInBytes >= 0, () -> "quotaInBytes = " + quotaInBytes + " must be >= 0");
       final int i = Long.numberOfTrailingZeros(quotaInBytes) / 10;
       final Units unit = Units.values()[i];
       final RawQuotaInBytes b = unit.getRawQuotaInBytes(quotaInBytes >> (i * 10));
