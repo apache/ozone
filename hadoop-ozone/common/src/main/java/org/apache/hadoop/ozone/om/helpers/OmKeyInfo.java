@@ -55,7 +55,7 @@ import org.slf4j.LoggerFactory;
  * datanode. Also, this is the metadata written to om.db on server side.
  */
 public final class OmKeyInfo extends WithParentObjectId
-    implements CopyObject<OmKeyInfo> {
+    implements CopyObject<OmKeyInfo>, WithTags {
   private static final Logger LOG = LoggerFactory.getLogger(OmKeyInfo.class);
 
   private static final Codec<OmKeyInfo> CODEC_TRUE = newCodec(true);
@@ -102,6 +102,11 @@ public final class OmKeyInfo extends WithParentObjectId
    */
   private final CopyOnWriteArrayList<OzoneAcl> acls;
 
+  /**
+   * Used for S3 tags.
+   */
+  private Map<String, String> tags;
+
   private OmKeyInfo(Builder b) {
     super(b);
     this.volumeName = b.volumeName;
@@ -118,6 +123,7 @@ public final class OmKeyInfo extends WithParentObjectId
     this.fileName = b.fileName;
     this.isFile = b.isFile;
     this.ownerName = b.ownerName;
+    this.tags = b.tags;
   }
 
   public String getVolumeName() {
@@ -188,6 +194,16 @@ public final class OmKeyInfo extends WithParentObjectId
 
   public boolean isHsync() {
     return getMetadata().containsKey(OzoneConsts.HSYNC_CLIENT_ID);
+  }
+
+  @Override
+  public Map<String, String> getTags() {
+    return tags;
+  }
+
+  @Override
+  public void setTags(Map<String, String> tags) {
+    this.tags = tags;
   }
 
   /**
@@ -435,6 +451,7 @@ public final class OmKeyInfo extends WithParentObjectId
     private FileChecksum fileChecksum;
 
     private boolean isFile;
+    private final Map<String, String> tags = new HashMap<>();
 
     public Builder() {
     }
@@ -563,6 +580,16 @@ public final class OmKeyInfo extends WithParentObjectId
       return this;
     }
 
+    public Builder addTag(String key, String value) {
+      tags.put(key, value);
+      return this;
+    }
+
+    public Builder addAllTags(Map<String, String> keyTags) {
+      tags.putAll(keyTags);
+      return this;
+    }
+
     public OmKeyInfo build() {
       return new OmKeyInfo(this);
     }
@@ -649,6 +676,7 @@ public final class OmKeyInfo extends WithParentObjectId
         .setCreationTime(creationTime)
         .setModificationTime(modificationTime)
         .addAllMetadata(KeyValueUtil.toProtobuf(getMetadata()))
+        .addAllTags(KeyValueUtil.toProtobuf(getTags()))
         .addAllAcls(OzoneAclUtil.toProtobuf(acls))
         .setObjectID(getObjectID())
         .setUpdateID(getUpdateID())
@@ -696,6 +724,7 @@ public final class OmKeyInfo extends WithParentObjectId
             .fromProto(keyInfo.getType(), keyInfo.getFactor(),
                 keyInfo.getEcReplicationConfig()))
         .addAllMetadata(KeyValueUtil.getFromProtobuf(keyInfo.getMetadataList()))
+        .addAllTags(KeyValueUtil.getFromProtobuf(keyInfo.getTagsList()))
         .setFileEncryptionInfo(keyInfo.hasFileEncryptionInfo() ?
             OMPBHelper.convert(keyInfo.getFileEncryptionInfo()) : null)
         .setAcls(OzoneAclUtil.fromProtobuf(keyInfo.getAclsList()));
@@ -824,7 +853,11 @@ public final class OmKeyInfo extends WithParentObjectId
                 keyLocationVersion.isMultipartKey())));
 
     if (getMetadata() != null) {
-      getMetadata().forEach((k, v) -> builder.addMetadata(k, v));
+      getMetadata().forEach(builder::addMetadata);
+    }
+
+    if (getTags() != null) {
+      getTags().forEach(builder::addTag);
     }
 
     if (fileChecksum != null) {

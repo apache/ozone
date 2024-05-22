@@ -68,11 +68,15 @@ public class TestS3InitiateMultipartUploadRequestWithFSO
     customMetadata.put("custom-key1", "custom-value1");
     customMetadata.put("custom-key2", "custom-value2");
 
+    Map<String, String> tags = new HashMap<>();
+    tags.put("tag-key1", "tag-value1");
+    tags.put("tag-key2", "tag-value2");
+
     final long volumeId = omMetadataManager.getVolumeId(volumeName);
     final long bucketId = omMetadataManager.getBucketId(volumeName,
             bucketName);
     OMRequest modifiedRequest = doPreExecuteInitiateMPUWithFSO(volumeName,
-        bucketName, keyName, customMetadata);
+        bucketName, keyName, customMetadata, tags);
 
     S3InitiateMultipartUploadRequest s3InitiateMultipartUploadReqFSO =
         getS3InitiateMultipartUploadReq(modifiedRequest);
@@ -110,6 +114,9 @@ public class TestS3InitiateMultipartUploadRequestWithFSO
     assertNotNull(omKeyInfo.getMetadata());
     assertEquals("custom-value1", omKeyInfo.getMetadata().get("custom-key1"));
     assertEquals("custom-value2", omKeyInfo.getMetadata().get("custom-key2"));
+    assertNotNull(omKeyInfo.getTags());
+    assertEquals("tag-value1", omKeyInfo.getTags().get("tag-key1"));
+    assertEquals("tag-value2", omKeyInfo.getTags().get("tag-key2"));
 
     OmMultipartKeyInfo omMultipartKeyInfo = omMetadataManager
             .getMultipartInfoTable().get(multipartFileKey);

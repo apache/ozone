@@ -718,6 +718,10 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
       keyArgs.addAllMetadata(KeyValueUtil.toProtobuf(args.getMetadata()));
     }
 
+    if (args.getTags() != null && args.getTags().size() > 0) {
+      keyArgs.addAllTags(KeyValueUtil.toProtobuf(args.getTags()));
+    }
+
     if (args.getMultipartUploadID() != null) {
       keyArgs.setMultipartUploadID(args.getMultipartUploadID());
     }
@@ -1608,7 +1612,8 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
         .addAllMetadata(KeyValueUtil.toProtobuf(omKeyArgs.getMetadata()))
         .setOwnerName(omKeyArgs.getOwner())
         .addAllAcls(omKeyArgs.getAcls().stream().map(a ->
-            OzoneAcl.toProtobuf(a)).collect(Collectors.toList()));
+            OzoneAcl.toProtobuf(a)).collect(Collectors.toList()))
+        .addAllTags(KeyValueUtil.toProtobuf(omKeyArgs.getTags()));
 
     setReplicationConfig(omKeyArgs.getReplicationConfig(), keyArgs);
 

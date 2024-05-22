@@ -192,6 +192,7 @@ public class S3InitiateMultipartUploadRequestWithFSO
               OMPBHelper.convert(keyArgs.getFileEncryptionInfo()) : null)
           .setParentObjectID(pathInfoFSO.getLastKnownParentId())
           .addAllMetadata(KeyValueUtil.getFromProtobuf(keyArgs.getMetadataList()))
+          .addAllTags(KeyValueUtil.getFromProtobuf(keyArgs.getTagsList()))
           .build();
       
       // validate and update namespace for missing parent directory

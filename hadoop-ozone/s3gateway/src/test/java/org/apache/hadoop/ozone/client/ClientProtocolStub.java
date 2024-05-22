@@ -228,6 +228,16 @@ public class ClientProtocolStub implements ClientProtocol {
   }
 
   @Override
+  public OzoneOutputStream createKey(String volumeName, String bucketName,
+                                     String keyName, long size,
+                                     ReplicationConfig replicationConfig,
+                                     Map<String, String> metadata,
+                                     Map<String, String> tags) throws IOException {
+    return getBucket(volumeName, bucketName)
+        .createKey(keyName, size, replicationConfig, metadata, tags);
+  }
+
+  @Override
   public OzoneInputStream getKey(String volumeName, String bucketName,
                                  String keyName) throws IOException {
     return getBucket(volumeName, bucketName).readKey(keyName);
@@ -320,6 +330,14 @@ public class ClientProtocolStub implements ClientProtocol {
       throws IOException {
     return getBucket(volumeName, bucketName)
         .initiateMultipartUpload(keyName, replicationConfig, metadata);
+  }
+
+  @Override
+  public OmMultipartInfo initiateMultipartUpload(String volumeName,
+         String bucketName, String keyName, ReplicationConfig replicationConfig,
+         Map<String, String> metadata, Map<String, String> tags) throws IOException {
+    return getBucket(volumeName, bucketName)
+        .initiateMultipartUpload(keyName, replicationConfig, metadata, tags);
   }
 
   @Override
@@ -634,6 +652,14 @@ public class ClientProtocolStub implements ClientProtocol {
       String volumeName, String bucketName, String keyName, long size,
       ReplicationConfig replicationConfig, Map<String, String> metadata)
       throws IOException {
+    return null;
+  }
+
+  @Override
+  public OzoneDataStreamOutput createStreamKey(
+      String volumeName, String bucketName, String keyName, long size,
+      ReplicationConfig replicationConfig, Map<String, String> metadata,
+      Map<String, String> tags) throws IOException {
     return null;
   }
 
