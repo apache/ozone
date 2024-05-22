@@ -20,10 +20,13 @@ package org.apache.hadoop.ozone.om.helpers;
 import java.io.IOException;
 import java.util.Objects;
 
+import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.BasicKeyInfo;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ListKeysRequest;
+
+import static org.apache.hadoop.ozone.OzoneConsts.ETAG;
 
 /**
  * Lightweight OmKeyInfo class.
@@ -38,6 +41,8 @@ public final class BasicOmKeyInfo {
   private final long modificationTime;
   private final ReplicationConfig replicationConfig;
   private final boolean isFile;
+  private final String eTag;
+  private String ownerName;
 
   private BasicOmKeyInfo(Builder b) {
     this.volumeName = b.volumeName;
@@ -48,6 +53,8 @@ public final class BasicOmKeyInfo {
     this.modificationTime = b.modificationTime;
     this.replicationConfig = b.replicationConfig;
     this.isFile = b.isFile;
+    this.eTag = StringUtils.isNotEmpty(b.eTag) ? b.eTag : null;
+    this.ownerName = b.ownerName;
   }
 
   private BasicOmKeyInfo(OmKeyInfo b) {
@@ -59,6 +66,8 @@ public final class BasicOmKeyInfo {
     this.modificationTime = b.getModificationTime();
     this.replicationConfig = b.getReplicationConfig();
     this.isFile = b.isFile();
+    this.eTag = b.getMetadata().get(ETAG);
+    this.ownerName = b.getOwnerName();
   }
 
   public String getVolumeName() {
@@ -93,6 +102,14 @@ public final class BasicOmKeyInfo {
     return isFile;
   }
 
+  public String getETag() {
+    return eTag;
+  }
+
+  public String getOwnerName() {
+    return ownerName;
+  }
+
   /**
    * Builder of BasicOmKeyInfo.
    */
@@ -105,6 +122,8 @@ public final class BasicOmKeyInfo {
     private long modificationTime;
     private ReplicationConfig replicationConfig;
     private boolean isFile;
+    private String eTag;
+    private String ownerName;
 
     public Builder setVolumeName(String volumeName) {
       this.volumeName = volumeName;
@@ -146,6 +165,16 @@ public final class BasicOmKeyInfo {
       return this;
     }
 
+    public Builder setETag(String etag) {
+      this.eTag = etag;
+      return this;
+    }
+
+    public Builder setOwnerName(String ownerName) {
+      this.ownerName = ownerName;
+      return this;
+    }
+
     public BasicOmKeyInfo build() {
       return new BasicOmKeyInfo(this);
     }
@@ -158,11 +187,17 @@ public final class BasicOmKeyInfo {
         .setCreationTime(creationTime)
         .setModificationTime(modificationTime)
         .setType(replicationConfig.getReplicationType());
+    if (ownerName != null) {
+      builder.setOwnerName(ownerName);
+    }
     if (replicationConfig instanceof ECReplicationConfig) {
       builder.setEcReplicationConfig(
           ((ECReplicationConfig) replicationConfig).toProto());
     } else {
       builder.setFactor(ReplicationConfig.getLegacyFactor(replicationConfig));
+    }
+    if (StringUtils.isNotEmpty(eTag)) {
+      builder.setETag(eTag);
     }
 
     return builder.build();
@@ -188,7 +223,9 @@ public final class BasicOmKeyInfo {
             basicKeyInfo.getType(),
             basicKeyInfo.getFactor(),
             basicKeyInfo.getEcReplicationConfig()))
-        .setIsFile(!keyName.endsWith("/"));
+        .setETag(basicKeyInfo.getETag())
+        .setIsFile(!keyName.endsWith("/"))
+        .setOwnerName(basicKeyInfo.getOwnerName());
 
     return builder.build();
   }
@@ -212,7 +249,9 @@ public final class BasicOmKeyInfo {
             basicKeyInfo.getType(),
             basicKeyInfo.getFactor(),
             basicKeyInfo.getEcReplicationConfig()))
-        .setIsFile(!keyName.endsWith("/"));
+        .setETag(basicKeyInfo.getETag())
+        .setIsFile(!keyName.endsWith("/"))
+        .setOwnerName(basicKeyInfo.getOwnerName());
 
     return builder.build();
   }
@@ -232,7 +271,9 @@ public final class BasicOmKeyInfo {
         creationTime == basicOmKeyInfo.creationTime &&
         modificationTime == basicOmKeyInfo.modificationTime &&
         replicationConfig.equals(basicOmKeyInfo.replicationConfig) &&
-        isFile == basicOmKeyInfo.isFile;
+        Objects.equals(eTag, basicOmKeyInfo.eTag) &&
+        isFile == basicOmKeyInfo.isFile &&
+        ownerName.equals(basicOmKeyInfo.ownerName);
   }
 
   public int hashCode() {
