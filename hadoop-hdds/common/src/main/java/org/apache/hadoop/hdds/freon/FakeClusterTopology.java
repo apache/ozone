@@ -18,6 +18,7 @@
 package org.apache.hadoop.hdds.freon;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Random;
 import java.util.UUID;
@@ -41,19 +42,20 @@ public final class FakeClusterTopology {
   private static final Logger LOGGER =
       LoggerFactory.getLogger(FakeClusterTopology.class);
 
-  public static final FakeClusterTopology INSTANCE = new FakeClusterTopology();
+  public static final FakeClusterTopology INSTANCE = newFakeClusterTopology();
 
   private final List<DatanodeDetailsProto> datanodes;
 
-  private final List<Pipeline> pipelines = new ArrayList<>();
+  private final List<Pipeline> pipelines;
 
   private final Random random = new Random();
 
-  private FakeClusterTopology newFakeClusterTopology() {
-    final List<DatanodeDetailsProto> datanodes = new ArrayList<>();
-    final List<Pipeline> pipelines = new ArrayList<>();
+  private static FakeClusterTopology newFakeClusterTopology() {
+    final int nodeCount = 9;
+    final List<DatanodeDetailsProto> datanodes = new ArrayList<>(nodeCount);
+    final List<Pipeline> pipelines = new ArrayList<>(nodeCount / 3);
     try {
-      for (int i = 0; i < 9; i++) {
+      for (int i = 0; i < nodeCount; i++) {
         datanodes.add(createDatanode());
         if ((i + 1) % 3 == 0) {
           pipelines.add(Pipeline.newBuilder()
@@ -69,10 +71,15 @@ public final class FakeClusterTopology {
     } catch (Exception ex) {
       LOGGER.error("Can't initialize FakeClusterTopology", ex);
     }
-
+    return new FakeClusterTopology(datanodes, pipelines);
   }
 
-  private DatanodeDetailsProto createDatanode() {
+  private FakeClusterTopology(List<DatanodeDetailsProto> datanodes, List<Pipeline> pipelines) {
+    this.datanodes = Collections.unmodifiableList(datanodes);
+    this.pipelines = Collections.unmodifiableList(pipelines);
+  }
+
+  private static DatanodeDetailsProto createDatanode() {
     return DatanodeDetailsProto.newBuilder()
         .setUuid(UUID.randomUUID().toString())
         .setHostName("localhost")
