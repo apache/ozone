@@ -123,7 +123,8 @@ public final class OzoneBucketStub extends OzoneBucket {
 
   @Override
   public OzoneOutputStream createKey(String key, long size,
-      ReplicationConfig rConfig, Map<String, String> metadata)
+      ReplicationConfig rConfig, Map<String, String> metadata,
+      Map<String, String> tags)
       throws IOException {
     assertDoesNotExist(key + "/");
 
@@ -148,7 +149,8 @@ public final class OzoneBucketStub extends OzoneBucket {
                 System.currentTimeMillis(),
                 new ArrayList<>(), finalReplicationCon, metadata, null,
                 () -> readKey(key), true,
-                UserGroupInformation.getCurrentUser().getShortUserName()
+                UserGroupInformation.getCurrentUser().getShortUserName(),
+                tags
             ));
             super.close();
           }
@@ -160,7 +162,8 @@ public final class OzoneBucketStub extends OzoneBucket {
   @Override
   public OzoneDataStreamOutput createStreamKey(String key, long size,
                                                ReplicationConfig rConfig,
-                                               Map<String, String> keyMetadata)
+                                               Map<String, String> keyMetadata,
+                                               Map<String, String> tags)
       throws IOException {
     assertDoesNotExist(key + "/");
 
@@ -188,7 +191,8 @@ public final class OzoneBucketStub extends OzoneBucket {
                 System.currentTimeMillis(),
                 new ArrayList<>(), rConfig, objectMetadata, null,
                 null, false,
-                UserGroupInformation.getCurrentUser().getShortUserName()
+                UserGroupInformation.getCurrentUser().getShortUserName(),
+                tags
             ));
           }
 
@@ -281,7 +285,8 @@ public final class OzoneBucketStub extends OzoneBucket {
           ozoneKeyDetails.getReplicationConfig(),
           ozoneKeyDetails.getMetadata(),
           ozoneKeyDetails.isFile(),
-          ozoneKeyDetails.getOwner());
+          ozoneKeyDetails.getOwner(),
+          ozoneKeyDetails.getTags());
     } else {
       throw new OMException(ResultCodes.KEY_NOT_FOUND);
     }
@@ -376,10 +381,10 @@ public final class OzoneBucketStub extends OzoneBucket {
 
   @Override
   public OmMultipartInfo initiateMultipartUpload(String keyName,
-       ReplicationConfig config, Map<String, String> metadata)
+       ReplicationConfig config, Map<String, String> metadata, Map<String, String> tags)
       throws IOException {
     String uploadID = UUID.randomUUID().toString();
-    keyToMultipartUpload.put(keyName, new MultipartInfoStub(uploadID, metadata));
+    keyToMultipartUpload.put(keyName, new MultipartInfoStub(uploadID, metadata, tags));
     return new OmMultipartInfo(getVolumeName(), getName(), keyName, uploadID);
   }
 
@@ -450,7 +455,8 @@ public final class OzoneBucketStub extends OzoneBucket {
           new ArrayList<>(), getReplicationConfig(),
           keyToMultipartUpload.get(key).getMetadata(), null,
           () -> readKey(key), true,
-          UserGroupInformation.getCurrentUser().getShortUserName()
+          UserGroupInformation.getCurrentUser().getShortUserName(),
+          keyToMultipartUpload.get(key).getTags()
       ));
     }
 
@@ -599,7 +605,8 @@ public final class OzoneBucketStub extends OzoneBucket {
         System.currentTimeMillis(),
         new ArrayList<>(), replicationConfig, new HashMap<>(), null,
         () -> readKey(keyName), false,
-        UserGroupInformation.getCurrentUser().getShortUserName()));
+        UserGroupInformation.getCurrentUser().getShortUserName(),
+        Collections.emptyMap()));
   }
 
   private void assertDoesNotExist(String keyName) throws OMException {
@@ -673,10 +680,13 @@ public final class OzoneBucketStub extends OzoneBucket {
 
     private final String uploadId;
     private final Map<String, String> metadata;
+    private final Map<String, String> tags;
 
-    MultipartInfoStub(String uploadId, Map<String, String> metadata) {
+    MultipartInfoStub(String uploadId, Map<String, String> metadata,
+                      Map<String, String> tags) {
       this.uploadId = uploadId;
       this.metadata = metadata;
+      this.tags = tags;
     }
 
     public String getUploadId() {
@@ -685,6 +695,10 @@ public final class OzoneBucketStub extends OzoneBucket {
 
     public Map<String, String> getMetadata() {
       return metadata;
+    }
+
+    public Map<String, String> getTags() {
+      return tags;
     }
   }
 

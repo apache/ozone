@@ -1512,8 +1512,17 @@ public abstract class TestOzoneRpcClientAbstract {
                         ReplicationFactor replication, String value,
                         int valueLength)
       throws IOException {
-    OzoneOutputStream out = bucket.createKey(keyName, valueLength, RATIS,
-        replication, new HashMap<>());
+    writeKey(bucket, keyName, replication, value, valueLength,
+        Collections.emptyMap(), Collections.emptyMap());
+  }
+
+  private void writeKey(OzoneBucket bucket, String keyName,
+                        ReplicationFactor replication, String value,
+                        int valueLength, Map<String, String> customMetadata,
+                        Map<String, String> tags)
+      throws IOException {
+    OzoneOutputStream out = bucket.createKey(keyName, valueLength,
+        ReplicationConfig.fromTypeAndFactor(RATIS, replication), customMetadata, tags);
     out.write(value.getBytes(UTF_8));
     out.close();
   }
@@ -2570,6 +2579,46 @@ public abstract class TestOzoneRpcClientAbstract {
     }
   }
 
+  @ParameterizedTest
+  @MethodSource("bucketLayouts")
+  public void testCreateKeyWithMetadataAndTags(BucketLayout bucketLayout) throws Exception {
+    String volumeName = UUID.randomUUID().toString();
+    String bucketName = UUID.randomUUID().toString();
+    String keyName = UUID.randomUUID().toString();
+    String value = "sample value";
+    OzoneVolume volume = null;
+    store.createVolume(volumeName);
+
+    volume = store.getVolume(volumeName);
+    BucketArgs bucketArgs =
+            BucketArgs.newBuilder().setBucketLayout(bucketLayout).build();
+    volume.createBucket(bucketName, bucketArgs);
+
+    OzoneBucket ozoneBucket = volume.getBucket(bucketName);
+
+    Map<String, String> customMetadata = new HashMap<>();
+    customMetadata.put("custom-key1", "custom-value1");
+    customMetadata.put("custom-key2", "custom-value2");
+
+    Map<String, String> tags = new HashMap<>();
+    tags.put("tag-key1", "tag-value1");
+    tags.put("tag-key2", "tag-value2");
+
+    writeKey(ozoneBucket, keyName, ONE, value, value.length(), customMetadata, tags);
+
+    OzoneKeyDetails keyDetails = ozoneBucket.getKey(keyName);
+
+    Map<String, String> keyMetadata = keyDetails.getMetadata();
+
+    Map<String, String> keyTags = keyDetails.getTags();
+
+    assertThat(keyMetadata).containsAllEntriesOf(customMetadata);
+    assertThat(keyMetadata).doesNotContainKeys("tag-key1", "tag-key2");
+
+    assertThat(keyTags).containsAllEntriesOf(keyTags);
+    assertThat(keyTags).doesNotContainKeys("custom-key1", "custom-key2");
+  }
+
   static Stream<ReplicationConfig> replicationConfigs() {
     return Stream.of(
         RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.ONE),
@@ -3119,7 +3168,41 @@ public abstract class TestOzoneRpcClientAbstract {
     customMetadata.put("custom-key1", "custom-value1");
     customMetadata.put("custom-key2", "custom-value2");
 
-    doMultipartUpload(bucket, keyName, (byte) 98, replication, customMetadata);
+    doMultipartUpload(bucket, keyName, (byte) 98, replication, customMetadata, Collections.emptyMap());
+  }
+
+  @ParameterizedTest
+  @MethodSource({"replicationConfigs"})
+  public void testMultipartUploadWithTags(ReplicationConfig replication) throws Exception {
+    testMultipartUploadWithTags(replication, BucketLayout.OBJECT_STORE);
+  }
+
+  @ParameterizedTest
+  @MethodSource({"bucketLayouts"})
+  public void testMultipartUploadWithTags(BucketLayout bucketLayout) throws Exception {
+    testMultipartUploadWithTags(RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.THREE), bucketLayout);
+  }
+
+  private void testMultipartUploadWithTags(ReplicationConfig replication, BucketLayout bucketLayout)
+      throws Exception {
+    String volumeName = UUID.randomUUID().toString();
+    String bucketName = UUID.randomUUID().toString();
+    String keyName = UUID.randomUUID().toString();
+
+    store.createVolume(volumeName);
+    OzoneVolume volume = store.getVolume(volumeName);
+
+    BucketArgs bucketArgs =
+        BucketArgs.newBuilder().setBucketLayout(bucketLayout).build();
+    volume.createBucket(bucketName, bucketArgs);
+    OzoneBucket bucket = volume.getBucket(bucketName);
+
+    // Create tags
+    Map<String, String> tags = new HashMap<>();
+    tags.put("tag-key1", "tag-value1");
+    tags.put("tag-key2", "tag-value2");
+
+    doMultipartUpload(bucket, keyName, (byte) 96, replication, Collections.emptyMap(), tags);
   }
 
   @Test
@@ -3755,14 +3838,14 @@ public abstract class TestOzoneRpcClientAbstract {
   private void doMultipartUpload(OzoneBucket bucket, String keyName, byte val,
       ReplicationConfig replication)
       throws Exception {
-    doMultipartUpload(bucket, keyName, val, replication, Collections.emptyMap());
+    doMultipartUpload(bucket, keyName, val, replication, Collections.emptyMap(), Collections.emptyMap());
   }
 
   private void doMultipartUpload(OzoneBucket bucket, String keyName, byte val,
-      ReplicationConfig replication, Map<String, String> customMetadata)
+      ReplicationConfig replication, Map<String, String> customMetadata, Map<String, String> tags)
       throws Exception {
     // Initiate Multipart upload request
-    String uploadID = initiateMultipartUpload(bucket, keyName, replication, customMetadata);
+    String uploadID = initiateMultipartUpload(bucket, keyName, replication, customMetadata, tags);
 
     // Upload parts
     Map<Integer, String> partsMap = new TreeMap<>();
@@ -3835,17 +3918,23 @@ public abstract class TestOzoneRpcClientAbstract {
     if (customMetadata != null && !customMetadata.isEmpty()) {
       assertThat(keyMetadata).containsAllEntriesOf(customMetadata);
     }
+
+    Map<String, String> keyTags = omKeyInfo.getTags();
+    if (keyTags != null && !keyTags.isEmpty()) {
+      assertThat(keyTags).containsAllEntriesOf(tags);
+    }
   }
 
   private String initiateMultipartUpload(OzoneBucket bucket, String keyName,
       ReplicationConfig replicationConfig) throws Exception {
-    return initiateMultipartUpload(bucket, keyName, replicationConfig, Collections.emptyMap());
+    return initiateMultipartUpload(bucket, keyName, replicationConfig, Collections.emptyMap(), Collections.emptyMap());
   }
 
   private String initiateMultipartUpload(OzoneBucket bucket, String keyName,
-      ReplicationConfig replicationConfig, Map<String, String> customMetadata) throws Exception {
+      ReplicationConfig replicationConfig, Map<String, String> customMetadata,
+      Map<String, String> tags) throws Exception {
     OmMultipartInfo multipartInfo = bucket.initiateMultipartUpload(keyName,
-        replicationConfig, customMetadata);
+        replicationConfig, customMetadata, tags);
 
     String uploadID = multipartInfo.getUploadID();
     assertNotNull(uploadID);

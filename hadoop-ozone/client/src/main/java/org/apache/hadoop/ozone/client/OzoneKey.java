@@ -63,7 +63,9 @@ public class OzoneKey {
 
   private ReplicationConfig replicationConfig;
 
-  private Map<String, String> metadata = new HashMap<>();
+  private final Map<String, String> metadata = new HashMap<>();
+
+  private final Map<String, String> tags = new HashMap<>();
 
   /**
    * Indicator if key is a file.
@@ -94,10 +96,12 @@ public class OzoneKey {
   public OzoneKey(String volumeName, String bucketName,
                   String keyName, long size, long creationTime,
                   long modificationTime, ReplicationConfig replicationConfig,
-                  Map<String, String> metadata, boolean isFile, String owner) {
+                  Map<String, String> metadata, boolean isFile, String owner,
+                  Map<String, String> tags) {
     this(volumeName, bucketName, keyName, size, creationTime,
         modificationTime, replicationConfig, isFile, owner);
     this.metadata.putAll(metadata);
+    this.tags.putAll(tags);
   }
 
   /**
@@ -163,8 +167,22 @@ public class OzoneKey {
     return modificationTime;
   }
 
+  /**
+   * Returns the metadata of the key.
+   *
+   * @return key metadata.
+   */
   public Map<String, String> getMetadata() {
     return metadata;
+  }
+
+  /**
+   * Returns the tags of the key.
+   *
+   * @return key tags.
+   */
+  public Map<String, String> getTags() {
+    return tags;
   }
 
   public void setMetadata(Map<String, String> metadata) {
@@ -205,7 +223,8 @@ public class OzoneKey {
     return new OzoneKey(keyInfo.getVolumeName(), keyInfo.getBucketName(),
         keyInfo.getKeyName(), keyInfo.getDataSize(), keyInfo.getCreationTime(),
         keyInfo.getModificationTime(), keyInfo.getReplicationConfig(),
-        keyInfo.getMetadata(), keyInfo.isFile(), keyInfo.getOwnerName());
+        keyInfo.getMetadata(), keyInfo.isFile(), keyInfo.getOwnerName(),
+        keyInfo.getTags());
   }
 
 }
