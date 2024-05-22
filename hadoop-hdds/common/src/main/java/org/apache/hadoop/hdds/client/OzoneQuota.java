@@ -23,6 +23,7 @@ import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.ratis.util.Preconditions;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 
@@ -65,6 +66,13 @@ public final class OzoneQuota {
       return b < cache.size() ? cache.get(Math.toIntExact(b))
           : new RawQuotaInBytes(this, b);
     }
+  }
+
+  private static final List<Units> PARSE_ORDER;
+  static {
+    List<Units> reversed = new ArrayList<>(Arrays.asList(Units.values()));
+    Collections.reverse(reversed);
+    PARSE_ORDER = Collections.unmodifiableList(reversed);
   }
 
   // Quota to decide how many buckets can be created.
@@ -177,7 +185,7 @@ public final class OzoneQuota {
     Units currUnit = Units.B;
 
     try {
-      for (Units unit : Units.values()) {
+      for (Units unit : PARSE_ORDER) {
         final String quota = unit.name();
         if (uppercase.endsWith((quota))) {
           size = uppercase
