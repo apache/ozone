@@ -54,7 +54,6 @@ import java.io.IOException;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -431,7 +430,7 @@ public class OzoneBucket extends WithMetadata {
   public OzoneOutputStream createKey(String key, long size)
       throws IOException {
     return createKey(key, size, defaultReplication,
-        new HashMap<>());
+        Collections.emptyMap());
   }
 
   /**
@@ -459,6 +458,7 @@ public class OzoneBucket extends WithMetadata {
    * @param key               Name of the key to be created.
    * @param size              Size of the data the key will point to.
    * @param replicationConfig Replication configuration.
+   * @param keyMetadata       Custom key metadata.
    * @return OzoneOutputStream to which the data has to be written.
    * @throws IOException
    */
@@ -466,8 +466,27 @@ public class OzoneBucket extends WithMetadata {
       ReplicationConfig replicationConfig,
       Map<String, String> keyMetadata)
       throws IOException {
+    return this.createKey(key, size, replicationConfig, keyMetadata, Collections.emptyMap());
+  }
+
+  /**
+   * Creates a new key in the bucket.
+   *
+   * @param key               Name of the key to be created.
+   * @param size              Size of the data the key will point to.
+   * @param replicationConfig Replication configuration.
+   * @param keyMetadata       Custom key metadata.
+   * @param tags              Tags used for S3 object tags
+   * @return OzoneOutputStream to which the data has to be written.
+   * @throws IOException
+   */
+  public OzoneOutputStream createKey(String key, long size,
+      ReplicationConfig replicationConfig,
+      Map<String, String> keyMetadata,
+      Map<String, String> tags)
+      throws IOException {
     return proxy
-        .createKey(volumeName, name, key, size, replicationConfig, keyMetadata);
+        .createKey(volumeName, name, key, size, replicationConfig, keyMetadata, tags);
   }
 
   /**
@@ -491,6 +510,7 @@ public class OzoneBucket extends WithMetadata {
    * @param key               Name of the key to be created.
    * @param size              Size of the data the key will point to.
    * @param replicationConfig Replication configuration.
+   * @param keyMetadata       Custom key metadata.
    * @return OzoneDataStreamOutput to which the data has to be written.
    * @throws IOException
    */
@@ -500,8 +520,28 @@ public class OzoneBucket extends WithMetadata {
     if (replicationConfig == null) {
       replicationConfig = defaultReplication;
     }
+    return this.createStreamKey(key, size, replicationConfig, keyMetadata,
+        Collections.emptyMap());
+  }
+
+  /**
+   * Creates a new key in the bucket.
+   *
+   * @param key               Name of the key to be created.
+   * @param size              Size of the data the key will point to.
+   * @param replicationConfig Replication configuration.
+   * @param keyMetadata       Custom key metadata.
+   * @return OzoneDataStreamOutput to which the data has to be written.
+   * @throws IOException
+   */
+  public OzoneDataStreamOutput createStreamKey(String key, long size,
+      ReplicationConfig replicationConfig, Map<String, String> keyMetadata,
+      Map<String, String> tags) throws IOException {
+    if (replicationConfig == null) {
+      replicationConfig = defaultReplication;
+    }
     return proxy.createStreamKey(volumeName, name, key, size,
-        replicationConfig, keyMetadata);
+        replicationConfig, keyMetadata, tags);
   }
 
   /**
@@ -669,11 +709,12 @@ public class OzoneBucket extends WithMetadata {
 
   /**
    * Initiate multipart upload for a specified key.
-   * @param keyName
-   * @param type
-   * @param factor
+   * @param keyName Name of the key to be created when the multipart upload is completed.
+   * @param type Replication type to be used.
+   * @param factor Replication factor of the key.
    * @return OmMultipartInfo
    * @throws IOException
+   * @deprecated Use {@link OzoneBucket#initiateMultipartUpload(String, ReplicationConfig)} instead.
    */
   @Deprecated
   public OmMultipartInfo initiateMultipartUpload(String keyName,
@@ -686,6 +727,10 @@ public class OzoneBucket extends WithMetadata {
 
   /**
    * Initiate multipart upload for a specified key.
+   * @param keyName Name of the key to be created when the multipart upload is completed.
+   * @param config Replication config.
+   * @return OmMultipartInfo
+   * @throws IOException
    */
   public OmMultipartInfo initiateMultipartUpload(String keyName,
       ReplicationConfig config)
@@ -695,11 +740,32 @@ public class OzoneBucket extends WithMetadata {
 
   /**
    * Initiate multipart upload for a specified key.
+   * @param keyName Name of the key to be created when the multipart upload is completed.
+   * @param config Replication config.
+   * @param metadata Custom key metadata.
+   * @return OmMultipartInfo
+   * @throws IOException
    */
   public OmMultipartInfo initiateMultipartUpload(String keyName,
       ReplicationConfig config, Map<String, String> metadata)
       throws IOException {
-    return proxy.initiateMultipartUpload(volumeName, name, keyName, config, metadata);
+    return initiateMultipartUpload(keyName, config, metadata, Collections.emptyMap());
+  }
+
+  /**
+   * Initiate multipart upload for a specified key.
+   * @param keyName Name of the key to be created when the multipart upload is completed.
+   * @param config Replication config.
+   * @param metadata Custom key metadata.
+   * @param tags Tags used for S3 object tags.
+   * @return OmMultipartInfo
+   * @throws IOException
+   */
+  public OmMultipartInfo initiateMultipartUpload(String keyName,
+      ReplicationConfig config, Map<String, String> metadata,
+      Map<String, String> tags)
+      throws IOException {
+    return proxy.initiateMultipartUpload(volumeName, name, keyName, config, metadata, tags);
   }
 
   /**
@@ -1321,7 +1387,8 @@ public class OzoneBucket extends WithMetadata {
         keyInfo.getReplicationConfig(),
         metadata,
         keyInfo.isFile(),
-        keyInfo.getOwnerName());
+        keyInfo.getOwnerName(),
+        Collections.emptyMap());
   }
 
 
