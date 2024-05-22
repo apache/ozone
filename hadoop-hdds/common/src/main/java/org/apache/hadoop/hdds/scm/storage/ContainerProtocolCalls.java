@@ -785,7 +785,7 @@ public final class ContainerProtocolCalls  {
         response.getMessage(), response.getResult());
   }
 
-  public static List<Validator> getValidatorList() {
+  private static List<Validator> getValidatorList() {
     return VALIDATORS;
   }
 

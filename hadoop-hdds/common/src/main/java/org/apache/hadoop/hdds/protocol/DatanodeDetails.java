@@ -242,7 +242,16 @@ public class DatanodeDetails extends NodeImpl implements
    * @return DataNode Ports
    */
   public synchronized List<Port> getPorts() {
-    return ports;
+    return new ArrayList<>(ports);
+  }
+
+  public synchronized boolean hasPort(int port) {
+    for (Port p : ports) {
+      if (p.getValue() == port) {
+        return true;
+      }
+    }
+    return false;
   }
 
   /**
