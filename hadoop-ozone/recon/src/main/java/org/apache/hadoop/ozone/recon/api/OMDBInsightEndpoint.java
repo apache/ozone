@@ -1018,17 +1018,18 @@ public class OMDBInsightEndpoint {
       return Response.ok(listKeysResponse).build();
     } catch (IOException e) {
       return ReconResponseUtils.createInternalServerErrorResponse(
-          "Error searching keys in OM DB: " + e.getMessage());
-    } catch (IllegalArgumentException e) {
-      return ReconResponseUtils.createBadRequestResponse("Invalid startPrefix: " + e.getMessage());
+          "Error listing keys from OM DB: " + e.getMessage());
     } catch (RuntimeException e) {
       return ReconResponseUtils.createInternalServerErrorResponse(
           "Unexpected runtime error while searching keys in OM DB: " + e.getMessage());
+    } catch (Exception e) {
+      return ReconResponseUtils.createInternalServerErrorResponse(
+          "Error listing keys from OM DB: " + e.getMessage());
     }
   }
 
   public Map<String, OmKeyInfo> searchKeysInFSO(ParamInfo paramInfo)
-      throws IOException, IllegalArgumentException {
+      throws IOException {
     int originalLimit = paramInfo.getLimit();
     Map<String, OmKeyInfo> matchedKeys = new LinkedHashMap<>();
     // Convert the search prefix to an object path for FSO buckets
@@ -1132,7 +1133,7 @@ public class OMDBInsightEndpoint {
    * @throws IOException If database access fails.
    */
   public String convertStartPrefixPathToObjectIdPath(String startPrefixPath)
-      throws IOException, IllegalArgumentException {
+      throws IOException {
 
     String[] names = parseRequestPath(
         normalizePath(startPrefixPath, BucketLayout.FILE_SYSTEM_OPTIMIZED));
