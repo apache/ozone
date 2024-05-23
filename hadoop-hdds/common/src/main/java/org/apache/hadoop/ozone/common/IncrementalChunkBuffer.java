@@ -277,12 +277,6 @@ final class IncrementalChunkBuffer implements ChunkBuffer {
   public List<ByteBuffer> asByteBufferList() {
     return Collections.unmodifiableList(buffers);
   }
-
-  @Override
-  public long writeTo(GatheringByteChannel channel) throws IOException {
-    return channel.write(buffers.toArray(new ByteBuffer[0]));
-  }
-
   @Override
   public void writeFully(GatheringByteChannel channel) throws IOException {
     for (ByteBuffer buf : buffers) {

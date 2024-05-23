@@ -214,13 +214,6 @@ public class ChunkBufferImplWithByteBufferList implements ChunkBuffer {
   }
 
   @Override
-  public long writeTo(GatheringByteChannel channel) throws IOException {
-    long bytes = channel.write(buffers.toArray(new ByteBuffer[0]));
-    findCurrent();
-    return bytes;
-  }
-
-  @Override
   public void writeFully(GatheringByteChannel channel) throws IOException {
     for (ByteBuffer buf : buffers) {
       BufferUtils.writeFully(channel, buf);

@@ -228,7 +228,7 @@ public class TestChunkBuffer {
     assertEquals(0, impl.position());
 
     ByteArrayOutputStream output = new ByteArrayOutputStream(expected.length);
-    impl.writeTo(new MockGatheringChannel(Channels.newChannel(output)));
+    impl.writeFully(new MockGatheringChannel(Channels.newChannel(output)));
     assertArrayEquals(expected, output.toByteArray());
     assertFalse(impl.hasRemaining());
   }

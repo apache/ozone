@@ -142,15 +142,13 @@ public final class BufferUtils {
 
   /**
    * Write all remaining bytes in buffer to the given channel.
-   * If the channel is selectable then it must be configured blocking.
    */
-  public static void writeFully(GatheringByteChannel ch, ByteBuffer bb)
-      throws IOException
-  {
+  public static void writeFully(GatheringByteChannel ch, ByteBuffer bb) throws IOException {
     while (bb.remaining() > 0) {
       int n = ch.write(bb);
-      if (n <= 0)
+      if (n <= 0) {
         throw new IllegalStateException("no bytes written");
+      }
     }
   }
 }
