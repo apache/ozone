@@ -228,7 +228,7 @@ public final class XceiverClientRatis extends XceiverClientSpi {
       return getClient().async().sendReadOnly(message);
     } else {
       if (LOG.isDebugEnabled()) {
-        LOG.debug("sendCommandAsync {}", message);
+        LOG.debug("sendCommandAsync write {} {}", writeReplicationLevel, message);
       }
       return getClient().async().send(message, writeReplicationLevel);
     }
@@ -310,10 +310,10 @@ public final class XceiverClientRatis extends XceiverClientSpi {
       final XceiverClientReply clientReply = newWatchReply(
           index, ReplicationLevel.MAJORITY_COMMITTED, index);
       reply.getCommitInfos().stream()
-          .filter(i -> i.getCommitIndex() < index)
+          .filter(i -> i.getCommitIndex() < index)  // only get the nodes that is lagging behind
           .forEach(proto -> {
             UUID address = RatisHelper.toDatanodeId(proto.getServer());
-            addDatanodetoReply(address, clientReply);
+            addDatanodetoReply(address, clientReply);  // add the dead datanode to XceiverClientReply
             // since 3 way commit has failed, the updated map from now on  will
             // only store entries for those datanodes which have had successful
             // replication.
@@ -336,6 +336,7 @@ public final class XceiverClientRatis extends XceiverClientSpi {
   @Override
   public XceiverClientReply sendCommandAsync(
       ContainerCommandRequestProto request) {
+//    return sendCommandAsyncInternal(request, ReplicationLevel.MAJORITY_COMMITTED);
     return sendCommandAsyncInternal(request, ReplicationLevel.ALL_COMMITTED);
   }
 
@@ -359,16 +360,21 @@ public final class XceiverClientRatis extends XceiverClientSpi {
     CompletableFuture<RaftClientReply> raftClientReply = sendRequestAsync(request, writeReplicationLevel);
     metrics.incrPendingContainerOpsMetrics(request.getCmdType());
     CompletableFuture<ContainerCommandResponseProto> containerCommandResponse =
-        raftClientReply.whenComplete((reply, e) -> {
+        raftClientReply.whenComplete((raftClientReply1, e) -> {
           if (LOG.isDebugEnabled()) {
-            LOG.debug("received reply {} for request: cmdType={} containerID={}"
-                    + " pipelineID={} traceID={} exception: {}", reply,
-                request.getCmdType(), request.getContainerID(),
+            LOG.debug("!!! received reply {} for request: cmdType={} writeReplicationLevel={} containerID={}"
+                    + " pipelineID={} traceID={} exception: {}", raftClientReply1,
+                request.getCmdType(), writeReplicationLevel, request.getContainerID(),
                 request.getPipelineID(), request.getTraceID(), e);
           }
           metrics.decrPendingContainerOpsMetrics(request.getCmdType());
           metrics.addContainerOpsLatency(request.getCmdType(),
               System.currentTimeMillis() - requestTime);
+          // Print commitIndex of all nodes
+          raftClientReply1.getCommitInfos().forEach(commitInfoProto -> {
+            UUID address = RatisHelper.toDatanodeId(commitInfoProto.getServer());
+            LOG.info("!!! sendCommandAsync: node {} commitIndex {}", address, commitInfoProto.getCommitIndex());
+          });
         }).thenApply(reply -> {
           try {
             if (!reply.isSuccess()) {
@@ -397,6 +403,7 @@ public final class XceiverClientRatis extends XceiverClientSpi {
             }
             asyncReply.setLogIndex(reply.getLogIndex());
             addDatanodetoReply(serverId, asyncReply);
+            addDatanodetoReply(serverId, asyncReply);  // add replier node to XceiverClientReply
             return response;
           } catch (InvalidProtocolBufferException e) {
             throw new CompletionException(e);

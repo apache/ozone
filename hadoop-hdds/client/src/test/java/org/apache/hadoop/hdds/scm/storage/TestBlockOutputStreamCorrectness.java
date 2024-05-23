@@ -43,6 +43,7 @@ import org.apache.hadoop.hdds.scm.XceiverClientSpi;
 import org.apache.hadoop.hdds.scm.pipeline.MockPipeline;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.ratis.proto.RaftProtos.ReplicationLevel;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
@@ -182,6 +183,13 @@ class TestBlockOutputStreamCorrectness {
       result.setLogIndex(counter.incrementAndGet());
       return result;
 
+    }
+
+    @Override
+    public XceiverClientReply sendCommandAsync(
+        ContainerCommandRequestProto request,
+        ReplicationLevel writeReplicationLevel) {
+      return sendCommandAsync(request);
     }
 
     @Override

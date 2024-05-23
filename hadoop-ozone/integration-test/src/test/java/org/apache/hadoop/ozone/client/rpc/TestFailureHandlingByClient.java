@@ -35,9 +35,11 @@ import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.ratis.conf.RatisClientConfig;
 import org.apache.hadoop.hdds.scm.OzoneClientConfig;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
+import org.apache.hadoop.hdds.scm.XceiverClientRatis;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
+import org.apache.hadoop.hdds.scm.storage.BlockOutputStream;
 import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.net.DNSToSwitchMapping;
 import org.apache.hadoop.net.NetUtils;
@@ -71,15 +73,19 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 
+import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
+import org.slf4j.event.Level;
 
 /**
  * Tests Exception handling by Ozone Client.
  */
 @Timeout(300)
 public class TestFailureHandlingByClient {
+
+  private static final org.slf4j.Logger LOG = org.slf4j.LoggerFactory.getLogger(TestFailureHandlingByClient.class);
 
   private MiniOzoneCluster cluster;
   private OzoneConfiguration conf;
@@ -150,6 +156,9 @@ public class TestFailureHandlingByClient {
     bucketName = volumeName;
     objectStore.createVolume(volumeName);
     objectStore.getVolume(volumeName).createBucket(bucketName);
+
+    GenericTestUtils.setLogLevel(XceiverClientRatis.LOG, Level.DEBUG);
+    GenericTestUtils.setLogLevel(BlockOutputStream.LOG, Level.DEBUG);
   }
 
   private void startCluster() throws Exception {
@@ -443,13 +452,17 @@ public class TestFailureHandlingByClient {
     // shutdown 1 datanode. This will make sure the 2 way commit happens for
     // next write ops.
     cluster.shutdownHddsDatanode(datanodes.get(0));
+    LOG.warn("!!! datanode is shut: {}", datanodes.get(0).getUuid());
 
     key.write(data.getBytes(UTF_8));
     key.write(data.getBytes(UTF_8));
     key.flush();
 
-    assertThat(keyOutputStream.getExcludeList().getDatanodes())
-        .contains(datanodes.get(0));
+    // With HDDS-10108, watchForCommit() no longer sends actual Ratis request and only does adjustBuffer(),
+    //  so as a side effect watchForCommit() won't populate DN exclude list anymore.
+    // TODO: Restore the DN exclude list population elsewhere if needed.
+    // The following commented out assertion is determined to fail:
+    assertThat(keyOutputStream.getExcludeList().getDatanodes()).contains(datanodes.get(0));
     assertThat(keyOutputStream.getExcludeList().getContainerIds()).isEmpty();
     assertThat(keyOutputStream.getExcludeList().getPipelineIds()).isEmpty();
     // The close will just write to the buffer

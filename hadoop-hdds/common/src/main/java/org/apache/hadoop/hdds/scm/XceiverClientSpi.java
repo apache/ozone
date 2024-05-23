@@ -34,6 +34,7 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 
 import com.google.common.annotations.VisibleForTesting;
+import org.apache.ratis.proto.RaftProtos.ReplicationLevel;
 import org.apache.ratis.util.function.CheckedBiConsumer;
 
 /**
@@ -164,6 +165,9 @@ public abstract class XceiverClientSpi implements Closeable {
   public abstract XceiverClientReply
       sendCommandAsync(ContainerCommandRequestProto request)
       throws IOException, ExecutionException, InterruptedException;
+
+  public abstract XceiverClientReply
+      sendCommandAsync(ContainerCommandRequestProto request, ReplicationLevel writeReplicationLevel);
 
   /**
    * Returns pipeline Type.

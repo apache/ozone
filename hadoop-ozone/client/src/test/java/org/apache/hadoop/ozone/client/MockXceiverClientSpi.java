@@ -39,6 +39,7 @@ import org.apache.hadoop.hdds.scm.XceiverClientReply;
 import org.apache.hadoop.hdds.scm.XceiverClientSpi;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerNotOpenException;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
+import org.apache.ratis.proto.RaftProtos.ReplicationLevel;
 
 import java.io.IOException;
 import java.util.Map;
@@ -106,6 +107,13 @@ public class MockXceiverClientSpi extends XceiverClientSpi {
           "Mock version of datanode call " + request.getCmdType()
               + " is not yet implemented");
     }
+  }
+
+  @Override
+  public XceiverClientReply sendCommandAsync(
+      ContainerCommandRequestProto request,
+      ReplicationLevel writeReplicationLevel) {
+    return sendCommandAsync(request);
   }
 
   private ReadChunkResponseProto readChunk(ReadChunkRequestProto readChunk) {
