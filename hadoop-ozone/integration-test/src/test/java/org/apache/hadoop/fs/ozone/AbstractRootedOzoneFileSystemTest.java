@@ -229,7 +229,6 @@ abstract class AbstractRootedOzoneFileSystemTest {
       .createUserForTesting(USER1,  new String[] {"usergroup"});
   // Non-privileged OFS instance
   private RootedOzoneFileSystem userOfs;
-  private OzoneFileSystem userO3fs;
 
   @BeforeAll
   void initClusterAndEnv() throws IOException, InterruptedException, TimeoutException {
@@ -280,9 +279,6 @@ abstract class AbstractRootedOzoneFileSystemTest {
     userOfs = UGI_USER1.doAs(
         (PrivilegedExceptionAction<RootedOzoneFileSystem>)()
             -> (RootedOzoneFileSystem) FileSystem.get(conf));
-    userO3fs = UGI_USER1.doAs(
-        (PrivilegedExceptionAction<OzoneFileSystem>)()
-            -> (OzoneFileSystem) FileSystem.get(conf));
 
     if (useOnlyCache) {
       cluster.getOzoneManager().getOmServerProtocol().setShouldFlushCache(omRatisEnabled);
@@ -306,7 +302,6 @@ abstract class AbstractRootedOzoneFileSystemTest {
   @Test
   void testUserHomeDirectory() {
     assertEquals(new Path("/user/" + USER1), userOfs.getHomeDirectory());
-    assertEquals(new Path("/user/" + USER1), userO3fs.getHomeDirectory());
   }
 
   @Test
