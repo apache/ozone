@@ -25,6 +25,7 @@ import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
+import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.recon.ReconResponseUtils;
@@ -1170,7 +1171,10 @@ public class OMDBInsightEndpoint {
             reconSCM, bucketInfo);
     long dirObjectId = -1;
     try {
-      dirObjectId = handler.getDirInfo(names).getObjectID();
+      OmDirectoryInfo dirInfo = handler.getDirInfo(names);
+      if (null != dirInfo) {
+        dirObjectId = dirInfo.getObjectID();
+      }
     } catch (Exception ioe) {
       LOG.error("Not valid directory :{}", ioe);
     }
@@ -1202,9 +1206,7 @@ public class OMDBInsightEndpoint {
         // check if RocksDB was able to seek correctly to the given key prefix
         // if not, then return empty result
         // In case of an empty prevKeyPrefix, all the keys are returned
-        if (seekKeyValue == null ||
-            (StringUtils.isNotBlank(paramInfo.getPrevKey()) &&
-                !seekKeyValue.getKey().equals(paramInfo.getPrevKey()))) {
+        if (seekKeyValue == null || (!seekKeyValue.getKey().equals(paramInfo.getPrevKey()))) {
           return matchedKeys;
         }
       } else {
@@ -1214,7 +1216,6 @@ public class OMDBInsightEndpoint {
       while (keyIter.hasNext()) {
         Table.KeyValue<String, OmKeyInfo> entry = keyIter.next();
         String dbKey = entry.getKey();
-        paramInfo.setLastKey(dbKey);
         if (!dbKey.startsWith(paramInfo.getStartPrefix())) {
           break; // Exit the loop if the key no longer matches the prefix
         }
@@ -1227,6 +1228,7 @@ public class OMDBInsightEndpoint {
             break;
           }
           matchedKeys.put(dbKey, entry.getValue());
+          paramInfo.setLastKey(dbKey);
         }
       }
     } catch (IOException exception) {
