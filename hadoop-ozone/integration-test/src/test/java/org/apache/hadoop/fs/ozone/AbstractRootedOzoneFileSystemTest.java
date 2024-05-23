@@ -305,8 +305,8 @@ abstract class AbstractRootedOzoneFileSystemTest {
 
   @Test
   void testUserHomeDirectory() {
-    assertEquals("/user/" + USER1, userOfs.getHomeDirectory());
-    assertEquals("/user/" + USER1, userO3fs.getHomeDirectory());
+    assertEquals(new Path("/user/" + USER1), userOfs.getHomeDirectory());
+    assertEquals(new Path("/user/" + USER1), userO3fs.getHomeDirectory());
   }
 
   @Test
