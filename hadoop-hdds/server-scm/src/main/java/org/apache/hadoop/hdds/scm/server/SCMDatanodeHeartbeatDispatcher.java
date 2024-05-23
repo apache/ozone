@@ -21,8 +21,6 @@ import com.google.common.base.Preconditions;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.CommandQueueReportProto;
 import org.apache.hadoop.hdds.protocol.proto
-    .StorageContainerDatanodeProtocolProtos.CRLStatusReport;
-import org.apache.hadoop.hdds.protocol.proto
     .StorageContainerDatanodeProtocolProtos.IncrementalContainerReportProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.LayoutVersionProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto;
@@ -438,18 +436,6 @@ public final class SCMDatanodeHeartbeatDispatcher {
 
     public CommandStatusReportFromDatanode(DatanodeDetails datanodeDetails,
         CommandStatusReportsProto report) {
-      super(datanodeDetails, report);
-    }
-  }
-
-  /**
-   * CRL Status report event payload with origin.
-   */
-  public static class CRLStatusReportFromDatanode
-      extends ReportFromDatanode<CRLStatusReport> {
-
-    public CRLStatusReportFromDatanode(DatanodeDetails datanodeDetails,
-                                           CRLStatusReport report) {
       super(datanodeDetails, report);
     }
   }

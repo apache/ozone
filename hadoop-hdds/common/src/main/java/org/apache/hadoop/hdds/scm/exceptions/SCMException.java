@@ -126,12 +126,18 @@ public class SCMException extends IOException {
     FAILED_TO_INIT_PIPELINE_CHOOSE_POLICY,
     FAILED_TO_INIT_LEADER_CHOOSE_POLICY,
     SCM_NOT_LEADER,
+    // Unused, revocation code was removed. Re-use with care when implementing revocation support.
+    // (To keep ordinals, we should not delete this from the enum.)
     FAILED_TO_REVOKE_CERTIFICATES,
     PIPELINE_NOT_FOUND,
     UNKNOWN_PIPELINE_STATE,
     CONTAINER_NOT_FOUND,
     CONTAINER_REPLICA_NOT_FOUND,
+    // Unused, revocation code was removed. Re-use with care when implementing revocation support.
+    // (To keep ordinals, we should not delete this from the enum.)
     FAILED_TO_CONNECT_TO_CRL_SERVICE,
+    // Unused, revocation code was removed. Re-use with care when implementing revocation support.
+    // (To keep ordinals, we should not delete this from the enum.)
     FAILED_TO_ADD_CRL_CLIENT,
     INVALID_PIPELINE_STATE,
     DUPLICATED_PIPELINE_ID,

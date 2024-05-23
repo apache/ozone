@@ -38,10 +38,6 @@ public final class HddsConfigKeys {
       "hdds.container.report.interval";
   public static final String HDDS_CONTAINER_REPORT_INTERVAL_DEFAULT =
       "60m";
-  public static final String HDDS_CRL_STATUS_REPORT_INTERVAL =
-      "hdds.crl.status.report.interval";
-  public static final String HDDS_CRL_STATUS_REPORT_INTERVAL_DEFAULT =
-      "60s";
   public static final String HDDS_PIPELINE_REPORT_INTERVAL =
       "hdds.pipeline.report.interval";
   public static final String HDDS_PIPELINE_REPORT_INTERVAL_DEFAULT =
@@ -183,9 +179,6 @@ public final class HddsConfigKeys {
   public static final String HDDS_X509_DIR_NAME_DEFAULT = "certs";
   public static final String HDDS_X509_FILE_NAME = "hdds.x509.file.name";
   public static final String HDDS_X509_FILE_NAME_DEFAULT = "certificate.crt";
-
-  public static final String HDDS_X509_CRL_NAME = "hdds.x509.CRL.name";
-  public static final String HDDS_X509_CRL_NAME_DEFAULT = "scm.crl";
 
   /**
    * Default duration of certificates issued by SCM CA. The formats accepted are
