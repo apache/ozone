@@ -145,12 +145,12 @@ export class DiskUsage extends React.Component<Record<string, object>, IDUState>
       const dataSize = duResponse.size;
       let subpaths: IDUSubpath[] = duResponse.subPaths;
 
-      // Only show top n blocks with the most DU,
-      // other blocks are merged as a single block
-      if (subpaths.length > limit || (subpaths.length > 0 && limit === MAX_DISPLAY_LIMIT)) {
+      // This logic is for other objects for Max Limit 30 we are calculating 
+      // Other Object Size = Total Size - Sum of all subpaths Size
+      if (subpaths.length >= limit || (subpaths.length > 0 && limit === MAX_DISPLAY_LIMIT)) {
         subpaths = subpaths.slice(0, limit);
         let topSize = 0;
-        for (let i = 0; limit === MAX_DISPLAY_LIMIT ? i < subpaths.length : i < limit; ++i) {
+        for (let i = 0; i < subpaths.length; ++i) {
           topSize += subpaths[i].size;
         }
         const otherSize = dataSize - topSize;
@@ -265,12 +265,9 @@ export class DiskUsage extends React.Component<Record<string, object>, IDUState>
 
   updateDisplayLimit(e): void {
     let res = -1;
-    if (e.key === '30') {
-      res = Number.parseInt(e.key, 10);
-    } else {
+    if (e.key) {
       res = Number.parseInt(e.key, 10);
     }
-
     this.updatePieChart(this.state.inputPath, res);
   }
 
