@@ -217,29 +217,46 @@ public final class XceiverClientRatis extends XceiverClientSpi {
     return commitInfoMap;
   }
 
+  private CompletableFuture<RaftClientReply> sendRequestAsyncInternal(
+      ContainerCommandRequestProto request, ReplicationLevel writeReplicationLevel) {
+    final ContainerCommandRequestMessage message =
+        ContainerCommandRequestMessage.toMessage(request, TracingUtil.exportCurrentSpan());
+    if (HddsUtils.isReadOnly(request)) {
+      if (LOG.isDebugEnabled()) {
+        LOG.debug("sendCommandAsync ReadOnly {}", message);
+      }
+      return getClient().async().sendReadOnly(message);
+    } else {
+      if (LOG.isDebugEnabled()) {
+        LOG.debug("sendCommandAsync {}", message);
+      }
+      return getClient().async().send(message, writeReplicationLevel);
+    }
+  }
+
+  /**
+   * Sends request async with ReplicationLevel.ALL_COMMITTED.
+   * @param request ContainerCommandRequestProto
+   * @return CompletableFuture<RaftClientReply>
+   */
   private CompletableFuture<RaftClientReply> sendRequestAsync(
       ContainerCommandRequestProto request) {
-    return TracingUtil.executeInNewSpan(
-        "XceiverClientRatis." + request.getCmdType().name(),
-        () -> {
-          final ContainerCommandRequestMessage message
-              = ContainerCommandRequestMessage.toMessage(
-              request, TracingUtil.exportCurrentSpan());
-          if (HddsUtils.isReadOnly(request)) {
-            if (LOG.isDebugEnabled()) {
-              LOG.debug("sendCommandAsync ReadOnly {}", message);
-            }
-            return getClient().async().sendReadOnly(message);
-          } else {
-            if (LOG.isDebugEnabled()) {
-              LOG.debug("sendCommandAsync {}", message);
-            }
-            return getClient().async().send(message, ReplicationLevel.ALL_COMMITTED);
-          }
+    final String spanName = "XceiverClientRatis." + request.getCmdType().name();
+    return TracingUtil.executeInNewSpan(spanName,
+        () -> sendRequestAsyncInternal(request, ReplicationLevel.ALL_COMMITTED));
+  }
 
-        }
-
-    );
+  /**
+   * Sends request async with ReplicationLevel.ALL_COMMITTED.
+   * @param request ContainerCommandRequestProto
+   * @param writeReplicationLevel Desired ReplicationLevel for write ops.
+   * @return CompletableFuture<RaftClientReply>
+   */
+  private CompletableFuture<RaftClientReply> sendRequestAsync(
+      ContainerCommandRequestProto request, ReplicationLevel writeReplicationLevel) {
+    final String spanName = "XceiverClientRatis." + request.getCmdType().name();
+    return TracingUtil.executeInNewSpan(spanName,
+        () -> sendRequestAsyncInternal(request, writeReplicationLevel));
   }
 
   // gets the minimum log index replicated to all servers
@@ -319,10 +336,27 @@ public final class XceiverClientRatis extends XceiverClientSpi {
   @Override
   public XceiverClientReply sendCommandAsync(
       ContainerCommandRequestProto request) {
+    return sendCommandAsyncInternal(request, ReplicationLevel.ALL_COMMITTED);
+  }
+
+  /**
+   * Sends a given command to server gets a waitable future back.
+   *
+   * @param request Request
+   * @param writeReplicationLevel Desired ReplicationLevel for write ops.
+   * @return Response to the command
+   */
+  @Override
+  public XceiverClientReply sendCommandAsync(
+      ContainerCommandRequestProto request, ReplicationLevel writeReplicationLevel) {
+    return sendCommandAsyncInternal(request, writeReplicationLevel);
+  }
+
+  private XceiverClientReply sendCommandAsyncInternal(
+      ContainerCommandRequestProto request, ReplicationLevel writeReplicationLevel) {
     XceiverClientReply asyncReply = new XceiverClientReply(null);
     long requestTime = System.currentTimeMillis();
-    CompletableFuture<RaftClientReply> raftClientReply =
-        sendRequestAsync(request);
+    CompletableFuture<RaftClientReply> raftClientReply = sendRequestAsync(request, writeReplicationLevel);
     metrics.incrPendingContainerOpsMetrics(request.getCmdType());
     CompletableFuture<ContainerCommandResponseProto> containerCommandResponse =
         raftClientReply.whenComplete((reply, e) -> {

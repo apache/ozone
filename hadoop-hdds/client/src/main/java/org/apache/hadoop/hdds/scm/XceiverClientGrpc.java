@@ -61,6 +61,7 @@ import com.google.common.base.Preconditions;
 import io.opentracing.Scope;
 import io.opentracing.Span;
 import io.opentracing.util.GlobalTracer;
+import org.apache.ratis.proto.RaftProtos.ReplicationLevel;
 import org.apache.ratis.thirdparty.io.grpc.ManagedChannel;
 import org.apache.ratis.thirdparty.io.grpc.Status;
 import org.apache.ratis.thirdparty.io.grpc.netty.GrpcSslContexts;
@@ -504,6 +505,13 @@ public class XceiverClientGrpc extends XceiverClientSpi {
     } finally {
       span.finish();
     }
+  }
+
+  @Override
+  public XceiverClientReply sendCommandAsync(
+      ContainerCommandRequestProto request, ReplicationLevel writeReplicationLevel) {
+    // TODO: Is throwing NotImplementedException better?
+    throw new IllegalArgumentException("ReplicationLevel is not applicable to " + getClass().getSimpleName());
   }
 
   /**
