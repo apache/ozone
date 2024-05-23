@@ -17,6 +17,7 @@
 package org.apache.hadoop.hdds.utils;
 
 import com.google.common.annotations.VisibleForTesting;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 
 import java.io.IOException;
 
@@ -47,6 +48,15 @@ public abstract class FaultInjector {
 
   @VisibleForTesting
   public Throwable getException() {
+    return null;
+  }
+
+  @VisibleForTesting
+  public void setType(ContainerProtos.Type type) {
+  }
+
+  @VisibleForTesting
+  public ContainerProtos.Type getType() {
     return null;
   }
 }

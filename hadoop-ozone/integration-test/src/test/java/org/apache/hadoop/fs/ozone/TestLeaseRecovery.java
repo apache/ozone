@@ -265,6 +265,7 @@ public class TestLeaseRecovery {
       stream.flush();
 
       FaultInjectorImpl injector = new FaultInjectorImpl();
+      injector.setType(ContainerProtos.Type.FinalizeBlock);
       KeyValueHandler.setInjector(injector);
       StorageContainerException sce = new StorageContainerException(
           "Requested operation not allowed as ContainerState is CLOSED",
@@ -357,6 +358,7 @@ public class TestLeaseRecovery {
       OzoneTestUtils.closeContainer(cluster.getStorageContainerManager(), container);
       // pause getCommittedBlockLength handling on all DNs to make sure all getCommittedBlockLength will time out
       FaultInjectorImpl injector = new FaultInjectorImpl();
+      injector.setType(ContainerProtos.Type.GetCommittedBlockLength);
       KeyValueHandler.setInjector(injector);
       GenericTestUtils.LogCapturer logs =
           GenericTestUtils.LogCapturer.captureLogs(XceiverClientGrpc.getLogger());
