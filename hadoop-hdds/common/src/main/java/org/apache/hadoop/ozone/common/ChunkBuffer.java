@@ -18,10 +18,12 @@
 package org.apache.hadoop.ozone.common;
 
 import java.io.IOException;
+import java.lang.ref.WeakReference;
 import java.nio.ByteBuffer;
 import java.nio.channels.GatheringByteChannel;
 import java.util.List;
 import java.util.Objects;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.Supplier;
@@ -61,24 +63,14 @@ public interface ChunkBuffer extends UncheckedAutoCloseable {
     return new ChunkBufferImplWithByteBuffer(buffer);
   }
 
-  /** Wrap the given {@link ByteBuffer} as a {@link ChunkBuffer}, with a function called when buffer is released. */
-  static ChunkBuffer wrap(ByteBuffer buffer, Consumer<Integer> function) {
-    return new ChunkBufferImplWithByteBuffer(buffer, function);
-  }
-
-  /** Wrap the given list of {@link ByteBuffer}s as a {@link ChunkBuffer}. */
-  static ChunkBuffer wrap(List<ByteBuffer> buffers) {
-    return wrap(buffers, null);
-  }
-
   /** Wrap the given list of {@link ByteBuffer}s as a {@link ChunkBuffer},
    * with a function called when buffers are released.*/
-  static ChunkBuffer wrap(List<ByteBuffer> buffers, Consumer<Integer> function) {
+  static ChunkBuffer wrap(List<ByteBuffer> buffers) {
     Objects.requireNonNull(buffers, "buffers == null");
     if (buffers.size() == 1) {
-      return wrap(buffers.get(0), function);
+      return wrap(buffers.get(0));
     }
-    return new ChunkBufferImplWithByteBufferList(buffers, function);
+    return new ChunkBufferImplWithByteBufferList(buffers);
   }
 
   /** Similar to {@link ByteBuffer#position()}. */

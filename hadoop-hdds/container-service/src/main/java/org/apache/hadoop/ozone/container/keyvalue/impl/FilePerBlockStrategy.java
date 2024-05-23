@@ -77,7 +77,7 @@ public class FilePerBlockStrategy implements ChunkManager {
   private final int defaultReadBufferCapacity;
   private final int readMappedBufferThreshold;
   private final int readMappedBufferMaxCount;
-  private final Semaphore semaphore;
+  private final MappedBufferManager mappedBufferManager;
   private final VolumeSet volumeSet;
 
   public FilePerBlockStrategy(boolean sync, BlockManager manager,
@@ -92,9 +92,9 @@ public class FilePerBlockStrategy implements ChunkManager {
     LOG.info("ozone.chunk.read.mapped.buffer.max.count is load with {}", readMappedBufferMaxCount);
     this.volumeSet = volSet;
     if (this.readMappedBufferMaxCount > 0) {
-      semaphore = new Semaphore(this.readMappedBufferMaxCount);
+      mappedBufferManager = new MappedBufferManager(this.readMappedBufferMaxCount);
     } else {
-      semaphore = null;
+      mappedBufferManager = null;
     }
   }
 
@@ -206,7 +206,7 @@ public class FilePerBlockStrategy implements ChunkManager {
     int bufferCapacity = ChunkManager.getBufferCapacityForChunkRead(info,
         defaultReadBufferCapacity);
     return ChunkUtils.readData(len, bufferCapacity, chunkFile, offset, volume,
-        readMappedBufferThreshold, readMappedBufferMaxCount > 0, semaphore);
+        readMappedBufferThreshold, readMappedBufferMaxCount > 0, mappedBufferManager);
   }
 
   @Override

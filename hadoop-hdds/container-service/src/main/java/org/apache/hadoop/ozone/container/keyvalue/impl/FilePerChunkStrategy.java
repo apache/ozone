@@ -69,7 +69,7 @@ public class FilePerChunkStrategy implements ChunkManager {
   private final int defaultReadBufferCapacity;
   private final int readMappedBufferThreshold;
   private final int readMappedBufferMaxCount;
-  private final Semaphore semaphore;
+  private final MappedBufferManager mappedBufferManager;
   private final VolumeSet volumeSet;
 
   public FilePerChunkStrategy(boolean sync, BlockManager manager,
@@ -85,9 +85,9 @@ public class FilePerChunkStrategy implements ChunkManager {
     LOG.info("ozone.chunk.read.mapped.buffer.max.count is load with {}", readMappedBufferMaxCount);
     this.volumeSet = volSet;
     if (this.readMappedBufferMaxCount > 0) {
-      semaphore = new Semaphore(this.readMappedBufferMaxCount);
+      mappedBufferManager = new MappedBufferManager(this.readMappedBufferMaxCount);
     } else {
-      semaphore = null;
+      mappedBufferManager = null;
     }
   }
 
@@ -276,7 +276,7 @@ public class FilePerChunkStrategy implements ChunkManager {
           long offset = info.getOffset() - chunkFileOffset;
           Preconditions.checkState(offset >= 0);
           return ChunkUtils.readData(len, bufferCapacity, file, offset, volume,
-              readMappedBufferThreshold, readMappedBufferMaxCount > 0, semaphore);
+              readMappedBufferThreshold, readMappedBufferMaxCount > 0, mappedBufferManager);
         }
       } catch (StorageContainerException ex) {
         //UNABLE TO FIND chunk is not a problem as we will try with the

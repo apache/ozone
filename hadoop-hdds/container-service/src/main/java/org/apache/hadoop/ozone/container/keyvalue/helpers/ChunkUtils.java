@@ -40,7 +40,7 @@ import java.util.EnumSet;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.Semaphore;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Supplier;
 import java.util.function.ToLongFunction;
 
@@ -51,6 +51,7 @@ import org.apache.hadoop.ozone.common.ChunkBuffer;
 import org.apache.hadoop.ozone.common.utils.BufferUtils;
 import org.apache.hadoop.ozone.container.common.helpers.ChunkInfo;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
+import org.apache.hadoop.ozone.container.keyvalue.impl.MappedBufferManager;
 import org.apache.hadoop.util.Time;
 
 import com.google.common.annotations.VisibleForTesting;
@@ -191,9 +192,9 @@ public final class ChunkUtils {
   @SuppressWarnings("checkstyle:parameternumber")
   public static ChunkBuffer readData(long len, int bufferCapacity,
       File file, long off, HddsVolume volume, int readMappedBufferThreshold, boolean mmapEnabled,
-      Semaphore semaphore) throws StorageContainerException {
+      MappedBufferManager mappedBufferManager) throws StorageContainerException {
     if (mmapEnabled && len > readMappedBufferThreshold && bufferCapacity > readMappedBufferThreshold) {
-      return readData(file, bufferCapacity, off, len, volume, semaphore);
+      return readData(file, bufferCapacity, off, len, volume, mappedBufferManager);
     } else if (len == 0) {
       return ChunkBuffer.wrap(Collections.emptyList());
     }
@@ -254,11 +255,11 @@ public final class ChunkUtils {
    * @return a list of {@link MappedByteBuffer} containing the data.
    */
   private static ChunkBuffer readData(File file, int chunkSize,
-      long offset, long length, HddsVolume volume, Semaphore semaphore)
+      long offset, long length, HddsVolume volume, MappedBufferManager mappedBufferManager)
       throws StorageContainerException {
 
     final int bufferNum = Math.toIntExact((length - 1) / chunkSize) + 1;
-    if (!semaphore.tryAcquire(bufferNum)) {
+    if (!mappedBufferManager.getQuota(bufferNum)) {
       // proceed with normal buffer
       final ByteBuffer[] buffers = BufferUtils.assignByteBuffers(length,
           chunkSize);
@@ -266,26 +267,39 @@ public final class ChunkUtils {
       Arrays.stream(buffers).forEach(ByteBuffer::flip);
       return ChunkBuffer.wrap(Arrays.asList(buffers));
     } else {
-      // proceed with mapped buffer
-      LOG.debug("mapped buffer permits decreased by {} to total {}", bufferNum, semaphore.availablePermits());
-      final List<ByteBuffer> buffers = new ArrayList<>(bufferNum);
-      readData(file, offset, length, channel -> {
-        long readLen = 0;
-        while (readLen < length) {
-          final int n = Math.toIntExact(Math.min(length - readLen, chunkSize));
-          final ByteBuffer mapped = channel.map(
-              FileChannel.MapMode.READ_ONLY, offset + readLen, n);
-          LOG.debug("mapped: offset={}, readLen={}, n={}, {}",
-              offset, readLen, n, mapped.getClass());
-          readLen += mapped.remaining();
-          buffers.add(mapped);
-        }
-        return readLen;
-      }, volume);
-      return ChunkBuffer.wrap(buffers, permits -> {
-        semaphore.release(permits);
-        LOG.debug("mapped buffer permits increased by {} to total {}", permits, semaphore.availablePermits());
-      });
+      try {
+        // proceed with mapped buffer
+        final List<ByteBuffer> buffers = new ArrayList<>(bufferNum);
+        readData(file, offset, length, channel -> {
+          long readLen = 0;
+          while (readLen < length) {
+            final int n = Math.toIntExact(Math.min(length - readLen, chunkSize));
+            final long finalOffset = offset + readLen;
+            final AtomicReference<IOException> exception = new AtomicReference<>();
+            ByteBuffer mapped = mappedBufferManager.computeIfAbsent(file.getAbsolutePath(), finalOffset, n,
+                () -> {
+                  try {
+                    return channel.map(FileChannel.MapMode.READ_ONLY, finalOffset, n);
+                  } catch (IOException e) {
+                    LOG.error("Failed to map file {} with offset {} and length {}", file, finalOffset, n);
+                    exception.set(e);
+                    return null;
+                  }
+                });
+            if (mapped == null) {
+              throw exception.get();
+            }
+            LOG.debug("mapped: offset={}, readLen={}, n={}, {}", finalOffset, readLen, n, mapped.getClass());
+            readLen += mapped.remaining();
+            buffers.add(mapped);
+          }
+          return readLen;
+        }, volume);
+        return ChunkBuffer.wrap(buffers);
+      } catch (Throwable e) {
+        mappedBufferManager.releaseQuota(bufferNum);
+        throw e;
+      }
     }
   }
 
