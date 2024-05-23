@@ -395,6 +395,7 @@ message ChunkInfo {
   repeated KeyValue metadata = 4;
   required ChecksumData checksumData =5;
   optional bytes stripeChecksum = 6;
+  optional bool healthy = 7;
 }
 
 message ChunkInfoList {
@@ -524,6 +525,25 @@ message SendContainerRequest {
 }
 
 message SendContainerResponse {
+}
+
+message ChunkInfoListMerkleTree {
+  repeated ChunkInfo chunks = 1; // List of chunks, a chunk has multiple hashes within it.
+}
+
+message BlockMerkleTree {
+  optional DatanodeBlockID blockID = 1;
+  optional int64 checksum = 2;
+  optional ChunkInfoListMerkleTree chunkInfo = 3;
+  optional bool deleted = 4;
+  optional bool healthy = 5;
+}
+
+message ContainerMerkleTree {
+  optional int64 containerID = 1;
+  optional int64 checksum = 2;
+  optional int64 deleteChecksum = 3;
+  repeated BlockMerkleTree blockMerkleTree = 4;
 }
 
 service XceiverClientProtocolService {
