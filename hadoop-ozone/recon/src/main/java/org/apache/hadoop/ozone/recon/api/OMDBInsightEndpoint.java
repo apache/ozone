@@ -1178,6 +1178,8 @@ public class OMDBInsightEndpoint {
       OmDirectoryInfo dirInfo = handler.getDirInfo(names);
       if (null != dirInfo) {
         dirObjectId = dirInfo.getObjectID();
+      } else {
+        throw new IllegalArgumentException("Not valid path");
       }
     } catch (Exception ioe) {
       throw new IllegalArgumentException("Not valid path: " + ioe);

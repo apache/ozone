@@ -119,6 +119,7 @@ public class TestOmDBInsightEndPoint extends AbstractReconSqlDBTest {
   private static final String EMPTY_OBS_BUCKET = "empty-obs-bucket";
   private static final String EMPTY_FSO_BUCKET = "empty-fso-bucket";
   private static final String LEGACY_BUCKET = "legacy-bucket";
+  private static final String FSO_BUCKET_TWO = "fso-bucket2";
 
   private static final String DIR_ONE = "dir1";
   private static final String DIR_TWO = "dir2";
@@ -128,6 +129,10 @@ public class TestOmDBInsightEndPoint extends AbstractReconSqlDBTest {
   private static final String DIR_FIVE = "dir5";
   private static final String DIR_SIX = "dir6";
   private static final String DIR_SEVEN = "dir7";
+
+  private static final String DIR_EIGHT = "dir8";
+  private static final String DIR_NINE = "dir9";
+  private static final String DIR_TEN = "dir10";
 
   private static final String TEST_FILE = "testfile";
   private static final String FILE_ONE = "file1";
@@ -147,12 +152,26 @@ public class TestOmDBInsightEndPoint extends AbstractReconSqlDBTest {
   private static final String KEY_TWELVE = "key12";
   private static final String KEY_THIRTEEN = "dir4/dir7/key13";
 
+  private static final String KEY_FOURTEEN = "dir8/key14";
+  private static final String KEY_FIFTEEN = "dir8/key15";
+  private static final String KEY_SIXTEEN = "dir9/key16";
+  private static final String KEY_SEVENTEEN = "dir9/key17";
+  private static final String KEY_EIGHTEEN = "dir8/key18";
+  private static final String KEY_NINETEEN = "dir8/key19";
+
   private static final String FILE_EIGHT = "key8";
   private static final String FILE_NINE = "key9";
   private static final String FILE_TEN = "key10";
   private static final String FILE_ELEVEN = "key11";
   private static final String FILE_TWELVE = "key12";
   private static final String FILE_THIRTEEN = "key13";
+
+  private static final String FILE_FOURTEEN = "key14";
+  private static final String FILE_FIFTEEN = "key15";
+  private static final String FILE_SIXTEEN = "key16";
+  private static final String FILE_SEVENTEEN = "key17";
+  private static final String FILE_EIGHTEEN = "key18";
+  private static final String FILE_NINETEEN = "key19";
 
   private static final long PARENT_OBJECT_ID_ZERO = 0L;
   private static final long VOLUME_ONE_OBJECT_ID = 1L;
@@ -187,8 +206,19 @@ public class TestOmDBInsightEndPoint extends AbstractReconSqlDBTest {
   private static final long KEY_SEVENTEEN_OBJECT_ID = 28L;
   private static final long KEY_EIGHTEEN_OBJECT_ID = 29L;
 
-  private static final long EMPTY_OBS_BUCKET_OBJECT_ID = 34L;
-  private static final long EMPTY_FSO_BUCKET_OBJECT_ID = 35L;
+  private static final long FSO_BUCKET_TWO_OBJECT_ID = 30L;
+  private static final long DIR_EIGHT_OBJECT_ID = 31L;
+  private static final long DIR_NINE_OBJECT_ID = 32L;
+  private static final long DIR_TEN_OBJECT_ID = 33L;
+  private static final long KEY_NINETEEN_OBJECT_ID = 34L;
+  private static final long KEY_TWENTY_OBJECT_ID = 35L;
+  private static final long KEY_TWENTY_ONE_OBJECT_ID = 36L;
+  private static final long KEY_TWENTY_TWO_OBJECT_ID = 37L;
+  private static final long KEY_TWENTY_THREE_OBJECT_ID = 38L;
+  private static final long KEY_TWENTY_FOUR_OBJECT_ID = 39L;
+
+  private static final long EMPTY_OBS_BUCKET_OBJECT_ID = 40L;
+  private static final long EMPTY_FSO_BUCKET_OBJECT_ID = 41L;
 
   private static final long KEY_ONE_SIZE = 2 * OzoneConsts.KB + 1; // bin 2
   private static final long KEY_TWO_SIZE = 2 * OzoneConsts.KB + 1; // bin 2
@@ -205,22 +235,24 @@ public class TestOmDBInsightEndPoint extends AbstractReconSqlDBTest {
 
   private static final long KEY_THIRTEEN_SIZE = 2 * OzoneConsts.KB + 1; // bin 2
 
+  private static final long KEY_FOURTEEN_SIZE = OzoneConsts.KB + 1; // bin 1
+  private static final long KEY_FIFTEEN_SIZE = 2 * OzoneConsts.KB + 1; // bin 2
+  private static final long KEY_SIXTEEN_SIZE = OzoneConsts.KB + 1; // bin 1
+  private static final long KEY_SEVENTEEN_SIZE = 2 * OzoneConsts.KB + 1; // bin 2
+  private static final long KEY_EIGHTEEN_SIZE = OzoneConsts.KB + 1; // bin 1
+  private static final long KEY_NINETEEN_SIZE = 2 * OzoneConsts.KB + 1; // bin 2
+
   private static final String OBS_BUCKET_PATH = "/volume1/obs-bucket";
   private static final String FSO_BUCKET_PATH = "/volume1/fso-bucket";
   private static final String LEGACY_BUCKET_PATH = "/volume1/legacy-bucket";
   private static final String EMPTY_OBS_BUCKET_PATH = "/volume1/empty-obs-bucket";
   private static final String EMPTY_FSO_BUCKET_PATH = "/volume1/empty-fso-bucket";
+  private static final String FSO_BUCKET_TWO_PATH = "/volume1/fso-bucket2";
 
   private static final String DIR_ONE_PATH = "/volume1/fso-bucket/dir1";
   private static final String DIR_TWO_PATH = "/volume1/fso-bucket/dir1/dir2";
   private static final String DIR_THREE_PATH = "/volume1/fso-bucket/dir1/dir2/dir3";
   private static final String NON_EXISTENT_DIR_FOUR_PATH = "/volume1/fso-bucket/dir1/dir2/dir3/dir4";
-
-  private static final String DIR_FOUR_PATH = "/volume1/legacy-bucket/dir4";
-  private static final String DIR_FIVE_PATH = "/volume1/legacy-bucket/dir4";
-  private static final String DIR_SIX_PATH = "/volume1/legacy-bucket/dir4";
-  private static final String DIR_SEVEN_PATH = "/volume1/legacy-bucket/dir4";
-
 
   private static final long VOLUME_ONE_QUOTA = 2 * OzoneConsts.MB;
   private static final long OBS_BUCKET_QUOTA = OzoneConsts.MB;
@@ -445,6 +477,18 @@ public class TestOmDBInsightEndPoint extends AbstractReconSqlDBTest {
 
     reconOMMetadataManager.getBucketTable().put(legacyBucketKey, legacyBucketInfo);
 
+    OmBucketInfo fsoBucketTwoInfo = OmBucketInfo.newBuilder()
+        .setVolumeName(VOLUME_ONE)
+        .setBucketName(FSO_BUCKET_TWO)
+        .setObjectID(FSO_BUCKET_TWO_OBJECT_ID)
+        .setQuotaInBytes(OzoneConsts.MB)
+        .setBucketLayout(BucketLayout.FILE_SYSTEM_OPTIMIZED)
+        .build();
+    String fsoBucketTwoKey = reconOMMetadataManager.getBucketKey(
+        fsoBucketTwoInfo.getVolumeName(), fsoBucketTwoInfo.getBucketName());
+
+    reconOMMetadataManager.getBucketTable().put(fsoBucketTwoKey, fsoBucketTwoInfo);
+
     // Write FSO keys data - Start
     writeDirToOm(reconOMMetadataManager, DIR_ONE_OBJECT_ID,
         FSO_BUCKET_OBJECT_ID, FSO_BUCKET_OBJECT_ID,
@@ -538,6 +582,99 @@ public class TestOmDBInsightEndPoint extends AbstractReconSqlDBTest {
         ratisOne,
         epochMillis2, true);
     // Write FSO Keys data - End
+
+    // Write FSO bucket two keys - Start
+    writeDirToOm(reconOMMetadataManager, DIR_EIGHT_OBJECT_ID,
+        FSO_BUCKET_TWO_OBJECT_ID, FSO_BUCKET_TWO_OBJECT_ID,
+        VOLUME_ONE_OBJECT_ID, DIR_EIGHT);
+    writeDirToOm(reconOMMetadataManager, DIR_NINE_OBJECT_ID,
+        FSO_BUCKET_TWO_OBJECT_ID, FSO_BUCKET_TWO_OBJECT_ID,
+        VOLUME_ONE_OBJECT_ID, DIR_NINE);
+    writeDirToOm(reconOMMetadataManager, DIR_TEN_OBJECT_ID,
+        FSO_BUCKET_TWO_OBJECT_ID, FSO_BUCKET_TWO_OBJECT_ID,
+        VOLUME_ONE_OBJECT_ID, DIR_TEN);
+
+    writeKeyToOm(reconOMMetadataManager,
+        TEST_FILE,
+        FSO_BUCKET_TWO,
+        VOLUME_ONE,
+        TEST_FILE,
+        KEY_NINETEEN_OBJECT_ID,
+        DIR_EIGHT_OBJECT_ID,
+        FSO_BUCKET_TWO_OBJECT_ID,
+        VOLUME_ONE_OBJECT_ID,
+        KEY_FOURTEEN_SIZE,
+        BucketLayout.FILE_SYSTEM_OPTIMIZED,
+        ratisOne,
+        epochMillis1, true);
+    writeKeyToOm(reconOMMetadataManager,
+        FILE_ONE,
+        FSO_BUCKET_TWO,
+        VOLUME_ONE,
+        FILE_ONE,
+        KEY_TWENTY_OBJECT_ID,
+        DIR_EIGHT_OBJECT_ID,
+        FSO_BUCKET_TWO_OBJECT_ID,
+        VOLUME_ONE_OBJECT_ID,
+        KEY_FIFTEEN_SIZE,
+        BucketLayout.FILE_SYSTEM_OPTIMIZED,
+        ratisOne,
+        epochMillis1, true);
+
+    writeKeyToOm(reconOMMetadataManager,
+        TEST_FILE,
+        FSO_BUCKET_TWO,
+        VOLUME_ONE,
+        TEST_FILE,
+        KEY_TWENTY_ONE_OBJECT_ID,
+        DIR_NINE_OBJECT_ID,
+        FSO_BUCKET_TWO_OBJECT_ID,
+        VOLUME_ONE_OBJECT_ID,
+        KEY_SIXTEEN_SIZE,
+        BucketLayout.FILE_SYSTEM_OPTIMIZED,
+        ratisOne,
+        epochMillis1, true);
+    writeKeyToOm(reconOMMetadataManager,
+        FILE_ONE,
+        FSO_BUCKET_TWO,
+        VOLUME_ONE,
+        FILE_ONE,
+        KEY_TWENTY_TWO_OBJECT_ID,
+        DIR_NINE_OBJECT_ID,
+        FSO_BUCKET_TWO_OBJECT_ID,
+        VOLUME_ONE_OBJECT_ID,
+        KEY_SEVENTEEN_SIZE,
+        BucketLayout.FILE_SYSTEM_OPTIMIZED,
+        ratisOne,
+        epochMillis1, true);
+
+    writeKeyToOm(reconOMMetadataManager,
+        TEST_FILE,
+        FSO_BUCKET_TWO,
+        VOLUME_ONE,
+        TEST_FILE,
+        KEY_TWENTY_THREE_OBJECT_ID,
+        DIR_TEN_OBJECT_ID,
+        FSO_BUCKET_TWO_OBJECT_ID,
+        VOLUME_ONE_OBJECT_ID,
+        KEY_EIGHTEEN_SIZE,
+        BucketLayout.FILE_SYSTEM_OPTIMIZED,
+        ratisOne,
+        epochMillis1, true);
+    writeKeyToOm(reconOMMetadataManager,
+        FILE_ONE,
+        FSO_BUCKET_TWO,
+        VOLUME_ONE,
+        FILE_ONE,
+        KEY_TWENTY_FOUR_OBJECT_ID,
+        DIR_TEN_OBJECT_ID,
+        FSO_BUCKET_TWO_OBJECT_ID,
+        VOLUME_ONE_OBJECT_ID,
+        KEY_NINETEEN_SIZE,
+        BucketLayout.FILE_SYSTEM_OPTIMIZED,
+        ratisOne,
+        epochMillis1, true);
+    // Write FSO bucket two keys - End
 
     // Write OBS Keys data - Start
     writeKeyToOm(reconOMMetadataManager,
@@ -1426,6 +1563,39 @@ public class TestOmDBInsightEndPoint extends AbstractReconSqlDBTest {
   }
 
   @Test
+  public void testListKeysFSOBucketTwoPathWithLimitAcrossDirsAtBucketLevel() {
+    // bucket level keyList
+    // Total 3 pages , each page 2 records. If each page we will retrieve 2 items, as total 6 FSO keys,
+    // so till we get empty last key, we'll continue to fetch and empty last key signifies the last page.
+    // First Page
+    Response bucketResponse = omdbInsightEndpoint.listKeys("RATIS", "", 0, FSO_BUCKET_TWO_PATH,
+        "", 3);
+    ListKeysResponse listKeysResponse = (ListKeysResponse) bucketResponse.getEntity();
+    assertEquals(3, listKeysResponse.getKeys().size());
+    KeyEntityInfo keyEntityInfo = listKeysResponse.getKeys().get(0);
+    assertEquals("volume1/fso-bucket2/dir8/file1", keyEntityInfo.getPath());
+    assertEquals("/1/30/32/file1", listKeysResponse.getLastKey());
+    assertEquals("RATIS", keyEntityInfo.getReplicationConfig().getReplicationType().toString());
+
+    // Second page
+    bucketResponse = omdbInsightEndpoint.listKeys("RATIS", "", 0,
+        FSO_BUCKET_TWO_PATH, listKeysResponse.getLastKey(), 3);
+    listKeysResponse = (ListKeysResponse) bucketResponse.getEntity();
+    assertEquals(3, listKeysResponse.getKeys().size());
+    keyEntityInfo = listKeysResponse.getKeys().get(0);
+    assertEquals("volume1/fso-bucket2/dir9/testfile", keyEntityInfo.getPath());
+    assertEquals("/1/30/33/testfile", listKeysResponse.getLastKey());
+
+    // Try again if third page is available. Ideally there should not be any further records
+    // and lastKey should be empty as per design.
+    bucketResponse = omdbInsightEndpoint.listKeys("RATIS", "", 0,
+        FSO_BUCKET_TWO_PATH, listKeysResponse.getLastKey(), 3);
+    listKeysResponse = (ListKeysResponse) bucketResponse.getEntity();
+    assertEquals(0, listKeysResponse.getKeys().size());
+    assertEquals("", listKeysResponse.getLastKey());
+  }
+
+  @Test
   public void testListKeysFSOBucketDirTwoPathWithLimitAndPagination() {
     // bucket level keyList
     // Total 2 pages , each page 2 records. If each page we will retrieve 2 items, as total 4 FSO keys,
@@ -1622,6 +1792,21 @@ public class TestOmDBInsightEndPoint extends AbstractReconSqlDBTest {
     ListKeysResponse listKeysResponse = (ListKeysResponse) bucketResponse.getEntity();
     assertEquals(0, listKeysResponse.getKeys().size());
     assertEquals("", listKeysResponse.getLastKey());
+  }
+
+  @Test
+  public void testListKeysForNullOrEmptyStartPrefixPath() {
+    Response nullStartPrefixResp = omdbInsightEndpoint.listKeys("RATIS", "", 0, null,
+        "", 2);
+    assertEquals(Response.Status.BAD_REQUEST.getStatusCode(), nullStartPrefixResp.getStatus());
+
+    Response emptyStartPrefixResp = omdbInsightEndpoint.listKeys("RATIS", "", 0, "",
+        "", 2);
+    assertEquals(Response.Status.BAD_REQUEST.getStatusCode(), emptyStartPrefixResp.getStatus());
+
+    Response invaliStartPrefixResp = omdbInsightEndpoint.listKeys("RATIS", "", 0, "null",
+        "", 2);
+    assertEquals(Response.Status.BAD_REQUEST.getStatusCode(), invaliStartPrefixResp.getStatus());
   }
 
   @Test
