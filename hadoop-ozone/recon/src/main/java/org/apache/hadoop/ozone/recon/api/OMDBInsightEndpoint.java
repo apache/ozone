@@ -1228,11 +1228,11 @@ public class OMDBInsightEndpoint {
           continue;
         }
         if (applyFilters(entry, paramInfo)) {
+          matchedKeys.put(dbKey, entry.getValue());
+          paramInfo.setLastKey(dbKey);
           if (matchedKeys.size() >= paramInfo.getLimit()) {
             break;
           }
-          matchedKeys.put(dbKey, entry.getValue());
-          paramInfo.setLastKey(dbKey);
         }
       }
     } catch (IOException exception) {
