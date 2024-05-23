@@ -40,7 +40,6 @@ import org.apache.hadoop.hdds.security.token.OzoneBlockTokenIdentifier;
 import org.apache.hadoop.security.token.Token;
 
 import com.google.common.annotations.VisibleForTesting;
-import org.apache.ratis.thirdparty.io.netty.util.concurrent.CompleteFuture;
 import org.apache.ratis.util.JavaUtils;
 
 /**

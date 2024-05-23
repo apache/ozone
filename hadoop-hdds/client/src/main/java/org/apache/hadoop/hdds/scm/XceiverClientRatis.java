@@ -29,7 +29,6 @@ import java.util.concurrent.CompletionException;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.ExecutionException;
-import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Stream;
 
@@ -267,48 +266,113 @@ public final class XceiverClientRatis extends XceiverClientSpi {
 
   @Override
   public XceiverClientReply watchForCommit(long index)
-      throws InterruptedException, ExecutionException, TimeoutException,
-      IOException {
+      throws InterruptedException, ExecutionException {
     final long replicatedMin = getReplicatedMinCommitIndex();
     if (replicatedMin >= index) {
       return newWatchReply(index, "replicatedMin", replicatedMin);
     }
 
+//    return watchForCommitInternalOld(index);
+    return watchForCommitInternalNew(index);
+  }
+
+  /**
+   * Old implementation that handles the retry using try-catch with a new future.
+   */
+  private XceiverClientReply watchForCommitInternalOld(long index)
+      throws InterruptedException, ExecutionException {
     try {
       CompletableFuture<RaftClientReply> replyFuture = getClient().async()
           .watch(index, RaftProtos.ReplicationLevel.ALL_COMMITTED);
       final RaftClientReply reply = replyFuture.get();
+      LOG.warn("!!! watchForCommit({}) ALL_COMMITTED success", index);
       final long updated = updateCommitInfosMap(reply);
       Preconditions.checkState(updated >= index);
       return newWatchReply(index, ReplicationLevel.ALL_COMMITTED, updated);
     } catch (Exception e) {
+      LOG.error("!!! watchForCommit({}) ALL_COMMITTED failed", index);
       LOG.warn("3 way commit failed on pipeline {}", pipeline, e);
-      Throwable t =
-          HddsClientUtils.containsException(e, GroupMismatchException.class);
+      Throwable t = HddsClientUtils.containsException(e, GroupMismatchException.class);
       if (t != null) {
         throw e;
       }
-      final RaftClientReply reply = getClient().async()
-          .watch(index, RaftProtos.ReplicationLevel.MAJORITY_COMMITTED)
-          .get();
-      final XceiverClientReply clientReply = newWatchReply(
-          index, ReplicationLevel.MAJORITY_COMMITTED, index);
+      LOG.warn("!!! watchForCommit({}) retrying with MAJORITY_COMMITTED", index);
+      CompletableFuture<RaftClientReply> replyFuture = getClient().async()
+          .watch(index, RaftProtos.ReplicationLevel.MAJORITY_COMMITTED);
+      final RaftClientReply reply = replyFuture.get();
+      LOG.warn("!!! watchForCommit({}) MAJORITY_COMMITTED success", index);
+      final XceiverClientReply clientReply = newWatchReply(index, ReplicationLevel.MAJORITY_COMMITTED, index);
       reply.getCommitInfos().stream()
           .filter(i -> i.getCommitIndex() < index)
-          .forEach(proto -> {
-            UUID address = RatisHelper.toDatanodeId(proto.getServer());
-            addDatanodetoReply(address, clientReply);
-            // since 3 way commit has failed, the updated map from now on  will
-            // only store entries for those datanodes which have had successful
-            // replication.
-            commitInfoMap.remove(address);
-            LOG.info(
-                "Could not commit index {} on pipeline {} to all the nodes. " +
-                "Server {} has failed. Committed by majority.",
-                index, pipeline, address);
-          });
+          .forEach(proto -> processCommitInfoProto(proto, clientReply, index));
       return clientReply;
     }
+  }
+
+  /**
+   * New implementation that handles the retry in the existing future.
+   */
+  private XceiverClientReply watchForCommitInternalNew(long index)
+      throws InterruptedException, ExecutionException {
+    CompletableFuture<XceiverClientReply> replyFuture = getClient().async()
+        .watch(index, RaftProtos.ReplicationLevel.ALL_COMMITTED)
+        .handle((raftClientReply, e) -> {
+          if (e == null) {
+            LOG.warn("!!! watchForCommit({}) ALL_COMMITTED success", index);
+            final long updated = updateCommitInfosMap(raftClientReply);
+            Preconditions.checkState(updated >= index);
+//            return raftClientReply;  // RaftClientReply
+            return newWatchReply(index, ReplicationLevel.ALL_COMMITTED, updated);  // XceiverClientReply
+          }
+
+          LOG.error("!!! watchForCommit({}) ALL_COMMITTED failed", index);
+          // Usually the exception is ExecutionException: org.apache.ratis.protocol.exceptions.TimeoutIOException:
+          // client-227325C3C5E5->UUID request #32 timeout 3000ms
+          LOG.warn("3 way commit failed on pipeline {}", pipeline, e);
+
+          Throwable t = HddsClientUtils.containsException((Exception) e, GroupMismatchException.class);
+          if (t != null) {
+            LOG.error("!!! GroupMismatchException found");
+            throw new CompletionException(e);  // Is this good enough? Is the semantic kept the same?
+          }
+
+          try {
+            LOG.warn("!!! watchForCommit({}) retrying with MAJORITY_COMMITTED", index);
+            final RaftClientReply majorReply = getClient().async()
+                .watch(index, ReplicationLevel.MAJORITY_COMMITTED).get();
+            final XceiverClientReply xceiverClientReply =
+                newWatchReply(index, ReplicationLevel.MAJORITY_COMMITTED, index);
+            majorReply.getCommitInfos().stream()
+                .filter(i -> i.getCommitIndex() < index)
+                .forEach(proto -> processCommitInfoProto(proto, xceiverClientReply, index));
+            return xceiverClientReply;  // XceiverClientReply
+          } catch (InterruptedException | ExecutionException ex) {
+            LOG.error("!!! watchForCommit({}) MAJORITY_COMMITTED hit exception", index, ex);
+            throw new CompletionException(ex);
+          }
+        }).whenComplete((raftClientReply, e) -> {
+          // this stage is only for logging
+          if (e != null) {
+            LOG.error("!!! watchForCommit({}) MAJORITY_COMMITTED failed as well", index, e);
+            throw new CompletionException(e);  // Could this cause any problem?
+          }
+          LOG.warn("!!! watchForCommit({}) ALL_COMMITTED or MAJORITY_COMMITTED success", index);
+        });
+
+    return replyFuture.get();
+  }
+
+  private void processCommitInfoProto(
+      RaftProtos.CommitInfoProto commitInfoProto, XceiverClientReply clientReply, long index) {
+    UUID address = RatisHelper.toDatanodeId(commitInfoProto.getServer());
+    LOG.warn("!!!! watchForCommit: processCommitInfoProto: adding datanode to reply: {}", address);
+    addDatanodetoReply(address, clientReply);
+    // since 3 way commit has failed, the updated map from now on  will
+    // only store entries for those datanodes which have had successful
+    // replication.
+    commitInfoMap.remove(address);
+    LOG.info("Could not commit index {} on pipeline {} to all the nodes. Server {} has failed. Committed by majority.",
+        index, pipeline, address);
   }
 
   /**
