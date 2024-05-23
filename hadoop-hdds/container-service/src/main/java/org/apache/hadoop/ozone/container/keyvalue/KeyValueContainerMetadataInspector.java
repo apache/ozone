@@ -35,6 +35,7 @@ import org.apache.hadoop.ozone.container.metadata.DatanodeStore;
 import org.apache.hadoop.ozone.container.metadata.DatanodeStoreSchemaThreeImpl;
 import org.apache.hadoop.ozone.container.metadata.DatanodeStoreSchemaTwoImpl;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.DeletedBlocksTransaction;
+import org.apache.hadoop.ozone.container.metadata.DatanodeStoreWithIncrementalChunkList;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -515,7 +516,7 @@ public class KeyValueContainerMetadataInspector implements ContainerInspector {
         // counted towards bytes used and total block count above.
         pendingDeleteBlockCountTotal += localIDs.size();
         pendingDeleteBytes += computePendingDeleteBytes(
-            localIDs, containerData, blockDataTable);
+            localIDs, containerData, blockDataTable, schemaTwoStore);
       }
     }
 
@@ -525,12 +526,12 @@ public class KeyValueContainerMetadataInspector implements ContainerInspector {
 
   static long computePendingDeleteBytes(List<Long> localIDs,
       KeyValueContainerData containerData,
-      Table<String, BlockData> blockDataTable) {
+      Table<String, BlockData> blockDataTable, DatanodeStoreWithIncrementalChunkList schemaTwoStore) {
     long pendingDeleteBytes = 0;
     for (long id : localIDs) {
       try {
         final String blockKey = containerData.getBlockKey(id);
-        final BlockData blockData = blockDataTable.get(blockKey);
+        final BlockData blockData = schemaTwoStore.getBlockByID(null, blockKey);
         if (blockData != null) {
           pendingDeleteBytes += blockData.getSize();
         }
@@ -560,7 +561,7 @@ public class KeyValueContainerMetadataInspector implements ContainerInspector {
         final List<Long> localIDs = delTx.getLocalIDList();
         pendingDeleteBlockCountTotal += localIDs.size();
         pendingDeleteBytes += computePendingDeleteBytes(
-            localIDs, containerData, blockDataTable);
+            localIDs, containerData, blockDataTable, schemaThreeStore);
       }
     }
     return new PendingDelete(pendingDeleteBlockCountTotal,

@@ -66,7 +66,7 @@ public class DatanodeStoreWithIncrementalChunkList extends AbstractDatanodeStore
       lastChunk = getLastChunkInfoTable().get(blockKey);
     }
 
-    if (blockData == null) {
+    if (blockData == null || blockData.getChunks().isEmpty()) {
       if (lastChunk == null) {
         throw new StorageContainerException(
             NO_SUCH_BLOCK_ERR_MSG + " BlockID : " + blockID, NO_SUCH_BLOCK);
@@ -190,18 +190,27 @@ public class DatanodeStoreWithIncrementalChunkList extends AbstractDatanodeStore
 
   private void putBlockWithPartialChunks(BatchOperation batch, long localID,
       BlockData data, KeyValueContainerData containerData) throws IOException {
+    String blockKey = containerData.getBlockKey(localID);
+    BlockData blockData = getBlockDataTable().get(blockKey);
     if (data.getChunks().size() == 1) {
       // Case (3.1) replace/update the last chunk info table
       getLastChunkInfoTable().putWithBatch(
-          batch, containerData.getBlockKey(localID), data);
+          batch, blockKey, data);
+
+      if (blockData == null) {
+        // populate blockDataTable with empty chunk list
+        blockData = new BlockData(data.getBlockID());
+        blockData.addMetadata(INCREMENTAL_CHUNK_LIST, "");
+        blockData.setBlockCommitSequenceId(data.getBlockCommitSequenceId());
+        getBlockDataTable().putWithBatch(batch, blockKey, blockData);
+      }
     } else {
       int lastChunkIndex = data.getChunks().size() - 1;
       // received more than one chunk this time
       List<ContainerProtos.ChunkInfo> lastChunkInfo =
           Collections.singletonList(
               data.getChunks().get(lastChunkIndex));
-      BlockData blockData = getBlockDataTable().get(
-          containerData.getBlockKey(localID));
+
       if (blockData == null) {
         // Case 3.2: if the block does not exist in the block data table
         List<ContainerProtos.ChunkInfo> chunkInfos =

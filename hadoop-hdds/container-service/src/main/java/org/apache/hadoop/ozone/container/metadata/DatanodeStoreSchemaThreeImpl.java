@@ -106,6 +106,7 @@ public class DatanodeStoreSchemaThreeImpl extends DatanodeStoreWithIncrementalCh
     try (BatchOperation batch = getBatchHandler().initBatchOperation()) {
       getMetadataTable().deleteBatchWithPrefix(batch, prefix);
       getBlockDataTable().deleteBatchWithPrefix(batch, prefix);
+      getLastChunkInfoTable().deleteBatchWithPrefix(batch, prefix);
       getDeleteTransactionTable().deleteBatchWithPrefix(batch, prefix);
       getBatchHandler().commitBatchOperation(batch);
     }
@@ -118,6 +119,8 @@ public class DatanodeStoreSchemaThreeImpl extends DatanodeStoreWithIncrementalCh
         getTableDumpFile(getMetadataTable(), dumpDir), prefix);
     getBlockDataTable().dumpToFileWithPrefix(
         getTableDumpFile(getBlockDataTable(), dumpDir), prefix);
+    getLastChunkInfoTable().dumpToFileWithPrefix(
+        getTableDumpFile(getBlockDataTable(), dumpDir), prefix);
     getDeleteTransactionTable().dumpToFileWithPrefix(
         getTableDumpFile(getDeleteTransactionTable(), dumpDir),
         prefix);
@@ -128,6 +131,8 @@ public class DatanodeStoreSchemaThreeImpl extends DatanodeStoreWithIncrementalCh
     getMetadataTable().loadFromFile(
         getTableDumpFile(getMetadataTable(), dumpDir));
     getBlockDataTable().loadFromFile(
+        getTableDumpFile(getBlockDataTable(), dumpDir));
+    getLastChunkInfoTable().loadFromFile(
         getTableDumpFile(getBlockDataTable(), dumpDir));
     getDeleteTransactionTable().loadFromFile(
         getTableDumpFile(getDeleteTransactionTable(), dumpDir));
