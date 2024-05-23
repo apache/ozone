@@ -960,6 +960,10 @@ public class OMDBInsightEndpoint {
     ParamInfo paramInfo = new ParamInfo(replicationType, creationDate, keySize, startPrefix, prevKey,
         limit, false, "");
     Response response = getListKeysResponse(paramInfo);
+    if ((response.getStatus() != Response.Status.OK.getStatusCode()) &&
+        (response.getStatus() != Response.Status.NOT_FOUND.getStatusCode())) {
+      return response;
+    }
     if (response.getEntity() instanceof ListKeysResponse) {
       listKeysResponse = (ListKeysResponse) response.getEntity();
     }
@@ -1039,7 +1043,7 @@ public class OMDBInsightEndpoint {
     Table<String, OmKeyInfo> fileTable =
         omMetadataManager.getKeyTable(BucketLayout.FILE_SYSTEM_OPTIMIZED);
 
-    // If names.length > 2, then the search prefix is at the volume or bucket level hence
+    // If names.length > 2, then the search prefix is at the level above bucket level hence
     // no need to find parent or extract id's or find subpaths as the fileTable is
     // suitable for volume and bucket level search
     if (names.length > 2) {
@@ -1176,7 +1180,7 @@ public class OMDBInsightEndpoint {
         dirObjectId = dirInfo.getObjectID();
       }
     } catch (Exception ioe) {
-      LOG.error("Not valid directory :{}", ioe);
+      throw new IllegalArgumentException("Not valid path: " + ioe);
     }
     return ReconUtils.constructObjectPathWithPrefix(volumeId, bucketId, dirObjectId);
   }

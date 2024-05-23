@@ -1592,7 +1592,6 @@ public class TestOmDBInsightEndPoint extends AbstractReconSqlDBTest {
     Response bucketResponse = omdbInsightEndpoint.listKeys("RATIS", "", 0, EMPTY_OBS_BUCKET_PATH,
         "", 1000);
     ListKeysResponse listKeysResponse = (ListKeysResponse) bucketResponse.getEntity();
-    // Since key7 doesn't exists in OM namespace, list keys on this will return zero keys.
     assertEquals(0, listKeysResponse.getKeys().size());
     assertEquals("", listKeysResponse.getLastKey());
   }
@@ -1611,10 +1610,9 @@ public class TestOmDBInsightEndPoint extends AbstractReconSqlDBTest {
     Response bucketResponse = omdbInsightEndpoint.listKeys("RATIS", "", 0, OBS_BUCKET_PATH +
             OM_KEY_PREFIX + NON_EXISTENT_KEY_SEVEN,
         "", 2);
-    ListKeysResponse listKeysResponse = (ListKeysResponse) bucketResponse.getEntity();
-    // Since key7 doesn't exists in OM namespace, list keys on this will return zero keys.
-    assertEquals(0, listKeysResponse.getKeys().size());
-    assertEquals("", listKeysResponse.getLastKey());
+    String entityResp = (String) bucketResponse.getEntity();
+    assertEquals("{\"message\": \"Unexpected runtime error while searching keys in OM DB: Not valid path: " +
+        "java.lang.UnsupportedOperationException: Object stores do not support directories.\"}", entityResp);
   }
 
   @Test
