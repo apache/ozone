@@ -47,7 +47,6 @@ import java.util.Set;
 import java.util.Timer;
 import java.util.TimerTask;
 import java.util.UUID;
-import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
@@ -985,15 +984,6 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
    * Class which schedule saving metrics to a file.
    */
   private class ScheduleOMMetricsWriteTask extends TimerTask {
-
-    public ScheduleOMMetricsWriteTask() throws IOException {
-      final File metricsStorageFile = getMetricsStorageFile();
-      if (metricsStorageFile.exists()) {
-        OmMetricsInfo metricsInfo = READER.readValue(metricsStorageFile);
-        metrics.setNumKeys(metricsInfo.getNumKeys());
-      }
-    }
-
     @Override
     public void run() {
       saveOmMetrics();
@@ -1678,23 +1668,21 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
           versionManager.getMetadataLayoutVersion(), layoutVersionInDB);
     }
 
-    // Set metrics and start metrics background thread
-    CompletableFuture.runAsync(() -> {
-      try {
-        metrics.setNumVolumes(
-            metadataManager.countRowsInTable(metadataManager.getVolumeTable()));
-        metrics.setNumBuckets(
-            metadataManager.countRowsInTable(metadataManager.getBucketTable()));
+    metrics.setNumVolumes(metadataManager
+        .countEstimatedRowsInTable(metadataManager.getVolumeTable()));
+    metrics.setNumBuckets(metadataManager
+        .countEstimatedRowsInTable(metadataManager.getBucketTable()));
 
-        // FSO(FILE_SYSTEM_OPTIMIZED)
-        metrics.setNumDirs(metadataManager.countEstimatedRowsInTable(
-            metadataManager.getDirectoryTable()));
-        metrics.setNumFiles(metadataManager.countEstimatedRowsInTable(
-            metadataManager.getFileTable()));
-      } catch (IOException e) {
-        throw new RuntimeException("Async set om metrics fail", e);
-      }
-    });
+    if (getMetricsStorageFile().exists()) {
+      OmMetricsInfo metricsInfo = READER.readValue(getMetricsStorageFile());
+      metrics.setNumKeys(metricsInfo.getNumKeys());
+    }
+
+    // FSO(FILE_SYSTEM_OPTIMIZED)
+    metrics.setNumDirs(metadataManager
+        .countEstimatedRowsInTable(metadataManager.getDirectoryTable()));
+    metrics.setNumFiles(metadataManager
+        .countEstimatedRowsInTable(metadataManager.getFileTable()));
 
     // Schedule save metrics
     long period = configuration.getTimeDuration(OZONE_OM_METRICS_SAVE_INTERVAL,
