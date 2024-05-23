@@ -75,11 +75,19 @@ class CommitWatcher extends AbstractCommitWatcher<ChunkBuffer> {
   }
 
   public void putFlushFuture(long flushPos, CompletableFuture<ContainerCommandResponseProto> flushFuture) {
+    // Combine futures at the flush position if there already is a future at the same position
     futureMap.compute(flushPos,
         (key, previous) -> previous == null ? flushFuture :
             previous.thenCombine(flushFuture, (prev, curr) -> curr));
   }
 
+  /**
+   * @return all remaining putBlock futures combined into one future
+   */
+  public synchronized CompletableFuture<Void> getCombinedFlushFuture() {
+    // return combined future directly, do not wait here
+    return CompletableFuture.allOf(futureMap.values().toArray(new CompletableFuture[0]));
+  }
 
   public void waitOnFlushFutures() throws InterruptedException, ExecutionException {
     // wait for all the transactions to complete

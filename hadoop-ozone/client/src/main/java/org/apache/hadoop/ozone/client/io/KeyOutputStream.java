@@ -24,6 +24,8 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.function.Function;
 import java.util.function.Supplier;
@@ -105,6 +107,8 @@ public class KeyOutputStream extends OutputStream
    * This is essential for operations like S3 put to ensure atomicity.
    */
   private boolean atomicKeyCreation;
+
+  private volatile CompletableFuture<Void> combinedFlushFuture;
 
   public KeyOutputStream(ReplicationConfig replicationConfig, BlockOutputStreamEntryPool blockOutputStreamEntryPool) {
     this.replication = replicationConfig;
@@ -457,12 +461,41 @@ public class KeyOutputStream extends OutputStream
           + replication.getRequiredNodes() + " <= 1");
     }
     checkNotClosed();
+
+    final long hsyncPos;
+    final CompletableFuture<Void> combinedFlushFutureToWait;
     synchronized (this) {
-      final long hsyncPos = writeOffset;
-      handleFlushOrClose(StreamAction.HSYNC);
-      Preconditions.checkState(offset >= hsyncPos,
-          "offset = %s < hsyncPos = %s", offset, hsyncPos);
+      hsyncPos = writeOffset;
+      handleFlushOrClose(StreamAction.HSYNC);  // This no longer waits for future completion
+      combinedFlushFutureToWait = combinedFlushFuture;
+      combinedFlushFuture = null;
+    }
+
+    waitForFutureToComplete(combinedFlushFutureToWait);
+
+    synchronized (this) {
+      // Sanity check: written data offset must be equal or have gone past hsync position once acked
+      Preconditions.checkState(offset >= hsyncPos, "offset = %s < hsyncPos = %s", offset, hsyncPos);
+      // TODO: when there are multiple hsync() queued up, only the one with the largest offset needs to call this
+      // Or make this parallel? Risk of other client seeing length before data flush
       blockOutputStreamEntryPool.hsyncKey(hsyncPos);
+    }
+  }
+
+  /**
+   * Helper method complete the future and deal with exception handling.
+   * @param future combinedFlushFuture to wait for.
+   */
+  private void waitForFutureToComplete(CompletableFuture<Void> future) {
+    if (future == null) {
+      return;
+    }
+    try {
+      future.get();
+    } catch (InterruptedException e) {
+      throw new RuntimeException(e);
+    } catch (ExecutionException e) {
+      throw new RuntimeException(e);
     }
   }
 
@@ -532,6 +565,8 @@ public class KeyOutputStream extends OutputStream
     default:
       throw new IOException("Invalid Operation");
     }
+    // A hacky way to return variable without changing too many method signatures
+    combinedFlushFuture = entry.getCombinedFlushFuture();
   }
 
   /**

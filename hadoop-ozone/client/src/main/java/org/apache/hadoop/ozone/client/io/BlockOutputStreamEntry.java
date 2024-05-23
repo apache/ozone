@@ -21,6 +21,7 @@ import java.io.IOException;
 import java.io.OutputStream;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
 import java.util.function.Supplier;
 
@@ -39,6 +40,7 @@ import org.apache.hadoop.hdds.security.token.OzoneBlockTokenIdentifier;
 import org.apache.hadoop.security.token.Token;
 
 import com.google.common.annotations.VisibleForTesting;
+import org.apache.ratis.thirdparty.io.netty.util.concurrent.CompleteFuture;
 import org.apache.ratis.util.JavaUtils;
 
 /**
@@ -150,6 +152,13 @@ public class BlockOutputStreamEntry extends OutputStream {
     if (isInitialized()) {
       getOutputStream().flush();
     }
+  }
+
+  CompletableFuture<Void> getCombinedFlushFuture() {
+    if (isInitialized()) {
+      return ((RatisBlockOutputStream) getOutputStream()).getCombinedFlushFuture();
+    }
+    return null;
   }
 
   void hsync() throws IOException {

@@ -605,6 +605,10 @@ public class BlockOutputStream extends OutputStream {
     }
   }
 
+  CompletableFuture<Void> getCombinedFlushFuture() {
+    return null;
+  }
+
   void waitOnFlushFutures() throws InterruptedException, ExecutionException {
   }
 

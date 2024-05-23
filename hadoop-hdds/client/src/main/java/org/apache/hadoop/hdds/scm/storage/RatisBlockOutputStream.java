@@ -118,6 +118,11 @@ public class RatisBlockOutputStream extends BlockOutputStream
   }
 
   @Override
+  public CompletableFuture<Void> getCombinedFlushFuture() {
+    return commitWatcher.getCombinedFlushFuture();
+  }
+
+  @Override
   void waitOnFlushFutures() throws InterruptedException, ExecutionException {
     commitWatcher.waitOnFlushFutures();
   }
