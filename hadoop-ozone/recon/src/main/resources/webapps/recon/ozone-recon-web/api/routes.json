@@ -49,5 +49,7 @@
   "/keys/deletePending?limit=*" : "/keydeletePending",
 
   "/containers/mismatch/deleted?limit=*": "/deleted",
-  "/keys/deletePending/dirs?limit=*": "/dirdeletePending"
+  "/keys/deletePending/dirs?limit=*": "/dirdeletePending",
+  "/datanodes/decommission/info": "/decommissioninfo",
+  "/datanodes/decommission/info/datanode?uuid=*": "/DatanodesDecommissionInfo"
 }

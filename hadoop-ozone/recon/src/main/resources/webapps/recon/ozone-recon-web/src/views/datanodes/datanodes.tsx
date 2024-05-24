@@ -37,6 +37,7 @@ import {ActionMeta, ValueType} from 'react-select';
 import {showDataFetchError} from 'utils/common';
 import {ColumnSearch} from 'utils/columnSearch';
 import { AxiosGetHelper } from 'utils/axiosRequestHelper';
+import DecommissionSummary from './decommissionSummary';
 
 interface IDatanodeResponse {
   hostname: string;
@@ -163,7 +164,12 @@ const COLUMNS = [
     isVisible: true,
     isSearchable: true,
     sorter: (a: IDatanode, b: IDatanode) => a.uuid.localeCompare(b.uuid),
-    defaultSortOrder: 'ascend' as const
+    defaultSortOrder: 'ascend' as const,
+    render: (uuid: IDatanode, record: IDatanode) => {
+      return (
+        record.opState === "DECOMMISSIONING" ?  <DecommissionSummary uuid={uuid} record={record}/> : <span>{uuid}</span>
+      );
+    }  
   },
   {
     title: 'Storage Capacity',

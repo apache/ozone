@@ -742,55 +742,55 @@
         "leaderNode": "localhost1.storage.enterprise.com",
         "datanodes": [
           {
-          "level": 0,
-          "parent": null,
-          "cost": 0,
-          "uuid": "9e4e92da-4abd-461d-b042-dc4fe72e8727",
-          "uuidString": "9e4e92da-4abd-461d-b042-dc4fe72e8727",
-          "ipAddress": "172.22.0.5",
-          "hostName": "ozone_datanode_1.ozone_default",
-          "ports": [
-            {
-              "name": "REPLICATION",
-              "value": 9886
-            },
-            {
-              "name": "RATIS",
-              "value": 9858
-            },
-            {
-              "name": "RATIS_ADMIN",
-              "value": 9857
-            },
-            {
-              "name": "RATIS_SERVER",
-              "value": 9856
-            },
-            {
-              "name": "RATIS_DATASTREAM",
-              "value": 9855
-            },
-            {
-              "name": "STANDALONE",
-              "value": 9859
-            }
+            "level": 0,
+            "parent": null,
+            "cost": 0,
+            "uuid": "9e4e92da-4abd-461d-b042-dc4fe72e8727",
+            "uuidString": "9e4e92da-4abd-461d-b042-dc4fe72e8727",
+            "ipAddress": "172.22.0.5",
+            "hostName": "ozone_datanode_1.ozone_default",
+            "ports": [
+              {
+                "name": "REPLICATION",
+                "value": 9886
+              },
+              {
+                "name": "RATIS",
+                "value": 9858
+              },
+              {
+                "name": "RATIS_ADMIN",
+                "value": 9857
+              },
+              {
+                "name": "RATIS_SERVER",
+                "value": 9856
+              },
+              {
+                "name": "RATIS_DATASTREAM",
+                "value": 9855
+              },
+              {
+                "name": "STANDALONE",
+                "value": 9859
+              }
 
-          ],
-          "certSerialId": null,
-          "version": null,
-          "setupTime": 0,
-          "revision": null,
-          "buildDate": null,
-          "persistedOpState": "IN_SERVICE",
-          "persistedOpStateExpiryEpochSec": 0,
-          "initialVersion": 0,
-          "currentVersion": 1,
-          "signature": -460136136,
-          "decomissioned": false,
-          "networkName": "9e4e92da-4abd-461d-b042-dc4fe72e8727",
-          "networkLocation": "/default-rack",
-          "networkFullPath": "/default-rack/9e4e92da-4abd-461d-b042-dc4fe72e8727",
-          "numOfLeaves": 1
+            ],
+            "certSerialId": null,
+            "version": null,
+            "setupTime": 0,
+            "revision": null,
+            "buildDate": null,
+            "persistedOpState": "IN_SERVICE",
+            "persistedOpStateExpiryEpochSec": 0,
+            "initialVersion": 0,
+            "currentVersion": 1,
+            "signature": -460136136,
+            "decomissioned": false,
+            "networkName": "9e4e92da-4abd-461d-b042-dc4fe72e8727",
+            "networkLocation": "/default-rack",
+            "networkFullPath": "/default-rack/9e4e92da-4abd-461d-b042-dc4fe72e8727",
+            "numOfLeaves": 1
           }
         ],
         "lastLeaderElection": 1578491471528,
@@ -3760,9 +3760,9 @@
     "totalOpenKeys": 10
   },
   "keysdeletePendingSummary":{
-      "totalUnreplicatedDataSize": 29291,
-      "totalReplicatedDataSize": 87873,
-      "totalDeletedKeys": 3
+    "totalUnreplicatedDataSize": 29291,
+    "totalReplicatedDataSize": 87873,
+    "totalDeletedKeys": 3
   },
   "omMismatch":{
     "containerDiscrepancyInfo": [
@@ -5168,9 +5168,9 @@
   },
   "nonFSO": {
     "keysSummary": {
-        "totalUnreplicatedDataSize": 10485760,
-        "totalReplicatedDataSize": 31457280,
-        "totalOpenKeys": 10
+      "totalUnreplicatedDataSize": 10485760,
+      "totalReplicatedDataSize": 31457280,
+      "totalOpenKeys": 10
     },
     "nonFSO": [
       {
@@ -5231,7 +5231,7 @@
           "replicationFactor": "ONE",
           "requiredNodes": 1,
           "replicationType": "RATIS"
-      }
+        }
       },
       {
         "key": "/-9223372036854775552/-9223372036854775040/-9223372036852420095/2441/110569623850191713",
@@ -5243,7 +5243,7 @@
           "replicationFactor": "ONE",
           "requiredNodes": 1,
           "replicationType": "RATIS"
-      }
+        }
       }
     ],
     "status": "OK"
@@ -6753,5 +6753,205 @@
       }
     ],
     "status": "OK"
+  },
+  "decommissioninfo": {
+    "DatanodesDecommissionInfo":[
+      {
+        "datanodeDetails": {
+            "level": 3,
+            "parent": null,
+            "cost": 0,
+            "uuid": "4712ba3d-4bb2-477a-9211-d9b50c013055",
+            "uuidString": "4712ba3d-4bb2-477a-9211-d9b50c013055",
+            "ipAddress": "172.18.0.13",
+            "hostName": "ozone-ha-datanode-6.ozone-ha_default",
+            "ports": [
+                {
+                    "name": "HTTP",
+                    "value": 9882
+                },
+                {
+                    "name": "CLIENT_RPC",
+                    "value": 19864
+                },
+                {
+                    "name": "REPLICATION",
+                    "value": 9886
+                },
+                {
+                    "name": "RATIS",
+                    "value": 9858
+                },
+                {
+                    "name": "RATIS_ADMIN",
+                    "value": 9857
+                },
+                {
+                    "name": "RATIS_SERVER",
+                    "value": 9856
+                },
+                {
+                    "name": "RATIS_DATASTREAM",
+                    "value": 9855
+                },
+                {
+                    "name": "STANDALONE",
+                    "value": 9859
+                }
+            ],
+            "certSerialId": null,
+            "version": null,
+            "setupTime": 0,
+            "revision": null,
+            "buildDate": null,
+            "persistedOpState": "IN_SERVICE",
+            "persistedOpStateExpiryEpochSec": 0,
+            "initialVersion": 0,
+            "currentVersion": 1,
+            "decommissioned": false,
+            "maintenance": false,
+            "ipAddressAsByteString": {
+                "string": "172.18.0.13",
+                "bytes": {
+                    "validUtf8": true,
+                    "empty": false
+                }
+            },
+            "hostNameAsByteString": {
+                "string": "ozone-ha-datanode-6.ozone-ha_default",
+                "bytes": {
+                    "validUtf8": true,
+                    "empty": false
+                }
+            },
+            "networkName": "4712ba3d-4bb2-477a-9211-d9b50c013055",
+            "networkLocation": "/default-rack",
+            "networkFullPath": "/default-rack/4712ba3d-4bb2-477a-9211-d9b50c013055",
+            "numOfLeaves": 1,
+            "networkNameAsByteString": {
+                "string": "4712ba3d-4bb2-477a-9211-d9b50c013055",
+                "bytes": {
+                    "validUtf8": true,
+                    "empty": false
+                }
+            },
+            "networkLocationAsByteString": {
+                "string": "/default-rack",
+                "bytes": {
+                    "validUtf8": true,
+                    "empty": false
+                }
+            }
+        },
+        "metrics": null,
+        "containers": {}
+    }
+    ]
+  },
+  "DatanodesDecommissionInfo": {
+    "DatanodesDecommissionInfo": [
+      {
+        "datanodeDetails": {
+          "level": 3,
+          "parent": null,
+          "cost": 0,
+          "uuid": "adc72ef9-0850-49d7-935d-e5a4e0d5be3c",
+          "uuidString": "adc72ef9-0850-49d7-935d-e5a4e0d5be3c",
+          "ipAddress": "172.18.0.10",
+          "hostName": "ozone-ha-datanode-2.ozone-ha_default",
+          "ports": [
+            {
+              "name": "HTTP",
+              "value": 9882
+            },
+            {
+              "name": "CLIENT_RPC",
+              "value": 19864
+            },
+            {
+              "name": "REPLICATION",
+              "value": 9886
+            },
+            {
+              "name": "RATIS",
+              "value": 9858
+            },
+            {
+              "name": "RATIS_ADMIN",
+              "value": 9857
+            },
+            {
+              "name": "RATIS_SERVER",
+              "value": 9856
+            },
+            {
+              "name": "RATIS_DATASTREAM",
+              "value": 9855
+            },
+            {
+              "name": "STANDALONE",
+              "value": 9859
+            }
+          ],
+          "certSerialId": null,
+          "version": null,
+          "setupTime": 0,
+          "revision": null,
+          "buildDate": null,
+          "persistedOpState": "DECOMMISSIONING",
+          "persistedOpStateExpiryEpochSec": 0,
+          "initialVersion": 0,
+          "currentVersion": 1,
+          "decommissioned": true,
+          "maintenance": false,
+          "ipAddressAsByteString": {
+            "string": "172.18.0.10",
+            "bytes": {
+              "validUtf8": true,
+              "empty": false
+            }
+          },
+          "hostNameAsByteString": {
+            "string": "ozone-ha-datanode-2.ozone-ha_default",
+            "bytes": {
+              "validUtf8": true,
+              "empty": false
+            }
+          },
+          "networkName": "adc72ef9-0850-49d7-935d-e5a4e0d5be3c",
+          "networkLocation": "/default-rack",
+          "networkFullPath": "/default-rack/adc72ef9-0850-49d7-935d-e5a4e0d5be3c",
+          "numOfLeaves": 1,
+          "networkNameAsByteString": {
+            "string": "adc72ef9-0850-49d7-935d-e5a4e0d5be3c",
+            "bytes": {
+              "validUtf8": true,
+              "empty": false
+            }
+          },
+          "networkLocationAsByteString": {
+            "string": "/default-rack",
+            "bytes": {
+              "validUtf8": true,
+              "empty": false
+            }
+          }
+        },
+        "metrics": {
+          "decommissionStartTime": "23/05/2024 07:28:35 UTC",
+          "numOfUnclosedPipelines": 2,
+          "numOfUnderReplicatedContainers": 0.0,
+          "numOfUnclosedContainers": 0.0
+        },
+        "containers": {
+          "UnderReplicated": [],
+          "UnClosed": [
+            "#6",
+            "#10",
+            "#17"
+          ]
+        }
+      }
+    ]
   }
 }
