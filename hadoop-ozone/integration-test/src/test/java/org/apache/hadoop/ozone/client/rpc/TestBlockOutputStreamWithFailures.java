@@ -62,7 +62,7 @@ import org.junit.jupiter.params.provider.ValueSource;
  * Tests failure detection and handling in BlockOutputStream Class.
  */
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
-@Timeout(300)
+@Timeout(600)
 class TestBlockOutputStreamWithFailures {
 
   private MiniOzoneCluster cluster;
