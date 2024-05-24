@@ -1521,7 +1521,7 @@ public class TestOmDBInsightEndPoint extends AbstractReconSqlDBTest {
   }
 
   @Test
-  public void testListKeysFSOBucketDirOnePathWithLimitAndPagination() {
+  public void testListKeysFSOBucketDirOnePathWithLimitTwoAndPagination() {
     // bucket level keyList
     // Total 3 pages , each page 2 records. If each page we will retrieve 2 items, as total 6 FSO keys,
     // so till we get empty last key, we'll continue to fetch and empty last key signifies the last page.
@@ -1554,6 +1554,57 @@ public class TestOmDBInsightEndPoint extends AbstractReconSqlDBTest {
     assertEquals("/1/10/13/testfile", listKeysResponse.getLastKey());
 
     // Try again if fourth page is available. Ideally there should not be any further records
+    // and lastKey should be empty as per design.
+    bucketResponse = omdbInsightEndpoint.listKeys("RATIS", "", 0,
+        DIR_ONE_PATH, listKeysResponse.getLastKey(), 2);
+    listKeysResponse = (ListKeysResponse) bucketResponse.getEntity();
+    assertEquals(0, listKeysResponse.getKeys().size());
+    assertEquals("", listKeysResponse.getLastKey());
+  }
+
+  @Test
+  public void testListKeysFSOBucketDirOnePathWithLimitOneAndPagination() {
+    // bucket level keyList
+    // Total 3 pages , each page 2 records. If each page we will retrieve 2 items, as total 6 FSO keys,
+    // so till we get empty last key, we'll continue to fetch and empty last key signifies the last page.
+    // First Page
+    Response bucketResponse = omdbInsightEndpoint.listKeys("RATIS", "", 0, DIR_ONE_PATH,
+        "", 1);
+    ListKeysResponse listKeysResponse = (ListKeysResponse) bucketResponse.getEntity();
+    assertEquals(1, listKeysResponse.getKeys().size());
+    KeyEntityInfo keyEntityInfo = listKeysResponse.getKeys().get(0);
+    assertEquals("volume1/fso-bucket/dir1/file1", keyEntityInfo.getPath());
+    assertEquals("/1/10/11/file1", listKeysResponse.getLastKey());
+    assertEquals("RATIS", keyEntityInfo.getReplicationConfig().getReplicationType().toString());
+
+    // Second page
+    bucketResponse = omdbInsightEndpoint.listKeys("RATIS", "", 0,
+        DIR_ONE_PATH, listKeysResponse.getLastKey(), 2);
+    listKeysResponse = (ListKeysResponse) bucketResponse.getEntity();
+    assertEquals(2, listKeysResponse.getKeys().size());
+    keyEntityInfo = listKeysResponse.getKeys().get(1);
+    assertEquals("volume1/fso-bucket/dir1/dir2/file1", keyEntityInfo.getPath());
+    assertEquals("/1/10/12/file1", listKeysResponse.getLastKey());
+
+    // Third page
+    bucketResponse = omdbInsightEndpoint.listKeys("RATIS", "", 0,
+        DIR_ONE_PATH, listKeysResponse.getLastKey(), 2);
+    listKeysResponse = (ListKeysResponse) bucketResponse.getEntity();
+    assertEquals(2, listKeysResponse.getKeys().size());
+    keyEntityInfo = listKeysResponse.getKeys().get(1);
+    assertEquals("volume1/fso-bucket/dir1/dir2/dir3/file1", keyEntityInfo.getPath());
+    assertEquals("/1/10/13/file1", listKeysResponse.getLastKey());
+
+    // Fourth page will have just one key
+    bucketResponse = omdbInsightEndpoint.listKeys("RATIS", "", 0,
+        DIR_ONE_PATH, listKeysResponse.getLastKey(), 2);
+    listKeysResponse = (ListKeysResponse) bucketResponse.getEntity();
+    assertEquals(1, listKeysResponse.getKeys().size());
+    keyEntityInfo = listKeysResponse.getKeys().get(0);
+    assertEquals("volume1/fso-bucket/dir1/dir2/dir3/testfile", keyEntityInfo.getPath());
+    assertEquals("/1/10/13/testfile", listKeysResponse.getLastKey());
+
+    // Try again if fifth page is available. Ideally there should not be any further records
     // and lastKey should be empty as per design.
     bucketResponse = omdbInsightEndpoint.listKeys("RATIS", "", 0,
         DIR_ONE_PATH, listKeysResponse.getLastKey(), 2);
@@ -1789,9 +1840,9 @@ public class TestOmDBInsightEndPoint extends AbstractReconSqlDBTest {
   public void testListKeysForNonExistentFSOPaths() {
     Response bucketResponse = omdbInsightEndpoint.listKeys("RATIS", "", 0, NON_EXISTENT_DIR_FOUR_PATH,
         "", 2);
-    ListKeysResponse listKeysResponse = (ListKeysResponse) bucketResponse.getEntity();
-    assertEquals(0, listKeysResponse.getKeys().size());
-    assertEquals("", listKeysResponse.getLastKey());
+    String entityResp = (String) bucketResponse.getEntity();
+    assertEquals("{\"message\": \"Unexpected runtime error while searching keys in OM DB: Not valid path: " +
+        "java.lang.IllegalArgumentException: Not valid path\"}", entityResp);
   }
 
   @Test
