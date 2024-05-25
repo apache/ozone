@@ -160,6 +160,26 @@ The `OmLifecycleConfiguration` table in RocksDB is used to store lifecycle confi
   - Each rule has a unique ID.
   - All rules are valid according to their individual validation criteria.
 
+# Retention Manager
+## High-Level Flow
+
+1. **Initialization and Start:**
+   - The retention manager is initialized with required parameters (rate limit, max iterators, and running interval).
+   - A retention service is started in the OzoneManager, running periodically based on a configured interval.
+
+2. **Periodic Execution:**
+   - Each time the service runs, it checks if the current node is the leader and sleeps if it is not the leader.
+   - If it is the leader, it proceeds with the following operations:
+     * Retrieve the lifecycle configurations list.
+     * Each lifecycle configuration represents a bucket and contains a list of lifecycle rules to be applied.
+     * Lifecycle configurations are handled simultaneously by a configurable threadpool executor.
+     * The operation involves scanning the bucket's entries, and if they are eligible, performing an action (currently, deletion).
+
+## Concurrency and Rate Limiting
+
+1. **Thread Pool:** the thread pool is configurable to allow concurrent processing of lifecycle configurations.
+2. **Rate Limiter:** the RateLimiter controls the rate of key deletions, ensuring system stability.
+
 
 # Proposal
 
