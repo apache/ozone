@@ -133,6 +133,34 @@ message ListLifecycleConfigurationsResponse {
 }
 ```
 
+# Table format
+## OmLifecycleConfiguration Table
+
+The `OmLifecycleConfiguration` table in RocksDB is used to store lifecycle configurations of buckets. Below is a summary of the table structure.
+
+### Table Structure
+
+| Column Name  | Data Type             | Description                                              |
+|--------------|-----------------------|----------------------------------------------------------|
+| volume       | String                | The name of the volume.                                  |
+| bucket       | String                | The name of the bucket.                                  |
+| owner        | String                | The owner of the volume/bucket.                          |
+| creationTime | long                  | The creation time of the configuration.                  |
+| rules        | List<OmLCRule>        | A list of lifecycle rules associated with the configuration. |
+| objectID     | long                  | Unique identifier for the object.                        |
+| updateID     | long                  | Identifier for updates to the object.                    |
+
+
+### Additional Information
+
+- **Maximum Rules**: The table can store up to 1000 rules per lifecycle configuration.
+- **Validation**: The configuration is considered valid if:
+  - The `volume`, `bucket`, and `owner` are not blank.
+  - The number of rules is between 1 and 1000.
+  - Each rule has a unique ID.
+  - All rules are valid according to their individual validation criteria.
+
+
 # Proposal
 
 ## 1. New Table for Lifecycle Configurations
