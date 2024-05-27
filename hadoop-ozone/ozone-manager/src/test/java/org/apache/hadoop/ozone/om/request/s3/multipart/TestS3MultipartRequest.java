@@ -148,9 +148,26 @@ public class TestS3MultipartRequest {
   protected OMRequest doPreExecuteInitiateMPU(
       String volumeName, String bucketName, String keyName,
       Map<String, String> metadata) throws Exception {
+    return doPreExecuteInitiateMPU(volumeName, bucketName, keyName, metadata,
+        Collections.emptyMap());
+  }
+
+  /**
+   * Perform preExecute of Initiate Multipart upload request for given
+   * volume, bucket and key name.
+   * @param volumeName
+   * @param bucketName
+   * @param keyName
+   * @param metadata
+   * @param tags
+   * @return OMRequest - returned from preExecute.
+   */
+  protected OMRequest doPreExecuteInitiateMPU(
+      String volumeName, String bucketName, String keyName,
+      Map<String, String> metadata, Map<String, String> tags) throws Exception {
     OMRequest omRequest =
         OMRequestTestUtils.createInitiateMPURequest(volumeName, bucketName,
-            keyName, metadata);
+            keyName, metadata, tags);
 
     S3InitiateMultipartUploadRequest s3InitiateMultipartUploadRequest =
         getS3InitiateMultipartUploadReq(omRequest);
@@ -171,6 +188,14 @@ public class TestS3MultipartRequest {
               .getKeyArgs().getMetadataList());
 
       assertThat(modifiedKeyMetadata).containsAllEntriesOf(metadata);
+    }
+
+    if (tags != null) {
+      Map<String, String> modifiedKeyTags = KeyValueUtil.getFromProtobuf(
+          modifiedRequest.getInitiateMultiPartUploadRequest()
+              .getKeyArgs().getTagsList());
+
+      assertThat(modifiedKeyTags).containsAllEntriesOf(tags);
     }
 
     return modifiedRequest;
@@ -273,7 +298,8 @@ public class TestS3MultipartRequest {
    */
   protected OMRequest doPreExecuteInitiateMPUWithFSO(
       String volumeName, String bucketName, String keyName) throws Exception {
-    return doPreExecuteInitiateMPUWithFSO(volumeName, bucketName, keyName, Collections.emptyMap());
+    return doPreExecuteInitiateMPUWithFSO(volumeName, bucketName, keyName,
+        Collections.emptyMap(), Collections.emptyMap());
   }
 
   /**
@@ -283,14 +309,15 @@ public class TestS3MultipartRequest {
    * @param bucketName
    * @param keyName
    * @param metadata
+   * @param tags
    * @return OMRequest - returned from preExecute.
    */
   protected OMRequest doPreExecuteInitiateMPUWithFSO(
       String volumeName, String bucketName, String keyName,
-      Map<String, String> metadata) throws Exception {
+      Map<String, String> metadata, Map<String, String> tags) throws Exception {
     OMRequest omRequest =
         OMRequestTestUtils.createInitiateMPURequest(volumeName, bucketName,
-            keyName, metadata);
+            keyName, metadata, tags);
 
     S3InitiateMultipartUploadRequestWithFSO
         s3InitiateMultipartUploadRequestWithFSO =
@@ -312,6 +339,14 @@ public class TestS3MultipartRequest {
           .getKeyArgs().getMetadataList());
 
       assertThat(modifiedKeyMetadata).containsAllEntriesOf(metadata);
+    }
+
+    if (tags != null) {
+      Map<String, String> modifiedKeyTags = KeyValueUtil.getFromProtobuf(
+          modifiedRequest.getInitiateMultiPartUploadRequest()
+              .getKeyArgs().getTagsList());
+
+      assertThat(modifiedKeyTags).containsAllEntriesOf(tags);
     }
 
     return modifiedRequest;
