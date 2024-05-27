@@ -29,8 +29,13 @@ import java.net.URL;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.sql.Timestamp;
+import java.text.ParseException;
+import java.text.SimpleDateFormat;
+import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.List;
+import java.util.TimeZone;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -39,6 +44,7 @@ import java.util.stream.Collectors;
 
 import com.google.common.base.Preconditions;
 import com.google.inject.Singleton;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
@@ -65,6 +71,8 @@ import static org.jooq.impl.DSL.select;
 import static org.jooq.impl.DSL.using;
 
 import org.apache.hadoop.ozone.OmUtils;
+import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.recon.api.types.NSSummary;
 import org.apache.hadoop.ozone.recon.api.types.DUResponse;
@@ -79,6 +87,8 @@ import com.google.common.annotations.VisibleForTesting;
 import org.jooq.Configuration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import javax.ws.rs.core.Response;
 
 /**
  * Recon Utility class.
@@ -508,5 +518,103 @@ public class ReconUtils {
   @VisibleForTesting
   public static void setLogger(Logger logger) {
     log = logger;
+  }
+
+  /**
+   * Return if all OMDB tables that will be used are initialized.
+   * @return if tables are initialized
+   */
+  public static boolean isInitializationComplete(ReconOMMetadataManager omMetadataManager) {
+    if (omMetadataManager == null) {
+      return false;
+    }
+    return omMetadataManager.getVolumeTable() != null
+        && omMetadataManager.getBucketTable() != null
+        && omMetadataManager.getDirectoryTable() != null
+        && omMetadataManager.getFileTable() != null
+        && omMetadataManager.getKeyTable(BucketLayout.LEGACY) != null;
+  }
+
+  /**
+   * Converts string date in a provided format to server timezone's epoch milllioseconds.
+   *
+   * @param dateString
+   * @param dateFormat
+   * @param timeZone
+   * @return the epoch milliseconds representation of the date.
+   * @throws ParseException
+   */
+  public static long convertToEpochMillis(String dateString, String dateFormat, TimeZone timeZone) {
+    String localDateFormat = dateFormat;
+    try {
+      if (StringUtils.isEmpty(dateString)) {
+        return Instant.now().toEpochMilli();
+      }
+      if (StringUtils.isEmpty(dateFormat)) {
+        localDateFormat = "MM-dd-yyyy HH:mm:ss";
+      }
+      if (null == timeZone) {
+        timeZone = TimeZone.getDefault();
+      }
+      SimpleDateFormat sdf = new SimpleDateFormat(localDateFormat);
+      sdf.setTimeZone(timeZone); // Set server's timezone
+      Date date = sdf.parse(dateString);
+      return date.getTime(); // Convert to epoch milliseconds
+    } catch (ParseException parseException) {
+      log.error("Date parse exception for date: {} in format: {} -> {}", dateString, localDateFormat, parseException);
+      return Instant.now().toEpochMilli();
+    } catch (Exception exception) {
+      log.error("Unexpected error while parsing date: {} in format: {} -> {}", dateString, localDateFormat, exception);
+      return Instant.now().toEpochMilli();
+    }
+  }
+
+  /**
+   * Validates volume or bucket names according to specific rules.
+   *
+   * @param resName The name to validate (volume or bucket).
+   * @return A Response object if validation fails, or null if the name is valid.
+   */
+  public static Response validateNames(String resName)
+      throws IllegalArgumentException {
+    if (resName.length() < OzoneConsts.OZONE_MIN_BUCKET_NAME_LENGTH ||
+        resName.length() > OzoneConsts.OZONE_MAX_BUCKET_NAME_LENGTH) {
+      throw new IllegalArgumentException(
+          "Bucket or Volume name length should be between " +
+              OzoneConsts.OZONE_MIN_BUCKET_NAME_LENGTH + " and " +
+              OzoneConsts.OZONE_MAX_BUCKET_NAME_LENGTH);
+    }
+
+    if (resName.charAt(0) == '.' || resName.charAt(0) == '-' ||
+        resName.charAt(resName.length() - 1) == '.' ||
+        resName.charAt(resName.length() - 1) == '-') {
+      throw new IllegalArgumentException(
+          "Bucket or Volume name cannot start or end with " +
+              "hyphen or period");
+    }
+
+    // Regex to check for lowercase letters, numbers, hyphens, underscores, and periods only.
+    if (!resName.matches("^[a-z0-9._-]+$")) {
+      throw new IllegalArgumentException(
+          "Bucket or Volume name can only contain lowercase " +
+              "letters, numbers, hyphens, underscores, and periods");
+    }
+
+    // If all checks pass, the name is valid
+    return null;
+  }
+
+  /**
+   * Constructs an object path with the given IDs.
+   *
+   * @param ids The IDs to construct the object path with.
+   * @return The constructed object path.
+   */
+  public static String constructObjectPathWithPrefix(long... ids) {
+    StringBuilder pathBuilder = new StringBuilder();
+    for (long id : ids) {
+      pathBuilder.append(OM_KEY_PREFIX).append(id);
+    }
+    return pathBuilder.toString();
   }
 }
