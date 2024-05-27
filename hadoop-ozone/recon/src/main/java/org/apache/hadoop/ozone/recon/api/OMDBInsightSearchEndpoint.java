@@ -290,7 +290,7 @@ public class OMDBInsightSearchEndpoint {
    * @return The object path as "/volumeID/bucketID/ParentId/" or an empty string if an error occurs.
    * @throws IOException If database access fails.
    */
-  public String convertToObjectPath(String prevKeyPrefix) throws IOException, IllegalArgumentException {
+  public String convertToObjectPath(String prevKeyPrefix) throws IOException {
     try {
       String[] names = parseRequestPath(normalizePath(prevKeyPrefix, BucketLayout.FILE_SYSTEM_OPTIMIZED));
 
@@ -314,7 +314,7 @@ public class OMDBInsightSearchEndpoint {
       String bucketKey = omMetadataManager.getBucketKey(volumeName, bucketName);
       OmBucketInfo bucketInfo = omMetadataManager.getBucketTable().getSkipCache(bucketKey);
       long bucketId = bucketInfo.getObjectID();
-      if (names.length == 2) {
+      if (names.length == 2 || bucketInfo.getBucketLayout() != BucketLayout.FILE_SYSTEM_OPTIMIZED) {
         return constructObjectPathWithPrefix(volumeId, bucketId);
       }
 
@@ -322,7 +322,11 @@ public class OMDBInsightSearchEndpoint {
       BucketHandler handler = getBucketHandler(reconNamespaceSummaryManager, omMetadataManager, reconSCM, bucketInfo);
       long dirObjectId = handler.getDirInfo(names).getObjectID();
       return constructObjectPathWithPrefix(volumeId, bucketId, dirObjectId);
-    } catch (NullPointerException e) {
+    }  catch (IllegalArgumentException e) {
+      LOG.error("IllegalArgumentException encountered while converting key prefix to object path: {}", prevKeyPrefix, e);
+      throw e;
+    } catch (RuntimeException e) {
+      LOG.error("RuntimeException encountered while converting key prefix to object path: {}", prevKeyPrefix, e);
       return prevKeyPrefix;
     }
   }

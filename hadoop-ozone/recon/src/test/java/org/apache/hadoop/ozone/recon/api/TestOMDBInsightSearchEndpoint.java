@@ -326,6 +326,49 @@ public class TestOMDBInsightSearchEndpoint extends AbstractReconSqlDBTest {
     result = (KeyInsightInfoResponse) response.getEntity();
     assertEquals(1, result.getNonFSOKeyInfoList().size());
     assertEquals(0, result.getFsoKeyInfoList().size());
+    assertEquals(result.getNonFSOKeyInfoList().get(0).getKey(), result.getLastKey(),
+        "Expected last key to be empty");
+  }
+
+  @Test
+  public void testKeyLevelSearch() throws IOException {
+    // FSO Bucket key-level search
+    Response response = omdbInsightSearchEndpoint.searchOpenKeys("/vola/bucketa1/filea1", 1, "");
+    assertEquals(200, response.getStatus());
+    KeyInsightInfoResponse result = (KeyInsightInfoResponse) response.getEntity();
+    assertEquals(1, result.getFsoKeyInfoList().size());
+    assertEquals(0, result.getNonFSOKeyInfoList().size());
+    // Assert Total Size
+    assertEquals(1000, result.getUnreplicatedDataSize());
+    assertEquals(1000 * 3, result.getReplicatedDataSize());
+
+    response = omdbInsightSearchEndpoint.searchOpenKeys("/vola/bucketa1/filea2", 1, "");
+    assertEquals(200, response.getStatus());
+    result = (KeyInsightInfoResponse) response.getEntity();
+    assertEquals(1, result.getFsoKeyInfoList().size());
+    assertEquals(0, result.getNonFSOKeyInfoList().size());
+    // Assert Total Size
+    assertEquals(1000, result.getUnreplicatedDataSize());
+    assertEquals(1000 * 3, result.getReplicatedDataSize());
+
+    // OBS Bucket key-level search
+    response = omdbInsightSearchEndpoint.searchOpenKeys("/volb/bucketb1/fileb1", 1, "");
+    assertEquals(200, response.getStatus());
+    result = (KeyInsightInfoResponse) response.getEntity();
+    assertEquals(0, result.getFsoKeyInfoList().size());
+    assertEquals(1, result.getNonFSOKeyInfoList().size());
+    // Assert Total Size
+    assertEquals(1000, result.getUnreplicatedDataSize());
+    assertEquals(1000 * 3, result.getReplicatedDataSize());
+
+    response = omdbInsightSearchEndpoint.searchOpenKeys("/volb/bucketb1/fileb2", 1, "");
+    assertEquals(200, response.getStatus());
+    result = (KeyInsightInfoResponse) response.getEntity();
+    assertEquals(0, result.getFsoKeyInfoList().size());
+    assertEquals(1, result.getNonFSOKeyInfoList().size());
+    // Assert Total Size
+    assertEquals(1000, result.getUnreplicatedDataSize());
+    assertEquals(1000 * 3, result.getReplicatedDataSize());
   }
 
 
