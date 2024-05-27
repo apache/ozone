@@ -175,7 +175,6 @@ class TestBlockOutputStreamWithFailures {
 
   @ParameterizedTest
   @ValueSource(booleans = {true, false})
-  @Flaky("HDDS-6113")
   void testWatchForCommitDatanodeFailure(boolean flushDelay) throws Exception {
     OzoneClientConfig config = newClientConfig(cluster.getConf(), flushDelay);
     try (OzoneClient client = newClient(cluster.getConf(), config)) {
