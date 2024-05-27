@@ -49,15 +49,15 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.mock;
 
 /**
- * Tests for {@link TestNewBlockInputStream}'s functionality.
+ * Tests for {@link TestStreamBlockInput}'s functionality.
  */
-public class TestNewBlockInputStream {
+public class TestStreamBlockInput {
   private int blockSize;
   private static final int CHUNK_SIZE = 100;
   private static final int BYTES_PER_CHECKSUM = 20;
   private static final Random RANDOM = new Random();
   private static final AtomicLong CONTAINER_ID = new AtomicLong();
-  private DummyNewBlockInputStream blockStream;
+  private DummyStreamBlockInput blockStream;
   private byte[] blockData;
   private List<ChunkInfo> chunks;
   private Map<String, byte[]> chunkDataMap;
@@ -77,7 +77,7 @@ public class TestNewBlockInputStream {
     createChunkList(5);
 
     Pipeline pipeline = MockPipeline.createSingleNodePipeline();
-    blockStream = new DummyNewBlockInputStream(blockID, blockSize, pipeline,
+    blockStream = new DummyStreamBlockInput(blockID, blockSize, pipeline,
         null, null, refreshFunction, clientConfig, chunks, chunkDataMap);
   }
 

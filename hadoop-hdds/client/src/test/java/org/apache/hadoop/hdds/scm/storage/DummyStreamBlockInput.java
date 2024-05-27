@@ -36,9 +36,9 @@ import org.apache.hadoop.security.token.Token;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 
 /**
- * A dummy NewBlockInputStream to mock read block call to DN.
+ * A dummy StreamBlockInput to mock read block call to DN.
  */
-class DummyNewBlockInputStream extends NewBlockInputStream {
+class DummyStreamBlockInput extends StreamBlockInput {
 
   private final List<ByteString> readByteBuffers = new ArrayList<>();
   private final List<ChunkInfo> chunks;
@@ -46,7 +46,7 @@ class DummyNewBlockInputStream extends NewBlockInputStream {
   private final Map<String, byte[]> chunkDataMap;
 
   @SuppressWarnings("parameternumber")
-  DummyNewBlockInputStream(
+  DummyStreamBlockInput(
       BlockID blockId,
       long blockLen,
       Pipeline pipeline,

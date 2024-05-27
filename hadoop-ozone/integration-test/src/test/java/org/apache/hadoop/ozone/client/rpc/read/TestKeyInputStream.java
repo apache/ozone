@@ -33,7 +33,7 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Type;
 import org.apache.hadoop.hdds.scm.XceiverClientManager;
 import org.apache.hadoop.hdds.scm.XceiverClientMetrics;
 import org.apache.hadoop.hdds.scm.storage.BlockExtendedInputStream;
-import org.apache.hadoop.hdds.scm.storage.NewBlockInputStream;
+import org.apache.hadoop.hdds.scm.storage.StreamBlockInput;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.io.KeyInputStream;
@@ -156,7 +156,7 @@ class TestKeyInputStream extends TestInputStreamBase {
 
     int readBlockLength = 0;
     for (BlockExtendedInputStream stream : blockStreams) {
-      NewBlockInputStream blockStream = (NewBlockInputStream) stream;
+      StreamBlockInput blockStream = (StreamBlockInput) stream;
       int blockStreamLength = Math.min(BLOCK_SIZE,
           dataLength - readBlockLength);
       assertEquals(blockStreamLength, blockStream.getLength());

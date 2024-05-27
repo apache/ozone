@@ -30,7 +30,7 @@ import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.scm.storage.BlockExtendedInputStream;
 import org.apache.hadoop.hdds.scm.storage.BlockLocationInfo;
-import org.apache.hadoop.hdds.scm.storage.NewBlockInputStream;
+import org.apache.hadoop.hdds.scm.storage.StreamBlockInput;
 import org.junit.jupiter.api.Test;
 
 import java.util.ArrayList;
@@ -62,7 +62,7 @@ public class TestBlockInputStreamFactoryImpl {
         factory.create(repConfig, blockInfo, blockInfo.getPipeline(),
             blockInfo.getToken(), null, null,
             clientConfig);
-    assertInstanceOf(NewBlockInputStream.class, stream);
+    assertInstanceOf(StreamBlockInput.class, stream);
     assertEquals(stream.getBlockID(), blockInfo.getBlockID());
     assertEquals(stream.getLength(), blockInfo.getLength());
   }

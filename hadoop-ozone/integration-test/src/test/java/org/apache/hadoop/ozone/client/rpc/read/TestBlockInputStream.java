@@ -21,7 +21,7 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 
 import org.apache.hadoop.hdds.scm.storage.ChunkInputStream;
-import org.apache.hadoop.hdds.scm.storage.NewBlockInputStream;
+import org.apache.hadoop.hdds.scm.storage.StreamBlockInput;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.io.KeyInputStream;
@@ -69,8 +69,8 @@ class TestBlockInputStream extends TestInputStreamBase {
 
     try (KeyInputStream keyInputStream = bucket.getKeyInputStream(keyName)) {
 
-      NewBlockInputStream block0Stream =
-          (NewBlockInputStream)keyInputStream.getPartStreams().get(0);
+      StreamBlockInput block0Stream =
+          (StreamBlockInput)keyInputStream.getPartStreams().get(0);
 
       // To read 1 byte of chunk data, ChunkInputStream should get one full
       // checksum boundary worth of data from Container and store it in buffers.
@@ -126,8 +126,8 @@ class TestBlockInputStream extends TestInputStreamBase {
     bucket.writeRandomBytes(keyName, CHUNK_SIZE);
 
     try (KeyInputStream keyInputStream = bucket.getKeyInputStream(keyName)) {
-      NewBlockInputStream block0Stream =
-          (NewBlockInputStream) keyInputStream.getPartStreams().get(0);
+      StreamBlockInput block0Stream =
+          (StreamBlockInput) keyInputStream.getPartStreams().get(0);
 
       readDataFromChunk(block0Stream, 0, 1);
       assertNotNull(block0Stream.getCachedBuffers());
@@ -148,8 +148,8 @@ class TestBlockInputStream extends TestInputStreamBase {
 
     try (KeyInputStream keyInputStream = bucket.getKeyInputStream(keyName)) {
 
-      NewBlockInputStream block0Stream =
-          (NewBlockInputStream)keyInputStream.getPartStreams().get(0);
+      StreamBlockInput block0Stream =
+          (StreamBlockInput)keyInputStream.getPartStreams().get(0);
 
       // Read checksum boundary - 1 bytes of data
       int readDataLen = BYTES_PER_CHECKSUM - 1;
@@ -197,16 +197,16 @@ class TestBlockInputStream extends TestInputStreamBase {
     }
   }
 
-  private byte[] readDataFromChunk(NewBlockInputStream blockInputStream,
-      int offset, int readDataLength) throws IOException {
+  private byte[] readDataFromChunk(StreamBlockInput blockInputStream,
+                                   int offset, int readDataLength) throws IOException {
     byte[] readData = new byte[readDataLength];
     blockInputStream.seek(offset);
     blockInputStream.read(readData, 0, readDataLength);
     return readData;
   }
 
-  private byte[] readDataFromChunk(NewBlockInputStream blockInputStream,
-      int readDataLength) throws IOException {
+  private byte[] readDataFromChunk(StreamBlockInput blockInputStream,
+                                   int readDataLength) throws IOException {
     byte[] readData = new byte[readDataLength];
     blockInputStream.read(readData, 0, readDataLength);
     return readData;

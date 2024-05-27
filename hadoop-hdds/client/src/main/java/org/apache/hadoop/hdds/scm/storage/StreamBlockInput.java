@@ -66,10 +66,10 @@ import static org.apache.hadoop.hdds.client.ReplicationConfig.getLegacyFactor;
  * An {@link java.io.InputStream} called from KeyInputStream to read a block from the
  * container.
  */
-public class NewBlockInputStream extends BlockExtendedInputStream
+public class StreamBlockInput extends BlockExtendedInputStream
     implements Seekable, CanUnbuffer, ByteBufferReadable {
   private static final Logger LOG =
-      LoggerFactory.getLogger(NewBlockInputStream.class);
+      LoggerFactory.getLogger(StreamBlockInput.class);
   private final BlockID blockID;
   private final long length;
   private final AtomicReference<Pipeline> pipelineRef =
@@ -94,7 +94,7 @@ public class NewBlockInputStream extends BlockExtendedInputStream
   private int retries;
 
 
-  public NewBlockInputStream(
+  public StreamBlockInput(
       BlockID blockID, long length, Pipeline pipeline,
       Token<OzoneBlockTokenIdentifier> token,
       XceiverClientFactory xceiverClientFactory,
