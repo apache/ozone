@@ -134,7 +134,7 @@ public class OmTableInsightTask implements ReconOmTask {
       writeDataToDB(replicatedSizeMap);
     }
 
-    LOG.info("Completed a 'reprocess' run of OmTableInsightTask.");
+    LOG.debug("Completed a 'reprocess' run of OmTableInsightTask.");
     return new ImmutablePair<>(getTaskName(), true);
   }
 
@@ -208,7 +208,7 @@ public class OmTableInsightTask implements ReconOmTask {
     if (!replicatedSizeMap.isEmpty()) {
       writeDataToDB(replicatedSizeMap);
     }
-    LOG.info("Completed a 'process' run of OmTableInsightTask.");
+    LOG.debug("Completed a 'process' run of OmTableInsightTask.");
     return new ImmutablePair<>(getTaskName(), true);
   }
 
