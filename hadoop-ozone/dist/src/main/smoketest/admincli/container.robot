@@ -101,13 +101,6 @@ Report containers as JSON
                          Should contain   ${output}   stats
                          Should contain   ${output}   samples
 
-Close container
-    ${container} =      Execute          ozone admin container list --state OPEN | jq -r 'select(.replicationConfig.replicationFactor == "THREE") | .containerID' | head -1
-                        Execute          ozone admin container close "${container}"
-    ${output} =         Execute          ozone admin container info "${container}"
-                        Should contain   ${output}   CLOS
-    Wait until keyword succeeds    1min    10sec    Container is closed    ${container}
-
 #List containers on unknown host
 #    ${output} =         Execute And Ignore Error     ozone admin --verbose container list --scm unknown-host
 #                        Should contain   ${output}   Invalid host name
@@ -137,6 +130,8 @@ Cannot reconcile open container
 Close container
     ${container} =      Execute          ozone admin container list --state OPEN | jq -r 'select(.replicationConfig.replicationFactor == "THREE") | .containerID' | head -1
                         Execute          ozone admin container close "${container}"
+    # The container may either be in CLOSED or CLOSING state at this point. Once we have verified this, we will wait
+    # for it to progress to CLOSED.
     ${output} =         Execute          ozone admin container info "${container}"
                         Should contain   ${output}   CLOS
     Wait until keyword succeeds    1min    10sec    Container is closed    ${container}

@@ -15,7 +15,7 @@
  * the License.
  */
 
-package org.apache.hadoop.hdds.scm.container.reconiliation;
+package org.apache.hadoop.hdds.scm.container.reconciliation;
 /**
  * This package contains classes related to container reconciliation.
  */
