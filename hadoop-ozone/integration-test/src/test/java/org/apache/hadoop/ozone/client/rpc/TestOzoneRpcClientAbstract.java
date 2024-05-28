@@ -1101,7 +1101,7 @@ public abstract class TestOzoneRpcClientAbstract extends OzoneTestBase {
   }
 
   @ParameterizedTest
-  @EnumSource(names = { "OBJECT_STORE" }) // TODO - only works on object store layout for now.
+  @EnumSource
   void rewriteKey(BucketLayout layout) throws IOException {
     OzoneBucket bucket = createBucket(layout);
     OzoneKeyDetails keyDetails = createTestKey(bucket);
@@ -1115,7 +1115,7 @@ public abstract class TestOzoneRpcClientAbstract extends OzoneTestBase {
   }
 
   @ParameterizedTest
-  @EnumSource(names = { "OBJECT_STORE" }) // TODO - only works on object store layout for now.
+  @EnumSource
   void overwriteAfterRewrite(BucketLayout layout) throws IOException {
     OzoneBucket bucket = createBucket(layout);
     OzoneKeyDetails keyDetails = createTestKey(bucket);
@@ -1130,7 +1130,7 @@ public abstract class TestOzoneRpcClientAbstract extends OzoneTestBase {
   }
 
   @ParameterizedTest
-  @EnumSource(names = { "OBJECT_STORE" }) // TODO - only works on object store layout for now.
+  @EnumSource
   void rewriteFailsDueToOutdatedGeneration(BucketLayout layout) throws IOException {
     OzoneBucket bucket = createBucket(layout);
     OzoneKeyDetails keyDetails = createTestKey(bucket);
@@ -1147,7 +1147,7 @@ public abstract class TestOzoneRpcClientAbstract extends OzoneTestBase {
   }
 
   @ParameterizedTest
-  @EnumSource(names = { "OBJECT_STORE" }) // TODO - only works on object store layout for now.
+  @EnumSource
   void rewriteFailsDueToOutdatedGenerationAtCommit(BucketLayout layout) throws IOException {
     OzoneBucket bucket = createBucket(layout);
     OzoneKeyDetails keyDetails = createTestKey(bucket);
@@ -1177,7 +1177,7 @@ public abstract class TestOzoneRpcClientAbstract extends OzoneTestBase {
   }
 
   @ParameterizedTest
-  @EnumSource(names = { "OBJECT_STORE" }) // TODO - only works on object store layout for now.
+  @EnumSource
   void cannotRewriteDeletedKey(BucketLayout layout) throws IOException {
     OzoneBucket bucket = createBucket(layout);
     OzoneKeyDetails keyDetails = createTestKey(bucket);

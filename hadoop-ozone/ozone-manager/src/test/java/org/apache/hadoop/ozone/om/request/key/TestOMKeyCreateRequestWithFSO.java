@@ -153,6 +153,11 @@ public class TestOMKeyCreateRequestWithFSO extends TestOMKeyCreateRequest {
     long lastKnownParentId = omBucketInfo.getObjectID();
     final long volumeId = omMetadataManager.getVolumeId(volumeName);
 
+    if (keyPath == null) {
+      // The file is at the root of the bucket, so it has no parent folder. The parent is
+      // the bucket itself.
+      return lastKnownParentId;
+    }
     Iterator<Path> elements = keyPath.iterator();
     StringBuilder fullKeyPath = new StringBuilder(bucketKey);
     while (elements.hasNext()) {

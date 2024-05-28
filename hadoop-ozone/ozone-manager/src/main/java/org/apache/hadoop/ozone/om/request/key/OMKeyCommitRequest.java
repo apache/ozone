@@ -504,7 +504,7 @@ public class OMKeyCommitRequest extends OMKeyRequest {
     return req;
   }
 
-  private void validateAtomicRewrite(OmKeyInfo existing, OmKeyInfo toCommit, Map<String, String> auditMap)
+  protected void validateAtomicRewrite(OmKeyInfo existing, OmKeyInfo toCommit, Map<String, String> auditMap)
       throws OMException {
     if (toCommit.getExpectedDataGeneration() != null) {
       // These values are not passed in the request keyArgs, so add them into the auditMap if they are present

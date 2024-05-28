@@ -442,7 +442,7 @@ public class OMKeyCreateRequest extends OMKeyRequest {
     return req;
   }
 
-  private void validateAtomicRewrite(OmKeyInfo dbKeyInfo, KeyArgs keyArgs)
+  protected void validateAtomicRewrite(OmKeyInfo dbKeyInfo, KeyArgs keyArgs)
       throws OMException {
     if (keyArgs.hasExpectedDataGeneration()) {
       // If a key does not exist, or if it exists but the updateID do not match, then fail this request.

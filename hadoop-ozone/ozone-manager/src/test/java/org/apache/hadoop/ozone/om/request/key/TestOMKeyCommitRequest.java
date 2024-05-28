@@ -226,11 +226,6 @@ public class TestOMKeyCommitRequest extends TestOMKeyRequest {
 
   @Test
   public void testAtomicRewrite() throws Exception {
-    if (getBucketLayout() == BucketLayout.FILE_SYSTEM_OPTIMIZED) {
-     // TODO - does not work with in FSO for now
-      return;
-    }
-
     Table<String, OmKeyInfo> openKeyTable = omMetadataManager.getOpenKeyTable(getBucketLayout());
     Table<String, OmKeyInfo> closedKeyTable = omMetadataManager.getKeyTable(getBucketLayout());
 
@@ -255,9 +250,7 @@ public class TestOMKeyCommitRequest extends TestOMKeyRequest {
     List<OzoneAcl> acls = Collections.singletonList(OzoneAcl.parseAcl("user:foo:rw"));
     omKeyInfo.addAcl(acls.get(0));
 
-    String openKey = getOzonePathKey() + "/" + modifiedOmRequest.getCommitKeyRequest().getClientID();
-
-    openKeyTable.put(openKey, omKeyInfo);
+    String openKey = addKeyToOpenKeyTable(allocatedLocationList, omKeyInfo);
     OmKeyInfo openKeyInfo = openKeyTable.get(openKey);
     assertNotNull(openKeyInfo);
     assertEquals(acls, openKeyInfo.getAcls());
@@ -825,6 +818,14 @@ public class TestOMKeyCommitRequest extends TestOMKeyRequest {
 
     return omMetadataManager.getOpenKey(volumeName, bucketName,
               keyName, clientID);
+  }
+
+  @Nonnull
+  protected String addKeyToOpenKeyTable(List<OmKeyLocationInfo> locationList, OmKeyInfo keyInfo) throws Exception {
+    OMRequestTestUtils.addKeyToTable(true, false, keyInfo, clientID, 0, omMetadataManager);
+
+    return omMetadataManager.getOpenKey(volumeName, bucketName,
+        keyName, clientID);
   }
 
   @Nonnull
