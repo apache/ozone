@@ -133,25 +133,6 @@ public class TestOMDBInsightSearchEndpoint extends AbstractReconSqlDBTest {
   }
 
   @Test
-  public void testVolumeLevelSearchRestriction() throws IOException {
-    // Test with volume level path
-    String volumePath = "/vola";
-    Response response = omdbInsightSearchEndpoint.searchOpenKeys(volumePath, 20, "");
-    assertEquals(Response.Status.BAD_REQUEST.getStatusCode(), response.getStatus());
-    String entity = (String) response.getEntity();
-    assertTrue(entity.contains("Invalid startPrefix: Path must be at the bucket level or deeper"),
-        "Expected a message indicating the path must be at the bucket level or deeper");
-
-    // Test with another volume level path
-    volumePath = "/volb";
-    response = omdbInsightSearchEndpoint.searchOpenKeys(volumePath, 20, "");
-    assertEquals(Response.Status.BAD_REQUEST.getStatusCode(), response.getStatus());
-    entity = (String) response.getEntity();
-    assertTrue(entity.contains("Invalid startPrefix: Path must be at the bucket level or deeper"),
-        "Expected a message indicating the path must be at the bucket level or deeper");
-  }
-
-  @Test
   public void testRootLevelSearchRestriction() throws IOException {
     // Test with root level path
     String rootPath = "/";
@@ -164,6 +145,25 @@ public class TestOMDBInsightSearchEndpoint extends AbstractReconSqlDBTest {
     // Test with root level path without trailing slash
     rootPath = "";
     response = omdbInsightSearchEndpoint.searchOpenKeys(rootPath, 20, "");
+    assertEquals(Response.Status.BAD_REQUEST.getStatusCode(), response.getStatus());
+    entity = (String) response.getEntity();
+    assertTrue(entity.contains("Invalid startPrefix: Path must be at the bucket level or deeper"),
+        "Expected a message indicating the path must be at the bucket level or deeper");
+  }
+
+  @Test
+  public void testVolumeLevelSearchRestriction() throws IOException {
+    // Test with volume level path
+    String volumePath = "/vola";
+    Response response = omdbInsightSearchEndpoint.searchOpenKeys(volumePath, 20, "");
+    assertEquals(Response.Status.BAD_REQUEST.getStatusCode(), response.getStatus());
+    String entity = (String) response.getEntity();
+    assertTrue(entity.contains("Invalid startPrefix: Path must be at the bucket level or deeper"),
+        "Expected a message indicating the path must be at the bucket level or deeper");
+
+    // Test with another volume level path
+    volumePath = "/volb";
+    response = omdbInsightSearchEndpoint.searchOpenKeys(volumePath, 20, "");
     assertEquals(Response.Status.BAD_REQUEST.getStatusCode(), response.getStatus());
     entity = (String) response.getEntity();
     assertTrue(entity.contains("Invalid startPrefix: Path must be at the bucket level or deeper"),
@@ -193,6 +193,13 @@ public class TestOMDBInsightSearchEndpoint extends AbstractReconSqlDBTest {
     // Assert Total Size
     assertEquals(5000, result.getUnreplicatedDataSize());
     assertEquals(5000 * 3, result.getReplicatedDataSize());
+
+    // Test with bucket that does not exist
+    response = omdbInsightSearchEndpoint.searchOpenKeys("/vola/nonexistentbucket", 20, "");
+    assertEquals(Response.Status.NOT_FOUND.getStatusCode(), response.getStatus());
+    String entity = (String) response.getEntity();
+    assertTrue(entity.contains("No keys matched the search prefix"),
+        "Expected a message indicating no keys were found");
   }
 
   @Test
@@ -229,6 +236,67 @@ public class TestOMDBInsightSearchEndpoint extends AbstractReconSqlDBTest {
     // Assert Total Size
     assertEquals(1000, result.getUnreplicatedDataSize());
     assertEquals(1000 * 3, result.getReplicatedDataSize());
+
+    // Test with non-existent directory
+    response = omdbInsightSearchEndpoint.searchOpenKeys("/vola/bucketa1/nonexistentdir", 20, "");
+    assertEquals(Response.Status.NOT_FOUND.getStatusCode(), response.getStatus());
+    String entity = (String) response.getEntity();
+    assertTrue(entity.contains("No keys matched the search prefix"),
+        "Expected a message indicating no keys were found");
+  }
+
+  @Test
+  public void testKeyLevelSearch() throws IOException {
+    // FSO Bucket key-level search
+    Response response = omdbInsightSearchEndpoint.searchOpenKeys("/vola/bucketa1/filea1", 10, "");
+    assertEquals(200, response.getStatus());
+    KeyInsightInfoResponse result = (KeyInsightInfoResponse) response.getEntity();
+    assertEquals(1, result.getFsoKeyInfoList().size());
+    assertEquals(0, result.getNonFSOKeyInfoList().size());
+    // Assert Total Size
+    assertEquals(1000, result.getUnreplicatedDataSize());
+    assertEquals(1000 * 3, result.getReplicatedDataSize());
+
+    response = omdbInsightSearchEndpoint.searchOpenKeys("/vola/bucketa1/filea2", 10, "");
+    assertEquals(200, response.getStatus());
+    result = (KeyInsightInfoResponse) response.getEntity();
+    assertEquals(1, result.getFsoKeyInfoList().size());
+    assertEquals(0, result.getNonFSOKeyInfoList().size());
+    // Assert Total Size
+    assertEquals(1000, result.getUnreplicatedDataSize());
+    assertEquals(1000 * 3, result.getReplicatedDataSize());
+
+    // OBS Bucket key-level search
+    response = omdbInsightSearchEndpoint.searchOpenKeys("/volb/bucketb1/fileb1", 10, "");
+    assertEquals(200, response.getStatus());
+    result = (KeyInsightInfoResponse) response.getEntity();
+    assertEquals(0, result.getFsoKeyInfoList().size());
+    assertEquals(1, result.getNonFSOKeyInfoList().size());
+    // Assert Total Size
+    assertEquals(1000, result.getUnreplicatedDataSize());
+    assertEquals(1000 * 3, result.getReplicatedDataSize());
+
+    response = omdbInsightSearchEndpoint.searchOpenKeys("/volb/bucketb1/fileb2", 10, "");
+    assertEquals(200, response.getStatus());
+    result = (KeyInsightInfoResponse) response.getEntity();
+    assertEquals(0, result.getFsoKeyInfoList().size());
+    assertEquals(1, result.getNonFSOKeyInfoList().size());
+    // Assert Total Size
+    assertEquals(1000, result.getUnreplicatedDataSize());
+    assertEquals(1000 * 3, result.getReplicatedDataSize());
+
+    // Test with non-existent key
+    response = omdbInsightSearchEndpoint.searchOpenKeys("/vola/bucketa1/nonexistentfile", 1, "");
+    assertEquals(Response.Status.NOT_FOUND.getStatusCode(), response.getStatus());
+    String entity = (String) response.getEntity();
+    assertTrue(entity.contains("No keys matched the search prefix"),
+        "Expected a message indicating no keys were found");
+
+    response = omdbInsightSearchEndpoint.searchOpenKeys("/volb/bucketb1/nonexistentfile", 1, "");
+    assertEquals(Response.Status.NOT_FOUND.getStatusCode(), response.getStatus());
+    entity = (String) response.getEntity();
+    assertTrue(entity.contains("No keys matched the search prefix"),
+        "Expected a message indicating no keys were found");
   }
 
   @Test
@@ -240,23 +308,6 @@ public class TestOMDBInsightSearchEndpoint extends AbstractReconSqlDBTest {
         (KeyInsightInfoResponse) response.getEntity();
     assertEquals(2, result.getFsoKeyInfoList().size());
     assertEquals(0, result.getNonFSOKeyInfoList().size());
-  }
-
-  @Test
-  public void testSearchOpenKeysWithNoMatchFound() throws IOException {
-    // Given a search prefix that matches no keys
-    String searchPrefix = "unknown-volume/unknown-bucket/";
-
-    Response response =
-        omdbInsightSearchEndpoint.searchOpenKeys(searchPrefix, 10, "");
-
-    // Then the response should indicate that no keys were found
-    assertEquals(Response.Status.NOT_FOUND.getStatusCode(),
-        response.getStatus(), "Expected a 404 NOT FOUND status");
-
-    String entity = (String) response.getEntity();
-    assertTrue(entity.contains("No keys matched the search prefix"),
-        "Expected a message indicating no keys were found");
   }
 
   @Test
@@ -328,47 +379,6 @@ public class TestOMDBInsightSearchEndpoint extends AbstractReconSqlDBTest {
     assertEquals(0, result.getFsoKeyInfoList().size());
     assertEquals(result.getNonFSOKeyInfoList().get(0).getKey(), result.getLastKey(),
         "Expected last key to be empty");
-  }
-
-  @Test
-  public void testKeyLevelSearch() throws IOException {
-    // FSO Bucket key-level search
-    Response response = omdbInsightSearchEndpoint.searchOpenKeys("/vola/bucketa1/filea1", 1, "");
-    assertEquals(200, response.getStatus());
-    KeyInsightInfoResponse result = (KeyInsightInfoResponse) response.getEntity();
-    assertEquals(1, result.getFsoKeyInfoList().size());
-    assertEquals(0, result.getNonFSOKeyInfoList().size());
-    // Assert Total Size
-    assertEquals(1000, result.getUnreplicatedDataSize());
-    assertEquals(1000 * 3, result.getReplicatedDataSize());
-
-    response = omdbInsightSearchEndpoint.searchOpenKeys("/vola/bucketa1/filea2", 1, "");
-    assertEquals(200, response.getStatus());
-    result = (KeyInsightInfoResponse) response.getEntity();
-    assertEquals(1, result.getFsoKeyInfoList().size());
-    assertEquals(0, result.getNonFSOKeyInfoList().size());
-    // Assert Total Size
-    assertEquals(1000, result.getUnreplicatedDataSize());
-    assertEquals(1000 * 3, result.getReplicatedDataSize());
-
-    // OBS Bucket key-level search
-    response = omdbInsightSearchEndpoint.searchOpenKeys("/volb/bucketb1/fileb1", 1, "");
-    assertEquals(200, response.getStatus());
-    result = (KeyInsightInfoResponse) response.getEntity();
-    assertEquals(0, result.getFsoKeyInfoList().size());
-    assertEquals(1, result.getNonFSOKeyInfoList().size());
-    // Assert Total Size
-    assertEquals(1000, result.getUnreplicatedDataSize());
-    assertEquals(1000 * 3, result.getReplicatedDataSize());
-
-    response = omdbInsightSearchEndpoint.searchOpenKeys("/volb/bucketb1/fileb2", 1, "");
-    assertEquals(200, response.getStatus());
-    result = (KeyInsightInfoResponse) response.getEntity();
-    assertEquals(0, result.getFsoKeyInfoList().size());
-    assertEquals(1, result.getNonFSOKeyInfoList().size());
-    // Assert Total Size
-    assertEquals(1000, result.getUnreplicatedDataSize());
-    assertEquals(1000 * 3, result.getReplicatedDataSize());
   }
 
 

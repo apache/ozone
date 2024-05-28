@@ -48,6 +48,7 @@ import java.util.List;
 import java.util.ArrayList;
 import java.util.Set;
 
+import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 import static org.apache.hadoop.ozone.recon.ReconConstants.DEFAULT_START_PREFIX;
 import static org.apache.hadoop.ozone.recon.ReconConstants.RECON_OPEN_KEY_DEFAULT_SEARCH_LIMIT;
 import static org.apache.hadoop.ozone.recon.ReconConstants.RECON_OPEN_KEY_SEARCH_DEFAULT_PREV_KEY;
@@ -203,13 +204,12 @@ public class OMDBInsightSearchEndpoint {
     // If names.length <= 2, then the search prefix is at the volume or bucket level hence
     // no need to find parent or extract id's or find subpaths as the openFileTable is
     // suitable for volume and bucket level search
-    if (names.length > 2) {
+    if (names.length > 2 && startPrefixObjectPath.endsWith(OM_KEY_PREFIX)) {
       // Fetch the parent ID to search for
       long parentId = Long.parseLong(names[names.length - 1]);
 
       // Fetch the nameSpaceSummary for the parent ID
-      NSSummary parentSummary =
-          reconNamespaceSummaryManager.getNSSummary(parentId);
+      NSSummary parentSummary = reconNamespaceSummaryManager.getNSSummary(parentId);
       if (parentSummary == null) {
         return matchedKeys;
       }
@@ -223,8 +223,7 @@ public class OMDBInsightSearchEndpoint {
 
       // Iterate over the subpaths and retrieve the open files
       for (String subPath : subPaths) {
-        matchedKeys.putAll(retrieveKeysFromTable(openFileTable, subPath,
-            limit - matchedKeys.size(), prevKey));
+        matchedKeys.putAll(retrieveKeysFromTable(openFileTable, subPath, limit - matchedKeys.size(), prevKey));
         if (matchedKeys.size() >= limit) {
           break;
         }
@@ -232,7 +231,7 @@ public class OMDBInsightSearchEndpoint {
       return matchedKeys;
     }
 
-    // Iterate over for bucket and volume level search
+    // If the search level is at the volume, bucket or key level, directly search the openFileTable
     matchedKeys.putAll(retrieveKeysFromTable(openFileTable, startPrefixObjectPath, limit, prevKey));
     return matchedKeys;
   }
@@ -294,12 +293,12 @@ public class OMDBInsightSearchEndpoint {
     try {
       String[] names = parseRequestPath(normalizePath(prevKeyPrefix, BucketLayout.FILE_SYSTEM_OPTIMIZED));
 
-      // Root-Level :- Return the original path
+      // Root-Level: Return the original path
       if (names.length == 0) {
         return prevKeyPrefix;
       }
 
-      // Volume-Level :- Fetch the volumeID
+      // Volume-Level: Fetch the volumeID
       String volumeName = names[0];
       validateNames(volumeName);
       String volumeKey = omMetadataManager.getVolumeKey(volumeName);
@@ -308,7 +307,7 @@ public class OMDBInsightSearchEndpoint {
         return constructObjectPathWithPrefix(volumeId);
       }
 
-      // Bucket-Level :- Fetch the bucketID
+      // Bucket-Level: Fetch the bucketID
       String bucketName = names[1];
       validateNames(bucketName);
       String bucketKey = omMetadataManager.getBucketKey(volumeName, bucketName);
@@ -318,16 +317,63 @@ public class OMDBInsightSearchEndpoint {
         return constructObjectPathWithPrefix(volumeId, bucketId);
       }
 
-      // Fetch the immediate parentID which could be a directory or the bucket itself
-      BucketHandler handler = getBucketHandler(reconNamespaceSummaryManager, omMetadataManager, reconSCM, bucketInfo);
-      long dirObjectId = handler.getDirInfo(names).getObjectID();
-      return constructObjectPathWithPrefix(volumeId, bucketId, dirObjectId);
-    }  catch (IllegalArgumentException e) {
+      // Check if the last element is a key
+      if (isKey(volumeId, bucketId, names[names.length - 1])) {
+        // The last element is a key hence return the path with the key prefix
+        return constructObjectPathWithPrefix(volumeId, bucketId, bucketId) + OM_KEY_PREFIX + names[names.length - 1];
+      }
+
+      // Attempt to fetch the immediate parentID which could be a directory or the bucket itself
+      BucketHandler handler =
+          getBucketHandler(reconNamespaceSummaryManager, omMetadataManager, reconSCM, bucketInfo);
+      long dirObjectId;
+      try {
+        dirObjectId = handler.getDirInfo(names).getObjectID();
+      } catch (NullPointerException e) {
+        // If fetching directory also then it's neither a key nor a directory hence unknown entity.
+        return constructObjectPathWithPrefix(volumeId, bucketId, bucketId) + OM_KEY_PREFIX + names[names.length - 1];
+      }
+      // If it's a directory, return the path with the directory prefix with a trailing '/' indicating a directory
+      return constructObjectPathWithPrefix(volumeId, bucketId, dirObjectId) + OM_KEY_PREFIX;
+    } catch (IllegalArgumentException e) {
       LOG.error("IllegalArgumentException encountered while converting key prefix to object path: {}", prevKeyPrefix, e);
       throw e;
     } catch (RuntimeException e) {
       LOG.error("RuntimeException encountered while converting key prefix to object path: {}", prevKeyPrefix, e);
       return prevKeyPrefix;
+    }
+  }
+
+
+  /**
+   * Checks if the last element in the path is a key.
+   *
+   * @param volumeId The volume ID.
+   * @param bucketId The bucket ID.
+   * @param potentialKeyName The name of the potential key.
+   * @return True if the last element is a key, false otherwise.
+   * @throws IOException If database access fails.
+   */
+  private boolean isKey(long volumeId, long bucketId, String potentialKeyName)
+      throws IOException {
+    String keyPrefixObjectPath =
+        constructObjectPathWithPrefix(volumeId, bucketId, bucketId);
+
+    Table<String, OmKeyInfo> openFileTable =
+        omMetadataManager.getOpenKeyTable(BucketLayout.FILE_SYSTEM_OPTIMIZED);
+    try (TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>> keyIter = openFileTable.iterator()) {
+      String searchKey = keyPrefixObjectPath + OM_KEY_PREFIX + potentialKeyName;
+      keyIter.seek(searchKey);
+      if (keyIter.hasNext()) {
+        Table.KeyValue<String, OmKeyInfo> keyValue = keyIter.next();
+        return keyValue.getValue().getFileName().equals(potentialKeyName);
+      }
+      return false;
+    } catch (IOException e) {
+      LOG.error(
+          "IOException encountered while checking if the last element is a key: {}",
+          potentialKeyName, e);
+      throw e;
     }
   }
 
