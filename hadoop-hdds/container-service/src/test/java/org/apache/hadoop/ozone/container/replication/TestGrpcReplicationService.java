@@ -29,6 +29,7 @@ import org.apache.hadoop.ozone.container.common.helpers.ContainerMetrics;
 import org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion;
 import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
 import org.apache.hadoop.ozone.container.common.interfaces.Handler;
+import org.apache.hadoop.ozone.container.common.utils.StorageVolumeUtil;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.ozone.container.common.volume.RoundRobinVolumeChoosingPolicy;
@@ -143,6 +144,8 @@ class TestGrpcReplicationService {
         ContainerLayoutVersion.FILE_PER_BLOCK, GB, UUID.randomUUID().toString(),
         datanode.getUuidString());
     KeyValueContainer container = new KeyValueContainer(data, conf);
+    StorageVolumeUtil.getHddsVolumesList(volumeSet.getVolumesList())
+        .forEach(hddsVolume -> hddsVolume.setDbParentDir(tempDir.toFile()));
     container.create(volumeSet, new RoundRobinVolumeChoosingPolicy(),
         "test-replication");
     containerSet.addContainer(container);

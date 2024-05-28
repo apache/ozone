@@ -25,12 +25,13 @@ import org.apache.hadoop.io.MD5Hash;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.util.DataChecksum;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
+import org.apache.ratis.util.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.security.MessageDigest;
 import java.util.List;
 
 
@@ -42,8 +43,8 @@ public class ECBlockChecksumComputer extends AbstractBlockChecksumComputer {
   private static final Logger LOG =
       LoggerFactory.getLogger(ECBlockChecksumComputer.class);
 
-  private List<ContainerProtos.ChunkInfo> chunkInfoList;
-  private OmKeyInfo keyInfo;
+  private final List<ContainerProtos.ChunkInfo> chunkInfoList;
+  private final OmKeyInfo keyInfo;
 
 
   public ECBlockChecksumComputer(
@@ -68,7 +69,7 @@ public class ECBlockChecksumComputer extends AbstractBlockChecksumComputer {
 
   }
 
-  private void computeMd5Crc() throws IOException {
+  private void computeMd5Crc() {
     Preconditions.checkArgument(chunkInfoList.size() > 0);
 
     final ContainerProtos.ChunkInfo firstChunkInfo = chunkInfoList.get(0);
@@ -77,32 +78,28 @@ public class ECBlockChecksumComputer extends AbstractBlockChecksumComputer {
     // Total parity checksum bytes per stripe to remove
     int parityBytes = getParityBytes(chunkSize, bytesPerCrc);
 
-    ByteArrayOutputStream out = new ByteArrayOutputStream();
+    final MessageDigest digester = MD5Hash.getDigester();
 
     for (ContainerProtos.ChunkInfo chunkInfo : chunkInfoList) {
       ByteString stripeChecksum = chunkInfo.getStripeChecksum();
 
       Preconditions.checkNotNull(stripeChecksum);
-      byte[] checksumBytes = stripeChecksum.toByteArray();
-
-      Preconditions.checkArgument(checksumBytes.length % 4 == 0,
+      final int checksumSize = stripeChecksum.size();
+      Preconditions.checkArgument(checksumSize % 4 == 0,
           "Checksum Bytes size does not match");
 
-      ByteBuffer byteWrap = ByteBuffer
-          .wrap(checksumBytes, 0, checksumBytes.length - parityBytes);
-      byte[] currentChecksum = new byte[4];
-
-      while (byteWrap.hasRemaining()) {
-        byteWrap.get(currentChecksum);
-        out.write(currentChecksum);
-      }
+      final ByteBuffer byteWrap = stripeChecksum.asReadOnlyByteBuffer();
+      byteWrap.limit(checksumSize - parityBytes);
+      digester.update(byteWrap);
     }
 
-    MD5Hash fileMD5 = MD5Hash.digest(out.toByteArray());
-    setOutBytes(fileMD5.getDigest());
+    final byte[] fileMD5 = digester.digest();
+    setOutBytes(digester.digest());
 
-    LOG.debug("Number of chunks={}, md5hash={}",
-        chunkInfoList.size(), fileMD5);
+    if (LOG.isDebugEnabled()) {
+      LOG.debug("Number of chunks={}, md5hash={}",
+          chunkInfoList.size(), StringUtils.bytes2HexString(fileMD5));
+    }
   }
 
   private void computeCompositeCrc() throws IOException {
@@ -124,12 +121,10 @@ public class ECBlockChecksumComputer extends AbstractBlockChecksumComputer {
 
     // Bytes required to create a CRC
     long bytesPerCrc = firstChunkInfo.getChecksumData().getBytesPerChecksum();
-    ECReplicationConfig replicationConfig =
-        (ECReplicationConfig) keyInfo.getReplicationConfig();
-    long chunkSize = replicationConfig.getEcChunkSize();
+    long chunkSize = firstChunkInfo.getLen();
 
     //When EC chunk size is not a multiple of ozone.client.bytes.per.checksum
-    // (default = 1MB) the last checksum in an EC chunk is only generated for
+    // (default = 16KB) the last checksum in an EC chunk is only generated for
     // offset.
     long bytesPerCrcOffset = chunkSize % bytesPerCrc;
 
@@ -149,17 +144,15 @@ public class ECBlockChecksumComputer extends AbstractBlockChecksumComputer {
       ByteString stripeChecksum = chunkInfo.getStripeChecksum();
 
       Preconditions.checkNotNull(stripeChecksum);
-      byte[] checksumBytes = stripeChecksum.toByteArray();
-
-      Preconditions.checkArgument(checksumBytes.length % 4 == 0,
+      final int checksumSize = stripeChecksum.size();
+      Preconditions.checkArgument(checksumSize % 4 == 0,
           "Checksum Bytes size does not match");
       CrcComposer chunkCrcComposer =
           CrcComposer.newCrcComposer(dataChecksumType, bytesPerCrc);
 
       // Limit parity bytes as they do not contribute to fileChecksum
-      ByteBuffer byteWrap = ByteBuffer
-          .wrap(checksumBytes, 0, checksumBytes.length - parityBytes);
-      byte[] currentChecksum = new byte[4];
+      final ByteBuffer byteWrap = stripeChecksum.asReadOnlyByteBuffer();
+      byteWrap.limit(checksumSize - parityBytes);
 
       long chunkOffsetIndex = 1;
       while (byteWrap.hasRemaining()) {
@@ -177,8 +170,7 @@ public class ECBlockChecksumComputer extends AbstractBlockChecksumComputer {
           currentChunkOffset = bytesPerCrcOffset;
         }
 
-        byteWrap.get(currentChecksum);
-        int checksumDataCrc = CrcUtil.readInt(currentChecksum, 0);
+        final int checksumDataCrc = byteWrap.getInt();
         //To handle last chunk when it size is lower than 1524K in the case
         // of rs-3-2-1524k.
         long chunkSizePerChecksum = Math.min(Math.min(keySize, bytesPerCrc),

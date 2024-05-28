@@ -112,7 +112,8 @@ public class TestOzoneManagerDoubleBufferWithOMResponse {
         .setOmMetadataManager(omMetadataManager)
         .setMaxUnFlushedTransactionCount(100000)
         .enableRatis(true)
-        .build();
+        .build()
+        .start();
   }
 
   @AfterEach

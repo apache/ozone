@@ -17,7 +17,6 @@
  */
 package org.apache.hadoop.ozone.om.helpers;
 
-import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
@@ -67,7 +66,7 @@ public final class OmBucketArgs extends WithMetadata implements Auditable {
   private final String ownerName;
 
   private OmBucketArgs(Builder b) {
-    setMetadata(b.metadata);
+    super(b);
     this.volumeName = b.volumeName;
     this.bucketName = b.bucketName;
     this.isVersionEnabled = b.isVersionEnabled;
@@ -187,18 +186,38 @@ public final class OmBucketArgs extends WithMetadata implements Auditable {
     if (this.ownerName != null) {
       auditMap.put(OzoneConsts.OWNER, this.ownerName);
     }
+    if (this.quotaInBytesSet && quotaInBytes > 0 ||
+        (this.quotaInBytes != OzoneConsts.QUOTA_RESET)) {
+      auditMap.put(OzoneConsts.QUOTA_IN_BYTES,
+          String.valueOf(this.quotaInBytes));
+    }
+    if (this.quotaInNamespaceSet && quotaInNamespace > 0 ||
+        (this.quotaInNamespace != OzoneConsts.QUOTA_RESET)) {
+      auditMap.put(OzoneConsts.QUOTA_IN_NAMESPACE,
+          String.valueOf(this.quotaInNamespace));
+    }
+    if (this.bekInfo != null) {
+      auditMap.put(OzoneConsts.BUCKET_ENCRYPTION_KEY,
+          this.bekInfo.getKeyName());
+    }
+    if (this.defaultReplicationConfig != null) {
+      auditMap.put(OzoneConsts.REPLICATION_TYPE, String.valueOf(
+          this.defaultReplicationConfig.getType()));
+      auditMap.put(OzoneConsts.REPLICATION_CONFIG,
+          this.defaultReplicationConfig.getReplicationConfig()
+              .getReplication());
+    }
     return auditMap;
   }
 
   /**
    * Builder for OmBucketArgs.
    */
-  public static class Builder {
+  public static class Builder extends WithMetadata.Builder {
     private String volumeName;
     private String bucketName;
     private Boolean isVersionEnabled;
     private StorageType storageType;
-    private final Map<String, String> metadata = new HashMap<>();
     private boolean quotaInBytesSet = false;
     private long quotaInBytes;
     private boolean quotaInNamespaceSet = false;
@@ -237,8 +256,9 @@ public final class OmBucketArgs extends WithMetadata implements Auditable {
       return this;
     }
 
+    @Override
     public Builder addAllMetadata(Map<String, String> map) {
-      metadata.putAll(map);
+      super.addAllMetadata(map);
       return this;
     }
 

@@ -1115,6 +1115,12 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
     Optional<Long> maxSizeToMovePerIterationInGB = Optional.empty();
     Optional<Long> maxSizeEnteringTargetInGB = Optional.empty();
     Optional<Long> maxSizeLeavingSourceInGB = Optional.empty();
+    Optional<Integer> balancingInterval = Optional.empty();
+    Optional<Integer> moveTimeout = Optional.empty();
+    Optional<Integer> moveReplicationTimeout = Optional.empty();
+    Optional<Boolean> networkTopologyEnable = Optional.empty();
+    Optional<String> includeNodes = Optional.empty();
+    Optional<String> excludeNodes = Optional.empty();
 
     if (request.hasThreshold()) {
       threshold = Optional.of(request.getThreshold());
@@ -1140,19 +1146,47 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
       maxSizeToMovePerIterationInGB =
           Optional.of(request.getMaxSizeToMovePerIterationInGB());
     }
+
     if (request.hasMaxSizeEnteringTargetInGB()) {
       maxSizeEnteringTargetInGB =
           Optional.of(request.getMaxSizeEnteringTargetInGB());
     }
+
     if (request.hasMaxSizeLeavingSourceInGB()) {
       maxSizeLeavingSourceInGB =
           Optional.of(request.getMaxSizeLeavingSourceInGB());
     }
 
+    if (request.hasBalancingInterval()) {
+      balancingInterval = Optional.of(request.getBalancingInterval());
+    }
+
+    if (request.hasMoveTimeout()) {
+      moveTimeout = Optional.of(request.getMoveTimeout());
+    }
+
+    if (request.hasMoveReplicationTimeout()) {
+      moveReplicationTimeout = Optional.of(request.getMoveReplicationTimeout());
+    }
+
+    if (request.hasNetworkTopologyEnable()) {
+      networkTopologyEnable = Optional.of(request.getNetworkTopologyEnable());
+    }
+
+    if (request.hasIncludeNodes()) {
+      includeNodes = Optional.of(request.getIncludeNodes());
+    }
+
+    if (request.hasExcludeNodes()) {
+      excludeNodes = Optional.of(request.getExcludeNodes());
+    }
+
     return impl.startContainerBalancer(threshold, iterations,
         maxDatanodesPercentageToInvolvePerIteration,
         maxSizeToMovePerIterationInGB, maxSizeEnteringTargetInGB,
-        maxSizeLeavingSourceInGB);
+        maxSizeLeavingSourceInGB, balancingInterval, moveTimeout,
+        moveReplicationTimeout, networkTopologyEnable, includeNodes,
+        excludeNodes);
   }
 
   public StopContainerBalancerResponseProto stopContainerBalancer(
@@ -1173,7 +1207,7 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
   public DecommissionNodesResponseProto decommissionNodes(
       DecommissionNodesRequestProto request) throws IOException {
     List<DatanodeAdminError> errors =
-        impl.decommissionNodes(request.getHostsList());
+        impl.decommissionNodes(request.getHostsList(), request.getForce());
     DecommissionNodesResponseProto.Builder response =
         DecommissionNodesResponseProto.newBuilder();
     for (DatanodeAdminError e : errors) {
@@ -1222,7 +1256,7 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
       StartMaintenanceNodesRequestProto request) throws IOException {
     List<DatanodeAdminError> errors =
         impl.startMaintenanceNodes(request.getHostsList(),
-        (int)request.getEndInHours());
+        (int)request.getEndInHours(), request.getForce());
     StartMaintenanceNodesResponseProto.Builder response =
         StartMaintenanceNodesResponseProto.newBuilder();
     for (DatanodeAdminError e : errors) {

@@ -20,12 +20,16 @@ package org.apache.hadoop.ozone.s3.endpoint;
 
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
+
 import org.junit.jupiter.api.Test;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 /**
  * Class tests Unmarshall logic of {@link CompleteMultipartUploadRequest}.
@@ -75,6 +79,7 @@ public class TestCompleteMultipartUploadRequestUnmarshaller {
   }
 
   private void checkContent(CompleteMultipartUploadRequest request) {
+    assertNotNull(request);
     assertEquals(2, request.getPartList().size());
 
     List<CompleteMultipartUploadRequest.Part> parts =
@@ -87,6 +92,45 @@ public class TestCompleteMultipartUploadRequestUnmarshaller {
   private CompleteMultipartUploadRequest unmarshall(
       ByteArrayInputStream inputBody) throws IOException {
     return new CompleteMultipartUploadRequestUnmarshaller()
+        .readFrom(null, null, null, null, null, inputBody);
+  }
+
+  @Test
+  public void concurrentParse() {
+    CompleteMultipartUploadRequestUnmarshaller unmarshaller =
+        new CompleteMultipartUploadRequestUnmarshaller();
+    byte[] bytes = ("<CompleteMultipartUpload>" + "<Part><ETag>" + part1 +
+        "</ETag><PartNumber>1</PartNumber" + "></Part><Part><ETag>" +
+        part2 + "</ETag><PartNumber>2" +
+        "</PartNumber></Part></CompleteMultipartUpload>").getBytes(
+        UTF_8);
+
+    List<CompletableFuture<CompleteMultipartUploadRequest>> futures =
+        new ArrayList<>();
+    for (int i = 0; i < 40; i++) {
+      futures.add(CompletableFuture.supplyAsync(() -> {
+        try {
+          //GIVEN
+          ByteArrayInputStream inputBody = new ByteArrayInputStream(bytes);
+          //WHEN
+          return unmarshall(unmarshaller, inputBody);
+        } catch (IOException e) {
+          return null;
+        }
+      }));
+    }
+
+    for (CompletableFuture<CompleteMultipartUploadRequest> future : futures) {
+      CompleteMultipartUploadRequest request = future.join();
+      //THEN
+      checkContent(request);
+    }
+  }
+
+  private CompleteMultipartUploadRequest unmarshall(
+      CompleteMultipartUploadRequestUnmarshaller unmarshaller,
+      ByteArrayInputStream inputBody) throws IOException {
+    return unmarshaller
         .readFrom(null, null, null, null, null, inputBody);
   }
 }

@@ -88,7 +88,7 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
   private final OzoneManager ozoneManager;
   private RequestHandler handler;
   private RaftGroupId raftGroupId;
-  private OzoneManagerDoubleBuffer ozoneManagerDoubleBuffer;
+  private volatile OzoneManagerDoubleBuffer ozoneManagerDoubleBuffer;
   private final ExecutorService executorService;
   private final ExecutorService installSnapshotExecutor;
   private final boolean isTracingEnabled;
@@ -109,9 +109,7 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
     this.threadPrefix = ozoneManager.getThreadNamePrefix();
 
     this.ozoneManagerDoubleBuffer = buildDoubleBufferForRatis();
-
-    this.handler = new OzoneManagerRequestHandler(ozoneManager,
-        ozoneManagerDoubleBuffer);
+    this.handler = new OzoneManagerRequestHandler(ozoneManager);
 
     ThreadFactory build = new ThreadFactoryBuilder().setDaemon(true)
         .setNameFormat(threadPrefix +
@@ -163,12 +161,18 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
   /** Notified by Ratis for non-StateMachine term-index update. */
   @Override
   public synchronized void notifyTermIndexUpdated(long currentTerm, long newIndex) {
+    // lastSkippedIndex is start of sequence (one less) of continuous notification from ratis
+    // if there is any applyTransaction (double buffer index), then this gap is handled during double buffer
+    // notification and lastSkippedIndex will be the start of last continuous sequence.
     final long oldIndex = lastNotifiedTermIndex.getIndex();
     if (newIndex - oldIndex > 1) {
       lastSkippedIndex = newIndex - 1;
     }
     final TermIndex newTermIndex = TermIndex.valueOf(currentTerm, newIndex);
     lastNotifiedTermIndex = assertUpdateIncreasingly("lastNotified", lastNotifiedTermIndex, newTermIndex);
+    if (lastNotifiedTermIndex.getIndex() - getLastAppliedTermIndex().getIndex() == 1) {
+      updateLastAppliedTermIndex(lastNotifiedTermIndex);
+    }
   }
 
   public TermIndex getLastNotifiedTermIndex() {
@@ -177,7 +181,15 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
 
   @Override
   protected synchronized boolean updateLastAppliedTermIndex(TermIndex newTermIndex) {
-    assertUpdateIncreasingly("lastApplied", getLastAppliedTermIndex(), newTermIndex);
+    TermIndex lastApplied = getLastAppliedTermIndex();
+    assertUpdateIncreasingly("lastApplied", lastApplied, newTermIndex);
+    // if newTermIndex getting updated is within sequence of notifiedTermIndex (i.e. from lastSkippedIndex and
+    // notifiedTermIndex), then can update directly to lastNotifiedTermIndex as it ensure previous double buffer's
+    // Index is notified or getting notified matching lastSkippedIndex
+    if (newTermIndex.getIndex() < getLastNotifiedTermIndex().getIndex()
+        && newTermIndex.getIndex() >= lastSkippedIndex) {
+      newTermIndex = getLastNotifiedTermIndex();
+    }
     return super.updateLastAppliedTermIndex(newTermIndex);
   }
 
@@ -415,7 +427,6 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
     if (statePausedCount.decrementAndGet() == 0) {
       getLifeCycle().startAndTransition(() -> {
         this.ozoneManagerDoubleBuffer = buildDoubleBufferForRatis();
-        handler.updateDoubleBuffer(ozoneManagerDoubleBuffer);
         this.setLastAppliedTermIndex(TermIndex.valueOf(
             newLastAppliedSnapShotTermIndex, newLastAppliedSnaphsotIndex));
       });
@@ -434,7 +445,8 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
         .setS3SecretManager(ozoneManager.getS3SecretManager())
         .enableRatis(true)
         .enableTracing(isTracingEnabled)
-        .build();
+        .build()
+        .start();
   }
 
   /**
@@ -524,7 +536,8 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
    */
   private OMResponse runCommand(OMRequest request, TermIndex termIndex) {
     try {
-      OMClientResponse omClientResponse = handler.handleWriteRequest(request, termIndex);
+      final OMClientResponse omClientResponse = handler.handleWriteRequest(
+          request, termIndex, ozoneManagerDoubleBuffer);
       OMLockDetails omLockDetails = omClientResponse.getOmLockDetails();
       OMResponse omResponse = omClientResponse.getOMResponse();
       if (omLockDetails != null) {

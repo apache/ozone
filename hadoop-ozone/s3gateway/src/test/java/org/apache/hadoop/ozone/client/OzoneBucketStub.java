@@ -26,6 +26,7 @@ import java.nio.ByteBuffer;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
@@ -36,12 +37,11 @@ import java.util.stream.Collectors;
 
 import javax.xml.bind.DatatypeConverter;
 import org.apache.commons.codec.digest.DigestUtils;
-import org.apache.hadoop.hdds.client.DefaultReplicationConfig;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
-import org.apache.hadoop.hdds.protocol.StorageType;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.storage.ByteBufferStreamOutput;
 import org.apache.hadoop.ozone.OzoneAcl;
@@ -54,7 +54,10 @@ import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartUploadCompleteInfo;
+import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.util.Time;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import static org.apache.hadoop.ozone.OzoneConsts.ETAG;
 import static org.apache.hadoop.ozone.OzoneConsts.MD5_HASH;
@@ -63,13 +66,15 @@ import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
 /**
  * In-memory ozone bucket for testing.
  */
-public class OzoneBucketStub extends OzoneBucket {
+public final class OzoneBucketStub extends OzoneBucket {
+
+  private static final Logger LOG = LoggerFactory.getLogger(OzoneBucketStub.class);
 
   private Map<String, OzoneKeyDetails> keyDetails = new HashMap<>();
 
   private Map<String, byte[]> keyContents = new HashMap<>();
 
-  private Map<String, String> multipartUploadIdMap = new HashMap<>();
+  private Map<String, MultipartInfoStub> keyToMultipartUpload = new HashMap<>();
 
   private Map<String, Map<Integer, Part>> partList = new HashMap<>();
 
@@ -80,7 +85,7 @@ public class OzoneBucketStub extends OzoneBucket {
     return new Builder();
   }
 
-  public OzoneBucketStub(Builder b) {
+  private OzoneBucketStub(Builder b) {
     super(b);
     this.replicationConfig = super.getReplicationConfig();
   }
@@ -91,43 +96,6 @@ public class OzoneBucketStub extends OzoneBucket {
   public static final class Builder extends OzoneBucket.Builder {
 
     private Builder() {
-    }
-
-    @Override
-    public Builder setVolumeName(String volumeName) {
-      super.setVolumeName(volumeName);
-      return this;
-    }
-
-    @Override
-    public Builder setName(String name) {
-      super.setName(name);
-      return this;
-    }
-
-    @Override
-    public Builder setDefaultReplicationConfig(
-        DefaultReplicationConfig defaultReplicationConfig) {
-      super.setDefaultReplicationConfig(defaultReplicationConfig);
-      return this;
-    }
-
-    @Override
-    public Builder setStorageType(StorageType storageType) {
-      super.setStorageType(storageType);
-      return this;
-    }
-
-    @Override
-    public Builder setVersioning(Boolean versioning) {
-      super.setVersioning(versioning);
-      return this;
-    }
-
-    @Override
-    public Builder setCreationTime(long creationTime) {
-      super.setCreationTime(creationTime);
-      return this;
     }
 
     @Override
@@ -149,31 +117,17 @@ public class OzoneBucketStub extends OzoneBucket {
                                      ReplicationFactor factor,
                                      Map<String, String> metadata)
       throws IOException {
-    ByteArrayOutputStream byteArrayOutputStream =
-        new ByteArrayOutputStream((int) size) {
-          @Override
-          public void close() throws IOException {
-            keyContents.put(key, toByteArray());
-            keyDetails.put(key, new OzoneKeyDetails(
-                getVolumeName(),
-                getName(),
-                key,
-                size,
-                System.currentTimeMillis(),
-                System.currentTimeMillis(),
-                new ArrayList<>(), replicationConfig, metadata, null,
-                () -> readKey(key), true
-            ));
-            super.close();
-          }
-        };
-    return new OzoneOutputStream(byteArrayOutputStream, null);
+    ReplicationConfig replication = ReplicationConfig.fromTypeAndFactor(type, factor);
+    return createKey(key, size, replication, metadata);
   }
 
   @Override
   public OzoneOutputStream createKey(String key, long size,
-      ReplicationConfig rConfig, Map<String, String> metadata)
+      ReplicationConfig rConfig, Map<String, String> metadata,
+      Map<String, String> tags)
       throws IOException {
+    assertDoesNotExist(key + "/");
+
     final ReplicationConfig repConfig;
     if (rConfig == null) {
       repConfig = getReplicationConfig();
@@ -194,7 +148,9 @@ public class OzoneBucketStub extends OzoneBucket {
                 System.currentTimeMillis(),
                 System.currentTimeMillis(),
                 new ArrayList<>(), finalReplicationCon, metadata, null,
-                () -> readKey(key), true
+                () -> readKey(key), true,
+                UserGroupInformation.getCurrentUser().getShortUserName(),
+                tags
             ));
             super.close();
           }
@@ -206,8 +162,11 @@ public class OzoneBucketStub extends OzoneBucket {
   @Override
   public OzoneDataStreamOutput createStreamKey(String key, long size,
                                                ReplicationConfig rConfig,
-                                               Map<String, String> keyMetadata)
+                                               Map<String, String> keyMetadata,
+                                               Map<String, String> tags)
       throws IOException {
+    assertDoesNotExist(key + "/");
+
     ByteBufferStreamOutput byteBufferStreamOutput =
         new KeyMetadataAwareByteBufferStreamOutput(keyMetadata) {
 
@@ -231,7 +190,9 @@ public class OzoneBucketStub extends OzoneBucket {
                 System.currentTimeMillis(),
                 System.currentTimeMillis(),
                 new ArrayList<>(), rConfig, objectMetadata, null,
-                null, false
+                null, false,
+                UserGroupInformation.getCurrentUser().getShortUserName(),
+                tags
             ));
           }
 
@@ -257,8 +218,8 @@ public class OzoneBucketStub extends OzoneBucket {
                                                         int partNumber,
                                                         String uploadID)
       throws IOException {
-    String multipartUploadID = multipartUploadIdMap.get(key);
-    if (multipartUploadID == null || !multipartUploadID.equals(uploadID)) {
+    MultipartInfoStub multipartInfo = keyToMultipartUpload.get(key);
+    if (multipartInfo == null || !multipartInfo.getUploadId().equals(uploadID)) {
       throw new OMException(ResultCodes.NO_SUCH_MULTIPART_UPLOAD_ERROR);
     } else {
       ByteBufferStreamOutput byteBufferStreamOutput =
@@ -322,7 +283,10 @@ public class OzoneBucketStub extends OzoneBucket {
           ozoneKeyDetails.getCreationTime().toEpochMilli(),
           ozoneKeyDetails.getModificationTime().toEpochMilli(),
           ozoneKeyDetails.getReplicationConfig(),
-          ozoneKeyDetails.isFile());
+          ozoneKeyDetails.getMetadata(),
+          ozoneKeyDetails.isFile(),
+          ozoneKeyDetails.getOwner(),
+          ozoneKeyDetails.getTags());
     } else {
       throw new OMException(ResultCodes.KEY_NOT_FOUND);
     }
@@ -377,7 +341,7 @@ public class OzoneBucketStub extends OzoneBucket {
               key.getDataSize(),
               key.getCreationTime().getEpochSecond() * 1000,
               key.getModificationTime().getEpochSecond() * 1000,
-              key.getReplicationConfig(), key.isFile());
+              key.getReplicationConfig(), key.isFile(), key.getOwner());
         }).collect(Collectors.toList());
 
     if (prevKey != null) {
@@ -405,16 +369,22 @@ public class OzoneBucketStub extends OzoneBucket {
                                                  ReplicationType type,
                                                  ReplicationFactor factor)
       throws IOException {
-    String uploadID = UUID.randomUUID().toString();
-    multipartUploadIdMap.put(keyName, uploadID);
-    return new OmMultipartInfo(getVolumeName(), getName(), keyName, uploadID);
+    return initiateMultipartUpload(keyName, ReplicationConfig.fromTypeAndFactor(type, factor),
+        Collections.emptyMap());
   }
 
   @Override
   public OmMultipartInfo initiateMultipartUpload(String keyName,
       ReplicationConfig repConfig) throws IOException {
+    return initiateMultipartUpload(keyName, repConfig, Collections.emptyMap());
+  }
+
+  @Override
+  public OmMultipartInfo initiateMultipartUpload(String keyName,
+       ReplicationConfig config, Map<String, String> metadata, Map<String, String> tags)
+      throws IOException {
     String uploadID = UUID.randomUUID().toString();
-    multipartUploadIdMap.put(keyName, uploadID);
+    keyToMultipartUpload.put(keyName, new MultipartInfoStub(uploadID, metadata, tags));
     return new OmMultipartInfo(getVolumeName(), getName(), keyName, uploadID);
   }
 
@@ -422,8 +392,8 @@ public class OzoneBucketStub extends OzoneBucket {
   public OzoneOutputStream createMultipartKey(String key, long size,
                                               int partNumber, String uploadID)
       throws IOException {
-    String multipartUploadID = multipartUploadIdMap.get(key);
-    if (multipartUploadID == null || !multipartUploadID.equals(uploadID)) {
+    MultipartInfoStub multipartInfo = keyToMultipartUpload.get(key);
+    if (multipartInfo == null || !multipartInfo.getUploadId().equals(uploadID)) {
       throw new OMException(ResultCodes.NO_SUCH_MULTIPART_UPLOAD_ERROR);
     } else {
       ByteArrayOutputStream byteArrayOutputStream =
@@ -449,12 +419,10 @@ public class OzoneBucketStub extends OzoneBucket {
   public OmMultipartUploadCompleteInfo completeMultipartUpload(String key,
       String uploadID, Map<Integer, String> partsMap) throws IOException {
 
-    if (multipartUploadIdMap.get(key) == null) {
+    if (keyToMultipartUpload.get(key) == null) {
       throw new OMException(ResultCodes.NO_SUCH_MULTIPART_UPLOAD_ERROR);
     } else {
       final Map<Integer, Part> partsList = partList.get(key);
-
-      int count = 1;
 
       ByteArrayOutputStream output = new ByteArrayOutputStream();
 
@@ -476,6 +444,20 @@ public class OzoneBucketStub extends OzoneBucket {
         }
         keyContents.put(key, output.toByteArray());
       }
+
+      keyDetails.put(key, new OzoneKeyDetails(
+          getVolumeName(),
+          getName(),
+          key,
+          keyContents.get(key) != null ? keyContents.get(key).length : 0,
+          System.currentTimeMillis(),
+          System.currentTimeMillis(),
+          new ArrayList<>(), getReplicationConfig(),
+          keyToMultipartUpload.get(key).getMetadata(), null,
+          () -> readKey(key), true,
+          UserGroupInformation.getCurrentUser().getShortUserName(),
+          keyToMultipartUpload.get(key).getTags()
+      ));
     }
 
     return new OmMultipartUploadCompleteInfo(getVolumeName(), getName(), key,
@@ -485,17 +467,17 @@ public class OzoneBucketStub extends OzoneBucket {
   @Override
   public void abortMultipartUpload(String keyName, String uploadID) throws
       IOException {
-    if (multipartUploadIdMap.get(keyName) == null) {
+    if (keyToMultipartUpload.get(keyName) == null) {
       throw new OMException(ResultCodes.NO_SUCH_MULTIPART_UPLOAD_ERROR);
     } else {
-      multipartUploadIdMap.remove(keyName);
+      keyToMultipartUpload.remove(keyName);
     }
   }
 
   @Override
   public OzoneMultipartUploadPartListParts listParts(String key,
       String uploadID, int partNumberMarker, int maxParts) throws IOException {
-    if (multipartUploadIdMap.get(key) == null) {
+    if (keyToMultipartUpload.get(key) == null) {
       throw new OMException(ResultCodes.NO_SUCH_MULTIPART_UPLOAD_ERROR);
     }
     List<PartInfo> partInfoList = new ArrayList<>();
@@ -611,6 +593,9 @@ public class OzoneBucketStub extends OzoneBucket {
 
   @Override
   public void createDirectory(String keyName) throws IOException {
+    assertDoesNotExist(StringUtils.stripEnd(keyName, "/"));
+
+    LOG.info("createDirectory({})", keyName);
     keyDetails.put(keyName, new OzoneKeyDetails(
         getVolumeName(),
         getName(),
@@ -619,7 +604,15 @@ public class OzoneBucketStub extends OzoneBucket {
         System.currentTimeMillis(),
         System.currentTimeMillis(),
         new ArrayList<>(), replicationConfig, new HashMap<>(), null,
-        () -> readKey(keyName), false));
+        () -> readKey(keyName), false,
+        UserGroupInformation.getCurrentUser().getShortUserName(),
+        Collections.emptyMap()));
+  }
+
+  private void assertDoesNotExist(String keyName) throws OMException {
+    if (keyDetails.get(keyName) != null) {
+      throw new OMException("already exists", ResultCodes.FILE_ALREADY_EXISTS);
+    }
   }
 
   /**
@@ -677,6 +670,35 @@ public class OzoneBucketStub extends OzoneBucket {
     @Override
     public Map<String, String> getMetadata() {
       return metadata;
+    }
+  }
+
+  /**
+   * Multipart upload stub to store MPU related information.
+   */
+  private static class MultipartInfoStub {
+
+    private final String uploadId;
+    private final Map<String, String> metadata;
+    private final Map<String, String> tags;
+
+    MultipartInfoStub(String uploadId, Map<String, String> metadata,
+                      Map<String, String> tags) {
+      this.uploadId = uploadId;
+      this.metadata = metadata;
+      this.tags = tags;
+    }
+
+    public String getUploadId() {
+      return uploadId;
+    }
+
+    public Map<String, String> getMetadata() {
+      return metadata;
+    }
+
+    public Map<String, String> getTags() {
+      return tags;
     }
   }
 

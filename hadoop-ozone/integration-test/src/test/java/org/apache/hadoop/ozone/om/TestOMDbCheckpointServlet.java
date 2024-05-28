@@ -414,13 +414,8 @@ public class TestOMDbCheckpointServlet {
     Path expectedLog = Paths.get(compactionLogDir, "expected" +
         COMPACTION_LOG_FILE_NAME_SUFFIX);
     String expectedLogStr = truncateFileName(metaDirLength, expectedLog);
-    Path unExpectedLog = Paths.get(compactionLogDir, "unexpected" +
-        COMPACTION_LOG_FILE_NAME_SUFFIX);
-    String unExpectedLogStr = truncateFileName(metaDirLength, unExpectedLog);
     Path expectedSst = Paths.get(sstBackupDir, "expected.sst");
     String expectedSstStr = truncateFileName(metaDirLength, expectedSst);
-    Path unExpectedSst = Paths.get(sstBackupDir, "unexpected.sst");
-    String unExpectedSstStr = truncateFileName(metaDirLength, unExpectedSst);
 
     // put "expected" fabricated files onto the fs before the files get
     //  copied to the temp dir.
@@ -436,15 +431,6 @@ public class TestOMDbCheckpointServlet {
       // with the snapshot data.
       doNothing().when(checkpoint).cleanupCheckpoint();
       realCheckpoint.set(checkpoint);
-
-      // put "unexpected" fabricated files onto the fs after the files
-      // get copied to the temp dir.  Since these appear in the "real"
-      // dir after the copy, they shouldn't exist in the final file
-      // set.  That will show that the copy only happened from the temp dir.
-      Files.write(unExpectedLog,
-          "fabricatedData".getBytes(StandardCharsets.UTF_8));
-      Files.write(unExpectedSst,
-          "fabricatedData".getBytes(StandardCharsets.UTF_8));
       return checkpoint;
     });
 
@@ -460,10 +446,6 @@ public class TestOMDbCheckpointServlet {
     long tmpHardLinkFileCount = tmpHardLinkFileCount();
     omDbCheckpointServletMock.doGet(requestMock, responseMock);
     assertEquals(tmpHardLinkFileCount, tmpHardLinkFileCount());
-
-    // Verify that tarball request count reaches to zero once doGet completes.
-    assertEquals(0,
-        dbStore.getRocksDBCheckpointDiffer().getTarballRequestCount());
     dbCheckpoint = realCheckpoint.get();
 
     // Untar the file into a temp folder to be examined.
@@ -528,15 +510,7 @@ public class TestOMDbCheckpointServlet {
         getFiles(Paths.get(metaDir.toString(), OM_SNAPSHOT_DIR), metaDirLength);
     assertThat(finalFullSet).contains(expectedLogStr);
     assertThat(finalFullSet).contains(expectedSstStr);
-    assertThat(initialFullSet).contains(unExpectedLogStr);
-    assertThat(initialFullSet).contains(unExpectedSstStr);
-
-    // Remove the dummy files that should not have been copied over
-    // from the expected data.
-    initialFullSet.remove(unExpectedLogStr);
-    initialFullSet.remove(unExpectedSstStr);
-    assertEquals(initialFullSet, finalFullSet,
-        "expected snapshot files not found");
+    assertEquals(initialFullSet, finalFullSet, "expected snapshot files not found");
   }
 
   private static long tmpHardLinkFileCount() throws IOException {

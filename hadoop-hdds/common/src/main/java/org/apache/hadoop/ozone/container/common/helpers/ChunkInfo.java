@@ -64,7 +64,6 @@ public class ChunkInfo {
    *
    * @param key   - Key Name.
    * @param value - Value.
-   * @throws IOException
    */
   public void addMetadata(String key, String value) throws IOException {
     synchronized (this.metadata) {
@@ -80,7 +79,6 @@ public class ChunkInfo {
    *
    * @param info - Protobuf class
    * @return ChunkInfo
-   * @throws IOException
    */
   public static ChunkInfo getFromProtoBuf(ContainerProtos.ChunkInfo info)
       throws IOException {
@@ -182,14 +180,9 @@ public class ChunkInfo {
   public void setStripeChecksum(ByteString stripeChecksum) {
     this.stripeChecksum = stripeChecksum;
   }
-  
-  /**
-   * Returns Metadata associated with this Chunk.
-   *
-   * @return - Map of Key,values.
-   */
-  public Map<String, String> getMetadata() {
-    return metadata;
+
+  public String getMetadata(String key) {
+    return metadata.get(key);
   }
 
   @Override

@@ -22,6 +22,7 @@ import org.apache.hadoop.metrics2.MetricsSystem;
 import org.apache.hadoop.metrics2.annotation.Metric;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.metrics2.lib.MutableCounterLong;
+import org.apache.hadoop.metrics2.lib.MutableGaugeLong;
 
 /**
  * This class is used for maintaining SafeMode metric information, which can
@@ -33,16 +34,16 @@ public class SafeModeMetrics {
 
 
   // These all values will be set to some values when safemode is enabled.
-  private @Metric MutableCounterLong
+  private @Metric MutableGaugeLong
       numContainerWithOneReplicaReportedThreshold;
   private @Metric MutableCounterLong
       currentContainersWithOneReplicaReportedCount;
 
   // When hdds.scm.safemode.pipeline-availability.check is set then only
   // below metrics will have some values, otherwise they will be zero.
-  private @Metric MutableCounterLong numHealthyPipelinesThreshold;
+  private @Metric MutableGaugeLong numHealthyPipelinesThreshold;
   private @Metric MutableCounterLong currentHealthyPipelinesCount;
-  private @Metric MutableCounterLong
+  private @Metric MutableGaugeLong
       numPipelinesWithAtleastOneReplicaReportedThreshold;
   private @Metric MutableCounterLong
       currentPipelinesWithAtleastOneReplicaReportedCount;
@@ -55,7 +56,7 @@ public class SafeModeMetrics {
   }
 
   public void setNumHealthyPipelinesThreshold(long val) {
-    this.numHealthyPipelinesThreshold.incr(val);
+    this.numHealthyPipelinesThreshold.set(val);
   }
 
   public void incCurrentHealthyPipelinesCount() {
@@ -63,7 +64,7 @@ public class SafeModeMetrics {
   }
 
   public void setNumPipelinesWithAtleastOneReplicaReportedThreshold(long val) {
-    this.numPipelinesWithAtleastOneReplicaReportedThreshold.incr(val);
+    this.numPipelinesWithAtleastOneReplicaReportedThreshold.set(val);
   }
 
   public void incCurrentHealthyPipelinesWithAtleastOneReplicaReportedCount() {
@@ -71,35 +72,35 @@ public class SafeModeMetrics {
   }
 
   public void setNumContainerWithOneReplicaReportedThreshold(long val) {
-    this.numContainerWithOneReplicaReportedThreshold.incr(val);
+    this.numContainerWithOneReplicaReportedThreshold.set(val);
   }
 
   public void incCurrentContainersWithOneReplicaReportedCount() {
     this.currentContainersWithOneReplicaReportedCount.incr();
   }
 
-  public MutableCounterLong getNumHealthyPipelinesThreshold() {
+  MutableGaugeLong getNumHealthyPipelinesThreshold() {
     return numHealthyPipelinesThreshold;
   }
 
-  public MutableCounterLong getCurrentHealthyPipelinesCount() {
+  MutableCounterLong getCurrentHealthyPipelinesCount() {
     return currentHealthyPipelinesCount;
   }
 
-  public MutableCounterLong
+  MutableGaugeLong
       getNumPipelinesWithAtleastOneReplicaReportedThreshold() {
     return numPipelinesWithAtleastOneReplicaReportedThreshold;
   }
 
-  public MutableCounterLong getCurrentPipelinesWithAtleastOneReplicaCount() {
+  MutableCounterLong getCurrentPipelinesWithAtleastOneReplicaCount() {
     return currentPipelinesWithAtleastOneReplicaReportedCount;
   }
 
-  public MutableCounterLong getNumContainerWithOneReplicaReportedThreshold() {
+  MutableGaugeLong getNumContainerWithOneReplicaReportedThreshold() {
     return numContainerWithOneReplicaReportedThreshold;
   }
 
-  public MutableCounterLong getCurrentContainersWithOneReplicaReportedCount() {
+  MutableCounterLong getCurrentContainersWithOneReplicaReportedCount() {
     return currentContainersWithOneReplicaReportedCount;
   }
 

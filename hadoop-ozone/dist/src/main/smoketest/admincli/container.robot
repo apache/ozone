@@ -85,6 +85,28 @@ Incomplete command
                         Should contain   ${output}   create
                         Should contain   ${output}   close
                         Should contain   ${output}   reconcile
+                        Should contain   ${output}   report
+                        Should contain   ${output}   upgrade
+
+List containers as JSON
+    ${output} =         Execute          ozone admin container info "${CONTAINER}" --json | jq -r '.'
+                        Should contain   ${output}    containerInfo
+                        Should contain   ${output}    pipeline
+                        Should contain   ${output}    replicas
+                        Should contain   ${output}    writePipelineID
+
+Report containers as JSON
+     ${output} =         Execute          ozone admin container report --json | jq -r '.'
+                         Should contain   ${output}   reportTimeStamp
+                         Should contain   ${output}   stats
+                         Should contain   ${output}   samples
+
+Close container
+    ${container} =      Execute          ozone admin container list --state OPEN | jq -r 'select(.replicationConfig.replicationFactor == "THREE") | .containerID' | head -1
+                        Execute          ozone admin container close "${container}"
+    ${output} =         Execute          ozone admin container info "${container}"
+                        Should contain   ${output}   CLOS
+    Wait until keyword succeeds    1min    10sec    Container is closed    ${container}
 
 #List containers on unknown host
 #    ${output} =         Execute And Ignore Error     ozone admin --verbose container list --scm unknown-host

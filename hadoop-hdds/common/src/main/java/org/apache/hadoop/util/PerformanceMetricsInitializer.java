@@ -70,7 +70,7 @@ public final class PerformanceMetricsInitializer {
    * @param intervals intervals for quantiles
    * @return an instance of PerformanceMetrics
    */
-  private static PerformanceMetrics getMetrics(
+  public static PerformanceMetrics getMetrics(
       MetricsRegistry registry, String name, String description,
       String sampleName, String valueName, int[] intervals) {
     return new PerformanceMetrics(

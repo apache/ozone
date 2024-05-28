@@ -47,7 +47,6 @@ import org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServer;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.util.StringUtils;
 import org.apache.ozone.test.GenericTestUtils;
-import org.apache.ozone.test.tag.Flaky;
 import org.apache.ratis.grpc.server.GrpcLogAppender;
 import org.apache.ratis.protocol.RaftPeer;
 import org.apache.ratis.protocol.RaftPeerId;
@@ -184,7 +183,6 @@ public class TestAddRemoveOzoneManager {
    * OM.
    */
   @Test
-  @Flaky("HDDS-7880")
   public void testBootstrap() throws Exception {
     setupCluster(1);
     OzoneManager oldOM = cluster.getOzoneManager();
@@ -303,7 +301,6 @@ public class TestAddRemoveOzoneManager {
     config.setInt(OMConfigKeys.OZONE_OM_ADMIN_PROTOCOL_MAX_RETRIES_KEY, 2);
     config.setInt(
         OMConfigKeys.OZONE_OM_ADMIN_PROTOCOL_WAIT_BETWEEN_RETRIES_KEY, 100);
-    cluster.setConf(config);
 
     GenericTestUtils.LogCapturer omLog =
         GenericTestUtils.LogCapturer.captureLogs(OzoneManager.LOG);

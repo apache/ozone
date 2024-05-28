@@ -41,6 +41,7 @@ import org.apache.hadoop.ozone.om.PrefixManager;
 import org.apache.hadoop.ozone.om.PrefixManagerImpl;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
+import org.apache.hadoop.ozone.om.helpers.KeyValueUtil;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
@@ -142,8 +143,12 @@ public class TestOMKeyCreateRequest extends TestOMKeyRequest {
     when(ozoneManager.getOzoneLockProvider()).thenReturn(
         new OzoneLockProvider(setKeyPathLock, setFileSystemPaths));
 
+    Map<String, String> tags = new HashMap<>();
+    tags.put("tag-key1", "tag-value1");
+    tags.put("tag-key2", "tag-value2");
+
     OMRequest modifiedOmRequest =
-        doPreExecute(createKeyRequest(false, 0));
+        doPreExecute(createKeyRequest(false, 0, Collections.emptyMap(), tags));
 
     OMKeyCreateRequest omKeyCreateRequest =
         getOMKeyCreateRequest(modifiedOmRequest);
@@ -175,10 +180,10 @@ public class TestOMKeyCreateRequest extends TestOMKeyRequest {
         .getCreateKeyResponse().getKeyInfo().getKeyLocationListCount());
 
     // Disk should have 1 version, as it is fresh key create.
-    assertEquals(1,
-        omMetadataManager.getOpenKeyTable(
-                omKeyCreateRequest.getBucketLayout())
-            .get(openKey).getKeyLocationVersions().size());
+    OmKeyInfo openKeyInfo = omMetadataManager.getOpenKeyTable(omKeyCreateRequest.getBucketLayout()).get(openKey);
+
+    assertEquals(1, openKeyInfo.getKeyLocationVersions().size());
+    assertThat(openKeyInfo.getTags()).containsAllEntriesOf(tags);
 
     // Write to DB like key commit.
     omMetadataManager.getKeyTable(omKeyCreateRequest.getBucketLayout())
@@ -186,9 +191,13 @@ public class TestOMKeyCreateRequest extends TestOMKeyRequest {
             .getOpenKeyTable(omKeyCreateRequest.getBucketLayout())
             .get(openKey));
 
+    tags.remove("tag-key1");
+    tags.remove("tag-key2");
+    tags.put("tag-key3", "tag-value3");
+
     // Override same key again
     modifiedOmRequest =
-        doPreExecute(createKeyRequest(false, 0));
+        doPreExecute(createKeyRequest(false, 0, Collections.emptyMap(), tags));
 
     id = modifiedOmRequest.getCreateKeyRequest().getClientID();
     openKey = getOpenKey(id);
@@ -218,6 +227,11 @@ public class TestOMKeyCreateRequest extends TestOMKeyRequest {
         omMetadataManager.getOpenKeyTable(
                 omKeyCreateRequest.getBucketLayout())
             .get(openKey).getKeyLocationVersions().size());
+    openKeyInfo = omMetadataManager.getOpenKeyTable(omKeyCreateRequest.getBucketLayout()).get(openKey);
+
+    assertEquals(1, openKeyInfo.getKeyLocationVersions().size());
+    assertThat(openKeyInfo.getTags()).containsAllEntriesOf(tags);
+    assertThat(openKeyInfo.getTags()).doesNotContainKeys("tag-key1", "tag-key2");
 
   }
 
@@ -426,7 +440,7 @@ public class TestOMKeyCreateRequest extends TestOMKeyRequest {
   @MethodSource("data")
   public void testValidateAndUpdateCacheWithInvalidPath(
       boolean setKeyPathLock, boolean setFileSystemPaths) throws Exception {
-    PrefixManager prefixManager = new PrefixManagerImpl(
+    PrefixManager prefixManager = new PrefixManagerImpl(ozoneManager,
         ozoneManager.getMetadataManager(), true);
     when(ozoneManager.getPrefixManager()).thenReturn(prefixManager);
     when(ozoneManager.getOzoneLockProvider()).thenReturn(
@@ -643,12 +657,23 @@ public class TestOMKeyCreateRequest extends TestOMKeyRequest {
 
   @SuppressWarnings("parameterNumber")
   protected OMRequest createKeyRequest(boolean isMultipartKey, int partNumber) {
-    return createKeyRequest(isMultipartKey, partNumber, keyName);
+    return createKeyRequest(isMultipartKey, partNumber, Collections.emptyMap(), Collections.emptyMap());
+  }
+
+  protected OMRequest createKeyRequest(boolean isMultipartKey, int partNumber,
+                                       Map<String, String> metadata, Map<String, String> tags) {
+    return createKeyRequest(isMultipartKey, partNumber, keyName, metadata, tags);
   }
 
   private OMRequest createKeyRequest(boolean isMultipartKey, int partNumber,
                                      String keyName) {
     return createKeyRequest(isMultipartKey, partNumber, keyName, null);
+  }
+
+  protected OMRequest createKeyRequest(boolean isMultipartKey, int partNumber,
+                                       String keyName,
+                                       Map<String, String> metadata) {
+    return createKeyRequest(isMultipartKey, partNumber, keyName, metadata, null);
   }
 
   /**
@@ -661,11 +686,14 @@ public class TestOMKeyCreateRequest extends TestOMKeyRequest {
    * @param keyName        The name of the key to create or update.
    * @param metadata       Optional metadata for the key. Pass null or an empty
    *                       map if no metadata is to be set.
+   * @param tags           Optional tags for the key. Pass null or an empty
+   *                       map if no tags is to be set.
    * @return OMRequest configured with the provided parameters.
    */
   protected OMRequest createKeyRequest(boolean isMultipartKey, int partNumber,
                                        String keyName,
-                                       Map<String, String> metadata) {
+                                       Map<String, String> metadata,
+                                       Map<String, String> tags) {
     KeyArgs.Builder keyArgs = KeyArgs.newBuilder()
         .setVolumeName(volumeName)
         .setBucketName(bucketName)
@@ -687,6 +715,10 @@ public class TestOMKeyCreateRequest extends TestOMKeyRequest {
           .setKey(key)
           .setValue(value)
           .build()));
+    }
+
+    if (tags != null && !tags.isEmpty()) {
+      keyArgs.addAllTags(KeyValueUtil.toProtobuf(tags));
     }
 
     OzoneManagerProtocolProtos.CreateKeyRequest createKeyRequest =
@@ -920,7 +952,7 @@ public class TestOMKeyCreateRequest extends TestOMKeyRequest {
 
     // Should inherit parent DEFAULT Acls
     assertEquals(parentDefaultAcl.stream()
-            .map(acl -> acl.setAclScope(OzoneAcl.AclScope.ACCESS))
+            .map(acl -> acl.withScope(OzoneAcl.AclScope.ACCESS))
             .collect(Collectors.toList()), keyAcls,
         "Failed to inherit parent DEFAULT acls!,");
 

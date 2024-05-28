@@ -36,7 +36,9 @@ import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -62,11 +64,19 @@ public class TestS3InitiateMultipartUploadRequestWithFSO
     OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
         omMetadataManager, getBucketLayout());
 
+    Map<String, String> customMetadata = new HashMap<>();
+    customMetadata.put("custom-key1", "custom-value1");
+    customMetadata.put("custom-key2", "custom-value2");
+
+    Map<String, String> tags = new HashMap<>();
+    tags.put("tag-key1", "tag-value1");
+    tags.put("tag-key2", "tag-value2");
+
     final long volumeId = omMetadataManager.getVolumeId(volumeName);
     final long bucketId = omMetadataManager.getBucketId(volumeName,
             bucketName);
     OMRequest modifiedRequest = doPreExecuteInitiateMPUWithFSO(volumeName,
-        bucketName, keyName);
+        bucketName, keyName, customMetadata, tags);
 
     S3InitiateMultipartUploadRequest s3InitiateMultipartUploadReqFSO =
         getS3InitiateMultipartUploadReq(modifiedRequest);
@@ -102,6 +112,12 @@ public class TestS3InitiateMultipartUploadRequestWithFSO
         "FileName mismatches!");
     assertEquals(parentID, omKeyInfo.getParentObjectID(),
         "ParentId mismatches!");
+    assertNotNull(omKeyInfo.getMetadata());
+    assertEquals("custom-value1", omKeyInfo.getMetadata().get("custom-key1"));
+    assertEquals("custom-value2", omKeyInfo.getMetadata().get("custom-key2"));
+    assertNotNull(omKeyInfo.getTags());
+    assertEquals("tag-value1", omKeyInfo.getTags().get("tag-key1"));
+    assertEquals("tag-value2", omKeyInfo.getTags().get("tag-key2"));
 
     OmMultipartKeyInfo omMultipartKeyInfo = omMetadataManager
             .getMultipartInfoTable().get(multipartFileKey);
@@ -256,7 +272,7 @@ public class TestS3InitiateMultipartUploadRequestWithFSO
         List<OzoneAcl> fileAcls = fileInfo.getAcls();
         System.out.println("  file acls : " + fileInfo + " ==> " + fileAcls);
         assertEquals(expectedInheritAcls.stream()
-                .map(acl -> acl.setAclScope(OzoneAcl.AclScope.ACCESS))
+                .map(acl -> acl.withScope(OzoneAcl.AclScope.ACCESS))
                 .collect(Collectors.toList()), fileAcls,
             "Failed to inherit parent DEFAULT acls!");
       }

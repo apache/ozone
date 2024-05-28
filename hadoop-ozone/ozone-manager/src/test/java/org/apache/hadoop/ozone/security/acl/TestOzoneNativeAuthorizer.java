@@ -21,8 +21,6 @@ import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.server.OzoneAdmins;
-import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
-import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.om.BucketManager;
 import org.apache.hadoop.ozone.om.KeyManager;
@@ -173,6 +171,7 @@ public class TestOzoneNativeAuthorizer {
         .setDataSize(0)
         .setAcls(OzoneAclUtil.getAclList(testUgi.getUserName(),
             testUgi.getGroupNames(), ALL, ALL))
+        .setOwnerName(UserGroupInformation.getCurrentUser().getShortUserName())
         .build();
 
     if (keyName.split(OZONE_URI_DELIMITER).length > 1) {
@@ -244,9 +243,9 @@ public class TestOzoneNativeAuthorizer {
       ACLType groupRight, boolean expectedResult) throws Exception {
     createAll(keyName, prefixName, userRight, groupRight, expectedResult);
     OzoneAcl userAcl = new OzoneAcl(USER, testUgi.getUserName(),
-        parentDirUserAcl, ACCESS);
+        ACCESS, parentDirUserAcl);
     OzoneAcl groupAcl = new OzoneAcl(GROUP, testUgi.getGroups().size() > 0 ?
-        testUgi.getGroups().get(0) : "", parentDirGroupAcl, ACCESS);
+        testUgi.getGroups().get(0) : "", ACCESS, parentDirGroupAcl);
     // Set access for volume.
     // We should directly add to table because old API's update to DB.
 
@@ -266,9 +265,9 @@ public class TestOzoneNativeAuthorizer {
       ACLType groupRight, boolean expectedResult) throws Exception {
     createAll(keyName, prefixName, userRight, groupRight, expectedResult);
     OzoneAcl userAcl = new OzoneAcl(USER, testUgi.getUserName(),
-        parentDirUserAcl, ACCESS);
+        ACCESS, parentDirUserAcl);
     OzoneAcl groupAcl = new OzoneAcl(GROUP, testUgi.getGroups().size() > 0 ?
-        testUgi.getGroups().get(0) : "", parentDirGroupAcl, ACCESS);
+        testUgi.getGroups().get(0) : "", ACCESS, parentDirGroupAcl);
     // Set access for volume & bucket. We should directly add to table
     // because old API's update to DB.
 
@@ -296,9 +295,9 @@ public class TestOzoneNativeAuthorizer {
         .build();
 
     OzoneAcl userAcl = new OzoneAcl(USER, testUgi.getUserName(),
-        parentDirUserAcl, ACCESS);
+        ACCESS, parentDirUserAcl);
     OzoneAcl groupAcl = new OzoneAcl(GROUP, testUgi.getGroups().size() > 0 ?
-        testUgi.getGroups().get(0) : "", parentDirGroupAcl, ACCESS);
+        testUgi.getGroups().get(0) : "", ACCESS, parentDirGroupAcl);
     // Set access for volume & bucket. We should directly add to table
     // because old API's update to DB.
 
@@ -314,45 +313,19 @@ public class TestOzoneNativeAuthorizer {
 
 
   private void setVolumeAcl(List<OzoneAcl> ozoneAcls) throws IOException {
-    String volumeKey = metadataManager.getVolumeKey(volObj.getVolumeName());
-    OmVolumeArgs omVolumeArgs =
-        metadataManager.getVolumeTable().get(volumeKey);
-
-    omVolumeArgs.setAcls(ozoneAcls);
-
-    metadataManager.getVolumeTable().addCacheEntry(new CacheKey<>(volumeKey),
-        CacheValue.get(1L, omVolumeArgs));
+    OzoneNativeAclTestUtil.setVolumeAcl(metadataManager, vol, ozoneAcls);
   }
 
   private void setBucketAcl(List<OzoneAcl> ozoneAcls) throws IOException {
-    String bucketKey = metadataManager.getBucketKey(vol, buck);
-    OmBucketInfo omBucketInfo = metadataManager.getBucketTable().get(bucketKey);
-
-    omBucketInfo.setAcls(ozoneAcls);
-
-    metadataManager.getBucketTable().addCacheEntry(new CacheKey<>(bucketKey),
-        CacheValue.get(1L, omBucketInfo));
+    OzoneNativeAclTestUtil.setBucketAcl(metadataManager, vol, buck, ozoneAcls);
   }
 
   private void addVolumeAcl(OzoneAcl ozoneAcl) throws IOException {
-    String volumeKey = metadataManager.getVolumeKey(volObj.getVolumeName());
-    OmVolumeArgs omVolumeArgs =
-        metadataManager.getVolumeTable().get(volumeKey);
-
-    omVolumeArgs.addAcl(ozoneAcl);
-
-    metadataManager.getVolumeTable().addCacheEntry(new CacheKey<>(volumeKey),
-        CacheValue.get(1L, omVolumeArgs));
+    OzoneNativeAclTestUtil.addVolumeAcl(metadataManager, vol, ozoneAcl);
   }
 
   private void addBucketAcl(OzoneAcl ozoneAcl) throws IOException {
-    String bucketKey = metadataManager.getBucketKey(vol, buck);
-    OmBucketInfo omBucketInfo = metadataManager.getBucketTable().get(bucketKey);
-
-    omBucketInfo.addAcl(ozoneAcl);
-
-    metadataManager.getBucketTable().addCacheEntry(new CacheKey<>(bucketKey),
-        CacheValue.get(1L, omBucketInfo));
+    OzoneNativeAclTestUtil.addBucketAcl(metadataManager, vol, buck, ozoneAcl);
   }
 
   private void resetAclsAndValidateAccess(
@@ -379,8 +352,8 @@ public class TestOzoneNativeAuthorizer {
      *    if user/group has access to them.
      */
     for (ACLType a1 : allAcls) {
-      OzoneAcl newAcl = new OzoneAcl(accessType, getAclName(accessType), a1,
-          ACCESS);
+      OzoneAcl newAcl = new OzoneAcl(accessType, getAclName(accessType), ACCESS, a1
+      );
 
       // Reset acls to only one right.
       if (obj.getResourceType() == VOLUME) {
@@ -459,7 +432,7 @@ public class TestOzoneNativeAuthorizer {
           ACLIdentityType identityType = ACLIdentityType.values()[type];
           // Add remaining acls one by one and then check access.
           OzoneAcl addAcl = new OzoneAcl(identityType,
-              getAclName(identityType), a2, ACCESS);
+              getAclName(identityType), ACCESS, a2);
 
           // For volume and bucket update to cache. As Old API's update to
           // only DB not cache.

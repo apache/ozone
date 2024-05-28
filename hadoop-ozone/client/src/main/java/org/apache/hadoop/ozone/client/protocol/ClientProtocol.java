@@ -327,9 +327,9 @@ public interface ClientProtocol {
    * @param bucketName Name of the Bucket
    * @param keyName Name of the Key
    * @param size Size of the data
-   * @param metadata custom key value metadata
+   * @param metadata Custom key value metadata
    * @return {@link OzoneOutputStream}
-   *
+   * @deprecated Use {@link ClientProtocol#createKey(String, String, String, long, ReplicationConfig, Map)} instead.
    */
   @Deprecated
   OzoneOutputStream createKey(String volumeName, String bucketName,
@@ -344,13 +344,29 @@ public interface ClientProtocol {
    * @param bucketName Name of the Bucket
    * @param keyName Name of the Key
    * @param size Size of the data
-   * @param metadata custom key value metadata
+   * @param metadata Custom key value metadata
    * @return {@link OzoneOutputStream}
    *
    */
   OzoneOutputStream createKey(String volumeName, String bucketName,
       String keyName, long size, ReplicationConfig replicationConfig,
       Map<String, String> metadata)
+      throws IOException;
+
+  /**
+   * Writes a key in an existing bucket.
+   * @param volumeName Name of the Volume
+   * @param bucketName Name of the Bucket
+   * @param keyName Name of the Key
+   * @param size Size of the data
+   * @param metadata Custom key value metadata
+   * @param tags Tags used for S3 object tags
+   * @return {@link OzoneOutputStream}
+   *
+   */
+  OzoneOutputStream createKey(String volumeName, String bucketName,
+      String keyName, long size, ReplicationConfig replicationConfig,
+      Map<String, String> metadata, Map<String, String> tags)
       throws IOException;
 
   /**
@@ -366,6 +382,22 @@ public interface ClientProtocol {
   OzoneDataStreamOutput createStreamKey(String volumeName, String bucketName,
       String keyName, long size, ReplicationConfig replicationConfig,
       Map<String, String> metadata)
+      throws IOException;
+
+  /**
+   * Writes a key in an existing bucket.
+   * @param volumeName Name of the Volume
+   * @param bucketName Name of the Bucket
+   * @param keyName Name of the Key
+   * @param size Size of the data
+   * @param metadata custom key value metadata
+   * @param tags Tags used for S3 object tags
+   * @return {@link OzoneDataStreamOutput}
+   *
+   */
+  OzoneDataStreamOutput createStreamKey(String volumeName, String bucketName,
+      String keyName, long size, ReplicationConfig replicationConfig,
+      Map<String, String> metadata, Map<String, String> tags)
       throws IOException;
 
   /**
@@ -509,15 +541,46 @@ public interface ClientProtocol {
 
   /**
    * Initiate Multipart upload.
-   * @param volumeName
-   * @param bucketName
-   * @param keyName
-   * @param replicationConfig
+   * @param volumeName Name of the Volume
+   * @param bucketName Name of the Bucket
+   * @param keyName Name of the Key
+   * @param replicationConfig Replication Config
    * @return {@link OmMultipartInfo}
    * @throws IOException
    */
   OmMultipartInfo initiateMultipartUpload(String volumeName, String
       bucketName, String keyName, ReplicationConfig replicationConfig)
+      throws IOException;
+
+  /**
+   * Initiate Multipart upload.
+   * @param volumeName Name of the Volume
+   * @param bucketName Name of the Bucket
+   * @param keyName Name of the Key
+   * @param replicationConfig Replication config
+   * @param metadata Custom key value metadata
+   * @return {@link OmMultipartInfo}
+   * @throws IOException
+   */
+  OmMultipartInfo initiateMultipartUpload(String volumeName, String
+      bucketName, String keyName, ReplicationConfig replicationConfig,
+      Map<String, String> metadata)
+      throws IOException;
+
+  /**
+   * Initiate Multipart upload.
+   * @param volumeName Name of the Volume
+   * @param bucketName Name of the Bucket
+   * @param keyName Name of the Key
+   * @param replicationConfig Replication config
+   * @param metadata Custom key value metadata
+   * @param tags Tags used for S3 object tags
+   * @return {@link OmMultipartInfo}
+   * @throws IOException
+   */
+  OmMultipartInfo initiateMultipartUpload(String volumeName, String
+      bucketName, String keyName, ReplicationConfig replicationConfig,
+      Map<String, String> metadata, Map<String, String> tags)
       throws IOException;
 
   /**
