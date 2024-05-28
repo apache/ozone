@@ -20,12 +20,11 @@ package org.apache.hadoop.hdds.server;
 
 import java.io.File;
 import java.io.IOException;
-import java.util.HashMap;
+import java.io.Reader;
 import java.util.List;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.MappingIterator;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.ObjectReader;
@@ -103,13 +102,12 @@ public final class JsonUtils {
     return MAPPER.readTree(content);
   }
 
-  public static List<HashMap<String, Object>> readTreeAsListOfMaps(String json)
-      throws IOException {
-    return MAPPER.readValue(json,
-        new TypeReference<List<HashMap<String, Object>>>() {
-        });
+  /**
+   * Reads JSON content from a Reader and deserializes it into a Java object.
+   */
+  public static <T> T readFromReader(Reader reader, Class<T> valueType) throws IOException {
+    return MAPPER.readValue(reader, valueType);
   }
-
 
   /**
    * Utility to sequentially write a large collection of items to a file.

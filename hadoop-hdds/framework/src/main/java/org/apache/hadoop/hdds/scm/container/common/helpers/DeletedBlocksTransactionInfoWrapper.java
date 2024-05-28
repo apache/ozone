@@ -17,6 +17,8 @@
  */
 package org.apache.hadoop.hdds.scm.container.common.helpers;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.DeletedBlocksTransactionInfo;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.DeletedBlocksTransaction;
 import java.util.List;
@@ -31,8 +33,11 @@ public class DeletedBlocksTransactionInfoWrapper {
   private final List<Long> localIdList;
   private final int count;
 
-  public DeletedBlocksTransactionInfoWrapper(long txID, long containerID,
-      List<Long> localIdList, int count) {
+  @JsonCreator
+  public DeletedBlocksTransactionInfoWrapper(@JsonProperty("txID") long txID,
+                                             @JsonProperty("containerID") long containerID,
+                                             @JsonProperty("localIdList") List<Long> localIdList,
+                                             @JsonProperty("count") int count) {
     this.txID = txID;
     this.containerID = containerID;
     this.localIdList = localIdList;

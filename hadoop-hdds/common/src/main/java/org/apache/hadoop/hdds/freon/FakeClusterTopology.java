@@ -18,6 +18,7 @@
 package org.apache.hadoop.hdds.freon;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Random;
 import java.util.UUID;
@@ -36,40 +37,49 @@ import org.slf4j.LoggerFactory;
  * Class to store pre-generated topology information for load-tests.
  */
 @SuppressWarnings("java:S2245") // no need for secure random
-public class FakeClusterTopology {
+public final class FakeClusterTopology {
 
   private static final Logger LOGGER =
       LoggerFactory.getLogger(FakeClusterTopology.class);
 
-  public static final FakeClusterTopology INSTANCE = new FakeClusterTopology();
+  public static final FakeClusterTopology INSTANCE = newFakeClusterTopology();
 
-  private List<DatanodeDetailsProto> datanodes = new ArrayList<>();
+  private final List<DatanodeDetailsProto> datanodes;
 
-  private List<Pipeline> pipelines = new ArrayList<>();
+  private final List<Pipeline> pipelines;
 
-  private Random random = new Random();
+  private final Random random = new Random();
 
-  public FakeClusterTopology() {
+  private static FakeClusterTopology newFakeClusterTopology() {
+    final int nodeCount = 9;
+    final List<DatanodeDetailsProto> datanodes = new ArrayList<>(nodeCount);
+    final List<Pipeline> pipelines = new ArrayList<>(nodeCount / 3);
     try {
-      for (int i = 0; i < 9; i++) {
+      for (int i = 0; i < nodeCount; i++) {
         datanodes.add(createDatanode());
         if ((i + 1) % 3 == 0) {
           pipelines.add(Pipeline.newBuilder()
               .setId(PipelineID.randomId().getProtobuf())
               .setFactor(ReplicationFactor.THREE)
               .setType(ReplicationType.RATIS)
-              .addMembers(getDatanode(i - 2))
-              .addMembers(getDatanode(i - 1))
-              .addMembers(getDatanode(i))
+              .addMembers(datanodes.get(i - 2))
+              .addMembers(datanodes.get(i - 1))
+              .addMembers(datanodes.get(i))
               .build());
         }
       }
     } catch (Exception ex) {
       LOGGER.error("Can't initialize FakeClusterTopology", ex);
     }
+    return new FakeClusterTopology(datanodes, pipelines);
   }
 
-  private DatanodeDetailsProto createDatanode() {
+  private FakeClusterTopology(List<DatanodeDetailsProto> datanodes, List<Pipeline> pipelines) {
+    this.datanodes = Collections.unmodifiableList(datanodes);
+    this.pipelines = Collections.unmodifiableList(pipelines);
+  }
+
+  private static DatanodeDetailsProto createDatanode() {
     return DatanodeDetailsProto.newBuilder()
         .setUuid(UUID.randomUUID().toString())
         .setHostName("localhost")
@@ -79,15 +89,11 @@ public class FakeClusterTopology {
         .build();
   }
 
-  public DatanodeDetailsProto getDatanode(int i) {
-    return datanodes.get(i);
-  }
-
   public Pipeline getRandomPipeline() {
     return pipelines.get(random.nextInt(pipelines.size()));
   }
 
-  public List<DatanodeDetailsProto> getAllDatanodes() {
+  public Iterable<DatanodeDetailsProto> getAllDatanodes() {
     return datanodes;
   }
 }

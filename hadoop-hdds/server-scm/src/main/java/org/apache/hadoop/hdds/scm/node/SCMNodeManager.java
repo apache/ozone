@@ -691,6 +691,11 @@ public class SCMNodeManager implements NodeManager {
       return;
     }
 
+    sendFinalizeToDatanodeIfNeeded(datanodeDetails, layoutVersionReport);
+  }
+
+  protected void sendFinalizeToDatanodeIfNeeded(DatanodeDetails datanodeDetails,
+      LayoutVersionProto layoutVersionReport) {
     // Software layout version is hardcoded to the SCM.
     int scmSlv = scmLayoutVersionManager.getSoftwareLayoutVersion();
     int dnSlv = layoutVersionReport.getSoftwareLayoutVersion();

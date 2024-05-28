@@ -107,7 +107,7 @@ public class NSSummaryTaskWithOBS extends NSSummaryTaskDbEventHandler {
     if (!flushAndCommitNSToDB(nsSummaryMap)) {
       return false;
     }
-    LOG.info("Completed a reprocess run of NSSummaryTaskWithOBS");
+    LOG.debug("Completed a reprocess run of NSSummaryTaskWithOBS");
     return true;
   }
 
@@ -203,7 +203,7 @@ public class NSSummaryTaskWithOBS extends NSSummaryTaskDbEventHandler {
       return false;
     }
 
-    LOG.info("Completed a process run of NSSummaryTaskWithOBS");
+    LOG.debug("Completed a process run of NSSummaryTaskWithOBS");
     return true;
   }
 

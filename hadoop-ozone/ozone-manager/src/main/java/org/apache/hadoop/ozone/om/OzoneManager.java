@@ -1673,11 +1673,10 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
           versionManager.getMetadataLayoutVersion(), layoutVersionInDB);
     }
 
-    // Set metrics and start metrics back ground thread
-    metrics.setNumVolumes(metadataManager.countRowsInTable(metadataManager
-        .getVolumeTable()));
-    metrics.setNumBuckets(metadataManager.countRowsInTable(metadataManager
-        .getBucketTable()));
+    metrics.setNumVolumes(metadataManager
+        .countEstimatedRowsInTable(metadataManager.getVolumeTable()));
+    metrics.setNumBuckets(metadataManager
+        .countEstimatedRowsInTable(metadataManager.getBucketTable()));
 
     if (getMetricsStorageFile().exists()) {
       OmMetricsInfo metricsInfo = READER.readValue(getMetricsStorageFile());

@@ -810,7 +810,7 @@ public final class HddsUtils {
   }
 
   @Nonnull
-  public static String threadNamePrefix(@Nullable String id) {
+  public static String threadNamePrefix(@Nullable Object id) {
     return id != null && !"".equals(id)
         ? id + "-"
         : "";

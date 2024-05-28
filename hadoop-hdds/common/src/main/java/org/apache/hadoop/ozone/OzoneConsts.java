@@ -119,6 +119,8 @@ public final class OzoneConsts {
   public static final long MB = KB * 1024L;
   public static final long GB = MB * 1024L;
   public static final long TB = GB * 1024L;
+  public static final long PB = TB * 1024L;
+  public static final long EB = PB * 1024L;
 
   /**
    * level DB names used by SCM and data nodes.
