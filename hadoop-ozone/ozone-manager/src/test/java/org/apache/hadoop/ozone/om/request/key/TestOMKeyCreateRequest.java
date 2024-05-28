@@ -20,7 +20,6 @@ package org.apache.hadoop.ozone.om.request.key;
 
 import java.io.IOException;
 import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -931,11 +930,6 @@ public class TestOMKeyCreateRequest extends TestOMKeyRequest {
     when(ozoneManager.getOzoneLockProvider()).thenReturn(
         new OzoneLockProvider(setKeyPathLock, setFileSystemPaths));
 
-    if (getBucketLayout() == BucketLayout.FILE_SYSTEM_OPTIMIZED) {
-      // TODO: Test is not applicable for FSO layout.
-      return;
-    }
-
     OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, omMetadataManager,
         OmBucketInfo.newBuilder().setVolumeName(volumeName)
             .setBucketName(bucketName)
@@ -956,11 +950,10 @@ public class TestOMKeyCreateRequest extends TestOMKeyRequest {
     List<OzoneAcl> acls = Collections.singletonList(OzoneAcl.parseAcl("user:foo:rw"));
     OmKeyInfo createdKeyInfo = createAndCheck(keyName, metadata, acls);
     // Commit openKey entry.
-    OMRequestTestUtils.addKeyToTable(false, false,
-        createdKeyInfo, 0L, 0L, omMetadataManager);
+    omMetadataManager.getKeyTable(getBucketLayout()).put(getOzoneKey(), createdKeyInfo);
+
     // Retrieve the committed key info
-    String ozoneKey = omMetadataManager.getOzoneKey(volumeName, bucketName, keyName);
-    OmKeyInfo existingKeyInfo = omMetadataManager.getKeyTable(getBucketLayout()).get(ozoneKey);
+    OmKeyInfo existingKeyInfo = omMetadataManager.getKeyTable(getBucketLayout()).get(getOzoneKey());
     List<OzoneAcl> existingAcls = existingKeyInfo.getAcls();
     assertEquals(acls, existingAcls);
 
@@ -981,10 +974,8 @@ public class TestOMKeyCreateRequest extends TestOMKeyRequest {
     response = omKeyCreateRequest.validateAndUpdateCache(ozoneManager, 105L);
     assertEquals(OK, response.getOMResponse().getStatus());
 
-    // Ensure the expectedDataGeneration is persisted in the open key table
-    String openKey = omMetadataManager.getOpenKey(volumeName, bucketName,
-        keyName, omRequest.getCreateKeyRequest().getClientID());
-    OmKeyInfo openKeyInfo = omMetadataManager.getOpenKeyTable(omKeyCreateRequest.getBucketLayout()).get(openKey);
+    OmKeyInfo openKeyInfo = omMetadataManager.getOpenKeyTable(getBucketLayout())
+        .get(getOpenKey(omRequest.getCreateKeyRequest().getClientID()));
 
     assertEquals(existingKeyInfo.getGeneration(), openKeyInfo.getExpectedDataGeneration());
     // Creation time should remain the same on rewrite.
@@ -1080,9 +1071,6 @@ public class TestOMKeyCreateRequest extends TestOMKeyRequest {
       OMKeyCreateRequest omKeyCreateRequest, OMRequest omRequest,
       String keyName) throws Exception {
     keyName = omKeyCreateRequest.validateAndNormalizeKey(true, keyName);
-    // Check intermediate directories created or not.
-    Path keyPath = Paths.get(keyName);
-    checkIntermediatePaths(keyPath);
 
     // Check open key entry
     String openKey = omMetadataManager.getOpenKey(volumeName, bucketName,
@@ -1116,7 +1104,7 @@ public class TestOMKeyCreateRequest extends TestOMKeyRequest {
   }
 
   protected OMKeyCreateRequest getOMKeyCreateRequest(OMRequest omRequest) {
-    return new OMKeyCreateRequest(omRequest, BucketLayout.DEFAULT);
+    return new OMKeyCreateRequest(omRequest, getBucketLayout());
   }
 
   protected OMKeyCreateRequest getOMKeyCreateRequest(
