@@ -515,7 +515,7 @@ public class OMKeyCommitRequest extends OMKeyRequest {
       }
       if (!toCommit.getExpectedDataGeneration().equals(existing.getUpdateID())) {
         throw new OMException("Cannot commit as current generation (" + existing.getUpdateID() +
-            ") does not match with the rewrite generation (" + toCommit.getExpectedDataGeneration() + ")",
+            ") does not match the expected generation to rewrite (" + toCommit.getExpectedDataGeneration() + ")",
             KEY_NOT_FOUND);
       }
     }
