@@ -166,10 +166,14 @@ public final class ReconPipelineManager extends PipelineManagerImpl {
    * @throws IOException
    */
   @VisibleForTesting
-  public void addPipeline(Pipeline pipeline)
-      throws IOException {
+  public void addPipeline(Pipeline pipeline) throws IOException {
     acquireWriteLock();
     try {
+      // Check if the pipeline already exists
+      if (containsPipeline(pipeline.getId())) {
+        LOG.warn("Duplicate pipeline ID {} detected, skipping addition.", pipeline.getId());
+        return;
+      }
       getStateManager().addPipeline(
           pipeline.getProtobufMessage(ClientVersion.CURRENT_VERSION));
     } finally {

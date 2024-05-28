@@ -209,6 +209,40 @@ public class TestReconPipelineManager {
   }
 
   @Test
+  public void testDuplicatePipelineHandling() throws IOException {
+    Pipeline pipeline = getRandomPipeline();
+    NetworkTopology clusterMap = new NetworkTopologyImpl(conf);
+    EventQueue eventQueue = new EventQueue();
+    this.versionManager = mock(HDDSLayoutVersionManager.class);
+    when(versionManager.getMetadataLayoutVersion()).thenReturn(
+        maxLayoutVersion());
+    when(versionManager.getSoftwareLayoutVersion()).thenReturn(
+        maxLayoutVersion());
+    NodeManager nodeManager =
+        new SCMNodeManager(conf, scmStorageConfig, eventQueue, clusterMap,
+            SCMContext.emptyContext(), versionManager);
+
+    ReconPipelineManager reconPipelineManager =
+        ReconPipelineManager.newReconPipelineManager(conf, nodeManager,
+            ReconSCMDBDefinition.PIPELINES.getTable(store), eventQueue,
+            scmhaManager, scmContext);
+
+    try {
+      reconPipelineManager.addPipeline(pipeline);
+      reconPipelineManager.addPipeline(
+          pipeline); // Adding the same pipeline again to check for duplicates
+    } catch (Exception e) {
+      // Fail the test if an exception is thrown
+      assertTrue(false,
+          "Exception was thrown when adding a duplicate pipeline: " +
+              e.getMessage());
+    }
+
+    // If no exception was thrown, the test is successful
+    assertTrue(true);
+  }
+
+  @Test
   public void testStubbedReconPipelineFactory() throws IOException {
 
     NodeManager nodeManagerMock = mock(NodeManager.class);
