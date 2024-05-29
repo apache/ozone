@@ -411,6 +411,8 @@ public class ContainerStateMachine extends BaseStateMachine {
         .setStateMachine(this)
         .setServerRole(RaftPeerRole.LEADER);
 
+    metrics.incPendingApplyTransactions();
+
     try {
       dispatcher.validateContainerCommand(proto);
     } catch (IOException ioe) {
@@ -884,6 +886,8 @@ public class ContainerStateMachine extends BaseStateMachine {
     final CheckedSupplier<ContainerCommandResponseProto, Exception> task
         = () -> {
           try {
+            // TODO: add a counter to track number of executing applyTransaction
+            // and queue size
             return dispatchCommand(request, context);
           } catch (Exception e) {
             exceptionHandler.accept(e);
@@ -1021,6 +1025,9 @@ public class ContainerStateMachine extends BaseStateMachine {
         applyTransactionSemaphore.release();
         metrics.recordApplyTransactionCompletionNs(
             Time.monotonicNowNanos() - applyTxnStartTime);
+        if (trx.getServerRole() == RaftPeerRole.LEADER) {
+          metrics.decPendingApplyTransactions();
+        }
       });
       return applyTransactionFuture;
     } catch (InterruptedException e) {
