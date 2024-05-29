@@ -1026,6 +1026,9 @@ message KeyArgs {
     // Force OM to update container cache location from SCL
     optional bool forceUpdateContainerCacheFromSCM = 20;
     optional string ownerName = 21;
+
+    // S3 object tags support
+    repeated hadoop.hdds.KeyValue tags = 22;
 }
 
 message KeyLocation {
@@ -1109,6 +1112,7 @@ message KeyInfo {
     optional FileChecksumProto fileChecksum = 18;
     optional bool isFile = 19;
     optional string ownerName = 20;
+    repeated hadoop.hdds.KeyValue tags = 21;
 }
 
 message BasicKeyInfo {

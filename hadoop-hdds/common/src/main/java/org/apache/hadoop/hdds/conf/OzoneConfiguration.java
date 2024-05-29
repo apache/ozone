@@ -30,6 +30,7 @@ import java.net.URL;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.Enumeration;
 import java.util.HashMap;
 import java.util.List;
@@ -163,15 +164,11 @@ public class OzoneConfiguration extends Configuration
     }
 
     public XMLConfiguration(List<Property> properties) {
-      this.properties = properties;
+      this.properties = new ArrayList<>(properties);
     }
 
     public List<Property> getProperties() {
-      return properties;
-    }
-
-    public void setProperties(List<Property> properties) {
-      this.properties = properties;
+      return Collections.unmodifiableList(properties);
     }
   }
 

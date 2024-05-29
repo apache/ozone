@@ -45,6 +45,9 @@ public class KeyMetadata {
   @XmlElement(name = "Key")
   private String key;
 
+  @XmlElement(name = "CompletePath")
+  private String completePath;
+
   @XmlElement(name = "DataSize")
   private long dataSize;
 
@@ -124,6 +127,14 @@ public class KeyMetadata {
 
   public void setBlockIds(Map<Long, List<ContainerBlockMetadata>> blockIds) {
     this.blockIds = blockIds;
+  }
+
+  public String getCompletePath() {
+    return completePath;
+  }
+
+  public void setCompletePath(String completePath) {
+    this.completePath = completePath;
   }
 
   /**

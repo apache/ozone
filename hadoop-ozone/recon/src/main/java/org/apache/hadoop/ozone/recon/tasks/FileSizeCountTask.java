@@ -81,7 +81,7 @@ public class FileSizeCountTask implements ReconOmTask {
 
     // Delete all records from FILE_COUNT_BY_SIZE table
     int execute = dslContext.delete(FILE_COUNT_BY_SIZE).execute();
-    LOG.info("Deleted {} records from {}", execute, FILE_COUNT_BY_SIZE);
+    LOG.debug("Deleted {} records from {}", execute, FILE_COUNT_BY_SIZE);
 
     // Call reprocessBucket method for FILE_SYSTEM_OPTIMIZED bucket layout
     boolean statusFSO =
@@ -96,7 +96,7 @@ public class FileSizeCountTask implements ReconOmTask {
       return new ImmutablePair<>(getTaskName(), false);
     }
     writeCountsToDB(true, fileSizeCountMap);
-    LOG.info("Completed a 'reprocess' run of FileSizeCountTask.");
+    LOG.debug("Completed a 'reprocess' run of FileSizeCountTask.");
     return new ImmutablePair<>(getTaskName(), true);
   }
 
@@ -198,7 +198,7 @@ public class FileSizeCountTask implements ReconOmTask {
       }
     }
     writeCountsToDB(false, fileSizeCountMap);
-    LOG.info("Completed a 'process' run of FileSizeCountTask.");
+    LOG.debug("Completed a 'process' run of FileSizeCountTask.");
     return new ImmutablePair<>(getTaskName(), true);
   }
 
