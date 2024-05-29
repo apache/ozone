@@ -439,10 +439,10 @@ public class ContainerStateMachine extends BaseStateMachine {
 
       builder.setStateMachineData(write.getData());
     }
-    return builder.setStateMachineContext(new Context(proto, protoBuilder.build()))
-        .setLogData(proto.toByteString())
+    final ContainerCommandRequestProto containerCommandRequestProto = protoBuilder.build();
+    return builder.setStateMachineContext(new Context(proto, containerCommandRequestProto))
+        .setLogData(containerCommandRequestProto.toByteString())
         .build();
-
   }
 
   private static ContainerCommandRequestProto getContainerCommandRequestProto(
