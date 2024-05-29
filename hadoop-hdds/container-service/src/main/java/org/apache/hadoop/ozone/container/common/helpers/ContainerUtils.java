@@ -194,21 +194,21 @@ public final class ContainerUtils {
    * Verify that the checksum stored in containerData is equal to the
    * computed checksum.
    */
-  public static void verifyChecksum(ContainerData containerData,
+  public static void verifyContainerFileChecksum(ContainerData containerData,
       ConfigurationSource conf) throws IOException {
     boolean enabled = conf.getBoolean(
             HddsConfigKeys.HDDS_CONTAINER_CHECKSUM_VERIFICATION_ENABLED,
             HddsConfigKeys.
                     HDDS_CONTAINER_CHECKSUM_VERIFICATION_ENABLED_DEFAULT);
     if (enabled) {
-      String storedChecksum = containerData.getChecksum();
+      String storedChecksum = containerData.getContainerFileChecksum();
 
       Yaml yaml = ContainerDataYaml.getYamlForContainerType(
           containerData.getContainerType(),
           containerData instanceof KeyValueContainerData &&
               ((KeyValueContainerData)containerData).getReplicaIndex() > 0);
-      containerData.computeAndSetChecksum(yaml);
-      String computedChecksum = containerData.getChecksum();
+      containerData.computeAndSetContainerFileChecksum(yaml);
+      String computedChecksum = containerData.getContainerFileChecksum();
 
       if (storedChecksum == null || !storedChecksum.equals(computedChecksum)) {
         throw new StorageContainerException("Container checksum error for " +
@@ -225,7 +225,7 @@ public final class ContainerUtils {
    * @param containerDataYamlStr ContainerData as a Yaml String
    * @return Checksum of the container data
    */
-  public static String getChecksum(String containerDataYamlStr)
+  public static String getContainerFileChecksum(String containerDataYamlStr)
       throws StorageContainerException {
     MessageDigest sha;
     try {

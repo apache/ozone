@@ -21,8 +21,10 @@ package org.apache.hadoop.ozone.container.common.interfaces;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.util.List;
 
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
+import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandRequestProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandResponseProto;
@@ -191,6 +193,13 @@ public abstract class Handler {
    */
   public abstract void deleteContainer(Container container, boolean force)
       throws IOException;
+
+  /**
+   * Triggers reconciliation of this container replica's data with its peers.
+   * @param container container to be reconciled.
+   * @param peers The other datanodes with a copy of this container whose data should be checked.
+   */
+  public abstract void reconcileContainer(Container<?> container, List<DatanodeDetails> peers) throws IOException;
 
   /**
    * Deletes the given files associated with a block of the container.

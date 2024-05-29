@@ -210,7 +210,7 @@ public final class KeyValueContainerUtil {
     long containerID = kvContainerData.getContainerID();
 
     // Verify Checksum
-    ContainerUtils.verifyChecksum(kvContainerData, config);
+    ContainerUtils.verifyContainerFileChecksum(kvContainerData, config);
 
     if (kvContainerData.getSchemaVersion() == null) {
       // If this container has not specified a schema version, it is in the old
