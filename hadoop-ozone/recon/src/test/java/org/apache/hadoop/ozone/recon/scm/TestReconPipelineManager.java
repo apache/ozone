@@ -58,16 +58,13 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_METADATA_DIRS;
 import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.getRandomPipeline;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertInstanceOf;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
+import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -213,11 +210,9 @@ public class TestReconPipelineManager {
     Pipeline pipeline = getRandomPipeline();
     NetworkTopology clusterMap = new NetworkTopologyImpl(conf);
     EventQueue eventQueue = new EventQueue();
-    this.versionManager = mock(HDDSLayoutVersionManager.class);
-    when(versionManager.getMetadataLayoutVersion()).thenReturn(
-        maxLayoutVersion());
-    when(versionManager.getSoftwareLayoutVersion()).thenReturn(
-        maxLayoutVersion());
+    versionManager = mock(HDDSLayoutVersionManager.class);
+    when(versionManager.getMetadataLayoutVersion()).thenReturn(maxLayoutVersion());
+    when(versionManager.getSoftwareLayoutVersion()).thenReturn(maxLayoutVersion());
     NodeManager nodeManager =
         new SCMNodeManager(conf, scmStorageConfig, eventQueue, clusterMap,
             SCMContext.emptyContext(), versionManager);
@@ -227,20 +222,15 @@ public class TestReconPipelineManager {
             ReconSCMDBDefinition.PIPELINES.getTable(store), eventQueue,
             scmhaManager, scmContext);
 
-    try {
-      reconPipelineManager.addPipeline(pipeline);
-      reconPipelineManager.addPipeline(
-          pipeline); // Adding the same pipeline again to check for duplicates
-    } catch (Exception e) {
-      // Fail the test if an exception is thrown
-      assertTrue(false,
-          "Exception was thrown when adding a duplicate pipeline: " +
-              e.getMessage());
-    }
+    // Add the pipeline for the first time
+    reconPipelineManager.addPipeline(pipeline);
 
-    // If no exception was thrown, the test is successful
-    assertTrue(true);
+    // Attempt to add the same pipeline again and ensure no exception is thrown
+    assertDoesNotThrow(() -> {
+      reconPipelineManager.addPipeline(pipeline);
+    }, "Exception was thrown when adding a duplicate pipeline.");
   }
+
 
   @Test
   public void testStubbedReconPipelineFactory() throws IOException {
