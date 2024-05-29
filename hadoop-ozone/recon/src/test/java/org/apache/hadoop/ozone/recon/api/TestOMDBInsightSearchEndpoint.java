@@ -63,7 +63,23 @@ import java.util.UUID;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_DB_DIRS;
 
 /**
- * Test for OMDBInsightSearchEndpoint.
+ * Test class for OMDBInsightSearchEndpoint.
+ *
+ * This class tests various scenarios for searching open keys within a
+ * given volume, bucket, and directory structure. The tests include:
+ *
+ * 1. Test Root Level Search Restriction: Ensures searching at the root level returns a bad request.
+ * 2. Test Volume Level Search Restriction: Ensures searching at the volume level returns a bad request.
+ * 3. Test Bucket Level Search: Verifies search results within different types of buckets (FSO, OBS, Legacy).
+ * 4. Test Directory Level Search: Validates searching inside specific directories.
+ * 5. Test Key Level Search: Confirms search results for specific keys within buckets.
+ * 6. Test Key Level Search Under Directory: Verifies searching for keys within nested directories.
+ * 7. Test Search Under Nested Directory: Checks search results within nested directories under dira3.
+ * 8. Test Limit Search: Tests the limit functionality of the search API.
+ * 9. Test Search Open Keys with Bad Request: Ensures bad requests with invalid parameters return appropriate responses.
+ * 10. Test Last Key in Response: Confirms the presence of the last key in paginated responses.
+ * 11. Test Search Open Keys with Pagination: Verifies paginated search results.
+ * 12. Test Search in Empty Bucket: Checks the response for searching within an empty bucket.
  */
 public class TestOMDBInsightSearchEndpoint extends AbstractReconSqlDBTest {
 
@@ -172,17 +188,19 @@ public class TestOMDBInsightSearchEndpoint extends AbstractReconSqlDBTest {
 
   @Test
   public void testBucketLevelSearch() throws IOException {
+    // Search inside FSO bucket
     Response response =
         omdbInsightSearchEndpoint.searchOpenKeys("/vola/bucketa1", 20, "");
     assertEquals(200, response.getStatus());
     KeyInsightInfoResponse result =
         (KeyInsightInfoResponse) response.getEntity();
-    assertEquals(5, result.getFsoKeyInfoList().size());
+    assertEquals(14, result.getFsoKeyInfoList().size());
     assertEquals(0, result.getNonFSOKeyInfoList().size());
     // Assert Total Size
-    assertEquals(5000, result.getUnreplicatedDataSize());
-    assertEquals(5000 * 3, result.getReplicatedDataSize());
+    assertEquals(14000, result.getUnreplicatedDataSize());
+    assertEquals(14000 * 3, result.getReplicatedDataSize());
 
+    // Search inside OBS bucket
     response =
         omdbInsightSearchEndpoint.searchOpenKeys("/volb/bucketb1", 20, "");
     assertEquals(200, response.getStatus());
@@ -193,6 +211,13 @@ public class TestOMDBInsightSearchEndpoint extends AbstractReconSqlDBTest {
     // Assert Total Size
     assertEquals(5000, result.getUnreplicatedDataSize());
     assertEquals(5000 * 3, result.getReplicatedDataSize());
+
+    // Search Inside LEGACY bucket
+    response =
+        omdbInsightSearchEndpoint.searchOpenKeys("/volc/bucketc1", 20, "");
+    assertEquals(200, response.getStatus());
+    result = (KeyInsightInfoResponse) response.getEntity();
+    assertEquals(7, result.getNonFSOKeyInfoList().size());
 
     // Test with bucket that does not exist
     response = omdbInsightSearchEndpoint.searchOpenKeys("/vola/nonexistentbucket", 20, "");
@@ -231,11 +256,11 @@ public class TestOMDBInsightSearchEndpoint extends AbstractReconSqlDBTest {
     assertEquals(200, response.getStatus());
     result =
         (KeyInsightInfoResponse) response.getEntity();
-    assertEquals(1, result.getFsoKeyInfoList().size());
+    assertEquals(10, result.getFsoKeyInfoList().size());
     assertEquals(0, result.getNonFSOKeyInfoList().size());
     // Assert Total Size
-    assertEquals(1000, result.getUnreplicatedDataSize());
-    assertEquals(1000 * 3, result.getReplicatedDataSize());
+    assertEquals(10000, result.getUnreplicatedDataSize());
+    assertEquals(10000 * 3, result.getReplicatedDataSize());
 
     // Test with non-existent directory
     response = omdbInsightSearchEndpoint.searchOpenKeys("/vola/bucketa1/nonexistentdir", 20, "");
@@ -293,6 +318,97 @@ public class TestOMDBInsightSearchEndpoint extends AbstractReconSqlDBTest {
         "Expected a message indicating no keys were found");
 
     response = omdbInsightSearchEndpoint.searchOpenKeys("/volb/bucketb1/nonexistentfile", 1, "");
+    assertEquals(Response.Status.NOT_FOUND.getStatusCode(), response.getStatus());
+    entity = (String) response.getEntity();
+    assertTrue(entity.contains("No keys matched the search prefix"),
+        "Expected a message indicating no keys were found");
+  }
+
+  // Test searching for keys under a directory
+  @Test
+  public void testKeyLevelSearchUnderDirectory() throws IOException {
+    // FSO Bucket key-level search
+    Response response =
+        omdbInsightSearchEndpoint.searchOpenKeys("/vola/bucketa1/dira1/innerfile", 10, "");
+    assertEquals(200, response.getStatus());
+    KeyInsightInfoResponse result = (KeyInsightInfoResponse) response.getEntity();
+    assertEquals(1, result.getFsoKeyInfoList().size());
+    assertEquals(0, result.getNonFSOKeyInfoList().size());
+
+    response =
+        omdbInsightSearchEndpoint.searchOpenKeys("/vola/bucketa1/dira2/innerfile", 10, "");
+    assertEquals(200, response.getStatus());
+    result = (KeyInsightInfoResponse) response.getEntity();
+    assertEquals(1, result.getFsoKeyInfoList().size());
+    assertEquals(0, result.getNonFSOKeyInfoList().size());
+
+    // Test for unknown file in fso bucket
+    response = omdbInsightSearchEndpoint.searchOpenKeys("/vola/bucketa1/dira1/unknownfile", 10, "");
+    assertEquals(Response.Status.NOT_FOUND.getStatusCode(), response.getStatus());
+    String entity = (String) response.getEntity();
+    assertTrue(entity.contains("No keys matched the search prefix"),
+        "Expected a message indicating no keys were found");
+
+    // Test for unknown file in fso bucket
+    response = omdbInsightSearchEndpoint.searchOpenKeys("/vola/bucketa1/dira2/unknownfile", 10, "");
+    assertEquals(Response.Status.NOT_FOUND.getStatusCode(), response.getStatus());
+    entity = (String) response.getEntity();
+    assertTrue(entity.contains("No keys matched the search prefix"),
+        "Expected a message indicating no keys were found");
+  }
+
+
+  @Test
+  public void testSearchUnderNestedDirectory() throws IOException {
+    Response response = omdbInsightSearchEndpoint.searchOpenKeys("/vola/bucketa1/dira3", 20,
+        "");
+    assertEquals(200, response.getStatus());
+    KeyInsightInfoResponse result = (KeyInsightInfoResponse) response.getEntity();
+    assertEquals(10, result.getFsoKeyInfoList().size());
+    assertEquals(0, result.getNonFSOKeyInfoList().size());
+
+    // Search under dira31
+    response = omdbInsightSearchEndpoint.searchOpenKeys("/vola/bucketa1/dira3/dira31",
+        20, "");
+    assertEquals(200, response.getStatus());
+    result = (KeyInsightInfoResponse) response.getEntity();
+    assertEquals(6, result.getFsoKeyInfoList().size());
+    assertEquals(0, result.getNonFSOKeyInfoList().size());
+
+    // Search under dira32
+    response = omdbInsightSearchEndpoint.searchOpenKeys(
+        "/vola/bucketa1/dira3/dira31/dira32", 20, "");
+    assertEquals(200, response.getStatus());
+    result = (KeyInsightInfoResponse) response.getEntity();
+    assertEquals(3, result.getFsoKeyInfoList().size());
+    assertEquals(0, result.getNonFSOKeyInfoList().size());
+
+    // Search under dira33
+    response = omdbInsightSearchEndpoint.searchOpenKeys(
+        "/vola/bucketa1/dira3/dira31/dira32/dira33", 20, "");
+    assertEquals(200, response.getStatus());
+    result = (KeyInsightInfoResponse) response.getEntity();
+    assertEquals(1, result.getFsoKeyInfoList().size());
+    assertEquals(0, result.getNonFSOKeyInfoList().size());
+
+    // Search for the exact file under dira33
+    response = omdbInsightSearchEndpoint.searchOpenKeys(
+        "/vola/bucketa1/dira3/dira31/dira32/dira33/file33_1", 20, "");
+    assertEquals(200, response.getStatus());
+    result = (KeyInsightInfoResponse) response.getEntity();
+    assertEquals(1, result.getFsoKeyInfoList().size());
+    assertEquals(0, result.getNonFSOKeyInfoList().size());
+
+    // Search for a non existant file under each nested directory
+    response = omdbInsightSearchEndpoint.searchOpenKeys(
+        "/vola/bucketa1/dira3/dira31/dira32/dira33/nonexistentfile", 20, "");
+    assertEquals(Response.Status.NOT_FOUND.getStatusCode(), response.getStatus());
+    String entity = (String) response.getEntity();
+    assertTrue(entity.contains("No keys matched the search prefix"),
+        "Expected a message indicating no keys were found");
+
+    response = omdbInsightSearchEndpoint.searchOpenKeys(
+        "/vola/bucketa1/dira3/dira31/dira32/nonexistentfile", 20, "");
     assertEquals(Response.Status.NOT_FOUND.getStatusCode(), response.getStatus());
     entity = (String) response.getEntity();
     assertTrue(entity.contains("No keys matched the search prefix"),
@@ -381,6 +497,15 @@ public class TestOMDBInsightSearchEndpoint extends AbstractReconSqlDBTest {
         "Expected last key to be empty");
   }
 
+  @Test
+  public void testSearchInEmptyBucket() throws IOException {
+    // Search in empty bucket bucketb2
+    Response response = omdbInsightSearchEndpoint.searchOpenKeys("/volb/bucketb2", 20, "");
+    assertEquals(404, response.getStatus());
+    String entity = (String) response.getEntity();
+    assertTrue(entity.contains("No keys matched the search prefix"),
+        "Expected a message indicating no keys were found");
+  }
 
   /**
    * Tests the NSSummaryEndpoint for a given volume, bucket, and directory structure.
@@ -394,6 +519,9 @@ public class TestOMDBInsightSearchEndpoint extends AbstractReconSqlDBTest {
    * │   │   ├── dira1 (Total Size: 1000KB)
    * │   │   ├── dira2 (Total Size: 1000KB)
    * │   │   └── dira3 (Total Size: 1000KB)
+   * │   │       ├── dira31 (Total Size: 1000KB)
+   * │   │       ├── dira32 (Total Size: 1000KB)
+   * │   │       └── dira33 (Total Size: 1000KB)
    * │   ├── bucketa2   (FSO) Total Size: 5000KB
    * │   │   ├── filea3 (Size: 1000KB)
    * │   │   ├── filea4 (Size: 1000KB)
@@ -401,12 +529,20 @@ public class TestOMDBInsightSearchEndpoint extends AbstractReconSqlDBTest {
    * │   │   ├── dira5 (Total Size: 1000KB)
    * │   │   └── dira6 (Total Size: 1000KB)
    * └── volb   (Total Size: 5000KB)
-   *     └── bucketb1   (OBS) Total Size: 5000KB
-   *         ├── fileb1 (Size: 1000KB)
-   *         ├── fileb2 (Size: 1000KB)
-   *         ├── fileb3 (Size: 1000KB)
-   *         ├── fileb4 (Size: 1000KB)
-   *         └── fileb5 (Size: 1000KB)
+   *     ├── bucketb1   (OBS) Total Size: 5000KB
+   *     │   ├── fileb1 (Size: 1000KB)
+   *     │   ├── fileb2 (Size: 1000KB)
+   *     │   ├── fileb3 (Size: 1000KB)
+   *     │   ├── fileb4 (Size: 1000KB)
+   *     │   └── fileb5 (Size: 1000KB)
+   *     └── bucketb2   (OBS) Total Size: 0KB (Empty Bucket)
+   * └── volc   (Total Size: 7000KB)
+   *     └── bucketc1   (LEGACY) Total Size: 7000KB
+   *         ├── filec1 (Size: 1000KB)
+   *         ├── filec2 (Size: 1000KB)
+   *         ├── filec3 (Size: 1000KB)
+   *         ├── dirc1/ (Total Size: 2000KB)
+   *         └── dirc2/ (Total Size: 2000KB)
    *
    * @throws Exception
    */
@@ -414,6 +550,7 @@ public class TestOMDBInsightSearchEndpoint extends AbstractReconSqlDBTest {
     // Create Volumes
     long volaObjectId = createVolume("vola");
     createVolume("volb");
+    createVolume("volc");
 
     // Create Buckets in vola
     long bucketa1ObjectId =
@@ -426,6 +563,11 @@ public class TestOMDBInsightSearchEndpoint extends AbstractReconSqlDBTest {
     // Create Bucket in volb
     createBucket("volb", "bucketb1", 1000 + 1000 + 1000 + 1000 + 1000,
             getOBSBucketLayout());
+    createBucket("volb", "bucketb2", 0, getOBSBucketLayout()); // Empty Bucket
+
+    // Create Bucket in volc
+    createBucket("volc", "bucketc1", 7000,
+        getLegacyBucketLayout());
 
     // Create Directories and Files under bucketa1
     long dira1ObjectId =
@@ -438,11 +580,50 @@ public class TestOMDBInsightSearchEndpoint extends AbstractReconSqlDBTest {
         createDirectory(bucketa1ObjectId, bucketa1ObjectId, volaObjectId,
             "dira3");
 
+    // Create nested directories under dira3
+    long dira31ObjectId =
+        createDirectory(dira3ObjectId, bucketa1ObjectId, volaObjectId,
+            "dira31");
+    long dira32ObjectId =
+        createDirectory(dira31ObjectId, bucketa1ObjectId, volaObjectId,
+            "dira32");
+    long dira33ObjectId =
+        createDirectory(dira32ObjectId, bucketa1ObjectId, volaObjectId,
+            "dira33");
+
     // Files directly under bucketa1
     createOpenFile("filea1", "bucketa1", "vola", "filea1", bucketa1ObjectId,
         bucketa1ObjectId, volaObjectId, 1000);
     createOpenFile("filea2", "bucketa1", "vola", "filea2", bucketa1ObjectId,
         bucketa1ObjectId, volaObjectId, 1000);
+
+    // Files under dira3
+    createOpenFile("dira3/file3_1", "bucketa1", "vola", "file3_1",
+        dira3ObjectId, bucketa1ObjectId, volaObjectId, 1000);
+    createOpenFile("dira3/file3_2", "bucketa1", "vola", "file3_2",
+        dira3ObjectId, bucketa1ObjectId, volaObjectId, 1000);
+    createOpenFile("dira3/file3_3", "bucketa1", "vola", "file3_3",
+        dira3ObjectId, bucketa1ObjectId, volaObjectId, 1000);
+    createOpenFile("dira3/file3_4", "bucketa1", "vola", "file3_4",
+        dira3ObjectId, bucketa1ObjectId, volaObjectId, 1000);
+
+    // Files under dira31
+    createOpenFile("dira3/dira31/file31_1", "bucketa1", "vola", "file31_1",
+        dira31ObjectId, bucketa1ObjectId, volaObjectId, 1000);
+    createOpenFile("dira3/dira31/file31_2", "bucketa1", "vola", "file31_2",
+        dira31ObjectId, bucketa1ObjectId, volaObjectId, 1000);
+    createOpenFile("dira3/dira31/file31_3", "bucketa1", "vola", "file31_3",
+        dira31ObjectId, bucketa1ObjectId, volaObjectId, 1000);
+
+    // Files under dira32
+    createOpenFile("dira3/dira31/dira32/file32_1", "bucketa1", "vola", "file32_1",
+        dira32ObjectId, bucketa1ObjectId, volaObjectId, 1000);
+    createOpenFile("dira3/dira31/dira32/file32_2", "bucketa1", "vola", "file32_2",
+        dira32ObjectId, bucketa1ObjectId, volaObjectId, 1000);
+
+    // Files under dira33
+    createOpenFile("dira3/dira31/dira32/dira33/file33_1", "bucketa1", "vola", "file33_1",
+        dira33ObjectId, bucketa1ObjectId, volaObjectId, 1000);
 
     // Create Directories and Files under bucketa2
     long dira4ObjectId =
@@ -473,14 +654,21 @@ public class TestOMDBInsightSearchEndpoint extends AbstractReconSqlDBTest {
         dira1ObjectId, bucketa1ObjectId, volaObjectId, 1000);
     createOpenFile("dira2/innerfile", "bucketa1", "vola", "innerfile",
         dira2ObjectId, bucketa1ObjectId, volaObjectId, 1000);
-    createOpenFile("dira3/innerfile", "bucketa1", "vola", "innerfile",
-        dira3ObjectId, bucketa1ObjectId, volaObjectId, 1000);
     createOpenFile("dira4/innerfile", "bucketa2", "vola", "innerfile",
         dira4ObjectId, bucketa2ObjectId, volaObjectId, 1000);
     createOpenFile("dira5/innerfile", "bucketa2", "vola", "innerfile",
         dira5ObjectId, bucketa2ObjectId, volaObjectId, 1000);
     createOpenFile("dira6/innerfile", "bucketa2", "vola", "innerfile",
         dira6ObjectId, bucketa2ObjectId, volaObjectId, 1000);
+
+    // Create Keys and Directories in bucketc1 (LEGACY layout)
+    createOpenKey("filec1", "bucketc1", "volc", 1000);
+    createOpenKey("filec2", "bucketc1", "volc", 1000);
+    createOpenKey("filec3", "bucketc1", "volc", 1000);
+    createOpenKey("dirc1/", "bucketc1", "volc", 2000); // Directory indicated by trailing slash
+    createOpenKey("dirc2/", "bucketc1", "volc", 2000); // Directory indicated by trailing slash
+    createOpenKey("dirc1/innerfile", "bucketc1", "volc", 2000); // File in directory
+    createOpenKey("dirc2/innerfile", "bucketc1", "volc", 2000); // File in directory
   }
 
   /**
@@ -593,6 +781,10 @@ public class TestOMDBInsightSearchEndpoint extends AbstractReconSqlDBTest {
 
   private static BucketLayout getOBSBucketLayout() {
     return BucketLayout.OBJECT_STORE;
+  }
+
+  private static BucketLayout getLegacyBucketLayout() {
+    return BucketLayout.LEGACY;
   }
 
 }

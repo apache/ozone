@@ -22,8 +22,10 @@ import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
+import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
+import org.apache.hadoop.ozone.recon.ReconUtils;
 import org.apache.hadoop.ozone.recon.api.handlers.BucketHandler;
 import org.apache.hadoop.ozone.recon.api.types.KeyEntityInfo;
 import org.apache.hadoop.ozone.recon.api.types.KeyInsightInfoResponse;
@@ -46,7 +48,6 @@ import java.util.Map;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.ArrayList;
-import java.util.Set;
 
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 import static org.apache.hadoop.ozone.recon.ReconConstants.DEFAULT_START_PREFIX;
@@ -219,7 +220,8 @@ public class OMDBInsightSearchEndpoint {
       subPaths.add(startPrefixObjectPath);
 
       // Recursively gather all subpaths
-      gatherSubPaths(parentId, subPaths, names);
+      ReconUtils.gatherSubPaths(parentId, subPaths, Long.parseLong(names[0]), Long.parseLong(names[1]),
+          reconNamespaceSummaryManager);
 
       // Iterate over the subpaths and retrieve the open files
       for (String subPath : subPaths) {
@@ -237,48 +239,6 @@ public class OMDBInsightSearchEndpoint {
   }
 
   /**
-   * Finds all subdirectories under a parent directory in an FSO bucket. It builds
-   * a list of paths for these subdirectories. These sub-directories are then used
-   * to search for open files in the openFileTable.
-   *
-   * How it works:
-   * - Starts from a parent directory identified by parentId.
-   * - Looks through all child directories of this parent.
-   * - For each child, it creates a path that starts with volumeID/bucketID/parentId,
-   * following our openFileTable format
-   * - Adds these paths to a list and explores each child further for more subdirectories.
-   *
-   * @param parentId The ID of the directory we start exploring from.
-   * @param subPaths A list where we collect paths to all subdirectories.
-   * @param names    An array with at least two elements: the first is volumeID and
-   *                 the second is bucketID. These are used to start each path.
-   * @throws IOException If there are problems accessing directory information.
-   */
-  private void gatherSubPaths(long parentId, List<String> subPaths,
-                              String[] names) throws IOException {
-    // Fetch the NSSummary object for parentId
-    NSSummary parentSummary = reconNamespaceSummaryManager.getNSSummary(parentId);
-    if (parentSummary == null) {
-      return;
-    }
-    long volumeID = Long.parseLong(names[0]);
-    long bucketID = Long.parseLong(names[1]);
-    Set<Long> childDirIds = parentSummary.getChildDir();
-    for (Long childId : childDirIds) {
-      // Fetch the NSSummary for each child directory
-      NSSummary childSummary = reconNamespaceSummaryManager.getNSSummary(childId);
-      if (childSummary != null) {
-        String subPath = constructObjectPathWithPrefix(volumeID, bucketID, childId);
-        // Add to subPaths
-        subPaths.add(subPath);
-        // Recurse into this child directory
-        gatherSubPaths(childId, subPaths, names);
-      }
-    }
-  }
-
-
-  /**
    * Converts a key prefix into an object path for FSO buckets, using IDs.
    * <p>
    * This method transforms a user-provided path (e.g., "volume/bucket/dir1") into
@@ -292,6 +252,7 @@ public class OMDBInsightSearchEndpoint {
   public String convertToObjectPath(String prevKeyPrefix) throws IOException {
     try {
       String[] names = parseRequestPath(normalizePath(prevKeyPrefix, BucketLayout.FILE_SYSTEM_OPTIMIZED));
+      Table<String, OmKeyInfo> openFileTable = omMetadataManager.getOpenKeyTable(BucketLayout.FILE_SYSTEM_OPTIMIZED);
 
       // Root-Level: Return the original path
       if (names.length == 0) {
@@ -317,65 +278,45 @@ public class OMDBInsightSearchEndpoint {
         return constructObjectPathWithPrefix(volumeId, bucketId);
       }
 
-      // Check if the last element is a key
-      if (isKey(volumeId, bucketId, names[names.length - 1])) {
-        // The last element is a key hence return the path with the key prefix
-        return constructObjectPathWithPrefix(volumeId, bucketId, bucketId) + OM_KEY_PREFIX + names[names.length - 1];
-      }
-
-      // Attempt to fetch the immediate parentID which could be a directory or the bucket itself
+      // Directory or Key-Level: Check both key and directory
       BucketHandler handler =
           getBucketHandler(reconNamespaceSummaryManager, omMetadataManager, reconSCM, bucketInfo);
-      long dirObjectId;
-      try {
-        dirObjectId = handler.getDirInfo(names).getObjectID();
-      } catch (NullPointerException e) {
-        // If fetching directory also then it's neither a key nor a directory hence unknown entity.
-        return constructObjectPathWithPrefix(volumeId, bucketId, bucketId) + OM_KEY_PREFIX + names[names.length - 1];
+
+      if (names.length >= 3) {
+        String lastEntiry = names[names.length - 1];
+
+        // Check if the directory exists
+        OmDirectoryInfo dirInfo = handler.getDirInfo(names);
+        if (dirInfo != null && dirInfo.getName().equals(lastEntiry)) {
+          return constructObjectPathWithPrefix(volumeId, bucketId, dirInfo.getObjectID()) + OM_KEY_PREFIX;
+        }
+
+        // Check if the key exists
+        long dirID = handler.getDirObjectId(names, names.length);
+        String keyKey = constructObjectPathWithPrefix(volumeId, bucketId, dirID) +
+                OM_KEY_PREFIX + lastEntiry;
+        OmKeyInfo keyInfo = openFileTable.getSkipCache(keyKey);
+        if (keyInfo != null && keyInfo.getFileName().equals(lastEntiry)) {
+          return constructObjectPathWithPrefix(volumeId, bucketId,
+              keyInfo.getParentObjectID()) + OM_KEY_PREFIX + lastEntiry;
+        }
+
+        return prevKeyPrefix;
       }
-      // If it's a directory, return the path with the directory prefix with a trailing '/' indicating a directory
-      return constructObjectPathWithPrefix(volumeId, bucketId, dirObjectId) + OM_KEY_PREFIX;
     } catch (IllegalArgumentException e) {
-      LOG.error("IllegalArgumentException encountered while converting key prefix to object path: {}", prevKeyPrefix, e);
+      LOG.error(
+          "IllegalArgumentException encountered while converting key prefix to object path: {}",
+          prevKeyPrefix, e);
       throw e;
     } catch (RuntimeException e) {
-      LOG.error("RuntimeException encountered while converting key prefix to object path: {}", prevKeyPrefix, e);
+      LOG.error(
+          "RuntimeException encountered while converting key prefix to object path: {}",
+          prevKeyPrefix, e);
       return prevKeyPrefix;
     }
+    return prevKeyPrefix;
   }
 
-
-  /**
-   * Checks if the last element in the path is a key.
-   *
-   * @param volumeId The volume ID.
-   * @param bucketId The bucket ID.
-   * @param potentialKeyName The name of the potential key.
-   * @return True if the last element is a key, false otherwise.
-   * @throws IOException If database access fails.
-   */
-  private boolean isKey(long volumeId, long bucketId, String potentialKeyName)
-      throws IOException {
-    String keyPrefixObjectPath =
-        constructObjectPathWithPrefix(volumeId, bucketId, bucketId);
-
-    Table<String, OmKeyInfo> openFileTable =
-        omMetadataManager.getOpenKeyTable(BucketLayout.FILE_SYSTEM_OPTIMIZED);
-    try (TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>> keyIter = openFileTable.iterator()) {
-      String searchKey = keyPrefixObjectPath + OM_KEY_PREFIX + potentialKeyName;
-      keyIter.seek(searchKey);
-      if (keyIter.hasNext()) {
-        Table.KeyValue<String, OmKeyInfo> keyValue = keyIter.next();
-        return keyValue.getValue().getFileName().equals(potentialKeyName);
-      }
-      return false;
-    } catch (IOException e) {
-      LOG.error(
-          "IOException encountered while checking if the last element is a key: {}",
-          potentialKeyName, e);
-      throw e;
-    }
-  }
 
   /**
    * Common method to retrieve keys from a table based on a search prefix and a limit.

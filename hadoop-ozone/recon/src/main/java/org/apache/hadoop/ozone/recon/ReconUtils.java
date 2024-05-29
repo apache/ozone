@@ -32,10 +32,7 @@ import java.sql.Timestamp;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.time.Instant;
-import java.util.ArrayList;
-import java.util.Date;
-import java.util.List;
-import java.util.TimeZone;
+import java.util.*;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -79,6 +76,7 @@ import org.apache.hadoop.ozone.recon.api.types.DUResponse;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 import org.apache.hadoop.ozone.recon.scm.ReconContainerReportQueue;
 import org.apache.hadoop.ozone.recon.spi.ReconNamespaceSummaryManager;
+import org.apache.hadoop.ozone.recon.spi.impl.ReconNamespaceSummaryManagerImpl;
 import org.apache.hadoop.security.authentication.client.AuthenticationException;
 import org.hadoop.ozone.recon.schema.tables.daos.GlobalStatsDao;
 import org.hadoop.ozone.recon.schema.tables.pojos.GlobalStats;
@@ -566,6 +564,53 @@ public class ReconUtils {
     } catch (Exception exception) {
       log.error("Unexpected error while parsing date: {} in format: {} -> {}", dateString, localDateFormat, exception);
       return Instant.now().toEpochMilli();
+    }
+  }
+
+  /**
+   * Finds all subdirectories under a parent directory in an FSO bucket. It builds
+   * a list of paths for these subdirectories. These sub-directories are then used
+   * to search for open files in the openFileTable.
+   *
+   * How it works:
+   * - Starts from a parent directory identified by parentId.
+   * - Looks through all child directories of this parent.
+   * - For each child, it creates a path that starts with volumeID/bucketID/parentId,
+   * following our openFileTable format
+   * - Adds these paths to a list and explores each child further for more subdirectories.
+   *
+   * @param parentId The ID of the directory we start exploring from.
+   * @param subPaths A list where we collect paths to all subdirectories.
+   * @param names    An array with at least two elements: the first is volumeID and
+   *                 the second is bucketID. These are used to start each path.
+   * @throws IOException If there are problems accessing directory information.
+   */
+  public static void gatherSubPaths(long parentId, List<String> subPaths,
+                              long volumeID, long bucketID,
+                              ReconNamespaceSummaryManager reconNamespaceSummaryManager)
+      throws IOException {
+    // Fetch the NSSummary object for parentId
+    NSSummary parentSummary =
+        reconNamespaceSummaryManager.getNSSummary(parentId);
+    if (parentSummary == null) {
+      return;
+    }
+
+    Set<Long> childDirIds = parentSummary.getChildDir();
+    for (Long childId : childDirIds) {
+      // Fetch the NSSummary for each child directory
+      NSSummary childSummary =
+          reconNamespaceSummaryManager.getNSSummary(childId);
+      if (childSummary != null) {
+        String subPath =
+            ReconUtils.constructObjectPathWithPrefix(volumeID, bucketID,
+                childId);
+        // Add to subPaths
+        subPaths.add(subPath);
+        // Recurse into this child directory
+        gatherSubPaths(childId, subPaths, volumeID, bucketID,
+            reconNamespaceSummaryManager);
+      }
     }
   }
 
