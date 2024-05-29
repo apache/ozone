@@ -4262,8 +4262,7 @@ public abstract class TestOzoneRpcClientAbstract {
         omKeyInfo.getKeyLocationVersions().size());
 
     // ensure flush double buffer for deleted Table
-    cluster.getOzoneManager().getOmRatisServer().getOmStateMachine()
-        .awaitDoubleBufferFlush();
+    cluster.getOzoneManager().awaitDoubleBufferFlush();
 
     if (expectedCount == 1) {
       List<? extends Table.KeyValue<String, RepeatedOmKeyInfo>> rangeKVs
