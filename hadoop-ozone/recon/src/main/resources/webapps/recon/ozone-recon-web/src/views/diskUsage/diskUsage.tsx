@@ -151,8 +151,8 @@ export class DiskUsage extends React.Component<Record<string, object>, IDUState>
       // necessarily have "Other objects", but later we check if the other objects's size is more than zero (we will have
       // other objects if there are more than 30 subpaths, but we can't check on that, as the response will always have 
       // 30 subpaths, but from the total size and the subpaths size we can calculate it).
-
-      if (subpaths.length >= limit || (subpaths.length > 0 && limit === MAX_DISPLAY_LIMIT)) {
+       
+      if (subpaths.length > limit || (subpaths.length > 0 && limit === MAX_DISPLAY_LIMIT)) {
         subpaths = subpaths.slice(0, limit);
         let topSize = 0;
         for (let i = 0; i < subpaths.length; ++i) {
