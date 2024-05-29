@@ -113,7 +113,7 @@ public class DatanodeConfiguration extends ReconfigurableConfig {
   private static final long
       AUTO_COMPACTION_SMALL_SST_FILE_INTERVAL_MINUTES_DEFAULT = 120;
   private static final int
-      AUTO_COMPACTION_SMALL_SST_FILE_EXECUTORS_DEFAULT = 1;
+      AUTO_COMPACTION_SMALL_SST_FILE_THREADS_DEFAULT = 1;
 
   /**
    * Number of threads per volume that Datanode will use for chunk read.
@@ -550,14 +550,14 @@ public class DatanodeConfiguration extends ReconfigurableConfig {
   private long autoCompactionSmallSstFileIntervalMinutes =
       AUTO_COMPACTION_SMALL_SST_FILE_INTERVAL_MINUTES_DEFAULT;
 
-  @Config(key = "rocksdb.auto-compaction-small-sst-file.executors",
+  @Config(key = "rocksdb.auto-compaction-small-sst-file.threads",
       defaultValue = "1",
       type = ConfigType.INT,
       tags = { DATANODE },
-      description = "Auto compact small SST files executors."
+      description = "Auto compact small SST files threads."
   )
-  private int autoCompactionSmallSstFileExecutors =
-      AUTO_COMPACTION_SMALL_SST_FILE_EXECUTORS_DEFAULT;
+  private int autoCompactionSmallSstFileThreads =
+      AUTO_COMPACTION_SMALL_SST_FILE_THREADS_DEFAULT;
 
   /**
    * Whether to check container directory or not to determine
@@ -944,13 +944,13 @@ public class DatanodeConfiguration extends ReconfigurableConfig {
         autoCompactionSmallSstFileIntervalMinutes;
   }
 
-  public int getAutoCompactionSmallSstFileExecutors() {
-    return autoCompactionSmallSstFileExecutors;
+  public int getAutoCompactionSmallSstFileThreads() {
+    return autoCompactionSmallSstFileThreads;
   }
 
-  public void setAutoCompactionSmallSstFileExecutors(
-      int autoCompactionSmallSstFileExecutors) {
-    this.autoCompactionSmallSstFileExecutors =
-        autoCompactionSmallSstFileExecutors;
+  public void setAutoCompactionSmallSstFileThreads(
+      int autoCompactionSmallSstFileThreads) {
+    this.autoCompactionSmallSstFileThreads =
+        autoCompactionSmallSstFileThreads;
   }
 }

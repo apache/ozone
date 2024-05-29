@@ -124,7 +124,7 @@ public class OzoneContainer {
   private final ReplicationServer replicationServer;
   private DatanodeDetails datanodeDetails;
   private StateContext context;
-  private ScheduledExecutorService compactExecutor;
+  private ScheduledExecutorService dbCompactionExecutorService;
 
   private final ContainerMetrics metrics;
 
@@ -166,12 +166,12 @@ public class OzoneContainer {
       HddsVolumeUtil.loadAllHddsVolumeDbStore(
           volumeSet, dbVolumeSet, false, LOG);
       if (dnConf.autoCompactionSmallSstFile()) {
-        this.compactExecutor = Executors.newScheduledThreadPool(
-            dbVolumeSet != null ? 1 :
-                dnConf.getAutoCompactionSmallSstFileExecutors(),
+        this.dbCompactionExecutorService = Executors.newScheduledThreadPool(
+                dnConf.getAutoCompactionSmallSstFileThreads(),
             new ThreadFactoryBuilder().setNameFormat(
-                "RocksDB Compact Thread-%d").build());
-        this.compactExecutor.scheduleWithFixedDelay(this::compactDb,
+                datanodeDetails.threadNamePrefix() +
+                    "RocksDBCompactionThread-%d").build());
+        this.dbCompactionExecutorService.scheduleWithFixedDelay(this::compactDb,
             dnConf.getAutoCompactionSmallSstFileIntervalMinutes(),
             dnConf.getAutoCompactionSmallSstFileIntervalMinutes(),
             TimeUnit.MINUTES);
@@ -506,8 +506,8 @@ public class OzoneContainer {
     if (dbVolumeSet != null) {
       dbVolumeSet.shutdown();
     }
-    if (compactExecutor != null) {
-      compactExecutor.shutdown();
+    if (dbCompactionExecutorService != null) {
+      dbCompactionExecutorService.shutdown();
     }
     blockDeletingService.shutdown();
     recoveringContainerScrubbingService.shutdown();
@@ -611,11 +611,8 @@ public class OzoneContainer {
   public void compactDb() {
     for (StorageVolume volume : volumeSet.getVolumesList()) {
       HddsVolume hddsVolume = (HddsVolume) volume;
-      CompletableFuture.runAsync(hddsVolume::compactDb, compactExecutor);
-      // If set dbVolumeSet only need to execute the compact db once
-      if (dbVolumeSet != null) {
-        break;
-      }
+      CompletableFuture.runAsync(hddsVolume::compactDb,
+          dbCompactionExecutorService);
     }
   }
 

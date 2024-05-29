@@ -462,21 +462,16 @@ public class HddsVolume extends StorageVolume {
         getStorageID());
   }
 
-  public boolean compactDb() {
-    File dbDir = getDbParentDir();
-    File dbFile = new File(dbDir, CONTAINER_DB_NAME);
-    if (dbFile.exists() && dbFile.canRead()) {
-      String dbFilePath = dbFile.getAbsolutePath();
-      try {
-        // Calculate number of files per level and size per level
-        RawDB rawDB =
-            DatanodeStoreCache.getInstance().getDB(dbFilePath, getConf());
-        rawDB.getStore().compactionIfNeeded();
-        return true;
-      } catch (Exception e) {
-        LOG.warn("compact rocksdb error in {}", dbFilePath, e);
-      }
+  public void compactDb() {
+    File dbFile = new File(getDbParentDir(), CONTAINER_DB_NAME);
+    String dbFilePath = dbFile.getAbsolutePath();
+    try {
+      // Calculate number of files per level and size per level
+      RawDB rawDB =
+          DatanodeStoreCache.getInstance().getDB(dbFilePath, getConf());
+      rawDB.getStore().compactionIfNeeded();
+    } catch (Exception e) {
+      LOG.warn("compact rocksdb error in {}", dbFilePath, e);
     }
-    return false;
   }
 }
