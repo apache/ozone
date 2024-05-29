@@ -439,7 +439,7 @@ class TestBlockOutputStream {
       key.flush();
       assertEquals(writeChunkCount + 2,
           metrics.getContainerOpCountMetrics(WriteChunk));
-      assertEquals(putBlockCount + ((enablePiggybacking)? 0 : 1),
+      assertEquals(putBlockCount + ((enablePiggybacking) ? 0 : 1),
           metrics.getContainerOpCountMetrics(PutBlock));
       assertEquals(pendingWriteChunkCount,
           metrics.getPendingContainerOpCountMetrics(WriteChunk));
@@ -468,9 +468,9 @@ class TestBlockOutputStream {
           metrics.getPendingContainerOpCountMetrics(PutBlock));
       assertEquals(writeChunkCount + 2,
           metrics.getContainerOpCountMetrics(WriteChunk));
-      assertEquals(putBlockCount + ((enablePiggybacking)? 1 : 2),
+      assertEquals(putBlockCount + ((enablePiggybacking) ? 1 : 2),
           metrics.getContainerOpCountMetrics(PutBlock));
-      assertEquals(totalOpCount  + ((enablePiggybacking)? 3 : 4), metrics.getTotalOpCount());
+      assertEquals(totalOpCount  + ((enablePiggybacking) ? 3 : 4), metrics.getTotalOpCount());
       assertEquals(0, keyOutputStream.getStreamEntries().size());
 
       validateData(keyName, data1, client.getObjectStore(), VOLUME, BUCKET);
@@ -746,9 +746,9 @@ class TestBlockOutputStream {
       assertEquals(writeChunkCount + 5,
           metrics.getContainerOpCountMetrics(WriteChunk));
       // The previous flush did not trigger any action with flushDelay enabled
-      assertEquals(putBlockCount + (flushDelay ? 2 : 3)  + (enablePiggybacking? 0 : 1),
+      assertEquals(putBlockCount + (flushDelay ? 2 : 3)  + (enablePiggybacking ? 0 : 1),
           metrics.getContainerOpCountMetrics(PutBlock));
-      assertEquals(totalOpCount + (flushDelay ? 7 : 8) + ((enablePiggybacking? 0 : 1)),
+      assertEquals(totalOpCount + (flushDelay ? 7 : 8) + ((enablePiggybacking ? 0 : 1)),
           metrics.getTotalOpCount());
       assertEquals(dataLength, blockOutputStream.getTotalAckDataLength());
       assertEquals(0, blockOutputStream.getCommitIndex2flushedDataMap().size());
