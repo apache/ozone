@@ -36,8 +36,7 @@ import {MultiSelect, IOption} from 'components/multiSelect/multiSelect';
 import {ActionMeta, ValueType} from 'react-select';
 import {showDataFetchError} from 'utils/common';
 import {ColumnSearch} from 'utils/columnSearch';
-import { AxiosGetHelper } from 'utils/axiosRequestHelper';
-import axios from "axios";
+import { AxiosGetHelper, AxiosPutHelper } from 'utils/axiosRequestHelper';
 
 interface IDatanodeResponse {
   hostname: string;
@@ -424,24 +423,20 @@ export class Datanodes extends React.Component<Record<string, object>, IDatanode
     });
   };
   
-  removeDatanode= async (selectedRowKeys: any) => {
-    try {
-      await axios.put('/api/v1/datanodes/remove', selectedRowKeys);
-      //Load Datanodes after removal
+  removeDatanode = async (selectedRowKeys: any) => {
+    const { request, controller } = await AxiosPutHelper('/api/v1/datanodes/remove', selectedRowKeys, cancelSignal);
+    cancelSignal = controller;
+    request.then(() => {
       this._loadData();
-      this.setState({
-        loading: false,
-        selectedRowKeys: []
-      });
-    }
-    catch (error) {
-      this.setState({
-        loading: false,
-        selectedRowKeys: []
-      });
+    }).catch(error => {
       showDataFetchError(error.toString());
-    }
-  };
+    }).finally(() => {
+      this.setState({
+        loading: false,
+        selectedRowKeys: []
+      });
+    });
+  }
 
   componentDidMount(): void {
     // Fetch datanodes on component mount
@@ -533,7 +528,7 @@ export class Datanodes extends React.Component<Record<string, object>, IDatanode
                 }
                 onConfirm={this.popConfirm}
               >
-                <Tooltip placement="topLeft" title="Remove and stop tracking the DECOMMISSIONED, IN_MAINTENANCE AND DEAD nodes!!!.">
+                <Tooltip placement="topLeft" title="Remove and stop tracking the DECOMMISSIONED, IN_MAINTENANCE, and DEAD nodes.">
                   <Icon type="info-circle"/>
                 </Tooltip>
                 &nbsp;&nbsp;
