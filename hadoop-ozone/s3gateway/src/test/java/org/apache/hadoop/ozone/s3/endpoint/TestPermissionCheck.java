@@ -38,6 +38,7 @@ import javax.ws.rs.core.HttpHeaders;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -167,7 +168,10 @@ public class TestPermissionCheck {
   public void testDeleteKeys() throws IOException, OS3Exception {
     when(objectStore.getVolume(anyString())).thenReturn(volume);
     when(objectStore.getS3Bucket(anyString())).thenReturn(bucket);
-    doThrow(exception).when(bucket).deleteKey(any());
+    Map<String, String> deleteErrors = new HashMap<>();
+    deleteErrors.put("deleteKeyName", "Access denied");
+    when(bucket.deleteKeysQuiet(any(), anyBoolean())).thenReturn(deleteErrors);
+
     BucketEndpoint bucketEndpoint = new BucketEndpoint();
     bucketEndpoint.setClient(client);
     MultiDeleteRequest request = new MultiDeleteRequest();
@@ -179,7 +183,7 @@ public class TestPermissionCheck {
     MultiDeleteResponse response =
         bucketEndpoint.multiDelete("BucketName", "keyName", request);
     assertEquals(1, response.getErrors().size());
-    assertEquals("PermissionDenied", response.getErrors().get(0).getCode());
+    assertEquals("Access denied", response.getErrors().get(0).getCode());
   }
 
   @Test
