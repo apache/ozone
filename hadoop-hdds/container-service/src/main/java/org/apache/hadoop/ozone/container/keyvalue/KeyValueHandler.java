@@ -29,9 +29,11 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.locks.Lock;
 import java.util.function.Function;
 
@@ -47,6 +49,7 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerC
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto.State;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.GetSmallFileRequestProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.KeyValue;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.MissingBlock;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.PutSmallFileRequestProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Type;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.WriteChunkRequestProto;
@@ -104,6 +107,7 @@ import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuil
 import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuilders.getBlockLengthResponse;
 import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuilders.getEchoResponse;
 import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuilders.getGetSmallFileResponseSuccess;
+import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuilders.getHeadBlocksResponse;
 import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuilders.getListBlockResponse;
 import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuilders.getPutFileResponseSuccess;
 import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuilders.getReadChunkResponse;
@@ -277,6 +281,8 @@ public class KeyValueHandler extends Handler {
       return handler.handleGetCommittedBlockLength(request, kvContainer);
     case Echo:
       return handler.handleEcho(request, kvContainer);
+    case HeadBlocks:
+      return handler.headBlocks(request, kvContainer);
     default:
       return null;
     }
@@ -602,6 +608,33 @@ public class KeyValueHandler extends Handler {
     }
 
     return getBlockDataResponse(request, responseData);
+  }
+
+  /**
+   * Handle Get Block operation. Calls BlockManager to process the request.
+   */
+  ContainerCommandResponseProto headBlocks(
+      ContainerCommandRequestProto request, KeyValueContainer kvContainer) {
+    if (!request.hasHeadBlocks()) {
+      if (LOG.isDebugEnabled()) {
+        LOG.debug("Malformed head Key request. trace ID: {}",
+            request.getTraceID());
+      }
+      return malformedRequest(request);
+    }
+
+    try {
+      Set<MissingBlock> responseData = blockManager.headBlocks(
+          kvContainer, new HashSet<>(request.getHeadBlocks().getLocalIDList()));
+      return getHeadBlocksResponse(request, responseData);
+    } catch (StorageContainerException ex) {
+      return ContainerUtils.logAndReturnError(LOG, ex, request);
+    } catch (IOException ex) {
+      return ContainerUtils.logAndReturnError(LOG,
+          new StorageContainerException("List blocks failed", ex, IO_EXCEPTION),
+          request);
+    }
+
   }
 
   /**

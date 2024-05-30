@@ -47,6 +47,8 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.GetBlockRe
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.GetBlockResponseProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.GetSmallFileRequestProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.GetSmallFileResponseProto;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.HeadBlocksRequestProto;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.HeadBlocksResponseProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.KeyValue;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ListBlockRequestProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ListBlockResponseProto;
@@ -143,6 +145,50 @@ public final class ContainerProtocolCalls  {
     ContainerCommandResponseProto response =
         xceiverClient.sendCommand(request, getValidatorList());
     return response.getListBlock();
+  }
+
+  /**
+   * Calls the container protocol to check the presence of blocks in a container.
+   *
+   * @param xceiverClient client to perform call
+   * @param containerID the ID of the container to check blocks
+   * @param localIds set of local IDs of the blocks to check
+   * @param token a token for this block (may be null)
+   * @return container protocol head blocks response
+   * @throws IOException if there is an I/O error while performing the call
+   */
+  public static HeadBlocksResponseProto headBlocks(XceiverClientSpi xceiverClient,
+      long containerID, Set<Long> localIds, Token<? extends TokenIdentifier> token) throws IOException {
+
+    HeadBlocksRequestProto headBlocksRequestProto =
+        HeadBlocksRequestProto.newBuilder()
+            .setContainerID(containerID)
+            .addAllLocalID(localIds)
+            .build();
+
+    // datanodeID doesn't matter for read only requests
+    String datanodeID =
+        xceiverClient.getPipeline().getFirstNode().getUuidString();
+
+    ContainerCommandRequestProto.Builder builder =
+        ContainerCommandRequestProto.newBuilder()
+            .setCmdType(Type.HeadBlocks)
+            .setContainerID(containerID)
+            .setDatanodeUuid(datanodeID)
+            .setHeadBlocks(headBlocksRequestProto);
+
+    if (token != null) {
+      builder.setEncodedToken(token.encodeToUrlString());
+    }
+    String traceId = TracingUtil.exportCurrentSpan();
+    if (traceId != null) {
+      builder.setTraceID(traceId);
+    }
+
+    ContainerCommandRequestProto request = builder.build();
+    ContainerCommandResponseProto response =
+        xceiverClient.sendCommand(request, getValidatorList());
+    return response.getHeadBlocks();
   }
 
   static <T> T tryEachDatanode(Pipeline pipeline,

@@ -18,11 +18,13 @@
 package org.apache.hadoop.ozone.container.keyvalue.interfaces;
 
 import org.apache.hadoop.hdds.client.BlockID;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.MissingBlock;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
 
 import java.io.IOException;
 import java.util.List;
+import java.util.Set;
 
 /**
  * BlockManager is for performing key related operations on the container.
@@ -78,6 +80,17 @@ public interface BlockManager {
    * @return List of Blocks that match the criteria.
    */
   List<BlockData> listBlock(Container container, long startLocalID, int count)
+      throws IOException;
+
+  /**
+   * Checks the presence of blocks in both the database and disk.
+   *
+   * @param container - Container in which blocks are stored.
+   * @param blocks - Set of block IDs to be checked.
+   * @return Set of MissingBlock representing blocks not found in the database or on disk.
+   * @throws IOException in case of I/O errors during the check.
+   */
+  Set<MissingBlock> headBlocks(Container container, Set<Long> blocks)
       throws IOException;
 
   /**

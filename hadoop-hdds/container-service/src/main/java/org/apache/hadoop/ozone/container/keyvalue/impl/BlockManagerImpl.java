@@ -18,17 +18,27 @@
 
 package org.apache.hadoop.ozone.container.keyvalue.impl;
 
+import java.io.File;
 import java.io.IOException;
+import java.io.UnsupportedEncodingException;
+import java.nio.file.DirectoryStream;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.MissingBlock;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
+import org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.apache.hadoop.ozone.container.common.interfaces.DBHandle;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainer;
@@ -40,6 +50,9 @@ import com.google.common.base.Preconditions;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.BCSID_MISMATCH;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.NO_SUCH_BLOCK;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.UNKNOWN_BCSID;
+import static org.apache.hadoop.ozone.OzoneConsts.SCHEMA_V3;
+
+import org.apache.hadoop.ozone.container.metadata.DatanodeSchemaThreeDBDefinition;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -311,6 +324,132 @@ public class BlockManagerImpl implements BlockManager {
       container.readUnlock();
     }
   }
+
+  public Set<MissingBlock> headBlocks(Container container, Set<Long> localIds) throws IOException {
+    Preconditions.checkNotNull(container, "container cannot be null");
+    Preconditions.checkNotNull(localIds, "local ID cannot be null");
+    if (localIds.isEmpty()) {
+      return new HashSet<>();
+    }
+
+    container.readLock();
+    try {
+      KeyValueContainerData containerData = (KeyValueContainerData) container.getContainerData();
+      if (!containerData.getLayoutVersion().equals(ContainerLayoutVersion.FILE_PER_BLOCK)) {
+        throw new UnsupportedEncodingException("Not support Container Layout " + containerData.getLayoutVersion());
+      }
+      boolean isV3Schema = containerData.hasSchema(SCHEMA_V3);
+      File chunksPath = new File(containerData.getChunksPath());
+
+      Set<Long> existingOnDB = getExistingBlocksFromDB(containerData, localIds, isV3Schema);
+      Set<Long> existingOnDisk = getExistingBlocksFromDisk(chunksPath, localIds);
+
+      return findMissingBlocks(localIds, existingOnDB, existingOnDisk);
+    } finally {
+      container.readUnlock();
+    }
+  }
+
+  private Set<Long> getExistingBlocksFromDB(KeyValueContainerData containerData, Set<Long> localIds,
+      boolean isV3Schema) throws IOException {
+    Set<Long> existingOnDB = new HashSet<>();
+    Long minLocalID = Collections.min(localIds);
+
+    try (DBHandle db = BlockUtils.getDB(containerData, config)) {
+      String startKey = containerData.getBlockKey(minLocalID);
+      List<? extends Table.KeyValue<String, BlockData>> range = db.getStore().getBlockDataTable()
+          .getSequentialRangeKVs(startKey, Integer.MAX_VALUE, containerData.containerPrefix(),
+              containerData.getUnprefixedKeyFilter());
+
+      for (Table.KeyValue<String, BlockData> entry : range) {
+        long blockId = parseBlockId(entry.getKey(), isV3Schema);
+        if (localIds.contains(blockId)) {
+          existingOnDB.add(blockId);
+          if (existingOnDB.size() == localIds.size()) {
+            break;
+          }
+        }
+      }
+    }
+    return existingOnDB;
+  }
+
+  private long parseBlockId(String key, boolean isV3Schema) {
+    return isV3Schema ? Long.parseLong(DatanodeSchemaThreeDBDefinition.getKeyWithoutPrefix(key)) : Long.parseLong(key);
+  }
+
+  private Set<Long> getExistingBlocksFromDisk(File chunksPath, Set<Long> localIds) throws IOException {
+    Set<Long> existingOnDisk = new HashSet<>();
+
+    Preconditions.checkArgument(chunksPath.isDirectory());
+    try (DirectoryStream<Path> stream = Files.newDirectoryStream(chunksPath.toPath())) {
+      for (Path entry : stream) {
+        Path fileNamePath = entry.getFileName();
+        if (fileNamePath == null) {
+          continue;
+        }
+        String fileName = fileNamePath.toString();
+        if (fileName.endsWith(".block")) {
+          try {
+            long blockId = Long.parseLong(fileName.substring(0, fileName.lastIndexOf(".block")));
+            if (localIds.contains(blockId)) {
+              existingOnDisk.add(blockId);
+              if (existingOnDisk.size() == localIds.size()) {
+                break;
+              }
+            }
+          } catch (NumberFormatException e) {
+            LOG.error("Invalid long value in file name: " + fileName);
+          }
+        }
+      }
+    }
+    return existingOnDisk;
+  }
+
+  private Set<MissingBlock> findMissingBlocks(Set<Long> localIds, Set<Long> existingOnDB, Set<Long> existingOnDisk) {
+    Set<MissingBlock> missingBlocks = new HashSet<>();
+    for (Long localId : localIds) {
+      boolean onDB = existingOnDB.contains(localId);
+      boolean onDisk = existingOnDisk.contains(localId);
+      if (!onDB || !onDisk) {
+        MissingBlock missingBlock = MissingBlock.newBuilder()
+            .setLocalID(localId)
+            .setOnDB(onDB)
+            .setOnDisk(onDisk)
+            .build();
+        missingBlocks.add(missingBlock);
+      }
+    }
+    return missingBlocks;
+  }
+
+
+//  @Override
+//  public List<MissingBlock> headBlocks(Container container, Set<Long> blocks) throws IOException {
+//    Preconditions.checkNotNull(container, "container cannot be null");
+//    container.readLock();
+//    try {
+//      List<BlockData> result = null;
+//      KeyValueContainerData cData =
+//          (KeyValueContainerData) container.getContainerData();
+//      try (DBHandle db = BlockUtils.getDB(cData, config)) {
+//        result = new ArrayList<>();
+//        String startKey = (startLocalID == -1) ? cData.startKeyEmpty()
+//            : cData.getBlockKey(startLocalID);
+//        List<? extends Table.KeyValue<String, BlockData>> range =
+//            db.getStore().getBlockDataTable()
+//                .getSequentialRangeKVs(startKey, count,
+//                    cData.containerPrefix(), cData.getUnprefixedKeyFilter());
+//        for (Table.KeyValue<String, BlockData> entry : range) {
+//          result.add(entry.getValue());
+//        }
+//        return result;
+//      }
+//    } finally {
+//      container.readUnlock();
+//    }
+//  }
 
   /**
    * Shutdown KeyValueContainerManager.

@@ -29,6 +29,7 @@ import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.BlockData;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.HeadBlocksResponseProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ListBlockResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos;
@@ -93,6 +94,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.EnumSet;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -115,6 +117,7 @@ import static org.apache.hadoop.ozone.container.ContainerTestHelper.newWriteChun
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
@@ -243,6 +246,7 @@ public class TestContainerCommandsEC {
   }
 
   @Test
+  @SuppressWarnings("checkstyle:methodlength")
   public void testOrphanBlock() throws Exception {
     // Close all pipelines so we are guaranteed to get a new one
     closeAllPipelines(repConfig);
@@ -304,6 +308,13 @@ public class TestContainerCommandsEC {
     // a orphan block.
     long localID = classBucket.getKey(keyName)
         .getOzoneKeyLocations().get(0).getLocalID();
+    try (XceiverClientGrpc client = new XceiverClientGrpc(
+        createSingleNodePipeline(orphanPipeline, dn2, 1), cluster.getConf())) {
+      HeadBlocksResponseProto missingBlock = ContainerProtocolCalls.headBlocks(
+          client, orphanContainerID, new HashSet<>(Arrays.asList(localID)), orphanContainerToken);
+      assertEquals(0, missingBlock.getMissingBlockCount());
+      assertEquals(orphanContainerID, missingBlock.getContainerID());
+    }
 
     // Create a delete command for the block and sent it.
     DeleteBlocksCommand deleteBlocksCommand =
@@ -336,6 +347,13 @@ public class TestContainerCommandsEC {
           throw new RuntimeException(e);
         }
       }, 500, 30000);
+      HeadBlocksResponseProto missingBlock = ContainerProtocolCalls.headBlocks(
+          client, orphanContainerID, new HashSet<>(Arrays.asList(localID)), orphanContainerToken);
+      assertEquals(orphanContainerID, missingBlock.getContainerID());
+      assertEquals(1, missingBlock.getMissingBlockList().size());
+      assertEquals(localID, missingBlock.getMissingBlock(0).getLocalID());
+      assertFalse(missingBlock.getMissingBlock(0).getOnDB());
+      assertFalse(missingBlock.getMissingBlock(0).getOnDisk());
     }
 
     // Create a reconstruction command to create a new copy of indexes 4 and 5

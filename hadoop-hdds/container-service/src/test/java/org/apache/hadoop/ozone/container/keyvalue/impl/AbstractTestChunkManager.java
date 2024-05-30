@@ -61,6 +61,7 @@ public abstract class AbstractTestChunkManager {
   private ChunkInfo chunkInfo;
   private ByteBuffer data;
   private byte[] header;
+  private byte[] body;
   private BlockManager blockManager;
 
   protected abstract ContainerLayoutTestInfo getStrategy();
@@ -100,15 +101,15 @@ public abstract class AbstractTestChunkManager {
         UUID.randomUUID().toString());
 
     header = "my header".getBytes(UTF_8);
-    byte[] bytes = "testing write chunks".getBytes(UTF_8);
-    data = ByteBuffer.allocate(header.length + bytes.length)
-        .put(header).put(bytes);
+    body = "testing write chunks".getBytes(UTF_8);
+    data = ByteBuffer.allocate(header.length + body.length)
+        .put(header).put(body);
     rewindBufferToDataStart();
 
     // Creating BlockData
     blockID = new BlockID(1L, 1L);
     chunkInfo = new ChunkInfo(String.format("%d.data.%d", blockID
-        .getLocalID(), 0), 0, bytes.length);
+        .getLocalID(), 0), 0, body.length);
   }
 
   protected Buffer rewindBufferToDataStart() {
@@ -166,5 +167,9 @@ public abstract class AbstractTestChunkManager {
 
   protected BlockManager getBlockManager() {
     return blockManager;
+  }
+
+  public byte[] getBody() {
+    return body.clone();
   }
 }
