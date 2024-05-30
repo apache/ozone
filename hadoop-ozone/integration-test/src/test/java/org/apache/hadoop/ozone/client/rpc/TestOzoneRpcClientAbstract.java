@@ -259,26 +259,11 @@ public abstract class TestOzoneRpcClientAbstract {
     }
   }
 
-  public static void setCluster(MiniOzoneCluster cluster) {
-    TestOzoneRpcClientAbstract.cluster = cluster;
-  }
-
-  public static void setOzClient(OzoneClient ozClient) {
+  private static void setOzClient(OzoneClient ozClient) {
     TestOzoneRpcClientAbstract.ozClient = ozClient;
   }
 
-  public static void setOzoneManager(OzoneManager ozoneManager) {
-    TestOzoneRpcClientAbstract.ozoneManager = ozoneManager;
-  }
-
-  public static void setStorageContainerLocationClient(
-      StorageContainerLocationProtocolClientSideTranslatorPB
-          storageContainerLocationClient) {
-    TestOzoneRpcClientAbstract.storageContainerLocationClient =
-        storageContainerLocationClient;
-  }
-
-  public static void setStore(ObjectStore store) {
+  private static void setStore(ObjectStore store) {
     TestOzoneRpcClientAbstract.store = store;
   }
 
