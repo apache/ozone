@@ -225,8 +225,8 @@ public class StorageContainerServiceProviderImpl
               }
             }
           }
-        } catch (Exception exception) {
-          LOG.error("Unexpected runtime error while downloading SCM Rocks DB snapshot/checkpoint : {}", exception);
+        } catch (Throwable throwable) {
+          LOG.error("Unexpected runtime error while downloading SCM Rocks DB snapshot/checkpoint : {}", throwable);
           throw exception;
         }
       }
