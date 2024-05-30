@@ -31,12 +31,7 @@ import org.junit.jupiter.api.BeforeAll;
  * Test Ozone Client with OM Ratis enabled.
  */
 class TestOzoneRpcClientWithRatis extends OzoneRpcClientTests {
-  /**
-   * Create a MiniOzoneCluster for testing.
-   * Ozone is made active by setting OZONE_ENABLED = true.
-   * Ozone OM Ratis server is made active by setting
-   * OZONE_OM_RATIS_ENABLE = true;
-   */
+
   @BeforeAll
   public static void init() throws Exception {
     OzoneConfiguration conf = new OzoneConfiguration();
@@ -52,9 +47,6 @@ class TestOzoneRpcClientWithRatis extends OzoneRpcClientTests {
     startCluster(conf);
   }
 
-  /**
-   * Close OzoneClient and shutdown MiniOzoneCluster.
-   */
   @AfterAll
   public static void shutdown() throws IOException {
     shutdownCluster();

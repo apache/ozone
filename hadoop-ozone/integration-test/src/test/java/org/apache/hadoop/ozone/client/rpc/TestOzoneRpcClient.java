@@ -35,13 +35,6 @@ import org.junit.jupiter.api.Timeout;
 @Timeout(300)
 class TestOzoneRpcClient extends OzoneRpcClientTests {
 
-  /**
-   * Create a MiniOzoneCluster for testing.
-   * <p>
-   * Ozone is made active by setting OZONE_ENABLED = true
-   *
-   * @throws IOException
-   */
   @BeforeAll
   public static void init() throws Exception {
     OzoneConfiguration conf = new OzoneConfiguration();
@@ -53,9 +46,6 @@ class TestOzoneRpcClient extends OzoneRpcClientTests {
     startCluster(conf);
   }
 
-  /**
-   * Close OzoneClient and shutdown MiniOzoneCluster.
-   */
   @AfterAll
   public static void shutdown() throws IOException {
     shutdownCluster();

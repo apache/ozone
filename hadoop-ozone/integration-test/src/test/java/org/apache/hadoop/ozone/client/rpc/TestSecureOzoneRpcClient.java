@@ -78,13 +78,6 @@ import static org.junit.jupiter.api.Assertions.assertNull;
  */
 class TestSecureOzoneRpcClient extends OzoneRpcClientTests {
 
-  /**
-   * Create a MiniOzoneCluster for testing.
-   * <p>
-   * Ozone is made active by setting OZONE_ENABLED = true
-   *
-   * @throws IOException
-   */
   @BeforeAll
   public static void init() throws Exception {
     File testDir = GenericTestUtils.getTestDir(

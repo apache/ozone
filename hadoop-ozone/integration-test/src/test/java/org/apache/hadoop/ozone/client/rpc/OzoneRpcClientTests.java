@@ -225,7 +225,6 @@ abstract class OzoneRpcClientTests {
   /**
    * Create a MiniOzoneCluster for testing.
    * @param conf Configurations to start the cluster.
-   * @throws Exception
    */
   static void startCluster(OzoneConfiguration conf) throws Exception {
     startCluster(conf, MiniOzoneCluster.newBuilder(conf));
