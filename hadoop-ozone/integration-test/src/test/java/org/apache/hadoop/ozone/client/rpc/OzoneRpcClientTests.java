@@ -1278,8 +1278,6 @@ abstract class OzoneRpcClientTests {
     String volumeName = UUID.randomUUID().toString();
     String bucketName = UUID.randomUUID().toString();
     String keyName = UUID.randomUUID().toString();
-    long blockSize = (long) ozoneManager.getConfiguration().getStorageSize(
-        OZONE_SCM_BLOCK_SIZE, OZONE_SCM_BLOCK_SIZE_DEFAULT, StorageUnit.BYTES);
 
     store.createVolume(volumeName);
     OzoneVolume volume = store.getVolume(volumeName);
@@ -1731,7 +1729,7 @@ abstract class OzoneRpcClientTests {
     thread1.start();
     thread2.start();
 
-    latch.await(600, TimeUnit.SECONDS);
+    assertTrue(latch.await(600, TimeUnit.SECONDS));
 
     assertThat(failCount.get())
         .withFailMessage("testPutKeyRatisThreeNodesParallel failed")
@@ -1883,6 +1881,7 @@ abstract class OzoneRpcClientTests {
         break;
       }
     }
+    assertNotNull(datanodeService);
     KeyValueContainerData containerData =
         (KeyValueContainerData)(datanodeService.getDatanodeStateMachine()
             .getContainer().getContainerSet().getContainer(containerID)
@@ -2177,35 +2176,24 @@ abstract class OzoneRpcClientTests {
     OzoneBucket bucket = volume.getBucket(bucketName);
     createTestKey(bucket, fromKeyName, value);
     BucketLayout bucketLayout = bucket.getBucketLayout();
-    OMException oe = null;
-    String toKeyName = "";
 
     if (!bucketLayout.isFileSystemOptimized()) {
       // Rename to an empty string should fail only in non FSO buckets
-      try {
-        bucket.renameKey(fromKeyName, toKeyName);
-      } catch (OMException e) {
-        oe = e;
-      }
+      OMException oe = assertThrows(OMException.class, () -> bucket.renameKey(fromKeyName, ""));
       assertEquals(ResultCodes.INVALID_KEY_NAME, oe.getResult());
     } else {
       // Rename to an empty key in FSO should be okay, as we are handling the
       // empty dest key on the server side and the source key name will be used
-      bucket.renameKey(fromKeyName, toKeyName);
+      bucket.renameKey(fromKeyName, "");
       OzoneKey emptyRenameKey = bucket.getKey(fromKeyName);
       assertEquals(fromKeyName, emptyRenameKey.getName());
     }
 
-    toKeyName = UUID.randomUUID().toString();
+    String toKeyName = UUID.randomUUID().toString();
     bucket.renameKey(fromKeyName, toKeyName);
 
     // Lookup for old key should fail.
-    try {
-      bucket.getKey(fromKeyName);
-    } catch (OMException e) {
-      oe = e;
-    }
-    assertEquals(KEY_NOT_FOUND, oe.getResult());
+    assertKeyRenamedEx(bucket, fromKeyName);
 
     OzoneKey key = bucket.getKey(toKeyName);
     assertEquals(toKeyName, key.getName());
@@ -3288,11 +3276,7 @@ abstract class OzoneRpcClientTests {
 
     Map<Integer, String> partsMap = new LinkedHashMap<>();
     partsMap.put(1, omMultipartCommitUploadPartInfo.getETag());
-    OmMultipartUploadCompleteInfo omMultipartUploadCompleteInfo =
-        bucket.completeMultipartUpload(keyName,
-        uploadID, partsMap);
-
-    assertNotNull(omMultipartCommitUploadPartInfo);
+    completeMultipartUpload(bucket, keyName, uploadID, partsMap);
 
     byte[] fileContent = new byte[data.length];
     try (OzoneInputStream inputStream = bucket.readKey(keyName)) {
@@ -3983,14 +3967,8 @@ abstract class OzoneRpcClientTests {
     assertEquals(keyName, key.getName());
   }
 
-  private void assertKeyRenamedEx(OzoneBucket bucket, String keyName)
-      throws Exception {
-    OMException oe = null;
-    try {
-      bucket.getKey(keyName);
-    } catch (OMException e) {
-      oe = e;
-    }
+  private void assertKeyRenamedEx(OzoneBucket bucket, String keyName) {
+    OMException oe = assertThrows(OMException.class, () -> bucket.getKey(keyName));
     assertEquals(KEY_NOT_FOUND, oe.getResult());
   }
 
