@@ -24,6 +24,10 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.Callable;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.function.Function;
 import java.util.function.Supplier;
@@ -66,7 +70,7 @@ import org.slf4j.LoggerFactory;
  * that first container succeeded but later ones failed, the succeeded writes
  * are not rolled back.
  *
- * TODO : currently not support multi-thread access.
+ * Thread-safe.
  */
 public class KeyOutputStream extends OutputStream
     implements Syncable, KeyMetadataAware {
@@ -97,6 +101,30 @@ public class KeyOutputStream extends OutputStream
 
   private long clientID;
   private StreamBufferArgs streamBufferArgs;
+
+  private CompletableFuture<Void> combinedFuture = CompletableFuture.completedFuture(null);
+
+  /**
+   * Combine with all previous futures (does not wait for them to complete inside this method).
+   */
+  private synchronized CompletableFuture<Void> combineFuture(Callable<CompletableFuture<Void>> callableFuture) {
+    this.combinedFuture = this.combinedFuture.thenCompose(dummy -> {
+      try {
+        return callableFuture.call();
+      } catch (Exception e) {
+        LOG.error("Exception caught but ignored in this POC");
+        throw new CompletionException(e);
+      }
+    });
+    return combinedFuture;
+  }
+
+  private synchronized CompletableFuture<Void> combine(CompletableFuture<Void> future) {
+    if (future == null) {
+      return combinedFuture;
+    }
+    return combineFuture(() -> future);
+  }
 
   /**
    * Indicates if an atomic write is required. When set to true,
@@ -168,12 +196,13 @@ public class KeyOutputStream extends OutputStream
    * @param version the set of blocks that are pre-allocated.
    * @param openVersion the version corresponding to the pre-allocation.
    */
+  // TODO: Remove synchronized
   public synchronized void addPreallocateBlocks(OmKeyLocationInfoGroup version, long openVersion) {
     blockOutputStreamEntryPool.addPreallocateBlocks(version, openVersion);
   }
 
   @Override
-  public synchronized void write(int b) throws IOException {
+  public void write(int b) throws IOException {
     byte[] buf = new byte[1];
     buf[0] = (byte) b;
     write(buf, 0, 1);
@@ -192,7 +221,7 @@ public class KeyOutputStream extends OutputStream
    * @throws IOException
    */
   @Override
-  public synchronized void write(byte[] b, int off, int len)
+  public void write(byte[] b, int off, int len)
       throws IOException {
     checkNotClosed();
     if (b == null) {
@@ -205,12 +234,33 @@ public class KeyOutputStream extends OutputStream
     if (len == 0) {
       return;
     }
-    handleWrite(b, off, len, false);
-    writeOffset += len;
+
+
+    synchronized (this) {
+      // Was considering Supplier<CompletableFuture<Void>> but exception catching is a mess
+      handleWrite(b, off, len, false);
+      writeOffset += len;
+    }
+
+    try {
+      LOG.warn("--- write(byte[], int, int) calling future.get(), thread = {}", Thread.currentThread().getId());
+      final CompletableFuture<Void> future;
+      // make findbugs happy
+      synchronized (this) {
+        future = combinedFuture;
+      }
+      // ideally this should wait up to the point the current write is done
+      future.get();
+    } catch (InterruptedException | ExecutionException e) {
+      // TODO: Handle this properly
+      LOG.error("Exception caught but ignored in this POC", e);
+    }
+    LOG.warn("--- write(byte[], int, int) finished, thread = {}", Thread.currentThread().getId());
   }
 
-  private void handleWrite(byte[] b, int off, long len, boolean retry)
+  private CompletableFuture<Void> handleWrite(byte[] b, int off, long len, boolean retry)
       throws IOException {
+    CompletableFuture<Void> future = null;
     while (len > 0) {
       try {
         BlockOutputStreamEntry current =
@@ -224,12 +274,18 @@ public class KeyOutputStream extends OutputStream
         // writeLen will be updated based on whether the write was succeeded
         // or if it sees an exception, how much the actual write was
         // acknowledged.
+
+        // TODO: Remove debug print
+//        LOG.debug("writeToOutputStream(current = {}, retry = {}, len = {}, b = {}, " +
+//            "expectedWriteLen = {}, off = {}, currentPos = {})",
+//            current, retry, len, b, expectedWriteLen, off, currentPos);
+
         int writtenLength =
                 writeToOutputStream(current, retry, len, b, expectedWriteLen,
                 off, currentPos);
         if (current.getRemaining() <= 0) {
           // since the current block is already written close the stream.
-          handleFlushOrClose(StreamAction.FULL);
+          future = combine(handleFlushOrClose(StreamAction.FULL));
         }
         len -= writtenLength;
         off += writtenLength;
@@ -238,6 +294,7 @@ public class KeyOutputStream extends OutputStream
         throw new IOException(e);
       }
     }
+    return future;
   }
 
   private int writeToOutputStream(BlockOutputStreamEntry current,
@@ -352,7 +409,13 @@ public class KeyOutputStream extends OutputStream
     if (bufferedDataLen > 0) {
       // If the data is still cached in the underlying stream, we need to
       // allocate new block and write this data in the datanode.
-      handleRetry(exception, bufferedDataLen);
+      try {
+        handleRetry(exception, bufferedDataLen);
+        // equivalent to flush here? thus wait for the future to complete?
+        combinedFuture.get();
+      } catch (InterruptedException | ExecutionException e) {
+        LOG.error("Exception caught but ignored in this POC", e);
+      }
       // reset the retryCount after handling the exception
       retryCount = 0;
     }
@@ -363,7 +426,7 @@ public class KeyOutputStream extends OutputStream
     closed = true;
   }
 
-  private void handleRetry(IOException exception, long len) throws IOException {
+  private CompletableFuture<Void> handleRetry(IOException exception, long len) throws IOException {
     RetryPolicy retryPolicy = retryPolicyMap
         .get(HddsClientUtils.checkForException(exception).getClass());
     if (retryPolicy == null) {
@@ -407,7 +470,7 @@ public class KeyOutputStream extends OutputStream
       LOG.trace("Retrying Write request. Already tried {} time(s); " +
           "retry policy is {} ", retryCount, retryPolicy);
     }
-    handleWrite(null, 0, len, true);
+    return handleWrite(null, 0, len, true);
   }
 
   private void setExceptionAndThrow(IOException ioe) throws IOException {
@@ -432,9 +495,17 @@ public class KeyOutputStream extends OutputStream
   }
 
   @Override
-  public synchronized void flush() throws IOException {
+  public void flush() throws IOException {
     checkNotClosed();
-    handleFlushOrClose(StreamAction.FLUSH);
+    try {
+      CompletableFuture<Void> future = handleFlushOrClose(StreamAction.FLUSH);
+      combine(future);
+      combinedFuture.get();
+    } catch (InterruptedException | ExecutionException e) {
+      // TODO: Handle this properly
+      LOG.error("Exception caught but ignored in this POC", e);
+      throw new IOException(e);
+    }
   }
 
   @Override
@@ -443,7 +514,7 @@ public class KeyOutputStream extends OutputStream
   }
 
   @Override
-  public synchronized void hsync() throws IOException {
+  public void hsync() throws IOException {  // De-synchronized
     if (replication.getReplicationType() != ReplicationType.RATIS) {
       throw new UnsupportedOperationException(
           "Replication type is not " + ReplicationType.RATIS);
@@ -453,8 +524,27 @@ public class KeyOutputStream extends OutputStream
           + replication.getRequiredNodes() + " <= 1");
     }
     checkNotClosed();
-    final long hsyncPos = writeOffset;
-    handleFlushOrClose(StreamAction.HSYNC);
+    final long hsyncPos;
+
+    CompletableFuture<Void> future = null;
+    synchronized (this) {
+      hsyncPos = writeOffset;
+      future = combine(handleFlushOrClose(StreamAction.HSYNC));
+    }
+
+    if (future != null) {  // TODO: Can remove this null check later
+      try {
+        future.get();
+      } catch (ExecutionException e) {
+//        handleExecutionException(e);
+        LOG.error("ExecutionException caught but ignored in this POC", e);
+      } catch (InterruptedException ex) {
+        Thread.currentThread().interrupt();
+//        handleInterruptedException(ex, true);
+        LOG.error("InterruptedException caught but ignored in this POC", ex);
+      }
+    }
+
     Preconditions.checkState(offset >= hsyncPos,
         "offset = %s < hsyncPos = %s", offset, hsyncPos);
     blockOutputStreamEntryPool.hsyncKey(hsyncPos);
@@ -476,7 +566,9 @@ public class KeyOutputStream extends OutputStream
    * @throws IOException In case, flush or close fails with exception.
    */
   @SuppressWarnings("squid:S1141")
-  private void handleFlushOrClose(StreamAction op) throws IOException {
+  private CompletableFuture<Void> handleFlushOrClose(StreamAction op) throws IOException {
+    LOG.warn("!!! handleFlushOrClose(op = {})", op);
+    CompletableFuture<Void> future = null;
     if (!blockOutputStreamEntryPool.isEmpty()) {
       while (true) {
         try {
@@ -484,23 +576,39 @@ public class KeyOutputStream extends OutputStream
               blockOutputStreamEntryPool.getCurrentStreamEntry();
           if (entry != null) {
             try {
-              handleStreamAction(entry, op);
-            } catch (IOException ioe) {
-              handleException(entry, ioe);
-              continue;
+              future = handleStreamAction(entry, op);
+
+              // TODO: Revisit this workaround. This is a workaround as only HSYNC is returning a future, for now
+              if (op == StreamAction.CLOSE || op == StreamAction.FULL || op == StreamAction.FLUSH) {
+                if (future != null) {
+                  future.get();
+                } else {
+                  LOG.debug("null future from op {}", op);
+                }
+              }
+              // for op == StreamAction.HSYNC, don't wait for the future to complete
+//            } catch (IOException ioe) {
+//              handleException(entry, ioe);
+//              continue;
+            } catch (ExecutionException | InterruptedException e) {
+              // TODO: Handle this properly, or remove when the workaround is no longer needed
+              // TODO: Can change handleException() instead. unwrap ExecutionException to get the cause
+              LOG.error("Exception caught but ignored in this POC", e);
             }
           }
-          return;
+          return future;
         } catch (Exception e) {
           markStreamClosed();
           throw e;
         }
       }
     }
+    return future;
   }
 
-  private void handleStreamAction(BlockOutputStreamEntry entry,
-                                  StreamAction op) throws IOException {
+  private CompletableFuture<Void> handleStreamAction(
+      BlockOutputStreamEntry entry,
+      StreamAction op) throws IOException {
     Collection<DatanodeDetails> failedServers = entry.getFailedServers();
     // failed servers can be null in case there is no data written in
     // the stream
@@ -508,24 +616,29 @@ public class KeyOutputStream extends OutputStream
       blockOutputStreamEntryPool.getExcludeList().addDatanodes(
           failedServers);
     }
+    CompletableFuture<Void> future = null;
     switch (op) {
     case CLOSE:
       entry.close();
+      // TODO: Revisit this
       break;
     case FULL:
       if (entry.getRemaining() == 0) {
         entry.close();
+        // TODO: Revisit this
       }
       break;
     case FLUSH:
       entry.flush();
+      // TODO: Revisit this
       break;
     case HSYNC:
-      entry.hsync();
+      future = entry.hsync();
       break;
     default:
       throw new IOException("Invalid Operation");
     }
+    return future;
   }
 
   /**
@@ -534,13 +647,20 @@ public class KeyOutputStream extends OutputStream
    * @throws IOException
    */
   @Override
-  public synchronized void close() throws IOException {
+  public void close() throws IOException {
     if (closed) {
       return;
     }
-    closed = true;
     try {
-      handleFlushOrClose(StreamAction.CLOSE);
+      combinedFuture.get();
+      closed = true;
+      CompletableFuture<Void> future = null;
+      synchronized (this) {
+        future = combine(handleFlushOrClose(StreamAction.CLOSE));
+      }
+      if (future != null) {
+        future.get();
+      }
       if (!isException) {
         Preconditions.checkArgument(writeOffset == offset);
       }
@@ -551,6 +671,13 @@ public class KeyOutputStream extends OutputStream
                 expectedSize, offset));
       }
       blockOutputStreamEntryPool.commitKey(offset);
+      // Wait for all futures to complete
+    } catch (ExecutionException e) {
+      // TODO: Handle this properly
+      LOG.error("ExecutionException caught but ignored in this POC", e);
+    } catch (InterruptedException e) {
+      // TODO: Handle this properly
+      LOG.error("InterruptedException caught but ignored in this POC", e);
     } finally {
       blockOutputStreamEntryPool.cleanup();
     }

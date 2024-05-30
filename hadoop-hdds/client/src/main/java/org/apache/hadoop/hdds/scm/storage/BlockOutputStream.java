@@ -92,15 +92,15 @@ public class BlockOutputStream extends OutputStream {
   public static final KeyValue FULL_CHUNK_KV =
       KeyValue.newBuilder().setKey(FULL_CHUNK).build();
 
-  private AtomicReference<BlockID> blockID;
+  private final AtomicReference<BlockID> blockID;
   private final AtomicReference<ChunkInfo> previousChunkInfo
       = new AtomicReference<>();
 
   private final BlockData.Builder containerBlockData;
   private XceiverClientFactory xceiverClientFactory;
-  private XceiverClientSpi xceiverClient;
-  private OzoneClientConfig config;
-  private StreamBufferArgs streamBufferArgs;
+  private volatile XceiverClientSpi xceiverClient;
+  private final OzoneClientConfig config;
+  private final StreamBufferArgs streamBufferArgs;
 
   private int chunkIndex;
   private final AtomicLong chunkOffset = new AtomicLong();
@@ -130,7 +130,7 @@ public class BlockOutputStream extends OutputStream {
   private final Checksum checksum;
 
   //number of buffers used before doing a flush/putBlock.
-  private int flushPeriod;
+  private final int flushPeriod;
   //bytes remaining to write in the current buffer.
   private int currentBufferRemaining;
   //current buffer allocated to write
@@ -141,10 +141,10 @@ public class BlockOutputStream extends OutputStream {
   private long lastChunkOffset;
   private final Token<? extends TokenIdentifier> token;
   private final String tokenString;
-  private int replicationIndex;
-  private Pipeline pipeline;
+  private final int replicationIndex;
+  private final Pipeline pipeline;
   private final ContainerClientMetrics clientMetrics;
-  private boolean allowPutBlockPiggybacking;
+  private final boolean allowPutBlockPiggybacking;
 
   /**
    * Creates a new BlockOutputStream.
@@ -233,7 +233,7 @@ public class BlockOutputStream extends OutputStream {
     return true;
   }
 
-  void refreshCurrentBuffer() {
+  private synchronized void refreshCurrentBuffer() {
     currentBuffer = bufferPool.getCurrentBuffer();
     currentBufferRemaining =
         currentBuffer != null ? currentBuffer.remaining() : 0;
@@ -292,13 +292,25 @@ public class BlockOutputStream extends OutputStream {
 
   @Override
   public void write(int b) throws IOException {
-    checkOpen();
-    allocateNewBufferIfNeeded();
-    currentBuffer.put((byte) b);
-    currentBufferRemaining--;
-    writeChunkIfNeeded();
-    writtenDataLength++;
-    doFlushOrWatchIfNeeded();
+    CompletableFuture<Void> future;
+    synchronized (this) {
+      checkOpen();
+      allocateNewBufferIfNeeded();
+      currentBuffer.put((byte) b);
+      currentBufferRemaining--;
+      writeChunkIfNeeded();
+      writtenDataLength++;
+      future = doFlushOrWatchIfNeeded();
+    }
+    if (future != null) {
+      try {
+        future.get();
+      } catch (InterruptedException e) {
+        throw new RuntimeException(e);
+      } catch (ExecutionException e) {
+        throw new RuntimeException(e);
+      }
+    }
   }
 
   private void writeChunkIfNeeded() throws IOException {
@@ -321,16 +333,28 @@ public class BlockOutputStream extends OutputStream {
       return;
     }
 
+    CompletableFuture<Void> future;
     while (len > 0) {
-      allocateNewBufferIfNeeded();
-      final int writeLen = Math.min(currentBufferRemaining, len);
-      currentBuffer.put(b, off, writeLen);
-      currentBufferRemaining -= writeLen;
-      writeChunkIfNeeded();
-      off += writeLen;
-      len -= writeLen;
-      updateWrittenDataLength(writeLen);
-      doFlushOrWatchIfNeeded();
+      synchronized (this) {
+        allocateNewBufferIfNeeded();
+        final int writeLen = Math.min(currentBufferRemaining, len);
+        currentBuffer.put(b, off, writeLen);
+        currentBufferRemaining -= writeLen;
+        writeChunkIfNeeded();
+        off += writeLen;
+        len -= writeLen;
+        updateWrittenDataLength(writeLen);
+        future = doFlushOrWatchIfNeeded();
+      }
+      if (future != null) {
+        try {
+          future.get();
+        } catch (InterruptedException e) {
+          throw new RuntimeException(e);
+        } catch (ExecutionException e) {
+          throw new RuntimeException(e);
+        }
+      }
     }
   }
 
@@ -338,7 +362,8 @@ public class BlockOutputStream extends OutputStream {
     writtenDataLength += writeLen;
   }
 
-  private void doFlushOrWatchIfNeeded() throws IOException {
+  private synchronized CompletableFuture<Void> doFlushOrWatchIfNeeded() throws IOException {
+  //private void doFlushOrWatchIfNeeded() throws IOException {
     if (currentBufferRemaining == 0) {
       if (bufferPool.getNumberOfUsedBuffers() % flushPeriod == 0) {
         updateFlushLength();
@@ -346,16 +371,28 @@ public class BlockOutputStream extends OutputStream {
       }
       // Data in the bufferPool can not exceed streamBufferMaxSize
       if (bufferPool.getNumberOfUsedBuffers() == bufferPool.getCapacity()) {
-        handleFullBuffer();
+        //handleFullBuffer();
+        return waitForFlushAndCommit(true, null);
       }
+    }
+
+    return null;
+  }
+
+  private synchronized void allocateNewBufferIfNeeded() {
+    if (currentBufferRemaining == 0) {
+      allocateNewBuffer();
     }
   }
 
-  private void allocateNewBufferIfNeeded() {
-    if (currentBufferRemaining == 0) {
-      currentBuffer = bufferPool.allocateBuffer(config.getBufferIncrement());
-      currentBufferRemaining = currentBuffer.remaining();
-    }
+  /**
+   * Unconditionally allocate a new buffer as currentBuffer.
+   * Resets currentBufferRemaining.
+   */
+  private void allocateNewBuffer() {
+    LOG.warn("@@@@@@@ calling allocateBuffer(increment = {})", config.getBufferIncrement());
+    currentBuffer = bufferPool.allocateBuffer(config.getBufferIncrement());
+    currentBufferRemaining = currentBuffer.remaining();
   }
 
   private void updateFlushLength() {
@@ -412,23 +449,40 @@ public class BlockOutputStream extends OutputStream {
    * @throws IOException
    */
   private void handleFullBuffer() throws IOException {
-    waitForFlushAndCommit(true);
-  }
-
-  void waitForFlushAndCommit(boolean bufferFull) throws IOException {
     try {
-      checkOpen();
-      waitOnFlushFutures();
-    } catch (ExecutionException e) {
-      handleExecutionException(e);
-    } catch (InterruptedException ex) {
-      Thread.currentThread().interrupt();
-      handleInterruptedException(ex, true);
+      waitForFlushAndCommit(true, null).get();
+    } catch (InterruptedException | ExecutionException e) {
+      // TODO: Handle exception
+      LOG.error("Exception caught but ignored in this POC", e);
     }
-    watchForCommit(bufferFull);
   }
 
-  void releaseBuffersOnException() {
+  synchronized CompletableFuture<Void> waitForFlushAndCommit(
+      boolean bufferFull, CompletableFuture<Void> future) throws IOException {
+    checkOpen();
+    if (future == null) {
+      future = waitOnFlushFutures();
+    } else {
+      future = future.thenCompose(r -> waitOnFlushFutures());
+    }
+
+    // ExecutionException and InterruptedException are no longer handled at this level
+    // since the future is being returned all the way up to KeyOutputStream
+
+    return future.thenApplyAsync(r -> {
+      try {
+        // TODO: HDDS-10108 could remove this call
+        watchForCommit(bufferFull);
+      } catch (IOException e) {
+        // TODO: Handle exception
+        LOG.error("IOException caught but ignored in this POC", e);
+        throw new CompletionException(e);
+      }
+      return r;
+    }, getResponseExecutor());
+  }
+
+  synchronized void releaseBuffersOnException() {
   }
 
   // It may happen that once the exception is encountered , we still might
@@ -553,7 +607,12 @@ public class BlockOutputStream extends OutputStream {
         && (!streamBufferArgs.isStreamBufferFlushDelay() ||
             writtenDataLength - totalDataFlushedLength
                 >= streamBufferArgs.getStreamBufferSize())) {
-      handleFlush(false);
+      try {
+        handleFlush(false).get();
+      } catch (InterruptedException | ExecutionException e) {
+        // TODO: Handle exception
+        LOG.error("InterruptedException or ExecutionException caught but ignored in this POC", e);
+      }
     }
   }
 
@@ -573,21 +632,26 @@ public class BlockOutputStream extends OutputStream {
   private void writeChunk(ChunkBuffer buffer)
       throws IOException {
     writeChunkCommon(buffer);
-    writeChunkToContainer(buffer.duplicate(0, buffer.position()), false);
+    final ChunkBuffer dupBuffer = buffer.duplicate(0, buffer.position());
+    LOG.warn("@@@@@@ writeChunk(buffer = {}): dupBuffer = {}", buffer, dupBuffer);
+    writeChunkToContainer(dupBuffer, false);
   }
 
   private void writeChunkAndPutBlock(ChunkBuffer buffer)
       throws IOException {
     writeChunkCommon(buffer);
-    writeChunkToContainer(buffer.duplicate(0, buffer.position()), true);
+    final ChunkBuffer dupBuffer = buffer.duplicate(0, buffer.position());
+    LOG.warn("@@@@@@ writeChunkAndPutBlock(buffer = {}): dupBuffer = {}", buffer, dupBuffer);
+    writeChunkToContainer(dupBuffer, true);
   }
 
   /**
    * @param close whether the flush is happening as part of closing the stream
    */
-  protected void handleFlush(boolean close) throws IOException {
+  protected synchronized CompletableFuture<Void> handleFlush(boolean close) throws IOException {
+    CompletableFuture<Void> future = null;
     try {
-      handleFlushInternal(close);
+      future = handleFlushInternal(close);
     } catch (ExecutionException e) {
       handleExecutionException(e);
     } catch (InterruptedException ex) {
@@ -602,52 +666,76 @@ public class BlockOutputStream extends OutputStream {
         cleanup(false);
       }
     }
+    return future;
   }
 
-  private void handleFlushInternal(boolean close)
+  private synchronized CompletableFuture<Void> handleFlushInternal(boolean close)
       throws IOException, InterruptedException, ExecutionException {
+    LOG.warn("handleFlushInternal(close = {})", close);
     checkOpen();
     // flush the last chunk data residing on the currentBuffer
-    if (totalDataFlushedLength < writtenDataLength) {
-      refreshCurrentBuffer();
-      Preconditions.checkArgument(currentBuffer.position() > 0);
+    synchronized (this) {
+      if (totalDataFlushedLength < writtenDataLength) {
+        refreshCurrentBuffer();
+        Preconditions.checkArgument(currentBuffer.position() > 0);
 
-      // This can be a partially filled chunk. Since we are flushing the buffer
-      // here, we just limit this buffer to the current position. So that next
-      // write will happen in new buffer
-      if (currentBuffer.hasRemaining()) {
-        if (allowPutBlockPiggybacking) {
-          updateFlushLength();
-          writeChunkAndPutBlock(currentBuffer);
+        // This can be a partially filled chunk. Since we are flushing the buffer
+        // here, we just limit this buffer to the current position. So that next
+        // write will happen in new buffer
+        if (currentBuffer.hasRemaining()) {
+          if (allowPutBlockPiggybacking) {
+            updateFlushLength();
+            writeChunkAndPutBlock(currentBuffer);
+          } else {
+            writeChunk(currentBuffer);
+            updateFlushLength();
+            executePutBlock(close, false);
+          }
+          // Unconditionally allocate a new buffer as currentBuffer.
+          // This is done to avoid buffer race between write() and hsync().
+          allocateNewBuffer();
+          // Note this can lead to waste of unused space in the buffer, increasing client (direct buffer) memory usage.
+          // TODO: Is there any trick to reuse the currentBuffer without major refactoring, even in this case?
         } else {
-          writeChunk(currentBuffer);
           updateFlushLength();
           executePutBlock(close, false);
         }
-      } else {
-        updateFlushLength();
-        executePutBlock(close, false);
+      } else if (close) {
+        // forcing an "empty" putBlock if stream is being closed without new
+        // data since latest flush - we need to send the "EOF" flag
+        executePutBlock(true, true);
       }
-    } else if (close) {
-      // forcing an "empty" putBlock if stream is being closed without new
-      // data since latest flush - we need to send the "EOF" flag
-      executePutBlock(true, true);
     }
-    waitOnFlushFutures();
-    watchForCommit(false);
-    // just check again if the exception is hit while waiting for the
-    // futures to ensure flush has indeed succeeded
 
-    // irrespective of whether the commitIndex2flushedDataMap is empty
-    // or not, ensure there is no exception set
-    checkOpen();
+    final CompletableFuture<Void> d = waitOnFlushFutures();
+    return d.thenApplyAsync(r -> {
+      try {
+        watchForCommit(false);
+        // just check again if the exception is hit while waiting for the
+        // futures to ensure flush has indeed succeeded
+
+        // irrespective of whether the commitIndex2flushedDataMap is empty
+        // or not, ensure there is no exception set
+        checkOpen();
+      } catch (IOException e) {
+        // TODO: Handle exception
+        LOG.error("IOException caught but ignored in this POC", e);
+        throw new CompletionException(e);
+      }
+      return r;
+    }, getResponseExecutor());
   }
 
   @Override
   public void close() throws IOException {
     if (xceiverClientFactory != null && xceiverClient != null) {
       if (bufferPool != null && bufferPool.getSize() > 0) {
-        handleFlush(true);
+        try {
+          handleFlush(true).get();
+        } catch (InterruptedException | ExecutionException e) {
+          // TODO: Handle exception
+          LOG.error("InterruptedException or ExecutionException caught but ignored in this POC", e);
+        }
         // TODO: Turn the below buffer empty check on when Standalone pipeline
         // is removed in the write path in tests
         // Preconditions.checkArgument(buffer.position() == 0);
@@ -658,7 +746,9 @@ public class BlockOutputStream extends OutputStream {
     }
   }
 
-  void waitOnFlushFutures() throws InterruptedException, ExecutionException {
+  // TODO: Should rename this to getFlushFutures
+  synchronized CompletableFuture<Void> waitOnFlushFutures() {
+    return null;
   }
 
   void validateResponse(
@@ -1031,6 +1121,7 @@ public class BlockOutputStream extends OutputStream {
    * handle ExecutionException else skip it.
    * @throws IOException
    */
+  // TODO: Move this to separate class StreamUtil.
   void handleInterruptedException(Exception ex,
       boolean processExecutionException)
       throws IOException {
@@ -1047,6 +1138,7 @@ public class BlockOutputStream extends OutputStream {
    * @param ex
    * @throws IOException
    */
+  // TODO: Move this to separate class StreamUtil.
   private void handleExecutionException(Exception ex) throws IOException {
     setIoException(ex);
     adjustBuffersOnException();

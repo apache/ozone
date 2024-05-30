@@ -104,10 +104,11 @@ class TestBufferPool {
       Deque<ChunkBuffer> buffers) {
     final int capacity = pool.getCapacity();
     for (int i = 0; i < 3 * capacity; i++) {
-      if (capacity > 1) {
-        assertThrows(IllegalStateException.class,
-            () -> pool.releaseBuffer(buffers.getLast()));
-      }
+      // Now that we allow out-of-order buffer release, this is no longer valid
+//      if (capacity > 1) {
+//        assertThrows(IllegalStateException.class,
+//            () -> pool.releaseBuffer(buffers.getLast()));
+//      }
 
       final ChunkBuffer released = buffers.removeFirst();
       pool.releaseBuffer(released);
@@ -129,8 +130,9 @@ class TestBufferPool {
       final ChunkBuffer released = buffers.removeFirst();
       pool.releaseBuffer(released);
       assertEquals(i, pool.getNumberOfUsedBuffers());
-      assertThrows(IllegalStateException.class,
-          () -> pool.releaseBuffer(released));
+      // Now that we allow out-of-order buffer release, this is no longer valid
+//      assertThrows(IllegalStateException.class,
+//          () -> pool.releaseBuffer(released));
     }
 
     pool.checkBufferPoolEmpty();

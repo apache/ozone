@@ -33,7 +33,6 @@ import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
-import java.util.concurrent.ExecutionException;
 
 /**
  * This class executes watchForCommit on ratis pipeline and releases
@@ -53,7 +52,7 @@ class CommitWatcher extends AbstractCommitWatcher<ChunkBuffer> {
   }
 
   @Override
-  void releaseBuffers(long index) {
+  synchronized void releaseBuffers(long index) {
     long acked = 0;
     for (ChunkBuffer buffer : remove(index)) {
       acked += buffer.position();
@@ -70,25 +69,25 @@ class CommitWatcher extends AbstractCommitWatcher<ChunkBuffer> {
   }
 
   @VisibleForTesting
-  ConcurrentMap<Long, CompletableFuture<ContainerCommandResponseProto>> getFutureMap() {
+  synchronized ConcurrentMap<Long, CompletableFuture<ContainerCommandResponseProto>> getFutureMap() {
     return futureMap;
   }
 
-  public void putFlushFuture(long flushPos, CompletableFuture<ContainerCommandResponseProto> flushFuture) {
+  public synchronized void putFlushFuture(long flushPos, CompletableFuture<ContainerCommandResponseProto> flushFuture) {
     futureMap.compute(flushPos,
         (key, previous) -> previous == null ? flushFuture :
             previous.thenCombine(flushFuture, (prev, curr) -> curr));
   }
 
 
-  public void waitOnFlushFutures() throws InterruptedException, ExecutionException {
-    // wait for all the transactions to complete
-    CompletableFuture.allOf(futureMap.values().toArray(
-        new CompletableFuture[0])).get();
+  public synchronized CompletableFuture<Void> waitOnFlushFutures() {
+    // return future directly, do not wait here
+    return CompletableFuture.allOf(futureMap.values().toArray(
+        new CompletableFuture[0]));  // TODO: Do we need to remove the CompletableFuture.allOf()
   }
 
   @Override
-  public void cleanup() {
+  public synchronized void cleanup() {
     super.cleanup();
     futureMap.clear();
   }

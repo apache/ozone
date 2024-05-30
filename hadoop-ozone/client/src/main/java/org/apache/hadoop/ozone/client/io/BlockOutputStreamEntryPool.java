@@ -337,11 +337,7 @@ public class BlockOutputStreamEntryPool implements KeyMetadataAware {
 
   void hsyncKey(long offset) throws IOException {
     if (keyArgs != null) {
-      // in test, this could be null
-      long length = getKeyLength();
-      Preconditions.checkArgument(offset == length,
-              "Expected offset: " + offset + " expected len: " + length);
-      keyArgs.setDataSize(length);
+      keyArgs.setDataSize(offset);
       keyArgs.setLocationInfoList(getLocationInfoList());
       // When the key is multipart upload part file upload, we should not
       // commit the key, as this is not an actual key, this is a just a

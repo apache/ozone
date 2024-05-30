@@ -28,6 +28,8 @@ import org.apache.hadoop.ozone.common.ChunkBuffer;
 
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 import org.apache.ratis.util.Preconditions;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import static java.util.Collections.emptyList;
 
@@ -35,6 +37,8 @@ import static java.util.Collections.emptyList;
  * This class creates and manages pool of n buffers.
  */
 public class BufferPool {
+
+  public static final Logger LOG = LoggerFactory.getLogger(BufferPool.class);
 
   private static final BufferPool EMPTY = new BufferPool(0, 0);
 
@@ -62,11 +66,11 @@ public class BufferPool {
     this.byteStringConversion = byteStringConversion;
   }
 
-  public Function<ByteBuffer, ByteString> byteStringConversion() {
+  public synchronized Function<ByteBuffer, ByteString> byteStringConversion() {
     return byteStringConversion;
   }
 
-  ChunkBuffer getCurrentBuffer() {
+  synchronized ChunkBuffer getCurrentBuffer() {
     return currentBufferIndex == -1 ? null : bufferList.get(currentBufferIndex);
   }
 
@@ -79,7 +83,7 @@ public class BufferPool {
    * less than the capacity to be allocated, just allocate a buffer of size
    * chunk size.
    */
-  public ChunkBuffer allocateBuffer(int increment) {
+  public synchronized ChunkBuffer allocateBuffer(int increment) {
     final int nextBufferIndex = currentBufferIndex + 1;
 
     Preconditions.assertTrue(nextBufferIndex < capacity, () ->
@@ -87,40 +91,65 @@ public class BufferPool {
 
     currentBufferIndex = nextBufferIndex;
 
+    LOG.warn("!! allocateBuffer(increment = {}): " +
+            "capacity = {}, currentBufferIndex = {}, nextBufferIndex = {}, bufferList.size() = {}",
+        increment,
+        capacity, currentBufferIndex, nextBufferIndex, bufferList.size());
+
     if (currentBufferIndex < bufferList.size()) {
       return getBuffer(currentBufferIndex);
     } else {
       final ChunkBuffer newBuffer = ChunkBuffer.allocate(bufferSize, increment);
+      LOG.warn("!! allocateBuffer(): ChunkBuffer allocated: {}", newBuffer);
       bufferList.add(newBuffer);
       return newBuffer;
     }
   }
 
-  void releaseBuffer(ChunkBuffer chunkBuffer) {
+  synchronized void releaseBuffer(ChunkBuffer chunkBuffer) {
+    LOG.warn("!! releaseBuffer(chunkBuffer = {}):" +
+            "currentBufferIndex = {}, bufferList.indexOf(chunkBuffer) = {}",
+        chunkBuffer,
+        currentBufferIndex, bufferList.indexOf(chunkBuffer));
+
     Preconditions.assertTrue(!bufferList.isEmpty(), "empty buffer list");
+//    if (bufferList.get(0) != chunkBuffer) {
+//      LOG.warn("only the first buffer can be released");
+//    }
     Preconditions.assertSame(bufferList.get(0), chunkBuffer,
         "only the first buffer can be released");
     Preconditions.assertTrue(currentBufferIndex >= 0,
         () -> "current buffer: " + currentBufferIndex);
 
     // always remove from head of the list and append at last
+//    boolean res = bufferList.remove(chunkBuffer);  // This does NOT work as intended
+//    int i;
+//    ChunkBuffer buffer = null;
+//    for (i = 0; i < bufferList.size(); i++) {
+//      // force comparison by object ID, overriding ByteBuffer's equals() method
+//      if (chunkBuffer == bufferList.get(i)) {
+//        buffer = bufferList.remove(i);
+//        break;
+//      }
+//    }
+//    Preconditions.assertSame(chunkBuffer, buffer, "Should be the same buffer");
     final ChunkBuffer buffer = bufferList.remove(0);
     buffer.clear();
     bufferList.add(buffer);
     currentBufferIndex--;
   }
 
-  public void clearBufferPool() {
+  public synchronized void clearBufferPool() {
     bufferList.forEach(ChunkBuffer::close);
     bufferList.clear();
     currentBufferIndex = -1;
   }
 
-  public void checkBufferPoolEmpty() {
+  public synchronized void checkBufferPoolEmpty() {
     Preconditions.assertSame(0, computeBufferData(), "total buffer size");
   }
 
-  public long computeBufferData() {
+  public synchronized long computeBufferData() {
     long totalBufferSize = 0;
     for (ChunkBuffer buf : bufferList) {
       totalBufferSize += buf.position();
@@ -128,27 +157,27 @@ public class BufferPool {
     return totalBufferSize;
   }
 
-  public int getSize() {
+  public synchronized int getSize() {
     return bufferList.size();
   }
 
-  public ChunkBuffer getBuffer(int index) {
+  public synchronized ChunkBuffer getBuffer(int index) {
     return bufferList.get(index);
   }
 
-  int getCurrentBufferIndex() {
+  synchronized int getCurrentBufferIndex() {
     return currentBufferIndex;
   }
 
-  public int getNumberOfUsedBuffers() {
+  public synchronized int getNumberOfUsedBuffers() {
     return currentBufferIndex + 1;
   }
 
-  public int getCapacity() {
+  public synchronized int getCapacity() {
     return capacity;
   }
 
-  public int getBufferSize() {
+  public synchronized int getBufferSize() {
     return bufferSize;
   }
 }
