@@ -423,6 +423,9 @@ public class ContainerStateMachine extends BaseStateMachine {
       return builder.build().setException(ioe);
     }
 
+    // once the token is verified, clear it from the proto
+    final ContainerCommandRequestProto.Builder protoBuilder = ContainerCommandRequestProto.newBuilder(proto)
+        .clearEncodedToken();
     boolean blockAlreadyFinalized = false;
     if (proto.getCmdType() == Type.PutBlock) {
       blockAlreadyFinalized = shouldRejectRequest(proto.getPutBlock().getBlockData().getBlockID());
@@ -430,29 +433,15 @@ public class ContainerStateMachine extends BaseStateMachine {
       final WriteChunkRequestProto write = proto.getWriteChunk();
       blockAlreadyFinalized = shouldRejectRequest(write.getBlockID());
       if (!blockAlreadyFinalized) {
-        // create the log entry proto
-        final WriteChunkRequestProto commitWriteChunkProto =
-            WriteChunkRequestProto.newBuilder(write)
-                // skipping the data field as it is
-                // already set in statemachine data proto
-                .clearData()
-                .build();
-        ContainerCommandRequestProto commitContainerCommandProto =
-            ContainerCommandRequestProto
-                .newBuilder(proto)
-                .setPipelineID(gid.getUuid().toString())
-                .setWriteChunk(commitWriteChunkProto)
-                .setTraceID(proto.getTraceID())
-                .build();
         Preconditions.checkArgument(write.hasData());
         Preconditions.checkArgument(!write.getData().isEmpty());
+        final WriteChunkRequestProto.Builder commitWriteChunkProto = WriteChunkRequestProto.newBuilder(write)
+            .clearData();
+        protoBuilder.setWriteChunk(commitWriteChunkProto)
+            .setPipelineID(gid.getUuid().toString())
+            .setTraceID(proto.getTraceID());
 
-        final Context context = new Context(proto, commitContainerCommandProto);
-        return builder
-            .setStateMachineContext(context)
-            .setStateMachineData(write.getData())
-            .setLogData(commitContainerCommandProto.toByteString())
-            .build();
+        builder.setStateMachineData(write.getData());
       }
     } else if (proto.getCmdType() == Type.FinalizeBlock) {
       containerController.addFinalizedBlock(proto.getContainerID(),
@@ -465,10 +454,9 @@ public class ContainerStateMachine extends BaseStateMachine {
           ContainerProtos.Result.BLOCK_ALREADY_FINALIZED));
       return transactionContext;
     } else {
-      final Context context = new Context(proto, proto);
-      return builder
-          .setStateMachineContext(context)
-          .setLogData(proto.toByteString())
+      final ContainerCommandRequestProto containerCommandRequestProto = protoBuilder.build();
+      return builder.setStateMachineContext(new Context(proto, containerCommandRequestProto))
+          .setLogData(containerCommandRequestProto.toByteString())
           .build();
     }
   }
