@@ -30,10 +30,10 @@ import org.junit.jupiter.api.Timeout;
 
 
 /**
- * This class is to test all the public facing APIs of Ozone Client.
+ * Test Ozone Client with OM Ratis disabled.
  */
 @Timeout(300)
-public class TestOzoneRpcClient extends TestOzoneRpcClientAbstract {
+class TestOzoneRpcClient extends OzoneRpcClientTests {
 
   /**
    * Create a MiniOzoneCluster for testing.

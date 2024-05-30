@@ -28,10 +28,9 @@ import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 
 /**
- * This class is to test all the public facing APIs of Ozone Client with an
- * active OM Ratis server.
+ * Test Ozone Client with OM Ratis enabled.
  */
-public class TestOzoneRpcClientWithRatis extends TestOzoneRpcClientAbstract {
+class TestOzoneRpcClientWithRatis extends OzoneRpcClientTests {
   /**
    * Create a MiniOzoneCluster for testing.
    * Ozone is made active by setting OZONE_ENABLED = true.

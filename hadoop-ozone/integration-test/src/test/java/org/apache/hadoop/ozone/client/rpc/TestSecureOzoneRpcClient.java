@@ -74,9 +74,9 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 
 /**
- * This class is to test all the public facing APIs of Ozone Client.
+ * Test Ozone Client with block tokens enabled.
  */
-public class TestSecureOzoneRpcClient extends TestOzoneRpcClientAbstract {
+class TestSecureOzoneRpcClient extends OzoneRpcClientTests {
 
   /**
    * Create a MiniOzoneCluster for testing.

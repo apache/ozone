@@ -194,13 +194,10 @@ import org.junit.jupiter.params.provider.MethodSource;
 
 /**
  * This is an abstract class to test all the public facing APIs of Ozone
- * Client, w/o OM Ratis server.
- * {@link TestOzoneRpcClient} tests the Ozone Client by submitting the
- * requests directly to OzoneManager. {@link TestOzoneRpcClientWithRatis}
- * tests the Ozone Client by submitting requests to OM's Ratis server.
+ * Client.
  */
 @TestMethodOrder(MethodOrderer.MethodName.class)
-public abstract class TestOzoneRpcClientAbstract {
+abstract class OzoneRpcClientTests {
 
   private static MiniOzoneCluster cluster = null;
   private static OzoneClient ozClient = null;
@@ -273,23 +270,23 @@ public abstract class TestOzoneRpcClientAbstract {
   }
 
   private static void setOzClient(OzoneClient ozClient) {
-    TestOzoneRpcClientAbstract.ozClient = ozClient;
+    OzoneRpcClientTests.ozClient = ozClient;
   }
 
   private static void setStore(ObjectStore store) {
-    TestOzoneRpcClientAbstract.store = store;
+    OzoneRpcClientTests.store = store;
   }
 
   public static ObjectStore getStore() {
-    return TestOzoneRpcClientAbstract.store;
+    return store;
   }
 
   public static OzoneClient getClient() {
-    return TestOzoneRpcClientAbstract.ozClient;
+    return ozClient;
   }
 
   public static MiniOzoneCluster getCluster() {
-    return TestOzoneRpcClientAbstract.cluster;
+    return cluster;
   }
   /**
    * Test OM Proxy Provider.
