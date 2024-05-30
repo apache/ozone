@@ -218,6 +218,10 @@ public abstract class TestOzoneRpcClientAbstract {
    * @throws Exception
    */
   static void startCluster(OzoneConfiguration conf) throws Exception {
+    startCluster(conf, MiniOzoneCluster.newBuilder(conf));
+  }
+
+  static void startCluster(OzoneConfiguration conf, MiniOzoneCluster.Builder builder) throws Exception {
     // Reduce long wait time in MiniOzoneClusterImpl#waitForHddsDatanodesStop
     //  for testZReadKeyWithUnhealthyContainerReplica.
     conf.set("ozone.scm.stale.node.interval", "10s");
@@ -227,7 +231,7 @@ public abstract class TestOzoneRpcClientAbstract {
         .setDataStreamMinPacketSize(1)
         .applyTo(conf);
 
-    cluster = MiniOzoneCluster.newBuilder(conf)
+    cluster = builder
         .setNumDatanodes(14)
         .build();
     cluster.waitForClusterToBeReady();
@@ -1007,7 +1011,7 @@ public abstract class TestOzoneRpcClientAbstract {
     store.deleteVolume(volumeName);
   }
 
-  private void verifyReplication(String volumeName, String bucketName,
+  protected void verifyReplication(String volumeName, String bucketName,
       String keyName, ReplicationConfig replication)
       throws IOException {
     OmKeyArgs keyArgs = new OmKeyArgs.Builder()
