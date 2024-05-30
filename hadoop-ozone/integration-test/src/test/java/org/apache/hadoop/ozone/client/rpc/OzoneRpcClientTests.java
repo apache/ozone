@@ -4348,7 +4348,6 @@ abstract class OzoneRpcClientTests {
   }
 
   @Test
-  @Flaky("HDDS-9967")
   public void testListSnapshot() throws IOException {
     String volumeA = "vol-a-" + RandomStringUtils.randomNumeric(5);
     String volumeB = "vol-b-" + RandomStringUtils.randomNumeric(5);
@@ -4385,11 +4384,10 @@ abstract class OzoneRpcClientTests {
           snapshotPrefixB + i + "-" + RandomStringUtils.randomNumeric(5));
     }
 
-    Iterator<? extends OzoneSnapshot> snapshotIter =
-        store.listSnapshot(volumeA, bucketA, null, null);
+    Iterator<OzoneSnapshot> snapshotIter = store.listSnapshot(volumeA, bucketA, null, null);
     int volABucketASnapshotCount = 0;
     while (snapshotIter.hasNext()) {
-      OzoneSnapshot snapshot = snapshotIter.next();
+      snapshotIter.next();
       volABucketASnapshotCount++;
     }
     assertEquals(20, volABucketASnapshotCount);
@@ -4397,26 +4395,26 @@ abstract class OzoneRpcClientTests {
     snapshotIter = store.listSnapshot(volumeA, bucketB, null, null);
     int volABucketBSnapshotCount = 0;
     while (snapshotIter.hasNext()) {
-      OzoneSnapshot snapshot = snapshotIter.next();
+      snapshotIter.next();
       volABucketBSnapshotCount++;
     }
-    assertEquals(20, volABucketASnapshotCount);
+    assertEquals(20, volABucketBSnapshotCount);
 
     snapshotIter = store.listSnapshot(volumeB, bucketA, null, null);
     int volBBucketASnapshotCount = 0;
     while (snapshotIter.hasNext()) {
-      OzoneSnapshot snapshot = snapshotIter.next();
+      snapshotIter.next();
       volBBucketASnapshotCount++;
     }
-    assertEquals(20, volABucketASnapshotCount);
+    assertEquals(20, volBBucketASnapshotCount);
 
     snapshotIter = store.listSnapshot(volumeB, bucketB, null, null);
     int volBBucketBSnapshotCount = 0;
     while (snapshotIter.hasNext()) {
-      OzoneSnapshot snapshot = snapshotIter.next();
+      snapshotIter.next();
       volBBucketBSnapshotCount++;
     }
-    assertEquals(20, volABucketASnapshotCount);
+    assertEquals(20, volBBucketBSnapshotCount);
 
     int volABucketASnapshotACount = 0;
     snapshotIter = store.listSnapshot(volumeA, bucketA, snapshotPrefixA, null);
