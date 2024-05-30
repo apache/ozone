@@ -233,8 +233,8 @@ public class SCMStateMachine extends BaseStateMachine {
     String leaderAddress = roleInfoProto.getFollowerInfo()
         .getLeaderInfo().getId().getAddress();
     Optional<SCMNodeDetails> leaderDetails =
-        scm.getSCMHANodeDetails().getPeerNodeDetails().stream().filter(
-            p -> p.getRatisHostPortStr().equals(leaderAddress))
+        scm.getSCMHANodeDetails().getPeerNodeDetails().stream()
+            .filter(p -> p.getRatisHostPortStr().equals(leaderAddress))
             .findFirst();
     Preconditions.checkState(leaderDetails.isPresent());
     final String leaderNodeId = leaderDetails.get().getNodeId();
