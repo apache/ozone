@@ -54,7 +54,7 @@ public class ListSnapshotHandler extends Handler {
     String volumeName = snapshotPath.getValue().getVolumeName();
     String bucketName = snapshotPath.getValue().getBucketName();
 
-    Iterator<? extends OzoneSnapshot> snapshotInfos = client.getObjectStore()
+    Iterator<OzoneSnapshot> snapshotInfos = client.getObjectStore()
         .listSnapshot(volumeName, bucketName, listOptions.getPrefix(),
             listOptions.getStartItem());
     int counter = printAsJsonArray(snapshotInfos, listOptions.getLimit());
