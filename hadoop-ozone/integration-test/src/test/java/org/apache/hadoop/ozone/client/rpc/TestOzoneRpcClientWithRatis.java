@@ -32,7 +32,6 @@ import org.junit.jupiter.api.BeforeAll;
  * active OM Ratis server.
  */
 public class TestOzoneRpcClientWithRatis extends TestOzoneRpcClientAbstract {
-  private static OzoneConfiguration conf;
   /**
    * Create a MiniOzoneCluster for testing.
    * Ozone is made active by setting OZONE_ENABLED = true.
@@ -41,7 +40,7 @@ public class TestOzoneRpcClientWithRatis extends TestOzoneRpcClientAbstract {
    */
   @BeforeAll
   public static void init() throws Exception {
-    conf = new OzoneConfiguration();
+    OzoneConfiguration conf = new OzoneConfiguration();
     conf.setInt(ScmConfigKeys.OZONE_SCM_PIPELINE_OWNER_CONTAINER_COUNT, 1);
     conf.setBoolean(ScmConfigKeys.OZONE_SCM_PIPELINE_AUTO_CREATE_FACTOR_ONE,
         false);
