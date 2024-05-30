@@ -460,7 +460,8 @@ public class BucketEndpoint extends EndpointBase {
           if (!request.isQuiet() && (!(undeletedKeyResultMap.containsKey(d.getKey())) ||
               undeletedKeyResultMap.get(d.getKey()).equals("Key not found"))) {
             result.addDeleted(new DeletedObject(d.getKey()));
-          } else {
+          } else if (undeletedKeyResultMap.containsKey(d.getKey()) &&
+              !undeletedKeyResultMap.get(d.getKey()).equals("Key not found")) {
             String error = undeletedKeyResultMap.get(d.getKey());
             result.addError(new Error(d.getKey(), error, error));
           }

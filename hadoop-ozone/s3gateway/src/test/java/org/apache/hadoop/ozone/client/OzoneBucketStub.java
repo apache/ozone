@@ -359,6 +359,18 @@ public final class OzoneBucketStub extends OzoneBucket {
   }
 
   @Override
+  public Map<String, String> deleteKeysQuiet(List<String> keyList, Boolean isQuiet) throws IOException {
+    Map<String, String> keyErrorMap = new HashMap<>();
+    for (String key : keyList) {
+      if (!keyDetails.containsKey(key)) {
+        keyErrorMap.put(key, "Key not found");
+      }
+      keyDetails.remove(key);
+    }
+    return keyErrorMap;
+  }
+
+  @Override
   public void renameKey(String fromKeyName, String toKeyName)
       throws IOException {
     throw new UnsupportedOperationException();
