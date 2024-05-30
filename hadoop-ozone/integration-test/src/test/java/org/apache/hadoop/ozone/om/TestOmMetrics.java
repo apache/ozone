@@ -341,6 +341,9 @@ public class TestOmMetrics {
     long initialNumTrashKeyLists = getLongCounter("NumTrashKeyLists", omMetrics);
     long initialNumKeys = getLongCounter("NumKeys", omMetrics);
     long initialNumInitiateMultipartUploads = getLongCounter("NumInitiateMultipartUploads", omMetrics);
+    long initialNumGetObjectTagging = getLongCounter("NumGetObjectTagging", omMetrics);
+    long initialNumPutObjectTagging = getLongCounter("NumPutObjectTagging", omMetrics);
+    long initialNumDeleteObjectTagging = getLongCounter("NumDeleteObjectTagging", omMetrics);
 
     long initialEcKeyCreateTotal = getLongCounter("EcKeyCreateTotal", omMetrics);
     long initialNumKeyAllocateFails = getLongCounter("NumKeyAllocateFails", omMetrics);
@@ -351,6 +354,9 @@ public class TestOmMetrics {
     long initialNumBlockAllocationFails = getLongCounter("NumBlockAllocationFails", omMetrics);
     long initialNumKeyListFails = getLongCounter("NumKeyListFails", omMetrics);
     long initialEcKeyCreateFailsTotal = getLongCounter("EcKeyCreateFailsTotal", omMetrics);
+    long initialNumGetObjectTaggingFails = getLongCounter("NumGetObjectTaggingFails", omMetrics);
+    long initialNumPutObjectTaggingFails = getLongCounter("NumPutObjectTaggingFails", omMetrics);
+    long initialNumDeleteObjectTaggingFails = getLongCounter("NumDeleteObjectTaggingFails", omMetrics);
 
     // see HDDS-10078 for making this work with FILE_SYSTEM_OPTIMIZED layout
     TestDataUtil.createVolumeAndBucket(client, volumeName, bucketName, BucketLayout.LEGACY);
@@ -360,7 +366,7 @@ public class TestOmMetrics {
 
     omMetrics = getMetrics("OMMetrics");
 
-    assertEquals(initialNumKeyOps + 7, getLongCounter("NumKeyOps", omMetrics));
+    assertEquals(initialNumKeyOps + 10, getLongCounter("NumKeyOps", omMetrics));
     assertEquals(initialNumKeyAllocate + 1, getLongCounter("NumKeyAllocate", omMetrics));
     assertEquals(initialNumKeyLookup + 1, getLongCounter("NumKeyLookup", omMetrics));
     assertEquals(initialNumKeyDeletes + 1, getLongCounter("NumKeyDeletes", omMetrics));
@@ -368,6 +374,9 @@ public class TestOmMetrics {
     assertEquals(initialNumTrashKeyLists + 1, getLongCounter("NumTrashKeyLists", omMetrics));
     assertEquals(initialNumKeys, getLongCounter("NumKeys", omMetrics));
     assertEquals(initialNumInitiateMultipartUploads + 1, getLongCounter("NumInitiateMultipartUploads", omMetrics));
+    assertEquals(initialNumGetObjectTagging + 1, getLongCounter("NumGetObjectTagging", omMetrics));
+    assertEquals(initialNumPutObjectTagging + 1, getLongCounter("NumPutObjectTagging", omMetrics));
+    assertEquals(initialNumDeleteObjectTagging + 1, getLongCounter("NumDeleteObjectTagging", omMetrics));
 
     keyArgs = createKeyArgs(volumeName, bucketName,
         new ECReplicationConfig("rs-3-2-1024K"));
@@ -411,6 +420,7 @@ public class TestOmMetrics {
         any(), any(), any(), any(), anyInt());
     doThrow(exception).when(mockKm).listTrash(
         any(), any(), any(), any(), anyInt());
+    doThrow(exception).when(mockKm).getObjectTagging(any(), any());
     OmMetadataReader omMetadataReader =
         (OmMetadataReader) ozoneManager.getOmMetadataReader().get();
     HddsWhiteboxTestUtils.setInternalState(
@@ -442,6 +452,9 @@ public class TestOmMetrics {
     assertEquals(initialNumInitiateMultipartUploadFails + 1, getLongCounter(
         "NumInitiateMultipartUploadFails", omMetrics));
     assertEquals(initialNumKeys + 2, getLongCounter("NumKeys", omMetrics));
+    assertEquals(initialNumGetObjectTaggingFails + 1,  getLongCounter("NumGetObjectTaggingFails", omMetrics));
+    assertEquals(initialNumPutObjectTaggingFails + 1, getLongCounter("NumPutObjectTaggingFails", omMetrics));
+    assertEquals(initialNumDeleteObjectTaggingFails + 1, getLongCounter("NumDeleteObjectTaggingFails", omMetrics));
 
     keyArgs = createKeyArgs(volumeName, bucketName,
         new ECReplicationConfig("rs-3-2-1024K"));
@@ -856,6 +869,21 @@ public class TestOmMetrics {
 
     try {
       writeClient.initiateMultipartUpload(keyArgs);
+    } catch (IOException ignored) {
+    }
+
+    try {
+      writeClient.putObjectTagging(keyArgs);
+    } catch (IOException ignored) {
+    }
+
+    try {
+      writeClient.getObjectTagging(keyArgs);
+    } catch (IOException ignored) {
+    }
+
+    try {
+      writeClient.deleteObjectTagging(keyArgs);
     } catch (IOException ignored) {
     }
   }

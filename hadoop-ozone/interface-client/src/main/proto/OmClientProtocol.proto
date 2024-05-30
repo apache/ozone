@@ -147,6 +147,10 @@ enum Type {
   ListStatusLight = 129;
   GetSnapshotInfo = 130;
   RenameSnapshot = 131;
+
+  PutObjectTagging = 132;
+  GetObjectTagging = 133;
+  DeleteObjectTagging = 134;
 }
 
 enum SafeMode {
@@ -283,6 +287,10 @@ message OMRequest {
   optional SetSnapshotPropertyRequest       SetSnapshotPropertyRequest     = 127;
   optional SnapshotInfoRequest              SnapshotInfoRequest            = 128;
   optional RenameSnapshotRequest            RenameSnapshotRequest          = 129;
+
+  optional GetObjectTaggingRequest          getObjectTaggingRequest        = 130;
+  optional PutObjectTaggingRequest          putObjectTaggingRequest        = 131;
+  optional DeleteObjectTaggingRequest       deleteObjectTaggingRequest     = 132;
 }
 
 message OMResponse {
@@ -406,6 +414,10 @@ message OMResponse {
   optional SnapshotInfoResponse              SnapshotInfoResponse          = 130;
   optional OMLockDetailsProto                omLockDetails                 = 131;
   optional RenameSnapshotResponse            RenameSnapshotResponse        = 132;
+
+  optional GetObjectTaggingResponse          getObjectTaggingResponse      = 133;
+  optional PutObjectTaggingResponse          putObjectTaggingResponse      = 134;
+  optional DeleteObjectTaggingResponse       deleteObjectTaggingResponse   = 135;
 }
 
 enum Status {
@@ -2136,6 +2148,28 @@ message OMLockDetailsProto {
   optional uint64 waitLockNanos    = 2;
   optional uint64 readLockNanos    = 3;
   optional uint64 writeLockNanos   = 4;
+}
+
+message PutObjectTaggingRequest {
+  required KeyArgs keyArgs = 1;
+}
+
+message PutObjectTaggingResponse {
+}
+
+message GetObjectTaggingRequest {
+  required KeyArgs keyArgs = 1;
+}
+
+message GetObjectTaggingResponse {
+  repeated hadoop.hdds.KeyValue tags = 1;
+}
+
+message DeleteObjectTaggingRequest {
+  required KeyArgs keyArgs = 1;
+}
+
+message DeleteObjectTaggingResponse {
 }
 
 /**

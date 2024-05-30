@@ -1013,6 +1013,37 @@ public class OzoneBucket extends WithMetadata {
     proxy.setTimes(ozoneObj, keyName, mtime, atime);
   }
 
+  /**
+   * Gets the tags for an existing key.
+   * @param keyName Key name.
+   * @return Tags for the specified key.
+   * @throws IOException
+   */
+  public Map<String, String> getObjectTagging(String keyName)
+      throws IOException {
+    return proxy.getObjectTagging(volumeName, name, keyName);
+  }
+
+  /**
+   * Sets the tags to an existing key.
+   * @param keyName Key name.
+   * @param tags Tags to set on the key.
+   * @throws IOException
+   */
+  public void putObjectTagging(String keyName, Map<String, String> tags)
+      throws IOException {
+    proxy.putObjectTagging(volumeName, name, keyName, tags);
+  }
+
+  /**
+   * Removes all the tags from an existing key.
+   * @param keyName Key name
+   * @throws IOException
+   */
+  public void deleteObjectTagging(String keyName) throws IOException {
+    proxy.deleteObjectTagging(volumeName, name, keyName);
+  }
+
   public void setSourcePathExist(boolean b) {
     this.sourcePathExist = b;
   }

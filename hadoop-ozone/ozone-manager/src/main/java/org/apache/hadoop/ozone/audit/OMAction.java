@@ -103,7 +103,11 @@ public enum OMAction implements AuditAction {
   SNAPSHOT_INFO,
   SET_TIMES,
 
-  ABORT_EXPIRED_MULTIPART_UPLOAD;
+  ABORT_EXPIRED_MULTIPART_UPLOAD,
+
+  GET_OBJECT_TAGGING,
+  PUT_OBJECT_TAGGING,
+  DELETE_OBJECT_TAGGING;
 
   @Override
   public String getAction() {
