@@ -76,10 +76,6 @@ public class ContainerBalancerSelectionCriteria {
     this.setMap = new HashMap<>();
   }
 
-  public Set<ContainerID> getSelectedContainers() {
-    return containerToSourceMap.keySet();
-  }
-
   /**
    * Checks whether container is currently undergoing replication or deletion.
    *
@@ -182,7 +178,7 @@ public class ContainerBalancerSelectionCriteria {
       return true;
     }
     return excludeContainers.contains(containerID) || excludeContainersDueToFailure.contains(containerID) ||
-        getSelectedContainers().contains(containerID) ||
+        containerToSourceMap.containsKey(containerID) ||
         !isContainerClosed(container, node) || isECContainerAndLegacyRMEnabled(container) ||
         isContainerReplicatingOrDeleting(containerID) ||
         !findSourceStrategy.canSizeLeaveSource(node, container.getUsedBytes())
@@ -261,10 +257,7 @@ public class ContainerBalancerSelectionCriteria {
       if (excludeContainersDueToFailure != null) {
         idSet.removeAll(excludeContainersDueToFailure);
       }
-      Set<ContainerID> selectedContainers = getSelectedContainers();
-      if (selectedContainers != null) {
-        idSet.removeAll(selectedContainers);
-      }
+      idSet.removeAll(containerToSourceMap.keySet());
       newSet.addAll(idSet);
       return newSet;
     } catch (NodeNotFoundException e) {
