@@ -240,12 +240,18 @@ public class OMDBInsightSearchEndpoint {
 
   /**
    * Converts a key prefix into an object path for FSO buckets, using IDs.
-   * <p>
+   *
    * This method transforms a user-provided path (e.g., "volume/bucket/dir1") into
    * a database-friendly format ("/volumeID/bucketID/ParentId/") by replacing names
    * with their corresponding IDs. It simplifies database queries for FSO bucket operations.
    *
-   * @param prevKeyPrefix The path to be converted, not including key or directory names/IDs.
+   * Examples:
+   * - Input: "volume/bucket/key" -> Output: "/volumeID/bucketID/parentDirID/key"
+   * - Input: "volume/bucket/dir1" -> Output: "/volumeID/bucketID/dir1ID/"
+   * - Input: "volume/bucket/dir1/key1" -> Output: "/volumeID/bucketID/dir1ID/key1"
+   * - Input: "volume/bucket/dir1/dir2" -> Output: "/volumeID/bucketID/dir2ID/"
+   *
+   * @param prevKeyPrefix The path to be converted.
    * @return The object path as "/volumeID/bucketID/ParentId/" or an empty string if an error occurs.
    * @throws IOException If database access fails.
    */

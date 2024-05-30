@@ -439,6 +439,12 @@ public class TestOMDBInsightSearchEndpoint extends AbstractReconSqlDBTest {
     String entity = (String) response.getEntity();
     assertTrue(entity.contains("Invalid startPrefix: Path must be at the bucket level or deeper"),
         "Expected a message indicating the path must be at the bucket level or deeper");
+
+    response = omdbInsightSearchEndpoint.searchOpenKeys("///", 20, "");
+    assertEquals(Response.Status.BAD_REQUEST.getStatusCode(), response.getStatus());
+    entity = (String) response.getEntity();
+    assertTrue(entity.contains("Invalid startPrefix: Path must be at the bucket level or deeper"),
+        "Expected a message indicating the path must be at the bucket level or deeper");
   }
 
   @Test
