@@ -86,7 +86,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 /**
  * This class is to test all the public facing APIs of Ozone Client.
  */
-public class TestSecureOzoneRpcClient extends TestOzoneRpcClient {
+public class TestSecureOzoneRpcClient extends TestOzoneRpcClientAbstract {
 
   private static MiniOzoneCluster cluster = null;
   private static OzoneClient ozClient = null;
