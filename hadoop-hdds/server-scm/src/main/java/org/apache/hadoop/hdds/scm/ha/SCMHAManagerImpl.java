@@ -96,9 +96,7 @@ public class SCMHAManagerImpl implements SCMHAManager {
       this.transactionBuffer = new SCMHADBTransactionBufferImpl(scm);
       this.ratisServer = new SCMRatisServerImpl(conf, scm,
           (SCMHADBTransactionBuffer) transactionBuffer);
-      this.scmSnapshotProvider = new SCMSnapshotProvider(conf,
-          scm.getSCMHANodeDetails().getPeerNodeDetails(),
-          scm.getScmCertificateClient());
+      this.scmSnapshotProvider = newScmSnapshotProvider(scm);
       grpcServer = new InterSCMGrpcProtocolService(conf, scm);
     } else {
       this.transactionBuffer = new SCMDBTransactionBufferImpl();
@@ -107,6 +105,13 @@ public class SCMHAManagerImpl implements SCMHAManager {
       this.ratisServer = null;
     }
 
+  }
+
+  @VisibleForTesting
+  protected SCMSnapshotProvider newScmSnapshotProvider(StorageContainerManager storageContainerManager) {
+    return new SCMSnapshotProvider(storageContainerManager.getConfiguration(),
+        storageContainerManager.getSCMHANodeDetails().getPeerNodeDetails(),
+        storageContainerManager.getScmCertificateClient());
   }
 
   /**
@@ -194,8 +199,10 @@ public class SCMHAManagerImpl implements SCMHAManager {
     }
 
     DBCheckpoint dBCheckpoint = getDBCheckpointFromLeader(leaderId);
-    LOG.info("Downloaded checkpoint from Leader {} to the location {}",
-        leaderId, dBCheckpoint.getCheckpointLocation());
+    if (dBCheckpoint != null) {
+      LOG.info("Downloaded checkpoint from Leader {} to the location {}",
+          leaderId, dBCheckpoint.getCheckpointLocation());
+    }
     return dBCheckpoint;
   }
 
@@ -262,7 +269,7 @@ public class SCMHAManagerImpl implements SCMHAManager {
 
     try {
       return scmSnapshotProvider.getSCMDBSnapshot(leaderId);
-    } catch (IOException e) {
+    } catch (Exception e) {
       LOG.error("Failed to download checkpoint from SCM leader {}", leaderId,
           e);
     }
