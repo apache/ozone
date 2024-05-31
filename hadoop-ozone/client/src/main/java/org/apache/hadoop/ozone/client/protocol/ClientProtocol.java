@@ -24,6 +24,7 @@ import java.util.List;
 import java.util.Map;
 
 import jakarta.annotation.Nonnull;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.crypto.key.KeyProvider;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
@@ -444,8 +445,8 @@ public interface ClientProtocol {
    * @param isQuiet flag to not throw exception if delete fails
    * @throws IOException
    */
-  Map<String, String> deleteKeysQuiet(String volumeName, String bucketName,
-                  List<String> keyNameList, Boolean isQuiet)
+  Map<String, Pair<String, String>> deleteKeysQuiet(String volumeName, String bucketName,
+                                                    List<String> keyNameList, Boolean isQuiet)
       throws IOException;
 
   /**

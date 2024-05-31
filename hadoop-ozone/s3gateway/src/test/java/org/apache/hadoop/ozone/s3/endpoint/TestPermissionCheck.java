@@ -19,6 +19,7 @@
  */
 package org.apache.hadoop.ozone.s3.endpoint;
 
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.client.ObjectStore;
@@ -168,8 +169,8 @@ public class TestPermissionCheck {
   public void testDeleteKeys() throws IOException, OS3Exception {
     when(objectStore.getVolume(anyString())).thenReturn(volume);
     when(objectStore.getS3Bucket(anyString())).thenReturn(bucket);
-    Map<String, String> deleteErrors = new HashMap<>();
-    deleteErrors.put("deleteKeyName", "Access denied");
+    Map<String, Pair<String, String>> deleteErrors = new HashMap<>();
+    deleteErrors.put("deleteKeyName", Pair.of("ACCESS_DENIED", "ACL check failed"));
     when(bucket.deleteKeysQuiet(any(), anyBoolean())).thenReturn(deleteErrors);
 
     BucketEndpoint bucketEndpoint = new BucketEndpoint();
@@ -183,7 +184,7 @@ public class TestPermissionCheck {
     MultiDeleteResponse response =
         bucketEndpoint.multiDelete("BucketName", "keyName", request);
     assertEquals(1, response.getErrors().size());
-    assertEquals("Access denied", response.getErrors().get(0).getCode());
+    assertEquals("ACCESS_DENIED", response.getErrors().get(0).getCode());
   }
 
   @Test

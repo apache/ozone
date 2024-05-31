@@ -38,6 +38,7 @@ import java.util.stream.Collectors;
 import javax.xml.bind.DatatypeConverter;
 import org.apache.commons.codec.digest.DigestUtils;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
@@ -359,11 +360,11 @@ public final class OzoneBucketStub extends OzoneBucket {
   }
 
   @Override
-  public Map<String, String> deleteKeysQuiet(List<String> keyList, Boolean isQuiet) throws IOException {
-    Map<String, String> keyErrorMap = new HashMap<>();
+  public Map<String, Pair<String, String>> deleteKeysQuiet(List<String> keyList, Boolean isQuiet) throws IOException {
+    Map<String, Pair<String, String>> keyErrorMap = new HashMap<>();
     for (String key : keyList) {
       if (!keyDetails.containsKey(key)) {
-        keyErrorMap.put(key, "Key not found");
+        keyErrorMap.put(key,Pair.of("KEY_NOT_FOUND", "Key does not exist"));
       }
       keyDetails.remove(key);
     }

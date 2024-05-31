@@ -20,6 +20,7 @@
 package org.apache.hadoop.ozone.client;
 
 import jakarta.annotation.Nonnull;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.crypto.key.KeyProvider;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
@@ -262,8 +263,9 @@ public class ClientProtocolStub implements ClientProtocol {
   }
 
   @Override
-  public Map<String, String> deleteKeysQuiet(String volumeName, String bucketName,
-                         List<String> keyNameList, Boolean isQuiet) throws IOException {
+  public Map<String, Pair<String, String>> deleteKeysQuiet(String volumeName, String bucketName,
+                                                           List<String> keyNameList, Boolean isQuiet)
+      throws IOException {
     return new HashMap<>();
   }
 

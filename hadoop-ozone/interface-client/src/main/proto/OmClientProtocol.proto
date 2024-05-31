@@ -1303,7 +1303,8 @@ message DeleteKeyArgs {
 
 message DeleteKeyErrors {
     required string key = 1;
-    required string error = 2;
+    required string errorCode = 2;
+    required string errorMsg = 3;
 }
 
 message DeleteKeysResponse {

@@ -681,7 +681,7 @@ public class OzoneBucket extends WithMetadata {
    * @param isQuiet flag to not throw exception if delete fails
    * @throws IOException
    */
-  public Map<String, String> deleteKeysQuiet(List<String> keyList, Boolean isQuiet) throws IOException {
+  public Map<String, Pair<String, String>> deleteKeysQuiet(List<String> keyList, Boolean isQuiet) throws IOException {
     return proxy.deleteKeysQuiet(volumeName, name, keyList, isQuiet);
   }
 

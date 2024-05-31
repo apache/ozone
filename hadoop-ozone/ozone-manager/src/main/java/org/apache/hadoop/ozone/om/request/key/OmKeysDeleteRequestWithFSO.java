@@ -17,6 +17,7 @@
  */
 package org.apache.hadoop.ozone.om.request.key;
 
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
@@ -148,13 +149,13 @@ public class OmKeysDeleteRequestWithFSO extends OMKeysDeleteRequest {
       List<OmKeyInfo> omKeyInfoList, List<OmKeyInfo> dirList,
       OzoneManagerProtocolProtos.OMResponse.Builder omResponse,
       OzoneManagerProtocolProtos.DeleteKeyArgs.Builder unDeletedKeys,
-      Map<String, String> keyToErrors,
+      Map<String, Pair<String, String>> keyToErrors,
       boolean deleteStatus, OmBucketInfo omBucketInfo, long volumeId, List<String> dbOpenKeys) {
     OMClientResponse omClientResponse;
     List<OzoneManagerProtocolProtos.DeleteKeyErrors> deleteKeyErrors = new ArrayList<>();
-    for (Map.Entry<String, String>  key : keyToErrors.entrySet()) {
+    for (Map.Entry<String, Pair<String, String>>  key : keyToErrors.entrySet()) {
       deleteKeyErrors.add(OzoneManagerProtocolProtos.DeleteKeyErrors.newBuilder()
-          .setKey(key.getKey()).setError(key.getValue()).build());
+          .setKey(key.getKey()).setErrorCode(key.getValue().getLeft()).setErrorMsg(key.getValue().getRight()).build());
     }
     omClientResponse = new OMKeysDeleteResponseWithFSO(omResponse
         .setDeleteKeysResponse(

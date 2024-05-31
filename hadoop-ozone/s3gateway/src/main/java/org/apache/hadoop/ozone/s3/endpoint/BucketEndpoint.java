@@ -18,6 +18,7 @@
 package org.apache.hadoop.ozone.s3.endpoint;
 
 import org.apache.commons.lang3.StringUtils;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.OzoneAcl;
@@ -446,7 +447,7 @@ public class BucketEndpoint extends EndpointBase {
 
     OzoneBucket bucket = getBucket(bucketName);
     MultiDeleteResponse result = new MultiDeleteResponse();
-    Map<String, String> undeletedKeyResultMap;
+    Map<String, Pair<String, String>> undeletedKeyResultMap;
 
     if (request.getObjects() != null) {
       List<String> deleteKeys = new ArrayList<>();
@@ -458,12 +459,12 @@ public class BucketEndpoint extends EndpointBase {
         undeletedKeyResultMap = bucket.deleteKeysQuiet(deleteKeys, true);
         for (DeleteObject d : request.getObjects()) {
           if (!request.isQuiet() && (!(undeletedKeyResultMap.containsKey(d.getKey())) ||
-              undeletedKeyResultMap.get(d.getKey()).equals("Key not found"))) {
+              undeletedKeyResultMap.get(d.getKey()).getLeft().equals(ResultCodes.KEY_NOT_FOUND.name()))) {
             result.addDeleted(new DeletedObject(d.getKey()));
           } else if (undeletedKeyResultMap.containsKey(d.getKey()) &&
-              !undeletedKeyResultMap.get(d.getKey()).equals("Key not found")) {
-            String error = undeletedKeyResultMap.get(d.getKey());
-            result.addError(new Error(d.getKey(), error, error));
+              !undeletedKeyResultMap.get(d.getKey()).getLeft().equals(ResultCodes.KEY_NOT_FOUND.name())) {
+            Pair<String, String> error = undeletedKeyResultMap.get(d.getKey());
+            result.addError(new Error(d.getKey(), error.getLeft(), error.getRight()));
           }
         }
         getMetrics().updateDeleteKeySuccessStats(startNanos);

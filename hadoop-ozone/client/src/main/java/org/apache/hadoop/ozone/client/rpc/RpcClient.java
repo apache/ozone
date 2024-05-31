@@ -29,6 +29,7 @@ import jakarta.annotation.Nonnull;
 import javax.crypto.Cipher;
 import javax.crypto.CipherInputStream;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.crypto.CryptoInputStream;
 import org.apache.hadoop.crypto.CryptoOutputStream;
 import org.apache.hadoop.crypto.key.KeyProvider;
@@ -1643,7 +1644,7 @@ public class RpcClient implements ClientProtocol {
   }
 
   @Override
-  public Map<String, String> deleteKeysQuiet(
+  public Map<String, Pair<String, String>> deleteKeysQuiet(
       String volumeName, String bucketName, List<String> keyNameList, Boolean isQuiet)
       throws IOException {
     verifyVolumeName(volumeName);
