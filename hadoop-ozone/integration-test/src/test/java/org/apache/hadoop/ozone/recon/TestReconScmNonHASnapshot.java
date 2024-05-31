@@ -52,7 +52,6 @@ public class TestReconScmNonHASnapshot {
 
   @Test
   public void testScmNonHASnapshot() throws Exception {
-    //ozoneCluster.getReconServer().getStorageContainerServiceProvider().
     TestReconScmSnapshot.testSnapshot(ozoneCluster);
   }
 

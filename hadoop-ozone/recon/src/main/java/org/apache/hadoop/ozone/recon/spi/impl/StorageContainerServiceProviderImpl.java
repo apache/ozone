@@ -49,7 +49,6 @@ import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
 import org.apache.hadoop.hdds.scm.ha.InterSCMGrpcClient;
-import org.apache.hadoop.hdds.scm.ha.SCMHAUtils;
 import org.apache.hadoop.hdds.scm.ha.SCMSnapshotDownloader;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocol;
@@ -184,51 +183,48 @@ public class StorageContainerServiceProviderImpl
     String snapshotFileName = RECON_SCM_SNAPSHOT_DB + "_" +
         System.currentTimeMillis();
     File targetFile = new File(scmSnapshotDBParentDir, snapshotFileName +
-            ".tar");
+        ".tar");
     try {
-      if (!SCMHAUtils.isSCMHAEnabled(configuration)) {
-        fetchSCMDBSnapshotUsingHttpClient(targetFile);
-        LOG.info("Downloaded SCM Snapshot from SCM");
-      } else {
-        try {
-          List<String> ratisRoles = scmClient.getScmInfo().getRatisPeerRoles();
-          for (String ratisRole : ratisRoles) {
-            String[] role = ratisRole.split(":");
-            // This explicit role length check is to support older versions where we cannot change the default value
-            // without breaking backward compatibility during upgrade, because if Ratis is not enabled then the roles
-            // command output is generated outside of Ratis. It will not have the Ratis terminologies.
-            if (role.length <= 2) {
-              fetchSCMDBSnapshotUsingHttpClient(targetFile);
-            } else {
-              if (role[2].equals(RaftProtos.RaftPeerRole.LEADER.toString())) {
-                String hostAddress = role[4].trim();
-                int grpcPort = configuration.getInt(
-                    ScmConfigKeys.OZONE_SCM_GRPC_PORT_KEY,
-                    ScmConfigKeys.OZONE_SCM_GRPC_PORT_DEFAULT);
+      try {
+        List<String> ratisRoles = scmClient.getScmInfo().getRatisPeerRoles();
+        for (String ratisRole : ratisRoles) {
+          String[] role = ratisRole.split(":");
+          // This explicit role length check is to support older versions where we cannot change the default value
+          // without breaking backward compatibility during upgrade, because if Ratis is not enabled then the roles
+          // command output is generated outside of Ratis. It will not have the Ratis terminologies.
+          if (role.length > 2) {
+            if (role[2].equals(RaftProtos.RaftPeerRole.LEADER.toString())) {
+              String hostAddress = role[4].trim();
+              int grpcPort = configuration.getInt(
+                  ScmConfigKeys.OZONE_SCM_GRPC_PORT_KEY,
+                  ScmConfigKeys.OZONE_SCM_GRPC_PORT_DEFAULT);
 
-                SecurityConfig secConf = new SecurityConfig(configuration);
-                SCMSecurityProtocolClientSideTranslatorPB scmSecurityClient =
-                    getScmSecurityClientWithMaxRetry(
-                        configuration, getCurrentUser());
-                try (ReconCertificateClient certClient =
-                         new ReconCertificateClient(
-                             secConf, scmSecurityClient, reconStorage, null, null);
-                     SCMSnapshotDownloader downloadClient = new InterSCMGrpcClient(
-                         hostAddress, grpcPort, configuration, certClient)) {
-                  downloadClient.download(targetFile.toPath()).get();
-                } catch (ExecutionException | InterruptedException e) {
-                  LOG.error("Rocks DB checkpoint downloading failed: {}", e);
-                  throw new IOException(e);
-                }
-                LOG.info("Downloaded SCM Snapshot from Leader SCM");
-                break;
+              SecurityConfig secConf = new SecurityConfig(configuration);
+              SCMSecurityProtocolClientSideTranslatorPB scmSecurityClient =
+                  getScmSecurityClientWithMaxRetry(
+                      configuration, getCurrentUser());
+              try (ReconCertificateClient certClient =
+                       new ReconCertificateClient(
+                           secConf, scmSecurityClient, reconStorage, null, null);
+                   SCMSnapshotDownloader downloadClient = new InterSCMGrpcClient(
+                       hostAddress, grpcPort, configuration, certClient)) {
+                downloadClient.download(targetFile.toPath()).get();
+              } catch (ExecutionException | InterruptedException e) {
+                LOG.error("Rocks DB checkpoint downloading failed: {}", e);
+                throw new IOException(e);
               }
+              LOG.info("Downloaded SCM Snapshot from Leader SCM");
+              break;
             }
+          } else {
+            fetchSCMDBSnapshotUsingHttpClient(targetFile);
+            LOG.info("Downloaded SCM Snapshot from SCM");
+            break;
           }
-        } catch (Throwable throwable) {
-          LOG.error("Unexpected runtime error while downloading SCM Rocks DB snapshot/checkpoint : {}", throwable);
-          throw throwable;
         }
+      } catch (Throwable throwable) {
+        LOG.error("Unexpected runtime error while downloading SCM Rocks DB snapshot/checkpoint : {}", throwable);
+        throw throwable;
       }
       return getRocksDBCheckpoint(snapshotFileName, targetFile);
     } catch (Throwable e) {

@@ -161,7 +161,6 @@ public class ReconServer extends GenericCli {
       // Start all services
       start();
       isStarted = true;
-      LOG.debug("Start of all services of Recon completed successfully !!!");
       LOG.info("Recon server initialized successfully!");
     } catch (Exception e) {
       ReconStorageContainerManagerFacade reconStorageContainerManagerFacade =
