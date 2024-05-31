@@ -18,6 +18,7 @@
 package org.apache.hadoop.hdds.scm.storage;
 
 import com.google.common.annotations.VisibleForTesting;
+import org.apache.hadoop.fs.Syncable;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandResponseProto;
 import org.apache.hadoop.hdds.scm.ContainerClientMetrics;
@@ -35,6 +36,7 @@ import java.io.OutputStream;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.function.Supplier;
 
@@ -55,7 +57,7 @@ import java.util.function.Supplier;
  * through to the container.
  */
 public class RatisBlockOutputStream extends BlockOutputStream
-    implements NonBlockingSyncable {
+    implements Syncable {
 
   // This object will maintain the commitIndexes and byteBufferList in order
   // Also, corresponding to the logIndex, the corresponding list of buffers will
@@ -116,8 +118,8 @@ public class RatisBlockOutputStream extends BlockOutputStream
   }
 
   @Override
-  CompletableFuture<Void> waitOnFlushFutures() {
-    return commitWatcher.waitOnFlushFutures();
+  void waitOnFlushFutures() throws InterruptedException, ExecutionException {
+    commitWatcher.waitOnFlushFutures();
   }
 
   @Override
@@ -126,19 +128,17 @@ public class RatisBlockOutputStream extends BlockOutputStream
   }
 
   @Override
-  public CompletableFuture<Void> hflush() throws IOException {
-    return hsync();
+  public void hflush() throws IOException {
+    hsync();
   }
 
   @Override
-  public CompletableFuture<Void> hsync() throws IOException {
-    CompletableFuture<Void> future = null;
+  public void hsync() throws IOException {
     if (!isClosed()) {
       if (getBufferPool() != null && getBufferPool().getSize() > 0) {
         handleFlush(false);
       }
-      future = waitForFlushAndCommit(false);
+      waitForFlushAndCommit(false);
     }
-    return future;
   }
 }

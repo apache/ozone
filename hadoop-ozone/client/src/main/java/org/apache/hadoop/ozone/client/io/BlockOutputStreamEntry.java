@@ -21,7 +21,6 @@ import java.io.IOException;
 import java.io.OutputStream;
 import java.util.Collection;
 import java.util.Collections;
-import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
 import java.util.function.Supplier;
 
@@ -35,7 +34,6 @@ import org.apache.hadoop.hdds.scm.XceiverClientFactory;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.storage.BlockOutputStream;
 import org.apache.hadoop.hdds.scm.storage.BufferPool;
-import org.apache.hadoop.hdds.scm.storage.NonBlockingSyncable;
 import org.apache.hadoop.hdds.scm.storage.RatisBlockOutputStream;
 import org.apache.hadoop.hdds.security.token.OzoneBlockTokenIdentifier;
 import org.apache.hadoop.security.token.Token;
@@ -154,18 +152,16 @@ public class BlockOutputStreamEntry extends OutputStream {
     }
   }
 
-  CompletableFuture<Void> hsync() throws IOException {
-    CompletableFuture<Void> future = null;
+  void hsync() throws IOException {
     if (isInitialized()) {
       final OutputStream out = getOutputStream();
-      if (!(out instanceof Syncable || out instanceof NonBlockingSyncable)) {
+      if (!(out instanceof Syncable)) {
         throw new UnsupportedOperationException(
             out.getClass() + " is not " + Syncable.class.getSimpleName());
       }
 
-      future = ((NonBlockingSyncable) out).hsync();
+      ((Syncable)out).hsync();
     }
-    return future;
   }
 
   @Override
