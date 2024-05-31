@@ -231,7 +231,7 @@ public class StorageContainerServiceProviderImpl
         }
       }
       return getRocksDBCheckpoint(snapshotFileName, targetFile);
-    } catch (Exception e) {
+    } catch (Throwable e) {
       reconContext.updateHealthStatus(new AtomicBoolean(false));
       reconContext.getErrors().add(ReconContext.ErrorCode.GET_SCM_DB_SNAPSHOT_FAILED);
       LOG.error("Unable to obtain SCM DB Snapshot: {} ", e);
