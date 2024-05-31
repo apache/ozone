@@ -364,7 +364,7 @@ public final class OzoneBucketStub extends OzoneBucket {
     Map<String, Pair<String, String>> keyErrorMap = new HashMap<>();
     for (String key : keyList) {
       if (!keyDetails.containsKey(key)) {
-        keyErrorMap.put(key,Pair.of("KEY_NOT_FOUND", "Key does not exist"));
+        keyErrorMap.put(key,Pair.of("KEY_NOT_FOUND",  "Key does not exist"));
       }
       keyDetails.remove(key);
     }
