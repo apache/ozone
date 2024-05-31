@@ -115,7 +115,25 @@ public class TestNSSummaryAdmin extends StandardOutputTestBase {
     String path = "/";
     executeAdminCommands(path);
     // Should throw warning - only buckets can have bucket layout.
-    assertThat(getOutContentString()).contains("[Warning] Namespace CLI is not designed for OBS bucket layout.");
+    assertThat(getOutContentString()).doesNotContain("INVALID_VOLUME_NAME");
+    assertThat(getOutContentString()).doesNotContain(
+        "[Warning] Namespace CLI is not designed for OBS bucket layout.");
+    assertThat(getOutContentString()).contains("Put more files into it to visualize DU");
+    assertThat(getOutContentString()).contains("Put more files into it to visualize file size distribution");
+  }
+
+  /**
+   * Test NSSummaryCLI on volume.
+   */
+  @Test
+  public void testNSSummaryCLIVolume() throws UnsupportedEncodingException {
+    // Running on root path.
+    String path = "/" + volumeName;
+    executeAdminCommands(path);
+    // Should throw warning - only buckets can have bucket layout.
+    assertThat(getOutContentString()).doesNotContain("INVALID_BUCKET_NAME");
+    assertThat(getOutContentString()).doesNotContain(
+        "[Warning] Namespace CLI is not designed for OBS bucket layout.");
     assertThat(getOutContentString()).contains("Put more files into it to visualize DU");
     assertThat(getOutContentString()).contains("Put more files into it to visualize file size distribution");
   }
