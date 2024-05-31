@@ -115,6 +115,11 @@ public class NSSummaryAdmin extends GenericCli implements SubcommandWithParent {
         OzoneConfiguration.of(getOzoneConfig()));
     try (OzoneClient ozoneClient = OzoneClientFactory.getRpcClient(getOzoneConfig())) {
       ObjectStore objectStore = ozoneClient.getObjectStore();
+      // Return false if path is root, just a volume
+      if (ofsPath.getVolumeName().isEmpty() ||
+          ofsPath.getBucketName().isEmpty()) {
+        return false;
+      }
       // Checks if the bucket is part of the path.
       OzoneBucket bucket = objectStore.getVolume(ofsPath.getVolumeName())
           .getBucket(ofsPath.getBucketName());
