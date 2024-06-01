@@ -40,7 +40,6 @@ import java.util.stream.Collectors;
 
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import org.apache.hadoop.hdds.recon.ReconConfigKeys;
-import org.apache.hadoop.hdds.server.ServerUtils;
 import org.apache.hadoop.hdds.utils.db.RocksDatabase;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedWriteBatch;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedWriteOptions;
@@ -58,6 +57,7 @@ import org.apache.hadoop.ozone.om.helpers.DBUpdates;
 import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.DBUpdatesRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ServicePort.Type;
+import org.apache.hadoop.ozone.recon.ReconContext;
 import org.apache.hadoop.ozone.recon.ReconServerConfigKeys;
 import org.apache.hadoop.ozone.recon.ReconUtils;
 import org.apache.hadoop.ozone.recon.metrics.OzoneManagerSyncMetrics;
@@ -112,6 +112,7 @@ public class OzoneManagerServiceProviderImpl
   private URLConnectionFactory connectionFactory;
 
   private File omSnapshotDBParentDir = null;
+  private File reconDbDir = null;
   private String omDBSnapshotUrl;
 
   private OzoneManagerProtocol ozoneManagerClient;
@@ -130,6 +131,7 @@ public class OzoneManagerServiceProviderImpl
   private AtomicBoolean isSyncDataFromOMRunning;
   private final String threadNamePrefix;
   private ThreadFactory threadFactory;
+  private ReconContext reconContext;
 
   /**
    * OM Snapshot related task names.
@@ -145,7 +147,8 @@ public class OzoneManagerServiceProviderImpl
       ReconOMMetadataManager omMetadataManager,
       ReconTaskController reconTaskController,
       ReconUtils reconUtils,
-      OzoneManagerProtocol ozoneManagerClient) {
+      OzoneManagerProtocol ozoneManagerClient,
+      ReconContext reconContext) {
 
     int connectionTimeout = (int) configuration.getTimeDuration(
         OZONE_RECON_OM_CONNECTION_TIMEOUT,
@@ -179,6 +182,8 @@ public class OzoneManagerServiceProviderImpl
 
     omSnapshotDBParentDir = reconUtils.getReconDbDir(configuration,
         OZONE_RECON_OM_SNAPSHOT_DB_DIR);
+    reconDbDir = reconUtils.getReconDbDir(configuration,
+        ReconConfigKeys.OZONE_RECON_DB_DIR);
 
     HttpConfig.Policy policy = HttpConfig.getHttpPolicy(configuration);
 
@@ -216,6 +221,7 @@ public class OzoneManagerServiceProviderImpl
     this.threadFactory =
         new ThreadFactoryBuilder().setNameFormat(threadNamePrefix + "SyncOM-%d")
             .build();
+    this.reconContext = reconContext;
   }
 
   public void registerOMDBTasks() {
@@ -253,7 +259,7 @@ public class OzoneManagerServiceProviderImpl
     try {
       omMetadataManager.start(configuration);
     } catch (IOException ioEx) {
-      LOG.error("Error staring Recon OM Metadata Manager.", ioEx);
+      LOG.error("Error starting Recon OM Metadata Manager.", ioEx);
     }
     reconTaskController.start();
     long initialDelay = configuration.getTimeDuration(
@@ -382,7 +388,6 @@ public class OzoneManagerServiceProviderImpl
       File[] sstFiles = untarredDbDir.toFile().listFiles((dir, name) -> name.endsWith(".sst"));
       if (sstFiles == null || sstFiles.length == 0) {
         LOG.warn("No SST files found in the OM snapshot directory: {}", untarredDbDir);
-        return null;
       }
 
       List<String> sstFileNames = Arrays.stream(sstFiles)
@@ -392,9 +397,13 @@ public class OzoneManagerServiceProviderImpl
 
       // Currently, OM DB type is not configurable. Hence, defaulting to
       // RocksDB.
+      reconContext.updateHealthStatus(new AtomicBoolean(true));
+      reconContext.getErrors().remove(ReconContext.ErrorCode.GET_OM_DB_SNAPSHOT_FAILED);
       return new RocksDBCheckpoint(untarredDbDir);
     } catch (IOException e) {
       LOG.error("Unable to obtain Ozone Manager DB Snapshot. ", e);
+      reconContext.updateHealthStatus(new AtomicBoolean(false));
+      reconContext.updateErrors(ReconContext.ErrorCode.GET_OM_DB_SNAPSHOT_FAILED);
     }
     return null;
   }
@@ -584,12 +593,24 @@ public class OzoneManagerServiceProviderImpl
               // Reinitialize tasks that are listening.
               LOG.info("Calling reprocess on Recon tasks.");
               reconTaskController.reInitializeTasks(omMetadataManager);
+
+              // Update health status in ReconContext
+              reconContext.updateHealthStatus(new AtomicBoolean(true));
+              reconContext.getErrors().remove(ReconContext.ErrorCode.GET_OM_DB_SNAPSHOT_FAILED);
+            } else {
+              metrics.incrNumSnapshotRequestsFailed();
+              // Update health status in ReconContext
+              reconContext.updateHealthStatus(new AtomicBoolean(false));
+              reconContext.updateErrors(ReconContext.ErrorCode.GET_OM_DB_SNAPSHOT_FAILED);
             }
           } catch (InterruptedException intEx) {
             Thread.currentThread().interrupt();
           } catch (Exception e) {
             metrics.incrNumSnapshotRequestsFailed();
             LOG.error("Unable to update Recon's metadata with new OM DB. ", e);
+            // Update health status in ReconContext
+            reconContext.updateHealthStatus(new AtomicBoolean(false));
+            reconContext.updateErrors(ReconContext.ErrorCode.GET_OM_DB_SNAPSHOT_FAILED);
           }
         }
       } finally {
@@ -603,7 +624,7 @@ public class OzoneManagerServiceProviderImpl
   }
 
   public void checkAndValidateReconDbPermissions() {
-    File dbDir = new File(configuration.get(omSnapshotDBParentDir.getPath()));
+    File dbDir = new File(reconDbDir.getPath());
     if (!dbDir.exists()) {
       LOG.error("Recon DB directory does not exist: {}", dbDir.getAbsolutePath());
       return;
@@ -625,8 +646,8 @@ public class OzoneManagerServiceProviderImpl
         LOG.info("Permissions for Recon DB directory '{}' meet the minimum required permissions '{}'",
             dbDir.getAbsolutePath(), expectedPermissions);
       } else {
-        LOG.warn("Permissions for Recon DB directory '{}' are '{}', which do not meet the minimum required permissions '{}'",
-            dbDir.getAbsolutePath(), actualPermissionsStr, expectedPermissions);
+        LOG.warn("Permissions for Recon DB directory '{}' are '{}', which do not meet the minimum" +
+            " required permissions '{}'", dbDir.getAbsolutePath(), actualPermissionsStr, expectedPermissions);
       }
     } catch (IOException e) {
       LOG.error("Failed to retrieve permissions for Recon DB directory: {}", dbDir.getAbsolutePath(), e);
