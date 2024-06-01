@@ -22,7 +22,8 @@ import org.apache.hadoop.hdds.conf.DatanodeRatisServerConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.ratis.conf.RatisClientConfig;
-import org.apache.hadoop.hdds.scm.XceiverClientManager;
+import org.apache.hadoop.hdds.scm.XceiverClientCreator;
+import org.apache.hadoop.hdds.scm.XceiverClientFactory;
 import org.apache.hadoop.hdds.scm.XceiverClientSpi;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
 import org.apache.hadoop.hdds.scm.protocolPB.StorageContainerLocationProtocolClientSideTranslatorPB;
@@ -79,11 +80,11 @@ public class TestDNRPCLoadGenerator {
         storageContainerLocationClient.allocateContainer(
             SCMTestUtils.getReplicationType(conf),
             HddsProtos.ReplicationFactor.ONE, OzoneConsts.OZONE);
-    XceiverClientManager xceiverClientManager = new XceiverClientManager(conf);
-    XceiverClientSpi client = xceiverClientManager
-        .acquireClient(container.getPipeline());
-    ContainerProtocolCalls.createContainer(client,
-        container.getContainerInfo().getContainerID(), null);
+    try (XceiverClientFactory factory = new XceiverClientCreator(conf);
+        XceiverClientSpi client = factory.acquireClient(container.getPipeline())) {
+      ContainerProtocolCalls.createContainer(client,
+          container.getContainerInfo().getContainerID(), null);
+    }
   }
 
   static void shutdownCluster() {
