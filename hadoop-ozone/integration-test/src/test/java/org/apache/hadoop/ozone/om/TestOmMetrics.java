@@ -863,16 +863,6 @@ public class TestOmMetrics {
     }
 
     try {
-      writeClient.deleteKey(keyArgs);
-    } catch (IOException ignored) {
-    }
-
-    try {
-      writeClient.initiateMultipartUpload(keyArgs);
-    } catch (IOException ignored) {
-    }
-
-    try {
       writeClient.putObjectTagging(keyArgs);
     } catch (IOException ignored) {
     }
@@ -884,6 +874,16 @@ public class TestOmMetrics {
 
     try {
       writeClient.deleteObjectTagging(keyArgs);
+    } catch (IOException ignored) {
+    }
+
+    try {
+      writeClient.deleteKey(keyArgs);
+    } catch (IOException ignored) {
+    }
+
+    try {
+      writeClient.initiateMultipartUpload(keyArgs);
     } catch (IOException ignored) {
     }
   }
