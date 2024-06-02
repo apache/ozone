@@ -227,6 +227,7 @@ import org.apache.hadoop.ozone.security.proto.SecurityProtos.CancelDelegationTok
 import org.apache.hadoop.ozone.security.proto.SecurityProtos.GetDelegationTokenRequestProto;
 import org.apache.hadoop.ozone.security.proto.SecurityProtos.RenewDelegationTokenRequestProto;
 import org.apache.hadoop.ozone.snapshot.CancelSnapshotDiffResponse;
+import org.apache.hadoop.ozone.snapshot.ListSnapshotResponse;
 import org.apache.hadoop.ozone.snapshot.SnapshotDiffReportOzone;
 import org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse;
 import org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse.JobStatus;
@@ -1324,7 +1325,7 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
    * {@inheritDoc}
    */
   @Override
-  public List<SnapshotInfo> listSnapshot(
+  public ListSnapshotResponse listSnapshot(
       String volumeName, String bucketName, String snapshotPrefix,
       String prevSnapshot, int maxListResult) throws IOException {
     final OzoneManagerProtocolProtos.ListSnapshotRequest.Builder
@@ -1347,11 +1348,24 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
         .build();
     final OMResponse omResponse = submitRequest(omRequest);
     handleError(omResponse);
-    List<SnapshotInfo> snapshotInfos = omResponse.getListSnapshotResponse()
+    OzoneManagerProtocolProtos.ListSnapshotResponse response = omResponse.getListSnapshotResponse();
+    List<SnapshotInfo> snapshotInfos = response
         .getSnapshotInfoList().stream()
         .map(snapshotInfo -> SnapshotInfo.getFromProtobuf(snapshotInfo))
         .collect(Collectors.toList());
-    return snapshotInfos;
+
+    String lastSnapshot = null;
+
+    if (response.hasLastSnapshot()) {
+      lastSnapshot = response.getLastSnapshot();
+    } else if (snapshotInfos.size() == maxListResult) {
+      // This is to make sure that the change (HDDS-9983) is forward compatibility.
+      // Set lastSnapshot only when current list size is equal to maxListResult
+      // and there is possibility of more entries.
+      lastSnapshot = snapshotInfos.get(maxListResult - 1).getName();
+    }
+
+    return new ListSnapshotResponse(snapshotInfos, lastSnapshot);
   }
 
   /**

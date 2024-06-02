@@ -1932,7 +1932,7 @@
   </property>
   <property>
     <name>ozone.security.crypto.compliance.mode</name>
-    <value>none</value>
+    <value>unrestricted</value>
     <tag>OZONE, SECURITY, HDDS, CRYPTO_COMPLIANCE</tag>
     <description>Based on this property the security compliance mode
       is loaded and enables filtering cryptographic configuration options
