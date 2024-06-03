@@ -171,7 +171,7 @@ public class TestPermissionCheck {
     when(objectStore.getS3Bucket(anyString())).thenReturn(bucket);
     Map<String, Pair<String, String>> deleteErrors = new HashMap<>();
     deleteErrors.put("deleteKeyName", Pair.of("ACCESS_DENIED", "ACL check failed"));
-    when(bucket.deleteKeysQuiet(any(), anyBoolean())).thenReturn(deleteErrors);
+    when(bucket.deleteKeys(any(), anyBoolean())).thenReturn(deleteErrors);
 
     BucketEndpoint bucketEndpoint = new BucketEndpoint();
     bucketEndpoint.setClient(client);

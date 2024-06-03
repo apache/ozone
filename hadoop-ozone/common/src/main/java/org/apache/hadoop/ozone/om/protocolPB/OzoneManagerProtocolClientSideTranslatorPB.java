@@ -955,11 +955,11 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
    */
   @Override
   public void deleteKeys(OmDeleteKeys deleteKeys) throws IOException {
-    deleteKeysQuiet(deleteKeys, false);
+    deleteKeys(deleteKeys, false);
   }
 
   @Override
-  public Map<String, Pair<String, String>> deleteKeysQuiet(OmDeleteKeys deleteKeys, Boolean isQuiet)
+  public Map<String, Pair<String, String>> deleteKeys(OmDeleteKeys deleteKeys, boolean quiet)
       throws IOException {
     DeleteKeysRequest.Builder req = DeleteKeysRequest.newBuilder();
     DeleteKeyArgs deletedKeys = DeleteKeyArgs.newBuilder()
@@ -972,13 +972,13 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
         .build();
     OMResponse omResponse = submitRequest(omRequest);
 
-    if (!isQuiet) {
+    if (!quiet) {
       handleError(omResponse);
     }
-    List<OzoneManagerProtocolProtos.DeleteKeyErrors> deleteKeyErrors =
-        omResponse.getDeleteKeysResponse().getDeleteKeyErrorsList();
+    List<OzoneManagerProtocolProtos.DeleteKeyError> errors =
+        omResponse.getDeleteKeysResponse().getErrorsList();
     Map<String, Pair<String, String>> keyToErrors = new HashMap<>();
-    for (OzoneManagerProtocolProtos.DeleteKeyErrors deleteKeyError : deleteKeyErrors) {
+    for (OzoneManagerProtocolProtos.DeleteKeyError deleteKeyError : errors) {
       keyToErrors.put(deleteKeyError.getKey(), Pair.of(deleteKeyError.getErrorCode(), deleteKeyError.getErrorMsg()));
     }
     return keyToErrors;

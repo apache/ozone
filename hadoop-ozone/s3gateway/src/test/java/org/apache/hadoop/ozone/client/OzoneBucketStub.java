@@ -360,13 +360,12 @@ public final class OzoneBucketStub extends OzoneBucket {
   }
 
   @Override
-  public Map<String, Pair<String, String>> deleteKeysQuiet(List<String> keyList, Boolean isQuiet) throws IOException {
+  public Map<String, Pair<String, String>> deleteKeys(List<String> keyList, boolean quiet) throws IOException {
     Map<String, Pair<String, String>> keyErrorMap = new HashMap<>();
     for (String key : keyList) {
-      if (!keyDetails.containsKey(key)) {
+      if (keyDetails.remove(key) == null) {
         keyErrorMap.put(key, Pair.of("KEY_NOT_FOUND", "Key does not exist"));
       }
-      keyDetails.remove(key);
     }
     return keyErrorMap;
   }

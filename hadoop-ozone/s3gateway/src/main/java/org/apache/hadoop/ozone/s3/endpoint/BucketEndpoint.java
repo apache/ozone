@@ -456,7 +456,7 @@ public class BucketEndpoint extends EndpointBase {
       }
       long startNanos = Time.monotonicNowNanos();
       try {
-        undeletedKeyResultMap = bucket.deleteKeysQuiet(deleteKeys, true);
+        undeletedKeyResultMap = bucket.deleteKeys(deleteKeys, true);
         for (DeleteObject d : request.getObjects()) {
           if (!request.isQuiet() && (!(undeletedKeyResultMap.containsKey(d.getKey())) ||
               undeletedKeyResultMap.get(d.getKey()).getLeft().equals(ResultCodes.KEY_NOT_FOUND.name()))) {

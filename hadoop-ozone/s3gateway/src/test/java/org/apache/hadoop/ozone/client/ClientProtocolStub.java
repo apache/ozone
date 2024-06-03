@@ -263,8 +263,8 @@ public class ClientProtocolStub implements ClientProtocol {
   }
 
   @Override
-  public Map<String, Pair<String, String>> deleteKeysQuiet(String volumeName, String bucketName,
-                                                           List<String> keyNameList, Boolean isQuiet)
+  public Map<String, Pair<String, String>> deleteKeys(String volumeName, String bucketName,
+                                                           List<String> keyNameList, boolean quiet)
       throws IOException {
     return new HashMap<>();
   }

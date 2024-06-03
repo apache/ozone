@@ -678,11 +678,11 @@ public class OzoneBucket extends WithMetadata {
   /**
    * Deletes the given list of keys from the bucket.
    * @param keyList List of the key name to be deleted.
-   * @param isQuiet flag to not throw exception if delete fails
+   * @param quiet flag to not throw exception if delete fails
    * @throws IOException
    */
-  public Map<String, Pair<String, String>> deleteKeysQuiet(List<String> keyList, Boolean isQuiet) throws IOException {
-    return proxy.deleteKeysQuiet(volumeName, name, keyList, isQuiet);
+  public Map<String, Pair<String, String>> deleteKeys(List<String> keyList, boolean quiet) throws IOException {
+    return proxy.deleteKeys(volumeName, name, keyList, quiet);
   }
 
   /**

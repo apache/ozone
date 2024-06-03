@@ -1644,15 +1644,15 @@ public class RpcClient implements ClientProtocol {
   }
 
   @Override
-  public Map<String, Pair<String, String>> deleteKeysQuiet(
-      String volumeName, String bucketName, List<String> keyNameList, Boolean isQuiet)
+  public Map<String, Pair<String, String>> deleteKeys(
+      String volumeName, String bucketName, List<String> keyNameList, boolean quiet)
       throws IOException {
     verifyVolumeName(volumeName);
     verifyBucketName(bucketName);
     Preconditions.checkNotNull(keyNameList);
     OmDeleteKeys omDeleteKeys = new OmDeleteKeys(volumeName, bucketName,
         keyNameList);
-    return ozoneManagerClient.deleteKeysQuiet(omDeleteKeys, isQuiet);
+    return ozoneManagerClient.deleteKeys(omDeleteKeys, quiet);
   }
 
   @Override

@@ -367,10 +367,10 @@ public interface OzoneManagerProtocol
    * through OzoneFileSystem.
    *
    * @param deleteKeys
-   * @param isQuiet - flag to not throw exception if delete fails
+   * @param quiet - flag to not throw exception if delete fails
    * @throws IOException
    */
-  default Map<String, Pair<String, String>> deleteKeysQuiet(OmDeleteKeys deleteKeys, Boolean isQuiet)
+  default Map<String, Pair<String, String>> deleteKeys(OmDeleteKeys deleteKeys, boolean quiet)
       throws IOException {
     throw new UnsupportedOperationException("OzoneManager does not require " +
         "this to be implemented, as write requests use a new approach.");

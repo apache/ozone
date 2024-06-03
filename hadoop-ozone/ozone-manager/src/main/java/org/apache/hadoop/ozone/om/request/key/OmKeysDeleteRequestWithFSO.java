@@ -152,15 +152,15 @@ public class OmKeysDeleteRequestWithFSO extends OMKeysDeleteRequest {
       Map<String, Pair<String, String>> keyToErrors,
       boolean deleteStatus, OmBucketInfo omBucketInfo, long volumeId, List<String> dbOpenKeys) {
     OMClientResponse omClientResponse;
-    List<OzoneManagerProtocolProtos.DeleteKeyErrors> deleteKeyErrors = new ArrayList<>();
+    List<OzoneManagerProtocolProtos.DeleteKeyError> deleteKeyErrors = new ArrayList<>();
     for (Map.Entry<String, Pair<String, String>>  key : keyToErrors.entrySet()) {
-      deleteKeyErrors.add(OzoneManagerProtocolProtos.DeleteKeyErrors.newBuilder()
+      deleteKeyErrors.add(OzoneManagerProtocolProtos.DeleteKeyError.newBuilder()
           .setKey(key.getKey()).setErrorCode(key.getValue().getLeft()).setErrorMsg(key.getValue().getRight()).build());
     }
     omClientResponse = new OMKeysDeleteResponseWithFSO(omResponse
         .setDeleteKeysResponse(
             OzoneManagerProtocolProtos.DeleteKeysResponse.newBuilder()
-                .setStatus(deleteStatus).setUnDeletedKeys(unDeletedKeys).addAllDeleteKeyErrors(deleteKeyErrors))
+                .setStatus(deleteStatus).setUnDeletedKeys(unDeletedKeys).addAllErrors(deleteKeyErrors))
         .setStatus(deleteStatus ? OK : PARTIAL_DELETE).setSuccess(deleteStatus)
         .build(), omKeyInfoList, dirList, ozoneManager.isRatisEnabled(),
         omBucketInfo.copyObject(), volumeId, dbOpenKeys);
