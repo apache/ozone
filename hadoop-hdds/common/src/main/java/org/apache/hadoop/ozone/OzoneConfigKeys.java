@@ -453,7 +453,8 @@ public final class OzoneConfigKeys {
 
   public static final String OZONE_CONTAINER_COPY_WORKDIR =
       "hdds.datanode.replication.work.dir";
-
+  public static final String OZONE_CONTAINER_REPLICATION_PORT =
+      "hdds.datanode.replication.port";
 
   public static final int OZONE_CLIENT_BYTES_PER_CHECKSUM_MIN_SIZE = 8 * 1024;
 
