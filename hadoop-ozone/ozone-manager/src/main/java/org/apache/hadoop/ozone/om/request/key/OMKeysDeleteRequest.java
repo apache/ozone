@@ -31,6 +31,7 @@ import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.ResolvedBucket;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
+import org.apache.hadoop.ozone.om.helpers.ErrorInfo;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
@@ -96,7 +97,7 @@ public class OMKeysDeleteRequest extends OMKeyRequest {
     Exception exception = null;
     OMClientResponse omClientResponse = null;
     Result result = null;
-    Map<String, Pair<String, String>> keyToError = new HashMap<>();
+    Map<String, ErrorInfo> keyToError = new HashMap<>();
 
     OMMetrics omMetrics = ozoneManager.getMetrics();
     omMetrics.incNumKeyDeletes();
@@ -152,7 +153,7 @@ public class OMKeysDeleteRequest extends OMKeyRequest {
               objectKey);
           deleteKeys.remove(keyName);
           unDeletedKeys.addKeys(keyName);
-          keyToError.put(keyName, Pair.of(OMException.ResultCodes.KEY_NOT_FOUND.name(), "Key does not exist"));
+          keyToError.put(keyName, new ErrorInfo(OMException.ResultCodes.KEY_NOT_FOUND.name(), "Key does not exist"));
           continue;
         }
 
@@ -170,7 +171,7 @@ public class OMKeysDeleteRequest extends OMKeyRequest {
           LOG.error("Acl check failed for Key: {}", objectKey, ex);
           deleteKeys.remove(keyName);
           unDeletedKeys.addKeys(keyName);
-          keyToError.put(keyName, Pair.of(OMException.ResultCodes.ACCESS_DENIED.name(), "ACL check failed"));
+          keyToError.put(keyName, new ErrorInfo(OMException.ResultCodes.ACCESS_DENIED.name(), "ACL check failed"));
         }
       }
 
@@ -203,7 +204,7 @@ public class OMKeysDeleteRequest extends OMKeyRequest {
       // Add all keys which are failed due to any other exception .
       for (int i = indexFailed; i < length; i++) {
         unDeletedKeys.addKeys(deleteKeyArgs.getKeys(i));
-        keyToError.put(deleteKeyArgs.getKeys(i), Pair.of(OMException.ResultCodes.INTERNAL_ERROR.name(),
+        keyToError.put(deleteKeyArgs.getKeys(i), new ErrorInfo(OMException.ResultCodes.INTERNAL_ERROR.name(),
             ex.getMessage()));
       }
 
@@ -266,13 +267,13 @@ public class OMKeysDeleteRequest extends OMKeyRequest {
       List<OmKeyInfo> omKeyInfoList, List<OmKeyInfo> dirList,
       OMResponse.Builder omResponse,
       OzoneManagerProtocolProtos.DeleteKeyArgs.Builder unDeletedKeys,
-      Map<String, Pair<String, String>> keyToErrors,
+      Map<String, ErrorInfo> keyToErrors,
       boolean deleteStatus, OmBucketInfo omBucketInfo, long volumeId, List<String> dbOpenKeys) {
     OMClientResponse omClientResponse;
     List<OzoneManagerProtocolProtos.DeleteKeyError> deleteKeyErrors = new ArrayList<>();
-    for (Map.Entry<String, Pair<String, String>>  key : keyToErrors.entrySet()) {
-      deleteKeyErrors.add(OzoneManagerProtocolProtos.DeleteKeyError.newBuilder()
-          .setKey(key.getKey()).setErrorCode(key.getValue().getLeft()).setErrorMsg(key.getValue().getRight()).build());
+    for (Map.Entry<String, ErrorInfo>  key : keyToErrors.entrySet()) {
+      deleteKeyErrors.add(OzoneManagerProtocolProtos.DeleteKeyError.newBuilder().setKey(key.getKey())
+          .setErrorCode(key.getValue().getCode()).setErrorMsg(key.getValue().getMessage()).build());
     }
     omClientResponse = new OMKeysDeleteResponse(omResponse
         .setDeleteKeysResponse(

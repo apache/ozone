@@ -19,7 +19,6 @@
  */
 package org.apache.hadoop.ozone.s3.endpoint;
 
-import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.client.ObjectStore;
@@ -28,6 +27,7 @@ import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.client.protocol.ClientProtocol;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
+import org.apache.hadoop.ozone.om.helpers.ErrorInfo;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
 import org.apache.hadoop.ozone.s3.metrics.S3GatewayMetrics;
 import org.junit.jupiter.api.BeforeEach;
@@ -169,8 +169,8 @@ public class TestPermissionCheck {
   public void testDeleteKeys() throws IOException, OS3Exception {
     when(objectStore.getVolume(anyString())).thenReturn(volume);
     when(objectStore.getS3Bucket(anyString())).thenReturn(bucket);
-    Map<String, Pair<String, String>> deleteErrors = new HashMap<>();
-    deleteErrors.put("deleteKeyName", Pair.of("ACCESS_DENIED", "ACL check failed"));
+    Map<String, ErrorInfo> deleteErrors = new HashMap<>();
+    deleteErrors.put("deleteKeyName", new ErrorInfo("ACCESS_DENIED", "ACL check failed"));
     when(bucket.deleteKeys(any(), anyBoolean())).thenReturn(deleteErrors);
 
     BucketEndpoint bucketEndpoint = new BucketEndpoint();

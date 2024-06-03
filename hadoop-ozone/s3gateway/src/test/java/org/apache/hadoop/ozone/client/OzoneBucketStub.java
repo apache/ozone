@@ -38,7 +38,6 @@ import java.util.stream.Collectors;
 import javax.xml.bind.DatatypeConverter;
 import org.apache.commons.codec.digest.DigestUtils;
 import org.apache.commons.lang3.StringUtils;
-import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
@@ -53,6 +52,7 @@ import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.client.OzoneMultipartUploadPartListParts.PartInfo;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes;
+import org.apache.hadoop.ozone.om.helpers.ErrorInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartUploadCompleteInfo;
 import org.apache.hadoop.security.UserGroupInformation;
@@ -360,11 +360,11 @@ public final class OzoneBucketStub extends OzoneBucket {
   }
 
   @Override
-  public Map<String, Pair<String, String>> deleteKeys(List<String> keyList, boolean quiet) throws IOException {
-    Map<String, Pair<String, String>> keyErrorMap = new HashMap<>();
+  public Map<String, ErrorInfo> deleteKeys(List<String> keyList, boolean quiet) throws IOException {
+    Map<String, ErrorInfo> keyErrorMap = new HashMap<>();
     for (String key : keyList) {
       if (keyDetails.remove(key) == null) {
-        keyErrorMap.put(key, Pair.of("KEY_NOT_FOUND", "Key does not exist"));
+        keyErrorMap.put(key, new ErrorInfo("KEY_NOT_FOUND", "Key does not exist"));
       }
     }
     return keyErrorMap;

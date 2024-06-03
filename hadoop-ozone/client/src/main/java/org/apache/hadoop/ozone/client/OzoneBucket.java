@@ -39,6 +39,7 @@ import org.apache.hadoop.ozone.client.protocol.ClientProtocol;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.BasicOmKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.ErrorInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartUploadCompleteInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
@@ -681,7 +682,7 @@ public class OzoneBucket extends WithMetadata {
    * @param quiet flag to not throw exception if delete fails
    * @throws IOException
    */
-  public Map<String, Pair<String, String>> deleteKeys(List<String> keyList, boolean quiet) throws IOException {
+  public Map<String, ErrorInfo> deleteKeys(List<String> keyList, boolean quiet) throws IOException {
     return proxy.deleteKeys(volumeName, name, keyList, quiet);
   }
 

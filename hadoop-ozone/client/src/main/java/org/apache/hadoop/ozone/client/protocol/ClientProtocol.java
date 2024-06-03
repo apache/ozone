@@ -24,7 +24,6 @@ import java.util.List;
 import java.util.Map;
 
 import jakarta.annotation.Nonnull;
-import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.crypto.key.KeyProvider;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
@@ -50,6 +49,7 @@ import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.DeleteTenantState;
+import org.apache.hadoop.ozone.om.helpers.ErrorInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartUploadCompleteInfo;
@@ -445,8 +445,8 @@ public interface ClientProtocol {
    * @param quiet flag to not throw exception if delete fails
    * @throws IOException
    */
-  Map<String, Pair<String, String>> deleteKeys(String volumeName, String bucketName,
-                                                    List<String> keyNameList, boolean quiet)
+  Map<String, ErrorInfo> deleteKeys(String volumeName, String bucketName,
+                                    List<String> keyNameList, boolean quiet)
       throws IOException;
 
   /**

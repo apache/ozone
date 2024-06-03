@@ -29,7 +29,6 @@ import java.util.stream.Collectors;
 import com.google.protobuf.Proto2Utils;
 import jakarta.annotation.Nonnull;
 import org.apache.commons.lang3.StringUtils;
-import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.fs.SafeModeAction;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
@@ -44,6 +43,7 @@ import org.apache.hadoop.ozone.ClientVersion;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.BasicOmKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.ErrorInfo;
 import org.apache.hadoop.ozone.om.helpers.ListKeysLightResult;
 import org.apache.hadoop.ozone.om.helpers.ListKeysResult;
 import org.apache.hadoop.ozone.om.helpers.DBUpdates;
@@ -959,7 +959,7 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
   }
 
   @Override
-  public Map<String, Pair<String, String>> deleteKeys(OmDeleteKeys deleteKeys, boolean quiet)
+  public Map<String, ErrorInfo> deleteKeys(OmDeleteKeys deleteKeys, boolean quiet)
       throws IOException {
     DeleteKeysRequest.Builder req = DeleteKeysRequest.newBuilder();
     DeleteKeyArgs deletedKeys = DeleteKeyArgs.newBuilder()
@@ -977,9 +977,10 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
     }
     List<OzoneManagerProtocolProtos.DeleteKeyError> errors =
         omResponse.getDeleteKeysResponse().getErrorsList();
-    Map<String, Pair<String, String>> keyToErrors = new HashMap<>();
+    Map<String, ErrorInfo> keyToErrors = new HashMap<>();
     for (OzoneManagerProtocolProtos.DeleteKeyError deleteKeyError : errors) {
-      keyToErrors.put(deleteKeyError.getKey(), Pair.of(deleteKeyError.getErrorCode(), deleteKeyError.getErrorMsg()));
+      keyToErrors.put(deleteKeyError.getKey(),
+          new ErrorInfo(deleteKeyError.getErrorCode(), deleteKeyError.getErrorMsg()));
     }
     return keyToErrors;
   }

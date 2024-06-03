@@ -18,7 +18,6 @@
 package org.apache.hadoop.ozone.s3.endpoint;
 
 import org.apache.commons.lang3.StringUtils;
-import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.OzoneAcl;
@@ -29,6 +28,7 @@ import org.apache.hadoop.ozone.client.OzoneMultipartUploadList;
 import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes;
+import org.apache.hadoop.ozone.om.helpers.ErrorInfo;
 import org.apache.hadoop.ozone.om.helpers.OzoneAclUtil;
 import org.apache.hadoop.ozone.s3.commontypes.EncodingTypeObject;
 import org.apache.hadoop.ozone.s3.commontypes.KeyMetadata;
@@ -447,7 +447,7 @@ public class BucketEndpoint extends EndpointBase {
 
     OzoneBucket bucket = getBucket(bucketName);
     MultiDeleteResponse result = new MultiDeleteResponse();
-    Map<String, Pair<String, String>> undeletedKeyResultMap;
+    Map<String, ErrorInfo> undeletedKeyResultMap;
 
     if (request.getObjects() != null) {
       List<String> deleteKeys = new ArrayList<>();
@@ -459,12 +459,12 @@ public class BucketEndpoint extends EndpointBase {
         undeletedKeyResultMap = bucket.deleteKeys(deleteKeys, true);
         for (DeleteObject d : request.getObjects()) {
           if (!request.isQuiet() && (!(undeletedKeyResultMap.containsKey(d.getKey())) ||
-              undeletedKeyResultMap.get(d.getKey()).getLeft().equals(ResultCodes.KEY_NOT_FOUND.name()))) {
+              undeletedKeyResultMap.get(d.getKey()).getCode().equals(ResultCodes.KEY_NOT_FOUND.name()))) {
             result.addDeleted(new DeletedObject(d.getKey()));
           } else if (undeletedKeyResultMap.containsKey(d.getKey()) &&
-              !undeletedKeyResultMap.get(d.getKey()).getLeft().equals(ResultCodes.KEY_NOT_FOUND.name())) {
-            Pair<String, String> error = undeletedKeyResultMap.get(d.getKey());
-            result.addError(new Error(d.getKey(), error.getLeft(), error.getRight()));
+              !undeletedKeyResultMap.get(d.getKey()).getCode().equals(ResultCodes.KEY_NOT_FOUND.name())) {
+            ErrorInfo error = undeletedKeyResultMap.get(d.getKey());
+            result.addError(new Error(d.getKey(), error.getCode(), error.getMessage()));
           }
         }
         getMetrics().updateDeleteKeySuccessStats(startNanos);
