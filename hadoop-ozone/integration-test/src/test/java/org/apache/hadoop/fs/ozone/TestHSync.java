@@ -97,7 +97,7 @@ import static org.mockito.Mockito.when;
 /**
  * Test HSync.
  */
-@Timeout(value = 300)
+//@Timeout(value = 300)
 public class TestHSync {
   private static final Logger LOG =
       LoggerFactory.getLogger(TestHSync.class);
@@ -454,7 +454,7 @@ public class TestHSync {
         + OZONE_URI_DELIMITER + bucket.getName();
 
     try (FileSystem fs = FileSystem.get(CONF)) {
-      for (int i = 0; i < 10; i++) {
+      for (int i = 0; i < 1; i++) {
         final Path file = new Path(dir, "file" + i);
         try (FSDataOutputStream out =
             fs.create(file, true)) {

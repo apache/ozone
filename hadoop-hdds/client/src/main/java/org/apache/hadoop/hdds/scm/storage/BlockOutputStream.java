@@ -307,7 +307,7 @@ public class BlockOutputStream extends OutputStream {
       }
       // Data in the bufferPool can not exceed streamBufferMaxSize
       if (bufferPool.getNumberOfUsedBuffers() == bufferPool.getCapacity()) {
-        handleFullBuffer();
+        handleFullBuffer();  // TODO: This is a blocking call
       }
     }
   }
@@ -361,7 +361,7 @@ public class BlockOutputStream extends OutputStream {
         executePutBlock(false, false);
       }
       if (writtenDataLength == streamBufferArgs.getStreamBufferMaxSize()) {
-        handleFullBuffer();
+        handleFullBuffer();  // TODO: This is a blocking call
       }
     }
   }
@@ -376,9 +376,44 @@ public class BlockOutputStream extends OutputStream {
     waitForFlushAndCommit(true);
   }
 
+  /**
+   * Async version of waitForFlushAndCommit.
+   */
+  CompletableFuture<Void> asyncFlushAndCommit(boolean bufferFull) throws IOException {
+    checkOpen();
+    return CompletableFuture.runAsync(() -> {
+      try {
+        waitForFlushAndCommit(bufferFull);
+      } catch (IOException ioEx) {
+        throw new CompletionException("Failed", ioEx);
+      }
+    }, getResponseExecutor());
+
+/* ABANDONED INCOMPLETE IMPLEMENTATION
+    return getCombinedFlushFuture().exceptionally(e -> {
+      if (LOG.isDebugEnabled()) {
+        LOG.debug("FlushAndCommit failed for blockID {} with exception {}",
+            blockID, e.getLocalizedMessage());
+      }
+      CompletionException ce = new CompletionException(e);
+      setIoException(ce);
+      adjustBuffersOnException();  // Will ExecutionException trigger this?
+      throw ce;
+    }).thenApplyAsync(r -> {
+      try {
+        watchForCommit(bufferFull);
+      } catch (IOException e) {
+        LOG.error("IOException thrown from watchForCommit after combined flush future", e);
+        throw new CompletionException(e);
+      }
+      return r;
+    }, getResponseExecutor());
+ */
+  }
+
   void waitForFlushAndCommit(boolean bufferFull) throws IOException {
+    checkOpen();
     try {
-      checkOpen();
       waitOnFlushFutures();
     } catch (ExecutionException e) {
       handleExecutionException(e);
@@ -414,6 +449,7 @@ public class BlockOutputStream extends OutputStream {
    */
   private void watchForCommit(boolean bufferFull) throws IOException {
     checkOpen();
+    LOG.warn("!!! Entering watchForCommit(bufferFull = {})", bufferFull);
     try {
       final XceiverClientReply reply = sendWatchForCommit(bufferFull);
       if (reply != null) {
@@ -430,6 +466,7 @@ public class BlockOutputStream extends OutputStream {
       setIoException(ioe);
       throw getIoException();
     }
+    LOG.warn("!!! Leaving watchForCommit(bufferFull = {})", bufferFull);
     refreshCurrentBuffer();
   }
 
@@ -535,7 +572,20 @@ public class BlockOutputStream extends OutputStream {
       bufferList = new ArrayList<>();
     }
     bufferList.add(buffer);
-    writeChunkToContainer(buffer.duplicate(0, buffer.position()));
+    writeChunkToContainer(buffer.duplicate(0, buffer.position()));  // What bad things can happen if we don't duplicate the buffer here: java.lang.NullPointerException: Future not found for 16384: existing = [1]
+  }
+
+  /**
+   * Async version of handleFlush.
+   */
+  protected CompletableFuture<Void> asyncHandleFlush(boolean close) {
+    return CompletableFuture.runAsync(() -> {
+      try {
+        handleFlush(close);
+      } catch (IOException e) {
+        throw new CompletionException("handleFlush failed", e);
+      }
+    }, getResponseExecutor());
   }
 
   /**
@@ -563,22 +613,24 @@ public class BlockOutputStream extends OutputStream {
   private void handleFlushInternal(boolean close)
       throws IOException, InterruptedException, ExecutionException {
     checkOpen();
-    // flush the last chunk data residing on the currentBuffer
-    if (totalDataFlushedLength < writtenDataLength) {
-      refreshCurrentBuffer();
-      Preconditions.checkArgument(currentBuffer.position() > 0);
-      if (currentBuffer.hasRemaining()) {
-        writeChunk(currentBuffer);
+    synchronized (this) {
+      // flush the last chunk data residing on the currentBuffer
+      if (totalDataFlushedLength < writtenDataLength) {
+        refreshCurrentBuffer();
+        Preconditions.checkArgument(currentBuffer.position() > 0);
+        if (currentBuffer.hasRemaining()) {
+          writeChunk(currentBuffer);
+        }
+        // This can be a partially filled chunk. Since we are flushing the buffer
+        // here, we just limit this buffer to the current position. So that next
+        // write will happen in new buffer
+        updateFlushLength();
+        executePutBlock(close, false);
+      } else if (close) {
+        // forcing an "empty" putBlock if stream is being closed without new
+        // data since latest flush - we need to send the "EOF" flag
+        executePutBlock(true, true);
       }
-      // This can be a partially filled chunk. Since we are flushing the buffer
-      // here, we just limit this buffer to the current position. So that next
-      // write will happen in new buffer
-      updateFlushLength();
-      executePutBlock(close, false);
-    } else if (close) {
-      // forcing an "empty" putBlock if stream is being closed without new
-      // data since latest flush - we need to send the "EOF" flag
-      executePutBlock(true, true);
     }
     waitOnFlushFutures();
     watchForCommit(false);
@@ -606,7 +658,7 @@ public class BlockOutputStream extends OutputStream {
   }
 
   CompletableFuture<Void> getCombinedFlushFuture() {
-    return null;
+    return CompletableFuture.completedFuture(null);  // dummy
   }
 
   void waitOnFlushFutures() throws InterruptedException, ExecutionException {

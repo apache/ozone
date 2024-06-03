@@ -28,6 +28,8 @@ import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandResponseProto;
 import org.apache.hadoop.hdds.scm.XceiverClientSpi;
 import org.apache.hadoop.ozone.common.ChunkBuffer;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
@@ -40,6 +42,8 @@ import java.util.concurrent.ExecutionException;
  * buffers once data successfully gets replicated.
  */
 class CommitWatcher extends AbstractCommitWatcher<ChunkBuffer> {
+  private static final Logger LOG = LoggerFactory.getLogger(CommitWatcher.class);
+
   // A reference to the pool of buffers holding the data
   private final BufferPool bufferPool;
 
@@ -60,6 +64,7 @@ class CommitWatcher extends AbstractCommitWatcher<ChunkBuffer> {
       bufferPool.releaseBuffer(buffer);
     }
     final long totalLength = addAckDataLength(acked);
+    LOG.warn("!!! Release buffers for index {} with total length {}", index, totalLength);
     // When putBlock is called, a future is added.
     // When putBlock is replied, the future is removed below.
     // Therefore, the removed future should not be null.

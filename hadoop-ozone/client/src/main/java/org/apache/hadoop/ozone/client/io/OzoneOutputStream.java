@@ -79,7 +79,7 @@ public class OzoneOutputStream extends ByteArrayStreamOutput
     this.outputStream = Objects.requireNonNull(outputStream,
         "outputStream == null");
     this.syncable = syncable != null ? syncable
-        : outputStream instanceof Syncable ? (Syncable) outputStream
+        : outputStream instanceof Syncable ? (Syncable) outputStream  // Should this switch to NonBlocking as well?
         : null;
     this.enableHsync = enableHsync;
   }

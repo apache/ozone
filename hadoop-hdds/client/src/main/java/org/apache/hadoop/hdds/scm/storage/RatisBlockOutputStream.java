@@ -57,7 +57,7 @@ import java.util.function.Supplier;
  * through to the container.
  */
 public class RatisBlockOutputStream extends BlockOutputStream
-    implements Syncable {
+    implements NonBlockingSyncable {
 
   // This object will maintain the commitIndexes and byteBufferList in order
   // Also, corresponding to the logIndex, the corresponding list of buffers will
@@ -133,17 +133,23 @@ public class RatisBlockOutputStream extends BlockOutputStream
   }
 
   @Override
-  public void hflush() throws IOException {
-    hsync();
+  public CompletableFuture<Void> hflush() throws IOException {
+    return hsync();
   }
 
   @Override
-  public void hsync() throws IOException {
+  public CompletableFuture<Void> hsync() throws IOException {
     if (!isClosed()) {
+      CompletableFuture<Void> future = null;
       if (getBufferPool() != null && getBufferPool().getSize() > 0) {
-        handleFlush(false);
+        future = asyncHandleFlush(false);
       }
-      waitForFlushAndCommit(false);
+      if (future != null) {
+        future = future.thenCombine(asyncFlushAndCommit(false), (prev, curr) -> prev);
+      }
+      return future;
+    } else {
+      return CompletableFuture.completedFuture(null);
     }
   }
 }

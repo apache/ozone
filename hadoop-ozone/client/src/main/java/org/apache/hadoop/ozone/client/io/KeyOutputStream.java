@@ -89,9 +89,9 @@ public class KeyOutputStream extends OutputStream
   private final Map<Class<? extends Throwable>, RetryPolicy> retryPolicyMap;
   private int retryCount;
   // how much of data is actually written yet to underlying stream
-  private long offset;
+  private volatile long offset;
   // how much data has been ingested into the stream
-  private long writeOffset;
+  private volatile long writeOffset;
   // whether an exception is encountered while write and whole write could
   // not succeed
   private boolean isException;
@@ -468,7 +468,7 @@ public class KeyOutputStream extends OutputStream
       hsyncPos = writeOffset;
       handleFlushOrClose(StreamAction.HSYNC);  // This no longer waits for future completion
       combinedFlushFutureToWait = combinedFlushFuture;
-      combinedFlushFuture = null;
+      combinedFlushFuture = CompletableFuture.completedFuture(null);
     }
 
     waitForFutureToComplete(combinedFlushFutureToWait);
@@ -487,15 +487,13 @@ public class KeyOutputStream extends OutputStream
    * @param future combinedFlushFuture to wait for.
    */
   private void waitForFutureToComplete(CompletableFuture<Void> future) {
-    if (future == null) {
-      return;
-    }
     try {
+      LOG.warn("!!! POC: Waiting for future to complete");
       future.get();
     } catch (InterruptedException e) {
-      throw new RuntimeException(e);
+      throw new RuntimeException("!!! POC: InterruptedException", e);
     } catch (ExecutionException e) {
-      throw new RuntimeException(e);
+      throw new RuntimeException("!!! POC: ExecutionException", e);
     }
   }
 
@@ -560,13 +558,13 @@ public class KeyOutputStream extends OutputStream
       entry.flush();
       break;
     case HSYNC:
-      entry.hsync();
+      this.combinedFlushFuture = entry.hsync();
       break;
     default:
       throw new IOException("Invalid Operation");
     }
     // A hacky way to return variable without changing too many method signatures
-    combinedFlushFuture = entry.getCombinedFlushFuture();
+//    combinedFlushFuture = entry.getCombinedFlushFuture();
   }
 
   /**

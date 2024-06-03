@@ -62,7 +62,7 @@ abstract class AbstractCommitWatcher<BUFFER> {
 
   private final XceiverClientSpi client;
 
-  private long totalAckDataLength;
+  private volatile long totalAckDataLength;
 
   AbstractCommitWatcher(XceiverClientSpi client) {
     this.client = client;
@@ -83,7 +83,7 @@ abstract class AbstractCommitWatcher<BUFFER> {
     return totalAckDataLength;
   }
 
-  long addAckDataLength(long acked) {
+  synchronized long addAckDataLength(long acked) {
     totalAckDataLength += acked;
     return totalAckDataLength;
   }
