@@ -34,7 +34,6 @@ import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientFactory;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
-import org.apache.hadoop.ozone.common.FSOBaseTool;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
@@ -126,12 +125,12 @@ public class TestFSORepairTool {
 
   @Test
   public void testConnectedTreeOneBucket() throws Exception {
-    FSORepairTool.Report expectedReport = buildConnectedTree("vol1", "bucket1");
+    org.apache.hadoop.ozone.repair.om.FSORepairTool.Report expectedReport = buildConnectedTree("vol1", "bucket1");
 
     // Test the connected tree in debug mode.
-    FSOBaseTool fsoTool = new FSOBaseTool(getOmDB(),
+    FSORepairTool fsoTool = new FSORepairTool(getOmDB(),
         getOmDBLocation(), true);
-    FSOBaseTool.Report debugReport = fsoTool.run();
+    FSORepairTool.Report debugReport = fsoTool.run();
 
     Assertions.assertEquals(expectedReport, debugReport);
     assertConnectedTreeReadable("vol1", "bucket1");
@@ -139,9 +138,9 @@ public class TestFSORepairTool {
 
     // Running again in repair mode should give same results since the tree
     // is connected.
-    fsoTool = new FSORepairTool(getOmDB(),
+    fsoTool = new org.apache.hadoop.ozone.repair.om.FSORepairTool(getOmDB(),
         getOmDBLocation(), false);
-    FSORepairTool.Report repairReport = fsoTool.run();
+    org.apache.hadoop.ozone.repair.om.FSORepairTool.Report repairReport = fsoTool.run();
 
     Assertions.assertEquals(expectedReport, repairReport);
     assertConnectedTreeReadable("vol1", "bucket1");
@@ -154,7 +153,8 @@ public class TestFSORepairTool {
     FSORepairTool.Report report2 = buildConnectedTree("vol1", "bucket2", 10);
     FSORepairTool.Report expectedReport = new FSORepairTool.Report(report1, report2);
 
-    FSORepairTool repair = new FSORepairTool(getOmDB(),
+    FSORepairTool
+        repair = new FSORepairTool(getOmDB(),
         getOmDBLocation(), false);
     FSORepairTool.Report debugReport = repair.run();
     Assertions.assertEquals(expectedReport, debugReport);
@@ -164,12 +164,13 @@ public class TestFSORepairTool {
   public void testMultipleBucketsAndVolumes() throws Exception {
     FSORepairTool.Report report1 = buildConnectedTree("vol1", "bucket1");
     FSORepairTool.Report report2 = buildDisconnectedTree("vol2", "bucket2");
-    FSORepairTool.Report expectedAggregateReport = new FSORepairTool.Report(
+    FSORepairTool.Report expectedAggregateReport = new org.apache.hadoop.ozone.repair.om.FSORepairTool.Report(
         report1, report2);
 
-    FSORepairTool repair = new FSORepairTool(getOmDB(),
+    org.apache.hadoop.ozone.repair.om.FSORepairTool
+        repair = new org.apache.hadoop.ozone.repair.om.FSORepairTool(getOmDB(),
         getOmDBLocation(), false);
-    FSORepairTool.Report generatedReport = repair.run();
+    org.apache.hadoop.ozone.repair.om.FSORepairTool.Report generatedReport = repair.run();
 
     Assertions.assertEquals(generatedReport, expectedAggregateReport);
     assertConnectedTreeReadable("vol1", "bucket1");
@@ -201,9 +202,10 @@ public class TestFSORepairTool {
     ContractTestUtils.touch(fs, new Path("/vol1/bucket1/dir1/file2"));
     disconnectDirectory("dir1");
 
-    FSORepairTool repair = new FSORepairTool(getOmDB(),
+    org.apache.hadoop.ozone.repair.om.FSORepairTool
+        repair = new org.apache.hadoop.ozone.repair.om.FSORepairTool(getOmDB(),
         getOmDBLocation(), false);
-    FSORepairTool.Report generatedReport = repair.run();
+    org.apache.hadoop.ozone.repair.om.FSORepairTool.Report generatedReport = repair.run();
 
     Assertions.assertEquals(1, generatedReport.getUnreachableDirs());
     Assertions.assertEquals(3, generatedReport.getUnreachableFiles());
@@ -214,10 +216,11 @@ public class TestFSORepairTool {
   @Test
   public void testEmptyFileTrees() throws Exception {
     // Run when there are no file trees.
-    FSORepairTool repair = new FSORepairTool(getOmDB(),
+    org.apache.hadoop.ozone.repair.om.FSORepairTool
+        repair = new org.apache.hadoop.ozone.repair.om.FSORepairTool(getOmDB(),
         getOmDBLocation(), false);
-    FSORepairTool.Report generatedReport = repair.run();
-    Assertions.assertEquals(generatedReport, new FSORepairTool.Report());
+    org.apache.hadoop.ozone.repair.om.FSORepairTool.Report generatedReport = repair.run();
+    Assertions.assertEquals(generatedReport, new org.apache.hadoop.ozone.repair.om.FSORepairTool.Report());
     assertDeleteTablesEmpty();
 
     // Create an empty volume and bucket.
@@ -225,10 +228,10 @@ public class TestFSORepairTool {
     fs.mkdirs(new Path("/vol2/bucket1"));
 
     // Run on an empty volume and bucket.
-    repair = new FSORepairTool(getOmDB(),
+    repair = new org.apache.hadoop.ozone.repair.om.FSORepairTool(getOmDB(),
         getOmDBLocation(), false);
     generatedReport = repair.run();
-    Assertions.assertEquals(generatedReport, new FSORepairTool.Report());
+    Assertions.assertEquals(generatedReport, new org.apache.hadoop.ozone.repair.om.FSORepairTool.Report());
     assertDeleteTablesEmpty();
   }
 
@@ -259,14 +262,15 @@ public class TestFSORepairTool {
       legacyStream.close();
 
       // Add an FSO bucket with data.
-      FSORepairTool.Report connectReport = buildConnectedTree("vol1", "fso" +
+      org.apache.hadoop.ozone.repair.om.FSORepairTool.Report connectReport = buildConnectedTree("vol1", "fso" +
           "-bucket");
 
       // Even in repair mode there should be no action. legacy and obs buckets
       // will be skipped and FSO tree is connected.
-      FSORepairTool repair = new FSORepairTool(getOmDB(),
+      org.apache.hadoop.ozone.repair.om.FSORepairTool
+          repair = new org.apache.hadoop.ozone.repair.om.FSORepairTool(getOmDB(),
           getOmDBLocation(), false);
-      FSORepairTool.Report generatedReport = repair.run();
+      org.apache.hadoop.ozone.repair.om.FSORepairTool.Report generatedReport = repair.run();
 
       Assertions.assertEquals(connectReport, generatedReport);
       assertConnectedTreeReadable("vol1", "fso-bucket");
@@ -281,7 +285,7 @@ public class TestFSORepairTool {
   }
 
 
-  private FSORepairTool.Report buildConnectedTree(String volume, String bucket)
+  private org.apache.hadoop.ozone.repair.om.FSORepairTool.Report buildConnectedTree(String volume, String bucket)
       throws Exception {
     return buildConnectedTree(volume, bucket, 0);
   }
@@ -289,8 +293,8 @@ public class TestFSORepairTool {
   /**
    * Creates a tree with 3 reachable directories and 4 reachable files.
    */
-  private FSORepairTool.Report buildConnectedTree(String volume, String bucket,
-                                                  int fileSize)
+  private org.apache.hadoop.ozone.repair.om.FSORepairTool.Report buildConnectedTree(String volume, String bucket,
+                                                                                    int fileSize)
       throws Exception {
     Path bucketPath = new Path("/" + volume + "/" + bucket);
     Path dir1 = new Path(bucketPath, "dir1");
@@ -325,7 +329,7 @@ public class TestFSORepairTool {
 
     assertConnectedTreeReadable(volume, bucket);
 
-    return new FSORepairTool.Report.Builder()
+    return new org.apache.hadoop.ozone.repair.om.FSORepairTool.Report.Builder()
         .setReachableDirs(3)
         .setReachableFiles(4)
         .setReachableBytes(fileSize * 4L)
@@ -354,7 +358,7 @@ public class TestFSORepairTool {
     Assertions.assertTrue(fs.exists(file4));
   }
 
-  private FSORepairTool.Report buildDisconnectedTree(String volume, String bucket)
+  private org.apache.hadoop.ozone.repair.om.FSORepairTool.Report buildDisconnectedTree(String volume, String bucket)
       throws Exception {
     return buildDisconnectedTree(volume, bucket, 0);
   }
@@ -363,8 +367,8 @@ public class TestFSORepairTool {
    * Creates a tree with 2 reachable directories, 1 reachable file, 1
    * unreachable directory, and 3 unreachable files.
    */
-  private FSORepairTool.Report buildDisconnectedTree(String volume, String bucket,
-                                                     int fileSize) throws Exception {
+  private org.apache.hadoop.ozone.repair.om.FSORepairTool.Report buildDisconnectedTree(String volume, String bucket,
+                                                                                       int fileSize) throws Exception {
     buildConnectedTree(volume, bucket, fileSize);
 
     // Manually remove dir1. This should disconnect 3 of the files and 1 of
@@ -373,7 +377,7 @@ public class TestFSORepairTool {
 
     assertDisconnectedTreePartiallyReadable(volume, bucket);
 
-    return new FSORepairTool.Report.Builder()
+    return new org.apache.hadoop.ozone.repair.om.FSORepairTool.Report.Builder()
         .setReachableDirs(1)
         .setReachableFiles(1)
         .setReachableBytes(fileSize)

@@ -19,10 +19,11 @@
 package org.apache.hadoop.ozone.repair.om;
 
 import org.apache.hadoop.hdds.cli.SubcommandWithParent;
-import org.apache.hadoop.ozone.common.FSOBaseCLI;
 import org.apache.hadoop.ozone.repair.OzoneRepair;
 import org.kohsuke.MetaInfServices;
 import picocli.CommandLine;
+
+import java.util.concurrent.Callable;
 
 /**
  * Parser for scm.db file.
@@ -35,24 +36,36 @@ import picocli.CommandLine;
         "INFO and DEBUG levels."
 )
 @MetaInfServices(SubcommandWithParent.class)
-public class FSORepairCLI extends FSOBaseCLI {
+public class FSORepairCLI implements Callable<Void>, SubcommandWithParent {
 
   @CommandLine.ParentCommand
   private OzoneRepair parent;
 
+  @CommandLine.Option(names = {"--db"},
+      required = true,
+      description = "Path to OM RocksDB")
+  private String dbPath;
+
+  @CommandLine.Option(names = {"--dry-run"},
+      description = "Path to OM RocksDB")
+  private boolean dryRun;
+
+  @CommandLine.Option(names = {"--verbose"},
+      description = "More verbose output. ")
+  private boolean verbose;
+
+
   @Override
   public Void call() throws Exception {
-
     try {
-      // TODO case insensitive enum options.
       FSORepairTool
-          repairTool = new FSORepairTool(getDbPath(), false);
+          repairTool = new FSORepairTool(dbPath, dryRun);
       repairTool.run();
     } catch (Exception ex) {
       throw new IllegalArgumentException("FSO repair failed: " + ex.getMessage());
     }
 
-    if (getVerbose()) {
+    if (verbose) {
       System.out.println("FSO repair finished. See client logs for results.");
     }
 
