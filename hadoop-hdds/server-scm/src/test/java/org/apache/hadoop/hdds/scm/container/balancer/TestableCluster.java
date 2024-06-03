@@ -138,8 +138,12 @@ public final class TestableCluster {
     // Use node utilization to determine over and under utilized nodes.
     List<DatanodeUsageInfo> expectedUnBalancedNodes = new ArrayList<>();
     for (int i = 0; i < nodeCount; i++) {
-      double nodeUtilization = nodeUtilizationList[i];
-      if (nodeUtilization < lowerLimit || nodeUtilization > upperLimit) {
+      if (nodeUtilizationList[nodeCount - i - 1] > upperLimit) {
+        expectedUnBalancedNodes.add(nodesInCluster[nodeCount - i - 1]);
+      }
+    }
+    for (int i = 0; i < nodeCount; i++) {
+      if (nodeUtilizationList[i] < lowerLimit) {
         expectedUnBalancedNodes.add(nodesInCluster[i]);
       }
     }

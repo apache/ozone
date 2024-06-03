@@ -39,12 +39,14 @@ import java.util.List;
 
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
+import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.utils.db.Table;
+import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
@@ -65,6 +67,7 @@ import org.apache.hadoop.ozone.recon.spi.impl.OzoneManagerServiceProviderImpl;
  */
 public final class OMMetadataManagerTestUtils {
 
+  public static final String TEST_USER = "TestUser";
   private static OzoneConfiguration configuration;
   private OMMetadataManagerTestUtils() {
   }
@@ -79,6 +82,8 @@ public final class OMMetadataManagerTestUtils {
     OzoneConfiguration omConfiguration = new OzoneConfiguration();
     omConfiguration.set(OZONE_OM_DB_DIRS,
         omDbDir.getAbsolutePath());
+    omConfiguration.set(OMConfigKeys
+        .OZONE_OM_ENABLE_FILESYSTEM_PATHS, "true");
     OMMetadataManager omMetadataManager = new OmMetadataManagerImpl(
         omConfiguration, null);
 
@@ -86,7 +91,7 @@ public final class OMMetadataManagerTestUtils {
     OmVolumeArgs args =
         OmVolumeArgs.newBuilder()
             .setVolume("sampleVol")
-            .setAdminName("TestUser")
+            .setAdminName(TEST_USER)
             .setOwnerName("TestUser")
             .build();
     omMetadataManager.getVolumeTable().put(volumeKey, args);
@@ -262,6 +267,56 @@ public final class OMMetadataManagerTestUtils {
                     .setObjectID(objectId)
                     .setParentObjectID(parentObjectId)
                     .build());
+  }
+
+  @SuppressWarnings("checkstyle:ParameterNumber")
+  private static String getKey(OMMetadataManager omMetadataManager, String key, String bucket, String volume,
+                               String fileName, long parentObjectId, long bucketObjectId, long volumeObjectId,
+                               BucketLayout bucketLayout) {
+    String omKey;
+    if (bucketLayout.equals(BucketLayout.FILE_SYSTEM_OPTIMIZED)) {
+      omKey = omMetadataManager.getOzonePathKey(volumeObjectId,
+          bucketObjectId, parentObjectId, fileName);
+    } else {
+      omKey = omMetadataManager.getOzoneKey(volume, bucket, key);
+    }
+    return omKey;
+  }
+
+  /**
+   * Write a key on OM instance.
+   * @throw IOException while writing.
+   */
+  @SuppressWarnings("checkstyle:parameternumber")
+  public static void writeKeyToOm(OMMetadataManager omMetadataManager,
+                                  String key,
+                                  String bucket,
+                                  String volume,
+                                  String fileName,
+                                  long objectID,
+                                  long parentObjectId,
+                                  long bucketObjectId,
+                                  long volumeObjectId,
+                                  long dataSize,
+                                  BucketLayout bucketLayout,
+                                  ReplicationConfig replicationConfig,
+                                  long creationTime, boolean isFile)
+      throws IOException {
+    String omKey =
+        getKey(omMetadataManager, key, bucket, volume, fileName, parentObjectId, bucketObjectId, volumeObjectId,
+            bucketLayout);
+    omMetadataManager.getKeyTable(bucketLayout).put(omKey,
+        new OmKeyInfo.Builder()
+            .setBucketName(bucket)
+            .setVolumeName(volume)
+            .setKeyName(key)
+            .setFile(isFile)
+            .setReplicationConfig(replicationConfig)
+            .setCreationTime(creationTime)
+            .setObjectID(objectID)
+            .setParentObjectID(parentObjectId)
+            .setDataSize(dataSize)
+            .build());
   }
 
   /**

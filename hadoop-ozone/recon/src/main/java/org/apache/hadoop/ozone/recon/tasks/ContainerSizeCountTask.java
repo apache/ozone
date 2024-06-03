@@ -98,7 +98,7 @@ public class ContainerSizeCountTask extends ReconScmTask {
           try {
             int execute =
                 dslContext.truncate(CONTAINER_COUNT_BY_SIZE).execute();
-            LOG.info("Deleted {} records from {}", execute,
+            LOG.debug("Deleted {} records from {}", execute,
                 CONTAINER_COUNT_BY_SIZE);
           } catch (Exception e) {
             LOG.error("An error occurred while truncating the table {}: {}",
@@ -111,7 +111,7 @@ public class ContainerSizeCountTask extends ReconScmTask {
         endTime = System.nanoTime();
         duration = endTime - startTime;
         durationMilliseconds = duration / 1_000_000;
-        LOG.info("Elapsed Time in milliseconds for Process() execution: {}",
+        LOG.debug("Elapsed Time in milliseconds for Process() execution: {}",
             durationMilliseconds);
       }
     } catch (Throwable t) {
@@ -197,7 +197,7 @@ public class ContainerSizeCountTask extends ReconScmTask {
       // Write to the database
       writeCountsToDB(false, containerSizeCountMap);
       containerSizeCountMap.clear();
-      LOG.info("Completed a 'process' run of ContainerSizeCountTask.");
+      LOG.debug("Completed a 'process' run of ContainerSizeCountTask.");
     } finally {
       lock.writeLock().unlock();
     }

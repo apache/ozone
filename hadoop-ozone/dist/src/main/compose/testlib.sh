@@ -28,6 +28,8 @@ if [[ -n "${OM_SERVICE_ID}" ]] && [[ "${OM_SERVICE_ID}" != "om" ]]; then
   OM_HA_PARAM="--om-service-id=${OM_SERVICE_ID}"
 fi
 
+source ${_testlib_dir}/compose_v2_compatibility.sh
+
 : ${SCM:=scm}
 
 ## @description create results directory, purging any prior data
@@ -142,9 +144,30 @@ start_docker_env(){
 
   trap stop_docker_env EXIT HUP INT TERM
 
-  docker-compose --ansi never up -d --scale datanode="${datanode_count}"
+  opts=""
+  if has_scalable_datanode; then
+    opts="--scale datanode=${datanode_count}"
+  fi
+
+  docker-compose --ansi never up -d $opts
+
   wait_for_safemode_exit
   wait_for_om_leader
+}
+
+has_scalable_datanode() {
+  local files="${COMPOSE_FILE:-docker-compose.yaml}"
+  local oifs=${IFS}
+  local rc=1
+  IFS=:
+  for f in ${files}; do
+    if [[ -e "${f}" ]] && grep -q '^\s*datanode:' ${f}; then
+      rc=0
+      break
+    fi
+  done
+  IFS=${oifs}
+  return ${rc}
 }
 
 ## @description  Execute robot tests in a specific container.
@@ -189,7 +212,7 @@ execute_robot_test(){
       "$SMOKETEST_DIR_INSIDE/$TEST"
   local -i rc=$?
 
-  FULL_CONTAINER_NAME=$(docker-compose ps | grep "_${CONTAINER}_" | head -n 1 | awk '{print $1}')
+  FULL_CONTAINER_NAME=$(docker-compose ps | grep "[-_]${CONTAINER}[-_]" | head -n 1 | awk '{print $1}')
   docker cp "$FULL_CONTAINER_NAME:$OUTPUT_PATH" "$RESULT_DIR/"
 
   if [[ ${rc} -gt 0 ]] && [[ ${rc} -le 250 ]]; then
@@ -228,7 +251,7 @@ create_stack_dumps() {
 ## @description Copy any 'out' files for daemon processes to the result dir
 copy_daemon_logs() {
   local c f
-  for c in $(docker-compose ps | grep "^${COMPOSE_ENV_NAME}_" | awk '{print $1}'); do
+  for c in $(docker-compose ps | grep "^${COMPOSE_ENV_NAME}[_-]" | awk '{print $1}'); do
     for f in $(docker exec "${c}" ls -1 /var/log/hadoop 2> /dev/null | grep -F -e '.out' -e audit); do
       docker cp "${c}:/var/log/hadoop/${f}" "$RESULT_DIR/"
     done

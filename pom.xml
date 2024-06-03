@@ -94,7 +94,7 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
 
-    <maven-gpg-plugin.version>3.2.2</maven-gpg-plugin.version>
+    <maven-gpg-plugin.version>3.2.4</maven-gpg-plugin.version>
     <shell-executable>bash</shell-executable>
 
     <!-- Set the Release year during release -->
@@ -112,11 +112,11 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
 
     <commons-beanutils.version>1.9.4</commons-beanutils.version>
     <commons-cli.version>1.6.0</commons-cli.version>
-    <commons-codec.version>1.15</commons-codec.version>
+    <commons-codec.version>1.17.0</commons-codec.version>
     <commons-collections.version>3.2.2</commons-collections.version>
     <commons-compress.version>1.26.0</commons-compress.version>
     <commons-configuration2.version>2.10.1</commons-configuration2.version>
-    <zstd-jni.version>1.5.6-2</zstd-jni.version>
+    <zstd-jni.version>1.5.6-3</zstd-jni.version>
     <commons-daemon.version>1.3.4</commons-daemon.version>
     <commons-io.version>2.16.1</commons-io.version>
     <commons-lang3.version>3.14.0</commons-lang3.version>
@@ -135,12 +135,12 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
     <java.security.egd>file:///dev/urandom</java.security.egd>
 
     <annotation-api.version>1.3.2</annotation-api.version>
-    <assertj.version>3.12.2</assertj.version>
+    <assertj.version>3.25.3</assertj.version>
     <bonecp.version>0.8.0.RELEASE</bonecp.version>
     <bouncycastle.version>1.78.1</bouncycastle.version>
     <derby.version>10.14.2.0</derby.version>
     <codahale-metrics.version>3.0.2</codahale-metrics.version>
-    <dropwizard-metrics.version>3.2.4</dropwizard-metrics.version>
+    <dropwizard-metrics.version>3.2.6</dropwizard-metrics.version>
     <jacoco.version>0.8.12</jacoco.version>
     <javassist.version>3.30.2-GA</javassist.version>
     <activation-api.version>1.2.2</activation-api.version>
@@ -149,18 +149,17 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
     <jsch.version>0.1.55</jsch.version>
     <cdi-api.version>2.0</cdi-api.version>
     <servlet-api.version>3.1.0</servlet-api.version>
-    <glassfish-servlet.version>3.1</glassfish-servlet.version>
     <jsp-api.version>2.1</jsp-api.version>
     <jsr311-api.version>1.1.1</jsr311-api.version>
 
     <!-- jersey version -->
     <jersey.version>1.19.4</jersey.version>
-    <jersey2.version>2.42</jersey2.version>
+    <jersey2.version>2.43</jersey2.version>
 
     <!-- jackson versions -->
     <jackson1.version>1.9.13</jackson1.version>
     <jackson-jaxr.version>1.9.13</jackson-jaxr.version>
-    <jackson2-bom.version>2.16.1</jackson2-bom.version>
+    <jackson2-bom.version>2.16.2</jackson2-bom.version>
     <woodstox.version>5.4.0</woodstox.version>
 
     <!-- jaegertracing veresion -->
@@ -174,15 +173,15 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
     <httpcore.version>4.4.16</httpcore.version>
 
     <!-- SLF4J/LOG4J version -->
-    <slf4j.version>2.0.12</slf4j.version>
+    <slf4j.version>2.0.13</slf4j.version>
     <log4j2.version>2.17.1</log4j2.version>
     <disruptor.version>3.4.4</disruptor.version>
     <reload4j.version>1.2.25</reload4j.version>
 
     <kerby.version>1.0.1</kerby.version>
-    <kotlin.version>1.9.22</kotlin.version>
+    <kotlin.version>1.9.24</kotlin.version>
     <metainf-services.version>1.11</metainf-services.version>
-    <picocli.version>4.7.5</picocli.version>
+    <picocli.version>4.7.6</picocli.version>
     <prometheus.version>0.16.0</prometheus.version>
     <reflections.version>0.10.2</reflections.version>
 
@@ -252,13 +251,13 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
     <maven-compiler-plugin.version>3.9.0</maven-compiler-plugin.version>
     <maven-install-plugin.version>3.1.1</maven-install-plugin.version>
     <maven-resources-plugin.version>3.1.0</maven-resources-plugin.version>
-    <maven-shade-plugin.version>3.5.2</maven-shade-plugin.version>
+    <maven-shade-plugin.version>3.6.0</maven-shade-plugin.version>
     <maven-jar-plugin.version>3.4.1</maven-jar-plugin.version>
     <maven-war-plugin.version>3.4.0</maven-war-plugin.version>
-    <maven-source-plugin.version>3.3.0</maven-source-plugin.version>
+    <maven-source-plugin.version>3.3.1</maven-source-plugin.version>
     <maven-pdf-plugin.version>1.6.1</maven-pdf-plugin.version>
     <maven-remote-resources-plugin.version>1.7.0</maven-remote-resources-plugin.version>
-    <maven-enforcer-plugin.version>3.4.1</maven-enforcer-plugin.version>
+    <maven-enforcer-plugin.version>3.5.0</maven-enforcer-plugin.version>
     <maven-javadoc-plugin.version>3.0.1</maven-javadoc-plugin.version>
     <maven-assembly-plugin.version>3.7.1</maven-assembly-plugin.version>
     <apache-rat-plugin.version>0.16.1</apache-rat-plugin.version>
@@ -272,7 +271,7 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
     <make-maven-plugin.version>1.0-beta-1</make-maven-plugin.version>
     <native-maven-plugin.version>1.0-alpha-11</native-maven-plugin.version>
     <maven-checkstyle-plugin.version>3.3.1</maven-checkstyle-plugin.version>
-    <maven-site-plugin.version>3.9.1</maven-site-plugin.version>
+    <maven-site-plugin.version>3.12.1</maven-site-plugin.version>
     <maven-antrun-plugin.version>3.1.0</maven-antrun-plugin.version>
     <checkstyle.version>9.3</checkstyle.version>
     <surefire.fork.timeout>1200</surefire.fork.timeout>
@@ -292,7 +291,7 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
     <restrict-imports.enforcer.version>2.5.0</restrict-imports.enforcer.version>
     <jgrapht.version>1.4.0</jgrapht.version>
 
-    <spring.version>5.3.27</spring.version>
+    <spring.version>5.3.34</spring.version>
     <jooq.version>3.11.10</jooq.version>
 
     <vault.driver.version>5.1.0</vault.driver.version>
@@ -552,11 +551,6 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
         <groupId>javax.servlet.jsp</groupId>
         <artifactId>jsp-api</artifactId>
         <version>${jsp-api.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>org.glassfish</groupId>
-        <artifactId>javax.servlet</artifactId>
-        <version>${glassfish-servlet.version}</version>
       </dependency>
       <dependency>
         <groupId>org.glassfish.hk2</groupId>

@@ -20,11 +20,11 @@ package org.apache.hadoop.hdds.server;
 
 import java.io.File;
 import java.io.IOException;
-import java.util.HashMap;
+import java.io.Reader;
 import java.util.List;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
-import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.MappingIterator;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.ObjectReader;
@@ -35,6 +35,8 @@ import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * JSON Utility functions used in ozone.
@@ -46,6 +48,8 @@ public final class JsonUtils {
   // before use.
   private static final ObjectMapper MAPPER;
   private static final ObjectWriter WRITER;
+  private static final ObjectMapper INDENT_OUTPUT_MAPPER; // New mapper instance
+  public static final Logger LOG = LoggerFactory.getLogger(JsonUtils.class);
 
   static {
     MAPPER = new ObjectMapper()
@@ -53,6 +57,12 @@ public final class JsonUtils {
         .registerModule(new JavaTimeModule())
         .configure(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS, false);
     WRITER = MAPPER.writerWithDefaultPrettyPrinter();
+
+    INDENT_OUTPUT_MAPPER = new ObjectMapper()
+        .setSerializationInclusion(JsonInclude.Include.NON_NULL)
+        .registerModule(new JavaTimeModule())
+        .configure(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS, false)
+        .enable(SerializationFeature.INDENT_OUTPUT);
   }
 
   private JsonUtils() {
@@ -66,6 +76,15 @@ public final class JsonUtils {
 
   public static String toJsonString(Object obj) throws IOException {
     return MAPPER.writeValueAsString(obj);
+  }
+
+  public static String toJsonStringWIthIndent(Object obj)  {
+    try {
+      return INDENT_OUTPUT_MAPPER.writeValueAsString(obj);
+    } catch (JsonProcessingException e) {
+      LOG.error("Error in JSON serialization", e);
+      return "{}";
+    }
   }
 
   public static ArrayNode createArrayNode() {
@@ -83,13 +102,12 @@ public final class JsonUtils {
     return MAPPER.readTree(content);
   }
 
-  public static List<HashMap<String, Object>> readTreeAsListOfMaps(String json)
-      throws IOException {
-    return MAPPER.readValue(json,
-        new TypeReference<List<HashMap<String, Object>>>() {
-        });
+  /**
+   * Reads JSON content from a Reader and deserializes it into a Java object.
+   */
+  public static <T> T readFromReader(Reader reader, Class<T> valueType) throws IOException {
+    return MAPPER.readValue(reader, valueType);
   }
-
 
   /**
    * Utility to sequentially write a large collection of items to a file.
