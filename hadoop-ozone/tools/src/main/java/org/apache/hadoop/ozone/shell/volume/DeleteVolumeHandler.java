@@ -47,6 +47,8 @@ import java.util.concurrent.atomic.AtomicInteger;
 import static org.apache.hadoop.fs.FileSystem.FS_DEFAULT_NAME_KEY;
 import static org.apache.hadoop.hdds.scm.net.NetConstants.PATH_SEPARATOR_STR;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_OFS_URI_SCHEME;
+import static org.apache.hadoop.ozone.om.helpers.BucketLayout.FILE_SYSTEM_OPTIMIZED;
+import static org.apache.hadoop.ozone.om.helpers.BucketLayout.LEGACY;
 
 /**
  * Executes deleteVolume call for the shell.
@@ -81,6 +83,7 @@ public class DeleteVolumeHandler extends VolumeHandler {
       throws IOException {
 
     String volumeName = address.getVolumeName();
+    boolean success = false;
     omServiceId = address.getOmServiceId(getConf());
     try {
       if (bRecursive) {
@@ -101,24 +104,47 @@ public class DeleteVolumeHandler extends VolumeHandler {
           }
         }
         vol = client.getObjectStore().getVolume(volumeName);
-        deleteVolumeRecursive();
+        success = deleteVolumeRecursive();
       }
     } catch (InterruptedException e) {
       out().printf("Exception while deleting volume recursively%n");
       return;
     }
-    client.getObjectStore().deleteVolume(volumeName);
-    out().printf("Volume %s is deleted%n", volumeName);
+    if (success) {
+      client.getObjectStore().deleteVolume(volumeName);
+      out().printf("Volume %s is deleted%n", volumeName);
+    }
   }
 
-  private void deleteVolumeRecursive()
-      throws InterruptedException {
+  private boolean handleSpecialVolumeTmp(OzoneBucket bucket)
+      throws IOException {
+    String hostPrefix = OZONE_OFS_URI_SCHEME + "://" +
+        omServiceId + PATH_SEPARATOR_STR;
+    String key = vol.getName() + PATH_SEPARATOR_STR + bucket.getName();
+    OzoneConfiguration clientConf = new OzoneConfiguration(getConf());
+    clientConf.set(FS_DEFAULT_NAME_KEY, hostPrefix);
+    OFSPath ofsPath = new OFSPath(key, clientConf);
+    RootedOzoneFileSystem ofs =
+        (RootedOzoneFileSystem) FileSystem.get(clientConf);
+    if (ofsPath.getBucketName().equals(OFSPath.md5Hex(ofs.getUsername())) ||
+        !ofsPath.isBucket()) {
+      return true;
+    }
+    return false;
+  }
+
+  private boolean deleteVolumeRecursive()
+      throws InterruptedException, IOException {
     // Get all the buckets for given volume
     Iterator<? extends OzoneBucket> bucketIterator =
         vol.listBuckets(null);
 
     while (bucketIterator.hasNext()) {
       OzoneBucket bucket = bucketIterator.next();
+      if ((bucket.getBucketLayout() == FILE_SYSTEM_OPTIMIZED || bucket.getBucketLayout() == LEGACY) &&
+          handleSpecialVolumeTmp(bucket)) {
+        return false;
+      }
       bucketIdList.add(bucket.getName());
       totalBucketCount++;
     }
@@ -128,6 +154,7 @@ public class DeleteVolumeHandler extends VolumeHandler {
     totalBucketCount = 0;
     cleanedBucketCounter.set(0);
     bucketIdList.clear();
+    return true;
   }
 
   /**
@@ -178,11 +205,6 @@ public class DeleteVolumeHandler extends VolumeHandler {
       OzoneConfiguration clientConf = new OzoneConfiguration(getConf());
       clientConf.set(FS_DEFAULT_NAME_KEY, hostPrefix);
       FileSystem fs = FileSystem.get(clientConf);
-      if (handleSpecialVolumeTmp(path, (RootedOzoneFileSystem) fs,
-          clientConf)) {
-        numberOfBucketsCleaned.getAndIncrement();
-        return true;
-      }
       if (!fs.delete(path, true)) {
         throw new IOException("Failed to delete bucket");
       }
@@ -193,19 +215,6 @@ public class DeleteVolumeHandler extends VolumeHandler {
       LOG.error("Could not clean bucket ", e);
       return false;
     }
-  }
-
-  private static boolean handleSpecialVolumeTmp(Path path,
-                                                RootedOzoneFileSystem fs,
-                                                OzoneConfiguration clientConf) {
-    String key = path.toUri().getPath().substring(1);
-    RootedOzoneFileSystem ofs = fs;
-    OFSPath ofsPath = new OFSPath(key, clientConf);
-    if (ofsPath.getBucketName().equals(OFSPath.md5Hex(ofs.getUsername())) ||
-        !ofsPath.isBucket()) {
-      return true;
-    }
-    return false;
   }
 
   private class BucketCleaner implements Runnable {
