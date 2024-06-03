@@ -20,12 +20,14 @@ package org.apache.hadoop.ozone.shell.bucket;
 
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.fs.ozone.RootedOzoneFileSystem;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneKey;
 import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.shell.OzoneAddress;
+import org.apache.hadoop.ozone.OFSPath;
 
 import picocli.CommandLine;
 import picocli.CommandLine.Command;
@@ -143,6 +145,10 @@ public class DeleteBucketHandler extends BucketHandler {
       OzoneConfiguration clientConf = new OzoneConfiguration(getConf());
       clientConf.set(FS_DEFAULT_NAME_KEY, hostPrefix);
       FileSystem fs = FileSystem.get(clientConf);
+      if (handleSpecialVolumeTmp(path, (RootedOzoneFileSystem) fs,
+          clientConf)) {
+        return;
+      }
       if (!fs.delete(path, true)) {
         out().printf("Could not delete bucket %s.%n", bucket.getName());
         return;
@@ -151,5 +157,17 @@ public class DeleteBucketHandler extends BucketHandler {
     } catch (IOException e) {
       out().printf("Could not delete bucket %s.%n", e.getMessage());
     }
+  }
+
+  private static boolean handleSpecialVolumeTmp(Path path,
+      RootedOzoneFileSystem fs, OzoneConfiguration clientConf) {
+    String key = path.toUri().getPath().substring(1);
+    RootedOzoneFileSystem ofs = fs;
+    OFSPath ofsPath = new OFSPath(key, clientConf);
+    if (ofsPath.getBucketName().equals(OFSPath.md5Hex(ofs.getUsername())) ||
+        !ofsPath.isBucket()) {
+      return true;
+    }
+    return false;
   }
 }

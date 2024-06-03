@@ -309,7 +309,7 @@ public class OFSPath {
     return !this.getKeyName().isEmpty();
   }
 
-  private static String md5Hex(String input) {
+  public static String md5Hex(String input) {
     try {
       MessageDigest md = MessageDigest.getInstance("MD5");
       byte[] digest = md.digest(input.getBytes(StandardCharsets.UTF_8));
