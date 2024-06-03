@@ -46,6 +46,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.apache.hadoop.fs.FileSystem.FS_DEFAULT_NAME_KEY;
 import static org.apache.hadoop.hdds.scm.net.NetConstants.PATH_SEPARATOR_STR;
+import static org.apache.hadoop.ozone.OFSPath.OFS_MOUNT_TMP_VOLUMENAME;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_OFS_URI_SCHEME;
 import static org.apache.hadoop.ozone.om.helpers.BucketLayout.FILE_SYSTEM_OPTIMIZED;
 import static org.apache.hadoop.ozone.om.helpers.BucketLayout.LEGACY;
@@ -83,7 +84,7 @@ public class DeleteVolumeHandler extends VolumeHandler {
       throws IOException {
 
     String volumeName = address.getVolumeName();
-    boolean success = false;
+    boolean success = true;
     omServiceId = address.getOmServiceId(getConf());
     try {
       if (bRecursive) {
@@ -141,7 +142,8 @@ public class DeleteVolumeHandler extends VolumeHandler {
 
     while (bucketIterator.hasNext()) {
       OzoneBucket bucket = bucketIterator.next();
-      if ((bucket.getBucketLayout() == FILE_SYSTEM_OPTIMIZED || bucket.getBucketLayout() == LEGACY) &&
+      if (vol.getName().equals(OFS_MOUNT_TMP_VOLUMENAME) &&
+          (bucket.getBucketLayout() == FILE_SYSTEM_OPTIMIZED || bucket.getBucketLayout() == LEGACY) &&
           handleSpecialVolumeTmp(bucket)) {
         return false;
       }
