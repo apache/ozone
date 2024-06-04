@@ -41,8 +41,9 @@ import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientFactory;
 import org.apache.hadoop.ozone.container.ContainerTestHelper;
 import org.apache.ozone.test.GenericTestUtils;
-import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 import java.io.IOException;
 import java.time.Duration;
@@ -54,10 +55,10 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 /**
- * This class tests the 2 way commit in Ratis.
+ * This class tests the 2 way and 3 way commit in Ratis.
  */
 @Timeout(300)
-public class Test2WayCommitInRatis {
+public class TestCommitInRatis {
   private MiniOzoneCluster cluster;
   private OzoneClient client;
   private ObjectStore objectStore;
@@ -132,10 +133,13 @@ public class Test2WayCommitInRatis {
     }
   }
 
-
-  @Test
-  public void test2WayCommitForRetryfailure() throws Exception {
+  @ParameterizedTest
+  @ValueSource(strings = {"ALL_COMMITTED", "MAJORITY_COMMITTED"})
+  public void test2WayCommitForRetryfailure(String watchType) throws Exception {
     OzoneConfiguration conf = new OzoneConfiguration();
+    RatisClientConfig ratisClientConfig = conf.getObject(RatisClientConfig.class);
+    ratisClientConfig.setWatchType(watchType);
+    conf.setFromObject(ratisClientConfig);
     startCluster(conf);
     GenericTestUtils.LogCapturer logCapturer =
         GenericTestUtils.LogCapturer.captureLogs(XceiverClientRatis.LOG);
@@ -172,11 +176,16 @@ public class Test2WayCommitInRatis {
     reply.getResponse().get();
     xceiverClient.watchForCommit(reply.getLogIndex());
 
-    // commitInfo Map will be reduced to 2 here
-    assertEquals(2, ratisClient.getCommitInfoMap().size());
+    if (watchType.equals("ALL_COMMITTED")) {
+      // commitInfo Map will be reduced to 2 here
+      assertEquals(2, ratisClient.getCommitInfoMap().size());
+      assertThat(logCapturer.getOutput()).contains("ALL_COMMITTED way commit failed");
+      assertThat(logCapturer.getOutput()).contains("Committed by majority");
+    } else {
+      // there will still be 3 here for MAJORITY_COMMITTED
+      assertEquals(3, ratisClient.getCommitInfoMap().size());
+    }
     clientManager.releaseClient(xceiverClient, false);
-    assertThat(logCapturer.getOutput()).contains("ALL_COMMITTED way commit failed");
-    assertThat(logCapturer.getOutput()).contains("Committed by majority");
     logCapturer.stopCapturing();
     shutdown();
   }

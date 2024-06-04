@@ -153,7 +153,7 @@ public final class XceiverClientRatis extends XceiverClientSpi {
 
   public long updateCommitInfosMap(
       Collection<RaftProtos.CommitInfoProto> commitInfoProtos) {
-    return updateCommitInfosMap(commitInfoProtos, ReplicationLevel.ALL_COMMITTED);
+    return updateCommitInfosMap(commitInfoProtos, watchType);
   }
 
   public long updateCommitInfosMap(
@@ -304,10 +304,6 @@ public final class XceiverClientRatis extends XceiverClientSpi {
     try {
       CompletableFuture<RaftClientReply> replyFuture = getClient().async().watch(index, watchType);
       final RaftClientReply reply = replyFuture.get();
-      if (!reply.isSuccess()) {
-        LOG.error("{} way commit failed", watchType, reply.getException());
-        throw reply.getException();
-      }
       final long updated = updateCommitInfosMap(reply, watchType);
       Preconditions.checkState(updated >= index, "Returned index " + updated + " is smaller than expected " + index);
       return newWatchReply(index, watchType, updated);

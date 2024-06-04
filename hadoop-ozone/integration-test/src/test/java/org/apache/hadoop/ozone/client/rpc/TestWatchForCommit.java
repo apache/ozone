@@ -76,6 +76,8 @@ import org.apache.ratis.protocol.exceptions.GroupMismatchException;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 /**
  * This class verifies the watchForCommit Handling by xceiverClient.
@@ -253,10 +255,14 @@ public class TestWatchForCommit {
     validateData(keyName, data1);
   }
 
-  @Test
-  public void testWatchForCommitForRetryfailure() throws Exception {
+  @ParameterizedTest
+  @ValueSource(strings = {"ALL_COMMITTED", "MAJORITY_COMMITTED"})
+  public void testWatchForCommitForRetryfailure(String watchType) throws Exception {
     GenericTestUtils.LogCapturer logCapturer =
         GenericTestUtils.LogCapturer.captureLogs(XceiverClientRatis.LOG);
+    RatisClientConfig ratisClientConfig = conf.getObject(RatisClientConfig.class);
+    ratisClientConfig.setWatchType(watchType);
+    conf.setFromObject(ratisClientConfig);
     try (XceiverClientManager clientManager = new XceiverClientManager(conf)) {
       ContainerWithPipeline container1 = storageContainerLocationClient
           .allocateContainer(HddsProtos.ReplicationType.RATIS,
@@ -301,10 +307,14 @@ public class TestWatchForCommit {
     }
   }
 
-  @Test
-  public void test2WayCommitForTimeoutException() throws Exception {
+  @ParameterizedTest
+  @ValueSource(strings = {"ALL_COMMITTED", "MAJORITY_COMMITTED"})
+  public void test2WayCommitForTimeoutException(String watchType) throws Exception {
     GenericTestUtils.LogCapturer logCapturer =
         GenericTestUtils.LogCapturer.captureLogs(XceiverClientRatis.LOG);
+    RatisClientConfig ratisClientConfig = conf.getObject(RatisClientConfig.class);
+    ratisClientConfig.setWatchType(watchType);
+    conf.setFromObject(ratisClientConfig);
     try (XceiverClientManager clientManager = new XceiverClientManager(conf)) {
 
       ContainerWithPipeline container1 = storageContainerLocationClient
@@ -340,14 +350,18 @@ public class TestWatchForCommit {
         xceiverClient.watchForCommit(reply.getLogIndex());
 
         // commitInfo Map will be reduced to 2 here
-        assertEquals(2, ratisClient.getCommitInfoMap().size());
+        if (watchType.equals("ALL_COMMITTED")) {
+          assertEquals(2, ratisClient.getCommitInfoMap().size());
+          String output = logCapturer.getOutput();
+          assertThat(output).contains("ALL_COMMITTED way commit failed");
+          assertThat(output).contains("TimeoutException");
+          assertThat(output).contains("Committed by majority");
+        } else {
+          assertEquals(3, ratisClient.getCommitInfoMap().size());
+        }
       } finally {
         clientManager.releaseClient(xceiverClient, false);
       }
-      String output = logCapturer.getOutput();
-      assertThat(output).contains("ALL_COMMITTED way commit failed");
-      assertThat(output).contains("TimeoutException");
-      assertThat(output).contains("Committed by majority");
     }
     logCapturer.stopCapturing();
   }

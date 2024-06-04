@@ -74,6 +74,8 @@ import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 /**
  * Tests Exception handling by Ozone Client.
@@ -90,6 +92,7 @@ public class TestFailureHandlingByClient {
   private String volumeName;
   private String bucketName;
   private String keyString;
+  private String watchType;
 
   /**
    * Create a MiniDFSCluster for testing.
@@ -108,6 +111,7 @@ public class TestFailureHandlingByClient {
         conf.getObject(RatisClientConfig.class);
     ratisClientConfig.setWriteRequestTimeout(Duration.ofSeconds(30));
     ratisClientConfig.setWatchRequestTimeout(Duration.ofSeconds(30));
+    ratisClientConfig.setWatchType(watchType);
     conf.setFromObject(ratisClientConfig);
 
     conf.setTimeDuration(
@@ -411,8 +415,10 @@ public class TestFailureHandlingByClient {
     validateData(keyName, data.concat(data).getBytes(UTF_8));
   }
 
-  @Test
-  public void testDatanodeExclusionWithMajorityCommit() throws Exception {
+  @ParameterizedTest
+  @ValueSource(strings = {"ALL_COMMITTED", "MAJORITY_COMMITTED"})
+  public void testDatanodeExclusionWithMajorityCommit(String type) throws Exception {
+    this.watchType = type;
     startCluster();
     String keyName = UUID.randomUUID().toString();
     OzoneOutputStream key =
@@ -448,8 +454,10 @@ public class TestFailureHandlingByClient {
     key.write(data.getBytes(UTF_8));
     key.flush();
 
-    assertThat(keyOutputStream.getExcludeList().getDatanodes())
-        .contains(datanodes.get(0));
+    if (type.equals("ALL_COMMITTED")) {
+      assertThat(keyOutputStream.getExcludeList().getDatanodes())
+          .contains(datanodes.get(0));
+    }
     assertThat(keyOutputStream.getExcludeList().getContainerIds()).isEmpty();
     assertThat(keyOutputStream.getExcludeList().getPipelineIds()).isEmpty();
     // The close will just write to the buffer
