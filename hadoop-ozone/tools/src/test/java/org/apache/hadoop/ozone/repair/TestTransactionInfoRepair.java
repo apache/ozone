@@ -29,11 +29,13 @@ import org.rocksdb.ColumnFamilyHandle;
 import org.rocksdb.RocksDB;
 import org.rocksdb.RocksDBException;
 
+import java.io.IOException;
 import java.io.UnsupportedEncodingException;
 import java.util.function.Supplier;
 
 import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.TRANSACTION_INFO_TABLE;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.anyList;
 import static org.mockito.Mockito.anyString;
@@ -74,15 +76,10 @@ public class TestTransactionInfoRepair {
   @Test
   public void testCommandWhenTableNotInDBForGivenPath() throws Exception {
     ManagedRocksDB mdb = mockRockDB();
-    try (GenericTestUtils.SystemErrCapturer errCapturer = new GenericTestUtils.SystemErrCapturer()) {
-      testCommand(mdb, null, () -> {
-        try {
-          return errCapturer.getOutput();
-        } catch (UnsupportedEncodingException e) {
-          throw new RuntimeException(e);
-        }
-      }, new String[]{TRANSACTION_INFO_TABLE + " is not in a column family in DB for the given path"});
-    }
+    IllegalArgumentException exception = assertThrows(IllegalArgumentException.class,
+        () -> testCommand(mdb, null, null, new String[]{""}));
+    assertThat(exception.getMessage().contains(TRANSACTION_INFO_TABLE +
+        " is not in a column family in DB for the given path"));
   }
 
   @Test
@@ -93,15 +90,10 @@ public class TestTransactionInfoRepair {
     doThrow(RocksDBException.class).when(rdb)
         .put(any(ColumnFamilyHandle.class), any(byte[].class), any(byte[].class));
 
-    try (GenericTestUtils.SystemErrCapturer errCapturer = new GenericTestUtils.SystemErrCapturer()) {
-      testCommand(mdb, mock(ColumnFamilyHandle.class), () -> {
-        try {
-          return errCapturer.getOutput();
-        } catch (UnsupportedEncodingException e) {
-          throw new RuntimeException(e);
-        }
-      }, new String[]{"Failed to update the RocksDB for the given path: " + DB_PATH});
-    }
+    IOException exception = assertThrows(IOException.class,
+        () -> testCommand(mdb, mock(ColumnFamilyHandle.class), null, new String[]{""}));
+    assertThat(exception.getMessage().contains(TRANSACTION_INFO_TABLE +
+        " is not in a column family in DB for the given path"));
   }
 
 
@@ -122,7 +114,8 @@ public class TestTransactionInfoRepair {
       RDBRepair rdbRepair = mock(RDBRepair.class);
       when(rdbRepair.getDbPath()).thenReturn(DB_PATH);
       when(cmd.getParent()).thenReturn(rdbRepair);
-      cmd.setHighestTransactionTermIndex(TEST_TERM + "#" + TEST_INDEX);
+      cmd.setHighestTransactionTerm(TEST_TERM);
+      cmd.setHighestTransactionIndex(TEST_INDEX);
 
       cmd.call();
       for (String message : messages) {

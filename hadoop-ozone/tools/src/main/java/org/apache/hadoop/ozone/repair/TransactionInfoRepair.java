@@ -36,6 +36,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import picocli.CommandLine;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.Callable;
@@ -48,8 +49,8 @@ import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.TRANSACTION_INFO_
  * Tool to update the highest term-index in transactionInfoTable.
  */
 @CommandLine.Command(
-    name = "transaction",
-    description = "CLI to update the highest index in transactionInfoTable.",
+    name = "update-transaction",
+    description = "CLI to update the highest index in transactionInfoTable. Currently it only supports for OM.",
     mixinStandardHelpOptions = true,
     versionProvider = HddsVersionProvider.class
 )
@@ -57,24 +58,33 @@ import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.TRANSACTION_INFO_
 public class TransactionInfoRepair
     implements Callable<Void>, SubcommandWithParent  {
 
-  protected static final Logger LOG = LoggerFactory.getLogger(TransactionInfoRepair.class);
-
   @CommandLine.Spec
   private static CommandLine.Model.CommandSpec spec;
 
   @CommandLine.ParentCommand
   private RDBRepair parent;
 
+  @CommandLine.Option(names = {"--term"},
+      required = true,
+      description = "Highest term of transactionInfoTable. The input should be non-zero long integer.")
+  private long highestTransactionTerm;
+
   @CommandLine.Option(names = {"--highest-transaction"},
       required = true,
-      description = "Highest termIndex of transactionInfoTable. The input format is: {term}#{index}.")
-  private String highestTransactionTermIndex;
+      description = "Highest index of transactionInfoTable. The input should be non-zero long integer.")
+  private long highestTransactionIndex;
 
 
-  protected void setHighestTransactionTermIndex(
-      String highestTransactionTermIndex) {
-    this.highestTransactionTermIndex = highestTransactionTermIndex;
+  protected void setHighestTransactionTerm(
+      long highestTransactionTerm) {
+    this.highestTransactionTerm = highestTransactionTerm;
   }
+
+  protected void setHighestTransactionIndex(
+      long highestTransactionIndex) {
+    this.highestTransactionIndex = highestTransactionIndex;
+  }
+
 
   @Override
   public Void call() throws Exception {
@@ -86,16 +96,15 @@ public class TransactionInfoRepair
     try (ManagedRocksDB db = ManagedRocksDB.open(dbPath, cfDescList, cfHandleList)) {
       ColumnFamilyHandle transactionInfoCfh = RocksDBUtils.getColumnFamilyHandle(TRANSACTION_INFO_TABLE, cfHandleList);
       if (transactionInfoCfh == null) {
-        System.err.println(TRANSACTION_INFO_TABLE + " is not in a column family in DB for the given path.");
-        return null;
+        throw new IllegalArgumentException(TRANSACTION_INFO_TABLE +
+            " is not in a column family in DB for the given path.");
       }
       TransactionInfo originalTransactionInfo =
           RocksDBUtils.getValue(db, transactionInfoCfh, TRANSACTION_INFO_KEY, TransactionInfo.getCodec());
 
       System.out.println("The original highest transaction Info was " + originalTransactionInfo.getTermIndex());
 
-      TransactionInfo transactionInfo = TransactionInfo.valueOf(
-          highestTransactionTermIndex);
+      TransactionInfo transactionInfo = TransactionInfo.valueOf(highestTransactionTerm, highestTransactionIndex);
 
       byte[] transactionInfoBytes = TransactionInfo.getCodec().toPersistedFormat(transactionInfo);
       db.get()
@@ -107,8 +116,8 @@ public class TransactionInfoRepair
     } catch (RocksDBException exception) {
       System.err.println("Failed to update the RocksDB for the given path: " + dbPath);
       System.err.println(
-          "Make sure that Ozone entity (OM, SCM or DN) is not running for the give database path and current host.");
-      LOG.error(exception.toString());
+          "Make sure that Ozone entity (OM) is not running for the give database path and current host.");
+      throw new IOException("Failed to update RocksDB: " + exception);
     } finally {
       IOUtils.closeQuietly(cfHandleList);
     }

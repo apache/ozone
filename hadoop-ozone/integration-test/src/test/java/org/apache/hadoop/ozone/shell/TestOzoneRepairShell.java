@@ -31,12 +31,13 @@ import org.junit.jupiter.api.Test;
 import picocli.CommandLine;
 
 import java.io.ByteArrayOutputStream;
+import java.io.File;
+import java.io.IOException;
 import java.io.PrintStream;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import static org.apache.hadoop.ozone.OzoneConsts.OM_DB_NAME;
-import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static java.nio.charset.StandardCharsets.UTF_8;
@@ -83,12 +84,12 @@ public class TestOzoneRepairShell {
   @Test
   public void testUpdateTransactionInfoTable() throws Exception {
     CommandLine cmd = new CommandLine(new RDBRepair()).addSubcommand(new TransactionInfoRepair());
-    String dbPath = OMStorage.getOmDbDir(conf) + OM_KEY_PREFIX + OM_DB_NAME;
+    String dbPath = new File(OMStorage.getOmDbDir(conf) + "/" + OM_DB_NAME).getPath();
 
     cluster.getOzoneManager().stop();
 
     String cmdOut = scanTransactionInfoTable(dbPath);
-    String originalHighestTermIndex = parseScanOutput(cmdOut);
+    String[] originalHighestTermIndex = parseScanOutput(cmdOut);
 
     String testTerm = "1111";
     String testIndex = "1111";
@@ -97,14 +98,19 @@ public class TestOzoneRepairShell {
     int exitCode = cmd.execute(args);
     assertEquals(0, exitCode);
     assertThat(out.toString(DEFAULT_ENCODING)).contains(
-        "The original highest transaction Info was " + originalHighestTermIndex);
+        "The original highest transaction Info was " +
+            String.format("(t:%s, i:%s)", originalHighestTermIndex[0], originalHighestTermIndex[1]));
     assertThat(out.toString(DEFAULT_ENCODING)).contains(
         String.format("The highest transaction info has been updated to: (t:%s, i:%s)",
         testTerm, testIndex));
 
     String cmdOut2 = scanTransactionInfoTable(dbPath);
     assertThat(cmdOut2).contains(testTerm + "#" + testIndex);
+
+    cmd.execute("--db=" + dbPath, "transaction", "--highest-transaction",
+        originalHighestTermIndex[0] + "#" + originalHighestTermIndex[1]);
     cluster.getOzoneManager().restart();
+    cluster.newClient().getObjectStore().createVolume("vol1");
   }
 
   private String scanTransactionInfoTable(String dbPath) throws Exception {
@@ -115,14 +121,13 @@ public class TestOzoneRepairShell {
     return out.toString(DEFAULT_ENCODING);
   }
 
-  private String parseScanOutput(String output) {
+  private String[] parseScanOutput(String output) throws IOException {
     Pattern pattern = Pattern.compile(TRANSACTION_INFO_TABLE_TERM_INDEX_PATTERN);
     Matcher matcher = pattern.matcher(output);
     if (matcher.find()) {
-      String[] termIndex = matcher.group(1).split("#");
-      return String.format("(t:%s, i:%s)", termIndex[0], termIndex[1]);
+      return matcher.group(1).split("#");
     }
-    return "dummyTermIndex";
+    throw new IllegalStateException("Failed to scan and find raft's highest term and index from TransactionInfo table");
   }
 
 }
