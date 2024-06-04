@@ -27,6 +27,10 @@
     <description>Default implementation of Apache Ozone Distributed Data Store's cryptographic functions</description>
     <name>Apache Ozone HDDS Crypto - Default</name>
 
+    <properties>
+        <maven.test.skip>true</maven.test.skip> <!-- no tests in this module so far -->
+    </properties>
+
     <dependencies>
 
     </dependencies>
