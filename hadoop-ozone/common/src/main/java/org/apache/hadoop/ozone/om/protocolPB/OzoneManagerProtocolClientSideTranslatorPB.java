@@ -972,15 +972,16 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
         .build();
     OMResponse omResponse = submitRequest(omRequest);
 
-    if (!quiet) {
-      handleError(omResponse);
-    }
-    List<OzoneManagerProtocolProtos.DeleteKeyError> errors =
-        omResponse.getDeleteKeysResponse().getErrorsList();
     Map<String, ErrorInfo> keyToErrors = new HashMap<>();
-    for (OzoneManagerProtocolProtos.DeleteKeyError deleteKeyError : errors) {
-      keyToErrors.put(deleteKeyError.getKey(),
-          new ErrorInfo(deleteKeyError.getErrorCode(), deleteKeyError.getErrorMsg()));
+    if (quiet) {
+      List<OzoneManagerProtocolProtos.DeleteKeyError> errors =
+          omResponse.getDeleteKeysResponse().getErrorsList();
+      for (OzoneManagerProtocolProtos.DeleteKeyError deleteKeyError : errors) {
+        keyToErrors.put(deleteKeyError.getKey(),
+            new ErrorInfo(deleteKeyError.getErrorCode(), deleteKeyError.getErrorMsg()));
+      }
+    } else {
+      handleError(omResponse);
     }
     return keyToErrors;
   }

@@ -448,9 +448,9 @@ public class BucketEndpoint extends EndpointBase {
     OzoneBucket bucket = getBucket(bucketName);
     MultiDeleteResponse result = new MultiDeleteResponse();
     Map<String, ErrorInfo> undeletedKeyResultMap;
+    List<String> deleteKeys = new ArrayList<>();
 
     if (request.getObjects() != null) {
-      List<String> deleteKeys = new ArrayList<>();
       for (DeleteObject keyToDelete : request.getObjects()) {
         deleteKeys.add(keyToDelete.getKey());
       }
@@ -458,10 +458,13 @@ public class BucketEndpoint extends EndpointBase {
       try {
         undeletedKeyResultMap = bucket.deleteKeys(deleteKeys, true);
         for (DeleteObject d : request.getObjects()) {
-          if (!request.isQuiet() && (!(undeletedKeyResultMap.containsKey(d.getKey())) ||
-              undeletedKeyResultMap.get(d.getKey()).getCode().equals(ResultCodes.KEY_NOT_FOUND.name()))) {
+          if (!(undeletedKeyResultMap.containsKey(d.getKey())) ||
+              undeletedKeyResultMap.get(d.getKey()).getCode().equals(ResultCodes.KEY_NOT_FOUND.name())) {
             // if the key is not found, it is assumed to be successfully deleted
-            result.addDeleted(new DeletedObject(d.getKey()));
+            deleteKeys.remove(d.getKey());
+            if (!request.isQuiet()) {
+              result.addDeleted(new DeletedObject(d.getKey()));
+            }
           } else if (undeletedKeyResultMap.containsKey(d.getKey()) &&
               !undeletedKeyResultMap.get(d.getKey()).getCode().equals(ResultCodes.KEY_NOT_FOUND.name())) {
             // All errors other than KEY_NOT_FOUND are returned
@@ -480,11 +483,7 @@ public class BucketEndpoint extends EndpointBase {
     }
 
     Map<String, String> auditMap = getAuditParameters();
-    List<String> keys = new ArrayList<>();
-    for (DeleteObject d : request.getObjects()) {
-      keys.add(d.getKey());
-    }
-    auditMap.put("Keys", keys.toString());
+    auditMap.put("failedDeletes", deleteKeys.toString());
     if (result.getErrors().size() != 0) {
       AUDIT.logWriteFailure(buildAuditMessageForFailure(s3GAction,
           auditMap, new Exception("MultiDelete Exception")));
