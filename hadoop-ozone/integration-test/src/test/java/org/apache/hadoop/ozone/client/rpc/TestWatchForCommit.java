@@ -345,7 +345,7 @@ public class TestWatchForCommit {
         clientManager.releaseClient(xceiverClient, false);
       }
       String output = logCapturer.getOutput();
-      assertThat(output).contains("3 way commit failed");
+      assertThat(output).contains("ALL_COMMITTED way commit failed");
       assertThat(output).contains("TimeoutException");
       assertThat(output).contains("Committed by majority");
     }

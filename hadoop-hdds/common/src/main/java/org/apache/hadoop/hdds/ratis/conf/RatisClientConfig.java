@@ -98,6 +98,21 @@ public class RatisClientConfig {
     }
   }
 
+  @Config(key = "client.request.watch.type",
+      defaultValue = "ALL_COMMITTED",
+      type = ConfigType.STRING,
+      tags = { OZONE, CLIENT, PERFORMANCE },
+      description = "The RATIS watch commit type, ALL_COMMITTED or MAJORITY_COMMITTED.")
+  private String watchType;
+
+  public String getWatchType() {
+    return watchType;
+  }
+
+  public void setWatchType(String type) {
+    watchType = type;
+  }
+
   @Config(key = "client.request.write.timeout",
       defaultValue = "5m",
       type = ConfigType.TIME,

@@ -175,7 +175,7 @@ public class Test2WayCommitInRatis {
     // commitInfo Map will be reduced to 2 here
     assertEquals(2, ratisClient.getCommitInfoMap().size());
     clientManager.releaseClient(xceiverClient, false);
-    assertThat(logCapturer.getOutput()).contains("3 way commit failed");
+    assertThat(logCapturer.getOutput()).contains("ALL_COMMITTED way commit failed");
     assertThat(logCapturer.getOutput()).contains("Committed by majority");
     logCapturer.stopCapturing();
     shutdown();
