@@ -35,6 +35,7 @@ import org.apache.hadoop.hdds.scm.XceiverClientManager;
 import org.apache.hadoop.hdds.scm.XceiverClientMetrics;
 import org.apache.hadoop.hdds.scm.XceiverClientRatis;
 import org.apache.hadoop.hdds.scm.XceiverClientReply;
+import org.apache.hadoop.hdds.scm.XceiverClientReply.Reason;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.ozone.common.Checksum;
@@ -373,8 +374,9 @@ public class BlockDataStreamOutput implements ByteBufferStreamOutput {
       XceiverClientReply reply = bufferFull ?
           commitWatcher.watchOnFirstIndex() :
           commitWatcher.watchOnLastIndex();
+      // Note: After HDDS-10108, reply is always null because it no longer sends actual watch request.
       if (reply != null) {
-        List<DatanodeDetails> dnList = reply.getDatanodes();
+        List<DatanodeDetails> dnList = reply.getDatanodes(Reason.TIMEOUT);
         if (!dnList.isEmpty()) {
           Pipeline pipe = xceiverClient.getPipeline();
 

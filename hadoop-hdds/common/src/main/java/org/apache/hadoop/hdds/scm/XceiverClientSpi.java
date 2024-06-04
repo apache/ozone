@@ -36,12 +36,14 @@ import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import com.google.common.annotations.VisibleForTesting;
 import org.apache.ratis.proto.RaftProtos.ReplicationLevel;
 import org.apache.ratis.util.function.CheckedBiConsumer;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * A Client for the storageContainer protocol.
  */
 public abstract class XceiverClientSpi implements Closeable {
-
+  public static final Logger LOG = LoggerFactory.getLogger(XceiverClientSpi.class);
   /**
    * Validator for container command request/response.
    */
@@ -156,6 +158,7 @@ public abstract class XceiverClientSpi implements Closeable {
     return new IOException("Failed to execute command "
         + HddsUtils.processForDebug(request), e);
   }
+
   /**
    * Sends a given command to server gets a waitable future back.
    *

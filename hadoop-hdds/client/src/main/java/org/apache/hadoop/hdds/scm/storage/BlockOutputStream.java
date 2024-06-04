@@ -43,6 +43,7 @@ import org.apache.hadoop.hdds.scm.OzoneClientConfig;
 import org.apache.hadoop.hdds.scm.StreamBufferArgs;
 import org.apache.hadoop.hdds.scm.XceiverClientFactory;
 import org.apache.hadoop.hdds.scm.XceiverClientReply;
+import org.apache.hadoop.hdds.scm.XceiverClientReply.Reason;
 import org.apache.hadoop.hdds.scm.XceiverClientSpi;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
@@ -59,6 +60,8 @@ import com.google.common.base.Preconditions;
 import static org.apache.hadoop.hdds.DatanodeVersion.COMBINED_PUTBLOCK_WRITECHUNK_RPC;
 import static org.apache.hadoop.hdds.scm.storage.ContainerProtocolCalls.putBlockAsync;
 import static org.apache.hadoop.hdds.scm.storage.ContainerProtocolCalls.writeChunkAsync;
+
+import org.apache.ratis.protocol.exceptions.RaftRetryFailureException;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -452,8 +455,9 @@ public class BlockOutputStream extends OutputStream {
     checkOpen();
     try {
       final XceiverClientReply reply = sendWatchForCommit(bufferFull);
+      // Note: After HDDS-10108, reply is always null because it no longer sends actual watch request.
       if (reply != null) {
-        List<DatanodeDetails> dnList = reply.getDatanodes();
+        List<DatanodeDetails> dnList = reply.getDatanodes(Reason.TIMEOUT);
         if (!dnList.isEmpty()) {
           Pipeline pipe = xceiverClient.getPipeline();
 
@@ -508,22 +512,42 @@ public class BlockOutputStream extends OutputStream {
           putBlockAsync(xceiverClient, blockData, close, tokenString);
       CompletableFuture<ContainerProtos.ContainerCommandResponseProto> future =
           asyncReply.getResponse();
+
       flushFuture = future.thenApplyAsync(e -> {
         try {
           validateResponse(e);
         } catch (IOException sce) {
           throw new CompletionException(sce);
         }
+        boolean timedOut = e.getMessage().equals("TIMEOUT");
         // if the ioException is not set, putBlock is successful
-        if (getIoException() == null && !force) {
+        if (getIoException() == null && !force && !timedOut) {
           handleSuccessfulPutBlock(e.getPutBlock().getCommittedBlockLength(),
               asyncReply, flushPos, byteBufferList);
+        }
+        if (timedOut) {
+          // Add the failed datanodes to the failedServers list
+          List<DatanodeDetails> dnList = asyncReply.getDatanodes(Reason.TIMEOUT);
+          if (!dnList.isEmpty()) {
+            Pipeline pipe = xceiverClient.getPipeline();
+            LOG.warn("Failed to commit BlockId {} on {}. Failed nodes: {}", blockID, pipe, dnList);
+            failedServers.addAll(dnList);
+          }
         }
         return e;
       }, responseExecutor).exceptionally(e -> {
         if (LOG.isDebugEnabled()) {
           LOG.debug("putBlock failed for blockID {} with exception {}",
                   blockID, e.getLocalizedMessage());
+        }
+/**
+ * Example e.getCause() result:
+ * org.apache.ratis.protocol.exceptions.RaftRetryFailureException: Failed RaftClientRequest:client-30ECCB03FDE0->459e18bf-a79e-41af-8dcd-f2ecdc7dc210@group-64F45F267D0D, cid=35, seq=5*, RW, cmdType: PutBlock
+ * traceID: ""
+ * containerID: 1
+ * datanodeUuid: "8be7c046-6538-4d8f-875e-845333dc5dab"
+ */
+        if (e.getCause().getClass() == RaftRetryFailureException.class) {
         }
         CompletionException ce =  new CompletionException(e);
         setIoException(ce);
@@ -802,22 +826,33 @@ public class BlockOutputStream extends OutputStream {
           blockID.get(), data, tokenString, replicationIndex, blockData);
       CompletableFuture<ContainerProtos.ContainerCommandResponseProto>
           respFuture = asyncReply.getResponse();
+
       validateFuture = respFuture.thenApplyAsync(e -> {
         try {
           validateResponse(e);
         } catch (IOException sce) {
           respFuture.completeExceptionally(sce);
         }
+        boolean timedOut = e.getMessage().equals("TIMEOUT");
         // if the ioException is not set, putBlock is successful
-        if (getIoException() == null && putBlockPiggybacking) {
+        if (getIoException() == null && putBlockPiggybacking) {  // & !timedOut
           handleSuccessfulPutBlock(e.getWriteChunk().getCommittedBlockLength(),
               asyncReply, flushPos, byteBufferList);
+        }
+        if (timedOut) {
+          // Add the failed datanodes to the failedServers list
+          List<DatanodeDetails> dnList = asyncReply.getDatanodes(Reason.TIMEOUT);
+          if (!dnList.isEmpty()) {
+            Pipeline pipe = xceiverClient.getPipeline();
+            LOG.warn("Failed to commit BlockId {} on {}. Failed nodes: {}", blockID, pipe, dnList);
+            failedServers.addAll(dnList);
+          }
         }
         return e;
       }, responseExecutor).exceptionally(e -> {
         String msg = "Failed to write chunk " + chunkInfo.getChunkName() +
             " into block " + blockID;
-        LOG.debug("{}, exception: {}", msg, e.getLocalizedMessage());
+        LOG.debug("{}, exception: {}", msg, e.getLocalizedMessage(), e);
         CompletionException ce = new CompletionException(msg, e);
         setIoException(ce);
         throw ce;

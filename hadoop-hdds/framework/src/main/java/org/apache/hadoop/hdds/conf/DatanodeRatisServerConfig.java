@@ -54,14 +54,14 @@ public class DatanodeRatisServerConfig {
   }
 
   @Config(key = "watch.timeout",
-      defaultValue = "180s",
+      defaultValue = "10s",
       type = ConfigType.TIME,
       tags = {OZONE, DATANODE, RATIS},
       description = "The timeout duration for watch request on Ratis Server. " +
           "Timeout for the watch request in Ratis server to acknowledge a " +
           "particular request is replayed to all servers."
   )
-  private long watchTimeOut = Duration.ofSeconds(180).toMillis();
+  private long watchTimeOut = Duration.ofSeconds(10).toMillis();
 
   public long getWatchTimeOut() {
     return watchTimeOut;

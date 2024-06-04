@@ -24,7 +24,9 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos
 
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * This class represents the reply from XceiverClient.
@@ -35,16 +37,22 @@ public class XceiverClientReply {
   private long logIndex;
 
   /**
-   * List of datanodes where the command got executed and reply is received.
-   * If there is an exception in the reply, these datanodes will inform
-   * about the servers where there is a failure.
+   * Key: Reason -> Value: List of DatanodeDetails
    */
-  private final List<DatanodeDetails> datanodes;
+  private final Map<Reason, List<DatanodeDetails>> reasonToNodeListMap;
+
+  /**
+   * Indicates the reason datanode is added to the list.
+   */
+  public enum Reason {
+    UNKNOWN,  // The default reason that keeps the original behavior of unmodified callers. TODO: Categorize them
+    TIMEOUT,  // Datanode that timed out in ALL_COMMITTED or MAJORITY_COMMITTED request
+  }
 
   public XceiverClientReply(
       CompletableFuture<ContainerCommandResponseProto> response) {
     this.response = response;
-    this.datanodes = new LinkedList<>();
+    this.reasonToNodeListMap = new ConcurrentHashMap<>();
   }
 
   public CompletableFuture<ContainerCommandResponseProto> getResponse() {
@@ -60,11 +68,25 @@ public class XceiverClientReply {
   }
 
   public List<DatanodeDetails> getDatanodes() {
-    return datanodes;
+    return getDatanodes(Reason.UNKNOWN);
+  }
+
+  public List<DatanodeDetails> getDatanodes(Reason reason) {
+    return reasonToNodeListMap.get(reason);
   }
 
   public void addDatanode(DatanodeDetails dn) {
-    datanodes.add(dn);
+    addDatanode(dn, Reason.UNKNOWN);
+  }
+
+  public void addDatanode(DatanodeDetails dn, Reason reason) {
+    reasonToNodeListMap.compute(reason, (k, v) -> {
+      if (v == null) {
+        v = new LinkedList<>();
+      }
+      v.add(dn);
+      return v;
+    });
   }
 
   public void setResponse(
