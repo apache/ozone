@@ -125,7 +125,7 @@ public class XceiverClientGrpc extends XceiverClientSpi {
     this.secConfig = new SecurityConfig(config);
     this.semaphore =
         new Semaphore(HddsClientUtils.getMaxOutstandingRequests(config));
-    this.metrics = XceiverClientManager.getXceiverClientMetrics();
+    this.metrics = XceiverClientManager.getXceiverClientMetrics(config);
     this.channels = new HashMap<>();
     this.asyncStubs = new HashMap<>();
     this.topologyAwareRead = config.getBoolean(
@@ -547,7 +547,7 @@ public class XceiverClientGrpc extends XceiverClientSpi {
                 metrics.decrPendingContainerOpsMetrics(request.getCmdType());
                 long cost = System.currentTimeMillis() - requestTime;
                 metrics.addContainerOpsLatency(request.getCmdType(),
-                    cost);
+                    cost, dn.getUuidString());
                 if (LOG.isDebugEnabled()) {
                   LOG.debug("Executed command {} on datanode {}, cost = {}, "
                           + "cmdType = {}", processForDebug(request), dn,
@@ -562,7 +562,7 @@ public class XceiverClientGrpc extends XceiverClientSpi {
                 metrics.decrPendingContainerOpsMetrics(request.getCmdType());
                 long cost = System.currentTimeMillis() - requestTime;
                 metrics.addContainerOpsLatency(request.getCmdType(),
-                    System.currentTimeMillis() - requestTime);
+                    System.currentTimeMillis() - requestTime, dn.getUuidString());
                 if (LOG.isDebugEnabled()) {
                   LOG.debug("Executed command {} on datanode {}, cost = {}, "
                           + "cmdType = {}", processForDebug(request), dn,

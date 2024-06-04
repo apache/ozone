@@ -687,6 +687,13 @@ public final class OzoneConfigKeys {
   public static final String OZONE_SECURITY_CRYPTO_COMPLIANCE_MODE_UNRESTRICTED = "unrestricted";
 
 
+  public static final String OZONE_XCEIVER_CLIENT_TOP_METRICS_LATENCY_RECORD_THRESHOLD_MS_KEY =
+      "ozone.xceiver.client.top.metrics.latency.record.threshold.ms.key";
+
+  public static final String OZONE_XCEIVER_CLIENT_TOP_METRICS_LATENCY_RECORD_COUNT_KEY =
+      "ozone.xceiver.client.top.metrics.latency.record.count.key";
+
+
   /**
    * There is no need to instantiate this class.
    */
