@@ -118,7 +118,7 @@ public class ClientTrustManager extends X509ExtendedTrustManager {
   private void initialize(List<X509Certificate> caCerts)
       throws CertificateException {
     try {
-      KeyStore ks = KeyStore.getInstance("jks");
+      KeyStore ks = KeyStore.getInstance(KeyStore.getDefaultType());
       ks.load(null);
 
       for (X509Certificate cert : caCerts) {
@@ -145,7 +145,7 @@ public class ClientTrustManager extends X509ExtendedTrustManager {
   private List<X509Certificate> loadCerts(CACertificateProvider caCertsProvider)
       throws CertificateException {
     try {
-      LOG.info("Loading certificates for client.");
+      LOG.debug("Loading certificates for client.");
       if (caCertsProvider == null) {
         return remoteProvider.provideCACerts();
       }

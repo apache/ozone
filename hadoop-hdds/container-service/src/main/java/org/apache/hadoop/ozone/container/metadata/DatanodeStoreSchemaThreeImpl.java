@@ -17,6 +17,7 @@
  */
 package org.apache.hadoop.ozone.container.metadata;
 
+import org.apache.hadoop.hdds.StringUtils;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.DeletedBlocksTransaction;
 import org.apache.hadoop.hdds.utils.MetadataKeyFilters;
@@ -30,7 +31,6 @@ import org.apache.hadoop.hdds.utils.db.managed.ManagedCompactRangeOptions;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.interfaces.BlockIterator;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
-import org.bouncycastle.util.Strings;
 import org.rocksdb.LiveFileMetaData;
 
 import java.io.File;
@@ -152,13 +152,12 @@ public class DatanodeStoreSchemaThreeImpl extends DatanodeStoreWithIncrementalCh
     int numThreshold = df.getAutoCompactionSmallSstFileNum();
     long sizeThreshold = df.getAutoCompactionSmallSstFileSize();
     Map<String, Map<Integer, List<LiveFileMetaData>>> stat = new HashMap<>();
-    Map<Integer, List<LiveFileMetaData>> map;
 
     for (LiveFileMetaData file: liveFileMetaDataList) {
       if (file.size() >= sizeThreshold) {
         continue;
       }
-      String cf = Strings.fromByteArray(file.columnFamilyName());
+      String cf = StringUtils.bytes2String(file.columnFamilyName());
       stat.computeIfAbsent(cf, k -> new HashMap<>());
       stat.computeIfPresent(cf, (k, v) -> {
         v.computeIfAbsent(file.level(), l -> new LinkedList<>());

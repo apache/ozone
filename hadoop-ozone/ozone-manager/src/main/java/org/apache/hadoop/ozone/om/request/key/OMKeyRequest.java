@@ -780,6 +780,12 @@ public abstract class OMKeyRequest extends OMClientRequest {
       dbKeyInfo.getMetadata().putAll(KeyValueUtil.getFromProtobuf(
           keyArgs.getMetadataList()));
 
+      // Construct a new tags from KeyArgs
+      // Clear the old one when the key is overwritten
+      dbKeyInfo.getTags().clear();
+      dbKeyInfo.getTags().putAll(KeyValueUtil.getFromProtobuf(
+          keyArgs.getTagsList()));
+
       dbKeyInfo.setFileEncryptionInfo(encInfo);
       return dbKeyInfo;
     }
@@ -821,7 +827,10 @@ public abstract class OMKeyRequest extends OMClientRequest {
                 keyArgs, omBucketInfo, omPathInfo, prefixManager))
             .addAllMetadata(KeyValueUtil.getFromProtobuf(
                     keyArgs.getMetadataList()))
+            .addAllTags(KeyValueUtil.getFromProtobuf(
+                    keyArgs.getTagsList()))
             .setUpdateID(transactionLogIndex)
+            .setOwnerName(keyArgs.getOwnerName())
             .setFile(true);
     if (omPathInfo instanceof OMFileRequest.OMPathInfoWithFSO) {
       // FileTable metadata format

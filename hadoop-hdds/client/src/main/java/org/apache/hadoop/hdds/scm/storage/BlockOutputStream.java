@@ -53,6 +53,7 @@ import org.apache.hadoop.ozone.common.ChunkBuffer;
 import org.apache.hadoop.ozone.common.OzoneChecksumException;
 import org.apache.hadoop.security.token.Token;
 import org.apache.hadoop.security.token.TokenIdentifier;
+import org.apache.hadoop.util.DirectBufferPool;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
@@ -107,6 +108,7 @@ public class BlockOutputStream extends OutputStream {
   private int chunkIndex;
   private final AtomicLong chunkOffset = new AtomicLong();
   private final BufferPool bufferPool;
+  private static final DirectBufferPool DIRECT_BUFFER_POOL = new DirectBufferPool();
   // The IOException will be set by response handling thread in case there is an
   // exception received in the response. If the exception is set, the next
   // request will fail upfront.
@@ -186,9 +188,10 @@ public class BlockOutputStream extends OutputStream {
     // tell DataNode I will send incremental chunk list
     if (config.getIncrementalChunkList()) {
       this.containerBlockData.addMetadata(INCREMENTAL_CHUNK_LIST_KV);
-      this.lastChunkBuffer =
-          ByteBuffer.allocate(config.getStreamBufferSize());
+      this.lastChunkBuffer = DIRECT_BUFFER_POOL.getBuffer(config.getStreamBufferSize());
       this.lastChunkOffset = 0;
+    } else {
+      this.lastChunkBuffer = null;
     }
     this.xceiverClient = xceiverClientManager.acquireClient(pipeline);
     this.bufferPool = bufferPool;
@@ -726,10 +729,14 @@ public class BlockOutputStream extends OutputStream {
     xceiverClient = null;
     cleanup();
 
-    if (bufferList !=  null) {
+    if (bufferList != null) {
       bufferList.clear();
     }
     bufferList = null;
+    if (lastChunkBuffer != null) {
+      DIRECT_BUFFER_POOL.returnBuffer(lastChunkBuffer);
+      lastChunkBuffer = null;
+    }
   }
 
   /**

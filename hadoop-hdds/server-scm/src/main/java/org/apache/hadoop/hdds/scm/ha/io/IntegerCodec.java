@@ -21,6 +21,7 @@ package org.apache.hadoop.hdds.scm.ha.io;
 import com.google.common.primitives.Ints;
 import com.google.protobuf.ByteString;
 import com.google.protobuf.InvalidProtocolBufferException;
+import com.google.protobuf.Proto2Utils;
 
 /**
  * Encodes/decodes an integer to a byte string.
@@ -29,7 +30,8 @@ public class IntegerCodec implements Codec {
   @Override
   public ByteString serialize(Object object)
       throws InvalidProtocolBufferException {
-    return ByteString.copyFrom(Ints.toByteArray((Integer) object));
+    // toByteArray returns a new array
+    return Proto2Utils.unsafeByteString(Ints.toByteArray((Integer) object));
   }
 
   @Override

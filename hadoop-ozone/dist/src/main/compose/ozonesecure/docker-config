@@ -84,7 +84,8 @@ OZONE-SITE.XML_ozone.scm.dead.node.interval=45s
 OZONE-SITE.XML_hdds.container.report.interval=60s
 OZONE-SITE.XML_ozone.scm.close.container.wait.duration=5s
 
-OZONE-SITE.XML_hdds.container.ratis.datastream.enabled=true
+# Ratis streaming is disabled to ensure coverage for both cases
+OZONE-SITE.XML_hdds.container.ratis.datastream.enabled=false
 
 HDFS-SITE.XML_dfs.datanode.kerberos.principal=dn/dn@EXAMPLE.COM
 HDFS-SITE.XML_dfs.datanode.kerberos.keytab.file=/etc/security/keytabs/dn.keytab
@@ -114,7 +115,7 @@ OZONE-SITE.XML_ozone.s3g.http.auth.kerberos.keytab=/etc/security/keytabs/s3g.key
 OZONE-SITE.XML_ozone.s3g.http.auth.kerberos.principal=HTTP/s3g@EXAMPLE.COM
 OZONE-SITE.XML_ozone.httpfs.http.auth.kerberos.keytab=/etc/security/keytabs/httpfs.keytab
 OZONE-SITE.XML_ozone.httpfs.http.auth.kerberos.principal=HTTP/httpfs@EXAMPLE.COM
-OZONE-SITE.XML_ozone.recon.http.auth.kerberos.principal=HTTP/recon@EXAMPLE.COM
+OZONE-SITE.XML_ozone.recon.http.auth.kerberos.principal=*
 OZONE-SITE.XML_ozone.recon.http.auth.kerberos.keytab=/etc/security/keytabs/recon.keytab
 
 CORE-SITE.XML_hadoop.http.authentication.simple.anonymous.allowed=false

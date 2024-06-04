@@ -55,9 +55,9 @@ public class OMKeyCommitResponseWithFSO extends OMKeyCommitResponse {
       @Nonnull OmBucketInfo omBucketInfo,
       Map<String, RepeatedOmKeyInfo> deleteKeyMap, long volumeId,
       boolean isHSync,
-      OmKeyInfo newOpenKeyInfo) {
+      OmKeyInfo newOpenKeyInfo, String openKeyNameToUpdate, OmKeyInfo openKeyToUpdate) {
     super(omResponse, omKeyInfo, ozoneKeyName, openKeyName,
-            omBucketInfo, deleteKeyMap, isHSync, newOpenKeyInfo);
+        omBucketInfo, deleteKeyMap, isHSync, newOpenKeyInfo, openKeyNameToUpdate, openKeyToUpdate);
     this.volumeId = volumeId;
   }
 
@@ -88,6 +88,7 @@ public class OMKeyCommitResponseWithFSO extends OMKeyCommitResponse {
         getOmKeyInfo(), volumeId, getOmBucketInfo().getObjectID());
 
     updateDeletedTable(omMetadataManager, batchOperation);
+    handleOpenKeyToUpdate(omMetadataManager, batchOperation);
 
     // update bucket usedBytes.
     omMetadataManager.getBucketTable().putWithBatch(batchOperation,

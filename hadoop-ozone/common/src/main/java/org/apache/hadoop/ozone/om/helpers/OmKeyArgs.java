@@ -39,6 +39,7 @@ public final class OmKeyArgs implements Auditable {
   private final String volumeName;
   private final String bucketName;
   private final String keyName;
+  private final String ownerName;
   private long dataSize;
   private final ReplicationConfig replicationConfig;
   private List<OmKeyLocationInfo> locationInfoList;
@@ -52,6 +53,7 @@ public final class OmKeyArgs implements Auditable {
   private final boolean recursive;
   private final boolean headOp;
   private final boolean forceUpdateContainerCacheFromSCM;
+  private final Map<String, String> tags;
 
   private OmKeyArgs(Builder b) {
     this.volumeName = b.volumeName;
@@ -70,6 +72,8 @@ public final class OmKeyArgs implements Auditable {
     this.recursive = b.recursive;
     this.headOp = b.headOp;
     this.forceUpdateContainerCacheFromSCM = b.forceUpdateContainerCacheFromSCM;
+    this.ownerName = b.ownerName;
+    this.tags = b.tags;
   }
 
   public boolean getIsMultipartKey() {
@@ -102,6 +106,10 @@ public final class OmKeyArgs implements Auditable {
 
   public String getKeyName() {
     return keyName;
+  }
+
+  public String getOwner() {
+    return ownerName;
   }
 
   public long getDataSize() {
@@ -144,12 +152,17 @@ public final class OmKeyArgs implements Auditable {
     return forceUpdateContainerCacheFromSCM;
   }
 
+  public Map<String, String> getTags() {
+    return tags;
+  }
+
   @Override
   public Map<String, String> toAuditMap() {
     Map<String, String> auditMap = new LinkedHashMap<>();
     auditMap.put(OzoneConsts.VOLUME, this.volumeName);
     auditMap.put(OzoneConsts.BUCKET, this.bucketName);
     auditMap.put(OzoneConsts.KEY, this.keyName);
+    auditMap.put(OzoneConsts.OWNER, this.ownerName);
     auditMap.put(OzoneConsts.DATA_SIZE, String.valueOf(this.dataSize));
     auditMap.put(OzoneConsts.REPLICATION_CONFIG,
         (this.replicationConfig != null) ?
@@ -170,6 +183,7 @@ public final class OmKeyArgs implements Auditable {
         .setVolumeName(volumeName)
         .setBucketName(bucketName)
         .setKeyName(keyName)
+        .setOwnerName(ownerName)
         .setDataSize(dataSize)
         .setReplicationConfig(replicationConfig)
         .setLocationInfoList(locationInfoList)
@@ -181,7 +195,8 @@ public final class OmKeyArgs implements Auditable {
         .setHeadOp(headOp)
         .setLatestVersionLocation(latestVersionLocation)
         .setAcls(acls)
-        .setForceUpdateContainerCacheFromSCM(forceUpdateContainerCacheFromSCM);
+        .setForceUpdateContainerCacheFromSCM(forceUpdateContainerCacheFromSCM)
+        .addAllTags(tags);
   }
 
   @Nonnull
@@ -206,6 +221,7 @@ public final class OmKeyArgs implements Auditable {
     private String volumeName;
     private String bucketName;
     private String keyName;
+    private String ownerName;
     private long dataSize;
     private ReplicationConfig replicationConfig;
     private List<OmKeyLocationInfo> locationInfoList;
@@ -219,6 +235,7 @@ public final class OmKeyArgs implements Auditable {
     private boolean recursive;
     private boolean headOp;
     private boolean forceUpdateContainerCacheFromSCM;
+    private final Map<String, String> tags = new HashMap<>();
 
     public Builder setVolumeName(String volume) {
       this.volumeName = volume;
@@ -232,6 +249,11 @@ public final class OmKeyArgs implements Auditable {
 
     public Builder setKeyName(String key) {
       this.keyName = key;
+      return this;
+    }
+
+    public Builder setOwnerName(String owner) {
+      this.ownerName = owner;
       return this;
     }
 
@@ -285,6 +307,16 @@ public final class OmKeyArgs implements Auditable {
       if (Boolean.parseBoolean(metadata.get(OzoneConsts.GDPR_FLAG))) {
         GDPRSymmetricKey.newDefaultInstance().acceptKeyDetails(metadata::put);
       }
+      return this;
+    }
+
+    public Builder addTag(String key, String value) {
+      this.tags.put(key, value);
+      return this;
+    }
+
+    public Builder addAllTags(Map<String, String> tagmap) {
+      this.tags.putAll(tagmap);
       return this;
     }
 

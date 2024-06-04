@@ -28,6 +28,7 @@ import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
 import picocli.CommandLine;
 
 import java.io.IOException;
+import java.time.Instant;
 import java.util.List;
 import java.util.concurrent.Callable;
 
@@ -66,6 +67,16 @@ public class ListOpenFilesSubCommand implements Callable<Void> {
       description = "Format output as JSON")
   private boolean json;
 
+  @CommandLine.Option(names = { "--show-deleted" },
+      defaultValue = "false",
+      description = "Whether to show deleted open keys")
+  private boolean showDeleted;
+
+  @CommandLine.Option(names = { "--show-overwritten" },
+      defaultValue = "false",
+      description = "Whether to show overwritten open keys")
+  private boolean showOverwritten;
+
   // Conforms to ListOptions, but not all in ListOptions applies here thus
   // not using that directly
   @CommandLine.Option(
@@ -95,7 +106,7 @@ public class ListOpenFilesSubCommand implements Callable<Void> {
   public Void call() throws Exception {
 
     if (StringUtils.isEmpty(omServiceId) && StringUtils.isEmpty(omHost)) {
-      System.err.println("Error: Please specify -id or -host");
+      System.err.println("Error: Please specify --service-id or --service-host");
       return null;
     }
 
@@ -105,6 +116,12 @@ public class ListOpenFilesSubCommand implements Callable<Void> {
     ListOpenFilesResult res =
         ozoneManagerClient.listOpenFiles(pathPrefix, limit, startItem);
 
+    if (!showDeleted) {
+      res.getOpenKeys().removeIf(o -> o.getKeyInfo().getMetadata().containsKey(OzoneConsts.DELETED_HSYNC_KEY));
+    }
+    if (!showOverwritten) {
+      res.getOpenKeys().removeIf(o -> o.getKeyInfo().getMetadata().containsKey(OzoneConsts.OVERWRITTEN_HSYNC_KEY));
+    }
     if (json) {
       // Print detailed JSON
       printOpenKeysListAsJson(res);
@@ -132,13 +149,16 @@ public class ListOpenFilesSubCommand implements Callable<Void> {
     if (startItem != null && !startItem.isEmpty()) {
       msg += "\nafter continuation token:\n  " + startItem;
     }
-    msg += "\n\nClient ID\t\tCreation time\tHsync'ed\tOpen File Path";
+    msg += "\n\nClient ID\t\t\tCreation time\t\tHsync'ed\t";
+    msg += showDeleted ? "Deleted\t" : "";
+    msg += showOverwritten ? "Overwritten\t" : "";
+    msg += "Open File Path";
     System.out.println(msg);
 
     for (OpenKeySession e : openFileList) {
       long clientId = e.getId();
       OmKeyInfo omKeyInfo = e.getKeyInfo();
-      String line = clientId + "\t" + omKeyInfo.getCreationTime() + "\t";
+      String line = clientId + "\t" + Instant.ofEpochMilli(omKeyInfo.getCreationTime()) + "\t";
 
       if (omKeyInfo.isHsync()) {
         String hsyncClientIdStr =
@@ -151,8 +171,24 @@ public class ListOpenFilesSubCommand implements Callable<Void> {
           // initially opens the file (!)
           line += "Yes w/ cid " + hsyncClientIdStr + "\t";
         }
+
+        if (showDeleted) {
+          if (omKeyInfo.getMetadata().containsKey(OzoneConsts.DELETED_HSYNC_KEY)) {
+            line += "Yes\t\t";
+          } else {
+            line += "No\t\t";
+          }
+        }
+        if (showOverwritten) {
+          if (omKeyInfo.getMetadata().containsKey(OzoneConsts.OVERWRITTEN_HSYNC_KEY)) {
+            line += "Yes\t";
+          } else {
+            line += "No\t";
+          }
+        }
       } else {
-        line += "No\t\t";
+        line += showDeleted ? "No\t\tNo\t\t" : "No\t\t";
+        line += showOverwritten ? "No\t" : "";
       }
 
       line += getFullPathFromKeyInfo(omKeyInfo);

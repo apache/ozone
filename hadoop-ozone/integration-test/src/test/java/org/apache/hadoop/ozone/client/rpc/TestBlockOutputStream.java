@@ -22,6 +22,7 @@ import java.time.Duration;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.stream.Stream;
 
 import org.apache.commons.lang3.RandomUtils;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
@@ -52,7 +53,8 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.TestInstance;
 import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.ValueSource;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Type.PutBlock;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Type.WriteChunk;
@@ -147,11 +149,21 @@ class TestBlockOutputStream {
     }
   }
 
+  private static Stream<Arguments> clientParameters() {
+    return Stream.of(
+        Arguments.of(true, true),
+        Arguments.of(true, false),
+        Arguments.of(false, true),
+        Arguments.of(false, false)
+    );
+  }
+
   static OzoneClientConfig newClientConfig(ConfigurationSource source,
-      boolean flushDelay) {
+      boolean flushDelay, boolean enablePiggybacking) {
     OzoneClientConfig clientConfig = source.getObject(OzoneClientConfig.class);
     clientConfig.setChecksumType(ChecksumType.NONE);
     clientConfig.setStreamBufferFlushDelay(flushDelay);
+    clientConfig.setEnablePutblockPiggybacking(enablePiggybacking);
     return clientConfig;
   }
 
@@ -163,9 +175,9 @@ class TestBlockOutputStream {
   }
 
   @ParameterizedTest
-  @ValueSource(booleans = {true, false})
-  void testWriteLessThanChunkSize(boolean flushDelay) throws Exception {
-    OzoneClientConfig config = newClientConfig(cluster.getConf(), flushDelay);
+  @MethodSource("clientParameters")
+  void testWriteLessThanChunkSize(boolean flushDelay, boolean enablePiggybacking) throws Exception {
+    OzoneClientConfig config = newClientConfig(cluster.getConf(), flushDelay, enablePiggybacking);
     try (OzoneClient client = newClient(cluster.getConf(), config)) {
       XceiverClientMetrics metrics =
           XceiverClientManager.getXceiverClientMetrics();
@@ -258,9 +270,9 @@ class TestBlockOutputStream {
   }
 
   @ParameterizedTest
-  @ValueSource(booleans = {true, false})
-  void testWriteExactlyFlushSize(boolean flushDelay) throws Exception {
-    OzoneClientConfig config = newClientConfig(cluster.getConf(), flushDelay);
+  @MethodSource("clientParameters")
+  void testWriteExactlyFlushSize(boolean flushDelay, boolean enablePiggybacking) throws Exception {
+    OzoneClientConfig config = newClientConfig(cluster.getConf(), flushDelay, enablePiggybacking);
     try (OzoneClient client = newClient(cluster.getConf(), config)) {
       XceiverClientMetrics metrics =
           XceiverClientManager.getXceiverClientMetrics();
@@ -281,10 +293,16 @@ class TestBlockOutputStream {
       byte[] data1 = RandomUtils.nextBytes(dataLength);
       key.write(data1);
 
-      assertEquals(pendingWriteChunkCount + 2,
-          metrics.getPendingContainerOpCountMetrics(WriteChunk));
-      assertEquals(pendingPutBlockCount + 1,
-          metrics.getPendingContainerOpCountMetrics(PutBlock));
+      assertEquals(writeChunkCount + 2,
+          metrics.getContainerOpCountMetrics(WriteChunk));
+      assertEquals(putBlockCount + 1,
+          metrics.getContainerOpCountMetrics(PutBlock));
+      // The WriteChunk and PutBlock can be completed soon.
+      assertThat(metrics.getPendingContainerOpCountMetrics(WriteChunk))
+          .isLessThanOrEqualTo(pendingWriteChunkCount + 2);
+      assertThat(metrics.getPendingContainerOpCountMetrics(PutBlock))
+          .isLessThanOrEqualTo(pendingPutBlockCount + 1);
+
       KeyOutputStream keyOutputStream =
           assertInstanceOf(KeyOutputStream.class, key.getOutputStream());
       assertEquals(1, keyOutputStream.getStreamEntries().size());
@@ -302,7 +320,10 @@ class TestBlockOutputStream {
       assertEquals(dataLength, blockOutputStream.getTotalDataFlushedLength());
       assertEquals(0, blockOutputStream.getTotalAckDataLength());
 
-      assertEquals(0, blockOutputStream.getCommitIndex2flushedDataMap().size());
+      // Before flush, if there was no pending PutBlock which means it is complete.
+      // It put a commit index into commitIndexMap.
+      assertEquals((metrics.getPendingContainerOpCountMetrics(PutBlock) == pendingPutBlockCount) ? 1 : 0,
+          blockOutputStream.getCommitIndex2flushedDataMap().size());
 
       // Now do a flush.
       key.flush();
@@ -310,10 +331,20 @@ class TestBlockOutputStream {
       assertEquals(1, keyOutputStream.getStreamEntries().size());
       // The previously written data is equal to flushSize, so no action is
       // triggered when execute flush, if flushDelay is enabled.
-      assertEquals(pendingWriteChunkCount + (flushDelay ? 2 : 0),
-          metrics.getPendingContainerOpCountMetrics(WriteChunk));
-      assertEquals(pendingPutBlockCount + (flushDelay ? 1 : 0),
-          metrics.getPendingContainerOpCountMetrics(PutBlock));
+      // If flushDelay is disabled, it will call waitOnFlushFutures to wait all
+      // putBlocks finished. It was broken because WriteChunk and PutBlock
+      // can be complete regardless of whether the flush executed or not.
+      if (flushDelay) {
+        assertThat(metrics.getPendingContainerOpCountMetrics(WriteChunk))
+            .isLessThanOrEqualTo(pendingWriteChunkCount + 2);
+        assertThat(metrics.getPendingContainerOpCountMetrics(PutBlock))
+            .isLessThanOrEqualTo(pendingWriteChunkCount + 1);
+      } else {
+        assertEquals(pendingWriteChunkCount,
+            metrics.getPendingContainerOpCountMetrics(WriteChunk));
+        assertEquals(pendingPutBlockCount,
+            metrics.getPendingContainerOpCountMetrics(PutBlock));
+      }
 
       // Since the data in the buffer is already flushed, flush here will have
       // no impact on the counters and data structures
@@ -325,7 +356,12 @@ class TestBlockOutputStream {
           blockOutputStream.getBufferPool().computeBufferData());
       assertEquals(dataLength, blockOutputStream.getWrittenDataLength());
       assertEquals(dataLength, blockOutputStream.getTotalDataFlushedLength());
-      assertEquals(0, blockOutputStream.getCommitIndex2flushedDataMap().size());
+      // If the flushDelay feature is enabled, nothing happens.
+      // The assertions will be as same as those before flush.
+      // If it flushed, the Commit index will be removed.
+      assertEquals((flushDelay &&
+              (metrics.getPendingContainerOpCountMetrics(PutBlock) == pendingPutBlockCount)) ? 1 : 0,
+          blockOutputStream.getCommitIndex2flushedDataMap().size());
       assertEquals(flushDelay ? 0 : dataLength,
           blockOutputStream.getTotalAckDataLength());
 
@@ -353,9 +389,9 @@ class TestBlockOutputStream {
   }
 
   @ParameterizedTest
-  @ValueSource(booleans = {true, false})
-  void testWriteMoreThanChunkSize(boolean flushDelay) throws Exception {
-    OzoneClientConfig config = newClientConfig(cluster.getConf(), flushDelay);
+  @MethodSource("clientParameters")
+  void testWriteMoreThanChunkSize(boolean flushDelay, boolean enablePiggybacking) throws Exception {
+    OzoneClientConfig config = newClientConfig(cluster.getConf(), flushDelay, enablePiggybacking);
     try (OzoneClient client = newClient(cluster.getConf(), config)) {
       XceiverClientMetrics metrics =
           XceiverClientManager.getXceiverClientMetrics();
@@ -402,7 +438,7 @@ class TestBlockOutputStream {
       key.flush();
       assertEquals(writeChunkCount + 2,
           metrics.getContainerOpCountMetrics(WriteChunk));
-      assertEquals(putBlockCount,
+      assertEquals(putBlockCount + ((enablePiggybacking) ? 0 : 1),
           metrics.getContainerOpCountMetrics(PutBlock));
       assertEquals(pendingWriteChunkCount,
           metrics.getPendingContainerOpCountMetrics(WriteChunk));
@@ -431,9 +467,9 @@ class TestBlockOutputStream {
           metrics.getPendingContainerOpCountMetrics(PutBlock));
       assertEquals(writeChunkCount + 2,
           metrics.getContainerOpCountMetrics(WriteChunk));
-      assertEquals(putBlockCount + 1,
+      assertEquals(putBlockCount + ((enablePiggybacking) ? 1 : 2),
           metrics.getContainerOpCountMetrics(PutBlock));
-      assertEquals(totalOpCount + 3, metrics.getTotalOpCount());
+      assertEquals(totalOpCount  + ((enablePiggybacking) ? 3 : 4), metrics.getTotalOpCount());
       assertEquals(0, keyOutputStream.getStreamEntries().size());
 
       validateData(keyName, data1, client.getObjectStore(), VOLUME, BUCKET);
@@ -441,9 +477,9 @@ class TestBlockOutputStream {
   }
 
   @ParameterizedTest
-  @ValueSource(booleans = {true, false})
-  void testWriteMoreThanFlushSize(boolean flushDelay) throws Exception {
-    OzoneClientConfig config = newClientConfig(cluster.getConf(), flushDelay);
+  @MethodSource("clientParameters")
+  void testWriteMoreThanFlushSize(boolean flushDelay, boolean enablePiggybacking) throws Exception {
+    OzoneClientConfig config = newClientConfig(cluster.getConf(), flushDelay, enablePiggybacking);
     try (OzoneClient client = newClient(cluster.getConf(), config)) {
       XceiverClientMetrics metrics =
           XceiverClientManager.getXceiverClientMetrics();
@@ -482,13 +518,29 @@ class TestBlockOutputStream {
       assertEquals(FLUSH_SIZE, blockOutputStream.getTotalDataFlushedLength());
       assertEquals(0, blockOutputStream.getTotalAckDataLength());
 
-      assertEquals(0, blockOutputStream.getCommitIndex2flushedDataMap().size());
+      // Before flush, if there was no pending PutBlock which means it is complete.
+      // It put a commit index into commitIndexMap.
+      assertEquals((metrics.getPendingContainerOpCountMetrics(PutBlock) == pendingPutBlockCount) ? 1 : 0,
+          blockOutputStream.getCommitIndex2flushedDataMap().size());
 
-      assertEquals(FLUSH_SIZE, blockOutputStream.getTotalDataFlushedLength());
-      assertEquals(0, blockOutputStream.getCommitIndex2flushedDataMap().size());
+      key.flush();
+      if (flushDelay) {
+        // If the flushDelay feature is enabled, nothing happens.
+        // The assertions will be as same as those before flush.
+        assertEquals(FLUSH_SIZE, blockOutputStream.getTotalDataFlushedLength());
+        assertEquals((metrics.getPendingContainerOpCountMetrics(PutBlock) == pendingPutBlockCount) ? 1 : 0,
+            blockOutputStream.getCommitIndex2flushedDataMap().size());
 
-      assertEquals(0, blockOutputStream.getTotalAckDataLength());
-      assertEquals(1, keyOutputStream.getStreamEntries().size());
+        assertEquals(0, blockOutputStream.getTotalAckDataLength());
+        assertEquals(1, keyOutputStream.getStreamEntries().size());
+      } else {
+        assertEquals(dataLength, blockOutputStream.getTotalDataFlushedLength());
+        assertEquals(0, blockOutputStream.getCommitIndex2flushedDataMap().size());
+
+        assertEquals(dataLength, blockOutputStream.getTotalAckDataLength());
+        assertEquals(1, keyOutputStream.getStreamEntries().size());
+      }
+
 
       key.close();
 
@@ -498,9 +550,11 @@ class TestBlockOutputStream {
           metrics.getPendingContainerOpCountMetrics(PutBlock));
       assertEquals(writeChunkCount + 3,
           metrics.getContainerOpCountMetrics(WriteChunk));
-      assertEquals(putBlockCount + 1,
+      // If the flushDelay was disabled, it sends PutBlock with the data in the buffer.
+      assertEquals(putBlockCount + (flushDelay ? 2 : 3) - (enablePiggybacking ? 1 : 0),
           metrics.getContainerOpCountMetrics(PutBlock));
-      assertEquals(totalOpCount + 4, metrics.getTotalOpCount());
+      assertEquals(totalOpCount + (flushDelay ? 5 : 6) - (enablePiggybacking ? 1 : 0),
+          metrics.getTotalOpCount());
       assertEquals(dataLength, blockOutputStream.getTotalAckDataLength());
       // make sure the bufferPool is empty
       assertEquals(0, blockOutputStream.getBufferPool().computeBufferData());
@@ -513,9 +567,9 @@ class TestBlockOutputStream {
   }
 
   @ParameterizedTest
-  @ValueSource(booleans = {true, false})
-  void testWriteExactlyMaxFlushSize(boolean flushDelay) throws Exception {
-    OzoneClientConfig config = newClientConfig(cluster.getConf(), flushDelay);
+  @MethodSource("clientParameters")
+  void testWriteExactlyMaxFlushSize(boolean flushDelay, boolean enablePiggybacking) throws Exception {
+    OzoneClientConfig config = newClientConfig(cluster.getConf(), flushDelay, enablePiggybacking);
     try (OzoneClient client = newClient(cluster.getConf(), config)) {
       XceiverClientMetrics metrics =
           XceiverClientManager.getXceiverClientMetrics();
@@ -604,9 +658,9 @@ class TestBlockOutputStream {
   }
 
   @ParameterizedTest
-  @ValueSource(booleans = {true, false})
-  void testWriteMoreThanMaxFlushSize(boolean flushDelay) throws Exception {
-    OzoneClientConfig config = newClientConfig(cluster.getConf(), flushDelay);
+  @MethodSource("clientParameters")
+  void testWriteMoreThanMaxFlushSize(boolean flushDelay, boolean enablePiggybacking) throws Exception {
+    OzoneClientConfig config = newClientConfig(cluster.getConf(), flushDelay, enablePiggybacking);
     try (OzoneClient client = newClient(cluster.getConf(), config)) {
       XceiverClientMetrics metrics =
           XceiverClientManager.getXceiverClientMetrics();
@@ -691,9 +745,9 @@ class TestBlockOutputStream {
       assertEquals(writeChunkCount + 5,
           metrics.getContainerOpCountMetrics(WriteChunk));
       // The previous flush did not trigger any action with flushDelay enabled
-      assertEquals(putBlockCount + (flushDelay ? 2 : 3),
+      assertEquals(putBlockCount + (flushDelay ? 2 : 3)  + (enablePiggybacking ? 0 : 1),
           metrics.getContainerOpCountMetrics(PutBlock));
-      assertEquals(totalOpCount + (flushDelay ? 7 : 8),
+      assertEquals(totalOpCount + (flushDelay ? 7 : 8) + ((enablePiggybacking ? 0 : 1)),
           metrics.getTotalOpCount());
       assertEquals(dataLength, blockOutputStream.getTotalAckDataLength());
       assertEquals(0, blockOutputStream.getCommitIndex2flushedDataMap().size());

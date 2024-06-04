@@ -23,12 +23,14 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.stream.Collectors;
 
 import com.google.common.collect.ImmutableList;
 import org.apache.hadoop.hdds.client.DefaultReplicationConfig;
 import org.apache.hadoop.hdds.protocol.StorageType;
 import org.apache.hadoop.hdds.utils.db.Codec;
+import org.apache.hadoop.hdds.utils.db.CopyObject;
 import org.apache.hadoop.hdds.utils.db.DelegatedCodec;
 import org.apache.hadoop.hdds.utils.db.Proto2Codec;
 import org.apache.hadoop.ozone.OzoneAcl;
@@ -42,7 +44,7 @@ import com.google.common.base.Preconditions;
 /**
  * A class that encapsulates Bucket Info.
  */
-public final class OmBucketInfo extends WithObjectID implements Auditable {
+public final class OmBucketInfo extends WithObjectID implements Auditable, CopyObject<OmBucketInfo> {
   private static final Codec<OmBucketInfo> CODEC = new DelegatedCodec<>(
       Proto2Codec.get(BucketInfo.getDefaultInstance()),
       OmBucketInfo::getFromProtobuf,
@@ -63,7 +65,7 @@ public final class OmBucketInfo extends WithObjectID implements Auditable {
   /**
    * ACL Information (mutable).
    */
-  private final List<OzoneAcl> acls;
+  private final CopyOnWriteArrayList<OzoneAcl> acls;
   /**
    * Bucket Version flag.
    */
@@ -104,7 +106,7 @@ public final class OmBucketInfo extends WithObjectID implements Auditable {
   /**
    * Bucket Layout.
    */
-  private BucketLayout bucketLayout;
+  private final BucketLayout bucketLayout;
 
   private String owner;
 
@@ -112,7 +114,7 @@ public final class OmBucketInfo extends WithObjectID implements Auditable {
     super(b);
     this.volumeName = b.volumeName;
     this.bucketName = b.bucketName;
-    this.acls = b.acls;
+    this.acls = new CopyOnWriteArrayList<>(b.acls);
     this.isVersionEnabled = b.isVersionEnabled;
     this.storageType = b.storageType;
     this.creationTime = b.creationTime;
@@ -340,9 +342,7 @@ public final class OmBucketInfo extends WithObjectID implements Auditable {
     return auditMap;
   }
 
-  /**
-   * Return a new copy of the object.
-   */
+  @Override
   public OmBucketInfo copyObject() {
     Builder builder = toBuilder();
 

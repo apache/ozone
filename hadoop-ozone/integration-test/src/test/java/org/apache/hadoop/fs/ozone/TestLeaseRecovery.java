@@ -53,6 +53,7 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.slf4j.event.Level;
 
+import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.net.ConnectException;
@@ -264,6 +265,7 @@ public class TestLeaseRecovery {
       stream.flush();
 
       FaultInjectorImpl injector = new FaultInjectorImpl();
+      injector.setType(ContainerProtos.Type.FinalizeBlock);
       KeyValueHandler.setInjector(injector);
       StorageContainerException sce = new StorageContainerException(
           "Requested operation not allowed as ContainerState is CLOSED",
@@ -356,6 +358,7 @@ public class TestLeaseRecovery {
       OzoneTestUtils.closeContainer(cluster.getStorageContainerManager(), container);
       // pause getCommittedBlockLength handling on all DNs to make sure all getCommittedBlockLength will time out
       FaultInjectorImpl injector = new FaultInjectorImpl();
+      injector.setType(ContainerProtos.Type.GetCommittedBlockLength);
       KeyValueHandler.setInjector(injector);
       GenericTestUtils.LogCapturer logs =
           GenericTestUtils.LogCapturer.captureLogs(XceiverClientGrpc.getLogger());
@@ -478,7 +481,7 @@ public class TestLeaseRecovery {
       stream.hsync();
       assertFalse(fs.isFileClosed(file));
 
-      assertThrows(OMException.class, () -> fs.recoverLease(notExistFile));
+      assertThrows(FileNotFoundException.class, () -> fs.recoverLease(notExistFile));
     } finally {
       closeIgnoringKeyNotFound(stream);
     }

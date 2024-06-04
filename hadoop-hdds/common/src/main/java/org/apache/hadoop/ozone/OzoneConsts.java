@@ -119,6 +119,8 @@ public final class OzoneConsts {
   public static final long MB = KB * 1024L;
   public static final long GB = MB * 1024L;
   public static final long TB = GB * 1024L;
+  public static final long PB = TB * 1024L;
+  public static final long EB = PB * 1024L;
 
   /**
    * level DB names used by SCM and data nodes.
@@ -388,6 +390,7 @@ public final class OzoneConsts {
   public static final String HSYNC_CLIENT_ID = "hsyncClientId";
   public static final String LEASE_RECOVERY = "leaseRecovery";
   public static final String DELETED_HSYNC_KEY = "deletedHsyncKey";
+  public static final String OVERWRITTEN_HSYNC_KEY = "overwrittenHsyncKey";
   public static final String FORCE_LEASE_RECOVERY_ENV = "OZONE.CLIENT.RECOVER.LEASE.FORCE";
 
   //GDPR

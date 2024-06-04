@@ -51,6 +51,8 @@ public class OMKeyCommitResponse extends OmKeyResponse {
   private Map<String, RepeatedOmKeyInfo> keyToDeleteMap;
   private boolean isHSync;
   private OmKeyInfo newOpenKeyInfo;
+  private OmKeyInfo openKeyToUpdate;
+  private String openKeyNameToUpdate;
 
   @SuppressWarnings("checkstyle:ParameterNumber")
   public OMKeyCommitResponse(
@@ -59,7 +61,7 @@ public class OMKeyCommitResponse extends OmKeyResponse {
       @Nonnull OmBucketInfo omBucketInfo,
       Map<String, RepeatedOmKeyInfo> keyToDeleteMap,
       boolean isHSync,
-      OmKeyInfo newOpenKeyInfo) {
+      OmKeyInfo newOpenKeyInfo, String openKeyNameToUpdate, OmKeyInfo openKeyToUpdate) {
     super(omResponse, omBucketInfo.getBucketLayout());
     this.omKeyInfo = omKeyInfo;
     this.ozoneKeyName = ozoneKeyName;
@@ -68,6 +70,8 @@ public class OMKeyCommitResponse extends OmKeyResponse {
     this.keyToDeleteMap = keyToDeleteMap;
     this.isHSync = isHSync;
     this.newOpenKeyInfo = newOpenKeyInfo;
+    this.openKeyNameToUpdate = openKeyNameToUpdate;
+    this.openKeyToUpdate = openKeyToUpdate;
   }
 
   /**
@@ -97,6 +101,7 @@ public class OMKeyCommitResponse extends OmKeyResponse {
         .putWithBatch(batchOperation, ozoneKeyName, omKeyInfo);
 
     updateDeletedTable(omMetadataManager, batchOperation);
+    handleOpenKeyToUpdate(omMetadataManager, batchOperation);
 
     // update bucket usedBytes.
     omMetadataManager.getBucketTable().putWithBatch(batchOperation,
@@ -133,6 +138,14 @@ public class OMKeyCommitResponse extends OmKeyResponse {
         omMetadataManager.getDeletedTable().putWithBatch(batchOperation,
             entry.getKey(), entry.getValue());
       }
+    }
+  }
+
+  protected void handleOpenKeyToUpdate(OMMetadataManager omMetadataManager,
+      BatchOperation batchOperation) throws IOException {
+    if (this.openKeyToUpdate != null) {
+      omMetadataManager.getOpenKeyTable(getBucketLayout()).putWithBatch(
+          batchOperation, openKeyNameToUpdate, openKeyToUpdate);
     }
   }
 
