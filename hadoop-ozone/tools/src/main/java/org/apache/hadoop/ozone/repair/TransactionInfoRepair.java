@@ -67,7 +67,7 @@ public class TransactionInfoRepair
       description = "Highest term of transactionInfoTable. The input should be non-zero long integer.")
   private long highestTransactionTerm;
 
-  @CommandLine.Option(names = {"--highest-transaction"},
+  @CommandLine.Option(names = {"--index"},
       required = true,
       description = "Highest index of transactionInfoTable. The input should be non-zero long integer.")
   private long highestTransactionIndex;

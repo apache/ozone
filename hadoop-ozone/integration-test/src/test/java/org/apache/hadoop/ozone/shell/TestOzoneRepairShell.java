@@ -94,7 +94,7 @@ public class TestOzoneRepairShell {
     String testTerm = "1111";
     String testIndex = "1111";
     String[] args =
-        new String[] {"--db=" + dbPath, "transaction", "--highest-transaction", testTerm + "#" + testIndex};
+        new String[] {"--db=" + dbPath, "update-transaction", "--term", testTerm, "--index", testIndex};
     int exitCode = cmd.execute(args);
     assertEquals(0, exitCode);
     assertThat(out.toString(DEFAULT_ENCODING)).contains(
