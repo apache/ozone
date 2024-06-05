@@ -510,7 +510,7 @@ public class XceiverClientGrpc extends XceiverClientSpi {
   @Override
   public XceiverClientReply sendCommandAsync(
       ContainerCommandRequestProto request, ReplicationLevel writeReplicationLevel)
-      throws IOException, ExecutionException, InterruptedException{
+      throws IOException, ExecutionException, InterruptedException {
     LOG.warn("Write ReplicationLevel is not applicable to {}", getClass().getSimpleName());
     return sendCommandAsync(request);
   }
