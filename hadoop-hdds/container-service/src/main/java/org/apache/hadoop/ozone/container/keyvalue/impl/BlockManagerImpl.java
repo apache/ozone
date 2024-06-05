@@ -424,33 +424,6 @@ public class BlockManagerImpl implements BlockManager {
     return missingBlocks;
   }
 
-
-//  @Override
-//  public List<MissingBlock> headBlocks(Container container, Set<Long> blocks) throws IOException {
-//    Preconditions.checkNotNull(container, "container cannot be null");
-//    container.readLock();
-//    try {
-//      List<BlockData> result = null;
-//      KeyValueContainerData cData =
-//          (KeyValueContainerData) container.getContainerData();
-//      try (DBHandle db = BlockUtils.getDB(cData, config)) {
-//        result = new ArrayList<>();
-//        String startKey = (startLocalID == -1) ? cData.startKeyEmpty()
-//            : cData.getBlockKey(startLocalID);
-//        List<? extends Table.KeyValue<String, BlockData>> range =
-//            db.getStore().getBlockDataTable()
-//                .getSequentialRangeKVs(startKey, count,
-//                    cData.containerPrefix(), cData.getUnprefixedKeyFilter());
-//        for (Table.KeyValue<String, BlockData> entry : range) {
-//          result.add(entry.getValue());
-//        }
-//        return result;
-//      }
-//    } finally {
-//      container.readUnlock();
-//    }
-//  }
-
   /**
    * Shutdown KeyValueContainerManager.
    */
