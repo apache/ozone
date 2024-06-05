@@ -38,7 +38,7 @@ public class XceiverClientReply {
   private long logIndex;
 
   /**
-   * Key: Reason -> Value: List of DatanodeDetails
+   * Key: Reason -> Value: List of DatanodeDetails.
    */
   private final Map<Reason, List<DatanodeDetails>> reasonToNodeListMap;
 
@@ -47,7 +47,7 @@ public class XceiverClientReply {
    */
   public enum Reason {
     UNKNOWN,  // The default reason that keeps the original behavior of unmodified callers. TODO: Categorize them
-    TIMEOUT,  // Datanode that timed out in ALL_COMMITTED or MAJORITY_COMMITTED request
+    TIMEOUT,  // Datanode that timed out in ALL_COMMITTED / MAJORITY_COMMITTED request
   }
 
   public XceiverClientReply(

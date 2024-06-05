@@ -510,8 +510,7 @@ public class XceiverClientGrpc extends XceiverClientSpi {
   @Override
   public XceiverClientReply sendCommandAsync(
       ContainerCommandRequestProto request, ReplicationLevel writeReplicationLevel) {
-    // TODO: Is throwing NotImplementedException better?
-    throw new IllegalArgumentException("ReplicationLevel is not applicable to " + getClass().getSimpleName());
+    throw new IllegalArgumentException("Write ReplicationLevel is not applicable to " + getClass().getSimpleName());
   }
 
   /**

@@ -269,9 +269,6 @@ public final class XceiverClientRatis extends XceiverClientSpi {
             .setClientId(ClientId.emptyClientId())
             .setServerId(raftId)
             .setGroupId(RaftGroupId.emptyGroupId());
-//        if (e != null) {
-//          replyBuilder.setException(new StateMachineException(raftId, e));
-//        }
         return replyBuilder.build();
       });
     }
@@ -425,37 +422,6 @@ public final class XceiverClientRatis extends XceiverClientSpi {
               addDatanodetoReply(timedOutNode, asyncReply, Reason.TIMEOUT);
             }
           }
-/*
-          // Retry with lower writeReplicationLevel if the request failed
-          if (e == null) {
-            return clientReply;
-          } else if (writeReplicationLevel == ReplicationLevel.ALL_COMMITTED) {
-            LOG.warn("!!! Retrying with writeReplicationLevel = MAJORITY_COMMITTED");
-            try {
-              RaftClientReply raftClientReply2 = sendRequestAsync(request, ReplicationLevel.MAJORITY_COMMITTED).get();
-              raftClientReply2.getCommitInfos().stream()
-//                  .filter(i -> i.getCommitIndex() < index)  // Is there an index here in this context, similar to watchForCommit?
-                  .forEach(proto -> {
-                    UUID address = RatisHelper.toDatanodeId(proto.getServer());
-                    addDatanodetoReply(address, asyncReply);
-                    // since ALL_COMMITTED has failed, the updated map from now on will
-                    // only store entries for those datanodes which have had successful
-                    // replication.
-                    commitInfoMap.remove(address);
-                    LOG.info("!!! Successfully fallen back to MAJORITY_COMMITTED due to node {} failure. "
-                            + "Could not send request {} to all nodes on pipeline: {}",
-                        address, request.getCmdType(), pipeline);
-                  });
-              return raftClientReply2;
-            } catch (InterruptedException | ExecutionException ex) {
-              throw new CompletionException(ex);  // TODO: Do I need extra error handling here
-            }
-          } else {
-            // if the request failed, and a retry is not desired, just wrap and throw the exception?
-            LOG.warn("!!! Not retrying request {}", request.getCmdType());
-            throw new CompletionException(e);
-          }
-*/
         }).thenApply(reply -> {
           final boolean isNotReplicatedException = reply.getCommitInfos() != null;
           final ContainerCommandResponseProto response;

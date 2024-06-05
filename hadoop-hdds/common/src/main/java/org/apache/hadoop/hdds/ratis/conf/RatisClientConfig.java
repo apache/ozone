@@ -118,7 +118,7 @@ public class RatisClientConfig {
       type = ConfigType.TIME,
       tags = { OZONE, CLIENT, PERFORMANCE },
       description = "Timeout for ratis client watch request.")
-  private Duration watchRequestTimeout = Duration.ofMinutes(3);  // TODO: Lower this as well?
+  private Duration watchRequestTimeout = Duration.ofMinutes(3);
 
   public Duration getWatchRequestTimeout() {
     return watchRequestTimeout;

@@ -62,7 +62,6 @@ import static org.apache.hadoop.hdds.DatanodeVersion.COMBINED_PUTBLOCK_WRITECHUN
 import static org.apache.hadoop.hdds.scm.storage.ContainerProtocolCalls.putBlockAsync;
 import static org.apache.hadoop.hdds.scm.storage.ContainerProtocolCalls.writeChunkAsync;
 
-import org.apache.ratis.protocol.exceptions.RaftRetryFailureException;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -541,16 +540,7 @@ public class BlockOutputStream extends OutputStream {
       }, responseExecutor).exceptionally(e -> {
         if (LOG.isDebugEnabled()) {
           LOG.debug("putBlock failed for blockID {} with exception {}",
-                  blockID, e.getLocalizedMessage());
-        }
-/**
- * Example e.getCause() result:
- * org.apache.ratis.protocol.exceptions.RaftRetryFailureException: Failed RaftClientRequest:client-30ECCB03FDE0->459e18bf-a79e-41af-8dcd-f2ecdc7dc210@group-64F45F267D0D, cid=35, seq=5*, RW, cmdType: PutBlock
- * traceID: ""
- * containerID: 1
- * datanodeUuid: "8be7c046-6538-4d8f-875e-845333dc5dab"
- */
-        if (e.getCause().getClass() == RaftRetryFailureException.class) {
+                  blockID, e.getLocalizedMessage(), e);
         }
         CompletionException ce =  new CompletionException(e);
         setIoException(ce);

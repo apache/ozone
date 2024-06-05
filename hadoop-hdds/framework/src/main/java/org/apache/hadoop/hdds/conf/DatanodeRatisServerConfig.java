@@ -59,7 +59,9 @@ public class DatanodeRatisServerConfig {
       tags = {OZONE, DATANODE, RATIS},
       description = "The timeout duration for watch request on Ratis Server. " +
           "Timeout for the watch request in Ratis server to acknowledge a " +
-          "particular request is replayed to all servers."
+          "particular request is replayed to all servers. " +
+          "This must be lower than raft.client.rpc.request.timeout in order " +
+          "for NotReplicatedException to be propagated from the Ratis server."
   )
   private long watchTimeOut = Duration.ofSeconds(10).toMillis();
 
