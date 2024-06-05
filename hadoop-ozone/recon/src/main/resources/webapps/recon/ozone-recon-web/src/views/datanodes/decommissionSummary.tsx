@@ -102,7 +102,7 @@ class DecommissionSummary extends React.Component<IDecommissionSummaryProps> {
       <>
         { (summaryData !== 'null' && summaryData !== 'undefined' && summaryData && summaryData.length !== 0) ?
           <>
-            <Tooltip title="Detailed Summary of Decomssioned Records on having on UUID">
+            <Tooltip title="Detailed Summary of Decomssioned Records.">
               <Icon type='info-circle' theme="twoTone" />
             </Tooltip>
             <Popover content={content} title="Decommission Status: DECOMMISSIONING" placement="top" trigger="hover">

@@ -22,7 +22,7 @@
     "datanodes": [
       {
         "hostname": "localhost2.storage.enterprise.com",
-        "uuid": "b590734e-a5f2-11ea-bb37-0242ac130002",
+        "uuid": "4712ba3d-4bb2-477a-9211-d9b50c013055",
         "state": "HEALTHY",
         "opState": "IN_SERVICE",
         "lastHeartbeat": 1574728876059,
@@ -160,7 +160,7 @@
       },
       {
         "hostname": "localhost3.storage.enterprise.com",
-        "uuid": "b5907812-a5f2-11ea-bb37-0242ac130002",
+        "uuid": "4712ba3d-4bb2-477a-9211-d9b50c013056",
         "state": "HEALTHY",
         "opState": "ENTERING_MAINTENANCE",
         "lastHeartbeat": 1574724876059,
@@ -6765,40 +6765,7 @@
             "uuidString": "4712ba3d-4bb2-477a-9211-d9b50c013055",
             "ipAddress": "172.18.0.13",
             "hostName": "ozone-ha-datanode-6.ozone-ha_default",
-            "ports": [
-                {
-                    "name": "HTTP",
-                    "value": 9882
-                },
-                {
-                    "name": "CLIENT_RPC",
-                    "value": 19864
-                },
-                {
-                    "name": "REPLICATION",
-                    "value": 9886
-                },
-                {
-                    "name": "RATIS",
-                    "value": 9858
-                },
-                {
-                    "name": "RATIS_ADMIN",
-                    "value": 9857
-                },
-                {
-                    "name": "RATIS_SERVER",
-                    "value": 9856
-                },
-                {
-                    "name": "RATIS_DATASTREAM",
-                    "value": 9855
-                },
-                {
-                    "name": "STANDALONE",
-                    "value": 9859
-                }
-            ],
+            
             "certSerialId": null,
             "version": null,
             "setupTime": 0,
@@ -6845,7 +6812,35 @@
         },
         "metrics": null,
         "containers": {}
-    }
+      },
+      {
+        "datanodeDetails": {
+            "level": 3,
+            "parent": null,
+            "cost": 0,
+            "uuid": "4712ba3d-4bb2-477a-9211-d9b50c013056",
+            "uuidString": "4712ba3d-4bb2-477a-9211-d9b50c013056",
+            "ipAddress": "172.18.0.13",
+            "hostName": "ozone-ha-datanode-6.ozone-ha_default",
+            "certSerialId": null,
+            "version": null,
+            "setupTime": 0,
+            "revision": null,
+            "buildDate": null,
+            "persistedOpState": "IN_SERVICE",
+            "persistedOpStateExpiryEpochSec": 0,
+            "initialVersion": 0,
+            "currentVersion": 1,
+            "decommissioned": false,
+            "maintenance": false,
+            "networkName": "4712ba3d-4bb2-477a-9211-d9b50c013055",
+            "networkLocation": "/default-rack",
+            "networkFullPath": "/default-rack/4712ba3d-4bb2-477a-9211-d9b50c013055",
+            "numOfLeaves": 1
+        },
+        "metrics": null,
+        "containers": {}
+      }
     ]
   },
   "DatanodesDecommissionInfo": {

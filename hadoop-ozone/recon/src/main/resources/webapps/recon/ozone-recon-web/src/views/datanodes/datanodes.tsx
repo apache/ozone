@@ -156,7 +156,6 @@ const COLUMNS = [
     render: (text: DatanodeOpState) => renderDatanodeOpState(text),
     sorter: (a: IDatanode, b: IDatanode) => a.opState.localeCompare(b.opState)
   },
- 
   {
     title: 'Uuid',
     dataIndex: 'uuid',
@@ -166,10 +165,22 @@ const COLUMNS = [
     sorter: (a: IDatanode, b: IDatanode) => a.uuid.localeCompare(b.uuid),
     defaultSortOrder: 'ascend' as const,
     render: (uuid: IDatanode, record: IDatanode) => {
+      let decommissionToolTip = (
+        <>
+          <Tooltip title="It is going to decommission Soon!!">
+            <Icon type='warning' theme="twoTone" />
+          </Tooltip>&nbsp;
+          <span>{uuid}</span>
+        </>
+      )
       return (
-        record.opState === "DECOMMISSIONING" ?  <DecommissionSummary uuid={uuid} record={record}/> : <span>{uuid}</span>
+        // 1.If Info API UUID == Datanodes API UUID then show tooltip As It is going to Decommission Soon
+        // As It will take time to update datanodes API OP Status to Decommissioning
+        //2. Once status from datanodes API get changed to Decommissioning show Summary
+        (decommissionUids && decommissionUids.includes(record.uuid) && (record.opState !== 'DECOMMISSIONING' && record.opState !== 'DECOMMISSIONED')) ? decommissionToolTip :
+          record.opState === "DECOMMISSIONING" ? <DecommissionSummary uuid={uuid} record={record} /> : <span>{uuid}</span>
       );
-    }  
+    }
   },
   {
     title: 'Storage Capacity',
@@ -346,6 +357,8 @@ const getTimeDiffFromTimestamp = (timestamp: number): string => {
 }
 
 let cancelSignal: AbortController;
+let cancelDecommissionSignal: AbortController;
+let decommissionUids: string | string[] =[];
 
 export class Datanodes extends React.Component<Record<string, object>, IDatanodesState> {
   autoReload: AutoReloadHelper;
@@ -379,6 +392,8 @@ export class Datanodes extends React.Component<Record<string, object>, IDatanode
   };
 
   _loadData = () => {
+    // Need to call decommission API on each interval to get updated status
+    this._loadDecommisionAPI();
     this.setState(prevState => ({
       loading: true,
       selectedColumns: this._getSelectedColumns(prevState.selectedColumns)
@@ -423,6 +438,32 @@ export class Datanodes extends React.Component<Record<string, object>, IDatanode
       this.setState({
         loading: false
       });
+      decommissionUids = [];
+      showDataFetchError(error.toString());
+    });
+
+  };
+
+  _loadDecommisionAPI = () => {
+    this.setState({
+      loading: true
+    });
+
+    decommissionUids = [];
+    const { request, controller } = AxiosGetHelper('/api/v1/datanodes/decommission/info', cancelDecommissionSignal);
+    cancelDecommissionSignal = controller;
+    request.then(decommissionResponse => {
+      decommissionUids = decommissionResponse && decommissionResponse.data &&
+        decommissionResponse.data.DatanodesDecommissionInfo &&
+        decommissionResponse.data.DatanodesDecommissionInfo.map((item: { datanodeDetails: { uuid: any; }; }) => item.datanodeDetails.uuid);
+      this.setState({
+        loading: false
+      });
+    }).catch(error => {
+      this.setState({
+        loading: false
+      });
+      decommissionUids = [];
       showDataFetchError(error.toString());
     });
   };
@@ -436,6 +477,7 @@ export class Datanodes extends React.Component<Record<string, object>, IDatanode
   componentWillUnmount(): void {
     this.autoReload.stopPolling();
     cancelSignal && cancelSignal.abort();
+    cancelDecommissionSignal && cancelDecommissionSignal.abort();
   }
 
   onShowSizeChange = (current: number, pageSize: number) => {
