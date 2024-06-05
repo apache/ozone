@@ -248,17 +248,21 @@ public final class XceiverClientRatis extends XceiverClientSpi {
         LOG.debug("reply is null, crafting a new RaftClientReply");
         final Collection<CommitInfoProto> commitInfos;
         final long maxCommitIndex;
-        // Unwrap exception to get commitInfos
-        if (e instanceof CompletionException && e.getCause() instanceof NotReplicatedException) {
+        if (e instanceof CompletionException) {
           final CompletionException ce = (CompletionException) e;
-          final NotReplicatedException nre = (NotReplicatedException) ce.getCause();
-          commitInfos = nre.getCommitInfos();
-          maxCommitIndex = commitInfos.stream()
-              .map(CommitInfoProto::getCommitIndex)
-              .max(Long::compareTo).orElse(-2L);
+          if (e.getCause() instanceof NotReplicatedException) {
+            // Unwrap exception to get commitInfos if NotReplicatedException is thrown
+            final NotReplicatedException nre = (NotReplicatedException) ce.getCause();
+            commitInfos = nre.getCommitInfos();
+            maxCommitIndex = commitInfos.stream()
+                .map(CommitInfoProto::getCommitIndex)
+                .max(Long::compareTo).orElse(-2L);
+          } else {
+            // Otherwise just throw the exception as is
+            throw ce;
+          }
         } else {
-          commitInfos = null;
-          maxCommitIndex = -1L;
+          throw new CompletionException("Unexpected exception", e);
         }
         RaftGroupMemberId raftId = RaftGroupMemberId.valueOf(RaftPeerId.valueOf("peer"), RaftGroupId.emptyGroupId());
         // Craft a reply, only set required fields
@@ -369,7 +373,7 @@ public final class XceiverClientRatis extends XceiverClientSpi {
   @Override
   public XceiverClientReply sendCommandAsync(
       ContainerCommandRequestProto request) {
-//    return sendCommandAsyncInternal(request, ReplicationLevel.MAJORITY_COMMITTED);
+    // TODO
     return sendCommandAsyncInternal(request, ReplicationLevel.ALL_COMMITTED);
   }
 

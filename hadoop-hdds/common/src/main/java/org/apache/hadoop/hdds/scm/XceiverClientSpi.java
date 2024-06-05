@@ -170,7 +170,8 @@ public abstract class XceiverClientSpi implements Closeable {
       throws IOException, ExecutionException, InterruptedException;
 
   public abstract XceiverClientReply
-      sendCommandAsync(ContainerCommandRequestProto request, ReplicationLevel writeReplicationLevel);
+      sendCommandAsync(ContainerCommandRequestProto request, ReplicationLevel writeReplicationLevel)
+      throws IOException, ExecutionException, InterruptedException;
 
   /**
    * Returns pipeline Type.
