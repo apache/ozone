@@ -51,6 +51,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.security.OzoneTokenIdentifier;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
 import org.apache.hadoop.ozone.snapshot.CancelSnapshotDiffResponse;
+import org.apache.hadoop.ozone.snapshot.ListSnapshotResponse;
 import org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse;
 import org.apache.hadoop.security.token.Token;
 
@@ -228,6 +229,16 @@ public class ClientProtocolStub implements ClientProtocol {
   }
 
   @Override
+  public OzoneOutputStream createKey(String volumeName, String bucketName,
+                                     String keyName, long size,
+                                     ReplicationConfig replicationConfig,
+                                     Map<String, String> metadata,
+                                     Map<String, String> tags) throws IOException {
+    return getBucket(volumeName, bucketName)
+        .createKey(keyName, size, replicationConfig, metadata, tags);
+  }
+
+  @Override
   public OzoneInputStream getKey(String volumeName, String bucketName,
                                  String keyName) throws IOException {
     return getBucket(volumeName, bucketName).readKey(keyName);
@@ -320,6 +331,14 @@ public class ClientProtocolStub implements ClientProtocol {
       throws IOException {
     return getBucket(volumeName, bucketName)
         .initiateMultipartUpload(keyName, replicationConfig, metadata);
+  }
+
+  @Override
+  public OmMultipartInfo initiateMultipartUpload(String volumeName,
+         String bucketName, String keyName, ReplicationConfig replicationConfig,
+         Map<String, String> metadata, Map<String, String> tags) throws IOException {
+    return getBucket(volumeName, bucketName)
+        .initiateMultipartUpload(keyName, replicationConfig, metadata, tags);
   }
 
   @Override
@@ -638,6 +657,14 @@ public class ClientProtocolStub implements ClientProtocol {
   }
 
   @Override
+  public OzoneDataStreamOutput createStreamKey(
+      String volumeName, String bucketName, String keyName, long size,
+      ReplicationConfig replicationConfig, Map<String, String> metadata,
+      Map<String, String> tags) throws IOException {
+    return null;
+  }
+
+  @Override
   public OzoneDataStreamOutput createMultipartStreamKey(
       String volumeName, String bucketName, String keyName, long size,
       int partNumber, String uploadID) throws IOException {
@@ -667,7 +694,7 @@ public class ClientProtocolStub implements ClientProtocol {
   }
 
   @Override
-  public List<OzoneSnapshot> listSnapshot(
+  public ListSnapshotResponse listSnapshot(
       String volumeName, String bucketName, String snapshotPrefix,
       String prevSnapshot, int maxListResult) throws IOException {
     return null;

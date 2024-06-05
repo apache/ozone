@@ -377,4 +377,33 @@ public class ReconNodeManager extends SCMNodeManager {
     return reconContext;
   }
 
+  @Override
+  protected void sendFinalizeToDatanodeIfNeeded(DatanodeDetails datanodeDetails,
+      LayoutVersionProto layoutVersionReport) {
+    // Recon should do nothing here.
+    int scmSlv = getLayoutVersionManager().getSoftwareLayoutVersion();
+    int scmMlv = getLayoutVersionManager().getMetadataLayoutVersion();
+    int dnSlv = layoutVersionReport.getSoftwareLayoutVersion();
+    int dnMlv = layoutVersionReport.getMetadataLayoutVersion();
+
+    if (dnSlv > scmSlv) {
+      LOG.error("Invalid data node reporting to Recon : {}. " +
+              "DataNode SoftwareLayoutVersion = {}, Recon/SCM " +
+              "SoftwareLayoutVersion = {}",
+          datanodeDetails.getHostName(), dnSlv, scmSlv);
+    }
+
+    if (scmMlv == scmSlv) {
+      // Recon metadata is finalised.
+      if (dnMlv < scmMlv) {
+        if (LOG.isDebugEnabled()) {
+          LOG.debug("Data node {} reports a lower MLV than Recon "
+                  + "DataNode MetadataLayoutVersion = {}, Recon/SCM "
+                  + "MetadataLayoutVersion = {}. SCM needs to finalize this DN",
+              datanodeDetails.getHostName(), dnMlv, scmMlv);
+        }
+      }
+    }
+
+  }
 }

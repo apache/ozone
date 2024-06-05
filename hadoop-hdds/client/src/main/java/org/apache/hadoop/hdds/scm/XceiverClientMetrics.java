@@ -32,7 +32,6 @@ import org.apache.hadoop.metrics2.lib.MetricsRegistry;
 import org.apache.hadoop.metrics2.lib.MutableCounterLong;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.util.PerformanceMetrics;
-import org.apache.hadoop.util.PerformanceMetricsInitializer;
 
 import java.util.EnumMap;
 
@@ -73,7 +72,7 @@ public class XceiverClientMetrics implements MetricsSource {
           "number of pending" + type + " ops", (long) 0));
       opsArray.put(type, registry.newCounter("opCount" + type,
           "number of" + type + " ops", (long) 0));
-      containerOpsLatency.put(type, PerformanceMetricsInitializer.getMetrics(registry,
+      containerOpsLatency.put(type, new PerformanceMetrics(registry,
           type + "Latency", "latency of " + type, "Ops", "Time", intervals));
     }
   }
