@@ -1960,6 +1960,26 @@
   </property>
 
   <property>
+    <name>ozone.xceiver.client.top.metrics.latency.record.threshold.ms.key</name>
+    <value/>
+    <tag>OZONE, METRICS, PERFORMANCE, S3GATEWAY</tag>
+    <description>
+      Threshold in milliseconds for recording the top latency metrics in the Storage Container Client.
+      If the latency of an operation exceeds this threshold, it will be included in the top latency metrics.
+    </description>
+  </property>
+
+  <property>
+    <name>ozone.xceiver.client.top.metrics.latency.record.count.key</name>
+    <value/>
+    <tag>OZONE, METRICS, PERFORMANCE, S3GATEWAY</tag>
+    <description>
+      The number of top latency records to keep for Storage Container Client operations.
+      This setting defines how many of the highest latency operations are tracked and recorded.
+    </description>
+  </property>
+
+  <property>
     <name>ozone.om.unflushed.transaction.max.count</name>
     <value>10000</value>
     <tag>OZONE, OM</tag>
