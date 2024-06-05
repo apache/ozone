@@ -107,8 +107,8 @@ public class TestOzoneRepairShell {
     String cmdOut2 = scanTransactionInfoTable(dbPath);
     assertThat(cmdOut2).contains(testTerm + "#" + testIndex);
 
-    cmd.execute("--db=" + dbPath, "transaction", "--highest-transaction",
-        originalHighestTermIndex[0] + "#" + originalHighestTermIndex[1]);
+    cmd.execute("--db=" + dbPath, "update-transaction", "--term",
+        originalHighestTermIndex[0], "--index", originalHighestTermIndex[1]);
     cluster.getOzoneManager().restart();
     cluster.newClient().getObjectStore().createVolume("vol1");
   }
