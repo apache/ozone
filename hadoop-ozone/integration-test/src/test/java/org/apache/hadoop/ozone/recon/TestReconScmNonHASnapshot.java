@@ -20,10 +20,9 @@ package org.apache.hadoop.ozone.recon;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
-
-import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HA_ENABLE_KEY;
@@ -32,14 +31,14 @@ import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HA_ENABLE_KEY;
  * Test Recon SCM HA Snapshot Download implementation.
  */
 @Timeout(300)
-public class TestReconScmHASnapshot {
+public class TestReconScmNonHASnapshot {
   private OzoneConfiguration conf;
   private MiniOzoneCluster ozoneCluster = null;
 
   @BeforeEach
   public void setup() throws Exception {
     conf = new OzoneConfiguration();
-    conf.setBoolean(OZONE_SCM_HA_ENABLE_KEY, true);
+    conf.setBoolean(OZONE_SCM_HA_ENABLE_KEY, false);
     conf.setBoolean(
         ReconServerConfigKeys.OZONE_RECON_SCM_SNAPSHOT_ENABLED, true);
     conf.setInt(ReconServerConfigKeys.OZONE_RECON_SCM_CONTAINER_THRESHOLD, 0);
@@ -52,7 +51,7 @@ public class TestReconScmHASnapshot {
   }
 
   @Test
-  public void testScmHASnapshot() throws Exception {
+  public void testScmNonHASnapshot() throws Exception {
     TestReconScmSnapshot.testSnapshot(ozoneCluster);
   }
 
