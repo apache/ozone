@@ -1457,7 +1457,7 @@ public class SCMNodeManager implements NodeManager {
     return nodeStateManager.getContainers(datanodeDetails.getUuid());
   }
 
-  int getContainerCount(DatanodeDetails datanodeDetails)
+  public int getContainerCount(DatanodeDetails datanodeDetails)
       throws NodeNotFoundException {
     return nodeStateManager.getContainerCount(datanodeDetails.getUuid());
   }
