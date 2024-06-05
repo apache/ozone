@@ -114,7 +114,6 @@ public class TestNSSummaryAdmin extends StandardOutputTestBase {
     // Running on root path.
     String path = "/";
     executeAdminCommands(path);
-    // Should throw warning - only buckets can have bucket layout.
     assertThat(getOutContentString()).doesNotContain("INVALID_VOLUME_NAME");
     assertThat(getOutContentString()).doesNotContain(
         "[Warning] Namespace CLI is not designed for OBS bucket layout.");
@@ -127,10 +126,9 @@ public class TestNSSummaryAdmin extends StandardOutputTestBase {
    */
   @Test
   public void testNSSummaryCLIVolume() throws UnsupportedEncodingException {
-    // Running on root path.
+    // Running on /volume path.
     String path = "/" + volumeName;
     executeAdminCommands(path);
-    // Should throw warning - only buckets can have bucket layout.
     assertThat(getOutContentString()).doesNotContain("INVALID_BUCKET_NAME");
     assertThat(getOutContentString()).doesNotContain(
         "[Warning] Namespace CLI is not designed for OBS bucket layout.");
