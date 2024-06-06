@@ -540,6 +540,11 @@ public final class ContainerTestHelper {
     return data;
   }
 
+  public static ContainerCommandRequestProto getDummyCommandRequestProto(
+      ContainerProtos.Type cmdType) {
+    return getDummyCommandRequestProto(cmdType, 0);
+  }
+
   /**
    * Construct fake protobuf messages for various types of requests.
    * This is tedious, however necessary to test. Protobuf classes are final
@@ -549,7 +554,7 @@ public final class ContainerTestHelper {
    * @return
    */
   public static ContainerCommandRequestProto getDummyCommandRequestProto(
-      ContainerProtos.Type cmdType) {
+      ContainerProtos.Type cmdType, int replicaIndex) {
     final Builder builder =
         ContainerCommandRequestProto.newBuilder()
             .setCmdType(cmdType)
@@ -558,7 +563,7 @@ public final class ContainerTestHelper {
 
     final DatanodeBlockID fakeBlockId =
         DatanodeBlockID.newBuilder()
-            .setContainerID(DUMMY_CONTAINER_ID).setLocalID(1)
+            .setContainerID(DUMMY_CONTAINER_ID).setLocalID(1).setReplicaIndex(replicaIndex)
             .setBlockCommitSequenceId(101).build();
 
     final ContainerProtos.ChunkInfo fakeChunkInfo =

@@ -440,7 +440,7 @@ public class ChunkInputStream extends InputStream
 
     ReadChunkResponseProto readChunkResponse =
         ContainerProtocolCalls.readChunk(xceiverClient,
-            readChunkInfo, blockID, datanodeBlockID, validators, tokenSupplier.get());
+            readChunkInfo, datanodeBlockID, validators, tokenSupplier.get());
 
     if (readChunkResponse.hasData()) {
       return readChunkResponse.getData().asReadOnlyByteBufferList()

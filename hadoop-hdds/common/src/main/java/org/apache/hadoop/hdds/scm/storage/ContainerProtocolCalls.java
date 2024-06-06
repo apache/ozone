@@ -314,31 +314,22 @@ public final class ContainerProtocolCalls  {
 
   /**
    * Calls the container protocol to read a chunk.
-   */
-  public static ContainerProtos.ReadChunkResponseProto readChunk(
-      XceiverClientSpi xceiverClient, ChunkInfo chunk, BlockID blockID,
-      List<Validator> validators, Token<? extends TokenIdentifier> token) throws IOException {
-    return readChunk(xceiverClient, chunk, blockID, blockID.getDatanodeBlockIDProtobuf(), validators, token);
-  }
-  /**
-   * Calls the container protocol to read a chunk.
    *
    * @param xceiverClient client to perform call
    * @param chunk information about chunk to read
    * @param blockID ID of the block
-   * @param dnBlockId dnBlock of the blockId
    * @param validators functions to validate the response
    * @param token a token for this block (may be null)
    * @return container protocol read chunk response
    * @throws IOException if there is an I/O error while performing the call
    */
   public static ContainerProtos.ReadChunkResponseProto readChunk(
-      XceiverClientSpi xceiverClient, ChunkInfo chunk, BlockID blockID,
-      DatanodeBlockID dnBlockId, List<Validator> validators,
+      XceiverClientSpi xceiverClient, ChunkInfo chunk,
+      DatanodeBlockID blockID, List<Validator> validators,
       Token<? extends TokenIdentifier> token) throws IOException {
     ReadChunkRequestProto.Builder readChunkRequest =
         ReadChunkRequestProto.newBuilder()
-            .setBlockID(dnBlockId)
+            .setBlockID(blockID)
             .setChunkData(chunk)
             .setReadChunkVersion(ContainerProtos.ReadChunkVersion.V1);
     ContainerCommandRequestProto.Builder builder =
@@ -365,7 +356,7 @@ public final class ContainerProtocolCalls  {
   }
 
   private static ContainerProtos.ReadChunkResponseProto readChunk(
-      XceiverClientSpi xceiverClient, ChunkInfo chunk, BlockID blockID,
+      XceiverClientSpi xceiverClient, ChunkInfo chunk, DatanodeBlockID blockID,
       List<Validator> validators,
       ContainerCommandRequestProto.Builder builder,
       DatanodeDetails d) throws IOException {
@@ -387,7 +378,7 @@ public final class ContainerProtocolCalls  {
     return response;
   }
 
-  static String toErrorMessage(ChunkInfo chunk, BlockID blockId,
+  static String toErrorMessage(ChunkInfo chunk, DatanodeBlockID blockId,
       DatanodeDetails d) {
     return String.format("Failed to read chunk %s (len=%s) %s from %s",
         chunk.getChunkName(), chunk.getLen(), blockId, d);

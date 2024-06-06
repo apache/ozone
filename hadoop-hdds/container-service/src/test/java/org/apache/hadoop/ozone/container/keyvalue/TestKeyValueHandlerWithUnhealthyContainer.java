@@ -34,6 +34,8 @@ import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -93,6 +95,22 @@ public class TestKeyValueHandlerWithUnhealthyContainer {
             getDummyCommandRequestProto(ContainerProtos.Type.GetBlock),
             container);
     assertEquals(UNKNOWN_BCSID, response.getResult());
+  }
+
+  @ParameterizedTest
+  @ValueSource(ints = {0, 1, 2, 3, 4, 5})
+  public void testGetBlockWithReplicaIndexMismatch(int replicaIndex) {
+    KeyValueContainer container = getMockContainerWithReplicaIndex(replicaIndex);
+    KeyValueHandler handler = getDummyHandler();
+    for (int rid = 0; rid <= 5; rid++) {
+      ContainerProtos.ContainerCommandResponseProto response =
+          handler.handleGetBlock(
+              getDummyCommandRequestProto(ContainerProtos.Type.GetBlock, rid),
+              container);
+      assertEquals(rid != replicaIndex ? ContainerProtos.Result.CONTAINER_NOT_FOUND : UNKNOWN_BCSID,
+          response.getResult());
+    }
+
   }
 
   @Test
@@ -200,6 +218,17 @@ public class TestKeyValueHandlerWithUnhealthyContainer {
     when(containerData.getState()).thenReturn(
         ContainerProtos.ContainerDataProto.State.UNHEALTHY);
     when(containerData.getBlockCommitSequenceId()).thenReturn(100L);
+    when(containerData.getProtoBufMessage()).thenReturn(ContainerProtos
+        .ContainerDataProto.newBuilder().setContainerID(1).build());
+    return new KeyValueContainer(containerData, new OzoneConfiguration());
+  }
+
+  private KeyValueContainer getMockContainerWithReplicaIndex(int replicaIndex) {
+    KeyValueContainerData containerData = mock(KeyValueContainerData.class);
+    when(containerData.getState()).thenReturn(
+        ContainerProtos.ContainerDataProto.State.CLOSED);
+    when(containerData.getBlockCommitSequenceId()).thenReturn(100L);
+    when(containerData.getReplicaIndex()).thenReturn(replicaIndex);
     when(containerData.getProtoBufMessage()).thenReturn(ContainerProtos
         .ContainerDataProto.newBuilder().setContainerID(1).build());
     return new KeyValueContainer(containerData, new OzoneConfiguration());

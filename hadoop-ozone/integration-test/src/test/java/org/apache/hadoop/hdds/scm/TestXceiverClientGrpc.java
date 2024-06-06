@@ -259,7 +259,7 @@ public class TestXceiverClientGrpc {
             .setLen(-1)
             .setOffset(0)
             .build(),
-        bid,
+        bid.getDatanodeBlockIDProtobuf(),
         null, null);
   }
 
