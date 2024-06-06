@@ -39,6 +39,7 @@ import java.util.EnumMap;
 public class CSMMetrics {
   public static final String SOURCE_NAME =
       CSMMetrics.class.getSimpleName();
+  private RaftGroupId gid;
 
   // ratis op metrics metrics
   private @Metric MutableCounterLong numWriteStateMachineOps;
@@ -69,7 +70,8 @@ public class CSMMetrics {
   private @Metric MutableRate applyTransactionNs;
   private @Metric MutableRate writeStateMachineDataNs;
 
-  public CSMMetrics() {
+  public CSMMetrics(RaftGroupId gid) {
+    this.gid = gid;
     this.opsLatencyMs = new EnumMap<>(ContainerProtos.Type.class);
     this.registry = new MetricsRegistry(CSMMetrics.class.getSimpleName());
     for (ContainerProtos.Type type : ContainerProtos.Type.values()) {
@@ -81,7 +83,12 @@ public class CSMMetrics {
     MetricsSystem ms = DefaultMetricsSystem.instance();
     return ms.register(SOURCE_NAME + gid.toString(),
         "Container State Machine",
-        new CSMMetrics());
+        new CSMMetrics(gid));
+  }
+
+  @Metric
+  public String getRaftGroupId() {
+    return gid.toString();
   }
 
   public void incNumWriteStateMachineOps() {
