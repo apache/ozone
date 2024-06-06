@@ -65,7 +65,7 @@ import static org.apache.hadoop.ozone.om.helpers.OzoneFSUtils.removeTrailingSlas
     name = "cert-recover",
     description = "Recover Deleted SCM Certificate from RocksDB")
 @MetaInfServices(SubcommandWithParent.class)
-public class RecoverSCMCertificate implements Callable<Void>, SubcommandWithParent{
+public class RecoverSCMCertificate implements Callable<Void>, SubcommandWithParent {
 
   @CommandLine.Option(names = {"--db"},
       required = true,
@@ -135,7 +135,7 @@ public class RecoverSCMCertificate implements Callable<Void>, SubcommandWithPare
       err().print("Failed to recover scm cert");
     }
     return null;
-    }
+  }
 
   private static ColumnFamilyHandle getColumnFamilyHandle(
       List<ColumnFamilyHandle> cfHandleList, byte[] tableNameBytes) throws Exception {
@@ -254,4 +254,4 @@ public class RecoverSCMCertificate implements Callable<Void>, SubcommandWithPare
     CertificateFactory factory = new CertificateFactory();
     return factory.engineGenerateCertPath(updatedList);
   }
- }
+}
