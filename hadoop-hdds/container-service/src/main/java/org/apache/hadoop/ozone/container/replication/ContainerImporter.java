@@ -122,7 +122,7 @@ public class ContainerImporter {
             packer.unpackContainerDescriptor(input);
         containerData = getKeyValueContainerData(containerDescriptorYaml);
       }
-      ContainerUtils.verifyChecksum(containerData, conf);
+      ContainerUtils.verifyContainerFileChecksum(containerData, conf);
       containerData.setVolume(targetVolume);
 
       try (FileInputStream input = new FileInputStream(tarFilePath.toFile())) {

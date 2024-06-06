@@ -43,7 +43,8 @@ import picocli.CommandLine.Spec;
         CreateSubcommand.class,
         CloseSubcommand.class,
         ReportSubcommand.class,
-        UpgradeSubcommand.class
+        UpgradeSubcommand.class,
+        ReconcileSubcommand.class
     })
 @MetaInfServices(SubcommandWithParent.class)
 public class ContainerCommands implements Callable<Void>, SubcommandWithParent {

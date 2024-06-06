@@ -84,6 +84,7 @@ public class TestKeyValueContainerData {
     assertEquals(val.get(), kvData.getBlockCount());
     assertEquals(val.get(), kvData.getNumPendingDeletionBlocks());
     assertEquals(MAXSIZE, kvData.getMaxSize());
+    assertEquals(0, kvData.getDataChecksum());
 
     kvData.setState(state);
     kvData.setContainerDBType(containerDBType);
@@ -98,6 +99,8 @@ public class TestKeyValueContainerData {
     kvData.incrPendingDeletionBlocks(1);
     kvData.setSchemaVersion(
         VersionedDatanodeFeatures.SchemaV3.chooseSchemaVersion(conf));
+    long expectedDataHash =  1234L;
+    kvData.setDataChecksum(expectedDataHash);
 
     assertEquals(state, kvData.getState());
     assertEquals(containerDBType, kvData.getContainerDBType());
@@ -114,6 +117,7 @@ public class TestKeyValueContainerData {
     assertEquals(datanodeId.toString(), kvData.getOriginNodeId());
     assertEquals(VersionedDatanodeFeatures.SchemaV3.chooseSchemaVersion(conf),
         kvData.getSchemaVersion());
+    assertEquals(expectedDataHash, kvData.getDataChecksum());
 
     KeyValueContainerData newKvData = new KeyValueContainerData(kvData);
     assertEquals(kvData.getReplicaIndex(), newKvData.getReplicaIndex());

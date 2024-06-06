@@ -41,6 +41,7 @@ import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.StorageUnit;
+import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandRequestProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandResponseProto;
@@ -56,6 +57,8 @@ import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerExcep
 import org.apache.hadoop.hdds.utils.HddsServerUtil;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.common.Checksum;
+import org.apache.hadoop.ozone.common.ChecksumByteBuffer;
+import org.apache.hadoop.ozone.common.ChecksumByteBufferFactory;
 import org.apache.hadoop.ozone.common.ChunkBuffer;
 import org.apache.hadoop.ozone.common.OzoneChecksumException;
 import org.apache.hadoop.ozone.common.utils.BufferUtils;
@@ -1158,6 +1161,23 @@ public class KeyValueHandler extends Handler {
   public void deleteContainer(Container container, boolean force)
       throws IOException {
     deleteInternal(container, force);
+  }
+
+  @Override
+  public void reconcileContainer(Container<?> container, List<DatanodeDetails> peers) throws IOException {
+    // TODO Just a deterministic placeholder hash for testing until actual implementation is finished.
+    ContainerData data = container.getContainerData();
+    long id = data.getContainerID();
+    ByteBuffer byteBuffer = ByteBuffer.allocate(Long.BYTES)
+        .putLong(id)
+        .asReadOnlyBuffer();
+    byteBuffer.rewind();
+    ChecksumByteBuffer checksumImpl = ChecksumByteBufferFactory.crc32Impl();
+    checksumImpl.update(byteBuffer);
+    long dataChecksum = checksumImpl.getValue();
+    LOG.info("Generated data checksum of container {} for testing: {}", id, dataChecksum);
+    data.setDataChecksum(dataChecksum);
+    sendICR(container);
   }
 
   /**

@@ -34,6 +34,12 @@ Container is closed
     ${output} =         Execute          ozone admin container info "${container}"
                         Should contain   ${output}   CLOSED
 
+Reconciliation complete
+    [arguments]    ${container}
+    ${data_checksum} =  Execute          ozone admin container info "${container}" --json | jq -r '.replicas[].dataChecksum' | head -n1
+                        Should not be empty    ${data_checksum}
+                        Should not be equal as strings    0    ${data_checksum}
+
 *** Test Cases ***
 Create container
     ${output} =         Execute          ozone admin container create
@@ -71,6 +77,17 @@ Verbose container info
     ${output} =         Execute          ozone admin --verbose container info "${CONTAINER}"
                         Should contain   ${output}   Pipeline Info
 
+Incomplete command
+    ${output} =         Execute And Ignore Error     ozone admin container
+                        Should contain   ${output}   Incomplete command
+                        Should contain   ${output}   list
+                        Should contain   ${output}   info
+                        Should contain   ${output}   create
+                        Should contain   ${output}   close
+                        Should contain   ${output}   reconcile
+                        Should contain   ${output}   report
+                        Should contain   ${output}   upgrade
+
 List containers as JSON
     ${output} =         Execute          ozone admin container info "${CONTAINER}" --json | jq -r '.'
                         Should contain   ${output}    containerInfo
@@ -84,23 +101,6 @@ Report containers as JSON
                          Should contain   ${output}   stats
                          Should contain   ${output}   samples
 
-Close container
-    ${container} =      Execute          ozone admin container list --state OPEN | jq -r 'select(.replicationConfig.replicationFactor == "THREE") | .containerID' | head -1
-                        Execute          ozone admin container close "${container}"
-    ${output} =         Execute          ozone admin container info "${container}"
-                        Should contain   ${output}   CLOS
-    Wait until keyword succeeds    1min    10sec    Container is closed    ${container}
-
-Incomplete command
-    ${output} =         Execute And Ignore Error     ozone admin container
-                        Should contain   ${output}   Incomplete command
-                        Should contain   ${output}   list
-                        Should contain   ${output}   info
-                        Should contain   ${output}   create
-                        Should contain   ${output}   close
-                        Should contain   ${output}   report
-                        Should contain   ${output}   upgrade
-
 #List containers on unknown host
 #    ${output} =         Execute And Ignore Error     ozone admin --verbose container list --scm unknown-host
 #                        Should contain   ${output}   Invalid host name
@@ -111,5 +111,38 @@ Cannot close container without admin privilege
 Cannot create container without admin privilege
     Requires admin privilege    ozone admin container create
 
+Cannot reconcile container without admin privilege
+    Requires admin privilege    ozone admin container reconcile "${CONTAINER}"
+
 Reset user
     Run Keyword if      '${SECURITY_ENABLED}' == 'true'     Kinit test user     testuser     testuser.keytab
+
+Cannot reconcile open container
+    # At this point we should have an open Ratis Three container.
+    ${container} =      Execute          ozone admin container list --state OPEN | jq -r 'select(.replicationConfig.replicationFactor == "THREE") | .containerID' | head -n1
+    Execute and check rc    ozone admin container reconcile "${container}"    255
+    # The container should not yet have any replica checksums.
+    # TODO When the scanner is computing checksums automatically, this test may need to be updated.
+    ${data_checksum} =  Execute          ozone admin container info "${container}" --json | jq -r '.replicas[].dataChecksum' | head -n1
+    # 0 is the hex value of an empty checksum.
+    Should Be Equal As Strings    0    ${data_checksum}
+
+Close container
+    ${container} =      Execute          ozone admin container list --state OPEN | jq -r 'select(.replicationConfig.replicationFactor == "THREE") | .containerID' | head -1
+                        Execute          ozone admin container close "${container}"
+    # The container may either be in CLOSED or CLOSING state at this point. Once we have verified this, we will wait
+    # for it to progress to CLOSED.
+    ${output} =         Execute          ozone admin container info "${container}"
+                        Should contain   ${output}   CLOS
+    Wait until keyword succeeds    1min    10sec    Container is closed    ${container}
+
+Reconcile closed container
+    # Check that info does not show replica checksums, since manual reconciliation has not yet been triggered.
+    # TODO When the scanner is computing checksums automatically, this test may need to be updated.
+    ${container} =      Execute          ozone admin container list --state CLOSED | jq -r 'select(.replicationConfig.replicationFactor == "THREE") | .containerID' | head -1
+    ${data_checksum} =  Execute          ozone admin container info "${container}" --json | jq -r '.replicas[].dataChecksum' | head -n1
+    # 0 is the hex value of an empty checksum.
+    Should Be Equal As Strings    0    ${data_checksum}
+    # When reconciliation finishes, replica checksums should be shown.
+    Execute    ozone admin container reconcile ${container}
+    Wait until keyword succeeds    1min    5sec    Reconciliation complete    ${container}
