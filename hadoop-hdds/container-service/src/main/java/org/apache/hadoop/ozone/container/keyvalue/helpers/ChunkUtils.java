@@ -377,8 +377,8 @@ public final class ChunkUtils {
    * @param chunkInfo - Chunk info
    * @return true if the user asks for it.
    */
-  public static boolean isOverWritePermitted(ChunkInfo chunkInfo) {
-    String overWrite = chunkInfo.getMetadata().get(OzoneConsts.CHUNK_OVERWRITE);
+  private static boolean isOverWritePermitted(ChunkInfo chunkInfo) {
+    String overWrite = chunkInfo.getMetadata(OzoneConsts.CHUNK_OVERWRITE);
     return Boolean.parseBoolean(overWrite);
   }
 

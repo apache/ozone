@@ -18,10 +18,10 @@
 
 package org.apache.hadoop.ozone.common.statemachine;
 
-import com.google.common.base.Supplier;
 import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.CacheLoader;
 import com.google.common.cache.LoadingCache;
+import com.google.common.collect.ImmutableSet;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -33,16 +33,16 @@ import java.util.Set;
  * @param <EVENT> events allowed
  */
 public class StateMachine<STATE extends Enum<?>, EVENT extends Enum<?>> {
-  private STATE initialState;
-  private Set<STATE> finalStates;
+  private final STATE initialState;
+  private final ImmutableSet<STATE> finalStates;
 
   private final LoadingCache<EVENT, Map<STATE, STATE>> transitions =
       CacheBuilder.newBuilder().build(
-          CacheLoader.from((Supplier<Map<STATE, STATE>>) () -> new HashMap()));
+          CacheLoader.from(() -> new HashMap<>()));
 
   public StateMachine(STATE initState, Set<STATE> finalStates) {
     this.initialState = initState;
-    this.finalStates = finalStates;
+    this.finalStates = finalStates == null ? ImmutableSet.of() : ImmutableSet.copyOf(finalStates);
   }
 
   public STATE getInitialState() {

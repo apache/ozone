@@ -125,7 +125,10 @@ public final class ReconContext {
         Arrays.asList("Recon health")),
     GET_OM_DB_SNAPSHOT_FAILED(
         "OM DB Snapshot sync failed !!!",
-        Arrays.asList("Overview (OM Data)", "OM DB Insights"));
+        Arrays.asList("Overview (OM Data)", "OM DB Insights")),
+    GET_SCM_DB_SNAPSHOT_FAILED(
+        "SCM DB Snapshot sync failed !!!",
+        Arrays.asList("Containers", "Pipelines"));
 
     private final String message;
     private final List<String> impacts;
