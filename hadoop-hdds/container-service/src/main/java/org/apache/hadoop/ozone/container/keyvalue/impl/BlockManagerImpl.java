@@ -38,6 +38,7 @@ import org.apache.hadoop.ozone.container.keyvalue.interfaces.BlockManager;
 
 import com.google.common.base.Preconditions;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.BCSID_MISMATCH;
+import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.CONTAINER_NOT_FOUND;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.NO_SUCH_BLOCK;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.UNKNOWN_BCSID;
 import org.slf4j.Logger;
@@ -218,6 +219,14 @@ public class BlockManagerImpl implements BlockManager {
 
     KeyValueContainerData containerData = (KeyValueContainerData) container
         .getContainerData();
+    int containerReplicaIndex = containerData.getReplicaIndex();
+    if (containerReplicaIndex != blockID.getReplicaIndex()) {
+      throw new StorageContainerException(
+          "Unable to find the Container with replicaIdx " + blockID.getReplicaIndex() + ". Container "
+              + containerData.getContainerID() + " replicaIdx is "
+              + containerReplicaIndex + ".", CONTAINER_NOT_FOUND);
+    }
+
     long containerBCSId = containerData.getBlockCommitSequenceId();
     if (containerBCSId < bcsId) {
       throw new StorageContainerException(

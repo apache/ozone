@@ -23,30 +23,38 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import java.util.Objects;
 
 /**
- * BlockID of Ozone (containerID + localID + blockCommitSequenceId).
+ * BlockID of Ozone (containerID + localID + blockCommitSequenceId + replicaIndex).
  */
 
 public class BlockID {
 
   private final ContainerBlockID containerBlockID;
   private long blockCommitSequenceId;
+  private int replicaIndex;
 
   public BlockID(long containerID, long localID) {
-    this(containerID, localID, 0);
+    this(containerID, localID, 0, 0);
   }
 
-  private BlockID(long containerID, long localID, long bcsID) {
+  private BlockID(long containerID, long localID, long bcsID, int repIndex) {
     containerBlockID = new ContainerBlockID(containerID, localID);
     blockCommitSequenceId = bcsID;
+    this.replicaIndex = repIndex;
+  }
+
+  public BlockID(BlockID blockID) {
+    this(blockID.getContainerID(), blockID.getLocalID(), blockID.getBlockCommitSequenceId(),
+        blockID.getReplicaIndex());
   }
 
   public BlockID(ContainerBlockID containerBlockID) {
-    this(containerBlockID, 0);
+    this(containerBlockID, 0, 0);
   }
 
-  private BlockID(ContainerBlockID containerBlockID, long bcsId) {
+  private BlockID(ContainerBlockID containerBlockID, long bcsId, int repIndex) {
     this.containerBlockID = containerBlockID;
     blockCommitSequenceId = bcsId;
+    this.replicaIndex = repIndex;
   }
 
   public long getContainerID() {
@@ -65,6 +73,14 @@ public class BlockID {
     this.blockCommitSequenceId = blockCommitSequenceId;
   }
 
+  public int getReplicaIndex() {
+    return replicaIndex;
+  }
+
+  public void setReplicaIndex(int replicaIndex) {
+    this.replicaIndex = replicaIndex;
+  }
+
   public ContainerBlockID getContainerBlockID() {
     return containerBlockID;
   }
@@ -79,21 +95,32 @@ public class BlockID {
   public void appendTo(StringBuilder sb) {
     containerBlockID.appendTo(sb);
     sb.append(" bcsId: ").append(blockCommitSequenceId);
+    sb.append(" replicaIndex: ").append(replicaIndex);
   }
 
   @JsonIgnore
   public ContainerProtos.DatanodeBlockID getDatanodeBlockIDProtobuf() {
+    ContainerProtos.DatanodeBlockID.Builder blockID = getDatanodeBlockIDProtobufBuilder();
+    if (replicaIndex > 0) {
+      blockID.setReplicaIndex(replicaIndex);
+    }
+    return blockID.build();
+  }
+
+  @JsonIgnore
+  public ContainerProtos.DatanodeBlockID.Builder getDatanodeBlockIDProtobufBuilder() {
     return ContainerProtos.DatanodeBlockID.newBuilder().
         setContainerID(containerBlockID.getContainerID())
         .setLocalID(containerBlockID.getLocalID())
-        .setBlockCommitSequenceId(blockCommitSequenceId).build();
+        .setBlockCommitSequenceId(blockCommitSequenceId);
   }
 
   @JsonIgnore
   public static BlockID getFromProtobuf(
       ContainerProtos.DatanodeBlockID blockID) {
     return new BlockID(blockID.getContainerID(),
-        blockID.getLocalID(), blockID.getBlockCommitSequenceId());
+        blockID.getLocalID(), blockID.getBlockCommitSequenceId(), blockID.hasReplicaIndex() ?
+        blockID.getReplicaIndex() : 0);
   }
 
   @JsonIgnore
@@ -107,7 +134,7 @@ public class BlockID {
   public static BlockID getFromProtobuf(HddsProtos.BlockID blockID) {
     return new BlockID(
         ContainerBlockID.getFromProtobuf(blockID.getContainerBlockID()),
-        blockID.getBlockCommitSequenceId());
+        blockID.getBlockCommitSequenceId(), 0);
   }
 
   @Override
@@ -120,13 +147,14 @@ public class BlockID {
     }
     BlockID blockID = (BlockID) o;
     return containerBlockID.equals(blockID.getContainerBlockID())
-        && blockCommitSequenceId == blockID.getBlockCommitSequenceId();
+        && blockCommitSequenceId == blockID.getBlockCommitSequenceId()
+        && replicaIndex == blockID.getReplicaIndex();
   }
 
   @Override
   public int hashCode() {
     return Objects
         .hash(containerBlockID.getContainerID(), containerBlockID.getLocalID(),
-            blockCommitSequenceId);
+            blockCommitSequenceId, replicaIndex);
   }
 }

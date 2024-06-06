@@ -26,6 +26,8 @@ import org.apache.hadoop.fs.ByteBufferReadable;
 import org.apache.hadoop.fs.CanUnbuffer;
 import org.apache.hadoop.fs.Seekable;
 import org.apache.hadoop.hdds.client.BlockID;
+import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ChunkInfo;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandRequestProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandResponseProto;
@@ -60,6 +62,7 @@ public class ChunkInputStream extends InputStream
   private final ChunkInfo chunkInfo;
   private final long length;
   private final BlockID blockID;
+  private ContainerProtos.DatanodeBlockID datanodeBlockID;
   private final XceiverClientFactory xceiverClientFactory;
   private XceiverClientSpi xceiverClient;
   private final Supplier<Pipeline> pipelineSupplier;
@@ -291,12 +294,26 @@ public class ChunkInputStream extends InputStream
   }
 
   /**
+   * Updates DatanodeBlockId which based on blockId.
+   */
+  private void updateDatanodeBlockId() throws IOException {
+    DatanodeDetails closestNode = pipelineSupplier.get().getClosestNode();
+    int replicaIdx = pipelineSupplier.get().getReplicaIndex(closestNode);
+    ContainerProtos.DatanodeBlockID.Builder builder = blockID.getDatanodeBlockIDProtobufBuilder();
+    if (replicaIdx > 0) {
+      builder.setReplicaIndex(replicaIdx);
+    }
+    datanodeBlockID = builder.build();
+  }
+
+  /**
    * Acquire new client if previous one was released.
    */
   protected synchronized void acquireClient() throws IOException {
     if (xceiverClientFactory != null && xceiverClient == null) {
       xceiverClient = xceiverClientFactory.acquireClientForReadData(
           pipelineSupplier.get());
+      updateDatanodeBlockId();
     }
   }
 
@@ -423,7 +440,7 @@ public class ChunkInputStream extends InputStream
 
     ReadChunkResponseProto readChunkResponse =
         ContainerProtocolCalls.readChunk(xceiverClient,
-            readChunkInfo, blockID, validators, tokenSupplier.get());
+            readChunkInfo, blockID, datanodeBlockID, validators, tokenSupplier.get());
 
     if (readChunkResponse.hasData()) {
       return readChunkResponse.getData().asReadOnlyByteBufferList()

@@ -314,10 +314,19 @@ public final class ContainerProtocolCalls  {
 
   /**
    * Calls the container protocol to read a chunk.
+   */
+  public static ContainerProtos.ReadChunkResponseProto readChunk(
+      XceiverClientSpi xceiverClient, ChunkInfo chunk, BlockID blockID,
+      List<Validator> validators, Token<? extends TokenIdentifier> token) throws IOException {
+    return readChunk(xceiverClient, chunk, blockID, blockID.getDatanodeBlockIDProtobuf(), validators, token);
+  }
+  /**
+   * Calls the container protocol to read a chunk.
    *
    * @param xceiverClient client to perform call
    * @param chunk information about chunk to read
    * @param blockID ID of the block
+   * @param dnBlockId dnBlock of the blockId
    * @param validators functions to validate the response
    * @param token a token for this block (may be null)
    * @return container protocol read chunk response
@@ -325,11 +334,11 @@ public final class ContainerProtocolCalls  {
    */
   public static ContainerProtos.ReadChunkResponseProto readChunk(
       XceiverClientSpi xceiverClient, ChunkInfo chunk, BlockID blockID,
-      List<Validator> validators,
+      DatanodeBlockID dnBlockId, List<Validator> validators,
       Token<? extends TokenIdentifier> token) throws IOException {
     ReadChunkRequestProto.Builder readChunkRequest =
         ReadChunkRequestProto.newBuilder()
-            .setBlockID(blockID.getDatanodeBlockIDProtobuf())
+            .setBlockID(dnBlockId)
             .setChunkData(chunk)
             .setReadChunkVersion(ContainerProtos.ReadChunkVersion.V1);
     ContainerCommandRequestProto.Builder builder =
