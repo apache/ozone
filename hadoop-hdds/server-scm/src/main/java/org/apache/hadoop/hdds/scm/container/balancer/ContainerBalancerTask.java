@@ -447,7 +447,8 @@ public class ContainerBalancerTask implements Runnable {
     }
 
     selectionCriteria = new ContainerBalancerSelectionCriteria(config,
-        nodeManager, replicationManager, containerManager, findSourceStrategy);
+        nodeManager, replicationManager, containerManager, findSourceStrategy,
+        containerToSourceMap);
     return true;
   }
 
@@ -927,8 +928,6 @@ public class ContainerBalancerTask implements Runnable {
     containerToTargetMap.put(containerID, target);
     selectedTargets.add(target);
     selectedSources.add(source);
-    selectionCriteria.setSelectedContainers(
-        new HashSet<>(containerToSourceMap.keySet()));
   }
 
   /**
