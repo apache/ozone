@@ -70,7 +70,6 @@ public class CSMMetrics {
 
   private @Metric MutableRate applyTransactionNs;
   private @Metric MutableRate writeStateMachineDataNs;
-  private @Metric MutableRate writeChunkCommitNs;
   private @Metric MutableRate untilApplyTransactionNs;
   private @Metric MutableRate startTransactionCompleteNs;
 
@@ -222,10 +221,6 @@ public class CSMMetrics {
 
   public void recordWriteStateMachineCompletionNs(long latencyNanos) {
     writeStateMachineDataNs.add(latencyNanos);
-  }
-
-  public void recordWriteChunkCommitNs(long latencyNanos) {
-    writeChunkCommitNs.add(latencyNanos);
   }
 
   public void recordUntilApplyTransactionNs(long latencyNanos) {

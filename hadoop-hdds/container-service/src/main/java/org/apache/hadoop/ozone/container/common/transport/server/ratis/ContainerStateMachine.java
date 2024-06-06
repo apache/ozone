@@ -895,8 +895,6 @@ public class ContainerStateMachine extends BaseStateMachine {
             // TODO: add a counter to track number of executing applyTransaction
             // and queue size
             ContainerCommandResponseProto proto =  dispatchCommand(request, context);
-            metrics.recordWriteChunkCommitNs(
-                Time.monotonicNowNanos() - timeNow);
             return proto;
           } catch (Exception e) {
             exceptionHandler.accept(e);
