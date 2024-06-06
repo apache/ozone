@@ -61,18 +61,6 @@
     <Bug pattern="SR_NOT_CHECKED" />
   </Match>
   <Match>
-    <Class name="org.apache.hadoop.ozone.client.rpc.TestOzoneRpcClientAbstract"/>
-    <Bug pattern="DLS_DEAD_LOCAL_STORE" />
-  </Match>
-  <Match>
-    <Class name="org.apache.hadoop.ozone.client.rpc.TestOzoneRpcClientAbstract"/>
-    <Bug pattern="NP_NULL_ON_SOME_PATH" />
-  </Match>
-  <Match>
-    <Class name="org.apache.hadoop.ozone.client.rpc.TestOzoneRpcClientAbstract"/>
-    <Bug pattern="RV_RETURN_VALUE_IGNORED" />
-  </Match>
-  <Match>
     <Class name="org.apache.hadoop.hdds.scm.storage.TestCommitWatcher"/>
     <Bug pattern="URF_UNREAD_FIELD" />
   </Match>
