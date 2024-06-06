@@ -73,7 +73,12 @@ public class XceiverClientReply {
   }
 
   public List<DatanodeDetails> getDatanodes(Reason reason) {
-    return Collections.unmodifiableList(reasonToNodeListMap.get(reason));
+    return Collections.unmodifiableList(reasonToNodeListMap.compute(reason, (k, v) -> {
+      if (v == null) {
+        v = new LinkedList<>();
+      }
+      return v;
+    }));
   }
 
   public void addDatanode(DatanodeDetails dn) {
