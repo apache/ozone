@@ -245,7 +245,6 @@ public final class XceiverClientRatis extends XceiverClientSpi {
           return reply;
         }
         // reply == null implies exception != null with the current Raft server implementation
-        LOG.debug("reply is null, crafting a new RaftClientReply");
         final Collection<CommitInfoProto> commitInfos;
         final long maxCommitIndex;
         if (e instanceof CompletionException) {
@@ -256,16 +255,19 @@ public final class XceiverClientRatis extends XceiverClientSpi {
             commitInfos = nre.getCommitInfos();
             maxCommitIndex = commitInfos.stream()
                 .map(CommitInfoProto::getCommitIndex)
-                .max(Long::compareTo).orElse(-2L);
+                .max(Long::compareTo).orElse(-1L);
           } else {
-            // Otherwise just throw the exception as is
+            // Otherwise just throw the exception as-is
+            LOG.debug("reply is null, but an exception other than NotReplicatedException is thrown", ce);
             throw ce;
           }
         } else {
+          // unreachable condition in theory
           throw new CompletionException("Unexpected exception", e);
         }
-        RaftGroupMemberId raftId = RaftGroupMemberId.valueOf(RaftPeerId.valueOf("peer"), RaftGroupId.emptyGroupId());
-        // Craft a reply, only set required fields
+        LOG.debug("reply is null, and NotReplicatedException is thrown, crafting a new RaftClientReply");
+        RaftGroupMemberId raftId = RaftGroupMemberId.valueOf(RaftPeerId.valueOf("pEER"), RaftGroupId.emptyGroupId());
+        // Craft a reply, only set useful and required fields
         RaftClientReply.Builder replyBuilder = RaftClientReply.newBuilder()
             .setCommitInfos(commitInfos)
             .setLogIndex(maxCommitIndex)
