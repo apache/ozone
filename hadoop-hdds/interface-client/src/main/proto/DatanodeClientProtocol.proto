@@ -527,6 +527,23 @@ message SendContainerRequest {
 message SendContainerResponse {
 }
 
+message BlockMerkleTreeProto {
+  optional int64 blockID = 1;
+  optional int64 blockChecksum = 2;
+  repeated ChunkInfo chunks = 3;
+}
+
+message ContainerMerkleTreeProto {
+  optional int64 dataChecksum = 1;
+  repeated BlockMerkleTreeProto blockMerkleTree = 2;
+}
+
+message ContainerChecksumInfo {
+  optional int64 containerID = 1;
+  optional ContainerMerkleTreeProto dataMerkleTree = 2;
+  repeated int64 deletedBlocks = 3;
+}
+
 service XceiverClientProtocolService {
   // A client-to-datanode RPC to send container commands
   rpc send(stream ContainerCommandRequestProto) returns
