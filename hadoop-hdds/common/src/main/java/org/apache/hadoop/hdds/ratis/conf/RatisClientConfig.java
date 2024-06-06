@@ -86,7 +86,9 @@ public class RatisClientConfig {
         description =
         "The timeout duration for ratis client watch request. "
             + "Timeout for the watch API in Ratis client to acknowledge a "
-            + "particular request getting replayed to all servers.")
+            + "particular request getting replayed to all servers. "
+            + "It is highly recommended for the timeout duration to be strictly longer than "
+            + "Ratis server watch timeout (hdds.ratis.raft.server.watch.timeout)")
     private Duration rpcWatchRequestTimeout = Duration.ofSeconds(180);
 
     public Duration getRpcWatchRequestTimeout() {

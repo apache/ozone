@@ -54,14 +54,16 @@ public class DatanodeRatisServerConfig {
   }
 
   @Config(key = "watch.timeout",
-      defaultValue = "180s",
+      defaultValue = "30s",
       type = ConfigType.TIME,
       tags = {OZONE, DATANODE, RATIS},
       description = "The timeout duration for watch request on Ratis Server. " +
           "Timeout for the watch request in Ratis server to acknowledge a " +
-          "particular request is replayed to all servers."
+          "particular request is replayed to all servers. It is highly recommended " +
+          "for the timeout duration to be strictly shorter than Ratis client watch timeout " +
+          "(hdds.ratis.raft.client.rpc.watch.request.timeout)."
   )
-  private long watchTimeOut = Duration.ofSeconds(180).toMillis();
+  private long watchTimeOut = Duration.ofSeconds(30).toMillis();
 
   public long getWatchTimeOut() {
     return watchTimeOut;
