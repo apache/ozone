@@ -16,7 +16,7 @@
     "buckets": 156,
     "keys": 253000,
     "keysPendingDeletion": 1000,
-    "scmServiceId": "scmservice,",
+    "scmServiceId": "scmservice",
     "omServiceId": "omservice"
   },
   "datanodes": {

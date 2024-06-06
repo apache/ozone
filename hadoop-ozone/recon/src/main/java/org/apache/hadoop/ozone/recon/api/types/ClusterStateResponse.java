@@ -102,10 +102,10 @@ public final class ClusterStateResponse {
   @JsonProperty
   private long deletedDirs;
 
-  @JsonProperty
+  @JsonProperty("scmServiceId")
   private String scmServiceId;
 
-  @JsonProperty
+  @JsonProperty("omServiceId")
   private String omServiceId;
 
   /**

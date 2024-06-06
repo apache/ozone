@@ -62,6 +62,11 @@ class OverviewCardWrapper extends React.Component<IOverviewCardWrapperProps> {
         active: '3'
       }
     }
+    else if (title === "Ozone Manager") {
+      return {
+        active: '4'
+      }
+    }
   };
 
   render() {

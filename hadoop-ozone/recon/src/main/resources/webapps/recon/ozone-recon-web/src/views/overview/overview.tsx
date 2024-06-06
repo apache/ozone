@@ -237,10 +237,14 @@ export class Overview extends React.Component<Record<string, object>, IOverviewS
         {deletePendingSummarytotalDeletedKeys !== undefined ? deletePendingSummarytotalDeletedKeys: '0'}  <span className='ant-card-meta-description meta'>Total Pending Delete Keys</span>
       </div>
   );
-    const scmAndOmServicesData = (
+    const scmServiceData = (
         <div>
-          SCM Service Id: <span className="ant-card-meta-description meta">{scmServiceId}</span><br />
-          OM Service Id: <span className="ant-card-meta-description meta">{omServiceId}</span>
+          Service Id: <span className="ant-card-meta-description meta" style={{fontSize: "17px"}}>{scmServiceId}</span><br />
+        </div>
+    );
+    const omServiceData = (
+        <div>
+          Service Id: <span className="ant-card-meta-description meta" style={{fontSize: "17px"}}>{omServiceId}</span>
         </div>
     );
     const containersTooltip = missingContainersCount === 1 ? 'container is missing' : 'containers are missing';
@@ -262,8 +266,6 @@ export class Overview extends React.Component<Record<string, object>, IOverviewS
         </Tooltip>
       </div>
     const clusterCapacity = `${size(storageReport.capacity - storageReport.remaining)}/${size(storageReport.capacity)}`;
-    const clusterIsInHaMode = scmServiceId !== null && scmServiceId !== undefined && scmServiceId !== '' && omServiceId !== null
-        && omServiceId !== undefined && omServiceId !== '';
     return (
       <div className='overview-content'>
         <div className='page-header'>
@@ -317,10 +319,15 @@ export class Overview extends React.Component<Record<string, object>, IOverviewS
           <Col xs={24} sm={18} md={12} lg={12} xl={6} className='summary-font'>
             <OverviewCard loading={loading} title='Pending Deleted Keys Summary' data={deletePendingSummaryData} icon='delete' linkToUrl='/Om'/>
           </Col>
-          {clusterIsInHaMode &&
-            <Col xs={24} sm={18} md={12} lg={12} xl={6}>
-              <OverviewCard loading={loading} data={scmAndOmServicesData}/>
-            </Col>
+          {scmServiceId &&
+              <Col xs={24} sm={18} md={12} lg={12} xl={6} className='summary-font'>
+                <OverviewCard title="Storage Container Manager" loading={loading} data={scmServiceData} icon='file-text'/>
+              </Col>
+          }
+          {omServiceId &&
+              <Col xs={24} sm={18} md={12} lg={12} xl={6} className='summary-font'>
+                <OverviewCard title="Ozone Manager" loading={loading} data={omServiceData} icon='file-text' linkToUrl='/Om' />
+              </Col>
           }
         </Row>
       </div>
