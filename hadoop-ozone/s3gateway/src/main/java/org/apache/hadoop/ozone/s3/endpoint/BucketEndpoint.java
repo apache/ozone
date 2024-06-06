@@ -447,10 +447,10 @@ public class BucketEndpoint extends EndpointBase {
 
     OzoneBucket bucket = getBucket(bucketName);
     MultiDeleteResponse result = new MultiDeleteResponse();
-    Map<String, ErrorInfo> undeletedKeyResultMap;
     List<String> deleteKeys = new ArrayList<>();
 
     if (request.getObjects() != null) {
+      Map<String, ErrorInfo> undeletedKeyResultMap;
       for (DeleteObject keyToDelete : request.getObjects()) {
         deleteKeys.add(keyToDelete.getKey());
       }
@@ -458,17 +458,16 @@ public class BucketEndpoint extends EndpointBase {
       try {
         undeletedKeyResultMap = bucket.deleteKeys(deleteKeys, true);
         for (DeleteObject d : request.getObjects()) {
-          if (!(undeletedKeyResultMap.containsKey(d.getKey())) ||
-              undeletedKeyResultMap.get(d.getKey()).getCode().equals(ResultCodes.KEY_NOT_FOUND.name())) {
-            // if the key is not found, it is assumed to be successfully deleted
+          ErrorInfo error = undeletedKeyResultMap.get(d.getKey());
+          boolean deleted = error == null ||
+              // if the key is not found, it is assumed to be successfully deleted
+              ResultCodes.KEY_NOT_FOUND.name().equals(error.getCode());
+          if (deleted) {
             deleteKeys.remove(d.getKey());
             if (!request.isQuiet()) {
               result.addDeleted(new DeletedObject(d.getKey()));
             }
-          } else if (undeletedKeyResultMap.containsKey(d.getKey()) &&
-              !undeletedKeyResultMap.get(d.getKey()).getCode().equals(ResultCodes.KEY_NOT_FOUND.name())) {
-            // All errors other than KEY_NOT_FOUND are returned
-            ErrorInfo error = undeletedKeyResultMap.get(d.getKey());
+          } else {
             result.addError(new Error(d.getKey(), error.getCode(), error.getMessage()));
           }
         }
