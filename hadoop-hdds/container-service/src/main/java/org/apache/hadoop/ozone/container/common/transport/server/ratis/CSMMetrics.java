@@ -51,6 +51,7 @@ public class CSMMetrics {
 
   private @Metric MutableRate transactionLatencyMs;
   private final EnumMap<Type, MutableRate> opsLatencyMs;
+  private final EnumMap<Type, MutableRate> opsQueueingDelay;
   private MetricsRegistry registry = null;
 
   // Failure Metrics
@@ -69,13 +70,18 @@ public class CSMMetrics {
 
   private @Metric MutableRate applyTransactionNs;
   private @Metric MutableRate writeStateMachineDataNs;
+  private @Metric MutableRate writeChunkCommitNs;
+  private @Metric MutableRate untilApplyTransactionNs;
+  private @Metric MutableRate startTransactionCompleteNs;
 
   public CSMMetrics(RaftGroupId gid) {
     this.gid = gid;
     this.opsLatencyMs = new EnumMap<>(ContainerProtos.Type.class);
+    this.opsQueueingDelay = new EnumMap<>(ContainerProtos.Type.class);
     this.registry = new MetricsRegistry(CSMMetrics.class.getSimpleName());
     for (ContainerProtos.Type type : ContainerProtos.Type.values()) {
       opsLatencyMs.put(type, registry.newRate(type.toString() + "Ms", type + " op"));
+      opsQueueingDelay.put(type, registry.newRate("queueingDelay" + type.toString() + "Ns", type + " op"));
     }
   }
 
@@ -197,6 +203,11 @@ public class CSMMetrics {
     transactionLatencyMs.add(latencyMillis);
   }
 
+  public void recordQueueingDelay(ContainerProtos.Type type,
+                                  long latencyNanos) {
+    opsQueueingDelay.get(type).add(latencyNanos);
+  }
+
   public void incNumStartTransactionVerifyFailures() {
     numStartTransactionVerifyFailures.incr();
   }
@@ -211,6 +222,18 @@ public class CSMMetrics {
 
   public void recordWriteStateMachineCompletionNs(long latencyNanos) {
     writeStateMachineDataNs.add(latencyNanos);
+  }
+
+  public void recordWriteChunkCommitNs(long latencyNanos) {
+    writeChunkCommitNs.add(latencyNanos);
+  }
+
+  public void recordUntilApplyTransactionNs(long latencyNanos) {
+    untilApplyTransactionNs.add(latencyNanos);
+  }
+
+  public void recordStartTransactionCompleteNs(long latencyNanos) {
+    startTransactionCompleteNs.add(latencyNanos);
   }
 
   public void incNumDataCacheMiss() {
