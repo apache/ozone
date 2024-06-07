@@ -108,8 +108,7 @@ public final class SCMCertStore implements CertificateStore {
   public void checkValidCertID(BigInteger serialID) throws IOException {
     lock.lock();
     try {
-      if ((getCertificateByID(serialID) != null) ||
-          (getCertificateByID(serialID) != null)) {
+      if (getCertificateByID(serialID) != null) {
         throw new SCMSecurityException("Conflicting certificate ID" + serialID);
       }
     } finally {

@@ -433,17 +433,14 @@ public class SCMSecurityProtocolServer implements SCMSecurityProtocol,
   @Override
   public List<String> listCertificate(NodeType role,
       long startSerialId, int count) throws IOException {
-    List<X509Certificate> certificates =
-        scmCertificateServer.listCertificate(role, startSerialId, count
-        );
+    List<X509Certificate> certificates = scmCertificateServer.listCertificate(role, startSerialId, count);
     List<String> results = new ArrayList<>(certificates.size());
     for (X509Certificate cert : certificates) {
       try {
         String certStr = getPEMEncodedString(cert);
         results.add(certStr);
       } catch (SCMSecurityException e) {
-        throw new SCMSecurityException("listCertificate operation failed.",
-            e, e.getErrorCode());
+        throw new SCMSecurityException("listCertificate operation failed.", e, e.getErrorCode());
       }
     }
     return results;
