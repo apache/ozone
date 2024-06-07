@@ -273,8 +273,9 @@ public class TestWatchForCommit {
                 xceiverClient.getPipeline()));
         reply.getResponse().get();
         long index = reply.getLogIndex();
-        for (int i; i < pipeline.getNodes(); i++)
+        for (int i; i < pipeline.getNodes(); i++) {
           cluster.shutdownHddsDatanode(pipeline.getNodes().get(i));
+        }
         // emulate closing pipeline when SCM detects DEAD datanodes
         cluster.getStorageContainerManager()
             .getPipelineManager().closePipeline(pipeline, false);
