@@ -41,8 +41,10 @@ import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientFactory;
 import org.apache.hadoop.ozone.container.ContainerTestHelper;
 import org.apache.ozone.test.GenericTestUtils;
+import org.apache.ratis.proto.RaftProtos;
 import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
 import org.junit.jupiter.params.provider.ValueSource;
 
 import java.io.IOException;
@@ -134,11 +136,11 @@ public class TestCommitInRatis {
   }
 
   @ParameterizedTest
-  @ValueSource(strings = {"ALL_COMMITTED", "MAJORITY_COMMITTED"})
-  public void test2WayCommitForRetryfailure(String watchType) throws Exception {
+  @EnumSource(value = RaftProtos.ReplicationLevel.class, names = {"MAJORITY_COMMITTED", "ALL_COMMITTED"})
+  public void test2WayCommitForRetryfailure(RaftProtos.ReplicationLevel watchType) throws Exception {
     OzoneConfiguration conf = new OzoneConfiguration();
     RatisClientConfig ratisClientConfig = conf.getObject(RatisClientConfig.class);
-    ratisClientConfig.setWatchType(watchType);
+    ratisClientConfig.setWatchType(watchType.toString());
     conf.setFromObject(ratisClientConfig);
     startCluster(conf);
     GenericTestUtils.LogCapturer logCapturer =
@@ -176,7 +178,7 @@ public class TestCommitInRatis {
     reply.getResponse().get();
     xceiverClient.watchForCommit(reply.getLogIndex());
 
-    if (watchType.equals("ALL_COMMITTED")) {
+    if (watchType == RaftProtos.ReplicationLevel.ALL_COMMITTED) {
       // commitInfo Map will be reduced to 2 here
       assertEquals(2, ratisClient.getCommitInfoMap().size());
       assertThat(logCapturer.getOutput()).contains("ALL_COMMITTED way commit failed");

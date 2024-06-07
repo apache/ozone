@@ -102,7 +102,10 @@ public class RatisClientConfig {
       defaultValue = "ALL_COMMITTED",
       type = ConfigType.STRING,
       tags = { OZONE, CLIENT, PERFORMANCE },
-      description = "The RATIS watch commit type, ALL_COMMITTED or MAJORITY_COMMITTED.")
+      description = "Desired replication level when Ozone client's Raft client calls watch(), " +
+          "ALL_COMMITTED or MAJORITY_COMMITTED. MAJORITY_COMMITTED increases write performance by reducing watch() " +
+          "latency when an Ozone datanode is slow in a pipeline, at the cost of potential read latency increasing " +
+          "due to read retries to different datanodes.")
   private String watchType;
 
   public String getWatchType() {

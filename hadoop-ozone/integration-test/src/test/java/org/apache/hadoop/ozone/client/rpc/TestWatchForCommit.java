@@ -72,11 +72,13 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
+import org.apache.ratis.proto.RaftProtos;
 import org.apache.ratis.protocol.exceptions.GroupMismatchException;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
 import org.junit.jupiter.params.provider.ValueSource;
 
 /**
@@ -256,12 +258,12 @@ public class TestWatchForCommit {
   }
 
   @ParameterizedTest
-  @ValueSource(strings = {"ALL_COMMITTED", "MAJORITY_COMMITTED"})
-  public void testWatchForCommitForRetryfailure(String watchType) throws Exception {
+  @EnumSource(value = RaftProtos.ReplicationLevel.class, names = {"MAJORITY_COMMITTED", "ALL_COMMITTED"})
+  public void testWatchForCommitForRetryfailure(RaftProtos.ReplicationLevel watchType) throws Exception {
     GenericTestUtils.LogCapturer logCapturer =
         GenericTestUtils.LogCapturer.captureLogs(XceiverClientRatis.LOG);
     RatisClientConfig ratisClientConfig = conf.getObject(RatisClientConfig.class);
-    ratisClientConfig.setWatchType(watchType);
+    ratisClientConfig.setWatchType(watchType.toString());
     conf.setFromObject(ratisClientConfig);
     try (XceiverClientManager clientManager = new XceiverClientManager(conf)) {
       ContainerWithPipeline container1 = storageContainerLocationClient
@@ -308,12 +310,12 @@ public class TestWatchForCommit {
   }
 
   @ParameterizedTest
-  @ValueSource(strings = {"ALL_COMMITTED", "MAJORITY_COMMITTED"})
-  public void test2WayCommitForTimeoutException(String watchType) throws Exception {
+  @EnumSource(value = RaftProtos.ReplicationLevel.class, names = {"MAJORITY_COMMITTED", "ALL_COMMITTED"})
+  public void test2WayCommitForTimeoutException(RaftProtos.ReplicationLevel watchType) throws Exception {
     GenericTestUtils.LogCapturer logCapturer =
         GenericTestUtils.LogCapturer.captureLogs(XceiverClientRatis.LOG);
     RatisClientConfig ratisClientConfig = conf.getObject(RatisClientConfig.class);
-    ratisClientConfig.setWatchType(watchType);
+    ratisClientConfig.setWatchType(watchType.toString());
     conf.setFromObject(ratisClientConfig);
     try (XceiverClientManager clientManager = new XceiverClientManager(conf)) {
 
@@ -350,7 +352,7 @@ public class TestWatchForCommit {
         xceiverClient.watchForCommit(reply.getLogIndex());
 
         // commitInfo Map will be reduced to 2 here
-        if (watchType.equals("ALL_COMMITTED")) {
+        if (watchType == RaftProtos.ReplicationLevel.ALL_COMMITTED) {
           assertEquals(2, ratisClient.getCommitInfoMap().size());
           String output = logCapturer.getOutput();
           assertThat(output).contains("ALL_COMMITTED way commit failed");
