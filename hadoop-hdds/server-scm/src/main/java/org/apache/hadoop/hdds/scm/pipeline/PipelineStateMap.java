@@ -80,7 +80,8 @@ class PipelineStateMap {
     }
     pipeline2container.put(pipeline.getId(), new TreeSet<>());
     if (pipeline.getPipelineState() == PipelineState.OPEN) {
-      query2OpenPipelines.computeIfAbsent(pipeline.getReplicationConfig(), any -> new ArrayList<>()).add(pipeline);
+      query2OpenPipelines.computeIfAbsent(pipeline.getReplicationConfig(), any -> new ArrayList<>())
+          .add(pipeline);
     }
   }
 
