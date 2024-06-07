@@ -247,8 +247,8 @@ public final class BlockUtils {
    */
   public static void verifyReplicaIdx(Container container, BlockID blockID)
       throws IOException {
-    int containerReplicaIndex = container.getContainerData().getReplicaIndex();
-    if (containerReplicaIndex > 0 && containerReplicaIndex != blockID.getReplicaIndex()) {
+    Integer containerReplicaIndex = container.getContainerData().getReplicaIndex();
+    if (containerReplicaIndex > 0 && !containerReplicaIndex.equals(blockID.getReplicaIndex())) {
       throw new StorageContainerException(
           "Unable to find the Container with replicaIdx " + blockID.getReplicaIndex() + ". Container "
               + container.getContainerData().getContainerID() + " replicaIdx is "

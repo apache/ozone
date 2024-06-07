@@ -266,11 +266,8 @@ public final class ContainerProtocolCalls  {
    * @return container protocol getLastCommittedBlockLength response
    * @throws IOException if there is an I/O error while performing the call
    */
-  public static ContainerProtos.GetCommittedBlockLengthResponseProto
-      getCommittedBlockLength(
-      XceiverClientSpi xceiverClient, BlockID blockID,
-      Token<OzoneBlockTokenIdentifier> token)
-      throws IOException {
+  public static ContainerProtos.GetCommittedBlockLengthResponseProto getCommittedBlockLength(
+      XceiverClientSpi xceiverClient, BlockID blockID, Token<OzoneBlockTokenIdentifier> token) throws IOException {
     ContainerProtos.GetCommittedBlockLengthRequestProto.Builder
         getBlockLengthRequestBuilder =
         ContainerProtos.GetCommittedBlockLengthRequestProto.newBuilder().
@@ -345,10 +342,8 @@ public final class ContainerProtocolCalls  {
    * @return container protocol read chunk response
    * @throws IOException if there is an I/O error while performing the call
    */
-  public static ContainerProtos.ReadChunkResponseProto readChunk(
-      XceiverClientSpi xceiverClient, ChunkInfo chunk,
-      DatanodeBlockID blockID, List<Validator> validators,
-      Token<? extends TokenIdentifier> token) throws IOException {
+  public static ContainerProtos.ReadChunkResponseProto readChunk(XceiverClientSpi xceiverClient, ChunkInfo chunk,
+      DatanodeBlockID blockID, List<Validator> validators, Token<? extends TokenIdentifier> token) throws IOException {
     ReadChunkRequestProto.Builder readChunkRequest =
         ReadChunkRequestProto.newBuilder()
             .setBlockID(blockID)

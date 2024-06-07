@@ -439,8 +439,8 @@ public class ChunkInputStream extends InputStream
       throws IOException {
 
     ReadChunkResponseProto readChunkResponse =
-        ContainerProtocolCalls.readChunk(xceiverClient,
-            readChunkInfo, datanodeBlockID, validators, tokenSupplier.get());
+        ContainerProtocolCalls.readChunk(xceiverClient, readChunkInfo, datanodeBlockID, validators,
+            tokenSupplier.get());
 
     if (readChunkResponse.hasData()) {
       return readChunkResponse.getData().asReadOnlyByteBufferList()
