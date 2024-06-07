@@ -82,7 +82,6 @@ public class XceiverClientMetrics implements MetricsSource {
         .OZONE_XCEIVER_CLIENT_TOP_METRICS_LATENCY_RECORD_THRESHOLD_MS_KEY);
     int latencyMsRecordCount = conf.getInt(OzoneConfigKeys
         .OZONE_XCEIVER_CLIENT_TOP_METRICS_LATENCY_RECORD_COUNT_KEY, 0);
-    int numEnumEntries = ContainerProtos.Type.values().length;
     this.registry = new MetricsRegistry(SOURCE_NAME);
     Arrays.sort(latencyMsThresholdsOrder);
     this.pendingOpsArray = new EnumMap<>(ContainerProtos.Type.class);
