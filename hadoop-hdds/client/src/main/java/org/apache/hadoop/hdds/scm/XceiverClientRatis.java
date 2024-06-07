@@ -411,8 +411,8 @@ public final class XceiverClientRatis extends XceiverClientSpi {
           metrics.addContainerOpsLatency(request.getCmdType(),
               System.currentTimeMillis() - requestTime);
 
-          // success == false here indicates that the request has failed to achieve ALL_COMMITTED replication level
-          if (!clientReply.isSuccess()) {
+          // isSuccess() == false here indicates that the request has failed to achieve ALL_COMMITTED replication level
+          if (clientReply != null && !clientReply.isSuccess()) {
             // And if NotReplicatedException is thrown, it implicates the request achieved MAJORITY_COMMITTED.
             // The list of servers given by getCommitInfos() would return with their respective commitIndex.
             // Find the node with the lowest commit index and add this (timed out) node to the reply in order to

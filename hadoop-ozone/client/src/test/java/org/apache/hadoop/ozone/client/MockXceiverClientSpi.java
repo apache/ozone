@@ -113,6 +113,8 @@ public class MockXceiverClientSpi extends XceiverClientSpi {
   public XceiverClientReply sendCommandAsync(
       ContainerCommandRequestProto request,
       ReplicationLevel writeReplicationLevel) {
+    LOG.warn("Ignoring writeReplicationLevel {} for command {}",
+        writeReplicationLevel, request.getCmdType());
     return sendCommandAsync(request);
   }
 
