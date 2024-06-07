@@ -1848,9 +1848,6 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
                 </goals>
               </execution>
             </executions>
-            <configuration>
-              <outputFormat>xml</outputFormat>
-            </configuration>
           </plugin>
         </plugins>
       </build>
