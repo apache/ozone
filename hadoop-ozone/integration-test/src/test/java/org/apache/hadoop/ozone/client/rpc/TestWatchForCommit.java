@@ -80,7 +80,6 @@ import org.junit.jupiter.api.Test;
 /**
  * This class verifies the watchForCommit Handling by xceiverClient.
  */
-@Flaky("HDDS-5818")
 public class TestWatchForCommit {
 
   private MiniOzoneCluster cluster;
@@ -274,8 +273,8 @@ public class TestWatchForCommit {
                 xceiverClient.getPipeline()));
         reply.getResponse().get();
         long index = reply.getLogIndex();
-        cluster.shutdownHddsDatanode(pipeline.getNodes().get(0));
-        cluster.shutdownHddsDatanode(pipeline.getNodes().get(1));
+        for (int i; i < pipeline.getNodes(); i++)
+          cluster.shutdownHddsDatanode(pipeline.getNodes().get(i));
         // emulate closing pipeline when SCM detects DEAD datanodes
         cluster.getStorageContainerManager()
             .getPipelineManager().closePipeline(pipeline, false);
