@@ -40,9 +40,11 @@ import java.util.TreeSet;
 import static java.lang.String.format;
 
 /**
- * Holds the data structures which maintain the information about pipeline and its state.
- * Invariant: If a pipeline exists in PipelineStateMap, both pipelineMap and pipeline2container would have
- *            a non-null mapping for it.
+ * Holds the data structures which maintain the information about pipeline and
+ * its state.
+ * Invariant: If a pipeline exists in PipelineStateMap, both pipelineMap and
+ * pipeline2container would have a non-null mapping for it.
+ *
  * Concurrency consideration:
  *   - thread-unsafe
  */
