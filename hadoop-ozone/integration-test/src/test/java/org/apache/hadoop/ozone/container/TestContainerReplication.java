@@ -47,7 +47,6 @@ import java.util.Random;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Collectors;
 
@@ -93,8 +92,6 @@ import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.mockito.MockedStatic;
 import org.mockito.Mockito;
-import org.mockito.invocation.InvocationOnMock;
-import org.mockito.stubbing.Answer;
 import org.slf4j.event.Level;
 
 /**
@@ -252,12 +249,43 @@ class TestContainerReplication {
     return bucket.readKey(KEY);
   }
 
+  private void mockContainerPlacementPolicy(final MockedStatic<ContainerPlacementPolicyFactory> mockedPlacementFactory,
+                                            final AtomicReference<DatanodeDetails> mockedDatanodeToRemove) {
+    mockedPlacementFactory.when(() -> ContainerPlacementPolicyFactory.getECPolicy(any(ConfigurationSource.class),
+        any(NodeManager.class), any(NetworkTopology.class), Mockito.anyBoolean(),
+        any(SCMContainerPlacementMetrics.class))).thenAnswer(i -> {
+          PlacementPolicy placementPolicy = (PlacementPolicy) Mockito.spy(i.callRealMethod());
+          Mockito.doAnswer(args -> {
+            Set<ContainerReplica> containerReplica = ((Set<ContainerReplica>) args.getArgument(0)).stream()
+                .filter(r -> r.getDatanodeDetails().equals(mockedDatanodeToRemove.get()))
+                .collect(Collectors.toSet());
+            return containerReplica;
+          }).when(placementPolicy).replicasToRemoveToFixOverreplication(Mockito.anySet(), Mockito.anyInt());
+          return placementPolicy;
+        });
+  }
+
+  private void mockContainerProtocolCalls(final MockedStatic<ContainerProtocolCalls> mockedContainerProtocolCalls,
+                                          final Map<Integer, Integer> failedReadChunkCountMap) {
+    mockedContainerProtocolCalls.when(() -> ContainerProtocolCalls.readChunk(any(), any(), any(), anyList(), any()))
+        .thenAnswer(invocation -> {
+          int replicaIndex = ((ContainerProtos.DatanodeBlockID) invocation.getArgument(2)).getReplicaIndex();
+          try {
+            return invocation.callRealMethod();
+          } catch (Throwable e) {
+            failedReadChunkCountMap.compute(replicaIndex,
+                (replicaIdx, totalCount) -> totalCount == null ? 1 : (totalCount + 1));
+            throw e;
+          }
+        });
+  }
+
 
   @Test
   public void testECContainerReplication() throws Exception {
     OzoneConfiguration conf = createConfiguration(false);
     final AtomicReference<DatanodeDetails> mockedDatanodeToRemove = new AtomicReference<>();
-    final Map<Integer, Integer>  failedReadChunkCountMap = new ConcurrentHashMap<>();
+    final Map<Integer, Integer> failedReadChunkCountMap = new ConcurrentHashMap<>();
     // Overiding Config to support 1k Chunk size
     conf.set("ozone.replication.allowed-configs", "(^((STANDALONE|RATIS)/(ONE|THREE))|(EC/(3-2|6-3|10-4)-" +
         "(512|1024|2048|4096|1)k)$)");
@@ -266,29 +294,8 @@ class TestContainerReplication {
              Mockito.mockStatic(ContainerPlacementPolicyFactory.class, Mockito.CALLS_REAL_METHODS);
          MockedStatic<ContainerProtocolCalls> mockedContainerProtocolCalls =
              Mockito.mockStatic(ContainerProtocolCalls.class, Mockito.CALLS_REAL_METHODS);) {
-      mockedPlacementFactory.when(() -> ContainerPlacementPolicyFactory.getECPolicy(any(ConfigurationSource.class),
-          any(NodeManager.class), any(NetworkTopology.class), Mockito.anyBoolean(),
-          any(SCMContainerPlacementMetrics.class))).thenAnswer(i -> {
-            PlacementPolicy placementPolicy = (PlacementPolicy) Mockito.spy(i.callRealMethod());
-            Mockito.doAnswer(args -> {
-              Set<ContainerReplica> containerReplica = ((Set<ContainerReplica>) args.getArgument(0)).stream()
-                  .filter(r -> r.getDatanodeDetails().equals(mockedDatanodeToRemove.get()))
-                  .collect(Collectors.toSet());
-              return containerReplica;
-            }).when(placementPolicy).replicasToRemoveToFixOverreplication(Mockito.anySet(), Mockito.anyInt());
-            return placementPolicy;
-          });
-      mockedContainerProtocolCalls.when(() -> ContainerProtocolCalls.readChunk(any(), any(), any(), anyList(), any()))
-          .thenAnswer(invocation -> {
-            int replicaIndex = ((ContainerProtos.DatanodeBlockID)invocation.getArgument(2)).getReplicaIndex();
-            try {
-              return invocation.callRealMethod();
-            } catch (Throwable e) {
-              failedReadChunkCountMap.compute(replicaIndex,
-                  (replicaIdx, totalCount) -> totalCount == null ? 1 : (totalCount+1));
-              throw e;
-            }
-          });
+      mockContainerPlacementPolicy(mockedPlacementFactory, mockedDatanodeToRemove);
+      mockContainerProtocolCalls(mockedContainerProtocolCalls, failedReadChunkCountMap);
       // Creating Cluster with 6 Nodes
       try (MiniOzoneCluster cluster = MiniOzoneCluster.newBuilder(conf).setNumDatanodes(6).build()) {
         cluster.waitForClusterToBeReady();
@@ -333,7 +340,7 @@ class TestContainerReplication {
           //Opening a new stream before we make changes to the blocks.
           try (OzoneInputStream inputStream = createInputStream(client)) {
             int firstReadLen = 1024 * 3;
-            Arrays.fill(readData, (byte)0);
+            Arrays.fill(readData, (byte) 0);
             inputStream.read(readData, 0, firstReadLen);
             Assertions.assertEquals(0, failedReadChunkCountMap.size());
             //Checking the initial state as per the latest location.

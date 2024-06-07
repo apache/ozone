@@ -20,9 +20,7 @@ import com.fasterxml.jackson.annotation.JsonIgnore;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 
-import java.util.Arrays;
 import java.util.Objects;
-import java.util.stream.Collectors;
 
 /**
  * BlockID of Ozone (containerID + localID + blockCommitSequenceId + replicaIndex).
