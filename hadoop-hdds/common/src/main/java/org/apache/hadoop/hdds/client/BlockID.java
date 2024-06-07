@@ -36,7 +36,6 @@ public class BlockID {
   // This value would be only set when deserializing from ContainerProtos.DatanodeBlockID or copying from another
   // BlockID object.
   private Integer replicaIndex;
-  private StackTraceElement[] stackTraceElements;
 
   public BlockID(long containerID, long localID) {
     this(containerID, localID, 0, null);
@@ -46,7 +45,6 @@ public class BlockID {
     containerBlockID = new ContainerBlockID(containerID, localID);
     blockCommitSequenceId = bcsID;
     this.replicaIndex = repIndex;
-    this.stackTraceElements = Thread.currentThread().getStackTrace();
   }
 
   public BlockID(BlockID blockID) {
@@ -62,7 +60,6 @@ public class BlockID {
     this.containerBlockID = containerBlockID;
     blockCommitSequenceId = bcsId;
     this.replicaIndex = repIndex;
-    this.stackTraceElements = Thread.currentThread().getStackTrace();
   }
 
   public long getContainerID() {
@@ -105,7 +102,6 @@ public class BlockID {
     containerBlockID.appendTo(sb);
     sb.append(" bcsId: ").append(blockCommitSequenceId);
     sb.append(" replicaIndex: ").append(replicaIndex);
-    sb.append(Arrays.stream(stackTraceElements).map(StackTraceElement::toString).collect(Collectors.joining("\n")));
   }
 
   @JsonIgnore
