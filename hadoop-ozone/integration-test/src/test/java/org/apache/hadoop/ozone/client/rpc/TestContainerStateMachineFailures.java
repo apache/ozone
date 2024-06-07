@@ -104,13 +104,12 @@ import org.apache.ratis.protocol.RaftGroupId;
 import org.apache.ratis.protocol.exceptions.StateMachineException;
 import org.apache.ratis.server.storage.FileInfo;
 import org.apache.ratis.statemachine.impl.SimpleStateMachineStorage;
-
 import org.apache.ratis.statemachine.impl.StatemachineImplTestUtil;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
-
+import static org.apache.hadoop.hdds.scm.storage.ContainerProtocolCalls.getContainerCommandRequestProtoBuilder;
 /**
  * Tests the containerStateMachine failure handling.
  */
@@ -391,8 +390,7 @@ public class TestContainerStateMachineFailures {
         .getDatanodeStateMachine().getContainer();
     HddsDispatcher dispatcher = (HddsDispatcher) ozoneContainer
         .getDispatcher();
-    ContainerProtos.ContainerCommandRequestProto.Builder request =
-        ContainerProtos.ContainerCommandRequestProto.newBuilder();
+    ContainerProtos.ContainerCommandRequestProto.Builder request = getContainerCommandRequestProtoBuilder();
     request.setCmdType(ContainerProtos.Type.CloseContainer);
     request.setContainerID(containerID);
     request.setCloseContainer(
@@ -451,8 +449,7 @@ public class TestContainerStateMachineFailures {
         .getContainerWithPipeline(containerID).getPipeline();
     XceiverClientSpi xceiverClient =
         xceiverClientManager.acquireClient(pipeline);
-    ContainerProtos.ContainerCommandRequestProto.Builder request =
-        ContainerProtos.ContainerCommandRequestProto.newBuilder();
+    ContainerProtos.ContainerCommandRequestProto.Builder request = getContainerCommandRequestProtoBuilder();
     request.setDatanodeUuid(pipeline.getFirstNode().getUuidString());
     request.setCmdType(ContainerProtos.Type.CloseContainer);
     request.setContainerID(containerID);
@@ -536,8 +533,7 @@ public class TestContainerStateMachineFailures {
         .getContainerWithPipeline(containerID).getPipeline();
     XceiverClientSpi xceiverClient =
         xceiverClientManager.acquireClient(pipeline);
-    ContainerProtos.ContainerCommandRequestProto.Builder request =
-        ContainerProtos.ContainerCommandRequestProto.newBuilder();
+    ContainerProtos.ContainerCommandRequestProto.Builder request = getContainerCommandRequestProtoBuilder();
     request.setDatanodeUuid(pipeline.getFirstNode().getUuidString());
     request.setCmdType(ContainerProtos.Type.CloseContainer);
     request.setContainerID(containerID);
@@ -628,8 +624,7 @@ public class TestContainerStateMachineFailures {
     AtomicInteger failCount = new AtomicInteger(0);
     Runnable r1 = () -> {
       try {
-        ContainerProtos.ContainerCommandRequestProto.Builder request =
-            ContainerProtos.ContainerCommandRequestProto.newBuilder();
+        ContainerProtos.ContainerCommandRequestProto.Builder request = getContainerCommandRequestProtoBuilder();
         request.setDatanodeUuid(pipeline.getFirstNode().getUuidString());
         request.setCmdType(ContainerProtos.Type.CloseContainer);
         request.setContainerID(containerID);

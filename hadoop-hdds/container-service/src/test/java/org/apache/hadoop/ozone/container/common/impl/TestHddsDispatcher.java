@@ -87,6 +87,7 @@ import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.hdds.fs.MockSpaceUsagePersistence.inMemory;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.HDDS_DATANODE_DIR_KEY;
 import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuilders.getContainerCommandResponse;
+import static org.apache.hadoop.hdds.scm.storage.ContainerProtocolCalls.getContainerCommandRequestProtoBuilder;
 import static org.apache.hadoop.ozone.container.common.ContainerTestUtils.COMMIT_STAGE;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -584,8 +585,7 @@ public class TestHddsDispatcher {
         .setChunkData(chunk)
         .setData(data);
 
-    return ContainerCommandRequestProto
-        .newBuilder()
+    return getContainerCommandRequestProtoBuilder()
         .setContainerID(containerId)
         .setCmdType(ContainerProtos.Type.WriteChunk)
         .setDatanodeUuid(datanodeId)
@@ -686,7 +686,7 @@ public class TestHddsDispatcher {
             .setBlockID(writeChunk.getBlockID())
             .setChunkData(writeChunk.getChunkData())
             .setReadChunkVersion(ContainerProtos.ReadChunkVersion.V1);
-    return ContainerCommandRequestProto.newBuilder()
+    return getContainerCommandRequestProtoBuilder()
         .setCmdType(ContainerProtos.Type.ReadChunk)
         .setContainerID(writeChunk.getBlockID().getContainerID())
         .setTraceID(writeChunkRequest.getTraceID())

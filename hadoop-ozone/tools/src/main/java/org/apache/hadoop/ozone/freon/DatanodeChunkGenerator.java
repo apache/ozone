@@ -52,6 +52,8 @@ import org.slf4j.LoggerFactory;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
 
+import static org.apache.hadoop.hdds.scm.storage.ContainerProtocolCalls.getContainerCommandRequestProtoBuilder;
+
 /**
  * Data generator to use pure datanode XCeiver interface.
  */
@@ -234,8 +236,7 @@ public class DatanodeChunkGenerator extends BaseFreonGenerator implements
     String id = datanodeDetails.getUuidString();
 
     ContainerCommandRequestProto.Builder builder =
-        ContainerCommandRequestProto
-            .newBuilder()
+        getContainerCommandRequestProtoBuilder()
             .setCmdType(Type.WriteChunk)
             .setContainerID(blockId.getContainerID())
             .setDatanodeUuid(id)

@@ -71,6 +71,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import static org.apache.hadoop.hdds.HddsUtils.processForDebug;
+import static org.apache.hadoop.hdds.scm.storage.ContainerProtocolCalls.getContainerCommandRequestProtoBuilder;
 
 /**
  * {@link XceiverClientSpi} implementation, the standalone client.
@@ -337,8 +338,7 @@ public class XceiverClientGrpc extends XceiverClientSpi {
 
     return TracingUtil.executeInNewSpan(spanName,
         () -> {
-          ContainerCommandRequestProto finalPayload =
-              ContainerCommandRequestProto.newBuilder(request)
+          ContainerCommandRequestProto finalPayload = getContainerCommandRequestProtoBuilder(request)
                   .setTraceID(TracingUtil.exportCurrentSpan()).build();
           return sendCommandWithRetry(finalPayload, validators);
         });
@@ -490,8 +490,7 @@ public class XceiverClientGrpc extends XceiverClientSpi {
 
     try (Scope ignored = GlobalTracer.get().activateSpan(span)) {
 
-      ContainerCommandRequestProto finalPayload =
-          ContainerCommandRequestProto.newBuilder(request)
+      ContainerCommandRequestProto finalPayload = getContainerCommandRequestProtoBuilder(request)
               .setTraceID(TracingUtil.exportCurrentSpan())
               .build();
       XceiverClientReply asyncReply =

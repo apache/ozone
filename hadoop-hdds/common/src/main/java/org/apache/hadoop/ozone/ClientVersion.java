@@ -28,7 +28,7 @@ import static java.util.stream.Collectors.toMap;
 /**
  * Versioning for protocol clients.
  */
-public enum ClientVersion implements ComponentVersion {
+public enum ClientVersion implements ComponentVersion, Comparable<ClientVersion> {
 
   DEFAULT_VERSION(0, "Initial version"),
 
@@ -41,6 +41,9 @@ public enum ClientVersion implements ComponentVersion {
   BUCKET_LAYOUT_SUPPORT(3,
       "This client version has support for Object Store and File " +
           "System Optimized Bucket Layouts."),
+
+  ERASURE_CODING_READ_CHUNK_CORRUPTION_FIX(4,
+      "This client version fixes for fixing read corruption in case for EC block reads."),
 
   FUTURE_VERSION(-1, "Used internally when the server side is older and an"
       + " unknown client version has arrived from the client.");
@@ -78,5 +81,7 @@ public enum ClientVersion implements ComponentVersion {
     ClientVersion[] versions = ClientVersion.values();
     return versions[versions.length - 2];
   }
+
+
 
 }

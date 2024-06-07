@@ -79,6 +79,7 @@ import java.util.concurrent.TimeUnit;
 import static org.apache.hadoop.ozone.audit.AuditLogger.PerformanceStringBuilder;
 import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuilders.malformedRequest;
 import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuilders.unsupportedRequest;
+import static org.apache.hadoop.hdds.scm.storage.ContainerProtocolCalls.getContainerCommandRequestProtoBuilder;
 import static org.apache.hadoop.ozone.container.common.interfaces.Container.ScanResult;
 
 /**
@@ -479,7 +480,7 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
     }
 
     ContainerCommandRequestProto.Builder requestBuilder =
-        ContainerCommandRequestProto.newBuilder()
+        getContainerCommandRequestProtoBuilder()
             .setCmdType(Type.CreateContainer)
             .setContainerID(containerRequest.getContainerID())
             .setCreateContainer(createRequest.build())

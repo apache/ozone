@@ -31,6 +31,7 @@ import static org.apache.hadoop.ozone.container.TestHelper.waitForReplicaCount;
 import static org.apache.ozone.test.GenericTestUtils.setLogLevel;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.Mockito.any;
 
 import java.io.IOException;
@@ -44,7 +45,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.Random;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Collectors;
 
@@ -55,6 +58,7 @@ import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.scm.PlacementPolicy;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.container.placement.algorithms.ContainerPlacementPolicyFactory;
@@ -66,6 +70,7 @@ import org.apache.hadoop.hdds.scm.container.placement.algorithms.SCMContainerPla
 import org.apache.hadoop.hdds.scm.container.placement.algorithms.SCMContainerPlacementRandom;
 import org.apache.hadoop.hdds.scm.net.NetworkTopology;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
+import org.apache.hadoop.hdds.scm.storage.ContainerProtocolCalls;
 import org.apache.hadoop.ozone.HddsDatanodeService;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.client.ObjectStore;
@@ -88,6 +93,8 @@ import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.mockito.MockedStatic;
 import org.mockito.Mockito;
+import org.mockito.invocation.InvocationOnMock;
+import org.mockito.stubbing.Answer;
 import org.slf4j.event.Level;
 
 /**
@@ -250,14 +257,16 @@ class TestContainerReplication {
   public void testECContainerReplication() throws Exception {
     OzoneConfiguration conf = createConfiguration(false);
     final AtomicReference<DatanodeDetails> mockedDatanodeToRemove = new AtomicReference<>();
-
+    final Map<Integer, Integer>  failedReadChunkCountMap = new ConcurrentHashMap<>();
     // Overiding Config to support 1k Chunk size
     conf.set("ozone.replication.allowed-configs", "(^((STANDALONE|RATIS)/(ONE|THREE))|(EC/(3-2|6-3|10-4)-" +
         "(512|1024|2048|4096|1)k)$)");
     conf.set(OZONE_SCM_CONTAINER_PLACEMENT_EC_IMPL_KEY, SCMContainerPlacementRackScatter.class.getCanonicalName());
-    try (MockedStatic<ContainerPlacementPolicyFactory> mocked =
-             Mockito.mockStatic(ContainerPlacementPolicyFactory.class, Mockito.CALLS_REAL_METHODS)) {
-      mocked.when(() -> ContainerPlacementPolicyFactory.getECPolicy(any(ConfigurationSource.class),
+    try (MockedStatic<ContainerPlacementPolicyFactory> mockedPlacementFactory =
+             Mockito.mockStatic(ContainerPlacementPolicyFactory.class, Mockito.CALLS_REAL_METHODS);
+         MockedStatic<ContainerProtocolCalls> mockedContainerProtocolCalls =
+             Mockito.mockStatic(ContainerProtocolCalls.class, Mockito.CALLS_REAL_METHODS);) {
+      mockedPlacementFactory.when(() -> ContainerPlacementPolicyFactory.getECPolicy(any(ConfigurationSource.class),
           any(NodeManager.class), any(NetworkTopology.class), Mockito.anyBoolean(),
           any(SCMContainerPlacementMetrics.class))).thenAnswer(i -> {
             PlacementPolicy placementPolicy = (PlacementPolicy) Mockito.spy(i.callRealMethod());
@@ -269,7 +278,17 @@ class TestContainerReplication {
             }).when(placementPolicy).replicasToRemoveToFixOverreplication(Mockito.anySet(), Mockito.anyInt());
             return placementPolicy;
           });
-
+      mockedContainerProtocolCalls.when(() -> ContainerProtocolCalls.readChunk(any(), any(), any(), anyList(), any()))
+          .thenAnswer(invocation -> {
+            int replicaIndex = ((ContainerProtos.DatanodeBlockID)invocation.getArgument(2)).getReplicaIndex();
+            try {
+              return invocation.callRealMethod();
+            } catch (Throwable e) {
+              failedReadChunkCountMap.compute(replicaIndex,
+                  (replicaIdx, totalCount) -> totalCount == null ? 1 : (totalCount+1));
+              throw e;
+            }
+          });
       // Creating Cluster with 6 Nodes
       try (MiniOzoneCluster cluster = MiniOzoneCluster.newBuilder(conf).setNumDatanodes(6).build()) {
         cluster.waitForClusterToBeReady();
@@ -308,14 +327,15 @@ class TestContainerReplication {
           byte[] readData = new byte[size];
           try (OzoneInputStream inputStream = createInputStream(client)) {
             inputStream.read(readData);
-            Assertions.assertTrue(Arrays.equals(readData, originalData));
+            Assertions.assertArrayEquals(readData, originalData);
           }
-
+          Assertions.assertEquals(0, failedReadChunkCountMap.size());
           //Opening a new stream before we make changes to the blocks.
           try (OzoneInputStream inputStream = createInputStream(client)) {
             int firstReadLen = 1024 * 3;
             Arrays.fill(readData, (byte)0);
             inputStream.read(readData, 0, firstReadLen);
+            Assertions.assertEquals(0, failedReadChunkCountMap.size());
             //Checking the initial state as per the latest location.
             assertState(cluster, ImmutableMap.of(1, replicaIndexMap.get(1), 2, replicaIndexMap.get(2),
                 3, replicaIndexMap.get(3), 4, replicaIndexMap.get(4), 5, replicaIndexMap.get(5)));
@@ -385,7 +405,8 @@ class TestContainerReplication {
 
             // Reading the pre initialized inputStream. This leads to swap of the block1 & block3.
             inputStream.read(readData, firstReadLen, size - firstReadLen);
-            Assertions.assertTrue(Arrays.equals(readData, originalData));
+            Assertions.assertEquals(ImmutableMap.of(1, 1, 3, 1), failedReadChunkCountMap);
+            Assertions.assertArrayEquals(readData, originalData);
           }
         }
       }

@@ -20,7 +20,9 @@ import com.fasterxml.jackson.annotation.JsonIgnore;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 
+import java.util.Arrays;
 import java.util.Objects;
+import java.util.stream.Collectors;
 
 /**
  * BlockID of Ozone (containerID + localID + blockCommitSequenceId + replicaIndex).
@@ -30,16 +32,21 @@ public class BlockID {
 
   private final ContainerBlockID containerBlockID;
   private long blockCommitSequenceId;
-  private int replicaIndex;
+  // null value when not set with private constructor.(This is to avoid confusion of replica index 0 & null value).
+  // This value would be only set when deserializing from ContainerProtos.DatanodeBlockID or copying from another
+  // BlockID object.
+  private Integer replicaIndex;
+  private StackTraceElement[] stackTraceElements;
 
   public BlockID(long containerID, long localID) {
-    this(containerID, localID, 0, 0);
+    this(containerID, localID, 0, null);
   }
 
-  private BlockID(long containerID, long localID, long bcsID, int repIndex) {
+  private BlockID(long containerID, long localID, long bcsID, Integer repIndex) {
     containerBlockID = new ContainerBlockID(containerID, localID);
     blockCommitSequenceId = bcsID;
     this.replicaIndex = repIndex;
+    this.stackTraceElements = Thread.currentThread().getStackTrace();
   }
 
   public BlockID(BlockID blockID) {
@@ -48,13 +55,14 @@ public class BlockID {
   }
 
   public BlockID(ContainerBlockID containerBlockID) {
-    this(containerBlockID, 0, 0);
+    this(containerBlockID, 0, null);
   }
 
-  private BlockID(ContainerBlockID containerBlockID, long bcsId, int repIndex) {
+  private BlockID(ContainerBlockID containerBlockID, long bcsId, Integer repIndex) {
     this.containerBlockID = containerBlockID;
     blockCommitSequenceId = bcsId;
     this.replicaIndex = repIndex;
+    this.stackTraceElements = Thread.currentThread().getStackTrace();
   }
 
   public long getContainerID() {
@@ -73,11 +81,12 @@ public class BlockID {
     this.blockCommitSequenceId = blockCommitSequenceId;
   }
 
-  public int getReplicaIndex() {
+  // Can return a null value in case it is not set.
+  public Integer getReplicaIndex() {
     return replicaIndex;
   }
 
-  public void setReplicaIndex(int replicaIndex) {
+  public void setReplicaIndex(Integer replicaIndex) {
     this.replicaIndex = replicaIndex;
   }
 
@@ -96,12 +105,13 @@ public class BlockID {
     containerBlockID.appendTo(sb);
     sb.append(" bcsId: ").append(blockCommitSequenceId);
     sb.append(" replicaIndex: ").append(replicaIndex);
+    sb.append(Arrays.stream(stackTraceElements).map(StackTraceElement::toString).collect(Collectors.joining("\n")));
   }
 
   @JsonIgnore
   public ContainerProtos.DatanodeBlockID getDatanodeBlockIDProtobuf() {
     ContainerProtos.DatanodeBlockID.Builder blockID = getDatanodeBlockIDProtobufBuilder();
-    if (replicaIndex > 0) {
+    if (replicaIndex != null) {
       blockID.setReplicaIndex(replicaIndex);
     }
     return blockID.build();
@@ -116,11 +126,11 @@ public class BlockID {
   }
 
   @JsonIgnore
-  public static BlockID getFromProtobuf(
-      ContainerProtos.DatanodeBlockID blockID) {
+  public static BlockID getFromProtobuf(ContainerProtos.DatanodeBlockID blockID) {
     return new BlockID(blockID.getContainerID(),
-        blockID.getLocalID(), blockID.getBlockCommitSequenceId(), blockID.hasReplicaIndex() ?
-        blockID.getReplicaIndex() : 0);
+        blockID.getLocalID(),
+        blockID.getBlockCommitSequenceId(),
+        blockID.hasReplicaIndex() ? blockID.getReplicaIndex() : null);
   }
 
   @JsonIgnore
@@ -134,7 +144,7 @@ public class BlockID {
   public static BlockID getFromProtobuf(HddsProtos.BlockID blockID) {
     return new BlockID(
         ContainerBlockID.getFromProtobuf(blockID.getContainerBlockID()),
-        blockID.getBlockCommitSequenceId(), 0);
+        blockID.getBlockCommitSequenceId(), null);
   }
 
   @Override
@@ -148,13 +158,12 @@ public class BlockID {
     BlockID blockID = (BlockID) o;
     return containerBlockID.equals(blockID.getContainerBlockID())
         && blockCommitSequenceId == blockID.getBlockCommitSequenceId()
-        && replicaIndex == blockID.getReplicaIndex();
+        && Objects.equals(replicaIndex, blockID.getReplicaIndex());
   }
 
   @Override
   public int hashCode() {
-    return Objects
-        .hash(containerBlockID.getContainerID(), containerBlockID.getLocalID(),
-            blockCommitSequenceId, replicaIndex);
+    return Objects.hash(containerBlockID.getContainerID(), containerBlockID.getLocalID(),
+        blockCommitSequenceId, replicaIndex);
   }
 }

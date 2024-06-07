@@ -139,6 +139,20 @@ public class TestKeyValueHandlerWithUnhealthyContainer {
     assertEquals(UNKNOWN_BCSID, response.getResult());
   }
 
+  @ParameterizedTest
+  @ValueSource(ints = {0, 1, 2, 3, 4, 5})
+  public void testReadChunkWithReplicaIndexMismatch(int replicaIndex) {
+    KeyValueContainer container = getMockContainerWithReplicaIndex(replicaIndex);
+    KeyValueHandler handler = getDummyHandler();
+    for (int rid = 0; rid <= 5; rid++) {
+      ContainerProtos.ContainerCommandResponseProto response =
+          handler.handleReadChunk(getDummyCommandRequestProto(ContainerProtos.Type.ReadChunk, rid), container, null);
+      assertEquals(rid != replicaIndex ? ContainerProtos.Result.CONTAINER_NOT_FOUND : UNKNOWN_BCSID,
+          response.getResult());
+    }
+
+  }
+
   @Test
   public void testGetSmallFile() {
     KeyValueContainer container = getMockUnhealthyContainer();

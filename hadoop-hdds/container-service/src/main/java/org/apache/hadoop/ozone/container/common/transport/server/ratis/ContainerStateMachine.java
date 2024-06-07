@@ -100,6 +100,8 @@ import org.apache.ratis.util.JavaUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import static org.apache.hadoop.hdds.scm.storage.ContainerProtocolCalls.getContainerCommandRequestProtoBuilder;
+
 /**
  * A {@link StateMachine} for containers,
  * which is responsible for handling different types of container requests.
@@ -387,7 +389,7 @@ public class ContainerStateMachine extends BaseStateMachine {
     final ContainerCommandRequestProto requestProto;
     if (logProto.getCmdType() == Type.WriteChunk) {
       // combine state machine data
-      requestProto = ContainerCommandRequestProto.newBuilder(logProto)
+      requestProto = getContainerCommandRequestProtoBuilder(logProto)
           .setWriteChunk(WriteChunkRequestProto.newBuilder(logProto.getWriteChunk())
           .setData(stateMachineLogEntry.getStateMachineEntry().getStateMachineData()))
           .build();
@@ -424,7 +426,7 @@ public class ContainerStateMachine extends BaseStateMachine {
     }
 
     // once the token is verified, clear it from the proto
-    final ContainerCommandRequestProto.Builder protoBuilder = ContainerCommandRequestProto.newBuilder(proto)
+    final ContainerCommandRequestProto.Builder protoBuilder = getContainerCommandRequestProtoBuilder(proto)
         .clearEncodedToken();
     if (proto.getCmdType() == Type.WriteChunk) {
       final WriteChunkRequestProto write = proto.getWriteChunk();
@@ -451,7 +453,7 @@ public class ContainerStateMachine extends BaseStateMachine {
     // TODO: We can avoid creating new builder and set pipeline Id if
     // the client is already sending the pipeline id, then we just have to
     // validate the pipeline Id.
-    return ContainerCommandRequestProto.newBuilder(
+    return getContainerCommandRequestProtoBuilder(
         ContainerCommandRequestProto.parseFrom(request))
         .setPipelineID(id.getUuid().toString()).build();
   }
@@ -726,7 +728,7 @@ public class ContainerStateMachine extends BaseStateMachine {
             .setChunkData(chunkInfo)
             .setReadChunkVersion(ContainerProtos.ReadChunkVersion.V1);
     ContainerCommandRequestProto dataContainerCommandProto =
-        ContainerCommandRequestProto.newBuilder(requestProto)
+        getContainerCommandRequestProtoBuilder(requestProto)
             .setCmdType(Type.ReadChunk).setReadChunk(readChunkRequestProto)
             .build();
     final DispatcherContext context = DispatcherContext

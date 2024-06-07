@@ -248,8 +248,7 @@ public class ECBlockOutputStreamEntry extends BlockOutputStreamEntry {
   @VisibleForTesting
   Pipeline createSingleECBlockPipeline(Pipeline ecPipeline,
       DatanodeDetails node, int replicaIndex) {
-    Map<DatanodeDetails, Integer> indiciesForSinglePipeline = new HashMap<>();
-    indiciesForSinglePipeline.put(node, replicaIndex);
+    Map<DatanodeDetails, Integer> indiciesForSinglePipeline = Collections.singletonMap(node, replicaIndex);
     return Pipeline.newBuilder()
         .setId(ecPipeline.getId())
         .setReplicationConfig(ecPipeline.getReplicationConfig())

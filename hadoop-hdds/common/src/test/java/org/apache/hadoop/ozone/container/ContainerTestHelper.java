@@ -52,6 +52,8 @@ import org.slf4j.LoggerFactory;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.fail;
 
+import static org.apache.hadoop.hdds.scm.storage.ContainerProtocolCalls.getContainerCommandRequestProtoBuilder;
+
 /**
  * Helpers for container tests.
  */
@@ -130,7 +132,7 @@ public final class ContainerTestHelper {
 
   public static ContainerCommandRequestProto getListBlockRequest(
       ContainerCommandRequestProto writeChunkRequest) {
-    return ContainerCommandRequestProto.newBuilder()
+    return getContainerCommandRequestProtoBuilder()
         .setContainerID(writeChunkRequest.getContainerID())
         .setCmdType(ContainerProtos.Type.ListBlock)
         .setDatanodeUuid(writeChunkRequest.getDatanodeUuid())
@@ -146,7 +148,7 @@ public final class ContainerTestHelper {
             .setSize(writeChunkRequest.getWriteChunk().getChunkData().getLen())
             .setBlockID(writeChunkRequest.getWriteChunk().getBlockID())
             .addChunks(writeChunkRequest.getWriteChunk().getChunkData());
-    return ContainerCommandRequestProto.newBuilder()
+    return getContainerCommandRequestProtoBuilder()
         .setContainerID(writeChunkRequest.getContainerID())
         .setCmdType(ContainerProtos.Type.PutBlock)
         .setDatanodeUuid(writeChunkRequest.getDatanodeUuid())
@@ -179,8 +181,7 @@ public final class ContainerTestHelper {
     writeRequest.setChunkData(info.getProtoBufMessage());
     writeRequest.setData(data.toByteString());
 
-    Builder request =
-        ContainerCommandRequestProto.newBuilder();
+    Builder request = getContainerCommandRequestProtoBuilder();
     request.setCmdType(ContainerProtos.Type.WriteChunk);
     request.setContainerID(blockID.getContainerID());
     request.setWriteChunk(writeRequest);
@@ -220,8 +221,7 @@ public final class ContainerTestHelper {
     smallFileRequest.setData(data.toByteString());
     smallFileRequest.setBlock(putRequest);
 
-    Builder request =
-        ContainerCommandRequestProto.newBuilder();
+    Builder request = getContainerCommandRequestProtoBuilder();
     request.setCmdType(ContainerProtos.Type.PutSmallFile);
     request.setContainerID(blockID.getContainerID());
     request.setPutSmallFile(smallFileRequest);
@@ -238,8 +238,7 @@ public final class ContainerTestHelper {
     ContainerCommandRequestProto getKey = getBlockRequest(pipeline, putKey);
     smallFileRequest.setBlock(getKey.getGetBlock());
 
-    Builder request =
-        ContainerCommandRequestProto.newBuilder();
+    Builder request = getContainerCommandRequestProtoBuilder();
     request.setCmdType(ContainerProtos.Type.GetSmallFile);
     request.setContainerID(getKey.getGetBlock().getBlockID().getContainerID());
     request.setGetSmallFile(smallFileRequest);
@@ -272,8 +271,7 @@ public final class ContainerTestHelper {
     readRequest.setChunkData(writeChunk.getChunkData());
     readRequest.setReadChunkVersion(ContainerProtos.ReadChunkVersion.V1);
 
-    Builder newRequest =
-        ContainerCommandRequestProto.newBuilder();
+    Builder newRequest = getContainerCommandRequestProtoBuilder();
     newRequest.setCmdType(ContainerProtos.Type.ReadChunk);
     newRequest.setContainerID(readRequest.getBlockID().getContainerID());
     newRequest.setReadChunk(readRequest);
@@ -295,8 +293,7 @@ public final class ContainerTestHelper {
 
   private static Builder getContainerCommandRequestBuilder(long containerID,
       Pipeline pipeline) throws IOException {
-    Builder request =
-        ContainerCommandRequestProto.newBuilder();
+    Builder request = getContainerCommandRequestProtoBuilder();
     request.setCmdType(ContainerProtos.Type.CreateContainer);
     request.setContainerID(containerID);
     request.setCreateContainer(
@@ -342,8 +339,7 @@ public final class ContainerTestHelper {
     Pipeline pipeline =
         MockPipeline.createSingleNodePipeline();
 
-    Builder request =
-        ContainerCommandRequestProto.newBuilder();
+    Builder request = getContainerCommandRequestProtoBuilder();
     request.setCmdType(ContainerProtos.Type.UpdateContainer);
     request.setContainerID(containerID);
     request.setUpdateContainer(updateRequestBuilder.build());
@@ -399,8 +395,7 @@ public final class ContainerTestHelper {
     blockData.setBlockCommitSequenceId(0);
     putRequest.setBlockData(blockData.getProtoBufMessage());
 
-    Builder request =
-        ContainerCommandRequestProto.newBuilder();
+    Builder request = getContainerCommandRequestProtoBuilder();
     request.setCmdType(ContainerProtos.Type.PutBlock);
     request.setContainerID(blockData.getContainerID());
     request.setPutBlock(putRequest);
@@ -430,8 +425,7 @@ public final class ContainerTestHelper {
         ContainerProtos.GetBlockRequestProto.newBuilder();
     getRequest.setBlockID(blockID);
 
-    Builder request =
-        ContainerCommandRequestProto.newBuilder();
+    Builder request = getContainerCommandRequestProtoBuilder();
     request.setCmdType(ContainerProtos.Type.GetBlock);
     request.setContainerID(blockID.getContainerID());
     request.setGetBlock(getRequest);
@@ -459,7 +453,7 @@ public final class ContainerTestHelper {
         ContainerProtos.GetCommittedBlockLengthRequestProto.newBuilder()
             .setBlockID(blockID);
 
-    return ContainerCommandRequestProto.newBuilder()
+    return getContainerCommandRequestProtoBuilder()
         .setCmdType(ContainerProtos.Type.GetCommittedBlockLength)
         .setContainerID(blockID.getContainerID())
         .setDatanodeUuid(pipeline.getFirstNode().getUuidString())
@@ -475,7 +469,7 @@ public final class ContainerTestHelper {
    */
   public static ContainerCommandRequestProto getCloseContainer(
       Pipeline pipeline, long containerID, Token<?> token) throws IOException {
-    Builder builder = ContainerCommandRequestProto.newBuilder()
+    Builder builder = getContainerCommandRequestProtoBuilder()
         .setCmdType(ContainerProtos.Type.CloseContainer)
         .setContainerID(containerID)
         .setCloseContainer(
@@ -506,7 +500,7 @@ public final class ContainerTestHelper {
     ContainerProtos.DeleteContainerRequestProto deleteRequest =
         ContainerProtos.DeleteContainerRequestProto.newBuilder().
             setForceDelete(forceDelete).build();
-    return ContainerCommandRequestProto.newBuilder()
+    return getContainerCommandRequestProtoBuilder()
         .setCmdType(ContainerProtos.Type.DeleteContainer)
         .setContainerID(containerID)
         .setDeleteContainer(
@@ -555,8 +549,7 @@ public final class ContainerTestHelper {
    */
   public static ContainerCommandRequestProto getDummyCommandRequestProto(
       ContainerProtos.Type cmdType, int replicaIndex) {
-    final Builder builder =
-        ContainerCommandRequestProto.newBuilder()
+    final Builder builder = getContainerCommandRequestProtoBuilder()
             .setCmdType(cmdType)
             .setContainerID(DUMMY_CONTAINER_ID)
             .setDatanodeUuid(DATANODE_UUID);
