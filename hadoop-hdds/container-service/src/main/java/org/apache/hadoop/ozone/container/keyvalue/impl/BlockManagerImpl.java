@@ -336,7 +336,7 @@ public class BlockManagerImpl implements BlockManager {
     try {
       KeyValueContainerData containerData = (KeyValueContainerData) container.getContainerData();
       if (!containerData.getLayoutVersion().equals(ContainerLayoutVersion.FILE_PER_BLOCK)) {
-        throw new UnsupportedEncodingException("Not support Container Layout " + containerData.getLayoutVersion());
+        throw new UnsupportedOperationException("Not support Container Layout " + containerData.getLayoutVersion());
       }
       boolean isV3Schema = containerData.hasSchema(SCHEMA_V3);
       File chunksPath = new File(containerData.getChunksPath());

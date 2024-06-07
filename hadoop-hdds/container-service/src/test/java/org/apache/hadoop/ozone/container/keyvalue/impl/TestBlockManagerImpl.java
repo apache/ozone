@@ -238,7 +238,7 @@ public class TestBlockManagerImpl {
       localIds.add(i);
     }
     if (keyValueContainer.getContainerData().getLayoutVersion() == ContainerLayoutVersion.FILE_PER_CHUNK) {
-      assertThrows(UnsupportedEncodingException.class,
+      assertThrows(UnsupportedOperationException.class,
           () -> blockManager.headBlocks(keyValueContainer, localIds));
       return;
     }
