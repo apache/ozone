@@ -54,7 +54,7 @@ public class DatanodeRatisServerConfig {
   }
 
   @Config(key = "watch.timeout",
-      defaultValue = "10s",
+      defaultValue = "30s",
       type = ConfigType.TIME,
       tags = {OZONE, DATANODE, RATIS},
       description = "The timeout duration for watch request on Ratis Server. " +
@@ -63,7 +63,7 @@ public class DatanodeRatisServerConfig {
           "This must be lower than raft.client.rpc.request.timeout in order " +
           "for NotReplicatedException to be propagated from the Ratis server."
   )
-  private long watchTimeOut = Duration.ofSeconds(10).toMillis();
+  private long watchTimeOut = Duration.ofSeconds(30).toMillis();
 
   public long getWatchTimeOut() {
     return watchTimeOut;
