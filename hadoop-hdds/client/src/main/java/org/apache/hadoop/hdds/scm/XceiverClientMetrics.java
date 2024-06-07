@@ -40,6 +40,9 @@ import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 
+import java.util.EnumMap;
+
+
 /**
  * The client metrics for the Storage Container protocol.
  */
@@ -52,9 +55,9 @@ public class XceiverClientMetrics implements MetricsSource {
   private @Metric MutableCounterLong totalOps;
   private @Metric MutableCounterLong ecReconstructionTotal;
   private @Metric MutableCounterLong ecReconstructionFailsTotal;
-  private MutableCounterLong[] pendingOpsArray;
-  private MutableCounterLong[] opsArray;
-  private PerformanceMetrics[] containerOpsLatency;
+  private EnumMap<ContainerProtos.Type, MutableCounterLong> pendingOpsArray;
+  private EnumMap<ContainerProtos.Type, MutableCounterLong> opsArray;
+  private EnumMap<ContainerProtos.Type, PerformanceMetrics> containerOpsLatency;
   private MetricsRegistry registry;
   private ConfigurationSource conf;
   private int[] intervals;
@@ -82,23 +85,16 @@ public class XceiverClientMetrics implements MetricsSource {
     int numEnumEntries = ContainerProtos.Type.values().length;
     this.registry = new MetricsRegistry(SOURCE_NAME);
     Arrays.sort(latencyMsThresholdsOrder);
-    this.pendingOpsArray = new MutableCounterLong[numEnumEntries];
-    this.opsArray = new MutableCounterLong[numEnumEntries];
-    this.containerOpsLatency = new PerformanceMetrics[numEnumEntries];
-    for (int i = 0; i < numEnumEntries; i++) {
-      pendingOpsArray[i] = registry.newCounter(
-          "numPending" + ContainerProtos.Type.forNumber(i + 1),
-          "number of pending" + ContainerProtos.Type.forNumber(i + 1) + " ops",
-          (long) 0);
-      opsArray[i] = registry
-          .newCounter("opCount" + ContainerProtos.Type.forNumber(i + 1),
-              "number of" + ContainerProtos.Type.forNumber(i + 1) + " ops",
-              (long) 0);
-      containerOpsLatency[i] =
-          new PerformanceMetrics(registry,
-              ContainerProtos.Type.forNumber(i + 1) + "Latency",
-              "latency of " + ContainerProtos.Type.forNumber(i + 1),
-              "Ops", "Time", intervals);
+    this.pendingOpsArray = new EnumMap<>(ContainerProtos.Type.class);
+    this.opsArray = new EnumMap<>(ContainerProtos.Type.class);
+    this.containerOpsLatency = new EnumMap<>(ContainerProtos.Type.class);
+    for (ContainerProtos.Type type : ContainerProtos.Type.values()) {
+      pendingOpsArray.put(type, registry.newCounter("numPending" + type,
+          "number of pending" + type + " ops", (long) 0));
+      opsArray.put(type, registry.newCounter("opCount" + type,
+          "number of" + type + " ops", (long) 0));
+      containerOpsLatency.put(type, new PerformanceMetrics(registry,
+          type + "Latency", "latency of " + type, "Ops", "Time", intervals));
     }
 
     for (int thresholds : latencyMsThresholdsOrder) {
@@ -125,19 +121,19 @@ public class XceiverClientMetrics implements MetricsSource {
   public void incrPendingContainerOpsMetrics(ContainerProtos.Type type) {
     pendingOps.incr();
     totalOps.incr();
-    opsArray[type.ordinal()].incr();
-    pendingOpsArray[type.ordinal()].incr();
+    opsArray.get(type).incr();
+    pendingOpsArray.get(type).incr();
   }
 
   public void decrPendingContainerOpsMetrics(ContainerProtos.Type type) {
     pendingOps.incr(-1);
-    pendingOpsArray[type.ordinal()].incr(-1);
+    pendingOpsArray.get(type).incr(-1);
   }
 
   public void addContainerOpsLatency(ContainerProtos.Type type,
       long latencyMillis, String datanode) {
     recordLatencyMetricsIfNeeded(type, latencyMillis, datanode);
-    containerOpsLatency[type.ordinal()].add(latencyMillis);
+    containerOpsLatency.get(type).add(latencyMillis);
   }
 
   private void recordLatencyMetricsIfNeeded(ContainerProtos.Type type, long latencyMillis,
@@ -156,7 +152,7 @@ public class XceiverClientMetrics implements MetricsSource {
   }
 
   public long getPendingContainerOpCountMetrics(ContainerProtos.Type type) {
-    return pendingOpsArray[type.ordinal()].value();
+    return pendingOpsArray.get(type).value();
   }
 
   public void incECReconstructionTotal() {
@@ -174,7 +170,7 @@ public class XceiverClientMetrics implements MetricsSource {
 
   @VisibleForTesting
   public long getContainerOpCountMetrics(ContainerProtos.Type type) {
-    return opsArray[type.ordinal()].value();
+    return opsArray.get(type).value();
   }
 
   @VisibleForTesting
@@ -196,11 +192,10 @@ public class XceiverClientMetrics implements MetricsSource {
     ecReconstructionTotal.snapshot(recordBuilder, b);
     ecReconstructionFailsTotal.snapshot(recordBuilder, b);
 
-    int numEnumEntries = ContainerProtos.Type.values().length;
-    for (int i = 0; i < numEnumEntries; i++) {
-      pendingOpsArray[i].snapshot(recordBuilder, b);
-      opsArray[i].snapshot(recordBuilder, b);
-      containerOpsLatency[i].snapshot(recordBuilder, b);
+    for (ContainerProtos.Type type : ContainerProtos.Type.values()) {
+      pendingOpsArray.get(type).snapshot(recordBuilder, b);
+      opsArray.get(type).snapshot(recordBuilder, b);
+      containerOpsLatency.get(type).snapshot(recordBuilder, b);
     }
 
     for (Map.Entry<Integer, Map<ContainerProtos.Type, TopNMetrics>> entry :
