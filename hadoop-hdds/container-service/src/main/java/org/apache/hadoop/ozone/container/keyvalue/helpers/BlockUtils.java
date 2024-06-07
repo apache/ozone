@@ -239,11 +239,11 @@ public final class BlockUtils {
   }
 
   /**
-   * Verify if request block BCSID is supported.
+   * Verify if request's replicaIndex matches with containerData.
    *
    * @param container container object.
    * @param blockID requested block info
-   * @throws IOException if cannot support block's blockCommitSequenceId
+   * @throws IOException if replicaIndex mismatches.
    */
   public static void verifyReplicaIdx(Container container, BlockID blockID)
       throws IOException {

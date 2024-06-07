@@ -296,8 +296,8 @@ public class ChunkInputStream extends InputStream
   /**
    * Updates DatanodeBlockId which based on blockId.
    */
-  private void updateDatanodeBlockId() throws IOException {
-    DatanodeDetails closestNode = pipelineSupplier.get().getClosestNode();
+  private void updateDatanodeBlockId(Pipeline pipeline) throws IOException {
+    DatanodeDetails closestNode = pipeline.getClosestNode();
     int replicaIdx = pipelineSupplier.get().getReplicaIndex(closestNode);
     ContainerProtos.DatanodeBlockID.Builder builder = blockID.getDatanodeBlockIDProtobufBuilder();
     if (replicaIdx > 0) {
@@ -311,9 +311,9 @@ public class ChunkInputStream extends InputStream
    */
   protected synchronized void acquireClient() throws IOException {
     if (xceiverClientFactory != null && xceiverClient == null) {
-      xceiverClient = xceiverClientFactory.acquireClientForReadData(
-          pipelineSupplier.get());
-      updateDatanodeBlockId();
+      Pipeline pipeline = pipelineSupplier.get();
+      xceiverClient = xceiverClientFactory.acquireClientForReadData(pipeline);
+      updateDatanodeBlockId(pipeline);
     }
   }
 

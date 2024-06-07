@@ -33,7 +33,7 @@ public class BlockID {
   // null value when not set with private constructor.(This is to avoid confusion of replica index 0 & null value).
   // This value would be only set when deserializing from ContainerProtos.DatanodeBlockID or copying from another
   // BlockID object.
-  private Integer replicaIndex;
+  private final Integer replicaIndex;
 
   public BlockID(long containerID, long localID) {
     this(containerID, localID, 0, null);
@@ -79,10 +79,6 @@ public class BlockID {
   // Can return a null value in case it is not set.
   public Integer getReplicaIndex() {
     return replicaIndex;
-  }
-
-  public void setReplicaIndex(Integer replicaIndex) {
-    this.replicaIndex = replicaIndex;
   }
 
   public ContainerBlockID getContainerBlockID() {

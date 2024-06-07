@@ -200,7 +200,8 @@ class TestContainerReplication {
     try (OutputStream out = bucket.createKey(KEY, 0, new ECReplicationConfig("RS-3-2-1k"),
         new HashMap<>())) {
       byte[] b = new byte[size];
-      new Random().nextBytes(b);
+      Random random = new Random();
+      random.nextBytes(b);
       out.write(b);
       return b;
     }
