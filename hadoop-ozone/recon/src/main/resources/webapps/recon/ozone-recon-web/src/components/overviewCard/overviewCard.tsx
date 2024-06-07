@@ -62,7 +62,7 @@ class OverviewCardWrapper extends React.Component<IOverviewCardWrapperProps> {
         active: '3'
       }
     }
-    else if (title === "Ozone Manager") {
+    else if (title === "OM Service") {
       return {
         active: '4'
       }
