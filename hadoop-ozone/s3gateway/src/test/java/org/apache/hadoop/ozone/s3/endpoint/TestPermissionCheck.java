@@ -27,6 +27,7 @@ import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.client.protocol.ClientProtocol;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
+import org.apache.hadoop.ozone.om.helpers.ErrorInfo;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -38,6 +39,7 @@ import javax.ws.rs.core.HttpHeaders;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -165,7 +167,9 @@ public class TestPermissionCheck {
   public void testDeleteKeys() throws IOException, OS3Exception {
     Mockito.when(objectStore.getVolume(anyString())).thenReturn(volume);
     Mockito.when(objectStore.getS3Bucket(anyString())).thenReturn(bucket);
-    doThrow(exception).when(bucket).deleteKey(any());
+    Map<String, ErrorInfo> deleteErrors = new HashMap<>();
+    deleteErrors.put("deleteKeyName", new ErrorInfo("ACCESS_DENIED", "ACL check failed"));
+    when(bucket.deleteKeys(any(), anyBoolean())).thenReturn(deleteErrors);
     BucketEndpoint bucketEndpoint = new BucketEndpoint();
     bucketEndpoint.setClient(client);
     MultiDeleteRequest request = new MultiDeleteRequest();
@@ -178,7 +182,7 @@ public class TestPermissionCheck {
         bucketEndpoint.multiDelete("BucketName", "keyName", request);
     assertEquals(1, response.getErrors().size());
     assertTrue(
-        response.getErrors().get(0).getCode().equals("PermissionDenied"));
+        response.getErrors().get(0).getCode().equals("ACCESS_DENIED"));
   }
 
   @Test

@@ -23,6 +23,7 @@ import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.DeleteKeyArgs;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.DeleteKeyError;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.DeleteKeysRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.junit.jupiter.api.Assertions;
@@ -70,6 +71,9 @@ public class TestOMKeysDeleteRequest extends TestOMKeyRequest {
             .getUnDeletedKeys();
     Assertions.assertEquals(0,
         unDeletedKeys.getKeysCount());
+    List<DeleteKeyError> keyErrors =  omClientResponse.getOMResponse().getDeleteKeysResponse()
+        .getErrorsList();
+    Assertions.assertEquals(0, keyErrors.size());
 
     // Check all keys are deleted.
     for (String deleteKey : deleteKeyList) {
@@ -120,6 +124,9 @@ public class TestOMKeysDeleteRequest extends TestOMKeyRequest {
         .getDeleteKeysResponse().getUnDeletedKeys();
     Assertions.assertEquals(1,
         unDeletedKeys.getKeysCount());
+    List<DeleteKeyError> keyErrors =  omClientResponse.getOMResponse().getDeleteKeysResponse()
+        .getErrorsList();
+    Assertions.assertEquals(1, keyErrors.size());
     Assertions.assertEquals("dummy", unDeletedKeys.getKeys(0));
   }
 
