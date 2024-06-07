@@ -15,7 +15,7 @@
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
  */
-package org.apache.hadoop.ozone.debug;
+package org.apache.hadoop.ozone.repair;
 
 import org.apache.hadoop.hdds.cli.SubcommandWithParent;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -28,6 +28,8 @@ import org.apache.hadoop.hdds.utils.db.DBDefinition;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksDB;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksIterator;
 import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.debug.DBDefinitionFactory;
+import org.apache.hadoop.ozone.debug.RocksDBUtils;
 import org.bouncycastle.jcajce.provider.asymmetric.x509.CertificateFactory;
 import org.kohsuke.MetaInfServices;
 import org.rocksdb.ColumnFamilyDescriptor;
@@ -59,7 +61,9 @@ import static org.apache.hadoop.ozone.om.helpers.OzoneFSUtils.removeTrailingSlas
 /**
  * In case of accidental deletion of SCM certificates from local storage,
  * this tool restores the certs that are persisted into the SCM DB.
- * Note that this will only work if the SCM has persisted certs in its RocksDB.
+ * Note that this will only work if the SCM has persisted certs in its RocksDB
+ * and the private keys are intact and not lost. If private keys of the SCM are
+ * lost, this tool is not of much use.
  */
 @CommandLine.Command(
     name = "cert-recover",
@@ -73,14 +77,14 @@ public class RecoverSCMCertificate implements Callable<Void>, SubcommandWithPare
   private String dbPath;
 
   @CommandLine.ParentCommand
-  private OzoneDebug parent;
+  private OzoneRepair parent;
 
   @CommandLine.Spec
   private CommandLine.Model.CommandSpec spec;
 
   @Override
   public Class<?> getParentType() {
-    return OzoneDebug.class;
+    return OzoneRepair.class;
   }
 
   private PrintWriter err() {
