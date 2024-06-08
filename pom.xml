@@ -111,7 +111,7 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
     <testsThreadCount>4</testsThreadCount>
 
     <commons-beanutils.version>1.9.4</commons-beanutils.version>
-    <commons-cli.version>1.6.0</commons-cli.version>
+    <commons-cli.version>1.8.0</commons-cli.version>
     <commons-codec.version>1.17.0</commons-codec.version>
     <commons-collections.version>3.2.2</commons-collections.version>
     <commons-compress.version>1.26.0</commons-compress.version>
