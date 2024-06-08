@@ -44,7 +44,7 @@
       <enabled>#{isFalse(env['GITHUB_ACTIONS'])}</enabled>
     </local>
     <remote>
-      <enabled>false</enabled>
+      <enabled>#{isTrue(env['GITHUB_ACTIONS'])}</enabled>
     </remote>
   </buildCache>
 </gradleEnterprise>
