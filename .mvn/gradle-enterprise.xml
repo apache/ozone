@@ -45,7 +45,7 @@
     </local>
     <remote>
       <enabled>true</enabled>
-      <storeEnabled>#{isTrue(env['GITHUB_ACTIONS'])}</storeEnabled>
+      <storeEnabled>#{isTrue(env['GITHUB_ACTIONS']) and env['GITHUB_REPOSITORY'] == 'apache/ozone'}</storeEnabled>
     </remote>
   </buildCache>
 </gradleEnterprise>
