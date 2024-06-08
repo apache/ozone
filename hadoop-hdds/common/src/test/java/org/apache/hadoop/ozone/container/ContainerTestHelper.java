@@ -38,6 +38,7 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.KeyValue;
 import org.apache.hadoop.hdds.scm.pipeline.MockPipeline;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.utils.UniqueId;
+import org.apache.hadoop.ozone.ClientVersion;
 import org.apache.hadoop.ozone.common.Checksum;
 import org.apache.hadoop.ozone.common.ChunkBuffer;
 import org.apache.hadoop.ozone.common.OzoneChecksumException;
@@ -543,7 +544,7 @@ public final class ContainerTestHelper {
 
   public static ContainerCommandRequestProto getDummyCommandRequestProto(
       ContainerProtos.Type cmdType) {
-    return getDummyCommandRequestProto(cmdType, 0);
+    return getDummyCommandRequestProto(ClientVersion.CURRENT, cmdType, 0);
   }
 
   /**
@@ -555,8 +556,8 @@ public final class ContainerTestHelper {
    * @return
    */
   public static ContainerCommandRequestProto getDummyCommandRequestProto(
-      ContainerProtos.Type cmdType, int replicaIndex) {
-    final Builder builder = getContainerCommandRequestProtoBuilder()
+      ClientVersion clientVersion, ContainerProtos.Type cmdType, int replicaIndex) {
+    final Builder builder = getContainerCommandRequestProtoBuilder(clientVersion.toProtoValue())
             .setCmdType(cmdType)
             .setContainerID(DUMMY_CONTAINER_ID)
             .setDatanodeUuid(DATANODE_UUID);
