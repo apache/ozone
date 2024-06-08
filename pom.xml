@@ -140,6 +140,7 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
     <bouncycastle.version>1.78.1</bouncycastle.version>
     <derby.version>10.14.2.0</derby.version>
     <codahale-metrics.version>3.0.2</codahale-metrics.version>
+    <cyclonedx.version>2.8.0</cyclonedx.version>
     <dropwizard-metrics.version>3.2.6</dropwizard-metrics.version>
     <jacoco.version>0.8.12</jacoco.version>
     <javassist.version>3.30.2-GA</javassist.version>
@@ -1577,6 +1578,11 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
           <artifactId>download-maven-plugin</artifactId>
           <version>${download-maven-plugin.version}</version>
         </plugin>
+        <plugin>
+          <groupId>org.cyclonedx</groupId>
+          <artifactId>cyclonedx-maven-plugin</artifactId>
+          <version>${cyclonedx.version}</version>
+        </plugin>
       </plugins>
     </pluginManagement>
 
@@ -1830,6 +1836,18 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
                 <phase>package</phase>
                 <goals>
                   <goal>enforce</goal>
+                </goals>
+              </execution>
+            </executions>
+          </plugin>
+          <plugin>
+            <groupId>org.cyclonedx</groupId>
+            <artifactId>cyclonedx-maven-plugin</artifactId>
+            <executions>
+              <execution>
+                <phase>package</phase>
+                <goals>
+                  <goal>makeAggregateBom</goal>
                 </goals>
               </execution>
             </executions>
