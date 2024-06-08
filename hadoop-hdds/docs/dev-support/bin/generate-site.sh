@@ -24,7 +24,7 @@ if [ ! "$(which hugo)" ]; then
    exit 0
 fi
 
-export OZONE_VERSION=$(mvn help:evaluate -Dexpression=ozone.version -q -DforceStdout)
+export OZONE_VERSION=$(mvn help:evaluate -Dexpression=ozone.version -q -DforceStdout -Dscan=false)
 
 ENABLE_GIT_INFO=
 if git -C $(pwd) status >& /dev/null; then
