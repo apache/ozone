@@ -17,12 +17,12 @@
  */
 package org.apache.hadoop.hdds.fs;
 
-import com.google.common.base.Preconditions;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.annotation.InterfaceStability;
 import org.apache.ratis.util.AutoCloseableLock;
 import org.apache.ratis.util.AutoCloseableReadWriteLock;
+import org.apache.ratis.util.Preconditions;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -65,7 +65,7 @@ public class CachingSpaceUsageSource implements SpaceUsageSource {
 
   CachingSpaceUsageSource(SpaceUsageCheckParams params,
       ScheduledExecutorService executor) {
-    Preconditions.checkArgument(params != null, "params == null");
+    Preconditions.assertNotNull(params, "params == null");
 
     refresh = params.getRefresh();
     source = params.getSource();
@@ -74,7 +74,7 @@ public class CachingSpaceUsageSource implements SpaceUsageSource {
     this.executor = executor;
     isRefreshRunning = new AtomicBoolean();
 
-    Preconditions.checkArgument(refresh.isZero() == (executor == null),
+    Preconditions.assertTrue(refresh.isZero() == (executor == null),
         "executor should be provided if and only if refresh is requested");
 
     loadInitialValue();
@@ -109,6 +109,10 @@ public class CachingSpaceUsageSource implements SpaceUsageSource {
   }
 
   public void incrementUsedSpace(long usedSpace) {
+    if (usedSpace == 0) {
+      return;
+    }
+    Preconditions.assertTrue(usedSpace > 0, () -> usedSpace + " < 0");
     final long current, change;
     try (AutoCloseableLock ignored = lock.writeLock(null, null)) {
       current = cachedAvailable;
@@ -124,6 +128,10 @@ public class CachingSpaceUsageSource implements SpaceUsageSource {
   }
 
   public void decrementUsedSpace(long reclaimedSpace) {
+    if (reclaimedSpace == 0) {
+      return;
+    }
+    Preconditions.assertTrue(reclaimedSpace > 0, () -> reclaimedSpace + " < 0");
     final long current, change;
     try (AutoCloseableLock ignored = lock.writeLock(null, null)) {
       current = cachedUsedSpace;
