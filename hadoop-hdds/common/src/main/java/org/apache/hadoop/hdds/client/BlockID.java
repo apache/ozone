@@ -146,9 +146,9 @@ public class BlockID {
       return false;
     }
     BlockID blockID = (BlockID) o;
-    return containerBlockID.equals(blockID.getContainerBlockID())
-        && blockCommitSequenceId == blockID.getBlockCommitSequenceId()
-        && Objects.equals(replicaIndex, blockID.getReplicaIndex());
+    return this.getContainerBlockID().equals(blockID.getContainerBlockID())
+        && this.getBlockCommitSequenceId() == blockID.getBlockCommitSequenceId()
+        && Objects.equals(this.getReplicaIndex(), blockID.getReplicaIndex());
   }
 
   @Override

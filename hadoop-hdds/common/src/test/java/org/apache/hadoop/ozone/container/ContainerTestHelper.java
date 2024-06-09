@@ -47,7 +47,6 @@ import org.apache.hadoop.ozone.container.common.helpers.ChunkInfo;
 import org.apache.hadoop.security.token.Token;
 
 import com.google.common.base.Preconditions;
-import org.mockito.Mockito;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -517,9 +516,12 @@ public final class ContainerTestHelper {
   }
 
   public static BlockID getTestBlockID(long containerID, Integer replicaIndex) {
-    BlockID blockID = Mockito.spy(new BlockID(containerID, UniqueId.next()));
-    Mockito.when(blockID.getReplicaIndex()).thenReturn(replicaIndex);
-    return blockID;
+    DatanodeBlockID.Builder datanodeBlockID = DatanodeBlockID.newBuilder().setContainerID(containerID)
+        .setLocalID(UniqueId.next());
+    if (replicaIndex != null) {
+      datanodeBlockID.setReplicaIndex(replicaIndex);
+    }
+    return BlockID.getFromProtobuf(datanodeBlockID.build());
   }
 
   public static long getTestContainerID() {

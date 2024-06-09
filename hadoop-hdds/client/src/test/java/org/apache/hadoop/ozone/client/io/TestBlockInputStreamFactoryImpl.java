@@ -33,6 +33,7 @@ import org.apache.hadoop.hdds.scm.storage.BlockInputStream;
 import org.apache.hadoop.hdds.scm.storage.BlockLocationInfo;
 import org.junit.jupiter.api.Test;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Map;
@@ -48,7 +49,7 @@ public class TestBlockInputStreamFactoryImpl {
   private OzoneConfiguration conf = new OzoneConfiguration();
 
   @Test
-  public void testNonECGivesBlockInputStream() {
+  public void testNonECGivesBlockInputStream() throws IOException {
     BlockInputStreamFactory factory = new BlockInputStreamFactoryImpl();
     ReplicationConfig repConfig =
         RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.THREE);
@@ -68,7 +69,7 @@ public class TestBlockInputStreamFactoryImpl {
   }
 
   @Test
-  public void testECGivesECBlockInputStream() {
+  public void testECGivesECBlockInputStream() throws IOException {
     BlockInputStreamFactory factory = new BlockInputStreamFactoryImpl();
     ReplicationConfig repConfig =
         new ECReplicationConfig(3, 2);

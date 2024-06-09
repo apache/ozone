@@ -509,7 +509,10 @@ public final class Pipeline {
         new StringBuilder(getClass().getSimpleName()).append("[");
     b.append(" Id: ").append(id.getId());
     b.append(", Nodes: ");
-    nodeStatus.keySet().forEach(b::append);
+    for (DatanodeDetails datanodeDetails : nodeStatus.keySet()) {
+      b.append(datanodeDetails);
+      b.append(" ReplicaIndex: ").append(this.getReplicaIndex(datanodeDetails));
+    }
     b.append(", ReplicationConfig: ").append(replicationConfig);
     b.append(", State:").append(getPipelineState());
     b.append(", leaderId:").append(leaderId != null ? leaderId.toString() : "");

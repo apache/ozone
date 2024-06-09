@@ -164,7 +164,7 @@ public class ECBlockInputStream extends BlockExtendedInputStream {
    * stream if it has not been opened already.
    * @return BlockInput stream to read from.
    */
-  protected BlockExtendedInputStream getOrOpenStream(int locationIndex) {
+  protected BlockExtendedInputStream getOrOpenStream(int locationIndex) throws IOException {
     BlockExtendedInputStream stream = blockStreams[locationIndex];
     if (stream == null) {
       // To read an EC block, we create a STANDALONE pipeline that contains the

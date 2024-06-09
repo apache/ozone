@@ -150,14 +150,8 @@ public class ReplicatedFileChecksumHelper extends BaseFileChecksumHelper {
             blockID.getContainerID());
       }
       xceiverClientSpi = getXceiverClientFactory().acquireClientForReadData(pipeline);
-
-      ContainerProtos.DatanodeBlockID.Builder datanodeBlockID = blockID.getDatanodeBlockIDProtobufBuilder();
-      int replicaIndex = pipeline.getReplicaIndex(pipeline.getClosestNode());
-      if (replicaIndex > 0) {
-        datanodeBlockID.setReplicaIndex(replicaIndex);
-      }
       ContainerProtos.GetBlockResponseProto response = ContainerProtocolCalls
-          .getBlock(xceiverClientSpi, datanodeBlockID.build(), token);
+          .getBlock(xceiverClientSpi, blockID, token);
 
       chunks = response.getBlockData().getChunksList();
     } finally {
