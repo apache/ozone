@@ -34,9 +34,8 @@
     </capture>
     <backgroundBuildScanUpload>#{isFalse(env['GITHUB_ACTIONS'])}</backgroundBuildScanUpload>
     <publishing>
-      <onlyIf>true</onlyIf>
+      <onlyIf><![CDATA[authenticated]]></onlyIf>
     </publishing>
-    <publishIfAuthenticated>true</publishIfAuthenticated>
     <obfuscation>
       <ipAddresses>#{{'0.0.0.0'}}</ipAddresses>
     </obfuscation>
