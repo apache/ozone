@@ -971,6 +971,12 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
   }
 
   @Override
+  public Path getHomeDirectory() {
+    return makeQualified(new Path(OZONE_USER_DIR + "/"
+        + this.userName));
+  }
+
+  @Override
   public Token<?> getDelegationToken(String renewer) throws IOException {
     return TracingUtil.executeInNewSpan("ofs getDelegationToken",
         () -> adapter.getDelegationToken(renewer));

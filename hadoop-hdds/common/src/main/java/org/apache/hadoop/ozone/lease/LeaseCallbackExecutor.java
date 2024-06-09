@@ -20,7 +20,6 @@ package org.apache.hadoop.ozone.lease;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.List;
 import java.util.concurrent.Callable;
 
 /**
@@ -33,19 +32,19 @@ public class LeaseCallbackExecutor<T> implements Runnable {
       LoggerFactory.getLogger(LeaseCallbackExecutor.class);
 
   private final T resource;
-  private final List<Callable<Void>> callbacks;
+  private final Callable<Void> callback;
 
   /**
    * Constructs LeaseCallbackExecutor instance with list of callbacks.
    *
    * @param resource
    *        The resource for which the callbacks are executed
-   * @param callbacks
-   *        Callbacks to be executed by this executor
+   * @param callback
+   *        Callback to be executed by this executor
    */
-  public LeaseCallbackExecutor(T resource, List<Callable<Void>> callbacks) {
+  public LeaseCallbackExecutor(T resource, Callable<Void> callback) {
     this.resource = resource;
-    this.callbacks = callbacks;
+    this.callback = callback;
   }
 
   @Override
@@ -53,7 +52,7 @@ public class LeaseCallbackExecutor<T> implements Runnable {
     if (LOG.isDebugEnabled()) {
       LOG.debug("Executing callbacks for lease on {}", resource);
     }
-    for (Callable<Void> callback : callbacks) {
+    if (callback != null) {
       try {
         callback.call();
       } catch (Exception e) {
@@ -62,5 +61,4 @@ public class LeaseCallbackExecutor<T> implements Runnable {
       }
     }
   }
-
 }

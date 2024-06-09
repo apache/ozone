@@ -100,7 +100,7 @@ public final class ScmConfigKeys {
       HDDS_CONTAINER_RATIS_LOG_APPENDER_QUEUE_NUM_ELEMENTS =
       "hdds.container.ratis.log.appender.queue.num-elements";
   public static final int
-      HDDS_CONTAINER_RATIS_LOG_APPENDER_QUEUE_NUM_ELEMENTS_DEFAULT = 1;
+      HDDS_CONTAINER_RATIS_LOG_APPENDER_QUEUE_NUM_ELEMENTS_DEFAULT = 1024;
   public static final String HDDS_CONTAINER_RATIS_LOG_APPENDER_QUEUE_BYTE_LIMIT =
       "hdds.container.ratis.log.appender.queue.byte-limit";
   public static final String

@@ -691,6 +691,11 @@ public class SCMNodeManager implements NodeManager {
       return;
     }
 
+    sendFinalizeToDatanodeIfNeeded(datanodeDetails, layoutVersionReport);
+  }
+
+  protected void sendFinalizeToDatanodeIfNeeded(DatanodeDetails datanodeDetails,
+      LayoutVersionProto layoutVersionReport) {
     // Software layout version is hardcoded to the SCM.
     int scmSlv = scmLayoutVersionManager.getSoftwareLayoutVersion();
     int dnSlv = layoutVersionReport.getSoftwareLayoutVersion();
@@ -975,8 +980,7 @@ public class SCMNodeManager implements NodeManager {
     SCMNodeStat stat = getNodeStatInternal(dn);
     DatanodeUsageInfo usageInfo = new DatanodeUsageInfo(dn, stat);
     try {
-      int containerCount = getContainers(dn).size();
-      usageInfo.setContainerCount(containerCount);
+      usageInfo.setContainerCount(getContainerCount(dn));
     } catch (NodeNotFoundException ex) {
       LOG.error("Unknown datanode {}.", dn, ex);
     }
@@ -1451,6 +1455,11 @@ public class SCMNodeManager implements NodeManager {
   public Set<ContainerID> getContainers(DatanodeDetails datanodeDetails)
       throws NodeNotFoundException {
     return nodeStateManager.getContainers(datanodeDetails.getUuid());
+  }
+
+  public int getContainerCount(DatanodeDetails datanodeDetails)
+      throws NodeNotFoundException {
+    return nodeStateManager.getContainerCount(datanodeDetails.getUuid());
   }
 
   @Override

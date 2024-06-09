@@ -126,9 +126,8 @@
     </description>
   </property>
   <property>
-    <name>hdds.container.ratis.log.appender.queue.num-elements
-</name>
-    <value>1</value>
+    <name>hdds.container.ratis.log.appender.queue.num-elements</name>
+    <value>1024</value>
     <tag>OZONE, DEBUG, CONTAINER, RATIS</tag>
     <description>Limit for number of append entries in ratis leader's
       log appender queue.
@@ -1933,7 +1932,7 @@
   </property>
   <property>
     <name>ozone.security.crypto.compliance.mode</name>
-    <value>none</value>
+    <value>unrestricted</value>
     <tag>OZONE, SECURITY, HDDS, CRYPTO_COMPLIANCE</tag>
     <description>Based on this property the security compliance mode
       is loaded and enables filtering cryptographic configuration options

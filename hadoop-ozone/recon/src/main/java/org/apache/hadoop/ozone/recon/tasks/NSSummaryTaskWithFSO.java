@@ -162,7 +162,7 @@ public class NSSummaryTaskWithFSO extends NSSummaryTaskDbEventHandler {
       return false;
     }
 
-    LOG.info("Completed a process run of NSSummaryTaskWithFSO");
+    LOG.debug("Completed a process run of NSSummaryTaskWithFSO");
     return true;
   }
 
@@ -210,7 +210,7 @@ public class NSSummaryTaskWithFSO extends NSSummaryTaskDbEventHandler {
     if (!flushAndCommitNSToDB(nsSummaryMap)) {
       return false;
     }
-    LOG.info("Completed a reprocess run of NSSummaryTaskWithFSO");
+    LOG.debug("Completed a reprocess run of NSSummaryTaskWithFSO");
     return true;
   }
 
