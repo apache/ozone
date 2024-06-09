@@ -28,7 +28,7 @@
   </server>
   <buildScan>
     <capture>
-      <goalInputFiles>true</goalInputFiles>
+      <fileFingerprints>true</fileFingerprints>
       <buildLogging>true</buildLogging>
       <testLogging>true</testLogging>
     </capture>
