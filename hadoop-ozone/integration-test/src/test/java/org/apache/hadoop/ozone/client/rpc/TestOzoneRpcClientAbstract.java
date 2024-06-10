@@ -134,6 +134,8 @@ import static java.nio.charset.StandardCharsets.UTF_8;
 
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.commons.lang3.RandomUtils;
+
+import static java.util.Collections.singletonMap;
 import static org.apache.hadoop.hdds.StringUtils.string2Bytes;
 import static org.apache.hadoop.hdds.client.ReplicationFactor.ONE;
 import static org.apache.hadoop.hdds.client.ReplicationFactor.THREE;
@@ -1124,15 +1126,12 @@ public abstract class TestOzoneRpcClientAbstract extends OzoneTestBase {
     OzoneKeyDetails keyDetails = createTestKey(bucket);
     OmKeyArgs keyArgs = toOmKeyArgs(keyDetails);
     rewriteKey(bucket, keyDetails, "rewrite".getBytes(UTF_8));
-    OmKeyInfo keyInfo = ozoneManager.lookupKey(keyArgs);
 
     final byte[] overwriteContent = "overwrite".getBytes(UTF_8);
     OzoneKeyDetails overwriteDetails = createTestKey(bucket, keyDetails.getName(), overwriteContent);
 
     OzoneKeyDetails actualKeyDetails = assertKeyContent(bucket, keyDetails.getName(), overwriteContent);
     assertEquals(overwriteDetails.getGeneration(), actualKeyDetails.getGeneration());
-    assertMetadataUnchanged(keyDetails, actualKeyDetails);
-    assertMetadataAfterRewrite(keyInfo, ozoneManager.lookupKey(keyArgs));
   }
 
   @ParameterizedTest
@@ -4075,7 +4074,8 @@ public abstract class TestOzoneRpcClientAbstract extends OzoneTestBase {
       OzoneBucket bucket, String keyName, byte[] bytes
   ) throws IOException {
     RatisReplicationConfig replication = RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.ONE);
-    try (OzoneOutputStream out = bucket.createKey(keyName, bytes.length, replication, new HashMap<>())) {
+    Map<String, String> metadata = singletonMap("key", RandomStringUtils.randomAscii(10));
+    try (OzoneOutputStream out = bucket.createKey(keyName, bytes.length, replication, metadata)) {
       out.write(bytes);
     }
     OzoneKeyDetails key = bucket.getKey(keyName);
