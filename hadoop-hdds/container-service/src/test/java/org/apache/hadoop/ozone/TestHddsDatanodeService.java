@@ -46,6 +46,7 @@ import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_NAMES;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SECURITY_ENABLED_KEY;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -112,6 +113,10 @@ public class TestHddsDatanodeService {
     LOG.info("SchemaV3_enabled: " +
         conf.get(DatanodeConfiguration.CONTAINER_SCHEMA_V3_ENABLED));
     service.start(conf);
+
+    assertNotNull(service.getDatanodeDetails());
+    assertNotNull(service.getDatanodeDetails().getHostName());
+    assertFalse(service.getDatanodeStateMachine().isDaemonStopped());
 
     // Get volumeSet and store volumes in temp folders
     // in order to access them after service.stop()
