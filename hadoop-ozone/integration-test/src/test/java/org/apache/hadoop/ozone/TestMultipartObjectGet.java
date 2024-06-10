@@ -170,6 +170,7 @@ public class TestMultipartObjectGet {
         REST.get(BUCKET, KEY, partNumber, null, 100, null);
     assertEquals(200, response.getStatus());
     assertEquals(bytes, response.getLength());
+    assertEquals("3", response.getHeaderString("x-amz-mp-parts-count"));
   }
 
   @Test

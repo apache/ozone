@@ -489,8 +489,13 @@ public class ObjectEndpoint extends EndpointBase {
       responseBuilder
           .header(ACCEPT_RANGE_HEADER, RANGE_HEADER_SUPPORTED_UNIT);
 
-      if (keyDetails.getMetadata().get(ETAG) != null) {
-        responseBuilder.header(ETAG, wrapInQuotes(keyDetails.getMetadata().get(ETAG)));
+      String eTag = keyDetails.getMetadata().get(ETAG);
+      if (eTag != null) {
+        responseBuilder.header(ETAG, wrapInQuotes(eTag));
+      }
+
+      if (isMultipartETag(eTag)) {
+        responseBuilder.header("x-amz-mp-parts-count", extractPartsCount(eTag));
       }
 
       // if multiple query parameters having same name,
@@ -613,11 +618,16 @@ public class ObjectEndpoint extends EndpointBase {
         .header("Content-Length", key.getDataSize())
         .header("Content-Type", "binary/octet-stream");
 
-    if (key.getMetadata().get(ETAG) != null) {
+    String eTag = key.getMetadata().get(ETAG);
+    if (eTag != null) {
       // Should not return ETag header if the ETag is not set
       // doing so will result in "null" string being returned instead
       // which breaks some AWS SDK implementation
-      response.header(ETAG, wrapInQuotes(key.getMetadata().get(ETAG)));
+      response.header(ETAG, wrapInQuotes(eTag));
+    }
+
+    if (isMultipartETag(eTag)) {
+      response.header("x-amz-mp-parts-count", extractPartsCount(eTag));
     }
 
     addLastModifiedDate(response, key);
@@ -1389,4 +1399,11 @@ public class ObjectEndpoint extends EndpointBase {
     return E_TAG_PROVIDER.get();
   }
 
+  private boolean isMultipartETag(String eTag) {
+    return eTag != null && eTag.contains("-");
+  }
+  private String extractPartsCount(String eTag) {
+    String[] parts = eTag.replace("\"", "").split("-");
+    return  parts[parts.length - 1];
+  }
 }
