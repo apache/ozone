@@ -1124,7 +1124,6 @@ public abstract class TestOzoneRpcClientAbstract extends OzoneTestBase {
   void overwriteAfterRewrite(BucketLayout layout) throws IOException {
     OzoneBucket bucket = createBucket(layout);
     OzoneKeyDetails keyDetails = createTestKey(bucket);
-    OmKeyArgs keyArgs = toOmKeyArgs(keyDetails);
     rewriteKey(bucket, keyDetails, "rewrite".getBytes(UTF_8));
 
     final byte[] overwriteContent = "overwrite".getBytes(UTF_8);
