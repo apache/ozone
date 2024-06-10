@@ -245,7 +245,7 @@ public final class ContainerProtocolCalls  {
     final DatanodeBlockID.Builder datanodeBlockID = blockID.getDatanodeBlockIDProtobufBuilder();
     int replicaIndex = xceiverClient.getPipeline().getReplicaIndex(datanode);
     if (replicaIndex > 0) {
-        datanodeBlockID.setReplicaIndex(replicaIndex);
+      datanodeBlockID.setReplicaIndex(replicaIndex);
     }
     final GetBlockRequestProto.Builder readBlockRequest = GetBlockRequestProto.newBuilder()
         .setBlockID(datanodeBlockID.build());
