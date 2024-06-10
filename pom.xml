@@ -688,8 +688,13 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
         <version>${ratis.version}</version>
       </dependency>
       <dependency>
-        <artifactId>ratis-client</artifactId>
         <groupId>org.apache.ratis</groupId>
+        <artifactId>ratis-client</artifactId>
+        <version>${ratis.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.ratis</groupId>
+        <artifactId>ratis-server-api</artifactId>
         <version>${ratis.version}</version>
       </dependency>
       <dependency>
