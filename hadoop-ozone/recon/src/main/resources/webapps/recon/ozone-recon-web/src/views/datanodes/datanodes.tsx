@@ -461,7 +461,7 @@ export class Datanodes extends React.Component<Record<string, object>, IDatanode
 
   onDisable = (record:any) => {
     // Will return Disable Checkbox records for remove whos Record state is not DEAD and Opeartional State=['IN_SERVICE','ENTERING_MAINTENANCE','DECOMMISSIONING']
-    //Enable Checkbox for remove who's State is Dead or Operation State=['Decommissioned','In_Maintenance']
+    // Enable Checkbox for remove who's State is Dead or Operation State=['Decommissioned','In_Maintenance']
     if (record.state !== 'DEAD') {
       return record.opState === 'IN_SERVICE' || record.opState === 'ENTERING_MAINTENANCE' || record.opState === 'DECOMMISSIONING';
     }
