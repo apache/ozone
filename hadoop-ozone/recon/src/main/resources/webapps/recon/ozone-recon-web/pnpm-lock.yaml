@@ -17,6 +17,7 @@ specifiers:
   ag-charts-community: ^7.3.0
   ag-charts-react: ^7.3.0
   antd: ^3.26.20
+  array-normalize: ^2.0.0
   axios: ^0.28.0
   babel-jest: ^24.9.0
   babel-plugin-import: ^1.13.8
@@ -61,6 +62,7 @@ dependencies:
   ag-charts-community: 7.3.0
   ag-charts-react: 7.3.0_4uflhkpzmxcxyxkuqg2ofty3gq
   antd: 3.26.20_wcqkhtmu7mswc6yz4uyexck3ty
+  array-normalize: 2.0.0
   axios: 0.28.0
   babel-jest: 24.9.0_@babel+core@7.22.11
   babel-plugin-import: 1.13.8
@@ -3653,6 +3655,12 @@ packages:
 
   /array-normalize/1.1.4:
     resolution: {integrity: sha512-fCp0wKFLjvSPmCn4F5Tiw4M3lpMZoHlCjfcs7nNzuj3vqQQ1/a8cgB9DXcpDSn18c+coLnaW7rqfcYCvKbyJXg==}
+    dependencies:
+      array-bounds: 1.0.1
+    dev: false
+
+  /array-normalize/2.0.0:
+    resolution: {integrity: sha512-WofPolGg9OqpmfYh2qqOJ0yeJ9Idjn+EcQ+Nyy3eQbqtuz0MRyqTEHB0PH/Ypp2PpsOAfjsqTMzu1fHOaPzO1Q==}
     dependencies:
       array-bounds: 1.0.1
     dev: false

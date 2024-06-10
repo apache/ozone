@@ -25,6 +25,7 @@ import {byteToSize, showDataFetchError} from 'utils/common';
 import './diskUsage.less';
 import moment from 'moment';
 import { AxiosGetHelper, cancelRequests } from 'utils/axiosRequestHelper';
+const normalize = require('array-normalize');
 
 const DEFAULT_DISPLAY_LIMIT = 10;
 const OTHER_PATH_NAME = 'Other Objects';
@@ -63,6 +64,7 @@ let cancelPieSignal: AbortController
 let cancelSummarySignal: AbortController
 let cancelQuotaSignal: AbortController;
 let cancelKeyMetadataSignal: AbortController;
+let normalizedValues: number[]=[];
 
 export class DiskUsage extends React.Component<Record<string, object>, IDUState> {
   constructor(props = {}) {
@@ -184,15 +186,19 @@ export class DiskUsage extends React.Component<Record<string, object>, IDUState>
           // Differentiate key without trailing slash
           return (subpath.isKey || subpathName === OTHER_PATH_NAME) ? subpathName : subpathName + '/';
         });
-
+         
         values = subpaths.map(subpath => {
           return subpath.size / dataSize;
         });
-
+        // Logic for Values Normalization on Pie chart adding 0.05 so minimum block
+        // will be displayed on Pie chart using below logic
+        // Percentage and Size string Logic will be same 
+        normalizedValues= normalize(values);
+        normalizedValues= values && values.map((item)=> item+ 0.05);
         percentage = values.map(value => {
           return (value * 100).toFixed(2);
         });
-
+       
         sizeStr = subpaths.map(subpath => {
           return byteToSize(subpath.size, 1);
         });
@@ -209,7 +215,7 @@ export class DiskUsage extends React.Component<Record<string, object>, IDUState>
         plotData: [{
           type: 'pie',
           hole: 0.2,
-          values: values,
+          values: normalizedValues,
           customdata: percentage,
           labels: pathLabels,
           text: sizeStr,
