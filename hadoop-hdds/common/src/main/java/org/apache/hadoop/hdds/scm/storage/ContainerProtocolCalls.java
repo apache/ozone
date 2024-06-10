@@ -242,9 +242,13 @@ public final class ContainerProtocolCalls  {
     if (traceId != null) {
       builder.setTraceID(traceId);
     }
-    final DatanodeBlockID datanodeBlockID = blockID.getDatanodeBlockIDProtobufBuilder()
-        .setReplicaIndex(xceiverClient.getPipeline().getReplicaIndex(datanode)).build();
-    final GetBlockRequestProto.Builder readBlockRequest = GetBlockRequestProto.newBuilder().setBlockID(datanodeBlockID);
+    final DatanodeBlockID.Builder datanodeBlockID = blockID.getDatanodeBlockIDProtobufBuilder();
+    int replicaIndex = xceiverClient.getPipeline().getReplicaIndex(datanode);
+    if (replicaIndex > 0) {
+        datanodeBlockID.setReplicaIndex(replicaIndex);
+    }
+    final GetBlockRequestProto.Builder readBlockRequest = GetBlockRequestProto.newBuilder()
+        .setBlockID(datanodeBlockID.build());
     final ContainerCommandRequestProto request = builder
         .setDatanodeUuid(datanode.getUuidString())
         .setGetBlock(readBlockRequest).build();
