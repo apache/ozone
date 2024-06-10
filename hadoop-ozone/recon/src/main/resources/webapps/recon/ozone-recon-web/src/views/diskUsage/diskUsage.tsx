@@ -145,7 +145,7 @@ export class DiskUsage extends React.Component<Record<string, object>, IDUState>
       const dataSize = duResponse.size;
       let subpaths: IDUSubpath[] = duResponse.subPaths;
 
-     // We need to calculate the size of "Other objects" in two cases: 
+      // We need to calculate the size of "Other objects" in two cases: 
       // 1) If we have more subpaths listed, than the limit.  
       // 2) If the limit is set to the maximum limit (30) and we have any number of subpaths. In this case we won't
       // necessarily have "Other objects", but later we check if the other objects's size is more than zero (we will have
@@ -269,8 +269,7 @@ export class DiskUsage extends React.Component<Record<string, object>, IDUState>
   }
 
   updateDisplayLimit(e): void {
-    let res = -1;
-    res = Number.parseInt(e.key, 10);
+    let res = Number.parseInt(e.key, 10);
     this.updatePieChart(this.state.inputPath, res);
   }
 
