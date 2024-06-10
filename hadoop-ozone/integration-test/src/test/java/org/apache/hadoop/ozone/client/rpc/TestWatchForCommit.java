@@ -253,8 +253,6 @@ public class TestWatchForCommit {
 
   @Test
   public void testWatchForCommitForRetryfailure() throws Exception {
-    GenericTestUtils.LogCapturer logCapturer =
-        GenericTestUtils.LogCapturer.captureLogs(XceiverClientRatis.LOG);
     try (XceiverClientManager clientManager = new XceiverClientManager(conf)) {
       ContainerWithPipeline container1 = storageContainerLocationClient
           .allocateContainer(HddsProtos.ReplicationType.RATIS,
@@ -272,14 +270,11 @@ public class TestWatchForCommit {
                 xceiverClient.getPipeline()));
         reply.getResponse().get();
         long index = reply.getLogIndex();
-        for (int i = 0; i < pipeline.getNodes().size(); i++) {
-          cluster.shutdownHddsDatanode(pipeline.getNodes().get(i));
-        }
-        // emulate closing pipeline when SCM detects DEAD datanodes
-        cluster.getStorageContainerManager()
-            .getPipelineManager().closePipeline(pipeline, false);
-        // again write data with more than max buffer limit. This wi
-        // just watch for a log index which in not updated in the commitInfo Map
+        // Intentionally we are shutting down only two nodes here.
+        cluster.shutdownHddsDatanode(pipeline.getNodes().get(0));
+        cluster.shutdownHddsDatanode(pipeline.getNodes().get(1));
+        // again write data with more than max buffer limit. This will
+        // just watch for a log index which is not updated in the commitInfo Map
         // as well as there is no logIndex generate in Ratis.
         // The basic idea here is just to test if its throws an exception.
         ExecutionException e = assertThrows(ExecutionException.class,
@@ -289,11 +284,6 @@ public class TestWatchForCommit {
         // RuntimeException
         assertFalse(HddsClientUtils
             .checkForException(e) instanceof TimeoutException);
-        // client should not attempt to watch with
-        // MAJORITY_COMMITTED replication level, except the grpc IO issue
-        if (!logCapturer.getOutput().contains("Connection refused")) {
-          assertThat(e.getMessage()).doesNotContain("Watch-MAJORITY_COMMITTED");
-        }
       } finally {
         clientManager.releaseClient(xceiverClient, false);
       }
@@ -353,6 +343,8 @@ public class TestWatchForCommit {
 
   @Test
   public void testWatchForCommitForGroupMismatchException() throws Exception {
+    GenericTestUtils.LogCapturer logCapturer =
+        GenericTestUtils.LogCapturer.captureLogs(XceiverClientRatis.LOG);
     try (XceiverClientManager clientManager = new XceiverClientManager(conf)) {
       ContainerWithPipeline container1 = storageContainerLocationClient
           .allocateContainer(HddsProtos.ReplicationType.RATIS,
@@ -370,6 +362,7 @@ public class TestWatchForCommit {
                 xceiverClient.getPipeline()));
         reply.getResponse().get();
         assertEquals(3, ratisClient.getCommitInfoMap().size());
+        // emulate closing pipeline when SCM detects DEAD datanodes
         List<Pipeline> pipelineList = new ArrayList<>();
         pipelineList.add(pipeline);
         TestHelper.waitForPipelineClose(pipelineList, cluster);
@@ -380,6 +373,11 @@ public class TestWatchForCommit {
             assertThrows(Exception.class,
                 () -> xceiverClient.watchForCommit(reply.getLogIndex() + RandomUtils.nextInt(0, 100) + 10));
         assertInstanceOf(GroupMismatchException.class, HddsClientUtils.checkForException(e));
+        // client should not attempt to watch with
+        // MAJORITY_COMMITTED replication level, except the grpc IO issue
+        if (!logCapturer.getOutput().contains("Connection refused")) {
+          assertThat(e.getMessage()).doesNotContain("Watch-MAJORITY_COMMITTED");
+        }
       } finally {
         clientManager.releaseClient(xceiverClient, false);
       }
