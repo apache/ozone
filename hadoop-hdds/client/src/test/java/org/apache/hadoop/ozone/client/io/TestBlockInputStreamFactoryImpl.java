@@ -32,6 +32,7 @@ import org.apache.hadoop.hdds.scm.storage.BlockExtendedInputStream;
 import org.apache.hadoop.hdds.scm.storage.BlockInputStream;
 import org.apache.hadoop.hdds.scm.storage.BlockLocationInfo;
 import org.junit.jupiter.api.Test;
+import org.mockito.Mockito;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -40,6 +41,7 @@ import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
+import static org.mockito.ArgumentMatchers.any;
 
 /**
  * Tests for BlockInputStreamFactoryImpl.
@@ -56,7 +58,9 @@ public class TestBlockInputStreamFactoryImpl {
 
     BlockLocationInfo blockInfo = createKeyLocationInfo(repConfig, 3,
         1024 * 1024 * 10);
-
+    Pipeline pipeline = Mockito.spy(blockInfo.getPipeline());
+    blockInfo.setPipeline(pipeline);
+    Mockito.when(pipeline.getReplicaIndex(any(DatanodeDetails.class))).thenReturn(1);
     OzoneClientConfig clientConfig = conf.getObject(OzoneClientConfig.class);
     clientConfig.setChecksumVerify(true);
     BlockExtendedInputStream stream =

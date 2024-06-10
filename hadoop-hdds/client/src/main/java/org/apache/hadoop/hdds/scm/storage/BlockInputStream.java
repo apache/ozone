@@ -263,9 +263,9 @@ public class BlockInputStream extends BlockExtendedInputStream {
     }
     Set<Integer> replicaIndexes =
         pipeline.getNodes().stream().map(pipeline::getReplicaIndex).collect(Collectors.toSet());
-    if (replicaIndexes.size() != 1) {
+    if (replicaIndexes.size() > 1) {
       throw new IOException(String.format("Pipeline: %s has nodes containing different replica indexes.",
-          pipeline.toString()));
+          pipeline));
     }
 
     // irrespective of the container state, we will always read via Standalone
