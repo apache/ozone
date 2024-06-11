@@ -30,6 +30,7 @@ import static org.apache.hadoop.ozone.container.TestHelper.waitForContainerClose
 import static org.apache.hadoop.ozone.container.TestHelper.waitForReplicaCount;
 import static org.apache.ozone.test.GenericTestUtils.setLogLevel;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.Mockito.any;
@@ -49,6 +50,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Collectors;
+import java.util.function.Supplier;
 
 import com.google.common.base.Functions;
 import com.google.common.collect.ImmutableMap;
@@ -63,6 +65,7 @@ import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.container.placement.algorithms.ContainerPlacementPolicyFactory;
 import org.apache.hadoop.hdds.scm.container.placement.algorithms.SCMContainerPlacementMetrics;
 import org.apache.hadoop.hdds.scm.container.placement.algorithms.SCMContainerPlacementRackScatter;
+import org.apache.hadoop.hdds.scm.container.placement.algorithms.SCMContainerPlacementMetrics;
 import org.apache.hadoop.hdds.scm.container.replication.ReplicationManager.ReplicationManagerConfiguration;
 import org.apache.hadoop.hdds.scm.container.placement.algorithms.SCMContainerPlacementCapacity;
 import org.apache.hadoop.hdds.scm.container.placement.algorithms.SCMContainerPlacementRackAware;
@@ -136,11 +139,16 @@ class TestContainerReplication {
     conf.set(OZONE_SCM_CONTAINER_PLACEMENT_IMPL_KEY, placementPolicyClass);
     try (MiniOzoneCluster cluster = newCluster(conf)) {
       cluster.waitForClusterToBeReady();
+      SCMContainerPlacementMetrics metrics = cluster.getStorageContainerManager().getPlacementMetrics();
       try (OzoneClient client = cluster.newClient()) {
         createTestData(client);
 
         List<OmKeyLocationInfo> keyLocations = lookupKey(cluster);
         assertThat(keyLocations).isNotEmpty();
+        long datanodeChooseAttemptCount = metrics.getDatanodeChooseAttemptCount();
+        long datanodeChooseSuccessCount = metrics.getDatanodeChooseSuccessCount();
+        long datanodeChooseFallbackCount = metrics.getDatanodeChooseFallbackCount();
+        long datanodeRequestCount = metrics.getDatanodeRequestCount();
 
         OmKeyLocationInfo keyLocation = keyLocations.get(0);
         long containerID = keyLocation.getContainerID();
@@ -150,6 +158,12 @@ class TestContainerReplication {
         waitForReplicaCount(containerID, 2, cluster);
 
         waitForReplicaCount(containerID, 3, cluster);
+
+        Supplier<String> messageSupplier = () -> "policy=" + placementPolicyClass + " legacy=" + legacyEnabled;
+        assertEquals(datanodeRequestCount + 1, metrics.getDatanodeRequestCount(), messageSupplier);
+        assertThat(metrics.getDatanodeChooseAttemptCount()).isGreaterThan(datanodeChooseAttemptCount);
+        assertEquals(datanodeChooseSuccessCount + 1, metrics.getDatanodeChooseSuccessCount(), messageSupplier);
+        assertThat(metrics.getDatanodeChooseFallbackCount()).isGreaterThanOrEqualTo(datanodeChooseFallbackCount);
       }
     }
   }

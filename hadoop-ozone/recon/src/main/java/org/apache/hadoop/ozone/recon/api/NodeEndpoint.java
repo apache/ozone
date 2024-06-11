@@ -152,9 +152,7 @@ public class NodeEndpoint {
         }
       });
       try {
-        Set<ContainerID> allContainers = nodeManager.getContainers(datanode);
-
-        builder.withContainers(allContainers.size());
+        builder.withContainers(nodeManager.getContainerCount(datanode));
         builder.withOpenContainers(openContainers.get());
       } catch (NodeNotFoundException ex) {
         LOG.warn("Cannot get containers, datanode {} not found.",

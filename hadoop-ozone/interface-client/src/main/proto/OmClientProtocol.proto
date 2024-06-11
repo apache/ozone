@@ -1301,9 +1301,16 @@ message DeleteKeyArgs {
     repeated string keys = 3;
 }
 
+message DeleteKeyError {
+    optional string key = 1;
+    optional string errorCode = 2;
+    optional string errorMsg = 3;
+}
+
 message DeleteKeysResponse {
     optional DeleteKeyArgs unDeletedKeys = 1;
     optional bool status = 2;
+    repeated DeleteKeyError errors = 3;
 }
 
 message DeleteKeyResponse {

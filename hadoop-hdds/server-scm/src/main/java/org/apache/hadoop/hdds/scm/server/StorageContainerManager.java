@@ -54,7 +54,6 @@ import org.apache.hadoop.hdds.scm.container.replication.ContainerReplicaPendingO
 import org.apache.hadoop.hdds.scm.container.replication.DatanodeCommandCountUpdatedHandler;
 import org.apache.hadoop.hdds.scm.container.replication.LegacyReplicationManager;
 import org.apache.hadoop.hdds.scm.ha.SCMServiceException;
-import org.apache.hadoop.hdds.scm.security.CRLStatusReportHandler;
 import org.apache.hadoop.hdds.scm.ha.BackgroundSCMService;
 import org.apache.hadoop.hdds.scm.ha.HASecurityUtils;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
@@ -203,12 +202,10 @@ import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_EVENT_REPORT_EX
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_EVENT_REPORT_QUEUE_WAIT_THRESHOLD_DEFAULT;
 import static org.apache.hadoop.hdds.scm.ScmUtils.checkIfCertSignRequestAllowed;
 import static org.apache.hadoop.hdds.scm.security.SecretKeyManagerService.isSecretKeyEnable;
-import static org.apache.hadoop.hdds.security.x509.certificate.authority.CertificateStore.CertType.VALID_CERTS;
 import static org.apache.hadoop.hdds.utils.HddsServerUtil.getRemoteUser;
 import static org.apache.hadoop.hdds.utils.HddsServerUtil.getScmSecurityClientWithMaxRetry;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ADMINISTRATORS;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_READONLY_ADMINISTRATORS;
-import static org.apache.hadoop.ozone.OzoneConsts.CRL_SEQUENCE_ID_KEY;
 import static org.apache.hadoop.ozone.OzoneConsts.SCM_SUB_CA_PREFIX;
 import static org.apache.hadoop.ozone.OzoneConsts.SCM_ROOT_CA_COMPONENT_NAME;
 import static org.apache.hadoop.security.UserGroupInformation.getCurrentUser;
@@ -503,8 +500,6 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
             scmNodeManager, containerManager, scmContext);
     PipelineActionHandler pipelineActionHandler =
         new PipelineActionHandler(pipelineManager, scmContext, configuration);
-    CRLStatusReportHandler crlStatusReportHandler =
-        new CRLStatusReportHandler(certificateStore, configuration);
 
     eventQueue.addHandler(SCMEvents.DATANODE_COMMAND, scmNodeManager);
     eventQueue.addHandler(SCMEvents.RETRIABLE_DATANODE_COMMAND, scmNodeManager);
@@ -577,7 +572,6 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
         (DeletedBlockLogImpl) scmBlockManager.getDeletedBlockLog());
     eventQueue.addHandler(SCMEvents.PIPELINE_ACTIONS, pipelineActionHandler);
     eventQueue.addHandler(SCMEvents.PIPELINE_REPORT, pipelineReportHandler);
-    eventQueue.addHandler(SCMEvents.CRL_STATUS_REPORT, crlStatusReportHandler);
 
     scmNodeManager.registerSendCommandNotify(
         SCMCommandProto.Type.deleteBlocksCommand,
@@ -879,8 +873,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
 
     certificateStore =
         new SCMCertStore.Builder().setMetadaStore(scmMetadataStore)
-            .setRatisServer(scmHAManager.getRatisServer())
-            .setCRLSequenceId(getLastSequenceIdForCRL()).build();
+            .setRatisServer(scmHAManager.getRatisServer()).build();
 
 
     final CertificateServer scmCertificateServer;
@@ -957,16 +950,14 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     // and ratis server initialized with statemachine. We need to do only
     // for primary scm, for other bootstrapped scm's certificates will be
     // persisted via ratis.
-    if (certificateStore.getCertificateByID(certSerial,
-        VALID_CERTS) == null) {
+    if (certificateStore.getCertificateByID(certSerial) == null) {
       LOG.info("Storing sub-ca certificate serialId {} on primary SCM",
           certSerial);
       certificateStore.storeValidScmCertificate(
           certSerial, scmCertificateClient.getCertificate());
     }
     X509Certificate rootCACert = scmCertificateClient.getCACertificate();
-    if (certificateStore.getCertificateByID(rootCACert.getSerialNumber(),
-        VALID_CERTS) == null) {
+    if (certificateStore.getCertificateByID(rootCACert.getSerialNumber()) == null) {
       LOG.info("Storing root certificate serialId {}",
           rootCACert.getSerialNumber());
       certificateStore.storeValidScmCertificate(
@@ -1074,19 +1065,6 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
       }
       LOG.info("SCM login successful.");
     }
-  }
-
-  long getLastSequenceIdForCRL() throws IOException {
-    Long sequenceId =
-        scmMetadataStore.getCRLSequenceIdTable().get(CRL_SEQUENCE_ID_KEY);
-    // If the CRL_SEQUENCE_ID_KEY does not exist in DB return 0 so that new
-    // CRL requests can have sequence id starting from 1.
-    if (sequenceId == null) {
-      return 0L;
-    }
-    // If there exists a last sequence id in the DB, the new incoming
-    // CRL requests must have sequence ids greater than the one stored in the DB
-    return sequenceId;
   }
 
   /**
@@ -1621,8 +1599,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
       for (String cert : pemEncodedCerts) {
         X509Certificate x509Certificate = CertificateCodec.getX509Certificate(
             cert, CertificateCodec::toIOException);
-        if (certificateStore.getCertificateByID(
-            x509Certificate.getSerialNumber(), VALID_CERTS) == null) {
+        if (certificateStore.getCertificateByID(x509Certificate.getSerialNumber()) == null) {
           LOG.info("Persist certificate serialId {} on Scm Bootstrap Node " +
                   "{}", x509Certificate.getSerialNumber(),
               scmStorageConfig.getScmId());
@@ -2117,6 +2094,10 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
   @VisibleForTesting
   public SCMHAMetrics getScmHAMetrics() {
     return scmHAMetrics;
+  }
+
+  public SCMContainerPlacementMetrics getPlacementMetrics() {
+    return placementMetrics;
   }
 
   public ContainerTokenGenerator getContainerTokenGenerator() {
