@@ -48,7 +48,7 @@ import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.TRANSACTION_INFO_
  */
 @CommandLine.Command(
     name = "update-transaction",
-    description = "CLI to update the highest index in transactionInfoTable. Currently it only supports for OM.",
+    description = "CLI to update the highest index in transactionInfoTable. Currently it is only supported for OM.",
     mixinStandardHelpOptions = true,
     versionProvider = HddsVersionProvider.class
 )
@@ -115,7 +115,7 @@ public class TransactionInfoRepair
       System.err.println("Failed to update the RocksDB for the given path: " + dbPath);
       System.err.println(
           "Make sure that Ozone entity (OM) is not running for the give database path and current host.");
-      throw new IOException("Failed to update RocksDB: " + exception);
+      throw new IOException("Failed to update RocksDB.", exception);
     } finally {
       IOUtils.closeQuietly(cfHandleList);
     }

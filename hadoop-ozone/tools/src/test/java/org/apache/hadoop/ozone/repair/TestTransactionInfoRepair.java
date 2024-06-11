@@ -78,8 +78,8 @@ public class TestTransactionInfoRepair {
     ManagedRocksDB mdb = mockRockDB();
     IllegalArgumentException exception = assertThrows(IllegalArgumentException.class,
         () -> testCommand(mdb, null, null, new String[]{""}));
-    assertThat(exception.getMessage().contains(TRANSACTION_INFO_TABLE +
-        " is not in a column family in DB for the given path"));
+    assertThat(exception.getMessage()).contains(TRANSACTION_INFO_TABLE +
+        " is not in a column family in DB for the given path");
   }
 
   @Test
@@ -92,8 +92,8 @@ public class TestTransactionInfoRepair {
 
     IOException exception = assertThrows(IOException.class,
         () -> testCommand(mdb, mock(ColumnFamilyHandle.class), null, new String[]{""}));
-    assertThat(exception.getMessage().contains(TRANSACTION_INFO_TABLE +
-        " is not in a column family in DB for the given path"));
+    assertThat(exception.getMessage()).contains("Failed to update RocksDB.");
+    assertThat(exception.getCause()).isInstanceOf(RocksDBException.class);
   }
 
 
