@@ -78,8 +78,6 @@ import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_PRIVATE_KEY_FILE_NAME_D
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_PUBLIC_KEY_FILE_NAME;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_PUBLIC_KEY_FILE_NAME_DEFAULT;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_SECURITY_PROVIDER;
-import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_X509_CRL_NAME;
-import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_X509_CRL_NAME_DEFAULT;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_X509_DEFAULT_DURATION;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_X509_DEFAULT_DURATION_DEFAULT;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_X509_DIR_NAME;
@@ -126,7 +124,6 @@ public class SecurityConfig {
   private final Duration defaultCertDuration;
   private final Duration renewalGracePeriod;
   private final boolean isSecurityEnabled;
-  private final String crlName;
   private final boolean grpcTlsUseTestCert;
   private final String externalRootCaPublicKeyPath;
   private final String externalRootCaPrivateKeyPath;
@@ -263,9 +260,6 @@ public class SecurityConfig {
         HDDS_X509_ROOTCA_PRIVATE_KEY_FILE,
         HDDS_X509_ROOTCA_PRIVATE_KEY_FILE_DEFAULT);
 
-    this.crlName = configuration.get(HDDS_X509_CRL_NAME,
-        HDDS_X509_CRL_NAME_DEFAULT);
-
     this.grpcSSLProvider = SslProvider.valueOf(
         configuration.get(HDDS_GRPC_TLS_PROVIDER,
             HDDS_GRPC_TLS_PROVIDER_DEFAULT));
@@ -355,15 +349,6 @@ public class SecurityConfig {
           " should be greater than maximum block/container token lifetime " +
           HddsConfigKeys.HDDS_BLOCK_TOKEN_EXPIRY_TIME);
     }
-  }
-
-  /**
-   * Returns the CRL Name.
-   *
-   * @return String.
-   */
-  public String getCrlName() {
-    return crlName;
   }
 
   /**
