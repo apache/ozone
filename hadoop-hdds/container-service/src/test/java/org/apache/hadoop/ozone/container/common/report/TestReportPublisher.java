@@ -18,39 +18,27 @@
 package org.apache.hadoop.ozone.container.common.report;
 
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
-import com.google.protobuf.Descriptors;
 import com.google.protobuf.Message;
 
-import java.io.IOException;
-import java.util.ArrayList;
-import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.HddsIdFactory;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.hdds.datanode.metadata.DatanodeCRLStore;
-import org.apache.hadoop.hdds.protocol.DatanodeDetails;
-import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.CRLStatusReport;
 import org.apache.hadoop.hdds.protocol.proto.
     StorageContainerDatanodeProtocolProtos.CommandStatus.Status;
 import org.apache.hadoop.hdds.protocol.proto.
     StorageContainerDatanodeProtocolProtos.SCMCommandProto.Type;
-import org.apache.hadoop.hdds.security.x509.crl.CRLInfo;
-import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine;
 import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
 import org.apache.hadoop.ozone.protocol.commands.CommandStatus;
 import org.apache.hadoop.util.concurrent.HadoopExecutors;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
-import java.util.Random;
-import java.util.UUID;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
@@ -182,66 +170,4 @@ public class TestReportPublisher {
         "Should publish report with 2 status objects");
     executorService.shutdown();
   }
-
-  @Test
-  public void testCRLStatusReportPublisher() throws IOException {
-    StateContext dummyContext = mock(StateContext.class);
-    DatanodeStateMachine dummyStateMachine =
-        mock(DatanodeStateMachine.class);
-    ReportPublisher publisher = new CRLStatusReportPublisher();
-    DatanodeCRLStore dnCrlStore = mock(DatanodeCRLStore.class);
-    when(dnCrlStore.getLatestCRLSequenceID()).thenReturn(3L);
-    List<CRLInfo> pendingCRLs = new ArrayList<>();
-    pendingCRLs.add(mock(CRLInfo.class));
-    pendingCRLs.add(mock(CRLInfo.class));
-    when(dnCrlStore.getPendingCRLs()).thenReturn(pendingCRLs);
-    when(dummyStateMachine.getDnCRLStore()).thenReturn(dnCrlStore);
-    when(dummyContext.getParent()).thenReturn(dummyStateMachine);
-    publisher.setConf(config);
-
-    ScheduledExecutorService executorService = HadoopExecutors
-        .newScheduledThreadPool(1,
-            new ThreadFactoryBuilder().setDaemon(true)
-                .setNameFormat("TestReportManagerThread-%d").build());
-    publisher.init(dummyContext, executorService);
-    Message report =
-        ((CRLStatusReportPublisher) publisher).getReport();
-    assertNotNull(report);
-    for (Descriptors.FieldDescriptor descriptor :
-        report.getDescriptorForType().getFields()) {
-      if (descriptor.getNumber() ==
-          CRLStatusReport.RECEIVEDCRLID_FIELD_NUMBER) {
-        assertEquals(3L, report.getField(descriptor));
-      }
-    }
-    executorService.shutdown();
-  }
-
-  /**
-   * Get a datanode details.
-   *
-   * @return DatanodeDetails
-   */
-  private static DatanodeDetails getDatanodeDetails() {
-    Random random = new Random();
-    String ipAddress =
-        random.nextInt(256) + "." + random.nextInt(256) + "." + random
-            .nextInt(256) + "." + random.nextInt(256);
-
-    DatanodeDetails.Port containerPort = DatanodeDetails.newPort(
-        DatanodeDetails.Port.Name.STANDALONE, 0);
-    DatanodeDetails.Port ratisPort = DatanodeDetails.newPort(
-        DatanodeDetails.Port.Name.RATIS, 0);
-    DatanodeDetails.Port restPort = DatanodeDetails.newPort(
-        DatanodeDetails.Port.Name.REST, 0);
-    DatanodeDetails.Builder builder = DatanodeDetails.newBuilder();
-    builder.setUuid(UUID.randomUUID())
-        .setHostName("localhost")
-        .setIpAddress(ipAddress)
-        .addPort(containerPort)
-        .addPort(ratisPort)
-        .addPort(restPort);
-    return builder.build();
-  }
-
 }

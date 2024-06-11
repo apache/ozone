@@ -27,16 +27,12 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolPro
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.common.helpers.MoveDataNodePair;
-import org.apache.hadoop.hdds.security.x509.certificate.CertInfo;
 import org.apache.hadoop.hdds.utils.DBStoreHAManager;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
-import org.apache.hadoop.hdds.security.x509.certificate.authority.CertificateStore;
-import org.apache.hadoop.hdds.security.x509.crl.CRLInfo;
 import org.apache.hadoop.hdds.utils.db.BatchOperationHandler;
 import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.utils.db.Table;
-import org.apache.hadoop.hdds.utils.db.TableIterator;
 
 import com.google.common.annotations.VisibleForTesting;
 
@@ -89,48 +85,6 @@ public interface SCMMetadataStore extends DBStoreHAManager {
    * @return Table
    */
   Table<BigInteger, X509Certificate> getValidSCMCertsTable();
-
-  /**
-   * This method is Deprecated in favor of getRevokedCertsV2Table().
-   * A Table that maintains all revoked certificates until they expire.
-   *
-   * @return Table.
-   */
-  @Deprecated
-  Table<BigInteger, X509Certificate> getRevokedCertsTable();
-
-  /**
-   * A Table that maintains all revoked certificates and the time of
-   * revocation until they expire.
-   *
-   * @return Table.
-   */
-  Table<BigInteger, CertInfo> getRevokedCertsV2Table();
-
-  /**
-   * A table that maintains X509 Certificate Revocation Lists and its metadata.
-   *
-   * @return Table.
-   */
-  Table<Long, CRLInfo> getCRLInfoTable();
-
-  /**
-   * A table that maintains the last CRL SequenceId. This helps to make sure
-   * that the CRL Sequence Ids are monotonically increasing.
-   *
-   * @return Table.
-   */
-  Table<String, Long> getCRLSequenceIdTable();
-
-  /**
-   * Returns the list of Certificates of a specific type.
-   *
-   * @param certType - CertType.
-   * @return Iterator<X509Certificate>
-   * @throws IOException on failure.
-   */
-  TableIterator getAllCerts(CertificateStore.CertType certType)
-      throws IOException;
 
   /**
    * A Table that maintains all the pipeline information.

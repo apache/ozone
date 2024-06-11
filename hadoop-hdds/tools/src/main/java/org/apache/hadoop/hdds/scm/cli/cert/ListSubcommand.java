@@ -68,8 +68,9 @@ public class ListSubcommand extends ScmCertSubcommand {
   private String role;
 
   @Option(names = {"-t", "--type"},
-      description = "Filter certificate by the type: valid or revoked",
-      defaultValue = "valid", showDefaultValue = Visibility.ALWAYS)
+      description = "This option is unused currently, and has no effect on the output.",
+      defaultValue = "VALID", showDefaultValue = Visibility.NEVER)
+  @Deprecated
   private String type;
   
   @Option(names = { "--json" },
@@ -89,10 +90,8 @@ public class ListSubcommand extends ScmCertSubcommand {
 
   @Override
   protected void execute(SCMSecurityProtocol client) throws IOException {
-    boolean isRevoked = type.equalsIgnoreCase("revoked");
     HddsProtos.NodeType nodeType = parseCertRole(role);
-    List<String> certPemList = client.listCertificate(nodeType,
-        startSerialId, count, isRevoked);
+    List<String> certPemList = client.listCertificate(nodeType, startSerialId, count);
     if (count == certPemList.size()) {
       err.println("The certificate list could be longer than the batch size: "
           + count + ". Please use the \"-c\" option to see more" +
@@ -100,8 +99,7 @@ public class ListSubcommand extends ScmCertSubcommand {
     }
 
     if (json) {
-      err.println("Certificate list:(Type=" + type.toUpperCase() +
-          ", BatchSize=" + count + ", CertCount=" + certPemList.size() + ")");
+      err.println("Certificate list:(BatchSize=" + count + ", CertCount=" + certPemList.size() + ")");
       List<Certificate> certList = new ArrayList<>();
       for (String certPemStr : certPemList) {
         try {
@@ -117,8 +115,7 @@ public class ListSubcommand extends ScmCertSubcommand {
       return;
     }
 
-    System.out.printf("Certificate list:(Type=%s, BatchSize=%s, CertCount=%s)%n",
-        type.toUpperCase(), count, certPemList.size());
+    System.out.printf("Certificate list:(BatchSize=%s, CertCount=%s)%n", count, certPemList.size());
     printCertList(certPemList);
   }
 
