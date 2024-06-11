@@ -104,12 +104,13 @@ public final class ReconPipelineManager extends PipelineManagerImpl {
       List<Pipeline> pipelinesInHouse = getPipelines();
       LOG.info("Recon has {} pipelines in house.", pipelinesInHouse.size());
       for (Pipeline pipeline : pipelinesFromScm) {
-        if (!containsPipeline(pipeline.getId())) {
-          // New pipeline got from SCM. Recon does not know anything about it,
-          // so let's add it.
-          LOG.info("Adding new pipeline {} from SCM.", pipeline.getId());
-          addPipeline(pipeline);
+        // New pipeline got from SCM. Recon does not know anything about it,
+        // so let's add it.
+        boolean added = addPipeline(pipeline);
+        if (added) {
+          LOG.info("Added new pipeline {} from SCM.", pipeline.getId());
         } else {
+          LOG.warn("Pipeline {} already exists in Recon pipeline metadata.", pipeline.getId());
           // Recon already has this pipeline. Just update state and creation
           // time.
           getStateManager().updatePipelineState(
@@ -160,22 +161,23 @@ public final class ReconPipelineManager extends PipelineManagerImpl {
       releaseWriteLock();
     }
   }
+
   /**
    * Add a new pipeline to the pipeline metadata.
    * @param pipeline pipeline
+   * @return true if the pipeline was added, false if it already existed
    * @throws IOException
    */
   @VisibleForTesting
-  public void addPipeline(Pipeline pipeline) throws IOException {
+  public boolean addPipeline(Pipeline pipeline) throws IOException {
     acquireWriteLock();
     try {
       // Check if the pipeline already exists
       if (containsPipeline(pipeline.getId())) {
-        LOG.warn("Duplicate pipeline ID {} detected, skipping addition.", pipeline.getId());
-        return;
+        return false;
       }
-      getStateManager().addPipeline(
-          pipeline.getProtobufMessage(ClientVersion.CURRENT_VERSION));
+      getStateManager().addPipeline(pipeline.getProtobufMessage(ClientVersion.CURRENT_VERSION));
+      return true;
     } finally {
       releaseWriteLock();
     }
