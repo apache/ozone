@@ -212,7 +212,8 @@ public final class ContainerProtocolCalls  {
    * @throws IOException if there is an I/O error while performing the call
    */
   public static GetBlockResponseProto getBlock(XceiverClientSpi xceiverClient,
-      List<Validator> validators, BlockID blockID, Token<? extends TokenIdentifier> token) throws IOException {
+      List<Validator> validators, BlockID blockID, Token<? extends TokenIdentifier> token,
+      Map<DatanodeDetails, Integer> replicaIndexes) throws IOException {
     ContainerCommandRequestProto.Builder builder = getContainerCommandRequestProtoBuilder()
         .setCmdType(Type.GetBlock)
         .setContainerID(blockID.getContainerID());
@@ -221,7 +222,7 @@ public final class ContainerProtocolCalls  {
     }
 
     return tryEachDatanode(xceiverClient.getPipeline(),
-        d -> getBlock(xceiverClient, validators, builder, blockID, d),
+        d -> getBlock(xceiverClient, validators, builder, blockID, d, replicaIndexes),
         d -> toErrorMessage(blockID, d));
   }
 
@@ -231,19 +232,20 @@ public final class ContainerProtocolCalls  {
   }
 
   public static GetBlockResponseProto getBlock(XceiverClientSpi xceiverClient,
-      BlockID datanodeBlockID,
-      Token<? extends TokenIdentifier> token) throws IOException {
-    return getBlock(xceiverClient, getValidatorList(), datanodeBlockID, token);
+      BlockID datanodeBlockID, Token<? extends TokenIdentifier> token,
+      Map<DatanodeDetails, Integer> replicaIndexes) throws IOException {
+    return getBlock(xceiverClient, getValidatorList(), datanodeBlockID, token, replicaIndexes);
   }
 
   private static GetBlockResponseProto getBlock(XceiverClientSpi xceiverClient, List<Validator> validators,
-      ContainerCommandRequestProto.Builder builder, BlockID blockID, DatanodeDetails datanode) throws IOException {
+      ContainerCommandRequestProto.Builder builder, BlockID blockID, DatanodeDetails datanode,
+      Map<DatanodeDetails, Integer> replicaIndexes) throws IOException {
     String traceId = TracingUtil.exportCurrentSpan();
     if (traceId != null) {
       builder.setTraceID(traceId);
     }
     final DatanodeBlockID.Builder datanodeBlockID = blockID.getDatanodeBlockIDProtobufBuilder();
-    int replicaIndex = xceiverClient.getPipeline().getReplicaIndex(datanode);
+    int replicaIndex = replicaIndexes.getOrDefault(datanode, 0);
     if (replicaIndex > 0) {
       datanodeBlockID.setReplicaIndex(replicaIndex);
     }

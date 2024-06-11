@@ -246,13 +246,14 @@ public class BlockInputStream extends BlockExtendedInputStream {
 
   @VisibleForTesting
   protected List<ChunkInfo> getChunkInfoListUsingClient() throws IOException {
+    Pipeline pipeline = pipelineRef.get();
     if (LOG.isDebugEnabled()) {
       LOG.debug("Initializing BlockInputStream for get key to access {} with pipeline {}.",
-          blockID.getContainerID(), xceiverClient.getPipeline());
+          blockID.getContainerID(), pipeline);
     }
 
     GetBlockResponseProto response = ContainerProtocolCalls.getBlock(
-        xceiverClient, VALIDATORS, blockID, tokenRef.get());
+        xceiverClient, VALIDATORS, blockID, tokenRef.get(), pipeline.getReplicaIndexes());
 
     return response.getBlockData().getChunksList();
   }

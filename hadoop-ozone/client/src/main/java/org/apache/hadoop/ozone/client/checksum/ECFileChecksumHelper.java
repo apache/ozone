@@ -189,7 +189,7 @@ public class ECFileChecksumHelper extends BaseFileChecksumHelper {
       xceiverClientSpi = getXceiverClientFactory().acquireClientForReadData(pipeline);
 
       ContainerProtos.GetBlockResponseProto response = ContainerProtocolCalls
-          .getBlock(xceiverClientSpi, blockID, token);
+          .getBlock(xceiverClientSpi, blockID, token, pipeline.getReplicaIndexes());
 
       chunks = response.getBlockData().getChunksList();
     } finally {
