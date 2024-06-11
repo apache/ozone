@@ -571,7 +571,7 @@ public class XceiverClientGrpc extends XceiverClientSpi {
                 metrics.decrPendingContainerOpsMetrics(request.getCmdType());
                 long cost = System.currentTimeMillis() - requestTime;
                 metrics.addContainerOpsLatency(request.getCmdType(),
-                    System.currentTimeMillis() - requestTime);
+                    cost);
                 if (LOG.isDebugEnabled()) {
                   LOG.debug("Executed command {} on datanode {}, cost = {}, "
                           + "cmdType = {}", processForDebug(request), dn,
