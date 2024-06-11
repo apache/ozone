@@ -2096,6 +2096,10 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     return scmHAMetrics;
   }
 
+  public SCMContainerPlacementMetrics getPlacementMetrics() {
+    return placementMetrics;
+  }
+
   public ContainerTokenGenerator getContainerTokenGenerator() {
     return containerTokenMgr != null
         ? containerTokenMgr
