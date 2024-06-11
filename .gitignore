@@ -72,3 +72,4 @@ dev-support/ci/bats-support
 hadoop-ozone/dist/src/main/license/current.txt
 
 .mvn/.gradle-enterprise/
+.mvn/.develocity/
