@@ -56,7 +56,7 @@ jobs:
       - name: Get NodeJS version
         id: nodejs-version
         if: steps.restore-cache.outputs.cache-hit != 'true'
-        run: echo "nodejs-version=$(mvn help:evaluate -Dexpression=nodejs.version -q -DforceStdout)" >> $GITHUB_OUTPUT
+        run: echo "nodejs-version=$(mvn help:evaluate -Dexpression=nodejs.version -q -DforceStdout -Dscan=false)" >> $GITHUB_OUTPUT
 
       - name: Restore NodeJS tarballs
         id: restore-nodejs

@@ -34,7 +34,7 @@ mkdir -p "${REPO_DIR}"
 declare -i rc=1
 
 if [[ -z "${NODEJS_VERSION:-}" ]]; then
-  NODEJS_VERSION=$(mvn help:evaluate -Dexpression=nodejs.version -q -DforceStdout)
+  NODEJS_VERSION=$(mvn help:evaluate -Dexpression=nodejs.version -q -DforceStdout -Dscan=false)
 fi
 
 if [[ -n "${NODEJS_VERSION}" ]]; then

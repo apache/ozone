@@ -91,7 +91,7 @@ if [ "$1" == "internal" ]; then
    exit 0
 fi
 
-TESTKRB5_IMAGE=$(mvn -f "$SCRIPT_DIR"/../../../pom.xml help:evaluate -Dexpression=docker.ozone-testkr5b.image -q -DforceStdout)
+TESTKRB5_IMAGE=$(mvn -f "$SCRIPT_DIR"/../../../pom.xml help:evaluate -Dexpression=docker.ozone-testkr5b.image -q -DforceStdout -Dscan=false)
 
 docker run -it --entrypoint=/etc/security/keytabs/update-keytabs.sh -v "$SCRIPT_DIR":/etc/security/keytabs $TESTKRB5_IMAGE internal
 

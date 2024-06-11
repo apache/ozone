@@ -31,7 +31,7 @@ source "${DIR}/_lib.sh"
 
 REPORT_DIR=${OUTPUT_DIR:-"${OZONE_ROOT}/target/acceptance"}
 
-OZONE_VERSION=$(mvn help:evaluate -Dexpression=ozone.version -q -DforceStdout)
+OZONE_VERSION=$(mvn help:evaluate -Dexpression=ozone.version -q -DforceStdout -Dscan=false)
 DIST_DIR="${OZONE_ROOT}/hadoop-ozone/dist/target/ozone-$OZONE_VERSION"
 
 if [ ! -d "$DIST_DIR" ]; then
@@ -45,7 +45,7 @@ if [[ "${OZONE_ACCEPTANCE_SUITE}" == "s3a" ]]; then
   OZONE_ACCEPTANCE_TEST_TYPE="maven"
 
   if [[ -z "${HADOOP_AWS_DIR}" ]]; then
-    HADOOP_VERSION=$(mvn help:evaluate -Dexpression=hadoop.version -q -DforceStdout)
+    HADOOP_VERSION=$(mvn help:evaluate -Dexpression=hadoop.version -q -DforceStdout -Dscan=false)
     export HADOOP_AWS_DIR=${OZONE_ROOT}/target/hadoop-src
   fi
 
