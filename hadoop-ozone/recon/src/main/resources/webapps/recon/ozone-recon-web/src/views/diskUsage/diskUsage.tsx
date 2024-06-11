@@ -30,6 +30,7 @@ const normalize = require('array-normalize');
 const DEFAULT_DISPLAY_LIMIT = 10;
 const OTHER_PATH_NAME = 'Other Objects';
 const MAX_DISPLAY_LIMIT = 30;
+const MIN_BLOCK_SIZE = 0.05;
 
 interface IDUSubpath {
   path: string;
@@ -186,24 +187,26 @@ export class DiskUsage extends React.Component<Record<string, object>, IDUState>
           // Differentiate key without trailing slash
           return (subpath.isKey || subpathName === OTHER_PATH_NAME) ? subpathName : subpathName + '/';
         });
-         
+
         values = subpaths.map(subpath => {
           return subpath.size / dataSize;
         });
-        // Logic for Values Normalization on Pie chart adding 0.05 so minimum block
-        // will be displayed on Pie chart using below logic
-        // Percentage and Size string Logic will be same 
-        normalizedValues= normalize(values);
-        normalizedValues= values && values.map((item)=> item+ 0.05);
+       // Normalize values for the pie chart to ensure better visual representation.
+       // Adding a small constant (MIN_BLOCK_SIZE) to each normalized value ensures that even 
+       // the smallest entities are visible on the pie chart.
+       // Note: The percentage and size string calculations remain unchanged.
+
+        normalizedValues = normalize(values);
+        normalizedValues = values && values.map((item) => item + MIN_BLOCK_SIZE);
         percentage = values.map(value => {
           return (value * 100).toFixed(2);
         });
-       
+
         sizeStr = subpaths.map(subpath => {
           return byteToSize(subpath.size, 1);
         });
       }
-    
+
       this.setState({
         // Normalized path
         isLoading: false,
@@ -574,7 +577,7 @@ export class DiskUsage extends React.Component<Record<string, object>, IDUState>
                       layout={
                         {
                           width: 1200,
-                          height: 900,
+                          height: 850,
                           font: {
                             family: 'Roboto, sans-serif',
                             size: 15
