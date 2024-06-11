@@ -150,10 +150,12 @@ Test Multipart Upload Complete
 
 #check whether parts count is retrieved through get and head object
     ${result}                   Execute AWSS3ApiCli        get-object --bucket ${BUCKET} --key ${PREFIX}/multipartKey1 --part-number 1 /tmp/${PREFIX}-multipartKey1-part1.result
-                                Should contain             ${result}        PartsCount
+    ${partsCount}               Execute and checkrc        echo '${result}' | jq -r '.PartsCount'    0
+                                Should Be Equal            ${partsCount}    2
 
     ${result}                   Execute AWSS3ApiCli        head-object --bucket ${BUCKET} --key ${PREFIX}/multipartKey1
-                                Should contain             ${result}        PartsCount
+    ${partsCount}               Execute and checkrc        echo '${result}' | jq -r '.PartsCount'    0
+                                Should Be Equal            ${partsCount}    2
 
 Test Multipart Upload with user defined metadata size larger than 2 KB
     ${custom_metadata_value} =  Execute                               printf 'v%.0s' {1..3000}

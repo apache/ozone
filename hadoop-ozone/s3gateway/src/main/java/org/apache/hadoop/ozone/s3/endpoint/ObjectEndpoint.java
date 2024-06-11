@@ -493,8 +493,9 @@ public class ObjectEndpoint extends EndpointBase {
       String eTag = keyDetails.getMetadata().get(ETAG);
       if (eTag != null) {
         responseBuilder.header(ETAG, wrapInQuotes(eTag));
-        if (eTag.contains("-")) {
-          responseBuilder.header(MP_PARTS_COUNT, extractPartsCount(eTag));
+        String partsCount = extractPartsCount(eTag);
+        if (partsCount != null) {
+          responseBuilder.header(MP_PARTS_COUNT, partsCount);
         }
       }
 
@@ -624,8 +625,9 @@ public class ObjectEndpoint extends EndpointBase {
       // doing so will result in "null" string being returned instead
       // which breaks some AWS SDK implementation
       response.header(ETAG, wrapInQuotes(eTag));
-      if (eTag.contains("-")) {
-        response.header(MP_PARTS_COUNT, extractPartsCount(eTag));
+      String partsCount = extractPartsCount(eTag);
+      if (partsCount != null) {
+        response.header(MP_PARTS_COUNT, partsCount);
       }
     }
 
@@ -1399,7 +1401,11 @@ public class ObjectEndpoint extends EndpointBase {
   }
 
   private String extractPartsCount(String eTag) {
-    String[] parts = eTag.replace("\"", "").split("-");
-    return  parts[parts.length - 1];
+    if (eTag.contains("-")) {
+      String[] parts = eTag.replace("\"", "").split("-");
+      String lastPart = parts[parts.length - 1];
+      return lastPart.matches("\\d+") ? lastPart : null;
+    }
+    return null;
   }
 }
