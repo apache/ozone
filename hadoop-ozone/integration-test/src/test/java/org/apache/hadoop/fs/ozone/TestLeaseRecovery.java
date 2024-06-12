@@ -162,7 +162,7 @@ public class TestLeaseRecovery {
   }
 
   @ParameterizedTest
-  @ValueSource(ints = {1 << 20, (1 << 20) + 1, (1 << 20) - 1})
+  @ValueSource(ints = {1 << 17, (1 << 17) + 1, (1 << 17) - 1})
   public void testRecovery(int dataSize) throws Exception {
     RootedOzoneFileSystem fs = (RootedOzoneFileSystem)FileSystem.get(conf);
 
