@@ -168,7 +168,7 @@ export class DiskUsage extends React.Component<Record<string, object>, IDUState>
         }
       }
 
-      let pathLabels, values, percentage, sizeStr, pieces, subpathName;
+      let pathLabels, values: any[] = [], percentage, sizeStr, pieces, subpathName;
 
       if (duResponse.subPathCount === 0 || subpaths === 0) {
         pieces = duResponse && duResponse.path != null && duResponse.path.split('/');
@@ -188,16 +188,19 @@ export class DiskUsage extends React.Component<Record<string, object>, IDUState>
           return (subpath.isKey || subpathName === OTHER_PATH_NAME) ? subpathName : subpathName + '/';
         });
 
-        values = subpaths.map(subpath => {
-          return subpath.size / dataSize;
-        });
-       // Normalize values for the pie chart to ensure better visual representation.
-       // Adding a small constant (MIN_BLOCK_SIZE) to each normalized value ensures that even 
-       // the smallest entities are visible on the pie chart.
-       // Note: The percentage and size string calculations remain unchanged.
+        // To avoid NaN Condition NaN will get divide by Zero to avoid map iterations
+        if (dataSize > 0) {
+          values = subpaths.map(subpath => {
+            return subpath.size / dataSize;
+          });
+        }
 
-        normalizedValues = normalize(values);
-        normalizedValues = values && values.map((item) => item + MIN_BLOCK_SIZE);
+        // Normalize values for the pie chart to ensure better visual representation.
+        // Adding a small constant (MIN_BLOCK_SIZE) to each normalized value ensures that even
+        // the smallest entities are visible on the pie chart.
+        // Note: The percentage and size string calculations remain unchanged.
+        // normalize() method will convert array between 0 to 1
+        normalizedValues = values && normalize(values) && values.map((item) => item + MIN_BLOCK_SIZE);
         percentage = values.map(value => {
           return (value * 100).toFixed(2);
         });
