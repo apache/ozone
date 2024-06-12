@@ -2562,7 +2562,7 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
         handleError(submitRequest(omRequest)).getRecoverLeaseResponse();
 
     return new LeaseKeyInfo(OmKeyInfo.getFromProtobuf(recoverLeaseResponse.getKeyInfo()),
-        recoverLeaseResponse.getIsKeyInfo());
+        OmKeyInfo.getFromProtobuf(recoverLeaseResponse.getOpenKeyInfo()));
   }
 
   @Override

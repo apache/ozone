@@ -40,6 +40,7 @@ import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.LeaseKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
+import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
 import org.apache.hadoop.security.token.DelegationTokenIssuer;
 
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.CONTAINER_NOT_FOUND;
@@ -156,21 +157,55 @@ public class OzoneFileSystem extends BasicOzoneFileSystem
       throw e;
     }
 
-    // finalize the final block and get block length
-    List<OmKeyLocationInfo> locationInfoList = leaseKeyInfo.getKeyInfo().getLatestVersionLocations().getLocationList();
-    if (!locationInfoList.isEmpty()) {
-      OmKeyLocationInfo block = locationInfoList.get(locationInfoList.size() - 1);
+    OmKeyLocationInfoGroup keyLatestVersionLocations = leaseKeyInfo.getKeyInfo().getLatestVersionLocations();
+    List<OmKeyLocationInfo> keyLocationInfoList = keyLatestVersionLocations.getLocationList();
+    OmKeyLocationInfoGroup openKeyLatestVersionLocations = leaseKeyInfo.getOpenKeyInfo().getLatestVersionLocations();
+    List<OmKeyLocationInfo> openKeyLocationInfoList = openKeyLatestVersionLocations.getLocationList();
+
+    int openKeyLocationSize = openKeyLocationInfoList.size();
+    int keyLocationSize = keyLocationInfoList.size();
+    OmKeyLocationInfo openKeyFinalBlock = null;
+    OmKeyLocationInfo openKeyPenultimateBlock = null;
+    OmKeyLocationInfo keyFinalBlock;
+
+    if (keyLocationSize > 0) {
+      // Block info from fileTable
+      keyFinalBlock = keyLocationInfoList.get(keyLocationSize - 1);
+      // Block info from openFileTable
+      if (openKeyLocationSize > 1) {
+        openKeyFinalBlock = openKeyLocationInfoList.get(openKeyLocationSize - 1);
+        openKeyPenultimateBlock = openKeyLocationInfoList.get(openKeyLocationSize - 2);
+      } else if (openKeyLocationSize > 0) {
+        openKeyFinalBlock = openKeyLocationInfoList.get(0);
+      }
+      // Finalize the final block and get block length
       try {
-        block.setLength(getAdapter().finalizeBlock(block));
+        // CASE 1: When openFileTable has more block than fileTable
+        // Try to finalize last block of openFileTable
+        // Add that block into fileTable locationInfo
+        if (openKeyLocationSize > keyLocationSize) {
+          openKeyFinalBlock.setLength(getAdapter().finalizeBlock(openKeyFinalBlock));
+          keyLocationInfoList.add(openKeyFinalBlock);
+        }
+        // CASE 2: When openFileTable penultimate block length is not equal to fileTable block length of last block
+        // Finalize and get the actual block length and update in fileTable last block
+        if ((openKeyPenultimateBlock != null && keyFinalBlock != null) &&
+            openKeyPenultimateBlock.getLength() != keyFinalBlock.getLength() &&
+            openKeyPenultimateBlock.getBlockID().getLocalID() == keyFinalBlock.getBlockID().getLocalID()) {
+          keyFinalBlock.setLength(getAdapter().finalizeBlock(keyFinalBlock));
+        }
+        // CASE 3: When openFileTable has same number of blocks as fileTable
+        // Finalize and get actual length of fileTable final block
+        if (keyLocationInfoList.size() == openKeyLocationInfoList.size() && keyFinalBlock != null) {
+          keyFinalBlock.setLength(getAdapter().finalizeBlock(keyFinalBlock));
+        }
       } catch (Throwable e) {
         if (e instanceof StorageContainerException && (((StorageContainerException) e).getResult().equals(NO_SUCH_BLOCK)
             || ((StorageContainerException) e).getResult().equals(CONTAINER_NOT_FOUND))
-            && !leaseKeyInfo.getIsKeyInfo() && locationInfoList.size() > 1) {
-          locationInfoList = leaseKeyInfo.getKeyInfo().getLatestVersionLocations().getLocationList().subList(0,
-              locationInfoList.size() - 1);
-          block = locationInfoList.get(locationInfoList.size() - 1);
+            && openKeyPenultimateBlock != null && keyFinalBlock != null &&
+            openKeyPenultimateBlock.getBlockID().getLocalID() == keyFinalBlock.getBlockID().getLocalID()) {
           try {
-            block.setLength(getAdapter().finalizeBlock(block));
+            keyFinalBlock.setLength(getAdapter().finalizeBlock(keyFinalBlock));
           } catch (Throwable exp) {
             if (!forceRecovery) {
               throw exp;
@@ -188,11 +223,11 @@ public class OzoneFileSystem extends BasicOzoneFileSystem
     }
 
     // recover and commit file
-    long keyLength = locationInfoList.stream().mapToLong(OmKeyLocationInfo::getLength).sum();
+    long keyLength = keyLocationInfoList.stream().mapToLong(OmKeyLocationInfo::getLength).sum();
     OmKeyArgs keyArgs = new OmKeyArgs.Builder().setVolumeName(leaseKeyInfo.getKeyInfo().getVolumeName())
         .setBucketName(leaseKeyInfo.getKeyInfo().getBucketName()).setKeyName(leaseKeyInfo.getKeyInfo().getKeyName())
         .setReplicationConfig(leaseKeyInfo.getKeyInfo().getReplicationConfig()).setDataSize(keyLength)
-        .setLocationInfoList(locationInfoList)
+        .setLocationInfoList(keyLocationInfoList)
         .build();
     getAdapter().recoverFile(keyArgs);
     return true;
