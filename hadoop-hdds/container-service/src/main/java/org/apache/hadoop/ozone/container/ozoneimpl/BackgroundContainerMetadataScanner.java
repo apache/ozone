@@ -96,7 +96,6 @@ public class BackgroundContainerMetadataScanner extends
   private boolean shouldScan(Container<?> container) {
     // Full data scan also does a metadata scan. If a full data scan was done
     // recently, we can skip this metadata scan.
-    return container.shouldScanMetadata() &&
-        !ContainerUtils.recentlyScanned(container, minScanGap, LOG);
+    return !ContainerUtils.recentlyScanned(container, minScanGap, LOG);
   }
 }
