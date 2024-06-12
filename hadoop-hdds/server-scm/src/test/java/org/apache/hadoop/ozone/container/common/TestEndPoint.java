@@ -476,7 +476,7 @@ public class TestEndPoint {
     final long tolerance = 900;
     scmServerImpl.setRpcResponseDelay(2500);
     long start = Time.monotonicNow();
-    registerTaskHelper(serverAddress, 1000, false).close();
+    registerTaskHelper(serverAddress, (int) rpcTimeout, false).close();
     long end = Time.monotonicNow();
     scmServerImpl.setRpcResponseDelay(0);
     assertThat(end - start).isLessThanOrEqualTo(rpcTimeout + tolerance);
