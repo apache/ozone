@@ -225,7 +225,6 @@ public class OMRecoverLeaseRequest extends OMKeyRequest {
       throw new OMException("Open Key " + keyName + " is already deleted",
           KEY_NOT_FOUND);
     }
-    long openKeyModificationTime = openKeyInfo.getModificationTime();
     if (openKeyInfo.getMetadata().containsKey(OzoneConsts.LEASE_RECOVERY)) {
       LOG.debug("Key: " + keyName + " is already under recovery");
     } else {
