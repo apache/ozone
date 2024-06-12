@@ -200,7 +200,7 @@ export class DiskUsage extends React.Component<Record<string, object>, IDUState>
         // the smallest entities are visible on the pie chart.
         // Note: The percentage and size string calculations remain unchanged.
         // normalize() method will convert array between 0 to 1
-        normalizedValues = values && normalize(values) && values.map((item) => item + MIN_BLOCK_SIZE);
+        normalizedValues = values && normalize(values) && values.map((item) => item > 0 ? item + MIN_BLOCK_SIZE : item);
         percentage = values.map(value => {
           return (value * 100).toFixed(2);
         });
