@@ -104,10 +104,8 @@ public final class ReconPipelineManager extends PipelineManagerImpl {
       List<Pipeline> pipelinesInHouse = getPipelines();
       LOG.info("Recon has {} pipelines in house.", pipelinesInHouse.size());
       for (Pipeline pipeline : pipelinesFromScm) {
-        // New pipeline got from SCM. Recon does not know anything about it,
-        // so let's add it.
-        boolean added = addPipeline(pipeline);
-        if (added) {
+        // New pipeline got from SCM. Validate If it doesn't exist at Recon, try adding it.
+        if (addPipeline(pipeline)) {
           LOG.info("Added new pipeline {} from SCM.", pipeline.getId());
         } else {
           LOG.warn("Pipeline {} already exists in Recon pipeline metadata.", pipeline.getId());
@@ -119,47 +117,42 @@ public final class ReconPipelineManager extends PipelineManagerImpl {
           getPipeline(pipeline.getId()).setCreationTimestamp(
               pipeline.getCreationTimestamp());
         }
-        removeInvalidPipelines(pipelinesFromScm);
       }
+      removeInvalidPipelines(pipelinesFromScm);
     } finally {
       releaseWriteLock();
     }
   }
 
   public void removeInvalidPipelines(List<Pipeline> pipelinesFromScm) {
-    acquireWriteLock();
-    try {
-      List<Pipeline> pipelinesInHouse = getPipelines();
-      // Removing pipelines in Recon that are no longer in SCM.
-      // TODO Recon may need to track inactive pipelines as well. So this can be
-      // removed in a followup JIRA.
-      List<Pipeline> invalidPipelines = pipelinesInHouse
-          .stream()
-          .filter(p -> !pipelinesFromScm.contains(p))
-          .collect(Collectors.toList());
-      invalidPipelines.forEach(p -> {
-        PipelineID pipelineID = p.getId();
-        if (!p.getPipelineState().equals(CLOSED)) {
-          try {
-            getStateManager().updatePipelineState(
-                pipelineID.getProtobuf(),
-                HddsProtos.PipelineState.PIPELINE_CLOSED);
-          } catch (IOException e) {
-            LOG.warn("Pipeline {} not found while updating state. ",
-                p.getId(), e);
-          }
-        }
+    List<Pipeline> pipelinesInHouse = getPipelines();
+    // Removing pipelines in Recon that are no longer in SCM.
+    // TODO Recon may need to track inactive pipelines as well. So this can be
+    // removed in a followup JIRA.
+    List<Pipeline> invalidPipelines = pipelinesInHouse
+        .stream()
+        .filter(p -> !pipelinesFromScm.contains(p))
+        .collect(Collectors.toList());
+    invalidPipelines.forEach(p -> {
+      PipelineID pipelineID = p.getId();
+      if (!p.getPipelineState().equals(CLOSED)) {
         try {
-          LOG.info("Removing invalid pipeline {} from Recon.", pipelineID);
-          closePipeline(p.getId());
-          deletePipeline(p.getId());
+          getStateManager().updatePipelineState(
+              pipelineID.getProtobuf(),
+              HddsProtos.PipelineState.PIPELINE_CLOSED);
         } catch (IOException e) {
-          LOG.warn("Unable to remove pipeline {}", pipelineID, e);
+          LOG.warn("Pipeline {} not found while updating state. ",
+              p.getId(), e);
         }
-      });
-    } finally {
-      releaseWriteLock();
-    }
+      }
+      try {
+        LOG.info("Removing invalid pipeline {} from Recon.", pipelineID);
+        closePipeline(p.getId());
+        deletePipeline(p.getId());
+      } catch (IOException e) {
+        LOG.warn("Unable to remove pipeline {}", pipelineID, e);
+      }
+    });
   }
 
   /**
