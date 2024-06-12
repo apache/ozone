@@ -894,8 +894,7 @@ public class ContainerStateMachine extends BaseStateMachine {
             metrics.recordQueueingDelay(request.getCmdType(), queueingDelay);
             // TODO: add a counter to track number of executing applyTransaction
             // and queue size
-            ContainerCommandResponseProto proto =  dispatchCommand(request, context);
-            return proto;
+            return dispatchCommand(request, context);
           } catch (Exception e) {
             exceptionHandler.accept(e);
             throw e;
