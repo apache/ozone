@@ -46,6 +46,7 @@ import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
+import org.apache.hadoop.util.MetricUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -350,12 +351,14 @@ public class BlockOutputStreamEntryPool implements KeyMetadataAware {
         throw new IOException("Hsync is unsupported for multipart keys.");
       } else {
         if (keyArgs.getLocationInfoList().size() == 0) {
-          omClient.hsyncKey(keyArgs, openID);
+          MetricUtil.captureLatencyNs(clientMetrics::addOMHsyncLatency,
+              () -> omClient.hsyncKey(keyArgs, openID));
         } else {
           ContainerBlockID lastBLockId = keyArgs.getLocationInfoList().get(keyArgs.getLocationInfoList().size() - 1)
               .getBlockID().getContainerBlockID();
           if (!lastUpdatedBlockId.equals(lastBLockId)) {
-            omClient.hsyncKey(keyArgs, openID);
+            MetricUtil.captureLatencyNs(clientMetrics::addOMHsyncLatency,
+                () -> omClient.hsyncKey(keyArgs, openID));
             lastUpdatedBlockId = lastBLockId;
           }
         }

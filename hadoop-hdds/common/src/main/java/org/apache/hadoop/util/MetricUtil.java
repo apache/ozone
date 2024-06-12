@@ -70,6 +70,16 @@ public final class MetricUtil {
     }
   }
 
+  public static <E extends IOException> void captureLatencyNs(
+      Consumer<Long> latencySetter, CheckedRunnable<E> block) throws E {
+    long start = Time.monotonicNowNanos();
+    try {
+      block.run();
+    } finally {
+      latencySetter.accept(Time.monotonicNowNanos() - start);
+    }
+  }
+
   /**
    * Creates MutableQuantiles metrics with one or multiple intervals.
    *
