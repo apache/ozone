@@ -57,9 +57,9 @@ public final class ContainerClientMetrics {
   private MutableQuantiles[] getCommittedBlockLengthLatency;
   private MutableQuantiles[] readChunkLatency;
   private MutableQuantiles[] getSmallFileLatency;
-  private MutableQuantiles[] hsyncLatency;
-  private MutableQuantiles[] omHsyncLatency;
-  private MutableQuantiles[] datanodeHsyncLatency;
+  private MutableQuantiles[] hsyncLatencyNs;
+  private MutableQuantiles[] omHsyncLatencyNs;
+  private MutableQuantiles[] datanodeHsyncLatencyNs;
   private final Map<PipelineID, MutableCounterLong> writeChunkCallsByPipeline;
   private final Map<PipelineID, MutableCounterLong> writeChunkBytesByPipeline;
   private final Map<UUID, MutableCounterLong> writeChunksCallsByLeaders;
@@ -99,9 +99,9 @@ public final class ContainerClientMetrics {
     getCommittedBlockLengthLatency = new MutableQuantiles[3];
     readChunkLatency = new MutableQuantiles[3];
     getSmallFileLatency = new MutableQuantiles[3];
-    hsyncLatency = new MutableQuantiles[3];
-    omHsyncLatency = new MutableQuantiles[3];
-    datanodeHsyncLatency = new MutableQuantiles[3];
+    hsyncLatencyNs = new MutableQuantiles[3];
+    omHsyncLatencyNs = new MutableQuantiles[3];
+    datanodeHsyncLatencyNs = new MutableQuantiles[3];
     int[] intervals = {60, 300, 900};
     for (int i = 0; i < intervals.length; i++) {
       int interval = intervals[i];
@@ -125,17 +125,17 @@ public final class ContainerClientMetrics {
           .newQuantiles("getSmallFileLatency" + interval
                   + "s", "GetSmallFile latency in microseconds", "ops",
               "latency", interval);
-      hsyncLatency[i] = registry
+      hsyncLatencyNs[i] = registry
           .newQuantiles("hsyncLatency" + interval
-                  + "s", "client hsync latency in microseconds", "ops",
+                  + "s", "client hsync latency in nanoseconds", "ops",
               "latency", interval);
-      omHsyncLatency[i] = registry
+      omHsyncLatencyNs[i] = registry
           .newQuantiles("omHsyncLatency" + interval
-                  + "s", "client hsync latency to OM in microseconds", "ops",
+                  + "s", "client hsync latency to OM in nanoseconds", "ops",
               "latency", interval);
-      datanodeHsyncLatency[i] = registry
+      datanodeHsyncLatencyNs[i] = registry
           .newQuantiles("dnHsyncLatency" + interval
-                  + "s", "client hsync latency to DN in microseconds", "ops",
+                  + "s", "client hsync latency to DN in nanoseconds", "ops",
               "latency", interval);
     }
   }
@@ -174,7 +174,7 @@ public final class ContainerClientMetrics {
   }
 
   public void addHsyncLatency(long hsyncLatencyTime) {
-    for (MutableQuantiles q : hsyncLatency) {
+    for (MutableQuantiles q : hsyncLatencyNs) {
       if (q != null) {
         q.add(hsyncLatencyTime);
       }
@@ -190,7 +190,7 @@ public final class ContainerClientMetrics {
   }
 
   public void addOMHsyncLatency(long hsyncLatencyTime) {
-    for (MutableQuantiles q : omHsyncLatency) {
+    for (MutableQuantiles q : omHsyncLatencyNs) {
       if (q != null) {
         q.add(hsyncLatencyTime);
       }
@@ -222,7 +222,7 @@ public final class ContainerClientMetrics {
   }
 
   public void addDataNodeHsyncLatency(long hsyncLatencyTime) {
-    for (MutableQuantiles q : datanodeHsyncLatency) {
+    for (MutableQuantiles q : datanodeHsyncLatencyNs) {
       if (q != null) {
         q.add(hsyncLatencyTime);
       }
