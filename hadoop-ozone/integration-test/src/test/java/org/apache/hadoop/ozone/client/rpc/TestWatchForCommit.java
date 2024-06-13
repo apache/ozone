@@ -131,7 +131,7 @@ public class TestWatchForCommit {
     DatanodeRatisServerConfig ratisServerConfig =
         conf.getObject(DatanodeRatisServerConfig.class);
     ratisServerConfig.setRequestTimeOut(Duration.ofSeconds(3));
-    ratisServerConfig.setWatchTimeOut(Duration.ofSeconds(3));
+    ratisServerConfig.setWatchTimeOut(Duration.ofSeconds(2));
     conf.setFromObject(ratisServerConfig);
 
     RatisClientConfig.RaftConfig raftClientConfig =
