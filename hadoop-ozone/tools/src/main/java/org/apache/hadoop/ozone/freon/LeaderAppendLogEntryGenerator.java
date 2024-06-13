@@ -68,6 +68,8 @@ import org.slf4j.LoggerFactory;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
 
+import static org.apache.hadoop.hdds.scm.storage.ContainerProtocolCalls.getContainerCommandRequestProtoBuilder;
+
 /**
  * Test isolated LEADER datanodes.
  * <p>
@@ -204,7 +206,7 @@ public class LeaderAppendLogEntryGenerator extends BaseAppendLogGenerator
 
   private ContainerCommandRequestProto createContainerRequest(
       long containerId) {
-    return ContainerCommandRequestProto.newBuilder()
+    return getContainerCommandRequestProtoBuilder()
         .setContainerID(containerId)
         .setCmdType(Type.CreateContainer)
         .setDatanodeUuid(serverId)
@@ -219,7 +221,7 @@ public class LeaderAppendLogEntryGenerator extends BaseAppendLogGenerator
       long chunkId) {
 
     long blockId = getPrefix().hashCode() + chunkId / 1000;
-    return ContainerCommandRequestProto.newBuilder()
+    return getContainerCommandRequestProtoBuilder()
         .setContainerID(containerId)
         .setCmdType(Type.WriteChunk)
         .setDatanodeUuid(serverId)

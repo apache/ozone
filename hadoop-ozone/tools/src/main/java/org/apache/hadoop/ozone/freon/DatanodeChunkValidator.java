@@ -39,6 +39,8 @@ import org.slf4j.LoggerFactory;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
 
+import static org.apache.hadoop.hdds.scm.storage.ContainerProtocolCalls.getContainerCommandRequestProtoBuilder;
+
 /**
  * Data validator of chunks to use pure datanode XCeiver interface.
  */
@@ -179,12 +181,11 @@ public class DatanodeChunkValidator extends BaseFreonGenerator
     String id = xceiverClient.getPipeline().getFirstNode().getUuidString();
 
     ContainerCommandRequestProto.Builder builder =
-            ContainerCommandRequestProto
-                    .newBuilder()
-                    .setCmdType(ContainerProtos.Type.ReadChunk)
-                    .setContainerID(blockId.getContainerID())
-                    .setDatanodeUuid(id)
-                    .setReadChunk(readChunkRequest);
+        getContainerCommandRequestProtoBuilder()
+            .setCmdType(ContainerProtos.Type.ReadChunk)
+            .setContainerID(blockId.getContainerID())
+            .setDatanodeUuid(id)
+            .setReadChunk(readChunkRequest);
 
     return builder.build();
   }

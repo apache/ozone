@@ -28,7 +28,7 @@ import static java.util.stream.Collectors.toMap;
 /**
  * Versioning for protocol clients.
  */
-public enum ClientVersion implements ComponentVersion {
+public enum ClientVersion implements ComponentVersion, Comparable<ClientVersion> {
 
   DEFAULT_VERSION(0, "Initial version"),
 

@@ -79,6 +79,7 @@ import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+import static org.apache.hadoop.hdds.scm.storage.ContainerProtocolCalls.getContainerCommandRequestProtoBuilder;
 
 /**
  * Tests delete key operation with inadequate datanodes.
@@ -249,8 +250,7 @@ public class TestDeleteWithInAdequateDN {
     key.close();
 
     // now move the container to the closed on the datanode.
-    ContainerProtos.ContainerCommandRequestProto.Builder request =
-        ContainerProtos.ContainerCommandRequestProto.newBuilder();
+    ContainerProtos.ContainerCommandRequestProto.Builder request = getContainerCommandRequestProtoBuilder();
     request.setDatanodeUuid(pipeline.getFirstNode().getUuidString());
     request.setCmdType(ContainerProtos.Type.CloseContainer);
     request.setContainerID(containerID);

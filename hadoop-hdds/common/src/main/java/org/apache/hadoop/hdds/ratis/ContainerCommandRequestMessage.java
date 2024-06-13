@@ -32,6 +32,8 @@ import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 import org.apache.ratis.thirdparty.com.google.protobuf.InvalidProtocolBufferException;
 import org.apache.ratis.util.JavaUtils;
 
+import static org.apache.hadoop.hdds.scm.storage.ContainerProtocolCalls.getContainerCommandRequestProtoBuilder;
+
 /**
  * Implementing the {@link Message} interface
  * for {@link ContainerCommandRequestProto}.
@@ -39,8 +41,7 @@ import org.apache.ratis.util.JavaUtils;
 public final class ContainerCommandRequestMessage implements Message {
   public static ContainerCommandRequestMessage toMessage(
       ContainerCommandRequestProto request, String traceId) {
-    final ContainerCommandRequestProto.Builder b
-        = ContainerCommandRequestProto.newBuilder(request);
+    final ContainerCommandRequestProto.Builder b = getContainerCommandRequestProtoBuilder(request);
     if (traceId != null) {
       b.setTraceID(traceId);
     }

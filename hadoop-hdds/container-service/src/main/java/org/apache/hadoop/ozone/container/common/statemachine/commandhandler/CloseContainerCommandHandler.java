@@ -48,6 +48,8 @@ import org.slf4j.LoggerFactory;
 import java.io.IOException;
 import java.util.concurrent.atomic.AtomicLong;
 
+import static org.apache.hadoop.hdds.scm.storage.ContainerProtocolCalls.getContainerCommandRequestProtoBuilder;
+
 /**
  * Handler for close container command received from SCM.
  */
@@ -164,8 +166,7 @@ public class CloseContainerCommandHandler implements CommandHandler {
   private ContainerCommandRequestProto getContainerCommandRequestProto(
       final DatanodeDetails datanodeDetails, final long containerId,
       final String encodedToken) {
-    final ContainerCommandRequestProto.Builder command =
-        ContainerCommandRequestProto.newBuilder();
+    final ContainerCommandRequestProto.Builder command = getContainerCommandRequestProtoBuilder();
     command.setCmdType(ContainerProtos.Type.CloseContainer);
     command.setTraceID(TracingUtil.exportCurrentSpan());
     command.setContainerID(containerId);

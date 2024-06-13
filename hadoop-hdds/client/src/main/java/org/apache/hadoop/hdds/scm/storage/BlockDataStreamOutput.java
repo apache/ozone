@@ -62,6 +62,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 
+import static org.apache.hadoop.hdds.scm.storage.ContainerProtocolCalls.getContainerCommandRequestProtoBuilder;
 import static org.apache.hadoop.hdds.scm.storage.ContainerProtocolCalls.putBlockAsync;
 
 /**
@@ -204,7 +205,7 @@ public class BlockDataStreamOutput implements ByteBufferStreamOutput {
     //  it or remove it completely if possible
     String id = pipeline.getFirstNode().getUuidString();
     ContainerProtos.ContainerCommandRequestProto.Builder builder =
-        ContainerProtos.ContainerCommandRequestProto.newBuilder()
+        getContainerCommandRequestProtoBuilder()
             .setCmdType(ContainerProtos.Type.StreamInit)
             .setContainerID(blockID.get().getContainerID())
             .setDatanodeUuid(id).setWriteChunk(writeChunkRequest);

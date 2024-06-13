@@ -378,6 +378,16 @@ public class NodeStateMap {
     }
   }
 
+  public int getContainerCount(UUID uuid) throws NodeNotFoundException {
+    lock.readLock().lock();
+    try {
+      checkIfNodeExist(uuid);
+      return nodeToContainer.get(uuid).size();
+    } finally {
+      lock.readLock().unlock();
+    }
+  }
+
   public void removeContainer(UUID uuid, ContainerID containerID) throws
       NodeNotFoundException {
     lock.writeLock().lock();

@@ -30,27 +30,19 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolPro
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.common.helpers.MoveDataNodePair;
-import org.apache.hadoop.hdds.security.x509.certificate.CertInfo;
 import org.apache.hadoop.hdds.utils.HAUtils;
 import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
-import org.apache.hadoop.hdds.security.x509.certificate.authority.CertificateStore;
-import org.apache.hadoop.hdds.security.x509.crl.CRLInfo;
 import org.apache.hadoop.hdds.utils.db.BatchOperationHandler;
 import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.utils.db.DBStoreBuilder;
 import org.apache.hadoop.hdds.utils.db.Table;
-import org.apache.hadoop.hdds.utils.db.TableIterator;
 
 import static org.apache.hadoop.hdds.scm.metadata.SCMDBDefinition.CONTAINERS;
-import static org.apache.hadoop.hdds.scm.metadata.SCMDBDefinition.CRLS;
-import static org.apache.hadoop.hdds.scm.metadata.SCMDBDefinition.CRL_SEQUENCE_ID;
 import static org.apache.hadoop.hdds.scm.metadata.SCMDBDefinition.DELETED_BLOCKS;
 import static org.apache.hadoop.hdds.scm.metadata.SCMDBDefinition.MOVE;
 import static org.apache.hadoop.hdds.scm.metadata.SCMDBDefinition.PIPELINES;
-import static org.apache.hadoop.hdds.scm.metadata.SCMDBDefinition.REVOKED_CERTS;
-import static org.apache.hadoop.hdds.scm.metadata.SCMDBDefinition.REVOKED_CERTS_V2;
 import static org.apache.hadoop.hdds.scm.metadata.SCMDBDefinition.STATEFUL_SERVICE_CONFIG;
 import static org.apache.hadoop.hdds.scm.metadata.SCMDBDefinition.TRANSACTIONINFO;
 import static org.apache.hadoop.hdds.scm.metadata.SCMDBDefinition.VALID_CERTS;
@@ -75,19 +67,11 @@ public class SCMMetadataStoreImpl implements SCMMetadataStore {
 
   private Table<BigInteger, X509Certificate> validSCMCertsTable;
 
-  private Table<BigInteger, X509Certificate> revokedCertsTable;
-
-  private Table<BigInteger, CertInfo> revokedCertsV2Table;
-
   private Table<ContainerID, ContainerInfo> containerTable;
 
   private Table<PipelineID, Pipeline> pipelineTable;
 
   private Table<String, TransactionInfo> transactionInfoTable;
-
-  private Table<Long, CRLInfo> crlInfoTable;
-
-  private Table<String, Long> crlSequenceIdTable;
 
   private Table<String, Long> sequenceIdTable;
 
@@ -152,14 +136,6 @@ public class SCMMetadataStoreImpl implements SCMMetadataStore {
 
       checkAndPopulateTable(validSCMCertsTable, VALID_SCM_CERTS.getName());
 
-      revokedCertsTable = REVOKED_CERTS.getTable(store);
-
-      checkAndPopulateTable(revokedCertsTable, REVOKED_CERTS.getName());
-
-      revokedCertsV2Table = REVOKED_CERTS_V2.getTable(store);
-
-      checkAndPopulateTable(revokedCertsV2Table, REVOKED_CERTS_V2.getName());
-
       pipelineTable = PIPELINES.getTable(store);
 
       checkAndPopulateTable(pipelineTable, PIPELINES.getName());
@@ -171,14 +147,6 @@ public class SCMMetadataStoreImpl implements SCMMetadataStore {
       transactionInfoTable = TRANSACTIONINFO.getTable(store);
 
       checkAndPopulateTable(transactionInfoTable, TRANSACTIONINFO.getName());
-
-      crlInfoTable = CRLS.getTable(store);
-
-      checkAndPopulateTable(crlInfoTable, CRLS.getName());
-
-      crlSequenceIdTable = CRL_SEQUENCE_ID.getTable(store);
-
-      checkAndPopulateTable(crlInfoTable, CRL_SEQUENCE_ID.getName());
 
       sequenceIdTable = SEQUENCE_ID.getTable(store);
 
@@ -225,51 +193,6 @@ public class SCMMetadataStoreImpl implements SCMMetadataStore {
   @Override
   public Table<BigInteger, X509Certificate> getValidSCMCertsTable() {
     return validSCMCertsTable;
-  }
-
-  @Override
-  public Table<BigInteger, X509Certificate> getRevokedCertsTable() {
-    return revokedCertsTable;
-  }
-
-  @Override
-  public Table<BigInteger, CertInfo> getRevokedCertsV2Table() {
-    return revokedCertsV2Table;
-  }
-
-  /**
-   * A table that maintains X509 Certificate Revocation Lists and its metadata.
-   *
-   * @return Table.
-   */
-  @Override
-  public Table<Long, CRLInfo> getCRLInfoTable() {
-    return crlInfoTable;
-  }
-
-  /**
-   * A table that maintains the last CRL SequenceId. This helps to make sure
-   * that the CRL Sequence Ids are monotonically increasing.
-   *
-   * @return Table.
-   */
-  @Override
-  public Table<String, Long> getCRLSequenceIdTable() {
-    return crlSequenceIdTable;
-  }
-
-  @Override
-  public TableIterator getAllCerts(CertificateStore.CertType certType)
-      throws IOException {
-    if (certType == CertificateStore.CertType.VALID_CERTS) {
-      return validCertsTable.iterator();
-    }
-
-    if (certType == CertificateStore.CertType.REVOKED_CERTS) {
-      return revokedCertsTable.iterator();
-    }
-
-    return null;
   }
 
   @Override
