@@ -57,6 +57,7 @@ public class ContainerMetrics {
   @Metric private MutableCounterLong numReadStateMachine;
   @Metric private MutableCounterLong bytesReadStateMachine;
 
+
   private final EnumMap<ContainerProtos.Type, MutableCounterLong> numOpsArray;
   private final EnumMap<ContainerProtos.Type, MutableCounterLong> opsBytesArray;
   private final EnumMap<ContainerProtos.Type, MutableRate> opsLatency;
