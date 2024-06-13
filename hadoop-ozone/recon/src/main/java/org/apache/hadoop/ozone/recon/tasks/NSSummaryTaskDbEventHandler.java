@@ -155,8 +155,7 @@ public class NSSummaryTaskDbEventHandler {
   protected void handleDeleteKeyEvent(OmKeyInfo keyInfo,
                                       Map<Long, NSSummary> nsSummaryMap)
       throws IOException {
-    NSSummary currentNSSummary = nsSummaryMap.get(keyInfo.getObjectID());
-    long parentObjectId = currentNSSummary.getParentId();
+    long parentObjectId = keyInfo.getParentObjectID();
     // Try to get the NSSummary from our local map that maps NSSummaries to IDs
     NSSummary nsSummary = nsSummaryMap.get(parentObjectId);
     if (nsSummary == null) {
