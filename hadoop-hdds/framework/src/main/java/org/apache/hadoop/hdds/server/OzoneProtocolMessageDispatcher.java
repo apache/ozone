@@ -17,6 +17,8 @@
  */
 package org.apache.hadoop.hdds.server;
 
+import io.opentracing.Scope;
+import io.opentracing.util.GlobalTracer;
 import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.hdds.utils.ProtocolMessageMetrics;
 
@@ -71,7 +73,7 @@ public class OzoneProtocolMessageDispatcher<REQUEST, RESPONSE, TYPE> {
       TYPE type,
       String traceId) throws ServiceException {
     Span span = TracingUtil.importAndCreateSpan(type.toString(), traceId);
-    try {
+    try (Scope scope = GlobalTracer.get().activateSpan(span)) {
       if (logger.isTraceEnabled()) {
         logger.trace(
             "[service={}] [type={}] request is received: <json>{}</json>",

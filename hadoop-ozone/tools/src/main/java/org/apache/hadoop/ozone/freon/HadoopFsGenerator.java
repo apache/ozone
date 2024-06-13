@@ -22,6 +22,7 @@ import java.net.URI;
 import java.util.Optional;
 import java.util.concurrent.Callable;
 
+import io.opentracing.util.GlobalTracer;
 import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
@@ -30,6 +31,7 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 
 import com.codahale.metrics.Timer;
 import org.apache.hadoop.hdds.conf.StorageSize;
+import org.apache.hadoop.hdds.tracing.TracingUtil;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
 
@@ -98,7 +100,10 @@ public class HadoopFsGenerator extends BaseFreonGenerator
 
     Path file = new Path(rootPath + "/" + generateObjectName(0));
     try (FileSystem fileSystem = threadLocalFileSystem.get()) {
-      fileSystem.mkdirs(file.getParent());
+      TracingUtil.executeInNewSpan("init", () -> {
+        GlobalTracer.get().activeSpan().setTag("file", file.toString());
+        fileSystem.mkdirs(file.getParent());
+      });
     }
 
     contentGenerator =
@@ -117,9 +122,12 @@ public class HadoopFsGenerator extends BaseFreonGenerator
     FileSystem fileSystem = threadLocalFileSystem.get();
 
     timer.time(() -> {
-      try (FSDataOutputStream output = fileSystem.create(file)) {
-        contentGenerator.write(output);
-      }
+      TracingUtil.executeInNewSpan("createFile", () -> {
+        GlobalTracer.get().activeSpan().setTag("file", file.toString());
+        try (FSDataOutputStream output = fileSystem.create(file)) {
+          contentGenerator.write(output);
+        }
+      });
       return null;
     });
   }

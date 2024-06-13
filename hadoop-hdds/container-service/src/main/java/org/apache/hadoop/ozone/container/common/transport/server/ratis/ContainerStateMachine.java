@@ -43,6 +43,8 @@ import java.util.function.Consumer;
 import java.util.stream.Collectors;
 
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
+import io.opentracing.Scope;
+import io.opentracing.util.GlobalTracer;
 import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.StorageUnit;
@@ -58,6 +60,7 @@ import org.apache.hadoop.hdds.ratis.ContainerCommandRequestMessage;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerNotOpenException;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
+import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.hdds.utils.Cache;
 import org.apache.hadoop.hdds.utils.ResourceCache;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
@@ -97,6 +100,8 @@ import org.apache.ratis.thirdparty.com.google.protobuf.TextFormat;
 import org.apache.ratis.util.TaskQueue;
 import org.apache.ratis.util.function.CheckedSupplier;
 import org.apache.ratis.util.JavaUtils;
+
+import io.opentracing.Span;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -404,6 +409,17 @@ public class ContainerStateMachine extends BaseStateMachine {
       throws IOException {
     final ContainerCommandRequestProto proto =
         message2ContainerCommandRequestProto(request.getMessage());
+    Span span = TracingUtil.importAndCreateSpan("startTransaction", proto.getTraceID());
+    try (Scope ignored = GlobalTracer.get().activateSpan(span)) {
+      return startTransactionTraced(request, proto);
+    } finally {
+      span.finish();
+    }
+  }
+
+  private TransactionContext startTransactionTraced(RaftClientRequest request,
+      ContainerCommandRequestProto proto)
+      throws IOException {
     Preconditions.checkArgument(request.getRaftGroupId().equals(gid));
 
     final TransactionContext.Builder builder = TransactionContext.newBuilder()
@@ -520,7 +536,8 @@ public class ContainerStateMachine extends BaseStateMachine {
     // thread.
     CompletableFuture<ContainerCommandResponseProto> writeChunkFuture =
         CompletableFuture.supplyAsync(() -> {
-          try {
+          Span span = TracingUtil.importAndCreateSpan("writeStateMachineData", requestProto.getTraceID());
+          try (Scope ignored = GlobalTracer.get().activateSpan(span)) {
             return dispatchCommand(requestProto, context);
           } catch (Exception e) {
             LOG.error("{}: writeChunk writeStateMachineData failed: blockId" +
@@ -532,6 +549,8 @@ public class ContainerStateMachine extends BaseStateMachine {
             stateMachineHealthy.set(false);
             raftFuture.completeExceptionally(e);
             throw e;
+          } finally {
+            span.finish();
           }
         }, getChunkExecutor(requestProto.getWriteChunk()));
 
@@ -735,8 +754,13 @@ public class ContainerStateMachine extends BaseStateMachine {
         .setLogIndex(index)
         .build();
     // read the chunk
-    ContainerCommandResponseProto response =
-        dispatchCommand(dataContainerCommandProto, context);
+    Span span = TracingUtil.importAndCreateSpan("readStateMachineData", requestProto.getTraceID());
+    ContainerCommandResponseProto response;
+    try (Scope ignored = GlobalTracer.get().activateSpan(span)) {
+      response = dispatchCommand(dataContainerCommandProto, context);
+    } finally {
+      span.finish();
+    }
     if (response.getResult() != ContainerProtos.Result.SUCCESS) {
       StorageContainerException sce =
           new StorageContainerException(response.getMessage(),
@@ -883,11 +907,14 @@ public class ContainerStateMachine extends BaseStateMachine {
     final long containerId = request.getContainerID();
     final CheckedSupplier<ContainerCommandResponseProto, Exception> task
         = () -> {
-          try {
+          Span span = TracingUtil.importAndCreateSpan("applyTransaction", request.getTraceID());
+          try (Scope ignored = GlobalTracer.get().activateSpan(span)) {
             return dispatchCommand(request, context);
           } catch (Exception e) {
             exceptionHandler.accept(e);
             throw e;
+          } finally {
+            span.finish();
           }
         };
     return containerTaskQueues.submit(containerId, task, executor);

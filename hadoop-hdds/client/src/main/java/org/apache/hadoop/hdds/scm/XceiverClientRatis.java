@@ -62,6 +62,9 @@ import org.apache.ratis.retry.RetryPolicy;
 import org.apache.ratis.rpc.RpcType;
 import org.apache.ratis.rpc.SupportedRpcType;
 import org.apache.ratis.thirdparty.com.google.protobuf.InvalidProtocolBufferException;
+
+import io.opentracing.Span;
+import io.opentracing.util.GlobalTracer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -220,12 +223,13 @@ public final class XceiverClientRatis extends XceiverClientSpi {
 
   private CompletableFuture<RaftClientReply> sendRequestAsync(
       ContainerCommandRequestProto request) {
+    String fullSpanID = TracingUtil.exportCurrentSpan();
     return TracingUtil.executeInNewSpan(
-        "XceiverClientRatis." + request.getCmdType().name(),
+        "XceiverClientRatis." + request.getCmdType().name() + "-async",
         () -> {
           final ContainerCommandRequestMessage message
               = ContainerCommandRequestMessage.toMessage(
-              request, TracingUtil.exportCurrentSpan());
+              request, fullSpanID);
           if (HddsUtils.isReadOnly(request)) {
             if (LOG.isDebugEnabled()) {
               LOG.debug("sendCommandAsync ReadOnly {}", message);
@@ -322,11 +326,18 @@ public final class XceiverClientRatis extends XceiverClientSpi {
       ContainerCommandRequestProto request) {
     XceiverClientReply asyncReply = new XceiverClientReply(null);
     long requestTime = System.currentTimeMillis();
+
+    Span span = GlobalTracer.get()
+        .buildSpan("XceiverClientReply." + request.getCmdType()).start();
+
     CompletableFuture<RaftClientReply> raftClientReply =
         sendRequestAsync(request);
     metrics.incrPendingContainerOpsMetrics(request.getCmdType());
     CompletableFuture<ContainerCommandResponseProto> containerCommandResponse =
         raftClientReply.whenComplete((reply, e) -> {
+
+          span.finish();
+
           if (LOG.isDebugEnabled()) {
             LOG.debug("received reply {} for request: cmdType={} containerID={}"
                     + " pipelineID={} traceID={} exception: {}", reply,
