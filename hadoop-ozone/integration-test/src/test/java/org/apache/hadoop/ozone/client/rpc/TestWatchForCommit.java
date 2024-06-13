@@ -346,7 +346,7 @@ public class TestWatchForCommit {
       }
       String output = logCapturer.getOutput();
       assertThat(output).contains("3 way commit failed");
-      assertThat(output).contains("TimeoutException");
+      assertThat(output).contains("NotReplicatedException");
       assertThat(output).contains("Committed by majority");
     }
     logCapturer.stopCapturing();
