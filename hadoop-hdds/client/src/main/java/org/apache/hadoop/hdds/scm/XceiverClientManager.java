@@ -27,6 +27,7 @@ import org.apache.hadoop.hdds.conf.ConfigGroup;
 import org.apache.hadoop.hdds.conf.ConfigType;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.client.ClientTrustManager;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
@@ -327,12 +328,16 @@ public class XceiverClientManager implements XceiverClientFactory {
   /**
    * Get xceiver client metric.
    */
-  public static synchronized XceiverClientMetrics getXceiverClientMetrics() {
+  public static synchronized XceiverClientMetrics getXceiverClientMetrics(ConfigurationSource configuration) {
     if (metrics == null) {
-      metrics = XceiverClientMetrics.create();
+      metrics = XceiverClientMetrics.create(configuration);
     }
 
     return metrics;
+  }
+
+  public static synchronized XceiverClientMetrics getXceiverClientMetrics() {
+    return getXceiverClientMetrics(new OzoneConfiguration());
   }
 
   /**

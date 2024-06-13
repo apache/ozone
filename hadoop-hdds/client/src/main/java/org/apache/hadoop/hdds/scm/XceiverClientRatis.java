@@ -103,8 +103,7 @@ public final class XceiverClientRatis extends XceiverClientSpi {
   // Map to track commit index at every server
   private final ConcurrentHashMap<UUID, Long> commitInfoMap;
 
-  private final XceiverClientMetrics metrics
-      = XceiverClientManager.getXceiverClientMetrics();
+  private final XceiverClientMetrics metrics;
 
   /**
    * Constructs a client.
@@ -118,6 +117,7 @@ public final class XceiverClientRatis extends XceiverClientSpi {
     this.retryPolicy = retryPolicy;
     commitInfoMap = new ConcurrentHashMap<>();
     this.tlsConfig = tlsConfig;
+    metrics = XceiverClientManager.getXceiverClientMetrics(configuration);
     this.ozoneConfiguration = configuration;
 
     if (LOG.isTraceEnabled()) {
@@ -335,7 +335,7 @@ public final class XceiverClientRatis extends XceiverClientSpi {
           }
           metrics.decrPendingContainerOpsMetrics(request.getCmdType());
           metrics.addContainerOpsLatency(request.getCmdType(),
-              System.currentTimeMillis() - requestTime);
+              System.currentTimeMillis() - requestTime, request.getDatanodeUuid());
         }).thenApply(reply -> {
           try {
             if (!reply.isSuccess()) {

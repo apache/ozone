@@ -19,7 +19,7 @@ package org.apache.hadoop.hdds.scm;
 
 import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
-import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.metrics2.MetricsCollector;
 import org.apache.hadoop.metrics2.MetricsRecordBuilder;
@@ -32,6 +32,13 @@ import org.apache.hadoop.metrics2.lib.MetricsRegistry;
 import org.apache.hadoop.metrics2.lib.MutableCounterLong;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.util.PerformanceMetrics;
+import org.apache.hadoop.util.TopNMetrics;
+
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Map;
+import java.util.Set;
 
 import java.util.EnumMap;
 
@@ -44,7 +51,6 @@ import java.util.EnumMap;
 public class XceiverClientMetrics implements MetricsSource {
   public static final String SOURCE_NAME = XceiverClientMetrics.class
       .getSimpleName();
-
   private @Metric MutableCounterLong pendingOps;
   private @Metric MutableCounterLong totalOps;
   private @Metric MutableCounterLong ecReconstructionTotal;
@@ -53,17 +59,31 @@ public class XceiverClientMetrics implements MetricsSource {
   private EnumMap<ContainerProtos.Type, MutableCounterLong> opsArray;
   private EnumMap<ContainerProtos.Type, PerformanceMetrics> containerOpsLatency;
   private MetricsRegistry registry;
-  private OzoneConfiguration conf = new OzoneConfiguration();
-  private int[] intervals = conf.getInts(OzoneConfigKeys
-      .OZONE_XCEIVER_CLIENT_METRICS_PERCENTILES_INTERVALS_SECONDS_KEY);
+  private ConfigurationSource conf;
+  private int[] intervals;
+  private int[] latencyMsThresholdsOrder;
+  private final Map<Integer, Map<ContainerProtos.Type, TopNMetrics>> latencyMsThresholdsMap = new HashMap<>();
+  private final Set<ContainerProtos.Type> topLatencyMetricsSet = new HashSet<>(Arrays.asList(
+      ContainerProtos.Type.GetBlock,
+      ContainerProtos.Type.PutBlock,
+      ContainerProtos.Type.WriteChunk,
+      ContainerProtos.Type.ReadChunk
+  ));
 
-  public XceiverClientMetrics() {
-    init();
+  public XceiverClientMetrics(ConfigurationSource conf) {
+    init(conf);
   }
 
-  public void init() {
+  public void init(ConfigurationSource configuration) {
+    this.conf = configuration;
+    intervals = conf.getInts(OzoneConfigKeys
+        .OZONE_XCEIVER_CLIENT_METRICS_PERCENTILES_INTERVALS_SECONDS_KEY);
+    latencyMsThresholdsOrder = conf.getInts(OzoneConfigKeys
+        .OZONE_XCEIVER_CLIENT_TOP_METRICS_LATENCY_RECORD_THRESHOLD_MS_KEY);
+    int latencyMsRecordCount = conf.getInt(OzoneConfigKeys
+        .OZONE_XCEIVER_CLIENT_TOP_METRICS_LATENCY_RECORD_COUNT_KEY, 0);
     this.registry = new MetricsRegistry(SOURCE_NAME);
-
+    Arrays.sort(latencyMsThresholdsOrder);
     this.pendingOpsArray = new EnumMap<>(ContainerProtos.Type.class);
     this.opsArray = new EnumMap<>(ContainerProtos.Type.class);
     this.containerOpsLatency = new EnumMap<>(ContainerProtos.Type.class);
@@ -75,13 +95,26 @@ public class XceiverClientMetrics implements MetricsSource {
       containerOpsLatency.put(type, new PerformanceMetrics(registry,
           type + "Latency", "latency of " + type, "Ops", "Time", intervals));
     }
+
+    for (int thresholds : latencyMsThresholdsOrder) {
+      Map<ContainerProtos.Type, TopNMetrics> metrics = new HashMap<>();
+      for (ContainerProtos.Type type : topLatencyMetricsSet) {
+        String metricName = type.name() + "Exceed" + thresholds + "MsCount";
+        String metricDescription = "Top count of " + type.name() +
+            " operations exceeding the threshold of " + thresholds + " milliseconds";
+        metrics.put(type, TopNMetrics.create(registry, metricName, metricDescription,
+            latencyMsRecordCount));
+      }
+      latencyMsThresholdsMap.put(thresholds, metrics);
+    }
+
   }
 
-  public static XceiverClientMetrics create() {
+  public static XceiverClientMetrics create(ConfigurationSource configuration) {
     DefaultMetricsSystem.initialize(SOURCE_NAME);
     MetricsSystem ms = DefaultMetricsSystem.instance();
     return ms.register(SOURCE_NAME, "Storage Container Client Metrics",
-        new XceiverClientMetrics());
+        new XceiverClientMetrics(configuration));
   }
 
   public void incrPendingContainerOpsMetrics(ContainerProtos.Type type) {
@@ -97,8 +130,24 @@ public class XceiverClientMetrics implements MetricsSource {
   }
 
   public void addContainerOpsLatency(ContainerProtos.Type type,
-      long latencyMillis) {
+      long latencyMillis, String datanode) {
+    recordLatencyMetricsIfNeeded(type, latencyMillis, datanode);
     containerOpsLatency.get(type).add(latencyMillis);
+  }
+
+  private void recordLatencyMetricsIfNeeded(ContainerProtos.Type type, long latencyMillis,
+      String datanode) {
+    if (latencyMsThresholdsOrder.length > 0 && topLatencyMetricsSet.contains(type)) {
+      for (int thresholdMs : latencyMsThresholdsOrder) {
+        if (latencyMillis > thresholdMs) {
+          latencyMsThresholdsMap.get(thresholdMs).get(type).add(datanode, 1L);
+        } else {
+          // Break the loop if latencyMillis is not greater than the current thresholdMs,
+          // because subsequent thresholds are larger due to the array's monotonically increasing.
+          break;
+        }
+      }
+    }
   }
 
   public long getPendingContainerOpCountMetrics(ContainerProtos.Type type) {
@@ -125,7 +174,7 @@ public class XceiverClientMetrics implements MetricsSource {
 
   @VisibleForTesting
   public void reset() {
-    init();
+    init(conf);
   }
 
   public void unRegister() {
@@ -137,15 +186,20 @@ public class XceiverClientMetrics implements MetricsSource {
   public void getMetrics(MetricsCollector collector, boolean b) {
     MetricsRecordBuilder recordBuilder = collector.addRecord(SOURCE_NAME);
 
-    pendingOps.snapshot(recordBuilder, true);
-    totalOps.snapshot(recordBuilder, true);
-    ecReconstructionTotal.snapshot(recordBuilder, true);
-    ecReconstructionFailsTotal.snapshot(recordBuilder, true);
+    pendingOps.snapshot(recordBuilder, b);
+    totalOps.snapshot(recordBuilder, b);
+    ecReconstructionTotal.snapshot(recordBuilder, b);
+    ecReconstructionFailsTotal.snapshot(recordBuilder, b);
 
     for (ContainerProtos.Type type : ContainerProtos.Type.values()) {
       pendingOpsArray.get(type).snapshot(recordBuilder, b);
       opsArray.get(type).snapshot(recordBuilder, b);
       containerOpsLatency.get(type).snapshot(recordBuilder, b);
+    }
+
+    for (Map.Entry<Integer, Map<ContainerProtos.Type, TopNMetrics>> entry :
+        latencyMsThresholdsMap.entrySet()) {
+      entry.getValue().values().forEach(value -> value.snapshot(recordBuilder, b));
     }
   }
 }
