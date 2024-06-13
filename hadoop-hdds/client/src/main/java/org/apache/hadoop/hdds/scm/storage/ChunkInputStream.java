@@ -298,7 +298,7 @@ public class ChunkInputStream extends InputStream
    */
   private void updateDatanodeBlockId(Pipeline pipeline) throws IOException {
     DatanodeDetails closestNode = pipeline.getClosestNode();
-    int replicaIdx = pipelineSupplier.get().getReplicaIndex(closestNode);
+    int replicaIdx = pipeline.getReplicaIndex(closestNode);
     ContainerProtos.DatanodeBlockID.Builder builder = blockID.getDatanodeBlockIDProtobufBuilder();
     if (replicaIdx > 0) {
       builder.setReplicaIndex(replicaIdx);
