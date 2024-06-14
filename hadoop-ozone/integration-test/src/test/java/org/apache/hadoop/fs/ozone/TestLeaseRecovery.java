@@ -558,6 +558,44 @@ public class TestLeaseRecovery {
     verifyData(data, (blockSize - 1) * 2, file, fs);
   }
 
+  @Test
+  public void testRecoveryWithSameBlockCountInOpenFileAndFileTable() throws Exception {
+    RootedOzoneFileSystem fs = (RootedOzoneFileSystem)FileSystem.get(conf);
+    int blockSize = (int) cluster.getOzoneManager().getConfiguration().getStorageSize(
+        OZONE_SCM_BLOCK_SIZE, OZONE_SCM_BLOCK_SIZE_DEFAULT, StorageUnit.BYTES);
+    final byte[] data = getData(blockSize / 2 - 1);
+
+    final FSDataOutputStream stream = fs.create(file, true);
+    try {
+      stream.write(data);
+      // block 1 exist in fileTable after hsync with length (blockSize / 2 - 1)
+      stream.hsync();
+      assertFalse(fs.isFileClosed(file));
+
+      // Write more data without hsync on same block
+      // File table block length will be still (blockSize / 2 - 1)
+      stream.write(data);
+      stream.flush();
+
+      int count = 0;
+      // fileTable and openFileTable will have same block count.
+      // Both table contains block1
+      while (count++ < 15 && !fs.recoverLease(file)) {
+        Thread.sleep(1000);
+      }
+      // The lease should have been recovered.
+      assertTrue(fs.isFileClosed(file), "File should be closed");
+
+      // A second call to recoverLease should succeed too.
+      assertTrue(fs.recoverLease(file));
+    } finally {
+      closeIgnoringKeyNotFound(stream);
+    }
+
+    // open it again, make sure the data is correct
+    verifyData(data, (blockSize / 2 - 1) * 2, file, fs);
+  }
+
   private void verifyData(byte[] data, int dataSize, Path filePath, RootedOzoneFileSystem fs) throws IOException {
     try (FSDataInputStream fdis = fs.open(filePath)) {
       int bufferSize = dataSize > data.length ? dataSize / 2 : dataSize;
