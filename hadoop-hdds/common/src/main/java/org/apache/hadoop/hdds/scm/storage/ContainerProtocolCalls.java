@@ -106,7 +106,7 @@ public final class ContainerProtocolCalls  {
   }
 
   public static ContainerCommandRequestProto.Builder getContainerCommandRequestProtoBuilder() {
-    return getContainerCommandRequestProtoBuilder(ClientVersion.CURRENT.toProtoValue());
+    return getContainerCommandRequestProtoBuilder(null, ClientVersion.CURRENT.toProtoValue());
   }
 
   public static ContainerCommandRequestProto.Builder getContainerCommandRequestProtoBuilder(
