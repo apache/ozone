@@ -326,8 +326,7 @@ public class NSSummaryTaskWithLegacy extends NSSummaryTaskDbEventHandler {
       if (parentKeyInfo != null) {
         keyInfo.setParentObjectID(parentKeyInfo.getObjectID());
       } else {
-        LOG.error(
-            "ParentKeyInfo is null for key: {} in volume: {}, bucket: {}. Full Parent Key: {}",
+        LOG.warn("ParentKeyInfo is null for key: {} in volume: {}, bucket: {}. Full Parent Key: {}",
             keyInfo.getKeyName(), keyInfo.getVolumeName(), keyInfo.getBucketName(), fullParentKeyName);
         throw new IOException("ParentKeyInfo for NSSummaryTaskWithLegacy is null for key: " +
                 keyInfo.getKeyName());
@@ -352,8 +351,7 @@ public class NSSummaryTaskWithLegacy extends NSSummaryTaskDbEventHandler {
     if (parentBucketInfo != null) {
       keyInfo.setParentObjectID(parentBucketInfo.getObjectID());
     } else {
-      LOG.error(
-          "ParentBucketInfo is null for key: {} in volume: {}, bucket: {}",
+      LOG.warn("ParentBucketInfo is null for key: {} in volume: {}, bucket: {}",
           keyInfo.getKeyName(), keyInfo.getVolumeName(), keyInfo.getBucketName());
       throw new IOException("ParentBucketInfo for NSSummaryTaskWithLegacy is null for key: " +
               keyInfo.getKeyName());
