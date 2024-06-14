@@ -52,6 +52,7 @@ import org.apache.hadoop.hdds.security.SecurityConfig;
 import org.apache.hadoop.hdds.security.exception.SCMSecurityException;
 import org.apache.hadoop.hdds.tracing.GrpcClientInterceptor;
 import org.apache.hadoop.hdds.tracing.TracingUtil;
+import org.apache.hadoop.ozone.ClientVersion;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.OzoneConsts;
 import java.util.concurrent.TimeoutException;
@@ -490,11 +491,13 @@ public class XceiverClientGrpc extends XceiverClientSpi {
 
     try (Scope ignored = GlobalTracer.get().activateSpan(span)) {
 
-      ContainerCommandRequestProto finalPayload = getContainerCommandRequestProtoBuilder(request)
-              .setTraceID(TracingUtil.exportCurrentSpan())
-              .build();
+      ContainerCommandRequestProto.Builder finalPayload = getContainerCommandRequestProtoBuilder(request)
+              .setTraceID(TracingUtil.exportCurrentSpan());
+      if (!request.hasVersion()) {
+        finalPayload.setVersion(ClientVersion.CURRENT.toProtoValue());
+      }
       XceiverClientReply asyncReply =
-          sendCommandAsync(finalPayload, pipeline.getFirstNode());
+          sendCommandAsync(finalPayload.build(), pipeline.getFirstNode());
       if (shouldBlockAndWaitAsyncReply(request)) {
         asyncReply.getResponse().get();
       }

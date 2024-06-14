@@ -47,6 +47,7 @@ import org.apache.hadoop.hdds.scm.XceiverClientSpi;
 import org.apache.hadoop.hdds.scm.pipeline.MockPipeline;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
+import org.apache.hadoop.ozone.ClientVersion;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.helpers.ChunkInfo;
@@ -231,6 +232,11 @@ class TestBlockOutputStreamCorrectness {
     public XceiverClientReply sendCommandAsync(
         ContainerCommandRequestProto request
     ) {
+      final ContainerCommandRequestProto.Builder finalRequest = ContainerCommandRequestProto.newBuilder(request);
+      if (!request.hasVersion()) {
+        finalRequest.setVersion(ClientVersion.CURRENT.toProtoValue());
+      }
+      request = finalRequest.build();
       final ContainerCommandResponseProto.Builder builder =
           ContainerCommandResponseProto.newBuilder()
               .setResult(Result.SUCCESS)
