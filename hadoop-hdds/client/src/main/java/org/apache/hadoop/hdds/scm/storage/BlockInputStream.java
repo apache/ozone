@@ -260,7 +260,7 @@ public class BlockInputStream extends BlockExtendedInputStream {
     if (pipeline == null) {
       return;
     }
-    long replicaIndexes = pipeline.getNodes().stream().map(pipeline::getReplicaIndex).distinct().count();
+    long replicaIndexes = pipeline.getNodes().stream().mapToInt(pipeline::getReplicaIndex).distinct().count();
 
     if (replicaIndexes > 1) {
       throw new IOException(String.format("Pipeline: %s has nodes containing different replica indexes.",
