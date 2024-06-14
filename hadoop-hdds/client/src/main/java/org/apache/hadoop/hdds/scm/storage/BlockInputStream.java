@@ -24,11 +24,9 @@ import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
-import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Function;
-import java.util.stream.Collectors;
 
 import com.google.common.base.Preconditions;
 import org.apache.hadoop.hdds.client.BlockID;
@@ -262,9 +260,9 @@ public class BlockInputStream extends BlockExtendedInputStream {
     if (pipeline == null) {
       return;
     }
-    Set<Integer> replicaIndexes =
-        pipeline.getNodes().stream().map(pipeline::getReplicaIndex).collect(Collectors.toSet());
-    if (replicaIndexes.size() > 1) {
+    long replicaIndexes = pipeline.getNodes().stream().map(pipeline::getReplicaIndex).distinct().count();
+
+    if (replicaIndexes > 1) {
       throw new IOException(String.format("Pipeline: %s has nodes containing different replica indexes.",
           pipeline));
     }

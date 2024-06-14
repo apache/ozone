@@ -21,6 +21,7 @@ package org.apache.hadoop.ozone.container;
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static java.util.Arrays.asList;
 import static java.util.Collections.emptyMap;
+import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerType.KeyValueContainer;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.THREE;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CONTAINER_PLACEMENT_EC_IMPL_KEY;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CONTAINER_PLACEMENT_IMPL_KEY;
@@ -48,7 +49,6 @@ import java.util.Random;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Collectors;
 import java.util.function.Supplier;
 
@@ -56,21 +56,16 @@ import com.google.common.base.Functions;
 import com.google.common.collect.ImmutableMap;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
-import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.scm.PlacementPolicy;
-import org.apache.hadoop.hdds.scm.container.ContainerReplica;
-import org.apache.hadoop.hdds.scm.container.placement.algorithms.ContainerPlacementPolicyFactory;
 import org.apache.hadoop.hdds.scm.container.placement.algorithms.SCMContainerPlacementMetrics;
 import org.apache.hadoop.hdds.scm.container.placement.algorithms.SCMContainerPlacementRackScatter;
 import org.apache.hadoop.hdds.scm.container.replication.ReplicationManager.ReplicationManagerConfiguration;
 import org.apache.hadoop.hdds.scm.container.placement.algorithms.SCMContainerPlacementCapacity;
 import org.apache.hadoop.hdds.scm.container.placement.algorithms.SCMContainerPlacementRackAware;
 import org.apache.hadoop.hdds.scm.container.placement.algorithms.SCMContainerPlacementRandom;
-import org.apache.hadoop.hdds.scm.net.NetworkTopology;
-import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.storage.ContainerProtocolCalls;
 import org.apache.hadoop.ozone.HddsDatanodeService;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
@@ -80,6 +75,8 @@ import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientFactory;
 import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.client.io.OzoneInputStream;
+import org.apache.hadoop.ozone.container.common.interfaces.Container;
+import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
@@ -263,22 +260,6 @@ class TestContainerReplication {
     return bucket.readKey(KEY);
   }
 
-  private void mockContainerPlacementPolicy(final MockedStatic<ContainerPlacementPolicyFactory> mockedPlacementFactory,
-                                            final AtomicReference<DatanodeDetails> mockedDatanodeToRemove) {
-    mockedPlacementFactory.when(() -> ContainerPlacementPolicyFactory.getECPolicy(any(ConfigurationSource.class),
-        any(NodeManager.class), any(NetworkTopology.class), Mockito.anyBoolean(),
-        any(SCMContainerPlacementMetrics.class))).thenAnswer(i -> {
-          PlacementPolicy placementPolicy = (PlacementPolicy) Mockito.spy(i.callRealMethod());
-          Mockito.doAnswer(args -> {
-            Set<ContainerReplica> containerReplica = ((Set<ContainerReplica>) args.getArgument(0)).stream()
-                .filter(r -> r.getDatanodeDetails().equals(mockedDatanodeToRemove.get()))
-                .collect(Collectors.toSet());
-            return containerReplica;
-          }).when(placementPolicy).replicasToRemoveToFixOverreplication(Mockito.anySet(), Mockito.anyInt());
-          return placementPolicy;
-        });
-  }
-
   private void mockContainerProtocolCalls(final MockedStatic<ContainerProtocolCalls> mockedContainerProtocolCalls,
                                           final Map<Integer, Integer> failedReadChunkCountMap) {
     mockedContainerProtocolCalls.when(() -> ContainerProtocolCalls.readChunk(any(), any(), any(), anyList(), any()))
@@ -295,36 +276,41 @@ class TestContainerReplication {
   }
 
 
+  private static void deleteContainer(MiniOzoneCluster cluster, DatanodeDetails dn, long containerId)
+      throws IOException {
+    OzoneContainer container = cluster.getHddsDatanode(dn).getDatanodeStateMachine().getContainer();
+    Container<?> containerData = container.getContainerSet().getContainer(containerId);
+    if (containerData != null) {
+      container.getDispatcher().getHandler(KeyValueContainer).deleteContainer(containerData, true);
+    }
+    cluster.getHddsDatanode(dn).getDatanodeStateMachine().triggerHeartbeat();
+  }
+
+
   @Test
   public void testECContainerReplication() throws Exception {
     OzoneConfiguration conf = createConfiguration(false);
-    final AtomicReference<DatanodeDetails> mockedDatanodeToRemove = new AtomicReference<>();
     final Map<Integer, Integer> failedReadChunkCountMap = new ConcurrentHashMap<>();
     // Overiding Config to support 1k Chunk size
     conf.set("ozone.replication.allowed-configs", "(^((STANDALONE|RATIS)/(ONE|THREE))|(EC/(3-2|6-3|10-4)-" +
         "(512|1024|2048|4096|1)k)$)");
     conf.set(OZONE_SCM_CONTAINER_PLACEMENT_EC_IMPL_KEY, SCMContainerPlacementRackScatter.class.getCanonicalName());
-    try (MockedStatic<ContainerPlacementPolicyFactory> mockedPlacementFactory =
-             Mockito.mockStatic(ContainerPlacementPolicyFactory.class, Mockito.CALLS_REAL_METHODS);
-         MockedStatic<ContainerProtocolCalls> mockedContainerProtocolCalls =
+    try (MockedStatic<ContainerProtocolCalls> mockedContainerProtocolCalls =
              Mockito.mockStatic(ContainerProtocolCalls.class, Mockito.CALLS_REAL_METHODS);) {
-      mockContainerPlacementPolicy(mockedPlacementFactory, mockedDatanodeToRemove);
       mockContainerProtocolCalls(mockedContainerProtocolCalls, failedReadChunkCountMap);
-      // Creating Cluster with 6 Nodes
-      try (MiniOzoneCluster cluster = MiniOzoneCluster.newBuilder(conf).setNumDatanodes(6).build()) {
+      // Creating Cluster with 5 Nodes
+      try (MiniOzoneCluster cluster = MiniOzoneCluster.newBuilder(conf).setNumDatanodes(5).build()) {
         cluster.waitForClusterToBeReady();
         try (OzoneClient client = OzoneClientFactory.getRpcClient(conf)) {
           Set<DatanodeDetails> allNodes =
               cluster.getHddsDatanodes().stream().map(HddsDatanodeService::getDatanodeDetails).collect(
                   Collectors.toSet());
           List<DatanodeDetails> initialNodesWithData = new ArrayList<>();
-          DatanodeDetails extraNode = null;
-          // Keeping 5 DNs and stopping the 6th Node here it is kept in the var extraNode
+          // Keeping 5 DNs and stopping the 6th Node here it is kept in the var extraNodes
           for (DatanodeDetails dn : allNodes) {
             if (initialNodesWithData.size() < 5) {
               initialNodesWithData.add(dn);
             } else {
-              extraNode = dn;
               cluster.shutdownHddsDatanode(dn);
             }
           }
@@ -355,77 +341,38 @@ class TestContainerReplication {
           try (OzoneInputStream inputStream = createInputStream(client)) {
             int firstReadLen = 1024 * 3;
             Arrays.fill(readData, (byte) 0);
+            //Reading first stripe.
             inputStream.read(readData, 0, firstReadLen);
             Assertions.assertEquals(0, failedReadChunkCountMap.size());
             //Checking the initial state as per the latest location.
             assertState(cluster, ImmutableMap.of(1, replicaIndexMap.get(1), 2, replicaIndexMap.get(2),
                 3, replicaIndexMap.get(3), 4, replicaIndexMap.get(4), 5, replicaIndexMap.get(5)));
 
-            // Shutting down DN1 and waiting for underreplication
+            // Stopping replication manager
+            cluster.getStorageContainerManager().getReplicationManager().stop();
+            // Deleting the container from DN1 & DN3
+            deleteContainer(cluster, replicaIndexMap.get(1), containerID);
+            deleteContainer(cluster, replicaIndexMap.get(3), containerID);
+            // Waiting for replica count of container to come down to 3.
+            waitForReplicaCount(containerID, 3, cluster);
+            // Shutting down DN1
             cluster.shutdownHddsDatanode(replicaIndexMap.get(1));
+            // Starting replication manager which should process under replication & write replica 1 to DN3.
+            cluster.getStorageContainerManager().getReplicationManager().start();
             waitForReplicaCount(containerID, 4, cluster);
-            assertState(cluster, ImmutableMap.of(2, replicaIndexMap.get(2), 3, replicaIndexMap.get(3),
+            // Asserting Replica 1 has been written to DN3.
+            assertState(cluster, ImmutableMap.of(1, replicaIndexMap.get(3), 2, replicaIndexMap.get(2),
                 4, replicaIndexMap.get(4), 5, replicaIndexMap.get(5)));
-
-            //Starting up ExtraDN. RM should run and create Replica Index 1 to ExtraDN
-            cluster.restartHddsDatanode(extraNode, false);
+            // Starting DN1.
+            cluster.restartHddsDatanode(replicaIndexMap.get(1), false);
+            // Waiting for underreplication to get resolved.
             waitForReplicaCount(containerID, 5, cluster);
-            assertState(cluster, ImmutableMap.of(1, extraNode, 2, replicaIndexMap.get(2),
-                3, replicaIndexMap.get(3), 4, replicaIndexMap.get(4), 5, replicaIndexMap.get(5)));
-
-            //Stopping RM and starting DN1, this should lead to overreplication of ReplicaIndex 1
-            cluster.getStorageContainerManager().getReplicationManager().stop();
-            cluster.restartHddsDatanode(replicaIndexMap.get(1), true);
-            waitForReplicaCount(containerID, 6, cluster);
-
-            //Mocking Overreplication processor to remove replica from DN1. Final Replica1 should be in extraNode
-            mockedDatanodeToRemove.set(replicaIndexMap.get(1));
-            cluster.getStorageContainerManager().getReplicationManager().start();
-            waitForReplicaCount(containerID, 5, cluster);
-            assertState(cluster, ImmutableMap.of(1, extraNode, 2, replicaIndexMap.get(2),
-                3, replicaIndexMap.get(3), 4, replicaIndexMap.get(4), 5, replicaIndexMap.get(5)));
-
-            //Stopping DN3 and waiting for underreplication
-            cluster.getStorageContainerManager().getReplicationManager().stop();
-            cluster.shutdownHddsDatanode(replicaIndexMap.get(3));
-            waitForReplicaCount(containerID, 4, cluster);
-            assertState(cluster, ImmutableMap.of(1, extraNode, 2, replicaIndexMap.get(2),
-                4, replicaIndexMap.get(4), 5, replicaIndexMap.get(5)));
-
-            //Starting RM, Under replication processor should create Replica 3 in DN1
-            cluster.getStorageContainerManager().getReplicationManager().start();
-            waitForReplicaCount(containerID, 5, cluster);
-            assertState(cluster, ImmutableMap.of(1, extraNode, 2, replicaIndexMap.get(2),
-                3, replicaIndexMap.get(1), 4, replicaIndexMap.get(4), 5, replicaIndexMap.get(5)));
-
-            //Starting DN3 leading to overreplication of replica 3
-            cluster.getStorageContainerManager().getReplicationManager().stop();
-            cluster.restartHddsDatanode(replicaIndexMap.get(3), true);
-            waitForReplicaCount(containerID, 6, cluster);
-
-            //Mocking Overreplication processor to remove data from DN3 leading to Replica3 to stay in DN1.
-            mockedDatanodeToRemove.set(replicaIndexMap.get(3));
-            cluster.getStorageContainerManager().getReplicationManager().start();
-            waitForReplicaCount(containerID, 5, cluster);
-            assertState(cluster, ImmutableMap.of(1, extraNode, 2, replicaIndexMap.get(2),
-                3, replicaIndexMap.get(1), 4, replicaIndexMap.get(4), 5, replicaIndexMap.get(5)));
-
-            //Stopping Extra DN leading to underreplication of Replica 1
-            cluster.getStorageContainerManager().getReplicationManager().stop();
-            cluster.shutdownHddsDatanode(extraNode);
-            waitForReplicaCount(containerID, 4, cluster);
-            assertState(cluster, ImmutableMap.of(2, replicaIndexMap.get(2), 3, replicaIndexMap.get(1),
-                4, replicaIndexMap.get(4), 5, replicaIndexMap.get(5)));
-
-
-            //RM should fix underreplication and write data to DN3
-            cluster.getStorageContainerManager().getReplicationManager().start();
-            waitForReplicaCount(containerID, 5, cluster);
+            // Asserting Replica 1 & Replica 3 has been swapped b/w DN1 & DN3.
             assertState(cluster, ImmutableMap.of(1, replicaIndexMap.get(3), 2, replicaIndexMap.get(2),
                 3, replicaIndexMap.get(1), 4, replicaIndexMap.get(4), 5, replicaIndexMap.get(5)));
-
-            // Reading the pre initialized inputStream. This leads to swap of the block1 & block3.
+            // Reading the Stripe 2 from the pre initialized inputStream
             inputStream.read(readData, firstReadLen, size - firstReadLen);
+            // Asserting there was a failure in the first read chunk.
             Assertions.assertEquals(ImmutableMap.of(1, 1, 3, 1), failedReadChunkCountMap);
             Assertions.assertArrayEquals(readData, originalData);
           }
