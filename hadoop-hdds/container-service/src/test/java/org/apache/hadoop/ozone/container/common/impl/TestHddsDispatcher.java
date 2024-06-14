@@ -624,8 +624,7 @@ public class TestHddsDispatcher {
         .setChunkData(chunk)
         .setData(chunkData);
 
-    return ContainerCommandRequestProto
-        .newBuilder()
+    return getContainerCommandRequestProtoBuilder()
         .setContainerID(containerId)
         .setCmdType(ContainerProtos.Type.WriteChunk)
         .setDatanodeUuid(datanodeId)
@@ -663,7 +662,7 @@ public class TestHddsDispatcher {
         .setBlock(putBlockRequest)
         .setData(data)
         .build();
-    return ContainerCommandRequestProto.newBuilder()
+    return getContainerCommandRequestProtoBuilder()
         .setCmdType(ContainerProtos.Type.PutSmallFile)
         .setContainerID(blockID.getContainerID())
         .setDatanodeUuid(UUID.randomUUID().toString())

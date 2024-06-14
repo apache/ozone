@@ -117,7 +117,8 @@ public final class ContainerProtocolCalls  {
 
   public static ContainerCommandRequestProto.Builder getContainerCommandRequestProtoBuilder(
       ContainerCommandRequestProto req) {
-    return getContainerCommandRequestProtoBuilder(req, ClientVersion.CURRENT.toProtoValue());
+    return getContainerCommandRequestProtoBuilder(req,
+        req.hasVersion() ? req.getVersion() : ClientVersion.CURRENT.toProtoValue());
   }
 
   /**
@@ -725,8 +726,7 @@ public final class ContainerProtocolCalls  {
             .build();
     String id = client.getPipeline().getClosestNode().getUuidString();
 
-    ContainerCommandRequestProto.Builder builder = ContainerCommandRequestProto
-        .newBuilder()
+    ContainerCommandRequestProto.Builder builder = getContainerCommandRequestProtoBuilder()
         .setCmdType(Type.Echo)
         .setContainerID(containerID)
         .setDatanodeUuid(id)
@@ -827,8 +827,7 @@ public final class ContainerProtocolCalls  {
     String id = client.getPipeline().getFirstNode().getUuidString();
     HashMap<DatanodeDetails, ReadContainerResponseProto> datanodeToResponseMap
         = new HashMap<>();
-    ContainerCommandRequestProto.Builder request =
-        ContainerCommandRequestProto.newBuilder();
+    ContainerCommandRequestProto.Builder request = getContainerCommandRequestProtoBuilder();
     request.setCmdType(Type.ReadContainer);
     request.setContainerID(containerID);
     request.setReadContainer(ReadContainerRequestProto.getDefaultInstance());
