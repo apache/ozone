@@ -162,7 +162,7 @@ public class TestLeaseRecovery {
   }
 
   @ParameterizedTest
-  @ValueSource(ints = {1 << 20, (1 << 20) + 1, (1 << 20) - 1})
+  @ValueSource(ints = {1 << 17, (1 << 17) + 1, (1 << 17) - 1})
   public void testRecovery(int dataSize) throws Exception {
     RootedOzoneFileSystem fs = (RootedOzoneFileSystem)FileSystem.get(conf);
 
@@ -506,6 +506,94 @@ public class TestLeaseRecovery {
     } finally {
       closeIgnoringKeyNotFound(stream);
     }
+  }
+
+  @Test
+  public void testRecoveryWithPartialFilledHsyncBlock() throws Exception {
+    RootedOzoneFileSystem fs = (RootedOzoneFileSystem)FileSystem.get(conf);
+    int blockSize = (int) cluster.getOzoneManager().getConfiguration().getStorageSize(
+        OZONE_SCM_BLOCK_SIZE, OZONE_SCM_BLOCK_SIZE_DEFAULT, StorageUnit.BYTES);
+    final byte[] data = getData(blockSize - 1);
+
+    final FSDataOutputStream stream = fs.create(file, true);
+    try {
+      // Write data into 1st block with total length = blockSize - 1
+      stream.write(data);
+      stream.hsync();
+
+      StorageContainerManager scm = cluster.getStorageContainerManager();
+      ContainerInfo container = scm.getContainerManager().getContainers().get(0);
+      // Close container so that new data won't be written into the same block
+      // block1 is partially filled
+      OzoneTestUtils.closeContainer(scm, container);
+      GenericTestUtils.waitFor(() -> {
+        try {
+          return scm.getPipelineManager().getPipeline(container.getPipelineID()).isClosed();
+        } catch (PipelineNotFoundException e) {
+          throw new RuntimeException(e);
+        }
+      }, 200, 30000);
+
+      assertFalse(fs.isFileClosed(file));
+
+      // write data, this data will completely go into block2 even though block1 had 1 space left
+      stream.write(data);
+      stream.flush();
+      // At this point both block1 and block2 has (blockSize - 1) length data
+
+      int count = 0;
+      while (count++ < 15 && !fs.recoverLease(file)) {
+        Thread.sleep(1000);
+      }
+      // The lease should have been recovered.
+      assertTrue(fs.isFileClosed(file), "File should be closed");
+
+      // A second call to recoverLease should succeed too.
+      assertTrue(fs.recoverLease(file));
+    } finally {
+      closeIgnoringKeyNotFound(stream);
+    }
+
+    // open it again, make sure the data is correct
+    verifyData(data, (blockSize - 1) * 2, file, fs);
+  }
+
+  @Test
+  public void testRecoveryWithSameBlockCountInOpenFileAndFileTable() throws Exception {
+    RootedOzoneFileSystem fs = (RootedOzoneFileSystem)FileSystem.get(conf);
+    int blockSize = (int) cluster.getOzoneManager().getConfiguration().getStorageSize(
+        OZONE_SCM_BLOCK_SIZE, OZONE_SCM_BLOCK_SIZE_DEFAULT, StorageUnit.BYTES);
+    final byte[] data = getData(blockSize / 2 - 1);
+
+    final FSDataOutputStream stream = fs.create(file, true);
+    try {
+      stream.write(data);
+      // block 1 exist in fileTable after hsync with length (blockSize / 2 - 1)
+      stream.hsync();
+      assertFalse(fs.isFileClosed(file));
+
+      // Write more data without hsync on same block
+      // File table block length will be still (blockSize / 2 - 1)
+      stream.write(data);
+      stream.flush();
+
+      int count = 0;
+      // fileTable and openFileTable will have same block count.
+      // Both table contains block1
+      while (count++ < 15 && !fs.recoverLease(file)) {
+        Thread.sleep(1000);
+      }
+      // The lease should have been recovered.
+      assertTrue(fs.isFileClosed(file), "File should be closed");
+
+      // A second call to recoverLease should succeed too.
+      assertTrue(fs.recoverLease(file));
+    } finally {
+      closeIgnoringKeyNotFound(stream);
+    }
+
+    // open it again, make sure the data is correct
+    verifyData(data, (blockSize / 2 - 1) * 2, file, fs);
   }
 
   private void verifyData(byte[] data, int dataSize, Path filePath, RootedOzoneFileSystem fs) throws IOException {

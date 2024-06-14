@@ -225,7 +225,6 @@ public class OMRecoverLeaseRequest extends OMKeyRequest {
       throw new OMException("Open Key " + keyName + " is already deleted",
           KEY_NOT_FOUND);
     }
-    long openKeyModificationTime = openKeyInfo.getModificationTime();
     if (openKeyInfo.getMetadata().containsKey(OzoneConsts.LEASE_RECOVERY)) {
       LOG.debug("Key: " + keyName + " is already under recovery");
     } else {
@@ -251,28 +250,19 @@ public class OMRecoverLeaseRequest extends OMKeyRequest {
     OmKeyLocationInfoGroup openKeyLatestVersionLocations = openKeyInfo.getLatestVersionLocations();
     List<OmKeyLocationInfo> openKeyLocationInfoList = openKeyLatestVersionLocations.getLocationList();
 
-    OmKeyLocationInfo finalBlock = null;
-    OmKeyLocationInfo penultimateBlock = null;
-    boolean returnKeyInfo = true;
-    if (openKeyLocationInfoList.size() > keyLocationInfoList.size() &&
-        openKeyModificationTime > keyInfo.getModificationTime() &&
-        openKeyLocationInfoList.size() > 0) {
-      finalBlock = openKeyLocationInfoList.get(openKeyLocationInfoList.size() - 1);
-      if (openKeyLocationInfoList.size() > 1) {
-        penultimateBlock = openKeyLocationInfoList.get(openKeyLocationInfoList.size() - 2);
-      }
-      returnKeyInfo = false;
-    } else if (keyLocationInfoList.size() > 0) {
-      finalBlock = keyLocationInfoList.get(keyLocationInfoList.size() - 1);
+    if (keyLocationInfoList.size() > 0) {
+      updateBlockInfo(ozoneManager, keyLocationInfoList.get(keyLocationInfoList.size() - 1));
     }
-    updateBlockInfo(ozoneManager, finalBlock);
-    updateBlockInfo(ozoneManager, penultimateBlock);
+    if (openKeyLocationInfoList.size() > 1) {
+      updateBlockInfo(ozoneManager, openKeyLocationInfoList.get(openKeyLocationInfoList.size() - 1));
+      updateBlockInfo(ozoneManager, openKeyLocationInfoList.get(openKeyLocationInfoList.size() - 2));
+    } else if (openKeyLocationInfoList.size() > 0) {
+      updateBlockInfo(ozoneManager, openKeyLocationInfoList.get(0));
+    }
 
     RecoverLeaseResponse.Builder rb = RecoverLeaseResponse.newBuilder();
-    rb.setKeyInfo(returnKeyInfo ? keyInfo.getNetworkProtobuf(getOmRequest().getVersion(), true) :
-        openKeyInfo.getNetworkProtobuf(getOmRequest().getVersion(), true));
-    rb.setIsKeyInfo(returnKeyInfo);
-
+    rb.setKeyInfo(keyInfo.getNetworkProtobuf(getOmRequest().getVersion(), true));
+    rb.setOpenKeyInfo(openKeyInfo.getNetworkProtobuf(getOmRequest().getVersion(), true));
     return rb.build();
   }
 
