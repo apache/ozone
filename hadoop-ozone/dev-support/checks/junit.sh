@@ -83,6 +83,10 @@ for i in $(seq 1 ${ITERATIONS}); do
       FAIL_FAST=true
     fi
 
+    if [[ ${irc} == 0 ]]; then
+      rm -fr "${REPORT_DIR}"
+    fi
+
     REPORT_DIR="${original_report_dir}"
     echo "Iteration ${i} exit code: ${irc}" | tee -a "${REPORT_FILE}"
   fi
