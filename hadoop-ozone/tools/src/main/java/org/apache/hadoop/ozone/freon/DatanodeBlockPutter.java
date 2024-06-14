@@ -43,8 +43,6 @@ import org.slf4j.LoggerFactory;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
 
-import static org.apache.hadoop.hdds.scm.storage.ContainerProtocolCalls.getContainerCommandRequestProtoBuilder;
-
 /**
  * Datanode test for block creation.
  */
@@ -148,7 +146,8 @@ public class DatanodeBlockPutter extends BaseFreonGenerator implements
     String id = client.getPipeline().getFirstNode().getUuidString();
 
     ContainerCommandRequestProto.Builder builder =
-        getContainerCommandRequestProtoBuilder()
+        ContainerCommandRequestProto
+            .newBuilder()
             .setCmdType(Type.PutBlock)
             .setContainerID(blockId.getContainerID())
             .setDatanodeUuid(id)

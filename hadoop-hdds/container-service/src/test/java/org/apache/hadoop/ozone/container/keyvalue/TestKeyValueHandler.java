@@ -57,7 +57,6 @@ import org.apache.ozone.test.GenericTestUtils;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DATANODE_VOLUME_CHOOSING_POLICY;
 import static org.apache.hadoop.hdds.HddsConfigKeys.OZONE_METADATA_DIRS;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.HDDS_DATANODE_DIR_KEY;
-import static org.apache.hadoop.hdds.scm.storage.ContainerProtocolCalls.getContainerCommandRequestProtoBuilder;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -122,7 +121,8 @@ public class TestKeyValueHandler {
   public void testHandlerCommandHandling() throws Exception {
     reset(handler);
     // Test Create Container Request handling
-    ContainerCommandRequestProto createContainerRequest = getContainerCommandRequestProtoBuilder()
+    ContainerCommandRequestProto createContainerRequest =
+        ContainerProtos.ContainerCommandRequestProto.newBuilder()
             .setCmdType(ContainerProtos.Type.CreateContainer)
             .setContainerID(DUMMY_CONTAINER_ID)
             .setDatanodeUuid(DATANODE_UUID)
@@ -296,7 +296,7 @@ public class TestKeyValueHandler {
 
   private ContainerCommandRequestProto getDummyCommandRequestProto(
       ContainerProtos.Type cmdType) {
-    return getContainerCommandRequestProtoBuilder()
+    return ContainerCommandRequestProto.newBuilder()
         .setCmdType(cmdType)
         .setContainerID(DUMMY_CONTAINER_ID)
         .setDatanodeUuid(DATANODE_UUID)
@@ -317,7 +317,7 @@ public class TestKeyValueHandler {
 
     // Create Close container request
     ContainerCommandRequestProto closeContainerRequest =
-        getContainerCommandRequestProtoBuilder()
+        ContainerProtos.ContainerCommandRequestProto.newBuilder()
             .setCmdType(ContainerProtos.Type.CloseContainer)
             .setContainerID(DUMMY_CONTAINER_ID)
             .setDatanodeUuid(DATANODE_UUID)
@@ -435,7 +435,7 @@ public class TestKeyValueHandler {
 
   private static ContainerCommandRequestProto createContainerRequest(
       String datanodeId, long containerID) {
-    return getContainerCommandRequestProtoBuilder()
+    return ContainerCommandRequestProto.newBuilder()
         .setCmdType(ContainerProtos.Type.CreateContainer)
         .setDatanodeUuid(datanodeId).setCreateContainer(
             ContainerProtos.CreateContainerRequestProto.newBuilder()

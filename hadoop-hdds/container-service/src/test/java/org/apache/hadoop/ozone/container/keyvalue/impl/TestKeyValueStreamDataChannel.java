@@ -58,7 +58,6 @@ import java.util.concurrent.ThreadLocalRandom;
 import static org.apache.hadoop.hdds.scm.storage.BlockDataStreamOutput.PUT_BLOCK_REQUEST_LENGTH_MAX;
 import static org.apache.hadoop.hdds.scm.storage.BlockDataStreamOutput.executePutBlockClose;
 import static org.apache.hadoop.hdds.scm.storage.BlockDataStreamOutput.getProtoLength;
-import static org.apache.hadoop.hdds.scm.storage.ContainerProtocolCalls.getContainerCommandRequestProtoBuilder;
 import static org.apache.hadoop.ozone.container.keyvalue.impl.KeyValueStreamDataChannel.closeBuffers;
 import static org.apache.hadoop.ozone.container.keyvalue.impl.KeyValueStreamDataChannel.readPutBlockRequest;
 import static org.apache.hadoop.ozone.container.keyvalue.impl.KeyValueStreamDataChannel.writeBuffers;
@@ -72,7 +71,7 @@ public class TestKeyValueStreamDataChannel {
       LoggerFactory.getLogger(TestKeyValueStreamDataChannel.class);
 
   static final ContainerCommandRequestProto PUT_BLOCK_PROTO
-      = getContainerCommandRequestProtoBuilder()
+      = ContainerCommandRequestProto.newBuilder()
       .setCmdType(Type.PutBlock)
       .setPutBlock(PutBlockRequestProto.newBuilder().setBlockData(
           BlockData.newBuilder().setBlockID(DatanodeBlockID.newBuilder()

@@ -72,7 +72,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import static org.apache.hadoop.hdds.HddsUtils.processForDebug;
-import static org.apache.hadoop.hdds.scm.storage.ContainerProtocolCalls.getContainerCommandRequestProtoBuilder;
 
 /**
  * {@link XceiverClientSpi} implementation, the standalone client.
@@ -279,9 +278,14 @@ public class XceiverClientGrpc extends XceiverClientSpi {
     List<DatanodeDetails> datanodeList = pipeline.getNodes();
     HashMap<DatanodeDetails, CompletableFuture<ContainerCommandResponseProto>>
             futureHashMap = new HashMap<>();
+    ContainerCommandRequestProto.Builder builder = ContainerCommandRequestProto.newBuilder(request);
+    if (!request.hasVersion()) {
+      builder.setVersion(ClientVersion.CURRENT.toProtoValue());
+    }
+    ContainerCommandRequestProto finalRequest = builder.build();
     for (DatanodeDetails dn : datanodeList) {
       try {
-        futureHashMap.put(dn, sendCommandAsync(request, dn).getResponse());
+        futureHashMap.put(dn, sendCommandAsync(finalRequest, dn).getResponse());
       } catch (InterruptedException e) {
         LOG.error("Command execution was interrupted.");
         // Re-interrupt the thread while catching InterruptedException
@@ -339,9 +343,13 @@ public class XceiverClientGrpc extends XceiverClientSpi {
 
     return TracingUtil.executeInNewSpan(spanName,
         () -> {
-          ContainerCommandRequestProto finalPayload = getContainerCommandRequestProtoBuilder(request)
-                  .setTraceID(TracingUtil.exportCurrentSpan()).build();
-          return sendCommandWithRetry(finalPayload, validators);
+          ContainerCommandRequestProto.Builder finalPayload =
+              ContainerCommandRequestProto.newBuilder(request)
+                  .setTraceID(TracingUtil.exportCurrentSpan());
+          if (!request.hasVersion()) {
+            finalPayload.setVersion(ClientVersion.CURRENT.toProtoValue());
+          }
+          return sendCommandWithRetry(finalPayload.build(), validators);
         });
   }
 
@@ -491,7 +499,8 @@ public class XceiverClientGrpc extends XceiverClientSpi {
 
     try (Scope ignored = GlobalTracer.get().activateSpan(span)) {
 
-      ContainerCommandRequestProto.Builder finalPayload = getContainerCommandRequestProtoBuilder(request)
+      ContainerCommandRequestProto.Builder finalPayload =
+          ContainerCommandRequestProto.newBuilder(request)
               .setTraceID(TracingUtil.exportCurrentSpan());
       if (!request.hasVersion()) {
         finalPayload.setVersion(ClientVersion.CURRENT.toProtoValue());

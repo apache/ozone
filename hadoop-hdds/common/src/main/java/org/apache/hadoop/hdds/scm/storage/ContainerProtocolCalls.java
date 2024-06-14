@@ -70,7 +70,6 @@ import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerExcep
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.security.token.OzoneBlockTokenIdentifier;
 import org.apache.hadoop.hdds.tracing.TracingUtil;
-import org.apache.hadoop.ozone.ClientVersion;
 import org.apache.hadoop.ozone.common.Checksum;
 import org.apache.hadoop.ozone.common.ChecksumData;
 import org.apache.hadoop.security.token.Token;
@@ -96,29 +95,6 @@ public final class ContainerProtocolCalls  {
    * There is no need to instantiate this class.
    */
   private ContainerProtocolCalls() {
-  }
-
-  /**
-   * Creates a ContainerCommandRequestProto with version set.
-   */
-  public static ContainerCommandRequestProto.Builder getContainerCommandRequestProtoBuilder(int version) {
-    return getContainerCommandRequestProtoBuilder(null, version);
-  }
-
-  public static ContainerCommandRequestProto.Builder getContainerCommandRequestProtoBuilder() {
-    return getContainerCommandRequestProtoBuilder(null, ClientVersion.CURRENT.toProtoValue());
-  }
-
-  public static ContainerCommandRequestProto.Builder getContainerCommandRequestProtoBuilder(
-      ContainerCommandRequestProto req, int version) {
-    return (req == null ?
-        ContainerCommandRequestProto.newBuilder() : ContainerCommandRequestProto.newBuilder(req)).setVersion(version);
-  }
-
-  public static ContainerCommandRequestProto.Builder getContainerCommandRequestProtoBuilder(
-      ContainerCommandRequestProto req) {
-    return getContainerCommandRequestProtoBuilder(req,
-        req.hasVersion() ? req.getVersion() : ClientVersion.CURRENT.toProtoValue());
   }
 
   /**
@@ -149,7 +125,7 @@ public final class ContainerProtocolCalls  {
         xceiverClient.getPipeline().getFirstNode().getUuidString();
 
     ContainerCommandRequestProto.Builder builder =
-        getContainerCommandRequestProtoBuilder()
+        ContainerCommandRequestProto.newBuilder()
             .setCmdType(Type.ListBlock)
             .setContainerID(containerID)
             .setDatanodeUuid(datanodeID)
@@ -219,7 +195,8 @@ public final class ContainerProtocolCalls  {
     GetBlockRequestProto.Builder readBlockRequest = GetBlockRequestProto
         .newBuilder()
         .setBlockID(datanodeBlockID);
-    ContainerCommandRequestProto.Builder builder = getContainerCommandRequestProtoBuilder()
+    ContainerCommandRequestProto.Builder builder = ContainerCommandRequestProto
+        .newBuilder()
         .setCmdType(Type.GetBlock)
         .setContainerID(datanodeBlockID.getContainerID())
         .setGetBlock(readBlockRequest);
@@ -278,7 +255,7 @@ public final class ContainerProtocolCalls  {
             setBlockID(blockID.getDatanodeBlockIDProtobuf());
     String id = xceiverClient.getPipeline().getFirstNode().getUuidString();
     ContainerCommandRequestProto.Builder builder =
-        getContainerCommandRequestProtoBuilder()
+        ContainerCommandRequestProto.newBuilder()
             .setCmdType(Type.GetCommittedBlockLength)
             .setContainerID(blockID.getContainerID())
             .setDatanodeUuid(id)
@@ -324,11 +301,11 @@ public final class ContainerProtocolCalls  {
             .setBlockData(containerBlockData)
             .setEof(eof);
     final String id = pipeline.getFirstNode().getUuidString();
-    ContainerCommandRequestProto.Builder builder = getContainerCommandRequestProtoBuilder()
-        .setCmdType(Type.PutBlock)
-        .setContainerID(containerBlockData.getBlockID().getContainerID())
-        .setDatanodeUuid(id)
-        .setPutBlock(createBlockRequest);
+    ContainerCommandRequestProto.Builder builder =
+        ContainerCommandRequestProto.newBuilder().setCmdType(Type.PutBlock)
+            .setContainerID(containerBlockData.getBlockID().getContainerID())
+            .setDatanodeUuid(id)
+            .setPutBlock(createBlockRequest);
     if (tokenString != null) {
       builder.setEncodedToken(tokenString);
     }
@@ -356,7 +333,7 @@ public final class ContainerProtocolCalls  {
             .setChunkData(chunk)
             .setReadChunkVersion(ContainerProtos.ReadChunkVersion.V1);
     ContainerCommandRequestProto.Builder builder =
-        getContainerCommandRequestProtoBuilder().setCmdType(Type.ReadChunk)
+        ContainerCommandRequestProto.newBuilder().setCmdType(Type.ReadChunk)
             .setContainerID(blockID.getContainerID())
             .setReadChunk(readChunkRequest);
     if (token != null) {
@@ -444,7 +421,7 @@ public final class ContainerProtocolCalls  {
             .setData(data);
     String id = xceiverClient.getPipeline().getFirstNode().getUuidString();
     ContainerCommandRequestProto.Builder builder =
-        getContainerCommandRequestProtoBuilder()
+        ContainerCommandRequestProto.newBuilder()
             .setCmdType(Type.WriteChunk)
             .setContainerID(blockID.getContainerID())
             .setDatanodeUuid(id)
@@ -502,7 +479,7 @@ public final class ContainerProtocolCalls  {
 
     String id = client.getPipeline().getFirstNode().getUuidString();
     ContainerCommandRequestProto.Builder builder =
-        getContainerCommandRequestProtoBuilder()
+        ContainerCommandRequestProto.newBuilder()
             .setCmdType(Type.PutSmallFile)
             .setContainerID(blockID.getContainerID())
             .setDatanodeUuid(id)
@@ -569,7 +546,7 @@ public final class ContainerProtocolCalls  {
 
     String id = client.getPipeline().getFirstNode().getUuidString();
     ContainerCommandRequestProto.Builder request =
-        getContainerCommandRequestProtoBuilder();
+        ContainerCommandRequestProto.newBuilder();
     if (encodedToken != null) {
       request.setEncodedToken(encodedToken);
     }
@@ -599,7 +576,7 @@ public final class ContainerProtocolCalls  {
     String id = client.getPipeline().getFirstNode().getUuidString();
 
     ContainerCommandRequestProto.Builder request =
-        getContainerCommandRequestProtoBuilder();
+        ContainerCommandRequestProto.newBuilder();
     request.setCmdType(ContainerProtos.Type.DeleteContainer);
     request.setContainerID(containerID);
     request.setDeleteContainer(deleteRequest);
@@ -625,7 +602,7 @@ public final class ContainerProtocolCalls  {
     String id = client.getPipeline().getFirstNode().getUuidString();
 
     ContainerCommandRequestProto.Builder request =
-        getContainerCommandRequestProtoBuilder();
+        ContainerCommandRequestProto.newBuilder();
     request.setCmdType(Type.CloseContainer);
     request.setContainerID(containerID);
     request.setCloseContainer(CloseContainerRequestProto.getDefaultInstance());
@@ -652,7 +629,7 @@ public final class ContainerProtocolCalls  {
     String id = client.getPipeline().getFirstNode().getUuidString();
 
     ContainerCommandRequestProto.Builder request =
-        getContainerCommandRequestProtoBuilder();
+        ContainerCommandRequestProto.newBuilder();
     request.setCmdType(Type.ReadContainer);
     request.setContainerID(containerID);
     request.setReadContainer(ReadContainerRequestProto.getDefaultInstance());
@@ -690,7 +667,8 @@ public final class ContainerProtocolCalls  {
             .build();
     String id = client.getPipeline().getClosestNode().getUuidString();
 
-    ContainerCommandRequestProto.Builder builder = getContainerCommandRequestProtoBuilder()
+    ContainerCommandRequestProto.Builder builder = ContainerCommandRequestProto
+        .newBuilder()
         .setCmdType(Type.GetSmallFile)
         .setContainerID(blockID.getContainerID())
         .setDatanodeUuid(id)
@@ -726,7 +704,8 @@ public final class ContainerProtocolCalls  {
             .build();
     String id = client.getPipeline().getClosestNode().getUuidString();
 
-    ContainerCommandRequestProto.Builder builder = getContainerCommandRequestProtoBuilder()
+    ContainerCommandRequestProto.Builder builder = ContainerCommandRequestProto
+        .newBuilder()
         .setCmdType(Type.Echo)
         .setContainerID(containerID)
         .setDatanodeUuid(id)
@@ -799,7 +778,8 @@ public final class ContainerProtocolCalls  {
     HashMap<DatanodeDetails, GetBlockResponseProto> datanodeToResponseMap
             = new HashMap<>();
     String id = xceiverClient.getPipeline().getFirstNode().getUuidString();
-    ContainerCommandRequestProto.Builder builder = getContainerCommandRequestProtoBuilder()
+    ContainerCommandRequestProto.Builder builder = ContainerCommandRequestProto
+        .newBuilder()
         .setCmdType(Type.GetBlock)
         .setContainerID(datanodeBlockID.getContainerID())
         .setDatanodeUuid(id)
@@ -827,7 +807,8 @@ public final class ContainerProtocolCalls  {
     String id = client.getPipeline().getFirstNode().getUuidString();
     HashMap<DatanodeDetails, ReadContainerResponseProto> datanodeToResponseMap
         = new HashMap<>();
-    ContainerCommandRequestProto.Builder request = getContainerCommandRequestProtoBuilder();
+    ContainerCommandRequestProto.Builder request =
+        ContainerCommandRequestProto.newBuilder();
     request.setCmdType(Type.ReadContainer);
     request.setContainerID(containerID);
     request.setReadContainer(ReadContainerRequestProto.getDefaultInstance());

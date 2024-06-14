@@ -40,8 +40,6 @@ import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
-import static org.apache.hadoop.hdds.scm.storage.ContainerProtocolCalls.getContainerCommandRequestProtoBuilder;
-
 /** Testing {@link ContainerCommandRequestMessage}. */
 public class TestContainerCommandRequestMessage {
   static final Random RANDOM = new Random();
@@ -88,7 +86,7 @@ public class TestContainerCommandRequestMessage {
         .setBlock(putBlockRequest)
         .setData(data)
         .build();
-    return getContainerCommandRequestProtoBuilder()
+    return ContainerCommandRequestProto.newBuilder()
         .setCmdType(Type.PutSmallFile)
         .setContainerID(blockID.getContainerID())
         .setDatanodeUuid(UUID.randomUUID().toString())
@@ -110,7 +108,7 @@ public class TestContainerCommandRequestMessage {
         .setBlockID(blockID.getDatanodeBlockIDProtobuf())
         .setChunkData(chunk)
         .setData(data);
-    return getContainerCommandRequestProtoBuilder()
+    return ContainerCommandRequestProto.newBuilder()
         .setCmdType(Type.WriteChunk)
         .setContainerID(blockID.getContainerID())
         .setDatanodeUuid(UUID.randomUUID().toString())

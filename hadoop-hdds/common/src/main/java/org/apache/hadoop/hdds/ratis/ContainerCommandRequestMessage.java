@@ -24,6 +24,7 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerC
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.PutSmallFileRequestProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Type;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.WriteChunkRequestProto;
+import org.apache.hadoop.ozone.ClientVersion;
 import org.apache.hadoop.ozone.common.Checksum;
 
 import org.apache.ratis.protocol.Message;
@@ -32,8 +33,6 @@ import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 import org.apache.ratis.thirdparty.com.google.protobuf.InvalidProtocolBufferException;
 import org.apache.ratis.util.JavaUtils;
 
-import static org.apache.hadoop.hdds.scm.storage.ContainerProtocolCalls.getContainerCommandRequestProtoBuilder;
-
 /**
  * Implementing the {@link Message} interface
  * for {@link ContainerCommandRequestProto}.
@@ -41,9 +40,13 @@ import static org.apache.hadoop.hdds.scm.storage.ContainerProtocolCalls.getConta
 public final class ContainerCommandRequestMessage implements Message {
   public static ContainerCommandRequestMessage toMessage(
       ContainerCommandRequestProto request, String traceId) {
-    final ContainerCommandRequestProto.Builder b = getContainerCommandRequestProtoBuilder(request);
+    final ContainerCommandRequestProto.Builder b
+        = ContainerCommandRequestProto.newBuilder(request);
     if (traceId != null) {
       b.setTraceID(traceId);
+    }
+    if (!request.hasVersion()) {
+      b.setVersion(ClientVersion.CURRENT.toProtoValue());
     }
 
     ByteString data = ByteString.EMPTY;
