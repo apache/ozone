@@ -815,6 +815,7 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
     case GetCommittedBlockLength : return DNAction.GET_COMMITTED_BLOCK_LENGTH;
     case StreamInit       : return DNAction.STREAM_INIT;
     case Echo             : return DNAction.ECHO;
+    case HeadBlocks       : return DNAction.HEAD_BLOCKS;
     default :
       LOG.debug("Invalid command type - {}", cmdType);
       return null;
@@ -945,6 +946,10 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
       auditParams.put(AUDIT_PARAM_BLOCK_DATA,
           BlockID.getFromProtobuf(msg.getGetCommittedBlockLength().getBlockID())
               .toString());
+      return auditParams;
+
+    case HeadBlocks:
+      auditParams.put(AUDIT_PARAM_CONTAINER_ID, containerID);
       return auditParams;
 
     default :

@@ -424,6 +424,7 @@ public final class HddsUtils {
     case ListContainer:
     case ListChunk:
     case GetCommittedBlockLength:
+    case HeadBlocks:
       return true;
     case CloseContainer:
     case WriteChunk:
@@ -493,6 +494,7 @@ public final class HddsUtils {
     case ReadContainer:
     case UpdateContainer:
     case ListBlock:
+    case HeadBlocks:
       return true;
     default:
       return false;

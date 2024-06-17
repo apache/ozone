@@ -104,6 +104,7 @@ enum Type {
   StreamInit = 19;
   StreamWrite = 20;
   Echo = 21;
+  HeadBlocks = 22;
 }
 
 
@@ -210,6 +211,7 @@ message ContainerCommandRequestProto {
   optional   string encodedToken = 23;
   optional   uint32 version = 24;
   optional   EchoRequestProto echo = 25;
+  optional   HeadBlocksRequestProto headBlocks = 26;
 }
 
 message ContainerCommandResponseProto {
@@ -241,6 +243,7 @@ message ContainerCommandResponseProto {
 
   optional GetCommittedBlockLengthResponseProto getCommittedBlockLength = 21;
   optional   EchoResponseProto echo = 22;
+  optional   HeadBlocksResponseProto headBlocks = 23;
 }
 
 message ContainerDataProto {
@@ -385,6 +388,22 @@ message  EchoRequestProto {
 
 message  EchoResponseProto {
   optional bytes payload = 1;
+}
+
+message  HeadBlocksRequestProto {
+  required int64 containerID = 1;
+  repeated int64 localID = 2;
+}
+
+message  HeadBlocksResponseProto {
+  required int64 containerID = 1;
+  repeated MissingBlock missingBlock = 2;
+}
+
+message MissingBlock {
+  required int64 localID = 2;
+  required bool onDB = 3;
+  required bool onDisk = 4;
 }
 
 // Chunk Operations

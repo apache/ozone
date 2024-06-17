@@ -20,10 +20,12 @@ package org.apache.hadoop.ozone.container.keyvalue.impl;
 import org.apache.commons.codec.binary.Hex;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.MissingBlock;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.common.ChunkBuffer;
 import org.apache.hadoop.ozone.container.ContainerTestHelper;
+import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.helpers.ChunkInfo;
 import org.apache.hadoop.ozone.container.keyvalue.ContainerLayoutTestInfo;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainer;
@@ -32,12 +34,16 @@ import org.junit.jupiter.api.Test;
 
 import java.nio.ByteBuffer;
 import java.security.MessageDigest;
+import java.util.HashSet;
+import java.util.Set;
 
 import static org.apache.hadoop.ozone.container.ContainerTestHelper.getChunk;
 import static org.apache.hadoop.ozone.container.ContainerTestHelper.setDataChecksum;
+import static org.apache.hadoop.ozone.container.common.ContainerTestUtils.COMBINED_STAGE;
 import static org.apache.hadoop.ozone.container.common.ContainerTestUtils.WRITE_STAGE;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Test for FilePerBlockStrategy.
@@ -131,6 +137,49 @@ public class TestFilePerBlockStrategy extends CommonChunkManagerTestCases {
     assertEquals(length, info2.getLen());
     assertEquals(data.rewind().toByteString().substring(start, start + length),
         readData2.rewind().toByteString());
+  }
+
+  @Test
+  public void testHeadsBlock() throws Exception {
+    ChunkManager chunkManager = createTestSubject();
+    KeyValueContainer container = getKeyValueContainer();
+    int blockCount = 10;
+    Set<Long> localIds = new HashSet<>();
+    for (long i = 1; i <= blockCount; i++) {
+      localIds.add(i);
+    }
+
+    for (int i = 1; i <= blockCount; i++) {
+      Set<MissingBlock> missingBlocks = getBlockManager().headBlocks(container, localIds);
+      assertEquals(blockCount - i + 1, missingBlocks.size());
+      for (int j = 1; j <= blockCount; j++) {
+        if (j >= i) {
+          assertTrue(missingBlocks.contains(MissingBlock.newBuilder()
+              .setLocalID(j)
+              .setOnDB(false)
+              .setOnDisk(false)
+              .build()));
+        }
+      }
+      createBlock(i, chunkManager, container);
+    }
+
+    Set<MissingBlock> missingBlocks = getBlockManager().headBlocks(container, localIds);
+    assertEquals(0, missingBlocks.size());
+  }
+
+  public void createBlock(int id, ChunkManager chunkManager, KeyValueContainer container) throws Exception {
+    BlockID blockID =  new BlockID(1L, id);
+    ByteBuffer data = getData();
+    rewindBufferToDataStart();
+    ChunkInfo chunkInfo = new ChunkInfo(String.format("%d.data.%d", blockID
+        .getLocalID(), 0), 0, getBody().length);
+    chunkManager.writeChunk(container, blockID,
+        chunkInfo, data,
+        COMBINED_STAGE);
+    BlockData blockData = new BlockData(blockID);
+    blockData.addChunk(chunkInfo.getProtoBufMessage());
+    getBlockManager().putBlock(container, blockData);
   }
 
   @Override

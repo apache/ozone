@@ -20,6 +20,7 @@ package org.apache.hadoop.hdds.scm.protocolPB;
 import com.google.common.base.Preconditions;
 import java.nio.ByteBuffer;
 import java.util.List;
+import java.util.Set;
 import java.util.function.Function;
 
 import org.apache.commons.lang3.RandomUtils;
@@ -35,6 +36,8 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.DatanodeBl
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.GetBlockResponseProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.GetCommittedBlockLengthResponseProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.GetSmallFileResponseProto;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.HeadBlocksResponseProto;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.MissingBlock;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.PutBlockResponseProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.PutSmallFileResponseProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ReadChunkResponseProto;
@@ -168,6 +171,18 @@ public final class ContainerCommandResponseBuilders {
         .setListBlock(builder)
         .build();
   }
+
+  public static ContainerCommandResponseProto getHeadBlocksResponse(
+      ContainerCommandRequestProto msg, Set<MissingBlock> data) {
+
+    HeadBlocksResponseProto.Builder builder =
+        HeadBlocksResponseProto.newBuilder();
+    builder.addAllMissingBlock(data).setContainerID(msg.getContainerID());
+    return getSuccessResponseBuilder(msg)
+        .setHeadBlocks(builder)
+        .build();
+  }
+
   /**
    * Returns successful getCommittedBlockLength Response.
    * @param msg - Request.
