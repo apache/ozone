@@ -49,6 +49,7 @@ import org.apache.hadoop.hdds.security.SecurityConfig;
 import org.apache.hadoop.hdds.security.exception.SCMSecurityException;
 import org.apache.hadoop.hdds.tracing.GrpcClientInterceptor;
 import org.apache.hadoop.hdds.tracing.TracingUtil;
+import org.apache.hadoop.ozone.ClientVersion;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.OzoneConsts;
 import java.util.concurrent.TimeoutException;
@@ -274,6 +275,11 @@ public class XceiverClientGrpc extends XceiverClientSpi {
     List<DatanodeDetails> datanodeList = pipeline.getNodes();
     HashMap<DatanodeDetails, CompletableFuture<ContainerCommandResponseProto>>
             futureHashMap = new HashMap<>();
+    if (!request.hasVersion()) {
+      ContainerCommandRequestProto.Builder builder = ContainerCommandRequestProto.newBuilder(request);
+      builder.setVersion(ClientVersion.CURRENT.toProtoValue());
+      request = builder.build();
+    }
     for (DatanodeDetails dn : datanodeList) {
       try {
         futureHashMap.put(dn, sendCommandAsync(request, dn).getResponse());
@@ -334,10 +340,13 @@ public class XceiverClientGrpc extends XceiverClientSpi {
 
     return TracingUtil.executeInNewSpan(spanName,
         () -> {
-          ContainerCommandRequestProto finalPayload =
+          ContainerCommandRequestProto.Builder builder =
               ContainerCommandRequestProto.newBuilder(request)
-                  .setTraceID(TracingUtil.exportCurrentSpan()).build();
-          return sendCommandWithRetry(finalPayload, validators);
+                  .setTraceID(TracingUtil.exportCurrentSpan());
+          if (!request.hasVersion()) {
+            builder.setVersion(ClientVersion.CURRENT.toProtoValue());
+          }
+          return sendCommandWithRetry(builder.build(), validators);
         });
   }
 
@@ -457,12 +466,14 @@ public class XceiverClientGrpc extends XceiverClientSpi {
 
     try (Scope ignored = GlobalTracer.get().activateSpan(span)) {
 
-      ContainerCommandRequestProto finalPayload =
+      ContainerCommandRequestProto.Builder builder =
           ContainerCommandRequestProto.newBuilder(request)
-              .setTraceID(TracingUtil.exportCurrentSpan())
-              .build();
+              .setTraceID(TracingUtil.exportCurrentSpan());
+      if (!request.hasVersion()) {
+        builder.setVersion(ClientVersion.CURRENT.toProtoValue());
+      }
       XceiverClientReply asyncReply =
-          sendCommandAsync(finalPayload, pipeline.getFirstNode());
+          sendCommandAsync(builder.build(), pipeline.getFirstNode());
       if (shouldBlockAndWaitAsyncReply(request)) {
         asyncReply.getResponse().get();
       }

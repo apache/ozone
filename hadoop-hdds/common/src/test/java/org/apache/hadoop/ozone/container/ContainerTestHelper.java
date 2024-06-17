@@ -38,6 +38,7 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.KeyValue;
 import org.apache.hadoop.hdds.scm.pipeline.MockPipeline;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.utils.UniqueId;
+import org.apache.hadoop.ozone.ClientVersion;
 import org.apache.hadoop.ozone.common.Checksum;
 import org.apache.hadoop.ozone.common.ChunkBuffer;
 import org.apache.hadoop.ozone.common.OzoneChecksumException;
@@ -567,6 +568,11 @@ public final class ContainerTestHelper {
     return data;
   }
 
+  public static ContainerCommandRequestProto getDummyCommandRequestProto(
+      ContainerProtos.Type cmdType) {
+    return getDummyCommandRequestProto(ClientVersion.CURRENT, cmdType, 0);
+  }
+
   /**
    * Construct fake protobuf messages for various types of requests.
    * This is tedious, however necessary to test. Protobuf classes are final
@@ -576,16 +582,17 @@ public final class ContainerTestHelper {
    * @return
    */
   public static ContainerCommandRequestProto getDummyCommandRequestProto(
-      ContainerProtos.Type cmdType) {
+      ClientVersion clientVersion, ContainerProtos.Type cmdType, int replicaIndex) {
     final Builder builder =
         ContainerCommandRequestProto.newBuilder()
+            .setVersion(clientVersion.toProtoValue())
             .setCmdType(cmdType)
             .setContainerID(DUMMY_CONTAINER_ID)
             .setDatanodeUuid(DATANODE_UUID);
 
     final DatanodeBlockID fakeBlockId =
         DatanodeBlockID.newBuilder()
-            .setContainerID(DUMMY_CONTAINER_ID).setLocalID(1)
+            .setContainerID(DUMMY_CONTAINER_ID).setLocalID(1).setReplicaIndex(replicaIndex)
             .setBlockCommitSequenceId(101).build();
 
     final ContainerProtos.ChunkInfo fakeChunkInfo =
