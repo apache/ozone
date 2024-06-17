@@ -95,6 +95,7 @@ import org.apache.hadoop.ozone.om.snapshot.SnapshotUtils;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ExpiredMultipartUploadInfo;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ExpiredMultipartUploadsBucket;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyArgs;
+import org.apache.hadoop.ozone.snapshot.ListSnapshotResponse;
 import org.apache.hadoop.ozone.storage.proto
     .OzoneManagerStorageProtos.PersistedUserVolumeInfo;
 import org.apache.hadoop.ozone.security.OzoneTokenIdentifier;
@@ -1391,7 +1392,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
   }
 
   @Override
-  public List<SnapshotInfo> listSnapshot(
+  public ListSnapshotResponse listSnapshot(
       String volumeName, String bucketName, String snapshotPrefix,
       String prevSnapshot, int maxListResult) throws IOException {
     if (Strings.isNullOrEmpty(volumeName)) {
@@ -1404,8 +1405,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
 
     String bucketNameBytes = getBucketKey(volumeName, bucketName);
     if (getBucketTable().get(bucketNameBytes) == null) {
-      throw new OMException("Bucket " + bucketName + " not found.",
-          BUCKET_NOT_FOUND);
+      throw new OMException("Bucket " + bucketName + " not found.", BUCKET_NOT_FOUND);
     }
 
     String prefix;
@@ -1422,30 +1422,30 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
     } else {
       // This allows us to seek directly to the first key with the right prefix.
       seek = getOzoneKey(volumeName, bucketName,
-          StringUtil.isNotBlank(
-              snapshotPrefix) ? snapshotPrefix : OM_KEY_PREFIX);
+          StringUtil.isNotBlank(snapshotPrefix) ? snapshotPrefix : OM_KEY_PREFIX);
     }
 
     List<SnapshotInfo> snapshotInfos =  Lists.newArrayList();
+    String lastSnapshot = null;
     try (ListIterator.MinHeapIterator snapshotIterator =
-        new ListIterator.MinHeapIterator(this, prefix, seek, volumeName,
-            bucketName, snapshotInfoTable)) {
-      try {
-        while (snapshotIterator.hasNext() && maxListResult > 0) {
-          SnapshotInfo snapshotInfo =
-              (SnapshotInfo) snapshotIterator.next().getValue();
-          if (!snapshotInfo.getName().equals(prevSnapshot)) {
-            snapshotInfos.add(snapshotInfo);
-            maxListResult--;
-          }
+             new ListIterator.MinHeapIterator(this, prefix, seek, volumeName, bucketName, snapshotInfoTable)) {
+      SnapshotInfo snapshotInfo = null;
+      while (snapshotIterator.hasNext() && maxListResult > 0) {
+        snapshotInfo = (SnapshotInfo) snapshotIterator.next().getValue();
+        if (!Objects.equals(snapshotInfo.getName(), prevSnapshot)) {
+          snapshotInfos.add(snapshotInfo);
+          maxListResult--;
         }
-      } catch (NoSuchElementException e) {
-        throw new IOException(e);
-      } catch (UncheckedIOException e) {
-        throw e.getCause();
       }
+      if (snapshotIterator.hasNext() && maxListResult == 0 && snapshotInfo != null) {
+        lastSnapshot = snapshotInfo.getName();
+      }
+    } catch (NoSuchElementException e) {
+      throw new IOException(e);
+    } catch (UncheckedIOException e) {
+      throw e.getCause();
     }
-    return snapshotInfos;
+    return new ListSnapshotResponse(snapshotInfos, lastSnapshot);
   }
 
   @Override

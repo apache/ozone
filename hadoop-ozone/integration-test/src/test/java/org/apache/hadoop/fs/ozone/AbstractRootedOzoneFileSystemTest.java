@@ -301,6 +301,12 @@ abstract class AbstractRootedOzoneFileSystemTest {
   }
 
   @Test
+  void testUserHomeDirectory() {
+    assertEquals(new Path(rootPath + "user/" + USER1),
+        userOfs.getHomeDirectory());
+  }
+
+  @Test
   void testCreateDoesNotAddParentDirKeys() throws Exception {
     Path grandparent = new Path(bucketPath,
         "testCreateDoesNotAddParentDirKeys");

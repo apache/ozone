@@ -72,6 +72,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.EchoRPC
 import org.apache.hadoop.ozone.security.OzoneDelegationTokenSelector;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
 import org.apache.hadoop.ozone.snapshot.CancelSnapshotDiffResponse;
+import org.apache.hadoop.ozone.snapshot.ListSnapshotResponse;
 import org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse;
 import org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.StatusAndMessages;
 import org.apache.hadoop.security.KerberosInfo;
@@ -768,12 +769,12 @@ public interface OzoneManagerProtocol
    * @param volumeName     volume name
    * @param bucketName     bucket name
    * @param snapshotPrefix snapshot prefix to match
-   * @param prevSnapshot   start of the list, this snapshot is excluded
-   * @param maxListResult  max numbet of snapshots to return
-   * @return list of snapshots for volume/bucket snapshotpath.
+   * @param prevSnapshot   snapshots will be listed after this snapshot name
+   * @param maxListResult  max number of snapshots to return
+   * @return list of snapshots for volume/bucket path.
    * @throws IOException
    */
-  default List<SnapshotInfo> listSnapshot(
+  default ListSnapshotResponse listSnapshot(
       String volumeName, String bucketName, String snapshotPrefix,
       String prevSnapshot, int maxListResult) throws IOException {
     throw new UnsupportedOperationException("OzoneManager does not require " +

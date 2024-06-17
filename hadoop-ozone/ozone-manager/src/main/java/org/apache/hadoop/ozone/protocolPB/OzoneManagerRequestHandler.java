@@ -162,6 +162,7 @@ import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PartInfo;
 import static org.apache.hadoop.util.MetricUtil.captureLatencyNs;
 
+import org.apache.hadoop.ozone.snapshot.ListSnapshotResponse;
 import org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.StatusAndMessages;
 import org.apache.hadoop.util.ProtobufUtils;
 import org.apache.ratis.server.protocol.TermIndex;
@@ -1484,14 +1485,19 @@ public class OzoneManagerRequestHandler implements RequestHandler {
   private OzoneManagerProtocolProtos.ListSnapshotResponse getSnapshots(
       OzoneManagerProtocolProtos.ListSnapshotRequest request)
       throws IOException {
-    List<SnapshotInfo> snapshotInfos = impl.listSnapshot(
+    ListSnapshotResponse implResponse = impl.listSnapshot(
         request.getVolumeName(), request.getBucketName(), request.getPrefix(),
         request.getPrevSnapshot(), request.getMaxListResult());
-    List<OzoneManagerProtocolProtos.SnapshotInfo> snapshotInfoList =
-        snapshotInfos.stream().map(SnapshotInfo::getProtobuf)
-            .collect(Collectors.toList());
-    return OzoneManagerProtocolProtos.ListSnapshotResponse.newBuilder()
-        .addAllSnapshotInfo(snapshotInfoList).build();
+
+    List<OzoneManagerProtocolProtos.SnapshotInfo> snapshotInfoList = implResponse.getSnapshotInfos()
+        .stream().map(SnapshotInfo::getProtobuf).collect(Collectors.toList());
+
+    OzoneManagerProtocolProtos.ListSnapshotResponse.Builder builder =
+        OzoneManagerProtocolProtos.ListSnapshotResponse.newBuilder().addAllSnapshotInfo(snapshotInfoList);
+    if (StringUtils.isNotEmpty(implResponse.getLastSnapshot())) {
+      builder.setLastSnapshot(implResponse.getLastSnapshot());
+    }
+    return builder.build();
   }
 
   private TransferLeadershipResponseProto transferLeadership(

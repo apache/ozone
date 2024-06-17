@@ -2012,6 +2012,7 @@ message CreateSnapshotResponse {
 
 message ListSnapshotResponse {
   repeated SnapshotInfo snapshotInfo = 1;
+  optional string lastSnapshot = 2;
 }
 
 message SnapshotDiffResponse {
