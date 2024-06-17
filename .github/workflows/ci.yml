@@ -15,6 +15,12 @@
 name: full-ci
 on:
   workflow_call:
+    inputs:
+      ratis_args:
+        type: string
+        description: Version overrides from custom Ratis build
+        default: ''
+        required: false
 env:
   FAIL_FAST: ${{ github.event_name == 'pull_request' }}
   MAVEN_OPTS: -Dhttp.keepAlive=false -Dmaven.wagon.http.pool=false -Dmaven.wagon.http.retryHandler.class=standard -Dmaven.wagon.http.retryHandler.count=3
@@ -100,7 +106,7 @@ jobs:
           restore-keys: |
             maven-repo-
       - name: Download Ratis repo
-        if: ${{ RATIS_ARGS != '' }}
+        if: ${{ inputs.ratis_args != '' }}
         uses: actions/download-artifact@v4
         with:
           name: ratis-jars
@@ -112,7 +118,7 @@ jobs:
           distribution: 'temurin'
           java-version: ${{ matrix.java }}
       - name: Run a full build
-        run: hadoop-ozone/dev-support/checks/build.sh -Pdist -Psrc $RATIS_ARGS
+        run: hadoop-ozone/dev-support/checks/build.sh -Pdist -Psrc ${{ inputs.ratis_args }}
         env:
           DEVELOCITY_ACCESS_KEY: ${{ secrets.GE_ACCESS_TOKEN }}
       - name: Store binaries for tests
