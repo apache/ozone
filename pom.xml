@@ -97,9 +97,6 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
     <maven-gpg-plugin.version>3.2.4</maven-gpg-plugin.version>
     <shell-executable>bash</shell-executable>
 
-    <!-- Set the Release year during release -->
-    <release-year>2019</release-year>
-
     <failIfNoTests>false</failIfNoTests>
     <surefire.failIfNoSpecifiedTests>false</surefire.failIfNoSpecifiedTests>
     <maven.test.redirectTestOutputToFile>true</maven.test.redirectTestOutputToFile>
