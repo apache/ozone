@@ -325,7 +325,7 @@ public final class SelfSignedCertificate {
           new SelfSignedCertificate(this);
       try {
         return rootCertificate.generateCertificate(caCertSerialId);
-      } catch (OperatorCreationException | CertIOException  e) {
+      } catch (OperatorCreationException | CertIOException e) {
         throw new CertificateException("Unable to create root certificate.",
             e.getCause());
       }
