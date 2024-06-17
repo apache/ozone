@@ -114,7 +114,6 @@ public class TestPipelineClose {
             ReplicationFactor.THREE), "testOwner");
     ratisContainer = new ContainerWithPipeline(containerInfo,
         pipelineManager.getPipeline(containerInfo.getPipelineID()));
-    pipelineManager = scm.getPipelineManager();
     // At this stage, there should be 2 pipeline one with 1 open container each.
     // Try closing the both the pipelines, one with a closed container and
     // the other with an open container.

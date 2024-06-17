@@ -58,16 +58,17 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_METADATA_DIRS;
 import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.getRandomPipeline;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertInstanceOf;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -207,6 +208,33 @@ public class TestReconPipelineManager {
     reconPipelineManager.addPipeline(pipeline);
     assertTrue(reconPipelineManager.containsPipeline(pipeline.getId()));
   }
+
+  @Test
+  public void testDuplicatePipelineHandling() throws IOException {
+    Pipeline pipeline = getRandomPipeline();
+    NetworkTopology clusterMap = new NetworkTopologyImpl(conf);
+    EventQueue eventQueue = new EventQueue();
+    versionManager = mock(HDDSLayoutVersionManager.class);
+    when(versionManager.getMetadataLayoutVersion()).thenReturn(maxLayoutVersion());
+    when(versionManager.getSoftwareLayoutVersion()).thenReturn(maxLayoutVersion());
+    NodeManager nodeManager =
+        new SCMNodeManager(conf, scmStorageConfig, eventQueue, clusterMap,
+            SCMContext.emptyContext(), versionManager);
+
+    ReconPipelineManager reconPipelineManager =
+        ReconPipelineManager.newReconPipelineManager(conf, nodeManager,
+            ReconSCMDBDefinition.PIPELINES.getTable(store), eventQueue,
+            scmhaManager, scmContext);
+
+    // Add the pipeline for the first time
+    reconPipelineManager.addPipeline(pipeline);
+
+    // Attempt to add the same pipeline again and ensure no exception is thrown
+    assertDoesNotThrow(() -> {
+      reconPipelineManager.addPipeline(pipeline);
+    }, "Exception was thrown when adding a duplicate pipeline.");
+  }
+
 
   @Test
   public void testStubbedReconPipelineFactory() throws IOException {
