@@ -1,0 +1,212 @@
+# Licensed to the Apache Software Foundation (ASF) under one
+# or more contributor license agreements.  See the NOTICE file
+# distributed with this work for additional information
+# regarding copyright ownership.  The ASF licenses this file
+# to you under the Apache License, Version 2.0 (the
+# "License"); you may not use this file except in compliance
+# with the License.  You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+image:
+  repository: apache/ozone
+  pullPolicy: IfNotPresent
+  tag: ~
+
+imagePullSecrets: []
+
+# Common environment variables (templated)
+env: []
+# Common envFrom items to set up environment variables (templated)
+envFrom: []
+
+# Configuration management
+configuration:
+  # Configuration directory, i.e. $OZONE_CONF_DIR
+  dir: /opt/hadoop/etc/hadoop
+  # Configuration files from the specified keys (file name) and values (file content)
+  files:
+    'log4j.properties': |-
+      log4j.rootLogger=INFO,stdout
+      log4j.appender.stdout=org.apache.log4j.ConsoleAppender
+      log4j.appender.stdout.layout=org.apache.log4j.PatternLayout
+      log4j.appender.stdout.layout.ConversionPattern=%d{ISO8601} [%t] %-5p %c{2} (%F:%M(%L)) - %m%n
+  # Configuration files from the existing ConfigMaps and Secrets
+  filesFrom: []
+  #  - configMap:
+  #      name: ozone-config-files
+  #  - secret:
+  #      name: ozone-secret-files
+  #  - secret:
+  #      name: common-secret-files
+  #      items:
+  #        - key: ozone
+  #          path: /etc/hadoop/ozone-site.xml
+
+# Constrain all Ozone pods to nodes with specific node labels
+nodeSelector: {}
+# Constrain all Ozone pods to nodes by affinity/anti-affinity rules
+affinity: {}
+# Allow to schedule all Ozone pods on nodes with matching taints
+tolerations: []
+
+# Common security context
+securityContext: {}
+
+# Datanode configuration
+datanode:
+  # Number of Datanode replicas
+  replicas: 3
+  # Command to launch Datanode (templated)
+  command: ~
+  # Arguments to launch Datanode (templated)
+  args: ["ozone", "datanode"]
+  # Additional Datanode environment variables (templated)
+  env: []
+  # Additional Datanode envFrom items to set up environment variables (templated)
+  envFrom: []
+  # Constrain Datanode pods to nodes with specific node labels
+  nodeSelector: {}
+  # Constrain Datanode pods to nodes by affinity/anti-affinity rules
+  affinity: {}
+  # Allow to schedule Datanode pods on nodes with matching taints
+  tolerations: []
+  # Datanode security context (overwrites common security context)
+  securityContext: {}
+  # Datanode service configuration
+  service:
+    type: ClusterIP
+    port: 9882
+    nodePort: ~
+  # Datanode persistence
+  persistence:
+    # Enable persistence
+    enabled: false
+    # Path for datanode volume mount
+    path: /data
+    # Existing PVC name to use
+    existingClaim: ~
+    # Volume size
+    size: 10Gi
+    # The name of a specific storage class name to use
+    storageClassName: ~
+
+# Ozone Manager configuration
+om:
+  # Number of Ozone Manager replicas
+  replicas: 1
+  # Command to launch Ozone Manager (templated)
+  command: ~
+  # Arguments to launch Ozone Manager (templated)
+  args: ["ozone", "om"]
+  # Additional Ozone Manager environment variables (templated)
+  env: []
+  # Additional Ozone Manager envFrom items to set up environment variables (templated)
+  envFrom: []
+  # Constrain Ozone Manager pods to nodes with specific node labels
+  nodeSelector: {}
+  # Constrain Ozone Manager pods to nodes by affinity/anti-affinity rules
+  affinity: {}
+  # Allow to schedule Ozone Manager pods on nodes with matching taints
+  tolerations: []
+  # Ozone Manager security context (overwrites common security context)
+  securityContext: {}
+  # Ozone Manager service configuration
+  service:
+    type: ClusterIP
+    port: 9874
+    nodePort: ~
+  # Ozone Manager persistence
+  persistence:
+    # Enable persistence
+    enabled: false
+    # Path for Ozone Manager volume mount
+    path: /data
+    # Existing PVC name to use
+    existingClaim: ~
+    # Volume size
+    size: 10Gi
+    # The name of a specific storage class name to use
+    storageClassName: ~
+
+# S3 Gateway configuration
+s3g:
+  # Number of S3 Gateway replicas
+  replicas: 1
+  # Command to launch S3 Gateway (templated)
+  command: ~
+  # Arguments to launch S3 Gateway (templated)
+  args: ["ozone", "s3g"]
+  # Additional S3 Gateway environment variables (templated)
+  env: []
+  # Additional S3 Gateway envFrom items to set up environment variables (templated)
+  envFrom: []
+  # Constrain S3 Gateway pods to nodes with specific node labels
+  nodeSelector: {}
+  # Constrain S3 Gateway pods to nodes by affinity/anti-affinity rules
+  affinity: {}
+  # Allow to schedule S3 Gateway pods on nodes with matching taints
+  tolerations: []
+  # S3 Gateway security context (overwrites common security context)
+  securityContext: {}
+  # S3 Gateway service configuration
+  service:
+    type: ClusterIP
+    port: 9878
+    nodePort: ~
+  # S3 Gateway persistence
+  persistence:
+    # Enable persistence
+    enabled: false
+    # Path for S3 Gateway volume mount
+    path: /data
+    # Existing PVC name to use
+    existingClaim: ~
+    # Volume size
+    size: 10Gi
+    # The name of a specific storage class name to use
+    storageClassName: ~
+
+# Storage Container Manager configuration
+scm:
+  # Number of Storage Container Manager replicas
+  replicas: 1
+  # Command to launch Storage Container Manager (templated)
+  command: ~
+  # Arguments to launch Storage Container Manager (templated)
+  args: ["ozone", "scm"]
+  # Additional Storage Container Manager environment variables (templated)
+  env: []
+  # Additional Storage Container Manager envFrom items to set up environment variables (templated)
+  envFrom: []
+  # Constrain Storage Container Manager pods to nodes with specific node labels
+  nodeSelector: {}
+  # Constrain Storage Container Manager pods to nodes by affinity/anti-affinity rules
+  affinity: {}
+  # Allow to schedule Storage Container Manager pods on nodes with matching taints
+  tolerations: []
+  # Storage Container Manager security context (overwrites common security context)
+  securityContext: {}
+  # Storage Container Manager service configuration
+  service:
+    type: ClusterIP
+    port: 9876
+    nodePort: ~
+  # Storage Container Manager persistence
+  persistence:
+    # Enable persistence
+    enabled: false
+    # Path for Storage Container Manager volume mount
+    path: /data
+    # Existing PVC name to use
+    existingClaim: ~
+    # Volume size
+    size: 10Gi
+    # The name of a specific storage class name to use
+    storageClassName: ~

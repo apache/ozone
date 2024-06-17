@@ -1,0 +1,47 @@
+{{/*
+  Licensed to the Apache Software Foundation (ASF) under one
+  or more contributor license agreements.  See the NOTICE file
+  distributed with this work for additional information
+  regarding copyright ownership.  The ASF licenses this file
+  to you under the Apache License, Version 2.0 (the
+  "License"); you may not use this file except in compliance
+  with the License.  You may obtain a copy of the License at
+
+      http://www.apache.org/licenses/LICENSE-2.0
+
+  Unless required by applicable law or agreed to in writing, software
+  distributed under the License is distributed on an "AS IS" BASIS,
+  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+  See the License for the specific language governing permissions and
+  limitations under the License.
+*/}}
+
+The chart has been installed!
+
+In order to check the release status, use:
+  helm status {{ .Release.Name }} -n {{ .Release.Namespace }}
+    or for more detailed info
+  helm get all {{ .Release.Name }} -n {{ .Release.Namespace }}
+
+****************
+*   Services   *
+****************
+
+Ozone Manager
+ To access Ozone Manager from a browser, use the following command and visit localhost:{{ .Values.om.service.port }}
+ $ kubectl port-forward svc/{{ .Release.Name }}-om {{ .Values.om.service.port }}:{{ .Values.om.service.port }}
+
+Storage Container Manager
+ To access Storage Container Manager from a browser, use the following command and visit localhost:{{ .Values.scm.service.port }}
+ $ kubectl port-forward svc/{{ .Release.Name }}-scm {{ .Values.scm.service.port }}:{{ .Values.scm.service.port }}
+
+Datanode
+ To access Datanode instances from a browser, use one of the following commands and visit localhost:{{ .Values.datanode.service.port }}
+ {{- $replicas := .Values.datanode.replicas | int }}
+ {{- range $i := until $replicas }}
+ $ kubectl port-forward pod/{{ $.Release.Name }}-datanode-{{ $i }} {{ $.Values.datanode.service.port }}:{{ $.Values.datanode.service.port }}
+ {{- end }}
+
+S3 Gateway
+ To access S3 Gateway from a local environment, use the following command and specify localhost:{{ .Values.s3g.service.port }} as S3 endpoint
+ $ kubectl port-forward svc/{{ .Release.Name }}-s3g {{ .Values.s3g.service.port }}:{{ .Values.s3g.service.port }}
