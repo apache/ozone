@@ -224,7 +224,11 @@ public class DefaultCAServer implements CertificateServer {
     CompletableFuture<Void> csrInspection = approver.inspectCSR(csr);
     CompletableFuture<CertPath> certPathPromise = new CompletableFuture<>();
     if (csrInspection.isCompletedExceptionally()) {
-      certPathPromise.completeExceptionally(new SCMSecurityException("Failed to verify the CSR."));
+      try {
+        csrInspection.get();
+      } catch (Exception e) {
+        certPathPromise.completeExceptionally(new SCMSecurityException("Failed to verify the CSR.", e));
+      }
     }
     try {
       switch (approverType) {
