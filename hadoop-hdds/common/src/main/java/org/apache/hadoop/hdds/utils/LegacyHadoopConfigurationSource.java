@@ -18,12 +18,18 @@
 package org.apache.hadoop.hdds.utils;
 
 import java.io.IOException;
-import java.net.URL;
-import java.util.*;
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.HashMap;
+import java.util.Iterator;
+import java.util.Map;
+import java.util.Properties;
 
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.hdds.conf.*;
-import org.apache.hadoop.hdds.fs.DUFactory;
+import org.apache.hadoop.hdds.conf.ConfigTag;
+import org.apache.hadoop.hdds.conf.ConfigurationException;
+import org.apache.hadoop.hdds.conf.ConfigurationSource;
+import org.apache.hadoop.hdds.conf.MutableConfigurationSource;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SECURITY_CRYPTO_COMPLIANCE_MODE_UNRESTRICTED;
@@ -39,10 +45,12 @@ public class LegacyHadoopConfigurationSource
   public LegacyHadoopConfigurationSource(Configuration configuration) {
     this.configuration = new Configuration(configuration) {
       private Properties properties;
-      private String complianceMode = getPropertyUnsafe(OzoneConfigKeys.OZONE_SECURITY_CRYPTO_COMPLIANCE_MODE,
-          OzoneConfigKeys.OZONE_SECURITY_CRYPTO_COMPLIANCE_MODE_UNRESTRICTED);
-      private boolean checkCompliance = !complianceMode.equals(OZONE_SECURITY_CRYPTO_COMPLIANCE_MODE_UNRESTRICTED);
-      Properties cryptoProperties = getCryptoProperties();
+      private final String complianceMode =
+          getPropertyUnsafe(OzoneConfigKeys.OZONE_SECURITY_CRYPTO_COMPLIANCE_MODE,
+              OzoneConfigKeys.OZONE_SECURITY_CRYPTO_COMPLIANCE_MODE_UNRESTRICTED);
+      private final boolean checkCompliance =
+          !complianceMode.equals(OZONE_SECURITY_CRYPTO_COMPLIANCE_MODE_UNRESTRICTED);
+      private final Properties cryptoProperties = getCryptoProperties();
 
       @Override
       protected synchronized Properties getProps() {
@@ -55,7 +63,7 @@ public class LegacyHadoopConfigurationSource
             }
 
             @Override
-            public synchronized Object setProperty(String key, String value) {
+            public Object setProperty(String key, String value) {
               super.setProperty(key, value);
               return defaults.setProperty(key, value);
             }
@@ -82,7 +90,8 @@ public class LegacyHadoopConfigurationSource
 
       public String checkCompliance(String config, String value) {
         // Don't check the ozone.security.crypto.compliance.mode config, even though it's tagged as a crypto config
-        if (checkCompliance && cryptoProperties.containsKey(config) && !config.equals(OzoneConfigKeys.OZONE_SECURITY_CRYPTO_COMPLIANCE_MODE)) {
+        if (checkCompliance && cryptoProperties.containsKey(config) &&
+            !config.equals(OzoneConfigKeys.OZONE_SECURITY_CRYPTO_COMPLIANCE_MODE)) {
 
           String whitelistConfig = config + "." + complianceMode + ".whitelist";
           String whitelistValue = getPropertyUnsafe(whitelistConfig, "");
@@ -107,7 +116,7 @@ public class LegacyHadoopConfigurationSource
         synchronized (props) {
           for (Map.Entry<Object, Object> item : props.entrySet()) {
             if (item.getKey() instanceof String && item.getValue() instanceof String) {
-              checkCompliance((String) item.getKey(),(String) item.getValue());
+              checkCompliance((String) item.getKey(), (String) item.getValue());
               result.put((String) item.getKey(), (String) item.getValue());
             }
           }

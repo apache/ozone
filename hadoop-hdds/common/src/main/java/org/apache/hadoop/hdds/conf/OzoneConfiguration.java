@@ -65,9 +65,9 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SECURITY_CRYPTO_COMP
 public class OzoneConfiguration extends Configuration
     implements MutableConfigurationSource {
 
-  private static String complianceMode;
-  private static boolean checkCompliance;
-  private static Properties cryptoProperties;
+  private static String complianceMode = null;
+  private static boolean checkCompliance = false;
+  private static Properties cryptoProperties = null;
   public static final SortedSet<String> TAGS = unmodifiableSortedSet(
       Arrays.stream(ConfigTag.values())
           .map(Enum::name)
@@ -111,11 +111,10 @@ public class OzoneConfiguration extends Configuration
   public OzoneConfiguration() {
     OzoneConfiguration.activate();
     loadDefaults();
-    cryptoProperties = getCryptoProperties();
-    complianceMode = getPropertyUnsafe(OzoneConfigKeys.OZONE_SECURITY_CRYPTO_COMPLIANCE_MODE,
+    OzoneConfiguration.complianceMode = getPropertyUnsafe(OzoneConfigKeys.OZONE_SECURITY_CRYPTO_COMPLIANCE_MODE,
         OzoneConfigKeys.OZONE_SECURITY_CRYPTO_COMPLIANCE_MODE_UNRESTRICTED);
-    checkCompliance = !complianceMode.equals(OZONE_SECURITY_CRYPTO_COMPLIANCE_MODE_UNRESTRICTED);
-    //cryptoProperties = getCryptoProperties();
+    OzoneConfiguration.checkCompliance = !complianceMode.equals(OZONE_SECURITY_CRYPTO_COMPLIANCE_MODE_UNRESTRICTED);
+    OzoneConfiguration.cryptoProperties = getCryptoProperties();
   }
 
   public OzoneConfiguration(Configuration conf) {
@@ -126,10 +125,10 @@ public class OzoneConfiguration extends Configuration
       loadDefaults();
       addResource(conf);
     }
-    complianceMode = getPropertyUnsafe(OzoneConfigKeys.OZONE_SECURITY_CRYPTO_COMPLIANCE_MODE,
+    OzoneConfiguration.complianceMode = getPropertyUnsafe(OzoneConfigKeys.OZONE_SECURITY_CRYPTO_COMPLIANCE_MODE,
         OzoneConfigKeys.OZONE_SECURITY_CRYPTO_COMPLIANCE_MODE_UNRESTRICTED);
-    checkCompliance = !complianceMode.equals(OZONE_SECURITY_CRYPTO_COMPLIANCE_MODE_UNRESTRICTED);
-    cryptoProperties = getCryptoProperties();
+    OzoneConfiguration.checkCompliance = !complianceMode.equals(OZONE_SECURITY_CRYPTO_COMPLIANCE_MODE_UNRESTRICTED);
+    OzoneConfiguration.cryptoProperties = getCryptoProperties();
   }
 
   private void loadDefaults() {
@@ -277,9 +276,9 @@ public class OzoneConfiguration extends Configuration
     Properties updatedProps = getProps();
     Properties propertiesByTag = super.getAllPropertiesByTag(tag);
     Properties props = new Properties();
-    Enumeration properties = propertiesByTag.propertyNames();
-    while (properties.hasMoreElements()) {
-      Object propertyName = properties.nextElement();
+    Enumeration propertyNames = propertiesByTag.propertyNames();
+    while (propertyNames.hasMoreElements()) {
+      Object propertyName = propertyNames.nextElement();
       // get the current value of the property
       Object value = updatedProps.getProperty(propertyName.toString());
       if (value != null) {
@@ -435,7 +434,7 @@ public class OzoneConfiguration extends Configuration
         }
 
         @Override
-        public synchronized Object setProperty(String key, String value) {
+        public  Object setProperty(String key, String value) {
           super.setProperty(key, value);
           return defaults.setProperty(key, value);
         }
@@ -462,7 +461,8 @@ public class OzoneConfiguration extends Configuration
 
   public String checkCompliance(String config, String value) {
     // Don't check the ozone.security.crypto.compliance.mode config, even though it's tagged as a crypto config
-    if (checkCompliance && cryptoProperties.containsKey(config) && !config.equals(OzoneConfigKeys.OZONE_SECURITY_CRYPTO_COMPLIANCE_MODE)) {
+    if (checkCompliance && cryptoProperties.containsKey(config) &&
+        !config.equals(OzoneConfigKeys.OZONE_SECURITY_CRYPTO_COMPLIANCE_MODE)) {
 
       String whitelistConfig = config + "." + complianceMode + ".whitelist";
       String whitelistValue = getPropertyUnsafe(whitelistConfig, "");
@@ -487,7 +487,7 @@ public class OzoneConfiguration extends Configuration
     synchronized (props) {
       for (Map.Entry<Object, Object> item : props.entrySet()) {
         if (item.getKey() instanceof String && item.getValue() instanceof String) {
-          checkCompliance((String) item.getKey(),(String) item.getValue());
+          checkCompliance((String) item.getKey(), (String) item.getValue());
           result.put((String) item.getKey(), (String) item.getValue());
         }
       }

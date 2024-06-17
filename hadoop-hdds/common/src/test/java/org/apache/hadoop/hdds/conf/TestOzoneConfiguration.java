@@ -17,7 +17,6 @@
  */
 package org.apache.hadoop.hdds.conf;
 
-import java.beans.Transient;
 import java.io.BufferedWriter;
 import java.io.File;
 import java.io.FileOutputStream;
@@ -26,7 +25,6 @@ import java.io.OutputStreamWriter;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
-import java.util.Properties;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Stream;
 
@@ -156,9 +154,9 @@ public class TestOzoneConfiguration {
 
   @Test
   public void testRestrictedComplianceModeWithOzoneConf() {
-    Configuration conf = new Configuration();
-    conf.set("ozone.security.crypto.compliance.mode", "restricted");
-    OzoneConfiguration ozoneConfig = new OzoneConfiguration(conf);
+    Configuration config = new Configuration();
+    config.set("ozone.security.crypto.compliance.mode", "restricted");
+    OzoneConfiguration ozoneConfig = new OzoneConfiguration(config);
 
     // Set it to an allowed config value
     ozoneConfig.set("hdds.x509.signature.algorithm", "SHA512withDCA");
@@ -182,8 +180,8 @@ public class TestOzoneConfiguration {
   @Test
   public void testRestrictedComplianceModeWithLegacyHadoopConf() {
     Configuration config = new Configuration();
-    config.set("ozone.security.crypto.compliance.mode", "restricted");
     config.addResource("ozone-default.xml");
+    config.set("ozone.security.crypto.compliance.mode", "restricted");
     LegacyHadoopConfigurationSource legacyHadoopConf = new LegacyHadoopConfigurationSource(config);
 
     // Set it to an allowed config value
@@ -191,7 +189,8 @@ public class TestOzoneConfiguration {
     legacyHadoopConf.set("hdds.x509.signature.algorithm.restricted.whitelist", "SHA512withRSA,SHA512withDCA");
 
     assertEquals("restricted", legacyHadoopConf.get("ozone.security.crypto.compliance.mode"));
-    assertEquals("SHA512withRSA,SHA512withDCA", legacyHadoopConf.get("hdds.x509.signature.algorithm.restricted.whitelist"));
+    assertEquals("SHA512withRSA,SHA512withDCA",
+        legacyHadoopConf.get("hdds.x509.signature.algorithm.restricted.whitelist"));
     assertEquals("SHA512withDCA", legacyHadoopConf.get("hdds.x509.signature.algorithm"));
 
     // Set it to a disallowed config value
