@@ -36,6 +36,7 @@ on:
         description: Ratis ref (branch, tag or commit SHA)
         default: 'master'
         required: true
+run-name: Test Ozone ${{ inputs.ref }} with Ratis ${{ inputs.ratis-repo }} @ ${{ inputs.ratis-ref }}
 jobs:
   ratis:
     uses: ./.github/workflows/build-ratis.yml
