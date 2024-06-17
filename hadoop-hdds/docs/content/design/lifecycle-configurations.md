@@ -153,12 +153,13 @@ The `OmLifecycleConfiguration` table in RocksDB is used to store lifecycle confi
 
 ### Additional Information
 
-- **Maximum Rules**: The table can store up to 1000 rules per lifecycle configuration.
+- **Maximum Rules**: The table can store up to 1000 rules per lifecycle configuration according to https://docs.aws.amazon.com/AmazonS3/latest/userguide/intro-lifecycle-rules.html#intro-lifecycle-rule-id
 - **Validation**: The configuration is considered valid if:
   - The `volume`, `bucket`, and `owner` are not blank.
   - The number of rules is between 1 and 1000.
   - Each rule has a unique ID.
   - All rules are valid according to their individual validation criteria.
+- **Conflict Resolution**: In case of overlapping lifecycle configurations the implementation follows AWS cost optimizing strategy to solve the conflicts https://docs.aws.amazon.com/AmazonS3/latest/userguide/lifecycle-configuration-examples.html#lifecycle-config-conceptual-ex5
 
 # Retention Manager
 ## High-Level Flow
