@@ -1239,6 +1239,18 @@ public abstract class TestOzoneRpcClientAbstract extends OzoneTestBase {
     assertThat(e).hasMessageContaining("not found");
   }
 
+  @ParameterizedTest
+  @EnumSource
+  void cannotRewriteRenamedKey(BucketLayout layout) throws IOException {
+    OzoneBucket bucket = createBucket(layout);
+    OzoneKeyDetails keyDetails = createTestKey(bucket);
+    bucket.renameKey(keyDetails.getName(), "newKeyName-" + layout.name());
+
+    OMException e = assertThrows(OMException.class, () -> rewriteKey(bucket, keyDetails, "rewrite".getBytes(UTF_8)));
+    assertEquals(KEY_NOT_FOUND, e.getResult());
+    assertThat(e).hasMessageContaining("not found");
+  }
+
   private static void rewriteKey(
       OzoneBucket bucket, OzoneKeyDetails keyDetails, byte[] newContent
   ) throws IOException {
