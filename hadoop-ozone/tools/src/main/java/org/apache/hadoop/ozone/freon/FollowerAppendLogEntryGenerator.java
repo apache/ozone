@@ -30,6 +30,7 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ChecksumData;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ChecksumType;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ChunkInfo;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandRequestProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.DatanodeBlockID;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Type;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.WriteChunkRequestProto;
@@ -71,8 +72,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
-
-import static org.apache.hadoop.hdds.scm.storage.ContainerProtocolCalls.getContainerCommandRequestProtoBuilder;
 
 /**
  * Freon test to test one single datanode with a fake leader (this test).
@@ -255,7 +254,7 @@ public class FollowerAppendLogEntryGenerator extends BaseAppendLogGenerator
       long blockId = chunkId / 1000;
       long containerId = blockId / 1000;
       //ozone specific
-      ByteString payload = getContainerCommandRequestProtoBuilder()
+      ByteString payload = ContainerCommandRequestProto.newBuilder()
           .setContainerID(containerId)
           .setCmdType(Type.WriteChunk)
           .setDatanodeUuid(serverId)
