@@ -229,14 +229,12 @@ class TestBlockOutputStreamCorrectness {
     }
 
     @Override
-    public XceiverClientReply sendCommandAsync(
-        ContainerCommandRequestProto request
-    ) {
-      final ContainerCommandRequestProto.Builder finalRequest = ContainerCommandRequestProto.newBuilder(request);
+    public XceiverClientReply sendCommandAsync(ContainerCommandRequestProto request) {
+
       if (!request.hasVersion()) {
-        finalRequest.setVersion(ClientVersion.CURRENT.toProtoValue());
+        request = ContainerCommandRequestProto.newBuilder(request)
+            .setVersion(ClientVersion.CURRENT.toProtoValue()).build();
       }
-      request = finalRequest.build();
       final ContainerCommandResponseProto.Builder builder =
           ContainerCommandResponseProto.newBuilder()
               .setResult(Result.SUCCESS)

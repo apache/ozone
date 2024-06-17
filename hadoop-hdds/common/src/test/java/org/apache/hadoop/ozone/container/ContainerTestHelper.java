@@ -556,7 +556,9 @@ public final class ContainerTestHelper {
    */
   public static ContainerCommandRequestProto getDummyCommandRequestProto(
       ClientVersion clientVersion, ContainerProtos.Type cmdType, int replicaIndex) {
-    final Builder builder = ContainerCommandRequestProto.newBuilder().setVersion(clientVersion.toProtoValue())
+    final Builder builder =
+        ContainerCommandRequestProto.newBuilder()
+            .setVersion(clientVersion.toProtoValue())
             .setCmdType(cmdType)
             .setContainerID(DUMMY_CONTAINER_ID)
             .setDatanodeUuid(DATANODE_UUID);
