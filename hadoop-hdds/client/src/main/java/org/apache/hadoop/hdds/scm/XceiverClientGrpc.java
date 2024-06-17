@@ -358,13 +358,19 @@ public class XceiverClientGrpc extends XceiverClientSpi {
     DatanodeBlockID blockID = null;
     if (request.getCmdType() == ContainerProtos.Type.GetBlock) {
       blockID = request.getGetBlock().getBlockID();
+      datanodeList = pipeline.getNodes();
+      int getBlockDNLeaderIndex = datanodeList.indexOf(pipeline.getLeaderNode());
+      if (getBlockDNLeaderIndex > 0) {
+        // Pull the Cached DN to the top of the DN list
+        Collections.swap(datanodeList, 0, getBlockDNLeaderIndex);
+      }
     } else if  (request.getCmdType() == ContainerProtos.Type.ReadChunk) {
       blockID = request.getReadChunk().getBlockID();
     } else if (request.getCmdType() == ContainerProtos.Type.GetSmallFile) {
       blockID = request.getGetSmallFile().getBlock().getBlockID();
     }
 
-    if (blockID != null) {
+    if (blockID != null && datanodeList == null) {
       // Check if the DN to which the GetBlock command was sent has been cached.
       DatanodeDetails cachedDN = getBlockDNcache.get(blockID);
       if (cachedDN != null) {
