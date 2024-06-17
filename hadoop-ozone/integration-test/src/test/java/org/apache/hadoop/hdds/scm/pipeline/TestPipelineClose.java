@@ -45,9 +45,11 @@ import org.apache.hadoop.ozone.container.common.transport.server.ratis.XceiverSe
 import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ratis.protocol.RaftGroupId;
-import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.TestInstance;
 import org.junit.jupiter.api.Timeout;
 import org.mockito.ArgumentCaptor;
 
@@ -70,6 +72,7 @@ import static org.mockito.Mockito.verify;
 /**
  * Tests for Pipeline Closing.
  */
+@TestInstance(TestInstance.Lifecycle.PER_CLASS)
 @Timeout(300)
 public class TestPipelineClose {
 
@@ -86,7 +89,7 @@ public class TestPipelineClose {
    *
    * @throws IOException
    */
-  @BeforeEach
+  @BeforeAll
   public void init() throws Exception {
     conf = new OzoneConfiguration();
     conf.set(OzoneConfigKeys.OZONE_SCM_CLOSE_CONTAINER_WAIT_DURATION, "2s");
@@ -102,6 +105,10 @@ public class TestPipelineClose {
     scm = cluster.getStorageContainerManager();
     containerManager = scm.getContainerManager();
     pipelineManager = scm.getPipelineManager();
+  }
+
+  @BeforeEach
+  void createContainer() throws IOException {
     ContainerInfo containerInfo = containerManager
         .allocateContainer(RatisReplicationConfig.getInstance(
             ReplicationFactor.THREE), "testOwner");
@@ -116,7 +123,7 @@ public class TestPipelineClose {
   /**
    * Shutdown MiniDFSCluster.
    */
-  @AfterEach
+  @AfterAll
   public void shutdown() {
     if (cluster != null) {
       cluster.shutdown();

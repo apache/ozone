@@ -31,6 +31,7 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.PutBlockRe
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.PutSmallFileRequestProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Type;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.WriteChunkRequestProto;
+import org.apache.hadoop.ozone.ClientVersion;
 import org.apache.hadoop.ozone.common.Checksum;
 import org.apache.hadoop.ozone.common.ChecksumData;
 import org.apache.hadoop.ozone.common.OzoneChecksumException;
@@ -39,8 +40,6 @@ import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-
-import static org.apache.hadoop.hdds.scm.storage.ContainerProtocolCalls.getContainerCommandRequestProtoBuilder;
 
 /** Testing {@link ContainerCommandRequestMessage}. */
 public class TestContainerCommandRequestMessage {
@@ -88,11 +87,12 @@ public class TestContainerCommandRequestMessage {
         .setBlock(putBlockRequest)
         .setData(data)
         .build();
-    return getContainerCommandRequestProtoBuilder()
+    return ContainerCommandRequestProto.newBuilder()
         .setCmdType(Type.PutSmallFile)
         .setContainerID(blockID.getContainerID())
         .setDatanodeUuid(UUID.randomUUID().toString())
         .setPutSmallFile(putSmallFileRequest)
+        .setVersion(ClientVersion.CURRENT.toProtoValue())
         .build();
   }
 
@@ -110,11 +110,12 @@ public class TestContainerCommandRequestMessage {
         .setBlockID(blockID.getDatanodeBlockIDProtobuf())
         .setChunkData(chunk)
         .setData(data);
-    return getContainerCommandRequestProtoBuilder()
+    return ContainerCommandRequestProto.newBuilder()
         .setCmdType(Type.WriteChunk)
         .setContainerID(blockID.getContainerID())
         .setDatanodeUuid(UUID.randomUUID().toString())
         .setWriteChunk(writeChunkRequest)
+        .setVersion(ClientVersion.CURRENT.toProtoValue())
         .build();
   }
 

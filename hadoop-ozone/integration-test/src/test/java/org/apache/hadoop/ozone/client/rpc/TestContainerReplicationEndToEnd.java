@@ -67,7 +67,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
-import static org.apache.hadoop.hdds.scm.storage.ContainerProtocolCalls.getContainerCommandRequestProtoBuilder;
 
 /**
  * Tests delete key operation with a slow follower in the datanode
@@ -195,7 +194,8 @@ public class TestContainerReplicationEndToEnd {
     Thread.sleep(2 * containerReportInterval);
     DatanodeDetails oldReplicaNode = pipeline.getFirstNode();
     // now move the container to the closed on the datanode.
-    ContainerProtos.ContainerCommandRequestProto.Builder request = getContainerCommandRequestProtoBuilder();
+    ContainerProtos.ContainerCommandRequestProto.Builder request =
+        ContainerProtos.ContainerCommandRequestProto.newBuilder();
     request.setDatanodeUuid(pipeline.getFirstNode().getUuidString());
     request.setCmdType(ContainerProtos.Type.CloseContainer);
     request.setContainerID(containerID);

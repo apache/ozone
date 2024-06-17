@@ -209,12 +209,12 @@ jobs:
         if: ${{ !cancelled() }}
       - name: Archive build results
         uses: actions/upload-artifact@v4
-        if: always()
+        if: ${{ failure() }}
         with:
           name: result-${{ github.run_number }}-${{ github.run_id }}-split-${{ matrix.split }}
           path: target/unit
   count-failures:
-    if: ${{ always() }}
+    if: ${{ failure() }}
     needs: run-test
     runs-on: ubuntu-20.04
     steps:
