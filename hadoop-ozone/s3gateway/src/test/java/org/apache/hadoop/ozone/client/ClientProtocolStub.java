@@ -33,6 +33,7 @@ import org.apache.hadoop.ozone.client.io.OzoneInputStream;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.client.protocol.ClientProtocol;
 import org.apache.hadoop.ozone.om.helpers.DeleteTenantState;
+import org.apache.hadoop.ozone.om.helpers.ErrorInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartUploadCompleteInfo;
@@ -58,6 +59,7 @@ import org.apache.hadoop.security.token.Token;
 import java.io.IOException;
 import java.net.URI;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -259,6 +261,13 @@ public class ClientProtocolStub implements ClientProtocol {
   public void deleteKeys(String volumeName, String bucketName,
                          List<String> keyNameList) throws IOException {
 
+  }
+
+  @Override
+  public Map<String, ErrorInfo> deleteKeys(String volumeName, String bucketName,
+                                           List<String> keyNameList, boolean quiet)
+      throws IOException {
+    return new HashMap<>();
   }
 
   @Override

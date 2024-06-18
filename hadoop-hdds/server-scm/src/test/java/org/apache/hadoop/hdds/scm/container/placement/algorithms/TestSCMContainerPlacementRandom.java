@@ -91,7 +91,7 @@ public class TestSCMContainerPlacementRandom {
 
     SCMContainerPlacementRandom scmContainerPlacementRandom =
         new SCMContainerPlacementRandom(mockNodeManager, conf, null, true,
-            null);
+            mock(SCMContainerPlacementMetrics.class));
 
     List<DatanodeDetails> existingNodes = new ArrayList<>();
     existingNodes.add(datanodes.get(0));
@@ -131,7 +131,7 @@ public class TestSCMContainerPlacementRandom {
     NodeManager mockNodeManager = mock(NodeManager.class);
     SCMContainerPlacementRandom scmContainerPlacementRandom =
         new SCMContainerPlacementRandom(mockNodeManager, conf, null, true,
-            null);
+            mock(SCMContainerPlacementMetrics.class));
     ContainerPlacementStatus status =
         scmContainerPlacementRandom.validateContainerPlacement(datanodes, 3);
     assertTrue(status.isPolicySatisfied());
@@ -210,7 +210,7 @@ public class TestSCMContainerPlacementRandom {
 
     SCMContainerPlacementRandom scmContainerPlacementRandom =
         new SCMContainerPlacementRandom(mockNodeManager, conf, null, true,
-            null);
+            mock(SCMContainerPlacementMetrics.class));
 
     assertTrue(
         scmContainerPlacementRandom.isValidNode(datanodes.get(0), 15L, 15L));

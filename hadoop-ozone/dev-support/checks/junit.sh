@@ -83,6 +83,10 @@ for i in $(seq 1 ${ITERATIONS}); do
       FAIL_FAST=true
     fi
 
+    if [[ ${irc} == 0 ]]; then
+      rm -fr "${REPORT_DIR}"
+    fi
+
     REPORT_DIR="${original_report_dir}"
     echo "Iteration ${i} exit code: ${irc}" | tee -a "${REPORT_FILE}"
   fi
@@ -103,7 +107,7 @@ fi
 
 if [[ "${OZONE_WITH_COVERAGE}" == "true" ]]; then
   #Archive combined jacoco records
-  mvn -B -N jacoco:merge -Djacoco.destFile=$REPORT_DIR/jacoco-combined.exec
+  mvn -B -N jacoco:merge -Djacoco.destFile=$REPORT_DIR/jacoco-combined.exec -Dscan=false
 fi
 
 exit ${rc}

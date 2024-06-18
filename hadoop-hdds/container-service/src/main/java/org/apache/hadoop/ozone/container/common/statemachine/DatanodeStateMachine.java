@@ -33,10 +33,8 @@ import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.conf.ReconfigurationHandler;
-import org.apache.hadoop.hdds.datanode.metadata.DatanodeCRLStore;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto;
-import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.CRLStatusReport;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.CommandStatusReportsProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReportsProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.NodeReportProto;
@@ -101,7 +99,6 @@ public class DatanodeStateMachine implements Closeable {
   private final ECReconstructionCoordinator ecReconstructionCoordinator;
   private StateContext context;
   private final OzoneContainer container;
-  private final DatanodeCRLStore dnCRLStore;
   private final DatanodeDetails datanodeDetails;
   private final CommandDispatcher commandDispatcher;
   private final ReportManager reportManager;
@@ -146,7 +143,6 @@ public class DatanodeStateMachine implements Closeable {
                               CertificateClient certClient,
                               SecretKeyClient secretKeyClient,
                               HddsDatanodeStopService hddsDatanodeStopService,
-                              DatanodeCRLStore crlStore,
                               ReconfigurationHandler reconfigurationHandler)
       throws IOException {
     DatanodeConfiguration dnConf =
@@ -167,7 +163,6 @@ public class DatanodeStateMachine implements Closeable {
     upgradeFinalizer = new DataNodeUpgradeFinalizer(layoutVersionManager);
     VersionedDatanodeFeatures.initialize(layoutVersionManager);
 
-    this.dnCRLStore = crlStore;
     String threadNamePrefix = datanodeDetails.threadNamePrefix();
     executorService = Executors.newFixedThreadPool(
         getEndPointTaskThreadPoolSize(),
@@ -269,7 +264,6 @@ public class DatanodeStateMachine implements Closeable {
         .addPublisherFor(ContainerReportsProto.class)
         .addPublisherFor(CommandStatusReportsProto.class)
         .addPublisherFor(PipelineReportsProto.class)
-        .addPublisherFor(CRLStatusReport.class)
         .addThreadNamePrefix(threadNamePrefix)
         .build();
 
@@ -280,7 +274,7 @@ public class DatanodeStateMachine implements Closeable {
   @VisibleForTesting
   public DatanodeStateMachine(DatanodeDetails datanodeDetails,
                               ConfigurationSource conf) throws IOException {
-    this(datanodeDetails, conf, null, null, null, null,
+    this(datanodeDetails, conf, null, null, null,
         new ReconfigurationHandler("DN", (OzoneConfiguration) conf, op -> { }));
   }
 
@@ -329,10 +323,6 @@ public class DatanodeStateMachine implements Closeable {
     } finally {
       constructionLock.readLock().unlock();
     }
-  }
-
-  public DatanodeCRLStore getDnCRLStore() {
-    return dnCRLStore;
   }
 
   /**

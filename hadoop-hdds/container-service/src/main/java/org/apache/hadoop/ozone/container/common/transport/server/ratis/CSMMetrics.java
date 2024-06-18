@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone.container.common.transport.server.ratis;
 
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Type;
 import org.apache.hadoop.metrics2.MetricsSystem;
 import org.apache.hadoop.metrics2.annotation.Metric;
 import org.apache.hadoop.metrics2.annotation.Metrics;
@@ -27,6 +28,8 @@ import org.apache.hadoop.metrics2.lib.MutableCounterLong;
 import org.apache.hadoop.metrics2.lib.MutableRate;
 import org.apache.hadoop.metrics2.lib.MetricsRegistry;
 import org.apache.ratis.protocol.RaftGroupId;
+
+import java.util.EnumMap;
 
 /**
  * This class is for maintaining Container State Machine statistics.
@@ -46,7 +49,7 @@ public class CSMMetrics {
   private @Metric MutableCounterLong numBytesCommittedCount;
 
   private @Metric MutableRate transactionLatencyMs;
-  private MutableRate[] opsLatencyMs;
+  private final EnumMap<Type, MutableRate> opsLatencyMs;
   private MetricsRegistry registry = null;
 
   // Failure Metrics
@@ -66,13 +69,10 @@ public class CSMMetrics {
   private @Metric MutableRate writeStateMachineDataNs;
 
   public CSMMetrics() {
-    int numCmdTypes = ContainerProtos.Type.values().length;
-    this.opsLatencyMs = new MutableRate[numCmdTypes];
+    this.opsLatencyMs = new EnumMap<>(ContainerProtos.Type.class);
     this.registry = new MetricsRegistry(CSMMetrics.class.getSimpleName());
-    for (int i = 0; i < numCmdTypes; i++) {
-      opsLatencyMs[i] = registry.newRate(
-          ContainerProtos.Type.forNumber(i + 1).toString() + "Ms",
-          ContainerProtos.Type.forNumber(i + 1) + " op");
+    for (ContainerProtos.Type type : ContainerProtos.Type.values()) {
+      opsLatencyMs.put(type, registry.newRate(type.toString() + "Ms", type + " op"));
     }
   }
 
@@ -185,7 +185,7 @@ public class CSMMetrics {
 
   public void incPipelineLatencyMs(ContainerProtos.Type type,
       long latencyMillis) {
-    opsLatencyMs[type.ordinal()].add(latencyMillis);
+    opsLatencyMs.get(type).add(latencyMillis);
     transactionLatencyMs.add(latencyMillis);
   }
 

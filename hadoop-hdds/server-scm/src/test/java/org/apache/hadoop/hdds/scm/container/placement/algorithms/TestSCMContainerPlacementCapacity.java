@@ -51,6 +51,7 @@ import static org.mockito.Mockito.when;
  * Test for the scm container placement.
  */
 public class TestSCMContainerPlacementCapacity {
+
   @Test
   public void chooseDatanodes() throws SCMException {
     //given
@@ -120,7 +121,7 @@ public class TestSCMContainerPlacementCapacity {
 
     SCMContainerPlacementCapacity scmContainerPlacementRandom =
         new SCMContainerPlacementCapacity(mockNodeManager, conf, null, true,
-            null);
+            mock(SCMContainerPlacementMetrics.class));
 
     List<DatanodeDetails> existingNodes = new ArrayList<>();
     existingNodes.add(datanodes.get(0));
