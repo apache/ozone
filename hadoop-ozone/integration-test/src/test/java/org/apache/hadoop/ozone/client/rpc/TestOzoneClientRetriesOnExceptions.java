@@ -218,7 +218,7 @@ public class TestOzoneClientRetriesOnExceptions {
                 .getPipeline(container.getPipelineID());
         XceiverClientSpi xceiverClient =
             xceiverClientManager.acquireClient(pipeline);
-        Assumptions.assumeFalse(containerList.contains(containerID));
+        assertThat(containerList.contains(containerID));
         containerList.add(containerID);
         xceiverClient.sendCommand(ContainerTestHelper
             .getCreateContainerRequest(containerID, pipeline));
