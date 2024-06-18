@@ -555,31 +555,13 @@ public class XceiverClientGrpc extends XceiverClientSpi {
               @Override
               public void onNext(ContainerCommandResponseProto value) {
                 replyFuture.complete(value);
-                metrics.decrPendingContainerOpsMetrics(request.getCmdType());
-                long cost = System.currentTimeMillis() - requestTime;
-                metrics.addContainerOpsLatency(request.getCmdType(),
-                    cost);
-                if (LOG.isDebugEnabled()) {
-                  LOG.debug("Executed command {} on datanode {}, cost = {}, "
-                          + "cmdType = {}", processForDebug(request), dn,
-                      cost, request.getCmdType());
-                }
-                semaphore.release();
+                decreasePendingMetricsAndReleaseSemaphore();
               }
 
               @Override
               public void onError(Throwable t) {
                 replyFuture.completeExceptionally(t);
-                metrics.decrPendingContainerOpsMetrics(request.getCmdType());
-                long cost = System.currentTimeMillis() - requestTime;
-                metrics.addContainerOpsLatency(request.getCmdType(),
-                    System.currentTimeMillis() - requestTime);
-                if (LOG.isDebugEnabled()) {
-                  LOG.debug("Executed command {} on datanode {}, cost = {}, "
-                          + "cmdType = {}", processForDebug(request), dn,
-                      cost, request.getCmdType());
-                }
-                semaphore.release();
+                decreasePendingMetricsAndReleaseSemaphore();
               }
 
               @Override
@@ -589,6 +571,17 @@ public class XceiverClientGrpc extends XceiverClientSpi {
                       "Stream completed but no reply for request " +
                           processForDebug(request)));
                 }
+              }
+
+              private void decreasePendingMetricsAndReleaseSemaphore() {
+                metrics.decrPendingContainerOpsMetrics(request.getCmdType());
+                long cost = System.currentTimeMillis() - requestTime;
+                metrics.addContainerOpsLatency(request.getCmdType(), cost);
+                if (LOG.isDebugEnabled()) {
+                  LOG.debug("Executed command {} on datanode {}, cost = {}, cmdType = {}",
+                      processForDebug(request), dn, cost, request.getCmdType());
+                }
+                semaphore.release();
               }
             });
     requestObserver.onNext(request);
