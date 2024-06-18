@@ -117,6 +117,10 @@ public class DBScanner implements Callable<Void>, SubcommandWithParent {
       description = "Key from which to iterate the DB")
   private String startKey;
 
+  @CommandLine.Option(names = {"--endkey", "--ek", "-e"},
+      description = "Key at which iteration of the DB ends")
+  private String endKey;
+
   @CommandLine.Option(names = {"--dnSchema", "--dn-schema", "-d"},
       description = "Datanode DB Schema Version: V1/V2/V3",
       defaultValue = "V3")
@@ -207,6 +211,24 @@ public class DBScanner implements Callable<Void>, SubcommandWithParent {
     }
   }
 
+  public byte[] getEndKeyValueObject(
+      DBColumnFamilyDefinition dbColumnFamilyDefinition) {
+    Class<?> keyType = dbColumnFamilyDefinition.getKeyType();
+    if (keyType.equals(String.class)) {
+      return endKey.getBytes(UTF_8);
+    } else if (keyType.equals(ContainerID.class)) {
+      return new ContainerID(Long.parseLong(endKey)).getBytes();
+    } else if (keyType.equals(Long.class)) {
+      return LongCodec.get().toPersistedFormat(Long.parseLong(endKey));
+    } else if (keyType.equals(PipelineID.class)) {
+      return PipelineID.valueOf(UUID.fromString(endKey)).getProtobuf()
+          .toByteArray();
+    } else {
+      throw new IllegalArgumentException(
+          "endKey is not supported for this table.");
+    }
+  }
+
   private boolean displayTable(ManagedRocksIterator iterator,
                                DBColumnFamilyDefinition dbColumnFamilyDef,
                                boolean schemaV3)
@@ -269,7 +291,12 @@ public class DBScanner implements Callable<Void>, SubcommandWithParent {
     // Count number of keys printed so far
     long count = 0;
     List<Future<Void>> futures = new ArrayList<>();
-    while (withinLimit(count) && iterator.get().isValid() && !exception) {
+    boolean reachedEnd = false;
+    while (withinLimit(count) && iterator.get().isValid() && !exception && !reachedEnd) {
+      // if invalid endKey is given, it is ignored
+      if (null != endKey && Arrays.equals(iterator.get().key(), getEndKeyValueObject(dbColumnFamilyDef))) {
+        reachedEnd = true;
+      }
       batch.add(new ByteArrayKeyValue(
           iterator.get().key(), iterator.get().value()));
       iterator.get().next();
