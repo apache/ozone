@@ -73,8 +73,8 @@ public class TestRoundRobinPipelineChoosePolicy {
 
     Map<Pipeline, Integer> selectedCountMap = new HashMap<>();
 
-    final int numBlocks = 1000;
-    for (int i = 0; i < numBlocks; i++) {
+    final int numContainers = 1000;
+    for (int i = 0; i < numContainers; i++) {
       Pipeline pipeline = policy.choosePipeline(pipelines, null);
       Assertions.assertNotNull(pipeline);
       final int expectedPipelineIndex = i % numPipelines;
@@ -85,7 +85,7 @@ public class TestRoundRobinPipelineChoosePolicy {
 
     // Each pipeline would be chosen 1000/4 = 250 times
     for (int i = 0; i < numPipelines; i++) {
-      Assertions.assertEquals(numBlocks / numPipelines, selectedCountMap.get(pipelines.get(i)));
+      Assertions.assertEquals(numContainers / numPipelines, selectedCountMap.get(pipelines.get(i)));
     }
   }
 }
