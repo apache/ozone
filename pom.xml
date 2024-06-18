@@ -2171,6 +2171,11 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
     </profile>
     <profile>
       <id>native</id>
+      <activation>
+        <property>
+          <name>rocks_tools_native</name>
+        </property>
+      </activation>
       <build>
         <plugins>
           <plugin>
