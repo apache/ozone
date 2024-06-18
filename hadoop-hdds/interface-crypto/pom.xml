@@ -22,7 +22,7 @@
         <version>1.5.0-SNAPSHOT</version>
     </parent>
 
-    <artifactId>hdds-crypto</artifactId>
+    <artifactId>hdds-interface-crypto</artifactId>
     <version>1.5.0-SNAPSHOT</version>
     <description>Apache Ozone Distributed Data Store cryptographic functions</description>
     <name>Apache Ozone HDDS Crypto</name>
