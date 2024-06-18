@@ -17,6 +17,7 @@
 package org.apache.hadoop.ozone.container.checksum;
 
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerChecksumInfo;
+import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 
 import java.io.File;
@@ -40,9 +41,8 @@ public class ContainerChecksumManager {
   /**
    * Creates one instance that should be used to coordinate all container checksum info within a datanode.
    */
-  public ContainerChecksumManager() {
-    // TODO add config key for size.
-    fileLock = SimpleStriped.readWriteLock(127, true);
+  public ContainerChecksumManager(DatanodeConfiguration dnConf) {
+    fileLock = SimpleStriped.readWriteLock(dnConf.getContainerChecksumLockStripes(), true);
   }
 
   /**
