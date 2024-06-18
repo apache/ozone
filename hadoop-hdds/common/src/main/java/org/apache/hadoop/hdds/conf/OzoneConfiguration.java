@@ -65,9 +65,9 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SECURITY_CRYPTO_COMP
 public class OzoneConfiguration extends Configuration
     implements MutableConfigurationSource {
 
-  private static String complianceMode = null;
-  private static boolean checkCompliance = false;
-  private static Properties cryptoProperties = null;
+  private final String complianceMode;
+  private final boolean checkCompliance;
+  private final Properties cryptoProperties;
   public static final SortedSet<String> TAGS = unmodifiableSortedSet(
       Arrays.stream(ConfigTag.values())
           .map(Enum::name)
@@ -111,10 +111,10 @@ public class OzoneConfiguration extends Configuration
   public OzoneConfiguration() {
     OzoneConfiguration.activate();
     loadDefaults();
-    OzoneConfiguration.complianceMode = getPropertyUnsafe(OzoneConfigKeys.OZONE_SECURITY_CRYPTO_COMPLIANCE_MODE,
-        OzoneConfigKeys.OZONE_SECURITY_CRYPTO_COMPLIANCE_MODE_UNRESTRICTED);
-    OzoneConfiguration.checkCompliance = !complianceMode.equals(OZONE_SECURITY_CRYPTO_COMPLIANCE_MODE_UNRESTRICTED);
-    OzoneConfiguration.cryptoProperties = getCryptoProperties();
+    complianceMode = getPropertyUnsafe(OzoneConfigKeys.OZONE_SECURITY_CRYPTO_COMPLIANCE_MODE,
+          OzoneConfigKeys.OZONE_SECURITY_CRYPTO_COMPLIANCE_MODE_UNRESTRICTED);
+    checkCompliance = !complianceMode.equals(OZONE_SECURITY_CRYPTO_COMPLIANCE_MODE_UNRESTRICTED);
+    cryptoProperties = getCryptoProperties();
   }
 
   public OzoneConfiguration(Configuration conf) {
@@ -125,10 +125,10 @@ public class OzoneConfiguration extends Configuration
       loadDefaults();
       addResource(conf);
     }
-    OzoneConfiguration.complianceMode = getPropertyUnsafe(OzoneConfigKeys.OZONE_SECURITY_CRYPTO_COMPLIANCE_MODE,
+    complianceMode = getPropertyUnsafe(OzoneConfigKeys.OZONE_SECURITY_CRYPTO_COMPLIANCE_MODE,
         OzoneConfigKeys.OZONE_SECURITY_CRYPTO_COMPLIANCE_MODE_UNRESTRICTED);
-    OzoneConfiguration.checkCompliance = !complianceMode.equals(OZONE_SECURITY_CRYPTO_COMPLIANCE_MODE_UNRESTRICTED);
-    OzoneConfiguration.cryptoProperties = getCryptoProperties();
+    checkCompliance = !complianceMode.equals(OZONE_SECURITY_CRYPTO_COMPLIANCE_MODE_UNRESTRICTED);
+    cryptoProperties = getCryptoProperties();
   }
 
   private void loadDefaults() {
