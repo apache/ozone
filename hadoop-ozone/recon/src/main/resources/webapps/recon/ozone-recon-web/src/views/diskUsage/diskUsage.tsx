@@ -202,7 +202,7 @@ export class DiskUsage extends React.Component<Record<string, object>, IDUState>
         // normalize() method will convert array between 0 to 1
         const clonedValues = structuredClone(values);
         const temp = clonedValues && normalize(clonedValues);
-        normalizedValues = temp.map((item: number) => item + MIN_BLOCK_SIZE);
+        normalizedValues = temp && temp.map((item: number) => item + MIN_BLOCK_SIZE);
 
         percentage = values.map(value => {
           return (value * 100).toFixed(2);
@@ -582,7 +582,7 @@ export class DiskUsage extends React.Component<Record<string, object>, IDUState>
                       data={plotData}
                       layout={
                         {
-                          width: 1200,
+                          width: 1000,
                           height: 850,
                           font: {
                             family: 'Roboto, sans-serif',
