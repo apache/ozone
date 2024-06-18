@@ -25,6 +25,7 @@ import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.util.SortedSet;
+import java.util.TreeSet;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.Lock;
 
@@ -36,7 +37,7 @@ import org.apache.hadoop.hdds.utils.SimpleStriped;
  */
 public class ContainerChecksumManager {
 
-  private Striped<ReadWriteLock> fileLock;
+  private final Striped<ReadWriteLock> fileLock;
 
   /**
    * Creates one instance that should be used to coordinate all container checksum info within a datanode.
@@ -73,11 +74,20 @@ public class ContainerChecksumManager {
     Lock writeLock = getWriteLock(data.getContainerID());
     writeLock.lock();
     try {
-      ContainerChecksumInfo newChecksumInfo = read(data).toBuilder()
-          // TODO actually need to merge here to keep blocks in sorted order.
-          .addAllDeletedBlocks(deletedBlockIDs)
+      ContainerChecksumInfo.Builder newChecksumInfoBuilder = read(data).toBuilder();
+
+      // Although the persisted block list should already be sorted, we will sort it here to make sure.
+      // This will automatically fix any bugs in the persisted order that may show up.
+      SortedSet<Long> sortedDeletedBlockIDs =
+          new TreeSet<>(newChecksumInfoBuilder.getDeletedBlocksList());
+      // Since the provided list of block IDs is already sorted, this is a linear time addition.
+      sortedDeletedBlockIDs.addAll(deletedBlockIDs);
+
+      newChecksumInfoBuilder
+          .clearDeletedBlocks()
+          .addAllDeletedBlocks(sortedDeletedBlockIDs)
           .build();
-      write(data, newChecksumInfo);
+      write(data, newChecksumInfoBuilder.build());
     } finally {
       writeLock.unlock();
     }
