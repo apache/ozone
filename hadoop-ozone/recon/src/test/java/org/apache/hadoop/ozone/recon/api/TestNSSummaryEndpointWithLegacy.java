@@ -37,6 +37,7 @@ import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OMPerformanceMetrics;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
+import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
@@ -44,6 +45,7 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
 import org.apache.hadoop.ozone.recon.ReconConstants;
 import org.apache.hadoop.ozone.recon.ReconTestInjector;
+import org.apache.hadoop.ozone.recon.ReconUtils;
 import org.apache.hadoop.ozone.recon.api.handlers.BucketHandler;
 import org.apache.hadoop.ozone.recon.api.handlers.EntityHandler;
 import org.apache.hadoop.ozone.recon.api.types.DUResponse;
@@ -59,6 +61,7 @@ import org.apache.hadoop.ozone.recon.spi.StorageContainerServiceProvider;
 import org.apache.hadoop.ozone.recon.spi.impl.OzoneManagerServiceProviderImpl;
 import org.apache.hadoop.ozone.recon.spi.impl.StorageContainerServiceProviderImpl;
 import org.apache.hadoop.ozone.recon.tasks.NSSummaryTaskWithLegacy;
+import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -75,15 +78,17 @@ import java.util.ArrayList;
 import java.util.Set;
 import java.util.HashSet;
 
+import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.getTestReconOmMetadataManager;
+import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.getMockOzoneManagerServiceProvider;
+import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.writeDirToOm;
+import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.writeKeyToOm;
+import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.setConfiguration;
+
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.apache.hadoop.hdds.protocol.MockDatanodeDetails.randomDatanodeDetails;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_DB_DIRS;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
-import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.writeKeyToOm;
-import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.writeDirToOm;
-import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.getMockOzoneManagerServiceProvider;
-import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.getTestReconOmMetadataManager;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -114,6 +119,7 @@ public class TestNSSummaryEndpointWithLegacy {
   @TempDir
   private Path temporaryFolder;
 
+  private ReconNamespaceSummaryManager reconNamespaceSummaryManager;
   private ReconOMMetadataManager reconOMMetadataManager;
   private NSSummaryEndpoint nsSummaryEndpoint;
   private OzoneConfiguration conf;
@@ -244,10 +250,10 @@ public class TestNSSummaryEndpointWithLegacy {
               StandaloneReplicationConfig.getInstance(ONE));
   private static final long FILE6_SIZE_WITH_REPLICA =
       getReplicatedSize(KEY_SIX_SIZE,
-              StandaloneReplicationConfig.getInstance(ONE));;
+              StandaloneReplicationConfig.getInstance(ONE));
   private static final long FILE7_SIZE_WITH_REPLICA =
       getReplicatedSize(KEY_SEVEN_SIZE,
-              StandaloneReplicationConfig.getInstance(ONE));;
+              StandaloneReplicationConfig.getInstance(ONE));
   private static final long FILE8_SIZE_WITH_REPLICA =
       getReplicatedSize(KEY_EIGHT_SIZE,
               StandaloneReplicationConfig.getInstance(ONE));
@@ -377,7 +383,7 @@ public class TestNSSummaryEndpointWithLegacy {
                 mock(StorageContainerServiceProviderImpl.class))
             .addBinding(NSSummaryEndpoint.class)
             .build();
-    ReconNamespaceSummaryManager reconNamespaceSummaryManager =
+    this.reconNamespaceSummaryManager =
         reconTestInjector.getInstance(ReconNamespaceSummaryManager.class);
     nsSummaryEndpoint = reconTestInjector.getInstance(NSSummaryEndpoint.class);
 
@@ -450,7 +456,7 @@ public class TestNSSummaryEndpointWithLegacy {
   public void testDiskUsageRoot() throws Exception {
     // root level DU
     Response rootResponse = nsSummaryEndpoint.getDiskUsage(ROOT_PATH,
-        false, false);
+        false, false, false);
     DUResponse duRootRes = (DUResponse) rootResponse.getEntity();
     assertEquals(2, duRootRes.getCount());
     List<DUResponse.DiskUsage> duRootData = duRootRes.getDuData();
@@ -469,7 +475,7 @@ public class TestNSSummaryEndpointWithLegacy {
   public void testDiskUsageVolume() throws Exception {
     // volume level DU
     Response volResponse = nsSummaryEndpoint.getDiskUsage(VOL_PATH,
-        false, false);
+        false, false, false);
     DUResponse duVolRes = (DUResponse) volResponse.getEntity();
     assertEquals(2, duVolRes.getCount());
     List<DUResponse.DiskUsage> duData = duVolRes.getDuData();
@@ -488,7 +494,7 @@ public class TestNSSummaryEndpointWithLegacy {
   public void testDiskUsageBucket() throws Exception {
     // bucket level DU
     Response bucketResponse = nsSummaryEndpoint.getDiskUsage(BUCKET_ONE_PATH,
-        false, false);
+        false, false, false);
     DUResponse duBucketResponse = (DUResponse) bucketResponse.getEntity();
     assertEquals(1, duBucketResponse.getCount());
     DUResponse.DiskUsage duDir1 = duBucketResponse.getDuData().get(0);
@@ -500,7 +506,7 @@ public class TestNSSummaryEndpointWithLegacy {
   public void testDiskUsageDir() throws Exception {
     // dir level DU
     Response dirResponse = nsSummaryEndpoint.getDiskUsage(DIR_ONE_PATH,
-        false, false);
+        false, false, false);
     DUResponse duDirReponse = (DUResponse) dirResponse.getEntity();
     assertEquals(3, duDirReponse.getCount());
     List<DUResponse.DiskUsage> duSubDir = duDirReponse.getDuData();
@@ -523,7 +529,7 @@ public class TestNSSummaryEndpointWithLegacy {
   public void testDiskUsageKey() throws Exception {
     // key level DU
     Response keyResponse = nsSummaryEndpoint.getDiskUsage(KEY_PATH,
-        false, false);
+        false, false, false);
     DUResponse keyObj = (DUResponse) keyResponse.getEntity();
     assertEquals(0, keyObj.getCount());
     assertEquals(KEY_FOUR_SIZE, keyObj.getSize());
@@ -533,7 +539,7 @@ public class TestNSSummaryEndpointWithLegacy {
   public void testDiskUsageUnknown() throws Exception {
     // invalid path check
     Response invalidResponse = nsSummaryEndpoint.getDiskUsage(INVALID_PATH,
-        false, false);
+        false, false, false);
     DUResponse invalidObj = (DUResponse) invalidResponse.getEntity();
     assertEquals(ResponseStatus.PATH_NOT_FOUND,
         invalidObj.getStatus());
@@ -543,7 +549,7 @@ public class TestNSSummaryEndpointWithLegacy {
   public void testDiskUsageWithReplication() throws Exception {
     setUpMultiBlockKey();
     Response keyResponse = nsSummaryEndpoint.getDiskUsage(MULTI_BLOCK_KEY_PATH,
-        false, true);
+        false, true, false);
     DUResponse replicaDUResponse = (DUResponse) keyResponse.getEntity();
     assertEquals(ResponseStatus.OK, replicaDUResponse.getStatus());
     assertEquals(MULTI_BLOCK_KEY_SIZE_WITH_REPLICA,
@@ -555,7 +561,7 @@ public class TestNSSummaryEndpointWithLegacy {
     setUpMultiBlockReplicatedKeys();
     //   withReplica is true
     Response rootResponse = nsSummaryEndpoint.getDiskUsage(ROOT_PATH,
-        false, true);
+        false, true, false);
     DUResponse replicaDUResponse = (DUResponse) rootResponse.getEntity();
     assertEquals(ResponseStatus.OK, replicaDUResponse.getStatus());
     assertEquals(MULTI_BLOCK_TOTAL_SIZE_WITH_REPLICA_UNDER_ROOT,
@@ -569,7 +575,7 @@ public class TestNSSummaryEndpointWithLegacy {
   public void testDataSizeUnderVolWithReplication() throws IOException {
     setUpMultiBlockReplicatedKeys();
     Response volResponse = nsSummaryEndpoint.getDiskUsage(VOL_PATH,
-        false, true);
+        false, true, false);
     DUResponse replicaDUResponse = (DUResponse) volResponse.getEntity();
     assertEquals(ResponseStatus.OK, replicaDUResponse.getStatus());
     assertEquals(MULTI_BLOCK_TOTAL_SIZE_WITH_REPLICA_UNDER_VOL,
@@ -582,7 +588,7 @@ public class TestNSSummaryEndpointWithLegacy {
   public void testDataSizeUnderBucketWithReplication() throws IOException {
     setUpMultiBlockReplicatedKeys();
     Response bucketResponse = nsSummaryEndpoint.getDiskUsage(BUCKET_ONE_PATH,
-        false, true);
+        false, true, false);
     DUResponse replicaDUResponse = (DUResponse) bucketResponse.getEntity();
     assertEquals(ResponseStatus.OK, replicaDUResponse.getStatus());
     assertEquals(MULTI_BLOCK_TOTAL_SIZE_WITH_REPLICA_UNDER_BUCKET1,
@@ -601,7 +607,7 @@ public class TestNSSummaryEndpointWithLegacy {
   public void testDataSizeUnderDirWithReplication() throws IOException {
     setUpMultiBlockReplicatedKeys();
     Response dir1Response = nsSummaryEndpoint.getDiskUsage(DIR_ONE_PATH,
-        false, true);
+        false, true, false);
     DUResponse replicaDUResponse = (DUResponse) dir1Response.getEntity();
     assertEquals(ResponseStatus.OK, replicaDUResponse.getStatus());
     assertEquals(MULTI_BLOCK_TOTAL_SIZE_WITH_REPLICA_UNDER_DIR1,
@@ -614,7 +620,7 @@ public class TestNSSummaryEndpointWithLegacy {
   public void testDataSizeUnderKeyWithReplication() throws IOException {
     setUpMultiBlockReplicatedKeys();
     Response keyResponse = nsSummaryEndpoint.getDiskUsage(KEY_PATH,
-        false, true);
+        false, true, false);
     DUResponse replicaDUResponse = (DUResponse) keyResponse.getEntity();
     assertEquals(ResponseStatus.OK, replicaDUResponse.getStatus());
     assertEquals(MULTI_BLOCK_TOTAL_SIZE_WITH_REPLICA_UNDER_KEY,
@@ -692,6 +698,48 @@ public class TestNSSummaryEndpointWithLegacy {
       assertEquals(0, fileSizeDist[i]);
     }
   }
+
+  @Test
+  public void testConstructFullPath() throws IOException {
+    // For Key Tables the parent object ID is not set hence it
+    // will by default be set as -1 when the NSSummary object is created
+    OmKeyInfo keyInfo = new OmKeyInfo.Builder()
+        .setKeyName("dir1/dir2/file2")
+        .setVolumeName(VOL)
+        .setBucketName(BUCKET_ONE)
+        .setObjectID(KEY_TWO_OBJECT_ID)
+        .build();
+    // Call constructFullPath and verify the result
+    String fullPath = ReconUtils.constructFullPath(keyInfo,
+        reconNamespaceSummaryManager, reconOMMetadataManager);
+    String expectedPath = "vol/bucket1/dir1/dir2/file2";
+    Assertions.assertEquals(expectedPath, fullPath);
+
+    // Create key info for file 3
+    keyInfo = new OmKeyInfo.Builder()
+        .setKeyName("dir1/dir2/")
+        .setVolumeName(VOL)
+        .setBucketName(BUCKET_ONE)
+        .setObjectID(DIR_TWO_OBJECT_ID)
+        .build();
+    fullPath = ReconUtils.constructFullPath(keyInfo,
+        reconNamespaceSummaryManager, reconOMMetadataManager);
+    expectedPath = "vol/bucket1/dir1/dir2/";
+    Assertions.assertEquals(expectedPath, fullPath);
+
+    // Create key info for file 6
+    keyInfo = new OmKeyInfo.Builder()
+        .setKeyName("dir1/dir4/file6")
+        .setVolumeName(VOL)
+        .setBucketName(BUCKET_ONE)
+        .setObjectID(KEY_SIX_OBJECT_ID)
+        .build();
+    fullPath = ReconUtils.constructFullPath(keyInfo,
+        reconNamespaceSummaryManager, reconOMMetadataManager);
+    expectedPath = "vol/bucket1/dir1/dir4/file6";
+    Assertions.assertEquals(expectedPath, fullPath);
+  }
+
 
   /**
    * Write directories and keys info into OM DB.
@@ -876,6 +924,7 @@ public class TestNSSummaryEndpointWithLegacy {
         omDbDir.getAbsolutePath());
     omConfiguration.set(OMConfigKeys
         .OZONE_OM_ENABLE_FILESYSTEM_PATHS, "true");
+    setConfiguration(omConfiguration);
     OMMetadataManager omMetadataManager = new OmMetadataManagerImpl(
         omConfiguration, null, new OMPerformanceMetrics());
 

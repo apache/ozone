@@ -26,7 +26,7 @@ Setup Test
 List certificates
     Pass Execution If       '${SECURITY_ENABLED}' == 'false'    N/A
     ${output} =             Execute          ozone admin cert list
-    Should Contain          ${output}        Certificate list:(Type=
+    Should Contain          ${output}        Certificate list:(BatchSize=
 
 List certificates as JSON
     Pass Execution If      '${SECURITY_ENABLED}' == 'false'    N/A
@@ -34,6 +34,6 @@ List certificates as JSON
     ${output}               Execute             cat outStream | jq -r '.[0] | keys'
                             Should Contain          ${output}           serialNumber
     ${errOutput} =          Execute                 cat errStream
-                            Should Contain          ${errOutput}        Certificate list:(Type=
+                            Should Contain          ${errOutput}        Certificate list:(BatchSize=
     Execute                 rm outStream
     Execute                 rm errStream

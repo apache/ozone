@@ -927,6 +927,39 @@ Returns all the datanodes in the cluster.
         ]
      }
 ```
+
+### PUT /api/v1/datanodes/remove
+
+**Parameters**
+
+* uuids (List of node uuids in JSON array format).
+
+```json
+[
+  "50ca4c95-2ef3-4430-b944-97d2442c3daf"
+]  
+```
+
+**Returns**
+
+Returns the list of datanodes which are removed successfully and list of datanodes which were not found.
+
+```json
+{
+  "removedNodes": {
+    "totalCount": 1,
+    "datanodes": [
+      {
+        "uuid": "50ca4c95-2ef3-4430-b944-97d2442c3daf",
+        "hostname": "ozone-datanode-4.ozone_default",
+        "state": "DEAD",
+        "pipelines": null
+      }
+    ],
+    "message": "Success"
+  }
+}     
+```
   
 ## Pipelines
 

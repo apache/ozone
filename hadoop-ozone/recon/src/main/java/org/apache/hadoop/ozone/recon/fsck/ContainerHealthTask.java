@@ -137,7 +137,7 @@ public class ContainerHealthTask extends ReconScmTask {
       long currentTime = System.currentTimeMillis();
       long existingCount = processExistingDBRecords(currentTime,
           unhealthyContainerStateStatsMap);
-      LOG.info("Container Health task thread took {} milliseconds to" +
+      LOG.debug("Container Health task thread took {} milliseconds to" +
               " process {} existing database records.",
           Time.monotonicNow() - start, existingCount);
 
@@ -163,7 +163,7 @@ public class ContainerHealthTask extends ReconScmTask {
           .forEach(c -> processContainer(c, currentTime,
               unhealthyContainerStateStatsMap));
       recordSingleRunCompletion();
-      LOG.info("Container Health task thread took {} milliseconds for" +
+      LOG.debug("Container Health task thread took {} milliseconds for" +
               " processing {} containers.", Time.monotonicNow() - start,
           containers.size());
       logUnhealthyContainerStats(unhealthyContainerStateStatsMap);
@@ -492,11 +492,11 @@ public class ContainerHealthTask extends ReconScmTask {
           populateContainerStats(container, UnHealthyContainerStates.MISSING,
               unhealthyContainerStateStatsMap);
         } else {
-          if (LOG.isDebugEnabled()) {
-            LOG.debug("Empty container {} is missing. Kindly check the " +
-                "consolidated container stats per UNHEALTHY state logged as " +
-                "starting with **Container State Stats:**");
-          }
+
+          LOG.debug("Empty container {} is missing. Kindly check the " +
+              "consolidated container stats per UNHEALTHY state logged as " +
+              "starting with **Container State Stats:**");
+
           records.add(
               recordForState(container, EMPTY_MISSING,
                   time));

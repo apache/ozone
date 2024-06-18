@@ -38,8 +38,6 @@ import org.apache.hadoop.hdds.cli.GenericCli;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.conf.ReconfigurationHandler;
-import org.apache.hadoop.hdds.datanode.metadata.DatanodeCRLStore;
-import org.apache.hadoop.hdds.datanode.metadata.DatanodeCRLStoreImpl;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.SecretKeyProtocol;
 import org.apache.hadoop.hdds.protocolPB.SCMSecurityProtocolClientSideTranslatorPB;
@@ -122,7 +120,6 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
   private DNMXBeanImpl serviceRuntimeInfo =
       new DNMXBeanImpl(HddsVersionInfo.HDDS_VERSION_INFO) { };
   private ObjectName dnInfoBeanName;
-  private DatanodeCRLStore dnCRLStore;
   private HddsDatanodeClientProtocolServer clientProtocolServer;
   private OzoneAdmins admins;
   private ReconfigurationHandler reconfigurationHandler;
@@ -272,9 +269,6 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
         layoutStorage.initialize();
       }
 
-      // initialize datanode CRL store
-      dnCRLStore = new DatanodeCRLStoreImpl(conf);
-
       if (OzoneSecurityUtil.isSecurityEnabled(conf)) {
         dnCertClient = initializeCertificateClient(dnCertClient);
 
@@ -297,7 +291,7 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
                   this::reconfigReplicationStreamsLimit);
 
       datanodeStateMachine = new DatanodeStateMachine(datanodeDetails, conf,
-          dnCertClient, secretKeyClient, this::terminateDatanode, dnCRLStore,
+          dnCertClient, secretKeyClient, this::terminateDatanode,
           reconfigurationHandler);
       try {
         httpServer = new HddsDatanodeHttpServer(conf);
@@ -504,11 +498,6 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
     return clientProtocolServer;
   }
 
-  @VisibleForTesting
-  public DatanodeCRLStore getCRLStore() {
-    return dnCRLStore;
-  }
-
   public void join() {
     if (datanodeStateMachine != null) {
       try {
@@ -560,14 +549,6 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
         getClientProtocolServer().stop();
       }
       unregisterMXBean();
-      // stop dn crl store
-      try {
-        if (dnCRLStore != null) {
-          dnCRLStore.stop();
-        }
-      } catch (Exception ex) {
-        LOG.error("Datanode CRL store stop failed", ex);
-      }
       RatisDropwizardExports.clear(ratisMetricsMap, ratisReporterList);
 
       if (secretKeyClient != null) {

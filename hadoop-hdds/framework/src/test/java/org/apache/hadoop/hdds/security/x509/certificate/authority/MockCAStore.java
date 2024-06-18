@@ -19,11 +19,6 @@
 
 package org.apache.hadoop.hdds.security.x509.certificate.authority;
 
-import org.apache.hadoop.hdds.security.x509.certificate.CertInfo;
-import org.apache.hadoop.hdds.security.x509.crl.CRLInfo;
-import org.apache.hadoop.hdds.security.x509.crl.CRLStatus;
-import org.bouncycastle.asn1.x509.CRLReason;
-import org.bouncycastle.cert.X509CertificateHolder;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeType;
 import org.apache.hadoop.hdds.scm.metadata.SCMMetadataStore;
 import java.io.IOException;
@@ -31,10 +26,7 @@ import java.math.BigInteger;
 import java.security.cert.X509Certificate;
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.Date;
 import java.util.List;
-import java.util.Optional;
-import java.util.UUID;
 
 /**
  *
@@ -57,66 +49,24 @@ public class MockCAStore implements CertificateStore {
   }
 
   @Override
-  public Optional<Long> revokeCertificates(
-      List<BigInteger> serialIDs,
-      X509CertificateHolder caCertificateHolder,
-      CRLReason reason,
-      Date revocationTime,
-      CRLApprover approver) throws IOException {
-    return Optional.empty();
-  }
-
-  @Override
-  public void removeExpiredCertificate(BigInteger serialID)
-      throws IOException {
-
-  }
-
-  @Override
   public List<X509Certificate> removeAllExpiredCertificates() {
     return new ArrayList<>();
   }
 
   @Override
-  public X509Certificate getCertificateByID(BigInteger serialID,
-                                            CertType certType)
-      throws IOException {
-    return null;
-  }
-
-  @Override
-  public CertInfo getRevokedCertificateInfoByID(BigInteger serialID)
+  public X509Certificate getCertificateByID(BigInteger serialID)
       throws IOException {
     return null;
   }
 
   @Override
   public List<X509Certificate> listCertificate(NodeType role,
-      BigInteger startSerialID, int count, CertType certType)
+      BigInteger startSerialID, int count)
       throws IOException {
     return Collections.emptyList();
   }
 
   @Override
-  public void reinitialize(SCMMetadataStore metadataStore) { }
-
-  @Override
-  public List<CRLInfo> getCrls(List<Long> crlIds) throws IOException {
-    return Collections.emptyList();
-  }
-
-  @Override
-  public long getLatestCrlId() {
-    return 0;
-  }
-
-  @Override
-  public CRLStatus getCRLStatusForDN(UUID uuid) {
-    return null;
-  }
-
-  @Override
-  public void setCRLStatusForDN(UUID uuid, CRLStatus crlStatus) {
-
+  public void reinitialize(SCMMetadataStore metadataStore) {
   }
 }

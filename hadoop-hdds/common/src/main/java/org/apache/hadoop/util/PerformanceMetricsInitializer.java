@@ -50,34 +50,12 @@ public final class PerformanceMetricsInitializer {
           String description = annotation.about();
           String name = field.getName();
           PerformanceMetrics performanceMetrics =
-              getMetrics(registry, name, description,
+              new PerformanceMetrics(registry, name, description,
                   sampleName, valueName, intervals);
           field.setAccessible(true);
           field.set(source, performanceMetrics);
         }
       }
     }
-  }
-
-  /**
-   * Helper method to create PerformanceMetrics.
-   *
-   * @param registry the metrics registry
-   * @param name metric name
-   * @param description metric description
-   * @param sampleName sample name
-   * @param valueName value name
-   * @param intervals intervals for quantiles
-   * @return an instance of PerformanceMetrics
-   */
-  public static PerformanceMetrics getMetrics(
-      MetricsRegistry registry, String name, String description,
-      String sampleName, String valueName, int[] intervals) {
-    return new PerformanceMetrics(
-        registry.newStat(
-            name, description, sampleName, valueName, false),
-        MetricUtil.createQuantiles(
-            registry, name, description, sampleName, valueName, intervals),
-        new MutableMinMax(registry, name, description, valueName));
   }
 }

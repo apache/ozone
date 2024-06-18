@@ -177,12 +177,6 @@ class TestOzoneAtRestEncryption {
         cluster.getStorageContainerLocationClient();
     ozoneManager = cluster.getOzoneManager();
     ozoneManager.setMinMultipartUploadPartSize(MPU_PART_MIN_SIZE);
-    TestOzoneRpcClient.setCluster(cluster);
-    TestOzoneRpcClient.setOzClient(ozClient);
-    TestOzoneRpcClient.setOzoneManager(ozoneManager);
-    TestOzoneRpcClient.setStorageContainerLocationClient(
-        storageContainerLocationClient);
-    TestOzoneRpcClient.setStore(store);
 
     // create test key
     createKey(TEST_KEY, cluster.getOzoneManager().getKmsProvider(), conf);
@@ -216,8 +210,6 @@ class TestOzoneAtRestEncryption {
   static void reInitClient() throws IOException {
     ozClient = OzoneClientFactory.getRpcClient(conf);
     store = ozClient.getObjectStore();
-    TestOzoneRpcClient.setOzClient(ozClient);
-    TestOzoneRpcClient.setStore(store);
   }
 
 
@@ -284,6 +276,17 @@ class TestOzoneAtRestEncryption {
       out.write(value.getBytes(StandardCharsets.UTF_8));
     }
     verifyKeyData(bucket, keyName, value, testStartTime);
+    OzoneKeyDetails key1 = bucket.getKey(keyName);
+
+    // Overwrite the key
+    try (OzoneOutputStream out = bucket.createKey(keyName,
+        value.getBytes(StandardCharsets.UTF_8).length,
+        ReplicationConfig.fromTypeAndFactor(RATIS, ONE),
+        new HashMap<>())) {
+      out.write(value.getBytes(StandardCharsets.UTF_8));
+    }
+    OzoneKeyDetails key2 = bucket.getKey(keyName);
+    assertNotEquals(key1.getFileEncryptionInfo().toString(), key2.getFileEncryptionInfo().toString());
   }
 
   static void createAndVerifyFileSystemData(
@@ -324,7 +327,6 @@ class TestOzoneAtRestEncryption {
       fileContent = new byte[value.getBytes(StandardCharsets.UTF_8).length];
       len = is.read(fileContent);
     }
-
 
     assertEquals(len, value.length());
     assertTrue(verifyRatisReplication(bucket.getVolumeName(),

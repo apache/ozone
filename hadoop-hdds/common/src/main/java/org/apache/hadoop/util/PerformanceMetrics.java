@@ -56,18 +56,21 @@ public class PerformanceMetrics {
   }
 
   /**
-   * Construct an instance of PerformanceMetrics with the specified MutableStat,
-   * MutableQuantiles, and MutableMinMax.
+   * Helper method to create PerformanceMetrics.
    *
-   * @param stat the stat metric
-   * @param quantiles the quantiles metrics
-   * @param minMax the min/max tracker
+   * @param registry the metrics registry
+   * @param name metric name
+   * @param description metric description
+   * @param sampleName sample name
+   * @param valueName value name
+   * @param intervals intervals for quantiles
    */
-  public PerformanceMetrics(MutableStat stat,
-      List<MutableQuantiles> quantiles, MutableMinMax minMax) {
-    this.stat = stat;
-    this.quantiles = quantiles;
-    this.minMax = minMax;
+  public PerformanceMetrics(
+      MetricsRegistry registry, String name, String description,
+      String sampleName, String valueName, int[] intervals) {
+    stat = registry.newStat(name, description, sampleName, valueName, false);
+    quantiles = MetricUtil.createQuantiles(registry, name, description, sampleName, valueName, intervals);
+    minMax = new MutableMinMax(registry, name, description, valueName);
   }
 
   /**

@@ -31,6 +31,7 @@ import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
 import org.apache.hadoop.hdds.security.SecurityConfig;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
 import org.apache.hadoop.ozone.recon.api.types.FeatureProvider;
+import org.apache.hadoop.ozone.recon.scm.ReconStorageContainerManagerFacade;
 import org.apache.hadoop.ozone.recon.security.ReconCertificateClient;
 import org.apache.hadoop.hdds.utils.HddsServerUtil;
 import org.apache.hadoop.ozone.OzoneSecurityUtil;
@@ -55,6 +56,7 @@ import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import static org.apache.hadoop.hdds.ratis.RatisHelper.newJvmPauseMonitor;
 import static org.apache.hadoop.hdds.recon.ReconConfig.ConfigStrings.OZONE_RECON_KERBEROS_KEYTAB_FILE_KEY;
@@ -139,6 +141,7 @@ public class ReconServer extends GenericCli {
           injector.getInstance(ReconSchemaManager.class);
       LOG.info("Creating Recon Schema.");
       reconSchemaManager.createReconSchema();
+      LOG.debug("Recon schema creation done.");
 
       this.reconSafeModeMgr = injector.getInstance(ReconSafeModeManager.class);
       this.reconSafeModeMgr.setInSafeMode(true);
@@ -153,13 +156,20 @@ public class ReconServer extends GenericCli {
 
       LOG.info("Initializing support of Recon Features...");
       FeatureProvider.initFeatureSupport(configuration);
+
+      LOG.debug("Now starting all services of Recon...");
+      // Start all services
+      start();
+      isStarted = true;
       LOG.info("Recon server initialized successfully!");
     } catch (Exception e) {
+      ReconStorageContainerManagerFacade reconStorageContainerManagerFacade =
+          (ReconStorageContainerManagerFacade) this.getReconStorageContainerManager();
+      ReconContext reconContext = reconStorageContainerManagerFacade.getReconContext();
+      reconContext.updateHealthStatus(new AtomicBoolean(false));
+      reconContext.getErrors().add(ReconContext.ErrorCode.INTERNAL_ERROR);
       LOG.error("Error during initializing Recon server.", e);
     }
-    // Start all services
-    start();
-    isStarted = true;
 
     ShutdownHookManager.get().addShutdownHook(() -> {
       try {
