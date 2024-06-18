@@ -24,6 +24,8 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.function.Function;
 import java.util.function.Supplier;
@@ -83,13 +85,13 @@ public class KeyOutputStream extends OutputStream
   public static final Logger LOG =
       LoggerFactory.getLogger(KeyOutputStream.class);
 
-  private boolean closed;
+  private volatile boolean closed;
   private final Map<Class<? extends Throwable>, RetryPolicy> retryPolicyMap;
   private int retryCount;
   // how much of data is actually written yet to underlying stream
-  private long offset;
+  private volatile long offset;
   // how much data has been ingested into the stream
-  private long writeOffset;
+  private volatile long writeOffset;
   // whether an exception is encountered while write and whole write could
   // not succeed
   private boolean isException;
@@ -105,6 +107,8 @@ public class KeyOutputStream extends OutputStream
    * This is essential for operations like S3 put to ensure atomicity.
    */
   private boolean atomicKeyCreation;
+
+  private volatile CompletableFuture<Void> combinedFlushFuture;
 
   public KeyOutputStream(ReplicationConfig replicationConfig, BlockOutputStreamEntryPool blockOutputStreamEntryPool) {
     this.replication = replicationConfig;
@@ -173,7 +177,7 @@ public class KeyOutputStream extends OutputStream
   }
 
   @Override
-  public synchronized void write(int b) throws IOException {
+  public void write(int b) throws IOException {
     byte[] buf = new byte[1];
     buf[0] = (byte) b;
     write(buf, 0, 1);
@@ -192,7 +196,7 @@ public class KeyOutputStream extends OutputStream
    * @throws IOException
    */
   @Override
-  public synchronized void write(byte[] b, int off, int len)
+  public void write(byte[] b, int off, int len)
       throws IOException {
     checkNotClosed();
     if (b == null) {
@@ -205,8 +209,10 @@ public class KeyOutputStream extends OutputStream
     if (len == 0) {
       return;
     }
-    handleWrite(b, off, len, false);
-    writeOffset += len;
+    synchronized (this) {
+      handleWrite(b, off, len, false);
+      writeOffset += len;
+    }
   }
 
   private void handleWrite(byte[] b, int off, long len, boolean retry)
@@ -432,9 +438,11 @@ public class KeyOutputStream extends OutputStream
   }
 
   @Override
-  public synchronized void flush() throws IOException {
+  public void flush() throws IOException {
     checkNotClosed();
-    handleFlushOrClose(StreamAction.FLUSH);
+    synchronized (this) {
+      handleFlushOrClose(StreamAction.FLUSH);
+    }
   }
 
   @Override
@@ -443,7 +451,7 @@ public class KeyOutputStream extends OutputStream
   }
 
   @Override
-  public synchronized void hsync() throws IOException {
+  public void hsync() throws IOException {
     if (replication.getReplicationType() != ReplicationType.RATIS) {
       throw new UnsupportedOperationException(
           "Replication type is not " + ReplicationType.RATIS);
@@ -453,11 +461,40 @@ public class KeyOutputStream extends OutputStream
           + replication.getRequiredNodes() + " <= 1");
     }
     checkNotClosed();
-    final long hsyncPos = writeOffset;
-    handleFlushOrClose(StreamAction.HSYNC);
-    Preconditions.checkState(offset >= hsyncPos,
-        "offset = %s < hsyncPos = %s", offset, hsyncPos);
-    blockOutputStreamEntryPool.hsyncKey(hsyncPos);
+
+    final long hsyncPos;
+    final CompletableFuture<Void> combinedFlushFutureToWait;
+    synchronized (this) {
+      hsyncPos = writeOffset;
+      handleFlushOrClose(StreamAction.HSYNC);  // This no longer waits for future completion
+      combinedFlushFutureToWait = combinedFlushFuture;
+      combinedFlushFuture = CompletableFuture.completedFuture(null);
+    }
+
+    waitForFutureToComplete(combinedFlushFutureToWait);
+
+    synchronized (this) {
+      // Sanity check: written data offset must be equal or have gone past hsync position once acked
+      Preconditions.checkState(offset >= hsyncPos, "offset = %s < hsyncPos = %s", offset, hsyncPos);
+      // TODO: when there are multiple hsync() queued up, only the one with the largest offset needs to call this
+      // Or make this parallel? Risk of other client seeing length before data flush
+      blockOutputStreamEntryPool.hsyncKey(hsyncPos);
+    }
+  }
+
+  /**
+   * Helper method complete the future and deal with exception handling.
+   * @param future combinedFlushFuture to wait for.
+   */
+  private void waitForFutureToComplete(CompletableFuture<Void> future) {
+    try {
+      LOG.warn("!!! POC: Waiting for future to complete");
+      future.get();
+    } catch (InterruptedException e) {
+      throw new RuntimeException("!!! POC: InterruptedException", e);
+    } catch (ExecutionException e) {
+      throw new RuntimeException("!!! POC: ExecutionException", e);
+    }
   }
 
   /**
@@ -521,11 +558,13 @@ public class KeyOutputStream extends OutputStream
       entry.flush();
       break;
     case HSYNC:
-      entry.hsync();
+      this.combinedFlushFuture = entry.hsync();
       break;
     default:
       throw new IOException("Invalid Operation");
     }
+    // A hacky way to return variable without changing too many method signatures
+//    combinedFlushFuture = entry.getCombinedFlushFuture();
   }
 
   /**
@@ -534,25 +573,27 @@ public class KeyOutputStream extends OutputStream
    * @throws IOException
    */
   @Override
-  public synchronized void close() throws IOException {
+  public void close() throws IOException {
     if (closed) {
       return;
     }
     closed = true;
-    try {
-      handleFlushOrClose(StreamAction.CLOSE);
-      if (!isException) {
-        Preconditions.checkArgument(writeOffset == offset);
+    synchronized (this) {
+      try {
+        handleFlushOrClose(StreamAction.CLOSE);
+        if (!isException) {
+          Preconditions.checkArgument(writeOffset == offset);
+        }
+        if (atomicKeyCreation) {
+          long expectedSize = blockOutputStreamEntryPool.getDataSize();
+          Preconditions.checkState(expectedSize == offset,
+              String.format("Expected: %d and actual %d write sizes do not match",
+                  expectedSize, offset));
+        }
+        blockOutputStreamEntryPool.commitKey(offset);
+      } finally {
+        blockOutputStreamEntryPool.cleanup();
       }
-      if (atomicKeyCreation) {
-        long expectedSize = blockOutputStreamEntryPool.getDataSize();
-        Preconditions.checkState(expectedSize == offset,
-            String.format("Expected: %d and actual %d write sizes do not match",
-                expectedSize, offset));
-      }
-      blockOutputStreamEntryPool.commitKey(offset);
-    } finally {
-      blockOutputStreamEntryPool.cleanup();
     }
   }
 

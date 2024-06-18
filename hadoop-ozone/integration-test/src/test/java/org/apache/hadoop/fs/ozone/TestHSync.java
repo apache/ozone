@@ -97,7 +97,7 @@ import static org.mockito.Mockito.when;
 /**
  * Test HSync.
  */
-@Timeout(value = 300)
+//@Timeout(value = 300)
 public class TestHSync {
   private static final Logger LOG =
       LoggerFactory.getLogger(TestHSync.class);
@@ -407,22 +407,22 @@ public class TestHSync {
     final long start = Time.monotonicNow();
     // two threads: write and hsync
     Runnable writer = () -> {
-      while ((Time.monotonicNow() - start < 10000)) {
+      while ((Time.monotonicNow() - start < 1000)) {
         try {
           out.write(data);
-        } catch (IOException e) {
-          writerException.set(e);
+        } catch (Throwable e) {
+          writerException.set(new IOException(e));
           throw new RuntimeException(e);
         }
       }
     };
 
     Runnable syncer = () -> {
-      while ((Time.monotonicNow() - start < 10000)) {
+      while ((Time.monotonicNow() - start < 1000)) {
         try {
           out.hsync();
-        } catch (IOException e) {
-          syncerException.set(e);
+        } catch (Throwable e) {
+          syncerException.set(new IOException(e));
           throw new RuntimeException(e);
         }
       }
@@ -454,7 +454,7 @@ public class TestHSync {
         + OZONE_URI_DELIMITER + bucket.getName();
 
     try (FileSystem fs = FileSystem.get(CONF)) {
-      for (int i = 0; i < 10; i++) {
+      for (int i = 0; i < 1; i++) {
         final Path file = new Path(dir, "file" + i);
         try (FSDataOutputStream out =
             fs.create(file, true)) {

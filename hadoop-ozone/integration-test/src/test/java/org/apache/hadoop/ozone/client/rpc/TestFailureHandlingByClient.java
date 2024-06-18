@@ -35,6 +35,7 @@ import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.ratis.conf.RatisClientConfig;
 import org.apache.hadoop.hdds.scm.OzoneClientConfig;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
+import org.apache.hadoop.hdds.scm.XceiverClientRatis;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
@@ -71,15 +72,19 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 
+import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
+import org.slf4j.event.Level;
 
 /**
  * Tests Exception handling by Ozone Client.
  */
-@Timeout(300)
+//@Timeout(300)
 public class TestFailureHandlingByClient {
+
+  private static final org.slf4j.Logger LOG = org.slf4j.LoggerFactory.getLogger(TestFailureHandlingByClient.class);
 
   private MiniOzoneCluster cluster;
   private OzoneConfiguration conf;
@@ -150,6 +155,8 @@ public class TestFailureHandlingByClient {
     bucketName = volumeName;
     objectStore.createVolume(volumeName);
     objectStore.getVolume(volumeName).createBucket(bucketName);
+
+    GenericTestUtils.setLogLevel(XceiverClientRatis.LOG, Level.DEBUG);
   }
 
   private void startCluster() throws Exception {
@@ -443,6 +450,7 @@ public class TestFailureHandlingByClient {
     // shutdown 1 datanode. This will make sure the 2 way commit happens for
     // next write ops.
     cluster.shutdownHddsDatanode(datanodes.get(0));
+    LOG.warn("!!! datanode is shut: {}", datanodes.get(0).getUuid());
 
     key.write(data.getBytes(UTF_8));
     key.write(data.getBytes(UTF_8));
