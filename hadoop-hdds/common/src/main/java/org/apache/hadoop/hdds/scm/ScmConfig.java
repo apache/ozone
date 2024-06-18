@@ -68,20 +68,21 @@ public class ScmConfig extends ReconfigurableConfig {
       defaultValue = "org.apache.hadoop.hdds.scm.pipeline.choose.algorithms.RandomPipelineChoosePolicy",
       tags = { ConfigTag.SCM, ConfigTag.PIPELINE },
       description =
-          "The full name of class which implements org.apache.hadoop.hdds.scm.PipelineChoosePolicy. "
+          "Sets the policy for choosing a pipeline for a Ratis container. The value should be "
+          + "the full name of a class which implements org.apache.hadoop.hdds.scm.PipelineChoosePolicy. "
           + "The class decides which pipeline will be used to find or allocate Ratis containers. If not set, "
           + "org.apache.hadoop.hdds.scm.pipeline.choose.algorithms.RandomPipelineChoosePolicy"
           + " will be used as default value. "
-          + "The following values can be used, "
+          + "One of the following values can be used: "
           + "(1) org.apache.hadoop.hdds.scm.pipeline.choose.algorithms.RandomPipelineChoosePolicy"
-          + " : choose a pipeline randomly. "
+          + " : chooses a pipeline randomly. "
           + "(2) org.apache.hadoop.hdds.scm.pipeline.choose.algorithms.HealthyPipelineChoosePolicy"
-          + " : choose a healthy pipeline randomly. "
+          + " : chooses a healthy pipeline randomly. "
           + "(3) org.apache.hadoop.hdds.scm.pipeline.choose.algorithms.CapacityPipelineChoosePolicy"
-          + " : choose the pipeline with lower utilization from the two pipelines. Note that"
+          + " : chooses the pipeline with lower utilization from two random pipelines. Note that"
           + " random choose method will be executed twice in this policy."
           + "(4) org.apache.hadoop.hdds.scm.pipeline.choose.algorithms.RoundRobinPipelineChoosePolicy"
-          + " : choose a pipeline in a round robin fashion. Intended for troubleshooting and testing purposes only."
+          + " : chooses a pipeline in a round robin fashion. Intended for troubleshooting and testing purposes only."
   )
   private String pipelineChoosePolicyName;
 
@@ -90,20 +91,21 @@ public class ScmConfig extends ReconfigurableConfig {
       defaultValue = "org.apache.hadoop.hdds.scm.pipeline.choose.algorithms.RandomPipelineChoosePolicy",
       tags = { ConfigTag.SCM, ConfigTag.PIPELINE },
       description =
-          "The full name of class which implements org.apache.hadoop.hdds.scm.PipelineChoosePolicy. "
+          "Sets the policy for choosing an EC pipeline. The value should be "
+          + "the full name of a class which implements org.apache.hadoop.hdds.scm.PipelineChoosePolicy. "
           + "The class decides which pipeline will be used when selecting an EC Pipeline. If not set, "
           + "org.apache.hadoop.hdds.scm.pipeline.choose.algorithms.RandomPipelineChoosePolicy"
           + " will be used as default value. "
-          + "The following values can be used, "
+          + "One of the following values can be used: "
           + "(1) org.apache.hadoop.hdds.scm.pipeline.choose.algorithms.RandomPipelineChoosePolicy"
-          + " : choose a pipeline randomly. "
+          + " : chooses a pipeline randomly. "
           + "(2) org.apache.hadoop.hdds.scm.pipeline.choose.algorithms.HealthyPipelineChoosePolicy"
-          + " : choose a healthy pipeline randomly. "
+          + " : chooses a healthy pipeline randomly. "
           + "(3) org.apache.hadoop.hdds.scm.pipeline.choose.algorithms.CapacityPipelineChoosePolicy"
-          + " : choose a pipeline with lower utilization from two random pipelines. Note that"
+          + " : chooses a pipeline with lower utilization from two random pipelines. Note that"
           + " random choose method will be executed twice in this policy."
           + "(4) org.apache.hadoop.hdds.scm.pipeline.choose.algorithms.RoundRobinPipelineChoosePolicy"
-          + " : choose a pipeline in a round robin fashion. Intended for troubleshooting and testing purposes only."
+          + " : chooses a pipeline in a round robin fashion. Intended for troubleshooting and testing purposes only."
   )
   private String ecPipelineChoosePolicyName;
 
