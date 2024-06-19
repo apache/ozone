@@ -25,6 +25,7 @@ import java.security.GeneralSecurityException;
 import java.security.PrivilegedExceptionAction;
 import java.util.UUID;
 import java.util.concurrent.ThreadLocalRandom;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 
 import org.apache.hadoop.crypto.CipherSuite;
@@ -69,6 +70,7 @@ import org.apache.hadoop.ozone.om.request.key.OMKeyRequest;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.util.Time;
 import org.apache.ozone.test.GenericTestUtils;
+import org.assertj.core.api.Assertions;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -86,6 +88,7 @@ import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_SCHEME;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_DEFAULT_BUCKET_LAYOUT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ADDRESS_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_RATIS_ENABLE_KEY;
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.fail;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -392,24 +395,25 @@ public class TestHSync {
     assertEquals(data.length, offset);
   }
 
-  private void runConcurrentWriteHSync(Path file,
-      final FSDataOutputStream out, int initialDataSize)
+  private int runConcurrentWriteHSync(Path file,
+      final FSDataOutputStream out, byte[] data)
       throws InterruptedException, IOException {
-    final byte[] data = new byte[initialDataSize];
-    ThreadLocalRandom.current().nextBytes(data);
+
 
     AtomicReference<IOException> writerException = new AtomicReference<>();
     AtomicReference<IOException> syncerException = new AtomicReference<>();
 
     LOG.info("runConcurrentWriteHSync {} with size {}",
-        file, initialDataSize);
+        file, data.length);
 
+    AtomicInteger writes = new AtomicInteger();
     final long start = Time.monotonicNow();
     // two threads: write and hsync
     Runnable writer = () -> {
       while ((Time.monotonicNow() - start < 1000)) {
         try {
           out.write(data);
+          writes.incrementAndGet();
         } catch (Throwable e) {
           writerException.set(new IOException(e));
           throw new RuntimeException(e);
@@ -430,10 +434,16 @@ public class TestHSync {
 
     Thread writerThread = new Thread(writer);
     writerThread.start();
-    Thread syncThread = new Thread(syncer);
-    syncThread.start();
+    Thread syncThread1 = new Thread(syncer);
+    Thread syncThread2 = new Thread(syncer);
+    Thread syncThread3 = new Thread(syncer);
+    syncThread1.start();
+    syncThread2.start();
+    syncThread3.start();
     writerThread.join();
-    syncThread.join();
+    syncThread1.join();
+    syncThread2.join();
+    syncThread3.join();
 
     if (writerException.get() != null) {
       throw writerException.get();
@@ -441,6 +451,7 @@ public class TestHSync {
     if (syncerException.get() != null) {
       throw syncerException.get();
     }
+    return writes.get();
   }
 
   @Test
@@ -456,14 +467,32 @@ public class TestHSync {
     try (FileSystem fs = FileSystem.get(CONF)) {
       for (int i = 0; i < 1; i++) {
         final Path file = new Path(dir, "file" + i);
+        final int times;
+        final byte[] data;
         try (FSDataOutputStream out =
             fs.create(file, true)) {
           int initialDataSize = 1 << i;
-          runConcurrentWriteHSync(file, out, initialDataSize);
+          data = new byte[initialDataSize];
+          ThreadLocalRandom.current().nextBytes(data);
+          times = runConcurrentWriteHSync(file, out, data);
         }
+
+        validateWrittenFile(file, fs, data, times);
 
         fs.delete(file, false);
       }
+    }
+  }
+
+  private void validateWrittenFile(Path file, FileSystem fs, byte[] expected, int times) throws IOException {
+    try (FSDataInputStream is = fs.open(file)) {
+      byte[] actual = new byte[expected.length];
+      for (int i = 0; i < times; i++) {
+        assertEquals(expected.length, is.read(expected));
+        assertArrayEquals(expected, actual);
+      }
+      // ensure nothing more can be read.
+      assertEquals(-1, is.read(expected));
     }
   }
 
