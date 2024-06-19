@@ -45,59 +45,6 @@ ozone sh bucket create /volume/bucket
 {{< /highlight >}}
 
 创建之后，请使用 _list volume_ 或 _list bucket_ 命令来确认桶已存在。
-下方为简单样例，创建的volume名为hh-v1，bucket名为hh-bk1：
-
-{{< highlight bash >}}
-ozone sh volume list o3://omhost:9862/
-ozone sh bucket list o3://omhost:9862/hh-v1
-{{< /highlight >}}
-
-返回结果依次如下：
-
-```
-[ {
-"metadata" : { },
-"name" : "hh-v1",
-"admin" : "root",
-"owner" : "root",
-"quotaInBytes" : -1,
-"quotaInNamespace" : -1,
-"usedNamespace" : 1,
-"creationTime" : "2024-06-18T07:24:51.226Z",
-"modificationTime" : "2024-06-18T07:24:51.226Z",
-"acls" : [ {
-"type" : "USER",
-"name" : "root",
-"aclScope" : "ACCESS",
-"aclList" : [ "ALL" ]
-}, {
-"type" : "GROUP",
-"name" : "root",
-"aclScope" : "ACCESS",
-"aclList" : [ "ALL" ]
-} ],
-"refCount" : 0
-} ]
-
-[ {
-"metadata" : { },
-"volumeName" : "hh-v1",
-"name" : "hh-bk1",
-"storageType" : "DISK",
-"versioning" : false,
-"usedBytes" : 66,
-"usedNamespace" : 1,
-"creationTime" : "2024-06-18T07:25:42.916Z",
-"modificationTime" : "2024-06-18T07:25:42.916Z",
-"sourcePathExist" : true,
-"quotaInBytes" : -1,
-"quotaInNamespace" : -1,
-"bucketLayout" : "FILE_SYSTEM_OPTIMIZED",
-"owner" : "root",
-"link" : false
-} ]
-```
-
 
 请在 core-site.xml 中添加以下条目：
 

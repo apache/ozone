@@ -49,58 +49,6 @@ ozone sh bucket create /volume/bucket
 {{< /highlight >}}
 
 Once this is created, please make sure that bucket exists via the _list volume_ or _list bucket_ commands.
-Here comes an example, created a valume named 'hh-v1' and a bucket named 'hh-bk1':
-
-{{< highlight bash >}}
-ozone sh volume list o3://omhost:9862/
-ozone sh bucket list o3://omhost:9862/hh-v1
-{{< /highlight >}}
-
-And the query results:
-
-```
-[ {
-"metadata" : { },
-"name" : "hh-v1",
-"admin" : "root",
-"owner" : "root",
-"quotaInBytes" : -1,
-"quotaInNamespace" : -1,
-"usedNamespace" : 1,
-"creationTime" : "2024-06-18T07:24:51.226Z",
-"modificationTime" : "2024-06-18T07:24:51.226Z",
-"acls" : [ {
-"type" : "USER",
-"name" : "root",
-"aclScope" : "ACCESS",
-"aclList" : [ "ALL" ]
-}, {
-"type" : "GROUP",
-"name" : "root",
-"aclScope" : "ACCESS",
-"aclList" : [ "ALL" ]
-} ],
-"refCount" : 0
-} ]
-
-[ {
-"metadata" : { },
-"volumeName" : "hh-v1",
-"name" : "hh-bk1",
-"storageType" : "DISK",
-"versioning" : false,
-"usedBytes" : 66,
-"usedNamespace" : 1,
-"creationTime" : "2024-06-18T07:25:42.916Z",
-"modificationTime" : "2024-06-18T07:25:42.916Z",
-"sourcePathExist" : true,
-"quotaInBytes" : -1,
-"quotaInNamespace" : -1,
-"bucketLayout" : "FILE_SYSTEM_OPTIMIZED",
-"owner" : "root",
-"link" : false
-} ]
-```
 
 Please add the following entry to the core-site.xml.
 
