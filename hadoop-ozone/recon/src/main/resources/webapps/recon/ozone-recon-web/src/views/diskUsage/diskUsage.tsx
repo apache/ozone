@@ -65,7 +65,7 @@ let cancelPieSignal: AbortController
 let cancelSummarySignal: AbortController
 let cancelQuotaSignal: AbortController;
 let cancelKeyMetadataSignal: AbortController;
-let normalizedValues: number[]=[];
+let normalizedValues: number[] = [];
 
 export class DiskUsage extends React.Component<Record<string, object>, IDUState> {
   constructor(props = {}) {
@@ -212,7 +212,6 @@ export class DiskUsage extends React.Component<Record<string, object>, IDUState>
           return byteToSize(subpath.size, 1);
         });
       }
-
       this.setState({
         // Normalized path
         isLoading: false,
