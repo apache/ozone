@@ -97,9 +97,6 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
     <maven-gpg-plugin.version>3.2.4</maven-gpg-plugin.version>
     <shell-executable>bash</shell-executable>
 
-    <!-- Set the Release year during release -->
-    <release-year>2019</release-year>
-
     <failIfNoTests>false</failIfNoTests>
     <surefire.failIfNoSpecifiedTests>false</surefire.failIfNoSpecifiedTests>
     <maven.test.redirectTestOutputToFile>true</maven.test.redirectTestOutputToFile>
@@ -244,7 +241,8 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
     <!-- Plugin versions and config -->
     <maven-surefire-plugin.argLine>-Xmx4096m -XX:+HeapDumpOnOutOfMemoryError</maven-surefire-plugin.argLine>
     <maven-surefire-plugin.argLineAccessArgs></maven-surefire-plugin.argLineAccessArgs>
-    <unstable-test-groups>flaky | native | slow | unhealthy</unstable-test-groups>
+    <excluded-test-groups>native | unhealthy</excluded-test-groups> <!-- test groups excluded by default (without any manual profile activation) -->
+    <unstable-test-groups>flaky | native | slow | unhealthy</unstable-test-groups> <!-- test groups excluded in CI (except in dedicated profiles for flaky and native) -->
     <maven-surefire-plugin.version>3.0.0-M4</maven-surefire-plugin.version>
     <maven-surefire-report-plugin.version>${maven-surefire-plugin.version}</maven-surefire-report-plugin.version>
 
@@ -1714,6 +1712,7 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
           <includes>
             <include>**/Test*.java</include>
           </includes>
+          <excludedGroups>${excluded-test-groups}</excludedGroups>
         </configuration>
       </plugin>
       <plugin>
@@ -1969,6 +1968,19 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
       </properties>
     </profile>
     <profile>
+      <!-- @Native tests are excluded by default.  This profile removes the exclusion if native build is enabled. -->
+      <id>rocks-native-tests</id>
+      <activation>
+        <property>
+          <name>rocks_tools_native</name>
+        </property>
+      </activation>
+      <properties>
+        <excluded-test-groups>unhealthy</excluded-test-groups>
+      </properties>
+    </profile>
+    <!-- The following profiles define test splits for CI -->
+    <profile>
       <id>client</id>
       <build>
         <plugins>
@@ -2155,6 +2167,7 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
       </build>
     </profile>
     <profile>
+      <!-- Test split dedicated for running @Flaky tests -->
       <id>flaky</id>
       <build>
         <plugins>
@@ -2170,6 +2183,7 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
       </build>
     </profile>
     <profile>
+      <!-- Test split dedicated for running @Native tests -->
       <id>native</id>
       <build>
         <plugins>
