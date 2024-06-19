@@ -116,7 +116,7 @@ import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuil
 import static org.apache.hadoop.hdds.scm.utils.ClientCommandsUtils.getReadChunkVersion;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos
     .ContainerDataProto.State.RECOVERING;
-import static org.apache.hadoop.ozone.ClientVersion.ERASURE_CODING_READ_CHUNK_CORRUPTION_FIX;
+import static org.apache.hadoop.ozone.ClientVersion.EC_REPLICA_INDEX_REQUIRED_IN_BLOCK_REQUEST;
 import static org.apache.hadoop.ozone.container.common.interfaces.Container.ScanResult;
 
 import org.apache.ratis.statemachine.StateMachine;
@@ -572,6 +572,15 @@ public class KeyValueHandler extends Handler {
   }
 
   /**
+   * Checks if a replicaIndex needs to be checked based on the client version for a request.
+   * @param request ContainerCommandRequest object.
+   * @return true if the validation is required for the client version else false.
+   */
+  private boolean replicaIndexCheckRequired(ContainerCommandRequestProto request) {
+    return request.hasVersion() && request.getVersion() >= EC_REPLICA_INDEX_REQUIRED_IN_BLOCK_REQUEST.toProtoValue();
+  }
+
+  /**
    * Handle Get Block operation. Calls BlockManager to process the request.
    */
   ContainerCommandResponseProto handleGetBlock(
@@ -590,8 +599,7 @@ public class KeyValueHandler extends Handler {
       BlockID blockID = BlockID.getFromProtobuf(
           request.getGetBlock().getBlockID());
       responseData = blockManager.getBlock(kvContainer, blockID,
-          request.hasVersion() && request.getVersion() >=
-              ERASURE_CODING_READ_CHUNK_CORRUPTION_FIX.toProtoValue()).getProtoBufMessage();
+          replicaIndexCheckRequired(request)).getProtoBufMessage();
       final long numBytes = responseData.getSerializedSize();
       metrics.incContainerBytesStats(Type.GetBlock, numBytes);
 
@@ -707,7 +715,7 @@ public class KeyValueHandler extends Handler {
       ChunkInfo chunkInfo = ChunkInfo.getFromProtoBuf(request.getReadChunk()
           .getChunkData());
       Preconditions.checkNotNull(chunkInfo);
-      if (request.hasVersion() && request.getVersion() >= ERASURE_CODING_READ_CHUNK_CORRUPTION_FIX.toProtoValue()) {
+      if (replicaIndexCheckRequired(request)) {
         BlockUtils.verifyReplicaIdx(kvContainer, blockID);
       }
       BlockUtils.verifyBCSId(kvContainer, blockID);
