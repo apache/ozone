@@ -460,16 +460,20 @@ export class Datanodes extends React.Component<Record<string, object>, IDatanode
   };
 
   onDisable = (record:any) => {
-    // Will return Disable Checkbox records for remove whos Record state is not DEAD and Opeartional State=['IN_SERVICE','ENTERING_MAINTENANCE','DECOMMISSIONING']
-    // Enable Checkbox for remove who's State is Dead or Operation State=['Decommissioned','In_Maintenance']
+    // Enable Checkbox for explicit removal who's State = DEAD
     if (record.state !== 'DEAD') {
-      return record.opState === 'IN_SERVICE' || record.opState === 'ENTERING_MAINTENANCE' || record.opState === 'DECOMMISSIONING';
+      // Will return disabled checkboxes records who's Record state is not DEAD and Opeartional State=['IN_SERVICE','ENTERING_MAINTENANCE','DECOMMISSIONING','IN_MAINTENANCE','DECOMMISSIONED']
+      return true;
     }
   };
   
   popConfirm = () => {
     this.setState({ loading: true });
     this.removeDatanode(this.state.selectedRowKeys);
+  };
+
+  cancel = () => {
+    this.setState({ selectedRowKeys: [] });
   };
 
   render() {
@@ -528,8 +532,9 @@ export class Datanodes extends React.Component<Record<string, object>, IDatanode
                   <Icon type='question-circle-o' style={{ color: 'red' }} />
                 }
                 onConfirm={this.popConfirm}
+                onCancel={this.cancel}
               >
-                <Tooltip placement="topLeft" title="Remove the dead or decommissioned or in maintenance datanodes.">
+                <Tooltip placement="topLeft" title="Remove the dead datanodes.">
                   <Icon type="info-circle"/>
                 </Tooltip>
                 &nbsp;&nbsp;
