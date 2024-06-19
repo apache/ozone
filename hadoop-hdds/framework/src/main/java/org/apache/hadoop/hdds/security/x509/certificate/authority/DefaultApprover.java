@@ -174,6 +174,7 @@ public class DefaultApprover extends BaseApprover {
     ContentSigner sigGen = new BcRSAContentSignerBuilder(sigAlgId, digAlgId)
         .build(asymmetricKP);
 
+    //TODO: as part of HDDS-10743 ensure that converter is instantiated only once
     return new JcaX509CertificateConverter().getCertificate(certificateGenerator.build(sigGen));
 
   }

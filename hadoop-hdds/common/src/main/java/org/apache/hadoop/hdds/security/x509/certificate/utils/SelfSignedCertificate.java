@@ -155,6 +155,7 @@ public final class SelfSignedCertificate {
       }
     }
     try {
+      //TODO: as part of HDDS-10743 ensure that converter is instantiated only once
       X509Certificate cert = new JcaX509CertificateConverter().getCertificate(builder.build(contentSigner));
       LOG.info("Certificate {} is issued by {} to {}, valid from {} to {}",
           cert.getSerialNumber(), cert.getIssuerDN(), cert.getSubjectDN(), cert.getNotBefore(), cert.getNotAfter());
