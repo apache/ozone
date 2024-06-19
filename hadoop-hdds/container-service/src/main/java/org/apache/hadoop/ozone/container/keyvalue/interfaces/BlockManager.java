@@ -55,24 +55,11 @@ public interface BlockManager {
    *
    * @param container - Container from which block needs to be fetched.
    * @param blockID - BlockID of the Block.
-   * @param isReplicaCheckRequired - if true will match container data's replica index with provided BlockID.
    * @return Block Data.
    * @throws IOException when BcsId is unknown or mismatched
    */
-  BlockData getBlock(Container container, BlockID blockID, boolean isReplicaCheckRequired)
-      throws IOException;
+  BlockData getBlock(Container container, BlockID blockID) throws IOException;
 
-  /**
-   * Gets an existing block.
-   *
-   * @param container - Container from which block needs to be fetched.
-   * @param blockID - BlockID of the Block.
-   * @return Block Data.
-   * @throws IOException when BcsId is unknown or mismatched
-   */
-  default BlockData getBlock(Container container, BlockID blockID) throws IOException {
-    return getBlock(container, blockID, false);
-  }
 
   /**
    * Deletes an existing block.

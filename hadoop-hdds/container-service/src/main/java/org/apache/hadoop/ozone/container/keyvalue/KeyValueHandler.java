@@ -598,8 +598,10 @@ public class KeyValueHandler extends Handler {
     try {
       BlockID blockID = BlockID.getFromProtobuf(
           request.getGetBlock().getBlockID());
-      responseData = blockManager.getBlock(kvContainer, blockID,
-          replicaIndexCheckRequired(request)).getProtoBufMessage();
+      if (replicaIndexCheckRequired(request)) {
+        BlockUtils.verifyReplicaIdx(kvContainer, blockID);
+      }
+      responseData = blockManager.getBlock(kvContainer, blockID).getProtoBufMessage();
       final long numBytes = responseData.getSerializedSize();
       metrics.incContainerBytesStats(Type.GetBlock, numBytes);
 

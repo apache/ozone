@@ -207,11 +207,7 @@ public class BlockManagerImpl implements BlockManager {
   }
 
   @Override
-  public BlockData getBlock(Container container, BlockID blockID, boolean isReplicaCheckRequired)
-      throws IOException {
-    if (isReplicaCheckRequired) {
-      BlockUtils.verifyReplicaIdx(container, blockID);
-    }
+  public BlockData getBlock(Container container, BlockID blockID) throws IOException {
     BlockUtils.verifyBCSId(container, blockID);
     KeyValueContainerData containerData = (KeyValueContainerData) container
         .getContainerData();
