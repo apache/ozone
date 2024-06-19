@@ -18,7 +18,7 @@
 import React from 'react';
 import dayjs, { Dayjs } from 'dayjs';
 import { Row, Button, Input, Dropdown, DatePicker, Form, Result } from 'antd';
-import { DownOutlined, UndoOutlined } from '@ant-design/icons';
+import { DownOutlined, LoadingOutlined, UndoOutlined } from '@ant-design/icons';
 import { MenuProps } from 'react-select';
 
 
@@ -352,7 +352,7 @@ export class Heatmap extends React.Component<Record<string, object>, ITreeState>
         label: <DatePicker
           format="YYYY-MM-DD"
           onChange={handleDatePickerChange}
-          onClick={(e) => { e.stopProppagation() }}
+          onClick={(e) => { e.stopPropagation() }}
           disabledDate={this.disabledDate}
           placement="topRight" />
       }]
@@ -389,7 +389,7 @@ export class Heatmap extends React.Component<Record<string, object>, ITreeState>
               selectable: true,
               defaultSelectedKeys: [this.state.entityType],
               onClick: handleMenuChange
-            }} placement='bottomCenter'>
+            }} placement='bottomRight'>
             <Button>Entity Type:&nbsp;{this.state.entityType}<DownOutlined /></Button>
           </Dropdown>
         </div>
@@ -401,7 +401,7 @@ export class Heatmap extends React.Component<Record<string, object>, ITreeState>
               defaultSelectedKeys: [date as string],
               onClick: handleCalendarChange
             }} placement='bottomLeft'>
-            <Button>Last &nbsp;{date > 100 ? new Date(date as number * 1000).toLocaleString() : date}<DownOutlined /></Button>
+            <Button>Last &nbsp;{date as number > 100 ? new Date(date as number * 1000).toLocaleString() : date}<DownOutlined /></Button>
           </Dropdown>
         </div>
       </Row>
@@ -409,7 +409,7 @@ export class Heatmap extends React.Component<Record<string, object>, ITreeState>
 
     return (
       <>
-        {isLoading ? <span><Icon type='loading' /> Loading...</span> : (
+        {isLoading ? <span><LoadingOutlined/> Loading...</span> : (
           <div className='heatmap-container'>
             <div className='page-header'>
               Tree Map for Entities
@@ -433,21 +433,21 @@ export class Heatmap extends React.Component<Record<string, object>, ITreeState>
                             {headerMenu}
                             <div className='heatmap-legend-container'>
                               <div className='heatmap-legend-item'>
-                                <div style={{ width: "13px", height: "13px", backgroundColor: `${colourScheme["amber_alert"][0]}`, marginRight: "5px" }}> </div>
+                                <div style={{ width: "13px", height: "13px", backgroundColor: `${colourScheme["amberAlert"][0]}`, marginRight: "5px" }}> </div>
                                 <span>Less Accessed</span>
                               </div>
                               <div className='heatmap-legend-item'>
-                                <div style={{ width: "13px", height: "13px", backgroundColor: `${colourScheme["amber_alert"][8]}`, marginRight: "5px" }}> </div>
+                                <div style={{ width: "13px", height: "13px", backgroundColor: `${colourScheme["amberAlert"][8]}`, marginRight: "5px" }}> </div>
                                 <span>Moderate Accessed</span>
                               </div>
                               <div className='heatmap-legend-item'>
-                                <div style={{ width: "13px", height: "13px", backgroundColor: `${colourScheme["amber_alert"][20]}`, marginRight: "5px" }}> </div>
+                                <div style={{ width: "13px", height: "13px", backgroundColor: `${colourScheme["amberAlert"][20]}`, marginRight: "5px" }}> </div>
                                 <span>Most Accessed</span>
                               </div>
                             </div>
                           </div>
                           <div id="heatmap-chart-container">
-                            <HeatMapConfiguration data={treeResponse} colorScheme={colourScheme["amber_alert"]} onClick={this.updateTreemapParent}></HeatMapConfiguration>
+                            <HeatMapConfiguration data={treeResponse} colorScheme={colourScheme["amberAlert"]} onClick={this.updateTreemapParent}></HeatMapConfiguration>
                           </div>
                         </>
                         :
