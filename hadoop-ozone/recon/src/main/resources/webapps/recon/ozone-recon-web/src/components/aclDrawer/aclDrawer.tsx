@@ -18,8 +18,8 @@
 
 import React from 'react';
 import {Table, Drawer, Tag} from 'antd';
-import {ACLIdentity, ACLIdentityTypeList, IAcl} from '../../types/om.types';
-import {aclRightColorMap, aclIdentityTypeColorMap} from '../../constants/aclDrawer.constants';
+import {ACLIdentity, ACLIdentityTypeList, IAcl} from '@/types/om.types';
+import {aclRightColorMap, aclIdentityTypeColorMap} from '@/constants/aclDrawer.constants';
 
 interface IAclDrawerProps extends RouteComponentProps<object> {
   visible: boolean;

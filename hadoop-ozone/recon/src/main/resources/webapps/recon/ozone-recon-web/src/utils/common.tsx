@@ -16,13 +16,16 @@
  * limitations under the License.
  */
 
-import moment from 'moment';
-import {notification} from 'antd';
+import dayjs from 'dayjs';
+import DayJSLocalizedFormat from 'dayjs/plugin/localizedFormat';
+import { notification } from 'antd';
+
+dayjs.extend(DayJSLocalizedFormat);
 
 export const getCapacityPercent = (used: number, total: number) => Math.round((used / total) * 100);
 
 export const timeFormat = (time: number) => time > 0 ?
-  moment(time).format('lll') : 'NA';
+  dayjs(time).format('lll') : 'NA';
 
 const showErrorNotification = (title: string, description: string) => {
   const args = {
@@ -35,8 +38,8 @@ const showErrorNotification = (title: string, description: string) => {
 
 export const showDataFetchError = (error: string) => {
   const title = 'Error while fetching data';
-  if (error.includes("CanceledError")){
-    error = "Previous request cancelled because context changed"
+  if (error.includes('CanceledError')) {
+    error = 'Previous request cancelled because context changed'
   }
   showErrorNotification(title, error);
 };
@@ -49,7 +52,7 @@ export const byteToSize = (bytes: number, decimals: number) => {
   const dm = decimals < 0 ? 0 : decimals;
   const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB', 'PB'];
   const i = Math.floor(Math.log(bytes) / Math.log(k));
-  return  isNaN(i) ? `Not Defined`:`${Number.parseFloat((bytes / (k ** i)).toFixed(dm))} ${sizes[i]}`;
+  return isNaN(i) ? `Not Defined` : `${Number.parseFloat((bytes / (k ** i)).toFixed(dm))} ${sizes[i]}`;
 };
 
 export const nullAwareLocaleCompare = (a: string, b: string) => {
@@ -67,5 +70,3 @@ export const nullAwareLocaleCompare = (a: string, b: string) => {
 
   return a.localeCompare(b);
 };
-
-

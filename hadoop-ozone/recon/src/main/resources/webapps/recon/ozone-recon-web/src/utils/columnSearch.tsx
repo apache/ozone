@@ -17,7 +17,9 @@
  */
 
 import React from 'react';
-import {Input, Button, Icon} from 'antd';
+import { Input, Button } from 'antd';
+import { SearchOutlined } from '@ant-design/icons';
+
 import './columnSearch.less';
 
 class ColumnSearch extends React.PureComponent {
@@ -67,12 +69,12 @@ class ColumnSearch extends React.PureComponent {
       </div>
     ),
     filterIcon: (filtered: boolean) => (
-      <Icon type='search' style={{color: filtered ? '#1890ff' : '#000000'}}/>
+      <SearchOutlined style={{ color: filtered ? '#1890ff' : '#000000' }} />
     ),
     onFilter: (value: string, record: any) => {
       if (record[dataIndex] !== undefined || record[dataIndex] !== null) {
         return typeof (record[dataIndex]) === typeof {}
-          ? Boolean (record[dataIndex].find(item => Object.values(item).toString().toLowerCase().includes(value.toLowerCase())))
+          ? Boolean(record[dataIndex].find(item => Object.values(item).toString().toLowerCase().includes(value.toLowerCase())))
           : record[dataIndex].toString().toLowerCase().includes(value.toLowerCase())
       }
       else {
@@ -99,4 +101,4 @@ class ColumnSearch extends React.PureComponent {
   };
 }
 
-export {ColumnSearch};
+export { ColumnSearch };

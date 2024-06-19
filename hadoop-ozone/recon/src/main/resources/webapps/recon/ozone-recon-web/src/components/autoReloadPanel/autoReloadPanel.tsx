@@ -17,12 +17,20 @@
  */
 
 import React from 'react';
+import dayjs from 'dayjs';
+import DayJSRelativeTime from 'dayjs/plugin/relativeTime';
+import DayJSLocalizedFormat from 'dayjs/plugin/localizedFormat';
+import { Tooltip, Button, Switch } from 'antd';
+import { PlayCircleOutlined, ReloadOutlined } from '@ant-design/icons';
+import { withRouter } from 'react-router-dom';
+import { RouteComponentProps } from 'react-router';
 
-import {Tooltip, Button, Switch} from 'antd';
 import './autoReloadPanel.less';
-import {withRouter} from 'react-router-dom';
-import {RouteComponentProps} from 'react-router';
-import moment from 'moment';
+
+// DayJS needs to be extended to support fromNow()
+// and localized formatting for ll, LTS etc.
+dayjs.extend(DayJSRelativeTime);
+dayjs.extend(DayJSLocalizedFormat);
 
 interface IAutoReloadPanelProps extends RouteComponentProps<object> {
   onReload: () => void;
@@ -37,57 +45,57 @@ interface IAutoReloadPanelProps extends RouteComponentProps<object> {
 
 class AutoReloadPanel extends React.Component<IAutoReloadPanelProps> {
   autoReloadToggleHandler = (checked: boolean, _event: Event) => {
-    const {togglePolling} = this.props;
+    const { togglePolling } = this.props;
     togglePolling(checked);
   };
 
   render() {
-    const {onReload, lastRefreshed, lastUpdatedOMDBDelta, lastUpdatedOMDBFull, isLoading, omSyncLoad, omStatus} = this.props;
+    const { onReload, lastRefreshed, lastUpdatedOMDBDelta, lastUpdatedOMDBFull, isLoading, omSyncLoad, omStatus } = this.props;
     const autoReloadEnabled = sessionStorage.getItem('autoReloadEnabled') === 'false' ? false : true;
-    
-     const lastRefreshedText = lastRefreshed === 0 || lastRefreshed === undefined ? 'NA' :
+
+    const lastRefreshedText = lastRefreshed === 0 || lastRefreshed === undefined ? 'NA' :
       (
         <Tooltip
-          placement='bottom' title={moment(lastRefreshed).format('ll LTS')}
+          placement='bottom' title={dayjs(lastRefreshed).format('ll LTS')}
         >
-          {moment(lastRefreshed).format('LT')}
+          {dayjs(lastRefreshed).format('LT')}
         </Tooltip>
-       );
-    
-     const omSyncStatusDisplay = omStatus === '' ? '' : omStatus ? <div>OM DB update is successfully triggered.</div> : <div>OM DB update is already running.</div>;
-    
-     const omDBDeltaFullToolTip = <span>
-          {omSyncStatusDisplay}
-          {'Delta Update'}: {moment(lastUpdatedOMDBDelta).fromNow()}, {moment(lastUpdatedOMDBDelta).format('LT')}
-          <br/>
-          {'Full Update'}: {moment(lastUpdatedOMDBFull).fromNow()}, {moment(lastUpdatedOMDBFull).format('LT')}
-       </span>
+      );
 
-      const lastUpdatedOMLatest = lastUpdatedOMDBDelta > lastUpdatedOMDBFull ? lastUpdatedOMDBDelta : lastUpdatedOMDBFull;
+    const omSyncStatusDisplay = omStatus === '' ? '' : omStatus ? <div>OM DB update is successfully triggered.</div> : <div>OM DB update is already running.</div>;
 
-      const lastUpdatedDeltaFullToolTip = lastUpdatedOMDBDelta === 0 || lastUpdatedOMDBDelta === undefined || lastUpdatedOMDBFull === 0 || lastUpdatedOMDBFull === undefined ? 'NA' :
+    const omDBDeltaFullToolTip = <span>
+      {omSyncStatusDisplay}
+      {'Delta Update'}: {dayjs(lastUpdatedOMDBDelta).fromNow()}, {dayjs(lastUpdatedOMDBDelta).format('LT')}
+      <br />
+      {'Full Update'}: {dayjs(lastUpdatedOMDBFull).fromNow()}, {dayjs(lastUpdatedOMDBFull).format('LT')}
+    </span>
+
+    const lastUpdatedOMLatest = lastUpdatedOMDBDelta > lastUpdatedOMDBFull ? lastUpdatedOMDBDelta : lastUpdatedOMDBFull;
+
+    const lastUpdatedDeltaFullToolTip = lastUpdatedOMDBDelta === 0 || lastUpdatedOMDBDelta === undefined || lastUpdatedOMDBFull === 0 || lastUpdatedOMDBFull === undefined ? 'NA' :
       (
         <Tooltip
           placement='bottom' title={omDBDeltaFullToolTip}
         >
-          {moment(lastUpdatedOMLatest).format('LT')}
+          {dayjs(lastUpdatedOMLatest).format('LT')}
         </Tooltip>
       );
 
-     const lastUpdatedDeltaFullText = lastUpdatedOMDBDelta === 0 || lastUpdatedOMDBDelta === undefined || lastUpdatedOMDBFull === 0 || lastUpdatedOMDBFull === undefined ? '' :
-     (
-      <>
-      &nbsp; | DB Synced at {lastUpdatedDeltaFullToolTip}
-      &nbsp;<Button shape='circle' icon='play-circle' size='small' loading={isLoading} onClick={omSyncLoad} disabled={omStatus === '' ? false : true } />
-      </>
-     );
+    const lastUpdatedDeltaFullText = lastUpdatedOMDBDelta === 0 || lastUpdatedOMDBDelta === undefined || lastUpdatedOMDBFull === 0 || lastUpdatedOMDBFull === undefined ? '' :
+      (
+        <>
+          &nbsp; | DB Synced at {lastUpdatedDeltaFullToolTip}
+          &nbsp;<Button shape='circle' icon={<PlayCircleOutlined />} size='small' loading={isLoading} onClick={omSyncLoad} disabled={omStatus === '' ? false : true} />
+        </>
+      );
 
     return (
       <div className='auto-reload-panel'>
         Auto Refresh
-        &nbsp;<Switch defaultChecked={autoReloadEnabled} size='small' className='toggle-switch' onChange={this.autoReloadToggleHandler}/>
+        &nbsp;<Switch defaultChecked={autoReloadEnabled} size='small' className='toggle-switch' onChange={this.autoReloadToggleHandler} />
         &nbsp; | Refreshed at {lastRefreshedText}
-        &nbsp;<Button shape='circle' icon='reload' size='small' loading={isLoading} onClick={onReload}/>
+        &nbsp;<Button shape='circle' icon={<ReloadOutlined />} size='small' loading={isLoading} onClick={onReload} />
         {lastUpdatedDeltaFullText}
       </div>
     );

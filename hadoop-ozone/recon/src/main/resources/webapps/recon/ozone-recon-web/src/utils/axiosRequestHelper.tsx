@@ -37,14 +37,14 @@ export const AxiosGetHelper = (
 export const AxiosAllGetHelper = (
   urls: string[],
   controller: AbortController,
-  message: string = ""
-): { requests: Promise<AxiosResponse<any, any>[]>, "controller": AbortController } => {
+  message = ''
+): { requests: Promise<AxiosResponse<any, any>[]>, controller: AbortController } => {
 
   controller && controller.abort(message);
   controller = new AbortController(); // generate new AbortController for the upcoming request
 
   //create axios get requests
-  let axiosGetRequests: Promise<AxiosResponse<any, any>>[] = [];
+  const axiosGetRequests: Promise<AxiosResponse<any, any>>[] = [];
   urls.forEach((url) => {
     axiosGetRequests.push(axios.get(url, { signal: controller.signal }))
   });
