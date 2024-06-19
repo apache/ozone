@@ -38,7 +38,7 @@ public interface CertificateApprover {
    * Approves a Certificate Request based on the policies of this approver.
    *
    * @param csr - Certificate Signing Request.
-   * @return - Future that will contain the certificate or exception.
+   * @return - Future that will contain Void if the certificate is considered valid otherwise an exception.
    */
   CompletableFuture<Void> inspectCSR(PKCS10CertificationRequest csr);
 
