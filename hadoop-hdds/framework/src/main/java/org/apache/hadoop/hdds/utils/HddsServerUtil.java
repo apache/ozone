@@ -452,7 +452,7 @@ public final class HddsServerUtil {
    */
   public static SCMSecurityProtocolClientSideTranslatorPB getScmSecurityClient(
       ConfigurationSource conf) throws IOException {
-    new SecurityConfig(conf);
+    SecurityConfig.initSecurityProvider(conf);
     return new SCMSecurityProtocolClientSideTranslatorPB(
         new SCMSecurityProtocolFailoverProxyProvider(conf,
             UserGroupInformation.getCurrentUser()));
@@ -465,7 +465,7 @@ public final class HddsServerUtil {
     // for ever. In this way DN start up is resilient to SCM service running
     // status.
     OzoneConfiguration configuration = new OzoneConfiguration(conf);
-    new SecurityConfig(configuration);
+    SecurityConfig.initSecurityProvider(configuration);
     SCMClientConfig scmClientConfig =
         conf.getObject(SCMClientConfig.class);
     int retryCount = Integer.MAX_VALUE;
@@ -485,7 +485,7 @@ public final class HddsServerUtil {
    */
   public static SCMSecurityProtocolClientSideTranslatorPB getScmSecurityClient(
       OzoneConfiguration conf, UserGroupInformation ugi) throws IOException {
-    new SecurityConfig(conf);
+    SecurityConfig.initSecurityProvider(conf);
     SCMSecurityProtocolClientSideTranslatorPB scmSecurityClient =
         new SCMSecurityProtocolClientSideTranslatorPB(
             new SCMSecurityProtocolFailoverProxyProvider(conf, ugi));

@@ -40,7 +40,7 @@ public class TestX509CertificateCodec {
 
   @BeforeAll
   public static void initSecurityProvider() {
-    new SecurityConfig(new OzoneConfiguration());
+    SecurityConfig.initSecurityProvider(new OzoneConfiguration());
   }
 
   @Test

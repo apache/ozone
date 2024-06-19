@@ -39,6 +39,8 @@ import org.apache.commons.validator.routines.InetAddressValidator;
 
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_HTTP_SECURITY_ENABLED_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_HTTP_SECURITY_ENABLED_KEY;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SECURITY_ENABLED_DEFAULT;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SECURITY_ENABLED_KEY;
 
 import org.apache.hadoop.hdds.security.SecurityConfig;
 import org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateCodec;
@@ -62,9 +64,8 @@ public final class OzoneSecurityUtil {
   }
 
   public static boolean isSecurityEnabled(ConfigurationSource conf) {
-    // Creating a new SecurityConfig object ensures that we load the BouncyCastle JCE provider at the moment.
-    // TODO: find a better way to ensure the loading of the provider.
-    return new SecurityConfig(conf).isSecurityEnabled();
+    SecurityConfig.initSecurityProvider(conf);
+    return conf.getBoolean(OZONE_SECURITY_ENABLED_KEY, OZONE_SECURITY_ENABLED_DEFAULT);
   }
 
   public static boolean isHttpSecurityEnabled(ConfigurationSource conf) {
