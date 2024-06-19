@@ -15,4 +15,14 @@
 * limitations under the License.
 */
 
-/// <reference types="vite/client" />
+const config = {
+  semi: true,
+  tabWidth: 2,
+  printWidth: 100,
+  singleQuote: true,
+  trailingComma: "es5",
+  jsxSingleQuote: true,
+  bracketSpacing: true,
+};
+
+export default config;
