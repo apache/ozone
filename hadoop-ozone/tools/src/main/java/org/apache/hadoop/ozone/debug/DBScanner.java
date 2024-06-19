@@ -193,39 +193,20 @@ public class DBScanner implements Callable<Void>, SubcommandWithParent {
     return spec.commandLine().getOut();
   }
 
-  public byte[] getValueObject(
-      DBColumnFamilyDefinition dbColumnFamilyDefinition) {
+  public byte[] getValueObject(DBColumnFamilyDefinition dbColumnFamilyDefinition, String key) {
     Class<?> keyType = dbColumnFamilyDefinition.getKeyType();
     if (keyType.equals(String.class)) {
-      return startKey.getBytes(UTF_8);
+      return key.getBytes(UTF_8);
     } else if (keyType.equals(ContainerID.class)) {
-      return new ContainerID(Long.parseLong(startKey)).getBytes();
+      return new ContainerID(Long.parseLong(key)).getBytes();
     } else if (keyType.equals(Long.class)) {
-      return LongCodec.get().toPersistedFormat(Long.parseLong(startKey));
+      return LongCodec.get().toPersistedFormat(Long.parseLong(key));
     } else if (keyType.equals(PipelineID.class)) {
-      return PipelineID.valueOf(UUID.fromString(startKey)).getProtobuf()
+      return PipelineID.valueOf(UUID.fromString(key)).getProtobuf()
           .toByteArray();
     } else {
       throw new IllegalArgumentException(
-          "StartKey is not supported for this table.");
-    }
-  }
-
-  public byte[] getEndKeyValueObject(
-      DBColumnFamilyDefinition dbColumnFamilyDefinition) {
-    Class<?> keyType = dbColumnFamilyDefinition.getKeyType();
-    if (keyType.equals(String.class)) {
-      return endKey.getBytes(UTF_8);
-    } else if (keyType.equals(ContainerID.class)) {
-      return new ContainerID(Long.parseLong(endKey)).getBytes();
-    } else if (keyType.equals(Long.class)) {
-      return LongCodec.get().toPersistedFormat(Long.parseLong(endKey));
-    } else if (keyType.equals(PipelineID.class)) {
-      return PipelineID.valueOf(UUID.fromString(endKey)).getProtobuf()
-          .toByteArray();
-    } else {
-      throw new IllegalArgumentException(
-          "endKey is not supported for this table.");
+          "StartKey and EndKey is not supported for this table.");
     }
   }
 
@@ -282,7 +263,7 @@ public class DBScanner implements Callable<Void>, SubcommandWithParent {
                               LogWriter logWriter, ExecutorService threadPool,
                               boolean schemaV3) throws InterruptedException {
     if (startKey != null) {
-      iterator.get().seek(getValueObject(dbColumnFamilyDef));
+      iterator.get().seek(getValueObject(dbColumnFamilyDef, startKey));
     }
     ArrayList<ByteArrayKeyValue> batch = new ArrayList<>(batchSize);
     // Used to ensure that the output of a multi-threaded parsed Json is in
@@ -294,7 +275,7 @@ public class DBScanner implements Callable<Void>, SubcommandWithParent {
     boolean reachedEnd = false;
     while (withinLimit(count) && iterator.get().isValid() && !exception && !reachedEnd) {
       // if invalid endKey is given, it is ignored
-      if (null != endKey && Arrays.equals(iterator.get().key(), getEndKeyValueObject(dbColumnFamilyDef))) {
+      if (null != endKey && Arrays.equals(iterator.get().key(), getValueObject(dbColumnFamilyDef, endKey))) {
         reachedEnd = true;
       }
       batch.add(new ByteArrayKeyValue(
