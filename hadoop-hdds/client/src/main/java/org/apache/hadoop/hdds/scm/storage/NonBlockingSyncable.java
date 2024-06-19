@@ -19,7 +19,6 @@
 package org.apache.hadoop.hdds.scm.storage;
 
 import java.io.IOException;
-import java.util.concurrent.CompletableFuture;
 
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
@@ -31,18 +30,20 @@ import org.apache.hadoop.classification.InterfaceStability;
 @InterfaceStability.Evolving
 public interface NonBlockingSyncable {
 
-  /** Flush out the data in client's user buffer.
+  /**
+   * Flush out the data in client's user buffer.
    * Returns a future. After the future is completed, new readers will see the data.
-   * @return CompletableFuture<Void>
+   *
    * @throws IOException if any error occurs
    */
-  CompletableFuture<Void> hflush() throws IOException;
+  void hflush() throws IOException;
 
-  /** Similar to posix fsync, flush out the data in client's user buffer
+  /**
+   * Similar to posix fsync, flush out the data in client's user buffer
    * all the way to the disk device (but the disk may have it in its cache)
    * when the future returned is completed.
-   * @return CompletableFuture<Void>
+   *
    * @throws IOException if error occurs
    */
-  CompletableFuture<Void> hsync() throws IOException;
+  void hsync() throws IOException;
 }

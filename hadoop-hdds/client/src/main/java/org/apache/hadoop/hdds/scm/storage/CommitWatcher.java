@@ -68,10 +68,12 @@ class CommitWatcher extends AbstractCommitWatcher<ChunkBuffer> {
     // When putBlock is called, a future is added.
     // When putBlock is replied, the future is removed below.
     // Therefore, the removed future should not be null.
-    final CompletableFuture<ContainerCommandResponseProto> removed =
-        futureMap.remove(totalLength);
-    Objects.requireNonNull(removed, () -> "Future not found for "
-        + totalLength + ": existing = " + futureMap.keySet());
+
+    // TODO: futureMap to be moved to RatisBlockOutputStream
+//    final CompletableFuture<ContainerCommandResponseProto> removed =
+//        futureMap.remove(totalLength);
+//    Objects.requireNonNull(removed, () -> "Future not found for "
+//        + totalLength + ": existing = " + futureMap.keySet());
   }
 
   @VisibleForTesting

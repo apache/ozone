@@ -18,7 +18,6 @@
 package org.apache.hadoop.hdds.scm.storage;
 
 import com.google.common.annotations.VisibleForTesting;
-import org.apache.hadoop.fs.Syncable;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandResponseProto;
 import org.apache.hadoop.hdds.scm.ContainerClientMetrics;
@@ -108,6 +107,11 @@ public class RatisBlockOutputStream extends BlockOutputStream
   }
 
   @Override
+  XceiverClientReply sendWatchForCommit(long commitIndex) throws IOException {
+    return commitWatcher.watchForCommit(commitIndex);
+  }
+
+  @Override
   void updateCommitInfo(XceiverClientReply reply, List<ChunkBuffer> buffers) {
     commitWatcher.updateCommitInfoMap(reply.getLogIndex(), buffers);
   }
@@ -133,23 +137,14 @@ public class RatisBlockOutputStream extends BlockOutputStream
   }
 
   @Override
-  public CompletableFuture<Void> hflush() throws IOException {
-    return hsync();
+  public void hflush() throws IOException {
+    hsync();
   }
 
   @Override
-  public CompletableFuture<Void> hsync() throws IOException {
+  public void hsync() throws IOException {
     if (!isClosed()) {
-      CompletableFuture<Void> future = null;
-      if (getBufferPool() != null && getBufferPool().getSize() > 0) {
-        future = asyncHandleFlush(false);
-      }
-      if (future != null) {
-        future = future.thenCombine(asyncFlushAndCommit(false), (prev, curr) -> prev);
-      }
-      return future;
-    } else {
-      return CompletableFuture.completedFuture(null);
+      handleFlush(false);
     }
   }
 }

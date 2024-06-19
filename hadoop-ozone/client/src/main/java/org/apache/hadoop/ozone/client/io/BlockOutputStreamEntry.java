@@ -161,7 +161,7 @@ public class BlockOutputStreamEntry extends OutputStream {
     return CompletableFuture.completedFuture(null);
   }
 
-  CompletableFuture<Void> hsync() throws IOException {
+  void hsync() throws IOException {
     if (isInitialized()) {
       final OutputStream out = getOutputStream();
       if (!(out instanceof Syncable || out instanceof NonBlockingSyncable)) {
@@ -169,9 +169,7 @@ public class BlockOutputStreamEntry extends OutputStream {
             out.getClass() + " is not " + Syncable.class.getSimpleName());
       }
 
-      return ((NonBlockingSyncable) out).hsync();
-    } else {
-      return CompletableFuture.completedFuture(null);
+      ((NonBlockingSyncable) out).hsync();
     }
   }
 

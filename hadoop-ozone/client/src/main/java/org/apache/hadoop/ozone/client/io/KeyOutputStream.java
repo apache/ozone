@@ -462,16 +462,8 @@ public class KeyOutputStream extends OutputStream
     }
     checkNotClosed();
 
-    final long hsyncPos;
-    final CompletableFuture<Void> combinedFlushFutureToWait;
-    synchronized (this) {
-      hsyncPos = writeOffset;
-      handleFlushOrClose(StreamAction.HSYNC);  // This no longer waits for future completion
-      combinedFlushFutureToWait = combinedFlushFuture;
-      combinedFlushFuture = CompletableFuture.completedFuture(null);
-    }
-
-    waitForFutureToComplete(combinedFlushFutureToWait);
+    final long hsyncPos = writeOffset;
+    handleFlushOrClose(StreamAction.HSYNC);
 
     synchronized (this) {
       // Sanity check: written data offset must be equal or have gone past hsync position once acked
@@ -558,7 +550,7 @@ public class KeyOutputStream extends OutputStream
       entry.flush();
       break;
     case HSYNC:
-      this.combinedFlushFuture = entry.hsync();
+      entry.hsync();
       break;
     default:
       throw new IOException("Invalid Operation");

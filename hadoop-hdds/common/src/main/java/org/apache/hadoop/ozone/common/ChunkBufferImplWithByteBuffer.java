@@ -27,6 +27,7 @@ import java.util.NoSuchElementException;
 import java.util.Objects;
 import java.util.function.Function;
 
+import org.apache.commons.lang3.RandomUtils;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 import org.apache.ratis.util.UncheckedAutoCloseable;
 
@@ -34,6 +35,7 @@ import org.apache.ratis.util.UncheckedAutoCloseable;
 final class ChunkBufferImplWithByteBuffer implements ChunkBuffer {
   private final ByteBuffer buffer;
   private final UncheckedAutoCloseable underlying;
+  private int identity = RandomUtils.nextInt();
 
   ChunkBufferImplWithByteBuffer(ByteBuffer buffer) {
     this(buffer, null);
@@ -161,6 +163,6 @@ final class ChunkBufferImplWithByteBuffer implements ChunkBuffer {
   @Override
   public String toString() {
     return getClass().getSimpleName() + ":limit=" + buffer.limit()
-        + "@" + Integer.toHexString(hashCode());
+        + "@" + Integer.toHexString(identity);
   }
 }
