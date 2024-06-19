@@ -307,17 +307,17 @@ public class BlockOutputStream extends OutputStream {
 
   private void doFlushOrWatchIfNeeded() throws IOException {
     if (currentBufferRemaining == 0) {
-      PutBlockResult putBlockResult = null;
+      CompletableFuture<PutBlockResult> putBlockResultFuture = null;
       if (bufferPool.getNumberOfUsedBuffers() % flushPeriod == 0) {
         updateFlushLength();
-        putBlockResult = executePutBlock(false, false);
+        putBlockResultFuture = executePutBlock(false, false);
       }
       // Data in the bufferPool can not exceed streamBufferMaxSize
       if (bufferPool.getNumberOfUsedBuffers() == bufferPool.getCapacity()) {
-        if (putBlockResult != null) {
-          handleFullBuffer(putBlockResult.commitIndexFuture);
+        if (putBlockResultFuture != null) {
+          handleFullBuffer(putBlockResultFuture.thenApply(r -> r.commitIndex));
         } else {
-          // TODO: clarify if this is feasible and what's needed.
+          // TODO: clarify if this is reachable and what's needed.
         }
       }
     }
@@ -472,23 +472,22 @@ public class BlockOutputStream extends OutputStream {
 
   static class PutBlockResult {
     final long flushPosition;
-    final CompletableFuture<Long> commitIndexFuture;
-    final CompletableFuture<ContainerCommandResponseProto> responseFuture;
+    final long commitIndex;
+    final ContainerCommandResponseProto response;
 
-    PutBlockResult(long flushPosition, CompletableFuture<Long> commitIndexFuture,
-        CompletableFuture<ContainerCommandResponseProto> responseFuture) {
+    PutBlockResult(long flushPosition, long commitIndex, ContainerCommandResponseProto response) {
       this.flushPosition = flushPosition;
-      this.commitIndexFuture = commitIndexFuture;
-      this.responseFuture = responseFuture;
+      this.commitIndex = commitIndex;
+      this.response = response;
     }
   }
 
   /**
    * @param close whether putBlock is happening as part of closing the stream
    * @param force true if no data was written since most recent putBlock and
-   *            stream is being closed
+   *              stream is being closed
    */
-  PutBlockResult executePutBlock(boolean close, boolean force) throws IOException {
+  CompletableFuture<PutBlockResult> executePutBlock(boolean close, boolean force) throws IOException {
     checkOpen();
     final long flushPos = totalDataFlushedLength;
     final List<ChunkBuffer> byteBufferList;
@@ -502,14 +501,12 @@ public class BlockOutputStream extends OutputStream {
     }
 
     CompletableFuture<ContainerCommandResponseProto> flushFuture = null;
-    final CompletableFuture<Long> commitIndexFuture = new CompletableFuture<>();
+    final XceiverClientReply asyncReply;
     try {
       BlockData blockData = containerBlockData.build();
-      XceiverClientReply asyncReply = putBlockAsync(xceiverClient, blockData, close, tokenString);
+      asyncReply = putBlockAsync(xceiverClient, blockData, close, tokenString);
       CompletableFuture<ContainerCommandResponseProto> future = asyncReply.getResponse();
-      flushFuture = future.whenComplete(
-          (r, e) -> commitIndexFuture.complete(asyncReply.getLogIndex()))
-          .thenApplyAsync(e -> {
+      flushFuture = future.thenApplyAsync(e -> {
         try {
           validateResponse(e);
         } catch (IOException sce) {
@@ -553,7 +550,7 @@ public class BlockOutputStream extends OutputStream {
       return null;
     }
     putFlushFuture(flushPos, flushFuture);
-    return new PutBlockResult(flushPos, commitIndexFuture, flushFuture);
+    return flushFuture.thenApply(r -> new PutBlockResult(flushPos, asyncReply.getLogIndex(), r));
   }
 
   void putFlushFuture(long flushPos,
@@ -611,7 +608,7 @@ public class BlockOutputStream extends OutputStream {
   private void handleFlushInternal(boolean close)
       throws IOException, InterruptedException, ExecutionException {
     checkOpen();
-    PutBlockResult putBlockResult = null;
+    CompletableFuture<PutBlockResult> putBlockResultFuture = null;
     synchronized (this) {
       LOG.warn("flushing, totalDataFlushedLength={}, writtenDataLength={}", totalDataFlushedLength, writtenDataLength);
       // flush the last chunk data residing on the currentBuffer
@@ -626,21 +623,21 @@ public class BlockOutputStream extends OutputStream {
         // here, we just limit this buffer to the current position. So that next
         // write will happen in new buffer
         updateFlushLength();
-        putBlockResult = executePutBlock(close, false);
+        putBlockResultFuture = executePutBlock(close, false);
       } else if (close) {
         // forcing an "empty" putBlock if stream is being closed without new
         // data since latest flush - we need to send the "EOF" flag
-        putBlockResult = executePutBlock(true, true);
+        putBlockResultFuture = executePutBlock(true, true);
       }
     }
     // TODO why wait for all flush futures?
     waitOnFlushFutures();
 
 
-    if (putBlockResult != null) {
-      long commitIndex = putBlockResult.commitIndexFuture.get();
-      LOG.info("commitIndex={}, flush position={}", commitIndex, putBlockResult.flushPosition);
-      watchForCommit(commitIndex);
+    if (putBlockResultFuture != null) {
+      PutBlockResult putBlockResult = putBlockResultFuture.get();
+      LOG.info("commitIndex={}, flush position={}", putBlockResult.commitIndex, putBlockResult.flushPosition);
+      watchForCommit(putBlockResult.commitIndex);
     } else {
       // todo, what would we wait if hsycn doesn't create writeChunk/PutBlock?
 //      watchForCommit(false);

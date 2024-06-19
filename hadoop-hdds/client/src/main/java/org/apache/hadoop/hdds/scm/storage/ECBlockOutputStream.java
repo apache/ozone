@@ -198,7 +198,7 @@ public class ECBlockOutputStream extends BlockOutputStream {
       ContainerCommandResponseProto> executePutBlock(boolean close,
       boolean force, long blockGroupLength) throws IOException {
     updateBlockGroupLengthInPutBlockMeta(blockGroupLength);
-    return executePutBlock(close, force).responseFuture;
+    return executePutBlock(close, force).thenApply(r -> r.response);
   }
 
   private void updateBlockGroupLengthInPutBlockMeta(final long blockGroupLen) {
@@ -229,10 +229,10 @@ public class ECBlockOutputStream extends BlockOutputStream {
   /**
    * @param close whether putBlock is happening as part of closing the stream
    * @param force true if no data was written since most recent putBlock and
-   *            stream is being closed
+   *              stream is being closed
    */
   @Override
-  public PutBlockResult executePutBlock(boolean close,
+  public CompletableFuture<PutBlockResult> executePutBlock(boolean close,
       boolean force) throws IOException {
     checkOpen();
 
@@ -274,7 +274,8 @@ public class ECBlockOutputStream extends BlockOutputStream {
       handleInterruptedException(ex, false);
     }
     this.putBlkRspFuture = flushFuture;
-    return new PutBlockResult(0, CompletableFuture.completedFuture(0L), flushFuture);
+    assert flushFuture != null;
+    return flushFuture.thenApply(f -> new PutBlockResult(0, 0, f));
   }
 
   /**
