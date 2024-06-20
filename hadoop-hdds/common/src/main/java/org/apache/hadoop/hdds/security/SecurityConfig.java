@@ -277,8 +277,10 @@ public class SecurityConfig {
           Security.addProvider(new BouncyCastleProvider());
           provider = Security.getProvider(providerString);
         }
-        LOG.error("Security Provider:{} is unknown", provider);
-        throw new SecurityException("Unknown security provider:" + provider);
+        if (SecurityConfig.provider == null) {
+          LOG.error("Security Provider:{} is unknown", provider);
+          throw new SecurityException("Unknown security provider:" + provider);
+        }
       }
     }
   }
