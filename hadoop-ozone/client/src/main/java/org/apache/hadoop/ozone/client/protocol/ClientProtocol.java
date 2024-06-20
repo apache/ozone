@@ -49,6 +49,7 @@ import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.DeleteTenantState;
+import org.apache.hadoop.ozone.om.helpers.ErrorInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartUploadCompleteInfo;
@@ -67,6 +68,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRoleI
 import org.apache.hadoop.ozone.security.OzoneTokenIdentifier;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
 import org.apache.hadoop.ozone.snapshot.CancelSnapshotDiffResponse;
+import org.apache.hadoop.ozone.snapshot.ListSnapshotResponse;
 import org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse;
 import org.apache.hadoop.security.KerberosInfo;
 import org.apache.hadoop.security.token.Token;
@@ -434,6 +436,18 @@ public interface ClientProtocol {
    */
   void deleteKeys(String volumeName, String bucketName,
                   List<String> keyNameList)
+      throws IOException;
+
+  /**
+   * Deletes keys through the list.
+   * @param volumeName Name of the Volume
+   * @param bucketName Name of the Bucket
+   * @param keyNameList List of the Key
+   * @param quiet flag to not throw exception if delete fails
+   * @throws IOException
+   */
+  Map<String, ErrorInfo> deleteKeys(String volumeName, String bucketName,
+                                    List<String> keyNameList, boolean quiet)
       throws IOException;
 
   /**
@@ -1205,12 +1219,12 @@ public interface ClientProtocol {
    * @param volumeName     volume name
    * @param bucketName     bucket name
    * @param snapshotPrefix snapshot prefix to match
-   * @param prevSnapshot   start of the list, this snapshot is excluded
-   * @param maxListResult  max numbet of snapshots to return
-   * @return list of snapshots for volume/bucket snapshotpath.
+   * @param prevSnapshot   snapshots will be listed after this snapshot name
+   * @param maxListResult  max number of snapshots to return
+   * @return list of snapshots for volume/bucket path.
    * @throws IOException
    */
-  List<OzoneSnapshot> listSnapshot(
+  ListSnapshotResponse listSnapshot(
       String volumeName, String bucketName, String snapshotPrefix,
       String prevSnapshot, int maxListResult) throws IOException;
 

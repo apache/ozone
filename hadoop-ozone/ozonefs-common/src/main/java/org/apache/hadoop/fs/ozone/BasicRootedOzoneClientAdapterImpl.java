@@ -837,8 +837,7 @@ public class BasicRootedOzoneClientAdapterImpl
     String group = getGroupName(ugi);
     List<FileStatusAdapter> res = new ArrayList<>();
 
-    Iterator<? extends OzoneSnapshot> snapshotIter =
-        objectStore.listSnapshot(volumeName, bucketName, null, null);
+    Iterator<OzoneSnapshot> snapshotIter = objectStore.listSnapshot(volumeName, bucketName, null, null);
 
     while (snapshotIter.hasNext()) {
       OzoneSnapshot ozoneSnapshot = snapshotIter.next();

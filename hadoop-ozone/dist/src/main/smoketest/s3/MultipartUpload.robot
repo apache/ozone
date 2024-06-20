@@ -117,10 +117,13 @@ Test Multipart Upload Complete
                                 Should contain                ${result}    ETag
                                 Should Be Equal As Strings    ${resultETag}     "${expectedResultETag}-2"
 
-#check whether the user defined metadata can be retrieved
+#check whether the user defined metadata and parts count can be retrieved
     ${result} =                 Execute AWSS3ApiCli           head-object --bucket ${BUCKET} --key ${PREFIX}/multipartKey1
                                 Should contain                ${result}    \"custom-key1\": \"custom-value1\"
                                 Should contain                ${result}    \"custom-key2\": \"custom-value2\"
+
+    ${partsCount}               Execute and checkrc           echo '${result}' | jq -r '.PartsCount'    0
+                                Should Be Equal               ${partsCount}    2
 
     ${result} =                 Execute                       ozone sh key info /s3v/${BUCKET}/${PREFIX}/multipartKey1
                                 Should contain                ${result}    \"custom-key1\" : \"custom-value1\"
@@ -129,12 +132,15 @@ Test Multipart Upload Complete
                                 Should contain                ${result}    \"tag-key1\" : \"tag-value1\"
                                 Should contain                ${result}    \"tag-key2\" : \"tag-value2\"
 
-#read file and check the key and tag count
+#read file and check the key, tag count and parts count
     ${result} =                 Execute AWSS3ApiCli        get-object --bucket ${BUCKET} --key ${PREFIX}/multipartKey1 /tmp/${PREFIX}-multipartKey1.result
                                 Should contain             ${result}      TagCount
 
     ${tagCount} =               Execute and checkrc        echo '${result}' | jq -r '.TagCount'    0
                                 Should Be Equal            ${tagCount}    2
+
+    ${partsCount}               Execute and checkrc        echo '${result}' | jq -r '.PartsCount'    0
+                                Should Be Equal            ${partsCount}    2
 
                                 Execute                    cat /tmp/part1 /tmp/part2 > /tmp/${PREFIX}-multipartKey1
     Compare files               /tmp/${PREFIX}-multipartKey1         /tmp/${PREFIX}-multipartKey1.result
@@ -144,6 +150,9 @@ Test Multipart Upload Complete
 
     ${tagCount} =               Execute and checkrc        echo '${result}' | jq -r '.TagCount'    0
                                 Should Be Equal            ${tagCount}    2
+
+    ${partsCount}               Execute and checkrc        echo '${result}' | jq -r '.PartsCount'    0
+                                Should Be Equal            ${partsCount}    2
 
     ${result} =                 Execute AWSS3ApiCli        get-object --bucket ${BUCKET} --key ${PREFIX}/multipartKey1 --part-number 2 /tmp/${PREFIX}-multipartKey1-part2.result
     Compare files               /tmp/part2        /tmp/${PREFIX}-multipartKey1-part2.result

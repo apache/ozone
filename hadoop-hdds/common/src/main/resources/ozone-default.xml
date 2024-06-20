@@ -370,14 +370,6 @@
       defined with postfix (ns,ms,s,m,h,d)</description>
   </property>
   <property>
-    <name>hdds.crl.status.report.interval</name>
-    <value>60000ms</value>
-    <tag>OZONE, SECURITY, MANAGEMENT</tag>
-    <description>Time interval of the datanode to send CRL status report. Each
-      datanode periodically sends CRL status report to SCM. Unit could be
-      defined with postfix (ns,ms,s,m,h,d)</description>
-  </property>
-  <property>
     <name>hdds.pipeline.report.interval</name>
     <value>60000ms</value>
     <tag>OZONE, PIPELINE, MANAGEMENT</tag>
@@ -1954,7 +1946,7 @@
   </property>
   <property>
     <name>ozone.security.crypto.compliance.mode</name>
-    <value>none</value>
+    <value>unrestricted</value>
     <tag>OZONE, SECURITY, HDDS, CRYPTO_COMPLIANCE</tag>
     <description>Based on this property the security compliance mode
       is loaded and enables filtering cryptographic configuration options

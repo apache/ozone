@@ -25,19 +25,13 @@ import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMGetAll
 import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMGetCertResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMGetCertResponseProto.ResponseCode;
 import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMGetCertificateRequestProto;
-import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMGetCrlsRequestProto;
-import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMGetCrlsResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMGetDataNodeCertRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMGetCertRequestProto;
-import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMGetLatestCrlIdRequestProto;
-import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMGetLatestCrlIdResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMGetOMCertRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMGetSCMCertRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMListCertificateRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMListCertificateResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMRemoveExpiredCertificatesResponseProto;
-import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMRevokeCertificatesRequestProto;
-import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMRevokeCertificatesResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMSecurityRequest;
 import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMSecurityResponse;
 import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.Status;
@@ -45,7 +39,6 @@ import org.apache.hadoop.hdds.protocolPB.SCMSecurityProtocolPB;
 import org.apache.hadoop.hdds.scm.ha.RatisUtil;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.security.exception.SCMSecurityException;
-import org.apache.hadoop.hdds.security.x509.crl.CRLInfo;
 import org.apache.hadoop.hdds.server.OzoneProtocolMessageDispatcher;
 import org.apache.hadoop.hdds.utils.ProtocolMessageMetrics;
 
@@ -130,21 +123,12 @@ public class SCMSecurityProtocolServerSideTranslatorPB
         return scmSecurityResponse.setListCertificateResponseProto(
             listCACertificate()).build();
       case GetCrls:
-        return SCMSecurityResponse.newBuilder()
-            .setCmdType(request.getCmdType())
-            .setGetCrlsResponseProto(getCrls(request.getGetCrlsRequest()))
-            .build();
       case GetLatestCrlId:
-        return SCMSecurityResponse.newBuilder()
-            .setCmdType(request.getCmdType())
-            .setGetLatestCrlIdResponseProto(getLatestCrlId(
-                request.getGetLatestCrlIdRequest()))
-            .build();
       case RevokeCertificates:
-        return SCMSecurityResponse.newBuilder()
-            .setCmdType(request.getCmdType())
-            .setRevokeCertificatesResponseProto(revokeCertificates(
-                request.getRevokeCertificatesRequest()))
+        return scmSecurityResponse
+            .setStatus(Status.INTERNAL_ERROR)
+            .setMessage("Unsupported operation.")
+            .setSuccess(false)
             .build();
       case GetCert:
         return scmSecurityResponse.setGetCertResponseProto(
@@ -326,7 +310,7 @@ public class SCMSecurityProtocolServerSideTranslatorPB
   public SCMListCertificateResponseProto listCertificate(
       SCMListCertificateRequestProto request) throws IOException {
     List<String> certs = impl.listCertificate(request.getRole(),
-        request.getStartCertId(), request.getCount(), request.getIsRevoked());
+        request.getStartCertId(), request.getCount());
 
     SCMListCertificateResponseProto.Builder builder =
         SCMListCertificateResponseProto
@@ -336,40 +320,6 @@ public class SCMSecurityProtocolServerSideTranslatorPB
             .addAllCertificates(certs);
     return builder.build();
 
-  }
-
-  public SCMGetCrlsResponseProto getCrls(
-      SCMGetCrlsRequestProto request) throws IOException {
-    List<CRLInfo> crls = impl.getCrls(request.getCrlIdList());
-    SCMGetCrlsResponseProto.Builder builder =
-        SCMGetCrlsResponseProto.newBuilder();
-    for (CRLInfo crl : crls) {
-      try {
-        builder.addCrlInfos(crl.getProtobuf());
-      } catch (SCMSecurityException e) {
-        LOG.error("Fail in parsing CRL info", e);
-        throw new SCMSecurityException("Fail in parsing CRL info", e);
-      }
-    }
-    return builder.build();
-  }
-
-  public SCMGetLatestCrlIdResponseProto getLatestCrlId(
-      SCMGetLatestCrlIdRequestProto request) throws IOException {
-    SCMGetLatestCrlIdResponseProto.Builder builder =
-        SCMGetLatestCrlIdResponseProto
-            .newBuilder().
-            setCrlId(impl.getLatestCrlId());
-    return builder.build();
-  }
-
-  public SCMRevokeCertificatesResponseProto revokeCertificates(
-      SCMRevokeCertificatesRequestProto request) throws IOException {
-    SCMRevokeCertificatesResponseProto.Builder builder =
-        SCMRevokeCertificatesResponseProto.newBuilder().setCrlId(
-            impl.revokeCertificates(request.getCertIdsList(),
-                request.getReason().getNumber(), request.getRevokeTime()));
-    return builder.build();
   }
 
   public SCMGetCertResponseProto getRootCACertificate() throws IOException {

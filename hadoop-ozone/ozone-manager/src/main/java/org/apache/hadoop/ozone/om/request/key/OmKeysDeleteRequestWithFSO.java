@@ -24,6 +24,7 @@ import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
+import org.apache.hadoop.ozone.om.helpers.ErrorInfo;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
@@ -36,6 +37,7 @@ import org.slf4j.LoggerFactory;
 import jakarta.annotation.Nonnull;
 
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
@@ -148,12 +150,19 @@ public class OmKeysDeleteRequestWithFSO extends OMKeysDeleteRequest {
       List<OmKeyInfo> omKeyInfoList, List<OmKeyInfo> dirList,
       OzoneManagerProtocolProtos.OMResponse.Builder omResponse,
       OzoneManagerProtocolProtos.DeleteKeyArgs.Builder unDeletedKeys,
+      Map<String, ErrorInfo> keyToErrors,
       boolean deleteStatus, OmBucketInfo omBucketInfo, long volumeId, Map<String, OmKeyInfo> openKeyInfoMap) {
     OMClientResponse omClientResponse;
+    List<OzoneManagerProtocolProtos.DeleteKeyError> deleteKeyErrors = new ArrayList<>();
+    for (Map.Entry<String, ErrorInfo>  key : keyToErrors.entrySet()) {
+      deleteKeyErrors.add(OzoneManagerProtocolProtos.DeleteKeyError.newBuilder()
+          .setKey(key.getKey()).setErrorCode(key.getValue().getCode())
+          .setErrorMsg(key.getValue().getMessage()).build());
+    }
     omClientResponse = new OMKeysDeleteResponseWithFSO(omResponse
         .setDeleteKeysResponse(
             OzoneManagerProtocolProtos.DeleteKeysResponse.newBuilder()
-                .setStatus(deleteStatus).setUnDeletedKeys(unDeletedKeys))
+                .setStatus(deleteStatus).setUnDeletedKeys(unDeletedKeys).addAllErrors(deleteKeyErrors))
         .setStatus(deleteStatus ? OK : PARTIAL_DELETE).setSuccess(deleteStatus)
         .build(), omKeyInfoList, dirList, ozoneManager.isRatisEnabled(),
         omBucketInfo.copyObject(), volumeId, openKeyInfoMap);

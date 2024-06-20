@@ -35,15 +35,12 @@ import org.apache.hadoop.fs.StorageStatistics;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.annotation.InterfaceStability;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
-import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.LeaseKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.security.token.DelegationTokenIssuer;
 
-import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.CONTAINER_NOT_FOUND;
-import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.NO_SUCH_BLOCK;
 import static org.apache.hadoop.ozone.OzoneConsts.FORCE_LEASE_RECOVERY_ENV;
 
 /**
@@ -156,43 +153,15 @@ public class OzoneFileSystem extends BasicOzoneFileSystem
       throw e;
     }
 
-    // finalize the final block and get block length
-    List<OmKeyLocationInfo> locationInfoList = leaseKeyInfo.getKeyInfo().getLatestVersionLocations().getLocationList();
-    if (!locationInfoList.isEmpty()) {
-      OmKeyLocationInfo block = locationInfoList.get(locationInfoList.size() - 1);
-      try {
-        block.setLength(getAdapter().finalizeBlock(block));
-      } catch (Throwable e) {
-        if (e instanceof StorageContainerException && (((StorageContainerException) e).getResult().equals(NO_SUCH_BLOCK)
-            || ((StorageContainerException) e).getResult().equals(CONTAINER_NOT_FOUND))
-            && !leaseKeyInfo.getIsKeyInfo() && locationInfoList.size() > 1) {
-          locationInfoList = leaseKeyInfo.getKeyInfo().getLatestVersionLocations().getLocationList().subList(0,
-              locationInfoList.size() - 1);
-          block = locationInfoList.get(locationInfoList.size() - 1);
-          try {
-            block.setLength(getAdapter().finalizeBlock(block));
-          } catch (Throwable exp) {
-            if (!forceRecovery) {
-              throw exp;
-            }
-            LOG.warn("Failed to finalize block. Continue to recover the file since {} is enabled.",
-                FORCE_LEASE_RECOVERY_ENV, exp);
-          }
-        } else if (!forceRecovery) {
-          throw e;
-        } else {
-          LOG.warn("Failed to finalize block. Continue to recover the file since {} is enabled.",
-              FORCE_LEASE_RECOVERY_ENV, e);
-        }
-      }
-    }
-
+    // Get keyLocationInfo
+    List<OmKeyLocationInfo> keyLocationInfoList = LeaseRecoveryClientDNHandler.getOmKeyLocationInfos(
+        leaseKeyInfo, getAdapter(), forceRecovery);
     // recover and commit file
-    long keyLength = locationInfoList.stream().mapToLong(OmKeyLocationInfo::getLength).sum();
+    long keyLength = keyLocationInfoList.stream().mapToLong(OmKeyLocationInfo::getLength).sum();
     OmKeyArgs keyArgs = new OmKeyArgs.Builder().setVolumeName(leaseKeyInfo.getKeyInfo().getVolumeName())
         .setBucketName(leaseKeyInfo.getKeyInfo().getBucketName()).setKeyName(leaseKeyInfo.getKeyInfo().getKeyName())
         .setReplicationConfig(leaseKeyInfo.getKeyInfo().getReplicationConfig()).setDataSize(keyLength)
-        .setLocationInfoList(locationInfoList)
+        .setLocationInfoList(keyLocationInfoList)
         .build();
     getAdapter().recoverFile(keyArgs);
     return true;

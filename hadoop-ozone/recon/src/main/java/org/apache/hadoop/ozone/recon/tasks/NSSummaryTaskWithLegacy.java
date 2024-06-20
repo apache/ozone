@@ -127,7 +127,7 @@ public class NSSummaryTaskWithLegacy extends NSSummaryTaskDbEventHandler {
       return false;
     }
 
-    LOG.info("Completed a process run of NSSummaryTaskWithLegacy");
+    LOG.debug("Completed a process run of NSSummaryTaskWithLegacy");
     return true;
   }
 
@@ -294,7 +294,7 @@ public class NSSummaryTaskWithLegacy extends NSSummaryTaskDbEventHandler {
     if (!flushAndCommitNSToDB(nsSummaryMap)) {
       return false;
     }
-    LOG.info("Completed a reprocess run of NSSummaryTaskWithLegacy");
+    LOG.debug("Completed a reprocess run of NSSummaryTaskWithLegacy");
     return true;
   }
 

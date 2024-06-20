@@ -83,6 +83,7 @@ import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
+import java.security.PrivilegedExceptionAction;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.ArrayList;
@@ -172,6 +173,10 @@ abstract class AbstractOzoneFileSystemTest {
   private String bucketName;
   private Trash trash;
   private OMMetrics omMetrics;
+  private static final String USER1 = "regularuser1";
+  private static final UserGroupInformation UGI_USER1 = UserGroupInformation
+      .createUserForTesting(USER1,  new String[] {"usergroup"});
+  private OzoneFileSystem userO3fs;
 
   @BeforeAll
   void init() throws Exception {
@@ -218,6 +223,10 @@ abstract class AbstractOzoneFileSystemTest {
     statistics = (OzoneFSStorageStatistics) o3fs.getOzoneFSOpsCountStatistics();
     assertEquals(OzoneConsts.OZONE_URI_SCHEME, fs.getUri().getScheme());
     assertEquals(OzoneConsts.OZONE_URI_SCHEME, statistics.getScheme());
+
+    userO3fs = UGI_USER1.doAs(
+        (PrivilegedExceptionAction<OzoneFileSystem>)()
+            -> (OzoneFileSystem) FileSystem.get(conf));
   }
 
   @AfterAll
@@ -257,6 +266,12 @@ abstract class AbstractOzoneFileSystemTest {
 
   public BucketLayout getBucketLayout() {
     return bucketLayout;
+  }
+
+  @Test
+  void testUserHomeDirectory() {
+    assertEquals(new Path(fsRoot + "user/" + USER1),
+        userO3fs.getHomeDirectory());
   }
 
   @Test

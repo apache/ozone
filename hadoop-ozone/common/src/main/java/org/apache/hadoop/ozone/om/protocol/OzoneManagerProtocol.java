@@ -21,6 +21,7 @@ package org.apache.hadoop.ozone.om.protocol;
 import java.io.Closeable;
 import java.io.IOException;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 import jakarta.annotation.Nonnull;
@@ -32,6 +33,7 @@ import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.DBUpdates;
 import org.apache.hadoop.ozone.om.helpers.DeleteTenantState;
+import org.apache.hadoop.ozone.om.helpers.ErrorInfo;
 import org.apache.hadoop.ozone.om.helpers.KeyInfoWithVolumeContext;
 import org.apache.hadoop.ozone.om.helpers.LeaseKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.ListOpenFilesResult;
@@ -72,6 +74,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.EchoRPC
 import org.apache.hadoop.ozone.security.OzoneDelegationTokenSelector;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
 import org.apache.hadoop.ozone.snapshot.CancelSnapshotDiffResponse;
+import org.apache.hadoop.ozone.snapshot.ListSnapshotResponse;
 import org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse;
 import org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.StatusAndMessages;
 import org.apache.hadoop.security.KerberosInfo;
@@ -370,6 +373,21 @@ public interface OzoneManagerProtocol
    * @throws IOException
    */
   default void deleteKeys(OmDeleteKeys deleteKeys) throws IOException {
+    throw new UnsupportedOperationException("OzoneManager does not require " +
+        "this to be implemented, as write requests use a new approach.");
+  }
+
+  /**
+   * Deletes existing key/keys. This interface supports delete
+   * multiple keys and a single key. Used by deleting files
+   * through OzoneFileSystem.
+   *
+   * @param deleteKeys
+   * @param quiet - flag to not throw exception if delete fails
+   * @throws IOException
+   */
+  default Map<String, ErrorInfo> deleteKeys(OmDeleteKeys deleteKeys, boolean quiet)
+      throws IOException {
     throw new UnsupportedOperationException("OzoneManager does not require " +
         "this to be implemented, as write requests use a new approach.");
   }
@@ -768,12 +786,12 @@ public interface OzoneManagerProtocol
    * @param volumeName     volume name
    * @param bucketName     bucket name
    * @param snapshotPrefix snapshot prefix to match
-   * @param prevSnapshot   start of the list, this snapshot is excluded
-   * @param maxListResult  max numbet of snapshots to return
-   * @return list of snapshots for volume/bucket snapshotpath.
+   * @param prevSnapshot   snapshots will be listed after this snapshot name
+   * @param maxListResult  max number of snapshots to return
+   * @return list of snapshots for volume/bucket path.
    * @throws IOException
    */
-  default List<SnapshotInfo> listSnapshot(
+  default ListSnapshotResponse listSnapshot(
       String volumeName, String bucketName, String snapshotPrefix,
       String prevSnapshot, int maxListResult) throws IOException {
     throw new UnsupportedOperationException("OzoneManager does not require " +

@@ -42,6 +42,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Expired
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OpenKey;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OpenKeyBucket;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PartKeyInfo;
+import org.apache.hadoop.ozone.snapshot.ListSnapshotResponse;
 import org.apache.hadoop.util.Time;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.BeforeEach;
@@ -79,6 +80,7 @@ import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.VOLU
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.params.provider.Arguments.arguments;
@@ -989,67 +991,58 @@ public class TestOmMetadataManager {
     for (int i = 1; i <= 100; i++) {
       if (i % 2 == 0) {
         snapshotsASnapshotIDMap.put(prefixA + i,
-            OMRequestTestUtils.addSnapshotToTable(vol1, bucket1,
-            prefixA + i, omMetadataManager));
+            OMRequestTestUtils.addSnapshotToTable(vol1, bucket1, prefixA + i, omMetadataManager));
         if (i % 4 == 0) {
           snapshotsASnapshotIDMap.put(prefixA + i,
-              OMRequestTestUtils.addSnapshotToTableCache(vol1, bucket1,
-              prefixA + i, omMetadataManager));
+              OMRequestTestUtils.addSnapshotToTableCache(vol1, bucket1, prefixA + i, omMetadataManager));
         }
       } else {
-        OMRequestTestUtils.addSnapshotToTableCache(vol1, bucket1,
-            prefixB + i, omMetadataManager);
+        OMRequestTestUtils.addSnapshotToTableCache(vol1, bucket1, prefixB + i, omMetadataManager);
       }
     }
 
     //Test listing all snapshots.
-    List<SnapshotInfo> snapshotInfos = omMetadataManager.listSnapshot(vol1,
-        bucket1, null, null, 100);
+    List<SnapshotInfo> snapshotInfos = omMetadataManager.listSnapshot(vol1, bucket1, null, null, 100)
+        .getSnapshotInfos();
     assertEquals(100, snapshotInfos.size());
 
-    snapshotInfos = omMetadataManager.listSnapshot(vol1,
-        bucket1, prefixA, null, 50);
+    snapshotInfos = omMetadataManager.listSnapshot(vol1, bucket1, prefixA, null, 50)
+        .getSnapshotInfos();
     assertEquals(50, snapshotInfos.size());
     for (SnapshotInfo snapshotInfo : snapshotInfos) {
       assertTrue(snapshotInfo.getName().startsWith(prefixA));
     }
 
     String startSnapshot = prefixA + 38;
-    snapshotInfos = omMetadataManager.listSnapshot(vol1,
-        bucket1, prefixA, startSnapshot, 50);
-    assertEquals(snapshotsASnapshotIDMap.tailMap(startSnapshot).size() - 1,
-        snapshotInfos.size());
+    snapshotInfos = omMetadataManager.listSnapshot(vol1, bucket1, prefixA, startSnapshot, 50)
+        .getSnapshotInfos();
+    System.out.println(snapshotInfos.stream().map(SnapshotInfo::getName).collect(Collectors.joining(",")));
+    assertEquals(snapshotsASnapshotIDMap.tailMap(startSnapshot).size() - 1, snapshotInfos.size());
     for (SnapshotInfo snapshotInfo : snapshotInfos) {
       assertTrue(snapshotInfo.getName().startsWith(prefixA));
-      assertEquals(snapshotInfo, snapshotsASnapshotIDMap.get(
-          snapshotInfo.getName()));
-      assertThat(snapshotInfo.getName().compareTo(startSnapshot)).isGreaterThan(0);
+      assertEquals(snapshotInfo, snapshotsASnapshotIDMap.get(snapshotInfo.getName()));
+      assertThat(snapshotInfo.getName().compareTo(startSnapshot)).isGreaterThanOrEqualTo(0);
     }
 
-    startSnapshot = null;
+    String lastSnapshot = null;
     TreeSet<String> expectedSnapshot = new TreeSet<>();
     for (int i = 1; i <= 5; i++) {
-      snapshotInfos = omMetadataManager.listSnapshot(
-          vol1, bucket1, prefixA, startSnapshot, 10);
+      ListSnapshotResponse listSnapshotResponse =
+          omMetadataManager.listSnapshot(vol1, bucket1, prefixA, lastSnapshot, 10);
+      snapshotInfos = listSnapshotResponse.getSnapshotInfos();
+      lastSnapshot = listSnapshotResponse.getLastSnapshot();
       assertEquals(10, snapshotInfos.size());
 
       for (SnapshotInfo snapshotInfo : snapshotInfos) {
         expectedSnapshot.add(snapshotInfo.getName());
-        assertEquals(snapshotInfo, snapshotsASnapshotIDMap.get(
-            snapshotInfo.getName()));
+        assertEquals(snapshotInfo, snapshotsASnapshotIDMap.get(snapshotInfo.getName()));
         assertTrue(snapshotInfo.getName().startsWith(prefixA));
-        startSnapshot = snapshotInfo.getName();
       }
     }
     assertEquals(snapshotsASnapshotIDMap.keySet(), expectedSnapshot);
-
-    // As now we have iterated all 50 snapshots, calling next time should
-    // return empty list.
-    snapshotInfos = omMetadataManager.listSnapshot(vol1, bucket1,
-        prefixA, startSnapshot, 10);
-
-    assertEquals(snapshotInfos.size(), 0);
+    assertNull(lastSnapshot);
   }
+
 
   @ParameterizedTest
   @MethodSource("listSnapshotWithInvalidPathCases")
@@ -1100,15 +1093,15 @@ public class TestOmMetadataManager {
     }
 
     //Test listing snapshots only lists snapshots of specified bucket
-    List<SnapshotInfo> snapshotInfos1 = omMetadataManager.listSnapshot(vol1,
-            bucket1, null, null, Integer.MAX_VALUE);
+    List<SnapshotInfo> snapshotInfos1 = omMetadataManager.listSnapshot(vol1, bucket1, null, null, Integer.MAX_VALUE)
+        .getSnapshotInfos();
     assertEquals(2, snapshotInfos1.size());
     for (SnapshotInfo snapshotInfo : snapshotInfos1) {
       assertTrue(snapshotInfo.getName().startsWith(snapshotName1));
     }
 
-    List<SnapshotInfo> snapshotInfos2 = omMetadataManager.listSnapshot(vol1,
-            bucket2, null, null, Integer.MAX_VALUE);
+    List<SnapshotInfo> snapshotInfos2 = omMetadataManager.listSnapshot(vol1, bucket2, null, null, Integer.MAX_VALUE)
+        .getSnapshotInfos();
     assertEquals(5, snapshotInfos2.size());
     for (SnapshotInfo snapshotInfo : snapshotInfos2) {
       assertTrue(snapshotInfo.getName().startsWith(snapshotName2));

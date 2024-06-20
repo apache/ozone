@@ -22,19 +22,15 @@ package org.apache.hadoop.ozone.om.helpers;
  */
 public class LeaseKeyInfo {
   private final OmKeyInfo keyInfo;
-  /**
-   * isKeyInfo = true indicates keyInfo is from keyTable.
-   * isKeyInfo = false indicates keyInfo is from openKeyTable.
-   */
-  private boolean isKeyInfo;
+  private final OmKeyInfo openKeyInfo;
 
-  public LeaseKeyInfo(OmKeyInfo info, boolean isKeyInfo) {
-    this.keyInfo = info;
-    this.isKeyInfo = isKeyInfo;
+  public LeaseKeyInfo(OmKeyInfo keyInfo, OmKeyInfo openKeyInfo) {
+    this.keyInfo = keyInfo;
+    this.openKeyInfo = openKeyInfo;
   }
 
-  public boolean getIsKeyInfo() {
-    return this.isKeyInfo;
+  public OmKeyInfo getOpenKeyInfo() {
+    return openKeyInfo;
   }
 
   public OmKeyInfo getKeyInfo() {
