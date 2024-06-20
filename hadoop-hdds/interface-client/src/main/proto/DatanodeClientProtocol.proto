@@ -527,10 +527,17 @@ message SendContainerRequest {
 message SendContainerResponse {
 }
 
+// Each chunk contains multiple checksums. This message aggregates them into one checksum for the whole chunk.
+message ChunkMerkleTreeProto {
+  optional int64 offset = 1;
+  optional int64 length = 2;
+  optional int64 chunkChecksum = 3;
+}
+
 message BlockMerkleTreeProto {
   optional int64 blockID = 1;
   optional int64 blockChecksum = 2;
-  repeated ChunkInfo chunks = 3;
+  repeated ChunkMerkleTreeProto chunkMerkleTree = 3;
 }
 
 message ContainerMerkleTreeProto {
