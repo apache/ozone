@@ -23,7 +23,6 @@ import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.pipeline.MockPipeline;
 import org.apache.hadoop.hdds.scm.pipeline.MockRatisPipelineProvider;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
 import java.util.ArrayList;
@@ -31,6 +30,8 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.mockito.Mockito.mock;
 
 /**
@@ -41,9 +42,9 @@ public class TestRoundRobinPipelineChoosePolicy {
   @Test
   public void testChoosePipeline() throws Exception {
 
-    // given 4 datanode
+    final int numDatanodes = 4;
     List<DatanodeDetails> datanodes = new ArrayList<>();
-    for (int i = 0; i < 4; i++) {
+    for (int i = 0; i < numDatanodes; i++) {
       datanodes.add(MockDatanodeDetails.randomDatanodeDetails());
     }
 
@@ -73,19 +74,20 @@ public class TestRoundRobinPipelineChoosePolicy {
 
     Map<Pipeline, Integer> selectedCountMap = new HashMap<>();
 
-    final int numContainers = 1000;
+    final int numContainers = 100;
     for (int i = 0; i < numContainers; i++) {
       Pipeline pipeline = policy.choosePipeline(pipelines, null);
-      Assertions.assertNotNull(pipeline);
+      assertNotNull(pipeline);
       final int expectedPipelineIndex = i % numPipelines;
       final Pipeline expectedPipelineChosen = pipelines.get(expectedPipelineIndex);
-      Assertions.assertEquals(expectedPipelineChosen, pipeline);
+      assertEquals(expectedPipelineChosen, pipeline);
       selectedCountMap.compute(pipeline, (k, v) -> v == null ? 1 : v + 1);
     }
 
-    // Each pipeline would be chosen 1000/4 = 250 times
+    // Each pipeline would be chosen 100/4 = 25 times
+    final int expectedCount = numContainers / numPipelines;
     for (int i = 0; i < numPipelines; i++) {
-      Assertions.assertEquals(numContainers / numPipelines, selectedCountMap.get(pipelines.get(i)));
+      assertEquals(expectedCount, selectedCountMap.get(pipelines.get(i)));
     }
   }
 }

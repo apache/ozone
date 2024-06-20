@@ -63,6 +63,7 @@ public class ScmConfig extends ReconfigurableConfig {
   )
   private String action;
 
+  // hdds.scm.pipeline.choose.policy.impl
   @Config(key = "pipeline.choose.policy.impl",
       type = ConfigType.STRING,
       defaultValue = "org.apache.hadoop.hdds.scm.pipeline.choose.algorithms.RandomPipelineChoosePolicy",
@@ -86,6 +87,7 @@ public class ScmConfig extends ReconfigurableConfig {
   )
   private String pipelineChoosePolicyName;
 
+  // hdds.scm.ec.pipeline.choose.policy.impl
   @Config(key = "ec.pipeline.choose.policy.impl",
       type = ConfigType.STRING,
       defaultValue = "org.apache.hadoop.hdds.scm.pipeline.choose.algorithms.RandomPipelineChoosePolicy",

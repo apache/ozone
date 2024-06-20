@@ -52,12 +52,13 @@ public class RoundRobinPipelineChoosePolicy implements PipelineChoosePolicy {
   @Override
   public int choosePipelineIndex(List<Pipeline> pipelineList,
       PipelineRequestInformation pri) {
-    int nextIndex;
+    final int numPipelines = pipelineList.size();
+    int chosenIndex;
     synchronized (this) {
-      nextPipelineIndex = nextPipelineIndex % pipelineList.size();
-      nextIndex = nextPipelineIndex++;
+      nextPipelineIndex = nextPipelineIndex % numPipelines;
+      chosenIndex = nextPipelineIndex++;
     }
-    LOG.debug("pipeline index chosen = {}, pipelineList size = {}", nextIndex, pipelineList.size());
-    return nextIndex;
+    LOG.debug("chosenIndex = {}, numPipelines = {}", chosenIndex, numPipelines);
+    return chosenIndex;
   }
 }
