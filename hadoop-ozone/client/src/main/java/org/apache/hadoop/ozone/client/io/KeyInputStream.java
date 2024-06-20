@@ -61,7 +61,7 @@ public class KeyInputStream extends MultipartInputStream {
       XceiverClientFactory xceiverClientFactory,
       Function<OmKeyInfo, OmKeyInfo> retryFunction,
       BlockInputStreamFactory blockStreamFactory,
-      OzoneClientConfig config) {
+      OzoneClientConfig config) throws IOException {
     List<BlockExtendedInputStream> partStreams = new ArrayList<>();
     for (OmKeyLocationInfo omKeyLocationInfo : blockInfos) {
       if (LOG.isDebugEnabled()) {
@@ -121,7 +121,7 @@ public class KeyInputStream extends MultipartInputStream {
       Function<OmKeyInfo, OmKeyInfo> retryFunction,
       BlockInputStreamFactory blockStreamFactory,
       List<OmKeyLocationInfo> locationInfos,
-      OzoneClientConfig config) {
+      OzoneClientConfig config) throws IOException {
     List<BlockExtendedInputStream> streams = createStreams(keyInfo,
         locationInfos, xceiverClientFactory, retryFunction,
         blockStreamFactory, config);
@@ -137,7 +137,7 @@ public class KeyInputStream extends MultipartInputStream {
       XceiverClientFactory xceiverClientFactory,
       Function<OmKeyInfo, OmKeyInfo> retryFunction,
       BlockInputStreamFactory blockStreamFactory,
-      OzoneClientConfig config) {
+      OzoneClientConfig config) throws IOException {
 
     List<OmKeyLocationInfo> keyLocationInfos = keyInfo
         .getLatestVersionLocations().getBlocksLatestVersionOnly();
@@ -150,7 +150,7 @@ public class KeyInputStream extends MultipartInputStream {
       XceiverClientFactory xceiverClientFactory,
       Function<OmKeyInfo, OmKeyInfo> retryFunction,
       BlockInputStreamFactory blockStreamFactory,
-      OzoneClientConfig config) {
+      OzoneClientConfig config) throws IOException {
 
     List<OmKeyLocationInfo> keyLocationInfos = keyInfo
         .getLatestVersionLocations().getBlocksLatestVersionOnly();
