@@ -57,6 +57,7 @@ import org.junit.jupiter.api.Timeout;
 import org.slf4j.event.Level;
 
 import static org.apache.hadoop.ozone.OzoneConsts.SCM_DUMMY_SERVICE_ID;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_DECOMMISSIONED_NODES_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_RATIS_SERVER_REQUEST_TIMEOUT_DEFAULT;
 import static org.apache.hadoop.ozone.om.TestOzoneManagerHA.createKey;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -81,8 +82,6 @@ public class TestAddRemoveOzoneManager {
   private static final String OM_SERVICE_ID = "om-add-remove";
   private static final String VOLUME_NAME;
   private static final String BUCKET_NAME;
-  private static final String DECOMM_NODES_CONFIG_KEY =
-      "ozone.om.decommissioned.nodes." + OM_SERVICE_ID;
 
   static {
     VOLUME_NAME = "volume" + RandomStringUtils.randomNumeric(5);
@@ -387,9 +386,9 @@ public class TestAddRemoveOzoneManager {
    */
   private void decommissionOM(String decommNodeId) throws Exception {
     Collection<String> decommNodes = conf.getTrimmedStringCollection(
-        DECOMM_NODES_CONFIG_KEY);
+        OZONE_OM_DECOMMISSIONED_NODES_KEY);
     decommNodes.add(decommNodeId);
-    conf.set(DECOMM_NODES_CONFIG_KEY, StringUtils.join(",", decommNodes));
+    conf.set(OZONE_OM_DECOMMISSIONED_NODES_KEY, StringUtils.join(",", decommNodes));
     List<OzoneManager> activeOMs = new ArrayList<>();
     for (OzoneManager om : cluster.getOzoneManagersList()) {
       String omNodeId = om.getOMNodeId();

@@ -22,7 +22,6 @@ package org.apache.hadoop.hdds.security.x509.certificate.authority;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Strings;
-import org.apache.commons.collections.CollectionUtils;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeType;
 import org.apache.hadoop.hdds.scm.metadata.SCMMetadataStore;
 import org.apache.hadoop.hdds.security.SecurityConfig;
@@ -30,10 +29,8 @@ import org.apache.hadoop.hdds.security.exception.SCMSecurityException;
 import org.apache.hadoop.hdds.security.x509.certificate.authority.profile.PKIProfile;
 import org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateCodec;
 import org.apache.hadoop.hdds.security.x509.certificate.utils.SelfSignedCertificate;
-import org.apache.hadoop.hdds.security.x509.crl.CRLInfo;
 import org.apache.hadoop.hdds.security.x509.keys.HDDSKeyGenerator;
 import org.apache.hadoop.hdds.security.x509.keys.KeyCodec;
-import org.bouncycastle.asn1.x509.CRLReason;
 import org.bouncycastle.cert.X509CertificateHolder;
 import org.bouncycastle.operator.OperatorCreationException;
 import org.bouncycastle.pkcs.PKCS10CertificationRequest;
@@ -58,7 +55,6 @@ import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.Date;
 import java.util.List;
-import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Future;
 import java.util.concurrent.locks.Lock;
@@ -128,10 +124,8 @@ public class DefaultCAServer implements CertificateServer {
    */
   private PKIProfile profile;
   private CertificateApprover approver;
-  private CRLApprover crlApprover;
   private CertificateStore store;
   private Lock lock;
-  private static boolean testSecureFlag;
   private BigInteger rootCertificateId;
 
   /**
@@ -177,8 +171,6 @@ public class DefaultCAServer implements CertificateServer {
     Consumer<SecurityConfig> caInitializer =
         processVerificationStatus(status, type);
     caInitializer.accept(securityConfig);
-    crlApprover = new DefaultCRLApprover(securityConfig,
-        getCAKeys().getPrivate());
   }
 
   @Override
@@ -212,8 +204,8 @@ public class DefaultCAServer implements CertificateServer {
   @Override
   public X509Certificate getCertificate(String certSerialId) throws
       IOException {
-    return store.getCertificateByID(new BigInteger(certSerialId),
-        CertificateStore.CertType.VALID_CERTS);
+    return store.getCertificateByID(new BigInteger(certSerialId)
+    );
   }
 
   private KeyPair getCAKeys() throws IOException {
@@ -315,55 +307,14 @@ public class DefaultCAServer implements CertificateServer {
   }
 
   @Override
-  public Future<Optional<Long>> revokeCertificates(
-      List<BigInteger> certificates,
-      CRLReason reason,
-      Date revocationTime) {
-    CompletableFuture<Optional<Long>> revoked = new CompletableFuture<>();
-    if (CollectionUtils.isEmpty(certificates)) {
-      revoked.completeExceptionally(new SCMSecurityException(
-          "Certificates cannot be null or empty"));
-      return revoked;
-    }
-    try {
-      revoked.complete(
-          store.revokeCertificates(certificates,
-              getCACertificate(), reason, revocationTime, crlApprover)
-      );
-    } catch (IOException ex) {
-      LOG.error("Revoking the certificate failed.", ex.getCause());
-      revoked.completeExceptionally(new SCMSecurityException(ex));
-    }
-    return revoked;
-  }
-
-  @Override
   public List<X509Certificate> listCertificate(NodeType role,
-      long startSerialId, int count, boolean isRevoked) throws IOException {
-    return store.listCertificate(role, BigInteger.valueOf(startSerialId), count,
-        isRevoked ? CertificateStore.CertType.REVOKED_CERTS :
-            CertificateStore.CertType.VALID_CERTS);
+      long startSerialId, int count) throws IOException {
+    return store.listCertificate(role, BigInteger.valueOf(startSerialId), count);
   }
 
   @Override
   public void reinitialize(SCMMetadataStore scmMetadataStore) {
     store.reinitialize(scmMetadataStore);
-  }
-
-  /**
-   * Get the CRLInfo based on the CRL Ids.
-   * @param crlIds - list of crl ids
-   * @return CRLInfo
-   * @throws IOException
-   */
-  @Override
-  public List<CRLInfo> getCrls(List<Long> crlIds) throws IOException {
-    return store.getCrls(crlIds);
-  }
-
-  @Override
-  public long getLatestCrlId() {
-    return store.getLatestCrlId();
   }
 
   /**
@@ -655,8 +606,4 @@ public class DefaultCAServer implements CertificateServer {
     INITIALIZE /* All artifacts are missing, we should init the system. */
   }
 
-  @VisibleForTesting
-  public static void setTestSecureFlag(boolean flag) {
-    testSecureFlag = flag;
-  }
 }

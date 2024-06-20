@@ -745,4 +745,8 @@ public class ReconStorageContainerManagerFacade
   public ContainerCountBySizeDao getContainerCountBySizeDao() {
     return containerCountBySizeDao;
   }
+
+  public ReconContext getReconContext() {
+    return reconContext;
+  }
 }

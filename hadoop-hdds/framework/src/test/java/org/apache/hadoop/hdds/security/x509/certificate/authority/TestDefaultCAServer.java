@@ -36,7 +36,6 @@ import org.apache.hadoop.hdds.security.x509.keys.HDDSKeyGenerator;
 import org.apache.hadoop.hdds.security.x509.keys.KeyCodec;
 import org.apache.hadoop.security.ssl.KeyStoreTestUtil;
 
-import org.bouncycastle.asn1.x509.CRLReason;
 import org.bouncycastle.cert.X509CertificateHolder;
 import org.bouncycastle.jcajce.provider.asymmetric.x509.CertificateFactory;
 import org.bouncycastle.pkcs.PKCS10CertificationRequest;
@@ -45,7 +44,6 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 import java.io.IOException;
-import java.math.BigInteger;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.security.KeyPair;
@@ -58,11 +56,7 @@ import java.security.cert.X509Certificate;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.Date;
 import java.util.List;
-import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
@@ -241,55 +235,6 @@ public class TestDefaultCAServer {
     // Right now our calls are synchronous. Eventually this will have to wait.
     assertTrue(holder.isDone());
     assertNotNull(CertificateCodec.firstCertificateFrom(holder.get()));
-  }
-
-  @Test
-  public void testRevokeCertificates() throws Exception {
-    String scmId =  RandomStringUtils.randomAlphabetic(4);
-    String clusterId =  RandomStringUtils.randomAlphabetic(4);
-    Date now = new Date();
-
-    CertificateServer testCA = new DefaultCAServer("testCA",
-        clusterId, scmId, caStore,
-        new DefaultProfile(),
-        Paths.get(SCM_CA_CERT_STORAGE_DIR, SCM_CA_PATH).toString());
-    testCA.init(securityConfig, CAType.ROOT);
-
-    KeyPair keyPair =
-        new HDDSKeyGenerator(securityConfig).generateKey();
-    PKCS10CertificationRequest csr = new CertificateSignRequest.Builder()
-        .addDnsName("hadoop.apache.org")
-        .addIpAddress("8.8.8.8")
-        .setCA(false)
-        .setSubject("testCA")
-        .setConfiguration(securityConfig)
-        .setKey(keyPair)
-        .build();
-
-    Future<CertPath> holder = testCA.requestCertificate(
-        csr, CertificateApprover.ApprovalType.TESTING_AUTOMATIC, OM,
-        String.valueOf(System.nanoTime()));
-
-    X509Certificate certificate =
-        CertificateCodec.firstCertificateFrom(holder.get());
-    List<BigInteger> serialIDs = new ArrayList<>();
-    serialIDs.add(certificate.getSerialNumber());
-    Future<Optional<Long>> revoked = testCA.revokeCertificates(serialIDs,
-        CRLReason.lookup(CRLReason.keyCompromise), now);
-
-    // Revoking a valid certificate complete successfully without errors.
-    assertTrue(revoked.isDone());
-
-    // Revoking empty list of certificates should throw an error.
-    ExecutionException execution = assertThrows(ExecutionException.class,
-        () -> {
-          Future<Optional<Long>> result =
-              testCA.revokeCertificates(Collections.emptyList(),
-              CRLReason.lookup(CRLReason.keyCompromise), now);
-          result.get();
-        });
-    assertThat(execution.getCause().getMessage())
-        .contains("Certificates cannot be null");
   }
 
   @Test

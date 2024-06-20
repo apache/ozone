@@ -72,7 +72,6 @@ import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_NEW_KEY_CERT_DIR_NAME_P
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_NEW_KEY_CERT_DIR_NAME_SUFFIX;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_X509_DIR_NAME_DEFAULT;
 import static org.apache.hadoop.hdds.scm.ha.SequenceIdGenerator.CERTIFICATE_ID;
-import static org.apache.hadoop.hdds.security.x509.certificate.authority.CertificateStore.CertType.VALID_CERTS;
 import static org.apache.hadoop.ozone.OzoneConsts.SCM_ROOT_CA_COMPONENT_NAME;
 
 /**
@@ -692,7 +691,7 @@ public class RootCARotationManager extends StatefulService {
             X509Certificate rootCACert = null;
             try {
               if (scm.getCertificateStore().getCertificateByID(
-                  rootCACertHolder.getSerialNumber(), VALID_CERTS) == null) {
+                  rootCACertHolder.getSerialNumber()) == null) {
                 LOG.info("Persist root certificate {} to cert store",
                     rootCACertId);
                 rootCACert =

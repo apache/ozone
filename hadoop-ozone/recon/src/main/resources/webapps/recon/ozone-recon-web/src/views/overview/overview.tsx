@@ -44,6 +44,8 @@ interface IClusterStateResponse {
   openContainers: number;
   deletedContainers: number;
   keysPendingDeletion: number;
+  scmServiceId: string;
+  omServiceId: string;
 }
 
 interface IOverviewState {
@@ -69,6 +71,8 @@ interface IOverviewState {
   deletePendingSummarytotalRepSize: number,
   deletePendingSummarytotalDeletedKeys: number,
   decommissionInfoCount: number
+  scmServiceId: string;
+  omServiceId: string;
 }
 
 let cancelOverviewSignal: AbortController;
@@ -162,7 +166,9 @@ export class Overview extends React.Component<Record<string, object>, IOverviewS
         deletePendingSummarytotalUnrepSize: deletePendingResponse.data && deletePendingResponse.data.totalUnreplicatedDataSize,
         deletePendingSummarytotalRepSize: deletePendingResponse.data && deletePendingResponse.data.totalReplicatedDataSize,
         deletePendingSummarytotalDeletedKeys: deletePendingResponse.data && deletePendingResponse.data.totalDeletedKeys,
-        decommissionInfoCount: decommissionInfoCount ? decommissionInfoCount : 0
+        decommissionInfoCount: decommissionInfoCount ? decommissionInfoCount : 0,
+        scmServiceId: clusterState.scmServiceId,
+        omServiceId: clusterState.omServiceId
       });
     })).catch(error => {
       this.setState({
@@ -215,7 +221,8 @@ export class Overview extends React.Component<Record<string, object>, IOverviewS
   render() {
     const {loading, datanodes, pipelines, storageReport, containers, volumes, buckets, openSummarytotalUnrepSize, openSummarytotalRepSize, openSummarytotalOpenKeys,
       deletePendingSummarytotalUnrepSize,deletePendingSummarytotalRepSize,deletePendingSummarytotalDeletedKeys,
-      keys, missingContainersCount, lastRefreshed, lastUpdatedOMDBDelta, lastUpdatedOMDBFull, omStatus, openContainers, deletedContainers, decommissionInfoCount } = this.state;
+      keys, missingContainersCount, lastRefreshed, lastUpdatedOMDBDelta, lastUpdatedOMDBFull,
+      omStatus, openContainers, deletedContainers, scmServiceId, omServiceId, decommissionInfoCount } = this.state;
       
     const datanodesElement = (
       <span>
@@ -235,7 +242,7 @@ export class Overview extends React.Component<Record<string, object>, IOverviewS
         {deletePendingSummarytotalUnrepSize!== undefined ? byteToSize(deletePendingSummarytotalUnrepSize,1): '0'}  <span className='ant-card-meta-description meta'>Total UnReplicated Data Size</span><br />
         {deletePendingSummarytotalDeletedKeys !== undefined ? deletePendingSummarytotalDeletedKeys: '0'}  <span className='ant-card-meta-description meta'>Total Pending Delete Keys</span>
       </div>
-  );
+    );
     const containersTooltip = missingContainersCount === 1 ? 'container is missing' : 'containers are missing';
     const containersLink = missingContainersCount > 0 ? '/MissingContainers' : '/Containers';
     const volumesLink = '/Volumes';
@@ -312,6 +319,16 @@ export class Overview extends React.Component<Record<string, object>, IOverviewS
             <OverviewCard loading={loading} title='Decommissioning Datanodes Summary' data={decommissionInfoCount.toString()} icon='hourglass'
               linkToUrl='/Datanodes' />
           </Col>
+          {scmServiceId &&
+              <Col xs={24} sm={18} md={12} lg={12} xl={6}>
+                <OverviewCard title="SCM Service" loading={loading} data={scmServiceId} icon='file-text'/>
+              </Col>
+          }
+          {omServiceId &&
+              <Col xs={24} sm={18} md={12} lg={12} xl={6}>
+                <OverviewCard title="OM Service" loading={loading} data={omServiceId} icon='file-text' linkToUrl='/Om' />
+              </Col>
+          }
         </Row>
       </div>
     );
