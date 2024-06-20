@@ -309,15 +309,13 @@ export class Overview extends React.Component<Record<string, object>, IOverviewS
           <Col xs={24} sm={18} md={12} lg={12} xl={6}>
             <OverviewCard loading={loading} title='Deleted Containers' data={deletedContainers.toString()} icon='delete' />
           </Col>
+        </Row>
+        <Row gutter={[25, 25]}>
           <Col xs={24} sm={18} md={12} lg={12} xl={6} className='summary-font'>
             <OverviewCard loading={loading} title='Open Keys Summary' data={openSummaryData} icon='file-text' linkToUrl='/Om' />
           </Col>
           <Col xs={24} sm={18} md={12} lg={12} xl={6} className='summary-font'>
             <OverviewCard loading={loading} title='Pending Deleted Keys Summary' data={deletePendingSummaryData} icon='delete' linkToUrl='/Om'/>
-          </Col>
-          <Col xs={24} sm={18} md={12} lg={12} xl={6}>
-            <OverviewCard loading={loading} title='Decommissioning Datanodes Summary' data={decommissionInfoCount.toString()} icon='hourglass'
-              linkToUrl='/Datanodes' />
           </Col>
           {scmServiceId &&
               <Col xs={24} sm={18} md={12} lg={12} xl={6}>
@@ -329,6 +327,12 @@ export class Overview extends React.Component<Record<string, object>, IOverviewS
                 <OverviewCard title="OM Service" loading={loading} data={omServiceId} icon='file-text' linkToUrl='/Om' />
               </Col>
           }
+        </Row>
+        <Row gutter={[25, 25]}>
+          <Col xs={24} sm={18} md={12} lg={12} xl={6}>
+            <OverviewCard loading={loading} title='Decommissioning Datanodes Summary' data={decommissionInfoCount.toString()} icon='hourglass'
+              linkToUrl='/Datanodes' />
+          </Col>
         </Row>
       </div>
     );
