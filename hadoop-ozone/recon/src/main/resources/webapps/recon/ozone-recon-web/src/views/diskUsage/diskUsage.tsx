@@ -19,8 +19,6 @@
 import React from 'react';
 import dayjs from 'dayjs';
 import LocalizedFormat from 'dayjs/plugin/localizedFormat';
-import Plot from 'react-plotly.js';
-import * as Plotly from 'plotly.js';
 import {
   Row,
   Col,
@@ -28,7 +26,8 @@ import {
   Input,
   MenuProps,
   Dropdown,
-  Tooltip } from 'antd';
+  Tooltip
+} from 'antd';
 import {
   InfoCircleOutlined,
   LeftOutlined,
@@ -37,6 +36,7 @@ import {
 } from '@ant-design/icons';
 
 import { DetailPanel } from '@/components/rightDrawer/rightDrawer';
+import { EChart } from '@/components/eChart/eChart';
 import { byteToSize, showDataFetchError } from '@/utils/common';
 import { AxiosGetHelper, cancelRequests } from '@/utils/axiosRequestHelper';
 
@@ -65,10 +65,16 @@ interface IDUResponse {
   sizeDirectKey: number;
 }
 
+interface IPlotData {
+  value: number;
+  name: string;
+  size: string;
+}
+
 interface IDUState {
   isLoading: boolean;
   duResponse: IDUResponse[];
-  plotData: Plotly.Data[];
+  plotData: IPlotData[];
   showPanel: boolean;
   panelKeys: string[];
   panelValues: string[];
@@ -224,16 +230,13 @@ export class DiskUsage extends React.Component<Record<string, object>, IDUState>
         returnPath: duResponse.path,
         displayLimit: limit,
         duResponse,
-        plotData: [{
-          type: 'pie',
-          hole: 0.2,
-          values: values,
-          customdata: percentage,
-          labels: pathLabels,
-          text: sizeStr,
-          textinfo: 'label',
-          hovertemplate: 'Percentage: %{customdata}%<br>Total Data Size: %{text}<extra></extra>'
-        }]
+        plotData: percentage.map((key, idx) => {
+          return {
+            value: parseFloat(key as string),
+            name: pathLabels[idx],
+            size: sizeStr[idx]
+          }
+        }) 
       });
     }).catch(error => {
       this.setState({
@@ -261,7 +264,7 @@ export class DiskUsage extends React.Component<Record<string, object>, IDUState>
   }
 
   clickPieSection(e, curPath: string): void {
-    const subPath: string = e.points[0].label;
+    const subPath: string = e.name;
     if (subPath === OTHER_PATH_NAME) {
       return;
     }
@@ -515,7 +518,7 @@ export class DiskUsage extends React.Component<Record<string, object>, IDUState>
 
   render() {
     const { plotData, duResponse, returnPath, panelKeys, panelValues, showPanel, isLoading, inputPath, displayLimit } = this.state;
-    const menuItems: MenuProps["items"] = [{
+    const menuItems: MenuProps['items'] = [{
       key: '5',
       label: 5
     }, {
@@ -536,6 +539,42 @@ export class DiskUsage extends React.Component<Record<string, object>, IDUState>
       const res = Number.parseInt(key, 10);
       this.updatePieChart(this.state.inputPath, res);
     }
+
+    const eChartsOptions = {
+      title: {
+        text: `Disk Usage for ${returnPath} (Total Size: ${byteToSize(duResponse.size, 1)})`,
+        left: 'center'
+      },
+      tooltip: {
+        trigger: 'item',
+        formatter: ({ dataIndex, percent }) => {
+          return `Total Data Size: ${plotData[dataIndex]['size']}<br>Percentage: ${percent} %`
+        }
+      },
+      legend: {
+        orient: 'vertical',
+        left: 'right'
+      },
+      series: [
+        {
+          type: 'pie',
+          radius: '50%',
+          data: plotData.map((value) => {
+            return {
+              value: value.value,
+              name: value.name
+            }
+          }),
+          emphasis: {
+            itemStyle: {
+              shadowBlur: 10,
+              shadowOffsetX: 0,
+              shadowColor: 'rgba(0, 0, 0, 0.5)'
+            }
+          }
+        }
+      ]
+    };
 
     return (
       <div className='du-container'>
@@ -582,26 +621,14 @@ export class DiskUsage extends React.Component<Record<string, object>, IDUState>
               </Row>
               <Row>
                 {(duResponse.size > 0) ?
-                  <div style={{ height: 1000 }}>
-                    <Plot
-                      data={plotData}
-                      layout={
-                        {
-                          width: 1200,
-                          height: 900,
-                          font: {
-                            family: 'Roboto, sans-serif',
-                            size: 15
-                          },
-                          showlegend: true,
-                          legend: {
-                            'x': 1.2,
-                            'xanchor': 'right'
-                          },
-                          title: 'Disk Usage for ' + returnPath + ' (Total Size: ' + byteToSize(duResponse.size, 1) + ')'
-                        }
-                      }
-                      onClick={(duResponse.subPathCount === 0) ? undefined : e => this.clickPieSection(e, returnPath)} />
+                  <div style={{ height: 1000, width: 1000 }}>
+                    <EChart
+                      option={eChartsOptions}
+                      onClick={
+                        (duResponse.subPathCount === 0)
+                          ? undefined
+                          : e => this.clickPieSection(e, returnPath)
+                      } />
                   </div>
                   :
                   <div style={{ height: 800 }} className='metadatainformation'><br />
