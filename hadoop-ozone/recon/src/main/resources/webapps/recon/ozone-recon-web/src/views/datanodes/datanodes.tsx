@@ -125,7 +125,7 @@ const getTimeDiffFromTimestamp = (timestamp: number): string => {
 
   const durationKeys = ['seconds', 'minutes', 'hours', 'days', 'months', 'years']
   durationKeys.forEach((k) => {
-    const time = duration['_data'][k]
+    const time = duration['$d'][k]
     if (time !== 0) {
       elapsedTime = time + `${k.substring(0, 1)} ` + elapsedTime
     }
@@ -507,7 +507,7 @@ export class Datanodes extends React.Component<Record<string, object>, IDatanode
             loading={loading}
             pagination={paginationConfig}
             rowKey='hostname'
-            scroll={{ x: true, scrollToFirstRowOnChange: true }}
+            scroll={{ x: 'max-content', scrollToFirstRowOnChange: true }}
             locale={{ filterTitle: '' }}
           />
         </div>

@@ -27,7 +27,7 @@ import { AxiosGetHelper, cancelRequests } from '@/utils/axiosRequestHelper';
 
 import './diskUsage.less';
 import { MenuProps } from 'react-select';
-import { InfoCircleOutlined, LoadingOutlined } from '@ant-design/icons';
+import { InfoCircleOutlined, LeftOutlined, LoadingOutlined, RedoOutlined } from '@ant-design/icons';
 
 const DEFAULT_DISPLAY_LIMIT = 10;
 const OTHER_PATH_NAME = 'Other Objects';
@@ -536,7 +536,7 @@ export class DiskUsage extends React.Component<Record<string, object>, IDUState>
               <Row>
                 <Col>
                   <div className='go-back-button'>
-                    <Button type='primary' onClick={e => this.goBack(e, returnPath)}><Icon type='left' /></Button>
+                    <Button type='primary' onClick={e => this.goBack(e, returnPath)}><LeftOutlined/></Button>
                   </div>
                   <div className='input-bar'>
                     <h3>Path</h3>
@@ -545,7 +545,7 @@ export class DiskUsage extends React.Component<Record<string, object>, IDUState>
                     </form>
                   </div>
                   <div className='go-back-button'>
-                    <Button type='primary' onClick={e => this.refreshCurPath(e, returnPath)}><Icon type='redo' /></Button>
+                    <Button type='primary' onClick={e => this.refreshCurPath(e, returnPath)}><RedoOutlined/></Button>
                   </div>
                   <div className='dropdown-button'>
                     <Dropdown

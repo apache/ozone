@@ -359,7 +359,7 @@ export class Insights extends React.Component<Record<string, object>, IInsightsS
       children: (
         <>
           <div className='content-div'>
-            {isLoading ? <span><Icon type='loading' /> Loading...</span> :
+            {isLoading ? <span><LoadingOutlined/> Loading...</span> :
               ((containerCountResponse && containerCountResponse.length > 0) ?
                 <div>
                   <Row>

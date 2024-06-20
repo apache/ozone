@@ -269,7 +269,7 @@ export class Pipelines extends React.Component<Record<string, object>, IPipeline
                     return filtered;
                   }, [])}
                   loading={activeLoading} pagination={paginationConfig} rowKey='pipelineId'
-                  scroll={{ x: true, scrollToFirstRowOnChange: true }}
+                  scroll={{ x: 'max-content', scrollToFirstRowOnChange: true }}
                   locale={{ filterTitle: '' }}
                 />
               )
