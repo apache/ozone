@@ -36,6 +36,7 @@ import java.util.concurrent.locks.Lock;
 import java.util.function.Function;
 
 import com.google.common.util.concurrent.Striped;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.client.BlockID;
@@ -48,6 +49,7 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerD
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.GetSmallFileRequestProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.KeyValue;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.PutSmallFileRequestProto;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ReadBlockRequestProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Type;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.WriteChunkRequestProto;
 import org.apache.hadoop.hdds.scm.ByteStringConversion;
@@ -106,6 +108,7 @@ import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuil
 import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuilders.getGetSmallFileResponseSuccess;
 import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuilders.getListBlockResponse;
 import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuilders.getPutFileResponseSuccess;
+import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuilders.getReadBlockResponse;
 import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuilders.getReadChunkResponse;
 import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuilders.getReadContainerResponse;
 import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuilders.getSuccessResponse;
@@ -120,6 +123,7 @@ import static org.apache.hadoop.ozone.container.common.interfaces.Container.Scan
 
 import org.apache.ratis.statemachine.StateMachine;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
+import org.apache.ratis.thirdparty.io.grpc.stub.StreamObserver;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -1218,6 +1222,124 @@ public class KeyValueHandler extends Handler {
       LOG.info("Deleted unreferenced chunk/block {} in container {}", name,
           containerID);
     }
+  }
+
+  @Override
+  public ContainerCommandResponseProto streamDataReadOnly(
+      ContainerCommandRequestProto request, KeyValueContainer kvContainer,
+      DispatcherContext dispatcherContext,
+      StreamObserver<ContainerCommandResponseProto> streamObserver) {
+    ContainerCommandResponseProto responseProto = null;
+    try {
+      if (!request.hasReadBlock()) {
+        if (LOG.isDebugEnabled()) {
+          LOG.debug("Malformed Read Block request. trace ID: {}",
+              request.getTraceID());
+        }
+        return malformedRequest(request);
+      }
+      ReadBlockRequestProto readBlock = request.getReadBlock();
+      ChunkBuffer data;
+
+      BlockID blockID = BlockID.getFromProtobuf(
+          readBlock.getBlockID());
+      BlockData blockData = blockManager.getBlock(kvContainer, blockID);
+      List<ContainerProtos.ChunkInfo> chunkInfos = blockData.getChunks();
+      long blockOffset = 0;
+      int chunkIndex = -1;
+      for (int i = 0; i < chunkInfos.size(); i++) {
+        blockOffset += chunkInfos.get(i).getLen();
+        if (blockOffset > readBlock.getOffset()) {
+          chunkIndex = i;
+          break;
+        }
+      }
+
+      BlockUtils.verifyBCSId(kvContainer, blockID);
+      if (dispatcherContext == null) {
+        dispatcherContext = DispatcherContext.getHandleReadBlock();
+      }
+
+      boolean isReadChunkV0 = readBlock.getVersion()
+          .equals(ContainerProtos.ReadChunkVersion.V0);
+
+      long offset = readBlock.getOffset();
+      long len =  readBlock.getLen();
+      long adjustedChunkOffset, adjustedChunkLen;
+      do {
+        int startIndex = -1;
+        ContainerProtos.ChunkInfo chunk = chunkInfos.get(chunkIndex);
+        if (readBlock.getVerifyChecksum()) {
+          Pair<Long, Long> adjustedOffsetAndLength =
+              computeChecksumBoundaries(chunk, offset, len);
+          adjustedChunkOffset = adjustedOffsetAndLength.getLeft();
+          adjustedChunkLen = adjustedOffsetAndLength.getRight();
+          startIndex = (int) adjustedChunkOffset /
+              chunk.getChecksumData().getBytesPerChecksum();
+          adjustedChunkOffset += chunk.getOffset();
+        } else {
+          adjustedChunkOffset = offset;
+          adjustedChunkLen = Math.min(
+              chunk.getLen() + chunk.getOffset() - offset, len);
+        }
+
+        ChunkInfo chunkInfo = ChunkInfo.getFromProtoBuf(
+            ContainerProtos.ChunkInfo.newBuilder(chunk)
+                .setOffset(adjustedChunkOffset)
+                .setLen(adjustedChunkLen).build());
+        // For older clients, set ReadDataIntoSingleBuffer to true so that
+        // all the data read from chunk file is returned as a single
+        // ByteString. Older clients cannot process data returned as a list
+        // of ByteStrings.
+        if (isReadChunkV0) {
+          chunkInfo.setReadDataIntoSingleBuffer(isReadChunkV0);
+        }
+        data = chunkManager.readChunk(
+            kvContainer, blockID, chunkInfo, dispatcherContext);
+
+        Preconditions.checkNotNull(data, "Chunk data is null");
+        if (DispatcherContext.op(dispatcherContext).readFromTmpFile()) {
+          validateChunkChecksumData(data, chunkInfo);
+          metrics.incBytesReadStateMachine(chunkInfo.getLen());
+          metrics.incNumReadStateMachine();
+        }
+        streamObserver.onNext(
+            getReadBlockResponse(request,
+                blockData.getProtoBufMessage().getBlockID(),
+                chunkInfo.getProtoBufMessage(), isReadChunkV0,
+                data, byteBufferToByteString, startIndex));
+        len -= adjustedChunkLen + adjustedChunkOffset - offset;
+        offset = adjustedChunkOffset + adjustedChunkLen;
+        chunkIndex++;
+      } while (len > 0);
+
+      metrics.incContainerBytesStats(Type.ReadBlock, readBlock.getLen());
+    } catch (StorageContainerException ex) {
+      responseProto = ContainerUtils.logAndReturnError(LOG, ex, request);
+    } catch (IOException ioe) {
+      responseProto = ContainerUtils.logAndReturnError(LOG,
+          new StorageContainerException("Read Block failed", ioe, IO_EXCEPTION),
+          request);
+    }
+    return responseProto;
+  }
+
+  private Pair<Long, Long> computeChecksumBoundaries(
+      ContainerProtos.ChunkInfo chunkInfo, long startByteIndex, long dataLen) {
+
+    int bytesPerChecksum = chunkInfo.getChecksumData().getBytesPerChecksum();
+    long chunkOffset = chunkInfo.getOffset();
+    startByteIndex = startByteIndex - chunkOffset;
+    // index of the last byte to be read from chunk, inclusively.
+    final long endByteIndex = startByteIndex + dataLen - 1;
+
+    long adjustedChunkOffset =  (startByteIndex / bytesPerChecksum)
+        * bytesPerChecksum; // inclusive
+    final long endIndex = ((endByteIndex / bytesPerChecksum) + 1)
+        * bytesPerChecksum; // exclusive
+    long adjustedChunkLen =
+        Math.min(endIndex, chunkInfo.getLen()) - adjustedChunkOffset;
+    return Pair.of(adjustedChunkOffset, adjustedChunkLen);
   }
 
   private String[] getFilesWithPrefix(String prefix, File chunkDir) {

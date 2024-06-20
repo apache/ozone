@@ -104,6 +104,8 @@ enum Type {
   StreamInit = 19;
   StreamWrite = 20;
   Echo = 21;
+  ReadBlock = 22;
+  StreamRead = 23;
 }
 
 
@@ -210,6 +212,7 @@ message ContainerCommandRequestProto {
   optional   string encodedToken = 23;
   optional   uint32 version = 24;
   optional   EchoRequestProto echo = 25;
+  optional   ReadBlockRequestProto readBlock = 26;
 }
 
 message ContainerCommandResponseProto {
@@ -241,6 +244,8 @@ message ContainerCommandResponseProto {
 
   optional GetCommittedBlockLengthResponseProto getCommittedBlockLength = 21;
   optional   EchoResponseProto echo = 22;
+  optional   ReadBlockResponseProto readBlock = 23;
+  optional   StreamDataResponseProto streamData = 24;
 }
 
 message ContainerDataProto {
@@ -374,6 +379,29 @@ message  ListBlockRequestProto {
 
 message  ListBlockResponseProto {
   repeated BlockData blockData = 1;
+}
+
+message ReadBlockRequestProto {
+  required DatanodeBlockID blockID = 1;
+  required uint64 offset = 2;
+  required uint64 len = 3;
+  required bool verifyChecksum = 4;
+  optional ReadChunkVersion version = 5;
+}
+
+message ReadBlockResponseProto {
+  required DatanodeBlockID blockID = 1;
+  required ChunkInfo chunkData = 2;
+  optional uint32 startIndex = 3;
+  // Chunk data should be returned in one of the two for
+  oneof responseData {
+    bytes data = 4; // Chunk data is returned as single buffer for V0
+    DataBuffers dataBuffers = 5; // Chunk data is returned as a list of buffers
+  }
+}
+
+message StreamDataResponseProto {
+  repeated ReadBlockResponseProto readBlock = 1;
 }
 
 message  EchoRequestProto {

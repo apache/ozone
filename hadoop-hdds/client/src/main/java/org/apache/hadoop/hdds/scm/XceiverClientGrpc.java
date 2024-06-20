@@ -41,6 +41,9 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandRequestProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandResponseProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.DatanodeBlockID;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ReadBlockResponseProto;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Type;
 import org.apache.hadoop.hdds.protocol.datanode.proto.XceiverClientProtocolServiceGrpc;
 import org.apache.hadoop.hdds.protocol.datanode.proto.XceiverClientProtocolServiceGrpc.XceiverClientProtocolServiceStub;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
@@ -109,12 +112,12 @@ public class XceiverClientGrpc extends XceiverClientSpi {
    * Constructs a client that can communicate with the Container framework on
    * data nodes via DatanodeClientProtocol.
    *
-   * @param pipeline - Pipeline that defines the machines.
-   * @param config   -- Ozone Config
+   * @param pipeline     - Pipeline that defines the machines.
+   * @param config       -- Ozone Config
    * @param trustManager - a {@link ClientTrustManager} with proper CA handling.
    */
   public XceiverClientGrpc(Pipeline pipeline, ConfigurationSource config,
-      ClientTrustManager trustManager) {
+                           ClientTrustManager trustManager) {
     super();
     Preconditions.checkNotNull(pipeline);
     Preconditions.checkNotNull(config);
@@ -362,39 +365,7 @@ public class XceiverClientGrpc extends XceiverClientSpi {
     // In case of an exception or an error, we will try to read from the
     // datanodes in the pipeline in a round-robin fashion.
     XceiverClientReply reply = new XceiverClientReply(null);
-    List<DatanodeDetails> datanodeList = null;
-
-    DatanodeBlockID blockID = null;
-    if (request.getCmdType() == ContainerProtos.Type.GetBlock) {
-      blockID = request.getGetBlock().getBlockID();
-    } else if  (request.getCmdType() == ContainerProtos.Type.ReadChunk) {
-      blockID = request.getReadChunk().getBlockID();
-    } else if (request.getCmdType() == ContainerProtos.Type.GetSmallFile) {
-      blockID = request.getGetSmallFile().getBlock().getBlockID();
-    }
-
-    if (blockID != null) {
-      // Check if the DN to which the GetBlock command was sent has been cached.
-      DatanodeDetails cachedDN = getBlockDNcache.get(blockID);
-      if (cachedDN != null) {
-        datanodeList = pipeline.getNodes();
-        int getBlockDNCacheIndex = datanodeList.indexOf(cachedDN);
-        if (getBlockDNCacheIndex > 0) {
-          // Pull the Cached DN to the top of the DN list
-          Collections.swap(datanodeList, 0, getBlockDNCacheIndex);
-        }
-      }
-    }
-    if (datanodeList == null) {
-      if (topologyAwareRead) {
-        datanodeList = pipeline.getNodesInOrder();
-      } else {
-        datanodeList = pipeline.getNodes();
-        // Shuffle datanode list so that clients do not read in the same order
-        // every time.
-        Collections.shuffle(datanodeList);
-      }
-    }
+    List<DatanodeDetails> datanodeList = getDatanodeList(request);
 
     boolean allInService = datanodeList.stream()
         .allMatch(dn -> dn.getPersistedOpState() == NodeOperationalState.IN_SERVICE);
@@ -412,7 +383,11 @@ public class XceiverClientGrpc extends XceiverClientSpi {
         // sendCommandAsyncCall will create a new channel and async stub
         // in case these don't exist for the specific datanode.
         reply.addDatanode(dn);
-        responseProto = sendCommandAsync(request, dn).getResponse().get();
+        if (request.getCmdType() == ContainerProtos.Type.ReadBlock) {
+          responseProto = sendCommandAsyncReadOnly(request, dn).getResponse().get();
+        } else {
+          responseProto = sendCommandAsync(request, dn).getResponse().get();
+        }
         if (validators != null && !validators.isEmpty()) {
           for (Validator validator : validators) {
             validator.accept(request, responseProto);
@@ -456,10 +431,10 @@ public class XceiverClientGrpc extends XceiverClientSpi {
       String message = "Failed to execute command {}";
       if (LOG.isDebugEnabled()) {
         LOG.debug(message + " on the pipeline {}.",
-                processForDebug(request), pipeline);
+            processForDebug(request), pipeline);
       } else {
         LOG.error(message + " on the pipeline {}.",
-                request.getCmdType(), pipeline);
+            request.getCmdType(), pipeline);
       }
       throw ioException;
     }
@@ -589,6 +564,71 @@ public class XceiverClientGrpc extends XceiverClientSpi {
     return new XceiverClientReply(replyFuture);
   }
 
+  public XceiverClientReply sendCommandAsyncReadOnly(
+      ContainerCommandRequestProto request, DatanodeDetails dn)
+      throws IOException, InterruptedException {
+
+    CompletableFuture<ContainerCommandResponseProto> future =
+        new CompletableFuture<>();
+    ContainerCommandResponseProto.Builder response =
+        ContainerCommandResponseProto.newBuilder();
+    ContainerProtos.StreamDataResponseProto.Builder streamData =
+        ContainerProtos.StreamDataResponseProto.newBuilder();
+    checkOpen(dn);
+    UUID dnID = dn.getUuid();
+    Type cmdType = request.getCmdType();
+    semaphore.acquire();
+    long requestTime = System.currentTimeMillis();
+    metrics.incrPendingContainerOpsMetrics(cmdType);
+
+    final StreamObserver<ContainerCommandRequestProto> requestObserver =
+        asyncStubs.get(dnID).withDeadlineAfter(timeout, TimeUnit.SECONDS)
+            .send(new StreamObserver<ContainerCommandResponseProto>() {
+              @Override
+              public void onNext(
+                  ContainerCommandResponseProto responseProto) {
+                ReadBlockResponseProto readBlock =
+                    responseProto.getReadBlock();
+                if (responseProto.getResult() == Result.SUCCESS) {
+                  streamData.addReadBlock(readBlock);
+                } else {
+                  future.complete(
+                      ContainerCommandResponseProto.newBuilder(responseProto)
+                          .setCmdType(Type.StreamRead).build());
+                }
+              }
+
+              @Override
+              public void onError(Throwable t) {
+                future.completeExceptionally(t);
+                metrics.decrPendingContainerOpsMetrics(cmdType);
+                metrics.addContainerOpsLatency(
+                    cmdType, System.currentTimeMillis() - requestTime);
+
+              }
+
+              @Override
+              public void onCompleted() {
+                if (streamData.getReadBlockCount() > 0) {
+                  future.complete(response.setStreamData(streamData)
+                      .setCmdType(Type.StreamRead).setResult(Result.SUCCESS).build());
+                }
+                if (!future.isDone()) {
+                  future.completeExceptionally(new IOException(
+                      "Stream completed but no reply for request " +
+                          processForDebug(request)));
+                }
+                metrics.decrPendingContainerOpsMetrics(cmdType);
+                metrics.addContainerOpsLatency(
+                    cmdType, System.currentTimeMillis() - requestTime);
+              }
+            });
+    requestObserver.onNext(request);
+    requestObserver.onCompleted();
+    semaphore.release();
+    return new XceiverClientReply(future);
+  }
+
   private synchronized void checkOpen(DatanodeDetails dn)
       throws IOException {
     if (closed) {
@@ -648,5 +688,42 @@ public class XceiverClientGrpc extends XceiverClientSpi {
 
   public void setTimeout(long timeout) {
     this.timeout = timeout;
+  }
+
+  private List<DatanodeDetails> getDatanodeList(
+      ContainerCommandRequestProto request) {
+    List<DatanodeDetails> datanodeList = null;
+    DatanodeBlockID blockID = null;
+    if (request.getCmdType() == ContainerProtos.Type.GetBlock) {
+      blockID = request.getGetBlock().getBlockID();
+    } else if  (request.getCmdType() == ContainerProtos.Type.ReadChunk) {
+      blockID = request.getReadChunk().getBlockID();
+    } else if (request.getCmdType() == ContainerProtos.Type.GetSmallFile) {
+      blockID = request.getGetSmallFile().getBlock().getBlockID();
+    }
+
+    if (blockID != null) {
+      // Check if the DN to which the GetBlock command was sent has been cached.
+      DatanodeDetails cachedDN = getBlockDNcache.get(blockID);
+      if (cachedDN != null) {
+        datanodeList = pipeline.getNodes();
+        int getBlockDNCacheIndex = datanodeList.indexOf(cachedDN);
+        if (getBlockDNCacheIndex > 0) {
+          // Pull the Cached DN to the top of the DN list
+          Collections.swap(datanodeList, 0, getBlockDNCacheIndex);
+        }
+      }
+    }
+    if (datanodeList == null) {
+      if (topologyAwareRead) {
+        datanodeList = pipeline.getNodesInOrder();
+      } else {
+        datanodeList = pipeline.getNodes();
+        // Shuffle datanode list so that clients do not read in the same order
+        // every time.
+        Collections.shuffle(datanodeList);
+      }
+    }
+    return datanodeList;
   }
 }

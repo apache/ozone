@@ -32,4 +32,8 @@
     <Class name="org.apache.hadoop.hdds.scm.storage.TestBlockInputStream"></Class>
     <Bug pattern="RR_NOT_CHECKED" />
   </Match>
+  <Match>
+    <Class name="org.apache.hadoop.hdds.scm.storage.TestNewBlockInputStream"></Class>
+    <Bug pattern="RR_NOT_CHECKED" />
+  </Match>
 </FindBugsFilter>

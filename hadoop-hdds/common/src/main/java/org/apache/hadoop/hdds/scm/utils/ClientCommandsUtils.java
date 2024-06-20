@@ -19,6 +19,7 @@
 package org.apache.hadoop.hdds.scm.utils;
 
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ReadBlockRequestProto;
 
 /**
  * These methods should be merged with other similar utility classes.
@@ -43,6 +44,15 @@ public final class ClientCommandsUtils {
       ContainerProtos.GetSmallFileRequestProto getSmallFileRequest) {
     if (getSmallFileRequest.hasReadChunkVersion()) {
       return getSmallFileRequest.getReadChunkVersion();
+    } else {
+      return ContainerProtos.ReadChunkVersion.V0;
+    }
+  }
+
+  public static ContainerProtos.ReadChunkVersion getReadChunkVersion(
+      ReadBlockRequestProto readBlock) {
+    if (readBlock.hasVersion()) {
+      return readBlock.getVersion();
     } else {
       return ContainerProtos.ReadChunkVersion.V0;
     }

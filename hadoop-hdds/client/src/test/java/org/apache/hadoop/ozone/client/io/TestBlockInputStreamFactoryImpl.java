@@ -29,8 +29,8 @@ import org.apache.hadoop.hdds.scm.OzoneClientConfig;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.scm.storage.BlockExtendedInputStream;
-import org.apache.hadoop.hdds.scm.storage.BlockInputStream;
 import org.apache.hadoop.hdds.scm.storage.BlockLocationInfo;
+import org.apache.hadoop.hdds.scm.storage.NewBlockInputStream;
 import org.junit.jupiter.api.Test;
 
 import java.util.ArrayList;
@@ -62,7 +62,7 @@ public class TestBlockInputStreamFactoryImpl {
         factory.create(repConfig, blockInfo, blockInfo.getPipeline(),
             blockInfo.getToken(), null, null,
             clientConfig);
-    assertInstanceOf(BlockInputStream.class, stream);
+    assertInstanceOf(NewBlockInputStream.class, stream);
     assertEquals(stream.getBlockID(), blockInfo.getBlockID());
     assertEquals(stream.getLength(), blockInfo.getLength());
   }
