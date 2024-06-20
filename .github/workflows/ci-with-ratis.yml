@@ -50,3 +50,4 @@ jobs:
     secrets: inherit
     with:
       ratis_args: "-Dratis.version=${{ needs.ratis.outputs.ratis-version }} -Dratis.thirdparty.version=${{ needs.ratis.outputs.thirdparty-version }} -Dio.grpc.version=${{ needs.ratis.outputs.grpc-version }} -Dnetty.version=${{ needs.ratis.outputs.netty-version }} -Dgrpc.protobuf-compile.version=${{ needs.ratis.outputs.protobuf-version }}"
+      ref: ${{ github.event.inputs.ref }}

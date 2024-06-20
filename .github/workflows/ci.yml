@@ -21,10 +21,15 @@ on:
         description: Version overrides from custom Ratis build
         default: ''
         required: false
+      ref:
+        type: string
+        description: Ozone ref (branch, tag or commit SHA)
+        default: ''
+        required: false
 env:
   FAIL_FAST: ${{ github.event_name == 'pull_request' }}
   MAVEN_OPTS: -Dhttp.keepAlive=false -Dmaven.wagon.http.pool=false -Dmaven.wagon.http.retryHandler.class=standard -Dmaven.wagon.http.retryHandler.count=3
-  OZONE_WITH_COVERAGE: ${{ github.repository == 'apache/ozone' && github.event_name != 'pull_request' }}
+  OZONE_WITH_COVERAGE: ${{ github.repository == 'apache/ozone' && github.event_name == 'push' }}
 jobs:
   build-info:
     runs-on: ubuntu-20.04
@@ -41,18 +46,35 @@ jobs:
       needs-dependency-check: ${{ steps.selective-checks.outputs.needs-dependency-check }}
       needs-integration-tests: ${{ steps.selective-checks.outputs.needs-integration-tests }}
       needs-kubernetes-tests: ${{ steps.selective-checks.outputs.needs-kubernetes-tests }}
+      sha: ${{ steps.get-sha.outputs.sha }}
     steps:
-      - name: "Checkout ${{ github.ref }} ( ${{ github.sha }} )"
+      - name: "Checkout ${{ github.ref }} / ${{ github.sha }} (push)"
         uses: actions/checkout@v4
         with:
           persist-credentials: false
-      - name: Fetch incoming commit ${{ github.sha }} with its parent
+        if: github.event_name  == 'push'
+      - name: "Checkout ${{ github.sha }} with its parent (pull request)"
         uses: actions/checkout@v4
         with:
           ref: ${{ github.sha }}
           fetch-depth: 2
           persist-credentials: false
         if: github.event_name  == 'pull_request'
+      - name: "Checkout ${{ inputs.ref }} given in workflow input (manual dispatch)"
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref }}
+          persist-credentials: false
+        if: github.event_name  == 'workflow_dispatch'
+      - name: Get SHA of ${{ inputs.ref || github.ref }}
+        id: get-sha
+        run: |
+          if [[ "${GITHUB_EVENT_NAME}" == "workflow_dispatch" ]]; then
+            sha="$(git rev-parse --verify HEAD)"
+          else
+            sha="${GITHUB_SHA}"
+          fi
+          echo "sha=$sha" >> $GITHUB_OUTPUT
       - name: Selective checks
         id: selective-checks
         env:
@@ -87,6 +109,8 @@ jobs:
     steps:
       - name: Checkout project
         uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.build-info.outputs.sha }}
       - name: Cache for npm dependencies
         uses: actions/cache@v4
         with:
@@ -211,11 +235,14 @@ jobs:
     steps:
       - name: Checkout project
         uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.build-info.outputs.sha }}
         if: matrix.check != 'bats'
       - name: Checkout project with history
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          ref: ${{ needs.build-info.outputs.sha }}
         if: matrix.check == 'bats'
       - name: Cache for maven dependencies
         uses: actions/cache/restore@v4
@@ -264,6 +291,8 @@ jobs:
     steps:
       - name: Checkout project
         uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.build-info.outputs.sha }}
       - name: Cache for maven dependencies
         uses: actions/cache/restore@v4
         with:
@@ -310,6 +339,8 @@ jobs:
     steps:
       - name: Checkout project
         uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.build-info.outputs.sha }}
       - name: Download compiled Ozone binaries
         uses: actions/download-artifact@v4
         with:
@@ -339,6 +370,8 @@ jobs:
     steps:
       - name: Checkout project
         uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.build-info.outputs.sha }}
       - name: Cache for maven dependencies
         uses: actions/cache/restore@v4
         with:
@@ -384,6 +417,8 @@ jobs:
     steps:
       - name: Checkout project
         uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.build-info.outputs.sha }}
       - name: Download compiled Ozone binaries
         uses: actions/download-artifact@v4
         with:
@@ -426,6 +461,8 @@ jobs:
     steps:
       - name: Checkout project
         uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.build-info.outputs.sha }}
       - name: Download compiled Ozone binaries
         uses: actions/download-artifact@v4
         with:
@@ -475,6 +512,8 @@ jobs:
     steps:
       - name: Checkout project
         uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.build-info.outputs.sha }}
       - name: Cache for maven dependencies
         uses: actions/cache/restore@v4
         with:
@@ -522,6 +561,7 @@ jobs:
     timeout-minutes: 30
     if: github.repository == 'apache/ozone' && github.event_name != 'pull_request'
     needs:
+      - build-info
       - acceptance
       - integration
       - native
@@ -530,6 +570,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          ref: ${{ needs.build-info.outputs.sha }}
       - name: Cache for maven dependencies
         uses: actions/cache/restore@v4
         with:
