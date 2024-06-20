@@ -80,7 +80,7 @@ class QuotaBar extends React.Component<IQuotaBarProps> {
             status='normal'
             strokeLinecap='square'
             percent={getCapacityPercent(used, quota)}
-            className='capacity-bar' strokeWidth={3}/>
+            className='capacity-bar' size='small'/>
         </Tooltip>
       </div>
     );

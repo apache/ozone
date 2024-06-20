@@ -18,7 +18,7 @@
 
 import React from 'react';
 import axios from 'axios';
-import { Layout, Menu } from 'antd';
+import { Layout, Menu, MenuProps } from 'antd';
 import {
   BarChartOutlined,
   ClusterOutlined,
@@ -38,7 +38,6 @@ import { RouteComponentProps } from 'react-router';
 import logo from '../../logo.png';
 import { showDataFetchError } from '@/utils/common';
 import './navBar.less';
-import { MenuProps } from 'react-select';
 
 const { Sider } = Layout;
 

@@ -20,7 +20,7 @@ import React from 'react';
 import dayjs from 'dayjs';
 import LocalizedFormat from 'dayjs/plugin/localizedFormat';
 import filesize from 'filesize';
-import { Table, Tabs, Menu, Dropdown, Tooltip } from 'antd';
+import { Table, Tabs, MenuProps, Dropdown, Tooltip } from 'antd';
 import { FunnelPlotFilled, InfoCircleOutlined } from '@ant-design/icons';
 import { PaginationConfig } from 'antd/lib/pagination';
 import { ActionMeta, ValueType } from "react-select";
@@ -388,15 +388,25 @@ export class Om extends React.Component<Record<string, object>, IOmdbInsightsSta
     // Inside the class component to access the React internal state
     const existsAtColumn = {
       title: <span>
-        <Dropdown overlay={this.existAtScmOmMenu} >
+        <Dropdown
+          menu={{
+            items: [{
+              key: 'OM',
+              label: 'OM'
+            }, {
+              key: 'SCM',
+              label: 'SCM'
+            }],
+            onClick: this.handleExistsAtChange
+          }} >
           <label> Exists at&nbsp;&nbsp;
-            <FunnelPlotFilled/>&nbsp;&nbsp;&nbsp;&nbsp;
+            <FunnelPlotFilled />&nbsp;&nbsp;&nbsp;&nbsp;
           </label>
         </Dropdown>&nbsp;&nbsp;
         <label>
           <Tooltip placement='top' title={<span>{'SCM: Container exist at SCM but missing at OM.'}<br />
             {'OM: Container exist at OM but missing at SCM.'}</span>}>
-            <InfoCircleOutlined/>
+            <InfoCircleOutlined />
           </Tooltip>
         </label>
       </span>,
@@ -417,21 +427,9 @@ export class Om extends React.Component<Record<string, object>, IOmdbInsightsSta
     }
   };
 
-  existAtScmOmMenu = () => (
-    <Menu
-      onClick={e => this.handleExistsAtChange(e)}>
-      <Menu.Item key='OM'>
-        OM
-      </Menu.Item>
-      <Menu.Item key='SCM'>
-        SCM
-      </Menu.Item>
-    </Menu>
-  );
-
-  handleExistsAtChange = (e: any) => {
-    console.log('handleExistsAtChange', e.key);
-    if (e.key === 'OM') {
+  handleExistsAtChange: MenuProps["onClick"] = ({ key }) => {
+    console.log('handleExistsAtChange', key);
+    if (key === 'OM') {
       this.fetchMismatchContainers('SCM');
     }
     else {
@@ -443,9 +441,19 @@ export class Om extends React.Component<Record<string, object>, IOmdbInsightsSta
     // Inside the class component to access the React internal state
     const fsoNonfsoColumn = {
       title: <span>
-        <Dropdown overlay={this.fsoNonfsoMenu} >
+        <Dropdown menu={{
+          items: [{
+            key: 'fso',
+            label: 'FSO'
+          }, {
+            key: 'nonFso',
+            label: 'Non FSO'
+          }],
+          defaultSelectedKeys: ['OM'],
+          onClick: this.handlefsoNonfsoMenuChange
+        }}>
           <label> Type&nbsp;&nbsp;
-            <FunnelPlotFilled/>
+            <FunnelPlotFilled />
           </label>
         </Dropdown></span>,
       dataIndex: 'type',
@@ -465,21 +473,9 @@ export class Om extends React.Component<Record<string, object>, IOmdbInsightsSta
     }
   };
 
-  fsoNonfsoMenu = () => (
-    <Menu
-      defaultSelectedKeys={['OM']}
-      onClick={e => this.handlefsoNonfsoMenuChange(e)}>
-      <Menu.Item key='fso'>
-        FSO
-      </Menu.Item>
-      <Menu.Item key='nonFso'>
-        Non FSO
-      </Menu.Item>
-    </Menu>
-  );
 
-  handlefsoNonfsoMenuChange = (e: any) => {
-    if (e.key === 'fso') {
+  handlefsoNonfsoMenuChange = ({ key }) => {
+    if (key === 'fso') {
       this.fetchOpenKeys(true, false);
     }
     else {
@@ -1084,7 +1080,7 @@ export class Om extends React.Component<Record<string, object>, IOmdbInsightsSta
               }}
             /> Limit
           </div>
-          <Tabs defaultActiveKey={this.state.activeTab} items={tabPanes} onChange={this.changeTab}/>
+          <Tabs defaultActiveKey={this.state.activeTab} items={tabPanes} onChange={this.changeTab} />
         </div>
       </div>
     );

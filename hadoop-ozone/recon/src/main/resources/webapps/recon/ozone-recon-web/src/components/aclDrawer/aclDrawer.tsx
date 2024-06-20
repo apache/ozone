@@ -68,9 +68,8 @@ export class AclPanel extends React.Component<IAclDrawerProps> {
           placement='right'
           width='40%'
           closable={false}
-          visible={visible}
+          open={visible}
           getContainer={false}
-          style={{position: 'absolute'}}
           onClose={this.onClose}
         >
           <Table dataSource={acls} rowKey='name' locale={{filterTitle: ""}}>

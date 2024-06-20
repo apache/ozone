@@ -17,9 +17,8 @@
  */
 import React from 'react';
 import dayjs, { Dayjs } from 'dayjs';
-import { Row, Button, Input, Dropdown, DatePicker, Form, Result } from 'antd';
+import { Row, Button, Input, MenuProps, Dropdown, DatePicker, Form, Result } from 'antd';
 import { DownOutlined, LoadingOutlined, UndoOutlined } from '@ant-design/icons';
-import { MenuProps } from 'react-select';
 
 
 import { showDataFetchError } from '@/utils/common';

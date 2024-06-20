@@ -81,7 +81,7 @@ class ColumnSearch extends React.PureComponent {
         return;
       }
     },
-    onFilterDropdownVisibleChange: (visible: boolean) => {
+    onFilterDropdownOpenChange: (visible: boolean) => {
       if (visible) {
         setTimeout(() => {
           if (this.searchInput) {

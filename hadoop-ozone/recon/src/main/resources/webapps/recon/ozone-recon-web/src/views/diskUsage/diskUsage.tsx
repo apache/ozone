@@ -17,17 +17,32 @@
  */
 
 import React from 'react';
+import dayjs from 'dayjs';
+import LocalizedFormat from 'dayjs/plugin/localizedFormat';
 import Plot from 'react-plotly.js';
 import * as Plotly from 'plotly.js';
-import { Row, Col, Button, Input, Menu, Dropdown, Tooltip } from 'antd';
+import {
+  Row,
+  Col,
+  Button,
+  Input,
+  MenuProps,
+  Dropdown,
+  Tooltip } from 'antd';
+import {
+  InfoCircleOutlined,
+  LeftOutlined,
+  LoadingOutlined,
+  RedoOutlined
+} from '@ant-design/icons';
 
 import { DetailPanel } from '@/components/rightDrawer/rightDrawer';
 import { byteToSize, showDataFetchError } from '@/utils/common';
 import { AxiosGetHelper, cancelRequests } from '@/utils/axiosRequestHelper';
 
 import './diskUsage.less';
-import { MenuProps } from 'react-select';
-import { InfoCircleOutlined, LeftOutlined, LoadingOutlined, RedoOutlined } from '@ant-design/icons';
+
+dayjs.extend(LocalizedFormat);
 
 const DEFAULT_DISPLAY_LIMIT = 10;
 const OTHER_PATH_NAME = 'Other Objects';
@@ -347,7 +362,7 @@ export class DiskUsage extends React.Component<Record<string, object>, IDUState>
 
       if (summaryResponse.objectInfo.creationTime && summaryResponse.objectInfo.creationTime !== -1) {
         keys.push('Creation Time');
-        values.push(moment(summaryResponse.objectInfo.creationTime).format('ll LTS'));
+        values.push(dayjs(summaryResponse.objectInfo.creationTime).format('ll LTS'));
       }
 
       if (summaryResponse.objectInfo.dataSize && summaryResponse.objectInfo.dataSize !== -1) {
@@ -372,7 +387,7 @@ export class DiskUsage extends React.Component<Record<string, object>, IDUState>
 
       if (summaryResponse.objectInfo.modificationTime && summaryResponse.objectInfo.modificationTime !== -1) {
         keys.push('Modification Time');
-        values.push(moment(summaryResponse.objectInfo.modificationTime).format('ll LTS'));
+        values.push(dayjs(summaryResponse.objectInfo.modificationTime).format('ll LTS'));
       }
 
       if (summaryResponse.objectInfo.name && summaryResponse.objectInfo.name !== -1) {
@@ -536,7 +551,7 @@ export class DiskUsage extends React.Component<Record<string, object>, IDUState>
               <Row>
                 <Col>
                   <div className='go-back-button'>
-                    <Button type='primary' onClick={e => this.goBack(e, returnPath)}><LeftOutlined/></Button>
+                    <Button type='primary' onClick={e => this.goBack(e, returnPath)}><LeftOutlined /></Button>
                   </div>
                   <div className='input-bar'>
                     <h3>Path</h3>
@@ -545,14 +560,14 @@ export class DiskUsage extends React.Component<Record<string, object>, IDUState>
                     </form>
                   </div>
                   <div className='go-back-button'>
-                    <Button type='primary' onClick={e => this.refreshCurPath(e, returnPath)}><RedoOutlined/></Button>
+                    <Button type='primary' onClick={e => this.refreshCurPath(e, returnPath)}><RedoOutlined /></Button>
                   </div>
                   <div className='dropdown-button'>
                     <Dropdown
                       menu={{
                         items: menuItems,
                         onClick: updateDisplayLimit
-                      }} placement='bottomCenter'>
+                      }} placement='bottom'>
                       <Button>Display Limit: {displayLimit}</Button>
                     </Dropdown>
                   </div>
