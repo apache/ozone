@@ -39,10 +39,10 @@ import static org.mockito.Mockito.mock;
  * Test for the round-robin pipeline choose policy.
  */
 public class TestRoundRobinPipelineChoosePolicy {
-  final int numDatanodes = 4;
-  final int numPipelines = 4;
-  PipelineChoosePolicy policy;
-  List<Pipeline> allPipelines;
+  private final int numDatanodes = 4;
+  private final int numPipelines = 4;
+  private PipelineChoosePolicy policy;
+  private List<Pipeline> allPipelines;
 
   @BeforeEach
   public void setup() throws Exception {
