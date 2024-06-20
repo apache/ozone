@@ -20,18 +20,20 @@ import React from 'react';
 import dayjs from 'dayjs';
 import LocalizedFormat from 'dayjs/plugin/localizedFormat';
 import Duration from 'dayjs/plugin/duration';
-import { Table, Tooltip, Popover } from 'antd';
+import { ActionMeta, ValueType } from 'react-select';
+import { Table, Tooltip, Popover, Button, Popconfirm } from 'antd';
+import { PaginationConfig } from 'antd/lib/pagination';
 import {
-  InfoCircleOutlined,
   CheckCircleFilled,
   CheckCircleOutlined,
+  CloseCircleFilled,
+  DeleteOutlined,
   HourglassFilled,
   HourglassOutlined,
-  CloseCircleFilled,
-  WarningOutlined,
+  InfoCircleOutlined,
+  QuestionCircleOutlined,
+  WarningOutlined
 } from '@ant-design/icons';
-import { PaginationConfig } from 'antd/lib/pagination';
-import { ActionMeta, ValueType } from 'react-select';
 
 import {
   DatanodeState,
@@ -40,14 +42,14 @@ import {
   DatanodeOpStateList,
   IStorageReport
 } from '@/types/datanode.types';
-import { AutoReloadHelper } from '@/utils/autoReloadHelper';
+import StorageBar from '@/components/storageBar/storageBar';
 import AutoReloadPanel from '@/components/autoReloadPanel/autoReloadPanel';
 import { MultiSelect, IOption } from '@/components/multiSelect/multiSelect';
 import { showDataFetchError } from '@/utils/common';
 import { ColumnSearch } from '@/utils/columnSearch';
-import { AxiosGetHelper } from '@/utils/axiosRequestHelper';
 import { ReplicationIcon } from '@/utils/themeIcons';
-import StorageBar from '@/components/storageBar/storageBar';
+import { AutoReloadHelper } from '@/utils/autoReloadHelper';
+import { AxiosGetHelper, AxiosPutHelper } from '@/utils/axiosRequestHelper';
 
 import './datanodes.less';
 
@@ -112,26 +114,7 @@ interface IDatanodesState {
   lastUpdated: number;
   selectedColumns: IOption[];
   columnOptions: IOption[];
-}
-
-const getTimeDiffFromTimestamp = (timestamp: number): string => {
-  const timestampDate = new Date(timestamp);
-  const currentDate = new Date();
-
-  let elapsedTime = '';
-  const duration: Duration.Duration = dayjs.duration(
-    dayjs(currentDate).diff(dayjs(timestampDate))
-  )
-
-  const durationKeys = ['seconds', 'minutes', 'hours', 'days', 'months', 'years']
-  durationKeys.forEach((k) => {
-    const time = duration['$d'][k]
-    if (time !== 0) {
-      elapsedTime = time + `${k.substring(0, 1)} ` + elapsedTime
-    }
-  })
-
-  return elapsedTime.trim().length === 0 ? 'Just now' : elapsedTime.trim() + ' ago';
+  selectedRowKeys: string[];
 }
 
 const renderDatanodeState = (state: DatanodeState) => {
@@ -155,6 +138,26 @@ const renderDatanodeOpState = (opState: DatanodeOpState) => {
   const icon = opState in opStateIconMap ? opStateIconMap[opState] : '';
   return <span>{icon} {opState}</span>;
 };
+
+const getTimeDiffFromTimestamp = (timestamp: number): string => {
+  const timestampDate = new Date(timestamp);
+  const currentDate = new Date();
+
+  let elapsedTime = '';
+  const duration: Duration.Duration = dayjs.duration(
+    dayjs(currentDate).diff(dayjs(timestampDate))
+  )
+
+  const durationKeys = ['seconds', 'minutes', 'hours', 'days', 'months', 'years']
+  durationKeys.forEach((k) => {
+    const time = duration['$d'][k]
+    if (time !== 0) {
+      elapsedTime = time + `${k.substring(0, 1)} ` + elapsedTime
+    }
+  })
+
+  return elapsedTime.trim().length === 0 ? 'Just now' : elapsedTime.trim() + ' ago';
+}
 
 const COLUMNS = [
   {
@@ -267,7 +270,7 @@ const COLUMNS = [
       <span>
         Leader Count&nbsp;
         <Tooltip title='The number of Ratis Pipelines in which the given datanode is elected as a leader.'>
-          <InfoCircleOutlined/>
+          <InfoCircleOutlined />
         </Tooltip>
       </span>,
     dataIndex: 'leaderCount',
@@ -289,7 +292,7 @@ const COLUMNS = [
       <span>
         Open Containers&nbsp;
         <Tooltip title='The number of open containers per pipeline.'>
-          <InfoCircleOutlined/>
+          <InfoCircleOutlined />
         </Tooltip>
       </span>,
     dataIndex: 'openContainers',
@@ -369,7 +372,8 @@ export class Datanodes extends React.Component<Record<string, object>, IDatanode
       totalCount: 0,
       lastUpdated: 0,
       selectedColumns: [],
-      columnOptions: defaultColumns
+      columnOptions: defaultColumns,
+      selectedRowKeys: []
     };
     this.autoReload = new AutoReloadHelper(this._loadData);
   }
@@ -438,6 +442,21 @@ export class Datanodes extends React.Component<Record<string, object>, IDatanode
     });
   };
 
+  removeDatanode = async (selectedRowKeys: any) => {
+    const { request, controller } = await AxiosPutHelper('/api/v1/datanodes/remove', selectedRowKeys, cancelSignal);
+    cancelSignal = controller;
+    request.then(() => {
+      this._loadData();
+    }).catch(error => {
+      showDataFetchError(error.toString());
+    }).finally(() => {
+      this.setState({
+        loading: false,
+        selectedRowKeys: []
+      });
+    });
+  }
+
   componentDidMount(): void {
     // Fetch datanodes on component mount
     this._loadData();
@@ -453,8 +472,43 @@ export class Datanodes extends React.Component<Record<string, object>, IDatanode
     console.log(current, pageSize);
   };
 
+  onSelectChange = (newSelectedRowKeys: any) => {
+    this.setState({
+      selectedRowKeys: newSelectedRowKeys
+    });
+  };
+
+  onDisable = (record: any) => {
+    // Enable Checkbox for explicit removal who's State = DEAD
+    if (record.state !== 'DEAD') {
+      // Will return disabled checkboxes records who's Record state is not DEAD and Opeartional State=['IN_SERVICE','ENTERING_MAINTENANCE','DECOMMISSIONING','IN_MAINTENANCE','DECOMMISSIONED']
+      return true;
+    }
+  };
+
+  popConfirm = () => {
+    this.setState({ loading: true });
+    this.removeDatanode(this.state.selectedRowKeys);
+  };
+
+  cancel = () => {
+    this.setState({ selectedRowKeys: [] });
+  };
+
   render() {
-    const { dataSource, loading, totalCount, lastUpdated, selectedColumns, columnOptions } = this.state;
+    const { dataSource, loading, totalCount, lastUpdated, selectedColumns, columnOptions, selectedRowKeys } = this.state;
+
+    const rowSelection = {
+      selectedRowKeys,
+      onChange: this.onSelectChange,
+      getCheckboxProps: record => ({
+        disabled: this.onDisable(record),
+        opState: record.opState,
+      }),
+    };
+
+    const hasSelected = selectedRowKeys.length > 0;
+
     const paginationConfig: PaginationConfig = {
       showTotal: (total: number, range) => `${range[0]}-${range[1]} of ${total} datanodes`,
       showSizeChanger: true,
@@ -487,7 +541,29 @@ export class Datanodes extends React.Component<Record<string, object>, IDatanode
         </div>
 
         <div className='content-div'>
+          {totalCount > 0 &&
+            <div style={{ marginBottom: 16 }}>
+              <Popconfirm
+                disabled={!hasSelected}
+                placement="topLeft"
+                title={`Are you sure you want Recon to stop tracking the selected ${selectedRowKeys.length} datanodes ?`}
+                icon={
+                  <QuestionCircleOutlined style={{ color: 'red' }} />
+                }
+                onConfirm={this.popConfirm}
+                onCancel={this.cancel}
+              >
+                <Tooltip placement="topLeft" title="Remove the dead datanodes.">
+                  <InfoCircleOutlined/>
+                </Tooltip>
+                &nbsp;&nbsp;
+                <Button type="primary" shape="round" icon={<DeleteOutlined />} disabled={!hasSelected} loading={loading}> Remove
+                </Button>
+              </Popconfirm>
+            </div>
+          }
           <Table
+            rowSelection={rowSelection}
             dataSource={dataSource}
             columns={COLUMNS.reduce<any[]>((filtered, column) => {
               if (selectedColumns.some(e => e.value === column.key)) {
@@ -506,7 +582,7 @@ export class Datanodes extends React.Component<Record<string, object>, IDatanode
             }, [])}
             loading={loading}
             pagination={paginationConfig}
-            rowKey='hostname'
+            rowKey='uuid'
             scroll={{ x: 'max-content', scrollToFirstRowOnChange: true }}
             locale={{ filterTitle: '' }}
           />
