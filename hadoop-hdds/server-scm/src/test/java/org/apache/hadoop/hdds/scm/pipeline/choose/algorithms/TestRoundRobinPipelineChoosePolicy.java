@@ -23,6 +23,7 @@ import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.pipeline.MockPipeline;
 import org.apache.hadoop.hdds.scm.pipeline.MockRatisPipelineProvider;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import java.util.ArrayList;
@@ -38,28 +39,30 @@ import static org.mockito.Mockito.mock;
  * Test for the round-robin pipeline choose policy.
  */
 public class TestRoundRobinPipelineChoosePolicy {
+  final int numDatanodes = 4;
+  final int numPipelines = 4;
+  PipelineChoosePolicy policy;
+  List<Pipeline> allPipelines;
 
-  @Test
-  public void testChoosePipeline() throws Exception {
+  @BeforeEach
+  public void setup() throws Exception {
 
-    final int numDatanodes = 4;
     List<DatanodeDetails> datanodes = new ArrayList<>();
     for (int i = 0; i < numDatanodes; i++) {
       datanodes.add(MockDatanodeDetails.randomDatanodeDetails());
     }
 
     NodeManager mockNodeManager = mock(NodeManager.class);
-    PipelineChoosePolicy policy = new RoundRobinPipelineChoosePolicy().init(mockNodeManager);
+    policy = new RoundRobinPipelineChoosePolicy().init(mockNodeManager);
 
-    // generate 4 pipelines, and every pipeline has 3 datanodes
+    // 4 pipelines with each pipeline having 3 datanodes
     //
     //  pipeline0    dn1   dn2   dn3
     //  pipeline1    dn0   dn2   dn3
     //  pipeline2    dn0   dn1   dn3
     //  pipeline3    dn0   dn1   dn2
     //
-    final int numPipelines = 4;
-    List<Pipeline> pipelines = new ArrayList<>();
+    allPipelines = new ArrayList<>();
     for (int i = 0; i < numPipelines; i++) {
       List<DatanodeDetails> dns = new ArrayList<>();
       for (int j = 0; j < datanodes.size(); j++) {
@@ -69,25 +72,99 @@ public class TestRoundRobinPipelineChoosePolicy {
       }
       Pipeline pipeline = MockPipeline.createPipeline(dns);
       MockRatisPipelineProvider.markPipelineHealthy(pipeline);
-      pipelines.add(pipeline);
+      allPipelines.add(pipeline);
     }
 
+  }
+
+  private void verifySelectedCountMap(Map<Pipeline, Integer> selectedCountMap, int[] arrExpectCount) {
+    for (int i = 0; i < numPipelines; i++) {
+      assertEquals(arrExpectCount[i], selectedCountMap.getOrDefault(allPipelines.get(i), 0));
+    }
+  }
+
+  @Test
+  public void testChoosePipeline() {
     Map<Pipeline, Integer> selectedCountMap = new HashMap<>();
 
     final int numContainers = 100;
     for (int i = 0; i < numContainers; i++) {
-      Pipeline pipeline = policy.choosePipeline(pipelines, null);
+      Pipeline pipeline = policy.choosePipeline(allPipelines, null);
       assertNotNull(pipeline);
-      final int expectedPipelineIndex = i % numPipelines;
-      final Pipeline expectedPipelineChosen = pipelines.get(expectedPipelineIndex);
-      assertEquals(expectedPipelineChosen, pipeline);
+      assertEquals(allPipelines.get(i % numPipelines), pipeline);
       selectedCountMap.compute(pipeline, (k, v) -> v == null ? 1 : v + 1);
     }
 
-    // Each pipeline would be chosen 100/4 = 25 times
-    final int expectedCount = numContainers / numPipelines;
-    for (int i = 0; i < numPipelines; i++) {
-      assertEquals(expectedCount, selectedCountMap.get(pipelines.get(i)));
+    // Each pipeline would be chosen 100 / 4 = 25 times
+    verifySelectedCountMap(selectedCountMap, new int[] {25, 25, 25, 25});
+  }
+
+  @Test
+  public void testChoosePipelineListVaries() {
+    Map<Pipeline, Integer> selectedCountMap;
+
+    // A pipeline list that holds only a subset of the pipelines for this test
+    List<Pipeline> availablePipelines = new ArrayList<>();
+    int numAvailablePipeline;
+
+    // Case 1. Only pipeline0 is available
+    availablePipelines.add(allPipelines.get(0));
+    numAvailablePipeline = availablePipelines.size();
+    selectedCountMap = new HashMap<>();
+    for (int i = 0; i < 10; i++) {
+      final Pipeline pipeline = policy.choosePipeline(availablePipelines, null);
+      assertEquals(allPipelines.get(i % numAvailablePipeline), pipeline);
+      selectedCountMap.compute(pipeline, (k, v) -> v == null ? 1 : v + 1);
     }
+    // pipeline0 is selected 10 times
+    verifySelectedCountMap(selectedCountMap, new int[] {10, 0, 0, 0});
+
+    // Case 2. pipeline0 and pipeline1 are available
+    availablePipelines.add(allPipelines.get(1));
+    numAvailablePipeline = availablePipelines.size();
+    selectedCountMap = new HashMap<>();
+    for (int i = 0; i < 10; i++) {
+      final Pipeline pipeline = policy.choosePipeline(availablePipelines, null);
+      assertEquals(availablePipelines.get((i + 1) % numAvailablePipeline), pipeline);
+      selectedCountMap.compute(pipeline, (k, v) -> v == null ? 1 : v + 1);
+    }
+    // pipeline0 and pipeline1 are selected 5 times each
+    verifySelectedCountMap(selectedCountMap, new int[] {5, 5, 0, 0});
+
+    // Case 2. pipeline0, pipeline1 and pipeline2 are available
+    availablePipelines.add(allPipelines.get(2));
+    numAvailablePipeline = availablePipelines.size();
+    selectedCountMap = new HashMap<>();
+    for (int i = 0; i < 10; i++) {
+      final Pipeline pipeline = policy.choosePipeline(availablePipelines, null);
+      assertEquals(availablePipelines.get((i + 1) % numAvailablePipeline), pipeline);
+      selectedCountMap.compute(pipeline, (k, v) -> v == null ? 1 : v + 1);
+    }
+    // pipeline0-2 are selected 3-4 times each
+    verifySelectedCountMap(selectedCountMap, new int[] {3, 4, 3, 0});
+
+    // Case 3. All 4 pipelines are available
+    availablePipelines.add(allPipelines.get(3));
+    numAvailablePipeline = availablePipelines.size();
+    selectedCountMap = new HashMap<>();
+    for (int i = 0; i < 10; i++) {
+      final Pipeline pipeline = policy.choosePipeline(availablePipelines, null);
+      assertEquals(availablePipelines.get((i + 2) % numAvailablePipeline), pipeline);
+      selectedCountMap.compute(pipeline, (k, v) -> v == null ? 1 : v + 1);
+    }
+    // pipeline0-3 are selected 2-3 times each
+    verifySelectedCountMap(selectedCountMap, new int[] {2, 2, 3, 3});
+
+    // Case 4. Remove pipeline0 from the available pipeline list
+    availablePipelines.remove(allPipelines.get(0));
+    numAvailablePipeline = availablePipelines.size();
+    selectedCountMap = new HashMap<>();
+    for (int i = 0; i < 10; i++) {
+      final Pipeline pipeline = policy.choosePipeline(availablePipelines, null);
+      assertEquals(availablePipelines.get((i + 1) % numAvailablePipeline), pipeline);
+      selectedCountMap.compute(pipeline, (k, v) -> v == null ? 1 : v + 1);
+    }
+    // pipeline1-3 are selected 3-4 times each
+    verifySelectedCountMap(selectedCountMap, new int[] {0, 3, 4, 3});
   }
 }
