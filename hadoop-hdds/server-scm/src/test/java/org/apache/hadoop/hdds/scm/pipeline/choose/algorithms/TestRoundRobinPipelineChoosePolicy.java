@@ -131,7 +131,7 @@ public class TestRoundRobinPipelineChoosePolicy {
     // pipeline0 and pipeline1 are selected 5 times each
     verifySelectedCountMap(selectedCountMap, new int[] {5, 5, 0, 0});
 
-    // Case 2. pipeline0, pipeline1 and pipeline2 are available
+    // Case 3. pipeline0, pipeline1 and pipeline2 are available
     availablePipelines.add(allPipelines.get(2));
     numAvailablePipeline = availablePipelines.size();
     selectedCountMap = new HashMap<>();
@@ -143,7 +143,7 @@ public class TestRoundRobinPipelineChoosePolicy {
     // pipeline0-2 are selected 3-4 times each
     verifySelectedCountMap(selectedCountMap, new int[] {3, 4, 3, 0});
 
-    // Case 3. All 4 pipelines are available
+    // Case 4. All 4 pipelines are available
     availablePipelines.add(allPipelines.get(3));
     numAvailablePipeline = availablePipelines.size();
     selectedCountMap = new HashMap<>();
@@ -155,7 +155,7 @@ public class TestRoundRobinPipelineChoosePolicy {
     // pipeline0-3 are selected 2-3 times each
     verifySelectedCountMap(selectedCountMap, new int[] {2, 2, 3, 3});
 
-    // Case 4. Remove pipeline0 from the available pipeline list
+    // Case 5. Remove pipeline0 from the available pipeline list
     availablePipelines.remove(allPipelines.get(0));
     numAvailablePipeline = availablePipelines.size();
     selectedCountMap = new HashMap<>();
