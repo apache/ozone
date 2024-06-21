@@ -22,8 +22,9 @@
 * of jquery-throttle-debounce
 */
 
-function readAndOmitPkg(pkg, _) {
+function readPackage(pkg, context) {
     if (pkg.name === 'throttle-debounce'){
+        context.log(`Found ${pkg.name}`);
         delete pkg.dependencies['throttle-debounce']
     }
     return pkg
@@ -31,6 +32,6 @@ function readAndOmitPkg(pkg, _) {
 
 module.exports = {
     hooks: {
-        readAndOmitPkg
+        readPackage
     }
 }
