@@ -157,7 +157,13 @@ public final class CertificateSignRequest {
     throw new CertificateException("No PKCS#9 extension found in CSR");
   }
 
-  //TODO: ApiDoc!
+  /**
+   * Encodes this CertificateSignRequest to a String representation, that can be transferred over the wire to
+   * the CA server for signing.
+   *
+   * @return the Certificate Sign Request encoded to a String
+   * @throws IOException if an error occurs during encoding.
+   */
   public String toEncodedFormat() throws IOException {
     StringWriter str = new StringWriter();
     try (JcaPEMWriter pemWriter = new JcaPEMWriter(str)) {
