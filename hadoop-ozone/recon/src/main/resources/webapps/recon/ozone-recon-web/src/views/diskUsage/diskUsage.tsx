@@ -200,9 +200,10 @@ export class DiskUsage extends React.Component<Record<string, object>, IDUState>
         // the smallest entities are visible on the pie chart.
         // Note: The percentage and size string calculations remain unchanged.
         // normalize() method will convert array between 0 to 1
+        // Zero Size Entities not adding Minimum Block Size Logic so it will not display inside pi chart
         const clonedValues = structuredClone(values);
         const temp = clonedValues && normalize(clonedValues);
-        normalizedValues = temp && temp.map((item: number) => item + MIN_BLOCK_SIZE);
+        normalizedValues = temp && temp.map((item: number) => item > 0 ? item + MIN_BLOCK_SIZE : item);
 
         percentage = values.map(value => {
           return (value * 100).toFixed(2);
@@ -565,6 +566,10 @@ export class DiskUsage extends React.Component<Record<string, object>, IDUState>
                       <Button>Display Limit: {displayLimit}</Button>
                     </Dropdown>
                   </div>
+                  &nbsp;&nbsp;&nbsp;&nbsp;
+                  <Tooltip placement="rightTop" title="In Below Chart We normalise the entity sizes to achieve visibility for small entities.">
+                    <Icon type='info-circle' />
+                  </Tooltip>
                   <div className='metadata-button'>
                     <Button type='primary' onClick={e => this.showMetadataDetails(e, returnPath)}>
                       <b>
