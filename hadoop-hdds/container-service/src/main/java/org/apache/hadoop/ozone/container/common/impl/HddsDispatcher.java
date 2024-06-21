@@ -226,11 +226,14 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
         (cmdType == Type.WriteChunk && dispatcherContext != null
             && dispatcherContext.getStage()
             == DispatcherContext.WriteChunkStage.COMMIT_DATA);
-    if (isWriteStage) {
+
+    if (dispatcherContext == null) {
+      // increase all op not through ratis
+      metrics.incContainerOpsMetrics(cmdType);
+    } else if (isWriteStage) {
+      // increase WriteChunk in only WRITE_STAGE
       metrics.incContainerOpsMetrics(cmdType);
     } else if (cmdType != Type.WriteChunk) {
-      metrics.incContainerOpsMetrics(cmdType);
-    } else if (dispatcherContext == null) {
       metrics.incContainerOpsMetrics(cmdType);
     }
 

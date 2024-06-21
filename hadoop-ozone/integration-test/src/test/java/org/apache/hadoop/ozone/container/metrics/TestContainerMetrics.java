@@ -234,7 +234,9 @@ public class TestContainerMetrics {
       assertCounter("WriteOpCount", 1L, volumeIOMetrics);
     } finally {
       ContainerMetrics.remove();
-      volumeSet.shutdown();
+      if (volumeSet != null) {
+        volumeSet.shutdown();
+      }
       if (client != null) {
         client.close();
       }
