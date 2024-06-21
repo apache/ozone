@@ -22,6 +22,7 @@ package org.apache.hadoop.hdds.security.x509.certificate.client;
 import org.apache.hadoop.hdds.security.exception.OzoneSecurityException;
 import org.apache.hadoop.hdds.security.ssl.ReloadingX509KeyManager;
 import org.apache.hadoop.hdds.security.ssl.ReloadingX509TrustManager;
+import org.apache.hadoop.hdds.security.exception.SCMSecurityException;
 import org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateSignRequest;
 import org.apache.hadoop.hdds.security.x509.exception.CertificateException;
 
@@ -156,13 +157,12 @@ public interface CertificateClient extends Closeable {
       X509Certificate cert) throws CertificateException;
 
   /**
-   * Returns a CSR builder that can be used to create a Certificate sigining
-   * request.
+   * Returns a CertificateSignRequest object, that can be used to retrieve
+   * a signed certificate from our CA server implementation.
    *
-   * @return CertificateSignRequest.Builder
+   * @return CertificateSignRequest a CSR based on which the certificate can be issued.
    */
-  CertificateSignRequest.Builder getCSRBuilder()
-      throws CertificateException;
+  CertificateSignRequest.Builder configureCSRBuilder() throws SCMSecurityException;
 
   default void assertValidKeysAndCertificate() throws OzoneSecurityException {
     try {
