@@ -559,7 +559,7 @@ jobs:
   coverage:
     runs-on: ubuntu-20.04
     timeout-minutes: 30
-    if: github.repository == 'apache/ozone' && github.event_name != 'pull_request'
+    if: github.repository == 'apache/ozone' && github.event_name == 'push'
     needs:
       - build-info
       - acceptance
