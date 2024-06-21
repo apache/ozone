@@ -1135,6 +1135,43 @@ public abstract class TestOzoneRpcClientAbstract extends OzoneTestBase {
 
   @ParameterizedTest
   @EnumSource
+  void rewriteAfterRename(BucketLayout layout) throws IOException {
+    OzoneBucket bucket = createBucket(layout);
+    OzoneKeyDetails keyDetails = createTestKey(bucket);
+    String newKeyName = "rewriteAfterRename-" + layout;
+
+    bucket.renameKey(keyDetails.getName(), newKeyName);
+    OzoneKeyDetails renamedKeyDetails = bucket.getKey(newKeyName);
+    OmKeyArgs keyArgs = toOmKeyArgs(renamedKeyDetails);
+    OmKeyInfo keyInfo = ozoneManager.lookupKey(keyArgs);
+
+    final byte[] rewriteContent = "rewrite".getBytes(UTF_8);
+    rewriteKey(bucket, renamedKeyDetails, rewriteContent);
+
+    OzoneKeyDetails actualKeyDetails = assertKeyContent(bucket, newKeyName, rewriteContent);
+    assertMetadataUnchanged(keyDetails, actualKeyDetails);
+    assertMetadataAfterRewrite(keyInfo, ozoneManager.lookupKey(keyArgs));
+  }
+
+  @ParameterizedTest
+  @EnumSource
+  void renameAfterRewrite(BucketLayout layout) throws IOException {
+    OzoneBucket bucket = createBucket(layout);
+    OzoneKeyDetails keyDetails = createTestKey(bucket);
+    final byte[] rewriteContent = "rewrite".getBytes(UTF_8);
+    rewriteKey(bucket, keyDetails, rewriteContent);
+    OmKeyInfo keyInfo = ozoneManager.lookupKey(toOmKeyArgs(keyDetails));
+
+    String newKeyName = "renameAfterRewrite-" + layout;
+    bucket.renameKey(keyDetails.getName(), newKeyName);
+
+    OzoneKeyDetails actualKeyDetails = assertKeyContent(bucket, newKeyName, rewriteContent);
+    assertMetadataUnchanged(keyDetails, actualKeyDetails);
+    assertMetadataAfterRewrite(keyInfo, ozoneManager.lookupKey(toOmKeyArgs(actualKeyDetails)));
+  }
+
+  @ParameterizedTest
+  @EnumSource
   void rewriteFailsDueToOutdatedGeneration(BucketLayout layout) throws IOException {
     OzoneBucket bucket = createBucket(layout);
     OzoneKeyDetails keyDetails = createTestKey(bucket);
@@ -1196,6 +1233,18 @@ public abstract class TestOzoneRpcClientAbstract extends OzoneTestBase {
     OzoneBucket bucket = createBucket(layout);
     OzoneKeyDetails keyDetails = createTestKey(bucket);
     bucket.deleteKey(keyDetails.getName());
+
+    OMException e = assertThrows(OMException.class, () -> rewriteKey(bucket, keyDetails, "rewrite".getBytes(UTF_8)));
+    assertEquals(KEY_NOT_FOUND, e.getResult());
+    assertThat(e).hasMessageContaining("not found");
+  }
+
+  @ParameterizedTest
+  @EnumSource
+  void cannotRewriteRenamedKey(BucketLayout layout) throws IOException {
+    OzoneBucket bucket = createBucket(layout);
+    OzoneKeyDetails keyDetails = createTestKey(bucket);
+    bucket.renameKey(keyDetails.getName(), "newKeyName-" + layout.name());
 
     OMException e = assertThrows(OMException.class, () -> rewriteKey(bucket, keyDetails, "rewrite".getBytes(UTF_8)));
     assertEquals(KEY_NOT_FOUND, e.getResult());
