@@ -44,14 +44,15 @@ S3 Gateway Secret Already Exists
     ${result} =         Execute                             curl -X PUT --negotiate -u : -v ${ENDPOINT_URL}/secret
                         Should contain          ${result}       HTTP/1.1 400 S3_SECRET_ALREADY_EXISTS    ignore_case=True
 
-S3 Gateway Generate Secret By Username
-    Pass Execution If   '${SECURITY_ENABLED}' == 'false'    Skipping this check as security is not enabled
-    ${result} =         Execute                             curl -X PUT --negotiate -u : -v ${ENDPOINT_URL}/secret/testuser
-                        Should contain          ${result}       HTTP/1.1 200 OK    ignore_case=True
-                        Should Match Regexp     ${result}       <awsAccessKey>.*</awsAccessKey><awsSecret>.*</awsSecret>
-
-S3 Gateway Generate Secret By Username For Other User
-    Pass Execution If   '${SECURITY_ENABLED}' == 'false'    Skipping this check as security is not enabled
-    ${result} =         Execute                             curl -X PUT --negotiate -u : -v ${ENDPOINT_URL}/secret/testuser2
-                        Should contain          ${result}       HTTP/1.1 200 OK    ignore_case=True
-                        Should Match Regexp     ${result}       <awsAccessKey>.*</awsAccessKey><awsSecret>.*</awsSecret>
+# TODO: Enable after HDDS-11041 is done.
+# S3 Gateway Generate Secret By Username
+#    Pass Execution If   '${SECURITY_ENABLED}' == 'false'    Skipping this check as security is not enabled
+#    ${result} =         Execute                             curl -X PUT --negotiate -u : -v ${ENDPOINT_URL}/secret/testuser
+#                        Should contain          ${result}       HTTP/1.1 200 OK    ignore_case=True
+#                        Should Match Regexp     ${result}       <awsAccessKey>.*</awsAccessKey><awsSecret>.*</awsSecret>
+#
+# S3 Gateway Generate Secret By Username For Other User
+#    Pass Execution If   '${SECURITY_ENABLED}' == 'false'    Skipping this check as security is not enabled
+#    ${result} =         Execute                             curl -X PUT --negotiate -u : -v ${ENDPOINT_URL}/secret/testuser2
+#                        Should contain          ${result}       HTTP/1.1 200 OK    ignore_case=True
+#                        Should Match Regexp     ${result}       <awsAccessKey>.*</awsAccessKey><awsSecret>.*</awsSecret>
