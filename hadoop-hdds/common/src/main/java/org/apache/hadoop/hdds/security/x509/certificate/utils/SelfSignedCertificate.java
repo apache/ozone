@@ -23,6 +23,7 @@ import java.io.IOException;
 import java.math.BigInteger;
 import java.net.InetAddress;
 import java.security.KeyPair;
+import java.security.cert.X509Certificate;
 import java.time.Duration;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
@@ -54,14 +55,15 @@ import org.bouncycastle.asn1.x509.GeneralNames;
 import org.bouncycastle.asn1.x509.KeyUsage;
 import org.bouncycastle.asn1.x509.SubjectPublicKeyInfo;
 import org.bouncycastle.cert.CertIOException;
-import org.bouncycastle.cert.X509CertificateHolder;
 import org.bouncycastle.cert.X509v3CertificateBuilder;
+import org.bouncycastle.cert.jcajce.JcaX509CertificateConverter;
 import org.bouncycastle.operator.ContentSigner;
 import org.bouncycastle.operator.OperatorCreationException;
 import org.bouncycastle.operator.jcajce.JcaContentSignerBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import static org.apache.hadoop.hdds.security.x509.exception.CertificateException.ErrorCode.CERTIFICATE_ERROR;
 import static org.apache.hadoop.hdds.security.x509.exception.CertificateException.ErrorCode.CSR_ERROR;
 
 /**
@@ -107,8 +109,7 @@ public final class SelfSignedCertificate {
     return new Builder();
   }
 
-  private X509CertificateHolder generateCertificate(BigInteger caCertSerialId)
-      throws OperatorCreationException, IOException {
+  private X509Certificate generateCertificate(BigInteger caCertSerialId) throws OperatorCreationException, IOException {
     byte[] encoded = key.getPublic().getEncoded();
     SubjectPublicKeyInfo publicKeyInfo =
         SubjectPublicKeyInfo.getInstance(encoded);
@@ -153,12 +154,15 @@ public final class SelfSignedCertificate {
                 new GeneralName[altNames.size()])).getEncoded()));
       }
     }
-    X509CertificateHolder certHolder = builder.build(contentSigner);
-    LOG.info("Certificate {} is issued by {} to {}, valid from {} to {}",
-        certHolder.getSerialNumber(), certHolder.getIssuer(),
-        certHolder.getSubject(), certHolder.getNotBefore(),
-        certHolder.getNotAfter());
-    return certHolder;
+    try {
+      //TODO: as part of HDDS-10743 ensure that converter is instantiated only once
+      X509Certificate cert = new JcaX509CertificateConverter().getCertificate(builder.build(contentSigner));
+      LOG.info("Certificate {} is issued by {} to {}, valid from {} to {}",
+          cert.getSerialNumber(), cert.getIssuerDN(), cert.getSubjectDN(), cert.getNotBefore(), cert.getNotAfter());
+      return cert;
+    } catch (java.security.cert.CertificateException e) {
+      throw new CertificateException("Could not create self-signed X509Certificate.", e, CERTIFICATE_ERROR);
+    }
   }
 
   /**
@@ -294,7 +298,7 @@ public final class SelfSignedCertificate {
           false, 0, new DERSequence(otherName));
     }
 
-    public X509CertificateHolder build()
+    public X509Certificate build()
         throws SCMSecurityException, IOException {
       Preconditions.checkNotNull(key, "Key cannot be null");
       Preconditions.checkArgument(StringUtils.isNotBlank(subject),

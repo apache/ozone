@@ -28,6 +28,7 @@ import { AxiosGetHelper, cancelRequests } from 'utils/axiosRequestHelper';
 
 const DEFAULT_DISPLAY_LIMIT = 10;
 const OTHER_PATH_NAME = 'Other Objects';
+const MAX_DISPLAY_LIMIT = 30;
 
 interface IDUSubpath {
   path: string;
@@ -129,7 +130,7 @@ export class DiskUsage extends React.Component<Record<string, object>, IDUState>
     this.setState({
       isLoading: true
     });
-    const duEndpoint = `/api/v1/namespace/du?path=${path}&files=true`;
+    const duEndpoint = `/api/v1/namespace/du?path=${path}&files=true&sortSubPaths=true`;
     const { request, controller } = AxiosGetHelper(duEndpoint, cancelPieSignal)
     cancelPieSignal = controller;
     request.then(response => {
@@ -144,20 +145,24 @@ export class DiskUsage extends React.Component<Record<string, object>, IDUState>
       const dataSize = duResponse.size;
       let subpaths: IDUSubpath[] = duResponse.subPaths;
 
-      subpaths.sort((a, b) => (a.size < b.size) ? 1 : -1);
-
-      // Only show top n blocks with the most DU,
-      // other blocks are merged as a single block
-      if (subpaths.length > limit) {
+      // We need to calculate the size of "Other objects" in two cases: 
+      // 1) If we have more subpaths listed, than the limit.  
+      // 2) If the limit is set to the maximum limit (30) and we have any number of subpaths. In this case we won't
+      // necessarily have "Other objects", but later we check if the other objects's size is more than zero (we will have
+      // other objects if there are more than 30 subpaths, but we can't check on that, as the response will always have 
+      // 30 subpaths, but from the total size and the subpaths size we can calculate it).
+       
+      if (subpaths.length > limit || (subpaths.length > 0 && limit === MAX_DISPLAY_LIMIT)) {
         subpaths = subpaths.slice(0, limit);
         let topSize = 0;
-        for (let i = 0; i < limit; ++i) {
+        for (let i = 0; i < subpaths.length; ++i) {
           topSize += subpaths[i].size;
         }
-
         const otherSize = dataSize - topSize;
-        const other: IDUSubpath = {path: OTHER_PATH_NAME, size: otherSize};
-        subpaths.push(other);
+        if (otherSize > 0) {
+          const other: IDUSubpath = {path: OTHER_PATH_NAME, size: otherSize};
+          subpaths.push(other);
+        }
       }
 
       let pathLabels, values, percentage, sizeStr, pieces, subpathName;
@@ -264,13 +269,7 @@ export class DiskUsage extends React.Component<Record<string, object>, IDUState>
   }
 
   updateDisplayLimit(e): void {
-    let res = -1;
-    if (e.key === 'all') {
-      res = Number.MAX_VALUE;
-    } else {
-      res = Number.parseInt(e.key, 10);
-    }
-
+    let res = Number.parseInt(e.key, 10);
     this.updatePieChart(this.state.inputPath, res);
   }
 
@@ -517,8 +516,8 @@ export class DiskUsage extends React.Component<Record<string, object>, IDUState>
         <Menu.Item key='20'>
           20
         </Menu.Item>
-        <Menu.Item key='all'>
-          All
+        <Menu.Item key='30'>
+          30
         </Menu.Item>
       </Menu>
     );
@@ -549,7 +548,7 @@ export class DiskUsage extends React.Component<Record<string, object>, IDUState>
                   </div>
                   <div className='dropdown-button'>
                     <Dropdown overlay={menu} placement='bottomCenter'>
-                      <Button>Display Limit: {(displayLimit === Number.MAX_VALUE) ? 'All' : displayLimit}</Button>
+                      <Button>Display Limit: {displayLimit}</Button>
                     </Dropdown>
                   </div>
                   <div className='metadata-button'>
@@ -569,7 +568,7 @@ export class DiskUsage extends React.Component<Record<string, object>, IDUState>
                       layout={
                         {
                           width: 1200,
-                          height: 750,
+                          height: 900,
                           font: {
                             family: 'Roboto, sans-serif',
                             size: 15

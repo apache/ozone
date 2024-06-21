@@ -68,8 +68,12 @@ public class TestS3InitiateMultipartUploadRequest
     customMetadata.put("custom-key1", "custom-value1");
     customMetadata.put("custom-key2", "custom-value2");
 
+    Map<String, String> tags = new HashMap<>();
+    tags.put("tag-key1", "tag-value1");
+    tags.put("tag-key2", "tag-value2");
+
     OMRequest modifiedRequest = doPreExecuteInitiateMPU(volumeName,
-        bucketName, keyName, customMetadata);
+        bucketName, keyName, customMetadata, tags);
 
     S3InitiateMultipartUploadRequest s3InitiateMultipartUploadRequest =
         getS3InitiateMultipartUploadReq(modifiedRequest);
@@ -93,6 +97,9 @@ public class TestS3InitiateMultipartUploadRequest
     assertNotNull(openMPUKeyInfo.getMetadata());
     assertEquals("custom-value1", openMPUKeyInfo.getMetadata().get("custom-key1"));
     assertEquals("custom-value2", openMPUKeyInfo.getMetadata().get("custom-key2"));
+    assertNotNull(openMPUKeyInfo.getTags());
+    assertEquals("tag-value1", openMPUKeyInfo.getTags().get("tag-key1"));
+    assertEquals("tag-value2", openMPUKeyInfo.getTags().get("tag-key2"));
 
     assertNotNull(omMetadataManager.getMultipartInfoTable().get(multipartKey));
 

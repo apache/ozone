@@ -49,7 +49,7 @@ class DummyBlockInputStream extends BlockInputStream {
       Function<BlockID, BlockLocationInfo> refreshFunction,
       List<ChunkInfo> chunkList,
       Map<String, byte[]> chunks,
-      OzoneClientConfig config) {
+      OzoneClientConfig config) throws IOException {
     super(blockId, blockLen, pipeline, token,
         xceiverClientManager, refreshFunction, config);
     this.chunkDataMap = chunks;

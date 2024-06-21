@@ -53,6 +53,7 @@ public final class OmKeyArgs implements Auditable {
   private final boolean recursive;
   private final boolean headOp;
   private final boolean forceUpdateContainerCacheFromSCM;
+  private final Map<String, String> tags;
   // expectedDataGeneration, when used in key creation indicates that a
   // key with the same keyName should exist with the given generation.
   // For a key commit to succeed, the original key should still be present with the
@@ -79,6 +80,7 @@ public final class OmKeyArgs implements Auditable {
     this.headOp = b.headOp;
     this.forceUpdateContainerCacheFromSCM = b.forceUpdateContainerCacheFromSCM;
     this.ownerName = b.ownerName;
+    this.tags = b.tags;
     this.expectedDataGeneration = b.expectedDataGeneration;
   }
 
@@ -158,6 +160,10 @@ public final class OmKeyArgs implements Auditable {
     return forceUpdateContainerCacheFromSCM;
   }
 
+  public Map<String, String> getTags() {
+    return tags;
+  }
+
   public Long getExpectedDataGeneration() {
     return expectedDataGeneration;
   }
@@ -201,7 +207,8 @@ public final class OmKeyArgs implements Auditable {
         .setHeadOp(headOp)
         .setLatestVersionLocation(latestVersionLocation)
         .setAcls(acls)
-        .setForceUpdateContainerCacheFromSCM(forceUpdateContainerCacheFromSCM);
+        .setForceUpdateContainerCacheFromSCM(forceUpdateContainerCacheFromSCM)
+        .addAllTags(tags);
 
     if (expectedDataGeneration != null) {
       builder.setExpectedDataGeneration(expectedDataGeneration);
@@ -248,6 +255,7 @@ public final class OmKeyArgs implements Auditable {
     private boolean recursive;
     private boolean headOp;
     private boolean forceUpdateContainerCacheFromSCM;
+    private final Map<String, String> tags = new HashMap<>();
     private Long expectedDataGeneration = null;
 
     public Builder setVolumeName(String volume) {
@@ -320,6 +328,16 @@ public final class OmKeyArgs implements Auditable {
       if (Boolean.parseBoolean(metadata.get(OzoneConsts.GDPR_FLAG))) {
         GDPRSymmetricKey.newDefaultInstance().acceptKeyDetails(metadata::put);
       }
+      return this;
+    }
+
+    public Builder addTag(String key, String value) {
+      this.tags.put(key, value);
+      return this;
+    }
+
+    public Builder addAllTags(Map<String, String> tagmap) {
+      this.tags.putAll(tagmap);
       return this;
     }
 

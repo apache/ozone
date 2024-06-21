@@ -364,6 +364,32 @@ export class Heatmap extends React.Component<Record<string, object>, ITreeState>
       </Menu>
     );
 
+    const headerMenu = (
+      <Row>
+        <div className='go-back-button'>
+          <Button type='primary' onClick={e => this.resetInputpath(e, inputPath)}><Icon type='undo' /></Button>
+        </div>
+        <div className='path-input-container'>
+          <h4 style={{ marginTop: "10px" }}>Path</h4>
+          <form className='input' autoComplete="off" id='input-form' onSubmit={this.handleSubmit}>
+            <Form.Item className='path-input-element' validateStatus={inputPathValid} help={helpMessage}>
+              <Input placeholder={CONSTANTS.ROOT_PATH} name="inputPath" value={inputPath} onChange={this.handleChange} />
+            </Form.Item>
+          </form>
+        </div>
+        <div className='entity-dropdown-button'>
+          <Dropdown overlay={entityTypeMenu} placement='bottomCenter'>
+            <Button>Entity Type:&nbsp;{this.state.entityType}<DownOutlined /></Button>
+          </Dropdown>
+        </div>
+        <div className='date-dropdown-button'>
+          <Dropdown overlay={menuCalendar} placement='bottomLeft'>
+            <Button>Last &nbsp;{date > 100 ? new Date(date * 1000).toLocaleString() : date}<DownOutlined /></Button>
+          </Dropdown>
+        </div>
+      </Row>
+    );
+
     return (
       <>
         {isLoading ? <span><Icon type='loading' /> Loading...</span> : (
@@ -385,31 +411,9 @@ export class Heatmap extends React.Component<Record<string, object>, ITreeState>
                         title="Failed to fetch Heatmap"/>
                       :
                       (Object.keys(treeResponse).length > 0 && (treeResponse.label !== null || treeResponse.path !== null)) ?
-                        <div>
+                        <>
                           <div className='heatmap-header-container'>
-                            <Row>
-                              <div className='go-back-button'>
-                                <Button type='primary' onClick={e => this.resetInputpath(e, inputPath)}><Icon type='undo' /></Button>
-                              </div>
-                              <div className='path-input-container'>
-                                <h4 style={{ marginTop: "10px" }}>Path</h4>
-                                <form className='input' autoComplete="off" id='input-form' onSubmit={this.handleSubmit}>
-                                  <Form.Item className='path-input-element' validateStatus={inputPathValid} help={helpMessage}>
-                                    <Input placeholder={CONSTANTS.ROOT_PATH} name="inputPath" value={inputPath} onChange={this.handleChange} />
-                                  </Form.Item>
-                                </form>
-                              </div>
-                              <div className='entity-dropdown-button'>
-                                <Dropdown overlay={entityTypeMenu} placement='bottomCenter'>
-                                  <Button>Entity Type:&nbsp;{this.state.entityType}<DownOutlined /></Button>
-                                </Dropdown>
-                              </div>
-                              <div className='date-dropdown-button'>
-                                <Dropdown overlay={menuCalendar} placement='bottomLeft'>
-                                  <Button>Last &nbsp;{date > 100 ? new Date(date * 1000).toLocaleString() : date}<DownOutlined /></Button>
-                                </Dropdown>
-                              </div>
-                            </Row>
+                            {headerMenu}
                             <div className='heatmap-legend-container'>
                               <div className='heatmap-legend-item'>
                                 <div style={{ width: "13px", height: "13px", backgroundColor: `${colourScheme["amber_alert"][0]}`, marginRight: "5px" }}> </div>
@@ -428,11 +432,16 @@ export class Heatmap extends React.Component<Record<string, object>, ITreeState>
                           <div id="heatmap-chart-container">
                             <HeatMapConfiguration data={treeResponse} colorScheme={colourScheme["amber_alert"]} onClick={this.updateTreemapParent}></HeatMapConfiguration>
                           </div>
-                        </div>
+                        </>
                         :
-                        <div className='heatmapinformation'><br />
-                          No Data Available. {' '}<br />
-                        </div>
+                        <>
+                          <div className='heatmap-header-container'>
+                            {headerMenu}
+                          </div>
+                          <div className='heatmapinformation'>
+                            No Data Available . {' '}<br />
+                          </div>
+                        </>
                     }</>}
               </div>
             </div>

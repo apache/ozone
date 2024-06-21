@@ -19,9 +19,6 @@ package org.apache.hadoop.ozone.lease;
 
 import org.apache.hadoop.util.Time;
 
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.Callable;
 import java.util.concurrent.atomic.AtomicLong;
@@ -49,9 +46,9 @@ public class Lease<T> {
   private boolean expired;
 
   /**
-   * Functions to be called in case of timeout.
+   * Function to be called in case of timeout.
    */
-  private List<Callable<Void>> callbacks;
+  private Callable<Void> callback;
 
 
   /**
@@ -63,11 +60,7 @@ public class Lease<T> {
    *        Lease lifetime in milliseconds
    */
   public Lease(T resource, long timeout) {
-    this.resource = resource;
-    this.leaseTimeout = new AtomicLong(timeout);
-    this.callbacks = Collections.synchronizedList(new ArrayList<>());
-    this.creationTime = Time.monotonicNow();
-    this.expired = false;
+    this(resource, timeout, null);
   }
 
   /**
@@ -81,8 +74,11 @@ public class Lease<T> {
    *        Callback registered to be triggered when lease expire
    */
   public Lease(T resource, long timeout, Callable<Void> callback) {
-    this(resource, timeout);
-    callbacks.add(callback);
+    this.resource = resource;
+    this.leaseTimeout = new AtomicLong(timeout);
+    this.callback = callback;
+    this.creationTime = Time.monotonicNow();
+    this.expired = false;
   }
 
   /**
@@ -176,15 +172,15 @@ public class Lease<T> {
    *
    * @return callbacks to be executed
    */
-  List<Callable<Void>> getCallbacks() {
-    return callbacks;
+  Callable<Void> getCallback() {
+    return callback;
   }
 
   /**
    * Expires/Invalidates the lease.
    */
   void invalidate() {
-    callbacks = null;
+    callback = null;
     expired = true;
   }
 

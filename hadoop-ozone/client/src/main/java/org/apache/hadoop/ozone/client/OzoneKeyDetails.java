@@ -59,9 +59,9 @@ public class OzoneKeyDetails extends OzoneKey {
       Map<String, String> metadata,
       FileEncryptionInfo feInfo,
       CheckedSupplier<OzoneInputStream, IOException> contentSupplier,
-      boolean isFile, String owner, Long generation) {
+      boolean isFile, String owner, Map<String, String> tags, Long generation) {
     super(volumeName, bucketName, keyName, size, creationTime,
-        modificationTime, replicationConfig, metadata, isFile, owner);
+        modificationTime, replicationConfig, metadata, isFile, owner, tags);
     this.ozoneKeyLocations = ozoneKeyLocations;
     this.feInfo = feInfo;
     this.contentSupplier = contentSupplier;
@@ -79,10 +79,10 @@ public class OzoneKeyDetails extends OzoneKey {
                          Map<String, String> metadata,
                          FileEncryptionInfo feInfo,
                          CheckedSupplier<OzoneInputStream, IOException> contentSupplier,
-                         boolean isFile, String owner) {
+                         boolean isFile, String owner, Map<String, String> tags) {
     this(volumeName, bucketName, keyName, size, creationTime,
         modificationTime, ozoneKeyLocations, replicationConfig, metadata, feInfo, contentSupplier,
-        isFile, owner, null);
+        isFile, owner, tags, null);
   }
 
   /**

@@ -1026,13 +1026,17 @@ message KeyArgs {
     // Force OM to update container cache location from SCL
     optional bool forceUpdateContainerCacheFromSCM = 20;
     optional string ownerName = 21;
+
+    // S3 object tags support
+    repeated hadoop.hdds.KeyValue tags = 22;
+
     // expectedDataGeneration, when used in key creation indicates that a
     // key with the same keyName should exist with the given generation.
     // For a key commit to succeed, the original key should still be present with the
     // generation unchanged.
     // This allows a key to be created an committed atomically if the original has not
     // been modified.
-    optional uint64 expectedDataGeneration = 22;
+    optional uint64 expectedDataGeneration = 23;
 }
 
 message KeyLocation {
@@ -1116,13 +1120,14 @@ message KeyInfo {
     optional FileChecksumProto fileChecksum = 18;
     optional bool isFile = 19;
     optional string ownerName = 20;
+    repeated hadoop.hdds.KeyValue tags = 21;
   // expectedDataGeneration, when used in key creation indicates that a
   // key with the same keyName should exist with the given generation.
   // For a key commit to succeed, the original key should still be present with the
   // generation unchanged.
   // This allows a key to be created an committed atomically if the original has not
   // been modified.
-    optional uint64 expectedDataGeneration = 21;
+    optional uint64 expectedDataGeneration = 22;
 }
 
 message BasicKeyInfo {
@@ -1311,9 +1316,16 @@ message DeleteKeyArgs {
     repeated string keys = 3;
 }
 
+message DeleteKeyError {
+    optional string key = 1;
+    optional string errorCode = 2;
+    optional string errorMsg = 3;
+}
+
 message DeleteKeysResponse {
     optional DeleteKeyArgs unDeletedKeys = 1;
     optional bool status = 2;
+    repeated DeleteKeyError errors = 3;
 }
 
 message DeleteKeyResponse {
@@ -1992,6 +2004,7 @@ message CreateSnapshotResponse {
 
 message ListSnapshotResponse {
   repeated SnapshotInfo snapshotInfo = 1;
+  optional string lastSnapshot = 2;
 }
 
 message SnapshotDiffResponse {

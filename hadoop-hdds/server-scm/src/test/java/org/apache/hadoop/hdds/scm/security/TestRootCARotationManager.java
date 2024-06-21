@@ -35,7 +35,6 @@ import org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateCodec;
 import org.apache.hadoop.hdds.security.x509.certificate.utils.SelfSignedCertificate;
 import org.apache.hadoop.security.ssl.KeyStoreTestUtil;
 import org.apache.ozone.test.GenericTestUtils;
-import org.bouncycastle.cert.jcajce.JcaX509CertificateConverter;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -260,7 +259,7 @@ public class TestRootCARotationManager {
     scmCertClient.setCACertificate(cert);
     CertificateCodec certCodec = new CertificateCodec(securityConfig,
         "scm/sub-ca");
-    certCodec.writeCertificate(CertificateCodec.getCertificateHolder(cert));
+    certCodec.writeCertificate(cert);
     rootCARotationManager = new RootCARotationManager(scm);
     rootCARotationManager.setRootCARotationHandler(handler);
     GenericTestUtils.LogCapturer logs =
@@ -316,7 +315,7 @@ public class TestRootCARotationManager {
     KeyPair keyPair = KeyStoreTestUtil.generateKeyPair("RSA");
     LocalDateTime start = startDate == null ? LocalDateTime.now() : startDate;
     LocalDateTime end = start.plus(certLifetime);
-    return new JcaX509CertificateConverter().getCertificate(
+    return
         SelfSignedCertificate.newBuilder()
             .setBeginDate(start)
             .setEndDate(end)
@@ -326,6 +325,6 @@ public class TestRootCARotationManager {
             .setConfiguration(new SecurityConfig(conf))
             .setKey(keyPair)
             .makeCA(certID)
-            .build());
+            .build();
   }
 }

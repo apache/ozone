@@ -40,6 +40,7 @@ import org.apache.hadoop.ozone.om.PrefixManager;
 import org.apache.hadoop.ozone.om.PrefixManagerImpl;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
+import org.apache.hadoop.ozone.om.helpers.KeyValueUtil;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
@@ -61,6 +62,8 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
     .OMRequest;
 import org.junit.jupiter.params.provider.ValueSource;
 
+import static java.util.Collections.emptyList;
+import static java.util.Collections.emptyMap;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.THREE;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType.EC;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType.RATIS;
@@ -142,8 +145,12 @@ public class TestOMKeyCreateRequest extends TestOMKeyRequest {
     when(ozoneManager.getOzoneLockProvider()).thenReturn(
         new OzoneLockProvider(setKeyPathLock, setFileSystemPaths));
 
+    Map<String, String> tags = new HashMap<>();
+    tags.put("tag-key1", "tag-value1");
+    tags.put("tag-key2", "tag-value2");
+
     OMRequest modifiedOmRequest =
-        doPreExecute(createKeyRequest(false, 0));
+        doPreExecute(createKeyRequest(false, 0, emptyMap(), tags));
 
     OMKeyCreateRequest omKeyCreateRequest =
         getOMKeyCreateRequest(modifiedOmRequest);
@@ -175,10 +182,10 @@ public class TestOMKeyCreateRequest extends TestOMKeyRequest {
         .getCreateKeyResponse().getKeyInfo().getKeyLocationListCount());
 
     // Disk should have 1 version, as it is fresh key create.
-    assertEquals(1,
-        omMetadataManager.getOpenKeyTable(
-                omKeyCreateRequest.getBucketLayout())
-            .get(openKey).getKeyLocationVersions().size());
+    OmKeyInfo openKeyInfo = omMetadataManager.getOpenKeyTable(omKeyCreateRequest.getBucketLayout()).get(openKey);
+
+    assertEquals(1, openKeyInfo.getKeyLocationVersions().size());
+    assertThat(openKeyInfo.getTags()).containsAllEntriesOf(tags);
 
     // Write to DB like key commit.
     omMetadataManager.getKeyTable(omKeyCreateRequest.getBucketLayout())
@@ -186,9 +193,13 @@ public class TestOMKeyCreateRequest extends TestOMKeyRequest {
             .getOpenKeyTable(omKeyCreateRequest.getBucketLayout())
             .get(openKey));
 
+    tags.remove("tag-key1");
+    tags.remove("tag-key2");
+    tags.put("tag-key3", "tag-value3");
+
     // Override same key again
     modifiedOmRequest =
-        doPreExecute(createKeyRequest(false, 0));
+        doPreExecute(createKeyRequest(false, 0, emptyMap(), tags));
 
     id = modifiedOmRequest.getCreateKeyRequest().getClientID();
     openKey = getOpenKey(id);
@@ -218,6 +229,11 @@ public class TestOMKeyCreateRequest extends TestOMKeyRequest {
         omMetadataManager.getOpenKeyTable(
                 omKeyCreateRequest.getBucketLayout())
             .get(openKey).getKeyLocationVersions().size());
+    openKeyInfo = omMetadataManager.getOpenKeyTable(omKeyCreateRequest.getBucketLayout()).get(openKey);
+
+    assertEquals(1, openKeyInfo.getKeyLocationVersions().size());
+    assertThat(openKeyInfo.getTags()).containsAllEntriesOf(tags);
+    assertThat(openKeyInfo.getTags()).doesNotContainKeys("tag-key1", "tag-key2");
 
   }
 
@@ -482,7 +498,7 @@ public class TestOMKeyCreateRequest extends TestOMKeyRequest {
     Map<String, String> initialMetadata =
         Collections.singletonMap("initialKey", "initialValue");
     OMRequest initialRequest =
-        createKeyRequest(false, 0, keyName, initialMetadata, Collections.emptyList());
+        createKeyRequest(false, 0, keyName, initialMetadata);
     OMKeyCreateRequest initialOmKeyCreateRequest =
         new OMKeyCreateRequest(initialRequest, getBucketLayout());
     OMClientResponse initialResponse =
@@ -500,7 +516,7 @@ public class TestOMKeyCreateRequest extends TestOMKeyRequest {
     Map<String, String> updatedMetadata =
         Collections.singletonMap("initialKey", "updatedValue");
     OMRequest updatedRequest =
-        createKeyRequest(false, 0, keyName, updatedMetadata, Collections.emptyList());
+        createKeyRequest(false, 0, keyName, updatedMetadata);
     OMKeyCreateRequest updatedOmKeyCreateRequest =
         new OMKeyCreateRequest(updatedRequest, getBucketLayout());
 
@@ -520,7 +536,7 @@ public class TestOMKeyCreateRequest extends TestOMKeyRequest {
 
     // Create the key request without any initial metadata
     OMRequest createRequestWithoutMetadata = createKeyRequest(false, 0, keyName,
-        null, Collections.emptyList()); // Passing 'null' for metadata
+        null, emptyMap(), emptyList()); // Passing 'null' for metadata
     OMKeyCreateRequest createOmKeyCreateRequest =
         new OMKeyCreateRequest(createRequestWithoutMetadata, getBucketLayout());
 
@@ -543,7 +559,7 @@ public class TestOMKeyCreateRequest extends TestOMKeyRequest {
 
     // Overwrite the previously created key with new metadata
     OMRequest overwriteRequestWithMetadata =
-        createKeyRequest(false, 0, keyName, overwriteMetadata, Collections.emptyList());
+        createKeyRequest(false, 0, keyName, overwriteMetadata, emptyMap(), emptyList());
     OMKeyCreateRequest overwriteOmKeyCreateRequest =
         new OMKeyCreateRequest(overwriteRequestWithMetadata, getBucketLayout());
 
@@ -643,12 +659,23 @@ public class TestOMKeyCreateRequest extends TestOMKeyRequest {
 
   @SuppressWarnings("parameterNumber")
   protected OMRequest createKeyRequest(boolean isMultipartKey, int partNumber) {
-    return createKeyRequest(isMultipartKey, partNumber, keyName);
+    return createKeyRequest(isMultipartKey, partNumber, emptyMap(), emptyMap());
+  }
+
+  protected OMRequest createKeyRequest(boolean isMultipartKey, int partNumber,
+                                       Map<String, String> metadata, Map<String, String> tags) {
+    return createKeyRequest(isMultipartKey, partNumber, keyName, metadata, tags, emptyList());
   }
 
   private OMRequest createKeyRequest(boolean isMultipartKey, int partNumber,
                                      String keyName) {
-    return createKeyRequest(isMultipartKey, partNumber, keyName, null, Collections.emptyList());
+    return createKeyRequest(isMultipartKey, partNumber, keyName, emptyMap());
+  }
+
+  protected OMRequest createKeyRequest(boolean isMultipartKey, int partNumber,
+                                       String keyName,
+                                       Map<String, String> metadata) {
+    return createKeyRequest(isMultipartKey, partNumber, keyName, metadata, emptyMap(), emptyList());
   }
 
   /**
@@ -661,11 +688,14 @@ public class TestOMKeyCreateRequest extends TestOMKeyRequest {
    * @param keyName        The name of the key to create or update.
    * @param metadata       Optional metadata for the key. Pass null or an empty
    *                       map if no metadata is to be set.
+   * @param tags           Optional tags for the key. Pass null or an empty
+   *                       map if no tags is to be set.
    * @return OMRequest configured with the provided parameters.
    */
   protected OMRequest createKeyRequest(boolean isMultipartKey, int partNumber,
                                        String keyName,
                                        Map<String, String> metadata,
+                                       Map<String, String> tags,
                                        List<OzoneAcl> acls) {
     KeyArgs.Builder keyArgs = KeyArgs.newBuilder()
         .setVolumeName(volumeName)
@@ -691,6 +721,10 @@ public class TestOMKeyCreateRequest extends TestOMKeyRequest {
           .setKey(key)
           .setValue(value)
           .build()));
+    }
+
+    if (tags != null && !tags.isEmpty()) {
+      keyArgs.addAllTags(KeyValueUtil.toProtobuf(tags));
     }
 
     OzoneManagerProtocolProtos.CreateKeyRequest createKeyRequest =
@@ -1046,12 +1080,12 @@ public class TestOMKeyCreateRequest extends TestOMKeyRequest {
   }
 
   private void createAndCheck(String keyName) throws Exception {
-    createAndCheck(keyName, Collections.emptyMap(), Collections.emptyList());
+    createAndCheck(keyName, emptyMap(), emptyList());
   }
 
   private OmKeyInfo createAndCheck(String keyName, Map<String, String> metadata, List<OzoneAcl> acls)
       throws Exception {
-    OMRequest omRequest = createKeyRequest(false, 0, keyName, metadata, acls);
+    OMRequest omRequest = createKeyRequest(false, 0, keyName, metadata, emptyMap(), acls);
 
     OMKeyCreateRequest omKeyCreateRequest = getOMKeyCreateRequest(omRequest);
 

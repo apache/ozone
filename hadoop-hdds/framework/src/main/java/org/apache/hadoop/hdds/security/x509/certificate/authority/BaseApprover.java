@@ -22,7 +22,6 @@ package org.apache.hadoop.hdds.security.x509.certificate.authority;
 import org.apache.hadoop.hdds.security.SecurityConfig;
 import org.apache.hadoop.hdds.security.exception.SCMSecurityException;
 import org.apache.hadoop.hdds.security.x509.certificate.authority.profile.PKIProfile;
-import org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateSignRequest;
 import org.bouncycastle.asn1.ASN1Encodable;
 import org.bouncycastle.asn1.ASN1ObjectIdentifier;
 import org.bouncycastle.asn1.pkcs.Attribute;
@@ -30,7 +29,6 @@ import org.bouncycastle.asn1.pkcs.PKCSObjectIdentifiers;
 import org.bouncycastle.asn1.x500.RDN;
 import org.bouncycastle.asn1.x509.Extension;
 import org.bouncycastle.asn1.x509.Extensions;
-import org.bouncycastle.cert.X509CertificateHolder;
 import org.bouncycastle.operator.ContentVerifierProvider;
 import org.bouncycastle.operator.OperatorCreationException;
 import org.bouncycastle.operator.jcajce.JcaContentVerifierProviderBuilder;
@@ -39,7 +37,6 @@ import org.bouncycastle.pkcs.PKCSException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
@@ -182,17 +179,7 @@ public abstract class BaseApprover implements CertificateApprover {
    * {@inheritDoc}
    */
   @Override
-  public CompletableFuture<X509CertificateHolder> inspectCSR(String csr)
-      throws IOException {
-    return inspectCSR(CertificateSignRequest.getCertificationRequest(csr));
-  }
-
-  /**
-   * {@inheritDoc}
-   */
-  @Override
-  public CompletableFuture<X509CertificateHolder>
-        inspectCSR(PKCS10CertificationRequest csr) {
+  public CompletableFuture<Void> inspectCSR(PKCS10CertificationRequest csr) {
     /**
      * The base approver executes the following algorithm to verify that a
      * CSR meets the PKI Profile criteria.
@@ -214,8 +201,7 @@ public abstract class BaseApprover implements CertificateApprover {
      * the Certificate when finished.
      */
 
-    CompletableFuture<X509CertificateHolder> response =
-        new CompletableFuture<>();
+    CompletableFuture<Void> response = new CompletableFuture<>();
     try {
       // Step 0: Verify this is not a CA Certificate.
       // Will be done by the Ozone PKI profile for time being.

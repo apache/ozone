@@ -18,18 +18,29 @@
  */
 package org.apache.hadoop.hdds.utils.db.managed;
 
+import org.apache.ratis.util.UncheckedAutoCloseable;
+import org.rocksdb.Options;
 import org.rocksdb.SstFileReader;
+
+import static org.apache.hadoop.hdds.utils.db.managed.ManagedRocksObjectUtils.track;
 
 /**
  * Managed SstFileReader.
  */
-public class ManagedSstFileReader extends ManagedObject<SstFileReader> {
+public class ManagedSstFileReader extends SstFileReader {
 
-  ManagedSstFileReader(SstFileReader original) {
-    super(original);
+  private final UncheckedAutoCloseable leakTracker = track(this);
+
+  public ManagedSstFileReader(final Options options) {
+    super(options);
   }
 
-  public static ManagedSstFileReader managed(SstFileReader reader) {
-    return new ManagedSstFileReader(reader);
+  @Override
+  public void close() {
+    try {
+      super.close();
+    } finally {
+      leakTracker.close();
+    }
   }
 }
