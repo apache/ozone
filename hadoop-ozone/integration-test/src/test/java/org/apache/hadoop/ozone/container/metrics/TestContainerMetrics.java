@@ -18,7 +18,9 @@
 package org.apache.hadoop.ozone.container.metrics;
 
 import java.io.File;
+import java.io.IOException;
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -32,6 +34,7 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandResponseProto;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.XceiverClientGrpc;
+import org.apache.hadoop.hdds.scm.XceiverClientSpi;
 import org.apache.hadoop.hdds.scm.pipeline.MockPipeline;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.metrics2.MetricsRecordBuilder;
@@ -44,6 +47,7 @@ import org.apache.hadoop.ozone.container.common.impl.HddsDispatcher;
 import org.apache.hadoop.ozone.container.common.interfaces.Handler;
 import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
 import org.apache.hadoop.ozone.container.common.transport.server.XceiverServerGrpc;
+import org.apache.hadoop.ozone.container.common.transport.server.XceiverServerSpi;
 import org.apache.hadoop.ozone.container.common.utils.StorageVolumeUtil;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
@@ -52,15 +56,20 @@ import org.apache.hadoop.ozone.container.common.volume.VolumeSet;
 import org.apache.ozone.test.GenericTestUtils;
 
 import com.google.common.collect.Maps;
+
 import static org.apache.hadoop.hdds.protocol.MockDatanodeDetails.randomDatanodeDetails;
 import static org.apache.ozone.test.MetricsAsserts.assertCounter;
 import static org.apache.ozone.test.MetricsAsserts.assertQuantileGauges;
 import static org.apache.ozone.test.MetricsAsserts.getMetrics;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
+import org.apache.ratis.util.function.CheckedBiConsumer;
+import org.apache.ratis.util.function.CheckedBiFunction;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.api.io.TempDir;
+
+import javax.xml.crypto.Data;
 
 /**
  * Test for metrics published by storage containers.
@@ -69,70 +78,98 @@ import org.junit.jupiter.api.io.TempDir;
 public class TestContainerMetrics {
   @TempDir
   private Path tempDir;
+  private static final OzoneConfiguration CONF = new OzoneConfiguration();
+  private static final int DFS_METRICS_PERCENTILES_INTERVALS = 1;
 
   @Test
   public void testContainerMetrics() throws Exception {
-    XceiverServerGrpc server = null;
-    XceiverClientGrpc client = null;
-    long containerID = ContainerTestHelper.getTestContainerID();
+    DatanodeDetails dd = randomDatanodeDetails();
     String path = GenericTestUtils.getRandomizedTempPath();
+    MutableVolumeSet volumeSet = createVolumeSet(dd, path);
+    HddsDispatcher hddsDispatcher = createDispatcher(dd, CONF, volumeSet);
+    runTestClientServer(volumeSet, (pipeline, conf) -> conf
+            .setInt(OzoneConfigKeys.HDDS_CONTAINER_IPC_PORT,
+                pipeline.getFirstNode()
+                    .getPort(DatanodeDetails.Port.Name.STANDALONE).getValue()),
+        XceiverClientGrpc::new,
+        (dn, conf) -> new XceiverServerGrpc(dd, conf,
+            hddsDispatcher, null), (dn, p) -> {
+        });
+  }
+
+  private MutableVolumeSet createVolumeSet(DatanodeDetails dn, String path) throws IOException {
+    CONF.set(ScmConfigKeys.HDDS_DATANODE_DIR_KEY, path);
+    CONF.set(OzoneConfigKeys.OZONE_METADATA_DIRS, path);
+    return new MutableVolumeSet(
+        dn.getUuidString(), CONF,
+        null, StorageVolume.VolumeType.DATA_VOLUME, null);
+  }
+
+  private HddsDispatcher createDispatcher(DatanodeDetails dd,
+                                          OzoneConfiguration conf,
+                                          VolumeSet volumeSet) {
+    conf.setInt(DFSConfigKeysLegacy.DFS_METRICS_PERCENTILES_INTERVALS_KEY,
+        DFS_METRICS_PERCENTILES_INTERVALS);
+    ContainerSet containerSet = new ContainerSet(1000);
+    StateContext context = ContainerTestUtils.getMockContext(
+        dd, conf);
+    ContainerMetrics metrics = ContainerMetrics.create(conf);
+    Map<ContainerProtos.ContainerType, Handler> handlers = Maps.newHashMap();
+    for (ContainerProtos.ContainerType containerType :
+        ContainerProtos.ContainerType.values()) {
+      handlers.put(containerType,
+          Handler.getHandlerForContainerType(containerType, conf,
+              context.getParent().getDatanodeDetails().getUuidString(),
+              containerSet, volumeSet, metrics,
+              c -> { }));
+    }
+    HddsDispatcher dispatcher = new HddsDispatcher(conf, containerSet,
+        volumeSet, handlers, context, metrics, null);
+    StorageVolumeUtil.getHddsVolumesList(volumeSet.getVolumesList())
+        .forEach(hddsVolume -> hddsVolume.setDbParentDir(tempDir.toFile()));
+    dispatcher.setClusterId(UUID.randomUUID().toString());
+    return dispatcher;
+  }
+
+  static void runTestClientServer(
+      MutableVolumeSet volumeSet,
+      CheckedBiConsumer<Pipeline, OzoneConfiguration, IOException> initConf,
+      CheckedBiFunction<Pipeline, OzoneConfiguration, XceiverClientSpi,
+          IOException> createClient,
+      CheckedBiFunction<DatanodeDetails, OzoneConfiguration, XceiverServerSpi,
+          IOException> createServer,
+      CheckedBiConsumer<DatanodeDetails, Pipeline, IOException> initServer)
+      throws Exception {
+    final List<XceiverServerSpi> servers = new ArrayList<>();
+    XceiverClientSpi client = null;
+    long containerID = ContainerTestHelper.getTestContainerID();
 
     try {
-      final int interval = 1;
-      Pipeline pipeline = MockPipeline
-          .createSingleNodePipeline();
-      OzoneConfiguration conf = new OzoneConfiguration();
-      conf.setInt(OzoneConfigKeys.HDDS_CONTAINER_IPC_PORT,
-          pipeline.getFirstNode()
-              .getPort(DatanodeDetails.Port.Name.STANDALONE).getValue());
-      conf.setInt(DFSConfigKeysLegacy.DFS_METRICS_PERCENTILES_INTERVALS_KEY,
-          interval);
+      final Pipeline pipeline =
+          MockPipeline.createSingleNodePipeline();
+      initConf.accept(pipeline, CONF);
 
-      DatanodeDetails datanodeDetails = randomDatanodeDetails();
-      conf.set(ScmConfigKeys.HDDS_DATANODE_DIR_KEY, path);
-      conf.set(OzoneConfigKeys.OZONE_METADATA_DIRS, path);
-      VolumeSet volumeSet = new MutableVolumeSet(
-          datanodeDetails.getUuidString(), conf,
-          null, StorageVolume.VolumeType.DATA_VOLUME, null);
-      ContainerSet containerSet = new ContainerSet(1000);
-      StateContext context = ContainerTestUtils.getMockContext(
-          datanodeDetails, conf);
-      ContainerMetrics metrics = ContainerMetrics.create(conf);
-      Map<ContainerProtos.ContainerType, Handler> handlers = Maps.newHashMap();
-      for (ContainerProtos.ContainerType containerType :
-          ContainerProtos.ContainerType.values()) {
-        handlers.put(containerType,
-            Handler.getHandlerForContainerType(containerType, conf,
-                context.getParent().getDatanodeDetails().getUuidString(),
-                containerSet, volumeSet, metrics,
-                c -> { }));
+      for (DatanodeDetails dn : pipeline.getNodes()) {
+        final XceiverServerSpi s = createServer.apply(dn, CONF);
+        servers.add(s);
+        s.start();
+        initServer.accept(dn, pipeline);
       }
-      HddsDispatcher dispatcher = new HddsDispatcher(conf, containerSet,
-          volumeSet, handlers, context, metrics, null);
-      StorageVolumeUtil.getHddsVolumesList(volumeSet.getVolumesList())
-          .forEach(hddsVolume -> hddsVolume.setDbParentDir(tempDir.toFile()));
-      dispatcher.setClusterId(UUID.randomUUID().toString());
 
-      server = new XceiverServerGrpc(datanodeDetails, conf, dispatcher, null);
-      client = new XceiverClientGrpc(pipeline, conf);
-
-      server.start();
+      client = createClient.apply(pipeline, CONF);
       client.connect();
 
       // Write Chunk
       BlockID blockID = ContainerTestHelper.getTestBlockID(containerID);
-      ContainerTestHelper.getWriteChunkRequest(
-          pipeline, blockID, 1024);
-      ContainerProtos.ContainerCommandRequestProto writeChunkRequest =
+      final ContainerProtos.ContainerCommandRequestProto writeChunkRequest =
           ContainerTestHelper.getWriteChunkRequest(
               pipeline, blockID, 1024);
-      ContainerCommandResponseProto response =
-              client.sendCommand(writeChunkRequest);
+      ContainerCommandResponseProto response = client.sendCommand(writeChunkRequest);
       assertEquals(ContainerProtos.Result.SUCCESS,
           response.getResult());
 
       //Read Chunk
-      ContainerProtos.ContainerCommandRequestProto readChunkRequest =
+      final ContainerProtos.ContainerCommandRequestProto readChunkRequest =
           ContainerTestHelper.getReadChunkRequest(pipeline, writeChunkRequest
               .getWriteChunk());
       response = client.sendCommand(readChunkRequest);
@@ -147,8 +184,8 @@ public class TestContainerMetrics {
       assertCounter("bytesWriteChunk", 1024L, containerMetrics);
       assertCounter("bytesReadChunk", 1024L, containerMetrics);
 
-      String sec = interval + "s";
-      Thread.sleep((interval + 1) * 1000);
+      String sec = DFS_METRICS_PERCENTILES_INTERVALS + "s";
+      Thread.sleep((DFS_METRICS_PERCENTILES_INTERVALS + 1) * 1000);
       assertQuantileGauges("WriteChunkNanos" + sec, containerMetrics);
 
       // Check VolumeIOStats metrics
@@ -163,17 +200,18 @@ public class TestContainerMetrics {
       assertCounter("WriteOpCount", 1L, volumeIOMetrics);
 
     } finally {
+      ContainerMetrics.remove();
+      volumeSet.shutdown();
       if (client != null) {
         client.close();
       }
-      if (server != null) {
-        server.stop();
-      }
+      servers.forEach(XceiverServerSpi::stop);
       // clean up volume dir
-      File file = new File(path);
+      File file = new File("");
       if (file.exists()) {
         FileUtil.fullyDelete(file);
       }
     }
   }
+
 }
