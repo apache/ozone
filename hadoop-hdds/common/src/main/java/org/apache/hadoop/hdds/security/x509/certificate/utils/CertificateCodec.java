@@ -22,9 +22,6 @@ package org.apache.hadoop.hdds.security.x509.certificate.utils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hdds.security.SecurityConfig;
 import org.apache.hadoop.hdds.security.exception.SCMSecurityException;
-import org.bouncycastle.cert.X509CertificateHolder;
-import org.bouncycastle.cert.jcajce.JcaX509CertificateConverter;
-import org.bouncycastle.jcajce.provider.asymmetric.x509.CertificateFactory;
 import org.bouncycastle.openssl.jcajce.JcaPEMWriter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -45,10 +42,11 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.attribute.PosixFilePermission;
+import java.security.NoSuchProviderException;
 import java.security.cert.CertPath;
 import java.security.cert.Certificate;
-import java.security.cert.CertificateEncodingException;
 import java.security.cert.CertificateException;
+import java.security.cert.CertificateFactory;
 import java.security.cert.X509Certificate;
 import java.util.ArrayList;
 import java.util.List;
@@ -72,8 +70,6 @@ public class CertificateCodec {
 
   private static final Logger LOG =
       LoggerFactory.getLogger(CertificateCodec.class);
-  private static final JcaX509CertificateConverter CERTIFICATE_CONVERTER
-      = new JcaX509CertificateConverter();
   private final SecurityConfig securityConfig;
   private final Path location;
   private final Set<PosixFilePermission> permissionSet =
@@ -96,18 +92,6 @@ public class CertificateCodec {
   }
 
   /**
-   * Returns a X509 Certificate from the Certificate Holder.
-   *
-   * @param holder - Holder
-   * @return X509Certificate.
-   * @throws CertificateException - on Error.
-   */
-  public static X509Certificate getX509Certificate(X509CertificateHolder holder)
-      throws CertificateException {
-    return CERTIFICATE_CONVERTER.getCertificate(holder);
-  }
-
-  /**
    * Get a valid pem encoded string for the certification path.
    */
   public static String getPEMEncodedString(CertPath certPath)
@@ -118,22 +102,6 @@ public class CertificateCodec {
       pemEncodedList.add(getPEMEncodedString((X509Certificate) cert));
     }
     return StringUtils.join(pemEncodedList, "\n");
-  }
-
-  /**
-   * Returns the Certificate as a PEM encoded String.
-   *
-   * @param x509CertHolder - X.509 Certificate Holder.
-   * @return PEM Encoded Certificate String.
-   * @throws SCMSecurityException - On failure to create a PEM String.
-   */
-  public static String getPEMEncodedString(X509CertificateHolder x509CertHolder)
-      throws SCMSecurityException {
-    try {
-      return getPEMEncodedString(getX509Certificate(x509CertHolder));
-    } catch (CertificateException exp) {
-      throw new SCMSecurityException(exp);
-    }
   }
 
   /**
@@ -207,9 +175,8 @@ public class CertificateCodec {
   private static <E extends Exception> X509Certificate readX509Certificate(
       InputStream input, Function<CertificateException, E> convertor)
       throws E {
-    final CertificateFactory fact = getCertFactory();
     try {
-      return (X509Certificate) fact.engineGenerateCertificate(input);
+      return (X509Certificate) getCertFactory().generateCertificate(input);
     } catch (CertificateException e) {
       throw convertor.apply(e);
     }
@@ -228,8 +195,12 @@ public class CertificateCodec {
     return (X509Certificate) certificatePath.getCertificates().get(0);
   }
 
-  public static CertificateFactory getCertFactory() {
-    return new CertificateFactory();
+  public static CertificateFactory getCertFactory() throws CertificateException {
+    try {
+      return CertificateFactory.getInstance("X.509", "BC");
+    } catch (NoSuchProviderException e) {
+      throw new RuntimeException("BouncyCastle JCE provider not loaded.", e);
+    }
   }
 
   /**
@@ -241,30 +212,13 @@ public class CertificateCodec {
     return location;
   }
 
-  /**
-   * Write the Certificate pointed to the location by the configs.
-   *
-   * @param xCertificate - Certificate to write.
-   * @throws SCMSecurityException - on Error.
-   * @throws IOException          - on Error.
-   */
-  public void writeCertificate(X509CertificateHolder xCertificate)
-      throws SCMSecurityException, IOException {
+  public void writeCertificate(X509Certificate xCertificate) throws IOException {
     String pem = getPEMEncodedString(xCertificate);
     writeCertificate(location.toAbsolutePath(),
         this.securityConfig.getCertificateFileName(), pem);
   }
 
-  /**
-   * Write the Certificate to the specific file.
-   *
-   * @param xCertificate - Certificate to write.
-   * @param fileName     - file name to write to.
-   * @throws SCMSecurityException - On Error.
-   * @throws IOException          - On Error.
-   */
-  public void writeCertificate(X509CertificateHolder xCertificate,
-      String fileName) throws IOException {
+  public void writeCertificate(X509Certificate xCertificate, String fileName) throws IOException {
     String pem = getPEMEncodedString(xCertificate);
     writeCertificate(location.toAbsolutePath(), fileName, pem);
   }
@@ -341,61 +295,40 @@ public class CertificateCodec {
   }
 
   /**
-   * Returns the Certificate holder from X509Certificate class.
-   *
-   * @param x509cert - Certificate class.
-   * @return X509CertificateHolder
-   * @throws CertificateEncodingException - on Error.
-   * @throws IOException                  - on Error.
-   */
-  public static X509CertificateHolder getCertificateHolder(
-      X509Certificate x509cert)
-      throws CertificateEncodingException, IOException {
-    return new X509CertificateHolder(x509cert.getEncoded());
-  }
-
-  /**
    * Helper method that takes in a certificate path and a certificate and
    * generates a new certificate path starting with the new certificate
    * followed by all certificates in the specified path.
    */
-  public CertPath prependCertToCertPath(X509CertificateHolder certHolder,
-      CertPath path) throws CertificateException {
+  public CertPath prependCertToCertPath(X509Certificate certificate, CertPath path) throws CertificateException {
     List<? extends Certificate> certificates = path.getCertificates();
     ArrayList<X509Certificate> updatedList = new ArrayList<>();
-    updatedList.add(getX509Certificate(certHolder));
+    updatedList.add(certificate);
     for (Certificate cert : certificates) {
       updatedList.add((X509Certificate) cert);
     }
-    CertificateFactory factory = getCertFactory();
-    return factory.engineGenerateCertPath(updatedList);
+    return getCertFactory().generateCertPath(updatedList);
   }
 
   /**
    * Helper method that gets one certificate from the specified location.
    * The remaining certificates are ignored.
    */
-  public X509CertificateHolder getTargetCertHolder(Path path,
-      String fileName) throws CertificateException, IOException {
+  public X509Certificate getTargetCert(Path path, String fileName) throws CertificateException, IOException {
     CertPath certPath = getCertPath(path, fileName);
-    X509Certificate certificate = firstCertificateFrom(certPath);
-    return getCertificateHolder(certificate);
+    return firstCertificateFrom(certPath);
   }
 
   /**
    * Helper method that gets one certificate from the default location.
    * The remaining certificates are ignored.
    */
-  public X509CertificateHolder getTargetCertHolder()
-      throws CertificateException, IOException {
-    return getTargetCertHolder(
+  public X509Certificate getTargetCert() throws CertificateException, IOException {
+    return getTargetCert(
         location, securityConfig.getCertificateFileName());
   }
 
-  private static CertPath generateCertPathFromInputStream(
-      InputStream inputStream) throws CertificateException {
-    CertificateFactory fact = getCertFactory();
-    return fact.engineGenerateCertPath(inputStream, "PEM");
+  private static CertPath generateCertPathFromInputStream(InputStream inputStream) throws CertificateException {
+    return getCertFactory().generateCertPath(inputStream, "PEM");
   }
 
   private void checkBasePathDirectory(Path basePath) throws IOException {

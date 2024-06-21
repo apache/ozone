@@ -1281,9 +1281,10 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
         (RemoveDataNodesResponseWrapper) removedDNResponse.getEntity();
     DatanodesResponse errorDataNodes = removeDataNodesResponseWrapper.getDatanodesResponseMap().get("failedDatanodes");
     DatanodesResponse removedNodes = removeDataNodesResponseWrapper.getDatanodesResponseMap().get("removedDatanodes");
-    assertEquals(1, removedNodes.getTotalCount());
-    assertNull(errorDataNodes);
-    removedNodes.getDatanodes().forEach(datanodeMetadata -> {
+
+    assertEquals(1, errorDataNodes.getTotalCount());
+    assertNull(removedNodes);
+    errorDataNodes.getDatanodes().forEach(datanodeMetadata -> {
       assertEquals("host3.datanode", datanodeMetadata.getHostname());
     });
   }
@@ -1301,7 +1302,7 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
     assertFalse(failedNodeErrorResponseMap.isEmpty());
     String nodeError = failedNodeErrorResponseMap.get(dnUUID);
     assertNotNull(nodeError);
-    assertEquals("DataNode should be in either DECOMMISSIONED operational state or DEAD node state.", nodeError);
+    assertEquals("DataNode should be in DEAD node status.", nodeError);
     assertEquals(Response.Status.OK.getStatusCode(), removedDNResponse.getStatus());
   }
 

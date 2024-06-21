@@ -6913,7 +6913,9 @@
     ],
     "status": "OK"
   },
-  "datanodesRemove": [
-    "b590734e-a5f2-11ea-bb37-0242ac130010"
-  ]
+  "datanodesRemove": {
+    "selectedRowKeys": [
+      "b5907812-a5f2-11ea-bb37-0242ac130011"
+    ]
+  }
 }
