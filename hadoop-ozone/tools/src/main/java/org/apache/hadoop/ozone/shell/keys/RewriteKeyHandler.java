@@ -17,18 +17,15 @@
  */
 package org.apache.hadoop.ozone.shell.keys;
 
-import org.apache.hadoop.hdds.client.ECReplicationConfig;
-import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.io.IOUtils;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientException;
 import org.apache.hadoop.ozone.client.OzoneKeyDetails;
 import org.apache.hadoop.ozone.client.OzoneVolume;
+import org.apache.hadoop.ozone.shell.MandatoryReplicationOptions;
 import org.apache.hadoop.ozone.shell.OzoneAddress;
-import org.apache.hadoop.ozone.shell.ShellReplicationOptions;
 import picocli.CommandLine;
 
 import java.io.IOException;
@@ -45,7 +42,7 @@ import static org.apache.hadoop.ozone.OzoneConsts.MB;
 public class RewriteKeyHandler extends KeyHandler {
 
   @CommandLine.Mixin
-  private ShellReplicationOptions replication;
+  private MandatoryReplicationOptions replication;
 
   @Override
   protected void execute(OzoneClient client, OzoneAddress address) throws IOException, OzoneClientException {
@@ -58,11 +55,8 @@ public class RewriteKeyHandler extends KeyHandler {
     OzoneKeyDetails key = bucket.getKey(keyName);
 
     ReplicationConfig newReplication = replication.fromParamsOrConfig(getConf());
-    if (newReplication == null) {
-      newReplication = key.getReplicationConfig().getReplicationType() == HddsProtos.ReplicationType.RATIS
-          ? new ECReplicationConfig(3, 2)
-          : RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.THREE);
-    } else if (newReplication.equals(key.getReplicationConfig())) {
+    if (newReplication == null ||
+        newReplication.equals(key.getReplicationConfig())) {
       System.err.println("Replication unchanged: " + key.getReplicationConfig());
       return;
     }
