@@ -110,7 +110,8 @@ class TestContainerMerkleTree {
         Arrays.asList(buildExpectedChunkTree(b1c1), buildExpectedChunkTree(b1c2)));
     ContainerProtos.BlockMerkleTree blockTree3 = buildExpectedBlockTree(blockID3,
         Arrays.asList(buildExpectedChunkTree(b3c1), buildExpectedChunkTree(b3c2)));
-    ContainerProtos.ContainerMerkleTree expectedTree = buildExpectedContainerTree(Arrays.asList(blockTree1, blockTree3));
+    ContainerProtos.ContainerMerkleTree expectedTree = buildExpectedContainerTree(
+        Arrays.asList(blockTree1, blockTree3));
 
     // Use the ContainerMerkleTree to build the same tree.
     // Add blocks and chunks out of order to test sorting.

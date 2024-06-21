@@ -16,7 +16,7 @@
  */
 package org.apache.hadoop.ozone.container.checksum;
 
-import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerChecksumInfo;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 
@@ -42,6 +42,7 @@ public class ContainerChecksumManager {
   private static final Logger LOG = LoggerFactory.getLogger(ContainerChecksumManager.class);
 
   // Used to coordinate reads and writes to each container's checksum file.
+  // Each container ID is mapped to a stripe.
   private final Striped<ReadWriteLock> fileLock;
 
   /**
@@ -61,7 +62,7 @@ public class ContainerChecksumManager {
     Lock writeLock = getWriteLock(data.getContainerID());
     writeLock.lock();
     try {
-      ContainerChecksumInfo newChecksumInfo = read(data).toBuilder()
+      ContainerProtos.ContainerChecksumInfo newChecksumInfo = read(data).toBuilder()
           .setDataMerkleTree(tree.toProto())
           .build();
       write(data, newChecksumInfo);
@@ -80,26 +81,26 @@ public class ContainerChecksumManager {
     Lock writeLock = getWriteLock(data.getContainerID());
     writeLock.lock();
     try {
-      ContainerChecksumInfo.Builder newChecksumInfoBuilder = read(data).toBuilder();
-
+      ContainerProtos.ContainerChecksumInfo.Builder checksumInfoBuilder = read(data).toBuilder();
       // Although the persisted block list should already be sorted, we will sort it here to make sure.
       // This will automatically fix any bugs in the persisted order that may show up.
-      SortedSet<Long> sortedDeletedBlockIDs = new TreeSet<>(newChecksumInfoBuilder.getDeletedBlocksList());
+      SortedSet<Long> sortedDeletedBlockIDs = new TreeSet<>(checksumInfoBuilder.getDeletedBlocksList());
       // Since the provided list of block IDs is already sorted, this is a linear time addition.
       sortedDeletedBlockIDs.addAll(deletedBlockIDs);
 
-      newChecksumInfoBuilder
+      checksumInfoBuilder
           .clearDeletedBlocks()
           .addAllDeletedBlocks(sortedDeletedBlockIDs)
           .build();
-      write(data, newChecksumInfoBuilder.build());
+      write(data, checksumInfoBuilder.build());
       LOG.debug("Deleted block list for container {} updated", data.getContainerID());
     } finally {
       writeLock.unlock();
     }
   }
 
-  public ContainerDiff diff(KeyValueContainerData thisContainer, ContainerChecksumInfo otherInfo) throws IOException {
+  public ContainerDiff diff(KeyValueContainerData thisContainer, ContainerProtos.ContainerChecksumInfo otherInfo)
+      throws IOException {
     // TODO HDDS-10928 compare the checksum info of the two containers and return a summary.
     //  Callers can act on this summary to repair their container replica using the peer's replica.
     //  This method will use the read lock, which is unused in the current implementation.
@@ -114,7 +115,7 @@ public class ContainerChecksumManager {
     return fileLock.get(containerID).writeLock();
   }
 
-  private ContainerChecksumInfo read(KeyValueContainerData data) throws IOException {
+  private ContainerProtos.ContainerChecksumInfo read(KeyValueContainerData data) throws IOException {
     long containerID = data.getContainerID();
     Lock readLock = getReadLock(containerID);
     readLock.lock();
@@ -124,20 +125,22 @@ public class ContainerChecksumManager {
       // Since all writes happen as part of an atomic read-modify-write cycle that requires a write lock, two empty
       // instances for the same container obtained only under the read lock will not conflict.
       if (!checksumFile.exists()) {
-        LOG.debug("Creating initial checksum file for container {} at {}", containerID, checksumFile);
-        return ContainerChecksumInfo.newBuilder()
+        LOG.debug("No checksum file currently exists for container {} at the path {}. Returning an empty instance.",
+            containerID, checksumFile);
+        return ContainerProtos.ContainerChecksumInfo.newBuilder()
             .setContainerID(containerID)
             .build();
       }
       try (FileInputStream inStream = new FileInputStream(checksumFile)) {
-        return ContainerChecksumInfo.parseFrom(inStream);
+        return ContainerProtos.ContainerChecksumInfo.parseFrom(inStream);
       }
     } finally {
       readLock.unlock();
     }
   }
 
-  private void write(KeyValueContainerData data, ContainerChecksumInfo checksumInfo) throws IOException {
+  private void write(KeyValueContainerData data, ContainerProtos.ContainerChecksumInfo checksumInfo)
+      throws IOException {
     Lock writeLock = getWriteLock(data.getContainerID());
     writeLock.lock();
     try (FileOutputStream outStream = new FileOutputStream(getContainerChecksumFile(data))) {

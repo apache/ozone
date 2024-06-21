@@ -66,7 +66,7 @@ class TestContainerChecksumManager {
   }
 
   @Test
-  public void testWriteToFileTreeOnly() throws Exception {
+  public void testWriteOnlyTreeToFile() throws Exception {
     ContainerMerkleTree tree = buildTestTree();
     checksumManager.writeContainerMerkleTree(container, tree);
 
@@ -80,7 +80,7 @@ class TestContainerChecksumManager {
   }
 
   @Test
-  public void testWriteToFileDeletedBlocksOnly() throws Exception {
+  public void testWriteOnlyDeletedBlocksToFile() throws Exception {
     List<Long> expectedBlocksToDelete = Arrays.asList(1L, 2L, 3L);
     checksumManager.markBlocksAsDeleted(container, new TreeSet<>(expectedBlocksToDelete));
 
@@ -108,7 +108,7 @@ class TestContainerChecksumManager {
   }
 
   @Test
-  public void testTreePreservedWithDeletedBlocks() throws Exception {
+  public void testTreePreservedOnDeletedBlocksWrite() throws Exception {
     ContainerMerkleTree tree = buildTestTree();
     checksumManager.writeContainerMerkleTree(container, tree);
     List<Long> expectedBlocksToDelete = Arrays.asList(1L, 2L, 3L);
@@ -122,7 +122,6 @@ class TestContainerChecksumManager {
   }
 
   private ContainerMerkleTree buildTestTree() throws Exception {
-    // Seed the expected and actual trees with the same chunks.
     final long blockID1 = 1;
     final long blockID2 = 2;
     final long blockID3 = 3;

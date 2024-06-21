@@ -76,10 +76,9 @@ public class ContainerMerkleTree {
     ByteBuffer containerChecksumBuffer = ByteBuffer.allocate(Long.BYTES * id2Block.size());
 
     for (BlockMerkleTree blockTree: id2Block.values()) {
-      // Add block's checksum tree to the proto.
       ContainerProtos.BlockMerkleTree blockTreeProto = blockTree.toProto();
       containerTreeBuilder.addBlockMerkleTree(blockTreeProto);
-      // Add the block's checksum to the buffer to calculate the container checksum.
+      // Add the block's checksum to the buffer that will be used to calculate the container checksum.
       containerChecksumBuffer.putLong(blockTreeProto.getBlockChecksum());
     }
     containerChecksumBuffer.flip();
