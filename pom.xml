@@ -239,7 +239,7 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
     <enforced.maven.version>[3.3.0,)</enforced.maven.version>
 
     <!-- Plugin versions and config -->
-    <maven-surefire-plugin.argLine>-Xmx4096m -XX:+HeapDumpOnOutOfMemoryError</maven-surefire-plugin.argLine>
+    <maven-surefire-plugin.argLine>-Xmx8192m -XX:+HeapDumpOnOutOfMemoryError</maven-surefire-plugin.argLine>
     <maven-surefire-plugin.argLineAccessArgs></maven-surefire-plugin.argLineAccessArgs>
     <excluded-test-groups>native | unhealthy</excluded-test-groups> <!-- test groups excluded by default (without any manual profile activation) -->
     <unstable-test-groups>flaky | native | slow | unhealthy</unstable-test-groups> <!-- test groups excluded in CI (except in dedicated profiles for flaky and native) -->
