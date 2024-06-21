@@ -63,7 +63,6 @@ import java.util.stream.Collectors;
 
 import static org.apache.hadoop.ozone.om.helpers.SnapshotInfo.SnapshotStatus.SNAPSHOT_ACTIVE;
 import static org.apache.hadoop.ozone.om.request.file.OMFileRequest.getDirectoryInfo;
-import static org.apache.hadoop.ozone.om.snapshot.SnapshotUtils.getOzonePathKeyForFso;
 
 /**
  * Snapshot BG Service for deleted directory deep clean and exclusive size
@@ -211,8 +210,9 @@ public class SnapshotDirectoryCleaningService
                   .getKeyTable(bucketInfo.getBucketLayout());
             }
 
-            String dbBucketKeyForDir = getOzonePathKeyForFso(metadataManager,
-                currSnapInfo.getVolumeName(), currSnapInfo.getBucketName());
+            String dbBucketKeyForDir = metadataManager
+                .getOzonePathKeyForFso(currSnapInfo.getVolumeName(),
+                    currSnapInfo.getBucketName());
             try (ReferenceCounted<OmSnapshot>
                      rcCurrOmSnapshot = omSnapshotManager.getActiveSnapshot(
                 currSnapInfo.getVolumeName(),
