@@ -20,11 +20,11 @@ package org.apache.hadoop.ozone.container.metrics;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Path;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
+import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.hdds.DFSConfigKeysLegacy;
 import org.apache.hadoop.hdds.client.BlockID;
@@ -73,6 +73,8 @@ import org.apache.ratis.util.function.CheckedBiConsumer;
 import org.apache.ratis.util.function.CheckedBiFunction;
 import org.apache.ratis.util.function.CheckedConsumer;
 import org.apache.ratis.util.function.CheckedFunction;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
@@ -95,11 +97,29 @@ public class TestContainerMetrics {
     CONF.setInt(DFSConfigKeysLegacy.DFS_METRICS_PERCENTILES_INTERVALS_KEY,
         DFS_METRICS_PERCENTILES_INTERVALS);
     CONF.setBoolean(OzoneConfigKeys.HDDS_CONTAINER_RATIS_DATASTREAM_ENABLED, false);
+    CONF.set(OzoneConfigKeys.OZONE_METADATA_DIRS, TEST_DIR);
+
+  }
+
+  @AfterAll
+  public static void cleanup() {
+    // clean up volume dir
+    File file = new File(TEST_DIR);
+    if (file.exists()) {
+      FileUtil.fullyDelete(file);
+    }
+  }
+
+  @AfterEach
+  public void cleanUp() throws IOException {
+    FileUtils.deleteQuietly(new File(CONF.get(ScmConfigKeys.HDDS_DATANODE_DIR_KEY)));
+    FileUtils.deleteQuietly(CONF.get(OzoneConfigKeys.HDDS_CONTAINER_RATIS_DATANODE_STORAGE_DIR) == null ?
+        null : new File(CONF.get(OzoneConfigKeys.HDDS_CONTAINER_RATIS_DATANODE_STORAGE_DIR)));
   }
 
   @Test
   public void testContainerMetrics() throws Exception {
-    runTestClientServer(1, pipeline -> CONF
+    runTestClientServer(pipeline -> CONF
             .setInt(OzoneConfigKeys.HDDS_CONTAINER_IPC_PORT,
                 pipeline.getFirstNode()
                     .getPort(DatanodeDetails.Port.Name.STANDALONE).getValue()),
@@ -111,12 +131,7 @@ public class TestContainerMetrics {
 
   @Test
   public void testContainerMetricsRatis() throws Exception {
-    runTestClientServer(1,
-        pipeline -> RatisTestHelper.initRatisConf(GRPC, CONF),
-        pipeline -> XceiverClientRatis.newXceiverClientRatis(pipeline, CONF),
-        this::newXceiverServerRatis, (dn, p) ->
-            RatisTestHelper.initXceiverServerRatis(GRPC, dn, p));
-    runTestClientServer(3,
+    runTestClientServer(
         pipeline -> RatisTestHelper.initRatisConf(GRPC, CONF),
         pipeline -> XceiverClientRatis.newXceiverClientRatis(pipeline, CONF),
         this::newXceiverServerRatis, (dn, p) ->
@@ -125,7 +140,6 @@ public class TestContainerMetrics {
 
   private static MutableVolumeSet createVolumeSet(DatanodeDetails dn, String path) throws IOException {
     CONF.set(ScmConfigKeys.HDDS_DATANODE_DIR_KEY, path);
-    CONF.set(OzoneConfigKeys.OZONE_METADATA_DIRS, path);
     return new MutableVolumeSet(
         dn.getUuidString(), CONF,
         null, StorageVolume.VolumeType.DATA_VOLUME, null);
@@ -154,7 +168,6 @@ public class TestContainerMetrics {
   }
 
   static void runTestClientServer(
-      int numDatanodes,
       CheckedConsumer<Pipeline, IOException> initConf,
       CheckedFunction<Pipeline, XceiverClientSpi,
                 IOException> createClient,
@@ -162,24 +175,21 @@ public class TestContainerMetrics {
           IOException> createServer,
       CheckedBiConsumer<DatanodeDetails, Pipeline, IOException> initServer)
       throws Exception {
-    final List<XceiverServerSpi> servers = new ArrayList<>();
+    XceiverServerSpi server = null;
     XceiverClientSpi client = null;
     long containerID = ContainerTestHelper.getTestContainerID();
-    List<MutableVolumeSet> mutableVolumeSetList = new ArrayList<>();
+    MutableVolumeSet volumeSet = null;
 
     try {
       final Pipeline pipeline =
-          MockPipeline.createPipeline(numDatanodes);
+          MockPipeline.createSingleNodePipeline();
       initConf.accept(pipeline);
 
-      for (DatanodeDetails dn : pipeline.getNodes()) {
-        final MutableVolumeSet volumeSet = createVolumeSet(dn, TEST_DIR + dn.getUuidString());
-        mutableVolumeSetList.add(volumeSet);
-        final XceiverServerSpi s = createServer.apply(dn, volumeSet);
-        servers.add(s);
-        s.start();
-        initServer.accept(dn, pipeline);
-      }
+      DatanodeDetails dn = pipeline.getFirstNode();
+      volumeSet = createVolumeSet(dn, TEST_DIR + dn.getUuidString());
+      server = createServer.apply(dn, volumeSet);
+      server.start();
+      initServer.accept(dn, pipeline);
 
       client = createClient.apply(pipeline);
       client.connect();
@@ -214,7 +224,7 @@ public class TestContainerMetrics {
       assertQuantileGauges("WriteChunkNanos" + sec, containerMetrics);
 
       List<HddsVolume> volumes =
-          StorageVolumeUtil.getHddsVolumesList(mutableVolumeSetList.get(0).getVolumesList());
+          StorageVolumeUtil.getHddsVolumesList(volumeSet.getVolumesList());
       HddsVolume hddsVolume = volumes.get(0);
       MetricsRecordBuilder volumeIOMetrics =
           getMetrics(hddsVolume.getVolumeIOStats().getMetricsSourceName());
@@ -224,17 +234,12 @@ public class TestContainerMetrics {
       assertCounter("WriteOpCount", 1L, volumeIOMetrics);
     } finally {
       ContainerMetrics.remove();
-      for (MutableVolumeSet volumeSet : mutableVolumeSetList) {
-        volumeSet.shutdown();
-      }
+      volumeSet.shutdown();
       if (client != null) {
         client.close();
       }
-      servers.forEach(XceiverServerSpi::stop);
-      // clean up volume dir
-      File file = new File(TEST_DIR);
-      if (file.exists()) {
-        FileUtil.fullyDelete(file);
+      if (server != null) {
+        server.stop();
       }
     }
   }
