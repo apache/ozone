@@ -25,7 +25,7 @@ import org.apache.hadoop.ozone.container.common.helpers.ChunkInfo;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 
 import java.nio.ByteBuffer;
-import java.util.List;
+import java.util.Collection;
 import java.util.SortedMap;
 import java.util.TreeMap;
 
@@ -61,7 +61,7 @@ public class ContainerMerkleTree {
    * @param blockID The ID of the block that these chunks belong to.
    * @param chunks A list of chunks to add to this block. The chunks will be sorted internally by their offset.
    */
-  public void addChunks(long blockID, List<ChunkInfo> chunks) {
+  public void addChunks(long blockID, Collection<ChunkInfo> chunks) {
     id2Block.computeIfAbsent(blockID, BlockMerkleTree::new).addChunks(chunks);
   }
 
@@ -112,7 +112,7 @@ public class ContainerMerkleTree {
      *
      * @param chunks A list of chunks to add to this block.
      */
-    public void addChunks(List<ChunkInfo> chunks) {
+    public void addChunks(Collection<ChunkInfo> chunks) {
       for (ChunkInfo chunk: chunks) {
         offset2Chunk.put(chunk.getOffset(), new ChunkMerkleTree(chunk));
       }
