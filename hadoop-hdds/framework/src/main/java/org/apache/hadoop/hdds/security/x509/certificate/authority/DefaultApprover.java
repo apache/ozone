@@ -101,8 +101,7 @@ public class DefaultApprover extends BaseApprover {
       PKCS10CertificationRequest certificationRequest,
       String scmId,
       String clusterId,
-      String certSerialId) throws IOException,
-      OperatorCreationException, CertificateException {
+      String certSerialId) throws IOException, CertificateException {
 
     AlgorithmIdentifier sigAlgId = new
         DefaultSignatureAlgorithmIdentifierFinder().find(
@@ -171,12 +170,15 @@ public class DefaultApprover extends BaseApprover {
       }
     }
 
-    ContentSigner sigGen = new BcRSAContentSignerBuilder(sigAlgId, digAlgId)
-        .build(asymmetricKP);
+    try {
+      ContentSigner sigGen = new BcRSAContentSignerBuilder(sigAlgId, digAlgId)
+          .build(asymmetricKP);
 
-    //TODO: as part of HDDS-10743 ensure that converter is instantiated only once
-    return new JcaX509CertificateConverter().getCertificate(certificateGenerator.build(sigGen));
-
+      //TODO: as part of HDDS-10743 ensure that converter is instantiated only once
+      return new JcaX509CertificateConverter().getCertificate(certificateGenerator.build(sigGen));
+    } catch (OperatorCreationException oce) {
+      throw new CertificateException(oce);
+    }
   }
 
 }
