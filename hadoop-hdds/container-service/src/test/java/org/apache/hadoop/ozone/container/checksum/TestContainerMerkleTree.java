@@ -1,5 +1,7 @@
 package org.apache.hadoop.ozone.container.checksum;
 
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerMerkleTreeProto;
 
@@ -11,6 +13,8 @@ import java.util.List;
 import java.util.stream.Collectors;
 import java.util.zip.CRC32;
 
+import org.apache.hadoop.hdds.scm.OzoneClientConfig;
+import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.ozone.container.common.helpers.ChunkInfo;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 import org.junit.jupiter.api.Test;
@@ -20,6 +24,10 @@ import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class TestContainerMerkleTree {
+  private static final long CHUNK_SIZE = (long) new OzoneConfiguration().getStorageSize(
+      ScmConfigKeys.OZONE_SCM_CHUNK_SIZE_KEY, ScmConfigKeys.OZONE_SCM_CHUNK_SIZE_DEFAULT, StorageUnit.BYTES);
+  private static final int BYTES_PER_CHECKSUM = new OzoneClientConfig().getBytesPerChecksum();
+
   @Test
   public void testBuildEmptyTree() {
     ContainerMerkleTree tree = new ContainerMerkleTree();
@@ -59,8 +67,7 @@ class TestContainerMerkleTree {
 
     ContainerProtos.ChunkMerkleTreeProto actualChunkTree = actualBlockTree.getChunkMerkleTree(0);
     assertEquals(0, actualChunkTree.getOffset());
-    // TODO use existing config for this value.
-    assertEquals(5 * 1024, actualChunkTree.getLength());
+    assertEquals(CHUNK_SIZE, actualChunkTree.getLength());
     assertNotEquals(0, actualChunkTree.getChunkChecksum());
   }
 
@@ -160,14 +167,10 @@ class TestContainerMerkleTree {
    * @return The ChunkInfo proto object built from this information.
    */
   private ChunkInfo buildChunk(int indexInBlock, ByteBuffer... chunkChecksums) throws IOException {
-    // Arbitrary sizes chosen for testing.
-    final int bytesPerChecksum = 1024;
-    final long chunkLength = 1024 * 5;
-
     // Each chunk checksum is added under the same ChecksumData object.
     ContainerProtos.ChecksumData checksumData = ContainerProtos.ChecksumData.newBuilder()
         .setType(ContainerProtos.ChecksumType.CRC32)
-        .setBytesPerChecksum(bytesPerChecksum)
+        .setBytesPerChecksum(BYTES_PER_CHECKSUM)
         .addAllChecksums(Arrays.stream(chunkChecksums)
             .map(ByteString::copyFrom)
             .collect(Collectors.toList()))
@@ -177,8 +180,8 @@ class TestContainerMerkleTree {
         ContainerProtos.ChunkInfo.newBuilder()
         .setChecksumData(checksumData)
         .setChunkName("chunk")
-        .setOffset(indexInBlock * chunkLength)
-        .setLen(chunkLength)
+        .setOffset(indexInBlock * CHUNK_SIZE)
+        .setLen(CHUNK_SIZE)
         .build());
   }
 
