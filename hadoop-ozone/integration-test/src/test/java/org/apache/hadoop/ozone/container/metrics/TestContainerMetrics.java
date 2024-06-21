@@ -62,7 +62,6 @@ import org.apache.hadoop.ozone.container.ozoneimpl.ContainerController;
 import org.apache.ozone.test.GenericTestUtils;
 
 import com.google.common.collect.Maps;
-
 import static org.apache.ozone.test.MetricsAsserts.assertCounter;
 import static org.apache.ozone.test.MetricsAsserts.assertQuantileGauges;
 import static org.apache.ozone.test.MetricsAsserts.getMetrics;
