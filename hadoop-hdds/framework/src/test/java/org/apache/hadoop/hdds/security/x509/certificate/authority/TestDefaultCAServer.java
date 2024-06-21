@@ -153,6 +153,7 @@ public class TestDefaultCAServer {
     String clusterId = RandomStringUtils.randomAlphabetic(4);
     KeyPair keyPair =
         new HDDSKeyGenerator(securityConfig).generateKey();
+    //TODO: generateCSR!
     PKCS10CertificationRequest csr = new CertificateSignRequest.Builder()
         .addDnsName("hadoop.apache.org")
         .addIpAddress("8.8.8.8")
@@ -163,7 +164,8 @@ public class TestDefaultCAServer {
         .setSubject("Ozone Cluster")
         .setConfiguration(securityConfig)
         .setKey(keyPair)
-        .build();
+        .build()
+        .generateCSR();
 
     CertificateServer testCA = new DefaultCAServer("testCA",
         clusterId, scmId, caStore,
@@ -204,6 +206,7 @@ public class TestDefaultCAServer {
   public void testRequestCertificateWithInvalidSubject() throws Exception {
     KeyPair keyPair =
         new HDDSKeyGenerator(securityConfig).generateKey();
+    //TODO: generateCSR!
     PKCS10CertificationRequest csr = new CertificateSignRequest.Builder()
         .addDnsName("hadoop.apache.org")
         .addIpAddress("8.8.8.8")
@@ -211,7 +214,8 @@ public class TestDefaultCAServer {
         .setSubject("Ozone Cluster")
         .setConfiguration(securityConfig)
         .setKey(keyPair)
-        .build();
+        .build()
+        .generateCSR();
 
     CertificateServer testCA = new DefaultCAServer("testCA",
         RandomStringUtils.randomAlphabetic(4),
@@ -232,6 +236,7 @@ public class TestDefaultCAServer {
   public void testRequestCertificateWithInvalidSubjectFailure() throws Exception {
     KeyPair keyPair =
         new HDDSKeyGenerator(securityConfig).generateKey();
+    //TODO: generateCSR!
     PKCS10CertificationRequest csr = new CertificateSignRequest.Builder()
         .addDnsName("hadoop.apache.org")
         .addIpAddress("8.8.8.8")
@@ -241,7 +246,8 @@ public class TestDefaultCAServer {
         .setSubject("Ozone Cluster")
         .setConfiguration(securityConfig)
         .setKey(keyPair)
-        .build();
+        .build()
+        .generateCSR();
 
     CertificateServer testCA = new DefaultCAServer("testCA",
         RandomStringUtils.randomAlphabetic(4),
@@ -344,6 +350,7 @@ public class TestDefaultCAServer {
       LocalDate beginDate = LocalDate.now().atStartOfDay().toLocalDate();
       LocalDate endDate =
           LocalDate.from(LocalDate.now().atStartOfDay().plusDays(10));
+      //TODO: generateCSR!
       PKCS10CertificationRequest csr = new CertificateSignRequest.Builder()
           .addDnsName("hadoop.apache.org")
           .addIpAddress("8.8.8.8")
@@ -354,7 +361,8 @@ public class TestDefaultCAServer {
           .setSubject("Ozone Cluster")
           .setConfiguration(securityConfig)
           .setKey(keyPair)
-          .build();
+          .build()
+          .generateCSR();
       X509Certificate externalCert = generateExternalCert(keyPair);
       X509Certificate signedCert = approver.sign(securityConfig,
           keyPair.getPrivate(), externalCert,
@@ -405,6 +413,7 @@ public class TestDefaultCAServer {
       // Generate cert
       KeyPair keyPair =
           new HDDSKeyGenerator(securityConfig).generateKey();
+      //TODO: generateCSR!
       PKCS10CertificationRequest csr = new CertificateSignRequest.Builder()
           .addDnsName("hadoop.apache.org")
           .addIpAddress("8.8.8.8")
@@ -412,7 +421,8 @@ public class TestDefaultCAServer {
           .setSubject("testCA")
           .setConfiguration(securityConfig)
           .setKey(keyPair)
-          .build();
+          .build()
+          .generateCSR();
 
       Future<CertPath> holder = rootCA.requestCertificate(csr,
           CertificateApprover.ApprovalType.TESTING_AUTOMATIC, SCM,

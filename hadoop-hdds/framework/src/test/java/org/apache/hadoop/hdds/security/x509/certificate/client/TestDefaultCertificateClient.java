@@ -25,6 +25,7 @@ import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMGetCer
 import org.apache.hadoop.hdds.protocolPB.SCMSecurityProtocolClientSideTranslatorPB;
 import org.apache.hadoop.hdds.security.x509.certificate.authority.CAType;
 import org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateCodec;
+import org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateSignRequest;
 import org.apache.hadoop.hdds.security.x509.exception.CertificateException;
 import org.apache.hadoop.hdds.security.x509.keys.KeyCodec;
 import org.bouncycastle.pkcs.PKCS10CertificationRequest;
@@ -560,21 +561,12 @@ public class TestDefaultCertificateClient {
     ) {
 
       @Override
-      protected String signAndStoreCertificate(
-          PKCS10CertificationRequest request, Path certificatePath) {
-        return "";
-      }
-
-      @Override
-      protected SCMGetCertResponseProto getCertificateSignResponse(
-          PKCS10CertificationRequest request) {
+      protected SCMGetCertResponseProto sign(CertificateSignRequest request) {
         return null;
       }
 
       @Override
-      protected String signAndStoreCertificate(
-          PKCS10CertificationRequest request, Path certificatePath,
-          boolean renew) {
+      protected String signAndStoreCertificate(CertificateSignRequest request, Path certificatePath, boolean renew) {
         return null;
       }
     };
