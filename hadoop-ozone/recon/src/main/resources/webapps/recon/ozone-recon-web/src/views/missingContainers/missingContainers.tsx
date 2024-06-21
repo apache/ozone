@@ -17,17 +17,22 @@
  */
 
 import React from 'react';
-import {Icon, Table, Tooltip, Tabs} from 'antd';
-import {PaginationConfig} from 'antd/lib/pagination';
+import dayjs from 'dayjs';
+import LocalizedFormat from 'dayjs/plugin/localizedFormat';
 import filesize from 'filesize';
-import moment from 'moment';
-import {showDataFetchError, timeFormat} from 'utils/common';
-import './missingContainers.less';
-import {ColumnSearch} from 'utils/columnSearch';
-import { AxiosGetHelper, cancelRequests } from 'utils/axiosRequestHelper';
+import { Table, Tooltip, Tabs } from 'antd';
+import { InfoCircleOutlined } from '@ant-design/icons';
+import { PaginationConfig } from 'antd/lib/pagination';
 
-const size = filesize.partial({standard: 'iec'});
-const {TabPane} = Tabs;
+import { ColumnSearch } from '@/utils/columnSearch';
+import { showDataFetchError, timeFormat } from '@/utils/common';
+import { AxiosGetHelper, cancelRequests } from '@/utils/axiosRequestHelper';
+
+import './missingContainers.less';
+
+const size = filesize.partial({ standard: 'iec' });
+
+dayjs.extend(LocalizedFormat);
 
 interface IContainerResponse {
   containerID: number;
@@ -108,13 +113,13 @@ const KEY_TABLE_COLUMNS = [
     title: 'Date Created',
     dataIndex: 'CreationTime',
     key: 'CreationTime',
-    render: (date: string) => moment(date).format('lll')
+    render: (date: string) => dayjs(date).format('lll')
   },
   {
     title: 'Date Modified',
     dataIndex: 'ModificationTime',
     key: 'ModificationTime',
-    render: (date: string) => moment(date).format('lll')
+    render: (date: string) => dayjs(date).format('lll')
   }
 ];
 
@@ -164,7 +169,7 @@ const CONTAINER_TAB_COLUMNS = [
                 placement='left'
                 title={tooltip}
               >
-                <Icon type='info-circle' className='icon-small'/>
+                <InfoCircleOutlined className='icon-small' />
               </Tooltip>
               <span className='pl-5'>
                 {replica.datanodeHost}
@@ -246,13 +251,13 @@ export class MissingContainers extends React.Component<Record<string, object>, I
 
       const underReplicatedResponseData = allContainers && allContainers.filter(item => item.containerState === 'UNDER_REPLICATED');
       const uContainers: IContainerResponse[] = underReplicatedResponseData;
-      
+
       const overReplicatedResponseData = allContainers && allContainers.filter(item => item.containerState === 'OVER_REPLICATED');
       const oContainers: IContainerResponse[] = overReplicatedResponseData;
-      
+
       const misReplicatedResponseData = allContainers && allContainers.filter(item => item.containerState === 'MIS_REPLICATED');
       const mrContainers: IContainerResponse[] = misReplicatedResponseData;
- 
+
       this.setState({
         loading: false,
         missingDataSource: mContainers,
@@ -278,15 +283,20 @@ export class MissingContainers extends React.Component<Record<string, object>, I
   onShowSizeChange = (current: number, pageSize: number) => {
     console.log(current, pageSize);
   };
-  
+
   onRowExpandClick = (expanded: boolean, record: IContainerResponse) => {
     if (expanded) {
-      this.setState(({expandedRowData}) => {
-        const expandedRowState: IExpandedRowState = expandedRowData[record.containerID] ?
-          Object.assign({}, expandedRowData[record.containerID], {loading: true}) :
-          {containerId: record.containerID, loading: true, dataSource: [], totalCount: 0};
+      this.setState(({ expandedRowData }) => {
+        const expandedRowState: IExpandedRowState = expandedRowData[record.containerID]
+          ? Object.assign({}, expandedRowData[record.containerID], { loading: true })
+          : {
+            containerId: record.containerID,
+            loading: true,
+            dataSource: [],
+            totalCount: 0
+          };
         return {
-          expandedRowData: Object.assign({}, expandedRowData, {[record.containerID]: expandedRowState})
+          expandedRowData: Object.assign({}, expandedRowData, { [record.containerID]: expandedRowState })
         };
       });
 
@@ -295,38 +305,38 @@ export class MissingContainers extends React.Component<Record<string, object>, I
 
       request.then(response => {
         const containerKeysResponse: IContainerKeysResponse = response.data;
-        this.setState(({expandedRowData}) => {
+        this.setState(({ expandedRowData }) => {
           const expandedRowState: IExpandedRowState =
-              Object.assign({}, expandedRowData[record.containerID],
-                {loading: false, dataSource: containerKeysResponse.keys, totalCount: containerKeysResponse.totalCount});
+            Object.assign({}, expandedRowData[record.containerID],
+              { loading: false, dataSource: containerKeysResponse.keys, totalCount: containerKeysResponse.totalCount });
           return {
-            expandedRowData: Object.assign({}, expandedRowData, {[record.containerID]: expandedRowState})
+            expandedRowData: Object.assign({}, expandedRowData, { [record.containerID]: expandedRowState })
           };
         });
       }).catch(error => {
-        this.setState(({expandedRowData}) => {
+        this.setState(({ expandedRowData }) => {
           const expandedRowState: IExpandedRowState =
-              Object.assign({}, expandedRowData[record.containerID],
-                {loading: false});
+            Object.assign({}, expandedRowData[record.containerID],
+              { loading: false });
           return {
-            expandedRowData: Object.assign({}, expandedRowData, {[record.containerID]: expandedRowState})
+            expandedRowData: Object.assign({}, expandedRowData, { [record.containerID]: expandedRowState })
           };
         });
         showDataFetchError(error.toString());
       });
     }
-    else{
+    else {
       cancelRowExpandSignal && cancelRowExpandSignal.abort();
     }
   };
 
   expandedRowRender = (record: IContainerResponse) => {
-    const {expandedRowData} = this.state;
+    const { expandedRowData } = this.state;
     const containerId = record.containerID;
     if (expandedRowData[containerId]) {
       const containerKeys: IExpandedRowState = expandedRowData[containerId];
       const dataSource = containerKeys.dataSource.map(record => (
-        {...record, uid: `${record.Volume}/${record.Bucket}/${record.Key}`}
+        { ...record, uid: `${record.Volume}/${record.Bucket}/${record.Key}` }
       ));
       const paginationConfig: PaginationConfig = {
         showTotal: (total: number, range) => `${range[0]}-${range[1]} of ${total} keys`
@@ -336,7 +346,7 @@ export class MissingContainers extends React.Component<Record<string, object>, I
           loading={containerKeys.loading} dataSource={dataSource}
           columns={KEY_TABLE_COLUMNS} pagination={paginationConfig}
           rowKey='uid'
-          locale={{filterTitle: ""}}/>
+          locale={{ filterTitle: '' }} />
       );
     }
 
@@ -360,13 +370,13 @@ export class MissingContainers extends React.Component<Record<string, object>, I
   };
 
   render() {
-    const {missingDataSource, loading, underReplicatedDataSource, overReplicatedDataSource, misReplicatedDataSource} = this.state;
+    const { missingDataSource, loading, underReplicatedDataSource, overReplicatedDataSource, misReplicatedDataSource } = this.state;
     const paginationConfig: PaginationConfig = {
       showTotal: (total: number, range) => `${range[0]}-${range[1]} of ${total} missing containers`,
       showSizeChanger: true,
       onShowSizeChange: this.onShowSizeChange
     };
-    
+
     const generateTable = (dataSource) => {
       return <Table
         expandRowByClick dataSource={dataSource}
@@ -375,8 +385,26 @@ export class MissingContainers extends React.Component<Record<string, object>, I
         pagination={paginationConfig} rowKey='containerID'
         expandedRowRender={this.expandedRowRender} onExpand={this.onRowExpandClick}
         onExpandedRowsChange={this.onRowExpandChange}
-        locale={{filterTitle: ""}}/>
+        locale={{ filterTitle: "" }} />
     }
+
+    const tabPanes = [{
+      key: '1',
+      label: `Missing${(missingDataSource && missingDataSource.length > 0) ? ` (${missingDataSource.length})` : ''}`,
+      children: generateTable(missingDataSource)
+    }, {
+      key: '2',
+      label: `Under-Replicated${(underReplicatedDataSource && underReplicatedDataSource.length > 0) ? ` (${underReplicatedDataSource.length})` : ''}`,
+      children: generateTable(underReplicatedDataSource)
+    }, {
+      key: '3',
+      label: `Over-Replicated${(overReplicatedDataSource && overReplicatedDataSource.length > 0) ? ` (${overReplicatedDataSource.length})` : ''}`,
+      children: generateTable(overReplicatedDataSource)
+    }, {
+      key: '4',
+      label: `Mis-Replicated${(misReplicatedDataSource && misReplicatedDataSource.length > 0) ? ` (${misReplicatedDataSource.length})` : ''}`,
+      children: generateTable(misReplicatedDataSource)
+    }]
 
     return (
       <div className='missing-containers-container'>
@@ -384,20 +412,7 @@ export class MissingContainers extends React.Component<Record<string, object>, I
           Containers
         </div>
         <div className='content-div'>
-          <Tabs defaultActiveKey='1'>
-            <TabPane key='1' tab={`Missing${(missingDataSource && missingDataSource.length > 0) ? ` (${missingDataSource.length})` : ''}`}>
-              {generateTable(missingDataSource)}
-            </TabPane>
-            <TabPane key='2' tab={`Under-Replicated${(underReplicatedDataSource && underReplicatedDataSource.length > 0) ? ` (${underReplicatedDataSource.length})` : ''}`}>
-              {generateTable(underReplicatedDataSource)}
-            </TabPane>
-            <TabPane key='3' tab={`Over-Replicated${(overReplicatedDataSource && overReplicatedDataSource.length > 0) ? ` (${overReplicatedDataSource.length})` : ''}`}>
-              {generateTable(overReplicatedDataSource)}
-            </TabPane>
-            <TabPane key='4' tab={`Mis-Replicated${(misReplicatedDataSource && misReplicatedDataSource.length > 0) ? ` (${misReplicatedDataSource.length})` : ''}`}>
-              {generateTable(misReplicatedDataSource)}
-            </TabPane>
-          </Tabs>
+          <Tabs defaultActiveKey='1' items={tabPanes} />
         </div>
       </div>
     );

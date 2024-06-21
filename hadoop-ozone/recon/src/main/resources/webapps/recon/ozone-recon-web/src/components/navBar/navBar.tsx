@@ -17,22 +17,36 @@
  */
 
 import React from 'react';
-import logo from '../../logo.png';
-import {Layout, Menu, Icon} from 'antd';
-import './navBar.less';
-import {withRouter, Link} from 'react-router-dom';
-import {RouteComponentProps} from 'react-router';
 import axios from 'axios';
-import {showDataFetchError} from 'utils/common';
+import { Layout, Menu, MenuProps } from 'antd';
+import {
+  BarChartOutlined,
+  ClusterOutlined,
+  ContainerOutlined,
+  DashboardOutlined,
+  DatabaseOutlined,
+  DeploymentUnitOutlined,
+  FolderOpenOutlined,
+  InboxOutlined,
+  LayoutOutlined,
+  PieChartOutlined
+} from '@ant-design/icons';
+import { withRouter, Link } from 'react-router-dom';
+import { RouteComponentProps } from 'react-router';
 
-const {Sider} = Layout;
+
+import logo from '../../logo.png';
+import { showDataFetchError } from '@/utils/common';
+import './navBar.less';
+
+const { Sider } = Layout;
 
 interface INavBarProps extends RouteComponentProps<object> {
   collapsed: boolean;
   onCollapse: (arg: boolean) => void;
   isHeatmapEnabled: boolean;
   isLoading: boolean;
-  location: object
+  location: object;
 }
 
 class NavBar extends React.Component<INavBarProps> {
@@ -50,7 +64,7 @@ class NavBar extends React.Component<INavBarProps> {
     });
     this.fetchDisableFeatures();
   }
-  
+
   fetchDisableFeatures = () => {
     this.setState({
       isLoading: true
@@ -73,91 +87,85 @@ class NavBar extends React.Component<INavBarProps> {
   };
 
   render() {
-    const {location} = this.props;
+    const { location } = this.props;
     const { isHeatmapEnabled } = this.state;
+    const menuItems: MenuProps['items'] = [{
+      key: '/Overview',
+      icon: <DashboardOutlined />,
+      label: <><span>Overview</span><Link to='/Overview' /></>
+    }, {
+      key: '/Volumes',
+      icon: <InboxOutlined />,
+      label: <><span>Volumes</span><Link to='/Volumes' /></>
+    }, {
+      key: '/Buckets',
+      icon: <FolderOpenOutlined />,
+      label: <><span>Buckets</span><Link to='/Buckets' /></>
+    }, {
+      key: '/Datanodes',
+      icon: <ClusterOutlined />,
+      label: <><span>Datanodes</span><Link to='/Datanodes' /></>
+    }, {
+      key: '/Pipelines',
+      icon: <DeploymentUnitOutlined />,
+      label: <><span>Pipelines</span><Link to='/Pipelines' /></>
+    }, {
+      key: '/Containers',
+      icon: <ContainerOutlined />,
+      label: <><span>Containers</span><Link to='/Containers' /></>
+    }, {
+      key: 'InsightsMenu',
+      icon: <BarChartOutlined />,
+      label: <><span>Insights</span></>,
+      children: [
+        {
+          key: '/Insights',
+          icon: <BarChartOutlined />,
+          label: <><span>Insights</span><Link to='/Insights' /></>
+        },
+        {
+          key: '/Om',
+          icon: <DatabaseOutlined />,
+          label: <><span>OM DB Insights</span><Link to='/Om' /></>
+        }
+      ]
+    }, {
+      key: '/DiskUsage',
+      icon: <PieChartOutlined />,
+      label: <><span>Disk Usage</span><Link to='/DiskUsage' /></>
+    }, isHeatmapEnabled ? {
+      key: '/Heatmap',
+      icon: <LayoutOutlined />,
+      label: <>
+        <span>Heatmap</span>
+        <Link to={{
+          pathname: '/Heatmap',
+          state: { isHeatmapEnabled: true }
+        }}
+        /></>
+    } : {}]
     return (
       <Sider
         collapsible
         collapsed={this.props.collapsed}
         collapsedWidth={50}
         style={{
-          overflow: 'auto', height: '100vh', position: 'fixed', left: 0
+          overflow: 'auto',
+          height: '100vh',
+          position: 'fixed',
+          left: 0
         }}
         onCollapse={this.props.onCollapse}
       >
         <div className='logo'>
-          <img src={logo} alt='Ozone Recon Logo' width={32} height={32}/>
+          <img src={logo} alt='Ozone Recon Logo' width={32} height={32} />
           <span className='logo-text'>Ozone Recon</span>
         </div>
         <Menu
           theme='dark' defaultSelectedKeys={['/Dashboard']}
           mode='inline' selectedKeys={[location.pathname]}
+          items={menuItems}
         >
-          <Menu.Item key='/Overview'>
-            <Icon type='dashboard'/>
-            <span>Overview</span>
-            <Link to='/Overview'/>
-          </Menu.Item>
-          <Menu.Item key='/Volumes'>
-            <Icon type='inbox'/>
-            <span>Volumes</span>
-            <Link to='/Volumes'/>.
-          </Menu.Item>
-          <Menu.Item key='/Buckets'>
-            <Icon type='folder-open'/>
-            <span>Buckets</span>
-            <Link to='/Buckets'/>.
-          </Menu.Item>
-          <Menu.Item key='/Datanodes'>
-            <Icon type='cluster'/>
-            <span>Datanodes</span>
-            <Link to='/Datanodes'/>
-          </Menu.Item>
-          <Menu.Item key='/Pipelines'>
-            <Icon type='deployment-unit'/>
-            <span>Pipelines</span>
-            <Link to='/Pipelines'/>
-          </Menu.Item>
-          <Menu.Item key='/Containers'>
-            <Icon type='container'/>
-            <span>Containers</span>
-            <Link to='/Containers'/>
-          </Menu.Item>
-          <Menu.SubMenu
-            title={
-              <span><Icon type='bar-chart' />
-                <span>Insights</span>
-              </span>
-            }>
-              <Menu.Item key="/Insights">
-                <span><Icon type='bar-chart' /></span>
-                <span>Insights</span>
-                <Link to='/Insights' />
-              </Menu.Item>
-              <Menu.Item key="/Om">
-              <span> <Icon type="database"/></span>
-              <span>OM DB Insights</span>
-              <Link to='/Om' />
-              </Menu.Item>
-          </Menu.SubMenu>
-          <Menu.Item key='/DiskUsage'>
-            <Icon type='pie-chart'/>
-            <span>Disk Usage</span>
-            <Link to='/DiskUsage'/>
-          </Menu.Item>
-          {
-            isHeatmapEnabled ?
-              <Menu.Item key='/Heatmap'>
-                <Icon type='bar-chart' />
-                <span>Heatmap</span>
-                <Link to={{
-                  pathname: '/Heatmap',
-                  state: { isHeatmapEnabled: true}
-                }}
-                />
-              </Menu.Item>
-              : ""
-          }
         </Menu>
       </Sider>
     );
