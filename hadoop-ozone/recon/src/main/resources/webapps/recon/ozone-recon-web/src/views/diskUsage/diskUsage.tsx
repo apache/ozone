@@ -621,7 +621,7 @@ export class DiskUsage extends React.Component<Record<string, object>, IDUState>
               </Row>
               <Row>
                 {(duResponse.size > 0) ?
-                  <div style={{ height: 1000, width: 1000 }}>
+                  <div style={{ height: 700, width: 1000, margin: 'auto', marginTop: '5%' }}>
                     <EChart
                       option={eChartsOptions}
                       onClick={

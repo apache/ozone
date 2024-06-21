@@ -198,7 +198,8 @@ export class Insights extends React.Component<Record<string, object>, IInsightsS
       this.setState({
         fileCountData: {
           title: {
-            text: 'File Size Distribution'
+            text: 'File Size Distribution',
+            left: 'center'
           },
           xAxis: {
             type: 'category',
@@ -224,6 +225,7 @@ export class Insights extends React.Component<Record<string, object>, IInsightsS
         containerCountData: {
           title: {
             text: 'Container Size Distribution',
+            left: 'center'
           },
           tooltip: {
             trigger: 'item',
@@ -370,7 +372,7 @@ export class Insights extends React.Component<Record<string, object>, IInsightsS
                     </Col>
                   </Row>
                   <Row>
-                    <Col>
+                    <Col style={{ margin: 'auto', marginTop: '2%' }}>
                       <EChart option={fileCountData} />
                     </Col>
                   </Row>
@@ -389,7 +391,7 @@ export class Insights extends React.Component<Record<string, object>, IInsightsS
               ((containerCountResponse && containerCountResponse.length > 0) ?
                 <div>
                   <Row>
-                    <Col>
+                    <Col style={{ margin: 'auto', marginTop: '2%' }}>
                       <EChart option={containerCountData} />
                     </Col>
                   </Row>
