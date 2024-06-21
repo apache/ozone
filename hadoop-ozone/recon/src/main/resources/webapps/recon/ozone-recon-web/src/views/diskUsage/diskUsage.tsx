@@ -524,10 +524,7 @@ export class DiskUsage extends React.Component<Record<string, object>, IDUState>
     return (
       <div className='du-container'>
         <div className='page-header'>
-          Disk Usage&nbsp;&nbsp;
-          <Tooltip placement="rightTop" title="Shows Disk Usage information only for FSO buckets">
-            <Icon type='info-circle' />
-          </Tooltip>
+          Disk Usage
         </div>
         <div className='content-div'>
           {isLoading ? <span><Icon type='loading'/> Loading...</span> : (
