@@ -20,6 +20,8 @@
 package org.apache.hadoop.ozone.container.ozoneimpl;
 
 import org.apache.commons.compress.utils.Lists;
+import org.apache.hadoop.hdfs.util.Canceler;
+import org.apache.hadoop.hdfs.util.DataTransferThrottler;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.apache.hadoop.ozone.container.common.interfaces.Container.ScanResult;
@@ -37,6 +39,7 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 
+import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto.State.UNHEALTHY;
 import static org.apache.hadoop.ozone.container.common.ContainerTestUtils.getUnhealthyScanResult;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -46,10 +49,12 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.eq;
 import static org.mockito.Mockito.atLeastOnce;
+import static org.mockito.Mockito.atMostOnce;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
+import static org.mockito.internal.verification.VerificationModeFactory.atMost;
 
 /**
  * Unit tests for the on-demand container scanner.
@@ -250,6 +255,41 @@ public class TestOnDemandContainerDataScanner extends
     OnDemandContainerDataScanner.shutdown();
     // Interrupting the healthy container's scan should not mark it unhealthy.
     verifyContainerMarkedUnhealthy(healthy, never());
+  }
+
+  @Test
+  @Override
+  public void testUnhealthyContainerRescanned() throws Exception {
+    Container<?> unhealthy = mockKeyValueContainer();
+    when(unhealthy.scanMetaData()).thenReturn(ScanResult.healthy());
+    when(unhealthy.scanData(
+        any(DataTransferThrottler.class), any(Canceler.class)))
+        .thenReturn(getUnhealthyScanResult());
+
+    // First iteration should find the unhealthy container.
+    scanContainer(unhealthy);
+    verifyContainerMarkedUnhealthy(unhealthy, atMostOnce());
+    OnDemandScannerMetrics metrics = OnDemandContainerDataScanner.getMetrics();
+    assertEquals(1, metrics.getNumContainersScanned());
+    assertEquals(1, metrics.getNumUnHealthyContainers());
+
+    // The unhealthy container should have been moved to the unhealthy state.
+    verify(unhealthy.getContainerData(), atMostOnce())
+        .setState(UNHEALTHY);
+    // Update the mock to reflect this.
+    when(unhealthy.getContainerState()).thenReturn(UNHEALTHY);
+    assertTrue(unhealthy.shouldScanData());
+
+    // Clear metrics to check the next run.
+    metrics.resetNumContainersScanned();
+    metrics.resetNumUnhealthyContainers();
+
+    // When rescanned the metrics should increase as we scan
+    // UNHEALTHY containers as well.
+    scanContainer(unhealthy);
+    verifyContainerMarkedUnhealthy(unhealthy, atMost(2));
+    assertEquals(1, metrics.getNumContainersScanned());
+    assertEquals(1, metrics.getNumUnHealthyContainers());
   }
 
   private void scanContainer(Container<?> container) throws Exception {
