@@ -70,6 +70,7 @@ public class CSMMetrics {
 
   private @Metric MutableRate applyTransactionNs;
   private @Metric MutableRate writeStateMachineDataNs;
+  private @Metric MutableRate writeStateMachineQueueingLatencyNs;
   private @Metric MutableRate untilApplyTransactionNs;
   private @Metric MutableRate startTransactionCompleteNs;
 
@@ -223,6 +224,11 @@ public class CSMMetrics {
     writeStateMachineDataNs.add(latencyNanos);
   }
 
+
+  public void recordWriteStateMachineQueueingLatencyNs(long latencyNanos) {
+    writeStateMachineQueueingLatencyNs.add(latencyNanos);
+  }
+
   public void recordUntilApplyTransactionNs(long latencyNanos) {
     untilApplyTransactionNs.add(latencyNanos);
   }
@@ -252,6 +258,6 @@ public class CSMMetrics {
 
   public void unRegister() {
     MetricsSystem ms = DefaultMetricsSystem.instance();
-    ms.unregisterSource(SOURCE_NAME);
+    ms.unregisterSource(SOURCE_NAME + gid.toString());
   }
 }
