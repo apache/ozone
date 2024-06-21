@@ -3,7 +3,6 @@ package org.apache.hadoop.ozone.container.checksum;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
-import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerMerkleTreeProto;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
@@ -31,7 +30,7 @@ class TestContainerMerkleTree {
   @Test
   public void testBuildEmptyTree() {
     ContainerMerkleTree tree = new ContainerMerkleTree();
-    ContainerMerkleTreeProto treeProto = tree.toProto();
+    ContainerProtos.ContainerMerkleTree treeProto = tree.toProto();
     assertEquals(0, treeProto.getDataChecksum());
     assertEquals(0, treeProto.getBlockMerkleTreeCount());
   }
@@ -43,29 +42,29 @@ class TestContainerMerkleTree {
     ChunkInfo chunk = buildChunk(0, ByteBuffer.wrap(new byte[]{1, 2, 3}));
 
     // Build the expected tree proto using the test code.
-    ContainerProtos.ChunkMerkleTreeProto chunkTree = buildExpectedChunkTree(chunk);
-    ContainerProtos.BlockMerkleTreeProto blockTree = buildExpectedBlockTree(blockID,
+    ContainerProtos.ChunkMerkleTree chunkTree = buildExpectedChunkTree(chunk);
+    ContainerProtos.BlockMerkleTree blockTree = buildExpectedBlockTree(blockID,
         Collections.singletonList(chunkTree));
-    ContainerMerkleTreeProto expectedTree = buildExpectedContainerTree(Collections.singletonList(blockTree));
+    ContainerProtos.ContainerMerkleTree expectedTree = buildExpectedContainerTree(Collections.singletonList(blockTree));
 
     // Use the ContainerMerkleTree to build the same tree.
     ContainerMerkleTree actualTree = new ContainerMerkleTree();
     actualTree.addChunks(blockID, Collections.singletonList(chunk));
 
     // Ensure the trees match.
-    ContainerMerkleTreeProto actualTreeProto = actualTree.toProto();
+    ContainerProtos.ContainerMerkleTree actualTreeProto = actualTree.toProto();
     assertTreesSortedAndMatch(expectedTree, actualTreeProto);
 
     // Do some manual verification of the generated tree as well.
     assertNotEquals(0, actualTreeProto.getDataChecksum());
     assertEquals(1, actualTreeProto.getBlockMerkleTreeCount());
 
-    ContainerProtos.BlockMerkleTreeProto actualBlockTree = actualTreeProto.getBlockMerkleTree(0);
+    ContainerProtos.BlockMerkleTree actualBlockTree = actualTreeProto.getBlockMerkleTree(0);
     assertEquals(1, actualBlockTree.getBlockID());
     assertEquals(1, actualBlockTree.getChunkMerkleTreeCount());
     assertNotEquals(0, actualBlockTree.getBlockChecksum());
 
-    ContainerProtos.ChunkMerkleTreeProto actualChunkTree = actualBlockTree.getChunkMerkleTree(0);
+    ContainerProtos.ChunkMerkleTree actualChunkTree = actualBlockTree.getChunkMerkleTree(0);
     assertEquals(0, actualChunkTree.getOffset());
     assertEquals(CHUNK_SIZE, actualChunkTree.getLength());
     assertNotEquals(0, actualChunkTree.getChunkChecksum());
@@ -80,16 +79,16 @@ class TestContainerMerkleTree {
     ChunkInfo chunk3 = buildChunk(2, ByteBuffer.wrap(new byte[]{4, 5, 6}));
 
     // Build the expected tree proto using the test code.
-    ContainerProtos.BlockMerkleTreeProto blockTree = buildExpectedBlockTree(blockID,
+    ContainerProtos.BlockMerkleTree blockTree = buildExpectedBlockTree(blockID,
         Arrays.asList(buildExpectedChunkTree(chunk1), buildExpectedChunkTree(chunk3)));
-    ContainerMerkleTreeProto expectedTree = buildExpectedContainerTree(Collections.singletonList(blockTree));
+    ContainerProtos.ContainerMerkleTree expectedTree = buildExpectedContainerTree(Collections.singletonList(blockTree));
 
     // Use the ContainerMerkleTree to build the same tree.
     ContainerMerkleTree actualTree = new ContainerMerkleTree();
     actualTree.addChunks(blockID, Arrays.asList(chunk1, chunk3));
 
     // Ensure the trees match.
-    ContainerMerkleTreeProto actualTreeProto = actualTree.toProto();
+    ContainerProtos.ContainerMerkleTree actualTreeProto = actualTree.toProto();
     assertTreesSortedAndMatch(expectedTree, actualTreeProto);
   }
 
@@ -107,11 +106,11 @@ class TestContainerMerkleTree {
     ChunkInfo b3c2 = buildChunk(1, ByteBuffer.wrap(new byte[]{1, 2, 3}));
 
     // Build the expected tree proto using the test code.
-    ContainerProtos.BlockMerkleTreeProto blockTree1 = buildExpectedBlockTree(blockID1,
+    ContainerProtos.BlockMerkleTree blockTree1 = buildExpectedBlockTree(blockID1,
         Arrays.asList(buildExpectedChunkTree(b1c1), buildExpectedChunkTree(b1c2)));
-    ContainerProtos.BlockMerkleTreeProto blockTree3 = buildExpectedBlockTree(blockID3,
+    ContainerProtos.BlockMerkleTree blockTree3 = buildExpectedBlockTree(blockID3,
         Arrays.asList(buildExpectedChunkTree(b3c1), buildExpectedChunkTree(b3c2)));
-    ContainerMerkleTreeProto expectedTree = buildExpectedContainerTree(Arrays.asList(blockTree1, blockTree3));
+    ContainerProtos.ContainerMerkleTree expectedTree = buildExpectedContainerTree(Arrays.asList(blockTree1, blockTree3));
 
     // Use the ContainerMerkleTree to build the same tree.
     // Add blocks and chunks out of order to test sorting.
@@ -120,7 +119,7 @@ class TestContainerMerkleTree {
     actualTree.addChunks(blockID1, Arrays.asList(b1c1, b1c2));
 
     // Ensure the trees match.
-    ContainerMerkleTreeProto actualTreeProto = actualTree.toProto();
+    ContainerProtos.ContainerMerkleTree actualTreeProto = actualTree.toProto();
     assertTreesSortedAndMatch(expectedTree, actualTreeProto);
   }
 
@@ -131,21 +130,21 @@ class TestContainerMerkleTree {
     final long blockID2 = 2;
     final long blockID3 = 3;
     ChunkInfo b1c1 = buildChunk(0, ByteBuffer.wrap(new byte[]{1, 2, 3}));
-    ChunkInfo b1c2 = buildChunk(1, ByteBuffer.wrap(new byte[]{1, 2, 3}));
+    ChunkInfo b1c2 = buildChunk(1, ByteBuffer.wrap(new byte[]{1, 2}));
     ChunkInfo b1c3 = buildChunk(2, ByteBuffer.wrap(new byte[]{1, 2, 3}));
     ChunkInfo b2c1 = buildChunk(0, ByteBuffer.wrap(new byte[]{1, 2, 3}));
     ChunkInfo b2c2 = buildChunk(1, ByteBuffer.wrap(new byte[]{1, 2, 3}));
-    ChunkInfo b3c1 = buildChunk(0, ByteBuffer.wrap(new byte[]{1, 2, 3}));
-    ChunkInfo b3c2 = buildChunk(1, ByteBuffer.wrap(new byte[]{1, 2, 3}));
+    ChunkInfo b3c1 = buildChunk(0, ByteBuffer.wrap(new byte[]{1}));
+    ChunkInfo b3c2 = buildChunk(1, ByteBuffer.wrap(new byte[]{2, 3, 4}));
 
     // Build the expected tree proto using the test code.
-    ContainerProtos.BlockMerkleTreeProto blockTree1 = buildExpectedBlockTree(blockID1,
+    ContainerProtos.BlockMerkleTree blockTree1 = buildExpectedBlockTree(blockID1,
         Arrays.asList(buildExpectedChunkTree(b1c1), buildExpectedChunkTree(b1c2), buildExpectedChunkTree(b1c3)));
-    ContainerProtos.BlockMerkleTreeProto blockTree2 = buildExpectedBlockTree(blockID2,
+    ContainerProtos.BlockMerkleTree blockTree2 = buildExpectedBlockTree(blockID2,
         Arrays.asList(buildExpectedChunkTree(b2c1), buildExpectedChunkTree(b2c2)));
-    ContainerProtos.BlockMerkleTreeProto blockTree3 = buildExpectedBlockTree(blockID3,
+    ContainerProtos.BlockMerkleTree blockTree3 = buildExpectedBlockTree(blockID3,
         Arrays.asList(buildExpectedChunkTree(b3c1), buildExpectedChunkTree(b3c2)));
-    ContainerMerkleTreeProto expectedTree = buildExpectedContainerTree(
+    ContainerProtos.ContainerMerkleTree expectedTree = buildExpectedContainerTree(
         Arrays.asList(blockTree1, blockTree2, blockTree3));
 
     // Use the ContainerMerkleTree to build the same tree.
@@ -161,18 +160,19 @@ class TestContainerMerkleTree {
     actualTree.addChunks(blockID3, Collections.singletonList(b3c2));
 
     // Ensure the trees match.
-    ContainerMerkleTreeProto actualTreeProto = actualTree.toProto();
+    ContainerProtos.ContainerMerkleTree actualTreeProto = actualTree.toProto();
     assertTreesSortedAndMatch(expectedTree, actualTreeProto);
   }
 
-  private void assertTreesSortedAndMatch(ContainerMerkleTreeProto expectedTree, ContainerMerkleTreeProto actualTree) {
+  public static void assertTreesSortedAndMatch(ContainerProtos.ContainerMerkleTree expectedTree,
+      ContainerProtos.ContainerMerkleTree actualTree) {
     assertEquals(expectedTree.getDataChecksum(), actualTree.getDataChecksum());
     assertEquals(expectedTree.getBlockMerkleTreeCount(), actualTree.getBlockMerkleTreeCount());
 
     long prevBlockID = -1;
     for (int blockIndex = 0; blockIndex < expectedTree.getBlockMerkleTreeCount(); blockIndex++) {
-      ContainerProtos.BlockMerkleTreeProto expectedBlockTree = expectedTree.getBlockMerkleTree(blockIndex);
-      ContainerProtos.BlockMerkleTreeProto actualBlockTree = actualTree.getBlockMerkleTree(blockIndex);
+      ContainerProtos.BlockMerkleTree expectedBlockTree = expectedTree.getBlockMerkleTree(blockIndex);
+      ContainerProtos.BlockMerkleTree actualBlockTree = actualTree.getBlockMerkleTree(blockIndex);
 
       // Blocks should be sorted by block ID.
       long currentBlockID = actualBlockTree.getBlockID();
@@ -184,8 +184,8 @@ class TestContainerMerkleTree {
 
       long prevChunkOffset = -1;
       for (int chunkIndex = 0; chunkIndex < expectedBlockTree.getChunkMerkleTreeCount(); chunkIndex++) {
-        ContainerProtos.ChunkMerkleTreeProto expectedChunkTree = expectedBlockTree.getChunkMerkleTree(chunkIndex);
-        ContainerProtos.ChunkMerkleTreeProto actualChunkTree = actualBlockTree.getChunkMerkleTree(chunkIndex);
+        ContainerProtos.ChunkMerkleTree expectedChunkTree = expectedBlockTree.getChunkMerkleTree(chunkIndex);
+        ContainerProtos.ChunkMerkleTree actualChunkTree = actualBlockTree.getChunkMerkleTree(chunkIndex);
 
         // Chunks should be sorted by offset.
         long currentChunkOffset = actualChunkTree.getOffset();
@@ -199,30 +199,30 @@ class TestContainerMerkleTree {
     }
   }
 
-  private ContainerMerkleTreeProto buildExpectedContainerTree(List<ContainerProtos.BlockMerkleTreeProto> blocks) {
-    return ContainerMerkleTreeProto.newBuilder()
+  private ContainerProtos.ContainerMerkleTree buildExpectedContainerTree(List<ContainerProtos.BlockMerkleTree> blocks) {
+    return ContainerProtos.ContainerMerkleTree.newBuilder()
         .addAllBlockMerkleTree(blocks)
         .setDataChecksum(computeExpectedChecksum(
             blocks.stream()
-                .map(ContainerProtos.BlockMerkleTreeProto::getBlockChecksum)
+                .map(ContainerProtos.BlockMerkleTree::getBlockChecksum)
                 .collect(Collectors.toList())))
         .build();
   }
 
-  private ContainerProtos.BlockMerkleTreeProto buildExpectedBlockTree(long blockID,
-      List<ContainerProtos.ChunkMerkleTreeProto> chunks) {
-    return ContainerProtos.BlockMerkleTreeProto.newBuilder()
+  private ContainerProtos.BlockMerkleTree buildExpectedBlockTree(long blockID,
+      List<ContainerProtos.ChunkMerkleTree> chunks) {
+    return ContainerProtos.BlockMerkleTree.newBuilder()
         .setBlockID(blockID)
         .setBlockChecksum(computeExpectedChecksum(
             chunks.stream()
-                .map(ContainerProtos.ChunkMerkleTreeProto::getChunkChecksum)
+                .map(ContainerProtos.ChunkMerkleTree::getChunkChecksum)
                 .collect(Collectors.toList())))
         .addAllChunkMerkleTree(chunks)
         .build();
   }
 
-  private ContainerProtos.ChunkMerkleTreeProto buildExpectedChunkTree(ChunkInfo chunk) {
-    return ContainerProtos.ChunkMerkleTreeProto.newBuilder()
+  private ContainerProtos.ChunkMerkleTree buildExpectedChunkTree(ChunkInfo chunk) {
+    return ContainerProtos.ChunkMerkleTree.newBuilder()
         .setOffset(chunk.getOffset())
         .setLength(chunk.getLen())
         .setChunkChecksum(computeExpectedChunkChecksum(chunk.getChecksumData().getChecksums()))
@@ -240,7 +240,7 @@ class TestContainerMerkleTree {
    *     "bytesPerChecksum" amount of data and are assumed to be contiguous.
    * @return The ChunkInfo proto object built from this information.
    */
-  private ChunkInfo buildChunk(int indexInBlock, ByteBuffer... chunkChecksums) throws IOException {
+  public static ChunkInfo buildChunk(int indexInBlock, ByteBuffer... chunkChecksums) throws IOException {
     // Each chunk checksum is added under the same ChecksumData object.
     ContainerProtos.ChecksumData checksumData = ContainerProtos.ChecksumData.newBuilder()
         .setType(ContainerProtos.ChecksumType.CRC32)

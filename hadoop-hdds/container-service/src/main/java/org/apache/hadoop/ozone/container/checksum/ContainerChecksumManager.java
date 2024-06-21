@@ -31,12 +31,17 @@ import java.util.concurrent.locks.Lock;
 
 import com.google.common.util.concurrent.Striped;
 import org.apache.hadoop.hdds.utils.SimpleStriped;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * This class coordinates reading and writing Container checksum information for all containers.
  */
 public class ContainerChecksumManager {
 
+  private static final Logger LOG = LoggerFactory.getLogger(ContainerChecksumManager.class);
+
+  // Used to coordinate reads and writes to each container's checksum file.
   private final Striped<ReadWriteLock> fileLock;
 
   /**
@@ -60,6 +65,7 @@ public class ContainerChecksumManager {
           .setDataMerkleTree(tree.toProto())
           .build();
       write(data, newChecksumInfo);
+      LOG.debug("Data merkle tree for container {} updated", data.getContainerID());
     } finally {
       writeLock.unlock();
     }
@@ -78,8 +84,7 @@ public class ContainerChecksumManager {
 
       // Although the persisted block list should already be sorted, we will sort it here to make sure.
       // This will automatically fix any bugs in the persisted order that may show up.
-      SortedSet<Long> sortedDeletedBlockIDs =
-          new TreeSet<>(newChecksumInfoBuilder.getDeletedBlocksList());
+      SortedSet<Long> sortedDeletedBlockIDs = new TreeSet<>(newChecksumInfoBuilder.getDeletedBlocksList());
       // Since the provided list of block IDs is already sorted, this is a linear time addition.
       sortedDeletedBlockIDs.addAll(deletedBlockIDs);
 
@@ -88,6 +93,7 @@ public class ContainerChecksumManager {
           .addAllDeletedBlocks(sortedDeletedBlockIDs)
           .build();
       write(data, newChecksumInfoBuilder.build());
+      LOG.debug("Deleted block list for container {} updated", data.getContainerID());
     } finally {
       writeLock.unlock();
     }
@@ -96,6 +102,7 @@ public class ContainerChecksumManager {
   public ContainerDiff diff(KeyValueContainerData thisContainer, ContainerChecksumInfo otherInfo) throws IOException {
     // TODO HDDS-10928 compare the checksum info of the two containers and return a summary.
     //  Callers can act on this summary to repair their container replica using the peer's replica.
+    //  This method will use the read lock, which is unused in the current implementation.
     return new ContainerDiff();
   }
 
@@ -108,10 +115,23 @@ public class ContainerChecksumManager {
   }
 
   private ContainerChecksumInfo read(KeyValueContainerData data) throws IOException {
-    Lock readLock = getReadLock(data.getContainerID());
+    long containerID = data.getContainerID();
+    Lock readLock = getReadLock(containerID);
     readLock.lock();
-    try (FileInputStream inStream = new FileInputStream(getContainerChecksumFile(data))) {
-      return ContainerChecksumInfo.parseFrom(inStream);
+    try {
+      File checksumFile = getContainerChecksumFile(data);
+      // If the checksum file has not been created yet, return an empty instance.
+      // Since all writes happen as part of an atomic read-modify-write cycle that requires a write lock, two empty
+      // instances for the same container obtained only under the read lock will not conflict.
+      if (!checksumFile.exists()) {
+        LOG.debug("Creating initial checksum file for container {} at {}", containerID, checksumFile);
+        return ContainerChecksumInfo.newBuilder()
+            .setContainerID(containerID)
+            .build();
+      }
+      try (FileInputStream inStream = new FileInputStream(checksumFile)) {
+        return ContainerChecksumInfo.parseFrom(inStream);
+      }
     } finally {
       readLock.unlock();
     }
@@ -132,8 +152,8 @@ public class ContainerChecksumManager {
   }
 
   /**
-   * This class represents the different between our replica of a container, and a peer's replica of a container.
-   * It summarizes the operations we need to do to reconcile our replica the peer replica it was compared to.
+   * This class represents the difference between our replica of a container and a peer's replica of a container.
+   * It summarizes the operations we need to do to reconcile our replica with the peer replica it was compared to.
    *
    * TODO HDDS-10928
    */

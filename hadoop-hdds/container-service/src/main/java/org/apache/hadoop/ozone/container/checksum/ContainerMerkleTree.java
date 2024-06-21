@@ -17,8 +17,6 @@
 package org.apache.hadoop.ozone.container.checksum;
 
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
-import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.BlockMerkleTreeProto;
-import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerMerkleTreeProto;
 import org.apache.hadoop.ozone.common.ChecksumByteBuffer;
 import org.apache.hadoop.ozone.common.ChecksumByteBufferFactory;
 import org.apache.hadoop.ozone.container.common.helpers.ChunkInfo;
@@ -38,8 +36,8 @@ import java.util.TreeMap;
  * Note that checksums are order dependent. Chunk checksums are sorted by their
  * offset within a block, and block checksums are sorted by their block ID.
  *
- * This class can be used to construct a consistent and completely filled {@link ContainerMerkleTreeProto} object.
- * It allows building a container merkle tree from scratch by incrementally adding chunks.
+ * This class can be used to construct a consistent and completely filled {@link ContainerProtos.ContainerMerkleTree}
+ * object. It allows building a container merkle tree from scratch by incrementally adding chunks.
  * The final checksums at higher levels of the tree are not calculated until
  * {@link ContainerMerkleTree#toProto} is called.
  */
@@ -71,15 +69,15 @@ public class ContainerMerkleTree {
    *
    * @return A complete protobuf object representation of this tree.
    */
-  public ContainerMerkleTreeProto toProto() {
+  public ContainerProtos.ContainerMerkleTree toProto() {
     // Compute checksums and return the result.
-    ContainerMerkleTreeProto.Builder containerTreeBuilder = ContainerMerkleTreeProto.newBuilder();
+    ContainerProtos.ContainerMerkleTree.Builder containerTreeBuilder = ContainerProtos.ContainerMerkleTree.newBuilder();
     ChecksumByteBuffer checksumImpl = ChecksumByteBufferFactory.crc32Impl();
     ByteBuffer containerChecksumBuffer = ByteBuffer.allocate(Long.BYTES * id2Block.size());
 
     for (BlockMerkleTree blockTree: id2Block.values()) {
       // Add block's checksum tree to the proto.
-      BlockMerkleTreeProto blockTreeProto = blockTree.toProto();
+      ContainerProtos.BlockMerkleTree blockTreeProto = blockTree.toProto();
       containerTreeBuilder.addBlockMerkleTree(blockTreeProto);
       // Add the block's checksum to the buffer to calculate the container checksum.
       containerChecksumBuffer.putLong(blockTreeProto.getBlockChecksum());
@@ -124,8 +122,8 @@ public class ContainerMerkleTree {
      *
      * @return A complete protobuf object representation of this block tree.
      */
-    public BlockMerkleTreeProto toProto() {
-      BlockMerkleTreeProto.Builder blockTreeBuilder = BlockMerkleTreeProto.newBuilder();
+    public ContainerProtos.BlockMerkleTree toProto() {
+      ContainerProtos.BlockMerkleTree.Builder blockTreeBuilder = ContainerProtos.BlockMerkleTree.newBuilder();
       ChecksumByteBuffer checksumImpl = ChecksumByteBufferFactory.crc32Impl();
       ByteBuffer blockChecksumBuffer = ByteBuffer.allocate(Long.BYTES * offset2Chunk.size());
 
@@ -135,7 +133,7 @@ public class ContainerMerkleTree {
         // ChunkInputStream#validateChunk for an example on the client read path).
         // There is no other value we can use to sort these checksums, so we assume the stored proto has them in the
         // correct order.
-        ContainerProtos.ChunkMerkleTreeProto chunkTreeProto = chunkTree.toProto();
+        ContainerProtos.ChunkMerkleTree chunkTreeProto = chunkTree.toProto();
         blockTreeBuilder.addChunkMerkleTree(chunkTreeProto);
         blockChecksumBuffer.putLong(chunkTreeProto.getChunkChecksum());
       }
@@ -167,13 +165,13 @@ public class ContainerMerkleTree {
      *
      * @return A complete protobuf representation of this chunk as a leaf in the container merkle tree.
      */
-    public ContainerProtos.ChunkMerkleTreeProto toProto() {
+    public ContainerProtos.ChunkMerkleTree toProto() {
       ChecksumByteBuffer checksumImpl = ChecksumByteBufferFactory.crc32Impl();
       for (ByteString checksum: chunk.getChecksumData().getChecksums()) {
         checksumImpl.update(checksum.asReadOnlyByteBuffer());
       }
 
-      return ContainerProtos.ChunkMerkleTreeProto.newBuilder()
+      return ContainerProtos.ChunkMerkleTree.newBuilder()
           .setOffset(chunk.getOffset())
           .setLength(chunk.getLen())
           .setChunkChecksum(checksumImpl.getValue())
