@@ -19,12 +19,12 @@
 import React from 'react';
 import axios from 'axios';
 import filesize from 'filesize';
-import Plot from 'react-plotly.js';
-import * as Plotly from 'plotly.js';
 import { Row, Col, Tabs } from 'antd';
 import { LoadingOutlined } from '@ant-design/icons';
 import { ActionMeta, ValueType } from 'react-select';
+import type { EChartsOption } from 'echarts';
 
+import { EChart } from '@/components/eChart/eChart';
 import { MultiSelect, IOption } from '@/components/multiSelect/multiSelect';
 import { showDataFetchError } from '@/utils/common';
 import { AxiosAllGetHelper } from '@/utils/axiosRequestHelper';
@@ -50,8 +50,8 @@ interface IInsightsState {
   isLoading: boolean;
   fileCountsResponse: IFileCountResponse[];
   containerCountResponse: IContainerCountResponse[];
-  fileCountData: Plotly.Data[];
-  containerCountData: Plotly.Data[];
+  fileCountData: EChartsOption;
+  containerCountData: EChartsOption;
   volumeBucketMap: Map<string, Set<string>>;
   selectedVolumes: IOption[];
   selectedBuckets: IOption[];
@@ -79,8 +79,8 @@ export class Insights extends React.Component<Record<string, object>, IInsightsS
       isLoading: false,
       fileCountsResponse: [],
       containerCountResponse: [],
-      fileCountData: [],
-      containerCountData: [],
+      fileCountData: {},
+      containerCountData: {},
       volumeBucketMap: new Map<string, Set<string>>(),
       selectedBuckets: [],
       selectedVolumes: [],
@@ -196,21 +196,56 @@ export class Insights extends React.Component<Record<string, object>, IInsightsS
       });
 
       this.setState({
-        fileCountData: [{
-          type: 'bar',
-          x: xFileCountValues,
-          y: Array.from(xyFileCountMap.values()),
-          name: 'file count'
-        }],
-        containerCountData: [{
-          type: 'pie',
-          hole: 0.2,
-          values: Array.from(xyContainerCountMap.values()),
-          customdata: Array.from(xyContainerCountMap.values()),
-          labels: xContainerCountValues,
-          text: keysize,
-          hovertemplate: 'Container Count: %{customdata}<br>Container Size: %{text}<extra></extra>'
-        }]
+        fileCountData: {
+          title: {
+            text: 'File Size Distribution'
+          },
+          xAxis: {
+            type: 'category',
+            data: xFileCountValues
+          },
+          yAxis: {
+            type: 'value'
+          },
+          tooltip: {
+            trigger: 'item',
+            formatter: ({ name, value }) => {
+              return `Size Range: ${name}<br>Count: <strong>${value}</strong>`
+            }
+          },
+          series: {
+            itemStyle: {
+              color: '#04AD78'
+            },
+            data: Array.from(xyFileCountMap.values()),
+            type: 'bar'
+          }
+        },
+        containerCountData: {
+          title: {
+            text: 'Container Size Distribution',
+          },
+          tooltip: {
+            trigger: 'item',
+            formatter: ({ data }) => {
+              return `Size Range: <strong>${data.name}</strong><br>Count: <strong>${data.value}</strong>`
+            }
+          },
+          legend: {
+            orient: 'vertical',
+            left: 'right'
+          },
+          series: {
+            type: 'pie',
+            radius: '50%',
+            data: Array.from(xyFileCountMap.values()).map((value, idx) => {
+              return {
+                value: value,
+                name: xContainerCountValues[idx]
+              }
+            }),
+          }
+        }
       });
     }
   };
@@ -336,16 +371,7 @@ export class Insights extends React.Component<Record<string, object>, IInsightsS
                   </Row>
                   <Row>
                     <Col>
-                      <Plot
-                        data={fileCountData}
-                        layout={
-                          {
-                            width: 800,
-                            height: 600,
-                            title: 'File Size Distribution',
-                            showlegend: false
-                          }
-                        } />
+                      <EChart option={fileCountData} />
                     </Col>
                   </Row>
                 </div> :
@@ -359,25 +385,12 @@ export class Insights extends React.Component<Record<string, object>, IInsightsS
       children: (
         <>
           <div className='content-div'>
-            {isLoading ? <span><LoadingOutlined/> Loading...</span> :
+            {isLoading ? <span><LoadingOutlined /> Loading...</span> :
               ((containerCountResponse && containerCountResponse.length > 0) ?
                 <div>
                   <Row>
                     <Col>
-                      <Plot
-                        data={containerCountData}
-                        layout={
-                          {
-                            width: 850,
-                            height: 750,
-                            font: {
-                              family: 'Roboto, sans-serif',
-                              size: 15
-                            },
-                            title: 'Container Size Distribution',
-                            showlegend: true
-                          }
-                        } />
+                      <EChart option={containerCountData} />
                     </Col>
                   </Row>
                 </div> :
