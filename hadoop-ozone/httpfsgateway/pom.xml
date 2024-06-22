@@ -42,6 +42,10 @@
   <dependencies>
     <dependency>
       <groupId>org.apache.ozone</groupId>
+      <artifactId>hdds-server-framework</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.ozone</groupId>
       <artifactId>ozone-filesystem-common</artifactId>
     </dependency>
     <dependency>

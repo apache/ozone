@@ -137,17 +137,17 @@ public final class HttpServer2 implements FilterContainer {
   public static final String HTTP_SCHEME = "http";
   public static final String HTTPS_SCHEME = "https";
 
-  private static final String HTTP_MAX_REQUEST_HEADER_SIZE_KEY =
+  public static final String HTTP_MAX_REQUEST_HEADER_SIZE_KEY =
       "hadoop.http.max.request.header.size";
   private static final int HTTP_MAX_REQUEST_HEADER_SIZE_DEFAULT = 65536;
-  private static final String HTTP_MAX_RESPONSE_HEADER_SIZE_KEY =
+  public static final String HTTP_MAX_RESPONSE_HEADER_SIZE_KEY =
       "hadoop.http.max.response.header.size";
   private static final int HTTP_MAX_RESPONSE_HEADER_SIZE_DEFAULT = 65536;
 
   private static final String HTTP_SOCKET_BACKLOG_SIZE_KEY =
       "hadoop.http.socket.backlog.size";
   private static final int HTTP_SOCKET_BACKLOG_SIZE_DEFAULT = 128;
-  private static final String HTTP_MAX_THREADS_KEY = "hadoop.http.max.threads";
+  public static final String HTTP_MAX_THREADS_KEY = "hadoop.http.max.threads";
   private static final String HTTP_ACCEPTOR_COUNT_KEY =
       "hadoop.http.acceptor.count";
   // -1 to use default behavior of setting count based on CPU core count
@@ -171,7 +171,7 @@ public final class HttpServer2 implements FilterContainer {
   private static final int HTTP_IDLE_TIMEOUT_MS_DEFAULT = 60000;
   private static final String HTTP_TEMP_DIR_KEY = "hadoop.http.temp.dir";
 
-  private static final String FILTER_INITIALIZER_PROPERTY
+  public static final String FILTER_INITIALIZER_PROPERTY
       = "ozone.http.filter.initializers";
 
   // The ServletContext attribute where the daemon Configuration
