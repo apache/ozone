@@ -25,7 +25,6 @@ import {byteToSize, showDataFetchError} from 'utils/common';
 import './diskUsage.less';
 import moment from 'moment';
 import { AxiosGetHelper, cancelRequests } from 'utils/axiosRequestHelper';
-const normalize = require('array-normalize');
 
 const DEFAULT_DISPLAY_LIMIT = 10;
 const OTHER_PATH_NAME = 'Other Objects';
@@ -65,7 +64,7 @@ let cancelPieSignal: AbortController
 let cancelSummarySignal: AbortController
 let cancelQuotaSignal: AbortController;
 let cancelKeyMetadataSignal: AbortController;
-let normalizedValues: number[] = [];
+let adddedvaluesBlockSize: number[] = [];
 
 export class DiskUsage extends React.Component<Record<string, object>, IDUState> {
   constructor(props = {}) {
@@ -195,15 +194,11 @@ export class DiskUsage extends React.Component<Record<string, object>, IDUState>
           });
         }
 
-        // Normalize values for the pie chart to ensure better visual representation.
-        // Adding a small constant (MIN_BLOCK_SIZE) to each normalized value ensures that even
-        // the smallest entities are visible on the pie chart.
+        // Adding a MIN_BLOCK_SIZE to each value ensures that even the smallest entities are visible on the pie chart.
         // Note: The percentage and size string calculations remain unchanged.
-        // normalize() method will convert array between 0 to 1
-        // Zero Size Entities not adding Minimum Block Size Logic so it will not display inside pi chart
+        // Zero Size Entities not adding Minimum Block Size Logic so it will not display inside pi chart.
         const clonedValues = structuredClone(values);
-        const temp = clonedValues && normalize(clonedValues);
-        normalizedValues = temp && temp.map((item: number) => item > 0 ? item + MIN_BLOCK_SIZE : item);
+        adddedvaluesBlockSize = clonedValues && clonedValues.map((item: number) => item > 0 ? item + MIN_BLOCK_SIZE : item);
 
         percentage = values.map(value => {
           return (value * 100).toFixed(2);
@@ -224,7 +219,7 @@ export class DiskUsage extends React.Component<Record<string, object>, IDUState>
         plotData: [{
           type: 'pie',
           hole: 0.2,
-          values: normalizedValues,
+          values: adddedvaluesBlockSize,
           customdata: percentage,
           labels: pathLabels,
           text: sizeStr,
@@ -567,7 +562,7 @@ export class DiskUsage extends React.Component<Record<string, object>, IDUState>
                     </Dropdown>
                   </div>
                   &nbsp;&nbsp;&nbsp;&nbsp;
-                  <Tooltip placement="rightTop" title="In Below Chart We normalise the entity sizes to achieve visibility for small entities.">
+                  <Tooltip placement="rightTop" title="In Below chart we have achieved visibility for all small entities using additional block size.">
                     <Icon type='info-circle' />
                   </Tooltip>
                   <div className='metadata-button'>
