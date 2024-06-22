@@ -6,9 +6,9 @@
  * to you under the Apache License, Version 2.0 (the
  * "License"); you may not use this file except in compliance
  * with the License.  You may obtain a copy of the License at
- * <p>
+ *
  * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -17,25 +17,27 @@
  */
 package org.apache.hadoop.ozone.shell;
 
-import picocli.CommandLine.Option;
+import picocli.CommandLine;
 
 /**
- * Options for specifying replication config in 'ozone shell' commands.
+ * Options for requiring replication config in 'ozone shell' commands.
  */
-public class ShellReplicationOptions extends ReplicationOptions {
+public class MandatoryReplicationOptions extends ReplicationOptions {
 
-  @Option(names = {"-t", "--type", "--replication-type"},
-      description = TYPE_DESCRIPTION)
-  @Override
-  public void setType(String type) {
-    super.setType(type);
-  }
-
-  @Option(names = {"--replication", "-r"},
-      description = REPLICATION_DESCRIPTION)
+  @CommandLine.Option(names = {"--replication", "-r"},
+      description = REPLICATION_DESCRIPTION,
+      required = true)
   @Override
   public void setReplication(String replication) {
     super.setReplication(replication);
+  }
+
+  @CommandLine.Option(names = {"-t", "--type", "--replication-type"},
+      description = TYPE_DESCRIPTION,
+      required = true)
+  @Override
+  public void setType(String type) {
+    super.setType(type);
   }
 
 }
