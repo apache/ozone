@@ -439,7 +439,7 @@ public final class ContainerProtocolCalls  {
   public static XceiverClientReply writeChunkAsync(
       XceiverClientSpi xceiverClient, ChunkInfo chunk, BlockID blockID,
       ByteString data, String tokenString,
-      int replicationIndex, BlockData blockData)
+      int replicationIndex, BlockData blockData, boolean close)
       throws IOException, ExecutionException, InterruptedException {
 
     WriteChunkRequestProto.Builder writeChunkRequest =
@@ -455,7 +455,8 @@ public final class ContainerProtocolCalls  {
     if (blockData != null) {
       PutBlockRequestProto.Builder createBlockRequest =
           PutBlockRequestProto.newBuilder()
-              .setBlockData(blockData);
+              .setBlockData(blockData)
+              .setEof(close);
       writeChunkRequest.setBlock(createBlockRequest);
     }
     String id = xceiverClient.getPipeline().getFirstNode().getUuidString();
