@@ -244,6 +244,9 @@ public class BlockManagerImpl implements BlockManager {
         db.getStore().getFinalizeBlocksTable().putWithBatch(batch,
             kvContainer.getContainerData().getBlockKey(localID), localID);
         db.getStore().getBatchHandler().commitBatchOperation(batch);
+
+        BlockData emptyBlockData = new BlockData(blockId);
+        db.getStore().putBlockByID(batch, incrementalEnabled, localID, emptyBlockData, kvContainer.getContainerData(), true);
       }
     }
   }
