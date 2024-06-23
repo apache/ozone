@@ -168,7 +168,7 @@ public class TestOzoneDelegationTokenSecretManager {
 
       @Override
       public X509Certificate getCertificate(String serialId) {
-        return CertificateCodec.firstCertificateFrom(certPath);
+        return (X509Certificate) certPath.getCertificates().get(0);
       }
     };
   }

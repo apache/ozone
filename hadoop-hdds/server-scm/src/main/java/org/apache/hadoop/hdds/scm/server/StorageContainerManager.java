@@ -200,7 +200,6 @@ import static org.apache.hadoop.hdds.HddsUtils.preserveThreadName;
 import static org.apache.hadoop.hdds.ratis.RatisHelper.newJvmPauseMonitor;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_EVENT_REPORT_EXEC_WAIT_THRESHOLD_DEFAULT;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_EVENT_REPORT_QUEUE_WAIT_THRESHOLD_DEFAULT;
-import static org.apache.hadoop.hdds.scm.ScmUtils.checkIfCertSignRequestAllowed;
 import static org.apache.hadoop.hdds.scm.security.SecretKeyManagerService.isSecretKeyEnable;
 import static org.apache.hadoop.hdds.utils.HddsServerUtil.getRemoteUser;
 import static org.apache.hadoop.hdds.utils.HddsServerUtil.getScmSecurityClientWithMaxRetry;
@@ -2212,9 +2211,9 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
       throw new IOException("Cannot remove current leader.");
     }
 
-    checkIfCertSignRequestAllowed(rootCARotationManager, false, configuration,
-        "removePeerFromHARing");
-
+    if (OzoneSecurityUtil.isSecurityEnabled(configuration)) {
+      securityProtocolServer.checkIfCertSignRequestAllowed(rootCARotationManager, false, "removePeerFromHARing");
+    }
     Preconditions.checkNotNull(getScmHAManager().getRatisServer()
         .getDivision().getGroup());
 

@@ -33,6 +33,7 @@ import org.junit.jupiter.api.Test;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.PrintStream;
+import java.io.StringWriter;
 import java.nio.charset.StandardCharsets;
 import java.security.KeyPair;
 import java.security.cert.X509Certificate;
@@ -72,7 +73,8 @@ class TestCleanExpiredCertsSubcommand {
     KeyPair keyPair = CertificateTestUtils.aKeyPair(new OzoneConfiguration());
     X509Certificate cert = createSelfSignedCert(keyPair, "aCert");
     ArrayList<String> certPemList = new ArrayList<>();
-    certPemList.add(CertificateCodec.getPEMEncodedString(cert));
+    CertificateCodec certificateCodec = new CertificateCodec();
+    certPemList.add(certificateCodec.writePEMEncoded(cert, new StringWriter()).toString());
     when(scmSecurityProtocolMock.removeExpiredCertificates())
         .thenReturn(certPemList);
     cmd.execute(scmSecurityProtocolMock);

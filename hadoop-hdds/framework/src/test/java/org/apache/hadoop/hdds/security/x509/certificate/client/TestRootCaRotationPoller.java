@@ -59,6 +59,7 @@ public class TestRootCaRotationPoller {
 
   @Mock
   private SCMSecurityProtocolClientSideTranslatorPB scmSecurityClient;
+  private CertificateCodec certificateCodec;
 
   @BeforeEach
   public void setup() {
@@ -66,6 +67,7 @@ public class TestRootCaRotationPoller {
     OzoneConfiguration conf = new OzoneConfiguration();
     conf.set(HDDS_X509_ROOTCA_CERTIFICATE_POLLING_INTERVAL, "PT1s");
     secConf = new SecurityConfig(conf);
+    certificateCodec = secConf.getCertificateCodec();
     logCapturer = GenericTestUtils.LogCapturer.captureLogs(
         org.slf4j.LoggerFactory.getLogger(RootCaRotationPoller.class));
   }
@@ -78,7 +80,7 @@ public class TestRootCaRotationPoller {
     HashSet<X509Certificate> knownCerts = new HashSet<>();
     knownCerts.add(knownCert);
     List<String> certsFromScm = new ArrayList<>();
-    certsFromScm.add(CertificateCodec.getPEMEncodedString(knownCert));
+    certsFromScm.add(certificateCodec.getPEMEncodedString(knownCert));
     RootCaRotationPoller poller = new RootCaRotationPoller(secConf,
         knownCerts, scmSecurityClient, "");
     //When the scm returns the same set of root ca certificates, and they poll
@@ -112,8 +114,8 @@ public class TestRootCaRotationPoller {
     HashSet<X509Certificate> knownCerts = new HashSet<>();
     knownCerts.add(knownCert);
     List<String> certsFromScm = new ArrayList<>();
-    certsFromScm.add(CertificateCodec.getPEMEncodedString(knownCert));
-    certsFromScm.add(CertificateCodec.getPEMEncodedString(newRootCa));
+    certsFromScm.add(certificateCodec.getPEMEncodedString(knownCert));
+    certsFromScm.add(certificateCodec.getPEMEncodedString(newRootCa));
     RootCaRotationPoller poller = new RootCaRotationPoller(secConf,
         knownCerts, scmSecurityClient, "");
     //when the scm returns the unknown certificate to the poller
@@ -145,8 +147,8 @@ public class TestRootCaRotationPoller {
     HashSet<X509Certificate> knownCerts = new HashSet<>();
     knownCerts.add(knownCert);
     List<String> certsFromScm = new ArrayList<>();
-    certsFromScm.add(CertificateCodec.getPEMEncodedString(knownCert));
-    certsFromScm.add(CertificateCodec.getPEMEncodedString(newRootCa));
+    certsFromScm.add(certificateCodec.getPEMEncodedString(knownCert));
+    certsFromScm.add(certificateCodec.getPEMEncodedString(newRootCa));
     RootCaRotationPoller poller = new RootCaRotationPoller(secConf,
         knownCerts, scmSecurityClient, "");
     when(scmSecurityClient.getAllRootCaCertificates())

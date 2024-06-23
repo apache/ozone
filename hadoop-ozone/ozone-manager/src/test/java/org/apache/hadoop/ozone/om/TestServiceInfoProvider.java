@@ -22,6 +22,7 @@ package org.apache.hadoop.ozone.om;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.security.SecurityConfig;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
+import org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateCodec;
 import org.apache.hadoop.ozone.om.helpers.ServiceInfoEx;
 import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
 import org.junit.jupiter.api.BeforeEach;
@@ -40,7 +41,6 @@ import java.util.function.Function;
 import static java.util.Collections.emptyList;
 import static org.apache.hadoop.hdds.security.x509.CertificateTestUtils.aKeyPair;
 import static org.apache.hadoop.hdds.security.x509.CertificateTestUtils.createSelfSignedCert;
-import static org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateCodec.getPEMEncodedString;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SECURITY_ENABLED_KEY;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
@@ -55,6 +55,7 @@ public class TestServiceInfoProvider {
 
   private OzoneConfiguration conf;
   private OzoneManagerProtocol om;
+  private CertificateCodec certificateCodec;
 
   @BeforeEach
   public void setup() throws Exception {
@@ -75,7 +76,9 @@ public class TestServiceInfoProvider {
     @BeforeEach
     public void setup() throws Exception {
       conf.setBoolean(OZONE_SECURITY_ENABLED_KEY, false);
-      provider = new ServiceInfoProvider(new SecurityConfig(conf), om, null);
+      SecurityConfig config = new SecurityConfig(conf);
+      provider = new ServiceInfoProvider(config, om, null);
+      certificateCodec = config.getCertificateCodec();
     }
 
     @Test
@@ -105,14 +108,14 @@ public class TestServiceInfoProvider {
     public void setup() throws Exception {
       conf.setBoolean(OZONE_SECURITY_ENABLED_KEY, true);
       certClient = mock(CertificateClient.class);
+      SecurityConfig config = new SecurityConfig(conf);
+      certificateCodec = config.getCertificateCodec();
       cert1 = createSelfSignedCert(aKeyPair(conf), "1st", Duration.ofDays(1));
-      pem1 = getPEMEncodedString(cert1);
+      pem1 = certificateCodec.getPEMEncodedString(cert1);
       cert2 = createSelfSignedCert(aKeyPair(conf), "2nd", Duration.ofDays(2));
-      pem2 = getPEMEncodedString(cert2);
-      when(certClient.getAllRootCaCerts())
-          .thenReturn(new HashSet<>(Arrays.asList(cert1, cert2)));
-      provider =
-          new ServiceInfoProvider(new SecurityConfig(conf), om, certClient);
+      pem2 = certificateCodec.getPEMEncodedString(cert2);
+      when(certClient.getAllRootCaCerts()).thenReturn(new HashSet<>(Arrays.asList(cert1, cert2)));
+      provider = new ServiceInfoProvider(config, om, certClient);
     }
 
     @Test
@@ -140,7 +143,7 @@ public class TestServiceInfoProvider {
 
       X509Certificate cert3 =
           createSelfSignedCert(aKeyPair(conf), "cn", Duration.ofDays(3));
-      String pem3 = getPEMEncodedString(cert3);
+      String pem3 = certificateCodec.getPEMEncodedString(cert3);
       List<X509Certificate> certs = Arrays.asList(cert2, cert3);
       ArgumentCaptor<Function<List<X509Certificate>, CompletableFuture<Void>>>
           captor = ArgumentCaptor.forClass(Function.class);

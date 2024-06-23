@@ -24,6 +24,7 @@ import org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateCodec;
 import org.apache.hadoop.hdds.utils.db.Codec;
 
 import java.io.IOException;
+import java.io.StringWriter;
 import java.nio.charset.StandardCharsets;
 import java.security.cert.X509Certificate;
 
@@ -50,7 +51,7 @@ public final class OldX509CertificateCodecForTesting
   @Override
   public byte[] toPersistedFormat(X509Certificate object) throws IOException {
     try {
-      return CertificateCodec.getPEMEncodedString(object)
+      return certificateCodec.writePEMEncoded(object, new StringWriter()).toString()
           .getBytes(StandardCharsets.UTF_8);
     } catch (SCMSecurityException exp) {
       throw new IOException(exp);
