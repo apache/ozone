@@ -14,5 +14,22 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# This check verifies build reproducibility.
+
 DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
-source "${DIR}"/_build.sh install
+cd "$DIR/../../.." || exit 1
+
+BASE_DIR="$(pwd -P)"
+REPORT_DIR=${OUTPUT_DIR:-"${BASE_DIR}/target/repro"}
+mkdir -p "$REPORT_DIR"
+REPORT_FILE="$REPORT_DIR/summary.txt"
+
+source "${DIR}"/_build.sh verify artifact:compare | tee "${REPORT_DIR}/output.log"
+
+grep 'ERROR.*mismatch' > "${REPORT_FILE}"
+
+wc -l "${REPORT_FILE}" | awk '{ print $1 }' > "${REPORT_DIR}/failures"
+
+if [[ -s "${REPORT_FILE}" ]]; then
+   exit 1
+fi
