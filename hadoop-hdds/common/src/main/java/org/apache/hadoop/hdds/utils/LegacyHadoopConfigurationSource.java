@@ -31,7 +31,6 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdds.conf.ConfigTag;
 import org.apache.hadoop.hdds.conf.ConfigurationException;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
-import org.apache.hadoop.hdds.conf.DelegatingProperties;
 import org.apache.hadoop.hdds.conf.MutableConfigurationSource;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 
@@ -45,6 +44,7 @@ public class LegacyHadoopConfigurationSource
 
   private Configuration configuration;
 
+  @SuppressWarnings("methodlength")
   public LegacyHadoopConfigurationSource(Configuration configuration) {
     this.configuration = new Configuration(configuration) {
       private Properties props;

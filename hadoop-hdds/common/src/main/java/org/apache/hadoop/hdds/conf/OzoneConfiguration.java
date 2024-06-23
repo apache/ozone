@@ -275,17 +275,17 @@ public class OzoneConfiguration extends Configuration
     // before calling super.getAllPropertiesByTag
     Properties updatedProps = getProps();
     Properties propertiesByTag = super.getAllPropertiesByTag(tag);
-    Properties props = new Properties();
+    Properties properties = new Properties();
     Enumeration propertyNames = propertiesByTag.propertyNames();
     while (propertyNames.hasMoreElements()) {
       Object propertyName = propertyNames.nextElement();
       // get the current value of the property
       Object value = updatedProps.getProperty(propertyName.toString());
       if (value != null) {
-        props.put(propertyName, value);
+        properties.put(propertyName, value);
       }
     }
-    return props;
+    return properties;
   }
 
   public Map<String, String> getOzoneProperties() {
