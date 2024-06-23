@@ -25,7 +25,6 @@ import org.apache.hadoop.hdds.utils.db.Codec;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
-import java.security.cert.CertificateException;
 import java.security.cert.X509Certificate;
 
 /**
@@ -37,12 +36,15 @@ public final class OldX509CertificateCodecForTesting
   private static final Codec<X509Certificate> INSTANCE =
       new OldX509CertificateCodecForTesting();
 
+  private static CertificateCodec certificateCodec;
+
   public static Codec<X509Certificate> get() {
     return INSTANCE;
   }
 
   private OldX509CertificateCodecForTesting() {
     // singleton
+    certificateCodec = new CertificateCodec();
   }
 
   @Override
@@ -56,14 +58,9 @@ public final class OldX509CertificateCodecForTesting
   }
 
   @Override
-  public X509Certificate fromPersistedFormat(byte[] rawData)
-      throws IOException {
-    try {
-      String s = new String(rawData, StandardCharsets.UTF_8);
-      return CertificateCodec.getX509Certificate(s);
-    } catch (CertificateException exp) {
-      throw new IOException(exp);
-    }
+  public X509Certificate fromPersistedFormat(byte[] rawData) throws IOException {
+    String s = new String(rawData, StandardCharsets.UTF_8);
+    return certificateCodec.getX509Certificate(s);
   }
 
   @Override

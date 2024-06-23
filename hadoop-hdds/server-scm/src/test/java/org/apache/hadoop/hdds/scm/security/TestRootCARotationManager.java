@@ -257,9 +257,7 @@ public class TestRootCARotationManager {
     X509Certificate cert = generateX509Cert(ozoneConfig,
         LocalDateTime.now(), Duration.ofSeconds(90));
     scmCertClient.setCACertificate(cert);
-    CertificateCodec certCodec = new CertificateCodec(securityConfig,
-        "scm/sub-ca");
-    certCodec.writeCertificate(cert);
+    certificateStorage.writeCertificate(securityConfig.getCertFilePath("scm/sub-ca"), cert);
     rootCARotationManager = new RootCARotationManager(scm);
     rootCARotationManager.setRootCARotationHandler(handler);
     GenericTestUtils.LogCapturer logs =

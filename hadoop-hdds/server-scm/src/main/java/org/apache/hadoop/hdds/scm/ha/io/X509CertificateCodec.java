@@ -34,8 +34,8 @@ public class X509CertificateCodec implements Codec {
   public ByteString serialize(Object object)
       throws InvalidProtocolBufferException {
     try {
-      String certString =
-          CertificateCodec.getPEMEncodedString((X509Certificate) object);
+      CertificateCodec certificateCodec = new CertificateCodec();
+      String certString = certificateCodec.getPEMEncodedString((X509Certificate) object);
       // getBytes returns a new array
       return Proto2Utils.unsafeByteString(certString.getBytes(UTF_8));
     } catch (Exception ex) {
@@ -49,7 +49,8 @@ public class X509CertificateCodec implements Codec {
       throws InvalidProtocolBufferException {
     try {
       String pemEncodedCert = new String(value.toByteArray(), UTF_8);
-      return CertificateCodec.getX509Certificate(pemEncodedCert);
+      CertificateCodec certificateCodec = new CertificateCodec();
+      return certificateCodec.getX509Certificate(pemEncodedCert);
     } catch (Exception ex) {
       throw new InvalidProtocolBufferException(
           "X509Certificate cannot be decoded: " + ex.getMessage());

@@ -26,13 +26,11 @@ import java.security.PrivateKey;
 import java.security.PublicKey;
 import java.security.Signature;
 import java.security.cert.CertPath;
-import java.security.cert.CertificateFactory;
 import java.security.cert.X509Certificate;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
 
-import com.google.common.collect.ImmutableList;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.security.SecurityConfig;
 import org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateCodec;
@@ -142,9 +140,10 @@ public class TestOzoneDelegationTokenSecretManager {
    * */
   private OMCertificateClient setupCertificateClient() throws Exception {
     KeyPair keyPair = KeyStoreTestUtil.generateKeyPair("RSA");
-    CertificateFactory fact = CertificateCodec.getCertFactory();
+    CertificateCodec certificateCodec = securityConfig.getCertificateCodec();
     X509Certificate singleCert = KeyStoreTestUtil.generateCertificate("CN=OzoneMaster", keyPair, 30, "SHA256withRSA");
-    CertPath certPath = fact.generateCertPath(ImmutableList.of(singleCert));
+    CertPath certPath = certificateCodec.getCertPathFromPemEncodedString(
+        certificateCodec.getPEMEncodedString(singleCert));
 
     OMStorage omStorage = mock(OMStorage.class);
     when(omStorage.getOmCertSerialId()).thenReturn(null);

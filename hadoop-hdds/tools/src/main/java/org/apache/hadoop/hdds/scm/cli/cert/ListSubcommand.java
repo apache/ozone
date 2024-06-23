@@ -19,7 +19,6 @@ package org.apache.hadoop.hdds.scm.cli.cert;
 
 import java.io.IOException;
 import java.math.BigInteger;
-import java.security.cert.CertificateException;
 import java.security.cert.X509Certificate;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -101,12 +100,13 @@ public class ListSubcommand extends ScmCertSubcommand {
     if (json) {
       err.println("Certificate list:(BatchSize=" + count + ", CertCount=" + certPemList.size() + ")");
       List<Certificate> certList = new ArrayList<>();
+      CertificateCodec certificateCodec = new CertificateCodec();
       for (String certPemStr : certPemList) {
         try {
           X509Certificate cert =
-              CertificateCodec.getX509Certificate(certPemStr);
+              certificateCodec.getX509Certificate(certPemStr);
           certList.add(new Certificate(cert));
-        } catch (CertificateException ex) {
+        } catch (IOException ex) {
           err.println("Failed to parse certificate.");
         }
       }

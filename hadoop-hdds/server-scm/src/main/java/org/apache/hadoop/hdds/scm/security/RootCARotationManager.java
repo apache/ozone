@@ -37,7 +37,6 @@ import org.apache.hadoop.hdds.security.x509.certificate.CertInfo;
 import org.apache.hadoop.hdds.security.x509.certificate.authority.CertificateServer;
 import org.apache.hadoop.hdds.security.x509.certificate.authority.profile.DefaultCAProfile;
 import org.apache.hadoop.hdds.security.x509.certificate.client.SCMCertificateClient;
-import org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateCodec;
 import org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateSignRequest;
 import org.apache.hadoop.hdds.security.x509.keys.HDDSKeyGenerator;
 import org.apache.hadoop.hdds.security.x509.keys.KeyCodec;
@@ -787,8 +786,7 @@ public class RootCARotationManager extends StatefulService {
       return;
     }
 
-    X509Certificate cert =
-        CertificateCodec.getX509Certificate(proto.getX509Certificate());
+    X509Certificate cert = secConf.getCertificateCodec().getX509Certificate(proto.getX509Certificate());
 
     List<X509Certificate> scmCertChain = scmCertClient.getTrustChain();
     Preconditions.checkArgument(scmCertChain.size() > 1);

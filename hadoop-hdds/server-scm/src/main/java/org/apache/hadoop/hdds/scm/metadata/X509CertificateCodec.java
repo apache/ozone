@@ -43,12 +43,15 @@ public final class X509CertificateCodec implements Codec<X509Certificate> {
   private static final Codec<X509Certificate> INSTANCE =
       new X509CertificateCodec();
 
+  private static CertificateCodec certificateCodec;
+
   public static Codec<X509Certificate> get() {
     return INSTANCE;
   }
 
+  // singleton
   private X509CertificateCodec() {
-    // singleton
+    certificateCodec = new CertificateCodec();
   }
 
   @Override
@@ -58,7 +61,7 @@ public final class X509CertificateCodec implements Codec<X509Certificate> {
 
   CheckedFunction<OutputStream, Integer, IOException> writeTo(
       X509Certificate object) {
-    return out -> CertificateCodec.writePEMEncoded(object,
+    return out -> certificateCodec.writePEMEncoded(object,
         new LengthOutputStream(out)).getLength();
   }
 
@@ -72,7 +75,7 @@ public final class X509CertificateCodec implements Codec<X509Certificate> {
   public X509Certificate fromCodecBuffer(@Nonnull CodecBuffer buffer)
       throws IOException {
     try (InputStream in = buffer.getInputStream()) {
-      return CertificateCodec.readX509Certificate(in);
+      return certificateCodec.readX509Certificate(in);
     }
   }
 
@@ -88,8 +91,7 @@ public final class X509CertificateCodec implements Codec<X509Certificate> {
   @Override
   public X509Certificate fromPersistedFormat(byte[] rawData)
       throws IOException {
-    return CertificateCodec.readX509Certificate(
-        new ByteArrayInputStream(rawData));
+    return certificateCodec.readX509Certificate(new ByteArrayInputStream(rawData));
   }
 
   @Override
