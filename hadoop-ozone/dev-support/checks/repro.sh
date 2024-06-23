@@ -26,7 +26,7 @@ REPORT_FILE="$REPORT_DIR/summary.txt"
 
 source "${DIR}"/_build.sh verify artifact:compare | tee "${REPORT_DIR}/output.log"
 
-grep 'ERROR.*mismatch' > "${REPORT_FILE}"
+grep 'ERROR.*mismatch' "${REPORT_DIR}/output.log" > "${REPORT_FILE}"
 
 wc -l "${REPORT_FILE}" | awk '{ print $1 }' > "${REPORT_DIR}/failures"
 
