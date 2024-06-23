@@ -119,6 +119,7 @@ public class DefaultCAServer implements CertificateServer {
   private Path caKeysPath;
   private Path caRootX509Path;
   private SecurityConfig config;
+  private CertificateStorage certificateStorage;
   /**
    * TODO: We will make these configurable in the future.
    */
@@ -161,6 +162,7 @@ public class DefaultCAServer implements CertificateServer {
     caKeysPath = securityConfig.getKeyLocation(componentName);
     caRootX509Path = securityConfig.getCertificateLocation(componentName);
     this.config = securityConfig;
+    certificateStorage = new CertificateStorage(config);
     this.approver = new DefaultApprover(profile, this.config);
 
     /* In future we will split this code to have different kind of CAs.
@@ -175,7 +177,6 @@ public class DefaultCAServer implements CertificateServer {
 
   @Override
   public X509Certificate getCACertificate() throws IOException {
-    CertificateStorage certificateStorage = new CertificateStorage(config);
     try {
       return certificateStorage.getFirstCertFromCertPath(
           config.getCertificateLocation(componentName), config.getCertificateFileName());
@@ -187,7 +188,6 @@ public class DefaultCAServer implements CertificateServer {
   @Override
   public CertPath getCaCertPath()
       throws CertificateException, IOException {
-    CertificateStorage certificateStorage = new CertificateStorage(config);
     return certificateStorage.getCertPath(componentName, config.getCertificateFileName());
   }
 
@@ -241,7 +241,6 @@ public class DefaultCAServer implements CertificateServer {
       case TESTING_AUTOMATIC:
         X509Certificate signedCertificate = signAndStoreCertificate(beginDate, endDate, csr, role, certSerialId);
         CertificateCodec codec = config.getCertificateCodec();
-        CertificateStorage certificateStorage = new CertificateStorage(config);
         CertPath certPath = certificateStorage.getCertPath(componentName, config.getCertificateFileName());
         CertPath updatedCertPath = codec.prependCertToCertPath(signedCertificate, certPath);
         certPathPromise.complete(updatedCertPath);
@@ -511,7 +510,6 @@ public class DefaultCAServer implements CertificateServer {
 
     builder.addInetAddresses();
     X509Certificate selfSignedCertificate = builder.build();
-    CertificateStorage certificateStorage = new CertificateStorage(config);
     certificateStorage.writeCertificate(securityConfig.getCertFilePath(componentName), selfSignedCertificate);
   }
 
@@ -523,7 +521,7 @@ public class DefaultCAServer implements CertificateServer {
 
     KeyCodec keyCodec = new KeyCodec(config, componentName);
     CertificateCodec certificateCodec = conf.getCertificateCodec();
-    CertificateStorage certificateStorage = new CertificateStorage(conf);
+    CertificateStorage certStorageWithExternalConf = new CertificateStorage(conf);
     try {
       Path extCertParent = extCertPath.getParent();
       Path extCertName = extCertPath.getFileName();
@@ -531,7 +529,8 @@ public class DefaultCAServer implements CertificateServer {
         throw new IOException("External cert path is not correct: " +
             extCertPath);
       }
-      X509Certificate certificate = certificateStorage.getFirstCertFromCertPath(extCertParent, extCertName.toString());
+      X509Certificate certificate = certStorageWithExternalConf.getFirstCertFromCertPath(
+          extCertParent, extCertName.toString());
       Path extPrivateKeyParent = extPrivateKeyPath.getParent();
       Path extPrivateKeyFileName = extPrivateKeyPath.getFileName();
       if (extPrivateKeyParent == null || extPrivateKeyFileName == null) {
@@ -544,7 +543,7 @@ public class DefaultCAServer implements CertificateServer {
       publicKey = readPublicKeyWithExternalData(
           externalPublicKeyLocation, keyCodec, certificate);
       keyCodec.writeKey(new KeyPair(publicKey, privateKey));
-      certificateStorage.writeCertificate(conf.getCertFilePath(componentName),
+      certStorageWithExternalConf.writeCertificate(conf.getCertFilePath(componentName),
           certificateCodec.getPEMEncodedString(certificate));
     } catch (IOException | CertificateException | NoSuchAlgorithmException |
              InvalidKeySpecException e) {

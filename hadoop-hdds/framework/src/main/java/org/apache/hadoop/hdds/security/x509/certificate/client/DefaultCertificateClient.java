@@ -136,6 +136,7 @@ public abstract class DefaultCertificateClient implements CertificateClient {
   private SCMSecurityProtocolClientSideTranslatorPB scmSecurityClient;
   private final Set<CertificateNotification> notificationReceivers;
   private RootCaRotationPoller rootCaRotationPoller;
+  private CertificateStorage certificateStorage;
 
   @SuppressWarnings("checkstyle:ParameterNumber")
   protected DefaultCertificateClient(
@@ -160,6 +161,7 @@ public abstract class DefaultCertificateClient implements CertificateClient {
     this.notificationReceivers = new HashSet<>();
     this.rootCaCertificates = ConcurrentHashMap.newKeySet();
     this.caCertificates = ConcurrentHashMap.newKeySet();
+    certificateStorage = new CertificateStorage(securityConfig);
 
     updateCertSerialId(certSerialId);
   }
@@ -231,7 +233,6 @@ public abstract class DefaultCertificateClient implements CertificateClient {
 
     X509Certificate cert;
     try {
-      CertificateStorage certificateStorage = new CertificateStorage(securityConfig);
       CertPath allCertificates = certificateStorage.getCertPath(component, fileName);
       cert = firstCertificateFrom(allCertificates);
       String readCertSerialId = cert.getSerialNumber().toString();
@@ -597,8 +598,6 @@ public abstract class DefaultCertificateClient implements CertificateClient {
                                                 CAType caType, Path certWritePath, boolean addToCertMap,
                                                 boolean updateCA) throws CertificateException {
     try {
-
-      CertificateStorage certificateStorage = new CertificateStorage(securityConfig);
       CertPath certificatePath = certificateStorage.writeCertificate(certWritePath, pemEncodedCert, caType);
       X509Certificate cert = (X509Certificate) certificatePath.getCertificates().get(0);
 

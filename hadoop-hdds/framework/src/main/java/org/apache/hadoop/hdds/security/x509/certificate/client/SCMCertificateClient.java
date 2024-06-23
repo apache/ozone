@@ -81,6 +81,7 @@ public class SCMCertificateClient extends DefaultCertificateClient {
   private ExecutorService executorService;
   private boolean isPrimarySCM = false;
   private Consumer<String> saveCertIdCallback;
+  private CertificateStorage certificateStorage;
 
   @SuppressWarnings("parameternumber")
   public SCMCertificateClient(SecurityConfig securityConfig,
@@ -94,6 +95,7 @@ public class SCMCertificateClient extends DefaultCertificateClient {
     this.scmHostname = hostname;
     this.isPrimarySCM = isPrimarySCM;
     this.saveCertIdCallback = saveCertId;
+    certificateStorage = new CertificateStorage(getSecurityConfig());
   }
 
   public SCMCertificateClient(SecurityConfig securityConfig,
@@ -193,7 +195,6 @@ public class SCMCertificateClient extends DefaultCertificateClient {
         storeCertificate(pemEncodedRootCert, CAType.SUBORDINATE, certWritePath, false, !renew);
         CertPath writtenCertPath = storeCertificate(pemEncodedCert, CAType.NONE, certWritePath,
             false, !renew);
-        CertificateStorage certificateStorage = new CertificateStorage(getSecurityConfig());
         certificateStorage.writeCertificate(Paths.get(certWritePath.toString(),
             getSecurityConfig().getCertificateFileName()), pemEncodedCert);
 
@@ -400,13 +401,12 @@ public class SCMCertificateClient extends DefaultCertificateClient {
    * Persists the sub SCM signed certificate to the location which can be
    * read by sub CA Certificate server.
    *
-   * @param certificateHolder
+   * @param encodedCert
    * @throws IOException
    */
   private void persistSubCACertificate(
       String encodedCert) throws IOException {
     SecurityConfig config = getSecurityConfig();
-    CertificateStorage certificateStorage = new CertificateStorage(config);
     certificateStorage.writeCertificate(config.getCertFilePath(getComponentName()), encodedCert);
   }
 }

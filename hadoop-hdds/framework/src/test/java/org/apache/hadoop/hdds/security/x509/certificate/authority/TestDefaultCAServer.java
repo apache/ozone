@@ -79,12 +79,14 @@ public class TestDefaultCAServer {
   private OzoneConfiguration conf;
   private SecurityConfig securityConfig;
   private MockCAStore caStore;
+  private CertificateStorage certificateStorage;
 
   @BeforeEach
   public void init(@TempDir Path tempDir) throws IOException {
     conf = new OzoneConfiguration();
     conf.set(OZONE_METADATA_DIRS, tempDir.toString());
     securityConfig = new SecurityConfig(conf);
+    certificateStorage = new CertificateStorage(securityConfig);
     caStore = new MockCAStore();
   }
 
@@ -278,7 +280,6 @@ public class TestDefaultCAServer {
     //Given an external certificate
     String externalCaCertFileName = "CaCert.pem";
     setExternalPathsInConfig(tempDir, externalCaCertFileName);
-    CertificateStorage certificateStorage = new CertificateStorage(securityConfig);
     try (SCMCertificateClient scmCertificateClient =
         new SCMCertificateClient(securityConfig, null, null)) {
 
@@ -359,7 +360,6 @@ public class TestDefaultCAServer {
 
       CertPath certPath = certFactory.generateCertPath(ImmutableList.of(signedCert, externalCert));
       CertificateCodec certificateCodec = securityConfig.getCertificateCodec();
-      CertificateStorage certificateStorage = new CertificateStorage(securityConfig);
       certificateStorage.writeCertificate(Paths.get(tempDir.toString(), externalCaCertFileName),
           certificateCodec.getPEMEncodedString(certPath));
 
@@ -431,7 +431,6 @@ public class TestDefaultCAServer {
       scmCertificateClient.storeCertificate(certificateCodec.getPEMEncodedString(certificate), CAType.NONE);
 
       String componentName = scmCertificateClient.getComponentName();
-      CertificateStorage certificateStorage = new CertificateStorage(securityConfig);
       certificateStorage.writeCertificate(securityConfig.getCertFilePath(componentName),
           certificateCodec.getPEMEncodedString(certificate));
 

@@ -218,6 +218,7 @@ final class TestSecureOzoneCluster {
   private Path omMetaDirPath;
   private int certGraceTime = 10 * 1000; // 10s
   private int delegationTokenMaxTime = 9 * 1000; // 9s
+  private CertificateStorage certificateStorage;
 
   @BeforeEach
   void init() {
@@ -264,6 +265,7 @@ final class TestSecureOzoneCluster {
       setSecureConfig();
       createCredentialsInKDC();
       securityConfig = new SecurityConfig(conf);
+      certificateStorage = new CertificateStorage(securityConfig);
       generateKeyPair();
       omInfo = OzoneManager.getOmDetailsProto(conf, omId);
     } catch (Exception e) {
@@ -969,7 +971,6 @@ final class TestSecureOzoneCluster {
     omStorage.forceInitialize();
     String caCertFileName = CAType.ROOT.getFileNamePrefix() + cert.getSerialNumber().toString() + ".crt";
     Path certificateLocation = securityConfig.getCertificateLocation("om");
-    CertificateStorage certificateStorage = new CertificateStorage(securityConfig);
     certificateStorage.writeCertificate(Paths.get(certificateLocation.toAbsolutePath().toString(),
         securityConfig.getCertificateFileName()), cert);
 
@@ -1051,7 +1052,6 @@ final class TestSecureOzoneCluster {
         new KeyPair(keyCodec.readPublicKey(), keyCodec.readPrivateKey()),
         null, Duration.ofSeconds(certificateLifetime));
     String certId = cert.getSerialNumber().toString();
-    CertificateStorage certificateStorage = new CertificateStorage(securityConfig);
     certificateStorage.writeCertificate(securityConfig.getCertFilePath("om"), cert);
     omStorage.setOmCertSerialId(certId);
     omStorage.forceInitialize();
@@ -1148,7 +1148,6 @@ final class TestSecureOzoneCluster {
           new KeyPair(client.getPublicKey(), client.getPrivateKey()),
           null, Duration.ofSeconds(certificateLifetime));
       String certId = cert.getSerialNumber().toString();
-      CertificateStorage certificateStorage = new CertificateStorage(securityConfig);
       certificateStorage.writeCertificate(securityConfig.getCertFilePath("om"), cert);
       omStorage.setOmCertSerialId(certId);
       omStorage.forceInitialize();
@@ -1297,7 +1296,6 @@ final class TestSecureOzoneCluster {
           scmCertClient.getPrivateKey()), scmCert, "om_cert", clusterId);
       String certId = cert.getSerialNumber().toString();
       String codecPath = securityConfig.getLocation("om").toAbsolutePath().toString();
-      CertificateStorage certificateStorage = new CertificateStorage(securityConfig);
       certificateStorage.writeCertificate(Paths.get(codecPath, securityConfig.getCertificateFileName()), cert);
       String subCAFileName = String.format(DefaultCertificateClient.CERT_FILE_NAME_FORMAT,
           CAType.SUBORDINATE.getFileNamePrefix() + scmCert.getSerialNumber().toString());

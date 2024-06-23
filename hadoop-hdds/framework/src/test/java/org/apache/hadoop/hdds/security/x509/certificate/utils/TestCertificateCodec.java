@@ -48,12 +48,14 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 public class TestCertificateCodec {
   private static final String COMPONENT = "test";
   private SecurityConfig securityConfig;
+  private CertificateStorage certificateStorage;
 
   @BeforeEach
   public void init(@TempDir Path tempDir) {
     OzoneConfiguration conf = new OzoneConfiguration();
     conf.set(OZONE_METADATA_DIRS, tempDir.toString());
     securityConfig = new SecurityConfig(conf);
+    certificateStorage = new CertificateStorage(securityConfig);
   }
 
   /**
@@ -100,7 +102,6 @@ public class TestCertificateCodec {
   public void testPrependCertificateToCertPath() throws Exception {
     X509Certificate initialCert = generateTestCert();
     X509Certificate prependedCert = generateTestCert();
-    CertificateStorage certificateStorage = new CertificateStorage(securityConfig);
     certificateStorage.writeCertificate(securityConfig.getCertFilePath(COMPONENT), initialCert);
     CertPath initialPath = certificateStorage.getCertPath(COMPONENT, securityConfig.getCertificateFileName());
     CertificateCodec codec = securityConfig.getCertificateCodec();
@@ -118,7 +119,6 @@ public class TestCertificateCodec {
   @Test
   public void testWriteCertificate(@TempDir Path basePath) throws Exception {
     X509Certificate cert = generateTestCert();
-    CertificateStorage certificateStorage = new CertificateStorage(securityConfig);
     Path path = Paths.get(basePath.toString(), "pemcertificate.crt");
     certificateStorage.writeCertificate(path, cert);
     X509Certificate loadedCertificate = certificateStorage.getFirstCertFromCertPath(basePath, "pemcertificate.crt");
@@ -133,7 +133,6 @@ public class TestCertificateCodec {
   @Test
   public void testWriteCertificateDefault() throws Exception {
     X509Certificate cert = generateTestCert();
-    CertificateStorage certificateStorage = new CertificateStorage(securityConfig);
     certificateStorage.writeCertificate(securityConfig.getCertFilePath(COMPONENT), cert);
     X509Certificate loadedCertificate = certificateStorage.getFirstCertFromCertPath(
         securityConfig.getCertificateLocation(COMPONENT), securityConfig.getCertificateFileName());
@@ -148,7 +147,6 @@ public class TestCertificateCodec {
   @Test
   public void writeCertificate2() throws Exception {
     X509Certificate cert = generateTestCert();
-    CertificateStorage certificateStorage = new CertificateStorage(securityConfig);
     // Rewrite with force support
     Path certificateLocation = securityConfig.getCertificateLocation("ca");
     certificateStorage.writeCertificate(
@@ -173,7 +171,6 @@ public class TestCertificateCodec {
     CertPath certPath = certificateFactory.generateCertPath(ImmutableList.of(initialCert));
 
     //When prepending the second one before the first one and reading them back
-    CertificateStorage certificateStorage = new CertificateStorage(securityConfig);
     CertificateCodec codec = securityConfig.getCertificateCodec();
     Path certificateLocation = securityConfig.getCertificateLocation("ca");
 
