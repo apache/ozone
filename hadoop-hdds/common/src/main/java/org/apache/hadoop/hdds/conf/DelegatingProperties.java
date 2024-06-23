@@ -23,10 +23,12 @@ import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
 
+/**
+ * Delegating properties helper class.
+ */
 public class DelegatingProperties extends Properties {
   private final OzoneConfiguration entries;
-  private final Properties
-      properties;
+  private final Properties properties;
 
   public DelegatingProperties(OzoneConfiguration entries, Properties properties) {
     this.entries = entries;
@@ -132,5 +134,10 @@ public class DelegatingProperties extends Properties {
   @Override
   public synchronized boolean equals(Object o) {
     return properties.equals(o);
+  }
+
+  @Override
+  public synchronized int hashCode() {
+    return properties.hashCode();
   }
 }

@@ -304,9 +304,9 @@ public class OzoneConfiguration extends Configuration
   @Override
   public Map<String, String> getPropsMatchPrefixAndTrimPrefix(
       String keyPrefix) {
-    Properties props = getProps();
+    Properties properties = getProps();
     Map<String, String> configMap = new HashMap<>();
-    for (String name : props.stringPropertyNames()) {
+    for (String name : properties.stringPropertyNames()) {
       if (name.startsWith(keyPrefix)) {
         String value = get(name);
         String keyName = name.substring(keyPrefix.length());
@@ -479,10 +479,10 @@ public class OzoneConfiguration extends Configuration
 
   @Override
   public Iterator<Map.Entry<String, String>> iterator() {
-    Properties props = getProps();
+    Properties properties = getProps();
     Map<String, String> result = new HashMap<>();
-    synchronized (props) {
-      for (Map.Entry<Object, Object> item : props.entrySet()) {
+    synchronized (properties) {
+      for (Map.Entry<Object, Object> item : properties.entrySet()) {
         if (item.getKey() instanceof String && item.getValue() instanceof String) {
           checkCompliance((String) item.getKey(), (String) item.getValue());
           result.put((String) item.getKey(), (String) item.getValue());

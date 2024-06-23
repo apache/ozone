@@ -35,6 +35,10 @@
     <Class name="org.apache.hadoop.hdds.utils.LegacyHadoopConfigurationSource$1$1" />
     <Bug pattern="SE_BAD_FIELD" />
   </Match>
+  <Match>
+    <Class name="org.apache.hadoop.hdds.conf.DelegatingProperties" />
+    <Bug pattern="SE_BAD_FIELD" />
+  </Match>
 
   <!-- Test -->
   <Match>

@@ -165,8 +165,13 @@ public class LegacyHadoopConfigurationSource
             }
 
             @Override
-            public synchronized Object clone() {
-              return props.clone();
+            public synchronized boolean equals(Object o) {
+              return props.equals(o);
+            }
+
+            @Override
+            public synchronized int hashCode() {
+              return props.hashCode();
             }
           };
         }
