@@ -421,26 +421,23 @@ public class OzoneConfiguration extends Configuration
     return Integer.parseInt(value);
   }
 
-  private Properties properties;
+  private Properties props;
+  private Properties delegatingProps;
+
+  @Override
+  public synchronized void reloadConfiguration() {
+    super.reloadConfiguration();
+    delegatingProps = null;
+    props = null;
+  }
 
   @Override
   protected final synchronized Properties getProps() {
-    if (properties == null) {
-      properties = new Properties(super.getProps()) {
-        @Override
-        public String getProperty(String key) {
-          String value = super.getProperty(key);
-          return checkCompliance(key, value);
-        }
-
-        @Override
-        public  Object setProperty(String key, String value) {
-          super.setProperty(key, value);
-          return defaults.setProperty(key, value);
-        }
-      };
+    if (delegatingProps == null) {
+      props = super.getProps();
+      delegatingProps = new DelegatingProperties(this, props);
     }
-    return properties;
+    return delegatingProps;
   }
 
   /**
