@@ -22,7 +22,7 @@ cd "$DIR/../../.." || exit 1
 BASE_DIR="$(pwd -P)"
 REPORT_DIR=${OUTPUT_DIR:-"${BASE_DIR}/target/repro"}
 
-source "${DIR}"/_build.sh verify artifact:compare | tee "${REPORT_DIR}/output.log"
+source "${DIR}"/_build.sh verify artifact:compare "$@" | tee "${REPORT_DIR}/output.log"
 
 mkdir -p "$REPORT_DIR"
 REPORT_FILE="$REPORT_DIR/summary.txt"
