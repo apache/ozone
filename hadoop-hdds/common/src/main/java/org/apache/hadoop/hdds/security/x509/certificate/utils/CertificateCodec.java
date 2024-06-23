@@ -124,7 +124,7 @@ public class CertificateCodec {
    * containing multiple certificates. To get all certificates, use
    * {@link #getCertPathFromPemEncodedString(String)}.
    *
-   * @param pemEncodedString - PEM encoded String.
+   * @param pemEncoded - PEM encoded String.
    * @return X509Certificate  - Certificate.
    * @throws IOException - Thrown on Failure.
    */

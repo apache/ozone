@@ -37,7 +37,7 @@ public final class OldX509CertificateCodecForTesting
   private static final Codec<X509Certificate> INSTANCE =
       new OldX509CertificateCodecForTesting();
 
-  private static CertificateCodec certificateCodec;
+  private static final CertificateCodec CERTIFICATE_CODEC = new CertificateCodec();
 
   public static Codec<X509Certificate> get() {
     return INSTANCE;
@@ -45,13 +45,12 @@ public final class OldX509CertificateCodecForTesting
 
   private OldX509CertificateCodecForTesting() {
     // singleton
-    certificateCodec = new CertificateCodec();
   }
 
   @Override
   public byte[] toPersistedFormat(X509Certificate object) throws IOException {
     try {
-      return certificateCodec.writePEMEncoded(object, new StringWriter()).toString()
+      return CERTIFICATE_CODEC.writePEMEncoded(object, new StringWriter()).toString()
           .getBytes(StandardCharsets.UTF_8);
     } catch (SCMSecurityException exp) {
       throw new IOException(exp);
@@ -61,7 +60,7 @@ public final class OldX509CertificateCodecForTesting
   @Override
   public X509Certificate fromPersistedFormat(byte[] rawData) throws IOException {
     String s = new String(rawData, StandardCharsets.UTF_8);
-    return certificateCodec.getX509Certificate(s);
+    return CERTIFICATE_CODEC.getX509Certificate(s);
   }
 
   @Override

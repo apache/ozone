@@ -51,12 +51,11 @@ public final class CertInfo implements Comparable<CertInfo>, Serializable {
   private final X509Certificate x509Certificate;
   // Timestamp when the certificate got persisted in the DB.
   private final long timestamp;
-  private final CertificateCodec certificateCodec;
+  private static final CertificateCodec CERTIFICATE_CODEC = new CertificateCodec();
 
   private CertInfo(X509Certificate x509Certificate, long timestamp) {
     this.x509Certificate = x509Certificate;
     this.timestamp = timestamp;
-    certificateCodec = new CertificateCodec();
   }
 
   public static CertInfo fromProtobuf(CertInfoProto info) throws IOException {
@@ -68,7 +67,7 @@ public final class CertInfo implements Comparable<CertInfo>, Serializable {
 
   public CertInfoProto getProtobuf() throws IOException {
     return CertInfoProto.newBuilder()
-        .setX509Certificate(certificateCodec.writePEMEncoded(getX509Certificate(), new StringWriter()).toString())
+        .setX509Certificate(CERTIFICATE_CODEC.writePEMEncoded(getX509Certificate(), new StringWriter()).toString())
         .setTimestamp(getTimestamp())
         .build();
   }
