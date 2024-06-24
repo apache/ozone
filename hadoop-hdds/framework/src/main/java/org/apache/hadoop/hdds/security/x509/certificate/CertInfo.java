@@ -133,7 +133,6 @@ public final class CertInfo implements Comparable<CertInfo>, Serializable {
   public static class Builder {
     private X509Certificate x509Certificate;
     private long timestamp;
-    private final CertificateCodec certificateCodec = new CertificateCodec();
 
     public Builder setX509Certificate(X509Certificate x509Certificate) {
       this.x509Certificate = x509Certificate;
@@ -142,7 +141,7 @@ public final class CertInfo implements Comparable<CertInfo>, Serializable {
 
     public Builder setX509Certificate(String x509Certificate)
         throws IOException {
-      return setX509Certificate(certificateCodec.getX509Certificate(x509Certificate));
+      return setX509Certificate(CERTIFICATE_CODEC.getX509Certificate(x509Certificate));
     }
 
     public Builder setTimestamp(long timestamp) {
