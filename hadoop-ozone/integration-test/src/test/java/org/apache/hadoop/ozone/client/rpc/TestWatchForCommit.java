@@ -72,10 +72,13 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
+import org.apache.ratis.proto.RaftProtos;
 import org.apache.ratis.protocol.exceptions.GroupMismatchException;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
 
 /**
  * This class verifies the watchForCommit Handling by xceiverClient.
@@ -253,10 +256,14 @@ public class TestWatchForCommit {
     validateData(keyName, data1);
   }
 
-  @Test
-  public void testWatchForCommitForRetryfailure() throws Exception {
+  @ParameterizedTest
+  @EnumSource(value = RaftProtos.ReplicationLevel.class, names = {"MAJORITY_COMMITTED", "ALL_COMMITTED"})
+  public void testWatchForCommitForRetryfailure(RaftProtos.ReplicationLevel watchType) throws Exception {
     GenericTestUtils.LogCapturer logCapturer =
         GenericTestUtils.LogCapturer.captureLogs(XceiverClientRatis.LOG);
+    RatisClientConfig ratisClientConfig = conf.getObject(RatisClientConfig.class);
+    ratisClientConfig.setWatchType(watchType.toString());
+    conf.setFromObject(ratisClientConfig);
     try (XceiverClientManager clientManager = new XceiverClientManager(conf)) {
       ContainerWithPipeline container1 = storageContainerLocationClient
           .allocateContainer(HddsProtos.ReplicationType.RATIS,
@@ -301,10 +308,14 @@ public class TestWatchForCommit {
     }
   }
 
-  @Test
-  public void test2WayCommitForTimeoutException() throws Exception {
+  @ParameterizedTest
+  @EnumSource(value = RaftProtos.ReplicationLevel.class, names = {"MAJORITY_COMMITTED", "ALL_COMMITTED"})
+  public void test2WayCommitForTimeoutException(RaftProtos.ReplicationLevel watchType) throws Exception {
     GenericTestUtils.LogCapturer logCapturer =
         GenericTestUtils.LogCapturer.captureLogs(XceiverClientRatis.LOG);
+    RatisClientConfig ratisClientConfig = conf.getObject(RatisClientConfig.class);
+    ratisClientConfig.setWatchType(watchType.toString());
+    conf.setFromObject(ratisClientConfig);
     try (XceiverClientManager clientManager = new XceiverClientManager(conf)) {
 
       ContainerWithPipeline container1 = storageContainerLocationClient
@@ -340,14 +351,18 @@ public class TestWatchForCommit {
         xceiverClient.watchForCommit(reply.getLogIndex());
 
         // commitInfo Map will be reduced to 2 here
-        assertEquals(2, ratisClient.getCommitInfoMap().size());
+        if (watchType == RaftProtos.ReplicationLevel.ALL_COMMITTED) {
+          assertEquals(2, ratisClient.getCommitInfoMap().size());
+          String output = logCapturer.getOutput();
+          assertThat(output).contains("ALL_COMMITTED way commit failed");
+          assertThat(output).contains("TimeoutException");
+          assertThat(output).contains("Committed by majority");
+        } else {
+          assertEquals(3, ratisClient.getCommitInfoMap().size());
+        }
       } finally {
         clientManager.releaseClient(xceiverClient, false);
       }
-      String output = logCapturer.getOutput();
-      assertThat(output).contains("3 way commit failed");
-      assertThat(output).contains("TimeoutException");
-      assertThat(output).contains("Committed by majority");
     }
     logCapturer.stopCapturing();
   }

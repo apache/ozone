@@ -20,7 +20,10 @@ package org.apache.hadoop.hdds.scm.ha.io;
 import com.google.protobuf.ByteString;
 import com.google.protobuf.InvalidProtocolBufferException;
 import com.google.protobuf.Proto2Utils;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.security.SecurityConfig;
 import org.apache.hadoop.security.ssl.KeyStoreTestUtil;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
 import java.security.KeyPair;
@@ -34,6 +37,11 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
  * Class to test X509CertificateCodec serialize and deserialize.
  */
 public class TestX509CertificateCodec {
+
+  @BeforeAll
+  public static void initSecurityProvider() {
+    SecurityConfig.initSecurityProvider(new OzoneConfiguration());
+  }
 
   @Test
   public void codec() throws Exception {
