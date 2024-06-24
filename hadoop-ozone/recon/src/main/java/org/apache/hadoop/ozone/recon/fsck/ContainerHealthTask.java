@@ -342,11 +342,7 @@ public class ContainerHealthTask extends ReconScmTask {
       }
 
       if (h.getContainer().getState() == HddsProtos.LifeCycleState.DELETING) {
-        LOG.info("Container {} is in DELETING state. It has {} keys and {} " +
-                "bytes used according to SCM metadata. Please visit Recon's " +
-                "unhealthy container endpoint for more details.",
-            h.getContainer().getContainerID(), h.getNumKeys(),
-            h.getContainer().getUsedBytes());
+        LOG.info("Container {} is in DELETING state.", h.getContainerID());
         return;
       }
 
