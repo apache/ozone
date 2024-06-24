@@ -617,7 +617,7 @@ public class OzoneManagerServiceProviderImpl
         isSyncDataFromOMRunning.set(false);
       }
     } else {
-      LOG.debug("OM DB sync is already running.");
+      LOG.info("OM DB sync is already running.");
       return false;
     }
     return true;
