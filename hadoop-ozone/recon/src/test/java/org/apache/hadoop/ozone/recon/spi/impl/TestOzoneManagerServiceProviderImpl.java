@@ -169,7 +169,7 @@ public class TestOzoneManagerServiceProviderImpl {
             dirReconMetadata);
 
     ReconUtils reconUtilsMock = getMockReconUtils();
-    HttpURLConnection httpURLConnectionMock = mock(HttpURLConnection.class);
+
     when(reconUtilsMock.makeHttpCall(any(), anyString(), anyBoolean()))
         .thenThrow(new IOException("Mocked IOException"));
     when(reconUtilsMock.getReconNodeDetails(
