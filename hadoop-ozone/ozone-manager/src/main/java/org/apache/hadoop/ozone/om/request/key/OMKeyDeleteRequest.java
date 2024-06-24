@@ -99,7 +99,7 @@ public class OMKeyDeleteRequest extends OMKeyRequest {
   }
 
   protected KeyArgs resolveBucketAndCheckAcls(OzoneManager ozoneManager,
-                                            KeyArgs.Builder newKeyArgs) throws IOException {
+      KeyArgs.Builder newKeyArgs) throws IOException {
     return captureLatencyNs(
           ozoneManager.getPerfMetrics().getDeleteKeyResolveBucketAndAclCheckLatencyNs(),
           () -> resolveBucketAndCheckKeyAcls(newKeyArgs.build(), ozoneManager, ACLType.DELETE));

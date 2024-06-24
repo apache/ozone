@@ -136,6 +136,7 @@ public class OMKeysDeleteRequest extends OMKeyRequest {
       bucket.audit(auditMap);
       volumeName = bucket.realVolume();
       bucketName = bucket.realBucket();
+
       mergeOmLockDetails(omMetadataManager.getLock()
           .acquireWriteLock(BUCKET_LOCK, volumeName, bucketName));
       acquiredLock = getOmLockDetails().isLockAcquired();
@@ -226,6 +227,7 @@ public class OMKeysDeleteRequest extends OMKeyRequest {
     }
 
     addDeletedKeys(auditMap, deleteKeys, unDeletedKeys.getKeysList());
+
     auditLog(auditLogger,
         buildAuditMessage(DELETE_KEYS, auditMap, exception, userInfo));
 
