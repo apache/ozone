@@ -42,13 +42,13 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.any;
+import static org.mockito.Mockito.atMost;
 import static org.mockito.Mockito.eq;
 import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.atMostOnce;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
-import static org.mockito.internal.verification.VerificationModeFactory.atMost;
 
 /**
  * Unit tests for the background container data scanner.
@@ -101,7 +101,7 @@ public class TestBackgroundContainerDataScanner extends
     ContainerDataScannerMetrics metrics = scanner.getMetrics();
     assertEquals(1, metrics.getNumScanIterations());
     assertEquals(2, metrics.getNumContainersScanned());
-    assertEquals(1, metrics.getNumUnHealthyContainers());
+    assertEquals(0, metrics.getNumUnHealthyContainers());
   }
 
   @Test
@@ -159,7 +159,8 @@ public class TestBackgroundContainerDataScanner extends
     when(unhealthy.scanMetaData()).thenReturn(ScanResult.healthy());
     when(unhealthy.scanData(any(DataTransferThrottler.class),
         any(Canceler.class))).thenReturn(getUnhealthyScanResult());
-
+    when(controller.markContainerUnhealthy(eq(unhealthy.getContainerData().getContainerID()),
+        any())).thenReturn(true);
     setContainers(unhealthy, healthy);
 
     // First iteration should find the unhealthy container.
@@ -177,17 +178,16 @@ public class TestBackgroundContainerDataScanner extends
     when(unhealthy.getContainerState()).thenReturn(UNHEALTHY);
     assertTrue(unhealthy.shouldScanData());
 
-    // Clear metrics to check the next run.
-    metrics.resetNumContainersScanned();
-    metrics.resetNumUnhealthyContainers();
-
+    when(controller.markContainerUnhealthy(eq(unhealthy.getContainerData().getContainerID()),
+        any())).thenReturn(false);
     scanner.runIteration();
-    // The only invocation of unhealthy on this container should have been from
-    // the previous scan.
+    // The invocation of unhealthy on this container will also happen in the
+    // next iteration.
     verifyContainerMarkedUnhealthy(unhealthy, atMost(2));
     // This iteration should scan the unhealthy container.
     assertEquals(2, metrics.getNumScanIterations());
-    assertEquals(2, metrics.getNumContainersScanned());
+    assertEquals(4, metrics.getNumContainersScanned());
+    // numUnHealthyContainers metrics is not incremented in the 2nd iteration.
     assertEquals(1, metrics.getNumUnHealthyContainers());
   }
 
