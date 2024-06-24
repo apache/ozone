@@ -18,7 +18,7 @@
 
 import React from 'react';
 import Plot from 'react-plotly.js';
-import {Row, Col, Icon, Button, Input, Menu, Dropdown} from 'antd';
+import {Row, Col, Icon, Button, Input, Menu, Dropdown, Tooltip} from 'antd';
 import {DetailPanel} from 'components/rightDrawer/rightDrawer';
 import * as Plotly from 'plotly.js';
 import {byteToSize, showDataFetchError} from 'utils/common';
