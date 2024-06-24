@@ -87,16 +87,16 @@ public class ECBlockOutputStream extends BlockOutputStream {
   }
 
   @Override
-  public void write(byte[] b, int off, int len) throws IOException {
+  public synchronized void write(byte[] b, int off, int len) throws IOException {
     this.currentChunkRspFuture =
         writeChunkToContainer(
-            ChunkBuffer.wrap(ByteBuffer.wrap(b, off, len)), false, false);
+            ChunkBuffer.wrap(ByteBuffer.wrap(b, off, len)));
     updateWrittenDataLength(len);
   }
 
   public CompletableFuture<ContainerProtos.ContainerCommandResponseProto> write(
       ByteBuffer buff) throws IOException {
-    return writeChunkToContainer(ChunkBuffer.wrap(buff), false, false);
+    return writeChunkToContainer(ChunkBuffer.wrap(buff));
   }
 
   public CompletableFuture<ContainerProtos.
@@ -199,7 +199,7 @@ public class ECBlockOutputStream extends BlockOutputStream {
       ContainerCommandResponseProto> executePutBlock(boolean close,
       boolean force, long blockGroupLength) throws IOException {
     updateBlockGroupLengthInPutBlockMeta(blockGroupLength);
-    return executePutBlock(close, force);
+    return executePutBlock(close, force).thenApply(PutBlockResult::getResponse);
   }
 
   private void updateBlockGroupLengthInPutBlockMeta(final long blockGroupLen) {
@@ -232,13 +232,13 @@ public class ECBlockOutputStream extends BlockOutputStream {
    * @param force true if no data was written since most recent putBlock and
    *            stream is being closed
    */
-  public CompletableFuture<ContainerProtos.
-      ContainerCommandResponseProto> executePutBlock(boolean close,
+  @Override
+  public CompletableFuture<PutBlockResult> executePutBlock(boolean close,
       boolean force) throws IOException {
     checkOpen();
 
     CompletableFuture<ContainerProtos.
-        ContainerCommandResponseProto> flushFuture = null;
+        ContainerCommandResponseProto> flushFuture;
     try {
       ContainerProtos.BlockData blockData = getContainerBlockData().build();
       XceiverClientReply asyncReply =
@@ -273,9 +273,11 @@ public class ECBlockOutputStream extends BlockOutputStream {
     } catch (InterruptedException ex) {
       Thread.currentThread().interrupt();
       handleInterruptedException(ex, false);
+      // never reach.
+      return null;
     }
     this.putBlkRspFuture = flushFuture;
-    return flushFuture;
+    return flushFuture.thenApply(r -> new PutBlockResult(0, 0, r));
   }
 
   /**
