@@ -24,8 +24,7 @@ import {
   Button,
   Input,
   Menu,
-  Dropdown,
-  Tooltip
+  Dropdown
 } from 'antd';
 import { MenuProps } from 'antd/es/menu';
 import {
@@ -582,10 +581,7 @@ export class DiskUsage extends React.Component<Record<string, object>, IDUState>
     return (
       <div className='du-container'>
         <div className='page-header'>
-          Disk Usage&nbsp;&nbsp;
-          <Tooltip placement="rightTop" title="Shows Disk Usage information only for FSO buckets">
-            <InfoCircleOutlined />
-          </Tooltip>
+          Disk Usage
         </div>
         <div className='content-div'>
           {isLoading ? <span><LoadingOutlined /> Loading...</span> : (
