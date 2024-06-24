@@ -20,17 +20,16 @@ package org.apache.hadoop.hdds.utils;
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.Collection;
-import java.util.Enumeration;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.Properties;
-import java.util.Set;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdds.conf.ConfigTag;
 import org.apache.hadoop.hdds.conf.ConfigurationException;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
+import org.apache.hadoop.hdds.conf.DelegatingProperties;
 import org.apache.hadoop.hdds.conf.MutableConfigurationSource;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 
@@ -44,7 +43,6 @@ public class LegacyHadoopConfigurationSource
 
   private Configuration configuration;
 
-  @SuppressWarnings("methodlength")
   public LegacyHadoopConfigurationSource(Configuration configuration) {
     this.configuration = new Configuration(configuration) {
       private Properties props;
@@ -67,113 +65,7 @@ public class LegacyHadoopConfigurationSource
       protected synchronized Properties getProps() {
         if (delegatingProps == null) {
           props = super.getProps();
-          delegatingProps = new Properties() {
-            @Override
-            public String getProperty(String key) {
-              String value = props.getProperty(key);
-              return checkCompliance(key, value);
-            }
-
-            @Override
-            public Object setProperty(String key, String value) {
-              return props.setProperty(key, value);
-            }
-
-            @Override
-            public synchronized Object remove(Object key) {
-              return props.remove(key);
-            }
-
-            @Override
-            public synchronized void clear() {
-              props.clear();
-            }
-
-            @Override
-            public Enumeration<Object> keys() {
-              return props.keys();
-            }
-
-            @Override
-            public Enumeration<?> propertyNames() {
-              return props.propertyNames();
-            }
-
-            @Override
-            public Set<String> stringPropertyNames() {
-              return props.stringPropertyNames();
-            }
-
-            @Override
-            public int size() {
-              return props.size();
-            }
-
-            @Override
-            public boolean isEmpty() {
-              return props.isEmpty();
-            }
-
-            @Override
-            public Set<Object> keySet() {
-              return props.keySet();
-            }
-
-            @Override
-            public boolean contains(Object value) {
-              return props.contains(value);
-            }
-
-            @Override
-            public boolean containsKey(Object key) {
-              return props.containsKey(key);
-            }
-
-            @Override
-            public boolean containsValue(Object value) {
-              return props.containsValue(value);
-            }
-
-            @Override
-            public Object get(Object key) {
-              return props.get(key);
-            }
-
-            @Override
-            public synchronized boolean remove(Object key, Object value) {
-              return props.remove(key, value);
-            }
-
-            @Override
-            public synchronized Object put(Object key, Object value) {
-              return props.put(key, value);
-            }
-
-            @Override
-            public synchronized void putAll(Map<?, ?> t) {
-              props.putAll(t);
-            }
-
-            @Override
-            public Collection<Object> values() {
-              return props.values();
-            }
-
-            @Override
-            public Set<Map.Entry<Object, Object>> entrySet() {
-              return props.entrySet();
-            }
-
-            @Override
-            public synchronized boolean equals(Object o) {
-              return props.equals(o);
-            }
-
-            @Override
-            public synchronized int hashCode() {
-              return props.hashCode();
-            }
-          };
+          delegatingProps = new DelegatingProperties(props, complianceMode, cryptoProperties);
         }
         return delegatingProps;
       }
@@ -191,7 +83,11 @@ public class LegacyHadoopConfigurationSource
       }
 
       private Properties getCryptoProperties() {
-        return super.getAllPropertiesByTag(ConfigTag.CRYPTO_COMPLIANCE.toString());
+        try {
+          return super.getAllPropertiesByTag(ConfigTag.CRYPTO_COMPLIANCE.toString());
+        } catch (NoSuchMethodError e) {
+          return new Properties();
+        }
       }
 
       public String checkCompliance(String config, String value) {
@@ -222,8 +118,8 @@ public class LegacyHadoopConfigurationSource
         synchronized (props) {
           for (Map.Entry<Object, Object> item : props.entrySet()) {
             if (item.getKey() instanceof String && item.getValue() instanceof String) {
-              checkCompliance((String) item.getKey(), (String) item.getValue());
-              result.put((String) item.getKey(), (String) item.getValue());
+              String value = checkCompliance((String) item.getKey(), (String) item.getValue());
+              result.put((String) item.getKey(), value);
             }
           }
         }
@@ -272,7 +168,9 @@ public class LegacyHadoopConfigurationSource
   }
 
   /**
-   *
+   * Use this with beware, as we are returning the Configuration object, without compliance checks.
+   * Currently it's only used in the OzoneConfiguration class, in an OzoneConfiguration constructor,
+   * so we'll handle the compliance checks in the OzoneConfiguration object.
    * @return
    */
   public Configuration getOriginalHadoopConfiguration() {

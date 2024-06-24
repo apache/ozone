@@ -435,7 +435,7 @@ public class OzoneConfiguration extends Configuration
   protected final synchronized Properties getProps() {
     if (delegatingProps == null) {
       props = super.getProps();
-      delegatingProps = new DelegatingProperties(this, props);
+      delegatingProps = new DelegatingProperties(props, complianceMode, cryptoProperties);
     }
     return delegatingProps;
   }
@@ -453,7 +453,11 @@ public class OzoneConfiguration extends Configuration
   }
 
   private Properties getCryptoProperties() {
-    return super.getAllPropertiesByTag(ConfigTag.CRYPTO_COMPLIANCE.toString());
+    try {
+      return super.getAllPropertiesByTag(ConfigTag.CRYPTO_COMPLIANCE.toString());
+    } catch (NoSuchMethodError e) {
+      return new Properties();
+    }
   }
 
   public String checkCompliance(String config, String value) {
@@ -484,13 +488,11 @@ public class OzoneConfiguration extends Configuration
     synchronized (properties) {
       for (Map.Entry<Object, Object> item : properties.entrySet()) {
         if (item.getKey() instanceof String && item.getValue() instanceof String) {
-          checkCompliance((String) item.getKey(), (String) item.getValue());
-          result.put((String) item.getKey(), (String) item.getValue());
+          String value = checkCompliance((String) item.getKey(), (String) item.getValue());
+          result.put((String) item.getKey(), value);
         }
       }
     }
     return result.entrySet().iterator();
   }
 }
-
-

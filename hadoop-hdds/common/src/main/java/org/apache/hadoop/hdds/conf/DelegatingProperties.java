@@ -17,28 +17,58 @@
  */
 package org.apache.hadoop.hdds.conf;
 
+import org.apache.hadoop.ozone.OzoneConfigKeys;
+
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.Enumeration;
 import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
 
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SECURITY_CRYPTO_COMPLIANCE_MODE_UNRESTRICTED;
+
 /**
  * Delegating properties helper class.
  */
 public class DelegatingProperties extends Properties {
-  private final OzoneConfiguration entries;
   private final Properties properties;
+  private final String complianceMode;
+  private final boolean checkCompliance;
+  private final Properties cryptoProperties;
 
-  public DelegatingProperties(OzoneConfiguration entries, Properties properties) {
-    this.entries = entries;
+  public DelegatingProperties(Properties properties, String complianceMode, Properties cryptoProperties) {
     this.properties = properties;
+    this.complianceMode = complianceMode;
+    this.checkCompliance = !complianceMode.equals(OZONE_SECURITY_CRYPTO_COMPLIANCE_MODE_UNRESTRICTED);
+    this.cryptoProperties = cryptoProperties;
+  }
+
+  public String checkCompliance(String config, String value) {
+    // Don't check the ozone.security.crypto.compliance.mode config, even though it's tagged as a crypto config
+    if (checkCompliance && cryptoProperties.containsKey(config) &&
+        !config.equals(OzoneConfigKeys.OZONE_SECURITY_CRYPTO_COMPLIANCE_MODE)) {
+
+      String whitelistConfig = config + "." + complianceMode + ".whitelist";
+      String whitelistValue = properties.getProperty(whitelistConfig, "");
+
+      if (whitelistValue != null) {
+        String[] whitelistOptions = whitelistValue.split(",");
+
+        if (!Arrays.asList(whitelistOptions).contains(value)) {
+          throw new ConfigurationException("Not allowed configuration value! Compliance mode is set to " +
+              complianceMode + " and " + config + " configuration's value is not allowed. Please check the " +
+              whitelistConfig + " configuration.");
+        }
+      }
+    }
+    return value;
   }
 
   @Override
   public String getProperty(String key) {
     String value = properties.getProperty(key);
-    return entries.checkCompliance(key, value);
+    return checkCompliance(key, value);
   }
 
   @Override
