@@ -100,10 +100,12 @@ public class TestContainerHealthTask extends AbstractReconSqlDBTest {
     ContainerReplica healthyReplicaMock = mock(ContainerReplica.class);
     when(healthyReplicaMock.getState()).thenReturn(State.CLOSED);
 
-    // Create 7 containers. The first 5 will have various unhealthy states
-    // defined below. The container with ID=6 will be healthy and
-    // container with ID=7 will be EMPTY_MISSING
-    List<ContainerInfo> mockContainers = getMockContainers(7);
+    // Create 9 containers. The first 5 will have various unhealthy states
+    // defined below. The container with ID=6 will be healthy,
+    // container with ID=7 will be EMPTY_MISSING,
+    // container with ID=8 will be DELETING,
+    // container with ID=9 will be DELETED
+    List<ContainerInfo> mockContainers = getMockContainers(9);
     when(scmMock.getScmServiceProvider()).thenReturn(scmClientMock);
     when(scmMock.getContainerManager()).thenReturn(containerManagerMock);
     when(containerManagerMock.getContainers(any(ContainerID.class),
@@ -170,6 +172,26 @@ public class TestContainerHealthTask extends AbstractReconSqlDBTest {
     when(containerManagerMock.getContainerReplicas(containerInfo7.containerID()))
         .thenReturn(Collections.emptySet());
 
+    // return 0 replicas for container ID 8 -> DELETING
+    ContainerInfo containerInfo8 =
+        TestContainerInfo.newBuilderForTest().setContainerID(8)
+            .setReplicationConfig(replicationConfig)
+            .setState(HddsProtos.LifeCycleState.DELETING).build();
+    when(containerManagerMock.getContainer(ContainerID.valueOf(8L))).thenReturn(
+        containerInfo8);
+    when(containerManagerMock.getContainerReplicas(containerInfo8.containerID()))
+        .thenReturn(Collections.emptySet());
+
+    // return 0 replicas for container ID 9 -> DELETED
+    ContainerInfo containerInfo9 =
+        TestContainerInfo.newBuilderForTest().setContainerID(9)
+            .setReplicationConfig(replicationConfig)
+            .setState(HddsProtos.LifeCycleState.DELETED).build();
+    when(containerManagerMock.getContainer(ContainerID.valueOf(9L))).thenReturn(
+        containerInfo9);
+    when(containerManagerMock.getContainerReplicas(containerInfo9.containerID()))
+        .thenReturn(Collections.emptySet());
+
     List<UnhealthyContainers> all = unHealthyContainersTableHandle.findAll();
     assertThat(all).isEmpty();
 
@@ -224,6 +246,12 @@ public class TestContainerHealthTask extends AbstractReconSqlDBTest {
     assertEquals(2, rec.getExpectedReplicaCount().intValue());
     assertEquals(1, rec.getActualReplicaCount().intValue());
     assertNotNull(rec.getReason());
+
+    // Ensure that DELETING container is not processed
+    assertEquals(0, unHealthyContainersTableHandle.fetchByContainerId(8L).size());
+
+    // Ensure that DELETED container is not processed
+    assertEquals(0, unHealthyContainersTableHandle.fetchByContainerId(9L).size());
 
     ReconTaskStatus taskStatus =
         reconTaskStatusDao.findById(containerHealthTask.getTaskName());
