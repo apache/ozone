@@ -37,9 +37,9 @@ import org.slf4j.LoggerFactory;
 /**
  * This class coordinates reading and writing Container checksum information for all containers.
  */
-public class ContainerChecksumManager {
+public class ContainerChecksumTreeManager {
 
-  private static final Logger LOG = LoggerFactory.getLogger(ContainerChecksumManager.class);
+  private static final Logger LOG = LoggerFactory.getLogger(ContainerChecksumTreeManager.class);
 
   // Used to coordinate reads and writes to each container's checksum file.
   // Each container ID is mapped to a stripe.
@@ -48,7 +48,7 @@ public class ContainerChecksumManager {
   /**
    * Creates one instance that should be used to coordinate all container checksum info within a datanode.
    */
-  public ContainerChecksumManager(DatanodeConfiguration dnConf) {
+  public ContainerChecksumTreeManager(DatanodeConfiguration dnConf) {
     fileLock = SimpleStriped.readWriteLock(dnConf.getContainerChecksumLockStripes(), true);
   }
 
@@ -58,7 +58,7 @@ public class ContainerChecksumManager {
    * file remains unchanged.
    * Concurrent writes to the same file are coordinated internally.
    */
-  public void writeContainerMerkleTree(KeyValueContainerData data, ContainerMerkleTree tree) throws IOException {
+  public void writeContainerDataTree(KeyValueContainerData data, ContainerMerkleTree tree) throws IOException {
     Lock writeLock = getWriteLock(data.getContainerID());
     writeLock.lock();
     try {
@@ -151,7 +151,7 @@ public class ContainerChecksumManager {
   }
 
   private File getContainerChecksumFile(KeyValueContainerData data) {
-    return new File(data.getMetadataPath(), data.getContainerID() + ".checksum");
+    return new File(data.getMetadataPath(), data.getContainerID() + ".tree");
   }
 
   /**

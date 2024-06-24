@@ -1,3 +1,19 @@
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with this
+ * work for additional information regarding copyright ownership.  The ASF
+ * licenses this file to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * <p>
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * <p>
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,WITHOUT
+ * WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
+ * License for the specific language governing permissions and limitations under
+ * the License.
+ */
 package org.apache.hadoop.ozone.container.checksum;
 
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
@@ -23,30 +39,30 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
-class TestContainerChecksumManager {
+class TestContainerChecksumTreeManager {
 
-  private KeyValueContainerData container;
-  private final long containerID = 1L;
+  private static final long CONTAINER_ID = 1L;
   @TempDir
   private File testDir;
+  private KeyValueContainerData container;
   private File checksumFile;
-  private ContainerChecksumManager checksumManager;
+  private ContainerChecksumTreeManager checksumManager;
 
   @BeforeEach
   public void init() {
     container = mock(KeyValueContainerData.class);
-    when(container.getContainerID()).thenReturn(containerID);
+    when(container.getContainerID()).thenReturn(CONTAINER_ID);
     when(container.getMetadataPath()).thenReturn(testDir.getAbsolutePath());
-    checksumFile = new File(testDir, containerID + ".checksum");
-    checksumManager = new ContainerChecksumManager(new DatanodeConfiguration());
+    checksumFile = new File(testDir, CONTAINER_ID + ".tree");
+    checksumManager = new ContainerChecksumTreeManager(new DatanodeConfiguration());
   }
 
   @Test
   public void testWriteEmptyTreeToFile() throws Exception {
-    checksumManager.writeContainerMerkleTree(container, new ContainerMerkleTree());
+    checksumManager.writeContainerDataTree(container, new ContainerMerkleTree());
     ContainerProtos.ContainerChecksumInfo checksumInfo = readFile();
 
-    assertEquals(containerID, checksumInfo.getContainerID());
+    assertEquals(CONTAINER_ID, checksumInfo.getContainerID());
     assertTrue(checksumInfo.getDeletedBlocksList().isEmpty());
     ContainerProtos.ContainerMerkleTree treeProto = checksumInfo.getDataMerkleTree();
     assertEquals(0, treeProto.getDataChecksum());
@@ -58,7 +74,7 @@ class TestContainerChecksumManager {
     checksumManager.markBlocksAsDeleted(container, new TreeSet<>());
     ContainerProtos.ContainerChecksumInfo checksumInfo = readFile();
 
-    assertEquals(containerID, checksumInfo.getContainerID());
+    assertEquals(CONTAINER_ID, checksumInfo.getContainerID());
     assertTrue(checksumInfo.getDeletedBlocksList().isEmpty());
     ContainerProtos.ContainerMerkleTree treeProto = checksumInfo.getDataMerkleTree();
     assertEquals(0, treeProto.getDataChecksum());
@@ -68,11 +84,11 @@ class TestContainerChecksumManager {
   @Test
   public void testWriteOnlyTreeToFile() throws Exception {
     ContainerMerkleTree tree = buildTestTree();
-    checksumManager.writeContainerMerkleTree(container, tree);
+    checksumManager.writeContainerDataTree(container, tree);
 
     ContainerProtos.ContainerChecksumInfo checksumInfo = readFile();
 
-    assertEquals(containerID, checksumInfo.getContainerID());
+    assertEquals(CONTAINER_ID, checksumInfo.getContainerID());
     assertTrue(checksumInfo.getDeletedBlocksList().isEmpty());
     // TestContainerMerkleTree verifies that going from ContainerMerkleTree to its proto is consistent.
     // Therefore, we can use the proto version of our expected tree to check what was written to the file.
@@ -86,7 +102,7 @@ class TestContainerChecksumManager {
 
     ContainerProtos.ContainerChecksumInfo checksumInfo = readFile();
 
-    assertEquals(containerID, checksumInfo.getContainerID());
+    assertEquals(CONTAINER_ID, checksumInfo.getContainerID());
     assertEquals(expectedBlocksToDelete, checksumInfo.getDeletedBlocksList());
     ContainerProtos.ContainerMerkleTree treeProto = checksumInfo.getDataMerkleTree();
     assertEquals(0, treeProto.getDataChecksum());
@@ -98,11 +114,11 @@ class TestContainerChecksumManager {
     List<Long> expectedBlocksToDelete = Arrays.asList(1L, 2L, 3L);
     checksumManager.markBlocksAsDeleted(container, new TreeSet<>(expectedBlocksToDelete));
     ContainerMerkleTree tree = buildTestTree();
-    checksumManager.writeContainerMerkleTree(container, tree);
+    checksumManager.writeContainerDataTree(container, tree);
 
     ContainerProtos.ContainerChecksumInfo checksumInfo = readFile();
 
-    assertEquals(containerID, checksumInfo.getContainerID());
+    assertEquals(CONTAINER_ID, checksumInfo.getContainerID());
     assertEquals(expectedBlocksToDelete, checksumInfo.getDeletedBlocksList());
     assertTreesSortedAndMatch(tree.toProto(), checksumInfo.getDataMerkleTree());
   }
@@ -110,13 +126,13 @@ class TestContainerChecksumManager {
   @Test
   public void testTreePreservedOnDeletedBlocksWrite() throws Exception {
     ContainerMerkleTree tree = buildTestTree();
-    checksumManager.writeContainerMerkleTree(container, tree);
+    checksumManager.writeContainerDataTree(container, tree);
     List<Long> expectedBlocksToDelete = Arrays.asList(1L, 2L, 3L);
     checksumManager.markBlocksAsDeleted(container, new TreeSet<>(expectedBlocksToDelete));
 
     ContainerProtos.ContainerChecksumInfo checksumInfo = readFile();
 
-    assertEquals(containerID, checksumInfo.getContainerID());
+    assertEquals(CONTAINER_ID, checksumInfo.getContainerID());
     assertEquals(expectedBlocksToDelete, checksumInfo.getDeletedBlocksList());
     assertTreesSortedAndMatch(tree.toProto(), checksumInfo.getDataMerkleTree());
   }
