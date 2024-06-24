@@ -967,7 +967,7 @@ export class Om extends React.Component<Record<string, object>, IOmdbInsightsSta
   render() {
     const { mismatchDataSource, loading, openKeysDataSource, pendingDeleteKeyDataSource, deletedContainerKeysDataSource, pendingDeleteDirDataSource, selectedLimit } = this.state;
 
-    const paginationConfig: PaginationConfig = {
+    const paginationConfig: TablePaginationConfig = {
       showTotal: (total: number, range) => `${range[0]}-${range[1]} of ${total}`,
       showSizeChanger: true,
       onShowSizeChange: this.onShowSizeChange,
@@ -975,17 +975,24 @@ export class Om extends React.Component<Record<string, object>, IOmdbInsightsSta
 
     const generateMismatchTable = (dataSource: any) => {
       return <Table
-        expandRowByClick dataSource={dataSource}
+        expandable={{
+          expandRowByClick: true,
+          expandedRowRender: this.expandedRowRender,
+          onExpand: this.onRowExpandClick
+        }}
+        dataSource={dataSource}
         columns={this.searchMismatchColumn()}
         loading={loading}
         pagination={paginationConfig} rowKey='containerId'
-        expandedRowRender={this.expandedRowRender} onExpand={this.onRowExpandClick}
         locale={{ filterTitle: "" }} />
     }
 
     const generateOpenKeyTable = (dataSource: any) => {
       return <Table
-        expandRowByClick dataSource={dataSource}
+        expandable={{
+          expandRowByClick: true,
+        }}
+        dataSource={dataSource}
         columns={this.searchOpenKeyColumn()}
         loading={loading} rowKey='key'
         pagination={paginationConfig}
@@ -994,20 +1001,28 @@ export class Om extends React.Component<Record<string, object>, IOmdbInsightsSta
 
     const generateKeysPendingTable = (dataSource: any) => {
       return <Table
-        expandRowByClick dataSource={dataSource}
+        expandable={{
+          expandRowByClick: true,
+          expandedRowRender: this.expandedKey
+        }}
+        dataSource={dataSource}
         columns={this.searchKeysPendingColumn()}
         loading={loading}
-        pagination={paginationConfig} rowKey='keyName'
-        expandedRowRender={this.expandedKey} />
+        pagination={paginationConfig}
+        rowKey='keyName'/>
     }
 
     const generateDeletedKeysTable = (dataSource: any) => {
       return <Table
-        expandRowByClick dataSource={dataSource}
+        expandable={{
+          expandRowByClick: true,
+          expandedRowRender: this.expandedRowRender,
+          onExpand: this.onRowExpandClick
+        }}
+        dataSource={dataSource}
         columns={this.searchDeletedKeyColumn()}
         loading={loading}
         pagination={paginationConfig} rowKey='containerId'
-        expandedRowRender={this.expandedRowRender} onExpand={this.onRowExpandClick}
         locale={{ filterTitle: "" }}
       />
     }

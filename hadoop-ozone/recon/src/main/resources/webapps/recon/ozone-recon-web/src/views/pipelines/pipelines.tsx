@@ -18,7 +18,7 @@
 
 import React from 'react';
 import moment from 'moment';
-import { Table, Tooltip } from 'antd';
+import { Table, Tabs, Tooltip } from 'antd';
 import { TablePaginationConfig } from 'antd/es/table';
 import { InfoCircleOutlined } from '@ant-design/icons';
 import prettyMilliseconds from 'pretty-ms';
@@ -247,7 +247,9 @@ export class Pipelines extends React.Component<Record<string, object>, IPipeline
           <AutoReloadPanel isLoading={activeLoading} lastRefreshed={lastUpdated} togglePolling={this.autoReload.handleAutoReloadToggle} onReload={this._loadData} />
         </div>
         <div className='content-div'>
-        <Table
+          <Tabs defaultActiveKey='1' onChange={this.onTabChange}>
+            <Tabs.TabPane key='1'>
+              <Table
                 dataSource={activeDataSource}
                 columns={COLUMNS.reduce<any[]>((filtered, column) => {
                   if (column.isSearchable) {
@@ -266,6 +268,8 @@ export class Pipelines extends React.Component<Record<string, object>, IPipeline
                 scroll={{ x: 'max-content', scrollToFirstRowOnChange: true }}
                 locale={{ filterTitle: '' }}
               />
+            </Tabs.TabPane>
+          </Tabs>
         </div>
       </div>
     );

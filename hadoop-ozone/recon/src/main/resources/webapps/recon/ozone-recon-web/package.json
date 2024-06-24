@@ -58,7 +58,6 @@
   "devDependencies": {
     "@types/react": "16.8.15",
     "@types/react-dom": "16.8.4",
-    "@types/react-plotly.js": "^2.2.4",
     "@types/react-router-dom": "^4.3.5",
     "@types/react-select": "^3.0.13",
     "@typescript-eslint/eslint-plugin": "^5.30.0",
