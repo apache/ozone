@@ -28,7 +28,6 @@ import {
 } from 'antd';
 import { MenuProps } from 'antd/es/menu';
 import {
-  InfoCircleOutlined,
   LeftOutlined,
   LoadingOutlined,
   RedoOutlined
