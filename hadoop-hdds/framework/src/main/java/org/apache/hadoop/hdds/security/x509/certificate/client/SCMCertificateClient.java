@@ -114,6 +114,7 @@ public class SCMCertificateClient extends DefaultCertificateClient {
     this.scmId = scmId;
     this.cId = clusterId;
     this.scmHostname = hostname;
+    certificateStorage = new CertificateStorage(getSecurityConfig());
   }
 
   public SCMCertificateClient(
