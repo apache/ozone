@@ -17,10 +17,10 @@
  */
 
 import React from 'react';
-import dayjs from 'dayjs';
-import { Table, Tabs, Tooltip } from 'antd';
+import moment from 'moment';
+import { Table, Tooltip } from 'antd';
+import { TablePaginationConfig } from 'antd/es/table';
 import { InfoCircleOutlined } from '@ant-design/icons';
-import { PaginationConfig } from 'antd/lib/pagination';
 import prettyMilliseconds from 'pretty-ms';
 
 import { IAxiosResponse } from '@/types/axios.types';
@@ -199,7 +199,7 @@ export class Pipelines extends React.Component<Record<string, object>, IPipeline
         activeLoading: false,
         activeDataSource: pipelines,
         activeTotalCount: totalCount,
-        lastUpdated: Number(dayjs())
+        lastUpdated: Number(moment())
       });
     }).catch(error => {
       this.setState({
@@ -235,7 +235,7 @@ export class Pipelines extends React.Component<Record<string, object>, IPipeline
 
   render() {
     const { activeDataSource, activeLoading, activeTotalCount, lastUpdated } = this.state;
-    const paginationConfig: PaginationConfig = {
+    const paginationConfig: TablePaginationConfig = {
       showTotal: (total: number, range) => `${range[0]}-${range[1]} of ${total} pipelines`,
       showSizeChanger: true,
       onShowSizeChange: this.onShowSizeChange
@@ -247,33 +247,25 @@ export class Pipelines extends React.Component<Record<string, object>, IPipeline
           <AutoReloadPanel isLoading={activeLoading} lastRefreshed={lastUpdated} togglePolling={this.autoReload.handleAutoReloadToggle} onReload={this._loadData} />
         </div>
         <div className='content-div'>
-          <Tabs
-            defaultActiveKey='1'
-            onChange={this.onTabChange}
-            items={[{
-              key: '1',
-              children: (
-                <Table
-                  dataSource={activeDataSource}
-                  columns={COLUMNS.reduce<any[]>((filtered, column) => {
-                    if (column.isSearchable) {
-                      const newColumn = {
-                        ...column,
-                        ...new ColumnSearch(column).getColumnSearchProps(column.dataIndex)
-                      };
-                      filtered.push(newColumn);
-                    } else {
-                      filtered.push(column);
-                    }
+        <Table
+                dataSource={activeDataSource}
+                columns={COLUMNS.reduce<any[]>((filtered, column) => {
+                  if (column.isSearchable) {
+                    const newColumn = {
+                      ...column,
+                      ...new ColumnSearch(column).getColumnSearchProps(column.dataIndex)
+                    };
+                    filtered.push(newColumn);
+                  } else {
+                    filtered.push(column);
+                  }
 
-                    return filtered;
-                  }, [])}
-                  loading={activeLoading} pagination={paginationConfig} rowKey='pipelineId'
-                  scroll={{ x: 'max-content', scrollToFirstRowOnChange: true }}
-                  locale={{ filterTitle: '' }}
-                />
-              )
-            }]} />
+                  return filtered;
+                }, [])}
+                loading={activeLoading} pagination={paginationConfig} rowKey='pipelineId'
+                scroll={{ x: 'max-content', scrollToFirstRowOnChange: true }}
+                locale={{ filterTitle: '' }}
+              />
         </div>
       </div>
     );

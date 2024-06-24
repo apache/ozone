@@ -325,82 +325,6 @@ export class Insights extends React.Component<Record<string, object>, IInsightsS
       containerCountData
     } = this.state;
 
-    const tabPanes = [{
-      key: '1',
-      label: 'File Size',
-      children: (
-        <>
-          <div className='content-div'>
-            {isLoading ? <span><LoadingOutlined /> Loading...</span> :
-              ((fileCountsResponse && fileCountsResponse.length > 0) ?
-                <div>
-                  <Row>
-                    <Col xs={24} xl={18}>
-                      <Row>
-                        <Col>
-                          <div className='filter-block'>
-                            <h4>Volumes</h4>
-                            <MultiSelect
-                              allowSelectAll
-                              isMulti
-                              className='multi-select-container'
-                              options={volumeOptions}
-                              closeMenuOnSelect={false}
-                              hideSelectedOptions={false}
-                              value={selectedVolumes}
-                              allOption={allVolumesOption}
-                              onChange={this.handleVolumeChange}
-                            />
-                          </div>
-                          <div className='filter-block'>
-                            <h4>Buckets</h4>
-                            <MultiSelect
-                              allowSelectAll
-                              isMulti
-                              className='multi-select-container'
-                              options={bucketOptions}
-                              closeMenuOnSelect={false}
-                              hideSelectedOptions={false}
-                              value={selectedBuckets}
-                              allOption={allBucketsOption}
-                              isDisabled={isBucketSelectionDisabled}
-                              onChange={this.handleBucketChange}
-                            />
-                          </div>
-                        </Col>
-                      </Row>
-                    </Col>
-                  </Row>
-                  <Row>
-                    <Col style={{ margin: 'auto', marginTop: '2%' }}>
-                      <EChart option={fileCountData} />
-                    </Col>
-                  </Row>
-                </div> :
-                <div>No data to visualize file size distribution. Add files to Ozone to see a visualization on file size distribution.</div>)}
-          </div>
-        </>
-      )
-    }, {
-      key: '2',
-      label: 'Container Size',
-      children: (
-        <>
-          <div className='content-div'>
-            {isLoading ? <span><LoadingOutlined /> Loading...</span> :
-              ((containerCountResponse && containerCountResponse.length > 0) ?
-                <div>
-                  <Row>
-                    <Col style={{ margin: 'auto', marginTop: '2%' }}>
-                      <EChart option={containerCountData} />
-                    </Col>
-                  </Row>
-                </div> :
-                <div>No data available for container size distribution visualization. Add files to Ozone</div>)}
-          </div>
-        </>
-      )
-    }]
     return (
       <div className='insights-container'>
         <div className='page-header'>
@@ -408,7 +332,73 @@ export class Insights extends React.Component<Record<string, object>, IInsightsS
         </div>
 
         <div className='content-div'>
-          <Tabs defaultActiveKey='1' items={tabPanes} />
+          <Tabs defaultActiveKey='1'>
+            <Tabs.TabPane tab='File Size' key='1'>
+              <div className='content-div'>
+                {isLoading ? <span><LoadingOutlined /> Loading...</span> :
+                  ((fileCountsResponse && fileCountsResponse.length > 0) ?
+                    <div>
+                      <Row>
+                        <Col xs={24} xl={18}>
+                          <Row>
+                            <Col>
+                              <div className='filter-block'>
+                                <h4>Volumes</h4>
+                                <MultiSelect
+                                  allowSelectAll
+                                  isMulti
+                                  className='multi-select-container'
+                                  options={volumeOptions}
+                                  closeMenuOnSelect={false}
+                                  hideSelectedOptions={false}
+                                  value={selectedVolumes}
+                                  allOption={allVolumesOption}
+                                  onChange={this.handleVolumeChange}
+                                />
+                              </div>
+                              <div className='filter-block'>
+                                <h4>Buckets</h4>
+                                <MultiSelect
+                                  allowSelectAll
+                                  isMulti
+                                  className='multi-select-container'
+                                  options={bucketOptions}
+                                  closeMenuOnSelect={false}
+                                  hideSelectedOptions={false}
+                                  value={selectedBuckets}
+                                  allOption={allBucketsOption}
+                                  isDisabled={isBucketSelectionDisabled}
+                                  onChange={this.handleBucketChange}
+                                />
+                              </div>
+                            </Col>
+                          </Row>
+                        </Col>
+                      </Row>
+                      <Row>
+                        <Col style={{ margin: 'auto', marginTop: '2%' }}>
+                          <EChart option={fileCountData} />
+                        </Col>
+                      </Row>
+                    </div> :
+                    <div>No data to visualize file size distribution. Add files to Ozone to see a visualization on file size distribution.</div>)}
+              </div>
+            </Tabs.TabPane>
+            <Tabs.TabPane tab='Container Size' key='2'>
+              <div className='content-div'>
+                {isLoading ? <span><LoadingOutlined /> Loading...</span> :
+                  ((containerCountResponse && containerCountResponse.length > 0) ?
+                    <div>
+                      <Row>
+                        <Col style={{ margin: 'auto', marginTop: '2%' }}>
+                          <EChart option={containerCountData} />
+                        </Col>
+                      </Row>
+                    </div> :
+                    <div>No data available for container size distribution visualization. Add files to Ozone</div>)}
+              </div>
+            </Tabs.TabPane>
+          </Tabs>
         </div>
       </div>
     );

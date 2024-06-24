@@ -17,17 +17,17 @@
  */
 
 import React from 'react';
-import dayjs from 'dayjs';
-import LocalizedFormat from 'dayjs/plugin/localizedFormat';
+import moment from 'moment';
 import {
   Row,
   Col,
   Button,
   Input,
-  MenuProps,
+  Menu,
   Dropdown,
   Tooltip
 } from 'antd';
+import { MenuProps } from 'antd/es/menu';
 import {
   InfoCircleOutlined,
   LeftOutlined,
@@ -42,7 +42,6 @@ import { AxiosGetHelper, cancelRequests } from '@/utils/axiosRequestHelper';
 
 import './diskUsage.less';
 
-dayjs.extend(LocalizedFormat);
 
 const DEFAULT_DISPLAY_LIMIT = 10;
 const OTHER_PATH_NAME = 'Other Objects';
@@ -365,7 +364,7 @@ export class DiskUsage extends React.Component<Record<string, object>, IDUState>
 
       if (summaryResponse.objectInfo.creationTime && summaryResponse.objectInfo.creationTime !== -1) {
         keys.push('Creation Time');
-        values.push(dayjs(summaryResponse.objectInfo.creationTime).format('ll LTS'));
+        values.push(moment(summaryResponse.objectInfo.creationTime).format('ll LTS'));
       }
 
       if (summaryResponse.objectInfo.dataSize && summaryResponse.objectInfo.dataSize !== -1) {
@@ -390,7 +389,7 @@ export class DiskUsage extends React.Component<Record<string, object>, IDUState>
 
       if (summaryResponse.objectInfo.modificationTime && summaryResponse.objectInfo.modificationTime !== -1) {
         keys.push('Modification Time');
-        values.push(dayjs(summaryResponse.objectInfo.modificationTime).format('ll LTS'));
+        values.push(moment(summaryResponse.objectInfo.modificationTime).format('ll LTS'));
       }
 
       if (summaryResponse.objectInfo.name && summaryResponse.objectInfo.name !== -1) {
@@ -518,27 +517,31 @@ export class DiskUsage extends React.Component<Record<string, object>, IDUState>
 
   render() {
     const { plotData, duResponse, returnPath, panelKeys, panelValues, showPanel, isLoading, inputPath, displayLimit } = this.state;
-    const menuItems: MenuProps['items'] = [{
-      key: '5',
-      label: 5
-    }, {
-      key: '10',
-      label: 10
-    }, {
-      key: '15',
-      label: 15
-    }, {
-      key: '20',
-      label: 20
-    }, {
-      key: '30',
-      label: 30
-    }]
 
-    const updateDisplayLimit = ({ key }: { key: string }): void => {
-      const res = Number.parseInt(key, 10);
+    const updateDisplayLimit: MenuProps["onClick"] = (e): void => {
+      const res = Number.parseInt(e.key, 10);
       this.updatePieChart(this.state.inputPath, res);
     }
+
+    const menuItems = (
+      <Menu onClick={updateDisplayLimit}>
+        <Menu.Item key='5'>
+          5
+        </Menu.Item>
+        <Menu.Item key='10'>
+          10
+        </Menu.Item>
+        <Menu.Item key='15'>
+          15
+        </Menu.Item>
+        <Menu.Item key='20'>
+          20
+        </Menu.Item>
+        <Menu.Item key='30'>
+          30
+        </Menu.Item>
+      </Menu>
+    )
 
     const eChartsOptions = {
       title: {
@@ -603,10 +606,8 @@ export class DiskUsage extends React.Component<Record<string, object>, IDUState>
                   </div>
                   <div className='dropdown-button'>
                     <Dropdown
-                      menu={{
-                        items: menuItems,
-                        onClick: updateDisplayLimit
-                      }} placement='bottom'>
+                      overlay={menuItems}
+                      placement='bottomCenter'>
                       <Button>Display Limit: {displayLimit}</Button>
                     </Dropdown>
                   </div>

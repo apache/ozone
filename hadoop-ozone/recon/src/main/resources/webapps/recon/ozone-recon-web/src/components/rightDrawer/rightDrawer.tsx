@@ -59,8 +59,9 @@ export class DetailPanel extends React.Component<IRightDrawerProps> {
           placement='right'
           width='25%'
           closable={true}
-          open={visible}
+          visible={visible}
           getContainer={false}
+          style={{ position: 'absolute' }}
           onClose={this.onClose}
         >
           <Table dataSource={content} locale={{ filterTitle: '' }}>

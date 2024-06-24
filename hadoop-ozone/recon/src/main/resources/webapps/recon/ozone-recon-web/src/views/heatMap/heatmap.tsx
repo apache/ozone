@@ -16,8 +16,9 @@
  * limitations under the License.
  */
 import React from 'react';
-import dayjs, { Dayjs } from 'dayjs';
-import { Row, Button, Input, MenuProps, Dropdown, DatePicker, Form, Result } from 'antd';
+import moment from 'moment';
+import { Row, Button, Menu, Input, Dropdown, DatePicker, Form, Result } from 'antd';
+import { MenuProps } from 'antd/es/menu';
 import { DownOutlined, LoadingOutlined, UndoOutlined } from '@ant-design/icons';
 
 
@@ -204,7 +205,7 @@ export class Heatmap extends React.Component<Record<string, object>, ITreeState>
   }
 
   disabledDate(current: any) {
-    return current > dayjs() || current < dayjs().subtract(90, 'day');
+    return current > moment() || current < moment().subtract(90, 'day');
   }
 
   resetInputpath = (_e: any, path: string) => {
@@ -289,9 +290,9 @@ export class Heatmap extends React.Component<Record<string, object>, ITreeState>
       inputPathValid,
       helpMessage } = this.state;
 
-    const handleDatePickerChange = (date: Dayjs) => {
+    const handleDatePickerChange = (date: moment.MomentInput) => {
       this.setState(prevState => ({
-        date: dayjs(date).unix(),
+        date: moment(date).unix(),
         entityType: prevState.entityType,
         inputPath: prevState.inputPath
       }), () => {
@@ -302,12 +303,12 @@ export class Heatmap extends React.Component<Record<string, object>, ITreeState>
       });
     };
 
-    const handleMenuChange: MenuProps["onClick"] = ({ key }) => {
-      if (CONSTANTS.ENTITY_TYPES.includes(key)) {
+    const handleMenuChange: MenuProps["onClick"] = (e) => {
+      if (CONSTANTS.ENTITY_TYPES.includes(e.key as string)) {
         minSize = Infinity;
         maxSize = 0;
         this.setState((prevState, _newState) => ({
-          entityType: key,
+          entityType: e.key as string,
           date: prevState.date,
           inputPath: prevState.inputPath
         }), () => {
@@ -319,10 +320,10 @@ export class Heatmap extends React.Component<Record<string, object>, ITreeState>
       }
     };
 
-    const handleCalendarChange: MenuProps["onClick"] = ({ key }) => {
-      if (CONSTANTS.TIME_PERIODS.includes(key)) {
+    const handleCalendarChange: MenuProps["onClick"] = (e) => {
+      if (CONSTANTS.TIME_PERIODS.includes(e.key as string)) {
         this.setState((prevState, _newState) => ({
-          date: key,
+          date: e.key,
           inputPath: prevState.inputPath,
           entityType: prevState.entityType
         }), () => {
@@ -334,39 +335,49 @@ export class Heatmap extends React.Component<Record<string, object>, ITreeState>
       }
     };
 
-    const menuCalendar: MenuProps["items"] = [{
-      key: CONSTANTS.TIME_PERIODS[0],
-      label: '24 Hour'
-    }, {
-      key: CONSTANTS.TIME_PERIODS[1],
-      label: '7 Days'
-    }, {
-      key: CONSTANTS.TIME_PERIODS[2],
-      label: '90 Days'
-    }, {
-      key: 'custTime',
-      label: 'Custom Select Last 90 Days',
-      children: [{
-        key: 'heatmapDatePicker',
-        label: <DatePicker
-          format="YYYY-MM-DD"
-          onChange={handleDatePickerChange}
-          onClick={(e) => { e.stopPropagation() }}
-          disabledDate={this.disabledDate}
-          placement="topRight" />
-      }]
-    }]
+    const menuCalendar = (
+      <Menu
+        defaultSelectedKeys={[date as string]}
+        onClick={handleCalendarChange}
+        selectable={true}>
+        <Menu.Item key={CONSTANTS.TIME_PERIODS[0]}>
+          24 Hour
+        </Menu.Item>
+        <Menu.Item key={CONSTANTS.TIME_PERIODS[1]}>
+          7 Days
+        </Menu.Item>
+        <Menu.Item key={CONSTANTS.TIME_PERIODS[2]}>
+          90 Days
+        </Menu.Item>
+        <Menu.SubMenu title='Custom Select Last 90 Days'>
+          <Menu.Item key='heatmapDatePicker'>
+            <DatePicker
+              format="YYYY-MM-DD"
+              onChange={handleDatePickerChange}
+              onClick={(e) => { e.stopPropagation() }}
+              disabledDate={this.disabledDate} />
+          </Menu.Item>
+        </Menu.SubMenu>
+      </Menu>
+    )
 
-    const entityTypeMenu = [{
-      key: CONSTANTS.ENTITY_TYPES[2],
-      label: 'Volume'
-    }, {
-      key: CONSTANTS.ENTITY_TYPES[1],
-      label: 'Bucket'
-    }, {
-      key: CONSTANTS.ENTITY_TYPES[0],
-      label: 'Key'
-    }]
+    const entityTypeMenu = (
+      <Menu
+        defaultSelectedKeys={[this.state.entityType]}
+        onClick={handleMenuChange}
+        selectable={true}>
+        <Menu.Item key={CONSTANTS.ENTITY_TYPES[2]}>
+          Volume
+        </Menu.Item>
+        <Menu.Item key={CONSTANTS.ENTITY_TYPES[1]}>
+          Bucket
+        </Menu.Item>
+        <Menu.Item key={CONSTANTS.ENTITY_TYPES[0]}>
+          Key
+        </Menu.Item>
+      </Menu>
+
+    )
 
     const headerMenu = (
       <Row>
@@ -383,23 +394,15 @@ export class Heatmap extends React.Component<Record<string, object>, ITreeState>
         </div>
         <div className='entity-dropdown-button'>
           <Dropdown
-            menu={{
-              items: entityTypeMenu,
-              selectable: true,
-              defaultSelectedKeys: [this.state.entityType],
-              onClick: handleMenuChange
-            }} placement='bottomRight'>
+            overlay={entityTypeMenu}
+            placement='bottomCenter'>
             <Button>Entity Type:&nbsp;{this.state.entityType}<DownOutlined /></Button>
           </Dropdown>
         </div>
         <div className='date-dropdown-button'>
           <Dropdown
-            menu={{
-              items: menuCalendar,
-              selectable: true,
-              defaultSelectedKeys: [date as string],
-              onClick: handleCalendarChange
-            }} placement='bottomLeft'>
+            overlay={menuCalendar}
+            placement='bottomLeft'>
             <Button>Last &nbsp;{date as number > 100 ? new Date(date as number * 1000).toLocaleString() : date}<DownOutlined /></Button>
           </Dropdown>
         </div>
@@ -408,7 +411,7 @@ export class Heatmap extends React.Component<Record<string, object>, ITreeState>
 
     return (
       <>
-        {isLoading ? <span><LoadingOutlined/> Loading...</span> : (
+        {isLoading ? <span><LoadingOutlined /> Loading...</span> : (
           <div className='heatmap-container'>
             <div className='page-header'>
               Tree Map for Entities

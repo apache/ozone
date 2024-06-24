@@ -62,7 +62,10 @@ export default defineConfig({
       less: {
         javascriptEnabled: true,
         math: "always",
-        relativeUrls: true
+        relativeUrls: true,
+        modifyVars: {
+          '@primary-color': '#1DA57A'
+        }
       }
     }
   },

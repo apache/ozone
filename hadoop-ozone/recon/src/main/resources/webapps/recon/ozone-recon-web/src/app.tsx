@@ -18,7 +18,7 @@
 
 import React from 'react';
 
-import { Layout, ConfigProvider } from 'antd';
+import { Layout } from 'antd';
 import './app.less';
 import NavBar from './components/navBar/navBar';
 import Breadcrumbs from './components/breadcrumbs/breadcrumbs';
@@ -51,20 +51,21 @@ class App extends React.Component<Record<string, object>, IAppState> {
     const layoutClass = classNames('content-layout', { 'sidebar-collapsed': collapsed });
 
     return (
-      <ConfigProvider theme={{
-        hashed: false,
-        token: {
-          colorPrimary: '#1DA57A',
-          fontSize: 14,
-          fontFamily: 'Roboto',
-          fontWeightStrong: 500,
-          // colorText: 'rgba(0, 0, 0, 0.65)',
-          borderRadius: 5,
-          boxShadowSecondary: '0px 0px 10px rgba(0, 0, 0, 0.2)',
-          controlItemBgHover: 'rgba(29, 165, 122, 0.12)'
+      // <ConfigProvider children={configChildren} theme={{
+      //   hashed: false,
+      //   token: {
+      //     colorPrimary: '#1DA57A',
+      //     fontSize: 14,
+      //     fontFamily: 'Roboto',
+      //     fontWeightStrong: 500,
+      //     // colorText: 'rgba(0, 0, 0, 0.65)',
+      //     borderRadius: 5,
+      //     boxShadowSecondary: '0px 0px 10px rgba(0, 0, 0, 0.2)',
+      //     controlItemBgHover: 'rgba(29, 165, 122, 0.12)'
 
-        }
-      }}>
+      //   }
+      // }}>
+      // </ConfigProvider>
       <Router>
         <Layout style={{ minHeight: '100vh' }}>
           <NavBar collapsed={collapsed} onCollapse={this.onCollapse} />
@@ -90,7 +91,6 @@ class App extends React.Component<Record<string, object>, IAppState> {
           </Layout>
         </Layout>
       </Router>
-      </ConfigProvider>
     );
   }
 }

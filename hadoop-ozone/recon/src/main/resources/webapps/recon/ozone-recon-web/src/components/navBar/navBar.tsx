@@ -18,7 +18,7 @@
 
 import React from 'react';
 import axios from 'axios';
-import { Layout, Menu, MenuProps } from 'antd';
+import { Layout, Menu } from 'antd';
 import {
   BarChartOutlined,
   ClusterOutlined,
@@ -89,61 +89,77 @@ class NavBar extends React.Component<INavBarProps> {
   render() {
     const { location } = this.props;
     const { isHeatmapEnabled } = this.state;
-    const menuItems: MenuProps['items'] = [{
-      key: '/Overview',
-      icon: <DashboardOutlined />,
-      label: <><span>Overview</span><Link to='/Overview' /></>
-    }, {
-      key: '/Volumes',
-      icon: <InboxOutlined />,
-      label: <><span>Volumes</span><Link to='/Volumes' /></>
-    }, {
-      key: '/Buckets',
-      icon: <FolderOpenOutlined />,
-      label: <><span>Buckets</span><Link to='/Buckets' /></>
-    }, {
-      key: '/Datanodes',
-      icon: <ClusterOutlined />,
-      label: <><span>Datanodes</span><Link to='/Datanodes' /></>
-    }, {
-      key: '/Pipelines',
-      icon: <DeploymentUnitOutlined />,
-      label: <><span>Pipelines</span><Link to='/Pipelines' /></>
-    }, {
-      key: '/Containers',
-      icon: <ContainerOutlined />,
-      label: <><span>Containers</span><Link to='/Containers' /></>
-    }, {
-      key: 'InsightsMenu',
-      icon: <BarChartOutlined />,
-      label: <><span>Insights</span></>,
-      children: [
-        {
-          key: '/Insights',
-          icon: <BarChartOutlined />,
-          label: <><span>Insights</span><Link to='/Insights' /></>
-        },
-        {
-          key: '/Om',
-          icon: <DatabaseOutlined />,
-          label: <><span>OM DB Insights</span><Link to='/Om' /></>
-        }
-      ]
-    }, {
-      key: '/DiskUsage',
-      icon: <PieChartOutlined />,
-      label: <><span>Disk Usage</span><Link to='/DiskUsage' /></>
-    }, isHeatmapEnabled ? {
-      key: '/Heatmap',
-      icon: <LayoutOutlined />,
-      label: <>
-        <span>Heatmap</span>
-        <Link to={{
-          pathname: '/Heatmap',
-          state: { isHeatmapEnabled: true }
-        }}
-        /></>
-    } : {}]
+    const menuItems = [(
+      <Menu.Item key='/Overview'
+        icon={<DashboardOutlined />}>
+        <span>Overview</span>
+        <Link to='/Overview' />
+      </Menu.Item>
+    ), (
+      <Menu.Item key='/Volumes'
+        icon={<InboxOutlined />}>
+        <span>Volumes</span>
+        <Link to='/Volumes' />
+      </Menu.Item>
+    ), (
+      <Menu.Item key='/Buckets'
+        icon={<FolderOpenOutlined />}>
+        <span>Buckets</span>
+        <Link to='/Buckets' />
+      </Menu.Item>
+    ), (
+      <Menu.Item key='/Datanodes'
+        icon={<ClusterOutlined />}>
+        <span>Datanodes</span>
+        <Link to='/Datanodes' />
+      </Menu.Item>
+    ), (
+      <Menu.Item key='/Pipelines'
+        icon={<DeploymentUnitOutlined />}>
+        <span>Pipelines</span>
+        <Link to='/Pipelines' />
+      </Menu.Item>
+    ), (
+      <Menu.Item key='/Containers'
+        icon={<ContainerOutlined />}>
+        <span>Containers</span>
+        <Link to='/Containers' />
+      </Menu.Item>
+    ), (
+      <Menu.SubMenu key='InsightsMenu'
+        title="Insights"
+        icon={<BarChartOutlined />}>
+        <Menu.Item key='/Insights'
+          icon={<BarChartOutlined />}>
+          <span>Insights</span>
+          <Link to='/Insights' />
+        </Menu.Item>
+        <Menu.Item key='/Om'
+          icon={<DatabaseOutlined />}>
+          <span>OM DB Insights</span>
+          <Link to='/Om' />
+        </Menu.Item>
+      </Menu.SubMenu>
+    ), (
+      <Menu.Item key='/DiskUsage'
+        icon={<PieChartOutlined />}>
+        <span>Disk Usage</span>
+        <Link to='/DiskUsage' />
+      </Menu.Item>
+    ), (
+      isHeatmapEnabled
+        ? <>
+          <Menu.Item key='/Heatmap'
+            icon={<LayoutOutlined />}>
+            <span>Heatmap</span>
+            <Link to={{
+              pathname: '/Heatmap',
+              state: { isHeatmapEnabled: true }
+            }}
+            />
+          </Menu.Item></>
+        : <></>
+    )]
     return (
       <Sider
         collapsible
@@ -164,8 +180,8 @@ class NavBar extends React.Component<INavBarProps> {
         <Menu
           theme='dark' defaultSelectedKeys={['/Dashboard']}
           mode='inline' selectedKeys={[location.pathname]}
-          items={menuItems}
         >
+          {...menuItems}
         </Menu>
       </Sider>
     );

@@ -17,12 +17,12 @@
  */
 
 import React from 'react';
-import dayjs from 'dayjs';
-import LocalizedFormat from 'dayjs/plugin/localizedFormat';
+import moment from 'moment';
 import filesize from 'filesize';
-import { Table, Tabs, MenuProps, Dropdown, Tooltip } from 'antd';
+import { Table, Tabs, Menu, Dropdown, Tooltip } from 'antd';
+import { MenuProps } from 'antd/es/menu';
+import { TablePaginationConfig } from 'antd/es/table';
 import { FunnelPlotFilled, InfoCircleOutlined } from '@ant-design/icons';
-import { PaginationConfig } from 'antd/lib/pagination';
 import { ActionMeta, ValueType } from "react-select";
 import CreatableSelect from "react-select/creatable";
 
@@ -33,7 +33,6 @@ import { IOption } from "@/components/multiSelect/multiSelect";
 
 import './om.less';
 
-dayjs.extend(LocalizedFormat);
 
 const size = filesize.partial({ standard: 'iec' });
 
@@ -125,13 +124,13 @@ const KEY_TABLE_COLUMNS = [
     title: 'Date Created',
     dataIndex: 'CreationTime',
     key: 'CreationTime',
-    render: (date: string) => dayjs(date).format('lll')
+    render: (date: string) => moment(date).format('lll')
   },
   {
     title: 'Date Modified',
     dataIndex: 'ModificationTime',
     key: 'ModificationTime',
-    render: (date: string) => dayjs(date).format('lll')
+    render: (date: string) => moment(date).format('lll')
   }
 ];
 
@@ -190,7 +189,7 @@ const OPEN_KEY_TAB_COLUMNS = [
     dataIndex: 'inStateSince',
     key: 'inStateSince',
     render: (inStateSince: number) => {
-      return inStateSince > 0 ? dayjs(inStateSince).format('ll LTS') : 'NA';
+      return inStateSince > 0 ? moment(inStateSince).format('ll LTS') : 'NA';
     }
   },
   {
@@ -290,7 +289,7 @@ const PENDINGDIR_TAB_COLUMNS = [
     dataIndex: 'inStateSince',
     key: 'inStateSince',
     render: (inStateSince: number) => {
-      return inStateSince > 0 ? dayjs(inStateSince).format('ll LTS') : 'NA';
+      return inStateSince > 0 ? moment(inStateSince).format('ll LTS') : 'NA';
     }
   },
   {
@@ -389,16 +388,15 @@ export class Om extends React.Component<Record<string, object>, IOmdbInsightsSta
     const existsAtColumn = {
       title: <span>
         <Dropdown
-          menu={{
-            items: [{
-              key: 'OM',
-              label: 'OM'
-            }, {
-              key: 'SCM',
-              label: 'SCM'
-            }],
-            onClick: this.handleExistsAtChange
-          }} >
+          overlay={
+            <Menu onClick={this.handleExistsAtChange}>
+              <Menu.Item key='OM'>
+                OM
+              </Menu.Item>
+              <Menu.Item key='SCM'>
+                SCM
+              </Menu.Item>
+            </Menu>} >
           <label> Exists at&nbsp;&nbsp;
             <FunnelPlotFilled />&nbsp;&nbsp;&nbsp;&nbsp;
           </label>
@@ -441,17 +439,18 @@ export class Om extends React.Component<Record<string, object>, IOmdbInsightsSta
     // Inside the class component to access the React internal state
     const fsoNonfsoColumn = {
       title: <span>
-        <Dropdown menu={{
-          items: [{
-            key: 'fso',
-            label: 'FSO'
-          }, {
-            key: 'nonFso',
-            label: 'Non FSO'
-          }],
-          defaultSelectedKeys: ['OM'],
-          onClick: this.handlefsoNonfsoMenuChange
-        }}>
+        <Dropdown overlay={
+          <Menu
+            defaultSelectedKeys={['OM']}
+            onClick={this.handlefsoNonfsoMenuChange}>
+            <Menu.Item key='fso'>
+              FSO
+            </Menu.Item>
+            <Menu.Item key='nonFso'>
+              Non FSO
+            </Menu.Item>
+          </Menu>
+        }>
           <label> Type&nbsp;&nbsp;
             <FunnelPlotFilled />
           </label>
@@ -474,8 +473,8 @@ export class Om extends React.Component<Record<string, object>, IOmdbInsightsSta
   };
 
 
-  handlefsoNonfsoMenuChange = ({ key }) => {
-    if (key === 'fso') {
+  handlefsoNonfsoMenuChange: MenuProps["onClick"] = (e) => {
+    if (e.key === 'fso') {
       this.fetchOpenKeys(true, false);
     }
     else {
@@ -672,7 +671,7 @@ export class Om extends React.Component<Record<string, object>, IOmdbInsightsSta
       dataIndex: 'creationTime',
       key: 'creationTime',
       render: (creationTime: number) => {
-        return creationTime > 0 ? dayjs(creationTime).format('ll LTS') : 'NA';
+        return creationTime > 0 ? moment(creationTime).format('ll LTS') : 'NA';
       }
     },
     {
@@ -680,7 +679,7 @@ export class Om extends React.Component<Record<string, object>, IOmdbInsightsSta
       dataIndex: 'modificationTime',
       key: 'modificationTime',
       render: (modificationTime: number) => {
-        return modificationTime > 0 ? dayjs(modificationTime).format('ll LTS') : 'NA';
+        return modificationTime > 0 ? moment(modificationTime).format('ll LTS') : 'NA';
       }
     }
     ]
@@ -851,7 +850,7 @@ export class Om extends React.Component<Record<string, object>, IOmdbInsightsSta
       const dataSource = containerKeys && containerKeys.dataSource && containerKeys.dataSource.map(record => (
         { ...record, uid: `${record.Volume}/${record.Bucket}/${record.Key}` }
       ));
-      const paginationConfig: PaginationConfig = {
+      const paginationConfig: TablePaginationConfig = {
         showTotal: (total: number, range) => `${range[0]}-${range[1]} of ${total} keys`
       };
       return (
@@ -1015,43 +1014,14 @@ export class Om extends React.Component<Record<string, object>, IOmdbInsightsSta
 
     const generateDirPendingTable = (dataSource: any) => {
       return <Table
-        expandRowByClick dataSource={dataSource}
+        expandable={{ expandRowByClick: true }}
+        dataSource={dataSource}
         columns={this.searchDirPendingColumn()}
         loading={loading}
         pagination={paginationConfig}
         rowKey='key'
       />
     }
-
-    const tabPanes = [{
-      key: '1',
-      label: 'Container Mismatch Info',
-      children: generateMismatchTable(mismatchDataSource)
-    }, {
-      key: '2',
-      label: 'Open Keys',
-      children: generateOpenKeyTable(openKeysDataSource)
-    }, {
-      key: '3',
-      label: (
-        <label>Keys Pending for Deletion&nbsp;&nbsp;
-          <Tooltip placement='top' title="Keys that are pending for deletion.">
-            <InfoCircleOutlined />
-          </Tooltip>
-        </label>
-      ),
-      children: generateKeysPendingTable(pendingDeleteKeyDataSource)
-    }, {
-      key: '4',
-      label: (
-        <label>Deleted Container Keys&nbsp;&nbsp;
-          <Tooltip placement='top' title={'Keys mapped to Containers in DELETED state SCM.'}>
-            <InfoCircleOutlined />
-          </Tooltip>
-        </label>
-      ),
-      children: generateDirPendingTable(pendingDeleteDirDataSource)
-    }]
 
     return (
       <div>
@@ -1080,7 +1050,32 @@ export class Om extends React.Component<Record<string, object>, IOmdbInsightsSta
               }}
             /> Limit
           </div>
-          <Tabs defaultActiveKey={this.state.activeTab} items={tabPanes} onChange={this.changeTab} />
+          <Tabs defaultActiveKey={this.state.activeTab} onChange={this.changeTab}>
+            <Tabs.TabPane key='1' tab='Container Mismatch Info'>
+              {generateMismatchTable(mismatchDataSource)}
+            </Tabs.TabPane>
+            <Tabs.TabPane key='2' tab='Open Keys'>
+              {generateOpenKeyTable(openKeysDataSource)}
+            </Tabs.TabPane>
+            <Tabs.TabPane key='3' tab={(
+              <label>Keys Pending for Deletion&nbsp;&nbsp;
+                <Tooltip placement='top' title="Keys that are pending for deletion.">
+                  <InfoCircleOutlined />
+                </Tooltip>
+              </label>
+            )}>
+              {generateKeysPendingTable(pendingDeleteKeyDataSource)}
+            </Tabs.TabPane>
+            <Tabs.TabPane key='4' tab={(
+              <label>Deleted Container Keys&nbsp;&nbsp;
+                <Tooltip placement='top' title={'Keys mapped to Containers in DELETED state SCM.'}>
+                  <InfoCircleOutlined />
+                </Tooltip>
+              </label>
+            )}>
+              {generateDirPendingTable(pendingDeleteDirDataSource)}
+            </Tabs.TabPane>
+          </Tabs>
         </div>
       </div>
     );

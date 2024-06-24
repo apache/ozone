@@ -18,7 +18,7 @@
 
 import React from 'react';
 import axios from 'axios';
-import dayjs from 'dayjs';
+import moment from 'moment';
 import filesize from 'filesize';
 import { Row, Col, Tooltip } from 'antd';
 import { CheckCircleFilled, ExclamationCircleFilled } from '@ant-design/icons';
@@ -155,7 +155,7 @@ export class Overview extends React.Component<Record<string, object>, IOverviewS
         missingContainersCount,
         openContainers: clusterState.openContainers,
         deletedContainers: clusterState.deletedContainers,
-        lastRefreshed: Number(dayjs()),
+        lastRefreshed: Number(moment()),
         lastUpdatedOMDBDelta: omDBDeltaObject && omDBDeltaObject.lastUpdatedTimestamp,
         lastUpdatedOMDBFull: omDBFullObject && omDBFullObject.lastUpdatedTimestamp,
         openSummarytotalUnrepSize: openResponse.data && openResponse.data.totalUnreplicatedDataSize,

@@ -30,17 +30,23 @@ class Breadcrumbs extends React.Component<RouteComponentProps> {
     const pathSnippets = location.pathname.split('/').filter(i => i);
     const extraBreadcrumbItems = pathSnippets.map((_: string, index: number) => {
       const url = `/${pathSnippets.slice(0, index + 1).join('/')}`;
-      return {
-        key: url,
-        title: <Link to={url}>{breadcrumbNameMap[url]}</Link>
-      }
+      return (
+        <Breadcrumb.Item key={url}>
+          <Link to={url}>
+            {breadcrumbNameMap[url]}
+          </Link>
+        </Breadcrumb.Item>
+      )
     });
-    const breadcrumbItems = [{
-      key: 'home',
-      title: <Link to='/'><HomeOutlined /></Link>
-    }].concat(extraBreadcrumbItems);
+    const breadcrumbItems = [(
+      <Breadcrumb.Item key='home'>
+        <Link to='/'><HomeOutlined /></Link>
+      </Breadcrumb.Item>
+    )].concat(extraBreadcrumbItems);
     return (
-      <Breadcrumb items={breadcrumbItems}/>
+      <Breadcrumb>
+        {breadcrumbItems}
+      </Breadcrumb>
     );
   }
 }

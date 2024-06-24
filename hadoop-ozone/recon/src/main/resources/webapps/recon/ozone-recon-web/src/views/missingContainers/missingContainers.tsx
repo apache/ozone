@@ -17,12 +17,11 @@
  */
 
 import React from 'react';
-import dayjs from 'dayjs';
-import LocalizedFormat from 'dayjs/plugin/localizedFormat';
+import moment from 'moment';
 import filesize from 'filesize';
 import { Table, Tooltip, Tabs } from 'antd';
+import { TablePaginationConfig } from 'antd/es/table';
 import { InfoCircleOutlined } from '@ant-design/icons';
-import { PaginationConfig } from 'antd/lib/pagination';
 
 import { ColumnSearch } from '@/utils/columnSearch';
 import { showDataFetchError, timeFormat } from '@/utils/common';
@@ -30,9 +29,8 @@ import { AxiosGetHelper, cancelRequests } from '@/utils/axiosRequestHelper';
 
 import './missingContainers.less';
 
-const size = filesize.partial({ standard: 'iec' });
 
-dayjs.extend(LocalizedFormat);
+const size = filesize.partial({ standard: 'iec' });
 
 interface IContainerResponse {
   containerID: number;
@@ -113,13 +111,13 @@ const KEY_TABLE_COLUMNS = [
     title: 'Date Created',
     dataIndex: 'CreationTime',
     key: 'CreationTime',
-    render: (date: string) => dayjs(date).format('lll')
+    render: (date: string) => moment(date).format('lll')
   },
   {
     title: 'Date Modified',
     dataIndex: 'ModificationTime',
     key: 'ModificationTime',
-    render: (date: string) => dayjs(date).format('lll')
+    render: (date: string) => moment(date).format('lll')
   }
 ];
 
@@ -338,7 +336,7 @@ export class MissingContainers extends React.Component<Record<string, object>, I
       const dataSource = containerKeys.dataSource.map(record => (
         { ...record, uid: `${record.Volume}/${record.Bucket}/${record.Key}` }
       ));
-      const paginationConfig: PaginationConfig = {
+      const paginationConfig: TablePaginationConfig = {
         showTotal: (total: number, range) => `${range[0]}-${range[1]} of ${total} keys`
       };
       return (
@@ -371,7 +369,7 @@ export class MissingContainers extends React.Component<Record<string, object>, I
 
   render() {
     const { missingDataSource, loading, underReplicatedDataSource, overReplicatedDataSource, misReplicatedDataSource } = this.state;
-    const paginationConfig: PaginationConfig = {
+    const paginationConfig: TablePaginationConfig = {
       showTotal: (total: number, range) => `${range[0]}-${range[1]} of ${total} missing containers`,
       showSizeChanger: true,
       onShowSizeChange: this.onShowSizeChange
@@ -379,32 +377,17 @@ export class MissingContainers extends React.Component<Record<string, object>, I
 
     const generateTable = (dataSource) => {
       return <Table
-        expandRowByClick dataSource={dataSource}
+        expandable={{
+          expandRowByClick: true,
+          expandedRowRender: this.expandedRowRender,
+          onExpand: this.onRowExpandClick
+        }}
+        dataSource={dataSource}
         columns={this.searchColumn()}
         loading={loading}
         pagination={paginationConfig} rowKey='containerID'
-        expandedRowRender={this.expandedRowRender} onExpand={this.onRowExpandClick}
-        onExpandedRowsChange={this.onRowExpandChange}
         locale={{ filterTitle: "" }} />
     }
-
-    const tabPanes = [{
-      key: '1',
-      label: `Missing${(missingDataSource && missingDataSource.length > 0) ? ` (${missingDataSource.length})` : ''}`,
-      children: generateTable(missingDataSource)
-    }, {
-      key: '2',
-      label: `Under-Replicated${(underReplicatedDataSource && underReplicatedDataSource.length > 0) ? ` (${underReplicatedDataSource.length})` : ''}`,
-      children: generateTable(underReplicatedDataSource)
-    }, {
-      key: '3',
-      label: `Over-Replicated${(overReplicatedDataSource && overReplicatedDataSource.length > 0) ? ` (${overReplicatedDataSource.length})` : ''}`,
-      children: generateTable(overReplicatedDataSource)
-    }, {
-      key: '4',
-      label: `Mis-Replicated${(misReplicatedDataSource && misReplicatedDataSource.length > 0) ? ` (${misReplicatedDataSource.length})` : ''}`,
-      children: generateTable(misReplicatedDataSource)
-    }]
 
     return (
       <div className='missing-containers-container'>
@@ -412,7 +395,28 @@ export class MissingContainers extends React.Component<Record<string, object>, I
           Containers
         </div>
         <div className='content-div'>
-          <Tabs defaultActiveKey='1' items={tabPanes} />
+          <Tabs defaultActiveKey='1'>
+            <Tabs.TabPane
+              key='1'
+              tab={`Missing${(missingDataSource && missingDataSource.length > 0) ? ` (${missingDataSource.length})` : ''}`}>
+              {generateTable(missingDataSource)}
+            </Tabs.TabPane>
+            <Tabs.TabPane
+              key='2'
+              tab={`Under-Replicated${(underReplicatedDataSource && underReplicatedDataSource.length > 0) ? ` (${underReplicatedDataSource.length})` : ''}`}>
+              {generateTable(underReplicatedDataSource)}
+            </Tabs.TabPane>
+            <Tabs.TabPane
+              key='3'
+              tab={`Over-Replicated${(overReplicatedDataSource && overReplicatedDataSource.length > 0) ? ` (${overReplicatedDataSource.length})` : ''}`}>
+              {generateTable(overReplicatedDataSource)}
+            </Tabs.TabPane>
+            <Tabs.TabPane
+              key='4'
+              tab={`Mis-Replicated${(misReplicatedDataSource && misReplicatedDataSource.length > 0) ? ` (${misReplicatedDataSource.length})` : ''}`}>
+              {generateTable(misReplicatedDataSource)}
+            </Tabs.TabPane>
+          </Tabs>
         </div>
       </div>
     );

@@ -17,8 +17,7 @@
  */
 
 import React from 'react';
-import dayjs from 'dayjs';
-import LocalizedFormat from 'dayjs/plugin/localizedFormat';
+import moment from 'moment';
 import { Table, Tag } from 'antd';
 import {
   CheckCircleOutlined,
@@ -29,8 +28,10 @@ import {
   LaptopOutlined,
   SaveOutlined
 } from '@ant-design/icons';
-import { ColumnProps } from 'antd/es/table';
-import { PaginationConfig } from 'antd/lib/pagination';
+import {
+  ColumnProps,
+  TablePaginationConfig
+} from 'antd/es/table';
 import { ActionMeta, ValueType } from 'react-select';
 import CreatableSelect from "react-select/creatable";
 
@@ -53,7 +54,6 @@ import QuotaBar from '@/components/quotaBar/quotaBar';
 
 import './buckets.less';
 
-dayjs.extend(LocalizedFormat);
 
 interface IBucketResponse {
   volumeName: string;
@@ -209,7 +209,7 @@ const COLUMNS: BucketTableColumn[] = [
     isVisible: true,
     sorter: (a: IBucket, b: IBucket) => a.creationTime - b.creationTime,
     render: (creationTime: number) => {
-      return creationTime > 0 ? dayjs(creationTime).format('ll LTS') : 'NA';
+      return creationTime > 0 ? moment(creationTime).format('ll LTS') : 'NA';
     }
   },
   {
@@ -219,7 +219,7 @@ const COLUMNS: BucketTableColumn[] = [
     isVisible: true,
     sorter: (a: IBucket, b: IBucket) => a.modificationTime - b.modificationTime,
     render: (modificationTime: number) => {
-      return modificationTime > 0 ? dayjs(modificationTime).format('ll LTS') : 'NA';
+      return modificationTime > 0 ? moment(modificationTime).format('ll LTS') : 'NA';
     }
   },
   {
@@ -480,7 +480,7 @@ export class Buckets extends React.Component<Record<string, object>, IBucketsSta
         totalCount,
         volumeBucketMap,
         volumeOptions,
-        lastUpdated: Number(dayjs()),
+        lastUpdated: Number(moment()),
         showPanel: false
       }, () => {
         if (!this.state.selectedVolumes || this.state.selectedVolumes.length === 0) {
@@ -528,7 +528,7 @@ export class Buckets extends React.Component<Record<string, object>, IBucketsSta
     const { loading, totalCount, lastUpdated, selectedColumns,
       columnOptions, volumeOptions, selectedVolumes,
       selectedBuckets, showPanel, currentRow, selectedLimit } = this.state;
-    const paginationConfig: PaginationConfig = {
+    const paginationConfig: TablePaginationConfig = {
       showTotal: (total: number, range) => `${range[0]}-${range[1]} of ${total} buckets`,
       showSizeChanger: true,
       onShowSizeChange: this.onShowSizeChange
@@ -616,8 +616,8 @@ export class Buckets extends React.Component<Record<string, object>, IBucketsSta
             loading={loading}
             pagination={paginationConfig}
             rowKey={(bucketRecord: IBucket) => `${bucketRecord.volumeName}_${bucketRecord.bucketName}`}
-            scroll={{ x: true, scrollToFirstRowOnChange: true }}
-            locale={{ filterTitle: "" }}
+            scroll={{ x: 'max-content', scrollToFirstRowOnChange: true }}
+            locale={{ filterTitle: '' }}
           />
         </div>
         <AclPanel visible={showPanel} acls={currentRow.acls} objName={currentRow.bucketName} objType='Bucket' />

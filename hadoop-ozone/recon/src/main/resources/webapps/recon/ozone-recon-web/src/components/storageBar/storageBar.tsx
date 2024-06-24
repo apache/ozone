@@ -73,7 +73,7 @@ class StorageBar extends React.Component<IStorageBarProps> {
             strokeLinecap='round'
             percent={getCapacityPercent(totalUsed, total)}
             success={{ percent: getCapacityPercent(used, total) }}
-            className='capacity-bar' size='small' />
+            className='capacity-bar' strokeWidth={3} />
         </Tooltip>
       </div>
     );

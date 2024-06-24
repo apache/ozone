@@ -17,11 +17,10 @@
  */
 
 import React from 'react';
-import dayjs from 'dayjs';
-import LocalizedFormat from 'dayjs/plugin/localizedFormat';
+import moment from 'moment';
 import { Table } from 'antd';
 import { ColumnProps } from 'antd/es/table';
-import { PaginationConfig } from 'antd/lib/pagination';
+import { TablePaginationConfig } from 'antd/es/table';
 import { Link } from 'react-router-dom';
 import { ActionMeta, ValueType } from 'react-select';
 import CreatableSelect from 'react-select/creatable';
@@ -38,7 +37,6 @@ import { AxiosGetHelper } from "@/utils/axiosRequestHelper";
 
 import './volumes.less';
 
-dayjs.extend(LocalizedFormat);
 
 interface IVolumeResponse {
   volume: string;
@@ -105,7 +103,7 @@ const COLUMNS: VolumnTableColumn[] = [
     isVisible: true,
     sorter: (a: IVolume, b: IVolume) => a.creationTime - b.creationTime,
     render: (creationTime: number) => {
-      return creationTime > 0 ? dayjs(creationTime).format('ll LTS') : 'NA';
+      return creationTime > 0 ? moment(creationTime).format('ll LTS') : 'NA';
     }
   },
   {
@@ -115,7 +113,7 @@ const COLUMNS: VolumnTableColumn[] = [
     isVisible: true,
     sorter: (a: IVolume, b: IVolume) => a.modificationTime - b.modificationTime,
     render: (modificationTime: number) => {
-      return modificationTime > 0 ? dayjs(modificationTime).format('ll LTS') : 'NA';
+      return modificationTime > 0 ? moment(modificationTime).format('ll LTS') : 'NA';
     }
   },
   {
@@ -310,7 +308,7 @@ export class Volumes extends React.Component<Record<string, object>, IVolumesSta
         loading: false,
         dataSource,
         totalCount,
-        lastUpdated: Number(dayjs()),
+        lastUpdated: Number(moment()),
         showPanel: false
       });
     }).catch(error => {
@@ -340,7 +338,7 @@ export class Volumes extends React.Component<Record<string, object>, IVolumesSta
   render() {
     const { dataSource, loading, totalCount, lastUpdated, selectedColumns,
       columnOptions, showPanel, currentRow, selectedLimit } = this.state;
-    const paginationConfig: PaginationConfig = {
+    const paginationConfig: TablePaginationConfig = {
       showTotal: (total: number, range) => `${range[0]}-${range[1]} of ${total} volumes`,
       showSizeChanger: true,
       onShowSizeChange: this.onShowSizeChange

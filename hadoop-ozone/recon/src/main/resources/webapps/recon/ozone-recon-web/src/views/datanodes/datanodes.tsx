@@ -17,12 +17,10 @@
  */
 
 import React from 'react';
-import dayjs from 'dayjs';
-import LocalizedFormat from 'dayjs/plugin/localizedFormat';
-import Duration from 'dayjs/plugin/duration';
+import moment from 'moment';
 import { ActionMeta, ValueType } from 'react-select';
 import { Table, Tooltip, Popover, Button, Popconfirm } from 'antd';
-import { PaginationConfig } from 'antd/lib/pagination';
+import { TablePaginationConfig } from 'antd/es/table';
 import {
   CheckCircleFilled,
   CheckCircleOutlined,
@@ -53,8 +51,6 @@ import { AxiosGetHelper, AxiosPutHelper } from '@/utils/axiosRequestHelper';
 
 import './datanodes.less';
 
-dayjs.extend(LocalizedFormat);
-dayjs.extend(Duration);
 
 interface IDatanodeResponse {
   hostname: string;
@@ -144,13 +140,13 @@ const getTimeDiffFromTimestamp = (timestamp: number): string => {
   const currentDate = new Date();
 
   let elapsedTime = '';
-  const duration: Duration.Duration = dayjs.duration(
-    dayjs(currentDate).diff(dayjs(timestampDate))
+  const duration: moment.Duration = moment.duration(
+    moment(currentDate).diff(moment(timestampDate))
   )
 
   const durationKeys = ['seconds', 'minutes', 'hours', 'days', 'months', 'years']
   durationKeys.forEach((k) => {
-    const time = duration['$d'][k]
+    const time = duration['_data'][k]
     if (time !== 0) {
       elapsedTime = time + `${k.substring(0, 1)} ` + elapsedTime
     }
@@ -317,7 +313,7 @@ const COLUMNS = [
     isVisible: true,
     sorter: (a: IDatanode, b: IDatanode) => a.setupTime - b.setupTime,
     render: (uptime: number) => {
-      return uptime > 0 ? dayjs(uptime).format('ll LTS') : 'NA';
+      return uptime > 0 ? moment(uptime).format('ll LTS') : 'NA';
     }
   },
   {
@@ -432,7 +428,7 @@ export class Datanodes extends React.Component<Record<string, object>, IDatanode
         loading: false,
         dataSource,
         totalCount,
-        lastUpdated: Number(dayjs())
+        lastUpdated: Number(moment())
       });
     }).catch(error => {
       this.setState({
@@ -524,7 +520,7 @@ export class Datanodes extends React.Component<Record<string, object>, IDatanode
 
     const hasSelected = selectedRowKeys.length > 0;
 
-    const paginationConfig: PaginationConfig = {
+    const paginationConfig: TablePaginationConfig = {
       showTotal: (total: number, range) => `${range[0]}-${range[1]} of ${total} datanodes`,
       showSizeChanger: true,
       onShowSizeChange: this.onShowSizeChange

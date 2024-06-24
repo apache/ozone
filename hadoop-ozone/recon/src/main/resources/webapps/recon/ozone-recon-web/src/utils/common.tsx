@@ -16,16 +16,13 @@
  * limitations under the License.
  */
 
-import dayjs from 'dayjs';
-import DayJSLocalizedFormat from 'dayjs/plugin/localizedFormat';
+import moment from 'moment';
 import { notification } from 'antd';
-
-dayjs.extend(DayJSLocalizedFormat);
 
 export const getCapacityPercent = (used: number, total: number) => Math.round((used / total) * 100);
 
 export const timeFormat = (time: number) => time > 0 ?
-  dayjs(time).format('lll') : 'NA';
+  moment(time).format('lll') : 'NA';
 
 const showErrorNotification = (title: string, description: string) => {
   const args = {

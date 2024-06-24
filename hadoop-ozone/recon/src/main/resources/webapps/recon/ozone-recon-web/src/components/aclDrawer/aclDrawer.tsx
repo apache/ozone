@@ -18,6 +18,7 @@
 
 import React from 'react';
 import {Table, Drawer, Tag} from 'antd';
+
 import {ACLIdentity, ACLIdentityTypeList, IAcl} from '@/types/om.types';
 import {aclRightColorMap, aclIdentityTypeColorMap} from '@/constants/aclDrawer.constants';
 
@@ -68,7 +69,7 @@ export class AclPanel extends React.Component<IAclDrawerProps> {
           placement='right'
           width='40%'
           closable={false}
-          open={visible}
+          visible={visible}
           getContainer={false}
           onClose={this.onClose}
         >

@@ -17,20 +17,13 @@
  */
 
 import React from 'react';
-import dayjs from 'dayjs';
-import DayJSRelativeTime from 'dayjs/plugin/relativeTime';
-import DayJSLocalizedFormat from 'dayjs/plugin/localizedFormat';
+import moment from 'moment';
 import { Tooltip, Button, Switch } from 'antd';
 import { PlayCircleOutlined, ReloadOutlined } from '@ant-design/icons';
 import { withRouter } from 'react-router-dom';
 import { RouteComponentProps } from 'react-router';
 
 import './autoReloadPanel.less';
-
-// DayJS needs to be extended to support fromNow()
-// and localized formatting for ll, LTS etc.
-dayjs.extend(DayJSRelativeTime);
-dayjs.extend(DayJSLocalizedFormat);
 
 interface IAutoReloadPanelProps extends RouteComponentProps<object> {
   onReload: () => void;
@@ -56,9 +49,9 @@ class AutoReloadPanel extends React.Component<IAutoReloadPanelProps> {
     const lastRefreshedText = lastRefreshed === 0 || lastRefreshed === undefined ? 'NA' :
       (
         <Tooltip
-          placement='bottom' title={dayjs(lastRefreshed).format('ll LTS')}
+          placement='bottom' title={moment(lastRefreshed).format('ll LTS')}
         >
-          {dayjs(lastRefreshed).format('LT')}
+          {moment(lastRefreshed).format('LT')}
         </Tooltip>
       );
 
@@ -66,9 +59,9 @@ class AutoReloadPanel extends React.Component<IAutoReloadPanelProps> {
 
     const omDBDeltaFullToolTip = <span>
       {omSyncStatusDisplay}
-      {'Delta Update'}: {dayjs(lastUpdatedOMDBDelta).fromNow()}, {dayjs(lastUpdatedOMDBDelta).format('LT')}
+      {'Delta Update'}: {moment(lastUpdatedOMDBDelta).fromNow()}, {moment(lastUpdatedOMDBDelta).format('LT')}
       <br />
-      {'Full Update'}: {dayjs(lastUpdatedOMDBFull).fromNow()}, {dayjs(lastUpdatedOMDBFull).format('LT')}
+      {'Full Update'}: {moment(lastUpdatedOMDBFull).fromNow()}, {moment(lastUpdatedOMDBFull).format('LT')}
     </span>
 
     const lastUpdatedOMLatest = lastUpdatedOMDBDelta > lastUpdatedOMDBFull ? lastUpdatedOMDBDelta : lastUpdatedOMDBFull;
@@ -78,7 +71,7 @@ class AutoReloadPanel extends React.Component<IAutoReloadPanelProps> {
         <Tooltip
           placement='bottom' title={omDBDeltaFullToolTip}
         >
-          {dayjs(lastUpdatedOMLatest).format('LT')}
+          {moment(lastUpdatedOMLatest).format('LT')}
         </Tooltip>
       );
 
