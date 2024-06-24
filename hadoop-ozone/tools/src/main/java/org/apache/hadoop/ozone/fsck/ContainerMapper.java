@@ -21,7 +21,6 @@ package org.apache.hadoop.ozone.fsck;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.ClientVersion;
-import org.apache.hadoop.ozone.om.OMPerformanceMetrics;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
@@ -80,17 +79,6 @@ public class ContainerMapper {
     }
     OmMetadataManagerImpl metadataManager =
         new OmMetadataManagerImpl(configuration, null);
-    return getBlockIdDetailsUtils(metadataManager);
-  }
-
-  public Map<Long, List<Map<Long, BlockIdDetails>>>
-      parseOmDB(OzoneConfiguration configuration, OMPerformanceMetrics perfMetrics) throws IOException {
-    String path = configuration.get(OZONE_OM_DB_DIRS);
-    if (path == null || path.isEmpty()) {
-      throw new IOException(OZONE_OM_DB_DIRS + "should be set ");
-    }
-    OmMetadataManagerImpl metadataManager =
-        new OmMetadataManagerImpl(configuration, null, perfMetrics);
     return getBlockIdDetailsUtils(metadataManager);
   }
 

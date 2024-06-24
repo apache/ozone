@@ -332,7 +332,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
     init(conf, ozoneManager);
     this.lock = new OzoneManagerLock(conf);
     this.omEpoch = OmUtils.getOMEpoch(isRatisEnabled);
-    this.perfMetrics = ozoneManager.getPerfMetrics();
+    this.perfMetrics = null;
     start(conf);
   }
 
@@ -1253,11 +1253,11 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
         cacheKeyMap.put(key, omKeyInfo);
       }
     }
-    long startNano, stopNano = 0;
+    long readFromRDbStartNs, readFromRDbStopNs = 0;
     // Get maxKeys from DB if it has.
     try (TableIterator<String, ? extends KeyValue<String, OmKeyInfo>>
              keyIter = getKeyTable(getBucketLayout()).iterator()) {
-      startNano = Time.monotonicNowNanos();
+      readFromRDbStartNs = Time.monotonicNowNanos();
       KeyValue< String, OmKeyInfo > kv;
       keyIter.seek(seekKey);
       // we need to iterate maxKeys + 1 here because if skipStartKey is true,
@@ -1280,7 +1280,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
           break;
         }
       }
-      stopNano = Time.monotonicNowNanos();
+      readFromRDbStopNs = Time.monotonicNowNanos();
     }
     boolean isTruncated = cacheKeyMap.size() > maxKeys;
     if (perfMetrics != null) {
@@ -1291,10 +1291,10 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
         averagePagination = cacheKeyMap.size();
       }
       perfMetrics.setListKeysAveragePagination(averagePagination);
-      long opsPerSec =
+      long opsPerNs =
           averagePagination / (Time.monotonicNowNanos() - startNanos);
-      perfMetrics.setListKeysOpsPerSec(opsPerSec);
-      perfMetrics.addListKeysReadFromRocksDbLatencyNs(stopNano - startNano);
+      perfMetrics.setListKeysOpsPerNs(opsPerNs);
+      perfMetrics.addListKeysReadFromRocksDbLatencyNs(readFromRDbStopNs - readFromRDbStartNs);
     }
     // Finally DB entries and cache entries are merged, then return the count
     // of maxKeys from the sorted map.

@@ -81,7 +81,6 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.params.provider.Arguments.arguments;
-import static org.mockito.Mockito.mock;
 
 /**
  * Tests OzoneManager MetadataManager.
@@ -99,9 +98,7 @@ public class TestOmMetadataManager {
     ozoneConfiguration = new OzoneConfiguration();
     ozoneConfiguration.set(OZONE_OM_DB_DIRS,
         folder.getAbsolutePath());
-    OMPerformanceMetrics perfMetrics = mock(OMPerformanceMetrics.class);
-    omMetadataManager = new OmMetadataManagerImpl(ozoneConfiguration, null,
-        perfMetrics);
+    omMetadataManager = new OmMetadataManagerImpl(ozoneConfiguration, null);
   }
 
   @Test

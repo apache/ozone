@@ -21,7 +21,6 @@ import com.google.common.collect.ImmutableMap;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
-import org.apache.hadoop.ozone.om.OMPerformanceMetrics;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
 import org.apache.hadoop.ozone.om.SnapshotChainManager;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
@@ -73,8 +72,7 @@ public class TestSnapshotChain {
   public void setup() throws Exception {
     OzoneConfiguration conf = new OzoneConfiguration();
     conf.set(OZONE_OM_DB_DIRS, folder.toString());
-    omMetadataManager = new OmMetadataManagerImpl(conf, null,
-        new OMPerformanceMetrics());
+    omMetadataManager = new OmMetadataManagerImpl(conf, null);
     snapshotIdToSnapshotInfoMap = new HashMap<>();
     chainManager = new SnapshotChainManager(omMetadataManager);
   }

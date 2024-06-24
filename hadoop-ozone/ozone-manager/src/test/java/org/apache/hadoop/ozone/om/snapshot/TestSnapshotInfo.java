@@ -21,7 +21,6 @@ package org.apache.hadoop.ozone.om.snapshot;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
-import org.apache.hadoop.ozone.om.OMPerformanceMetrics;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo.SnapshotStatus;
@@ -56,8 +55,7 @@ public class TestSnapshotInfo {
     OzoneConfiguration conf = new OzoneConfiguration();
     conf.set(OZONE_OM_DB_DIRS,
         folder.toAbsolutePath().toString());
-    omMetadataManager = new OmMetadataManagerImpl(conf, null,
-        new OMPerformanceMetrics());
+    omMetadataManager = new OmMetadataManagerImpl(conf, null);
   }
 
   private SnapshotInfo createSnapshotInfo() {

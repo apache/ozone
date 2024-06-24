@@ -66,7 +66,7 @@ public class TestOMMultiTenantManagerImpl {
     conf = new OzoneConfiguration();
     conf.set(OZONE_OM_DB_DIRS, folder.toAbsolutePath().toString());
     conf.set(OZONE_OM_TENANT_DEV_SKIP_RANGER, "true");
-    omMetadataManager = new OmMetadataManagerImpl(conf, ozoneManager, new OMPerformanceMetrics());
+    omMetadataManager = new OmMetadataManagerImpl(conf, ozoneManager);
 
     createTenantInDB(TENANT_ID);
     assignUserToTenantInDB(TENANT_ID, "seed-accessId1", "seed-user1", false,

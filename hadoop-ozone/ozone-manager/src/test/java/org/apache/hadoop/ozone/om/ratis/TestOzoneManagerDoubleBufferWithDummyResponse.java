@@ -24,7 +24,6 @@ import java.util.UUID;
 import java.util.concurrent.atomic.AtomicLong;
 
 import org.apache.hadoop.hdds.utils.TransactionInfo;
-import org.apache.hadoop.ozone.om.OMPerformanceMetrics;
 import org.apache.hadoop.ozone.om.response.CleanupTableInfo;
 import org.apache.ratis.server.protocol.TermIndex;
 import org.junit.jupiter.api.AfterEach;
@@ -73,8 +72,7 @@ public class TestOzoneManagerDoubleBufferWithDummyResponse {
     OzoneConfiguration configuration = new OzoneConfiguration();
     configuration.set(OZONE_METADATA_DIRS,
         folder.toAbsolutePath().toString());
-    omMetadataManager = new OmMetadataManagerImpl(configuration, null,
-        new OMPerformanceMetrics());
+    omMetadataManager = new OmMetadataManagerImpl(configuration, null);
     doubleBuffer = OzoneManagerDoubleBuffer.newBuilder()
         .setOmMetadataManager(omMetadataManager)
         .setMaxUnFlushedTransactionCount(10000)
@@ -164,14 +162,14 @@ public class TestOzoneManagerDoubleBufferWithDummyResponse {
     private final OmBucketInfo omBucketInfo;
 
     OMDummyCreateBucketResponse(OmBucketInfo omBucketInfo,
-                                OMResponse omResponse) {
+        OMResponse omResponse) {
       super(omResponse);
       this.omBucketInfo = omBucketInfo;
     }
 
     @Override
     public void addToDBBatch(OMMetadataManager omMetadataManager,
-                             BatchOperation batchOperation) throws IOException {
+        BatchOperation batchOperation) throws IOException {
       String dbBucketKey =
           omMetadataManager.getBucketKey(omBucketInfo.getVolumeName(),
               omBucketInfo.getBucketName());

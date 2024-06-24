@@ -33,7 +33,6 @@ import org.apache.hadoop.hdds.utils.MetadataKeyFilters;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.Table.KeyValue;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
-import org.apache.hadoop.ozone.om.OMPerformanceMetrics;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
 import org.apache.hadoop.ozone.om.OzoneManagerUtils;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
@@ -109,7 +108,7 @@ public class PrefixParser implements Callable<Void>, SubcommandWithParent {
 
   @Override
   public Void call() throws Exception {
-    parse(volume, bucket, dbPath, filePath, null);
+    parse(volume, bucket, dbPath, filePath);
     return null;
   }
 
@@ -118,7 +117,7 @@ public class PrefixParser implements Callable<Void>, SubcommandWithParent {
   }
 
   public void parse(String vol, String buck, String db,
-                    String file, OMPerformanceMetrics perfMetrics) throws Exception {
+                    String file) throws Exception {
     if (!Files.exists(Paths.get(db))) {
       System.out.println("DB path not exist:" + db);
       return;
@@ -129,13 +128,7 @@ public class PrefixParser implements Callable<Void>, SubcommandWithParent {
 
     OzoneConfiguration conf = new OzoneConfiguration();
     conf.set(OMConfigKeys.OZONE_OM_DB_DIRS, db);
-    OmMetadataManagerImpl metadataManager;
-
-    if (perfMetrics != null) {
-      metadataManager = new OmMetadataManagerImpl(conf, null, perfMetrics);
-    } else {
-      metadataManager = new OmMetadataManagerImpl(conf, null);
-    }
+    OmMetadataManagerImpl metadataManager = new OmMetadataManagerImpl(conf, null);
 
     metadataManager.start(conf);
 

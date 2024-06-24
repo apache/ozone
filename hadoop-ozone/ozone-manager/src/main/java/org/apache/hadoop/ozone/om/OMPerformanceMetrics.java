@@ -229,8 +229,8 @@ public class OMPerformanceMetrics {
     listKeysAveragePagination.add(averagePagination);
   }
 
-  public void setListKeysOpsPerSec(long opsPerSec) {
-    listKeysOpsPerSec.add(opsPerSec);
+  public void setListKeysOpsPerNs(long opsPerNs) {
+    listKeysOpsPerSec.add(opsPerNs);
   }
   
   MutableRate getListKeysAclCheckLatencyNs() {

@@ -20,7 +20,6 @@ package org.apache.hadoop.ozone.recon.api;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
-import org.apache.hadoop.ozone.om.OMPerformanceMetrics;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
@@ -127,7 +126,7 @@ public class TestNSSummaryDiskUsageOrdering {
     omConfiguration.set(OZONE_OM_DB_DIRS,
         omDbDir.getAbsolutePath());
     OMMetadataManager omMetadataManager = new OmMetadataManagerImpl(
-        omConfiguration, null, new OMPerformanceMetrics());
+        omConfiguration, null);
     return omMetadataManager;
   }
 
