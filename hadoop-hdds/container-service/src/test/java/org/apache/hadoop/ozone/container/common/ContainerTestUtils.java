@@ -214,7 +214,6 @@ public final class ContainerTestUtils {
     when(data.getContainerID()).thenReturn(containerIdSeq.getAndIncrement());
     when(c.getContainerData()).thenReturn(data);
     when(c.shouldScanData()).thenReturn(shouldScanData);
-    when(c.shouldScanMetadata()).thenReturn(true);
     when(c.getContainerData().getVolume()).thenReturn(vol);
 
     try {

@@ -114,15 +114,17 @@ public class ContainerController {
    * @param reason The reason the container was marked unhealthy
    * @throws IOException in case of exception
    */
-  public void markContainerUnhealthy(final long containerId, ScanResult reason)
+  public boolean markContainerUnhealthy(final long containerId, ScanResult reason)
           throws IOException {
-    Container container = containerSet.getContainer(containerId);
-    if (container != null) {
+    Container container = getContainer(containerId);
+    if (container != null && container.getContainerState() != State.UNHEALTHY) {
       getHandler(container).markContainerUnhealthy(container, reason);
+      return true;
     } else {
       LOG.warn("Container {} not found, may be deleted, skip mark UNHEALTHY",
           containerId);
     }
+    return false;
   }
 
   /**
