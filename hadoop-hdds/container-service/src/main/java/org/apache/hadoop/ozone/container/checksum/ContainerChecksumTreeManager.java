@@ -34,6 +34,8 @@ import org.apache.hadoop.hdds.utils.SimpleStriped;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import static org.apache.hadoop.util.MetricUtil.captureLatencyNs;
+
 /**
  * This class coordinates reading and writing Container checksum information for all containers.
  */
@@ -44,12 +46,15 @@ public class ContainerChecksumTreeManager {
   // Used to coordinate reads and writes to each container's checksum file.
   // Each container ID is mapped to a stripe.
   private final Striped<ReadWriteLock> fileLock;
+  private final ContainerMerkleTreeMetrics metrics;
 
   /**
    * Creates one instance that should be used to coordinate all container checksum info within a datanode.
    */
   public ContainerChecksumTreeManager(DatanodeConfiguration dnConf) {
     fileLock = SimpleStriped.readWriteLock(dnConf.getContainerChecksumLockStripes(), true);
+    // TODO: TO unregister metrics on stop.
+    metrics = ContainerMerkleTreeMetrics.create();
   }
 
   /**
@@ -65,8 +70,13 @@ public class ContainerChecksumTreeManager {
       ContainerProtos.ContainerChecksumInfo newChecksumInfo = read(data).toBuilder()
           .setDataMerkleTree(tree.toProto())
           .build();
-      write(data, newChecksumInfo);
+      captureLatencyNs(metrics.getWriteContainerMerkleTreeLatencyNS(),
+          () -> write(data, newChecksumInfo));
       LOG.debug("Data merkle tree for container {} updated", data.getContainerID());
+    } catch (IOException ex) {
+      metrics.incrementMerkleTreeWriteFailures();
+      throw new IOException("Error occurred when writing container merkle tree for containerID "
+          + data.getContainerID(), ex);
     } finally {
       writeLock.unlock();
     }
@@ -92,8 +102,13 @@ public class ContainerChecksumTreeManager {
           .clearDeletedBlocks()
           .addAllDeletedBlocks(sortedDeletedBlockIDs)
           .build();
-      write(data, checksumInfoBuilder.build());
+      captureLatencyNs(metrics.getUpdateContainerMerkleTreeLatencyNS(),
+          () -> write(data, checksumInfoBuilder.build()));
       LOG.debug("Deleted block list for container {} updated", data.getContainerID());
+    } catch (IOException ex) {
+      metrics.incrementMerkleTreeUpdateFailures();
+      throw new IOException("Error occurred when updating container merkle tree for containerID "
+          + data.getContainerID(), ex);
     } finally {
       writeLock.unlock();
     }
@@ -115,7 +130,7 @@ public class ContainerChecksumTreeManager {
     return fileLock.get(containerID).writeLock();
   }
 
-  private ContainerProtos.ContainerChecksumInfo read(KeyValueContainerData data) throws IOException {
+  public ContainerProtos.ContainerChecksumInfo read(KeyValueContainerData data) throws IOException {
     long containerID = data.getContainerID();
     Lock readLock = getReadLock(containerID);
     readLock.lock();
@@ -131,11 +146,20 @@ public class ContainerChecksumTreeManager {
             .setContainerID(containerID)
             .build();
       }
-      try (FileInputStream inStream = new FileInputStream(checksumFile)) {
-        return ContainerProtos.ContainerChecksumInfo.parseFrom(inStream);
-      }
+      return captureLatencyNs(metrics.getReadContainerMerkleTreeLatencyNS(), () ->
+          readFile(checksumFile));
+    } catch (IOException ex) {
+      metrics.incrementMerkleTreeReadFailures();
+      throw new IOException("Error occurred when reading container merkle tree for containerID "
+        + data.getContainerID(), ex);
     } finally {
       readLock.unlock();
+    }
+  }
+
+  private ContainerProtos.ContainerChecksumInfo readFile(File checksumFile) throws IOException {
+    try (FileInputStream inStream = new FileInputStream(checksumFile)) {
+      return ContainerProtos.ContainerChecksumInfo.parseFrom(inStream);
     }
   }
 
@@ -152,6 +176,10 @@ public class ContainerChecksumTreeManager {
 
   private File getContainerChecksumFile(KeyValueContainerData data) {
     return new File(data.getMetadataPath(), data.getContainerID() + ".tree");
+  }
+
+  public ContainerMerkleTreeMetrics getMetrics() {
+    return this.metrics;
   }
 
   /**
