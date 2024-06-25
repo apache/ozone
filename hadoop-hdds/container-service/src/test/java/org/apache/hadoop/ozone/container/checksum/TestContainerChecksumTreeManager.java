@@ -16,6 +16,7 @@
  */
 package org.apache.hadoop.ozone.container.checksum;
 
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.ozone.container.common.helpers.ChunkInfo;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
@@ -54,7 +55,7 @@ class TestContainerChecksumTreeManager {
     when(container.getContainerID()).thenReturn(CONTAINER_ID);
     when(container.getMetadataPath()).thenReturn(testDir.getAbsolutePath());
     checksumFile = new File(testDir, CONTAINER_ID + ".tree");
-    checksumManager = new ContainerChecksumTreeManager(new DatanodeConfiguration());
+    checksumManager = new ContainerChecksumTreeManager(new OzoneConfiguration());
   }
 
   @Test

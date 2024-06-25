@@ -35,6 +35,7 @@ import org.apache.hadoop.hdds.utils.BackgroundTask;
 import org.apache.hadoop.hdds.utils.MetadataKeyFilters.KeyPrefixFilter;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
+import org.apache.hadoop.ozone.container.checksum.ContainerChecksumTreeManager;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.helpers.BlockDeletingServiceMetrics;
 import org.apache.hadoop.ozone.container.common.impl.BlockDeletingService;
@@ -73,10 +74,12 @@ public class BlockDeletingTask implements BackgroundTask {
   private final OzoneContainer ozoneContainer;
   private final ConfigurationSource conf;
   private Duration blockDeletingMaxLockHoldingTime;
+  private final ContainerChecksumTreeManager checksumTreeManager;
 
   public BlockDeletingTask(
       BlockDeletingService blockDeletingService,
       BlockDeletingService.ContainerBlockInfo containerBlockInfo,
+      ContainerChecksumTreeManager checksumTreeManager,
       int priority) {
     this.ozoneContainer = blockDeletingService.getOzoneContainer();
     this.metrics = blockDeletingService.getMetrics();
@@ -87,6 +90,7 @@ public class BlockDeletingTask implements BackgroundTask {
     this.containerData =
         (KeyValueContainerData) containerBlockInfo.getContainerData();
     this.blocksToDelete = containerBlockInfo.getNumBlocksToDelete();
+    this.checksumTreeManager = checksumTreeManager;
   }
 
   private static class ContainerBackgroundTaskResult
@@ -223,6 +227,9 @@ public class BlockDeletingTask implements BackgroundTask {
           LOG.error("Failed to delete files for block {}", blockName, e);
         }
       }
+
+      // TODO add succeededBlocks to deleted here.
+//      checksumTreeManager.markBlocksAsDeleted(succeedBlocks);
 
       // Once chunks in the blocks are deleted... remove the blockID from
       // blockDataTable.
@@ -366,6 +373,9 @@ public class BlockDeletingTask implements BackgroundTask {
           tx -> crr.addAll(tx.getLocalIDList().stream()
               .map(String::valueOf).collect(Collectors.toList()))
       );
+
+      // TODO write blocks deleted to the file here since txns are not yet removed from DB.
+      checksumTreeManager.markBlocksAsDeleted(crr.getDeletedBlocks());
 
       // Once blocks are deleted... remove the blockID from blockDataTable
       // and also remove the transactions from txnTable.

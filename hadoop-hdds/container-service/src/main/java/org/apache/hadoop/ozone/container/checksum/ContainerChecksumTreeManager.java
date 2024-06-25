@@ -16,6 +16,7 @@
  */
 package org.apache.hadoop.ozone.container.checksum;
 
+import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
@@ -48,8 +49,9 @@ public class ContainerChecksumTreeManager {
   /**
    * Creates one instance that should be used to coordinate all container checksum info within a datanode.
    */
-  public ContainerChecksumTreeManager(DatanodeConfiguration dnConf) {
-    fileLock = SimpleStriped.readWriteLock(dnConf.getContainerChecksumLockStripes(), true);
+  public ContainerChecksumTreeManager(ConfigurationSource conf) {
+    fileLock = SimpleStriped.readWriteLock(
+        conf.getObject(DatanodeConfiguration.class).getContainerChecksumLockStripes(), true);
   }
 
   /**
