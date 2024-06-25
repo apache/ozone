@@ -63,7 +63,7 @@ public class ScmConfig extends ReconfigurableConfig {
   )
   private String action;
 
-  private final String descriptionPipelinePolicyImplChoices =
+  private static final String DESCRIPTION_COMMON_CHOICES_OF_PIPELINE_CHOOSE_POLICY_IMPL =
       "One of the following values can be used: "
       + "(1) org.apache.hadoop.hdds.scm.pipeline.choose.algorithms.RandomPipelineChoosePolicy"
       + " : chooses a pipeline randomly. "
@@ -85,7 +85,7 @@ public class ScmConfig extends ReconfigurableConfig {
           + "the full name of a class which implements org.apache.hadoop.hdds.scm.PipelineChoosePolicy. "
           + "The class decides which pipeline will be used to find or allocate Ratis containers. If not set, "
           + "org.apache.hadoop.hdds.scm.pipeline.choose.algorithms.RandomPipelineChoosePolicy"
-          + " will be used as default value. " + descriptionPipelinePolicyImplChoices
+          + " will be used as default value. " + DESCRIPTION_COMMON_CHOICES_OF_PIPELINE_CHOOSE_POLICY_IMPL
   )
   private String pipelineChoosePolicyName;
 
@@ -99,7 +99,7 @@ public class ScmConfig extends ReconfigurableConfig {
           + "the full name of a class which implements org.apache.hadoop.hdds.scm.PipelineChoosePolicy. "
           + "The class decides which pipeline will be used when selecting an EC Pipeline. If not set, "
           + "org.apache.hadoop.hdds.scm.pipeline.choose.algorithms.RandomPipelineChoosePolicy"
-          + " will be used as default value. " + descriptionPipelinePolicyImplChoices
+          + " will be used as default value. " + DESCRIPTION_COMMON_CHOICES_OF_PIPELINE_CHOOSE_POLICY_IMPL
   )
   private String ecPipelineChoosePolicyName;
 
