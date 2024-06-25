@@ -39,8 +39,8 @@ import static org.mockito.Mockito.mock;
  * Test for the round-robin pipeline choose policy.
  */
 public class TestRoundRobinPipelineChoosePolicy {
-  private final int numDatanodes = 4;
-  private final int numPipelines = 4;
+  private static final int NUM_DATANODES = 4;
+  private static final int NUM_PIPELINES = 4;
   private PipelineChoosePolicy policy;
   private List<Pipeline> allPipelines;
 
@@ -48,7 +48,7 @@ public class TestRoundRobinPipelineChoosePolicy {
   public void setup() throws Exception {
 
     List<DatanodeDetails> datanodes = new ArrayList<>();
-    for (int i = 0; i < numDatanodes; i++) {
+    for (int i = 0; i < NUM_DATANODES; i++) {
       datanodes.add(MockDatanodeDetails.randomDatanodeDetails());
     }
 
@@ -63,7 +63,7 @@ public class TestRoundRobinPipelineChoosePolicy {
     //  pipeline3    dn0   dn1   dn2
     //
     allPipelines = new ArrayList<>();
-    for (int i = 0; i < numPipelines; i++) {
+    for (int i = 0; i < NUM_PIPELINES; i++) {
       List<DatanodeDetails> dns = new ArrayList<>();
       for (int j = 0; j < datanodes.size(); j++) {
         if (i != j) {
@@ -78,7 +78,7 @@ public class TestRoundRobinPipelineChoosePolicy {
   }
 
   private void verifySelectedCountMap(Map<Pipeline, Integer> selectedCountMap, int[] arrExpectCount) {
-    for (int i = 0; i < numPipelines; i++) {
+    for (int i = 0; i < NUM_PIPELINES; i++) {
       assertEquals(arrExpectCount[i], selectedCountMap.getOrDefault(allPipelines.get(i), 0));
     }
   }
@@ -91,7 +91,7 @@ public class TestRoundRobinPipelineChoosePolicy {
     for (int i = 0; i < numContainers; i++) {
       Pipeline pipeline = policy.choosePipeline(allPipelines, null);
       assertNotNull(pipeline);
-      assertEquals(allPipelines.get(i % numPipelines), pipeline);
+      assertEquals(allPipelines.get(i % NUM_PIPELINES), pipeline);
       selectedCountMap.compute(pipeline, (k, v) -> v == null ? 1 : v + 1);
     }
 
