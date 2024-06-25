@@ -483,7 +483,9 @@ public abstract class OMClientRequest implements RequestAuditor {
   public AuditMessage buildAuditMessage(AuditAction op,
       Map< String, String > auditMap, Throwable throwable,
       OzoneManagerProtocolProtos.UserInfo userInfo, TermIndex termIndex) {
-    auditMap.put("Transaction", "" + termIndex.getIndex());
+    if (null != auditMap) {
+      auditMap.put("Transaction", "" + termIndex.getIndex());
+    }
     return new AuditMessage.Builder()
         .setUser(userInfo != null ? userInfo.getUserName() : null)
         .atIp(userInfo != null ? userInfo.getRemoteAddress() : null)
