@@ -22,7 +22,7 @@ import filesize from 'filesize';
 import { Row, Col, Tabs } from 'antd';
 import { LoadingOutlined } from '@ant-design/icons';
 import { ActionMeta, ValueType } from 'react-select';
-import type { EChartsOption } from 'echarts';
+import { format, type EChartsOption } from 'echarts';
 
 import { EChart } from '@/components/eChart/eChart';
 import { MultiSelect, IOption } from '@/components/multiSelect/multiSelect';
@@ -195,6 +195,10 @@ export class Insights extends React.Component<Record<string, object>, IInsightsS
         return (size(value));
       });
 
+      console.log(xyFileCountMap);
+      console.log(xContainerCountValues);
+      console.log(xyContainerCountMap);
+
       this.setState({
         fileCountData: {
           title: {
@@ -240,7 +244,7 @@ export class Insights extends React.Component<Record<string, object>, IInsightsS
           series: {
             type: 'pie',
             radius: '50%',
-            data: Array.from(xyFileCountMap.values()).map((value, idx) => {
+            data: Array.from(xyContainerCountMap.values()).map((value, idx) => {
               return {
                 value: value,
                 name: xContainerCountValues[idx]
