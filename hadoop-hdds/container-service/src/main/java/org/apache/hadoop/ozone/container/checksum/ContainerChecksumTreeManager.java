@@ -99,12 +99,19 @@ public class ContainerChecksumTreeManager {
     }
   }
 
-  public ContainerDiff diff(KeyValueContainerData thisContainer, ContainerProtos.ContainerChecksumInfo otherInfo)
+  public ContainerDiff diff(KeyValueContainerData thisContainer, File otherContainerTree)
       throws IOException {
     // TODO HDDS-10928 compare the checksum info of the two containers and return a summary.
     //  Callers can act on this summary to repair their container replica using the peer's replica.
     //  This method will use the read lock, which is unused in the current implementation.
     return new ContainerDiff();
+  }
+
+  /**
+   * Returns the container checksum tree file for the specified container without deserializing it.
+   */
+  public File getContainerChecksumFile(KeyValueContainerData data) {
+    return new File(data.getMetadataPath(), data.getContainerID() + ".tree");
   }
 
   private Lock getReadLock(long containerID) {
@@ -148,10 +155,6 @@ public class ContainerChecksumTreeManager {
     } finally {
       writeLock.unlock();
     }
-  }
-
-  private File getContainerChecksumFile(KeyValueContainerData data) {
-    return new File(data.getMetadataPath(), data.getContainerID() + ".tree");
   }
 
   /**

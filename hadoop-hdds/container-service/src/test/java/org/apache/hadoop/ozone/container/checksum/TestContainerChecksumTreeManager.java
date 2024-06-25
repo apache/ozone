@@ -137,6 +137,11 @@ class TestContainerChecksumTreeManager {
     assertTreesSortedAndMatch(tree.toProto(), checksumInfo.getDataMerkleTree());
   }
 
+  @Test
+  public void testChecksumTreeFilePath() {
+    assertEquals(checksumFile.getAbsolutePath(), checksumManager.getContainerChecksumFile(container).getAbsolutePath());
+  }
+
   private ContainerMerkleTree buildTestTree() throws Exception {
     final long blockID1 = 1;
     final long blockID2 = 2;
