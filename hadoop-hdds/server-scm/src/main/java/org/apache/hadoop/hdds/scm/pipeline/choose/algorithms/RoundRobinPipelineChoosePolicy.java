@@ -37,7 +37,6 @@ public class RoundRobinPipelineChoosePolicy implements PipelineChoosePolicy {
   private int nextPipelineIndex = 0;
 
   @Override
-  @SuppressWarnings("java:S2245") // no need for secure random
   public Pipeline choosePipeline(List<Pipeline> pipelineList,
       PipelineRequestInformation pri) {
     return pipelineList.get(choosePipelineIndex(pipelineList, pri));

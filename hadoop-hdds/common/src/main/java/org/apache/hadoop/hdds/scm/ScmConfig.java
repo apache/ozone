@@ -63,6 +63,18 @@ public class ScmConfig extends ReconfigurableConfig {
   )
   private String action;
 
+  private final String descriptionPipelinePolicyImplChoices =
+      "One of the following values can be used: "
+      + "(1) org.apache.hadoop.hdds.scm.pipeline.choose.algorithms.RandomPipelineChoosePolicy"
+      + " : chooses a pipeline randomly. "
+      + "(2) org.apache.hadoop.hdds.scm.pipeline.choose.algorithms.HealthyPipelineChoosePolicy"
+      + " : chooses a healthy pipeline randomly. "
+      + "(3) org.apache.hadoop.hdds.scm.pipeline.choose.algorithms.CapacityPipelineChoosePolicy"
+      + " : chooses the pipeline with lower utilization from two random pipelines. Note that"
+      + " random choose method will be executed twice in this policy."
+      + "(4) org.apache.hadoop.hdds.scm.pipeline.choose.algorithms.RoundRobinPipelineChoosePolicy"
+      + " : chooses a pipeline in a round robin fashion. Intended for troubleshooting and testing purposes only.";
+
   // hdds.scm.pipeline.choose.policy.impl
   @Config(key = "pipeline.choose.policy.impl",
       type = ConfigType.STRING,
@@ -73,17 +85,7 @@ public class ScmConfig extends ReconfigurableConfig {
           + "the full name of a class which implements org.apache.hadoop.hdds.scm.PipelineChoosePolicy. "
           + "The class decides which pipeline will be used to find or allocate Ratis containers. If not set, "
           + "org.apache.hadoop.hdds.scm.pipeline.choose.algorithms.RandomPipelineChoosePolicy"
-          + " will be used as default value. "
-          + "One of the following values can be used: "
-          + "(1) org.apache.hadoop.hdds.scm.pipeline.choose.algorithms.RandomPipelineChoosePolicy"
-          + " : chooses a pipeline randomly. "
-          + "(2) org.apache.hadoop.hdds.scm.pipeline.choose.algorithms.HealthyPipelineChoosePolicy"
-          + " : chooses a healthy pipeline randomly. "
-          + "(3) org.apache.hadoop.hdds.scm.pipeline.choose.algorithms.CapacityPipelineChoosePolicy"
-          + " : chooses the pipeline with lower utilization from two random pipelines. Note that"
-          + " random choose method will be executed twice in this policy."
-          + "(4) org.apache.hadoop.hdds.scm.pipeline.choose.algorithms.RoundRobinPipelineChoosePolicy"
-          + " : chooses a pipeline in a round robin fashion. Intended for troubleshooting and testing purposes only."
+          + " will be used as default value. " + descriptionPipelinePolicyImplChoices
   )
   private String pipelineChoosePolicyName;
 
@@ -97,17 +99,7 @@ public class ScmConfig extends ReconfigurableConfig {
           + "the full name of a class which implements org.apache.hadoop.hdds.scm.PipelineChoosePolicy. "
           + "The class decides which pipeline will be used when selecting an EC Pipeline. If not set, "
           + "org.apache.hadoop.hdds.scm.pipeline.choose.algorithms.RandomPipelineChoosePolicy"
-          + " will be used as default value. "
-          + "One of the following values can be used: "
-          + "(1) org.apache.hadoop.hdds.scm.pipeline.choose.algorithms.RandomPipelineChoosePolicy"
-          + " : chooses a pipeline randomly. "
-          + "(2) org.apache.hadoop.hdds.scm.pipeline.choose.algorithms.HealthyPipelineChoosePolicy"
-          + " : chooses a healthy pipeline randomly. "
-          + "(3) org.apache.hadoop.hdds.scm.pipeline.choose.algorithms.CapacityPipelineChoosePolicy"
-          + " : chooses a pipeline with lower utilization from two random pipelines. Note that"
-          + " random choose method will be executed twice in this policy."
-          + "(4) org.apache.hadoop.hdds.scm.pipeline.choose.algorithms.RoundRobinPipelineChoosePolicy"
-          + " : chooses a pipeline in a round robin fashion. Intended for troubleshooting and testing purposes only."
+          + " will be used as default value. " + descriptionPipelinePolicyImplChoices
   )
   private String ecPipelineChoosePolicyName;
 
