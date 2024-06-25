@@ -233,7 +233,7 @@ export class DiskUsage extends React.Component<Record<string, object>, IDUState>
             name: pathLabels[idx],
             size: sizeStr[idx]
           }
-        }) 
+        })
       });
     }).catch(error => {
       this.setState({
@@ -553,8 +553,10 @@ export class DiskUsage extends React.Component<Record<string, object>, IDUState>
         }
       },
       legend: {
+        top: '10%',
         orient: 'vertical',
-        left: 'right'
+        left: 'left',
+        padding: [5, 15, 5, 5]
       },
       series: [
         {
@@ -585,8 +587,13 @@ export class DiskUsage extends React.Component<Record<string, object>, IDUState>
         <div className='content-div'>
           {isLoading ? <span><LoadingOutlined /> Loading...</span> : (
             <div>
-              <Row>
-                <Col>
+              <Row
+                style={{
+                  alignItems: 'end',
+                  margin: '0px 10px',
+                  justifyContent: 'space-between'
+                }}>
+                <div className='path-nav-container'>
                   <div className='go-back-button'>
                     <Button type='primary' onClick={e => this.goBack(e, returnPath)}><LeftOutlined /></Button>
                   </div>
@@ -599,6 +606,8 @@ export class DiskUsage extends React.Component<Record<string, object>, IDUState>
                   <div className='go-back-button'>
                     <Button type='primary' onClick={e => this.refreshCurPath(e, returnPath)}><RedoOutlined /></Button>
                   </div>
+                </div>
+                <div className='du-button-container'>
                   <div className='dropdown-button'>
                     <Dropdown
                       overlay={menuItems}
@@ -613,7 +622,7 @@ export class DiskUsage extends React.Component<Record<string, object>, IDUState>
                       </b>
                     </Button>
                   </div>
-                </Col>
+                </div>
               </Row>
               <Row>
                 {(duResponse.size > 0) ?

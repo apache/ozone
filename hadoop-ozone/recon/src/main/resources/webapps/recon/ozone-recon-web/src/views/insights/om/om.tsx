@@ -1009,7 +1009,7 @@ export class Om extends React.Component<Record<string, object>, IOmdbInsightsSta
         columns={this.searchKeysPendingColumn()}
         loading={loading}
         pagination={paginationConfig}
-        rowKey='keyName'/>
+        rowKey='keyName' />
     }
 
     const generateDeletedKeysTable = (dataSource: any) => {
@@ -1085,6 +1085,15 @@ export class Om extends React.Component<Record<string, object>, IOmdbInsightsSta
               <label>Deleted Container Keys&nbsp;&nbsp;
                 <Tooltip placement='top' title={'Keys mapped to Containers in DELETED state SCM.'}>
                   <InfoCircleOutlined />
+                </Tooltip>
+              </label>
+            )}>
+              {generateDeletedKeysTable(deletedContainerKeysDataSource)}
+            </Tabs.TabPane>
+            <Tabs.TabPane key='5' tab={(
+              <label>Directories Pending for Deletion&nbsp;&nbsp;
+                <Tooltip placement='top' title="Directories that are pending for deletion.">
+                  <InfoCircleOutlined/>
                 </Tooltip>
               </label>
             )}>
