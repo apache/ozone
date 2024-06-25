@@ -167,7 +167,7 @@ export class DiskUsage extends React.Component<Record<string, object>, IDUState>
         }
       }
 
-      let pathLabels, values: any[] = [], percentage, sizeStr, pieces, subpathName;
+      let pathLabels, values: number[] = [], percentage, sizeStr, pieces, subpathName;
 
       if (duResponse.subPathCount === 0 || subpaths === 0) {
         pieces = duResponse && duResponse.path != null && duResponse.path.split('/');
@@ -194,9 +194,8 @@ export class DiskUsage extends React.Component<Record<string, object>, IDUState>
           });
         }
 
-        // Adding a MIN_BLOCK_SIZE to each value ensures that even the smallest entities are visible on the pie chart.
+        // Adding a MIN_BLOCK_SIZE to non-zero size entities to ensure that even the smallest entities are visible on the pie chart.
         // Note: The percentage and size string calculations remain unchanged.
-        // Zero Size Entities not adding Minimum Block Size Logic so it will not display inside pi chart.
         const clonedValues = structuredClone(values);
         adddedvaluesBlockSize = clonedValues && clonedValues.map((item: number) => item > 0 ? item + MIN_BLOCK_SIZE : item);
 
@@ -559,7 +558,7 @@ export class DiskUsage extends React.Component<Record<string, object>, IDUState>
                     </Dropdown>
                   </div>
                   &nbsp;&nbsp;&nbsp;&nbsp;
-                  <Tooltip placement="rightTop" title="In Below chart we have achieved visibility for all small entities using additional block size.">
+                  <Tooltip placement="rightTop" title="Additional block size added for viewing small entity sizes. Please refer to pie-chart tooltip for exact size information.">
                     <Icon type='info-circle' />
                   </Tooltip>
                   <div className='metadata-button'>
