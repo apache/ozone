@@ -72,7 +72,8 @@ public class TestOzoneManagerDoubleBufferWithDummyResponse {
     OzoneConfiguration configuration = new OzoneConfiguration();
     configuration.set(OZONE_METADATA_DIRS,
         folder.toAbsolutePath().toString());
-    omMetadataManager = new OmMetadataManagerImpl(configuration, null);
+    omMetadataManager =
+        new OmMetadataManagerImpl(configuration, null);
     doubleBuffer = OzoneManagerDoubleBuffer.newBuilder()
         .setOmMetadataManager(omMetadataManager)
         .setMaxUnFlushedTransactionCount(10000)

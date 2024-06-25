@@ -128,7 +128,8 @@ public class PrefixParser implements Callable<Void>, SubcommandWithParent {
 
     OzoneConfiguration conf = new OzoneConfiguration();
     conf.set(OMConfigKeys.OZONE_OM_DB_DIRS, db);
-    OmMetadataManagerImpl metadataManager = new OmMetadataManagerImpl(conf, null);
+    OmMetadataManagerImpl metadataManager =
+        new OmMetadataManagerImpl(conf, null);
 
     metadataManager.start(conf);
 

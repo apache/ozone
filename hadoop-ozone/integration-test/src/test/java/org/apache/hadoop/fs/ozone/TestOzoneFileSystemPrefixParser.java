@@ -66,6 +66,7 @@ public class TestOzoneFileSystemPrefixParser {
     bucketName = RandomStringUtils.randomAlphabetic(10).toLowerCase();
 
     configuration = new OzoneConfiguration();
+
     cluster = MiniOzoneCluster.newBuilder(configuration)
         .setNumDatanodes(3)
         .build();

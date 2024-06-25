@@ -346,7 +346,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
     this.perfMetrics = perfMetrics;
     // For test purpose only
     ignorePipelineinKey = conf.getBoolean(
-            "ozone.om.ignore.pipeline", Boolean.TRUE);
+  "ozone.om.ignore.pipeline", Boolean.TRUE);
     start(conf);
   }
   private void init(OzoneConfiguration conf, OzoneManager manager) {
@@ -401,7 +401,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
     lock = new OmReadOnlyLock();
     omEpoch = 0;
     setStore(loadDB(conf, dir, name, true,
-        Optional.of(Boolean.TRUE), Optional.empty()));
+        java.util.Optional.of(Boolean.TRUE), Optional.empty()));
     initializeOmTables(CacheType.PARTIAL_CACHE, false);
     perfMetrics = null;
   }
@@ -434,7 +434,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
         checkSnapshotDirExist(checkpoint);
       }
       setStore(loadDB(conf, metaDir, dbName, false,
-          Optional.of(Boolean.TRUE),
+          java.util.Optional.of(Boolean.TRUE),
           Optional.of(maxOpenFiles), false, false));
       initializeOmTables(CacheType.PARTIAL_CACHE, false);
     } catch (IOException e) {
@@ -590,14 +590,14 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
   public static DBStore loadDB(OzoneConfiguration configuration, File metaDir)
       throws IOException {
     return loadDB(configuration, metaDir, OM_DB_NAME, false,
-            Optional.empty(), Optional.empty(), true, true);
+            java.util.Optional.empty(), Optional.empty(), true, true);
   }
 
   public static DBStore loadDB(OzoneConfiguration configuration, File metaDir,
                                String dbName, boolean readOnly,
-                               Optional<Boolean>
+                               java.util.Optional<Boolean>
                                        disableAutoCompaction,
-                               Optional<Integer> maxOpenFiles)
+                               java.util.Optional<Integer> maxOpenFiles)
           throws IOException {
     return loadDB(configuration, metaDir, dbName, readOnly,
         disableAutoCompaction, maxOpenFiles, true, true);
@@ -606,9 +606,9 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
   @SuppressWarnings("checkstyle:parameternumber")
   public static DBStore loadDB(OzoneConfiguration configuration, File metaDir,
                                String dbName, boolean readOnly,
-                               Optional<Boolean>
+                               java.util.Optional<Boolean>
                                    disableAutoCompaction,
-                               Optional<Integer> maxOpenFiles,
+                               java.util.Optional<Integer> maxOpenFiles,
                                boolean enableCompactionDag,
                                boolean createCheckpointDirs)
       throws IOException {
@@ -819,7 +819,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
    */
   @Override
   public String getVolumeKey(String volume) {
-    return OM_KEY_PREFIX + volume;
+    return OzoneConsts.OM_KEY_PREFIX + volume;
   }
 
   /**
@@ -1093,13 +1093,13 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
     List<OmBucketInfo> result = new ArrayList<>();
     if (Strings.isNullOrEmpty(volumeName)) {
       throw new OMException("Volume name is required.",
-          VOLUME_NOT_FOUND);
+          ResultCodes.VOLUME_NOT_FOUND);
     }
 
     String volumeNameBytes = getVolumeKey(volumeName);
     if (volumeTable.get(volumeNameBytes) == null) {
       throw new OMException("Volume " + volumeName + " not found.",
-          VOLUME_NOT_FOUND);
+          ResultCodes.VOLUME_NOT_FOUND);
     }
 
     String startKey;
@@ -1192,18 +1192,18 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
 
     if (Strings.isNullOrEmpty(volumeName)) {
       throw new OMException("Volume name is required.",
-          VOLUME_NOT_FOUND);
+          ResultCodes.VOLUME_NOT_FOUND);
     }
 
     if (Strings.isNullOrEmpty(bucketName)) {
       throw new OMException("Bucket name is required.",
-          BUCKET_NOT_FOUND);
+          ResultCodes.BUCKET_NOT_FOUND);
     }
 
     String bucketNameBytes = getBucketKey(volumeName, bucketName);
     if (getBucketTable().get(bucketNameBytes) == null) {
       throw new OMException("Bucket " + bucketName + " not found.",
-          BUCKET_NOT_FOUND);
+          ResultCodes.BUCKET_NOT_FOUND);
     }
 
     String seekKey;
@@ -1282,7 +1282,9 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
       }
       readFromRDbStopNs = Time.monotonicNowNanos();
     }
+
     boolean isTruncated = cacheKeyMap.size() > maxKeys;
+
     if (perfMetrics != null) {
       long averagePagination;
       if (isTruncated) {
@@ -1435,7 +1437,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
     int index = 0;
     if (!Strings.isNullOrEmpty(startKey)) {
       index = volumes.indexOf(
-          startKey.startsWith(OM_KEY_PREFIX) ?
+          startKey.startsWith(OzoneConsts.OM_KEY_PREFIX) ?
           startKey.substring(1) :
           startKey);
 
@@ -1455,7 +1457,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
           // this probably means om db is corrupted or some entries are
           // accidentally removed.
           throw new OMException("Volume info not found for " + volumeName,
-              VOLUME_NOT_FOUND);
+              ResultCodes.VOLUME_NOT_FOUND);
         }
         result.add(volumeArgs);
       }
@@ -1779,7 +1781,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
               = dbOpenKeyName.substring(lastPrefix + 1);
 
           final OmKeyInfo info = kt.get(dbKeyName);
-          final boolean isHsync = Optional.ofNullable(info)
+          final boolean isHsync = java.util.Optional.ofNullable(info)
               .map(WithMetadata::getMetadata)
               .map(meta -> meta.get(OzoneConsts.HSYNC_CLIENT_ID))
               .filter(id -> id.equals(clientIdString))
@@ -1795,7 +1797,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
                 .setBucketName(info.getBucketName())
                 .setKeyName(info.getKeyName())
                 .setDataSize(info.getDataSize());
-            Optional.ofNullable(info.getLatestVersionLocations())
+            java.util.Optional.ofNullable(info.getLatestVersionLocations())
                 .map(OmKeyLocationInfoGroup::getLocationList)
                 .map(Collection::stream)
                 .orElseGet(Stream::empty)
