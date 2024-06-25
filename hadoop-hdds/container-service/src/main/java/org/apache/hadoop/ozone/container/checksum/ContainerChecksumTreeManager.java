@@ -68,7 +68,7 @@ public class ContainerChecksumTreeManager {
     writeLock.lock();
     try {
       ContainerProtos.ContainerChecksumInfo newChecksumInfo = read(data).toBuilder()
-          .setDataMerkleTree(tree.toProto())
+          .setDataMerkleTree(captureLatencyNs(metrics.getCreateMerkleTreeLatencyNS(), tree::toProto))
           .build();
       captureLatencyNs(metrics.getWriteContainerMerkleTreeLatencyNS(),
           () -> write(data, newChecksumInfo));

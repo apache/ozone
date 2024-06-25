@@ -58,6 +58,9 @@ public class ContainerMerkleTreeMetrics {
   @Metric(about = "Merkle tree update latency")
   private MutableRate merkleTreeUpdateLatencyNS;
 
+  @Metric(about = "Merkle tree creation latency")
+  private MutableRate merkleTreeCreateLatencyNS;
+
   public void incrementMerkleTreeWriteFailures() {
     this.numMerkleTreeWriteFailure.incr();
   }
@@ -80,5 +83,9 @@ public class ContainerMerkleTreeMetrics {
 
   public MutableRate getUpdateContainerMerkleTreeLatencyNS() {
     return this.merkleTreeUpdateLatencyNS;
+  }
+
+  public MutableRate getCreateMerkleTreeLatencyNS() {
+    return this.merkleTreeCreateLatencyNS;
   }
 }
