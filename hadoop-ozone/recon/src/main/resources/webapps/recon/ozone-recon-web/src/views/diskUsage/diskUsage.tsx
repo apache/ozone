@@ -541,6 +541,11 @@ export class DiskUsage extends React.Component<Record<string, object>, IDUState>
       </Menu>
     )
 
+    console.log(plotData.map((value) => {
+      return {
+        name: value.name
+      }
+    }))
     const eChartsOptions = {
       title: {
         text: `Disk Usage for ${returnPath} (Total Size: ${byteToSize(duResponse.size, 1)})`,
@@ -548,8 +553,10 @@ export class DiskUsage extends React.Component<Record<string, object>, IDUState>
       },
       tooltip: {
         trigger: 'item',
-        formatter: ({ dataIndex, percent }) => {
-          return `Total Data Size: ${plotData[dataIndex]['size']}<br>Percentage: ${percent} %`
+        formatter: ({ dataIndex, percent, name, color }) => {
+          let nameEl = `<strong style='color: ${color}'>${name}</strong><br>`;
+          let dataEl = `Total Data Size: ${plotData[dataIndex]['size']}<br>Percentage: ${percent} %`
+          return `${nameEl}${dataEl}`
         }
       },
       legend: {
