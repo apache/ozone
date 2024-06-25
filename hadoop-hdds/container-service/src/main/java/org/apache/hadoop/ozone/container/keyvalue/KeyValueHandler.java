@@ -877,13 +877,11 @@ public class KeyValueHandler extends Handler {
         // block metadata is piggybacked in the same message.
         // there will not be an additional PutBlock request.
         //
-        // End of block will always be sent as a standalone PutBlock.
-        // the PutBlock piggybacked in WriteChunk is never end of block.
-        //
         // do not do this in WRITE_DATA phase otherwise PutBlock will be out
         // of order.
         blockData.setBlockCommitSequenceId(dispatcherContext.getLogIndex());
-        blockManager.putBlock(kvContainer, blockData, false);
+        boolean eob = writeChunk.getBlock().getEof();
+        blockManager.putBlock(kvContainer, blockData, eob);
         blockDataProto = blockData.getProtoBufMessage();
         final long numBytes = blockDataProto.getSerializedSize();
         metrics.incContainerBytesStats(Type.PutBlock, numBytes);

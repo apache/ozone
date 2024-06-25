@@ -244,7 +244,23 @@ public class BlockManagerImpl implements BlockManager {
         db.getStore().getFinalizeBlocksTable().putWithBatch(batch,
             kvContainer.getContainerData().getBlockKey(localID), localID);
         db.getStore().getBatchHandler().commitBatchOperation(batch);
+
+        mergeLastChunkForBlockFinalization(blockId, db, kvContainer, batch, localID);
       }
+    }
+  }
+
+  private void mergeLastChunkForBlockFinalization(BlockID blockId, DBHandle db,
+                         KeyValueContainer kvContainer, BatchOperation batch,
+                         long localID) throws IOException {
+    // if the chunk list of the block to be finalized was written incremental,
+    // merge the last chunk into block data.
+    BlockData blockData = getBlockByID(db, blockId, kvContainer.getContainerData());
+    if (blockData.getMetadata().containsKey(INCREMENTAL_CHUNK_LIST)) {
+      BlockData emptyBlockData = new BlockData(blockId);
+      emptyBlockData.addMetadata(INCREMENTAL_CHUNK_LIST, "");
+      db.getStore().putBlockByID(batch, incrementalEnabled, localID,
+          emptyBlockData, kvContainer.getContainerData(), true);
     }
   }
 
