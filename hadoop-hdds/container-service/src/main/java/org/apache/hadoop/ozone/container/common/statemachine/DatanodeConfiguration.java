@@ -74,6 +74,7 @@ public class DatanodeConfiguration extends ReconfigurableConfig {
       "hdds.datanode.wait.on.all.followers";
   public static final String CONTAINER_SCHEMA_V3_ENABLED =
       "hdds.datanode.container.schema.v3.enabled";
+  public static final String CONTAINER_CHECKSUM_LOCK_STRIPES_KEY = "hdds.datanode.container.checksum.lock.stripes";
 
   static final boolean CHUNK_DATA_VALIDATION_CHECK_DEFAULT = false;
 
@@ -109,6 +110,7 @@ public class DatanodeConfiguration extends ReconfigurableConfig {
       "hdds.datanode.rocksdb.delete_obsolete_files_period";
   public static final Boolean
       OZONE_DATANODE_CHECK_EMPTY_CONTAINER_DIR_ON_DELETE_DEFAULT = false;
+  public static final int CONTAINER_CHECKSUM_LOCK_STRIPES_DEFAULT = 127;
 
   /**
    * Number of threads per volume that Datanode will use for chunk read.
@@ -550,6 +552,21 @@ public class DatanodeConfiguration extends ReconfigurableConfig {
   private boolean bCheckEmptyContainerDir =
       OZONE_DATANODE_CHECK_EMPTY_CONTAINER_DIR_ON_DELETE_DEFAULT;
 
+  /**
+   * Whether to check container directory or not to determine
+   * container is empty.
+   */
+  @Config(key = "container.checksum.lock.stripes",
+      type = ConfigType.INT,
+      defaultValue = "127",
+      tags = { DATANODE },
+      description = "The number of lock stripes used to coordinate modifications to container checksum information. " +
+          "This information is only updated after a container is closed and does not affect the data read or write" +
+          " path. Each container in the datanode will be mapped to one lock which will only be held while its " +
+          "checksum information is updated."
+  )
+  private int containerChecksumLockStripes = CONTAINER_CHECKSUM_LOCK_STRIPES_DEFAULT;
+
   @PostConstruct
   public void validate() {
     if (containerDeleteThreads < 1) {
@@ -682,6 +699,12 @@ public class DatanodeConfiguration extends ReconfigurableConfig {
           ROCKSDB_DELETE_OBSOLETE_FILES_PERIOD_MICRO_SECONDS_DEFAULT);
       rocksdbDeleteObsoleteFilesPeriod =
           ROCKSDB_DELETE_OBSOLETE_FILES_PERIOD_MICRO_SECONDS_DEFAULT;
+    }
+
+    if (containerChecksumLockStripes < 1) {
+      LOG.warn("{} must be at least 1. Defaulting to {}", CONTAINER_CHECKSUM_LOCK_STRIPES_KEY,
+          CONTAINER_CHECKSUM_LOCK_STRIPES_DEFAULT);
+      containerChecksumLockStripes = CONTAINER_CHECKSUM_LOCK_STRIPES_DEFAULT;
     }
   }
 
@@ -909,5 +932,9 @@ public class DatanodeConfiguration extends ReconfigurableConfig {
 
   public void setAutoCompactionSmallSstFileNum(int num) {
     this.autoCompactionSmallSstFileNum = num;
+  }
+
+  public int getContainerChecksumLockStripes() {
+    return containerChecksumLockStripes;
   }
 }
