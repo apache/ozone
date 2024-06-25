@@ -231,12 +231,12 @@ public class OMTenantDeleteRequest extends OMVolumeRequest {
       auditLog(ozoneManager.getAuditLogger(),
           buildAuditMessage(OMAction.UPDATE_VOLUME,
               buildVolumeAuditMap(volumeName),
-              exception, getOmRequest().getUserInfo()));
+              exception, getOmRequest().getUserInfo(), termIndex));
     }
     // Audit tenant deletion
     auditLog(ozoneManager.getAuditLogger(),
         buildAuditMessage(OMAction.DELETE_TENANT,
-            auditMap, exception, getOmRequest().getUserInfo()));
+            auditMap, exception, getOmRequest().getUserInfo(), termIndex));
 
     if (exception == null) {
       LOG.info("Deleted tenant '{}' and volume '{}'", tenantId, volumeName);

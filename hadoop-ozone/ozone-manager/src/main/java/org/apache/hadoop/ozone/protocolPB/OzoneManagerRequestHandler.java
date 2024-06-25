@@ -19,8 +19,10 @@ package org.apache.hadoop.ozone.protocolPB;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -41,6 +43,8 @@ import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.scm.protocolPB.OzonePBHelper;
 import org.apache.hadoop.hdds.utils.FaultInjector;
 import org.apache.hadoop.ozone.OzoneAcl;
+import org.apache.hadoop.ozone.audit.AuditMessage;
+import org.apache.hadoop.ozone.audit.OMAction;
 import org.apache.hadoop.ozone.util.PayloadUtils;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.OzoneManagerPrepareState;
@@ -388,15 +392,129 @@ public class OzoneManagerRequestHandler implements RequestHandler {
     return responseBuilder.build();
   }
 
+  /**
+   * return AuditAction for request which is used for request.
+   * @param request
+   * @return OMAction
+   */
+  private OMAction getAction(OMRequest request) {
+    Type cmdType = request.getCmdType();
+    switch (cmdType) {
+    case CreateVolume:
+      return OMAction.CREATE_VOLUME;
+    case SetVolumeProperty:
+      boolean hasQuota = request.getSetVolumePropertyRequest()
+          .hasQuotaInBytes();
+      if (hasQuota) {
+        return OMAction.SET_QUOTA;
+      } else {
+        return OMAction.SET_OWNER;
+      }
+    case DeleteVolume:
+      return OMAction.DELETE_VOLUME;
+    case CreateBucket:
+      return OMAction.CREATE_BUCKET;
+    case DeleteBucket:
+      return OMAction.DELETE_BUCKET;
+    case SetBucketProperty:
+      boolean hasBucketOwner = request.getSetBucketPropertyRequest()
+          .getBucketArgs().hasOwnerName();
+      if (hasBucketOwner) {
+        return OMAction.SET_OWNER;
+      } else {
+        return OMAction.UPDATE_BUCKET;
+      }
+    case AddAcl:
+      return OMAction.ADD_ACL;
+    case RemoveAcl:
+      return OMAction.REMOVE_ACL;
+    case SetAcl:
+      return OMAction.SET_ACL;
+    case GetDelegationToken:
+      return OMAction.GET_DELEGATION_TOKEN;
+    case CancelDelegationToken:
+      return OMAction.CANCEL_DELEGATION_TOKEN;
+    case RenewDelegationToken:
+      return OMAction.RENEW_DELEGATION_TOKEN;
+    case GetS3Secret:
+      return OMAction.GET_S3_SECRET;
+    case SetS3Secret:
+      return OMAction.SET_S3_SECRET;
+    case RevokeS3Secret:
+      return OMAction.REVOKE_S3_SECRET;
+    case CreateTenant:
+      return OMAction.CREATE_TENANT;
+    case DeleteTenant:
+      return OMAction.DELETE_TENANT;
+    case TenantAssignUserAccessId:
+      return OMAction.TENANT_ASSIGN_USER_ACCESSID;
+    case TenantRevokeUserAccessId:
+      return OMAction.TENANT_REVOKE_USER_ACCESSID;
+    case TenantAssignAdmin:
+      return OMAction.TENANT_ASSIGN_ADMIN;
+    case TenantRevokeAdmin:
+      return OMAction.TENANT_REVOKE_ADMIN;
+    case CreateSnapshot:
+      return OMAction.CREATE_SNAPSHOT;
+    case DeleteSnapshot:
+      return OMAction.DELETE_SNAPSHOT;
+    case RenameSnapshot:
+      return OMAction.RENAME_SNAPSHOT;
+    case RecoverLease:
+      return OMAction.RECOVER_LEASE;
+    case CreateDirectory:
+      return OMAction.CREATE_DIRECTORY;
+    case CreateFile:
+      return OMAction.CREATE_FILE;
+    case CreateKey:
+      return OMAction.ALLOCATE_KEY;
+    case AllocateBlock:
+      return OMAction.ALLOCATE_BLOCK;
+    case CommitKey:
+      return OMAction.COMMIT_KEY;
+    case DeleteKey:
+      return OMAction.DELETE_KEY;
+    case DeleteKeys:
+      return OMAction.DELETE_KEYS;
+    case RenameKey:
+      return OMAction.RENAME_KEY;
+    case RenameKeys:
+      return OMAction.RENAME_KEYS;
+    case InitiateMultiPartUpload:
+      return OMAction.INITIATE_MULTIPART_UPLOAD;
+    case CommitMultiPartUpload:
+      return OMAction.COMMIT_MULTIPART_UPLOAD_PARTKEY;
+    case AbortMultiPartUpload:
+      return OMAction.ABORT_MULTIPART_UPLOAD;
+    case CompleteMultiPartUpload:
+      return OMAction.COMPLETE_MULTIPART_UPLOAD;
+    case SetTimes:
+      return OMAction.SET_TIMES;
+    case AbortExpiredMultiPartUploads:
+      return OMAction.ABORT_EXPIRED_MULTIPART_UPLOAD;
+    default:
+      return null;
+    }
+  }
+
   @Override
   public OMClientResponse handleWriteRequestImpl(OMRequest omRequest, TermIndex termIndex) throws IOException {
     injectPause();
     OMClientRequest omClientRequest =
         OzoneManagerRatisUtils.createClientRequest(omRequest, impl);
-    return captureLatencyNs(
-        impl.getPerfMetrics().getValidateAndUpdateCacheLatencyNs(),
-        () -> Objects.requireNonNull(omClientRequest.validateAndUpdateCache(getOzoneManager(), termIndex),
-            "omClientResponse returned by validateAndUpdateCache cannot be null"));
+    try {
+      return captureLatencyNs(
+          impl.getPerfMetrics().getValidateAndUpdateCacheLatencyNs(),
+          () -> Objects.requireNonNull(omClientRequest.validateAndUpdateCache(getOzoneManager(), termIndex),
+              "omClientResponse returned by validateAndUpdateCache cannot be null"));
+    } catch (Throwable th) {
+      Map<String, String> auditMap = new HashMap<>();
+      auditMap.put("Command", omClientRequest.getOmRequest().getCmdType().name());
+      AuditMessage msg = omClientRequest.buildAuditMessage(getAction(omRequest), auditMap,
+          th, omClientRequest.getUserInfo(), termIndex);
+      omClientRequest.auditLog(impl.getAuditLogger(), msg);
+      throw th;
+    }
   }
 
   @VisibleForTesting

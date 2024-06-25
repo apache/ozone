@@ -133,7 +133,7 @@ public class S3ExpiredMultipartUploadsAbortRequest extends OMKeyRequest {
     }
 
     // Only successfully aborted MPUs are included in the audit.
-    auditAbortedMPUs(ozoneManager, abortedMultipartUploads);
+    auditAbortedMPUs(ozoneManager, abortedMultipartUploads, termIndex);
 
     processResults(omMetrics, numSubmittedMPUs,
         abortedMultipartUploads.size(),
@@ -144,7 +144,7 @@ public class S3ExpiredMultipartUploadsAbortRequest extends OMKeyRequest {
   }
 
   private void auditAbortedMPUs(OzoneManager ozoneManager,
-      Map<OmBucketInfo, List<OmMultipartAbortInfo>> abortedMultipartUploads) {
+      Map<OmBucketInfo, List<OmMultipartAbortInfo>> abortedMultipartUploads, TermIndex termIndex) {
     for (Map.Entry<OmBucketInfo, List<OmMultipartAbortInfo>> entry :
         abortedMultipartUploads.entrySet()) {
       KeyArgs.Builder keyArgsAuditBuilder = KeyArgs.newBuilder()
@@ -163,7 +163,7 @@ public class S3ExpiredMultipartUploadsAbortRequest extends OMKeyRequest {
             .getUploadID());
         auditLog(ozoneManager.getAuditLogger(), buildAuditMessage(
             OMAction.ABORT_EXPIRED_MULTIPART_UPLOAD, auditMap,
-            null, getOmRequest().getUserInfo()));
+            null, getOmRequest().getUserInfo(), termIndex));
       }
     }
   }

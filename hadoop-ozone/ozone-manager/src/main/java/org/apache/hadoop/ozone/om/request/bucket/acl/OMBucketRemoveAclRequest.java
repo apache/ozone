@@ -112,9 +112,9 @@ public class OMBucketRemoveAclRequest extends OMBucketAclRequest {
   @Override
   void onComplete(boolean operationResult, Exception exception,
       OMMetrics omMetrics, AuditLogger auditLogger,
-      Map<String, String> auditMap) {
+      Map<String, String> auditMap, TermIndex termIndex) {
     auditLog(auditLogger, buildAuditMessage(OMAction.REMOVE_ACL, auditMap,
-        exception, getOmRequest().getUserInfo()));
+        exception, getOmRequest().getUserInfo(), termIndex));
 
     if (operationResult) {
       LOG.debug("Remove acl: {} for path: {} success!", getAcls(), getPath());

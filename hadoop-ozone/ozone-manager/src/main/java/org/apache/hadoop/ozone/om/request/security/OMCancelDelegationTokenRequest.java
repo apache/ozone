@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.ozone.om.request.security;
 
+import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.ratis.server.protocol.TermIndex;
 import org.apache.hadoop.ozone.audit.AuditLogger;
 import org.apache.hadoop.ozone.audit.OMAction;
@@ -79,7 +80,7 @@ public class OMCancelDelegationTokenRequest extends OMClientRequest {
     } catch (IOException ioe) {
       auditLog(auditLogger,
           buildAuditMessage(OMAction.CANCEL_DELEGATION_TOKEN, auditMap, ioe,
-              request.getUserInfo()));
+              request.getUserInfo(), TransactionInfo.getTermIndex(-1)));
       throw ioe;
     }
   }
@@ -127,7 +128,7 @@ public class OMCancelDelegationTokenRequest extends OMClientRequest {
 
     auditLog(auditLogger,
         buildAuditMessage(OMAction.CANCEL_DELEGATION_TOKEN, auditMap, exception,
-            getOmRequest().getUserInfo()));
+            getOmRequest().getUserInfo(), termIndex));
 
     if (LOG.isDebugEnabled()) {
       LOG.debug("Cancelled delegation token: {}", ozoneTokenIdentifier);

@@ -22,6 +22,7 @@ import java.io.IOException;
 import java.nio.file.InvalidPathException;
 import java.util.Map;
 
+import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.ratis.server.protocol.TermIndex;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.audit.AuditLogger;
@@ -87,7 +88,7 @@ public class OMRenewDelegationTokenRequest extends OMClientRequest {
     } catch (IOException ioe) {
       auditLog(auditLogger,
           buildAuditMessage(OMAction.RENEW_DELEGATION_TOKEN, auditMap, ioe,
-              request.getUserInfo()));
+              request.getUserInfo(), TransactionInfo.getTermIndex(-1)));
       throw ioe;
     }
 
@@ -183,7 +184,7 @@ public class OMRenewDelegationTokenRequest extends OMClientRequest {
 
     auditLog(auditLogger,
         buildAuditMessage(OMAction.RENEW_DELEGATION_TOKEN, auditMap, exception,
-            getOmRequest().getUserInfo()));
+            getOmRequest().getUserInfo(), termIndex));
 
     if (LOG.isDebugEnabled()) {
       LOG.debug("Updated renew delegation token in-memory map: {} with expiry" +

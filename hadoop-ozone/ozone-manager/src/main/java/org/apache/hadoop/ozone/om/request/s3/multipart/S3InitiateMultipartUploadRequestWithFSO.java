@@ -243,7 +243,7 @@ public class S3InitiateMultipartUploadRequestWithFSO
       }
     }
     logResult(ozoneManager, multipartInfoInitiateRequest, auditMap, volumeName,
-            bucketName, keyName, exception, result);
+            bucketName, keyName, exception, result, termIndex);
 
     return omClientResponse;
   }

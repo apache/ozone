@@ -262,7 +262,7 @@ public class OMAllocateBlockRequest extends OMKeyRequest {
     }
 
     auditLog(auditLogger, buildAuditMessage(OMAction.ALLOCATE_BLOCK, auditMap,
-        exception, getOmRequest().getUserInfo()));
+        exception, getOmRequest().getUserInfo(), termIndex));
 
     return omClientResponse;
   }

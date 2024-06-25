@@ -227,7 +227,7 @@ public class OMKeysDeleteRequest extends OMKeyRequest {
     addDeletedKeys(auditMap, deleteKeys, unDeletedKeys.getKeysList());
 
     auditLog(auditLogger,
-        buildAuditMessage(DELETE_KEYS, auditMap, exception, userInfo));
+        buildAuditMessage(DELETE_KEYS, auditMap, exception, userInfo, termIndex));
 
     switch (result) {
     case SUCCESS:

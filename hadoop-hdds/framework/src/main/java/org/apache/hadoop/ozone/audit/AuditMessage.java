@@ -90,7 +90,11 @@ public final class AuditMessage implements Message {
     }
 
     public Builder forOperation(AuditAction action) {
-      this.op = action.getAction();
+      if (null == action) {
+        this.op = "None";
+      } else {
+        this.op = action.getAction();
+      }
       return this;
     }
 

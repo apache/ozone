@@ -163,7 +163,7 @@ public class OMVolumeDeleteRequest extends OMVolumeRequest {
     // Performing audit logging outside of the lock.
     auditLog(ozoneManager.getAuditLogger(),
         buildAuditMessage(OMAction.DELETE_VOLUME, buildVolumeAuditMap(volume),
-            exception, getOmRequest().getUserInfo()));
+            exception, getOmRequest().getUserInfo(), termIndex));
 
     // return response after releasing lock.
     if (exception == null) {

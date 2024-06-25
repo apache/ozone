@@ -140,7 +140,7 @@ public class OMKeySetTimesRequestWithFSO extends OMKeySetTimesRequest {
     }
 
     Map<String, String> auditMap = new LinkedHashMap<>();
-    onComplete(result, exception, ozoneManager.getAuditLogger(), auditMap);
+    onComplete(result, exception, ozoneManager.getAuditLogger(), auditMap, termIndex);
 
     return omClientResponse;
   }

@@ -216,7 +216,7 @@ public class OMBucketDeleteRequest extends OMClientRequest {
 
     // Performing audit logging outside of the lock.
     auditLog(auditLogger, buildAuditMessage(OMAction.DELETE_BUCKET,
-        auditMap, exception, userInfo));
+        auditMap, exception, userInfo, termIndex));
 
     // return response.
     if (success) {

@@ -120,7 +120,7 @@ public class S3RevokeSecretRequest extends OMClientRequest {
     auditMap.put(OzoneConsts.S3_REVOKESECRET_USER, kerberosID);
     auditLog(ozoneManager.getAuditLogger(), buildAuditMessage(
         OMAction.REVOKE_S3_SECRET, auditMap,
-        exception, getOmRequest().getUserInfo()));
+        exception, getOmRequest().getUserInfo(), termIndex));
 
     if (exception == null) {
       if (omResponse.getStatus() == Status.OK) {

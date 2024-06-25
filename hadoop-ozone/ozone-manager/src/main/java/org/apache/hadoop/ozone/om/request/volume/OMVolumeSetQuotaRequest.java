@@ -173,7 +173,7 @@ public class OMVolumeSetQuotaRequest extends OMVolumeRequest {
 
     // Performing audit logging outside of the lock.
     auditLog(auditLogger, buildAuditMessage(OMAction.SET_QUOTA, auditMap,
-        exception, userInfo));
+        exception, userInfo, termIndex));
 
     // return response after releasing lock.
     if (exception == null) {

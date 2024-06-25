@@ -219,7 +219,7 @@ public class OMKeyRenameRequestWithFSO extends OMKeyRenameRequest {
     }
 
     auditLog(auditLogger, buildAuditMessage(OMAction.RENAME_KEY, auditMap,
-            exception, getOmRequest().getUserInfo()));
+            exception, getOmRequest().getUserInfo(), termIndex));
 
     switch (result) {
     case SUCCESS:

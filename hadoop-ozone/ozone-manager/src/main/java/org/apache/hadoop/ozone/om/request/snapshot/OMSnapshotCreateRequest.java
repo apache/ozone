@@ -212,7 +212,7 @@ public class OMSnapshotCreateRequest extends OMClientRequest {
 
     // Performing audit logging outside the lock.
     auditLog(auditLogger, buildAuditMessage(OMAction.CREATE_SNAPSHOT,
-        snapshotInfo.toAuditMap(), exception, userInfo));
+        snapshotInfo.toAuditMap(), exception, userInfo, termIndex));
 
     if (exception == null) {
       LOG.info("Created snapshot: '{}' with snapshotId: '{}' under path '{}'",

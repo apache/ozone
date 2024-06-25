@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone.om.request.volume.acl;
 
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
+import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.ratis.server.protocol.TermIndex;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.audit.AuditLogger;
@@ -137,7 +138,7 @@ public class OMVolumeAddAclRequest extends OMVolumeAclRequest {
     }
 
     auditLog(auditLogger, buildAuditMessage(OMAction.ADD_ACL, auditMap,
-        ex, getOmRequest().getUserInfo()));
+        ex, getOmRequest().getUserInfo(), TransactionInfo.getTermIndex(trxnLogIndex)));
   }
 
   @Override

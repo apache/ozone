@@ -149,7 +149,7 @@ public class OMSetSecretRequest extends OMClientRequest {
     // audit log
     auditLog(ozoneManager.getAuditLogger(), buildAuditMessage(
         OMAction.SET_S3_SECRET, auditMap,
-        exception, getOmRequest().getUserInfo()));
+        exception, getOmRequest().getUserInfo(), termIndex));
 
     if (exception == null) {
       LOG.debug("Success: SetSecret for accessKey '{}'", accessId);

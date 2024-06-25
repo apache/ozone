@@ -271,7 +271,7 @@ public class S3MultipartUploadCommitPartRequest extends OMKeyRequest {
 
     logResult(ozoneManager, multipartCommitUploadPartRequest, keyArgs,
             auditMap, volumeName, bucketName, keyName, exception, partName,
-            result);
+            result, termIndex);
 
     return omClientResponse;
   }
@@ -314,7 +314,7 @@ public class S3MultipartUploadCommitPartRequest extends OMKeyRequest {
       MultipartCommitUploadPartRequest multipartCommitUploadPartRequest,
       KeyArgs keyArgs, Map<String, String> auditMap, String volumeName,
       String bucketName, String keyName, Exception exception,
-      String partName, Result result) {
+      String partName, Result result, TermIndex termIndex) {
     // audit log
     // Add MPU related information.
     auditMap.put(OzoneConsts.MULTIPART_UPLOAD_PART_NUMBER,
@@ -323,7 +323,7 @@ public class S3MultipartUploadCommitPartRequest extends OMKeyRequest {
     auditLog(ozoneManager.getAuditLogger(), buildAuditMessage(
         OMAction.COMMIT_MULTIPART_UPLOAD_PARTKEY,
         auditMap, exception,
-        getOmRequest().getUserInfo()));
+        getOmRequest().getUserInfo(), termIndex));
 
     switch (result) {
     case SUCCESS:

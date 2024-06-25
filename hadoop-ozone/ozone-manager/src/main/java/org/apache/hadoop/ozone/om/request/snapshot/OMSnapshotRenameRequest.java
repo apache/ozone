@@ -224,7 +224,7 @@ public class OMSnapshotRenameRequest extends OMClientRequest {
 
     // Perform audit logging outside the lock
     auditLog(auditLogger, buildAuditMessage(OMAction.RENAME_SNAPSHOT,
-                                            snapshotOldInfo.toAuditMap(), exception, userInfo));
+                                            snapshotOldInfo.toAuditMap(), exception, userInfo, termIndex));
     return omClientResponse;
   }
 }
