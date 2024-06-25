@@ -1093,7 +1093,7 @@ export class Om extends React.Component<Record<string, object>, IOmdbInsightsSta
             <Tabs.TabPane key='5' tab={(
               <label>Directories Pending for Deletion&nbsp;&nbsp;
                 <Tooltip placement='top' title="Directories that are pending for deletion.">
-                  <InfoCircleOutlined/>
+                  <InfoCircleOutlined />
                 </Tooltip>
               </label>
             )}>
