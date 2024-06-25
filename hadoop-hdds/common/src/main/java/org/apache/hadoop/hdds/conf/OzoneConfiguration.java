@@ -275,17 +275,17 @@ public class OzoneConfiguration extends Configuration
     // before calling super.getAllPropertiesByTag
     Properties updatedProps = getProps();
     Properties propertiesByTag = super.getAllPropertiesByTag(tag);
-    Properties properties = new Properties();
-    Enumeration propertyNames = propertiesByTag.propertyNames();
-    while (propertyNames.hasMoreElements()) {
-      Object propertyName = propertyNames.nextElement();
+    Properties props = new Properties();
+    Enumeration properties = propertiesByTag.propertyNames();
+    while (properties.hasMoreElements()) {
+      Object propertyName = properties.nextElement();
       // get the current value of the property
       Object value = updatedProps.getProperty(propertyName.toString());
       if (value != null) {
-        properties.put(propertyName, value);
+        props.put(propertyName, value);
       }
     }
-    return properties;
+    return props;
   }
 
   public Map<String, String> getOzoneProperties() {
@@ -304,9 +304,9 @@ public class OzoneConfiguration extends Configuration
   @Override
   public Map<String, String> getPropsMatchPrefixAndTrimPrefix(
       String keyPrefix) {
-    Properties properties = getProps();
+    Properties props = getProps();
     Map<String, String> configMap = new HashMap<>();
-    for (String name : properties.stringPropertyNames()) {
+    for (String name : props.stringPropertyNames()) {
       if (name.startsWith(keyPrefix)) {
         String value = get(name);
         String keyName = name.substring(keyPrefix.length());
@@ -421,21 +421,18 @@ public class OzoneConfiguration extends Configuration
     return Integer.parseInt(value);
   }
 
-  private Properties props;
   private Properties delegatingProps;
 
   @Override
   public synchronized void reloadConfiguration() {
     super.reloadConfiguration();
     delegatingProps = null;
-    props = null;
   }
 
   @Override
   protected final synchronized Properties getProps() {
     if (delegatingProps == null) {
-      props = super.getProps();
-      delegatingProps = new DelegatingProperties(props, complianceMode, cryptoProperties);
+      delegatingProps = new DelegatingProperties(super.getProps(), complianceMode, cryptoProperties);
     }
     return delegatingProps;
   }

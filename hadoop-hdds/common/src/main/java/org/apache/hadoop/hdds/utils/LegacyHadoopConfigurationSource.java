@@ -45,7 +45,6 @@ public class LegacyHadoopConfigurationSource
 
   public LegacyHadoopConfigurationSource(Configuration configuration) {
     this.configuration = new Configuration(configuration) {
-      private Properties props;
       private Properties delegatingProps;
       private final String complianceMode =
           getPropertyUnsafe(OzoneConfigKeys.OZONE_SECURITY_CRYPTO_COMPLIANCE_MODE,
@@ -58,14 +57,12 @@ public class LegacyHadoopConfigurationSource
       public synchronized void reloadConfiguration() {
         super.reloadConfiguration();
         delegatingProps = null;
-        props = null;
       }
 
       @Override
       protected synchronized Properties getProps() {
         if (delegatingProps == null) {
-          props = super.getProps();
-          delegatingProps = new DelegatingProperties(props, complianceMode, cryptoProperties);
+          delegatingProps = new DelegatingProperties(super.getProps(), complianceMode, cryptoProperties);
         }
         return delegatingProps;
       }
