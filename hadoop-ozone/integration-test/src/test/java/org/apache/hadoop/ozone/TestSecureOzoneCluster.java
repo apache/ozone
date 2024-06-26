@@ -77,7 +77,7 @@ import org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateSignReq
 import org.apache.hadoop.hdds.security.x509.certificate.utils.SelfSignedCertificate;
 import org.apache.hadoop.hdds.security.x509.exception.CertificateException;
 import org.apache.hadoop.hdds.security.x509.keys.HDDSKeyGenerator;
-import org.apache.hadoop.hdds.security.x509.keys.KeyCodec;
+import org.apache.hadoop.hdds.security.x509.keys.KeyStorage;
 import org.apache.hadoop.hdds.utils.HAUtils;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.ipc.Client;
@@ -644,8 +644,8 @@ final class TestSecureOzoneCluster {
     SecurityConfig securityConfig = new SecurityConfig(conf);
     HDDSKeyGenerator keyGenerator = new HDDSKeyGenerator(securityConfig);
     keyPair = keyGenerator.generateKey();
-    KeyCodec pemWriter = new KeyCodec(securityConfig, COMPONENT);
-    pemWriter.writeKey(keyPair, true);
+    KeyStorage keyStorage = new KeyStorage(securityConfig, COMPONENT);
+    keyStorage.storeKey(keyPair, true);
   }
 
   /**
@@ -961,10 +961,9 @@ final class TestSecureOzoneCluster {
 
     // save first cert
     final int certificateLifetime = 20; // seconds
-    KeyCodec keyCodec =
-        new KeyCodec(securityConfig, securityConfig.getKeyLocation("om"));
+    KeyStorage keyStorage = new KeyStorage(securityConfig, "om");
     X509Certificate cert = generateSelfSignedX509Cert(securityConfig,
-        new KeyPair(keyCodec.readPublicKey(), keyCodec.readPrivateKey()),
+        new KeyPair(keyStorage.readPublicKey(), keyStorage.readPrivateKey()),
         null, Duration.ofSeconds(certificateLifetime));
     String certId = cert.getSerialNumber().toString();
     omStorage.setOmCertSerialId(certId);
@@ -1044,10 +1043,10 @@ final class TestSecureOzoneCluster {
 
     // save first cert
     final int certificateLifetime = 20; // seconds
-    KeyCodec keyCodec =
-        new KeyCodec(securityConfig, securityConfig.getKeyLocation("om"));
+    KeyStorage keyStorage =
+        new KeyStorage(securityConfig, "om");
     X509Certificate certHolder = generateSelfSignedX509Cert(securityConfig,
-        new KeyPair(keyCodec.readPublicKey(), keyCodec.readPrivateKey()),
+        new KeyPair(keyStorage.readPublicKey(), keyStorage.readPrivateKey()),
         null, Duration.ofSeconds(certificateLifetime));
     String certId = certHolder.getSerialNumber().toString();
     certCodec.writeCertificate(certHolder);
