@@ -37,6 +37,7 @@ import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.ozone.common.Checksum;
 import org.apache.hadoop.ozone.common.ChunkBuffer;
 import org.apache.hadoop.ozone.container.ContainerTestHelper;
+import org.apache.hadoop.ozone.container.checksum.ContainerChecksumTreeManager;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.helpers.BlockDeletingServiceMetrics;
 import org.apache.hadoop.ozone.container.common.helpers.ChunkInfo;
@@ -79,11 +80,13 @@ import org.junit.jupiter.api.io.TempDir;
 import org.slf4j.LoggerFactory;
 
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.RandomAccessFile;
 import java.nio.ByteBuffer;
 import java.time.Duration;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
@@ -92,6 +95,7 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.stream.Collectors;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.commons.lang3.RandomStringUtils.randomAlphanumeric;
@@ -110,7 +114,11 @@ import static org.apache.hadoop.ozone.container.keyvalue.helpers.KeyValueContain
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNotSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.fail;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -591,6 +599,9 @@ public class TestBlockDeletingService {
       // An interval will delete 1 * 2 blocks
       deleteAndWait(svc, 1);
 
+      // Make sure that deletions for each container were recorded in the checksum tree file.
+      containerData.forEach(c -> assertDeletionsInChecksumFile(c, 2));
+
       GenericTestUtils.waitFor(() ->
           containerData.get(0).getBytesUsed() == containerSpace /
               3, 100, 3000);
@@ -614,6 +625,8 @@ public class TestBlockDeletingService {
           deletingServiceMetrics.getTotalPendingBlockCount());
 
       deleteAndWait(svc, 2);
+
+      containerData.forEach(c -> assertDeletionsInChecksumFile(c, 3));
 
       // After deletion of all 3 blocks, space used by the containers
       // should be zero.
@@ -839,7 +852,7 @@ public class TestBlockDeletingService {
     timeout  = 0;
     svc = new BlockDeletingService(ozoneContainer,
         TimeUnit.MILLISECONDS.toNanos(1000), timeout, TimeUnit.MILLISECONDS,
-        10, conf, "", mock(ReconfigurationHandler.class));
+        10, conf, "", mock(ContainerChecksumTreeManager.class), mock(ReconfigurationHandler.class));
     svc.start();
 
     // get container meta data
@@ -1153,5 +1166,30 @@ public class TestBlockDeletingService {
     this.layout = versionInfo.getLayout();
     this.schemaVersion = versionInfo.getSchemaVersion();
     ContainerTestVersionInfo.setTestSchemaVersion(schemaVersion, conf);
+  }
+
+  private void assertDeletionsInChecksumFile(ContainerData data, int numBlocks) {
+    File checksumFile = ContainerChecksumTreeManager.getContainerChecksumFile(data);
+    ContainerProtos.ContainerChecksumInfo checksumInfo = null;
+    try (FileInputStream inStream = new FileInputStream(checksumFile)) {
+       checksumInfo = ContainerProtos.ContainerChecksumInfo.parseFrom(inStream);
+    } catch (IOException ex) {
+      fail("Failed to read container checksum tree file", ex);
+    }
+
+    assertNotNull(checksumInfo);
+
+    List<Long> deletedBlocks = checksumInfo.getDeletedBlocksList();
+
+    assertEquals(numBlocks, deletedBlocks.size());
+    // Create a sorted copy of the list to check the order written to the file.
+    List<Long> sortedDeletedBlocks = checksumInfo.getDeletedBlocksList().stream()
+        .sorted()
+        .collect(Collectors.toList());
+    assertNotSame(sortedDeletedBlocks, deletedBlocks);
+    assertEquals(sortedDeletedBlocks, deletedBlocks);
+
+    // Block list should be unique.
+    assertEquals(new HashSet<>(deletedBlocks).size(), deletedBlocks.size());
   }
 }

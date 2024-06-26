@@ -18,6 +18,7 @@ package org.apache.hadoop.ozone.container.checksum;
 
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
+import org.apache.hadoop.ozone.container.common.impl.ContainerData;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 
@@ -112,8 +113,9 @@ public class ContainerChecksumTreeManager {
   /**
    * Returns the container checksum tree file for the specified container without deserializing it.
    */
-  public File getContainerChecksumFile(KeyValueContainerData data) {
-    return new File(data.getMetadataPath(), data.getContainerID() + ".tree");
+  public static File getContainerChecksumFile(ContainerData data) {
+    // TODO change type don't cast
+    return new File(((KeyValueContainerData) data).getMetadataPath(), data.getContainerID() + ".tree");
   }
 
   private Lock getReadLock(long containerID) {

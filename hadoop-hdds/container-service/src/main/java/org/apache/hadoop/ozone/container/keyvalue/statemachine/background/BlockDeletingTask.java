@@ -198,7 +198,8 @@ public class BlockDeletingTask implements BackgroundTask {
         return crr;
       }
 
-      List<Long> succeedBlocks = new LinkedList<>();
+      List<Long> succeedBlockIDs = new LinkedList<>();
+      List<String> succeedBlockDBKeys = new LinkedList<>();
       LOG.debug("Container : {}, To-Delete blocks : {}",
           containerData.getContainerID(), toDeleteBlocks.size());
 
@@ -219,7 +220,8 @@ public class BlockDeletingTask implements BackgroundTask {
           handler.deleteBlock(container, entry.getValue());
           releasedBytes += KeyValueContainerUtil.getBlockLength(
               entry.getValue());
-          succeedBlocks.add(Long.parseLong(blockName));
+          succeedBlockIDs.add(entry.getValue().getLocalID());
+          succeedBlockDBKeys.add(entry.getKey());
         } catch (InvalidProtocolBufferException e) {
           LOG.error("Failed to parse block info for block {}", blockName, e);
         } catch (IOException e) {
@@ -230,14 +232,14 @@ public class BlockDeletingTask implements BackgroundTask {
       // Mark blocks as deleted in the container checksum tree.
       // Data for these blocks does not need to be copied if container replicas diverge.
       // Do this before the delete transactions are removed from the database.
-      checksumTreeManager.markBlocksAsDeleted(containerData, succeedBlocks);
+      checksumTreeManager.markBlocksAsDeleted(containerData, succeedBlockIDs);
 
       // Once chunks in the blocks are deleted... remove the blockID from
       // blockDataTable.
       try (BatchOperation batch = meta.getStore().getBatchHandler()
           .initBatchOperation()) {
-        for (Long entry : succeedBlocks) {
-          blockDataTable.deleteWithBatch(batch, Long.toString(entry));
+        for (String key: succeedBlockDBKeys) {
+          blockDataTable.deleteWithBatch(batch, key);
         }
 
         // Handler.deleteBlock calls deleteChunk to delete all the chunks
@@ -245,7 +247,7 @@ public class BlockDeletingTask implements BackgroundTask {
         // updated with decremented used bytes during deleteChunk. This is
         // done here so that all the DB update for block delete can be
         // batched together while committing to DB.
-        int deletedBlocksCount = succeedBlocks.size();
+        int deletedBlocksCount = succeedBlockDBKeys.size();
         containerData.updateAndCommitDBCounters(meta, batch,
             deletedBlocksCount, releasedBytes);
         // Once DB update is persisted, check if there are any blocks
@@ -265,13 +267,13 @@ public class BlockDeletingTask implements BackgroundTask {
         metrics.incrSuccessBytes(releasedBytes);
       }
 
-      if (!succeedBlocks.isEmpty()) {
+      if (!succeedBlockDBKeys.isEmpty()) {
         LOG.debug("Container: {}, deleted blocks: {}, space reclaimed: {}, " +
                 "task elapsed time: {}ms", containerData.getContainerID(),
-            succeedBlocks.size(), releasedBytes,
+            succeedBlockDBKeys.size(), releasedBytes,
             Time.monotonicNow() - startTime);
       }
-      crr.addAll(succeedBlocks);
+      crr.addAll(succeedBlockIDs);
       return crr;
     } catch (IOException exception) {
       LOG.warn("Deletion operation was not successful for container: " +
