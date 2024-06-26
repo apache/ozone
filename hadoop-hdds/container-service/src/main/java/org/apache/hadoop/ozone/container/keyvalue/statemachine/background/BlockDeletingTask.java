@@ -26,7 +26,6 @@ import java.util.LinkedList;
 import java.util.Objects;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.stream.Collectors;
 
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.utils.BackgroundTaskResult;
@@ -95,21 +94,21 @@ public class BlockDeletingTask implements BackgroundTask {
 
   private static class ContainerBackgroundTaskResult
       implements BackgroundTaskResult {
-    private List<String> deletedBlockIds;
+    private final List<Long> deletedBlockIds;
 
     ContainerBackgroundTaskResult() {
       deletedBlockIds = new LinkedList<>();
     }
 
-    public void addBlockId(String blockId) {
+    public void addBlockId(Long blockId) {
       deletedBlockIds.add(blockId);
     }
 
-    public void addAll(List<String> blockIds) {
+    public void addAll(List<Long> blockIds) {
       deletedBlockIds.addAll(blockIds);
     }
 
-    public List<String> getDeletedBlocks() {
+    public List<Long> getDeletedBlocks() {
       return deletedBlockIds;
     }
 
@@ -199,7 +198,7 @@ public class BlockDeletingTask implements BackgroundTask {
         return crr;
       }
 
-      List<String> succeedBlocks = new LinkedList<>();
+      List<Long> succeedBlocks = new LinkedList<>();
       LOG.debug("Container : {}, To-Delete blocks : {}",
           containerData.getContainerID(), toDeleteBlocks.size());
 
@@ -220,7 +219,7 @@ public class BlockDeletingTask implements BackgroundTask {
           handler.deleteBlock(container, entry.getValue());
           releasedBytes += KeyValueContainerUtil.getBlockLength(
               entry.getValue());
-          succeedBlocks.add(blockName);
+          succeedBlocks.add(Long.parseLong(blockName));
         } catch (InvalidProtocolBufferException e) {
           LOG.error("Failed to parse block info for block {}", blockName, e);
         } catch (IOException e) {
@@ -228,15 +227,17 @@ public class BlockDeletingTask implements BackgroundTask {
         }
       }
 
-      // TODO add succeededBlocks to deleted here.
-//      checksumTreeManager.markBlocksAsDeleted(succeedBlocks);
+      // Mark blocks as deleted in the container checksum tree.
+      // Data for these blocks does not need to be copied if container replicas diverge.
+      // Do this before the delete transactions are removed from the database.
+      checksumTreeManager.markBlocksAsDeleted(containerData, succeedBlocks);
 
       // Once chunks in the blocks are deleted... remove the blockID from
       // blockDataTable.
       try (BatchOperation batch = meta.getStore().getBatchHandler()
           .initBatchOperation()) {
-        for (String entry : succeedBlocks) {
-          blockDataTable.deleteWithBatch(batch, entry);
+        for (Long entry : succeedBlocks) {
+          blockDataTable.deleteWithBatch(batch, Long.toString(entry));
         }
 
         // Handler.deleteBlock calls deleteChunk to delete all the chunks
@@ -370,12 +371,13 @@ public class BlockDeletingTask implements BackgroundTask {
       List<DeletedBlocksTransaction> deletedBlocksTxs =
           deleteBlocksResult.deletedBlocksTxs();
       deleteBlocksResult.deletedBlocksTxs().forEach(
-          tx -> crr.addAll(tx.getLocalIDList().stream()
-              .map(String::valueOf).collect(Collectors.toList()))
-      );
+          tx -> crr.addAll(tx.getLocalIDList()));
 
-      // TODO write blocks deleted to the file here since txns are not yet removed from DB.
-      checksumTreeManager.markBlocksAsDeleted(crr.getDeletedBlocks());
+      // TODO if block file was not found, will it still get added to CRR?
+      // Mark blocks as deleted in the container checksum tree.
+      // Data for these blocks does not need to be copied if container replicas diverge.
+      // Do this before the delete transactions are removed from the database.
+      checksumTreeManager.markBlocksAsDeleted(containerData, crr.getDeletedBlocks());
 
       // Once blocks are deleted... remove the blockID from blockDataTable
       // and also remove the transactions from txnTable.

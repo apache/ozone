@@ -25,6 +25,7 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.util.Collection;
 import java.util.SortedSet;
 import java.util.TreeSet;
 import java.util.concurrent.locks.ReadWriteLock;
@@ -79,7 +80,7 @@ public class ContainerChecksumTreeManager {
    * All other content of the file remains unchanged.
    * Concurrent writes to the same file are coordinated internally.
    */
-  public void markBlocksAsDeleted(KeyValueContainerData data, SortedSet<Long> deletedBlockIDs) throws IOException {
+  public void markBlocksAsDeleted(KeyValueContainerData data, Collection<Long> deletedBlockIDs) throws IOException {
     Lock writeLock = getWriteLock(data.getContainerID());
     writeLock.lock();
     try {
@@ -87,7 +88,6 @@ public class ContainerChecksumTreeManager {
       // Although the persisted block list should already be sorted, we will sort it here to make sure.
       // This will automatically fix any bugs in the persisted order that may show up.
       SortedSet<Long> sortedDeletedBlockIDs = new TreeSet<>(checksumInfoBuilder.getDeletedBlocksList());
-      // Since the provided list of block IDs is already sorted, this is a linear time addition.
       sortedDeletedBlockIDs.addAll(deletedBlockIDs);
 
       checksumInfoBuilder
