@@ -41,7 +41,7 @@ import org.apache.hadoop.hdds.security.SecurityConfig;
 import org.apache.hadoop.hdds.security.x509.certificate.client.DNCertificateClient;
 import org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateCodec;
 import org.apache.hadoop.hdds.security.x509.certificate.utils.SelfSignedCertificate;
-import org.apache.hadoop.hdds.security.x509.keys.KeyCodec;
+import org.apache.hadoop.hdds.security.x509.keys.KeyStorage;
 import org.apache.hadoop.security.ssl.KeyStoreTestUtil;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.hadoop.util.ServicePlugin;
@@ -84,7 +84,7 @@ public class TestHddsSecureDatanodeInit {
   private static PublicKey publicKey;
   private static GenericTestUtils.LogCapturer dnLogs;
   private static SecurityConfig securityConfig;
-  private static KeyCodec keyCodec;
+  private static KeyStorage keyStorage;
   private static CertificateCodec certCodec;
   private static X509Certificate cert;
   private static final String DN_COMPONENT = DNCertificateClient.COMPONENT_NAME;
@@ -130,7 +130,7 @@ public class TestHddsSecureDatanodeInit {
     dnLogs = GenericTestUtils.LogCapturer.captureLogs(
         ((DNCertificateClient)service.getCertificateClient()).getLogger());
     certCodec = new CertificateCodec(securityConfig, DN_COMPONENT);
-    keyCodec = new KeyCodec(securityConfig, DN_COMPONENT);
+    keyStorage = new KeyStorage(securityConfig, DN_COMPONENT);
     dnLogs.clearOutput();
     privateKey = service.getCertificateClient().getPrivateKey();
     publicKey = service.getCertificateClient().getPublicKey();
@@ -197,7 +197,7 @@ public class TestHddsSecureDatanodeInit {
   @Test
   public void testSecureDnStartupCase2() throws Exception {
     // Case 2: When private key and certificate is missing.
-    keyCodec.writePublicKey(publicKey);
+    keyStorage.storePublicKey(publicKey);
     RuntimeException rteException = assertThrows(
         RuntimeException.class,
         () -> service.initializeCertificateClient(client));
@@ -213,7 +213,7 @@ public class TestHddsSecureDatanodeInit {
   @Test
   public void testSecureDnStartupCase3() throws Exception {
     // Case 3: When only public key and certificate is present.
-    keyCodec.writePublicKey(publicKey);
+    keyStorage.storePublicKey(publicKey);
     certCodec.writeCertificate(cert);
     RuntimeException rteException = assertThrows(
         RuntimeException.class,
@@ -230,7 +230,7 @@ public class TestHddsSecureDatanodeInit {
   @Test
   public void testSecureDnStartupCase4() throws Exception {
     // Case 4: When public key as well as certificate is missing.
-    keyCodec.writePrivateKey(privateKey);
+    keyStorage.storePrivateKey(privateKey);
     // provide a new valid SCMGetCertResponseProto
     X509Certificate newCert = generateX509Cert(null, null, Duration.ofSeconds(CERT_LIFETIME));
     String pemCert = CertificateCodec.getPEMEncodedString(newCert);
@@ -261,7 +261,7 @@ public class TestHddsSecureDatanodeInit {
   public void testSecureDnStartupCase5() throws Exception {
     // Case 5: If private key and certificate is present.
     certCodec.writeCertificate(cert);
-    keyCodec.writePrivateKey(privateKey);
+    keyStorage.storePrivateKey(privateKey);
     service.initializeCertificateClient(client);
     assertNotNull(client.getPrivateKey());
     assertNotNull(client.getPublicKey());
@@ -273,8 +273,8 @@ public class TestHddsSecureDatanodeInit {
   @Test
   public void testSecureDnStartupCase6() throws Exception {
     // Case 6: If key pair already exist than response should be GETCERT.
-    keyCodec.writePublicKey(publicKey);
-    keyCodec.writePrivateKey(privateKey);
+    keyStorage.storePublicKey(publicKey);
+    keyStorage.storePrivateKey(privateKey);
     assertThrows(Exception.class,
         () -> service.initializeCertificateClient(client));
     assertNotNull(client.getPrivateKey());
@@ -287,8 +287,8 @@ public class TestHddsSecureDatanodeInit {
   @Test
   public void testSecureDnStartupCase7() throws Exception {
     // Case 7 When keypair and certificate is present.
-    keyCodec.writePublicKey(publicKey);
-    keyCodec.writePrivateKey(privateKey);
+    keyStorage.storePublicKey(publicKey);
+    keyStorage.storePrivateKey(privateKey);
     certCodec.writeCertificate(cert);
 
     service.initializeCertificateClient(client);

@@ -83,7 +83,7 @@ import org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateCodec;
 import org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateSignRequest;
 import org.apache.hadoop.hdds.security.x509.exception.CertificateException;
 import org.apache.hadoop.hdds.security.x509.keys.HDDSKeyGenerator;
-import org.apache.hadoop.hdds.security.x509.keys.KeyCodec;
+import org.apache.hadoop.hdds.security.x509.keys.KeyStorage;
 import org.apache.hadoop.ozone.OzoneSecurityUtil;
 
 import com.google.common.base.Preconditions;
@@ -115,7 +115,7 @@ public abstract class DefaultCertificateClient implements CertificateClient {
 
   private final Logger logger;
   private final SecurityConfig securityConfig;
-  private final KeyCodec keyCodec;
+  private final KeyStorage keyStorage;
   private PrivateKey privateKey;
   private PublicKey publicKey;
   private CertPath certPath;
@@ -152,7 +152,7 @@ public abstract class DefaultCertificateClient implements CertificateClient {
     Objects.requireNonNull(securityConfig);
     this.securityConfig = securityConfig;
     this.scmSecurityClient = scmSecurityClient;
-    keyCodec = new KeyCodec(securityConfig, component);
+    keyStorage = new KeyStorage(securityConfig, component);
     this.logger = log;
     this.certificateMap = new ConcurrentHashMap<>();
     this.component = component;
@@ -322,7 +322,7 @@ public abstract class DefaultCertificateClient implements CertificateClient {
     if (OzoneSecurityUtil.checkIfFileExist(keyPath,
         securityConfig.getPrivateKeyFileName())) {
       try {
-        privateKey = keyCodec.readPrivateKey();
+        privateKey = keyStorage.readPrivateKey();
       } catch (InvalidKeySpecException | NoSuchAlgorithmException
           | IOException e) {
         getLogger().error("Error while getting private key.", e);
@@ -346,7 +346,7 @@ public abstract class DefaultCertificateClient implements CertificateClient {
     if (OzoneSecurityUtil.checkIfFileExist(keyPath,
         securityConfig.getPublicKeyFileName())) {
       try {
-        publicKey = keyCodec.readPublicKey();
+        publicKey = keyStorage.readPublicKey();
       } catch (InvalidKeySpecException | NoSuchAlgorithmException
           | IOException e) {
         getLogger().error("Error while getting public key.", e);
@@ -859,7 +859,7 @@ public abstract class DefaultCertificateClient implements CertificateClient {
     try {
 
       if (validateKeyPair(pubKey)) {
-        keyCodec.writePublicKey(pubKey);
+        keyStorage.storePublicKey(pubKey);
         publicKey = pubKey;
       } else {
         getLogger().error("Can't recover public key " +
@@ -889,7 +889,7 @@ public abstract class DefaultCertificateClient implements CertificateClient {
         PublicKey pubKey = KeyFactory.getInstance(securityConfig.getKeyAlgo())
             .generatePublic(rsaPublicKeySpec);
         if (validateKeyPair(pubKey)) {
-          keyCodec.writePublicKey(pubKey);
+          keyStorage.storePublicKey(pubKey);
           publicKey = pubKey;
           getLogger().info("Public key is recovered from the private key.");
           return true;
@@ -933,20 +933,19 @@ public abstract class DefaultCertificateClient implements CertificateClient {
             "for certificate storage.", BOOTSTRAP_ERROR);
       }
     }
-    KeyPair keyPair = createKeyPair(keyCodec);
+    KeyPair keyPair = createKeyPair(keyStorage);
     privateKey = keyPair.getPrivate();
     publicKey = keyPair.getPublic();
   }
 
-  protected KeyPair createKeyPair(KeyCodec codec) throws CertificateException {
+  protected KeyPair createKeyPair(KeyStorage storage) throws CertificateException {
     HDDSKeyGenerator keyGenerator = new HDDSKeyGenerator(securityConfig);
-    KeyPair keyPair = null;
+    KeyPair keyPair;
     try {
       keyPair = keyGenerator.generateKey();
-      codec.writePublicKey(keyPair.getPublic());
-      codec.writePrivateKey(keyPair.getPrivate());
+      storage.storeKey(keyPair);
     } catch (NoSuchProviderException | NoSuchAlgorithmException
-        | IOException e) {
+             | IOException e) {
       getLogger().error("Error while bootstrapping certificate client.", e);
       throw new CertificateException("Error while bootstrapping certificate.",
           BOOTSTRAP_ERROR);
@@ -1117,10 +1116,10 @@ public abstract class DefaultCertificateClient implements CertificateClient {
     }
 
     // Generate key
-    KeyCodec newKeyCodec = new KeyCodec(securityConfig, newKeyDir.toPath());
+    KeyStorage newKeyStorage = new KeyStorage(securityConfig, newKeyDir.toPath());
     KeyPair newKeyPair;
     try {
-      newKeyPair = createKeyPair(newKeyCodec);
+      newKeyPair = createKeyPair(newKeyStorage);
     } catch (CertificateException e) {
       throw new CertificateException("Error while creating new key pair.",
           e, RENEW_ERROR);

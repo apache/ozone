@@ -24,7 +24,7 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.security.SecurityConfig;
 import org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateCodec;
 import org.apache.hadoop.hdds.security.x509.keys.HDDSKeyGenerator;
-import org.apache.hadoop.hdds.security.x509.keys.KeyCodec;
+import org.apache.hadoop.hdds.security.x509.keys.KeyStorage;
 import org.apache.hadoop.ozone.OzoneSecurityUtil;
 import org.apache.hadoop.ozone.om.OMStorage;
 import org.apache.hadoop.ozone.om.OzoneManager;
@@ -66,7 +66,7 @@ public class TestOmCertificateClientInit {
   private OMCertificateClient omCertificateClient;
   private HDDSKeyGenerator keyGenerator;
   private SecurityConfig securityConfig;
-  private KeyCodec omKeyCodec;
+  private KeyStorage omKeyStorage;
   private X509Certificate x509Certificate;
   private static final String OM_COMPONENT = OMCertificateClient.COMPONENT_NAME;
 
@@ -101,7 +101,7 @@ public class TestOmCertificateClientInit {
     omCertificateClient =
         new OMCertificateClient(
             securityConfig, null, storage, omInfo, "", null, null, null);
-    omKeyCodec = new KeyCodec(securityConfig, OM_COMPONENT);
+    omKeyStorage = new KeyStorage(securityConfig, OM_COMPONENT);
 
     Files.createDirectories(securityConfig.getKeyLocation(OM_COMPONENT));
   }
@@ -117,7 +117,7 @@ public class TestOmCertificateClientInit {
   public void testInitOzoneManager(boolean pvtKeyPresent, boolean pubKeyPresent,
       boolean certPresent, InitResponse expectedResult) throws Exception {
     if (pvtKeyPresent) {
-      omKeyCodec.writePrivateKey(keyPair.getPrivate());
+      omKeyStorage.storePrivateKey(keyPair.getPrivate());
     } else {
       FileUtils.deleteQuietly(Paths.get(
           securityConfig.getKeyLocation(OM_COMPONENT).toString(),
@@ -126,7 +126,7 @@ public class TestOmCertificateClientInit {
 
     if (pubKeyPresent) {
       if (omCertificateClient.getPublicKey() == null) {
-        omKeyCodec.writePublicKey(keyPair.getPublic());
+        omKeyStorage.storePublicKey(keyPair.getPublic());
       }
     } else {
       FileUtils.deleteQuietly(Paths.get(

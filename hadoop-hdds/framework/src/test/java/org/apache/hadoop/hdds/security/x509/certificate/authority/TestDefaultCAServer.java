@@ -33,7 +33,7 @@ import org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateCodec;
 import org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateSignRequest;
 import org.apache.hadoop.hdds.security.x509.certificate.utils.SelfSignedCertificate;
 import org.apache.hadoop.hdds.security.x509.keys.HDDSKeyGenerator;
-import org.apache.hadoop.hdds.security.x509.keys.KeyCodec;
+import org.apache.hadoop.hdds.security.x509.keys.KeyStorage;
 import org.apache.hadoop.security.ssl.KeyStoreTestUtil;
 
 import org.bouncycastle.pkcs.PKCS10CertificationRequest;
@@ -290,10 +290,9 @@ public class TestDefaultCAServer {
         new SCMCertificateClient(securityConfig, null, null)) {
 
       KeyPair keyPair = KeyStoreTestUtil.generateKeyPair("RSA");
-      KeyCodec keyPEMWriter = new KeyCodec(securityConfig,
-          scmCertificateClient.getComponentName());
+      KeyStorage keyStorage = new KeyStorage(securityConfig, scmCertificateClient.getComponentName());
 
-      keyPEMWriter.writeKey(tempDir, keyPair, true);
+      keyStorage.storeKey(tempDir, keyPair, true);
       X509Certificate externalCert = generateExternalCert(keyPair);
 
       CertificateCodec certificateCodec = new CertificateCodec(securityConfig,
@@ -343,10 +342,8 @@ public class TestDefaultCAServer {
       String scmId = RandomStringUtils.randomAlphabetic(4);
       String clusterId = RandomStringUtils.randomAlphabetic(4);
       KeyPair keyPair = new HDDSKeyGenerator(securityConfig).generateKey();
-      KeyCodec keyPEMWriter = new KeyCodec(securityConfig,
-          scmCertificateClient.getComponentName());
-
-      keyPEMWriter.writeKey(tempDir, keyPair, true);
+      KeyStorage keyStorage = new KeyStorage(securityConfig, scmCertificateClient.getComponentName());
+      keyStorage.storeKey(tempDir, keyPair, true);
       LocalDate beginDate = LocalDate.now().atStartOfDay().toLocalDate();
       LocalDate endDate =
           LocalDate.from(LocalDate.now().atStartOfDay().plusDays(10));
