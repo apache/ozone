@@ -141,7 +141,7 @@ public abstract class BackgroundService {
             if (LOG.isDebugEnabled()) {
               LOG.debug("task execution result size {}", result.getSize());
             }
-          } catch (Exception e) {
+          } catch (Throwable e) {
             LOG.warn("Background task execution failed", e);
           } finally {
             long endTime = System.nanoTime();
