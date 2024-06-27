@@ -199,7 +199,7 @@ public class SCMCertificateClient extends DefaultCertificateClient {
         certificateStorage.storeCertificate(Paths.get(certWritePath.toString(),
             getSecurityConfig().getCertificateFileName()), pemEncodedCert);
 
-        X509Certificate certificate = (X509Certificate) writtenCertPath.getCertificates().get(0);
+        X509Certificate certificate = firstCertificateFrom(writtenCertPath);
         // return new scm cert serial ID.
         return certificate.getSerialNumber().toString();
       } else {
@@ -328,7 +328,7 @@ public class SCMCertificateClient extends DefaultCertificateClient {
         //note: this does exactly the same as store certificate
         persistSubCACertificate(pemEncodedCert);
 
-        X509Certificate certificate = (X509Certificate) writtenCertPath.getCertificates().get(0);
+        X509Certificate certificate = firstCertificateFrom(writtenCertPath);
         // Persist scm cert serial ID.
         saveCertIdCallback.accept(certificate.getSerialNumber().toString());
       } else {
@@ -363,7 +363,7 @@ public class SCMCertificateClient extends DefaultCertificateClient {
       storeCertificate(pemEncodedCert, CAType.NONE);
       //note: this does exactly the same as store certificate
       persistSubCACertificate(pemEncodedCert);
-      X509Certificate cert = (X509Certificate) scmSubCACertPath.getCertificates().get(0);
+      X509Certificate cert = firstCertificateFrom(scmSubCACertPath);
       // Persist scm cert serial ID.
       saveCertIdCallback.accept(cert.getSerialNumber().toString());
     } catch (InterruptedException | ExecutionException | IOException | java.security.cert.CertificateException e) {
@@ -405,8 +405,7 @@ public class SCMCertificateClient extends DefaultCertificateClient {
    * @param encodedCert
    * @throws IOException
    */
-  private void persistSubCACertificate(
-      String encodedCert) throws IOException {
+  private void persistSubCACertificate(String encodedCert) throws IOException {
     SecurityConfig config = getSecurityConfig();
     certificateStorage.storeCertificate(config.getCertFilePath(getComponentName()), encodedCert);
   }

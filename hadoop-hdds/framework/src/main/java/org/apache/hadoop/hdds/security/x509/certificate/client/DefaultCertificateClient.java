@@ -599,7 +599,7 @@ public abstract class DefaultCertificateClient implements CertificateClient {
                                                 boolean updateCA) throws CertificateException {
     try {
       CertPath certificatePath = certificateStorage.storeCertificate(certWritePath, pemEncodedCert, caType);
-      X509Certificate cert = (X509Certificate) certificatePath.getCertificates().get(0);
+      X509Certificate cert = firstCertificateFrom(certificatePath);
 
       if (updateCA) {
         if (caType == CAType.SUBORDINATE) {
@@ -722,7 +722,7 @@ public abstract class DefaultCertificateClient implements CertificateClient {
     return handleCase(init);
   }
 
-  private X509Certificate firstCertificateFrom(CertPath certificatePath) {
+  X509Certificate firstCertificateFrom(CertPath certificatePath) {
     return (X509Certificate) certificatePath.getCertificates().get(0);
   }
 

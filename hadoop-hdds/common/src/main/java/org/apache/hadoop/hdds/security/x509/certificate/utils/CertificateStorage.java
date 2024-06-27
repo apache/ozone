@@ -111,7 +111,7 @@ public class CertificateStorage {
     return getCertPath(path, fileName);
   }
 
-  public CertPath getCertPath(Path path, String fileName) throws IOException, CertificateException {
+  private CertPath getCertPath(Path path, String fileName) throws IOException, CertificateException {
     checkBasePathDirectory(path.toAbsolutePath());
     File certFile =
         Paths.get(path.toAbsolutePath().toString(), fileName).toFile();

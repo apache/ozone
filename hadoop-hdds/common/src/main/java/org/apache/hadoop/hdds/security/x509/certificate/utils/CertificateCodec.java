@@ -56,12 +56,6 @@ public class CertificateCodec {
       LoggerFactory.getLogger(CertificateCodec.class);
 
   /**
-   * Creates a CertificateCodec with component name.
-   */
-  public CertificateCodec() {
-  }
-
-  /**
    * Get a valid pem encoded string for the certification path.
    */
   public String getPEMEncodedString(CertPath certPath)
