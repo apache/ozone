@@ -30,6 +30,7 @@ import java.util.UUID;
 
 import static org.apache.hadoop.hdds.HddsUtils.toProtobuf;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 
 /**
  * Tests SnapshotInfo metadata data structure holding state info for
@@ -67,7 +68,6 @@ public class TestOmSnapshotInfo {
         .setCheckpointDir(CHECKPOINT_DIR)
         .setDbTxSequenceNumber(DB_TX_SEQUENCE_NUMBER)
         .setDeepClean(false)
-        .setSstFiltered(false)
         .setReferencedSize(2000L)
         .setReferencedReplicatedSize(6000L)
         .setExclusiveSize(1000L)
@@ -91,7 +91,6 @@ public class TestOmSnapshotInfo {
         .setCheckpointDir(CHECKPOINT_DIR)
         .setDbTxSequenceNumber(DB_TX_SEQUENCE_NUMBER)
         .setDeepClean(false)
-        .setSstFiltered(false)
         .setReferencedSize(2000L)
         .setReferencedReplicatedSize(6000L)
         .setExclusiveSize(1000L)
@@ -130,8 +129,7 @@ public class TestOmSnapshotInfo {
         snapshotInfoEntryActual.getDbTxSequenceNumber());
     assertEquals(snapshotInfoEntryExpected.getDeepClean(),
         snapshotInfoEntryActual.getDeepClean());
-    assertEquals(snapshotInfoEntryExpected.getSstFiltered(),
-        snapshotInfoEntryActual.getSstFiltered());
+    assertFalse(snapshotInfoEntryActual.hasSstFiltered());
     assertEquals(snapshotInfoEntryExpected.getReferencedSize(),
         snapshotInfoEntryActual.getReferencedSize());
     assertEquals(
@@ -171,8 +169,6 @@ public class TestOmSnapshotInfo {
         snapshotInfoActual.getDbTxSequenceNumber());
     assertEquals(snapshotInfoExpected.getDeepClean(),
         snapshotInfoActual.getDeepClean());
-    assertEquals(snapshotInfoExpected.isSstFiltered(),
-        snapshotInfoActual.isSstFiltered());
     assertEquals(snapshotInfoExpected.getReferencedSize(),
         snapshotInfoActual.getReferencedSize());
     assertEquals(snapshotInfoExpected.getReferencedReplicatedSize(),

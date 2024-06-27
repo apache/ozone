@@ -118,7 +118,6 @@ public final class SnapshotInfo implements Auditable, CopyObject<SnapshotInfo> {
    */
   private long dbTxSequenceNumber;
   private boolean deepClean;
-  private boolean sstFiltered;
   private long referencedSize;
   private long referencedReplicatedSize;
   private long exclusiveSize;
@@ -139,7 +138,6 @@ public final class SnapshotInfo implements Auditable, CopyObject<SnapshotInfo> {
     this.checkpointDir = b.checkpointDir;
     this.dbTxSequenceNumber = b.dbTxSequenceNumber;
     this.deepClean = b.deepClean;
-    this.sstFiltered = b.sstFiltered;
     this.referencedSize = b.referencedSize;
     this.referencedReplicatedSize = b.referencedReplicatedSize;
     this.exclusiveSize = b.exclusiveSize;
@@ -235,14 +233,6 @@ public final class SnapshotInfo implements Auditable, CopyObject<SnapshotInfo> {
     return checkpointDir;
   }
 
-  public boolean isSstFiltered() {
-    return sstFiltered;
-  }
-
-  public void setSstFiltered(boolean sstFiltered) {
-    this.sstFiltered = sstFiltered;
-  }
-
   public static org.apache.hadoop.ozone.om.helpers.SnapshotInfo.Builder
       newBuilder() {
     return new org.apache.hadoop.ozone.om.helpers.SnapshotInfo.Builder();
@@ -262,7 +252,6 @@ public final class SnapshotInfo implements Auditable, CopyObject<SnapshotInfo> {
         .setSnapshotPath(snapshotPath)
         .setCheckpointDir(checkpointDir)
         .setDeepClean(deepClean)
-        .setSstFiltered(sstFiltered)
         .setReferencedSize(referencedSize)
         .setReferencedReplicatedSize(referencedReplicatedSize)
         .setExclusiveSize(exclusiveSize)
@@ -287,7 +276,6 @@ public final class SnapshotInfo implements Auditable, CopyObject<SnapshotInfo> {
     private String checkpointDir;
     private long dbTxSequenceNumber;
     private boolean deepClean;
-    private boolean sstFiltered;
     private long referencedSize;
     private long referencedReplicatedSize;
     private long exclusiveSize;
@@ -377,11 +365,6 @@ public final class SnapshotInfo implements Auditable, CopyObject<SnapshotInfo> {
       return this;
     }
 
-    public Builder setSstFiltered(boolean sstFiltered) {
-      this.sstFiltered = sstFiltered;
-      return this;
-    }
-
     /** @param referencedSize - Snapshot referenced size. */
     public Builder setReferencedSize(long referencedSize) {
       this.referencedSize = referencedSize;
@@ -430,7 +413,6 @@ public final class SnapshotInfo implements Auditable, CopyObject<SnapshotInfo> {
             .setSnapshotStatus(snapshotStatus.toProto())
             .setCreationTime(creationTime)
             .setDeletionTime(deletionTime)
-            .setSstFiltered(sstFiltered)
             .setReferencedSize(referencedSize)
             .setReferencedReplicatedSize(referencedReplicatedSize)
             .setExclusiveSize(exclusiveSize)
@@ -482,10 +464,6 @@ public final class SnapshotInfo implements Auditable, CopyObject<SnapshotInfo> {
 
     if (snapshotInfoProto.hasDeepClean()) {
       osib.setDeepClean(snapshotInfoProto.getDeepClean());
-    }
-
-    if (snapshotInfoProto.hasSstFiltered()) {
-      osib.setSstFiltered(snapshotInfoProto.getSstFiltered());
     }
 
     if (snapshotInfoProto.hasReferencedSize()) {
@@ -668,7 +646,6 @@ public final class SnapshotInfo implements Auditable, CopyObject<SnapshotInfo> {
         snapshotPath.equals(that.snapshotPath) &&
         checkpointDir.equals(that.checkpointDir) &&
         deepClean == that.deepClean &&
-        sstFiltered == that.sstFiltered &&
         referencedSize == that.referencedSize &&
         referencedReplicatedSize == that.referencedReplicatedSize &&
         exclusiveSize == that.exclusiveSize &&
@@ -682,8 +659,7 @@ public final class SnapshotInfo implements Auditable, CopyObject<SnapshotInfo> {
         snapshotStatus,
         creationTime, deletionTime, pathPreviousSnapshotId,
         globalPreviousSnapshotId, snapshotPath, checkpointDir,
-        deepClean, sstFiltered,
-        referencedSize, referencedReplicatedSize,
+        deepClean, referencedSize, referencedReplicatedSize,
         exclusiveSize, exclusiveReplicatedSize, deepCleanedDeletedDir);
   }
 
@@ -706,7 +682,6 @@ public final class SnapshotInfo implements Auditable, CopyObject<SnapshotInfo> {
         .setCheckpointDir(checkpointDir)
         .setDbTxSequenceNumber(dbTxSequenceNumber)
         .setDeepClean(deepClean)
-        .setSstFiltered(sstFiltered)
         .setReferencedSize(referencedSize)
         .setReferencedReplicatedSize(referencedReplicatedSize)
         .setExclusiveSize(exclusiveSize)
@@ -731,7 +706,6 @@ public final class SnapshotInfo implements Auditable, CopyObject<SnapshotInfo> {
         ", checkpointDir: '" + checkpointDir + '\'' +
         ", dbTxSequenceNumber: '" + dbTxSequenceNumber + '\'' +
         ", deepClean: '" + deepClean + '\'' +
-        ", sstFiltered: '" + sstFiltered + '\'' +
         ", referencedSize: '" + referencedSize + '\'' +
         ", referencedReplicatedSize: '" + referencedReplicatedSize + '\'' +
         ", exclusiveSize: '" + exclusiveSize + '\'' +

@@ -96,6 +96,8 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_DIFF_CLE
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_DIFF_DB_DIR;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_DIFF_REPORT_MAX_PAGE_SIZE;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_DIFF_REPORT_MAX_PAGE_SIZE_DEFAULT;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_PROP_CLEANUP_SERVICE_DEFAULT;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_PROP_CLEANUP_SERVICE_INTERVAL;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INVALID_KEY_NAME;
 import static org.apache.hadoop.ozone.om.snapshot.SnapshotDiffManager.getSnapshotRootPath;
 import static org.apache.hadoop.ozone.om.snapshot.SnapshotUtils.checkSnapshotActive;
@@ -159,6 +161,18 @@ public final class OmSnapshotManager implements AutoCloseable {
   private static final String SNAP_DIFF_PURGED_JOB_TABLE_NAME =
       "snap-diff-purged-job-table";
 
+  /**
+   * Contains all the snap diff job which can be purged either due to max
+   * allowed time is over, FAILED or REJECTED.
+   * |-----------------------------------------------------|
+   * |  KEY               |  VALUE                         |
+   * |-----------------------------------------------------|
+   * |  snapshotId        | SnapshotProperties             |
+   * |-----------------------------------------------------|
+   */
+  private static final String SNAPSHOT_PROP_TABLE_NAME =
+      "snapshot-properties-table";
+
   private final long diffCleanupServiceInterval;
   private final int maxOpenSstFilesInSnapshotDb;
   private final ManagedColumnFamilyOptions columnFamilyOptions;
@@ -166,6 +180,7 @@ public final class OmSnapshotManager implements AutoCloseable {
   private final List<ColumnFamilyDescriptor> columnFamilyDescriptors;
   private final List<ColumnFamilyHandle> columnFamilyHandles;
   private final SnapshotDiffCleanupService snapshotDiffCleanupService;
+  private final SnapshotPropertiesManager snapshotPropertiesManager;
 
   private final int maxPageSize;
 
@@ -209,6 +224,7 @@ public final class OmSnapshotManager implements AutoCloseable {
     ColumnFamilyHandle snapDiffJobCf;
     ColumnFamilyHandle snapDiffReportCf;
     ColumnFamilyHandle snapDiffPurgedJobCf;
+    ColumnFamilyHandle snapshotPropertiesCf;
     String dbPath = getDbPath(ozoneManager.getConfiguration());
 
     try {
@@ -229,13 +245,13 @@ public final class OmSnapshotManager implements AutoCloseable {
       snapDiffPurgedJobCf = getOrCreateColumnFamily(
           SNAP_DIFF_PURGED_JOB_TABLE_NAME, columnFamilyDescriptors,
           columnFamilyHandles);
-
+      snapshotPropertiesCf = getOrCreateColumnFamily(SNAPSHOT_PROP_TABLE_NAME,
+          columnFamilyDescriptors, columnFamilyHandles);
       dropUnknownColumnFamilies(columnFamilyHandles);
     } catch (RuntimeException exception) {
       close();
       throw exception;
     }
-
     this.ozoneManager = ozoneManager;
     RocksDBCheckpointDiffer differ = ozoneManager
         .getMetadataManager()
@@ -248,7 +264,6 @@ public final class OmSnapshotManager implements AutoCloseable {
         OZONE_OM_SNAPSHOT_CACHE_MAX_SIZE_DEFAULT);
 
     CacheLoader<UUID, OmSnapshot> loader = createCacheLoader();
-
     // TODO: [SNAPSHOT] Remove this if not going to make SnapshotCache impl
     //  pluggable.
     RemovalListener<String, OmSnapshot> removalListener = notification -> {
@@ -294,6 +309,10 @@ public final class OmSnapshotManager implements AutoCloseable {
         .getTimeDuration(OZONE_OM_SNAPSHOT_DIFF_CLEANUP_SERVICE_TIMEOUT,
             OZONE_OM_SNAPSHOT_DIFF_CLEANUP_SERVICE_TIMEOUT_DEFAULT,
             TimeUnit.MILLISECONDS);
+    long snapshotPropCleanupServiceInterval = ozoneManager.getConfiguration()
+        .getTimeDuration(OZONE_OM_SNAPSHOT_PROP_CLEANUP_SERVICE_INTERVAL,
+            OZONE_OM_SNAPSHOT_PROP_CLEANUP_SERVICE_DEFAULT,
+            TimeUnit.MILLISECONDS);
 
     if (ozoneManager.isFilesystemSnapshotEnabled()) {
       this.snapshotDiffCleanupService = new SnapshotDiffCleanupService(
@@ -309,6 +328,13 @@ public final class OmSnapshotManager implements AutoCloseable {
       this.snapshotDiffCleanupService.start();
     } else {
       this.snapshotDiffCleanupService = null;
+    }
+    try {
+      this.snapshotPropertiesManager = new SnapshotPropertiesManager(ozoneManager.getMetadataManager(),
+          snapshotDiffDb, snapshotPropertiesCf, snapshotPropCleanupServiceInterval);
+    } catch (IOException e) {
+      close();
+      throw new RuntimeException("Error while loading SnapshotProperties from " + SNAPSHOT_PROP_TABLE_NAME + " table");
     }
   }
 
@@ -706,6 +732,10 @@ public final class OmSnapshotManager implements AutoCloseable {
     return SnapshotUtils.getSnapshotInfo(ozoneManager, key);
   }
 
+  public SnapshotPropertiesManager getSnapshotPropertiesManager() {
+    return snapshotPropertiesManager;
+  }
+
   public static String getSnapshotPrefix(String snapshotName) {
     return OM_SNAPSHOT_INDICATOR + OM_KEY_PREFIX +
         snapshotName + OM_KEY_PREFIX;
@@ -929,7 +959,8 @@ public final class OmSnapshotManager implements AutoCloseable {
   ) {
     Set<String> allowedColumnFamilyOnStartUp = new HashSet<>(
         Arrays.asList(DEFAULT_COLUMN_FAMILY_NAME, SNAP_DIFF_JOB_TABLE_NAME,
-            SNAP_DIFF_REPORT_TABLE_NAME, SNAP_DIFF_PURGED_JOB_TABLE_NAME));
+            SNAP_DIFF_REPORT_TABLE_NAME, SNAP_DIFF_PURGED_JOB_TABLE_NAME,
+            SNAPSHOT_PROP_TABLE_NAME));
 
     try {
       for (ColumnFamilyHandle columnFamilyHandle : familyHandles) {

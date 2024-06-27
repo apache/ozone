@@ -591,6 +591,12 @@ public final class OMConfigKeys {
       OZONE_OM_SNAPSHOT_DIFF_CLEANUP_SERVICE_TIMEOUT_DEFAULT
       = TimeUnit.MINUTES.toMillis(5);
 
+  public static final String OZONE_OM_SNAPSHOT_PROP_CLEANUP_SERVICE_INTERVAL
+      = "ozone.om.snapshot.prop.cleanup.service.interval";
+
+  public static final long OZONE_OM_SNAPSHOT_PROP_CLEANUP_SERVICE_DEFAULT
+      = TimeUnit.MINUTES.toMillis(5);
+
   public static final String
       OZONE_OM_SNAPSHOT_DIFF_MAX_ALLOWED_KEYS_CHANGED_PER_DIFF_JOB
       = "ozone.om.snapshot.diff.max.allowed.keys.changed.per.job";

@@ -101,17 +101,4 @@ public class TestSnapshotInfo {
     snapshotInfo.delete(EXPECTED_SNAPSHOT_KEY);
     assertFalse(snapshotInfo.isExist(EXPECTED_SNAPSHOT_KEY));
   }
-
-  @Test
-  public void testSnapshotSSTFilteredFlag() throws Exception {
-    Table<String, SnapshotInfo> snapshotInfo =
-            omMetadataManager.getSnapshotInfoTable();
-    SnapshotInfo info = createSnapshotInfo();
-    info.setSstFiltered(false);
-    snapshotInfo.put(EXPECTED_SNAPSHOT_KEY, info);
-    assertFalse(snapshotInfo.get(EXPECTED_SNAPSHOT_KEY).isSstFiltered());
-    info.setSstFiltered(true);
-    snapshotInfo.put(EXPECTED_SNAPSHOT_KEY, info);
-    assertTrue(snapshotInfo.get(EXPECTED_SNAPSHOT_KEY).isSstFiltered());
-  }
 }

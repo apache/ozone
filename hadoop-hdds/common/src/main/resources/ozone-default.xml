@@ -4315,6 +4315,16 @@
   </property>
 
   <property>
+    <name>ozone.om.snapshot.prop.cleanup.service.interval</name>
+    <value>5m</value>
+    <tag>OZONE, OM</tag>
+    <description>
+      Interval for snapshot property clean up service for removing purged snapshot properties from the table.
+      Uses millisecond by default when no time unit is specified.
+    </description>
+  </property>
+
+  <property>
     <name>ozone.om.snapshot.cache.cleanup.service.run.interval</name>
     <value>1m</value>
     <tag>OZONE, OM</tag>

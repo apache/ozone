@@ -41,6 +41,7 @@ import org.apache.hadoop.ozone.om.OmSnapshot;
 import org.apache.hadoop.ozone.om.OmSnapshotManager;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.SnapshotChainManager;
+import org.apache.hadoop.ozone.om.SnapshotPropertiesManager;
 import org.apache.hadoop.ozone.om.helpers.OMRatisHelper;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
@@ -49,6 +50,7 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
+import org.apache.hadoop.ozone.om.helpers.SnapshotProperties;
 import org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServer;
 import org.apache.hadoop.ozone.om.snapshot.ReferenceCounted;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
@@ -67,6 +69,7 @@ import org.slf4j.LoggerFactory;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
@@ -100,6 +103,7 @@ public class SnapshotDeletingService extends AbstractKeyDeletingService {
   private final long snapshotDeletionPerTask;
   private final int keyLimitPerSnapshot;
   private final int ratisByteLimit;
+  private final SnapshotPropertiesManager snapshotPropertiesManager;
 
   public SnapshotDeletingService(long interval, long serviceTimeout,
       OzoneManager ozoneManager, ScmBlockLocationProtocol scmClient)
@@ -112,6 +116,7 @@ public class SnapshotDeletingService extends AbstractKeyDeletingService {
     OmMetadataManagerImpl omMetadataManager = (OmMetadataManagerImpl)
         ozoneManager.getMetadataManager();
     this.chainManager = omMetadataManager.getSnapshotChainManager();
+    this.snapshotPropertiesManager = omSnapshotManager.getSnapshotPropertiesManager();
     this.successRunCount = new AtomicLong(0);
     this.suspended = new AtomicBoolean(false);
     this.conf = ozoneManager.getConfiguration();
@@ -158,7 +163,8 @@ public class SnapshotDeletingService extends AbstractKeyDeletingService {
                   .isSstFilteringSvcEnabled();
 
           // Only Iterate in deleted snapshot
-          if (shouldIgnoreSnapshot(snapInfo, isSstFilteringServiceEnabled)) {
+          if (shouldIgnoreSnapshot(snapInfo, isSstFilteringServiceEnabled,
+              snapshotPropertiesManager.getSnapshotProperties(snapInfo.getSnapshotId()))) {
             continue;
           }
 
@@ -592,10 +598,10 @@ public class SnapshotDeletingService extends AbstractKeyDeletingService {
   }
 
   public static boolean shouldIgnoreSnapshot(SnapshotInfo snapInfo,
-      boolean isSstFilteringServiceEnabled) {
+      boolean isSstFilteringServiceEnabled, Optional<SnapshotProperties> snapshotProperties) {
     SnapshotInfo.SnapshotStatus snapshotStatus = snapInfo.getSnapshotStatus();
     return !(snapshotStatus == SnapshotInfo.SnapshotStatus.SNAPSHOT_DELETED)
-        || (isSstFilteringServiceEnabled && !snapInfo.isSstFiltered());
+        || (isSstFilteringServiceEnabled && (!snapshotProperties.map(SnapshotProperties::isSstFiltered).orElse(false)));
   }
 
   // TODO: Move this util class.
