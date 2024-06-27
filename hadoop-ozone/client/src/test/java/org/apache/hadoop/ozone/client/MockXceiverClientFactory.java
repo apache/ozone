@@ -122,6 +122,12 @@ public class MockXceiverClientFactory
   }
 
   @Override
+  public XceiverClientSpi acquireClientUncached(Pipeline pipeline,
+      boolean topologyAware) throws IOException {
+    return acquireClient(pipeline, topologyAware);
+  }
+
+  @Override
   public void releaseClient(XceiverClientSpi xceiverClient,
                             boolean invalidateClient, boolean topologyAware) {
 

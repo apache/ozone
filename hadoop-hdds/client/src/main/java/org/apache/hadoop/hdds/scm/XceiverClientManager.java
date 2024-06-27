@@ -19,7 +19,6 @@
 package org.apache.hadoop.hdds.scm;
 
 import java.io.IOException;
-import java.util.concurrent.Callable;
 import java.util.concurrent.TimeUnit;
 
 import org.apache.hadoop.hdds.conf.Config;
@@ -188,6 +187,39 @@ public class XceiverClientManager implements XceiverClientFactory {
   }
 
   /**
+   * Similar to acquireClient() but does not use the cache.
+   * User must close the client explicitly after use.
+   * @param pipeline pipeline
+   * @param topologyAware topology aware
+   * @return XceiverClientSpi object
+   * @throws IOException
+   */
+  @Override
+  public XceiverClientSpi acquireClientUncached(Pipeline pipeline,
+                                        boolean topologyAware) throws
+      Exception {
+    HddsProtos.ReplicationType type = pipeline.getType();
+    XceiverClientSpi client = null;
+    switch (type) {
+    case RATIS:
+      client = XceiverClientRatis.newXceiverClientRatis(pipeline, conf,
+          trustManager);
+      break;
+    case STAND_ALONE:
+      client = new XceiverClientGrpc(pipeline, conf, trustManager);
+      break;
+    case EC:
+      client = new ECXceiverClientGrpc(pipeline, conf, trustManager);
+      break;
+    case CHAINED:
+    default:
+      throw new IOException("not implemented " + pipeline.getType());
+    }
+    client.connect();
+    return client;
+  }
+
+  /**
    * Releases a XceiverClientSpi after use.
    *
    * @param client client to release
@@ -229,34 +261,12 @@ public class XceiverClientManager implements XceiverClientFactory {
 
   private XceiverClientSpi getClient(Pipeline pipeline, boolean topologyAware)
       throws IOException {
-    HddsProtos.ReplicationType type = pipeline.getType();
     try {
       // create different client different pipeline node based on
       // network topology
       String key = getPipelineCacheKey(pipeline, topologyAware);
-      return clientCache.get(key, new Callable<XceiverClientSpi>() {
-        @Override
-          public XceiverClientSpi call() throws Exception {
-            XceiverClientSpi client = null;
-            switch (type) {
-            case RATIS:
-              client = XceiverClientRatis.newXceiverClientRatis(pipeline, conf,
-                  trustManager);
-              break;
-            case STAND_ALONE:
-              client = new XceiverClientGrpc(pipeline, conf, trustManager);
-              break;
-            case EC:
-              client = new ECXceiverClientGrpc(pipeline, conf, trustManager);
-              break;
-            case CHAINED:
-            default:
-              throw new IOException("not implemented " + pipeline.getType());
-            }
-            client.connect();
-            return client;
-          }
-        });
+      return clientCache.get(key,
+          () -> acquireClientUncached(pipeline, topologyAware));
     } catch (Exception e) {
       throw new IOException(
           "Exception getting XceiverClient: " + e.toString(), e);

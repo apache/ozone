@@ -160,7 +160,7 @@ public class DNRPCLoadGenerator extends BaseFreonGenerator
     }
     clients = new ArrayList<>(numClients);
     for (int i = 0; i < numClients; i++) {
-      clients.add(xceiverClientManager.acquireClient(pipeline));
+      clients.add(xceiverClientManager.acquireClientUncached(pipeline, true));
     }
 
     init();
@@ -171,7 +171,7 @@ public class DNRPCLoadGenerator extends BaseFreonGenerator
       runTests(this::sendRPCReq);
     } finally {
       for (XceiverClientSpi client : clients) {
-        xceiverClientManager.releaseClient(client, false);
+        client.close();
       }
       xceiverClientManager.close();
       scmClient.close();
