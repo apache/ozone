@@ -88,7 +88,7 @@ public class TestOmSnapshotUtils {
 
   private static Stream<Arguments> testCasesForIgnoreSnapshotGc() {
     SnapshotProperties filteredSnapshotProperties = SnapshotProperties.newBuilder().setSstFiltered(true).build();
-    SnapshotProperties unfilteredSnapshotProperties = SnapshotProperties.newBuilder().setSstFiltered(true).build();
+    SnapshotProperties unfilteredSnapshotProperties = SnapshotProperties.newBuilder().setSstFiltered(false).build();
     SnapshotInfo filteredSnapshot =
         SnapshotInfo.newBuilder().setName("snap1").build();
     SnapshotInfo unFilteredSnapshot =
