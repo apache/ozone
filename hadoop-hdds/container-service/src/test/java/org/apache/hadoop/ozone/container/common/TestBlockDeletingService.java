@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone.container.common;
 
 
 import com.google.common.collect.Lists;
+import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.client.BlockID;
@@ -84,6 +85,10 @@ import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.RandomAccessFile;
 import java.nio.ByteBuffer;
+import java.nio.file.DirectoryStream;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -109,6 +114,7 @@ import static org.apache.hadoop.ozone.container.common.ContainerTestUtils.COMMIT
 import static org.apache.hadoop.ozone.container.common.ContainerTestUtils.WRITE_STAGE;
 import static org.apache.hadoop.ozone.container.common.ContainerTestUtils.createDbInstancesForTestIfNeeded;
 import static org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion.FILE_PER_BLOCK;
+import static org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion.FILE_PER_CHUNK;
 import static org.apache.hadoop.ozone.container.common.states.endpoint.VersionEndpointTask.LOG;
 import static org.apache.hadoop.ozone.container.keyvalue.helpers.KeyValueContainerUtil.isSameSchemaVersion;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -1102,6 +1108,47 @@ public class TestBlockDeletingService {
   }
 
   /**
+   * The container checksum file is updated with blocks that have been deleted after the file is removed from disk,
+   * but before the transaction is removed from the DB. If there is a failure partway through, the checksum file
+   * should still get updated when the transaction is retried, even if the block file is not present.
+   */
+  @ContainerTestVersionInfo.ContainerTest
+  public void testChecksumFileUpdatedWhenDeleteRetried(ContainerTestVersionInfo versionInfo) throws Exception {
+    final int numBlocks = 4;
+    setLayoutAndSchemaForTest(versionInfo);
+    DatanodeConfiguration dnConf = conf.getObject(DatanodeConfiguration.class);
+    dnConf.setBlockDeletionLimit(4);
+    this.blockLimitPerInterval = dnConf.getBlockDeletionLimit();
+    conf.setFromObject(dnConf);
+    ContainerSet containerSet = new ContainerSet(1000);
+    KeyValueContainerData contData = createToDeleteBlocks(containerSet, numBlocks, 4);
+    KeyValueHandler keyValueHandler =
+        new KeyValueHandler(conf, datanodeUuid, containerSet, volumeSet,
+            ContainerMetrics.create(conf), c -> {});
+    BlockDeletingServiceTestImpl svc =
+        getBlockDeletingService(containerSet, conf, keyValueHandler);
+    svc.start();
+    GenericTestUtils.waitFor(svc::isStarted, 100, 3000);
+
+    // Remove all the block files from the disk, as if they were deleted previously but the system failed before
+    // doing any metadata updates or removing the transaction of to-delete block IDs from the DB.
+    File blockDataDir = new File(contData.getChunksPath());
+    try (DirectoryStream<Path> stream = Files.newDirectoryStream(blockDataDir.toPath())) {
+      for (Path entry : stream) {
+        assertTrue(entry.toFile().delete());
+      }
+    }
+
+    String[] blockFilesRemaining = blockDataDir.list();
+    assertNotNull(blockFilesRemaining);
+    assertEquals(0, blockFilesRemaining.length);
+
+    deleteAndWait(svc, 1);
+
+    assertDeletionsInChecksumFile(contData, numBlocks);
+  }
+
+  /**
    *  Check blockData record count of certain container (DBHandle not provided).
    *
    * @param expectedCount expected records in the table
@@ -1176,11 +1223,9 @@ public class TestBlockDeletingService {
     } catch (IOException ex) {
       fail("Failed to read container checksum tree file", ex);
     }
-
     assertNotNull(checksumInfo);
 
     List<Long> deletedBlocks = checksumInfo.getDeletedBlocksList();
-
     assertEquals(numBlocks, deletedBlocks.size());
     // Create a sorted copy of the list to check the order written to the file.
     List<Long> sortedDeletedBlocks = checksumInfo.getDeletedBlocksList().stream()
@@ -1189,7 +1234,7 @@ public class TestBlockDeletingService {
     assertNotSame(sortedDeletedBlocks, deletedBlocks);
     assertEquals(sortedDeletedBlocks, deletedBlocks);
 
-    // Block list should be unique.
+    // Each block in the list should be unique.
     assertEquals(new HashSet<>(deletedBlocks).size(), deletedBlocks.size());
   }
 }
