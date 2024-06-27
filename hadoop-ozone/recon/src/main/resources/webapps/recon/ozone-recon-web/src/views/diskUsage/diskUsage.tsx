@@ -64,7 +64,7 @@ let cancelPieSignal: AbortController
 let cancelSummarySignal: AbortController
 let cancelQuotaSignal: AbortController;
 let cancelKeyMetadataSignal: AbortController;
-let adddedvaluesBlockSize: number[] = [];
+let valuesWithMinBlockSize: number[] = [];
 
 export class DiskUsage extends React.Component<Record<string, object>, IDUState> {
   constructor(props = {}) {
@@ -197,7 +197,7 @@ export class DiskUsage extends React.Component<Record<string, object>, IDUState>
         // Adding a MIN_BLOCK_SIZE to non-zero size entities to ensure that even the smallest entities are visible on the pie chart.
         // Note: The percentage and size string calculations remain unchanged.
         const clonedValues = structuredClone(values);
-        adddedvaluesBlockSize = clonedValues && clonedValues.map((item: number) => item > 0 ? item + MIN_BLOCK_SIZE : item);
+        valuesWithMinBlockSize = clonedValues && clonedValues.map((item: number) => item > 0 ? item + MIN_BLOCK_SIZE : item);
 
         percentage = values.map(value => {
           return (value * 100).toFixed(2);
@@ -218,7 +218,7 @@ export class DiskUsage extends React.Component<Record<string, object>, IDUState>
         plotData: [{
           type: 'pie',
           hole: 0.2,
-          values: adddedvaluesBlockSize,
+          values: valuesWithMinBlockSize,
           customdata: percentage,
           labels: pathLabels,
           text: sizeStr,
@@ -558,7 +558,7 @@ export class DiskUsage extends React.Component<Record<string, object>, IDUState>
                     </Dropdown>
                   </div>
                   &nbsp;&nbsp;&nbsp;&nbsp;
-                  <Tooltip placement="rightTop" title="Additional block size added for viewing small entity sizes. Please refer to pie-chart tooltip for exact size information.">
+                  <Tooltip placement="rightTop" title="Additional block size is added to each entity, so even the small entities are visible. Please refer to pie-chart tooltip for exact size information.">
                     <Icon type='info-circle' />
                   </Tooltip>
                   <div className='metadata-button'>
