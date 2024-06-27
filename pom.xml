@@ -75,10 +75,10 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
     <!-- HDDS Rocks Native dependency version-->
     <hdds.rocks.native.version>${hdds.version}</hdds.rocks.native.version>
     <!-- Apache Ratis version -->
-    <ratis.version>3.0.1</ratis.version>
+    <ratis.version>3.1.0</ratis.version>
 
     <!-- Apache Ratis thirdparty version -->
-    <ratis.thirdparty.version>1.0.5</ratis.thirdparty.version>
+    <ratis.thirdparty.version>1.0.6</ratis.thirdparty.version>
 
     <!-- Apache Ranger plugin version -->
     <ranger.version>2.3.0</ranger.version>
@@ -256,7 +256,7 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
     <allow.junit4>true</allow.junit4>
 
     <!-- Plugin versions and config -->
-    <maven-surefire-plugin.argLine>-Xmx4096m -XX:+HeapDumpOnOutOfMemoryError</maven-surefire-plugin.argLine>
+    <maven-surefire-plugin.argLine>-Xmx8192m -XX:+HeapDumpOnOutOfMemoryError</maven-surefire-plugin.argLine>
     <unstable-test-groups>flaky | org.apache.ozone.test.FlakyTest | slow | org.apache.ozone.test.SlowTest | unhealthy | org.apache.ozone.test.UnhealthyTest</unstable-test-groups>
     <maven-surefire-plugin.version>3.0.0-M4</maven-surefire-plugin.version>
     <maven-surefire-report-plugin.version>${maven-surefire-plugin.version}</maven-surefire-report-plugin.version>
