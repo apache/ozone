@@ -385,7 +385,7 @@ public class KeyValueContainerCheck {
     int bytesPerChecksum = checksumData.getBytesPerChecksum();
     Checksum cal = new Checksum(checksumData.getChecksumType(),
         bytesPerChecksum);
-    ByteBuffer buffer = ByteBuffer.allocate(bytesPerChecksum);
+    ByteBuffer buffer = ByteBuffer.allocateDirect(bytesPerChecksum);
     long bytesRead = 0;
     try (FileChannel channel = FileChannel.open(chunkFile.toPath(),
         ChunkUtils.READ_OPTIONS, ChunkUtils.NO_ATTRIBUTES)) {
