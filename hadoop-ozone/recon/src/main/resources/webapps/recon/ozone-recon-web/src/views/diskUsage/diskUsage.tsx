@@ -567,7 +567,7 @@ export class DiskUsage extends React.Component<Record<string, object>, IDUState>
       series: [
         {
           type: 'pie',
-          radius: '70%',
+          radius: '50%',
           data: plotData.map((value) => {
             return {
               value: value.value,
