@@ -126,7 +126,9 @@ public final class DecommissionUtils {
                                                  Map<String, Object> countsMap, String errMsg)
       throws IOException {
     for (int i = 1; i <= numDecomNodes; i++) {
-      if (datanode.getHostName().equals(counts.get("tag.datanode." + i).asText())) {
+      String datanodeHostName =
+          (counts.get("tag.datanode." + i) != null) ? (counts.get("tag.datanode." + i).asText()) : "";
+      if (datanode.getHostName().equals(datanodeHostName)) {
         JsonNode pipelinesDN = counts.get("PipelinesWaitingToCloseDN." + i);
         JsonNode underReplicatedDN = counts.get("UnderReplicatedDN." + i);
         JsonNode unclosedDN = counts.get("UnclosedContainersDN." + i);
