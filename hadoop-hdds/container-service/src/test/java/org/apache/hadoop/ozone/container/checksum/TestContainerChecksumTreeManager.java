@@ -65,7 +65,7 @@ class TestContainerChecksumTreeManager {
 
     assertEquals(CONTAINER_ID, checksumInfo.getContainerID());
     assertTrue(checksumInfo.getDeletedBlocksList().isEmpty());
-    ContainerProtos.ContainerMerkleTree treeProto = checksumInfo.getDataMerkleTree();
+    ContainerProtos.ContainerMerkleTree treeProto = checksumInfo.getContainerMerkleTree();
     assertEquals(0, treeProto.getDataChecksum());
     assertTrue(treeProto.getBlockMerkleTreeList().isEmpty());
   }
@@ -77,7 +77,7 @@ class TestContainerChecksumTreeManager {
 
     assertEquals(CONTAINER_ID, checksumInfo.getContainerID());
     assertTrue(checksumInfo.getDeletedBlocksList().isEmpty());
-    ContainerProtos.ContainerMerkleTree treeProto = checksumInfo.getDataMerkleTree();
+    ContainerProtos.ContainerMerkleTree treeProto = checksumInfo.getContainerMerkleTree();
     assertEquals(0, treeProto.getDataChecksum());
     assertTrue(treeProto.getBlockMerkleTreeList().isEmpty());
   }
@@ -93,7 +93,7 @@ class TestContainerChecksumTreeManager {
     assertTrue(checksumInfo.getDeletedBlocksList().isEmpty());
     // TestContainerMerkleTree verifies that going from ContainerMerkleTree to its proto is consistent.
     // Therefore, we can use the proto version of our expected tree to check what was written to the file.
-    assertTreesSortedAndMatch(tree.toProto(), checksumInfo.getDataMerkleTree());
+    assertTreesSortedAndMatch(tree.toProto(), checksumInfo.getContainerMerkleTree());
   }
 
   @Test
@@ -105,7 +105,7 @@ class TestContainerChecksumTreeManager {
 
     assertEquals(CONTAINER_ID, checksumInfo.getContainerID());
     assertEquals(expectedBlocksToDelete, checksumInfo.getDeletedBlocksList());
-    ContainerProtos.ContainerMerkleTree treeProto = checksumInfo.getDataMerkleTree();
+    ContainerProtos.ContainerMerkleTree treeProto = checksumInfo.getContainerMerkleTree();
     assertEquals(0, treeProto.getDataChecksum());
     assertTrue(treeProto.getBlockMerkleTreeList().isEmpty());
   }
@@ -121,7 +121,7 @@ class TestContainerChecksumTreeManager {
 
     assertEquals(CONTAINER_ID, checksumInfo.getContainerID());
     assertEquals(expectedBlocksToDelete, checksumInfo.getDeletedBlocksList());
-    assertTreesSortedAndMatch(tree.toProto(), checksumInfo.getDataMerkleTree());
+    assertTreesSortedAndMatch(tree.toProto(), checksumInfo.getContainerMerkleTree());
   }
 
   @Test
@@ -135,7 +135,7 @@ class TestContainerChecksumTreeManager {
 
     assertEquals(CONTAINER_ID, checksumInfo.getContainerID());
     assertEquals(expectedBlocksToDelete, checksumInfo.getDeletedBlocksList());
-    assertTreesSortedAndMatch(tree.toProto(), checksumInfo.getDataMerkleTree());
+    assertTreesSortedAndMatch(tree.toProto(), checksumInfo.getContainerMerkleTree());
   }
 
   @Test

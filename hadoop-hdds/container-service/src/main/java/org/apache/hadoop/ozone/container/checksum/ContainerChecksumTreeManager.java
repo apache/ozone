@@ -67,7 +67,7 @@ public class ContainerChecksumTreeManager {
     writeLock.lock();
     try {
       ContainerProtos.ContainerChecksumInfo newChecksumInfo = read(data).toBuilder()
-          .setDataMerkleTree(tree.toProto())
+          .setContainerMerkleTree(tree.toProto())
           .build();
       write(data, newChecksumInfo);
       LOG.debug("Data merkle tree for container {} updated", data.getContainerID());
