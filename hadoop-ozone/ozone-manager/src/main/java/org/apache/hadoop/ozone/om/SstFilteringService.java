@@ -133,6 +133,10 @@ public class SstFilteringService extends BackgroundService
           String snapshotTableKey = SnapshotInfo.getTableKey(volume, bucket,
               snapshotName);
           SnapshotInfo snapshotInfo = snapshotInfoTable.get(snapshotTableKey);
+          if (snapshotInfo == null) {
+            LOG.info("Snapshot {} has been purged. Ignoring updating the snapshot properties", snapshotTableKey);
+            return;
+          }
           SnapshotProperties snapshotProperties =
               ozoneManager.getOmSnapshotManager().getSnapshotPropertiesManager().
               getSnapshotProperties(snapshotInfo.getSnapshotId()).orElse(SnapshotProperties.newBuilder()
