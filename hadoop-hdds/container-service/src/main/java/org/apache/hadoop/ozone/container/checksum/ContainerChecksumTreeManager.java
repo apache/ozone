@@ -62,7 +62,7 @@ public class ContainerChecksumTreeManager {
    * file remains unchanged.
    * Concurrent writes to the same file are coordinated internally.
    */
-  public void writeContainerDataTree(KeyValueContainerData data, ContainerMerkleTree tree) throws IOException {
+  public void writeContainerDataTree(ContainerData data, ContainerMerkleTree tree) throws IOException {
     Lock writeLock = getWriteLock(data.getContainerID());
     writeLock.lock();
     try {
@@ -114,8 +114,7 @@ public class ContainerChecksumTreeManager {
    * Returns the container checksum tree file for the specified container without deserializing it.
    */
   public static File getContainerChecksumFile(ContainerData data) {
-    // TODO change type don't cast
-    return new File(((KeyValueContainerData) data).getMetadataPath(), data.getContainerID() + ".tree");
+    return new File(data.getMetadataPath(), data.getContainerID() + ".tree");
   }
 
   private Lock getReadLock(long containerID) {
@@ -126,7 +125,7 @@ public class ContainerChecksumTreeManager {
     return fileLock.get(containerID).writeLock();
   }
 
-  private ContainerProtos.ContainerChecksumInfo read(KeyValueContainerData data) throws IOException {
+  private ContainerProtos.ContainerChecksumInfo read(ContainerData data) throws IOException {
     long containerID = data.getContainerID();
     Lock readLock = getReadLock(containerID);
     readLock.lock();
@@ -150,7 +149,7 @@ public class ContainerChecksumTreeManager {
     }
   }
 
-  private void write(KeyValueContainerData data, ContainerProtos.ContainerChecksumInfo checksumInfo)
+  private void write(ContainerData data, ContainerProtos.ContainerChecksumInfo checksumInfo)
       throws IOException {
     Lock writeLock = getWriteLock(data.getContainerID());
     writeLock.lock();
