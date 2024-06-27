@@ -31,6 +31,7 @@ import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.ozone.lock.BootstrapStateHandler;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
+import org.apache.hadoop.ozone.om.helpers.SnapshotProperties;
 import org.apache.hadoop.ozone.om.lock.OMLockDetails;
 import org.apache.hadoop.ozone.om.snapshot.ReferenceCounted;
 import org.rocksdb.RocksDBException;
@@ -129,13 +130,17 @@ public class SstFilteringService extends BackgroundService
         Table<String, SnapshotInfo> snapshotInfoTable =
             ozoneManager.getMetadataManager().getSnapshotInfoTable();
         try {
-          // mark the snapshot as filtered by writing to the file
           String snapshotTableKey = SnapshotInfo.getTableKey(volume, bucket,
               snapshotName);
           SnapshotInfo snapshotInfo = snapshotInfoTable.get(snapshotTableKey);
-
-          snapshotInfo.setSstFiltered(true);
-          snapshotInfoTable.put(snapshotTableKey, snapshotInfo);
+          SnapshotProperties snapshotProperties =
+              ozoneManager.getOmSnapshotManager().getSnapshotPropertiesManager().
+              getSnapshotProperties(snapshotInfo.getSnapshotId()).orElse(SnapshotProperties.newBuilder()
+                      .setSnapshotTableKey(snapshotTableKey).build());
+          // mark the snapshot as filtered by writing to the file
+          snapshotProperties.setSstFiltered(true);
+          ozoneManager.getOmSnapshotManager().getSnapshotPropertiesManager().setSnapshotProperties(
+              snapshotInfo.getSnapshotId(), snapshotProperties);
         } finally {
           ozoneManager.getMetadataManager().getLock()
               .releaseWriteLock(SNAPSHOT_LOCK, volume, bucket, snapshotName);
@@ -145,10 +150,11 @@ public class SstFilteringService extends BackgroundService
 
     @Override
     public BackgroundTaskResult call() throws Exception {
-
-      Optional<OmSnapshotManager> snapshotManager = Optional.ofNullable(ozoneManager)
+      Optional<OmSnapshotManager> omSnapshotManager = Optional.ofNullable(ozoneManager)
           .map(OzoneManager::getOmSnapshotManager);
-      if (!snapshotManager.isPresent()) {
+      Optional<SnapshotPropertiesManager> snapshotPropertiesManager = Optional.ofNullable(ozoneManager)
+          .map(OzoneManager::getOmSnapshotManager).map(OmSnapshotManager::getSnapshotPropertiesManager);
+      if (!snapshotPropertiesManager.isPresent()) {
         return BackgroundTaskResult.EmptyTaskResult.newResult();
       }
       Table<String, SnapshotInfo> snapshotInfoTable =
@@ -168,7 +174,8 @@ public class SstFilteringService extends BackgroundService
             String snapShotTableKey = keyValue.getKey();
             SnapshotInfo snapshotInfo = keyValue.getValue();
 
-            if (snapshotInfo.isSstFiltered()) {
+            if (snapshotPropertiesManager.get().getSnapshotProperties(snapshotInfo.getSnapshotId())
+                .map(SnapshotProperties::isSstFiltered).orElse(false)) {
               continue;
             }
 
@@ -182,7 +189,7 @@ public class SstFilteringService extends BackgroundService
 
             try (
                 ReferenceCounted<OmSnapshot> snapshotMetadataReader =
-                    snapshotManager.get().getActiveSnapshot(
+                    omSnapshotManager.get().getActiveSnapshot(
                         snapshotInfo.getVolumeName(),
                         snapshotInfo.getBucketName(),
                         snapshotInfo.getName())) {

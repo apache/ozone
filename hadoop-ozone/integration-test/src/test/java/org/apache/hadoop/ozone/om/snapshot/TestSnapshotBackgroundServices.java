@@ -38,11 +38,13 @@ import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OmFailoverProxyUtil;
 import org.apache.hadoop.ozone.om.OmSnapshot;
 import org.apache.hadoop.ozone.om.OzoneManager;
+import org.apache.hadoop.ozone.om.SnapshotPropertiesManager;
 import org.apache.hadoop.ozone.om.exceptions.OMLeaderNotReadyException;
 import org.apache.hadoop.ozone.om.exceptions.OMNotLeaderException;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
+import org.apache.hadoop.ozone.om.helpers.SnapshotProperties;
 import org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServerConfig;
 import org.apache.hadoop.ozone.snapshot.SnapshotDiffReportOzone;
 import org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse;
@@ -82,7 +84,6 @@ import static org.apache.hadoop.ozone.om.TestOzoneManagerHAWithStoppedNodes.crea
 import static org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse.JobStatus.DONE;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.fail;
 
 /**
  * Tests snapshot background services.
@@ -563,16 +564,12 @@ public class TestSnapshotBackgroundServices {
     writeKeys(1);
     SnapshotInfo newSnapshot = createOzoneSnapshot(ozoneManager, SNAPSHOT_NAME_PREFIX + counter.incrementAndGet());
     assertNotNull(newSnapshot);
-    Table<String, SnapshotInfo> snapshotInfoTable =
-        ozoneManager.getMetadataManager().getSnapshotInfoTable();
+    SnapshotPropertiesManager snapshotPropertiesManager =
+        ozoneManager.getOmSnapshotManager().getSnapshotPropertiesManager();
+
     GenericTestUtils.waitFor(() -> {
-      SnapshotInfo snapshotInfo = null;
-      try {
-        snapshotInfo = snapshotInfoTable.get(newSnapshot.getTableKey());
-      } catch (IOException e) {
-        fail();
-      }
-      return snapshotInfo.isSstFiltered();
+      return snapshotPropertiesManager.getSnapshotProperties(newSnapshot.getSnapshotId())
+          .map(SnapshotProperties::isSstFiltered).orElse(false);
     }, 1000, 10000);
   }
 

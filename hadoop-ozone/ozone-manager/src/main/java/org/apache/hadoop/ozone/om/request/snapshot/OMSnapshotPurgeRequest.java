@@ -23,6 +23,7 @@ import org.apache.commons.lang3.tuple.Triple;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OMMetrics;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
+import org.apache.hadoop.ozone.om.helpers.SnapshotProperties;
 import org.apache.ratis.server.protocol.TermIndex;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
@@ -48,6 +49,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.NoSuchElementException;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 
@@ -125,7 +127,13 @@ public class OMSnapshotPurgeRequest extends OMClientRequest {
 
           acquireLock(lockSet, snapTableKey, omMetadataManager);
           SnapshotInfo fromSnapshot = omMetadataManager.getSnapshotInfoTable().get(snapTableKey);
-
+          Optional<SnapshotProperties> snapshotProperties = ozoneManager.getOmSnapshotManager()
+              .getSnapshotPropertiesManager().getSnapshotProperties(fromSnapshot.getSnapshotId());
+          if (snapshotProperties.isPresent()) {
+            snapshotProperties.get().setSnapshotPurged(true);
+            ozoneManager.getOmSnapshotManager().getSnapshotPropertiesManager()
+                .setSnapshotProperties(fromSnapshot.getSnapshotId(), snapshotProperties.get());
+          }
           SnapshotInfo nextSnapshot =
               SnapshotUtils.getNextActiveSnapshot(fromSnapshot, snapshotChainManager, omSnapshotManager);
 

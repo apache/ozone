@@ -67,7 +67,6 @@ public class TestOmSnapshotInfo {
         .setCheckpointDir(CHECKPOINT_DIR)
         .setDbTxSequenceNumber(DB_TX_SEQUENCE_NUMBER)
         .setDeepClean(false)
-        .setSstFiltered(false)
         .setReferencedSize(2000L)
         .setReferencedReplicatedSize(6000L)
         .setExclusiveSize(1000L)
@@ -171,8 +170,6 @@ public class TestOmSnapshotInfo {
         snapshotInfoActual.getDbTxSequenceNumber());
     assertEquals(snapshotInfoExpected.getDeepClean(),
         snapshotInfoActual.getDeepClean());
-    assertEquals(snapshotInfoExpected.isSstFiltered(),
-        snapshotInfoActual.isSstFiltered());
     assertEquals(snapshotInfoExpected.getReferencedSize(),
         snapshotInfoActual.getReferencedSize());
     assertEquals(snapshotInfoExpected.getReferencedReplicatedSize(),

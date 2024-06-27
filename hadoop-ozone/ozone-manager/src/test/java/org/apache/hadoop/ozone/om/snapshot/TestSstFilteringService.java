@@ -40,6 +40,7 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.helpers.OpenKeySession;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
+import org.apache.hadoop.ozone.om.helpers.SnapshotProperties;
 import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.security.UserGroupInformation;
@@ -206,7 +207,9 @@ public class TestSstFilteringService {
     createSnapshot(volumeName, bucketName2, snapshotName1);
     SnapshotInfo snapshotInfo = om.getMetadataManager().getSnapshotInfoTable()
         .get(SnapshotInfo.getTableKey(volumeName, bucketName2, snapshotName1));
-    assertFalse(snapshotInfo.isSstFiltered());
+    assertFalse(om.getOmSnapshotManager().getSnapshotPropertiesManager()
+        .getSnapshotProperties(snapshotInfo.getSnapshotId())
+        .map(SnapshotProperties::isSstFiltered).orElse(false));
     waitForSnapshotsAtLeast(filteringService, countExistingSnapshots + 1);
     assertEquals(countExistingSnapshots + 1, filteringService.getSnapshotFilteredCount().get());
 
@@ -238,8 +241,11 @@ public class TestSstFilteringService {
 
     // Need to read the sstFiltered flag which is set in background process and
     // hence snapshotInfo.isSstFiltered() may not work sometimes.
-    assertTrue(om.getMetadataManager().getSnapshotInfoTable().get(SnapshotInfo
-        .getTableKey(volumeName, bucketName2, snapshotName1)).isSstFiltered());
+    SnapshotInfo snapshotInfo1 = om.getMetadataManager().getSnapshotInfoTable().get(SnapshotInfo
+        .getTableKey(volumeName, bucketName2, snapshotName1));
+    assertTrue(om.getOmSnapshotManager().getSnapshotPropertiesManager()
+        .getSnapshotProperties(snapshotInfo1.getSnapshotId()).map(SnapshotProperties::isSstFiltered)
+        .orElse(false));
 
     String snapshotName2 = "snapshot2";
     final long count;

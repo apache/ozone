@@ -858,6 +858,16 @@ message SnapshotInfo {
   optional bool deepCleanedDeletedDir = 19;
 }
 
+
+/**
+ Snapshot internal properties saved for Bucket/Volume snapshot
+*/
+message SnapshotProperties {
+    optional bool sstFiltered = 1;
+    optional string snapshotTableKey = 2;
+    optional bool snapshotPurged = 3;
+}
+
 message SnapshotDiffJobProto {
   optional uint64 creationTime = 1;
   optional string jobId = 2;
@@ -2154,3 +2164,4 @@ service OzoneManagerService {
     rpc submitRequest(OMRequest)
           returns(OMResponse);
 }
+
