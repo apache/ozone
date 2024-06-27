@@ -437,7 +437,7 @@ export class Datanodes extends React.Component<Record<string, object>, IDatanode
       showDataFetchError(error.toString());
     });
   };
-  
+
   removeDatanode = async (selectedRowKeys: any) => {
     const { request, controller } = await AxiosPutHelper('/api/v1/datanodes/remove', selectedRowKeys, cancelSignal);
     cancelSignal = controller;

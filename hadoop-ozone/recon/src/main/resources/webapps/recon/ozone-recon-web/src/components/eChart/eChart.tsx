@@ -83,5 +83,5 @@ export function EChart({
         }
     }, [loading, theme]);
 
-    return <div ref={chartRef} style={{ width: "50em", height: "50em", margin: 'auto', ...style }}/>;
+    return <div ref={chartRef} style={{ width: "100em", height: "50em", margin: 'auto', ...style }}/>;
 }

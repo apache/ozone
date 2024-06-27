@@ -554,21 +554,20 @@ export class DiskUsage extends React.Component<Record<string, object>, IDUState>
       tooltip: {
         trigger: 'item',
         formatter: ({ dataIndex, percent, name, color }) => {
-          let nameEl = `<strong style='color: ${color}'>${name}</strong><br>`;
-          let dataEl = `Total Data Size: ${plotData[dataIndex]['size']}<br>Percentage: ${percent} %`
+          const nameEl = `<strong style='color: ${color}'>${name}</strong><br>`;
+          const dataEl = `Total Data Size: ${plotData[dataIndex]['size']}<br>Percentage: ${percent} %`
           return `${nameEl}${dataEl}`
         }
       },
       legend: {
         top: '10%',
         orient: 'vertical',
-        left: 'left',
-        padding: [5, 15, 5, 5]
+        left: 'left'
       },
       series: [
         {
           type: 'pie',
-          radius: '50%',
+          radius: '70%',
           data: plotData.map((value) => {
             return {
               value: value.value,
@@ -633,7 +632,11 @@ export class DiskUsage extends React.Component<Record<string, object>, IDUState>
               </Row>
               <Row>
                 {(duResponse.size > 0) ?
-                  <div style={{ height: 700, width: 1000, margin: 'auto', marginTop: '5%' }}>
+                  <div style={{
+                    height: 700,
+                    margin: 'auto',
+                    marginTop: '5%'
+                  }}>
                     <EChart
                       option={eChartsOptions}
                       onClick={

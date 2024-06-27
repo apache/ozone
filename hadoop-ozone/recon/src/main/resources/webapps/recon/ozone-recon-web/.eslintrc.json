@@ -43,10 +43,6 @@
           "varsIgnorePattern": "^_\\w*"
         }
       ],
-      "template-curly-spacing": [
-        "warn",
-        "always"
-      ],
       "object-curly-spacing": [
         "warn",
         "always"
