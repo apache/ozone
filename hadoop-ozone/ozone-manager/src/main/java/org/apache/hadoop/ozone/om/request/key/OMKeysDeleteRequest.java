@@ -24,9 +24,11 @@ import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.ratis.server.protocol.TermIndex;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
+import org.apache.hadoop.util.Time;
 import org.apache.hadoop.ozone.audit.AuditLogger;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OMMetrics;
+import org.apache.hadoop.ozone.om.OMPerformanceMetrics;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.ResolvedBucket;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
@@ -71,6 +73,7 @@ import static org.apache.hadoop.ozone.audit.OMAction.DELETE_KEYS;
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.BUCKET_LOCK;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status.OK;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status.PARTIAL_DELETE;
+import static org.apache.hadoop.util.MetricUtil.captureLatencyNs;
 
 /**
  * Handles DeleteKey request.
@@ -101,6 +104,7 @@ public class OMKeysDeleteRequest extends OMKeyRequest {
 
     OMMetrics omMetrics = ozoneManager.getMetrics();
     omMetrics.incNumKeyDeletes();
+    OMPerformanceMetrics perfMetrics = ozoneManager.getPerfMetrics();
     String volumeName = deleteKeyArgs.getVolumeName();
     String bucketName = deleteKeyArgs.getBucketName();
     Map<String, String> auditMap = new LinkedHashMap<>();
@@ -126,9 +130,12 @@ public class OMKeysDeleteRequest extends OMKeyRequest {
             .setVolumeName(volumeName).setBucketName(bucketName);
 
     boolean deleteStatus = true;
+    long startNanos = Time.monotonicNowNanos();
+    String finalVolumeName = volumeName;
+    String finalBucketName = bucketName;
     try {
-      ResolvedBucket bucket =
-          ozoneManager.resolveBucketLink(Pair.of(volumeName, bucketName), this);
+      ResolvedBucket bucket = captureLatencyNs(perfMetrics.getDeleteKeysResolveBucketLatencyNs(), () ->
+          ozoneManager.resolveBucketLink(Pair.of(finalVolumeName, finalBucketName), this));
       bucket.audit(auditMap);
       volumeName = bucket.realVolume();
       bucketName = bucket.realBucket();
@@ -159,9 +166,9 @@ public class OMKeysDeleteRequest extends OMKeyRequest {
 
         try {
           // check Acl
-          checkKeyAcls(ozoneManager, volumeName, bucketName, keyName,
-              IAccessAuthorizer.ACLType.DELETE, OzoneObj.ResourceType.KEY,
-              volumeOwner);
+          captureLatencyNs(perfMetrics.getDeleteKeysAclCheckLatencyNs(),
+                  () -> checkKeyAcls(ozoneManager, finalVolumeName, finalBucketName, keyName,
+              IAccessAuthorizer.ACLType.DELETE, OzoneObj.ResourceType.KEY, volumeOwner));
           OzoneFileStatus fileStatus = getOzoneKeyStatus(
               ozoneManager, omMetadataManager, volumeName, bucketName, keyName);
           addKeyToAppropriateList(omKeyInfoList, omKeyInfo, dirList,
@@ -193,7 +200,8 @@ public class OMKeysDeleteRequest extends OMKeyRequest {
               unDeletedKeys, keyToError, deleteStatus, omBucketInfo, volumeId, dbOpenKeys);
 
       result = Result.SUCCESS;
-
+      long endNanosDeleteKeySuccessLatencyNs = Time.monotonicNowNanos();
+      perfMetrics.setDeleteKeySuccessLatencyNs(endNanosDeleteKeySuccessLatencyNs - startNanos);
     } catch (IOException | InvalidPathException ex) {
       result = Result.FAILURE;
       exception = ex;
@@ -213,7 +221,8 @@ public class OMKeysDeleteRequest extends OMKeyRequest {
               .setUnDeletedKeys(unDeletedKeys).build()).build();
       omClientResponse =
           new OMKeysDeleteResponse(omResponse.build(), getBucketLayout());
-
+      long endNanosDeleteKeyFailureLatencyNs = Time.monotonicNowNanos();
+      perfMetrics.setDeleteKeyFailureLatencyNs(endNanosDeleteKeyFailureLatencyNs - startNanos);
     } finally {
       if (acquiredLock) {
         mergeOmLockDetails(omMetadataManager.getLock()
