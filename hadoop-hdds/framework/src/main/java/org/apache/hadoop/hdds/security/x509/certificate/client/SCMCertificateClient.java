@@ -196,7 +196,7 @@ public class SCMCertificateClient extends DefaultCertificateClient {
         storeCertificate(pemEncodedRootCert, CAType.SUBORDINATE, certWritePath, false, !renew);
         CertPath writtenCertPath = storeCertificate(pemEncodedCert, CAType.NONE, certWritePath,
             false, !renew);
-        certificateStorage.writeCertificate(Paths.get(certWritePath.toString(),
+        certificateStorage.storeCertificate(Paths.get(certWritePath.toString(),
             getSecurityConfig().getCertificateFileName()), pemEncodedCert);
 
         X509Certificate certificate = (X509Certificate) writtenCertPath.getCertificates().get(0);
@@ -408,6 +408,6 @@ public class SCMCertificateClient extends DefaultCertificateClient {
   private void persistSubCACertificate(
       String encodedCert) throws IOException {
     SecurityConfig config = getSecurityConfig();
-    certificateStorage.writeCertificate(config.getCertFilePath(getComponentName()), encodedCert);
+    certificateStorage.storeCertificate(config.getCertFilePath(getComponentName()), encodedCert);
   }
 }

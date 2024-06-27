@@ -148,7 +148,7 @@ public class TestRootCertificate {
 
     CertificateStorage certificateStorage = new CertificateStorage(securityConfig);
 
-    certificateStorage.writeCertificate(Paths.get(basePath.toString(), "pemcertificate.crt"), certificate);
+    certificateStorage.storeCertificate(Paths.get(basePath.toString(), "pemcertificate.crt"), certificate);
 
     X509Certificate loadedCert = certificateStorage.getFirstCertFromCertPath(basePath, "pemcertificate.crt");
     assertNotNull(loadedCert);

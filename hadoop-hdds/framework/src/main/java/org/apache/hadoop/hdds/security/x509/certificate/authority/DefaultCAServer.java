@@ -510,7 +510,7 @@ public class DefaultCAServer implements CertificateServer {
 
     builder.addInetAddresses();
     X509Certificate selfSignedCertificate = builder.build();
-    certificateStorage.writeCertificate(securityConfig.getCertFilePath(componentName), selfSignedCertificate);
+    certificateStorage.storeCertificate(securityConfig.getCertFilePath(componentName), selfSignedCertificate);
   }
 
   private void initWithExternalRootCa(SecurityConfig conf) {
@@ -543,7 +543,7 @@ public class DefaultCAServer implements CertificateServer {
       publicKey = readPublicKeyWithExternalData(
           externalPublicKeyLocation, keyCodec, certificate);
       keyCodec.writeKey(new KeyPair(publicKey, privateKey));
-      certStorageWithExternalConf.writeCertificate(conf.getCertFilePath(componentName),
+      certStorageWithExternalConf.storeCertificate(conf.getCertFilePath(componentName),
           certificateCodec.getPEMEncodedString(certificate));
     } catch (IOException | CertificateException | NoSuchAlgorithmException |
              InvalidKeySpecException e) {

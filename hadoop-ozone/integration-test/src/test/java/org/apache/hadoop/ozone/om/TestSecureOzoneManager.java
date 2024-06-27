@@ -151,7 +151,7 @@ class TestSecureOzoneManager {
         "CN=Test", new KeyPair(publicKey, privateKey), 365,
         securityConfig.getSignatureAlgo());
     CertificateStorage certificateStorage = new CertificateStorage(securityConfig);
-    certificateStorage.writeCertificate(securityConfig.getCertFilePath(COMPONENT), x509Certificate);
+    certificateStorage.storeCertificate(securityConfig.getCertFilePath(COMPONENT), x509Certificate);
 
     omStorage.setOmCertSerialId(x509Certificate.getSerialNumber().toString());
     client =

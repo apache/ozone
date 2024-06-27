@@ -295,16 +295,16 @@ public class TestDefaultCertificateClient {
             .toString()));
     assertThat(certException.getMessage())
         .contains("Error while getting certificate");
-    certificateStorage.writeCertificate(Paths.get(certPath.toString(), "1.crt"), cert1);
-    certificateStorage.writeCertificate(Paths.get(certPath.toString(), "2.crt"), cert2);
-    certificateStorage.writeCertificate(Paths.get(certPath.toString(), "3.crt"), cert3);
-    certificateStorage.writeCertificate(Paths.get(certPath.toString(), CAType.ROOT.getFileNamePrefix() + "1.crt"),
+    certificateStorage.storeCertificate(Paths.get(certPath.toString(), "1.crt"), cert1);
+    certificateStorage.storeCertificate(Paths.get(certPath.toString(), "2.crt"), cert2);
+    certificateStorage.storeCertificate(Paths.get(certPath.toString(), "3.crt"), cert3);
+    certificateStorage.storeCertificate(Paths.get(certPath.toString(), CAType.ROOT.getFileNamePrefix() + "1.crt"),
         rootCa1);
-    certificateStorage.writeCertificate(Paths.get(certPath.toString(), CAType.ROOT.getFileNamePrefix() + "2.crt"),
+    certificateStorage.storeCertificate(Paths.get(certPath.toString(), CAType.ROOT.getFileNamePrefix() + "2.crt"),
         rootCa2);
-    certificateStorage.writeCertificate(
+    certificateStorage.storeCertificate(
         Paths.get(certPath.toString(), CAType.SUBORDINATE.getFileNamePrefix() + "1.crt"), subCa1);
-    certificateStorage.writeCertificate(Paths.get(certPath.toString(),
+    certificateStorage.storeCertificate(Paths.get(certPath.toString(),
         CAType.SUBORDINATE.getFileNamePrefix() + "2.crt"), subCa2);
 
     // Re instantiate DN client which will load certificates from filesystem.
@@ -398,7 +398,7 @@ public class TestDefaultCertificateClient {
         dnSecurityConfig.getKeyLocation(DN_COMPONENT).toString(),
         dnSecurityConfig.getCertificateFileName()).toFile());
 
-    certificateStorage.writeCertificate(Paths.get(dnSecurityConfig.getCertificateLocation(DN_COMPONENT).toString(),
+    certificateStorage.storeCertificate(Paths.get(dnSecurityConfig.getCertificateLocation(DN_COMPONENT).toString(),
         dnSecurityConfig.getCertificateFileName()), x509Certificate);
     // Check for DN.
     assertEquals(FAILURE, dnCertClient.init());
@@ -456,7 +456,7 @@ public class TestDefaultCertificateClient {
   @Test
   public void testRenewAndStoreKeyAndCertificate() throws Exception {
     // save the certificate on dn
-    certificateStorage.writeCertificate(dnSecurityConfig.getCertFilePath(DN_COMPONENT), x509Certificate);
+    certificateStorage.storeCertificate(dnSecurityConfig.getCertFilePath(DN_COMPONENT), x509Certificate);
 
     X509Certificate newCert = generateX509Cert(null);
     String pemCert = certificateCodec.getPEMEncodedString(newCert);
@@ -539,7 +539,7 @@ public class TestDefaultCertificateClient {
     String compName = "test";
 
     X509Certificate cert = generateX509Cert(null);
-    certificateStorage.writeCertificate(conf.getCertFilePath(compName), cert);
+    certificateStorage.storeCertificate(conf.getCertFilePath(compName), cert);
 
     Logger logger = mock(Logger.class);
     String certId = cert.getSerialNumber().toString();

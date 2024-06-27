@@ -76,18 +76,18 @@ public class CertificateStorage {
    * @param pemEncodedCertificate - pemEncoded Certificate file.
    * @throws IOException - on Error.
    */
-  public synchronized CertPath writeCertificate(Path basePath, String pemEncodedCertificate, CAType caType)
+  public synchronized CertPath storeCertificate(Path basePath, String pemEncodedCertificate, CAType caType)
       throws IOException {
     CertPath certPath = certificateCodec.getCertPathFromPemEncodedString(pemEncodedCertificate);
     X509Certificate cert = (X509Certificate) certPath.getCertificates().get(0);
     String certName = String.format(CERT_FILE_NAME_FORMAT,
         caType.getFileNamePrefix() + cert.getSerialNumber().toString());
     Path finalPath = Paths.get(basePath.toAbsolutePath().toString(), certName);
-    writeCertificate(finalPath.toAbsolutePath(), pemEncodedCertificate);
+    storeCertificate(finalPath.toAbsolutePath(), pemEncodedCertificate);
     return certPath;
   }
 
-  public synchronized void writeCertificate(Path basePath, String pemEncodedCertificate) throws IOException {
+  public synchronized void storeCertificate(Path basePath, String pemEncodedCertificate) throws IOException {
     checkBasePathDirectory(basePath.getParent());
     File certificateFile = basePath.toFile();
     try (FileOutputStream file = new FileOutputStream(certificateFile)) {
@@ -98,12 +98,12 @@ public class CertificateStorage {
     Files.setPosixFilePermissions(certificateFile.toPath(), PERMISSION_SET);
   }
 
-  public synchronized void writeCertificate(Path basePath, CertPath certPath) throws IOException {
-    writeCertificate(basePath, certificateCodec.getPEMEncodedString(certPath));
+  public synchronized void storeCertificate(Path basePath, CertPath certPath) throws IOException {
+    storeCertificate(basePath, certificateCodec.getPEMEncodedString(certPath));
   }
 
-  public synchronized void writeCertificate(Path basePath, X509Certificate certificate) throws IOException {
-    writeCertificate(basePath, certificateCodec.getPEMEncodedString(certificate));
+  public synchronized void storeCertificate(Path basePath, X509Certificate certificate) throws IOException {
+    storeCertificate(basePath, certificateCodec.getPEMEncodedString(certificate));
   }
 
   public CertPath getCertPath(String componentName, String fileName) throws IOException, CertificateException {

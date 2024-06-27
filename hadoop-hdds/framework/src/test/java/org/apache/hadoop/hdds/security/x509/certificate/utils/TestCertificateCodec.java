@@ -102,7 +102,7 @@ public class TestCertificateCodec {
   public void testPrependCertificateToCertPath() throws Exception {
     X509Certificate initialCert = generateTestCert();
     X509Certificate prependedCert = generateTestCert();
-    certificateStorage.writeCertificate(securityConfig.getCertFilePath(COMPONENT), initialCert);
+    certificateStorage.storeCertificate(securityConfig.getCertFilePath(COMPONENT), initialCert);
     CertPath initialPath = certificateStorage.getCertPath(COMPONENT, securityConfig.getCertificateFileName());
     CertificateCodec codec = securityConfig.getCertificateCodec();
     CertPath pathWithPrependedCert =
@@ -120,7 +120,7 @@ public class TestCertificateCodec {
   public void testWriteCertificate(@TempDir Path basePath) throws Exception {
     X509Certificate cert = generateTestCert();
     Path path = Paths.get(basePath.toString(), "pemcertificate.crt");
-    certificateStorage.writeCertificate(path, cert);
+    certificateStorage.storeCertificate(path, cert);
     X509Certificate loadedCertificate = certificateStorage.getFirstCertFromCertPath(basePath, "pemcertificate.crt");
 
     assertNotNull(loadedCertificate);
@@ -133,7 +133,7 @@ public class TestCertificateCodec {
   @Test
   public void testWriteCertificateDefault() throws Exception {
     X509Certificate cert = generateTestCert();
-    certificateStorage.writeCertificate(securityConfig.getCertFilePath(COMPONENT), cert);
+    certificateStorage.storeCertificate(securityConfig.getCertFilePath(COMPONENT), cert);
     X509Certificate loadedCertificate = certificateStorage.getFirstCertFromCertPath(
         securityConfig.getCertificateLocation(COMPONENT), securityConfig.getCertificateFileName());
 
@@ -149,7 +149,7 @@ public class TestCertificateCodec {
     X509Certificate cert = generateTestCert();
     // Rewrite with force support
     Path certificateLocation = securityConfig.getCertificateLocation("ca");
-    certificateStorage.writeCertificate(
+    certificateStorage.storeCertificate(
         Paths.get(certificateLocation.toAbsolutePath().toString(), "newcert.crt"), cert);
 
     X509Certificate loadedCertificate = certificateStorage.getFirstCertFromCertPath(certificateLocation, "newcert.crt");
@@ -177,7 +177,7 @@ public class TestCertificateCodec {
     CertPath updatedCertPath = codec.prependCertToCertPath(certToPrepend, certPath);
 
     String certFileName = "newcert.crt";
-    certificateStorage.writeCertificate(
+    certificateStorage.storeCertificate(
         Paths.get(certificateLocation.toAbsolutePath().toString(), certFileName), updatedCertPath);
 
     CertPath rereadCertPath = certificateStorage.getCertPath("ca", certFileName);

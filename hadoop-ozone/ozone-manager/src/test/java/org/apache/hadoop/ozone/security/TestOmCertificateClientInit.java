@@ -136,7 +136,7 @@ public class TestOmCertificateClientInit {
 
     if (certPresent) {
       CertificateStorage certificateStorage = new CertificateStorage(securityConfig);
-      certificateStorage.writeCertificate(securityConfig.getCertFilePath(OM_COMPONENT), x509Certificate);
+      certificateStorage.storeCertificate(securityConfig.getCertFilePath(OM_COMPONENT), x509Certificate);
     } else {
       FileUtils.deleteQuietly(Paths.get(
           securityConfig.getKeyLocation(OM_COMPONENT).toString(),

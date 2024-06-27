@@ -466,6 +466,6 @@ public class TestHddsSecureDatanodeInit {
   }
 
   private void writeCertificate() throws IOException {
-    certificateStorage.writeCertificate(securityConfig.getCertFilePath(DN_COMPONENT), cert);
+    certificateStorage.storeCertificate(securityConfig.getCertFilePath(DN_COMPONENT), cert);
   }
 }

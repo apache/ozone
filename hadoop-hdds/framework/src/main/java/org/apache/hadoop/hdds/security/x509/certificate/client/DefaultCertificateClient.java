@@ -598,7 +598,7 @@ public abstract class DefaultCertificateClient implements CertificateClient {
                                                 CAType caType, Path certWritePath, boolean addToCertMap,
                                                 boolean updateCA) throws CertificateException {
     try {
-      CertPath certificatePath = certificateStorage.writeCertificate(certWritePath, pemEncodedCert, caType);
+      CertPath certificatePath = certificateStorage.storeCertificate(certWritePath, pemEncodedCert, caType);
       X509Certificate cert = (X509Certificate) certificatePath.getCertificates().get(0);
 
       if (updateCA) {
