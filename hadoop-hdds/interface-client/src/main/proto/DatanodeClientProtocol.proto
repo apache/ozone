@@ -547,7 +547,7 @@ message ContainerMerkleTree {
 
 message ContainerChecksumInfo {
   optional int64 containerID = 1;
-  optional ContainerMerkleTree dataMerkleTree = 2;
+  optional ContainerMerkleTree containerMerkleTree = 2;
   repeated int64 deletedBlocks = 3;
 }
 
