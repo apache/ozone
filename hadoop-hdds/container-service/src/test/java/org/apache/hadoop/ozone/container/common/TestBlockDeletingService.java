@@ -19,7 +19,6 @@ package org.apache.hadoop.ozone.container.common;
 
 
 import com.google.common.collect.Lists;
-import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.client.BlockID;
@@ -88,10 +87,8 @@ import java.nio.ByteBuffer;
 import java.nio.file.DirectoryStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.time.Duration;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
@@ -114,13 +111,11 @@ import static org.apache.hadoop.ozone.container.common.ContainerTestUtils.COMMIT
 import static org.apache.hadoop.ozone.container.common.ContainerTestUtils.WRITE_STAGE;
 import static org.apache.hadoop.ozone.container.common.ContainerTestUtils.createDbInstancesForTestIfNeeded;
 import static org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion.FILE_PER_BLOCK;
-import static org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion.FILE_PER_CHUNK;
 import static org.apache.hadoop.ozone.container.common.states.endpoint.VersionEndpointTask.LOG;
 import static org.apache.hadoop.ozone.container.keyvalue.helpers.KeyValueContainerUtil.isSameSchemaVersion;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNotSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -1123,8 +1118,7 @@ public class TestBlockDeletingService {
     ContainerSet containerSet = new ContainerSet(1000);
     KeyValueContainerData contData = createToDeleteBlocks(containerSet, numBlocks, 4);
     KeyValueHandler keyValueHandler =
-        new KeyValueHandler(conf, datanodeUuid, containerSet, volumeSet,
-            ContainerMetrics.create(conf), c -> {});
+        new KeyValueHandler(conf, datanodeUuid, containerSet, volumeSet, ContainerMetrics.create(conf), c -> { });
     BlockDeletingServiceTestImpl svc =
         getBlockDeletingService(containerSet, conf, keyValueHandler);
     svc.start();
@@ -1219,7 +1213,7 @@ public class TestBlockDeletingService {
     File checksumFile = ContainerChecksumTreeManager.getContainerChecksumFile(data);
     ContainerProtos.ContainerChecksumInfo checksumInfo = null;
     try (FileInputStream inStream = new FileInputStream(checksumFile)) {
-       checksumInfo = ContainerProtos.ContainerChecksumInfo.parseFrom(inStream);
+      checksumInfo = ContainerProtos.ContainerChecksumInfo.parseFrom(inStream);
     } catch (IOException ex) {
       fail("Failed to read container checksum tree file", ex);
     }
