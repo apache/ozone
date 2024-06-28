@@ -61,7 +61,6 @@ import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.TimeZone;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
@@ -1061,7 +1060,8 @@ public class OMDBInsightEndpoint {
       subPaths.add(startPrefixObjectPath);
 
       // Recursively gather all subpaths
-      gatherSubPaths(parentId, subPaths, Long.parseLong(names[0]), Long.parseLong(names[1]));
+      ReconUtils.gatherSubPaths(parentId, subPaths, Long.parseLong(names[0]),
+          Long.parseLong(names[1]), reconNamespaceSummaryManager);
       // Iterate over the subpaths and retrieve the files
       for (String subPath : subPaths) {
         paramInfo.setStartPrefix(subPath);
@@ -1080,49 +1080,6 @@ public class OMDBInsightEndpoint {
     matchedKeys.putAll(
         retrieveKeysFromTable(fileTable, paramInfo));
     return matchedKeys;
-  }
-
-  /**
-   * Finds all subdirectories under a parent directory in an FSO bucket. It builds
-   * a list of paths for these subdirectories. These sub-directories are then used
-   * to search for files in the fileTable.
-   * <p>
-   * How it works:
-   * - Starts from a parent directory identified by parentId.
-   * - Looks through all child directories of this parent.
-   * - For each child, it creates a path that starts with volumeID/bucketID/parentId,
-   * following our fileTable format
-   * - Adds these paths to a list and explores each child further for more subdirectories.
-   *
-   * @param parentId The ID of the directory we start exploring from.
-   * @param subPaths A list where we collect paths to all subdirectories.
-   * @param volumeID
-   * @param bucketID
-   * @throws IOException If there are problems accessing directory information.
-   */
-  private void gatherSubPaths(long parentId, List<String> subPaths,
-                              long volumeID, long bucketID) throws IOException {
-    // Fetch the NSSummary object for parentId
-    NSSummary parentSummary =
-        reconNamespaceSummaryManager.getNSSummary(parentId);
-    if (parentSummary == null) {
-      return;
-    }
-
-    Set<Long> childDirIds = parentSummary.getChildDir();
-    for (Long childId : childDirIds) {
-      // Fetch the NSSummary for each child directory
-      NSSummary childSummary =
-          reconNamespaceSummaryManager.getNSSummary(childId);
-      if (childSummary != null) {
-        String subPath =
-            ReconUtils.constructObjectPathWithPrefix(volumeID, bucketID, childId);
-        // Add to subPaths
-        subPaths.add(subPath);
-        // Recurse into this child directory
-        gatherSubPaths(childId, subPaths, volumeID, bucketID);
-      }
-    }
   }
 
 
