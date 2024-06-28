@@ -102,7 +102,7 @@ public class TestContainerStateMachineFailureOnRead {
     ratisServerConfig.setFollowerSlownessTimeout(Duration.ofSeconds(1000));
     ratisServerConfig.setNoLeaderTimeout(Duration.ofSeconds(1000));
     ratisServerConfig.setRequestTimeOut(Duration.ofSeconds(3));
-    ratisServerConfig.setWatchTimeOut(Duration.ofSeconds(3));
+    ratisServerConfig.setWatchTimeOut(Duration.ofSeconds(2));
     conf.setFromObject(ratisServerConfig);
 
     RatisClientConfig.RaftConfig raftClientConfig =

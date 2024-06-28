@@ -50,6 +50,7 @@ import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.helpers.ChunkInfo;
+import org.apache.ratis.proto.RaftProtos.ReplicationLevel;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
@@ -76,12 +77,13 @@ class TestBlockOutputStreamCorrectness {
   @ValueSource(ints = { 1, 1024, 1024 * 1024 })
   void test(final int writeSize) throws IOException {
     assertEquals(0, DATA_SIZE % writeSize);
+    final int dataSize = Math.toIntExact(Math.min(DATA_SIZE, writeSize * OzoneConsts.MB));
 
     final BufferPool bufferPool = new BufferPool(4 * 1024 * 1024, 32 / 4);
 
     for (int block = 0; block < 10; block++) {
       try (BlockOutputStream outputStream = createBlockOutputStream(bufferPool)) {
-        for (int i = 0; i < DATA_SIZE / writeSize; i++) {
+        for (int i = 0; i < dataSize / writeSize; i++) {
           if (writeSize > 1) {
             outputStream.write(DATA, i * writeSize, writeSize);
           } else {
@@ -158,8 +160,8 @@ class TestBlockOutputStreamCorrectness {
     final Pipeline pipeline = MockPipeline.createRatisPipeline();
 
     final XceiverClientManager xcm = mock(XceiverClientManager.class);
-    when(xcm.acquireClient(any()))
-        .thenReturn(new MockXceiverClientSpi(pipeline));
+    final MockXceiverClientSpi client = new MockXceiverClientSpi(pipeline);
+    when(xcm.acquireClient(any())).thenReturn(client);
 
     OzoneClientConfig config = new OzoneClientConfig();
     config.setStreamBufferSize(4 * 1024 * 1024);
@@ -264,6 +266,13 @@ class TestBlockOutputStreamCorrectness {
       result.setLogIndex(counter.incrementAndGet());
       return result;
 
+    }
+
+    @Override
+    public XceiverClientReply sendCommandAsync(
+        ContainerCommandRequestProto request,
+        ReplicationLevel writeReplicationLevel) {
+      return sendCommandAsync(request);
     }
 
     @Override
