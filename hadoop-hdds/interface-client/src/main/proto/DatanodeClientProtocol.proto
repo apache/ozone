@@ -527,6 +527,30 @@ message SendContainerRequest {
 message SendContainerResponse {
 }
 
+// Each chunk contains multiple checksums. This message aggregates them into one checksum for the whole chunk.
+message ChunkMerkleTree {
+  optional int64 offset = 1;
+  optional int64 length = 2;
+  optional int64 chunkChecksum = 3;
+}
+
+message BlockMerkleTree {
+  optional int64 blockID = 1;
+  optional int64 blockChecksum = 2;
+  repeated ChunkMerkleTree chunkMerkleTree = 3;
+}
+
+message ContainerMerkleTree {
+  optional int64 dataChecksum = 1;
+  repeated BlockMerkleTree blockMerkleTree = 2;
+}
+
+message ContainerChecksumInfo {
+  optional int64 containerID = 1;
+  optional ContainerMerkleTree containerMerkleTree = 2;
+  repeated int64 deletedBlocks = 3;
+}
+
 service XceiverClientProtocolService {
   // A client-to-datanode RPC to send container commands
   rpc send(stream ContainerCommandRequestProto) returns
