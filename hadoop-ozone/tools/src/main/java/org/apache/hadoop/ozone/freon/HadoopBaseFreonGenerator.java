@@ -44,6 +44,7 @@ public abstract class HadoopBaseFreonGenerator extends BaseFreonGenerator {
 
   @Override
   public void init() {
+    super.init();
     configuration = createOzoneConfiguration();
     uri = URI.create(rootPath);
     String scheme = Optional.ofNullable(uri.getScheme())
