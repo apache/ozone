@@ -17,7 +17,7 @@
  */
 
 import React from 'react';
-import {Table, Drawer} from 'antd';
+import { Table, Drawer } from 'antd';
 
 interface IRightDrawerProps extends RouteComponentProps<object> {
   visible: boolean;
@@ -27,11 +27,11 @@ interface IRightDrawerProps extends RouteComponentProps<object> {
 }
 
 export class DetailPanel extends React.Component<IRightDrawerProps> {
-  state = {visible: false};
+  state = { visible: false };
 
   componentWillReceiveProps(props) {
-    const {visible} = props;
-    this.setState({visible});
+    const { visible } = props;
+    this.setState({ visible });
   }
 
   onClose = () => {
@@ -41,12 +41,15 @@ export class DetailPanel extends React.Component<IRightDrawerProps> {
   };
 
   render() {
-    const {Column} = Table;
-    const {keys, values, path} = this.props;
-    const {visible} = this.state;
+    const { Column } = Table;
+    const { keys, values, path } = this.props;
+    const { visible } = this.state;
     const content = [];
     for (const [i, v] of keys.entries()) {
-      content.push({key: v, value: values[i]});
+      content.push({
+        key: v,
+        value: values[i]
+      });
     }
 
     return (
@@ -58,12 +61,12 @@ export class DetailPanel extends React.Component<IRightDrawerProps> {
           closable={true}
           visible={visible}
           getContainer={false}
-          style={{position: 'absolute'}}
+          style={{ position: 'absolute' }}
           onClose={this.onClose}
         >
-          <Table dataSource={content} locale={{filterTitle: ""}}>
-            <Column title='Property' dataIndex='key'/>
-            <Column title='Value' dataIndex='value'/>
+          <Table dataSource={content} locale={{ filterTitle: '' }}>
+            <Column title='Property' dataIndex='key' />
+            <Column title='Value' dataIndex='value' />
           </Table>
         </Drawer>
       </div>
