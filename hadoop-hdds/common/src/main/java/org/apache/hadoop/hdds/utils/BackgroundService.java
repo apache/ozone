@@ -142,7 +142,10 @@ public abstract class BackgroundService {
               LOG.debug("task execution result size {}", result.getSize());
             }
           } catch (Throwable e) {
-            LOG.warn("Background task execution failed", e);
+            LOG.error("Background task execution failed", e);
+            if (e instanceof Error) {
+              return;
+            }
           } finally {
             long endTime = System.nanoTime();
             if (endTime - startTime > serviceTimeoutInNanos) {
