@@ -181,6 +181,7 @@ public class KeyValueContainerData extends ContainerData {
    * Returns container metadata path.
    * @return - Physical path where container file and checksum is stored.
    */
+  @Override
   public String getMetadataPath() {
     return metadataPath;
   }
