@@ -79,8 +79,10 @@ public class BackgroundContainerMetadataScanner extends
     if (!result.isHealthy()) {
       LOG.error("Corruption detected in container [{}]. Marking it UNHEALTHY.",
           containerID, result.getException());
-      metrics.incNumUnHealthyContainers();
-      controller.markContainerUnhealthy(containerID, result);
+      boolean containerMarkedUnhealthy = controller.markContainerUnhealthy(containerID, result);
+      if (containerMarkedUnhealthy) {
+        metrics.incNumUnHealthyContainers();
+      }
     }
 
     // Do not update the scan timestamp after the scan since this was just a
@@ -96,7 +98,6 @@ public class BackgroundContainerMetadataScanner extends
   private boolean shouldScan(Container<?> container) {
     // Full data scan also does a metadata scan. If a full data scan was done
     // recently, we can skip this metadata scan.
-    return container.shouldScanMetadata() &&
-        !ContainerUtils.recentlyScanned(container, minScanGap, LOG);
+    return !ContainerUtils.recentlyScanned(container, minScanGap, LOG);
   }
 }

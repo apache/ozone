@@ -149,8 +149,7 @@ public class ContainerChecksumTreeManager {
     }
   }
 
-  private void write(ContainerData data, ContainerProtos.ContainerChecksumInfo checksumInfo)
-      throws IOException {
+  private void write(ContainerData data, ContainerProtos.ContainerChecksumInfo checksumInfo) throws IOException {
     Lock writeLock = getWriteLock(data.getContainerID());
     writeLock.lock();
     try (FileOutputStream outStream = new FileOutputStream(getContainerChecksumFile(data))) {
