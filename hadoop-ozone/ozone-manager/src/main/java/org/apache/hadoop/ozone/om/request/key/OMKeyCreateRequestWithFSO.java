@@ -229,7 +229,7 @@ public class OMKeyCreateRequestWithFSO extends OMKeyCreateRequest {
     // Audit Log outside the lock
     auditLog(ozoneManager.getAuditLogger(), buildAuditMessage(
             OMAction.ALLOCATE_KEY, auditMap, exception,
-            getOmRequest().getUserInfo()));
+            getOmRequest().getUserInfo(), termIndex));
 
     logResult(createKeyRequest, omMetrics, exception, result,
             numKeysCreated);

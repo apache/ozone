@@ -238,7 +238,7 @@ public class OMBucketSetPropertyRequest extends OMClientRequest {
 
     // Performing audit logging outside of the lock.
     auditLog(auditLogger, buildAuditMessage(OMAction.UPDATE_BUCKET,
-        omBucketArgs.toAuditMap(), exception, userInfo));
+        omBucketArgs.toAuditMap(), exception, userInfo, termIndex));
 
     // return response.
     if (success) {

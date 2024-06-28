@@ -241,7 +241,7 @@ public class OMDirectoryCreateRequest extends OMKeyRequest {
     }
 
     auditLog(auditLogger, buildAuditMessage(OMAction.CREATE_DIRECTORY,
-        auditMap, exception, userInfo));
+        auditMap, exception, userInfo, termIndex));
 
     logResult(createDirectoryRequest, keyArgs, omMetrics, result,
         exception, numMissingParents);

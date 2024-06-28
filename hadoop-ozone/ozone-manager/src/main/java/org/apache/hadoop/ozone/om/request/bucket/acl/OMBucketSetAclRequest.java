@@ -111,9 +111,9 @@ public class OMBucketSetAclRequest extends OMBucketAclRequest {
   @Override
   void onComplete(boolean operationResult, Exception exception,
       OMMetrics omMetrics, AuditLogger auditLogger,
-      Map<String, String> auditMap) {
+      Map<String, String> auditMap, TermIndex termIndex) {
     auditLog(auditLogger, buildAuditMessage(OMAction.SET_ACL, auditMap,
-        exception, getOmRequest().getUserInfo()));
+        exception, getOmRequest().getUserInfo(), termIndex));
 
     if (operationResult) {
       if (LOG.isDebugEnabled()) {

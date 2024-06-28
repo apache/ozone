@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.ozone.om.request.security;
 
+import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.ratis.server.protocol.TermIndex;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.ozone.OzoneConsts;
@@ -80,7 +81,7 @@ public class OMGetDelegationTokenRequest extends OMClientRequest {
     } catch (IOException ioe) {
       auditLog(auditLogger,
           buildAuditMessage(OMAction.GET_DELEGATION_TOKEN,
-              new LinkedHashMap<>(), ioe, request.getUserInfo()));
+              new LinkedHashMap<>(), ioe, request.getUserInfo(), TransactionInfo.getTermIndex(-1)));
       throw ioe;
     }
 
@@ -197,7 +198,7 @@ public class OMGetDelegationTokenRequest extends OMClientRequest {
 
     auditLog(auditLogger,
         buildAuditMessage(OMAction.GET_DELEGATION_TOKEN, auditMap, exception,
-            getOmRequest().getUserInfo()));
+            getOmRequest().getUserInfo(), termIndex));
 
     if (LOG.isDebugEnabled()) {
       LOG.debug("Updated delegation token in-memory map: {}",

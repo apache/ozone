@@ -253,7 +253,7 @@ public class S3InitiateMultipartUploadRequest extends OMKeyRequest {
       }
     }
     logResult(ozoneManager, multipartInfoInitiateRequest, auditMap, volumeName,
-            bucketName, keyName, exception, result);
+            bucketName, keyName, exception, result, termIndex);
 
     return omClientResponse;
   }
@@ -262,11 +262,11 @@ public class S3InitiateMultipartUploadRequest extends OMKeyRequest {
   protected void logResult(OzoneManager ozoneManager,
       MultipartInfoInitiateRequest multipartInfoInitiateRequest,
       Map<String, String> auditMap, String volumeName, String bucketName,
-      String keyName, Exception exception, Result result) {
+      String keyName, Exception exception, Result result, TermIndex termIndex) {
     // audit log
     auditLog(ozoneManager.getAuditLogger(), buildAuditMessage(
         OMAction.INITIATE_MULTIPART_UPLOAD, auditMap,
-        exception, getOmRequest().getUserInfo()));
+        exception, getOmRequest().getUserInfo(), termIndex));
 
     switch (result) {
     case SUCCESS:

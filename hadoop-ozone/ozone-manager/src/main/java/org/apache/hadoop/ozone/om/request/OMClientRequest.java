@@ -475,14 +475,17 @@ public abstract class OMClientRequest implements RequestAuditor {
    * @param auditLogger
    * @param auditMessage
    */
-  protected void auditLog(AuditLogger auditLogger, AuditMessage auditMessage) {
+  public void auditLog(AuditLogger auditLogger, AuditMessage auditMessage) {
     auditLogger.logWrite(auditMessage);
   }
 
   @Override
   public AuditMessage buildAuditMessage(AuditAction op,
       Map< String, String > auditMap, Throwable throwable,
-      OzoneManagerProtocolProtos.UserInfo userInfo) {
+      OzoneManagerProtocolProtos.UserInfo userInfo, TermIndex termIndex) {
+    if (null != auditMap) {
+      auditMap.put("Transaction", "" + termIndex.getIndex());
+    }
     return new AuditMessage.Builder()
         .setUser(userInfo != null ? userInfo.getUserName() : null)
         .atIp(userInfo != null ? userInfo.getRemoteAddress() : null)

@@ -229,7 +229,7 @@ public class OMTenantRevokeAdminRequest extends OMClientRequest {
     auditMap.put(OzoneConsts.TENANT, tenantId);
     auditLog(ozoneManager.getAuditLogger(), buildAuditMessage(
         OMAction.TENANT_REVOKE_ADMIN, auditMap, exception,
-        getOmRequest().getUserInfo()));
+        getOmRequest().getUserInfo(), termIndex));
 
     if (exception == null) {
       LOG.info("Revoked admin of accessId '{}' from tenant '{}'",

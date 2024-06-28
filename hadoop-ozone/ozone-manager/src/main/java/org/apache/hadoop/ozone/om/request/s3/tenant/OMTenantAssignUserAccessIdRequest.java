@@ -352,7 +352,7 @@ public class OMTenantAssignUserAccessIdRequest extends OMClientRequest {
     auditMap.put("accessId", accessId);
     auditLog(ozoneManager.getAuditLogger(), buildAuditMessage(
         OMAction.TENANT_ASSIGN_USER_ACCESSID, auditMap, exception,
-            getOmRequest().getUserInfo()));
+            getOmRequest().getUserInfo(), termIndex));
 
     if (exception == null) {
       LOG.info("Assigned user '{}' to tenant '{}' with accessId '{}'",

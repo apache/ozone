@@ -349,7 +349,7 @@ public class OMKeyCommitRequest extends OMKeyRequest {
 
     if (!isHSync) {
       auditLog(auditLogger, buildAuditMessage(OMAction.COMMIT_KEY, auditMap,
-              exception, getOmRequest().getUserInfo()));
+              exception, getOmRequest().getUserInfo(), termIndex));
       processResult(commitKeyRequest, volumeName, bucketName, keyName,
           omMetrics, exception, omKeyInfo, result);
     }

@@ -383,7 +383,7 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
     }
 
     logResult(ozoneManager, multipartUploadCompleteRequest, partsList,
-            auditMap, volumeName, bucketName, keyName, exception, result);
+            auditMap, volumeName, bucketName, keyName, exception, result, termIndex);
 
     return omClientResponse;
   }
@@ -431,14 +431,14 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
       List<OzoneManagerProtocolProtos.Part> partsList,
       Map<String, String> auditMap, String volumeName,
       String bucketName, String keyName, Exception exception,
-      Result result) {
+      Result result, TermIndex termIndex) {
     auditMap.put(OzoneConsts.MULTIPART_LIST, partsList.toString()
         .replaceAll("\\n", " "));
 
     // audit log
     auditLog(ozoneManager.getAuditLogger(), buildAuditMessage(
         OMAction.COMPLETE_MULTIPART_UPLOAD, auditMap, exception,
-        getOmRequest().getUserInfo()));
+        getOmRequest().getUserInfo(), termIndex));
 
     switch (result) {
     case SUCCESS:

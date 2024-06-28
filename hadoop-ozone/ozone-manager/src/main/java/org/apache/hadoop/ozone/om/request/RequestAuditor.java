@@ -31,6 +31,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
     .KeyArgs;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
     .UserInfo;
+import org.apache.ratis.server.protocol.TermIndex;
 
 import static org.apache.hadoop.ozone.OzoneConsts.ETAG;
 
@@ -47,8 +48,8 @@ public interface RequestAuditor {
    * @param userInfo
    * @return
    */
-  AuditMessage buildAuditMessage(AuditAction op,
-      Map<String, String> auditMap, Throwable throwable, UserInfo userInfo);
+  AuditMessage buildAuditMessage(
+      AuditAction op, Map<String, String> auditMap, Throwable throwable, UserInfo userInfo, TermIndex idx);
 
   /**
    * Build auditMap with specified volume.

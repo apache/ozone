@@ -156,7 +156,7 @@ public abstract class OMBucketAclRequest extends OMClientRequest {
     }
 
     onComplete(operationResult, exception, ozoneManager.getMetrics(),
-        ozoneManager.getAuditLogger(), auditMap);
+        ozoneManager.getAuditLogger(), auditMap, termIndex);
     return omClientResponse;
   }
 
@@ -210,6 +210,6 @@ public abstract class OMBucketAclRequest extends OMClientRequest {
    */
   abstract void onComplete(boolean operationResult, Exception exception,
       OMMetrics omMetrics, AuditLogger auditLogger,
-      Map<String, String> auditMap);
+      Map<String, String> auditMap, TermIndex termIndex);
 }
 

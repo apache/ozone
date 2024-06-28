@@ -239,7 +239,7 @@ public class OMTenantAssignAdminRequest extends OMClientRequest {
     auditMap.put(OzoneConsts.TENANT, tenantId);
     auditLog(ozoneManager.getAuditLogger(), buildAuditMessage(
         OMAction.TENANT_ASSIGN_ADMIN, auditMap, exception,
-        getOmRequest().getUserInfo()));
+        getOmRequest().getUserInfo(), termIndex));
 
     if (exception == null) {
       LOG.info("Assigned admin to accessId '{}' in tenant '{}', "

@@ -216,7 +216,7 @@ public class S3GetSecretRequest extends OMClientRequest {
     // audit log
     auditLog(ozoneManager.getAuditLogger(), buildAuditMessage(
         OMAction.GET_S3_SECRET, auditMap,
-        exception, getOmRequest().getUserInfo()));
+        exception, getOmRequest().getUserInfo(), termIndex));
 
     if (exception == null) {
       LOG.debug("Success: GetSecret for accessKey '{}', createIfNotExist '{}'",

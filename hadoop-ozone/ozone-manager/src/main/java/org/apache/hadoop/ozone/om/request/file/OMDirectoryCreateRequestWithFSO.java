@@ -194,7 +194,7 @@ public class OMDirectoryCreateRequestWithFSO extends OMDirectoryCreateRequest {
     }
 
     auditLog(auditLogger, buildAuditMessage(OMAction.CREATE_DIRECTORY,
-        auditMap, exception, userInfo));
+        auditMap, exception, userInfo, termIndex));
 
     logResult(createDirectoryRequest, keyArgs, omMetrics, numKeysCreated,
             result, exception);

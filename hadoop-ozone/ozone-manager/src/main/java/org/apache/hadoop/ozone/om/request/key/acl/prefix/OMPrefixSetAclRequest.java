@@ -23,6 +23,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
+import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.audit.AuditLogger;
 import org.apache.hadoop.ozone.audit.OMAction;
@@ -117,7 +118,7 @@ public class OMPrefixSetAclRequest extends OMPrefixAclRequest {
       auditMap.put(OzoneConsts.ACL, ozoneAcls.toString());
     }
     auditLog(auditLogger, buildAuditMessage(OMAction.SET_ACL, auditMap,
-        exception, getOmRequest().getUserInfo()));
+        exception, getOmRequest().getUserInfo(), TransactionInfo.getTermIndex(trxnLogIndex)));
   }
 
   @Override

@@ -140,7 +140,7 @@ public class OMKeySetTimesRequest extends OMKeyRequest {
   }
 
   protected void onComplete(Result result, Exception exception,
-      AuditLogger auditLogger, Map<String, String> auditMap) {
+      AuditLogger auditLogger, Map<String, String> auditMap, TermIndex termIndex) {
     switch (result) {
     case SUCCESS:
       LOG.debug("Set mtime: {} to path: {} success!", modificationTime,
@@ -161,7 +161,7 @@ public class OMKeySetTimesRequest extends OMKeyRequest {
     auditMap.put(OzoneConsts.MODIFICATION_TIME,
         String.valueOf(getModificationTime()));
     auditLog(auditLogger, buildAuditMessage(OMAction.SET_TIMES, auditMap,
-        exception, getOmRequest().getUserInfo()));
+        exception, getOmRequest().getUserInfo(), termIndex));
   }
 
   protected void apply(OmKeyInfo omKeyInfo) {
@@ -243,7 +243,7 @@ public class OMKeySetTimesRequest extends OMKeyRequest {
     }
 
     Map<String, String> auditMap = new LinkedHashMap<>();
-    onComplete(result, exception, ozoneManager.getAuditLogger(), auditMap);
+    onComplete(result, exception, ozoneManager.getAuditLogger(), auditMap, termIndex);
 
     return omClientResponse;
   }
