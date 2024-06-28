@@ -110,10 +110,6 @@ public class ContainerMetrics {
     numOpsArray.get(type).incr();
   }
 
-  public long getContainerOpsMetrics(ContainerProtos.Type type) {
-    return numOpsArray.get(type).value();
-  }
-
   public void incContainerOpsLatencies(ContainerProtos.Type type,
                                        long latencyMillis) {
     opsLatency.get(type).add(latencyMillis);
