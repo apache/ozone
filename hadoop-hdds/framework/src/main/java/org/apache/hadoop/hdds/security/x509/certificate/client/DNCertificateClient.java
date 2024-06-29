@@ -23,10 +23,10 @@ import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMGetCertResponseProto;
 import org.apache.hadoop.hdds.protocolPB.SCMSecurityProtocolClientSideTranslatorPB;
 import org.apache.hadoop.hdds.security.SecurityConfig;
+import org.apache.hadoop.hdds.security.exception.SCMSecurityException;
 import org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateSignRequest;
 import org.apache.hadoop.hdds.security.x509.exception.CertificateException;
 import org.apache.hadoop.security.UserGroupInformation;
-import org.bouncycastle.pkcs.PKCS10CertificationRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -35,7 +35,6 @@ import java.net.InetAddress;
 import java.security.KeyPair;
 import java.util.function.Consumer;
 
-import static org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateSignRequest.getEncodedString;
 import static org.apache.hadoop.hdds.security.x509.exception.CertificateException.ErrorCode.CSR_ERROR;
 
 /**
@@ -70,9 +69,9 @@ public class DNCertificateClient extends DefaultCertificateClient {
    * @return CertificateSignRequest.Builder
    */
   @Override
-  public CertificateSignRequest.Builder getCSRBuilder()
-      throws CertificateException {
-    CertificateSignRequest.Builder builder = super.getCSRBuilder();
+  public CertificateSignRequest.Builder configureCSRBuilder()
+      throws SCMSecurityException {
+    CertificateSignRequest.Builder builder = super.configureCSRBuilder();
 
     try {
       String hostname = InetAddress.getLocalHost().getCanonicalHostName();
@@ -93,10 +92,8 @@ public class DNCertificateClient extends DefaultCertificateClient {
   }
 
   @Override
-  public SCMGetCertResponseProto getCertificateSignResponse(
-      PKCS10CertificationRequest csr) throws IOException {
-    return getScmSecureClient().getDataNodeCertificateChain(
-        dn.getProtoBufMessage(), getEncodedString(csr));
+  public SCMGetCertResponseProto sign(CertificateSignRequest csr) throws IOException {
+    return getScmSecureClient().getDataNodeCertificateChain(dn.getProtoBufMessage(), csr.toEncodedFormat());
   }
 
   @Override

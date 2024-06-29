@@ -25,12 +25,12 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMGetCertResponseProto;
 import org.apache.hadoop.hdds.protocolPB.SCMSecurityProtocolClientSideTranslatorPB;
 import org.apache.hadoop.hdds.security.SecurityConfig;
+import org.apache.hadoop.hdds.security.exception.SCMSecurityException;
 import org.apache.hadoop.hdds.security.x509.certificate.client.DefaultCertificateClient;
 import org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateSignRequest;
 import org.apache.hadoop.hdds.security.x509.exception.CertificateException;
 import org.apache.hadoop.ozone.om.OMStorage;
 import org.apache.hadoop.security.UserGroupInformation;
-import org.bouncycastle.pkcs.PKCS10CertificationRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -38,7 +38,6 @@ import java.io.IOException;
 import java.security.KeyPair;
 import java.util.function.Consumer;
 
-import static org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateSignRequest.getEncodedString;
 
 /**
  * Certificate client for OzoneManager.
@@ -81,9 +80,9 @@ public class OMCertificateClient extends DefaultCertificateClient {
    * @return CertificateSignRequest.Builder
    */
   @Override
-  public CertificateSignRequest.Builder getCSRBuilder()
-      throws CertificateException {
-    CertificateSignRequest.Builder builder = super.getCSRBuilder();
+  public CertificateSignRequest.Builder configureCSRBuilder()
+      throws SCMSecurityException {
+    CertificateSignRequest.Builder builder = super.configureCSRBuilder();
 
     String hostname = omInfo.getHostName();
     String subject;
@@ -118,10 +117,8 @@ public class OMCertificateClient extends DefaultCertificateClient {
   }
 
   @Override
-  protected SCMGetCertResponseProto getCertificateSignResponse(
-      PKCS10CertificationRequest request) throws IOException {
-    return getScmSecureClient().getOMCertChain(
-        omInfo, getEncodedString(request));
+  protected SCMGetCertResponseProto sign(CertificateSignRequest request) throws IOException {
+    return getScmSecureClient().getOMCertChain(omInfo, request.toEncodedFormat());
   }
 
   @Override

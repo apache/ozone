@@ -72,6 +72,7 @@ import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMGetCertResponseProto;
 import org.apache.hadoop.hdds.protocolPB.SCMSecurityProtocolClientSideTranslatorPB;
 import org.apache.hadoop.hdds.security.SecurityConfig;
+import org.apache.hadoop.hdds.security.exception.SCMSecurityException;
 import org.apache.hadoop.hdds.security.ssl.KeyStoresFactory;
 import org.apache.hadoop.hdds.security.x509.certificate.authority.CAType;
 import org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateCodec;
@@ -97,7 +98,6 @@ import static org.apache.hadoop.hdds.security.x509.exception.CertificateExceptio
 import static org.apache.hadoop.hdds.security.x509.exception.CertificateException.ErrorCode.RENEW_ERROR;
 import static org.apache.hadoop.hdds.security.x509.exception.CertificateException.ErrorCode.ROLLBACK_ERROR;
 
-import org.bouncycastle.pkcs.PKCS10CertificationRequest;
 import org.slf4j.Logger;
 
 /**
@@ -565,15 +565,12 @@ public abstract class DefaultCertificateClient implements CertificateClient {
    * @return CertificateSignRequest.Builder
    */
   @Override
-  public CertificateSignRequest.Builder getCSRBuilder()
-      throws CertificateException {
-    CertificateSignRequest.Builder builder =
-        new CertificateSignRequest.Builder()
-            .setConfiguration(securityConfig)
-            .addInetAddresses()
-            .setDigitalEncryption(true)
-            .setDigitalSignature(true);
-    return builder;
+  public CertificateSignRequest.Builder configureCSRBuilder() throws SCMSecurityException {
+    return new CertificateSignRequest.Builder()
+        .setConfiguration(securityConfig)
+        .addInetAddresses()
+        .setDigitalEncryption(true)
+        .setDigitalSignature(true);
   }
 
   /**
@@ -803,7 +800,8 @@ public abstract class DefaultCertificateClient implements CertificateClient {
       getLogger().info("Initialization successful, case:{}.", state);
       break;
     case GETCERT:
-      String certId = signAndStoreCertificate(getCSRBuilder().build());
+      Path certLocation = securityConfig.getCertificateLocation(getComponentName());
+      String certId = signAndStoreCertificate(configureCSRBuilder().build(), certLocation, false);
       if (certIdSaveCallback != null) {
         certIdSaveCallback.accept(certId);
       } else {
@@ -1147,7 +1145,7 @@ public abstract class DefaultCertificateClient implements CertificateClient {
     // Get certificate signed
     String newCertSerialId;
     try {
-      CertificateSignRequest.Builder csrBuilder = getCSRBuilder();
+      CertificateSignRequest.Builder csrBuilder = configureCSRBuilder();
       csrBuilder.setKey(newKeyPair);
       newCertSerialId = signAndStoreCertificate(csrBuilder.build(),
           Paths.get(newCertPath), true);
@@ -1315,20 +1313,12 @@ public abstract class DefaultCertificateClient implements CertificateClient {
     return certSerialId;
   }
 
-  protected String signAndStoreCertificate(
-      PKCS10CertificationRequest request, Path certificatePath)
-      throws CertificateException {
-    return signAndStoreCertificate(request, certificatePath, false);
-  }
+  protected abstract SCMGetCertResponseProto sign(CertificateSignRequest request) throws IOException;
 
-  protected abstract SCMGetCertResponseProto getCertificateSignResponse(
-      PKCS10CertificationRequest request) throws IOException;
-
-  protected String signAndStoreCertificate(
-      PKCS10CertificationRequest request, Path certificatePath, boolean renew)
+  protected String signAndStoreCertificate(CertificateSignRequest csr, Path certificatePath, boolean renew)
       throws CertificateException {
     try {
-      SCMGetCertResponseProto response = getCertificateSignResponse(request);
+      SCMGetCertResponseProto response = sign(csr);
 
       // Persist certificates.
       if (response.hasX509CACertificate()) {
@@ -1364,12 +1354,6 @@ public abstract class DefaultCertificateClient implements CertificateClient {
       storeCertificate(rootCAPem, CAType.ROOT, certCodec,
           false, !renew);
     }
-  }
-
-  public String signAndStoreCertificate(
-      PKCS10CertificationRequest request) throws CertificateException {
-    return updateCertSerialId(signAndStoreCertificate(request,
-        securityConfig.getCertificateLocation(getComponentName())));
   }
 
   public SCMSecurityProtocolClientSideTranslatorPB getScmSecureClient() {
