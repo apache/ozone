@@ -27,7 +27,6 @@ import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
-import org.apache.hadoop.hdds.scm.ContainerPlacementStatus;
 import org.apache.hadoop.hdds.scm.PlacementPolicy;
 import org.apache.hadoop.hdds.scm.PlacementPolicyValidateProxy;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
@@ -47,7 +46,6 @@ import org.apache.hadoop.hdds.scm.ha.StatefulServiceStateManager;
 import org.apache.hadoop.hdds.scm.ha.StatefulServiceStateManagerImpl;
 import org.apache.hadoop.hdds.scm.net.NetworkTopology;
 import org.apache.hadoop.hdds.scm.node.DatanodeUsageInfo;
-import org.apache.hadoop.hdds.scm.node.NodeStatus;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
@@ -74,11 +72,9 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
-import java.util.stream.Collectors;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotSame;
-import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.apache.hadoop.hdds.scm.container.replication.ReplicationManager.ReplicationManagerConfiguration;
@@ -86,10 +82,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.anyString;
-import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.when;
 
 /**
@@ -246,259 +240,6 @@ public class TestContainerBalancerTask {
     ContainerBalancer sb = new ContainerBalancer(scm);
     containerBalancerTask = new ContainerBalancerTask(scm, 0, sb,
         sb.getMetrics(), balancerConfiguration, false);
-  }
-
-  @Test
-  public void containerBalancerShouldSelectOnlyClosedContainers()
-      throws IllegalContainerBalancerStateException, IOException,
-      InvalidContainerBalancerConfigurationException, TimeoutException {
-    // make all containers open, balancer should not select any of them
-    for (ContainerInfo containerInfo : cidToInfoMap.values()) {
-      containerInfo.setState(HddsProtos.LifeCycleState.OPEN);
-    }
-    balancerConfiguration.setThreshold(10);
-    startBalancer(balancerConfiguration);
-    stopBalancer();
-
-    // balancer should have identified unbalanced nodes
-    assertFalse(TestContainerBalancerDatanodeNodeLimit.getUnBalancedNodes(containerBalancerTask).isEmpty());
-    // no container should have been selected
-    assertTrue(containerBalancerTask.getContainerToSourceMap()
-        .isEmpty());
-    /*
-    Iteration result should be CAN_NOT_BALANCE_ANY_MORE because no container
-    move is generated
-     */
-    assertEquals(
-        ContainerBalancerTask.IterationResult.CAN_NOT_BALANCE_ANY_MORE,
-        containerBalancerTask.getIterationResult());
-
-    // now, close all containers
-    for (ContainerInfo containerInfo : cidToInfoMap.values()) {
-      containerInfo.setState(HddsProtos.LifeCycleState.CLOSED);
-    }
-    startBalancer(balancerConfiguration);
-    stopBalancer();
-
-    // check whether all selected containers are closed
-    for (ContainerID cid:
-         containerBalancerTask.getContainerToSourceMap().keySet()) {
-      assertSame(
-          cidToInfoMap.get(cid).getState(), HddsProtos.LifeCycleState.CLOSED);
-    }
-  }
-
-  /**
-   * Container Balancer should not select a non-CLOSED replica for moving.
-   */
-  @Test
-  public void balancerShouldNotSelectNonClosedContainerReplicas()
-      throws IOException, IllegalContainerBalancerStateException,
-      InvalidContainerBalancerConfigurationException, TimeoutException {
-
-    // let's mock such that all replicas have CLOSING state
-    when(containerManager.getContainerReplicas(any(ContainerID.class)))
-        .thenAnswer(invocationOnMock -> {
-          ContainerID cid = (ContainerID) invocationOnMock.getArguments()[0];
-          Set<ContainerReplica> replicas = cidToReplicasMap.get(cid);
-          Set<ContainerReplica> replicasToReturn =
-              new HashSet<>(replicas.size());
-          for (ContainerReplica replica : replicas) {
-            ContainerReplica newReplica =
-                replica.toBuilder().setContainerState(
-                    ContainerReplicaProto.State.CLOSING).build();
-            replicasToReturn.add(newReplica);
-          }
-
-          return replicasToReturn;
-        });
-
-    balancerConfiguration.setThreshold(10);
-    balancerConfiguration.setMaxDatanodesPercentageToInvolvePerIteration(100);
-    balancerConfiguration.setMaxSizeToMovePerIteration(50 * STORAGE_UNIT);
-    balancerConfiguration.setMaxSizeEnteringTarget(50 * STORAGE_UNIT);
-
-    startBalancer(balancerConfiguration);
-    stopBalancer();
-
-    // balancer should have identified unbalanced nodes
-    assertFalse(TestContainerBalancerDatanodeNodeLimit.getUnBalancedNodes(containerBalancerTask).isEmpty());
-    // no container should have moved because all replicas are CLOSING
-    assertTrue(
-        containerBalancerTask.getContainerToSourceMap().isEmpty());
-  }
-
-  @Test
-  public void containerBalancerShouldObeyMaxSizeToMoveLimit()
-      throws IllegalContainerBalancerStateException, IOException,
-      InvalidContainerBalancerConfigurationException, TimeoutException {
-    balancerConfiguration.setThreshold(1);
-    balancerConfiguration.setMaxSizeToMovePerIteration(10 * STORAGE_UNIT);
-    balancerConfiguration.setIterations(1);
-    startBalancer(balancerConfiguration);
-
-    // balancer should not have moved more size than the limit
-    assertThat(containerBalancerTask.getSizeScheduledForMoveInLatestIteration())
-        .isLessThanOrEqualTo(10 * STORAGE_UNIT);
-
-    long size = containerBalancerTask.getMetrics()
-        .getDataSizeMovedGBInLatestIteration();
-    assertThat(size).isGreaterThan(0);
-    assertThat(size).isLessThanOrEqualTo(10);
-    stopBalancer();
-  }
-
-  @Test
-  public void targetDatanodeShouldNotAlreadyContainSelectedContainer()
-      throws IllegalContainerBalancerStateException, IOException,
-      InvalidContainerBalancerConfigurationException, TimeoutException {
-    balancerConfiguration.setThreshold(10);
-    balancerConfiguration.setMaxSizeToMovePerIteration(100 * STORAGE_UNIT);
-    balancerConfiguration.setMaxDatanodesPercentageToInvolvePerIteration(100);
-    startBalancer(balancerConfiguration);
-
-    stopBalancer();
-    Map<ContainerID, DatanodeDetails> map =
-        containerBalancerTask.getContainerToTargetMap();
-    for (Map.Entry<ContainerID, DatanodeDetails> entry : map.entrySet()) {
-      ContainerID container = entry.getKey();
-      DatanodeDetails target = entry.getValue();
-      assertTrue(cidToReplicasMap.get(container)
-          .stream()
-          .map(ContainerReplica::getDatanodeDetails)
-          .noneMatch(target::equals));
-    }
-  }
-
-  @Test
-  public void containerMoveSelectionShouldFollowPlacementPolicy()
-      throws IllegalContainerBalancerStateException, IOException,
-      InvalidContainerBalancerConfigurationException, TimeoutException {
-    balancerConfiguration.setThreshold(10);
-    balancerConfiguration.setMaxSizeToMovePerIteration(50 * STORAGE_UNIT);
-    balancerConfiguration.setMaxDatanodesPercentageToInvolvePerIteration(100);
-    balancerConfiguration.setIterations(1);
-    startBalancer(balancerConfiguration);
-
-    stopBalancer();
-    Map<ContainerID, DatanodeDetails> containerFromSourceMap =
-        containerBalancerTask.getContainerToSourceMap();
-    Map<ContainerID, DatanodeDetails> containerToTargetMap =
-        containerBalancerTask.getContainerToTargetMap();
-
-    // for each move selection, check if {replicas - source + target}
-    // satisfies placement policy
-    for (Map.Entry<ContainerID, DatanodeDetails> entry :
-        containerFromSourceMap.entrySet()) {
-      ContainerID container = entry.getKey();
-      DatanodeDetails source = entry.getValue();
-
-      List<DatanodeDetails> replicas = cidToReplicasMap.get(container)
-          .stream()
-          .map(ContainerReplica::getDatanodeDetails)
-          .collect(Collectors.toList());
-      // remove source and add target
-      replicas.remove(source);
-      replicas.add(containerToTargetMap.get(container));
-
-      ContainerInfo containerInfo = cidToInfoMap.get(container);
-      ContainerPlacementStatus placementStatus;
-      if (containerInfo.getReplicationType() ==
-          HddsProtos.ReplicationType.RATIS) {
-        placementStatus = placementPolicy.validateContainerPlacement(replicas,
-            containerInfo.getReplicationConfig().getRequiredNodes());
-      } else {
-        placementStatus =
-            ecPlacementPolicy.validateContainerPlacement(replicas,
-                containerInfo.getReplicationConfig().getRequiredNodes());
-      }
-      assertTrue(placementStatus.isPolicySatisfied());
-    }
-  }
-
-  @Test
-  public void targetDatanodeShouldBeInServiceHealthy()
-      throws NodeNotFoundException, IllegalContainerBalancerStateException,
-      IOException, InvalidContainerBalancerConfigurationException,
-      TimeoutException {
-    balancerConfiguration.setThreshold(10);
-    balancerConfiguration.setMaxDatanodesPercentageToInvolvePerIteration(100);
-    balancerConfiguration.setMaxSizeToMovePerIteration(50 * STORAGE_UNIT);
-    balancerConfiguration.setMaxSizeEnteringTarget(50 * STORAGE_UNIT);
-    balancerConfiguration.setIterations(1);
-    startBalancer(balancerConfiguration);
-
-    stopBalancer();
-    for (DatanodeDetails target : containerBalancerTask.getSelectedTargets()) {
-      NodeStatus status = mockNodeManager.getNodeStatus(target);
-      assertSame(HddsProtos.NodeOperationalState.IN_SERVICE,
-          status.getOperationalState());
-      assertTrue(status.isHealthy());
-    }
-  }
-
-  @Test
-  public void selectedContainerShouldNotAlreadyHaveBeenSelected()
-      throws IllegalContainerBalancerStateException, IOException,
-      InvalidContainerBalancerConfigurationException, NodeNotFoundException,
-      TimeoutException {
-    balancerConfiguration.setThreshold(10);
-    balancerConfiguration.setMaxDatanodesPercentageToInvolvePerIteration(100);
-    balancerConfiguration.setMaxSizeToMovePerIteration(50 * STORAGE_UNIT);
-    balancerConfiguration.setMaxSizeEnteringTarget(50 * STORAGE_UNIT);
-    balancerConfiguration.setIterations(1);
-    rmConf.setEnableLegacy(true);
-
-    startBalancer(balancerConfiguration);
-
-    stopBalancer();
-
-    int numContainers = containerBalancerTask.getContainerToTargetMap().size();
-
-    /*
-    Assuming move is called exactly once for each unique container, number of
-     calls to move should equal number of unique containers. If number of
-     calls to move is more than number of unique containers, at least one
-     container has been re-selected. It's expected that number of calls to
-     move should equal number of unique, selected containers (from
-     containerToTargetMap).
-     */
-    verify(replicationManager, times(numContainers))
-        .move(any(ContainerID.class), any(DatanodeDetails.class),
-            any(DatanodeDetails.class));
-
-    /*
-     Try the same test by disabling LegacyReplicationManager so that
-     MoveManager is used.
-     */
-    rmConf.setEnableLegacy(false);
-    startBalancer(balancerConfiguration);
-    stopBalancer();
-    numContainers = containerBalancerTask.getContainerToTargetMap().size();
-    verify(moveManager, times(numContainers))
-        .move(any(ContainerID.class), any(DatanodeDetails.class),
-            any(DatanodeDetails.class));
-  }
-
-  @Test
-  public void balancerShouldNotSelectConfiguredExcludeContainers()
-      throws IllegalContainerBalancerStateException, IOException,
-      InvalidContainerBalancerConfigurationException, TimeoutException {
-    balancerConfiguration.setThreshold(10);
-    balancerConfiguration.setMaxDatanodesPercentageToInvolvePerIteration(100);
-    balancerConfiguration.setMaxSizeToMovePerIteration(50 * STORAGE_UNIT);
-    balancerConfiguration.setMaxSizeEnteringTarget(50 * STORAGE_UNIT);
-    balancerConfiguration.setExcludeContainers("1, 4, 5");
-
-    startBalancer(balancerConfiguration);
-
-    stopBalancer();
-    Set<ContainerID> excludeContainers =
-        balancerConfiguration.getExcludeContainers();
-    for (ContainerID container :
-        containerBalancerTask.getContainerToSourceMap().keySet()) {
-      assertThat(excludeContainers).doesNotContain(container);
-    }
   }
 
   /**
