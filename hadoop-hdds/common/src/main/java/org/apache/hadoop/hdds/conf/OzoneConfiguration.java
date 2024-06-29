@@ -33,6 +33,7 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.Enumeration;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
@@ -55,6 +56,7 @@ import static java.util.Collections.unmodifiableSortedSet;
 import static java.util.stream.Collectors.toCollection;
 import static org.apache.hadoop.hdds.ratis.RatisHelper.HDDS_DATANODE_RATIS_PREFIX_KEY;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_CONTAINER_COPY_WORKDIR;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SECURITY_CRYPTO_COMPLIANCE_MODE_UNRESTRICTED;
 
 /**
  * Configuration for ozone.
@@ -63,6 +65,9 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_CONTAINER_COPY_WORKD
 public class OzoneConfiguration extends Configuration
     implements MutableConfigurationSource {
 
+  private final String complianceMode;
+  private final boolean checkCompliance;
+  private final Properties cryptoProperties;
   public static final SortedSet<String> TAGS = unmodifiableSortedSet(
       Arrays.stream(ConfigTag.values())
           .map(Enum::name)
@@ -106,6 +111,10 @@ public class OzoneConfiguration extends Configuration
   public OzoneConfiguration() {
     OzoneConfiguration.activate();
     loadDefaults();
+    complianceMode = getPropertyUnsafe(OzoneConfigKeys.OZONE_SECURITY_CRYPTO_COMPLIANCE_MODE,
+          OzoneConfigKeys.OZONE_SECURITY_CRYPTO_COMPLIANCE_MODE_UNRESTRICTED);
+    checkCompliance = !complianceMode.equals(OZONE_SECURITY_CRYPTO_COMPLIANCE_MODE_UNRESTRICTED);
+    cryptoProperties = getCryptoProperties();
   }
 
   public OzoneConfiguration(Configuration conf) {
@@ -116,6 +125,10 @@ public class OzoneConfiguration extends Configuration
       loadDefaults();
       addResource(conf);
     }
+    complianceMode = getPropertyUnsafe(OzoneConfigKeys.OZONE_SECURITY_CRYPTO_COMPLIANCE_MODE,
+        OzoneConfigKeys.OZONE_SECURITY_CRYPTO_COMPLIANCE_MODE_UNRESTRICTED);
+    checkCompliance = !complianceMode.equals(OZONE_SECURITY_CRYPTO_COMPLIANCE_MODE_UNRESTRICTED);
+    cryptoProperties = getCryptoProperties();
   }
 
   private void loadDefaults() {
@@ -406,5 +419,77 @@ public class OzoneConfiguration extends Configuration
       return defaultValue;
     }
     return Integer.parseInt(value);
+  }
+
+  private Properties delegatingProps;
+
+  @Override
+  public synchronized void reloadConfiguration() {
+    super.reloadConfiguration();
+    delegatingProps = null;
+  }
+
+  @Override
+  protected final synchronized Properties getProps() {
+    if (delegatingProps == null) {
+      delegatingProps = new DelegatingProperties(super.getProps(), complianceMode, cryptoProperties);
+    }
+    return delegatingProps;
+  }
+
+  /**
+   * Get a property value without the compliance check. It's needed to get the compliance
+   * mode and the whitelist parameter values in the checkCompliance method.
+   *
+   * @param key property name
+   * @param defaultValue default value
+   * @return property value, without compliance check
+   */
+  private String getPropertyUnsafe(String key, String defaultValue) {
+    return super.getProps().getProperty(key, defaultValue);
+  }
+
+  private Properties getCryptoProperties() {
+    try {
+      return super.getAllPropertiesByTag(ConfigTag.CRYPTO_COMPLIANCE.toString());
+    } catch (NoSuchMethodError e) {
+      return new Properties();
+    }
+  }
+
+  public String checkCompliance(String config, String value) {
+    // Don't check the ozone.security.crypto.compliance.mode config, even though it's tagged as a crypto config
+    if (checkCompliance && cryptoProperties.containsKey(config) &&
+        !config.equals(OzoneConfigKeys.OZONE_SECURITY_CRYPTO_COMPLIANCE_MODE)) {
+
+      String whitelistConfig = config + "." + complianceMode + ".whitelist";
+      String whitelistValue = getPropertyUnsafe(whitelistConfig, "");
+
+      if (whitelistValue != null) {
+        String[] whitelistOptions = whitelistValue.split(",");
+
+        if (!Arrays.asList(whitelistOptions).contains(value)) {
+          throw new ConfigurationException("Not allowed configuration value! Compliance mode is set to " +
+              complianceMode + " and " + config + " configuration's value is not allowed. Please check the " +
+              whitelistConfig + " configuration.");
+        }
+      }
+    }
+    return value;
+  }
+
+  @Override
+  public Iterator<Map.Entry<String, String>> iterator() {
+    Properties properties = getProps();
+    Map<String, String> result = new HashMap<>();
+    synchronized (properties) {
+      for (Map.Entry<Object, Object> item : properties.entrySet()) {
+        if (item.getKey() instanceof String && item.getValue() instanceof String) {
+          String value = checkCompliance((String) item.getKey(), (String) item.getValue());
+          result.put((String) item.getKey(), value);
+        }
+      }
+    }
+    return result.entrySet().iterator();
   }
 }
