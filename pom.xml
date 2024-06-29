@@ -291,7 +291,7 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
     <jgrapht.version>1.4.0</jgrapht.version>
 
     <spring.version>5.3.34</spring.version>
-    <jooq.version>3.11.10</jooq.version>
+    <jooq.version>3.12.4</jooq.version>
 
     <!-- Node.js version number (without the v prefix required by frontend-maven-plugin) -->
     <nodejs.version>16.14.2</nodejs.version>
