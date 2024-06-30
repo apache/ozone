@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone.container.common.transport.server.ratis;
 
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.annotation.InterfaceStability;
+import org.apache.hadoop.util.Time;
 import org.apache.ratis.server.protocol.TermIndex;
 
 import java.util.Map;
@@ -118,12 +119,15 @@ public final class DispatcherContext {
 
   private final Map<Long, Long> container2BCSIDMap;
 
+  private long startTime;
+
   private DispatcherContext(Builder b) {
     this.op = Objects.requireNonNull(b.op, "op == null");
     this.term = b.term;
     this.logIndex = b.logIndex;
     this.stage = b.stage;
     this.container2BCSIDMap = b.container2BCSIDMap;
+    this.startTime = Time.monotonicNowNanos();
   }
 
   /** Use {@link DispatcherContext#op(DispatcherContext)} for handling null. */
@@ -145,6 +149,10 @@ public final class DispatcherContext {
 
   public Map<Long, Long> getContainer2BCSIDMap() {
     return container2BCSIDMap;
+  }
+
+  public long getStartTime() {
+    return startTime;
   }
 
   @Override
