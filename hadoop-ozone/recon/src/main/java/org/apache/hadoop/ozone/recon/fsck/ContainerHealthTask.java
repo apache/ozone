@@ -340,6 +340,12 @@ public class ContainerHealthTask extends ReconScmTask {
       if (h.isMissing() && containerDeletedInSCM(container)) {
         return;
       }
+
+      if (h.getContainer().getState() == HddsProtos.LifeCycleState.DELETING) {
+        LOG.info("Container {} is in DELETING state.", h.getContainerID());
+        return;
+      }
+
       containerHealthSchemaManager.insertUnhealthyContainerRecords(
           ContainerHealthRecords.generateUnhealthyRecords(h, currentTime,
               unhealthyContainerStateStatsMap));
