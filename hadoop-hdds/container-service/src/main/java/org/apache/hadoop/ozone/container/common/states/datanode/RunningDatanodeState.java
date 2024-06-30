@@ -53,7 +53,7 @@ public class RunningDatanodeState implements DatanodeState {
   private final SCMConnectionManager connectionManager;
   private final ConfigurationSource conf;
   private final StateContext context;
-  private CompletionService<EndPointStates> ecs;
+  private ThreadLocal<CompletionService<EndPointStates>> ecs = new ThreadLocal<>();
   /** Cache the end point task per end point per end point state. */
   private Map<EndpointStateMachine, Map<EndPointStates,
       Callable<EndPointStates>>> endpointTasks;
@@ -138,7 +138,7 @@ public class RunningDatanodeState implements DatanodeState {
    */
   @Override
   public void execute(ExecutorService executor) {
-    ecs = new ExecutorCompletionService<>(executor);
+    ecs.set(new ExecutorCompletionService<>(executor));
     for (EndpointStateMachine endpoint : connectionManager.getValues()) {
       Callable<EndPointStates> endpointTask = getEndPointTask(endpoint);
       if (endpointTask != null) {
@@ -152,7 +152,7 @@ public class RunningDatanodeState implements DatanodeState {
         } else {
           heartbeatFrequency = context.getHeartbeatFrequency();
         }
-        ecs.submit(() -> endpoint.getExecutorService()
+        ecs.get().submit(() -> endpoint.getExecutorService()
             .submit(endpointTask)
             .get(heartbeatFrequency, TimeUnit.MILLISECONDS));
       } else {
@@ -168,7 +168,7 @@ public class RunningDatanodeState implements DatanodeState {
 
   @VisibleForTesting
   public void setExecutorCompletionService(ExecutorCompletionService e) {
-    this.ecs = e;
+    this.ecs.set(e);
   }
 
   private Callable<EndPointStates> getEndPointTask(
@@ -229,7 +229,7 @@ public class RunningDatanodeState implements DatanodeState {
 
     while (returned < count && timeLeft > 0) {
       Future<EndPointStates> result =
-          ecs.poll(timeLeft, TimeUnit.MILLISECONDS);
+          ecs.get().poll(timeLeft, TimeUnit.MILLISECONDS);
       if (result != null) {
         results.add(result);
         returned++;
