@@ -47,6 +47,7 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
 
+import org.apache.hadoop.util.DirectBufferPool;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -70,6 +71,7 @@ public class KeyValueContainerCheck {
   private String metadataPath;
   private HddsVolume volume;
   private KeyValueContainer container;
+  private DirectBufferPool bufferPool = new DirectBufferPool();
 
   public KeyValueContainerCheck(String metadataPath, ConfigurationSource conf,
       long containerID, HddsVolume volume, KeyValueContainer container) {
@@ -364,8 +366,11 @@ public class KeyValueContainerCheck {
         }
       } else if (chunk.getChecksumData().getType()
           != ContainerProtos.ChecksumType.NONE) {
-        ScanResult result = verifyChecksum(block, chunk, chunkFile, layout,
+        ByteBuffer buffer = bufferPool.getBuffer(chunk.getChecksumData().getBytesPerChecksum());
+        buffer.clear();
+        ScanResult result = verifyChecksum(block, chunk, chunkFile, layout, buffer,
             throttler, canceler);
+        bufferPool.returnBuffer(buffer);
         if (!result.isHealthy()) {
           return result;
         }
@@ -377,7 +382,7 @@ public class KeyValueContainerCheck {
 
   private static ScanResult verifyChecksum(BlockData block,
       ContainerProtos.ChunkInfo chunk, File chunkFile,
-      ContainerLayoutVersion layout,
+      ContainerLayoutVersion layout, ByteBuffer buffer,
       DataTransferThrottler throttler, Canceler canceler) {
     ChecksumData checksumData =
         ChecksumData.getFromProtoBuf(chunk.getChecksumData());
@@ -385,7 +390,6 @@ public class KeyValueContainerCheck {
     int bytesPerChecksum = checksumData.getBytesPerChecksum();
     Checksum cal = new Checksum(checksumData.getChecksumType(),
         bytesPerChecksum);
-    ByteBuffer buffer = ByteBuffer.allocateDirect(bytesPerChecksum);
     long bytesRead = 0;
     try (FileChannel channel = FileChannel.open(chunkFile.toPath(),
         ChunkUtils.READ_OPTIONS, ChunkUtils.NO_ATTRIBUTES)) {
