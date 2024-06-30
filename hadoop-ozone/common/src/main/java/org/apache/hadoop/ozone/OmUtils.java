@@ -810,6 +810,12 @@ public final class OmUtils {
       try {
         OMNodeDetails omNodeDetails = OMNodeDetails.getOMNodeDetailsFromConf(
             conf, omServiceId, nodeId);
+        if (omNodeDetails == null) {
+          LOG.error(
+              "There is no OM configuration for node ID {} in ozone-site.xml.",
+              nodeId);
+          continue;
+        }
         if (decommissionedNodeIds.contains(omNodeDetails.getNodeId())) {
           omNodeDetails.setDecommissioningState();
         }
