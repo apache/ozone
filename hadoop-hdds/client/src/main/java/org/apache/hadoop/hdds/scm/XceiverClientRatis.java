@@ -54,8 +54,10 @@ import org.apache.ratis.client.RaftClient;
 import org.apache.ratis.client.api.DataStreamApi;
 import org.apache.ratis.grpc.GrpcTlsConfig;
 import org.apache.ratis.proto.RaftProtos;
+import org.apache.ratis.proto.RaftProtos.CommitInfoProto;
 import org.apache.ratis.proto.RaftProtos.ReplicationLevel;
 import org.apache.ratis.protocol.exceptions.GroupMismatchException;
+import org.apache.ratis.protocol.exceptions.NotReplicatedException;
 import org.apache.ratis.protocol.exceptions.RaftException;
 import org.apache.ratis.protocol.RaftClientReply;
 import org.apache.ratis.retry.RetryPolicy;
@@ -288,27 +290,42 @@ public final class XceiverClientRatis extends XceiverClientSpi {
       if (t != null) {
         throw e;
       }
-      final RaftClientReply reply = getClient().async()
-          .watch(index, RaftProtos.ReplicationLevel.MAJORITY_COMMITTED)
-          .get();
-      final XceiverClientReply clientReply = newWatchReply(
-          index, ReplicationLevel.MAJORITY_COMMITTED, index);
-      reply.getCommitInfos().stream()
-          .filter(i -> i.getCommitIndex() < index)
-          .forEach(proto -> {
-            UUID address = RatisHelper.toDatanodeId(proto.getServer());
-            addDatanodetoReply(address, clientReply);
-            // since 3 way commit has failed, the updated map from now on  will
-            // only store entries for those datanodes which have had successful
-            // replication.
-            commitInfoMap.remove(address);
-            LOG.info(
-                "Could not commit index {} on pipeline {} to all the nodes. " +
-                "Server {} has failed. Committed by majority.",
-                index, pipeline, address);
-          });
-      return clientReply;
+      Throwable nre =
+          HddsClientUtils.containsException(e, NotReplicatedException.class);
+      Collection<CommitInfoProto> commitInfoProtoList;
+      if (nre instanceof NotReplicatedException) {
+        // If NotReplicatedException is thrown from the Datanode leader
+        // we can save one watch request round trip by using the CommitInfoProto
+        // in the NotReplicatedException
+        commitInfoProtoList = ((NotReplicatedException) nre).getCommitInfos();
+      } else {
+        final RaftClientReply reply = getClient().async()
+            .watch(index, RaftProtos.ReplicationLevel.MAJORITY_COMMITTED)
+            .get();
+        commitInfoProtoList = reply.getCommitInfos();
+      }
+      return handleFailedAllCommit(index, commitInfoProtoList);
     }
+  }
+
+  private XceiverClientReply handleFailedAllCommit(long index, Collection<CommitInfoProto> commitInfoProtoList) {
+    final XceiverClientReply clientReply = newWatchReply(
+        index, ReplicationLevel.MAJORITY_COMMITTED, index);
+    commitInfoProtoList.stream()
+        .filter(i -> i.getCommitIndex() < index)
+        .forEach(proto -> {
+          UUID address = RatisHelper.toDatanodeId(proto.getServer());
+          addDatanodetoReply(address, clientReply);
+          // since 3 way commit has failed, the updated map from now on  will
+          // only store entries for those datanodes which have had successful
+          // replication.
+          commitInfoMap.remove(address);
+          LOG.info(
+              "Could not commit index {} on pipeline {} to all the nodes. " +
+                  "Server {} has failed. Committed by majority.",
+              index, pipeline, address);
+        });
+    return clientReply;
   }
 
   /**
