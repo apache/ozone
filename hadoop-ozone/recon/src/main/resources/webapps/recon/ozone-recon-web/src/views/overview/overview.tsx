@@ -70,6 +70,7 @@ interface IOverviewState {
   deletePendingSummarytotalUnrepSize: number,
   deletePendingSummarytotalRepSize: number,
   deletePendingSummarytotalDeletedKeys: number,
+  decommissionInfoCount: number
   scmServiceId: string;
   omServiceId: string;
 }
@@ -108,7 +109,8 @@ export class Overview extends React.Component<Record<string, object>, IOverviewS
       openSummarytotalOpenKeys: 0,
       deletePendingSummarytotalUnrepSize: 0,
       deletePendingSummarytotalRepSize: 0,
-      deletePendingSummarytotalDeletedKeys: 0
+      deletePendingSummarytotalDeletedKeys: 0,
+      decommissionInfoCount: 0
     };
     this.autoReload = new AutoReloadHelper(this._loadData);
   }
@@ -128,18 +130,21 @@ export class Overview extends React.Component<Record<string, object>, IOverviewS
       '/api/v1/clusterState',
       '/api/v1/task/status',
       '/api/v1/keys/open/summary',
-      '/api/v1/keys/deletePending/summary'
+      '/api/v1/keys/deletePending/summary',
+      '/api/v1/datanodes/decommission/info'
     ], cancelOverviewSignal);
     cancelOverviewSignal = controller;
 
-    requests.then(axios.spread((clusterStateResponse, taskstatusResponse, openResponse, deletePendingResponse) => {
+    requests.then(axios.spread((clusterStateResponse, taskstatusResponse, openResponse, deletePendingResponse, decommissionResponse) => {
       
       const clusterState: IClusterStateResponse = clusterStateResponse.data;
       const taskStatus = taskstatusResponse.data;
       const missingContainersCount = clusterState.missingContainers;
       const omDBDeltaObject = taskStatus && taskStatus.find((item:any) => item.taskName === 'OmDeltaRequest');
       const omDBFullObject = taskStatus && taskStatus.find((item:any) => item.taskName === 'OmSnapshotRequest');
-
+      const decommissionInfoCount = decommissionResponse && decommissionResponse.data && 
+      decommissionResponse.data.DatanodesDecommissionInfo && decommissionResponse.data.DatanodesDecommissionInfo.length;
+      
       this.setState({
         loading: false,
         datanodes: `${clusterState.healthyDatanodes}/${clusterState.totalDatanodes}`,
@@ -161,6 +166,7 @@ export class Overview extends React.Component<Record<string, object>, IOverviewS
         deletePendingSummarytotalUnrepSize: deletePendingResponse.data && deletePendingResponse.data.totalUnreplicatedDataSize,
         deletePendingSummarytotalRepSize: deletePendingResponse.data && deletePendingResponse.data.totalReplicatedDataSize,
         deletePendingSummarytotalDeletedKeys: deletePendingResponse.data && deletePendingResponse.data.totalDeletedKeys,
+        decommissionInfoCount: decommissionInfoCount ? decommissionInfoCount : 0,
         scmServiceId: clusterState.scmServiceId,
         omServiceId: clusterState.omServiceId
       });
@@ -216,7 +222,7 @@ export class Overview extends React.Component<Record<string, object>, IOverviewS
     const {loading, datanodes, pipelines, storageReport, containers, volumes, buckets, openSummarytotalUnrepSize, openSummarytotalRepSize, openSummarytotalOpenKeys,
       deletePendingSummarytotalUnrepSize,deletePendingSummarytotalRepSize,deletePendingSummarytotalDeletedKeys,
       keys, missingContainersCount, lastRefreshed, lastUpdatedOMDBDelta, lastUpdatedOMDBFull,
-      omStatus, openContainers, deletedContainers, scmServiceId, omServiceId } = this.state;
+      omStatus, openContainers, deletedContainers, scmServiceId, omServiceId, decommissionInfoCount } = this.state;
       
     const datanodesElement = (
       <span>
@@ -303,6 +309,8 @@ export class Overview extends React.Component<Record<string, object>, IOverviewS
           <Col xs={24} sm={18} md={12} lg={12} xl={6}>
             <OverviewCard loading={loading} title='Deleted Containers' data={deletedContainers.toString()} icon='delete' />
           </Col>
+        </Row>
+        <Row gutter={[25, 25]}>
           <Col xs={24} sm={18} md={12} lg={12} xl={6} className='summary-font'>
             <OverviewCard loading={loading} title='Open Keys Summary' data={openSummaryData} icon='file-text' linkToUrl='/Om' />
           </Col>
@@ -319,6 +327,12 @@ export class Overview extends React.Component<Record<string, object>, IOverviewS
                 <OverviewCard title="OM Service" loading={loading} data={omServiceId} icon='file-text' linkToUrl='/Om' />
               </Col>
           }
+        </Row>
+        <Row gutter={[25, 25]}>
+          <Col xs={24} sm={18} md={12} lg={12} xl={6}>
+            <OverviewCard loading={loading} title='Decommissioning Datanodes Summary' data={decommissionInfoCount.toString()} icon='hourglass'
+              linkToUrl='/Datanodes' />
+          </Col>
         </Row>
       </div>
     );
