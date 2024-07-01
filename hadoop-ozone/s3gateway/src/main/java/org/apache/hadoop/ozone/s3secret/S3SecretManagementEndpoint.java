@@ -33,6 +33,7 @@ import javax.ws.rs.core.Response;
 import java.io.IOException;
 
 import static javax.ws.rs.core.Response.Status.BAD_REQUEST;
+import static javax.ws.rs.core.Response.Status.METHOD_NOT_ALLOWED;
 import static javax.ws.rs.core.Response.Status.NOT_FOUND;
 
 /**
@@ -53,7 +54,8 @@ public class S3SecretManagementEndpoint extends S3SecretEndpointBase {
   @Path("/{username}")
   public Response generate(@PathParam("username") String username)
       throws IOException {
-    return generateInternal(username);
+    // TODO: It is a temporary solution. To be removed after HDDS-11041 is done.
+    return Response.status(METHOD_NOT_ALLOWED).build();
   }
 
   private Response generateInternal(@Nullable String username) throws IOException {
@@ -93,7 +95,8 @@ public class S3SecretManagementEndpoint extends S3SecretEndpointBase {
   @Path("/{username}")
   public Response revoke(@PathParam("username") String username)
       throws IOException {
-    return revokeInternal(username);
+    // TODO: It is a temporary solution. To be removed after HDDS-11041 is done.
+    return Response.status(METHOD_NOT_ALLOWED).build();
   }
 
   private Response revokeInternal(@Nullable String username)
