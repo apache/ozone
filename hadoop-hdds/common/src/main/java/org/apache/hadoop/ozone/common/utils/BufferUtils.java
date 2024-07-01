@@ -52,12 +52,12 @@ public final class BufferUtils {
     long allocatedLen = 0;
     // For each ByteBuffer (except the last) allocate bufferLen of capacity
     for (int i = 0; i < numBuffers - 1; i++) {
-      dataBuffers[i] = ByteBuffer.allocateDirect(bufferCapacity);
+      dataBuffers[i] = ByteBuffer.allocate(bufferCapacity);
       allocatedLen += bufferCapacity;
     }
     // For the last ByteBuffer, allocate as much space as is needed to fit
     // remaining bytes
-    dataBuffers[numBuffers - 1] = ByteBuffer.allocateDirect(
+    dataBuffers[numBuffers - 1] = ByteBuffer.allocate(
         Math.toIntExact(totalLen - allocatedLen));
     return dataBuffers;
   }
