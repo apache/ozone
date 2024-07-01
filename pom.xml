@@ -102,6 +102,7 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
     <maven.test.redirectTestOutputToFile>true</maven.test.redirectTestOutputToFile>
     <jetty.version>9.4.54.v20240208</jetty.version>
     <java.dev.jna.version>5.2.0</java.dev.jna.version>
+    <jcip-annotations.version>1.0-1</jcip-annotations.version>
     <curator.version>4.2.0</curator.version>
 
     <!-- number of threads/forks to use when running tests in parallel, see parallel-tests profile -->
@@ -482,6 +483,11 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
         <groupId>com.github.luben</groupId>
         <artifactId>zstd-jni</artifactId>
         <version>${zstd-jni.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>com.github.stephenc.jcip</groupId>
+        <artifactId>jcip-annotations</artifactId>
+        <version>${jcip-annotations.version}</version>
       </dependency>
       <dependency>
         <groupId>javax.annotation</groupId>
