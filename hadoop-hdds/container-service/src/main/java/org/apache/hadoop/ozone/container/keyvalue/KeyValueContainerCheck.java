@@ -368,8 +368,6 @@ public class KeyValueContainerCheck {
           != ContainerProtos.ChecksumType.NONE) {
         int bytesPerChecksum = chunk.getChecksumData().getBytesPerChecksum();
         ByteBuffer buffer = bufferPool.getBuffer(bytesPerChecksum);
-        buffer.position(0);
-        buffer.limit(bytesPerChecksum);
         ScanResult result = verifyChecksum(block, chunk, chunkFile, layout, buffer,
             throttler, canceler);
         buffer.clear();
