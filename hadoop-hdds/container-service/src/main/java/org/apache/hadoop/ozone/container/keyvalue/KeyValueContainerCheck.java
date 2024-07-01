@@ -366,10 +366,13 @@ public class KeyValueContainerCheck {
         }
       } else if (chunk.getChecksumData().getType()
           != ContainerProtos.ChecksumType.NONE) {
-        ByteBuffer buffer = bufferPool.getBuffer(chunk.getChecksumData().getBytesPerChecksum());
-        buffer.clear();
+        int bytesPerChecksum = chunk.getChecksumData().getBytesPerChecksum();
+        ByteBuffer buffer = bufferPool.getBuffer(bytesPerChecksum);
+        buffer.position(0);
+        buffer.limit(bytesPerChecksum);
         ScanResult result = verifyChecksum(block, chunk, chunkFile, layout, buffer,
             throttler, canceler);
+        buffer.clear();
         bufferPool.returnBuffer(buffer);
         if (!result.isHealthy()) {
           return result;
