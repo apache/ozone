@@ -79,11 +79,6 @@ public class ContainerMapper {
     }
     OmMetadataManagerImpl metadataManager =
         new OmMetadataManagerImpl(configuration, null);
-    return getBlockIdDetailsUtils(metadataManager);
-  }
-
-  private static Map<Long, List<Map<Long, BlockIdDetails>>> getBlockIdDetailsUtils(
-      OmMetadataManagerImpl metadataManager) throws IOException {
     try {
       Table<String, OmKeyInfo> keyTable =
           metadataManager.getKeyTable(getBucketLayout());

@@ -343,12 +343,12 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
     //  change should go through Ratis - be it standalone (for non-HA) or
     //  replicated (for HA).
     isRatisEnabled = conf.getBoolean(
-            OMConfigKeys.OZONE_OM_RATIS_ENABLE_KEY,
-            OMConfigKeys.OZONE_OM_RATIS_ENABLE_DEFAULT);
+        OMConfigKeys.OZONE_OM_RATIS_ENABLE_KEY,
+        OMConfigKeys.OZONE_OM_RATIS_ENABLE_DEFAULT);
     this.omEpoch = OmUtils.getOMEpoch(isRatisEnabled);
     // For test purpose only
     ignorePipelineinKey = conf.getBoolean(
-  "ozone.om.ignore.pipeline", Boolean.TRUE);
+        "ozone.om.ignore.pipeline", Boolean.TRUE);
     start(conf);
   }
 
