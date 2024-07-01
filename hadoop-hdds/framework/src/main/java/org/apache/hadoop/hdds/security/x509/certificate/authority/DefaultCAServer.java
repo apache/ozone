@@ -520,7 +520,6 @@ public class DefaultCAServer implements CertificateServer {
     String externalPublicKeyLocation = conf.getExternalRootCaPublicKeyPath();
 
     KeyCodec keyCodec = new KeyCodec(config, componentName);
-    CertificateCodec certificateCodec = conf.getCertificateCodec();
     CertificateStorage certStorageWithExternalConf = new CertificateStorage(conf);
     try {
       Path extCertParent = extCertPath.getParent();
