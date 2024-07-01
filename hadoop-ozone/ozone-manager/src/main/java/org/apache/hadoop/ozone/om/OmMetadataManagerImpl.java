@@ -329,38 +329,29 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
    */
   public OmMetadataManagerImpl(OzoneConfiguration conf,
       OzoneManager ozoneManager) throws IOException {
-    init(conf, ozoneManager);
-    this.lock = new OzoneManagerLock(conf);
-    this.omEpoch = OmUtils.getOMEpoch(isRatisEnabled);
-    this.perfMetrics = null;
-    start(conf);
+    this(conf, ozoneManager, null);
   }
 
   public OmMetadataManagerImpl(OzoneConfiguration conf,
                                OzoneManager ozoneManager,
                                OMPerformanceMetrics perfMetrics)
       throws IOException {
-    init(conf, ozoneManager);
-    this.lock = new OzoneManagerLock(conf);
-    this.omEpoch = OmUtils.getOMEpoch(isRatisEnabled);
+    this.ozoneManager = ozoneManager;
     this.perfMetrics = perfMetrics;
+    this.lock = new OzoneManagerLock(conf);
+    // TODO: This is a temporary check. Once fully implemented, all OM state
+    //  change should go through Ratis - be it standalone (for non-HA) or
+    //  replicated (for HA).
+    isRatisEnabled = conf.getBoolean(
+            OMConfigKeys.OZONE_OM_RATIS_ENABLE_KEY,
+            OMConfigKeys.OZONE_OM_RATIS_ENABLE_DEFAULT);
+    this.omEpoch = OmUtils.getOMEpoch(isRatisEnabled);
     // For test purpose only
     ignorePipelineinKey = conf.getBoolean(
   "ozone.om.ignore.pipeline", Boolean.TRUE);
     start(conf);
   }
-  private void init(OzoneConfiguration conf, OzoneManager manager) {
-    this.ozoneManager = manager;
-    // TODO: This is a temporary check. Once fully implemented, all OM state
-  //  change should go through Ratis - be it standalone (for non-HA) or
-  //  replicated (for HA).
-    isRatisEnabled = conf.getBoolean(
-      OMConfigKeys.OZONE_OM_RATIS_ENABLE_KEY,
-      OMConfigKeys.OZONE_OM_RATIS_ENABLE_DEFAULT);
-  // For test purpose only
-    ignorePipelineinKey = conf.getBoolean(
-      "ozone.om.ignore.pipeline", Boolean.TRUE);
-  }
+
   /**
    * For subclass overriding.
    */
@@ -1293,9 +1284,9 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
         averagePagination = cacheKeyMap.size();
       }
       perfMetrics.setListKeysAveragePagination(averagePagination);
-      long opsPerNs =
-          averagePagination / (Time.monotonicNowNanos() - startNanos);
-      perfMetrics.setListKeysOpsPerNs(opsPerNs);
+      float opsPerSec =
+              averagePagination / ((Time.monotonicNowNanos() - startNanos) / 1000000000.0f);
+      perfMetrics.setListKeysOpsPerSec(opsPerSec);
       perfMetrics.addListKeysReadFromRocksDbLatencyNs(readFromRDbStopNs - readFromRDbStartNs);
     }
     // Finally DB entries and cache entries are merged, then return the count

@@ -260,8 +260,7 @@ public class TestCleanupTableInfo {
    * @throws IOException if I/O error occurs in setting up data store for the
    *                     metadata manager.
    */
-  private OmMetadataManagerImpl createOMMetadataManagerSpy()
-      throws IOException {
+  private OmMetadataManagerImpl createOMMetadataManagerSpy() throws IOException {
     OzoneConfiguration conf = new OzoneConfiguration();
     File newFolder = folder.toFile();
     if (!newFolder.exists()) {

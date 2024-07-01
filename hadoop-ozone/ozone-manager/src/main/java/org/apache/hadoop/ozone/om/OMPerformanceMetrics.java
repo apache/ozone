@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone.om;
 import org.apache.hadoop.metrics2.MetricsSystem;
 import org.apache.hadoop.metrics2.annotation.Metric;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
+import org.apache.hadoop.metrics2.lib.MutableGaugeFloat;
 import org.apache.hadoop.metrics2.lib.MutableRate;
 
 /**
@@ -117,7 +118,7 @@ public class OMPerformanceMetrics {
   private MutableRate listKeysAveragePagination;
 
   @Metric(about = "ops per second for listKeys")
-  private MutableRate listKeysOpsPerSec;
+  private MutableGaugeFloat listKeysOpsPerSec;
 
   @Metric(about = "ACLs check latency in listKeys")
   private MutableRate listKeysAclCheckLatencyNs;
@@ -229,8 +230,8 @@ public class OMPerformanceMetrics {
     listKeysAveragePagination.add(averagePagination);
   }
 
-  public void setListKeysOpsPerNs(long opsPerNs) {
-    listKeysOpsPerSec.add(opsPerNs);
+  public void setListKeysOpsPerSec(float opsPerSec) {
+    listKeysOpsPerSec.set(opsPerSec);
   }
   
   MutableRate getListKeysAclCheckLatencyNs() {
