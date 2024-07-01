@@ -144,7 +144,7 @@ public abstract class BackgroundService {
           } catch (Throwable e) {
             LOG.error("Background task execution failed", e);
             if (e instanceof Error) {
-              return;
+              throw e;
             }
           } finally {
             long endTime = System.nanoTime();
