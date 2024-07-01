@@ -99,9 +99,15 @@ fi
 
 CONF_DESTINATION_DIR="${OZONE_CONF_DIR:-/opt/hadoop/etc/hadoop}"
 
+# If custom define config at local, you can set the CUSTOMIZED_CONFIG_DIR
+# eg: CUSTOMIZED_CONFIG_DIR=$DIR/../etc/hadoop, this is an environment variable.
+
 #Try to copy the defaults
 set +e
-if [[ -d "/opt/ozone/etc/hadoop" ]]; then
+if [[ -d "$CUSTOMIZED_CONFIG_DIR" ]]; then
+   CONF_DESTINATION_DIR=$CUSTOMIZED_CONFIG_DIR
+   OZONE_CONF_DIR=$CUSTOMIZED_CONFIG_DIR
+elif [[ -d "/opt/ozone/etc/hadoop" ]]; then
    cp /opt/ozone/etc/hadoop/* "$CONF_DESTINATION_DIR/" > /dev/null 2>&1
 elif [[ -d "/opt/hadoop/etc/hadoop" ]]; then
    cp /opt/hadoop/etc/hadoop/* "$CONF_DESTINATION_DIR/" > /dev/null 2>&1
