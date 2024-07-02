@@ -25,7 +25,7 @@ import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.security.SecurityConfig;
 import org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateCodec;
 import org.apache.hadoop.hdds.security.x509.keys.HDDSKeyGenerator;
-import org.apache.hadoop.hdds.security.x509.keys.KeyCodec;
+import org.apache.hadoop.hdds.security.x509.keys.KeyStorage;
 import org.apache.hadoop.ozone.OzoneSecurityUtil;
 import org.apache.hadoop.security.ssl.KeyStoreTestUtil;
 import org.junit.jupiter.api.AfterEach;
@@ -64,7 +64,7 @@ public class TestDnCertificateClientInit {
   @TempDir
   private Path metaDirPath;
   private SecurityConfig securityConfig;
-  private KeyCodec dnKeyCodec;
+  private KeyStorage dnKeyStorage;
   private X509Certificate x509Certificate;
   private static final String DN_COMPONENT = DNCertificateClient.COMPONENT_NAME;
 
@@ -94,7 +94,7 @@ public class TestDnCertificateClientInit {
     dnCertificateClient =
         new DNCertificateClient(
             securityConfig, null, dn, certSerialId, null, null);
-    dnKeyCodec = new KeyCodec(securityConfig, DN_COMPONENT);
+    dnKeyStorage = new KeyStorage(securityConfig, DN_COMPONENT);
 
     Files.createDirectories(securityConfig.getKeyLocation(DN_COMPONENT));
   }
@@ -111,7 +111,7 @@ public class TestDnCertificateClientInit {
   public void testInitDatanode(boolean pvtKeyPresent, boolean pubKeyPresent,
       boolean certPresent, InitResponse expectedResult) throws Exception {
     if (pvtKeyPresent) {
-      dnKeyCodec.writePrivateKey(keyPair.getPrivate());
+      dnKeyStorage.storePrivateKey(keyPair.getPrivate());
     } else {
       FileUtils.deleteQuietly(Paths.get(
           securityConfig.getKeyLocation(DN_COMPONENT).toString(),
@@ -120,7 +120,7 @@ public class TestDnCertificateClientInit {
 
     if (pubKeyPresent) {
       if (dnCertificateClient.getPublicKey() == null) {
-        dnKeyCodec.writePublicKey(keyPair.getPublic());
+        dnKeyStorage.storePublicKey(keyPair.getPublic());
       }
     } else {
       FileUtils.deleteQuietly(
