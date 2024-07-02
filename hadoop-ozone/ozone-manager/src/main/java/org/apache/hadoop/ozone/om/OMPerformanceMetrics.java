@@ -119,6 +119,12 @@ public class OMPerformanceMetrics {
   @Metric(about = "resolveBucketLink latency in listKeys")
   private MutableRate listKeysResolveBucketLatencyNs;
 
+  @Metric(about = "resolveBucketLink latency in getObjectTagging")
+  private MutableRate getObjectTaggingResolveBucketLatencyNs;
+
+  @Metric(about = "ACLs check in getObjectTagging")
+  private MutableRate getObjectTaggingAclCheckLatencyNs;
+
   public void addLookupLatency(long latencyInNs) {
     lookupLatencyNs.add(latencyInNs);
   }
@@ -222,5 +228,17 @@ public class OMPerformanceMetrics {
 
   MutableRate getListKeysResolveBucketLatencyNs() {
     return listKeysResolveBucketLatencyNs;
+  }
+
+  public MutableRate getGetObjectTaggingResolveBucketLatencyNs() {
+    return getObjectTaggingResolveBucketLatencyNs;
+  }
+
+  public MutableRate getGetObjectTaggingAclCheckLatencyNs() {
+    return getObjectTaggingAclCheckLatencyNs;
+  }
+
+  public void addGetObjectTaggingLatencyNs(long latencyInNs) {
+    getObjectTaggingAclCheckLatencyNs.add(latencyInNs);
   }
 }
