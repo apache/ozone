@@ -101,6 +101,7 @@ public class StateContext {
   private final Map<Long, CommandStatus> cmdStatusMap;
   private final Lock lock;
   private final DatanodeStateMachine parentDatanodeStateMachine;
+  private RunningDatanodeState runningDatanodeState;
   private final AtomicLong stateExecutionCount;
   private final ConfigurationSource conf;
   private final Set<InetSocketAddress> endpoints;
@@ -612,9 +613,13 @@ public class StateContext {
           parentDatanodeStateMachine.getConnectionManager(),
           this);
     case RUNNING:
-      return new RunningDatanodeState(this.conf,
-          parentDatanodeStateMachine.getConnectionManager(),
-          this);
+      if (runningDatanodeState == null) {
+        synchronized (this) {
+          runningDatanodeState = new RunningDatanodeState(this.conf,
+              parentDatanodeStateMachine.getConnectionManager(), this);
+        }
+      }
+      return runningDatanodeState;
     case SHUTDOWN:
       return null;
     default:
