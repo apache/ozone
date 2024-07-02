@@ -385,9 +385,10 @@ public final class HAUtils {
     long waitDuration =
         configuration.getTimeDuration(OZONE_SCM_CA_LIST_RETRY_INTERVAL,
             OZONE_SCM_CA_LIST_RETRY_INTERVAL_DEFAULT, TimeUnit.SECONDS);
+    CertificateCodec certificateCodec = new CertificateCodec();
     if (certClient != null) {
       if (!SCMHAUtils.isSCMHAEnabled(configuration)) {
-        return generateCAList(certClient);
+        return generateCAList(certClient, certificateCodec);
       } else {
         Collection<String> scmNodes = SCMHAUtils.getSCMNodeIds(configuration);
         int expectedCount = scmNodes.size() + 1;
@@ -403,7 +404,7 @@ public final class HAUtils {
                   waitForCACerts(certClient::updateCAList, expectedCount),
               waitDuration);
         } else {
-          return generateCAList(certClient);
+          return generateCAList(certClient, certificateCodec);
         }
       }
     } else {
@@ -434,14 +435,14 @@ public final class HAUtils {
     }
   }
 
-  private static List<String> generateCAList(CertificateClient certClient)
+  private static List<String> generateCAList(CertificateClient certClient, CertificateCodec certificateCodec)
       throws IOException {
     List<String> caCertPemList = new ArrayList<>();
     for (X509Certificate cert : certClient.getAllRootCaCerts()) {
-      caCertPemList.add(CertificateCodec.getPEMEncodedString(cert));
+      caCertPemList.add(certificateCodec.getPEMEncodedString(cert));
     }
     for (X509Certificate cert : certClient.getAllCaCerts()) {
-      caCertPemList.add(CertificateCodec.getPEMEncodedString(cert));
+      caCertPemList.add(certificateCodec.getPEMEncodedString(cert));
     }
     return caCertPemList;
   }

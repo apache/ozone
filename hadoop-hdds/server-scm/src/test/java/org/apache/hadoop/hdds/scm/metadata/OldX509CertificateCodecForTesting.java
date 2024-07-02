@@ -24,8 +24,8 @@ import org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateCodec;
 import org.apache.hadoop.hdds.utils.db.Codec;
 
 import java.io.IOException;
+import java.io.StringWriter;
 import java.nio.charset.StandardCharsets;
-import java.security.cert.CertificateException;
 import java.security.cert.X509Certificate;
 
 /**
@@ -36,6 +36,8 @@ public final class OldX509CertificateCodecForTesting
 
   private static final Codec<X509Certificate> INSTANCE =
       new OldX509CertificateCodecForTesting();
+
+  private static final CertificateCodec CERTIFICATE_CODEC = new CertificateCodec();
 
   public static Codec<X509Certificate> get() {
     return INSTANCE;
@@ -48,7 +50,7 @@ public final class OldX509CertificateCodecForTesting
   @Override
   public byte[] toPersistedFormat(X509Certificate object) throws IOException {
     try {
-      return CertificateCodec.getPEMEncodedString(object)
+      return CERTIFICATE_CODEC.writePEMEncoded(object, new StringWriter()).toString()
           .getBytes(StandardCharsets.UTF_8);
     } catch (SCMSecurityException exp) {
       throw new IOException(exp);
@@ -56,14 +58,9 @@ public final class OldX509CertificateCodecForTesting
   }
 
   @Override
-  public X509Certificate fromPersistedFormat(byte[] rawData)
-      throws IOException {
-    try {
-      String s = new String(rawData, StandardCharsets.UTF_8);
-      return CertificateCodec.getX509Certificate(s);
-    } catch (CertificateException exp) {
-      throw new IOException(exp);
-    }
+  public X509Certificate fromPersistedFormat(byte[] rawData) throws IOException {
+    String s = new String(rawData, StandardCharsets.UTF_8);
+    return CERTIFICATE_CODEC.getX509Certificate(s);
   }
 
   @Override

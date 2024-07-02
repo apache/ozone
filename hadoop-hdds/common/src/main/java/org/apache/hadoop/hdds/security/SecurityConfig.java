@@ -32,6 +32,7 @@ import org.apache.hadoop.hdds.conf.ConfigurationSource;
 
 import com.google.common.base.Preconditions;
 import org.apache.hadoop.hdds.HddsConfigKeys;
+import org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateCodec;
 import org.apache.ratis.thirdparty.io.netty.handler.ssl.SslProvider;
 import org.bouncycastle.jce.provider.BouncyCastleProvider;
 import org.slf4j.Logger;
@@ -137,6 +138,7 @@ public class SecurityConfig {
   private final Duration rootCaCertificatePollingInterval;
   private final boolean autoCARotationEnabled;
   private final Duration expiredCertificateCheckInterval;
+  private final CertificateCodec certificateCodec;
 
   /**
    * Constructs a SecurityConfig.
@@ -263,6 +265,7 @@ public class SecurityConfig {
     this.grpcSSLProvider = SslProvider.valueOf(
         configuration.get(HDDS_GRPC_TLS_PROVIDER,
             HDDS_GRPC_TLS_PROVIDER_DEFAULT));
+    this.certificateCodec = new CertificateCodec();
   }
 
   public static synchronized void initSecurityProvider(ConfigurationSource configuration) {
@@ -396,6 +399,11 @@ public class SecurityConfig {
    */
   public String getCertificateFileName() {
     return certificateFileName;
+  }
+
+  public Path getCertFilePath(String componentName) {
+    String certDir = getCertificateLocation(componentName).toAbsolutePath().toString();
+    return Paths.get(certDir, getCertificateFileName());
   }
 
   /**
@@ -598,5 +606,9 @@ public class SecurityConfig {
 
   public boolean isTokenEnabled() {
     return blockTokenEnabled || containerTokenEnabled;
+  }
+
+  public CertificateCodec getCertificateCodec() {
+    return certificateCodec;
   }
 }
