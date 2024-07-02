@@ -19,6 +19,7 @@
 package org.apache.hadoop.hdds.protocol;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.EnumSet;
 import java.util.List;
 import java.util.Set;
@@ -442,11 +443,15 @@ public class DatanodeDetails extends NodeImpl implements
   }
 
   public HddsProtos.DatanodeDetailsProto toProto(int clientVersion) {
-    return toProtoBuilder(clientVersion).build();
+    return toProtoBuilder(clientVersion, Collections.emptySet()).build();
+  }
+
+  public HddsProtos.DatanodeDetailsProto toProto(int clientVersion, Set<Port.Name> requiredPorts) {
+    return toProtoBuilder(clientVersion, requiredPorts).build();
   }
 
   public HddsProtos.DatanodeDetailsProto.Builder toProtoBuilder(
-      int clientVersion) {
+      int clientVersion, Set<Port.Name> requiredPorts) {
 
     HddsProtos.UUID uuid128 = HddsProtos.UUID.newBuilder()
         .setMostSigBits(uuid.getMostSignificantBits())
@@ -486,13 +491,18 @@ public class DatanodeDetails extends NodeImpl implements
         ClientVersion.fromProtoValue(clientVersion)
         .compareTo(VERSION_HANDLES_UNKNOWN_DN_PORTS) >= 0;
     for (Port port : ports) {
-      if (handlesUnknownPorts || Name.V0_PORTS.contains(port.getName())) {
-        builder.addPorts(port.toProto());
-      } else {
-        if (LOG.isDebugEnabled()) {
-          LOG.debug("Skip adding {} port {} to proto message for client v{}",
-              port.getName(), port.getValue(), clientVersion);
+      if (requiredPorts.isEmpty() || requiredPorts.contains(port.name)) {
+        if (handlesUnknownPorts || Name.V0_PORTS.contains(port.getName())) {
+          builder.addPorts(port.toProto());
+        } else {
+          if (LOG.isDebugEnabled()) {
+            LOG.debug("Skip adding {} port {} to proto message for client v{}",
+                port.getName(), port.getValue(), clientVersion);
+          }
         }
+      }
+      if (!requiredPorts.isEmpty() && builder.getPortsCount() == requiredPorts.size()) {
+        break;
       }
     }
 
@@ -899,6 +909,9 @@ public class DatanodeDetails extends NodeImpl implements
           Name.values());
       public static final Set<Name> V0_PORTS = ImmutableSet.copyOf(
           EnumSet.of(STANDALONE, RATIS, REST));
+
+      public static final Set<Name> IO_PORTS = ImmutableSet.copyOf(
+          EnumSet.of(STANDALONE, RATIS, RATIS_DATASTREAM));
     }
 
     private final Name name;
@@ -1066,7 +1079,7 @@ public class DatanodeDetails extends NodeImpl implements
   public HddsProtos.NetworkNode toProtobuf(
       int clientVersion) {
     return HddsProtos.NetworkNode.newBuilder()
-        .setDatanodeDetails(toProtoBuilder(clientVersion).build())
+        .setDatanodeDetails(toProtoBuilder(clientVersion, Collections.emptySet()).build())
         .build();
   }
 }
