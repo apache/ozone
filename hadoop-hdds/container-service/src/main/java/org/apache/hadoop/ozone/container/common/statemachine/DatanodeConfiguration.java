@@ -203,6 +203,21 @@ public class DatanodeConfiguration extends ReconfigurableConfig {
       BLOCK_DELETE_COMMAND_WORKER_INTERVAL_DEFAULT;
 
   /**
+   * The maximum count of recent transactions cached in memory. This cache
+   * prevents duplicate transactions from being written to the database.
+   * By default, the value is set to the same as
+   * {@link org.apache.hadoop.hdds.scm.ScmConfig#blockDeletionLimit}.
+   */
+  @Config(key = "max.cached.recent.committed.transactions.count",
+      type = ConfigType.INT,
+      defaultValue = "5000",
+      tags = {DATANODE},
+      description = "The maximum count of recently committed transaction" +
+          " IDs that can be cached in memory."
+  )
+  private int maxCachedRecentCommittedTransactionsCount = 5000;
+
+  /**
    * The maximum number of commands in queued list.
    * if the commands limit crosses limit, then command will be ignored.
    */
@@ -805,6 +820,14 @@ public class DatanodeConfiguration extends ReconfigurableConfig {
   public void setBlockDeleteCommandWorkerInterval(
       Duration blockDeleteCommandWorkerInterval) {
     this.blockDeleteCommandWorkerInterval = blockDeleteCommandWorkerInterval;
+  }
+
+  public int getMaxCachedRecentCommittedTransactionsCount() {
+    return maxCachedRecentCommittedTransactionsCount;
+  }
+
+  public void setMaxCachedRecentCommittedTransactionsCount(int count) {
+    maxCachedRecentCommittedTransactionsCount = count;
   }
 
   public int getCommandQueueLimit() {

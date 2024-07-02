@@ -44,6 +44,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.api.io.TempDir;
+import org.mockito.ArgumentCaptor;
 import org.mockito.invocation.InvocationOnMock;
 import org.mockito.stubbing.Answer;
 import org.apache.hadoop.hdds.protocol.proto
@@ -89,7 +90,7 @@ import static org.mockito.Mockito.when;
 public class TestDeleteBlocksCommandHandler {
   @TempDir
   private Path folder;
-  private OzoneConfiguration conf;
+  private OzoneConfiguration conf = new OzoneConfiguration();
   private ContainerLayoutVersion layout;
   private OzoneContainer ozoneContainer;
   private ContainerSet containerSet;
@@ -100,15 +101,18 @@ public class TestDeleteBlocksCommandHandler {
 
   private void prepareTest(ContainerTestVersionInfo versionInfo)
       throws Exception {
-    this.layout = versionInfo.getLayout();
-    this.schemaVersion = versionInfo.getSchemaVersion();
-    conf = new OzoneConfiguration();
-    ContainerTestVersionInfo.setTestSchemaVersion(schemaVersion, conf);
-    setup();
+    prepareTest(versionInfo, conf.getObject(DatanodeConfiguration.class));
   }
 
-  private void setup() throws Exception {
-    conf = new OzoneConfiguration();
+  private void prepareTest(ContainerTestVersionInfo versionInfo, DatanodeConfiguration dnConf)
+      throws Exception {
+    this.layout = versionInfo.getLayout();
+    this.schemaVersion = versionInfo.getSchemaVersion();
+    ContainerTestVersionInfo.setTestSchemaVersion(schemaVersion, conf);
+    setup(dnConf);
+  }
+
+  private void setup(DatanodeConfiguration dnConf) throws Exception {
     layout = ContainerLayoutVersion.FILE_PER_BLOCK;
     ozoneContainer = mock(OzoneContainer.class);
     containerSet = new ContainerSet(1000);
@@ -128,9 +132,6 @@ public class TestDeleteBlocksCommandHandler {
       containerSet.addContainer(container);
     }
     when(ozoneContainer.getContainerSet()).thenReturn(containerSet);
-    DatanodeConfiguration dnConf =
-        conf.getObject(DatanodeConfiguration.class);
-
     handler = spy(new DeleteBlocksCommandHandler(
         ozoneContainer, conf, dnConf, ""));
     blockDeleteMetrics = handler.getBlockDeleteMetrics();
@@ -145,7 +146,9 @@ public class TestDeleteBlocksCommandHandler {
 
   @AfterEach
   public void tearDown() {
-    handler.stop();
+    if (handler != null) {
+      handler.stop();
+    }
     BlockDeletingServiceMetrics.unRegister();
   }
 
@@ -336,7 +339,11 @@ public class TestDeleteBlocksCommandHandler {
   @ContainerTestVersionInfo.ContainerTest
   public void testDuplicateDeleteBlocksCommand(
       ContainerTestVersionInfo versionInfo) throws Exception {
-    prepareTest(versionInfo);
+    OzoneConfiguration configuration = new OzoneConfiguration();
+    DatanodeConfiguration dnConf =
+        configuration.getObject(DatanodeConfiguration.class);
+    dnConf.setMaxCachedRecentCommittedTransactionsCount(0);
+    prepareTest(versionInfo, dnConf);
     assertThat(containerSet.containerCount()).isGreaterThan(0);
     Container<?> container = containerSet.getContainerIterator(volume1).next();
     DeletedBlocksTransaction transaction = createDeletedBlocksTransaction(100,
@@ -370,6 +377,79 @@ public class TestDeleteBlocksCommandHandler {
     // Duplicate cmd content will not be persisted.
     assertEquals(2,
         ((KeyValueContainerData) container.getContainerData()).getNumPendingDeletionBlocks());
+  }
+
+
+  @ContainerTestVersionInfo.ContainerTest
+  public void testDuplicateDeleteBlocksTxsBeFiltered(
+      ContainerTestVersionInfo versionInfo) throws Exception {
+    OzoneConfiguration configuration = new OzoneConfiguration();
+    DatanodeConfiguration dnConf =
+        configuration.getObject(DatanodeConfiguration.class);
+    dnConf.setMaxCachedRecentCommittedTransactionsCount(10);
+    prepareTest(versionInfo, dnConf);
+    assertThat(containerSet.containerCount()).isGreaterThan(0);
+    Container<?> container = containerSet.getContainerIterator(volume1).next();
+    String schemaVersionOrDefault = ((KeyValueContainerData)
+        container.getContainerData()).getSupportedSchemaVersionOrDefault();
+    DeletedBlocksTransaction transaction1 = createDeletedBlocksTransaction(100,
+        container.getContainerData().getContainerID());
+    DeletedBlocksTransaction transaction2 = createDeletedBlocksTransaction(101,
+        container.getContainerData().getContainerID());
+    // A duplicate Transaction with first Transaction (TxId 100)
+    DeletedBlocksTransaction transaction1Again = createDeletedBlocksTransaction(100,
+        container.getContainerData().getContainerID());
+
+    List<DeleteBlockTransactionResult> results1 =
+        handler.executeCmdWithRetry(Arrays.asList(transaction1));
+    List<DeleteBlockTransactionResult> results2 =
+        handler.executeCmdWithRetry(Arrays.asList(transaction2));
+    // Handle a duplicate Transaction with first Transaction (TxId 100)
+    List<DeleteBlockTransactionResult> results3 =
+        handler.executeCmdWithRetry(Arrays.asList(transaction1Again));
+
+    // Only 2 Transactions will be handled because the transaction1Again is same with transaction1
+    // transaction1Again will be filtered.
+    verify(handler.getSchemaHandlers().get(schemaVersionOrDefault),
+        times(2)).handle(any(), any());
+    // All the Transactions were successful
+    assertEquals(1, results1.size());
+    assertTrue(results1.get(0).getSuccess());
+    assertEquals(1, results1.size());
+    assertTrue(results2.get(0).getSuccess());
+    assertEquals(1, results3.size());
+    assertTrue(results3.get(0).getSuccess());
+
+    // Check the parameter which passed to method submitTasks()
+    ArgumentCaptor<List<DeletedBlocksTransaction>> argumentCaptor = ArgumentCaptor.forClass(List.class);
+    verify(handler, times(3)).submitTasks(argumentCaptor.capture());
+    List<List<DeletedBlocksTransaction>> capturedArguments = argumentCaptor.getAllValues();
+    assertEquals(3, capturedArguments.size());
+    assertEquals(1, capturedArguments.get(0).size());
+    assertEquals(1, capturedArguments.get(1).size());
+    // Duplicate transactions will not be submitted
+    assertEquals(0, capturedArguments.get(2).size());
+  }
+
+  @Test
+  public void testCommittedTransactionCache() {
+    int maxCacheSize = 10;
+    DeleteBlocksCommandHandler.CommittedTransactionCache cache =
+        new DeleteBlocksCommandHandler.CommittedTransactionCache(maxCacheSize);
+    for (long i = 1; i <= 15; i++) {
+      cache.adds(Arrays.asList(i));
+    }
+
+    // Check cache size does not exceed maxCacheSize
+    assertEquals(maxCacheSize, cache.getCacheSize());
+    // Check the oldest transactions are evicted
+    for (long i = 1; i <= 5; i++) {
+      assertFalse(cache.contains(i));
+    }
+    // Check the newest transactions are still in the cache
+    for (long i = 6; i <= 15; i++) {
+      assertTrue(cache.contains(i));
+    }
   }
 
   private DeletedBlocksTransaction createDeletedBlocksTransaction(long txID,
