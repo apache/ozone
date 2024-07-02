@@ -191,7 +191,7 @@ Create file with user defined metadata with gdpr enabled value in request
 
 Create file with user defined metadata size larger than 2 KB
                                 Execute                    echo "Randomtext" > /tmp/testfile2
-    ${custom_metadata_value} =  Execute                    printf 'v%.0s' {1..3000}
+    ${custom_metadata_value} =  Generate Random String    3000
     ${result} =                 Execute AWSS3APICli and checkrc       put-object --bucket ${BUCKET} --key ${PREFIX}/putobject/custom-metadata/key2 --body /tmp/testfile2 --metadata="custom-key1=${custom_metadata_value}"    255
                                 Should contain                        ${result}   MetadataTooLarge
                                 Should not contain                    ${result}   custom-key1: ${custom_metadata_value}
@@ -199,10 +199,10 @@ Create file with user defined metadata size larger than 2 KB
 Create files invalid tags
     ${result} =                 Execute AWSS3APICli and checkrc       put-object --bucket ${BUCKET} --key ${PREFIX}/putobject/custom-metadata/key2 --body /tmp/testfile2 --tagging="tag-key1=tag-value1&tag-key1=tag-value2"    255
                                 Should contain                        ${result}   InvalidTag
-    ${long_tag_key} =           Execute                               printf 'v%.0s' {1..129}
+    ${long_tag_key} =           Generate Random String    129
     ${result} =                 Execute AWSS3APICli and checkrc       put-object --bucket ${BUCKET} --key ${PREFIX}/putobject/custom-metadata/key2 --body /tmp/testfile2 --tagging="${long_tag_key}=tag-value1"    255
                                 Should contain                        ${result}   InvalidTag
-    ${long_tag_value} =         Execute                               printf 'v%.0s' {1..257}
+    ${long_tag_value} =         Generate Random String    257
     ${result} =                 Execute AWSS3APICli and checkrc       put-object --bucket ${BUCKET} --key ${PREFIX}/putobject/custom-metadata/key2 --body /tmp/testfile2 --tagging="tag-key1=${long_tag_value}"    255
                                 Should contain                        ${result}   InvalidTag
 
