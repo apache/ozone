@@ -38,7 +38,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import picocli.CommandLine.Command;
 
-import static org.apache.hadoop.hdds.StringUtils.startupShutdownMessage;
 import static org.apache.hadoop.hdds.ratis.RatisHelper.newJvmPauseMonitor;
 import static org.apache.hadoop.hdds.server.http.HttpServer2.setHttpBaseDir;
 import static org.apache.hadoop.ozone.conf.OzoneServiceConfig.DEFAULT_SHUTDOWN_HOOK_PRIORITY;
@@ -95,7 +94,7 @@ public class Gateway extends GenericCli {
   public void start() throws IOException {
     String[] originalArgs = getCmd().getParseResult().originalArgs()
         .toArray(new String[0]);
-    startupShutdownMessage(OzoneVersionInfo.OZONE_VERSION_INFO,
+    HddsServerUtil.startupShutdownMessage(OzoneVersionInfo.OZONE_VERSION_INFO,
         Gateway.class, originalArgs, LOG, ozoneConfiguration);
 
     LOG.info("Starting Ozone S3 gateway");

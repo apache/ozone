@@ -18,9 +18,17 @@
 
 package org.apache.hadoop.hdds.utils;
 
+import jnr.constants.platform.Signal;
+import jnr.posix.POSIX;
+import jnr.posix.POSIXFactory;
+import jnr.posix.SignalHandler;
+import jnr.posix.util.DefaultPOSIXHandler;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.annotation.InterfaceStability;
 import org.slf4j.Logger;
+
+import java.util.EnumSet;
+import java.util.Set;
 
 /**
  * This class logs a message whenever we're about to exit on a UNIX signal.
@@ -34,20 +42,18 @@ public enum SignalLogger {
 
   INSTANCE;
 
-  private static final String[] SIGNALS = new String[] {"TERM", "HUP", "INT"};
+  private static final Set<Signal> SIGNALS = EnumSet.of(Signal.SIGHUP, Signal.SIGINT, Signal.SIGTERM);
 
   private boolean registered = false;
 
   /**
    * Our signal handler.
    */
-  private static class Handler implements sun.misc.SignalHandler {
+  private static class Handler implements SignalHandler {
     private final Logger log;
-    private final sun.misc.SignalHandler prevHandler;
 
-    Handler(String name, Logger log) {
+    Handler(Logger log) {
       this.log = log;
-      prevHandler = sun.misc.Signal.handle(new sun.misc.Signal(name), this);
     }
 
     /**
@@ -56,10 +62,8 @@ public enum SignalLogger {
      * @param signal The incoming signal
      */
     @Override
-    public void handle(sun.misc.Signal signal) {
-      log.error("RECEIVED SIGNAL {}: SIG{}",
-          signal.getNumber(), signal.getName());
-      prevHandler.handle(signal);
+    public void handle(int signal) {
+      log.error("RECEIVED SIGNAL {}: {}", signal, Signal.valueOf(signal));
     }
   }
 
@@ -76,10 +80,12 @@ public enum SignalLogger {
     StringBuilder bld = new StringBuilder();
     bld.append("registered UNIX signal handlers for [");
     String separator = "";
-    for (String signalName : SIGNALS) {
+    final POSIX posix = POSIXFactory.getPOSIX(new DefaultPOSIXHandler(), true);
+    final Handler handler = new Handler(log);
+    for (Signal signal : SIGNALS) {
       try {
-        new Handler(signalName, log);
-        bld.append(separator).append(signalName);
+        posix.signal(signal, handler);
+        bld.append(separator).append(signal.name());
         separator = ", ";
       } catch (Exception e) {
         log.debug("", e);

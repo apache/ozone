@@ -3,6 +3,11 @@ share/ozone/lib/annotations.jar
 share/ozone/lib/annotations.jar
 share/ozone/lib/aopalliance.jar
 share/ozone/lib/aopalliance-repackaged.jar
+share/ozone/lib/asm-analysis.jar
+share/ozone/lib/asm-commons.jar
+share/ozone/lib/asm.jar
+share/ozone/lib/asm-tree.jar
+share/ozone/lib/asm-util.jar
 share/ozone/lib/aspectjrt.jar
 share/ozone/lib/aspectjweaver.jar
 share/ozone/lib/aws-java-sdk-core.jar
@@ -141,6 +146,8 @@ share/ozone/lib/jetty-util-ajax.jar
 share/ozone/lib/jetty-util.jar
 share/ozone/lib/jetty-webapp.jar
 share/ozone/lib/jetty-xml.jar
+share/ozone/lib/jffi.jar
+share/ozone/lib/jffi-native.jar
 share/ozone/lib/jgrapht-core.jar
 share/ozone/lib/jgrapht-ext.jar
 share/ozone/lib/jgraphx.jar
@@ -148,6 +155,11 @@ share/ozone/lib/jheaps.jar
 share/ozone/lib/jmespath-java.jar
 share/ozone/lib/jna.jar
 share/ozone/lib/jna-platform.jar
+share/ozone/lib/jnr-a64asm.jar
+share/ozone/lib/jnr-constants.jar
+share/ozone/lib/jnr-ffi.jar
+share/ozone/lib/jnr-posix.jar
+share/ozone/lib/jnr-x86asm.jar
 share/ozone/lib/joda-time.jar
 share/ozone/lib/jooq-codegen.jar
 share/ozone/lib/jooq.jar
