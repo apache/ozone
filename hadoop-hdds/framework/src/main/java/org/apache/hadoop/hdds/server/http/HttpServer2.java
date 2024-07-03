@@ -249,6 +249,7 @@ public final class HttpServer2 implements FilterContainer {
 
     private boolean xFrameEnabled;
     private XFrameOption xFrameOption = XFrameOption.SAMEORIGIN;
+    private boolean skipDefaultApps;
 
     public Builder setName(String serverName) {
       this.name = serverName;
@@ -445,6 +446,11 @@ public final class HttpServer2 implements FilterContainer {
       excludeCiphers = sslConf.get(SSLFactory.SSL_SERVER_EXCLUDE_CIPHER_LIST);
     }
 
+    public Builder withoutDefaultApps() {
+      this.skipDefaultApps = true;
+      return this;
+    }
+
     public HttpServer2 build() throws IOException {
       Preconditions.checkNotNull(name, "name is not set");
       Preconditions.checkState(!endpoints.isEmpty(), "No endpoints specified");
@@ -591,11 +597,11 @@ public final class HttpServer2 implements FilterContainer {
 
     this.findPort = b.findPort;
     this.portRanges = b.portRanges;
-    initializeWebServer(b.name, b.hostName, b.conf, b.pathSpecs,
+    initializeWebServer(b, b.name, b.hostName, b.conf, b.pathSpecs,
         b.authFilterConfigurationPrefix, b.securityEnabled);
   }
 
-  private void initializeWebServer(String name, String hostName,
+  private void initializeWebServer(Builder b, String name, String hostName,
       MutableConfigurationSource conf, String[] pathSpecs,
       String authFilterConfigPrefix,
       boolean securityEnabled) throws IOException {
@@ -628,7 +634,9 @@ public final class HttpServer2 implements FilterContainer {
     }
     handlers.addHandler(webAppContext);
     final String appDir = getWebAppsPath(name);
-    addDefaultApps(contexts, appDir, conf);
+    if (!b.skipDefaultApps) {
+      addDefaultApps(contexts, appDir, conf);
+    }
     webServer.setHandler(handlers);
     Map<String, String> config = generateFilterConfiguration(conf);
     addGlobalFilter("safety", QuotingInputFilter.class.getName(), config);
@@ -649,7 +657,9 @@ public final class HttpServer2 implements FilterContainer {
       }
     }
 
-    addDefaultServlets();
+    if (!b.skipDefaultApps) {
+      addDefaultServlets();
+    }
 
     if (pathSpecs != null) {
       for (String path : pathSpecs) {
