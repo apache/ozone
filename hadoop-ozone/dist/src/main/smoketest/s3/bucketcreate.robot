@@ -43,6 +43,7 @@ Create bucket with invalid bucket name
                         Should contain          ${result}           InvalidBucketName
 
 Create new bucket and check no group ACL
+    [tags]    aws-skip
     ${bucket} =         Create bucket
     ${acl} =            Execute     ozone sh bucket getacl s3v/${bucket}
     ${group} =          Get Regexp Matches   ${acl}     "GROUP"
@@ -51,4 +52,13 @@ Create new bucket and check no group ACL
         # make sure this check is for group acl
         Should contain      ${json}[1][type]       GROUP
         Should contain      ${json}[1][aclList]    NONE
+    END
+
+Test buckets named like web endpoints
+    [tags]    aws-skip
+    ${path} =    Create Random File
+
+    FOR  ${name}   IN    conf    jmx    logs    logstream    prof    prom    stacks    static
+        Create bucket with name    ${name}
+        Put object to bucket    bucket=${name}    key=testkey    path=${path}
     END

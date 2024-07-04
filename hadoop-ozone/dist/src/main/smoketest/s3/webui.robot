@@ -25,7 +25,6 @@ Default Tags        no-bucket-type
 
 *** Variables ***
 
-${ENDPOINT_URL}     http://s3g:9878
 ${S3G_WEB_UI}       http://s3g:19878
 
 
@@ -34,11 +33,3 @@ ${S3G_WEB_UI}       http://s3g:19878
 Check web UI
     ${result} =         Execute                             curl --negotiate -u : -v ${S3G_WEB_UI}
                         Should contain      ${result}       Apache Ozone S3
-
-Test buckets named like web endpoints
-    ${path} =    Create Random File
-
-    FOR  ${name}   IN    conf    jmx    logs    logstream    prof    prom    stacks    static
-        Create bucket with name    ${name}
-        Put object to bucket    bucket=${name}    key=testkey    path=${path}
-    END
