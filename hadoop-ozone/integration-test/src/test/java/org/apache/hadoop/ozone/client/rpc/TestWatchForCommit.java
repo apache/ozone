@@ -307,12 +307,12 @@ public class TestWatchForCommit {
         Pipeline pipeline = xceiverClient.getPipeline();
         TestHelper.createPipelineOnDatanode(pipeline, cluster);
         XceiverClientRatis ratisClient = (XceiverClientRatis) xceiverClient;
+        GenericTestUtils.waitFor(() ->
+            cluster.getStorageContainerManager().checkLeader(), 1000, 20000);
         XceiverClientReply reply = xceiverClient.sendCommandAsync(
             ContainerTestHelper.getCreateContainerRequest(
                 container1.getContainerInfo().getContainerID(),
                 xceiverClient.getPipeline()));
-        GenericTestUtils.waitFor(() ->
-            cluster.getStorageContainerManager().checkLeader(), 1000, 10000);
         reply.getResponse().get();
         assertEquals(3, ratisClient.getCommitInfoMap().size());
         List<DatanodeDetails> nodesInPipeline = pipeline.getNodes();
