@@ -66,6 +66,7 @@ import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.DBUpdates;
 import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
+import org.apache.hadoop.ozone.recon.ReconContext;
 import org.apache.hadoop.ozone.recon.ReconUtils;
 import org.apache.hadoop.ozone.recon.common.CommonUtils;
 import org.apache.hadoop.ozone.recon.metrics.OzoneManagerSyncMetrics;
@@ -91,6 +92,7 @@ public class TestOzoneManagerServiceProviderImpl {
   private OzoneConfiguration configuration;
   private OzoneManagerProtocol ozoneManagerProtocol;
   private CommonUtils commonUtils;
+  private ReconContext reconContext;
 
   @BeforeEach
   public void setUp(@TempDir File dirReconSnapDB, @TempDir File dirReconDB)
@@ -103,6 +105,7 @@ public class TestOzoneManagerServiceProviderImpl {
     configuration.set("ozone.om.address", "localhost:9862");
     ozoneManagerProtocol = getMockOzoneManagerClient(new DBUpdates());
     commonUtils = new CommonUtils();
+    reconContext = new ReconContext(configuration, new ReconUtils());
   }
 
   @Test
@@ -136,7 +139,7 @@ public class TestOzoneManagerServiceProviderImpl {
     OzoneManagerServiceProviderImpl ozoneManagerServiceProvider =
         new OzoneManagerServiceProviderImpl(configuration,
             reconOMMetadataManager, reconTaskController, reconUtilsMock,
-            ozoneManagerProtocol);
+            ozoneManagerProtocol, reconContext);
 
     assertNull(reconOMMetadataManager.getKeyTable(getBucketLayout())
         .get("/sampleVol/bucketOne/key_one"));
@@ -144,6 +147,81 @@ public class TestOzoneManagerServiceProviderImpl {
         .get("/sampleVol/bucketOne/key_two"));
 
     assertTrue(ozoneManagerServiceProvider.updateReconOmDBWithNewSnapshot());
+
+    assertNotNull(reconOMMetadataManager.getKeyTable(getBucketLayout())
+        .get("/sampleVol/bucketOne/key_one"));
+    assertNotNull(reconOMMetadataManager.getKeyTable(getBucketLayout())
+        .get("/sampleVol/bucketOne/key_two"));
+
+    // Verifying if context error GET_OM_DB_SNAPSHOT_FAILED is removed
+    assertFalse(reconContext.getErrors().contains(ReconContext.ErrorCode.GET_OM_DB_SNAPSHOT_FAILED));
+  }
+
+  @Test
+  public void testUpdateReconOmDBWithNewSnapshotFailure(
+      @TempDir File dirOmMetadata, @TempDir File dirReconMetadata)
+      throws Exception {
+
+    OMMetadataManager omMetadataManager =
+        initializeNewOmMetadataManager(dirOmMetadata);
+    ReconOMMetadataManager reconOMMetadataManager =
+        getTestReconOmMetadataManager(omMetadataManager,
+            dirReconMetadata);
+
+    ReconUtils reconUtilsMock = getMockReconUtils();
+
+    when(reconUtilsMock.makeHttpCall(any(), anyString(), anyBoolean()))
+        .thenThrow(new IOException("Mocked IOException"));
+    when(reconUtilsMock.getReconNodeDetails(
+        any(OzoneConfiguration.class))).thenReturn(
+        commonUtils.getReconNodeDetails());
+    ReconTaskController reconTaskController = getMockTaskController();
+
+    OzoneManagerServiceProviderImpl ozoneManagerServiceProvider =
+        new OzoneManagerServiceProviderImpl(configuration,
+            reconOMMetadataManager, reconTaskController, reconUtilsMock,
+            ozoneManagerProtocol, reconContext);
+
+    assertFalse(ozoneManagerServiceProvider.updateReconOmDBWithNewSnapshot());
+
+    // Verifying if context error GET_OM_DB_SNAPSHOT_FAILED is added
+    assertTrue(reconContext.getErrors().contains(ReconContext.ErrorCode.GET_OM_DB_SNAPSHOT_FAILED));
+  }
+
+  @Test
+  public void testUpdateReconOmDBWithNewSnapshotSuccess(
+      @TempDir File dirOmMetadata, @TempDir File dirReconMetadata) throws Exception {
+
+    OMMetadataManager omMetadataManager =
+        initializeNewOmMetadataManager(dirOmMetadata);
+    ReconOMMetadataManager reconOMMetadataManager =
+        getTestReconOmMetadataManager(omMetadataManager, dirReconMetadata);
+
+    writeDataToOm(omMetadataManager, "key_one");
+    writeDataToOm(omMetadataManager, "key_two");
+
+    DBCheckpoint checkpoint = omMetadataManager.getStore().getCheckpoint(true);
+    File tarFile = createTarFile(checkpoint.getCheckpointLocation());
+    InputStream inputStream = new FileInputStream(tarFile);
+    ReconUtils reconUtilsMock = getMockReconUtils();
+    HttpURLConnection httpURLConnectionMock = mock(HttpURLConnection.class);
+    when(httpURLConnectionMock.getInputStream()).thenReturn(inputStream);
+    when(reconUtilsMock.makeHttpCall(any(), anyString(), anyBoolean()))
+        .thenReturn(httpURLConnectionMock);
+    when(reconUtilsMock.getReconNodeDetails(any(OzoneConfiguration.class)))
+        .thenReturn(commonUtils.getReconNodeDetails());
+    ReconTaskController reconTaskController = getMockTaskController();
+
+    reconContext.updateErrors(ReconContext.ErrorCode.GET_OM_DB_SNAPSHOT_FAILED);
+
+    OzoneManagerServiceProviderImpl ozoneManagerServiceProvider =
+        new OzoneManagerServiceProviderImpl(configuration,
+            reconOMMetadataManager, reconTaskController, reconUtilsMock,
+            ozoneManagerProtocol, reconContext);
+
+    assertTrue(reconContext.getErrors().contains(ReconContext.ErrorCode.GET_OM_DB_SNAPSHOT_FAILED));
+    assertTrue(ozoneManagerServiceProvider.updateReconOmDBWithNewSnapshot());
+    assertFalse(reconContext.getErrors().contains(ReconContext.ErrorCode.GET_OM_DB_SNAPSHOT_FAILED));
 
     assertNotNull(reconOMMetadataManager.getKeyTable(getBucketLayout())
         .get("/sampleVol/bucketOne/key_one"));
@@ -182,7 +260,7 @@ public class TestOzoneManagerServiceProviderImpl {
     OzoneManagerServiceProviderImpl ozoneManagerServiceProvider1 =
         new OzoneManagerServiceProviderImpl(configuration,
             reconOMMetadataManager, reconTaskController, reconUtilsMock,
-            ozoneManagerProtocol);
+            ozoneManagerProtocol, reconContext);
     assertTrue(ozoneManagerServiceProvider1.updateReconOmDBWithNewSnapshot());
 
     HttpURLConnection httpURLConnectionMock2 = mock(HttpURLConnection.class);
@@ -192,7 +270,7 @@ public class TestOzoneManagerServiceProviderImpl {
     OzoneManagerServiceProviderImpl ozoneManagerServiceProvider2 =
         new OzoneManagerServiceProviderImpl(configuration,
             reconOMMetadataManager, reconTaskController, reconUtilsMock,
-            ozoneManagerProtocol);
+            ozoneManagerProtocol, reconContext);
     assertTrue(ozoneManagerServiceProvider2.updateReconOmDBWithNewSnapshot());
   }
 
@@ -238,7 +316,7 @@ public class TestOzoneManagerServiceProviderImpl {
       OzoneManagerServiceProviderImpl ozoneManagerServiceProvider =
           new OzoneManagerServiceProviderImpl(configuration,
               reconOMMetadataManager, reconTaskController, reconUtilsMock,
-              ozoneManagerProtocol);
+              ozoneManagerProtocol, reconContext);
 
       DBCheckpoint checkpoint = ozoneManagerServiceProvider
           .getOzoneManagerDBSnapshot();
@@ -288,7 +366,7 @@ public class TestOzoneManagerServiceProviderImpl {
         new OzoneManagerServiceProviderImpl(configuration,
             getTestReconOmMetadataManager(omMetadataManager, dirReconMetadata),
             getMockTaskController(), new ReconUtils(),
-            getMockOzoneManagerClient(dbUpdatesWrapper));
+            getMockOzoneManagerClient(dbUpdatesWrapper), reconContext);
 
     OMDBUpdatesHandler updatesHandler =
         new OMDBUpdatesHandler(omMetadataManager);
@@ -358,7 +436,7 @@ public class TestOzoneManagerServiceProviderImpl {
             getTestReconOmMetadataManager(omMetadataManager, dirReconMetadata),
             getMockTaskController(), new ReconUtils(),
             getMockOzoneManagerClientWith4Updates(dbUpdatesWrapper[0],
-                dbUpdatesWrapper[1], dbUpdatesWrapper[2], dbUpdatesWrapper[3]));
+                dbUpdatesWrapper[1], dbUpdatesWrapper[2], dbUpdatesWrapper[3]), reconContext);
 
     assertTrue(dbUpdatesWrapper[0].isDBUpdateSuccess());
     assertTrue(dbUpdatesWrapper[1].isDBUpdateSuccess());
@@ -414,7 +492,7 @@ public class TestOzoneManagerServiceProviderImpl {
 
     OzoneManagerServiceProviderImpl ozoneManagerServiceProvider =
         new MockOzoneServiceProvider(configuration, omMetadataManager,
-            reconTaskControllerMock, new ReconUtils(), ozoneManagerProtocol);
+            reconTaskControllerMock, new ReconUtils(), ozoneManagerProtocol, reconContext);
 
     OzoneManagerSyncMetrics metrics = ozoneManagerServiceProvider.getMetrics();
     assertEquals(0, metrics.getNumSnapshotRequests());
@@ -454,7 +532,7 @@ public class TestOzoneManagerServiceProviderImpl {
 
     OzoneManagerServiceProviderImpl ozoneManagerServiceProvider =
         new OzoneManagerServiceProviderImpl(configuration, omMetadataManager,
-            reconTaskControllerMock, new ReconUtils(), ozoneManagerProtocol);
+            reconTaskControllerMock, new ReconUtils(), ozoneManagerProtocol, reconContext);
 
     OzoneManagerSyncMetrics metrics = ozoneManagerServiceProvider.getMetrics();
 
@@ -495,7 +573,7 @@ public class TestOzoneManagerServiceProviderImpl {
     OzoneManagerProtocol protocol = getMockOzoneManagerClientWithThrow();
     OzoneManagerServiceProviderImpl ozoneManagerServiceProvider =
         new MockOzoneServiceProvider(configuration, omMetadataManager,
-            reconTaskControllerMock, new ReconUtils(), protocol);
+            reconTaskControllerMock, new ReconUtils(), protocol, reconContext);
 
     OzoneManagerSyncMetrics metrics = ozoneManagerServiceProvider.getMetrics();
 
@@ -569,9 +647,10 @@ class MockOzoneServiceProvider extends OzoneManagerServiceProviderImpl {
                            ReconOMMetadataManager omMetadataManager,
                            ReconTaskController reconTaskController,
                            ReconUtils reconUtils,
-                           OzoneManagerProtocol ozoneManagerClient) {
+                           OzoneManagerProtocol ozoneManagerClient,
+                           ReconContext reconContext) {
     super(configuration, omMetadataManager, reconTaskController, reconUtils,
-        ozoneManagerClient);
+        ozoneManagerClient, reconContext);
   }
 
   @Override
