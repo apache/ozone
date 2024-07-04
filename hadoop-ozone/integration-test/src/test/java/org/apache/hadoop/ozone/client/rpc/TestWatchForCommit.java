@@ -311,6 +311,8 @@ public class TestWatchForCommit {
             ContainerTestHelper.getCreateContainerRequest(
                 container1.getContainerInfo().getContainerID(),
                 xceiverClient.getPipeline()));
+        GenericTestUtils.waitFor(() ->
+            cluster.getStorageContainerManager().checkLeader(), 1000, 10000);
         reply.getResponse().get();
         assertEquals(3, ratisClient.getCommitInfoMap().size());
         List<DatanodeDetails> nodesInPipeline = pipeline.getNodes();
