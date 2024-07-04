@@ -35,6 +35,8 @@ ${SCM_CONF_URL}     http://${SCM}:9876/conf
 ${SCM_JMX_URL}      http://${SCM}:9876/jmx
 ${SCM_STACKS_URL}   http://${SCM}:9876/stacks
 
+${S3G_WEB_UI}       http://s3g:19878
+
 
 *** Keywords ***
 Verify SPNEGO enabled URL
@@ -73,4 +75,7 @@ Test SCM stacks
 
 Test Recon portal
     Verify SPNEGO enabled URL       ${RECON_URL}
+
+Test S3 Gateway web UI
+    Verify SPNEGO enabled URL       ${S3G_WEB_UI}
 
