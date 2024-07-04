@@ -24,6 +24,7 @@ Test Timeout        5 minutes
 Default Tags        no-bucket-type
 Test Setup          Run Keywords       Kinit test user    testuser    testuser.keytab
 ...                 AND                Revoke S3 secrets
+Suite Teardown      Setup v4 headers
 
 *** Variables ***
 ${ENDPOINT_URL}       http://s3g:19878
