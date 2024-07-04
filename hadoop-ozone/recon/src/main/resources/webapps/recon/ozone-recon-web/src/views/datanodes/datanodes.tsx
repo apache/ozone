@@ -52,7 +52,6 @@ interface IDatanodeResponse {
   version: string;
   setupTime: number;
   revision: string;
-  buildDate: string;
   networkLocation: string;
 }
 
@@ -78,7 +77,6 @@ interface IDatanode {
   version: string;
   setupTime: number;
   revision: string;
-  buildDate: string;
   networkLocation: string;
 }
 
@@ -291,15 +289,6 @@ const COLUMNS = [
     defaultSortOrder: 'ascend' as const
   },
   {
-    title: 'Build Date',
-    dataIndex: 'buildDate',
-    key: 'buildDate',
-    isVisible: true,
-    isSearchable: true,
-    sorter: (a: IDatanode, b: IDatanode) => a.buildDate.localeCompare(b.buildDate),
-    defaultSortOrder: 'ascend' as const
-  },
-  {
     title: 'Network Location',
     dataIndex: 'networkLocation',
     key: 'networkLocation',
@@ -404,7 +393,6 @@ export class Datanodes extends React.Component<Record<string, object>, IDatanode
           version: datanode.version,
           setupTime: datanode.setupTime,
           revision: datanode.revision,
-          buildDate: datanode.buildDate,
           networkLocation: datanode.networkLocation
         };
       });
