@@ -71,25 +71,30 @@ public class CertificateStorage {
   /**
    * Helper function that writes data to the file.
    *
-   * @param basePath              - Base Path where the file needs to written
-   *                              to..
+   * @param certDir               - Directory where the certificates are stored.
    * @param pemEncodedCertificate - pemEncoded Certificate file.
    * @throws IOException - on Error.
    */
-  public synchronized CertPath storeCertificate(Path basePath, String pemEncodedCertificate, CAType caType)
+  public synchronized CertPath storeCertificate(Path certDir, String pemEncodedCertificate, CAType caType)
       throws IOException {
     CertPath certPath = certificateCodec.getCertPathFromPemEncodedString(pemEncodedCertificate);
     X509Certificate cert = (X509Certificate) certPath.getCertificates().get(0);
     String certName = String.format(CERT_FILE_NAME_FORMAT,
         caType.getFileNamePrefix() + cert.getSerialNumber().toString());
-    Path finalPath = Paths.get(basePath.toAbsolutePath().toString(), certName);
+    Path finalPath = Paths.get(certDir.toAbsolutePath().toString(), certName);
     storeCertificate(finalPath.toAbsolutePath(), pemEncodedCertificate);
     return certPath;
   }
 
-  public synchronized void storeCertificate(Path basePath, String pemEncodedCertificate) throws IOException {
-    checkBasePathDirectory(basePath.getParent());
-    File certificateFile = basePath.toFile();
+  /**
+   * @param pathToCertificate     the path which points to the certificate file after it is written.
+   *                              The leaf of the path is the certificate file itself.
+   * @param pemEncodedCertificate
+   * @throws IOException
+   */
+  public synchronized void storeCertificate(Path pathToCertificate, String pemEncodedCertificate) throws IOException {
+    checkDirectoryExists(pathToCertificate.getParent());
+    File certificateFile = pathToCertificate.toFile();
     try (FileOutputStream file = new FileOutputStream(certificateFile)) {
       file.write(pemEncodedCertificate.getBytes(DEFAULT_CHARSET));
     }
@@ -98,12 +103,12 @@ public class CertificateStorage {
     Files.setPosixFilePermissions(certificateFile.toPath(), PERMISSION_SET);
   }
 
-  public synchronized void storeCertificate(Path basePath, CertPath certPath) throws IOException {
-    storeCertificate(basePath, certificateCodec.getPEMEncodedString(certPath));
+  public synchronized void storeCertificate(Path pathToCertificate, CertPath certPath) throws IOException {
+    storeCertificate(pathToCertificate, certificateCodec.getPEMEncodedString(certPath));
   }
 
-  public synchronized void storeCertificate(Path basePath, X509Certificate certificate) throws IOException {
-    storeCertificate(basePath, certificateCodec.getPEMEncodedString(certificate));
+  public synchronized void storeCertificate(Path pathToCertificate, X509Certificate certificate) throws IOException {
+    storeCertificate(pathToCertificate, certificateCodec.getPEMEncodedString(certificate));
   }
 
   public CertPath getCertPath(String componentName, String fileName) throws IOException, CertificateException {
@@ -111,10 +116,10 @@ public class CertificateStorage {
     return getCertPath(path, fileName);
   }
 
-  private CertPath getCertPath(Path path, String fileName) throws IOException, CertificateException {
-    checkBasePathDirectory(path.toAbsolutePath());
+  private CertPath getCertPath(Path certDir, String certFileName) throws IOException, CertificateException {
+    checkDirectoryExists(certDir.toAbsolutePath());
     File certFile =
-        Paths.get(path.toAbsolutePath().toString(), fileName).toFile();
+        Paths.get(certDir.toAbsolutePath().toString(), certFileName).toFile();
     if (!certFile.exists()) {
       throw new IOException("Unable to find the requested certificate file. " +
           "Path: " + certFile);
@@ -124,13 +129,13 @@ public class CertificateStorage {
     }
   }
 
-  public X509Certificate getFirstCertFromCertPath(Path path, String fileName)
+  public X509Certificate getFirstCertFromCertPath(Path certDir, String certFileName)
       throws IOException, CertificateException {
-    CertPath certPath = getCertPath(path, fileName);
+    CertPath certPath = getCertPath(certDir, certFileName);
     return (X509Certificate) certPath.getCertificates().get(0);
   }
 
-  private static void checkBasePathDirectory(Path basePath) throws IOException {
+  private static void checkDirectoryExists(Path basePath) throws IOException {
     if (!basePath.toFile().exists()) {
       if (!basePath.toFile().mkdirs()) {
         LOG.error("Unable to create file path. Path: {}", basePath);
