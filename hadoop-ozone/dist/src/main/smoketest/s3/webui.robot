@@ -32,13 +32,10 @@ ${S3G_WEB_UI}       http://s3g:19878
 *** Test Cases ***
 
 Check web UI
-    Run Keyword if      '${SECURITY_ENABLED}' == 'true'     Kinit HTTP user
     ${result} =         Execute                             curl --negotiate -u : -v ${S3G_WEB_UI}
                         Should contain      ${result}       Apache Ozone S3
 
 Test buckets named like web endpoints
-    Run Keyword if      '${SECURITY_ENABLED}' == 'true'     Kinit test user    testuser    testuser.keytab
-
     ${path} =    Create Random File
 
     FOR  ${name}   IN    conf    jmx    logs    logstream    prof    prom    stacks    static
