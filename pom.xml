@@ -213,7 +213,7 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
     <mockito.version>4.11.0</mockito.version>
     <hamcrest.version>2.2</hamcrest.version>
     <junit5.version>5.10.3</junit5.version>
-    <zookeeper.version>3.8.4</zookeeper.version>
+    <zookeeper.version>3.9.2</zookeeper.version>
 
     <!-- Maven protoc compiler -->
     <protobuf-maven-plugin.version>0.6.1</protobuf-maven-plugin.version>
