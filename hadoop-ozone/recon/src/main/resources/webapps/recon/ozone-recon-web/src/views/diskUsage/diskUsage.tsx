@@ -20,14 +20,15 @@ import React from 'react';
 import moment from 'moment';
 import {
   Row,
-  Col,
   Button,
   Input,
   Menu,
-  Dropdown
+  Dropdown,
+  Tooltip
 } from 'antd';
 import { MenuProps } from 'antd/es/menu';
 import {
+  InfoCircleOutlined,
   LeftOutlined,
   LoadingOutlined,
   RedoOutlined
@@ -44,6 +45,7 @@ import './diskUsage.less';
 const DEFAULT_DISPLAY_LIMIT = 10;
 const OTHER_PATH_NAME = 'Other Objects';
 const MAX_DISPLAY_LIMIT = 30;
+const MIN_BLOCK_SIZE = 0.05;
 
 interface IDUSubpath {
   path: string;
@@ -66,6 +68,7 @@ interface IPlotData {
   value: number;
   name: string;
   size: string;
+  percentage: string;
 }
 
 interface IDUState {
@@ -84,6 +87,7 @@ let cancelPieSignal: AbortController
 let cancelSummarySignal: AbortController
 let cancelQuotaSignal: AbortController;
 let cancelKeyMetadataSignal: AbortController;
+let valuesWithMinBlockSize: number[] = [];
 
 export class DiskUsage extends React.Component<Record<string, object>, IDUState> {
   constructor(props = {}) {
@@ -186,7 +190,7 @@ export class DiskUsage extends React.Component<Record<string, object>, IDUState>
         }
       }
 
-      let pathLabels, values, percentage, sizeStr, pieces, subpathName;
+      let pathLabels, values: number[] = [], percentage, sizeStr, pieces, subpathName;
 
       if (duResponse.subPathCount === 0 || subpaths === 0) {
         pieces = duResponse && duResponse.path != null && duResponse.path.split('/');
@@ -206,9 +210,17 @@ export class DiskUsage extends React.Component<Record<string, object>, IDUState>
           return (subpath.isKey || subpathName === OTHER_PATH_NAME) ? subpathName : subpathName + '/';
         });
 
-        values = subpaths.map(subpath => {
-          return subpath.size / dataSize;
-        });
+        // To avoid NaN Condition NaN will get divide by Zero to avoid map iterations
+        if (dataSize > 0) {
+          values = subpaths.map(subpath => {
+            return subpath.size / dataSize;
+          });
+        }
+
+        // Adding a MIN_BLOCK_SIZE to non-zero size entities to ensure that even the smallest entities are visible on the pie chart.
+        // Note: The percentage and size string calculations remain unchanged.
+        const clonedValues = structuredClone(values);
+        valuesWithMinBlockSize = clonedValues && clonedValues.map((item: number) => item > 0 ? item + MIN_BLOCK_SIZE : item);
 
         percentage = values.map(value => {
           return (value * 100).toFixed(2);
@@ -227,11 +239,12 @@ export class DiskUsage extends React.Component<Record<string, object>, IDUState>
         returnPath: duResponse.path,
         displayLimit: limit,
         duResponse,
-        plotData: percentage.map((key, idx) => {
+        plotData: valuesWithMinBlockSize.map((key, idx) => {
           return {
-            value: parseFloat(key as string),
+            value: key,
             name: pathLabels[idx],
-            size: sizeStr[idx]
+            size: sizeStr[idx],
+            percentage: percentage[idx]
           }
         })
       });
@@ -516,7 +529,7 @@ export class DiskUsage extends React.Component<Record<string, object>, IDUState>
   render() {
     const { plotData, duResponse, returnPath, panelKeys, panelValues, showPanel, isLoading, inputPath, displayLimit } = this.state;
 
-    const updateDisplayLimit: MenuProps["onClick"] = (e): void => {
+    const updateDisplayLimit: MenuProps['onClick'] = (e): void => {
       const res = Number.parseInt(e.key, 10);
       this.updatePieChart(this.state.inputPath, res);
     }
@@ -553,10 +566,11 @@ export class DiskUsage extends React.Component<Record<string, object>, IDUState>
       },
       tooltip: {
         trigger: 'item',
-        formatter: ({ dataIndex, percent, name, color }) => {
+        formatter: ({ dataIndex, name, color }) => {
           const nameEl = `<strong style='color: ${color}'>${name}</strong><br>`;
-          const dataEl = `Total Data Size: ${plotData[dataIndex]['size']}<br>Percentage: ${percent} %`
-          return `${nameEl}${dataEl}`
+          const dataEl = `Total Data Size: ${plotData[dataIndex]['size']}<br>`
+          const percentageEl = `Percentage: ${plotData[dataIndex]['percentage']} %`
+          return `${nameEl}${dataEl}${percentageEl}`
         }
       },
       legend: {
@@ -611,6 +625,17 @@ export class DiskUsage extends React.Component<Record<string, object>, IDUState>
                   </div>
                   <div className='go-back-button'>
                     <Button type='primary' onClick={e => this.refreshCurPath(e, returnPath)}><RedoOutlined /></Button>
+                  </div>
+                  <div style={{ paddingLeft: '15px' }}>
+                    <Tooltip
+                      placement="rightTop"
+                      color='rgba(26, 165, 122, 0.9)'
+                      title="Additional block size is added to small entities, for better visibility. Please refer to pie-chart tooltip for exact size information.">
+                      <InfoCircleOutlined
+                        style={{
+                          fontSize: '1.3em'
+                        }}/>
+                    </Tooltip>
                   </div>
                 </div>
                 <div className='du-button-container'>
