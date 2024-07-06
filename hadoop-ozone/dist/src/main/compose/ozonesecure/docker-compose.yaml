@@ -66,7 +66,7 @@ services:
       - docker-config
     command: ["/opt/hadoop/bin/ozone","om"]
   httpfs:
-    image: apache/ozone-runner:${OZONE_RUNNER_VERSION}
+    image: ${OZONE_RUNNER_IMAGE}:${OZONE_RUNNER_VERSION}
     hostname: httpfs
     volumes:
       - ../..:/opt/hadoop
