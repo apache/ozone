@@ -391,7 +391,7 @@
               "useBackend": false
             }
           ],
-          "title": "Rocksdb level0 metrics (num files )",
+          "title": "Rocksdb level0 metrics (num files)",
           "type": "timeseries"
         },
         {
@@ -476,7 +476,7 @@
               },
               "disableTextWrap": false,
               "editorMode": "code",
-              "expr": "rdb_metrics_num_db_key_get_if_exist_checks{instance=~\"ccycloud-.*.mus-t1.root.comops.site:9875\"}",
+              "expr": "rdb_metrics_num_db_key_get_if_exist_checks{instance=~\".*:9875\"}",
               "fullMetaSearch": false,
               "includeNullMetadata": true,
               "instant": false,
@@ -491,7 +491,7 @@
               },
               "disableTextWrap": false,
               "editorMode": "code",
-              "expr": "rdb_metrics_num_db_key_get_if_exist_gets{instance=~\"ccycloud-.*.mus-t1.root.comops.site:9875\"}",
+              "expr": "rdb_metrics_num_db_key_get_if_exist_gets{instance=~\".*:9875\"}",
               "fullMetaSearch": false,
               "hide": false,
               "includeNullMetadata": true,
@@ -502,7 +502,7 @@
               "useBackend": false
             }
           ],
-          "title": "Rdb no. of db key metrics",
+          "title": "Rocksdb no. of db key metrics",
           "type": "timeseries"
         },
         {
@@ -1197,7 +1197,7 @@
               "useBackend": false
             }
           ],
-          "title": "Om num key metrics",
+          "title": "OM num key metrics",
           "type": "timeseries"
         },
         {
@@ -1292,7 +1292,7 @@
               "useBackend": false
             }
           ],
-          "title": "Om num key ops metrics",
+          "title": "OM num key ops metrics",
           "type": "timeseries"
         }
       ],
@@ -1405,7 +1405,7 @@
           "type": "timeseries"
         }
       ],
-      "title": "OM Servicelists Metrics",
+      "title": "OM Service Lists Metrics",
       "type": "row"
     },
     {
@@ -1515,7 +1515,7 @@
           "type": "timeseries"
         }
       ],
-      "title": "OM Read key Info Metrics",
+      "title": "OM Read Key Info Metrics",
       "type": "row"
     },
     {
@@ -1610,7 +1610,7 @@
               },
               "disableTextWrap": false,
               "editorMode": "builder",
-              "expr": "table_cache_metrics_hit_count{instance=~\"ccycloud-.*.mus-t1.root.comops.site:9875\"}",
+              "expr": "table_cache_metrics_hit_count{instance=~\".*:9875\"}",
               "fullMetaSearch": false,
               "includeNullMetadata": true,
               "instant": false,
@@ -1625,7 +1625,7 @@
               },
               "disableTextWrap": false,
               "editorMode": "code",
-              "expr": "table_cache_metrics_miss_count{instance=~\"ccycloud-.*.mus-t1.root.comops.site:9875\"}",
+              "expr": "table_cache_metrics_miss_count{instance=~\".*:9875\"}",
               "fullMetaSearch": false,
               "hide": false,
               "includeNullMetadata": true,
@@ -2271,449 +2271,6 @@
         }
       ],
       "title": "S3 Gateway Key Failure Metrics",
-      "type": "row"
-    },
-    {
-      "collapsed": true,
-      "gridPos": {
-        "h": 1,
-        "w": 24,
-        "x": 0,
-        "y": 9
-      },
-      "id": 28,
-      "panels": [
-        {
-          "datasource": {
-            "type": "prometheus"
-          },
-          "fieldConfig": {
-            "defaults": {
-              "color": {
-                "mode": "palette-classic"
-              },
-              "custom": {
-                "axisCenteredZero": false,
-                "axisColorMode": "text",
-                "axisLabel": "",
-                "axisPlacement": "auto",
-                "barAlignment": 0,
-                "drawStyle": "line",
-                "fillOpacity": 0,
-                "gradientMode": "none",
-                "hideFrom": {
-                  "legend": false,
-                  "tooltip": false,
-                  "viz": false
-                },
-                "insertNulls": false,
-                "lineInterpolation": "linear",
-                "lineWidth": 1,
-                "pointSize": 5,
-                "scaleDistribution": {
-                  "type": "linear"
-                },
-                "showPoints": "auto",
-                "spanNulls": false,
-                "stacking": {
-                  "group": "A",
-                  "mode": "none"
-                },
-                "thresholdsStyle": {
-                  "mode": "off"
-                }
-              },
-              "mappings": [],
-              "thresholds": {
-                "mode": "absolute",
-                "steps": [
-                  {
-                    "color": "green"
-                  },
-                  {
-                    "color": "red",
-                    "value": 80
-                  }
-                ]
-              }
-            },
-            "overrides": []
-          },
-          "gridPos": {
-            "h": 8,
-            "w": 8,
-            "x": 0,
-            "y": 75
-          },
-          "id": 34,
-          "options": {
-            "legend": {
-              "calcs": [],
-              "displayMode": "list",
-              "placement": "bottom",
-              "showLegend": true
-            },
-            "tooltip": {
-              "mode": "single",
-              "sort": "none"
-            }
-          },
-          "targets": [
-            {
-              "datasource": {
-                "type": "prometheus"
-              },
-              "disableTextWrap": false,
-              "editorMode": "builder",
-              "expr": "xceiver_client_metrics_op_count_get_block",
-              "fullMetaSearch": false,
-              "includeNullMetadata": true,
-              "instant": false,
-              "legendFormat": "{{__name__}}, {{hostname}}",
-              "range": true,
-              "refId": "A",
-              "useBackend": false
-            },
-            {
-              "datasource": {
-                "type": "prometheus"
-              },
-              "disableTextWrap": false,
-              "editorMode": "builder",
-              "expr": "xceiver_client_metrics_op_count_read_chunk",
-              "fullMetaSearch": false,
-              "hide": false,
-              "includeNullMetadata": true,
-              "instant": false,
-              "legendFormat": "{{__name__}}, {{hostname}}",
-              "range": true,
-              "refId": "B",
-              "useBackend": false
-            }
-          ],
-          "title": "op count metrics",
-          "type": "timeseries"
-        },
-        {
-          "datasource": {
-            "type": "prometheus"
-          },
-          "fieldConfig": {
-            "defaults": {
-              "color": {
-                "mode": "palette-classic"
-              },
-              "custom": {
-                "axisCenteredZero": false,
-                "axisColorMode": "text",
-                "axisLabel": "no. of ops",
-                "axisPlacement": "auto",
-                "barAlignment": 0,
-                "drawStyle": "line",
-                "fillOpacity": 0,
-                "gradientMode": "none",
-                "hideFrom": {
-                  "legend": false,
-                  "tooltip": false,
-                  "viz": false
-                },
-                "insertNulls": false,
-                "lineInterpolation": "linear",
-                "lineWidth": 1,
-                "pointSize": 5,
-                "scaleDistribution": {
-                  "type": "linear"
-                },
-                "showPoints": "auto",
-                "spanNulls": false,
-                "stacking": {
-                  "group": "A",
-                  "mode": "none"
-                },
-                "thresholdsStyle": {
-                  "mode": "off"
-                }
-              },
-              "mappings": [],
-              "thresholds": {
-                "mode": "absolute",
-                "steps": [
-                  {
-                    "color": "green"
-                  },
-                  {
-                    "color": "red",
-                    "value": 80
-                  }
-                ]
-              }
-            },
-            "overrides": []
-          },
-          "gridPos": {
-            "h": 8,
-            "w": 8,
-            "x": 8,
-            "y": 75
-          },
-          "id": 33,
-          "options": {
-            "legend": {
-              "calcs": [],
-              "displayMode": "list",
-              "placement": "bottom",
-              "showLegend": true
-            },
-            "tooltip": {
-              "mode": "single",
-              "sort": "none"
-            }
-          },
-          "targets": [
-            {
-              "datasource": {
-                "type": "prometheus"
-              },
-              "disableTextWrap": false,
-              "editorMode": "builder",
-              "expr": "xceiver_client_metrics_total_ops",
-              "fullMetaSearch": false,
-              "includeNullMetadata": true,
-              "instant": false,
-              "legendFormat": "{{__name__}}, {{hostname}}",
-              "range": true,
-              "refId": "A",
-              "useBackend": false
-            }
-          ],
-          "title": "total ops metric",
-          "type": "timeseries"
-        },
-        {
-          "datasource": {
-            "type": "prometheus"
-          },
-          "fieldConfig": {
-            "defaults": {
-              "color": {
-                "mode": "palette-classic"
-              },
-              "custom": {
-                "axisCenteredZero": false,
-                "axisColorMode": "text",
-                "axisLabel": "time (ns)",
-                "axisPlacement": "auto",
-                "barAlignment": 0,
-                "drawStyle": "line",
-                "fillOpacity": 0,
-                "gradientMode": "none",
-                "hideFrom": {
-                  "legend": false,
-                  "tooltip": false,
-                  "viz": false
-                },
-                "insertNulls": false,
-                "lineInterpolation": "linear",
-                "lineWidth": 1,
-                "pointSize": 5,
-                "scaleDistribution": {
-                  "type": "linear"
-                },
-                "showPoints": "auto",
-                "spanNulls": false,
-                "stacking": {
-                  "group": "A",
-                  "mode": "none"
-                },
-                "thresholdsStyle": {
-                  "mode": "off"
-                }
-              },
-              "mappings": [],
-              "thresholds": {
-                "mode": "absolute",
-                "steps": [
-                  {
-                    "color": "green"
-                  },
-                  {
-                    "color": "red",
-                    "value": 80
-                  }
-                ]
-              },
-              "unit": "ns"
-            },
-            "overrides": []
-          },
-          "gridPos": {
-            "h": 8,
-            "w": 8,
-            "x": 16,
-            "y": 75
-          },
-          "id": 31,
-          "options": {
-            "legend": {
-              "calcs": [],
-              "displayMode": "list",
-              "placement": "bottom",
-              "showLegend": true
-            },
-            "tooltip": {
-              "mode": "single",
-              "sort": "none"
-            }
-          },
-          "targets": [
-            {
-              "datasource": {
-                "type": "prometheus"
-              },
-              "disableTextWrap": false,
-              "editorMode": "builder",
-              "expr": "xceiver_client_metrics_get_block_latency_avg_time",
-              "fullMetaSearch": false,
-              "includeNullMetadata": true,
-              "instant": false,
-              "legendFormat": "{{__name__}}, {{hostname}}",
-              "range": true,
-              "refId": "A",
-              "useBackend": false
-            },
-            {
-              "datasource": {
-                "type": "prometheus"
-              },
-              "disableTextWrap": false,
-              "editorMode": "builder",
-              "expr": "xceiver_client_metrics_read_chunk_latency_avg_time",
-              "fullMetaSearch": false,
-              "hide": false,
-              "includeNullMetadata": true,
-              "instant": false,
-              "legendFormat": "{{__name__}}, {{hostname}}",
-              "range": true,
-              "refId": "B",
-              "useBackend": false
-            }
-          ],
-          "title": "Combined latency (avg. time) metrics",
-          "type": "timeseries"
-        },
-        {
-          "datasource": {
-            "type": "prometheus"
-          },
-          "fieldConfig": {
-            "defaults": {
-              "color": {
-                "mode": "palette-classic"
-              },
-              "custom": {
-                "axisCenteredZero": false,
-                "axisColorMode": "text",
-                "axisLabel": "no. of ops",
-                "axisPlacement": "auto",
-                "barAlignment": 0,
-                "drawStyle": "line",
-                "fillOpacity": 0,
-                "gradientMode": "none",
-                "hideFrom": {
-                  "legend": false,
-                  "tooltip": false,
-                  "viz": false
-                },
-                "insertNulls": false,
-                "lineInterpolation": "linear",
-                "lineWidth": 1,
-                "pointSize": 5,
-                "scaleDistribution": {
-                  "type": "linear"
-                },
-                "showPoints": "auto",
-                "spanNulls": false,
-                "stacking": {
-                  "group": "A",
-                  "mode": "none"
-                },
-                "thresholdsStyle": {
-                  "mode": "off"
-                }
-              },
-              "mappings": [],
-              "thresholds": {
-                "mode": "absolute",
-                "steps": [
-                  {
-                    "color": "green"
-                  },
-                  {
-                    "color": "red",
-                    "value": 80
-                  }
-                ]
-              }
-            },
-            "overrides": []
-          },
-          "gridPos": {
-            "h": 8,
-            "w": 8,
-            "x": 0,
-            "y": 83
-          },
-          "id": 32,
-          "options": {
-            "legend": {
-              "calcs": [],
-              "displayMode": "list",
-              "placement": "bottom",
-              "showLegend": true
-            },
-            "tooltip": {
-              "mode": "single",
-              "sort": "none"
-            }
-          },
-          "targets": [
-            {
-              "datasource": {
-                "type": "prometheus"
-              },
-              "disableTextWrap": false,
-              "editorMode": "builder",
-              "expr": "xceiver_client_metrics_get_block_latency_num_ops",
-              "fullMetaSearch": false,
-              "includeNullMetadata": true,
-              "instant": false,
-              "legendFormat": "{{__name__}}, {{hostname}}",
-              "range": true,
-              "refId": "A",
-              "useBackend": false
-            },
-            {
-              "datasource": {
-                "type": "prometheus"
-              },
-              "disableTextWrap": false,
-              "editorMode": "builder",
-              "expr": "xceiver_client_metrics_read_chunk_latency_num_ops",
-              "fullMetaSearch": false,
-              "hide": false,
-              "includeNullMetadata": true,
-              "instant": false,
-              "legendFormat": "{{__name__}}, {{hostname}}",
-              "range": true,
-              "refId": "B",
-              "useBackend": false
-            }
-          ],
-          "title": "Combined latency (no. of ops) metrics",
-          "type": "timeseries"
-        }
-      ],
-      "title": "S3 Gateway Xceiver Client Metrics",
       "type": "row"
     },
     {
@@ -3532,7 +3089,7 @@
               },
               "disableTextWrap": false,
               "editorMode": "code",
-              "expr": "ugi_metrics_login_success_avg_time{instance=~\"ccycloud-.*.mus-t1.root.comops.site:9877\"}",
+              "expr": "ugi_metrics_login_success_avg_time{instance=~\".*:9877\"}",
               "fullMetaSearch": false,
               "includeNullMetadata": true,
               "instant": false,
@@ -3627,7 +3184,7 @@
               },
               "disableTextWrap": false,
               "editorMode": "code",
-              "expr": "ugi_metrics_login_success_num_ops{instance=~\"ccycloud-.*.mus-t1.root.comops.site:9877\"}",
+              "expr": "ugi_metrics_login_success_num_ops{instance=~\".*:9877\"}",
               "fullMetaSearch": false,
               "includeNullMetadata": true,
               "instant": false,
