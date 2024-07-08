@@ -135,20 +135,18 @@ public class CertificateClientTestImpl implements CertificateClient {
     String certDuration = conf.get(HDDS_X509_DEFAULT_DURATION,
         HDDS_X509_DEFAULT_DURATION_DEFAULT);
     x509Certificate = approver.sign(securityConfig, rootKeyPair.getPrivate(),
-            rootCert,
-            Date.from(start.atZone(ZoneId.systemDefault()).toInstant()),
-            Date.from(start.plus(Duration.parse(certDuration))
-                .atZone(ZoneId.systemDefault()).toInstant()),
-            csrBuilder.build(), "scm1", "cluster1",
-            String.valueOf(System.nanoTime()));
+        rootCert,
+        Date.from(start.atZone(ZoneId.systemDefault()).toInstant()),
+        Date.from(start.plus(Duration.parse(certDuration))
+            .atZone(ZoneId.systemDefault()).toInstant()),
+        csrBuilder.build(), "scm1", "cluster1",
+        String.valueOf(System.nanoTime()));
     certificateMap.put(x509Certificate.getSerialNumber().toString(),
         x509Certificate);
 
     notificationReceivers = new HashSet<>();
-    serverKeyStoresFactory = SecurityUtil.getServerKeyStoresFactory(
-        this, true);
-    clientKeyStoresFactory = SecurityUtil.getClientKeyStoresFactory(
-        this, true);
+    serverKeyStoresFactory = getServerKeyStoresFactory();
+    clientKeyStoresFactory = getClientKeyStoresFactory();
 
     if (autoRenew) {
       Duration gracePeriod = securityConfig.getRenewalGracePeriod();

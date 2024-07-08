@@ -93,33 +93,4 @@ public final class SecurityUtil {
     }
     return key;
   }
-
-  public static KeyStoresFactory getServerKeyStoresFactory(
-      CertificateClient client,
-      boolean requireClientAuth) throws CertificateException {
-    PemFileBasedKeyStoresFactory factory =
-        new PemFileBasedKeyStoresFactory(client);
-    try {
-      factory.init(KeyStoresFactory.Mode.SERVER, requireClientAuth);
-    } catch (IOException | GeneralSecurityException e) {
-      throw new CertificateException("Failed to init keyStoresFactory", e,
-          CertificateException.ErrorCode.KEYSTORE_ERROR);
-    }
-    return factory;
-  }
-
-  public static KeyStoresFactory getClientKeyStoresFactory(
-      CertificateClient client,
-      boolean requireClientAuth) throws CertificateException {
-    PemFileBasedKeyStoresFactory factory =
-        new PemFileBasedKeyStoresFactory(client);
-
-    try {
-      factory.init(KeyStoresFactory.Mode.CLIENT, requireClientAuth);
-    } catch (IOException | GeneralSecurityException e) {
-      throw new CertificateException("Failed to init keyStoresFactory", e,
-          CertificateException.ErrorCode.KEYSTORE_ERROR);
-    }
-    return factory;
-  }
 }

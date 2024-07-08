@@ -27,6 +27,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
+import java.security.GeneralSecurityException;
 import java.security.InvalidKeyException;
 import java.security.KeyFactory;
 import java.security.KeyPair;
@@ -73,6 +74,7 @@ import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMGetCer
 import org.apache.hadoop.hdds.protocolPB.SCMSecurityProtocolClientSideTranslatorPB;
 import org.apache.hadoop.hdds.security.SecurityConfig;
 import org.apache.hadoop.hdds.security.ssl.KeyStoresFactory;
+import org.apache.hadoop.hdds.security.ssl.PemFileBasedKeyStoresFactory;
 import org.apache.hadoop.hdds.security.x509.certificate.authority.CAType;
 import org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateCodec;
 import org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateSignRequest;
@@ -1024,7 +1026,7 @@ public abstract class DefaultCertificateClient implements CertificateClient {
   public synchronized KeyStoresFactory getServerKeyStoresFactory()
       throws CertificateException {
     if (serverKeyStoresFactory == null) {
-      serverKeyStoresFactory = SecurityUtil.getServerKeyStoresFactory(this, true);
+      serverKeyStoresFactory = getServerKeyStoresFactory(this, true);
     }
     return serverKeyStoresFactory;
   }
@@ -1033,13 +1035,44 @@ public abstract class DefaultCertificateClient implements CertificateClient {
   public KeyStoresFactory getClientKeyStoresFactory()
       throws CertificateException {
     if (clientKeyStoresFactory == null) {
-      clientKeyStoresFactory = SecurityUtil.getClientKeyStoresFactory(this, true);
+      clientKeyStoresFactory = getClientKeyStoresFactory(this, true);
     }
     return clientKeyStoresFactory;
   }
 
+  public static KeyStoresFactory getServerKeyStoresFactory(
+      CertificateClient client,
+      boolean requireClientAuth) throws CertificateException {
+    PemFileBasedKeyStoresFactory factory =
+        new PemFileBasedKeyStoresFactory(client);
+    try {
+      factory.init(KeyStoresFactory.Mode.SERVER, requireClientAuth);
+    } catch (IOException | GeneralSecurityException e) {
+      throw new CertificateException("Failed to init keyStoresFactory", e,
+          CertificateException.ErrorCode.KEYSTORE_ERROR);
+    }
+    return factory;
+  }
+
+  public static KeyStoresFactory getClientKeyStoresFactory(
+      CertificateClient client,
+      boolean requireClientAuth) throws CertificateException {
+    PemFileBasedKeyStoresFactory factory =
+        new PemFileBasedKeyStoresFactory(client);
+
+    try {
+      factory.init(KeyStoresFactory.Mode.CLIENT, requireClientAuth);
+    } catch (IOException | GeneralSecurityException e) {
+      throw new CertificateException("Failed to init keyStoresFactory", e,
+          CertificateException.ErrorCode.KEYSTORE_ERROR);
+    }
+    return factory;
+  }
+
+
   /**
    * Register a receiver that will be called after the certificate renewed.
+   *
    * @param receiver
    */
   @Override
