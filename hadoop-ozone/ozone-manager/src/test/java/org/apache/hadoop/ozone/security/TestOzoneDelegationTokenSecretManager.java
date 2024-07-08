@@ -26,6 +26,7 @@ import java.security.PrivateKey;
 import java.security.PublicKey;
 import java.security.Signature;
 import java.security.cert.CertPath;
+import java.security.cert.CertificateFactory;
 import java.security.cert.X509Certificate;
 import java.util.HashMap;
 import java.util.Map;
@@ -69,7 +70,6 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import org.apache.ratis.protocol.RaftPeerId;
-import org.bouncycastle.jcajce.provider.asymmetric.x509.CertificateFactory;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -143,10 +143,8 @@ public class TestOzoneDelegationTokenSecretManager {
   private OMCertificateClient setupCertificateClient() throws Exception {
     KeyPair keyPair = KeyStoreTestUtil.generateKeyPair("RSA");
     CertificateFactory fact = CertificateCodec.getCertFactory();
-    X509Certificate singleCert = KeyStoreTestUtil
-        .generateCertificate("CN=OzoneMaster", keyPair, 30, "SHA256withRSA");
-    CertPath certPath = fact.engineGenerateCertPath(
-        ImmutableList.of(singleCert));
+    X509Certificate singleCert = KeyStoreTestUtil.generateCertificate("CN=OzoneMaster", keyPair, 30, "SHA256withRSA");
+    CertPath certPath = fact.generateCertPath(ImmutableList.of(singleCert));
 
     OMStorage omStorage = mock(OMStorage.class);
     when(omStorage.getOmCertSerialId()).thenReturn(null);

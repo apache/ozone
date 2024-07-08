@@ -92,7 +92,7 @@ jobs:
           echo "ratis=${ratis_version}" >> $GITHUB_OUTPUT
       - name: Run a full build
         run: |
-          mvn versions:set -DnewVersion=${{ steps.versions.outputs.ratis }} -Dscan=false
+          mvn -B --no-transfer-progress -Dscan=false versions:set -DnewVersion=${{ steps.versions.outputs.ratis }}
           dev-support/checks/build.sh
       - name: Store Maven repo for tests
         uses: actions/upload-artifact@v4

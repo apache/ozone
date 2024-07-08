@@ -3079,7 +3079,7 @@
     <name>hdds.datanode.http.auth.type</name>
     <value>simple</value>
     <tag>DATANODE, SECURITY, KERBEROS</tag>
-    <description> simple or kerberos. If kerberos is set, Kerberos SPNEOGO
+    <description> simple or kerberos. If kerberos is set, SPNEGO
       will be used for http authentication.
     </description>
   </property>
@@ -3087,7 +3087,7 @@
     <name>ozone.freon.http.auth.type</name>
     <value>simple</value>
     <tag>FREON, SECURITY</tag>
-    <description> simple or kerberos. If kerberos is set, Kerberos SPNEOGO
+    <description> simple or kerberos. If kerberos is set, SPNEGO
       will be used for http authentication.
     </description>
   </property>
@@ -3095,7 +3095,7 @@
     <name>ozone.om.http.auth.type</name>
     <value>simple</value>
     <tag>OM, SECURITY, KERBEROS</tag>
-    <description> simple or kerberos. If kerberos is set, Kerberos SPNEOGO
+    <description> simple or kerberos. If kerberos is set, SPNEGO
       will be used for http authentication.
     </description>
   </property>
@@ -3103,7 +3103,7 @@
     <name>hdds.scm.http.auth.type</name>
     <value>simple</value>
     <tag>OM, SECURITY, KERBEROS</tag>
-    <description> simple or kerberos. If kerberos is set, Kerberos SPNEOGO
+    <description> simple or kerberos. If kerberos is set, SPNEGO
       will be used for http authentication.
     </description>
   </property>
@@ -3111,7 +3111,7 @@
     <name>ozone.recon.http.auth.type</name>
     <value>simple</value>
     <tag>RECON, SECURITY, KERBEROS</tag>
-    <description> simple or kerberos. If kerberos is set, Kerberos SPNEOGO
+    <description> simple or kerberos. If kerberos is set, SPNEGO
       will be used for http authentication.
     </description>
   </property>
@@ -3119,7 +3119,7 @@
     <name>ozone.s3g.http.auth.type</name>
     <value>simple</value>
     <tag>S3GATEWAY, SECURITY, KERBEROS</tag>
-    <description> simple or kerberos. If kerberos is set, Kerberos SPNEOGO
+    <description> simple or kerberos. If kerberos is set, SPNEGO
       will be used for http authentication.
     </description>
   </property>

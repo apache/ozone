@@ -164,7 +164,7 @@ public class ECBlockInputStream extends BlockExtendedInputStream {
    * stream if it has not been opened already.
    * @return BlockInput stream to read from.
    */
-  protected BlockExtendedInputStream getOrOpenStream(int locationIndex) {
+  protected BlockExtendedInputStream getOrOpenStream(int locationIndex) throws IOException {
     BlockExtendedInputStream stream = blockStreams[locationIndex];
     if (stream == null) {
       // To read an EC block, we create a STANDALONE pipeline that contains the
@@ -176,8 +176,8 @@ public class ECBlockInputStream extends BlockExtendedInputStream {
           .setReplicationConfig(StandaloneReplicationConfig.getInstance(
               HddsProtos.ReplicationFactor.ONE))
           .setNodes(Arrays.asList(dataLocation))
-          .setId(PipelineID.valueOf(dataLocation.getUuid())).setReplicaIndexes(
-              ImmutableMap.of(dataLocation, locationIndex + 1))
+          .setId(PipelineID.valueOf(dataLocation.getUuid()))
+          .setReplicaIndexes(ImmutableMap.of(dataLocation, locationIndex + 1))
           .setState(Pipeline.PipelineState.CLOSED)
           .build();
 
@@ -228,6 +228,7 @@ public class ECBlockInputStream extends BlockExtendedInputStream {
                   HddsProtos.ReplicationFactor.ONE))
           .setNodes(Collections.singletonList(curIndexNode))
           .setId(PipelineID.randomId())
+          .setReplicaIndexes(Collections.singletonMap(curIndexNode, replicaIndex))
           .setState(Pipeline.PipelineState.CLOSED)
           .build();
       blockLocationInfo.setPipeline(pipeline);

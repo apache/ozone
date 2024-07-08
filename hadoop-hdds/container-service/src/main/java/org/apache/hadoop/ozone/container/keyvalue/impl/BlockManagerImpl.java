@@ -41,7 +41,6 @@ import org.apache.hadoop.ozone.container.upgrade.VersionedDatanodeFeatures;
 import com.google.common.base.Preconditions;
 
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.BCSID_MISMATCH;
-import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.UNKNOWN_BCSID;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_CHUNK_LIST_INCREMENTAL;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_CHUNK_LIST_INCREMENTAL_DEFAULT;
 
@@ -265,24 +264,11 @@ public class BlockManagerImpl implements BlockManager {
   }
 
   @Override
-  public BlockData getBlock(Container container, BlockID blockID)
-      throws IOException {
-    long bcsId = blockID.getBlockCommitSequenceId();
-    Preconditions.checkNotNull(blockID,
-        "BlockID cannot be null in GetBlock request");
-    Preconditions.checkNotNull(container,
-        "Container cannot be null");
-
+  public BlockData getBlock(Container container, BlockID blockID) throws IOException {
+    BlockUtils.verifyBCSId(container, blockID);
     KeyValueContainerData containerData = (KeyValueContainerData) container
         .getContainerData();
-    long containerBCSId = containerData.getBlockCommitSequenceId();
-    if (containerBCSId < bcsId) {
-      throw new StorageContainerException(
-          "Unable to find the block with bcsID " + bcsId + ". Container "
-              + containerData.getContainerID() + " bcsId is "
-              + containerBCSId + ".", UNKNOWN_BCSID);
-    }
-
+    long bcsId = blockID.getBlockCommitSequenceId();
     try (DBHandle db = BlockUtils.getDB(containerData, config)) {
       // This is a post condition that acts as a hint to the user.
       // Should never fail.

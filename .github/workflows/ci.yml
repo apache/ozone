@@ -15,10 +15,21 @@
 name: full-ci
 on:
   workflow_call:
+    inputs:
+      ratis_args:
+        type: string
+        description: Version overrides from custom Ratis build
+        default: ''
+        required: false
+      ref:
+        type: string
+        description: Ozone ref (branch, tag or commit SHA)
+        default: ''
+        required: false
 env:
   FAIL_FAST: ${{ github.event_name == 'pull_request' }}
   MAVEN_OPTS: -Dhttp.keepAlive=false -Dmaven.wagon.http.pool=false -Dmaven.wagon.http.retryHandler.class=standard -Dmaven.wagon.http.retryHandler.count=3
-  OZONE_WITH_COVERAGE: ${{ github.repository == 'apache/ozone' && github.event_name != 'pull_request' }}
+  OZONE_WITH_COVERAGE: ${{ github.repository == 'apache/ozone' && github.event_name == 'push' }}
 jobs:
   build-info:
     runs-on: ubuntu-20.04
@@ -35,18 +46,35 @@ jobs:
       needs-dependency-check: ${{ steps.selective-checks.outputs.needs-dependency-check }}
       needs-integration-tests: ${{ steps.selective-checks.outputs.needs-integration-tests }}
       needs-kubernetes-tests: ${{ steps.selective-checks.outputs.needs-kubernetes-tests }}
+      sha: ${{ steps.get-sha.outputs.sha }}
     steps:
-      - name: "Checkout ${{ github.ref }} ( ${{ github.sha }} )"
+      - name: "Checkout ${{ github.ref }} / ${{ github.sha }} (push)"
         uses: actions/checkout@v4
         with:
           persist-credentials: false
-      - name: Fetch incoming commit ${{ github.sha }} with its parent
+        if: github.event_name  == 'push'
+      - name: "Checkout ${{ github.sha }} with its parent (pull request)"
         uses: actions/checkout@v4
         with:
           ref: ${{ github.sha }}
           fetch-depth: 2
           persist-credentials: false
         if: github.event_name  == 'pull_request'
+      - name: "Checkout ${{ inputs.ref }} given in workflow input (manual dispatch)"
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref }}
+          persist-credentials: false
+        if: github.event_name  == 'workflow_dispatch'
+      - name: Get SHA of ${{ inputs.ref || github.ref }}
+        id: get-sha
+        run: |
+          if [[ "${GITHUB_EVENT_NAME}" == "workflow_dispatch" ]]; then
+            sha="$(git rev-parse --verify HEAD)"
+          else
+            sha="${GITHUB_SHA}"
+          fi
+          echo "sha=$sha" >> $GITHUB_OUTPUT
       - name: Selective checks
         id: selective-checks
         env:
@@ -81,6 +109,8 @@ jobs:
     steps:
       - name: Checkout project
         uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.build-info.outputs.sha }}
       - name: Cache for npm dependencies
         uses: actions/cache@v4
         with:
@@ -99,13 +129,20 @@ jobs:
           key: maven-repo-${{ hashFiles('**/pom.xml') }}
           restore-keys: |
             maven-repo-
+      - name: Download Ratis repo
+        if: ${{ inputs.ratis_args != '' }}
+        uses: actions/download-artifact@v4
+        with:
+          name: ratis-jars
+          path: |
+            ~/.m2/repository/org/apache/ratis
       - name: Setup java
         uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
           java-version: ${{ matrix.java }}
       - name: Run a full build
-        run: hadoop-ozone/dev-support/checks/build.sh -Pdist -Psrc
+        run: hadoop-ozone/dev-support/checks/build.sh -Pdist -Psrc ${{ inputs.ratis_args }}
         env:
           DEVELOCITY_ACCESS_KEY: ${{ secrets.GE_ACCESS_TOKEN }}
       - name: Store binaries for tests
@@ -168,13 +205,20 @@ jobs:
           key: maven-repo-${{ hashFiles('**/pom.xml') }}
           restore-keys: |
             maven-repo-
+      - name: Download Ratis repo
+        if: ${{ inputs.ratis_args != '' }}
+        uses: actions/download-artifact@v4
+        with:
+          name: ratis-jars
+          path: |
+            ~/.m2/repository/org/apache/ratis
       - name: Setup java
         uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
           java-version: ${{ matrix.java }}
       - name: Compile Ozone using Java ${{ matrix.java }}
-        run: hadoop-ozone/dev-support/checks/build.sh -Dskip.npx -Dskip.installnpx -Djavac.version=${{ matrix.java }}
+        run: hadoop-ozone/dev-support/checks/build.sh -Dskip.npx -Dskip.installnpx -Djavac.version=${{ matrix.java }} ${{ inputs.ratis_args }}
         env:
           OZONE_WITH_COVERAGE: false
           DEVELOCITY_ACCESS_KEY: ${{ secrets.GE_ACCESS_TOKEN }}
@@ -191,11 +235,14 @@ jobs:
     steps:
       - name: Checkout project
         uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.build-info.outputs.sha }}
         if: matrix.check != 'bats'
       - name: Checkout project with history
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          ref: ${{ needs.build-info.outputs.sha }}
         if: matrix.check == 'bats'
       - name: Cache for maven dependencies
         uses: actions/cache/restore@v4
@@ -207,13 +254,20 @@ jobs:
           restore-keys: |
             maven-repo-
         if: ${{ !contains('author,bats,docs', matrix.check) }}
+      - name: Download Ratis repo
+        if: ${{ inputs.ratis_args != '' }}
+        uses: actions/download-artifact@v4
+        with:
+          name: ratis-jars
+          path: |
+            ~/.m2/repository/org/apache/ratis
       - name: Setup java
         uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
           java-version: 8
       - name: Execute tests
-        run: hadoop-ozone/dev-support/checks/${{ matrix.check }}.sh
+        run: hadoop-ozone/dev-support/checks/${{ matrix.check }}.sh ${{ inputs.ratis_args }}
         continue-on-error: true
         env:
           DEVELOCITY_ACCESS_KEY: ${{ secrets.GE_ACCESS_TOKEN }}
@@ -237,6 +291,8 @@ jobs:
     steps:
       - name: Checkout project
         uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.build-info.outputs.sha }}
       - name: Cache for maven dependencies
         uses: actions/cache/restore@v4
         with:
@@ -246,13 +302,20 @@ jobs:
           key: maven-repo-${{ hashFiles('**/pom.xml') }}
           restore-keys: |
             maven-repo-
+      - name: Download Ratis repo
+        if: ${{ inputs.ratis_args != '' }}
+        uses: actions/download-artifact@v4
+        with:
+          name: ratis-jars
+          path: |
+            ~/.m2/repository/org/apache/ratis
       - name: Setup java
         uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
           java-version: 8
       - name: Execute tests
-        run: hadoop-ozone/dev-support/checks/${{ github.job }}.sh
+        run: hadoop-ozone/dev-support/checks/${{ github.job }}.sh ${{ inputs.ratis_args }}
         continue-on-error: true
         env:
           DEVELOCITY_ACCESS_KEY: ${{ secrets.GE_ACCESS_TOKEN }}
@@ -276,6 +339,8 @@ jobs:
     steps:
       - name: Checkout project
         uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.build-info.outputs.sha }}
       - name: Download compiled Ozone binaries
         uses: actions/download-artifact@v4
         with:
@@ -305,6 +370,8 @@ jobs:
     steps:
       - name: Checkout project
         uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.build-info.outputs.sha }}
       - name: Cache for maven dependencies
         uses: actions/cache/restore@v4
         with:
@@ -350,6 +417,8 @@ jobs:
     steps:
       - name: Checkout project
         uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.build-info.outputs.sha }}
       - name: Download compiled Ozone binaries
         uses: actions/download-artifact@v4
         with:
@@ -392,6 +461,8 @@ jobs:
     steps:
       - name: Checkout project
         uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.build-info.outputs.sha }}
       - name: Download compiled Ozone binaries
         uses: actions/download-artifact@v4
         with:
@@ -420,7 +491,6 @@ jobs:
   integration:
     needs:
       - build-info
-      - build
       - basic
     runs-on: ubuntu-20.04
     timeout-minutes: 150
@@ -442,6 +512,8 @@ jobs:
     steps:
       - name: Checkout project
         uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.build-info.outputs.sha }}
       - name: Cache for maven dependencies
         uses: actions/cache/restore@v4
         with:
@@ -451,6 +523,13 @@ jobs:
           key: maven-repo-${{ hashFiles('**/pom.xml') }}
           restore-keys: |
             maven-repo-
+      - name: Download Ratis repo
+        if: ${{ inputs.ratis_args != '' }}
+        uses: actions/download-artifact@v4
+        with:
+          name: ratis-jars
+          path: |
+            ~/.m2/repository/org/apache/ratis
       - name: Setup java
         uses: actions/setup-java@v4
         with:
@@ -459,9 +538,9 @@ jobs:
       - name: Execute tests
         continue-on-error: true
         run: |
-          args=
+          args="${{ inputs.ratis_args }}"
           if [[ "${{ matrix.profile }}" == "flaky" ]]; then
-            args="-Dsurefire.rerunFailingTestsCount=5 -Dsurefire.fork.timeout=3600"
+            args="$args -Dsurefire.rerunFailingTestsCount=5 -Dsurefire.fork.timeout=3600"
           fi
 
           hadoop-ozone/dev-support/checks/integration.sh -P${{ matrix.profile }} ${args}
@@ -480,8 +559,9 @@ jobs:
   coverage:
     runs-on: ubuntu-20.04
     timeout-minutes: 30
-    if: github.repository == 'apache/ozone' && github.event_name != 'pull_request'
+    if: github.repository == 'apache/ozone' && github.event_name == 'push'
     needs:
+      - build-info
       - acceptance
       - integration
       - native
@@ -490,6 +570,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          ref: ${{ needs.build-info.outputs.sha }}
       - name: Cache for maven dependencies
         uses: actions/cache/restore@v4
         with:

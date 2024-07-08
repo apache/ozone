@@ -50,6 +50,7 @@ import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.container.ContainerManagerImpl;
 import org.apache.hadoop.hdds.scm.PlacementPolicyValidateProxy;
 import org.apache.hadoop.hdds.scm.container.balancer.MoveManager;
+import org.apache.hadoop.hdds.scm.container.placement.metrics.SCMPerformanceMetrics;
 import org.apache.hadoop.hdds.scm.container.replication.ContainerReplicaPendingOps;
 import org.apache.hadoop.hdds.scm.container.replication.DatanodeCommandCountUpdatedHandler;
 import org.apache.hadoop.hdds.scm.container.replication.LegacyReplicationManager;
@@ -233,6 +234,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
    * SCM metrics.
    */
   private static SCMMetrics metrics;
+  private static SCMPerformanceMetrics perfMetrics;
   private SCMHAMetrics scmHAMetrics;
 
   /*
@@ -364,6 +366,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     scmHANodeDetails = SCMHANodeDetails.loadSCMHAConfig(conf, scmStorageConfig);
     configuration = conf;
     initMetrics();
+    initPerfMetrics();
 
     boolean ratisEnabled = SCMHAUtils.isSCMHAEnabled(conf);
     if (scmStorageConfig.getState() != StorageState.INITIALIZED) {
@@ -1407,6 +1410,18 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
   public static SCMMetrics getMetrics() {
     return metrics == null ? SCMMetrics.create() : metrics;
   }
+  /**
+   * Initialize SCMPerformance metrics.
+   */
+  public static void initPerfMetrics() {
+    perfMetrics = SCMPerformanceMetrics.create();
+  }
+  /**
+   * Return SCMPerformance metrics instance.
+   */
+  public static SCMPerformanceMetrics getPerfMetrics() {
+    return perfMetrics == null ? SCMPerformanceMetrics.create() : perfMetrics;
+  }
 
   public SCMStorageConfig getScmStorageConfig() {
     return scmStorageConfig;
@@ -1693,6 +1708,10 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
 
     if (metrics != null) {
       metrics.unRegister();
+    }
+
+    if (perfMetrics != null) {
+      perfMetrics.unRegister();
     }
 
     unregisterMXBean();

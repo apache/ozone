@@ -62,7 +62,7 @@ public class KeyInputStream extends MultipartInputStream {
       XceiverClientFactory xceiverClientFactory,
       Function<OmKeyInfo, OmKeyInfo> retryFunction,
       BlockInputStreamFactory blockStreamFactory,
-      OzoneClientConfig config) {
+      OzoneClientConfig config) throws IOException {
     boolean isHsyncFile = keyInfo.getMetadata().containsKey(OzoneConsts.HSYNC_CLIENT_ID);
     List<BlockExtendedInputStream> partStreams = new ArrayList<>();
     for (int i = 0; i < blockInfos.size(); i++) {
@@ -129,7 +129,7 @@ public class KeyInputStream extends MultipartInputStream {
       Function<OmKeyInfo, OmKeyInfo> retryFunction,
       BlockInputStreamFactory blockStreamFactory,
       List<OmKeyLocationInfo> locationInfos,
-      OzoneClientConfig config) {
+      OzoneClientConfig config) throws IOException {
     List<BlockExtendedInputStream> streams = createStreams(keyInfo,
         locationInfos, xceiverClientFactory, retryFunction,
         blockStreamFactory, config);
@@ -145,7 +145,7 @@ public class KeyInputStream extends MultipartInputStream {
       XceiverClientFactory xceiverClientFactory,
       Function<OmKeyInfo, OmKeyInfo> retryFunction,
       BlockInputStreamFactory blockStreamFactory,
-      OzoneClientConfig config) {
+      OzoneClientConfig config) throws IOException {
 
     List<OmKeyLocationInfo> keyLocationInfos = keyInfo
         .getLatestVersionLocations().getBlocksLatestVersionOnly();
@@ -158,7 +158,7 @@ public class KeyInputStream extends MultipartInputStream {
       XceiverClientFactory xceiverClientFactory,
       Function<OmKeyInfo, OmKeyInfo> retryFunction,
       BlockInputStreamFactory blockStreamFactory,
-      OzoneClientConfig config) {
+      OzoneClientConfig config) throws IOException {
 
     List<OmKeyLocationInfo> keyLocationInfos = keyInfo
         .getLatestVersionLocations().getBlocksLatestVersionOnly();

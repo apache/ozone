@@ -52,6 +52,7 @@ import org.apache.hadoop.hdds.security.SecurityConfig;
 import org.apache.hadoop.hdds.security.exception.SCMSecurityException;
 import org.apache.hadoop.hdds.tracing.GrpcClientInterceptor;
 import org.apache.hadoop.hdds.tracing.TracingUtil;
+import org.apache.hadoop.ozone.ClientVersion;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.OzoneConsts;
 import java.util.concurrent.TimeoutException;
@@ -277,6 +278,11 @@ public class XceiverClientGrpc extends XceiverClientSpi {
     List<DatanodeDetails> datanodeList = pipeline.getNodes();
     HashMap<DatanodeDetails, CompletableFuture<ContainerCommandResponseProto>>
             futureHashMap = new HashMap<>();
+    if (!request.hasVersion()) {
+      ContainerCommandRequestProto.Builder builder = ContainerCommandRequestProto.newBuilder(request);
+      builder.setVersion(ClientVersion.CURRENT.toProtoValue());
+      request = builder.build();
+    }
     for (DatanodeDetails dn : datanodeList) {
       try {
         futureHashMap.put(dn, sendCommandAsync(request, dn).getResponse());
@@ -337,10 +343,13 @@ public class XceiverClientGrpc extends XceiverClientSpi {
 
     return TracingUtil.executeInNewSpan(spanName,
         () -> {
-          ContainerCommandRequestProto finalPayload =
+          ContainerCommandRequestProto.Builder builder =
               ContainerCommandRequestProto.newBuilder(request)
-                  .setTraceID(TracingUtil.exportCurrentSpan()).build();
-          return sendCommandWithRetry(finalPayload, validators);
+                  .setTraceID(TracingUtil.exportCurrentSpan());
+          if (!request.hasVersion()) {
+            builder.setVersion(ClientVersion.CURRENT.toProtoValue());
+          }
+          return sendCommandWithRetry(builder.build(), validators);
         });
   }
 
@@ -365,9 +374,17 @@ public class XceiverClientGrpc extends XceiverClientSpi {
     }
 
     if (blockID != null) {
+      if (request.getCmdType() != ContainerProtos.Type.ReadChunk) {
+        datanodeList = pipeline.getNodes();
+        int getBlockDNLeaderIndex = datanodeList.indexOf(pipeline.getLeaderNode());
+        if (getBlockDNLeaderIndex > 0) {
+          // Pull the leader DN to the top of the DN list
+          Collections.swap(datanodeList, 0, getBlockDNLeaderIndex);
+        }
+      }
       // Check if the DN to which the GetBlock command was sent has been cached.
       DatanodeDetails cachedDN = getBlockDNcache.get(blockID);
-      if (cachedDN != null) {
+      if (cachedDN != null && !topologyAwareRead) {
         datanodeList = pipeline.getNodes();
         int getBlockDNCacheIndex = datanodeList.indexOf(cachedDN);
         if (getBlockDNCacheIndex > 0) {
@@ -490,12 +507,14 @@ public class XceiverClientGrpc extends XceiverClientSpi {
 
     try (Scope ignored = GlobalTracer.get().activateSpan(span)) {
 
-      ContainerCommandRequestProto finalPayload =
+      ContainerCommandRequestProto.Builder builder =
           ContainerCommandRequestProto.newBuilder(request)
-              .setTraceID(TracingUtil.exportCurrentSpan())
-              .build();
+              .setTraceID(TracingUtil.exportCurrentSpan());
+      if (!request.hasVersion()) {
+        builder.setVersion(ClientVersion.CURRENT.toProtoValue());
+      }
       XceiverClientReply asyncReply =
-          sendCommandAsync(finalPayload, pipeline.getFirstNode());
+          sendCommandAsync(builder.build(), pipeline.getFirstNode());
       if (shouldBlockAndWaitAsyncReply(request)) {
         asyncReply.getResponse().get();
       }
@@ -544,31 +563,13 @@ public class XceiverClientGrpc extends XceiverClientSpi {
               @Override
               public void onNext(ContainerCommandResponseProto value) {
                 replyFuture.complete(value);
-                metrics.decrPendingContainerOpsMetrics(request.getCmdType());
-                long cost = System.currentTimeMillis() - requestTime;
-                metrics.addContainerOpsLatency(request.getCmdType(),
-                    cost);
-                if (LOG.isDebugEnabled()) {
-                  LOG.debug("Executed command {} on datanode {}, cost = {}, "
-                          + "cmdType = {}", processForDebug(request), dn,
-                      cost, request.getCmdType());
-                }
-                semaphore.release();
+                decreasePendingMetricsAndReleaseSemaphore();
               }
 
               @Override
               public void onError(Throwable t) {
                 replyFuture.completeExceptionally(t);
-                metrics.decrPendingContainerOpsMetrics(request.getCmdType());
-                long cost = System.currentTimeMillis() - requestTime;
-                metrics.addContainerOpsLatency(request.getCmdType(),
-                    System.currentTimeMillis() - requestTime);
-                if (LOG.isDebugEnabled()) {
-                  LOG.debug("Executed command {} on datanode {}, cost = {}, "
-                          + "cmdType = {}", processForDebug(request), dn,
-                      cost, request.getCmdType());
-                }
-                semaphore.release();
+                decreasePendingMetricsAndReleaseSemaphore();
               }
 
               @Override
@@ -578,6 +579,17 @@ public class XceiverClientGrpc extends XceiverClientSpi {
                       "Stream completed but no reply for request " +
                           processForDebug(request)));
                 }
+              }
+
+              private void decreasePendingMetricsAndReleaseSemaphore() {
+                metrics.decrPendingContainerOpsMetrics(request.getCmdType());
+                long cost = System.currentTimeMillis() - requestTime;
+                metrics.addContainerOpsLatency(request.getCmdType(), cost);
+                if (LOG.isDebugEnabled()) {
+                  LOG.debug("Executed command {} on datanode {}, cost = {}, cmdType = {}",
+                      processForDebug(request), dn, cost, request.getCmdType());
+                }
+                semaphore.release();
               }
             });
     requestObserver.onNext(request);

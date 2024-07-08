@@ -121,7 +121,7 @@ public class BlockInputStream extends BlockExtendedInputStream {
       Token<OzoneBlockTokenIdentifier> token,
       XceiverClientFactory xceiverClientFactory,
       Function<BlockID, BlockLocationInfo> refreshFunction,
-      OzoneClientConfig config) {
+      OzoneClientConfig config) throws IOException {
     this.blockInfo = blockInfo;
     this.blockID = blockInfo.getBlockID();
     this.length = blockInfo.getLength();
@@ -140,7 +140,7 @@ public class BlockInputStream extends BlockExtendedInputStream {
                           Token<OzoneBlockTokenIdentifier> token,
                           XceiverClientFactory xceiverClientFactory,
                           OzoneClientConfig config
-  ) {
+  ) throws IOException {
     this(new BlockLocationInfo(new BlockLocationInfo.Builder().setBlockID(blockId).setLength(blockLen)),
         pipeline, token, xceiverClientFactory, null, config);
   }
@@ -268,8 +268,7 @@ public class BlockInputStream extends BlockExtendedInputStream {
    * @return BlockData.
    */
   protected BlockData getBlockDataUsingClient() throws IOException {
-    final Pipeline pipeline = xceiverClient.getPipeline();
-
+    Pipeline pipeline = pipelineRef.get();
     if (LOG.isDebugEnabled()) {
       LOG.debug("Initializing BlockInputStream for get key to access block {}",
           blockID);
@@ -286,13 +285,19 @@ public class BlockInputStream extends BlockExtendedInputStream {
     }
 
     GetBlockResponseProto response = ContainerProtocolCalls.getBlock(
-        xceiverClient, VALIDATORS, blkIDBuilder.build(), tokenRef.get());
+        xceiverClient, VALIDATORS, blockID, tokenRef.get(), pipeline.getReplicaIndexes());
     return response.getBlockData();
   }
 
-  private void setPipeline(Pipeline pipeline) {
+  private void setPipeline(Pipeline pipeline) throws IOException {
     if (pipeline == null) {
       return;
+    }
+    long replicaIndexes = pipeline.getNodes().stream().mapToInt(pipeline::getReplicaIndex).distinct().count();
+
+    if (replicaIndexes > 1) {
+      throw new IOException(String.format("Pipeline: %s has nodes containing different replica indexes.",
+          pipeline));
     }
 
     // irrespective of the container state, we will always read via Standalone

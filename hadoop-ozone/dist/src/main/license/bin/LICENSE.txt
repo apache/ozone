@@ -218,6 +218,7 @@ EDL 1.0
 EPL 2.0
 =====================
 
+   com.github.jnr:jnr-posix
    jakarta.annotation:jakarta.annotation-api
    jakarta.ws.rs:jakarta.ws.rs-api
    org.aspectj:aspectjrt
@@ -280,6 +281,10 @@ Apache License 2.0
    com.fasterxml.jackson.datatype:jackson-datatype-jsr310
    com.fasterxml.jackson.module:jackson-module-jaxb-annotations
    com.fasterxml.woodstox:woodstox-core
+   com.github.jnr:jnr-a64asm
+   com.github.jnr:jnr-constants
+   com.github.jnr:jnr-ffi
+   com.github.jnr:jffi
    com.github.stephenc.jcip:jcip-annotations
    com.google.android:annotations
    com.google.api.grpc:proto-google-common-protos
@@ -446,6 +451,7 @@ MIT
 =====================
 
    com.bettercloud:vault-java-driver
+   com.github.jnr:jnr-x86asm
    com.kstruct:gethostname4j
    org.bouncycastle:bcpkix-jdk18on
    org.bouncycastle:bcprov-jdk18on
@@ -472,6 +478,11 @@ BSD 3-Clause
    com.google.re2j:re2j
    com.jcraft:jsch
    com.thoughtworks.paranamer:paranamer
+   org.ow2.asm:asm
+   org.ow2.asm:asm-analysis
+   org.ow2.asm:asm-commons
+   org.ow2.asm:asm-tree
+   org.ow2.asm:asm-util
 
 
 BSD 2-Clause
