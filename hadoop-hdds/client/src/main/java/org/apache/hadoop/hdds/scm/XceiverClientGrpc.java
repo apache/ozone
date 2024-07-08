@@ -285,7 +285,7 @@ public class XceiverClientGrpc extends XceiverClientSpi {
     }
     for (DatanodeDetails dn : datanodeList) {
       try {
-        request = reconstructRequestIfNeeded(request, dn, pipeline);
+        request = reconstructRequestIfNeeded(request, dn);
         futureHashMap.put(dn, sendCommandAsync(request, dn).getResponse());
       } catch (InterruptedException e) {
         LOG.error("Command execution was interrupted.");
@@ -328,7 +328,7 @@ public class XceiverClientGrpc extends XceiverClientSpi {
    * @return new updated Request
    */
   private ContainerCommandRequestProto reconstructRequestIfNeeded(
-      ContainerCommandRequestProto request, DatanodeDetails dn, Pipeline pipeline) {
+      ContainerCommandRequestProto request, DatanodeDetails dn) {
     boolean isEcRequest = pipeline.getReplicationConfig()
         .getReplicationType() == HddsProtos.ReplicationType.EC;
     if (request.hasGetBlock() && isEcRequest) {
