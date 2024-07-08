@@ -76,6 +76,7 @@ import org.apache.hadoop.ozone.common.ChecksumData;
 import org.apache.hadoop.security.token.Token;
 
 import org.apache.hadoop.security.token.TokenIdentifier;
+import org.apache.ratis.proto.RaftProtos.ReplicationLevel;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 import org.apache.ratis.util.function.CheckedFunction;
 import org.slf4j.Logger;
@@ -291,7 +292,10 @@ public final class ContainerProtocolCalls  {
       throws IOException, InterruptedException, ExecutionException {
     final ContainerCommandRequestProto request = getPutBlockRequest(
         xceiverClient.getPipeline(), containerBlockData, eof, tokenString);
-    return xceiverClient.sendCommandAsync(request);
+    // TODO: Make only putBlock triggered from hsync ALL_COMMITTED.
+    //  While keeping the ones triggered from write() and others at MAJORITY
+    //  and call regular watchForCommit in order to reduce latency for write()s.
+    return xceiverClient.sendCommandAsync(request, ReplicationLevel.ALL_COMMITTED);
   }
 
   /**
@@ -472,7 +476,9 @@ public final class ContainerProtocolCalls  {
       builder.setEncodedToken(tokenString);
     }
     ContainerCommandRequestProto request = builder.build();
-    return xceiverClient.sendCommandAsync(request);
+    // TODO: WriteChunk can stay at MAJORITY if piggybacking is not enabled,
+    //  since in that case it must have a follow-up PutBlock.
+    return xceiverClient.sendCommandAsync(request, ReplicationLevel.MAJORITY);
   }
 
   /**

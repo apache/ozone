@@ -724,7 +724,7 @@ public class TestOmContainerLocationCache {
     }
     doAnswer(invocation -> new XceiverClientReply(response))
         .when(mockDnProtocol)
-        .sendCommandAsync(argThat(matchCmd(Type.GetBlock)), any());
+        .sendCommandAsync(argThat(matchCmd(Type.GetBlock)), any(DatanodeDetails.class));
   }
 
   @Nonnull
@@ -771,7 +771,7 @@ public class TestOmContainerLocationCache {
 
     doAnswer(invocation -> new XceiverClientReply(response))
         .when(mockDnProtocol)
-        .sendCommandAsync(argThat(matchCmd(Type.ReadChunk)), any());
+        .sendCommandAsync(argThat(matchCmd(Type.ReadChunk)), any(DatanodeDetails.class));
 
   }
 

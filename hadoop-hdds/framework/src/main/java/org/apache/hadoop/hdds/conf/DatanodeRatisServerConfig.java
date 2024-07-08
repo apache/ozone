@@ -61,7 +61,9 @@ public class DatanodeRatisServerConfig {
           "Timeout for the watch request in Ratis server to acknowledge a " +
           "particular request is replayed to all servers. It is highly recommended " +
           "for the timeout duration to be strictly shorter than Ratis client watch timeout " +
-          "(hdds.ratis.raft.client.rpc.watch.request.timeout)."
+          "(hdds.ratis.raft.client.rpc.watch.request.timeout)." +
+          "Note: This must be lower than Ratis client watch timeout in order " +
+          "for NotReplicatedException to be propagated from the Ratis server."
   )
   private long watchTimeOut = Duration.ofSeconds(30).toMillis();
 

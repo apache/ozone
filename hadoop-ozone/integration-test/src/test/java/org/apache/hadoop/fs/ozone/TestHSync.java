@@ -32,6 +32,7 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Stream;
 
@@ -627,24 +628,40 @@ public class TestHSync {
     out.writeAndHsync(data);
 
     final byte[] buffer = new byte[4 << 10];
-    int offset = 0;
-    try (FSDataInputStream in = fs.open(file)) {
-      final long skipped = in.skip(length);
-      assertEquals(length, skipped);
+    AtomicInteger attempted = new AtomicInteger();
 
-      for (; ;) {
-        final int n = in.read(buffer, 0, buffer.length);
-        if (n <= 0) {
-          break;
+    // Because linearizable read (raft.server.read.option = LINEARIZABLE) is NOT enabled for performance reason,
+    // read-after-write-consistency is not guaranteed. The issue is more prominent with
+    // reduction in operation latency. The workaround here is to just wait and retry for a bit.
+    GenericTestUtils.waitFor(() -> {
+      attempted.addAndGet(1);
+      int offset = 0;
+      try (FSDataInputStream in = fs.open(file)) {
+        final long skipped = in.skip(length);
+        assertEquals(length, skipped);
+
+        for (; ;) {
+          final int n = in.read(buffer, 0, buffer.length);
+          if (n <= 0) {
+            break;
+          }
+          for (int i = 0; i < n; i++) {
+            assertEquals(data[offset + i], buffer[i], "expected at offset " + offset + " i=" + i);
+          }
+          offset += n;
         }
-        for (int i = 0; i < n; i++) {
-          assertEquals(data[offset + i], buffer[i],
-              "expected at offset " + offset + " i=" + i);
+        if (offset != data.length) {
+          LOG.error("Read attempt #{} failed. offset {}, expected data.length {}", attempted, offset, data.length);
+          return false;
+        } else {
+          LOG.debug("Read attempt #{} succeeded. offset {}, expected data.length {}", attempted, offset, data.length);
+          return true;
         }
-        offset += n;
+      } catch (IOException e) {
+        LOG.error("Exception is thrown during read", e);
+        return false;
       }
-    }
-    assertEquals(data.length, offset);
+    }, 500, 3000);
   }
 
   private void runConcurrentWriteHSync(Path file,

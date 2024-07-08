@@ -131,7 +131,7 @@ public class TestWatchForCommit {
     DatanodeRatisServerConfig ratisServerConfig =
         conf.getObject(DatanodeRatisServerConfig.class);
     ratisServerConfig.setRequestTimeOut(Duration.ofSeconds(3));
-    ratisServerConfig.setWatchTimeOut(Duration.ofSeconds(3));
+    ratisServerConfig.setWatchTimeOut(Duration.ofSeconds(2));
     conf.setFromObject(ratisServerConfig);
 
     RatisClientConfig.RaftConfig raftClientConfig =
@@ -346,7 +346,7 @@ public class TestWatchForCommit {
       }
       String output = logCapturer.getOutput();
       assertThat(output).contains("3 way commit failed");
-      assertThat(output).contains("TimeoutException");
+      assertThat(output).contains("NotReplicatedException");
       assertThat(output).contains("Committed by majority");
     }
     logCapturer.stopCapturing();

@@ -134,7 +134,7 @@ public class TestDeleteWithInAdequateDN {
         conf.getObject(DatanodeRatisServerConfig.class);
     ratisServerConfig.setNoLeaderTimeout(Duration.ofSeconds(1000));
     ratisServerConfig.setRequestTimeOut(Duration.ofSeconds(3));
-    ratisServerConfig.setWatchTimeOut(Duration.ofSeconds(3));
+    ratisServerConfig.setWatchTimeOut(Duration.ofSeconds(2));
     conf.setFromObject(ratisServerConfig);
 
     RatisClientConfig.RaftConfig raftClientConfig =

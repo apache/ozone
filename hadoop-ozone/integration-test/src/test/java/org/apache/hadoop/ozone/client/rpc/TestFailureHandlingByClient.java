@@ -35,9 +35,11 @@ import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.ratis.conf.RatisClientConfig;
 import org.apache.hadoop.hdds.scm.OzoneClientConfig;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
+import org.apache.hadoop.hdds.scm.XceiverClientRatis;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
+import org.apache.hadoop.hdds.scm.storage.BlockOutputStream;
 import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.net.DNSToSwitchMapping;
 import org.apache.hadoop.net.NetUtils;
@@ -70,16 +72,21 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 
+import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
+import org.slf4j.event.Level;
 
 /**
  * Tests Exception handling by Ozone Client.
  */
 @Timeout(300)
 public class TestFailureHandlingByClient {
+
+  private static final org.slf4j.Logger LOG = org.slf4j.LoggerFactory.getLogger(TestFailureHandlingByClient.class);
 
   private MiniOzoneCluster cluster;
   private OzoneConfiguration conf;
@@ -117,14 +124,20 @@ public class TestFailureHandlingByClient {
         OzoneConfigKeys.OZONE_NETWORK_TOPOLOGY_AWARE_READ_KEY, true);
     conf.setInt(ScmConfigKeys.OZONE_DATANODE_PIPELINE_LIMIT, 2);
     conf.setInt(ScmConfigKeys.OZONE_SCM_RATIS_PIPELINE_LIMIT, 15);
-    DatanodeRatisServerConfig ratisServerConfig =
-        conf.getObject(DatanodeRatisServerConfig.class);
+
+    DatanodeRatisServerConfig ratisServerConfig = conf.getObject(DatanodeRatisServerConfig.class);
+    // raft.client.rpc.request.timeout
     ratisServerConfig.setRequestTimeOut(Duration.ofSeconds(3));
-    ratisServerConfig.setWatchTimeOut(Duration.ofSeconds(3));
+    // raft.server.watch.timeout
+    ratisServerConfig.setWatchTimeOut(Duration.ofSeconds(2));
+    // Note: raft.server.watch.timeout MUST be lower than raft.client.rpc.request.timeout
+    // for the client to get NotReplicatedException, otherwise the Raft client throws TimeoutIOException
+    // TODO: Add a config checker during startup in order to detect such misconfiguration?
+    //  Abort the startup if the check failed, otherwise it'd be hard to debug.
+    //  But add another hidden config to allow overriding the check?
     conf.setFromObject(ratisServerConfig);
 
-    RatisClientConfig.RaftConfig raftClientConfig =
-        conf.getObject(RatisClientConfig.RaftConfig.class);
+    RatisClientConfig.RaftConfig raftClientConfig = conf.getObject(RatisClientConfig.RaftConfig.class);
     raftClientConfig.setRpcRequestTimeout(Duration.ofSeconds(3));
     raftClientConfig.setRpcWatchRequestTimeout(Duration.ofSeconds(3));
     conf.setFromObject(raftClientConfig);
@@ -150,6 +163,14 @@ public class TestFailureHandlingByClient {
     bucketName = volumeName;
     objectStore.createVolume(volumeName);
     objectStore.getVolume(volumeName).createBucket(bucketName);
+
+    //GenericTestUtils.setLogLevel(AbstractDatanodeStore.LOG, Level.DEBUG);
+    //GenericTestUtils.setLogLevel(BlockInputStream.LOG, Level.DEBUG);
+    //GenericTestUtils.setLogLevel(BlockManagerImpl.LOG, Level.DEBUG);
+    GenericTestUtils.setLogLevel(BlockOutputStream.LOG, Level.DEBUG);
+    //GenericTestUtils.setLogLevel(KeyValueHandler.LOG, Level.DEBUG);
+    //GenericTestUtils.setLogLevel(OrderedAsync.LOG, Level.DEBUG);
+    GenericTestUtils.setLogLevel(XceiverClientRatis.LOG, Level.DEBUG);
   }
 
   private void startCluster() throws Exception {
@@ -440,16 +461,22 @@ public class TestFailureHandlingByClient {
             .getPipeline(container.getPipelineID());
     List<DatanodeDetails> datanodes = pipeline.getNodes();
 
-    // shutdown 1 datanode. This will make sure the 2 way commit happens for
-    // next write ops.
-    cluster.shutdownHddsDatanode(datanodes.get(0));
+    // Shutdown a follower datanode
+    // This will make sure the 2 way commit happens for next write ops.
+    DatanodeDetails dnKilled = datanodes.stream()
+        .filter(d -> !d.getUuid().equals(pipeline.getLeaderId())).findFirst().orElse(null);
+    assertNotNull(dnKilled, "A follower DN is not found in the pipeline");
+
+    cluster.shutdownHddsDatanode(dnKilled);
+    LOG.debug("datanode {} is shut down. pipeline leader is {}",
+        dnKilled.getUuid(), pipeline.getLeaderNode().getUuid());
 
     key.write(data.getBytes(UTF_8));
     key.write(data.getBytes(UTF_8));
     key.flush();
 
-    assertThat(keyOutputStream.getExcludeList().getDatanodes())
-        .contains(datanodes.get(0));
+    // Expect dead datanode to show up in the exclude list
+    assertThat(keyOutputStream.getExcludeList().getDatanodes()).contains(dnKilled);
     assertThat(keyOutputStream.getExcludeList().getContainerIds()).isEmpty();
     assertThat(keyOutputStream.getExcludeList().getPipelineIds()).isEmpty();
     // The close will just write to the buffer

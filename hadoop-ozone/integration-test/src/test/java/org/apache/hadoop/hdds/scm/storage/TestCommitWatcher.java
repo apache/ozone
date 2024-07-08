@@ -40,7 +40,6 @@ import org.apache.hadoop.hdds.scm.XceiverClientManager;
 import org.apache.hadoop.hdds.scm.XceiverClientRatis;
 import org.apache.hadoop.hdds.scm.XceiverClientReply;
 import org.apache.hadoop.hdds.scm.XceiverClientSpi;
-import org.apache.hadoop.hdds.scm.client.HddsClientUtils;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.protocolPB.StorageContainerLocationProtocolClientSideTranslatorPB;
@@ -60,13 +59,7 @@ import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_STALENODE_INTER
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
-import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import org.apache.ratis.protocol.exceptions.AlreadyClosedException;
-import org.apache.ratis.protocol.exceptions.NotReplicatedException;
-import org.apache.ratis.protocol.exceptions.RaftRetryFailureException;
-import org.apache.ratis.protocol.exceptions.TimeoutIOException;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -307,20 +300,8 @@ public class TestCommitWatcher {
         // just watch for a higher index so as to ensure, it does an actual
         // call to Ratis. Otherwise, it may just return in case the
         // commitInfoMap is updated to the latest index in putBlock response.
-        IOException ioe =
-            assertThrows(IOException.class, () -> watcher.watchForCommit(replies.get(1).getLogIndex() + 100));
-        Throwable t = HddsClientUtils.checkForException(ioe);
-        // with retry count set to noRetry and a lower watch request
-        // timeout, watch request will eventually
-        // fail with TimeoutIOException from ratis client or the client
-        // can itself get AlreadyClosedException from the Ratis Server
-        // and the write may fail with RaftRetryFailureException
-        assertTrue(
-            t instanceof RaftRetryFailureException ||
-                t instanceof TimeoutIOException ||
-                t instanceof AlreadyClosedException ||
-                t instanceof NotReplicatedException,
-            "Unexpected exception: " + t.getClass());
+        // Note watchForCommit no longer throws IOException after HDDS-10108, but it does release buffer nonetheless
+        watcher.watchForCommit(replies.get(1).getLogIndex() + 100);
         if (ratisClient.getReplicatedMinCommitIndex() < replies.get(1)
             .getLogIndex()) {
           assertEquals(chunkSize, watcher.getTotalAckDataLength());
