@@ -511,6 +511,7 @@ public class TestHddsVolume {
       assertEquals(0, volumeInfoMetrics.getReserved());
       assertEquals(0, volumeInfoMetrics.getTotalCapacity());
       assertEquals(0, volumeInfoMetrics.getCommitted());
+      assertEquals(0, volumeInfoMetrics.getDbCompactTime());
     } finally {
       // Shutdown the volume.
       volume.shutdown();

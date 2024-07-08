@@ -38,6 +38,7 @@ import org.apache.hadoop.ozone.container.common.utils.RawDB;
 import org.apache.hadoop.ozone.container.common.utils.StorageVolumeUtil;
 import org.apache.hadoop.ozone.container.upgrade.VersionedDatanodeFeatures;
 import org.apache.hadoop.ozone.container.upgrade.VersionedDatanodeFeatures.SchemaV3;
+import org.apache.hadoop.util.Time;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -469,7 +470,9 @@ public class HddsVolume extends StorageVolume {
       // Calculate number of files per level and size per level
       RawDB rawDB =
           DatanodeStoreCache.getInstance().getDB(dbFilePath, getConf());
+      long start = Time.monotonicNow();
       rawDB.getStore().compactionIfNeeded();
+      volumeInfoMetrics.dbCompactTimeIncr(Time.monotonicNow() - start);
     } catch (Exception e) {
       LOG.warn("compact rocksdb error in {}", dbFilePath, e);
     }
