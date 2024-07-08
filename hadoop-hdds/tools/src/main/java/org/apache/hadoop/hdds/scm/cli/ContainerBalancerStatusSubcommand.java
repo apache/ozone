@@ -18,10 +18,21 @@
 package org.apache.hadoop.hdds.scm.cli;
 
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ContainerBalancerStatusInfoResponseProto;
 import org.apache.hadoop.hdds.scm.client.ScmClient;
+import org.apache.hadoop.ozone.OzoneConsts;
+import picocli.CommandLine;
 import picocli.CommandLine.Command;
 
 import java.io.IOException;
+import java.time.Duration;
+import java.time.Instant;
+import java.time.LocalDateTime;
+import java.time.ZoneId;
+import java.util.List;
+import java.util.stream.Collectors;
 
 /**
  * Handler to query status of container balancer.
@@ -33,13 +44,103 @@ import java.io.IOException;
     versionProvider = HddsVersionProvider.class)
 public class ContainerBalancerStatusSubcommand extends ScmSubcommand {
 
+  @CommandLine.Option(names = {"-v", "--verbose"},
+          description = "More verbose output. Show balance iteration history.")
+  private boolean verbose;
+
   @Override
   public void execute(ScmClient scmClient) throws IOException {
-    boolean execReturn = scmClient.getContainerBalancerStatus();
-    if (execReturn) {
-      System.out.println("ContainerBalancer is Running.");
-    } else {
+    ContainerBalancerStatusInfoResponseProto balancerStatusInfo = scmClient.getContainerBalancerStatusInfo();
+    if (balancerStatusInfo == null) {
       System.out.println("ContainerBalancer is Not Running.");
+    } else {
+      LocalDateTime dateTime =
+              LocalDateTime.ofInstant(Instant.ofEpochSecond(balancerStatusInfo.getStartedAt()), ZoneId.systemDefault());
+      System.out.println("ContainerBalancer is Running.");
+      System.out.printf("Started at: %s %s\n\n", dateTime.toLocalDate(), dateTime.toLocalTime());
+      System.out.println(getConfigurationPrettyString(balancerStatusInfo.getConfiguration()));
+      List<StorageContainerLocationProtocolProtos.ContainerBalancerTaskIterationStatusInfo> iterationsStatusInfoList = balancerStatusInfo.getIterationsStatusInfoList();
+      if (verbose) {
+        System.out.println("Iteration history list:");
+        System.out.println(iterationsStatusInfoList.stream().map(this::getPrettyIterationStatusInfo).collect(Collectors.joining("\n")));
+      } else {
+        System.out.println("Current iteration info:");
+        System.out.println(getPrettyIterationStatusInfo(iterationsStatusInfoList.get(iterationsStatusInfoList.size() - 1)));
+      }
     }
   }
+
+  String getConfigurationPrettyString(HddsProtos.ContainerBalancerConfigurationProto configuration) {
+    return String.format("Container Balancer Configuration values:%n" +
+                    "%-50s %s%n" +
+                    "%-50s %s%n" +
+                    "%-50s %d%n" +
+                    "%-50s %dGB%n" +
+                    "%-50s %dGB%n" +
+                    "%-50s %dGB%n" +
+                    "%-50s %d%n" +
+                    "%-50s %dmin%n" +
+                    "%-50s %dmin%n" +
+                    "%-50s %dmin%n" +
+                    "%-50s %s%n" +
+                    "%-50s %s%n" +
+                    "%-50s %s%n" +
+                    "%-50s %s%n" +
+                    "%-50s %s%n", "Key", "Value", "Threshold",
+            configuration.getUtilizationThreshold(), "Max Datanodes to Involve per Iteration(percent)",
+            configuration.getDatanodesInvolvedMaxPercentagePerIteration(),
+            "Max Size to Move per Iteration",
+            configuration.getDatanodesInvolvedMaxPercentagePerIteration() / OzoneConsts.GB,
+            "Max Size Entering Target per Iteration",
+            configuration.getSizeEnteringTargetMax() / OzoneConsts.GB,
+            "Max Size Leaving Source per Iteration",
+            configuration.getSizeLeavingSourceMax() / OzoneConsts.GB,
+            "Number of Iterations",
+            configuration.getIterations(),
+            "Time Limit for Single Container's Movement",
+            Duration.ofMillis(configuration.getMoveTimeout()).toMinutes(),
+            "Time Limit for Single Container's Replication",
+            Duration.ofMillis(configuration.getMoveReplicationTimeout()).toMinutes(),
+            "Interval between each Iteration",
+            Duration.ofMillis(configuration.getBalancingIterationInterval()).toMinutes(),
+            "Whether to Enable Network Topology",
+            configuration.getMoveNetworkTopologyEnable(),
+            "Whether to Trigger Refresh Datanode Usage Info",
+            configuration.getTriggerDuBeforeMoveEnable(),
+            "Container IDs to Exclude from Balancing",
+            configuration.getExcludeContainers().isEmpty() ? "None" : configuration.getExcludeContainers(),
+            "Datanodes Specified to be Balanced",
+            configuration.getIncludeDatanodes().isEmpty() ? "None" : configuration.getIncludeDatanodes(),
+            "Datanodes Excluded from Balancing",
+            configuration.getExcludeDatanodes().isEmpty() ? "None" : configuration.getExcludeDatanodes());
+  }
+
+  private String getPrettyIterationStatusInfo(StorageContainerLocationProtocolProtos.ContainerBalancerTaskIterationStatusInfo iterationStatusInfo) {
+    return String.format(
+                    "%-50s %s%n" +
+                    "%-50s %s%n" +
+                    "%-50s %s%n" +
+                    "%-50s %s%n" +
+                    "%-50s %s%n" +
+                    "%-50s %s%n" +
+                    "%-50s %s%n" +
+                    "%-50s %s%n" +
+                    "%-50s %s%n" +
+                    "%-50s \n%s" +
+                    "%-50s \n%s",
+            "Key", "Value",
+            "Iteration number", iterationStatusInfo.getIterationNumber(),
+            "Iteration result", iterationStatusInfo.getIterationResult().isEmpty() ? "IN_PROGRESS" : iterationStatusInfo.getIterationResult(),
+            "Size scheduled to move", iterationStatusInfo.getSizeScheduledForMove(),
+            "Moved data size", iterationStatusInfo.getDataSizeMovedGB(),
+            "Scheduled to move containers", iterationStatusInfo.getContainerMovesScheduled(),
+            "Already moved containers", iterationStatusInfo.getContainerMovesCompleted(),
+            "Failed to move containers", iterationStatusInfo.getContainerMovesFailed(),
+            "Failed to move containers by timeout", iterationStatusInfo.getContainerMovesTimeout(),
+            "Entered data to nodes", iterationStatusInfo.getSizeEnteringNodesList().stream().map(
+                    nodeInfo -> nodeInfo.getUuid() + " <- " + nodeInfo.getDataVolume() + "\n")
+                    .collect(Collectors.joining()),
+            "Exited data from nodes", iterationStatusInfo.getSizeLeavingNodesList().stream().map(nodeInfo -> nodeInfo.getUuid() + " -> " + nodeInfo.getDataVolume() + "\n").collect(Collectors.joining()));
+  }
 }
+

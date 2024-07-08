@@ -600,6 +600,13 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
             .setContainerBalancerStatusResponse(getContainerBalancerStatus(
                 request.getContainerBalancerStatusRequest()))
             .build();
+      case GetContainerBalancerStatusInfo:
+        return ScmContainerLocationResponse.newBuilder()
+                .setCmdType(request.getCmdType())
+                .setStatus(Status.OK)
+                .setContainerBalancerStatusInfoResponse(getContainerBalancerStatusInfo(
+                        request.getContainerBalancerStatusInfoRequest()))
+                .build();
       case GetPipeline:
         return ScmContainerLocationResponse.newBuilder()
             .setCmdType(request.getCmdType())
@@ -1194,6 +1201,17 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
       throws IOException {
     return ContainerBalancerStatusResponseProto.newBuilder()
         .setIsRunning(impl.getContainerBalancerStatus()).build();
+  }
+
+  public ContainerBalancerStatusInfoResponseProto getContainerBalancerStatusInfo(
+          ContainerBalancerStatusInfoRequestProto request)
+          throws IOException {
+    ContainerBalancerStatusInfoResponseProto containerBalancerStatusInfo = impl.getContainerBalancerStatusInfo();
+    return ContainerBalancerStatusInfoResponseProto.newBuilder()
+            .setStartedAt(containerBalancerStatusInfo.getStartedAt())
+            .setConfiguration(containerBalancerStatusInfo.getConfiguration())
+            .addAllIterationsStatusInfo(containerBalancerStatusInfo.getIterationsStatusInfoList())
+            .build();
   }
 
   public DecommissionNodesResponseProto decommissionNodes(

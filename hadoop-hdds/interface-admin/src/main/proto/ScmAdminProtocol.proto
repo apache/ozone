@@ -84,6 +84,7 @@ message ScmContainerLocationRequest {
   optional SingleNodeQueryRequestProto singleNodeQueryRequest = 45;
   optional GetContainersOnDecomNodeRequestProto getContainersOnDecomNodeRequest = 46;
   optional GetMetricsRequestProto getMetricsRequest = 47;
+  optional ContainerBalancerStatusInfoRequestProto containerBalancerStatusInfoRequest = 48;
 }
 
 message ScmContainerLocationResponse {
@@ -139,6 +140,7 @@ message ScmContainerLocationResponse {
   optional SingleNodeQueryResponseProto singleNodeQueryResponse = 45;
   optional GetContainersOnDecomNodeResponseProto getContainersOnDecomNodeResponse = 46;
   optional GetMetricsResponseProto getMetricsResponse = 47;
+  optional ContainerBalancerStatusInfoResponseProto containerBalancerStatusInfoResponse = 48;
 
   enum Status {
     OK = 1;
@@ -193,6 +195,7 @@ enum Type {
   SingleNodeQuery = 41;
   GetContainersOnDecomNode = 42;
   GetMetrics = 43;
+  GetContainerBalancerStatusInfo = 44;
 }
 
 /**
@@ -605,6 +608,34 @@ message ContainerBalancerStatusRequestProto {
 
 message ContainerBalancerStatusResponseProto {
   required bool isRunning = 1;
+}
+
+message ContainerBalancerStatusInfoRequestProto {
+  optional string traceID = 1;
+}
+
+message ContainerBalancerStatusInfoResponseProto {
+  required uint64 startedAt = 1;
+  required ContainerBalancerConfigurationProto configuration = 2;
+  repeated ContainerBalancerTaskIterationStatusInfo iterationsStatusInfo = 3;
+}
+
+message ContainerBalancerTaskIterationStatusInfo {
+    required int32 iterationNumber = 1;
+    optional string iterationResult = 2;
+    required int64 sizeScheduledForMove = 3;
+    required int64 dataSizeMovedGB = 4;
+    required int64 containerMovesScheduled = 5;
+    required int64 containerMovesCompleted = 6;
+    required int64 containerMovesFailed = 7;
+    required int64 containerMovesTimeout = 8;
+    repeated NodeTransferInfo sizeEnteringNodes = 9;
+    repeated NodeTransferInfo sizeLeavingNodes = 10;
+}
+
+message NodeTransferInfo {
+ required string uuid = 1;
+ required int64 dataVolume = 2;
 }
 
 message DecommissionScmRequestProto {

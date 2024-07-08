@@ -187,6 +187,10 @@
               {
                 "name": "DecommissionScm",
                 "integer": 40
+              },
+              {
+                "name": "GetContainerBalancerStatusInfo",
+                "integer": 44
               }
             ]
           },
@@ -497,6 +501,12 @@
                 "name": "decommissionScmRequest",
                 "type": "DecommissionScmRequestProto",
                 "optional": true
+              },
+              {
+                "id": 48,
+                "name": "containerBalancerStatusInfoRequest",
+                "type": "ContainerBalancerStatusInfoRequestProto",
+                "optional": true
               }
             ]
           },
@@ -771,6 +781,12 @@
                 "id": 44,
                 "name": "decommissionScmResponse",
                 "type": "DecommissionScmResponseProto",
+                "optional": true
+              },
+              {
+                "id": 48,
+                "name": "containerBalancerStatusInfoResponse",
+                "type": "ContainerBalancerStatusInfoResponseProto",
                 "optional": true
               }
             ]
@@ -1913,6 +1929,40 @@
                 "name": "errorMsg",
                 "type": "string",
                 "optional": true
+              }
+            ]
+          },
+          {
+            "name": "ContainerBalancerStatusInfoRequestProto",
+            "fields": [
+              {
+                "id": 1,
+                "name": "traceID",
+                "type": "string",
+                "optional": true
+              }
+            ]
+          },
+          {
+            "name": "ContainerBalancerStatusInfoResponseProto",
+            "fields": [
+              {
+                "id": 1,
+                "name": "startedAt",
+                "type": "uint64",
+                "required": true
+              },
+              {
+                "id": 2,
+                "name": "configuration",
+                "type": "ContainerBalancerConfigurationProto",
+                "required": true
+              },
+              {
+                "id": 3,
+                "name": "iterationsStatusInfo",
+                "type": "ContainerBalancerTaskIterationStatusInfo",
+                "is_repeated": true
               }
             ]
           }
