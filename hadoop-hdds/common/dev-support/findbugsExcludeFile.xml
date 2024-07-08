@@ -31,10 +31,6 @@
     <Method name="update" />
     <Bug pattern="SF_SWITCH_FALLTHROUGH,SF_SWITCH_NO_DEFAULT" />
   </Match>
-  <Match>
-    <Class name="org.apache.hadoop.hdds.utils.LegacyHadoopConfigurationSource$1$1" />
-    <Bug pattern="SE_BAD_FIELD" />
-  </Match>
 
   <!-- Test -->
   <Match>
