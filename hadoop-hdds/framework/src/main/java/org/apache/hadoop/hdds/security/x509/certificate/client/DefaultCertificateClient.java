@@ -102,6 +102,9 @@ import static org.apache.hadoop.hdds.security.x509.exception.CertificateExceptio
 import org.bouncycastle.pkcs.PKCS10CertificationRequest;
 import org.slf4j.Logger;
 
+import javax.net.ssl.KeyManager;
+import javax.net.ssl.TrustManager;
+
 /**
  * Default Certificate client implementation. It provides certificate
  * operations that needs to be performed by certificate clients in the Ozone
@@ -1031,6 +1034,13 @@ public abstract class DefaultCertificateClient implements CertificateClient {
     return serverKeyStoresFactory;
   }
 
+  public TrustManager getTrustManager() throws CertificateException {
+    if (serverKeyStoresFactory == null) {
+      serverKeyStoresFactory = getServerKeyStoresFactory(this, true);
+    }
+    return serverKeyStoresFactory.getTrustManagers()[0];
+  }
+
   @Override
   public KeyStoresFactory getClientKeyStoresFactory()
       throws CertificateException {
@@ -1038,6 +1048,13 @@ public abstract class DefaultCertificateClient implements CertificateClient {
       clientKeyStoresFactory = getClientKeyStoresFactory(this, true);
     }
     return clientKeyStoresFactory;
+  }
+
+  public KeyManager getKeyManager() throws CertificateException {
+    if (serverKeyStoresFactory == null) {
+      serverKeyStoresFactory = getServerKeyStoresFactory(this, true);
+    }
+    return serverKeyStoresFactory.getKeyManagers()[0];
   }
 
   public static KeyStoresFactory getServerKeyStoresFactory(
