@@ -226,8 +226,8 @@ public class OMPerformanceMetrics {
     return validateAndUpdateCacheLatencyNs;
   }
 
-  public void setListKeysAveragePagination(long averagePagination) {
-    listKeysAveragePagination.add(averagePagination);
+  public void setListKeysAveragePagination(long keyCount) {
+    listKeysAveragePagination.add(keyCount);
   }
 
   public void setListKeysOpsPerSec(float opsPerSec) {

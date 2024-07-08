@@ -1277,15 +1277,15 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
     boolean isTruncated = cacheKeyMap.size() > maxKeys;
 
     if (perfMetrics != null) {
-      long averagePagination;
+      long keyCount;
       if (isTruncated) {
-        averagePagination = maxKeys;
+        keyCount = maxKeys;
       } else {
-        averagePagination = cacheKeyMap.size();
+        keyCount = cacheKeyMap.size();
       }
-      perfMetrics.setListKeysAveragePagination(averagePagination);
+      perfMetrics.setListKeysAveragePagination(keyCount);
       float opsPerSec =
-              averagePagination / ((Time.monotonicNowNanos() - startNanos) / 1000000000.0f);
+              keyCount / ((Time.monotonicNowNanos() - startNanos) / 1000000000.0f);
       perfMetrics.setListKeysOpsPerSec(opsPerSec);
       perfMetrics.addListKeysReadFromRocksDbLatencyNs(readFromRDbStopNs - readFromRDbStartNs);
     }
