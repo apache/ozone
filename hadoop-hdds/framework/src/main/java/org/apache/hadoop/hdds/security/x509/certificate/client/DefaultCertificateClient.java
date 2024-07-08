@@ -31,6 +31,7 @@ import java.security.GeneralSecurityException;
 import java.security.InvalidKeyException;
 import java.security.KeyFactory;
 import java.security.KeyPair;
+import java.security.KeyStore;
 import java.security.NoSuchAlgorithmException;
 import java.security.NoSuchProviderException;
 import java.security.PrivateKey;
@@ -75,13 +76,14 @@ import org.apache.hadoop.hdds.protocolPB.SCMSecurityProtocolClientSideTranslator
 import org.apache.hadoop.hdds.security.SecurityConfig;
 import org.apache.hadoop.hdds.security.ssl.KeyStoresFactory;
 import org.apache.hadoop.hdds.security.ssl.PemFileBasedKeyStoresFactory;
+import org.apache.hadoop.hdds.security.ssl.ReloadingX509KeyManager;
+import org.apache.hadoop.hdds.security.ssl.ReloadingX509TrustManager;
 import org.apache.hadoop.hdds.security.x509.certificate.authority.CAType;
 import org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateCodec;
 import org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateSignRequest;
 import org.apache.hadoop.hdds.security.x509.exception.CertificateException;
 import org.apache.hadoop.hdds.security.x509.keys.HDDSKeyGenerator;
 import org.apache.hadoop.hdds.security.x509.keys.KeyCodec;
-import org.apache.hadoop.hdds.security.x509.keys.SecurityUtil;
 import org.apache.hadoop.ozone.OzoneSecurityUtil;
 
 import com.google.common.base.Preconditions;
@@ -133,6 +135,8 @@ public abstract class DefaultCertificateClient implements CertificateClient {
   private Lock pemEncodedCACertsLock = new ReentrantLock();
   private KeyStoresFactory serverKeyStoresFactory;
   private KeyStoresFactory clientKeyStoresFactory;
+  private KeyManager keyManager;
+  private TrustManager trustManager;
 
   private ScheduledExecutorService executorService;
   private Consumer<String> certIdSaveCallback;
@@ -1034,11 +1038,14 @@ public abstract class DefaultCertificateClient implements CertificateClient {
     return serverKeyStoresFactory;
   }
 
-  public TrustManager getTrustManager() throws CertificateException {
-    if (serverKeyStoresFactory == null) {
-      serverKeyStoresFactory = getServerKeyStoresFactory(this, true);
+  public TrustManager getTrustManager() throws IOException, GeneralSecurityException {
+    if (trustManager == null) {
+      Set<X509Certificate> newRootCaCerts = rootCaCertificates.isEmpty() ?
+          caCertificates : rootCaCertificates;
+      trustManager = new ReloadingX509TrustManager(KeyStore.getDefaultType(), new ArrayList<>(newRootCaCerts));
+      notificationReceivers.add((ReloadingX509TrustManager) trustManager);
     }
-    return serverKeyStoresFactory.getTrustManagers()[0];
+    return trustManager;
   }
 
   @Override
@@ -1050,11 +1057,13 @@ public abstract class DefaultCertificateClient implements CertificateClient {
     return clientKeyStoresFactory;
   }
 
-  public KeyManager getKeyManager() throws CertificateException {
-    if (serverKeyStoresFactory == null) {
-      serverKeyStoresFactory = getServerKeyStoresFactory(this, true);
+  public KeyManager getKeyManager() throws IOException, GeneralSecurityException {
+    if (keyManager == null) {
+      keyManager = new ReloadingX509KeyManager(
+          KeyStore.getDefaultType(), getComponentName(), getPrivateKey(), getTrustChain());
+      notificationReceivers.add((ReloadingX509KeyManager) keyManager);
     }
-    return serverKeyStoresFactory.getKeyManagers()[0];
+    return keyManager;
   }
 
   public static KeyStoresFactory getServerKeyStoresFactory(

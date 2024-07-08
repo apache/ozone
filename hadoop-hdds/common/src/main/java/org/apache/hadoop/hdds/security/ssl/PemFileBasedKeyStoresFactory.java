@@ -30,6 +30,7 @@ import javax.net.ssl.TrustManager;
 import java.io.IOException;
 import java.security.GeneralSecurityException;
 import java.security.KeyStore;
+import java.util.ArrayList;
 
 /**
  * {@link KeyStoresFactory} implementation that reads the certificates from
@@ -62,8 +63,9 @@ public class PemFileBasedKeyStoresFactory implements KeyStoresFactory,
    */
   private void createTrustManagers() throws
       GeneralSecurityException, IOException {
-    ReloadingX509TrustManager trustManager = new ReloadingX509TrustManager(KeyStore.getDefaultType(), caClient);
-    trustManagers = new TrustManager[] {trustManager};
+    ReloadingX509TrustManager trustManager = new ReloadingX509TrustManager(KeyStore.getDefaultType(),
+        new ArrayList<>(caClient.getAllRootCaCerts()));
+    trustManagers = new TrustManager[]{trustManager};
   }
 
   /**
@@ -72,8 +74,9 @@ public class PemFileBasedKeyStoresFactory implements KeyStoresFactory,
    */
   private void createKeyManagers() throws
       GeneralSecurityException, IOException {
-    ReloadingX509KeyManager keystoreManager = new ReloadingX509KeyManager(KeyStore.getDefaultType(), caClient);
-    keyManagers = new KeyManager[] {keystoreManager};
+    ReloadingX509KeyManager keystoreManager = new ReloadingX509KeyManager(KeyStore.getDefaultType(),
+        caClient.getComponentName(), caClient.getPrivateKey(), caClient.getTrustChain());
+    keyManagers = new KeyManager[]{keystoreManager};
   }
 
   /**
@@ -147,17 +150,16 @@ public class PemFileBasedKeyStoresFactory implements KeyStoresFactory,
       CertificateClient certClient, String oldCertId, String newCertId) {
     LOG.info("{} notify certificate renewed", certClient.getComponentName());
     if (keyManagers != null) {
-      for (KeyManager km: keyManagers) {
+      for (KeyManager km : keyManagers) {
         if (km instanceof ReloadingX509KeyManager) {
-          ((ReloadingX509KeyManager) km).loadFrom(certClient);
+          ((ReloadingX509KeyManager) km).notifyCertificateRenewed(certClient, oldCertId, newCertId);
         }
       }
     }
-
     if (trustManagers != null) {
-      for (TrustManager tm: trustManagers) {
+      for (TrustManager tm : trustManagers) {
         if (tm instanceof ReloadingX509TrustManager) {
-          ((ReloadingX509TrustManager) tm).loadFrom(certClient);
+          ((ReloadingX509TrustManager) tm).notifyCertificateRenewed(certClient, oldCertId, newCertId);
         }
       }
     }
