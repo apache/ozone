@@ -28,6 +28,7 @@ import {
 } from 'antd';
 import { MenuProps } from 'antd/es/menu';
 import {
+  CloseOutlined,
   InfoCircleOutlined,
   LeftOutlined,
   LoadingOutlined,
@@ -192,11 +193,12 @@ export class DiskUsage extends React.Component<Record<string, object>, IDUState>
 
       let pathLabels, values: number[] = [], percentage, sizeStr, pieces, subpathName;
 
-      if (duResponse.subPathCount === 0 || subpaths === 0) {
+      if (duResponse.subPathCount === 0 || subpaths.length === 0) {
         pieces = duResponse && duResponse.path != null && duResponse.path.split('/');
         subpathName = pieces[pieces.length - 1];
         pathLabels = [subpathName];
         values = [0.1];
+        valuesWithMinBlockSize = structuredClone(values);
         percentage = [100.00];
         sizeStr = [byteToSize(duResponse.size, 1)];
       }
@@ -245,7 +247,7 @@ export class DiskUsage extends React.Component<Record<string, object>, IDUState>
             name: pathLabels[idx],
             size: sizeStr[idx],
             percentage: percentage[idx]
-          }
+          } as IPlotData
         })
       });
     }).catch(error => {
@@ -554,6 +556,7 @@ export class DiskUsage extends React.Component<Record<string, object>, IDUState>
       </Menu>
     )
 
+    console.log(plotData);
     console.log(plotData.map((value) => {
       return {
         name: value.name
