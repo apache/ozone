@@ -20,10 +20,11 @@
 package org.apache.hadoop.hdds.security.x509.certificate.client;
 
 import org.apache.hadoop.hdds.security.exception.OzoneSecurityException;
-import org.apache.hadoop.hdds.security.ssl.KeyStoresFactory;
 import org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateSignRequest;
 import org.apache.hadoop.hdds.security.x509.exception.CertificateException;
 
+import javax.net.ssl.KeyManager;
+import javax.net.ssl.TrustManager;
 import java.io.Closeable;
 import java.io.IOException;
 import java.security.PrivateKey;
@@ -174,15 +175,9 @@ public interface CertificateClient extends Closeable {
     }
   }
 
-  /**
-   * Return the store factory for key manager and trust manager for server.
-   */
-  KeyStoresFactory getServerKeyStoresFactory() throws CertificateException;
+  KeyManager getKeyManager() throws CertificateException;
 
-  /**
-   * Return the store factory for key manager and trust manager for client.
-   */
-  KeyStoresFactory getClientKeyStoresFactory() throws CertificateException;
+  TrustManager getTrustManager() throws CertificateException;
 
   /**
    * Register a receiver that will be called after the certificate renewed.

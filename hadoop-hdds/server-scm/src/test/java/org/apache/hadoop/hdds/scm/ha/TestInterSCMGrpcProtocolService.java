@@ -23,7 +23,6 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.metadata.SCMMetadataStore;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
-import org.apache.hadoop.hdds.security.ssl.KeyStoresFactory;
 import org.apache.hadoop.hdds.security.x509.CertificateTestUtils;
 import org.apache.hadoop.hdds.security.x509.certificate.client.SCMCertificateClient;
 import org.apache.hadoop.hdds.utils.TransactionInfo;
@@ -36,8 +35,6 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.mockito.ArgumentCaptor;
 
-import javax.net.ssl.KeyManager;
-import javax.net.ssl.TrustManager;
 import javax.net.ssl.X509KeyManager;
 import javax.net.ssl.X509TrustManager;
 
@@ -207,30 +204,14 @@ class TestInterSCMGrpcProtocolService {
 
     serverKeyManager = aKeyManagerWith(serviceKeys, serviceCert);
     serverTrustManager = aTrustManagerThatTrusts(clientCert);
-    KeyStoresFactory serverKeyStores =
-        aKeyStoresFactoryWith(serverKeyManager, serverTrustManager);
 
     clientKeyManager = aKeyManagerWith(clientKeys, clientCert);
     clientTrustManager = aTrustManagerThatTrusts(serviceCert);
-    KeyStoresFactory clientKeyStores =
-        aKeyStoresFactoryWith(clientKeyManager, clientTrustManager);
 
     SCMCertificateClient scmCertClient = mock(SCMCertificateClient.class);
-    doReturn(serverKeyStores).when(scmCertClient).getServerKeyStoresFactory();
-    doReturn(clientKeyStores).when(scmCertClient).getClientKeyStoresFactory();
+    doReturn(serverKeyManager, clientKeyManager).when(scmCertClient).getKeyManager();
+    doReturn(serverTrustManager, clientTrustManager).when(scmCertClient).getTrustManager();
     return scmCertClient;
-  }
-
-  private KeyStoresFactory aKeyStoresFactoryWith(
-      X509KeyManager keyManager,
-      X509TrustManager trustManager
-  ) {
-    KeyStoresFactory serverKeyStores = mock(KeyStoresFactory.class);
-    doReturn(new KeyManager[]{keyManager})
-        .when(serverKeyStores).getKeyManagers();
-    doReturn(new TrustManager[]{trustManager})
-        .when(serverKeyStores).getTrustManagers();
-    return serverKeyStores;
   }
 
   private X509TrustManager aTrustManagerThatTrusts(X509Certificate certificate)

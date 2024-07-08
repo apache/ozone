@@ -18,8 +18,10 @@ package org.apache.hadoop.hdds.security.x509.certificate.client;
 
 import java.io.IOException;
 import java.math.BigInteger;
+import java.security.GeneralSecurityException;
 import java.security.InvalidKeyException;
 import java.security.KeyPair;
+import java.security.KeyStore;
 import java.security.NoSuchAlgorithmException;
 import java.security.NoSuchProviderException;
 import java.security.PrivateKey;
@@ -46,8 +48,9 @@ import java.util.function.Function;
 
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.hdds.security.ssl.KeyStoresFactory;
 import org.apache.hadoop.hdds.security.SecurityConfig;
+import org.apache.hadoop.hdds.security.ssl.ReloadingX509KeyManager;
+import org.apache.hadoop.hdds.security.ssl.ReloadingX509TrustManager;
 import org.apache.hadoop.hdds.security.x509.certificate.authority.DefaultApprover;
 import org.apache.hadoop.hdds.security.x509.certificate.authority.profile.DefaultProfile;
 import org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateSignRequest;
@@ -55,7 +58,8 @@ import org.apache.hadoop.hdds.security.x509.certificate.utils.SelfSignedCertific
 import org.apache.hadoop.hdds.security.x509.exception.CertificateException;
 import org.apache.hadoop.hdds.security.x509.keys.HDDSKeyGenerator;
 
-import org.apache.hadoop.hdds.security.x509.keys.SecurityUtil;
+import javax.net.ssl.KeyManager;
+import javax.net.ssl.TrustManager;
 
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_X509_DEFAULT_DURATION;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_X509_DEFAULT_DURATION_DEFAULT;
@@ -79,8 +83,8 @@ public class CertificateClientTestImpl implements CertificateClient {
 
   private HDDSKeyGenerator keyGen;
   private DefaultApprover approver;
-  private KeyStoresFactory serverKeyStoresFactory;
-  private KeyStoresFactory clientKeyStoresFactory;
+  private KeyManager keyManager;
+  private TrustManager trustManager;
   private Map<String, X509Certificate> certificateMap;
   private ScheduledExecutorService executorService;
   private Set<CertificateNotification> notificationReceivers;
@@ -145,8 +149,6 @@ public class CertificateClientTestImpl implements CertificateClient {
         x509Certificate);
 
     notificationReceivers = new HashSet<>();
-    serverKeyStoresFactory = getServerKeyStoresFactory();
-    clientKeyStoresFactory = getClientKeyStoresFactory();
 
     if (autoRenew) {
       Duration gracePeriod = securityConfig.getRenewalGracePeriod();
@@ -335,13 +337,33 @@ public class CertificateClientTestImpl implements CertificateClient {
   }
 
   @Override
-  public KeyStoresFactory getServerKeyStoresFactory() {
-    return serverKeyStoresFactory;
+  public KeyManager getKeyManager() throws CertificateException {
+    try {
+      if (keyManager == null) {
+        keyManager = new ReloadingX509KeyManager(
+            KeyStore.getDefaultType(), getComponentName(), getPrivateKey(), getTrustChain());
+        notificationReceivers.add((ReloadingX509KeyManager) keyManager);
+      }
+      return keyManager;
+    } catch (IOException | GeneralSecurityException e) {
+      throw new CertificateException("Failed to init keyManager", e,
+          CertificateException.ErrorCode.KEYSTORE_ERROR);
+    }
   }
 
   @Override
-  public KeyStoresFactory getClientKeyStoresFactory() {
-    return clientKeyStoresFactory;
+  public TrustManager getTrustManager() throws CertificateException {
+    try {
+      if (trustManager == null) {
+        Set<X509Certificate> newRootCaCerts = getAllRootCaCerts().isEmpty() ?
+            getAllCaCerts() : getAllRootCaCerts();
+        trustManager = new ReloadingX509TrustManager(KeyStore.getDefaultType(), new ArrayList<>(newRootCaCerts));
+        notificationReceivers.add((ReloadingX509TrustManager) trustManager);
+      }
+      return trustManager;
+    } catch (IOException | GeneralSecurityException e) {
+      throw new CertificateException("Failed to init trustManager", e);
+    }
   }
 
   @Override
@@ -360,14 +382,6 @@ public class CertificateClientTestImpl implements CertificateClient {
 
   @Override
   public void close() throws IOException {
-    if (serverKeyStoresFactory != null) {
-      serverKeyStoresFactory.destroy();
-    }
-
-    if (clientKeyStoresFactory != null) {
-      clientKeyStoresFactory.destroy();
-    }
-
     if (executorService != null) {
       executorService.shutdown();
     }

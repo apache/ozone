@@ -74,8 +74,6 @@ import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMGetCertResponseProto;
 import org.apache.hadoop.hdds.protocolPB.SCMSecurityProtocolClientSideTranslatorPB;
 import org.apache.hadoop.hdds.security.SecurityConfig;
-import org.apache.hadoop.hdds.security.ssl.KeyStoresFactory;
-import org.apache.hadoop.hdds.security.ssl.PemFileBasedKeyStoresFactory;
 import org.apache.hadoop.hdds.security.ssl.ReloadingX509KeyManager;
 import org.apache.hadoop.hdds.security.ssl.ReloadingX509TrustManager;
 import org.apache.hadoop.hdds.security.x509.certificate.authority.CAType;
@@ -133,8 +131,6 @@ public abstract class DefaultCertificateClient implements CertificateClient {
   private final String threadNamePrefix;
   private List<String> pemEncodedCACerts = null;
   private Lock pemEncodedCACertsLock = new ReentrantLock();
-  private KeyStoresFactory serverKeyStoresFactory;
-  private KeyStoresFactory clientKeyStoresFactory;
   private KeyManager keyManager;
   private TrustManager trustManager;
 
@@ -1030,71 +1026,35 @@ public abstract class DefaultCertificateClient implements CertificateClient {
   }
 
   @Override
-  public synchronized KeyStoresFactory getServerKeyStoresFactory()
-      throws CertificateException {
-    if (serverKeyStoresFactory == null) {
-      serverKeyStoresFactory = getServerKeyStoresFactory(this, true);
+  public TrustManager getTrustManager() throws CertificateException {
+    try {
+      if (trustManager == null) {
+        Set<X509Certificate> newRootCaCerts = rootCaCertificates.isEmpty() ?
+            caCertificates : rootCaCertificates;
+        trustManager = new ReloadingX509TrustManager(KeyStore.getDefaultType(), new ArrayList<>(newRootCaCerts));
+        notificationReceivers.add((ReloadingX509TrustManager) trustManager);
+      }
+      return trustManager;
+    } catch (IOException | GeneralSecurityException e) {
+      throw new CertificateException("Failed to init trustManager", e,
+          CertificateException.ErrorCode.KEYSTORE_ERROR);
     }
-    return serverKeyStoresFactory;
-  }
-
-  public TrustManager getTrustManager() throws IOException, GeneralSecurityException {
-    if (trustManager == null) {
-      Set<X509Certificate> newRootCaCerts = rootCaCertificates.isEmpty() ?
-          caCertificates : rootCaCertificates;
-      trustManager = new ReloadingX509TrustManager(KeyStore.getDefaultType(), new ArrayList<>(newRootCaCerts));
-      notificationReceivers.add((ReloadingX509TrustManager) trustManager);
-    }
-    return trustManager;
   }
 
   @Override
-  public KeyStoresFactory getClientKeyStoresFactory()
-      throws CertificateException {
-    if (clientKeyStoresFactory == null) {
-      clientKeyStoresFactory = getClientKeyStoresFactory(this, true);
-    }
-    return clientKeyStoresFactory;
-  }
-
-  public KeyManager getKeyManager() throws IOException, GeneralSecurityException {
-    if (keyManager == null) {
-      keyManager = new ReloadingX509KeyManager(
-          KeyStore.getDefaultType(), getComponentName(), getPrivateKey(), getTrustChain());
-      notificationReceivers.add((ReloadingX509KeyManager) keyManager);
-    }
-    return keyManager;
-  }
-
-  public static KeyStoresFactory getServerKeyStoresFactory(
-      CertificateClient client,
-      boolean requireClientAuth) throws CertificateException {
-    PemFileBasedKeyStoresFactory factory =
-        new PemFileBasedKeyStoresFactory(client);
+  public KeyManager getKeyManager() throws CertificateException {
     try {
-      factory.init(KeyStoresFactory.Mode.SERVER, requireClientAuth);
+      if (keyManager == null) {
+        keyManager = new ReloadingX509KeyManager(
+            KeyStore.getDefaultType(), getComponentName(), getPrivateKey(), getTrustChain());
+        notificationReceivers.add((ReloadingX509KeyManager) keyManager);
+      }
+      return keyManager;
     } catch (IOException | GeneralSecurityException e) {
-      throw new CertificateException("Failed to init keyStoresFactory", e,
+      throw new CertificateException("Failed to init keyManager", e,
           CertificateException.ErrorCode.KEYSTORE_ERROR);
     }
-    return factory;
   }
-
-  public static KeyStoresFactory getClientKeyStoresFactory(
-      CertificateClient client,
-      boolean requireClientAuth) throws CertificateException {
-    PemFileBasedKeyStoresFactory factory =
-        new PemFileBasedKeyStoresFactory(client);
-
-    try {
-      factory.init(KeyStoresFactory.Mode.CLIENT, requireClientAuth);
-    } catch (IOException | GeneralSecurityException e) {
-      throw new CertificateException("Failed to init keyStoresFactory", e,
-          CertificateException.ErrorCode.KEYSTORE_ERROR);
-    }
-    return factory;
-  }
-
 
   /**
    * Register a receiver that will be called after the certificate renewed.
@@ -1129,14 +1089,6 @@ public abstract class DefaultCertificateClient implements CertificateClient {
 
     if (rootCaRotationPoller != null) {
       rootCaRotationPoller.close();
-    }
-
-    if (serverKeyStoresFactory != null) {
-      serverKeyStoresFactory.destroy();
-    }
-
-    if (clientKeyStoresFactory != null) {
-      clientKeyStoresFactory.destroy();
     }
   }
 
