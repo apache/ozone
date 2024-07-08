@@ -587,13 +587,13 @@ public class BlockOutputStream extends OutputStream {
   private void writeChunk(ChunkBuffer buffer)
       throws IOException {
     writeChunkCommon(buffer);
-    writeChunkToContainer(buffer.duplicate(0, buffer.position()), false);
+    writeChunkToContainer(buffer.duplicate(0, buffer.position()), false, false);
   }
 
-  private void writeChunkAndPutBlock(ChunkBuffer buffer)
+  private void writeChunkAndPutBlock(ChunkBuffer buffer, boolean close)
       throws IOException {
     writeChunkCommon(buffer);
-    writeChunkToContainer(buffer.duplicate(0, buffer.position()), true);
+    writeChunkToContainer(buffer.duplicate(0, buffer.position()), true, close);
   }
 
   /**
@@ -632,7 +632,7 @@ public class BlockOutputStream extends OutputStream {
       if (currentBuffer.hasRemaining()) {
         if (allowPutBlockPiggybacking) {
           updateFlushLength();
-          writeChunkAndPutBlock(currentBuffer);
+          writeChunkAndPutBlock(currentBuffer, close);
         } else {
           writeChunk(currentBuffer);
           updateFlushLength();
@@ -758,7 +758,7 @@ public class BlockOutputStream extends OutputStream {
    * @return
    */
   CompletableFuture<ContainerCommandResponseProto> writeChunkToContainer(
-      ChunkBuffer chunk, boolean putBlockPiggybacking) throws IOException {
+      ChunkBuffer chunk, boolean putBlockPiggybacking, boolean close) throws IOException {
     int effectiveChunkSize = chunk.remaining();
     final long offset = chunkOffset.getAndAdd(effectiveChunkSize);
     final ByteString data = chunk.toByteString(
@@ -820,7 +820,7 @@ public class BlockOutputStream extends OutputStream {
       }
 
       XceiverClientReply asyncReply = writeChunkAsync(xceiverClient, chunkInfo,
-          blockID.get(), data, tokenString, replicationIndex, blockData);
+          blockID.get(), data, tokenString, replicationIndex, blockData, close);
       CompletableFuture<ContainerProtos.ContainerCommandResponseProto>
           respFuture = asyncReply.getResponse();
 

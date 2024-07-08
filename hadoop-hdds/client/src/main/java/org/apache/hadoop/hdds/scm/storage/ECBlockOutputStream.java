@@ -90,13 +90,13 @@ public class ECBlockOutputStream extends BlockOutputStream {
   public void write(byte[] b, int off, int len) throws IOException {
     this.currentChunkRspFuture =
         writeChunkToContainer(
-            ChunkBuffer.wrap(ByteBuffer.wrap(b, off, len)), false);
+            ChunkBuffer.wrap(ByteBuffer.wrap(b, off, len)), false, false);
     updateWrittenDataLength(len);
   }
 
   public CompletableFuture<ContainerProtos.ContainerCommandResponseProto> write(
       ByteBuffer buff) throws IOException {
-    return writeChunkToContainer(ChunkBuffer.wrap(buff), false);
+    return writeChunkToContainer(ChunkBuffer.wrap(buff), false, false);
   }
 
   public CompletableFuture<ContainerProtos.
