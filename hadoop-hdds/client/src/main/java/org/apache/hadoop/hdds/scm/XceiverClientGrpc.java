@@ -285,6 +285,7 @@ public class XceiverClientGrpc extends XceiverClientSpi {
     }
     for (DatanodeDetails dn : datanodeList) {
       try {
+        request = reconstructRequestIfNeeded(request, dn, pipeline);
         futureHashMap.put(dn, sendCommandAsync(request, dn).getResponse());
       } catch (InterruptedException e) {
         LOG.error("Command execution was interrupted.");
@@ -314,6 +315,37 @@ public class XceiverClientGrpc extends XceiverClientSpi {
       }
     }
     return responseProtoHashMap;
+  }
+
+  /**
+   * @param request
+   * @param dn
+   * @param pipeline
+   * In case of getBlock for EC keys, it is required to set replicaIndex for
+   * every request with the replicaIndex for that DN for which the request is
+   * sent to. This method unpacks proto and reconstructs request after setting
+   * the replicaIndex field.
+   * @return new updated Request
+   */
+  private ContainerCommandRequestProto reconstructRequestIfNeeded(
+      ContainerCommandRequestProto request, DatanodeDetails dn, Pipeline pipeline) {
+    boolean isEcRequest = pipeline.getReplicationConfig()
+        .getReplicationType() == HddsProtos.ReplicationType.EC;
+    if (request.hasGetBlock() && isEcRequest) {
+      int replicaIdx = pipeline.getReplicaIndex(dn);
+      ContainerProtos.GetBlockRequestProto getBlockRequestProto =
+          request.getGetBlock();
+      DatanodeBlockID datanodeBlockID = getBlockRequestProto.getBlockID();
+      DatanodeBlockID newDatanodeBlockID =
+          DatanodeBlockID.newBuilder(datanodeBlockID)
+              .setReplicaIndex(replicaIdx).build();
+      ContainerProtos.GetBlockRequestProto newGetBlockRequestProto =
+          ContainerProtos.GetBlockRequestProto.newBuilder(getBlockRequestProto)
+              .setBlockID(newDatanodeBlockID).build();
+      request = ContainerCommandRequestProto.newBuilder(request)
+          .setGetBlock(newGetBlockRequestProto).build();
+    }
+    return request;
   }
 
   @Override
