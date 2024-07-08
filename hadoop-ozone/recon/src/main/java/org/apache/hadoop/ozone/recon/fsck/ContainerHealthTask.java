@@ -336,13 +336,11 @@ public class ContainerHealthTask extends ReconScmTask {
       if (h.isHealthilyReplicated() || h.isDeleted()) {
         return;
       }
-      // For containers deleted in SCM, we sync the container state here.
-      if (h.isMissing() && containerDeletedInSCM(container)) {
-        return;
-      }
 
-      if (h.getContainer().getState() == HddsProtos.LifeCycleState.DELETING) {
-        LOG.info("Container {} is in DELETING state.", h.getContainerID());
+      // For containers in DELETING or DELETED state, we sync the container state here.
+      if (h.getContainer().getState() == HddsProtos.LifeCycleState.DELETING ||
+          (h.isMissing() && containerDeletedInSCM(container))) {
+        LOG.info("Container {} is in DELETING or DELETED state.", h.getContainerID());
         return;
       }
 
@@ -350,8 +348,7 @@ public class ContainerHealthTask extends ReconScmTask {
           ContainerHealthRecords.generateUnhealthyRecords(h, currentTime,
               unhealthyContainerStateStatsMap));
     } catch (ContainerNotFoundException e) {
-      LOG.error("Container not found while processing container in Container " +
-          "Health task", e);
+      LOG.error("Container not found while processing container in Container Health task", e);
     }
   }
 
