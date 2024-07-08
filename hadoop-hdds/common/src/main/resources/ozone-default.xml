@@ -4429,4 +4429,12 @@
       maximum number of buckets across all volumes.
     </description>
   </property>
+  <property>
+    <name>ozone.om.onfailure.readonly.enable</name>
+    <value>false</value>
+    <tag>OZONE, OM</tag>
+    <description>
+      enable readonly mode when om state machine failure is observed.
+    </description>
+  </property>
 </configuration>

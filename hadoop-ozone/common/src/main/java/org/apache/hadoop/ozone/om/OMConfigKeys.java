@@ -612,4 +612,8 @@ public final class OMConfigKeys {
   public static final String OZONE_OM_MAX_BUCKET =
       "ozone.om.max.buckets";
   public static final int OZONE_OM_MAX_BUCKET_DEFAULT = 100000;
+
+  public static final String OZONE_OM_ONFAILURE_READONLY =
+      "ozone.om.onfailure.readonly.enable";
+  public static final boolean OZONE_OM_ONFAILURE_READONLY_DEFAULT = false;
 }
