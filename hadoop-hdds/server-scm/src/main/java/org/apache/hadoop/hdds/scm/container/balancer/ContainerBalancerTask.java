@@ -298,10 +298,10 @@ public class ContainerBalancerTask implements Runnable {
     tryStopWithSaveConfiguration("Completed all iterations.");
   }
 
-  private void saveIterationStatistic(Integer iterationNumber, IterationResult iterationResult) {
+  private void saveIterationStatistic(Integer iterationNumber, IterationResult iR) {
     ContainerBalancerTaskIterationStatusInfo iterationStatistic = new ContainerBalancerTaskIterationStatusInfo(
             iterationNumber,
-            iterationResult.name(),
+            iR.name(),
             getSizeScheduledForMoveInLatestIteration() / OzoneConsts.GB,
             metrics.getDataSizeMovedGBInLatestIteration(),
             metrics.getNumContainerMovesScheduledInLatestIteration(),
@@ -335,7 +335,10 @@ public class ContainerBalancerTask implements Runnable {
   }
 
   public List<ContainerBalancerTaskIterationStatusInfo> getCurrentIterationsStatistic() {
-    int lastIterationNumber = iterationsStatistic.stream().mapToInt(ContainerBalancerTaskIterationStatusInfo::getIterationNumber).max().orElse(0);
+    int lastIterationNumber = iterationsStatistic.stream()
+            .mapToInt(ContainerBalancerTaskIterationStatusInfo::getIterationNumber)
+            .max()
+            .orElse(0);
     ContainerBalancerTaskIterationStatusInfo currentIterationStatistic = new ContainerBalancerTaskIterationStatusInfo(
             lastIterationNumber + 1,
             null,

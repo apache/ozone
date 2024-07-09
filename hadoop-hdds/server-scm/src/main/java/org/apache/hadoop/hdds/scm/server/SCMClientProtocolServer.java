@@ -37,8 +37,10 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos.DeletedBlocksTransaction
 import org.apache.hadoop.hdds.protocol.proto.ReconfigureProtocolProtos.ReconfigureProtocolService;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ContainerBalancerStatusInfoResponseProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ContainerBalancerTaskIterationStatusInfo;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.DecommissionScmResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.DecommissionScmResponseProto.Builder;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.NodeTransferInfo;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.StartContainerBalancerResponseProto;
 import org.apache.hadoop.hdds.protocolPB.ReconfigureProtocolPB;
 import org.apache.hadoop.hdds.protocolPB.ReconfigureProtocolServerSideTranslatorPB;
@@ -53,7 +55,7 @@ import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.container.ReplicationManagerReport;
 import org.apache.hadoop.hdds.scm.container.balancer.ContainerBalancer;
 import org.apache.hadoop.hdds.scm.container.balancer.ContainerBalancerConfiguration;
-import org.apache.hadoop.hdds.scm.container.balancer.ContainerBalancerTaskStatusInfo;
+import org.apache.hadoop.hdds.scm.container.balancer.ContainerBalancerStatusInfo;
 import org.apache.hadoop.hdds.scm.container.balancer.IllegalContainerBalancerStateException;
 import org.apache.hadoop.hdds.scm.container.balancer.InvalidContainerBalancerConfigurationException;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
@@ -1208,7 +1210,7 @@ public class SCMClientProtocolServer implements
   public ContainerBalancerStatusInfoResponseProto getContainerBalancerStatusInfo() {
     AUDIT.logReadSuccess(buildAuditMessageForSuccess(
             SCMAction.GET_CONTAINER_BALANCER_STATUS_INFO, null));
-    ContainerBalancerTaskStatusInfo balancerStatusInfo = scm.getContainerBalancer().getBalancerStatusInfo();
+    ContainerBalancerStatusInfo balancerStatusInfo = scm.getContainerBalancer().getBalancerStatusInfo();
     return ContainerBalancerStatusInfoResponseProto
             .newBuilder()
             .setStartedAt(balancerStatusInfo.getStartedAt().toEpochSecond())
@@ -1217,7 +1219,7 @@ public class SCMClientProtocolServer implements
                     balancerStatusInfo.getIterationsStatusInfo()
                             .stream()
                             .map(
-                                    info -> StorageContainerLocationProtocolProtos.ContainerBalancerTaskIterationStatusInfo.newBuilder()
+                                    info -> ContainerBalancerTaskIterationStatusInfo.newBuilder()
                                             .setIterationNumber(info.getIterationNumber())
                                             .setIterationResult(info.getIterationResult())
                                             .setSizeScheduledForMove(info.getSizeScheduledForMove())
@@ -1229,7 +1231,7 @@ public class SCMClientProtocolServer implements
                                             .addAllSizeEnteringNodes(
                                                     info.getSizeEnteringNodes().entrySet()
                                                             .stream()
-                                                            .map(entry -> StorageContainerLocationProtocolProtos.NodeTransferInfo.newBuilder()
+                                                            .map(entry -> NodeTransferInfo.newBuilder()
                                                                     .setUuid(entry.getKey().toString())
                                                                     .setDataVolume(entry.getValue())
                                                                     .build()
@@ -1239,7 +1241,7 @@ public class SCMClientProtocolServer implements
                                             .addAllSizeLeavingNodes(
                                                     info.getSizeLeavingNodes().entrySet()
                                                             .stream()
-                                                            .map(entry -> StorageContainerLocationProtocolProtos.NodeTransferInfo.newBuilder()
+                                                            .map(entry -> NodeTransferInfo.newBuilder()
                                                                     .setUuid(entry.getKey().toString())
                                                                     .setDataVolume(entry.getValue())
                                                                     .build()

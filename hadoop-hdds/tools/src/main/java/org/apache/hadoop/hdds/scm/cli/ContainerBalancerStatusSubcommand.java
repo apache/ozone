@@ -19,8 +19,8 @@ package org.apache.hadoop.hdds.scm.cli;
 
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
-import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ContainerBalancerStatusInfoResponseProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ContainerBalancerTaskIterationStatusInfo;
 import org.apache.hadoop.hdds.scm.client.ScmClient;
 import org.apache.hadoop.ozone.OzoneConsts;
 import picocli.CommandLine;
@@ -59,13 +59,18 @@ public class ContainerBalancerStatusSubcommand extends ScmSubcommand {
       System.out.println("ContainerBalancer is Running.");
       System.out.printf("Started at: %s %s\n\n", dateTime.toLocalDate(), dateTime.toLocalTime());
       System.out.println(getConfigurationPrettyString(balancerStatusInfo.getConfiguration()));
-      List<StorageContainerLocationProtocolProtos.ContainerBalancerTaskIterationStatusInfo> iterationsStatusInfoList = balancerStatusInfo.getIterationsStatusInfoList();
+      List<ContainerBalancerTaskIterationStatusInfo> iterationsStatusInfoList
+              = balancerStatusInfo.getIterationsStatusInfoList();
       if (verbose) {
         System.out.println("Iteration history list:");
-        System.out.println(iterationsStatusInfoList.stream().map(this::getPrettyIterationStatusInfo).collect(Collectors.joining("\n")));
+        System.out.println(
+                iterationsStatusInfoList.stream().map(this::getPrettyIterationStatusInfo)
+                        .collect(Collectors.joining("\n"))
+        );
       } else {
         System.out.println("Current iteration info:");
-        System.out.println(getPrettyIterationStatusInfo(iterationsStatusInfoList.get(iterationsStatusInfoList.size() - 1)));
+        System.out.println(
+                getPrettyIterationStatusInfo(iterationsStatusInfoList.get(iterationsStatusInfoList.size() - 1)));
       }
     }
   }
@@ -115,9 +120,23 @@ public class ContainerBalancerStatusSubcommand extends ScmSubcommand {
             configuration.getExcludeDatanodes().isEmpty() ? "None" : configuration.getExcludeDatanodes());
   }
 
-  private String getPrettyIterationStatusInfo(StorageContainerLocationProtocolProtos.ContainerBalancerTaskIterationStatusInfo iterationStatusInfo) {
+  private String getPrettyIterationStatusInfo(ContainerBalancerTaskIterationStatusInfo iterationStatusInfo) {
+    int iterationNumber = iterationStatusInfo.getIterationNumber();
+    String iterationResult = iterationStatusInfo.getIterationResult();
+    long sizeScheduledForMove = iterationStatusInfo.getSizeScheduledForMove();
+    long dataSizeMovedGB = iterationStatusInfo.getDataSizeMovedGB();
+    long containerMovesScheduled = iterationStatusInfo.getContainerMovesScheduled();
+    long containerMovesCompleted = iterationStatusInfo.getContainerMovesCompleted();
+    long containerMovesFailed = iterationStatusInfo.getContainerMovesFailed();
+    long containerMovesTimeout = iterationStatusInfo.getContainerMovesTimeout();
+    String enteringDataNodeList = iterationStatusInfo.getSizeEnteringNodesList()
+            .stream().map(nodeInfo -> nodeInfo.getUuid() + " <- " + nodeInfo.getDataVolume() + "\n")
+            .collect(Collectors.joining());
+    String leavingDataNodeList = iterationStatusInfo.getSizeLeavingNodesList()
+            .stream().map(nodeInfo -> nodeInfo.getUuid() + " -> " + nodeInfo.getDataVolume() + "\n")
+            .collect(Collectors.joining());
     return String.format(
-                    "%-50s %s%n" +
+            "%-50s %s%n" +
                     "%-50s %s%n" +
                     "%-50s %s%n" +
                     "%-50s %s%n" +
@@ -129,18 +148,17 @@ public class ContainerBalancerStatusSubcommand extends ScmSubcommand {
                     "%-50s \n%s" +
                     "%-50s \n%s",
             "Key", "Value",
-            "Iteration number", iterationStatusInfo.getIterationNumber(),
-            "Iteration result", iterationStatusInfo.getIterationResult().isEmpty() ? "IN_PROGRESS" : iterationStatusInfo.getIterationResult(),
-            "Size scheduled to move", iterationStatusInfo.getSizeScheduledForMove(),
-            "Moved data size", iterationStatusInfo.getDataSizeMovedGB(),
-            "Scheduled to move containers", iterationStatusInfo.getContainerMovesScheduled(),
-            "Already moved containers", iterationStatusInfo.getContainerMovesCompleted(),
-            "Failed to move containers", iterationStatusInfo.getContainerMovesFailed(),
-            "Failed to move containers by timeout", iterationStatusInfo.getContainerMovesTimeout(),
-            "Entered data to nodes", iterationStatusInfo.getSizeEnteringNodesList().stream().map(
-                    nodeInfo -> nodeInfo.getUuid() + " <- " + nodeInfo.getDataVolume() + "\n")
-                    .collect(Collectors.joining()),
-            "Exited data from nodes", iterationStatusInfo.getSizeLeavingNodesList().stream().map(nodeInfo -> nodeInfo.getUuid() + " -> " + nodeInfo.getDataVolume() + "\n").collect(Collectors.joining()));
+            "Iteration number", iterationNumber,
+            "Iteration result",
+            iterationResult.isEmpty() ? "IN_PROGRESS" : iterationResult,
+            "Size scheduled to move", sizeScheduledForMove,
+            "Moved data size", dataSizeMovedGB,
+            "Scheduled to move containers", containerMovesScheduled,
+            "Already moved containers", containerMovesCompleted,
+            "Failed to move containers", containerMovesFailed,
+            "Failed to move containers by timeout", containerMovesTimeout,
+            "Entered data to nodes", enteringDataNodeList,
+            "Exited data from nodes", leavingDataNodeList);
   }
 }
 

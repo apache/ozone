@@ -178,11 +178,12 @@ public class ContainerBalancer extends StatefulService {
   }
 
   /**
-   * Get balancer status info
+   * Get balancer status info.
+   *
    * @return balancer status info if balancer started
    */
-  public ContainerBalancerTaskStatusInfo getBalancerStatusInfo() {
-    return new ContainerBalancerTaskStatusInfo(
+  public ContainerBalancerStatusInfo getBalancerStatusInfo() {
+    return new ContainerBalancerStatusInfo(
             this.startedAt,
             task.getConfig(),
             task.getCurrentIterationsStatistic()
