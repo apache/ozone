@@ -1338,7 +1338,9 @@ public class TestSnapshotDiffManager {
   private static Stream<Arguments> threadPoolFullScenarios() {
     return Stream.of(
         Arguments.of("When there is a wait time between job batches",
-            500L, 45, 0)
+            500L, 45, 0),
+        Arguments.of("When there is no wait time between job batches",
+            0L, 20, 25)
     );
   }
 
