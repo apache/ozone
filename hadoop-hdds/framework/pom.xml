@@ -194,7 +194,6 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-compiler-plugin</artifactId>
         <configuration>
-          <proc>full</proc>
           <annotationProcessorPaths>
             <path>
               <groupId>org.apache.ozone</groupId>
