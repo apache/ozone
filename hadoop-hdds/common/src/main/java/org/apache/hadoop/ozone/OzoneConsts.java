@@ -127,10 +127,7 @@ public final class OzoneConsts {
    */
   public static final String CONTAINER_DB_SUFFIX = "container.db";
   public static final String PIPELINE_DB_SUFFIX = "pipeline.db";
-  public static final String CRL_DB_SUFFIX = "crl.db";
   public static final String DN_CONTAINER_DB = "-dn-" + CONTAINER_DB_SUFFIX;
-  public static final String DN_CRL_DB = "dn-" + CRL_DB_SUFFIX;
-  public static final String CRL_DB_DIRECTORY_NAME = "crl";
   public static final String OM_DB_NAME = "om.db";
   public static final String SCM_DB_NAME = "scm.db";
   public static final String OM_DB_BACKUP_PREFIX = "om.db.backup.";
@@ -451,9 +448,6 @@ public final class OzoneConsts {
   // in non-HA style.
   public static final String SCM_DUMMY_NODEID = "scmNodeId";
   public static final String SCM_DUMMY_SERVICE_ID = "scmServiceId";
-
-  // CRL Sequence Id
-  public static final String CRL_SEQUENCE_ID_KEY = "CRL_SEQUENCE_ID";
 
   public static final String SCM_CA_PATH = "ca";
   public static final String SCM_CA_CERT_STORAGE_DIR = "scm";

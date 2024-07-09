@@ -56,7 +56,7 @@ final class DummyBlockInputStreamWithRetry
       List<ChunkInfo> chunkList,
       Map<String, byte[]> chunkMap,
       AtomicBoolean isRerfreshed, IOException ioException,
-      OzoneClientConfig config) {
+      OzoneClientConfig config) throws IOException {
     super(blockId, blockLen, pipeline, token,
         xceiverClientManager, blockID -> {
           isRerfreshed.set(true);

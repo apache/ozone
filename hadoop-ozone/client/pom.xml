@@ -40,6 +40,11 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
       <artifactId>ozone-common</artifactId>
     </dependency>
 
+    <dependency>
+      <groupId>com.github.stephenc.jcip</groupId>
+      <artifactId>jcip-annotations</artifactId>
+    </dependency>
+
     <!-- Test dependencies -->
     <dependency>
       <groupId>org.apache.ozone</groupId>
