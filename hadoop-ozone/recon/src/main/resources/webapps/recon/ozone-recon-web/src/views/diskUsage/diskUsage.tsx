@@ -295,6 +295,7 @@ export class DiskUsage extends React.Component<Record<string, object>, IDUState>
       keys.push('Entity Type');
       values.push(summaryResponse.type);
 
+      // If status is not INITIALIZING then adding Entities for metadata to avoid null failures on UI.
       if (summaryResponse.status !== 'INITIALIZING') {
         if (summaryResponse.countStats.type === 'KEY') {
           const keyEndpoint = `/api/v1/namespace/du?path=${path}&replica=true`;
@@ -488,6 +489,7 @@ export class DiskUsage extends React.Component<Record<string, object>, IDUState>
         return;
       }
 
+      // If Quota status is INITIALIZING then do not append entities to metadata to avoid null
       if (quotaResponse.status === 'INITIALIZING') {
         return;
       }
