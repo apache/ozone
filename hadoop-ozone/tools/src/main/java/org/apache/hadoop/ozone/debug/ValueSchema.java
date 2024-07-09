@@ -81,10 +81,6 @@ public class ValueSchema implements Callable<Void>, SubcommandWithParent {
 
     boolean success = true;
 
-    List<ColumnFamilyDescriptor> cfDescList =
-        RocksDBUtils.getColumnFamilyDescriptors(parent.getDbPath());
-    final List<ColumnFamilyHandle> cfHandleList = new ArrayList<>();
-
     String dbPath = parent.getDbPath();
     Map<String, List<String>> fields = new HashMap<>();
     success = getValueFields(dbPath, fields);
