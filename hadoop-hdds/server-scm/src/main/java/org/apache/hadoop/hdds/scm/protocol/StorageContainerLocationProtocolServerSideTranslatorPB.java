@@ -1208,6 +1208,9 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
           StorageContainerLocationProtocolProtos.ContainerBalancerStatusInfoRequestProto request)
           throws IOException {
     ContainerBalancerStatusInfoResponseProto containerBalancerStatusInfo = impl.getContainerBalancerStatusInfo();
+    if (containerBalancerStatusInfo == null) {
+      return ContainerBalancerStatusInfoResponseProto.newBuilder().getDefaultInstanceForType();
+    }
     return ContainerBalancerStatusInfoResponseProto.newBuilder()
             .setStartedAt(containerBalancerStatusInfo.getStartedAt())
             .setConfiguration(containerBalancerStatusInfo.getConfiguration())
