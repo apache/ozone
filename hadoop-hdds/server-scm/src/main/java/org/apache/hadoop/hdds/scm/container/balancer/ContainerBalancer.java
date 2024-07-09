@@ -183,6 +183,9 @@ public class ContainerBalancer extends StatefulService {
    * @return balancer status info if balancer started
    */
   public ContainerBalancerStatusInfo getBalancerStatusInfo() {
+    if (this.startedAt == null || task == null) {
+      return null;
+    }
     return new ContainerBalancerStatusInfo(
             this.startedAt,
             task.getConfig(),
