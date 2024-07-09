@@ -57,7 +57,7 @@ public class ContainerBalancerStatusSubcommand extends ScmSubcommand {
       LocalDateTime dateTime =
               LocalDateTime.ofInstant(Instant.ofEpochSecond(balancerStatusInfo.getStartedAt()), ZoneId.systemDefault());
       System.out.println("ContainerBalancer is Running.");
-      System.out.printf("Started at: %s %s\n\n", dateTime.toLocalDate(), dateTime.toLocalTime());
+      System.out.printf("Started at: %s %s%n%n", dateTime.toLocalDate(), dateTime.toLocalTime());
       System.out.println(getConfigurationPrettyString(balancerStatusInfo.getConfiguration()));
       List<ContainerBalancerTaskIterationStatusInfo> iterationsStatusInfoList
               = balancerStatusInfo.getIterationsStatusInfoList();
