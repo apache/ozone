@@ -145,8 +145,8 @@ public class ContainerBalancerStatusSubcommand extends ScmSubcommand {
                     "%-50s %s%n" +
                     "%-50s %s%n" +
                     "%-50s %s%n" +
-                    "%-50s \n%s" +
-                    "%-50s \n%s",
+                    "%-50s %n%s" +
+                    "%-50s %n%s",
             "Key", "Value",
             "Iteration number", iterationNumber,
             "Iteration result",
