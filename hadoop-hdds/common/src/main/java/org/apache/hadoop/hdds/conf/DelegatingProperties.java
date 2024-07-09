@@ -22,6 +22,8 @@ import org.apache.hadoop.ozone.OzoneConfigKeys;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Enumeration;
+import java.util.HashMap;
+import java.util.Iterator;
 import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
@@ -158,7 +160,7 @@ public class DelegatingProperties extends Properties {
 
   @Override
   public Set<Map.Entry<Object, Object>> entrySet() {
-    return properties.entrySet();
+    throw new UnsupportedOperationException("Entryset is not available in DelegatingProperties");
   }
 
   @Override
@@ -169,5 +171,18 @@ public class DelegatingProperties extends Properties {
   @Override
   public synchronized int hashCode() {
     return properties.hashCode();
+  }
+
+  public Iterator<Map.Entry<String, String>> iterator() {
+    Map<String, String> result = new HashMap<>();
+    synchronized (properties) {
+      for (Map.Entry<Object, Object> item : properties.entrySet()) {
+        if (item.getKey() instanceof String && item.getValue() instanceof String) {
+          String value = checkCompliance((String) item.getKey(), (String) item.getValue());
+          result.put((String) item.getKey(), value);
+        }
+      }
+    }
+    return result.entrySet().iterator();
   }
 }
