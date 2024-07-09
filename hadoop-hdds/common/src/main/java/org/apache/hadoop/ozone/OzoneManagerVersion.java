@@ -42,6 +42,8 @@ public enum OzoneManagerVersion implements ComponentVersion {
 
   OBJECT_TAG(5, "OzoneManager version that supports object tags"),
 
+  ATOMIC_REWRITE_KEY(6, "OzoneManager version that supports rewriting key as atomic operation"),
+
   FUTURE_VERSION(-1, "Used internally in the client when the server side is "
       + " newer and an unknown server version has arrived to the client.");
 

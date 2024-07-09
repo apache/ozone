@@ -20,12 +20,12 @@
     "omServiceId": "omservice"
   },
   "datanodes": {
-    "totalCount": 12,
+    "totalCount": 19,
     "datanodes": [
       {
         "hostname": "localhost2.storage.enterprise.com",
-        "uuid": "b590734e-a5f2-11ea-bb37-0242ac130002",
-        "state": "HEALTHY",
+        "uuid": "b590734e-a5f2-11ea-bb37-0242ac130010",
+        "state": "DEAD",
         "opState": "IN_SERVICE",
         "lastHeartbeat": 1574728876059,
         "storageReport": {
@@ -94,7 +94,7 @@
       },
       {
         "hostname": "localhost1.storage.enterprise.com",
-        "uuid": "b5907812-a5f2-11ea-bb37-0242ac130002",
+        "uuid": "b5907812-a5f2-11ea-bb37-0242ac130011",
         "state": "HEALTHY",
         "opState": "DECOMMISSIONING",
         "lastHeartbeat": 1574724876059,
@@ -128,7 +128,7 @@
       },
       {
         "hostname": "localhost4.storage.enterprise.com",
-        "uuid": "b5907812-a5f2-11ea-bb37-0242ac130002",
+        "uuid": "b5907812-a5f2-11ea-bb37-0242ac130012",
         "state": "HEALTHY",
         "opState": "DECOMMISSIONED",
         "lastHeartbeat": 1574724876059,
@@ -162,7 +162,7 @@
       },
       {
         "hostname": "localhost3.storage.enterprise.com",
-        "uuid": "b5907812-a5f2-11ea-bb37-0242ac130002",
+        "uuid": "b5907812-a5f2-11ea-bb37-0242ac130013",
         "state": "HEALTHY",
         "opState": "ENTERING_MAINTENANCE",
         "lastHeartbeat": 1574724876059,
@@ -196,7 +196,7 @@
       },
       {
         "hostname": "localhost6.storage.enterprise.com",
-        "uuid": "b5907812-a5f2-11ea-bb37-0242ac130002",
+        "uuid": "b5907812-a5f2-11ea-bb37-0242ac130014",
         "state": "HEALTHY",
         "opState": "IN_MAINTENANCE",
         "lastHeartbeat": 1574724876059,
@@ -230,7 +230,7 @@
       },
       {
         "hostname": "localhost5.storage.enterprise.com",
-        "uuid": "b5907934-a5f2-11ea-bb37-0242ac130002",
+        "uuid": "b5907934-a5f2-11ea-bb37-0242ac130015",
         "state": "STALE",
         "opState": "IN_SERVICE",
         "lastHeartbeat": 1343544879843,
@@ -270,7 +270,7 @@
       },
       {
         "hostname": "localhost7.storage.enterprise.com",
-        "uuid": "b5907934-a5f2-11ea-bb37-0242ac130002",
+        "uuid": "b5907934-a5f2-11ea-bb37-0242ac130016",
         "state": "STALE",
         "opState": "DECOMMISSIONING",
         "lastHeartbeat": 1343544879843,
@@ -310,7 +310,7 @@
       },
       {
         "hostname": "localhost8.storage.enterprise.com",
-        "uuid": "b5907934-a5f2-11ea-bb37-0242ac130002",
+        "uuid": "b5907934-a5f2-11ea-bb37-0242ac130017",
         "state": "STALE",
         "opState": "DECOMMISSIONED",
         "lastHeartbeat": 1343544879843,
@@ -350,7 +350,7 @@
       },
       {
         "hostname": "localhost9.storage.enterprise.com",
-        "uuid": "b5907934-a5f2-11ea-bb37-0242ac130002",
+        "uuid": "b5907934-a5f2-11ea-bb37-0242ac130018",
         "state": "STALE",
         "opState": "ENTERING_MAINTENANCE",
         "lastHeartbeat": 1343544879843,
@@ -390,7 +390,7 @@
       },
       {
         "hostname": "localhost10.storage.enterprise.com",
-        "uuid": "b5907934-a5f2-11ea-bb37-0242ac130002",
+        "uuid": "b5907934-a5f2-11ea-bb37-0242ac130019",
         "state": "STALE",
         "opState": "IN_MAINTENANCE",
         "lastHeartbeat": 1343544879843,
@@ -430,7 +430,7 @@
       },
       {
         "hostname": "localhost11.storage.enterprise.com",
-        "uuid": "b5907a06-a5f2-11ea-bb37-0242ac130002",
+        "uuid": "b5907a06-a5f2-11ea-bb37-0242ac130020",
         "state": "DEAD",
         "opState": "IN_SERVICE",
         "lastHeartbeat": 1074724876059,
@@ -451,7 +451,7 @@
       },
       {
         "hostname": "localhost12.storage.enterprise.com",
-        "uuid": "b5907ac4-a5f2-11ea-bb37-0242ac130002",
+        "uuid": "b5907ac4-a5f2-11ea-bb37-0242ac130021",
         "state": "DEAD",
         "opState": "DECOMMISSIONING",
         "lastHeartbeat": 1574724876059,
@@ -485,7 +485,7 @@
       },
       {
         "hostname": "localhost13.storage.enterprise.com",
-        "uuid": "b5907b82-a5f2-11ea-bb37-0242ac130002",
+        "uuid": "b5907b82-a5f2-11ea-bb37-0242ac130022",
         "state": "DEAD",
         "opState": "DECOMMISSIONED",
         "lastHeartbeat": 1574724876059,
@@ -519,7 +519,7 @@
       },
       {
         "hostname": "localhost14.storage.enterprise.com",
-        "uuid": "b5907c40-a5f2-11ea-bb37-0242ac130002",
+        "uuid": "b5907c40-a5f2-11ea-bb37-0242ac130023",
         "state": "DEAD",
         "opState": "ENTERING_MAINTENANCE",
         "lastHeartbeat": 1574724876059,
@@ -559,7 +559,7 @@
       },
       {
         "hostname": "localhost15.storage.enterprise.com",
-        "uuid": "b5907cf4-a5f2-11ea-bb37-0242ac130002",
+        "uuid": "b5907cf4-a5f2-11ea-bb37-0242ac130024",
         "state": "DEAD",
         "opState": "IN_MAINTENANCE",
         "lastHeartbeat": 1574724876059,
@@ -593,7 +593,7 @@
       },
       {
         "hostname": "localhost16.storage.enterprise.com",
-        "uuid": "b5907f4c-a5f2-11ea-bb37-0242ac130002",
+        "uuid": "b5907f4c-a5f2-11ea-bb37-0242ac130025",
         "state": "HEALTHY",
         "opState": "IN_SERVICE",
         "lastHeartbeat": 1574724874011,
@@ -627,7 +627,7 @@
       },
       {
         "hostname": "localhost17.storage.enterprise.com",
-        "uuid": "b590801e-a5f2-11ea-bb37-0242ac130002",
+        "uuid": "b590801e-a5f2-11ea-bb37-0242ac130026",
         "state": "HEALTHY",
         "opState": "IN_SERVICE",
         "lastHeartbeat": 1574723876959,
@@ -667,7 +667,7 @@
       },
       {
         "hostname": "localhost18.storage.enterprise.com",
-        "uuid": "b59080e6-a5f2-11ea-bb37-0242ac130002",
+        "uuid": "b59080e6-a5f2-11ea-bb37-0242ac130027",
         "state": "STALE",
         "opState": "IN_SERVICE",
         "lastHeartbeat": 1474724876783,
@@ -701,7 +701,7 @@
       },
       {
         "hostname": "localhost19.storage.enterprise.com",
-        "uuid": "b59081a4-a5f2-11ea-bb37-0242ac130002",
+        "uuid": "b59081a4-a5f2-11ea-bb37-0242ac130028",
         "state": "HEALTHY",
         "opState": "IN_SERVICE",
         "lastHeartbeat": 1574724796532,
@@ -1398,217 +1398,42 @@
   "root": {
     "status": "OK",
     "path": "/",
-    "size": 1709108,
+    "size": 15160,
     "sizeWithReplica": -1,
-    "subPathCount": 30,
+    "subPathCount": 5,
     "subPaths": [
       {
         "key": false,
-        "path": "/vol-0-30461",
-        "size": 33096,
-        "sizeWithReplica": -1,
-        "isKey": false
-      },
-      {
-        "key": false,
-        "path": "/vol-1-82078",
-        "size": 33096,
-        "sizeWithReplica": -1,
-        "isKey": false
-      },
-      {
-        "key": false,
-        "path": "/vol-2-96509",
-        "size": 330496,
-        "sizeWithReplica": -1,
-        "isKey": false
-      },
-      {
-        "key": false,
-        "path": "/vol-3-75124",
-        "size": 330496,
-        "sizeWithReplica": -1,
-        "isKey": false
-      },
-      {
-        "key": false,
-        "path": "/vol-4-53147",
-        "size": 330240,
-        "sizeWithReplica": -1,
-        "isKey": false
-      },
-      {
-        "key": false,
         "path": "/vol1",
-        "size": 12204,
+        "size": 10000,
         "sizeWithReplica": -1,
         "isKey": false
       },
       {
         "key": false,
-        "path": "/vol17",
-        "size": 8136,
-        "sizeWithReplica": -1,
-        "isKey": false
-      },
-      {
-        "key": false,
-        "path": "/vol21",
-        "size": 8136,
-        "sizeWithReplica": -1,
-        "isKey": false
-      },
-      {
-        "key": false,
-        "path": "/vol22",
-        "size": 8136,
-        "sizeWithReplica": -1,
-        "isKey": false
-      },
-      {
-        "key": false,
-        "path": "/vol4",
-        "size": 8136,
-        "sizeWithReplica": -1,
-        "isKey": false
-      },
-      {
-        "key": false,
-        "path": "/vol18",
-        "size": 4068,
-        "sizeWithReplica": -1,
-        "isKey": false
-      },
-      {
-        "key": false,
-        "path": "/vol19",
-        "size": 4068,
-        "sizeWithReplica": -1,
-        "isKey": false
-      },
-      {
-        "key": false,
-        "path": "/s3v",
-        "size": 0,
-        "sizeWithReplica": -1,
-        "isKey": false
-      },
-      {
-        "key": false,
-        "path": "/vol10",
-        "size": 0,
-        "sizeWithReplica": -1,
-        "isKey": false
-      },
-      {
-        "key": false,
-        "path": "/vol11",
-        "size": 0,
-        "sizeWithReplica": -1,
-        "isKey": false
-      },
-      {
-        "key": false,
-        "path": "/vol12",
-        "size": 0,
-        "sizeWithReplica": -1,
-        "isKey": false
-      },
-      {
-        "key": false,
-        "path": "/vol13",
-        "size": 0,
-        "sizeWithReplica": -1,
-        "isKey": false
-      },
-      {
-        "key": false,
-        "path": "/vol14",
-        "size": 0,
-        "sizeWithReplica": -1,
-        "isKey": false
-      },
-      {
-        "key": false,
-        "path": "/vol15",
-        "size": 0,
-        "sizeWithReplica": -1,
-        "isKey": false
-      },
-      {
-        "key": false,
-        "path": "/vol16",
-        "size": 0,
-        "sizeWithReplica": -1,
-        "isKey": false
-      },
-      {
-        "key": false,
-        "path": "/vol2",
-        "size": 0,
-        "sizeWithReplica": -1,
-        "isKey": false
-      },
-      {
-        "key": false,
-        "path": "/vol20",
-        "size": 0,
-        "sizeWithReplica": -1,
-        "isKey": false
-      },
-      {
-        "key": false,
-        "path": "/vol3",
-        "size": 0,
-        "sizeWithReplica": -1,
-        "isKey": false
-      },
-      {
-        "key": false,
-        "path": "/vol5",
-        "size": 0,
-        "sizeWithReplica": -1,
-        "isKey": false
-      },
-      {
-        "key": false,
-        "path": "/vol6",
-        "size": 0,
-        "sizeWithReplica": -1,
-        "isKey": false
-      },
-      {
-        "key": false,
-        "path": "/vol7",
-        "size": 0,
-        "sizeWithReplica": -1,
-        "isKey": false
-      },
-      {
-        "key": false,
-        "path": "/vol8",
-        "size": 0,
-        "sizeWithReplica": -1,
-        "isKey": false
-      },
-      {
-        "key": false,
-        "path": "/vol9",
-        "size": 0,
-        "sizeWithReplica": -1,
-        "isKey": false
-      },
-      {
-        "key": false,
-        "path": "/vol10",
+        "path": "/vol-2",
         "size": 10,
         "sizeWithReplica": -1,
         "isKey": false
       },
       {
         "key": false,
-        "path": "/vol11",
-        "size": 20,
+        "path": "/vol3",
+        "size": 100,
+        "sizeWithReplica": -1,
+        "isKey": false
+      },
+      {
+        "key": false,
+        "path": "/vol4",
+        "size": 50,
+        "sizeWithReplica": -1,
+        "isKey": false
+      },
+      {
+        "key": false,
+        "path": "/vol5",
+        "size": 5000,
         "sizeWithReplica": -1,
         "isKey": false
       }
@@ -6944,5 +6769,10 @@
       }
     ],
     "status": "OK"
+  },
+  "datanodesRemove": {
+    "selectedRowKeys": [
+      "b5907812-a5f2-11ea-bb37-0242ac130011"
+    ]
   }
 }

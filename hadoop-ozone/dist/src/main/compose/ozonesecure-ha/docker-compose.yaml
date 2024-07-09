@@ -184,7 +184,7 @@ services:
       ozone_net:
         ipv4_address: 172.25.0.113
   httpfs:
-    image: apache/ozone-runner:${OZONE_RUNNER_VERSION}
+    image: ${OZONE_RUNNER_IMAGE}:${OZONE_RUNNER_VERSION}
     hostname: httpfs
     volumes:
       - ../..:/opt/hadoop

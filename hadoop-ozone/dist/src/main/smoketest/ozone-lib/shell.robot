@@ -56,6 +56,13 @@ Find Jars Dir
     ${dir} =    Execute    ozone envvars | grep 'HDDS_LIB_JARS_DIR' | cut -f2 -d= | sed -e "s/'//g" -e 's/"//g'
     Set Environment Variable    HDDS_LIB_JARS_DIR    ${dir}
 
+Create bucket with layout
+    [Arguments]          ${volume}    ${layout}
+    ${postfix} =         Generate Random String    10    [LOWER]
+    ${bucket} =          Set Variable    bucket-${postfix}
+    ${result} =          Execute         ozone sh bucket create --layout ${layout} ${volume}/${bucket}
+    [Return]             ${bucket}
+
 Create Key
     [arguments]    ${key}    ${file}    ${args}=${EMPTY}
     ${output} =    Execute          ozone sh key put ${args} ${key} ${file}

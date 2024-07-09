@@ -518,7 +518,16 @@ public final class ContainerTestHelper {
   }
 
   public static BlockID getTestBlockID(long containerID) {
-    return new BlockID(containerID, UniqueId.next());
+    return getTestBlockID(containerID, null);
+  }
+
+  public static BlockID getTestBlockID(long containerID, Integer replicaIndex) {
+    DatanodeBlockID.Builder datanodeBlockID = DatanodeBlockID.newBuilder().setContainerID(containerID)
+        .setLocalID(UniqueId.next());
+    if (replicaIndex != null) {
+      datanodeBlockID.setReplicaIndex(replicaIndex);
+    }
+    return BlockID.getFromProtobuf(datanodeBlockID.build());
   }
 
   public static long getTestContainerID() {
