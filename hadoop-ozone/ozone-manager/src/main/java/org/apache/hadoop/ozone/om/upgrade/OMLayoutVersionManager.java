@@ -134,7 +134,8 @@ public final class OMLayoutVersionManager
         .setUrls(ClasspathHelper.forPackage(packageName))
         .setScanners(new SubTypesScanner())
         .setExpandSuperTypes(false)
-        .setParallel(true));
+        .setParallel(true)
+        .filterInputsBy(new FilterBuilder().excludePattern(".*META-INF/MANIFEST.MF.*")));
     Set<Class<? extends OMClientRequest>> validRequests = new HashSet<>();
 
     Set<Class<? extends OMClientRequest>> subTypes =
