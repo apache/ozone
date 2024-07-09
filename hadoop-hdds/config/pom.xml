@@ -57,20 +57,12 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
         <artifactId>maven-compiler-plugin</artifactId>
         <executions>
           <execution>
-            <id>default-compile</id>
-            <goals>
-              <goal>compile</goal>
-            </goals>
-            <configuration>
-              <proc>none</proc>
-            </configuration>
-          </execution>
-          <execution>
             <id>default-testCompile</id>
             <goals>
               <goal>testCompile</goal>
             </goals>
             <configuration>
+              <proc>full</proc>
               <annotationProcessorPaths>
                 <path>
                   <groupId>org.apache.ozone</groupId>
