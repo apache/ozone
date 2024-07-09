@@ -41,6 +41,10 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
       <artifactId>picocli</artifactId>
     </dependency>
     <dependency>
+      <groupId>com.github.stephenc.jcip</groupId>
+      <artifactId>jcip-annotations</artifactId>
+    </dependency>
+    <dependency>
       <groupId>com.google.protobuf</groupId>
       <artifactId>protobuf-java</artifactId>
       <scope>compile</scope>
