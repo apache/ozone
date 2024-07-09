@@ -35,6 +35,7 @@ import org.reflections.scanners.SubTypesScanner;
 import org.reflections.scanners.TypeAnnotationsScanner;
 import org.reflections.util.ClasspathHelper;
 import org.reflections.util.ConfigurationBuilder;
+import org.reflections.util.FilterBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -96,7 +97,8 @@ public final class OMLayoutVersionManager
         .forPackages(packageName)
         .setScanners(new TypeAnnotationsScanner(), new SubTypesScanner())
         .setExpandSuperTypes(false)
-        .setParallel(true));
+        .setParallel(true)
+        .filterInputsBy(new FilterBuilder().excludePattern(".*META-INF/MANIFEST.MF.*")));
     Set<Class<?>> typesAnnotatedWith =
         reflections.getTypesAnnotatedWith(UpgradeActionOm.class);
     typesAnnotatedWith.forEach(actionClass -> {

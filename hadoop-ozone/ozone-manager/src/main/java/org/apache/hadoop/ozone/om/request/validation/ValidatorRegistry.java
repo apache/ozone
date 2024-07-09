@@ -21,6 +21,7 @@ import org.reflections.Reflections;
 import org.reflections.scanners.MethodAnnotationsScanner;
 import org.reflections.util.ClasspathHelper;
 import org.reflections.util.ConfigurationBuilder;
+import org.reflections.util.FilterBuilder;
 
 import java.lang.reflect.Method;
 import java.net.URL;
@@ -72,6 +73,7 @@ public class ValidatorRegistry {
         .setUrls(searchUrls)
         .setScanners(new MethodAnnotationsScanner())
         .setParallel(true)
+        .filterInputsBy(new FilterBuilder().excludePattern(".*META-INF/MANIFEST.MF.*"))
     );
 
     Set<Method> describedValidators =
