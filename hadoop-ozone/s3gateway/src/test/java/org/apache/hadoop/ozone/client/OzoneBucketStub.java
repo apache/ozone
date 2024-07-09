@@ -52,6 +52,7 @@ import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.client.OzoneMultipartUploadPartListParts.PartInfo;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes;
+import org.apache.hadoop.ozone.om.helpers.ErrorInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartUploadCompleteInfo;
 import org.apache.hadoop.security.UserGroupInformation;
@@ -356,6 +357,17 @@ public final class OzoneBucketStub extends OzoneBucket {
   @Override
   public void deleteKey(String key) throws IOException {
     keyDetails.remove(key);
+  }
+
+  @Override
+  public Map<String, ErrorInfo> deleteKeys(List<String> keyList, boolean quiet) throws IOException {
+    Map<String, ErrorInfo> keyErrorMap = new HashMap<>();
+    for (String key : keyList) {
+      if (keyDetails.remove(key) == null) {
+        keyErrorMap.put(key, new ErrorInfo("KEY_NOT_FOUND", "Key does not exist"));
+      }
+    }
+    return keyErrorMap;
   }
 
   @Override

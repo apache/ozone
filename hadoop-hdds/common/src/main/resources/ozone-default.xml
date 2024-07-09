@@ -370,14 +370,6 @@
       defined with postfix (ns,ms,s,m,h,d)</description>
   </property>
   <property>
-    <name>hdds.crl.status.report.interval</name>
-    <value>60000ms</value>
-    <tag>OZONE, SECURITY, MANAGEMENT</tag>
-    <description>Time interval of the datanode to send CRL status report. Each
-      datanode periodically sends CRL status report to SCM. Unit could be
-      defined with postfix (ns,ms,s,m,h,d)</description>
-  </property>
-  <property>
     <name>hdds.pipeline.report.interval</name>
     <value>60000ms</value>
     <tag>OZONE, PIPELINE, MANAGEMENT</tag>
@@ -3065,7 +3057,7 @@
     <name>hdds.datanode.http.auth.type</name>
     <value>simple</value>
     <tag>DATANODE, SECURITY, KERBEROS</tag>
-    <description> simple or kerberos. If kerberos is set, Kerberos SPNEOGO
+    <description> simple or kerberos. If kerberos is set, SPNEGO
       will be used for http authentication.
     </description>
   </property>
@@ -3073,7 +3065,7 @@
     <name>ozone.freon.http.auth.type</name>
     <value>simple</value>
     <tag>FREON, SECURITY</tag>
-    <description> simple or kerberos. If kerberos is set, Kerberos SPNEOGO
+    <description> simple or kerberos. If kerberos is set, SPNEGO
       will be used for http authentication.
     </description>
   </property>
@@ -3081,7 +3073,7 @@
     <name>ozone.om.http.auth.type</name>
     <value>simple</value>
     <tag>OM, SECURITY, KERBEROS</tag>
-    <description> simple or kerberos. If kerberos is set, Kerberos SPNEOGO
+    <description> simple or kerberos. If kerberos is set, SPNEGO
       will be used for http authentication.
     </description>
   </property>
@@ -3089,7 +3081,7 @@
     <name>hdds.scm.http.auth.type</name>
     <value>simple</value>
     <tag>OM, SECURITY, KERBEROS</tag>
-    <description> simple or kerberos. If kerberos is set, Kerberos SPNEOGO
+    <description> simple or kerberos. If kerberos is set, SPNEGO
       will be used for http authentication.
     </description>
   </property>
@@ -3097,7 +3089,7 @@
     <name>ozone.recon.http.auth.type</name>
     <value>simple</value>
     <tag>RECON, SECURITY, KERBEROS</tag>
-    <description> simple or kerberos. If kerberos is set, Kerberos SPNEOGO
+    <description> simple or kerberos. If kerberos is set, SPNEGO
       will be used for http authentication.
     </description>
   </property>
@@ -3105,7 +3097,7 @@
     <name>ozone.s3g.http.auth.type</name>
     <value>simple</value>
     <tag>S3GATEWAY, SECURITY, KERBEROS</tag>
-    <description> simple or kerberos. If kerberos is set, Kerberos SPNEOGO
+    <description> simple or kerberos. If kerberos is set, SPNEGO
       will be used for http authentication.
     </description>
   </property>

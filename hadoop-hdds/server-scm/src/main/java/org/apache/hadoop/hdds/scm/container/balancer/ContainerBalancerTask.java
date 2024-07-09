@@ -44,6 +44,7 @@ import org.slf4j.LoggerFactory;
 import java.io.IOException;
 import java.time.Duration;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -52,6 +53,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
@@ -447,7 +449,8 @@ public class ContainerBalancerTask implements Runnable {
     }
 
     selectionCriteria = new ContainerBalancerSelectionCriteria(config,
-        nodeManager, replicationManager, containerManager, findSourceStrategy);
+        nodeManager, replicationManager, containerManager, findSourceStrategy,
+        containerToSourceMap);
     return true;
   }
 
@@ -472,7 +475,7 @@ public class ContainerBalancerTask implements Runnable {
     findTargetStrategy.reInitialize(potentialTargets, config, upperLimit);
     findSourceStrategy.reInitialize(getPotentialSources(), config, lowerLimit);
 
-    moveSelectionToFutureMap = new HashMap<>(underUtilizedNodes.size() + overUtilizedNodes.size());
+    moveSelectionToFutureMap = new ConcurrentHashMap<>();
     boolean isMoveGeneratedInThisIteration = false;
     iterationResult = IterationResult.ITERATION_COMPLETED;
     boolean canAdaptWhenNearingLimits = true;
@@ -598,21 +601,25 @@ public class ContainerBalancerTask implements Runnable {
    */
   private void checkIterationMoveResults() {
     this.countDatanodesInvolvedPerIteration = 0;
-    CompletableFuture<Void> allFuturesResult = CompletableFuture.allOf(
-        moveSelectionToFutureMap.values()
-            .toArray(new CompletableFuture[moveSelectionToFutureMap.size()]));
-    try {
-      allFuturesResult.get(config.getMoveTimeout().toMillis(),
-          TimeUnit.MILLISECONDS);
-    } catch (InterruptedException e) {
-      LOG.warn("Container balancer is interrupted");
-      Thread.currentThread().interrupt();
-    } catch (TimeoutException e) {
-      long timeoutCounts = cancelMovesThatExceedTimeoutDuration();
-      LOG.warn("{} Container moves are canceled.", timeoutCounts);
-      metrics.incrementNumContainerMovesTimeoutInLatestIteration(timeoutCounts);
-    } catch (ExecutionException e) {
-      LOG.error("Got exception while checkIterationMoveResults", e);
+    Collection<CompletableFuture<MoveManager.MoveResult>> futures =
+        moveSelectionToFutureMap.values();
+    if (!futures.isEmpty()) {
+      CompletableFuture<Void> allFuturesResult = CompletableFuture.allOf(
+          futures.toArray(new CompletableFuture[futures.size()]));
+      try {
+        allFuturesResult.get(config.getMoveTimeout().toMillis(),
+            TimeUnit.MILLISECONDS);
+      } catch (InterruptedException e) {
+        LOG.warn("Container balancer is interrupted");
+        Thread.currentThread().interrupt();
+      } catch (TimeoutException e) {
+        long timeoutCounts = cancelMovesThatExceedTimeoutDuration();
+        LOG.warn("{} Container moves are canceled.", timeoutCounts);
+        metrics.incrementNumContainerMovesTimeoutInLatestIteration(
+            timeoutCounts);
+      } catch (ExecutionException e) {
+        LOG.error("Got exception while checkIterationMoveResults", e);
+      }
     }
 
     countDatanodesInvolvedPerIteration =
@@ -828,6 +835,7 @@ public class ContainerBalancerTask implements Runnable {
 
       future = future.whenComplete((result, ex) -> {
         metrics.incrementCurrentIterationContainerMoveMetric(result, 1);
+        moveSelectionToFutureMap.remove(moveSelection);
         if (ex != null) {
           LOG.info("Container move for container {} from source {} to " +
                   "target {} failed with exceptions.",
@@ -883,7 +891,6 @@ public class ContainerBalancerTask implements Runnable {
         return false;
       } else {
         MoveManager.MoveResult result = future.join();
-        moveSelectionToFutureMap.put(moveSelection, future);
         if (result == MoveManager.MoveResult.REPLICATION_FAIL_NOT_EXIST_IN_SOURCE ||
             result == MoveManager.MoveResult.REPLICATION_FAIL_EXIST_IN_TARGET ||
             result == MoveManager.MoveResult.REPLICATION_FAIL_CONTAINER_NOT_CLOSED ||
@@ -927,8 +934,6 @@ public class ContainerBalancerTask implements Runnable {
     containerToTargetMap.put(containerID, target);
     selectedTargets.add(target);
     selectedSources.add(source);
-    selectionCriteria.setSelectedContainers(
-        new HashSet<>(containerToSourceMap.keySet()));
   }
 
   /**

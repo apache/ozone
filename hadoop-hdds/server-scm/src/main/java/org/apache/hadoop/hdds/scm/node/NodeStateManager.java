@@ -682,6 +682,11 @@ public class NodeStateManager implements Runnable, Closeable {
     return nodeStateMap.getContainers(uuid);
   }
 
+  public int getContainerCount(UUID uuid)
+      throws NodeNotFoundException {
+    return nodeStateMap.getContainerCount(uuid);
+  }
+
   /**
    * Move Stale or Dead node to healthy if we got a heartbeat from them.
    * Move healthy nodes to stale nodes if it is needed.

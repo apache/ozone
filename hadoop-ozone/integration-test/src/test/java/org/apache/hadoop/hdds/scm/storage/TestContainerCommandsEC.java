@@ -167,6 +167,7 @@ public class TestContainerCommandsEC {
   public static void init() throws Exception {
     config = new OzoneConfiguration();
     config.setInt(ScmConfigKeys.OZONE_SCM_PIPELINE_OWNER_CONTAINER_COUNT, 1);
+    config.setTimeDuration(ScmConfigKeys.OZONE_SCM_STALENODE_INTERVAL, 3, TimeUnit.SECONDS);
     config.setBoolean(OzoneConfigKeys.OZONE_ACL_ENABLED, true);
     config.set(OzoneConfigKeys.OZONE_ACL_AUTHORIZER_CLASS,
         OzoneConfigKeys.OZONE_ACL_AUTHORIZER_CLASS_NATIVE);
@@ -452,10 +453,10 @@ public class TestContainerCommandsEC {
           .generateToken(ANY_USER, container.containerID());
       scm.getContainerManager().getContainerStateManager()
           .addContainer(container.getProtobuf());
-
+      int replicaIndex = 4;
       XceiverClientSpi dnClient = xceiverClientManager.acquireClient(
           createSingleNodePipeline(newPipeline, newPipeline.getNodes().get(0),
-              2));
+              replicaIndex));
       try {
         // To create the actual situation, container would have been in closed
         // state at SCM.
@@ -470,7 +471,7 @@ public class TestContainerCommandsEC {
         String encodedToken = cToken.encodeToUrlString();
         ContainerProtocolCalls.createRecoveringContainer(dnClient,
             container.containerID().getProtobuf().getId(),
-            encodedToken, 4);
+            encodedToken, replicaIndex);
 
         BlockID blockID = ContainerTestHelper
             .getTestBlockID(container.containerID().getProtobuf().getId());
@@ -511,7 +512,8 @@ public class TestContainerCommandsEC {
             readContainerResponseProto.getContainerData().getState());
         ContainerProtos.ReadChunkResponseProto readChunkResponseProto =
             ContainerProtocolCalls.readChunk(dnClient,
-                writeChunkRequest.getWriteChunk().getChunkData(), blockID, null,
+                writeChunkRequest.getWriteChunk().getChunkData(),
+                blockID.getDatanodeBlockIDProtobufBuilder().setReplicaIndex(replicaIndex).build(), null,
                 blockToken);
         ByteBuffer[] readOnlyByteBuffersArray = BufferUtils
             .getReadOnlyByteBuffersArray(

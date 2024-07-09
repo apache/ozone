@@ -681,7 +681,7 @@ public final class RocksDatabase implements Closeable {
     try (UncheckedAutoCloseable ignored = acquire()) {
       final int size = db.get().get(family.getHandle(),
           DEFAULT_READ_OPTION, key, outValue);
-      LOG.debug("get: size={}, remaining={}",
+      LOG.trace("get: size={}, remaining={}",
           size, outValue.asReadOnlyBuffer().remaining());
       return size == ManagedRocksDB.NOT_FOUND ? null : size;
     } catch (RocksDBException e) {
