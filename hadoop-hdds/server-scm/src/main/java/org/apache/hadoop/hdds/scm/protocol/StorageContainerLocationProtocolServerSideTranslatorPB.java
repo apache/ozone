@@ -34,6 +34,7 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolPro
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ActivatePipelineResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ClosePipelineRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ClosePipelineResponseProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ContainerBalancerStatusInfoResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ContainerBalancerStatusRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ContainerBalancerStatusResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ContainerRequestProto;
@@ -1204,7 +1205,7 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
   }
 
   public ContainerBalancerStatusInfoResponseProto getContainerBalancerStatusInfo(
-          ContainerBalancerStatusInfoRequestProto request)
+          StorageContainerLocationProtocolProtos.ContainerBalancerStatusInfoRequestProto request)
           throws IOException {
     ContainerBalancerStatusInfoResponseProto containerBalancerStatusInfo = impl.getContainerBalancerStatusInfo();
     return ContainerBalancerStatusInfoResponseProto.newBuilder()

@@ -510,7 +510,7 @@ public class ContainerOperationClient implements ScmClient {
   }
 
   @Override
-  public ContainerBalancerStatusInfoResponseProto getContainerBalancerStatusInfo() {
+  public ContainerBalancerStatusInfoResponseProto getContainerBalancerStatusInfo() throws IOException {
     return storageContainerLocationClient.getContainerBalancerStatusInfo();
   }
 

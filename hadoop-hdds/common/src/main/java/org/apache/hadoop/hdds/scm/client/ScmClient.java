@@ -385,7 +385,7 @@ public interface ScmClient extends Closeable {
    */
   boolean getContainerBalancerStatus() throws IOException;
 
-  ContainerBalancerStatusInfoResponseProto getContainerBalancerStatusInfo();
+  ContainerBalancerStatusInfoResponseProto getContainerBalancerStatusInfo() throws IOException;
 
   /**
    * returns the list of ratis peer roles. Currently only include peer address.

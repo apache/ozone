@@ -430,7 +430,7 @@ public interface StorageContainerLocationProtocol extends Closeable {
    */
   boolean getContainerBalancerStatus() throws IOException;
 
-  ContainerBalancerStatusInfoResponseProto getContainerBalancerStatusInfo();
+  ContainerBalancerStatusInfoResponseProto getContainerBalancerStatusInfo() throws IOException;
 
   /**
    * Get Datanode usage information by ip or hostname or uuid.
