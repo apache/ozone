@@ -60,8 +60,7 @@ public class LegacyHadoopConfigurationSource
       }
 
       /**
-       * Get a property value without the compliance check. It's needed to get the compliance
-       * mode and the whitelist parameter values in the checkCompliance method.
+       * Get a property value without the compliance check. It's needed to get the compliance mode.
        *
        * @param key property name
        * @param defaultValue default value
@@ -129,12 +128,6 @@ public class LegacyHadoopConfigurationSource
     }
   }
 
-  /**
-   * Use this with beware, as we are returning the Configuration object, without compliance checks.
-   * Currently, it's only used in the OzoneConfiguration class, in an OzoneConfiguration constructor,
-   * so we'll handle the compliance checks in the OzoneConfiguration object.
-   * @return
-   */
   public Configuration getOriginalHadoopConfiguration() {
     return configuration;
   }
