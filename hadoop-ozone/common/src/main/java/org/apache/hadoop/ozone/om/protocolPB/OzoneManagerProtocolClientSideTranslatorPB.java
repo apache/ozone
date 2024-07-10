@@ -302,10 +302,8 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
   }
 
   @VisibleForTesting
-  public OMRequest.Builder createOMRequest(Type cmdType,int clientVersion) {
-    return OMRequest.newBuilder()
-        .setCmdType(cmdType)
-        .setVersion(clientVersion)
+  public OMRequest.Builder createOMRequest(Type cmdType, int clientVersion) {
+    return OMRequest.newBuilder().setCmdType(cmdType).setVersion(clientVersion)
         .setClientId(clientID);
   }
 

@@ -276,9 +276,9 @@ public class TestObjectStoreWithFSO {
     OzoneBucket ozoneBucket = ozoneVolume.getBucket(bucketName);
     assertEquals(bucketName, ozoneBucket.getName());
     String data = "random data";
-    try(OzoneOutputStream ozoneOutputStream = ozoneBucket.createKey(key,
+    try (OzoneOutputStream ozoneOutputStream = ozoneBucket.createKey(key,
         data.length(), ReplicationType.RATIS, ReplicationFactor.ONE,
-        new HashMap<>())){
+        new HashMap<>())) {
       ozoneOutputStream.write(data.getBytes(StandardCharsets.UTF_8));
     }
     // try to read from older client
@@ -292,7 +292,7 @@ public class TestObjectStoreWithFSO {
           () -> getFileStatus(keyArgs, clientVersion),
           "Expecting Unsupported Operation Exception");
     } else {
-      assertNotNull(getFileStatus(keyArgs,clientVersion));
+      assertNotNull(getFileStatus(keyArgs, clientVersion));
     }
   }
 
