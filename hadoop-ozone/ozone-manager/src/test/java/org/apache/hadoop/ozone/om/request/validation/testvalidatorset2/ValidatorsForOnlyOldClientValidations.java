@@ -21,7 +21,7 @@ import org.apache.hadoop.ozone.om.request.validation.ValidationContext;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 
 import static org.apache.hadoop.ozone.om.request.validation.RequestProcessingPhase.PRE_PROCESS;
-import static org.apache.hadoop.ozone.om.request.validation.ValidationCondition.OLDER_CLIENT_REQUESTS;
+import static org.apache.hadoop.ozone.om.request.validation.ValidationCondition.OLDER_BUCKET_LAYOUT_CLIENT_REQUESTS;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type.CreateKey;
 
 /**
@@ -33,7 +33,7 @@ public final class ValidatorsForOnlyOldClientValidations {
   private ValidatorsForOnlyOldClientValidations() { }
 
   @RequestFeatureValidator(
-      conditions = { OLDER_CLIENT_REQUESTS },
+      conditions = { OLDER_BUCKET_LAYOUT_CLIENT_REQUESTS },
       processingPhase = PRE_PROCESS,
       requestType = CreateKey)
   public static OMRequest oldClientPreProcessCreateKeyValidator2(

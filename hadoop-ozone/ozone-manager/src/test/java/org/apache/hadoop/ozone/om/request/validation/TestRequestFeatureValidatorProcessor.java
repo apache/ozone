@@ -365,7 +365,7 @@ public class TestRequestFeatureValidatorProcessor {
 
   private ValidationCondition[] someConditions() {
     return
-        new ValidationCondition[] {ValidationCondition.OLDER_CLIENT_REQUESTS};
+        new ValidationCondition[] {ValidationCondition.OLDER_BUCKET_LAYOUT_CLIENT_REQUESTS };
   }
 
   private ValidationCondition[] emptyConditions() {

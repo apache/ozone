@@ -42,9 +42,10 @@ public enum ValidationCondition {
 
   /**
    * Classifies validations that has to run, when the client uses an older
-   * protocol version than the server.
+   * protocol version than the bucket layout version i.e the version where
+   * bucket types where introduced.
    */
-  OLDER_CLIENT_REQUESTS {
+  OLDER_BUCKET_LAYOUT_CLIENT_REQUESTS {
     @Override
     public boolean shouldApply(OMRequest req, ValidationContext ctx) {
       return req.getVersion() < ClientVersion.BUCKET_LAYOUT_SUPPORT.getVersion();

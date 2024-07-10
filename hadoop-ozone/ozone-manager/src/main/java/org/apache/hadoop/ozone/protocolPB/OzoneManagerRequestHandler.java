@@ -629,7 +629,7 @@ public class OzoneManagerRequestHandler implements RequestHandler {
   }
 
   @RequestFeatureValidator(
-      conditions = ValidationCondition.OLDER_CLIENT_REQUESTS,
+      conditions = ValidationCondition.OLDER_BUCKET_LAYOUT_CLIENT_REQUESTS,
       processingPhase = RequestProcessingPhase.POST_PROCESS,
       requestType = Type.LookupKey
   )
@@ -656,7 +656,7 @@ public class OzoneManagerRequestHandler implements RequestHandler {
   }
 
   @RequestFeatureValidator(
-      conditions = ValidationCondition.OLDER_CLIENT_REQUESTS,
+      conditions = ValidationCondition.OLDER_BUCKET_LAYOUT_CLIENT_REQUESTS,
       processingPhase = RequestProcessingPhase.POST_PROCESS,
       requestType = Type.LookupKey
   )
@@ -743,7 +743,7 @@ public class OzoneManagerRequestHandler implements RequestHandler {
   }
 
   @RequestFeatureValidator(
-      conditions = ValidationCondition.OLDER_CLIENT_REQUESTS,
+      conditions = ValidationCondition.OLDER_BUCKET_LAYOUT_CLIENT_REQUESTS,
       processingPhase = RequestProcessingPhase.POST_PROCESS,
       requestType = Type.ListKeys
   )
@@ -770,7 +770,7 @@ public class OzoneManagerRequestHandler implements RequestHandler {
   }
 
   @RequestFeatureValidator(
-      conditions = ValidationCondition.OLDER_CLIENT_REQUESTS,
+      conditions = ValidationCondition.OLDER_BUCKET_LAYOUT_CLIENT_REQUESTS,
       processingPhase = RequestProcessingPhase.POST_PROCESS,
       requestType = Type.ListKeys
   )
@@ -831,7 +831,7 @@ public class OzoneManagerRequestHandler implements RequestHandler {
   }
 
   @RequestFeatureValidator(
-      conditions = ValidationCondition.OLDER_CLIENT_REQUESTS,
+      conditions = ValidationCondition.OLDER_BUCKET_LAYOUT_CLIENT_REQUESTS,
       processingPhase = RequestProcessingPhase.POST_PROCESS,
       requestType = Type.ListTrash
   )
@@ -861,7 +861,7 @@ public class OzoneManagerRequestHandler implements RequestHandler {
   }
 
   @RequestFeatureValidator(
-      conditions = ValidationCondition.OLDER_CLIENT_REQUESTS,
+      conditions = ValidationCondition.OLDER_BUCKET_LAYOUT_CLIENT_REQUESTS,
       processingPhase = RequestProcessingPhase.POST_PROCESS,
       requestType = Type.ListTrash
   )
@@ -1048,7 +1048,7 @@ public class OzoneManagerRequestHandler implements RequestHandler {
   }
 
   @RequestFeatureValidator(
-      conditions = ValidationCondition.OLDER_CLIENT_REQUESTS,
+      conditions = ValidationCondition.OLDER_BUCKET_LAYOUT_CLIENT_REQUESTS,
       processingPhase = RequestProcessingPhase.POST_PROCESS,
       requestType = Type.GetFileStatus
   )
@@ -1078,7 +1078,7 @@ public class OzoneManagerRequestHandler implements RequestHandler {
 
 
   @RequestFeatureValidator(
-      conditions = ValidationCondition.OLDER_CLIENT_REQUESTS,
+      conditions = ValidationCondition.OLDER_BUCKET_LAYOUT_CLIENT_REQUESTS,
       processingPhase = RequestProcessingPhase.POST_PROCESS,
       requestType = Type.GetFileStatus
   )
@@ -1127,7 +1127,7 @@ public class OzoneManagerRequestHandler implements RequestHandler {
   }
 
   @RequestFeatureValidator(
-      conditions = ValidationCondition.OLDER_CLIENT_REQUESTS,
+      conditions = ValidationCondition.OLDER_BUCKET_LAYOUT_CLIENT_REQUESTS,
       processingPhase = RequestProcessingPhase.POST_PROCESS,
       requestType = Type.LookupFile
   )
@@ -1155,7 +1155,7 @@ public class OzoneManagerRequestHandler implements RequestHandler {
   }
 
   @RequestFeatureValidator(
-      conditions = ValidationCondition.OLDER_CLIENT_REQUESTS,
+      conditions = ValidationCondition.OLDER_BUCKET_LAYOUT_CLIENT_REQUESTS,
       processingPhase = RequestProcessingPhase.POST_PROCESS,
       requestType = Type.LookupFile
   )
@@ -1237,7 +1237,7 @@ public class OzoneManagerRequestHandler implements RequestHandler {
   }
 
   @RequestFeatureValidator(
-      conditions = ValidationCondition.OLDER_CLIENT_REQUESTS,
+      conditions = ValidationCondition.OLDER_BUCKET_LAYOUT_CLIENT_REQUESTS,
       processingPhase = RequestProcessingPhase.POST_PROCESS,
       requestType = Type.ListStatus
   )
@@ -1265,7 +1265,7 @@ public class OzoneManagerRequestHandler implements RequestHandler {
   }
 
   @RequestFeatureValidator(
-      conditions = ValidationCondition.OLDER_CLIENT_REQUESTS,
+      conditions = ValidationCondition.OLDER_BUCKET_LAYOUT_CLIENT_REQUESTS,
       processingPhase = RequestProcessingPhase.POST_PROCESS,
       requestType = Type.ListStatus
   )
