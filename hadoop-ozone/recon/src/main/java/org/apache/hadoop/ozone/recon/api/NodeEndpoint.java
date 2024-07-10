@@ -280,8 +280,7 @@ public class NodeEndpoint {
     AtomicBoolean isContainerOrPipeLineOpen = new AtomicBoolean(false);
     try {
       nodeStatus = nodeManager.getNodeStatus(nodeByUuid);
-      boolean isNodeDecommissioned = nodeByUuid.getPersistedOpState() == NodeOperationalState.DECOMMISSIONED;
-      if (isNodeDecommissioned || nodeStatus.isDead()) {
+      if (nodeStatus.isDead()) {
         checkContainers(nodeByUuid, isContainerOrPipeLineOpen);
         if (isContainerOrPipeLineOpen.get()) {
           failedNodeErrorResponseMap.put(nodeByUuid.getUuidString(), "Open Containers/Pipelines");
@@ -298,8 +297,7 @@ public class NodeEndpoint {
       LOG.error("Node : {} not found", nodeByUuid);
       return false;
     }
-    failedNodeErrorResponseMap.put(nodeByUuid.getUuidString(), "DataNode should be in either DECOMMISSIONED " +
-        "operational state or DEAD node state.");
+    failedNodeErrorResponseMap.put(nodeByUuid.getUuidString(), "DataNode should be in DEAD node status.");
     return false;
   }
 

@@ -75,10 +75,10 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
     <!-- HDDS Rocks Native dependency version-->
     <hdds.rocks.native.version>${hdds.version}</hdds.rocks.native.version>
     <!-- Apache Ratis version -->
-    <ratis.version>3.0.1</ratis.version>
+    <ratis.version>3.1.0</ratis.version>
 
     <!-- Apache Ratis thirdparty version -->
-    <ratis.thirdparty.version>1.0.5</ratis.thirdparty.version>
+    <ratis.thirdparty.version>1.0.6</ratis.thirdparty.version>
 
     <!-- Apache Ranger plugin version -->
     <ranger.version>2.3.0</ranger.version>
@@ -97,14 +97,12 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
     <maven-gpg-plugin.version>3.2.4</maven-gpg-plugin.version>
     <shell-executable>bash</shell-executable>
 
-    <!-- Set the Release year during release -->
-    <release-year>2019</release-year>
-
     <failIfNoTests>false</failIfNoTests>
     <surefire.failIfNoSpecifiedTests>false</surefire.failIfNoSpecifiedTests>
     <maven.test.redirectTestOutputToFile>true</maven.test.redirectTestOutputToFile>
-    <jetty.version>9.4.54.v20240208</jetty.version>
+    <jetty.version>9.4.55.v20240627</jetty.version>
     <java.dev.jna.version>5.2.0</java.dev.jna.version>
+    <jcip-annotations.version>1.0-1</jcip-annotations.version>
     <curator.version>4.2.0</curator.version>
 
     <!-- number of threads/forks to use when running tests in parallel, see parallel-tests profile -->
@@ -124,7 +122,7 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
     <commons-logging-api.version>1.1</commons-logging-api.version>
     <commons-math3.version>3.6.1</commons-math3.version>
     <commons-net.version>3.10.0</commons-net.version>
-    <commons-text.version>1.11.0</commons-text.version>
+    <commons-text.version>1.12.0</commons-text.version>
     <commons-validator.version>1.6</commons-validator.version>
     <commons-fileupload.version>1.5</commons-fileupload.version>
     <download-maven-plugin.version>1.7.1</download-maven-plugin.version>
@@ -147,6 +145,7 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
     <activation-api.version>1.2.2</activation-api.version>
     <jaxb-api.version>2.3.3</jaxb-api.version>
     <jaxb-runtime.version>2.3.9</jaxb-runtime.version>
+    <jnr-posix.version>3.1.19</jnr-posix.version>
     <jsch.version>0.1.55</jsch.version>
     <cdi-api.version>2.0</cdi-api.version>
     <servlet-api.version>3.1.0</servlet-api.version>
@@ -213,7 +212,7 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
     <okio.version>3.6.0</okio.version>
     <mockito.version>4.11.0</mockito.version>
     <hamcrest.version>2.2</hamcrest.version>
-    <junit5.version>5.10.2</junit5.version>
+    <junit5.version>5.10.3</junit5.version>
     <zookeeper.version>3.8.4</zookeeper.version>
 
     <!-- Maven protoc compiler -->
@@ -231,7 +230,7 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
     <weld-servlet.version>3.1.9.Final</weld-servlet.version>
 
     <!-- define the Java language version used by the compiler -->
-    <javac.version>1.8</javac.version>
+    <javac.version>8</javac.version>
 
     <!-- The java version enforced by the maven enforcer -->
     <!-- more complex patterns can be used here, such as
@@ -242,9 +241,10 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
     <enforced.maven.version>[3.3.0,)</enforced.maven.version>
 
     <!-- Plugin versions and config -->
-    <maven-surefire-plugin.argLine>-Xmx4096m -XX:+HeapDumpOnOutOfMemoryError</maven-surefire-plugin.argLine>
+    <maven-surefire-plugin.argLine>-Xmx8192m -XX:+HeapDumpOnOutOfMemoryError</maven-surefire-plugin.argLine>
     <maven-surefire-plugin.argLineAccessArgs></maven-surefire-plugin.argLineAccessArgs>
-    <unstable-test-groups>flaky | native | slow | unhealthy</unstable-test-groups>
+    <excluded-test-groups>native | unhealthy</excluded-test-groups> <!-- test groups excluded by default (without any manual profile activation) -->
+    <unstable-test-groups>flaky | native | slow | unhealthy</unstable-test-groups> <!-- test groups excluded in CI (except in dedicated profiles for flaky and native) -->
     <maven-surefire-plugin.version>3.0.0-M4</maven-surefire-plugin.version>
     <maven-surefire-report-plugin.version>${maven-surefire-plugin.version}</maven-surefire-report-plugin.version>
 
@@ -253,24 +253,24 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
     <maven-install-plugin.version>3.1.2</maven-install-plugin.version>
     <maven-resources-plugin.version>3.1.0</maven-resources-plugin.version>
     <maven-shade-plugin.version>3.6.0</maven-shade-plugin.version>
-    <maven-jar-plugin.version>3.4.1</maven-jar-plugin.version>
+    <maven-jar-plugin.version>3.4.2</maven-jar-plugin.version>
     <maven-war-plugin.version>3.4.0</maven-war-plugin.version>
     <maven-source-plugin.version>3.3.1</maven-source-plugin.version>
     <maven-pdf-plugin.version>1.6.1</maven-pdf-plugin.version>
     <maven-remote-resources-plugin.version>1.7.0</maven-remote-resources-plugin.version>
     <maven-enforcer-plugin.version>3.5.0</maven-enforcer-plugin.version>
-    <maven-javadoc-plugin.version>3.0.1</maven-javadoc-plugin.version>
+    <maven-javadoc-plugin.version>3.7.0</maven-javadoc-plugin.version>
     <maven-assembly-plugin.version>3.7.1</maven-assembly-plugin.version>
     <apache-rat-plugin.version>0.16.1</apache-rat-plugin.version>
     <maven-deploy-plugin.version>3.1.2</maven-deploy-plugin.version>
-    <build-helper-maven-plugin.version>3.5.0</build-helper-maven-plugin.version>
-    <maven-dependency-plugin.version>3.6.1</maven-dependency-plugin.version>
+    <build-helper-maven-plugin.version>3.6.0</build-helper-maven-plugin.version>
+    <maven-dependency-plugin.version>3.7.1</maven-dependency-plugin.version>
     <plexus-archiver.version>4.2.2</plexus-archiver.version>
     <docker-maven-plugin.version>0.44.0</docker-maven-plugin.version>
     <exec-maven-plugin.version>3.1.1</exec-maven-plugin.version>
-    <license-maven-plugin.version>2.3.0</license-maven-plugin.version>
+    <license-maven-plugin.version>2.4.0</license-maven-plugin.version>
     <make-maven-plugin.version>1.0-beta-1</make-maven-plugin.version>
-    <native-maven-plugin.version>1.0-alpha-11</native-maven-plugin.version>
+    <native-maven-plugin.version>1.0-M1</native-maven-plugin.version>
     <maven-checkstyle-plugin.version>3.4.0</maven-checkstyle-plugin.version>
     <maven-site-plugin.version>3.12.1</maven-site-plugin.version>
     <maven-antrun-plugin.version>3.1.0</maven-antrun-plugin.version>
@@ -304,7 +304,7 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
     <maven.core.version>3.9.6</maven.core.version>
     <snappy-java.version>1.1.10.5</snappy-java.version>
     <hadoop-shaded-guava.version>1.2.0</hadoop-shaded-guava.version>
-    <com.nimbusds.nimbus-jose-jwt.version>9.37.2</com.nimbusds.nimbus-jose-jwt.version>
+    <com.nimbusds.nimbus-jose-jwt.version>9.40</com.nimbusds.nimbus-jose-jwt.version>
   </properties>
 
   <dependencyManagement>
@@ -481,9 +481,19 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
         <version>${commons-validator.version}</version>
       </dependency>
       <dependency>
+        <groupId>com.github.jnr</groupId>
+        <artifactId>jnr-posix</artifactId>
+        <version>${jnr-posix.version}</version>
+      </dependency>
+      <dependency>
         <groupId>com.github.luben</groupId>
         <artifactId>zstd-jni</artifactId>
         <version>${zstd-jni.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>com.github.stephenc.jcip</groupId>
+        <artifactId>jcip-annotations</artifactId>
+        <version>${jcip-annotations.version}</version>
       </dependency>
       <dependency>
         <groupId>javax.annotation</groupId>
@@ -1312,8 +1322,6 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
           <artifactId>maven-compiler-plugin</artifactId>
           <version>${maven-compiler-plugin.version}</version>
           <configuration>
-            <source>${javac.version}</source>
-            <target>${javac.version}</target>
             <useIncrementalCompilation>false</useIncrementalCompilation>
           </configuration>
         </plugin>
@@ -1714,6 +1722,7 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
           <includes>
             <include>**/Test*.java</include>
           </includes>
+          <excludedGroups>${excluded-test-groups}</excludedGroups>
         </configuration>
       </plugin>
       <plugin>
@@ -1957,6 +1966,28 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
         </plugins>
       </build>
     </profile>
+
+    <!-- Profiles for specific JDK versions -->
+    <profile>
+      <id>java8</id>
+      <activation>
+        <jdk>[,8]</jdk>
+      </activation>
+      <properties>
+        <maven.compiler.source>${javac.version}</maven.compiler.source>
+        <maven.compiler.target>${javac.version}</maven.compiler.target>
+      </properties>
+    </profile>
+    <profile>
+      <id>java9-or-later</id>
+      <activation>
+        <jdk>[9,]</jdk>
+      </activation>
+      <properties>
+        <maven.compiler.release>${javac.version}</maven.compiler.release> <!-- supported since Java 9 -->
+      </properties>
+    </profile>
+
     <profile>
       <id>go-offline</id>
       <properties>
@@ -1968,6 +1999,19 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
         <maven.shade.skip>true</maven.shade.skip>
       </properties>
     </profile>
+    <profile>
+      <!-- @Native tests are excluded by default.  This profile removes the exclusion if native build is enabled. -->
+      <id>rocks-native-tests</id>
+      <activation>
+        <property>
+          <name>rocks_tools_native</name>
+        </property>
+      </activation>
+      <properties>
+        <excluded-test-groups>unhealthy</excluded-test-groups>
+      </properties>
+    </profile>
+    <!-- The following profiles define test splits for CI -->
     <profile>
       <id>client</id>
       <build>
@@ -2155,6 +2199,7 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
       </build>
     </profile>
     <profile>
+      <!-- Test split dedicated for running @Flaky tests -->
       <id>flaky</id>
       <build>
         <plugins>
@@ -2170,6 +2215,7 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
       </build>
     </profile>
     <profile>
+      <!-- Test split dedicated for running @Native tests -->
       <id>native</id>
       <build>
         <plugins>

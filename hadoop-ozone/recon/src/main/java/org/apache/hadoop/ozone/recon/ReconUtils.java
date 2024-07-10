@@ -425,6 +425,32 @@ public class ReconUtils {
   }
 
   /**
+   * Converts Unix numeric permissions into a symbolic representation.
+   * @param numericPermissions The numeric string, e.g., "750".
+   * @return The symbolic representation, e.g., "rwxr-x---".
+   */
+  public static String convertNumericToSymbolic(String numericPermissions) {
+    int owner = Character.getNumericValue(numericPermissions.charAt(0));
+    int group = Character.getNumericValue(numericPermissions.charAt(1));
+    int others = Character.getNumericValue(numericPermissions.charAt(2));
+
+    return String.format("%s%s%s",
+        convertToSymbolicPermission(owner),
+        convertToSymbolicPermission(group),
+        convertToSymbolicPermission(others));
+  }
+
+  /**
+   * Converts a single digit Unix permission into a symbolic representation.
+   * @param permission The permission digit.
+   * @return The symbolic representation for the digit.
+   */
+  public static String convertToSymbolicPermission(int permission) {
+    String[] symbols = {"---", "--x", "-w-", "-wx", "r--", "r-x", "rw-", "rwx"};
+    return symbols[permission];
+  }
+
+  /**
    * Sorts a list of DiskUsage objects in descending order by size using parallel sorting and
    * returns the top N records as specified by the limit.
    *
