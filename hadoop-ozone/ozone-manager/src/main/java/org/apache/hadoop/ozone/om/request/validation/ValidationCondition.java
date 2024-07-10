@@ -47,7 +47,7 @@ public enum ValidationCondition {
   OLDER_CLIENT_REQUESTS {
     @Override
     public boolean shouldApply(OMRequest req, ValidationContext ctx) {
-      return req.getVersion() < ClientVersion.CURRENT_VERSION;
+      return req.getVersion() < ClientVersion.BUCKET_LAYOUT_SUPPORT.getVersion();
     }
   };
 
