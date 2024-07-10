@@ -45,12 +45,21 @@ _init() {
 }
 
 _write() {
-  execute_robot_test ${container} -N "xcompat-cluster-${cluster_version}-client-${client_version}-write" -v SUFFIX:${client_version} compatibility/write.robot
+  execute_robot_test ${container} -N "xcompat-cluster-${cluster_version}-client-${client_version}-write" \
+    -v CLIENT_VERSION:${client_version} \
+    -v CLUSTER_VERSION:${cluster_version} \
+    -v SUFFIX:${client_version} \
+    compatibility/write.robot
 }
 
 _read() {
   local data_version="$1"
-  execute_robot_test ${container} -N "xcompat-cluster-${cluster_version}-client-${client_version}-read-${data_version}" -v SUFFIX:${data_version} compatibility/read.robot
+  execute_robot_test ${container} -N "xcompat-cluster-${cluster_version}-client-${client_version}-read-${data_version}" \
+    -v CLIENT_VERSION:${client_version} \
+    -v CLUSTER_VERSION:${cluster_version} \
+    -v DATA_VERSION:${data_version} \
+    -v SUFFIX:${data_version} \
+    compatibility/read.robot
 }
 
 test_cross_compatibility() {
