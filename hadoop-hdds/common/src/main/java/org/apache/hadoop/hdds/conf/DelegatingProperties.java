@@ -33,7 +33,9 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ADMINISTRATORS;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SECURITY_CRYPTO_COMPLIANCE_MODE_UNRESTRICTED;
 
 /**
- * Delegating properties helper class.
+ * Delegating properties helper class. It's needed for configuration related classes, so we are able
+ * to delegate the operations that are happening on their Properties object to their parent's
+ * Properties object. This is needed because of the configuration compliance checks.
  */
 public class DelegatingProperties extends Properties {
   private final Properties properties;
