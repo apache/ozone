@@ -30,6 +30,7 @@ import org.apache.hadoop.ozone.client.ObjectStoreStub;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientStub;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
+import org.apache.ozone.test.tag.Unhealthy;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -97,6 +98,7 @@ public class TestSecretRevoke {
   }
 
   @Test
+  @Unhealthy("HDDS-11041")
   void testSecretRevokeWithUsername() throws IOException {
     endpoint.revoke(OTHER_USER_NAME);
     verify(objectStore, times(1))
