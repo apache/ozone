@@ -744,55 +744,55 @@
         "leaderNode": "localhost1.storage.enterprise.com",
         "datanodes": [
           {
-          "level": 0,
-          "parent": null,
-          "cost": 0,
-          "uuid": "9e4e92da-4abd-461d-b042-dc4fe72e8727",
-          "uuidString": "9e4e92da-4abd-461d-b042-dc4fe72e8727",
-          "ipAddress": "172.22.0.5",
-          "hostName": "ozone_datanode_1.ozone_default",
-          "ports": [
-            {
-              "name": "REPLICATION",
-              "value": 9886
-            },
-            {
-              "name": "RATIS",
-              "value": 9858
-            },
-            {
-              "name": "RATIS_ADMIN",
-              "value": 9857
-            },
-            {
-              "name": "RATIS_SERVER",
-              "value": 9856
-            },
-            {
-              "name": "RATIS_DATASTREAM",
-              "value": 9855
-            },
-            {
-              "name": "STANDALONE",
-              "value": 9859
-            }
+            "level": 0,
+            "parent": null,
+            "cost": 0,
+            "uuid": "9e4e92da-4abd-461d-b042-dc4fe72e8727",
+            "uuidString": "9e4e92da-4abd-461d-b042-dc4fe72e8727",
+            "ipAddress": "172.22.0.5",
+            "hostName": "ozone_datanode_1.ozone_default",
+            "ports": [
+              {
+                "name": "REPLICATION",
+                "value": 9886
+              },
+              {
+                "name": "RATIS",
+                "value": 9858
+              },
+              {
+                "name": "RATIS_ADMIN",
+                "value": 9857
+              },
+              {
+                "name": "RATIS_SERVER",
+                "value": 9856
+              },
+              {
+                "name": "RATIS_DATASTREAM",
+                "value": 9855
+              },
+              {
+                "name": "STANDALONE",
+                "value": 9859
+              }
 
-          ],
-          "certSerialId": null,
-          "version": null,
-          "setupTime": 0,
-          "revision": null,
-          "buildDate": null,
-          "persistedOpState": "IN_SERVICE",
-          "persistedOpStateExpiryEpochSec": 0,
-          "initialVersion": 0,
-          "currentVersion": 1,
-          "signature": -460136136,
-          "decomissioned": false,
-          "networkName": "9e4e92da-4abd-461d-b042-dc4fe72e8727",
-          "networkLocation": "/default-rack",
-          "networkFullPath": "/default-rack/9e4e92da-4abd-461d-b042-dc4fe72e8727",
-          "numOfLeaves": 1
+            ],
+            "certSerialId": null,
+            "version": null,
+            "setupTime": 0,
+            "revision": null,
+            "buildDate": null,
+            "persistedOpState": "IN_SERVICE",
+            "persistedOpStateExpiryEpochSec": 0,
+            "initialVersion": 0,
+            "currentVersion": 1,
+            "signature": -460136136,
+            "decomissioned": false,
+            "networkName": "9e4e92da-4abd-461d-b042-dc4fe72e8727",
+            "networkLocation": "/default-rack",
+            "networkFullPath": "/default-rack/9e4e92da-4abd-461d-b042-dc4fe72e8727",
+            "numOfLeaves": 1
           }
         ],
         "lastLeaderElection": 1578491471528,
@@ -3773,10 +3773,10 @@
     "totalReplicatedDataSize": 31457280,
     "totalOpenKeys": 10
   },
-  "keysdeletePendingSummary":{
-      "totalUnreplicatedDataSize": 29291,
-      "totalReplicatedDataSize": 87873,
-      "totalDeletedKeys": 3
+  "keysdeletePendingSummary": {
+    "totalUnreplicatedDataSize": 29291,
+    "totalReplicatedDataSize": 87873,
+    "totalDeletedKeys": 3
   },
   "omMismatch": {
     "containerDiscrepancyInfo": [
