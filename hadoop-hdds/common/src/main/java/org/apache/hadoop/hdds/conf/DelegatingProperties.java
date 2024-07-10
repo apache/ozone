@@ -162,7 +162,7 @@ public class DelegatingProperties extends Properties {
 
   @Override
   public Set<Map.Entry<Object, Object>> entrySet() {
-    throw new UnsupportedOperationException("Entryset is not available in DelegatingProperties");
+    return properties.entrySet();
   }
 
   @Override
