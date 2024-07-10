@@ -1212,50 +1212,58 @@ public class SCMClientProtocolServer implements
         SCMAction.GET_CONTAINER_BALANCER_STATUS_INFO, null));
     ContainerBalancerStatusInfo balancerStatusInfo = scm.getContainerBalancer().getBalancerStatusInfo();
     if (balancerStatusInfo == null) {
-      return null;
+      return ContainerBalancerStatusInfoResponseProto
+          .newBuilder()
+          .setIsRunning(false)
+          .build();
+    } else {
+      return ContainerBalancerStatusInfoResponseProto
+          .newBuilder()
+          .setIsRunning(true)
+          .setContainerBalancerStatusInfo(StorageContainerLocationProtocolProtos.ContainerBalancerStatusInfo
+              .newBuilder()
+              .setStartedAt(balancerStatusInfo.getStartedAt().toEpochSecond())
+              .setConfiguration(balancerStatusInfo.getConfiguration().toProtobufBuilder())
+              .addAllIterationsStatusInfo(
+                  balancerStatusInfo.getIterationsStatusInfo()
+                      .stream()
+                      .map(
+                          info -> ContainerBalancerTaskIterationStatusInfo.newBuilder()
+                              .setIterationNumber(info.getIterationNumber())
+                              .setIterationResult(info.getIterationResult())
+                              .setSizeScheduledForMove(info.getSizeScheduledForMove())
+                              .setDataSizeMovedGB(info.getDataSizeMovedGB())
+                              .setContainerMovesScheduled(info.getContainerMovesScheduled())
+                              .setContainerMovesCompleted(info.getContainerMovesCompleted())
+                              .setContainerMovesFailed(info.getContainerMovesFailed())
+                              .setContainerMovesTimeout(info.getContainerMovesTimeout())
+                              .addAllSizeEnteringNodes(
+                                  info.getSizeEnteringNodes().entrySet()
+                                      .stream()
+                                      .map(entry -> NodeTransferInfo.newBuilder()
+                                          .setUuid(entry.getKey().toString())
+                                          .setDataVolume(entry.getValue())
+                                          .build()
+                                      )
+                                      .collect(Collectors.toList())
+                              )
+                              .addAllSizeLeavingNodes(
+                                  info.getSizeLeavingNodes().entrySet()
+                                      .stream()
+                                      .map(entry -> NodeTransferInfo.newBuilder()
+                                          .setUuid(entry.getKey().toString())
+                                          .setDataVolume(entry.getValue())
+                                          .build()
+                                      )
+                                      .collect(Collectors.toList())
+                              )
+                              .build()
+                      )
+                      .collect(Collectors.toList())
+              )
+          )
+          .build();
     }
-    return ContainerBalancerStatusInfoResponseProto
-        .newBuilder()
-        .setStartedAt(balancerStatusInfo.getStartedAt().toEpochSecond())
-        .setConfiguration(balancerStatusInfo.getConfiguration().toProtobufBuilder())
-        .addAllIterationsStatusInfo(
-            balancerStatusInfo.getIterationsStatusInfo()
-                .stream()
-                .map(
-                    info -> ContainerBalancerTaskIterationStatusInfo.newBuilder()
-                        .setIterationNumber(info.getIterationNumber())
-                        .setIterationResult(info.getIterationResult())
-                        .setSizeScheduledForMove(info.getSizeScheduledForMove())
-                        .setDataSizeMovedGB(info.getDataSizeMovedGB())
-                        .setContainerMovesScheduled(info.getContainerMovesScheduled())
-                        .setContainerMovesCompleted(info.getContainerMovesCompleted())
-                        .setContainerMovesFailed(info.getContainerMovesFailed())
-                        .setContainerMovesTimeout(info.getContainerMovesTimeout())
-                        .addAllSizeEnteringNodes(
-                            info.getSizeEnteringNodes().entrySet()
-                                .stream()
-                                .map(entry -> NodeTransferInfo.newBuilder()
-                                    .setUuid(entry.getKey().toString())
-                                    .setDataVolume(entry.getValue())
-                                    .build()
-                                )
-                                .collect(Collectors.toList())
-                        )
-                        .addAllSizeLeavingNodes(
-                            info.getSizeLeavingNodes().entrySet()
-                                .stream()
-                                .map(entry -> NodeTransferInfo.newBuilder()
-                                    .setUuid(entry.getKey().toString())
-                                    .setDataVolume(entry.getValue())
-                                    .build()
-                                )
-                                .collect(Collectors.toList())
-                        )
-                        .build()
-                )
-                .collect(Collectors.toList())
-        )
-        .build();
   }
 
   /**

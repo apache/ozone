@@ -18,6 +18,7 @@
 package org.apache.hadoop.hdds.scm.cli.datanode;
 
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ContainerBalancerStatusInfo;
 import org.apache.hadoop.hdds.scm.cli.ContainerBalancerStartSubcommand;
 import org.apache.hadoop.hdds.scm.cli.ContainerBalancerStatusSubcommand;
 import org.apache.hadoop.hdds.scm.cli.ContainerBalancerStopSubcommand;
@@ -199,11 +200,15 @@ public class TestContainerBalancerSubCommand {
                     .build();
     StorageContainerLocationProtocolProtos.ContainerBalancerStatusInfoResponseProto statusInfoResponseProto =
             StorageContainerLocationProtocolProtos.ContainerBalancerStatusInfoResponseProto.newBuilder()
+                .setIsRunning(true)
+                .setContainerBalancerStatusInfo(ContainerBalancerStatusInfo.newBuilder()
                     .setStartedAt(OffsetDateTime.now().toEpochSecond())
                     .setConfiguration(config.toProtobufBuilder().setShouldRun(true))
                     .addAllIterationsStatusInfo(
-                            Arrays.asList(iteration0StatusInfo, iteration1StatusInfo, iteration2StatusInfo)
+                        Arrays.asList(iteration0StatusInfo, iteration1StatusInfo, iteration2StatusInfo)
                     )
+                )
+
                     .build();
     //test status is running
     when(scmClient.getContainerBalancerStatusInfo()).thenReturn(statusInfoResponseProto);

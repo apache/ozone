@@ -19,6 +19,7 @@ package org.apache.hadoop.hdds.scm.cli;
 
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ContainerBalancerStatusInfo;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ContainerBalancerStatusInfoResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ContainerBalancerTaskIterationStatusInfo;
 import org.apache.hadoop.hdds.scm.client.ScmClient;
@@ -45,33 +46,44 @@ import java.util.stream.Collectors;
 public class ContainerBalancerStatusSubcommand extends ScmSubcommand {
 
   @CommandLine.Option(names = {"-v", "--verbose"},
-          description = "More verbose output. Show balance iteration history.")
+          description = "Verbose output. Show current iteration info.")
   private boolean verbose;
+
+  @CommandLine.Option(names = {"-vh", "--verbose-with-history"},
+      description = "More verbose output. Show current and history iteration info.")
+  private boolean verboseWithHistory;
 
   @Override
   public void execute(ScmClient scmClient) throws IOException {
-    ContainerBalancerStatusInfoResponseProto balancerStatusInfo = scmClient.getContainerBalancerStatusInfo();
-    if (balancerStatusInfo == null) {
-      System.out.println("ContainerBalancer is Not Running.");
-    } else {
+    ContainerBalancerStatusInfoResponseProto response = scmClient.getContainerBalancerStatusInfo();
+    boolean isRunning = response.getIsRunning();
+    ContainerBalancerStatusInfo balancerStatusInfo = response.getContainerBalancerStatusInfo();
+    if (isRunning) {
       LocalDateTime dateTime =
-              LocalDateTime.ofInstant(Instant.ofEpochSecond(balancerStatusInfo.getStartedAt()), ZoneId.systemDefault());
+          LocalDateTime.ofInstant(Instant.ofEpochSecond(balancerStatusInfo.getStartedAt()), ZoneId.systemDefault());
       System.out.println("ContainerBalancer is Running.");
-      System.out.printf("Started at: %s %s%n%n", dateTime.toLocalDate(), dateTime.toLocalTime());
-      System.out.println(getConfigurationPrettyString(balancerStatusInfo.getConfiguration()));
-      List<ContainerBalancerTaskIterationStatusInfo> iterationsStatusInfoList
-              = balancerStatusInfo.getIterationsStatusInfoList();
-      if (verbose) {
-        System.out.println("Iteration history list:");
-        System.out.println(
-                iterationsStatusInfoList.stream().map(this::getPrettyIterationStatusInfo)
-                        .collect(Collectors.joining("\n"))
-        );
-      } else {
-        System.out.println("Current iteration info:");
-        System.out.println(
-                getPrettyIterationStatusInfo(iterationsStatusInfoList.get(iterationsStatusInfoList.size() - 1)));
+
+      if (verbose || verboseWithHistory) {
+        System.out.printf("Started at: %s %s%n%n", dateTime.toLocalDate(), dateTime.toLocalTime());
+        System.out.println(getConfigurationPrettyString(balancerStatusInfo.getConfiguration()));
+        List<ContainerBalancerTaskIterationStatusInfo> iterationsStatusInfoList
+            = balancerStatusInfo.getIterationsStatusInfoList();
+        if (verbose) {
+          System.out.println("Current iteration info:");
+          System.out.println(
+              getPrettyIterationStatusInfo(iterationsStatusInfoList.get(iterationsStatusInfoList.size() - 1))
+          );
+        } else if (verboseWithHistory) {
+          System.out.println("Iteration history list:");
+          System.out.println(
+              iterationsStatusInfoList.stream().map(this::getPrettyIterationStatusInfo)
+                  .collect(Collectors.joining("\n"))
+          );
+        }
       }
+
+    } else {
+      System.out.println("ContainerBalancer is Not Running.");
     }
   }
 

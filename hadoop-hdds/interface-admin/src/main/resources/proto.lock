@@ -1948,21 +1948,15 @@
             "fields": [
               {
                 "id": 1,
-                "name": "startedAt",
-                "type": "uint64",
+                "name": "isRunning",
+                "type": "bool",
                 "required": true
               },
               {
                 "id": 2,
-                "name": "configuration",
-                "type": "ContainerBalancerConfigurationProto",
+                "name": "containerBalancerStatusInfo",
+                "type": "ContainerBalancerStatusInfo",
                 "required": true
-              },
-              {
-                "id": 3,
-                "name": "iterationsStatusInfo",
-                "type": "ContainerBalancerTaskIterationStatusInfo",
-                "is_repeated": true
               }
             ]
           }

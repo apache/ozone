@@ -615,6 +615,10 @@ message ContainerBalancerStatusInfoRequestProto {
 }
 
 message ContainerBalancerStatusInfoResponseProto {
+  required bool isRunning = 1;
+  optional ContainerBalancerStatusInfo containerBalancerStatusInfo = 2;
+}
+message ContainerBalancerStatusInfo {
   required uint64 startedAt = 1;
   required ContainerBalancerConfigurationProto configuration = 2;
   repeated ContainerBalancerTaskIterationStatusInfo iterationsStatusInfo = 3;

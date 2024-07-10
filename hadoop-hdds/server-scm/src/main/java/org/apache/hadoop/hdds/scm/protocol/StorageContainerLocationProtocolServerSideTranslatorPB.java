@@ -1207,15 +1207,7 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
   public ContainerBalancerStatusInfoResponseProto getContainerBalancerStatusInfo(
           StorageContainerLocationProtocolProtos.ContainerBalancerStatusInfoRequestProto request)
           throws IOException {
-    ContainerBalancerStatusInfoResponseProto containerBalancerStatusInfo = impl.getContainerBalancerStatusInfo();
-    if (containerBalancerStatusInfo == null) {
-      return ContainerBalancerStatusInfoResponseProto.newBuilder().getDefaultInstanceForType();
-    }
-    return ContainerBalancerStatusInfoResponseProto.newBuilder()
-            .setStartedAt(containerBalancerStatusInfo.getStartedAt())
-            .setConfiguration(containerBalancerStatusInfo.getConfiguration())
-            .addAllIterationsStatusInfo(containerBalancerStatusInfo.getIterationsStatusInfoList())
-            .build();
+    return impl.getContainerBalancerStatusInfo();
   }
 
   public DecommissionNodesResponseProto decommissionNodes(
