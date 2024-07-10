@@ -750,7 +750,10 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
   public static OMRequest blockMPUCompleteWithBucketLayoutFromOldClient(
       OMRequest req, ValidationContext ctx) throws IOException {
     if (ClientVersion.fromProtoValue(req.getVersion())
-        .compareTo(ClientVersion.BUCKET_LAYOUT_SUPPORT) < 0 && req.getCompleteMultiPartUploadRequest().hasKeyArgs()) {
+        .compareTo(ClientVersion.BUCKET_LAYOUT_SUPPORT) >= 0) {
+      return req;
+    }
+    if (req.getCompleteMultiPartUploadRequest().hasKeyArgs()) {
       KeyArgs keyArgs = req.getCompleteMultiPartUploadRequest().getKeyArgs();
 
       if (keyArgs.hasVolumeName() && keyArgs.hasBucketName()) {

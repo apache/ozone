@@ -289,16 +289,16 @@ public class OMBucketDeleteRequest extends OMClientRequest {
   public static OMRequest blockBucketDeleteWithBucketLayoutFromOldClient(
       OMRequest req, ValidationContext ctx) throws IOException {
     if (ClientVersion.fromProtoValue(req.getVersion())
-        .compareTo(ClientVersion.BUCKET_LAYOUT_SUPPORT) < 0) {
-      DeleteBucketRequest request = req.getDeleteBucketRequest();
+        .compareTo(ClientVersion.BUCKET_LAYOUT_SUPPORT) >= 0) {
+      return req;
+    }
+    DeleteBucketRequest request = req.getDeleteBucketRequest();
 
-      if (request.hasBucketName() && request.hasVolumeName()) {
-        BucketLayout bucketLayout = ctx.getBucketLayout(
-            request.getVolumeName(), request.getBucketName());
-        bucketLayout.validateSupportedOperation();
-      }
+    if (request.hasBucketName() && request.hasVolumeName()) {
+      BucketLayout bucketLayout = ctx.getBucketLayout(
+          request.getVolumeName(), request.getBucketName());
+      bucketLayout.validateSupportedOperation();
     }
     return req;
-
   }
 }

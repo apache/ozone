@@ -328,7 +328,10 @@ public class S3InitiateMultipartUploadRequest extends OMKeyRequest {
   public static OMRequest blockInitiateMPUWithBucketLayoutFromOldClient(
       OMRequest req, ValidationContext ctx) throws IOException {
     if (ClientVersion.fromProtoValue(req.getVersion())
-        .compareTo(ClientVersion.BUCKET_LAYOUT_SUPPORT) < 0 && req.getInitiateMultiPartUploadRequest().hasKeyArgs()) {
+        .compareTo(ClientVersion.BUCKET_LAYOUT_SUPPORT) >= 0) {
+      return req;
+    }
+    if (req.getInitiateMultiPartUploadRequest().hasKeyArgs()) {
       KeyArgs keyArgs = req.getInitiateMultiPartUploadRequest().getKeyArgs();
 
       if (keyArgs.hasVolumeName() && keyArgs.hasBucketName()) {

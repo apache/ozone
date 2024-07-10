@@ -278,7 +278,10 @@ public class OMKeyRenameRequest extends OMKeyRequest {
   public static OMRequest blockRenameKeyWithBucketLayoutFromOldClient(
       OMRequest req, ValidationContext ctx) throws IOException {
     if (ClientVersion.fromProtoValue(req.getVersion())
-        .compareTo(ClientVersion.BUCKET_LAYOUT_SUPPORT) < 0 && req.getRenameKeyRequest().hasKeyArgs()) {
+        .compareTo(ClientVersion.BUCKET_LAYOUT_SUPPORT) >= 0) {
+      return req;
+    }
+    if (req.getRenameKeyRequest().hasKeyArgs()) {
       KeyArgs keyArgs = req.getRenameKeyRequest().getKeyArgs();
 
       if (keyArgs.hasVolumeName() && keyArgs.hasBucketName()) {

@@ -433,7 +433,10 @@ public class OMFileCreateRequest extends OMKeyRequest {
   public static OMRequest blockCreateFileWithBucketLayoutFromOldClient(
       OMRequest req, ValidationContext ctx) throws IOException {
     if (ClientVersion.fromProtoValue(req.getVersion())
-        .compareTo(ClientVersion.BUCKET_LAYOUT_SUPPORT) < 0 && req.getCreateFileRequest().hasKeyArgs()) {
+        .compareTo(ClientVersion.BUCKET_LAYOUT_SUPPORT) >= 0) {
+      return req;
+    }
+    if (req.getCreateFileRequest().hasKeyArgs()) {
 
       KeyArgs keyArgs = req.getCreateFileRequest().getKeyArgs();
 

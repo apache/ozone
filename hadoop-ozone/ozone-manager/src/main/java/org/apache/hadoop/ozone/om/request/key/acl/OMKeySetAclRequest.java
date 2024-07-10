@@ -170,7 +170,10 @@ public class OMKeySetAclRequest extends OMKeyAclRequest {
   public static OMRequest blockSetAclWithBucketLayoutFromOldClient(
       OMRequest req, ValidationContext ctx) throws IOException {
     if (ClientVersion.fromProtoValue(req.getVersion())
-        .compareTo(ClientVersion.BUCKET_LAYOUT_SUPPORT) < 0 && req.getSetAclRequest().hasObj()) {
+        .compareTo(ClientVersion.BUCKET_LAYOUT_SUPPORT) >= 0) {
+      return req;
+    }
+    if (req.getSetAclRequest().hasObj()) {
       OzoneObj obj =
           OzoneObjInfo.fromProtobuf(req.getSetAclRequest().getObj());
       String path = obj.getPath();

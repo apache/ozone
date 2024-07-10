@@ -306,7 +306,11 @@ public class OMAllocateBlockRequest extends OMKeyRequest {
   public static OMRequest blockAllocateBlockWithBucketLayoutFromOldClient(
       OMRequest req, ValidationContext ctx) throws IOException {
     if (ClientVersion.fromProtoValue(req.getVersion())
-        .compareTo(ClientVersion.BUCKET_LAYOUT_SUPPORT) < 0 && req.getAllocateBlockRequest().hasKeyArgs()) {
+        .compareTo(ClientVersion.BUCKET_LAYOUT_SUPPORT) >= 0) {
+      return req;
+    }
+
+    if (req.getAllocateBlockRequest().hasKeyArgs()) {
       KeyArgs keyArgs = req.getAllocateBlockRequest().getKeyArgs();
 
       if (keyArgs.hasVolumeName() && keyArgs.hasBucketName()) {

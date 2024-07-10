@@ -440,7 +440,10 @@ public class OMDirectoryCreateRequest extends OMKeyRequest {
   public static OMRequest blockCreateDirectoryWithBucketLayoutFromOldClient(
       OMRequest req, ValidationContext ctx) throws IOException {
     if (ClientVersion.fromProtoValue(req.getVersion())
-        .compareTo(ClientVersion.BUCKET_LAYOUT_SUPPORT) < 0 && req.getCreateDirectoryRequest().hasKeyArgs()) {
+        .compareTo(ClientVersion.BUCKET_LAYOUT_SUPPORT) >= 0) {
+      return req;
+    }
+    if (req.getCreateDirectoryRequest().hasKeyArgs()) {
       KeyArgs keyArgs = req.getCreateDirectoryRequest().getKeyArgs();
 
       if (keyArgs.hasVolumeName() && keyArgs.hasBucketName()) {

@@ -297,7 +297,10 @@ public class S3MultipartUploadAbortRequest extends OMKeyRequest {
   public static OMRequest blockMPUAbortWithBucketLayoutFromOldClient(
       OMRequest req, ValidationContext ctx) throws IOException {
     if (ClientVersion.fromProtoValue(req.getVersion())
-        .compareTo(ClientVersion.BUCKET_LAYOUT_SUPPORT) < 0 && req.getAbortMultiPartUploadRequest().hasKeyArgs()) {
+        .compareTo(ClientVersion.BUCKET_LAYOUT_SUPPORT) >= 0) {
+      return req;
+    }
+    if (req.getAbortMultiPartUploadRequest().hasKeyArgs()) {
       KeyArgs keyArgs = req.getAbortMultiPartUploadRequest().getKeyArgs();
 
       if (keyArgs.hasVolumeName() && keyArgs.hasBucketName()) {

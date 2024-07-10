@@ -388,7 +388,10 @@ public class S3MultipartUploadCommitPartRequest extends OMKeyRequest {
   public static OMRequest blockMPUCommitWithBucketLayoutFromOldClient(
       OMRequest req, ValidationContext ctx) throws IOException {
     if (ClientVersion.fromProtoValue(req.getVersion())
-        .compareTo(ClientVersion.BUCKET_LAYOUT_SUPPORT) < 0 && req.getCommitMultiPartUploadRequest().hasKeyArgs()) {
+        .compareTo(ClientVersion.BUCKET_LAYOUT_SUPPORT) >= 0) {
+      return req;
+    }
+    if (req.getCommitMultiPartUploadRequest().hasKeyArgs()) {
       KeyArgs keyArgs = req.getCommitMultiPartUploadRequest().getKeyArgs();
 
       if (keyArgs.hasVolumeName() && keyArgs.hasBucketName()) {

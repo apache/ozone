@@ -241,7 +241,10 @@ public class OMKeyDeleteRequest extends OMKeyRequest {
   public static OMRequest blockDeleteKeyWithBucketLayoutFromOldClient(
       OMRequest req, ValidationContext ctx) throws IOException {
     if (ClientVersion.fromProtoValue(req.getVersion())
-        .compareTo(ClientVersion.BUCKET_LAYOUT_SUPPORT) < 0 && req.getDeleteKeyRequest().hasKeyArgs()) {
+        .compareTo(ClientVersion.BUCKET_LAYOUT_SUPPORT) >= 0) {
+      return req;
+    }
+    if (req.getDeleteKeyRequest().hasKeyArgs()) {
       KeyArgs keyArgs = req.getDeleteKeyRequest().getKeyArgs();
 
       if (keyArgs.hasVolumeName() && keyArgs.hasBucketName()) {
