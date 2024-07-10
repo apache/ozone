@@ -17,11 +17,12 @@
  */
 
 import React from 'react';
-import { Descriptions, Popover, Tooltip, Icon } from 'antd';
+import { Descriptions, Popover, Tooltip } from 'antd';
+import { InfoCircleOutlined } from '@ant-design/icons';
 import { withRouter } from 'react-router-dom';
 import { RouteComponentProps } from 'react-router';
 import axios from 'axios';
-import { showDataFetchError } from 'utils/common';
+import { showDataFetchError } from '@/utils/common';
 
 interface IDecommissionSummaryProps extends RouteComponentProps<object> {
   uuid: string;
@@ -103,7 +104,7 @@ class DecommissionSummary extends React.Component<IDecommissionSummaryProps> {
         { (summaryData !== 'null' && summaryData !== 'undefined' && summaryData && summaryData.length !== 0) ?
           <>
             <Tooltip title="Detailed Summary of Decomssioned Records.">
-              <Icon type='info-circle' theme="twoTone" />
+              <InfoCircleOutlined />
             </Tooltip>
             <Popover content={content} title="Decommission Status: DECOMMISSIONING" placement="top" trigger="hover">
               &nbsp;{uuid}
