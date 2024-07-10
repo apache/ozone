@@ -47,16 +47,16 @@ import static org.mockito.Mockito.when;
  * Unit tests to validate the ContainerBalancerSubCommand class includes the
  * correct output when executed against a mock client.
  */
-public class TestContainerBalancerSubCommand {
+class TestContainerBalancerSubCommand {
 
-  private ContainerBalancerStopSubcommand stopCmd;
-  private ContainerBalancerStartSubcommand startCmd;
-  private ContainerBalancerStatusSubcommand statusCmd;
+  private static final String DEFAULT_ENCODING = StandardCharsets.UTF_8.name();
   private final ByteArrayOutputStream outContent = new ByteArrayOutputStream();
   private final ByteArrayOutputStream errContent = new ByteArrayOutputStream();
   private final PrintStream originalOut = System.out;
   private final PrintStream originalErr = System.err;
-  private static final String DEFAULT_ENCODING = StandardCharsets.UTF_8.name();
+  private ContainerBalancerStopSubcommand stopCmd;
+  private ContainerBalancerStartSubcommand startCmd;
+  private ContainerBalancerStatusSubcommand statusCmd;
 
   @BeforeEach
   public void setup() throws UnsupportedEncodingException {
@@ -75,7 +75,7 @@ public class TestContainerBalancerSubCommand {
 
   @Test
   public void testContainerBalancerStatusInfoSubcommandRunning()
-          throws IOException {
+      throws IOException {
     ScmClient scmClient = mock(ScmClient.class);
 
     ContainerBalancerConfiguration config = new ContainerBalancerConfiguration();
@@ -95,160 +95,159 @@ public class TestContainerBalancerSubCommand {
     config.setTriggerDuEnable(false);
 
     StorageContainerLocationProtocolProtos.ContainerBalancerTaskIterationStatusInfo iteration0StatusInfo =
-            StorageContainerLocationProtocolProtos.ContainerBalancerTaskIterationStatusInfo.newBuilder()
-                    .setIterationNumber(0)
-                    .setIterationResult("ITERATION_COMPLETED")
-                    .setSizeScheduledForMove(48)
-                    .setDataSizeMovedGB(48)
-                    .setContainerMovesScheduled(11)
-                    .setContainerMovesCompleted(11)
-                    .setContainerMovesFailed(0)
-                    .setContainerMovesTimeout(0)
-                    .addSizeEnteringNodes(
-                            StorageContainerLocationProtocolProtos.NodeTransferInfo.newBuilder()
-                                    .setUuid("80f6bc27-e6f3-493e-b1f4-25f810ad960d")
-                                    .setDataVolume(27)
-                                    .build()
-                    )
-                    .addSizeEnteringNodes(
-                            StorageContainerLocationProtocolProtos.NodeTransferInfo.newBuilder()
-                                    .setUuid("701ca98e-aa1a-4b36-b817-e28ed634bba6")
-                                    .setDataVolume(23L)
-                                    .build()
-                    )
-                    .addSizeLeavingNodes(
-                            StorageContainerLocationProtocolProtos.NodeTransferInfo.newBuilder()
-                                    .setUuid("b8b9c511-c30f-4933-8938-2f272e307070")
-                                    .setDataVolume(24L)
-                                    .build()
-                    )
-                    .addSizeLeavingNodes(
-                            StorageContainerLocationProtocolProtos.NodeTransferInfo.newBuilder()
-                                    .setUuid("7bd99815-47e7-4015-bc61-ca6ef6dfd130")
-                                    .setDataVolume(26L)
-                                    .build()
-                    )
-                    .build();
+        StorageContainerLocationProtocolProtos.ContainerBalancerTaskIterationStatusInfo.newBuilder()
+            .setIterationNumber(0)
+            .setIterationResult("ITERATION_COMPLETED")
+            .setSizeScheduledForMove(48)
+            .setDataSizeMovedGB(48)
+            .setContainerMovesScheduled(11)
+            .setContainerMovesCompleted(11)
+            .setContainerMovesFailed(0)
+            .setContainerMovesTimeout(0)
+            .addSizeEnteringNodes(
+                StorageContainerLocationProtocolProtos.NodeTransferInfo.newBuilder()
+                    .setUuid("80f6bc27-e6f3-493e-b1f4-25f810ad960d")
+                    .setDataVolume(27)
+                    .build()
+            )
+            .addSizeEnteringNodes(
+                StorageContainerLocationProtocolProtos.NodeTransferInfo.newBuilder()
+                    .setUuid("701ca98e-aa1a-4b36-b817-e28ed634bba6")
+                    .setDataVolume(23L)
+                    .build()
+            )
+            .addSizeLeavingNodes(
+                StorageContainerLocationProtocolProtos.NodeTransferInfo.newBuilder()
+                    .setUuid("b8b9c511-c30f-4933-8938-2f272e307070")
+                    .setDataVolume(24L)
+                    .build()
+            )
+            .addSizeLeavingNodes(
+                StorageContainerLocationProtocolProtos.NodeTransferInfo.newBuilder()
+                    .setUuid("7bd99815-47e7-4015-bc61-ca6ef6dfd130")
+                    .setDataVolume(26L)
+                    .build()
+            )
+            .build();
     StorageContainerLocationProtocolProtos.ContainerBalancerTaskIterationStatusInfo iteration1StatusInfo =
-            StorageContainerLocationProtocolProtos.ContainerBalancerTaskIterationStatusInfo.newBuilder()
-                    .setIterationNumber(1)
-                    .setIterationResult("ITERATION_COMPLETED")
-                    .setSizeScheduledForMove(48)
-                    .setDataSizeMovedGB(48)
-                    .setContainerMovesScheduled(11)
-                    .setContainerMovesCompleted(11)
-                    .setContainerMovesFailed(0)
-                    .setContainerMovesTimeout(0)
-                    .addSizeEnteringNodes(
-                            StorageContainerLocationProtocolProtos.NodeTransferInfo.newBuilder()
-                                    .setUuid("80f6bc27-e6f3-493e-b1f4-25f810ad960d")
-                                    .setDataVolume(27L)
-                                    .build()
-                    )
-                    .addSizeEnteringNodes(
-                            StorageContainerLocationProtocolProtos.NodeTransferInfo.newBuilder()
-                                    .setUuid("701ca98e-aa1a-4b36-b817-e28ed634bba6")
-                                    .setDataVolume(23L)
-                                    .build()
-                    )
-                    .addSizeLeavingNodes(
-                            StorageContainerLocationProtocolProtos.NodeTransferInfo.newBuilder()
-                                    .setUuid("b8b9c511-c30f-4933-8938-2f272e307070")
-                                    .setDataVolume(24L)
-                                    .build()
-                    )
-                    .addSizeLeavingNodes(
-                            StorageContainerLocationProtocolProtos.NodeTransferInfo.newBuilder()
-                                    .setUuid("7bd99815-47e7-4015-bc61-ca6ef6dfd130")
-                                    .setDataVolume(26L)
-                                    .build()
-                    )
-                    .build();
+        StorageContainerLocationProtocolProtos.ContainerBalancerTaskIterationStatusInfo.newBuilder()
+            .setIterationNumber(1)
+            .setIterationResult("ITERATION_COMPLETED")
+            .setSizeScheduledForMove(48)
+            .setDataSizeMovedGB(48)
+            .setContainerMovesScheduled(11)
+            .setContainerMovesCompleted(11)
+            .setContainerMovesFailed(0)
+            .setContainerMovesTimeout(0)
+            .addSizeEnteringNodes(
+                StorageContainerLocationProtocolProtos.NodeTransferInfo.newBuilder()
+                    .setUuid("80f6bc27-e6f3-493e-b1f4-25f810ad960d")
+                    .setDataVolume(27L)
+                    .build()
+            )
+            .addSizeEnteringNodes(
+                StorageContainerLocationProtocolProtos.NodeTransferInfo.newBuilder()
+                    .setUuid("701ca98e-aa1a-4b36-b817-e28ed634bba6")
+                    .setDataVolume(23L)
+                    .build()
+            )
+            .addSizeLeavingNodes(
+                StorageContainerLocationProtocolProtos.NodeTransferInfo.newBuilder()
+                    .setUuid("b8b9c511-c30f-4933-8938-2f272e307070")
+                    .setDataVolume(24L)
+                    .build()
+            )
+            .addSizeLeavingNodes(
+                StorageContainerLocationProtocolProtos.NodeTransferInfo.newBuilder()
+                    .setUuid("7bd99815-47e7-4015-bc61-ca6ef6dfd130")
+                    .setDataVolume(26L)
+                    .build()
+            )
+            .build();
     StorageContainerLocationProtocolProtos.ContainerBalancerTaskIterationStatusInfo iteration2StatusInfo =
-            StorageContainerLocationProtocolProtos.ContainerBalancerTaskIterationStatusInfo.newBuilder()
-                    .setIterationNumber(1)
-                    .setIterationResult("")
-                    .setSizeScheduledForMove(48)
-                    .setDataSizeMovedGB(48)
-                    .setContainerMovesScheduled(11)
-                    .setContainerMovesCompleted(11)
-                    .setContainerMovesFailed(0)
-                    .setContainerMovesTimeout(0)
-                    .addSizeEnteringNodes(
-                            StorageContainerLocationProtocolProtos.NodeTransferInfo.newBuilder()
-                                    .setUuid("80f6bc27-e6f3-493e-b1f4-25f810ad960d")
-                                    .setDataVolume(27L)
-                                    .build()
-                    )
-                    .addSizeEnteringNodes(
-                            StorageContainerLocationProtocolProtos.NodeTransferInfo.newBuilder()
-                                    .setUuid("701ca98e-aa1a-4b36-b817-e28ed634bba6")
-                                    .setDataVolume(23L)
-                                    .build()
-                    )
-                    .addSizeLeavingNodes(
-                            StorageContainerLocationProtocolProtos.NodeTransferInfo.newBuilder()
-                                    .setUuid("b8b9c511-c30f-4933-8938-2f272e307070")
-                                    .setDataVolume(24L)
-                                    .build()
-                    )
-                    .addSizeLeavingNodes(
-                            StorageContainerLocationProtocolProtos.NodeTransferInfo.newBuilder()
-                                    .setUuid("7bd99815-47e7-4015-bc61-ca6ef6dfd130")
-                                    .setDataVolume(26L)
-                                    .build()
-                    )
-                    .build();
+        StorageContainerLocationProtocolProtos.ContainerBalancerTaskIterationStatusInfo.newBuilder()
+            .setIterationNumber(1)
+            .setIterationResult("")
+            .setSizeScheduledForMove(48)
+            .setDataSizeMovedGB(48)
+            .setContainerMovesScheduled(11)
+            .setContainerMovesCompleted(11)
+            .setContainerMovesFailed(0)
+            .setContainerMovesTimeout(0)
+            .addSizeEnteringNodes(
+                StorageContainerLocationProtocolProtos.NodeTransferInfo.newBuilder()
+                    .setUuid("80f6bc27-e6f3-493e-b1f4-25f810ad960d")
+                    .setDataVolume(27L)
+                    .build()
+            )
+            .addSizeEnteringNodes(
+                StorageContainerLocationProtocolProtos.NodeTransferInfo.newBuilder()
+                    .setUuid("701ca98e-aa1a-4b36-b817-e28ed634bba6")
+                    .setDataVolume(23L)
+                    .build()
+            )
+            .addSizeLeavingNodes(
+                StorageContainerLocationProtocolProtos.NodeTransferInfo.newBuilder()
+                    .setUuid("b8b9c511-c30f-4933-8938-2f272e307070")
+                    .setDataVolume(24L)
+                    .build()
+            )
+            .addSizeLeavingNodes(
+                StorageContainerLocationProtocolProtos.NodeTransferInfo.newBuilder()
+                    .setUuid("7bd99815-47e7-4015-bc61-ca6ef6dfd130")
+                    .setDataVolume(26L)
+                    .build()
+            )
+            .build();
     ContainerBalancerStatusInfoResponseProto statusInfoResponseProto =
-            ContainerBalancerStatusInfoResponseProto.newBuilder()
-                .setIsRunning(true)
-                .setContainerBalancerStatusInfo(ContainerBalancerStatusInfo.newBuilder()
-                    .setStartedAt(OffsetDateTime.now().toEpochSecond())
-                    .setConfiguration(config.toProtobufBuilder().setShouldRun(true))
-                    .addAllIterationsStatusInfo(
-                        Arrays.asList(iteration0StatusInfo, iteration1StatusInfo, iteration2StatusInfo)
-                    )
+        ContainerBalancerStatusInfoResponseProto.newBuilder()
+            .setIsRunning(true)
+            .setContainerBalancerStatusInfo(ContainerBalancerStatusInfo.newBuilder()
+                .setStartedAt(OffsetDateTime.now().toEpochSecond())
+                .setConfiguration(config.toProtobufBuilder().setShouldRun(true))
+                .addAllIterationsStatusInfo(
+                    Arrays.asList(iteration0StatusInfo, iteration1StatusInfo, iteration2StatusInfo)
                 )
+            )
 
-                    .build();
+            .build();
     //test status is running
     when(scmClient.getContainerBalancerStatusInfo()).thenReturn(statusInfoResponseProto);
 
     statusCmd.execute(scmClient);
     Pattern p = Pattern.compile(
-            "^ContainerBalancer\\sis\\sRunning.");
+        "^ContainerBalancer\\sis\\sRunning.");
     Matcher m = p.matcher(outContent.toString(DEFAULT_ENCODING));
     assertTrue(m.find());
   }
 
   @Test
   public void testContainerBalancerStatusInfoSubcommandRunningOnStoppedBalancer()
-          throws IOException {
+      throws IOException {
     ScmClient scmClient = mock(ScmClient.class);
 
     //test status is running
     when(scmClient.getContainerBalancerStatusInfo()).thenReturn(
-            ContainerBalancerStatusInfoResponseProto.newBuilder()
-                    .setIsRunning(false)
-                    .build())
-    ;
+        ContainerBalancerStatusInfoResponseProto.newBuilder()
+            .setIsRunning(false)
+            .build());
 
     statusCmd.execute(scmClient);
     Pattern p = Pattern.compile(
-            "^ContainerBalancer\\sis\\sNot\\sRunning.");
+        "^ContainerBalancer\\sis\\sNot\\sRunning.");
     Matcher m = p.matcher(outContent.toString(DEFAULT_ENCODING));
     assertTrue(m.find());
   }
 
   @Test
-  public void testContainerBalancerStatusSubcommandNotRunning()
-      throws IOException  {
+  void testContainerBalancerStatusSubcommandNotRunning()
+      throws IOException {
     ScmClient scmClient = mock(ScmClient.class);
 
     when(scmClient.getContainerBalancerStatusInfo()).thenReturn(
-            ContainerBalancerStatusInfoResponseProto.newBuilder()
-                    .setIsRunning(false)
-                    .build());
+        ContainerBalancerStatusInfoResponseProto.newBuilder()
+            .setIsRunning(false)
+            .build());
 
     statusCmd.execute(scmClient);
 
@@ -259,13 +258,13 @@ public class TestContainerBalancerSubCommand {
   }
 
   @Test
-  public void testContainerBalancerStopSubcommand() throws IOException  {
+  public void testContainerBalancerStopSubcommand() throws IOException {
     ScmClient scmClient = mock(ScmClient.class);
     stopCmd.execute(scmClient);
 
     Pattern p = Pattern.compile("^Sending\\sstop\\scommand." +
-            "\\sWaiting\\sfor\\sContainer\\sBalancer\\sto\\sstop...\\n" +
-            "Container\\sBalancer\\sstopped.");
+        "\\sWaiting\\sfor\\sContainer\\sBalancer\\sto\\sstop...\\n" +
+        "Container\\sBalancer\\sstopped.");
 
     Matcher m = p.matcher(outContent.toString(DEFAULT_ENCODING));
     assertTrue(m.find());
@@ -273,10 +272,10 @@ public class TestContainerBalancerSubCommand {
 
   @Test
   public void testContainerBalancerStartSubcommandWhenBalancerIsNotRunning()
-      throws IOException  {
+      throws IOException {
     ScmClient scmClient = mock(ScmClient.class);
     when(scmClient.startContainerBalancer(
-            null, null, null, null, null, null, null, null, null, null, null, null))
+        null, null, null, null, null, null, null, null, null, null, null, null))
         .thenReturn(
             StorageContainerLocationProtocolProtos
                 .StartContainerBalancerResponseProto.newBuilder()
@@ -292,10 +291,10 @@ public class TestContainerBalancerSubCommand {
 
   @Test
   public void testContainerBalancerStartSubcommandWhenBalancerIsRunning()
-      throws IOException  {
+      throws IOException {
     ScmClient scmClient = mock(ScmClient.class);
     when(scmClient.startContainerBalancer(
-            null, null, null, null, null, null, null, null, null, null, null, null))
+        null, null, null, null, null, null, null, null, null, null, null, null))
         .thenReturn(StorageContainerLocationProtocolProtos
             .StartContainerBalancerResponseProto.newBuilder()
             .setStart(false)
