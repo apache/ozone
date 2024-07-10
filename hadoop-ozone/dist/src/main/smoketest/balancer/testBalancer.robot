@@ -63,6 +63,22 @@ Datanode Recommission is Finished
 Run Container Balancer
     ${result} =             Execute                         ozone admin containerbalancer start -t 1 -d 100 -i 1
                             Should Contain                  ${result}             Container Balancer started successfully.
+    ${result} =             Execute                         ozone admin containerbalancer status -v
+                            Should Contain                  ${result}             ContainerBalancer is Running.
+                            Should Contain                  ${result}             Started at:
+                            Should Contain                  ${result}             Container Balancer Configuration values:
+                            Should Contain                  ${result}             Current iteration info:
+                            Should Contain                  ${result}             Iteration number                                   1
+                            Should Contain                  ${result}             Iteration result                                   IN_PROGRESS
+                            Should Contain                  ${result}             Scheduled to move containers                       3
+    ${result} =             Execute                         ozone admin containerbalancer status -vh
+                            Should Contain                  ${result}             ContainerBalancer is Running.
+                            Should Contain                  ${result}             Started at:
+                            Should Contain                  ${result}             Container Balancer Configuration values:
+                            Should Contain                  ${result}             Iteration history list:
+                            Should Contain                  ${result}             Iteration number                                   1
+                            Should Contain                  ${result}             Iteration result                                   IN_PROGRESS
+                            Should Contain                  ${result}             Scheduled to move containers                       3
     ${result} =             Execute                         ozone admin containerbalancer status
                             Should Contain                  ${result}             ContainerBalancer is Running.
                             Wait Until Keyword Succeeds      3min    10sec    ContainerBalancer is Not Running

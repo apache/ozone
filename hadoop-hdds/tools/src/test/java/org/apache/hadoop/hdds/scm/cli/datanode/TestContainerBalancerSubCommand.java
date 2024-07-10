@@ -19,6 +19,7 @@ package org.apache.hadoop.hdds.scm.cli.datanode;
 
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ContainerBalancerStatusInfo;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ContainerBalancerStatusInfoResponseProto;
 import org.apache.hadoop.hdds.scm.cli.ContainerBalancerStartSubcommand;
 import org.apache.hadoop.hdds.scm.cli.ContainerBalancerStatusSubcommand;
 import org.apache.hadoop.hdds.scm.cli.ContainerBalancerStopSubcommand;
@@ -198,8 +199,8 @@ public class TestContainerBalancerSubCommand {
                                     .build()
                     )
                     .build();
-    StorageContainerLocationProtocolProtos.ContainerBalancerStatusInfoResponseProto statusInfoResponseProto =
-            StorageContainerLocationProtocolProtos.ContainerBalancerStatusInfoResponseProto.newBuilder()
+    ContainerBalancerStatusInfoResponseProto statusInfoResponseProto =
+            ContainerBalancerStatusInfoResponseProto.newBuilder()
                 .setIsRunning(true)
                 .setContainerBalancerStatusInfo(ContainerBalancerStatusInfo.newBuilder()
                     .setStartedAt(OffsetDateTime.now().toEpochSecond())
@@ -226,7 +227,11 @@ public class TestContainerBalancerSubCommand {
     ScmClient scmClient = mock(ScmClient.class);
 
     //test status is running
-    when(scmClient.getContainerBalancerStatusInfo()).thenReturn(null);
+    when(scmClient.getContainerBalancerStatusInfo()).thenReturn(
+            ContainerBalancerStatusInfoResponseProto.newBuilder()
+                    .setIsRunning(false)
+                    .build())
+    ;
 
     statusCmd.execute(scmClient);
     Pattern p = Pattern.compile(
@@ -240,7 +245,10 @@ public class TestContainerBalancerSubCommand {
       throws IOException  {
     ScmClient scmClient = mock(ScmClient.class);
 
-    when(scmClient.getContainerBalancerStatus()).thenAnswer(invocation -> false);
+    when(scmClient.getContainerBalancerStatusInfo()).thenReturn(
+            ContainerBalancerStatusInfoResponseProto.newBuilder()
+                    .setIsRunning(false)
+                    .build());
 
     statusCmd.execute(scmClient);
 

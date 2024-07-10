@@ -184,16 +184,19 @@ public class ContainerBalancer extends StatefulService {
    * @return balancer status info if balancer started
    */
   public ContainerBalancerStatusInfo getBalancerStatusInfo() throws IOException {
-    if (task == null || task.getBalancerStatus() != ContainerBalancerTask.Status.RUNNING) {
+    boolean isTaskRunning = task != null && task.getBalancerStatus() != ContainerBalancerTask.Status.RUNNING;
+    if (isTaskRunning) {
+      HddsProtos.ContainerBalancerConfigurationProto configProto =
+              readConfiguration(HddsProtos.ContainerBalancerConfigurationProto.class);
+      return new ContainerBalancerStatusInfo(
+              this.startedAt,
+              configProto,
+              task.getCurrentIterationsStatistic()
+      );
+    } else {
       return null;
     }
-    HddsProtos.ContainerBalancerConfigurationProto configProto =
-            readConfiguration(HddsProtos.ContainerBalancerConfigurationProto.class);
-    return new ContainerBalancerStatusInfo(
-            this.startedAt,
-            configProto,
-            task.getCurrentIterationsStatistic()
-    );
+
   }
   /**
    * Checks if ContainerBalancer is in valid state to call stop.

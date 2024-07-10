@@ -335,42 +335,50 @@ public class ContainerBalancerTask implements Runnable {
   }
 
   public List<ContainerBalancerTaskIterationStatusInfo> getCurrentIterationsStatistic() {
-    int lastIterationNumber = iterationsStatistic.stream()
-            .mapToInt(ContainerBalancerTaskIterationStatusInfo::getIterationNumber)
-            .max()
-            .orElse(0);
-    ContainerBalancerTaskIterationStatusInfo currentIterationStatistic = new ContainerBalancerTaskIterationStatusInfo(
-            lastIterationNumber + 1,
-            null,
-            getSizeScheduledForMoveInLatestIteration() / OzoneConsts.GB,
-            sizeActuallyMovedInLatestIteration / OzoneConsts.GB,
-            metrics.getNumContainerMovesScheduledInLatestIteration(),
-            metrics.getNumContainerMovesCompletedInLatestIteration(),
-            metrics.getNumContainerMovesFailedInLatestIteration(),
-            metrics.getNumContainerMovesTimeoutInLatestIteration(),
-            findTargetStrategy.getSizeEnteringNodes()
-                    .entrySet()
-                    .stream()
-                    .filter(Objects::nonNull)
-                    .filter(datanodeDetailsLongEntry -> datanodeDetailsLongEntry.getValue() > 0)
-                    .collect(Collectors.toMap(
-                                    entry -> entry.getKey().getUuid(),
-                                    entry -> entry.getValue() / OzoneConsts.GB
-                            )
-                    ),
-            findSourceStrategy.getSizeLeavingNodes()
-                    .entrySet()
-                    .stream()
-                    .filter(Objects::nonNull)
-                    .filter(datanodeDetailsLongEntry -> datanodeDetailsLongEntry.getValue() > 0)
-                    .collect(
-                            Collectors.toMap(
-                                    entry -> entry.getKey().getUuid(),
-                                    entry -> entry.getValue() / OzoneConsts.GB
-                            )
-                    )
-    );
-    iterationsStatistic.add(currentIterationStatistic);
+
+    boolean isActiveIterationPresent = iterationsStatistic.stream()
+            .anyMatch(iterationStatusInfo -> iterationStatusInfo.getIterationResult() == null);
+
+    if (!isActiveIterationPresent) {
+
+      int lastIterationNumber = iterationsStatistic.stream()
+              .mapToInt(ContainerBalancerTaskIterationStatusInfo::getIterationNumber)
+              .max()
+              .orElse(0);
+
+      ContainerBalancerTaskIterationStatusInfo currentIterationStatistic = new ContainerBalancerTaskIterationStatusInfo(
+              lastIterationNumber + 1,
+              null,
+              getSizeScheduledForMoveInLatestIteration() / OzoneConsts.GB,
+              sizeActuallyMovedInLatestIteration / OzoneConsts.GB,
+              metrics.getNumContainerMovesScheduledInLatestIteration(),
+              metrics.getNumContainerMovesCompletedInLatestIteration(),
+              metrics.getNumContainerMovesFailedInLatestIteration(),
+              metrics.getNumContainerMovesTimeoutInLatestIteration(),
+              findTargetStrategy.getSizeEnteringNodes()
+                      .entrySet()
+                      .stream()
+                      .filter(Objects::nonNull)
+                      .filter(datanodeDetailsLongEntry -> datanodeDetailsLongEntry.getValue() > 0)
+                      .collect(Collectors.toMap(
+                                      entry -> entry.getKey().getUuid(),
+                                      entry -> entry.getValue() / OzoneConsts.GB
+                              )
+                      ),
+              findSourceStrategy.getSizeLeavingNodes()
+                      .entrySet()
+                      .stream()
+                      .filter(Objects::nonNull)
+                      .filter(datanodeDetailsLongEntry -> datanodeDetailsLongEntry.getValue() > 0)
+                      .collect(
+                              Collectors.toMap(
+                                      entry -> entry.getKey().getUuid(),
+                                      entry -> entry.getValue() / OzoneConsts.GB
+                              )
+                      )
+      );
+      iterationsStatistic.add(currentIterationStatistic);
+    }
     return iterationsStatistic;
   }
 
