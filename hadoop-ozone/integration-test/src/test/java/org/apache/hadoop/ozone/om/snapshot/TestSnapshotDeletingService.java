@@ -222,6 +222,7 @@ public class TestSnapshotDeletingService {
   @SuppressWarnings("checkstyle:MethodLength")
   @Test
   @Order(3)
+  @Flaky("HDDS-11131")
   public void testSnapshotWithFSO() throws Exception {
     Table<String, OmDirectoryInfo> dirTable =
         om.getMetadataManager().getDirectoryTable();
