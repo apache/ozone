@@ -444,6 +444,9 @@ public class OzoneConfiguration extends Configuration
     try {
       return super.getAllPropertiesByTag(ConfigTag.CRYPTO_COMPLIANCE.toString());
     } catch (NoSuchMethodError e) {
+      // We need to handle NoSuchMethodError, because in Hadoop 2 we don't have the
+      // getAllPropertiesByTag method. We won't be supporting the compliance mode with
+      // that version, so we are safe to catch the exception and return a new Properties object.
       return new Properties();
     }
   }
