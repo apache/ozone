@@ -19,7 +19,6 @@ Library             BuiltIn
 Resource            ../lib/os.robot
 Resource            ../ozone-lib/shell.robot
 Test Timeout        5 minutes
-Suite Setup         Find Jars Dir
 
 *** Test Cases ***
 Ignores HADOOP_CLASSPATH if OZONE_CLASSPATH is set
@@ -38,10 +37,14 @@ Picks up items from OZONE_CLASSPATH
                         Should Contain   ${output}   ${TEMP_DIR}/ozone-classpath.jar
     [teardown]    Remove File         ${TEMP_DIR}/ozone-classpath.jar
 
-# disabled: cannot implement with read-only working dir
-# Adds optional dir entries
-#     [setup]    Create File         %{HDDS_LIB_JARS_DIR}/ozone-insight/optional.jar
-#     Set Environment Variable   OZONE_CLASSPATH  ${EMPTY}
-#     ${output} =         Execute          ozone classpath ozone-insight
-#                         Should Contain   ${output}   %{HDDS_LIB_JARS_DIR}/ozone-insight/optional.jar
-#     [teardown]    Remove File    %{HDDS_LIB_JARS_DIR}/ozone-insight/optional.jar
+Adds optional dir entries
+    Set Environment Variable   OZONE_CLASSPATH  ${EMPTY}
+    ${OZONE_COPY} =     Set Variable     ${TEMP_DIR}/ozone-copy
+    Copy Directory      ${OZONE_DIR}     ${OZONE_COPY}
+    ${jars_dir} =       Find Jars Dir    ${OZONE_COPY}
+    Create File         ${jars_dir}/ozone-insight/optional.jar
+
+    ${output} =         Execute          ${OZONE_COPY}/bin/ozone classpath ozone-insight
+                        Should Contain   ${output}   ${jars_dir}/ozone-insight/optional.jar
+
+    [teardown]    Remove Directory    ${OZONE_COPY}    recursive=True
