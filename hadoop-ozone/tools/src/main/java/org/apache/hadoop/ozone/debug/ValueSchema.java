@@ -77,8 +77,6 @@ public class ValueSchema implements Callable<Void>, SubcommandWithParent {
       defaultValue = "-1")
   private int depth;
 
-  private static volatile boolean exception;
-
   @Override
   public Void call() throws Exception {
 
