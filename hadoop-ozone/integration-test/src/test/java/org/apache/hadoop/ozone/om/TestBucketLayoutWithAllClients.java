@@ -16,6 +16,7 @@
  */
 package org.apache.hadoop.ozone.om;
 
+import com.google.protobuf.ServiceException;
 import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.ClientVersion;
@@ -23,29 +24,39 @@ import org.apache.hadoop.ozone.TestDataUtil;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
+import org.apache.hadoop.ozone.client.rpc.RpcClient;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
+import org.apache.hadoop.ozone.om.protocolPB.OzoneManagerProtocolClientSideTranslatorPB;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 
 import java.io.IOException;
+import java.util.Arrays;
 import java.util.UUID;
+import java.util.function.Function;
+import java.util.stream.Stream;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 /**
- * Tests to verify bucket ops with older version client.
+ * Tests to verify bucket ops with different client versions.
  */
 @Timeout(1200)
-public class TestBucketLayoutWithOlderClient {
+public class TestBucketLayoutWithAllClients {
 
   private static MiniOzoneCluster cluster = null;
   private static OzoneConfiguration conf;
   private static OzoneClient client;
+  private static OzoneManagerProtocolClientSideTranslatorPB ozoneManagerClient;
 
   /**
    * Create a MiniDFSCluster for testing.
@@ -61,6 +72,21 @@ public class TestBucketLayoutWithOlderClient {
     cluster = MiniOzoneCluster.newBuilder(conf).build();
     cluster.waitForClusterToBeReady();
     client = cluster.newClient();
+    ozoneManagerClient =
+        (OzoneManagerProtocolClientSideTranslatorPB)
+            ((RpcClient) client.getObjectStore().getClientProxy()).getOzoneManagerClient();
+  }
+
+  private static Stream<Arguments> allClientVersions() {
+    return Arrays.stream(ClientVersion.values()).flatMap(
+        clientVersion -> Stream.of(Arguments.of(clientVersion, BucketLayout.FILE_SYSTEM_OPTIMIZED),
+            Arguments.of(clientVersion, BucketLayout.OBJECT_STORE)));
+  }
+
+  private OzoneManagerProtocolProtos.OMRequest.Builder getOmRequest(OzoneManagerProtocolProtos.Type type,
+                                                                    ClientVersion clientVersion) {
+    return ozoneManagerClient.createOMRequest(type)
+        .setVersion(clientVersion.toProtoValue());
   }
 
   @Test
@@ -107,6 +133,57 @@ public class TestBucketLayoutWithOlderClient {
         cluster.getOzoneManager().getBucketInfo(volumeName, buckName);
     assertNotNull(bucketInfo);
     assertEquals(BucketLayout.LEGACY, bucketInfo.getBucketLayout());
+  }
+
+  private OzoneManagerProtocolProtos.KeyArgs getKeyArgs(String volume, String bucket) {
+    return OzoneManagerProtocolProtos.KeyArgs.newBuilder()
+            .setVolumeName(volume)
+            .setBucketName(bucket).setKeyName("a/b/c/key")
+            .build();
+  }
+
+  private OzoneManagerProtocolProtos.Status createKey(String volume, String bucket, ClientVersion clientVersion,
+                            OzoneManagerProtocolProtos.Status expectedStatus) throws IOException {
+    OzoneManagerProtocolProtos.CreateFileRequest createFileRequest =
+        OzoneManagerProtocolProtos.CreateFileRequest.newBuilder()
+        .setKeyArgs(getKeyArgs(volume, bucket))
+        .setIsOverwrite(true)
+        .setIsRecursive(true).build();
+    OzoneManagerProtocolProtos.OMRequest request = getOmRequest(OzoneManagerProtocolProtos.Type.CreateFile,
+        clientVersion)
+        .setCreateFileRequest(createFileRequest).build();
+    OzoneManagerProtocolProtos.OMResponse
+    omResponse = ozoneManagerClient.submitRequest(request);
+    return expectedStatus;
+  }
+
+  private void performOpWithLatestClientVersion(ClientVersion clientVersion,
+                                                Function<ClientVersion, OzoneManagerProtocolProtos.Status> operation,
+                                                OzoneManagerProtocolProtos.Status expectedStatusWithClientVersion) {
+    Assertions.assertEquals(expectedStatusWithClientVersion, operation.apply(clientVersion));
+    if (!operation.apply(clientVersion).equals(OzoneManagerProtocolProtos.Status.OK)) {
+      operation.apply(ClientVersion.CURRENT);
+    }
+
+  }
+  @ParameterizedTest
+  @MethodSource("allClientVersions")
+  public void testBucketOperationsOnNonLegacyBucket(ClientVersion version, BucketLayout bucketLayout)
+      throws IOException, ServiceException {
+    String suffix = version.toProtoValue() + "-" +
+        bucketLayout.toString().toLowerCase().replaceAll("_","-");
+    String volume = "volume-" + suffix;
+    String bucket = "bucket-" + suffix;
+    OzoneBucket ozoneBucket = TestDataUtil.createVolumeAndBucket(client, volume, bucket, bucketLayout);
+    Assertions.assertEquals(bucketLayout,
+        client.getObjectStore().getVolume(volume).getBucket(bucket).getBucketLayout());
+    // Create key
+    OzoneManagerProtocolProtos.Status expectedStatus =
+        version.toProtoValue() >= ClientVersion.BUCKET_LAYOUT_SUPPORT.toProtoValue() ?
+            OzoneManagerProtocolProtos.Status.OK : OzoneManagerProtocolProtos.Status.NOT_SUPPORTED_OPERATION;
+    performOpWithLatestClientVersion(createKey(volume, bucket, version, expectedStatus));
+
+
   }
 
   /**

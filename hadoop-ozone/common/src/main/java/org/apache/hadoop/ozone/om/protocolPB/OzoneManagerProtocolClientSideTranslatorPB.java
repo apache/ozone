@@ -290,11 +290,13 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
     transport.close();
   }
 
+
   /**
    * Returns a OMRequest builder with specified type.
    * @param cmdType type of the request
    */
-  private OMRequest.Builder createOMRequest(Type cmdType) {
+  @VisibleForTesting
+  public OMRequest.Builder createOMRequest(Type cmdType) {
     return OMRequest.newBuilder()
         .setCmdType(cmdType)
         .setVersion(ClientVersion.CURRENT_VERSION)
@@ -307,7 +309,8 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
    * @return response from OM
    * @throws IOException thrown if any Protobuf service exception occurs
    */
-  private OMResponse submitRequest(OMRequest omRequest)
+  @VisibleForTesting
+  public OMResponse submitRequest(OMRequest omRequest)
       throws IOException {
     OMRequest.Builder  builder = OMRequest.newBuilder(omRequest);
     // Insert S3 Authentication information for each request.
