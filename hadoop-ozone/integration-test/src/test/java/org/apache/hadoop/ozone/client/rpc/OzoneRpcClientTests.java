@@ -1900,6 +1900,7 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
 
 
   @Test
+  @Flaky("HDDS-10886")
   public void testPutKeyRatisThreeNodesParallel() throws IOException,
       InterruptedException {
     String volumeName = UUID.randomUUID().toString();
