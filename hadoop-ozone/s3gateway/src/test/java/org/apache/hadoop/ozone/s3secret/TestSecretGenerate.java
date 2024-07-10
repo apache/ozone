@@ -33,6 +33,7 @@ import org.apache.hadoop.ozone.client.OzoneClientStub;
 import org.apache.hadoop.ozone.client.protocol.ClientProtocol;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.S3SecretValue;
+import org.apache.ozone.test.tag.Unhealthy;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -111,6 +112,7 @@ class TestSecretGenerate {
   }
 
   @Test
+  @Unhealthy("HDDS-11041")
   void testSecretGenerateWithUsername() throws IOException {
     hasNoSecretYet();
 
