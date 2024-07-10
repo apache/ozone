@@ -38,14 +38,20 @@ import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneKey;
 import org.apache.hadoop.ozone.client.OzoneKeyDetails;
 import org.apache.hadoop.ozone.client.OzoneVolume;
+import org.apache.hadoop.ozone.ClientVersion;
 import org.apache.hadoop.ozone.client.BucketArgs;
 import org.apache.hadoop.ozone.client.io.KeyOutputStream;
 import org.apache.hadoop.ozone.client.io.OzoneInputStream;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
+import org.apache.hadoop.ozone.client.rpc.RpcClient;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
+import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
+import org.apache.hadoop.ozone.om.protocolPB.OzoneManagerProtocolClientSideTranslatorPB;
 import org.apache.hadoop.util.StringUtils;
 import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.AfterEach;
@@ -53,6 +59,9 @@ import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.MethodSource;
+import org.junit.jupiter.params.provider.Arguments;
 
 import java.io.IOException;
 import java.net.URI;
@@ -64,6 +73,7 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.TimeoutException;
+import java.util.stream.Stream;
 
 import static org.apache.hadoop.hdds.client.ReplicationFactor.ONE;
 import static org.apache.hadoop.hdds.client.ReplicationType.RATIS;
@@ -72,6 +82,7 @@ import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_SCHEME;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.KEY_ALREADY_EXISTS;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.KEY_NOT_FOUND;
+import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status.OK;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
@@ -94,6 +105,8 @@ public class TestObjectStoreWithFSO {
   private static FileSystem fs;
   private static OzoneClient client;
 
+  private static OzoneManagerProtocolClientSideTranslatorPB ozoneManagerClient;
+
   /**
    * Create a MiniDFSCluster for testing.
    * <p>
@@ -108,6 +121,9 @@ public class TestObjectStoreWithFSO {
     cluster = MiniOzoneCluster.newBuilder(conf).build();
     cluster.waitForClusterToBeReady();
     client = cluster.newClient();
+    ozoneManagerClient =
+        (OzoneManagerProtocolClientSideTranslatorPB)
+            ((RpcClient) client.getObjectStore().getClientProxy()).getOzoneManagerClient();
     // create a volume and a bucket to be used by OzoneFileSystem
     OzoneBucket bucket = TestDataUtil
         .createVolumeAndBucket(client, BucketLayout.FILE_SYSTEM_OPTIMIZED);
@@ -208,6 +224,76 @@ public class TestObjectStoreWithFSO {
     verifyKeyInFileTable(fileTable, file, dirPathC.getObjectID(), true);
     verifyKeyInOpenFileTable(openFileTable, clientID, file,
             dirPathC.getObjectID(), true);
+  }
+
+  public OzoneFileStatus getFileStatus(OmKeyArgs args, int clientVersion)
+      throws IOException {
+    OzoneManagerProtocolProtos.KeyArgs keyArgs =
+        OzoneManagerProtocolProtos.KeyArgs.newBuilder()
+            .setVolumeName(args.getVolumeName())
+            .setBucketName(args.getBucketName()).setKeyName(args.getKeyName())
+            .build();
+    OzoneManagerProtocolProtos.GetFileStatusRequest req =
+        OzoneManagerProtocolProtos.GetFileStatusRequest.newBuilder()
+            .setKeyArgs(keyArgs).build();
+    OzoneManagerProtocolProtos.OMRequest omRequest =
+        ozoneManagerClient.createOMRequest(
+                OzoneManagerProtocolProtos.Type.GetFileStatus, clientVersion)
+            .setGetFileStatusRequest(req).build();
+    OzoneManagerProtocolProtos.GetFileStatusResponse resp;
+    try {
+      OzoneManagerProtocolProtos.OMResponse omResponse =
+          ozoneManagerClient.submitRequest(omRequest);
+      if (omResponse.getStatus() != OK) {
+        throw new OMException(omResponse.getMessage(),
+            OMException.ResultCodes.values()[omResponse.getStatus().ordinal()]);
+      }
+      resp = omResponse.getGetFileStatusResponse();
+    } catch (IOException e) {
+      throw e;
+    }
+    OzoneFileStatus getFileStatusResp =
+        OzoneFileStatus.getFromProtobuf(resp.getStatus());
+    return getFileStatusResp;
+  }
+
+
+  private static Stream<Arguments> allClientVersions() {
+    return Arrays.stream(ClientVersion.values())
+        .map(clientVersion -> Arguments.of(clientVersion.getVersion()));
+  }
+  @ParameterizedTest
+  @MethodSource("allClientVersions")
+  public void testGetFileStatusFromOlderClients(int clientVersion) throws Exception {
+    // try to create key from new client
+    String parent = "a/b/c/";
+    String file = "key1" + RandomStringUtils.randomNumeric(5);
+    String key = parent + file;
+
+    ObjectStore objectStore = client.getObjectStore();
+    OzoneVolume ozoneVolume = objectStore.getVolume(volumeName);
+    assertEquals(volumeName, ozoneVolume.getName());
+    OzoneBucket ozoneBucket = ozoneVolume.getBucket(bucketName);
+    assertEquals(bucketName, ozoneBucket.getName());
+    String data = "random data";
+    try(OzoneOutputStream ozoneOutputStream = ozoneBucket.createKey(key,
+        data.length(), ReplicationType.RATIS, ReplicationFactor.ONE,
+        new HashMap<>())){
+      ozoneOutputStream.write(data.getBytes(StandardCharsets.UTF_8));
+    }
+    // try to read from older client
+    OmKeyArgs keyArgs = new OmKeyArgs.Builder()
+        .setVolumeName(ozoneBucket.getVolumeName())
+        .setBucketName(ozoneBucket.getName())
+        .setKeyName(key)
+        .build();
+    if (clientVersion < ClientVersion.BUCKET_LAYOUT_SUPPORT.getVersion()) {
+      assertThrows(OMException.class,
+          () -> getFileStatus(keyArgs, clientVersion),
+          "Expecting Unsupported Operation Exception");
+    } else {
+      assertNotNull(getFileStatus(keyArgs,clientVersion));
+    }
   }
 
   /**

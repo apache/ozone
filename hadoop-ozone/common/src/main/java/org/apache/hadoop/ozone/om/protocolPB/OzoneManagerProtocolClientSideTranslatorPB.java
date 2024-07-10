@@ -301,13 +301,22 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
         .setClientId(clientID);
   }
 
+  @VisibleForTesting
+  public OMRequest.Builder createOMRequest(Type cmdType,int clientVersion) {
+    return OMRequest.newBuilder()
+        .setCmdType(cmdType)
+        .setVersion(clientVersion)
+        .setClientId(clientID);
+  }
+
   /**
    * Submits client request to OM server.
    * @param omRequest client request
    * @return response from OM
    * @throws IOException thrown if any Protobuf service exception occurs
    */
-  private OMResponse submitRequest(OMRequest omRequest)
+  @VisibleForTesting
+  public OMResponse submitRequest(OMRequest omRequest)
       throws IOException {
     OMRequest.Builder  builder = OMRequest.newBuilder(omRequest);
     // Insert S3 Authentication information for each request.
