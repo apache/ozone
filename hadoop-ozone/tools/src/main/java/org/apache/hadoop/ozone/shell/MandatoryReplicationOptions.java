@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -15,27 +15,29 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.hadoop.hdds.scm.safemode;
+package org.apache.hadoop.ozone.shell;
 
-import java.util.EnumSet;
-
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ScmOps;
+import picocli.CommandLine;
 
 /**
- * Operations restricted in SCM safe mode.
+ * Options for requiring replication config in 'ozone shell' commands.
  */
-public final class SafeModeRestrictedOps {
-  private static EnumSet restrictedOps = EnumSet.noneOf(ScmOps.class);
+public class MandatoryReplicationOptions extends ReplicationOptions {
 
-  private SafeModeRestrictedOps() {
+  @CommandLine.Option(names = {"--replication", "-r"},
+      description = REPLICATION_DESCRIPTION,
+      required = true)
+  @Override
+  public void setReplication(String replication) {
+    super.setReplication(replication);
   }
 
-  static {
-    restrictedOps.add(ScmOps.allocateBlock);
-    restrictedOps.add(ScmOps.allocateContainer);
+  @CommandLine.Option(names = {"-t", "--type", "--replication-type"},
+      description = TYPE_DESCRIPTION,
+      required = true)
+  @Override
+  public void setType(String type) {
+    super.setType(type);
   }
 
-  public static boolean isRestrictedInSafeMode(ScmOps opName) {
-    return restrictedOps.contains(opName);
-  }
 }

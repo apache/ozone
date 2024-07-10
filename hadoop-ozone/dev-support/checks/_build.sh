@@ -18,7 +18,7 @@ cd "$DIR/../../.." || exit 1
 
 : ${OZONE_WITH_COVERAGE:="false"}
 
-MAVEN_OPTIONS='-V -B -Dmaven.javadoc.skip=true -DskipTests -DskipDocs --no-transfer-progress'
+MAVEN_OPTIONS='-V -B -DskipTests -DskipDocs --no-transfer-progress'
 
 if [[ "${OZONE_WITH_COVERAGE}" == "true" ]]; then
   MAVEN_OPTIONS="${MAVEN_OPTIONS} -Pcoverage"
