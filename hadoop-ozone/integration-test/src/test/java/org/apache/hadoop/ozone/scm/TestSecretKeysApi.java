@@ -34,6 +34,7 @@ import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.authorize.AuthorizationException;
 import org.apache.hadoop.util.ExitUtil;
 import org.apache.ozone.test.GenericTestUtils;
+import org.apache.ozone.test.tag.Flaky;
 import org.apache.ratis.util.ExitUtils;
 import org.jetbrains.annotations.NotNull;
 import org.junit.After;
@@ -192,6 +193,7 @@ public final class TestSecretKeysApi {
    * Test secret key apis in happy case.
    */
   @Test
+  @Flaky("HDDS-8900")
   public void testSecretKeyApiSuccess() throws Exception {
     enableBlockToken();
     // set a low rotation period, of 1s, expiry is 3s, expect 3 active keys
