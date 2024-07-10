@@ -23,7 +23,6 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeType;
 import org.apache.hadoop.hdds.scm.metadata.SCMMetadataStore;
 import org.apache.hadoop.hdds.security.SecurityConfig;
 import org.apache.hadoop.hdds.security.exception.SCMSecurityException;
-import org.bouncycastle.cert.X509CertificateHolder;
 import org.bouncycastle.pkcs.PKCS10CertificationRequest;
 
 import java.io.IOException;
@@ -52,13 +51,12 @@ public interface CertificateServer {
   /**
    * Returns the CA Certificate for this CA.
    *
-   * @return X509CertificateHolder - Certificate for this CA.
+   * @return X509Certificate - Certificate for this CA.
    * @throws CertificateException - usually thrown if this CA is not
    *                              initialized.
    * @throws IOException          - on Error.
    */
-  X509CertificateHolder getCACertificate()
-      throws CertificateException, IOException;
+  X509Certificate getCACertificate() throws CertificateException, IOException;
 
   /**
    * Gets the certificate bundle for the CA certificate of this server.

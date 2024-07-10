@@ -100,6 +100,7 @@ public class SnapshotDeletingService extends AbstractKeyDeletingService {
   private final long snapshotDeletionPerTask;
   private final int keyLimitPerSnapshot;
   private final int ratisByteLimit;
+  private final boolean isSstFilteringServiceEnabled;
 
   public SnapshotDeletingService(long interval, long serviceTimeout,
       OzoneManager ozoneManager, ScmBlockLocationProtocol scmClient)
@@ -127,6 +128,8 @@ public class SnapshotDeletingService extends AbstractKeyDeletingService {
     this.keyLimitPerSnapshot = conf.getInt(
         OZONE_SNAPSHOT_KEY_DELETING_LIMIT_PER_TASK,
         OZONE_SNAPSHOT_KEY_DELETING_LIMIT_PER_TASK_DEFAULT);
+
+    this.isSstFilteringServiceEnabled = ((KeyManagerImpl) ozoneManager.getKeyManager()).isSstFilteringSvcEnabled();
   }
 
   private class SnapshotDeletingTask implements BackgroundTask {
@@ -153,12 +156,9 @@ public class SnapshotDeletingService extends AbstractKeyDeletingService {
 
         while (iterator.hasNext() && snapshotLimit > 0) {
           SnapshotInfo snapInfo = iterator.next().getValue();
-          boolean isSstFilteringServiceEnabled =
-              ((KeyManagerImpl) ozoneManager.getKeyManager())
-                  .isSstFilteringSvcEnabled();
 
           // Only Iterate in deleted snapshot
-          if (shouldIgnoreSnapshot(snapInfo, isSstFilteringServiceEnabled)) {
+          if (shouldIgnoreSnapshot(snapInfo)) {
             continue;
           }
 
@@ -591,10 +591,10 @@ public class SnapshotDeletingService extends AbstractKeyDeletingService {
     }
   }
 
-  public static boolean shouldIgnoreSnapshot(SnapshotInfo snapInfo,
-      boolean isSstFilteringServiceEnabled) {
+  @VisibleForTesting
+  boolean shouldIgnoreSnapshot(SnapshotInfo snapInfo) {
     SnapshotInfo.SnapshotStatus snapshotStatus = snapInfo.getSnapshotStatus();
-    return !(snapshotStatus == SnapshotInfo.SnapshotStatus.SNAPSHOT_DELETED)
+    return snapshotStatus != SnapshotInfo.SnapshotStatus.SNAPSHOT_DELETED
         || (isSstFilteringServiceEnabled && !snapInfo.isSstFiltered());
   }
 

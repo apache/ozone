@@ -744,55 +744,55 @@
         "leaderNode": "localhost1.storage.enterprise.com",
         "datanodes": [
           {
-            "level": 0,
-            "parent": null,
-            "cost": 0,
-            "uuid": "9e4e92da-4abd-461d-b042-dc4fe72e8727",
-            "uuidString": "9e4e92da-4abd-461d-b042-dc4fe72e8727",
-            "ipAddress": "172.22.0.5",
-            "hostName": "ozone_datanode_1.ozone_default",
-            "ports": [
-              {
-                "name": "REPLICATION",
-                "value": 9886
-              },
-              {
-                "name": "RATIS",
-                "value": 9858
-              },
-              {
-                "name": "RATIS_ADMIN",
-                "value": 9857
-              },
-              {
-                "name": "RATIS_SERVER",
-                "value": 9856
-              },
-              {
-                "name": "RATIS_DATASTREAM",
-                "value": 9855
-              },
-              {
-                "name": "STANDALONE",
-                "value": 9859
-              }
+          "level": 0,
+          "parent": null,
+          "cost": 0,
+          "uuid": "9e4e92da-4abd-461d-b042-dc4fe72e8727",
+          "uuidString": "9e4e92da-4abd-461d-b042-dc4fe72e8727",
+          "ipAddress": "172.22.0.5",
+          "hostName": "ozone_datanode_1.ozone_default",
+          "ports": [
+            {
+              "name": "REPLICATION",
+              "value": 9886
+            },
+            {
+              "name": "RATIS",
+              "value": 9858
+            },
+            {
+              "name": "RATIS_ADMIN",
+              "value": 9857
+            },
+            {
+              "name": "RATIS_SERVER",
+              "value": 9856
+            },
+            {
+              "name": "RATIS_DATASTREAM",
+              "value": 9855
+            },
+            {
+              "name": "STANDALONE",
+              "value": 9859
+            }
 
-            ],
-            "certSerialId": null,
-            "version": null,
-            "setupTime": 0,
-            "revision": null,
-            "buildDate": null,
-            "persistedOpState": "IN_SERVICE",
-            "persistedOpStateExpiryEpochSec": 0,
-            "initialVersion": 0,
-            "currentVersion": 1,
-            "signature": -460136136,
-            "decomissioned": false,
-            "networkName": "9e4e92da-4abd-461d-b042-dc4fe72e8727",
-            "networkLocation": "/default-rack",
-            "networkFullPath": "/default-rack/9e4e92da-4abd-461d-b042-dc4fe72e8727",
-            "numOfLeaves": 1
+          ],
+          "certSerialId": null,
+          "version": null,
+          "setupTime": 0,
+          "revision": null,
+          "buildDate": null,
+          "persistedOpState": "IN_SERVICE",
+          "persistedOpStateExpiryEpochSec": 0,
+          "initialVersion": 0,
+          "currentVersion": 1,
+          "signature": -460136136,
+          "decomissioned": false,
+          "networkName": "9e4e92da-4abd-461d-b042-dc4fe72e8727",
+          "networkLocation": "/default-rack",
+          "networkFullPath": "/default-rack/9e4e92da-4abd-461d-b042-dc4fe72e8727",
+          "numOfLeaves": 1
           }
         ],
         "lastLeaderElection": 1578491471528,
@@ -1398,217 +1398,42 @@
   "root": {
     "status": "OK",
     "path": "/",
-    "size": 1709108,
+    "size": 15160,
     "sizeWithReplica": -1,
-    "subPathCount": 30,
+    "subPathCount": 5,
     "subPaths": [
       {
         "key": false,
-        "path": "/vol-0-30461",
-        "size": 33096,
-        "sizeWithReplica": -1,
-        "isKey": false
-      },
-      {
-        "key": false,
-        "path": "/vol-1-82078",
-        "size": 33096,
-        "sizeWithReplica": -1,
-        "isKey": false
-      },
-      {
-        "key": false,
-        "path": "/vol-2-96509",
-        "size": 330496,
-        "sizeWithReplica": -1,
-        "isKey": false
-      },
-      {
-        "key": false,
-        "path": "/vol-3-75124",
-        "size": 330496,
-        "sizeWithReplica": -1,
-        "isKey": false
-      },
-      {
-        "key": false,
-        "path": "/vol-4-53147",
-        "size": 330240,
-        "sizeWithReplica": -1,
-        "isKey": false
-      },
-      {
-        "key": false,
         "path": "/vol1",
-        "size": 12204,
+        "size": 10000,
         "sizeWithReplica": -1,
         "isKey": false
       },
       {
         "key": false,
-        "path": "/vol17",
-        "size": 8136,
-        "sizeWithReplica": -1,
-        "isKey": false
-      },
-      {
-        "key": false,
-        "path": "/vol21",
-        "size": 8136,
-        "sizeWithReplica": -1,
-        "isKey": false
-      },
-      {
-        "key": false,
-        "path": "/vol22",
-        "size": 8136,
-        "sizeWithReplica": -1,
-        "isKey": false
-      },
-      {
-        "key": false,
-        "path": "/vol4",
-        "size": 8136,
-        "sizeWithReplica": -1,
-        "isKey": false
-      },
-      {
-        "key": false,
-        "path": "/vol18",
-        "size": 4068,
-        "sizeWithReplica": -1,
-        "isKey": false
-      },
-      {
-        "key": false,
-        "path": "/vol19",
-        "size": 4068,
-        "sizeWithReplica": -1,
-        "isKey": false
-      },
-      {
-        "key": false,
-        "path": "/s3v",
-        "size": 0,
-        "sizeWithReplica": -1,
-        "isKey": false
-      },
-      {
-        "key": false,
-        "path": "/vol10",
-        "size": 0,
-        "sizeWithReplica": -1,
-        "isKey": false
-      },
-      {
-        "key": false,
-        "path": "/vol11",
-        "size": 0,
-        "sizeWithReplica": -1,
-        "isKey": false
-      },
-      {
-        "key": false,
-        "path": "/vol12",
-        "size": 0,
-        "sizeWithReplica": -1,
-        "isKey": false
-      },
-      {
-        "key": false,
-        "path": "/vol13",
-        "size": 0,
-        "sizeWithReplica": -1,
-        "isKey": false
-      },
-      {
-        "key": false,
-        "path": "/vol14",
-        "size": 0,
-        "sizeWithReplica": -1,
-        "isKey": false
-      },
-      {
-        "key": false,
-        "path": "/vol15",
-        "size": 0,
-        "sizeWithReplica": -1,
-        "isKey": false
-      },
-      {
-        "key": false,
-        "path": "/vol16",
-        "size": 0,
-        "sizeWithReplica": -1,
-        "isKey": false
-      },
-      {
-        "key": false,
-        "path": "/vol2",
-        "size": 0,
-        "sizeWithReplica": -1,
-        "isKey": false
-      },
-      {
-        "key": false,
-        "path": "/vol20",
-        "size": 0,
-        "sizeWithReplica": -1,
-        "isKey": false
-      },
-      {
-        "key": false,
-        "path": "/vol3",
-        "size": 0,
-        "sizeWithReplica": -1,
-        "isKey": false
-      },
-      {
-        "key": false,
-        "path": "/vol5",
-        "size": 0,
-        "sizeWithReplica": -1,
-        "isKey": false
-      },
-      {
-        "key": false,
-        "path": "/vol6",
-        "size": 0,
-        "sizeWithReplica": -1,
-        "isKey": false
-      },
-      {
-        "key": false,
-        "path": "/vol7",
-        "size": 0,
-        "sizeWithReplica": -1,
-        "isKey": false
-      },
-      {
-        "key": false,
-        "path": "/vol8",
-        "size": 0,
-        "sizeWithReplica": -1,
-        "isKey": false
-      },
-      {
-        "key": false,
-        "path": "/vol9",
-        "size": 0,
-        "sizeWithReplica": -1,
-        "isKey": false
-      },
-      {
-        "key": false,
-        "path": "/vol10",
+        "path": "/vol-2",
         "size": 10,
         "sizeWithReplica": -1,
         "isKey": false
       },
       {
         "key": false,
-        "path": "/vol11",
-        "size": 20,
+        "path": "/vol3",
+        "size": 100,
+        "sizeWithReplica": -1,
+        "isKey": false
+      },
+      {
+        "key": false,
+        "path": "/vol4",
+        "size": 50,
+        "sizeWithReplica": -1,
+        "isKey": false
+      },
+      {
+        "key": false,
+        "path": "/vol5",
+        "size": 5000,
         "sizeWithReplica": -1,
         "isKey": false
       }
@@ -1804,11 +1629,11 @@
               "blockID": {
                 "containerBlockID": {
                   "containerID": 1,
-                  "localID": 111677748019200007
+                  "localID": 111677748019200000
                 },
                 "blockCommitSequenceId": 18,
                 "containerID": 1,
-                "localID": 111677748019200007
+                "localID": 111677748019200000
               },
               "length": 3879,
               "offset": 0,
@@ -1817,7 +1642,7 @@
               "pipeline": null,
               "partNumber": 0,
               "containerID": 1,
-              "localID": 111677748019200007,
+              "localID": 111677748019200000,
               "blockCommitSequenceId": 18
             }
           ],
@@ -1827,11 +1652,11 @@
               "blockID": {
                 "containerBlockID": {
                   "containerID": 1,
-                  "localID": 111677748019200007
+                  "localID": 111677748019200000
                 },
                 "blockCommitSequenceId": 18,
                 "containerID": 1,
-                "localID": 111677748019200007
+                "localID": 111677748019200000
               },
               "length": 3879,
               "offset": 0,
@@ -1840,7 +1665,7 @@
               "pipeline": null,
               "partNumber": 0,
               "containerID": 1,
-              "localID": 111677748019200007,
+              "localID": 111677748019200000,
               "blockCommitSequenceId": 18
             }
           ],
@@ -1850,11 +1675,11 @@
                 "blockID": {
                   "containerBlockID": {
                     "containerID": 1,
-                    "localID": 111677748019200007
+                    "localID": 111677748019200000
                   },
                   "blockCommitSequenceId": 18,
                   "containerID": 1,
-                  "localID": 111677748019200007
+                  "localID": 111677748019200000
                 },
                 "length": 3879,
                 "offset": 0,
@@ -1863,7 +1688,7 @@
                 "pipeline": null,
                 "partNumber": 0,
                 "containerID": 1,
-                "localID": 111677748019200007,
+                "localID": 111677748019200000,
                 "blockCommitSequenceId": 18
               }
             ]
@@ -2479,8 +2304,7 @@
         "quotaInBytes": -1,
         "quotaInNamespace": -1,
         "usedNamespace": 3000,
-        "acls": [
-        ]
+        "acls": []
       },
       {
         "volume": "vol4",
@@ -2718,7 +2542,7 @@
                 "label": "",
                 "size": 256,
                 "accessCount": 39202,
-                "color": 1.0
+                "color": 1
               }
             ],
             "size": 256,
@@ -2733,7 +2557,7 @@
                 "label": "",
                 "size": 256,
                 "accessCount": 5675,
-                "color": 1.0
+                "color": 1
               }
             ],
             "size": 256,
@@ -2748,7 +2572,7 @@
                 "label": "",
                 "size": 256,
                 "accessCount": 4867,
-                "color": 1.0
+                "color": 1
               }
             ],
             "size": 256,
@@ -2763,7 +2587,7 @@
                 "label": "",
                 "size": 256,
                 "accessCount": 4655,
-                "color": 1.0
+                "color": 1
               }
             ],
             "size": 256,
@@ -2778,7 +2602,7 @@
                 "label": "",
                 "size": 256,
                 "accessCount": 4606,
-                "color": 1.0
+                "color": 1
               }
             ],
             "size": 256,
@@ -2793,7 +2617,7 @@
                 "label": "",
                 "size": 256,
                 "accessCount": 3832,
-                "color": 1.0
+                "color": 1
               }
             ],
             "size": 256,
@@ -2808,7 +2632,7 @@
                 "label": "",
                 "size": 256,
                 "accessCount": 2369,
-                "color": 1.0
+                "color": 1
               }
             ],
             "size": 256,
@@ -2823,7 +2647,7 @@
                 "label": "",
                 "size": 256,
                 "accessCount": 2228,
-                "color": 1.0
+                "color": 1
               }
             ],
             "size": 256,
@@ -2838,7 +2662,7 @@
                 "label": "",
                 "size": 256,
                 "accessCount": 1984,
-                "color": 1.0
+                "color": 1
               }
             ],
             "size": 256,
@@ -2853,7 +2677,7 @@
                 "label": "",
                 "size": 256,
                 "accessCount": 1895,
-                "color": 1.0
+                "color": 1
               }
             ],
             "size": 256,
@@ -2868,7 +2692,7 @@
                 "label": "",
                 "size": 256,
                 "accessCount": 271,
-                "color": 1.0
+                "color": 1
               }
             ],
             "size": 256,
@@ -2883,7 +2707,7 @@
                 "label": "",
                 "size": 256,
                 "accessCount": 245,
-                "color": 1.0
+                "color": 1
               }
             ],
             "size": 256,
@@ -2905,7 +2729,7 @@
                 "label": "",
                 "size": 256,
                 "accessCount": 1015,
-                "color": 1.0
+                "color": 1
               }
             ],
             "size": 256,
@@ -2920,7 +2744,7 @@
                 "label": "",
                 "size": 256,
                 "accessCount": 839,
-                "color": 1.0
+                "color": 1
               }
             ],
             "size": 256,
@@ -2935,7 +2759,7 @@
                 "label": "",
                 "size": 256,
                 "accessCount": 727,
-                "color": 1.0
+                "color": 1
               }
             ],
             "size": 256,
@@ -2957,7 +2781,7 @@
                 "label": "",
                 "size": 256,
                 "accessCount": 271,
-                "color": 1.0
+                "color": 1
               }
             ],
             "size": 256,
@@ -2972,7 +2796,7 @@
                 "label": "",
                 "size": 256,
                 "accessCount": 237,
-                "color": 1.0
+                "color": 1
               }
             ],
             "size": 256,
@@ -2987,7 +2811,7 @@
                 "label": "",
                 "size": 256,
                 "accessCount": 213,
-                "color": 1.0
+                "color": 1
               }
             ],
             "size": 256,
@@ -3009,7 +2833,7 @@
                 "label": "",
                 "size": 256,
                 "accessCount": 187,
-                "color": 1.0
+                "color": 1
               }
             ],
             "size": 256,
@@ -3024,7 +2848,7 @@
                 "label": "",
                 "size": 256,
                 "accessCount": 185,
-                "color": 1.0
+                "color": 1
               }
             ],
             "size": 256,
@@ -3039,7 +2863,7 @@
                 "label": "",
                 "size": 256,
                 "accessCount": 73,
-                "color": 1.0
+                "color": 1
               }
             ],
             "size": 256,
@@ -3061,7 +2885,7 @@
                 "label": "label1",
                 "size": 0,
                 "accessCount": 3,
-                "color": 1.0
+                "color": 1
               }
             ],
             "size": 256,
@@ -3076,7 +2900,7 @@
                 "label": "label2",
                 "size": 256,
                 "accessCount": 2,
-                "color": 1.0
+                "color": 1
               }
             ],
             "size": 256,
@@ -3098,7 +2922,7 @@
                 "label": "",
                 "size": 256,
                 "accessCount": 2,
-                "color": 1.0
+                "color": 1
               }
             ],
             "size": 256,
@@ -3120,7 +2944,7 @@
                 "label": "",
                 "size": 256,
                 "accessCount": 2,
-                "color": 1.0
+                "color": 1
               }
             ],
             "size": 256,
@@ -3142,7 +2966,7 @@
                 "label": "",
                 "size": 256,
                 "accessCount": 2,
-                "color": 1.0
+                "color": 1
               }
             ],
             "size": 256,
@@ -3157,7 +2981,7 @@
                 "label": "",
                 "size": 256,
                 "accessCount": 1,
-                "color": 1.0
+                "color": 1
               }
             ],
             "size": 256,
@@ -3174,7 +2998,7 @@
     "minAccessCount": 1,
     "maxAccessCount": 39202
   },
-  "keyHeatmap":  {
+  "keyHeatmap": {
     "label": "root",
     "children": [
       {
@@ -3187,7 +3011,7 @@
                 "label": "demo2",
                 "size": 256,
                 "accessCount": 84,
-                "color": 1.0
+                "color": 1
               },
               {
                 "label": "demo35",
@@ -3520,7 +3344,7 @@
                 "label": "demo1",
                 "size": 256,
                 "accessCount": 65,
-                "color": 1.0
+                "color": 1
               },
               {
                 "label": "demo2",
@@ -3541,7 +3365,7 @@
                 "label": "demo2",
                 "size": 256,
                 "accessCount": 55,
-                "color": 1.0
+                "color": 1
               },
               {
                 "label": "demo3",
@@ -3586,7 +3410,7 @@
                 "label": "demo6",
                 "size": 256,
                 "accessCount": 49,
-                "color": 1.0
+                "color": 1
               },
               {
                 "label": "demo2",
@@ -3637,7 +3461,7 @@
                 "label": "demo9",
                 "size": 256,
                 "accessCount": 48,
-                "color": 1.0
+                "color": 1
               },
               {
                 "label": "demo6",
@@ -3724,7 +3548,7 @@
                 "label": "test_dir/demo1",
                 "size": 256,
                 "accessCount": 45,
-                "color": 1.0
+                "color": 1
               },
               {
                 "label": "test_dir/demo2",
@@ -3745,7 +3569,7 @@
                 "label": "demo17",
                 "size": 256,
                 "accessCount": 44,
-                "color": 1.0
+                "color": 1
               },
               {
                 "label": "demo5",
@@ -3826,7 +3650,7 @@
                 "label": "test_dir/demo2",
                 "size": 256,
                 "accessCount": 38,
-                "color": 1.0
+                "color": 1
               },
               {
                 "label": "test_dir/demo1",
@@ -3854,13 +3678,13 @@
                 "label": ".trash",
                 "size": 256,
                 "accessCount": 24,
-                "color": 1.0
+                "color": 1
               },
               {
                 "label": ".trash/om",
                 "size": 256,
                 "accessCount": 24,
-                "color": 1.0
+                "color": 1
               }
             ],
             "size": 512,
@@ -3890,7 +3714,7 @@
                 "label": "enc_path/hive_tpcds/store_sales/test1.dat",
                 "size": 1026,
                 "accessCount": 155074,
-                "color": 1.0
+                "color": 1
               },
               {
                 "label": "enc_path/hive_tpcds/catalog_sales/test2",
@@ -3918,7 +3742,7 @@
                 "label": "enc_path/hive_tpcds/store_sales/test11.dat",
                 "size": 2500,
                 "accessCount": 155074,
-                "color": 1.0
+                "color": 1
               },
               {
                 "label": "enc_path/hive_tpcds/catalog_sales/test12",
@@ -3944,18 +3768,17 @@
   "disabledFeatures": [
     "FLAG1"
   ],
-
   "keysOpenSummary": {
     "totalUnreplicatedDataSize": 10485760,
     "totalReplicatedDataSize": 31457280,
     "totalOpenKeys": 10
   },
   "keysdeletePendingSummary":{
-    "totalUnreplicatedDataSize": 29291,
-    "totalReplicatedDataSize": 87873,
-    "totalDeletedKeys": 3
+      "totalUnreplicatedDataSize": 29291,
+      "totalReplicatedDataSize": 87873,
+      "totalDeletedKeys": 3
   },
-  "omMismatch":{
+  "omMismatch": {
     "containerDiscrepancyInfo": [
       {
         "containerId": 1,
@@ -3965,7 +3788,6 @@
             "id": {
               "id": "1202e6bb-b7c1-4a85-8067-61374b069adb"
             },
-
             "replicationConfig": {
               "replicationFactor": "ONE",
               "requiredNodes": 1,
@@ -3977,7 +3799,6 @@
             "id": {
               "id": "1202e6bb-b7c1-4a85-8067-613724nn"
             },
-
             "replicationConfig": {
               "replicationFactor": "ONE",
               "requiredNodes": 1,
@@ -3985,7 +3806,6 @@
             },
             "healthy": true
           }
-
         ],
         "existsAt": "SCM"
       },
@@ -4159,7 +3979,6 @@
             "id": {
               "id": "1202e6bb-b7c1-4a85-8067-61374b069adb"
             },
-
             "replicationConfig": {
               "replicationFactor": "ONE",
               "requiredNodes": 1,
@@ -4171,7 +3990,6 @@
             "id": {
               "id": "1202e6bb-b7c1-4a85-8067-613724nn"
             },
-
             "replicationConfig": {
               "replicationFactor": "ONE",
               "requiredNodes": 1,
@@ -4179,7 +3997,6 @@
             },
             "healthy": true
           }
-
         ],
         "existsAt": "SCM"
       },
@@ -4383,7 +4200,7 @@
       }
     ]
   },
-  "scmMismatch":{
+  "scmMismatch": {
     "containerDiscrepancyInfo": [
       {
         "containerId": 1,
@@ -4393,7 +4210,6 @@
             "id": {
               "id": "1202e6bb-b7c1-4a85-8067-61374b069adb"
             },
-
             "replicationConfig": {
               "replicationFactor": "ONE",
               "requiredNodes": 1,
@@ -4405,7 +4221,6 @@
             "id": {
               "id": "1202e6bb-b7c1-4a85-8067-613724nn"
             },
-
             "replicationConfig": {
               "replicationFactor": "ONE",
               "requiredNodes": 1,
@@ -4413,7 +4228,6 @@
             },
             "healthy": true
           }
-
         ],
         "existsAt": "OM"
       },
@@ -4587,7 +4401,6 @@
             "id": {
               "id": "1202e6bb-b7c1-4a85-8067-61374b069adb"
             },
-
             "replicationConfig": {
               "replicationFactor": "ONE",
               "requiredNodes": 1,
@@ -4599,7 +4412,6 @@
             "id": {
               "id": "1202e6bb-b7c1-4a85-8067-613724nn"
             },
-
             "replicationConfig": {
               "replicationFactor": "ONE",
               "requiredNodes": 1,
@@ -4607,7 +4419,6 @@
             },
             "healthy": true
           }
-
         ],
         "existsAt": "OM"
       },
@@ -4781,7 +4592,6 @@
             "id": {
               "id": "1202e6bb-b7c1-4a85-8067-61374b069adb"
             },
-
             "replicationConfig": {
               "replicationFactor": "ONE",
               "requiredNodes": 1,
@@ -4793,7 +4603,6 @@
             "id": {
               "id": "1202e6bb-b7c1-4a85-8067-613724nn"
             },
-
             "replicationConfig": {
               "replicationFactor": "ONE",
               "requiredNodes": 1,
@@ -4801,7 +4610,6 @@
             },
             "healthy": true
           }
-
         ],
         "existsAt": "OM"
       },
@@ -4975,7 +4783,6 @@
             "id": {
               "id": "1202e6bb-b7c1-4a85-8067-61374b069adb"
             },
-
             "replicationConfig": {
               "replicationFactor": "ONE",
               "requiredNodes": 1,
@@ -4987,7 +4794,6 @@
             "id": {
               "id": "1202e6bb-b7c1-4a85-8067-613724nn"
             },
-
             "replicationConfig": {
               "replicationFactor": "ONE",
               "requiredNodes": 1,
@@ -4995,7 +4801,6 @@
             },
             "healthy": true
           }
-
         ],
         "existsAt": "OM"
       },
@@ -5169,7 +4974,6 @@
             "id": {
               "id": "1202e6bb-b7c1-4a85-8067-61374b069adb"
             },
-
             "replicationConfig": {
               "replicationFactor": "ONE",
               "requiredNodes": 1,
@@ -5181,7 +4985,6 @@
             "id": {
               "id": "1202e6bb-b7c1-4a85-8067-613724nn"
             },
-
             "replicationConfig": {
               "replicationFactor": "ONE",
               "requiredNodes": 1,
@@ -5189,7 +4992,6 @@
             },
             "healthy": true
           }
-
         ],
         "existsAt": "OM"
       },
@@ -5377,7 +5179,7 @@
         }
       },
       {
-        "key": "/-9223372036854775552/-9223372036854775040/-9223372036852420095/2439/110569623850191713",
+        "key": "/-9223372036854775552/-9223372036854775040/-9223372036852420095/2439/110569623850191714",
         "path": "nonfso 2",
         "inStateSince": 1686156886632,
         "size": 268435456,
@@ -5389,7 +5191,7 @@
         }
       },
       {
-        "key": "/-9223372036854775552/-9223372036854775040/-9223372036852420095/2440/110569623850191713",
+        "key": "/-9223372036854775552/-9223372036854775040/-9223372036852420095/2440/110569623850191715",
         "path": "nonfso 11",
         "inStateSince": 1686156886632,
         "size": 268435456,
@@ -5401,7 +5203,7 @@
         }
       },
       {
-        "key": "/-9223372036854775552/-9223372036854775040/-9223372036852420095/2441/110569623850191713",
+        "key": "/-9223372036854775552/-9223372036854775040/-9223372036852420095/2441/110569623850191716",
         "path": "nonfso 12",
         "inStateSince": 1686156886632,
         "size": 268435456,
@@ -5413,7 +5215,7 @@
         }
       },
       {
-        "key": "/-9223372036854775552/-9223372036854775040/-9223372036852420095/2440/110569623850191713",
+        "key": "/-9223372036854775552/-9223372036854775040/-9223372036852420095/2440/110569623850191717",
         "path": "nonfso 21",
         "inStateSince": 1686156886632,
         "size": 268435456,
@@ -5425,7 +5227,7 @@
         }
       },
       {
-        "key": "/-9223372036854775552/-9223372036854775040/-9223372036852420095/2441/110569623850191713",
+        "key": "/-9223372036854775552/-9223372036854775040/-9223372036852420095/2441/110569623850191718",
         "path": "nonfso 22",
         "inStateSince": 1686156886632,
         "size": 268435456,
@@ -5454,7 +5256,7 @@
         }
       },
       {
-        "key": "/-9223372036854775552/-9223372036854775040/-9223372036852420095/2402/110569623850191713",
+        "key": "/-9223372036854775552/-9223372036854775040/-9223372036852420095/2402/110569623850191714",
         "path": "2",
         "inStateSince": 1686156887186,
         "size": 268435456,
@@ -5464,10 +5266,9 @@
           "requiredNodes": 1,
           "replicationType": "RATIS"
         }
-
       },
       {
-        "key": "/-9223372036854775552/-9223372036854775040/-9223372036852420095/2403/110569623850191713",
+        "key": "/-9223372036854775552/-9223372036854775040/-9223372036852420095/2403/110569623850191715",
         "path": "3",
         "inStateSince": 1686156887186,
         "size": 268435456,
@@ -5477,10 +5278,9 @@
           "requiredNodes": 1,
           "replicationType": "RATIS"
         }
-
       },
       {
-        "key": "/-9223372036854775552/-9223372036854775040/-9223372036852420095/2404/110569623850191713",
+        "key": "/-9223372036854775552/-9223372036854775040/-9223372036852420095/2404/110569623850191716",
         "path": "4",
         "inStateSince": 1686156887186,
         "size": 268435456,
@@ -5492,7 +5292,7 @@
         }
       },
       {
-        "key": "/-9223372036854775552/-9223372036854775040/-9223372036852420095/2405/110569623850191713",
+        "key": "/-9223372036854775552/-9223372036854775040/-9223372036852420095/2405/110569623850191717",
         "path": "5",
         "inStateSince": 1686156887186,
         "size": 268435456,
@@ -5502,10 +5302,9 @@
           "requiredNodes": 1,
           "replicationType": "RATIS"
         }
-
       },
       {
-        "key": "/-9223372036854775552/-9223372036854775040/-9223372036852420095/2406/110569623850191713",
+        "key": "/-9223372036854775552/-9223372036854775040/-9223372036852420095/2406/110569623850191718",
         "path": "6",
         "inStateSince": 1686156887186,
         "size": 268435456,
@@ -5515,10 +5314,9 @@
           "requiredNodes": 1,
           "replicationType": "RATIS"
         }
-
       },
       {
-        "key": "/-9223372036854775552/-9223372036854775040/-9223372036852420095/2407/110569623850191713",
+        "key": "/-9223372036854775552/-9223372036854775040/-9223372036852420095/2407/110569623850191719",
         "path": "7",
         "inStateSince": 1686156887186,
         "size": 268435456,
@@ -5528,10 +5326,9 @@
           "requiredNodes": 1,
           "replicationType": "RATIS"
         }
-
       },
       {
-        "key": "/-9223372036854775552/-9223372036854775040/-9223372036852420095/2408/110569623850191713",
+        "key": "/-9223372036854775552/-9223372036854775040/-9223372036852420095/2408/110569623850191720",
         "path": "8",
         "inStateSince": 1686156887186,
         "size": 268435456,
@@ -5541,10 +5338,9 @@
           "requiredNodes": 1,
           "replicationType": "RATIS"
         }
-
       },
       {
-        "key": "/-9223372036854775552/-9223372036854775040/-9223372036852420095/2409/110569623850191713",
+        "key": "/-9223372036854775552/-9223372036854775040/-9223372036852420095/2409/110569623850191721",
         "path": "9",
         "inStateSince": 1686156887186,
         "size": 268435456,
@@ -5554,7 +5350,6 @@
           "requiredNodes": 1,
           "replicationType": "RATIS"
         }
-
       },
       {
         "key": "fso 10",
@@ -5569,7 +5364,7 @@
         }
       },
       {
-        "key": "/-9223372036854775552/-9223372036854775040/-9223372036852420095/2411/110569623850191713",
+        "key": "/-9223372036854775552/-9223372036854775040/-9223372036852420095/2411/110569623850191722",
         "path": "11",
         "inStateSince": 1686156886632,
         "size": 268435456,
@@ -5677,7 +5472,7 @@
         }
       },
       {
-        "key": "/-9223372036854775552/-9223372036854775040/-9223372036852420095/2411/110569623850191713",
+        "key": "/-9223372036854775552/-9223372036854775040/-9223372036852420095/2411/110569623850191723",
         "path": "21",
         "inStateSince": 1686156886632,
         "size": 268435456,
@@ -5799,7 +5594,7 @@
     ],
     "status": "OK"
   },
-  "keydeletePending":{
+  "keydeletePending": {
     "keysSummary": {
       "totalUnreplicatedDataSize": 29291,
       "totalReplicatedDataSize": 87873,
@@ -5811,9 +5606,9 @@
       {
         "omKeyInfoList": [
           {
-            "objectID": -9223372036844470271,
+            "objectID": -9223372036844470000,
             "updateID": 40429,
-            "parentObjectID": -9223372036844472575,
+            "parentObjectID": -9223372036844472000,
             "volumeName": "volume",
             "bucketName": "bucket1",
             "keyName": "List1key1",
@@ -5836,9 +5631,9 @@
             "updateIDset": true
           },
           {
-            "objectID": -9223372036844470271,
+            "objectID": -9223372036844470000,
             "updateID": 40429,
-            "parentObjectID": -9223372036844472575,
+            "parentObjectID": -9223372036844472000,
             "volumeName": "volume",
             "bucketName": "bucket1",
             "keyName": "List1key1",
@@ -5861,9 +5656,9 @@
             "updateIDset": true
           },
           {
-            "objectID": -9223372036844470271,
+            "objectID": -9223372036844470000,
             "updateID": 40429,
-            "parentObjectID": -9223372036844472575,
+            "parentObjectID": -9223372036844472000,
             "volumeName": "volume",
             "bucketName": "bucket1",
             "keyName": "List1key1",
@@ -5890,10 +5685,9 @@
       {
         "omKeyInfoList": [
           {
-
-            "objectID": -9223372036844470015,
+            "objectID": -9223372036844470000,
             "updateID": 40407,
-            "parentObjectID": -9223372036844472575,
+            "parentObjectID": -9223372036844472000,
             "volumeName": "volume",
             "bucketName": "bucket1",
             "keyName": "List2Key1",
@@ -5920,9 +5714,9 @@
       {
         "omKeyInfoList": [
           {
-            "objectID": -9223372036844432639,
+            "objectID": -9223372036844432000,
             "updateID": 40601,
-            "parentObjectID": -9223372036844472575,
+            "parentObjectID": -9223372036844472000,
             "volumeName": "volume",
             "bucketName": "bucket1",
             "keyName": "List3Key1",
@@ -5942,9 +5736,9 @@
             "replicatedSize": 30000000
           },
           {
-            "objectID": -9223372036844432639,
+            "objectID": -9223372036844432000,
             "updateID": 40601,
-            "parentObjectID": -9223372036844472575,
+            "parentObjectID": -9223372036844472000,
             "volumeName": "volume",
             "bucketName": "bucket1",
             "keyName": "List3Key1",
@@ -5968,9 +5762,9 @@
       {
         "omKeyInfoList": [
           {
-            "objectID": -9223372036843970815,
+            "objectID": -9223372036843971000,
             "updateID": 42403,
-            "parentObjectID": -9223372036844472575,
+            "parentObjectID": -9223372036844472000,
             "volumeName": "volume",
             "bucketName": "bucket1",
             "keyName": "List4Key1",
@@ -5992,9 +5786,9 @@
       {
         "omKeyInfoList": [
           {
-            "objectID": -9223372036843964159,
+            "objectID": -9223372036843964000,
             "updateID": 42443,
-            "parentObjectID": -9223372036844472575,
+            "parentObjectID": -9223372036844472000,
             "volumeName": "volume",
             "bucketName": "bucket1",
             "keyName": "List5Key1",
@@ -6016,9 +5810,9 @@
       {
         "omKeyInfoList": [
           {
-            "objectID": -9223372036843961087,
+            "objectID": -9223372036843961000,
             "updateID": 42450,
-            "parentObjectID": -9223372036844472575,
+            "parentObjectID": -9223372036844472000,
             "volumeName": "volume",
             "bucketName": "bucket1",
             "keyName": "List6Key1",
@@ -6045,9 +5839,9 @@
       {
         "omKeyInfoList": [
           {
-            "objectID": -9223372036843959807,
+            "objectID": -9223372036843959000,
             "updateID": 42449,
-            "parentObjectID": -9223372036844472575,
+            "parentObjectID": -9223372036844472000,
             "volumeName": "volume",
             "bucketName": "bucket1",
             "keyName": "List7Key1",
@@ -6074,9 +5868,9 @@
       {
         "omKeyInfoList": [
           {
-            "objectID": -9223372036843953919,
+            "objectID": -9223372036843954000,
             "updateID": 42467,
-            "parentObjectID": -9223372036844472575,
+            "parentObjectID": -9223372036844472000,
             "volumeName": "volume",
             "bucketName": "bucket1",
             "keyName": "List8Key1",
@@ -6103,9 +5897,9 @@
       {
         "omKeyInfoList": [
           {
-            "objectID": -9223372036843951359,
+            "objectID": -9223372036843951000,
             "updateID": 42483,
-            "parentObjectID": -9223372036844472575,
+            "parentObjectID": -9223372036844472000,
             "volumeName": "volume",
             "bucketName": "bucket1",
             "keyName": "List9Key1",
@@ -6132,9 +5926,9 @@
       {
         "omKeyInfoList": [
           {
-            "objectID": -9223372036843950335,
+            "objectID": -9223372036843950000,
             "updateID": 42478,
-            "parentObjectID": -9223372036844472575,
+            "parentObjectID": -9223372036844472000,
             "volumeName": "volume",
             "bucketName": "bucket1",
             "keyName": "List10Key1",

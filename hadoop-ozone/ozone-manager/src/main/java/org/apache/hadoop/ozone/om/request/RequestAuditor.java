@@ -82,6 +82,10 @@ public interface RequestAuditor {
         auditMap.put(OzoneConsts.REPLICATION_CONFIG,
             ECReplicationConfig.toString(keyArgs.getEcReplicationConfig()));
       }
+      if (keyArgs.hasExpectedDataGeneration()) {
+        auditMap.put(OzoneConsts.REWRITE_GENERATION,
+            String.valueOf(keyArgs.getExpectedDataGeneration()));
+      }
       for (HddsProtos.KeyValue item : keyArgs.getMetadataList()) {
         if (ETAG.equals(item.getKey())) {
           auditMap.put(ETAG, item.getValue());
