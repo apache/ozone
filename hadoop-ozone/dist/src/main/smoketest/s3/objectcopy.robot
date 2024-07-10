@@ -112,6 +112,6 @@ Copy Object using an invalid copy directive
 
 Copy Object with user defined metadata size larger than 2 KB
                                 Execute                    echo "Randomtext" > /tmp/testfile2
-    ${custom_metadata_value} =  Execute                    printf 'v%.0s' {1..3000}
+    ${custom_metadata_value} =  Generate Random String    3000
     ${result} =                 Execute AWSS3ApiCli and checkrc       copy-object --bucket ${DESTBUCKET} --key ${PREFIX}/copyobject/key=value/f1 --copy-source ${BUCKET}/${PREFIX}/copyobject/key=value/f1 --metadata="custom-key1=${custom_metadata_value}" --metadata-directive REPLACE       255
                                 Should contain                        ${result}   MetadataTooLarge

@@ -689,8 +689,13 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
     KeyArgs.Builder keyArgs = KeyArgs.newBuilder()
         .setVolumeName(args.getVolumeName())
         .setBucketName(args.getBucketName())
-        .setKeyName(args.getKeyName())
-        .setOwnerName(args.getOwner());
+        .setKeyName(args.getKeyName());
+
+    // When rewriting a key, the owner does not need to be passed, as it is inherited
+    // from the existing key. Hence it can be null.
+    if (args.getOwner() != null) {
+      keyArgs.setOwnerName(args.getOwner());
+    }
 
     if (args.getAcls() != null) {
       keyArgs.addAllAcls(args.getAcls().stream().distinct().map(a ->
@@ -732,6 +737,10 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
     keyArgs.setIsMultipartKey(args.getIsMultipartKey());
 
     keyArgs.setSortDatanodes(args.getSortDatanodes());
+
+    if (args.getExpectedDataGeneration() != null) {
+      keyArgs.setExpectedDataGeneration(args.getExpectedDataGeneration());
+    }
 
     req.setKeyArgs(keyArgs.build());
 

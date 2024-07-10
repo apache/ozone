@@ -25,9 +25,17 @@ import picocli.CommandLine.Option;
 public class ShellReplicationOptions extends ReplicationOptions {
 
   @Option(names = {"-t", "--type", "--replication-type"},
-      description = "Replication type. Supported types are: RATIS, EC")
+      description = TYPE_DESCRIPTION)
   @Override
   public void setType(String type) {
     super.setType(type);
   }
+
+  @Option(names = {"--replication", "-r"},
+      description = REPLICATION_DESCRIPTION)
+  @Override
+  public void setReplication(String replication) {
+    super.setReplication(replication);
+  }
+
 }
