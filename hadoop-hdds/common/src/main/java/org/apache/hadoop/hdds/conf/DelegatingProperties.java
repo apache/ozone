@@ -20,7 +20,6 @@ package org.apache.hadoop.hdds.conf;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.util.StringUtils;
 
-import java.util.Arrays;
 import java.util.Collection;
 import java.util.Enumeration;
 import java.util.HashMap;
@@ -29,7 +28,6 @@ import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
 
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ADMINISTRATORS;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SECURITY_CRYPTO_COMPLIANCE_MODE_UNRESTRICTED;
 
 /**
