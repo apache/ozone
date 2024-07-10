@@ -25,6 +25,7 @@ import com.google.common.cache.RemovalListener;
 
 import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.hdds.client.BlockID;
+import org.apache.hadoop.hdds.client.ContainerBlockID;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
 import org.apache.hadoop.ozone.common.ChunkBuffer;
@@ -137,34 +138,36 @@ public class FilePerBlockStrategy implements ChunkManager {
     KeyValueContainerData containerData = (KeyValueContainerData) container
         .getContainerData();
 
-    final File chunkFile = getChunkFile(container, blockID);
     long len = info.getLen();
     long offset = info.getOffset();
 
     HddsVolume volume = containerData.getVolume();
 
     FileChannel channel = null;
+    OpenFile openFile = null;
     boolean overwrite;
     try {
-      channel = files.getChannel(chunkFile, doSyncWrite);
+      openFile = files.getOpenFile(container, blockID, doSyncWrite);
+      channel = openFile.getChannel();
       overwrite = validateChunkForOverwrite(channel, info);
     } catch (IOException e) {
       onFailure(volume);
       throw e;
     }
 
+    String openFileName = openFile.getFileName();
     if (LOG.isDebugEnabled()) {
       LOG.debug("Writing chunk {} (overwrite: {}) in stage {} to file {}",
-          info, overwrite, stage, chunkFile);
+          info, overwrite, stage, openFile.getFileName());
     }
 
     // check whether offset matches block file length if its an overwrite
     if (!overwrite) {
-      ChunkUtils.validateChunkSize(channel, info, chunkFile.getName());
+      ChunkUtils.validateChunkSize(channel, info, openFileName);
     }
 
     ChunkUtils
-        .writeData(channel, chunkFile.getName(), data, offset, len, volume);
+        .writeData(channel, openFileName, data, offset, len, volume);
 
     containerData.updateWriteStats(len, overwrite);
   }
@@ -285,19 +288,19 @@ public class FilePerBlockStrategy implements ChunkManager {
 
   private static final class OpenFiles {
 
-    private static final RemovalListener<String, OpenFile> ON_REMOVE =
+    private static final RemovalListener<ContainerBlockID, OpenFile> ON_REMOVE =
         event -> close(event.getKey(), event.getValue());
 
-    private final Cache<String, OpenFile> files = CacheBuilder.newBuilder()
+    private final Cache<ContainerBlockID, OpenFile> files = CacheBuilder.newBuilder()
         .expireAfterAccess(Duration.ofMinutes(10))
         .removalListener(ON_REMOVE)
         .build();
 
-    public FileChannel getChannel(File file, boolean sync)
+    public OpenFile getOpenFile(Container container, BlockID blockID, boolean sync)
         throws StorageContainerException {
       try {
-        return files.get(file.getPath(),
-            () -> open(file, sync)).getChannel();
+        return files.get(blockID.getContainerBlockID(),
+            () -> open(container, blockID, sync));
       } catch (ExecutionException e) {
         if (e.getCause() instanceof IOException) {
           throw new UncheckedIOException((IOException) e.getCause());
@@ -307,10 +310,13 @@ public class FilePerBlockStrategy implements ChunkManager {
       }
     }
 
-    private static OpenFile open(File file, boolean sync) {
+    private static OpenFile open(Container container, BlockID blockID, boolean sync) {
       try {
+        File file = getChunkFile(container, blockID);
         return new OpenFile(file, sync);
       } catch (FileNotFoundException e) {
+        throw new UncheckedIOException(e);
+      } catch (StorageContainerException e) {
         throw new UncheckedIOException(e);
       }
     }
@@ -326,15 +332,15 @@ public class FilePerBlockStrategy implements ChunkManager {
           files.getIfPresent(file.getPath()) != null;
     }
 
-    private static void close(String filename, OpenFile openFile) {
+    private static void close(ContainerBlockID blockID, OpenFile openFile) {
       if (openFile != null) {
         if (LOG.isDebugEnabled()) {
-          LOG.debug("Closing file {}", filename);
+          LOG.debug("Closing file {}", openFile.getFileName());
         }
         openFile.close();
       } else {
         if (LOG.isDebugEnabled()) {
-          LOG.debug("File {} not open", filename);
+          LOG.debug("File for block {} not open", blockID);
         }
       }
     }
@@ -343,6 +349,7 @@ public class FilePerBlockStrategy implements ChunkManager {
   private static final class OpenFile {
 
     private final RandomAccessFile file;
+    private final String fileName;
 
     private OpenFile(File file, boolean sync) throws FileNotFoundException {
       String mode = sync ? "rws" : "rw";
@@ -350,10 +357,14 @@ public class FilePerBlockStrategy implements ChunkManager {
       if (LOG.isDebugEnabled()) {
         LOG.debug("Opened file {}", file);
       }
+      fileName = file.getPath();
     }
 
     public FileChannel getChannel() {
       return file.getChannel();
+    }
+    public String getFileName() {
+      return fileName;
     }
 
     public void close() {
