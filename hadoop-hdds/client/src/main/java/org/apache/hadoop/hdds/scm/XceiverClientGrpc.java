@@ -332,18 +332,10 @@ public class XceiverClientGrpc extends XceiverClientSpi {
     boolean isEcRequest = pipeline.getReplicationConfig()
         .getReplicationType() == HddsProtos.ReplicationType.EC;
     if (request.hasGetBlock() && isEcRequest) {
-      int replicaIdx = pipeline.getReplicaIndex(dn);
-      ContainerProtos.GetBlockRequestProto getBlockRequestProto =
-          request.getGetBlock();
-      DatanodeBlockID datanodeBlockID = getBlockRequestProto.getBlockID();
-      DatanodeBlockID newDatanodeBlockID =
-          DatanodeBlockID.newBuilder(datanodeBlockID)
-              .setReplicaIndex(replicaIdx).build();
-      ContainerProtos.GetBlockRequestProto newGetBlockRequestProto =
-          ContainerProtos.GetBlockRequestProto.newBuilder(getBlockRequestProto)
-              .setBlockID(newDatanodeBlockID).build();
-      request = ContainerCommandRequestProto.newBuilder(request)
-          .setGetBlock(newGetBlockRequestProto).build();
+      ContainerProtos.GetBlockRequestProto gbr = request.getGetBlock();
+      request = request.toBuilder().setGetBlock(gbr.toBuilder().setBlockID(
+          gbr.getBlockID().toBuilder().setReplicaIndex(
+              pipeline.getReplicaIndex(dn)).build()).build()).build();
     }
     return request;
   }
