@@ -18,6 +18,8 @@
 
 package org.apache.hadoop.hdds.scm.container.balancer;
 
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+
 import java.time.OffsetDateTime;
 import java.util.List;
 
@@ -26,13 +28,13 @@ import java.util.List;
  */
 public class ContainerBalancerStatusInfo {
   private final OffsetDateTime startedAt;
-  private final ContainerBalancerConfiguration configuration;
+  private final HddsProtos.ContainerBalancerConfigurationProto  configuration;
   private final List<ContainerBalancerTaskIterationStatusInfo> iterationsStatusInfo;
 
   public ContainerBalancerStatusInfo(
-      OffsetDateTime startedAt,
-      ContainerBalancerConfiguration configuration,
-      List<ContainerBalancerTaskIterationStatusInfo> iterationsStatusInfo) {
+          OffsetDateTime startedAt,
+          HddsProtos.ContainerBalancerConfigurationProto configuration,
+          List<ContainerBalancerTaskIterationStatusInfo> iterationsStatusInfo) {
     this.startedAt = startedAt;
     this.configuration = configuration;
     this.iterationsStatusInfo = iterationsStatusInfo;
@@ -42,7 +44,7 @@ public class ContainerBalancerStatusInfo {
     return startedAt;
   }
 
-  public ContainerBalancerConfiguration getConfiguration() {
+  public HddsProtos.ContainerBalancerConfigurationProto  getConfiguration() {
     return configuration;
   }
 

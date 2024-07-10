@@ -22,6 +22,7 @@ import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.fs.DUFactory;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ContainerBalancerConfigurationProto;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
@@ -182,13 +183,15 @@ public class ContainerBalancer extends StatefulService {
    *
    * @return balancer status info if balancer started
    */
-  public ContainerBalancerStatusInfo getBalancerStatusInfo() {
+  public ContainerBalancerStatusInfo getBalancerStatusInfo() throws IOException {
     if (this.startedAt == null || task == null) {
       return null;
     }
+    HddsProtos.ContainerBalancerConfigurationProto configProto =
+            readConfiguration(HddsProtos.ContainerBalancerConfigurationProto.class);
     return new ContainerBalancerStatusInfo(
             this.startedAt,
-            task.getConfig(),
+            configProto,
             task.getCurrentIterationsStatistic()
     );
   }
@@ -269,6 +272,7 @@ public class ContainerBalancer extends StatefulService {
   public void startBalancer(ContainerBalancerConfiguration configuration)
       throws IllegalContainerBalancerStateException,
       InvalidContainerBalancerConfigurationException, IOException {
+    startedAt = OffsetDateTime.now();
     lock.lock();
     try {
       // validates state, config, and then saves config
