@@ -18,6 +18,7 @@
 package org.apache.hadoop.hdds.conf;
 
 import org.apache.hadoop.ozone.OzoneConfigKeys;
+import org.apache.hadoop.util.StringUtils;
 
 import java.util.Arrays;
 import java.util.Collection;
@@ -28,6 +29,7 @@ import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
 
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ADMINISTRATORS;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SECURITY_CRYPTO_COMPLIANCE_MODE_UNRESTRICTED;
 
 /**
@@ -55,9 +57,9 @@ public class DelegatingProperties extends Properties {
       String whitelistValue = properties.getProperty(whitelistConfig, "");
 
       if (whitelistValue != null) {
-        String[] whitelistOptions = whitelistValue.split(",");
+        Collection<String> whitelistOptions = StringUtils.getTrimmedStringCollection(whitelistValue);
 
-        if (!Arrays.asList(whitelistOptions).contains(value)) {
+        if (!whitelistOptions.contains(value)) {
           throw new ConfigurationException("Not allowed configuration value! Compliance mode is set to " +
               complianceMode + " and " + config + " configuration's value is not allowed. Please check the " +
               whitelistConfig + " configuration.");
