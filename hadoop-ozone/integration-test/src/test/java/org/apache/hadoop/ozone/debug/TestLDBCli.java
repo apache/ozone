@@ -299,7 +299,7 @@ public class TestLDBCli {
     // Prepare scan args
     List<String> completeScanArgs = new ArrayList<>(Arrays.asList(
         "--db", dbStore.getDbLocation().getAbsolutePath(),
-        "schema",
+        "value-schema",
         "--column-family", KEY_TABLE));
 
     int exitCode = cmd.execute(completeScanArgs.toArray(new String[0]));

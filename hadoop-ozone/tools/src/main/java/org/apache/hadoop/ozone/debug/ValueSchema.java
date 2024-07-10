@@ -48,7 +48,7 @@ import java.util.stream.Collectors;
  * Get schema of value for scm.db, om.db or container db file.
  */
 @CommandLine.Command(
-    name = "schema",
+    name = "value-schema",
     description = "Schema of value in metadataTable"
 )
 @MetaInfServices(SubcommandWithParent.class)
@@ -72,6 +72,11 @@ public class ValueSchema implements Callable<Void>, SubcommandWithParent {
       defaultValue = "V3")
   private String dnDBSchemaVersion;
 
+  @CommandLine.Option(names = {"--depth"},
+      description = "The level till which the value-schema should be shown, negative value shows full depth schema",
+      defaultValue = "-1")
+  private int depth;
+
   private static volatile boolean exception;
 
   @Override
@@ -80,7 +85,7 @@ public class ValueSchema implements Callable<Void>, SubcommandWithParent {
     boolean success = true;
 
     String dbPath = parent.getDbPath();
-    Map<String, List<String>> fields = new HashMap<>();
+    Map<String, Object> fields = new HashMap<>();
     success = getValueFields(dbPath, fields);
 
     out().println(JsonUtils.toJsonStringWithDefaultPrettyPrinter(fields));
@@ -94,7 +99,7 @@ public class ValueSchema implements Callable<Void>, SubcommandWithParent {
     return null;
   }
 
-  private boolean getValueFields(String dbPath, Map<String, List<String>> valueSchema) {
+  private boolean getValueFields(String dbPath, Map<String, Object> valueSchema) {
 
     dbPath = removeTrailingSlashIfNeeded(dbPath);
     DBDefinitionFactory.setDnDBSchemaVersion(dnDBSchemaVersion);
@@ -111,39 +116,41 @@ public class ValueSchema implements Callable<Void>, SubcommandWithParent {
     }
 
     Class<?> c = columnFamilyDefinition.getValueType();
-    List<Field> fieldDescriptors = getAllFields(c);
-    if (null == fieldDescriptors || fieldDescriptors.size() == 0) {
-      return false;
-    }
+    valueSchema.put(c.getSimpleName(), getFieldsStructure(c, depth));
 
-    for (Field field : fieldDescriptors) {
-      if (!java.lang.reflect.Modifier.isStatic(field.getModifiers())) {
+    return true;
+  }
+
+  private Object getFieldsStructure(Class<?> clazz, int currentDepth) {
+    if (clazz.isPrimitive() || String.class.equals(clazz)) {
+      return clazz.getSimpleName();
+    } else if (currentDepth == 0) {
+      return "struct";
+    } else {
+      Map<String, Object> finalFields = new HashMap<>();
+      List<Field> clazzFields = getAllFields(clazz);
+      for (Field field : clazzFields) {
         Class<?> fieldClass;
-        if (Collection.class.isAssignableFrom(field.getType())) {
-          fieldClass = (Class<?>) ((ParameterizedType) field.getGenericType()).getActualTypeArguments()[0];
-        } else {
+        try {
+          if (Collection.class.isAssignableFrom(field.getType())) {
+            fieldClass = (Class<?>) ((ParameterizedType) field.getGenericType()).getActualTypeArguments()[0];
+          } else {
+            fieldClass = field.getType();
+          }
+        } catch (ClassCastException ex) {
           fieldClass = field.getType();
         }
-
-        List<String> subfieldNames = new ArrayList<>();
-        if (!fieldClass.isPrimitive() && !fieldClass.equals(String.class)) {
-          List<Field> subfields = getAllFields(fieldClass);
-          for (Field subfield : subfields) {
-            if (!java.lang.reflect.Modifier.isStatic(subfield.getModifiers())) {
-              subfieldNames.add(subfield.getName());
-            }
-          }
-        }
-        valueSchema.put(field.getName(), subfieldNames);
+        finalFields.put(field.getName(), getFieldsStructure(fieldClass, currentDepth - 1));
       }
+      return finalFields;
     }
-    return true;
   }
 
   private List<Field> getAllFields(Class clazz) {
     if (clazz == null) {
       return Collections.emptyList();
     }
+    // get all fields, including inherited ones, of clazz
     List<Field> result = new ArrayList<>(getAllFields(clazz.getSuperclass()));
     List<Field> filteredFields = Arrays.stream(clazz.getDeclaredFields())
         .filter(f -> !Modifier.isStatic(f.getModifiers()))
@@ -151,7 +158,6 @@ public class ValueSchema implements Callable<Void>, SubcommandWithParent {
     result.addAll(filteredFields);
     return result;
   }
-
 
   private static PrintWriter err() {
     return spec.commandLine().getErr();
