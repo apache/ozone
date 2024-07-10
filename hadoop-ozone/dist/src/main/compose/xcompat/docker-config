@@ -35,4 +35,5 @@ OZONE-SITE.XML_ozone.scm.pipeline.owner.container.count=1
 OZONE-SITE.XML_recon.om.snapshot.task.interval.delay=1m
 OZONE-SITE.XML_hdds.scmclient.max.retry.timeout=30s
 OZONE-SITE.XML_ozone.default.bucket.layout=LEGACY
+OZONE-SITE.XML_ozone.http.basedir=/tmp/ozone_http
 no_proxy=om,recon,scm,s3g,kdc,localhost,127.0.0.1
