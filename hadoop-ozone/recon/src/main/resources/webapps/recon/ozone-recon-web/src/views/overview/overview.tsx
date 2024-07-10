@@ -67,13 +67,13 @@ interface IOverviewState {
   omStatus: string;
   openContainers: number;
   deletedContainers: number;
-  openSummarytotalUnrepSize: number,
-  openSummarytotalRepSize: number,
-  openSummarytotalOpenKeys: number,
-  deletePendingSummarytotalUnrepSize: number,
-  deletePendingSummarytotalRepSize: number,
-  deletePendingSummarytotalDeletedKeys: number,
-  decommissionInfoCount: number
+  openSummarytotalUnrepSize: number;
+  openSummarytotalRepSize: number;
+  openSummarytotalOpenKeys: number;
+  deletePendingSummarytotalUnrepSize: number;
+  deletePendingSummarytotalRepSize: number;
+  deletePendingSummarytotalDeletedKeys: number;
+  decommissionInfoCount: number;
   scmServiceId: string;
   omServiceId: string;
 }
