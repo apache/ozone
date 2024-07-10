@@ -35,8 +35,8 @@ File Can Be Put
     Execute    ozone fs -put ${TESTFILE} o3fs://bucket1.vol1/dir-${SUFFIX}/file-${SUFFIX}
 
 FSO Bucket Can Be Created and Used
-    Skip If    '${CLIENT_VERSION}' < '${FSO_VERSION}'    Client does not support FSO
-    Skip If    '${CLUSTER_VERSION}' < '${FSO_VERSION}'   Cluster does not support FSO
+    Pass Execution If    '${CLIENT_VERSION}' < '${FSO_VERSION}'    Client does not support FSO
+    Pass Execution If    '${CLUSTER_VERSION}' < '${FSO_VERSION}'   Cluster does not support FSO
     Execute    ozone sh bucket create --layout FILE_SYSTEM_OPTIMIZED /vol1/fso-bucket-${SUFFIX}
     Execute    ozone fs -mkdir -p ofs://om/vol1/fso-bucket-${SUFFIX}/dir/subdir
     Execute    ozone fs -put ${TESTFILE} ofs://om/vol1/fso-bucket-${SUFFIX}/dir/subdir/file
