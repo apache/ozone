@@ -139,7 +139,6 @@ export class Overview extends React.Component<Record<string, object>, IOverviewS
     cancelOverviewSignal = controller;
 
     requests.then(axios.spread((clusterStateResponse, taskstatusResponse, openResponse, deletePendingResponse, decommissionResponse) => {
-      
       const clusterState: IClusterStateResponse = clusterStateResponse.data;
       const taskStatus = taskstatusResponse.data;
       const missingContainersCount = clusterState.missingContainers;
@@ -226,7 +225,7 @@ export class Overview extends React.Component<Record<string, object>, IOverviewS
       deletePendingSummarytotalUnrepSize, deletePendingSummarytotalRepSize, deletePendingSummarytotalDeletedKeys,
       keys, missingContainersCount, lastRefreshed, lastUpdatedOMDBDelta, lastUpdatedOMDBFull,
       omStatus, openContainers, deletedContainers, scmServiceId, omServiceId, decommissionInfoCount } = this.state;
-      
+
     const datanodesElement = (
       <span>
         <CheckCircleFilled className='icon-success icon-small' /> {datanodes} <span className='ant-card-meta-description meta'>HEALTHY</span>
