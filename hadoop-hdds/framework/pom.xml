@@ -105,6 +105,10 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
       <artifactId>jetty-webapp</artifactId>
     </dependency>
     <dependency>
+      <groupId>org.glassfish.jersey.containers</groupId>
+      <artifactId>jersey-container-servlet-core</artifactId>
+    </dependency>
+    <dependency>
       <artifactId>ratis-server</artifactId>
       <groupId>org.apache.ratis</groupId>
       <exclusions>
