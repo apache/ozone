@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.om.request.key;
 
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.utils.db.Table;
+import org.apache.hadoop.ozone.ClientVersion;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.ratis.server.protocol.TermIndex;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
@@ -357,7 +358,8 @@ public class OMKeysDeleteRequest extends OMKeyRequest {
   )
   public static OMRequest blockDeleteKeysWithBucketLayoutFromOldClient(
       OMRequest req, ValidationContext ctx) throws IOException {
-    if (req.getDeleteKeysRequest().hasDeleteKeys()) {
+    if (ClientVersion.fromProtoValue(req.getVersion())
+        .compareTo(ClientVersion.BUCKET_LAYOUT_SUPPORT) < 0 && req.getDeleteKeysRequest().hasDeleteKeys()) {
       DeleteKeyArgs keyArgs = req.getDeleteKeysRequest().getDeleteKeys();
 
       if (keyArgs.hasVolumeName() && keyArgs.hasBucketName()) {
