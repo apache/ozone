@@ -1713,10 +1713,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
       metrics.unRegister();
     }
 
-    if (this.nettyMetrics != null) {
-      this.nettyMetrics.unregister();
-    }
-
+    nettyMetrics.unregister();
     if (perfMetrics != null) {
       perfMetrics.unRegister();
     }
