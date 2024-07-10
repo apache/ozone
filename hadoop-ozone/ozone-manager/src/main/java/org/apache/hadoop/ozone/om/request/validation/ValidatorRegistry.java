@@ -18,7 +18,7 @@ package org.apache.hadoop.ozone.om.request.validation;
 
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
 import org.reflections.Reflections;
-import org.reflections.scanners.MethodAnnotationsScanner;
+import org.reflections.scanners.Scanners;
 import org.reflections.util.ClasspathHelper;
 import org.reflections.util.ConfigurationBuilder;
 
@@ -71,7 +71,7 @@ public class ValidatorRegistry {
   ValidatorRegistry(Collection<URL> searchUrls) {
     Reflections reflections = new Reflections(new ConfigurationBuilder()
         .setUrls(searchUrls)
-        .setScanners(new MethodAnnotationsScanner())
+        .setScanners(Scanners.MethodsAnnotated)
         .setParallel(true)
     );
 
