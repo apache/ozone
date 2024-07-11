@@ -62,8 +62,7 @@ public class SnapshotDiffHandler extends Handler {
   private String token;
 
   @CommandLine.Option(names = {"-p", "--page-size"},
-      description = "number of diff entries to be returned in the response" +
-          " (optional)",
+      description = "number of diff entries to be returned in the response",
       defaultValue = "1000",
       showDefaultValue = CommandLine.Help.Visibility.ALWAYS
   )
