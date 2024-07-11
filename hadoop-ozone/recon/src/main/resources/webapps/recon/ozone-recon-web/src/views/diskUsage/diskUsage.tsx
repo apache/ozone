@@ -17,14 +17,30 @@
  */
 
 import React from 'react';
-import Plot from 'react-plotly.js';
-import {Row, Col, Icon, Button, Input, Menu, Dropdown, Tooltip} from 'antd';
-import {DetailPanel} from 'components/rightDrawer/rightDrawer';
-import * as Plotly from 'plotly.js';
-import {byteToSize, showDataFetchError} from 'utils/common';
-import './diskUsage.less';
 import moment from 'moment';
-import { AxiosGetHelper, cancelRequests } from 'utils/axiosRequestHelper';
+import {
+  Row,
+  Col,
+  Button,
+  Input,
+  Menu,
+  Dropdown,
+  Tooltip
+} from 'antd';
+import { MenuProps } from 'antd/es/menu';
+import {
+  InfoCircleOutlined,
+  LeftOutlined,
+  LoadingOutlined,
+  RedoOutlined
+} from '@ant-design/icons';
+
+import { DetailPanel } from '@/components/rightDrawer/rightDrawer';
+import { EChart } from '@/components/eChart/eChart';
+import { byteToSize, showDataFetchError } from '@/utils/common';
+import { AxiosGetHelper, cancelRequests } from '@/utils/axiosRequestHelper';
+
+import './diskUsage.less';
 
 const DEFAULT_DISPLAY_LIMIT = 10;
 const OTHER_PATH_NAME = 'Other Objects';
@@ -46,10 +62,16 @@ interface IDUResponse {
   sizeDirectKey: number;
 }
 
+interface IPlotData {
+  value: number;
+  name: string;
+  size: string;
+}
+
 interface IDUState {
   isLoading: boolean;
   duResponse: IDUResponse[];
-  plotData: Plotly.Data[];
+  plotData: IPlotData[];
   showPanel: boolean;
   panelKeys: string[];
   panelValues: string[];
@@ -80,7 +102,7 @@ export class DiskUsage extends React.Component<Record<string, object>, IDUState>
   }
 
   handleChange = e => {
-    this.setState({inputPath: e.target.value, showPanel: false});
+    this.setState({ inputPath: e.target.value, showPanel: false });
   };
 
   handleSubmit = _e => {
@@ -136,7 +158,7 @@ export class DiskUsage extends React.Component<Record<string, object>, IDUState>
       const duResponse: IDUResponse[] = response.data;
       const status = duResponse.status;
       if (status === 'PATH_NOT_FOUND') {
-        this.setState({isLoading: false});
+        this.setState({ isLoading: false });
         showDataFetchError(`Invalid Path: ${path}`);
         return;
       }
@@ -156,13 +178,13 @@ export class DiskUsage extends React.Component<Record<string, object>, IDUState>
         }
 
         const otherSize = dataSize - topSize;
-        const other: IDUSubpath = {path: OTHER_PATH_NAME, size: otherSize};
+        const other: IDUSubpath = { path: OTHER_PATH_NAME, size: otherSize };
         subpaths.push(other);
       }
 
       let pathLabels, values, percentage, sizeStr, pieces, subpathName;
 
-      if (duResponse.subPathCount === 0 || subpaths === 0) {
+      if (duResponse.subPathCount === 0 || subpaths.length === 0) {
         pieces = duResponse && duResponse.path != null && duResponse.path.split('/');
         subpathName = pieces[pieces.length - 1];
         pathLabels = [subpathName];
@@ -192,7 +214,7 @@ export class DiskUsage extends React.Component<Record<string, object>, IDUState>
           return byteToSize(subpath.size, 1);
         });
       }
-    
+
       this.setState({
         // Normalized path
         isLoading: false,
@@ -201,16 +223,13 @@ export class DiskUsage extends React.Component<Record<string, object>, IDUState>
         returnPath: duResponse.path,
         displayLimit: limit,
         duResponse,
-        plotData: [{
-          type: 'pie',
-          hole: 0.2,
-          values: values,
-          customdata: percentage,
-          labels: pathLabels,
-          text: sizeStr,
-          textinfo: 'label',
-          hovertemplate: 'Percentage: %{customdata}%<br>Total Data Size: %{text}<extra></extra>'
-        }]
+        plotData: percentage.map((key, idx) => {
+          return {
+            value: parseFloat(key as string),
+            name: pathLabels[idx],
+            size: sizeStr[idx]
+          }
+        })
       });
     }).catch(error => {
       this.setState({
@@ -238,7 +257,7 @@ export class DiskUsage extends React.Component<Record<string, object>, IDUState>
   }
 
   clickPieSection(e, curPath: string): void {
-    const subPath: string = e.points[0].label;
+    const subPath: string = e.name;
     if (subPath === OTHER_PATH_NAME) {
       return;
     }
@@ -261,17 +280,6 @@ export class DiskUsage extends React.Component<Record<string, object>, IDUState>
     }
 
     this.updatePieChart(path, this.state.displayLimit);
-  }
-
-  updateDisplayLimit(e): void {
-    let res = -1;
-    if (e.key === 'all') {
-      res = Number.MAX_VALUE;
-    } else {
-      res = Number.parseInt(e.key, 10);
-    }
-
-    this.updatePieChart(this.state.inputPath, res);
   }
 
   // Show the right side panel that display metadata details of path
@@ -412,7 +420,7 @@ export class DiskUsage extends React.Component<Record<string, object>, IDUState>
         keys.push('Replication Required Nodes');
         values.push(summaryResponse.objectInfo.replicationConfig.requiredNodes);
       }
-      
+
       if (summaryResponse.objectInfo.sourceBucket && summaryResponse.objectInfo.sourceBucket !== -1) {
         keys.push('Source Bucket');
         values.push(summaryResponse.objectInfo.sourceBucket);
@@ -502,9 +510,21 @@ export class DiskUsage extends React.Component<Record<string, object>, IDUState>
   }
 
   render() {
-    const {plotData, duResponse, returnPath, panelKeys, panelValues, showPanel, isLoading, inputPath, displayLimit} = this.state;
+    const { plotData, duResponse, returnPath, panelKeys, panelValues, showPanel, isLoading, inputPath, displayLimit } = this.state;
+
+    const updateDisplayLimit: MenuProps['onClick'] = (e): void => {
+      let res = -1;
+      if (e.key === 'all') {
+        res = Number.MAX_VALUE;
+      } else {
+        res = Number.parseInt(e.key, 10);
+      }
+
+      this.updatePieChart(this.state.inputPath, res);
+    }
+
     const menu = (
-      <Menu onClick={e => this.updateDisplayLimit(e)}>
+      <Menu onClick={updateDisplayLimit}>
         <Menu.Item key='5'>
           5
         </Menu.Item>
@@ -522,76 +542,115 @@ export class DiskUsage extends React.Component<Record<string, object>, IDUState>
         </Menu.Item>
       </Menu>
     );
+
+    const eChartsOptions = {
+      title: {
+        text: `Disk Usage for ${returnPath} (Total Size: ${byteToSize(duResponse.size, 1)})`,
+        left: 'center'
+      },
+      tooltip: {
+        trigger: 'item',
+        formatter: ({ dataIndex, percent }) => {
+          return `Total Data Size: ${plotData[dataIndex]['size']}<br>Percentage: ${percent} %`
+        }
+      },
+      legend: {
+        top: '10%',
+        orient: 'vertical',
+        left: 'left'
+      },
+      series: [
+        {
+          type: 'pie',
+          radius: '50%',
+          data: plotData.map((value) => {
+            return {
+              value: value.value,
+              name: value.name
+            }
+          }),
+          emphasis: {
+            itemStyle: {
+              shadowBlur: 10,
+              shadowOffsetX: 0,
+              shadowColor: 'rgba(0, 0, 0, 0.5)'
+            }
+          }
+        }
+      ]
+    };
+
     return (
       <div className='du-container'>
         <div className='page-header'>
           Disk Usage&nbsp;&nbsp;
           <Tooltip placement="rightTop" title="Shows Disk Usage information only for FSO buckets">
-            <Icon type='info-circle' />
+            <InfoCircleOutlined />
           </Tooltip>
         </div>
         <div className='content-div'>
-          {isLoading ? <span><Icon type='loading'/> Loading...</span> : (
-            <div>
-              <Row>
-                <Col>
-                  <div className='go-back-button'>
-                    <Button type='primary' onClick={e => this.goBack(e, returnPath)}><Icon type='left'/></Button>
+          {isLoading
+            ? <span><LoadingOutlined /> Loading...</span>
+            : (
+              <div>
+                <Row
+                  style={{
+                    alignItems: 'end',
+                    margin: '0px 10px',
+                    justifyContent: 'space-between'
+                  }}>
+                  <div className='path-nav-container'>
+                    <div className='go-back-button'>
+                      <Button type='primary' onClick={e => this.goBack(e, returnPath)}><LeftOutlined /></Button>
+                    </div>
+                    <div className='input-bar'>
+                      <h3>Path</h3>
+                      <form className='input' id='input-form' onSubmit={this.handleSubmit}>
+                        <Input placeholder='/' value={inputPath} onChange={this.handleChange} />
+                      </form>
+                    </div>
+                    <div className='go-back-button'>
+                      <Button type='primary' onClick={e => this.refreshCurPath(e, returnPath)}><RedoOutlined /></Button>
+                    </div>
                   </div>
-                  <div className='input-bar'>
-                    <h3>Path</h3>
-                    <form className='input' id='input-form' onSubmit={this.handleSubmit}>
-                      <Input placeholder='/' value={inputPath} onChange={this.handleChange}/>
-                    </form>
+                  <div className='du-button-container'>
+                    <div className='dropdown-button'>
+                      <Dropdown overlay={menu} placement='bottomCenter'>
+                        <Button>Display Limit: {(displayLimit === Number.MAX_VALUE) ? 'All' : displayLimit}</Button>
+                      </Dropdown>
+                    </div>
+                    <div className='metadata-button'>
+                      <Button type='primary' onClick={e => this.showMetadataDetails(e, returnPath)}>
+                        <b>
+                          Show Metadata for Current Path
+                        </b>
+                      </Button>
+                    </div>
                   </div>
-                  <div className='go-back-button'>
-                    <Button type='primary' onClick={e => this.refreshCurPath(e, returnPath)}><Icon type='redo'/></Button>
-                  </div>
-                  <div className='dropdown-button'>
-                    <Dropdown overlay={menu} placement='bottomCenter'>
-                      <Button>Display Limit: {(displayLimit === Number.MAX_VALUE) ? 'All' : displayLimit}</Button>
-                    </Dropdown>
-                  </div>
-                  <div className='metadata-button'>
-                    <Button type='primary' onClick={e => this.showMetadataDetails(e, returnPath)}>
-                      <b>
-                        Show Metadata for Current Path
-                      </b>
-                    </Button>
-                  </div>
-                </Col>
-              </Row>
-              <Row>
-                {(duResponse.size > 0) ?
-                  <div style={{height: 1000}}>
-                    <Plot
-                      data={plotData}
-                      layout={
-                        {
-                          width: 1200,
-                          height: 750,
-                          font: {
-                            family: 'Roboto, sans-serif',
-                            size: 15
-                          },
-                          showlegend: true,
-                          legend: {
-                            "x": 1.2,
-                            "xanchor": "right"
-                          },
-                          title: 'Disk Usage for ' + returnPath + ' (Total Size: ' + byteToSize(duResponse.size, 1) + ')'
-                        }
-                      }
-                      onClick={(duResponse.subPathCount === 0) ? undefined : e => this.clickPieSection(e, returnPath)}/>
-                  </div>
+                </Row>
+                <Row>
+                  {(duResponse.size > 0) ?
+                    <div style={{
+                      height: 700,
+                      margin: 'auto',
+                      marginTop: '5%'
+                    }}>
+                      <EChart
+                        option={eChartsOptions}
+                        onClick={
+                          (duResponse.subPathCount === 0)
+                            ? undefined
+                            : e => this.clickPieSection(e, returnPath)
+                        } />
+                    </div>
                     :
-                  <div style={{height: 800}} className='metadatainformation'><br/>
-                    This object is empty. Add files to it to see a visualization on disk usage.{' '}<br/>
+                    <div style={{ height: 800 }} className='metadatainformation'><br />
+                      This object is empty. Add files to it to see a visualization on disk usage.{' '}<br />
                       You can also view its metadata details by clicking the top right button.
-                  </div>}
-                <DetailPanel path={returnPath} keys={panelKeys} values={panelValues} visible={showPanel}/>
-              </Row>
-            </div>)}
+                    </div>}
+                  <DetailPanel path={returnPath} keys={panelKeys} values={panelValues} visible={showPanel} />
+                </Row>
+              </div>)}
         </div>
       </div>
     );

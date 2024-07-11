@@ -17,26 +17,30 @@
  */
 
 import React from 'react';
-import {Table, Icon, Tooltip} from 'antd';
-import {PaginationConfig} from 'antd/lib/pagination';
 import moment from 'moment';
-import {ReplicationIcon} from 'utils/themeIcons';
-import StorageBar from 'components/storageBar/storageBar';
+import { ActionMeta, ValueType } from 'react-select';
+import { Table, Tooltip } from 'antd';
+import { TablePaginationConfig } from 'antd/es/table';
+
+
 import {
   DatanodeState,
   DatanodeStateList,
   DatanodeOpState,
   DatanodeOpStateList,
   IStorageReport
-} from 'types/datanode.types';
+} from '@/types/datanode.types';
+import StorageBar from '@/components/storageBar/storageBar';
+import AutoReloadPanel from '@/components/autoReloadPanel/autoReloadPanel';
+import { MultiSelect, IOption } from '@/components/multiSelect/multiSelect';
+import { showDataFetchError } from '@/utils/common';
+import { ColumnSearch } from '@/utils/columnSearch';
+import { AutoReloadHelper } from '@/utils/autoReloadHelper';
+import { AxiosGetHelper } from '@/utils/axiosRequestHelper';
+import { ReplicationIcon } from '@/utils/themeIcons';
+
 import './datanodes.less';
-import {AutoReloadHelper} from 'utils/autoReloadHelper';
-import AutoReloadPanel from 'components/autoReloadPanel/autoReloadPanel';
-import {MultiSelect, IOption} from 'components/multiSelect/multiSelect';
-import {ActionMeta, ValueType} from 'react-select';
-import {showDataFetchError} from 'utils/common';
-import {ColumnSearch} from 'utils/columnSearch';
-import { AxiosGetHelper } from 'utils/axiosRequestHelper';
+import { CheckCircleFilled, CheckCircleOutlined, CloseCircleFilled, HourglassFilled, HourglassOutlined, InfoCircleOutlined, WarningOutlined } from '@ant-design/icons';
 
 interface IDatanodeResponse {
   hostname: string;
@@ -99,9 +103,9 @@ interface IDatanodesState {
 
 const renderDatanodeState = (state: DatanodeState) => {
   const stateIconMap = {
-    HEALTHY: <Icon type='check-circle' theme='filled' twoToneColor='#1da57a' className='icon-success'/>,
-    STALE: <Icon type='hourglass' theme='filled' className='icon-warning'/>,
-    DEAD: <Icon type='close-circle' theme='filled' className='icon-failure'/>
+    HEALTHY: <CheckCircleFilled twoToneColor='#1da57a' className='icon-success' />,
+    STALE: <HourglassFilled className='icon-warning' />,
+    DEAD: <CloseCircleFilled className='icon-failure' />
   };
   const icon = state in stateIconMap ? stateIconMap[state] : '';
   return <span>{icon} {state}</span>;
@@ -109,11 +113,11 @@ const renderDatanodeState = (state: DatanodeState) => {
 
 const renderDatanodeOpState = (opState: DatanodeOpState) => {
   const opStateIconMap = {
-    IN_SERVICE: <Icon type='check-circle' theme='outlined' twoToneColor='#1da57a' className='icon-success'/>,
-    DECOMMISSIONING: <Icon type='hourglass' theme='outlined' className='icon-warning'/>,
-    DECOMMISSIONED: <Icon type='warning' theme='outlined' className='icon-warning'/>,
-    ENTERING_MAINTENANCE: <Icon type='hourglass' theme='outlined' className='icon-warning'/>,
-    IN_MAINTENANCE: <Icon type='warning' theme='outlined' className='icon-warning'/>
+    IN_SERVICE: <CheckCircleOutlined twoToneColor='#1da57a' className='icon-success' />,
+    DECOMMISSIONING: <HourglassOutlined className='icon-warning' />,
+    DECOMMISSIONED: <WarningOutlined className='icon-warning' />,
+    ENTERING_MAINTENANCE: <HourglassOutlined className='icon-warning' />,
+    IN_MAINTENANCE: <WarningOutlined className='icon-warning' />
   };
   const icon = opState in opStateIconMap ? opStateIconMap[opState] : '';
   return <span>{icon} {opState}</span>;
@@ -126,7 +130,7 @@ const COLUMNS = [
     key: 'hostname',
     isVisible: true,
     isSearchable: true,
-    sorter: (a: IDatanode, b: IDatanode) => a.hostname.localeCompare(b.hostname, undefined, {numeric: true}),
+    sorter: (a: IDatanode, b: IDatanode) => a.hostname.localeCompare(b.hostname, undefined, { numeric: true }),
     defaultSortOrder: 'ascend' as const,
     fixed: 'left'
   },
@@ -137,7 +141,7 @@ const COLUMNS = [
     isVisible: true,
     isSearchable: true,
     filterMultiple: true,
-    filters: DatanodeStateList && DatanodeStateList.map(state => ({text: state, value: state})),
+    filters: DatanodeStateList && DatanodeStateList.map(state => ({ text: state, value: state })),
     onFilter: (value: DatanodeState, record: IDatanode) => record.state === value,
     render: (text: DatanodeState) => renderDatanodeState(text),
     sorter: (a: IDatanode, b: IDatanode) => a.state.localeCompare(b.state)
@@ -149,12 +153,12 @@ const COLUMNS = [
     isVisible: true,
     isSearchable: true,
     filterMultiple: true,
-    filters: DatanodeOpStateList && DatanodeOpStateList.map(state => ({text: state, value: state})),
+    filters: DatanodeOpStateList && DatanodeOpStateList.map(state => ({ text: state, value: state })),
     onFilter: (value: DatanodeOpState, record: IDatanode) => record.opState === value,
     render: (text: DatanodeOpState) => renderDatanodeOpState(text),
     sorter: (a: IDatanode, b: IDatanode) => a.opState.localeCompare(b.opState)
   },
- 
+
   {
     title: 'Uuid',
     dataIndex: 'uuid',
@@ -173,8 +177,9 @@ const COLUMNS = [
     render: (text: string, record: IDatanode) => (
       <StorageBar
         total={record.storageTotal} used={record.storageUsed}
-        remaining={record.storageRemaining}/>
-    )},
+        remaining={record.storageRemaining} />
+    )
+  },
   {
     title: 'Last Heartbeat',
     dataIndex: 'lastHeartbeat',
@@ -200,7 +205,7 @@ const COLUMNS = [
                   replicationFactor={pipeline.replicationFactor}
                   replicationType={pipeline.replicationType}
                   leaderNode={pipeline.leaderNode}
-                  isLeader={pipeline.leaderNode === record.hostname}/>
+                  isLeader={pipeline.leaderNode === record.hostname} />
                 {pipeline.pipelineID}
               </div>
             ))
@@ -211,12 +216,12 @@ const COLUMNS = [
   },
   {
     title:
-  <span>
-    Leader Count&nbsp;
-    <Tooltip title='The number of Ratis Pipelines in which the given datanode is elected as a leader.'>
-      <Icon type='info-circle'/>
-    </Tooltip>
-  </span>,
+      <span>
+        Leader Count&nbsp;
+        <Tooltip title='The number of Ratis Pipelines in which the given datanode is elected as a leader.'>
+          <InfoCircleOutlined />
+        </Tooltip>
+      </span>,
     dataIndex: 'leaderCount',
     key: 'leaderCount',
     isVisible: true,
@@ -233,12 +238,12 @@ const COLUMNS = [
   },
   {
     title:
-    <span>
-    Open Containers&nbsp;
-    <Tooltip title='The number of open containers per pipeline.'>
-      <Icon type='info-circle'/>
-    </Tooltip>
-  </span>,
+      <span>
+        Open Containers&nbsp;
+        <Tooltip title='The number of open containers per pipeline.'>
+          <InfoCircleOutlined/>
+        </Tooltip>
+      </span>,
     dataIndex: 'openContainers',
     key: 'openContainers',
     isVisible: true,
@@ -341,7 +346,7 @@ export class Datanodes extends React.Component<Record<string, object>, IDatanode
       loading: true,
       selectedColumns: this._getSelectedColumns(prevState.selectedColumns)
     }));
-    
+
     const { request, controller } = AxiosGetHelper('/api/v1/datanodes', cancelSignal);
     cancelSignal = controller;
     request.then(response => {
@@ -400,8 +405,8 @@ export class Datanodes extends React.Component<Record<string, object>, IDatanode
   };
 
   render() {
-    const {dataSource, loading, totalCount, lastUpdated, selectedColumns, columnOptions} = this.state;
-    const paginationConfig: PaginationConfig = {
+    const { dataSource, loading, totalCount, lastUpdated, selectedColumns, columnOptions } = this.state;
+    const paginationConfig: TablePaginationConfig = {
       showTotal: (total: number, range) => `${range[0]}-${range[1]} of ${total} datanodes`,
       showSizeChanger: true,
       onShowSizeChange: this.onShowSizeChange
@@ -453,8 +458,8 @@ export class Datanodes extends React.Component<Record<string, object>, IDatanode
             loading={loading}
             pagination={paginationConfig}
             rowKey='hostname'
-            scroll={{x: true, y: false, scrollToFirstRowOnChange: true}}
-            locale={{filterTitle: ""}}
+            scroll={{ x: 'max-content', scrollToFirstRowOnChange: true }}
+            locale={{ filterTitle: '' }}
           />
         </div>
       </div>

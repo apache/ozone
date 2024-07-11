@@ -21,9 +21,9 @@ import axios, { AxiosResponse } from "axios";
 export const AxiosGetHelper = (
   url: string,
   controller: AbortController,
-  message: string = "",
+  message: string = '',
   params: any = {},
-): { "request": Promise<AxiosResponse<any, any>>, "controller": AbortController } => {
+): { request: Promise<AxiosResponse<any, any>>; controller: AbortController } => {
 
   controller && controller.abort(message);
   controller = new AbortController(); // generate new AbortController for the upcoming request
@@ -37,8 +37,8 @@ export const AxiosGetHelper = (
 export const AxiosAllGetHelper = (
   urls: string[],
   controller: AbortController,
-  message: string = ""
-): { requests: Promise<AxiosResponse<any, any>[]>, "controller": AbortController } => {
+  message: string = ''
+): { requests: Promise<AxiosResponse<any, any>[]>; controller: AbortController } => {
 
   controller && controller.abort(message);
   controller = new AbortController(); // generate new AbortController for the upcoming request

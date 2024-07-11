@@ -18,7 +18,8 @@
 
 import React from 'react';
 import { AgChartsReact } from 'ag-charts-react';
-import { byteToSize } from 'utils/common';
+
+import { byteToSize } from '@/utils/common';
 
 interface ITreeResponse {
   label: string;
@@ -37,7 +38,7 @@ interface IChildren {
 }
 
 interface IHeatmapConfigurationProps {
-  data: ITreeResponse[];
+  data: ITreeResponse | ITreeResponse[];
   onClick: Function;
   colorScheme: string[];
 }
@@ -124,7 +125,7 @@ export default class HeatMapConfiguration extends React.Component<IHeatmapConfig
         Max Access Count:
       ${params.datum.maxAccessCount}
     `;}
-    if (params.datum.label !== "") {
+    if (params.datum.label !== '') {
       tooltipContent += `<br/>
         Entity Name:
         ${params.datum.label ? params.datum.label.split("/").slice(-1) : ""}

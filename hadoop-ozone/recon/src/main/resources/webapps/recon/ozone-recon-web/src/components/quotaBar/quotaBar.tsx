@@ -17,16 +17,18 @@
  */
 
 import React from 'react';
-import {Icon, Progress} from 'antd';
-import {withRouter} from 'react-router-dom';
-import {RouteComponentProps} from 'react-router';
-import {FilledIcon} from 'utils/themeIcons';
-import Tooltip from 'antd/lib/tooltip';
-import {getCapacityPercent} from 'utils/common';
 import filesize from 'filesize';
+import { Progress } from 'antd';
+import Icon from '@ant-design/icons';
+import Tooltip from 'antd/lib/tooltip';
+import { withRouter } from 'react-router-dom';
+import { RouteComponentProps } from 'react-router';
+
+import { FilledIcon } from '@/utils/themeIcons';
+import { getCapacityPercent } from '@/utils/common';
 import './quotaBar.less';
 
-const size = filesize.partial({standard: 'iec'});
+const size = filesize.partial({ standard: 'iec' });
 
 interface IQuotaBarProps extends RouteComponentProps<object> {
   quota: number;
@@ -46,7 +48,7 @@ class QuotaBar extends React.Component<IQuotaBarProps> {
   static defaultProps = defaultProps;
 
   render() {
-    const {quota, used, quotaType, showMeta} = this.props;
+    const { quota, used, quotaType, showMeta } = this.props;
     const remaining = quota - used;
 
     const renderQuota = (quota: number) => {
@@ -64,8 +66,8 @@ class QuotaBar extends React.Component<IQuotaBarProps> {
 
     const tooltip = (
       <div>
-        <div><Icon component={FilledIcon} className='quota-used-bg'/> Used ({renderQuota(used)})</div>
-        <div><Icon component={FilledIcon} className='quota-remaining-bg'/> Remaining ({renderQuota(remaining)})</div>
+        <div><Icon component={FilledIcon} className='quota-used-bg' /> Used ({renderQuota(used)})</div>
+        <div><Icon component={FilledIcon} className='quota-remaining-bg' /> Remaining ({renderQuota(remaining)})</div>
       </div>
     );
     const metaElement = showMeta ? <div>{renderQuota(used)} / {renderQuota(quota)}</div> : null;
@@ -78,7 +80,7 @@ class QuotaBar extends React.Component<IQuotaBarProps> {
             status='normal'
             strokeLinecap='square'
             percent={getCapacityPercent(used, quota)}
-            className='capacity-bar' strokeWidth={3}/>
+            className='capacity-bar' strokeWidth={3} />
         </Tooltip>
       </div>
     );

@@ -17,7 +17,7 @@
  */
 
 import moment from 'moment';
-import {notification} from 'antd';
+import { notification } from 'antd';
 
 export const getCapacityPercent = (used: number, total: number) => Math.round((used / total) * 100);
 
@@ -35,8 +35,8 @@ const showErrorNotification = (title: string, description: string) => {
 
 export const showDataFetchError = (error: string) => {
   const title = 'Error while fetching data';
-  if (error.includes("CanceledError")){
-    error = "Previous request cancelled because context changed"
+  if (error.includes("CanceledError")) {
+    error = 'Previous request cancelled because context changed'
   }
   showErrorNotification(title, error);
 };
@@ -49,7 +49,7 @@ export const byteToSize = (bytes: number, decimals: number) => {
   const dm = decimals < 0 ? 0 : decimals;
   const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB', 'PB'];
   const i = Math.floor(Math.log(bytes) / Math.log(k));
-  return  isNaN(i) ? `Not Defined`:`${Number.parseFloat((bytes / (k ** i)).toFixed(dm))} ${sizes[i]}`;
+  return isNaN(i) ? `Not Defined` : `${Number.parseFloat((bytes / (k ** i)).toFixed(dm))} ${sizes[i]}`;
 };
 
 export const nullAwareLocaleCompare = (a: string, b: string) => {

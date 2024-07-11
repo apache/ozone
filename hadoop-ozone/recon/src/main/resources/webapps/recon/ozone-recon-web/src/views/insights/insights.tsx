@@ -18,18 +18,20 @@
 
 import React from 'react';
 import axios from 'axios';
-import {Icon, Row, Col, Tabs} from 'antd';
 import filesize from 'filesize';
-import {showDataFetchError} from 'utils/common';
-import Plot from 'react-plotly.js';
-import * as Plotly from 'plotly.js';
-import {MultiSelect, IOption} from 'components/multiSelect/multiSelect';
-import {ActionMeta, ValueType} from 'react-select';
-import './insights.less';
-import { AxiosAllGetHelper } from 'utils/axiosRequestHelper';
-const {TabPane} = Tabs;
+import { Row, Col, Tabs } from 'antd';
+import { LoadingOutlined } from '@ant-design/icons';
+import { ActionMeta, ValueType } from 'react-select';
+import { type EChartsOption } from 'echarts';
 
-const size = filesize.partial({standard: 'iec',round: 0});
+import { EChart } from '@/components/eChart/eChart';
+import { MultiSelect, IOption } from '@/components/multiSelect/multiSelect';
+import { showDataFetchError } from '@/utils/common';
+import { AxiosAllGetHelper } from '@/utils/axiosRequestHelper';
+
+import './insights.less';
+
+const size = filesize.partial({ standard: 'iec', round: 0 });
 
 interface IFileCountResponse {
   volume: string;
@@ -47,8 +49,8 @@ interface IInsightsState {
   isLoading: boolean;
   fileCountsResponse: IFileCountResponse[];
   containerCountResponse: IContainerCountResponse[];
-  fileCountData: Plotly.Data[];
-  containerCountData: Plotly.Data[];
+  fileCountData: EChartsOption;
+  containerCountData: EChartsOption;
   volumeBucketMap: Map<string, Set<string>>;
   selectedVolumes: IOption[];
   selectedBuckets: IOption[];
@@ -76,8 +78,8 @@ export class Insights extends React.Component<Record<string, object>, IInsightsS
       isLoading: false,
       fileCountsResponse: [],
       containerCountResponse: [],
-      fileCountData: [],
-      containerCountData: [],
+      fileCountData: {},
+      containerCountData: {},
       volumeBucketMap: new Map<string, Set<string>>(),
       selectedBuckets: [],
       selectedVolumes: [],
@@ -88,21 +90,21 @@ export class Insights extends React.Component<Record<string, object>, IInsightsS
   }
 
   handleVolumeChange = (selected: ValueType<IOption>, _action: ActionMeta<IOption>) => {
-    const {volumeBucketMap} = this.state;
+    const { volumeBucketMap } = this.state;
     const selectedVolumes = (selected as IOption[]);
 
     // Disable bucket selection dropdown if more than one volume is selected
     // If there is only one volume, bucket selection dropdown should not be disabled.
     const isBucketSelectionDisabled = !selectedVolumes ||
-        (selectedVolumes &&
-            (selectedVolumes.length > 1 &&
-                (volumeBucketMap.size !== 1)));
+      (selectedVolumes &&
+        (selectedVolumes.length > 1 &&
+          (volumeBucketMap.size !== 1)));
     let bucketOptions: IOption[] = [];
     // When volume is changed and more than one volume is selected,
     // selected buckets value should be reset to all buckets
     let selectedBuckets = [allBucketsOption];
     // Update bucket options only if one volume is selected
-    if (selectedVolumes && ((selectedVolumes.length === 2 && selectedVolumes[0].value === '*') || (selectedVolumes.length === 1))){
+    if (selectedVolumes && ((selectedVolumes.length === 2 && selectedVolumes[0].value === '*') || (selectedVolumes.length === 1))) {
       let selectedVolume;
       if (selectedVolumes.length === 1) {
         selectedVolume = selectedVolumes[0].value;
@@ -135,7 +137,7 @@ export class Insights extends React.Component<Record<string, object>, IInsightsS
   };
 
   updatePlotData = () => {
-    const {fileCountsResponse, selectedVolumes, selectedBuckets, containerCountResponse} = this.state;
+    const { fileCountsResponse, selectedVolumes, selectedBuckets, containerCountResponse } = this.state;
     // Aggregate counts across volumes & buckets
     if (selectedVolumes && selectedBuckets) {
       let filteredData = fileCountsResponse;
@@ -168,7 +170,7 @@ export class Insights extends React.Component<Record<string, object>, IInsightsS
         const lowerbound = upperboundPower > 10 ? size(2 ** (upperboundPower - 1)) : size(0);
         return `${lowerbound} - ${upperbound}`;
       });
-      
+
       const xyContainerCountMap: Map<number, number> = containerCountResponse.reduce(
         (map: Map<number, number>, current) => {
           const containerSize = current.containerSize;
@@ -189,25 +191,62 @@ export class Insights extends React.Component<Record<string, object>, IInsightsS
 
       let keysize = [];
       keysize = Array.from(xyContainerCountMap.keys()).map(value => {
-        return (size(value) );
+        return (size(value));
       });
 
       this.setState({
-        fileCountData: [{
-          type: 'bar',
-          x: xFileCountValues,
-          y: Array.from(xyFileCountMap.values()),
-          name: 'file count'
-        }],
-        containerCountData: [{
-          type: 'pie',
-          hole: 0.2,
-          values: Array.from(xyContainerCountMap.values()),  
-          customdata: Array.from(xyContainerCountMap.values()),
-          labels: xContainerCountValues, 
-          text: keysize,
-          hovertemplate: 'Container Count: %{customdata}<br>Container Size: %{text}<extra></extra>'
-        }]
+        fileCountData: {
+          title: {
+            text: 'File Size Distribution',
+            left: 'center'
+          },
+          xAxis: {
+            type: 'category',
+            data: xFileCountValues
+          },
+          yAxis: {
+            type: 'value'
+          },
+          tooltip: {
+            trigger: 'item',
+            formatter: ({ name, value }) => {
+              return `Size Range: ${name}<br>Count: <strong>${value}</strong>`
+            }
+          },
+          series: {
+            itemStyle: {
+              color: '#04AD78'
+            },
+            data: Array.from(xyFileCountMap.values()),
+            type: 'bar'
+          }
+        },
+        containerCountData: {
+          title: {
+            text: 'Container Size Distribution',
+            left: 'center'
+          },
+          tooltip: {
+            trigger: 'item',
+            formatter: ({ data }) => {
+              return `Size Range: <strong>${data.name}</strong><br>Count: <strong>${data.value}</strong>`
+            }
+          },
+          legend: {
+            orient: 'vertical',
+            left: 'right'
+          },
+          series: {
+            type: 'pie',
+            radius: '50%',
+            data: Array.from(xyContainerCountMap.values()).map((value, idx) => {
+              return {
+                value: value,
+                name: xContainerCountValues[idx]
+              }
+            }),
+          }
+        }
       });
     }
   };
@@ -257,7 +296,7 @@ export class Insights extends React.Component<Record<string, object>, IInsightsS
       }, () => {
         this.updatePlotData();
         // Select all volumes by default
-        this.handleVolumeChange([allVolumesOption, ...volumeOptions], {action: 'select-option'});
+        this.handleVolumeChange([allVolumesOption, ...volumeOptions], { action: 'select-option' });
       });
     })).catch(error => {
       this.setState({
@@ -268,24 +307,24 @@ export class Insights extends React.Component<Record<string, object>, IInsightsS
   }
 
   componentWillUnmount(): void {
-    cancelInsightSignal && cancelInsightSignal.abort(); 
+    cancelInsightSignal && cancelInsightSignal.abort();
   }
 
   render() {
-    const {fileCountData, isLoading, selectedBuckets, volumeOptions,
-      selectedVolumes, fileCountsResponse, bucketOptions, isBucketSelectionDisabled, containerCountResponse, containerCountData} = this.state;
+    const { fileCountData, isLoading, selectedBuckets, volumeOptions,
+      selectedVolumes, fileCountsResponse, bucketOptions, isBucketSelectionDisabled, containerCountResponse, containerCountData } = this.state;
     return (
       <div className='insights-container'>
         <div className='page-header'>
           Insights
         </div>
-       
+
         <div className='content-div'>
           <Tabs defaultActiveKey='1'>
-            <TabPane key='1' tab={`File Size`}>
+            <Tabs.TabPane key='1' tab={`File Size`}>
               {
                 <div className='content-div'>
-                  {isLoading ? <span><Icon type='loading'/> Loading...</span> :
+                  {isLoading ? <span><LoadingOutlined /> Loading...</span> :
                     ((fileCountsResponse && fileCountsResponse.length > 0) ?
                       <div>
                         <Row>
@@ -326,53 +365,31 @@ export class Insights extends React.Component<Record<string, object>, IInsightsS
                           </Col>
                         </Row>
                         <Row>
-                          <Col>
-                            <Plot
-                              data={fileCountData}
-                              layout={
-                                {
-                                  width: 800,
-                                  height: 600,
-                                  title: 'File Size Distribution',
-                                  showlegend: false
-                                }
-                              } />
+                          <Col style={{ margin: 'auto', marginTop: '2%' }}>
+                            <EChart option={fileCountData} />
                           </Col>
                         </Row>
                       </div> :
                       <div>No data to visualize file size distribution. Add files to Ozone to see a visualization on file size distribution.</div>)}
                 </div>
               }
-            </TabPane>
-            <TabPane key='2' tab={`Container Size`}>
+            </Tabs.TabPane>
+            <Tabs.TabPane key='2' tab={`Container Size`}>
               {
                 <div className='content-div'>
-                  {isLoading ? <span><Icon type='loading'/> Loading...</span> :
+                  {isLoading ? <span><LoadingOutlined/> Loading...</span> :
                     ((containerCountResponse && containerCountResponse.length > 0) ?
                       <div>
                         <Row>
-                          <Col>
-                            <Plot
-                              data={containerCountData}
-                              layout={
-                                {
-                                  width: 850,
-                                  height: 750,
-                                  font: {
-                                    family: 'Roboto, sans-serif',
-                                    size: 15
-                                  },
-                                  title: 'Container Size Distribution',
-                                  showlegend: true
-                                }
-                              }/>
+                          <Col style={{ margin: 'auto', marginTop: '2%' }}>
+                            <EChart option={containerCountData} />
                           </Col>
                         </Row>
                       </div> :
                       <div>No data available for container size distribution visualization. Add files to Ozone</div>)}
                 </div>
               }
-            </TabPane>
+            </Tabs.TabPane>
           </Tabs>
         </div>
       </div>
