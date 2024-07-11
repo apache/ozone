@@ -30,6 +30,8 @@ import org.apache.hadoop.hdds.security.x509.certificate.authority.DefaultCAServe
 import org.apache.hadoop.hdds.security.x509.certificate.authority.profile.PKIProfile;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
 import org.apache.hadoop.hdds.security.x509.certificate.client.SCMCertificateClient;
+import org.apache.hadoop.hdds.server.ServerUtils;
+import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.ratis.client.RaftClient;
 import org.apache.ratis.conf.RaftProperties;
@@ -43,9 +45,11 @@ import org.apache.ratis.util.TimeDuration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.File;
 import java.io.IOException;
 import java.math.BigInteger;
 import java.net.InetAddress;
+import java.nio.file.Paths;
 import java.security.cert.X509Certificate;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
@@ -78,7 +82,10 @@ public final class HASecurityUtils {
       OzoneConfiguration conf, String scmHostname, boolean primaryscm)
       throws IOException {
     LOG.info("Initializing secure StorageContainerManager.");
-
+    File scmDbDir = ServerUtils.getScmDbDir(conf);
+    String dbPath = Paths.get(scmDbDir.getAbsolutePath(), OzoneConsts.SCM_DB_NAME)
+        .toFile().getAbsolutePath();
+    LOG.info("SCM DB Path is : {}");
     SecurityConfig securityConfig = new SecurityConfig(conf);
     SCMSecurityProtocolClientSideTranslatorPB scmSecurityClient =
         getScmSecurityClientWithFixedDuration(conf);
@@ -93,7 +100,7 @@ public final class HASecurityUtils {
                 LOG.error("Failed to set new certificate ID", e);
                 throw new RuntimeException("Failed to set new certificate ID");
               }
-            })) {
+            }, dbPath)) {
       certClient.initWithRecovery();
     }
   }
